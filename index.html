@@ -5379,7 +5379,7 @@ function repPickerShouldShow(n, f){
 function repPickerFindColumnHeader(lines, fromIdx){
   const yearRe  = /\b(19|20)\d{2}\b/;
   const monthRe = /(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)/i;
-  const keyRe   = /(закончи|по состоянию|за\s+\S+\s+(месяц|полуг|квартал|год)|period ended|as of|three months|six months)/i;
+  const keyRe   = /(закончи|по состоянию|за\s+\S+\s+(месяц|полуг|квартал|год)|\d+\s+месяц|полугоди|квартал\b|period ended|as of|\d+\s+months|three months|six months|twelve months|ltm)/i;
   const isHeaderLike = L => yearRe.test(L) || monthRe.test(L) || keyRe.test(L);
 
   // Найдём первую сверху header-like строку как якорь.
