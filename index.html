@@ -1402,6 +1402,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <input type="text" id="rep-picker-manual" placeholder="напр. 63 540 или 435 877" style="width:160px;padding:3px 6px;font-family:var(--mono)">
         <button type="button" class="btn btn-sm" onclick="repPickerGrabSelection()" title="Подхватить выделенный мышью фрагмент">📌 взять выделение</button>
         <button type="button" class="btn btn-sm" onclick="repPickerApplyManual()">✓ Применить к текущему полю</button>
+        <button type="button" class="btn btn-sm" onclick="repPickerSkip()" title="Значения в отчёте нет — очистить поле и перейти к следующему" style="color:var(--danger,#c44);border-color:var(--danger,#c44)">✗ нет в отчёте</button>
       </div>
 
       <!-- Top-кандидаты: строки с наибольшей релевантностью к активному полю -->
@@ -5655,6 +5656,25 @@ function repRenderPickerLines(text){
 function repPickerRerender(){
   const text = window._lastParsedText || '';
   if(text) repRenderPickerLines(text);
+}
+
+// «Нет в отчёте» — очищаем текущее поле, двигаемся к следующему.
+// Используется когда показатель не представлен в загруженном PDF (напр.
+// EBITDA в промежуточном отчёте, или LTM-значение для полугодия).
+function repPickerSkip(){
+  const sel = document.getElementById('rep-picker-target');
+  if(!sel) return;
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  const input = document.getElementById(sel.value);
+  if(input) input.value = '';
+  const idx = sel.selectedIndex;
+  fields.forEach((f,i)=>{
+    const cur = document.getElementById(f.id);
+    const curVal = cur && cur.value ? ` = ${cur.value}` : (i === idx ? ' — нет в отчёте' : '');
+    if(sel.options[i]) sel.options[i].textContent = f.label + curVal;
+  });
+  if(idx + 1 < sel.options.length) sel.selectedIndex = idx + 1;
+  repPickerUpdateCurrent();
 }
 
 // Применить число, вписанное/вставленное вручную.
