@@ -1435,12 +1435,33 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <span style="color:var(--text3)">·</span>
         <span>поиск:</span>
         <input type="text" id="ctx-search" placeholder="подсветить…" style="padding:2px 6px;width:150px" oninput="repPickerCtxRender()">
-        <span style="margin-left:auto;color:var(--text3)">↔ прокрутка по горизонтали</span>
+        <button type="button" class="btn btn-sm btn-p" style="padding:2px 8px;font-size:.58rem;margin-left:auto" onclick="pdfvOpenFromCtx()" title="Показать исходную страницу PDF с кликабельными числами">📄 PDF-вид</button>
       </div>
       <div id="ctx-text" style="flex:1;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="pickerCtxClose()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF-вид: рендерим страницу оригинала + абсолютно позиционированные
+     кликабельные числа поверх -->
+<div class="modal-overlay" id="modal-pdf-view">
+  <div class="modal" style="width:96vw;max-width:1400px;height:94vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      📄 PDF стр. <span id="pdfv-page">?</span> / <span id="pdfv-total">?</span>
+      <span style="margin-left:12px;display:inline-flex;gap:4px">
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvNav(-1)">◀</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvNav(1)">▶</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvZoom(-1)">−</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvZoom(1)">+</button>
+      </span>
+      <span id="pdfv-hint" style="font-size:.58rem;color:var(--text3);margin-left:8px">тапни по числу — применится к текущему полю</span>
+      <button class="modal-x" onclick="pdfvClose()">✕</button>
+    </div>
+    <div id="pdfv-scroll" style="flex:1;overflow:auto;background:#2a2a2a;padding:8px;text-align:center">
+      <div id="pdfv-container" style="position:relative;display:inline-block;background:#fff"></div>
     </div>
   </div>
 </div>
@@ -1876,6 +1897,9 @@ const RSBU_CODE_SET = new Set([
 //      формируют последующие ячейки. Колонки 'note' и 'code' полностью
 //      игнорируются — из них никогда не придёт значение.
 async function extractPdfTextLines(pdf, maxPages=80) {
+  // Сохраняем для просмотрщика PDF (рендеринг страницы с подсветкой чисел).
+  window._pickerPdfDoc = pdf;
+  const pageBoundaries = [0]; // номер первой строки каждой страницы
   let out = '';
   const pages = Math.min(pdf.numPages, maxPages);
   for(let i = 1; i <= pages; i++) {
@@ -2032,7 +2056,10 @@ async function extractPdfTextLines(pdf, maxPages=80) {
       }
     }
     out += '\n';
+    // Запомнить, сколько строк уже в out — старт следующей страницы.
+    pageBoundaries.push((out.match(/\n/g) || []).length);
   }
+  window._pickerPdfPageBoundaries = pageBoundaries;
   return out;
 }
 
@@ -5814,6 +5841,155 @@ function repPickerCtxRender(){
     box.scrollTop = Math.max(0, target);
   }
 }
+
+// ── PDF-вид страницы с кликабельными числами ──
+window._pdfvPage = 1;
+window._pdfvScale = 1.5;
+
+function pdfvOpenFromCtx(){
+  if(!window._pickerPdfDoc){ alert('PDF-вид доступен только для PDF-файлов, загруженных через «Ручной подбор из PDF».'); return; }
+  // Определяем страницу по якорной строке контекста.
+  const pb = window._pickerPdfPageBoundaries || [0];
+  const idx = window._pickerCtxIdx || 0;
+  let pageNum = 1;
+  for(let i = pb.length - 1; i >= 0; i--){
+    if(idx >= pb[i]){ pageNum = i + 1; break; }
+  }
+  pdfvOpen(pageNum);
+}
+
+async function pdfvOpen(pageNum){
+  const pdf = window._pickerPdfDoc;
+  if(!pdf){ alert('Сначала загрузите PDF.'); return; }
+  window._pdfvPage = Math.max(1, Math.min(pdf.numPages, pageNum || 1));
+  document.getElementById('modal-pdf-view').classList.add('open');
+  try { history.pushState({pdfv:1}, ''); } catch(e){}
+  const total = document.getElementById('pdfv-total');
+  if(total) total.textContent = String(pdf.numPages);
+  await pdfvRender();
+}
+
+function pdfvClose(){
+  const m = document.getElementById('modal-pdf-view');
+  if(!m) return;
+  if(history.state && history.state.pdfv){
+    history.back();
+  } else {
+    m.classList.remove('open');
+  }
+}
+
+function pdfvNav(delta){
+  const pdf = window._pickerPdfDoc;
+  if(!pdf) return;
+  const next = Math.max(1, Math.min(pdf.numPages, (window._pdfvPage || 1) + delta));
+  window._pdfvPage = next;
+  pdfvRender();
+}
+
+function pdfvZoom(delta){
+  window._pdfvScale = Math.max(0.5, Math.min(4.0, (window._pdfvScale || 1.5) + delta * 0.25));
+  pdfvRender();
+}
+
+async function pdfvRender(){
+  const pdf = window._pickerPdfDoc;
+  const container = document.getElementById('pdfv-container');
+  if(!pdf || !container) return;
+  const pn = window._pdfvPage || 1;
+  const pageLbl = document.getElementById('pdfv-page');
+  if(pageLbl) pageLbl.textContent = String(pn);
+  container.innerHTML = '<div style="padding:20px;color:#444">⏳ рендеринг…</div>';
+
+  let page;
+  try { page = await pdf.getPage(pn); } catch(e){ container.innerHTML = 'Ошибка: '+e.message; return; }
+  const scale = window._pdfvScale || 1.5;
+  const viewport = page.getViewport({scale});
+
+  container.innerHTML = '';
+  container.style.width = viewport.width + 'px';
+  container.style.height = viewport.height + 'px';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  canvas.style.cssText = 'position:absolute;top:0;left:0;display:block';
+  container.appendChild(canvas);
+  const cctx = canvas.getContext('2d');
+  try { await page.render({canvasContext:cctx, viewport}).promise; }
+  catch(e){ console.warn('render err', e); }
+
+  // Текстовый слой с кликабельными числами поверх canvas.
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;top:0;left:0;width:'+viewport.width+'px;height:'+viewport.height+'px;pointer-events:none';
+  container.appendChild(overlay);
+
+  let content;
+  try { content = await page.getTextContent(); } catch(e){ return; }
+
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
+
+  for(const it of (content.items || [])){
+    const str = it.str || '';
+    if(!str.trim()) continue;
+    // Проверяем, есть ли в item числа.
+    numRe.lastIndex = 0;
+    let hasNum = false;
+    const matches = [];
+    let m;
+    while((m = numRe.exec(str)) !== null){
+      const n = repPickerParseNumber(m[0]);
+      if(n === null) continue;
+      const abs = Math.abs(n);
+      if(abs < 1) continue;
+      if(RSBU_CODE_SET.has(abs)) continue;
+      if(Number.isInteger(n) && n >= 1 && n <= 99) continue;
+      matches.push({raw:m[0], n, start:m.index, end:m.index+m[0].length});
+      hasNum = true;
+    }
+    if(!hasNum) continue;
+
+    // Позиционирование: transform item через viewport
+    const tx = pdfjsLib.Util.transform(viewport.transform, it.transform);
+    const fontH = Math.abs(tx[3] || tx[0] || 12);
+    const left = tx[4];
+    const top  = tx[5] - fontH; // PDF origin — нижний левый, у нас верхний
+
+    // Один кликабельный overlay-span на всё содержимое item. Если
+    // чисел несколько — применяется ПЕРВОЕ (редкий случай).
+    const pick = matches[0];
+    const span = document.createElement('button');
+    span.type = 'button';
+    span.textContent = str;
+    span.title = 'Применить: ' + pick.raw;
+    span.style.cssText = 'position:absolute;left:'+left+'px;top:'+top+'px;height:'+fontH+'px;line-height:'+fontH+'px;font-size:'+fontH*0.9+'px;padding:0 1px;margin:0;border:1px solid rgba(255,200,0,.9);background:rgba(255,240,120,.45);color:transparent;cursor:pointer;white-space:pre;pointer-events:auto;font-family:sans-serif;border-radius:2px';
+    span.onmouseover = () => { span.style.background = 'rgba(120,255,120,.7)'; };
+    span.onmouseout  = () => { span.style.background = 'rgba(255,240,120,.45)'; };
+    span.onclick = (ev) => {
+      ev.preventDefault();
+      // Если чисел несколько — можно ткнуть снова; применяем все по очереди
+      // (простая логика: по количеству нажатий — круговой выбор).
+      const idx = (parseInt(span.dataset.pickIdx,10) || 0) % matches.length;
+      const m = matches[idx];
+      span.dataset.pickIdx = String(idx + 1);
+      repPickerAssign(m.n, span);
+      // Мини-тост снизу
+      const hint = document.getElementById('pdfv-hint');
+      if(hint) hint.textContent = '✓ применено: ' + m.raw + (matches.length>1 ? ' ('+ (idx+1) +'/'+ matches.length +') — тапни ещё для другого числа' : '');
+    };
+    overlay.appendChild(span);
+  }
+}
+
+// Закрытие по системной «Назад» (в дополнение к уже настроенной
+// для modal-picker-context).
+(function(){
+  const orig = window.onpopstate;
+  window.addEventListener('popstate', () => {
+    const m = document.getElementById('modal-pdf-view');
+    if(m && m.classList.contains('open')) m.classList.remove('open');
+  });
+})();
 
 function repRenderPickerLines(text){
   repPickerRenderSuggestions(text);
