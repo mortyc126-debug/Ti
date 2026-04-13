@@ -5591,6 +5591,28 @@ function repPickerFixBrokenYears(s){
 }
 
 // ── Самые вероятные кандидаты для активного поля ──
+// Достаём подписи колонок из найденной шапки раздела. Если количество
+// найденных подписей совпадает с количеством числовых колонок кандидата —
+// используем; иначе возвращаем null, чтобы UI написал «кол. N».
+function repPickerDeriveColLabels(header, n){
+  if(!header || !n) return null;
+  const parts = [];
+  // Предпочитаем полные даты «30 июня 2025».
+  const dateRe = /\b\d{1,2}\s+(январ\S*|феврал\S*|март\S*|апрел\S*|ма[йя]\S*|июн\S*|июл\S*|август\S*|сентябр\S*|октябр\S*|ноябр\S*|декабр\S*)\s+(19|20)\d{2}\b/gi;
+  let m;
+  while((m = dateRe.exec(header)) !== null) parts.push(m[0]);
+  // Иначе — одиночные годы.
+  if(parts.length < 2){
+    const yrs = (header.match(/\b(19|20)\d{2}\b/g) || []);
+    parts.length = 0;
+    for(const y of yrs) parts.push(y);
+  }
+  if(parts.length === n) return parts;
+  // Если дат чуть меньше (например 2 года на 3 колонки restatement:
+  // до/влияние/после за одну дату) — не рискуем, возвращаем null.
+  return null;
+}
+
 function repPickerRenderSuggestions(text){
   const box = document.getElementById('rep-picker-suggest');
   const list = document.getElementById('rep-picker-suggest-list');
@@ -5866,12 +5888,13 @@ function repPickerRenderSuggestions(text){
       if(c.table){
         const lab = document.createElement('div');
         lab.style.cssText = 'font-size:.52rem;color:var(--text3);text-align:center;letter-spacing:.05em';
-        // Подпись: либо по indexColIdx из подписей страницы, либо «кол. N»
-        const labels = c.colLabels || [];
-        // Самый частый сценарий — 2 колонки «текущий | прошлый».
-        const yearInLabels = labels.join(' ').match(/\b(19|20)\d{2}\b/g) || [];
+        // Пытаемся аккуратно распарсить подписи колонок из шапки раздела.
+        if(!c._derivedLabels){
+          c._derivedLabels = repPickerDeriveColLabels(c.header, c.allNums.length);
+        }
         const colIdx = num.colIdx != null ? num.colIdx : i;
-        lab.textContent = yearInLabels[colIdx] || ('кол. ' + (colIdx+1));
+        const derived = c._derivedLabels;
+        lab.textContent = (derived && derived[colIdx]) ? derived[colIdx] : ('кол. ' + (colIdx+1));
         cell.appendChild(lab);
       }
       const b = document.createElement('button');
