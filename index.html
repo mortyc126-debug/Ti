@@ -5476,33 +5476,70 @@ function repPickerRenderSuggestions(text){
 
   const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
   const lines = text.split(/\r?\n/);
-  const candidates = [];
-  lines.forEach((line, idx) => {
-    if(!lineMatchesHint(line)) return;
+
+  // Парсер чисел из одной строки.
+  const parseNumsFrom = (srcLine, offset) => {
     numRe.lastIndex = 0;
-    const nums = [];
+    const out = [];
     let m;
-    while((m = numRe.exec(line)) !== null){
+    while((m = numRe.exec(srcLine)) !== null){
       const n = repPickerParseNumber(m[0]);
       if(n === null) continue;
       const abs = Math.abs(n);
       if(abs < 1) continue;
       if(RSBU_CODE_SET.has(abs)) continue;
-      if(Number.isInteger(n) && n >= 1 && n <= 99) continue; // порядковые/номера примечаний
-      nums.push({n, raw:m[0].trim(), pos:m.index});
+      if(Number.isInteger(n) && n >= 1 && n <= 99) continue;
+      out.push({n, raw:m[0].trim(), pos: (offset||0) + m.index});
+    }
+    return out;
+  };
+
+  const candidates = [];
+  lines.forEach((line, idx) => {
+    if(!lineMatchesHint(line)) return;
+    let nums = parseNumsFrom(line, 0);
+    let displayLine = line;
+    // Если в строке с ключевым словом нет чисел — в PDF числа часто
+    // оказываются на следующей строке (извлечение таблиц). Смотрим +1/+2.
+    if(!nums.length){
+      for(let la = 1; la <= 2 && idx + la < lines.length; la++){
+        const next = lines[idx + la];
+        if(!next || !next.trim()) continue;
+        // Не прыгать через явно текстовую строку.
+        if(/[а-яa-z]{4,}/i.test(next) && !/\d/.test(next)) break;
+        const ns = parseNumsFrom(next, line.length + 1);
+        if(ns.length){
+          nums = ns;
+          displayLine = line + ' ' + next;
+          break;
+        }
+      }
     }
     if(!nums.length) return;
+
     const last = nums[nums.length - 1];
     const maxAbs = nums.reduce((acc, x) => Math.max(acc, Math.abs(x.n)), 0);
     const lineLower = line.toLowerCase();
     const mAll = lineLower.match(new RegExp(hintRe.source, 'ig')) || [];
-    // Score: длина матчей + логарифм МАКСИМАЛЬНОГО числа в строке.
-    // Для «Совокупные активы» строка баланса «Всего активов 435 877»
-    // должна обгонять строку пересчёта «Всего активов 366 084» просто
-    // за счёт большей величины суммы.
     const matchLen = mAll.reduce((a,b)=>a + b.length, 0);
-    const score = matchLen + Math.log10(maxAbs + 10) * 3;
-    candidates.push({idx, line, score, pick: last, allNums: nums, maxAbs});
+    let score = matchLen + Math.log10(maxAbs + 10) * 3;
+
+    // Ищем шапку ПО ТОМУ ЖЕ idx и штрафуем/премируем строку.
+    const header = repPickerFindColumnHeader(lines, idx) || '';
+    const headerLc = header.toLowerCase();
+    if(/влияни|пересч|перес\s*чит|restat/i.test(headerLc)) score -= 6;
+    const yearsInHeader = (header.match(/\b20\d{2}\b/g) || []);
+    if(yearsInHeader.length >= 2) score += 4;
+    // Текущий год даёт небольшой бонус.
+    const nowYear = new Date().getFullYear();
+    if(yearsInHeader.includes(String(nowYear))) score += 1;
+    if(yearsInHeader.includes(String(nowYear-1))) score += 1;
+
+    // Строки, начинающиеся с «Итого/Всего/Total», поднимаем —
+    // это почти всегда финальные суммы раздела.
+    if(/^\s*(итого|всего|total)\b/i.test(line)) score += 2;
+
+    candidates.push({idx, line: displayLine, origLine: line, score, pick: last, allNums: nums, maxAbs, header});
   });
 
   if(!candidates.length){ box.style.display = 'none'; return; }
@@ -5534,8 +5571,8 @@ function repPickerRenderSuggestions(text){
     head.appendChild(ctxBtn);
     row.appendChild(head);
 
-    // Шапка колонок (даты/годы из ближайшей строки сверху).
-    const colHeader = repPickerFindColumnHeader(lines, c.idx);
+    // Шапка колонок (используем уже найденную в ранжировании).
+    const colHeader = c.header;
     if(colHeader){
       const hd = document.createElement('div');
       hd.style.cssText = 'flex:1 1 100%;font-size:.56rem;color:var(--acc);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
