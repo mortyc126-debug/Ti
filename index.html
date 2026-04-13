@@ -1939,31 +1939,10 @@ function _pickValueCell(cellNums, colYears){
   return {value: w.v, year: w.year, colIdx: w.i};
 }
 
-// Признак «секционного» заголовка — отдельной строки, к которой нельзя
-// присоединять текст следующей data-строки. Используется в extractPdfTextLines
-// для безопасного склеивания многострочных подписей ячеек.
-const _SECTION_HEAD_RE = /^\s*(?:[IVX]+\s*[.\)]|раздел\b|часть\b|глава\b|приложение\b|примечание\b|note\b|section\b)/i;
-function _isSectionHeader(desc){
-  if(!desc) return false;
-  if(_SECTION_HEAD_RE.test(desc)) return true;
-  // Заканчивается двоеточием — почти всегда заголовок раздела.
-  if(/[:：]\s*$/.test(desc)) return true;
-  // Полностью прописными буквами (минимум одна буква, ни одной строчной).
-  const hasLetter = /[A-Za-zА-Яа-яЁё]/.test(desc);
-  const hasLower  = /[a-zа-яё]/.test(desc);
-  if(hasLetter && !hasLower && desc.trim().length >= 4) return true;
-  return false;
-}
-
-// Признак продолжения предыдущей desc-строки в текущей data-строке.
-// Если current выглядит как новое предложение (Заглавная, цифра, тире) —
-// НЕ склеиваем. Это защищает от неверной склейки соседних строк таблицы.
-function _looksLikeContinuation(prev, current){
-  if(!current) return true; // пустой desc у data-строки — точно продолжение
-  if(/^[a-zа-яё(\[«"„'\-—]/.test(current)) return true;
-  if(/[.;]\s*$/.test(prev || '')) return false;
-  return false;
-}
+// (Ранее тут жили _isSectionHeader/_looksLikeContinuation для попытки
+// склеивать многострочные desc. На практике в плотных таблицах это
+// давало неверные соединения соседних data-строк — логика убрана.
+// Picker и findVal умеют look-ahead на уровне строк без склейки.)
 
 // Извлекает текст PDF как таблицу с классификацией колонок.
 // Алгоритм:
@@ -2008,7 +1987,25 @@ async function extractPdfTextLines(pdf, maxPages=80) {
 
     const heights = items.map(it => it.height || Math.abs(it.transform[3]) || 12);
     const avgH = heights.reduce((a,b)=>a+b,0) / heights.length || 12;
-    const yTol = avgH; // щедрая толерантность — cells могут быть чуть сдвинуты
+    // Адаптивный yTol: раньше был avgH (слишком щедро для плотных таблиц
+    // — 3-5 data-строк сегментной таблицы слипались в один Y-bucket).
+    // Берём все Y-дельты между соседними items (после сортировки уникальных
+    // Y-координат); маленькие дельты (< avgH) — это items одной строки, их
+    // максимум задаёт нижнюю границу толерантности. Ограничиваем диапазон
+    // [0.25·avgH .. 0.7·avgH] — нижняя граница не даёт рвать sup/sub-script
+    // в одной строке, верхняя не даёт склеивать соседние строки.
+    const sortedYs = [...new Set(items.map(it => Math.round(it.transform[5] * 10) / 10))]
+      .sort((a,b) => a - b);
+    const intraDeltas = [];
+    for(let k = 1; k < sortedYs.length; k++){
+      const d = sortedYs[k] - sortedYs[k-1];
+      if(d > 0.1 && d < avgH) intraDeltas.push(d);
+    }
+    intraDeltas.sort((a,b) => a-b);
+    const p80 = intraDeltas.length
+      ? intraDeltas[Math.min(intraDeltas.length - 1, Math.floor(intraDeltas.length * 0.8))]
+      : avgH * 0.35;
+    const yTol = Math.max(avgH * 0.25, Math.min(avgH * 0.7, p80 + 0.5));
 
     // 1. Y-группировка
     const byLine = new Map();
@@ -2171,8 +2168,10 @@ async function extractPdfTextLines(pdf, maxPages=80) {
     }
 
     // 3. Сборка строк: items идут в нужные «ведра» согласно типу колонки.
-    // pendingDesc — буфер для строк-продолжений (многострочные подписи).
-    let pendingDesc = '';
+    // Одна Y-строка PDF = одна строка вывода (без склейки с соседями —
+    // это рушило плотные таблицы). Многострочные подписи остаются
+    // разнесёнными по исходным строкам; Picker уже умеет look-ahead,
+    // а findVal опирается на __HDR__ + колоночный padding.
     for(const [, lineItems] of linesOrdered) {
       lineItems.sort((a,b) => a.transform[4] - b.transform[4]);
       let desc = '';
@@ -2214,65 +2213,17 @@ async function extractPdfTextLines(pdf, maxPages=80) {
       const valCells = valueColIdx.map(ci => (valueCells.get(ci) || '').trim());
       const hasValues = valCells.some(v => v !== '');
 
-      const isPageHdr = !hasValues && desc
-        && /(19|20)\d{2}|закончи|по состоянию|месяц|полугод|квартал/i.test(desc)
-        && desc.length < 220;
-      const isSection = !hasValues && desc && _isSectionHeader(desc);
-
-      if(isPageHdr || isSection){
-        // Заголовок колонок-периода или секции — не склеиваем
-        // со следующей data-строкой, выводим отдельно.
-        if(pendingDesc){
-          tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
-          out += pendingDesc + '\n';
-          curLineIdx++;
-          pendingDesc = '';
-        }
-        tableRows.push({lineIdx: curLineIdx, page: i, desc, cols: []});
-        if(isPageHdr){
+      if(desc || hasValues){
+        tableRows.push({lineIdx: curLineIdx, page: i, desc, cols: valCells.slice()});
+        // Если строка без чисел и содержит год / дату-период — вероятно
+        // это часть шапки колонок страницы. Сохраняем для Picker'а.
+        if(!hasValues && /(19|20)\d{2}|закончи|по состоянию|месяц|полугод|квартал/i.test(desc) && desc.length < 220){
           if(!pageHeaders[i]) pageHeaders[i] = [];
           pageHeaders[i].push(desc);
         }
-        out += desc + '\n';
+        out += [desc, ...valCells].join('\t') + '\n';
         curLineIdx++;
-      } else if(!hasValues && desc){
-        // Кандидат на продолжение многострочной подписи — буферизуем.
-        pendingDesc = pendingDesc ? pendingDesc + ' ' + desc : desc;
-        if(pendingDesc.length > 240){
-          tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
-          out += pendingDesc + '\n';
-          curLineIdx++;
-          pendingDesc = '';
-        }
-      } else if(hasValues){
-        let finalDesc = desc;
-        if(pendingDesc){
-          if(_looksLikeContinuation(pendingDesc, desc)){
-            finalDesc = pendingDesc + (desc ? ' ' + desc : '');
-          } else {
-            // Склейка небезопасна — выводим pending отдельно.
-            tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
-            out += pendingDesc + '\n';
-            curLineIdx++;
-          }
-          pendingDesc = '';
-        }
-        tableRows.push({lineIdx: curLineIdx, page: i, desc: finalDesc, cols: valCells.slice()});
-        out += [finalDesc, ...valCells].join('\t') + '\n';
-        curLineIdx++;
-      } else if(pendingDesc){
-        // Совсем пустая строка — flush pending (конец абзаца подписи).
-        tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
-        out += pendingDesc + '\n';
-        curLineIdx++;
-        pendingDesc = '';
       }
-    }
-    if(pendingDesc){
-      tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
-      out += pendingDesc + '\n';
-      curLineIdx++;
-      pendingDesc = '';
     }
     out += '\n';
     curLineIdx++;
@@ -2385,8 +2336,11 @@ async function parseAnyReport(input) {
       await _ensureXlsx();
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
+      // TAB-разделённый вывод вместо CSV: в русских числах «1 234,5»
+      // запятая — это десятичный знак, а в описаниях статей часто
+      // встречается в тексте — и то и другое ломает CSV-parsing.
       wb.SheetNames.forEach(name => {
-        txt += XLSX.utils.sheet_to_csv(wb.Sheets[name]) + '\n';
+        txt += XLSX.utils.sheet_to_csv(wb.Sheets[name], {FS: '\t'}) + '\n';
       });
 
     } else {
@@ -6210,9 +6164,36 @@ function repPickerCtxRender(){
   // Регекс чисел — тот же, что в кандидатах.
   const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
 
+  // Сохранение пространственного положения: строки у нас — tab-разделённые
+  // [desc, val1, val2 …]. В monospace можно выровнять по колонкам, если
+  // каждое поле padding'овать до максимума по окну (desc — слева, value —
+  // справа, чтобы цифры единиц/тысяч совпадали вертикально).
+  const splitted = [];
+  let maxCols = 0;
   for(let k = from; k <= to; k++){
     const raw = lines[k] || '';
-    const line = repPickerFixBrokenYears(raw);
+    const parts = raw.split('\t');
+    splitted.push(parts);
+    if(parts.length > maxCols) maxCols = parts.length;
+  }
+  const colWidths = new Array(maxCols).fill(0);
+  for(const parts of splitted){
+    for(let i = 0; i < parts.length; i++){
+      if(parts[i].length > colWidths[i]) colWidths[i] = parts[i].length;
+    }
+  }
+  const padLeft  = (s, w) => s + ' '.repeat(Math.max(0, w - s.length));
+  const padRight = (s, w) => ' '.repeat(Math.max(0, w - s.length)) + s;
+  const GAP = '  ';
+
+  for(let k = from; k <= to; k++){
+    const parts = splitted[k - from];
+    // Склеиваем обратно с padding'ом: desc слева, value-колонки — справа.
+    const aligned = parts.map((p, i) => {
+      if(!colWidths[i]) return p;
+      return i === 0 ? padLeft(p, colWidths[i]) : padRight(p, colWidths[i]);
+    }).join(GAP);
+    const line = repPickerFixBrokenYears(aligned);
     const row = document.createElement('div');
     row.style.cssText = 'display:block' + (k === idx ? ';background:rgba(100,200,255,.08);border-left:2px solid var(--acc);padding-left:4px' : ';padding-left:6px');
 
@@ -6835,7 +6816,9 @@ async function repExtractXlsx(file){
   let text='';
   wb.SheetNames.forEach(name=>{
     const ws=wb.Sheets[name];
-    const csv=XLSX.utils.sheet_to_csv(ws);
+    // TAB-разделитель вместо запятой: иначе русская десятичная «,» и
+    // запятые в текстовых полях ломают разбор колонок.
+    const csv=XLSX.utils.sheet_to_csv(ws, {FS: '\t'});
     text+=csv+'\n';
   });
   return text;
