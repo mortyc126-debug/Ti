@@ -1404,7 +1404,14 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <button type="button" class="btn btn-sm" onclick="repPickerApplyManual()">✓ Применить к текущему полю</button>
       </div>
 
-      <div id="rep-picker-lines" style="max-height:44vh;overflow-y:auto;font-family:var(--mono);font-size:.62rem;line-height:1.85;background:var(--bg);border:1px solid var(--border2);padding:10px;white-space:pre-wrap"></div>
+      <!-- Top-кандидаты: строки с наибольшей релевантностью к активному полю -->
+      <div id="rep-picker-suggest" style="display:none;flex-direction:column;gap:4px;padding:8px;background:linear-gradient(180deg,var(--s2),var(--s1));border:1px solid var(--acc);font-size:.62rem">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)">★ Кандидаты для «<span id="rep-picker-suggest-label">—</span>»</div>
+        <div id="rep-picker-suggest-list" style="display:flex;flex-direction:column;gap:4px"></div>
+        <div style="font-size:.56rem;color:var(--text3)">Клик по числу справа → значение попадёт в выбранное поле с учётом единиц.</div>
+      </div>
+
+      <div id="rep-picker-lines" style="max-height:40vh;overflow-y:auto;font-family:var(--mono);font-size:.62rem;line-height:1.85;background:var(--bg);border:1px solid var(--border2);padding:10px;white-space:pre-wrap"></div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-picker')">Закрыть</button>
@@ -5366,7 +5373,95 @@ function repPickerShouldShow(n, f){
   return true;
 }
 
+// ── Самые вероятные кандидаты для активного поля ──
+// Алгоритм: берём hint активного поля → для каждой строки, содержащей
+// hint, считаем score (кол-во матчей × длину) и берём самое «правое
+// большое число» — в таблицах это обычно колонка итога.
+function repPickerRenderSuggestions(text){
+  const box = document.getElementById('rep-picker-suggest');
+  const list = document.getElementById('rep-picker-suggest-list');
+  const labelEl = document.getElementById('rep-picker-suggest-label');
+  if(!box || !list) return;
+  list.innerHTML = '';
+
+  const sel = document.getElementById('rep-picker-target');
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  const curId = sel ? sel.value : (fields[0] && fields[0].id);
+  const f = fields.find(x => x.id === curId);
+  if(!f || !f.hint){ box.style.display = 'none'; return; }
+  if(labelEl) labelEl.textContent = f.label;
+
+  let hintRe = null;
+  try { hintRe = new RegExp(f.hint, 'i'); } catch(e){ hintRe = null; }
+  if(!hintRe){ box.style.display = 'none'; return; }
+
+  const numRe = /-?\(?-?\d[\d\s\u00a0.,]*\d\)?|-?\d/g;
+  const lines = text.split(/\r?\n/);
+  const candidates = [];
+  lines.forEach((line, idx) => {
+    if(!hintRe.test(line)) return;
+    numRe.lastIndex = 0;
+    const nums = [];
+    let m;
+    while((m = numRe.exec(line)) !== null){
+      const n = repPickerParseNumber(m[0]);
+      if(n === null) continue;
+      const abs = Math.abs(n);
+      if(abs < 1) continue;
+      if(RSBU_CODE_SET.has(abs)) continue;
+      if(Number.isInteger(n) && n >= 1 && n <= 99) continue; // порядковые/номера примечаний
+      nums.push({n, raw:m[0].trim(), pos:m.index});
+    }
+    if(!nums.length) return;
+    const last = nums[nums.length - 1];
+    const lineLower = line.toLowerCase();
+    const mAll = lineLower.match(new RegExp(hintRe.source, 'ig')) || [];
+    const score = mAll.reduce((a,b)=>a + b.length, 0) + Math.log10(Math.abs(last.n) + 10);
+    candidates.push({idx, line, score, pick: last, allNums: nums});
+  });
+
+  if(!candidates.length){ box.style.display = 'none'; return; }
+
+  candidates.sort((a,b) => b.score - a.score);
+  const top = candidates.slice(0, 5);
+
+  top.forEach(c => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;padding:5px 6px;background:var(--bg);border:1px solid var(--border)';
+    const desc = document.createElement('div');
+    desc.style.cssText = 'flex:1;font-size:.6rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    desc.title = c.line;
+    const firstNumPos = c.allNums[0].pos;
+    const descText = (c.line.slice(0, firstNumPos) || c.line).trim().replace(/\s+/g,' ');
+    desc.textContent = descText.slice(0, 70) + (descText.length > 70 ? '…' : '');
+    row.appendChild(desc);
+
+    c.allNums.slice(0, -1).forEach(alt => {
+      const a = document.createElement('button');
+      a.type = 'button';
+      a.textContent = alt.raw;
+      a.title = 'альтернативное число из строки';
+      a.style.cssText = 'padding:2px 6px;font-size:.58rem;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;border-radius:3px';
+      a.onclick = () => repPickerAssign(alt.n, a);
+      row.appendChild(a);
+    });
+
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.textContent = '→ ' + c.pick.raw;
+    pickBtn.title = 'Применить к полю «' + f.label + '»';
+    pickBtn.className = 'btn btn-sm btn-p';
+    pickBtn.style.cssText = 'padding:3px 10px;font-size:.66rem;font-weight:600';
+    pickBtn.onclick = () => repPickerAssign(c.pick.n, pickBtn);
+    row.appendChild(pickBtn);
+    list.appendChild(row);
+  });
+
+  box.style.display = 'flex';
+}
+
 function repRenderPickerLines(text){
+  repPickerRenderSuggestions(text);
   const box = document.getElementById('rep-picker-lines');
   if(!box) return;
   box.innerHTML = '';
@@ -5413,9 +5508,27 @@ function repRenderPickerLines(text){
     idxSpan.style.color = 'var(--text3)';
     row.appendChild(idxSpan);
 
+    // Вспом. для подсветки совпадений поискового regex в текстовых кусках.
+    const appendTextHighlighted = (txt) => {
+      if(!searchRe || !txt){ row.appendChild(document.createTextNode(txt)); return; }
+      let i = 0;
+      const re = new RegExp(searchRe.source, 'ig');
+      let mm;
+      while((mm = re.exec(txt)) !== null){
+        if(mm.index > i) row.appendChild(document.createTextNode(txt.slice(i, mm.index)));
+        const hi = document.createElement('mark');
+        hi.textContent = mm[0];
+        hi.style.cssText = 'background:var(--acc);color:#000;padding:0 2px;border-radius:2px';
+        row.appendChild(hi);
+        i = mm.index + mm[0].length;
+        if(!mm[0].length) re.lastIndex++;
+      }
+      if(i < txt.length) row.appendChild(document.createTextNode(txt.slice(i)));
+    };
+
     let cursor = 0;
     matches.forEach(mt => {
-      if(mt.start > cursor) row.appendChild(document.createTextNode(line.slice(cursor, mt.start)));
+      if(mt.start > cursor) appendTextHighlighted(line.slice(cursor, mt.start));
       if(repPickerShouldShow(mt.n, f)){
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -5436,7 +5549,7 @@ function repRenderPickerLines(text){
       }
       cursor = mt.end;
     });
-    if(cursor < line.length) row.appendChild(document.createTextNode(line.slice(cursor)));
+    if(cursor < line.length) appendTextHighlighted(line.slice(cursor));
     if(!line.trim()) row.innerHTML = '&nbsp;';
     box.appendChild(row);
   });
@@ -5508,6 +5621,8 @@ function repPickerUpdateCurrent(){
   if(!sel || !info) return;
   const fields = window._pickerFields || REP_PICKER_FIELDS;
   const f = fields.find(x => x.id === sel.value);
+  // пересчитать кандидатов для нового поля
+  if(window._lastParsedText) repPickerRenderSuggestions(window._lastParsedText);
   if(!f){ info.textContent = ''; return; }
   const input = document.getElementById(f.id);
   const cur = input && input.value ? input.value : '—';
