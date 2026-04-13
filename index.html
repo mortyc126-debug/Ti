@@ -2066,25 +2066,31 @@ async function extractPdfTextLines(pdf, maxPages=80) {
 
     const heights = items.map(it => it.height || Math.abs(it.transform[3]) || 12);
     const avgH = heights.reduce((a,b)=>a+b,0) / heights.length || 12;
-    // Адаптивный yTol: раньше был avgH (слишком щедро для плотных таблиц
-    // — 3-5 data-строк сегментной таблицы слипались в один Y-bucket).
-    // Берём все Y-дельты между соседними items (после сортировки уникальных
-    // Y-координат); маленькие дельты (< avgH) — это items одной строки, их
-    // максимум задаёт нижнюю границу толерантности. Ограничиваем диапазон
-    // [0.25·avgH .. 0.7·avgH] — нижняя граница не даёт рвать sup/sub-script
-    // в одной строке, верхняя не даёт склеивать соседние строки.
-    const sortedYs = [...new Set(items.map(it => Math.round(it.transform[5] * 10) / 10))]
-      .sort((a,b) => a - b);
-    const intraDeltas = [];
-    for(let k = 1; k < sortedYs.length; k++){
-      const d = sortedYs[k] - sortedYs[k-1];
-      if(d > 0.1 && d < avgH) intraDeltas.push(d);
+    // Y-tolerance — **mode-based**. Предыдущие версии (avgH, потом
+    // перцентиль-по-малым-дельтам) регулярно склеивали соседние data-
+    // строки плотных таблиц: включали inter-line gap в расчёт, и yTol
+    // оказывался близок к line-height, из-за чего items соседней
+    // строки попадали в тот же Y-bucket.
+    //
+    // Теперь: сортируем ВСЕ items по Y, считаем гистограмму ненулевых
+    // Y-дельт (round to 0.5pt) и берём самую частую — это и есть
+    // настоящий line-height таблицы. yTol = 45% от неё — items одной
+    // строки (sup/sub-script gap ≤ 1/3 line-h) остаются вместе, items
+    // соседней (gap = line-h) гарантированно разделяются.
+    const ysDesc = items.map(it => it.transform[5]).sort((a,b) => b - a);
+    const gapHist = new Map();
+    for(let k = 1; k < ysDesc.length; k++){
+      const g = ysDesc[k-1] - ysDesc[k];
+      if(g < 0.5) continue;              // тот же baseline
+      if(g > avgH * 3)  continue;        // пропуск параграфа / страницы
+      const bucket = Math.round(g * 2) / 2;
+      gapHist.set(bucket, (gapHist.get(bucket) || 0) + 1);
     }
-    intraDeltas.sort((a,b) => a-b);
-    const p80 = intraDeltas.length
-      ? intraDeltas[Math.min(intraDeltas.length - 1, Math.floor(intraDeltas.length * 0.8))]
-      : avgH * 0.35;
-    const yTol = Math.max(avgH * 0.25, Math.min(avgH * 0.7, p80 + 0.5));
+    let modeGap = avgH, modeCount = 0;
+    for(const [g, c] of gapHist){
+      if(c > modeCount){ modeCount = c; modeGap = g; }
+    }
+    const yTol = Math.max(1.0, Math.min(avgH * 0.8, modeGap * 0.45));
 
     // 1. Y-группировка
     const byLine = new Map();
