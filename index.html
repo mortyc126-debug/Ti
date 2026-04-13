@@ -5740,9 +5740,13 @@ function repPickerCtxRender(){
     box.appendChild(row);
   }
 
-  // Прокрутка к якорной строке.
+  // Прокрутка к якорной строке — только внутри контейнера ctx-text,
+  // чтобы не скроллить основное окно страницы.
   const anchor = box.children[idx - from];
-  if(anchor && anchor.scrollIntoView) anchor.scrollIntoView({block:'center'});
+  if(anchor){
+    const target = anchor.offsetTop - box.clientHeight / 2 + anchor.clientHeight / 2;
+    box.scrollTop = Math.max(0, target);
+  }
 }
 
 function repRenderPickerLines(text){
