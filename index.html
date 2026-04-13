@@ -5465,15 +5465,20 @@ function repPickerRenderSuggestions(text){
   let hintRe = null;
   try { hintRe = new RegExp(f.hint, 'i'); } catch(e){ hintRe = null; }
   if(!hintRe){ box.style.display = 'none'; return; }
+  // Fallback: в PDF слова часто разбиты на части («Всего а ктивов»),
+  // поэтому дополнительно ищем подстроку в «схлопнутой» версии строки.
+  const hintsNorm = f.hint.split('|').map(x => x.toLowerCase().replace(/\s+/g,'')).filter(Boolean);
+  const lineMatchesHint = (L) => {
+    if(hintRe.test(L)) return true;
+    const norm = L.toLowerCase().replace(/\s+/g,'');
+    return hintsNorm.some(h => h && norm.includes(h));
+  };
 
-  // Строгий regex: разряды через пробел — только группами по 3 цифры.
-  // Старый жадный вариант склеивал «64 175 841 8 171 726 65 695» в одно
-  // огромное «число», что давало мусор в Сэтл-отчёте с 5+ колонками.
   const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
   const lines = text.split(/\r?\n/);
   const candidates = [];
   lines.forEach((line, idx) => {
-    if(!hintRe.test(line)) return;
+    if(!lineMatchesHint(line)) return;
     numRe.lastIndex = 0;
     const nums = [];
     let m;
@@ -5595,10 +5600,14 @@ function repRenderPickerLines(text){
     try { searchRe = new RegExp(f.search, 'i'); }
     catch(e){ searchRe = null; }
   }
+  // Fallback: поиск по «схлопнутой» строке (без пробелов между буквами)
+  // — PDF часто разбивает слова на части, регекс их не находит.
+  const searchNormParts = f.search ? f.search.split('|').map(x => x.toLowerCase().replace(/\s+/g,'')).filter(Boolean) : [];
   const lineMatchesSearch = (line) => {
     if(!f.search) return true;
-    if(searchRe) return searchRe.test(line);
-    return line.toLowerCase().indexOf(f.search) >= 0;
+    if(searchRe && searchRe.test(line)) return true;
+    const norm = line.toLowerCase().replace(/\s+/g,'');
+    return searchNormParts.some(h => norm.includes(h));
   };
 
   lines.forEach((line, idx) => {
