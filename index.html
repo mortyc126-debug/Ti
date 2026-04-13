@@ -2023,6 +2023,127 @@ function _aoaFromFlatText(txt){
   return String(txt||'').split(/\r?\n/).map(l => [l]);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// РАСПОЗНАВАНИЕ РАЗДЕЛОВ ОТЧЁТА
+// ═══════════════════════════════════════════════════════════════════
+// Без ориентирования по разделам findVal регулярно путал:
+//   • «Денежные средства» в балансе vs «ДС на конец периода» в ОДДС
+//     (разные цифры!);
+//   • «Чистая прибыль» в ОПиУ vs та же строка в ОДДС («Прибыль до
+//     налогообложения» в operating activities);
+//   • «Выручка» в основном ОПиУ vs сегментной разбивке (где итоги
+//     другие — по географии/сегментам);
+//   • «Итого активы» в балансе vs «Итого активы сегмента X»
+//     в примечаниях.
+//
+// Идея: находим заголовки разделов («Отчёт о финансовом положении»,
+// «Отчёт о прибылях и убытках», «Отчёт о движении денежных средств»
+// и т.п.), размечаем по ним диапазоны строк, и в findVal добавляем
+// +бонус/−штраф к score в зависимости от того, в каком разделе
+// оказался кандидат для каждого конкретного показателя.
+
+const _SECTION_RE_PNL = /отч[её]т\s+о\s+(?:прибыл[а-я]*\s+и\s+убытк[а-я]*|совокуп[а-я]+\s+(?:дох|финансов)|полном\s+совокуп|финансов[а-я]+\s+результат[а-я]*)|отч[её]т\s+о\s+прибыл[а-я]*|statement\s+of\s+(?:profit|comprehensive|income|operations|financial\s+performance)/i;
+const _SECTION_RE_BAL = /отч[её]т\s+о\s+финансов[а-я]+\s+положен[а-я]+|бухгалтерск[а-я]+\s+баланс\b|\bbalance\s+sheet\b|statement\s+of\s+financial\s+position/i;
+const _SECTION_RE_CF  = /отч[её]т\s+о\s+движен[а-я]+\s+денежн[а-я]+\s+средств|statement\s+of\s+cash\s+flows?/i;
+const _SECTION_RE_EQ  = /отч[её]т\s+об\s+изменен[а-я]+\s+капитал[а-я]*|statement\s+of\s+changes\s+in\s+equity/i;
+const _SECTION_RE_NOTE = /^\s*(?:примечание|note)\s+(\d+)[.\s:)\-—]/i;
+const _SECTION_RE_SEGMENT = /\bинформация\s+по\s+(?:операционн[а-я]+\s+)?сегмент|отч[её]тн[а-я]+\s+сегмент|segment\s+(?:information|reporting)/i;
+
+function _classifySectionTitle(desc){
+  if(!desc) return null;
+  const s = String(desc).replace(/\s+/g,' ').trim();
+  if(!s || s.length > 200) return null;
+  // Сегменты — ВАЖНО проверять раньше ОПиУ, т.к. подпись вроде
+  // «Информация по операционным сегментам. Выручка сегмента» может
+  // совпасть и с PnL (слово «выручк»).
+  if(_SECTION_RE_SEGMENT.test(s)) return {kind: 'segments'};
+  if(_SECTION_RE_PNL.test(s))     return {kind: 'pnl'};
+  if(_SECTION_RE_BAL.test(s))     return {kind: 'balance'};
+  if(_SECTION_RE_CF.test(s))      return {kind: 'cashflow'};
+  if(_SECTION_RE_EQ.test(s))      return {kind: 'equity'};
+  const mNote = s.match(_SECTION_RE_NOTE);
+  if(mNote) return {kind: 'note', n: parseInt(mNote[1], 10)};
+  return null;
+}
+
+// Сканируем строки и размечаем: [{kind, startLineIdx, endLineIdx, title}].
+// Новый раздел закрывает предыдущий (endLineIdx = next.start − 1).
+function _detectReportSections(textOrLines){
+  const lines = Array.isArray(textOrLines) ? textOrLines : String(textOrLines||'').split('\n');
+  const sections = [];
+  for(let i = 0; i < lines.length; i++){
+    const line = lines[i] || '';
+    if(!line || line.startsWith(_HEADER_MARKER)) continue;
+    const cells = line.split('\t');
+    const desc = cells[0] || '';
+    // Заголовки разделов почти всегда без чисел — data-строки пропускаем.
+    const hasValues = cells.slice(1).some(c => /\d/.test(c));
+    if(hasValues) continue;
+    const cls = _classifySectionTitle(desc);
+    if(!cls) continue;
+    sections.push({
+      kind: cls.kind,
+      n: cls.n || null,
+      startLineIdx: i,
+      endLineIdx: lines.length - 1,
+      title: desc
+    });
+  }
+  for(let k = 0; k < sections.length - 1; k++){
+    sections[k].endLineIdx = sections[k+1].startLineIdx - 1;
+  }
+  return sections;
+}
+
+function _sectionAt(sections, idx){
+  if(!sections || !sections.length) return null;
+  for(const s of sections){
+    if(idx >= s.startLineIdx && idx <= s.endLineIdx) return s;
+  }
+  return null;
+}
+
+// Маппинг: ожидаемый раздел для каждого базового показателя.
+// Ключ — базовое имя поля (без префиксов is-/rep-np-).
+// 'note' означает «может встретиться и в примечаниях»; таким полям
+// не штрафуем раздел note, но приоритет остаётся у основной таблицы.
+const _FIELD_SECTION = {
+  rev:    ['pnl'],
+  ebitda: ['pnl','note'],
+  ebit:   ['pnl'],
+  np:     ['pnl'],
+  int:    ['pnl','note'],
+  tax:    ['pnl'],
+  assets: ['balance'],
+  ca:     ['balance'],
+  cl:     ['balance'],
+  debt:   ['balance','note'],
+  cash:   ['balance'],   // КРИТИЧНО: не cashflow!
+  ret:    ['balance'],
+  eq:     ['balance'],
+};
+function _expectedSectionsForFieldId(fieldId){
+  if(!fieldId) return null;
+  const key = String(fieldId).replace(/^is-|^rep-np-/, '');
+  return _FIELD_SECTION[key] || null;
+}
+
+// Премия/штраф к score для кандидата в разделе `got`, когда ожидались
+// разделы из `expected`. Возвращает число (+бонус / −штраф).
+// Шкала калибрована относительно «итог vs раздел» (±100): раздел даёт
+// ±40..+60, а ОДДС для балансового поля — сильный штраф.
+function _sectionScoreAdj(got, expected){
+  if(!expected || !expected.length) return 0;
+  if(!got) return -5;                                 // раздел неизвестен
+  if(expected.includes(got)) return 60;               // точное попадание
+  // Частые путаницы: cashflow ↔ balance для ДС/чистой прибыли.
+  if(got === 'cashflow' && !expected.includes('cashflow')) return -40;
+  if(got === 'segments' && !expected.includes('segments')) return -30;
+  if(got === 'equity'   && !expected.includes('equity'))   return -20;
+  if(got === 'note')    return -10;                   // возможно, но не основной источник
+  return -15;
+}
+
 // Извлекает текст PDF как таблицу с классификацией колонок.
 // Алгоритм:
 //   1) items группируются по Y → строки.
@@ -2469,9 +2590,11 @@ async function parseAnyReport(input) {
     //      из них — самую «крупную» (|n|≥100) не-код.
     //   4) Fallback: если строка не TAB-формата (DOCX/XLSX), берём
     //      pickPrimaryNumber по всей строке.
-    function findVal(patterns) {
+    const _sections = _detectReportSections(txt);
+    function findVal(patterns, fieldId) {
       const lines = txt.split('\n');
       const wantTotal = patterns.some(p => /итог|итого|total/i.test(p));
+      const expSecs = _expectedSectionsForFieldId(fieldId);
       let curHeaders = null;
       const cands = [];
       for(let li = 0; li < lines.length; li++){
@@ -2509,12 +2632,16 @@ async function parseAnyReport(input) {
         }
         const isTotalDesc = /итог|итого|total/i.test(desc);
         // Ранжирование: меньший patIdx лучше (паттерны отсортированы по
-        // приоритету); совпадение wantTotal ↔ isTotalDesc даёт +100 очков.
+        // приоритету); совпадение wantTotal ↔ isTotalDesc даёт +100 очков;
+        // попадание в ожидаемый раздел отчёта — +60/−40 (ОДДС для поля
+        // «Денежные средства» промахивается на полном штрафе).
         let score = -patIdx * 10;
         if(wantTotal === isTotalDesc) score += 100;
         else if(wantTotal) score -= 50;
         else score -= 5;
-        cands.push({score, value, year, line, patIdx});
+        const sect = _sectionAt(_sections, li);
+        score += _sectionScoreAdj(sect ? sect.kind : null, expSecs);
+        cands.push({score, value, year, line, patIdx, sectionKind: sect ? sect.kind : null});
       }
       if(!cands.length) return null;
       cands.sort((a, b) => b.score - a.score || a.patIdx - b.patIdx);
@@ -2539,19 +2666,19 @@ async function parseAnyReport(input) {
     const sc = v => v !== null ? parseFloat((v * scale).toFixed(6)) : null;
     const alreadyFilled = new Set(Object.keys(codeResults).filter(k=>codeResults[k]!=null));
     const fields = {
-      'is-rev':    alreadyFilled.has('is-rev')    ? null : sc(findVal(['Выручка по договорам','Выручка от реализации','Итого выручк[а-яё]*','^\\s*Выручка\\b','Доходы от реализации','Revenue'])),
-      'is-ebitda': sc(findVal(['EBITDA','Прибыль до вычета процентов','ЕБИТДА'])),
-      'is-ebit':   alreadyFilled.has('is-ebit')   ? null : sc(findVal(['Операционная прибыль','Прибыль от продаж','EBIT'])),
-      'is-np':     alreadyFilled.has('is-np')     ? null : sc(findVal(['Чистая прибыль','Итого чистая прибыль','Прибыль за период','Прибыль за отчетн','Net profit','Profit for the period'])),
-      'is-int':    alreadyFilled.has('is-int')    ? null : sc(findVal(['Проценты к уплате','Процентные расходы','Расходы по процентам','Финансовые расходы','Finance costs'])),
-      'is-tax':    alreadyFilled.has('is-tax')    ? null : sc(findVal(['Налог на прибыль','Расход по налогу','Income tax'])),
-      'is-assets': alreadyFilled.has('is-assets') ? null : sc(findVal(['Итого активы','Итого активов','Совокупные активы','Всего активов','Total assets','ИТОГО АКТИВЫ','БАЛАНС'])),
-      'is-ca':     alreadyFilled.has('is-ca')     ? null : sc(findVal(['Итого оборотн[а-яё]*\\s+активов','Итого оборотных','Оборотные активы','Total current assets','Current assets'])),
-      'is-cl':     alreadyFilled.has('is-cl')     ? null : sc(findVal(['Итого краткосрочн[а-яё]*\\s+обязательств','Итого краткосрочных','Краткосрочные обязательства','Total current liabilities','Current liabilities'])),
-      'is-debt':   alreadyFilled.has('is-debt')   ? null : sc(findVal(['Заемные средства','Кредиты и займы','Total borrowings','Долгосрочные займы'])),
-      'is-cash':   alreadyFilled.has('is-cash')   ? null : sc(findVal(['Денежные средства и (их )?эквивалент','Cash and cash equivalents','ДС и их эквивалент'])),
-      'is-ret':    alreadyFilled.has('is-ret')    ? null : sc(findVal(['Нераспредел[её]нная прибыль','Retained earnings'])),
-      'is-eq':     alreadyFilled.has('is-eq')     ? null : sc(findVal(['Итого капитал','Итого собственн[а-яё]*\\s+капитал','Собственный капитал','Total equity','ИТОГО КАПИТАЛ'])),
+      'is-rev':    alreadyFilled.has('is-rev')    ? null : sc(findVal(['Выручка по договорам','Выручка от реализации','Итого выручк[а-яё]*','^\\s*Выручка\\b','Доходы от реализации','Revenue'], 'is-rev')),
+      'is-ebitda': sc(findVal(['EBITDA','Прибыль до вычета процентов','ЕБИТДА'], 'is-ebitda')),
+      'is-ebit':   alreadyFilled.has('is-ebit')   ? null : sc(findVal(['Операционная прибыль','Прибыль от продаж','EBIT'], 'is-ebit')),
+      'is-np':     alreadyFilled.has('is-np')     ? null : sc(findVal(['Чистая прибыль','Итого чистая прибыль','Прибыль за период','Прибыль за отчетн','Net profit','Profit for the period'], 'is-np')),
+      'is-int':    alreadyFilled.has('is-int')    ? null : sc(findVal(['Проценты к уплате','Процентные расходы','Расходы по процентам','Финансовые расходы','Finance costs'], 'is-int')),
+      'is-tax':    alreadyFilled.has('is-tax')    ? null : sc(findVal(['Налог на прибыль','Расход по налогу','Income tax'], 'is-tax')),
+      'is-assets': alreadyFilled.has('is-assets') ? null : sc(findVal(['Итого активы','Итого активов','Совокупные активы','Всего активов','Total assets','ИТОГО АКТИВЫ','БАЛАНС'], 'is-assets')),
+      'is-ca':     alreadyFilled.has('is-ca')     ? null : sc(findVal(['Итого оборотн[а-яё]*\\s+активов','Итого оборотных','Оборотные активы','Total current assets','Current assets'], 'is-ca')),
+      'is-cl':     alreadyFilled.has('is-cl')     ? null : sc(findVal(['Итого краткосрочн[а-яё]*\\s+обязательств','Итого краткосрочных','Краткосрочные обязательства','Total current liabilities','Current liabilities'], 'is-cl')),
+      'is-debt':   alreadyFilled.has('is-debt')   ? null : sc(findVal(['Заемные средства','Кредиты и займы','Total borrowings','Долгосрочные займы'], 'is-debt')),
+      'is-cash':   alreadyFilled.has('is-cash')   ? null : sc(findVal(['Денежные средства и (их )?эквивалент','Cash and cash equivalents','ДС и их эквивалент'], 'is-cash')),
+      'is-ret':    alreadyFilled.has('is-ret')    ? null : sc(findVal(['Нераспредел[её]нная прибыль','Retained earnings'], 'is-ret')),
+      'is-eq':     alreadyFilled.has('is-eq')     ? null : sc(findVal(['Итого капитал','Итого собственн[а-яё]*\\s+капитал','Собственный капитал','Total equity','ИТОГО КАПИТАЛ'], 'is-eq')),
     };
     const labels = {
       'is-rev':'Выручка','is-ebitda':'EBITDA','is-ebit':'EBIT','is-np':'Чистая прибыль',
@@ -6974,13 +7101,19 @@ function repFillFromText(rawText, scaleOverride){
   let scale = 1;
 
   const sources = {};
+  // Разметка по разделам отчёта — определяется один раз на файл.
+  const _sections = _detectReportSections(txt);
+  window._reportSections = _sections;
+
   // findValTrace: то же что findVal из parseAnyReport, но ещё записывает
-  // источник значения (строка, год, паттерн) в `sources` для отладочного
-  // лога. Поддерживает синтетические __HDR__-строки для выбора
-  // «самого свежего года» и ранжирование «итог vs раздел».
+  // источник значения (строка, год, раздел, паттерн) в `sources` для
+  // отладочного лога. Поддерживает __HDR__-строки для выбора «самого
+  // свежего года», ранжирование «итог vs раздел» и приоритет ожидаемого
+  // раздела отчёта (напр. ДС ищется в балансе, а не в ОДДС).
   function findValTrace(patterns, traceId){
     const lines = txt.split('\n');
     const wantTotal = patterns.some(p => /итог|итого|total/i.test(p));
+    const expSecs = _expectedSectionsForFieldId(traceId);
     let curHeaders = null;
     const cands = [];
     for(let li = 0; li < lines.length; li++){
@@ -7021,13 +7154,18 @@ function repFillFromText(rawText, scaleOverride){
       if(wantTotal === isTotalDesc) score += 100;
       else if(wantTotal) score -= 50;
       else score -= 5;
+      // Приоритет ожидаемого раздела (решает путаницу ДС/ОДДС,
+      // Выручка/сегменты и т.п.).
+      const sect = _sectionAt(_sections, li);
+      const sectKind = sect ? sect.kind : null;
+      score += _sectionScoreAdj(sectKind, expSecs);
       // Также: если подпись явно содержит год-тег из extractPdfTextLines
       // (перевёрнутая таблица), используем его, если колоночного года нет.
       if(year == null){
         const tag = desc.match(/\[(19[5-9]\d|20\d{2})\]/);
         if(tag) year = parseInt(tag[1], 10);
       }
-      cands.push({score, value, year, line, pattern: matchedPat, patIdx});
+      cands.push({score, value, year, line, pattern: matchedPat, patIdx, sectionKind: sectKind, sectionTitle: sect ? sect.title : null});
     }
     if(!cands.length) return null;
     cands.sort((a, b) => b.score - a.score || a.patIdx - b.patIdx);
@@ -7036,7 +7174,9 @@ function repFillFromText(rawText, scaleOverride){
       line: best.line.replace(/\t/g,' | ').trim(),
       value: best.value,
       pattern: best.pattern,
-      year: best.year
+      year: best.year,
+      sectionKind: best.sectionKind,
+      sectionTitle: best.sectionTitle
     };
     return best.value;
   }
@@ -7086,10 +7226,17 @@ function repFillFromText(rawText, scaleOverride){
       const yearTag = src?.year != null
         ? ` <span style="color:var(--text3)">· год ${src.year}</span>`
         : '';
+      const sectNames = {
+        pnl: 'ОПиУ', balance: 'Баланс', cashflow: 'ОДДС',
+        equity: 'Капитал', segments: 'Сегменты', note: 'Примечание'
+      };
+      const sectTag = src?.sectionKind
+        ? ` <span style="color:var(--text3)">· ${sectNames[src.sectionKind] || src.sectionKind}</span>`
+        : '';
       logLines.push(
         `<div style="padding:3px 0;border-bottom:1px dotted rgba(30,48,72,.4)">`+
         `<span style="color:var(--green)">✓</span> <strong>${labels[id]||id}</strong> = `+
-        `<span style="color:var(--acc)">${val}</span> <span style="color:var(--text3)">(сырое ${src?.value??'?'} × scale ${scale})</span>${yearTag}`+
+        `<span style="color:var(--acc)">${val}</span> <span style="color:var(--text3)">(сырое ${src?.value??'?'} × scale ${scale})</span>${yearTag}${sectTag}`+
         (lineShort ? `<br><span style="color:var(--text3);font-size:.56rem">↳ ${lineShort.replace(/</g,'&lt;')}</span>` : '')+
         `</div>`
       );
