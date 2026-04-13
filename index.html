@@ -5493,16 +5493,22 @@ function repPickerRenderSuggestions(text){
     }
     if(!nums.length) return;
     const last = nums[nums.length - 1];
+    const maxAbs = nums.reduce((acc, x) => Math.max(acc, Math.abs(x.n)), 0);
     const lineLower = line.toLowerCase();
     const mAll = lineLower.match(new RegExp(hintRe.source, 'ig')) || [];
-    const score = mAll.reduce((a,b)=>a + b.length, 0) + Math.log10(Math.abs(last.n) + 10);
-    candidates.push({idx, line, score, pick: last, allNums: nums});
+    // Score: длина матчей + логарифм МАКСИМАЛЬНОГО числа в строке.
+    // Для «Совокупные активы» строка баланса «Всего активов 435 877»
+    // должна обгонять строку пересчёта «Всего активов 366 084» просто
+    // за счёт большей величины суммы.
+    const matchLen = mAll.reduce((a,b)=>a + b.length, 0);
+    const score = matchLen + Math.log10(maxAbs + 10) * 3;
+    candidates.push({idx, line, score, pick: last, allNums: nums, maxAbs});
   });
 
   if(!candidates.length){ box.style.display = 'none'; return; }
 
   candidates.sort((a,b) => b.score - a.score);
-  const top = candidates.slice(0, 5);
+  const top = candidates.slice(0, 8);
 
   top.forEach(c => {
     const row = document.createElement('div');
