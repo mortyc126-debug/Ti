@@ -1420,6 +1420,31 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
+<!-- Полноэкранный просмотрщик контекста (pre-formatted, без переносов) -->
+<div class="modal-overlay" id="modal-picker-context">
+  <div class="modal" style="width:96vw;max-width:1400px;height:92vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">📖 Контекст отчёта <span id="ctx-info" style="font-size:.6rem;color:var(--text3);margin-left:8px"></span><button class="modal-x" onclick="closeModal('modal-picker-context')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;flex:1">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.6rem;padding:6px;background:var(--s1);border:1px solid var(--border)">
+        <label>строк до:<input type="number" id="ctx-before" value="5" min="0" max="500" style="width:55px;margin-left:4px;padding:2px 4px" oninput="repPickerCtxRender()"></label>
+        <label>после:<input type="number" id="ctx-after" value="5" min="0" max="500" style="width:55px;margin-left:4px;padding:2px 4px" oninput="repPickerCtxRender()"></label>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(5,5)">±5</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(15,15)">±15</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(40,40)">±40</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(100,100)">±100</button>
+        <span style="color:var(--text3)">·</span>
+        <span>поиск:</span>
+        <input type="text" id="ctx-search" placeholder="подсветить…" style="padding:2px 6px;width:150px" oninput="repPickerCtxRender()">
+        <span style="margin-left:auto;color:var(--text3)">↔ прокрутка по горизонтали</span>
+      </div>
+      <div id="ctx-text" style="flex:1;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-picker-context')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /main -->
 
@@ -5572,9 +5597,10 @@ function repPickerRenderSuggestions(text){
 
     const ctxBtn = document.createElement('button');
     ctxBtn.type = 'button';
-    ctxBtn.textContent = 'ⓘ контекст';
+    ctxBtn.textContent = '📖 контекст';
     ctxBtn.className = 'btn btn-sm';
     ctxBtn.style.cssText = 'padding:2px 6px;font-size:.55rem';
+    ctxBtn.onclick = () => repPickerOpenContext(c.idx);
     head.appendChild(ctxBtn);
     row.appendChild(head);
 
@@ -5606,32 +5632,117 @@ function repPickerRenderSuggestions(text){
     });
     row.appendChild(numsBar);
 
-    // Inline-контекст (±3 строки), раскрывается кнопкой ⓘ.
-    const ctxBox = document.createElement('div');
-    ctxBox.style.cssText = 'display:none;flex:1 1 100%;margin-top:4px;padding:6px 8px;background:var(--s2);border-left:2px solid var(--acc);font-family:var(--mono);font-size:.58rem;line-height:1.6;color:var(--text2);white-space:pre-wrap';
-    row.appendChild(ctxBox);
-    ctxBtn.onclick = () => {
-      if(ctxBox.style.display === 'none'){
-        const from = Math.max(0, c.idx - 3);
-        const to = Math.min(lines.length - 1, c.idx + 3);
-        let ctx = '';
-        for(let k = from; k <= to; k++){
-          const marker = (k === c.idx) ? '▶ ' : '  ';
-          ctx += marker + repPickerFixBrokenYears(lines[k] || '') + '\n';
-        }
-        ctxBox.textContent = ctx;
-        ctxBox.style.display = 'block';
-        ctxBtn.textContent = 'ⓧ скрыть';
-      } else {
-        ctxBox.style.display = 'none';
-        ctxBtn.textContent = 'ⓘ контекст';
-      }
-    };
-
     list.appendChild(row);
   });
 
   box.style.display = 'flex';
+}
+
+// ── Полноэкранный просмотрщик контекста ──
+// Сохраняем исходные позиции символов (pre, no-wrap, горизонтальная
+// прокрутка) — удобно для больших таблиц отчётности.
+window._pickerCtxIdx = 0;
+
+function repPickerOpenContext(idx){
+  window._pickerCtxIdx = idx;
+  const before = document.getElementById('ctx-before'); if(before) before.value = '5';
+  const after  = document.getElementById('ctx-after');  if(after)  after.value  = '5';
+  const s = document.getElementById('ctx-search'); if(s) s.value = '';
+  document.getElementById('modal-picker-context').classList.add('open');
+  repPickerCtxRender();
+}
+
+function repPickerCtxSet(b, a){
+  const before = document.getElementById('ctx-before'); if(before) before.value = String(b);
+  const after  = document.getElementById('ctx-after');  if(after)  after.value  = String(a);
+  repPickerCtxRender();
+}
+
+function repPickerCtxRender(){
+  const text = window._lastParsedText || '';
+  if(!text) return;
+  const lines = text.split(/\r?\n/);
+  const idx = window._pickerCtxIdx || 0;
+  const b = Math.max(0, parseInt(document.getElementById('ctx-before')?.value, 10) || 0);
+  const a = Math.max(0, parseInt(document.getElementById('ctx-after')?.value, 10)  || 0);
+  const from = Math.max(0, idx - b);
+  const to   = Math.min(lines.length - 1, idx + a);
+  const search = (document.getElementById('ctx-search')?.value || '').toLowerCase();
+
+  const box = document.getElementById('ctx-text');
+  const info = document.getElementById('ctx-info');
+  if(!box) return;
+  box.innerHTML = '';
+  if(info) info.textContent = `строки ${from+1}–${to+1} из ${lines.length} (якорь: строка ${idx+1})`;
+
+  // Регекс чисел — тот же, что в кандидатах.
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
+
+  for(let k = from; k <= to; k++){
+    const raw = lines[k] || '';
+    const line = repPickerFixBrokenYears(raw);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:block' + (k === idx ? ';background:rgba(100,200,255,.08);border-left:2px solid var(--acc);padding-left:4px' : ';padding-left:6px');
+
+    // Номер строки
+    const ln = document.createElement('span');
+    ln.textContent = (k === idx ? '▶ ' : '  ') + String(k+1).padStart(5,' ') + ' │ ';
+    ln.style.color = 'var(--text3)';
+    row.appendChild(ln);
+
+    // Разбиваем строку на числовые и не-числовые куски.
+    numRe.lastIndex = 0;
+    const matches = [];
+    let m;
+    while((m = numRe.exec(line)) !== null){
+      matches.push({start:m.index, end:m.index + m[0].length, raw:m[0]});
+    }
+    // Функция подсветки поиска в тексте.
+    const appendText = (txt) => {
+      if(!search){ row.appendChild(document.createTextNode(txt)); return; }
+      const low = txt.toLowerCase();
+      let i = 0;
+      while(i < txt.length){
+        const p = low.indexOf(search, i);
+        if(p < 0){ row.appendChild(document.createTextNode(txt.slice(i))); break; }
+        if(p > i) row.appendChild(document.createTextNode(txt.slice(i, p)));
+        const hi = document.createElement('mark');
+        hi.textContent = txt.slice(p, p + search.length);
+        hi.style.cssText = 'background:var(--acc);color:#000;padding:0 1px';
+        row.appendChild(hi);
+        i = p + search.length;
+      }
+    };
+
+    let cursor = 0;
+    matches.forEach(mt => {
+      if(mt.start > cursor) appendText(line.slice(cursor, mt.start));
+      const n = repPickerParseNumber(mt.raw);
+      const abs = n !== null ? Math.abs(n) : 0;
+      const isClickable = n !== null && abs >= 1 && !RSBU_CODE_SET.has(abs) && !(Number.isInteger(n) && n >= 1 && n <= 99);
+      if(isClickable){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = mt.raw;
+        btn.style.cssText = 'display:inline-block;padding:0 4px;margin:0;border:1px solid var(--border2);background:var(--s2);color:var(--text);font:inherit;cursor:pointer;border-radius:2px';
+        btn.onclick = () => repPickerAssign(n, btn);
+        row.appendChild(btn);
+      } else {
+        const sp = document.createElement('span');
+        sp.textContent = mt.raw;
+        sp.style.color = 'var(--text3)';
+        row.appendChild(sp);
+      }
+      cursor = mt.end;
+    });
+    if(cursor < line.length) appendText(line.slice(cursor));
+    if(!line.trim()) row.innerHTML += '&nbsp;';
+    box.appendChild(row);
+  }
+
+  // Прокрутка к якорной строке.
+  const anchor = box.children[idx - from];
+  if(anchor && anchor.scrollIntoView) anchor.scrollIntoView({block:'center'});
 }
 
 function repRenderPickerLines(text){
