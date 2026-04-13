@@ -1269,9 +1269,10 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         </div>
         <div id="rep-np-parse-log" style="display:none;margin-top:8px;font-size:.62rem;line-height:1.8;color:var(--text2);max-height:180px;overflow-y:auto"></div>
         <div id="rep-np-raw-wrap" style="display:none;margin-top:8px">
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div id="rep-np-tools-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button type="button" class="btn btn-sm" onclick="repToggleRawText()" id="rep-np-raw-btn">📄 Показать распознанный текст</button>
             <button type="button" class="btn btn-sm" onclick="repCopyRawText()" title="Скопировать в буфер — можно прислать для отладки">📋 Скопировать</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenPicker()" title="Кликать по числам в распознанном тексте и раскидывать их по полям вручную">🎯 Ручной подбор</button>
           </div>
           <textarea id="rep-np-raw-text" readonly style="display:none;width:100%;margin-top:6px;min-height:150px;max-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:8px;white-space:pre"></textarea>
         </div>
@@ -1307,6 +1308,39 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-period')">Отмена</button>
       <button class="btn btn-p" onclick="repSavePeriod()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual picker modal: кликать по числам в распознанном тексте -->
+<div class="modal-overlay" id="modal-rep-picker">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div class="modal-hdr">🎯 Ручной подбор значений <button class="modal-x" onclick="closeModal('modal-rep-picker')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:.63rem;color:var(--text2);line-height:1.6">
+        Выберите поле и единицы, затем кликните по числу в тексте — оно попадёт в выбранное поле, курсор сам перейдёт на следующее.
+        Коды РСБУ и числа |n|&lt;1 скрыты.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;padding:8px;background:var(--s1);border:1px solid var(--border)">
+        <div class="field" style="flex:1;min-width:200px">
+          <label>Назначаю на поле</label>
+          <select id="rep-picker-target" onchange="repPickerUpdateCurrent()"></select>
+        </div>
+        <div class="field" style="min-width:140px">
+          <label>Единицы</label>
+          <select id="rep-picker-unit">
+            <option value="1">млрд ₽ (×1)</option>
+            <option value="0.001" selected>млн ₽ (×0.001)</option>
+            <option value="0.000001">тыс. ₽ (×0.000001)</option>
+            <option value="0.000000001">₽ (×10⁻⁹)</option>
+          </select>
+        </div>
+        <div id="rep-picker-current" style="font-size:.62rem;color:var(--text3);flex-basis:100%"></div>
+      </div>
+      <div id="rep-picker-lines" style="max-height:52vh;overflow-y:auto;font-family:var(--mono);font-size:.62rem;line-height:1.85;background:var(--bg);border:1px solid var(--border2);padding:10px;white-space:pre-wrap"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-rep-picker')">Закрыть</button>
     </div>
   </div>
 </div>
@@ -4984,6 +5018,167 @@ function repCopyRawText(){
   }
   if(wasHidden) ta.style.display = 'none';
   ta.setSelectionRange(0,0);
+}
+
+// ── Ручной подбор значений ──
+// Список целевых полей в том же порядке, в каком они идут в форме.
+const REP_PICKER_FIELDS = [
+  {id:'rep-np-rev',    label:'Выручка'},
+  {id:'rep-np-ebitda', label:'EBITDA'},
+  {id:'rep-np-np',     label:'Чистая прибыль'},
+  {id:'rep-np-ebit',   label:'EBIT'},
+  {id:'rep-np-assets', label:'Совокупные активы'},
+  {id:'rep-np-eq',     label:'Собственный капитал'},
+  {id:'rep-np-debt',   label:'Долг (кредиты+займы)'},
+  {id:'rep-np-cash',   label:'Денежные средства'},
+  {id:'rep-np-ca',     label:'Оборотные активы'},
+  {id:'rep-np-cl',     label:'Краткосрочные обяз.'},
+  {id:'rep-np-int',    label:'Процентные расходы'},
+  {id:'rep-np-ret',    label:'Нераспр. прибыль'},
+];
+
+function repOpenPicker(){
+  const text = window._lastParsedText || '';
+  if(!text){ alert('Сначала загрузите файл.'); return; }
+  // Заполняем dropdown полей
+  const sel = document.getElementById('rep-picker-target');
+  if(sel){
+    sel.innerHTML = '';
+    REP_PICKER_FIELDS.forEach(f=>{
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      const cur = document.getElementById(f.id);
+      const curVal = cur && cur.value ? ` = ${cur.value}` : '';
+      opt.textContent = f.label + curVal;
+      sel.appendChild(opt);
+    });
+    sel.selectedIndex = 0;
+  }
+  const unit = document.getElementById('rep-picker-unit');
+  if(unit) unit.value = '0.001'; // по умолчанию млн ₽
+  repRenderPickerLines(text);
+  repPickerUpdateCurrent();
+  document.getElementById('modal-rep-picker').classList.add('open');
+}
+
+// Форматирование числа из найденной строки в JS-число.
+// Поддерживает "1 234,56", "1.234,56", "1,234.56", скобки для отрицательных.
+function repPickerParseNumber(raw){
+  if(!raw) return null;
+  let s = raw.trim();
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  s = s.replace(/\s+/g,'').replace(/\u00a0/g,'');
+  // Если есть и ',' и '.', последний по позиции считаем десятичным
+  const hasComma = s.indexOf(',') >= 0;
+  const hasDot   = s.indexOf('.') >= 0;
+  if(hasComma && hasDot){
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')){
+      s = s.replace(/\./g,'').replace(',','.');
+    } else {
+      s = s.replace(/,/g,'');
+    }
+  } else if(hasComma){
+    // одна запятая — десятичный разделитель, если после ≤3 цифр и это единственный разделитель
+    const parts = s.split(',');
+    if(parts.length === 2 && parts[1].length <= 3) s = parts[0] + '.' + parts[1];
+    else s = s.replace(/,/g,'');
+  }
+  const n = parseFloat(s);
+  if(!isFinite(n)) return null;
+  return neg ? -n : n;
+}
+
+function repRenderPickerLines(text){
+  const box = document.getElementById('rep-picker-lines');
+  if(!box) return;
+  box.innerHTML = '';
+  const lines = text.split(/\r?\n/);
+  // Регулярка ловит числа с опциональным знаком/скобками/пробелами-разделителями
+  const numRe = /-?\(?-?\d[\d\s\u00a0.,]*\d\)?|-?\d/g;
+  lines.forEach((line, idx) => {
+    const row = document.createElement('div');
+    row.style.padding = '2px 0';
+    row.style.borderBottom = '1px dashed var(--border)';
+    const idxSpan = document.createElement('span');
+    idxSpan.textContent = String(idx+1).padStart(4,' ') + '  ';
+    idxSpan.style.color = 'var(--text3)';
+    row.appendChild(idxSpan);
+
+    let cursor = 0;
+    const matches = [];
+    let m;
+    numRe.lastIndex = 0;
+    while((m = numRe.exec(line)) !== null){
+      matches.push({start:m.index, end:m.index + m[0].length, raw:m[0]});
+    }
+    matches.forEach(mt => {
+      if(mt.start > cursor){
+        row.appendChild(document.createTextNode(line.slice(cursor, mt.start)));
+      }
+      const n = repPickerParseNumber(mt.raw);
+      if(n === null || Math.abs(n) < 1 || RSBU_CODE_SET.has(Math.abs(n)) || (Number.isInteger(n) && RSBU_CODE_SET.has(n))){
+        // прячем коды и малые числа — оставляем как текст
+        row.appendChild(document.createTextNode(mt.raw));
+      } else {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = mt.raw.trim();
+        btn.dataset.value = String(n);
+        btn.style.cssText = 'display:inline-block;margin:0 2px;padding:1px 6px;border:1px solid var(--border2);background:var(--s2);color:var(--text);font:inherit;cursor:pointer;border-radius:3px';
+        btn.onmouseover = ()=>{ btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; };
+        btn.onmouseout  = ()=>{ btn.style.background = 'var(--s2)';    btn.style.color = 'var(--text)'; };
+        btn.onclick = ()=> repPickerAssign(n, btn);
+        row.appendChild(btn);
+      }
+      cursor = mt.end;
+    });
+    if(cursor < line.length) row.appendChild(document.createTextNode(line.slice(cursor)));
+    if(!line.trim()) row.innerHTML = '&nbsp;';
+    box.appendChild(row);
+  });
+}
+
+function repPickerAssign(value, btn){
+  const sel = document.getElementById('rep-picker-target');
+  const unitSel = document.getElementById('rep-picker-unit');
+  if(!sel || !sel.value) return;
+  const unit = unitSel ? parseFloat(unitSel.value) : 1;
+  const finalVal = value * (isFinite(unit) ? unit : 1);
+  const input = document.getElementById(sel.value);
+  if(input){
+    // округляем до 3 знаков, убираем хвостовые нули
+    input.value = (Math.round(finalVal * 1000) / 1000).toString();
+  }
+  // визуальная отметка кнопки
+  if(btn){
+    btn.style.background = 'var(--green, #2a7a2a)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--green, #2a7a2a)';
+  }
+  // Обновляем подписи с текущими значениями в select
+  const idx = sel.selectedIndex;
+  REP_PICKER_FIELDS.forEach((f,i)=>{
+    const cur = document.getElementById(f.id);
+    const curVal = cur && cur.value ? ` = ${cur.value}` : '';
+    if(sel.options[i]) sel.options[i].textContent = f.label + curVal;
+  });
+  // двигаемся на следующее поле
+  if(idx + 1 < sel.options.length){
+    sel.selectedIndex = idx + 1;
+  }
+  repPickerUpdateCurrent();
+}
+
+function repPickerUpdateCurrent(){
+  const sel = document.getElementById('rep-picker-target');
+  const info = document.getElementById('rep-picker-current');
+  if(!sel || !info) return;
+  const f = REP_PICKER_FIELDS.find(x => x.id === sel.value);
+  if(!f){ info.textContent = ''; return; }
+  const input = document.getElementById(f.id);
+  const cur = input && input.value ? input.value : '—';
+  info.innerHTML = `Текущее значение «${f.label}»: <strong style="color:var(--text)">${cur}</strong>`;
 }
 
 function repNewPeriodModal(){
