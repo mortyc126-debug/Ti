@@ -5534,6 +5534,9 @@ function repPickerRenderSuggestions(text){
     }
 
     // Все числа строки как равноправные кнопки.
+    // Порядок колонок (текущий / прошлый период) автоматически
+    // определить нельзя — в разных отчётах разный, поэтому никакую
+    // кнопку не подсвечиваем как «главную».
     const numsBar = document.createElement('div');
     numsBar.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;flex:1 1 100%';
     c.allNums.forEach((num, i) => {
@@ -5541,11 +5544,8 @@ function repPickerRenderSuggestions(text){
       b.type = 'button';
       b.textContent = num.raw;
       b.title = 'Применить: ' + num.raw + ' × ' + (document.getElementById('rep-picker-unit')?.value || 1);
-      const isLast = i === c.allNums.length - 1;
-      b.className = 'btn btn-sm' + (isLast ? ' btn-p' : '');
-      b.style.cssText = isLast
-        ? 'padding:3px 10px;font-size:.66rem;font-weight:600'
-        : 'padding:3px 8px;font-size:.62rem';
+      b.className = 'btn btn-sm';
+      b.style.cssText = 'padding:3px 8px;font-size:.64rem';
       b.onclick = () => repPickerAssign(num.n, b);
       numsBar.appendChild(b);
     });
