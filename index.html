@@ -1944,6 +1944,85 @@ function _pickValueCell(cellNums, colYears){
 // давало неверные соединения соседних data-строк — логика убрана.
 // Picker и findVal умеют look-ahead на уровне строк без склейки.)
 
+// Универсальный построитель «структурного» вывода из array-of-arrays
+// (rowsAoa = [[desc, val1, val2 …], …]). Заполняет те же глобалы,
+// что и extractPdfTextLines, чтобы Picker (🎯 Ручной подбор,
+// modal-picker-context, и т.п.) работал одинаково на DOCX/XLSX/CSV.
+// Возвращает tab-разделённый текст (вход для findVal/findValTrace).
+//
+// Использование: repExtractDocx/repExtractXlsx формируют aoa из
+// соответствующего формата и передают сюда. extractPdfTextLines
+// остаётся отдельной реализацией с классификацией колонок по X —
+// это сильнее подходит для плотных PDF-таблиц.
+function _buildRowsFromAoa(aoa, {label=''} = {}){
+  window._pickerPdfDoc = null;            // был PDF? уже нет
+  window._pickerPdfTableRows = [];
+  window._pickerPdfPageHeaders = {1: []};
+  window._pickerPdfPageBoundaries = [0];
+  const tableRows = window._pickerPdfTableRows;
+  const pageHeaders = window._pickerPdfPageHeaders;
+  const page = 1;
+  let out = '';
+  let curLineIdx = 0;
+  // Сначала определяем «year» для каждой value-колонки, если в первых
+  // 1–3 строках встречаются год/дата/период — эмитим __HDR__, чтобы
+  // findVal/findValTrace выбирали самое свежее значение.
+  let headerYears = null;
+  const scanRows = aoa.slice(0, 5);
+  for(const row of scanRows){
+    if(!row || !row.length) continue;
+    const cells = row.map(c => String(c == null ? '' : c));
+    // Пропускаем пустой desc или саму строку, если первая ячейка — это
+    // число (значит это data-строка, а не шапка).
+    const hasNumFirstCell = /^\s*-?\d/.test(cells[0] || '');
+    if(hasNumFirstCell) break;
+    const yrs = cells.slice(1).map(c => _parseYearLabel(c));
+    if(yrs.some(y => y != null)){
+      headerYears = yrs;
+      break;
+    }
+  }
+  if(headerYears && headerYears.length){
+    const hdrLine = _HEADER_MARKER + '\t' + headerYears.map(y => y != null ? String(y) : '').join('\t');
+    out += hdrLine + '\n';
+    tableRows.push({lineIdx: curLineIdx, page, desc: hdrLine, cols: []});
+    curLineIdx++;
+  }
+  if(label){
+    out += '— ' + label + ' —\n';
+    tableRows.push({lineIdx: curLineIdx, page, desc: '— ' + label + ' —', cols: []});
+    curLineIdx++;
+  }
+  for(const rowCells of aoa){
+    if(!rowCells || !rowCells.length) continue;
+    const cells = rowCells.map(c => {
+      const s = c == null ? '' : String(c);
+      return s.replace(/\s+/g, ' ').trim();
+    });
+    const desc = cells[0] || '';
+    const cols = cells.slice(1);
+    const hasValues = cols.some(c => c && /\d/.test(c));
+    if(!desc && !hasValues) continue;
+    tableRows.push({lineIdx: curLineIdx, page, desc, cols: cols.slice()});
+    if(!hasValues && /(19|20)\d{2}|закончи|по состоянию|месяц|полугод|квартал/i.test(desc) && desc.length < 220){
+      pageHeaders[page].push(desc);
+    }
+    out += [desc, ...cols].join('\t') + '\n';
+    curLineIdx++;
+  }
+  window._pickerPdfPageBoundaries.push((out.match(/\n/g) || []).length);
+  return out;
+}
+
+// Из плоского «mammoth extractRawText» вывода делаем хотя бы слабую
+// структуру: каждая строка → одна запись с единственной ячейкой desc.
+// Это даёт Picker'у возможность сопоставлять ключевые слова и искать
+// числа в соседних строках (look-ahead), пусть и без колоночной
+// разбивки.
+function _aoaFromFlatText(txt){
+  return String(txt||'').split(/\r?\n/).map(l => [l]);
+}
+
 // Извлекает текст PDF как таблицу с классификацией колонок.
 // Алгоритм:
 //   1) items группируются по Y → строки.
@@ -2325,23 +2404,13 @@ async function parseAnyReport(input) {
       txt = await extractPdfTextLines(pdf, 80);
 
     } else if (ext === 'docx' || ext === 'doc') {
-      // ── DOCX ──
-      await _ensureMammoth();
-      const buf = await file.arrayBuffer();
-      const res = await mammoth.extractRawText({ arrayBuffer: buf });
-      txt = res.value || '';
+      // ── DOCX ── делегируем на общий экстрактор (и Picker получит
+      // структуру таблиц через _buildRowsFromAoa).
+      txt = await repExtractDocx(file);
 
     } else if (ext === 'xlsx' || ext === 'xls') {
-      // ── XLSX ──
-      await _ensureXlsx();
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
-      // TAB-разделённый вывод вместо CSV: в русских числах «1 234,5»
-      // запятая — это десятичный знак, а в описаниях статей часто
-      // встречается в тексте — и то и другое ломает CSV-parsing.
-      wb.SheetNames.forEach(name => {
-        txt += XLSX.utils.sheet_to_csv(wb.Sheets[name], {FS: '\t'}) + '\n';
-      });
+      // ── XLSX ── тот же экстрактор, aoa → tableRows для Picker'а.
+      txt = await repExtractXlsx(file);
 
     } else {
       status.style.color = 'var(--danger)';
@@ -6805,23 +6874,62 @@ async function repExtractPdf(file){
 async function repExtractDocx(file){
   await _ensureMammoth();
   const buf=await file.arrayBuffer();
-  const res=await mammoth.extractRawText({arrayBuffer:buf});
-  return res.value||'';
+  // mammoth.convertToHtml сохраняет таблицы как <table><tr><td> — мы
+  // можем пройтись по DOM и собрать настоящую структуру (ячейки таблиц
+  // идут по своим колонкам, а параграфы — как одна длинная ячейка).
+  // Это то, что нужно Picker'у: кандидаты с контекстом берутся из
+  // tableRows одинаково для PDF/DOCX/XLSX.
+  let html='';
+  try {
+    const res = await mammoth.convertToHtml({arrayBuffer: buf});
+    html = res.value || '';
+  } catch(e){
+    // Fallback: если convertToHtml упал — возвращаемся к plain text,
+    // Picker будет работать в «слабом» режиме look-ahead по строкам.
+    const res = await mammoth.extractRawText({arrayBuffer: buf});
+    return _buildRowsFromAoa(_aoaFromFlatText(res.value||''));
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const aoa = [];
+  function walk(node){
+    if(!node) return;
+    if(node.nodeType !== 1){ return; }
+    const tag = (node.tagName || '').toLowerCase();
+    if(tag === 'table'){
+      for(const tr of node.querySelectorAll('tr')){
+        const cells = [...tr.querySelectorAll('td,th')]
+          .map(c => (c.textContent || '').replace(/\s+/g,' ').trim());
+        if(cells.some(c => c)) aoa.push(cells);
+      }
+      return;
+    }
+    if(['p','h1','h2','h3','h4','h5','li'].includes(tag)){
+      const t = (node.textContent || '').replace(/\s+/g,' ').trim();
+      if(t) aoa.push([t]);
+      return;
+    }
+    for(const ch of node.childNodes) walk(ch);
+  }
+  walk(doc.body);
+  return _buildRowsFromAoa(aoa);
 }
 
 async function repExtractXlsx(file){
   await _ensureXlsx();
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array'});
-  let text='';
-  wb.SheetNames.forEach(name=>{
-    const ws=wb.Sheets[name];
-    // TAB-разделитель вместо запятой: иначе русская десятичная «,» и
-    // запятые в текстовых полях ломают разбор колонок.
-    const csv=XLSX.utils.sheet_to_csv(ws, {FS: '\t'});
-    text+=csv+'\n';
-  });
-  return text;
+  // Используем sheet_to_json с header:1 — получаем настоящий
+  // array-of-arrays (каждая строка = массив ячеек), Picker сможет
+  // показать структуру отчёта 1-в-1 как в Excel.
+  const aoa = [];
+  for(const name of wb.SheetNames){
+    const ws = wb.Sheets[name];
+    const sheet = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+    if(aoa.length && sheet.length) aoa.push([]); // пустая строка-разделитель
+    if(sheet.length) aoa.push(['— Лист: ' + name + ' —']);
+    for(const row of sheet) aoa.push(row || []);
+  }
+  return _buildRowsFromAoa(aoa);
 }
 
 // Определение масштаба по тексту документа. Возвращает самый частый
