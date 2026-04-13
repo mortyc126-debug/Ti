@@ -5373,27 +5373,46 @@ function repPickerShouldShow(n, f){
   return true;
 }
 
-// Ищем ближайшую сверху строку-шапку таблицы (годы, даты, "(в млн
-// ₽)" и т.п.) — она помогает понять, где текущий период, где прошлый.
+// Ищем шапку таблицы. В PDF-извлечении она часто разбита на несколько
+// смежных строк («закончившихся» / «30 июня 2025 года» / «30 июня 2024
+// года») — склеиваем их в один заголовок.
 function repPickerFindColumnHeader(lines, fromIdx){
-  const yearRe = /\b(19|20)\d{2}\b/;
+  const yearRe  = /\b(19|20)\d{2}\b/;
   const monthRe = /(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)/i;
-  let best = null;
+  const keyRe   = /(закончи|по состоянию|за\s+\S+\s+(месяц|полуг|квартал|год)|period ended|as of|three months|six months)/i;
+  const isHeaderLike = L => yearRe.test(L) || monthRe.test(L) || keyRe.test(L);
+
+  // Найдём первую сверху header-like строку как якорь.
+  let anchor = -1;
   for(let i = fromIdx - 1; i >= Math.max(0, fromIdx - 40); i--){
     const L = (lines[i] || '').trim();
     if(!L) continue;
-    const years = L.match(/\b(19|20)\d{2}\b/g) || [];
-    const hasMonth = monthRe.test(L);
-    // Шапка сравнения: 2+ годов, или год+месяц, или 2+ дат.
-    if(years.length >= 2 || (years.length >= 1 && hasMonth)){
-      return L;
-    }
-    // Первый встреченный год запомним как fallback
-    if(!best && (years.length >= 1 || hasMonth)) best = L;
-    // Не прыгать слишком далеко за границу раздела.
-    if(/^\s*\d+\s*$/.test(L) && best) break; // номер страницы
+    if(isHeaderLike(L)){ anchor = i; break; }
+    // Номер страницы / разделитель — не прерывает поиск.
+    if(/^\s*\d+\s*$/.test(L)) continue;
   }
-  return best;
+  if(anchor < 0) return null;
+
+  // Расширяем блок: все смежные header-like строки вокруг якоря.
+  let start = anchor, end = anchor;
+  for(let i = anchor - 1; i >= Math.max(0, anchor - 4); i--){
+    const L = (lines[i] || '').trim();
+    if(!L){ continue; }
+    if(!isHeaderLike(L)) break;
+    start = i;
+  }
+  for(let i = anchor + 1; i < fromIdx && i <= anchor + 4; i++){
+    const L = (lines[i] || '').trim();
+    if(!L){ continue; }
+    if(!isHeaderLike(L)) break;
+    end = i;
+  }
+  const parts = [];
+  for(let i = start; i <= end; i++){
+    const L = (lines[i] || '').trim();
+    if(L) parts.push(L);
+  }
+  return parts.join(' · ').slice(0, 180);
 }
 
 // ── Самые вероятные кандидаты для активного поля ──
