@@ -1420,10 +1420,10 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
-<!-- Полноэкранный просмотрщик контекста (pre-formatted, без переносов) -->
+<!-- Просмотрщик контекста (pre-formatted, без переносов) -->
 <div class="modal-overlay" id="modal-picker-context">
-  <div class="modal" style="width:96vw;max-width:1400px;height:92vh;display:flex;flex-direction:column">
-    <div class="modal-hdr">📖 Контекст отчёта <span id="ctx-info" style="font-size:.6rem;color:var(--text3);margin-left:8px"></span><button class="modal-x" onclick="closeModal('modal-picker-context')">✕</button></div>
+  <div class="modal" style="width:92vw;max-width:1200px;height:82vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">📖 Контекст отчёта <span id="ctx-info" style="font-size:.6rem;color:var(--text3);margin-left:8px"></span><button class="modal-x" onclick="pickerCtxClose()">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;flex:1">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.6rem;padding:6px;background:var(--s1);border:1px solid var(--border)">
         <label>строк до:<input type="number" id="ctx-before" value="5" min="0" max="500" style="width:55px;margin-left:4px;padding:2px 4px" oninput="repPickerCtxRender()"></label>
@@ -1440,7 +1440,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div id="ctx-text" style="flex:1;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
     </div>
     <div class="modal-ftr">
-      <button class="btn" onclick="closeModal('modal-picker-context')">Закрыть</button>
+      <button class="btn" onclick="pickerCtxClose()">Закрыть</button>
     </div>
   </div>
 </div>
@@ -5649,8 +5649,30 @@ function repPickerOpenContext(idx){
   const after  = document.getElementById('ctx-after');  if(after)  after.value  = '5';
   const s = document.getElementById('ctx-search'); if(s) s.value = '';
   document.getElementById('modal-picker-context').classList.add('open');
+  // Ловим системную кнопку «Назад» на мобилках — чтобы она закрывала
+  // модалку, а не выкидывала с текущей страницы.
+  try { history.pushState({pickerCtx:1}, ''); } catch(e){}
   repPickerCtxRender();
 }
+
+// Закрыть контекст: если мы ранее делали pushState — откатываем историю
+// (Назад и кнопка X тогда идут одинаково), иначе просто прячем.
+function pickerCtxClose(){
+  const m = document.getElementById('modal-picker-context');
+  if(!m) return;
+  if(history.state && history.state.pickerCtx){
+    history.back(); // popstate → закроет модалку
+  } else {
+    m.classList.remove('open');
+  }
+}
+
+// Системная кнопка «Назад» на мобилках: закрываем картой открытую модалку
+// контекста (одну за раз), чтобы пользователь не выпадал из страницы.
+window.addEventListener('popstate', () => {
+  const m = document.getElementById('modal-picker-context');
+  if(m && m.classList.contains('open')) m.classList.remove('open');
+});
 
 function repPickerCtxSet(b, a){
   const before = document.getElementById('ctx-before'); if(before) before.value = String(b);
