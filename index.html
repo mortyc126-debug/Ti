@@ -5395,7 +5395,10 @@ function repPickerRenderSuggestions(text){
   try { hintRe = new RegExp(f.hint, 'i'); } catch(e){ hintRe = null; }
   if(!hintRe){ box.style.display = 'none'; return; }
 
-  const numRe = /-?\(?-?\d[\d\s\u00a0.,]*\d\)?|-?\d/g;
+  // Строгий regex: разряды через пробел — только группами по 3 цифры.
+  // Старый жадный вариант склеивал «64 175 841 8 171 726 65 695» в одно
+  // огромное «число», что давало мусор в Сэтл-отчёте с 5+ колонками.
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
   const lines = text.split(/\r?\n/);
   const candidates = [];
   lines.forEach((line, idx) => {
@@ -5427,33 +5430,34 @@ function repPickerRenderSuggestions(text){
 
   top.forEach(c => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:6px;align-items:center;padding:5px 6px;background:var(--bg);border:1px solid var(--border)';
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;background:var(--bg);border:1px solid var(--border)';
     const desc = document.createElement('div');
-    desc.style.cssText = 'flex:1;font-size:.6rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+    desc.style.cssText = 'flex:1 1 100%;font-size:.6rem;color:var(--text2);line-height:1.4';
     desc.title = c.line;
     const firstNumPos = c.allNums[0].pos;
     const descText = (c.line.slice(0, firstNumPos) || c.line).trim().replace(/\s+/g,' ');
-    desc.textContent = descText.slice(0, 70) + (descText.length > 70 ? '…' : '');
+    desc.textContent = descText.slice(0, 100) + (descText.length > 100 ? '…' : '');
     row.appendChild(desc);
 
-    c.allNums.slice(0, -1).forEach(alt => {
-      const a = document.createElement('button');
-      a.type = 'button';
-      a.textContent = alt.raw;
-      a.title = 'альтернативное число из строки';
-      a.style.cssText = 'padding:2px 6px;font-size:.58rem;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;border-radius:3px';
-      a.onclick = () => repPickerAssign(alt.n, a);
-      row.appendChild(a);
+    // Все числа строки как равноправные кнопки (в исходном порядке).
+    // В отчётности обычно 2+ колонок (текущий / прошлый период + сегменты),
+    // автоматически не угадаешь, какое нужно — пусть юзер выбирает.
+    const numsBar = document.createElement('div');
+    numsBar.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;flex:1 1 100%';
+    c.allNums.forEach((num, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = num.raw;
+      b.title = 'Применить: ' + num.raw + ' × ' + (document.getElementById('rep-picker-unit')?.value || 1);
+      const isLast = i === c.allNums.length - 1;
+      b.className = 'btn btn-sm' + (isLast ? ' btn-p' : '');
+      b.style.cssText = isLast
+        ? 'padding:3px 10px;font-size:.66rem;font-weight:600'
+        : 'padding:3px 8px;font-size:.62rem';
+      b.onclick = () => repPickerAssign(num.n, b);
+      numsBar.appendChild(b);
     });
-
-    const pickBtn = document.createElement('button');
-    pickBtn.type = 'button';
-    pickBtn.textContent = '→ ' + c.pick.raw;
-    pickBtn.title = 'Применить к полю «' + f.label + '»';
-    pickBtn.className = 'btn btn-sm btn-p';
-    pickBtn.style.cssText = 'padding:3px 10px;font-size:.66rem;font-weight:600';
-    pickBtn.onclick = () => repPickerAssign(c.pick.n, pickBtn);
-    row.appendChild(pickBtn);
+    row.appendChild(numsBar);
     list.appendChild(row);
   });
 
@@ -5467,7 +5471,7 @@ function repRenderPickerLines(text){
   box.innerHTML = '';
   const f = repPickerGetFilters();
   const lines = text.split(/\r?\n/);
-  const numRe = /-?\(?-?\d[\d\s\u00a0.,]*\d\)?|-?\d/g;
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
   let totalNums = 0, shownNums = 0, shownLines = 0;
 
   // Поиск: если есть '|' — интерпретируем как regex-альтернативы.
