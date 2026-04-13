@@ -5646,20 +5646,50 @@ function repPickerRenderSuggestions(text){
   const candidates = [];
 
   if(useTable){
+    // Индекс по lineIdx — для look-ahead.
+    const byLineIdx = new Map();
+    tableRows.forEach(r => byLineIdx.set(r.lineIdx, r));
+
     tableRows.forEach(r => {
       const desc = r.desc || '';
       if(!lineMatchesHint(desc)) return;
-      // Собираем по одному числу из каждой колонки (первое значащее).
-      const nums = [];
-      r.cols.forEach((c, ci) => {
-        const parsed = parseNumsFrom(c, 0);
-        if(parsed.length){
-          // Чаще всего в ячейке одно значение; если несколько — берём
-          // самое большое (прим.: «(1 234)» + «567» = −1234 или 567).
-          const best = parsed.reduce((a,b) => Math.abs(b.n) > Math.abs(a.n) ? b : a);
-          nums.push({...best, colIdx: ci});
+      // 1. Сначала пытаемся взять числа из своей row.cols.
+      let nums = [];
+      const collectFrom = (rr, baseColIdx) => {
+        (rr.cols || []).forEach((c, ci) => {
+          const parsed = parseNumsFrom(c, 0);
+          if(parsed.length){
+            const best = parsed.reduce((a,b) => Math.abs(b.n) > Math.abs(a.n) ? b : a);
+            nums.push({...best, colIdx: (baseColIdx || 0) + ci});
+          }
+        });
+      };
+      collectFrom(r, 0);
+      // 2. Если пусто — fallback на plain-text строку (числа могли не
+      // попасть в cols из-за классификации).
+      if(!nums.length){
+        const plain = lines[r.lineIdx] || '';
+        const parsed = parseNumsFrom(plain, 0);
+        if(parsed.length) nums = parsed.map((p, ci) => ({...p, colIdx: ci}));
+      }
+      // 3. Look-ahead: «Итого …» может быть без чисел, а числа — на
+      // следующих 1-2 строках (той же страницы).
+      if(!nums.length){
+        for(let la = 1; la <= 2; la++){
+          const next = byLineIdx.get(r.lineIdx + la);
+          if(!next || next.page !== r.page) break;
+          if(next.desc && lineMatchesHint(next.desc)) break; // следующая сама — кандидат
+          collectFrom(next, 0);
+          if(nums.length) break;
+          // fallback на её plain-text
+          const plain = lines[r.lineIdx + la] || '';
+          const parsed = parseNumsFrom(plain, 0);
+          if(parsed.length){
+            nums = parsed.map((p, ci) => ({...p, colIdx: ci}));
+            break;
+          }
         }
-      });
+      }
       if(!nums.length) return;
 
       const idx = r.lineIdx;
@@ -5707,7 +5737,9 @@ function repPickerRenderSuggestions(text){
         pick: nums[0], allNums: nums, maxAbs, header, table: true, colLabels
       });
     });
-  } else {
+  }
+  // Fallback: табличный режим ничего не нашёл — пробуем текстовый.
+  if(!useTable || candidates.length === 0){
   // ТЕКСТОВЫЙ РЕЖИМ (fallback для не-PDF или старого кода).
   lines.forEach((line, idx) => {
     if(!lineMatchesHint(line)) return;
