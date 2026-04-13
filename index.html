@@ -1899,8 +1899,13 @@ const RSBU_CODE_SET = new Set([
 async function extractPdfTextLines(pdf, maxPages=80) {
   // Сохраняем для просмотрщика PDF (рендеринг страницы с подсветкой чисел).
   window._pickerPdfDoc = pdf;
+  window._pickerPdfTableRows = [];           // структурные строки: {lineIdx, page, desc, cols}
+  window._pickerPdfPageHeaders = {};         // страница → массив колоночных подписей
+  const tableRows = window._pickerPdfTableRows;
+  const pageHeaders = window._pickerPdfPageHeaders;
   const pageBoundaries = [0]; // номер первой строки каждой страницы
   let out = '';
+  let curLineIdx = 0;
   const pages = Math.min(pdf.numPages, maxPages);
   for(let i = 1; i <= pages; i++) {
     let page;
@@ -2052,10 +2057,19 @@ async function extractPdfTextLines(pdf, maxPages=80) {
         .map(([,v]) => v.trim())
         .filter(Boolean);
       if(desc || valCells.length) {
+        tableRows.push({lineIdx: curLineIdx, page: i, desc, cols: valCells.slice()});
+        // Если строка без чисел и содержит год / дату-период — вероятно это
+        // часть шапки колонок текущей страницы. Копим, чтобы потом подписать колонки.
+        if(!valCells.length && /(19|20)\d{2}|закончи|по состоянию|месяц|полугод|квартал/i.test(desc) && desc.length < 220){
+          if(!pageHeaders[i]) pageHeaders[i] = [];
+          pageHeaders[i].push(desc);
+        }
         out += [desc, ...valCells].join('\t') + '\n';
+        curLineIdx++;
       }
     }
     out += '\n';
+    curLineIdx++;
     // Запомнить, сколько строк уже в out — старт следующей страницы.
     pageBoundaries.push((out.match(/\n/g) || []).length);
   }
@@ -5623,7 +5637,78 @@ function repPickerRenderSuggestions(text){
     return out;
   };
 
+  // ТАБЛИЧНЫЙ РЕЖИМ: если PDF был разобран в структуру (desc + cols[]),
+  // используем её — в ней числа уже разнесены по колонкам, и описание
+  // статьи не мешается с цифрами.
+  const tableRows = window._pickerPdfTableRows || [];
+  const pageHeaders = window._pickerPdfPageHeaders || {};
+  const useTable = tableRows.length > 0;
   const candidates = [];
+
+  if(useTable){
+    tableRows.forEach(r => {
+      const desc = r.desc || '';
+      if(!lineMatchesHint(desc)) return;
+      // Собираем по одному числу из каждой колонки (первое значащее).
+      const nums = [];
+      r.cols.forEach((c, ci) => {
+        const parsed = parseNumsFrom(c, 0);
+        if(parsed.length){
+          // Чаще всего в ячейке одно значение; если несколько — берём
+          // самое большое (прим.: «(1 234)» + «567» = −1234 или 567).
+          const best = parsed.reduce((a,b) => Math.abs(b.n) > Math.abs(a.n) ? b : a);
+          nums.push({...best, colIdx: ci});
+        }
+      });
+      if(!nums.length) return;
+
+      const idx = r.lineIdx;
+      const maxAbs = nums.reduce((acc, x) => Math.max(acc, Math.abs(x.n)), 0);
+      const descLower = desc.toLowerCase();
+      const mAll = descLower.match(new RegExp(hintRe.source, 'ig')) || [];
+      const matchLen = mAll.reduce((a,b)=>a + b.length, 0);
+      let score = matchLen + Math.log10(maxAbs + 10) * 3;
+
+      // Шапка раздела (восстановим как и в текстовом режиме).
+      const header = repPickerFindColumnHeader(lines, idx) || '';
+      const headerLc = header.toLowerCase();
+      if(/влияни|пересч|перес\s*чит|restat/i.test(headerLc)) score -= 6;
+      const yearsInHeader = (header.match(/\b20\d{2}\b/g) || []);
+      if(yearsInHeader.length >= 2) score += 4;
+      const nowYear = new Date().getFullYear();
+      if(yearsInHeader.includes(String(nowYear))) score += 1;
+      if(yearsInHeader.includes(String(nowYear-1))) score += 1;
+
+      if(/^\s*(итого|всего|total)\b/i.test(desc)) score += 6;
+      if(/^\s*от\s+[а-я]/i.test(desc)) score -= 3;
+      if(/признаваема(я|ой)/i.test(desc) && !/итого|всего/i.test(desc)) score -= 1;
+
+      const ctx = repPickerCtxFor(f.id);
+      if(ctx){
+        const from = Math.max(0, idx - 6);
+        const to   = Math.min(lines.length - 1, idx + 6);
+        let nearHits = 0, antiHits = 0;
+        for(let k = from; k <= to; k++){
+          if(k === idx) continue;
+          const L = lines[k] || '';
+          if(!L.trim()) continue;
+          if(ctx.near && ctx.near.test(L)) nearHits++;
+          if(ctx.anti && ctx.anti.test(L)) antiHits++;
+        }
+        score += Math.min(nearHits, 3) * 1.5;
+        score -= Math.min(antiHits, 3) * 2.0;
+      }
+
+      // Подписи колонок для карточки — из накопленной шапки страницы.
+      const colLabels = (pageHeaders[r.page] || []).slice();
+
+      candidates.push({
+        idx, line: desc, origLine: desc, score,
+        pick: nums[0], allNums: nums, maxAbs, header, table: true, colLabels
+      });
+    });
+  } else {
+  // ТЕКСТОВЫЙ РЕЖИМ (fallback для не-PDF или старого кода).
   lines.forEach((line, idx) => {
     if(!lineMatchesHint(line)) return;
     let nums = parseNumsFrom(line, 0);
@@ -5697,6 +5782,7 @@ function repPickerRenderSuggestions(text){
 
     candidates.push({idx, line: displayLine, origLine: line, score, pick: last, allNums: nums, maxAbs, header});
   });
+  } // else (text mode)
 
   if(!candidates.length){ box.style.display = 'none'; return; }
 
@@ -5738,13 +5824,24 @@ function repPickerRenderSuggestions(text){
       row.appendChild(hd);
     }
 
-    // Все числа строки как равноправные кнопки.
-    // Порядок колонок (текущий / прошлый период) автоматически
-    // определить нельзя — в разных отчётах разный, поэтому никакую
-    // кнопку не подсвечиваем как «главную».
+    // Если табличный режим — над числами показываем подписи колонок
+    // (даты / «2025 / 2024») в один ряд с кнопками-значениями.
     const numsBar = document.createElement('div');
-    numsBar.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;flex:1 1 100%';
+    numsBar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;flex:1 1 100%;align-items:flex-end';
     c.allNums.forEach((num, i) => {
+      const cell = document.createElement('div');
+      cell.style.cssText = 'display:flex;flex-direction:column;gap:2px';
+      if(c.table){
+        const lab = document.createElement('div');
+        lab.style.cssText = 'font-size:.52rem;color:var(--text3);text-align:center;letter-spacing:.05em';
+        // Подпись: либо по indexColIdx из подписей страницы, либо «кол. N»
+        const labels = c.colLabels || [];
+        // Самый частый сценарий — 2 колонки «текущий | прошлый».
+        const yearInLabels = labels.join(' ').match(/\b(19|20)\d{2}\b/g) || [];
+        const colIdx = num.colIdx != null ? num.colIdx : i;
+        lab.textContent = yearInLabels[colIdx] || ('кол. ' + (colIdx+1));
+        cell.appendChild(lab);
+      }
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = num.raw;
@@ -5752,7 +5849,8 @@ function repPickerRenderSuggestions(text){
       b.className = 'btn btn-sm';
       b.style.cssText = 'padding:3px 8px;font-size:.64rem';
       b.onclick = () => repPickerAssign(num.n, b);
-      numsBar.appendChild(b);
+      cell.appendChild(b);
+      numsBar.appendChild(cell);
     });
     row.appendChild(numsBar);
 
