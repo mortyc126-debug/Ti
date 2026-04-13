@@ -1902,12 +1902,56 @@ async function extractPdfTextLines(pdf, maxPages=80) {
       if(!byLine.has(key)) byLine.set(key, []);
       byLine.get(key).push(it);
     }
+
+    // 1.5. Склейка соседних items ВНУТРИ строки.
+    // PDF-экстрактор часто отдаёт один визуальный токен («2025»,
+    // «30 июня 2025 года») как несколько items подряд с почти нулевым
+    // горизонтальным зазором. Это рвёт даты («202 4 года») и делает
+    // классификацию колонок неверной. Склеиваем, если между концом
+    // предыдущего и началом следующего gap < 0.18 × avgH И по Y совпадают.
+    for(const [k, arr] of byLine) {
+      arr.sort((a,b) => a.transform[4] - b.transform[4]);
+      const merged = [];
+      for(const it of arr) {
+        const last = merged[merged.length - 1];
+        if(last) {
+          const lastEnd = last.transform[4] + (last.width || 0);
+          const gap = it.transform[4] - lastEnd;
+          const h = last.height || it.height || avgH;
+          // Не склеиваем если был явный пробел-разделитель (≥0.18×h).
+          // Также не склеиваем «последнее — число, это — число» если
+          // между ними любой видимый зазор: это может быть соседняя
+          // колонка таблицы.
+          const bothNumeric = /^\s*-?[\d\s\u00a0.,()]+$/.test(last.str||'')
+                           && /^\s*-?[\d\s\u00a0.,()]+$/.test(it.str||'');
+          const threshold = bothNumeric ? 0.05 : 0.18;
+          if(gap < h * threshold){
+            last.str = (last.str || '') + (it.str || '');
+            last.width = (it.transform[4] + (it.width || 0)) - last.transform[4];
+            continue;
+          }
+        }
+        merged.push({
+          str: it.str || '',
+          transform: it.transform.slice(),
+          width: it.width || 0,
+          height: it.height || avgH,
+        });
+      }
+      byLine.set(k, merged);
+    }
+
     const linesOrdered = [...byLine.entries()].sort((a,b) => b[0] - a[0]);
+
+    // После merge переcбираем плоский items2 для кластеризации/классификации,
+    // чтобы они работали с уже склеенными токенами.
+    const items2 = [];
+    for(const [, arr] of byLine) for(const it of arr) items2.push(it);
 
     // 2. Кластеризация X всех items + классификация каждой колонки.
     // Плотные пороги: 1.3 × avgH между кластерами (раньше было 2×)
     // — так лучше отделяются узкие соседние числовые колонки.
-    const allXs = items.map(it => it.transform[4]).sort((a,b) => a-b);
+    const allXs = items2.map(it => it.transform[4]).sort((a,b) => a-b);
     const COL_GAP = avgH * 1.3;
     const colStarts = [];
     if(allXs.length) {
@@ -1929,7 +1973,7 @@ async function extractPdfTextLines(pdf, maxPages=80) {
     // — подавляющее большинство (80%+) её items должны быть такими.
     const NUM_PURE = /^\s*\(?-?[\d][\d \u00a0,.]{0,}\)?\s*$/;
     const colKinds = colStarts.map((_, ci) => {
-      const bucket = items.filter(it => colOf(it.transform[4]) === ci);
+      const bucket = items2.filter(it => colOf(it.transform[4]) === ci);
       if(!bucket.length) return 'desc';
       let numeric = 0, rsbu = 0, note = 0, big = 0, text = 0;
       for(const it of bucket) {
