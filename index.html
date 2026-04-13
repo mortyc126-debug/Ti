@@ -5373,10 +5373,30 @@ function repPickerShouldShow(n, f){
   return true;
 }
 
+// Ищем ближайшую сверху строку-шапку таблицы (годы, даты, "(в млн
+// ₽)" и т.п.) — она помогает понять, где текущий период, где прошлый.
+function repPickerFindColumnHeader(lines, fromIdx){
+  const yearRe = /\b(19|20)\d{2}\b/;
+  const monthRe = /(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)/i;
+  let best = null;
+  for(let i = fromIdx - 1; i >= Math.max(0, fromIdx - 40); i--){
+    const L = (lines[i] || '').trim();
+    if(!L) continue;
+    const years = L.match(/\b(19|20)\d{2}\b/g) || [];
+    const hasMonth = monthRe.test(L);
+    // Шапка сравнения: 2+ годов, или год+месяц, или 2+ дат.
+    if(years.length >= 2 || (years.length >= 1 && hasMonth)){
+      return L;
+    }
+    // Первый встреченный год запомним как fallback
+    if(!best && (years.length >= 1 || hasMonth)) best = L;
+    // Не прыгать слишком далеко за границу раздела.
+    if(/^\s*\d+\s*$/.test(L) && best) break; // номер страницы
+  }
+  return best;
+}
+
 // ── Самые вероятные кандидаты для активного поля ──
-// Алгоритм: берём hint активного поля → для каждой строки, содержащей
-// hint, считаем score (кол-во матчей × длину) и берём самое «правое
-// большое число» — в таблицах это обычно колонка итога.
 function repPickerRenderSuggestions(text){
   const box = document.getElementById('rep-picker-suggest');
   const list = document.getElementById('rep-picker-suggest-list');
@@ -5430,18 +5450,39 @@ function repPickerRenderSuggestions(text){
 
   top.forEach(c => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 8px;background:var(--bg);border:1px solid var(--border)';
+    row.style.cssText = 'display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;padding:6px 8px;background:var(--bg);border:1px solid var(--border)';
+
+    // Заголовок карточки: название статьи + (если найдена) шапка колонок
+    const head = document.createElement('div');
+    head.style.cssText = 'flex:1 1 100%;display:flex;justify-content:space-between;gap:8px;align-items:baseline';
+
     const desc = document.createElement('div');
-    desc.style.cssText = 'flex:1 1 100%;font-size:.6rem;color:var(--text2);line-height:1.4';
+    desc.style.cssText = 'font-size:.62rem;color:var(--text2);line-height:1.4;flex:1';
     desc.title = c.line;
     const firstNumPos = c.allNums[0].pos;
     const descText = (c.line.slice(0, firstNumPos) || c.line).trim().replace(/\s+/g,' ');
     desc.textContent = descText.slice(0, 100) + (descText.length > 100 ? '…' : '');
-    row.appendChild(desc);
+    head.appendChild(desc);
 
-    // Все числа строки как равноправные кнопки (в исходном порядке).
-    // В отчётности обычно 2+ колонок (текущий / прошлый период + сегменты),
-    // автоматически не угадаешь, какое нужно — пусть юзер выбирает.
+    const ctxBtn = document.createElement('button');
+    ctxBtn.type = 'button';
+    ctxBtn.textContent = 'ⓘ контекст';
+    ctxBtn.className = 'btn btn-sm';
+    ctxBtn.style.cssText = 'padding:2px 6px;font-size:.55rem';
+    head.appendChild(ctxBtn);
+    row.appendChild(head);
+
+    // Шапка колонок (даты/годы из ближайшей строки сверху).
+    const colHeader = repPickerFindColumnHeader(lines, c.idx);
+    if(colHeader){
+      const hd = document.createElement('div');
+      hd.style.cssText = 'flex:1 1 100%;font-size:.56rem;color:var(--acc);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      hd.title = 'Шапка таблицы (ближайшая строка сверху с датой/годом)';
+      hd.textContent = '↑ колонки: ' + colHeader.slice(0, 120);
+      row.appendChild(hd);
+    }
+
+    // Все числа строки как равноправные кнопки.
     const numsBar = document.createElement('div');
     numsBar.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;flex:1 1 100%';
     c.allNums.forEach((num, i) => {
@@ -5458,6 +5499,29 @@ function repPickerRenderSuggestions(text){
       numsBar.appendChild(b);
     });
     row.appendChild(numsBar);
+
+    // Inline-контекст (±3 строки), раскрывается кнопкой ⓘ.
+    const ctxBox = document.createElement('div');
+    ctxBox.style.cssText = 'display:none;flex:1 1 100%;margin-top:4px;padding:6px 8px;background:var(--s2);border-left:2px solid var(--acc);font-family:var(--mono);font-size:.58rem;line-height:1.6;color:var(--text2);white-space:pre-wrap';
+    row.appendChild(ctxBox);
+    ctxBtn.onclick = () => {
+      if(ctxBox.style.display === 'none'){
+        const from = Math.max(0, c.idx - 3);
+        const to = Math.min(lines.length - 1, c.idx + 3);
+        let ctx = '';
+        for(let k = from; k <= to; k++){
+          const marker = (k === c.idx) ? '▶ ' : '  ';
+          ctx += marker + (lines[k] || '') + '\n';
+        }
+        ctxBox.textContent = ctx;
+        ctxBox.style.display = 'block';
+        ctxBtn.textContent = 'ⓧ скрыть';
+      } else {
+        ctxBox.style.display = 'none';
+        ctxBtn.textContent = 'ⓘ контекст';
+      }
+    };
+
     list.appendChild(row);
   });
 
