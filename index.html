@@ -1342,7 +1342,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px;background:var(--s2);border:1px solid var(--border);font-size:.62rem">
         <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Фильтры:</div>
         <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">мин. |n| ≥
-          <input type="number" id="rep-picker-f-min" value="1" step="0.01" style="width:70px;padding:2px 4px" oninput="repPickerRerender()">
+          <input type="number" id="rep-picker-f-min" value="0" step="0.01" style="width:70px;padding:2px 4px" oninput="repPickerRerender()">
         </label>
         <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
           <input type="checkbox" id="rep-picker-f-nofrac" onchange="repPickerRerender()"> скрыть дробные
@@ -1354,17 +1354,23 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <input type="number" id="rep-picker-f-mindigits" value="1" min="1" max="12" step="1" style="width:50px;padding:2px 4px" oninput="repPickerRerender()">
         </label>
         <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
-          <input type="text" id="rep-picker-f-search" placeholder="поиск по строкам…" style="width:150px;padding:2px 6px" oninput="repPickerRerender()">
+          <input type="text" id="rep-picker-f-search" placeholder="поиск (| = или, напр. активы|итого)" style="width:220px;padding:2px 6px" oninput="repPickerRerender()">
         </label>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerResetFilters()">↻ сброс</button>
         <span id="rep-picker-stats" style="color:var(--text3);margin-left:auto"></span>
+      </div>
+
+      <!-- Быстрые пресеты по показателям -->
+      <div id="rep-picker-presets" style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 8px;background:var(--s1);border:1px solid var(--border);font-size:.6rem">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);align-self:center;margin-right:4px">Показатель →</div>
       </div>
 
       <!-- Ручной ввод числа -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px;background:var(--s2);border:1px solid var(--border);font-size:.62rem">
-        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Или вписать число вручную:</div>
-        <input type="text" id="rep-picker-manual" placeholder="напр. 63 540 или 63,5" style="width:160px;padding:3px 6px;font-family:var(--mono)">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Или вручную:</div>
+        <input type="text" id="rep-picker-manual" placeholder="напр. 63 540 или 435 877" style="width:160px;padding:3px 6px;font-family:var(--mono)">
+        <button type="button" class="btn btn-sm" onclick="repPickerGrabSelection()" title="Подхватить выделенный мышью фрагмент">📌 взять выделение</button>
         <button type="button" class="btn btn-sm" onclick="repPickerApplyManual()">✓ Применить к текущему полю</button>
-        <span style="color:var(--text3)">— можно вставить выделенный фрагмент из текста</span>
       </div>
 
       <div id="rep-picker-lines" style="max-height:44vh;overflow-y:auto;font-family:var(--mono);font-size:.62rem;line-height:1.85;background:var(--bg);border:1px solid var(--border2);padding:10px;white-space:pre-wrap"></div>
@@ -5052,19 +5058,20 @@ function repCopyRawText(){
 
 // ── Ручной подбор значений ──
 // Список целевых полей в том же порядке, в каком они идут в форме.
+// hint — ключевые слова строки отчёта, которые помогут найти нужные числа.
 const REP_PICKER_FIELDS = [
-  {id:'rep-np-rev',    label:'Выручка'},
-  {id:'rep-np-ebitda', label:'EBITDA'},
-  {id:'rep-np-np',     label:'Чистая прибыль'},
-  {id:'rep-np-ebit',   label:'EBIT'},
-  {id:'rep-np-assets', label:'Совокупные активы'},
-  {id:'rep-np-eq',     label:'Собственный капитал'},
-  {id:'rep-np-debt',   label:'Долг (кредиты+займы)'},
-  {id:'rep-np-cash',   label:'Денежные средства'},
-  {id:'rep-np-ca',     label:'Оборотные активы'},
-  {id:'rep-np-cl',     label:'Краткосрочные обяз.'},
-  {id:'rep-np-int',    label:'Процентные расходы'},
-  {id:'rep-np-ret',    label:'Нераспр. прибыль'},
+  {id:'rep-np-rev',    label:'Выручка',              hint:'выручка|revenue|доходы от реализации'},
+  {id:'rep-np-ebitda', label:'EBITDA',               hint:'ebitda'},
+  {id:'rep-np-np',     label:'Чистая прибыль',       hint:'чистая прибыль|net profit|net income|прибыль за (период|год)'},
+  {id:'rep-np-ebit',   label:'EBIT',                 hint:'ebit|операционная прибыль|прибыль от продаж|operating profit'},
+  {id:'rep-np-assets', label:'Совокупные активы',    hint:'всего активов|итого активов|total assets'},
+  {id:'rep-np-eq',     label:'Собственный капитал',  hint:'итого (собственного )?капитал|всего капитал|total equity'},
+  {id:'rep-np-debt',   label:'Долг (кредиты+займы)', hint:'кредиты и займы|заемные средства|долгосрочные заимствования|borrowings'},
+  {id:'rep-np-cash',   label:'Денежные средства',    hint:'денежные средства|cash'},
+  {id:'rep-np-ca',     label:'Оборотные активы',     hint:'итого оборотных активов|оборотные активы|current assets'},
+  {id:'rep-np-cl',     label:'Краткосрочные обяз.',  hint:'итого краткосрочных обязательств|краткосрочные обязательства|current liabilities'},
+  {id:'rep-np-int',    label:'Процентные расходы',   hint:'процентные расходы|проценты к уплате|interest expense'},
+  {id:'rep-np-ret',    label:'Нераспр. прибыль',     hint:'нераспределенн|нераспределённ|retained'},
 ];
 
 function repOpenPicker(){
@@ -5086,9 +5093,69 @@ function repOpenPicker(){
   }
   const unit = document.getElementById('rep-picker-unit');
   if(unit) unit.value = '0.001'; // по умолчанию млн ₽
+  // Рисуем кнопки-пресеты: клик ставит поле + включает поиск по hint.
+  const presetBox = document.getElementById('rep-picker-presets');
+  if(presetBox){
+    // чистим всё кроме вводного label (первый child)
+    while(presetBox.children.length > 1) presetBox.removeChild(presetBox.lastChild);
+    REP_PICKER_FIELDS.forEach(f => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = f.label;
+      b.className = 'btn btn-sm';
+      b.style.cssText = 'padding:2px 8px;font-size:.58rem';
+      b.onclick = () => repPickerPreset(f.id, f.hint);
+      presetBox.appendChild(b);
+    });
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.textContent = '🔓 показать всё';
+    all.className = 'btn btn-sm';
+    all.style.cssText = 'padding:2px 8px;font-size:.58rem;margin-left:auto';
+    all.onclick = () => { repPickerResetFilters(); };
+    presetBox.appendChild(all);
+  }
+  // По умолчанию сбрасываем фильтры на «пусто» — ничего лишнего не прячем.
+  repPickerResetFilters(true);
   repRenderPickerLines(text);
   repPickerUpdateCurrent();
   document.getElementById('modal-rep-picker').classList.add('open');
+}
+
+// Кликнули по кнопке-пресету: выставляем поле + ставим поиск по ключевым словам.
+function repPickerPreset(fieldId, hint){
+  const sel = document.getElementById('rep-picker-target');
+  if(sel){
+    for(let i=0;i<sel.options.length;i++){
+      if(sel.options[i].value === fieldId){ sel.selectedIndex = i; break; }
+    }
+  }
+  const searchEl = document.getElementById('rep-picker-f-search');
+  if(searchEl){ searchEl.value = hint || ''; }
+  repPickerUpdateCurrent();
+  repPickerRerender();
+}
+
+// Сброс фильтров к дефолту (не скрываем мелкие числа).
+function repPickerResetFilters(skipRender){
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.value = val; };
+  const chk = (id, val) => { const el=document.getElementById(id); if(el) el.checked = val; };
+  set('rep-picker-f-min', '0');
+  chk('rep-picker-f-nofrac', false);
+  chk('rep-picker-f-intonly', false);
+  set('rep-picker-f-mindigits', '1');
+  set('rep-picker-f-search', '');
+  if(!skipRender) repPickerRerender();
+}
+
+// Подхватить выделенный мышью фрагмент (из текста модалки или с любой части страницы).
+function repPickerGrabSelection(){
+  const sel = (window.getSelection && window.getSelection().toString()) || '';
+  const el = document.getElementById('rep-picker-manual');
+  if(!el) return;
+  if(!sel.trim()){ alert('Сначала выделите фрагмент текста в распознанном тексте.'); return; }
+  el.value = sel.trim();
+  el.focus();
 }
 
 // Форматирование числа из найденной строки в JS-число.
@@ -5156,9 +5223,21 @@ function repRenderPickerLines(text){
   const numRe = /-?\(?-?\d[\d\s\u00a0.,]*\d\)?|-?\d/g;
   let totalNums = 0, shownNums = 0, shownLines = 0;
 
+  // Поиск: если есть '|' — интерпретируем как regex-альтернативы.
+  let searchRe = null;
+  if(f.search){
+    try { searchRe = new RegExp(f.search, 'i'); }
+    catch(e){ searchRe = null; }
+  }
+  const lineMatchesSearch = (line) => {
+    if(!f.search) return true;
+    if(searchRe) return searchRe.test(line);
+    return line.toLowerCase().indexOf(f.search) >= 0;
+  };
+
   lines.forEach((line, idx) => {
     // Поиск по строкам — отфильтровываем целиком
-    if(f.search && line.toLowerCase().indexOf(f.search) < 0) return;
+    if(!lineMatchesSearch(line)) return;
 
     const matches = [];
     let m; numRe.lastIndex = 0;
