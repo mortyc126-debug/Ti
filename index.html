@@ -770,19 +770,19 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <div class="card-hdr">P&amp;L (млрд ₽)</div>
           <div class="card-body" style="display:flex;flex-direction:column;gap:9px">
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Выручка</label><input type="number" id="is-rev" placeholder="8540" step="0.1"></div><button class="sp-field-btn" id="spb-is-rev" onclick="searchSingleField('is-rev','Выручка (Revenue)')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>EBITDA</label><input type="number" id="is-ebitda" placeholder="1820" step="0.1"></div><button class="sp-field-btn" id="spb-is-ebitda" onclick="searchSingleField('is-ebitda','EBITDA')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Выручка</label><input type="number" id="is-rev" placeholder="8540" step="0.1"></div><button class="sp-field-btn" id="spb-is-rev" onclick="openFieldLookup('is-rev','Выручка (Revenue)')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>EBITDA</label><input type="number" id="is-ebitda" placeholder="1820" step="0.1"></div><button class="sp-field-btn" id="spb-is-ebitda" onclick="openFieldLookup('is-ebitda','EBITDA')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>EBIT (опер. прибыль)</label><input type="number" id="is-ebit" placeholder="1240" step="0.1"></div><button class="sp-field-btn" id="spb-is-ebit" onclick="searchSingleField('is-ebit','EBIT операционная прибыль')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>Чистая прибыль</label><input type="number" id="is-np" placeholder="620" step="0.1"></div><button class="sp-field-btn" id="spb-is-np" onclick="searchSingleField('is-np','Чистая прибыль')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>EBIT (опер. прибыль)</label><input type="number" id="is-ebit" placeholder="1240" step="0.1"></div><button class="sp-field-btn" id="spb-is-ebit" onclick="openFieldLookup('is-ebit','EBIT операционная прибыль')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Чистая прибыль</label><input type="number" id="is-np" placeholder="620" step="0.1"></div><button class="sp-field-btn" id="spb-is-np" onclick="openFieldLookup('is-np','Чистая прибыль')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Процентные расходы</label><input type="number" id="is-int" placeholder="380" step="0.1"></div><button class="sp-field-btn" id="spb-is-int" onclick="searchSingleField('is-int','Процентные расходы')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>Налог на прибыль</label><input type="number" id="is-tax" placeholder="155" step="0.1"></div><button class="sp-field-btn" id="spb-is-tax" onclick="searchSingleField('is-tax','Налог на прибыль')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Процентные расходы</label><input type="number" id="is-int" placeholder="380" step="0.1"></div><button class="sp-field-btn" id="spb-is-int" onclick="openFieldLookup('is-int','Процентные расходы')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Налог на прибыль</label><input type="number" id="is-tax" placeholder="155" step="0.1"></div><button class="sp-field-btn" id="spb-is-tax" onclick="openFieldLookup('is-tax','Налог на прибыль')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Амортизация (D&A)</label><input type="number" id="is-dep" placeholder="120" step="0.1"></div><button class="sp-field-btn" id="spb-is-dep" onclick="searchSingleField('is-dep','Амортизация Depreciation')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Амортизация (D&A)</label><input type="number" id="is-dep" placeholder="120" step="0.1"></div><button class="sp-field-btn" id="spb-is-dep" onclick="openFieldLookup('is-dep','Амортизация Depreciation')" title="Найти">🔍</button></div>
               <div style="font-size:.58rem;color:var(--text3);align-self:flex-end;padding-bottom:8px;line-height:1.5">Нужна для точного расчёта EBITDA.<br>Если не указана — считается приближённо.</div>
             </div>
           </div>
@@ -793,20 +793,20 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <div class="card-hdr">Баланс (млрд ₽)</div>
           <div class="card-body" style="display:flex;flex-direction:column;gap:9px">
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Совокупные активы</label><input type="number" id="is-assets" placeholder="25400" step="0.1"></div><button class="sp-field-btn" id="spb-is-assets" onclick="searchSingleField('is-assets','Совокупные активы Total assets')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>Оборотные активы</label><input type="number" id="is-ca" placeholder="3200" step="0.1"></div><button class="sp-field-btn" id="spb-is-ca" onclick="searchSingleField('is-ca','Оборотные активы Current assets')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Совокупные активы</label><input type="number" id="is-assets" placeholder="25400" step="0.1"></div><button class="sp-field-btn" id="spb-is-assets" onclick="openFieldLookup('is-assets','Совокупные активы Total assets')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Оборотные активы</label><input type="number" id="is-ca" placeholder="3200" step="0.1"></div><button class="sp-field-btn" id="spb-is-ca" onclick="openFieldLookup('is-ca','Оборотные активы Current assets')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Краткосрочные обязат.</label><input type="number" id="is-cl" placeholder="2100" step="0.1"></div><button class="sp-field-btn" id="spb-is-cl" onclick="searchSingleField('is-cl','Краткосрочные обязательства Current liabilities')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>Совокупный долг</label><input type="number" id="is-debt" placeholder="5800" step="0.1"></div><button class="sp-field-btn" id="spb-is-debt" onclick="searchSingleField('is-debt','Совокупный долг Total debt кредиты займы')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Краткосрочные обязат.</label><input type="number" id="is-cl" placeholder="2100" step="0.1"></div><button class="sp-field-btn" id="spb-is-cl" onclick="openFieldLookup('is-cl','Краткосрочные обязательства Current liabilities')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Совокупный долг</label><input type="number" id="is-debt" placeholder="5800" step="0.1"></div><button class="sp-field-btn" id="spb-is-debt" onclick="openFieldLookup('is-debt','Совокупный долг Total debt кредиты займы')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Денежные средства</label><input type="number" id="is-cash" placeholder="620" step="0.1"></div><button class="sp-field-btn" id="spb-is-cash" onclick="searchSingleField('is-cash','Денежные средства Cash equivalents')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>Нераспр. прибыль</label><input type="number" id="is-ret" placeholder="4100" step="0.1"></div><button class="sp-field-btn" id="spb-is-ret" onclick="searchSingleField('is-ret','Нераспределённая прибыль Retained earnings')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Денежные средства</label><input type="number" id="is-cash" placeholder="620" step="0.1"></div><button class="sp-field-btn" id="spb-is-cash" onclick="openFieldLookup('is-cash','Денежные средства Cash equivalents')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Нераспр. прибыль</label><input type="number" id="is-ret" placeholder="4100" step="0.1"></div><button class="sp-field-btn" id="spb-is-ret" onclick="openFieldLookup('is-ret','Нераспределённая прибыль Retained earnings')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
-              <div class="field-wrap"><div class="field"><label>Собственный капитал</label><input type="number" id="is-eq" placeholder="12300" step="0.1"></div><button class="sp-field-btn" id="spb-is-eq" onclick="searchSingleField('is-eq','Собственный капитал Total equity')" title="Найти">🔍</button></div>
-              <div class="field-wrap"><div class="field"><label>Рыночная кап-я (если публ.)</label><input type="number" id="is-mkt" placeholder="3800" step="0.1"></div><button class="sp-field-btn" id="spb-is-mkt" onclick="searchSingleField('is-mkt','Рыночная капитализация')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Собственный капитал</label><input type="number" id="is-eq" placeholder="12300" step="0.1"></div><button class="sp-field-btn" id="spb-is-eq" onclick="openFieldLookup('is-eq','Собственный капитал Total equity')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Рыночная кап-я (если публ.)</label><input type="number" id="is-mkt" placeholder="3800" step="0.1"></div><button class="sp-field-btn" id="spb-is-mkt" onclick="openFieldLookup('is-mkt','Рыночная капитализация')" title="Найти">🔍</button></div>
             </div>
           </div>
         </div>
@@ -815,7 +815,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <div class="card-body" style="display:flex;flex-direction:column;gap:9px">
             <div class="g2">
               <div class="field-wrap"><div class="field"><label>Объём выпуска (млрд ₽)</label><input type="number" id="is-sz" placeholder="50" step="0.1"></div><button class="sp-field-btn" id="spb-is-sz" onclick="searchVolumeFromMoex()" title="Найти на MOEX" style="border-color:var(--acc2);color:var(--acc2)">📊</button></div>
-              <div class="field-wrap"><div class="field"><label>Пиковые выплаты / год (млрд ₽)</label><input type="number" id="is-peak" placeholder="180" step="0.1"></div><button class="sp-field-btn" id="spb-is-peak" onclick="searchSingleField('is-peak','Пиковые выплаты долга погашение')" title="Найти">🔍</button></div>
+              <div class="field-wrap"><div class="field"><label>Пиковые выплаты / год (млрд ₽)</label><input type="number" id="is-peak" placeholder="180" step="0.1"></div><button class="sp-field-btn" id="spb-is-peak" onclick="openFieldLookup('is-peak','Пиковые выплаты долга погашение')" title="Найти">🔍</button></div>
             </div>
             <div class="g2">
               <div class="field"><label>Ставка купона, %</label><input type="number" id="is-coup" placeholder="11.5" step="0.01"></div>
@@ -1269,9 +1269,10 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         </div>
         <div id="rep-np-parse-log" style="display:none;margin-top:8px;font-size:.62rem;line-height:1.8;color:var(--text2);max-height:180px;overflow-y:auto"></div>
         <div id="rep-np-raw-wrap" style="display:none;margin-top:8px">
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div id="rep-np-tools-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button type="button" class="btn btn-sm" onclick="repToggleRawText()" id="rep-np-raw-btn">📄 Показать распознанный текст</button>
             <button type="button" class="btn btn-sm" onclick="repCopyRawText()" title="Скопировать в буфер — можно прислать для отладки">📋 Скопировать</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenPicker()" title="Кликать по числам в распознанном тексте и раскидывать их по полям вручную">🎯 Ручной подбор</button>
           </div>
           <textarea id="rep-np-raw-text" readonly style="display:none;width:100%;margin-top:6px;min-height:150px;max-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:8px;white-space:pre"></textarea>
         </div>
@@ -1307,6 +1308,160 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-period')">Отмена</button>
       <button class="btn btn-p" onclick="repSavePeriod()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Field lookup menu: маленькая модалка с выбором источника -->
+<div class="modal-overlay" id="modal-field-lookup">
+  <div class="modal" style="width:380px;max-width:96vw">
+    <div class="modal-hdr">🔍 Найти: <span id="fl-field-label" style="color:var(--acc)"></span><button class="modal-x" onclick="closeModal('modal-field-lookup')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" class="btn" style="text-align:left" onclick="flRunAiSearch()">🤖 AI-поиск (интернет)</button>
+      <button type="button" class="btn" style="text-align:left" onclick="flLoadPdf()">📂 Ручной подбор из PDF</button>
+      <button type="button" class="btn" style="text-align:left" onclick="flPasteText()">📝 Вставить распознанный текст</button>
+      <div id="fl-recent-info" style="font-size:.58rem;color:var(--text3);line-height:1.5"></div>
+      <input type="file" id="fl-pdf-input" accept=".pdf,.docx,.xlsx,.xls" style="display:none">
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-field-lookup')">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- Paste-text modal -->
+<div class="modal-overlay" id="modal-paste-text">
+  <div class="modal" style="width:600px;max-width:96vw">
+    <div class="modal-hdr">📝 Вставить распознанный текст <button class="modal-x" onclick="closeModal('modal-paste-text')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px">Вставьте текст из PDF (например через Adobe Reader / копирование со страницы), после — откроется ручной подбор.</div>
+      <textarea id="fl-paste-area" style="width:100%;min-height:220px;font-family:var(--mono);font-size:.62rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-paste-text')">Отмена</button>
+      <button class="btn btn-p" onclick="flAcceptPastedText()">Далее → подбор</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual picker modal: кликать по числам в распознанном тексте --><div class="modal-overlay" id="modal-rep-picker">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div class="modal-hdr">🎯 Ручной подбор значений <button class="modal-x" onclick="closeModal('modal-rep-picker')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:.63rem;color:var(--text2);line-height:1.6">
+        Выберите поле и единицы, затем кликните по числу в тексте — оно попадёт в выбранное поле, курсор сам перейдёт на следующее.
+        Коды РСБУ и числа |n|&lt;1 скрыты. Фильтры ниже помогают убрать мусор.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;padding:8px;background:var(--s1);border:1px solid var(--border)">
+        <div class="field" style="flex:1;min-width:200px">
+          <label>Назначаю на поле</label>
+          <select id="rep-picker-target" onchange="repPickerUpdateCurrent()"></select>
+        </div>
+        <div class="field" style="min-width:140px">
+          <label>Единицы</label>
+          <select id="rep-picker-unit">
+            <option value="1">млрд ₽ (×1)</option>
+            <option value="0.001" selected>млн ₽ (×0.001)</option>
+            <option value="0.000001">тыс. ₽ (×0.000001)</option>
+            <option value="0.000000001">₽ (×10⁻⁹)</option>
+          </select>
+        </div>
+        <div id="rep-picker-current" style="font-size:.62rem;color:var(--text3);flex-basis:100%"></div>
+      </div>
+
+      <!-- Фильтры отображаемых чипов -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px;background:var(--s2);border:1px solid var(--border);font-size:.62rem">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Фильтры:</div>
+        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">мин. |n| ≥
+          <input type="number" id="rep-picker-f-min" value="0" step="0.01" style="width:70px;padding:2px 4px" oninput="repPickerRerender()">
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="rep-picker-f-nofrac" onchange="repPickerRerender()"> скрыть дробные
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="rep-picker-f-intonly" onchange="repPickerRerender()"> только целые
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">мин. цифр
+          <input type="number" id="rep-picker-f-mindigits" value="1" min="1" max="12" step="1" style="width:50px;padding:2px 4px" oninput="repPickerRerender()">
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="text" id="rep-picker-f-search" placeholder="поиск (| = или, напр. активы|итого)" style="width:220px;padding:2px 6px" oninput="repPickerRerender()">
+        </label>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerResetFilters()">↻ сброс</button>
+        <span id="rep-picker-stats" style="color:var(--text3);margin-left:auto"></span>
+      </div>
+
+      <!-- Быстрые пресеты по показателям -->
+      <div id="rep-picker-presets" style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 8px;background:var(--s1);border:1px solid var(--border);font-size:.6rem">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);align-self:center;margin-right:4px">Показатель →</div>
+      </div>
+
+      <!-- Ручной ввод числа -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px;background:var(--s2);border:1px solid var(--border);font-size:.62rem">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Или вручную:</div>
+        <input type="text" id="rep-picker-manual" placeholder="напр. 63 540 или 435 877" style="width:160px;padding:3px 6px;font-family:var(--mono)">
+        <button type="button" class="btn btn-sm" onclick="repPickerGrabSelection()" title="Подхватить выделенный мышью фрагмент">📌 взять выделение</button>
+        <button type="button" class="btn btn-sm" onclick="repPickerApplyManual()">✓ Применить к текущему полю</button>
+        <button type="button" class="btn btn-sm" onclick="repPickerSkip()" title="Значения в отчёте нет — очистить поле и перейти к следующему" style="color:var(--danger,#c44);border-color:var(--danger,#c44)">✗ нет в отчёте</button>
+      </div>
+
+      <!-- Top-кандидаты: строки с наибольшей релевантностью к активному полю -->
+      <div id="rep-picker-suggest" style="display:none;flex-direction:column;gap:4px;padding:8px;background:linear-gradient(180deg,var(--s2),var(--s1));border:1px solid var(--acc);font-size:.62rem">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)">★ Кандидаты для «<span id="rep-picker-suggest-label">—</span>»</div>
+        <div id="rep-picker-suggest-list" style="display:flex;flex-direction:column;gap:4px"></div>
+        <div style="font-size:.56rem;color:var(--text3)">Клик по числу справа → значение попадёт в выбранное поле с учётом единиц.</div>
+      </div>
+
+      <div id="rep-picker-lines" style="max-height:40vh;overflow-y:auto;font-family:var(--mono);font-size:.62rem;line-height:1.85;background:var(--bg);border:1px solid var(--border2);padding:10px;white-space:pre-wrap"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-rep-picker')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Просмотрщик контекста (pre-formatted, без переносов) -->
+<div class="modal-overlay" id="modal-picker-context">
+  <div class="modal" style="width:92vw;max-width:1200px;height:82vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">📖 Контекст отчёта <span id="ctx-info" style="font-size:.6rem;color:var(--text3);margin-left:8px"></span><button class="modal-x" onclick="pickerCtxClose()">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;flex:1">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.6rem;padding:6px;background:var(--s1);border:1px solid var(--border)">
+        <label>строк до:<input type="number" id="ctx-before" value="5" min="0" max="500" style="width:55px;margin-left:4px;padding:2px 4px" oninput="repPickerCtxRender()"></label>
+        <label>после:<input type="number" id="ctx-after" value="5" min="0" max="500" style="width:55px;margin-left:4px;padding:2px 4px" oninput="repPickerCtxRender()"></label>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(5,5)">±5</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(15,15)">±15</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(40,40)">±40</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="repPickerCtxSet(100,100)">±100</button>
+        <span style="color:var(--text3)">·</span>
+        <span>поиск:</span>
+        <input type="text" id="ctx-search" placeholder="подсветить…" style="padding:2px 6px;width:150px" oninput="repPickerCtxRender()">
+        <button type="button" class="btn btn-sm btn-p" style="padding:2px 8px;font-size:.58rem;margin-left:auto" onclick="pdfvOpenFromCtx()" title="Показать исходную страницу PDF с кликабельными числами">📄 PDF-вид</button>
+      </div>
+      <div id="ctx-text" style="flex:1;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="pickerCtxClose()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF-вид: рендерим страницу оригинала + абсолютно позиционированные
+     кликабельные числа поверх -->
+<div class="modal-overlay" id="modal-pdf-view">
+  <div class="modal" style="width:96vw;max-width:1400px;height:94vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      📄 PDF стр. <span id="pdfv-page">?</span> / <span id="pdfv-total">?</span>
+      <span style="margin-left:12px;display:inline-flex;gap:4px">
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvNav(-1)">◀</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvNav(1)">▶</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvZoom(-1)">−</button>
+        <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvZoom(1)">+</button>
+      </span>
+      <span id="pdfv-hint" style="font-size:.58rem;color:var(--text3);margin-left:8px">тапни по числу — применится к текущему полю</span>
+      <button class="modal-x" onclick="pdfvClose()">✕</button>
+    </div>
+    <div id="pdfv-scroll" style="flex:1;overflow:auto;background:#2a2a2a;padding:8px;text-align:center">
+      <div id="pdfv-container" style="position:relative;display:inline-block;background:#fff"></div>
     </div>
   </div>
 </div>
@@ -1833,7 +1988,15 @@ function _looksLikeContinuation(prev, current){
 //      связь значения с годом.
 //   6) Колонки 'note' и 'code' игнорируются.
 async function extractPdfTextLines(pdf, maxPages=80) {
+  // Сохраняем для просмотрщика PDF (рендеринг страницы с подсветкой чисел).
+  window._pickerPdfDoc = pdf;
+  window._pickerPdfTableRows = [];           // структурные строки: {lineIdx, page, desc, cols}
+  window._pickerPdfPageHeaders = {};         // страница → массив колоночных подписей
+  const tableRows = window._pickerPdfTableRows;
+  const pageHeaders = window._pickerPdfPageHeaders;
+  const pageBoundaries = [0]; // номер первой строки каждой страницы
   let out = '';
+  let curLineIdx = 0;
   const pages = Math.min(pdf.numPages, maxPages);
   for(let i = 1; i <= pages; i++) {
     let page;
@@ -1859,12 +2022,56 @@ async function extractPdfTextLines(pdf, maxPages=80) {
       if(!byLine.has(key)) byLine.set(key, []);
       byLine.get(key).push(it);
     }
+
+    // 1.5. Склейка соседних items ВНУТРИ строки.
+    // PDF-экстрактор часто отдаёт один визуальный токен («2025»,
+    // «30 июня 2025 года») как несколько items подряд с почти нулевым
+    // горизонтальным зазором. Это рвёт даты («202 4 года») и делает
+    // классификацию колонок неверной. Склеиваем, если между концом
+    // предыдущего и началом следующего gap < 0.18 × avgH И по Y совпадают.
+    for(const [k, arr] of byLine) {
+      arr.sort((a,b) => a.transform[4] - b.transform[4]);
+      const merged = [];
+      for(const it of arr) {
+        const last = merged[merged.length - 1];
+        if(last) {
+          const lastEnd = last.transform[4] + (last.width || 0);
+          const gap = it.transform[4] - lastEnd;
+          const h = last.height || it.height || avgH;
+          // Не склеиваем если был явный пробел-разделитель (≥0.18×h).
+          // Также не склеиваем «последнее — число, это — число» если
+          // между ними любой видимый зазор: это может быть соседняя
+          // колонка таблицы.
+          const bothNumeric = /^\s*-?[\d\s\u00a0.,()]+$/.test(last.str||'')
+                           && /^\s*-?[\d\s\u00a0.,()]+$/.test(it.str||'');
+          const threshold = bothNumeric ? 0.05 : 0.18;
+          if(gap < h * threshold){
+            last.str = (last.str || '') + (it.str || '');
+            last.width = (it.transform[4] + (it.width || 0)) - last.transform[4];
+            continue;
+          }
+        }
+        merged.push({
+          str: it.str || '',
+          transform: it.transform.slice(),
+          width: it.width || 0,
+          height: it.height || avgH,
+        });
+      }
+      byLine.set(k, merged);
+    }
+
     const linesOrdered = [...byLine.entries()].sort((a,b) => b[0] - a[0]);
+
+    // После merge переcбираем плоский items2 для кластеризации/классификации,
+    // чтобы они работали с уже склеенными токенами.
+    const items2 = [];
+    for(const [, arr] of byLine) for(const it of arr) items2.push(it);
 
     // 2. Кластеризация X всех items + классификация каждой колонки.
     // Плотные пороги: 1.3 × avgH между кластерами (раньше было 2×)
     // — так лучше отделяются узкие соседние числовые колонки.
-    const allXs = items.map(it => it.transform[4]).sort((a,b) => a-b);
+    const allXs = items2.map(it => it.transform[4]).sort((a,b) => a-b);
     const COL_GAP = avgH * 1.3;
     const colStarts = [];
     if(allXs.length) {
@@ -1886,7 +2093,7 @@ async function extractPdfTextLines(pdf, maxPages=80) {
     // — подавляющее большинство (80%+) её items должны быть такими.
     const NUM_PURE = /^\s*\(?-?[\d][\d \u00a0,.]{0,}\)?\s*$/;
     const colKinds = colStarts.map((_, ci) => {
-      const bucket = items.filter(it => colOf(it.transform[4]) === ci);
+      const bucket = items2.filter(it => colOf(it.transform[4]) === ci);
       if(!bucket.length) return 'desc';
       let numeric = 0, rsbu = 0, note = 0, big = 0, text = 0, yearLike = 0;
       for(const it of bucket) {
@@ -1950,18 +2157,22 @@ async function extractPdfTextLines(pdf, maxPages=80) {
 
     // Эмитим синтетический header-row, если есть value-колонки. Даже если
     // ни один год не распознан — пустая строка-маркер не мешает, но даёт
-    // парсеру понять «здесь начинается новая страница / таблица».
+    // findVal/findValTrace понять «здесь начинается новая таблица», а
+    // ранжировщику — сопоставить ячейку с годом колонки.
+    // IMPORTANT: curLineIdx синхронизирован с txt.split('\n') — picker
+    // полагается на это; также пушим пустой tableRow, чтобы lineIdx
+    // value-строк после шапки по-прежнему указывал в правильное место.
     if(valueColIdx.length){
       const headerCells = valueColIdx.map(ci => colYears[ci] != null ? String(colYears[ci]) : '');
-      out += _HEADER_MARKER + '\t' + headerCells.join('\t') + '\n';
+      const hdrLine = _HEADER_MARKER + '\t' + headerCells.join('\t');
+      out += hdrLine + '\n';
+      tableRows.push({lineIdx: curLineIdx, page: i, desc: hdrLine, cols: []});
+      curLineIdx++;
     }
 
     // 3. Сборка строк: items идут в нужные «ведра» согласно типу колонки.
-    // pendingDesc — буфер для строк-продолжений (см. п.4 в шапке).
+    // pendingDesc — буфер для строк-продолжений (многострочные подписи).
     let pendingDesc = '';
-    const flushPending = () => {
-      if(pendingDesc){ out += pendingDesc + '\n'; pendingDesc = ''; }
-    };
     for(const [, lineItems] of linesOrdered) {
       lineItems.sort((a,b) => a.transform[4] - b.transform[4]);
       let desc = '';
@@ -1996,21 +2207,42 @@ async function extractPdfTextLines(pdf, maxPages=80) {
         desc = desc ? desc + ' ' + tag : tag;
       }
       // Выравниваем value-ячейки по value-колонкам страницы (с padding'ом).
-      // Это критично, чтобы индекс ячейки соответствовал году в __HDR__.
+      // Это критично, чтобы индекс ячейки соответствовал году в __HDR__;
+      // pickerPdfTableRows также выиграет — colIdx в cols стабильно
+      // указывает на позицию колонки, а пустые «''» picker пропустит
+      // (parseNumsFrom('')=[]).
       const valCells = valueColIdx.map(ci => (valueCells.get(ci) || '').trim());
       const hasValues = valCells.some(v => v !== '');
 
-      if(!hasValues && desc){
-        // Строка только с подписью (без значений).
-        if(_isSectionHeader(desc)){
-          // Заголовок раздела — не склеиваем со следующей data-строкой.
-          flushPending();
-          out += desc + '\n';
-        } else {
-          // Возможное продолжение многострочной подписи — буферизуем.
-          pendingDesc = pendingDesc ? pendingDesc + ' ' + desc : desc;
-          // Защита от бесконтрольного накопления.
-          if(pendingDesc.length > 240){ flushPending(); }
+      const isPageHdr = !hasValues && desc
+        && /(19|20)\d{2}|закончи|по состоянию|месяц|полугод|квартал/i.test(desc)
+        && desc.length < 220;
+      const isSection = !hasValues && desc && _isSectionHeader(desc);
+
+      if(isPageHdr || isSection){
+        // Заголовок колонок-периода или секции — не склеиваем
+        // со следующей data-строкой, выводим отдельно.
+        if(pendingDesc){
+          tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
+          out += pendingDesc + '\n';
+          curLineIdx++;
+          pendingDesc = '';
+        }
+        tableRows.push({lineIdx: curLineIdx, page: i, desc, cols: []});
+        if(isPageHdr){
+          if(!pageHeaders[i]) pageHeaders[i] = [];
+          pageHeaders[i].push(desc);
+        }
+        out += desc + '\n';
+        curLineIdx++;
+      } else if(!hasValues && desc){
+        // Кандидат на продолжение многострочной подписи — буферизуем.
+        pendingDesc = pendingDesc ? pendingDesc + ' ' + desc : desc;
+        if(pendingDesc.length > 240){
+          tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
+          out += pendingDesc + '\n';
+          curLineIdx++;
+          pendingDesc = '';
         }
       } else if(hasValues){
         let finalDesc = desc;
@@ -2018,20 +2250,36 @@ async function extractPdfTextLines(pdf, maxPages=80) {
           if(_looksLikeContinuation(pendingDesc, desc)){
             finalDesc = pendingDesc + (desc ? ' ' + desc : '');
           } else {
-            // Склейка не безопасна — выводим pending отдельно.
+            // Склейка небезопасна — выводим pending отдельно.
+            tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
             out += pendingDesc + '\n';
+            curLineIdx++;
           }
           pendingDesc = '';
         }
+        tableRows.push({lineIdx: curLineIdx, page: i, desc: finalDesc, cols: valCells.slice()});
         out += [finalDesc, ...valCells].join('\t') + '\n';
-      } else {
-        // Совсем пустая строка — flush на всякий случай.
-        flushPending();
+        curLineIdx++;
+      } else if(pendingDesc){
+        // Совсем пустая строка — flush pending (конец абзаца подписи).
+        tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
+        out += pendingDesc + '\n';
+        curLineIdx++;
+        pendingDesc = '';
       }
     }
-    flushPending();
+    if(pendingDesc){
+      tableRows.push({lineIdx: curLineIdx, page: i, desc: pendingDesc, cols: []});
+      out += pendingDesc + '\n';
+      curLineIdx++;
+      pendingDesc = '';
+    }
     out += '\n';
+    curLineIdx++;
+    // Запомнить, сколько строк уже в out — старт следующей страницы.
+    pageBoundaries.push((out.match(/\n/g) || []).length);
   }
+  window._pickerPdfPageBoundaries = pageBoundaries;
   return out;
 }
 
@@ -5188,6 +5436,1190 @@ function repCopyRawText(){
   }
   if(wasHidden) ta.style.display = 'none';
   ta.setSelectionRange(0,0);
+}
+
+// ── Ручной подбор значений ──
+// Список целевых полей: по умолчанию — поля модалки Отчётности. Но
+// когда picker вызывается из лупы эмитента, _pickerFields подменяется
+// на одно конкретное поле (is-rev, is-ebitda, и т.п.).
+// hint — ключевые слова строки отчёта, которые помогут найти числа.
+const REP_PICKER_FIELDS = [
+  {id:'rep-np-rev',    label:'Выручка',              hint:'выручка|revenue|доходы от реализации|выручка от продаж'},
+  {id:'rep-np-ebitda', label:'EBITDA',               hint:'ebitda'},
+  {id:'rep-np-np',     label:'Чистая прибыль',       hint:'чистая прибыль|net profit|net income|прибыль за (период|год)'},
+  {id:'rep-np-ebit',   label:'EBIT',                 hint:'ebit|операционная прибыль|прибыль от продаж|operating profit|прибыль до (налога|финансовых)'},
+  {id:'rep-np-assets', label:'Совокупные активы',    hint:'всего активов|итого активов|total assets|активов, всего'},
+  {id:'rep-np-eq',     label:'Собственный капитал',  hint:'итого (собственного )?капитал|всего капитал|total equity|капитал, всего'},
+  {id:'rep-np-debt',   label:'Долг (кредиты+займы)', hint:'кредиты и займы|заемные средства|заёмные средства|borrowings|долгосрочные заимствования|долговые обязательства'},
+  {id:'rep-np-cash',   label:'Денежные средства',    hint:'денежные средства|cash and cash equivalents|cash'},
+  {id:'rep-np-ca',     label:'Оборотные активы',     hint:'итого оборотных активов|оборотные активы|current assets'},
+  {id:'rep-np-cl',     label:'Краткосрочные обяз.',  hint:'итого краткосрочных обязательств|краткосрочные обязательства|current liabilities'},
+  {id:'rep-np-int',    label:'Процентные расходы',   hint:'процентные расходы|проценты к уплате|interest expense|финансовые расходы|finance cost|проценты по кредитам'},
+  {id:'rep-np-ret',    label:'Нераспр. прибыль',     hint:'нераспределенн|нераспределённ|retained'},
+];
+
+// Общая таблица контекста — используется и для REP_PICKER_FIELDS
+// (ключи rep-np-*), и для IS_FIELD_HINTS (is-*). Маппинг — по суффиксу.
+function repPickerCtxFor(fieldId){
+  if(FIELD_CTX[fieldId]) return FIELD_CTX[fieldId];
+  // rep-np-rev → is-rev
+  const key = fieldId.replace(/^rep-np-/, 'is-');
+  return FIELD_CTX[key] || null;
+}
+
+// Хинты для полей вкладки «Данные эмитента» (is-*). Используются,
+// когда picker открывается из лупы конкретного поля.
+const IS_FIELD_HINTS = {
+  'is-rev':   'выручка|revenue|доходы от реализации|выручка от продаж',
+  'is-ebitda':'ebitda',
+  'is-ebit':  'ebit|операционная прибыль|прибыль от продаж|operating profit|прибыль до (налога|финансовых)',
+  'is-np':    'чистая прибыль|net profit|net income|прибыль за (период|год)',
+  'is-int':   'процентные расходы|проценты к уплате|interest expense|финансовые расходы|finance cost|проценты по кредитам',
+  'is-tax':   'налог на прибыль|income tax',
+  'is-dep':   'амортизация|depreciation|d&a',
+  'is-assets':'всего активов|итого активов|total assets|активов, всего',
+  'is-ca':    'итого оборотных активов|оборотные активы|current assets',
+  'is-cl':    'итого краткосрочных обязательств|краткосрочные обязательства|current liabilities',
+  'is-debt':  'кредиты и займы|заемные средства|заёмные средства|borrowings|долговые обязательства|долгосрочные заимствования',
+  'is-cash':  'денежные средства|денежные средства и.*эквивалент|cash and cash equivalents|cash',
+  'is-ret':   'нераспределенн|нераспределённ|retained',
+  'is-eq':    'итого (собственного )?капитал|всего капитал|total equity|капитал, всего',
+  'is-mkt':   'рыночная капитализация|market cap',
+  'is-peak':  'погашение|оферта|пиковые выплаты',
+};
+
+// Контекстные подсказки: какие соседние строки УКРЕПЛЯЮТ / ОСЛАБЛЯЮТ
+// вероятность того, что строка — искомый показатель. Разделы отчёта
+// (ОПиУ / Баланс / ОДДС / Капитал) легко распознать по заголовкам —
+// рядом с «Прибыль до налога» значит это ОПиУ, рядом с «Операционная
+// деятельность» — это ОДДС, и т.д.
+const FIELD_CTX = {
+  // ОПиУ
+  'is-rev':    { near: /себестоимость|валовая прибыль|выручка|ebitda/i,               anti: /поступлени|движение денежных/i },
+  'is-ebitda': { near: /операционная прибыль|амортизаци|ebit\b/i,                      anti: /12\s+месяц|ltm/i /* мы ищем за период отчёта */ },
+  'is-ebit':   { near: /себестоимость|валовая|коммерческие|административн/i,           anti: /поступлени|движение денежных/i },
+  'is-np':     { near: /налог на прибыль|прибыль до налога|совокупный доход/i,         anti: /изменение (капитала|резерва)|дивиденд/i },
+  'is-int':    { near: /прибыль до налога|операционная прибыль|налог на прибыль|финансовые доходы/i, anti: /поступлени|выплат[ыа]|инвестиционная деятельность|\bкорректировк/i },
+  'is-tax':    { near: /прибыль до налога|чистая прибыль/i,                            anti: /поступлени/i },
+  'is-dep':    { near: /корректировк|прибыль за период|износ|операционная деятельность/i, anti: /накопленная амортизаци/i },
+  // Баланс
+  'is-assets': { near: /капитал и обязательства|внеоборотн|оборотные активы|пассив/i,  anti: /поступлени|выплат/i },
+  'is-ca':     { near: /запасы|дебиторск|денежные средства|аванс/i,                    anti: /капитал|обязательств/i },
+  'is-cl':     { near: /кредиторск|краткосрочн|обязательств|резерв/i,                  anti: /оборотные активы/i },
+  'is-debt':   { near: /долгосрочн|краткосрочн|займ|облигаци|финансовая аренда/i,      anti: /дебиторск|активы/i },
+  'is-cash':   { near: /эквивалент|банк|счет|депозит|внеоборотн|оборотные/i,           anti: /движение денежных средств/i /* в ОДДС итог по-другому */ },
+  'is-ret':    { near: /уставн|нераспредел|капитал участник|капитал группы/i,          anti: /обязательств|активы/i },
+  'is-eq':     { near: /обязательств|уставн|нераспредел|резерв/i,                      anti: /дебиторск|поступлени/i },
+};
+
+// Текущий список полей для picker'а (по умолчанию — все 12 из модалки
+// Отчётности). Подменяется при вызове из лупы эмитента.
+window._pickerFields = REP_PICKER_FIELDS;
+
+// ── Лупа у полей во вкладке «Данные эмитента»: меню выбора источника ──
+window._flTargetField = null; // {id,label,hint}
+
+function openFieldLookup(fieldId, fieldLabel){
+  const hint = IS_FIELD_HINTS[fieldId] || fieldLabel.toLowerCase();
+  window._flTargetField = {id:fieldId, label:fieldLabel, hint};
+  const lblEl = document.getElementById('fl-field-label');
+  if(lblEl) lblEl.textContent = fieldLabel;
+  const info = document.getElementById('fl-recent-info');
+  if(info){
+    info.textContent = window._lastParsedText
+      ? `↳ уже загружен текст (${window._lastParsedText.length.toLocaleString('ru')} симв.) — подбор откроется сразу.`
+      : '↳ текст ещё не загружен. Выберите PDF или вставьте текст.';
+  }
+  document.getElementById('modal-field-lookup').classList.add('open');
+}
+
+function flRunAiSearch(){
+  const t = window._flTargetField;
+  closeModal('modal-field-lookup');
+  if(!t) return;
+  if(typeof searchSingleField === 'function') searchSingleField(t.id, t.label);
+}
+
+function flLoadPdf(){
+  const t = window._flTargetField;
+  if(!t) return;
+  // Если уже есть распознанный текст — не грузим заново, открываем сразу.
+  if(window._lastParsedText){
+    closeModal('modal-field-lookup');
+    openPickerForField(t.id, t.label, t.hint);
+    return;
+  }
+  const input = document.getElementById('fl-pdf-input');
+  if(!input) return;
+  input.value = '';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if(!file) return;
+    const ext = (file.name.split('.').pop()||'').toLowerCase();
+    try {
+      let text = '';
+      if(ext === 'pdf' && typeof repExtractPdf === 'function') text = await repExtractPdf(file);
+      else if(ext === 'docx' && typeof repExtractDocx === 'function') text = await repExtractDocx(file);
+      else if((ext === 'xlsx' || ext === 'xls') && typeof repExtractXlsx === 'function') text = await repExtractXlsx(file);
+      else { alert('Поддерживаются PDF / DOCX / XLSX'); return; }
+      window._lastParsedText = text || '';
+      closeModal('modal-field-lookup');
+      openPickerForField(t.id, t.label, t.hint);
+    } catch(e){
+      alert('Ошибка чтения файла: ' + e.message);
+    }
+  };
+  input.click();
+}
+
+function flPasteText(){
+  const t = window._flTargetField;
+  if(!t) return;
+  const ta = document.getElementById('fl-paste-area');
+  if(ta) ta.value = window._lastParsedText || '';
+  closeModal('modal-field-lookup');
+  document.getElementById('modal-paste-text').classList.add('open');
+}
+
+function flAcceptPastedText(){
+  const t = window._flTargetField;
+  const ta = document.getElementById('fl-paste-area');
+  if(!t || !ta) return;
+  const text = (ta.value || '').trim();
+  if(!text){ alert('Вставьте текст.'); return; }
+  window._lastParsedText = text;
+  closeModal('modal-paste-text');
+  openPickerForField(t.id, t.label, t.hint);
+}
+
+// Открыть picker для ОДНОГО конкретного поля (с вкладки Данные эмитента).
+function openPickerForField(fieldId, fieldLabel, hint){
+  window._pickerFields = [{id:fieldId, label:fieldLabel, hint:hint||''}];
+  repOpenPicker(/*singleHint=*/hint||'');
+}
+
+
+function repOpenPicker(singleHint){
+  // Если вызываем из модалки Отчётности — восстанавливаем полный список полей.
+  // Из лупы эмитента _pickerFields уже подменён через openPickerForField.
+  if(!singleHint && window._pickerFields !== REP_PICKER_FIELDS){
+    window._pickerFields = REP_PICKER_FIELDS;
+  }
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  const text = window._lastParsedText || '';
+  if(!text){ alert('Сначала загрузите файл или вставьте распознанный текст.'); return; }
+  // Заполняем dropdown полей
+  const sel = document.getElementById('rep-picker-target');
+  if(sel){
+    sel.innerHTML = '';
+    fields.forEach(f=>{
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      const cur = document.getElementById(f.id);
+      const curVal = cur && cur.value ? ` = ${cur.value}` : '';
+      opt.textContent = f.label + curVal;
+      sel.appendChild(opt);
+    });
+    sel.selectedIndex = 0;
+  }
+  const unit = document.getElementById('rep-picker-unit');
+  if(unit) unit.value = '0.001'; // по умолчанию млн ₽
+  // Рисуем кнопки-пресеты: клик ставит поле + включает поиск по hint.
+  const presetBox = document.getElementById('rep-picker-presets');
+  if(presetBox){
+    // чистим всё кроме вводного label (первый child)
+    while(presetBox.children.length > 1) presetBox.removeChild(presetBox.lastChild);
+    fields.forEach(f => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = f.label;
+      b.className = 'btn btn-sm';
+      b.style.cssText = 'padding:2px 8px;font-size:.58rem';
+      b.onclick = () => repPickerPreset(f.id, f.hint);
+      presetBox.appendChild(b);
+    });
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.textContent = '🔓 показать всё';
+    all.className = 'btn btn-sm';
+    all.style.cssText = 'padding:2px 8px;font-size:.58rem;margin-left:auto';
+    all.onclick = () => { repPickerResetFilters(); };
+    presetBox.appendChild(all);
+  }
+  // Сбрасываем фильтры.
+  repPickerResetFilters(true);
+  // Если открыто для одного поля — сразу включаем фильтр по hint.
+  if(singleHint){
+    const s = document.getElementById('rep-picker-f-search');
+    if(s) s.value = singleHint;
+  }
+  repRenderPickerLines(text);
+  repPickerUpdateCurrent();
+  document.getElementById('modal-rep-picker').classList.add('open');
+}
+
+// Кликнули по кнопке-пресету: выставляем поле + ставим поиск по ключевым словам.
+function repPickerPreset(fieldId, hint){
+  const sel = document.getElementById('rep-picker-target');
+  if(sel){
+    for(let i=0;i<sel.options.length;i++){
+      if(sel.options[i].value === fieldId){ sel.selectedIndex = i; break; }
+    }
+  }
+  const searchEl = document.getElementById('rep-picker-f-search');
+  if(searchEl){ searchEl.value = hint || ''; }
+  repPickerUpdateCurrent();
+  repPickerRerender();
+}
+
+// Сброс фильтров к дефолту (не скрываем мелкие числа).
+function repPickerResetFilters(skipRender){
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.value = val; };
+  const chk = (id, val) => { const el=document.getElementById(id); if(el) el.checked = val; };
+  set('rep-picker-f-min', '0');
+  chk('rep-picker-f-nofrac', false);
+  chk('rep-picker-f-intonly', false);
+  set('rep-picker-f-mindigits', '1');
+  set('rep-picker-f-search', '');
+  if(!skipRender) repPickerRerender();
+}
+
+// Подхватить выделенный мышью фрагмент (из текста модалки или с любой части страницы).
+function repPickerGrabSelection(){
+  const sel = (window.getSelection && window.getSelection().toString()) || '';
+  const el = document.getElementById('rep-picker-manual');
+  if(!el) return;
+  if(!sel.trim()){ alert('Сначала выделите фрагмент текста в распознанном тексте.'); return; }
+  el.value = sel.trim();
+  el.focus();
+}
+
+// Форматирование числа из найденной строки в JS-число.
+// Поддерживает "1 234,56", "1.234,56", "1,234.56", скобки для отрицательных.
+function repPickerParseNumber(raw){
+  if(!raw) return null;
+  let s = raw.trim();
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  s = s.replace(/\s+/g,'').replace(/\u00a0/g,'');
+  // Если есть и ',' и '.', последний по позиции считаем десятичным
+  const hasComma = s.indexOf(',') >= 0;
+  const hasDot   = s.indexOf('.') >= 0;
+  if(hasComma && hasDot){
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')){
+      s = s.replace(/\./g,'').replace(',','.');
+    } else {
+      s = s.replace(/,/g,'');
+    }
+  } else if(hasComma){
+    // одна запятая — десятичный разделитель, если после ≤3 цифр и это единственный разделитель
+    const parts = s.split(',');
+    if(parts.length === 2 && parts[1].length <= 3) s = parts[0] + '.' + parts[1];
+    else s = s.replace(/,/g,'');
+  }
+  const n = parseFloat(s);
+  if(!isFinite(n)) return null;
+  return neg ? -n : n;
+}
+
+// Вытаскиваем текущие настройки фильтров из панели.
+function repPickerGetFilters(){
+  const num = id => { const el=document.getElementById(id); const v=el?parseFloat(el.value):NaN; return isFinite(v)?v:null; };
+  const chk = id => { const el=document.getElementById(id); return !!(el && el.checked); };
+  const str = id => { const el=document.getElementById(id); return el ? el.value.trim().toLowerCase() : ''; };
+  return {
+    min: num('rep-picker-f-min') ?? 1,
+    noFrac: chk('rep-picker-f-nofrac'),
+    intOnly: chk('rep-picker-f-intonly'),
+    minDigits: Math.max(1, num('rep-picker-f-mindigits') ?? 1),
+    search: str('rep-picker-f-search'),
+  };
+}
+
+// Решаем, показывать ли число как кликабельный чип.
+function repPickerShouldShow(n, f){
+  if(n === null || !isFinite(n)) return false;
+  const abs = Math.abs(n);
+  if(abs < (f.min ?? 1)) return false;
+  if(RSBU_CODE_SET.has(abs) || (Number.isInteger(n) && RSBU_CODE_SET.has(n))) return false;
+  const isFrac = !Number.isInteger(n);
+  if((f.noFrac || f.intOnly) && isFrac) return false;
+  // Длина значащей целой части
+  const digits = Math.floor(Math.abs(n)).toString().length;
+  if(digits < (f.minDigits ?? 1)) return false;
+  return true;
+}
+
+// Ищем шапку таблицы. В PDF-извлечении она часто разбита на несколько
+// смежных строк («закончившихся» / «30 июня 2025 года» / «30 июня 2024
+// года») — склеиваем их в один заголовок.
+function repPickerFindColumnHeader(lines, fromIdx){
+  const yearRe  = /\b(19|20)\d{2}\b/;
+  const monthRe = /(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)/i;
+  const keyRe   = /(закончи|по состоянию|за\s+\S+\s+(месяц|полуг|квартал|год)|\d+\s+месяц|полугоди|квартал\b|period ended|as of|\d+\s+months|three months|six months|twelve months|ltm)/i;
+
+  // Признак: строка выглядит как шапка, а не как строка-данные.
+  // В шапке не может быть больших сумм денег — только годы/подписи.
+  const hasBigMoney = L => {
+    const nums = L.match(/-?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?|-?\d{4,}(?:[.,]\d+)?/g) || [];
+    for(const s of nums){
+      const cleaned = s.replace(/[ \u00a0]/g,'').replace(/\(|\)/g,'').replace(',','.');
+      const n = parseFloat(cleaned);
+      if(isFinite(n) && Math.abs(n) >= 1000){
+        // исключение: год «2024» сам по себе — не деньги
+        if(/^(19|20)\d{2}$/.test(cleaned)) continue;
+        return true;
+      }
+    }
+    return false;
+  };
+  const isHeaderLike = L => {
+    if(hasBigMoney(L)) return false;
+    return yearRe.test(L) || monthRe.test(L) || keyRe.test(L);
+  };
+
+  // Найдём первую сверху header-like строку как якорь.
+  let anchor = -1;
+  for(let i = fromIdx - 1; i >= Math.max(0, fromIdx - 40); i--){
+    const L = (lines[i] || '').trim();
+    if(!L) continue;
+    if(isHeaderLike(L)){ anchor = i; break; }
+    // Номер страницы / разделитель — не прерывает поиск.
+    if(/^\s*\d+\s*$/.test(L)) continue;
+  }
+  if(anchor < 0) return null;
+
+  // Расширяем блок: все смежные header-like строки вокруг якоря.
+  let start = anchor, end = anchor;
+  for(let i = anchor - 1; i >= Math.max(0, anchor - 4); i--){
+    const L = (lines[i] || '').trim();
+    if(!L){ continue; }
+    if(!isHeaderLike(L)) break;
+    start = i;
+  }
+  for(let i = anchor + 1; i < fromIdx && i <= anchor + 4; i++){
+    const L = (lines[i] || '').trim();
+    if(!L){ continue; }
+    if(!isHeaderLike(L)) break;
+    end = i;
+  }
+  const parts = [];
+  for(let i = start; i <= end; i++){
+    const L = (lines[i] || '').trim();
+    if(L) parts.push(L);
+  }
+  return repPickerFixBrokenYears(parts.join(' · ')).slice(0, 200);
+}
+
+// Склеиваем годы, разбитые на куски в PDF ("202 4" -> "2024", "2 025" -> "2025").
+function repPickerFixBrokenYears(s){
+  if(!s) return s;
+  // "20 25" / "20 24" -> "2025"/"2024"
+  s = s.replace(/\b(19|20)\s+(\d{2})\b/g, '$1$2');
+  // "202 5" / "202 4" -> "2025"/"2024"
+  s = s.replace(/\b((?:19|20)\d)\s+(\d)\b/g, '$1$2');
+  // "2 025" / "2 024" -> "2025"/"2024"
+  s = s.replace(/\b([12])\s+(\d{3})\b/g, (m,a,b) => (a==='1'||a==='2') && /^0\d{2}$|^\d{3}$/.test(b) ? a+b : m);
+  return s;
+}
+
+// ── Самые вероятные кандидаты для активного поля ──
+// Достаём подписи колонок из найденной шапки раздела. Если количество
+// найденных подписей совпадает с количеством числовых колонок кандидата —
+// используем; иначе возвращаем null, чтобы UI написал «кол. N».
+function repPickerDeriveColLabels(header, n){
+  if(!header || !n) return null;
+  const parts = [];
+  // Предпочитаем полные даты «30 июня 2025».
+  const dateRe = /\b\d{1,2}\s+(январ\S*|феврал\S*|март\S*|апрел\S*|ма[йя]\S*|июн\S*|июл\S*|август\S*|сентябр\S*|октябр\S*|ноябр\S*|декабр\S*)\s+(19|20)\d{2}\b/gi;
+  let m;
+  while((m = dateRe.exec(header)) !== null) parts.push(m[0]);
+  // Иначе — одиночные годы.
+  if(parts.length < 2){
+    const yrs = (header.match(/\b(19|20)\d{2}\b/g) || []);
+    parts.length = 0;
+    for(const y of yrs) parts.push(y);
+  }
+  if(parts.length === n) return parts;
+  // Если дат чуть меньше (например 2 года на 3 колонки restatement:
+  // до/влияние/после за одну дату) — не рискуем, возвращаем null.
+  return null;
+}
+
+function repPickerRenderSuggestions(text){
+  const box = document.getElementById('rep-picker-suggest');
+  const list = document.getElementById('rep-picker-suggest-list');
+  const labelEl = document.getElementById('rep-picker-suggest-label');
+  if(!box || !list) return;
+  list.innerHTML = '';
+
+  const sel = document.getElementById('rep-picker-target');
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  const curId = sel ? sel.value : (fields[0] && fields[0].id);
+  const f = fields.find(x => x.id === curId);
+  if(!f || !f.hint){ box.style.display = 'none'; return; }
+  if(labelEl) labelEl.textContent = f.label;
+
+  let hintRe = null;
+  try { hintRe = new RegExp(f.hint, 'i'); } catch(e){ hintRe = null; }
+  if(!hintRe){ box.style.display = 'none'; return; }
+  // Fallback: в PDF слова часто разбиты на части («Всего а ктивов»),
+  // поэтому дополнительно ищем подстроку в «схлопнутой» версии строки.
+  const hintsNorm = f.hint.split('|').map(x => x.toLowerCase().replace(/\s+/g,'')).filter(Boolean);
+  const lineMatchesHint = (L) => {
+    if(hintRe.test(L)) return true;
+    const norm = L.toLowerCase().replace(/\s+/g,'');
+    return hintsNorm.some(h => h && norm.includes(h));
+  };
+
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
+  const lines = text.split(/\r?\n/);
+
+  // Парсер чисел из одной строки.
+  const parseNumsFrom = (srcLine, offset) => {
+    numRe.lastIndex = 0;
+    const out = [];
+    let m;
+    while((m = numRe.exec(srcLine)) !== null){
+      const n = repPickerParseNumber(m[0]);
+      if(n === null) continue;
+      const abs = Math.abs(n);
+      if(abs < 1) continue;
+      if(RSBU_CODE_SET.has(abs)) continue;
+      if(Number.isInteger(n) && n >= 1 && n <= 99) continue;
+      out.push({n, raw:m[0].trim(), pos: (offset||0) + m.index});
+    }
+    return out;
+  };
+
+  // ТАБЛИЧНЫЙ РЕЖИМ: если PDF был разобран в структуру (desc + cols[]),
+  // используем её — в ней числа уже разнесены по колонкам, и описание
+  // статьи не мешается с цифрами.
+  const tableRows = window._pickerPdfTableRows || [];
+  const pageHeaders = window._pickerPdfPageHeaders || {};
+  const useTable = tableRows.length > 0;
+  const candidates = [];
+
+  if(useTable){
+    // Индекс по lineIdx — для look-ahead.
+    const byLineIdx = new Map();
+    tableRows.forEach(r => byLineIdx.set(r.lineIdx, r));
+
+    tableRows.forEach(r => {
+      const desc = r.desc || '';
+      if(!lineMatchesHint(desc)) return;
+      // 1. Сначала пытаемся взять числа из своей row.cols.
+      let nums = [];
+      const collectFrom = (rr, baseColIdx) => {
+        (rr.cols || []).forEach((c, ci) => {
+          const parsed = parseNumsFrom(c, 0);
+          if(parsed.length){
+            const best = parsed.reduce((a,b) => Math.abs(b.n) > Math.abs(a.n) ? b : a);
+            nums.push({...best, colIdx: (baseColIdx || 0) + ci});
+          }
+        });
+      };
+      collectFrom(r, 0);
+      // 2. Если пусто — fallback на plain-text строку (числа могли не
+      // попасть в cols из-за классификации).
+      if(!nums.length){
+        const plain = lines[r.lineIdx] || '';
+        const parsed = parseNumsFrom(plain, 0);
+        if(parsed.length) nums = parsed.map((p, ci) => ({...p, colIdx: ci}));
+      }
+      // 3. Look-ahead: «Итого …» может быть без чисел, а числа — на
+      // следующих 1-2 строках (той же страницы).
+      if(!nums.length){
+        for(let la = 1; la <= 2; la++){
+          const next = byLineIdx.get(r.lineIdx + la);
+          if(!next || next.page !== r.page) break;
+          if(next.desc && lineMatchesHint(next.desc)) break; // следующая сама — кандидат
+          collectFrom(next, 0);
+          if(nums.length) break;
+          // fallback на её plain-text
+          const plain = lines[r.lineIdx + la] || '';
+          const parsed = parseNumsFrom(plain, 0);
+          if(parsed.length){
+            nums = parsed.map((p, ci) => ({...p, colIdx: ci}));
+            break;
+          }
+        }
+      }
+      if(!nums.length) return;
+
+      const idx = r.lineIdx;
+      const maxAbs = nums.reduce((acc, x) => Math.max(acc, Math.abs(x.n)), 0);
+      const descLower = desc.toLowerCase();
+      const mAll = descLower.match(new RegExp(hintRe.source, 'ig')) || [];
+      const matchLen = mAll.reduce((a,b)=>a + b.length, 0);
+      let score = matchLen + Math.log10(maxAbs + 10) * 3;
+
+      // Шапка раздела (восстановим как и в текстовом режиме).
+      const header = repPickerFindColumnHeader(lines, idx) || '';
+      const headerLc = header.toLowerCase();
+      if(/влияни|пересч|перес\s*чит|restat/i.test(headerLc)) score -= 6;
+      const yearsInHeader = (header.match(/\b20\d{2}\b/g) || []);
+      if(yearsInHeader.length >= 2) score += 4;
+      const nowYear = new Date().getFullYear();
+      if(yearsInHeader.includes(String(nowYear))) score += 1;
+      if(yearsInHeader.includes(String(nowYear-1))) score += 1;
+
+      if(/^\s*(итого|всего|total)\b/i.test(desc)) score += 6;
+      if(/^\s*от\s+[а-я]/i.test(desc)) score -= 3;
+      if(/признаваема(я|ой)/i.test(desc) && !/итого|всего/i.test(desc)) score -= 1;
+
+      const ctx = repPickerCtxFor(f.id);
+      if(ctx){
+        const from = Math.max(0, idx - 6);
+        const to   = Math.min(lines.length - 1, idx + 6);
+        let nearHits = 0, antiHits = 0;
+        for(let k = from; k <= to; k++){
+          if(k === idx) continue;
+          const L = lines[k] || '';
+          if(!L.trim()) continue;
+          if(ctx.near && ctx.near.test(L)) nearHits++;
+          if(ctx.anti && ctx.anti.test(L)) antiHits++;
+        }
+        score += Math.min(nearHits, 3) * 1.5;
+        score -= Math.min(antiHits, 3) * 2.0;
+      }
+
+      // Подписи колонок для карточки — из накопленной шапки страницы.
+      const colLabels = (pageHeaders[r.page] || []).slice();
+
+      candidates.push({
+        idx, line: desc, origLine: desc, score,
+        pick: nums[0], allNums: nums, maxAbs, header, table: true, colLabels
+      });
+    });
+  }
+  // Fallback: табличный режим ничего не нашёл — пробуем текстовый.
+  if(!useTable || candidates.length === 0){
+  // ТЕКСТОВЫЙ РЕЖИМ (fallback для не-PDF или старого кода).
+  lines.forEach((line, idx) => {
+    if(!lineMatchesHint(line)) return;
+    let nums = parseNumsFrom(line, 0);
+    let displayLine = line;
+    // Если в строке с ключевым словом нет чисел — в PDF числа часто
+    // оказываются на следующей строке (извлечение таблиц). Смотрим +1/+2.
+    if(!nums.length){
+      for(let la = 1; la <= 2 && idx + la < lines.length; la++){
+        const next = lines[idx + la];
+        if(!next || !next.trim()) continue;
+        // Не прыгать через явно текстовую строку.
+        if(/[а-яa-z]{4,}/i.test(next) && !/\d/.test(next)) break;
+        const ns = parseNumsFrom(next, line.length + 1);
+        if(ns.length){
+          nums = ns;
+          displayLine = line + ' ' + next;
+          break;
+        }
+      }
+    }
+    if(!nums.length) return;
+
+    const last = nums[nums.length - 1];
+    const maxAbs = nums.reduce((acc, x) => Math.max(acc, Math.abs(x.n)), 0);
+    const lineLower = line.toLowerCase();
+    const mAll = lineLower.match(new RegExp(hintRe.source, 'ig')) || [];
+    const matchLen = mAll.reduce((a,b)=>a + b.length, 0);
+    let score = matchLen + Math.log10(maxAbs + 10) * 3;
+
+    // Ищем шапку ПО ТОМУ ЖЕ idx и штрафуем/премируем строку.
+    const header = repPickerFindColumnHeader(lines, idx) || '';
+    const headerLc = header.toLowerCase();
+    if(/влияни|пересч|перес\s*чит|restat/i.test(headerLc)) score -= 6;
+    const yearsInHeader = (header.match(/\b20\d{2}\b/g) || []);
+    if(yearsInHeader.length >= 2) score += 4;
+    // Текущий год даёт небольшой бонус.
+    const nowYear = new Date().getFullYear();
+    if(yearsInHeader.includes(String(nowYear))) score += 1;
+    if(yearsInHeader.includes(String(nowYear-1))) score += 1;
+
+    // Строки, начинающиеся с «Итого/Всего/Total», поднимаем —
+    // это почти всегда финальные суммы раздела.
+    if(/^\s*(итого|всего|total)\b/i.test(line)) score += 6;
+    // Подпункты обычно начинаются с «От …» (От реализации, От оказания…)
+    // — это не итоги, а детализация. Пессимизируем.
+    if(/^\s*от\s+[а-я]/i.test(line)) score -= 3;
+    // Строки-заголовки разделов типа «Выручка, признаваемая в течение
+    // времени» (без чисел или с малыми подпунктами в ней) — штрафуем,
+    // чтобы настоящие ИТОГО всплывали.
+    if(/признаваема(я|ой)/i.test(line) && !/итого|всего/i.test(line)) score -= 1;
+
+    // Контекст раздела: смотрим ±6 строк вокруг кандидата. Если рядом
+    // ожидаемые соседи (напр. «налог на прибыль» для процентных
+    // расходов) — бонус; если чужой раздел (напр. «поступления» из
+    // ОДДС) — штраф.
+    const ctx = repPickerCtxFor(f.id);
+    if(ctx){
+      const from = Math.max(0, idx - 6);
+      const to   = Math.min(lines.length - 1, idx + 6);
+      let nearHits = 0, antiHits = 0;
+      for(let k = from; k <= to; k++){
+        if(k === idx) continue;
+        const L = lines[k] || '';
+        if(!L.trim()) continue;
+        if(ctx.near && ctx.near.test(L)) nearHits++;
+        if(ctx.anti && ctx.anti.test(L)) antiHits++;
+      }
+      score += Math.min(nearHits, 3) * 1.5;  // до +4.5
+      score -= Math.min(antiHits, 3) * 2.0;  // до −6
+    }
+
+    candidates.push({idx, line: displayLine, origLine: line, score, pick: last, allNums: nums, maxAbs, header});
+  });
+  } // else (text mode)
+
+  if(!candidates.length){ box.style.display = 'none'; return; }
+
+  candidates.sort((a,b) => b.score - a.score);
+  const top = candidates.slice(0, 8);
+
+  top.forEach(c => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;padding:6px 8px;background:var(--bg);border:1px solid var(--border)';
+
+    // Заголовок карточки: название статьи + (если найдена) шапка колонок
+    const head = document.createElement('div');
+    head.style.cssText = 'flex:1 1 100%;display:flex;justify-content:space-between;gap:8px;align-items:baseline';
+
+    const desc = document.createElement('div');
+    desc.style.cssText = 'font-size:.62rem;color:var(--text2);line-height:1.4;flex:1';
+    desc.title = c.line;
+    const firstNumPos = c.allNums[0].pos;
+    const descText = repPickerFixBrokenYears((c.line.slice(0, firstNumPos) || c.line).trim().replace(/\s+/g,' '));
+    desc.textContent = descText.slice(0, 100) + (descText.length > 100 ? '…' : '');
+    head.appendChild(desc);
+
+    const ctxBtn = document.createElement('button');
+    ctxBtn.type = 'button';
+    ctxBtn.textContent = '📖 контекст';
+    ctxBtn.className = 'btn btn-sm';
+    ctxBtn.style.cssText = 'padding:2px 6px;font-size:.55rem';
+    ctxBtn.onclick = () => repPickerOpenContext(c.idx);
+    head.appendChild(ctxBtn);
+    row.appendChild(head);
+
+    // Шапка колонок (используем уже найденную в ранжировании).
+    const colHeader = c.header;
+    if(colHeader){
+      const hd = document.createElement('div');
+      hd.style.cssText = 'flex:1 1 100%;font-size:.56rem;color:var(--acc);opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      hd.title = 'Шапка таблицы (ближайшая строка сверху с датой/годом)';
+      hd.textContent = '↑ колонки: ' + colHeader.slice(0, 120);
+      row.appendChild(hd);
+    }
+
+    // Если табличный режим — над числами показываем подписи колонок
+    // (даты / «2025 / 2024») в один ряд с кнопками-значениями.
+    const numsBar = document.createElement('div');
+    numsBar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;flex:1 1 100%;align-items:flex-end';
+    c.allNums.forEach((num, i) => {
+      const cell = document.createElement('div');
+      cell.style.cssText = 'display:flex;flex-direction:column;gap:2px';
+      if(c.table){
+        const lab = document.createElement('div');
+        lab.style.cssText = 'font-size:.52rem;color:var(--text3);text-align:center;letter-spacing:.05em';
+        // Пытаемся аккуратно распарсить подписи колонок из шапки раздела.
+        if(!c._derivedLabels){
+          c._derivedLabels = repPickerDeriveColLabels(c.header, c.allNums.length);
+        }
+        const colIdx = num.colIdx != null ? num.colIdx : i;
+        const derived = c._derivedLabels;
+        lab.textContent = (derived && derived[colIdx]) ? derived[colIdx] : ('кол. ' + (colIdx+1));
+        cell.appendChild(lab);
+      }
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = num.raw;
+      b.title = 'Применить: ' + num.raw + ' × ' + (document.getElementById('rep-picker-unit')?.value || 1);
+      b.className = 'btn btn-sm';
+      b.style.cssText = 'padding:3px 8px;font-size:.64rem';
+      b.onclick = () => repPickerAssign(num.n, b);
+      cell.appendChild(b);
+      numsBar.appendChild(cell);
+    });
+    row.appendChild(numsBar);
+
+    list.appendChild(row);
+  });
+
+  box.style.display = 'flex';
+}
+
+// ── Полноэкранный просмотрщик контекста ──
+// Сохраняем исходные позиции символов (pre, no-wrap, горизонтальная
+// прокрутка) — удобно для больших таблиц отчётности.
+window._pickerCtxIdx = 0;
+
+function repPickerOpenContext(idx){
+  window._pickerCtxIdx = idx;
+  const before = document.getElementById('ctx-before'); if(before) before.value = '5';
+  const after  = document.getElementById('ctx-after');  if(after)  after.value  = '5';
+  const s = document.getElementById('ctx-search'); if(s) s.value = '';
+  document.getElementById('modal-picker-context').classList.add('open');
+  // Ловим системную кнопку «Назад» на мобилках — чтобы она закрывала
+  // модалку, а не выкидывала с текущей страницы.
+  try { history.pushState({pickerCtx:1}, ''); } catch(e){}
+  repPickerCtxRender();
+}
+
+// Закрыть контекст: если мы ранее делали pushState — откатываем историю
+// (Назад и кнопка X тогда идут одинаково), иначе просто прячем.
+function pickerCtxClose(){
+  const m = document.getElementById('modal-picker-context');
+  if(!m) return;
+  if(history.state && history.state.pickerCtx){
+    history.back(); // popstate → закроет модалку
+  } else {
+    m.classList.remove('open');
+  }
+}
+
+// Системная кнопка «Назад» на мобилках: закрываем картой открытую модалку
+// контекста (одну за раз), чтобы пользователь не выпадал из страницы.
+window.addEventListener('popstate', () => {
+  const m = document.getElementById('modal-picker-context');
+  if(m && m.classList.contains('open')) m.classList.remove('open');
+});
+
+function repPickerCtxSet(b, a){
+  const before = document.getElementById('ctx-before'); if(before) before.value = String(b);
+  const after  = document.getElementById('ctx-after');  if(after)  after.value  = String(a);
+  repPickerCtxRender();
+}
+
+function repPickerCtxRender(){
+  const text = window._lastParsedText || '';
+  if(!text) return;
+  const lines = text.split(/\r?\n/);
+  const idx = window._pickerCtxIdx || 0;
+  const b = Math.max(0, parseInt(document.getElementById('ctx-before')?.value, 10) || 0);
+  const a = Math.max(0, parseInt(document.getElementById('ctx-after')?.value, 10)  || 0);
+  const from = Math.max(0, idx - b);
+  const to   = Math.min(lines.length - 1, idx + a);
+  const search = (document.getElementById('ctx-search')?.value || '').toLowerCase();
+
+  const box = document.getElementById('ctx-text');
+  const info = document.getElementById('ctx-info');
+  if(!box) return;
+  box.innerHTML = '';
+  if(info) info.textContent = `строки ${from+1}–${to+1} из ${lines.length} (якорь: строка ${idx+1})`;
+
+  // Регекс чисел — тот же, что в кандидатах.
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
+
+  for(let k = from; k <= to; k++){
+    const raw = lines[k] || '';
+    const line = repPickerFixBrokenYears(raw);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:block' + (k === idx ? ';background:rgba(100,200,255,.08);border-left:2px solid var(--acc);padding-left:4px' : ';padding-left:6px');
+
+    // Номер строки
+    const ln = document.createElement('span');
+    ln.textContent = (k === idx ? '▶ ' : '  ') + String(k+1).padStart(5,' ') + ' │ ';
+    ln.style.color = 'var(--text3)';
+    row.appendChild(ln);
+
+    // Разбиваем строку на числовые и не-числовые куски.
+    numRe.lastIndex = 0;
+    const matches = [];
+    let m;
+    while((m = numRe.exec(line)) !== null){
+      matches.push({start:m.index, end:m.index + m[0].length, raw:m[0]});
+    }
+    // Функция подсветки поиска в тексте.
+    const appendText = (txt) => {
+      if(!search){ row.appendChild(document.createTextNode(txt)); return; }
+      const low = txt.toLowerCase();
+      let i = 0;
+      while(i < txt.length){
+        const p = low.indexOf(search, i);
+        if(p < 0){ row.appendChild(document.createTextNode(txt.slice(i))); break; }
+        if(p > i) row.appendChild(document.createTextNode(txt.slice(i, p)));
+        const hi = document.createElement('mark');
+        hi.textContent = txt.slice(p, p + search.length);
+        hi.style.cssText = 'background:var(--acc);color:#000;padding:0 1px';
+        row.appendChild(hi);
+        i = p + search.length;
+      }
+    };
+
+    let cursor = 0;
+    matches.forEach(mt => {
+      if(mt.start > cursor) appendText(line.slice(cursor, mt.start));
+      const n = repPickerParseNumber(mt.raw);
+      const abs = n !== null ? Math.abs(n) : 0;
+      const isClickable = n !== null && abs >= 1 && !RSBU_CODE_SET.has(abs) && !(Number.isInteger(n) && n >= 1 && n <= 99);
+      if(isClickable){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = mt.raw;
+        btn.style.cssText = 'display:inline-block;padding:0 4px;margin:0;border:1px solid var(--border2);background:var(--s2);color:var(--text);font:inherit;cursor:pointer;border-radius:2px';
+        btn.onclick = () => repPickerAssign(n, btn);
+        row.appendChild(btn);
+      } else {
+        const sp = document.createElement('span');
+        sp.textContent = mt.raw;
+        sp.style.color = 'var(--text3)';
+        row.appendChild(sp);
+      }
+      cursor = mt.end;
+    });
+    if(cursor < line.length) appendText(line.slice(cursor));
+    if(!line.trim()) row.innerHTML += '&nbsp;';
+    box.appendChild(row);
+  }
+
+  // Прокрутка к якорной строке — только внутри контейнера ctx-text,
+  // чтобы не скроллить основное окно страницы.
+  const anchor = box.children[idx - from];
+  if(anchor){
+    const target = anchor.offsetTop - box.clientHeight / 2 + anchor.clientHeight / 2;
+    box.scrollTop = Math.max(0, target);
+  }
+}
+
+// ── PDF-вид страницы с кликабельными числами ──
+window._pdfvPage = 1;
+window._pdfvScale = 1.5;
+
+function pdfvOpenFromCtx(){
+  if(!window._pickerPdfDoc){ alert('PDF-вид доступен только для PDF-файлов, загруженных через «Ручной подбор из PDF».'); return; }
+  // Определяем страницу по якорной строке контекста.
+  const pb = window._pickerPdfPageBoundaries || [0];
+  const idx = window._pickerCtxIdx || 0;
+  let pageNum = 1;
+  for(let i = pb.length - 1; i >= 0; i--){
+    if(idx >= pb[i]){ pageNum = i + 1; break; }
+  }
+  pdfvOpen(pageNum);
+}
+
+async function pdfvOpen(pageNum){
+  const pdf = window._pickerPdfDoc;
+  if(!pdf){ alert('Сначала загрузите PDF.'); return; }
+  window._pdfvPage = Math.max(1, Math.min(pdf.numPages, pageNum || 1));
+  document.getElementById('modal-pdf-view').classList.add('open');
+  try { history.pushState({pdfv:1}, ''); } catch(e){}
+  const total = document.getElementById('pdfv-total');
+  if(total) total.textContent = String(pdf.numPages);
+  await pdfvRender();
+}
+
+function pdfvClose(){
+  const m = document.getElementById('modal-pdf-view');
+  if(!m) return;
+  if(history.state && history.state.pdfv){
+    history.back();
+  } else {
+    m.classList.remove('open');
+  }
+}
+
+function pdfvNav(delta){
+  const pdf = window._pickerPdfDoc;
+  if(!pdf) return;
+  const next = Math.max(1, Math.min(pdf.numPages, (window._pdfvPage || 1) + delta));
+  window._pdfvPage = next;
+  pdfvRender();
+}
+
+function pdfvZoom(delta){
+  window._pdfvScale = Math.max(0.5, Math.min(4.0, (window._pdfvScale || 1.5) + delta * 0.25));
+  pdfvRender();
+}
+
+async function pdfvRender(){
+  const pdf = window._pickerPdfDoc;
+  const container = document.getElementById('pdfv-container');
+  if(!pdf || !container) return;
+  const pn = window._pdfvPage || 1;
+  const pageLbl = document.getElementById('pdfv-page');
+  if(pageLbl) pageLbl.textContent = String(pn);
+  container.innerHTML = '<div style="padding:20px;color:#444">⏳ рендеринг…</div>';
+
+  let page;
+  try { page = await pdf.getPage(pn); } catch(e){ container.innerHTML = 'Ошибка: '+e.message; return; }
+  const scale = window._pdfvScale || 1.5;
+  const viewport = page.getViewport({scale});
+
+  container.innerHTML = '';
+  container.style.width = viewport.width + 'px';
+  container.style.height = viewport.height + 'px';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  canvas.style.cssText = 'position:absolute;top:0;left:0;display:block';
+  container.appendChild(canvas);
+  const cctx = canvas.getContext('2d');
+  try { await page.render({canvasContext:cctx, viewport}).promise; }
+  catch(e){ console.warn('render err', e); }
+
+  // Текстовый слой с кликабельными числами поверх canvas.
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;top:0;left:0;width:'+viewport.width+'px;height:'+viewport.height+'px;pointer-events:none';
+  container.appendChild(overlay);
+
+  let content;
+  try { content = await page.getTextContent(); } catch(e){ return; }
+
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
+
+  for(const it of (content.items || [])){
+    const str = it.str || '';
+    if(!str.trim()) continue;
+    // Проверяем, есть ли в item числа.
+    numRe.lastIndex = 0;
+    let hasNum = false;
+    const matches = [];
+    let m;
+    while((m = numRe.exec(str)) !== null){
+      const n = repPickerParseNumber(m[0]);
+      if(n === null) continue;
+      const abs = Math.abs(n);
+      if(abs < 1) continue;
+      if(RSBU_CODE_SET.has(abs)) continue;
+      if(Number.isInteger(n) && n >= 1 && n <= 99) continue;
+      matches.push({raw:m[0], n, start:m.index, end:m.index+m[0].length});
+      hasNum = true;
+    }
+    if(!hasNum) continue;
+
+    // Позиционирование: transform item через viewport
+    const tx = pdfjsLib.Util.transform(viewport.transform, it.transform);
+    const fontH = Math.abs(tx[3] || tx[0] || 12);
+    const left = tx[4];
+    const top  = tx[5] - fontH; // PDF origin — нижний левый, у нас верхний
+
+    // Один кликабельный overlay-span на всё содержимое item. Если
+    // чисел несколько — применяется ПЕРВОЕ (редкий случай).
+    const pick = matches[0];
+    const span = document.createElement('button');
+    span.type = 'button';
+    span.textContent = str;
+    span.title = 'Применить: ' + pick.raw;
+    span.style.cssText = 'position:absolute;left:'+left+'px;top:'+top+'px;height:'+fontH+'px;line-height:'+fontH+'px;font-size:'+fontH*0.9+'px;padding:0 1px;margin:0;border:1px solid rgba(255,200,0,.9);background:rgba(255,240,120,.45);color:transparent;cursor:pointer;white-space:pre;pointer-events:auto;font-family:sans-serif;border-radius:2px';
+    span.onmouseover = () => { span.style.background = 'rgba(120,255,120,.7)'; };
+    span.onmouseout  = () => { span.style.background = 'rgba(255,240,120,.45)'; };
+    span.onclick = (ev) => {
+      ev.preventDefault();
+      // Если чисел несколько — можно ткнуть снова; применяем все по очереди
+      // (простая логика: по количеству нажатий — круговой выбор).
+      const idx = (parseInt(span.dataset.pickIdx,10) || 0) % matches.length;
+      const m = matches[idx];
+      span.dataset.pickIdx = String(idx + 1);
+      repPickerAssign(m.n, span);
+      // Мини-тост снизу
+      const hint = document.getElementById('pdfv-hint');
+      if(hint) hint.textContent = '✓ применено: ' + m.raw + (matches.length>1 ? ' ('+ (idx+1) +'/'+ matches.length +') — тапни ещё для другого числа' : '');
+    };
+    overlay.appendChild(span);
+  }
+}
+
+// Закрытие по системной «Назад» (в дополнение к уже настроенной
+// для modal-picker-context).
+(function(){
+  const orig = window.onpopstate;
+  window.addEventListener('popstate', () => {
+    const m = document.getElementById('modal-pdf-view');
+    if(m && m.classList.contains('open')) m.classList.remove('open');
+  });
+})();
+
+function repRenderPickerLines(text){
+  repPickerRenderSuggestions(text);
+  const box = document.getElementById('rep-picker-lines');
+  if(!box) return;
+  box.innerHTML = '';
+  const f = repPickerGetFilters();
+  const lines = text.split(/\r?\n/);
+  const numRe = /-?\(?\d{1,3}(?:[ \u00a0]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d+(?:[.,]\d+)?\)?/g;
+  let totalNums = 0, shownNums = 0, shownLines = 0;
+
+  // Поиск: если есть '|' — интерпретируем как regex-альтернативы.
+  let searchRe = null;
+  if(f.search){
+    try { searchRe = new RegExp(f.search, 'i'); }
+    catch(e){ searchRe = null; }
+  }
+  // Fallback: поиск по «схлопнутой» строке (без пробелов между буквами)
+  // — PDF часто разбивает слова на части, регекс их не находит.
+  const searchNormParts = f.search ? f.search.split('|').map(x => x.toLowerCase().replace(/\s+/g,'')).filter(Boolean) : [];
+  const lineMatchesSearch = (line) => {
+    if(!f.search) return true;
+    if(searchRe && searchRe.test(line)) return true;
+    const norm = line.toLowerCase().replace(/\s+/g,'');
+    return searchNormParts.some(h => norm.includes(h));
+  };
+
+  lines.forEach((line, idx) => {
+    // Поиск по строкам — отфильтровываем целиком
+    if(!lineMatchesSearch(line)) return;
+
+    const matches = [];
+    let m; numRe.lastIndex = 0;
+    while((m = numRe.exec(line)) !== null){
+      matches.push({start:m.index, end:m.index + m[0].length, raw:m[0], n: repPickerParseNumber(m[0])});
+    }
+    totalNums += matches.length;
+    const visibleChips = matches.filter(mt => repPickerShouldShow(mt.n, f));
+    // Если в строке нет ни одного видимого чипа и нет поиска — можно скрыть строку,
+    // чтобы не плодить шум. Но при активном поиске строку оставляем.
+    if(!visibleChips.length && !f.search) return;
+
+    shownLines++;
+    shownNums += visibleChips.length;
+
+    const row = document.createElement('div');
+    row.style.padding = '2px 0';
+    row.style.borderBottom = '1px dashed var(--border)';
+    const idxSpan = document.createElement('span');
+    idxSpan.textContent = String(idx+1).padStart(4,' ') + '  ';
+    idxSpan.style.color = 'var(--text3)';
+    row.appendChild(idxSpan);
+
+    // Вспом. для подсветки совпадений поискового regex в текстовых кусках.
+    const appendTextHighlighted = (txt) => {
+      if(!searchRe || !txt){ row.appendChild(document.createTextNode(txt)); return; }
+      let i = 0;
+      const re = new RegExp(searchRe.source, 'ig');
+      let mm;
+      while((mm = re.exec(txt)) !== null){
+        if(mm.index > i) row.appendChild(document.createTextNode(txt.slice(i, mm.index)));
+        const hi = document.createElement('mark');
+        hi.textContent = mm[0];
+        hi.style.cssText = 'background:var(--acc);color:#000;padding:0 2px;border-radius:2px';
+        row.appendChild(hi);
+        i = mm.index + mm[0].length;
+        if(!mm[0].length) re.lastIndex++;
+      }
+      if(i < txt.length) row.appendChild(document.createTextNode(txt.slice(i)));
+    };
+
+    let cursor = 0;
+    matches.forEach(mt => {
+      if(mt.start > cursor) appendTextHighlighted(line.slice(cursor, mt.start));
+      if(repPickerShouldShow(mt.n, f)){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = mt.raw.trim();
+        btn.dataset.value = String(mt.n);
+        btn.style.cssText = 'display:inline-block;margin:0 2px;padding:1px 6px;border:1px solid var(--border2);background:var(--s2);color:var(--text);font:inherit;cursor:pointer;border-radius:3px';
+        btn.onmouseover = ()=>{ btn.style.background = 'var(--accent)'; btn.style.color = '#fff'; };
+        btn.onmouseout  = ()=>{ btn.style.background = 'var(--s2)';    btn.style.color = 'var(--text)'; };
+        btn.onclick = ()=> repPickerAssign(mt.n, btn);
+        row.appendChild(btn);
+      } else {
+        // Скрытые числа — серым текстом, чтобы были видны, но не кликались
+        const sp = document.createElement('span');
+        sp.textContent = mt.raw;
+        sp.style.color = 'var(--text3)';
+        sp.style.opacity = '.6';
+        row.appendChild(sp);
+      }
+      cursor = mt.end;
+    });
+    if(cursor < line.length) appendTextHighlighted(line.slice(cursor));
+    if(!line.trim()) row.innerHTML = '&nbsp;';
+    box.appendChild(row);
+  });
+
+  const stats = document.getElementById('rep-picker-stats');
+  if(stats) stats.textContent = `чипов: ${shownNums}/${totalNums}, строк: ${shownLines}/${lines.length}`;
+  if(!box.children.length){
+    const empty = document.createElement('div');
+    empty.style.color = 'var(--text3)';
+    empty.textContent = '— нет строк под текущие фильтры —';
+    box.appendChild(empty);
+  }
+}
+
+// Перерисовка при смене любого фильтра.
+function repPickerRerender(){
+  const text = window._lastParsedText || '';
+  if(text) repRenderPickerLines(text);
+}
+
+// «Нет в отчёте» — очищаем текущее поле, двигаемся к следующему.
+// Используется когда показатель не представлен в загруженном PDF (напр.
+// EBITDA в промежуточном отчёте, или LTM-значение для полугодия).
+function repPickerSkip(){
+  const sel = document.getElementById('rep-picker-target');
+  if(!sel) return;
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  const input = document.getElementById(sel.value);
+  if(input) input.value = '';
+  const idx = sel.selectedIndex;
+  fields.forEach((f,i)=>{
+    const cur = document.getElementById(f.id);
+    const curVal = cur && cur.value ? ` = ${cur.value}` : (i === idx ? ' — нет в отчёте' : '');
+    if(sel.options[i]) sel.options[i].textContent = f.label + curVal;
+  });
+  if(idx + 1 < sel.options.length) sel.selectedIndex = idx + 1;
+  repPickerUpdateCurrent();
+}
+
+// Применить число, вписанное/вставленное вручную.
+function repPickerApplyManual(){
+  const el = document.getElementById('rep-picker-manual');
+  if(!el) return;
+  const raw = el.value.trim();
+  if(!raw){ alert('Введите число или вставьте фрагмент.'); return; }
+  const n = repPickerParseNumber(raw);
+  if(n === null){ alert('Не удалось распознать число из: '+raw); return; }
+  repPickerAssign(n, null);
+  el.value = '';
+  el.focus();
+}
+
+function repPickerAssign(value, btn){
+  const sel = document.getElementById('rep-picker-target');
+  const unitSel = document.getElementById('rep-picker-unit');
+  if(!sel || !sel.value) return;
+  const unit = unitSel ? parseFloat(unitSel.value) : 1;
+  const finalVal = value * (isFinite(unit) ? unit : 1);
+  const input = document.getElementById(sel.value);
+  if(input){
+    // округляем до 3 знаков, убираем хвостовые нули
+    input.value = (Math.round(finalVal * 1000) / 1000).toString();
+  }
+  // визуальная отметка кнопки
+  if(btn){
+    btn.style.background = 'var(--green, #2a7a2a)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--green, #2a7a2a)';
+  }
+  // Обновляем подписи с текущими значениями в select
+  const idx = sel.selectedIndex;
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  fields.forEach((f,i)=>{
+    const cur = document.getElementById(f.id);
+    const curVal = cur && cur.value ? ` = ${cur.value}` : '';
+    if(sel.options[i]) sel.options[i].textContent = f.label + curVal;
+  });
+  // двигаемся на следующее поле
+  if(idx + 1 < sel.options.length){
+    sel.selectedIndex = idx + 1;
+  }
+  repPickerUpdateCurrent();
+}
+
+function repPickerUpdateCurrent(){
+  const sel = document.getElementById('rep-picker-target');
+  const info = document.getElementById('rep-picker-current');
+  if(!sel || !info) return;
+  const fields = window._pickerFields || REP_PICKER_FIELDS;
+  const f = fields.find(x => x.id === sel.value);
+  // пересчитать кандидатов для нового поля
+  if(window._lastParsedText) repPickerRenderSuggestions(window._lastParsedText);
+  if(!f){ info.textContent = ''; return; }
+  const input = document.getElementById(f.id);
+  const cur = input && input.value ? input.value : '—';
+  info.innerHTML = `Текущее значение «${f.label}»: <strong style="color:var(--text)">${cur}</strong>`;
 }
 
 function repNewPeriodModal(){
