@@ -1728,19 +1728,110 @@ const RSBU_CODE_SET = new Set([
   2410,2421,2460,2400,2510,2520,2500,
 ]);
 
+// ── Маркер синтетической строки заголовков таблицы. extractPdfTextLines
+// эмитит её один раз на каждую страницу, чтобы findVal/findValTrace знали
+// какому году/периоду соответствует каждая колонка значений.
+const _HEADER_MARKER = '__HDR__';
+
+// Извлекает год из произвольной строки заголовка («2024», «31.12.2024»,
+// «На 31 декабря 2024 года», «За год, закончившийся 31 декабря 2024 г.»).
+// Для безопасности ограничиваем диапазон 1950–2099 и используем границы
+// слова, чтобы не подхватить год внутри большого числа.
+function _parseYearLabel(s){
+  if(!s) return null;
+  const m = String(s).match(/(?:^|\D)(19[5-9]\d|20\d{2})(?:\D|$)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// Парсит синтетическую строку __HDR__\t<year1>\t<year2>… из вывода
+// extractPdfTextLines. Возвращает массив year/null по индексу
+// колонки значений (соответствует cells[i+1] в data-строке) либо
+// null если это не header-строка.
+function _parseHeaderCells(line){
+  if(!line || !line.startsWith(_HEADER_MARKER)) return null;
+  const cells = line.split('\t').slice(1);
+  return cells.map(c => _parseYearLabel(c));
+}
+
+// Выбирает «лучшую» ячейку из табличной строки.
+//   cellNums — массив чисел/null по индексу value-колонки (после
+//              padding до длины value-колонок).
+//   colYears — массив year/null того же размера.
+// Логика приоритетов:
+//   1) исключаем ячейки, чьё значение совпадает с известным РСБУ-кодом,
+//   2) если есть «крупные» (|n|≥100) — берём из них самую свежую (по году),
+//   3) иначе — первое не-кодовое не-null,
+//   4) иначе — первое вообще не-null.
+// Возвращает {value, year, colIdx} либо null.
+function _pickValueCell(cellNums, colYears){
+  if(!cellNums || !cellNums.length) return null;
+  const present = cellNums
+    .map((v, i) => ({v, i, year: (colYears && colYears[i] != null) ? colYears[i] : null}))
+    .filter(o => o.v != null);
+  if(!present.length) return null;
+  const nonCode = present.filter(o => !RSBU_CODE_SET.has(Math.abs(o.v)));
+  const pool0 = nonCode.length ? nonCode : present;
+  const big = pool0.filter(o => Math.abs(o.v) >= 100);
+  const pool = big.length ? big : pool0;
+  // Сортировка: сначала самый свежий год (известный), потом порядок слева→направо.
+  pool.sort((a, b) => {
+    const ya = a.year ?? -Infinity;
+    const yb = b.year ?? -Infinity;
+    if(yb !== ya) return yb - ya;
+    return a.i - b.i;
+  });
+  const w = pool[0];
+  return {value: w.v, year: w.year, colIdx: w.i};
+}
+
+// Признак «секционного» заголовка — отдельной строки, к которой нельзя
+// присоединять текст следующей data-строки. Используется в extractPdfTextLines
+// для безопасного склеивания многострочных подписей ячеек.
+const _SECTION_HEAD_RE = /^\s*(?:[IVX]+\s*[.\)]|раздел\b|часть\b|глава\b|приложение\b|примечание\b|note\b|section\b)/i;
+function _isSectionHeader(desc){
+  if(!desc) return false;
+  if(_SECTION_HEAD_RE.test(desc)) return true;
+  // Заканчивается двоеточием — почти всегда заголовок раздела.
+  if(/[:：]\s*$/.test(desc)) return true;
+  // Полностью прописными буквами (минимум одна буква, ни одной строчной).
+  const hasLetter = /[A-Za-zА-Яа-яЁё]/.test(desc);
+  const hasLower  = /[a-zа-яё]/.test(desc);
+  if(hasLetter && !hasLower && desc.trim().length >= 4) return true;
+  return false;
+}
+
+// Признак продолжения предыдущей desc-строки в текущей data-строке.
+// Если current выглядит как новое предложение (Заглавная, цифра, тире) —
+// НЕ склеиваем. Это защищает от неверной склейки соседних строк таблицы.
+function _looksLikeContinuation(prev, current){
+  if(!current) return true; // пустой desc у data-строки — точно продолжение
+  if(/^[a-zа-яё(\[«"„'\-—]/.test(current)) return true;
+  if(/[.;]\s*$/.test(prev || '')) return false;
+  return false;
+}
+
 // Извлекает текст PDF как таблицу с классификацией колонок.
 // Алгоритм:
 //   1) items группируются по Y → строки.
 //   2) По всей странице строятся X-кластеры (колонки). Для каждой
 //      колонки классифицируется тип:
-//        'desc'  — в колонке много текста (не числа).
-//        'note'  — 1-2-значные целые (номера примечаний).
-//        'code'  — известные РСБУ-коды (1110-1700, 2110-2500).
-//        'value' — остальные числа ≥ 3 цифр или дробные.
-//   3) При сборке строки: все items из 'desc'-колонок склеиваются в
-//      одну текстовую ячейку (первый cell), а items из 'value'-колонок
-//      формируют последующие ячейки. Колонки 'note' и 'code' полностью
-//      игнорируются — из них никогда не придёт значение.
+//        'desc'   — в колонке много текста (не числа).
+//        'note'   — 1-2-значные целые (номера примечаний).
+//        'code'   — известные РСБУ-коды (1110-1700, 2110-2500).
+//        'period' — колонка сплошь годов 1990–2099 (в «перевёрнутых»
+//                   таблицах строки = годы, колонки = показатели).
+//        'value'  — остальные числа ≥ 3 цифр или дробные.
+//   3) Заголовки value-колонок (год/период) распознаются по верхним
+//      строкам страницы и эмитятся синтетической строкой
+//      `__HDR__\t<year_col1>\t<year_col2>…` — findVal/findValTrace
+//      использует её, чтобы выбрать ячейку нужного года.
+//   4) Многострочные подписи ячеек («Долгосрочные обязательства\nпо
+//      займам банков 1234») склеиваются в одну строку при безопасных
+//      условиях (нижняя строка — явное продолжение, не новый заголовок).
+//   5) Колонки 'period' переносятся в desc как «… [2024]» — это
+//      превращает «перевёрнутую» таблицу в обычный формат и сохраняет
+//      связь значения с годом.
+//   6) Колонки 'note' и 'code' игнорируются.
 async function extractPdfTextLines(pdf, maxPages=80) {
   let out = '';
   const pages = Math.min(pdf.numPages, maxPages);
@@ -1797,7 +1888,7 @@ async function extractPdfTextLines(pdf, maxPages=80) {
     const colKinds = colStarts.map((_, ci) => {
       const bucket = items.filter(it => colOf(it.transform[4]) === ci);
       if(!bucket.length) return 'desc';
-      let numeric = 0, rsbu = 0, note = 0, big = 0, text = 0;
+      let numeric = 0, rsbu = 0, note = 0, big = 0, text = 0, yearLike = 0;
       for(const it of bucket) {
         const s = (it.str || '').trim();
         if(!s) continue;
@@ -1807,6 +1898,7 @@ async function extractPdfTextLines(pdf, maxPages=80) {
           const n = parseInt(cleaned, 10);
           if(!isNaN(n)) {
             if(RSBU_CODE_SET && RSBU_CODE_SET.has(n)) rsbu++;
+            else if(n >= 1990 && n <= 2099 && /^\d{4}$/.test(cleaned)) { yearLike++; big++; }
             else if(n >= 1 && n <= 99 && Number.isInteger(parseFloat(cleaned))) note++;
             else big++;
           } else big++;
@@ -1814,6 +1906,9 @@ async function extractPdfTextLines(pdf, maxPages=80) {
       }
       // Если в колонке больше текста чем чисел — это desc.
       if(numeric < text * 0.5) return 'desc';
+      // Колонка «период» — почти все числа выглядят как годы (для
+      // перевёрнутых таблиц, где год вынесен в боковую колонку).
+      if(yearLike >= 2 && yearLike >= numeric * 0.6) return 'period';
       // Жёсткий порог для note/code: минимум 80% чистого содержимого
       // и мало «крупных» чисел (иначе реальный показатель 25 мог бы
       // ошибочно классифицировать колонку как note).
@@ -1822,11 +1917,56 @@ async function extractPdfTextLines(pdf, maxPages=80) {
       return 'value';
     });
 
+    // 2.5. Заголовки value-колонок: ищем год среди items, попавших в эту
+    // колонку из верхних строк страницы. Останавливаемся на первой
+    // строке, в которой уже есть «крупное» (не-год) число — это
+    // настоящая data-строка.
+    const colHeaderText = colStarts.map(() => '');
+    for(const [, lineItems] of linesOrdered){
+      let bigDataHit = 0;
+      for(const it of lineItems){
+        const c = colOf(it.transform[4]);
+        if(colKinds[c] !== 'value') continue;
+        const s = (it.str||'').trim();
+        if(!NUM_PURE.test(s)) continue;
+        const cleaned = s.replace(/[()\s,\u00a0]/g,'').replace(/^\-/,'');
+        const n = parseFloat(cleaned);
+        if(!isNaN(n) && Math.abs(n) >= 1000 && !(n >= 1990 && n <= 2099)) bigDataHit++;
+      }
+      if(bigDataHit) break; // дошли до данных — заголовков выше уже нет
+      for(const it of lineItems){
+        const c = colOf(it.transform[4]);
+        if(colKinds[c] !== 'value') continue;
+        colHeaderText[c] = (colHeaderText[c] + ' ' + (it.str||'')).replace(/\s+/g,' ').trim();
+      }
+    }
+    const colYears = colKinds.map((k, i) => k === 'value' ? _parseYearLabel(colHeaderText[i]) : null);
+
+    // Индексы value-колонок слева направо — по ним выравниваются ячейки
+    // в выводе и заголовок __HDR__.
+    const valueColIdx = colKinds
+      .map((k, i) => k === 'value' ? i : -1)
+      .filter(i => i >= 0);
+
+    // Эмитим синтетический header-row, если есть value-колонки. Даже если
+    // ни один год не распознан — пустая строка-маркер не мешает, но даёт
+    // парсеру понять «здесь начинается новая страница / таблица».
+    if(valueColIdx.length){
+      const headerCells = valueColIdx.map(ci => colYears[ci] != null ? String(colYears[ci]) : '');
+      out += _HEADER_MARKER + '\t' + headerCells.join('\t') + '\n';
+    }
+
     // 3. Сборка строк: items идут в нужные «ведра» согласно типу колонки.
+    // pendingDesc — буфер для строк-продолжений (см. п.4 в шапке).
+    let pendingDesc = '';
+    const flushPending = () => {
+      if(pendingDesc){ out += pendingDesc + '\n'; pendingDesc = ''; }
+    };
     for(const [, lineItems] of linesOrdered) {
       lineItems.sort((a,b) => a.transform[4] - b.transform[4]);
       let desc = '';
       let prevDescEnd = null;
+      let period = '';
       const valueCells = new Map(); // colIdx → текст ячейки
       for(const it of lineItems) {
         const x = it.transform[4], w = it.width || 0;
@@ -1840,19 +1980,56 @@ async function extractPdfTextLines(pdf, maxPages=80) {
         } else if(kind === 'value') {
           const prev = valueCells.get(c) || '';
           valueCells.set(c, prev ? (prev.endsWith(' ') ? prev + s : prev + ' ' + s) : s);
+        } else if(kind === 'period') {
+          const t = (s||'').trim();
+          if(t) period = period ? period + ' ' + t : t;
         }
         // 'note' / 'code' — игнорируем полностью.
       }
       desc = desc.replace(/\s+/g,' ').trim();
-      // Упорядочиваем value-ячейки по X колонки (слева направо).
-      const valCells = [...valueCells.entries()]
-        .sort((a,b) => colStarts[a[0]] - colStarts[b[0]])
-        .map(([,v]) => v.trim())
-        .filter(Boolean);
-      if(desc || valCells.length) {
-        out += [desc, ...valCells].join('\t') + '\n';
+      // Период (год сбоку) — переносим в desc, чтобы значение было
+      // явно «привязано» к году. Это сохраняет связь в перевёрнутых
+      // таблицах, где раньше год терялся как 'note'.
+      const periodYear = _parseYearLabel(period);
+      if(periodYear != null){
+        const tag = '[' + periodYear + ']';
+        desc = desc ? desc + ' ' + tag : tag;
+      }
+      // Выравниваем value-ячейки по value-колонкам страницы (с padding'ом).
+      // Это критично, чтобы индекс ячейки соответствовал году в __HDR__.
+      const valCells = valueColIdx.map(ci => (valueCells.get(ci) || '').trim());
+      const hasValues = valCells.some(v => v !== '');
+
+      if(!hasValues && desc){
+        // Строка только с подписью (без значений).
+        if(_isSectionHeader(desc)){
+          // Заголовок раздела — не склеиваем со следующей data-строкой.
+          flushPending();
+          out += desc + '\n';
+        } else {
+          // Возможное продолжение многострочной подписи — буферизуем.
+          pendingDesc = pendingDesc ? pendingDesc + ' ' + desc : desc;
+          // Защита от бесконтрольного накопления.
+          if(pendingDesc.length > 240){ flushPending(); }
+        }
+      } else if(hasValues){
+        let finalDesc = desc;
+        if(pendingDesc){
+          if(_looksLikeContinuation(pendingDesc, desc)){
+            finalDesc = pendingDesc + (desc ? ' ' + desc : '');
+          } else {
+            // Склейка не безопасна — выводим pending отдельно.
+            out += pendingDesc + '\n';
+          }
+          pendingDesc = '';
+        }
+        out += [finalDesc, ...valCells].join('\t') + '\n';
+      } else {
+        // Совсем пустая строка — flush на всякий случай.
+        flushPending();
       }
     }
+    flushPending();
     out += '\n';
   }
   return out;
@@ -1996,48 +2173,75 @@ async function parseAnyReport(input) {
       if(c > best) { best = c; scale = parseFloat(s); }
     }
 
-    // Ищем число на строке с ключом. НЕ трогаем исходный текст глобально —
-    // это сохраняет границы таблиц, где колонки разделены пробелами.
-    // Поиск значения. Каждая строка — TAB-разделённые ячейки:
-    //   [desc, val1, val2, val3, ...].
-    // Ищем ключ в desc (первая ячейка); если ключ найден — берём первое
-    // число из cells[1..] с |n| ≥ 100 (это пропускает колонку номеров
-    // примечаний). Если большого числа нет — возвращаем первое найденное.
-    // Fallback: если строка не TAB-формата (DOCX/XLSX), пробуем по всей
-    // строке через pickPrimaryNumber.
+    // Ищем число на строке с ключом. НЕ трогаем исходный текст глобально
+    // — это сохраняет границы таблиц, где колонки разделены пробелами.
+    // Каждая строка — TAB-разделённые ячейки [desc, val1, val2, …].
+    // extractPdfTextLines также эмитит синтетическую строку
+    // __HDR__\t<year1>\t<year2>… в начале каждой страницы — по ней мы
+    // знаем, какому году соответствует каждая колонка, и умеем выбрать
+    // самое свежее значение.
+    //
+    // Логика выбора среди нескольких совпавших строк:
+    //   1) Строки без значений пропускаются (настоящие подписи разделов
+    //      в табличном формате всегда отдельно от данных).
+    //   2) Если паттерн содержит «Итог|ИТОГ|Total» — предпочитаем строки
+    //      с этим словом в desc. Наоборот, если паттерн НЕ про итог —
+    //      предпочитаем обычные строки (иначе «Чистая прибыль»
+    //      мимоходом ловит «Итого чистая прибыль и прочий доход»).
+    //   3) Из value-ячеек выбираем самую свежую по году (__HDR__),
+    //      из них — самую «крупную» (|n|≥100) не-код.
+    //   4) Fallback: если строка не TAB-формата (DOCX/XLSX), берём
+    //      pickPrimaryNumber по всей строке.
     function findVal(patterns) {
       const lines = txt.split('\n');
-      for (const pat of patterns) {
-        const re = new RegExp(pat, 'i');
-        for (const line of lines) {
-          const cells = line.split('\t');
-          const desc = cells[0] || '';
-          const isTabFormat = cells.length > 1;
-          const match = isTabFormat ? re.test(desc) : re.test(line);
-          if(!match) continue;
-          if(isTabFormat){
-            const cellNums = [];
-            for(let i = 1; i < cells.length; i++){
-              const nums = filterMeaningfulNumbers(extractNumbersFromLine(cells[i]), {minAbs:1});
-              if(nums.length) cellNums.push(nums[0]);
-            }
-            if(!cellNums.length) continue;
-            // Значащее число: >= 100 И не РСБУ-код. Если все значения —
-            // коды или малые — берём первое не-код, иначе первое вообще.
-            const nonCode = cellNums.filter(n => !RSBU_CODE_SET.has(Math.abs(n)));
-            const big = nonCode.find(n => Math.abs(n) >= 100);
-            if(big != null) return big;
-            if(nonCode.length) return nonCode[0];
-            return cellNums[0];
-          } else {
-            const nums = filterMeaningfulNumbers(extractNumbersFromLine(line), {minAbs:1})
-              .filter(n => !RSBU_CODE_SET.has(Math.abs(n)));
-            const v = pickPrimaryNumber(nums);
-            if(v != null) return v;
-          }
+      const wantTotal = patterns.some(p => /итог|итого|total/i.test(p));
+      let curHeaders = null;
+      const cands = [];
+      for(let li = 0; li < lines.length; li++){
+        const line = lines[li];
+        const hdr = _parseHeaderCells(line);
+        if(hdr){ curHeaders = hdr; continue; }
+        if(!line) continue;
+        const cells = line.split('\t');
+        const desc = cells[0] || '';
+        const isTabFormat = cells.length > 1;
+        let patIdx = -1;
+        for(let pi = 0; pi < patterns.length; pi++){
+          const re = new RegExp(patterns[pi], 'i');
+          if(isTabFormat ? re.test(desc) : re.test(line)){ patIdx = pi; break; }
         }
+        if(patIdx < 0) continue;
+        let value = null, year = null;
+        if(isTabFormat){
+          const cellNums = [];
+          for(let i = 1; i < cells.length; i++){
+            const nums = filterMeaningfulNumbers(extractNumbersFromLine(cells[i]), {minAbs:1});
+            cellNums.push(nums.length ? nums[0] : null);
+          }
+          if(!cellNums.some(v => v != null)) continue;
+          const colY = curHeaders ? cellNums.map((_, i) => curHeaders[i] ?? null) : cellNums.map(() => null);
+          const picked = _pickValueCell(cellNums, colY);
+          if(!picked) continue;
+          value = picked.value; year = picked.year;
+        } else {
+          const nums = filterMeaningfulNumbers(extractNumbersFromLine(line), {minAbs:1})
+            .filter(n => !RSBU_CODE_SET.has(Math.abs(n)));
+          const v = pickPrimaryNumber(nums);
+          if(v == null) continue;
+          value = v;
+        }
+        const isTotalDesc = /итог|итого|total/i.test(desc);
+        // Ранжирование: меньший patIdx лучше (паттерны отсортированы по
+        // приоритету); совпадение wantTotal ↔ isTotalDesc даёт +100 очков.
+        let score = -patIdx * 10;
+        if(wantTotal === isTotalDesc) score += 100;
+        else if(wantTotal) score -= 50;
+        else score -= 5;
+        cands.push({score, value, year, line, patIdx});
       }
-      return null;
+      if(!cands.length) return null;
+      cands.sort((a, b) => b.score - a.score || a.patIdx - b.patIdx);
+      return cands[0].value;
     }
 
     // ── Сначала пробуем коды РСБУ (для XLSX/CSV) ──
@@ -5241,42 +5445,71 @@ function repFillFromText(rawText, scaleOverride){
   let scale = 1;
 
   const sources = {};
+  // findValTrace: то же что findVal из parseAnyReport, но ещё записывает
+  // источник значения (строка, год, паттерн) в `sources` для отладочного
+  // лога. Поддерживает синтетические __HDR__-строки для выбора
+  // «самого свежего года» и ранжирование «итог vs раздел».
   function findValTrace(patterns, traceId){
     const lines = txt.split('\n');
-    for(const pat of patterns){
-      const re = new RegExp(pat, 'i');
-      for(const line of lines){
-        const cells = line.split('\t');
-        const desc = cells[0] || '';
-        const isTabFormat = cells.length > 1;
-        const match = isTabFormat ? re.test(desc) : re.test(line);
-        if(!match) continue;
-        let v = null;
-        if(isTabFormat){
-          const cellNums = [];
-          for(let i = 1; i < cells.length; i++){
-            const nums = filterMeaningfulNumbers(extractNumbersFromLine(cells[i]), {minAbs:1});
-            if(nums.length) cellNums.push(nums[0]);
-          }
-          if(cellNums.length){
-            const nonCode = cellNums.filter(n => !RSBU_CODE_SET.has(Math.abs(n)));
-            const big = nonCode.find(n => Math.abs(n) >= 100);
-            if(big != null) v = big;
-            else if(nonCode.length) v = nonCode[0];
-            else v = cellNums[0];
-          }
-        } else {
-          const nums = filterMeaningfulNumbers(extractNumbersFromLine(line), {minAbs:1})
-            .filter(n => !RSBU_CODE_SET.has(Math.abs(n)));
-          v = pickPrimaryNumber(nums);
-        }
-        if(v != null){
-          if(traceId) sources[traceId] = {line: line.replace(/\t/g,' | ').trim(), value: v, pattern: pat};
-          return v;
-        }
+    const wantTotal = patterns.some(p => /итог|итого|total/i.test(p));
+    let curHeaders = null;
+    const cands = [];
+    for(let li = 0; li < lines.length; li++){
+      const line = lines[li];
+      const hdr = _parseHeaderCells(line);
+      if(hdr){ curHeaders = hdr; continue; }
+      if(!line) continue;
+      const cells = line.split('\t');
+      const desc = cells[0] || '';
+      const isTabFormat = cells.length > 1;
+      let patIdx = -1, matchedPat = null;
+      for(let pi = 0; pi < patterns.length; pi++){
+        const re = new RegExp(patterns[pi], 'i');
+        if(isTabFormat ? re.test(desc) : re.test(line)){ patIdx = pi; matchedPat = patterns[pi]; break; }
       }
+      if(patIdx < 0) continue;
+      let value = null, year = null;
+      if(isTabFormat){
+        const cellNums = [];
+        for(let i = 1; i < cells.length; i++){
+          const nums = filterMeaningfulNumbers(extractNumbersFromLine(cells[i]), {minAbs:1});
+          cellNums.push(nums.length ? nums[0] : null);
+        }
+        if(!cellNums.some(v => v != null)) continue;
+        const colY = curHeaders ? cellNums.map((_, i) => curHeaders[i] ?? null) : cellNums.map(() => null);
+        const picked = _pickValueCell(cellNums, colY);
+        if(!picked) continue;
+        value = picked.value; year = picked.year;
+      } else {
+        const nums = filterMeaningfulNumbers(extractNumbersFromLine(line), {minAbs:1})
+          .filter(n => !RSBU_CODE_SET.has(Math.abs(n)));
+        const v = pickPrimaryNumber(nums);
+        if(v == null) continue;
+        value = v;
+      }
+      const isTotalDesc = /итог|итого|total/i.test(desc);
+      let score = -patIdx * 10;
+      if(wantTotal === isTotalDesc) score += 100;
+      else if(wantTotal) score -= 50;
+      else score -= 5;
+      // Также: если подпись явно содержит год-тег из extractPdfTextLines
+      // (перевёрнутая таблица), используем его, если колоночного года нет.
+      if(year == null){
+        const tag = desc.match(/\[(19[5-9]\d|20\d{2})\]/);
+        if(tag) year = parseInt(tag[1], 10);
+      }
+      cands.push({score, value, year, line, pattern: matchedPat, patIdx});
     }
-    return null;
+    if(!cands.length) return null;
+    cands.sort((a, b) => b.score - a.score || a.patIdx - b.patIdx);
+    const best = cands[0];
+    if(traceId) sources[traceId] = {
+      line: best.line.replace(/\t/g,' | ').trim(),
+      value: best.value,
+      pattern: best.pattern,
+      year: best.year
+    };
+    return best.value;
   }
   const findVal = (pats) => findValTrace(pats);
 
@@ -5321,10 +5554,13 @@ function repFillFromText(rawText, scaleOverride){
       const src = sources[id];
       // Источник для отладки: какая строка PDF, какое сырое число, какое после scale.
       const lineShort = src?.line?.slice(0,90) + (src?.line?.length>90 ? '…' : '') || '';
+      const yearTag = src?.year != null
+        ? ` <span style="color:var(--text3)">· год ${src.year}</span>`
+        : '';
       logLines.push(
         `<div style="padding:3px 0;border-bottom:1px dotted rgba(30,48,72,.4)">`+
         `<span style="color:var(--green)">✓</span> <strong>${labels[id]||id}</strong> = `+
-        `<span style="color:var(--acc)">${val}</span> <span style="color:var(--text3)">(сырое ${src?.value??'?'} × scale ${scale})</span>`+
+        `<span style="color:var(--acc)">${val}</span> <span style="color:var(--text3)">(сырое ${src?.value??'?'} × scale ${scale})</span>${yearTag}`+
         (lineShort ? `<br><span style="color:var(--text3);font-size:.56rem">↳ ${lineShort.replace(/</g,'&lt;')}</span>` : '')+
         `</div>`
       );
