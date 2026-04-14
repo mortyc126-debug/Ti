@@ -1453,15 +1453,26 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div id="ctx-split" style="display:flex;flex:1;gap:8px;min-height:0;flex-wrap:wrap">
         <div id="ctx-text" style="flex:1 1 55%;min-width:260px;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
         <div id="ctx-pdf-pane" style="flex:1 1 40%;min-width:220px;display:none;flex-direction:column;background:#2a2a2a;border:1px solid var(--border2);overflow:hidden">
-          <div style="display:flex;gap:4px;padding:4px 6px;background:var(--s1);align-items:center;font-size:.55rem;color:var(--text3)">
+          <div style="display:flex;gap:4px;padding:4px 6px;background:var(--s1);align-items:center;font-size:.55rem;color:var(--text3);flex-wrap:wrap">
             <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfNav(-1)" title="Предыдущая страница">◀</button>
-            <span id="ctx-pdf-info" style="flex:1;text-align:center">—</span>
+            <span id="ctx-pdf-info" style="flex:1;text-align:center;min-width:60px">—</span>
             <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfNav(1)" title="Следующая страница">▶</button>
             <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfSyncToAnchor()" title="Вернуться к странице якоря">⌖</button>
+            <button type="button" class="btn btn-sm" id="ctx-pdf-mask-btn" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfToggleMask()" title="Маска распознавания: рамки колонок и классификация items (desc/value/note/code/period)">🎭 маска</button>
           </div>
           <div id="ctx-pdf-scroll" style="flex:1;overflow:auto;text-align:center;padding:4px">
-            <canvas id="ctx-pdf-canvas" style="max-width:100%;display:inline-block"></canvas>
+            <div id="ctx-pdf-stage" style="position:relative;display:inline-block;max-width:100%">
+              <canvas id="ctx-pdf-canvas" style="max-width:100%;display:inline-block"></canvas>
+              <div id="ctx-pdf-overlay" style="position:absolute;left:0;top:0;pointer-events:none"></div>
+            </div>
             <div id="ctx-pdf-empty" style="display:none;color:var(--text3);font-size:.6rem;padding:20px">Оригинальная страница PDF доступна только когда загружен PDF-файл (для DOCX/XLSX используйте текст слева).</div>
+            <div id="ctx-pdf-legend" style="display:none;font-size:.5rem;color:var(--text3);padding:4px 6px;border-top:1px solid var(--border);line-height:1.6">
+              <span style="display:inline-block;width:10px;height:10px;background:rgba(100,150,255,.3);border:1px solid rgba(100,150,255,.8);vertical-align:middle"></span> desc ·
+              <span style="display:inline-block;width:10px;height:10px;background:rgba(100,255,150,.3);border:1px solid rgba(100,255,150,.8);vertical-align:middle"></span> value ·
+              <span style="display:inline-block;width:10px;height:10px;background:rgba(255,220,100,.3);border:1px solid rgba(255,220,100,.8);vertical-align:middle"></span> note ·
+              <span style="display:inline-block;width:10px;height:10px;background:rgba(180,180,180,.3);border:1px solid rgba(180,180,180,.8);vertical-align:middle"></span> code ·
+              <span style="display:inline-block;width:10px;height:10px;background:rgba(200,100,255,.3);border:1px solid rgba(200,100,255,.8);vertical-align:middle"></span> period
+            </div>
           </div>
         </div>
       </div>
@@ -2450,8 +2461,10 @@ async function extractPdfTextLines(pdf, maxPages=80) {
   window._pickerPdfDoc = pdf;
   window._pickerPdfTableRows = [];           // структурные строки: {lineIdx, page, desc, cols}
   window._pickerPdfPageHeaders = {};         // страница → массив колоночных подписей
+  window._pickerPdfPageLayout = {};          // страница → {colStarts, colKinds, items[{x,y,w,h,kind,str}]}
   const tableRows = window._pickerPdfTableRows;
   const pageHeaders = window._pickerPdfPageHeaders;
+  const pageLayout = window._pickerPdfPageLayout;
   const pageBoundaries = [0]; // номер первой строки каждой страницы
   let out = '';
   let curLineIdx = 0;
@@ -2714,6 +2727,24 @@ async function extractPdfTextLines(pdf, maxPages=80) {
     curLineIdx++;
     // Запомнить, сколько строк уже в out — старт следующей страницы.
     pageBoundaries.push((out.match(/\n/g) || []).length);
+    // Сохранить layout страницы для визуальной маски (поверх мини-PDF).
+    // items — только те, что относятся к value/desc/note/code/period
+    // колонкам (у них определён kind); координаты — в PDF-единицах,
+    // перевод в canvas-coords делает viewport.convertToViewportPoint
+    // при рендере маски.
+    pageLayout[i] = {
+      colStarts: colStarts.slice(),
+      colKinds: colKinds.slice(),
+      avgH,
+      items: items2.map(it => ({
+        x: it.transform[4],
+        y: it.transform[5],
+        w: it.width || 0,
+        h: it.height || avgH,
+        kind: colKinds[colOf(it.transform[4])] || 'desc',
+        str: (it.str || '').slice(0, 40)
+      }))
+    };
   }
   window._pickerPdfPageBoundaries = pageBoundaries;
   return out;
@@ -6774,6 +6805,15 @@ function repPickerOpenContext(idx){
     else if(saved === '0')                          pane.style.display = 'none';
     else                                            pane.style.display = window._pickerPdfDoc ? 'flex' : 'none';
   }
+  // Восстанавливаем состояние маски распознавания.
+  try {
+    const savedMask = localStorage.getItem('bondan_ctx_mask');
+    window._ctxMaskOn = savedMask === '1';
+    const btn = document.getElementById('ctx-pdf-mask-btn');
+    if(btn) btn.style.background = window._ctxMaskOn ? 'var(--acc)' : '';
+    const legend = document.getElementById('ctx-pdf-legend');
+    if(legend) legend.style.display = window._ctxMaskOn ? 'block' : 'none';
+  } catch(e){}
   repPickerCtxRender();
 }
 
@@ -6978,6 +7018,7 @@ async function _ctxRenderMiniPdf(pageNum){
     canvas.style.display = 'none';
     if(empty) empty.style.display = 'block';
     if(info) info.textContent = 'нет PDF';
+    _ctxRenderMask(null, null);
     return;
   }
   if(empty) empty.style.display = 'none';
@@ -6998,8 +7039,83 @@ async function _ctxRenderMiniPdf(pageNum){
     window._ctxPdfTask = page.render({canvasContext: canvas.getContext('2d'), viewport: vp});
     await window._ctxPdfTask.promise;
     window._ctxPdfTask = null;
+    _ctxRenderMask(pageNum, vp);
   } catch(e){
     if(info) info.textContent = 'ошибка: ' + (e.message || e);
+  }
+}
+
+// ── Маска распознавания поверх мини-PDF ──────────────────────────
+// Цель: наглядно показать, как парсер понял страницу. Рисуем рамки
+// колонок (colStarts + classified kind) и box вокруг каждого item
+// с цветом по типу (desc/value/note/code/period). Вкл/выкл кнопкой
+// «🎭 маска». По умолчанию — выкл (маска может закрывать текст).
+window._ctxMaskOn = false;
+function ctxPdfToggleMask(){
+  window._ctxMaskOn = !window._ctxMaskOn;
+  try { localStorage.setItem('bondan_ctx_mask', window._ctxMaskOn ? '1' : '0'); } catch(e){}
+  const btn = document.getElementById('ctx-pdf-mask-btn');
+  if(btn) btn.style.background = window._ctxMaskOn ? 'var(--acc)' : '';
+  const legend = document.getElementById('ctx-pdf-legend');
+  if(legend) legend.style.display = window._ctxMaskOn ? 'block' : 'none';
+  // Перерисовать — viewport неизвестен здесь, используем последний
+  // кэшированный через повторный render страницы.
+  const p = window._ctxPdfPage;
+  if(p) _ctxRenderMiniPdf(p);
+}
+
+const _MASK_BG = {
+  desc:   'rgba(100,150,255,.18)',
+  value:  'rgba(100,255,150,.18)',
+  note:   'rgba(255,220,100,.22)',
+  code:   'rgba(180,180,180,.22)',
+  period: 'rgba(200,100,255,.22)'
+};
+const _MASK_BD = {
+  desc:   'rgba(100,150,255,.8)',
+  value:  'rgba(100,255,150,.8)',
+  note:   'rgba(255,220,100,.9)',
+  code:   'rgba(180,180,180,.9)',
+  period: 'rgba(200,100,255,.9)'
+};
+
+function _ctxRenderMask(pageNum, viewport){
+  const overlay = document.getElementById('ctx-pdf-overlay');
+  if(!overlay) return;
+  overlay.innerHTML = '';
+  if(!pageNum || !viewport || !window._ctxMaskOn) return;
+  const layout = window._pickerPdfPageLayout?.[pageNum];
+  if(!layout) return;
+  overlay.style.width  = viewport.width  + 'px';
+  overlay.style.height = viewport.height + 'px';
+  const {colStarts, colKinds, items} = layout;
+  // 1) Колоночные зоны — фоновые вертикальные полосы.
+  for(let c = 0; c < colStarts.length; c++){
+    const kind = colKinds[c] || 'desc';
+    const sx = viewport.convertToViewportPoint(colStarts[c], 0)[0];
+    const ex = c + 1 < colStarts.length
+      ? viewport.convertToViewportPoint(colStarts[c+1], 0)[0]
+      : viewport.width;
+    const d = document.createElement('div');
+    d.style.cssText = `position:absolute;left:${sx}px;top:0;width:${Math.max(1, ex - sx)}px;height:100%;background:${_MASK_BG[kind] || 'transparent'};border-left:1px dashed ${_MASK_BD[kind] || '#888'}`;
+    d.title = `col ${c}: ${kind}`;
+    overlay.appendChild(d);
+  }
+  // 2) Boxes вокруг items — точная классификация каждого токена.
+  for(const it of items){
+    const kind = it.kind || 'desc';
+    // PDF baseline → canvas coords: verttex наверху = y_base − h.
+    const topLeft = viewport.convertToViewportPoint(it.x, it.y + it.h);
+    const bottomRight = viewport.convertToViewportPoint(it.x + it.w, it.y);
+    const x = Math.min(topLeft[0], bottomRight[0]);
+    const y = Math.min(topLeft[1], bottomRight[1]);
+    const w = Math.abs(bottomRight[0] - topLeft[0]);
+    const h = Math.abs(bottomRight[1] - topLeft[1]);
+    if(w < 0.5 || h < 0.5) continue;
+    const b = document.createElement('div');
+    b.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1px solid ${_MASK_BD[kind] || '#888'};box-sizing:border-box`;
+    b.title = `${kind}: ${it.str}`;
+    overlay.appendChild(b);
   }
 }
 
