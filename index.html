@@ -2313,6 +2313,101 @@ function girboLinkForInn(inn){
   return 'https://bo.nalog.ru/search?query=' + encodeURIComponent(inn);
 }
 
+// ── Авто-подбор эталона по ИНН и периоду ─────────────────────────────
+// Каталог эталонов хранится в двух местах:
+//   • references/index.json рядом с index.html (общие, коммитятся в репо)
+//   • localStorage['bondan_refs'] (личные, попадают туда через «💾
+//     сохранить в кэш» и при ручном импорте)
+// При каждом парсинге отчёта мы после detectReportMeta ищем эталон с
+// совпадающим ИНН (и близким периодом) и автоматически применяем его.
+// Если эталон не нашёлся — сверка тихо остаётся пустой; кнопки ручного
+// импорта/экспорта по-прежнему доступны.
+const _REF_CATALOGUE_URL = 'references/index.json';
+window._refCatalogue = null;
+
+async function _ensureRefCatalogue(){
+  if(window._refCatalogue) return window._refCatalogue;
+  // 1) Локальные — сохранённые пользователем.
+  let localEntries = [];
+  try {
+    const raw = localStorage.getItem('bondan_refs');
+    if(raw) localEntries = JSON.parse(raw) || [];
+  } catch(e){}
+  // 2) Общие — из JSON рядом с index.html.
+  let repoEntries = [];
+  try {
+    const resp = await fetch(_REF_CATALOGUE_URL, {cache: 'no-store'});
+    if(resp.ok){
+      const data = await resp.json();
+      repoEntries = Array.isArray(data.entries) ? data.entries : [];
+    }
+  } catch(e){}
+  window._refCatalogue = {localEntries, repoEntries};
+  return window._refCatalogue;
+}
+
+// Сопоставление периода: нормализуем разные формы (2024, «2024 год»,
+// «H1 2024», «9M 2024», «31.12.2024») к строке-каноникалу.
+function _normalisePeriod(p){
+  if(!p) return '';
+  const s = String(p).toLowerCase().replace(/ё/g,'е');
+  // ищем «h1/h2/q1-q4/9m/12m/годовой» и год
+  const yearM = s.match(/(19|20)\d{2}/);
+  const year = yearM ? yearM[0] : '';
+  let kind = '';
+  if(/h1|полугод|\b6\s*мес|9м\s*2|12\s*мес|годов|year|31\.03|31\.12|30\.06|30\.09/.test(s)){
+    if(/h1|полугод|\b6\s*мес|30\.06/.test(s)) kind = 'H1';
+    else if(/9м|30\.09/.test(s)) kind = '9M';
+    else if(/q1|3\s*мес|31\.03/.test(s)) kind = 'Q1';
+    else if(/q3|30\.09/.test(s)) kind = '9M';
+    else kind = 'FY'; // full year
+  } else {
+    kind = 'FY';
+  }
+  return kind + ' ' + year;
+}
+
+// Ищем в каталоге эталон для метаданных отчёта. Приоритет: полное
+// совпадение ИНН+период > совпадение только по ИНН > null.
+function _findRefFor(meta, period){
+  if(!meta || !meta.inn) return null;
+  const cat = window._refCatalogue;
+  if(!cat) return null;
+  const wantPeriod = _normalisePeriod(period || meta.period);
+  const all = [...cat.localEntries, ...cat.repoEntries];
+  const byInn = all.filter(e => String(e.inn) === String(meta.inn));
+  if(!byInn.length) return null;
+  // Точное совпадение по периоду.
+  const exact = byInn.find(e => _normalisePeriod(e.period) === wantPeriod);
+  if(exact) return exact;
+  // Иначе — самый свежий по году.
+  byInn.sort((a, b) => {
+    const ya = (String(a.period||'').match(/(19|20)\d{2}/)||[''])[0];
+    const yb = (String(b.period||'').match(/(19|20)\d{2}/)||[''])[0];
+    return String(yb).localeCompare(String(ya));
+  });
+  return byInn[0];
+}
+
+// Сохранение эталона в локальный кэш (localStorage) — чтобы при
+// следующей загрузке того же отчёта сверка применялась автоматом.
+function _saveRefToLocal(ref){
+  if(!ref || !ref.inn) return false;
+  try {
+    const raw = localStorage.getItem('bondan_refs');
+    const arr = raw ? (JSON.parse(raw) || []) : [];
+    // Заменяем предыдущую запись с тем же ИНН+периодом.
+    const key = ref.inn + '|' + _normalisePeriod(ref.period);
+    const filtered = arr.filter(e => (e.inn + '|' + _normalisePeriod(e.period)) !== key);
+    filtered.push(ref);
+    localStorage.setItem('bondan_refs', JSON.stringify(filtered));
+    if(window._refCatalogue) window._refCatalogue.localEntries = filtered;
+    return true;
+  } catch(e){
+    return false;
+  }
+}
+
 // Извлекает текст PDF как таблицу с классификацией колонок.
 // Алгоритм:
 //   1) items группируются по Y → строки.
@@ -5789,6 +5884,9 @@ function repOnRefFile(input){
         return;
       }
       window._reportReference = ref;
+      // Сохраняем в локальный кэш, чтобы при следующей загрузке того же
+      // отчёта (тот же ИНН+период) сверка применилась автоматически.
+      if(ref.inn) _saveRefToLocal(ref);
       repRenderRefResult();
     } catch(e){
       alert('Не удалось прочитать JSON: ' + e.message);
@@ -5901,8 +5999,14 @@ function repRenderRefResult(){
     ref.scope === 'group' ? 'группа' : (ref.scope === 'standalone' ? 'юрлицо' : null),
     ref.standard
   ].filter(Boolean).join(' · ');
+  // Заметка об автоподборе: если этот эталон пришёл из каталога /
+  // localStorage без ручного импорта — покажем маркер «🤖 авто» и
+  // источник (где был найден).
+  const autoTag = ref._autoSource
+    ? ` <span style="color:var(--text3)">· 🤖 авто (${ref._autoSource})</span>`
+    : '';
 
-  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}. ${okBadge}</div>${warning}${rows}`;
+  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>${warning}${rows}`;
 }
 function repCopyRawText(){
   const ta = document.getElementById('rep-np-raw-text');
@@ -7598,10 +7702,27 @@ function repFillFromText(rawText, scaleOverride){
   } else if(note) {
     note.textContent = ' · выбрано вручную';
   }
-  // Показываем распознанную мета-инфо + обновляем сверку, если эталон
-  // уже был импортирован ранее (в рамках той же сессии).
+  // Показываем распознанную мета-инфо + авто-подбор эталона.
+  // Каталог эталонов (references/index.json + localStorage) подтянут
+  // при старте приложения; ищем запись с совпадающим ИНН (и по
+  // возможности периодом) и молча применяем. Если пользователь
+  // позже импортирует другой JSON руками — он перезапишет.
   repRenderMeta(_meta);
-  if(window._reportReference) repRenderRefResult();
+  (async () => {
+    await _ensureRefCatalogue();
+    if(!window._reportReference){
+      const period = document.getElementById('rep-np-year')?.value;
+      const cat = window._refCatalogue || {localEntries:[], repoEntries:[]};
+      const found = _findRefFor(_meta, period);
+      if(found){
+        const ref = normaliseReference(found) || found;
+        // Помечаем, откуда пришёл, чтобы отображать «🤖 авто (кэш/каталог)».
+        ref._autoSource = cat.localEntries.includes(found) ? 'кэш' : 'каталог';
+        window._reportReference = ref;
+      }
+    }
+    if(window._reportReference) repRenderRefResult();
+  })();
   return filled;
 }
 
