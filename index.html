@@ -1545,6 +1545,25 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       </div>
 
       <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
+        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>💼 Офлайн-код</strong> — без сети и без сервера, подходит когда блокировщик / корпоративный firewall режет fetch</summary>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
+            Собираем тот же снапшот (портфель, watchlist, reportsDB, эталоны, AI-ключ), сжимаем gzip'ом и кодируем в base64. Длинная текстовая строка копируется на другое устройство любым способом (Telegram Saved Messages, e-mail себе, AirDrop, заметки) и вставляется в это же поле. Никаких внешних серверов.
+          </div>
+          <textarea id="offline-code" rows="4" placeholder="Нажмите «🧳 Собрать» — здесь появится код для копирования; либо вставьте сюда чужой код и нажмите «📥 Применить»" style="width:100%;font-family:var(--mono);font-size:.55rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:6px;resize:vertical;min-height:80px"></textarea>
+          <div id="offline-status" style="font-size:.6rem;padding:4px 8px;display:none;border:1px solid var(--border)"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="offlineMakeCode()" title="Собрать текущие данные в строку-код">🧳 Собрать</button>
+            <button class="btn btn-sm btn-p" onclick="offlineApplyCode()" title="Применить вставленный в textarea код">📥 Применить</button>
+            <button class="btn btn-sm" onclick="offlineCopyCode()" title="Скопировать содержимое textarea в буфер">📋 Скопировать</button>
+            <button class="btn btn-sm" onclick="offlineDownloadFile()" title="Скачать полный снапшот как .json-файл">💾 Файл</button>
+            <input type="file" id="offline-file" accept=".json,application/json" style="display:none" onchange="offlineLoadFile(this)">
+            <button class="btn btn-sm" onclick="document.getElementById('offline-file').click()" title="Загрузить снапшот из .json-файла">📂 Из файла</button>
+          </div>
+        </div>
+      </details>
+
+      <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
         <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>Альтернатива: через GitHub Gist</strong> (если у вас один и тот же GitHub-аккаунт на всех устройствах)</summary>
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
           <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
@@ -8889,6 +8908,167 @@ function syncShowQR(){
   if(img) img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=4&data=' + encodeURIComponent(code);
   if(txt) txt.textContent = code;
   if(pop){ pop.style.display = 'flex'; }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ОФЛАЙН-КОД — синхронизация без сервера и без сети
+// ══════════════════════════════════════════════════════════════════
+// Используется когда «Код синхронизации» через jsonblob.com не
+// работает (корпоративный firewall, блокирующее расширение в
+// браузере, «Failed to fetch» и т.п.). Идея: сам снапшот пакуется в
+// gzip+base64 строку, которая копируется между устройствами любым
+// способом (Telegram Saved Messages, e-mail себе, AirDrop, заметки).
+// Никаких внешних сервисов, никаких fetch'ей — работает всегда.
+
+function _offlineStatus(msg, color){
+  const el = document.getElementById('offline-status');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.color = color || 'var(--text2)';
+  el.textContent = msg;
+}
+
+async function _gzipB64(text){
+  try {
+    const stream = new Response(new TextEncoder().encode(text)).body
+      .pipeThrough(new CompressionStream('gzip'));
+    const buf = await new Response(stream).arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    // Chrome 80+/Firefox 113+/Safari 16.4+ поддерживают CompressionStream;
+    // на старых браузерах fallback на простой base64 без сжатия.
+    let s = '';
+    for(let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return 'gz:' + btoa(s);
+  } catch(e){
+    return 'b:' + btoa(unescape(encodeURIComponent(text)));
+  }
+}
+
+async function _ungzipB64(code){
+  if(code.startsWith('gz:')){
+    const bytes = _b64dec(code.slice(3));
+    const stream = new Response(bytes).body.pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  }
+  if(code.startsWith('b:')){
+    return decodeURIComponent(escape(atob(code.slice(2))));
+  }
+  // Попытка auto-detect: мог быть просто чистый JSON или base64 без префикса.
+  try { return decodeURIComponent(escape(atob(code))); } catch(e){}
+  return code;
+}
+
+async function offlineMakeCode(){
+  try {
+    const snapshot = _syncBuildSnapshot();
+    const json = JSON.stringify(snapshot);
+    const code = await _gzipB64(json);
+    const ta = document.getElementById('offline-code');
+    if(ta) ta.value = code;
+    const ratio = (code.length / json.length * 100).toFixed(0);
+    _offlineStatus(`✅ Собрано: ${(code.length/1024).toFixed(1)} КБ (сжатие ${ratio}% от оригинала). Нажмите «📋 Скопировать» и вставьте строку на другом устройстве в это же поле → «📥 Применить».`, 'var(--green)');
+  } catch(e){
+    _offlineStatus('❌ Ошибка сборки: ' + (e.message || e), 'var(--danger)');
+  }
+}
+
+async function _offlineApplySnapshot(d, source){
+  const savedAt = d.savedAt ? new Date(d.savedAt).toLocaleString('ru-RU') : 'неизвестно';
+  const refsCount = Array.isArray(d.refs) ? d.refs.length : 0;
+  if(!confirm(`${source}: снапшот от ${savedAt}\n\nЭталонов: ${refsCount}\n\nПортфель, watchlist, календарь, reportsDB и AI-ключ будут заменены. Эталоны сверки будут объединены с локальными.`)){
+    _offlineStatus('Отменено', 'var(--text3)');
+    return false;
+  }
+  if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
+  if(d.portfolio)  portfolio  = d.portfolio;
+  if(d.watchlists) watchlists = d.watchlists;
+  if(d.calEvents)  calEvents  = d.calEvents;
+  if(d.reportsDB)  reportsDB  = d.reportsDB;
+  if(Array.isArray(d.refs) && d.refs.length){
+    try {
+      const local = JSON.parse(localStorage.getItem('bondan_refs') || '[]');
+      const keyOf = r => (r.inn || '') + '|' + _normalisePeriod(r.period);
+      const merged = new Map();
+      for(const r of local) merged.set(keyOf(r), r);
+      for(const r of d.refs) merged.set(keyOf(r), r);
+      const arr = [...merged.values()];
+      localStorage.setItem('bondan_refs', JSON.stringify(arr));
+      if(window._refCatalogue) window._refCatalogue.localEntries = arr;
+    } catch(e){}
+  }
+  if(d.apiKey){
+    localStorage.setItem('ba_apikey', d.apiKey);
+    const apiInput = document.getElementById('api-key-input');
+    if(apiInput) apiInput.value = d.apiKey;
+  }
+  save();
+  renderYtm(); renderPort(); renderSbLists();
+  document.getElementById('sb-pc').textContent = portfolio.length;
+  const repEl = document.getElementById('sb-rep');
+  if(repEl) repEl.textContent = Object.keys(reportsDB).length;
+  _offlineStatus(`✅ Применено. Эталонов: ${refsCount}.`, 'var(--green)');
+  return true;
+}
+
+async function offlineApplyCode(){
+  const ta = document.getElementById('offline-code');
+  if(!ta) return;
+  const code = ta.value.trim();
+  if(!code){
+    _offlineStatus('⚠️ Сначала вставьте код в textarea.', 'var(--warn)');
+    return;
+  }
+  try {
+    const plain = await _ungzipB64(code);
+    const d = JSON.parse(plain);
+    await _offlineApplySnapshot(d, 'Офлайн-код');
+  } catch(e){
+    _offlineStatus('❌ Не удалось распаковать: ' + (e.message || e) + '. Возможно, код обрезан при копировании — скопируйте заново полностью.', 'var(--danger)');
+  }
+}
+
+async function offlineCopyCode(){
+  const ta = document.getElementById('offline-code');
+  if(!ta) return;
+  const code = ta.value;
+  if(!code){ _offlineStatus('⚠️ Сначала нажмите «🧳 Собрать».', 'var(--warn)'); return; }
+  try {
+    await navigator.clipboard.writeText(code);
+    _offlineStatus('✅ Скопировано в буфер обмена.', 'var(--green)');
+  } catch(e){
+    ta.select();
+    try { document.execCommand('copy'); _offlineStatus('✅ Скопировано (fallback).', 'var(--green)'); }
+    catch(_){ _offlineStatus('Выделите текст в textarea и скопируйте вручную (Ctrl+C).', 'var(--warn)'); }
+  }
+}
+
+function offlineDownloadFile(){
+  const snapshot = _syncBuildSnapshot();
+  const json = JSON.stringify(snapshot, null, 2);
+  const blob = new Blob([json], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bondan-snapshot-' + new Date().toISOString().slice(0,16).replace(/[T:]/g,'-') + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  _offlineStatus('✅ Снапшот сохранён. Перенесите файл на другое устройство и загрузите кнопкой «📂 Из файла».', 'var(--green)');
+}
+
+function offlineLoadFile(input){
+  const f = input.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const d = JSON.parse(reader.result);
+      await _offlineApplySnapshot(d, 'Файл ' + f.name);
+    } catch(e){
+      _offlineStatus('❌ Ошибка чтения файла: ' + (e.message || e), 'var(--danger)');
+    }
+  };
+  reader.readAsText(f);
+  input.value = '';
 }
 
 function gistStatus(msg, color='var(--text2)') {
