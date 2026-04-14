@@ -1268,6 +1268,18 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           </div>
         </div>
         <div id="rep-np-parse-log" style="display:none;margin-top:8px;font-size:.62rem;line-height:1.8;color:var(--text2);max-height:180px;overflow-y:auto"></div>
+        <div id="rep-np-meta-wrap" style="display:none;margin-top:6px;font-size:.62rem;color:var(--text2);padding:6px 8px;background:var(--s1);border-left:2px solid var(--acc)"></div>
+        <div id="rep-np-ref-wrap" style="display:none;margin-top:8px;padding:8px;background:var(--s1);border:1px solid var(--border)">
+          <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">⚖️ Сверка с эталоном</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.ru">📋 Импорт JSON</button>
+            <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
+            <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
+            <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
+            <button type="button" class="btn btn-sm" onclick="repClearReference()" title="Очистить импортированный эталон">✗</button>
+          </div>
+          <div id="rep-np-ref-result" style="font-size:.62rem;color:var(--text2);line-height:1.7"></div>
+        </div>
         <div id="rep-np-raw-wrap" style="display:none;margin-top:8px">
           <div id="rep-np-tools-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button type="button" class="btn btn-sm" onclick="repToggleRawText()" id="rep-np-raw-btn">📄 Показать распознанный текст</button>
@@ -2142,6 +2154,163 @@ function _sectionScoreAdj(got, expected){
   if(got === 'equity'   && !expected.includes('equity'))   return -20;
   if(got === 'note')    return -10;                   // возможно, но не основной источник
   return -15;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// МЕТАДАННЫЕ ОТЧЁТА + СВЕРКА С ЭТАЛОНОМ
+// ═══════════════════════════════════════════════════════════════════
+// Пользовательский запрос: различать МСФО-группу (consolidated) и
+// РСБУ-юрлицо (standalone). Если пользователь сверяет с ГИР БО, но
+// загружен отчёт МСФО-группы — цифры несопоставимы, это надо явно
+// отметить, а не показывать красные флаги как будто парсер промахнулся.
+
+// detectReportMeta(txt) → {standard, scope, inn, orgName, confidence}
+//   standard: 'МСФО' | 'РСБУ' | null
+//   scope:    'group' (консолидированный) | 'standalone' (одно юрлицо) | null
+//   inn:      10 или 12 цифр, распознанных рядом со словом «ИНН»
+//   orgName:  «ПАО «…»», «ООО «…»», если удалось выудить в первых 3000 симв.
+function detectReportMeta(txt){
+  const s = String(txt||'');
+  // 1. Стандарт.
+  let standard = null;
+  if(/IFRS\b|международн\w+\s+стандарт|\bIAS\s+\d|МСФО/i.test(s)) standard = 'МСФО';
+  else if(/\bПБУ\s|\bРСБУ\b|российск\w+\s+стандарт|Приказ\s+Минфина|форма\s+(?:№\s*)?1\b|Бухгалтерский\s+баланс/i.test(s)) standard = 'РСБУ';
+  else if(/\b(1110|1150|1600|2110|2400|1250)\b/.test(s)) standard = 'РСБУ';
+
+  // 2. Область (группа / юрлицо). Считаем «голоса» за оба варианта.
+  const groupVotes = [
+    /консолидированн(?:ая|ой|ый|ого|ым|ую)/i,
+    /\bconsolidated\b/i,
+    /\bГруппа\s+(?:компани|«|»|\w)/,
+    /\bgroup\b/i,
+    /гудвил+/i,
+    /goodwill/i,
+    /неконтролирующ[а-я]+\s+дол/i,
+    /non[-\s]?controlling\s+interest/i,
+    /доля\s+в\s+прибыли\s+ассоциированн/i,
+    /операции\s+со\s+связанн[а-я]+\s+сторон/i,
+    /дочерн[а-я]+\s+(?:общест|компани|предприят)/i
+  ].reduce((n, re) => n + (re.test(s) ? 1 : 0), 0);
+  const standaloneVotes = [
+    /форма\s+(?:№\s*)?1\b/i,
+    /ОКУД\s+0710001/i,
+    /Приказ\s+Минфина\s+(?:РФ\s+)?(?:от\s+)?(?:№\s*)?66н/i
+  ].reduce((n, re) => n + (re.test(s) ? 1 : 0), 0);
+  let scope = null;
+  if(groupVotes >= 2) scope = 'group';
+  else if(standaloneVotes >= 1 && groupVotes === 0) scope = 'standalone';
+  else if(standard === 'МСФО') scope = 'group';      // МСФО публично — почти всегда консолидация
+  else if(standard === 'РСБУ') scope = 'standalone'; // РСБУ публично — почти всегда standalone
+
+  // 3. ИНН — 10 цифр (юрлицо) или 12 (ИП), рядом со словом «ИНН».
+  let inn = null;
+  const innMatch = s.match(/\bИНН\s*[:№]?\s*(\d{10}|\d{12})\b/i);
+  if(innMatch) inn = innMatch[1];
+
+  // 4. Название эмитента — в первых 3000 симв. ищем орг-форму + кавычки.
+  let orgName = null;
+  const head = s.slice(0, 3000);
+  const orgMatch = head.match(/(?:ПАО|АО|ООО|ЗАО|ОАО|НАО)\s*[«"„]\s*([^»"\n“]{2,80})\s*[»"“]/);
+  if(orgMatch) orgName = orgMatch[0].replace(/\s+/g,' ').trim();
+
+  const confidence = (standard ? 0.4 : 0) + (scope ? 0.3 : 0) + (inn ? 0.2 : 0) + (orgName ? 0.1 : 0);
+  return {standard, scope, inn, orgName, confidence};
+}
+
+// Маппинг строк РСБУ (коды из ГИР БО формата {current1110, current2110, …})
+// на поля формы «Добавить период отчётности». ГИР БО отдаёт сырые данные
+// в тысячах рублей — в normaliseReference делим на 1e6, чтобы получить
+// млрд ₽ (в которых работает БондАналитик).
+const _GIRBO_FIELD_MAP = {
+  'rep-np-rev':    '2110',
+  'rep-np-ebit':   '2200',
+  'rep-np-np':     '2400',
+  'rep-np-int':    '2330',
+  'rep-np-assets': '1600',
+  'rep-np-ca':     '1200',
+  'rep-np-cl':     '1500',
+  'rep-np-debt':   ['1410','1510'], // долгосрочные + краткосрочные займы
+  'rep-np-cash':   '1250',
+  'rep-np-ret':    '1370',
+  'rep-np-eq':     '1300'
+};
+
+// Приводит произвольный JSON-эталон к единой структуре:
+//   {values, standard, scope, company, inn, period, source, unit, format}
+// Поддержанные форматы ввода:
+//   A. Наш: {schema: 'bondan/ref/v1', values: {rep-np-…}, scope, standard, …}
+//   B. ГИР БО: {current1110: …, current2110: …, organisationName, …}
+// null — если формат не распознан.
+function normaliseReference(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  // Наш формат.
+  if(typeof raw.schema === 'string' && raw.schema.startsWith('bondan/ref') && raw.values){
+    return {
+      values: raw.values,
+      standard: raw.standard || null,
+      scope: raw.scope || null,
+      company: raw.company || null,
+      inn: raw.inn || null,
+      period: raw.period || null,
+      source: raw.source || 'manual',
+      unit: raw.unit || null,
+      format: 'bondan'
+    };
+  }
+  // ГИР БО.
+  const hasGirbo = Object.keys(raw).some(k => /^current\d{4}$/.test(k));
+  if(hasGirbo){
+    const values = {};
+    for(const [fid, code] of Object.entries(_GIRBO_FIELD_MAP)){
+      const codes = Array.isArray(code) ? code : [code];
+      let sum = 0, any = false;
+      for(const c of codes){
+        const v = raw['current' + c];
+        if(typeof v === 'number'){ sum += v; any = true; }
+      }
+      if(any) values[fid] = sum / 1e6; // тыс ₽ → млрд ₽
+    }
+    return {
+      values,
+      standard: 'РСБУ',
+      scope: 'standalone',
+      company: raw.organisationName || raw.name || raw.shortName || null,
+      inn: raw.inn || raw.organisationInn || null,
+      period: raw.period || raw.year || null,
+      source: 'ГИР БО',
+      unit: 'млрд ₽',
+      format: 'girbo'
+    };
+  }
+  return null;
+}
+
+// Сравнивает значения в форме с эталоном. Для каждого поля статус:
+//   ok      — расхождение ≤ 2%
+//   warn    — расхождение 2%..10%
+//   err     — расхождение > 10%
+//   missing — поле в форме не заполнено
+function repCompareReference(ref){
+  if(!ref || !ref.values) return [];
+  const res = [];
+  for(const [fid, expected] of Object.entries(ref.values)){
+    const el = document.getElementById(fid);
+    if(!el) continue;
+    const parsed = parseFloat(el.value);
+    if(isNaN(parsed)){
+      res.push({fid, parsed: null, expected, status: 'missing'});
+      continue;
+    }
+    const rel = expected ? Math.abs(parsed - expected) / Math.abs(expected) : 0;
+    const status = rel <= 0.02 ? 'ok' : (rel <= 0.1 ? 'warn' : 'err');
+    res.push({fid, parsed, expected, rel, status});
+  }
+  return res;
+}
+
+function girboLinkForInn(inn){
+  if(!inn) return null;
+  return 'https://bo.nalog.ru/search?query=' + encodeURIComponent(inn);
 }
 
 // Извлекает текст PDF как таблицу с классификацией колонок.
@@ -5577,6 +5746,164 @@ function repToggleRawText(){
     if(btn) btn.textContent = '📄 Показать распознанный текст';
   }
 }
+
+// ── Мета + сверка с эталоном ─────────────────────────────────────
+// Показываем распознанный тип отчёта (МСФО/РСБУ, группа/юрлицо,
+// ИНН, название) над логом парсинга. Это само по себе полезно (видно,
+// что поняло приложение) и служит контекстом для кнопки сверки.
+function repRenderMeta(meta){
+  const box = document.getElementById('rep-np-meta-wrap');
+  const refWrap = document.getElementById('rep-np-ref-wrap');
+  if(!box) return;
+  if(!meta || (!meta.standard && !meta.scope && !meta.inn && !meta.orgName)){
+    box.style.display = 'none';
+    if(refWrap) refWrap.style.display = 'block'; // кнопку импорта всё равно показываем
+    return;
+  }
+  const parts = [];
+  if(meta.standard){
+    parts.push(`<strong style="color:var(--acc)">${meta.standard}</strong>`);
+  }
+  if(meta.scope){
+    parts.push(meta.scope === 'group'
+      ? '<span style="color:var(--warn)">группа (consolidated)</span>'
+      : '<span style="color:var(--green)">юрлицо (standalone)</span>');
+  }
+  if(meta.orgName) parts.push(`<span style="color:var(--text)">${meta.orgName.replace(/</g,'&lt;')}</span>`);
+  if(meta.inn) parts.push(`<span style="color:var(--text3)">ИНН ${meta.inn}</span>`);
+  box.innerHTML = '📄 ' + parts.join(' · ');
+  box.style.display = 'block';
+  if(refWrap) refWrap.style.display = 'block';
+}
+
+function repOnRefFile(input){
+  const f = input.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const raw = JSON.parse(reader.result);
+      const ref = normaliseReference(raw);
+      if(!ref){
+        alert('Формат JSON не распознан. Поддерживаются:\n• наш формат (schema: "bondan/ref/v1")\n• сырой JSON из bo.nalog.ru (поля current1110, current2110 и т.п.)');
+        return;
+      }
+      window._reportReference = ref;
+      repRenderRefResult();
+    } catch(e){
+      alert('Не удалось прочитать JSON: ' + e.message);
+    }
+  };
+  reader.readAsText(f);
+  input.value = '';
+}
+
+function repOpenGirboForInn(){
+  const meta = window._reportMeta;
+  const inn = meta?.inn;
+  if(!inn){
+    const manual = prompt('ИНН не распознан в отчёте. Введите вручную (10 или 12 цифр):', '');
+    if(!manual) return;
+    if(!/^\d{10}(\d{2})?$/.test(manual.trim())){
+      alert('ИНН должен быть 10 цифр (юрлицо) или 12 (ИП).');
+      return;
+    }
+    window.open('https://bo.nalog.ru/search?query=' + encodeURIComponent(manual.trim()), '_blank', 'noopener');
+  } else {
+    window.open(girboLinkForInn(inn), '_blank', 'noopener');
+  }
+  alert('1. На странице ГИР БО откройте карточку компании.\n2. Найдите нужный отчётный год → «Скачать» или «Открыть JSON».\n3. Сохраните файл на диск.\n4. Вернитесь и нажмите «📋 Импорт JSON».\n\nПодробнее: ГИР БО отдаёт только РСБУ-отчётность юрлица. Если ваш загруженный отчёт — МСФО-группа, приложение покажет это как справочную информацию, а не прямую сверку.');
+}
+
+function repExportCurrentAsRef(){
+  const values = {};
+  ['rep-np-rev','rep-np-ebitda','rep-np-ebit','rep-np-np','rep-np-int',
+   'rep-np-assets','rep-np-ca','rep-np-cl','rep-np-debt','rep-np-cash',
+   'rep-np-ret','rep-np-eq'].forEach(id => {
+    const v = parseFloat(document.getElementById(id)?.value);
+    if(!isNaN(v)) values[id] = v;
+  });
+  if(!Object.keys(values).length){
+    alert('В форме нет значений для экспорта. Сначала заполните хотя бы одно поле.');
+    return;
+  }
+  const meta = window._reportMeta || {};
+  const ref = {
+    schema: 'bondan/ref/v1',
+    company: meta.orgName || '',
+    inn: meta.inn || '',
+    standard: meta.standard || '',
+    scope: meta.scope || '',
+    period: document.getElementById('rep-np-year')?.value || '',
+    unit: 'млрд ₽',
+    source: 'manual export',
+    note: 'Экспортировано из БондАналитик. Используйте для регрессионного теста парсера.',
+    values
+  };
+  const blob = new Blob([JSON.stringify(ref, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'reference-' + (meta.inn || meta.orgName?.replace(/[^a-zа-я0-9]+/gi,'-').slice(0,30) || 'manual') + '-' + (ref.period||'') + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function repClearReference(){
+  window._reportReference = null;
+  const box = document.getElementById('rep-np-ref-result');
+  if(box) box.innerHTML = '';
+}
+
+function repRenderRefResult(){
+  const box = document.getElementById('rep-np-ref-result');
+  const wrap = document.getElementById('rep-np-ref-wrap');
+  if(!box || !wrap) return;
+  wrap.style.display = 'block';
+  const ref = window._reportReference;
+  if(!ref){ box.innerHTML = ''; return; }
+  const meta = window._reportMeta || {};
+  const diffs = repCompareReference(ref);
+
+  // Проверка совместимости scope: МСФО-группа vs РСБУ-standalone.
+  let warning = '';
+  const scopeMismatch = meta.scope && ref.scope && meta.scope !== ref.scope;
+  if(scopeMismatch){
+    warning = `<div style="color:var(--warn);padding:5px 8px;background:rgba(250,200,80,.08);border-left:2px solid var(--warn);margin-bottom:6px;font-size:.6rem;line-height:1.5">⚠️ <strong>НЕ прямое сравнение.</strong> Эталон — ${ref.scope === 'standalone' ? '<strong>РСБУ юрлица</strong>' : '<strong>МСФО группы</strong>'} (${ref.source || '?'}), а загруженный отчёт — <strong>${meta.scope === 'group' ? 'МСФО группы' : 'РСБУ юрлица'}</strong>. Цифры заведомо разного масштаба (standalone-выручка часто в разы/порядки меньше консолидированной). Показываю расхождения справочно — красный не означает ошибку парсера.</div>`;
+  } else if(ref.scope === 'standalone' && meta.scope === 'standalone'){
+    warning = `<div style="color:var(--green);font-size:.58rem;margin-bottom:4px">✓ Однотипные отчёты — прямая сверка.</div>`;
+  }
+
+  const labels = {
+    'rep-np-rev':'Выручка','rep-np-ebitda':'EBITDA','rep-np-ebit':'EBIT',
+    'rep-np-np':'ЧП','rep-np-int':'Проценты','rep-np-assets':'Активы',
+    'rep-np-ca':'Обор. активы','rep-np-cl':'Кр. обяз.','rep-np-debt':'Долг',
+    'rep-np-cash':'ДС','rep-np-ret':'Нераспр.','rep-np-eq':'Капитал'
+  };
+  const ico = {ok:'✅',warn:'⚠️',err:'🔴',missing:'⚫'};
+  const clr = {ok:'var(--green)',warn:'var(--warn)',err:'var(--danger)',missing:'var(--text3)'};
+  const rows = diffs.map(d => {
+    const lbl = labels[d.fid] || d.fid;
+    const dlt = d.status === 'missing'
+      ? '— не заполнено в форме'
+      : `${d.parsed} vs <strong>${d.expected}</strong>${d.rel != null ? ` (Δ ${(d.rel*100).toFixed(1)}%)` : ''}`;
+    return `<div style="padding:2px 0;border-bottom:1px dotted rgba(30,48,72,.3)">${ico[d.status]} <strong>${lbl}</strong>: <span style="color:${clr[d.status]}">${dlt}</span></div>`;
+  }).join('');
+  const okCount = diffs.filter(d => d.status === 'ok').length;
+  const totalKnown = diffs.filter(d => d.status !== 'missing').length;
+  const okBadge = scopeMismatch ? '' :
+    `<span style="color:${okCount === totalKnown ? 'var(--green)' : 'var(--warn)'}">Точность: ${okCount}/${totalKnown}</span>`;
+
+  const header = [
+    ref.source || '?',
+    ref.period || null,
+    ref.company || null,
+    ref.scope === 'group' ? 'группа' : (ref.scope === 'standalone' ? 'юрлицо' : null),
+    ref.standard
+  ].filter(Boolean).join(' · ');
+
+  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}. ${okBadge}</div>${warning}${rows}`;
+}
 function repCopyRawText(){
   const ta = document.getElementById('rep-np-raw-text');
   if(!ta || !ta.value){ alert('Сначала загрузите файл.'); return; }
@@ -7098,6 +7425,11 @@ function repFillFromText(rawText, scaleOverride){
   // extractNumbersFromLine и filter-ы работали корректно для обоих.
   _numFormat = detectNumberFormat(txt);
 
+  // Мета-информация отчёта (стандарт, scope, ИНН, название) — для
+  // отображения под логом разбора и для проверки совместимости эталона.
+  const _meta = detectReportMeta(txt);
+  window._reportMeta = _meta;
+
   let scale = 1;
 
   const sources = {};
@@ -7266,6 +7598,10 @@ function repFillFromText(rawText, scaleOverride){
   } else if(note) {
     note.textContent = ' · выбрано вручную';
   }
+  // Показываем распознанную мета-инфо + обновляем сверку, если эталон
+  // уже был импортирован ранее (в рамках той же сессии).
+  repRenderMeta(_meta);
+  if(window._reportReference) repRenderRefResult();
   return filled;
 }
 
