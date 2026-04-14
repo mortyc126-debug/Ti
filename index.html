@@ -1276,6 +1276,9 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
             <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
+            <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)">📤 Все</button>
+            <input type="file" id="rep-np-refs-bulk-file" accept=".json,application/json" style="display:none" onchange="repImportAllRefs(this)">
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-refs-bulk-file').click()" title="Импортировать коллекцию эталонов из файла (результат repExportAllRefs)">📥 Все</button>
             <button type="button" class="btn btn-sm" onclick="repClearReference()" title="Очистить импортированный эталон">✗</button>
           </div>
           <div id="rep-np-ref-result" style="font-size:.62rem;color:var(--text2);line-height:1.7"></div>
@@ -1515,8 +1518,9 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
 
       <div style="font-size:.67rem;color:var(--text2);line-height:1.7;padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
-        Данные хранятся в приватном Gist на вашем GitHub аккаунте.<br>
-        Можно загружать и выгружать с любого устройства одной кнопкой.
+        Данные хранятся в приватном Gist на вашем GitHub-аккаунте.<br>
+        Можно загружать и выгружать с любого устройства одной кнопкой.<br>
+        <span style="color:var(--text3)">Синхронизируется: портфель, watchlist, календарь, отчётности, эталоны сверки, AI-ключ. UI-настройки (видимость панелей, маска) остаются локально.</span>
       </div>
 
       <div class="field">
@@ -5999,6 +6003,90 @@ function repClearReference(){
   if(box) box.innerHTML = '';
 }
 
+// Массовый экспорт: скачать ВСЕ сохранённые на устройстве эталоны
+// одним JSON-файлом. Нужен как оффлайн-бэкап / для переноса между
+// устройствами без GitHub Gist (флешка, e-mail, облачный диск).
+function repExportAllRefs(){
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem('bondan_refs') || '[]'); } catch(e){}
+  if(!arr.length){
+    alert('В локальной коллекции эталонов пока пусто. Сначала импортируйте/сохраните хотя бы один.');
+    return;
+  }
+  const bundle = {
+    schema: 'bondan/ref-bundle/v1',
+    note: 'Коллекция эталонов БондАналитик. Импортируется кнопкой «📥 Все».',
+    savedAt: new Date().toISOString(),
+    count: arr.length,
+    entries: arr
+  };
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bondan-refs-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Массовый импорт коллекции: принимает:
+//   • bundle (schema: 'bondan/ref-bundle/v1') — массив под ключом `entries`;
+//   • обычный ref-catalogue (schema: 'bondan/ref-catalogue/v1');
+//   • голый массив эталонов;
+//   • одиночный эталон (тогда это то же что и repOnRefFile).
+// Сливает с локальным по ключу «ИНН+период», новые записи перезаписывают
+// старые (при желании можно будет сделать выбор «заменить/слить»).
+function repImportAllRefs(input){
+  const f = input.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const raw = JSON.parse(reader.result);
+      let entries = [];
+      if(raw && raw.schema && /bondan\/ref-bundle/.test(raw.schema)) entries = raw.entries || [];
+      else if(raw && raw.schema && /bondan\/ref-catalogue/.test(raw.schema)) entries = raw.entries || [];
+      else if(Array.isArray(raw)) entries = raw;
+      else if(raw && raw.schema && /bondan\/ref\b/.test(raw.schema)) entries = [raw];
+      if(!entries.length){
+        alert('В файле нет эталонов или формат не распознан.');
+        return;
+      }
+      let local = [];
+      try { local = JSON.parse(localStorage.getItem('bondan_refs') || '[]'); } catch(e){}
+      const keyOf = r => (r.inn || '') + '|' + _normalisePeriod(r.period);
+      const merged = new Map();
+      for(const r of local)   merged.set(keyOf(r), r);
+      let added = 0, replaced = 0;
+      for(const r of entries){
+        const k = keyOf(r);
+        if(merged.has(k)) replaced++;
+        else added++;
+        merged.set(k, r);
+      }
+      const arr = [...merged.values()];
+      localStorage.setItem('bondan_refs', JSON.stringify(arr));
+      if(window._refCatalogue) window._refCatalogue.localEntries = arr;
+      alert(`Импортировано: ${entries.length}\nНовых: ${added}, заменено: ${replaced}.\nВсего в коллекции: ${arr.length}.`);
+      // Если текущий отчёт распознан и совпал по ИНН — применим.
+      if(window._reportMeta){
+        const period = document.getElementById('rep-np-year')?.value;
+        const found = _findRefFor(window._reportMeta, period);
+        if(found){
+          const ref = normaliseReference(found) || found;
+          ref._autoSource = 'кэш';
+          window._reportReference = ref;
+          repRenderRefResult();
+        }
+      }
+    } catch(e){
+      alert('Не удалось прочитать JSON: ' + e.message);
+    }
+  };
+  reader.readAsText(f);
+  input.value = '';
+}
+
 function repRenderRefResult(){
   const box = document.getElementById('rep-np-ref-result');
   const wrap = document.getElementById('rep-np-ref-wrap');
@@ -8582,8 +8670,21 @@ async function gistSave() {
   btn.disabled = true; btn.textContent = '⏳ Сохраняю...';
   gistStatus('Отправляю данные...', 'var(--warn)');
 
+  // Снапшот для Gist. Помимо основных данных БондАналитика (портфель,
+  // watchlist, календарь, reportsDB), кладём:
+  //  • refs — эталоны сверки отчётов (localStorage['bondan_refs']);
+  //  • apiKey — ключ AI-анализа (чтобы не вводить заново);
+  //  • meta.version — версия схемы на случай будущих миграций.
+  // UI-флаги (показан ли pane, включена ли маска) НЕ синхронизируем —
+  // это device-specific.
+  let refs = [];
+  try { refs = JSON.parse(localStorage.getItem('bondan_refs') || '[]'); } catch(e){}
+  const apiKey = localStorage.getItem('ba_apikey') || '';
   const content = JSON.stringify({
     ytmBonds, portfolio, watchlists, calEvents, reportsDB,
+    refs,
+    apiKey,
+    meta: { schemaVersion: 3 },
     savedAt: new Date().toISOString()
   }, null, 2);
 
@@ -8673,6 +8774,26 @@ async function gistLoad() {
     if(d.watchlists) watchlists = d.watchlists;
     if(d.calEvents)  calEvents  = d.calEvents;
     if(d.reportsDB)  reportsDB  = d.reportsDB;
+    // Эталоны сверки — сливаем с локальными по ключу «ИНН+период»,
+    // записи из gist перезаписывают локальные (приоритет облаку).
+    if(Array.isArray(d.refs) && d.refs.length){
+      try {
+        const local = JSON.parse(localStorage.getItem('bondan_refs') || '[]');
+        const keyOf = r => (r.inn || '') + '|' + _normalisePeriod(r.period);
+        const merged = new Map();
+        for(const r of local) merged.set(keyOf(r), r);
+        for(const r of d.refs) merged.set(keyOf(r), r);
+        const arr = [...merged.values()];
+        localStorage.setItem('bondan_refs', JSON.stringify(arr));
+        if(window._refCatalogue) window._refCatalogue.localEntries = arr;
+      } catch(e){}
+    }
+    // API-ключ — если в gist есть, подставим и обновим поле ввода.
+    if(d.apiKey){
+      localStorage.setItem('ba_apikey', d.apiKey);
+      const apiInput = document.getElementById('api-key-input');
+      if(apiInput) apiInput.value = d.apiKey;
+    }
     save();
 
     renderYtm(); renderPort(); renderSbLists();
@@ -8680,7 +8801,9 @@ async function gistLoad() {
     const repEl = document.getElementById('sb-rep');
     if(repEl) repEl.textContent = Object.keys(reportsDB).length;
 
-    gistStatus(`✅ Загружено! Данные от ${savedAt}`, 'var(--green)');
+    const refsCount = Array.isArray(d.refs) ? d.refs.length : 0;
+    const extras = refsCount ? ` · эталонов: ${refsCount}` : '';
+    gistStatus(`✅ Загружено! Данные от ${savedAt}${extras}`, 'var(--green)');
   } catch(e) {
     gistStatus(`❌ Ошибка: ${e.message}`, 'var(--danger)');
   } finally {
