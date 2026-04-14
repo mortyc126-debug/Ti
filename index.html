@@ -1513,43 +1513,82 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 <!-- MODAL -->
 <!-- GitHub Gist Sync Modal -->
 <div class="modal-overlay" id="modal-gist">
-  <div class="modal" style="width:480px">
-    <div class="modal-hdr">⚡ Синхронизация через GitHub Gist <button class="modal-x" onclick="closeModal('modal-gist')">✕</button></div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+  <div class="modal" style="width:540px;max-width:94vw">
+    <div class="modal-hdr">⚡ Синхронизация между устройствами <button class="modal-x" onclick="closeModal('modal-gist')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
 
-      <div style="font-size:.67rem;color:var(--text2);line-height:1.7;padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
-        Данные хранятся в приватном Gist на вашем GitHub-аккаунте.<br>
-        Можно загружать и выгружать с любого устройства одной кнопкой.<br>
-        <span style="color:var(--text3)">Синхронизируется: портфель, watchlist, календарь, отчётности, эталоны сверки, AI-ключ. UI-настройки (видимость панелей, маска) остаются локально.</span>
+      <div style="font-size:.67rem;color:var(--text2);line-height:1.6;padding:6px 10px;background:var(--s2);border:1px solid var(--border)">
+        Синхронизируется: портфель, watchlist, календарь, отчётности, эталоны сверки, AI-ключ.
+        <span style="color:var(--text3)">UI-настройки (видимость панелей, маска) остаются локально — зависят от размера экрана.</span>
       </div>
 
-      <div class="field">
-        <label>GitHub Personal Access Token</label>
-        <input type="password" id="gist-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off"
-          style="font-family:var(--mono);font-size:.72rem"
-          oninput="localStorage.setItem('ba_gist_token',this.value)">
-        <div style="font-size:.57rem;color:var(--text3);margin-top:4px">
-          Создать: github.com → Settings → Developer settings → Personal access tokens → New token → выбрать <strong style="color:var(--text)">gist</strong> → Generate
+      <div style="padding:8px 10px;background:var(--s2);border:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:.68rem;color:var(--text2);line-height:1.5">
+          <strong style="color:var(--acc)">🔑 Код синхронизации</strong> — без GitHub, без регистрации, без аккаунтов.
+          Данные шифруются <span style="color:var(--text3)">AES-256-GCM</span> у вас в браузере и кладутся анонимным blob'ом на jsonblob.com.
+          Тот же код на другом устройстве расшифровывает и подгружает. Ключ шифрования — часть кода, сервер его не видит.
+        </div>
+        <div class="field" style="margin:0">
+          <label>Код вида <code style="background:var(--bg);padding:0 3px;font-size:.7em">UUID:ключ</code> (создаётся при первом сохранении)</label>
+          <input type="text" id="sync-code" placeholder="019d...-xxx:base64ключ"
+            style="font-family:var(--mono);font-size:.62rem"
+            oninput="localStorage.setItem('ba_sync_code',this.value)">
+        </div>
+        <div id="sync-cloud-status" style="font-size:.6rem;padding:5px 8px;display:none;border:1px solid var(--border)"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="syncMakeCode()" id="sync-make-btn" title="Создать новый зашифрованный blob и код доступа к нему">🆕 Создать код</button>
+          <button class="btn btn-sm btn-p" onclick="syncCloudSave()" id="sync-save-btn">⬆️ Сохранить</button>
+          <button class="btn btn-sm" onclick="syncCloudLoad()" id="sync-load-btn">⬇️ Загрузить</button>
+          <button class="btn btn-sm" onclick="syncShowQR()" title="Показать код как QR — удобно сканировать между ноутбуком и телефоном">📷 QR</button>
+          <button class="btn btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('sync-code').value)" title="Скопировать код в буфер">📋 Скопировать</button>
         </div>
       </div>
 
-      <div class="field">
-        <label>Gist ID <span style="color:var(--text3)">(заполнится после первого сохранения)</span></label>
-        <input type="text" id="gist-id" placeholder="оставьте пустым для создания нового"
-          style="font-family:var(--mono);font-size:.72rem"
-          oninput="localStorage.setItem('ba_gist_id',this.value)">
-        <div style="font-size:.57rem;color:var(--text3);margin-top:4px">
-          Скопируйте ID из URL: gist.github.com/<strong style="color:var(--text)">ваш_id</strong>
+      <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
+        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>Альтернатива: через GitHub Gist</strong> (если у вас один и тот же GitHub-аккаунт на всех устройствах)</summary>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+          <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
+            Данные хранятся в приватном Gist на вашем GitHub-аккаунте. Если у вас разные аккаунты на разных устройствах — используйте код синхронизации выше.
+          </div>
+          <div class="field">
+            <label>GitHub Personal Access Token</label>
+            <input type="password" id="gist-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off"
+              style="font-family:var(--mono);font-size:.72rem"
+              oninput="localStorage.setItem('ba_gist_token',this.value)">
+            <div style="font-size:.57rem;color:var(--text3);margin-top:4px">
+              Создать: github.com → Settings → Developer settings → Personal access tokens → New token → выбрать <strong style="color:var(--text)">gist</strong> → Generate
+            </div>
+          </div>
+          <div class="field">
+            <label>Gist ID <span style="color:var(--text3)">(заполнится после первого сохранения)</span></label>
+            <input type="text" id="gist-id" placeholder="оставьте пустым для создания нового"
+              style="font-family:var(--mono);font-size:.72rem"
+              oninput="localStorage.setItem('ba_gist_id',this.value)">
+            <div style="font-size:.57rem;color:var(--text3);margin-top:4px">
+              Скопируйте ID из URL: gist.github.com/<strong style="color:var(--text)">ваш_id</strong>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="gistLoad()" id="gist-load-btn">⬇️ Загрузить с Gist</button>
+            <button class="btn btn-sm btn-p" onclick="gistSave()" id="gist-save-btn">⬆️ Сохранить в Gist</button>
+          </div>
         </div>
-      </div>
+      </details>
 
       <div id="gist-status" style="font-size:.65rem;display:none;padding:7px 10px;border:1px solid var(--border)"></div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-gist')">Закрыть</button>
-      <button class="btn" onclick="gistLoad()" id="gist-load-btn">⬇️ Загрузить с Gist</button>
-      <button class="btn btn-p" onclick="gistSave()" id="gist-save-btn">⬆️ Сохранить в Gist</button>
     </div>
+  </div>
+</div>
+
+<!-- QR popup для кода синхронизации -->
+<div id="sync-qr-popup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;cursor:pointer" onclick="this.style.display='none'">
+  <div style="background:#fff;padding:18px;border-radius:10px;text-align:center;max-width:94vw">
+    <img id="sync-qr-img" src="" style="max-width:320px;max-height:60vh;display:block;margin:0 auto">
+    <div style="font-family:monospace;font-size:.55rem;color:#333;margin-top:10px;word-break:break-all" id="sync-qr-text"></div>
+    <div style="font-size:.62rem;color:#555;margin-top:8px">Отсканируйте на другом устройстве · тап для закрытия</div>
   </div>
 </div>
 <div class="modal-overlay" id="modal-nl">
@@ -8649,8 +8688,207 @@ function openGistModal() {
   const id = localStorage.getItem('ba_gist_id');
   if(t) document.getElementById('gist-token').value = t;
   if(id) document.getElementById('gist-id').value = id;
+  // Код синхронизации (альтернатива без GitHub).
+  const syncCode = localStorage.getItem('ba_sync_code');
+  const syncInput = document.getElementById('sync-code');
+  if(syncInput && syncCode) syncInput.value = syncCode;
   document.getElementById('gist-status').style.display = 'none';
+  const syncStatus = document.getElementById('sync-cloud-status');
+  if(syncStatus) syncStatus.style.display = 'none';
   document.getElementById('modal-gist').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// АНОНИМНАЯ СИНХРОНИЗАЦИЯ БЕЗ GITHUB
+// ══════════════════════════════════════════════════════════════════
+// Пользовательский запрос: «на ноутбуке другой аккаунт, переключения
+// между GitHub-аккаунтами приводят к странным багам». Нужен способ
+// синхронизации, не связанный с GitHub-логином.
+//
+// Решение: анонимный зашифрованный blob на jsonblob.com.
+//  • POST без авторизации создаёт blob, возвращает UUID;
+//  • данные шифруются AES-256-GCM в браузере ПЕРЕД отправкой;
+//  • ключ шифрования генерируется clientside и попадает только в
+//    «код синхронизации» `UUID:ключ_b64`, который пользователь сам
+//    переносит между устройствами (копипастом или QR).
+//  • сервер видит только непрозрачные байты — сервис jsonblob.com
+//    не знает содержимого; если blob утечёт, без ключа он бесполезен.
+//
+// Этот механизм полностью независим от Gist — в модалке «⚡ Sync»
+// оба блока сосуществуют; пользователь выбирает удобный.
+
+const _JSONBLOB_BASE = 'https://jsonblob.com/api/jsonBlob';
+const _b64enc = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const _b64dec = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+async function _syncEncrypt(text, keyB64){
+  const key = await crypto.subtle.importKey('raw', _b64dec(keyB64),
+    {name:'AES-GCM', length:256}, false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key,
+    new TextEncoder().encode(text));
+  return {v:1, iv: _b64enc(iv), data: _b64enc(new Uint8Array(ct))};
+}
+
+async function _syncDecrypt(payload, keyB64){
+  if(!payload || payload.v !== 1) throw new Error('Неизвестный формат blob');
+  const key = await crypto.subtle.importKey('raw', _b64dec(keyB64),
+    {name:'AES-GCM', length:256}, false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv: _b64dec(payload.iv)},
+    key, _b64dec(payload.data));
+  return new TextDecoder().decode(pt);
+}
+
+function _syncCloudStatus(msg, color){
+  const el = document.getElementById('sync-cloud-status');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.color = color || 'var(--text2)';
+  el.textContent = msg;
+}
+
+function _syncBuildSnapshot(){
+  let refs = [];
+  try { refs = JSON.parse(localStorage.getItem('bondan_refs') || '[]'); } catch(e){}
+  return {
+    ytmBonds, portfolio, watchlists, calEvents, reportsDB,
+    refs,
+    apiKey: localStorage.getItem('ba_apikey') || '',
+    meta: {schemaVersion: 3},
+    savedAt: new Date().toISOString()
+  };
+}
+
+async function syncMakeCode(){
+  _syncCloudStatus('Создаю шифрованный blob…', 'var(--warn)');
+  try {
+    const keyBytes = crypto.getRandomValues(new Uint8Array(32));
+    const keyB64 = _b64enc(keyBytes);
+    const resp = await fetch(_JSONBLOB_BASE, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Accept':'application/json'},
+      body: '{}'
+    });
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    let id = resp.headers.get('X-jsonblob-id');
+    if(!id){
+      const loc = resp.headers.get('Location') || '';
+      id = loc.split('/').pop();
+    }
+    if(!id) throw new Error('Сервис не вернул ID blob');
+    const code = id + ':' + keyB64;
+    const input = document.getElementById('sync-code');
+    if(input) input.value = code;
+    try { localStorage.setItem('ba_sync_code', code); } catch(e){}
+    _syncCloudStatus('✅ Код создан. Нажмите ⬆️ Сохранить, чтобы залить текущие данные, и скопируйте код (или QR) на другое устройство.', 'var(--green)');
+  } catch(e){
+    _syncCloudStatus('❌ Ошибка создания: ' + e.message, 'var(--danger)');
+  }
+}
+
+async function syncCloudSave(){
+  const code = document.getElementById('sync-code')?.value?.trim();
+  if(!code || !code.includes(':')){
+    _syncCloudStatus('⚠️ Сначала создайте код (🆕) или введите существующий.', 'var(--warn)');
+    return;
+  }
+  const idx = code.indexOf(':');
+  const id = code.slice(0, idx), keyB64 = code.slice(idx + 1);
+  const btn = document.getElementById('sync-save-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Сохраняю…'; }
+  _syncCloudStatus('Шифрую и отправляю…', 'var(--warn)');
+  try {
+    const snapshot = _syncBuildSnapshot();
+    const payload = await _syncEncrypt(JSON.stringify(snapshot), keyB64);
+    const resp = await fetch(_JSONBLOB_BASE + '/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    try { localStorage.setItem('ba_sync_code', code); } catch(e){}
+    _syncCloudStatus('✅ Сохранено · ' + new Date().toLocaleString('ru-RU'), 'var(--green)');
+  } catch(e){
+    _syncCloudStatus('❌ Ошибка сохранения: ' + e.message, 'var(--danger)');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '⬆️ Сохранить'; }
+  }
+}
+
+async function syncCloudLoad(){
+  const code = document.getElementById('sync-code')?.value?.trim();
+  if(!code || !code.includes(':')){
+    _syncCloudStatus('⚠️ Введите код синхронизации (скопируйте с другого устройства).', 'var(--warn)');
+    return;
+  }
+  const idx = code.indexOf(':');
+  const id = code.slice(0, idx), keyB64 = code.slice(idx + 1);
+  const btn = document.getElementById('sync-load-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Загружаю…'; }
+  _syncCloudStatus('Скачиваю и расшифровываю…', 'var(--warn)');
+  try {
+    const resp = await fetch(_JSONBLOB_BASE + '/' + encodeURIComponent(id));
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const payload = await resp.json();
+    const plain = await _syncDecrypt(payload, keyB64);
+    const d = JSON.parse(plain);
+    const savedAt = d.savedAt ? new Date(d.savedAt).toLocaleString('ru-RU') : 'неизвестно';
+    const refsCount = Array.isArray(d.refs) ? d.refs.length : 0;
+    if(!confirm(`Загрузить снапшот от ${savedAt}?\n\nЭталонов в нём: ${refsCount}\n\nПортфель, watchlist, календарь, reportsDB и AI-ключ будут заменены. Эталоны будут ОБЪЕДИНЕНЫ с локальными (облачные перезаписывают одноимённые).`)){
+      _syncCloudStatus('Отменено', 'var(--text3)');
+      return;
+    }
+    if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
+    if(d.portfolio)  portfolio  = d.portfolio;
+    if(d.watchlists) watchlists = d.watchlists;
+    if(d.calEvents)  calEvents  = d.calEvents;
+    if(d.reportsDB)  reportsDB  = d.reportsDB;
+    if(Array.isArray(d.refs) && d.refs.length){
+      try {
+        const local = JSON.parse(localStorage.getItem('bondan_refs') || '[]');
+        const keyOf = r => (r.inn || '') + '|' + _normalisePeriod(r.period);
+        const merged = new Map();
+        for(const r of local) merged.set(keyOf(r), r);
+        for(const r of d.refs) merged.set(keyOf(r), r);
+        const arr = [...merged.values()];
+        localStorage.setItem('bondan_refs', JSON.stringify(arr));
+        if(window._refCatalogue) window._refCatalogue.localEntries = arr;
+      } catch(e){}
+    }
+    if(d.apiKey){
+      localStorage.setItem('ba_apikey', d.apiKey);
+      const apiInput = document.getElementById('api-key-input');
+      if(apiInput) apiInput.value = d.apiKey;
+    }
+    save();
+    try { localStorage.setItem('ba_sync_code', code); } catch(e){}
+    renderYtm(); renderPort(); renderSbLists();
+    document.getElementById('sb-pc').textContent = portfolio.length;
+    const repEl = document.getElementById('sb-rep');
+    if(repEl) repEl.textContent = Object.keys(reportsDB).length;
+    _syncCloudStatus(`✅ Загружено. Эталонов: ${refsCount}`, 'var(--green)');
+  } catch(e){
+    const msg = /Cipher|invalid|decrypt/i.test(e.message || e)
+      ? '❌ Не удалось расшифровать. Проверьте код — он должен быть в точности как на первом устройстве.'
+      : '❌ Ошибка: ' + (e.message || e);
+    _syncCloudStatus(msg, 'var(--danger)');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '⬇️ Загрузить'; }
+  }
+}
+
+function syncShowQR(){
+  const code = document.getElementById('sync-code')?.value?.trim();
+  if(!code){
+    alert('Сначала создайте код (🆕) или введите существующий.');
+    return;
+  }
+  const pop = document.getElementById('sync-qr-popup');
+  const img = document.getElementById('sync-qr-img');
+  const txt = document.getElementById('sync-qr-text');
+  if(img) img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=4&data=' + encodeURIComponent(code);
+  if(txt) txt.textContent = code;
+  if(pop){ pop.style.display = 'flex'; }
 }
 
 function gistStatus(msg, color='var(--text2)') {
