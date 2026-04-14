@@ -201,6 +201,18 @@ tr:hover td{background:var(--s2)}
 .rep-view-btn.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
 
 @media(max-width:800px){.sidebar{display:none}.g3,.g4{grid-template-columns:1fr 1fr}}
+/* Плавающее меню синхронизации/экспорта — всегда видно в правом
+   нижнем углу на любом экране. Нужно, потому что на телефоне
+   кнопки ⚡Sync/⬇️/⬆️ в правой части топбара уезжают за экран
+   (topbar flex-row без wrap). */
+.fab{position:fixed;right:16px;bottom:16px;z-index:2000;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:8px;pointer-events:none}
+.fab>*{pointer-events:auto}
+.fab-btn{width:46px;height:46px;border-radius:50%;border:1px solid var(--border2);background:var(--acc);color:#000;font-size:1.15rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);font-weight:600}
+.fab-btn:hover{transform:scale(1.05)}
+.fab-items{display:none;flex-direction:column;gap:6px;align-items:flex-end}
+.fab.open .fab-items{display:flex}
+.fab-item{padding:8px 14px;background:var(--s1);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;border-radius:22px;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;min-width:140px;text-align:left}
+.fab-item:hover{background:var(--s2);border-color:var(--acc)}
 </style>
 <!-- Библиотеки работы с файлами. Грузим статически; а на случай если внешний
      скрипт ещё не готов в момент клика (htmlpreview.github.io рендерит
@@ -246,6 +258,18 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 </script>
 </head>
 <body>
+
+<!-- Плавающее меню действий: ⚡ Sync / ⬇ Экспорт / ⬆ Импорт — всегда
+     видимо в правом нижнем углу, даже если topbar уехал за экран на
+     мобильном устройстве (topbar flex-row без wrap). -->
+<div class="fab" id="fab-menu">
+  <div class="fab-items" id="fab-items">
+    <button class="fab-item" onclick="openGistModal();fabToggle(false)">⚡ Синхронизация</button>
+    <button class="fab-item" onclick="exportAllData();fabToggle(false)">⬇️ Экспорт всего в JSON</button>
+    <button class="fab-item" onclick="document.getElementById('import-file').click();fabToggle(false)">⬆️ Импорт из JSON</button>
+  </div>
+  <button class="fab-btn" onclick="fabToggle()" title="Синхронизация и экспорт/импорт">⚡</button>
+</div>
 
 <div class="topbar">
   <div class="logo">Бонд<span>Аналитик</span></div>
@@ -8700,6 +8724,22 @@ document.getElementById('is-rep-period')?.addEventListener('change', function() 
 
 // ══ GITHUB GIST SYNC ══
 const GIST_FILENAME = 'bondanalytics_data.json';
+
+// Плавающее меню ⚡ в правом нижнем углу — дублирует кнопки
+// из правой части топбара, чтобы они были доступны даже когда
+// топбар уезжает за экран на узких устройствах.
+function fabToggle(state){
+  const el = document.getElementById('fab-menu');
+  if(!el) return;
+  const open = typeof state === 'boolean' ? state : !el.classList.contains('open');
+  el.classList.toggle('open', open);
+}
+// Клик вне FAB — закрыть меню.
+document.addEventListener('click', (e) => {
+  const fab = document.getElementById('fab-menu');
+  if(!fab || !fab.classList.contains('open')) return;
+  if(!fab.contains(e.target)) fab.classList.remove('open');
+});
 
 function openGistModal() {
   // Восстанавливаем сохранённые значения
