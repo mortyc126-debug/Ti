@@ -1447,9 +1447,24 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <span style="color:var(--text3)">·</span>
         <span>поиск:</span>
         <input type="text" id="ctx-search" placeholder="подсветить…" style="padding:2px 6px;width:150px" oninput="repPickerCtxRender()">
+        <button type="button" class="btn btn-sm" id="ctx-pdf-toggle" style="padding:2px 8px;font-size:.58rem" onclick="ctxTogglePdfPane()" title="Показать/скрыть мини-окно с оригиналом PDF">🖼️ оригинал</button>
         <button type="button" class="btn btn-sm btn-p" style="padding:2px 8px;font-size:.58rem;margin-left:auto" onclick="pdfvOpenFromCtx()" title="Показать исходную страницу PDF с кликабельными числами">📄 PDF-вид</button>
       </div>
-      <div id="ctx-text" style="flex:1;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
+      <div id="ctx-split" style="display:flex;flex:1;gap:8px;min-height:0;flex-wrap:wrap">
+        <div id="ctx-text" style="flex:1 1 55%;min-width:260px;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
+        <div id="ctx-pdf-pane" style="flex:1 1 40%;min-width:220px;display:none;flex-direction:column;background:#2a2a2a;border:1px solid var(--border2);overflow:hidden">
+          <div style="display:flex;gap:4px;padding:4px 6px;background:var(--s1);align-items:center;font-size:.55rem;color:var(--text3)">
+            <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfNav(-1)" title="Предыдущая страница">◀</button>
+            <span id="ctx-pdf-info" style="flex:1;text-align:center">—</span>
+            <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfNav(1)" title="Следующая страница">▶</button>
+            <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfSyncToAnchor()" title="Вернуться к странице якоря">⌖</button>
+          </div>
+          <div id="ctx-pdf-scroll" style="flex:1;overflow:auto;text-align:center;padding:4px">
+            <canvas id="ctx-pdf-canvas" style="max-width:100%;display:inline-block"></canvas>
+            <div id="ctx-pdf-empty" style="display:none;color:var(--text3);font-size:.6rem;padding:20px">Оригинальная страница PDF доступна только когда загружен PDF-файл (для DOCX/XLSX используйте текст слева).</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="pickerCtxClose()">Закрыть</button>
@@ -6749,6 +6764,16 @@ function repPickerOpenContext(idx){
   // Ловим системную кнопку «Назад» на мобилках — чтобы она закрывала
   // модалку, а не выкидывала с текущей страницы.
   try { history.pushState({pickerCtx:1}, ''); } catch(e){}
+  // Восстанавливаем последнее состояние мини-окна PDF. По умолчанию:
+  // если есть _pickerPdfDoc (загружен PDF) — pane показан, иначе скрыт.
+  const pane = document.getElementById('ctx-pdf-pane');
+  if(pane){
+    let saved = null;
+    try { saved = localStorage.getItem('bondan_ctx_pdf_pane'); } catch(e){}
+    if(saved === '1' && window._pickerPdfDoc)      pane.style.display = 'flex';
+    else if(saved === '0')                          pane.style.display = 'none';
+    else                                            pane.style.display = window._pickerPdfDoc ? 'flex' : 'none';
+  }
   repPickerCtxRender();
 }
 
@@ -6892,6 +6917,89 @@ function repPickerCtxRender(){
   if(anchor){
     const target = anchor.offsetTop - box.clientHeight / 2 + anchor.clientHeight / 2;
     box.scrollTop = Math.max(0, target);
+  }
+
+  // Мини-окно PDF справа — синхронизируем страницу с текущим якорем.
+  // Видимость pane контролируется кнопкой «🖼️ оригинал» (состояние
+  // запоминается в localStorage).
+  ctxPdfSyncToAnchor();
+}
+
+// ── Мини-окно оригинала PDF рядом с контекстом ───────────────────
+// Ключевая боль распознавания: иногда парсер рвёт/склеивает цифры и
+// не ясно, откуда взялись «триллионы в выручке». Имея оригинал
+// страницы сбоку, можно за 2 секунды свериться глазами без
+// переключения на другую вкладку с PDF.
+
+window._ctxPdfPage = null;
+window._ctxPdfTask = null;
+
+function ctxTogglePdfPane(){
+  const pane = document.getElementById('ctx-pdf-pane');
+  if(!pane) return;
+  const shown = pane.style.display !== 'none' && pane.style.display !== '';
+  if(shown){
+    pane.style.display = 'none';
+    try { localStorage.setItem('bondan_ctx_pdf_pane','0'); } catch(e){}
+  } else {
+    pane.style.display = 'flex';
+    try { localStorage.setItem('bondan_ctx_pdf_pane','1'); } catch(e){}
+    ctxPdfSyncToAnchor();
+  }
+}
+
+function ctxPdfSyncToAnchor(){
+  const pane = document.getElementById('ctx-pdf-pane');
+  if(!pane || pane.style.display === 'none' || pane.style.display === '') return;
+  const idx = window._pickerCtxIdx || 0;
+  const pb = window._pickerPdfPageBoundaries || [0];
+  let p = 1;
+  for(let i = pb.length - 1; i >= 0; i--){
+    if(idx >= pb[i]){ p = i + 1; break; }
+  }
+  _ctxRenderMiniPdf(p);
+}
+
+function ctxPdfNav(delta){
+  const pdf = window._pickerPdfDoc;
+  if(!pdf) return;
+  const cur = window._ctxPdfPage || 1;
+  const next = Math.max(1, Math.min(pdf.numPages, cur + delta));
+  _ctxRenderMiniPdf(next);
+}
+
+async function _ctxRenderMiniPdf(pageNum){
+  const pdf = window._pickerPdfDoc;
+  const canvas = document.getElementById('ctx-pdf-canvas');
+  const empty = document.getElementById('ctx-pdf-empty');
+  const info = document.getElementById('ctx-pdf-info');
+  if(!canvas) return;
+  if(!pdf){
+    canvas.style.display = 'none';
+    if(empty) empty.style.display = 'block';
+    if(info) info.textContent = 'нет PDF';
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+  canvas.style.display = 'inline-block';
+  pageNum = Math.max(1, Math.min(pdf.numPages, pageNum || 1));
+  window._ctxPdfPage = pageNum;
+  if(info) info.textContent = `стр. ${pageNum} / ${pdf.numPages}`;
+  try {
+    const page = await pdf.getPage(pageNum);
+    const scroll = document.getElementById('ctx-pdf-scroll');
+    const paneW = Math.max(200, (scroll?.clientWidth || 400) - 8);
+    const vp1 = page.getViewport({scale: 1});
+    const scale = paneW / vp1.width;
+    const vp = page.getViewport({scale});
+    canvas.width = vp.width;
+    canvas.height = vp.height;
+    if(window._ctxPdfTask) try { window._ctxPdfTask.cancel(); } catch(e){}
+    window._ctxPdfTask = page.render({canvasContext: canvas.getContext('2d'), viewport: vp});
+    await window._ctxPdfTask.promise;
+    window._ctxPdfTask = null;
+  } catch(e){
+    if(info) info.textContent = 'ошибка: ' + (e.message || e);
   }
 }
 
