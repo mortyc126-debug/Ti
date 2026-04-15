@@ -10015,21 +10015,30 @@ function _applyIndustryFromSnapshot(d){
     const el = document.getElementById('girbo-proxy');
     if(el) el.value = d.girboProxy;
   }
+  // schemaVersion 5: Росстат/ФНС ROS/ROA по отраслям.
+  if(d.rosstatRatios && typeof d.rosstatRatios === 'object'){
+    try {
+      localStorage.setItem('bondan_rosstat_ratios', JSON.stringify(d.rosstatRatios));
+      window._rosstatRatios = d.rosstatRatios;
+    } catch(e){}
+  }
 }
 
 function _syncBuildSnapshot(){
-  let refs = [], industryPeers = null, industryMedians = null;
+  let refs = [], industryPeers = null, industryMedians = null, rosstatRatios = null;
   try { refs = JSON.parse(localStorage.getItem('bondan_refs') || '[]'); } catch(e){}
   try { industryPeers = JSON.parse(localStorage.getItem('bondan_industry_peers') || 'null'); } catch(e){}
   try { industryMedians = JSON.parse(localStorage.getItem('bondan_industry_medians') || 'null'); } catch(e){}
+  try { rosstatRatios = JSON.parse(localStorage.getItem('bondan_rosstat_ratios') || 'null'); } catch(e){}
   return {
     ytmBonds, portfolio, watchlists, calEvents, reportsDB,
     refs,
     industryPeers,
     industryMedians,
+    rosstatRatios,
     girboProxy: localStorage.getItem('bondan_girbo_proxy') || '',
     apiKey: localStorage.getItem('ba_apikey') || '',
-    meta: {schemaVersion: 4},
+    meta: {schemaVersion: 5},
     savedAt: new Date().toISOString()
   };
 }
