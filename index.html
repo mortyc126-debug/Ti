@@ -1299,6 +1299,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
             <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.ru">📋 Импорт JSON</button>
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
+            <button type="button" class="btn btn-sm btn-p" onclick="repFetchGirboSeries()" title="Через прокси автоматически подтянуть до 5 лет РСБУ-отчётности по ИНН (только standalone)">📡 5 лет</button>
             <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
             <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)">📤 Все</button>
             <input type="file" id="rep-np-refs-bulk-file" accept=".json,application/json" style="display:none" onchange="repImportAllRefs(this)">
@@ -1567,6 +1568,22 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <button class="btn btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('sync-code').value)" title="Скопировать код в буфер">📋 Скопировать</button>
         </div>
       </div>
+
+      <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
+        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>📡 ГИР БО — прокси</strong> для автоматической подтяжки 5 лет РСБУ по ИНН</summary>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
+            ГИР БО (bo.nalog.ru) не отдаёт CORS-заголовки браузеру, поэтому нужен прокси. По умолчанию — публичный <code>corsproxy.io</code>. Для приватности и надёжности можно развернуть свой Cloudflare Worker (5 минут, бесплатно): код в файле <code>cf-worker.js</code> в репозитории, инструкция в README. URL вашего Worker'а вписывайте сюда.
+          </div>
+          <div class="field" style="margin:0">
+            <label style="font-size:.6rem">URL прокси</label>
+            <input type="text" id="girbo-proxy" placeholder="https://corsproxy.io/?  или  https://bondan.ваш-cf.workers.dev/?u="
+              style="font-family:var(--mono);font-size:.65rem"
+              oninput="localStorage.setItem('bondan_girbo_proxy', this.value || 'https://corsproxy.io/?')">
+          </div>
+          <div style="font-size:.55rem;color:var(--text3)">Соглашение: если URL заканчивается на <code>?</code> или <code>=</code> — прокси получит target-URL после; если на <code>/</code> — добавится <code>https://bo.nalog.ru/...</code>; иначе — путь api подставится напрямую.</div>
+        </div>
+      </details>
 
       <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
         <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>💼 Офлайн-код</strong> — без сети и без сервера, подходит когда блокировщик / корпоративный firewall режет fetch</summary>
@@ -2542,6 +2559,106 @@ function repCompareReference(ref){
 function girboLinkForInn(inn){
   if(!inn) return null;
   return 'https://bo.nalog.ru/search?query=' + encodeURIComponent(inn);
+}
+
+// ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
+// bo.nalog.ru API доступен из РФ, но из браузера блокируется CORS
+// (Access-Control-Allow-Origin не выставлен). Решение — прокси:
+//   • по умолчанию используем публичный CORS-прокси corsproxy.io;
+//   • пользователь может вписать свой URL (например, развёрнутый
+//     Cloudflare Worker — см. cf-worker.js в репо), это надёжнее
+//     и приватнее (через свой Worker не идёт через сторонний сервис).
+// Запросы — только GET к /nbo/* (публичная отчётность РСБУ юрлиц).
+function _girboProxyBase(){
+  return localStorage.getItem('bondan_girbo_proxy') || 'https://corsproxy.io/?';
+}
+function _girboMakeUrl(path){
+  const proxy = _girboProxyBase();
+  const target = 'https://bo.nalog.ru' + path;
+  // Соглашение: если URL прокси заканчивается на «?» или «=» —
+  // подставляем target как есть (corsproxy.io, allorigins). Иначе
+  // считаем, что прокси сам возьмёт path (CF Worker с одинаковыми
+  // путями).
+  if(/[?=]$/.test(proxy)) return proxy + target;
+  if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.ru' + path;
+  return proxy + path;
+}
+async function _girboFetchJson(path){
+  const url = _girboMakeUrl(path);
+  const r = await fetch(url, {headers: {'Accept': 'application/json'}});
+  if(!r.ok) throw new Error('HTTP ' + r.status + ' ' + path);
+  const ct = r.headers.get('content-type') || '';
+  if(!/json/i.test(ct)){
+    const txt = await r.text();
+    if(txt.startsWith('<')) throw new Error('Прокси вернул HTML вместо JSON — возможно, ГИР БО показал капчу. Попробуйте сменить прокси.');
+  }
+  return r.json();
+}
+
+// Подтягиваем последние N годовых отчётов РСБУ по ИНН, складываем в
+// единую series (формат normaliseReference). Возвращает {series,
+// company, inn, count, errors}.
+async function fetchGirboByInn(inn, maxYears = 5){
+  if(!/^\d{10}(\d{2})?$/.test(inn)) throw new Error('ИНН должен быть 10 или 12 цифр');
+
+  // 1. Поиск организации — может вернуть массив или {content:[...]}.
+  const search = await _girboFetchJson('/nbo/organizations/?query=' + encodeURIComponent(inn));
+  const orgs = Array.isArray(search) ? search : (search.content || search.organizations || []);
+  if(!orgs.length) throw new Error('ИНН не найден в ГИР БО');
+  const org = orgs.find(o => String(o.inn || o.organisationInn) === String(inn)) || orgs[0];
+  const orgId = org.id || org.organizationId;
+  if(!orgId) throw new Error('У ответа ГИР БО нет orgId');
+
+  // 2. Список отчётов организации.
+  const bfoListResp = await _girboFetchJson('/nbo/organizations/' + orgId + '/bfo');
+  const bfoList = Array.isArray(bfoListResp) ? bfoListResp : (bfoListResp.content || bfoListResp.bfo || []);
+  // Только годовые, отсортированы от новых к старым.
+  const annual = bfoList
+    .filter(b => /year|год/i.test(b.period || b.bfoPeriod || '') || b.periodType === 'YEAR' || (b.year && !b.quarter))
+    .sort((a, b) => (b.year || 0) - (a.year || 0))
+    .slice(0, maxYears);
+  if(!annual.length) throw new Error('Нет годовых отчётов в ГИР БО');
+
+  // 3. Детали каждого отчёта → values по нашим полям.
+  const series = {};
+  const errors = [];
+  for(const b of annual){
+    try {
+      const bfoId = b.id || b.bfoId;
+      const det = await _girboFetchJson('/nbo/bfo/' + bfoId);
+      // Сам ответ содержит current{code} и previous{code} — есть две
+      // соседние года в одном файле. Возьмём оба, чтобы получить больше
+      // лет за меньшее число запросов.
+      const yearMain = b.year || det.year;
+      const yearPrev = yearMain ? yearMain - 1 : null;
+      const buildVals = (kind) => {
+        const v = {};
+        for(const [fid, code] of Object.entries(_GIRBO_FIELD_MAP)){
+          const codes = Array.isArray(code) ? code : [code];
+          let sum = 0, any = false;
+          for(const c of codes){
+            const x = det[kind + c];
+            if(typeof x === 'number'){ sum += x; any = true; }
+          }
+          if(any) v[fid] = sum / 1e6; // тыс ₽ → млрд ₽
+        }
+        return Object.keys(v).length ? v : null;
+      };
+      const cur = buildVals('current');
+      if(cur && yearMain) series[_periodLabel(yearMain, 'FY')] = cur;
+      const prev = buildVals('previous');
+      if(prev && yearPrev) series[_periodLabel(yearPrev, 'FY')] = series[_periodLabel(yearPrev, 'FY')] || prev;
+    } catch(e){
+      errors.push({year: b.year, error: e.message});
+    }
+  }
+  return {
+    series,
+    company: org.name || org.shortName || org.fullName || null,
+    inn: String(inn),
+    count: Object.keys(series).length,
+    errors
+  };
 }
 
 // ── Авто-подбор эталона по ИНН и периоду ─────────────────────────────
@@ -6211,6 +6328,57 @@ function repClearReference(){
   if(box) box.innerHTML = '';
 }
 
+// Кнопка «📡 5 лет» — подтянуть многолетнюю историю РСБУ из ГИР БО
+// по распознанному ИНН. Работает только для standalone-юрлиц
+// (это всё, что у ФНС в открытом доступе). Если загруженный отчёт —
+// МСФО-группа, цифры будут существенно меньше консолидированных,
+// и блок сверки явно это подсветит как «не прямое сравнение».
+async function repFetchGirboSeries(){
+  const meta = window._reportMeta || {};
+  let inn = meta.inn;
+  if(!inn){
+    inn = prompt('ИНН не распознан в отчёте. Введите вручную (10 или 12 цифр):', '');
+    if(!inn) return;
+    inn = inn.trim();
+    if(!/^\d{10}(\d{2})?$/.test(inn)){ alert('ИНН должен быть 10 (юрлицо) или 12 (ИП) цифр.'); return; }
+  }
+  const box = document.getElementById('rep-np-ref-result');
+  const wrap = document.getElementById('rep-np-ref-wrap');
+  if(wrap) wrap.style.display = 'block';
+  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос ГИР БО по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
+  try {
+    const data = await fetchGirboByInn(inn, 5);
+    if(!data.count){
+      if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ГИР БО ничего не вернул (компания исключена из публикации? нет годовых отчётов?). Ошибки: ${data.errors.length}.</div>`;
+      return;
+    }
+    // Соберём ref в нашем формате и применим как обычный.
+    const baseSeries = window._reportReference?.series || null;
+    const merged = _mergeSeries(baseSeries, data.series);
+    const newest = Object.keys(merged).sort((a,b) => _periodSortKey(b) - _periodSortKey(a))[0];
+    const ref = {
+      values: merged[newest],
+      series: merged,
+      standard: 'РСБУ',
+      scope: 'standalone',
+      company: data.company || meta.orgName,
+      inn: data.inn,
+      period: newest,
+      source: 'ГИР БО (прокси)',
+      unit: 'млрд ₽',
+      format: 'girbo-multi',
+      _autoSource: 'ГИР БО'
+    };
+    window._reportReference = ref;
+    // Сохраняем в локальный кэш — при следующем открытии того же
+    // отчёта подтянется автоматически без запроса.
+    _saveRefToLocal({...ref, schema: 'bondan/ref/v1'});
+    repRenderRefResult();
+  } catch(e){
+    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ${e.message}<br><span style="color:var(--text3)">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Альтернативы: corsproxy.io, ваш CF Worker.</span></div>`;
+  }
+}
+
 // Массовый экспорт: скачать ВСЕ сохранённые на устройстве эталоны
 // одним JSON-файлом. Нужен как оффлайн-бэкап / для переноса между
 // устройствами без GitHub Gist (флешка, e-mail, облачный диск).
@@ -9015,6 +9183,10 @@ function openGistModal() {
   const syncCode = localStorage.getItem('ba_sync_code');
   const syncInput = document.getElementById('sync-code');
   if(syncInput && syncCode) syncInput.value = syncCode;
+  // URL прокси для ГИР БО.
+  const proxyVal = localStorage.getItem('bondan_girbo_proxy') || 'https://corsproxy.io/?';
+  const proxyInput = document.getElementById('girbo-proxy');
+  if(proxyInput) proxyInput.value = proxyVal;
   document.getElementById('gist-status').style.display = 'none';
   const syncStatus = document.getElementById('sync-cloud-status');
   if(syncStatus) syncStatus.style.display = 'none';
