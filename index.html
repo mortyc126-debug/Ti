@@ -282,6 +282,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
     <button class="nav-btn" onclick="showPage('reports')">📂 Отчётность</button>
     <button class="nav-btn" onclick="showPage('industries')">🏭 Отрасли</button>
+    <button class="nav-btn" onclick="showPage('cross')">📊 Сравнение</button>
   </nav>
   <div class="topbar-right">
     <span class="pulse-dot"></span>
@@ -304,6 +305,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="showPage('calendar');sbAct(this)"><span class="sb-icon">📅</span>Календарь событий<span class="sb-badge" id="sb-ev">0</span></div>
     <div class="sb-item" onclick="showPage('reports');sbAct(this)"><span class="sb-icon">📂</span>База отчётности<span class="sb-badge" id="sb-rep">0</span></div>
     <div class="sb-item" onclick="showPage('industries');sbAct(this)"><span class="sb-icon">🏭</span>Отрасли / медианы<span class="sb-badge" id="sb-ind">0</span></div>
+    <div class="sb-item" onclick="showPage('cross');sbAct(this)"><span class="sb-icon">📊</span>Сравнение компаний</div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -1562,6 +1564,37 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
+<!-- ═══ Страница «📊 Сравнение компаний» ═══ -->
+<div class="page" id="page-cross">
+  <div class="card">
+    <div class="card-hdr">📊 Сравнение компаний по показателю</div>
+    <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
+      Ранжирование всех эмитентов из базы отчётности по одному показателю в выбранном периоде.
+      Сравниваются только компании, у которых в этом периоде распознаны нужные поля для расчёта. Выбирайте период и показатель — список перестраивается мгновенно.
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:0 4px 10px">
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Период</label>
+        <select id="cross-period" onchange="crossRender()" style="font-size:.7rem;padding:3px 6px;min-width:130px"></select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Показатель</label>
+        <select id="cross-metric" onchange="crossRender()" style="font-size:.7rem;padding:3px 6px;min-width:220px"></select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Фильтр (подстрока в имени)</label>
+        <input type="text" id="cross-filter" oninput="crossRender()" placeholder="например: лизинг" style="font-size:.7rem;padding:3px 6px;width:180px">
+      </div>
+      <label style="font-size:.6rem;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer">
+        <input type="checkbox" id="cross-same-scope" onchange="crossRender()" style="margin:0"> только той же scope
+      </label>
+      <button class="btn btn-sm" onclick="crossExportCsv()" title="Выгрузить текущий ранжированный список в CSV" style="margin-left:auto">💾 CSV</button>
+    </div>
+    <div id="cross-status" style="font-size:.6rem;padding:4px 8px;color:var(--text3)"></div>
+    <div id="cross-chart" style="padding:4px"></div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1738,7 +1771,7 @@ function showPage(n){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','portfolio','watchlist','pnl','issuer','calendar','reports','industries'].indexOf(n);
+  const idx=['ytm','portfolio','watchlist','pnl','issuer','calendar','reports','industries','cross'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   if(n==='portfolio') renderPort();
   if(n==='watchlist') renderWL();
@@ -1746,6 +1779,7 @@ function showPage(n){
   if(n==='calendar'){renderCalendar();updateCalStats();}
   if(n==='reports') repInit();
   if(n==='industries') indRender();
+  if(n==='cross') crossInit();
 }
 function sbAct(el){document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));el.classList.add('active')}
 function swIssTab(t,el){
@@ -6407,6 +6441,271 @@ function repCalcRatios(d){
   if(d.ebitda&&d.rev) r.ebitdam = (d.ebitda/d.rev*100).toFixed(1);
   if(d.eq&&d.assets) r.eqr = (d.eq/d.assets*100).toFixed(1);
   return r;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// СТРАНИЦА «📊 Сравнение компаний»
+// Ранжирует всех эмитентов из reportsDB по выбранному показателю в
+// выбранном периоде. Сравниваем только тех, у кого в данном периоде
+// есть поля, нужные для расчёта — остальные тихо пропускаем.
+//
+// Ключ периода — `${year}_${period}` (без scope/type), так как один
+// и тот же квартал может быть и в РСБУ и в МСФО: агрегируем их в
+// один «слот», а из дубликатов берём запись с максимальным количеством
+// заполненных числовых полей.
+// ═════════════════════════════════════════════════════════════════════
+
+const _CROSS_METRICS = [
+  {k:'ebitdam', l:'EBITDA-маржа, %',           unit:'%',    higher:true,  calc:d => (d.ebitda && d.rev) ? d.ebitda/d.rev*100 : null},
+  {k:'npm',     l:'Чистая маржа, %',           unit:'%',    higher:true,  calc:d => (d.np != null && d.rev) ? d.np/d.rev*100 : null},
+  {k:'ndE',     l:'ND / EBITDA',               unit:'x',    higher:false, calc:d => (d.ebitda && d.debt != null && d.cash != null) ? (d.debt - d.cash)/d.ebitda : null},
+  {k:'icr',     l:'ICR (EBITDA / %проц.)',     unit:'x',    higher:true,  calc:d => (d.ebitda && d.int) ? d.ebitda/d.int : null},
+  {k:'cur',     l:'Current Ratio (CA / CL)',   unit:'x',    higher:true,  calc:d => (d.ca && d.cl) ? d.ca/d.cl : null},
+  {k:'eqr',     l:'Equity Ratio, %',           unit:'%',    higher:true,  calc:d => (d.eq && d.assets) ? d.eq/d.assets*100 : null},
+  {k:'roa',     l:'ROA (ЧП / Активы), %',      unit:'%',    higher:true,  calc:d => (d.np != null && d.assets) ? d.np/d.assets*100 : null},
+  {k:'roe',     l:'ROE (ЧП / Капитал), %',     unit:'%',    higher:true,  calc:d => (d.np != null && d.eq) ? d.np/d.eq*100 : null},
+  {k:'rev',     l:'Выручка, млрд ₽',           unit:'млрд', higher:true,  calc:d => (typeof d.rev === 'number') ? d.rev : null},
+  {k:'ebitda',  l:'EBITDA, млрд ₽',            unit:'млрд', higher:true,  calc:d => (typeof d.ebitda === 'number') ? d.ebitda : null},
+  {k:'ebit',    l:'EBIT, млрд ₽',              unit:'млрд', higher:true,  calc:d => (typeof d.ebit === 'number') ? d.ebit : null},
+  {k:'np',      l:'Чистая прибыль, млрд ₽',    unit:'млрд', higher:true,  calc:d => (typeof d.np === 'number') ? d.np : null},
+  {k:'assets',  l:'Активы, млрд ₽',            unit:'млрд', higher:true,  calc:d => (typeof d.assets === 'number') ? d.assets : null},
+  {k:'eq',      l:'Капитал, млрд ₽',           unit:'млрд', higher:true,  calc:d => (typeof d.eq === 'number') ? d.eq : null},
+  {k:'debt',    l:'Долг, млрд ₽',              unit:'млрд', higher:false, calc:d => (typeof d.debt === 'number') ? d.debt : null}
+];
+
+// Сортировочный вес периода: FY > 9M > H1 > Q1 в пределах одного года.
+function _crossPeriodWeight(period){
+  if(period === 'FY') return 1.00;
+  if(period === '9M') return 0.75;
+  if(period === 'H1') return 0.50;
+  if(period === 'Q1') return 0.25;
+  return 0.40;
+}
+
+function _crossEnumeratePeriods(){
+  const bucket = {};
+  for(const iss of Object.values(reportsDB || {})){
+    for(const p of Object.values(iss.periods || {})){
+      if(!p || !p.year) continue;
+      const period = p.period || 'FY';
+      const key = p.year + '_' + period;
+      if(!bucket[key]){
+        bucket[key] = {
+          key,
+          label: p.year + ' ' + period,
+          count: 0,
+          sortKey: p.year * 10 + _crossPeriodWeight(period) * 10
+        };
+      }
+      bucket[key].count++;
+    }
+  }
+  return Object.values(bucket).sort((a, b) => b.sortKey - a.sortKey);
+}
+
+function crossBuildPeriodSelector(){
+  const sel = document.getElementById('cross-period');
+  if(!sel) return;
+  const cur = sel.value;
+  const periods = _crossEnumeratePeriods();
+  if(!periods.length){
+    sel.innerHTML = '<option value="">—</option>';
+    return;
+  }
+  sel.innerHTML = periods.map(p =>
+    `<option value="${p.key}">${p.label} · ${p.count} ком.</option>`
+  ).join('');
+  if(cur && periods.find(p => p.key === cur)) sel.value = cur;
+}
+
+function crossBuildMetricSelector(){
+  const sel = document.getElementById('cross-metric');
+  if(!sel || sel.options.length) return; // строим один раз
+  sel.innerHTML = _CROSS_METRICS.map(m =>
+    `<option value="${m.k}">${m.l}${m.higher === false ? ' (меньше = лучше)' : ''}</option>`
+  ).join('');
+  sel.value = 'ebitdam';
+}
+
+function crossInit(){
+  crossBuildPeriodSelector();
+  crossBuildMetricSelector();
+  crossRender();
+}
+
+// Собираем одну запись на эмитента: тот его период, где ключ совпал и
+// есть максимальное число заполненных числовых полей (устраняем дубли
+// по scope — РСБУ vs МСФО в один квартал).
+function _crossCollect(periodKey, metric, opts){
+  const rows = [];
+  const filter = (opts.filter || '').trim().toLowerCase();
+  const sameType = opts.scopeFilter || null; // null = любые
+  const [yearStr, period] = periodKey.split('_');
+  const year = +yearStr;
+  for(const [issId, iss] of Object.entries(reportsDB || {})){
+    if(!iss || !iss.periods) continue;
+    if(filter && !String(iss.name || '').toLowerCase().includes(filter)) continue;
+    let candidates = Object.values(iss.periods).filter(p =>
+      p && +p.year === year && (p.period || 'FY') === period
+    );
+    if(sameType) candidates = candidates.filter(p => (p.type || '?') === sameType);
+    if(!candidates.length) continue;
+    // Выбираем самый заполненный — чтобы МСФО с EBITDA/Долг не проиграл РСБУ без этих полей.
+    candidates.sort((a, b) =>
+      Object.values(b).filter(v => typeof v === 'number').length -
+      Object.values(a).filter(v => typeof v === 'number').length
+    );
+    const p = candidates[0];
+    const v = metric.calc(p);
+    if(v == null || !isFinite(v)) continue;
+    rows.push({
+      name: iss.name || issId,
+      id: issId,
+      value: v,
+      type: p.type || '?',
+      year: p.year,
+      period: p.period || 'FY'
+    });
+  }
+  rows.sort((a, b) => metric.higher === false ? (a.value - b.value) : (b.value - a.value));
+  return rows;
+}
+
+function _crossFmt(v, unit){
+  if(unit === 'млрд'){
+    const abs = Math.abs(v);
+    return v.toLocaleString('ru-RU', {maximumFractionDigits: abs >= 100 ? 0 : abs >= 10 ? 1 : 2}) + ' млрд';
+  }
+  if(unit === 'x') return v.toFixed(2) + 'x';
+  if(unit === '%') return v.toFixed(1) + '%';
+  return v.toFixed(2);
+}
+
+function crossRender(){
+  crossBuildPeriodSelector();
+  crossBuildMetricSelector();
+  const periodKey = document.getElementById('cross-period')?.value || '';
+  const metricKey = document.getElementById('cross-metric')?.value || 'ebitdam';
+  const filter    = document.getElementById('cross-filter')?.value || '';
+  const sameScopeChk = document.getElementById('cross-same-scope')?.checked;
+  const chart  = document.getElementById('cross-chart');
+  const status = document.getElementById('cross-status');
+  if(!chart) return;
+
+  if(!periodKey){
+    chart.innerHTML = '<div class="empty"><div class="ei">📊</div><p>Нет распознанных отчётов. Перейдите в 📂 Отчётность и добавьте хотя бы 2 периода от разных эмитентов.</p></div>';
+    if(status) status.textContent = '';
+    window._crossLast = null;
+    return;
+  }
+
+  const metric = _CROSS_METRICS.find(m => m.k === metricKey) || _CROSS_METRICS[0];
+  // scopeFilter — если чекбокс включен, берём тот scope, который чаще
+  // встречается в выбранном периоде, чтобы не смешивать МСФО и РСБУ.
+  let scopeFilter = null;
+  if(sameScopeChk){
+    const [yearStr, period] = periodKey.split('_');
+    const freq = {};
+    for(const iss of Object.values(reportsDB || {})){
+      for(const p of Object.values(iss.periods || {})){
+        if(p && +p.year === +yearStr && (p.period || 'FY') === period){
+          const t = p.type || '?';
+          freq[t] = (freq[t] || 0) + 1;
+        }
+      }
+    }
+    scopeFilter = Object.entries(freq).sort((a,b) => b[1] - a[1])[0]?.[0] || null;
+  }
+
+  const rows = _crossCollect(periodKey, metric, {filter, scopeFilter});
+  window._crossLast = {rows, metric, periodKey};
+
+  if(!rows.length){
+    chart.innerHTML = `<div class="empty"><div class="ei">∅</div><p>В этом периоде ни у одного эмитента нет нужных полей для показателя «${metric.l}».</p></div>`;
+    if(status) status.textContent = '';
+    return;
+  }
+
+  if(status){
+    const scopeTag = scopeFilter ? ` · scope=${scopeFilter}` : '';
+    status.innerHTML = `${rows.length} эмитент(ов)${scopeTag} · показатель «<strong>${metric.l}</strong>». Сортировка: ${metric.higher === false ? 'по возрастанию (меньше — лучше)' : 'по убыванию (больше — лучше)'}.`;
+  }
+
+  // Бар-чарт.
+  const maxV = Math.max(...rows.map(r => Math.abs(r.value))) || 1;
+  const hasNeg = rows.some(r => r.value < 0);
+  const best = rows[0].value;
+  const worst = rows[rows.length - 1].value;
+  const avg = rows.reduce((s, r) => s + r.value, 0) / rows.length;
+  const median = rows.length ? rows.slice().sort((a,b) => a.value - b.value)[Math.floor(rows.length / 2)].value : 0;
+
+  const barRows = rows.map((r, i) => {
+    const absW = Math.abs(r.value) / maxV * (hasNeg ? 50 : 100);
+    const barPos = hasNeg
+      ? (r.value >= 0
+          ? `left:50%;width:${absW}%;background:${metric.higher === false ? 'var(--danger)' : 'var(--green)'};opacity:.75`
+          : `right:50%;width:${absW}%;background:${metric.higher === false ? 'var(--green)' : 'var(--danger)'};opacity:.75`)
+      : `left:0;width:${absW}%;background:var(--acc);opacity:.72`;
+    const clr = r.value === best ? 'var(--green)' : (r.value === worst && rows.length > 1 ? 'var(--danger)' : 'var(--text2)');
+    return `<div style="display:grid;grid-template-columns:30px minmax(180px,1.4fr) 1fr 100px;gap:8px;padding:4px 4px;border-bottom:1px solid rgba(30,48,72,.3);align-items:center;font-size:.64rem">
+      <div style="color:var(--text3);text-align:right;font-variant-numeric:tabular-nums">${i + 1}.</div>
+      <div style="color:${clr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name} · ${r.type}"><span style="cursor:pointer;text-decoration:underline dotted var(--text3) 1px" onclick="crossOpenIssuer('${r.id}')">${r.name}</span><span style="color:var(--text3);font-size:.52rem"> · ${r.type}</span></div>
+      <div style="position:relative;height:14px;background:var(--s1);border:1px solid var(--border)">
+        ${hasNeg ? '<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--text3);opacity:.45"></div>' : ''}
+        <div style="position:absolute;top:0;bottom:0;${barPos}"></div>
+      </div>
+      <div style="text-align:right;font-variant-numeric:tabular-nums;color:${clr};font-weight:600">${_crossFmt(r.value, metric.unit)}</div>
+    </div>`;
+  }).join('');
+
+  chart.innerHTML = `
+    <div style="margin-bottom:6px;font-size:.58rem;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap">
+      <span><strong style="color:var(--text2)">Период:</strong> ${rows[0].year} ${rows[0].period}</span>
+      <span><strong style="color:var(--text2)">Лидер:</strong> ${rows[0].name} = ${_crossFmt(best, metric.unit)}</span>
+      <span><strong style="color:var(--text2)">Среднее:</strong> ${_crossFmt(avg, metric.unit)}</span>
+      <span><strong style="color:var(--text2)">Медиана:</strong> ${_crossFmt(median, metric.unit)}</span>
+    </div>
+    ${barRows}
+  `;
+}
+
+// Клик по имени эмитента — переходим на страницу «📂 Отчётность»
+// с выбранным эмитентом.
+function crossOpenIssuer(issId){
+  if(!reportsDB[issId]) return;
+  repActiveIssuerId = issId;
+  repActivePeriodKey = null;
+  showPage('reports');
+  const sel = document.getElementById('rep-issuer-sel');
+  if(sel){
+    sel.value = issId;
+    if(typeof repSelectIssuer === 'function') repSelectIssuer();
+  }
+}
+
+function crossExportCsv(){
+  if(!window._crossLast || !window._crossLast.rows?.length){
+    alert('Нет данных для экспорта — выберите период с доступными эмитентами.');
+    return;
+  }
+  const {rows, metric, periodKey} = window._crossLast;
+  const header = ['rank','name','type','year','period', metric.k, 'unit'].join(';');
+  const body = rows.map((r, i) => [
+    i + 1,
+    '"' + (r.name || '').replace(/"/g, '""') + '"',
+    r.type,
+    r.year,
+    r.period,
+    r.value.toFixed(4).replace('.', ','),
+    metric.unit
+  ].join(';')).join('\n');
+  const blob = new Blob(['\ufeff' + header + '\n' + body + '\n'], {type: 'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cross_${periodKey}_${metric.k}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
 let repActiveIssuerId = null;
