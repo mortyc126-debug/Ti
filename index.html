@@ -1548,6 +1548,9 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <input type="file" id="ind-import-file" accept=".json" style="display:none" onchange="indImportPeers(this)">
       <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON">📥 Импорт</button>
       <button class="btn btn-sm" onclick="indResetSeed()" title="Откатить к встроенному стартовому списку (удаляет ваши правки)">♻️ Сбросить</button>
+      <input type="file" id="ind-rosstat-file" accept=".xlsx,.xls" multiple style="display:none" onchange="rosstatImportFiles(this)">
+      <button class="btn btn-sm" onclick="document.getElementById('ind-rosstat-file').click()" title="Импорт XLSX ФНС (ind2020.xlsx … ind2024.xls) — среднеотраслевые ROS/ROA по ОКВЭД. Можно выделить сразу несколько файлов.">🇷🇺 Импорт ФНС XLSX</button>
+      <button class="btn btn-sm" onclick="rosstatClear()" title="Очистить загруженные данные ФНС">🗑️ ФНС</button>
     </div>
     <div id="ind-status" style="font-size:.6rem;padding:4px 8px;display:none;border:1px solid var(--border);margin-bottom:8px"></div>
     <div id="ind-layout" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
@@ -2800,10 +2803,110 @@ async function indRender(){
       </div>
     ` : '<div style="color:var(--text3);padding:16px;text-align:center;font-size:.65rem">Список пуст. Добавьте хотя бы 5-10 ИНН, чтобы медианы были осмысленны.</div>'}
     ${_indMediansView(key)}
+    ${_indRosstatView(key)}
   `;
   const cnt = keys.reduce((a,k) => a + (data.industries[k].peers||[]).length, 0);
   const bd = document.getElementById('sb-ind');
   if(bd) bd.textContent = cnt;
+}
+
+// Таблица ROS/ROA из XLSX ФНС по годам для выбранной отрасли.
+// Если данных нет — краткая подсказка, как их загрузить.
+function _indRosstatView(key){
+  const db = _rosstatLoad();
+  const years = Object.keys(db).map(y => +y).sort();
+  if(!years.length){
+    return `<div style="margin-top:14px;padding:8px;border:1px dashed var(--border);color:var(--text3);font-size:.58rem;line-height:1.5">
+      🇷🇺 <strong>ROS/ROA (ФНС)</strong> — не загружено. Скачайте
+      <code>ind2024.xls</code> и соседние годы с
+      <a href="https://www.nalog.gov.ru/rn77/taxation/reference_work/conception_vnp/" target="_blank" style="color:var(--acc)">nalog.gov.ru/conception_vnp</a>
+      и нажмите «🇷🇺 Импорт ФНС XLSX».
+    </div>`;
+  }
+  const fmt = v => (v == null ? '—' : v.toFixed(1) + '%');
+  const fnsNames = _ROSSTAT_INDUSTRY_MAP[key] || [];
+  // Для каждого года пробуем найти первое совпадение из списка.
+  const lookups = years.map(y => {
+    const hit = rosstatLookup(key, y);
+    return {y, hit};
+  });
+  const anyHit = lookups.some(x => x.hit);
+  const mappingLine = fnsNames.length
+    ? `<div style="font-size:.52rem;color:var(--text3);margin-top:4px">мэппинг: <code>${fnsNames.map(n => n.length > 40 ? n.slice(0, 40) + '…' : n).join('</code> → <code>')}</code></div>`
+    : `<div style="font-size:.52rem;color:var(--warn);margin-top:4px">⚠ Для отрасли <code>${key}</code> нет мэппинга в словаре _ROSSTAT_INDUSTRY_MAP.</div>`;
+  if(!anyHit){
+    return `<div style="margin-top:14px;padding:8px;border:1px solid var(--border);background:var(--s2);font-size:.58rem">
+      <div style="color:var(--text2)"><strong>🇷🇺 ROS/ROA (ФНС)</strong> · загружено лет: ${years.join(', ')}</div>
+      <div style="color:var(--warn);margin-top:4px">Для этой отрасли ничего не нашлось по текущему мэппингу.</div>
+      ${mappingLine}
+    </div>`;
+  }
+  return `<div style="margin-top:14px">
+    <div style="font-size:.58rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">🇷🇺 среднеотраслевые ros / roa (фнс)</div>
+    <div style="overflow:auto"><table style="font-size:.6rem;border-collapse:collapse;width:100%;min-width:${140 + years.length * 110}px">
+      <tr style="color:var(--text3);background:var(--bg)">
+        <th style="text-align:left;padding:4px 6px;border:1px solid var(--border)">Показатель</th>
+        ${lookups.map(l => `<th style="text-align:right;padding:4px 6px;border:1px solid var(--border)">${l.y}</th>`).join('')}
+      </tr>
+      <tr>
+        <td style="padding:3px 6px;border:1px solid var(--border);color:var(--text2)" title="Рентабельность проданных товаров (EBIT/Выручка)">ROS</td>
+        ${lookups.map(l => {
+          if(!l.hit) return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;color:var(--text3)">—</td>`;
+          const neg = l.hit.rosNeg && l.hit.ros == null;
+          const val = neg ? '<span style="color:var(--danger)">&lt;0</span>' : fmt(l.hit.ros);
+          return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums" title="«${l.hit.matchedName || l.hit.name}»">${val}</td>`;
+        }).join('')}
+      </tr>
+      <tr>
+        <td style="padding:3px 6px;border:1px solid var(--border);color:var(--text2)" title="Рентабельность активов (ЧП/Активы)">ROA</td>
+        ${lookups.map(l => {
+          if(!l.hit) return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;color:var(--text3)">—</td>`;
+          const neg = l.hit.roaNeg && l.hit.roa == null;
+          const val = neg ? '<span style="color:var(--danger)">&lt;0</span>' : fmt(l.hit.roa);
+          return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums" title="«${l.hit.matchedName || l.hit.name}»">${val}</td>`;
+        }).join('')}
+      </tr>
+    </table></div>
+    ${mappingLine}
+  </div>`;
+}
+
+// Импорт одного или нескольких XLSX ФНС. Каждый файл парсится отдельно,
+// год берётся из шапки. Все успешные результаты мёрджатся в общий стор.
+async function rosstatImportFiles(input){
+  const files = Array.from(input.files || []);
+  if(!files.length) return;
+  const statusEl = document.getElementById('ind-status');
+  const setStatus = (msg, color) => {
+    if(!statusEl) return;
+    statusEl.style.display = 'block';
+    statusEl.style.color = color || 'var(--text2)';
+    statusEl.innerHTML = msg;
+  };
+  setStatus(`⏳ Парсю ${files.length} файл(ов)…`, 'var(--warn)');
+  const ok = [], err = [];
+  for(const f of files){
+    try {
+      const parsed = await rosstatParseFnsXlsx(f);
+      rosstatStoreParsed(parsed);
+      ok.push(`${f.name} → ${parsed.year} (${parsed.entries.length} строк)`);
+    } catch(e){
+      err.push(`${f.name}: ${e.message}`);
+    }
+  }
+  input.value = '';
+  const okLine  = ok.length  ? `<div style="color:var(--green)">✅ ${ok.join('<br>')}</div>` : '';
+  const errLine = err.length ? `<div style="color:var(--danger)">❌ ${err.join('<br>')}</div>` : '';
+  setStatus(okLine + errLine, ok.length ? 'var(--text2)' : 'var(--danger)');
+  indRender();
+}
+
+// Полная очистка загруженных данных ФНС.
+function rosstatClear(){
+  if(!confirm('Удалить все загруженные данные ФНС?')) return;
+  window._rosstatRatios = {};
+  try { localStorage.removeItem('bondan_rosstat_ratios'); } catch(e){}
+  indRender();
 }
 
 function _indMediansView(key){
@@ -3018,6 +3121,180 @@ async function indBuildMedians(){
   const filled = Object.entries(medians).filter(([k,v]) => Object.keys(v).length).length;
   status(`✅ Готово за ${elapsed}с. Отраслей с данными: ${filled}/${Object.keys(medians).length}. ${errSummary}`, 'var(--green)');
   indRender();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// РОССТАТ / ФНС — среднеотраслевые ROS / ROA
+// Источник файлов: ФНС публикует ежегодно "Приложение № 4 к Приказу
+// ФНС № ММ-3-06/333@" на https://www.nalog.gov.ru/rn77/taxation/
+// reference_work/conception_vnp/  (файлы ind2017.xlsx … ind2024.xls).
+// Данные рассчитаны по статистике Росстата. Это среднеотраслевые
+// показатели по крупным и средним предприятиям.
+//
+// Структура XLSX (стабильна 2020–2024):
+//   Лист «Рентабельность» (в 2020 — с пробелом на конце)
+//   r1–r4: шапка, в одной из строк год формата «NNNN год»
+//   r5+:   [название ОКВЭД-группы, ROS %, ROA %]
+//   Значение "отр" = отрицательная, точная величина не публикуется.
+//   Кодов ОКВЭД в файле нет — только текстовые названия групп.
+//
+// Хранение: localStorage['bondan_rosstat_ratios'] =
+//   {year: {normName: {name, ros, roa, rosNeg, roaNeg}}}
+// ═════════════════════════════════════════════════════════════════════
+
+window._rosstatRatios = null;
+
+function _rosstatLoad(){
+  if(window._rosstatRatios) return window._rosstatRatios;
+  try {
+    const raw = localStorage.getItem('bondan_rosstat_ratios');
+    if(raw) window._rosstatRatios = JSON.parse(raw);
+  } catch(e){}
+  if(!window._rosstatRatios) window._rosstatRatios = {};
+  return window._rosstatRatios;
+}
+
+function _rosstatSave(){
+  try {
+    localStorage.setItem('bondan_rosstat_ratios', JSON.stringify(window._rosstatRatios || {}));
+  } catch(e){}
+}
+
+// Нормализация названия отрасли для устойчивого мэппинга: lower-case,
+// ё→е, срезаем переводы строк / кавычки / концевые точки, схлопываем пробелы.
+function _rosstatNormName(s){
+  return String(s || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[«»"']/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[,.;:]+$/, '')
+    .trim();
+}
+
+// Разбор одной ячейки: "отр" → отрицательная без значения, число или
+// "12,3" → число. Возвращает {v, neg} или null если пустое.
+function _rosstatParseCell(v){
+  if(v == null || v === '') return null;
+  if(typeof v === 'number') return {v, neg: v < 0};
+  const s = String(v).trim().toLowerCase();
+  if(!s) return null;
+  if(s === 'отр' || s === 'отр.' || s === '-' || s === '–' || s === '—')
+    return {v: null, neg: true};
+  const num = parseFloat(s.replace(',', '.').replace(/[^\d.\-]/g, ''));
+  return isNaN(num) ? null : {v: num, neg: num < 0};
+}
+
+// Парсер одного файла ФНС (XLSX или XLS). Возвращает
+// {year, fileName, entries: [{name, key, ros, roa, rosNeg, roaNeg}]}.
+async function rosstatParseFnsXlsx(file){
+  await _ensureXlsx();
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type: 'array'});
+  const sheetName = wb.SheetNames.find(n => /рентабельност/i.test(n.trim()));
+  if(!sheetName) throw new Error(`В файле «${file.name}» нет листа «Рентабельность»`);
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header: 1, raw: false, defval: ''});
+
+  // Год — ищем в первых 6 строках паттерн «2023 год» или «в 2023 году».
+  let year = null;
+  for(let i = 0; i < Math.min(6, rows.length); i++){
+    const joined = (rows[i] || []).join(' ');
+    const m = joined.match(/(19\d{2}|20\d{2})\s*год/i);
+    if(m){ year = parseInt(m[1], 10); break; }
+  }
+  // Fallback — год из имени файла ind2024.xls.
+  if(!year){
+    const m = (file.name || '').match(/(19\d{2}|20\d{2})/);
+    if(m) year = parseInt(m[1], 10);
+  }
+  if(!year) throw new Error(`Не удалось определить год в файле «${file.name}»`);
+
+  const entries = [];
+  for(let i = 0; i < rows.length; i++){
+    const row = rows[i] || [];
+    const a = String(row[0] || '').trim();
+    if(!a) continue;
+    // Пропуск шапки и сносок.
+    if(/^\*/.test(a)) continue;
+    if(/вид\s+экономическ/i.test(a)) continue;
+    if(/^рентабельность\s+проданн/i.test(a)) continue;
+    if(/приложение/i.test(a)) continue;
+    const ros = _rosstatParseCell(row[1]);
+    const roa = _rosstatParseCell(row[2]);
+    if(ros == null && roa == null) continue;
+    entries.push({
+      name: a.replace(/\s+/g, ' '),
+      key: _rosstatNormName(a),
+      ros: ros ? ros.v : null,
+      roa: roa ? roa.v : null,
+      rosNeg: !!(ros && ros.neg),
+      roaNeg: !!(roa && roa.neg)
+    });
+  }
+  if(!entries.length)
+    throw new Error(`В «${file.name}» не нашлось ни одной строки с данными рентабельности`);
+  return {year, fileName: file.name, entries};
+}
+
+// Сохранить результат парсинга в общий локальный стор; год-ключ заменяется.
+function rosstatStoreParsed(parsed){
+  const db = _rosstatLoad();
+  const y = String(parsed.year);
+  db[y] = {};
+  for(const e of parsed.entries){
+    db[y][e.key] = {
+      name: e.name,
+      ros: e.ros,
+      roa: e.roa,
+      rosNeg: e.rosNeg,
+      roaNeg: e.roaNeg
+    };
+  }
+  window._rosstatRatios = db;
+  _rosstatSave();
+}
+
+// Хардкод-мэппинг 15 отраслей (из references/industry-peers.json) на
+// текстовые названия групп из ФНС-файлов. Порядок важен: берём первую
+// строку, которая есть в данных конкретного года. При желании можно
+// переопределить через localStorage['bondan_rosstat_map'] в будущем.
+const _ROSSTAT_INDUSTRY_MAP = {
+  oil_gas:       ['добыча сырой нефти и природного газа', 'производство кокса и нефтепродуктов', 'добыча полезных ископаемых'],
+  metals_mining: ['производство металлургическое', 'добыча металлических руд', 'добыча полезных ископаемых'],
+  telecom:       ['деятельность в области информации и связи'],
+  banks:         ['деятельность финансовая и страховая'],
+  retail:        ['торговля оптовая и розничная; ремонт автотранспортных средств и мотоциклов', 'торговля розничная, кроме торговли автотранспортными средствами и мотоциклами'],
+  transport:     ['транспортировка и хранение'],
+  it_software:   ['деятельность в области информации и связи'],
+  utilities:     ['обеспечение электрической энергией, газом и паром; кондиционирование воздуха', 'водоснабжение; водоотведение, организация сбора и утилизации отходов, деятельно'],
+  pharma:        ['производство лекарственных средств и материалов, применяемых в медицинских целях', 'деятельность в области здравоохранения и социальных услуг'],
+  chemistry:     ['производство химических веществ и химических продуктов'],
+  development:   ['строительство', 'деятельность по операциям с недвижимым имуществом'],
+  leasing:       ['деятельность финансовая и страховая'],
+  mfi:           ['деятельность финансовая и страховая'],
+  agro_food:     ['сельское, лесное хозяйство, охота, рыболовство и рыбоводство', 'производство пищевых продуктов', 'растениеводство и животноводство, охота и предоставление соответствующих услуг в этих областях'],
+  other:         ['всего']
+};
+
+// Поиск рентабельностей ФНС по industryKey за конкретный год. Пробуем
+// все названия из мэппинга по очереди, возвращаем первое найденное.
+function rosstatLookup(industryKey, year){
+  const db = _rosstatLoad();
+  if(!db[String(year)]) return null;
+  const fnsNames = _ROSSTAT_INDUSTRY_MAP[industryKey];
+  if(!fnsNames || !fnsNames.length) return null;
+  const bucket = db[String(year)];
+  for(const nm of fnsNames){
+    const k = _rosstatNormName(nm);
+    if(bucket[k]) return {...bucket[k], year: +year, matchedName: bucket[k].name};
+  }
+  return null;
+}
+
+// Список лет с загруженными данными ФНС.
+function rosstatAvailableYears(){
+  return Object.keys(_rosstatLoad()).map(y => +y).sort();
 }
 
 // Автоопределение отрасли для распознанного эмитента отчёта: ищем
