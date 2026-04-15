@@ -2931,9 +2931,103 @@ async function indResetSeed(){
   await indRender();
 }
 
-function indBuildMedians(){
-  // Будет реализовано следующим коммитом (краулер + расчёт p25/p50/p75).
-  alert('🧮 Расчёт медиан через ГИР БО — в следующем коммите.\n\nСейчас страница позволяет вести базу ИНН по отраслям; сам расчёт добавлю отдельно, чтобы проще было тестировать и откатывать.');
+// Перцентиль по отсортированному по возрастанию массиву (линейная
+// интерполяция между соседними значениями). q ∈ [0,1].
+function _percentile(sortedArr, q){
+  if(!sortedArr.length) return null;
+  const idx = (sortedArr.length - 1) * q;
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if(lo === hi) return sortedArr[lo];
+  return sortedArr[lo] + (sortedArr[hi] - sortedArr[lo]) * (idx - lo);
+}
+
+// Обход всех ИНН в базе отраслей через ГИР БО прокси, группировка по
+// отраслям и (год × показатель), расчёт p25/p50/p75/n. Результат
+// записывается в bondan_industry_medians и отображается в матрицах.
+async function indBuildMedians(){
+  await _indLoad();
+  const data = window._industryData;
+  if(!data || !data.industries){ alert('База отраслей пуста'); return; }
+  const statusEl = document.getElementById('ind-status');
+  const status = (msg, color) => {
+    if(!statusEl) return;
+    statusEl.style.display = 'block';
+    statusEl.style.color = color || 'var(--text2)';
+    statusEl.innerHTML = msg;
+  };
+  const totalInns = Object.values(data.industries).reduce((a, ind) => a + (ind.peers||[]).length, 0);
+  if(!totalInns){ alert('Во всех отраслях пусто. Добавьте хотя бы несколько ИНН.'); return; }
+  const estMin = Math.max(1, Math.round(totalInns * 8 / 60));
+  if(!confirm(`🧮 Построить медианы по ${totalInns} компаниям?\n\nНа каждый ИНН — до 3 запросов к ГИР БО через прокси (${_girboProxyBase()}). Ориентировочно ${estMin}–${estMin*2} минут. По ходу будет показан прогресс; ошибочные ИНН пропустим.`)) return;
+
+  // Накопитель: byIndustry[ind][period][fid] = [числа со всех peer'ов]
+  const byIndustry = {};
+  const errors = [];
+  let done = 0;
+  const t0 = Date.now();
+
+  for(const [indKey, ind] of Object.entries(data.industries)){
+    byIndustry[indKey] = {};
+    for(const peer of (ind.peers || [])){
+      done++;
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+      status(`⏳ ${done}/${totalInns} · ${elapsed}с · <strong>${ind.label}</strong>: ${peer.name || peer.inn}…`, 'var(--warn)');
+      try {
+        const result = await fetchGirboByInn(peer.inn, 5);
+        for(const [period, vals] of Object.entries(result.series || {})){
+          byIndustry[indKey][period] = byIndustry[indKey][period] || {};
+          for(const [fid, v] of Object.entries(vals)){
+            if(typeof v === 'number' && isFinite(v)){
+              byIndustry[indKey][period][fid] = byIndustry[indKey][period][fid] || [];
+              byIndustry[indKey][period][fid].push(v);
+            }
+          }
+        }
+      } catch(e){
+        errors.push({inn: peer.inn, name: peer.name || '?', err: e.message});
+      }
+    }
+  }
+
+  // Расчёт перцентилей. Пропускаем серии из <2 значений — они
+  // некорректны как медиана.
+  const medians = {};
+  for(const [indKey, periods] of Object.entries(byIndustry)){
+    medians[indKey] = {};
+    for(const [period, fields] of Object.entries(periods)){
+      medians[indKey][period] = {};
+      for(const [fid, arr] of Object.entries(fields)){
+        if(arr.length < 2) continue;
+        const s = [...arr].sort((a,b) => a - b);
+        medians[indKey][period][fid] = {
+          p25: _percentile(s, 0.25),
+          p50: _percentile(s, 0.50),
+          p75: _percentile(s, 0.75),
+          n: s.length,
+          min: s[0], max: s[s.length - 1]
+        };
+      }
+    }
+  }
+  window._industryMedians = medians;
+  try { localStorage.setItem('bondan_industry_medians', JSON.stringify(medians)); } catch(e){}
+  const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
+  const errSummary = errors.length
+    ? `<br><span style="color:var(--warn)">⚠ ${errors.length} ошибок, примеры: ${errors.slice(0,3).map(e => `${e.inn} (${e.err.slice(0,40)})`).join('; ')}${errors.length>3?'…':''}</span>`
+    : '';
+  const filled = Object.entries(medians).filter(([k,v]) => Object.keys(v).length).length;
+  status(`✅ Готово за ${elapsed}с. Отраслей с данными: ${filled}/${Object.keys(medians).length}. ${errSummary}`, 'var(--green)');
+  indRender();
+}
+
+// Автоопределение отрасли для распознанного эмитента отчёта: ищем
+// его ИНН среди peer'ов всех отраслей. Возвращает industryKey или null.
+function _industryKeyForInn(inn){
+  if(!inn || !window._industryData?.industries) return null;
+  for(const [key, ind] of Object.entries(window._industryData.industries)){
+    if((ind.peers || []).some(p => String(p.inn) === String(inn))) return key;
+  }
+  return null;
 }
 
 // ── Авто-подбор эталона по ИНН и периоду ─────────────────────────────
@@ -6796,11 +6890,19 @@ function repRenderRefResult(){
       return;
     }
     const fmtNum = v => v == null ? '—' : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1));
+    // Отраслевые медианы — если в базе отраслей есть ИНН эмитента,
+    // подтягиваем медиану по его отрасли для самого свежего периода.
+    const indKey = _industryKeyForInn(meta.inn);
+    const indMed = indKey && window._industryMedians?.[indKey] || null;
+    const indLabel = indKey ? (window._industryData?.industries?.[indKey]?.label || indKey) : null;
+    const newestPeriod = periods[periods.length - 1];
+    const hasIndCol = !!(indMed && indMed[newestPeriod]);
     const headRow = `<div style="display:contents">
       <div style="padding:4px 6px;font-weight:600;color:var(--text)">Показатель</div>
       ${periods.map(p => `<div style="padding:4px 4px;text-align:right;font-size:.55rem;color:var(--text3);font-variant-numeric:tabular-nums">${p}</div>`).join('')}
       <div style="padding:4px 4px;text-align:center;color:var(--text3);font-size:.55rem">тренд</div>
       <div style="padding:4px 4px;text-align:right;font-size:.55rem;color:var(--text3)">в форме</div>
+      ${hasIndCol ? `<div style="padding:4px 4px;text-align:right;font-size:.55rem;color:var(--text3)" title="Медиана по отрасли «${indLabel}» за ${newestPeriod}">отрасль p50</div>` : ''}
     </div>`;
     let okN = 0, knownN = 0;
     const dataRows = rows.map(fid => {
@@ -6828,21 +6930,41 @@ function repRenderRefResult(){
       }).join('');
       const sparkBtn = `<div style="padding:3px 4px;text-align:center;cursor:pointer" onclick="refOpenChart('${fid}')" title="Открыть полный график">${_sparkline(vals)}</div>`;
       const formCell = `<div style="padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums;font-size:.6rem;color:${clr}">${haveForm ? fmtNum(formV) + ' ' + ico : '<span style="color:var(--text3)">—</span>'}</div>`;
+      // Отраслевая ячейка: медиана + %-отклонение «в форме» от p50.
+      let indCell = '';
+      if(hasIndCol){
+        const cell = indMed[newestPeriod][fid];
+        if(cell){
+          let rel = '';
+          if(haveForm && cell.p50){
+            const d = (formV - cell.p50) / Math.abs(cell.p50) * 100;
+            rel = ` <span style="color:${d >= 0 ? 'var(--green)' : 'var(--danger)'};font-size:.5rem">${d >= 0 ? '+' : ''}${d.toFixed(0)}%</span>`;
+          }
+          indCell = `<div style="padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums;font-size:.6rem;color:var(--text2)" title="p25=${fmtNum(cell.p25)} · p50=${fmtNum(cell.p50)} · p75=${fmtNum(cell.p75)} · n=${cell.n}">${fmtNum(cell.p50)}${rel}</div>`;
+        } else {
+          indCell = `<div style="padding:3px 4px;text-align:right;color:var(--text3);font-size:.6rem">—</div>`;
+        }
+      }
       return `<div style="display:contents">
         <div style="padding:3px 6px;color:var(--text2);font-size:.6rem">${_REF_LABELS[fid] || fid}</div>
-        ${cells}${sparkBtn}${formCell}
+        ${cells}${sparkBtn}${formCell}${indCell}
       </div>`;
     }).join('');
     const okBadge = scopeMismatch ? '' :
       `<span style="color:${okN === knownN && knownN ? 'var(--green)' : 'var(--warn)'}">Точность сейчас: ${okN}/${knownN}</span>`;
+    const indBadge = hasIndCol
+      ? ` <span style="color:var(--text3)">· 🏭 ${indLabel} (n=${indMed[newestPeriod] && Object.values(indMed[newestPeriod])[0]?.n || '?'})</span>`
+      : (indKey ? ` <span style="color:var(--text3)">· 🏭 ${indLabel} (медианы не рассчитаны)</span>` : '');
+    const gridCols = `minmax(110px,1.2fr) repeat(${cols},minmax(60px,1fr)) 70px minmax(80px,1fr)${hasIndCol ? ' minmax(80px,1fr)' : ''}`;
+    const minW = 360 + cols*64 + (hasIndCol ? 80 : 0);
     box.innerHTML = `
-      <div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>
+      <div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}${indBadge}</div>
       ${warning}
-      <div style="overflow:auto"><div style="display:grid;grid-template-columns:minmax(110px,1.2fr) repeat(${cols},minmax(60px,1fr)) 70px minmax(80px,1fr);gap:1px;background:var(--border);border:1px solid var(--border);font-size:.6rem;min-width:${360 + cols*64}px">
+      <div style="overflow:auto"><div style="display:grid;grid-template-columns:${gridCols};gap:1px;background:var(--border);border:1px solid var(--border);font-size:.6rem;min-width:${minW}px">
         ${headRow}
         ${dataRows}
       </div></div>
-      <div style="margin-top:6px;font-size:.52rem;color:var(--text3)">Клик по тренду → крупный график. Колонка «в форме» — что сейчас введено на форме (после распознавания).</div>
+      <div style="margin-top:6px;font-size:.52rem;color:var(--text3)">Клик по тренду → крупный график. «в форме» — что сейчас распознано. ${hasIndCol ? '«отрасль p50» — медиана по отрасли (hover → p25/p75/n). Цветной % — отклонение «в форме» от медианы отрасли.' : ''}</div>
     `;
     // Сохраняем series в DOM-памяти кнопок графика.
     window._refChartData = {series, periods, ref};
@@ -9517,14 +9639,41 @@ function _syncCloudStatus(msg, color){
   el.textContent = msg;
 }
 
+// Применить industry-часть полученного снапшота (используется в трёх
+// ветвях загрузки: Gist, cloud (шифрованный blob), offline-код / файл).
+function _applyIndustryFromSnapshot(d){
+  if(d.industryPeers && typeof d.industryPeers === 'object'){
+    try {
+      localStorage.setItem('bondan_industry_peers', JSON.stringify(d.industryPeers));
+      window._industryData = null; // перечитаем при следующем indRender
+    } catch(e){}
+  }
+  if(d.industryMedians && typeof d.industryMedians === 'object'){
+    try {
+      localStorage.setItem('bondan_industry_medians', JSON.stringify(d.industryMedians));
+      window._industryMedians = d.industryMedians;
+    } catch(e){}
+  }
+  if(d.girboProxy){
+    try { localStorage.setItem('bondan_girbo_proxy', d.girboProxy); } catch(e){}
+    const el = document.getElementById('girbo-proxy');
+    if(el) el.value = d.girboProxy;
+  }
+}
+
 function _syncBuildSnapshot(){
-  let refs = [];
+  let refs = [], industryPeers = null, industryMedians = null;
   try { refs = JSON.parse(localStorage.getItem('bondan_refs') || '[]'); } catch(e){}
+  try { industryPeers = JSON.parse(localStorage.getItem('bondan_industry_peers') || 'null'); } catch(e){}
+  try { industryMedians = JSON.parse(localStorage.getItem('bondan_industry_medians') || 'null'); } catch(e){}
   return {
     ytmBonds, portfolio, watchlists, calEvents, reportsDB,
     refs,
+    industryPeers,
+    industryMedians,
+    girboProxy: localStorage.getItem('bondan_girbo_proxy') || '',
     apiKey: localStorage.getItem('ba_apikey') || '',
-    meta: {schemaVersion: 3},
+    meta: {schemaVersion: 4},
     savedAt: new Date().toISOString()
   };
 }
@@ -9630,6 +9779,7 @@ async function syncCloudLoad(){
       const apiInput = document.getElementById('api-key-input');
       if(apiInput) apiInput.value = d.apiKey;
     }
+    _applyIndustryFromSnapshot(d);
     save();
     try { localStorage.setItem('ba_sync_code', code); } catch(e){}
     renderYtm(); renderPort(); renderSbLists();
@@ -9752,6 +9902,7 @@ async function _offlineApplySnapshot(d, source){
     const apiInput = document.getElementById('api-key-input');
     if(apiInput) apiInput.value = d.apiKey;
   }
+  _applyIndustryFromSnapshot(d);
   save();
   renderYtm(); renderPort(); renderSbLists();
   document.getElementById('sb-pc').textContent = portfolio.length;
@@ -9963,6 +10114,7 @@ async function gistLoad() {
       const apiInput = document.getElementById('api-key-input');
       if(apiInput) apiInput.value = d.apiKey;
     }
+    _applyIndustryFromSnapshot(d);
     save();
 
     renderYtm(); renderPort(); renderSbLists();
