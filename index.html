@@ -7242,6 +7242,7 @@ function repRenderRefResult(){
         ${dataRows}
       </div></div>
       <div style="margin-top:6px;font-size:.52rem;color:var(--text3)">Клик по тренду → крупный график. «в форме» — что сейчас распознано. ${hasIndCol ? '«отрасль p50» — медиана по отрасли (hover → p25/p75/n). Цветной % — отклонение «в форме» от медианы отрасли.' : ''}</div>
+      ${_rosstatCompareBlock(meta, newestPeriod)}
     `;
     // Сохраняем series в DOM-памяти кнопок графика.
     window._refChartData = {series, periods, ref};
@@ -7263,8 +7264,86 @@ function repRenderRefResult(){
   const totalKnown = diffs.filter(d => d.status !== 'missing').length;
   const okBadge = scopeMismatch ? '' :
     `<span style="color:${okCount === totalKnown ? 'var(--green)' : 'var(--warn)'}">Точность: ${okCount}/${totalKnown}</span>`;
-  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>${warning}${rowsHtml}`;
+  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>${warning}${rowsHtml}${_rosstatCompareBlock(meta, ref.period)}`;
   window._refChartData = null;
+}
+
+// Блок сравнения ROS/ROA эмитента со среднеотраслевыми данными ФНС.
+// Показывается только если (a) эмитент определён по ИНН в какой-то
+// отрасли, (b) для этой отрасли есть мэппинг на строку ФНС, (c) для
+// года `period` данные ФНС загружены. Иначе возвращает пустую строку.
+function _rosstatCompareBlock(meta, period){
+  if(!meta || !meta.inn) return '';
+  const indKey = _industryKeyForInn(meta.inn);
+  if(!indKey) return '';
+  // Вытаскиваем год из подписи периода — первая 4-значная цифра 19xx/20xx.
+  const ym = String(period || '').match(/(19\d{2}|20\d{2})/);
+  if(!ym) return '';
+  const year = +ym[1];
+  const hit = rosstatLookup(indKey, year);
+  if(!hit) return '';
+  // Значения эмитента — из текущей формы РасБух-блока.
+  const num = id => {
+    const v = parseFloat(document.getElementById(id)?.value);
+    return isNaN(v) ? null : v;
+  };
+  const rev = num('rep-np-rev');
+  const ebit = num('rep-np-ebit');
+  const ebitda = num('rep-np-ebitda');
+  const np = num('rep-np-np');
+  const assets = num('rep-np-assets');
+  // ROS = прибыль от продаж (EBIT) / Выручка. Если EBIT не распознан —
+  // пробуем ЧП, это ближе всего к «прибыли до налогов и процентов»
+  // в рамках простой формы ФНС (у них тоже грубый знаменатель).
+  const rosSrc = ebit != null ? 'EBIT' : (np != null ? 'ЧП' : null);
+  const rosNum = ebit != null ? ebit : (np != null ? np : null);
+  const rosEmit = (rosNum != null && rev && rev !== 0) ? (rosNum / rev * 100) : null;
+  const roaEmit = (np != null && assets && assets !== 0) ? (np / assets * 100) : null;
+  if(rosEmit == null && roaEmit == null) return '';
+
+  const indLabel = window._industryData?.industries?.[indKey]?.label || indKey;
+  const fmt = v => v == null ? '—' : v.toFixed(1) + '%';
+  const fmtRef = (val, neg) => {
+    if(neg && val == null) return '<span style="color:var(--danger)">&lt;0</span>';
+    return val == null ? '—' : val.toFixed(1) + '%';
+  };
+  const deltaCell = (emit, ref) => {
+    if(emit == null || ref == null || ref === 0) return '<span style="color:var(--text3)">—</span>';
+    const d = emit - ref;
+    const pp = (d >= 0 ? '+' : '') + d.toFixed(1) + ' п.п.';
+    const clr = Math.abs(d) < 2 ? 'var(--green)' : (Math.abs(d) < 10 ? 'var(--warn)' : 'var(--danger)');
+    return `<span style="color:${clr}">${pp}</span>`;
+  };
+
+  return `
+    <div style="margin-top:10px;padding:8px 10px;background:var(--s2);border:1px solid var(--border);font-size:.6rem">
+      <div style="color:var(--text3);font-size:.55rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">
+        🇷🇺 сравнение с фнс/росстат · отрасль «${indLabel}» · ${year} г.
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(60px,auto) repeat(3,minmax(70px,1fr)) minmax(100px,2fr);gap:1px;background:var(--border);border:1px solid var(--border);font-variant-numeric:tabular-nums">
+        <div style="padding:3px 6px;background:var(--bg);color:var(--text3);font-size:.52rem">Пок-ль</div>
+        <div style="padding:3px 6px;background:var(--bg);color:var(--text3);font-size:.52rem;text-align:right">эмитент</div>
+        <div style="padding:3px 6px;background:var(--bg);color:var(--text3);font-size:.52rem;text-align:right">ФНС ${year}</div>
+        <div style="padding:3px 6px;background:var(--bg);color:var(--text3);font-size:.52rem;text-align:right">Δ</div>
+        <div style="padding:3px 6px;background:var(--bg);color:var(--text3);font-size:.52rem">строка ФНС</div>
+
+        <div style="padding:3px 6px;background:var(--s1);color:var(--text2)" title="ROS = ${rosSrc || '—'} / Выручка · 100%">ROS</div>
+        <div style="padding:3px 6px;background:var(--s1);text-align:right">${rosEmit == null ? '—' : fmt(rosEmit)}${rosSrc && rosSrc !== 'EBIT' ? ` <span style="color:var(--text3);font-size:.5rem">(из ${rosSrc})</span>` : ''}</div>
+        <div style="padding:3px 6px;background:var(--s1);text-align:right">${fmtRef(hit.ros, hit.rosNeg)}</div>
+        <div style="padding:3px 6px;background:var(--s1);text-align:right">${deltaCell(rosEmit, hit.ros)}</div>
+        <div style="padding:3px 6px;background:var(--s1);color:var(--text3);font-size:.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${hit.matchedName || hit.name}">${hit.matchedName || hit.name}</div>
+
+        <div style="padding:3px 6px;background:var(--s1);color:var(--text2)" title="ROA = ЧП / Активы · 100%">ROA</div>
+        <div style="padding:3px 6px;background:var(--s1);text-align:right">${roaEmit == null ? '—' : fmt(roaEmit)}</div>
+        <div style="padding:3px 6px;background:var(--s1);text-align:right">${fmtRef(hit.roa, hit.roaNeg)}</div>
+        <div style="padding:3px 6px;background:var(--s1);text-align:right">${deltaCell(roaEmit, hit.roa)}</div>
+        <div style="padding:3px 6px;background:var(--s1);color:var(--text3);font-size:.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${hit.matchedName || hit.name}">${hit.matchedName || hit.name}</div>
+      </div>
+      <div style="margin-top:4px;font-size:.5rem;color:var(--text3);line-height:1.4">
+        Источник: ФНС, Приложение № 4 к Приказу ММ-3-06/333@, данные Росстата по крупным и средним организациям. Зелёный = в пределах ±2 п.п. от средней, жёлтый = ±2…±10, красный = &gt;10.
+      </div>
+    </div>
+  `;
 }
 
 // ── Крупный график показателя по годам ──
