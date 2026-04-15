@@ -1626,6 +1626,17 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
+<!-- Крупный график показателя по периодам — открывается из матрицы сверки -->
+<div class="modal-overlay" id="modal-ref-chart">
+  <div class="modal" style="width:840px;max-width:96vw">
+    <div class="modal-hdr">📈 <span id="ref-chart-title">График</span> <button class="modal-x" onclick="closeModal('modal-ref-chart')">✕</button></div>
+    <div class="modal-body">
+      <div id="ref-chart-svg" style="overflow:auto"></div>
+      <div style="font-size:.55rem;color:var(--text3);margin-top:8px;text-align:center">Источник: эталоны + reportsDB. Чем больше периодов накоплено, тем точнее динамика.</div>
+    </div>
+  </div>
+</div>
+
 <!-- QR popup для кода синхронизации -->
 <div id="sync-qr-popup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;cursor:pointer" onclick="this.style.display='none'">
   <div style="background:#fff;padding:18px;border-radius:10px;text-align:center;max-width:94vw">
@@ -2355,10 +2366,18 @@ const _GIRBO_FIELD_MAP = {
 // null — если формат не распознан.
 function normaliseReference(raw){
   if(!raw || typeof raw !== 'object') return null;
-  // Наш формат.
-  if(typeof raw.schema === 'string' && raw.schema.startsWith('bondan/ref') && raw.values){
+  // Наш формат — поддерживает либо `values` (одноразовый), либо
+  // `series` (мульти-период), либо оба.
+  if(typeof raw.schema === 'string' && raw.schema.startsWith('bondan/ref') && (raw.values || raw.series)){
+    let series = raw.series && typeof raw.series === 'object' ? {...raw.series} : null;
+    if(raw.values && raw.period){
+      const lbl = _periodLabel(raw.period.match?.(/(\d{4})/)?.[1] || raw.period, raw.period);
+      series = series || {};
+      if(!series[lbl]) series[lbl] = raw.values;
+    }
     return {
-      values: raw.values,
+      values: raw.values || (series ? series[Object.keys(series).sort((a,b)=>_periodSortKey(b)-_periodSortKey(a))[0]] : null),
+      series,
       standard: raw.standard || null,
       scope: raw.scope || null,
       company: raw.company || null,
@@ -2382,13 +2401,16 @@ function normaliseReference(raw){
       }
       if(any) values[fid] = sum / 1e6; // тыс ₽ → млрд ₽
     }
+    const period = raw.period || raw.year || null;
+    const series = period ? {[_periodLabel(period, 'FY')]: values} : null;
     return {
       values,
+      series,
       standard: 'РСБУ',
       scope: 'standalone',
       company: raw.organisationName || raw.name || raw.shortName || null,
       inn: raw.inn || raw.organisationInn || null,
-      period: raw.period || raw.year || null,
+      period,
       source: 'ГИР БО',
       unit: 'млрд ₽',
       format: 'girbo'
@@ -2402,6 +2424,103 @@ function normaliseReference(raw){
 //   warn    — расхождение 2%..10%
 //   err     — расхождение > 10%
 //   missing — поле в форме не заполнено
+// Маппинг короткие_имена_reportsDB → ID полей формы (rep-np-*).
+// reportsDB.periods[*] хранит данные с короткими ключами {rev, ebitda,
+// np, ebit, ...}, а наши эталоны и сравнение — с длинными `rep-np-*`.
+const _REPORTS_FIELD_MAP = {
+  rev: 'rep-np-rev', ebitda: 'rep-np-ebitda', np: 'rep-np-np',
+  ebit: 'rep-np-ebit', int: 'rep-np-int',
+  assets: 'rep-np-assets', eq: 'rep-np-eq', debt: 'rep-np-debt',
+  cash: 'rep-np-cash', ca: 'rep-np-ca', cl: 'rep-np-cl',
+  ret: 'rep-np-ret'
+};
+
+// Нормализованный ярлык периода: «FY 2024», «H1 2025», «9M 2024».
+function _periodLabel(year, period){
+  if(!year) return String(period || '');
+  const p = String(period || '').toUpperCase();
+  if(!p || p === 'FY' || /год|year|annual/i.test(p)) return 'FY ' + year;
+  if(/h1|полугод|6\s*мес|30\.06/i.test(p)) return 'H1 ' + year;
+  if(/9м|9m|30\.09|9\s*мес/i.test(p)) return '9M ' + year;
+  if(/q1|3\s*мес|31\.03/i.test(p)) return 'Q1 ' + year;
+  if(/q3|30\.09/i.test(p)) return '9M ' + year;
+  return p + ' ' + year;
+}
+
+// Парсит ярлык в число для сортировки (старше → меньше).
+function _periodSortKey(label){
+  const m = String(label || '').match(/(\d{4})/);
+  const y = m ? parseInt(m[1], 10) : 0;
+  let kind = 0;
+  if(/^Q1\b/i.test(label))      kind = 0.25;
+  else if(/^H1\b/i.test(label)) kind = 0.50;
+  else if(/^9M\b/i.test(label)) kind = 0.75;
+  else                          kind = 1.00; // FY
+  return y + kind;
+}
+
+// Собирает многопериодную series из reportsDB по совпадению с
+// распознанным эмитентом отчёта. Cравнение по orgName (включает),
+// в обе стороны — потому что строка эмитента в отчёте часто длиннее
+// (с орг-формой и кавычками), чем в reportsDB.
+function _seriesFromReportsDB(meta){
+  if(!meta || !meta.orgName || typeof reportsDB !== 'object') return null;
+  const myName = String(meta.orgName).toLowerCase().replace(/[«»"„'()]/g,' ').replace(/\s+/g,' ').trim();
+  const myCore = myName.replace(/^(пао|ао|ооо|зао|оао|нао)\s+/i,'').trim();
+  const issuers = Object.values(reportsDB);
+  const target = issuers.find(iss => {
+    if(!iss || !iss.name) return false;
+    const nm = String(iss.name).toLowerCase().replace(/[«»"„'()]/g,' ').replace(/\s+/g,' ').trim();
+    if(!nm) return false;
+    return nm.includes(myCore) || myCore.includes(nm)
+        || nm.includes(myName) || myName.includes(nm);
+  });
+  if(!target || !target.periods) return null;
+  const series = {};
+  for(const data of Object.values(target.periods)){
+    if(!data) continue;
+    const label = _periodLabel(data.year, data.period);
+    const v = {};
+    for(const [src, dst] of Object.entries(_REPORTS_FIELD_MAP)){
+      if(typeof data[src] === 'number') v[dst] = data[src];
+    }
+    if(Object.keys(v).length) series[label] = v;
+  }
+  return Object.keys(series).length ? series : null;
+}
+
+// Объединяет две series по полям; cur (более свежая запись)
+// перезаписывает совпадающие периоды.
+function _mergeSeries(base, cur){
+  if(!base && !cur) return null;
+  const out = {};
+  for(const k of Object.keys(base || {})) out[k] = {...base[k]};
+  for(const k of Object.keys(cur || {}))  out[k] = {...(out[k] || {}), ...cur[k]};
+  return Object.keys(out).length ? out : null;
+}
+
+// Простой SVG-sparkline по массиву чисел/null. width × height в px.
+function _sparkline(values, opts={}){
+  const w = opts.w || 64, h = opts.h || 18;
+  const valid = values.map((v,i) => typeof v === 'number' ? {v, i} : null).filter(Boolean);
+  if(valid.length < 2) return '<span style="color:var(--text3);font-size:.55rem">—</span>';
+  const min = Math.min(...valid.map(o => o.v));
+  const max = Math.max(...valid.map(o => o.v));
+  const range = max - min || Math.abs(max) || 1;
+  const pad = 2;
+  const innerW = w - pad*2, innerH = h - pad*2;
+  const xOf = i => pad + (values.length === 1 ? innerW/2 : (i / (values.length - 1)) * innerW);
+  const yOf = v => pad + (1 - (v - min) / range) * innerH;
+  const path = valid.map((o, k) => (k===0?'M':'L') + xOf(o.i).toFixed(1) + ',' + yOf(o.v).toFixed(1)).join(' ');
+  const last = valid[valid.length - 1];
+  const lastUp = valid.length >= 2 && last.v >= valid[valid.length - 2].v;
+  const colour = lastUp ? 'var(--green)' : 'var(--danger)';
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="vertical-align:middle;display:inline-block">
+    <path d="${path}" fill="none" stroke="${colour}" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${xOf(last.i).toFixed(1)}" cy="${yOf(last.v).toFixed(1)}" r="1.6" fill="${colour}"/>
+  </svg>`;
+}
+
 function repCompareReference(ref){
   if(!ref || !ref.values) return [];
   const res = [];
@@ -6058,17 +6177,24 @@ function repExportCurrentAsRef(){
     return;
   }
   const meta = window._reportMeta || {};
+  const periodRaw = document.getElementById('rep-np-year')?.value || '';
+  const periodLabel = _periodLabel(periodRaw.match?.(/(\d{4})/)?.[1] || periodRaw, periodRaw);
+  // Если в текущем эталоне (или подтянутой истории) уже есть series —
+  // мёрджим её и добавляем/перезаписываем текущий период.
+  const existing = window._reportReference?.series || null;
+  const series = _mergeSeries(existing, {[periodLabel]: values}) || {[periodLabel]: values};
   const ref = {
     schema: 'bondan/ref/v1',
     company: meta.orgName || '',
     inn: meta.inn || '',
     standard: meta.standard || '',
     scope: meta.scope || '',
-    period: document.getElementById('rep-np-year')?.value || '',
+    period: periodRaw,
     unit: 'млрд ₽',
     source: 'manual export',
-    note: 'Экспортировано из БондАналитик. Используйте для регрессионного теста парсера.',
-    values
+    note: 'Экспортировано из БондАналитик. Содержит весь накопленный ряд периодов.',
+    values,
+    series
   };
   const blob = new Blob([JSON.stringify(ref, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
@@ -6169,6 +6295,19 @@ function repImportAllRefs(input){
   input.value = '';
 }
 
+// Краткие подписи показателей — одни и те же для матрицы и графика.
+const _REF_LABELS = {
+  'rep-np-rev':'Выручка','rep-np-ebitda':'EBITDA','rep-np-ebit':'EBIT',
+  'rep-np-np':'ЧП','rep-np-int':'Проценты','rep-np-assets':'Активы',
+  'rep-np-ca':'Обор. активы','rep-np-cl':'Кр. обяз.','rep-np-debt':'Долг',
+  'rep-np-cash':'ДС','rep-np-ret':'Нераспр.','rep-np-eq':'Капитал'
+};
+const _REF_FIDS_ORDER = [
+  'rep-np-rev','rep-np-ebitda','rep-np-ebit','rep-np-np','rep-np-int',
+  'rep-np-assets','rep-np-ca','rep-np-cl','rep-np-debt','rep-np-cash',
+  'rep-np-ret','rep-np-eq'
+];
+
 function repRenderRefResult(){
   const box = document.getElementById('rep-np-ref-result');
   const wrap = document.getElementById('rep-np-ref-wrap');
@@ -6177,27 +6316,102 @@ function repRenderRefResult(){
   const ref = window._reportReference;
   if(!ref){ box.innerHTML = ''; return; }
   const meta = window._reportMeta || {};
-  const diffs = repCompareReference(ref);
 
-  // Проверка совместимости scope: МСФО-группа vs РСБУ-standalone.
+  // Совместимость scope (МСФО-группа vs РСБУ-standalone).
   let warning = '';
   const scopeMismatch = meta.scope && ref.scope && meta.scope !== ref.scope;
   if(scopeMismatch){
-    warning = `<div style="color:var(--warn);padding:5px 8px;background:rgba(250,200,80,.08);border-left:2px solid var(--warn);margin-bottom:6px;font-size:.6rem;line-height:1.5">⚠️ <strong>НЕ прямое сравнение.</strong> Эталон — ${ref.scope === 'standalone' ? '<strong>РСБУ юрлица</strong>' : '<strong>МСФО группы</strong>'} (${ref.source || '?'}), а загруженный отчёт — <strong>${meta.scope === 'group' ? 'МСФО группы' : 'РСБУ юрлица'}</strong>. Цифры заведомо разного масштаба (standalone-выручка часто в разы/порядки меньше консолидированной). Показываю расхождения справочно — красный не означает ошибку парсера.</div>`;
+    warning = `<div style="color:var(--warn);padding:5px 8px;background:rgba(250,200,80,.08);border-left:2px solid var(--warn);margin-bottom:6px;font-size:.6rem;line-height:1.5">⚠️ <strong>НЕ прямое сравнение.</strong> Эталон — ${ref.scope === 'standalone' ? '<strong>РСБУ юрлица</strong>' : '<strong>МСФО группы</strong>'}, отчёт — <strong>${meta.scope === 'group' ? 'МСФО группы' : 'РСБУ юрлица'}</strong>. Цифры заведомо разного масштаба, красный ≠ ошибка парсера.</div>`;
   } else if(ref.scope === 'standalone' && meta.scope === 'standalone'){
     warning = `<div style="color:var(--green);font-size:.58rem;margin-bottom:4px">✓ Однотипные отчёты — прямая сверка.</div>`;
   }
 
-  const labels = {
-    'rep-np-rev':'Выручка','rep-np-ebitda':'EBITDA','rep-np-ebit':'EBIT',
-    'rep-np-np':'ЧП','rep-np-int':'Проценты','rep-np-assets':'Активы',
-    'rep-np-ca':'Обор. активы','rep-np-cl':'Кр. обяз.','rep-np-debt':'Долг',
-    'rep-np-cash':'ДС','rep-np-ret':'Нераспр.','rep-np-eq':'Капитал'
-  };
+  const header = [
+    ref.source || '?',
+    ref.period || null,
+    ref.company || null,
+    ref.scope === 'group' ? 'группа' : (ref.scope === 'standalone' ? 'юрлицо' : null),
+    ref.standard
+  ].filter(Boolean).join(' · ');
+  const autoTag = ref._autoSource
+    ? ` <span style="color:var(--text3)">· 🤖 авто (${ref._autoSource})</span>`
+    : '';
+
+  const series = ref.series || (ref.values ? {[_periodLabel('—', ref.period||'')]: ref.values} : null);
+  const periods = series
+    ? Object.keys(series).sort((a, b) => _periodSortKey(a) - _periodSortKey(b))
+    : [];
+
+  // ── Матричный режим: ≥2 периодов ──
+  if(series && periods.length >= 2){
+    // Для каждого показателя — массив значений по периодам, sparkline,
+    // последний vs текущий из формы.
+    const cols = periods.length;
+    const rows = _REF_FIDS_ORDER.filter(fid => periods.some(p => typeof series[p]?.[fid] === 'number'));
+    if(!rows.length){
+      box.innerHTML = `<div style="color:var(--text3);font-size:.58rem">Эталон: ${header}.${autoTag}</div>${warning}<div style="font-size:.6rem;color:var(--text3);margin-top:4px">В эталоне нет числовых данных по показателям.</div>`;
+      return;
+    }
+    const fmtNum = v => v == null ? '—' : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1));
+    const headRow = `<div style="display:contents">
+      <div style="padding:4px 6px;font-weight:600;color:var(--text)">Показатель</div>
+      ${periods.map(p => `<div style="padding:4px 4px;text-align:right;font-size:.55rem;color:var(--text3);font-variant-numeric:tabular-nums">${p}</div>`).join('')}
+      <div style="padding:4px 4px;text-align:center;color:var(--text3);font-size:.55rem">тренд</div>
+      <div style="padding:4px 4px;text-align:right;font-size:.55rem;color:var(--text3)">в форме</div>
+    </div>`;
+    let okN = 0, knownN = 0;
+    const dataRows = rows.map(fid => {
+      const vals = periods.map(p => series[p]?.[fid]);
+      const cur  = vals[vals.length - 1];
+      const formV = parseFloat(document.getElementById(fid)?.value);
+      const haveForm = !isNaN(formV);
+      let status = 'missing', clr = 'var(--text3)';
+      if(haveForm && cur != null){
+        knownN++;
+        const rel = cur ? Math.abs(formV - cur) / Math.abs(cur) : 0;
+        status = rel <= 0.02 ? 'ok' : (rel <= 0.1 ? 'warn' : 'err');
+        clr = {ok:'var(--green)', warn:'var(--warn)', err:'var(--danger)'}[status];
+        if(status === 'ok') okN++;
+      }
+      const ico = {ok:'✅', warn:'⚠️', err:'🔴', missing:''}[status] || '';
+      const cells = vals.map((v, i) => {
+        const isLast = i === vals.length - 1;
+        const prev = i > 0 ? vals[i-1] : null;
+        const yoy = (typeof v === 'number' && typeof prev === 'number' && prev) ? ((v - prev) / Math.abs(prev) * 100) : null;
+        const yoyTag = yoy != null
+          ? ` <span style="color:${yoy >= 0 ? 'var(--green)' : 'var(--danger)'};font-size:.5rem">${yoy >= 0 ? '+' : ''}${yoy.toFixed(0)}%</span>`
+          : '';
+        return `<div style="padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums;font-size:.6rem;${isLast?'color:var(--text);font-weight:600':'color:var(--text2)'}">${fmtNum(v)}${yoyTag}</div>`;
+      }).join('');
+      const sparkBtn = `<div style="padding:3px 4px;text-align:center;cursor:pointer" onclick="refOpenChart('${fid}')" title="Открыть полный график">${_sparkline(vals)}</div>`;
+      const formCell = `<div style="padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums;font-size:.6rem;color:${clr}">${haveForm ? fmtNum(formV) + ' ' + ico : '<span style="color:var(--text3)">—</span>'}</div>`;
+      return `<div style="display:contents">
+        <div style="padding:3px 6px;color:var(--text2);font-size:.6rem">${_REF_LABELS[fid] || fid}</div>
+        ${cells}${sparkBtn}${formCell}
+      </div>`;
+    }).join('');
+    const okBadge = scopeMismatch ? '' :
+      `<span style="color:${okN === knownN && knownN ? 'var(--green)' : 'var(--warn)'}">Точность сейчас: ${okN}/${knownN}</span>`;
+    box.innerHTML = `
+      <div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>
+      ${warning}
+      <div style="overflow:auto"><div style="display:grid;grid-template-columns:minmax(110px,1.2fr) repeat(${cols},minmax(60px,1fr)) 70px minmax(80px,1fr);gap:1px;background:var(--border);border:1px solid var(--border);font-size:.6rem;min-width:${360 + cols*64}px">
+        ${headRow}
+        ${dataRows}
+      </div></div>
+      <div style="margin-top:6px;font-size:.52rem;color:var(--text3)">Клик по тренду → крупный график. Колонка «в форме» — что сейчас введено на форме (после распознавания).</div>
+    `;
+    // Сохраняем series в DOM-памяти кнопок графика.
+    window._refChartData = {series, periods, ref};
+    return;
+  }
+
+  // ── Одноразовый режим: показываем как раньше, плюс sparkline-плейсхолдер. ──
+  const diffs = repCompareReference(ref);
   const ico = {ok:'✅',warn:'⚠️',err:'🔴',missing:'⚫'};
   const clr = {ok:'var(--green)',warn:'var(--warn)',err:'var(--danger)',missing:'var(--text3)'};
-  const rows = diffs.map(d => {
-    const lbl = labels[d.fid] || d.fid;
+  const rowsHtml = diffs.map(d => {
+    const lbl = _REF_LABELS[d.fid] || d.fid;
     const dlt = d.status === 'missing'
       ? '— не заполнено в форме'
       : `${d.parsed} vs <strong>${d.expected}</strong>${d.rel != null ? ` (Δ ${(d.rel*100).toFixed(1)}%)` : ''}`;
@@ -6207,22 +6421,54 @@ function repRenderRefResult(){
   const totalKnown = diffs.filter(d => d.status !== 'missing').length;
   const okBadge = scopeMismatch ? '' :
     `<span style="color:${okCount === totalKnown ? 'var(--green)' : 'var(--warn)'}">Точность: ${okCount}/${totalKnown}</span>`;
+  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>${warning}${rowsHtml}`;
+  window._refChartData = null;
+}
 
-  const header = [
-    ref.source || '?',
-    ref.period || null,
-    ref.company || null,
-    ref.scope === 'group' ? 'группа' : (ref.scope === 'standalone' ? 'юрлицо' : null),
-    ref.standard
-  ].filter(Boolean).join(' · ');
-  // Заметка об автоподборе: если этот эталон пришёл из каталога /
-  // localStorage без ручного импорта — покажем маркер «🤖 авто» и
-  // источник (где был найден).
-  const autoTag = ref._autoSource
-    ? ` <span style="color:var(--text3)">· 🤖 авто (${ref._autoSource})</span>`
-    : '';
-
-  box.innerHTML = `<div style="color:var(--text3);margin-bottom:4px;font-size:.58rem">Эталон: ${header}.${autoTag} ${okBadge}</div>${warning}${rows}`;
+// ── Крупный график показателя по годам ──
+// Открывается кликом по sparkline в матрице. Использует данные,
+// сохранённые в window._refChartData при последнем рендере.
+function refOpenChart(fid){
+  const data = window._refChartData;
+  if(!data) return;
+  const {series, periods} = data;
+  const vals = periods.map(p => series[p]?.[fid]);
+  const valid = vals.map((v,i) => typeof v === 'number' ? {v, i} : null).filter(Boolean);
+  if(!valid.length){ alert('Нет данных по этому показателю'); return; }
+  const W = 760, H = 360, mLeft = 60, mRight = 12, mTop = 16, mBottom = 36;
+  const innerW = W - mLeft - mRight, innerH = H - mTop - mBottom;
+  const min = Math.min(...valid.map(o => o.v), 0);
+  const max = Math.max(...valid.map(o => o.v));
+  const range = max - min || Math.abs(max) || 1;
+  const xOf = i => mLeft + (vals.length === 1 ? innerW/2 : (i / (vals.length - 1)) * innerW);
+  const yOf = v => mTop + (1 - (v - min) / range) * innerH;
+  // Сетка по Y (5 линий).
+  const ticks = 5;
+  let yGrid = '', yLabels = '';
+  for(let k = 0; k <= ticks; k++){
+    const v = min + (k/ticks) * range;
+    const y = yOf(v);
+    yGrid += `<line x1="${mLeft}" y1="${y}" x2="${W-mRight}" y2="${y}" stroke="var(--border)" stroke-dasharray="2 2"/>`;
+    yLabels += `<text x="${mLeft - 6}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="var(--mono)">${(v >= 100 ? v.toFixed(0) : v.toFixed(1))}</text>`;
+  }
+  let xLabels = '';
+  vals.forEach((_, i) => {
+    xLabels += `<text x="${xOf(i)}" y="${H - mBottom + 18}" text-anchor="middle" font-size="10" fill="var(--text2)" font-family="var(--mono)">${periods[i]}</text>`;
+  });
+  const path = valid.map((o, k) => (k===0?'M':'L') + xOf(o.i).toFixed(1) + ',' + yOf(o.v).toFixed(1)).join(' ');
+  const dots = valid.map(o =>
+    `<circle cx="${xOf(o.i).toFixed(1)}" cy="${yOf(o.v).toFixed(1)}" r="3.5" fill="var(--acc)"/>` +
+    `<text x="${xOf(o.i).toFixed(1)}" y="${yOf(o.v).toFixed(1) - 8}" text-anchor="middle" font-size="10" fill="var(--text)" font-family="var(--mono)" font-weight="600">${o.v >= 100 ? o.v.toFixed(0) : o.v.toFixed(1)}</text>`
+  ).join('');
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block;margin:0 auto;background:var(--bg)">
+    ${yGrid}${yLabels}${xLabels}
+    <path d="${path}" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linejoin="round"/>
+    ${dots}
+  </svg>`;
+  const title = (_REF_LABELS[fid] || fid) + (data.ref?.unit ? ', ' + data.ref.unit : '');
+  document.getElementById('ref-chart-title').textContent = title;
+  document.getElementById('ref-chart-svg').innerHTML = svg;
+  document.getElementById('modal-ref-chart').classList.add('open');
 }
 function repCopyRawText(){
   const ta = document.getElementById('rep-np-raw-text');
@@ -8104,17 +8350,35 @@ function repFillFromText(rawText, scaleOverride){
   repRenderMeta(_meta);
   (async () => {
     await _ensureRefCatalogue();
+    let ref = null;
     if(!window._reportReference){
       const period = document.getElementById('rep-np-year')?.value;
       const cat = window._refCatalogue || {localEntries:[], repoEntries:[]};
       const found = _findRefFor(_meta, period);
       if(found){
-        const ref = normaliseReference(found) || found;
-        // Помечаем, откуда пришёл, чтобы отображать «🤖 авто (кэш/каталог)».
+        ref = normaliseReference(found) || found;
         ref._autoSource = cat.localEntries.includes(found) ? 'кэш' : 'каталог';
-        window._reportReference = ref;
+      }
+    } else {
+      ref = window._reportReference;
+    }
+    // Авто-мёрдж многолетней истории из reportsDB того же эмитента —
+    // даёт «график динамики» даже если внешнего эталона нет.
+    const histSeries = _seriesFromReportsDB(_meta);
+    if(histSeries){
+      if(!ref){
+        ref = {
+          values: null, series: histSeries,
+          standard: _meta.standard, scope: _meta.scope,
+          company: _meta.orgName, inn: _meta.inn, period: null,
+          source: 'reportsDB', unit: 'млрд ₽', format: 'reportsdb',
+          _autoSource: 'reportsDB'
+        };
+      } else {
+        ref.series = _mergeSeries(histSeries, ref.series);
       }
     }
+    if(ref) window._reportReference = ref;
     if(window._reportReference) repRenderRefResult();
   })();
   return filled;
