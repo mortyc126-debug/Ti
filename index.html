@@ -281,6 +281,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="nav-btn" onclick="showPage('issuer')">🏢 Эмитент</button>
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
     <button class="nav-btn" onclick="showPage('reports')">📂 Отчётность</button>
+    <button class="nav-btn" onclick="showPage('industries')">🏭 Отрасли</button>
   </nav>
   <div class="topbar-right">
     <span class="pulse-dot"></span>
@@ -302,6 +303,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="showPage('issuer');sbAct(this)"><span class="sb-icon">🏢</span>Анализ эмитента</div>
     <div class="sb-item" onclick="showPage('calendar');sbAct(this)"><span class="sb-icon">📅</span>Календарь событий<span class="sb-badge" id="sb-ev">0</span></div>
     <div class="sb-item" onclick="showPage('reports');sbAct(this)"><span class="sb-icon">📂</span>База отчётности<span class="sb-badge" id="sb-rep">0</span></div>
+    <div class="sb-item" onclick="showPage('industries');sbAct(this)"><span class="sb-icon">🏭</span>Отрасли / медианы<span class="sb-badge" id="sb-ind">0</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -1532,6 +1534,31 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
+<!-- ═══ Страница «🏭 Отрасли / медианы» ═══ -->
+<div class="page" id="page-industries">
+  <div class="card">
+    <div class="card-hdr">🏭 Отрасли и медианы</div>
+    <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
+      База компаний-аналогов по секторам — нужна для расчёта медиан (p25 / p50 / p75) по каждому показателю. Данные тянутся из ГИР БО по ИНН (только РСБУ standalone).
+      <br><span style="color:var(--text3)">Встроенный стартовый список — 20+ крупнейших публичных эмитентов. Добавляйте свои, чтобы покрыть отрасли ВДО. Ваши правки хранятся в localStorage и синхронизируются между устройствами (⚡ Sync).</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:0 4px">
+      <button class="btn btn-sm btn-p" onclick="indBuildMedians()" title="Для каждой отрасли обойти все ИНН через прокси ГИР БО, посчитать медианы за 5 лет и сохранить">🧮 Построить медианы</button>
+      <button class="btn btn-sm" onclick="indExportPeers()" title="Сохранить текущую базу отраслей как JSON">💾 Экспорт</button>
+      <input type="file" id="ind-import-file" accept=".json" style="display:none" onchange="indImportPeers(this)">
+      <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON">📥 Импорт</button>
+      <button class="btn btn-sm" onclick="indResetSeed()" title="Откатить к встроенному стартовому списку (удаляет ваши правки)">♻️ Сбросить</button>
+    </div>
+    <div id="ind-status" style="font-size:.6rem;padding:4px 8px;display:none;border:1px solid var(--border);margin-bottom:8px"></div>
+    <div id="ind-layout" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <!-- Левая колонка: список отраслей -->
+      <div id="ind-list" style="flex:0 0 220px;min-width:220px;max-height:520px;overflow-y:auto;border:1px solid var(--border);padding:4px;background:var(--s1)"></div>
+      <!-- Правая: выбранная отрасль -->
+      <div id="ind-detail" style="flex:1;min-width:260px;border:1px solid var(--border);padding:8px;background:var(--s1)"></div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1708,13 +1735,14 @@ function showPage(n){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','portfolio','watchlist','pnl','issuer','calendar','reports'].indexOf(n);
+  const idx=['ytm','portfolio','watchlist','pnl','issuer','calendar','reports','industries'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   if(n==='portfolio') renderPort();
   if(n==='watchlist') renderWL();
   if(n==='ytm') renderYtm();
   if(n==='calendar'){renderCalendar();updateCalStats();}
   if(n==='reports') repInit();
+  if(n==='industries') indRender();
 }
 function sbAct(el){document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));el.classList.add('active')}
 function swIssTab(t,el){
@@ -2659,6 +2687,253 @@ async function fetchGirboByInn(inn, maxYears = 5){
     count: Object.keys(series).length,
     errors
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// БАЗА ОТРАСЛЕЙ И МЕДИАНЫ (страница «🏭 Отрасли»)
+// ═══════════════════════════════════════════════════════════════════
+// Семантика:
+//   • references/industry-peers.json (коммитится в репо) — стартовый
+//     список отраслей и ИНН, которые я знаю точно (blue chips).
+//   • localStorage['bondan_industry_peers'] — правки пользователя:
+//     можно добавлять/удалять ИНН в любой отрасли, создавать новые
+//     отрасли. При загрузке приложения мёрджим с seed'ом (по ключам
+//     industry.key, peer.inn — локальные побеждают).
+//   • localStorage['bondan_industry_medians'] — результат расчёта
+//     (обновляется по нажатию «🧮 Построить медианы»). Храним в
+//     синхронизируемом снапшоте (попадает в sync-код / Gist).
+// Расчёт: для каждой отрасли обходим все ИНН через fetchGirboByInn,
+// собираем series по всем peer'ам, потом по каждому (год, показатель)
+// считаем p25 / p50 / p75.
+
+const _IND_SEED_URL = 'references/industry-peers.json';
+window._industryData = null;       // {industries: {key: {label, okved2, peers:[{inn,name}]}}}
+window._industryMedians = null;    // {industryKey: {year: {fid: {p25,p50,p75,n}}}}
+window._indActiveKey = null;
+
+async function _indLoad(){
+  if(window._industryData) return window._industryData;
+  // 1) seed
+  let seed = {industries:{}};
+  try {
+    const r = await fetch(_IND_SEED_URL, {cache:'no-store'});
+    if(r.ok) seed = await r.json();
+  } catch(e){}
+  // 2) пользовательские правки
+  let user = {industries:{}};
+  try {
+    const raw = localStorage.getItem('bondan_industry_peers');
+    if(raw) user = JSON.parse(raw);
+  } catch(e){}
+  // 3) мёрдж: отрасль из user полностью побеждает seed; если в user
+  // отрасли нет — берём seed-версию.
+  const merged = {industries: {}};
+  const allKeys = new Set([...Object.keys(seed.industries || {}), ...Object.keys(user.industries || {})]);
+  for(const k of allKeys){
+    merged.industries[k] = (user.industries && user.industries[k]) || seed.industries[k];
+  }
+  window._industryData = merged;
+  // Медианы — из localStorage (будут пересчитаны по кнопке).
+  try {
+    const m = localStorage.getItem('bondan_industry_medians');
+    if(m) window._industryMedians = JSON.parse(m);
+  } catch(e){}
+  return merged;
+}
+
+function _indSaveUser(){
+  // Сохраняем только пользовательские правки (весь merged-state —
+  // так его легко синхронизировать и откатить к seed).
+  try {
+    localStorage.setItem('bondan_industry_peers', JSON.stringify(window._industryData));
+  } catch(e){}
+}
+
+async function indRender(){
+  await _indLoad();
+  const data = window._industryData;
+  const listEl = document.getElementById('ind-list');
+  const detEl  = document.getElementById('ind-detail');
+  if(!listEl || !detEl) return;
+  // Список отраслей слева.
+  const keys = Object.keys(data.industries);
+  if(!window._indActiveKey || !data.industries[window._indActiveKey]){
+    window._indActiveKey = keys[0] || null;
+  }
+  listEl.innerHTML = keys.map(k => {
+    const ind = data.industries[k];
+    const n = (ind.peers || []).length;
+    const hasMed = window._industryMedians?.[k] ? ' 📊' : '';
+    const active = k === window._indActiveKey;
+    const bg = active ? 'background:var(--acc);color:#000' : '';
+    return `<div onclick="indSelect('${k}')" style="padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.65rem;${bg}">
+      ${ind.label}${hasMed} <span style="color:${active?'#000':'var(--text3)'};float:right">${n}</span>
+    </div>`;
+  }).join('') + `<div style="padding:8px;border-top:1px solid var(--border)"><button class="btn btn-sm" onclick="indAddIndustry()" style="width:100%">+ новая отрасль</button></div>`;
+
+  // Детализация выбранной отрасли справа.
+  const key = window._indActiveKey;
+  if(!key){ detEl.innerHTML = '<div style="color:var(--text3);padding:20px;text-align:center">Нет отраслей</div>'; return; }
+  const ind = data.industries[key];
+  const peers = ind.peers || [];
+  const okvedLabel = (ind.okved2 && ind.okved2.length) ? ` · ОКВЭД2: ${ind.okved2.join(', ')}` : '';
+  detEl.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <strong style="font-size:.8rem">${ind.label}</strong>
+      <span style="font-size:.55rem;color:var(--text3)">${okvedLabel}</span>
+      <button class="btn btn-sm" onclick="indEditIndustry('${key}')" style="margin-left:auto;padding:2px 8px;font-size:.55rem">✎</button>
+      <button class="btn btn-sm" onclick="indDeleteIndustry('${key}')" style="padding:2px 8px;font-size:.55rem" title="Удалить отрасль">✗</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input type="text" id="ind-add-inn" placeholder="ИНН (10 цифр)" style="width:130px;font-family:var(--mono);font-size:.7rem;padding:3px 6px">
+      <input type="text" id="ind-add-name" placeholder="Название (опционально)" style="flex:1;font-size:.7rem;padding:3px 6px">
+      <button class="btn btn-sm btn-p" onclick="indAddPeer('${key}')">+</button>
+    </div>
+    ${peers.length ? `
+      <div style="max-height:340px;overflow:auto;border:1px solid var(--border);font-size:.65rem">
+        ${peers.map((p, i) => `
+          <div style="display:flex;gap:6px;padding:4px 6px;border-bottom:1px solid var(--border);align-items:center">
+            <span style="font-family:var(--mono);color:var(--text3);min-width:92px">${p.inn || ''}</span>
+            <span style="flex:1;color:var(--text2);overflow:hidden;text-overflow:ellipsis">${p.name || ''}</span>
+            <button class="btn btn-sm" onclick="indRemovePeer('${key}',${i})" style="padding:1px 6px;font-size:.55rem">✗</button>
+          </div>`).join('')}
+      </div>
+    ` : '<div style="color:var(--text3);padding:16px;text-align:center;font-size:.65rem">Список пуст. Добавьте хотя бы 5-10 ИНН, чтобы медианы были осмысленны.</div>'}
+    ${_indMediansView(key)}
+  `;
+  const cnt = keys.reduce((a,k) => a + (data.industries[k].peers||[]).length, 0);
+  const bd = document.getElementById('sb-ind');
+  if(bd) bd.textContent = cnt;
+}
+
+function _indMediansView(key){
+  const med = window._industryMedians?.[key];
+  if(!med) return '<div style="color:var(--text3);font-size:.6rem;margin-top:10px">Медианы не рассчитаны. Нажмите «🧮 Построить медианы».</div>';
+  const years = Object.keys(med).sort((a,b) => _periodSortKey(a) - _periodSortKey(b));
+  const rows = _REF_FIDS_ORDER.filter(fid => years.some(y => med[y][fid]));
+  if(!rows.length) return '<div style="color:var(--warn);font-size:.6rem;margin-top:10px">Медианы пусты — либо ИНН не отвечают ГИР БО, либо прокси недоступен.</div>';
+  const fmt = v => v == null ? '—' : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1));
+  return `
+    <div style="margin-top:14px">
+      <div style="font-size:.58rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">медианы (p50) по годам</div>
+      <div style="overflow:auto"><table style="font-size:.6rem;border-collapse:collapse;width:100%;min-width:${160+years.length*90}px">
+        <tr style="color:var(--text3);background:var(--bg)"><th style="text-align:left;padding:4px 6px;border:1px solid var(--border)">Показатель</th>
+          ${years.map(y => `<th style="text-align:right;padding:4px 6px;border:1px solid var(--border)">${y}</th>`).join('')}
+        </tr>
+        ${rows.map(fid => `
+          <tr>
+            <td style="padding:3px 6px;border:1px solid var(--border);color:var(--text2)">${_REF_LABELS[fid]||fid}</td>
+            ${years.map(y => {
+              const cell = med[y][fid];
+              if(!cell) return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;color:var(--text3)">—</td>`;
+              return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums" title="p25=${fmt(cell.p25)} · p50=${fmt(cell.p50)} · p75=${fmt(cell.p75)} · n=${cell.n}">${fmt(cell.p50)}<span style="color:var(--text3);font-size:.55rem"> (n=${cell.n})</span></td>`;
+            }).join('')}
+          </tr>`).join('')}
+      </table></div>
+    </div>
+  `;
+}
+
+function indSelect(key){ window._indActiveKey = key; indRender(); }
+
+function indAddPeer(key){
+  const inn = document.getElementById('ind-add-inn').value.trim();
+  if(!/^\d{10}(\d{2})?$/.test(inn)){ alert('ИНН должен быть 10 или 12 цифр'); return; }
+  const name = document.getElementById('ind-add-name').value.trim();
+  const ind = window._industryData.industries[key];
+  ind.peers = ind.peers || [];
+  if(ind.peers.some(p => p.inn === inn)){ alert('Такой ИНН уже есть в отрасли'); return; }
+  ind.peers.push({inn, name});
+  _indSaveUser();
+  indRender();
+}
+
+function indRemovePeer(key, idx){
+  const ind = window._industryData.industries[key];
+  if(!ind.peers || !ind.peers[idx]) return;
+  if(!confirm(`Удалить «${ind.peers[idx].name || ind.peers[idx].inn}» из отрасли «${ind.label}»?`)) return;
+  ind.peers.splice(idx, 1);
+  _indSaveUser();
+  indRender();
+}
+
+function indAddIndustry(){
+  const label = prompt('Название новой отрасли:', '');
+  if(!label) return;
+  const key = 'custom_' + Date.now().toString(36);
+  window._industryData.industries[key] = {label, okved2: [], peers: []};
+  window._indActiveKey = key;
+  _indSaveUser();
+  indRender();
+}
+
+function indEditIndustry(key){
+  const ind = window._industryData.industries[key];
+  const label = prompt('Новое название отрасли:', ind.label);
+  if(!label) return;
+  const okved = prompt('Коды ОКВЭД2 через запятую (напр. 46, 47):', (ind.okved2||[]).join(', '));
+  ind.label = label;
+  ind.okved2 = (okved || '').split(',').map(s => s.trim()).filter(Boolean);
+  _indSaveUser();
+  indRender();
+}
+
+function indDeleteIndustry(key){
+  const ind = window._industryData.industries[key];
+  if(!confirm(`Удалить отрасль «${ind.label}» со всеми ИНН?`)) return;
+  delete window._industryData.industries[key];
+  if(window._industryMedians) delete window._industryMedians[key];
+  _indSaveUser();
+  try { localStorage.setItem('bondan_industry_medians', JSON.stringify(window._industryMedians||{})); } catch(e){}
+  window._indActiveKey = Object.keys(window._industryData.industries)[0] || null;
+  indRender();
+}
+
+function indExportPeers(){
+  const data = {
+    schema: 'bondan/industry-peers/v1',
+    savedAt: new Date().toISOString(),
+    industries: window._industryData?.industries || {}
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'bondan-industries-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function indImportPeers(input){
+  const f = input.files[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if(!d.industries){ alert('Формат не распознан'); return; }
+      if(!confirm('Импортировать отрасли и ИНН из файла? Текущие ваши правки будут замещены.')) return;
+      window._industryData = {industries: d.industries};
+      _indSaveUser();
+      indRender();
+    } catch(e){ alert('Ошибка: ' + e.message); }
+  };
+  r.readAsText(f);
+  input.value = '';
+}
+
+async function indResetSeed(){
+  if(!confirm('Удалить все ваши изменения в базе отраслей и вернуться к встроенному списку? Это также очистит рассчитанные медианы.')) return;
+  try { localStorage.removeItem('bondan_industry_peers'); } catch(e){}
+  try { localStorage.removeItem('bondan_industry_medians'); } catch(e){}
+  window._industryData = null;
+  window._industryMedians = null;
+  window._indActiveKey = null;
+  await indRender();
+}
+
+function indBuildMedians(){
+  // Будет реализовано следующим коммитом (краулер + расчёт p25/p50/p75).
+  alert('🧮 Расчёт медиан через ГИР БО — в следующем коммите.\n\nСейчас страница позволяет вести базу ИНН по отраслям; сам расчёт добавлю отдельно, чтобы проще было тестировать и откатывать.');
 }
 
 // ── Авто-подбор эталона по ИНН и периоду ─────────────────────────────
