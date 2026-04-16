@@ -8065,18 +8065,18 @@ function repCopyRawText(){
 // на одно конкретное поле (is-rev, is-ebitda, и т.п.).
 // hint — ключевые слова строки отчёта, которые помогут найти числа.
 const REP_PICKER_FIELDS = [
-  {id:'rep-np-rev',    label:'Выручка',              hint:'выручка|revenue|доходы от реализации|выручка от продаж'},
-  {id:'rep-np-ebitda', label:'EBITDA',               hint:'ebitda'},
-  {id:'rep-np-np',     label:'Чистая прибыль',       hint:'чистая прибыль|net profit|net income|прибыль за (период|год)'},
-  {id:'rep-np-ebit',   label:'EBIT',                 hint:'ebit|операционная прибыль|прибыль от продаж|operating profit|прибыль до (налога|финансовых)'},
-  {id:'rep-np-assets', label:'Совокупные активы',    hint:'всего активов|итого активов|total assets|активов, всего'},
-  {id:'rep-np-eq',     label:'Собственный капитал',  hint:'итого (собственного )?капитал|всего капитал|total equity|капитал, всего'},
-  {id:'rep-np-debt',   label:'Долг (кредиты+займы)', hint:'кредиты и займы|заемные средства|заёмные средства|borrowings|долгосрочные заимствования|долговые обязательства'},
-  {id:'rep-np-cash',   label:'Денежные средства',    hint:'денежные средства|cash and cash equivalents|cash'},
-  {id:'rep-np-ca',     label:'Оборотные активы',     hint:'итого оборотных активов|оборотные активы|current assets'},
-  {id:'rep-np-cl',     label:'Краткосрочные обяз.',  hint:'итого краткосрочных обязательств|краткосрочные обязательства|current liabilities'},
-  {id:'rep-np-int',    label:'Процентные расходы',   hint:'процентные расходы|проценты к уплате|interest expense|финансовые расходы|finance cost|проценты по кредитам'},
-  {id:'rep-np-ret',    label:'Нераспр. прибыль',     hint:'нераспределенн|нераспределённ|retained'},
+  {id:'rep-np-rev',    label:'Выручка',              hint:'выручка|revenue|sales|оборот|доходы? от реализации|доходы? от обычных видов|выручка от продаж|выручка от контрактов|выручка от реализац|чистая выручка|общая выручка|net sales|total revenue|net revenue|total sales'},
+  {id:'rep-np-ebitda', label:'EBITDA',               hint:'ebitda|показатель ebitda|скорр\\w* ebitda|adjusted ebitda|оibda'},
+  {id:'rep-np-np',     label:'Чистая прибыль',       hint:'чистая прибыль|чистый убыток|net profit|net income|прибыль \\(убыток\\) за|прибыль за (период|год|отчет)|чистая прибыль \\(убыток\\)|итоговая прибыль'},
+  {id:'rep-np-ebit',   label:'EBIT',                 hint:'\\bebit\\b|операционная прибыль|операционный результат|прибыль от продаж|прибыль от операционной|operating profit|operating income|прибыль до (налог|финансовых|процентов)|прибыль до налогообложени'},
+  {id:'rep-np-assets', label:'Совокупные активы',    hint:'всего активов|итого активов|итого активы|total assets|активов,? всего|активы,? всего|валюта баланса|итого раздела баланса'},
+  {id:'rep-np-eq',     label:'Собственный капитал',  hint:'итого (собственного )?капитал|всего капитал|total equity|капитал,? всего|капитал и резервы|итого собственных средств|итого раздела iii|total shareholders'},
+  {id:'rep-np-debt',   label:'Долг (кредиты+займы)', hint:'кредиты и займы|займы и кредиты|заемные средства|заёмные средства|borrowings|loans and borrowings|долгосрочные (кредиты|заимствования|займы)|краткосрочные (кредиты|заимствования|займы)|долговые обязательства|общий долг|total debt|кредиты банков|банковские кредиты'},
+  {id:'rep-np-cash',   label:'Денежные средства',    hint:'денежные средства|денежные средства и (их )?эквивалент|cash and cash equivalents|\\bcash\\b|эквиваленты денежных средств'},
+  {id:'rep-np-ca',     label:'Оборотные активы',     hint:'итого оборотных активов|оборотные активы|итого краткосрочных активов|краткосрочные активы|итого текущих активов|текущие активы|current assets|total current assets|итого раздела ii'},
+  {id:'rep-np-cl',     label:'Краткосрочные обяз.',  hint:'итого краткосрочных обязательств|краткосрочные обязательства|итого текущих обязательств|текущие обязательства|current liabilities|total current liabilities|итого раздела v'},
+  {id:'rep-np-int',    label:'Процентные расходы',   hint:'процентные расходы|расходы по процентам|проценты к уплате|проценты уплаченные|проценты начисленные|проценты по (кредитам|займам)|interest expense|finance (cost|expenses)|финансовые расходы'},
+  {id:'rep-np-ret',    label:'Нераспр. прибыль',     hint:'нераспределенн|нераспределённ|retained|непокрытый убыток|нераспредел\\w+ прибыль'},
 ];
 
 // Общая таблица контекста — используется и для REP_PICKER_FIELDS
@@ -8692,10 +8692,46 @@ function repPickerRenderSuggestions(text){
   });
   } // else (text mode)
 
-  if(!candidates.length){ box.style.display = 'none'; return; }
+  // Fallback: если по ключевым словам ничего не нашлось, собираем
+  // топ-30 самых больших чисел по всему тексту с их строками — лучше
+  // дать пользователю просмотреть глазами, чем прятать панель.
+  let fallbackUsed = false;
+  if(!candidates.length){
+    fallbackUsed = true;
+    const allByLine = [];
+    lines.forEach((line, idx) => {
+      const nums = parseNumsFrom(line, 0);
+      if(!nums.length) return;
+      const maxAbs = nums.reduce((acc, x) => Math.max(acc, Math.abs(x.n)), 0);
+      // Отсекаем «мелочь» — в отчётах показатели обычно в тыс./млн ₽,
+      // бизнес-значения всегда крупнее 1 000.
+      if(maxAbs < 1000) return;
+      // Штрафуем строки, похожие на шапку (годы/даты/номера страниц).
+      const isDate  = /\b(19|20)\d{2}\b.*\b(19|20)\d{2}\b/.test(line) && !/\d{4,}/.test(line.replace(/\b(19|20)\d{2}\b/g,''));
+      const isPage  = /^\s*(стр\.?|page)\s*\d+/i.test(line);
+      if(isDate || isPage) return;
+      const header = repPickerFindColumnHeader(lines, idx) || '';
+      allByLine.push({idx, line, origLine:line, score:Math.log10(maxAbs+10), pick:nums[nums.length-1], allNums:nums, maxAbs, header});
+    });
+    allByLine.sort((a,b) => b.maxAbs - a.maxAbs);
+    candidates.push(...allByLine.slice(0, 30));
+  }
+
+  if(!candidates.length){
+    // Совсем пусто (в тексте нет крупных чисел — скан не распознался).
+    list.innerHTML = `<div style="padding:10px;text-align:center;color:var(--warn);font-size:.6rem">⚠ В распознанном тексте вообще не нашлось подходящих чисел. Попробуйте «📄 Показать распознанный текст» и проверьте, что текст нормально извлёкся.</div>`;
+    box.style.display = 'flex';
+    return;
+  }
 
   candidates.sort((a,b) => b.score - a.score);
-  const top = candidates.slice(0, 8);
+  const top = candidates.slice(0, fallbackUsed ? 30 : 8);
+  if(fallbackUsed){
+    const warn = document.createElement('div');
+    warn.style.cssText = 'padding:6px 8px;background:rgba(250,200,80,.08);border-left:2px solid var(--warn);color:var(--warn);font-size:.58rem;line-height:1.5';
+    warn.innerHTML = `⚠ Ни одна строка не совпала с ключевыми словами для <strong>«${f.label}»</strong>. Показываю топ-${top.length} самых крупных чисел из текста — выберите подходящее вручную. Если нужного числа здесь нет — воспользуйтесь ручным поиском в поле «поиск» выше.`;
+    list.appendChild(warn);
+  }
 
   top.forEach(c => {
     const row = document.createElement('div');
