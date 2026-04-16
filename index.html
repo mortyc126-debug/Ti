@@ -1170,6 +1170,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип">✎ Редактировать период</button>
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
+    <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">🔍 Аудит данных</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
@@ -1386,6 +1387,20 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-paste-text')">Отмена</button>
       <button class="btn btn-p" onclick="flAcceptPastedText()">Далее → подбор</button>
+    </div>
+  </div>
+</div>
+
+<!-- Audit modal: проверка логических нестыковок в reportsDB -->
+<div class="modal-overlay" id="modal-rep-audit">
+  <div class="modal" style="width:820px;max-width:96vw">
+    <div class="modal-hdr">🔍 Аудит данных <button class="modal-x" onclick="closeModal('modal-rep-audit')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto">
+      <div id="rep-audit-summary" style="font-size:.65rem;color:var(--text2)"></div>
+      <div id="rep-audit-body" style="font-size:.62rem"></div>
+    </div>
+    <div class="modal-ft" style="gap:6px">
+      <button class="btn" onclick="closeModal('modal-rep-audit')">Закрыть</button>
     </div>
   </div>
 </div>
@@ -9534,6 +9549,176 @@ function repDeletePeriod(){
   save();
   repBuildPeriodTabs();
   _repSyncPeriodToolbar();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// АУДИТ reportsDB: проверка логических нестыковок по всем периодам
+// всех эмитентов. Две категории:
+//   🔴 HARD — балансовые тождества нарушены (такое в реальной
+//              отчётности невозможно, значит поле перепутано).
+//   🟡 SOFT — подозрительно, но теоретически возможно (редко).
+//
+// Толерантность 0.5% — округления в отчётах в млрд с 1 знаком после
+// запятой периодически дают «балансовые» отклонения до 0.3%.
+// ═════════════════════════════════════════════════════════════════════
+
+const _REP_AUDIT_TOL = 1.005; // +0.5%
+const _REP_AUDIT_RULES = [
+  // ── HARD: нарушения балансового уравнения ──
+  {id:'eq_gt_assets', sev:'hard', label:'Капитал > Активы',
+   hint:'Капитал (eq) — часть пассивов, всегда ≤ Активов. Скорее всего перепутано значение eq/assets или одно из них в другом масштабе.',
+   test:d => d.eq!=null && d.assets!=null && d.eq > d.assets * _REP_AUDIT_TOL,
+   fields:['eq','assets']},
+  {id:'ca_gt_assets', sev:'hard', label:'Оборотные активы > Всего активов',
+   hint:'Оборотные активы (ca) — часть всех активов. Должно быть ca ≤ assets.',
+   test:d => d.ca!=null && d.assets!=null && d.ca > d.assets * _REP_AUDIT_TOL,
+   fields:['ca','assets']},
+  {id:'cl_gt_assets', sev:'hard', label:'Кр. обязательства > Активы',
+   hint:'Краткосрочные обязательства не могут превышать все активы — иначе даже ликвидировав всё, компания не погасит долги в течение года.',
+   test:d => d.cl!=null && d.assets!=null && d.cl > d.assets * _REP_AUDIT_TOL,
+   fields:['cl','assets']},
+  {id:'cash_gt_ca', sev:'hard', label:'ДС > Оборотные активы',
+   hint:'Денежные средства (cash) — часть оборотных активов (ca). Должно быть cash ≤ ca.',
+   test:d => d.cash!=null && d.ca!=null && d.cash > d.ca * _REP_AUDIT_TOL,
+   fields:['cash','ca']},
+  {id:'cash_gt_assets', sev:'hard', label:'ДС > Все активы',
+   hint:'Денежные средства не могут превышать все активы.',
+   test:d => d.cash!=null && d.assets!=null && d.cash > d.assets * _REP_AUDIT_TOL,
+   fields:['cash','assets']},
+  {id:'ebit_gt_ebitda', sev:'hard', label:'EBIT > EBITDA',
+   hint:'EBITDA = EBIT + амортизация, амортизация ≥ 0. Значит EBITDA всегда ≥ EBIT. Скорее всего местами перепутаны.',
+   test:d => d.ebit!=null && d.ebitda!=null && d.ebit > d.ebitda * _REP_AUDIT_TOL,
+   fields:['ebit','ebitda']},
+  {id:'debt_gt_assets_x2', sev:'hard', label:'Долг более чем в 2 раза превышает активы',
+   hint:'Долг > 2 × активов — почти наверняка разный масштаб (млн ₽ vs млрд ₽) или перепутали поле.',
+   test:d => d.debt!=null && d.assets!=null && d.debt > d.assets * 2,
+   fields:['debt','assets']},
+  // ── SOFT: подозрительно ──
+  {id:'ebitda_gt_rev', sev:'soft', label:'EBITDA > Выручка',
+   hint:'EBITDA выше выручки встречается только у холдингов с большими прочими доходами. Чаще всего — перепутаны местами.',
+   test:d => d.ebitda!=null && d.rev!=null && d.rev > 0 && d.ebitda > d.rev * _REP_AUDIT_TOL,
+   fields:['ebitda','rev']},
+  {id:'np_gt_ebit_x2', sev:'soft', label:'ЧП > EBIT × 2',
+   hint:'ЧП обычно меньше EBIT (из-за налогов и процентов). Если больше — перепутано или большой финансовый доход.',
+   test:d => d.np!=null && d.ebit!=null && d.ebit > 0 && d.np > d.ebit * 2,
+   fields:['np','ebit']},
+  {id:'ret_gt_eq', sev:'soft', label:'Нераспр. прибыль > Капитал',
+   hint:'Нераспределённая прибыль — часть капитала. Может слегка превышать только если остальные компоненты капитала отрицательные (добавочный, прочие).',
+   test:d => d.ret!=null && d.eq!=null && d.ret > d.eq * _REP_AUDIT_TOL,
+   fields:['ret','eq']},
+  {id:'rev_neg', sev:'soft', label:'Отрицательная выручка',
+   hint:'Отрицательная выручка в РСБУ/МСФО бывает лишь как корректировки. Проверьте знак.',
+   test:d => d.rev!=null && d.rev < -0.0001,
+   fields:['rev']},
+  {id:'int_neg', sev:'soft', label:'Отрицательные процентные расходы',
+   hint:'В карточке отчётности проценты принято вводить как положительную величину.',
+   test:d => d.int!=null && d.int < -0.0001,
+   fields:['int']},
+  {id:'net_margin_huge', sev:'soft', label:'Чистая маржа > 80%',
+   hint:'np/rev > 80% — очень редко бывает (только у финансовых холдингов в отдельные периоды). Проверьте, не перепутаны ли np и rev.',
+   test:d => d.np!=null && d.rev!=null && d.rev > 0 && d.np / d.rev > 0.8,
+   fields:['np','rev']},
+  {id:'ebitdam_huge', sev:'soft', label:'EBITDA-маржа > 95%',
+   hint:'Почти чистая EBITDA из выручки — нереалистично для производственной/торговой компании.',
+   test:d => d.ebitda!=null && d.rev!=null && d.rev > 0 && d.ebitda / d.rev > 0.95,
+   fields:['ebitda','rev']}
+];
+
+function _repAuditIssuer(iss, issId){
+  const out = [];
+  for(const [pKey, p] of Object.entries(iss.periods || {})){
+    if(!p) continue;
+    for(const rule of _REP_AUDIT_RULES){
+      if(rule.test(p)){
+        out.push({issId, issName: iss.name || issId, pKey, p, rule});
+      }
+    }
+  }
+  return out;
+}
+
+function repRunAudit(){
+  const all = [];
+  for(const [issId, iss] of Object.entries(reportsDB || {})){
+    all.push(..._repAuditIssuer(iss, issId));
+  }
+  // Подсчёт периодов всего.
+  let totalPeriods = 0, totalIssuers = 0;
+  for(const iss of Object.values(reportsDB || {})){
+    totalIssuers++;
+    totalPeriods += Object.keys(iss.periods || {}).length;
+  }
+  const hardCnt = all.filter(a => a.rule.sev === 'hard').length;
+  const softCnt = all.filter(a => a.rule.sev === 'soft').length;
+  const sumEl = document.getElementById('rep-audit-summary');
+  const bodyEl = document.getElementById('rep-audit-body');
+  if(sumEl){
+    if(!all.length){
+      sumEl.innerHTML = `<span style="color:var(--green)">✓ Проверено ${totalPeriods} период(ов) у ${totalIssuers} эмитент(ов). Логических нестыковок не найдено.</span>`;
+    } else {
+      sumEl.innerHTML = `Проверено <strong>${totalPeriods}</strong> период(ов) у <strong>${totalIssuers}</strong> эмитент(ов). Найдено проблем: <span style="color:var(--danger)">🔴 ${hardCnt} критичных</span>, <span style="color:var(--warn)">🟡 ${softCnt} подозрительных</span>. Кликните по строке — откроется редактирование периода.`;
+    }
+  }
+  if(bodyEl){
+    if(!all.length){
+      bodyEl.innerHTML = '<div style="padding:12px;color:var(--text3);text-align:center">Все значения логически согласованы.</div>';
+    } else {
+      // Группируем по эмитенту.
+      const byIss = {};
+      for(const a of all){ (byIss[a.issId] ||= {name: a.issName, items: []}).items.push(a); }
+      // HARD сначала, в пределах эмитента — периоды по убыванию.
+      const fmtV = v => v == null ? '—' : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2));
+      const html = Object.entries(byIss).map(([issId, g]) => {
+        g.items.sort((a, b) => (a.rule.sev === 'hard' ? 0 : 1) - (b.rule.sev === 'hard' ? 0 : 1));
+        const rows = g.items.map(a => {
+          const p = a.p;
+          const sevIco = a.rule.sev === 'hard' ? '🔴' : '🟡';
+          const sevClr = a.rule.sev === 'hard' ? 'var(--danger)' : 'var(--warn)';
+          const vals = a.rule.fields.map(f => `<code style="color:var(--text2)">${f}=${fmtV(p[f])}</code>`).join(' · ');
+          return `<tr onclick="repAuditJumpTo('${a.issId}','${a.pKey}')" style="cursor:pointer" onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''">
+            <td style="padding:4px 6px;border:1px solid var(--border);text-align:center">${sevIco}</td>
+            <td style="padding:4px 6px;border:1px solid var(--border);white-space:nowrap;color:var(--text2)">${p.year} ${p.period || 'FY'} <span style="color:var(--text3);font-size:.55rem">${p.type || ''}</span></td>
+            <td style="padding:4px 6px;border:1px solid var(--border);color:${sevClr}"><strong>${a.rule.label}</strong><div style="color:var(--text3);font-size:.55rem;margin-top:2px">${a.rule.hint}</div></td>
+            <td style="padding:4px 6px;border:1px solid var(--border)">${vals}</td>
+          </tr>`;
+        }).join('');
+        return `<div style="margin-top:10px">
+          <div style="font-weight:600;font-size:.65rem;color:var(--text);margin-bottom:4px">🏢 ${g.name} <span style="color:var(--text3);font-size:.55rem">· ${g.items.length} проблем(ы)</span></div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="color:var(--text3);background:var(--bg)">
+              <th style="padding:3px 4px;border:1px solid var(--border);width:28px">!</th>
+              <th style="padding:3px 4px;border:1px solid var(--border);text-align:left;width:110px">Период</th>
+              <th style="padding:3px 4px;border:1px solid var(--border);text-align:left">Правило</th>
+              <th style="padding:3px 4px;border:1px solid var(--border);text-align:left">Значения</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      }).join('');
+      bodyEl.innerHTML = html;
+    }
+  }
+  document.getElementById('modal-rep-audit').classList.add('open');
+}
+
+// Клик по строке аудита → переход к этому эмитенту/периоду и сразу в режим редактирования.
+function repAuditJumpTo(issId, pKey){
+  if(!reportsDB[issId] || !reportsDB[issId].periods[pKey]) return;
+  closeModal('modal-rep-audit');
+  showPage('reports');
+  repActiveIssuerId = issId;
+  repActivePeriodKey = pKey;
+  const sel = document.getElementById('rep-issuer-sel');
+  if(sel){
+    sel.value = issId;
+    if(typeof repSelectIssuer === 'function') repSelectIssuer();
+  }
+  // После того как repSelectIssuer сбросил активный период — восстанавливаем тот, куда прыгаем.
+  repActivePeriodKey = pKey;
+  repBuildPeriodTabs();
+  _repSyncPeriodToolbar();
+  // Прямо открываем модал редактирования.
+  setTimeout(() => repEditPeriod(), 50);
 }
 
 // ── File parsers ──
