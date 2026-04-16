@@ -1325,7 +1325,21 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         </div>
       </div>
       <!-- Fields -->
-      <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:2px">Показатели (млрд ₽, можно заполнить вручную)</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:2px">
+        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Единицы ввода:</div>
+        <div id="rep-np-unit-switch" style="display:flex;gap:4px;flex-wrap:wrap">
+          <label style="font-size:.65rem;display:inline-flex;gap:4px;align-items:center;cursor:pointer;border:1px solid var(--border);padding:2px 6px"><input type="radio" name="rep-np-unit" value="млн" onchange="_repNpSetUnit('млн')"> млн ₽</label>
+          <label style="font-size:.65rem;display:inline-flex;gap:4px;align-items:center;cursor:pointer;border:1px solid var(--acc);background:var(--acc-dim);padding:2px 6px"><input type="radio" name="rep-np-unit" value="млрд" checked onchange="_repNpSetUnit('млрд')"> млрд ₽</label>
+          <label style="font-size:.65rem;display:inline-flex;gap:4px;align-items:center;cursor:pointer;border:1px solid var(--border);padding:2px 6px"><input type="radio" name="rep-np-unit" value="трлн" onchange="_repNpSetUnit('трлн')"> трлн ₽</label>
+        </div>
+        <div style="display:flex;gap:3px;margin-left:6px" title="Быстро переразметить уже введённые числа: нажмите если поняли, что вводили цифры в другой шкале. Пересчитывает все 12 полей сразу, единица ввода не меняется.">
+          <button type="button" class="btn btn-sm" onclick="_repNpRescale(0.001)" style="padding:2px 6px;font-size:.55rem">÷1000<br><span style="color:var(--text3);font-size:.45rem">было в млн</span></button>
+          <button type="button" class="btn btn-sm" onclick="_repNpRescale(1000)" style="padding:2px 6px;font-size:.55rem">×1000<br><span style="color:var(--text3);font-size:.45rem">было в тыс</span></button>
+        </div>
+        <div style="font-size:.52rem;color:var(--text3);flex-basis:100%;margin-top:2px">
+          <strong>Переключатель</strong> — в какой шкале вводите числа прямо сейчас (число конвертится в млрд при сохранении). <strong>÷/×1000</strong> — быстро пересчитать уже введённые значения, если ошиблись со шкалой (удобно в режиме редактирования).
+        </div>
+      </div>
       <div class="g2">
         <div class="field"><label>Выручка</label><input type="number" id="rep-np-rev" placeholder="8 540" step="0.1"></div>
         <div class="field"><label>EBITDA</label><input type="number" id="rep-np-ebitda" placeholder="1 820" step="0.1"></div>
@@ -9440,6 +9454,10 @@ function repNewPeriodModal(){
   window._repEditOldKey = null;
   const hdr = document.querySelector('#modal-rep-period .modal-hdr');
   if(hdr && hdr.firstChild) hdr.firstChild.nodeValue = 'Добавить период отчётности ';
+  // Сброс переключателя единиц в «млрд» (в памяти данные всегда в млрд).
+  window._repNpCurrentUnit = 'млрд';
+  const bnRadio = document.querySelector('input[name="rep-np-unit"][value="млрд"]');
+  if(bnRadio){ bnRadio.checked = true; _repNpSetUnit('млрд'); }
   // Clear fields
   ['rep-np-rev','rep-np-ebitda','rep-np-np','rep-np-ebit','rep-np-assets','rep-np-eq',
    'rep-np-debt','rep-np-cash','rep-np-ca','rep-np-cl','rep-np-int','rep-np-ret','rep-np-note'].forEach(id=>{
@@ -9477,13 +9495,84 @@ function repNewPeriodModal(){
   document.getElementById('modal-rep-period').classList.add('open');
 }
 
+// Коэффициент перевода из выбранной пользователем единицы в млрд ₽
+// (внутреннее представление в reportsDB).
+const _REP_UNIT_TO_BN = {'млн': 1/1000, 'млрд': 1, 'трлн': 1000};
+
+// Текущая единица ввода в форме. Меняется радио-кнопками; при сохранении
+// используется для пересчёта всех числовых полей в млрд.
+window._repNpCurrentUnit = 'млрд';
+
+// Переключение единицы: пересчитывает все числовые поля формы, чтобы
+// отображать то же значение в новой шкале. При сохранении данные
+// интерпретируются в текущей единице и переводятся в млрд.
+function _repNpSetUnit(newUnit){
+  const prev = window._repNpCurrentUnit || 'млрд';
+  // Подсветка активной метки (border/background).
+  document.querySelectorAll('#rep-np-unit-switch label').forEach(lbl => {
+    const active = lbl.querySelector('input')?.value === newUnit;
+    lbl.style.borderColor = active ? 'var(--acc)' : 'var(--border)';
+    lbl.style.background  = active ? 'var(--acc-dim)' : 'transparent';
+  });
+  if(newUnit === prev){ window._repNpCurrentUnit = newUnit; return; }
+  // Множитель перевода «величина, как она есть в поле» из prev в new.
+  // Поле содержит число в единицах prev; чтобы остаться в тех же млрд,
+  // новое число = старое × (prev→млрд) / (new→млрд).
+  const factor = _REP_UNIT_TO_BN[prev] / _REP_UNIT_TO_BN[newUnit];
+  ['rep-np-rev','rep-np-ebitda','rep-np-np','rep-np-ebit',
+   'rep-np-assets','rep-np-eq','rep-np-debt','rep-np-cash',
+   'rep-np-ca','rep-np-cl','rep-np-int','rep-np-ret'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el || !el.value) return;
+    const v = parseFloat(el.value);
+    if(isNaN(v)) return;
+    const out = v * factor;
+    const abs = Math.abs(out);
+    el.value = abs >= 100 ? out.toFixed(0)
+             : abs >= 1   ? out.toFixed(2)
+             : abs >= 0.01 ? out.toFixed(3)
+             : out.toFixed(5);
+  });
+  window._repNpCurrentUnit = newUnit;
+}
+
+// Пересчёт значений формы множителем без смены единицы ввода. Для
+// исправления уже введённых чисел, попавших не в ту шкалу.
+function _repNpRescale(factor){
+  const ids = ['rep-np-rev','rep-np-ebitda','rep-np-np','rep-np-ebit',
+               'rep-np-assets','rep-np-eq','rep-np-debt','rep-np-cash',
+               'rep-np-ca','rep-np-cl','rep-np-int','rep-np-ret'];
+  const anyFilled = ids.some(id => document.getElementById(id)?.value);
+  if(!anyFilled){ alert('В форме пока нет чисел для пересчёта.'); return; }
+  const op = factor < 1 ? `÷ ${Math.round(1/factor)}` : `× ${factor}`;
+  if(!confirm(`Пересчитать все заполненные поля: ${op}? Единица ввода останется прежней — ${window._repNpCurrentUnit || 'млрд'} ₽.`)) return;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(!el || !el.value) return;
+    const v = parseFloat(el.value);
+    if(isNaN(v)) return;
+    const out = v * factor;
+    const abs = Math.abs(out);
+    el.value = abs >= 100 ? out.toFixed(0)
+             : abs >= 1   ? out.toFixed(2)
+             : abs >= 0.01 ? out.toFixed(3)
+             : out.toFixed(5);
+  });
+}
+
 function repSavePeriod(){
   if(!repActiveIssuerId) return;
   const year=document.getElementById('rep-np-year').value;
   const period=document.getElementById('rep-np-period').value;
   const type=document.getElementById('rep-np-type').value;
   const key=`${year}_${period}_${type}`;
-  const gn = id => { const v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v; };
+  // Множитель в млрд из текущей единицы ввода формы.
+  const unit = window._repNpCurrentUnit || 'млрд';
+  const toBn = _REP_UNIT_TO_BN[unit] || 1;
+  const gn = id => {
+    const v = parseFloat(document.getElementById(id).value);
+    return isNaN(v) ? null : v * toBn;
+  };
   const data={
     year,period,type,note:document.getElementById('rep-np-note').value.trim(),
     rev:gn('rep-np-rev'), ebitda:gn('rep-np-ebitda'), np:gn('rep-np-np'), ebit:gn('rep-np-ebit'),
