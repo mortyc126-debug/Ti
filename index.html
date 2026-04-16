@@ -1167,6 +1167,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     </div>
     <button class="btn btn-sm btn-p" onclick="repNewIssuerModal()">＋ Эмитент</button>
     <button class="btn btn-sm" id="rep-add-period-btn" style="display:none" onclick="repNewPeriodModal()">＋ Добавить период</button>
+    <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип">✎ Редактировать период</button>
+    <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
@@ -6518,8 +6520,25 @@ function _crossEnumeratePeriods(){
 // круга, начиная с 12 часов по часовой.
 const _CROSS_RADAR_AXES = ['ebitdam','npm','roa','roe','icr','ndE','cur','eqr'];
 
-// Палитра для полигонов компаний в радаре (циклится).
-const _CROSS_PALETTE = ['#00d4ff','#22d3a0','#ff4d6d','#f5a623','#c39cff','#66ddff','#ff9e7a','#8dd66a','#ffd166','#a78bfa'];
+// Палитра для полигонов компаний в радаре. 30 цветов в HSL с шагом
+// hue ≈ 12° и чередованием насыщенности/яркости — соседи по индексу
+// контрастны, и при ≤30 эмитентов точно нет повторов.
+const _CROSS_PALETTE = (() => {
+  const out = [];
+  // Перестановка hue: 0,180,90,270,45,225,135,315,22,202,… — даёт
+  // максимальный угловой разнос между соседними индексами.
+  const hueOrder = [0, 180, 90, 270, 45, 225, 135, 315,
+                    22, 202, 112, 292, 67, 247, 157, 337,
+                    11, 191, 101, 281, 56, 236, 146, 326,
+                    34, 214, 124, 304, 78, 258];
+  hueOrder.forEach((h, i) => {
+    const layer = i % 3; // 3 «слоя» насыщенности/яркости
+    const sat = layer === 0 ? 78 : layer === 1 ? 62 : 88;
+    const lig = layer === 0 ? 60 : layer === 1 ? 52 : 68;
+    out.push(`hsl(${h}, ${sat}%, ${lig}%)`);
+  });
+  return out;
+})();
 
 let _crossViewMode = 'radar'; // radar | heatmap | bar
 let _crossHiddenIds = new Set(); // чекбокс-скрытые эмитенты
@@ -7025,16 +7044,23 @@ function repRebuildSelect(){
 
 function repSelectIssuer(){
   const id = document.getElementById('rep-issuer-sel').value;
-  if(!id){ 
+  const editBtn = document.getElementById('rep-edit-period-btn');
+  const delPBtn = document.getElementById('rep-del-period-btn');
+  if(!id){
     document.getElementById('rep-empty').style.display='block';
     document.getElementById('rep-issuer-view').style.display='none';
     document.getElementById('rep-compare-btn').style.display='none';
     document.getElementById('rep-add-period-btn').style.display='none';
     document.getElementById('rep-pdf-btn').style.display='none';
     document.getElementById('rep-del-issuer-btn').style.display='none';
+    if(editBtn) editBtn.style.display='none';
+    if(delPBtn) delPBtn.style.display='none';
     return;
   }
   repActiveIssuerId = id;
+  // При смене эмитента активный период сбрасываем — пусть выберется
+  // самый свежий внутри repBuildPeriodTabs.
+  repActivePeriodKey = null;
   document.getElementById('rep-empty').style.display='none';
   document.getElementById('rep-issuer-view').style.display='block';
   document.getElementById('rep-compare-view').style.display='none';
@@ -7042,6 +7068,18 @@ function repSelectIssuer(){
   document.getElementById('rep-pdf-btn').style.display='';
   document.getElementById('rep-del-issuer-btn').style.display='';
   repBuildPeriodTabs();
+  _repSyncPeriodToolbar();
+}
+
+// Видимость кнопок «✎ Редактировать / 🗑 Удалить период» — ON, если у
+// активного эмитента есть выбранный период. Вызывается отовсюду, где
+// меняется repActivePeriodKey.
+function _repSyncPeriodToolbar(){
+  const editBtn = document.getElementById('rep-edit-period-btn');
+  const delPBtn = document.getElementById('rep-del-period-btn');
+  const have = !!(repActiveIssuerId && repActivePeriodKey && reportsDB[repActiveIssuerId]?.periods?.[repActivePeriodKey]);
+  if(editBtn) editBtn.style.display = have ? '' : 'none';
+  if(delPBtn) delPBtn.style.display = have ? '' : 'none';
 }
 
 function repBuildPeriodTabs(){
@@ -7066,6 +7104,7 @@ function repBuildPeriodTabs(){
 
   if(!repActivePeriodKey) repActivePeriodKey = periods[0][0];
   repRenderPeriod();
+  _repSyncPeriodToolbar();
 }
 
 function repSelectPeriod(key, btn){
@@ -7073,6 +7112,7 @@ function repSelectPeriod(key, btn){
   document.querySelectorAll('#rep-period-tabs .ptab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   repRenderPeriod();
+  _repSyncPeriodToolbar();
 }
 
 function repRenderPeriod(){
@@ -9380,6 +9420,11 @@ function repPickerUpdateCurrent(){
 }
 
 function repNewPeriodModal(){
+  // По умолчанию открываем модал в режиме «добавить новый» — сбрасываем
+  // флаг режима редактирования и возвращаем оригинальный заголовок.
+  window._repEditOldKey = null;
+  const hdr = document.querySelector('#modal-rep-period .modal-hdr');
+  if(hdr && hdr.firstChild) hdr.firstChild.nodeValue = 'Добавить период отчётности ';
   // Clear fields
   ['rep-np-rev','rep-np-ebitda','rep-np-np','rep-np-ebit','rep-np-assets','rep-np-eq',
    'rep-np-debt','rep-np-cash','rep-np-ca','rep-np-cl','rep-np-int','rep-np-ret','rep-np-note'].forEach(id=>{
@@ -9430,10 +9475,65 @@ function repSavePeriod(){
     assets:gn('rep-np-assets'), eq:gn('rep-np-eq'), debt:gn('rep-np-debt'), cash:gn('rep-np-cash'),
     ca:gn('rep-np-ca'), cl:gn('rep-np-cl'), int:gn('rep-np-int'), ret:gn('rep-np-ret'),
   };
-  reportsDB[repActiveIssuerId].periods[key]=data;
+  // Режим редактирования: если ключ изменился (поменяли год/период/тип) —
+  // удаляем старую запись, чтобы не плодить дубликаты. Если такой ключ
+  // уже есть и не наш — спросим подтверждение.
+  const oldKey = window._repEditOldKey || null;
+  const periods = reportsDB[repActiveIssuerId].periods;
+  if(periods[key] && key !== oldKey){
+    if(!confirm(`Период ${year} ${period} ${type} уже существует у этого эмитента. Перезаписать?`)) return;
+  }
+  if(oldKey && oldKey !== key) delete periods[oldKey];
+  // Сохраняем заметку из старой записи, если редактируем и новое поле пустое.
+  if(oldKey && periods[oldKey] && !data.note) data.note = periods[oldKey].note || '';
+  periods[key]=data;
   repActivePeriodKey=key;
+  window._repEditOldKey = null;
   save(); closeModal('modal-rep-period');
   repBuildPeriodTabs();
+}
+
+// Открыть форму с заполненными значениями активного периода.
+function repEditPeriod(){
+  if(!repActiveIssuerId || !repActivePeriodKey) return;
+  const p = reportsDB[repActiveIssuerId]?.periods?.[repActivePeriodKey];
+  if(!p){ alert('Активный период не найден'); return; }
+  // Сбрасываем модал в чистое состояние тем же путём, что и для нового.
+  repNewPeriodModal();
+  // Помечаем «режим редактирования» (для repSavePeriod) и заполняем поля.
+  window._repEditOldKey = repActivePeriodKey;
+  const setVal = (id, v) => { const el = document.getElementById(id); if(el) el.value = (v == null ? '' : v); };
+  setVal('rep-np-year',  p.year);
+  setVal('rep-np-period', p.period || 'FY');
+  setVal('rep-np-type',  p.type || 'РСБУ');
+  setVal('rep-np-note',  p.note || '');
+  setVal('rep-np-rev',   p.rev);
+  setVal('rep-np-ebitda',p.ebitda);
+  setVal('rep-np-np',    p.np);
+  setVal('rep-np-ebit',  p.ebit);
+  setVal('rep-np-assets',p.assets);
+  setVal('rep-np-eq',    p.eq);
+  setVal('rep-np-debt',  p.debt);
+  setVal('rep-np-cash',  p.cash);
+  setVal('rep-np-ca',    p.ca);
+  setVal('rep-np-cl',    p.cl);
+  setVal('rep-np-int',   p.int);
+  setVal('rep-np-ret',   p.ret);
+  // Подменяем заголовок модала, чтобы было ясно — это правка.
+  const hdr = document.querySelector('#modal-rep-period .modal-hdr');
+  if(hdr) hdr.firstChild.nodeValue = `Редактирование периода ${p.year} ${p.period || 'FY'} ${p.type || ''} `;
+}
+
+function repDeletePeriod(){
+  if(!repActiveIssuerId || !repActivePeriodKey) return;
+  const p = reportsDB[repActiveIssuerId]?.periods?.[repActivePeriodKey];
+  if(!p) return;
+  if(!confirm(`Удалить период ${p.year} ${p.period || 'FY'} ${p.type || ''}?`)) return;
+  delete reportsDB[repActiveIssuerId].periods[repActivePeriodKey];
+  repActivePeriodKey = null;
+  save();
+  repBuildPeriodTabs();
+  _repSyncPeriodToolbar();
 }
 
 // ── File parsers ──
