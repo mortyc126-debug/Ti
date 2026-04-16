@@ -1171,6 +1171,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">🔍 Аудит данных</button>
+    <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
+    <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов.">📥 Импорт эмитента</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
@@ -9760,6 +9762,56 @@ function _repAuditIssuer(iss, issId){
     }
   }
   return out;
+}
+
+// Импорт одного эмитента с периодами из JSON-файла. Формат:
+// {schema:'bondan/issuer/v1', name:'…', ind:'transport',
+//  periods:{<key>: {year, period, type, rev, ebitda, …}}}
+// Если эмитент с таким же name уже есть — мёрджим периоды (новые
+// добавляются, существующие перезаписываются). Если нет — создаём.
+function repImportIssuerJson(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      if(!d || !d.name) throw new Error('В файле нет поля name');
+      if(!d.periods || typeof d.periods !== 'object') throw new Error('В файле нет поля periods');
+      let issId = Object.keys(reportsDB).find(k => reportsDB[k].name === d.name);
+      let created = false;
+      if(!issId){
+        issId = 'iss_imp_' + Math.floor(Math.random() * 1e9).toString(36) + '_' + Date.now().toString(36);
+        reportsDB[issId] = {name: d.name, ind: d.ind || '', periods: {}};
+        created = true;
+      } else if(d.ind && !reportsDB[issId].ind){
+        reportsDB[issId].ind = d.ind;
+      }
+      let added = 0, updated = 0;
+      for(const [key, p] of Object.entries(d.periods)){
+        if(!p || !p.year) continue;
+        if(reportsDB[issId].periods[key]) updated++;
+        else added++;
+        reportsDB[issId].periods[key] = p;
+      }
+      save();
+      document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
+      alert(`✅ ${d.name}\n${created ? 'Создан новый эмитент' : 'Эмитент уже существовал'} · периодов: +${added} добавлено, ${updated} обновлено.`);
+      // Перейти на импортированного эмитента и отрендерить.
+      repActiveIssuerId = issId;
+      repActivePeriodKey = null;
+      const sel = document.getElementById('rep-issuer-sel');
+      if(sel){
+        repRebuildSelect();
+        sel.value = issId;
+        repSelectIssuer();
+      }
+    } catch(err){
+      alert('❌ Не удалось импортировать: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
 function repRunAudit(){
