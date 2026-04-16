@@ -1567,10 +1567,9 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 <!-- ═══ Страница «📊 Сравнение компаний» ═══ -->
 <div class="page" id="page-cross">
   <div class="card">
-    <div class="card-hdr">📊 Сравнение компаний по показателю</div>
+    <div class="card-hdr">📊 Сравнение компаний — все показатели сразу</div>
     <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
-      Ранжирование всех эмитентов из базы отчётности по одному показателю в выбранном периоде.
-      Сравниваются только компании, у которых в этом периоде распознаны нужные поля для расчёта. Выбирайте период и показатель — список перестраивается мгновенно.
+      На одной диаграмме видно, в чём каждая компания сильна, а в чём слаба. Каждая ось — отдельный показатель, нормированный <strong>в процентиль от остальных</strong> в этом же периоде (0 = худший, 100 = лучший). Для «меньше — лучше» метрик (ND/EBITDA, Долг) знак перевёрнут, так что на радаре всегда «чем дальше от центра, тем лучше».
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:0 4px 10px">
       <div class="field" style="margin:0">
@@ -1578,20 +1577,31 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <select id="cross-period" onchange="crossRender()" style="font-size:.7rem;padding:3px 6px;min-width:130px"></select>
       </div>
       <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Показатель</label>
+        <label style="font-size:.55rem">Вид</label>
+        <div style="display:flex;gap:0">
+          <button class="btn btn-sm cross-view-btn" data-view="radar"   onclick="crossSetView('radar', this)">📡 Радар</button>
+          <button class="btn btn-sm cross-view-btn" data-view="heatmap" onclick="crossSetView('heatmap', this)">🌡️ Тепло</button>
+          <button class="btn btn-sm cross-view-btn" data-view="bar"     onclick="crossSetView('bar', this)">📊 Бар</button>
+        </div>
+      </div>
+      <div class="field" style="margin:0" id="cross-metric-wrap">
+        <label style="font-size:.55rem">Показатель (для бар-вида)</label>
         <select id="cross-metric" onchange="crossRender()" style="font-size:.7rem;padding:3px 6px;min-width:220px"></select>
       </div>
       <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Фильтр (подстрока в имени)</label>
-        <input type="text" id="cross-filter" oninput="crossRender()" placeholder="например: лизинг" style="font-size:.7rem;padding:3px 6px;width:180px">
+        <label style="font-size:.55rem">Фильтр по имени</label>
+        <input type="text" id="cross-filter" oninput="crossRender()" placeholder="например: лизинг" style="font-size:.7rem;padding:3px 6px;width:160px">
       </div>
       <label style="font-size:.6rem;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer">
         <input type="checkbox" id="cross-same-scope" onchange="crossRender()" style="margin:0"> только той же scope
       </label>
-      <button class="btn btn-sm" onclick="crossExportCsv()" title="Выгрузить текущий ранжированный список в CSV" style="margin-left:auto">💾 CSV</button>
+      <button class="btn btn-sm" onclick="crossExportCsv()" title="Выгрузить сводную матрицу в CSV" style="margin-left:auto">💾 CSV</button>
     </div>
     <div id="cross-status" style="font-size:.6rem;padding:4px 8px;color:var(--text3)"></div>
-    <div id="cross-chart" style="padding:4px"></div>
+    <div id="cross-layout" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;padding:4px">
+      <div id="cross-companies" style="flex:0 0 220px;min-width:200px;max-height:640px;overflow-y:auto;border:1px solid var(--border);background:var(--s1);font-size:.6rem"></div>
+      <div id="cross-chart" style="flex:1;min-width:320px"></div>
+    </div>
   </div>
 </div>
 
@@ -6503,6 +6513,17 @@ function _crossEnumeratePeriods(){
   return Object.values(bucket).sort((a, b) => b.sortKey - a.sortKey);
 }
 
+// Восемь «профильных» метрик для радара — независимые от абсолютного
+// размера компании (все коэффициенты). Порядок = порядок осей вокруг
+// круга, начиная с 12 часов по часовой.
+const _CROSS_RADAR_AXES = ['ebitdam','npm','roa','roe','icr','ndE','cur','eqr'];
+
+// Палитра для полигонов компаний в радаре (циклится).
+const _CROSS_PALETTE = ['#00d4ff','#22d3a0','#ff4d6d','#f5a623','#c39cff','#66ddff','#ff9e7a','#8dd66a','#ffd166','#a78bfa'];
+
+let _crossViewMode = 'radar'; // radar | heatmap | bar
+let _crossHiddenIds = new Set(); // чекбокс-скрытые эмитенты
+
 function crossBuildPeriodSelector(){
   const sel = document.getElementById('cross-period');
   if(!sel) return;
@@ -6520,58 +6541,110 @@ function crossBuildPeriodSelector(){
 
 function crossBuildMetricSelector(){
   const sel = document.getElementById('cross-metric');
-  if(!sel || sel.options.length) return; // строим один раз
+  if(!sel || sel.options.length) return;
   sel.innerHTML = _CROSS_METRICS.map(m =>
     `<option value="${m.k}">${m.l}${m.higher === false ? ' (меньше = лучше)' : ''}</option>`
   ).join('');
   sel.value = 'ebitdam';
 }
 
-function crossInit(){
-  crossBuildPeriodSelector();
-  crossBuildMetricSelector();
+function crossSetView(mode, btn){
+  _crossViewMode = mode;
+  document.querySelectorAll('.cross-view-btn').forEach(b => b.classList.remove('btn-p'));
+  if(btn) btn.classList.add('btn-p');
+  const mw = document.getElementById('cross-metric-wrap');
+  if(mw) mw.style.display = mode === 'bar' ? '' : 'none';
   crossRender();
 }
 
-// Собираем одну запись на эмитента: тот его период, где ключ совпал и
-// есть максимальное число заполненных числовых полей (устраняем дубли
-// по scope — РСБУ vs МСФО в один квартал).
-function _crossCollect(periodKey, metric, opts){
-  const rows = [];
+function crossInit(){
+  crossBuildPeriodSelector();
+  crossBuildMetricSelector();
+  // Подсвечиваем активную кнопку вида.
+  document.querySelectorAll('.cross-view-btn').forEach(b => {
+    b.classList.toggle('btn-p', b.dataset.view === _crossViewMode);
+  });
+  const mw = document.getElementById('cross-metric-wrap');
+  if(mw) mw.style.display = _crossViewMode === 'bar' ? '' : 'none';
+  crossRender();
+}
+
+// Выбираем одну запись на эмитента в указанном периоде — тот scope, где
+// заполнено больше числовых полей. Возвращает {id, name, type, year,
+// period, data (сырой объект периода)}.
+function _crossPickRow(iss, issId, year, period, scopeFilter){
+  if(!iss || !iss.periods) return null;
+  let cand = Object.values(iss.periods).filter(p =>
+    p && +p.year === year && (p.period || 'FY') === period
+  );
+  if(scopeFilter) cand = cand.filter(p => (p.type || '?') === scopeFilter);
+  if(!cand.length) return null;
+  cand.sort((a, b) =>
+    Object.values(b).filter(v => typeof v === 'number').length -
+    Object.values(a).filter(v => typeof v === 'number').length
+  );
+  const p = cand[0];
+  return {
+    id: issId,
+    name: iss.name || issId,
+    type: p.type || '?',
+    year: p.year,
+    period: p.period || 'FY',
+    data: p
+  };
+}
+
+// Все эмитенты периода, с сырыми значениями по всем метрикам.
+function _crossCollectAll(periodKey, opts){
   const filter = (opts.filter || '').trim().toLowerCase();
-  const sameType = opts.scopeFilter || null; // null = любые
+  const scopeFilter = opts.scopeFilter || null;
   const [yearStr, period] = periodKey.split('_');
   const year = +yearStr;
+  const out = [];
   for(const [issId, iss] of Object.entries(reportsDB || {})){
-    if(!iss || !iss.periods) continue;
-    if(filter && !String(iss.name || '').toLowerCase().includes(filter)) continue;
-    let candidates = Object.values(iss.periods).filter(p =>
-      p && +p.year === year && (p.period || 'FY') === period
-    );
-    if(sameType) candidates = candidates.filter(p => (p.type || '?') === sameType);
-    if(!candidates.length) continue;
-    // Выбираем самый заполненный — чтобы МСФО с EBITDA/Долг не проиграл РСБУ без этих полей.
-    candidates.sort((a, b) =>
-      Object.values(b).filter(v => typeof v === 'number').length -
-      Object.values(a).filter(v => typeof v === 'number').length
-    );
-    const p = candidates[0];
-    const v = metric.calc(p);
-    if(v == null || !isFinite(v)) continue;
-    rows.push({
-      name: iss.name || issId,
-      id: issId,
-      value: v,
-      type: p.type || '?',
-      year: p.year,
-      period: p.period || 'FY'
+    if(filter && !String(iss?.name || '').toLowerCase().includes(filter)) continue;
+    const row = _crossPickRow(iss, issId, year, period, scopeFilter);
+    if(!row) continue;
+    row.values = {};
+    for(const m of _CROSS_METRICS){
+      const v = m.calc(row.data);
+      row.values[m.k] = (v == null || !isFinite(v)) ? null : v;
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+// Перцентиль-rank каждой компании по каждой метрике: 0 = худший,
+// 100 = лучший. Для higher=false метрик сравнение инвертировано, т.е.
+// меньше ND/EBITDA → выше percentile. Компании с null-значением
+// получают null (на радаре точка тянется к центру).
+function _crossRanks(rows){
+  const ranks = {};
+  for(const m of _CROSS_METRICS){
+    const pairs = rows
+      .map((r, i) => ({i, v: r.values[m.k]}))
+      .filter(p => p.v != null);
+    if(pairs.length < 2){
+      rows.forEach(r => { (ranks[m.k] ||= {})[r.id] = null; });
+      continue;
+    }
+    pairs.sort((a, b) => m.higher === false ? (a.v - b.v) : (b.v - a.v));
+    // Лучший (первый) → 100, худший → 0. Tied values → усреднённый rank.
+    const n = pairs.length;
+    pairs.forEach((p, idx) => {
+      // percentile по «сколько компаний я обошёл»: (n-1-idx)/(n-1) * 100.
+      (ranks[m.k] ||= {})[rows[p.i].id] = n === 1 ? 100 : Math.round((n - 1 - idx) / (n - 1) * 100);
+    });
+    rows.forEach(r => {
+      if(r.values[m.k] == null) (ranks[m.k])[r.id] = null;
     });
   }
-  rows.sort((a, b) => metric.higher === false ? (a.value - b.value) : (b.value - a.value));
-  return rows;
+  return ranks;
 }
 
 function _crossFmt(v, unit){
+  if(v == null) return '—';
   if(unit === 'млрд'){
     const abs = Math.abs(v);
     return v.toLocaleString('ru-RU', {maximumFractionDigits: abs >= 100 ? 0 : abs >= 10 ? 1 : 2}) + ' млрд';
@@ -6581,27 +6654,72 @@ function _crossFmt(v, unit){
   return v.toFixed(2);
 }
 
+function _crossColor(i){ return _CROSS_PALETTE[i % _CROSS_PALETTE.length]; }
+
+// Сайдбар со списком компаний (чекбоксы + цветовой маркер = легенда
+// радара). В режиме heatmap/bar маркер не нужен, но список остаётся —
+// позволяет фильтровать «вручную».
+function _crossRenderCompanies(rows){
+  const box = document.getElementById('cross-companies');
+  if(!box) return;
+  if(!rows.length){
+    box.innerHTML = '<div style="padding:10px;color:var(--text3)">—</div>';
+    return;
+  }
+  const showLegend = _crossViewMode === 'radar';
+  const visible = rows.filter(r => !_crossHiddenIds.has(r.id));
+  const head = `<div style="padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg);display:flex;gap:6px;align-items:center">
+      <strong style="font-size:.62rem;color:var(--text2)">${rows.length} эмит.</strong>
+      <span style="color:var(--text3);font-size:.55rem">(${visible.length} видимых)</span>
+      <button class="btn btn-sm" onclick="crossToggleAll(true)" style="padding:1px 6px;margin-left:auto;font-size:.52rem">все</button>
+      <button class="btn btn-sm" onclick="crossToggleAll(false)" style="padding:1px 6px;font-size:.52rem">ничего</button>
+    </div>`;
+  const list = rows.map((r, i) => {
+    const checked = !_crossHiddenIds.has(r.id);
+    const dot = showLegend
+      ? `<span style="width:10px;height:10px;display:inline-block;background:${checked ? _crossColor(i) : 'transparent'};border:1px solid ${_crossColor(i)};flex:0 0 auto"></span>`
+      : '';
+    return `<label style="display:flex;gap:6px;padding:4px 8px;border-bottom:1px solid rgba(30,48,72,.3);align-items:center;cursor:pointer;font-size:.58rem;${checked ? '' : 'opacity:.45'}" title="${r.name} · ${r.type}">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="crossToggleId('${r.id}', this.checked)" style="margin:0">
+      ${dot}
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${r.name}</span>
+    </label>`;
+  }).join('');
+  box.innerHTML = head + list;
+}
+
+function crossToggleId(id, checked){
+  if(checked) _crossHiddenIds.delete(id); else _crossHiddenIds.add(id);
+  crossRender();
+}
+
+function crossToggleAll(on){
+  if(on){
+    _crossHiddenIds.clear();
+  } else {
+    const rows = window._crossLast?.rows || [];
+    rows.forEach(r => _crossHiddenIds.add(r.id));
+  }
+  crossRender();
+}
+
 function crossRender(){
   crossBuildPeriodSelector();
   crossBuildMetricSelector();
   const periodKey = document.getElementById('cross-period')?.value || '';
-  const metricKey = document.getElementById('cross-metric')?.value || 'ebitdam';
   const filter    = document.getElementById('cross-filter')?.value || '';
   const sameScopeChk = document.getElementById('cross-same-scope')?.checked;
   const chart  = document.getElementById('cross-chart');
   const status = document.getElementById('cross-status');
   if(!chart) return;
-
   if(!periodKey){
-    chart.innerHTML = '<div class="empty"><div class="ei">📊</div><p>Нет распознанных отчётов. Перейдите в 📂 Отчётность и добавьте хотя бы 2 периода от разных эмитентов.</p></div>';
+    chart.innerHTML = '<div class="empty"><div class="ei">📊</div><p>Нет распознанных отчётов. Добавьте хотя бы 2 периода от разных эмитентов в 📂 Отчётность.</p></div>';
+    _crossRenderCompanies([]);
     if(status) status.textContent = '';
     window._crossLast = null;
     return;
   }
-
-  const metric = _CROSS_METRICS.find(m => m.k === metricKey) || _CROSS_METRICS[0];
-  // scopeFilter — если чекбокс включен, берём тот scope, который чаще
-  // встречается в выбранном периоде, чтобы не смешивать МСФО и РСБУ.
+  // scopeFilter — если чекбокс включен, берём самый частый type в периоде.
   let scopeFilter = null;
   if(sameScopeChk){
     const [yearStr, period] = periodKey.split('_');
@@ -6616,37 +6734,192 @@ function crossRender(){
     }
     scopeFilter = Object.entries(freq).sort((a,b) => b[1] - a[1])[0]?.[0] || null;
   }
-
-  const rows = _crossCollect(periodKey, metric, {filter, scopeFilter});
-  window._crossLast = {rows, metric, periodKey};
-
+  const rows = _crossCollectAll(periodKey, {filter, scopeFilter});
+  const ranks = _crossRanks(rows);
+  window._crossLast = {rows, ranks, periodKey, scopeFilter};
+  _crossRenderCompanies(rows);
   if(!rows.length){
-    chart.innerHTML = `<div class="empty"><div class="ei">∅</div><p>В этом периоде ни у одного эмитента нет нужных полей для показателя «${metric.l}».</p></div>`;
+    chart.innerHTML = '<div class="empty"><div class="ei">∅</div><p>В этом периоде нет эмитентов (с учётом фильтра).</p></div>';
     if(status) status.textContent = '';
     return;
   }
-
   if(status){
     const scopeTag = scopeFilter ? ` · scope=${scopeFilter}` : '';
-    status.innerHTML = `${rows.length} эмитент(ов)${scopeTag} · показатель «<strong>${metric.l}</strong>». Сортировка: ${metric.higher === false ? 'по возрастанию (меньше — лучше)' : 'по убыванию (больше — лучше)'}.`;
+    const viewLabel = {radar:'радар (профиль)', heatmap:'тепловая карта', bar:'бар-чарт'}[_crossViewMode];
+    status.innerHTML = `${rows.length} эмитент(ов)${scopeTag} · вид: <strong>${viewLabel}</strong>${_crossViewMode!=='bar' ? ' · значения нормированы в перцентили (0…100)' : ''}`;
   }
+  if(_crossViewMode === 'radar')        _crossRenderRadar(rows, ranks);
+  else if(_crossViewMode === 'heatmap') _crossRenderHeatmap(rows, ranks);
+  else                                  _crossRenderBar(rows);
+}
 
-  // Бар-чарт.
-  const maxV = Math.max(...rows.map(r => Math.abs(r.value))) || 1;
-  const hasNeg = rows.some(r => r.value < 0);
-  const best = rows[0].value;
-  const worst = rows[rows.length - 1].value;
-  const avg = rows.reduce((s, r) => s + r.value, 0) / rows.length;
-  const median = rows.length ? rows.slice().sort((a,b) => a.value - b.value)[Math.floor(rows.length / 2)].value : 0;
+// ── Радар (паутинка) ─────────────────────────────────────────────────
+// Оси = _CROSS_RADAR_AXES, radius = percentile (0..1). Каждая видимая
+// компания — полигон своего цвета. Наведение на точку — tooltip с
+// исходным значением метрики.
+function _crossRenderRadar(rows, ranks){
+  const chart = document.getElementById('cross-chart');
+  const axes = _CROSS_RADAR_AXES.map(k => _CROSS_METRICS.find(m => m.k === k)).filter(Boolean);
+  const N = axes.length;
+  const W = 640, H = 560;
+  const cx = W / 2, cy = H / 2 - 8;
+  const R = Math.min(W, H) / 2 - 96;
+  const angleOf = i => -Math.PI / 2 + (i / N) * Math.PI * 2; // 12 часов → по часовой
+  const point = (i, r) => [cx + Math.cos(angleOf(i)) * R * r, cy + Math.sin(angleOf(i)) * R * r];
+  // Сетка: 4 концентрических десятиугольника (25/50/75/100%).
+  const gridPoly = f => axes.map((_, i) => {
+    const [x, y] = point(i, f);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const grid = [0.25, 0.5, 0.75, 1].map(f =>
+    `<polygon points="${gridPoly(f)}" fill="none" stroke="var(--border)" stroke-width="${f===1?1.2:.7}" opacity="${f===1?0.9:0.5}"/>`
+  ).join('');
+  const spokes = axes.map((m, i) => {
+    const [x, y] = point(i, 1);
+    return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width=".6" opacity=".55"/>`;
+  }).join('');
+  // Подписи осей.
+  const labels = axes.map((m, i) => {
+    const [x, y] = point(i, 1.14);
+    const anchor = Math.abs(x - cx) < 2 ? 'middle' : (x > cx ? 'start' : 'end');
+    const tag = m.higher === false ? ' ↓' : '';
+    const short = m.l.split(',')[0].split('(')[0].trim();
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="var(--text2)" font-size="11" font-family="var(--mono, monospace)">${short}${tag}</text>`;
+  }).join('');
+  // Метки перцентиля 50/100.
+  const ringLabels = [0.5, 1].map(f => {
+    const [x, y] = point(0, f);
+    return `<text x="${(x+6).toFixed(1)}" y="${(y-4).toFixed(1)}" fill="var(--text3)" font-size="9">${Math.round(f*100)}</text>`;
+  }).join('');
+  // Полигоны компаний (только видимые).
+  const polys = [];
+  const markers = [];
+  rows.forEach((r, idx) => {
+    if(_crossHiddenIds.has(r.id)) return;
+    const color = _crossColor(idx);
+    const pts = [];
+    axes.forEach((m, i) => {
+      const pr = ranks[m.k]?.[r.id];
+      const f = pr == null ? 0 : pr / 100;
+      const [x, y] = point(i, f);
+      pts.push([x, y, m, pr, r.values[m.k]]);
+    });
+    const polyStr = pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    polys.push(`<polygon points="${polyStr}" fill="${color}" fill-opacity=".12" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/>`);
+    pts.forEach(p => {
+      const [x, y, m, pr, raw] = p;
+      const title = `${r.name} · ${m.l}: ${_crossFmt(raw, m.unit)} (перцентиль ${pr == null ? '—' : pr})`;
+      markers.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="${color}" stroke="var(--bg)" stroke-width=".8"><title>${title.replace(/"/g,'&quot;')}</title></circle>`);
+    });
+  });
+  const visibleCount = rows.filter(r => !_crossHiddenIds.has(r.id)).length;
+  chart.innerHTML = `
+    <div style="font-size:.56rem;color:var(--text3);margin-bottom:4px">
+      ↓ = «меньше — лучше» (для ND/EBITDA шкала инвертирована, чтобы «дальше от центра = лучше» работало всегда). Наведите мышь на точку — увидите сырое значение.
+    </div>
+    <div style="overflow:auto"><svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block;margin:0 auto">
+      ${grid}${spokes}${ringLabels}${labels}${polys.join('')}${markers.join('')}
+    </svg></div>
+    <div style="margin-top:4px;font-size:.55rem;color:var(--text3)">Показано полигонов: ${visibleCount} / ${rows.length}. Отключайте лишние в списке слева.</div>
+  `;
+}
 
-  const barRows = rows.map((r, i) => {
+// ── Тепловая карта ───────────────────────────────────────────────────
+// Строки = компании (отсортированы по среднему перцентилю по всем
+// метрикам — лучшие сверху). Колонки = метрики. Цвет ячейки ∝
+// перцентилю: красный (0) → жёлтый (50) → зелёный (100).
+function _percentileColor(p){
+  if(p == null) return 'var(--s1)';
+  // 0 → #ff4d6d, 50 → #f5a623, 100 → #22d3a0
+  const hex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const [r, g, bl] = p <= 50
+    ? mix(hex('#ff4d6d'), hex('#f5a623'), p / 50)
+    : mix(hex('#f5a623'), hex('#22d3a0'), (p - 50) / 50);
+  return `rgba(${r},${g},${bl},.78)`;
+}
+
+function _crossRenderHeatmap(rows, ranks){
+  const chart = document.getElementById('cross-chart');
+  const metrics = _CROSS_METRICS;
+  // Сортировка строк: сначала считаем средний перцентиль по всем метрикам у каждой компании.
+  const withAvg = rows.map(r => {
+    const vals = metrics.map(m => ranks[m.k]?.[r.id]).filter(v => v != null);
+    const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : -1;
+    return {row: r, avg};
+  });
+  withAvg.sort((a, b) => b.avg - a.avg);
+  const visible = withAvg.filter(x => !_crossHiddenIds.has(x.row.id));
+  if(!visible.length){
+    chart.innerHTML = '<div class="empty"><div class="ei">👻</div><p>Все компании скрыты — отметьте их в списке слева.</p></div>';
+    return;
+  }
+  const headCols = metrics.map(m => {
+    const lbl = m.l.split(',')[0].split('(')[0].trim();
+    const arr = m.higher === false ? ' ↓' : '';
+    return `<th style="font-size:.5rem;padding:6px 3px;border:1px solid var(--border);color:var(--text3);writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;min-width:26px" title="${m.l}">${lbl}${arr}</th>`;
+  }).join('');
+  const body = visible.map(({row, avg}) => {
+    const cells = metrics.map(m => {
+      const p = ranks[m.k]?.[row.id];
+      const raw = row.values[m.k];
+      const color = _percentileColor(p);
+      const label = p == null ? '—' : String(p);
+      const tt = `${m.l}: ${_crossFmt(raw, m.unit)} · перцентиль ${p == null ? '—' : p}`;
+      return `<td style="padding:0;border:1px solid var(--border);text-align:center;font-size:.54rem;font-variant-numeric:tabular-nums;background:${color};color:${p!=null&&p<40?'#fff':'var(--bg)'};min-width:36px;height:22px" title="${tt.replace(/"/g,'&quot;')}">${label}</td>`;
+    }).join('');
+    const avgCell = `<td style="padding:3px 6px;border:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums;background:${_percentileColor(avg<0?null:avg)};color:${avg<50?'#fff':'var(--bg)'};font-weight:600">${avg<0?'—':avg.toFixed(0)}</td>`;
+    return `<tr>
+      <td style="padding:3px 6px;border:1px solid var(--border);background:var(--s1);white-space:nowrap;font-size:.58rem;color:var(--text2);max-width:220px;overflow:hidden;text-overflow:ellipsis">
+        <span style="cursor:pointer;text-decoration:underline dotted var(--text3) 1px" onclick="crossOpenIssuer('${row.id}')" title="${row.name} · ${row.type}">${row.name}</span>
+        <span style="color:var(--text3);font-size:.5rem"> · ${row.type}</span>
+      </td>
+      ${avgCell}
+      ${cells}
+    </tr>`;
+  }).join('');
+  chart.innerHTML = `
+    <div style="font-size:.56rem;color:var(--text3);margin-bottom:4px">
+      Строки отсортированы по среднему перцентилю (лучшие сверху). Зелёный = лидер, красный = аутсайдер. ↓ = метрика «меньше — лучше» (шкала уже инвертирована).
+    </div>
+    <div style="overflow:auto;max-height:640px"><table style="border-collapse:collapse;font-family:var(--mono,monospace)">
+      <thead><tr>
+        <th style="padding:6px 8px;border:1px solid var(--border);background:var(--bg);text-align:left;font-size:.58rem;color:var(--text3);position:sticky;left:0;z-index:2">Компания</th>
+        <th style="padding:6px 8px;border:1px solid var(--border);background:var(--bg);font-size:.58rem;color:var(--text3)" title="Средний перцентиль по всем метрикам">ср.</th>
+        ${headCols}
+      </tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>
+  `;
+}
+
+// ── Бар-чарт по одной метрике (старый вид) ───────────────────────────
+function _crossRenderBar(rows){
+  const chart = document.getElementById('cross-chart');
+  const metricKey = document.getElementById('cross-metric')?.value || 'ebitdam';
+  const metric = _CROSS_METRICS.find(m => m.k === metricKey) || _CROSS_METRICS[0];
+  const filtered = rows
+    .filter(r => !_crossHiddenIds.has(r.id) && r.values[metric.k] != null)
+    .map(r => ({...r, value: r.values[metric.k]}));
+  filtered.sort((a, b) => metric.higher === false ? (a.value - b.value) : (b.value - a.value));
+  if(!filtered.length){
+    chart.innerHTML = `<div class="empty"><div class="ei">∅</div><p>Ни у одного эмитента нет полей для показателя «${metric.l}».</p></div>`;
+    return;
+  }
+  const maxV = Math.max(...filtered.map(r => Math.abs(r.value))) || 1;
+  const hasNeg = filtered.some(r => r.value < 0);
+  const best = filtered[0].value;
+  const worst = filtered[filtered.length - 1].value;
+  const avg = filtered.reduce((s, r) => s + r.value, 0) / filtered.length;
+  const median = filtered.slice().sort((a, b) => a.value - b.value)[Math.floor(filtered.length / 2)].value;
+  const barRows = filtered.map((r, i) => {
     const absW = Math.abs(r.value) / maxV * (hasNeg ? 50 : 100);
     const barPos = hasNeg
       ? (r.value >= 0
           ? `left:50%;width:${absW}%;background:${metric.higher === false ? 'var(--danger)' : 'var(--green)'};opacity:.75`
           : `right:50%;width:${absW}%;background:${metric.higher === false ? 'var(--green)' : 'var(--danger)'};opacity:.75`)
       : `left:0;width:${absW}%;background:var(--acc);opacity:.72`;
-    const clr = r.value === best ? 'var(--green)' : (r.value === worst && rows.length > 1 ? 'var(--danger)' : 'var(--text2)');
+    const clr = r.value === best ? 'var(--green)' : (r.value === worst && filtered.length > 1 ? 'var(--danger)' : 'var(--text2)');
     return `<div style="display:grid;grid-template-columns:30px minmax(180px,1.4fr) 1fr 100px;gap:8px;padding:4px 4px;border-bottom:1px solid rgba(30,48,72,.3);align-items:center;font-size:.64rem">
       <div style="color:var(--text3);text-align:right;font-variant-numeric:tabular-nums">${i + 1}.</div>
       <div style="color:${clr};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name} · ${r.type}"><span style="cursor:pointer;text-decoration:underline dotted var(--text3) 1px" onclick="crossOpenIssuer('${r.id}')">${r.name}</span><span style="color:var(--text3);font-size:.52rem"> · ${r.type}</span></div>
@@ -6657,11 +6930,10 @@ function crossRender(){
       <div style="text-align:right;font-variant-numeric:tabular-nums;color:${clr};font-weight:600">${_crossFmt(r.value, metric.unit)}</div>
     </div>`;
   }).join('');
-
   chart.innerHTML = `
     <div style="margin-bottom:6px;font-size:.58rem;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap">
-      <span><strong style="color:var(--text2)">Период:</strong> ${rows[0].year} ${rows[0].period}</span>
-      <span><strong style="color:var(--text2)">Лидер:</strong> ${rows[0].name} = ${_crossFmt(best, metric.unit)}</span>
+      <span><strong style="color:var(--text2)">Показатель:</strong> ${metric.l}</span>
+      <span><strong style="color:var(--text2)">Лидер:</strong> ${filtered[0].name} = ${_crossFmt(best, metric.unit)}</span>
       <span><strong style="color:var(--text2)">Среднее:</strong> ${_crossFmt(avg, metric.unit)}</span>
       <span><strong style="color:var(--text2)">Медиана:</strong> ${_crossFmt(median, metric.unit)}</span>
     </div>
@@ -6688,21 +6960,32 @@ function crossExportCsv(){
     alert('Нет данных для экспорта — выберите период с доступными эмитентами.');
     return;
   }
-  const {rows, metric, periodKey} = window._crossLast;
-  const header = ['rank','name','type','year','period', metric.k, 'unit'].join(';');
-  const body = rows.map((r, i) => [
-    i + 1,
-    '"' + (r.name || '').replace(/"/g, '""') + '"',
-    r.type,
-    r.year,
-    r.period,
-    r.value.toFixed(4).replace('.', ','),
-    metric.unit
-  ].join(';')).join('\n');
+  const {rows, ranks, periodKey} = window._crossLast;
+  const metrics = _CROSS_METRICS;
+  // Сводная матрица: по каждой компании — сырое значение и перцентиль
+  // по всем метрикам плюс средний перцентиль.
+  const header = ['name','type','year','period', ...metrics.map(m => m.k), ...metrics.map(m => m.k + '_pct'), 'avg_pct'].join(';');
+  const body = rows.map(r => {
+    const raw = metrics.map(m => {
+      const v = r.values[m.k];
+      return v == null ? '' : v.toFixed(4).replace('.', ',');
+    });
+    const pct = metrics.map(m => {
+      const p = ranks[m.k]?.[r.id];
+      return p == null ? '' : p;
+    });
+    const valid = pct.filter(p => p !== '');
+    const avg = valid.length ? (valid.reduce((s, v) => s + (+v), 0) / valid.length).toFixed(1).replace('.', ',') : '';
+    return [
+      '"' + (r.name || '').replace(/"/g, '""') + '"',
+      r.type, r.year, r.period,
+      ...raw, ...pct, avg
+    ].join(';');
+  }).join('\n');
   const blob = new Blob(['\ufeff' + header + '\n' + body + '\n'], {type: 'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `cross_${periodKey}_${metric.k}.csv`;
+  a.download = `cross_${periodKey}_matrix.csv`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
