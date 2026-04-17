@@ -285,6 +285,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
     <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
+    <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
   </div>
   <div class="sb-div"></div>
@@ -7488,6 +7489,58 @@ function demojibakeCp1251(str){
   }
   try { return new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
   catch(_){ return null; }
+}
+
+// Признак того, что строка — мохо́на CP1251 (а не нормальный текст).
+// Считаем пары «Р<кириллица/типографика>» — в обычном русском тексте
+// столько таких пар подряд не бывает.
+function looksLikeMojibake(s){
+  if(typeof s !== 'string' || !s) return false;
+  const hits = (s.match(/Р[\u0400-\u04FF\u2010-\u2122]/g) || []).length;
+  return hits >= 2;
+}
+
+function maybeFixString(s){
+  if(!looksLikeMojibake(s)) return s;
+  const fixed = demojibakeCp1251(s);
+  return (fixed && /[А-Яа-яЁё]/.test(fixed)) ? fixed : s;
+}
+
+// Глубокое восстановление: ходим по объекту и исправляем все строки,
+// включая ключи словарей (ключи периодов вида "2025_РџРѕР»СѓРіРѕРґРёРµ_РњРЎР¤Рћ").
+function fixMojibakeDeep(v){
+  if(typeof v === 'string') return maybeFixString(v);
+  if(Array.isArray(v)) return v.map(fixMojibakeDeep);
+  if(v && typeof v === 'object'){
+    const out = {};
+    for(const [k, val] of Object.entries(v)){
+      out[maybeFixString(k)] = fixMojibakeDeep(val);
+    }
+    return out;
+  }
+  return v;
+}
+
+// Чистит всё состояние приложения in-place; возвращает статистику.
+function fixMojibakeEverywhere(){
+  const before = JSON.stringify({ytmBonds, portfolio, watchlists, calEvents, reportsDB});
+  ytmBonds   = fixMojibakeDeep(ytmBonds);
+  portfolio  = fixMojibakeDeep(portfolio);
+  watchlists = fixMojibakeDeep(watchlists);
+  calEvents  = fixMojibakeDeep(calEvents);
+  reportsDB  = fixMojibakeDeep(reportsDB);
+  const after = JSON.stringify({ytmBonds, portfolio, watchlists, calEvents, reportsDB});
+  const changed = before !== after;
+  if(!changed){
+    alert('Кракозябр в текущих данных не найдено — чинить нечего.');
+    return;
+  }
+  save();
+  if(typeof renderYtm === 'function') renderYtm();
+  if(typeof renderPort === 'function') renderPort();
+  if(typeof renderSbLists === 'function') renderSbLists();
+  if(typeof repInit === 'function') repInit();
+  alert('✅ Кириллица восстановлена. Проверьте вкладку «Отчётность».');
 }
 
 // Общий обработчик импорта: принимает уже прочитанный текст, парсит,
