@@ -295,6 +295,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
     <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
+    <input type="file" id="girbo-file" accept=".csv,.txt,.tsv" style="display:none" onchange="importGirboCsv(this)">
+    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт выгрузки ГИРБО (bo.nalog.ru) — CSV/TXT в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV)</div>
     <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
   </div>
@@ -729,6 +731,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
                 <select id="is-rep-type">
                   <option value="">— не указан —</option>
                   <option value="РСБУ">РСБУ (российский стандарт)</option>
+                  <option value="ГИРБО">ГИРБО (госресурс бухучёта ФНС, РСБУ)</option>
                   <option value="МСФО">МСФО / IFRS (международный)</option>
                 </select>
               </div>
@@ -1305,6 +1308,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <select id="rep-np-type">
           <option value="МСФО">МСФО</option>
           <option value="РСБУ">РСБУ</option>
+          <option value="ГИРБО">ГИРБО</option>
         </select>
       </div>
       <!-- File upload -->
@@ -7912,8 +7916,11 @@ function analyzeAutoClick() {
   }, 80);
 }
 
-// Автоопределение РСБУ/МСФО по тексту файла
+// Автоопределение РСБУ/МСФО/ГИРБО по тексту файла
 function detectReportType(text) {
+  // ГИРБО — госресурс бухучёта ФНС (bo.nalog.ru). Строго до МСФО/РСБУ,
+  // т.к. выгрузки ГИРБО сами содержат ключевые слова «РСБУ» в шапке.
+  if (/ГИРБО|bo\.nalog\.ru|Госресурс\s+бухгалтерской|Ресурс\s+бухгалтерской\s+отч/i.test(text)) return 'ГИРБО';
   if (/IFRS|международн\w+ стандарт|IAS |МСФО/i.test(text)) return 'МСФО';
   if (/ПБУ |РСБУ|российск\w+ стандарт|Приказ Минфин/i.test(text)) return 'РСБУ';
   // Коды РСБУ — явный признак
@@ -8228,6 +8235,166 @@ function importAllData(input) {
   };
   reader.onerror = () => alert('Не удалось прочитать файл. Попробуйте «📋 Вставить JSON».');
   reader.readAsText(file);
+}
+
+// ═══ ИМПОРТ ГИРБО (CSV/TXT, Windows-1251 или UTF-8) ═══
+// ГИРБО — Государственный информационный ресурс бухгалтерской отчётности
+// ФНС (bo.nalog.ru). Отдаёт выгрузки в CSV/TXT Windows-1251. Формат
+// отличается от МСФО: это не международный стандарт, а российский
+// госреестр РСБУ-отчётности. Поэтому отдельный тип отчётности «ГИРБО».
+//
+// Алгоритм:
+//   1. Читаем файл как ArrayBuffer.
+//   2. UTF-8 с fatal:true — если не валиден, разворачиваем Windows-1251.
+//   3. Нормализуем «;» → «\t» и гоним через существующий extractByRsbuCodes.
+//   4. Пытаемся вытащить ИНН (10 или 12 цифр), год, наименование.
+//   5. Находим (или создаём) эмитента в reportsDB и дописываем период.
+
+function decodeBytesAutoCp1251(buf){
+  const bytes = new Uint8Array(buf);
+  // BOM UTF-8
+  if(bytes.length >= 3 && bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF){
+    return { text: new TextDecoder('utf-8').decode(bytes.subarray(3)), encoding: 'UTF-8 (BOM)' };
+  }
+  try {
+    return { text: new TextDecoder('utf-8', {fatal:true}).decode(bytes), encoding: 'UTF-8' };
+  } catch(_) {
+    return { text: new TextDecoder('windows-1251').decode(bytes), encoding: 'Windows-1251' };
+  }
+}
+
+function parseGirboText(raw){
+  // CSV-разделитель «;» (де-факто стандарт ГИРБО) заменяем на TAB —
+  // тогда extractByRsbuCodes и findVal видят привычные границы колонок.
+  const text = raw.replace(/;/g, '\t');
+  const lines = text.split(/\r?\n/);
+
+  // ИНН: 10 цифр (юрлицо) или 12 (ИП). Берём первое отдельно стоящее вхождение.
+  const innMatch = text.match(/(?:^|[^\d])(\d{10}|\d{12})(?:[^\d]|$)/);
+  const inn = innMatch ? innMatch[1] : '';
+
+  // Год отчётности: «за 2023 год», «отчётный период … 2023», «на 31.12.2023».
+  let year = null;
+  const yMatches = [
+    text.match(/за\s+(20\d{2})\s*г(?:од)?/i),
+    text.match(/отч[её]тн\w+\s+(?:период|год)[^0-9]{0,40}(20\d{2})/i),
+    text.match(/на\s+31[.\/-]12[.\/-](20\d{2})/),
+  ];
+  for(const m of yMatches){ if(m){ year = parseInt(m[1]); break; } }
+
+  // Наименование: «ПАО "Газпром"», «АО «РЖД»», «ООО Ромашка».
+  // \b не работает для кириллицы в JS, поэтому фиксируем границу вручную:
+  // начало строки или символ, который точно не буква.
+  let name = '';
+  const nameRe = /(?:^|[^А-ЯЁа-яёA-Za-z])((?:ПАО|АО|ОАО|ЗАО|ООО|НКО|ФГУП|ГУП|МУП|ИП)\s+(?:«[^»]{2,120}»|"[^"]{2,120}"|[А-ЯЁA-Z][А-ЯЁа-яёA-Za-z0-9\-\s«»"]{1,80}?))(?=[\s,;:\t\r\n]|$)/u;
+  for(const l of lines){
+    const m = l.match(nameRe);
+    if(m){ name = m[1].trim().replace(/\s+/g,' '); break; }
+  }
+
+  const codes = extractByRsbuCodes(text);
+  return { inn, year, name, codes, encoding: null, text };
+}
+
+function importGirboCsv(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const { text, encoding } = decodeBytesAutoCp1251(e.target.result);
+      const parsed = parseGirboText(text);
+      parsed.encoding = encoding;
+
+      if(!Object.keys(parsed.codes).length){
+        alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
+              'Кодировка: '+encoding+'\n' +
+              'Проверьте, что это выгрузка ГИРБО с кодами строк баланса и ОФР.');
+        return;
+      }
+
+      let year = parsed.year;
+      if(!year){
+        const ans = prompt('Не удалось определить год отчёта из файла.\nУкажите год (например, 2023):', String(new Date().getFullYear()-1));
+        year = ans ? parseInt(String(ans).trim()) : null;
+        if(!year || year < 2000 || year > 2099){ return; }
+      }
+
+      let issName = parsed.name;
+      if(!issName){
+        issName = (prompt('Не удалось определить эмитента из файла.\nВведите название компании:', '') || '').trim();
+        if(!issName) return;
+      }
+
+      // Ищем существующего эмитента: по ИНН — приоритет, затем по имени.
+      let issId = null;
+      for(const [id, iss] of Object.entries(reportsDB)){
+        if(parsed.inn && iss && iss.inn === parsed.inn){ issId = id; break; }
+      }
+      if(!issId){
+        for(const [id, iss] of Object.entries(reportsDB)){
+          if(iss && iss.name && iss.name.trim().toLowerCase() === issName.toLowerCase()){ issId = id; break; }
+        }
+      }
+      if(!issId){
+        issId = 'iss_girbo_' + Date.now().toString(36);
+        reportsDB[issId] = {
+          name: issName, ind: 'other', periods: {},
+          inn: parsed.inn || undefined,
+          note: 'Импорт ГИРБО ('+(encoding)+') · '+new Date().toLocaleDateString('ru-RU'),
+        };
+      } else if(parsed.inn && !reportsDB[issId].inn){
+        reportsDB[issId].inn = parsed.inn;
+      }
+
+      const type = 'ГИРБО';
+      const period = 'FY';
+      const key = year+'_'+period+'_'+type;
+      if(reportsDB[issId].periods[key] &&
+         !confirm('Период '+year+' · '+type+' для «'+reportsDB[issId].name+'» уже есть в базе.\n\nПерезаписать новыми данными?')){
+        return;
+      }
+
+      // ГИРБО хранит суммы в тысячах рублей. БондАналитик считает в млрд ₽.
+      const scale = 0.000001;
+      const fieldMap = {
+        'is-rev':'rev','is-ebit':'ebit','is-np':'np','is-int':'int',
+        'is-tax':'tax','is-assets':'assets','is-ca':'ca','is-cl':'cl',
+        'is-debt':'debt','is-cash':'cash','is-ret':'ret','is-eq':'eq',
+      };
+      const pData = {
+        year, period, type,
+        note: reportsDB[issId].note || '',
+        analysisHTML: '',
+        rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+        assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+      };
+      let filled = 0;
+      for(const [fid, pk] of Object.entries(fieldMap)){
+        const v = parsed.codes[fid];
+        if(v != null){
+          pData[pk] = parseFloat((v * scale).toFixed(6));
+          filled++;
+        }
+      }
+      reportsDB[issId].periods[key] = pData;
+
+      save();
+      if(typeof repInit === 'function') repInit();
+      const sbRep = document.getElementById('sb-rep');
+      if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+
+      alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
+            'Кодировка файла: '+encoding+'\n' +
+            'Заполнено полей: '+filled+' из '+Object.keys(fieldMap).length+'\n\n' +
+            'Откройте «📂 База отчётности» для просмотра.');
+    } catch(err){
+      alert('Ошибка чтения файла ГИРБО: ' + err.message);
+    } finally {
+      input.value = '';
+    }
+  };
+  reader.onerror = () => alert('Не удалось прочитать файл ГИРБО.');
+  reader.readAsArrayBuffer(file);
 }
 
 // Merge-импорт: добавляет новое, не трогая то, что уже есть.
