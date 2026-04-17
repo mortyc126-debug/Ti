@@ -296,8 +296,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
     <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
-    <input type="file" id="girbo-file" accept=".csv,.txt,.tsv" style="display:none" onchange="importGirboCsv(this)">
-    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт выгрузки ГИРБО (bo.nalog.ru) — CSV/TXT в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV)</div>
+    <input type="file" id="girbo-file" accept=".csv,.txt,.tsv,.xml" style="display:none" onchange="importGirboCsv(this)">
+    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт выгрузки ГИРБО (bo.nalog.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
     <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
   </div>
@@ -8321,18 +8321,14 @@ function importAllData(input) {
   reader.readAsText(file);
 }
 
-// ═══ ИМПОРТ ГИРБО (CSV/TXT, Windows-1251 или UTF-8) ═══
+// ═══ ИМПОРТ ГИРБО (CSV/TXT/XML, Windows-1251 или UTF-8) ═══
 // ГИРБО — Государственный информационный ресурс бухгалтерской отчётности
-// ФНС (bo.nalog.ru). Отдаёт выгрузки в CSV/TXT Windows-1251. Формат
-// отличается от МСФО: это не международный стандарт, а российский
-// госреестр РСБУ-отчётности. Поэтому отдельный тип отчётности «ГИРБО».
-//
-// Алгоритм:
-//   1. Читаем файл как ArrayBuffer.
-//   2. UTF-8 с fatal:true — если не валиден, разворачиваем Windows-1251.
-//   3. Нормализуем «;» → «\t» и гоним через существующий extractByRsbuCodes.
-//   4. Пытаемся вытащить ИНН (10 или 12 цифр), год, наименование.
-//   5. Находим (или создаём) эмитента в reportsDB и дописываем период.
+// ФНС (bo.nalog.ru). Отдаёт выгрузки в двух форматах:
+//   * CSV/TXT — строки баланса и ОФР с кодами РСБУ;
+//   * XML КНД 0710099 — машиночитаемая форма с тегами вида
+//     <стр2110>...</стр2110> или атрибутами Код="1600" Знач="...".
+// Оба варианта чаще всего в Windows-1251. Формат отличается от МСФО:
+// это госреестр РСБУ-отчётности, поэтому отдельный тип «ГИРБО».
 
 function decodeBytesAutoCp1251(buf){
   const bytes = new Uint8Array(buf);
@@ -8345,6 +8341,144 @@ function decodeBytesAutoCp1251(buf){
   } catch(_) {
     return { text: new TextDecoder('windows-1251').decode(bytes), encoding: 'Windows-1251' };
   }
+}
+
+// Для XML уважаем заявленную кодировку в прологе: <?xml encoding="..."?>.
+// Первые ~300 байт читаем как ASCII (latin1) — этого хватит, чтобы
+// вытащить имя кодировки даже если сам контент в Windows-1251.
+function decodeXmlBytes(buf){
+  const bytes = new Uint8Array(buf);
+  if(bytes.length >= 3 && bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF){
+    return { text: new TextDecoder('utf-8').decode(bytes.subarray(3)), encoding: 'UTF-8 (BOM)' };
+  }
+  const head = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(bytes.length, 300)));
+  const declMatch = head.match(/<\?xml[^?]*encoding\s*=\s*["']([^"']+)["']/i);
+  const declared = declMatch ? declMatch[1].toLowerCase() : null;
+  if(declared && /windows-?1251|cp1251/.test(declared)){
+    return { text: new TextDecoder('windows-1251').decode(bytes), encoding: 'Windows-1251 (XML prolog)' };
+  }
+  if(declared && /utf-?8/.test(declared)){
+    return { text: new TextDecoder('utf-8').decode(bytes), encoding: 'UTF-8 (XML prolog)' };
+  }
+  return decodeBytesAutoCp1251(buf);
+}
+
+// Распознаём XML либо по расширению, либо по содержимому: строгий
+// ГИРБО-XML начинается с «<?xml», встречаются вариации «<Файл...>».
+function looksLikeXml(name, text){
+  if(/\.xml$/i.test(name||'')) return true;
+  const head = (text||'').trimStart().slice(0, 80);
+  return /^<\?xml/i.test(head) || /^<(?:Файл|Документ|БухОтч)\b/u.test(head);
+}
+
+// RSBU_CODES — это {fieldId: [кодыСтрок]}. Здесь делаем обратное:
+// для каждого кода — список fieldId, на который его значение пойдёт.
+// Делаем ленивое построение: RSBU_CODES объявляется ниже по файлу.
+function _rsbuInverseMap(){
+  const inv = {};
+  for(const [fid, codes] of Object.entries(RSBU_CODES||{})){
+    for(const c of (codes||[])) (inv[String(c)] = inv[String(c)] || []).push(fid);
+  }
+  return inv;
+}
+
+// Парсер ГИРБО-XML: извлекает ИНН/год/наименование + код→значение,
+// маппит коды на внутренние поля (is-rev, is-np, ...) через RSBU_CODES.
+function parseGirboXml(text){
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  const perr = doc.querySelector('parsererror');
+  if(perr){
+    // Попробуем как text/xml — другой кодек ошибок в Firefox.
+    const doc2 = new DOMParser().parseFromString(text, 'text/xml');
+    if(doc2.querySelector('parsererror')){
+      throw new Error('XML не удалось разобрать: ' + (perr.textContent||'').slice(0,200));
+    }
+  }
+  const root = doc.documentElement;
+
+  // ── Метаданные: ИНН, наименование, отчётный год ──
+  let inn = '', name = '', year = null;
+  const all = root.getElementsByTagName('*');
+  for(let i=0;i<all.length;i++){
+    const el = all[i];
+    for(let j=0;j<el.attributes.length;j++){
+      const a = el.attributes[j];
+      const v = (a.value||'').trim();
+      const n = a.name.toLowerCase();
+      if(!inn && /инн/.test(n) && /^(\d{10}|\d{12})$/.test(v)) inn = v;
+      if(!name && /наим(орг|юл|полн|сокр)?|наименование/.test(n) && v.length >= 2) name = v;
+      if(!year && /отчетгод|отчгод|отчётгод|периодотч|годотч|отчетныйгод/.test(n) && /^20\d{2}$/.test(v)) year = parseInt(v);
+      if(!year && /датадок|даталок|дата/.test(n)){
+        const m = v.match(/(?:^|[^\d])(\d{2})\.(\d{2})\.(20\d{2})(?:$|[^\d])/);
+        if(m) year = parseInt(m[3]);
+      }
+    }
+  }
+  if(!inn){
+    const m = (root.textContent||'').match(/\b(\d{10}|\d{12})\b/);
+    if(m) inn = m[1];
+  }
+  if(!year){
+    const m = text.match(/за\s+(20\d{2})\s*г|ОтчетГод\s*=\s*["'](20\d{2})/i);
+    if(m) year = parseInt(m[1]||m[2]);
+  }
+
+  // ── Коды → значения ──
+  // Вариант A: теги вида <стр2110>15876000</стр2110>
+  // Вариант B: элемент с атрибутом Код="2110" + Знач/ЗначОтч/ЗначГод
+  const codeValues = {}; // {codeStr: number}
+  const toNum = s => {
+    const n = parseFloat(String(s||'').replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.'));
+    return isFinite(n) ? n : null;
+  };
+  for(let i=0;i<all.length;i++){
+    const el = all[i];
+    const tag = el.localName || el.nodeName;
+    const tm = tag && tag.match(/^стр_?(\d{4})$/i);
+    if(tm){
+      const num = toNum(el.textContent);
+      if(num != null) codeValues[tm[1]] = num;
+    }
+    // Атрибут Код/код
+    const codeAttr = el.getAttribute('Код') || el.getAttribute('код') || el.getAttribute('KOD');
+    if(codeAttr && /^\d{4}$/.test(codeAttr)){
+      const val = el.getAttribute('Знач') || el.getAttribute('ЗначОтч') ||
+                  el.getAttribute('ЗначГод') || el.getAttribute('Значение') ||
+                  el.getAttribute('значение') || el.textContent;
+      const num = toNum(val);
+      if(num != null && codeValues[codeAttr] == null) codeValues[codeAttr] = num;
+    }
+  }
+
+  // ── Маппинг кода на внутренние поля через RSBU_CODES ──
+  const inv = _rsbuInverseMap();
+  const codes = {};
+  for(const [code, num] of Object.entries(codeValues)){
+    const fids = inv[code] || [];
+    for(const fid of fids){
+      if(fid === 'is-debt' && codes[fid] != null) codes[fid] += num; // 1410+1510
+      else if(codes[fid] == null) codes[fid] = num;
+    }
+  }
+
+  // ── Fallback: прогоняем плоское представление через extractByRsbuCodes,
+  // чтобы поймать нестандартные схемы (например, с человекочитаемой
+  // шапкой внутри XML). ──
+  if(Object.keys(codes).length < 6){
+    const flat = [];
+    for(let i=0;i<all.length;i++){
+      const el = all[i];
+      const attrs = Array.from(el.attributes).map(a => a.name + '\t' + a.value).join('\t');
+      const txt = el.childNodes.length === 1 && el.firstChild.nodeType === 3 ? el.textContent : '';
+      flat.push((el.localName||el.nodeName) + '\t' + attrs + '\t' + txt);
+    }
+    const fromText = extractByRsbuCodes(flat.join('\n'));
+    for(const [fid, v] of Object.entries(fromText)){
+      if(codes[fid] == null && v != null) codes[fid] = v;
+    }
+  }
+
+  return { inn, name, year, codes };
 }
 
 function parseGirboText(raw){
@@ -8385,12 +8519,26 @@ function importGirboCsv(input){
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const { text, encoding } = decodeBytesAutoCp1251(e.target.result);
-      const parsed = parseGirboText(text);
+      const buf = e.target.result;
+      // Сначала прикинем, XML это или CSV, не декодируя весь буфер дважды.
+      const peek = new TextDecoder('latin1').decode(new Uint8Array(buf).subarray(0, Math.min(buf.byteLength, 80)));
+      const isXml = looksLikeXml(file.name, peek);
+
+      let text, encoding, parsed;
+      if(isXml){
+        ({ text, encoding } = decodeXmlBytes(buf));
+        parsed = parseGirboXml(text);
+        parsed.format = 'XML';
+      } else {
+        ({ text, encoding } = decodeBytesAutoCp1251(buf));
+        parsed = parseGirboText(text);
+        parsed.format = 'CSV/TXT';
+      }
       parsed.encoding = encoding;
 
       if(!Object.keys(parsed.codes).length){
         alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
+              'Формат: '+parsed.format+'\n' +
               'Кодировка: '+encoding+'\n' +
               'Проверьте, что это выгрузка ГИРБО с кодами строк баланса и ОФР.');
         return;
@@ -8424,7 +8572,7 @@ function importGirboCsv(input){
         reportsDB[issId] = {
           name: issName, ind: 'other', periods: {},
           inn: parsed.inn || undefined,
-          note: 'Импорт ГИРБО ('+(encoding)+') · '+new Date().toLocaleDateString('ru-RU'),
+          note: 'Импорт ГИРБО ('+parsed.format+', '+encoding+') · '+new Date().toLocaleDateString('ru-RU'),
         };
       } else if(parsed.inn && !reportsDB[issId].inn){
         reportsDB[issId].inn = parsed.inn;
@@ -8468,7 +8616,7 @@ function importGirboCsv(input){
       if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
 
       alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
-            'Кодировка файла: '+encoding+'\n' +
+            'Формат: '+parsed.format+' · '+encoding+'\n' +
             'Заполнено полей: '+filled+' из '+Object.keys(fieldMap).length+'\n\n' +
             'Откройте «📂 База отчётности» для просмотра.');
     } catch(err){
