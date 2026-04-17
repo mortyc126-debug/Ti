@@ -261,7 +261,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   <div class="topbar-right">
     <span class="pulse-dot"></span>
     <span class="ks-badge">КС: 15.00%</span>
-    <input type="file" id="import-file" accept=".json,.txt,application/json,text/plain" style="display:none" onchange="importAllData(this)">
+    <input type="file" id="import-file" accept="*/*" style="display:none" onchange="importAllData(this)">
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem" onclick="exportAllData()" title="Экспорт в JSON">⬇️</button>
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem" onclick="document.getElementById('import-file').click()" title="Импорт из JSON">⬆️</button>
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem;border-color:#6e7681;color:#6e7681" onclick="openGistModal()" title="Синхронизация через GitHub Gist">⚡ Sync</button>
@@ -284,6 +284,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-lbl">Данные · бэкап</div>
     <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
+    <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
   </div>
   <div class="sb-div"></div>
@@ -1523,6 +1524,23 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="modal-hdr">Создать список <button class="modal-x" onclick="closeModal('modal-nl')">✕</button></div>
     <div class="modal-body"><div class="field"><label>Название</label><input id="nl-name" placeholder="Потенциальные покупки..."></div></div>
     <div class="modal-ftr"><button class="btn" onclick="closeModal('modal-nl')">Отмена</button><button class="btn btn-p" onclick="createList()">Создать</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-import-paste">
+  <div class="modal" style="width:600px;max-width:96vw">
+    <div class="modal-hdr">📋 Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px;line-height:1.6">
+        Вставьте содержимое JSON-файла целиком — если файл не удаётся открыть через выбор с диска. Начинается с <code>{</code> и заканчивается <code>}</code>.
+      </div>
+      <textarea id="import-paste-area" placeholder='{"reportsDB": {...}, "portfolio": [...]}'
+        style="width:100%;min-height:240px;font-family:var(--mono);font-size:.62rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-import-paste')">Отмена</button>
+      <button class="btn btn-p" onclick="importFromPastedText()">Загрузить →</button>
+    </div>
   </div>
 </div>
 
@@ -7436,48 +7454,81 @@ function exportAllData() {
   URL.revokeObjectURL(url);
 }
 
+// Общий обработчик импорта: принимает уже прочитанный текст, парсит,
+// спрашивает режим (merge/replace) и применяет. Возвращает true при успехе.
+function applyImportedJsonText(raw){
+  if(!raw || !raw.trim()){ alert('Пустой текст — вставьте содержимое JSON.'); return false; }
+  let d;
+  try {
+    // Чистим BOM и обёрточные пробелы — частая беда при сохранении в .txt.
+    const clean = String(raw).replace(/^\uFEFF/, '').trim();
+    d = JSON.parse(clean);
+  } catch(err){
+    alert('Не получилось разобрать JSON.\n\n' + err.message + '\n\nПроверьте, что текст начинается с { и заканчивается }.');
+    return false;
+  }
+  if(!d || typeof d !== 'object' || Array.isArray(d)){
+    alert('Это не объект бэкапа. Ожидается JSON вида { "reportsDB": {...}, "portfolio": [...] }.');
+    return false;
+  }
+  const hasAnything = ['ytmBonds','portfolio','watchlists','calEvents','reportsDB'].some(k => d[k] != null);
+  if(!hasAnything){
+    alert('В файле нет ни одного из ожидаемых разделов (ytmBonds / portfolio / watchlists / calEvents / reportsDB).');
+    return false;
+  }
+  const choice = (prompt(
+    'Что сделать с текущими данными?\n\n' +
+    '1 — ОБЪЕДИНИТЬ (рекомендуется): добавить новое, ничего не терять.\n' +
+    '      Для отчётности: периоды, которых ещё нет, добавятся; существующие не трогаются.\n' +
+    '2 — ЗАМЕНИТЬ: полностью перезаписать текущие данные файлом (ВНИМАНИЕ: старое удалится).\n\n' +
+    'Введите 1 или 2 (или нажмите Отмена):',
+    '1'
+  ) || '').trim();
+  if(choice !== '1' && choice !== '2') return false;
+
+  if(choice === '2'){
+    if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
+    if(d.portfolio)  portfolio  = d.portfolio;
+    if(d.watchlists) watchlists = d.watchlists;
+    if(d.calEvents)  calEvents  = d.calEvents;
+    if(d.reportsDB)  reportsDB  = d.reportsDB;
+  } else {
+    mergeImportedData(d);
+  }
+  save();
+  renderYtm(); renderPort(); renderSbLists();
+  document.getElementById('sb-pc').textContent = portfolio.length;
+  document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
+  alert(choice==='2' ? '✅ Данные заменены на содержимое файла.' : '✅ Данные объединены с текущими.');
+  return true;
+}
+
+function openPasteImportModal(){
+  const ta = document.getElementById('import-paste-area');
+  if(ta) ta.value = '';
+  document.getElementById('modal-import-paste').classList.add('open');
+}
+
+function importFromPastedText(){
+  const ta = document.getElementById('import-paste-area');
+  const raw = ta ? ta.value : '';
+  if(applyImportedJsonText(raw)) closeModal('modal-import-paste');
+}
+
 function importAllData(input) {
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      // Подчищаем BOM и обёрточные пробелы — встречается, если юзер
-      // сохранил JSON в .txt через блокнот или отредактировал вручную.
-      const raw = String(e.target.result || '').replace(/^\uFEFF/, '').trim();
-      const d = JSON.parse(raw);
-      // 3-состоянийный диалог: объединить / заменить / отмена.
-      // prompt вместо confirm, чтобы дать пользователю явный выбор, а не
-      // подменять стандартное «OK/Cancel» на неочевидную семантику.
-      const choice = (prompt(
-        'Что сделать с текущими данными?\n\n' +
-        '1 — ОБЪЕДИНИТЬ (рекомендуется): добавить новое, ничего не терять.\n' +
-        '      Для отчётности: периоды, которых ещё нет, добавятся; существующие не трогаются.\n' +
-        '2 — ЗАМЕНИТЬ: полностью перезаписать текущие данные файлом (ВНИМАНИЕ: старое удалится).\n\n' +
-        'Введите 1 или 2 (или нажмите Отмена):',
-        '1'
-      ) || '').trim();
-      if(choice !== '1' && choice !== '2') { input.value = ''; return; }
-
-      if(choice === '2'){
-        if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
-        if(d.portfolio)  portfolio  = d.portfolio;
-        if(d.watchlists) watchlists = d.watchlists;
-        if(d.calEvents)  calEvents  = d.calEvents;
-        if(d.reportsDB)  reportsDB  = d.reportsDB;
-      } else {
-        mergeImportedData(d);
-      }
-      save();
-      renderYtm(); renderPort(); renderSbLists();
-      document.getElementById('sb-pc').textContent = portfolio.length;
-      document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
-      alert(choice==='2' ? '✅ Данные заменены на содержимое файла.' : '✅ Данные объединены с текущими.');
+      const raw = String(e.target.result || '');
+      applyImportedJsonText(raw);
     } catch(err) {
-      alert('Ошибка чтения файла: '+err.message);
+      alert('Ошибка чтения файла: ' + err.message);
     } finally {
-      input.value = ''; // чтобы повторный выбор того же файла работал
+      input.value = '';
     }
   };
+  reader.onerror = () => alert('Не удалось прочитать файл. Попробуйте «📋 Вставить JSON».');
   reader.readAsText(file);
 }
 
