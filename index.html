@@ -7420,22 +7420,98 @@ function importAllData(input) {
   reader.onload = e => {
     try {
       const d = JSON.parse(e.target.result);
-      if(!confirm(`Загрузить данные из файла?\nЭто заменит текущие данные портфеля, списков и базы отчётности.`)) return;
-      if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
-      if(d.portfolio)  portfolio  = d.portfolio;
-      if(d.watchlists) watchlists = d.watchlists;
-      if(d.calEvents)  calEvents  = d.calEvents;
-      if(d.reportsDB)  reportsDB  = d.reportsDB;
+      // 3-состоянийный диалог: объединить / заменить / отмена.
+      // prompt вместо confirm, чтобы дать пользователю явный выбор, а не
+      // подменять стандартное «OK/Cancel» на неочевидную семантику.
+      const choice = (prompt(
+        'Что сделать с текущими данными?\n\n' +
+        '1 — ОБЪЕДИНИТЬ (рекомендуется): добавить новое, ничего не терять.\n' +
+        '      Для отчётности: периоды, которых ещё нет, добавятся; существующие не трогаются.\n' +
+        '2 — ЗАМЕНИТЬ: полностью перезаписать текущие данные файлом (ВНИМАНИЕ: старое удалится).\n\n' +
+        'Введите 1 или 2 (или нажмите Отмена):',
+        '1'
+      ) || '').trim();
+      if(choice !== '1' && choice !== '2') { input.value = ''; return; }
+
+      if(choice === '2'){
+        if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
+        if(d.portfolio)  portfolio  = d.portfolio;
+        if(d.watchlists) watchlists = d.watchlists;
+        if(d.calEvents)  calEvents  = d.calEvents;
+        if(d.reportsDB)  reportsDB  = d.reportsDB;
+      } else {
+        mergeImportedData(d);
+      }
       save();
       renderYtm(); renderPort(); renderSbLists();
       document.getElementById('sb-pc').textContent = portfolio.length;
       document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
-      alert('✅ Данные успешно импортированы!');
+      alert(choice==='2' ? '✅ Данные заменены на содержимое файла.' : '✅ Данные объединены с текущими.');
     } catch(err) {
       alert('Ошибка чтения файла: '+err.message);
+    } finally {
+      input.value = ''; // чтобы повторный выбор того же файла работал
     }
   };
   reader.readAsText(file);
+}
+
+// Merge-импорт: добавляет новое, не трогая то, что уже есть.
+// Идентификация: для массивов — по естественному ключу (имя и т.п.);
+// для reportsDB — по name эмитента, т.к. id случайные и в разных
+// экспортах не совпадают. Для периодов: ключ {year}_{period}_{type}.
+function mergeImportedData(d){
+  if(Array.isArray(d.ytmBonds)){
+    const have = new Set(ytmBonds.map(b => (b && b.name) || ''));
+    d.ytmBonds.forEach(b => { if(b && b.name && !have.has(b.name)){ ytmBonds.push(b); have.add(b.name); } });
+  }
+  if(Array.isArray(d.portfolio)){
+    const key = p => ((p && p.id) || '') + '|' + ((p && p.name) || '');
+    const have = new Set(portfolio.map(key));
+    d.portfolio.forEach(p => { const k=key(p); if(!have.has(k)){ portfolio.push(p); have.add(k); } });
+  }
+  if(d.watchlists && typeof d.watchlists === 'object'){
+    for(const [name, list] of Object.entries(d.watchlists)){
+      if(!watchlists[name]){
+        watchlists[name] = list;
+      } else if(Array.isArray(list) && Array.isArray(watchlists[name])){
+        const have = new Set(watchlists[name].map(x => JSON.stringify(x)));
+        list.forEach(item => {
+          const k = JSON.stringify(item);
+          if(!have.has(k)){ watchlists[name].push(item); have.add(k); }
+        });
+      }
+    }
+  }
+  if(Array.isArray(d.calEvents)){
+    const key = ev => ((ev && ev.date) || '') + '|' + ((ev && ev.bond) || '') + '|' + ((ev && ev.text) || '') + '|' + ((ev && ev.type) || '');
+    const have = new Set(calEvents.map(key));
+    d.calEvents.forEach(ev => { const k=key(ev); if(!have.has(k)){ calEvents.push(ev); have.add(k); } });
+  }
+  if(d.reportsDB && typeof d.reportsDB === 'object'){
+    const byName = {};
+    Object.entries(reportsDB).forEach(([id, iss]) => { if(iss && iss.name) byName[iss.name] = id; });
+    Object.entries(d.reportsDB).forEach(([impId, impIss]) => {
+      if(!impIss || !impIss.name) return;
+      let targetId = byName[impIss.name];
+      if(!targetId){
+        let id = impId && !reportsDB[impId] ? impId : ('iss_imp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7));
+        let n = 0; while(reportsDB[id]){ id = (impId||'iss_imp') + '_' + (++n); }
+        reportsDB[id] = impIss;
+        byName[impIss.name] = id;
+      } else {
+        const cur = reportsDB[targetId];
+        if(!cur.periods) cur.periods = {};
+        if(impIss.periods && typeof impIss.periods === 'object'){
+          Object.entries(impIss.periods).forEach(([k, period]) => {
+            if(!cur.periods[k]) cur.periods[k] = period;
+          });
+        }
+        if(!cur.ind && impIss.ind) cur.ind = impIss.ind;
+        if(!cur.note && impIss.note) cur.note = impIss.note;
+      }
+    });
+  }
 }
 
 // Обработчик периода "другой"
