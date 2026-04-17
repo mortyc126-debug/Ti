@@ -4435,6 +4435,67 @@ function urgencyBadge(days){
   return `<span style="font-size:.55rem;color:var(--text3);padding:1px 6px">через ${days}д</span>`;
 }
 
+// Нормализация имени эмитента для fuzzy-сравнения:
+// убираем кавычки, тире, «ПАО/АО/ООО», пробелы, приводим к lowercase.
+function normalizeIssuerName(name){
+  if(!name) return '';
+  return String(name)
+    .toLowerCase()
+    .replace(/[«»"'`"„“()\[\]]/g, '')
+    .replace(/\b(пао|оао|ао|ооо|зао|группа|групп|gk|pjsc|jsc|llc|ltd|public|joint[\s-]?stock|company)\b/g, '')
+    .replace(/[\-–—_.,;:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Ищет в reportsDB эмитента по имени (exact → substring → пересечение слов).
+// Возвращает id или null. Используется из календаря, чтобы дать прямую
+// ссылку в локальную «Базу отчётности» вместо общего e-disclosure-поиска.
+function findReportsIssuerByName(name){
+  if(!name || !reportsDB) return null;
+  const target = normalizeIssuerName(name);
+  if(!target) return null;
+  const entries = Object.entries(reportsDB);
+  // 1) Точное совпадение нормализованных имён
+  for(const [id, iss] of entries){
+    if(normalizeIssuerName(iss && iss.name) === target) return id;
+  }
+  // 2) Подстрока в любую сторону
+  for(const [id, iss] of entries){
+    const n = normalizeIssuerName(iss && iss.name);
+    if(n && (n.includes(target) || target.includes(n))) return id;
+  }
+  // 3) Пересечение значимых (≥3 символа) слов: ищем лучший матч.
+  const targetWords = target.split(' ').filter(w => w.length >= 3);
+  if(!targetWords.length) return null;
+  let bestId = null, bestHits = 0;
+  for(const [id, iss] of entries){
+    const nWords = normalizeIssuerName(iss && iss.name).split(' ').filter(w => w.length >= 3);
+    const hits = targetWords.filter(w => nWords.includes(w)).length;
+    if(hits > bestHits){ bestHits = hits; bestId = id; }
+  }
+  // Требуем минимум 1 совпадение + совпадение хотя бы половины целевых слов.
+  return (bestHits > 0 && bestHits >= Math.ceil(targetWords.length / 2)) ? bestId : null;
+}
+
+// Переключается на вкладку «Отчётность» и выбирает заданного эмитента.
+function calOpenIssuerInReports(issuerId){
+  if(!reportsDB[issuerId]){ alert('Эмитент не найден в базе — возможно, удалён.'); return; }
+  if(typeof showPage === 'function') showPage('reports');
+  // Обновляем select и триггерим его обработчик вручную — часть логики
+  // репа завязана на change-событие / чтение value.
+  const sel = document.getElementById('rep-issuer-sel');
+  if(sel){
+    sel.value = issuerId;
+    if(typeof repSelectIssuer === 'function') repSelectIssuer();
+  }
+  // Подсветим активный пункт в сайдбаре
+  const sbItems = document.querySelectorAll('.sb-item');
+  sbItems.forEach(i => i.classList.remove('active'));
+  const target = [...sbItems].find(i => (i.textContent||'').includes('База отчётности'));
+  if(target) target.classList.add('active');
+}
+
 function renderEventCard(e){
   const m = CAL_TYPE_META[e.type]||CAL_TYPE_META.other;
   const sm = CAL_STATUS_META[e.status]||CAL_STATUS_META.expected;
@@ -4452,22 +4513,34 @@ function renderEventCard(e){
   const moexIssuerLink  = e.isin ? `https://www.moex.com/ru/issue.aspx?code=${e.isin}` : null;
   const moexEventsLink  = e.isin ? `https://iss.moex.com/iss/securities/${e.isin}/events.json` : null;
 
+  // Поиск эмитента в локальной «Базе отчётности» — если есть, делаем
+  // кнопку прямого перехода к нему, а не на общий поиск по внешнему сайту.
+  const localIssuerId = findReportsIssuerByName(e.issuer);
+  const localIssuerLink = localIssuerId
+    ? `<button type="button"
+        style="font-size:.58rem;color:var(--acc);border:1px solid var(--acc);background:transparent;padding:2px 7px;cursor:pointer;transition:background .12s"
+        onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background='transparent'"
+        onclick="event.stopPropagation();calOpenIssuerInReports('${localIssuerId}')">🏢 В базе отчётности</button>`
+    : '';
+
   const linksHTML = isReport ? `
     <div style="display:flex;gap:8px;margin-top:5px;flex-wrap:wrap">
+      ${localIssuerLink}
       <a href="${edisclosureLink}" target="_blank" rel="noopener"
         style="font-size:.58rem;color:var(--acc2);border:1px solid var(--acc2);padding:2px 7px;text-decoration:none;transition:background .12s"
         onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''"
-        onclick="event.stopPropagation()">↗ e-disclosure.ru</a>
+        onclick="event.stopPropagation()">↗ e-disclosure</a>
       ${moexIssuerLink?`<a href="${moexIssuerLink}" target="_blank" rel="noopener"
         style="font-size:.58rem;color:var(--acc2);border:1px solid var(--acc2);padding:2px 7px;text-decoration:none;transition:background .12s"
         onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''"
         onclick="event.stopPropagation()">↗ MOEX</a>`:''}
     </div>` : (e.isin && ['coupon','offer','maturity'].includes(e.type)) ? `
-    <div style="margin-top:4px">
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      ${localIssuerLink}
       <a href="https://www.moex.com/ru/issue.aspx?code=${e.isin}" target="_blank" rel="noopener"
         style="font-size:.58rem;color:var(--text3);border:1px solid var(--border);padding:2px 7px;text-decoration:none"
         onclick="event.stopPropagation()">↗ MOEX · ${e.isin}</a>
-    </div>` : '';
+    </div>` : (localIssuerLink ? `<div style="margin-top:4px">${localIssuerLink}</div>` : '');
 
   const publishedWarning = maybePublished ? `
     <div style="font-size:.6rem;color:var(--warn);margin-top:3px">
