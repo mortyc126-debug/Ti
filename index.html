@@ -200,6 +200,7 @@ tr:hover td{background:var(--s2)}
 /* CAL FILTER */
 .cal-flt.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
 .rep-view-btn.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
+.rep-tf-btn.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
 
 @media(max-width:800px){.sidebar{display:none}.g3,.g4{grid-template-columns:1fr 1fr}}
 </style>
@@ -1191,6 +1192,13 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 
   <!-- Issuer view -->
   <div id="rep-issuer-view" style="display:none">
+    <!-- Type filter (ГИРБО visibility) -->
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <span style="font-size:.56rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Тип отчётности:</span>
+      <button class="btn btn-sm rep-tf-btn" data-tf="all" onclick="repSetTypeFilter('all')" title="Показать все типы: МСФО, РСБУ, ГИРБО (ГИРБО — с низшим приоритетом при равных периодах)">Все</button>
+      <button class="btn btn-sm rep-tf-btn" data-tf="no-girbo" onclick="repSetTypeFilter('no-girbo')" title="Скрыть ГИРБО — оставить только МСФО/РСБУ">Без ГИРБО</button>
+      <button class="btn btn-sm rep-tf-btn" data-tf="only-girbo" onclick="repSetTypeFilter('only-girbo')" title="Только выгрузки ГИРБО с bo.nalog.ru">Только ГИРБО</button>
+    </div>
     <!-- Period tabs -->
     <div style="display:flex;gap:1px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid var(--border)" id="rep-period-tabs"></div>
 
@@ -5194,6 +5202,64 @@ let repActiveIssuerId = null;
 let repActivePeriodKey = null;
 let repViewMode = 'cards';
 
+// Приоритет типов отчётности в смешанных списках. МСФО детальнее
+// и аудируются → первые. РСБУ — оперативные. ГИРБО — те же цифры РСБУ
+// из госреестра ФНС, поэтому замыкает при прочих равных.
+const REP_TYPE_PRIORITY = {'МСФО': 1, 'РСБУ': 2, 'ГИРБО': 3};
+function repTypeRank(t){ return REP_TYPE_PRIORITY[t] ?? 4; }
+
+// Фильтр по типу: 'all' (по умолчанию), 'no-girbo', 'only-girbo'.
+// Храним в localStorage, чтобы переключение сохранялось между сессиями.
+let repTypeFilter = (() => {
+  try { return localStorage.getItem('repTypeFilter') || 'all'; }
+  catch(_) { return 'all'; }
+})();
+
+// Возвращает отфильтрованные и отсортированные entries([key, period]):
+// сначала год (asc/desc в зависимости от order), затем period, затем
+// приоритет типа (МСФО → РСБУ → ГИРБО).
+function repFilteredPeriods(iss, order){
+  if(!iss || !iss.periods) return [];
+  order = order || 'desc';
+  const entries = Object.entries(iss.periods).filter(([,p]) => {
+    if(!p) return false;
+    if(repTypeFilter === 'no-girbo')   return p.type !== 'ГИРБО';
+    if(repTypeFilter === 'only-girbo') return p.type === 'ГИРБО';
+    return true;
+  });
+  entries.sort(([,a],[,b]) => {
+    const ay = String(a.year || ''), by = String(b.year || '');
+    if(ay !== by) return order === 'asc' ? ay.localeCompare(by) : by.localeCompare(ay);
+    const ap = String(a.period || ''), bp = String(b.period || '');
+    if(ap !== bp) return order === 'asc' ? ap.localeCompare(bp) : bp.localeCompare(ap);
+    return repTypeRank(a.type) - repTypeRank(b.type);
+  });
+  return entries;
+}
+
+function repSetTypeFilter(mode){
+  if(!['all','no-girbo','only-girbo'].includes(mode)) return;
+  repTypeFilter = mode;
+  try { localStorage.setItem('repTypeFilter', mode); } catch(_){}
+  document.querySelectorAll('.rep-tf-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tf === mode));
+  // Если активный период отфильтрован — сбросим, дальше repBuildPeriodTabs
+  // выберет первый доступный.
+  const iss = reportsDB[repActiveIssuerId];
+  if(iss && repActivePeriodKey){
+    const per = iss.periods && iss.periods[repActivePeriodKey];
+    const stillVisible = per && (
+      repTypeFilter === 'all' ||
+      (repTypeFilter === 'no-girbo' && per.type !== 'ГИРБО') ||
+      (repTypeFilter === 'only-girbo' && per.type === 'ГИРБО')
+    );
+    if(!stillVisible) repActivePeriodKey = null;
+  }
+  repBuildPeriodTabs();
+  const cmpView = document.getElementById('rep-compare-view');
+  if(cmpView && cmpView.style.display === 'block') repShowCompare();
+}
+
 function repInit(){
   repRebuildSelect();
   const ids = Object.keys(reportsDB);
@@ -5209,6 +5275,9 @@ function repInit(){
     const y = new Date().getFullYear();
     for(let i=y;i>=y-10;i--) ySel.add(new Option(i,i));
   }
+  // Подсветим сохранённый фильтр по типу отчётности.
+  document.querySelectorAll('.rep-tf-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tf === repTypeFilter));
 }
 
 function repRebuildSelect(){
@@ -5249,25 +5318,33 @@ function repSelectIssuer(){
 
 function repBuildPeriodTabs(){
   const iss = reportsDB[repActiveIssuerId]; if(!iss) return;
-  const periods = Object.entries(iss.periods||{}).sort((a,b)=>b[0].localeCompare(a[0]));
+  const periods = repFilteredPeriods(iss, 'desc');
   const tabsEl = document.getElementById('rep-period-tabs');
-  
+
   if(!periods.length){
-    tabsEl.innerHTML = `<div style="font-size:.67rem;color:var(--text3);padding:8px 0">Нет периодов — добавьте первый</div>`;
+    const msg = repTypeFilter === 'only-girbo'
+      ? 'Нет ГИРБО-периодов у этого эмитента. Переключитесь на «Все» или импортируйте ГИРБО.'
+      : repTypeFilter === 'no-girbo'
+      ? 'Нет МСФО/РСБУ-периодов. Снимите фильтр «Без ГИРБО», чтобы увидеть ГИРБО.'
+      : 'Нет периодов — добавьте первый';
+    tabsEl.innerHTML = `<div style="font-size:.67rem;color:var(--text3);padding:8px 0">${msg}</div>`;
     document.getElementById('rep-cards-grid').innerHTML='';
     document.getElementById('rep-compare-btn').style.display='none';
     return;
   }
 
+  // Если активный период не попал в фильтр — выбираем первый доступный.
+  if(!repActivePeriodKey || !periods.some(([k]) => k === repActivePeriodKey)){
+    repActivePeriodKey = periods[0][0];
+  }
+
   document.getElementById('rep-compare-btn').style.display = periods.length>=2 ? '' : 'none';
 
-  tabsEl.innerHTML = periods.map(([key,p],i)=>{
-    const active = repActivePeriodKey===key || (!repActivePeriodKey&&i===0);
-    if(active&&i===0&&!repActivePeriodKey) repActivePeriodKey=key;
+  tabsEl.innerHTML = periods.map(([key,p])=>{
+    const active = repActivePeriodKey===key;
     return `<button class="ptab${active?' active':''}" onclick="repSelectPeriod('${key}',this)">${p.year} ${p.period} <span style="font-size:.55rem;opacity:.7">${p.type}</span></button>`;
   }).join('');
 
-  if(!repActivePeriodKey) repActivePeriodKey = periods[0][0];
   repRenderPeriod();
 }
 
@@ -5360,9 +5437,12 @@ function repRenderText(p, iss){
 
 function repRenderCharts(iss){
   const area = document.getElementById('rep-chart-area');
-  const periods = Object.entries(iss.periods||{}).sort((a,b)=>a[0].localeCompare(b[0]));
+  const periods = repFilteredPeriods(iss, 'asc');
   if(periods.length<2){
-    area.innerHTML=`<div class="empty"><div class="ei">📈</div><p>Нужно минимум 2 периода для сравнения динамики</p></div>`;
+    const hint = repTypeFilter !== 'all'
+      ? '<br><span style="font-size:.6rem;color:var(--text3)">Сейчас активен фильтр «'+(repTypeFilter==='only-girbo'?'Только ГИРБО':'Без ГИРБО')+'» — попробуйте «Все».</span>'
+      : '';
+    area.innerHTML=`<div class="empty"><div class="ei">📈</div><p>Нужно минимум 2 периода для сравнения динамики${hint}</p></div>`;
     return;
   }
 
@@ -5526,7 +5606,11 @@ function repRenderAnalysis(p, iss){
 // ── Compare ──
 function repShowCompare(){
   const iss = reportsDB[repActiveIssuerId]; if(!iss) return;
-  const periods = Object.entries(iss.periods||{}).sort((a,b)=>b[0].localeCompare(a[0]));
+  const periods = repFilteredPeriods(iss, 'desc');
+  if(periods.length < 2){
+    alert('Для сравнения нужно ≥2 периода после фильтра. Сейчас доступно: '+periods.length+'.');
+    return;
+  }
   ['rep-cmp-a','rep-cmp-b'].forEach((selId,si)=>{
     const sel = document.getElementById(selId);
     sel.innerHTML = periods.map(([k,p],i)=>`<option value="${k}" ${i===si?'selected':''}>${p.year} ${p.period} ${p.type}</option>`).join('');
