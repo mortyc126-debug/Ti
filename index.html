@@ -5207,7 +5207,15 @@ function repExportIssuer(){
   if(!repActiveIssuerId) return;
   const iss = reportsDB[repActiveIssuerId];
   if(!iss){ alert('Эмитент не найден'); return; }
-  const payload = { reportsDB: { [repActiveIssuerId]: iss } };
+  // Экспортируем в схеме bondan/issuer/v1 — плоский файл одного эмитента.
+  // Импорт это распознаёт и оборачивает обратно в reportsDB.
+  const payload = {
+    schema: 'bondan/issuer/v1',
+    name: iss.name,
+    ind: iss.ind || 'other',
+    note: iss.note || '',
+    periods: iss.periods || {},
+  };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
@@ -7454,16 +7462,51 @@ function exportAllData() {
   URL.revokeObjectURL(url);
 }
 
+// Развернуть двойную кодировку UTF-8 → CP1251 (классический мохо́на,
+// когда UTF-8-файл читают как Windows-1251, а потом полученные
+// «кракозябры» сохраняют как UTF-8). Возвращает null, если строка
+// не восстанавливается.
+const _cp1251ToByte = (() => {
+  const buf = new Uint8Array(256);
+  for(let i=0;i<256;i++) buf[i]=i;
+  const decoded = new TextDecoder('windows-1251').decode(buf);
+  const map = new Map();
+  for(let i=0;i<256;i++){
+    // Для всех символов CP1251 сохраняем обратный байт; неопределённые
+    // позиции (U+FFFD от дыр в CP1251) пропускаем, иначе коллизии.
+    if(decoded.charCodeAt(i) !== 0xFFFD) map.set(decoded[i], i);
+  }
+  return map;
+})();
+
+function demojibakeCp1251(str){
+  const bytes = new Uint8Array(str.length);
+  for(let i=0;i<str.length;i++){
+    const b = _cp1251ToByte.get(str[i]);
+    if(b === undefined) return null;
+    bytes[i] = b;
+  }
+  try { return new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
+  catch(_){ return null; }
+}
+
 // Общий обработчик импорта: принимает уже прочитанный текст, парсит,
 // спрашивает режим (merge/replace) и применяет. Возвращает true при успехе.
 function applyImportedJsonText(raw){
   if(!raw || !raw.trim()){ alert('Пустой текст — вставьте содержимое JSON.'); return false; }
+  let clean = String(raw).replace(/^\uFEFF/, '').trim();
+
+  // Эвристика мохо́ны: характерный «Р<кириллица>» в 3+ местах.
+  // Разворачиваем только если в результате появляется нормальная кириллица.
+  const mojibakeHits = (clean.match(/Р[\u0400-\u04FF\u2010-\u2122]/g) || []).length;
+  if(mojibakeHits >= 3){
+    const fixed = demojibakeCp1251(clean);
+    if(fixed && /[А-Яа-яЁё]/.test(fixed)) clean = fixed;
+  }
+
   let d;
-  try {
-    // Чистим BOM и обёрточные пробелы — частая беда при сохранении в .txt.
-    const clean = String(raw).replace(/^\uFEFF/, '').trim();
-    d = JSON.parse(clean);
-  } catch(err){
+  try { d = JSON.parse(clean); }
+  catch(err){
     alert('Не получилось разобрать JSON.\n\n' + err.message + '\n\nПроверьте, что текст начинается с { и заканчивается }.');
     return false;
   }
@@ -7471,9 +7514,20 @@ function applyImportedJsonText(raw){
     alert('Это не объект бэкапа. Ожидается JSON вида { "reportsDB": {...}, "portfolio": [...] }.');
     return false;
   }
+
+  // Single-issuer schema (bondan/issuer/v1 или просто объект с name+periods)
+  // авто-оборачиваем в reportsDB — дальше работает общий merge.
+  const isSingleIssuer =
+    !d.reportsDB && !d.portfolio && !d.ytmBonds && !d.watchlists && !d.calEvents &&
+    d.name && d.periods && typeof d.periods === 'object';
+  if(isSingleIssuer){
+    const id = 'iss_imp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+    d = { reportsDB: { [id]: { name: d.name, ind: d.ind || 'other', note: d.note || '', periods: d.periods } } };
+  }
+
   const hasAnything = ['ytmBonds','portfolio','watchlists','calEvents','reportsDB'].some(k => d[k] != null);
   if(!hasAnything){
-    alert('В файле нет ни одного из ожидаемых разделов (ytmBonds / portfolio / watchlists / calEvents / reportsDB).');
+    alert('В файле нет ни одного из ожидаемых разделов (ytmBonds / portfolio / watchlists / calEvents / reportsDB), и это не файл отдельного эмитента (schema bondan/issuer/v1).');
     return false;
   }
   const choice = (prompt(
