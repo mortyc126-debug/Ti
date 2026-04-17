@@ -8110,6 +8110,19 @@ function applyImportedJsonText(raw){
     } } };
   }
 
+  // Bare-reportsDB: плоский словарь {issuerId: {name, periods, ...}}
+  // без обёртки «reportsDB». Детект: нет известных ключей верхнего
+  // уровня, но ВСЕ значения — объекты с name+periods.
+  const knownKeys = ['reportsDB','portfolio','ytmBonds','watchlists','calEvents','schema','name','periods'];
+  const hasKnown = knownKeys.some(k => k in d);
+  if(!hasKnown){
+    const entries = Object.entries(d);
+    const looksLikeIssuerMap = entries.length > 0 && entries.every(([, v]) =>
+      v && typeof v === 'object' && !Array.isArray(v) && typeof v.name === 'string' && v.periods && typeof v.periods === 'object'
+    );
+    if(looksLikeIssuerMap) d = { reportsDB: d };
+  }
+
   const hasAnything = ['ytmBonds','portfolio','watchlists','calEvents','reportsDB'].some(k => d[k] != null);
   if(!hasAnything){
     alert('В файле нет ни одного из ожидаемых разделов (ytmBonds / portfolio / watchlists / calEvents / reportsDB), и это не файл отдельного эмитента (schema bondan/issuer/v1).');
