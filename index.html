@@ -261,7 +261,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   <div class="topbar-right">
     <span class="pulse-dot"></span>
     <span class="ks-badge">КС: 15.00%</span>
-    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importAllData(this)">
+    <input type="file" id="import-file" accept=".json,.txt,application/json,text/plain" style="display:none" onchange="importAllData(this)">
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem" onclick="exportAllData()" title="Экспорт в JSON">⬇️</button>
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem" onclick="document.getElementById('import-file').click()" title="Импорт из JSON">⬆️</button>
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem;border-color:#6e7681;color:#6e7681" onclick="openGistModal()" title="Синхронизация через GitHub Gist">⚡ Sync</button>
@@ -1149,6 +1149,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
+      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">⬇️ Экспорт эмитента</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
     </div>
   </div>
@@ -4799,6 +4800,7 @@ function repSelectIssuer(){
     document.getElementById('rep-add-period-btn').style.display='none';
     document.getElementById('rep-pdf-btn').style.display='none';
     document.getElementById('rep-del-issuer-btn').style.display='none';
+    const ex = document.getElementById('rep-export-issuer-btn'); if(ex) ex.style.display='none';
     return;
   }
   repActiveIssuerId = id;
@@ -4808,6 +4810,7 @@ function repSelectIssuer(){
   document.getElementById('rep-add-period-btn').style.display='';
   document.getElementById('rep-pdf-btn').style.display='';
   document.getElementById('rep-del-issuer-btn').style.display='';
+  const exBtn = document.getElementById('rep-export-issuer-btn'); if(exBtn) exBtn.style.display='';
   repBuildPeriodTabs();
 }
 
@@ -5177,6 +5180,25 @@ function repDeleteIssuer(){
   save(); repInit();
   document.getElementById('rep-issuer-view').style.display='none';
   document.getElementById('rep-empty').style.display='block';
+}
+
+// Экспорт одного эмитента: удобно перетаскивать между устройствами
+// одну компанию, не таская весь портфель. Формат совместим с общим
+// импортом — просто reportsDB с единственным ключом.
+function repExportIssuer(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss){ alert('Эмитент не найден'); return; }
+  const payload = { reportsDB: { [repActiveIssuerId]: iss } };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const safe = (iss.name||'issuer').replace(/[^\wа-яА-ЯёЁ0-9\-]+/g,'_').slice(0,60);
+  a.href = url;
+  a.download = `bondanalytics_${safe}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // Прямой shortcut для загрузки PDF: открывает ту же модалку создания
@@ -7419,7 +7441,10 @@ function importAllData(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const d = JSON.parse(e.target.result);
+      // Подчищаем BOM и обёрточные пробелы — встречается, если юзер
+      // сохранил JSON в .txt через блокнот или отредактировал вручную.
+      const raw = String(e.target.result || '').replace(/^\uFEFF/, '').trim();
+      const d = JSON.parse(raw);
       // 3-состоянийный диалог: объединить / заменить / отмена.
       // prompt вместо confirm, чтобы дать пользователю явный выбор, а не
       // подменять стандартное «OK/Cancel» на неочевидную семантику.
