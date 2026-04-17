@@ -281,6 +281,13 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
+    <div class="sb-lbl">Данные · бэкап</div>
+    <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
+    <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
+    <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
+  </div>
+  <div class="sb-div"></div>
+  <div class="sb-sec">
     <div class="sb-lbl">Мои списки</div>
     <div id="sb-lists"></div>
     <div class="sb-add" onclick="newListModal()">＋ Создать список</div>
