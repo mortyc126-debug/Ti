@@ -1151,6 +1151,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
+      <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие">✎ Редактировать</button>
       <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">⬇️ Экспорт эмитента</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
     </div>
@@ -1211,11 +1212,12 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
-<!-- Modal: new issuer -->
+<!-- Modal: new/edit issuer -->
 <div class="modal-overlay" id="modal-rep-issuer">
-  <div class="modal">
-    <div class="modal-hdr">Новый эмитент <button class="modal-x" onclick="closeModal('modal-rep-issuer')">✕</button></div>
+  <div class="modal" style="width:480px;max-width:96vw">
+    <div class="modal-hdr" id="rep-ni-title">Новый эмитент <button class="modal-x" onclick="closeModal('modal-rep-issuer')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="rep-ni-id">
       <div class="field"><label>Название компании</label><input id="rep-ni-name" placeholder="ПАО Газпром"></div>
       <div class="field"><label>Отрасль</label>
         <select id="rep-ni-ind">
@@ -1226,10 +1228,27 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <option value="other">Другое</option>
         </select>
       </div>
+      <div style="border:1px solid var(--border2);padding:10px;background:var(--bg);display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Раскрытие · ссылки на e-disclosure</div>
+        <div class="gap-row">
+          <div class="field" style="flex:1;min-width:180px"><label>ISIN (опц.)</label>
+            <input id="rep-ni-isin" placeholder="RU000A10EAC6" style="text-transform:uppercase">
+          </div>
+          <button class="btn btn-sm" type="button" onclick="repNiFetchMoex()" title="Подтянуть ИНН/ОГРН по ISIN из MOEX">🔍 С MOEX</button>
+        </div>
+        <div class="g2">
+          <div class="field"><label>ИНН</label><input id="rep-ni-inn" placeholder="7736050003" inputmode="numeric"></div>
+          <div class="field"><label>ОГРН</label><input id="rep-ni-ogrn" placeholder="1027700070518" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>URL раскрытия (вручную, перекрывает всё)</label>
+          <input id="rep-ni-disclosure" placeholder="https://www.e-disclosure.ru/portal/company.aspx?id=934">
+        </div>
+        <div id="rep-ni-moex-status" style="font-size:.6rem;color:var(--text3);min-height:14px"></div>
+      </div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-issuer')">Отмена</button>
-      <button class="btn btn-p" onclick="repCreateIssuer()">Создать</button>
+      <button class="btn btn-p" onclick="repSaveIssuerFromModal()" id="rep-ni-save">Создать</button>
     </div>
   </div>
 </div>
@@ -4507,15 +4526,28 @@ function renderEventCard(e){
   const isReport = e.type === 'report';
   const maybePublished = isReport && isPast && e.status === 'expected';
 
-  // Ссылки на источники
+  // Ссылки на источники.
+  // Приоритет для e-disclosure:
+  //   1) URL, прописанный у эмитента вручную (самая точная);
+  //   2) поиск по ОГРН (уникален);
+  //   3) поиск по ИНН (обычно уникален);
+  //   4) поиск по имени (fallback).
+  const localIssuerId = findReportsIssuerByName(e.issuer);
+  const localIss = localIssuerId ? reportsDB[localIssuerId] : null;
   const issuerQuery = encodeURIComponent(e.issuerShort || e.issuer.split(' ').slice(0,2).join(' '));
-  const edisclosureLink = `https://e-disclosure.ru/poisk-po-kompaniyam?query=${issuerQuery}`;
+  const edisclosureLink =
+      (localIss && localIss.disclosureUrl) ? localIss.disclosureUrl
+    : (localIss && localIss.ogrn) ? `https://www.e-disclosure.ru/poisk-po-ogrn?ogrn=${encodeURIComponent(localIss.ogrn)}`
+    : (localIss && localIss.inn)  ? `https://www.e-disclosure.ru/poisk-po-inn?inn=${encodeURIComponent(localIss.inn)}`
+    : `https://www.e-disclosure.ru/poisk-po-kompaniyam?query=${issuerQuery}`;
+  const edisclosureHint =
+      (localIss && localIss.disclosureUrl) ? 'прямая ссылка'
+    : (localIss && localIss.ogrn) ? 'по ОГРН'
+    : (localIss && localIss.inn)  ? 'по ИНН'
+    : 'поиск по имени';
   const moexIssuerLink  = e.isin ? `https://www.moex.com/ru/issue.aspx?code=${e.isin}` : null;
   const moexEventsLink  = e.isin ? `https://iss.moex.com/iss/securities/${e.isin}/events.json` : null;
 
-  // Поиск эмитента в локальной «Базе отчётности» — если есть, делаем
-  // кнопку прямого перехода к нему, а не на общий поиск по внешнему сайту.
-  const localIssuerId = findReportsIssuerByName(e.issuer);
   const localIssuerLink = localIssuerId
     ? `<button type="button"
         style="font-size:.58rem;color:var(--acc);border:1px solid var(--acc);background:transparent;padding:2px 7px;cursor:pointer;transition:background .12s"
@@ -4527,9 +4559,10 @@ function renderEventCard(e){
     <div style="display:flex;gap:8px;margin-top:5px;flex-wrap:wrap">
       ${localIssuerLink}
       <a href="${edisclosureLink}" target="_blank" rel="noopener"
+        title="${edisclosureHint}"
         style="font-size:.58rem;color:var(--acc2);border:1px solid var(--acc2);padding:2px 7px;text-decoration:none;transition:background .12s"
         onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''"
-        onclick="event.stopPropagation()">↗ e-disclosure</a>
+        onclick="event.stopPropagation()">↗ e-disclosure · ${edisclosureHint}</a>
       ${moexIssuerLink?`<a href="${moexIssuerLink}" target="_blank" rel="noopener"
         style="font-size:.58rem;color:var(--acc2);border:1px solid var(--acc2);padding:2px 7px;text-decoration:none;transition:background .12s"
         onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''"
@@ -4901,6 +4934,7 @@ function repSelectIssuer(){
     document.getElementById('rep-pdf-btn').style.display='none';
     document.getElementById('rep-del-issuer-btn').style.display='none';
     const ex = document.getElementById('rep-export-issuer-btn'); if(ex) ex.style.display='none';
+    const ed = document.getElementById('rep-edit-issuer-btn'); if(ed) ed.style.display='none';
     return;
   }
   repActiveIssuerId = id;
@@ -4911,6 +4945,7 @@ function repSelectIssuer(){
   document.getElementById('rep-pdf-btn').style.display='';
   document.getElementById('rep-del-issuer-btn').style.display='';
   const exBtn = document.getElementById('rep-export-issuer-btn'); if(exBtn) exBtn.style.display='';
+  const edBtn = document.getElementById('rep-edit-issuer-btn'); if(edBtn) edBtn.style.display='';
   repBuildPeriodTabs();
 }
 
@@ -5257,21 +5292,131 @@ function repRenderCompare(){
 }
 
 // ── CRUD ──
+function repNiClearForm(){
+  document.getElementById('rep-ni-id').value = '';
+  document.getElementById('rep-ni-name').value = '';
+  document.getElementById('rep-ni-ind').value = 'other';
+  document.getElementById('rep-ni-isin').value = '';
+  document.getElementById('rep-ni-inn').value = '';
+  document.getElementById('rep-ni-ogrn').value = '';
+  document.getElementById('rep-ni-disclosure').value = '';
+  const st = document.getElementById('rep-ni-moex-status'); if(st) st.textContent = '';
+}
 function repNewIssuerModal(){
-  document.getElementById('rep-ni-name').value='';
+  repNiClearForm();
+  document.getElementById('rep-ni-title').innerHTML = 'Новый эмитент <button class="modal-x" onclick="closeModal(\'modal-rep-issuer\')">✕</button>';
+  document.getElementById('rep-ni-save').textContent = 'Создать';
   document.getElementById('modal-rep-issuer').classList.add('open');
 }
-function repCreateIssuer(){
-  const name=document.getElementById('rep-ni-name').value.trim();
-  if(!name) return;
-  const ind=document.getElementById('rep-ni-ind').value;
-  const id='iss_'+Date.now();
-  reportsDB[id]={name,ind,periods:{}};
+function repEditIssuerModal(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  repNiClearForm();
+  document.getElementById('rep-ni-id').value = repActiveIssuerId;
+  document.getElementById('rep-ni-name').value = iss.name || '';
+  document.getElementById('rep-ni-ind').value = iss.ind || 'other';
+  document.getElementById('rep-ni-isin').value = iss.isin || '';
+  document.getElementById('rep-ni-inn').value = iss.inn || '';
+  document.getElementById('rep-ni-ogrn').value = iss.ogrn || '';
+  document.getElementById('rep-ni-disclosure').value = iss.disclosureUrl || '';
+  document.getElementById('rep-ni-title').innerHTML = 'Редактировать эмитента <button class="modal-x" onclick="closeModal(\'modal-rep-issuer\')">✕</button>';
+  document.getElementById('rep-ni-save').textContent = '💾 Сохранить';
+  document.getElementById('modal-rep-issuer').classList.add('open');
+}
+function repSaveIssuerFromModal(){
+  const editId = document.getElementById('rep-ni-id').value.trim();
+  const name = document.getElementById('rep-ni-name').value.trim();
+  if(!name){ alert('Укажите название компании.'); return; }
+  const ind = document.getElementById('rep-ni-ind').value;
+  const isin = document.getElementById('rep-ni-isin').value.trim().toUpperCase();
+  const inn  = document.getElementById('rep-ni-inn').value.trim();
+  const ogrn = document.getElementById('rep-ni-ogrn').value.trim();
+  const disclosureUrl = document.getElementById('rep-ni-disclosure').value.trim();
+  if(editId && reportsDB[editId]){
+    // Редактирование: сохраняем periods/note и прочие поля
+    const cur = reportsDB[editId];
+    cur.name = name; cur.ind = ind;
+    cur.isin = isin || undefined;
+    cur.inn = inn || undefined;
+    cur.ogrn = ogrn || undefined;
+    cur.disclosureUrl = disclosureUrl || undefined;
+    save(); closeModal('modal-rep-issuer');
+    repRebuildSelect();
+    document.getElementById('rep-issuer-sel').value = editId;
+    repSelectIssuer();
+    return;
+  }
+  // Новый эмитент
+  const id = 'iss_' + Date.now();
+  reportsDB[id] = {
+    name, ind, periods:{},
+    isin: isin || undefined,
+    inn: inn || undefined,
+    ogrn: ogrn || undefined,
+    disclosureUrl: disclosureUrl || undefined,
+  };
   save(); closeModal('modal-rep-issuer');
   repRebuildSelect();
-  document.getElementById('rep-issuer-sel').value=id;
+  document.getElementById('rep-issuer-sel').value = id;
   repSelectIssuer();
-  document.getElementById('sb-rep').textContent=Object.keys(reportsDB).length;
+  document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
+}
+
+// Бэкап-алиас: в коде мог остаться старый вызов.
+function repCreateIssuer(){ return repSaveIssuerFromModal(); }
+
+// Автоподтягивание ИНН/ОГРН/имени с MOEX ISS по ISIN.
+// MOEX отдаёт описание бумаги в блоке description; имена полей плавают
+// между выпусками (INN / ISSUERINN / EMITTER_INN и т.п.) — пробуем все.
+async function repNiFetchMoex(){
+  const isinInput = document.getElementById('rep-ni-isin');
+  const isin = (isinInput.value || '').trim().toUpperCase();
+  const st = document.getElementById('rep-ni-moex-status');
+  if(!isin){ st.style.color='var(--danger)'; st.textContent='Впишите ISIN, чтобы подтянуть данные с MOEX.'; return; }
+  if(typeof moexFetch !== 'function'){ st.style.color='var(--danger)'; st.textContent='MOEX-клиент недоступен.'; return; }
+  st.style.color = 'var(--warn)';
+  st.textContent = '⏳ Запрашиваю MOEX по ' + isin + '...';
+  try {
+    // 1) Находим SECID (ISIN может и сам быть secid'ом — пробуем прямой запрос)
+    let secid = isin;
+    let desc = null;
+    try { desc = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}.json`); }
+    catch(_){ desc = null; }
+    const hasRows = desc && desc.description && Array.isArray(desc.description.data) && desc.description.data.length;
+    if(!hasRows){
+      const s = await moexFetch(`/iss/securities.json?q=${encodeURIComponent(isin)}&limit=3`);
+      const cols = s?.securities?.columns || [];
+      const rows = s?.securities?.data || [];
+      const secidIdx = cols.indexOf('secid');
+      if(rows.length && secidIdx >= 0){
+        secid = rows[0][secidIdx];
+        desc = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}.json`);
+      }
+    }
+    const map = (typeof parseMoexDesc === 'function' ? parseMoexDesc(desc||{}) : {});
+    // Имена полей ИНН/ОГРН в MOEX плавают — тянем первое непустое
+    const pick = keys => { for(const k of keys){ if(map[k]) return String(map[k]).trim(); } return ''; };
+    const inn  = pick(['INN','ISSUERINN','EMITTER_INN','EMITENT_INN']);
+    const ogrn = pick(['OGRN','ISSUEROGRN','EMITTER_OGRN','EMITENT_OGRN']);
+    const issuerName = pick(['ISSUERNAME','EMITTER_NAME','EMITENT_NAME']);
+    let filled = 0;
+    if(inn){ document.getElementById('rep-ni-inn').value = inn; filled++; }
+    if(ogrn){ document.getElementById('rep-ni-ogrn').value = ogrn; filled++; }
+    // Если название пустое — подставим то, что прислал MOEX (пользователь увидит и сможет перебить)
+    const nameEl = document.getElementById('rep-ni-name');
+    if(issuerName && !nameEl.value.trim()){ nameEl.value = issuerName; filled++; }
+    if(filled){
+      st.style.color = 'var(--green)';
+      st.textContent = `✓ С MOEX: ${[inn&&'ИНН',ogrn&&'ОГРН',issuerName&&'имя'].filter(Boolean).join(' · ')} (${secid})`;
+    } else {
+      st.style.color = 'var(--warn)';
+      st.textContent = 'MOEX вернул описание, но без ИНН/ОГРН. Впишите вручную.';
+    }
+  } catch(e){
+    st.style.color = 'var(--danger)';
+    st.textContent = 'MOEX не ответил: ' + (e.message || e);
+  }
 }
 function repDeleteIssuer(){
   if(!repActiveIssuerId||!confirm('Удалить эмитента и все его отчёты?')) return;
@@ -5296,6 +5441,10 @@ function repExportIssuer(){
     name: iss.name,
     ind: iss.ind || 'other',
     note: iss.note || '',
+    isin: iss.isin || undefined,
+    inn: iss.inn || undefined,
+    ogrn: iss.ogrn || undefined,
+    disclosureUrl: iss.disclosureUrl || undefined,
     periods: iss.periods || {},
   };
   const json = JSON.stringify(payload, null, 2);
@@ -7699,7 +7848,11 @@ function applyImportedJsonText(raw){
     d.name && d.periods && typeof d.periods === 'object';
   if(isSingleIssuer){
     const id = 'iss_imp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
-    d = { reportsDB: { [id]: { name: d.name, ind: d.ind || 'other', note: d.note || '', periods: d.periods } } };
+    d = { reportsDB: { [id]: {
+      name: d.name, ind: d.ind || 'other', note: d.note || '',
+      isin: d.isin, inn: d.inn, ogrn: d.ogrn, disclosureUrl: d.disclosureUrl,
+      periods: d.periods,
+    } } };
   }
 
   const hasAnything = ['ytmBonds','portfolio','watchlists','calEvents','reportsDB'].some(k => d[k] != null);
@@ -7816,6 +7969,10 @@ function mergeImportedData(d){
         }
         if(!cur.ind && impIss.ind) cur.ind = impIss.ind;
         if(!cur.note && impIss.note) cur.note = impIss.note;
+        // Идентификаторы/ссылки: берём из импорта только если у текущего пусто
+        ['isin','inn','ogrn','disclosureUrl'].forEach(k => {
+          if(!cur[k] && impIss[k]) cur[k] = impIss[k];
+        });
       }
     });
   }
