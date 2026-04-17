@@ -30,6 +30,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .nav-btn:hover{color:var(--acc);background:var(--acc-dim)}
 .nav-btn.active{color:var(--acc);background:var(--acc-dim)}
 .nav-btn.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--acc)}
+.nav-btn.nav-sep{border-left:2px solid var(--border2)}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 14px}
 .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pdot 2s infinite}
 @keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,211,160,.4)}50%{opacity:.7;box-shadow:0 0 0 5px transparent}}
@@ -251,17 +252,17 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   <div class="logo">Бонд<span>Аналитик</span></div>
   <nav class="nav">
     <button class="nav-btn active" onclick="showPage('ytm')">📊 YTM</button>
-    <button class="nav-btn" onclick="showPage('portfolio')">💼 Портфель</button>
-    <button class="nav-btn" onclick="showPage('watchlist')">⭐ Списки</button>
-    <button class="nav-btn" onclick="showPage('pnl')">💰 P&amp;L</button>
     <button class="nav-btn" onclick="showPage('issuer')">🏢 Эмитент</button>
+    <button class="nav-btn nav-sep" onclick="showPage('reports')">📂 Отчётность</button>
+    <button class="nav-btn" onclick="showPage('portfolio')">💼 Портфель</button>
+    <button class="nav-btn" onclick="showPage('pnl')">💰 P&amp;L</button>
+    <button class="nav-btn nav-sep" onclick="showPage('watchlist')">⭐ Списки</button>
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
-    <button class="nav-btn" onclick="showPage('reports')">📂 Отчётность</button>
   </nav>
   <div class="topbar-right">
     <span class="pulse-dot"></span>
     <span class="ks-badge">КС: 15.00%</span>
-    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importAllData(this)">
+    <input type="file" id="import-file" accept="*/*" style="display:none" onchange="importAllData(this)">
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem" onclick="exportAllData()" title="Экспорт в JSON">⬇️</button>
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem" onclick="document.getElementById('import-file').click()" title="Импорт из JSON">⬆️</button>
     <button class="btn btn-sm" style="padding:3px 9px;font-size:.56rem;border-color:#6e7681;color:#6e7681" onclick="openGistModal()" title="Синхронизация через GitHub Gist">⚡ Sync</button>
@@ -271,13 +272,31 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 <div class="main">
 <div class="sidebar">
   <div class="sb-sec">
-    <div class="sb-lbl">Навигация</div>
+    <div class="sb-lbl">Анализ</div>
     <div class="sb-item active" onclick="showPage('ytm');sbAct(this)"><span class="sb-icon">📊</span>Сравнение YTM</div>
-    <div class="sb-item" onclick="showPage('portfolio');sbAct(this)"><span class="sb-icon">💼</span>Портфель<span class="sb-badge" id="sb-pc">0</span></div>
-    <div class="sb-item" onclick="showPage('pnl');sbAct(this)"><span class="sb-icon">💰</span>P&amp;L / Безубыток</div>
     <div class="sb-item" onclick="showPage('issuer');sbAct(this)"><span class="sb-icon">🏢</span>Анализ эмитента</div>
-    <div class="sb-item" onclick="showPage('calendar');sbAct(this)"><span class="sb-icon">📅</span>Календарь событий<span class="sb-badge" id="sb-ev">0</span></div>
     <div class="sb-item" onclick="showPage('reports');sbAct(this)"><span class="sb-icon">📂</span>База отчётности<span class="sb-badge" id="sb-rep">0</span></div>
+  </div>
+  <div class="sb-div"></div>
+  <div class="sb-sec">
+    <div class="sb-lbl">Портфель</div>
+    <div class="sb-item" onclick="showPage('portfolio');sbAct(this)"><span class="sb-icon">💼</span>Позиции<span class="sb-badge" id="sb-pc">0</span></div>
+    <div class="sb-item" onclick="showPage('pnl');sbAct(this)"><span class="sb-icon">💰</span>P&amp;L / Безубыток</div>
+    <div class="sb-item" onclick="showPage('watchlist');sbAct(this)"><span class="sb-icon">⭐</span>Сравнение YTM (избранное)</div>
+  </div>
+  <div class="sb-div"></div>
+  <div class="sb-sec">
+    <div class="sb-lbl">События</div>
+    <div class="sb-item" onclick="showPage('calendar');sbAct(this)"><span class="sb-icon">📅</span>Календарь событий<span class="sb-badge" id="sb-ev">0</span></div>
+  </div>
+  <div class="sb-div"></div>
+  <div class="sb-sec">
+    <div class="sb-lbl">Данные · бэкап</div>
+    <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
+    <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
+    <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
+    <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
+    <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -392,6 +411,15 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="stat-card"><div class="sc-lbl">Купонов / год</div><div class="sc-val" id="ps-coup">—</div></div>
   </div>
 
+  <div class="card" id="port-charts-card" style="display:none">
+    <div class="card-hdr">Структура портфеля
+      <span style="margin-left:auto;font-size:.58rem;color:var(--text3)">доли по текущей стоимости</span>
+    </div>
+    <div class="card-body">
+      <div id="port-charts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px"></div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-hdr">+ Добавить позицию
       <span style="margin-left:auto;font-size:.58rem;color:var(--text3)">Введите ISIN или название → автозаполнение с MOEX</span>
@@ -478,6 +506,13 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <div class="field"><label>Номинал, ₽</label><input type="number" id="ep-nom" step="100"></div>
         <div class="field"><label>Лет до погаш.</label><input type="number" id="ep-years" step="0.1" min="0.1"></div>
       </div>
+      <div class="g2">
+        <div class="field"><label>Рейтинг (АКРА/Эксперт)</label><input id="ep-rating" placeholder="AAA, AA+, BBB-..."></div>
+        <div class="field"><label>Оферта (дата put-call, опц.)</label><input type="date" id="ep-offer"></div>
+      </div>
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:.68rem">
+        <input type="checkbox" id="ep-amort"> Амортизация номинала
+      </label>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-edit-pos')">Отмена</button>
@@ -725,13 +760,13 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         </div>
         <div class="card" style="border-color:rgba(0,212,255,.3)">
           <div class="card-hdr">📄 Автозаполнение из отчётности
-            <span style="margin-left:auto;font-size:.58rem;color:var(--text3)">PDF · DOCX · XLSX · МСФО / РСБУ</span>
+            <span style="margin-left:auto;font-size:.58rem;color:var(--text3)">PDF · DOCX · XLSX · 🖼 фото · МСФО / РСБУ</span>
           </div>
           <div class="card-body">
             <div style="font-size:.67rem;color:var(--text2);margin-bottom:8px">Загрузите файл отчётности — поля заполнятся автоматически</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input type="file" id="pdf-upload" accept=".pdf,.docx,.doc,.xlsx,.xls" style="display:none" onchange="parseAnyReport(this)">
-              <button class="btn btn-sm" type="button" onclick="document.getElementById('pdf-upload').click()">📂 PDF / DOCX / XLSX</button>
+              <input type="file" id="pdf-upload" accept=".pdf,.docx,.doc,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="parseAnyReport(this)">
+              <button class="btn btn-sm" type="button" onclick="document.getElementById('pdf-upload').click()">📂 PDF / DOCX / XLSX / 🖼 фото</button>
               <div id="pdf-status" style="font-size:.65rem;color:var(--text3)">файл не выбран</div>
             </div>
             <div id="pdf-found" style="display:none;margin-top:10px;font-size:.64rem;line-height:1.8;color:var(--text2)"></div>
@@ -1142,6 +1177,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
+      <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие">✎ Редактировать</button>
+      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">⬇️ Экспорт эмитента</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
     </div>
   </div>
@@ -1201,11 +1238,12 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
-<!-- Modal: new issuer -->
+<!-- Modal: new/edit issuer -->
 <div class="modal-overlay" id="modal-rep-issuer">
-  <div class="modal">
-    <div class="modal-hdr">Новый эмитент <button class="modal-x" onclick="closeModal('modal-rep-issuer')">✕</button></div>
+  <div class="modal" style="width:480px;max-width:96vw">
+    <div class="modal-hdr" id="rep-ni-title">Новый эмитент <button class="modal-x" onclick="closeModal('modal-rep-issuer')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" id="rep-ni-id">
       <div class="field"><label>Название компании</label><input id="rep-ni-name" placeholder="ПАО Газпром"></div>
       <div class="field"><label>Отрасль</label>
         <select id="rep-ni-ind">
@@ -1216,10 +1254,30 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <option value="other">Другое</option>
         </select>
       </div>
+      <div style="border:1px solid var(--border2);padding:10px;background:var(--bg);display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Раскрытие · ссылки на e-disclosure</div>
+        <div class="gap-row">
+          <div class="field" style="flex:1;min-width:180px"><label>ISIN (опц.)</label>
+            <input id="rep-ni-isin" placeholder="RU000A10EAC6" style="text-transform:uppercase">
+          </div>
+          <button class="btn btn-sm" type="button" onclick="repNiFetchMoex()" title="Подтянуть ИНН/ОГРН по ISIN из MOEX">🔍 С MOEX</button>
+        </div>
+        <div class="g2">
+          <div class="field"><label>ИНН</label><input id="rep-ni-inn" placeholder="7736050003" inputmode="numeric"></div>
+          <div class="field"><label>ОГРН</label><input id="rep-ni-ogrn" placeholder="1027700070518" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>URL раскрытия (вручную, перекрывает всё)</label>
+          <input id="rep-ni-disclosure" placeholder="https://www.e-disclosure.ru/portal/company.aspx?id=934">
+        </div>
+        <div class="field"><label>Кредитный рейтинг (АКРА / Эксперт РА)</label>
+          <input id="rep-ni-rating" placeholder="ruA+, ruBBB-, AA(RU)..." title="Используется в портфеле, если у позиции рейтинг не указан">
+        </div>
+        <div id="rep-ni-moex-status" style="font-size:.6rem;color:var(--text3);min-height:14px"></div>
+      </div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-issuer')">Отмена</button>
-      <button class="btn btn-p" onclick="repCreateIssuer()">Создать</button>
+      <button class="btn btn-p" onclick="repSaveIssuerFromModal()" id="rep-ni-save">Создать</button>
     </div>
   </div>
 </div>
@@ -1253,8 +1311,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div style="border:1px solid var(--border2);padding:10px;background:var(--bg)">
         <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:7px">📎 Загрузить файл (необязательно)</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="rep-np-file" accept=".pdf,.docx,.xlsx,.xls" style="display:none" onchange="repParseFile(this)">
-          <button class="btn btn-sm" onclick="document.getElementById('rep-np-file').click()">📂 PDF / DOCX / XLSX</button>
+          <input type="file" id="rep-np-file" accept=".pdf,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="repParseFile(this)">
+          <button class="btn btn-sm" onclick="document.getElementById('rep-np-file').click()">📂 PDF / DOCX / XLSX / 🖼 фото</button>
           <div id="rep-np-file-status" style="font-size:.63rem;color:var(--text3)">файл не выбран</div>
         </div>
         <div style="margin-top:6px;font-size:.56rem;color:var(--text3)" id="rep-lib-status"></div>
@@ -1278,7 +1336,15 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         </div>
       </div>
       <!-- Fields -->
-      <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:2px">Показатели (млрд ₽, можно заполнить вручную)</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">Показатели <span id="rep-np-manual-unit-hint">(млрд ₽)</span> <span style="color:var(--text2);text-transform:none;letter-spacing:0">· можно заполнить вручную</span></div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Ед.:</span>
+          <label style="font-size:.65rem;display:inline-flex;gap:4px;align-items:center;cursor:pointer"><input type="radio" name="rep-np-manual-unit" value="1" checked onchange="repManualUnitChanged()"> млрд ₽</label>
+          <label style="font-size:.65rem;display:inline-flex;gap:4px;align-items:center;cursor:pointer"><input type="radio" name="rep-np-manual-unit" value="0.001" onchange="repManualUnitChanged()"> млн ₽</label>
+          <label style="font-size:.65rem;display:inline-flex;gap:4px;align-items:center;cursor:pointer"><input type="radio" name="rep-np-manual-unit" value="0.000001" onchange="repManualUnitChanged()"> тыс. ₽</label>
+        </div>
+      </div>
       <div class="g2">
         <div class="field"><label>Выручка</label><input type="number" id="rep-np-rev" placeholder="8 540" step="0.1"></div>
         <div class="field"><label>EBITDA</label><input type="number" id="rep-np-ebitda" placeholder="1 820" step="0.1"></div>
@@ -1321,7 +1387,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <button type="button" class="btn" style="text-align:left" onclick="flLoadPdf()">📂 Ручной подбор из PDF</button>
       <button type="button" class="btn" style="text-align:left" onclick="flPasteText()">📝 Вставить распознанный текст</button>
       <div id="fl-recent-info" style="font-size:.58rem;color:var(--text3);line-height:1.5"></div>
-      <input type="file" id="fl-pdf-input" accept=".pdf,.docx,.xlsx,.xls" style="display:none">
+      <input type="file" id="fl-pdf-input" accept=".pdf,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none">
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-field-lookup')">Отмена</button>
@@ -1518,6 +1584,23 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-import-paste">
+  <div class="modal" style="width:600px;max-width:96vw">
+    <div class="modal-hdr">📋 Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px;line-height:1.6">
+        Вставьте содержимое JSON-файла целиком — если файл не удаётся открыть через выбор с диска. Начинается с <code>{</code> и заканчивается <code>}</code>.
+      </div>
+      <textarea id="import-paste-area" placeholder='{"reportsDB": {...}, "portfolio": [...]}'
+        style="width:100%;min-height:240px;font-family:var(--mono);font-size:.62rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-import-paste')">Отмена</button>
+      <button class="btn btn-p" onclick="importFromPastedText()">Загрузить →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 // ══ CONSTANTS ══
@@ -1556,7 +1639,7 @@ function showPage(n){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','portfolio','watchlist','pnl','issuer','calendar','reports'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   if(n==='portfolio') renderPort();
   if(n==='watchlist') renderWL();
@@ -2183,9 +2266,18 @@ async function parseAnyReport(input) {
         txt += XLSX.utils.sheet_to_csv(wb.Sheets[name]) + '\n';
       });
 
+    } else if (typeof isImageExt === 'function' && isImageExt(ext)) {
+      // ── Изображение (скан / фото таблицы) ──
+      txt = await repOcrImage(file, (p, n, phase) => {
+        status.style.color = 'var(--warn)';
+        status.textContent = phase === 'init'
+          ? '⏳ Загружаю OCR-модели (русский/английский)...'
+          : '⏳ Распознаю изображение...';
+      });
+
     } else {
       status.style.color = 'var(--danger)';
-      status.textContent = '⚠️ Формат не поддерживается. Используйте PDF, DOCX или XLSX.';
+      status.textContent = '⚠️ Формат не поддерживается. Используйте PDF, DOCX, XLSX или фото (JPG/PNG).';
       return;
     }
 
@@ -2443,7 +2535,36 @@ async function lookupIsin(secidOverride){
     document.getElementById('pp-nom').value=nom;
     if(yearsLeft) document.getElementById('pp-years').value=yearsLeft.toFixed(2);
     if(curPrice) document.getElementById('pp-cur').value=curPrice.toFixed(2);
-    status.innerHTML=`<span style="color:var(--green)">✓ ${name} · ${isin}${curPrice?` · цена ${curPrice.toFixed(2)}%`:''}${maturity?` · погаш. ${maturity}`:''}</span>`;
+
+    // Подтягиваем амортизацию и ближайшую оферту из bondization.json.
+    // amortizations > 1 строки (или суммы < номинала на последней дате)
+    // = есть амортизация. offers: ближайшая будущая put-call дата.
+    let hasAmort = false, offerDate = '';
+    try {
+      const bz = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}/bondization.json?iss.meta=off`);
+      const amCols = bz?.amortizations?.columns || [];
+      const amRows = bz?.amortizations?.data || [];
+      if(amRows.length > 1) hasAmort = true;
+      const ofCols = bz?.offers?.columns || [];
+      const ofRows = bz?.offers?.data || [];
+      const ofDateIdx = ofCols.indexOf('offerdate');
+      const todayIso = new Date().toISOString().slice(0,10);
+      const futureOffers = ofRows
+        .map(r => ofDateIdx >= 0 ? r[ofDateIdx] : null)
+        .filter(d => d && d >= todayIso)
+        .sort();
+      if(futureOffers.length) offerDate = futureOffers[0];
+    } catch(_){}
+    // Стэшим данные для addPortPos в data-атрибутах формы.
+    const form = document.getElementById('pp-name');
+    form.dataset.isin = isin;
+    form.dataset.hasAmortization = hasAmort ? '1' : '';
+    form.dataset.offerDate = offerDate || '';
+
+    const extras = [];
+    if(hasAmort) extras.push('амортизация');
+    if(offerDate) extras.push('оферта ' + offerDate);
+    status.innerHTML=`<span style="color:var(--green)">✓ ${name} · ${isin}${curPrice?` · цена ${curPrice.toFixed(2)}%`:''}${maturity?` · погаш. ${maturity}`:''}${extras.length?' · '+extras.join(' · '):''}</span>`;
   }catch(e){
     status.innerHTML=`<span style="color:var(--danger)">Ошибка: ${e.message}</span>`;
   }finally{
@@ -2473,8 +2594,16 @@ function addPortPos(){
   const curP=isNaN(cur)?buy:cur;
   const ytm=(!isNaN(years)&&years>0&&coupon>0)?calcYTM(buy,coupon,years):null;
   const isinVal=document.getElementById('pp-isin').value.trim();
-  portfolio.push({name,btype,ctype,buy,cur:curP,coupon,qty,nom,years:isNaN(years)?0:years,ytm,isin:isinVal,id:Date.now()+Math.random()});
+  const form=document.getElementById('pp-name');
+  const hasAmortization = form.dataset.hasAmortization === '1' ? true : undefined;
+  const offerDate = form.dataset.offerDate || undefined;
+  portfolio.push({
+    name,btype,ctype,buy,cur:curP,coupon,qty,nom,years:isNaN(years)?0:years,
+    ytm,isin:isinVal,id:Date.now()+Math.random(),
+    hasAmortization, offerDate,
+  });
   save(); renderPort(); clearPortForm();
+  if(form){ delete form.dataset.hasAmortization; delete form.dataset.offerDate; delete form.dataset.isin; }
 }
 
 function removePortPos(id){portfolio=portfolio.filter(p=>p.id!==id);save();renderPort()}
@@ -2491,6 +2620,9 @@ function editPortPos(id){
   document.getElementById('ep-qty').value=p.qty;
   document.getElementById('ep-nom').value=p.nom;
   document.getElementById('ep-years').value=p.years;
+  const rat=document.getElementById('ep-rating'); if(rat) rat.value=p.rating||'';
+  const off=document.getElementById('ep-offer'); if(off) off.value=p.offerDate||'';
+  const am=document.getElementById('ep-amort'); if(am) am.checked=!!p.hasAmortization;
   document.getElementById('modal-edit-pos').classList.add('open');
 }
 function saveEditPos(){
@@ -2501,6 +2633,9 @@ function saveEditPos(){
   const coupon=parseFloat(document.getElementById('ep-coupon').value)||0;
   const years=parseFloat(document.getElementById('ep-years').value);
   const nom=parseFloat(document.getElementById('ep-nom').value)||1000;
+  const rat=(document.getElementById('ep-rating')?.value||'').trim();
+  const offerDate=document.getElementById('ep-offer')?.value||'';
+  const hasAmort=!!document.getElementById('ep-amort')?.checked;
   portfolio[idx]={
     ...portfolio[idx],
     name:document.getElementById('ep-name').value.trim(),
@@ -2509,6 +2644,9 @@ function saveEditPos(){
     coupon,buy,cur:isNaN(cur)?buy:cur,
     qty:parseInt(document.getElementById('ep-qty').value)||1,
     nom,years:isNaN(years)?0:years,
+    rating: rat || undefined,
+    offerDate: offerDate || undefined,
+    hasAmortization: hasAmort || undefined,
     ytm:(!isNaN(years)&&years>0&&coupon>0)?calcYTM(buy,coupon,years):null
   };
   save(); renderPort(); closeModal('modal-edit-pos');
@@ -2584,8 +2722,15 @@ function renderPort(){
       ? `<div><span class="${ytmCls(ytmCur)}">${ytmCur.toFixed(2)}%</span> ${deltaStr}</div>`
       : '—';
 
+    // Бэйджи особенностей выпуска: амортизация / оферта / рейтинг
+    const badges = [];
+    if(p.rating) badges.push(`<span title="Рейтинг" style="font-size:.52rem;color:var(--text2);border:1px solid var(--border2);padding:1px 4px;margin-left:5px">${p.rating}</span>`);
+    if(p.hasAmortization) badges.push(`<span title="Амортизация номинала" style="font-size:.52rem;color:var(--warn);border:1px solid var(--warn);padding:1px 4px;margin-left:5px">АМОРТ</span>`);
+    if(p.offerDate) badges.push(`<span title="Оферта ${p.offerDate}" style="font-size:.52rem;color:var(--purple);border:1px solid var(--purple);padding:1px 4px;margin-left:5px">ОФ ${fmtOfferDate(p.offerDate)}</span>`);
+    const badgesHtml = badges.join('');
+
     return`<tr>
-      <td style="font-weight:600">${p.name}</td>
+      <td style="font-weight:600">${p.name}${badgesHtml}</td>
       <td><span class="tag ${BT_TAG[p.btype]||'tag-corp'}">${p.btype}</span></td>
       <td><span class="tag ct-${p.ctype}" style="font-size:.54rem">${CT_LABELS[p.ctype]}</span></td>
       <td>${p.buy.toFixed(2)}%</td><td>${p.cur.toFixed(2)}%</td><td>${p.qty}</td>
@@ -2614,6 +2759,218 @@ function renderPort(){
   const buyEl=document.getElementById('ps-ytmbuy');
   if(buyEl) buyEl.textContent=avgYtmBuy?avgYtmBuy.toFixed(2)+'%':'—';
   document.getElementById('ps-coup').textContent=rub(tCoup);
+  // Круговые диаграммы — рисуем всегда, когда в портфеле что-то есть.
+  renderPortCharts();
+}
+
+// Форматирует дату оферты как «DD.MM.YY» — экономит место в таблице.
+function fmtOfferDate(iso){
+  if(!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1].slice(2)}` : iso;
+}
+
+// Класс рейтинга для группировки. Нормализуем «ruAA+», «AA-», «A+» → «AA»/«A».
+// Возвращает ключ из {AAA, AA, A, BBB, BB, B, CCC и ниже, нет}.
+function ratingClass(r){
+  if(!r) return 'нет';
+  const s = String(r).toUpperCase().replace(/^RU/, '').replace(/[+\-−–]/g,'').trim();
+  if(s.startsWith('AAA')) return 'AAA';
+  if(s.startsWith('AA'))  return 'AA';
+  if(s.startsWith('A'))   return 'A';
+  if(s.startsWith('BBB')) return 'BBB';
+  if(s.startsWith('BB'))  return 'BB';
+  if(s.startsWith('B'))   return 'B';
+  if(s.startsWith('C') || s.startsWith('D')) return 'CCC и ниже';
+  return 'нет';
+}
+
+// Рисует 4 SVG-круговых диаграммы: по рейтингу / сроку / YTM / риску.
+// Вес слайсов — доля по текущей стоимости позиции (cur*nom*qty).
+function renderPortCharts(){
+  const card = document.getElementById('port-charts-card');
+  const wrap = document.getElementById('port-charts');
+  if(!wrap || !card) return;
+  if(!portfolio.length){ card.style.display='none'; wrap.innerHTML=''; return; }
+
+  const weight = p => (p.cur/100)*p.nom*p.qty;
+
+  // Палитры — подогнаны под тему (акцент, зелёный, варн, даунгер, пурпл, бирюза).
+  const PALETTE = ['#00d4ff','#22d3a0','#f5a623','#ff4d6d','#a78bfa','#60a5fa','#7aa0b8','#3a6080'];
+  const RATING_ORDER = ['AAA','AA','A','BBB','BB','B','CCC и ниже','нет'];
+  const RATING_COLORS = {
+    'AAA':'#22d3a0','AA':'#60a5fa','A':'#00d4ff','BBB':'#a78bfa',
+    'BB':'#f5a623','B':'#ff4d6d','CCC и ниже':'#ff4d6d','нет':'#7aa0b8',
+  };
+  const RISK_COLORS = {'Низкий':'#22d3a0','Средний':'#f5a623','Высокий':'#ff4d6d','Не оценено':'#7aa0b8'};
+
+  // Эффективный рейтинг позиции: сначала из позиции, потом из совпавшего
+  // по имени эмитента в «Базе отчётности» — чтобы не пришлось дублировать.
+  const effectiveRating = p => {
+    if(p.rating) return p.rating;
+    if(typeof findReportsIssuerByName !== 'function') return '';
+    const issId = findReportsIssuerByName(p.name);
+    const iss = issId ? reportsDB[issId] : null;
+    return (iss && iss.rating) ? iss.rating : '';
+  };
+
+  // Собираем «жалобы»: позиции, у которых не хватает данных для разбивок.
+  const missingRating = [];       // для диаграммы рейтинга/риска
+  const missingYears  = [];       // для диаграммы срока
+  const missingYtm    = [];       // для диаграммы YTM
+
+  // 1) По рейтингу
+  const byRating = {};
+  portfolio.forEach(p => {
+    const cls = ratingClass(effectiveRating(p));
+    if(cls === 'нет') missingRating.push(p.name);
+    byRating[cls] = (byRating[cls] || 0) + weight(p);
+  });
+  const ratingSlices = RATING_ORDER.filter(k => byRating[k] > 0)
+    .map(k => ({label:k, value:byRating[k], color:RATING_COLORS[k]}));
+
+  // 2) По сроку до погашения (учитываем оферту — если ближе, берём её)
+  const now = new Date();
+  const yearsLeft = p => {
+    if(p.offerDate){
+      const o = new Date(p.offerDate);
+      if(!isNaN(o)) {
+        const d = (o - now)/(365.25*24*3600*1000);
+        if(d > 0 && (p.years == null || d < p.years)) return d;
+      }
+    }
+    return p.years || 0;
+  };
+  const termBuckets = [
+    {k:'до 1 года', test:y => y < 1,            color:'#22d3a0'},
+    {k:'1–3 года',  test:y => y >= 1 && y < 3,  color:'#00d4ff'},
+    {k:'3–5 лет',   test:y => y >= 3 && y < 5,  color:'#a78bfa'},
+    {k:'5+ лет',    test:y => y >= 5,           color:'#f5a623'},
+  ];
+  const byTerm = {};
+  portfolio.forEach(p => {
+    const y = yearsLeft(p);
+    if(!y || !isFinite(y) || y <= 0){ missingYears.push(p.name); return; }
+    const b = termBuckets.find(b => b.test(y));
+    if(b) byTerm[b.k] = (byTerm[b.k] || 0) + weight(p);
+  });
+  const termSlices = termBuckets.filter(b => byTerm[b.k] > 0)
+    .map(b => ({label:b.k, value:byTerm[b.k], color:b.color}));
+
+  // 3) По YTM (текущей)
+  const ytmOf = p => {
+    if(p.ctype==='float')          return RATE_NOW+(p.spread||0)-(p.cur-100)/(p.years||2);
+    if(p.coupon>0 && p.years>0)    return calcYTM(p.cur, p.coupon, p.years);
+    return null;
+  };
+  const ytmBuckets = [
+    {k:'до 10%',  test:y => y < 10,              color:'#7aa0b8'},
+    {k:'10–15%',  test:y => y >= 10 && y < 15,   color:'#60a5fa'},
+    {k:'15–20%',  test:y => y >= 15 && y < 20,   color:'#22d3a0'},
+    {k:'20–25%',  test:y => y >= 20 && y < 25,   color:'#f5a623'},
+    {k:'25%+',    test:y => y >= 25,             color:'#ff4d6d'},
+  ];
+  const byYtm = {};
+  portfolio.forEach(p => {
+    const y = ytmOf(p);
+    if(y == null || !isFinite(y)){ missingYtm.push(p.name); return; }
+    const b = ytmBuckets.find(b => b.test(y));
+    if(b) byYtm[b.k] = (byYtm[b.k] || 0) + weight(p);
+  });
+  const ytmSlices = ytmBuckets.filter(b => byYtm[b.k] > 0)
+    .map(b => ({label:b.k, value:byYtm[b.k], color:b.color}));
+
+  // 4) По риску: ОФЗ/муни + рейтинг → Низкий / Средний / Высокий.
+  const riskOf = p => {
+    if(p.btype === 'ОФЗ' || p.btype === 'Муни') return 'Низкий';
+    const r = ratingClass(effectiveRating(p));
+    if(r === 'AAA' || r === 'AA') return 'Низкий';
+    if(r === 'A' || r === 'BBB') return 'Средний';
+    if(r === 'BB' || r === 'B' || r === 'CCC и ниже') return 'Высокий';
+    return 'Не оценено';
+  };
+  const byRisk = {};
+  portfolio.forEach(p => {
+    const r = riskOf(p);
+    byRisk[r] = (byRisk[r] || 0) + weight(p);
+  });
+  const RISK_ORDER = ['Низкий','Средний','Высокий','Не оценено'];
+  const riskSlices = RISK_ORDER.filter(k => byRisk[k] > 0)
+    .map(k => ({label:k, value:byRisk[k], color:RISK_COLORS[k]}));
+
+  // Подсказки о недостающих данных — отображаются под диаграммой, если
+  // соответствующее поле пусто у ≥1 позиций.
+  const ratingHint = missingRating.length
+    ? `У ${missingRating.length} поз. нет рейтинга: ${missingRating.slice(0,3).join(', ')}${missingRating.length>3?' и ещё '+(missingRating.length-3):''}. Добавьте через ✏️ у позиции или в «Базе отчётности» (он подтянется по имени).`
+    : '';
+  const termHint = missingYears.length
+    ? `У ${missingYears.length} поз. не указан срок до погашения: ${missingYears.slice(0,3).join(', ')}${missingYears.length>3?'...':''}`
+    : '';
+  const ytmHint = missingYtm.length
+    ? `У ${missingYtm.length} поз. не посчитался YTM (нужны купон + срок): ${missingYtm.slice(0,3).join(', ')}${missingYtm.length>3?'...':''}`
+    : '';
+  const riskHint = missingRating.length
+    ? `Для корп. бумаг без рейтинга риск = «Не оценено». Задайте рейтинг, чтобы он попал в нужную категорию.`
+    : '';
+
+  card.style.display = '';
+  wrap.innerHTML = [
+    pieChartBlock('По рейтингу', ratingSlices, ratingHint),
+    pieChartBlock('По сроку', termSlices, termHint),
+    pieChartBlock('По доходности', ytmSlices, ytmHint),
+    pieChartBlock('По риску', riskSlices, riskHint),
+  ].join('');
+}
+
+// Рендерит один блок: заголовок + SVG-пирог + легенда справа.
+// Использует inline SVG без зависимостей — держит стиль моно-терминала.
+// hint (опц.) — пояснение под диаграммой о неполных данных.
+function pieChartBlock(title, slices, hint){
+  const hintHtml = hint ? `<div style="font-size:.55rem;color:var(--warn);margin-top:6px;line-height:1.4">⚠ ${hint}</div>` : '';
+  const total = slices.reduce((s, x) => s + (x.value || 0), 0);
+  if(!total){
+    return `<div style="border:1px solid var(--border);padding:10px;background:var(--bg)">
+      <div style="font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">${title}</div>
+      <div style="font-size:.6rem;color:var(--text3)">нет данных</div>
+      ${hintHtml}
+    </div>`;
+  }
+  const R = 42, CX = 52, CY = 52;
+  let a0 = -Math.PI / 2;
+  const paths = slices.map(s => {
+    const frac = s.value / total;
+    const a1 = a0 + frac * Math.PI * 2;
+    // Отдельный полный круг, если единственный слайс — SVG arc с 360° не рисуется.
+    if(frac >= 0.9999){
+      a0 = a1;
+      return `<circle cx="${CX}" cy="${CY}" r="${R}" fill="${s.color}"/>`;
+    }
+    const x0 = CX + R * Math.cos(a0), y0 = CY + R * Math.sin(a0);
+    const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1);
+    const large = frac > 0.5 ? 1 : 0;
+    a0 = a1;
+    return `<path d="M${CX},${CY} L${x0.toFixed(2)},${y0.toFixed(2)} A${R},${R} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z" fill="${s.color}"/>`;
+  }).join('');
+  const legend = slices.map(s => {
+    const pct = (s.value / total * 100).toFixed(1);
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:.6rem;color:var(--text2)">
+      <span style="width:9px;height:9px;background:${s.color};flex-shrink:0"></span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.label}</span>
+      <span style="color:var(--text);font-variant-numeric:tabular-nums">${pct}%</span>
+    </div>`;
+  }).join('');
+  return `<div style="border:1px solid var(--border);padding:10px;background:var(--bg)">
+    <div style="font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">${title}</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <svg viewBox="0 0 104 104" style="width:88px;height:88px;flex-shrink:0">
+        <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="var(--border)" stroke-width="1"/>
+        ${paths}
+        <circle cx="${CX}" cy="${CY}" r="18" fill="var(--s1)"/>
+      </svg>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">${legend}</div>
+    </div>
+    ${hintHtml}
+  </div>`;
 }
 
 // Close suggest on outside click
@@ -4391,6 +4748,67 @@ function urgencyBadge(days){
   return `<span style="font-size:.55rem;color:var(--text3);padding:1px 6px">через ${days}д</span>`;
 }
 
+// Нормализация имени эмитента для fuzzy-сравнения:
+// убираем кавычки, тире, «ПАО/АО/ООО», пробелы, приводим к lowercase.
+function normalizeIssuerName(name){
+  if(!name) return '';
+  return String(name)
+    .toLowerCase()
+    .replace(/[«»"'`"„“()\[\]]/g, '')
+    .replace(/\b(пао|оао|ао|ооо|зао|группа|групп|gk|pjsc|jsc|llc|ltd|public|joint[\s-]?stock|company)\b/g, '')
+    .replace(/[\-–—_.,;:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Ищет в reportsDB эмитента по имени (exact → substring → пересечение слов).
+// Возвращает id или null. Используется из календаря, чтобы дать прямую
+// ссылку в локальную «Базу отчётности» вместо общего e-disclosure-поиска.
+function findReportsIssuerByName(name){
+  if(!name || !reportsDB) return null;
+  const target = normalizeIssuerName(name);
+  if(!target) return null;
+  const entries = Object.entries(reportsDB);
+  // 1) Точное совпадение нормализованных имён
+  for(const [id, iss] of entries){
+    if(normalizeIssuerName(iss && iss.name) === target) return id;
+  }
+  // 2) Подстрока в любую сторону
+  for(const [id, iss] of entries){
+    const n = normalizeIssuerName(iss && iss.name);
+    if(n && (n.includes(target) || target.includes(n))) return id;
+  }
+  // 3) Пересечение значимых (≥3 символа) слов: ищем лучший матч.
+  const targetWords = target.split(' ').filter(w => w.length >= 3);
+  if(!targetWords.length) return null;
+  let bestId = null, bestHits = 0;
+  for(const [id, iss] of entries){
+    const nWords = normalizeIssuerName(iss && iss.name).split(' ').filter(w => w.length >= 3);
+    const hits = targetWords.filter(w => nWords.includes(w)).length;
+    if(hits > bestHits){ bestHits = hits; bestId = id; }
+  }
+  // Требуем минимум 1 совпадение + совпадение хотя бы половины целевых слов.
+  return (bestHits > 0 && bestHits >= Math.ceil(targetWords.length / 2)) ? bestId : null;
+}
+
+// Переключается на вкладку «Отчётность» и выбирает заданного эмитента.
+function calOpenIssuerInReports(issuerId){
+  if(!reportsDB[issuerId]){ alert('Эмитент не найден в базе — возможно, удалён.'); return; }
+  if(typeof showPage === 'function') showPage('reports');
+  // Обновляем select и триггерим его обработчик вручную — часть логики
+  // репа завязана на change-событие / чтение value.
+  const sel = document.getElementById('rep-issuer-sel');
+  if(sel){
+    sel.value = issuerId;
+    if(typeof repSelectIssuer === 'function') repSelectIssuer();
+  }
+  // Подсветим активный пункт в сайдбаре
+  const sbItems = document.querySelectorAll('.sb-item');
+  sbItems.forEach(i => i.classList.remove('active'));
+  const target = [...sbItems].find(i => (i.textContent||'').includes('База отчётности'));
+  if(target) target.classList.add('active');
+}
+
 function renderEventCard(e){
   const m = CAL_TYPE_META[e.type]||CAL_TYPE_META.other;
   const sm = CAL_STATUS_META[e.status]||CAL_STATUS_META.expected;
@@ -4402,28 +4820,54 @@ function renderEventCard(e){
   const isReport = e.type === 'report';
   const maybePublished = isReport && isPast && e.status === 'expected';
 
-  // Ссылки на источники
+  // Ссылки на источники.
+  // Приоритет для e-disclosure:
+  //   1) URL, прописанный у эмитента вручную (самая точная);
+  //   2) поиск по ОГРН (уникален);
+  //   3) поиск по ИНН (обычно уникален);
+  //   4) поиск по имени (fallback).
+  const localIssuerId = findReportsIssuerByName(e.issuer);
+  const localIss = localIssuerId ? reportsDB[localIssuerId] : null;
   const issuerQuery = encodeURIComponent(e.issuerShort || e.issuer.split(' ').slice(0,2).join(' '));
-  const edisclosureLink = `https://e-disclosure.ru/poisk-po-kompaniyam?query=${issuerQuery}`;
+  const edisclosureLink =
+      (localIss && localIss.disclosureUrl) ? localIss.disclosureUrl
+    : (localIss && localIss.ogrn) ? `https://www.e-disclosure.ru/poisk-po-ogrn?ogrn=${encodeURIComponent(localIss.ogrn)}`
+    : (localIss && localIss.inn)  ? `https://www.e-disclosure.ru/poisk-po-inn?inn=${encodeURIComponent(localIss.inn)}`
+    : `https://www.e-disclosure.ru/poisk-po-kompaniyam?query=${issuerQuery}`;
+  const edisclosureHint =
+      (localIss && localIss.disclosureUrl) ? 'прямая ссылка'
+    : (localIss && localIss.ogrn) ? 'по ОГРН'
+    : (localIss && localIss.inn)  ? 'по ИНН'
+    : 'поиск по имени';
   const moexIssuerLink  = e.isin ? `https://www.moex.com/ru/issue.aspx?code=${e.isin}` : null;
   const moexEventsLink  = e.isin ? `https://iss.moex.com/iss/securities/${e.isin}/events.json` : null;
 
+  const localIssuerLink = localIssuerId
+    ? `<button type="button"
+        style="font-size:.58rem;color:var(--acc);border:1px solid var(--acc);background:transparent;padding:2px 7px;cursor:pointer;transition:background .12s"
+        onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background='transparent'"
+        onclick="event.stopPropagation();calOpenIssuerInReports('${localIssuerId}')">🏢 В базе отчётности</button>`
+    : '';
+
   const linksHTML = isReport ? `
     <div style="display:flex;gap:8px;margin-top:5px;flex-wrap:wrap">
+      ${localIssuerLink}
       <a href="${edisclosureLink}" target="_blank" rel="noopener"
+        title="${edisclosureHint}"
         style="font-size:.58rem;color:var(--acc2);border:1px solid var(--acc2);padding:2px 7px;text-decoration:none;transition:background .12s"
         onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''"
-        onclick="event.stopPropagation()">↗ e-disclosure.ru</a>
+        onclick="event.stopPropagation()">↗ e-disclosure · ${edisclosureHint}</a>
       ${moexIssuerLink?`<a href="${moexIssuerLink}" target="_blank" rel="noopener"
         style="font-size:.58rem;color:var(--acc2);border:1px solid var(--acc2);padding:2px 7px;text-decoration:none;transition:background .12s"
         onmouseover="this.style.background='var(--acc-dim)'" onmouseout="this.style.background=''"
         onclick="event.stopPropagation()">↗ MOEX</a>`:''}
     </div>` : (e.isin && ['coupon','offer','maturity'].includes(e.type)) ? `
-    <div style="margin-top:4px">
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      ${localIssuerLink}
       <a href="https://www.moex.com/ru/issue.aspx?code=${e.isin}" target="_blank" rel="noopener"
         style="font-size:.58rem;color:var(--text3);border:1px solid var(--border);padding:2px 7px;text-decoration:none"
         onclick="event.stopPropagation()">↗ MOEX · ${e.isin}</a>
-    </div>` : '';
+    </div>` : (localIssuerLink ? `<div style="margin-top:4px">${localIssuerLink}</div>` : '');
 
   const publishedWarning = maybePublished ? `
     <div style="font-size:.6rem;color:var(--warn);margin-top:3px">
@@ -4783,6 +5227,8 @@ function repSelectIssuer(){
     document.getElementById('rep-add-period-btn').style.display='none';
     document.getElementById('rep-pdf-btn').style.display='none';
     document.getElementById('rep-del-issuer-btn').style.display='none';
+    const ex = document.getElementById('rep-export-issuer-btn'); if(ex) ex.style.display='none';
+    const ed = document.getElementById('rep-edit-issuer-btn'); if(ed) ed.style.display='none';
     return;
   }
   repActiveIssuerId = id;
@@ -4792,6 +5238,8 @@ function repSelectIssuer(){
   document.getElementById('rep-add-period-btn').style.display='';
   document.getElementById('rep-pdf-btn').style.display='';
   document.getElementById('rep-del-issuer-btn').style.display='';
+  const exBtn = document.getElementById('rep-export-issuer-btn'); if(exBtn) exBtn.style.display='';
+  const edBtn = document.getElementById('rep-edit-issuer-btn'); if(edBtn) edBtn.style.display='';
   repBuildPeriodTabs();
 }
 
@@ -5138,21 +5586,136 @@ function repRenderCompare(){
 }
 
 // ── CRUD ──
+function repNiClearForm(){
+  document.getElementById('rep-ni-id').value = '';
+  document.getElementById('rep-ni-name').value = '';
+  document.getElementById('rep-ni-ind').value = 'other';
+  document.getElementById('rep-ni-isin').value = '';
+  document.getElementById('rep-ni-inn').value = '';
+  document.getElementById('rep-ni-ogrn').value = '';
+  document.getElementById('rep-ni-disclosure').value = '';
+  const r = document.getElementById('rep-ni-rating'); if(r) r.value = '';
+  const st = document.getElementById('rep-ni-moex-status'); if(st) st.textContent = '';
+}
 function repNewIssuerModal(){
-  document.getElementById('rep-ni-name').value='';
+  repNiClearForm();
+  document.getElementById('rep-ni-title').innerHTML = 'Новый эмитент <button class="modal-x" onclick="closeModal(\'modal-rep-issuer\')">✕</button>';
+  document.getElementById('rep-ni-save').textContent = 'Создать';
   document.getElementById('modal-rep-issuer').classList.add('open');
 }
-function repCreateIssuer(){
-  const name=document.getElementById('rep-ni-name').value.trim();
-  if(!name) return;
-  const ind=document.getElementById('rep-ni-ind').value;
-  const id='iss_'+Date.now();
-  reportsDB[id]={name,ind,periods:{}};
+function repEditIssuerModal(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  repNiClearForm();
+  document.getElementById('rep-ni-id').value = repActiveIssuerId;
+  document.getElementById('rep-ni-name').value = iss.name || '';
+  document.getElementById('rep-ni-ind').value = iss.ind || 'other';
+  document.getElementById('rep-ni-isin').value = iss.isin || '';
+  document.getElementById('rep-ni-inn').value = iss.inn || '';
+  document.getElementById('rep-ni-ogrn').value = iss.ogrn || '';
+  document.getElementById('rep-ni-disclosure').value = iss.disclosureUrl || '';
+  const r = document.getElementById('rep-ni-rating'); if(r) r.value = iss.rating || '';
+  document.getElementById('rep-ni-title').innerHTML = 'Редактировать эмитента <button class="modal-x" onclick="closeModal(\'modal-rep-issuer\')">✕</button>';
+  document.getElementById('rep-ni-save').textContent = '💾 Сохранить';
+  document.getElementById('modal-rep-issuer').classList.add('open');
+}
+function repSaveIssuerFromModal(){
+  const editId = document.getElementById('rep-ni-id').value.trim();
+  const name = document.getElementById('rep-ni-name').value.trim();
+  if(!name){ alert('Укажите название компании.'); return; }
+  const ind = document.getElementById('rep-ni-ind').value;
+  const isin = document.getElementById('rep-ni-isin').value.trim().toUpperCase();
+  const inn  = document.getElementById('rep-ni-inn').value.trim();
+  const ogrn = document.getElementById('rep-ni-ogrn').value.trim();
+  const disclosureUrl = document.getElementById('rep-ni-disclosure').value.trim();
+  const rating = (document.getElementById('rep-ni-rating')?.value || '').trim();
+  if(editId && reportsDB[editId]){
+    // Редактирование: сохраняем periods/note и прочие поля
+    const cur = reportsDB[editId];
+    cur.name = name; cur.ind = ind;
+    cur.isin = isin || undefined;
+    cur.inn = inn || undefined;
+    cur.ogrn = ogrn || undefined;
+    cur.disclosureUrl = disclosureUrl || undefined;
+    cur.rating = rating || undefined;
+    save(); closeModal('modal-rep-issuer');
+    repRebuildSelect();
+    document.getElementById('rep-issuer-sel').value = editId;
+    repSelectIssuer();
+    return;
+  }
+  // Новый эмитент
+  const id = 'iss_' + Date.now();
+  reportsDB[id] = {
+    name, ind, periods:{},
+    isin: isin || undefined,
+    inn: inn || undefined,
+    ogrn: ogrn || undefined,
+    disclosureUrl: disclosureUrl || undefined,
+    rating: rating || undefined,
+  };
   save(); closeModal('modal-rep-issuer');
   repRebuildSelect();
-  document.getElementById('rep-issuer-sel').value=id;
+  document.getElementById('rep-issuer-sel').value = id;
   repSelectIssuer();
-  document.getElementById('sb-rep').textContent=Object.keys(reportsDB).length;
+  document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
+}
+
+// Бэкап-алиас: в коде мог остаться старый вызов.
+function repCreateIssuer(){ return repSaveIssuerFromModal(); }
+
+// Автоподтягивание ИНН/ОГРН/имени с MOEX ISS по ISIN.
+// MOEX отдаёт описание бумаги в блоке description; имена полей плавают
+// между выпусками (INN / ISSUERINN / EMITTER_INN и т.п.) — пробуем все.
+async function repNiFetchMoex(){
+  const isinInput = document.getElementById('rep-ni-isin');
+  const isin = (isinInput.value || '').trim().toUpperCase();
+  const st = document.getElementById('rep-ni-moex-status');
+  if(!isin){ st.style.color='var(--danger)'; st.textContent='Впишите ISIN, чтобы подтянуть данные с MOEX.'; return; }
+  if(typeof moexFetch !== 'function'){ st.style.color='var(--danger)'; st.textContent='MOEX-клиент недоступен.'; return; }
+  st.style.color = 'var(--warn)';
+  st.textContent = '⏳ Запрашиваю MOEX по ' + isin + '...';
+  try {
+    // 1) Находим SECID (ISIN может и сам быть secid'ом — пробуем прямой запрос)
+    let secid = isin;
+    let desc = null;
+    try { desc = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}.json`); }
+    catch(_){ desc = null; }
+    const hasRows = desc && desc.description && Array.isArray(desc.description.data) && desc.description.data.length;
+    if(!hasRows){
+      const s = await moexFetch(`/iss/securities.json?q=${encodeURIComponent(isin)}&limit=3`);
+      const cols = s?.securities?.columns || [];
+      const rows = s?.securities?.data || [];
+      const secidIdx = cols.indexOf('secid');
+      if(rows.length && secidIdx >= 0){
+        secid = rows[0][secidIdx];
+        desc = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}.json`);
+      }
+    }
+    const map = (typeof parseMoexDesc === 'function' ? parseMoexDesc(desc||{}) : {});
+    // Имена полей ИНН/ОГРН в MOEX плавают — тянем первое непустое
+    const pick = keys => { for(const k of keys){ if(map[k]) return String(map[k]).trim(); } return ''; };
+    const inn  = pick(['INN','ISSUERINN','EMITTER_INN','EMITENT_INN']);
+    const ogrn = pick(['OGRN','ISSUEROGRN','EMITTER_OGRN','EMITENT_OGRN']);
+    const issuerName = pick(['ISSUERNAME','EMITTER_NAME','EMITENT_NAME']);
+    let filled = 0;
+    if(inn){ document.getElementById('rep-ni-inn').value = inn; filled++; }
+    if(ogrn){ document.getElementById('rep-ni-ogrn').value = ogrn; filled++; }
+    // Если название пустое — подставим то, что прислал MOEX (пользователь увидит и сможет перебить)
+    const nameEl = document.getElementById('rep-ni-name');
+    if(issuerName && !nameEl.value.trim()){ nameEl.value = issuerName; filled++; }
+    if(filled){
+      st.style.color = 'var(--green)';
+      st.textContent = `✓ С MOEX: ${[inn&&'ИНН',ogrn&&'ОГРН',issuerName&&'имя'].filter(Boolean).join(' · ')} (${secid})`;
+    } else {
+      st.style.color = 'var(--warn)';
+      st.textContent = 'MOEX вернул описание, но без ИНН/ОГРН. Впишите вручную.';
+    }
+  } catch(e){
+    st.style.color = 'var(--danger)';
+    st.textContent = 'MOEX не ответил: ' + (e.message || e);
+  }
 }
 function repDeleteIssuer(){
   if(!repActiveIssuerId||!confirm('Удалить эмитента и все его отчёты?')) return;
@@ -5161,6 +5724,38 @@ function repDeleteIssuer(){
   save(); repInit();
   document.getElementById('rep-issuer-view').style.display='none';
   document.getElementById('rep-empty').style.display='block';
+}
+
+// Экспорт одного эмитента: удобно перетаскивать между устройствами
+// одну компанию, не таская весь портфель. Формат совместим с общим
+// импортом — просто reportsDB с единственным ключом.
+function repExportIssuer(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss){ alert('Эмитент не найден'); return; }
+  // Экспортируем в схеме bondan/issuer/v1 — плоский файл одного эмитента.
+  // Импорт это распознаёт и оборачивает обратно в reportsDB.
+  const payload = {
+    schema: 'bondan/issuer/v1',
+    name: iss.name,
+    ind: iss.ind || 'other',
+    note: iss.note || '',
+    isin: iss.isin || undefined,
+    inn: iss.inn || undefined,
+    ogrn: iss.ogrn || undefined,
+    disclosureUrl: iss.disclosureUrl || undefined,
+    rating: iss.rating || undefined,
+    periods: iss.periods || {},
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const safe = (iss.name||'issuer').replace(/[^\wа-яА-ЯёЁ0-9\-]+/g,'_').slice(0,60);
+  a.href = url;
+  a.download = `bondanalytics_${safe}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // Прямой shortcut для загрузки PDF: открывает ту же модалку создания
@@ -5328,7 +5923,10 @@ function flLoadPdf(){
       if(ext === 'pdf' && typeof repExtractPdf === 'function') text = await repExtractPdf(file);
       else if(ext === 'docx' && typeof repExtractDocx === 'function') text = await repExtractDocx(file);
       else if((ext === 'xlsx' || ext === 'xls') && typeof repExtractXlsx === 'function') text = await repExtractXlsx(file);
-      else { alert('Поддерживаются PDF / DOCX / XLSX'); return; }
+      else if(typeof isImageExt === 'function' && isImageExt(ext) && typeof repOcrImage === 'function') {
+        text = await repOcrImage(file);
+      }
+      else { alert('Поддерживаются PDF / DOCX / XLSX или фото (JPG/PNG)'); return; }
       window._lastParsedText = text || '';
       closeModal('modal-field-lookup');
       openPickerForField(t.id, t.label, t.hint);
@@ -6407,6 +7005,10 @@ function repNewPeriodModal(){
   if(scaleWrap) scaleWrap.style.display='none';
   const autoRadio = document.querySelector('input[name="rep-np-scale"][value="auto"]');
   if(autoRadio) autoRadio.checked = true;
+  // Единицы ручного ввода сбрасываем на млрд ₽ (дефолт, placeholder'ы
+  // и подпись подогнаны под этот случай).
+  const bln = document.querySelector('input[name="rep-np-manual-unit"][value="1"]');
+  if(bln){ bln.checked = true; if(typeof repManualUnitChanged === 'function') repManualUnitChanged(); }
   window._lastParsedText = '';
   // Show library status
   const libEl=document.getElementById('rep-lib-status');
@@ -6433,7 +7035,17 @@ function repSavePeriod(){
   const period=document.getElementById('rep-np-period').value;
   const type=document.getElementById('rep-np-type').value;
   const key=`${year}_${period}_${type}`;
-  const gn = id => { const v=parseFloat(document.getElementById(id).value); return isNaN(v)?null:v; };
+  // Выбранные единицы ручного ввода (радио): 1 = млрд ₽ (базовый внутренний
+  // формат), 0.001 = млн ₽, 0.000001 = тыс. ₽. На save умножаем введённое
+  // на коэффициент, чтобы положить в reportsDB всегда в млрд ₽.
+  const unitEl = document.querySelector('input[name="rep-np-manual-unit"]:checked');
+  const unitScale = unitEl ? parseFloat(unitEl.value) : 1;
+  const gn = id => {
+    const raw = parseFloat(document.getElementById(id).value);
+    if(isNaN(raw)) return null;
+    // Округляем до 6 знаков, чтобы избежать float-хвоста у «тыс → млрд».
+    return parseFloat((raw * unitScale).toFixed(6));
+  };
   const data={
     year,period,type,note:document.getElementById('rep-np-note').value.trim(),
     rev:gn('rep-np-rev'), ebitda:gn('rep-np-ebitda'), np:gn('rep-np-np'), ebit:gn('rep-np-ebit'),
@@ -6444,6 +7056,31 @@ function repSavePeriod(){
   repActivePeriodKey=key;
   save(); closeModal('modal-rep-period');
   repBuildPeriodTabs();
+}
+
+// Обновление подсказки единицы в заголовке блока «Показатели» + обновление
+// placeholder'ов полей под выбранные единицы, чтобы не вводить в заблуждение.
+function repManualUnitChanged(){
+  const unitEl = document.querySelector('input[name="rep-np-manual-unit"]:checked');
+  const scale = unitEl ? parseFloat(unitEl.value) : 1;
+  const hint = document.getElementById('rep-np-manual-unit-hint');
+  const label = scale === 1 ? '(млрд ₽)' : scale === 0.001 ? '(млн ₽)' : '(тыс. ₽)';
+  if(hint) hint.textContent = label;
+  // Placeholder'ы: в HTML исходно заданы в млрд ₽ (например, 8540 —
+  // выручка Газпром-класса). Пересчитываем в выбранные единицы:
+  // value_in_target = value_in_bln / scale.
+  const baseBln = {
+    'rep-np-rev':8540,'rep-np-ebitda':1820,'rep-np-np':620,'rep-np-ebit':1240,
+    'rep-np-assets':25400,'rep-np-eq':8200,'rep-np-debt':4100,'rep-np-cash':890,
+    'rep-np-ca':3200,'rep-np-cl':2100,'rep-np-int':380,'rep-np-ret':1500,
+  };
+  for(const [id, bln] of Object.entries(baseBln)){
+    const el = document.getElementById(id);
+    if(!el) continue;
+    const v = bln / scale;
+    const str = Math.round(v).toString();
+    el.placeholder = str.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
 }
 
 // ── File parsers ──
@@ -6478,9 +7115,18 @@ async function repParseFile(input){
       text = await repExtractDocx(file);
     } else if(ext==='xlsx'||ext==='xls'){
       text = await repExtractXlsx(file);
+    } else if(isImageExt(ext)){
+      status.style.color='var(--warn)';
+      status.textContent='⏳ OCR изображения '+file.name+'...';
+      text = await repOcrImage(file, (p, n, phase) => {
+        status.style.color='var(--warn)';
+        status.textContent = phase==='init'
+          ? '⏳ Загружаю OCR-модели (русский/английский)...'
+          : '⏳ Распознаю изображение...';
+      });
     } else {
       status.style.color='var(--danger)';
-      status.textContent='Формат не поддерживается. Используйте PDF, DOCX или XLSX.';
+      status.textContent='Формат не поддерживается. Используйте PDF, DOCX, XLSX или фото (JPG/PNG).';
       return;
     }
     window._lastParsedText = text;
@@ -6536,6 +7182,60 @@ async function repParseFile(input){
     status.textContent='Ошибка: '+e.message;
   }
 }
+
+// OCR картинки (JPG/PNG/WebP и т.п.): прогоняем через tesseract.js
+// напрямую — без промежуточной отрисовки. Языки: русский + английский.
+// Предобработка: большие картинки (>1600 px по узкой стороне) уменьшаем,
+// чтобы уложиться в разумное время распознавания.
+async function repOcrImage(file, onProgress) {
+  if(typeof window._loadTesseract !== 'function') throw new Error('OCR-лоадер не инициализирован');
+  if(onProgress) onProgress(0, 1, 'init');
+  await window._loadTesseract();
+  if(typeof Tesseract === 'undefined') throw new Error('Tesseract.js недоступен');
+
+  // Готовим источник: пробуем уменьшить слишком большие снимки.
+  let source = file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const minSide = Math.min(bmp.width, bmp.height);
+    const MAX_MIN_SIDE = 1600;
+    if(minSide > MAX_MIN_SIDE){
+      const k = MAX_MIN_SIDE / minSide;
+      const w = Math.round(bmp.width * k);
+      const h = Math.round(bmp.height * k);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      source = canvas;
+    } else {
+      const canvas = document.createElement('canvas');
+      canvas.width = bmp.width; canvas.height = bmp.height;
+      canvas.getContext('2d').drawImage(bmp, 0, 0);
+      source = canvas;
+    }
+  } catch(_) {
+    // Браузер не поддержал createImageBitmap / файл не-картинка —
+    // tesseract сам справится с File.
+  }
+
+  const worker = await Tesseract.createWorker(['rus','eng'], 1, {
+    logger: m => {
+      if(m.status && onProgress && m.status.includes('loading')) {
+        onProgress(0, 1, 'init');
+      }
+    }
+  });
+  try {
+    if(onProgress) onProgress(1, 1, 'ocr');
+    const { data } = await worker.recognize(source);
+    return data.text || '';
+  } finally {
+    await worker.terminate();
+  }
+}
+
+const IMG_EXTS = ['jpg','jpeg','png','webp','bmp','gif'];
+function isImageExt(ext){ return IMG_EXTS.includes((ext||'').toLowerCase()); }
 
 // OCR PDF-скана: рендерим каждую страницу в canvas и прогоняем через
 // tesseract.js. Языки: русский + английский. Возвращаем склеенный текст.
@@ -6757,6 +7457,10 @@ function repFillFromText(rawText, scaleOverride){
   } else if(note) {
     note.textContent = ' · выбрано вручную';
   }
+  // Значения в поля уже записаны в млрд ₽. Сбрасываем радио ручных
+  // единиц в «млрд», чтобы repSavePeriod не домножил повторно.
+  const bln = document.querySelector('input[name="rep-np-manual-unit"][value="1"]');
+  if(bln && !bln.checked){ bln.checked = true; if(typeof repManualUnitChanged === 'function') repManualUnitChanged(); }
   return filled;
 }
 
@@ -7332,28 +8036,260 @@ function exportAllData() {
   URL.revokeObjectURL(url);
 }
 
+// Развернуть двойную кодировку UTF-8 → CP1251 (классический мохо́на,
+// когда UTF-8-файл читают как Windows-1251, а потом полученные
+// «кракозябры» сохраняют как UTF-8). Возвращает null, если строка
+// не восстанавливается.
+const _cp1251ToByte = (() => {
+  const buf = new Uint8Array(256);
+  for(let i=0;i<256;i++) buf[i]=i;
+  const decoded = new TextDecoder('windows-1251').decode(buf);
+  const map = new Map();
+  for(let i=0;i<256;i++){
+    // Для всех символов CP1251 сохраняем обратный байт; неопределённые
+    // позиции (U+FFFD от дыр в CP1251) пропускаем, иначе коллизии.
+    if(decoded.charCodeAt(i) !== 0xFFFD) map.set(decoded[i], i);
+  }
+  return map;
+})();
+
+function demojibakeCp1251(str){
+  const bytes = new Uint8Array(str.length);
+  for(let i=0;i<str.length;i++){
+    const b = _cp1251ToByte.get(str[i]);
+    if(b === undefined) return null;
+    bytes[i] = b;
+  }
+  try { return new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
+  catch(_){ return null; }
+}
+
+// Признак того, что строка — мохо́на CP1251 (а не нормальный текст).
+// Считаем пары «Р<кириллица/типографика>» — в обычном русском тексте
+// столько таких пар подряд не бывает.
+function looksLikeMojibake(s){
+  if(typeof s !== 'string' || !s) return false;
+  const hits = (s.match(/Р[\u0400-\u04FF\u2010-\u2122]/g) || []).length;
+  return hits >= 2;
+}
+
+function maybeFixString(s){
+  if(!looksLikeMojibake(s)) return s;
+  const fixed = demojibakeCp1251(s);
+  return (fixed && /[А-Яа-яЁё]/.test(fixed)) ? fixed : s;
+}
+
+// Глубокое восстановление: ходим по объекту и исправляем все строки,
+// включая ключи словарей (ключи периодов вида "2025_РџРѕР»СѓРіРѕРґРёРµ_РњРЎР¤Рћ").
+function fixMojibakeDeep(v){
+  if(typeof v === 'string') return maybeFixString(v);
+  if(Array.isArray(v)) return v.map(fixMojibakeDeep);
+  if(v && typeof v === 'object'){
+    const out = {};
+    for(const [k, val] of Object.entries(v)){
+      out[maybeFixString(k)] = fixMojibakeDeep(val);
+    }
+    return out;
+  }
+  return v;
+}
+
+// Чистит всё состояние приложения in-place; возвращает статистику.
+function fixMojibakeEverywhere(){
+  const before = JSON.stringify({ytmBonds, portfolio, watchlists, calEvents, reportsDB});
+  ytmBonds   = fixMojibakeDeep(ytmBonds);
+  portfolio  = fixMojibakeDeep(portfolio);
+  watchlists = fixMojibakeDeep(watchlists);
+  calEvents  = fixMojibakeDeep(calEvents);
+  reportsDB  = fixMojibakeDeep(reportsDB);
+  const after = JSON.stringify({ytmBonds, portfolio, watchlists, calEvents, reportsDB});
+  const changed = before !== after;
+  if(!changed){
+    alert('Кракозябр в текущих данных не найдено — чинить нечего.');
+    return;
+  }
+  save();
+  if(typeof renderYtm === 'function') renderYtm();
+  if(typeof renderPort === 'function') renderPort();
+  if(typeof renderSbLists === 'function') renderSbLists();
+  if(typeof repInit === 'function') repInit();
+  alert('✅ Кириллица восстановлена. Проверьте вкладку «Отчётность».');
+}
+
+// Общий обработчик импорта: принимает уже прочитанный текст, парсит,
+// спрашивает режим (merge/replace) и применяет. Возвращает true при успехе.
+function applyImportedJsonText(raw){
+  if(!raw || !raw.trim()){ alert('Пустой текст — вставьте содержимое JSON.'); return false; }
+  let clean = String(raw).replace(/^\uFEFF/, '').trim();
+
+  // Эвристика мохо́ны: характерный «Р<кириллица>» в 3+ местах.
+  // Разворачиваем только если в результате появляется нормальная кириллица.
+  const mojibakeHits = (clean.match(/Р[\u0400-\u04FF\u2010-\u2122]/g) || []).length;
+  if(mojibakeHits >= 3){
+    const fixed = demojibakeCp1251(clean);
+    if(fixed && /[А-Яа-яЁё]/.test(fixed)) clean = fixed;
+  }
+
+  let d;
+  try { d = JSON.parse(clean); }
+  catch(err){
+    alert('Не получилось разобрать JSON.\n\n' + err.message + '\n\nПроверьте, что текст начинается с { и заканчивается }.');
+    return false;
+  }
+  if(!d || typeof d !== 'object' || Array.isArray(d)){
+    alert('Это не объект бэкапа. Ожидается JSON вида { "reportsDB": {...}, "portfolio": [...] }.');
+    return false;
+  }
+
+  // Single-issuer schema (bondan/issuer/v1 или просто объект с name+periods)
+  // авто-оборачиваем в reportsDB — дальше работает общий merge.
+  const isSingleIssuer =
+    !d.reportsDB && !d.portfolio && !d.ytmBonds && !d.watchlists && !d.calEvents &&
+    d.name && d.periods && typeof d.periods === 'object';
+  if(isSingleIssuer){
+    const id = 'iss_imp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+    d = { reportsDB: { [id]: {
+      name: d.name, ind: d.ind || 'other', note: d.note || '',
+      isin: d.isin, inn: d.inn, ogrn: d.ogrn, disclosureUrl: d.disclosureUrl,
+      rating: d.rating,
+      periods: d.periods,
+    } } };
+  }
+
+  // Bare-reportsDB: плоский словарь {issuerId: {name, periods, ...}}
+  // без обёртки «reportsDB». Детект: нет известных ключей верхнего
+  // уровня, но ВСЕ значения — объекты с name+periods.
+  const knownKeys = ['reportsDB','portfolio','ytmBonds','watchlists','calEvents','schema','name','periods'];
+  const hasKnown = knownKeys.some(k => k in d);
+  if(!hasKnown){
+    const entries = Object.entries(d);
+    const looksLikeIssuerMap = entries.length > 0 && entries.every(([, v]) =>
+      v && typeof v === 'object' && !Array.isArray(v) && typeof v.name === 'string' && v.periods && typeof v.periods === 'object'
+    );
+    if(looksLikeIssuerMap) d = { reportsDB: d };
+  }
+
+  const hasAnything = ['ytmBonds','portfolio','watchlists','calEvents','reportsDB'].some(k => d[k] != null);
+  if(!hasAnything){
+    alert('В файле нет ни одного из ожидаемых разделов (ytmBonds / portfolio / watchlists / calEvents / reportsDB), и это не файл отдельного эмитента (schema bondan/issuer/v1).');
+    return false;
+  }
+  const choice = (prompt(
+    'Что сделать с текущими данными?\n\n' +
+    '1 — ОБЪЕДИНИТЬ (рекомендуется): добавить новое, ничего не терять.\n' +
+    '      Для отчётности: периоды, которых ещё нет, добавятся; существующие не трогаются.\n' +
+    '2 — ЗАМЕНИТЬ: полностью перезаписать текущие данные файлом (ВНИМАНИЕ: старое удалится).\n\n' +
+    'Введите 1 или 2 (или нажмите Отмена):',
+    '1'
+  ) || '').trim();
+  if(choice !== '1' && choice !== '2') return false;
+
+  if(choice === '2'){
+    if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
+    if(d.portfolio)  portfolio  = d.portfolio;
+    if(d.watchlists) watchlists = d.watchlists;
+    if(d.calEvents)  calEvents  = d.calEvents;
+    if(d.reportsDB)  reportsDB  = d.reportsDB;
+  } else {
+    mergeImportedData(d);
+  }
+  save();
+  renderYtm(); renderPort(); renderSbLists();
+  document.getElementById('sb-pc').textContent = portfolio.length;
+  document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
+  alert(choice==='2' ? '✅ Данные заменены на содержимое файла.' : '✅ Данные объединены с текущими.');
+  return true;
+}
+
+function openPasteImportModal(){
+  const ta = document.getElementById('import-paste-area');
+  if(ta) ta.value = '';
+  document.getElementById('modal-import-paste').classList.add('open');
+}
+
+function importFromPastedText(){
+  const ta = document.getElementById('import-paste-area');
+  const raw = ta ? ta.value : '';
+  if(applyImportedJsonText(raw)) closeModal('modal-import-paste');
+}
+
 function importAllData(input) {
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const d = JSON.parse(e.target.result);
-      if(!confirm(`Загрузить данные из файла?\nЭто заменит текущие данные портфеля, списков и базы отчётности.`)) return;
-      if(d.ytmBonds)   ytmBonds   = d.ytmBonds;
-      if(d.portfolio)  portfolio  = d.portfolio;
-      if(d.watchlists) watchlists = d.watchlists;
-      if(d.calEvents)  calEvents  = d.calEvents;
-      if(d.reportsDB)  reportsDB  = d.reportsDB;
-      save();
-      renderYtm(); renderPort(); renderSbLists();
-      document.getElementById('sb-pc').textContent = portfolio.length;
-      document.getElementById('sb-rep').textContent = Object.keys(reportsDB).length;
-      alert('✅ Данные успешно импортированы!');
+      const raw = String(e.target.result || '');
+      applyImportedJsonText(raw);
     } catch(err) {
-      alert('Ошибка чтения файла: '+err.message);
+      alert('Ошибка чтения файла: ' + err.message);
+    } finally {
+      input.value = '';
     }
   };
+  reader.onerror = () => alert('Не удалось прочитать файл. Попробуйте «📋 Вставить JSON».');
   reader.readAsText(file);
+}
+
+// Merge-импорт: добавляет новое, не трогая то, что уже есть.
+// Идентификация: для массивов — по естественному ключу (имя и т.п.);
+// для reportsDB — по name эмитента, т.к. id случайные и в разных
+// экспортах не совпадают. Для периодов: ключ {year}_{period}_{type}.
+function mergeImportedData(d){
+  if(Array.isArray(d.ytmBonds)){
+    const have = new Set(ytmBonds.map(b => (b && b.name) || ''));
+    d.ytmBonds.forEach(b => { if(b && b.name && !have.has(b.name)){ ytmBonds.push(b); have.add(b.name); } });
+  }
+  if(Array.isArray(d.portfolio)){
+    const key = p => ((p && p.id) || '') + '|' + ((p && p.name) || '');
+    const have = new Set(portfolio.map(key));
+    d.portfolio.forEach(p => { const k=key(p); if(!have.has(k)){ portfolio.push(p); have.add(k); } });
+  }
+  if(d.watchlists && typeof d.watchlists === 'object'){
+    for(const [name, list] of Object.entries(d.watchlists)){
+      if(!watchlists[name]){
+        watchlists[name] = list;
+      } else if(Array.isArray(list) && Array.isArray(watchlists[name])){
+        const have = new Set(watchlists[name].map(x => JSON.stringify(x)));
+        list.forEach(item => {
+          const k = JSON.stringify(item);
+          if(!have.has(k)){ watchlists[name].push(item); have.add(k); }
+        });
+      }
+    }
+  }
+  if(Array.isArray(d.calEvents)){
+    const key = ev => ((ev && ev.date) || '') + '|' + ((ev && ev.bond) || '') + '|' + ((ev && ev.text) || '') + '|' + ((ev && ev.type) || '');
+    const have = new Set(calEvents.map(key));
+    d.calEvents.forEach(ev => { const k=key(ev); if(!have.has(k)){ calEvents.push(ev); have.add(k); } });
+  }
+  if(d.reportsDB && typeof d.reportsDB === 'object'){
+    const byName = {};
+    Object.entries(reportsDB).forEach(([id, iss]) => { if(iss && iss.name) byName[iss.name] = id; });
+    Object.entries(d.reportsDB).forEach(([impId, impIss]) => {
+      if(!impIss || !impIss.name) return;
+      let targetId = byName[impIss.name];
+      if(!targetId){
+        let id = impId && !reportsDB[impId] ? impId : ('iss_imp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7));
+        let n = 0; while(reportsDB[id]){ id = (impId||'iss_imp') + '_' + (++n); }
+        reportsDB[id] = impIss;
+        byName[impIss.name] = id;
+      } else {
+        const cur = reportsDB[targetId];
+        if(!cur.periods) cur.periods = {};
+        if(impIss.periods && typeof impIss.periods === 'object'){
+          Object.entries(impIss.periods).forEach(([k, period]) => {
+            if(!cur.periods[k]) cur.periods[k] = period;
+          });
+        }
+        if(!cur.ind && impIss.ind) cur.ind = impIss.ind;
+        if(!cur.note && impIss.note) cur.note = impIss.note;
+        // Идентификаторы/ссылки/рейтинг: из импорта только если у текущего пусто
+        ['isin','inn','ogrn','disclosureUrl','rating'].forEach(k => {
+          if(!cur[k] && impIss[k]) cur[k] = impIss[k];
+        });
+      }
+    });
+  }
 }
 
 // Обработчик периода "другой"
