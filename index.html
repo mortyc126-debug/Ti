@@ -1269,6 +1269,9 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <div class="field"><label>URL раскрытия (вручную, перекрывает всё)</label>
           <input id="rep-ni-disclosure" placeholder="https://www.e-disclosure.ru/portal/company.aspx?id=934">
         </div>
+        <div class="field"><label>Кредитный рейтинг (АКРА / Эксперт РА)</label>
+          <input id="rep-ni-rating" placeholder="ruA+, ruBBB-, AA(RU)..." title="Используется в портфеле, если у позиции рейтинг не указан">
+        </div>
         <div id="rep-ni-moex-status" style="font-size:.6rem;color:var(--text3);min-height:14px"></div>
       </div>
     </div>
@@ -2801,10 +2804,26 @@ function renderPortCharts(){
   };
   const RISK_COLORS = {'Низкий':'#22d3a0','Средний':'#f5a623','Высокий':'#ff4d6d','Не оценено':'#7aa0b8'};
 
+  // Эффективный рейтинг позиции: сначала из позиции, потом из совпавшего
+  // по имени эмитента в «Базе отчётности» — чтобы не пришлось дублировать.
+  const effectiveRating = p => {
+    if(p.rating) return p.rating;
+    if(typeof findReportsIssuerByName !== 'function') return '';
+    const issId = findReportsIssuerByName(p.name);
+    const iss = issId ? reportsDB[issId] : null;
+    return (iss && iss.rating) ? iss.rating : '';
+  };
+
+  // Собираем «жалобы»: позиции, у которых не хватает данных для разбивок.
+  const missingRating = [];       // для диаграммы рейтинга/риска
+  const missingYears  = [];       // для диаграммы срока
+  const missingYtm    = [];       // для диаграммы YTM
+
   // 1) По рейтингу
   const byRating = {};
   portfolio.forEach(p => {
-    const cls = ratingClass(p.rating);
+    const cls = ratingClass(effectiveRating(p));
+    if(cls === 'нет') missingRating.push(p.name);
     byRating[cls] = (byRating[cls] || 0) + weight(p);
   });
   const ratingSlices = RATING_ORDER.filter(k => byRating[k] > 0)
@@ -2831,6 +2850,7 @@ function renderPortCharts(){
   const byTerm = {};
   portfolio.forEach(p => {
     const y = yearsLeft(p);
+    if(!y || !isFinite(y) || y <= 0){ missingYears.push(p.name); return; }
     const b = termBuckets.find(b => b.test(y));
     if(b) byTerm[b.k] = (byTerm[b.k] || 0) + weight(p);
   });
@@ -2853,7 +2873,7 @@ function renderPortCharts(){
   const byYtm = {};
   portfolio.forEach(p => {
     const y = ytmOf(p);
-    if(y == null || !isFinite(y)) return;
+    if(y == null || !isFinite(y)){ missingYtm.push(p.name); return; }
     const b = ytmBuckets.find(b => b.test(y));
     if(b) byYtm[b.k] = (byYtm[b.k] || 0) + weight(p);
   });
@@ -2863,7 +2883,7 @@ function renderPortCharts(){
   // 4) По риску: ОФЗ/муни + рейтинг → Низкий / Средний / Высокий.
   const riskOf = p => {
     if(p.btype === 'ОФЗ' || p.btype === 'Муни') return 'Низкий';
-    const r = ratingClass(p.rating);
+    const r = ratingClass(effectiveRating(p));
     if(r === 'AAA' || r === 'AA') return 'Низкий';
     if(r === 'A' || r === 'BBB') return 'Средний';
     if(r === 'BB' || r === 'B' || r === 'CCC и ниже') return 'Высокий';
@@ -2878,23 +2898,41 @@ function renderPortCharts(){
   const riskSlices = RISK_ORDER.filter(k => byRisk[k] > 0)
     .map(k => ({label:k, value:byRisk[k], color:RISK_COLORS[k]}));
 
+  // Подсказки о недостающих данных — отображаются под диаграммой, если
+  // соответствующее поле пусто у ≥1 позиций.
+  const ratingHint = missingRating.length
+    ? `У ${missingRating.length} поз. нет рейтинга: ${missingRating.slice(0,3).join(', ')}${missingRating.length>3?' и ещё '+(missingRating.length-3):''}. Добавьте через ✏️ у позиции или в «Базе отчётности» (он подтянется по имени).`
+    : '';
+  const termHint = missingYears.length
+    ? `У ${missingYears.length} поз. не указан срок до погашения: ${missingYears.slice(0,3).join(', ')}${missingYears.length>3?'...':''}`
+    : '';
+  const ytmHint = missingYtm.length
+    ? `У ${missingYtm.length} поз. не посчитался YTM (нужны купон + срок): ${missingYtm.slice(0,3).join(', ')}${missingYtm.length>3?'...':''}`
+    : '';
+  const riskHint = missingRating.length
+    ? `Для корп. бумаг без рейтинга риск = «Не оценено». Задайте рейтинг, чтобы он попал в нужную категорию.`
+    : '';
+
   card.style.display = '';
   wrap.innerHTML = [
-    pieChartBlock('По рейтингу', ratingSlices),
-    pieChartBlock('По сроку', termSlices),
-    pieChartBlock('По доходности', ytmSlices),
-    pieChartBlock('По риску', riskSlices),
+    pieChartBlock('По рейтингу', ratingSlices, ratingHint),
+    pieChartBlock('По сроку', termSlices, termHint),
+    pieChartBlock('По доходности', ytmSlices, ytmHint),
+    pieChartBlock('По риску', riskSlices, riskHint),
   ].join('');
 }
 
 // Рендерит один блок: заголовок + SVG-пирог + легенда справа.
 // Использует inline SVG без зависимостей — держит стиль моно-терминала.
-function pieChartBlock(title, slices){
+// hint (опц.) — пояснение под диаграммой о неполных данных.
+function pieChartBlock(title, slices, hint){
+  const hintHtml = hint ? `<div style="font-size:.55rem;color:var(--warn);margin-top:6px;line-height:1.4">⚠ ${hint}</div>` : '';
   const total = slices.reduce((s, x) => s + (x.value || 0), 0);
   if(!total){
     return `<div style="border:1px solid var(--border);padding:10px;background:var(--bg)">
       <div style="font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">${title}</div>
       <div style="font-size:.6rem;color:var(--text3)">нет данных</div>
+      ${hintHtml}
     </div>`;
   }
   const R = 42, CX = 52, CY = 52;
@@ -2931,6 +2969,7 @@ function pieChartBlock(title, slices){
       </svg>
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">${legend}</div>
     </div>
+    ${hintHtml}
   </div>`;
 }
 
@@ -5555,6 +5594,7 @@ function repNiClearForm(){
   document.getElementById('rep-ni-inn').value = '';
   document.getElementById('rep-ni-ogrn').value = '';
   document.getElementById('rep-ni-disclosure').value = '';
+  const r = document.getElementById('rep-ni-rating'); if(r) r.value = '';
   const st = document.getElementById('rep-ni-moex-status'); if(st) st.textContent = '';
 }
 function repNewIssuerModal(){
@@ -5575,6 +5615,7 @@ function repEditIssuerModal(){
   document.getElementById('rep-ni-inn').value = iss.inn || '';
   document.getElementById('rep-ni-ogrn').value = iss.ogrn || '';
   document.getElementById('rep-ni-disclosure').value = iss.disclosureUrl || '';
+  const r = document.getElementById('rep-ni-rating'); if(r) r.value = iss.rating || '';
   document.getElementById('rep-ni-title').innerHTML = 'Редактировать эмитента <button class="modal-x" onclick="closeModal(\'modal-rep-issuer\')">✕</button>';
   document.getElementById('rep-ni-save').textContent = '💾 Сохранить';
   document.getElementById('modal-rep-issuer').classList.add('open');
@@ -5588,6 +5629,7 @@ function repSaveIssuerFromModal(){
   const inn  = document.getElementById('rep-ni-inn').value.trim();
   const ogrn = document.getElementById('rep-ni-ogrn').value.trim();
   const disclosureUrl = document.getElementById('rep-ni-disclosure').value.trim();
+  const rating = (document.getElementById('rep-ni-rating')?.value || '').trim();
   if(editId && reportsDB[editId]){
     // Редактирование: сохраняем periods/note и прочие поля
     const cur = reportsDB[editId];
@@ -5596,6 +5638,7 @@ function repSaveIssuerFromModal(){
     cur.inn = inn || undefined;
     cur.ogrn = ogrn || undefined;
     cur.disclosureUrl = disclosureUrl || undefined;
+    cur.rating = rating || undefined;
     save(); closeModal('modal-rep-issuer');
     repRebuildSelect();
     document.getElementById('rep-issuer-sel').value = editId;
@@ -5610,6 +5653,7 @@ function repSaveIssuerFromModal(){
     inn: inn || undefined,
     ogrn: ogrn || undefined,
     disclosureUrl: disclosureUrl || undefined,
+    rating: rating || undefined,
   };
   save(); closeModal('modal-rep-issuer');
   repRebuildSelect();
@@ -5700,6 +5744,7 @@ function repExportIssuer(){
     inn: iss.inn || undefined,
     ogrn: iss.ogrn || undefined,
     disclosureUrl: iss.disclosureUrl || undefined,
+    rating: iss.rating || undefined,
     periods: iss.periods || {},
   };
   const json = JSON.stringify(payload, null, 2);
@@ -8106,6 +8151,7 @@ function applyImportedJsonText(raw){
     d = { reportsDB: { [id]: {
       name: d.name, ind: d.ind || 'other', note: d.note || '',
       isin: d.isin, inn: d.inn, ogrn: d.ogrn, disclosureUrl: d.disclosureUrl,
+      rating: d.rating,
       periods: d.periods,
     } } };
   }
@@ -8237,8 +8283,8 @@ function mergeImportedData(d){
         }
         if(!cur.ind && impIss.ind) cur.ind = impIss.ind;
         if(!cur.note && impIss.note) cur.note = impIss.note;
-        // Идентификаторы/ссылки: берём из импорта только если у текущего пусто
-        ['isin','inn','ogrn','disclosureUrl'].forEach(k => {
+        // Идентификаторы/ссылки/рейтинг: из импорта только если у текущего пусто
+        ['isin','inn','ogrn','disclosureUrl','rating'].forEach(k => {
           if(!cur[k] && impIss[k]) cur[k] = impIss[k];
         });
       }
