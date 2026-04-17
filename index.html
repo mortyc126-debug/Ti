@@ -1179,6 +1179,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm btn-p" onclick="repNewIssuerModal()">＋ Эмитент</button>
     <button class="btn btn-sm" id="rep-add-period-btn" style="display:none" onclick="repNewPeriodModal()">＋ Добавить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
+    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.ru — CSV/TXT/XML в Windows-1251 или UTF-8">📥 ГИРБО</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
       <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие">✎ Редактировать</button>
@@ -1609,6 +1610,38 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-import-paste')">Отмена</button>
       <button class="btn btn-p" onclick="importFromPastedText()">Загрузить →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: импорт ГИРБО (CSV/XML) — дублирует сайдбар-пункт для мобильных -->
+<div class="modal-overlay" id="modal-girbo-import">
+  <div class="modal" style="width:560px;max-width:96vw">
+    <div class="modal-hdr">📥 Импорт ГИРБО (CSV/XML) <button class="modal-x" onclick="closeModal('modal-girbo-import')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
+        Выгрузки с <strong>bo.nalog.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
+      </div>
+      <input type="file" id="girbo-file-modal" accept=".csv,.txt,.tsv,.xml" style="display:none" onchange="importGirboCsv(this)">
+      <div id="girbo-drop" onclick="document.getElementById('girbo-file-modal').click()"
+           style="border:2px dashed var(--border2);padding:22px 16px;text-align:center;background:var(--bg);cursor:pointer;user-select:none">
+        <div style="font-size:1.6rem;margin-bottom:4px">📥</div>
+        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы выбрать файл<br><span style="color:var(--text3);font-size:.6rem">(на десктопе можно перетащить сюда)</span></div>
+        <div style="font-size:.56rem;color:var(--text3);margin-top:6px;letter-spacing:.08em">.CSV · .TXT · .TSV · .XML</div>
+      </div>
+      <details style="font-size:.62rem;color:var(--text2)">
+        <summary style="cursor:pointer;padding:4px 0">Не получается выбрать файл? Вставить текстом</summary>
+        <div style="font-size:.58rem;color:var(--text3);margin:6px 0;line-height:1.5">
+          Открой файл в браузере, выдели всё (Ctrl/Cmd+A), скопируй (Ctrl/Cmd+C) и вставь сюда:
+        </div>
+        <textarea id="girbo-paste" placeholder="Содержимое CSV или XML целиком..."
+          style="width:100%;min-height:140px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
+        <button class="btn btn-sm btn-p" style="margin-top:6px" onclick="importGirboFromPaste()">Загрузить вставленное</button>
+      </details>
+      <div id="girbo-modal-status" style="font-size:.6rem;color:var(--text3)"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-girbo-import')">Закрыть</button>
     </div>
   </div>
 </div>
@@ -8514,119 +8547,168 @@ function parseGirboText(raw){
   return { inn, year, name, codes, encoding: null, text };
 }
 
+// Ядро: берёт ArrayBuffer + имя файла, определяет формат, декодирует,
+// парсит и пишет в reportsDB. Общая точка входа для файл-инпута, paste
+// и drag-and-drop — чтобы логика не дублировалась.
+function _processGirboFile(buf, filename){
+  if(!buf || !buf.byteLength){ alert('Пустой файл.'); return; }
+  const peek = new TextDecoder('latin1').decode(new Uint8Array(buf).subarray(0, Math.min(buf.byteLength, 80)));
+  const isXml = looksLikeXml(filename, peek);
+
+  let text, encoding, parsed;
+  if(isXml){
+    ({ text, encoding } = decodeXmlBytes(buf));
+    parsed = parseGirboXml(text);
+    parsed.format = 'XML';
+  } else {
+    ({ text, encoding } = decodeBytesAutoCp1251(buf));
+    parsed = parseGirboText(text);
+    parsed.format = 'CSV/TXT';
+  }
+  parsed.encoding = encoding;
+
+  if(!Object.keys(parsed.codes).length){
+    alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
+          'Формат: '+parsed.format+'\n' +
+          'Кодировка: '+encoding+'\n' +
+          'Проверьте, что это выгрузка ГИРБО с кодами строк баланса и ОФР.');
+    return;
+  }
+
+  let year = parsed.year;
+  if(!year){
+    const ans = prompt('Не удалось определить год отчёта из файла.\nУкажите год (например, 2023):', String(new Date().getFullYear()-1));
+    year = ans ? parseInt(String(ans).trim()) : null;
+    if(!year || year < 2000 || year > 2099){ return; }
+  }
+
+  let issName = parsed.name;
+  if(!issName){
+    issName = (prompt('Не удалось определить эмитента из файла.\nВведите название компании:', '') || '').trim();
+    if(!issName) return;
+  }
+
+  // Ищем существующего эмитента: по ИНН — приоритет, затем по имени.
+  let issId = null;
+  for(const [id, iss] of Object.entries(reportsDB)){
+    if(parsed.inn && iss && iss.inn === parsed.inn){ issId = id; break; }
+  }
+  if(!issId){
+    for(const [id, iss] of Object.entries(reportsDB)){
+      if(iss && iss.name && iss.name.trim().toLowerCase() === issName.toLowerCase()){ issId = id; break; }
+    }
+  }
+  if(!issId){
+    issId = 'iss_girbo_' + Date.now().toString(36);
+    reportsDB[issId] = {
+      name: issName, ind: 'other', periods: {},
+      inn: parsed.inn || undefined,
+      note: 'Импорт ГИРБО ('+parsed.format+', '+encoding+') · '+new Date().toLocaleDateString('ru-RU'),
+    };
+  } else if(parsed.inn && !reportsDB[issId].inn){
+    reportsDB[issId].inn = parsed.inn;
+  }
+
+  const type = 'ГИРБО';
+  const period = 'FY';
+  const key = year+'_'+period+'_'+type;
+  if(reportsDB[issId].periods[key] &&
+     !confirm('Период '+year+' · '+type+' для «'+reportsDB[issId].name+'» уже есть в базе.\n\nПерезаписать новыми данными?')){
+    return;
+  }
+
+  // ГИРБО хранит суммы в тысячах рублей. БондАналитик считает в млрд ₽.
+  const scale = 0.000001;
+  const fieldMap = {
+    'is-rev':'rev','is-ebit':'ebit','is-np':'np','is-int':'int',
+    'is-tax':'tax','is-assets':'assets','is-ca':'ca','is-cl':'cl',
+    'is-debt':'debt','is-cash':'cash','is-ret':'ret','is-eq':'eq',
+  };
+  const pData = {
+    year, period, type,
+    note: reportsDB[issId].note || '',
+    analysisHTML: '',
+    rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+    assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+  };
+  let filled = 0;
+  for(const [fid, pk] of Object.entries(fieldMap)){
+    const v = parsed.codes[fid];
+    if(v != null){
+      pData[pk] = parseFloat((v * scale).toFixed(6));
+      filled++;
+    }
+  }
+  reportsDB[issId].periods[key] = pData;
+
+  save();
+  if(typeof repInit === 'function') repInit();
+  const sbRep = document.getElementById('sb-rep');
+  if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+
+  // Закрываем модалку, если открыта.
+  const modal = document.getElementById('modal-girbo-import');
+  if(modal && modal.classList.contains('open')) modal.classList.remove('open');
+
+  alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
+        'Формат: '+parsed.format+' · '+encoding+'\n' +
+        'Заполнено полей: '+filled+' из '+Object.keys(fieldMap).length+'\n\n' +
+        'Откройте «📂 База отчётности» для просмотра.');
+}
+
 function importGirboCsv(input){
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    try {
-      const buf = e.target.result;
-      // Сначала прикинем, XML это или CSV, не декодируя весь буфер дважды.
-      const peek = new TextDecoder('latin1').decode(new Uint8Array(buf).subarray(0, Math.min(buf.byteLength, 80)));
-      const isXml = looksLikeXml(file.name, peek);
-
-      let text, encoding, parsed;
-      if(isXml){
-        ({ text, encoding } = decodeXmlBytes(buf));
-        parsed = parseGirboXml(text);
-        parsed.format = 'XML';
-      } else {
-        ({ text, encoding } = decodeBytesAutoCp1251(buf));
-        parsed = parseGirboText(text);
-        parsed.format = 'CSV/TXT';
-      }
-      parsed.encoding = encoding;
-
-      if(!Object.keys(parsed.codes).length){
-        alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
-              'Формат: '+parsed.format+'\n' +
-              'Кодировка: '+encoding+'\n' +
-              'Проверьте, что это выгрузка ГИРБО с кодами строк баланса и ОФР.');
-        return;
-      }
-
-      let year = parsed.year;
-      if(!year){
-        const ans = prompt('Не удалось определить год отчёта из файла.\nУкажите год (например, 2023):', String(new Date().getFullYear()-1));
-        year = ans ? parseInt(String(ans).trim()) : null;
-        if(!year || year < 2000 || year > 2099){ return; }
-      }
-
-      let issName = parsed.name;
-      if(!issName){
-        issName = (prompt('Не удалось определить эмитента из файла.\nВведите название компании:', '') || '').trim();
-        if(!issName) return;
-      }
-
-      // Ищем существующего эмитента: по ИНН — приоритет, затем по имени.
-      let issId = null;
-      for(const [id, iss] of Object.entries(reportsDB)){
-        if(parsed.inn && iss && iss.inn === parsed.inn){ issId = id; break; }
-      }
-      if(!issId){
-        for(const [id, iss] of Object.entries(reportsDB)){
-          if(iss && iss.name && iss.name.trim().toLowerCase() === issName.toLowerCase()){ issId = id; break; }
-        }
-      }
-      if(!issId){
-        issId = 'iss_girbo_' + Date.now().toString(36);
-        reportsDB[issId] = {
-          name: issName, ind: 'other', periods: {},
-          inn: parsed.inn || undefined,
-          note: 'Импорт ГИРБО ('+parsed.format+', '+encoding+') · '+new Date().toLocaleDateString('ru-RU'),
-        };
-      } else if(parsed.inn && !reportsDB[issId].inn){
-        reportsDB[issId].inn = parsed.inn;
-      }
-
-      const type = 'ГИРБО';
-      const period = 'FY';
-      const key = year+'_'+period+'_'+type;
-      if(reportsDB[issId].periods[key] &&
-         !confirm('Период '+year+' · '+type+' для «'+reportsDB[issId].name+'» уже есть в базе.\n\nПерезаписать новыми данными?')){
-        return;
-      }
-
-      // ГИРБО хранит суммы в тысячах рублей. БондАналитик считает в млрд ₽.
-      const scale = 0.000001;
-      const fieldMap = {
-        'is-rev':'rev','is-ebit':'ebit','is-np':'np','is-int':'int',
-        'is-tax':'tax','is-assets':'assets','is-ca':'ca','is-cl':'cl',
-        'is-debt':'debt','is-cash':'cash','is-ret':'ret','is-eq':'eq',
-      };
-      const pData = {
-        year, period, type,
-        note: reportsDB[issId].note || '',
-        analysisHTML: '',
-        rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
-        assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
-      };
-      let filled = 0;
-      for(const [fid, pk] of Object.entries(fieldMap)){
-        const v = parsed.codes[fid];
-        if(v != null){
-          pData[pk] = parseFloat((v * scale).toFixed(6));
-          filled++;
-        }
-      }
-      reportsDB[issId].periods[key] = pData;
-
-      save();
-      if(typeof repInit === 'function') repInit();
-      const sbRep = document.getElementById('sb-rep');
-      if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
-
-      alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
-            'Формат: '+parsed.format+' · '+encoding+'\n' +
-            'Заполнено полей: '+filled+' из '+Object.keys(fieldMap).length+'\n\n' +
-            'Откройте «📂 База отчётности» для просмотра.');
-    } catch(err){
-      alert('Ошибка чтения файла ГИРБО: ' + err.message);
-    } finally {
-      input.value = '';
-    }
+    try { _processGirboFile(e.target.result, file.name); }
+    catch(err){ alert('Ошибка чтения файла ГИРБО: ' + err.message); }
+    finally { input.value = ''; }
   };
   reader.onerror = () => alert('Не удалось прочитать файл ГИРБО.');
   reader.readAsArrayBuffer(file);
+}
+
+// Открыть модалку загрузки ГИРБО (рабочий путь для мобильных:
+// сайдбар-пункт скрыт на узких экранах, нужна видимая кнопка).
+function openGirboImportModal(){
+  const ta = document.getElementById('girbo-paste'); if(ta) ta.value = '';
+  const st = document.getElementById('girbo-modal-status'); if(st) st.textContent = '';
+  document.getElementById('modal-girbo-import').classList.add('open');
+  _initGirboDropZone();
+}
+
+// Вставить содержимое CSV/XML из textarea. Упаковываем строку в байты
+// и гоним через тот же _processGirboFile — автодетект и парсер отработают.
+function importGirboFromPaste(){
+  const ta = document.getElementById('girbo-paste');
+  const raw = ta ? String(ta.value || '') : '';
+  if(!raw.trim()){ alert('Пусто — вставьте содержимое CSV или XML.'); return; }
+  try {
+    const buf = new TextEncoder().encode(raw).buffer;
+    const guessed = raw.trimStart().startsWith('<') ? 'pasted.xml' : 'pasted.csv';
+    _processGirboFile(buf, guessed);
+  } catch(err){
+    alert('Ошибка обработки вставленного текста: ' + err.message);
+  }
+}
+
+// Drag-and-drop навешиваем один раз на div-зону внутри модалки.
+let _girboDropInit = false;
+function _initGirboDropZone(){
+  if(_girboDropInit) return;
+  const drop = document.getElementById('girbo-drop');
+  if(!drop) return;
+  _girboDropInit = true;
+  const setHover = on => { drop.style.borderColor = on ? 'var(--acc)' : 'var(--border2)'; };
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); setHover(true); }));
+  ['dragleave'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); setHover(false); }));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation(); setHover(false);
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(!file){ alert('Не удалось получить файл из drop.'); return; }
+    file.arrayBuffer().then(buf => _processGirboFile(buf, file.name))
+      .catch(err => alert('Ошибка: '+err.message));
+  });
 }
 
 // Merge-импорт: добавляет новое, не трогая то, что уже есть.
