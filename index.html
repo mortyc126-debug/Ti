@@ -765,8 +765,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
           <div class="card-body">
             <div style="font-size:.67rem;color:var(--text2);margin-bottom:8px">Загрузите файл отчётности — поля заполнятся автоматически</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input type="file" id="pdf-upload" accept=".pdf,.docx,.doc,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="parseAnyReport(this)">
-              <button class="btn btn-sm" type="button" onclick="document.getElementById('pdf-upload').click()">📂 PDF / DOCX / XLSX / 🖼 фото</button>
+              <input type="file" id="pdf-upload" accept=".pdf,.docx,.doc,.xlsx,.xls,.xml,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="parseAnyReport(this)">
+              <button class="btn btn-sm" type="button" onclick="document.getElementById('pdf-upload').click()">📂 PDF / DOCX / XLSX / XML / 🖼 фото</button>
               <div id="pdf-status" style="font-size:.65rem;color:var(--text3)">файл не выбран</div>
             </div>
             <div id="pdf-found" style="display:none;margin-top:10px;font-size:.64rem;line-height:1.8;color:var(--text2)"></div>
@@ -1311,7 +1311,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div style="border:1px solid var(--border2);padding:10px;background:var(--bg)">
         <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:7px">📎 Загрузить файл (необязательно)</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="rep-np-file" accept=".pdf,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="repParseFile(this)">
+          <input type="file" id="rep-np-file" accept=".pdf,.docx,.xlsx,.xls,.xml,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="repParseFile(this)">
           <button class="btn btn-sm" onclick="document.getElementById('rep-np-file').click()">📂 PDF / DOCX / XLSX / 🖼 фото</button>
           <div id="rep-np-file-status" style="font-size:.63rem;color:var(--text3)">файл не выбран</div>
         </div>
@@ -1387,7 +1387,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <button type="button" class="btn" style="text-align:left" onclick="flLoadPdf()">📂 Ручной подбор из PDF</button>
       <button type="button" class="btn" style="text-align:left" onclick="flPasteText()">📝 Вставить распознанный текст</button>
       <div id="fl-recent-info" style="font-size:.58rem;color:var(--text3);line-height:1.5"></div>
-      <input type="file" id="fl-pdf-input" accept=".pdf,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none">
+      <input type="file" id="fl-pdf-input" accept=".pdf,.docx,.xlsx,.xls,.xml,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none">
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-field-lookup')">Отмена</button>
@@ -2266,6 +2266,47 @@ async function parseAnyReport(input) {
         txt += XLSX.utils.sheet_to_csv(wb.Sheets[name]) + '\n';
       });
 
+    } else if (ext === 'xml') {
+      // ── 1С:Бухгалтерия БФО (XML, форма 5.x) ──
+      const xmlText = await readXmlAsText(file);
+      const res = extractFrom1CXml(xmlText);
+      if (!res) {
+        status.style.color = 'var(--danger)';
+        status.textContent = '⚠️ XML не распознан как форма 1С:Бухгалтерия (БФО 5.x).';
+        return;
+      }
+      const idToKey = {
+        'is-rev':'rev','is-ebit':'ebit','is-np':'np','is-int':'intExp','is-tax':'tax',
+        'is-assets':'assets','is-ca':'ca','is-cl':'cl','is-debt':'debt',
+        'is-cash':'cash','is-ret':'ret','is-eq':'eq'
+      };
+      const xmlLabels = {
+        'is-rev':'Выручка','is-ebit':'EBIT (Прибыль от продаж)','is-np':'Чистая прибыль',
+        'is-int':'Проценты к уплате','is-tax':'Текущий налог','is-assets':'Активы (стр.1600)',
+        'is-ca':'Оборотные активы (1200)','is-cl':'Краткосрочные обяз. (1500)',
+        'is-debt':'Заёмные средства (1410+1510)','is-cash':'Денежные средства (1250)',
+        'is-ret':'Нераспр. прибыль (1370)','is-eq':'Капитал (1300)'
+      };
+      const xmlLog = [];
+      let xmlFilled = 0;
+      for (const [id, key] of Object.entries(idToKey)) {
+        const val = res.values[key];
+        if (val != null && document.getElementById(id)) {
+          document.getElementById(id).value = val;
+          xmlLog.push('<span style="color:var(--green)">✓</span> ' + xmlLabels[id] + ': <strong>' + val + '</strong>');
+          xmlFilled++;
+        }
+      }
+      const xmlRepTypeSel = document.getElementById('is-rep-type');
+      if (xmlRepTypeSel && !xmlRepTypeSel.value) xmlRepTypeSel.value = 'РСБУ';
+      status.style.color = xmlFilled ? 'var(--green)' : 'var(--warn)';
+      status.textContent = xmlFilled
+        ? `✓ 1С:Бухгалтерия XML · заполнено ${xmlFilled} полей · ${file.name}`
+        : `⚠️ Теги найдены, но все значения пустые · ${file.name}`;
+      found.style.display = 'block';
+      found.innerHTML = xmlLog.join('<br>');
+      return;
+
     } else if (typeof isImageExt === 'function' && isImageExt(ext)) {
       // ── Изображение (скан / фото таблицы) ──
       txt = await repOcrImage(file, (p, n, phase) => {
@@ -2277,7 +2318,7 @@ async function parseAnyReport(input) {
 
     } else {
       status.style.color = 'var(--danger)';
-      status.textContent = '⚠️ Формат не поддерживается. Используйте PDF, DOCX, XLSX или фото (JPG/PNG).';
+      status.textContent = '⚠️ Формат не поддерживается. Используйте PDF, DOCX, XLSX, XML (1С:БФО) или фото (JPG/PNG).';
       return;
     }
 
@@ -7115,6 +7156,48 @@ async function repParseFile(input){
       text = await repExtractDocx(file);
     } else if(ext==='xlsx'||ext==='xls'){
       text = await repExtractXlsx(file);
+    } else if(ext==='xml'){
+      // ── 1С:Бухгалтерия БФО (XML, форма 5.x) ──
+      const xmlText = await readXmlAsText(file);
+      const res = extractFrom1CXml(xmlText);
+      if(!res){
+        status.style.color='var(--danger)';
+        status.textContent='⚠️ XML не распознан как форма 1С:Бухгалтерия (БФО 5.x).';
+        return;
+      }
+      const idToKey = {
+        'rep-np-rev':'rev','rep-np-ebit':'ebit','rep-np-np':'np','rep-np-int':'intExp',
+        'rep-np-assets':'assets','rep-np-ca':'ca','rep-np-cl':'cl','rep-np-debt':'debt',
+        'rep-np-cash':'cash','rep-np-ret':'ret','rep-np-eq':'eq'
+      };
+      const labels = {
+        'rep-np-rev':'Выручка','rep-np-ebit':'EBIT (Прибыль от продаж)','rep-np-np':'Чистая прибыль',
+        'rep-np-int':'Проценты к уплате','rep-np-assets':'Активы (1600)',
+        'rep-np-ca':'Оборотные активы (1200)','rep-np-cl':'Краткосрочные обяз. (1500)',
+        'rep-np-debt':'Заёмные средства (1410+1510)','rep-np-cash':'Денежные средства (1250)',
+        'rep-np-ret':'Нераспр. прибыль (1370)','rep-np-eq':'Капитал (1300)'
+      };
+      const logEl = document.getElementById('rep-np-parse-log');
+      const lines = [];
+      let filled = 0;
+      for(const [id, key] of Object.entries(idToKey)){
+        const val = res.values[key];
+        if(val != null && document.getElementById(id)){
+          document.getElementById(id).value = val;
+          lines.push(`<div style="padding:3px 0;border-bottom:1px dotted rgba(30,48,72,.4)">`+
+            `<span style="color:var(--green)">✓</span> <strong>${labels[id]}</strong> = <strong>${val}</strong> млрд ₽</div>`);
+          filled++;
+        }
+      }
+      if(logEl){
+        logEl.style.display='block';
+        logEl.innerHTML = `<div style="font-size:.6rem;color:var(--text3);margin-bottom:4px">1С:Бухгалтерия XML · ОтчетГод=${res.period||'?'}</div>` + lines.join('');
+      }
+      status.style.color = filled ? 'var(--green)' : 'var(--warn)';
+      status.textContent = filled
+        ? `✓ 1С:Бухгалтерия XML · найдено ${filled} показателей · ${file.name}`
+        : `⚠️ Теги найдены, но все значения пустые · ${file.name}`;
+      return;
     } else if(isImageExt(ext)){
       status.style.color='var(--warn)';
       status.textContent='⏳ OCR изображения '+file.name+'...';
@@ -7126,7 +7209,7 @@ async function repParseFile(input){
       });
     } else {
       status.style.color='var(--danger)';
-      status.textContent='Формат не поддерживается. Используйте PDF, DOCX, XLSX или фото (JPG/PNG).';
+      status.textContent='Формат не поддерживается. Используйте PDF, DOCX, XLSX, XML (1С:БФО) или фото (JPG/PNG).';
       return;
     }
     window._lastParsedText = text;
@@ -7510,6 +7593,78 @@ function extractByRsbuCodes(txt) {
     }
   }
   return result;
+}
+
+// ══ 1С:Бухгалтерия XML (БФО, форма 5.x) ══
+// Дерево из файла: Файл > Документ > {СвНП, Подписант, Баланс, ФинРез, ОтчетИзмКап, ДвижениеДен}.
+// Значения лежат в атрибутах листов/узлов: СумОтч — отчётный период,
+// СумПрдщ/СумПрдшв — −1/−2 год для баланса, СумПред — прошлый год для ОПиУ.
+// ОКЕИ в теге Документ задаёт единицу: 384 — тыс. руб., 385 — млн. руб., 383 — руб.
+// Возвращаем значения уже в млрд ₽ (внутренний формат приложения); null — не 1С XML.
+function extractFrom1CXml(xmlText){
+  if(!xmlText || !/<Файл[\s>]/.test(xmlText) || !/<Документ[\s>]/.test(xmlText)) return null;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  if(doc.getElementsByTagName('parsererror').length) return null;
+  if(!doc.getElementsByTagName('Баланс').length && !doc.getElementsByTagName('ФинРез').length) return null;
+
+  const first = tag => doc.getElementsByTagName(tag)[0] || null;
+  const firstUnder = (parentTag, childTag) => {
+    const parent = first(parentTag);
+    if(!parent) return null;
+    const kids = parent.getElementsByTagName(childTag);
+    return kids[0] || null;
+  };
+  const num = (el, attr='СумОтч') => {
+    if(!el) return null;
+    const v = el.getAttribute(attr);
+    if(v == null || v === '') return null;
+    const n = parseFloat(String(v).replace(/\s+/g,'').replace(',', '.'));
+    return isFinite(n) ? n : null;
+  };
+
+  const docEl = first('Документ');
+  const okei  = docEl?.getAttribute('ОКЕИ') || '384';
+  const SCALE = okei === '385' ? 1e-3 : okei === '383' ? 1e-9 : 1e-6;
+  const sc = v => v == null ? null : parseFloat((v * SCALE).toFixed(6));
+
+  // Заёмные средства: строки 1410 (долгосрочные) + 1510 (краткосрочные).
+  const debtLong  = num(firstUnder('ДолгосрОбяз',  'ЗаемСредств'));
+  const debtShort = num(firstUnder('КраткосрОбяз', 'ЗаемСредств'));
+  const debt = (debtLong != null || debtShort != null)
+    ? (debtLong || 0) + (debtShort || 0)
+    : null;
+
+  return {
+    repType: 'РСБУ',
+    period:  docEl?.getAttribute('ОтчетГод') || '',
+    values: {
+      assets: sc(num(first('Актив'))),                         // 1600
+      ca:     sc(num(first('ОбА'))),                           // 1200
+      cl:     sc(num(first('КраткосрОбяз'))),                  // 1500
+      debt:   sc(debt),                                         // 1410+1510
+      cash:   sc(num(firstUnder('ОбА', 'ДенежнСр'))),          // 1250
+      eq:     sc(num(first('Капитал'))),                       // 1300
+      ret:    sc(num(first('НераспПриб'))),                    // 1370
+      rev:    sc(num(first('Выруч'))),                         // 2110
+      ebit:   sc(num(first('ПрибПрод'))),                      // 2200
+      np:     sc(num(first('ЧистПрибУб'))),                    // 2400
+      intExp: sc(num(first('ПроцУпл'))),                       // 2330
+      tax:    sc(num(first('ТекНалПриб'))),                    // 2410
+    }
+  };
+}
+
+// Читает File как строку с учётом encoding из XML-декларации
+// (1С по умолчанию пишет windows-1251).
+async function readXmlAsText(file){
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const head = new TextDecoder('ascii', {fatal:false}).decode(bytes.slice(0, 400));
+  const m = head.match(/encoding=["']([^"']+)["']/i);
+  const enc = (m ? m[1] : 'utf-8').toLowerCase();
+  try { return new TextDecoder(enc).decode(bytes); }
+  catch { return new TextDecoder('utf-8').decode(bytes); }
 }
 
 // Обновлённый parseAnyReport — сначала пробует коды, потом текст
