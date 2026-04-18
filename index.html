@@ -369,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-item" onclick="showPage('reports');sbAct(this)"><span class="sb-icon">📂</span>База отчётности<span class="sb-badge" id="sb-rep">0</span></div>
     <div class="sb-item" onclick="showPage('industries');sbAct(this)"><span class="sb-icon">🏭</span>Отрасли / медианы<span class="sb-badge" id="sb-ind">0</span></div>
     <div class="sb-item" onclick="showPage('cross');sbAct(this)"><span class="sb-icon">📊</span>Сравнение компаний</div>
+    <div class="sb-item" onclick="showPage('moex');sbAct(this)" title="Каталог всех торгуемых на Мосбирже облигаций — ОФЗ, корпораты, субфеды, ВДО. Фильтры, которых нет в самой MOEX."><span class="sb-icon">🏛</span>Каталог Мосбиржи<span class="sb-badge" id="sb-moex">0</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -1788,6 +1789,129 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+<!-- ═══ Страница «🏛 Каталог Мосбиржи» ═══ -->
+<div class="page" id="page-moex">
+  <div class="page-title">🏛 Каталог облигаций Мосбиржи</div>
+  <div class="page-sub">Все торгуемые выпуски · ОФЗ · корпораты · субфеды · ВДО · замещайки · флоатеры</div>
+
+  <div class="card">
+    <div class="card-hdr">
+      📡 Загрузка каталога с MOEX ISS
+      <span id="moex-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
+    </div>
+    <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-p" id="moex-refresh-btn" onclick="fetchMoexCatalog()">📡 Обновить каталог</button>
+      <button class="btn" onclick="moexClearCache()" title="Удалить локальный кэш и начать с чистого листа">🗑 Очистить кэш</button>
+      <span id="moex-status" style="font-size:.62rem;color:var(--text2);flex:1"></span>
+    </div>
+    <div style="padding:4px 12px 10px;font-size:.58rem;color:var(--text3);line-height:1.55">
+      Источник: публичный ISS API Мосбиржи (без ключа, без регистрации). По кнопке подтянутся ~5000 выпусков, ≈ 5 МБ трафика, 30–60 секунд. Потом всё работает локально из кеша — фильтры и сортировка мгновенно. Обновлять раз в 1-2 дня достаточно (ставка ЦБ/купоны редко меняются).
+    </div>
+  </div>
+
+  <div class="card" id="moex-filters-card" style="display:none;margin-top:12px">
+    <div class="card-hdr">🎯 Фильтры <span id="moex-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Поиск (название / ISIN / эмитент)</label>
+        <input type="text" id="moex-f-text" oninput="moexApplyFilters()" placeholder="пгк, офз 26238, RU000A...">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Тип</label>
+        <select id="moex-f-type" onchange="moexApplyFilters()">
+          <option value="">Все</option>
+          <option value="ofz">ОФЗ (гос.)</option>
+          <option value="corp">Корпоративные</option>
+          <option value="subfed">Субфед / муни</option>
+          <option value="exchange">Биржевые</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Уровень листинга</label>
+        <select id="moex-f-list" onchange="moexApplyFilters()">
+          <option value="">Все</option>
+          <option value="1">1 (котировальный)</option>
+          <option value="2">2</option>
+          <option value="3">3 (ВДО)</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Валюта</label>
+        <select id="moex-f-ccy" onchange="moexApplyFilters()">
+          <option value="">Все</option>
+          <option value="SUR">RUB</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="CNY">CNY</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">YTM от, %</label>
+        <input type="number" id="moex-f-ytm-min" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 12">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">YTM до, %</label>
+        <input type="number" id="moex-f-ytm-max" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 25">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Срок от, лет</label>
+        <input type="number" id="moex-f-mat-min" oninput="moexApplyFilters()" step="0.1" placeholder="0.5">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Срок до, лет</label>
+        <input type="number" id="moex-f-mat-max" oninput="moexApplyFilters()" step="0.5" placeholder="10">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Тип купона</label>
+        <select id="moex-f-coupon" onchange="moexApplyFilters()">
+          <option value="">Все</option>
+          <option value="fix">Фиксированный</option>
+          <option value="float">Флоатер</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Оферта</label>
+        <select id="moex-f-offer" onchange="moexApplyFilters()">
+          <option value="">Не важно</option>
+          <option value="yes">Есть оферта</option>
+          <option value="no">Без оферты</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Объём выпуска от, млн ₽</label>
+        <input type="number" id="moex-f-size-min" oninput="moexApplyFilters()" step="100" placeholder="500">
+      </div>
+      <div class="field" style="margin:0" title="Показать только выпуски эмитентов, у которых у тебя есть отчётность в reportsDB">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="moex-f-indb" onchange="moexApplyFilters()" style="margin:0"> Только «есть в базе»
+        </label>
+      </div>
+    </div>
+    <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
+      <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
+      <div style="flex:1"></div>
+      <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
+        Сортировка:
+        <select id="moex-sort" onchange="moexApplyFilters()" style="font-size:.65rem;padding:2px 4px">
+          <option value="ytm-desc">YTM ↓</option>
+          <option value="ytm-asc">YTM ↑</option>
+          <option value="mat-asc">Срок ↑</option>
+          <option value="mat-desc">Срок ↓</option>
+          <option value="name-asc">Имя А–Я</option>
+          <option value="coupon-desc">Купон ↓</option>
+          <option value="size-desc">Объём ↓</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" id="moex-table-card" style="display:none;margin-top:12px">
+    <div id="moex-table" style="overflow-x:auto;font-size:.64rem"></div>
+  </div>
+
+</div>
+
 </div><!-- /content -->
 </div><!-- /main -->
 
@@ -2470,6 +2594,7 @@ function showPage(n){
   if(n==='reports') repInit();
   if(n==='industries') indRender();
   if(n==='cross') crossInit();
+  if(n==='moex') moexInit();
 }
 function sbAct(el){document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));el.classList.add('active')}
 function swIssTab(t,el){
@@ -15332,6 +15457,410 @@ function dossierIssueDelete(){
   const cnt = Object.keys(iss.issues || {}).length;
   document.getElementById('dossier-iss-count').textContent = cnt ? '('+cnt+')' : '';
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// КАТАЛОГ ОБЛИГАЦИЙ МОСБИРЖИ (ISS API, публичный, без ключа)
+// ─────────────────────────────────────────────────────────────────────
+// Источник: https://iss.moex.com/iss/engines/stock/markets/bonds/securities.json
+// Пагинация — по 100 записей, параметр `start`. Итого ~4500-5000 бумаг.
+// CORS у ISS открыт, поэтому работает прямо из браузера без прокси.
+// Хранение: отдельный ключ localStorage['bondan_moex_catalog'],
+// НЕ в sync-snapshot (каталог большой и re-fetchable).
+// ═════════════════════════════════════════════════════════════════════
+
+const _MOEX_CACHE_KEY = 'bondan_moex_catalog';
+const _MOEX_PAGE_SIZE = 100;
+const _MOEX_BASE = 'https://iss.moex.com/iss/engines/stock/markets/bonds/securities.json';
+
+function moexInit(){
+  if(!window._moexCatalog) _moexLoadCache();
+  _moexRenderMeta();
+  moexApplyFilters();
+}
+
+function _moexLoadCache(){
+  try {
+    const raw = localStorage.getItem(_MOEX_CACHE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(parsed && Array.isArray(parsed.items)) window._moexCatalog = parsed;
+  } catch(e){}
+}
+
+function _moexSaveCache(){
+  if(!window._moexCatalog) return;
+  try {
+    localStorage.setItem(_MOEX_CACHE_KEY, JSON.stringify(window._moexCatalog));
+  } catch(e){
+    alert('Не удалось сохранить каталог в localStorage (вероятно, не хватает места). Фильтры будут работать в рамках сессии, но после перезагрузки нужно будет обновить снова.\n\n' + e.message);
+  }
+}
+
+function moexClearCache(){
+  if(!confirm('Удалить локальный кэш каталога?')) return;
+  localStorage.removeItem(_MOEX_CACHE_KEY);
+  window._moexCatalog = null;
+  _moexRenderMeta();
+  moexApplyFilters();
+}
+
+function _moexRenderMeta(){
+  const meta = document.getElementById('moex-meta');
+  const cat = window._moexCatalog;
+  const sbM = document.getElementById('sb-moex');
+  if(!cat || !cat.items){
+    if(meta) meta.textContent = 'Кэш пуст — нажми «Обновить каталог»';
+    if(sbM) sbM.textContent = '0';
+    return;
+  }
+  const age = Math.round((Date.now() - new Date(cat.updatedAt).getTime()) / 86400000 * 10) / 10;
+  if(meta) meta.textContent = `В кэше: ${cat.items.length} бумаг · обновлено ${new Date(cat.updatedAt).toLocaleString('ru-RU')}${age >= 1 ? ' · ≈ '+age+' дн. назад' : ''}`;
+  if(sbM) sbM.textContent = String(cat.items.length);
+}
+
+function _num(v){
+  if(v == null || v === '') return null;
+  const n = parseFloat(v);
+  return isFinite(n) ? n : null;
+}
+
+// Парсит одну страницу: securities (статика) + marketdata (котировки), мерджим по SECID.
+function _moexParsePage(resp){
+  const sec = resp.securities || {};
+  const md  = resp.marketdata || {};
+  const secCols = sec.columns || [], secData = sec.data || [];
+  const mdCols  = md.columns  || [], mdData  = md.data  || [];
+  const idx = (cols, name) => cols.indexOf(name);
+  const sidIdx = idx(secCols, 'SECID');
+  const mdSidIdx = idx(mdCols, 'SECID');
+  const mdById = {};
+  for(const r of mdData){ const id = r[mdSidIdx]; if(id) mdById[id] = r; }
+  const out = [];
+  for(const r of secData){
+    const secid = r[sidIdx]; if(!secid) continue;
+    const g  = (name) => r[idx(secCols, name)];
+    const mdr = mdById[secid] || [];
+    const gm = (name) => mdr[idx(mdCols, name)];
+    out.push({
+      secid,
+      isin:        g('ISIN') || secid,
+      shortName:   g('SHORTNAME') || g('SECNAME') || secid,
+      secName:     g('SECNAME'),
+      boardid:     g('BOARDID'),
+      coupon:      _num(g('COUPONPERCENT')) || _num(g('COUPONVALUE')),
+      couponValue: _num(g('COUPONVALUE')),
+      couponPeriod:_num(g('COUPONPERIOD')),
+      nextCoupon:  g('NEXTCOUPON') || null,
+      faceValue:   _num(g('FACEVALUE')),
+      currency:    g('CURRENCYID') || g('FACEUNIT'),
+      matDate:     g('MATDATE') || null,
+      offerDate:   g('OFFERDATE') || null,
+      issueSize:   _num(g('ISSUESIZE')),
+      listLevel:   _num(g('LISTLEVEL')),
+      secType:     g('SECTYPE'),
+      status:      g('STATUS'),
+      price:       _num(gm('LAST')) || _num(g('PREVWAPRICE')) || _num(g('PREVPRICE')) || _num(g('PREVLEGALCLOSEPRICE')),
+      ytm:         _num(gm('YIELD')) || _num(g('YIELDATPREVWAPRICE')),
+      durationD:   _num(gm('DURATION')) || null,
+    });
+  }
+  return out;
+}
+
+async function fetchMoexCatalog(){
+  const btn = document.getElementById('moex-refresh-btn');
+  const status = document.getElementById('moex-status');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Загружаю…'; }
+  const items = [];
+  let start = 0, pages = 0;
+  try {
+    while(true){
+      if(status) status.textContent = `страница ${pages+1}, загружено ${items.length} бумаг…`;
+      const url = `${_MOEX_BASE}?iss.meta=off&iss.json=extended&start=${start}&limit=${_MOEX_PAGE_SIZE}`;
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok) throw new Error('MOEX HTTP ' + r.status);
+      const raw = await r.json();
+      const body = Array.isArray(raw) ? (raw[1] || raw[0]) : raw;
+      const batch = _moexParsePage(body);
+      if(!batch.length) break;
+      items.push(...batch);
+      pages++;
+      if(batch.length < _MOEX_PAGE_SIZE) break;
+      start += _MOEX_PAGE_SIZE;
+      if(pages > 80) break;
+    }
+    window._moexCatalog = { items, updatedAt: new Date().toISOString() };
+    _moexSaveCache();
+    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} бумаг за ${pages} страниц</span>`;
+    _moexRenderMeta();
+    moexApplyFilters();
+  } catch(e){
+    if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '📡 Обновить каталог'; }
+  }
+}
+
+// Индекс эмитентов из reportsDB по нормализованному имени — для флага «есть в базе».
+function _moexBuildIssuerIndex(){
+  const idx = new Map();
+  for(const [issId, iss] of Object.entries(reportsDB || {})){
+    if(!iss || !iss.name) continue;
+    const n = (typeof _normIssuerName === 'function') ? _normIssuerName(iss.name) : iss.name.toLowerCase();
+    if(n) idx.set(n, issId);
+  }
+  return idx;
+}
+
+function _moexMatchIssuer(bond, idx){
+  const raw = bond.secName || bond.shortName || '';
+  // Обрезаем хвост «Б-04», «БО-02», «П-01», номера выпусков.
+  const head = String(raw).split(/[,\s]+/).filter(Boolean)
+    .filter(w => !/^(Б|П|Р|БО|ПО|РП)-?\d/i.test(w) && !/^\d/.test(w))
+    .slice(0, 3).join(' ');
+  if(!head) return null;
+  const n = (typeof _normIssuerName === 'function') ? _normIssuerName(head) : head.toLowerCase();
+  if(!n) return null;
+  if(idx.has(n)) return idx.get(n);
+  for(const [key, id] of idx){ if(key.includes(n) || n.includes(key)) return id; }
+  return null;
+}
+
+function moexApplyFilters(){
+  const cat = window._moexCatalog;
+  const filtersCard = document.getElementById('moex-filters-card');
+  const tableCard = document.getElementById('moex-table-card');
+  if(!cat || !cat.items || !cat.items.length){
+    if(filtersCard) filtersCard.style.display = 'none';
+    if(tableCard) tableCard.style.display = 'none';
+    return;
+  }
+  if(filtersCard) filtersCard.style.display = '';
+  if(tableCard) tableCard.style.display = '';
+
+  const f = {
+    text: (document.getElementById('moex-f-text').value || '').trim().toLowerCase(),
+    type: document.getElementById('moex-f-type').value,
+    list: document.getElementById('moex-f-list').value,
+    ccy:  document.getElementById('moex-f-ccy').value,
+    ytmMin: _num(document.getElementById('moex-f-ytm-min').value),
+    ytmMax: _num(document.getElementById('moex-f-ytm-max').value),
+    matMin: _num(document.getElementById('moex-f-mat-min').value),
+    matMax: _num(document.getElementById('moex-f-mat-max').value),
+    coupon: document.getElementById('moex-f-coupon').value,
+    offer: document.getElementById('moex-f-offer').value,
+    sizeMin: _num(document.getElementById('moex-f-size-min').value),
+    inDbOnly: document.getElementById('moex-f-indb').checked,
+    sort: document.getElementById('moex-sort').value || 'ytm-desc',
+  };
+
+  const issIdx = _moexBuildIssuerIndex();
+  const today = Date.now();
+  const isOfz = b => /^ОФЗ/i.test(b.shortName || '') || b.boardid === 'TQOB' || String(b.secType || '') === '3';
+  const isSubfed = b => String(b.secType || '') === '2' || /муни|субфед/i.test(b.secName || '');
+
+  const enriched = cat.items.map(b => {
+    const matY = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
+    const issId = _moexMatchIssuer(b, issIdx);
+    const isFloat = /КС|RUONIA|ИПЦ|FLT|флоат/i.test(b.secName || b.shortName || '')
+                  || (b.coupon != null && b.coupon < 1 && b.couponPeriod && b.couponPeriod < 95);
+    return { ...b, matYears: matY, issId, isFloat, _isOfz: isOfz(b), _isSubfed: isSubfed(b) };
+  });
+
+  const filtered = enriched.filter(b => {
+    if(f.text){
+      const hay = ((b.shortName||'') + ' ' + (b.secName||'') + ' ' + b.isin + ' ' + b.secid).toLowerCase();
+      if(!hay.includes(f.text)) return false;
+    }
+    if(f.type === 'ofz' && !b._isOfz) return false;
+    if(f.type === 'corp' && (b._isOfz || b._isSubfed)) return false;
+    if(f.type === 'subfed' && !b._isSubfed) return false;
+    if(f.type === 'exchange' && !/TQ|EQ/i.test(b.boardid || '')) return false;
+    if(f.list && String(b.listLevel) !== f.list) return false;
+    if(f.ccy && b.currency !== f.ccy) return false;
+    if(f.ytmMin != null && (b.ytm == null || b.ytm < f.ytmMin)) return false;
+    if(f.ytmMax != null && (b.ytm == null || b.ytm > f.ytmMax)) return false;
+    if(f.matMin != null && (b.matYears == null || b.matYears < f.matMin)) return false;
+    if(f.matMax != null && (b.matYears == null || b.matYears > f.matMax)) return false;
+    if(f.coupon === 'fix' && b.isFloat) return false;
+    if(f.coupon === 'float' && !b.isFloat) return false;
+    if(f.offer === 'yes' && !b.offerDate) return false;
+    if(f.offer === 'no' && b.offerDate) return false;
+    if(f.sizeMin != null){
+      const sizeM = b.issueSize && b.faceValue ? (b.issueSize * b.faceValue / 1e6) : null;
+      if(sizeM == null || sizeM < f.sizeMin) return false;
+    }
+    if(f.inDbOnly && !b.issId) return false;
+    return true;
+  });
+
+  const cmp = {
+    'ytm-desc': (a,b) => (b.ytm||-999) - (a.ytm||-999),
+    'ytm-asc':  (a,b) => (a.ytm||999) - (b.ytm||999),
+    'mat-asc':  (a,b) => (a.matYears||999) - (b.matYears||999),
+    'mat-desc': (a,b) => (b.matYears||-999) - (a.matYears||-999),
+    'name-asc': (a,b) => String(a.shortName||'').localeCompare(String(b.shortName||''), 'ru'),
+    'coupon-desc':(a,b) => (b.coupon||-999) - (a.coupon||-999),
+    'size-desc':(a,b) => ((b.issueSize||0) * (b.faceValue||0)) - ((a.issueSize||0) * (a.faceValue||0)),
+  }[f.sort];
+  if(cmp) filtered.sort(cmp);
+
+  document.getElementById('moex-count').textContent = `${filtered.length} из ${cat.items.length}`;
+  _moexRenderTable(filtered);
+  window._moexFilteredCache = filtered;
+}
+
+function _moexRenderTable(list){
+  const box = document.getElementById('moex-table');
+  if(!box) return;
+  if(!list.length){
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:.65rem">По текущим фильтрам ничего не нашлось.</div>';
+    return;
+  }
+  const limit = 500;
+  const shown = list.slice(0, limit);
+  const moreHint = list.length > limit
+    ? `<div style="padding:8px 10px;font-size:.58rem;color:var(--text3);background:var(--s2)">Показано первых ${limit} из ${list.length} — сузь фильтры.</div>`
+    : '';
+
+  let html = `${moreHint}<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--s2);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
+      <th style="padding:6px 8px;text-align:left">Бумага</th>
+      <th style="padding:6px 8px;text-align:left">Эмитент / тип</th>
+      <th style="padding:6px 8px;text-align:right">Цена</th>
+      <th style="padding:6px 8px;text-align:right">YTM</th>
+      <th style="padding:6px 8px;text-align:right">Купон</th>
+      <th style="padding:6px 8px;text-align:right">Срок</th>
+      <th style="padding:6px 8px;text-align:center">Лист</th>
+      <th style="padding:6px 8px;text-align:right">Объём, млн</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead><tbody>`;
+
+  for(const b of shown){
+    const issName = b.issId ? (reportsDB[b.issId]?.name || '') : '';
+    const inDbBadge = b.issId
+      ? `<span class="dossier-pill ok" style="padding:1px 6px;font-size:.52rem">в базе</span>` : '';
+    const typeBadge = b._isOfz
+      ? '<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem;background:rgba(0,212,255,.1);color:var(--acc)">ОФЗ</span>'
+      : b._isSubfed ? '<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem">субфед</span>' : '';
+    const floatBadge = b.isFloat ? '<span class="dossier-pill warn" style="padding:1px 6px;font-size:.52rem">флоатер</span>' : '';
+    const offerBadge = b.offerDate ? `<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem" title="оферта ${b.offerDate}">оферта</span>` : '';
+    const mat = b.matYears != null ? b.matYears.toFixed(1) + ' л' : '—';
+    const matDate = b.matDate ? ` <span style="color:var(--text3);font-size:.54rem">(${b.matDate})</span>` : '';
+    const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
+    const coup = b.coupon != null ? b.coupon.toFixed(2) + '%' : '—';
+    const price = b.price != null ? b.price.toFixed(2) : '—';
+    const sizeM = b.issueSize && b.faceValue ? Math.round(b.issueSize * b.faceValue / 1e6) : null;
+    const size = sizeM != null ? sizeM.toLocaleString('ru-RU') : '—';
+    const lvl = b.listLevel || '—';
+    const actions = `
+      <button class="btn btn-sm" onclick="moexAddToYtm('${b.secid}')" title="Добавить в Сравнение YTM" style="padding:2px 6px;font-size:.54rem">+ YTM</button>
+      ${b.issId ? `<button class="btn btn-sm" onclick="moexOpenDossier('${b.issId}')" title="Открыть досье эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📇</button>` : ''}
+    `;
+    const ytmColor = b.ytm > 20 ? 'var(--warn)' : b.ytm > 15 ? 'var(--green)' : 'var(--text)';
+    html += `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+      <td style="padding:5px 8px">
+        <div style="font-weight:600;color:var(--text)">${b.shortName || b.secid}</div>
+        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${b.isin}${matDate}</div>
+      </td>
+      <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">
+        ${issName ? `<div>${issName}</div>` : ''}
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${typeBadge}${inDbBadge}${floatBadge}${offerBadge}</div>
+      </td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${price}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${ytmColor}"><strong>${ytm}</strong></td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${coup}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${mat}</td>
+      <td style="padding:5px 8px;text-align:center">${lvl}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${size}</td>
+      <td style="padding:5px 8px;text-align:right;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+function moexResetFilters(){
+  ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-offer'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('moex-f-indb').checked = false;
+  document.getElementById('moex-sort').value = 'ytm-desc';
+  moexApplyFilters();
+}
+
+function moexAddToYtm(secid){
+  const cat = window._moexCatalog;
+  if(!cat) return;
+  const b = cat.items.find(x => x.secid === secid);
+  if(!b){ alert('Бумага не найдена в кэше'); return; }
+  if(ytmBonds.some(x => x.isin === b.isin || x.name === b.shortName)){
+    alert('Эта бумага уже есть в списке YTM.'); return;
+  }
+  const years = b.matDate ? (new Date(b.matDate).getTime() - Date.now()) / (365.25 * 86400000) : null;
+  const isOfz = /^ОФЗ/i.test(b.shortName || '') || b.boardid === 'TQOB';
+  const isSubfed = String(b.secType || '') === '2';
+  const isFloat = /КС|RUONIA|ИПЦ|FLT|флоат/i.test(b.secName || b.shortName || '');
+  const bond = {
+    id: Date.now() + Math.random(),
+    name: b.shortName || b.secid,
+    isin: b.isin,
+    btype: isOfz ? 'ОФЗ' : isSubfed ? 'Субфед' : 'Корп',
+    ctype: isFloat ? 'float' : 'fix',
+    price: b.price || 100,
+    coupon: b.coupon || 0,
+    years: years ? parseFloat(years.toFixed(2)) : 1,
+    ytm: b.ytm || null,
+  };
+  if(bond.ctype === 'float'){
+    if(/КС/i.test(b.secName || b.shortName || '')) bond.base = 'КС';
+    else if(/ИПЦ/i.test(b.secName || b.shortName || '')) bond.base = 'ИПЦ';
+    else if(/RUONIA/i.test(b.secName || b.shortName || '')) bond.base = 'RUONIA';
+    bond.spread = 0;
+  }
+  ytmBonds.push(bond);
+  save();
+  if(typeof renderYtm === 'function') renderYtm();
+  alert(`✓ «${bond.name}» добавлена в «Сравнение YTM»`);
+}
+
+function moexOpenDossier(issId){
+  if(!reportsDB[issId]){ alert('Эмитент не найден в базе'); return; }
+  showPage('reports');
+  setTimeout(() => {
+    const sel = document.getElementById('rep-issuer-sel');
+    if(sel){ sel.value = issId; if(typeof repSelectIssuer === 'function') repSelectIssuer(); }
+    dossierOpen();
+  }, 100);
+}
+
+function moexExportCsv(){
+  const list = window._moexFilteredCache;
+  if(!list || !list.length){ alert('Сначала отфильтруй — выгружается текущий срез.'); return; }
+  const cols = ['secid','isin','shortName','secName','boardid','price','ytm','coupon','couponPeriod','faceValue','currency','matDate','offerDate','issueSize','listLevel','secType','matYears'];
+  const esc = v => {
+    if(v == null) return '';
+    const s = String(v);
+    return /[,"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  };
+  const rows = [cols.join(',')];
+  for(const b of list) rows.push(cols.map(c => esc(b[c])).join(','));
+  const blob = new Blob(['\uFEFF'+rows.join('\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'moex-bonds-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// При старте — если в кэше что-то есть, покажем счётчик в sidebar.
+(function _moexBootstrap(){
+  try { _moexLoadCache(); _moexRenderMeta(); } catch(e){}
+})();
 </script>
 </body>
 </html>
