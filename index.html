@@ -1870,6 +1870,16 @@ document.addEventListener('DOMContentLoaded', () => {
         </select>
       </div>
       <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Частота купона</label>
+        <select id="moex-f-freq" onchange="moexApplyFilters()">
+          <option value="">Любая</option>
+          <option value="month">Месяц (~30 дн)</option>
+          <option value="quarter">Квартал (~91 дн)</option>
+          <option value="half">Полгода (~182 дн)</option>
+          <option value="year">Год (~365 дн)</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
         <label style="font-size:.55rem">Оферта</label>
         <select id="moex-f-offer" onchange="moexApplyFilters()">
           <option value="">Не важно</option>
@@ -1884,6 +1894,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="field" style="margin:0" title="Показать только выпуски эмитентов, у которых у тебя есть отчётность в reportsDB">
         <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
           <input type="checkbox" id="moex-f-indb" onchange="moexApplyFilters()" style="margin:0"> Только «есть в базе»
+        </label>
+      </div>
+      <div class="field" style="margin:0" title="Структурные продукты — СберИОС, ГазИОС и подобные. По сути это ставка на индекс/курс с мелким купоном и большой выплатой в конце — НЕ классический бонд. По умолчанию спрятаны, чтобы не засорять скрининг ВДО.">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0"> 🎭 Показывать структурные продукты (ИОС и т.п.)
         </label>
       </div>
     </div>
@@ -3517,7 +3532,19 @@ function _girboMakeUrl(path){
 async function _girboFetchJson(path){
   const url = _girboMakeUrl(path);
   const r = await fetch(url, {headers: {'Accept': 'application/json'}});
-  if(!r.ok) throw new Error('HTTP ' + r.status + ' ' + path);
+  if(!r.ok){
+    // Специально обрабатываем 403/429 — это почти всегда блокировка
+    // публичного прокси corsproxy.io. Объясняем пользователю что делать.
+    if(r.status === 403 || r.status === 429){
+      const proxy = _girboProxyBase();
+      const isPublic = /corsproxy\.io|allorigins/i.test(proxy);
+      const hint = isPublic
+        ? ' (публичный corsproxy.io часто блокирует под нагрузкой). Подними свой Cloudflare Worker (см. cf-worker.js в репо, 2 минуты) и впиши URL в «⚡ Sync» → «📡 ГИР БО — прокси»'
+        : ' — прокси ' + proxy + ' не отвечает';
+      throw new Error('ГИР БО прокси: ' + r.status + hint);
+    }
+    throw new Error('HTTP ' + r.status + ' ' + path);
+  }
   const ct = r.headers.get('content-type') || '';
   if(!/json/i.test(ct)){
     const txt = await r.text();
@@ -15858,9 +15885,11 @@ function moexApplyFilters(){
     matMin: _num(document.getElementById('moex-f-mat-min').value),
     matMax: _num(document.getElementById('moex-f-mat-max').value),
     coupon: document.getElementById('moex-f-coupon').value,
+    freq: document.getElementById('moex-f-freq')?.value || '',
     offer: document.getElementById('moex-f-offer').value,
     sizeMin: _num(document.getElementById('moex-f-size-min').value),
     inDbOnly: document.getElementById('moex-f-indb').checked,
+    showStructured: document.getElementById('moex-f-structured')?.checked || false,
     // Фильтры по фундаменталу:
     deMax:   _num(document.getElementById('moex-f-de-max')?.value),
     ndeMax:  _num(document.getElementById('moex-f-nde-max')?.value),
@@ -15882,12 +15911,34 @@ function moexApplyFilters(){
   const isOfz = b => /^ОФЗ/i.test(b.shortName || '') || b.boardid === 'TQOB' || String(b.secType || '') === '3';
   const isSubfed = b => String(b.secType || '') === '2' || /муни|субфед/i.test(b.secName || '');
 
+  // Структурные продукты: СберИОС / ГазИОС / вариации. Определяем по:
+  // • имени (содержит ИОС, ИО-N, SberIO, GazprombankIO и т.п.)
+  // • купон < 1% при обычном номинале = payoff в конце (структурка).
+  const isStructured = b => {
+    const names = ((b.shortName || '') + ' ' + (b.secName || '')).toUpperCase();
+    if(/ИОС|SBERIO|GAZPROM.?IO|\bИО-?\d/i.test(names)) return true;
+    // Низкий купон (< 0.5%) + длинный период = часто структурка «до погашения».
+    if(b.coupon != null && b.coupon > 0 && b.coupon < 0.5 && b.couponPeriod && b.couponPeriod > 300) return true;
+    return false;
+  };
+
+  // Категоризация по частоте купона (по COUPONPERIOD в днях).
+  const freqOf = b => {
+    const p = b.couponPeriod;
+    if(!p) return null;
+    if(p <= 40)  return 'month';
+    if(p <= 105) return 'quarter';
+    if(p <= 200) return 'half';
+    if(p <= 400) return 'year';
+    return null;
+  };
+
   const enriched = cat.items.map(b => {
     const matY = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
     const issId = _moexMatchIssuer(b, issIdx);
     const isFloat = /КС|RUONIA|ИПЦ|FLT|флоат/i.test(b.secName || b.shortName || '')
                   || (b.coupon != null && b.coupon < 1 && b.couponPeriod && b.couponPeriod < 95);
-    return { ...b, matYears: matY, issId, isFloat, _isOfz: isOfz(b), _isSubfed: isSubfed(b) };
+    return { ...b, matYears: matY, issId, isFloat, _isOfz: isOfz(b), _isSubfed: isSubfed(b), _isStructured: isStructured(b), _freq: freqOf(b) };
   });
 
   const filtered = enriched.filter(b => {
@@ -15907,6 +15958,8 @@ function moexApplyFilters(){
     if(f.matMax != null && (b.matYears == null || b.matYears > f.matMax)) return false;
     if(f.coupon === 'fix' && b.isFloat) return false;
     if(f.coupon === 'float' && !b.isFloat) return false;
+    if(f.freq && b._freq !== f.freq) return false;
+    if(!f.showStructured && b._isStructured) return false;
     if(f.offer === 'yes' && !b.offerDate) return false;
     if(f.offer === 'no' && b.offerDate) return false;
     if(f.sizeMin != null){
@@ -16062,10 +16115,12 @@ function moexResetFilters(){
    'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-offer','moex-f-rating-min','moex-f-rating-has'].forEach(id => {
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-rating-min','moex-f-rating-has'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('moex-f-indb').checked = false;
+  const struct = document.getElementById('moex-f-structured');
+  if(struct) struct.checked = false;
   document.getElementById('moex-sort').value = 'ytm-desc';
   moexApplyFilters();
 }
@@ -16112,6 +16167,28 @@ function moexAddToYtm(secid){
 
 // Кэш инфо о бумагах, чтобы при bulk не дёргать одну и ту же SECID дважды.
 window._moexSecInfoCache = window._moexSecInfoCache || new Map();
+
+// Поиск ИНН через ГИР БО по названию эмитента.
+// MOEX часто не содержит ИНН (для структурных продуктов, бирж. облиг. и т.п.),
+// но ГИР БО позволяет искать организацию по имени. Если имя совпадает — вернёт
+// ИНН и дальше работает обычный путь.
+async function _girboFindInnByName(name){
+  if(!name) return null;
+  // Очищаем от кавычек и лишнего, оставляем суть.
+  const clean = String(name).replace(/[«»"„""]/g, '').replace(/\s+/g, ' ').trim();
+  if(clean.length < 3) return null;
+  try {
+    const search = await _girboFetchJson('/nbo/organizations/?query=' + encodeURIComponent(clean));
+    const orgs = Array.isArray(search) ? search : (search.content || search.organizations || []);
+    if(!orgs.length) return null;
+    // Первая организация — обычно лучший матч. Возвращаем её ИНН.
+    const o = orgs[0];
+    const inn = o.inn || o.organisationInn;
+    return inn ? String(inn) : null;
+  } catch(e){
+    return null;
+  }
+}
 
 // Возвращает {inn, issuer, shortName, isin, regNumber} из MOEX.
 // Где искать ИНН: у MOEX оно лежит в description, но название поля
@@ -16211,14 +16288,22 @@ async function _moexAutoGirbo(secid, allowPrompt){
   catch(e){ return { error: 'MOEX info: ' + e.message, secid }; }
 
   let inn = info.inn;
+  // Fallback 1: поиск ИНН через ГИР БО по названию эмитента.
+  if(!inn){
+    const nameForSearch = info.issuer || info.shortName || '';
+    if(nameForSearch){
+      inn = await _girboFindInnByName(nameForSearch);
+    }
+  }
+  // Fallback 2: prompt для ручного клика.
   if(!inn && allowPrompt){
-    const ent = (prompt(`ИНН не нашёлся в MOEX для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
+    const ent = (prompt(`ИНН не нашёлся ни в MOEX, ни по имени в ГИР БО для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
     if(!ent) return { error: 'ИНН не введён, пропущено', secid };
     if(!/^\d{10}$|^\d{12}$/.test(ent)) return { error: 'ИНН должен быть 10 или 12 цифр', secid };
     inn = ent;
   }
   if(!inn){
-    return { error: 'ИНН не найден в MOEX (см. console.warn — там показаны поля, которые есть)', secid, _noInn: true };
+    return { error: 'ИНН не найден ни в MOEX, ни по имени в ГИР БО', secid, _noInn: true };
   }
 
   const issId = _moexEnsureIssuer(inn, info.issuer || info.shortName);
