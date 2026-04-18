@@ -8543,8 +8543,117 @@ function parseGirboText(raw){
     if(m){ name = m[1].trim().replace(/\s+/g,' '); break; }
   }
 
-  const codes = extractByRsbuCodes(text);
+  // Сначала пробуем строковый вариант (одна строка на код).
+  let codes = extractByRsbuCodes(text);
+
+  // Колоночный fallback: open-data ФНС публикует гигантские CSV, где
+  // каждая компания — отдельная строка, а коды стоят в заголовках:
+  //   ИНН;Наим;...;строка_2110_3;строка_2110_4;строка_1600_3;...
+  // В таком случае extractByRsbuCodes находит <2 полей. Тогда читаем
+  // заголовок, ищем строку по ИНН и тянем значения по индексам колонок.
+  if(Object.keys(codes).length < 4){
+    const byHeader = extractByRsbuCsvHeader(raw, inn);
+    for(const [fid, v] of Object.entries(byHeader)){
+      if(codes[fid] == null && v != null) codes[fid] = v;
+    }
+  }
+
   return { inn, year, name, codes, encoding: null, text };
+}
+
+// Колоночный разбор CSV: ищем в заголовке имена колонок с кодом РСБУ
+// (строка_2110, line_2110, "2110", "2110_3", "2110.3", "2110_от" и т.п.),
+// затем берём значения из строки-данных. Если ИНН уже определён — ищем
+// именно его строку, иначе — первую строку с числами.
+function extractByRsbuCsvHeader(raw, expectedInn){
+  if(!raw) return {};
+  // Разделитель колонок: выбираем по частоте — «;», «\t», «,» (в открытых
+  // CSV ФНС подавляющее — точка с запятой).
+  const counts = {
+    ';': (raw.match(/;/g)||[]).length,
+    '\t': (raw.match(/\t/g)||[]).length,
+    ',': (raw.match(/,/g)||[]).length,
+  };
+  const delim = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+  if(!counts[delim] || counts[delim] < 4) return {};
+
+  const lines = raw.split(/\r?\n/).filter(l => l.trim().length);
+  if(lines.length < 2) return {};
+
+  // Простой CSV-сплит: если в колонке кавычки — уважаем. Достаточно для ФНС.
+  const splitRow = (line) => {
+    const out = [];
+    let cur = '', inQ = false;
+    for(let i=0;i<line.length;i++){
+      const ch = line[i];
+      if(ch === '"'){
+        if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if(ch === delim && !inQ){ out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  };
+
+  const headers = splitRow(lines[0]).map(h => h.trim().toLowerCase());
+  // code → preferred colIdx (предпочитаем колонку «за отчётный» — обычно
+  // суффикс _3 в схеме ФНС; _4 — прошлый период, _5 — позапрошлый).
+  const codeColMap = {};
+  const isPreferred = variant => !variant || /^3$|^от|^отч/i.test(variant);
+
+  headers.forEach((h, i) => {
+    // строка_2110, строка2110, стр_2110, стр2110, line_2110, line2110
+    // или просто 2110, 2110_3, 2110.3, 2110_от
+    const m = h.match(/(?:^|[\s_\-.:/;])(?:строка|стр|line|code)?[\s_\-.:/;]?(\d{4})(?:[\s_\-.:/;]?([а-яёa-z0-9]+))?(?=\s*$|[\s_\-.:/;])/iu);
+    if(!m) return;
+    const code = m[1];
+    if(!/^(1\d{3}|2\d{3})$/.test(code)) return;
+    const variant = (m[2]||'').toLowerCase();
+    const cur = codeColMap[code];
+    if(cur == null || (!isPreferred(cur.variant) && isPreferred(variant))){
+      codeColMap[code] = { idx: i, variant };
+    }
+  });
+  if(!Object.keys(codeColMap).length) return {};
+
+  // Ищем нужную строку-данные. Если знаем ИНН — предпочитаем совпадение.
+  let dataRow = null;
+  const innColIdx = headers.findIndex(h => /инн|^inn\b/.test(h));
+  if(expectedInn && innColIdx >= 0){
+    for(let k=1; k<lines.length; k++){
+      const cells = splitRow(lines[k]);
+      if((cells[innColIdx]||'').trim() === expectedInn){ dataRow = cells; break; }
+    }
+  }
+  if(!dataRow){
+    // Fallback: первая строка, где хотя бы половина ячеек с кодами — числа.
+    for(let k=1; k<lines.length; k++){
+      const cells = splitRow(lines[k]);
+      let numCnt = 0, total = 0;
+      for(const {idx} of Object.values(codeColMap)){
+        total++;
+        const n = parseFloat(String(cells[idx]||'').replace(/\s/g,'').replace(',','.'));
+        if(isFinite(n) && n !== 0) numCnt++;
+      }
+      if(total && numCnt >= Math.max(3, total/3)){ dataRow = cells; break; }
+    }
+  }
+  if(!dataRow) return {};
+
+  const inv = _rsbuInverseMap();
+  const codes = {};
+  for(const [code, {idx}] of Object.entries(codeColMap)){
+    const raw = String(dataRow[idx]||'').trim();
+    const num = parseFloat(raw.replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.'));
+    if(!isFinite(num)) continue;
+    const fids = inv[code] || [];
+    for(const fid of fids){
+      if(fid === 'is-debt' && codes[fid] != null) codes[fid] += num;
+      else if(codes[fid] == null) codes[fid] = num;
+    }
+  }
+  return codes;
 }
 
 // Ядро: берёт ArrayBuffer + имя файла, определяет формат, декодирует,
@@ -8568,10 +8677,14 @@ function _processGirboFile(buf, filename){
   parsed.encoding = encoding;
 
   if(!Object.keys(parsed.codes).length){
+    // Показываем начало файла — часто этого достаточно, чтобы понять,
+    // это ГИРБО-выгрузка или, например, прайс-лист с теми же цифрами.
+    const preview = String(text || '').slice(0, 500).replace(/\t/g, ' | ');
     alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
           'Формат: '+parsed.format+'\n' +
-          'Кодировка: '+encoding+'\n' +
-          'Проверьте, что это выгрузка ГИРБО с кодами строк баланса и ОФР.');
+          'Кодировка: '+encoding+'\n\n' +
+          '── Начало файла ──\n' + preview + (text && text.length > 500 ? '\n...' : '') +
+          '\n\nЕсли это действительно ГИРБО — пришли первые строки, подправлю парсер.');
     return;
   }
 
