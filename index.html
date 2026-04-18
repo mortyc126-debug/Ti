@@ -3529,28 +3529,55 @@ function _girboMakeUrl(path){
   if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.ru' + path;
   return proxy + path;
 }
-async function _girboFetchJson(path){
+async function _girboFetchJson(path, retries){
+  if(retries == null) retries = 2;
   const url = _girboMakeUrl(path);
-  const r = await fetch(url, {headers: {'Accept': 'application/json'}});
-  if(!r.ok){
-    // Специально обрабатываем 403/429 — это почти всегда блокировка
-    // публичного прокси corsproxy.io. Объясняем пользователю что делать.
-    if(r.status === 403 || r.status === 429){
-      const proxy = _girboProxyBase();
-      const isPublic = /corsproxy\.io|allorigins/i.test(proxy);
-      const hint = isPublic
-        ? ' (публичный corsproxy.io часто блокирует под нагрузкой). Подними свой Cloudflare Worker (см. cf-worker.js в репо, 2 минуты) и впиши URL в «⚡ Sync» → «📡 ГИР БО — прокси»'
-        : ' — прокси ' + proxy + ' не отвечает';
-      throw new Error('ГИР БО прокси: ' + r.status + hint);
+  let lastErr = null;
+  for(let attempt = 0; attempt <= retries; attempt++){
+    try {
+      const r = await fetch(url, {headers: {'Accept': 'application/json'}});
+      if(r.ok){
+        const ct = r.headers.get('content-type') || '';
+        if(!/json/i.test(ct)){
+          const txt = await r.text();
+          if(txt.startsWith('<')) throw new Error('Прокси вернул HTML вместо JSON — возможно, ГИР БО показал капчу. Попробуйте сменить прокси.');
+        }
+        return r.json();
+      }
+      // 522/524 — Cloudflare Worker не достучался до bo.nalog.ru
+      // (origin timeout / unreachable). Это transient: ФНС иногда
+      // тормозит или периодически режет CF-трафик. Retry с задержкой
+      // часто помогает — пробуем 2 раза с экспоненциальной паузой.
+      if([502, 503, 504, 522, 524].includes(r.status) && attempt < retries){
+        lastErr = new Error('HTTP ' + r.status + ' (CF→ФНС timeout, retry ' + (attempt+1) + '/' + retries + ')');
+        await new Promise(res => setTimeout(res, 800 * Math.pow(2, attempt)));
+        continue;
+      }
+      // 403/429 — почти всегда блок публичного прокси.
+      if(r.status === 403 || r.status === 429){
+        const proxy = _girboProxyBase();
+        const isPublic = /corsproxy\.io|allorigins/i.test(proxy);
+        const hint = isPublic
+          ? ' (публичный corsproxy.io часто блокирует под нагрузкой). Подними свой Cloudflare Worker (см. cf-worker.js в репо, 2 минуты) и впиши URL в «⚡ Sync» → «📡 ГИР БО — прокси»'
+          : ' — прокси ' + proxy + ' не отвечает';
+        throw new Error('ГИР БО прокси: ' + r.status + hint);
+      }
+      // 522/524 после всех retry — отдельное человеческое сообщение.
+      if([502, 503, 504, 522, 524].includes(r.status)){
+        throw new Error('ФНС/CF недоступны (HTTP ' + r.status + ') — bo.nalog.ru не отвечает через Cloudflare. Подожди 5-10 мин и повтори. Если упорно — возможно, ФНС временно режет CF-трафик.');
+      }
+      throw new Error('HTTP ' + r.status + ' ' + path);
+    } catch(e){
+      // Сетевые ошибки тоже ретраим.
+      if(attempt < retries && /NetworkError|Failed to fetch|timeout/i.test(e.message || '')){
+        lastErr = e;
+        await new Promise(res => setTimeout(res, 800 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw e;
     }
-    throw new Error('HTTP ' + r.status + ' ' + path);
   }
-  const ct = r.headers.get('content-type') || '';
-  if(!/json/i.test(ct)){
-    const txt = await r.text();
-    if(txt.startsWith('<')) throw new Error('Прокси вернул HTML вместо JSON — возможно, ГИР БО показал капчу. Попробуйте сменить прокси.');
-  }
-  return r.json();
+  throw lastErr || new Error('ГИР БО: исчерпаны попытки');
 }
 
 // Подтягиваем последние N годовых отчётов РСБУ по ИНН, складываем в
