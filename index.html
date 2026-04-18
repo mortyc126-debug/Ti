@@ -3049,7 +3049,14 @@ async function fetchGirboByInn(inn, maxYears = 5){
             const x = det[kind + c];
             if(typeof x === 'number'){ sum += x; any = true; }
           }
-          if(any) v[fid] = sum / 1e6; // тыс ₽ → млрд ₽
+          if(any){
+            // Строки 2330 (проценты к уплате) и 2410 (налог на прибыль)
+            // в РСБУ-отчёте — это расходы; у нас они хранятся как
+            // положительные магнитуды. В XML/JSON от ГИР БО значение
+            // иногда приходит со знаком минус — нормализуем.
+            const isExpense = fid === 'rep-np-int' || (Array.isArray(code) ? false : code === '2410');
+            v[fid] = (isExpense ? Math.abs(sum) : sum) / 1e6; // тыс ₽ → млрд ₽
+          }
         }
         return Object.keys(v).length ? v : null;
       };
@@ -10857,12 +10864,15 @@ const _REP_AUDIT_RULES = [
    test:d => d.ebitda!=null && d.rev!=null && d.rev > 0 && d.ebitda > d.rev * _REP_AUDIT_TOL,
    fields:['ebitda','rev']},
   {id:'np_gt_ebit_x2', sev:'soft', label:'ЧП > EBIT × 2',
-   hint:'ЧП обычно меньше EBIT (из-за налогов и процентов). Если больше — перепутано или большой финансовый доход.',
-   test:d => d.np!=null && d.ebit!=null && d.ebit > 0 && d.np > d.ebit * 2,
+   hint:'ЧП обычно меньше EBIT (из-за налогов и процентов). Если больше — перепутано или большой финансовый доход. Для очень маленьких компаний (EBIT < 0.5 млрд) правило не срабатывает — при такой базе любой ×2 легко достигается округлениями.',
+   // Отсекаем шум при малом EBIT: 0.29 против 0.06 формально в 4.8×,
+   // но это 60 млн против 290 млн — разница не о «перепутанных
+   // полях», а об особенностях округления до млрд.
+   test:d => d.np!=null && d.ebit!=null && d.ebit > 0.5 && d.np > d.ebit * 2,
    fields:['np','ebit']},
-  {id:'ret_gt_eq', sev:'soft', label:'Нераспр. прибыль > Капитал',
-   hint:'Нераспределённая прибыль — часть капитала. Может слегка превышать только если остальные компоненты капитала отрицательные (добавочный, прочие).',
-   test:d => d.ret!=null && d.eq!=null && d.ret > d.eq * _REP_AUDIT_TOL,
+  {id:'ret_gt_eq', sev:'soft', label:'Нераспр. прибыль существенно > Капитал',
+   hint:'В МСФО капитал = уставный + добавочный + нераспределённая + накопленный OCI ± казначейские. Если OCI отрицательный (курсовые потери, переоценки), нераспр. прибыль законно превышает итоговый капитал. Мы триггерим только при ret > 1.5 × eq и eq > 0 — это уже не структурный эффект, а вероятная ошибка поля.',
+   test:d => d.ret!=null && d.eq!=null && d.eq > 0.1 && d.ret > d.eq * 1.5,
    fields:['ret','eq']},
   {id:'rev_neg', sev:'soft', label:'Отрицательная выручка',
    hint:'Отрицательная выручка в РСБУ/МСФО бывает лишь как корректировки. Проверьте знак.',
@@ -13106,10 +13116,17 @@ function _processGirboFile(buf, filename, opts){
   };
   const filledList = [];
   const missedList = [];
+  // Строки 2330 (проценты к уплате) и 2410 (налог на прибыль) — расходы,
+  // у нас хранятся как положительные магнитуды. В XML/1С значение часто
+  // приходит со знаком минус (внутреннее signed-представление отчёта
+  // о финрезультатах). Без нормализации попадает минус в базу, ломает
+  // ICR, триггерит ложный аудит «отрицательные проценты».
+  const _expenseFields = new Set(['is-int', 'is-tax']);
   for(const [fid, pk] of Object.entries(fieldMap)){
     const v = parsed.codes[fid];
     if(v != null){
-      pData[pk] = parseFloat((v * scale).toFixed(6));
+      const norm = _expenseFields.has(fid) ? Math.abs(v) : v;
+      pData[pk] = parseFloat((norm * scale).toFixed(6));
       filledList.push(fieldLabels[fid]);
     } else {
       missedList.push(fieldLabels[fid]);
