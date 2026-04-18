@@ -215,6 +215,32 @@ tr:hover td{background:var(--s2)}
 .fab.open .fab-items{display:flex}
 .fab-item{padding:8px 14px;background:var(--s1);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;border-radius:22px;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;min-width:140px;text-align:left}
 .fab-item:hover{background:var(--s2);border-color:var(--acc)}
+
+/* Досье эмитента — модалка с вкладками */
+.dossier-tab-btn{background:none;color:var(--text2);cursor:pointer}
+.dossier-tab-btn:hover{color:var(--text)}
+.dossier-tab-btn.active{color:var(--acc);border-bottom-color:var(--acc)!important}
+.dossier-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+@media(max-width:700px){.dossier-grid{grid-template-columns:1fr}}
+.dossier-field{display:flex;flex-direction:column;gap:3px}
+.dossier-field>span{font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;gap:4px}
+.dossier-field input,.dossier-field select,.dossier-field textarea{
+  width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  font-family:var(--mono);font-size:.74rem;padding:6px 9px;outline:none;transition:border-color .2s;
+}
+.dossier-field input:focus,.dossier-field select:focus,.dossier-field textarea:focus{border-color:var(--acc)}
+.dossier-hint{cursor:help;opacity:.55;font-size:.65rem;transition:opacity .15s}
+.dossier-hint:hover{opacity:1}
+.dossier-issue-card{border:1px solid var(--border);background:var(--s2);padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s}
+.dossier-issue-card:hover{border-color:var(--acc);background:var(--s3)}
+.dossier-fin-row{display:grid;grid-template-columns:1.6fr .7fr .8fr 1fr;gap:10px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:.66rem;align-items:center}
+.dossier-fin-row.hdr{font-size:.54rem;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border2)}
+.dossier-fin-sec{font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:10px 0 4px;padding-left:8px;border-left:2px solid var(--acc)}
+.dossier-pill{display:inline-block;padding:1px 8px;font-size:.56rem;letter-spacing:.05em;border-radius:10px;font-weight:600}
+.dossier-pill.ok{background:rgba(34,211,160,.14);color:var(--green)}
+.dossier-pill.warn{background:rgba(245,166,35,.14);color:var(--warn)}
+.dossier-pill.err{background:rgba(255,77,109,.14);color:var(--danger)}
+.dossier-pill.nd{background:var(--border);color:var(--text3)}
 </style>
 <!-- Библиотеки работы с файлами. Грузим статически; а на случай если внешний
      скрипт ещё не готов в момент клика (htmlpreview.github.io рендерит
@@ -1255,6 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов.">📥 Импорт эмитента</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
+      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств.">📇 Досье</button>
       <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие">✎ Редактировать</button>
       <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">⬇️ Экспорт эмитента</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
@@ -1989,6 +2016,323 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-girbo-diag')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Досье эмитента — анкета в духе рейтинговых агентств (МСП1) -->
+<div class="modal-overlay" id="modal-dossier">
+  <div class="modal" style="width:920px;max-width:98vw;max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      📇 Досье эмитента: <span id="dossier-issuer-name" style="color:var(--acc)"></span>
+      <span id="dossier-updated" style="font-size:.54rem;color:var(--text3);margin-left:auto;margin-right:12px"></span>
+      <button class="modal-x" onclick="closeModal('modal-dossier')">✕</button>
+    </div>
+    <div style="display:flex;gap:2px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <button class="btn btn-sm dossier-tab-btn active" data-dt="fin"  onclick="dossierTab('fin')"  style="border:none;border-bottom:2px solid var(--acc);border-radius:0;padding:10px 16px">A · Финансы <span style="color:var(--text3);font-size:.54rem">(авто)</span></button>
+      <button class="btn btn-sm dossier-tab-btn"        data-dt="biz"  onclick="dossierTab('biz')"  style="border:none;border-bottom:2px solid transparent;border-radius:0;padding:10px 16px">B · Бизнес-профиль</button>
+      <button class="btn btn-sm dossier-tab-btn"        data-dt="mod"  onclick="dossierTab('mod')"  style="border:none;border-bottom:2px solid transparent;border-radius:0;padding:10px 16px">C · Модификаторы</button>
+      <button class="btn btn-sm dossier-tab-btn"        data-dt="iss"  onclick="dossierTab('iss')"  style="border:none;border-bottom:2px solid transparent;border-radius:0;padding:10px 16px">D · Выпуски <span id="dossier-iss-count" style="color:var(--text3);font-size:.54rem"></span></button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;flex:1;padding:16px 20px">
+
+      <!-- Tab A: Финансовый профиль (readonly, расчёт из reportsDB) -->
+      <div id="dossier-tab-fin" class="dossier-tab-pane">
+        <div id="dossier-fin-meta" style="font-size:.6rem;color:var(--text2);margin-bottom:10px"></div>
+        <div id="dossier-fin-body"></div>
+      </div>
+
+      <!-- Tab B: Бизнес-профиль (ручной ввод + подсказки) -->
+      <div id="dossier-tab-biz" class="dossier-tab-pane" style="display:none">
+        <div style="font-size:.6rem;color:var(--text3);margin-bottom:12px;line-height:1.5">
+          Наводи на 📖 рядом с каждым полем — подскажу, где конкретно брать данные. Ничего обязательного — заполняй по ходу, что смогла найти.
+        </div>
+        <div class="dossier-grid">
+          <label class="dossier-field">
+            <span>Доля рынка, % <span class="dossier-hint" data-hint="IR-презентация эмитента (слайд «Рынок и наша доля»); годовой отчёт — раздел «Наша позиция на рынке». Крупные компании публикуют явно, средние — редко.">📖</span></span>
+            <input type="number" id="dos-biz-marketShare" step="0.1" min="0" max="100" placeholder="например, 12.5">
+          </label>
+          <label class="dossier-field">
+            <span>Конкурентная позиция <span class="dossier-hint" data-hint="Ранг в отрасли. Лидер = топ-3 по РФ или монополист ниши. Средний = в первой десятке. Догоняющий = меньше 2% доли, высокая уязвимость.">📖</span></span>
+            <select id="dos-biz-marketPosition">
+              <option value="">—</option>
+              <option value="leader">Лидер (топ-3 / монополист)</option>
+              <option value="mid">Средний (топ-10)</option>
+              <option value="lag">Догоняющий (&lt; 2% доли)</option>
+              <option value="niche">Нишевый без прямой конкуренции</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Топ-3 клиента = % выручки <span class="dossier-hint" data-hint="Годовой отчёт — раздел «Существенные риски», «Концентрация клиентов» или «Выручка по клиентам». Часто в МСФО в примечаниях к выручке (Note 3-4). &gt;50% — высокая концентрация = риск.">📖</span></span>
+            <input type="number" id="dos-biz-clientsTop3" step="1" min="0" max="100" placeholder="0..100">
+          </label>
+          <label class="dossier-field">
+            <span>Топ-3 поставщика = % закупок <span class="dossier-hint" data-hint="МСФО примечания — «Существенные контрагенты по закупкам». У торговли / дистрибуции критично. Часто раскрывают &gt; 10%.">📖</span></span>
+            <input type="number" id="dos-biz-suppliersTop3" step="1" min="0" max="100" placeholder="0..100">
+          </label>
+          <label class="dossier-field">
+            <span>Географическая диверсификация <span class="dossier-hint" data-hint="МСФО — «Сегментная отчётность». Признак: количество стран с операциями + доля каждой.">📖</span></span>
+            <select id="dos-biz-geoDiv">
+              <option value="">—</option>
+              <option value="local">Один регион РФ</option>
+              <option value="ru">По всей РФ</option>
+              <option value="cis">РФ + СНГ</option>
+              <option value="global">Глобальная (включая ЕС/Азию)</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Доля экспорта, % <span class="dossier-hint" data-hint="МСФО — «Выручка по географии». Высокий экспорт = валютная подушка + санкционный риск.">📖</span></span>
+            <input type="number" id="dos-biz-exportShare" step="1" min="0" max="100" placeholder="0..100">
+          </label>
+          <label class="dossier-field">
+            <span>Цикличность отрасли <span class="dossier-hint" data-hint="Оценка чувствительности к фазам делового цикла. Строительство, металлургия, автопром — высокая. Энергетика, связь, продукты питания — низкая. В Подходе 2 будет шаблон по отрасли.">📖</span></span>
+            <select id="dos-biz-cyclicality">
+              <option value="">—</option>
+              <option value="low">Низкая (потребительский базис, коммуналка)</option>
+              <option value="mid">Средняя (транспорт, инфра)</option>
+              <option value="high">Высокая (стройка, металл, авто)</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Барьеры входа в отрасль <span class="dossier-hint" data-hint="Лицензирование, капитальные затраты, технологии, эффект масштаба. Высокие = защита маржи. Низкие = новые игроки давят цену.">📖</span></span>
+            <select id="dos-biz-barriers">
+              <option value="">—</option>
+              <option value="low">Низкие (услуги, торговля)</option>
+              <option value="mid">Средние (производство)</option>
+              <option value="high">Высокие (лицензии, капиталоёмкость, сети)</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Регуляторная зависимость <span class="dossier-hint" data-hint="Насколько финрезультат зависит от тарифов/регуляции. Энергосетевые, ЖКХ — высокая. Импортёры — средняя. IT, B2B-услуги — низкая.">📖</span></span>
+            <select id="dos-biz-regDependency">
+              <option value="">—</option>
+              <option value="low">Низкая</option>
+              <option value="mid">Средняя</option>
+              <option value="high">Высокая (тарифы, лицензии)</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Капексоёмкость <span class="dossier-hint" data-hint="Отношение CAPEX / EBITDA за год. Высокая (&gt; 50%) — все деньги уходят в развитие, свободного кешфлоу почти нет. Низкая (&lt; 20%) — компания может гасить долг и платить дивиденды.">📖</span></span>
+            <select id="dos-biz-capexIntensity">
+              <option value="">—</option>
+              <option value="low">Низкая (&lt; 20% EBITDA)</option>
+              <option value="mid">Средняя (20-50%)</option>
+              <option value="high">Высокая (&gt; 50%)</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Сезонность <span class="dossier-hint" data-hint="Смотрим квартальные выручки в МСФО. Сильная — если Q4/Q1 отличается &gt; 2×. У ритейла, туризма, ЖКХ — выражена; у связи, аренды — слабая.">📖</span></span>
+            <select id="dos-biz-seasonality">
+              <option value="">—</option>
+              <option value="none">Нет / слабая</option>
+              <option value="mild">Умеренная</option>
+              <option value="strong">Сильная</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Валютные риски <span class="dossier-hint" data-hint="МСФО — «Управление валютным риском» или «Финансовые инструменты». Хеджируется или открытая позиция?">📖</span></span>
+            <select id="dos-biz-currencyRisk">
+              <option value="">—</option>
+              <option value="none">Нет (всё рубли)</option>
+              <option value="mitigated">Хеджируется / натуральный хедж</option>
+              <option value="exposed">Открытая позиция (валютный долг без выручки)</option>
+            </select>
+          </label>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>Заметки по бизнес-профилю</label>
+          <textarea id="dos-biz-notes" placeholder="Свободный текст: про продуктовую линейку, конкурентов, стратегию..." style="min-height:60px"></textarea>
+        </div>
+      </div>
+
+      <!-- Tab C: Модификаторы -->
+      <div id="dossier-tab-mod" class="dossier-tab-pane" style="display:none">
+        <div style="font-size:.6rem;color:var(--text3);margin-bottom:12px;line-height:1.5">
+          Структурные факторы: кто акционер, кто аудитор, частота раскрытий, график погашения долга, ковенанты. Напрямую влияют на кредитный класс сверх финансовых мультипликаторов.
+        </div>
+        <div class="dossier-grid">
+          <label class="dossier-field">
+            <span>Аудитор <span class="dossier-hint" data-hint="Титульный лист МСФО (справа внизу) или Аудиторское заключение в начале отчёта. Big-4 (Deloitte/PwC/EY/KPMG) ушли из РФ — у крупных теперь «российская 4» (Б1, Технологии Доверия, Кэпт, ФБК).">📖</span></span>
+            <select id="dos-mod-auditor">
+              <option value="">—</option>
+              <option value="big4">Big-4 / их правопреемники в РФ</option>
+              <option value="ru4">Российская 4 (Б1, ТД, Кэпт, ФБК)</option>
+              <option value="local">Локальная компания</option>
+              <option value="none">Без аудита / только РСБУ</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Частота раскрытий МСФО <span class="dossier-hint" data-hint="Смотри архив на e-disclosure.ru или в разделе «Инвесторам» сайта эмитента. Ежеквартально = прозрачно + много данных для анализа. Только годовой = слепая зона 9+ месяцев.">📖</span></span>
+            <select id="dos-mod-disclosureFreq">
+              <option value="">—</option>
+              <option value="quarterly">Ежеквартально</option>
+              <option value="semiannual">Полугодие + год</option>
+              <option value="annual">Только годовой</option>
+              <option value="sparse">Нерегулярно / с пропусками</option>
+              <option value="none">Нет МСФО, только РСБУ</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Господдержка <span class="dossier-hint" data-hint="Явная = основной акционер РФ/субъект/ФНБ/госкорпорация. Неявная = стратегическое предприятие, спецпроекты, bail-out в прошлом. Проверить: акционеры в годовом отчёте + СОЭП реестр.">📖</span></span>
+            <select id="dos-mod-stateSupport">
+              <option value="">—</option>
+              <option value="explicit">Явная (государство/госкомпания акционер)</option>
+              <option value="implicit">Неявная (стратегическое значение)</option>
+              <option value="none">Нет</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Структура акционеров <span class="dossier-hint" data-hint="Годовой отчёт — список акционеров &gt; 5%. Или disclosure.ru — «Список лиц, контролирующих эмитента».">📖</span></span>
+            <select id="dos-mod-ownership">
+              <option value="">—</option>
+              <option value="state">Государство / госкомпания</option>
+              <option value="strategic">Крупный стратег (холдинг)</option>
+              <option value="pe">PE-фонд / инвестхолдинг</option>
+              <option value="solo">Один мажоритарий (физлицо)</option>
+              <option value="diverse">Распылённая (&lt; 50% у одного)</option>
+            </select>
+          </label>
+          <label class="dossier-field" style="grid-column:span 2">
+            <span>Кредитные рейтинги <span class="dossier-hint" data-hint="raexpert.ru/ratings, acra-ratings.ru, ratings.ru (НКР). Формат: «AA-(RU) Эксперт РА, стабильный / A+(RU) АКРА». Укажи все актуальные, через запятую.">📖</span></span>
+            <input type="text" id="dos-mod-rating" placeholder="AA-(RU) Эксперт РА · A+(RU) АКРА">
+          </label>
+          <label class="dossier-field">
+            <span>История дефолтов <span class="dossier-hint" data-hint="cbonds.ru или raexpert.ru — «Дефолты» в поиске по эмитенту. Реструктуризация купона / основной суммы считается техническим дефолтом.">📖</span></span>
+            <select id="dos-mod-defaultHistory">
+              <option value="">—</option>
+              <option value="none">Нет</option>
+              <option value="restructure">Реструктуризация была</option>
+              <option value="default">Технический / фактический дефолт был</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Доля краткосрочного долга, % <span class="dossier-hint" data-hint="МСФО — «Заимствования», разделение на long-term / short-term. Или грубо: cl / (cl + non-current debt). &gt; 50% = риск рефинансирования.">📖</span></span>
+            <input type="number" id="dos-mod-shortDebtShare" step="1" min="0" max="100" placeholder="0..100">
+          </label>
+          <label class="dossier-field">
+            <span>Риск рефинансирования <span class="dossier-hint" data-hint="Субъективная оценка: если в ближайшие 12 мес. надо гасить &gt; cash + 50% EBITDA, а в портфеле нет откр. кредитных линий — высокий.">📖</span></span>
+            <select id="dos-mod-refinanceRisk">
+              <option value="">—</option>
+              <option value="low">Низкий</option>
+              <option value="mid">Средний</option>
+              <option value="high">Высокий</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Ковенанты в выпусках <span class="dossier-hint" data-hint="Эмиссионная документация — Проспект или Решение о выпуске на e-disclosure.ru. Ищи «Финансовые ковенанты» или «Обязательства эмитента». Типично: Долг/EBITDA &lt; X, ICR &gt; Y.">📖</span></span>
+            <select id="dos-mod-covenants">
+              <option value="">—</option>
+              <option value="strict">Жёсткие (2+ финансовых ковенанта)</option>
+              <option value="mild">Мягкие (1 ковенант или только информационные)</option>
+              <option value="none">Отсутствуют</option>
+            </select>
+          </label>
+          <label class="dossier-field">
+            <span>Старшинство выпусков <span class="dossier-hint" data-hint="Senior unsecured — обычный бонд. Субординированные = банковские / hybrid capital, погашаются после обычных. Обеспеченные — залог имущества.">📖</span></span>
+            <select id="dos-mod-subordination">
+              <option value="">—</option>
+              <option value="senior">Senior (обычные)</option>
+              <option value="secured">Обеспеченные</option>
+              <option value="subordinated">Субординированные</option>
+              <option value="hybrid">Гибридные (вечные и т.п.)</option>
+            </select>
+          </label>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>Заметки по модификаторам</label>
+          <textarea id="dos-mod-notes" placeholder="Свободный текст: ключевые акционерные события, спец. условия по долгу, планы рефинансирования..." style="min-height:60px"></textarea>
+        </div>
+      </div>
+
+      <!-- Tab D: Выпуски (малые паспорта) -->
+      <div id="dossier-tab-iss" class="dossier-tab-pane" style="display:none">
+        <div style="font-size:.6rem;color:var(--text3);margin-bottom:12px;line-height:1.5">
+          Паспорт выпуска — опционально. Если у эмитента много выпусков с разными параметрами (купон, оферта, ковенанты) и это важно — заполни. Если один рядовой выпуск — можно пропустить всю вкладку.
+          <br><br>
+          В Подходе 3 эти поля будут автоматом тянуться с MOEX ISS по ISIN.
+        </div>
+        <div id="dossier-iss-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+        <button class="btn btn-sm" onclick="dossierIssueNew()">＋ Добавить паспорт выпуска</button>
+
+        <!-- Встроенная мини-форма: показывается при add/edit -->
+        <div id="dossier-iss-form" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--border2);background:var(--bg)">
+          <div style="font-size:.62rem;letter-spacing:.05em;margin-bottom:10px"><strong id="dossier-iss-form-title">Новый паспорт</strong></div>
+          <input type="hidden" id="dos-iss-origKey">
+          <div class="dossier-grid">
+            <label class="dossier-field">
+              <span>ISIN <span class="dossier-hint" data-hint="12 символов: 2 буквы страны + 10 цифр. На MOEX.com в карточке бумаги. Пример: RU000A107SV1.">📖</span></span>
+              <input type="text" id="dos-iss-isin" placeholder="RU000A107SV1" maxlength="12">
+            </label>
+            <label class="dossier-field">
+              <span>Короткое имя</span>
+              <input type="text" id="dos-iss-shortName" placeholder="например, ПГК Б02-04">
+            </label>
+            <label class="dossier-field">
+              <span>Купон, % годовых</span>
+              <input type="number" id="dos-iss-couponRate" step="0.1" min="0" max="50">
+            </label>
+            <label class="dossier-field">
+              <span>Тип купона</span>
+              <select id="dos-iss-couponType">
+                <option value="">—</option>
+                <option value="fixed">Фиксированный</option>
+                <option value="float-kc">Флоатер от КС (КС + spread)</option>
+                <option value="float-ipc">Флоатер от ИПЦ</option>
+                <option value="float-ruonia">Флоатер от RUONIA</option>
+                <option value="step">Step-up / step-down</option>
+              </select>
+            </label>
+            <label class="dossier-field">
+              <span>Номинал, ₽</span>
+              <input type="number" id="dos-iss-faceValue" step="1" min="0" placeholder="1000">
+            </label>
+            <label class="dossier-field">
+              <span>Валюта</span>
+              <select id="dos-iss-currency">
+                <option value="RUB">RUB</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="CNY">CNY</option>
+              </select>
+            </label>
+            <label class="dossier-field">
+              <span>Дата погашения</span>
+              <input type="date" id="dos-iss-maturityDate">
+            </label>
+            <label class="dossier-field">
+              <span>Ближайшая оферта</span>
+              <input type="date" id="dos-iss-offerDate">
+            </label>
+            <label class="dossier-field">
+              <span>Объём выпуска, млн ₽ <span class="dossier-hint" data-hint="MOEX → карточка бумаги → «Номинальный объём выпуска». У мелких выпусков часто &lt; 500 млн = плохая ликвидность, разрыв bid/ask.">📖</span></span>
+              <input type="number" id="dos-iss-issueSize" step="1" min="0">
+            </label>
+            <label class="dossier-field">
+              <span>Уровень листинга <span class="dossier-hint" data-hint="MOEX → карточка бумаги → «Уровень листинга». 1 = котировальный, для институционалов / НПФ. 2 = квалификация попроще. 3 = некотировальный.">📖</span></span>
+              <select id="dos-iss-listLevel">
+                <option value="">—</option>
+                <option value="1">1 уровень</option>
+                <option value="2">2 уровень</option>
+                <option value="3">3 уровень (ВДО)</option>
+              </select>
+            </label>
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Ковенанты и примечания к этому выпуску</label>
+            <textarea id="dos-iss-note" placeholder="Специфические ковенанты, условия put-опциона, amortization schedule..." style="min-height:50px"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-sm btn-p" onclick="dossierIssueSave()">💾 Сохранить выпуск</button>
+            <button class="btn btn-sm" onclick="document.getElementById('dossier-iss-form').style.display='none'">Отмена</button>
+            <button class="btn btn-sm" id="dos-iss-del-btn" style="display:none;margin-left:auto;border-color:var(--danger);color:var(--danger)" onclick="dossierIssueDelete()">🗑 Удалить</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-dossier')">Закрыть</button>
+      <button class="btn btn-p" onclick="dossierSave()">💾 Сохранить досье</button>
     </div>
   </div>
 </div>
@@ -7822,6 +8166,7 @@ function repSelectIssuer(){
     document.getElementById('rep-del-issuer-btn').style.display='none';
     const ex = document.getElementById('rep-export-issuer-btn'); if(ex) ex.style.display='none';
     const ed = document.getElementById('rep-edit-issuer-btn'); if(ed) ed.style.display='none';
+    const dos = document.getElementById('rep-dossier-btn'); if(dos) dos.style.display='none';
     if(editBtn) editBtn.style.display='none';
     if(delPBtn) delPBtn.style.display='none';
     return;
@@ -7838,6 +8183,7 @@ function repSelectIssuer(){
   document.getElementById('rep-del-issuer-btn').style.display='';
   const exBtn = document.getElementById('rep-export-issuer-btn'); if(exBtn) exBtn.style.display='';
   const edBtn = document.getElementById('rep-edit-issuer-btn'); if(edBtn) edBtn.style.display='';
+  const dosBtn = document.getElementById('rep-dossier-btn'); if(dosBtn) dosBtn.style.display='';
   repBuildPeriodTabs();
   _repSyncPeriodToolbar();
 }
@@ -13785,7 +14131,7 @@ function _syncBuildSnapshot(){
     rosstatRatios,
     girboProxy: localStorage.getItem('bondan_girbo_proxy') || '',
     apiKey: localStorage.getItem('ba_apikey') || '',
-    meta: {schemaVersion: 5},
+    meta: {schemaVersion: 6}, // v6: reportsDB[id].dossier + .issues (досье эмитента + паспорта выпусков)
     savedAt: new Date().toISOString()
   };
 }
@@ -14242,6 +14588,419 @@ async function gistLoad() {
   } finally {
     btn.disabled = false; btn.textContent = '⬇️ Загрузить с Gist';
   }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// ДОСЬЕ ЭМИТЕНТА — анкета в духе методологии рейтинговых агентств
+// ─────────────────────────────────────────────────────────────────────
+// Структура: reportsDB[id].dossier = {biz, mod, updatedAt} + .issues = {ISIN→...}
+// Вкладка A (финансы) — считается на лету из последнего FY периода,
+//   не хранится (иначе надо пересчитывать при каждой правке отчётности).
+// Вкладки B, C — ручной ввод, сохраняется в dossier.
+// Вкладка D — малые паспорта выпусков (опционально). В Подходе 3
+//   заполнится автоматом из MOEX ISS.
+// ═════════════════════════════════════════════════════════════════════
+
+// Подсказки «📖 Где брать» реализованы через простой click на иконке —
+// показываем alert с текстом из data-hint. Tooltip не используем, так
+// как на мобильном hover не работает, а alert одинаково хорош везде.
+document.addEventListener('click', (e) => {
+  const h = e.target.closest('.dossier-hint');
+  if(!h) return;
+  e.preventDefault(); e.stopPropagation();
+  alert('📖 Где брать:\n\n' + (h.dataset.hint || ''));
+});
+
+function dossierTab(name){
+  ['fin','biz','mod','iss'].forEach(t => {
+    const pane = document.getElementById('dossier-tab-'+t);
+    const btn = document.querySelector('.dossier-tab-btn[data-dt="'+t+'"]');
+    if(pane) pane.style.display = (t === name) ? '' : 'none';
+    if(btn){
+      btn.classList.toggle('active', t === name);
+      btn.style.borderBottomColor = (t === name) ? 'var(--acc)' : 'transparent';
+    }
+  });
+  if(name === 'fin') _dossierRenderFin();
+  if(name === 'iss') _dossierRenderIssues();
+}
+
+function dossierOpen(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  // Имя + дата обновления.
+  document.getElementById('dossier-issuer-name').textContent = iss.name || '—';
+  const upd = iss.dossier?.updatedAt;
+  document.getElementById('dossier-updated').textContent = upd
+    ? 'Обновлено: ' + new Date(upd).toLocaleDateString('ru-RU')
+    : 'Досье ещё не заполнено';
+  // Заполняем поля B и C из iss.dossier.
+  const d = iss.dossier || {};
+  const biz = d.biz || {};
+  const mod = d.mod || {};
+  _dossierSetVals({
+    'dos-biz-marketShare':   biz.marketShare,
+    'dos-biz-marketPosition':biz.marketPosition || '',
+    'dos-biz-clientsTop3':   biz.clientsTop3,
+    'dos-biz-suppliersTop3': biz.suppliersTop3,
+    'dos-biz-geoDiv':        biz.geoDiv || '',
+    'dos-biz-exportShare':   biz.exportShare,
+    'dos-biz-cyclicality':   biz.cyclicality || '',
+    'dos-biz-barriers':      biz.barriers || '',
+    'dos-biz-regDependency': biz.regDependency || '',
+    'dos-biz-capexIntensity':biz.capexIntensity || '',
+    'dos-biz-seasonality':   biz.seasonality || '',
+    'dos-biz-currencyRisk':  biz.currencyRisk || '',
+    'dos-biz-notes':         biz.notes || '',
+    'dos-mod-auditor':       mod.auditor || '',
+    'dos-mod-disclosureFreq':mod.disclosureFreq || '',
+    'dos-mod-stateSupport':  mod.stateSupport || '',
+    'dos-mod-ownership':     mod.ownership || '',
+    'dos-mod-rating':        mod.rating || '',
+    'dos-mod-defaultHistory':mod.defaultHistory || '',
+    'dos-mod-shortDebtShare':mod.shortDebtShare,
+    'dos-mod-refinanceRisk': mod.refinanceRisk || '',
+    'dos-mod-covenants':     mod.covenants || '',
+    'dos-mod-subordination': mod.subordination || '',
+    'dos-mod-notes':         mod.notes || '',
+  });
+  // Счётчик выпусков.
+  const issCount = Object.keys(iss.issues || {}).length;
+  document.getElementById('dossier-iss-count').textContent = issCount ? '('+issCount+')' : '';
+  // Открываем на вкладке A по умолчанию.
+  dossierTab('fin');
+  document.getElementById('modal-dossier').classList.add('open');
+}
+
+function _dossierSetVals(map){
+  for(const [id, v] of Object.entries(map)){
+    const el = document.getElementById(id);
+    if(!el) continue;
+    el.value = (v == null || v === '') ? '' : v;
+  }
+}
+
+function _dossierGetVal(id){
+  const el = document.getElementById(id);
+  if(!el) return '';
+  const v = el.value.trim();
+  return v === '' ? '' : v;
+}
+function _dossierGetNum(id){
+  const v = _dossierGetVal(id);
+  if(v === '') return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function dossierSave(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  iss.dossier = {
+    biz: {
+      marketShare:    _dossierGetNum('dos-biz-marketShare'),
+      marketPosition: _dossierGetVal('dos-biz-marketPosition'),
+      clientsTop3:    _dossierGetNum('dos-biz-clientsTop3'),
+      suppliersTop3:  _dossierGetNum('dos-biz-suppliersTop3'),
+      geoDiv:         _dossierGetVal('dos-biz-geoDiv'),
+      exportShare:    _dossierGetNum('dos-biz-exportShare'),
+      cyclicality:    _dossierGetVal('dos-biz-cyclicality'),
+      barriers:       _dossierGetVal('dos-biz-barriers'),
+      regDependency:  _dossierGetVal('dos-biz-regDependency'),
+      capexIntensity: _dossierGetVal('dos-biz-capexIntensity'),
+      seasonality:    _dossierGetVal('dos-biz-seasonality'),
+      currencyRisk:   _dossierGetVal('dos-biz-currencyRisk'),
+      notes:          _dossierGetVal('dos-biz-notes'),
+    },
+    mod: {
+      auditor:         _dossierGetVal('dos-mod-auditor'),
+      disclosureFreq:  _dossierGetVal('dos-mod-disclosureFreq'),
+      stateSupport:    _dossierGetVal('dos-mod-stateSupport'),
+      ownership:       _dossierGetVal('dos-mod-ownership'),
+      rating:          _dossierGetVal('dos-mod-rating'),
+      defaultHistory:  _dossierGetVal('dos-mod-defaultHistory'),
+      shortDebtShare:  _dossierGetNum('dos-mod-shortDebtShare'),
+      refinanceRisk:   _dossierGetVal('dos-mod-refinanceRisk'),
+      covenants:       _dossierGetVal('dos-mod-covenants'),
+      subordination:   _dossierGetVal('dos-mod-subordination'),
+      notes:           _dossierGetVal('dos-mod-notes'),
+    },
+    updatedAt: new Date().toISOString()
+  };
+  save();
+  document.getElementById('dossier-updated').textContent = 'Обновлено: ' + new Date().toLocaleDateString('ru-RU');
+  // Лёгкая визуальная подтверждашка.
+  const btn = document.querySelector('#modal-dossier .modal-ftr .btn-p');
+  if(btn){
+    const prev = btn.textContent;
+    btn.textContent = '✓ Сохранено';
+    setTimeout(() => { btn.textContent = prev; }, 1400);
+  }
+}
+
+// ───────── Финансовый профиль (авто из reportsDB) ─────────
+
+// Находит самый свежий период с данными — предпочтение FY, потом 9M/H1/Q1.
+function _dossierLatestPeriod(iss){
+  if(!iss || !iss.periods) return null;
+  const entries = Object.entries(iss.periods).filter(([k, p]) => p && p.year);
+  if(!entries.length) return null;
+  entries.sort((a, b) => {
+    const [ka, pa] = a, [kb, pb] = b;
+    const ya = parseInt(pa.year, 10), yb = parseInt(pb.year, 10);
+    if(yb !== ya) return yb - ya;
+    // FY важнее квартальных при равном году.
+    const rank = p => /год|FY|year/i.test(p.period || 'FY') ? 0
+                    : /9М|9M/i.test(p.period || '') ? 1
+                    : /H1|Полугод/i.test(p.period || '') ? 2 : 3;
+    return rank(pa) - rank(pb);
+  });
+  return { key: entries[0][0], data: entries[0][1] };
+}
+
+// Вердикт для метрики: сравниваем с отраслевой медианой если есть,
+// иначе — с жёсткими порогами bond-инвестора (консервативными).
+// dir = 'up' значит «больше = лучше», 'down' значит «меньше = лучше».
+function _dossierVerdict(val, dir, hardThresholds, medianTriple){
+  if(val == null || !isFinite(val)) return {cls:'nd', txt:'—'};
+  // 1. Сравнение с отраслевой медианой (квартили p25/p50/p75), если есть.
+  if(medianTriple && medianTriple.p25 != null && medianTriple.p75 != null){
+    if(dir === 'up'){
+      if(val >= medianTriple.p75) return {cls:'ok',  txt:'✓ лучше 75% отрасли'};
+      if(val >= medianTriple.p50) return {cls:'ok',  txt:'✓ выше медианы'};
+      if(val >= medianTriple.p25) return {cls:'warn',txt:'⚠ ниже медианы'};
+      return {cls:'err', txt:'❌ в худших 25%'};
+    } else {
+      if(val <= medianTriple.p25) return {cls:'ok',  txt:'✓ лучше 75% отрасли'};
+      if(val <= medianTriple.p50) return {cls:'ok',  txt:'✓ ниже медианы'};
+      if(val <= medianTriple.p75) return {cls:'warn',txt:'⚠ выше медианы'};
+      return {cls:'err', txt:'❌ в худших 25%'};
+    }
+  }
+  // 2. Жёсткие пороги (fallback).
+  const [ok, warn] = hardThresholds;
+  if(dir === 'up'){
+    if(val >= ok)   return {cls:'ok',  txt:'✓ хорошо'};
+    if(val >= warn) return {cls:'warn',txt:'⚠ средне'};
+    return {cls:'err', txt:'❌ плохо'};
+  } else {
+    if(val <= ok)   return {cls:'ok',  txt:'✓ хорошо'};
+    if(val <= warn) return {cls:'warn',txt:'⚠ средне'};
+    return {cls:'err', txt:'❌ плохо'};
+  }
+}
+
+function _dossierFmt(v, opts){
+  opts = opts || {};
+  if(v == null || !isFinite(v)) return '—';
+  if(opts.pct) return (v * 100).toFixed(1) + '%';
+  if(opts.years) return v.toFixed(1) + ' лет';
+  const a = Math.abs(v);
+  if(a >= 100) return v.toFixed(1);
+  if(a >= 10)  return v.toFixed(2);
+  if(a >= 1)   return v.toFixed(2);
+  return v.toFixed(3);
+}
+
+function _dossierRenderFin(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  const meta = document.getElementById('dossier-fin-meta');
+  const body = document.getElementById('dossier-fin-body');
+  if(!iss){ body.innerHTML = ''; return; }
+  const latest = _dossierLatestPeriod(iss);
+  if(!latest){
+    meta.innerHTML = '<span style="color:var(--danger)">Нет ни одного заполненного периода — не из чего считать.</span>';
+    body.innerHTML = '';
+    return;
+  }
+  const p = latest.data;
+  const periodLabel = `${p.year} · ${p.period || 'FY'} · ${p.type || '—'}`;
+  meta.innerHTML = `Источник: <strong style="color:var(--text)">${periodLabel}</strong> · все значения в млрд ₽ (внутренняя единица базы)`;
+
+  // Отраслевая медиана (если рассчитана) для сравнения.
+  const indKey = iss.ind || 'other';
+  const medians = (window._industryMedians && window._industryMedians[indKey] && window._industryMedians[indKey][p.year]) || {};
+  const m = (fid) => medians[fid] || null;
+
+  // Расчёты.
+  const safeDiv = (a, b) => (a != null && b != null && b !== 0) ? a / b : null;
+  const rev = p.rev, ebitda = p.ebitda, ebit = p.ebit, np = p.np, intE = p.int,
+        assets = p.assets, eq = p.eq, debt = p.debt, cash = p.cash, ca = p.ca, cl = p.cl;
+  const netDebt = (debt != null && cash != null) ? (debt - cash) : null;
+  const rows = [
+    {sec:'Долговая нагрузка'},
+    {name:'Долг / EBITDA',           val: safeDiv(debt, ebitda),    dir:'down', hard:[3, 5],   med: m('rep-np-debt-ebitda'), hint:'< 3× обычно безопасно для ВДО; > 5× — высокий риск'},
+    {name:'Чистый долг / EBITDA',    val: safeDiv(netDebt, ebitda), dir:'down', hard:[2, 4],   med: null, hint:'С учётом денежной подушки'},
+    {name:'EBIT / Проценты (ICR)',   val: safeDiv(ebit, intE),      dir:'up',   hard:[3, 1.5], med: m('rep-np-icr'), hint:'< 1.5 — проценты съедают прибыль от операций'},
+    {name:'EBITDA / Проценты',       val: safeDiv(ebitda, intE),    dir:'up',   hard:[5, 2],   med: null, hint:'Расширенная метрика покрытия'},
+    {sec:'Рентабельность'},
+    {name:'ROA (ЧП / Активы)',       val: safeDiv(np, assets),      dir:'up',   hard:[0.05, 0.02],  med: m('rep-np-roa'),     pct:true,  hint:'Эффективность использования активов'},
+    {name:'ROE (ЧП / Капитал)',      val: safeDiv(np, eq),          dir:'up',   hard:[0.12, 0.05],  med: m('rep-np-roe'),     pct:true,  hint:'Доходность для акционеров'},
+    {name:'ROS (ЧП / Выручка)',      val: safeDiv(np, rev),         dir:'up',   hard:[0.08, 0.02],  med: m('rep-np-ros'),     pct:true,  hint:'Чистая маржа'},
+    {name:'EBITDA-маржа',            val: safeDiv(ebitda, rev),     dir:'up',   hard:[0.15, 0.07],  med: m('rep-np-ebitda-m'),pct:true,  hint:'Операционная эффективность'},
+    {name:'EBIT-маржа',              val: safeDiv(ebit, rev),       dir:'up',   hard:[0.10, 0.04],  med: m('rep-np-ebit-m'),  pct:true,  hint:'Операционная маржа без амортизации'},
+    {sec:'Ликвидность и структура'},
+    {name:'Current ratio (CA/CL)',   val: safeDiv(ca, cl),          dir:'up',   hard:[1.5, 1.0], med: null, hint:'> 1.5 — подушка оборотного капитала'},
+    {name:'Cash / Кр. обязательства',val: safeDiv(cash, cl),        dir:'up',   hard:[0.3, 0.1], med: null, hint:'Сколько кр. обязательств покрывается чистыми деньгами'},
+    {name:'Активоёмкость (A/Rev)',   val: safeDiv(assets, rev),     dir:'down', hard:[1, 2],     med: null, hint:'< 1 — быстрый оборот (торговля, услуги); > 3 — тяжёлые активы (инфра, энергетика)'},
+    {name:'Капитал / Активы',        val: safeDiv(eq, assets),      dir:'up',   hard:[0.30, 0.15], med: null, pct:true, hint:'Финансовая автономность; < 15% — высокая зависимость от заёмного'},
+    {sec:'Масштаб'},
+    {name:'Выручка, млрд ₽',         val: rev,                      dir:'up',   hard:[10, 1],    med: null, hint:'Абсолютный размер — прокси надёжности'},
+    {name:'Активы, млрд ₽',          val: assets,                   dir:'up',   hard:[20, 2],    med: null, hint:'Объём баланса'},
+    {name:'Публичная история (лет)', val: _dossierYearsInDB(iss),   dir:'up',   hard:[3, 1],     med: null, years:true, hint:'Сколько лет отчётности у нас накопилось — прокси прозрачности'},
+  ];
+
+  let html = `<div class="dossier-fin-row hdr">
+    <div>Показатель</div><div style="text-align:right">Значение</div><div style="text-align:right">Медиана отрасли (p50)</div><div>Вердикт</div>
+  </div>`;
+  for(const r of rows){
+    if(r.sec){ html += `<div class="dossier-fin-sec">${r.sec}</div>`; continue; }
+    const v = _dossierVerdict(r.val, r.dir, r.hard, r.med);
+    const medShow = r.med && r.med.p50 != null ? _dossierFmt(r.med.p50, {pct:r.pct, years:r.years}) : '—';
+    html += `<div class="dossier-fin-row" title="${r.hint || ''}">
+      <div>${r.name}</div>
+      <div style="text-align:right;font-family:var(--mono);color:var(--text)">${_dossierFmt(r.val, {pct:r.pct, years:r.years})}</div>
+      <div style="text-align:right;font-family:var(--mono);color:var(--text3)">${medShow}</div>
+      <div><span class="dossier-pill ${v.cls}">${v.txt}</span></div>
+    </div>`;
+  }
+  html += `<div style="margin-top:12px;font-size:.55rem;color:var(--text3);line-height:1.5">
+    <strong>Логика вердиктов:</strong> если для отрасли посчитана медиана через ГИР БО (страница «🏭 Отрасли / медианы») — сравнение идёт с ней (лучше/хуже квартили).
+    Если медианы нет — жёсткие пороги консервативного bond-инвестора (колонка «Медиана» пуста).
+    <br>Метрики, для которых медиана по отрасли ещё не предусмотрена, размечены по жёстким порогам.
+  </div>`;
+  body.innerHTML = html;
+}
+
+// Сколько лет (FY-периодов) в базе для этого эмитента.
+function _dossierYearsInDB(iss){
+  if(!iss || !iss.periods) return 0;
+  const fyYears = new Set();
+  for(const p of Object.values(iss.periods)){
+    if(p && p.year && /год|FY|year/i.test(p.period || 'FY')) fyYears.add(p.year);
+  }
+  return fyYears.size;
+}
+
+// ───────── Вкладка D: паспорта выпусков ─────────
+
+function _dossierRenderIssues(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  const list = document.getElementById('dossier-iss-list');
+  if(!iss || !list) return;
+  const issues = iss.issues || {};
+  const keys = Object.keys(issues).sort((a, b) => {
+    const da = issues[a].maturityDate || '';
+    const db = issues[b].maturityDate || '';
+    return da.localeCompare(db);
+  });
+  if(!keys.length){
+    list.innerHTML = '<div style="color:var(--text3);font-size:.62rem;padding:10px 0">Паспортов выпусков пока нет.</div>';
+    return;
+  }
+  list.innerHTML = keys.map(k => {
+    const e = issues[k];
+    const mat = e.maturityDate ? new Date(e.maturityDate).toLocaleDateString('ru-RU') : '—';
+    const offer = e.offerDate ? ' · оферта ' + new Date(e.offerDate).toLocaleDateString('ru-RU') : '';
+    const coup = e.couponRate != null ? e.couponRate + '%' : '—';
+    const lvl = e.listLevel ? ' · ур.' + e.listLevel : '';
+    return `<div class="dossier-issue-card" onclick="dossierIssueEdit('${k}')">
+      <div style="flex:1">
+        <div style="font-size:.72rem;color:var(--text)"><strong>${e.shortName || e.isin || k}</strong> <span style="color:var(--text3);font-size:.58rem">${e.isin || ''}</span></div>
+        <div style="font-size:.58rem;color:var(--text2);margin-top:2px">${coup} · ${e.couponType || '—'} · погаш ${mat}${offer}${lvl}</div>
+      </div>
+      <div style="font-size:.55rem;color:var(--text3)">✎</div>
+    </div>`;
+  }).join('');
+}
+
+function dossierIssueNew(){
+  document.getElementById('dossier-iss-form-title').textContent = 'Новый паспорт выпуска';
+  document.getElementById('dos-iss-origKey').value = '';
+  ['dos-iss-isin','dos-iss-shortName','dos-iss-couponRate','dos-iss-faceValue',
+   'dos-iss-maturityDate','dos-iss-offerDate','dos-iss-issueSize','dos-iss-note'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('dos-iss-couponType').value = '';
+  document.getElementById('dos-iss-currency').value = 'RUB';
+  document.getElementById('dos-iss-listLevel').value = '';
+  document.getElementById('dos-iss-del-btn').style.display = 'none';
+  document.getElementById('dossier-iss-form').style.display = 'block';
+}
+
+function dossierIssueEdit(isinKey){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  const e = iss?.issues?.[isinKey];
+  if(!e) return;
+  document.getElementById('dossier-iss-form-title').textContent = 'Редактирование: ' + (e.shortName || e.isin || isinKey);
+  document.getElementById('dos-iss-origKey').value = isinKey;
+  _dossierSetVals({
+    'dos-iss-isin':         e.isin || '',
+    'dos-iss-shortName':    e.shortName || '',
+    'dos-iss-couponRate':   e.couponRate,
+    'dos-iss-couponType':   e.couponType || '',
+    'dos-iss-faceValue':    e.faceValue,
+    'dos-iss-currency':     e.currency || 'RUB',
+    'dos-iss-maturityDate': e.maturityDate || '',
+    'dos-iss-offerDate':    e.offerDate || '',
+    'dos-iss-issueSize':    e.issueSize,
+    'dos-iss-listLevel':    e.listLevel || '',
+    'dos-iss-note':         e.note || '',
+  });
+  document.getElementById('dos-iss-del-btn').style.display = '';
+  document.getElementById('dossier-iss-form').style.display = 'block';
+}
+
+function dossierIssueSave(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  const isin = _dossierGetVal('dos-iss-isin').toUpperCase();
+  if(!isin){ alert('Укажи ISIN — он используется как ключ выпуска.'); return; }
+  if(!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)){
+    if(!confirm('ISIN «'+isin+'» не похож на стандартный (2 буквы страны + 10 символов, последний — цифра). Сохранить всё равно?')) return;
+  }
+  const origKey = _dossierGetVal('dos-iss-origKey');
+  iss.issues = iss.issues || {};
+  // Если ISIN поменялся — удаляем старую запись.
+  if(origKey && origKey !== isin) delete iss.issues[origKey];
+  iss.issues[isin] = {
+    isin,
+    shortName:    _dossierGetVal('dos-iss-shortName'),
+    couponRate:   _dossierGetNum('dos-iss-couponRate'),
+    couponType:   _dossierGetVal('dos-iss-couponType'),
+    faceValue:    _dossierGetNum('dos-iss-faceValue'),
+    currency:     _dossierGetVal('dos-iss-currency') || 'RUB',
+    maturityDate: _dossierGetVal('dos-iss-maturityDate'),
+    offerDate:    _dossierGetVal('dos-iss-offerDate'),
+    issueSize:    _dossierGetNum('dos-iss-issueSize'),
+    listLevel:    _dossierGetVal('dos-iss-listLevel') ? parseInt(_dossierGetVal('dos-iss-listLevel'), 10) : null,
+    note:         _dossierGetVal('dos-iss-note'),
+  };
+  save();
+  document.getElementById('dossier-iss-form').style.display = 'none';
+  _dossierRenderIssues();
+  const cnt = Object.keys(iss.issues).length;
+  document.getElementById('dossier-iss-count').textContent = cnt ? '('+cnt+')' : '';
+}
+
+function dossierIssueDelete(){
+  if(!repActiveIssuerId) return;
+  const iss = reportsDB[repActiveIssuerId];
+  const origKey = _dossierGetVal('dos-iss-origKey');
+  if(!origKey || !iss?.issues?.[origKey]) return;
+  const e = iss.issues[origKey];
+  if(!confirm(`Удалить паспорт выпуска ${e.shortName || e.isin || origKey}?`)) return;
+  delete iss.issues[origKey];
+  save();
+  document.getElementById('dossier-iss-form').style.display = 'none';
+  _dossierRenderIssues();
+  const cnt = Object.keys(iss.issues || {}).length;
+  document.getElementById('dossier-iss-count').textContent = cnt ? '('+cnt+')' : '';
 }
 </script>
 </body>
