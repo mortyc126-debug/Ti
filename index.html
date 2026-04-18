@@ -1872,12 +1872,21 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Выгрузки с <strong>bo.nalog.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
       </div>
-      <input type="file" id="girbo-file-modal" accept="*/*" multiple style="display:none" onchange="importGirboCsv(this)">
+      <input type="file" id="girbo-file-modal" accept="*/*" multiple style="display:none" onchange="girboQueueAdd(this)">
       <div id="girbo-drop" onclick="document.getElementById('girbo-file-modal').click()"
            style="border:2px dashed var(--border2);padding:22px 16px;text-align:center;background:var(--bg);cursor:pointer;user-select:none">
         <div style="font-size:1.6rem;margin-bottom:4px">📥</div>
-        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы выбрать <strong>один или несколько</strong> файлов<br><span style="color:var(--text3);font-size:.6rem">(на десктопе можно перетащить сюда; для пачки — Ctrl/⌘+клик)</span></div>
+        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы <strong>добавить файл в очередь</strong><br><span style="color:var(--text3);font-size:.6rem">тапайте несколько раз — каждый файл добавится, потом жмите «Импортировать»</span></div>
         <div style="font-size:.56rem;color:var(--text3);margin-top:6px;letter-spacing:.08em">.CSV · .TXT · .TSV · .XML</div>
+      </div>
+      <!-- Очередь: список уже добавленных файлов + кнопка импорта -->
+      <div id="girbo-queue-wrap" style="display:none;border:1px solid var(--border2);padding:8px 10px;background:var(--bg)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:.62rem;color:var(--text2);font-weight:600">📋 В очереди: <span id="girbo-queue-count">0</span></span>
+          <button class="btn btn-sm" type="button" onclick="girboQueueClear()" style="margin-left:auto;font-size:.56rem;padding:2px 8px">Очистить</button>
+          <button class="btn btn-sm btn-p" type="button" onclick="girboQueueRun()" style="font-size:.58rem;padding:3px 10px">▶ Импортировать все</button>
+        </div>
+        <div id="girbo-queue-list" style="font-size:.6rem;color:var(--text2);max-height:180px;overflow:auto;font-family:var(--mono)"></div>
       </div>
       <details style="font-size:.62rem;color:var(--text2)">
         <summary style="cursor:pointer;padding:4px 0">Не получается выбрать файл? Вставить текстом</summary>
@@ -12956,6 +12965,56 @@ function importGirboCsv(input){
   importGirboBatch(files).finally(() => { input.value = ''; });
 }
 
+// Очередь файлов для батч-импорта в модалке. Нужна потому, что OEM-пикеры
+// на Android (Huawei Files, MIUI и др.) игнорируют multiple-флаг и берут
+// только один файл за раз. Пользователь добавляет по одному, список копится,
+// затем жмёт «Импортировать все» — и пачка уходит через importGirboBatch.
+let _girboQueue = []; // [File, File, ...]
+
+function girboQueueAdd(input){
+  const files = Array.from(input.files || []);
+  for(const f of files) _girboQueue.push(f);
+  input.value = '';
+  _girboQueueRender();
+}
+
+function girboQueueClear(){
+  _girboQueue = [];
+  _girboQueueRender();
+}
+
+function girboQueueRemove(i){
+  _girboQueue.splice(i, 1);
+  _girboQueueRender();
+}
+
+function _girboQueueRender(){
+  const wrap  = document.getElementById('girbo-queue-wrap');
+  const cnt   = document.getElementById('girbo-queue-count');
+  const list  = document.getElementById('girbo-queue-list');
+  if(!wrap || !cnt || !list) return;
+  if(!_girboQueue.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  cnt.textContent = String(_girboQueue.length);
+  list.innerHTML = _girboQueue.map((f, i) => {
+    const nameSafe = f.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;border-bottom:1px dotted rgba(30,48,72,.35)">
+      <span style="color:var(--text3);min-width:1.8em;text-align:right">${i+1}.</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameSafe}</span>
+      <span style="color:var(--text3);font-size:.55rem">${(f.size/1024).toFixed(1)} КБ</span>
+      <button onclick="girboQueueRemove(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0 4px;font-size:.75rem" title="Убрать">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function girboQueueRun(){
+  if(!_girboQueue.length) return;
+  const files = _girboQueue.slice();
+  _girboQueue = [];
+  _girboQueueRender();
+  importGirboBatch(files);
+}
+
 // Пакетный импорт: читаем файлы последовательно (не параллельно — чтобы не
 // плодить гонки за reportsDB и localStorage), показываем прогресс-тост,
 // в конце — модалка со сводкой (по эмитентам → какие периоды пришли).
@@ -13064,13 +13123,10 @@ function _initGirboDropZone(){
     e.preventDefault(); e.stopPropagation(); setHover(false);
     const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
     if(!files.length){ alert('Не удалось получить файл из drop.'); return; }
-    if(files.length === 1){
-      const file = files[0];
-      file.arrayBuffer().then(buf => _processGirboFile(buf, file.name))
-        .catch(err => alert('Ошибка: '+err.message));
-    } else {
-      importGirboBatch(files);
-    }
+    // В модалке всё идёт через очередь — и для тапа-пикера, и для drag-and-drop.
+    // Пользователь увидит список и жмёт «Импортировать все» сам.
+    for(const f of files) _girboQueue.push(f);
+    _girboQueueRender();
   });
 }
 
