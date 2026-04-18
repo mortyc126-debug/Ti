@@ -15576,12 +15576,14 @@ async function fetchMoexCatalog(){
   try {
     while(true){
       if(status) status.textContent = `страница ${pages+1}, загружено ${items.length} бумаг…`;
-      const url = `${_MOEX_BASE}?iss.meta=off&iss.json=extended&start=${start}&limit=${_MOEX_PAGE_SIZE}`;
+      // iss.json=extended меняет структуру ответа (вместо columns+data —
+      // массив именованных объектов), и мой парсер под него не заточен.
+      // Используем обычный columns+data формат.
+      const url = `${_MOEX_BASE}?iss.meta=off&start=${start}&limit=${_MOEX_PAGE_SIZE}`;
       const r = await fetch(url, {cache:'no-store'});
       if(!r.ok) throw new Error('MOEX HTTP ' + r.status);
       const raw = await r.json();
-      const body = Array.isArray(raw) ? (raw[1] || raw[0]) : raw;
-      const batch = _moexParsePage(body);
+      const batch = _moexParsePage(raw);
       if(!batch.length) break;
       items.push(...batch);
       pages++;
