@@ -220,10 +220,44 @@ tr:hover td{background:var(--s2)}
      скрипт ещё не готов в момент клика (htmlpreview.github.io рендерит
      HTML через innerHTML и внешние скрипты загружаются асинхронно) —
      ниже ленивые loader-ы, которые подтянут библиотеку по требованию. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<!-- Тяжёлые библиотеки (pdf.js ≈ 500 КБ, xlsx ≈ 900 КБ, mammoth ≈ 1 МБ)
+     раньше грузились жадно на старте — на телефоне это ≈ 2 МБ сети +
+     парсинг JS до первого показа страницы. Теперь подтягиваются лениво:
+     первый раз, когда пользователь открывает «📂 Отчётность» и выбирает
+     файл. Loader-ы ниже гарантируют, что глобалы будут готовы. -->
 <script>
+// Замер времени старта — виден в сайдбаре «⚡ Старт: XXX мс».
+// Телефонные браузеры не дают DevTools, поэтому делаем диагностику
+// внутри самой страницы. performance.now() — монотонное время в мс от
+// начала навигации (т.е. от момента, когда пользователь перешёл на
+// страницу). Чем меньше — тем быстрее приложение стартует.
+window._perfMarks = { htmlParsed: performance.now() };
+function _perfUpdate(){
+  const el = document.getElementById('sb-perf-time');
+  if(!el) return;
+  const m = window._perfMarks || {};
+  const v = m.ready != null ? m.ready : (m.dcl != null ? m.dcl : m.htmlParsed);
+  if(v != null) el.textContent = Math.round(v) + ' мс';
+}
+function _perfShow(){
+  const m = window._perfMarks || {};
+  const fmt = v => v != null ? Math.round(v) + ' мс' : '—';
+  const libStat = (name, present) => `  • ${name}: ${present ? 'загружена' : 'ещё не нужна'}`;
+  const txt =
+    'ДИАГНОСТИКА ЗАГРУЗКИ\n' +
+    '(время от момента перехода на страницу)\n\n' +
+    'HTML-парсинг до первого скрипта:  ' + fmt(m.htmlParsed) + '\n' +
+    'DOMContentLoaded (каркас готов):  ' + fmt(m.dcl) + '\n' +
+    'Инициализация завершена:          ' + fmt(m.ready) + '\n\n' +
+    'Тяжёлые библиотеки (грузятся при первом открытии файла):\n' +
+    libStat('pdf.js  (≈ 500 КБ)', typeof pdfjsLib !== 'undefined') + '\n' +
+    libStat('xlsx    (≈ 900 КБ)', typeof XLSX     !== 'undefined') + '\n' +
+    libStat('mammoth (≈ 1 МБ)',   typeof mammoth  !== 'undefined') + '\n\n' +
+    'Меньше = быстрее. Если «Готово к работе» > 1500 мс на телефоне — ' +
+    'причина либо в медленной сети (много CDN-запросов), либо в объёме ' +
+    'кода (index.html). Можно сравнить до/после обновлений приложения.';
+  alert(txt);
+}
 function _loadScript(src){
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -256,6 +290,10 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   s.onload = () => resolve();
   s.onerror = () => reject(new Error('Не удалось загрузить tesseract.js'));
   document.head.appendChild(s);
+});
+document.addEventListener('DOMContentLoaded', () => {
+  window._perfMarks.dcl = performance.now();
+  _perfUpdate();
 });
 </script>
 </head>
@@ -328,6 +366,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт ОДНОГО или НЕСКОЛЬКИХ файлов ГИРБО (bo.nalog.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
     <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
+    <div class="sb-item" onclick="_perfShow()" title="Время загрузки приложения в миллисекундах. Клик — подробная диагностика (DOM, инициализация, какие тяжёлые библиотеки уже скачались)."><span class="sb-icon">⏱</span>Старт: <span id="sb-perf-time" style="color:var(--text3);font-size:.62rem;margin-left:auto">считаю…</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -6438,6 +6477,12 @@ if(!ytmBonds.length){
 renderYtm(); renderSbLists();
 document.getElementById('sb-pc').textContent=portfolio.length;
 
+// Метка «инициализация завершена». Видно пользователю в сайдбаре.
+if(window._perfMarks){
+  window._perfMarks.ready = performance.now();
+  if(typeof _perfUpdate === 'function') _perfUpdate();
+}
+
 // Demo P&L prefill
 ['pl-buy','pl-sell','pl-coupon'].forEach((id,i)=>{document.getElementById(id).value=['60.5','72.0','7.1'][i]});
 document.getElementById('pl-qty').value='20';
@@ -10399,7 +10444,9 @@ function repNewPeriodModal(){
   if(girboRes) girboRes.innerHTML = '';
   const girboStatus = document.getElementById('rep-np-girbo-status');
   if(girboStatus) girboStatus.innerHTML = '';
-  // Show library status
+  // Статус библиотек распознавания. Теперь они грузятся лениво
+  // (при первом выборе файла), поэтому до клика это нормально, что
+  // PDF/DOCX/XLSX «ещё не загружены» — паниковать не надо.
   const libEl=document.getElementById('rep-lib-status');
   if(libEl){
     const xlsxOk = typeof XLSX!=='undefined';
@@ -10408,11 +10455,12 @@ function repNewPeriodModal(){
     if(xlsxOk&&mammothOk&&pdfOk){
       libEl.innerHTML='<span style="color:var(--green)">✓ PDF, DOCX, XLSX готовы</span>';
     } else {
-      const missing=[];
-      if(!pdfOk) missing.push('PDF');
-      if(!mammothOk) missing.push('DOCX');
-      if(!xlsxOk) missing.push('XLSX');
-      libEl.innerHTML=`<span style="color:var(--danger)">⚠ Не загружено: ${missing.join(', ')} — обновите страницу</span>`;
+      const loaded = [pdfOk && 'PDF', mammothOk && 'DOCX', xlsxOk && 'XLSX'].filter(Boolean);
+      const pending = [!pdfOk && 'PDF', !mammothOk && 'DOCX', !xlsxOk && 'XLSX'].filter(Boolean);
+      const parts = [];
+      if(loaded.length) parts.push(`<span style="color:var(--green)">✓ ${loaded.join(', ')}</span>`);
+      if(pending.length) parts.push(`<span style="color:var(--text3)">${pending.join(', ')} — догрузятся при выборе файла (~2 МБ)</span>`);
+      libEl.innerHTML = parts.join(' · ');
     }
   }
   document.getElementById('modal-rep-period').classList.add('open');
