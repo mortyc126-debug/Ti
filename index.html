@@ -16218,6 +16218,83 @@ function moexAddToYtm(secid){
 // Кэш инфо о бумагах, чтобы при bulk не дёргать одну и ту же SECID дважды.
 window._moexSecInfoCache = window._moexSecInfoCache || new Map();
 
+// ───────── Локальный справочник ИНН (без сети) ─────────
+// Корневая проблема: MOEX в description ИНН выдаёт редко, а name-search
+// в ГИР БО требует рабочего прокси (сейчас ФНС периодически режет CF).
+// Выход: многие «знакомые» эмитенты уже есть в наших локальных источниках:
+// • references/industry-peers.json — ~100 ИНН по 15 отраслям (РЖД,
+//   Газпром, ПГК, Сбер и т.д.) — проверенные, коммитятся в репо.
+// • reportsDB — все эмитенты, которые пользователь уже заводил (у них
+//   обычно заполнен inn).
+// Для знакомых эмитентов ИНН находится мгновенно, без единого сетевого
+// запроса — что критично когда прокси 522.
+
+window._moexLocalInnMap = null;
+
+async function _moexBuildLocalInnMap(){
+  if(window._moexLocalInnMap) return window._moexLocalInnMap;
+  const map = new Map(); // normName → {inn, name, initials, source}
+  const addEntry = (name, inn, source) => {
+    if(!name || !inn) return;
+    if(!/^\d{10}$|^\d{12}$/.test(String(inn).trim())) return;
+    const n = (typeof _normIssuerName === 'function') ? _normIssuerName(name) : String(name).toLowerCase();
+    if(!n || n.length < 2) return;
+    if(map.has(n)) return; // первый источник побеждает
+    map.set(n, { inn: String(inn).trim(), name, initials: _moexInitialsOf(name), source });
+  };
+  // 1. industry-peers.json (seed + правки пользователя).
+  try {
+    if(typeof _indLoad === 'function'){
+      const ind = await _indLoad();
+      for(const [key, data] of Object.entries((ind && ind.industries) || {})){
+        for(const p of data.peers || []){
+          addEntry(p.name, p.inn, 'peers');
+        }
+      }
+    }
+  } catch(e){ /* ignore */ }
+  // 2. reportsDB — уже заведённые эмитенты с ИНН.
+  for(const iss of Object.values(reportsDB || {})){
+    addEntry(iss.name, iss.inn, 'reportsDB');
+  }
+  window._moexLocalInnMap = map;
+  return map;
+}
+
+// Аббревиатура по первым буквам значимых слов: «Первая Грузовая
+// Компания» → «пгк», «Российские Железные Дороги» → «ржд».
+function _moexInitialsOf(name){
+  if(!name) return '';
+  return String(name).toLowerCase()
+    .replace(/[«»"„"()-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !/^(ао|пао|ооо|зао|оао|нао|нк|нп|пкф|ск|ск|тк|ук)$/i.test(w))
+    .map(w => w[0])
+    .join('');
+}
+
+// Синхронный lookup в локальном индексе.
+// Пробует: точное совпадение → contains (в обе стороны) → аббревиатура.
+function _moexLocalInnLookup(bondName){
+  const map = window._moexLocalInnMap;
+  if(!map || !bondName) return null;
+  const target = (typeof _normIssuerName === 'function') ? _normIssuerName(bondName) : String(bondName).toLowerCase();
+  if(!target || target.length < 2) return null;
+  // 1. Exact.
+  if(map.has(target)){
+    return { inn: map.get(target).inn, name: map.get(target).name, matched: 'exact' };
+  }
+  // 2. Contains в обе стороны + initials.
+  for(const [key, data] of map){
+    if(target.length >= 3 && key.includes(target)) return { inn: data.inn, name: data.name, matched: 'contains' };
+    if(key.length >= 3 && target.includes(key)) return { inn: data.inn, name: data.name, matched: 'contains' };
+    if(data.initials && data.initials.length >= 2 && (target === data.initials || target.startsWith(data.initials + ' ') || target.startsWith(data.initials))){
+      return { inn: data.inn, name: data.name, matched: 'initials' };
+    }
+  }
+  return null;
+}
+
 // MOEX имеет справочник эмитентов: /iss/emittents/{id}.json или
 // /iss/issuers/{id}.json — точное имя зависит от версии ISS. Пробуем
 // оба, достаём ИНН из любой секции ответа.
@@ -16412,9 +16489,31 @@ function _moexEnsureIssuer(inn, issuerName){
 // allowPrompt=true (только для ручного клика) — при отсутствии ИНН в MOEX
 // предложит ввести вручную. В bulk-режиме false, чтобы не спамить prompt'ами.
 async function _moexAutoGirbo(secid, allowPrompt){
-  let info;
-  try { info = await _moexFetchSecurityInfo(secid); }
-  catch(e){ return { error: 'MOEX info: ' + e.message, secid }; }
+  // 0. Сначала локальный справочник — мгновенно, без сети.
+  // Покрывает всех «знакомых» эмитентов из peers + reportsDB.
+  await _moexBuildLocalInnMap();
+  const cat = window._moexCatalog;
+  const bondFromCat = cat?.items?.find(b => b.secid === secid);
+  let info = null;
+  if(bondFromCat){
+    const local = _moexLocalInnLookup(bondFromCat.shortName || bondFromCat.secName);
+    if(local){
+      info = {
+        inn: local.inn,
+        issuer: local.name,
+        shortName: bondFromCat.shortName,
+        isin: bondFromCat.isin,
+        regNumber: null,
+        _localMatch: true
+      };
+    }
+  }
+
+  // 1. Если не нашли локально — идём в MOEX description + EMITTER_ID.
+  if(!info){
+    try { info = await _moexFetchSecurityInfo(secid); }
+    catch(e){ return { error: 'MOEX info: ' + e.message, secid }; }
+  }
 
   let inn = info.inn;
   // Fallback 1: поиск ИНН через ГИР БО по названию эмитента.
@@ -16426,13 +16525,13 @@ async function _moexAutoGirbo(secid, allowPrompt){
   }
   // Fallback 2: prompt для ручного клика.
   if(!inn && allowPrompt){
-    const ent = (prompt(`ИНН не нашёлся ни в MOEX, ни по имени в ГИР БО для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
+    const ent = (prompt(`ИНН не нашёлся ни в локальном справочнике, ни в MOEX, ни по имени в ГИР БО для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
     if(!ent) return { error: 'ИНН не введён, пропущено', secid };
     if(!/^\d{10}$|^\d{12}$/.test(ent)) return { error: 'ИНН должен быть 10 или 12 цифр', secid };
     inn = ent;
   }
   if(!inn){
-    return { error: 'ИНН не найден ни в MOEX, ни по имени в ГИР БО', secid, _noInn: true };
+    return { error: 'ИНН не найден ни локально, ни в MOEX, ни по имени в ГИР БО', secid, _noInn: true };
   }
 
   const issId = _moexEnsureIssuer(inn, info.issuer || info.shortName);
@@ -16505,30 +16604,43 @@ async function moexPullGirboBulk(){
   let totalOk = 0, totalErr = 0, totalSkipped = 0, totalNewIssuers = 0;
   const errors = [];
 
-  // Шаг 1: собрать уникальных эмитентов через info-fetch.
-  // Если MOEX не даёт ИНН — пробуем ГИР БО по имени (ранее этот fallback
-  // был только в одиночной кнопке, не в bulk — отсюда шла жалоба «0 ИНН»).
+  // Шаг 1: собрать уникальных эмитентов.
+  // Сначала локальный справочник — мгновенно, без сети. Для оставшихся
+  // — через MOEX (info) и поиск по имени в ГИР БО.
+  await _moexBuildLocalInnMap();
   let done = 0;
   let noInnCount = 0;
+  let localHits = 0;
   for(const b of targets){
     done++;
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: ищу ИНН (${done}/${targets.length}): ${b.shortName}</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: ищу ИНН (${done}/${targets.length}, локально: ${localHits}): ${b.shortName}</span>`;
+
+    // 1.1 — локальный справочник.
+    const local = _moexLocalInnLookup(b.shortName || b.secName);
+    if(local){
+      localHits++;
+      if(!unique.has(local.inn)){
+        unique.set(local.inn, { secid: b.secid, name: local.name });
+      }
+      continue;
+    }
+
+    // 1.2 — MOEX info + его fallback'и (EMITTER_ID, имя).
     let info;
     try { info = await _moexFetchSecurityInfo(b.secid); }
     catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
 
     let inn = info.inn;
-    // Fallback через ГИР БО по имени.
     if(!inn){
       const nameGuess = info.issuer || _moexGuessIssuerName(b.shortName, info.shortName);
       if(nameGuess){
         try {
           inn = await _girboFindInnByName(nameGuess);
-        } catch(e){ /* продолжаем, учтём в noInnCount */ }
-        await new Promise(r => setTimeout(r, 120)); // полегче с прокси
+        } catch(e){ /* продолжаем */ }
+        await new Promise(r => setTimeout(r, 120));
       }
     }
-    if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет (ни MOEX, ни поиск по имени в ГИР БО)`); continue; }
+    if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет (ни локально, ни MOEX, ни поиск по имени)`); continue; }
     if(!unique.has(inn)){
       unique.set(inn, { secid: b.secid, name: info.issuer || info.shortName });
     }
@@ -16564,7 +16676,7 @@ async function moexPullGirboBulk(){
   }
 
   // Результат.
-  const msg = `✓ Готово: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов (пропущено ${totalSkipped} уже существовавших), новых эмитентов в базе: ${totalNewIssuers}` + (totalErr ? `, ошибок: ${totalErr}` : '') + (noInnCount ? `, без ИНН в MOEX: ${noInnCount}` : '');
+  const msg = `✓ Готово: обработано ${totalInns} эмитентов (${localHits} через локальный справочник, ${totalInns - localHits} через MOEX/ГИР БО), добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `, ошибок на шаге ГИР БО: ${totalErr}` : '') + (noInnCount ? `, без ИНН: ${noInnCount}` : '');
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
   if(errors.length){
     console.warn('GIR BO bulk errors:', errors);
