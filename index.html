@@ -14827,57 +14827,113 @@ function _dossierRenderFin(){
   const summaryHTML = _dossierBuildSummary(iss, p);
   meta.innerHTML = summaryHTML + `<div style="margin-top:12px;font-size:.6rem;color:var(--text2)">Источник финансов: <strong style="color:var(--text)">${periodLabel}</strong> · все значения в млрд ₽ (внутренняя единица базы)</div>`;
 
-  // Отраслевая медиана (если рассчитана) для сравнения.
-  const indKey = iss.ind || 'other';
-  const medians = (window._industryMedians && window._industryMedians[indKey] && window._industryMedians[indKey][p.year]) || {};
-  const m = (fid) => medians[fid] || null;
-
   // Расчёты.
   const safeDiv = (a, b) => (a != null && b != null && b !== 0) ? a / b : null;
   const rev = p.rev, ebitda = p.ebitda, ebit = p.ebit, np = p.np, intE = p.int,
         assets = p.assets, eq = p.eq, debt = p.debt, cash = p.cash, ca = p.ca, cl = p.cl;
   const netDebt = (debt != null && cash != null) ? (debt - cash) : null;
+
+  // Fallback на EBIT для метрик, требующих EBITDA: если EBITDA нет,
+  // но EBIT есть — считаем по EBIT и пометим метрику как «(по EBIT)».
+  // РСБУ-форма ФНС вообще не содержит EBITDA, поэтому для всех
+  // импортов из ГИР БО этот fallback — основной путь.
+  const fb = (fn, ...deps) => {
+    const missing = [];
+    const names = ['debt','netDebt','ebitda','ebit','int','rev','assets','ca','cl','cash','eq'];
+    const vals  = { debt, netDebt, ebitda, ebit, int:intE, rev, assets, ca, cl, cash, eq };
+    for(const d of deps){ if(vals[d] == null) missing.push(d); }
+    return { val: missing.length ? null : fn(vals), missing };
+  };
+  const mapMissing = {
+    debt:'долг', netDebt:'чистый долг', ebitda:'EBITDA', ebit:'EBIT',
+    int:'проценты', rev:'выручка', assets:'активы', ca:'оборотные активы',
+    cl:'кр. обязательства', cash:'денежные средства', eq:'капитал'
+  };
+
+  // Для «EBITDA-метрик» — если нет EBITDA, смотрим EBIT.
+  const debtEbitdaCore = fb(v => v.debt / v.ebitda, 'debt','ebitda');
+  const debtEbitFallback = fb(v => v.debt / v.ebit, 'debt','ebit');
+  const debtEbitda = debtEbitdaCore.val != null ? debtEbitdaCore
+                   : debtEbitFallback.val != null ? { ...debtEbitFallback, proxy:'EBIT' }
+                   : debtEbitdaCore;
+
+  const netDebtEbitdaCore = fb(v => v.netDebt / v.ebitda, 'netDebt','ebitda');
+  const netDebtEbitFallback = fb(v => v.netDebt / v.ebit, 'netDebt','ebit');
+  const netDebtEbitda = netDebtEbitdaCore.val != null ? netDebtEbitdaCore
+                      : netDebtEbitFallback.val != null ? { ...netDebtEbitFallback, proxy:'EBIT' }
+                      : netDebtEbitdaCore;
+
+  const ebitdaIntCore = fb(v => v.ebitda / v.int, 'ebitda','int');
+  const ebitIntFallback = fb(v => v.ebit / v.int, 'ebit','int');
+  const ebitdaInt = ebitdaIntCore.val != null ? ebitdaIntCore
+                  : ebitIntFallback.val != null ? { ...ebitIntFallback, proxy:'EBIT' }
+                  : ebitdaIntCore;
+
+  // Отраслевая медиана (если рассчитана) для сравнения.
+  const indKey = iss.ind || 'other';
+  const medians = (window._industryMedians && window._industryMedians[indKey] && window._industryMedians[indKey][p.year]) || {};
+  const m = (fid) => medians[fid] || null;
+
   const rows = [
     {sec:'Долговая нагрузка'},
-    {name:'Долг / EBITDA',           val: safeDiv(debt, ebitda),    dir:'down', hard:[3, 5],   med: m('rep-np-debt-ebitda'), hint:'< 3× обычно безопасно для ВДО; > 5× — высокий риск'},
-    {name:'Чистый долг / EBITDA',    val: safeDiv(netDebt, ebitda), dir:'down', hard:[2, 4],   med: null, hint:'С учётом денежной подушки'},
-    {name:'EBIT / Проценты (ICR)',   val: safeDiv(ebit, intE),      dir:'up',   hard:[3, 1.5], med: m('rep-np-icr'), hint:'< 1.5 — проценты съедают прибыль от операций'},
-    {name:'EBITDA / Проценты',       val: safeDiv(ebitda, intE),    dir:'up',   hard:[5, 2],   med: null, hint:'Расширенная метрика покрытия'},
+    {name:'Долг / EBITDA',           v: debtEbitda,                                  dir:'down', hard:[3, 5],   med: m('rep-np-debt-ebitda'), hint:'< 3× обычно безопасно для ВДО; > 5× — высокий риск'},
+    {name:'Чистый долг / EBITDA',    v: netDebtEbitda,                               dir:'down', hard:[2, 4],   med: null, hint:'С учётом денежной подушки'},
+    {name:'EBIT / Проценты (ICR)',   v: fb(x => x.ebit / x.int,  'ebit','int'),      dir:'up',   hard:[3, 1.5], med: m('rep-np-icr'), hint:'< 1.5 — проценты съедают прибыль от операций'},
+    {name:'EBITDA / Проценты',       v: ebitdaInt,                                   dir:'up',   hard:[5, 2],   med: null, hint:'Расширенная метрика покрытия'},
     {sec:'Рентабельность'},
-    {name:'ROA (ЧП / Активы)',       val: safeDiv(np, assets),      dir:'up',   hard:[0.05, 0.02],  med: m('rep-np-roa'),     pct:true,  hint:'Эффективность использования активов'},
-    {name:'ROE (ЧП / Капитал)',      val: safeDiv(np, eq),          dir:'up',   hard:[0.12, 0.05],  med: m('rep-np-roe'),     pct:true,  hint:'Доходность для акционеров'},
-    {name:'ROS (ЧП / Выручка)',      val: safeDiv(np, rev),         dir:'up',   hard:[0.08, 0.02],  med: m('rep-np-ros'),     pct:true,  hint:'Чистая маржа'},
-    {name:'EBITDA-маржа',            val: safeDiv(ebitda, rev),     dir:'up',   hard:[0.15, 0.07],  med: m('rep-np-ebitda-m'),pct:true,  hint:'Операционная эффективность'},
-    {name:'EBIT-маржа',              val: safeDiv(ebit, rev),       dir:'up',   hard:[0.10, 0.04],  med: m('rep-np-ebit-m'),  pct:true,  hint:'Операционная маржа без амортизации'},
+    {name:'ROA (ЧП / Активы)',       v: fb(x => x.np / x.assets,  'np','assets'),    dir:'up',   hard:[0.05, 0.02],  med: m('rep-np-roa'),     pct:true,  hint:'Эффективность использования активов'},
+    {name:'ROE (ЧП / Капитал)',      v: fb(x => x.np / x.eq,      'np','eq'),        dir:'up',   hard:[0.12, 0.05],  med: m('rep-np-roe'),     pct:true,  hint:'Доходность для акционеров'},
+    {name:'ROS (ЧП / Выручка)',      v: fb(x => x.np / x.rev,     'np','rev'),       dir:'up',   hard:[0.08, 0.02],  med: m('rep-np-ros'),     pct:true,  hint:'Чистая маржа'},
+    {name:'EBITDA-маржа',            v: fb(x => x.ebitda / x.rev, 'ebitda','rev'),   dir:'up',   hard:[0.15, 0.07],  med: m('rep-np-ebitda-m'),pct:true,  hint:'Операционная эффективность'},
+    {name:'EBIT-маржа',              v: fb(x => x.ebit / x.rev,   'ebit','rev'),     dir:'up',   hard:[0.10, 0.04],  med: m('rep-np-ebit-m'),  pct:true,  hint:'Операционная маржа без амортизации'},
     {sec:'Ликвидность и структура'},
-    {name:'Current ratio (CA/CL)',   val: safeDiv(ca, cl),          dir:'up',   hard:[1.5, 1.0], med: null, hint:'> 1.5 — подушка оборотного капитала'},
-    {name:'Cash / Кр. обязательства',val: safeDiv(cash, cl),        dir:'up',   hard:[0.3, 0.1], med: null, hint:'Сколько кр. обязательств покрывается чистыми деньгами'},
-    {name:'Активоёмкость (A/Rev)',   val: safeDiv(assets, rev),     dir:'down', hard:[1, 2],     med: null, hint:'< 1 — быстрый оборот (торговля, услуги); > 3 — тяжёлые активы (инфра, энергетика)'},
-    {name:'Капитал / Активы',        val: safeDiv(eq, assets),      dir:'up',   hard:[0.30, 0.15], med: null, pct:true, hint:'Финансовая автономность; < 15% — высокая зависимость от заёмного'},
+    {name:'Current ratio (CA/CL)',   v: fb(x => x.ca / x.cl,       'ca','cl'),       dir:'up',   hard:[1.5, 1.0], med: null, hint:'> 1.5 — подушка оборотного капитала'},
+    {name:'Cash / Кр. обязательства',v: fb(x => x.cash / x.cl,     'cash','cl'),     dir:'up',   hard:[0.3, 0.1], med: null, hint:'Сколько кр. обязательств покрывается чистыми деньгами'},
+    {name:'Активоёмкость (A/Rev)',   v: fb(x => x.assets / x.rev,  'assets','rev'),  dir:'down', hard:[1, 2],     med: null, hint:'< 1 — быстрый оборот; > 3 — тяжёлые активы'},
+    {name:'Капитал / Активы',        v: fb(x => x.eq / x.assets,   'eq','assets'),   dir:'up',   hard:[0.30, 0.15], med: null, pct:true, hint:'Финансовая автономность; < 15% — высокая зависимость от заёмного'},
     {sec:'Масштаб'},
-    {name:'Выручка, млрд ₽',         val: rev,                      dir:'up',   hard:[10, 1],    med: null, hint:'Абсолютный размер — прокси надёжности'},
-    {name:'Активы, млрд ₽',          val: assets,                   dir:'up',   hard:[20, 2],    med: null, hint:'Объём баланса'},
-    {name:'Публичная история (лет)', val: _dossierYearsInDB(iss),   dir:'up',   hard:[3, 1],     med: null, years:true, hint:'Сколько лет отчётности у нас накопилось — прокси прозрачности'},
+    {name:'Выручка, млрд ₽',         v: fb(x => x.rev,    'rev'),                    dir:'up',   hard:[10, 1],    med: null, hint:'Абсолютный размер — прокси надёжности'},
+    {name:'Активы, млрд ₽',          v: fb(x => x.assets, 'assets'),                 dir:'up',   hard:[20, 2],    med: null, hint:'Объём баланса'},
+    {name:'Публичная история (лет)', v: { val: _dossierYearsInDB(iss), missing: [] }, dir:'up',  hard:[3, 1],     med: null, years:true, hint:'Сколько лет отчётности у нас накопилось — прокси прозрачности'},
   ];
 
   let html = `<div class="dossier-fin-row hdr">
     <div>Показатель</div><div style="text-align:right">Значение</div><div style="text-align:right">Медиана отрасли (p50)</div><div>Вердикт</div>
   </div>`;
+  let missCount = 0;
   for(const r of rows){
     if(r.sec){ html += `<div class="dossier-fin-sec">${r.sec}</div>`; continue; }
-    const v = _dossierVerdict(r.val, r.dir, r.hard, r.med);
+    const val = r.v.val;
+    const missing = r.v.missing || [];
+    const proxy = r.v.proxy; // 'EBIT' если fallback
+    let verdict;
+    if(val == null){
+      missCount++;
+      const miss = missing.map(x => mapMissing[x] || x).join(', ');
+      verdict = { cls:'nd', txt: `— нет: ${miss}` };
+    } else {
+      verdict = _dossierVerdict(val, r.dir, r.hard, r.med);
+    }
     const medShow = r.med && r.med.p50 != null ? _dossierFmt(r.med.p50, {pct:r.pct, years:r.years}) : '—';
+    const valShow = val == null ? '—' : _dossierFmt(val, {pct:r.pct, years:r.years});
+    const proxyTag = proxy ? ` <span style="font-size:.52rem;color:var(--warn)">(по ${proxy})</span>` : '';
     html += `<div class="dossier-fin-row" title="${r.hint || ''}">
-      <div>${r.name}</div>
-      <div style="text-align:right;font-family:var(--mono);color:var(--text)">${_dossierFmt(r.val, {pct:r.pct, years:r.years})}</div>
+      <div>${r.name}${proxyTag}</div>
+      <div style="text-align:right;font-family:var(--mono);color:var(--text)">${valShow}</div>
       <div style="text-align:right;font-family:var(--mono);color:var(--text3)">${medShow}</div>
-      <div><span class="dossier-pill ${v.cls}">${v.txt}</span></div>
+      <div><span class="dossier-pill ${verdict.cls}">${verdict.txt}</span></div>
     </div>`;
   }
-  html += `<div style="margin-top:12px;font-size:.55rem;color:var(--text3);line-height:1.5">
+  const missHint = missCount > 0
+    ? `<div style="margin-top:10px;padding:8px 12px;background:rgba(240,180,0,.06);border-left:2px solid var(--warn);font-size:.58rem;color:var(--text2);line-height:1.55">
+         <strong>${missCount} метрик не посчитались — не хватает полей в периоде.</strong> Самое частое: <strong>EBITDA</strong> — её нет в РСБУ-форме ФНС (строки такой нет), поэтому для ГИР БО-периодов эта строка всегда пустая. Варианты:
+         <br>• Открыть период (✎ Редактировать) и вписать EBITDA из МСФО-отчёта эмитента — обычно в разделе «Ключевые показатели» или «Alternative Performance Measures».
+         <br>• Оставить пустым — часть метрик выше уже посчиталась <strong>по EBIT</strong> как fallback (пометка <span style="color:var(--warn)">(по EBIT)</span>), это менее точно но достаточно для грубой оценки.
+       </div>`
+    : '';
+  html += missHint + `<div style="margin-top:10px;font-size:.55rem;color:var(--text3);line-height:1.5">
     <strong>Логика вердиктов:</strong> если для отрасли посчитана медиана через ГИР БО (страница «🏭 Отрасли / медианы») — сравнение идёт с ней (лучше/хуже квартили).
-    Если медианы нет — жёсткие пороги консервативного bond-инвестора (колонка «Медиана» пуста).
-    <br>Метрики, для которых медиана по отрасли ещё не предусмотрена, размечены по жёстким порогам.
+    Если медианы нет — жёсткие пороги консервативного bond-инвестора.
   </div>`;
   body.innerHTML = html;
 }
