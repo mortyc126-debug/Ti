@@ -1439,9 +1439,21 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         <div class="field"><label>Нераспр. прибыль</label><input type="number" id="rep-np-ret" placeholder="1 500" step="0.1"></div>
       </div>
       <div class="field"><label>Заметка к периоду</label><textarea id="rep-np-note" placeholder="Комментарий к результатам..."></textarea></div>
+      <!-- Блок сверки с ГИР БО: тянется по ИНН эмитента, сравнивает
+           каждое поле формы с официальной строкой РСБУ из ФНС.
+           Работает только для годовых РСБУ (других у ФНС нет). -->
+      <div id="rep-np-girbo-wrap" style="display:none;margin-top:10px;border:1px solid var(--border2);padding:8px 10px;background:var(--bg)">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+          <strong style="font-size:.62rem;letter-spacing:.05em">🔍 Сверка с ГИР БО (ФНС)</strong>
+          <span id="rep-np-girbo-status" style="font-size:.58rem;color:var(--text3);flex:1"></span>
+          <button type="button" class="btn btn-sm" onclick="_repGirboHide()" style="font-size:.55rem;padding:2px 6px">✗ Закрыть</button>
+        </div>
+        <div id="rep-np-girbo-result" style="font-size:.6rem;color:var(--text2)"></div>
+      </div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-period')">Отмена</button>
+      <button class="btn" onclick="repVerifyGirbo()" title="Сверить каждое поле с официальной РСБУ-строкой из ГИР БО по ИНН эмитента. Единственный в приложении способ проверить введённые цифры на соответствие реальности (а не только на внутреннюю логику).">🔍 Сверить с ГИР БО</button>
       <button class="btn btn-p" onclick="repSavePeriod()">💾 Сохранить</button>
     </div>
   </div>
@@ -10379,6 +10391,14 @@ function repNewPeriodModal(){
   const bln = document.querySelector('input[name="rep-np-manual-unit"][value="1"]');
   if(bln){ bln.checked = true; if(typeof repManualUnitChanged === 'function') repManualUnitChanged(); }
   window._lastParsedText = '';
+  // Сбрасываем блок сверки с ГИР БО — чтобы при открытии/новом периоде
+  // не висели результаты от предыдущего сеанса.
+  const girboWrap = document.getElementById('rep-np-girbo-wrap');
+  if(girboWrap){ girboWrap.style.display = 'none'; }
+  const girboRes = document.getElementById('rep-np-girbo-result');
+  if(girboRes) girboRes.innerHTML = '';
+  const girboStatus = document.getElementById('rep-np-girbo-status');
+  if(girboStatus) girboStatus.innerHTML = '';
   // Show library status
   const libEl=document.getElementById('rep-lib-status');
   if(libEl){
@@ -10541,6 +10561,204 @@ function repDeletePeriod(){
   save();
   repBuildPeriodTabs();
   _repSyncPeriodToolbar();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// СВЕРКА С ГИР БО (привязка ввода к реальности)
+// ─────────────────────────────────────────────────────────────────────
+// Правила «EBITDA ≤ выручки» ловят грубые нарушения, но не защищают от
+// главной беды — смешивания цифр разных лет или разного масштаба.
+// Единственный доступный нам внешний источник истины — ГИР БО ФНС.
+// Для каждого поля формы сравниваем введённое значение с официальной
+// строкой РСБУ за тот же год по ИНН эмитента. Работает только для
+// годовых РСБУ-периодов (квартальные и МСФО ФНС не публикует).
+//
+// Пороги: ≤2% — ок (округления), 2-10% — предупреждение, >10% — ошибка.
+// Рядом с каждой строкой — кнопка «применить», чтобы одним кликом
+// подставить значение ФНС в поле формы.
+// ═════════════════════════════════════════════════════════════════════
+
+// Поля, которые сверяем. EBITDA сюда не включена — ФНС её не считает
+// (это не строка РСБУ, а расчёт). Пользователь поймёт по отсутствию.
+const _REP_GIRBO_COMPARE_FIELDS = [
+  {id:'rep-np-rev',    label:'Выручка (2110)'},
+  {id:'rep-np-ebit',   label:'Прибыль от продаж (2200)'},
+  {id:'rep-np-np',     label:'Чистая прибыль (2400)'},
+  {id:'rep-np-int',    label:'Проценты к уплате (2330)'},
+  {id:'rep-np-assets', label:'Всего активов (1600)'},
+  {id:'rep-np-ca',     label:'Оборотные активы (1200)'},
+  {id:'rep-np-cash',   label:'Денежные средства (1250)'},
+  {id:'rep-np-eq',     label:'Капитал и резервы (1300)'},
+  {id:'rep-np-ret',    label:'Нераспр. прибыль (1370)'},
+  {id:'rep-np-debt',   label:'Долг — займы (1410+1510)'},
+  {id:'rep-np-cl',     label:'Кр. обязательства (1500)'},
+];
+
+function _repGirboHide(){
+  const wrap = document.getElementById('rep-np-girbo-wrap');
+  if(wrap) wrap.style.display = 'none';
+}
+
+function _repGirboFmt(v){
+  if(v == null || isNaN(v)) return '—';
+  const a = Math.abs(v);
+  if(a >= 100) return v.toFixed(0);
+  if(a >= 1)   return v.toFixed(2);
+  if(a >= 0.01) return v.toFixed(3);
+  return v.toFixed(5);
+}
+
+// Подставить значение ГИР БО в конкретное поле формы (в единицах
+// текущего ввода). Подсвечиваем поле на 1.5 сек.
+function _repGirboApply(fieldId, value){
+  const el = document.getElementById(fieldId);
+  if(!el) return;
+  const rounded = Math.round(value * 1000) / 1000;
+  el.value = rounded.toString();
+  const prevBg = el.style.background;
+  el.style.background = 'rgba(30,180,90,.22)';
+  setTimeout(() => { el.style.background = prevBg; }, 1500);
+}
+
+async function repVerifyGirbo(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  const wrap = document.getElementById('rep-np-girbo-wrap');
+  const res = document.getElementById('rep-np-girbo-result');
+  const status = document.getElementById('rep-np-girbo-status');
+  if(!wrap || !res || !status) return;
+  wrap.style.display = 'block';
+  res.innerHTML = '';
+
+  // 1. ИНН. Если пуст — спрашиваем и сохраняем в карточку.
+  let inn = iss?.inn;
+  if(!inn){
+    inn = (prompt('У эмитента не указан ИНН. Введите (10 цифр для юрлица, 12 для ИП):', '') || '').trim();
+    if(!inn){ wrap.style.display = 'none'; return; }
+    if(!/^\d{10}(\d{2})?$/.test(inn)){
+      status.innerHTML = '<span style="color:var(--danger)">ИНН должен быть 10 или 12 цифр.</span>';
+      return;
+    }
+    iss.inn = inn;
+    save();
+  }
+
+  // 2. Параметры текущего периода в форме.
+  const year = parseInt(document.getElementById('rep-np-year').value, 10);
+  const period = document.getElementById('rep-np-period').value;
+  const type = document.getElementById('rep-np-type').value;
+  if(!year){
+    status.innerHTML = '<span style="color:var(--danger)">Сначала выберите год периода в форме.</span>';
+    return;
+  }
+  const isAnnual = !period || /год|FY|year|annual/i.test(period);
+  const warnings = [];
+  if(!isAnnual) warnings.push(`⚠ ГИР БО содержит только <strong>годовые</strong> РСБУ. Период «${period}» напрямую не сравнить — покажу годовой итог ${year} как ориентир.`);
+  if(type === 'МСФО') warnings.push('⚠ Тип периода — МСФО (консолидация). ГИР БО отдаёт standalone РСБУ головной компании. Расхождения в разы — нормальны, это <strong>разная отчётность</strong>, не ошибка.');
+  if(type === 'ГИРБО') warnings.push('⚠ Период уже помечен как ГИРБО — сверка потенциально круговая.');
+
+  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос к ГИР БО по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
+
+  let data;
+  try {
+    data = await fetchGirboByInn(inn, 10);
+  } catch(e){
+    status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
+    res.innerHTML = `<div style="font-size:.58rem;color:var(--text3);margin-top:6px">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Либо разверните свой Cloudflare Worker (см. cf-worker.js в репо) — надёжнее и приватнее.</div>`;
+    return;
+  }
+
+  // 3. Найти годовой отчёт того же года.
+  const targetLbl = _periodLabel(year, 'FY');
+  const years = Object.keys(data.series || {}).sort((a, b) => _periodSortKey(b) - _periodSortKey(a));
+  const girboVals = data.series && data.series[targetLbl];
+  if(!girboVals){
+    const avail = years.length ? years.join(', ') : '—';
+    status.innerHTML = `<span style="color:var(--warn)">Нет годового отчёта ${year} в ГИР БО.</span> Доступно: ${avail}.`;
+    res.innerHTML = `<div style="font-size:.58rem;color:var(--text3);margin-top:6px">ФНС публикует годовую РСБУ с лагом 3–6 мес. после конца года. Свежие цифры могут ещё не быть загружены.</div>`;
+    return;
+  }
+
+  // 4. Сравниваем поле за полем. inBn — введённое в млрд (для
+  // арифметики); в колонках показываем в текущих единицах формы,
+  // чтобы было удобно править рядом.
+  const unit = window._repNpCurrentUnit || 'млрд';
+  const toBn = _REP_UNIT_TO_BN[unit] || 1;
+  let ok = 0, warn = 0, err = 0, missForm = 0, missGirbo = 0;
+
+  const rows = _REP_GIRBO_COMPARE_FIELDS.map(f => {
+    const el = document.getElementById(f.id);
+    const rawIn = el && el.value !== '' ? parseFloat(el.value) : null;
+    const inBn = rawIn == null || isNaN(rawIn) ? null : rawIn * toBn;
+    const girboBn = typeof girboVals[f.id] === 'number' ? girboVals[f.id] : null;
+
+    if(inBn == null && girboBn == null) return ''; // нечего показывать
+
+    let color = 'var(--text3)', label = '—', verdict = 'skip';
+    if(inBn == null){
+      missForm++;
+      verdict = 'miss-form'; color = 'var(--text3)'; label = 'в форме пусто';
+    } else if(girboBn == null){
+      missGirbo++;
+      verdict = 'miss-girbo'; color = 'var(--text3)'; label = 'нет в ГИР БО';
+    } else {
+      const base = Math.max(Math.abs(inBn), Math.abs(girboBn), 1e-9);
+      const pct = (inBn - girboBn) / base * 100;
+      const abs = Math.abs(pct);
+      const signed = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+      if(abs <= 2){ ok++; color = 'var(--green)'; label = '✓ Δ ' + signed; }
+      else if(abs <= 10){ warn++; verdict = 'warn'; color = 'var(--warn)'; label = '⚠ Δ ' + signed; }
+      else { err++; verdict = 'err'; color = 'var(--danger)'; label = '❌ Δ ' + signed; }
+    }
+
+    // Значение для «применить» — в единицах текущего ввода.
+    const applyVal = girboBn != null ? (girboBn / toBn) : null;
+    const applyBtn = applyVal != null
+      ? `<button type="button" class="btn btn-sm" style="padding:1px 6px;font-size:.54rem" onclick="_repGirboApply('${f.id}', ${applyVal})" title="Подставить значение ГИР БО в поле формы">→</button>`
+      : '';
+    const girboShow = girboBn == null ? '—' : _repGirboFmt(girboBn / toBn);
+    const formShow = rawIn == null ? '—' : _repGirboFmt(rawIn);
+    const rowBg = verdict === 'err' ? 'background:rgba(220,60,60,.06);'
+                : verdict === 'warn' ? 'background:rgba(240,180,0,.05);' : '';
+
+    return `<tr style="${rowBg}">
+      <td style="padding:3px 6px">${f.label}</td>
+      <td style="padding:3px 6px;text-align:right;font-family:var(--mono)">${formShow}</td>
+      <td style="padding:3px 6px;text-align:right;font-family:var(--mono);color:var(--text2)">${girboShow}</td>
+      <td style="padding:3px 6px;color:${color};white-space:nowrap;font-weight:600">${label}</td>
+      <td style="padding:3px 6px;text-align:center">${applyBtn}</td>
+    </tr>`;
+  }).filter(Boolean).join('');
+
+  const company = data.company ? `<span style="color:var(--text3)">${data.company}</span>` : '';
+  const summary = `<strong style="color:var(--green)">✓ ${ok}</strong> &nbsp; <strong style="color:var(--warn)">⚠ ${warn}</strong> &nbsp; <strong style="color:var(--danger)">❌ ${err}</strong> &nbsp; <span style="color:var(--text3)">нет в ГИР БО: ${missGirbo}, пусто в форме: ${missForm}</span>`;
+  const warnBanner = warnings.length
+    ? `<div style="background:rgba(240,180,0,.08);border-left:3px solid var(--warn);padding:6px 10px;margin-bottom:8px;font-size:.58rem;color:var(--text2);line-height:1.5">${warnings.join('<br>')}</div>`
+    : '';
+  const bigErrHint = err > 0
+    ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(220,60,60,.06);border-left:3px solid var(--danger);font-size:.58rem;color:var(--text2);line-height:1.5"><strong>❌ Расхождения > 10%</strong> — самая частая причина:<br>• значения попали <strong>не из того года</strong> (проверь год в форме и в исходнике);<br>• ошибка <strong>масштаба</strong> (кнопки ÷1000 / ×1000 сверху помогут);<br>• распознавание PDF подставило не ту строку — можно нажать «→» чтобы применить цифру ФНС.</div>`
+    : '';
+
+  status.innerHTML = `<span style="color:var(--text2)">ГИР БО ${targetLbl} ${company}</span>`;
+  res.innerHTML = `
+    ${warnBanner}
+    <div style="margin-bottom:4px;font-size:.58rem">${summary}</div>
+    <table style="width:100%;font-size:.6rem;border-collapse:collapse">
+      <thead><tr style="background:var(--bg2);color:var(--text3);font-size:.54rem;letter-spacing:.05em">
+        <th style="padding:3px 6px;text-align:left">Показатель (строка РСБУ)</th>
+        <th style="padding:3px 6px;text-align:right">В форме, ${unit} ₽</th>
+        <th style="padding:3px 6px;text-align:right">ГИР БО, ${unit} ₽</th>
+        <th style="padding:3px 6px;text-align:left">Δ</th>
+        <th style="padding:3px 6px"></th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="padding:10px;text-align:center;color:var(--text3)">Нет совпадений — ни в форме, ни в ГИР БО.</td></tr>'}</tbody>
+    </table>
+    ${bigErrHint}
+    <div style="margin-top:6px;font-size:.54rem;color:var(--text3);line-height:1.5">
+      Пороги: ≤ 2% — округления (✓); 2–10% — предупреждение (⚠); > 10% — почти наверняка ошибка (❌).
+      Данные ФНС появляются с лагом 3–6 мес. после конца года; EBITDA и ebitda-маржа в РСБУ не публикуются.
+    </div>
+  `;
 }
 
 // ═════════════════════════════════════════════════════════════════════
