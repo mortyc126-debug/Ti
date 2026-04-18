@@ -1210,6 +1210,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.ru — CSV/TXT/XML в Windows-1251 или UTF-8">📥 ГИРБО</button>
+    <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут">🔗 Объединить</button>
     <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">🔍 Аудит данных</button>
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
     <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов.">📥 Импорт эмитента</button>
@@ -1873,10 +1874,10 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
         Выгрузки с <strong>bo.nalog.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
       </div>
       <input type="file" id="girbo-file-modal" accept="*/*" multiple style="display:none" onchange="girboQueueAdd(this)">
-      <div id="girbo-drop" onclick="document.getElementById('girbo-file-modal').click()"
+      <div id="girbo-drop" onclick="girboQueueStartChain()"
            style="border:2px dashed var(--border2);padding:22px 16px;text-align:center;background:var(--bg);cursor:pointer;user-select:none">
         <div style="font-size:1.6rem;margin-bottom:4px">📥</div>
-        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы <strong>добавить файл в очередь</strong><br><span style="color:var(--text3);font-size:.6rem">тапайте несколько раз — каждый файл добавится, потом жмите «Импортировать»</span></div>
+        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы <strong>выбирать файлы подряд</strong><br><span style="color:var(--text3);font-size:.6rem">пикер будет открываться сам после каждого файла, нажмите «Отмена» чтобы остановиться</span></div>
         <div style="font-size:.56rem;color:var(--text3);margin-top:6px;letter-spacing:.08em">.CSV · .TXT · .TSV · .XML</div>
       </div>
       <!-- Очередь: список уже добавленных файлов + кнопка импорта -->
@@ -1922,6 +1923,34 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-girbo-diag')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: объединение эмитентов (слияние по ИНН или вручную) -->
+<div class="modal-overlay" id="modal-merge-issuers">
+  <div class="modal" style="width:600px;max-width:96vw">
+    <div class="modal-hdr">🔗 Объединить эмитентов <button class="modal-x" onclick="closeModal('modal-merge-issuers')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
+        Все периоды ИСТОЧНИКА переедут в ЦЕЛЕВОГО эмитента. Дубли периодов (ключ <code>год_период_тип</code>) пропускаются — в целевом остаются свои. Источник после слияния удаляется.
+      </div>
+      <div class="field">
+        <label>Источник — кого сливаем (его периоды переедут)</label>
+        <select id="merge-src" style="width:100%"></select>
+      </div>
+      <div class="field">
+        <label>Цель — в кого сливаем</label>
+        <select id="merge-dst" style="width:100%"></select>
+      </div>
+      <div id="merge-preview" style="font-size:.6rem;color:var(--text2);font-family:var(--mono);background:var(--bg);border:1px solid var(--border);padding:8px;min-height:40px;max-height:220px;overflow:auto"></div>
+      <div style="font-size:.58rem;color:var(--text3)">
+        Автокандидаты — по совпадению ИНН, либо по нормализованному имени (ПАО/АО/ООО, кавычки и пробелы игнорируются).
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-merge-issuers')">Отмена</button>
+      <button class="btn btn-p" onclick="repDoMerge()">🔗 Объединить</button>
     </div>
   </div>
 </div>
@@ -12737,14 +12766,17 @@ function _processGirboFile(buf, filename, opts){
     if(!issName) return { ok:false, error:'имя не указано', file:filename, year };
   }
 
-  // Ищем существующего эмитента: по ИНН — приоритет, затем по имени.
+  // Ищем существующего эмитента: 1) по ИНН, 2) по нормализованному имени.
+  // Нормализация: убираем ПАО/АО/ООО/ЗАО/ОАО/ИП, кавычки-ёлочки-апострофы,
+  // пунктуацию и лишние пробелы — чтобы «ПАО "ТГК-14"» и «ТГК-14» совпали.
   let issId = null;
   for(const [id, iss] of Object.entries(reportsDB)){
     if(parsed.inn && iss && iss.inn === parsed.inn){ issId = id; break; }
   }
   if(!issId){
+    const target = _normIssuerName(issName);
     for(const [id, iss] of Object.entries(reportsDB)){
-      if(iss && iss.name && iss.name.trim().toLowerCase() === issName.toLowerCase()){ issId = id; break; }
+      if(iss && iss.name && _normIssuerName(iss.name) === target){ issId = id; break; }
     }
   }
   if(!issId){
@@ -12755,6 +12787,8 @@ function _processGirboFile(buf, filename, opts){
       note: 'Импорт ГИРБО ('+parsed.format+', '+encoding+') · '+new Date().toLocaleDateString('ru-RU'),
     };
   } else if(parsed.inn && !reportsDB[issId].inn){
+    // Доп. бонус: если нашли по имени, а ИНН в существующей карточке пустой —
+    // прописываем его, чтобы в следующий раз сработал быстрый ИНН-матч.
     reportsDB[issId].inn = parsed.inn;
   }
 
@@ -12965,17 +12999,148 @@ function importGirboCsv(input){
   importGirboBatch(files).finally(() => { input.value = ''; });
 }
 
+// Нормализация имени эмитента для слияния дубликатов.
+// «ПАО "ТГК-14"», «пао тгк 14», «ТГК-14» → "тгк14".
+function _normIssuerName(name){
+  if(!name) return '';
+  let s = String(name).toLowerCase();
+  // Убираем организационные формы в любом месте строки.
+  s = s.replace(/\b(пао|ао|оао|зао|ооо|ип|публичное\s+акционерное\s+общество|открытое\s+акционерное\s+общество|закрытое\s+акционерное\s+общество|акционерное\s+общество|общество\s+с\s+ограниченной\s+ответственностью|индивидуальный\s+предприниматель)\b/g, ' ');
+  // Кавычки всех мастей, апострофы, угловые скобки, знаки препинания — в пробел.
+  s = s.replace(/[«»""''"„"`"‘’"'()\[\]{}<>.,:;!?/\\|*+=~#%^&@]/g, ' ');
+  // Тире и подчёркивания — тоже убираем: ТГК-14 = ТГК14.
+  s = s.replace(/[-–—_]/g, '');
+  // Все пробелы — в один, потом убираем (чтобы «тгк 14» = «тгк14»).
+  s = s.replace(/\s+/g, ' ').trim().replace(/\s+/g, '');
+  return s;
+}
+
+// Объединение эмитентов: переносит периоды из src в dst и удаляет src.
+// Дубли периодов (год_период_тип) не трогаем — приоритет у dst.
+function _mergeIssuers(srcId, dstId){
+  const src = reportsDB[srcId], dst = reportsDB[dstId];
+  if(!src || !dst || srcId === dstId) return { moved:0, skipped:0 };
+  let moved = 0, skipped = 0;
+  for(const [key, p] of Object.entries(src.periods || {})){
+    if(dst.periods[key]){ skipped++; continue; }
+    dst.periods[key] = p;
+    moved++;
+  }
+  // Переливаем недостающие метаданные (ИНН, ISIN, ОГРН, рейтинг и т.п.).
+  for(const k of ['inn','isin','ogrn','url','rating','ind']){
+    if(!dst[k] && src[k]) dst[k] = src[k];
+  }
+  delete reportsDB[srcId];
+  return { moved, skipped };
+}
+
+// Открывает модалку слияния. Автоматически предлагает кандидатов:
+// src = текущий активный, dst = ближайший по ИНН или нормализованному имени.
+function repOpenMergeModal(){
+  const ids = Object.keys(reportsDB);
+  if(ids.length < 2){ alert('Для слияния нужны минимум 2 эмитента в базе.'); return; }
+  const srcSel = document.getElementById('merge-src');
+  const dstSel = document.getElementById('merge-dst');
+  if(!srcSel || !dstSel) return;
+  const sorted = ids.slice().sort((a,b) => (reportsDB[a].name||'').localeCompare(reportsDB[b].name||''));
+  const opts = sorted.map(id => {
+    const iss = reportsDB[id];
+    const np  = Object.keys(iss.periods||{}).length;
+    const inn = iss.inn ? ' · '+iss.inn : '';
+    return `<option value="${id}">${(iss.name||'—').replace(/</g,'&lt;')}${inn} (${np} периодов)</option>`;
+  }).join('');
+  srcSel.innerHTML = opts;
+  dstSel.innerHTML = opts;
+  // Подбираем авто-пару: предпочитаем текущий активный как src, ищем совпадение как dst.
+  const active = repActiveIssuerId;
+  if(active && reportsDB[active]){
+    srcSel.value = active;
+    const candidate = _findMergeCandidate(active);
+    if(candidate) dstSel.value = candidate;
+    else dstSel.value = sorted.find(id => id !== active) || active;
+  }
+  srcSel.onchange = dstSel.onchange = _updateMergePreview;
+  _updateMergePreview();
+  document.getElementById('modal-merge-issuers').classList.add('open');
+}
+
+// Ищем подходящую цель для слияния: по ИНН или нормализованному имени.
+function _findMergeCandidate(srcId){
+  const src = reportsDB[srcId];
+  if(!src) return null;
+  const srcNorm = _normIssuerName(src.name);
+  for(const [id, iss] of Object.entries(reportsDB)){
+    if(id === srcId || !iss) continue;
+    if(src.inn && iss.inn && src.inn === iss.inn) return id;
+    if(srcNorm && _normIssuerName(iss.name) === srcNorm) return id;
+  }
+  return null;
+}
+
+function _updateMergePreview(){
+  const srcId = document.getElementById('merge-src').value;
+  const dstId = document.getElementById('merge-dst').value;
+  const el = document.getElementById('merge-preview');
+  if(!el) return;
+  if(srcId === dstId){ el.innerHTML = '<span style="color:var(--warn)">⚠ Источник и цель совпадают. Выбери разные карточки.</span>'; return; }
+  const src = reportsDB[srcId], dst = reportsDB[dstId];
+  if(!src || !dst){ el.innerHTML = ''; return; }
+  const srcPeriods = Object.keys(src.periods || {});
+  const dstPeriods = new Set(Object.keys(dst.periods || {}));
+  const willMove = srcPeriods.filter(k => !dstPeriods.has(k));
+  const willSkip = srcPeriods.filter(k =>  dstPeriods.has(k));
+  const fmt = k => k.replace(/_/g, ' ');
+  el.innerHTML =
+    `<div style="color:var(--green)">Переедет: ${willMove.length}</div>` +
+    (willMove.length ? '<div style="margin-left:12px;color:var(--text3)">' + willMove.map(fmt).join(' · ') + '</div>' : '') +
+    (willSkip.length ? `<div style="color:var(--warn);margin-top:4px">Пропущено (дубли в цели): ${willSkip.length}</div><div style="margin-left:12px;color:var(--text3)">${willSkip.map(fmt).join(' · ')}</div>` : '') +
+    `<div style="color:var(--danger);margin-top:6px">После слияния «${(src.name||'—').replace(/</g,'&lt;')}» будет удалён.</div>`;
+}
+
+function repDoMerge(){
+  const srcId = document.getElementById('merge-src').value;
+  const dstId = document.getElementById('merge-dst').value;
+  if(srcId === dstId){ alert('Выбери разные карточки источника и цели.'); return; }
+  const src = reportsDB[srcId], dst = reportsDB[dstId];
+  if(!src || !dst) return;
+  if(!confirm(`Объединить «${src.name}» → «${dst.name}»?\n\nВсе периоды источника (кроме дублей) перейдут в цель. Источник удалится.`)) return;
+  const { moved, skipped } = _mergeIssuers(srcId, dstId);
+  save();
+  if(repActiveIssuerId === srcId) repActiveIssuerId = dstId;
+  if(typeof repInit === 'function') repInit();
+  closeModal('modal-merge-issuers');
+  showToast(`✓ Слияние: перенесено ${moved} периодов${skipped ? ', пропущено '+skipped+' дублей' : ''}`, 'ok');
+}
+
 // Очередь файлов для батч-импорта в модалке. Нужна потому, что OEM-пикеры
 // на Android (Huawei Files, MIUI и др.) игнорируют multiple-флаг и берут
 // только один файл за раз. Пользователь добавляет по одному, список копится,
 // затем жмёт «Импортировать все» — и пачка уходит через importGirboBatch.
 let _girboQueue = []; // [File, File, ...]
+let _girboChainActive = false; // авто-переоткрытие пикера: true пока пользователь не нажмёт «Отмена»
 
 function girboQueueAdd(input){
   const files = Array.from(input.files || []);
+  // Пользователь нажал «Отмена» в пикере — прерываем цепочку авто-переоткрытий.
+  if(!files.length){ _girboChainActive = false; return; }
   for(const f of files) _girboQueue.push(f);
   input.value = '';
   _girboQueueRender();
+  // Авто-переоткрытие пикера, чтобы не тапать drop-зону каждый раз на Android,
+  // где OEM-пикеры (Huawei Files, MIUI) показывают только radio-кружки и берут
+  // один файл за раз. Пользователь отмечает подряд, пока не нажмёт «Отмена».
+  if(_girboChainActive){
+    // Небольшая задержка, чтобы модалка успела отрисоваться между двумя пикерами.
+    setTimeout(() => {
+      if(_girboChainActive) input.click();
+    }, 250);
+  }
+}
+
+function girboQueueStartChain(){
+  _girboChainActive = true;
+  const input = document.getElementById('girbo-file-modal');
+  if(input) input.click();
 }
 
 function girboQueueClear(){
@@ -13090,8 +13255,10 @@ function _showGirboBatchSummary(results){
 function openGirboImportModal(){
   const ta = document.getElementById('girbo-paste'); if(ta) ta.value = '';
   const st = document.getElementById('girbo-modal-status'); if(st) st.textContent = '';
+  _girboChainActive = false; // сбрасываем цепочку при каждом открытии модалки
   document.getElementById('modal-girbo-import').classList.add('open');
   _initGirboDropZone();
+  _girboQueueRender();
 }
 
 // Вставить содержимое CSV/XML из textarea. Упаковываем строку в байты
