@@ -1603,6 +1603,62 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 
 <script>
 'use strict';
+
+// ══ ГЛОБАЛЬНЫЕ ОШИБКИ → тост ══
+// Чтобы JS-вылеты не терялись в консоли (особенно на мобиле, где DevTools нет).
+// Тап по тосту копирует сообщение в буфер — удобно прислать мне.
+function showToast(msg, kind){
+  kind = kind || 'info';
+  const colorMap = { info:'var(--acc)', warn:'var(--warn)', err:'var(--danger)', ok:'var(--green)' };
+  const color = colorMap[kind] || colorMap.info;
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:20px;right:20px;max-width:min(92vw,480px);
+    background:var(--s2);border:1px solid ${color};color:${color};
+    font-family:var(--mono);font-size:.66rem;padding:9px 14px;z-index:99999;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;word-break:break-word;
+    line-height:1.45`;
+  t.textContent = msg;
+  t.title = 'Тап — скопировать';
+  t.onclick = () => {
+    (navigator.clipboard?.writeText(msg) || Promise.reject()).catch(()=>{}).finally(()=>{
+      t.style.borderColor = 'var(--green)';
+      t.style.color = 'var(--green)';
+      t.textContent = '✓ скопировано';
+      setTimeout(()=>t.remove(), 900);
+    });
+  };
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), kind === 'err' ? 12000 : 5000);
+  return t;
+}
+
+(function(){
+  let last = '', lastAt = 0;
+  function report(tag, msg){
+    if(!msg) return;
+    // Игнорируем мусор от сторонних расширений / ResizeObserver.
+    if(/^(ResizeObserver loop|Script error\.?)\s*$/i.test(msg)) return;
+    // Деду́пим одинаковые сообщения в течение 3 сек.
+    const now = Date.now();
+    if(msg === last && now - lastAt < 3000) return;
+    last = msg; lastAt = now;
+    console.error('[' + tag + ']', msg);
+    showToast('⚠️ ' + tag + ': ' + msg.slice(0, 400), 'err');
+  }
+  window.addEventListener('error', e => {
+    // Событие error также срабатывает на ошибки загрузки ресурсов (img/script) —
+    // в таком случае e.error === null. Их пропускаем.
+    if(!e.error && !e.message) return;
+    const stack = e.error?.stack ? '\n' + e.error.stack.split('\n').slice(0,3).join('\n') : '';
+    report('JS', (e.message || 'ошибка') + stack);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason;
+    const msg = r?.stack || r?.message || (typeof r === 'string' ? r : JSON.stringify(r));
+    report('Promise', msg || 'unhandled rejection');
+  });
+})();
+
 // ══ CONSTANTS ══
 const RATE_NOW=15;
 const IND_NAMES={energy:'Нефть и газ',metals:'Металлургия',retail:'Ритейл',telecom:'Телеком',finance:'Финансы/Банки',realty:'Недвижимость',transport:'Транспорт',agro:'АПК',other:'Другое'};
@@ -2269,12 +2325,22 @@ async function parseAnyReport(input) {
     } else if (ext === 'xml') {
       // ── 1С:Бухгалтерия БФО (XML, форма 5.x) ──
       const xmlText = await readXmlAsText(file);
-      const res = extractFrom1CXml(xmlText);
+      const diag    = build1CXmlDiag(xmlText);
+      const res     = extractFrom1CXml(xmlText);
+      found.style.display = 'block';
+      found.innerHTML = '';
+
       if (!res) {
-        status.style.color = 'var(--danger)';
-        status.textContent = '⚠️ XML не распознан как форма 1С:Бухгалтерия (БФО 5.x).';
+        status.style.color = 'var(--warn)';
+        status.textContent = '⚠️ XML распарсен, но это не знакомая форма 1С:БФО. Смотрите диагностику ↓';
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:.65rem;color:var(--warn);margin-bottom:6px';
+        hint.textContent = 'Не нашёл тегов <Файл> / <Документ> / <Баланс> / <ФинРез>. Пришлите дерево — добавлю поддержку.';
+        found.appendChild(hint);
+        renderXmlDiagInto(found, diag, xmlText);
         return;
       }
+
       const idToKey = {
         'is-rev':'rev','is-ebit':'ebit','is-np':'np','is-int':'intExp','is-tax':'tax',
         'is-assets':'assets','is-ca':'ca','is-cl':'cl','is-debt':'debt',
@@ -2287,24 +2353,28 @@ async function parseAnyReport(input) {
         'is-debt':'Заёмные средства (1410+1510)','is-cash':'Денежные средства (1250)',
         'is-ret':'Нераспр. прибыль (1370)','is-eq':'Капитал (1300)'
       };
-      const xmlLog = [];
+      const okLines = [], missLines = [];
       let xmlFilled = 0;
       for (const [id, key] of Object.entries(idToKey)) {
         const val = res.values[key];
         if (val != null && document.getElementById(id)) {
           document.getElementById(id).value = val;
-          xmlLog.push('<span style="color:var(--green)">✓</span> ' + xmlLabels[id] + ': <strong>' + val + '</strong>');
+          okLines.push('<span style="color:var(--green)">✓</span> ' + xmlLabels[id] + ': <strong>' + val + '</strong>');
           xmlFilled++;
+        } else {
+          missLines.push('<span style="color:var(--warn)">✗</span> ' + xmlLabels[id] + ' <span style="color:var(--text3)">— жду тег ' + (XML_1C_EXPECTED[id]||'?') + '</span>');
         }
       }
       const xmlRepTypeSel = document.getElementById('is-rep-type');
       if (xmlRepTypeSel && !xmlRepTypeSel.value) xmlRepTypeSel.value = 'РСБУ';
       status.style.color = xmlFilled ? 'var(--green)' : 'var(--warn)';
       status.textContent = xmlFilled
-        ? `✓ 1С:Бухгалтерия XML · заполнено ${xmlFilled} полей · ${file.name}`
+        ? `✓ 1С:Бухгалтерия XML · заполнено ${xmlFilled} из ${Object.keys(idToKey).length} полей · ${file.name}`
         : `⚠️ Теги найдены, но все значения пустые · ${file.name}`;
-      found.style.display = 'block';
-      found.innerHTML = xmlLog.join('<br>');
+      const okBlock   = okLines.length   ? okLines.join('<br>') : '';
+      const missBlock = missLines.length ? '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--border);color:var(--text3);font-size:.62rem">Не нашлось ('+missLines.length+'):</div>' + missLines.join('<br>') : '';
+      found.innerHTML = okBlock + missBlock;
+      renderXmlDiagInto(found, diag, xmlText);
       return;
 
     } else if (typeof isImageExt === 'function' && isImageExt(ext)) {
@@ -7159,12 +7229,24 @@ async function repParseFile(input){
     } else if(ext==='xml'){
       // ── 1С:Бухгалтерия БФО (XML, форма 5.x) ──
       const xmlText = await readXmlAsText(file);
-      const res = extractFrom1CXml(xmlText);
+      const diag    = build1CXmlDiag(xmlText);
+      const res     = extractFrom1CXml(xmlText);
+      const logEl   = document.getElementById('rep-np-parse-log');
+      if(logEl){ logEl.style.display='block'; logEl.innerHTML = ''; }
+
       if(!res){
-        status.style.color='var(--danger)';
-        status.textContent='⚠️ XML не распознан как форма 1С:Бухгалтерия (БФО 5.x).';
+        status.style.color='var(--warn)';
+        status.textContent='⚠️ XML распарсен, но это не знакомая форма 1С:БФО. Смотрите диагностику ↓';
+        if(logEl){
+          const hint = document.createElement('div');
+          hint.style.cssText = 'font-size:.65rem;color:var(--warn);margin-bottom:6px';
+          hint.textContent = 'Не нашёл тегов <Файл> / <Документ> / <Баланс> / <ФинРез>. Пришлите дерево — добавлю поддержку.';
+          logEl.appendChild(hint);
+          renderXmlDiagInto(logEl, diag, xmlText);
+        }
         return;
       }
+
       const idToKey = {
         'rep-np-rev':'rev','rep-np-ebit':'ebit','rep-np-np':'np','rep-np-int':'intExp',
         'rep-np-assets':'assets','rep-np-ca':'ca','rep-np-cl':'cl','rep-np-debt':'debt',
@@ -7177,21 +7259,27 @@ async function repParseFile(input){
         'rep-np-debt':'Заёмные средства (1410+1510)','rep-np-cash':'Денежные средства (1250)',
         'rep-np-ret':'Нераспр. прибыль (1370)','rep-np-eq':'Капитал (1300)'
       };
-      const logEl = document.getElementById('rep-np-parse-log');
-      const lines = [];
+      // is-* маппинг → ключи XML_1C_EXPECTED (чтобы подписать, какой тег ожидался).
+      const expKey = id => id.replace(/^rep-np-/, 'is-');
+      const okLines = [], missLines = [];
       let filled = 0;
       for(const [id, key] of Object.entries(idToKey)){
         const val = res.values[key];
         if(val != null && document.getElementById(id)){
           document.getElementById(id).value = val;
-          lines.push(`<div style="padding:3px 0;border-bottom:1px dotted rgba(30,48,72,.4)">`+
+          okLines.push(`<div style="padding:3px 0;border-bottom:1px dotted rgba(30,48,72,.4)">`+
             `<span style="color:var(--green)">✓</span> <strong>${labels[id]}</strong> = <strong>${val}</strong> млрд ₽</div>`);
           filled++;
+        } else {
+          missLines.push(`<div style="padding:2px 0;font-size:.62rem;color:var(--text3)">`+
+            `<span style="color:var(--warn)">✗</span> ${labels[id]} — жду тег ${XML_1C_EXPECTED[expKey(id)]||'?'}</div>`);
         }
       }
       if(logEl){
-        logEl.style.display='block';
-        logEl.innerHTML = `<div style="font-size:.6rem;color:var(--text3);margin-bottom:4px">1С:Бухгалтерия XML · ОтчетГод=${res.period||'?'}</div>` + lines.join('');
+        const header = `<div style="font-size:.6rem;color:var(--text3);margin-bottom:4px">1С:Бухгалтерия XML · ОтчетГод=${res.period||'?'} · заполнено ${filled}/${Object.keys(idToKey).length}</div>`;
+        const missHdr = missLines.length ? `<div style="margin-top:6px;padding-top:4px;border-top:1px dashed var(--border);font-size:.6rem;color:var(--text3)">Не нашлось (${missLines.length}):</div>` : '';
+        logEl.innerHTML = header + okLines.join('') + missHdr + missLines.join('');
+        renderXmlDiagInto(logEl, diag, xmlText);
       }
       status.style.color = filled ? 'var(--green)' : 'var(--warn)';
       status.textContent = filled
@@ -7653,6 +7741,107 @@ function extractFrom1CXml(xmlText){
       tax:    sc(num(first('ТекНалПриб'))),                    // 2410
     }
   };
+}
+
+// Соответствие полей → ожидаемые теги БФО (для лога «не найдено»).
+const XML_1C_EXPECTED = {
+  'is-assets':'Актив (стр. 1600)',
+  'is-ca':    'ОбА (стр. 1200)',
+  'is-cl':    'КраткосрОбяз (стр. 1500)',
+  'is-debt':  'ДолгосрОбяз/ЗаемСредств + КраткосрОбяз/ЗаемСредств (1410+1510)',
+  'is-cash':  'ОбА/ДенежнСр (стр. 1250)',
+  'is-eq':    'Капитал (стр. 1300)',
+  'is-ret':   'НераспПриб (стр. 1370)',
+  'is-rev':   'Выруч (стр. 2110)',
+  'is-ebit':  'ПрибПрод (стр. 2200)',
+  'is-np':    'ЧистПрибУб (стр. 2400)',
+  'is-int':   'ПроцУпл (стр. 2330)',
+  'is-tax':   'ТекНалПриб (стр. 2410)',
+};
+
+// Обходит XML и собирает список уникальных пар «родитель > потомок» с числом
+// детей и ИМЕНАМИ атрибутов (без значений — без утечки ИНН/ФИО/сумм).
+// Нужен, когда 1С пришлёт форму с нестандартными тегами — видно, чего не хватает.
+function build1CXmlDiag(xmlText){
+  if(!xmlText) return { ok:false, plain:'пусто', html:'<pre style="color:var(--text3)">пусто</pre>' };
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  const perr = doc.getElementsByTagName('parsererror')[0];
+  if(perr){
+    const msg = perr.textContent.slice(0, 400);
+    return { ok:false, plain:'XML parse error: ' + msg,
+      html:'<pre style="color:var(--danger);white-space:pre-wrap">' + msg.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</pre>' };
+  }
+  const root = doc.documentElement;
+  if(!root) return { ok:false, plain:'Нет корневого элемента', html:'<pre>нет корня</pre>' };
+
+  const verForm = root.getAttribute('ВерсФорм') || '?';
+  const verProg = root.getAttribute('ВерсПрог') || '?';
+  const okei    = doc.getElementsByTagName('Документ')[0]?.getAttribute('ОКЕИ') || '?';
+  const rows = [];
+  let total = 0;
+  const seen = new Set();
+  const attrNames = el => Array.from(el.attributes).map(a=>a.name).join(' ');
+
+  rows.push({ depth:0, line: `=== ROOT: ${root.tagName} ===` });
+  rows.push({ depth:0, line: `Версия формы: ${verForm} · Программа: ${verProg} · ОКЕИ: ${okei}` });
+
+  (function walk(el, depth){
+    for(const c of Array.from(el.children)){
+      total++;
+      const key = el.tagName + '>' + c.tagName;
+      if(!seen.has(key)){
+        seen.add(key);
+        const kidsN = c.children.length;
+        const tag   = kidsN > 0 ? `[${kidsN} kids]` : '[leaf]';
+        const attrs = attrNames(c);
+        const line  = `${el.tagName} > ${c.tagName}  ${tag}${attrs ? '  attrs: '+attrs : ''}`;
+        rows.push({ depth, line });
+      }
+      walk(c, depth+1);
+    }
+  })(root, 1);
+
+  const limit = 500;
+  const rowsOut = rows.slice(0, limit);
+  if(rows.length > limit) rowsOut.push({ depth:0, line:`... ещё ${rows.length-limit} пар тегов (всего элементов: ${total})` });
+
+  const plain = rowsOut.map(r => r.line).join('\n');
+  const html  = '<pre style="white-space:pre-wrap;word-break:break-word;font-size:.6rem;line-height:1.45;color:var(--text2);max-height:320px;overflow:auto;margin:0;padding:8px 10px;background:rgba(8,14,24,.5);border:1px solid var(--border)">'
+    + plain.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</pre>';
+  return { ok:true, plain, html, totalPairs: rows.length, totalElements: total };
+}
+
+// Вставляет панель «Диагностика XML» под логом импорта. Дайджест + кнопка копирования.
+function renderXmlDiagInto(container, diag, xmlText){
+  if(!container || !diag) return;
+  const id = 'xml-diag-' + Math.random().toString(36).slice(2,8);
+  const wrap = document.createElement('details');
+  wrap.style.cssText = 'margin-top:10px;border:1px solid var(--border);border-radius:4px;padding:6px 10px;background:rgba(0,0,0,.25)';
+  wrap.innerHTML = `
+    <summary style="cursor:pointer;font-size:.65rem;color:var(--text2);font-family:var(--mono)">
+      🔍 ДИАГНОСТИКА XML ${diag.ok ? '· тегов: '+(diag.totalPairs||'?')+' · элементов: '+(diag.totalElements||'?') : '· ошибка парсинга'}
+    </summary>
+    <div style="font-size:.62rem;color:var(--text3);margin:6px 0 4px">
+      Список уникальных пар «родитель&nbsp;&gt;&nbsp;потомок» с именами атрибутов (без значений, ИНН/ФИО не светятся).
+      Пришлите, если 1С выдала нестандартную форму — добью схему.
+    </div>
+    ${diag.html}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
+      <button class="btn btn-sm" type="button" data-copy="plain" id="${id}-pt">📋 Скопировать дерево</button>
+      <button class="btn btn-sm" type="button" data-copy="xml"   id="${id}-xm">📄 Скопировать XML полностью</button>
+      <span id="${id}-msg" style="font-size:.6rem;color:var(--text3);align-self:center"></span>
+    </div>`;
+  container.appendChild(wrap);
+  const msg = wrap.querySelector('#'+id+'-msg');
+  const copy = (txt, label) => {
+    (navigator.clipboard?.writeText(txt) || Promise.reject())
+      .then(()=>{ msg.style.color='var(--green)'; msg.textContent = '✓ '+label+' скопирован'; })
+      .catch(()=>{ msg.style.color='var(--warn)'; msg.textContent = 'не удалось — выделите вручную'; });
+    setTimeout(()=>{ msg.textContent=''; }, 2500);
+  };
+  wrap.querySelector('#'+id+'-pt').onclick = e => { e.preventDefault(); copy(diag.plain, 'дерево'); };
+  wrap.querySelector('#'+id+'-xm').onclick = e => { e.preventDefault(); copy(xmlText || '', 'XML'); };
 }
 
 // Читает File как строку с учётом encoding из XML-декларации
