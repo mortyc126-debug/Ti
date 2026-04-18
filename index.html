@@ -1887,6 +1887,56 @@ document.addEventListener('DOMContentLoaded', () => {
         </label>
       </div>
     </div>
+    <div style="padding:0 12px 8px">
+      <div style="font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--acc)">
+        🧮 Фундаментал эмитента (из reportsDB + досье)
+      </div>
+      <div style="font-size:.55rem;color:var(--text3);margin-bottom:6px;line-height:1.5">
+        Эти фильтры работают только для выпусков, эмитент которых есть в твоём reportsDB. Если включить хоть один — бумаги без matched эмитента скроются автоматически.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+        <div class="field" style="margin:0">
+          <label style="font-size:.55rem">Долг / EBITDA ≤</label>
+          <input type="number" id="moex-f-de-max" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 3">
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:.55rem">Чистый долг / EBITDA ≤</label>
+          <input type="number" id="moex-f-nde-max" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 2.5">
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:.55rem">ICR (EBIT/%) ≥</label>
+          <input type="number" id="moex-f-icr-min" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 3">
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:.55rem">ROA ≥, %</label>
+          <input type="number" id="moex-f-roa-min" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 3">
+        </div>
+        <div class="field" style="margin:0">
+          <label style="font-size:.55rem">EBITDA-маржа ≥, %</label>
+          <input type="number" id="moex-f-ebm-min" oninput="moexApplyFilters()" step="1" placeholder="напр. 10">
+        </div>
+        <div class="field" style="margin:0" title="Рейтинг берётся из dossier.mod.rating (заполняется вручную в досье эмитента). Шкала: AAA > AA > A > BBB > BB > B > CCC > D.">
+          <label style="font-size:.55rem">Рейтинг ≥</label>
+          <select id="moex-f-rating-min" onchange="moexApplyFilters()">
+            <option value="">Любой / не важно</option>
+            <option value="AAA">AAA</option>
+            <option value="AA">AA и выше</option>
+            <option value="A">A и выше</option>
+            <option value="BBB">BBB и выше (инвест)</option>
+            <option value="BB">BB и выше</option>
+            <option value="B">B и выше</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0" title="Если у эмитента в досье поле «Кредитные рейтинги» пустое — это «без рейтинга». Раздельно показать/скрыть.">
+          <label style="font-size:.55rem">Наличие рейтинга</label>
+          <select id="moex-f-rating-has" onchange="moexApplyFilters()">
+            <option value="">Не важно (показывать всё)</option>
+            <option value="yes">Только с рейтингом</option>
+            <option value="no">Только без рейтинга</option>
+          </select>
+        </div>
+      </div>
+    </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
@@ -15731,6 +15781,60 @@ function _moexMatchIssuer(bond, idx){
   return null;
 }
 
+// Рейтинговая шкала — числовые уровни, чтобы сравнивать «≥».
+const _MOEX_RATING_ORDER = ['D','C','CC','CCC','B','BB','BBB','A','AA','AAA'];
+function _moexRatingRank(cls){
+  if(!cls) return -1;
+  const i = _MOEX_RATING_ORDER.indexOf(String(cls).toUpperCase());
+  return i < 0 ? -1 : i;
+}
+
+// Из свободного текста «AA-(RU) Эксперт РА · A+(RU) АКРА» → класс «AA».
+// Берём ПЕРВЫЙ рейтинг в тексте. Знаки +/- для фильтра игнорируем —
+// они внутри класса.
+function _moexRatingClass(text){
+  if(!text) return null;
+  const m = String(text).match(/\b(AAA|AA|A|BBB|BB|B|CCC|CC|C|RD|D)[+\-]?/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+// Кэш посчитанных мультипликаторов эмитента за сессию рендера.
+// Иначе на 500 строк таблицы пересчитывал бы для одного эмитента
+// 10 раз подряд.
+function _moexIssuerMetrics(issId, cache){
+  if(cache.has(issId)) return cache.get(issId);
+  const iss = reportsDB[issId];
+  if(!iss){ cache.set(issId, null); return null; }
+  // Последний FY период.
+  let latest = null;
+  for(const p of Object.values(iss.periods || {})){
+    if(!p || !p.year) continue;
+    if(!/год|FY|year/i.test(p.period || 'FY')) continue;
+    if(!latest || parseInt(p.year, 10) > parseInt(latest.year, 10)) latest = p;
+  }
+  if(!latest){ cache.set(issId, null); return null; }
+  const p = latest;
+  const div = (a, b) => (a != null && b != null && b !== 0) ? a / b : null;
+  // Fallback на EBIT, если EBITDA нет (как в досье).
+  const base = p.ebitda != null ? p.ebitda : p.ebit;
+  const netDebt = (p.debt != null && p.cash != null) ? (p.debt - p.cash) : null;
+  const rating = iss.dossier?.mod?.rating || '';
+  const metrics = {
+    year: p.year,
+    debtEbitda:    div(p.debt, base),
+    netDebtEbitda: div(netDebt, base),
+    icr:           div(p.ebit, p.int),
+    roa:           div(p.np, p.assets),
+    ebitdaMargin:  p.ebitda != null ? div(p.ebitda, p.rev) : null,
+    ebitMargin:    div(p.ebit, p.rev),
+    usedEbit:      p.ebitda == null && p.ebit != null,
+    rating:        rating,
+    ratingClass:   _moexRatingClass(rating)
+  };
+  cache.set(issId, metrics);
+  return metrics;
+}
+
 function moexApplyFilters(){
   const cat = window._moexCatalog;
   const filtersCard = document.getElementById('moex-filters-card');
@@ -15756,8 +15860,21 @@ function moexApplyFilters(){
     offer: document.getElementById('moex-f-offer').value,
     sizeMin: _num(document.getElementById('moex-f-size-min').value),
     inDbOnly: document.getElementById('moex-f-indb').checked,
+    // Фильтры по фундаменталу:
+    deMax:   _num(document.getElementById('moex-f-de-max')?.value),
+    ndeMax:  _num(document.getElementById('moex-f-nde-max')?.value),
+    icrMin:  _num(document.getElementById('moex-f-icr-min')?.value),
+    roaMin:  _num(document.getElementById('moex-f-roa-min')?.value),
+    ebmMin:  _num(document.getElementById('moex-f-ebm-min')?.value),
+    ratingMin: document.getElementById('moex-f-rating-min')?.value || '',
+    ratingHas: document.getElementById('moex-f-rating-has')?.value || '',
     sort: document.getElementById('moex-sort').value || 'ytm-desc',
   };
+  // Любой из фундамент-фильтров → подразумевает «только есть в базе».
+  const fundActive = f.deMax != null || f.ndeMax != null || f.icrMin != null
+                  || f.roaMin != null || f.ebmMin != null
+                  || f.ratingMin || f.ratingHas;
+  const metricsCache = new Map();
 
   const issIdx = _moexBuildIssuerIndex();
   const today = Date.now();
@@ -15796,8 +15913,27 @@ function moexApplyFilters(){
       if(sizeM == null || sizeM < f.sizeMin) return false;
     }
     if(f.inDbOnly && !b.issId) return false;
+    // Фундамент-фильтры: если включены — нужен matched эмитент
+    // с посчитанными мультипликаторами.
+    if(fundActive){
+      if(!b.issId) return false;
+      const m = _moexIssuerMetrics(b.issId, metricsCache);
+      if(!m) return false;
+      if(f.deMax  != null && (m.debtEbitda    == null || m.debtEbitda    > f.deMax))  return false;
+      if(f.ndeMax != null && (m.netDebtEbitda == null || m.netDebtEbitda > f.ndeMax)) return false;
+      if(f.icrMin != null && (m.icr  == null || m.icr  < f.icrMin)) return false;
+      if(f.roaMin != null && (m.roa  == null || m.roa * 100 < f.roaMin)) return false;
+      if(f.ebmMin != null && (m.ebitdaMargin == null || m.ebitdaMargin * 100 < f.ebmMin)) return false;
+      if(f.ratingMin){
+        if(_moexRatingRank(m.ratingClass) < _moexRatingRank(f.ratingMin)) return false;
+      }
+      if(f.ratingHas === 'yes' && !m.ratingClass) return false;
+      if(f.ratingHas === 'no'  &&  m.ratingClass) return false;
+    }
     return true;
   });
+  // Прокидываем cache в рендер, чтобы показать мини-профиль без повторных расчётов.
+  window._moexMetricsCache = metricsCache;
 
   const cmp = {
     'ytm-desc': (a,b) => (b.ytm||-999) - (a.ytm||-999),
@@ -15841,8 +15977,10 @@ function _moexRenderTable(list){
       <th style="padding:6px 8px"></th>
     </tr></thead><tbody>`;
 
+  const metricsCache = window._moexMetricsCache || new Map();
   for(const b of shown){
     const issName = b.issId ? (reportsDB[b.issId]?.name || '') : '';
+    const metrics = b.issId ? _moexIssuerMetrics(b.issId, metricsCache) : null;
     const inDbBadge = b.issId
       ? `<span class="dossier-pill ok" style="padding:1px 6px;font-size:.52rem">в базе</span>` : '';
     const typeBadge = b._isOfz
@@ -15863,6 +16001,36 @@ function _moexRenderTable(list){
       ${b.issId ? `<button class="btn btn-sm" onclick="moexOpenDossier('${b.issId}')" title="Открыть досье эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📇</button>` : ''}
     `;
     const ytmColor = b.ytm > 20 ? 'var(--warn)' : b.ytm > 15 ? 'var(--green)' : 'var(--text)';
+    // Мини-профиль эмитента: Долг/EBITDA, ICR, ROA, EBITDA-маржа, рейтинг.
+    let metricsLine = '';
+    if(metrics){
+      const parts = [];
+      const pill = (txt, cls) => `<span style="color:${cls};font-family:var(--mono)">${txt}</span>`;
+      if(metrics.debtEbitda != null){
+        const c = metrics.debtEbitda < 3 ? 'var(--green)' : metrics.debtEbitda < 5 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('D/E ' + metrics.debtEbitda.toFixed(1) + '×' + (metrics.usedEbit ? '*' : ''), c));
+      }
+      if(metrics.icr != null){
+        const c = metrics.icr > 3 ? 'var(--green)' : metrics.icr > 1.5 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('ICR ' + metrics.icr.toFixed(1) + '×', c));
+      }
+      if(metrics.roa != null){
+        const roaP = metrics.roa * 100;
+        const c = roaP > 5 ? 'var(--green)' : roaP > 0 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('ROA ' + roaP.toFixed(1) + '%', c));
+      }
+      if(metrics.ebitdaMargin != null){
+        const mp = metrics.ebitdaMargin * 100;
+        const c = mp > 15 ? 'var(--green)' : mp > 7 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('EBITDA-м ' + mp.toFixed(0) + '%', c));
+      }
+      if(metrics.ratingClass){
+        parts.push(`<span style="color:var(--acc);font-weight:600">${metrics.ratingClass}</span>`);
+      }
+      if(parts.length){
+        metricsLine = `<div style="font-size:.54rem;color:var(--text3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap" title="Фундаментал эмитента за FY ${metrics.year}${metrics.usedEbit ? ' — D/E посчитан по EBIT (EBITDA нет)' : ''}">${parts.join(' · ')}</div>`;
+      }
+    }
     html += `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
       <td style="padding:5px 8px">
         <div style="font-weight:600;color:var(--text)">${b.shortName || b.secid}</div>
@@ -15871,6 +16039,7 @@ function _moexRenderTable(list){
       <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">
         ${issName ? `<div>${issName}</div>` : ''}
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${typeBadge}${inDbBadge}${floatBadge}${offerBadge}</div>
+        ${metricsLine}
       </td>
       <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${price}</td>
       <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${ytmColor}"><strong>${ytm}</strong></td>
@@ -15886,10 +16055,11 @@ function _moexRenderTable(list){
 }
 
 function moexResetFilters(){
-  ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min'].forEach(id => {
+  ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min',
+   'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-offer'].forEach(id => {
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-offer','moex-f-rating-min','moex-f-rating-has'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('moex-f-indb').checked = false;
