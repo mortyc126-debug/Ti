@@ -2049,18 +2049,20 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="dossier-grid">
           <label class="dossier-field">
-            <span>Доля рынка, % <span class="dossier-hint" data-hint="IR-презентация эмитента (слайд «Рынок и наша доля»); годовой отчёт — раздел «Наша позиция на рынке». Крупные компании публикуют явно, средние — редко.">📖</span></span>
-            <input type="number" id="dos-biz-marketShare" step="0.1" min="0" max="100" placeholder="например, 12.5">
-          </label>
-          <label class="dossier-field">
-            <span>Конкурентная позиция <span class="dossier-hint" data-hint="Ранг в отрасли. Лидер = топ-3 по РФ или монополист ниши. Средний = в первой десятке. Догоняющий = меньше 2% доли, высокая уязвимость.">📖</span></span>
+            <span>Рыночная позиция <span class="dossier-hint" data-hint="Качественная градация, не требует одной цифры. Если у эмитента много рынков/регионов, подробности опиши ниже в «Сегменты и доли». Монополист = &gt; 50% на основном рынке или единственный (ЖКХ, сети). Доминирующий = 30-50%. Крупный = 15-30%. Средний = 5-15%. Малый = &lt; 5%. Нишевый = специализация без прямой конкуренции.">📖</span></span>
             <select id="dos-biz-marketPosition">
               <option value="">—</option>
-              <option value="leader">Лидер (топ-3 / монополист)</option>
-              <option value="mid">Средний (топ-10)</option>
-              <option value="lag">Догоняющий (&lt; 2% доли)</option>
-              <option value="niche">Нишевый без прямой конкуренции</option>
+              <option value="monopoly">Монополист / квази-монополист (&gt; 50%)</option>
+              <option value="dominant">Доминирующий (30-50%)</option>
+              <option value="large">Крупный (15-30%)</option>
+              <option value="mid">Средний (5-15%)</option>
+              <option value="small">Малый (&lt; 5%)</option>
+              <option value="niche">Нишевый / без прямой конкуренции</option>
             </select>
+          </label>
+          <label class="dossier-field" style="grid-column:span 2">
+            <span>Сегменты и доли — свободный текст <span class="dossier-hint" data-hint="Честно покажи структуру, если рынок не один. Пример для ТГК-14: «тепло Забайкалье 26%, тепло Бурятия 30%, Чита+У-У — монополист по теплоснабжению; электро Забайкалье 31%, электро Бурятия 11%». Одной цифрой такое не описать.">📖</span></span>
+            <textarea id="dos-biz-segments" placeholder="тепло Забайкалье 26%, тепло Бурятия 30%, Чита+Улан-Удэ — монополист; электро Забайкалье 31%, электро Бурятия 11%" style="min-height:50px"></textarea>
           </label>
           <label class="dossier-field">
             <span>Топ-3 клиента = % выручки <span class="dossier-hint" data-hint="Годовой отчёт — раздел «Существенные риски», «Концентрация клиентов» или «Выручка по клиентам». Часто в МСФО в примечаниях к выручке (Note 3-4). &gt;50% — высокая концентрация = риск.">📖</span></span>
@@ -14640,8 +14642,8 @@ function dossierOpen(){
   const biz = d.biz || {};
   const mod = d.mod || {};
   _dossierSetVals({
-    'dos-biz-marketShare':   biz.marketShare,
     'dos-biz-marketPosition':biz.marketPosition || '',
+    'dos-biz-segments':      biz.segments || '',
     'dos-biz-clientsTop3':   biz.clientsTop3,
     'dos-biz-suppliersTop3': biz.suppliersTop3,
     'dos-biz-geoDiv':        biz.geoDiv || '',
@@ -14700,8 +14702,8 @@ function dossierSave(){
   if(!iss) return;
   iss.dossier = {
     biz: {
-      marketShare:    _dossierGetNum('dos-biz-marketShare'),
       marketPosition: _dossierGetVal('dos-biz-marketPosition'),
+      segments:       _dossierGetVal('dos-biz-segments'),
       clientsTop3:    _dossierGetNum('dos-biz-clientsTop3'),
       suppliersTop3:  _dossierGetNum('dos-biz-suppliersTop3'),
       geoDiv:         _dossierGetVal('dos-biz-geoDiv'),
