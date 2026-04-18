@@ -8493,29 +8493,31 @@ const GIRBO_XML_SEMANTIC = {
   // 2120
   'СебестПродаж':'2120','СебестПрод':'2120',
   // 2100
-  'ВалПрибУб':'2100','ВалПрибыль':'2100','ВаловПриб':'2100',
+  'ВалПрибУб':'2100','ВалПрибыль':'2100','ВаловПриб':'2100','ВаловаяПрибыль':'2100',
   // 2210
-  'КоммРасх':'2210','КоммерчРасх':'2210',
+  'КоммРасх':'2210','КоммерчРасх':'2210','КомРасход':'2210',
   // 2220
-  'УпрРасх':'2220','УправлРасх':'2220',
+  'УпрРасх':'2220','УправлРасх':'2220','УпрРасход':'2220',
   // 2200 — прибыль от продаж
-  'ПрибУбПрод':'2200','ПрибыльПродаж':'2200','ПрибУб':'2200',
+  'ПрибУбПрод':'2200','ПрибыльПродаж':'2200','ПрибУб':'2200','ПрибПрод':'2200',
   // 2310
   'ДохУчастДрОрг':'2310','ДохУчаст':'2310',
   // 2320
   'ПроцПолуч':'2320',
-  // 2330
-  'ПроцУпл':'2330',
+  // 2330 — проценты к уплате
+  'ПроцУпл':'2330','ПроцДолгОбяз':'2330',
   // 2340
   'ПрочДох':'2340','ПрочДоход':'2340',
   // 2350
   'ПрочРасх':'2350',
   // 2300 — прибыль до налогообложения
   'ПрибУбДоНал':'2300','ПрибУбНал':'2300',
-  // 2410 — текущий налог
-  'ТекНалПриб':'2410','ТекНалогПриб':'2410','НалогПриб':'2410','Налог':'2410',
+  // 2410 — текущий налог на прибыль (у 1С просто НалПриб или НалогПриб)
+  'ТекНалПриб':'2410','ТекНалогПриб':'2410','НалогПриб':'2410','НалПриб':'2410','Налог':'2410',
   // 2400 — чистая прибыль
   'ЧистПриб':'2400','ЧистПрибыль':'2400','ЧистПрибУб':'2400',
+  // 1350
+  'ДобКапитал':'1350',
 };
 
 // Контекст родителя: один и тот же тег в разных разделах баланса имеет
@@ -8537,14 +8539,55 @@ const GIRBO_XML_CONTEXT = {
   'ОборАкт/ФинВлож':'1240','ОборотнАкт/ФинВлож':'1240',
 };
 
-// Извлекает значения по семантической схеме КНД 0710099.
-// Приоритет атрибутов: НаОтч (текущий) → НаОтчДату → Знач/ЗначОтч.
-// Для тегов без детей-элементов — читаем textContent.
+// Извлекает значения по семантической схеме КНД 0710099 + коды в
+// именах тегов (ВписПоказ1220). Для v5.10 1С значения часто лежат в
+// ребёнке <НаОтч>N</НаОтч>, а не в атрибуте — именно поэтому главные
+// итоги (ИтБалансАкт, ИтКапРез, ИтОборАкт) раньше пропускались как
+// «не-leaf». Теперь проверяем 4 источника значения:
+//   1) атрибуты (НаОтч, НаПредОтч, НаОтчДату, СумНаОтч, Знач...);
+//   2) ребёнок <НаОтч>/<НаОтчДату>/<Знач>...;
+//   3) любой числовой атрибут (если не похож на дату);
+//   4) textContent, если у элемента нет детей-элементов.
 function _extractGirboSemanticCodes(doc){
   const toNum = s => {
     const n = parseFloat(String(s||'').replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.'));
     return isFinite(n) ? n : null;
   };
+  const VAL_ATTRS = ['НаОтч','НаОтчДату','НаОтчДат','СумНаОтч','Знач','ЗначОтч','ЗначГод','Значение','Сумма'];
+  const VAL_CHILDREN_RE = /^(наотч|наотчдату?|наотчдат|сумнаотч|знач|значотч|значгод|значение|сумма)$/i;
+  const pickValue = (el) => {
+    for(const a of VAL_ATTRS){
+      const v = el.getAttribute(a);
+      if(v != null){ const n = toNum(v); if(n != null) return n; }
+    }
+    const kids = el.children || [];
+    for(let j=0;j<kids.length;j++){
+      const ch = kids[j];
+      const chTag = (ch.localName || ch.nodeName || '').toLowerCase();
+      if(VAL_CHILDREN_RE.test(chTag)){
+        const n = toNum(ch.textContent);
+        if(n != null) return n;
+      }
+    }
+    // Fallback на любой числовой атрибут, но без дат: yyyy, yyyymmdd, dd.mm.yyyy.
+    for(let j=0;j<el.attributes.length;j++){
+      const a = el.attributes[j];
+      const v = (a.value||'').trim();
+      if(!/^-?\d[\d\s.,]*$/.test(v)) continue;
+      if(/^20\d{2}$/.test(v)) continue;
+      if(/^20\d{6}$/.test(v)) continue;
+      if(/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(v)) continue;
+      const n = toNum(v);
+      if(n != null) return n;
+    }
+    // textContent без детей-элементов.
+    if(!(el.children||[]).length){
+      const n = toNum(el.textContent);
+      if(n != null) return n;
+    }
+    return null;
+  };
+
   const codeValues = {};
   const all = doc.getElementsByTagName('*');
   for(let i=0;i<all.length;i++){
@@ -8556,17 +8599,13 @@ function _extractGirboSemanticCodes(doc){
     const parentTag = parent && (parent.localName || parent.nodeName);
     if(parentTag) code = GIRBO_XML_CONTEXT[parentTag + '/' + tag] || null;
     if(!code) code = GIRBO_XML_SEMANTIC[tag] || null;
-    if(!code) continue;
-    let valRaw = el.getAttribute('НаОтч') || el.getAttribute('НаОтчДату') ||
-                 el.getAttribute('СумНаОтч') || el.getAttribute('Знач') ||
-                 el.getAttribute('ЗначОтч') || el.getAttribute('ЗначГод') ||
-                 el.getAttribute('Значение') || el.getAttribute('Сумма');
-    if(!valRaw){
-      // Без детей-элементов — пробуем текст. Иначе суммы детей замешаются.
-      const hasElChildren = Array.from(el.children||[]).length > 0;
-      if(!hasElChildren) valRaw = el.textContent;
+    if(!code){
+      // Код прямо в имени тега: ВписПоказ1220, Доп1520, line_2110 и т.п.
+      const m = tag.match(/(\d{4})(?!\d)/);
+      if(m && /^(1\d{3}|2\d{3})$/.test(m[1])) code = m[1];
     }
-    const num = toNum(valRaw);
+    if(!code) continue;
+    const num = pickValue(el);
     if(num == null) continue;
     if(!(code in codeValues)) codeValues[code] = num;
   }
