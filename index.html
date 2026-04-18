@@ -14820,7 +14820,12 @@ function _dossierRenderFin(){
   }
   const p = latest.data;
   const periodLabel = `${p.year} · ${p.period || 'FY'} · ${p.type || '—'}`;
-  meta.innerHTML = `Источник: <strong style="color:var(--text)">${periodLabel}</strong> · все значения в млрд ₽ (внутренняя единица базы)`;
+
+  // Сводка эмитента — синтез из заполненных полей dossier + финансы.
+  // Показываем поверх метаданных; если досье пустое — будет только
+  // финансовая часть (авто-флаги по мультипликаторам).
+  const summaryHTML = _dossierBuildSummary(iss, p);
+  meta.innerHTML = summaryHTML + `<div style="margin-top:12px;font-size:.6rem;color:var(--text2)">Источник финансов: <strong style="color:var(--text)">${periodLabel}</strong> · все значения в млрд ₽ (внутренняя единица базы)</div>`;
 
   // Отраслевая медиана (если рассчитана) для сравнения.
   const indKey = iss.ind || 'other';
@@ -14875,6 +14880,273 @@ function _dossierRenderFin(){
     <br>Метрики, для которых медиана по отрасли ещё не предусмотрена, размечены по жёстким порогам.
   </div>`;
   body.innerHTML = html;
+}
+
+// ───────── Сводка эмитента (синтез dossier + финансы) ─────────
+
+// Человекочитаемые ярлыки для кодов из select'ов.
+const _DOSSIER_LABELS = {
+  marketPosition: {
+    monopoly:'Монополист', dominant:'Доминирует', large:'Крупный игрок',
+    mid:'Средний игрок', small:'Малый игрок', niche:'Нишевый'
+  },
+  geoDiv: {
+    local:'Один регион', ru:'Вся РФ', cis:'РФ + СНГ', global:'Глобальная'
+  },
+  cyclicality: { low:'Низкая цикличность', mid:'Средняя цикличность', high:'Высокая цикличность' },
+  barriers:    { low:'Низкие барьеры',     mid:'Средние барьеры',      high:'Высокие барьеры входа' },
+  capexIntensity: { low:'Низкая капексоёмкость', mid:'Средняя капексоёмкость', high:'Высокая капексоёмкость' },
+  currencyRisk: { none:'Нет валютных рисков', mitigated:'Валюта хеджируется', exposed:'Открытая валютная позиция' },
+  seasonality:  { none:'Без сезонности', mild:'Умеренная сезонность', strong:'Сильная сезонность' },
+  auditor:  { big4:'Big-4 / преемники', ru4:'Российская 4 (Б1/ТД/Кэпт/ФБК)', local:'Локальный аудитор', none:'Без аудита' },
+  disclosureFreq: { quarterly:'Ежеквартально', semiannual:'Полугодие+год', annual:'Только годовой', sparse:'С пропусками', none:'Нет МСФО' },
+  stateSupport: { explicit:'Явная господдержка', implicit:'Неявная господдержка', none:'Без поддержки' },
+  ownership: { state:'Госкомпания', strategic:'Стратег-холдинг', pe:'PE/инвестфонд', solo:'Мажоритарий', diverse:'Распылённая' },
+  defaultHistory: { none:'', restructure:'Была реструктуризация', 'default':'Был дефолт' },
+  refinanceRisk: { low:'', mid:'Средний риск рефинанса', high:'Высокий риск рефинанса' },
+  covenants: { strict:'Жёсткие ковенанты', mild:'Мягкие ковенанты', none:'Без ковенантов' },
+  subordination: { senior:'Senior', secured:'Обеспеченные', subordinated:'Субординированные', hybrid:'Гибридные' }
+};
+
+function _dossierLabel(field, code){
+  if(!code) return null;
+  return (_DOSSIER_LABELS[field] && _DOSSIER_LABELS[field][code]) || code;
+}
+
+// Строит сводную панель: профиль-пилюли + автофлаги + нарратив.
+// Возвращает HTML-строку. Если dossier пустой — показывает только
+// флаги по финансам и инвайт «заполни B/C для полной картины».
+function _dossierBuildSummary(iss, p){
+  const d = iss.dossier || {};
+  const biz = d.biz || {};
+  const mod = d.mod || {};
+
+  // ── Профиль-пилюли: иконка + короткий ярлык на каждое заполненное поле.
+  const pills = [];
+  const pushPill = (icon, field, value) => {
+    const label = _dossierLabel(field, value);
+    if(!label) return;
+    pills.push(`<span class="dossier-pill nd" style="padding:3px 9px;font-size:.58rem">${icon} ${label}</span>`);
+  };
+  pushPill('📍', 'marketPosition', biz.marketPosition);
+  pushPill('🏛', 'stateSupport',   mod.stateSupport);
+  pushPill('👥', 'ownership',      mod.ownership);
+  if(mod.rating) pills.push(`<span class="dossier-pill nd" style="padding:3px 9px;font-size:.58rem">📊 ${mod.rating}</span>`);
+  pushPill('🔍', 'auditor',        mod.auditor);
+  pushPill('📅', 'disclosureFreq', mod.disclosureFreq);
+  pushPill('🌍', 'geoDiv',         biz.geoDiv);
+  pushPill('📈', 'cyclicality',    biz.cyclicality);
+  pushPill('🏗', 'capexIntensity', biz.capexIntensity);
+  pushPill('💱', 'currencyRisk',   biz.currencyRisk);
+  pushPill('📜', 'covenants',      mod.covenants);
+  pushPill('🎯', 'subordination',  mod.subordination);
+  if(mod.defaultHistory && mod.defaultHistory !== 'none'){
+    pills.push(`<span class="dossier-pill err" style="padding:3px 9px;font-size:.58rem">⚠ ${_dossierLabel('defaultHistory', mod.defaultHistory)}</span>`);
+  }
+
+  // ── Автофлаги из сочетаний полей + финансов.
+  const flags = _dossierBuildFlags(iss, biz, mod, p);
+
+  // ── Нарратив — 2-4 предложения.
+  const narrative = _dossierBuildNarrative(iss, biz, mod, p);
+
+  // ── Собираем HTML.
+  const isEmpty = !pills.length && !narrative;
+  const pillsHTML = pills.length
+    ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${pills.join('')}</div>`
+    : '';
+  const flagsHTML = flags.length
+    ? `<div style="display:flex;flex-direction:column;gap:4px;margin-top:10px">${
+        flags.map(f => `<div style="display:flex;gap:8px;align-items:flex-start;font-size:.62rem;line-height:1.45">
+          <span class="dossier-pill ${f.cls}" style="flex-shrink:0;padding:1px 7px">${f.icon}</span>
+          <span style="color:var(--text2)">${f.text}</span>
+        </div>`).join('')
+      }</div>`
+    : '';
+  const narrHTML = narrative
+    ? `<div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-left:2px solid var(--acc);font-size:.66rem;line-height:1.55;color:var(--text)">${narrative}</div>`
+    : '';
+  const emptyHint = isEmpty && !flags.length
+    ? `<div style="padding:10px;background:var(--s2);border:1px dashed var(--border2);font-size:.6rem;color:var(--text3);line-height:1.5">
+         Досье ещё не заполнено. Открой вкладки B и C, пройдись по полям — после «💾 Сохранить» здесь появится сводная картинка эмитента: профиль, автофлаги, короткий нарратив.
+       </div>`
+    : '';
+
+  return `
+    <div style="background:var(--s1);border:1px solid var(--border2);padding:12px 14px">
+      <div style="font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)">📇 Сводка</div>
+      ${narrHTML}
+      ${flagsHTML}
+      ${pillsHTML}
+      ${emptyHint}
+    </div>
+  `;
+}
+
+// Риск-флаги: автовывод из комбинации биз+мод+финансов.
+// Каждый элемент: {cls: 'ok'|'warn'|'err', icon: '✓'|'⚠'|'❌', text: '...'}
+function _dossierBuildFlags(iss, biz, mod, p){
+  const flags = [];
+  const add = (cls, icon, text) => flags.push({cls, icon, text});
+  const safeDiv = (a, b) => (a != null && b != null && b !== 0) ? a / b : null;
+
+  // ── Позитивные ──
+  if(biz.marketPosition === 'monopoly')
+    add('ok', '✓', 'Монополист — ценовая власть и устойчивость спроса');
+  else if(biz.marketPosition === 'dominant')
+    add('ok', '✓', 'Доминирующая позиция (30-50% рынка)');
+  if(mod.stateSupport === 'explicit')
+    add('ok', '✓', 'Явная господдержка — снижает вероятность дефолта');
+  if(mod.stateSupport === 'implicit' && (biz.marketPosition === 'monopoly' || biz.marketPosition === 'dominant'))
+    add('ok', '✓', 'Стратегическая значимость + рыночная сила');
+  if(mod.disclosureFreq === 'quarterly')
+    add('ok', '✓', 'Ежеквартальная МСФО-отчётность — высокая прозрачность');
+  if(mod.auditor === 'big4' || mod.auditor === 'ru4')
+    add('ok', '✓', 'Аудитор уровня ' + _dossierLabel('auditor', mod.auditor));
+
+  if(p){
+    const debtEbitda = safeDiv(p.debt, p.ebitda);
+    if(debtEbitda != null && debtEbitda > 0 && debtEbitda < 2)
+      add('ok', '✓', `Долг/EBITDA ${debtEbitda.toFixed(1)}× — низкая долговая нагрузка`);
+    else if(debtEbitda != null && debtEbitda >= 2 && debtEbitda < 3)
+      add('ok', '✓', `Долг/EBITDA ${debtEbitda.toFixed(1)}× — умеренная нагрузка`);
+    const icr = safeDiv(p.ebit, p.int);
+    if(icr != null && icr > 5)
+      add('ok', '✓', `ICR ${icr.toFixed(1)}× — высокое покрытие процентов`);
+    const currentRatio = safeDiv(p.ca, p.cl);
+    if(currentRatio != null && currentRatio > 1.5)
+      add('ok', '✓', `Current ratio ${currentRatio.toFixed(2)} — запас оборотного капитала`);
+  }
+
+  // ── Предупреждения ──
+  if(mod.shortDebtShare != null && mod.shortDebtShare >= 50 && mod.shortDebtShare < 70)
+    add('warn', '⚠', `Краткосрочного долга ${mod.shortDebtShare}% — повышенный риск рефинансирования`);
+  if(mod.refinanceRisk === 'mid')
+    add('warn', '⚠', 'Средний риск рефинансирования долга');
+  if(biz.clientsTop3 != null && biz.clientsTop3 >= 50)
+    add('warn', '⚠', `Топ-3 клиента = ${biz.clientsTop3}% выручки — высокая концентрация`);
+  if(biz.capexIntensity === 'high')
+    add('warn', '⚠', 'Высокая капексоёмкость — свободного кешфлоу мало');
+  if(biz.currencyRisk === 'exposed')
+    add('warn', '⚠', 'Открытая валютная позиция (долг в валюте без соответствующей выручки)');
+  if(biz.cyclicality === 'high')
+    add('warn', '⚠', 'Высокая цикличность отрасли — EBITDA волатильна к фазе цикла');
+  if(biz.geoDiv === 'local')
+    add('warn', '⚠', 'Один регион операций — географический риск сконцентрирован');
+  if(mod.disclosureFreq === 'annual' || mod.disclosureFreq === 'sparse' || mod.disclosureFreq === 'none')
+    add('warn', '⚠', 'Редкое раскрытие МСФО — слепая зона между отчётами');
+  if(mod.ownership === 'solo')
+    add('warn', '⚠', 'Концентрация у одного мажоритария — корпоративные риски');
+  if(mod.subordination === 'subordinated' || mod.subordination === 'hybrid')
+    add('warn', '⚠', 'Субординация выпусков — погашение после обычных кредиторов');
+
+  if(p){
+    const debtEbitda = safeDiv(p.debt, p.ebitda);
+    if(debtEbitda != null && debtEbitda >= 3 && debtEbitda < 5)
+      add('warn', '⚠', `Долг/EBITDA ${debtEbitda.toFixed(1)}× — повышенная нагрузка`);
+    const icr = safeDiv(p.ebit, p.int);
+    if(icr != null && icr >= 1.5 && icr < 3)
+      add('warn', '⚠', `ICR ${icr.toFixed(1)}× — покрытие процентов на грани нормы`);
+    const eqShare = safeDiv(p.eq, p.assets);
+    if(eqShare != null && eqShare > 0 && eqShare < 0.15)
+      add('warn', '⚠', `Капитал/Активы ${(eqShare*100).toFixed(0)}% — тонкая финансовая подушка`);
+  }
+
+  // ── Красные флаги ──
+  if(mod.shortDebtShare != null && mod.shortDebtShare >= 70)
+    add('err', '❌', `Краткосрочного долга ${mod.shortDebtShare}% — срочная потребность в рефинансе`);
+  if(mod.refinanceRisk === 'high')
+    add('err', '❌', 'Высокий риск рефинансирования');
+  if(mod.defaultHistory === 'default')
+    add('err', '❌', 'В истории был дефолт/технический дефолт');
+  if(mod.defaultHistory === 'restructure')
+    add('warn', '⚠', 'В истории была реструктуризация долга');
+
+  if(p){
+    const debtEbitda = safeDiv(p.debt, p.ebitda);
+    if(debtEbitda != null && debtEbitda >= 5)
+      add('err', '❌', `Долг/EBITDA ${debtEbitda.toFixed(1)}× — чрезмерная нагрузка`);
+    if(p.ebitda != null && p.ebitda < 0)
+      add('err', '❌', 'Отрицательная EBITDA — операционный убыток');
+    const icr = safeDiv(p.ebit, p.int);
+    if(icr != null && icr < 1.5 && icr >= 0)
+      add('err', '❌', `ICR ${icr.toFixed(1)}× — проценты съедают EBIT`);
+    if(icr != null && icr < 0)
+      add('err', '❌', 'ICR отрицательный — EBIT не покрывает проценты');
+    if(p.eq != null && p.eq < 0)
+      add('err', '❌', `Отрицательный капитал (${p.eq.toFixed(1)} млрд) — накопленные убытки превысили вклады`);
+    if(p.np != null && p.np < 0 && p.rev != null && p.rev > 0)
+      add('warn', '⚠', 'Чистый убыток в последнем периоде');
+  }
+
+  return flags;
+}
+
+// Нарратив из 2-4 предложений: позиция → долг → риски → особенности.
+function _dossierBuildNarrative(iss, biz, mod, p){
+  const safeDiv = (a, b) => (a != null && b != null && b !== 0) ? a / b : null;
+  const name = iss.name || 'Эмитент';
+  const parts = [];
+
+  // 1. Позиционирование.
+  const posTxt = {
+    monopoly: 'монополист в своей нише',
+    dominant: 'доминирующий игрок',
+    large: 'крупный игрок рынка',
+    mid: 'средний игрок',
+    small: 'малый игрок',
+    niche: 'нишевый игрок без прямой конкуренции'
+  }[biz.marketPosition];
+  if(posTxt){
+    let s = `${name} — ${posTxt}`;
+    if(mod.stateSupport === 'explicit') s += ' с явной господдержкой';
+    else if(mod.stateSupport === 'implicit') s += ' стратегической важности';
+    if(biz.geoDiv === 'local') s += ', операции сконцентрированы в одном регионе';
+    else if(biz.geoDiv === 'global') s += ' с глобальной географией';
+    parts.push(s + '.');
+  }
+
+  // 2. Долговой профиль.
+  if(p){
+    const de = safeDiv(p.debt, p.ebitda);
+    if(de != null && de > 0){
+      let load = de < 2 ? 'низкая' : de < 3 ? 'умеренная' : de < 5 ? 'повышенная' : 'высокая';
+      let s = `Долговая нагрузка ${load} (Долг/EBITDA ${de.toFixed(1)}×)`;
+      const icr = safeDiv(p.ebit, p.int);
+      if(icr != null){
+        const icrTxt = icr < 1.5 ? 'проценты съедают операционную прибыль' :
+                       icr < 3 ? 'покрытие процентов на грани нормы' :
+                       icr < 5 ? 'нормальное покрытие процентов' :
+                       'комфортное покрытие процентов';
+        s += `, ${icrTxt} (ICR ${icr.toFixed(1)}×)`;
+      }
+      parts.push(s + '.');
+    }
+  }
+
+  // 3. Риски рефинансирования / структура.
+  if(mod.shortDebtShare != null && mod.shortDebtShare >= 50){
+    parts.push(`Краткосрочного долга ${mod.shortDebtShare}% — риск рефинансирования ${mod.shortDebtShare >= 70 ? 'высокий' : 'повышенный'}.`);
+  } else if(mod.refinanceRisk === 'high'){
+    parts.push('Риск рефинансирования долга оценён как высокий.');
+  }
+
+  // 4. Особенности бизнеса.
+  const issues = [];
+  if(biz.capexIntensity === 'high') issues.push('высокая капексоёмкость');
+  if(biz.cyclicality === 'high') issues.push('высокая цикличность');
+  if(biz.currencyRisk === 'exposed') issues.push('открытая валютная позиция');
+  if(biz.clientsTop3 != null && biz.clientsTop3 >= 50) issues.push(`концентрация клиентов ${biz.clientsTop3}%`);
+  if(issues.length){
+    parts.push(`Уязвимости: ${issues.join(', ')}.`);
+  }
+
+  // 5. Дефолтная история (если была).
+  if(mod.defaultHistory === 'default') parts.push('В истории — дефолт/технический дефолт.');
+  else if(mod.defaultHistory === 'restructure') parts.push('В истории — реструктуризация долга.');
+
+  if(!parts.length) return '';
+  return parts.join(' ');
 }
 
 // Сколько лет (FY-периодов) в базе для этого эмитента.
