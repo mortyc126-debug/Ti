@@ -324,7 +324,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
     <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
-    <input type="file" id="girbo-file" accept=".csv,.txt,.tsv,.xml" style="display:none" onchange="importGirboCsv(this)">
+    <input type="file" id="girbo-file" accept="*/*" style="display:none" onchange="importGirboCsv(this)">
     <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт выгрузки ГИРБО (bo.nalog.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
     <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
@@ -1872,7 +1872,7 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Выгрузки с <strong>bo.nalog.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
       </div>
-      <input type="file" id="girbo-file-modal" accept=".csv,.txt,.tsv,.xml" style="display:none" onchange="importGirboCsv(this)">
+      <input type="file" id="girbo-file-modal" accept="*/*" style="display:none" onchange="importGirboCsv(this)">
       <div id="girbo-drop" onclick="document.getElementById('girbo-file-modal').click()"
            style="border:2px dashed var(--border2);padding:22px 16px;text-align:center;background:var(--bg);cursor:pointer;user-select:none">
         <div style="font-size:1.6rem;margin-bottom:4px">📥</div>
