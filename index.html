@@ -8041,6 +8041,7 @@ function repRenderAnalysis(p, iss){
     sz:     null,
     peak:   null,
   };
+  window._lastAnalysis = { d, opts:{mode:'archive'}, containerId:'rep-analysis-area' };
   area.innerHTML = buildAnalysisHTML(d, {mode:'archive'});
 }
 
@@ -11278,12 +11279,51 @@ const _origParseAny = parseAnyReport;
 // ══ АВТОНОМНЫЙ АНАЛИЗ ══
 function gv(id) { const v=parseFloat(document.getElementById(id)?.value); return isNaN(v)?null:v; }
 
+// Текущая единица отображения в карточках анализа: 'auto'|'млрд'|'млн'|'тыс'.
+// Пользовательский выбор сохраняется в localStorage, 'auto' = угадать по данным.
+let _fmtUnit = 'млрд';
+
 function fmtB(v) {
   if(v==null) return '—';
-  const abs=Math.abs(v);
+  const abs = Math.abs(v);
+  const u = _fmtUnit;
+  if(u === 'млрд'){
+    if(abs >= 1000) return (v/1000).toFixed(2)+' трлн ₽';
+    return v.toFixed(abs >= 10 ? 1 : 2)+' млрд ₽';
+  }
+  if(u === 'млн'){
+    const m = v*1000, absM = abs*1000;
+    return m.toFixed(absM >= 100 ? 0 : absM >= 10 ? 1 : 2)+' млн ₽';
+  }
+  if(u === 'тыс'){
+    return (v*1e6).toFixed(0)+' тыс ₽';
+  }
+  // fallback (старое поведение)
   if(abs>=1000) return (v/1000).toFixed(2)+' трлн ₽';
   if(abs>=1)    return v.toFixed(2)+' млрд ₽';
   return (v*1000).toFixed(0)+' млн ₽';
+}
+
+// Определяет «главную» единицу отчёта по медиане набора значений (в млрд).
+// Внутри приложения всё в млрд: 1 = 1 млрд, 0.001 = 1 млн, 1e-6 = 1 тыс.
+function pickFmtUnit(vals){
+  const nums = (vals||[]).filter(v => v != null && isFinite(v) && Math.abs(v) > 1e-9);
+  if(!nums.length) return 'млрд';
+  const sorted = nums.map(Math.abs).sort((a,b)=>a-b);
+  const med = sorted[Math.floor(sorted.length/2)];
+  if(med >= 1)     return 'млрд';
+  if(med >= 0.001) return 'млн';
+  return 'тыс';
+}
+
+// Переключатель единиц: пользователь нажал кнопку. Сохраняем в localStorage и
+// перерисовываем последнюю карточку анализа из кэша.
+function setFmtUnit(choice){
+  try { localStorage.setItem('ba_fmt_unit', choice); } catch(_){}
+  const last = window._lastAnalysis;
+  if(!last) return;
+  const c = document.getElementById(last.containerId);
+  if(c) c.innerHTML = buildAnalysisHTML(last.d, last.opts);
 }
 
 // Цветная шкала с маркером позиции
@@ -11362,6 +11402,14 @@ function buildAnalysisHTML(d, opts={}) {
   const peak   = d.peak ?? null;
   const repType = d.repType||'';
   const period  = d.period||'';
+
+  // Единица отображения: пользовательский выбор или авто-подбор по медиане.
+  const userUnit = (function(){
+    try { return localStorage.getItem('ba_fmt_unit') || 'auto'; } catch(_){ return 'auto'; }
+  })();
+  _fmtUnit = userUnit === 'auto'
+    ? pickFmtUnit([rev, d.ebitda, ebit, np, assets, ca, cl, debt, cash, eq])
+    : userUnit;
 
   const norms = IND_NORMS[ind]||IND_NORMS.other;
 
@@ -11586,6 +11634,25 @@ function buildAnalysisHTML(d, opts={}) {
     </div>
   ` : '';
 
+  // Переключатель единиц: «авто» помечает подобранное значение в скобках,
+  // остальные — принудительный пересчёт без повторного импорта.
+  const unitBtn = (u, label) => {
+    const active = userUnit === u;
+    return `<button type="button" onclick="setFmtUnit('${u}')"
+      style="padding:2px 9px;font-size:.58rem;font-family:var(--mono);cursor:pointer;
+      border:1px solid ${active?'var(--acc)':'var(--border)'};
+      background:${active?'var(--acc)':'transparent'};
+      color:${active?'var(--bg)':'var(--text2)'};border-radius:3px">${label}</button>`;
+  };
+  const unitBar = `
+    <div style="display:flex;align-items:center;gap:5px;font-size:.58rem;color:var(--text3);margin-bottom:10px;flex-wrap:wrap">
+      <span style="margin-right:4px">Единицы:</span>
+      ${unitBtn('auto','авто'+(userUnit==='auto'?` · ${_fmtUnit}`:''))}
+      ${unitBtn('млрд','млрд')}
+      ${unitBtn('млн','млн')}
+      ${unitBtn('тыс','тыс')}
+    </div>`;
+
   return `
     <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--s1);border:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap">
       <div>
@@ -11598,6 +11665,7 @@ function buildAnalysisHTML(d, opts={}) {
         <div style="font-size:.72rem;font-weight:600;color:${riskColor}">${riskLevel} риск</div>
       </div>
     </div>
+    ${unitBar}
 
     ${debtSection?`<div class="card" style="margin-bottom:10px">
       <div class="card-hdr">💼 Долговая нагрузка</div>
@@ -11653,6 +11721,7 @@ function analyzeAuto() {
     repType: document.getElementById('is-rep-type')?.value||'',
     period:  perSel==='custom' ? perCustom : perSel,
   };
+  window._lastAnalysis = { d, opts:{mode:'editor'}, containerId:'iss-res-content' };
   document.getElementById('iss-res-content').innerHTML = buildAnalysisHTML(d, {mode:'editor'});
 }
 
