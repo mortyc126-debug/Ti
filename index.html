@@ -12590,15 +12590,10 @@ function _processGirboFile(buf, filename){
   // Если что-то не нашлось и у нас XML — собираем теги с числовыми
   // значениями, которые парсер НЕ смог замаппить на код РСБУ. Это ровно
   // тот список, который нужен, чтобы понять, что дописать в схему.
-  let unknownBlock = '';
+  const unknownTags = [];
   if(missedList.length && parsed.format === 'XML'){
     try {
       const doc = new DOMParser().parseFromString(text, 'application/xml');
-      const mapped = new Set();
-      for(const [code] of Object.entries(parsed.codes || {})){
-        mapped.add(code); // это fid (is-rev и т.п.), не тег — но ок, сравниваем по факту извлечения
-      }
-      const unknown = new Set();
       const VAL_ATTRS = ['НаОтч','НаОтчДату','НаОтчДат','СумНаОтч','Знач','ЗначОтч','ЗначГод','Значение','Сумма'];
       const VAL_CHILDREN_RE = /^(наотч|наотчдату?|наотчдат|сумнаотч|знач|значотч|значгод|значение|сумма)$/i;
       const hasValueSomewhere = (el) => {
@@ -12614,37 +12609,52 @@ function _processGirboFile(buf, filename){
         }
         return false;
       };
+      const seen = new Set();
       const all = doc.getElementsByTagName('*');
       for(let i=0;i<all.length;i++){
         const el = all[i];
         const tag = el.localName || el.nodeName; if(!tag) continue;
+        if(seen.has(tag)) continue;
         if(!hasValueSomewhere(el)) continue;
-        // Уже замаплен (через семантику или через код-в-имени)?
-        const mappedBySemantic = !!(GIRBO_XML_SEMANTIC[tag]);
+        if(GIRBO_XML_SEMANTIC[tag]) continue;
         const codeInName = (tag.match(/(\d{4})(?!\d)/)||[])[1];
-        const mappedByCode = codeInName && /^(1\d{3}|2\d{3})$/.test(codeInName);
-        if(mappedBySemantic || mappedByCode) continue;
-        // Контекстные (ЗаемнСр под нужным родителем) — тоже пропускаем.
+        if(codeInName && /^(1\d{3}|2\d{3})$/.test(codeInName)) continue;
         const parent = el.parentNode;
         const parentTag = parent && (parent.localName || parent.nodeName);
         if(parentTag && GIRBO_XML_CONTEXT[parentTag + '/' + tag]) continue;
-        unknown.add(tag);
-      }
-      if(unknown.size){
-        const list = Array.from(unknown).slice(0, 30).join(', ') + (unknown.size > 30 ? ` (+${unknown.size-30})` : '');
-        unknownBlock = '\n\n🔎 Теги с числами, которые не замаплены ('+unknown.size+'):\n  '+list;
+        seen.add(tag);
+        unknownTags.push(tag);
       }
     } catch(_){}
   }
 
+  // Android-алерты обрезают длинный текст многоточием. Если тегов много —
+  // копируем полный список в буфер и не пихаем его в alert; показываем
+  // только подсказку. Пользователь вставит из буфера в чат.
+  let unknownBlock = '';
+  let copiedToClipboard = false;
+  if(unknownTags.length){
+    const fullList = unknownTags.join(', ');
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      try { navigator.clipboard.writeText(fullList); copiedToClipboard = true; } catch(_){}
+    }
+    if(copiedToClipboard){
+      unknownBlock = '\n\n🔎 '+unknownTags.length+' неопознанных тегов — СКОПИРОВАНО В БУФЕР.\nВставь их в чат, чтобы добавить в схему.';
+    } else {
+      // Буфер недоступен — показываем первые 15, остальные подсказкой.
+      const preview = unknownTags.slice(0, 15).join(', ');
+      const rest = unknownTags.length > 15 ? ` (+${unknownTags.length-15} ещё)` : '';
+      unknownBlock = '\n\n🔎 Неопознанные теги ('+unknownTags.length+'):\n  '+preview+rest;
+    }
+  }
+
   const missedBlock = missedList.length
-    ? '\n\n✗ Не нашлось ('+missedList.length+'):\n  '+missedList.join('\n  ') +
-      '\n\nПусто может быть нормой (нет долга / процентов / и т.п.). Если уверен(а), что значение в отчёте есть — пришли скриншот или список «🔎 неопознанных тегов» ниже, дозабью схему.'
+    ? '\n\n✗ Не нашлось: '+missedList.length+' из 12 (пусто часто норма)'
     : '';
   alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
-        'Формат: '+parsed.format+' · '+encoding+'\n\n' +
-        filledBlock + missedBlock + unknownBlock +
-        '\n\nОткройте «📂 База отчётности» для просмотра.');
+        parsed.format+' · '+encoding+'\n' +
+        unknownBlock +
+        '\n\n'+filledBlock + missedBlock);
 }
 
 function importGirboCsv(input){
