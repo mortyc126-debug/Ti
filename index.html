@@ -5412,13 +5412,32 @@ function repRenderCards(p){
   const ratios = repCalcRatios(p);
   const grid = document.getElementById('rep-cards-grid');
 
+  // Значение хранится в млрд ₽. Для малых значений переключаем единицу,
+  // иначе 0,03 млрд округляется до «0» и показатели выглядят пустыми.
+  //   |v| >= 1        — млрд, 1 знак;
+  //   0.1  <= |v| < 1 — млрд, 2 знака;
+  //   0.01 <= |v| < 0.1 — млн ₽, 0 знаков;
+  //   |v|  < 0.01      — млн ₽, 1 знак;
+  //   чистый 0 — оставляем «0».
+  const fmtRep = v => {
+    if(v == null) return { text: '—', unit: '' };
+    if(v === 0)   return { text: '0',  unit: 'млрд ₽' };
+    const abs = Math.abs(v);
+    if(abs >= 1)   return { text: v.toLocaleString('ru-RU',{maximumFractionDigits:1}), unit: 'млрд ₽' };
+    if(abs >= 0.1) return { text: v.toLocaleString('ru-RU',{maximumFractionDigits:2}), unit: 'млрд ₽' };
+    const inMln = v * 1000;
+    if(abs >= 0.01) return { text: inMln.toLocaleString('ru-RU',{maximumFractionDigits:0}), unit: 'млн ₽' };
+    return { text: inMln.toLocaleString('ru-RU',{maximumFractionDigits:1}), unit: 'млн ₽' };
+  };
+
   // Main metrics
   const cards = REP_FIELDS.filter(f=>p[f.id]!=null).map(f=>{
     const v = p[f.id];
+    const fmt = fmtRep(v);
     return `<div style="background:var(--s1);border:1px solid var(--border);padding:12px 14px">
       <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:4px">${f.icon} ${f.label}</div>
-      <div style="font-size:1.05rem;font-weight:600;color:var(--text)">${v.toLocaleString('ru-RU',{maximumFractionDigits:1})}</div>
-      <div style="font-size:.57rem;color:var(--text3)">${f.unit}</div>
+      <div style="font-size:1.05rem;font-weight:600;color:var(--text)">${fmt.text}</div>
+      <div style="font-size:.57rem;color:var(--text3)">${fmt.unit || f.unit}</div>
     </div>`;
   }).join('');
 
