@@ -1939,6 +1939,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
+      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе — подтянуть РСБУ из ГИР БО (ФНС) по ИНН. Каждый эмитент — 2-3 запроса к прокси, 1-2 секунды. Затем мультипликаторы появятся прямо в строке.">📡 ГИР БО для эмитентов в фильтре</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
@@ -15998,7 +15999,9 @@ function _moexRenderTable(list){
     const lvl = b.listLevel || '—';
     const actions = `
       <button class="btn btn-sm" onclick="moexAddToYtm('${b.secid}')" title="Добавить в Сравнение YTM" style="padding:2px 6px;font-size:.54rem">+ YTM</button>
-      ${b.issId ? `<button class="btn btn-sm" onclick="moexOpenDossier('${b.issId}')" title="Открыть досье эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📇</button>` : ''}
+      ${b.issId
+        ? `<button class="btn btn-sm" onclick="moexOpenDossier('${b.issId}')" title="Открыть досье эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📇</button>`
+        : `<button class="btn btn-sm" onclick="moexPullGirbo('${b.secid}')" title="Подтянуть РСБУ из ГИР БО по ИНН эмитента и создать его в базе (5 лет годовой отчётности ФНС). После этого мультипликаторы появятся прямо в этой строке." style="padding:2px 6px;font-size:.54rem;margin-left:4px;border-color:var(--acc);color:var(--acc)">📡</button>`}
     `;
     const ytmColor = b.ytm > 20 ? 'var(--warn)' : b.ytm > 15 ? 'var(--green)' : 'var(--text)';
     // Мини-профиль эмитента: Долг/EBITDA, ICR, ROA, EBITDA-маржа, рейтинг.
@@ -16100,6 +16103,197 @@ function moexAddToYtm(secid){
   save();
   if(typeof renderYtm === 'function') renderYtm();
   alert(`✓ «${bond.name}» добавлена в «Сравнение YTM»`);
+}
+
+// ───────── Автоподтяжка ГИР БО по ИНН эмитента ─────────
+// Workflow: взять бумагу из MOEX → узнать ИНН через /iss/securities/{secid}
+// → найти/создать эмитента в reportsDB → позвать fetchGirboByInn
+// (уже реализован) → записать годовые периоды type='ГИРБО'.
+
+// Кэш инфо о бумагах, чтобы при bulk не дёргать одну и ту же SECID дважды.
+window._moexSecInfoCache = window._moexSecInfoCache || new Map();
+
+// Возвращает {inn, issuer, shortName, isin, regNumber} из MOEX.
+async function _moexFetchSecurityInfo(secid){
+  if(window._moexSecInfoCache.has(secid)) return window._moexSecInfoCache.get(secid);
+  const url = `https://iss.moex.com/iss/securities/${encodeURIComponent(secid)}.json?iss.only=description&iss.meta=off`;
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error('MOEX securities info HTTP '+r.status);
+  const raw = await r.json();
+  const desc = raw.description || {};
+  const cols = desc.columns || [], data = desc.data || [];
+  const nameIdx = cols.indexOf('name'), valIdx = cols.indexOf('value');
+  const find = (n) => {
+    const row = data.find(r => r[nameIdx] === n);
+    return row ? row[valIdx] : null;
+  };
+  const info = {
+    inn:       find('INN') || find('EMITTER_INN') || null,
+    issuer:    find('ISSUER') || find('EMITENT_FULL_NAME') || find('EMITTER_FULL_NAME') || null,
+    shortName: find('SHORTNAME'),
+    isin:      find('ISIN') || secid,
+    regNumber: find('REGNUMBER') || null,
+  };
+  window._moexSecInfoCache.set(secid, info);
+  return info;
+}
+
+// Находит в reportsDB эмитента по ИНН → иначе по имени → иначе создаёт.
+function _moexEnsureIssuer(inn, issuerName){
+  for(const [id, iss] of Object.entries(reportsDB || {})){
+    if(iss && iss.inn && String(iss.inn) === String(inn)) return id;
+  }
+  // По имени — нормализованное.
+  if(issuerName){
+    const target = (typeof _normIssuerName === 'function') ? _normIssuerName(issuerName) : String(issuerName).toLowerCase();
+    for(const [id, iss] of Object.entries(reportsDB || {})){
+      if(!iss || !iss.name) continue;
+      const n = (typeof _normIssuerName === 'function') ? _normIssuerName(iss.name) : String(iss.name).toLowerCase();
+      if(n && (n === target || n.includes(target) || target.includes(n))){
+        if(!iss.inn) iss.inn = inn;
+        return id;
+      }
+    }
+  }
+  // Создаём нового.
+  const id = 'iss_moex_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  reportsDB[id] = {
+    name: issuerName || ('ИНН ' + inn),
+    ind: 'other',
+    inn: String(inn),
+    periods: {},
+  };
+  return id;
+}
+
+// Полный цикл для одной бумаги: info → ensure issuer → fetch ГИР БО → сохранить.
+// Возвращает {issId, issName, added, skipped, inn, error}.
+async function _moexAutoGirbo(secid){
+  let info;
+  try { info = await _moexFetchSecurityInfo(secid); }
+  catch(e){ return { error: 'MOEX info: ' + e.message, secid }; }
+
+  if(!info.inn){
+    return { error: 'ИНН не найден в описании бумаги на MOEX (редко, но бывает — обычно у замещаек / структурных продуктов)', secid };
+  }
+
+  const issId = _moexEnsureIssuer(info.inn, info.issuer || info.shortName);
+  const iss = reportsDB[issId];
+
+  let data;
+  try { data = await fetchGirboByInn(info.inn, 5); }
+  catch(e){ return { error: 'ГИР БО: ' + e.message, issId, issName: iss.name, inn: info.inn }; }
+
+  if(!data.count){
+    return { error: 'ГИР БО вернул 0 годовых отчётов по ИНН '+info.inn+' (компания могла быть исключена из публикации или ещё не отчитывалась)', issId, issName: iss.name, inn: info.inn };
+  }
+
+  // Сериализуем series в reportsDB.periods. Ключи series формата
+  // «FY 2024» → year=2024, period='FY', type='ГИРБО'.
+  const fieldMap = {
+    'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+    'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+    'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+  };
+  let added = 0, skipped = 0;
+  for(const [lbl, values] of Object.entries(data.series || {})){
+    const yearMatch = String(lbl).match(/(\d{4})/);
+    if(!yearMatch) continue;
+    const year = yearMatch[1];
+    const key = `${year}_FY_ГИРБО`;
+    if(iss.periods[key]){ skipped++; continue; }
+    const period = {
+      year, period:'FY', type:'ГИРБО', note:'', analysisHTML:'',
+      rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+      assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+    };
+    for(const [fid, shortKey] of Object.entries(fieldMap)){
+      if(values[fid] != null) period[shortKey] = values[fid];
+    }
+    iss.periods[key] = period;
+    added++;
+  }
+  save();
+  return { issId, issName: iss.name, added, skipped, inn: info.inn };
+}
+
+async function moexPullGirbo(secid){
+  const status = document.getElementById('moex-status');
+  const origText = status ? status.innerHTML : '';
+  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Подтягиваю ГИР БО для ${secid}…</span>`;
+  const res = await _moexAutoGirbo(secid);
+  if(res.error){
+    if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${res.error}</span>`;
+    return;
+  }
+  if(status) status.innerHTML = `<span style="color:var(--green)">✓ «${res.issName}»: добавлено ${res.added} годов (пропущено ${res.skipped})</span>`;
+  // Перерисовываем таблицу — теперь для этой бумаги будет matched issuer и мини-профиль.
+  moexApplyFilters();
+  const sbRep = document.getElementById('sb-rep');
+  if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+}
+
+async function moexPullGirboBulk(){
+  const list = window._moexFilteredCache || [];
+  const targets = list.filter(b => !b.issId);
+  if(!targets.length){
+    alert('Нет выпусков, эмитент которых НЕ в базе — ничего подтягивать. Сузь фильтр до бумаг без мини-профиля.');
+    return;
+  }
+  if(targets.length > 30){
+    if(!confirm(`В текущем фильтре ${targets.length} выпусков без matched эмитента. Это может быть 10-30 уникальных эмитентов (одна компания = несколько выпусков). Подтяжка ~1-2 сек на эмитента через прокси ГИР БО. Продолжить?`)) return;
+  }
+  const status = document.getElementById('moex-status');
+  const unique = new Map(); // inn → {secid, shortName}
+  let totalOk = 0, totalErr = 0, totalSkipped = 0, totalNewIssuers = 0;
+  const errors = [];
+
+  // Шаг 1: собрать уникальных эмитентов через info-fetch.
+  let done = 0;
+  for(const b of targets){
+    done++;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: узнаю ИНН (${done}/${targets.length}): ${b.shortName}</span>`;
+    let info;
+    try { info = await _moexFetchSecurityInfo(b.secid); }
+    catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
+    if(!info.inn){ errors.push(`${b.shortName}: ИНН нет в MOEX`); continue; }
+    if(!unique.has(info.inn)){
+      unique.set(info.inn, { secid: b.secid, name: info.issuer || info.shortName });
+    }
+    await new Promise(r => setTimeout(r, 60)); // не давим на MOEX
+  }
+
+  // Шаг 2: по каждому уникальному ИНН — ГИР БО.
+  const totalInns = unique.size;
+  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: дёргаю ГИР БО для ${totalInns} уникальных эмитентов…</span>`;
+  let idx = 0;
+  for(const [inn, meta] of unique){
+    idx++;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: ГИР БО ${idx}/${totalInns}: ${meta.name}</span>`;
+    const issIdBefore = _moexEnsureIssuer(inn, meta.name);
+    const existed = Object.keys(reportsDB[issIdBefore].periods || {}).length > 0;
+    if(!existed) totalNewIssuers++;
+    const res = await _moexAutoGirbo(meta.secid);
+    if(res.error){ totalErr++; errors.push(`${meta.name}: ${res.error}`); continue; }
+    totalOk += res.added || 0;
+    totalSkipped += res.skipped || 0;
+    await new Promise(r => setTimeout(r, 150)); // ГИР БО через прокси — полегоньку
+  }
+
+  // Результат.
+  const msg = `✓ Готово: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов (пропущено ${totalSkipped} уже существовавших), новых эмитентов в базе: ${totalNewIssuers}` + (totalErr ? `, ошибок: ${totalErr}` : '');
+  if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
+  if(errors.length){
+    console.warn('GIR BO bulk errors:', errors);
+    setTimeout(() => {
+      if(confirm(msg + `\n\nОшибок: ${errors.length}. Показать первые 10?`)){
+        alert(errors.slice(0, 10).join('\n\n'));
+      }
+    }, 100);
+  }
+  moexApplyFilters();
+  const sbRep = document.getElementById('sb-rep');
+  if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
 }
 
 function moexOpenDossier(issId){
