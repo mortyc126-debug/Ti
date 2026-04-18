@@ -16418,13 +16418,8 @@ async function _moexFetchSecurityInfo(secid){
       inn = String(v).trim(); break;
     }
   }
-  // EMITTER_ID: отдельный запрос к MOEX по id эмитента. Некоторые
-  // типы бумаг (особенно биржевые с LISTLEVEL=3) не содержат ИНН
-  // в описании выпуска, но в справочнике эмитентов MOEX он есть.
-  const emitterId = find('EMITTER_ID');
-  if(!inn && emitterId){
-    inn = await _moexFetchInnByEmitterId(emitterId);
-  }
+  // Note: MOEX /iss/emittents/{id} и /iss/issuers/{id} возвращают 404
+  // (таких endpoint'ов нет). Отдельный emitter-lookup убран.
   // Last-ditch: сканируем все value на 10/12-значное число — это формат ИНН.
   // Risk: можем поймать ОГРН (13 цифр), КПП (9), но они отсеиваются длиной.
   if(!inn && valIdx >= 0){
