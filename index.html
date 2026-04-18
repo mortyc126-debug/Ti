@@ -1896,6 +1896,27 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
   </div>
 </div>
 
+<!-- Modal: диагностика XML — дамп всех тегов для ручной отправки в чат -->
+<div class="modal-overlay" id="modal-girbo-diag">
+  <div class="modal" style="width:600px;max-width:96vw">
+    <div class="modal-hdr">🔎 Диагностика XML <button class="modal-x" onclick="closeModal('modal-girbo-diag')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:.62rem;color:var(--text2);line-height:1.5">
+        Список всех тегов из твоего XML. Что делать:<br>
+        <strong>1.</strong> Долгое нажатие в поле ниже → «Выделить всё» → «Копировать».<br>
+        <strong>2.</strong> Вставь это сообщение в чат — по этому списку я добью схему.
+      </div>
+      <textarea id="girbo-diag-text" readonly
+        style="width:100%;min-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px;white-space:pre;overflow:auto"></textarea>
+      <button class="btn btn-sm btn-p" onclick="_girboDiagCopy()" style="align-self:flex-start">📋 Попробовать скопировать</button>
+      <div id="girbo-diag-copy-status" style="font-size:.58rem;color:var(--text3)"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-girbo-diag')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 // ══ CONSTANTS ══
@@ -12586,75 +12607,119 @@ function _processGirboFile(buf, filename){
   const filledBlock = filledList.length
     ? '✓ Заполнено ('+filledList.length+'):\n  '+filledList.join('\n  ')
     : '⚠ Ни одно поле не заполнено.';
-
-  // Если что-то не нашлось и у нас XML — собираем теги с числовыми
-  // значениями, которые парсер НЕ смог замаппить на код РСБУ. Это ровно
-  // тот список, который нужен, чтобы понять, что дописать в схему.
-  const unknownTags = [];
-  if(missedList.length && parsed.format === 'XML'){
-    try {
-      const doc = new DOMParser().parseFromString(text, 'application/xml');
-      const VAL_ATTRS = ['НаОтч','НаОтчДату','НаОтчДат','СумНаОтч','Знач','ЗначОтч','ЗначГод','Значение','Сумма'];
-      const VAL_CHILDREN_RE = /^(наотч|наотчдату?|наотчдат|сумнаотч|знач|значотч|значгод|значение|сумма)$/i;
-      const hasValueSomewhere = (el) => {
-        for(const a of VAL_ATTRS){ const v = el.getAttribute(a); if(v != null && /^-?\d[\d\s.,]*$/.test((v||'').trim())) return true; }
-        const kids = el.children || [];
-        for(let j=0;j<kids.length;j++){
-          const ch = kids[j];
-          const chTag = (ch.localName || ch.nodeName || '').toLowerCase();
-          if(VAL_CHILDREN_RE.test(chTag)){
-            const t = (ch.textContent||'').trim();
-            if(/^-?\d[\d\s.,]*$/.test(t)) return true;
-          }
-        }
-        return false;
-      };
-      const seen = new Set();
-      const all = doc.getElementsByTagName('*');
-      for(let i=0;i<all.length;i++){
-        const el = all[i];
-        const tag = el.localName || el.nodeName; if(!tag) continue;
-        if(seen.has(tag)) continue;
-        if(!hasValueSomewhere(el)) continue;
-        if(GIRBO_XML_SEMANTIC[tag]) continue;
-        const codeInName = (tag.match(/(\d{4})(?!\d)/)||[])[1];
-        if(codeInName && /^(1\d{3}|2\d{3})$/.test(codeInName)) continue;
-        const parent = el.parentNode;
-        const parentTag = parent && (parent.localName || parent.nodeName);
-        if(parentTag && GIRBO_XML_CONTEXT[parentTag + '/' + tag]) continue;
-        seen.add(tag);
-        unknownTags.push(tag);
-      }
-    } catch(_){}
-  }
-
-  // Android-алерты обрезают длинный текст многоточием. Если тегов много —
-  // копируем полный список в буфер и не пихаем его в alert; показываем
-  // только подсказку. Пользователь вставит из буфера в чат.
-  let unknownBlock = '';
-  let copiedToClipboard = false;
-  if(unknownTags.length){
-    const fullList = unknownTags.join(', ');
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      try { navigator.clipboard.writeText(fullList); copiedToClipboard = true; } catch(_){}
-    }
-    if(copiedToClipboard){
-      unknownBlock = '\n\n🔎 '+unknownTags.length+' неопознанных тегов — СКОПИРОВАНО В БУФЕР.\nВставь их в чат, чтобы добавить в схему.';
-    } else {
-      // Буфер недоступен — показываем первые 15, остальные подсказкой.
-      const preview = unknownTags.slice(0, 15).join(', ');
-      const rest = unknownTags.length > 15 ? ` (+${unknownTags.length-15} ещё)` : '';
-      unknownBlock = '\n\n🔎 Неопознанные теги ('+unknownTags.length+'):\n  '+preview+rest;
-    }
-  }
-
   const missedBlock = missedList.length
     ? '\n\n✗ Не нашлось: '+missedList.length+' из 12 (пусто часто норма)'
     : '';
+
+  // Если формат XML и часть полей не нашлась — готовим диагностический
+  // дамп всех тегов (с их структурой: parent · tag · children-count ·
+  // значение). Clipboard API на мобильном без user-gesture не срабатывает,
+  // поэтому открываем модалку с textarea — пользователь выделит вручную.
+  let openDiag = false;
+  if(missedList.length && parsed.format === 'XML'){
+    const dump = _buildGirboXmlDump(text);
+    if(dump){
+      const ta = document.getElementById('girbo-diag-text');
+      if(ta){ ta.value = dump; openDiag = true; }
+    }
+  }
+
   alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
-        parsed.format+' · '+encoding+'\n' +
-        unknownBlock +
-        '\n\n'+filledBlock + missedBlock);
+        parsed.format+' · '+encoding+'\n\n' +
+        filledBlock + missedBlock +
+        (openDiag ? '\n\n🔎 Дальше откроется диагностика — вставь её в чат.' : ''));
+
+  if(openDiag){
+    const cs = document.getElementById('girbo-diag-copy-status');
+    if(cs) cs.textContent = '';
+    document.getElementById('modal-girbo-diag').classList.add('open');
+  }
+}
+
+// Формируем плоский дамп XML для ручной передачи в чат.
+// Структура:
+//   === ROOT: Файл ===
+//   Документ > СвНП > НПЮЛ        [inline leaf]          attrs: ИНН=... / НаимОрг=...
+//   Документ > БухОтч > БалансАкт  [container/4 kids]    value(НаОтч)=5000000
+//   ...
+// Выводим только ~120 первых уникальных «путей родитель→тег», с примером
+// значения, если нашлось. Этого хватает, чтобы понять схему формы.
+function _buildGirboXmlDump(text){
+  try {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if(doc.querySelector('parsererror')) return '[XML parse error]';
+    const root = doc.documentElement;
+    const VAL_ATTRS = ['НаОтч','НаПредОтч','НаПредПредОтч','НаОтчДату','НаОтчДат','СумНаОтч','Знач','ЗначОтч','ЗначГод','Значение','Сумма'];
+    const VAL_CHILDREN_RE = /^(наотч|напредотч|напредпредотч|наотчдату?|наотчдат|сумнаотч|знач|значотч|значгод|значение|сумма)$/i;
+    const pickVal = (el) => {
+      for(const a of VAL_ATTRS){
+        const v = el.getAttribute(a);
+        if(v != null && v.trim()) return {src: a, val: v.trim()};
+      }
+      const kids = el.children || [];
+      for(let j=0;j<kids.length;j++){
+        const ch = kids[j];
+        const chTag = (ch.localName || ch.nodeName || '');
+        if(VAL_CHILDREN_RE.test(chTag)){
+          const t = (ch.textContent||'').trim();
+          if(t) return {src:'<'+chTag+'>', val:t};
+        }
+      }
+      if(!(el.children||[]).length){
+        const t = (el.textContent||'').trim();
+        if(t && t.length < 80) return {src:'text', val:t};
+      }
+      return null;
+    };
+
+    const lines = ['=== ROOT: ' + (root.localName || root.nodeName) + ' ===',
+                   'Версия формы: ' + (root.getAttribute('ВерсФорм') || '?') +
+                   ' · Программа: ' + (root.getAttribute('ВерсПрог') || '?')];
+    const seen = new Set();
+    const all = root.getElementsByTagName('*');
+    const MAX = 200;
+    for(let i=0;i<all.length && lines.length < MAX+2;i++){
+      const el = all[i];
+      const tag = el.localName || el.nodeName; if(!tag) continue;
+      const parent = el.parentNode;
+      const parentTag = parent ? (parent.localName || parent.nodeName) : '';
+      const key = parentTag + '/' + tag;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      const nKids = (el.children || []).length;
+      const marker = nKids ? '['+nKids+' kids]' : '[leaf]';
+      const v = pickVal(el);
+      const valPart = v ? '  ' + v.src + '=' + v.val.slice(0, 40) : '';
+      lines.push(parentTag + ' > ' + tag + '  ' + marker + valPart);
+    }
+    if(all.length >= MAX) lines.push('... ещё элементов (всего '+all.length+')');
+    return lines.join('\n');
+  } catch(e){
+    return '[dump error: ' + e.message + ']';
+  }
+}
+
+// Попытка скопировать содержимое textarea — срабатывает, т.к. это
+// клик от пользователя. На старых WebView может понадобиться execCommand.
+function _girboDiagCopy(){
+  const ta = document.getElementById('girbo-diag-text');
+  const st = document.getElementById('girbo-diag-copy-status');
+  if(!ta){ return; }
+  try {
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(_){}
+    if(!ok && navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ta.value).then(() => {
+        if(st) st.textContent = '✓ Скопировано.';
+      }, () => { if(st) st.textContent = '⚠ Не получилось — выдели вручную и скопируй.'; });
+    } else {
+      if(st) st.textContent = ok ? '✓ Скопировано.' : '⚠ Не получилось — выдели вручную и скопируй.';
+    }
+  } catch(e){
+    if(st) st.textContent = '⚠ ' + e.message + ' — выдели вручную и скопируй.';
+  }
 }
 
 function importGirboCsv(input){
