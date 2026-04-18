@@ -8843,37 +8843,57 @@ function _processGirboFile(buf, filename){
   parsed.encoding = encoding;
 
   if(!Object.keys(parsed.codes).length){
-    // Показываем начало файла + для XML — список leaf-тегов с НаОтч.
-    // Это прямая подсказка, какие теги использует конкретная схема:
-    // если их нет в GIRBO_XML_SEMANTIC — добавить и всё заработает.
+    // Диагностика: нужно увидеть точные имена тегов и где значения.
+    // Три категории: (1) с НаОтч/НаПредОтч-атрибутами — стандарт ФНС;
+    // (2) с ЛЮБЫМ числовым атрибутом; (3) вообще все leaf-теги.
     const preview = String(text || '').slice(0, 500).replace(/\t/g, ' | ');
     let tagList = '';
     if(parsed.format === 'XML'){
       try {
         const doc = new DOMParser().parseFromString(text, 'application/xml');
-        const tags = new Set();
+        const naOtchTags = new Set();     // с НаОтч-семейством
+        const numAttrTags = new Set();    // с числовым атрибутом
+        const numTextTags = new Set();    // с числовым textContent
+        const allLeafTags = new Set();    // любой leaf
         const all = doc.getElementsByTagName('*');
+        const NUM_RE = /^-?\d[\d\s.,]*$/;
         for(let i=0;i<all.length;i++){
           const el = all[i];
-          // leaf: без детей-элементов + имеет НаОтч/НаОтчДату/Знач-подобный атрибут
-          if((el.children||[]).length) continue;
-          const hasVal = el.getAttribute('НаОтч') || el.getAttribute('НаОтчДату') ||
-                         el.getAttribute('СумНаОтч') || el.getAttribute('Знач');
-          if(hasVal) tags.add(el.localName || el.nodeName);
+          const hasElChildren = Array.from(el.children||[]).length > 0;
+          if(hasElChildren) continue;
+          const name = el.localName || el.nodeName;
+          allLeafTags.add(name);
+          if(el.getAttribute('НаОтч') || el.getAttribute('НаПредОтч') ||
+             el.getAttribute('НаПредПредОтч') || el.getAttribute('НаОтчДату') ||
+             el.getAttribute('СумНаОтч') || el.getAttribute('Знач')){
+            naOtchTags.add(name);
+          }
+          for(let j=0;j<el.attributes.length;j++){
+            const v = (el.attributes[j].value || '').trim();
+            if(v && NUM_RE.test(v)){ numAttrTags.add(name); break; }
+          }
+          const txt = (el.textContent || '').trim();
+          if(txt && NUM_RE.test(txt)) numTextTags.add(name);
         }
-        if(tags.size){
-          tagList = '\n\n── Leaf-теги с НаОтч (которых не нашлось в схеме) ──\n' +
-                    Array.from(tags).slice(0, 40).join(', ') +
-                    (tags.size > 40 ? ` (ещё ${tags.size-40})` : '');
+        const short = (set, limit) => Array.from(set).slice(0, limit).join(', ') +
+          (set.size > limit ? ` (+${set.size-limit})` : '');
+        if(naOtchTags.size){
+          tagList = '\n\n── Leaf-теги с НаОтч (не в схеме) ──\n' + short(naOtchTags, 40);
+        } else if(numAttrTags.size){
+          tagList = '\n\n── Leaf-теги с числовыми атрибутами ──\n' + short(numAttrTags, 40);
+        } else if(numTextTags.size){
+          tagList = '\n\n── Leaf-теги с числом в тексте ──\n' + short(numTextTags, 40);
+        } else {
+          tagList = '\n\n── Leaf-теги (все) ──\n' + short(allLeafTags, 40);
         }
-      } catch(_){}
+      } catch(e){ tagList = '\n\n── XML parse error: ' + e.message + ' ──'; }
     }
     alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
           'Формат: '+parsed.format+'\n' +
-          'Кодировка: '+encoding+'\n\n' +
-          '── Начало файла ──\n' + preview + (text && text.length > 500 ? '\n...' : '') +
+          'Кодировка: '+encoding+
           tagList +
-          '\n\nЕсли это действительно ГИРБО — пришли первые строки, подправлю парсер.');
+          '\n\n── Начало файла ──\n' + preview + (text && text.length > 500 ? '\n...' : '') +
+          '\n\nЕсли это действительно ГИРБО — пришли теги из первой секции выше.');
     return;
   }
 
