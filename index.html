@@ -12300,7 +12300,10 @@ function parseGirboXml(text){
   const root = doc.documentElement;
 
   // ── Метаданные: ИНН, наименование, отчётный год ──
-  let inn = '', name = '', year = null;
+  // ВАЖНО: ОтчетГод и ДатаДок собираем отдельно — иначе при обходе атрибутов
+  // ДатаДок="30.03.2026" срабатывает раньше ОтчетГод="2025" (годовой отчёт
+  // сдают в марте СЛЕДУЮЩЕГО года), и год отчёта получается завышен на 1.
+  let inn = '', name = '', year = null, dateYear = null;
   const all = root.getElementsByTagName('*');
   for(let i=0;i<all.length;i++){
     const el = all[i];
@@ -12311,12 +12314,17 @@ function parseGirboXml(text){
       if(!inn && /инн/.test(n) && /^(\d{10}|\d{12})$/.test(v)) inn = v;
       if(!name && /наим(орг|юл|полн|сокр)?|наименование/.test(n) && v.length >= 2) name = v;
       if(!year && /отчетгод|отчгод|отчётгод|периодотч|годотч|отчетныйгод/.test(n) && /^20\d{2}$/.test(v)) year = parseInt(v);
-      if(!year && /датадок|даталок|дата/.test(n)){
+      if(!dateYear && /датадок|даталок|дата/.test(n)){
         const m = v.match(/(?:^|[^\d])(\d{2})\.(\d{2})\.(20\d{2})(?:$|[^\d])/);
-        if(m) year = parseInt(m[3]);
+        if(m) dateYear = parseInt(m[3]);
       }
     }
   }
+  // Фолбэк по ДатаДок только если ОтчетГод нигде не нашёлся.
+  // Точно угадать тут нельзя (годовой сдают в Q1 следующего года, квартальный —
+  // в том же), поэтому берём как есть — большинство кейсов перекрывает основной
+  // путь через ОтчетГод.
+  if(!year && dateYear) year = dateYear;
   if(!inn){
     const m = (root.textContent||'').match(/\b(\d{10}|\d{12})\b/);
     if(m) inn = m[1];
