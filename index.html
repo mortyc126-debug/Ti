@@ -16295,6 +16295,50 @@ function _moexLocalInnLookup(bondName){
   return null;
 }
 
+// MOEX поиск: /iss/securities.json?q={query} — это другой endpoint,
+// чем /iss/securities/{secid}.json. Возвращает табличный результат с
+// колонками, среди которых бывает `emitent_inn` (не гарантировано,
+// но часто). Это единственный бесплатный путь получить ИНН мелких
+// ВДО-эмитентов БЕЗ прохода через прокси ФНС.
+window._moexSearchInnCache = window._moexSearchInnCache || new Map();
+async function _moexFetchInnBySearch(query){
+  if(!query) return null;
+  if(window._moexSearchInnCache.has(query)) return window._moexSearchInnCache.get(query);
+  try {
+    const url = 'https://iss.moex.com/iss/securities.json?iss.meta=off&limit=5&q=' + encodeURIComponent(query);
+    const r = await fetch(url, {cache:'no-store'});
+    if(!r.ok){ window._moexSearchInnCache.set(query, null); return null; }
+    const raw = await r.json();
+    const sec = raw.securities || {};
+    const cols = sec.columns || [];
+    const data = sec.data || [];
+    // Ищем колонку emitent_inn / inn / issuer_inn (лениво, нерегистрозависимо).
+    const innCol = cols.findIndex(c => /^(emitent_inn|issuer_inn|emitent_inn_issuer|inn)$/i.test(c || ''));
+    if(innCol < 0){
+      // Поле не нашлось — может быть MOEX в этом endpoint'е ИНН не отдаёт.
+      // Залогируем один раз для диагностики, кэшируем null.
+      if(!window._moexSearchInnColWarned){
+        console.warn('[MOEX search] в securities.json?q= нет колонки *_inn. Есть:', cols);
+        window._moexSearchInnColWarned = true;
+      }
+      window._moexSearchInnCache.set(query, null);
+      return null;
+    }
+    // Берём первое непустое валидное ИНН-значение.
+    for(const row of data){
+      const v = String(row[innCol] || '').trim();
+      if(/^\d{10}$|^\d{12}$/.test(v)){
+        window._moexSearchInnCache.set(query, v);
+        return v;
+      }
+    }
+    window._moexSearchInnCache.set(query, null);
+    return null;
+  } catch(e){
+    return null;
+  }
+}
+
 // MOEX имеет справочник эмитентов: /iss/emittents/{id}.json или
 // /iss/issuers/{id}.json — точное имя зависит от версии ISS. Пробуем
 // оба, достаём ИНН из любой секции ответа.
@@ -16511,22 +16555,28 @@ async function _moexAutoGirbo(secid, allowPrompt){
   }
 
   let inn = info.inn;
-  // Fallback 1: поиск ИНН через ГИР БО по названию эмитента.
+  // Fallback 1: MOEX search endpoint — часто содержит emitent_inn,
+  // когда description его не содержит (особенно для мелких ВДО).
+  if(!inn){
+    inn = await _moexFetchInnBySearch(secid);
+  }
+  // Fallback 2: поиск ИНН через ГИР БО по названию эмитента
+  // (упирается в прокси — если он 522, не сработает).
   if(!inn){
     const nameForSearch = info.issuer || _moexGuessIssuerName(info.shortName);
     if(nameForSearch){
       inn = await _girboFindInnByName(nameForSearch);
     }
   }
-  // Fallback 2: prompt для ручного клика.
+  // Fallback 3: prompt для ручного клика.
   if(!inn && allowPrompt){
-    const ent = (prompt(`ИНН не нашёлся ни в локальном справочнике, ни в MOEX, ни по имени в ГИР БО для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
+    const ent = (prompt(`ИНН не нашёлся ни в локальном справочнике, ни в MOEX (description + search), ни по имени в ГИР БО для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
     if(!ent) return { error: 'ИНН не введён, пропущено', secid };
     if(!/^\d{10}$|^\d{12}$/.test(ent)) return { error: 'ИНН должен быть 10 или 12 цифр', secid };
     inn = ent;
   }
   if(!inn){
-    return { error: 'ИНН не найден ни локально, ни в MOEX, ни по имени в ГИР БО', secid, _noInn: true };
+    return { error: 'ИНН не найден (локально, MOEX, ГИР БО — ничего)', secid, _noInn: true };
   }
 
   const issId = _moexEnsureIssuer(inn, info.issuer || info.shortName);
@@ -16626,6 +16676,12 @@ async function moexPullGirboBulk(){
     catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
 
     let inn = info.inn;
+    // MOEX search endpoint — часто даёт emitent_inn там, где description
+    // молчит. Критично для мелких ВДО.
+    if(!inn){
+      inn = await _moexFetchInnBySearch(b.secid);
+    }
+    // ГИР БО name-search (требует прокси).
     if(!inn){
       const nameGuess = info.issuer || _moexGuessIssuerName(b.shortName, info.shortName);
       if(nameGuess){
@@ -16635,7 +16691,7 @@ async function moexPullGirboBulk(){
         await new Promise(r => setTimeout(r, 120));
       }
     }
-    if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет (ни локально, ни MOEX, ни поиск по имени)`); continue; }
+    if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет (локально, MOEX, ГИР БО — ничего)`); continue; }
     if(!unique.has(inn)){
       unique.set(inn, { secid: b.secid, name: info.issuer || info.shortName });
     }
