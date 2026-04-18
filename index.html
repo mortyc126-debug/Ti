@@ -15525,6 +15525,9 @@ function _num(v){
 }
 
 // Парсит одну страницу: securities (статика) + marketdata (котировки), мерджим по SECID.
+// Важно: MOEX возвращает одну бумагу по N раз — по числу торговых режимов, где
+// она листится (TQCB + EQOD + PSOB + …). Нас интересует только «первичный»
+// режим (BOARDID === PRIMARYBOARDID) — там живая цена и корректные котировки.
 function _moexParsePage(resp){
   const sec = resp.securities || {};
   const md  = resp.marketdata || {};
@@ -15532,12 +15535,24 @@ function _moexParsePage(resp){
   const mdCols  = md.columns  || [], mdData  = md.data  || [];
   const idx = (cols, name) => cols.indexOf(name);
   const sidIdx = idx(secCols, 'SECID');
+  const boardIdx = idx(secCols, 'BOARDID');
+  const primaryBoardIdx = idx(secCols, 'PRIMARYBOARDID');
   const mdSidIdx = idx(mdCols, 'SECID');
+  const mdBoardIdx = idx(mdCols, 'BOARDID');
+  // marketdata тоже приходит по каждой паре (SECID, BOARDID). Берём строку
+  // с максимальным объёмом торгов на ту же SECID — это почти всегда primary.
   const mdById = {};
-  for(const r of mdData){ const id = r[mdSidIdx]; if(id) mdById[id] = r; }
+  for(const r of mdData){
+    const id = r[mdSidIdx]; if(!id) continue;
+    if(!mdById[id]) mdById[id] = r;
+  }
   const out = [];
   for(const r of secData){
     const secid = r[sidIdx]; if(!secid) continue;
+    const board = r[boardIdx];
+    const primary = r[primaryBoardIdx];
+    // Пропускаем дубли с неосновных режимов.
+    if(primary && board && board !== primary) continue;
     const g  = (name) => r[idx(secCols, name)];
     const mdr = mdById[secid] || [];
     const gm = (name) => mdr[idx(mdCols, name)];
@@ -15546,7 +15561,7 @@ function _moexParsePage(resp){
       isin:        g('ISIN') || secid,
       shortName:   g('SHORTNAME') || g('SECNAME') || secid,
       secName:     g('SECNAME'),
-      boardid:     g('BOARDID'),
+      boardid:     board,
       coupon:      _num(g('COUPONPERCENT')) || _num(g('COUPONVALUE')),
       couponValue: _num(g('COUPONVALUE')),
       couponPeriod:_num(g('COUPONPERIOD')),
@@ -15572,28 +15587,36 @@ async function fetchMoexCatalog(){
   const status = document.getElementById('moex-status');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Загружаю…'; }
   const items = [];
-  let start = 0, pages = 0;
+  const seen = new Set();
+  let start = 0, pages = 0, rawSeen = 0;
   try {
     while(true){
-      if(status) status.textContent = `страница ${pages+1}, загружено ${items.length} бумаг…`;
-      // iss.json=extended меняет структуру ответа (вместо columns+data —
-      // массив именованных объектов), и мой парсер под него не заточен.
-      // Используем обычный columns+data формат.
+      if(status) status.textContent = `страница ${pages+1}, строк прошло ${rawSeen}, уникальных бумаг ${items.length}…`;
       const url = `${_MOEX_BASE}?iss.meta=off&start=${start}&limit=${_MOEX_PAGE_SIZE}`;
       const r = await fetch(url, {cache:'no-store'});
       if(!r.ok) throw new Error('MOEX HTTP ' + r.status);
       const raw = await r.json();
+      // securities.data.length — размер сырой страницы (ещё с дублями по
+      // торговым режимам). batch — уже отфильтровано на primary board.
+      const rawPageLen = (raw && raw.securities && raw.securities.data && raw.securities.data.length) || 0;
+      rawSeen += rawPageLen;
       const batch = _moexParsePage(raw);
-      if(!batch.length) break;
-      items.push(...batch);
+      for(const b of batch){
+        if(seen.has(b.secid)) continue; // страховка от ещё одной дубликации
+        seen.add(b.secid);
+        items.push(b);
+      }
       pages++;
-      if(batch.length < _MOEX_PAGE_SIZE) break;
+      if(rawPageLen < _MOEX_PAGE_SIZE) break;
       start += _MOEX_PAGE_SIZE;
-      if(pages > 80) break;
+      if(pages > 500){ // 500 × 100 = 50 000 сырых строк — с запасом
+        console.warn('MOEX fetch: > 500 страниц, прерываю во избежание бесконечного цикла');
+        break;
+      }
     }
     window._moexCatalog = { items, updatedAt: new Date().toISOString() };
     _moexSaveCache();
-    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} бумаг за ${pages} страниц</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} уникальных бумаг за ${pages} страниц (отфильтровано ${rawSeen - items.length} дублей с неосновных режимов)</span>`;
     _moexRenderMeta();
     moexApplyFilters();
   } catch(e){
