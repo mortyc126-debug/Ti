@@ -1919,6 +1919,62 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
 
 <script>
 'use strict';
+
+// ══ ГЛОБАЛЬНЫЕ ОШИБКИ → тост ══
+// Чтобы JS-вылеты не терялись в консоли (особенно на мобиле, где DevTools нет).
+// Тап по тосту копирует сообщение в буфер — удобно прислать в чат.
+function showToast(msg, kind){
+  kind = kind || 'info';
+  const colorMap = { info:'var(--acc)', warn:'var(--warn)', err:'var(--danger)', ok:'var(--green)' };
+  const color = colorMap[kind] || colorMap.info;
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:20px;right:20px;max-width:min(92vw,480px);
+    background:var(--s2);border:1px solid ${color};color:${color};
+    font-family:var(--mono);font-size:.66rem;padding:9px 14px;z-index:99999;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;word-break:break-word;
+    line-height:1.45`;
+  t.textContent = msg;
+  t.title = 'Тап — скопировать';
+  t.onclick = () => {
+    (navigator.clipboard?.writeText(msg) || Promise.reject()).catch(()=>{}).finally(()=>{
+      t.style.borderColor = 'var(--green)';
+      t.style.color = 'var(--green)';
+      t.textContent = '✓ скопировано';
+      setTimeout(()=>t.remove(), 900);
+    });
+  };
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), kind === 'err' ? 12000 : 5000);
+  return t;
+}
+
+(function(){
+  let last = '', lastAt = 0;
+  function report(tag, msg){
+    if(!msg) return;
+    // Игнорируем мусор от сторонних расширений / ResizeObserver.
+    if(/^(ResizeObserver loop|Script error\.?)\s*$/i.test(msg)) return;
+    // Деду́пим одинаковые сообщения в течение 3 сек.
+    const now = Date.now();
+    if(msg === last && now - lastAt < 3000) return;
+    last = msg; lastAt = now;
+    console.error('[' + tag + ']', msg);
+    showToast('⚠️ ' + tag + ': ' + msg.slice(0, 400), 'err');
+  }
+  window.addEventListener('error', e => {
+    // Событие error также срабатывает на ошибки загрузки ресурсов (img/script) —
+    // в таком случае e.error === null. Их пропускаем.
+    if(!e.error && !e.message) return;
+    const stack = e.error?.stack ? '\n' + e.error.stack.split('\n').slice(0,3).join('\n') : '';
+    report('JS', (e.message || 'ошибка') + stack);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason;
+    const msg = r?.stack || r?.message || (typeof r === 'string' ? r : JSON.stringify(r));
+    report('Promise', msg || 'unhandled rejection');
+  });
+})();
+
 // ══ CONSTANTS ══
 const RATE_NOW=15;
 const IND_NAMES={energy:'Нефть и газ',metals:'Металлургия',retail:'Ритейл',telecom:'Телеком',finance:'Финансы/Банки',realty:'Недвижимость',transport:'Транспорт',agro:'АПК',other:'Другое'};
