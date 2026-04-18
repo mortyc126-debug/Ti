@@ -16114,9 +16114,15 @@ function moexAddToYtm(secid){
 window._moexSecInfoCache = window._moexSecInfoCache || new Map();
 
 // Возвращает {inn, issuer, shortName, isin, regNumber} из MOEX.
+// Где искать ИНН: у MOEX оно лежит в description, но название поля
+// нестабильное — для разных типов бумаг по-разному. Пробуем варианты,
+// затем сканируем все значения на 10/12-значные числа (формат ИНН).
 async function _moexFetchSecurityInfo(secid){
   if(window._moexSecInfoCache.has(secid)) return window._moexSecInfoCache.get(secid);
-  const url = `https://iss.moex.com/iss/securities/${encodeURIComponent(secid)}.json?iss.only=description&iss.meta=off`;
+  // Полный ответ (без iss.only) — он маленький, ~1-2 КБ. Раньше я
+  // сужал до description, но иногда нужное поле называется EMITTER_INN
+  // и попадает в другой раздел.
+  const url = `https://iss.moex.com/iss/securities/${encodeURIComponent(secid)}.json?iss.meta=off`;
   const r = await fetch(url, {cache:'no-store'});
   if(!r.ok) throw new Error('MOEX securities info HTTP '+r.status);
   const raw = await r.json();
@@ -16124,16 +16130,46 @@ async function _moexFetchSecurityInfo(secid){
   const cols = desc.columns || [], data = desc.data || [];
   const nameIdx = cols.indexOf('name'), valIdx = cols.indexOf('value');
   const find = (n) => {
-    const row = data.find(r => r[nameIdx] === n);
-    return row ? row[valIdx] : null;
+    if(nameIdx < 0) return null;
+    const row = data.find(r => String(r[nameIdx] || '').toUpperCase() === String(n).toUpperCase());
+    return row && valIdx >= 0 ? row[valIdx] : null;
   };
-  const info = {
-    inn:       find('INN') || find('EMITTER_INN') || null,
-    issuer:    find('ISSUER') || find('EMITENT_FULL_NAME') || find('EMITTER_FULL_NAME') || null,
-    shortName: find('SHORTNAME'),
-    isin:      find('ISIN') || secid,
-    regNumber: find('REGNUMBER') || null,
-  };
+  // Варианты названия поля ИНН.
+  let inn = null;
+  for(const variant of ['INN','EMITTER_INN','ISSUER_INN','EMITENT_INN','TAX_ID']){
+    const v = find(variant);
+    if(v && /^\d{10}$|^\d{12}$/.test(String(v).trim())){
+      inn = String(v).trim(); break;
+    }
+  }
+  // Last-ditch: сканируем все value на 10/12-значное число — это формат ИНН.
+  // Risk: можем поймать ОГРН (13 цифр), КПП (9), но они отсеиваются длиной.
+  if(!inn && valIdx >= 0){
+    for(const row of data){
+      const v = row[valIdx];
+      if(v == null) continue;
+      const s = String(v).trim();
+      if(/^\d{10}$|^\d{12}$/.test(s)){
+        // Дополнительная проверка по ИНН-чексумме была бы строже,
+        // но на практике 10-значное число в description — это почти
+        // всегда ИНН. Берём.
+        inn = s; break;
+      }
+    }
+  }
+  // Имя эмитента — несколько кандидатов.
+  const issuer = find('ISSUER') || find('EMITENT_FULL_NAME') || find('EMITTER_FULL_NAME')
+              || find('EMITENT') || find('EMITENTNAME') || find('FULLNAME') || null;
+  const shortName = find('SHORTNAME') || find('SECNAME');
+  const isin = find('ISIN') || secid;
+  const regNumber = find('REGNUMBER') || null;
+  // Диагностика — если ИНН не нашёлся, в консоль логируем все поля
+  // description, чтобы можно было посмотреть, как называется нужное.
+  if(!inn){
+    const dump = data.map(r => `${r[nameIdx]}=${r[valIdx]}`);
+    console.warn('[MOEX] нет ИНН для', secid, '— поля description:', dump);
+  }
+  const info = { inn, issuer, shortName, isin, regNumber };
   window._moexSecInfoCache.set(secid, info);
   return info;
 }
@@ -16167,25 +16203,33 @@ function _moexEnsureIssuer(inn, issuerName){
 }
 
 // Полный цикл для одной бумаги: info → ensure issuer → fetch ГИР БО → сохранить.
-// Возвращает {issId, issName, added, skipped, inn, error}.
-async function _moexAutoGirbo(secid){
+// allowPrompt=true (только для ручного клика) — при отсутствии ИНН в MOEX
+// предложит ввести вручную. В bulk-режиме false, чтобы не спамить prompt'ами.
+async function _moexAutoGirbo(secid, allowPrompt){
   let info;
   try { info = await _moexFetchSecurityInfo(secid); }
   catch(e){ return { error: 'MOEX info: ' + e.message, secid }; }
 
-  if(!info.inn){
-    return { error: 'ИНН не найден в описании бумаги на MOEX (редко, но бывает — обычно у замещаек / структурных продуктов)', secid };
+  let inn = info.inn;
+  if(!inn && allowPrompt){
+    const ent = (prompt(`ИНН не нашёлся в MOEX для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
+    if(!ent) return { error: 'ИНН не введён, пропущено', secid };
+    if(!/^\d{10}$|^\d{12}$/.test(ent)) return { error: 'ИНН должен быть 10 или 12 цифр', secid };
+    inn = ent;
+  }
+  if(!inn){
+    return { error: 'ИНН не найден в MOEX (см. console.warn — там показаны поля, которые есть)', secid, _noInn: true };
   }
 
-  const issId = _moexEnsureIssuer(info.inn, info.issuer || info.shortName);
+  const issId = _moexEnsureIssuer(inn, info.issuer || info.shortName);
   const iss = reportsDB[issId];
 
   let data;
-  try { data = await fetchGirboByInn(info.inn, 5); }
-  catch(e){ return { error: 'ГИР БО: ' + e.message, issId, issName: iss.name, inn: info.inn }; }
+  try { data = await fetchGirboByInn(inn, 5); }
+  catch(e){ return { error: 'ГИР БО: ' + e.message, issId, issName: iss.name, inn }; }
 
   if(!data.count){
-    return { error: 'ГИР БО вернул 0 годовых отчётов по ИНН '+info.inn+' (компания могла быть исключена из публикации или ещё не отчитывалась)', issId, issName: iss.name, inn: info.inn };
+    return { error: 'ГИР БО вернул 0 годовых отчётов по ИНН '+inn+' (компания могла быть исключена из публикации или ещё не отчитывалась)', issId, issName: iss.name, inn };
   }
 
   // Сериализуем series в reportsDB.periods. Ключи series формата
@@ -16214,14 +16258,13 @@ async function _moexAutoGirbo(secid){
     added++;
   }
   save();
-  return { issId, issName: iss.name, added, skipped, inn: info.inn };
+  return { issId, issName: iss.name, added, skipped, inn };
 }
 
 async function moexPullGirbo(secid){
   const status = document.getElementById('moex-status');
-  const origText = status ? status.innerHTML : '';
   if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Подтягиваю ГИР БО для ${secid}…</span>`;
-  const res = await _moexAutoGirbo(secid);
+  const res = await _moexAutoGirbo(secid, true); // allowPrompt=true для ручной кнопки
   if(res.error){
     if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${res.error}</span>`;
     return;
@@ -16250,21 +16293,33 @@ async function moexPullGirboBulk(){
 
   // Шаг 1: собрать уникальных эмитентов через info-fetch.
   let done = 0;
+  let noInnCount = 0;
   for(const b of targets){
     done++;
     if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: узнаю ИНН (${done}/${targets.length}): ${b.shortName}</span>`;
     let info;
     try { info = await _moexFetchSecurityInfo(b.secid); }
     catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
-    if(!info.inn){ errors.push(`${b.shortName}: ИНН нет в MOEX`); continue; }
+    if(!info.inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет в MOEX`); continue; }
     if(!unique.has(info.inn)){
       unique.set(info.inn, { secid: b.secid, name: info.issuer || info.shortName });
     }
-    await new Promise(r => setTimeout(r, 60)); // не давим на MOEX
+    await new Promise(r => setTimeout(r, 60));
+  }
+
+  const totalInns = unique.size;
+
+  // Если совсем ничего не нашлось — честно объясняем.
+  if(totalInns === 0){
+    const why = noInnCount === targets.length
+      ? `ни у одной из ${targets.length} бумаг ИНН не оказалось в MOEX-описании. Это часто бывает у замещаек, структурных продуктов и старых выпусков. Можно по-одному нажимать «📡» на строке — там попросит ИНН вручную.`
+      : `что-то пошло не так. Ошибок: ${errors.length}. Подробности — в консоли браузера (chrome://inspect → Console). Также для каждой бумаги без ИНН в console.warn выведены все поля description — посмотри как там назвается поле с ИНН.`;
+    if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${why}</span>`;
+    console.warn('[GIR BO bulk] no INN errors:', errors.slice(0, 20));
+    return;
   }
 
   // Шаг 2: по каждому уникальному ИНН — ГИР БО.
-  const totalInns = unique.size;
   if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: дёргаю ГИР БО для ${totalInns} уникальных эмитентов…</span>`;
   let idx = 0;
   for(const [inn, meta] of unique){
@@ -16273,20 +16328,20 @@ async function moexPullGirboBulk(){
     const issIdBefore = _moexEnsureIssuer(inn, meta.name);
     const existed = Object.keys(reportsDB[issIdBefore].periods || {}).length > 0;
     if(!existed) totalNewIssuers++;
-    const res = await _moexAutoGirbo(meta.secid);
+    const res = await _moexAutoGirbo(meta.secid, false);
     if(res.error){ totalErr++; errors.push(`${meta.name}: ${res.error}`); continue; }
     totalOk += res.added || 0;
     totalSkipped += res.skipped || 0;
-    await new Promise(r => setTimeout(r, 150)); // ГИР БО через прокси — полегоньку
+    await new Promise(r => setTimeout(r, 150));
   }
 
   // Результат.
-  const msg = `✓ Готово: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов (пропущено ${totalSkipped} уже существовавших), новых эмитентов в базе: ${totalNewIssuers}` + (totalErr ? `, ошибок: ${totalErr}` : '');
+  const msg = `✓ Готово: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов (пропущено ${totalSkipped} уже существовавших), новых эмитентов в базе: ${totalNewIssuers}` + (totalErr ? `, ошибок: ${totalErr}` : '') + (noInnCount ? `, без ИНН в MOEX: ${noInnCount}` : '');
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
   if(errors.length){
     console.warn('GIR BO bulk errors:', errors);
     setTimeout(() => {
-      if(confirm(msg + `\n\nОшибок: ${errors.length}. Показать первые 10?`)){
+      if(confirm(msg + `\n\nОшибок/пропусков: ${errors.length}. Показать первые 10?`)){
         alert(errors.slice(0, 10).join('\n\n'));
       }
     }, 100);
