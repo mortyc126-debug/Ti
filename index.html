@@ -324,8 +324,8 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
     <div class="sb-item" onclick="exportAllData()" title="Сохранить все данные в JSON-файл"><span class="sb-icon">⬇️</span>Экспорт JSON</div>
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
     <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
-    <input type="file" id="girbo-file" accept="*/*" style="display:none" onchange="importGirboCsv(this)">
-    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт выгрузки ГИРБО (bo.nalog.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
+    <input type="file" id="girbo-file" accept="*/*" multiple style="display:none" onchange="importGirboCsv(this)">
+    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт ОДНОГО или НЕСКОЛЬКИХ файлов ГИРБО (bo.nalog.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
     <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
   </div>
@@ -1872,11 +1872,11 @@ window._loadTesseract = () => new Promise((resolve, reject) => {
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Выгрузки с <strong>bo.nalog.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
       </div>
-      <input type="file" id="girbo-file-modal" accept="*/*" style="display:none" onchange="importGirboCsv(this)">
+      <input type="file" id="girbo-file-modal" accept="*/*" multiple style="display:none" onchange="importGirboCsv(this)">
       <div id="girbo-drop" onclick="document.getElementById('girbo-file-modal').click()"
            style="border:2px dashed var(--border2);padding:22px 16px;text-align:center;background:var(--bg);cursor:pointer;user-select:none">
         <div style="font-size:1.6rem;margin-bottom:4px">📥</div>
-        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы выбрать файл<br><span style="color:var(--text3);font-size:.6rem">(на десктопе можно перетащить сюда)</span></div>
+        <div style="font-size:.72rem;color:var(--text);line-height:1.4">Нажмите, чтобы выбрать <strong>один или несколько</strong> файлов<br><span style="color:var(--text3);font-size:.6rem">(на десктопе можно перетащить сюда; для пачки — Ctrl/⌘+клик)</span></div>
         <div style="font-size:.56rem;color:var(--text3);margin-top:6px;letter-spacing:.08em">.CSV · .TXT · .TSV · .XML</div>
       </div>
       <details style="font-size:.62rem;color:var(--text2)">
@@ -12625,8 +12625,16 @@ function extractByRsbuCsvHeader(raw, expectedInn){
 // Ядро: берёт ArrayBuffer + имя файла, определяет формат, декодирует,
 // парсит и пишет в reportsDB. Общая точка входа для файл-инпута, paste
 // и drag-and-drop — чтобы логика не дублировалась.
-function _processGirboFile(buf, filename){
-  if(!buf || !buf.byteLength){ alert('Пустой файл.'); return; }
+// opts = { quiet: true, autoOverwrite: true } — используется батчем.
+// Всегда возвращает сводку {ok, issName, year, format, encoding, filled, missed, error, skippedReason}.
+function _processGirboFile(buf, filename, opts){
+  opts = opts || {};
+  const quiet = !!opts.quiet;
+  const autoOverwrite = !!opts.autoOverwrite;
+  if(!buf || !buf.byteLength){
+    if(!quiet) alert('Пустой файл.');
+    return { ok:false, error:'пустой файл', file:filename };
+  }
   const peek = new TextDecoder('latin1').decode(new Uint8Array(buf).subarray(0, Math.min(buf.byteLength, 80)));
   const isXml = looksLikeXml(filename, peek);
 
@@ -12688,26 +12696,36 @@ function _processGirboFile(buf, filename){
         }
       } catch(e){ tagList = '\n\n── XML parse error: ' + e.message + ' ──'; }
     }
-    alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
-          'Формат: '+parsed.format+'\n' +
-          'Кодировка: '+encoding+
-          tagList +
-          '\n\n── Начало файла ──\n' + preview + (text && text.length > 500 ? '\n...' : '') +
-          '\n\nЕсли это действительно ГИРБО — пришли теги из первой секции выше.');
-    return;
+    if(!quiet){
+      alert('В файле не найдены строки РСБУ (2110/1600/1300 и т.д.).\n\n' +
+            'Формат: '+parsed.format+'\n' +
+            'Кодировка: '+encoding+
+            tagList +
+            '\n\n── Начало файла ──\n' + preview + (text && text.length > 500 ? '\n...' : '') +
+            '\n\nЕсли это действительно ГИРБО — пришли теги из первой секции выше.');
+    }
+    return { ok:false, error:'не найдены коды РСБУ', file:filename, format:parsed.format, encoding };
   }
 
   let year = parsed.year;
   if(!year){
+    if(quiet){
+      return { ok:false, error:'не определён год отчёта', file:filename, format:parsed.format, encoding };
+    }
     const ans = prompt('Не удалось определить год отчёта из файла.\nУкажите год (например, 2023):', String(new Date().getFullYear()-1));
     year = ans ? parseInt(String(ans).trim()) : null;
-    if(!year || year < 2000 || year > 2099){ return; }
+    if(!year || year < 2000 || year > 2099){
+      return { ok:false, error:'год не указан', file:filename };
+    }
   }
 
   let issName = parsed.name;
   if(!issName){
+    if(quiet){
+      return { ok:false, error:'не определено имя эмитента', file:filename, year };
+    }
     issName = (prompt('Не удалось определить эмитента из файла.\nВведите название компании:', '') || '').trim();
-    if(!issName) return;
+    if(!issName) return { ok:false, error:'имя не указано', file:filename, year };
   }
 
   // Ищем существующего эмитента: по ИНН — приоритет, затем по имени.
@@ -12734,9 +12752,10 @@ function _processGirboFile(buf, filename){
   const type = 'ГИРБО';
   const period = 'FY';
   const key = year+'_'+period+'_'+type;
-  if(reportsDB[issId].periods[key] &&
+  const alreadyExists = !!reportsDB[issId].periods[key];
+  if(alreadyExists && !autoOverwrite &&
      !confirm('Период '+year+' · '+type+' для «'+reportsDB[issId].name+'» уже есть в базе.\n\nПерезаписать новыми данными?')){
-    return;
+    return { ok:false, skippedReason:'период уже есть, отказ от перезаписи', file:filename, year, issName:reportsDB[issId].name };
   }
 
   // ГИРБО хранит суммы в тысячах рублей. БондАналитик считает в млрд ₽.
@@ -12803,16 +12822,29 @@ function _processGirboFile(buf, filename){
     }
   }
 
-  alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
-        parsed.format+' · '+encoding+'\n\n' +
-        filledBlock + missedBlock +
-        (openDiag ? '\n\n🔎 Дальше откроется диагностика — вставь её в чат.' : ''));
+  if(!quiet){
+    alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
+          parsed.format+' · '+encoding+'\n\n' +
+          filledBlock + missedBlock +
+          (openDiag ? '\n\n🔎 Дальше откроется диагностика — вставь её в чат.' : ''));
 
-  if(openDiag){
-    const cs = document.getElementById('girbo-diag-copy-status');
-    if(cs) cs.textContent = '';
-    document.getElementById('modal-girbo-diag').classList.add('open');
+    if(openDiag){
+      const cs = document.getElementById('girbo-diag-copy-status');
+      if(cs) cs.textContent = '';
+      document.getElementById('modal-girbo-diag').classList.add('open');
+    }
   }
+  return {
+    ok: true,
+    file: filename,
+    issName: reportsDB[issId].name,
+    year,
+    format: parsed.format,
+    encoding,
+    filled: filledList,
+    missed: missedList,
+    overwrote: alreadyExists,
+  };
 }
 
 // Формируем плоский дамп XML для ручной передачи в чат.
@@ -12902,15 +12934,96 @@ function _girboDiagCopy(){
 }
 
 function importGirboCsv(input){
-  const file = input.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try { _processGirboFile(e.target.result, file.name); }
-    catch(err){ alert('Ошибка чтения файла ГИРБО: ' + err.message); }
-    finally { input.value = ''; }
-  };
-  reader.onerror = () => alert('Не удалось прочитать файл ГИРБО.');
-  reader.readAsArrayBuffer(file);
+  const files = Array.from(input.files || []);
+  if(!files.length) return;
+
+  // Один файл — классический путь: алерт с подробностями, промпты при
+  // необходимости, диагностический модал при пропусках.
+  if(files.length === 1){
+    const file = files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+      try { _processGirboFile(e.target.result, file.name); }
+      catch(err){ alert('Ошибка чтения файла ГИРБО: ' + err.message); }
+      finally { input.value = ''; }
+    };
+    reader.onerror = () => alert('Не удалось прочитать файл ГИРБО.');
+    reader.readAsArrayBuffer(file);
+    return;
+  }
+
+  // Несколько файлов — батч: без промптов, авто-перезапись, одна сводка в конце.
+  importGirboBatch(files).finally(() => { input.value = ''; });
+}
+
+// Пакетный импорт: читаем файлы последовательно (не параллельно — чтобы не
+// плодить гонки за reportsDB и localStorage), показываем прогресс-тост,
+// в конце — модалка со сводкой (по эмитентам → какие периоды пришли).
+async function importGirboBatch(files){
+  const progressToast = showToast(`⏳ ГИРБО · 0 / ${files.length}`, 'info');
+  const results = [];
+  const auto = { quiet: true, autoOverwrite: true };
+
+  for(let i = 0; i < files.length; i++){
+    const f = files[i];
+    if(progressToast) progressToast.textContent = `⏳ ГИРБО · ${i+1} / ${files.length} · ${f.name.slice(0,40)}`;
+    try {
+      const buf = await f.arrayBuffer();
+      const res = _processGirboFile(buf, f.name, auto) || { ok:false, error:'без ответа', file:f.name };
+      results.push(res);
+    } catch(err){
+      results.push({ ok:false, file:f.name, error:String(err.message || err).slice(0, 200) });
+    }
+    // Микропауза, чтобы UI успел отрисовать прогресс.
+    await new Promise(r => setTimeout(r, 0));
+  }
+  if(progressToast) progressToast.remove();
+
+  _showGirboBatchSummary(results);
+}
+
+// Сводка батч-импорта: группируем по эмитентам, показываем статус каждого файла.
+function _showGirboBatchSummary(results){
+  const byIssuer = new Map(); // issName → [{year, filled, missed, overwrote, ok, error}]
+  const orphans  = []; // файлы без эмитента (ошибки парсинга)
+  for(const r of results){
+    if(r.issName){
+      const arr = byIssuer.get(r.issName) || [];
+      arr.push(r);
+      byIssuer.set(r.issName, arr);
+    } else {
+      orphans.push(r);
+    }
+  }
+  const okCount   = results.filter(r => r.ok).length;
+  const failCount = results.length - okCount;
+
+  const lines = [];
+  lines.push(`ГИРБО · импорт пачкой`);
+  lines.push(`Файлов: ${results.length} · успешно: ${okCount} · с ошибкой: ${failCount}`);
+  lines.push('');
+  for(const [name, arr] of Array.from(byIssuer.entries()).sort((a,b)=>a[0].localeCompare(b[0]))){
+    arr.sort((a,b) => (a.year||0) - (b.year||0));
+    const years = arr.map(r => {
+      if(!r.ok) return `${r.year||'?'} ✗`;
+      const f = r.filled?.length || 0;
+      const m = r.missed?.length || 0;
+      const mark = r.overwrote ? '↻' : '+';
+      return `${r.year} ${mark}${f}/${f+m}`;
+    }).join(' · ');
+    lines.push(`• ${name}`);
+    lines.push(`   ${years}`);
+  }
+  if(orphans.length){
+    lines.push('');
+    lines.push(`Не обработано (${orphans.length}):`);
+    for(const r of orphans){
+      lines.push(`  ✗ ${r.file} — ${r.error || r.skippedReason || 'нераспознано'}`);
+    }
+  }
+  lines.push('');
+  lines.push(`Легенда: «+N/12» — добавлен новый период, «↻N/12» — перезаписан, ✗ — пропущен.`);
+  alert(lines.join('\n'));
 }
 
 // Открыть модалку загрузки ГИРБО (рабочий путь для мобильных:
@@ -12949,10 +13062,15 @@ function _initGirboDropZone(){
   ['dragleave'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); setHover(false); }));
   drop.addEventListener('drop', e => {
     e.preventDefault(); e.stopPropagation(); setHover(false);
-    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if(!file){ alert('Не удалось получить файл из drop.'); return; }
-    file.arrayBuffer().then(buf => _processGirboFile(buf, file.name))
-      .catch(err => alert('Ошибка: '+err.message));
+    const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+    if(!files.length){ alert('Не удалось получить файл из drop.'); return; }
+    if(files.length === 1){
+      const file = files[0];
+      file.arrayBuffer().then(buf => _processGirboFile(buf, file.name))
+        .catch(err => alert('Ошибка: '+err.message));
+    } else {
+      importGirboBatch(files);
+    }
   });
 }
 
