@@ -16168,6 +16168,27 @@ function moexAddToYtm(secid){
 // Кэш инфо о бумагах, чтобы при bulk не дёргать одну и ту же SECID дважды.
 window._moexSecInfoCache = window._moexSecInfoCache || new Map();
 
+// Грубая эвристика извлечения бренда эмитента из SHORTNAME.
+// У MOEX для структурок и многих выпусков description не содержит
+// имя эмитента вообще — только коды. Но в SHORTNAME обычно первые
+// буквы до цифр/дефиса/БО — это бренд:
+//   «СберИОС790» → «Сбер»
+//   «ГазпромКап-02» → «ГазпромКап»
+//   «ПГК БО-02» → «ПГК»
+//   «РЖД 1Р-20R» → «РЖД»
+// Не идеально, но для ГИР БО-поиска по имени даёт зацепку.
+function _moexGuessIssuerName(shortName, secName){
+  const raw = shortName || secName || '';
+  if(!raw) return null;
+  // Берём первое «слово» до разделителя (цифра, дефис, пробел, БО/П/Р-№).
+  const m = String(raw).match(/^([А-Яа-яA-Za-zЁё]+(?:[А-Яа-яA-Za-zЁё])*)/);
+  if(!m) return null;
+  let brand = m[1];
+  // Отрезаем хвостовые ИОС/БО/ПО, оставляем сам бренд.
+  brand = brand.replace(/(ИОС|ИО|БО|ПО|СП)$/i, '').trim();
+  return brand.length >= 3 ? brand : null;
+}
+
 // Поиск ИНН через ГИР БО по названию эмитента.
 // MOEX часто не содержит ИНН (для структурных продуктов, бирж. облиг. и т.п.),
 // но ГИР БО позволяет искать организацию по имени. Если имя совпадает — вернёт
@@ -16290,7 +16311,7 @@ async function _moexAutoGirbo(secid, allowPrompt){
   let inn = info.inn;
   // Fallback 1: поиск ИНН через ГИР БО по названию эмитента.
   if(!inn){
-    const nameForSearch = info.issuer || info.shortName || '';
+    const nameForSearch = info.issuer || _moexGuessIssuerName(info.shortName);
     if(nameForSearch){
       inn = await _girboFindInnByName(nameForSearch);
     }
@@ -16377,17 +16398,31 @@ async function moexPullGirboBulk(){
   const errors = [];
 
   // Шаг 1: собрать уникальных эмитентов через info-fetch.
+  // Если MOEX не даёт ИНН — пробуем ГИР БО по имени (ранее этот fallback
+  // был только в одиночной кнопке, не в bulk — отсюда шла жалоба «0 ИНН»).
   let done = 0;
   let noInnCount = 0;
   for(const b of targets){
     done++;
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: узнаю ИНН (${done}/${targets.length}): ${b.shortName}</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: ищу ИНН (${done}/${targets.length}): ${b.shortName}</span>`;
     let info;
     try { info = await _moexFetchSecurityInfo(b.secid); }
     catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
-    if(!info.inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет в MOEX`); continue; }
-    if(!unique.has(info.inn)){
-      unique.set(info.inn, { secid: b.secid, name: info.issuer || info.shortName });
+
+    let inn = info.inn;
+    // Fallback через ГИР БО по имени.
+    if(!inn){
+      const nameGuess = info.issuer || _moexGuessIssuerName(b.shortName, info.shortName);
+      if(nameGuess){
+        try {
+          inn = await _girboFindInnByName(nameGuess);
+        } catch(e){ /* продолжаем, учтём в noInnCount */ }
+        await new Promise(r => setTimeout(r, 120)); // полегче с прокси
+      }
+    }
+    if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет (ни MOEX, ни поиск по имени в ГИР БО)`); continue; }
+    if(!unique.has(inn)){
+      unique.set(inn, { secid: b.secid, name: info.issuer || info.shortName });
     }
     await new Promise(r => setTimeout(r, 60));
   }
