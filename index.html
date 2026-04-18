@@ -8985,6 +8985,14 @@ function _processGirboFile(buf, filename){
     'is-tax':'tax','is-assets':'assets','is-ca':'ca','is-cl':'cl',
     'is-debt':'debt','is-cash':'cash','is-ret':'ret','is-eq':'eq',
   };
+  const fieldLabels = {
+    'is-rev':'Выручка (2110)','is-ebit':'Прибыль от продаж (2200)',
+    'is-np':'Чистая прибыль (2400)','is-int':'Проценты к уплате (2330)',
+    'is-tax':'Налог на прибыль (2410)','is-assets':'Итого активы (1600)',
+    'is-ca':'Оборотные активы (1200)','is-cl':'Краткосрочн. обязат. (1500)',
+    'is-debt':'Заёмные средства (1410+1510)','is-cash':'Денежные ср-ва (1250)',
+    'is-ret':'Нераспр. прибыль (1370)','is-eq':'Итого капитал (1300)',
+  };
   const pData = {
     year, period, type,
     note: reportsDB[issId].note || '',
@@ -8992,12 +9000,15 @@ function _processGirboFile(buf, filename){
     rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
     assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
   };
-  let filled = 0;
+  const filledList = [];
+  const missedList = [];
   for(const [fid, pk] of Object.entries(fieldMap)){
     const v = parsed.codes[fid];
     if(v != null){
       pData[pk] = parseFloat((v * scale).toFixed(6));
-      filled++;
+      filledList.push(fieldLabels[fid]);
+    } else {
+      missedList.push(fieldLabels[fid]);
     }
   }
   reportsDB[issId].periods[key] = pData;
@@ -9011,10 +9022,17 @@ function _processGirboFile(buf, filename){
   const modal = document.getElementById('modal-girbo-import');
   if(modal && modal.classList.contains('open')) modal.classList.remove('open');
 
+  const filledBlock = filledList.length
+    ? '✓ Заполнено ('+filledList.length+'):\n  '+filledList.join('\n  ')
+    : '⚠ Ни одно поле не заполнено.';
+  const missedBlock = missedList.length
+    ? '\n\n✗ Не нашлось ('+missedList.length+'):\n  '+missedList.join('\n  ') +
+      '\n\nПусто может быть нормой (нет долга / процентов / и т.п.). Если уверен(а), что значение в отчёте есть — пришли скриншот, добавлю недостающий тег.'
+    : '';
   alert('✅ ГИРБО · '+reportsDB[issId].name+' · '+year+'\n' +
-        'Формат: '+parsed.format+' · '+encoding+'\n' +
-        'Заполнено полей: '+filled+' из '+Object.keys(fieldMap).length+'\n\n' +
-        'Откройте «📂 База отчётности» для просмотра.');
+        'Формат: '+parsed.format+' · '+encoding+'\n\n' +
+        filledBlock + missedBlock +
+        '\n\nОткройте «📂 База отчётности» для просмотра.');
 }
 
 function importGirboCsv(input){
