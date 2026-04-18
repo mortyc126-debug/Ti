@@ -1880,11 +1880,19 @@ document.addEventListener('DOMContentLoaded', () => {
         </select>
       </div>
       <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Оферта</label>
+        <label style="font-size:.55rem">Оферта (put/call)</label>
         <select id="moex-f-offer" onchange="moexApplyFilters()">
           <option value="">Не важно</option>
-          <option value="yes">Есть оферта</option>
-          <option value="no">Без оферты</option>
+          <option value="yes">Есть оферта (put или call)</option>
+          <option value="no">Без оферты (до погашения)</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0" title="Амортизация — постепенное погашение основного долга равными частями в даты купонов. У амортизируемых номинал уменьшается с каждой выплатой. Меняет профиль кешфлоу и дюрацию.">
+        <label style="font-size:.55rem">Амортизация</label>
+        <select id="moex-f-amort" onchange="moexApplyFilters()">
+          <option value="">Не важно</option>
+          <option value="no">Без амортизации</option>
+          <option value="yes">Только амортизируемые</option>
         </select>
       </div>
       <div class="field" style="margin:0">
@@ -15695,6 +15703,8 @@ function _moexParsePage(resp){
       issueSize:   _num(g('ISSUESIZE')),
       listLevel:   _num(g('LISTLEVEL')),
       secType:     g('SECTYPE'),
+      bondType:    g('BOND_TYPE'),        // «Амортизируемые облигации», «Фикс с известным купоном» и т.д.
+      bondSubtype: g('BOND_SUBTYPE'),     // «До оферты (call)», «До погашения», «До оферты (put)»
       status:      g('STATUS'),
       price:       _num(gm('LAST')) || _num(g('PREVWAPRICE')) || _num(g('PREVPRICE')) || _num(g('PREVLEGALCLOSEPRICE')),
       ytm:         _num(gm('YIELD')) || _num(g('YIELDATPREVWAPRICE')),
@@ -15802,6 +15812,8 @@ function _moexParsePageBoard(resp){
       issueSize:   _num(g('ISSUESIZE')),
       listLevel:   _num(g('LISTLEVEL')),
       secType:     g('SECTYPE'),
+      bondType:    g('BOND_TYPE'),        // «Амортизируемые облигации», «Фикс с известным купоном» и т.д.
+      bondSubtype: g('BOND_SUBTYPE'),     // «До оферты (call)», «До погашения», «До оферты (put)»
       status:      g('STATUS'),
       price:       _num(gm('LAST')) || _num(g('PREVWAPRICE')) || _num(g('PREVPRICE')) || _num(g('PREVLEGALCLOSEPRICE')),
       ytm:         _num(gm('YIELD')) || _num(g('YIELDATPREVWAPRICE')),
@@ -15914,6 +15926,7 @@ function moexApplyFilters(){
     coupon: document.getElementById('moex-f-coupon').value,
     freq: document.getElementById('moex-f-freq')?.value || '',
     offer: document.getElementById('moex-f-offer').value,
+    amort: document.getElementById('moex-f-amort')?.value || '',
     sizeMin: _num(document.getElementById('moex-f-size-min').value),
     inDbOnly: document.getElementById('moex-f-indb').checked,
     showStructured: document.getElementById('moex-f-structured')?.checked || false,
@@ -15960,6 +15973,14 @@ function moexApplyFilters(){
     return null;
   };
 
+  // Оферта/колл/пут: учитываем и OFFERDATE (дата put), и BOND_SUBTYPE
+  // (текстовое «До оферты (call)» / «До оферты (put)») — у call-
+  // опциона часто нет конкретной даты оферты в OFFERDATE, но по сути
+  // это тоже оферта, только от эмитента.
+  const hasOffer = b => !!b.offerDate || /оферт|\bcall\b|\bput\b/i.test(b.bondSubtype || '');
+  // Амортизация: BOND_TYPE типично «Амортизируемые облигации».
+  const isAmort = b => /амортиз/i.test(b.bondType || '');
+
   const enriched = cat.items.map(b => {
     const matY = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
     const issId = _moexMatchIssuer(b, issIdx);
@@ -15987,8 +16008,10 @@ function moexApplyFilters(){
     if(f.coupon === 'float' && !b.isFloat) return false;
     if(f.freq && b._freq !== f.freq) return false;
     if(!f.showStructured && b._isStructured) return false;
-    if(f.offer === 'yes' && !b.offerDate) return false;
-    if(f.offer === 'no' && b.offerDate) return false;
+    if(f.offer === 'yes' && !hasOffer(b)) return false;
+    if(f.offer === 'no' && hasOffer(b)) return false;
+    if(f.amort === 'no' && isAmort(b)) return false;
+    if(f.amort === 'yes' && !isAmort(b)) return false;
     if(f.sizeMin != null){
       const sizeM = b.issueSize && b.faceValue ? (b.issueSize * b.faceValue / 1e6) : null;
       if(sizeM == null || sizeM < f.sizeMin) return false;
@@ -16142,7 +16165,7 @@ function moexResetFilters(){
    'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-rating-min','moex-f-rating-has'].forEach(id => {
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('moex-f-indb').checked = false;
@@ -16194,6 +16217,57 @@ function moexAddToYtm(secid){
 
 // Кэш инфо о бумагах, чтобы при bulk не дёргать одну и ту же SECID дважды.
 window._moexSecInfoCache = window._moexSecInfoCache || new Map();
+
+// MOEX имеет справочник эмитентов: /iss/emittents/{id}.json или
+// /iss/issuers/{id}.json — точное имя зависит от версии ISS. Пробуем
+// оба, достаём ИНН из любой секции ответа.
+window._moexEmitterCache = window._moexEmitterCache || new Map();
+async function _moexFetchInnByEmitterId(emitterId){
+  if(window._moexEmitterCache.has(emitterId)) return window._moexEmitterCache.get(emitterId);
+  const tryUrls = [
+    `https://iss.moex.com/iss/emittents/${emitterId}.json?iss.meta=off`,
+    `https://iss.moex.com/iss/issuers/${emitterId}.json?iss.meta=off`,
+  ];
+  for(const url of tryUrls){
+    try {
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok) continue;
+      const raw = await r.json();
+      // Может прийти либо «description-format» (rows {name,value}),
+      // либо обычная таблица с колонкой INN. Обрабатываем оба.
+      for(const [sectionKey, section] of Object.entries(raw)){
+        if(!section || typeof section !== 'object') continue;
+        const cols = section.columns || [];
+        const data = section.data || [];
+        const nameIdx = cols.indexOf('name');
+        const valIdx = cols.indexOf('value');
+        if(nameIdx >= 0 && valIdx >= 0){
+          for(const row of data){
+            const n = String(row[nameIdx] || '').toUpperCase();
+            if(['INN','TAX_ID','EMITTER_INN'].includes(n)){
+              const v = String(row[valIdx] || '').trim();
+              if(/^\d{10}$|^\d{12}$/.test(v)){
+                window._moexEmitterCache.set(emitterId, v);
+                return v;
+              }
+            }
+          }
+        } else {
+          const innIdx = cols.findIndex(c => /^inn$|tax.?id/i.test(c || ''));
+          if(innIdx >= 0 && data[0]){
+            const v = String(data[0][innIdx] || '').trim();
+            if(/^\d{10}$|^\d{12}$/.test(v)){
+              window._moexEmitterCache.set(emitterId, v);
+              return v;
+            }
+          }
+        }
+      }
+    } catch(e){ /* следующий URL */ }
+  }
+  window._moexEmitterCache.set(emitterId, null);
+  return null;
+}
 
 // Грубая эвристика извлечения бренда эмитента из SHORTNAME.
 // У MOEX для структурок и многих выпусков description не содержит
@@ -16266,6 +16340,13 @@ async function _moexFetchSecurityInfo(secid){
     if(v && /^\d{10}$|^\d{12}$/.test(String(v).trim())){
       inn = String(v).trim(); break;
     }
+  }
+  // EMITTER_ID: отдельный запрос к MOEX по id эмитента. Некоторые
+  // типы бумаг (особенно биржевые с LISTLEVEL=3) не содержат ИНН
+  // в описании выпуска, но в справочнике эмитентов MOEX он есть.
+  const emitterId = find('EMITTER_ID');
+  if(!inn && emitterId){
+    inn = await _moexFetchInnByEmitterId(emitterId);
   }
   // Last-ditch: сканируем все value на 10/12-значное число — это формат ИНН.
   // Risk: можем поймать ОГРН (13 цифр), КПП (9), но они отсеиваются длиной.
