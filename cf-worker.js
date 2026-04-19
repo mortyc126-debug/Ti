@@ -91,13 +91,22 @@ export default {
           upstream = await fetch(target, {
             method: req.method,
             headers: {
-              // У ФНС — JSON API, у audit-it — HTML. Универсальный
-              // Accept, чтобы оба пускали.
-              'Accept': 'text/html,application/json,application/xhtml+xml,*/*;q=0.8',
-              // Чистый Chrome UA — на случай если origin реагирует на слово
-              // «Proxy» в User-Agent. Самый нейтральный фингерпринт.
+              // У ФНС — JSON API, у audit-it — HTML. Универсальный Accept.
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
+              'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+              'Accept-Encoding': 'gzip, deflate, br',
+              // Полный браузерный фингерпринт — audit-it без Sec-* заголовков
+              // отвечает anti-bot заглушкой «включите JS и cookies».
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-              'Accept-Language': 'ru-RU,ru;q=0.9'
+              'Sec-Ch-Ua': '"Google Chrome";v="126", "Chromium";v="126", "Not-A.Brand";v="99"',
+              'Sec-Ch-Ua-Mobile': '?0',
+              'Sec-Ch-Ua-Platform': '"Windows"',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none',
+              'Sec-Fetch-User': '?1',
+              'Upgrade-Insecure-Requests': '1',
+              'Cache-Control': 'max-age=0'
             },
             cf: {
               // Кэшируем ТОЛЬКО успешные ответы. Ошибки не попадают в кэш,
