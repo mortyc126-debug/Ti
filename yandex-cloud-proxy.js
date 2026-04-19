@@ -99,19 +99,19 @@ exports.handler = async (event) => {
     const qs = event.queryStringParameters || {};
     let target = qs.u;
 
-    // Разрешённые upstream-домены: ФНС (bo.nalog.gov.ru) и audit-it.ru
-    // (агрегатор РСБУ-отчётности, покрывает ВДО глубже и свежее ФНС).
-    // Формат: протокол обязательно https, первый сегмент пути —
-    // один из известных публичных (anti-abuse).
+    // Разрешённые upstream-домены: ФНС (bo.nalog.gov.ru), audit-it.ru
+    // (агрегатор, ручной paste), buxbalans.ru (агрегатор, серверный
+    // парсинг работает — anti-bot отсутствует).
     const ALLOWED = [
         /^https:\/\/bo\.nalog\.gov\.ru\//,
-        /^https:\/\/(www\.)?audit-it\.ru\//
+        /^https:\/\/(www\.)?audit-it\.ru\//,
+        /^https:\/\/(www\.)?buxbalans\.ru\//
     ];
     const isAllowed = (url) => ALLOWED.some((re) => re.test(url));
 
     // Альтернатива: путь повторяет upstream (/nbo/..., /advanced-search/...
-    // — ФНС; /buh_otchet/..., /search/... — audit-it). По префиксу пути
-    // выбираем целевой домен.
+    // — ФНС; /buh_otchet/..., /search/... — audit-it; /<inn>.html — buxbalans).
+    // По префиксу пути выбираем целевой домен.
     if (!target && event.path) {
         const qp = Object.entries(qs).filter(([k]) => k !== 'u').map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
         const suffix = event.path + (qp ? '?' + qp : '');
@@ -119,6 +119,8 @@ exports.handler = async (event) => {
             target = 'https://bo.nalog.gov.ru' + suffix;
         } else if (event.path.startsWith('/buh_otchet') || event.path.startsWith('/search') || event.path.startsWith('/contragent')) {
             target = 'https://www.audit-it.ru' + suffix;
+        } else if (/^\/\d{10}(\d{2})?\.html$/.test(event.path)) {
+            target = 'https://buxbalans.ru' + suffix;
         }
     }
 
@@ -130,7 +132,7 @@ exports.handler = async (event) => {
                 'Cache-Control': 'no-store',
                 'Content-Type': 'text/plain; charset=utf-8'
             },
-            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru. Pass URL via ?u=https://…'
+            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru. Pass URL via ?u=https://…'
         };
     }
 

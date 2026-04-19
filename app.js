@@ -988,6 +988,7 @@ function _proxyMakeUrl(host, path){
 }
 function _girboMakeUrl(path){ return _proxyMakeUrl('bo.nalog.gov.ru', path); }
 function _auditItMakeUrl(path){ return _proxyMakeUrl('www.audit-it.ru', path); }
+function _buxBalansMakeUrl(path){ return _proxyMakeUrl('buxbalans.ru', path); }
 async function _girboFetchJson(path, retries, timeoutMs){
   if(retries == null) retries = 2;
   if(timeoutMs == null) timeoutMs = 8000; // 8s — половина старого, меньше висеть
@@ -1181,6 +1182,85 @@ async function fetchAuditItByInn(query, maxYears = 10){
     series,
     company: parsed.company,
     inn: parsed.inn || '',
+    count: Object.keys(series).length,
+    errors: []
+  };
+}
+
+// buxbalans.ru — агрегатор, который парсит и ГИР БО, и Росстат, плюс
+// хранит данные «удалённые из официальных источников» (санкционные
+// 2022-2024 у Сбер/ВТБ/РЖД). URL простой: /<ИНН>.html. Серверный
+// прокси они пускают (anti-bot отсутствует на момент интеграции).
+// Структура HTML: таблицы с `<span data-key='КОД'>`, а за ним ячейки
+// `<td class="column_YYYY">ЗНАЧЕНИЕ</td>`. Ячейки могут содержать
+// вложенный <sup>X%</sup> с приростом — отбрасываем.
+// Единицы — тыс ₽, формат совместим с _auditItDataToSeries.
+function _buxBalansParseHtml(html){
+  if(!html || html.length < 1000) throw new Error('buxbalans: пустой ответ');
+  // Для каждого `data-key='КОД'` ищем хвост до следующего data-key
+  // (или до </table>) и там вытаскиваем все column_YYYY-ячейки.
+  const codeRe = /<span[^>]*data-key=['"](\d{3,4})['"][^>]*>\s*\d+\s*<\/span>/g;
+  const data = {};
+  const matches = [];
+  let m;
+  while((m = codeRe.exec(html)) !== null){
+    matches.push({ code: m[1], idx: m.index + m[0].length });
+  }
+  for(let i = 0; i < matches.length; i++){
+    const { code, idx } = matches[i];
+    const end = i + 1 < matches.length ? matches[i + 1].idx : Math.min(idx + 8000, html.length);
+    const rowSlice = html.slice(idx, end);
+    // column_YYYY + число (может быть со знаком -, с пробелами-разделителями
+    // тысяч, либо через non-breaking space). Отрезаем до ближайшего <.
+    const cellRe = /<td\s+class=["']column_(\d{4})["'][^>]*>\s*(-|[\d\-\s\u00A0]+?)(?=\s*<)/g;
+    let c;
+    while((c = cellRe.exec(rowSlice)) !== null){
+      const year = c[1];
+      const raw = c[2];
+      if(!raw || raw.trim() === '-') continue;
+      const n = parseInt(raw.replace(/[\s\u00A0]/g, ''), 10);
+      if(!Number.isFinite(n)) continue;
+      data[year] = data[year] || { values: {} };
+      // Одна и та же строка РСБУ может встречаться дважды (в балансе и
+      // в разделе аналитики). Первое вхождение — из оригинальной
+      // отчётности, его и берём. Игнорируем последующие.
+      if(data[year].values[code] == null) data[year].values[code] = n;
+    }
+  }
+  // Метаданные.
+  let company = null;
+  const mCompany = html.match(/<title>[^<]*?([«"][^«"»"]+[»"])/);
+  if(mCompany) company = mCompany[1].replace(/^["«]|["»]$/g, '').trim();
+  if(!company){
+    const mH1 = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+    if(mH1) company = mH1[1].replace(/&quot;/g, '"').trim();
+  }
+  let inn = null;
+  const mInn = html.match(/ИНН\s*:?\s*<[^>]*>(\d{10,12})</);
+  if(mInn) inn = mInn[1];
+  return { data, company, inn };
+}
+
+async function fetchBuxBalansByInn(inn, maxYears = 15){
+  if(!inn || !/^\d{10}(\d{2})?$/.test(String(inn).trim())) throw new Error('buxbalans: нужен ИНН (10 или 12 цифр)');
+  const clean = String(inn).trim();
+  const url = _buxBalansMakeUrl('/' + clean + '.html');
+  const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const to = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+  let html;
+  try {
+    const r = await fetch(url, {headers: {'Accept': 'text/html,*/*'}, signal: ctrl ? ctrl.signal : undefined});
+    if(r.status === 404) throw new Error('buxbalans: «' + clean + '» не найден');
+    if(!r.ok) throw new Error('buxbalans HTTP ' + r.status);
+    html = await r.text();
+  } finally { if(to) clearTimeout(to); }
+  const parsed = _buxBalansParseHtml(html);
+  if(!parsed || !Object.keys(parsed.data).length) throw new Error('buxbalans: на странице нет балансовых данных');
+  const series = _auditItDataToSeries(parsed.data, maxYears);
+  return {
+    series,
+    company: parsed.company,
+    inn: parsed.inn || clean,
     count: Object.keys(series).length,
     errors: []
   };
@@ -6784,16 +6864,28 @@ function repClearReference(){
 // МСФО-группа, цифры будут существенно меньше консолидированных,
 // и блок сверки явно это подсветит как «не прямое сравнение».
 async function repFetchGirboSeries(){
+  return _repFetchSeriesGeneric({source: 'girbo', fetcher: fetchGirboByInn, maxYears: 5});
+}
+async function repFetchBuxBalansSeries(){
+  return _repFetchSeriesGeneric({source: 'buxbalans', fetcher: fetchBuxBalansByInn, maxYears: 15});
+}
+async function _repFetchSeriesGeneric({source, fetcher, maxYears}){
+  const SOURCE_LABELS = {
+    girbo: { name: 'ГИР БО', emoji: '📡', autoSource: 'ГИР БО', refSource: 'ГИР БО (прокси)' },
+    buxbalans: { name: 'buxbalans.ru', emoji: '📊', autoSource: 'buxbalans', refSource: 'buxbalans (прокси)' }
+  };
+  const cfg = SOURCE_LABELS[source];
   const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр):');
   if(!inn) return;
+  const meta = window._reportMeta || {};
   const box = document.getElementById('rep-np-ref-result');
   const wrap = document.getElementById('rep-np-ref-wrap');
   if(wrap) wrap.style.display = 'block';
-  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос ГИР БО по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
+  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос ${cfg.name} по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
   try {
-    const data = await fetchGirboByInn(inn, 5);
+    const data = await fetcher(inn, maxYears);
     if(!data.count){
-      if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ГИР БО ничего не вернул (компания исключена из публикации? нет годовых отчётов?). Ошибки: ${data.errors.length}.</div>`;
+      if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ${cfg.name} ничего не вернул (компания исключена из публикации? нет годовых отчётов?). ${data.errors?.length ? 'Ошибки: ' + data.errors.length : ''}</div>`;
       return;
     }
     // Соберём ref в нашем формате и применим как обычный.
@@ -6808,10 +6900,10 @@ async function repFetchGirboSeries(){
       company: data.company || meta.orgName,
       inn: data.inn,
       period: newest,
-      source: 'ГИР БО (прокси)',
+      source: cfg.refSource,
       unit: 'млрд ₽',
       format: 'girbo-multi',
-      _autoSource: 'ГИР БО'
+      _autoSource: cfg.autoSource
     };
     window._reportReference = ref;
     // Сохраняем в локальный кэш — при следующем открытии того же
@@ -6819,7 +6911,7 @@ async function repFetchGirboSeries(){
     _saveRefToLocal({...ref, schema: 'bondan/ref/v1'});
     repRenderRefResult();
   } catch(e){
-    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ${e.message}<br><span style="color:var(--text3)">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Альтернативы: corsproxy.io, ваш CF Worker.</span></div>`;
+    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ${cfg.name}: ${e.message}<br><span style="color:var(--text3)">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Альтернативы: corsproxy.io, ваш CF Worker.</span></div>`;
   }
 }
 

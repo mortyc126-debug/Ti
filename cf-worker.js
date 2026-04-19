@@ -33,11 +33,11 @@ export default {
     // Соглашение БондАналитика: target-URL передаётся через ?u=…
     let target = url.searchParams.get('u');
 
-    // Разрешённые upstream-домены: ФНС (bo.nalog.gov.ru) и audit-it.ru
-    // (агрегатор РСБУ-отчётности). Anti-abuse: только https + whitelist.
+    // Разрешённые upstream-домены: ФНС, audit-it.ru, buxbalans.ru.
     const ALLOWED = [
       /^https:\/\/bo\.nalog\.gov\.ru\//,
-      /^https:\/\/(www\.)?audit-it\.ru\//
+      /^https:\/\/(www\.)?audit-it\.ru\//,
+      /^https:\/\/(www\.)?buxbalans\.ru\//
     ];
     const isAllowed = (u) => ALLOWED.some((re) => re.test(u));
 
@@ -47,11 +47,13 @@ export default {
         target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
       } else if (url.pathname.startsWith('/buh_otchet') || url.pathname.startsWith('/search') || url.pathname.startsWith('/contragent')) {
         target = 'https://www.audit-it.ru' + url.pathname + url.search;
+      } else if (/^\/\d{10}(\d{2})?\.html$/.test(url.pathname)) {
+        target = 'https://buxbalans.ru' + url.pathname + url.search;
       }
     }
 
     if (!target || !isAllowed(target)) {
-      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru. Pass URL via ?u=https://…', {
+      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru. Pass URL via ?u=https://…', {
         status: 400,
         headers: {'Access-Control-Allow-Origin': '*'}
       });
