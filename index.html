@@ -3567,7 +3567,7 @@ function _girboMakeUrl(path){
 }
 async function _girboFetchJson(path, retries, timeoutMs){
   if(retries == null) retries = 2;
-  if(timeoutMs == null) timeoutMs = 12000; // 12s дефолт на одну попытку
+  if(timeoutMs == null) timeoutMs = 8000; // 8s — половина старого, меньше висеть
   const url = _girboMakeUrl(path);
   let lastErr = null;
   for(let attempt = 0; attempt <= retries; attempt++){
@@ -16735,16 +16735,28 @@ async function moexPullGirboBulk(){
     'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
   };
   let idx = 0;
+  let consecutiveTimeouts = 0;
   for(const [key, meta] of unique){
     idx++;
     if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: ГИР БО ${idx}/${totalInns}: «${meta.name}»</span>`;
     let data;
     try {
       data = await fetchGirboByInn(meta.query, 5);
+      consecutiveTimeouts = 0;
     } catch(e){
       totalErr++;
       errors.push(`${meta.name}: ${e.message}`);
-      await new Promise(r => setTimeout(r, 150));
+      // Если подряд 5 таймаутов/ошибок прокси — сеть нестабильна,
+      // дальнейшие попытки бесполезны. Прерываем bulk с честным
+      // сообщением, чтобы не ждать минуты впустую.
+      if(/timeout|CF→ФНС|Upstream unreachable|Failed to fetch|NetworkError/i.test(e.message || '')){
+        consecutiveTimeouts++;
+        if(consecutiveTimeouts >= 5){
+          if(status) status.innerHTML = `<span style="color:var(--danger)">✋ Остановлено: ${consecutiveTimeouts} таймаутов подряд — прокси/сеть нестабильны. Обработано ${idx-consecutiveTimeouts} из ${totalInns}. Попробуй позже или через «📝 ИНН-мастер».</span>`;
+          break;
+        }
+      }
+      await new Promise(r => setTimeout(r, 400));
       continue;
     }
     if(!data || !data.count){
@@ -16778,7 +16790,7 @@ async function moexPullGirboBulk(){
       totalOk++;
     }
     save();
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 400));
   }
   // Сбрасываем кэш локального справочника — новые ИНН попадут туда.
   window._moexLocalInnMap = null;
