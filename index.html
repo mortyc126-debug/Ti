@@ -1276,6 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
     <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8">📥 ГИРБО</button>
+    <button class="btn btn-sm" onclick="openAuditItImportModal()" title="Импорт данных audit-it.ru — вставить HTML страницы компании (Ctrl+U → Ctrl+A → Ctrl+C) либо JSON от bookmarklet. До 11 лет РСБУ за один импорт.">📗 audit-it HTML</button>
     <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут">🔗 Объединить</button>
     <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">🔍 Аудит данных</button>
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
@@ -2195,6 +2196,50 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-girbo-import')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: импорт audit-it (HTML paste / JSON от bookmarklet) — обход
+     серверного anti-bot: пользователь сам открывает страницу у себя,
+     отдаёт её html/json в БондАналитик через буфер обмена. -->
+<div class="modal-overlay" id="modal-auditit-import">
+  <div class="modal" style="width:640px;max-width:96vw">
+    <div class="modal-hdr">📗 Импорт audit-it <button class="modal-x" onclick="closeModal('modal-auditit-import')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
+        <strong>audit-it.ru</strong> даёт до 11 лет РСБУ (2015-2025), включая ВДО и санкционные компании. Серверный парсинг блокируется anti-bot'ом, но <strong>твой браузер</strong> страницы открывает нормально. Два способа:
+      </div>
+      <details style="font-size:.62rem;color:var(--text2);background:var(--s2);padding:8px 10px;border:1px solid var(--border)">
+        <summary style="cursor:pointer;font-weight:600">🔖 Способ 1: bookmarklet (1 клик после настройки)</summary>
+        <ol style="margin:8px 0 8px 16px;padding:0;line-height:1.7">
+          <li>Нажми кнопку ниже → в буфер скопируется код закладки.</li>
+          <li>В браузере: Ctrl+Shift+B (панель закладок) → правый клик на панели → «Добавить страницу» → Имя: «📗 audit-it → БондАналитик», URL: Ctrl+V (вставить из буфера) → Сохранить.</li>
+          <li>Теперь на любой странице audit-it.ru/buh_otchet/… клик по этой закладке → JSON в буфере.</li>
+          <li>Возвращайся сюда → «📋 Вставить из буфера» ниже.</li>
+        </ol>
+        <button class="btn btn-sm btn-p" onclick="auditItCopyBookmarklet()" style="font-size:.58rem;padding:4px 10px">📋 Скопировать bookmarklet</button>
+      </details>
+      <details style="font-size:.62rem;color:var(--text2);background:var(--s2);padding:8px 10px;border:1px solid var(--border)">
+        <summary style="cursor:pointer;font-weight:600">📋 Способ 2: paste HTML (без настройки)</summary>
+        <ol style="margin:8px 0 0 16px;padding:0;line-height:1.7">
+          <li>На странице компании на audit-it нажми Ctrl+U (просмотр исходного кода).</li>
+          <li>В открывшейся вкладке: Ctrl+A → Ctrl+C (скопировать всё).</li>
+          <li>Вернись сюда → Ctrl+V в поле ниже → «🔍 Распознать».</li>
+        </ol>
+      </details>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="auditItPasteFromClipboard()" style="font-size:.58rem;padding:4px 10px" title="Прочитать буфер обмена (требует разрешения браузера)">📋 Вставить из буфера</button>
+        <button class="btn btn-sm" onclick="auditItParseInput()" style="font-size:.58rem;padding:4px 10px;border-color:var(--acc);color:var(--acc)">🔍 Распознать</button>
+        <button class="btn btn-sm" onclick="document.getElementById('auditit-paste').value = ''; document.getElementById('auditit-preview').innerHTML = ''; document.getElementById('auditit-modal-status').innerHTML = ''" style="font-size:.58rem;padding:4px 10px">🗑 Очистить</button>
+      </div>
+      <textarea id="auditit-paste" placeholder="Сюда HTML страницы audit-it либо JSON от bookmarklet. Содержимое может быть длинное — несколько МБ, это нормально."
+        style="width:100%;min-height:180px;font-family:var(--mono);font-size:.56rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px;resize:vertical"></textarea>
+      <div id="auditit-modal-status" style="font-size:.6rem;color:var(--text3);min-height:18px"></div>
+      <div id="auditit-preview"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-auditit-import')">Закрыть</button>
     </div>
   </div>
 </div>

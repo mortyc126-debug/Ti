@@ -1125,6 +1125,39 @@ function _auditItParsePage(html){
   return { data, company, inn };
 }
 
+// Преобразует audit-it `Data` объект {year: {values: {code: number|'hidden'}}}
+// в series {«2025»: {rep-np-rev: …, rep-np-np: …}, …} по _GIRBO_FIELD_MAP.
+// "hidden" поля (платный контент) пропускаются. Единицы audit-it — тыс ₽,
+// делим на 1e6 → млрд ₽ (внутренняя единица БондАналитик).
+function _auditItDataToSeries(data, maxYears){
+  if(maxYears == null) maxYears = 20;
+  const series = {};
+  const years = Object.keys(data || {}).sort((a, b) => Number(b) - Number(a)).slice(0, maxYears);
+  for(const year of years){
+    const info = data[year];
+    if(!info || !info.values) continue;
+    const vals = info.values;
+    const out = {};
+    for(const [fid, code] of Object.entries(_GIRBO_FIELD_MAP)){
+      const codes = Array.isArray(code) ? code : [code];
+      let sum = 0, any = false;
+      for(const c of codes){
+        const x = vals[c];
+        if(typeof x === 'number' && !isNaN(x)){ sum += x; any = true; }
+        else if(typeof x === 'string' && /^-?\d+$/.test(x)){ sum += parseInt(x, 10); any = true; }
+      }
+      if(any){
+        const isExpense = fid === 'rep-np-int' || (!Array.isArray(code) && code === '2410');
+        out[fid] = (isExpense ? Math.abs(sum) : sum) / 1e6;
+      }
+    }
+    if(Object.keys(out).length){
+      series[_periodLabel(year, 'FY')] = out;
+    }
+  }
+  return series;
+}
+
 // Подтягиваем РСБУ-отчётность с audit-it за все доступные года.
 // Сигнатура как у fetchGirboByInn — одинаковая форма результата,
 // чтобы call-sites не различали источник.
@@ -1141,34 +1174,9 @@ async function fetchAuditItByInn(query, maxYears = 10){
   const parsed = _auditItParsePage(html);
   if(!parsed) throw new Error('audit-it: на странице нет JSON Data');
 
-  // 3. Маппинг кодов РСБУ (те же, что в ГИР БО) → наши rep-np-*.
-  // Единицы у audit-it — тыс ₽, делим на 1e6 → млрд ₽.
-  const series = {};
-  const years = Object.keys(parsed.data).sort((a, b) => Number(b) - Number(a)).slice(0, maxYears);
-  for(const year of years){
-    const info = parsed.data[year];
-    if(!info || !info.values) continue;
-    const vals = info.values;
-    const out = {};
-    for(const [fid, code] of Object.entries(_GIRBO_FIELD_MAP)){
-      const codes = Array.isArray(code) ? code : [code];
-      let sum = 0, any = false;
-      for(const c of codes){
-        const x = vals[c];
-        // "hidden" — платное поле. Число может быть как JS-number,
-        // так и строкой ("16686" — audit-it иногда так хранит).
-        if(typeof x === 'number' && !isNaN(x)){ sum += x; any = true; }
-        else if(typeof x === 'string' && /^-?\d+$/.test(x)){ sum += parseInt(x, 10); any = true; }
-      }
-      if(any){
-        const isExpense = fid === 'rep-np-int' || (!Array.isArray(code) && code === '2410');
-        out[fid] = (isExpense ? Math.abs(sum) : sum) / 1e6;
-      }
-    }
-    if(Object.keys(out).length){
-      series[_periodLabel(year, 'FY')] = out;
-    }
-  }
+  // 3. Маппинг кодов РСБУ → наши rep-np-* (общий хелпер, та же логика
+  // используется при ручном импорте HTML из буфера).
+  const series = _auditItDataToSeries(parsed.data, maxYears);
   return {
     series,
     company: parsed.company,
@@ -11763,6 +11771,153 @@ function openGirboImportModal(){
   document.getElementById('modal-girbo-import').classList.add('open');
   _initGirboDropZone();
   _girboQueueRender();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ИМПОРТ AUDIT-IT (paste HTML / JSON из bookmarklet)
+// ═══════════════════════════════════════════════════════════════════
+// Пользователь открывает страницу компании на audit-it.ru у себя в
+// браузере (anti-bot не триггерит, потому что это живой визит), берёт
+// HTML целиком (Ctrl+U → Ctrl+A → Ctrl+C) либо использует bookmarklet
+// (один клик — закладка парсит страницу и кладёт JSON в буфер).
+// Дальше сюда вставляем, парсер вытаскивает Data, создаёт периоды
+// в reportsDB. Серверный прокси не нужен — всё локально.
+
+function openAuditItImportModal(){
+  const ta = document.getElementById('auditit-paste'); if(ta) ta.value = '';
+  const st = document.getElementById('auditit-modal-status'); if(st) st.innerHTML = '';
+  const preview = document.getElementById('auditit-preview'); if(preview) preview.innerHTML = '';
+  document.getElementById('modal-auditit-import').classList.add('open');
+}
+
+// Распознать содержимое textarea. Принимает:
+//   (а) HTML страницы audit-it — вытаскиваем `const Data = {…}`.
+//   (б) JSON вида {source:'audit-it', data:{…}, company, inn} от bookmarklet.
+// На выходе — preview с предложением применить к активному эмитенту
+// или создать нового.
+function auditItParseInput(){
+  const ta = document.getElementById('auditit-paste');
+  const st = document.getElementById('auditit-modal-status');
+  const preview = document.getElementById('auditit-preview');
+  const raw = (ta?.value || '').trim();
+  if(!raw){
+    if(st) st.innerHTML = '<span style="color:var(--warn)">Вставь HTML страницы audit-it (Ctrl+U → Ctrl+A → Ctrl+C → Ctrl+V) или JSON из bookmarklet.</span>';
+    return;
+  }
+  let parsed = null;
+  // Попытка 1: JSON.
+  if(raw.startsWith('{')){
+    try {
+      const obj = JSON.parse(raw);
+      if(obj && obj.source === 'audit-it' && obj.data){
+        parsed = { data: obj.data, company: obj.company || null, inn: obj.inn || null };
+      }
+    } catch(_){ /* не JSON, пробуем как HTML */ }
+  }
+  // Попытка 2: HTML.
+  if(!parsed){
+    parsed = _auditItParsePage(raw);
+  }
+  if(!parsed){
+    if(st) st.innerHTML = '<span style="color:var(--danger)">Не распознал: ни const Data в HTML, ни JSON от bookmarklet. Проверь что скопировал ВЕСЬ исходник страницы.</span>';
+    return;
+  }
+  const series = _auditItDataToSeries(parsed.data, 20);
+  const years = Object.keys(series).sort((a,b) => _periodSortKey(b) - _periodSortKey(a));
+  window._auditItPendingImport = { series, company: parsed.company, inn: parsed.inn };
+  // Превью.
+  const yearsLabel = years.map(y => String(y).match(/\d{4}/)?.[0] || y).join(', ');
+  const existingId = parsed.inn ? Object.entries(reportsDB || {}).find(([,iss]) => String(iss?.inn||'') === String(parsed.inn))?.[0] : null;
+  const activeMatch = repActiveIssuerId && reportsDB[repActiveIssuerId];
+  const fields = Object.keys(_GIRBO_FIELD_MAP).length;
+  preview.innerHTML = `
+    <div style="padding:10px;background:var(--s2);border:1px solid var(--border);border-radius:4px;margin-top:10px;font-size:.65rem;line-height:1.5">
+      <div><strong>Компания:</strong> ${parsed.company || '—'}</div>
+      <div><strong>ИНН:</strong> ${parsed.inn || '—'}</div>
+      <div><strong>Лет с данными:</strong> ${years.length} (${yearsLabel || '—'})</div>
+      <div><strong>Полей в маппинге:</strong> ${fields} (rep-np-*)</div>
+      ${existingId ? `<div style="color:var(--green);margin-top:6px">✓ Эмитент с ИНН ${parsed.inn} уже есть: <strong>${reportsDB[existingId].name}</strong> — периоды допишутся туда.</div>` : (activeMatch ? `<div style="color:var(--warn);margin-top:6px">⚠ ИНН в reportsDB не найден. Активный эмитент: <strong>${reportsDB[repActiveIssuerId].name}</strong> — допишем туда (и сохраним ИНН).</div>` : `<div style="color:var(--warn);margin-top:6px">⚠ ИНН не найден в reportsDB, активный эмитент не выбран. Создадим нового.</div>`)}
+    </div>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn btn-sm" style="border-color:var(--green);color:var(--green)" onclick="auditItApplyImport()">✓ Применить ${years.length} период${years.length === 1 ? '' : years.length < 5 ? 'а' : 'ов'}</button>
+      <button class="btn btn-sm" onclick="document.getElementById('modal-auditit-import').classList.remove('open')">Отмена</button>
+    </div>`;
+  if(st) st.innerHTML = '<span style="color:var(--green)">Распознано. Проверь превью, нажми «Применить».</span>';
+}
+
+// Применяет ранее распарсенный audit-it-результат как периоды reportsDB.
+function auditItApplyImport(){
+  const pending = window._auditItPendingImport;
+  if(!pending){ alert('Сначала нажми «Распознать».'); return; }
+  const { series, company, inn } = pending;
+  const issId = _moexEnsureIssuer(inn || ('noInn_' + Date.now()), company || ('ИНН ' + (inn || '?')));
+  const iss = reportsDB[issId];
+  if(inn && !iss.inn) iss.inn = String(inn);
+  if(company && (!iss.name || /^ИНН /.test(iss.name))) iss.name = company;
+  const fieldMap = {
+    'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+    'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+    'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+  };
+  let added = 0, skipped = 0, overwritten = 0;
+  for(const [lbl, values] of Object.entries(series)){
+    const ym = String(lbl).match(/(\d{4})/);
+    if(!ym) continue;
+    const year = ym[1];
+    const pkey = `${year}_FY_ГИРБО`;
+    const exists = !!iss.periods[pkey];
+    if(exists && !confirm(`Период ${year} (ГИРБО) уже есть. Перезаписать данными из audit-it?`)){
+      skipped++;
+      continue;
+    }
+    if(exists) overwritten++;
+    const period = {
+      year, period:'FY', type:'ГИРБО', note:'audit-it', analysisHTML:'',
+      rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+      assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+    };
+    for(const [fid, shortKey] of Object.entries(fieldMap)){
+      if(values[fid] != null) period[shortKey] = values[fid];
+    }
+    iss.periods[pkey] = period;
+    added++;
+  }
+  save();
+  window._auditItPendingImport = null;
+  document.getElementById('modal-auditit-import').classList.remove('open');
+  alert(`✓ Готово. Эмитент: ${iss.name}\nДобавлено/обновлено периодов: ${added}${overwritten ? ` (перезаписано: ${overwritten})` : ''}${skipped ? `, пропущено: ${skipped}` : ''}.`);
+  // Если мы на странице отчётности — обновить UI.
+  if(typeof repRenderList === 'function') repRenderList();
+}
+
+// Вставить содержимое буфера обмена в textarea импорта.
+async function auditItPasteFromClipboard(){
+  const ta = document.getElementById('auditit-paste');
+  const st = document.getElementById('auditit-modal-status');
+  try {
+    const txt = await navigator.clipboard.readText();
+    if(!txt){ if(st) st.innerHTML = '<span style="color:var(--warn)">Буфер пуст.</span>'; return; }
+    ta.value = txt;
+    auditItParseInput();
+  } catch(e){
+    if(st) st.innerHTML = '<span style="color:var(--danger)">Не удалось прочитать буфер: ' + e.message + '. Попробуй Ctrl+V в textarea вручную.</span>';
+  }
+}
+
+// Скопировать bookmarklet в буфер — пользователь создаёт закладку и
+// вставляет в поле URL этот текст. После сохранения закладка появляется
+// на панели; одним кликом на странице audit-it она выдёргивает данные
+// и кладёт в буфер как JSON (дальше «📥 Из буфера» в модалке импорта).
+function auditItCopyBookmarklet(){
+  // Сам код bookmarklet'а. Минификация и экранирование не нужны —
+  // передаём как есть, браузер примет. Однострочный — иначе закладка
+  // не сохранится в некоторых браузерах.
+  const code = "javascript:(function(){try{var h=document.documentElement.outerHTML;var m=h.match(/const\\s+Data\\s*=\\s*(\\{[\\s\\S]*?\\});\\s*const\\s+CustomData/);if(!m)throw new Error('const Data не найден');var d=JSON.parse(m[1]);var n=h.match(/Полное наименование:\\s*<strong>([^<]+)<\\/strong>/);var i=h.match(/ИНН:\\s*<strong>(\\d{10,12})<\\/strong>/);var p={source:'audit-it',company:n?n[1].trim():null,inn:i?i[1]:null,data:d,exported:new Date().toISOString()};var j=JSON.stringify(p);navigator.clipboard.writeText(j).then(function(){alert('\\u2713 audit-it JSON ('+Math.round(j.length/1024)+' \\u041a\\u0411) \\u2192 \\u0431\\u0443\\u0444\\u0435\\u0440. \\u0412\\u0441\\u0442\\u0430\\u0432\\u044c \\u0432 \\u0411\\u043e\\u043d\\u0434\\u0410\\u043d\\u0430\\u043b\\u0438\\u0442\\u0438\\u043a \\u2192 \\u041f\\u0430\\u0440\\u0441\\u0438\\u043d\\u0433 audit-it.')}).catch(function(){prompt('Copy manually:',j)})}catch(e){alert('audit-it: '+e.message)}})();";
+  navigator.clipboard.writeText(code).then(() => {
+    alert('✓ Bookmarklet скопирован в буфер.\n\nКак поставить:\n1. Открой панель закладок (Ctrl+Shift+B).\n2. Правый клик на панели → «Добавить страницу» / «Создать закладку».\n3. Имя: «📗 audit-it → БондАналитик».\n4. URL: вставь из буфера (Ctrl+V).\n5. Сохрани.\n\nТеперь на любой странице audit-it один клик по этой закладке — данные в буфере, возвращайся в БондАналитик → «📥 Из буфера».');
+  }).catch(e => {
+    prompt('Скопируй вручную и вставь как URL в новую закладку:', code);
+  });
 }
 
 // Вставить содержимое CSV/XML из textarea. Упаковываем строку в байты
