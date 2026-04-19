@@ -3553,14 +3553,17 @@ function _girboProxyBase(){
 }
 function _girboMakeUrl(path){
   const proxy = _girboProxyBase();
-  const target = 'https://bo.nalog.ru' + path;
-  // Соглашение: если URL прокси заканчивается на «?» или «=» —
-  // подставляем target как есть (corsproxy.io, allorigins). Иначе
-  // считаем, что прокси сам возьмёт path (CF Worker с одинаковыми
-  // путями).
+  // Cache-busting: добавляем в путь параметр _t=<timestamp>, чтобы
+  // закешированные в браузере disk-cache ответы (включая 522!) не
+  // перехватывались. В cf-worker.js (новая версия) ошибки уже не
+  // кэшируются, но старый развёрнутый Worker мог закешировать —
+  // этот параметр обходит обе проблемы одним махом. Ничего не ломает,
+  // потому что bo.nalog.ru лишние параметры игнорирует.
+  const cb = (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
+  const target = 'https://bo.nalog.ru' + path + cb;
   if(/[?=]$/.test(proxy)) return proxy + target;
-  if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.ru' + path;
-  return proxy + path;
+  if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.ru' + path + cb;
+  return proxy + path + cb;
 }
 async function _girboFetchJson(path, retries){
   if(retries == null) retries = 2;

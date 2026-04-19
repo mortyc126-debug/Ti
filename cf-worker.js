@@ -74,24 +74,40 @@ export default {
           'User-Agent': 'Mozilla/5.0 BondanProxy'
         },
         cf: {
-          // Кэшируем 10 минут — отчётность не меняется чаще раза в год,
-          // экономит CF-квоту и нагрузку на ГИР БО.
+          // Кэшируем ТОЛЬКО успешные ответы и только на стороне CF.
+          // cacheEverything=true раньше приводил к тому, что CF кэшировал
+          // и 522-ошибки тоже, а браузер получал их с Cache-Control:
+          // max-age=600 и отдавал из disk cache 10 минут подряд —
+          // retry на клиенте был бесполезен, мы даже в сеть не ходили.
           cacheTtl: 600,
-          cacheEverything: true
+          cacheTtlByStatus: { '200-299': 600, '300-599': 0 }
         }
       });
 
       const headers = new Headers(upstream.headers);
       headers.set('Access-Control-Allow-Origin', '*');
-      headers.set('Cache-Control', 'public, max-age=600');
       headers.delete('Set-Cookie');
       headers.delete('Strict-Transport-Security');
+      // Кэш в БРАУЗЕРЕ — только на успешные ответы. Ошибки (5xx, 4xx)
+      // не кэшируем, чтобы каждый retry на клиенте реально уходил в сеть.
+      // Иначе один 522 «застревал» на 10 минут в disk cache и казался
+      // постоянной проблемой.
+      if (upstream.status >= 200 && upstream.status < 300) {
+        headers.set('Cache-Control', 'public, max-age=600');
+      } else {
+        headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        headers.set('Pragma', 'no-cache');
+        headers.set('Expires', '0');
+      }
 
       return new Response(upstream.body, {status: upstream.status, headers});
     } catch (e) {
       return new Response('Upstream error: ' + (e.message || String(e)), {
         status: 502,
-        headers: {'Access-Control-Allow-Origin': '*'}
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+        }
       });
     }
   }
