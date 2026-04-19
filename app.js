@@ -13801,6 +13801,7 @@ function _moexParsePage(resp){
       isin:        g('ISIN') || secid,
       shortName:   g('SHORTNAME') || g('SECNAME') || secid,
       secName:     g('SECNAME'),
+      issuer:      g('ISSUERNAME') || g('EMITTER_NAME') || g('EMITENT_NAME') || null,
       boardid:     board,
       coupon:      _num(g('COUPONPERCENT')) || _num(g('COUPONVALUE')),
       couponValue: _num(g('COUPONVALUE')),
@@ -13910,6 +13911,7 @@ function _moexParsePageBoard(resp){
       isin:        g('ISIN') || secid,
       shortName:   g('SHORTNAME') || g('SECNAME') || secid,
       secName:     g('SECNAME'),
+      issuer:      g('ISSUERNAME') || g('EMITTER_NAME') || g('EMITENT_NAME') || null,
       boardid:     g('BOARDID'),
       coupon:      _num(g('COUPONPERCENT')) || _num(g('COUPONVALUE')),
       couponValue: _num(g('COUPONVALUE')),
@@ -14802,12 +14804,16 @@ async function moexPullGirboBulk(){
         unique.set(key, { inn: local.inn, name: local.name || b.shortName || b.secName, sampleSecid: b.secid });
       }
     } else {
-      // Пробуем извлечь бренд — будем искать в ЕГРЮЛ.
-      const brand = _moexGuessIssuerName(b.shortName, b.secName) || b.shortName || b.secName;
-      if(brand && brand.length >= 3){
-        const nkey = 'name:' + brand.toLowerCase();
+      // Для ЕГРЮЛ нужен максимально полный текст имени эмитента.
+      // Приоритет: ISSUERNAME от MOEX (полное юр-имя, есть после обновления
+      // каталога) → secName → shortName. _moexGuessIssuerName обрезает
+      // «Сегежа 002P-02R» до «Сегежа» — это плохо для ЕГРЮЛ (он не знает
+      // такое юрлицо); а полное «ПАО «Сегежа Групп» он найдёт точно.
+      const fullName = (b.issuer && b.issuer.trim()) || b.secName || b.shortName;
+      if(fullName && fullName.length >= 3){
+        const nkey = 'name:' + fullName.toLowerCase();
         if(!unique.has(nkey)){
-          unique.set(nkey, { inn: null, name: brand, sampleSecid: b.secid, needsInnLookup: true });
+          unique.set(nkey, { inn: null, name: fullName, sampleSecid: b.secid, needsInnLookup: true });
         }
       } else {
         totalSkipped++;
