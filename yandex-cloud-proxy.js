@@ -99,19 +99,20 @@ exports.handler = async (event) => {
     const qs = event.queryStringParameters || {};
     let target = qs.u;
 
-    // Разрешённые upstream-домены: ФНС (bo.nalog.gov.ru), audit-it.ru
-    // (агрегатор, ручной paste), buxbalans.ru (агрегатор, серверный
-    // парсинг работает — anti-bot отсутствует).
+    // Разрешённые upstream-домены: ФНС БФО (bo.nalog.gov.ru), ЕГРЮЛ
+    // (egrul.nalog.ru — POST API для поиска ИНН по имени + PNG капча),
+    // audit-it.ru (paste-режим), buxbalans.ru (автопарсер).
     const ALLOWED = [
         /^https:\/\/bo\.nalog\.gov\.ru\//,
+        /^https:\/\/egrul\.nalog\.ru\//,
         /^https:\/\/(www\.)?audit-it\.ru\//,
         /^https:\/\/(www\.)?buxbalans\.ru\//
     ];
     const isAllowed = (url) => ALLOWED.some((re) => re.test(url));
 
     // Альтернатива: путь повторяет upstream (/nbo/..., /advanced-search/...
-    // — ФНС; /buh_otchet/..., /search/... — audit-it; /<inn>.html — buxbalans).
-    // По префиксу пути выбираем целевой домен.
+    // — ФНС БФО; /buh_otchet/..., /search/... — audit-it;
+    // /<inn>.html — buxbalans). По префиксу пути выбираем upstream.
     if (!target && event.path) {
         const qp = Object.entries(qs).filter(([k]) => k !== 'u').map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
         const suffix = event.path + (qp ? '?' + qp : '');
@@ -121,6 +122,8 @@ exports.handler = async (event) => {
             target = 'https://www.audit-it.ru' + suffix;
         } else if (/^\/\d{10}(\d{2})?\.html$/.test(event.path)) {
             target = 'https://buxbalans.ru' + suffix;
+        } else if (event.path.startsWith('/search-result') || event.path.startsWith('/static/captcha') || event.path.startsWith('/captcha')) {
+            target = 'https://egrul.nalog.ru' + suffix;
         }
     }
 
@@ -150,8 +153,10 @@ exports.handler = async (event) => {
         };
     }
 
-    // Только чтение.
-    if (event.httpMethod !== 'GET' && event.httpMethod !== 'HEAD') {
+    // Разрешены GET/HEAD (для всех upstream'ов) и POST (нужен для
+    // поисковых API ЕГРЮЛ — form-urlencoded). PUT/DELETE/etc. не
+    // пускаем — чтобы прокси нельзя было использовать для записи.
+    if (event.httpMethod !== 'GET' && event.httpMethod !== 'HEAD' && event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
             headers: {
@@ -162,36 +167,50 @@ exports.handler = async (event) => {
         };
     }
 
-    // Retry на transient 5xx — как в CF Worker. 3 попытки с паузой.
+    const isAuditIt = target.includes('audit-it.ru');
+    const isEgrul = target.includes('egrul.nalog.ru');
+
+    // POST с формой — нужен для ЕГРЮЛ (/ принимает form-urlencoded).
+    // Я.Cloud шлёт тело в event.body; при бинарных методах — base64.
+    let reqBody;
+    let reqContentType;
+    if (event.httpMethod === 'POST') {
+        reqBody = event.body || '';
+        if (event.isBase64Encoded && reqBody) {
+            try { reqBody = Buffer.from(reqBody, 'base64').toString('utf8'); } catch(_) {}
+        }
+        reqContentType = (event.headers && (event.headers['Content-Type'] || event.headers['content-type'])) || 'application/x-www-form-urlencoded; charset=UTF-8';
+    }
+
+    // Retry на transient 5xx. 3 попытки с паузой.
     let lastStatus = 0;
     let lastError = null;
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
+            const reqHeaders = {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
+                'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                // Полный браузерный фингерпринт — audit-it без Sec-*
+                // заголовков отвечает anti-bot заглушкой.
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+                'Sec-Ch-Ua': '"Google Chrome";v="126", "Chromium";v="126", "Not-A.Brand";v="99"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': (isAuditIt || isEgrul) ? 'same-origin' : 'none',
+                'Sec-Fetch-User': '?1',
+                'Upgrade-Insecure-Requests': '1',
+                'Cache-Control': 'max-age=0',
+                ...(isAuditIt ? {'Referer': 'https://www.audit-it.ru/'} : {}),
+                ...(isEgrul ? {'Referer': 'https://egrul.nalog.ru/index.html', 'Origin': 'https://egrul.nalog.ru', 'X-Requested-With': 'XMLHttpRequest'} : {}),
+                ...(reqContentType ? {'Content-Type': reqContentType} : {})
+            };
             const upstream = await fetch(target, {
                 method: event.httpMethod,
-                headers: {
-                    // У ФНС — JSON API, у audit-it — HTML. Универсальный
-                    // Accept, чтобы оба пускали.
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
-                    'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    // Полный браузерный фингерпринт — без Sec-Ch-Ua/Sec-Fetch-*
-                    // audit-it отвечает anti-bot заглушкой «включите JS и cookies».
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-                    'Sec-Ch-Ua': '"Google Chrome";v="126", "Chromium";v="126", "Not-A.Brand";v="99"',
-                    'Sec-Ch-Ua-Mobile': '?0',
-                    'Sec-Ch-Ua-Platform': '"Windows"',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    // same-origin + Referer на главную — как будто пользователь
-                    // кликнул по внутренней ссылке. none+прямой заход audit-it
-                    // отклоняет заглушкой «включите JS и cookies».
-                    'Sec-Fetch-Site': target.includes('audit-it.ru') ? 'same-origin' : 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Cache-Control': 'max-age=0',
-                    ...(target.includes('audit-it.ru') ? {'Referer': 'https://www.audit-it.ru/'} : {})
-                }
+                headers: reqHeaders,
+                body: reqBody
             });
 
             lastStatus = upstream.status;
@@ -204,24 +223,42 @@ exports.handler = async (event) => {
                 }
             }
 
-            // Читаем тело.
+            // Читаем тело. Для PNG капчи (image/*) — как base64, иначе
+            // клиент получит мусор. Для всего остального — text.
             const contentType = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
-            const body = await upstream.text();
+            const isBinary = /^(image|application\/octet-stream)/i.test(contentType);
+            let body;
+            if (isBinary) {
+                const buf = Buffer.from(await upstream.arrayBuffer());
+                body = buf.toString('base64');
+            } else {
+                body = await upstream.text();
+            }
 
             // Кеширование: ТОЛЬКО успешные ответы. Ошибки не кешируем,
             // иначе один 522 застревал в disk cache и retry становился
             // бесполезным (клиент получал кешированный 522, не ходил в сеть).
-            const cacheControl = upstream.status >= 200 && upstream.status < 300
+            // POST-запросы тоже не кешируем — они должны долетать до origin.
+            const cacheControl = (upstream.status >= 200 && upstream.status < 300 && event.httpMethod !== 'POST')
                 ? 'public, max-age=600'
                 : 'no-store, no-cache, must-revalidate, max-age=0';
+
+            // Передаём Set-Cookie наружу — ЕГРЮЛ может присылать
+            // сессионную cookie, без которой следующий запрос опять
+            // запросит капчу. CORS Access-Control-Expose-Headers позволяет
+            // клиенту её видеть (но не сохранять cross-origin — см. клиент).
+            const setCookie = upstream.headers.get('set-cookie');
 
             return {
                 statusCode: upstream.status,
                 headers: {
                     'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Expose-Headers': 'Content-Type, Set-Cookie',
                     'Content-Type': contentType,
-                    'Cache-Control': cacheControl
+                    'Cache-Control': cacheControl,
+                    ...(setCookie ? {'X-Upstream-Set-Cookie': setCookie} : {})
                 },
+                isBase64Encoded: isBinary,
                 body: body
             };
 

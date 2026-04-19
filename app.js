@@ -1008,6 +1008,7 @@ function _proxyMakeUrl(host, path){
 function _girboMakeUrl(path){ return _proxyMakeUrl('bo.nalog.gov.ru', path); }
 function _auditItMakeUrl(path){ return _proxyMakeUrl('www.audit-it.ru', path); }
 function _buxBalansMakeUrl(path){ return _proxyMakeUrl('buxbalans.ru', path); }
+function _egrulMakeUrl(path){ return _proxyMakeUrl('egrul.nalog.ru', path); }
 async function _girboFetchJson(path, retries, timeoutMs){
   if(retries == null) retries = 2;
   if(timeoutMs == null) timeoutMs = 8000; // 8s — половина старого, меньше висеть
@@ -1283,6 +1284,158 @@ async function fetchBuxBalansByInn(inn, maxYears = 15){
     count: Object.keys(series).length,
     errors: []
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ЕГРЮЛ (egrul.nalog.ru) — поиск ИНН по названию
+// ═══════════════════════════════════════════════════════════════════
+// Официальный первоисточник. Даёт ИНН/ОГРН/адрес/ОКВЭД по имени.
+// Нужен чтобы для бумаг из MOEX, где ИНН неизвестен, автоматически
+// достать ИНН → потом по нему buxbalans подтянет отчётность.
+//
+// API (по актуальной схеме 2024-2026):
+//   POST /                  — подать поисковый запрос,
+//                             body: vyp3CaptchaToken=...&page=&query=X&region=&
+//                                   PreventChromeAutocomplete=
+//                             → {t: '<queryId>', captchaRequired: bool}
+//   GET  /search-result/<id> — забрать результат; если пусто — {status:'wait'}
+//   При captchaRequired=true приходит {captchaToken, captchaPng (base64)}
+//   — показываем пользователю картинку, он вводит 6 букв, мы вторым POST'ом
+//   повторяем запрос с captcha=<value>&captchaToken=<token>.
+//
+// Внимание: реальная схема ответов может немного отличаться (ЕГРЮЛ несколько
+// раз переделывал API). На первом живом тесте возможна правка парсинга —
+// ниже стоят гибкие detect'ы признаков капчи и ИНН.
+
+async function _egrulSubmitSearch(query, captchaValue, captchaToken){
+  // POST /
+  const url = _egrulMakeUrl('/');
+  const body = new URLSearchParams({
+    'vyp3CaptchaToken': captchaToken || '',
+    'page': '',
+    'query': query,
+    'region': '',
+    'PreventChromeAutocomplete': '',
+    ...(captchaValue ? {'captcha': captchaValue, 'captchaToken': captchaToken || ''} : {})
+  }).toString();
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'Accept': 'application/json, text/plain, */*'
+    },
+    body
+  });
+  if(!r.ok) throw new Error('ЕГРЮЛ HTTP ' + r.status);
+  const ct = r.headers.get('content-type') || '';
+  if(/json/i.test(ct)) return await r.json();
+  const txt = await r.text();
+  try { return JSON.parse(txt); } catch(_) { return { _raw: txt }; }
+}
+
+async function _egrulFetchResult(queryId, maxWaitMs){
+  // GET /search-result/<id> — ЕГРЮЛ может отвечать {status:'wait'} пока
+  // обрабатывает запрос; опрашиваем с паузами до maxWaitMs.
+  const deadline = Date.now() + (maxWaitMs || 10000);
+  while(Date.now() < deadline){
+    const r = await fetch(_egrulMakeUrl('/search-result/' + encodeURIComponent(queryId)), {
+      headers: {'Accept': 'application/json'}
+    });
+    if(!r.ok) throw new Error('ЕГРЮЛ result HTTP ' + r.status);
+    const j = await r.json();
+    if(!j || j.status === 'wait' || j.status === 'pending'){
+      await new Promise(res => setTimeout(res, 500));
+      continue;
+    }
+    return j;
+  }
+  throw new Error('ЕГРЮЛ не вернул результат за ' + (maxWaitMs/1000) + 'с');
+}
+
+// Вытаскивает капчу из ответа: PNG как base64 + token.
+// Структура может быть: {captchaPng, captchaToken} или {captchaImage, token}.
+function _egrulExtractCaptcha(resp){
+  if(!resp || typeof resp !== 'object') return null;
+  const required = resp.captchaRequired === true || resp.captcha === true || /captcha/i.test(resp.status || '');
+  const png = resp.captchaPng || resp.captchaImage || resp.captcha || resp.image || null;
+  const token = resp.captchaToken || resp.token || resp.t || null;
+  if(required || (png && token)){
+    return { png, token };
+  }
+  return null;
+}
+
+// Показывает модалку с PNG капчи, возвращает Promise<строка-ответ> или null.
+function _egrulAskCaptcha(pngBase64, hint){
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-egrul-captcha');
+    const img = document.getElementById('egrul-captcha-img');
+    const input = document.getElementById('egrul-captcha-input');
+    const msg = document.getElementById('egrul-captcha-msg');
+    if(!modal || !img || !input){ resolve(null); return; }
+    img.src = pngBase64 ? ('data:image/png;base64,' + pngBase64) : '';
+    input.value = '';
+    if(msg) msg.textContent = hint || 'Введи буквы/цифры с картинки и нажми «Продолжить».';
+    window._egrulCaptchaResolve = (val) => { window._egrulCaptchaResolve = null; resolve(val); };
+    modal.classList.add('open');
+    setTimeout(() => input.focus(), 50);
+  });
+}
+function _egrulCaptchaSubmit(){
+  const input = document.getElementById('egrul-captcha-input');
+  const val = (input?.value || '').trim();
+  document.getElementById('modal-egrul-captcha').classList.remove('open');
+  if(window._egrulCaptchaResolve) window._egrulCaptchaResolve(val);
+}
+function _egrulCaptchaCancel(){
+  document.getElementById('modal-egrul-captcha').classList.remove('open');
+  if(window._egrulCaptchaResolve) window._egrulCaptchaResolve(null);
+}
+
+// Ищет первую подходящую организацию в ЕГРЮЛ по имени, возвращает
+// {inn, ogrn, name} или null. При капче показывает модалку — пользователь
+// вводит значение, запрос повторяется.
+async function egrulFindInnByName(query){
+  if(!query || String(query).trim().length < 2) return null;
+  const q = String(query).trim();
+  // Шаг 1 — первичный POST.
+  let resp = await _egrulSubmitSearch(q, '', '');
+  // Если сразу капча — просим пользователя.
+  let captcha = _egrulExtractCaptcha(resp);
+  let attempts = 0;
+  while(captcha && attempts < 3){
+    const userVal = await _egrulAskCaptcha(captcha.png, attempts === 0
+      ? 'Введи буквы/цифры с картинки.'
+      : 'Не распозналось, попробуй ещё раз.');
+    if(!userVal){ throw new Error('ЕГРЮЛ: капча отменена пользователем'); }
+    resp = await _egrulSubmitSearch(q, userVal, captcha.token || '');
+    captcha = _egrulExtractCaptcha(resp);
+    attempts++;
+  }
+  // Шаг 2 — если ответ содержит queryId — забираем результат.
+  let rows = null;
+  if(resp && resp.rows) rows = resp.rows;
+  else if(resp && (resp.t || resp.queryId)){
+    const result = await _egrulFetchResult(resp.t || resp.queryId, 10000);
+    rows = result.rows || result.results || null;
+    // На втором шаге тоже возможна капча.
+    const cap2 = _egrulExtractCaptcha(result);
+    if(cap2){
+      const val = await _egrulAskCaptcha(cap2.png);
+      if(!val) throw new Error('ЕГРЮЛ: капча отменена');
+      // Пересчитываем.
+      const retry = await _egrulFetchResult(resp.t || resp.queryId, 10000);
+      rows = retry.rows || retry.results || null;
+    }
+  }
+  if(!Array.isArray(rows) || !rows.length) return null;
+  // Поля в rows: i=ИНН, o=ОГРН, c/n/t=название (в разных версиях разные).
+  const first = rows[0];
+  const inn = first.i || first.inn || first.ИНН || null;
+  const ogrn = first.o || first.ogrn || first.ОГРН || null;
+  const name = first.c || first.n || first.t || first.name || first.Наименование || null;
+  if(!inn || !/^\d{10}(\d{2})?$/.test(String(inn))) return null;
+  return { inn: String(inn), ogrn: ogrn ? String(ogrn) : null, name: name || null };
 }
 
 // Подтягиваем последние N годовых отчётов РСБУ по ИНН, складываем в
@@ -14591,25 +14744,34 @@ async function moexPullGirboBulk(){
     done++;
     if(status && done % 20 === 0) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: группирую (${done}/${targets.length}, эмитентов: ${unique.size})</span>`;
 
-    // Ищем имя — приоритет: полное имя из локального справочника
-    // (оно точнее для ГИР БО), потом MOEX guess + fallback-кандидаты.
-    // Нужен ИНН из локального справочника (peers.json + reportsDB).
-    // buxbalans ищет ТОЛЬКО по ИНН — эмитентов без ИНН bulk пропускает
-    // (для них — «📝 ИНН-мастер», где ИНН вводится руками).
+    // ИНН из локального справочника (peers.json + reportsDB) идёт в
+    // buxbalans напрямую. Без локального ИНН — добавляем в список
+    // «на поиск через ЕГРЮЛ» (по имени). ЕГРЮЛ может запросить капчу —
+    // модалка предложит её ввести (одна капча обычно разблокирует 20-50
+    // последующих запросов).
     const local = _moexLocalInnLookup(b.shortName || b.secName);
-    if(!local || !local.inn){
-      totalSkipped++;
-      continue;
-    }
-    const key = local.inn;
-    if(!unique.has(key)){
-      unique.set(key, { inn: local.inn, name: local.name || b.shortName || b.secName, sampleSecid: b.secid });
+    if(local && local.inn){
+      const key = local.inn;
+      if(!unique.has(key)){
+        unique.set(key, { inn: local.inn, name: local.name || b.shortName || b.secName, sampleSecid: b.secid });
+      }
+    } else {
+      // Пробуем извлечь бренд — будем искать в ЕГРЮЛ.
+      const brand = _moexGuessIssuerName(b.shortName, b.secName) || b.shortName || b.secName;
+      if(brand && brand.length >= 3){
+        const nkey = 'name:' + brand.toLowerCase();
+        if(!unique.has(nkey)){
+          unique.set(nkey, { inn: null, name: brand, sampleSecid: b.secid, needsInnLookup: true });
+        }
+      } else {
+        totalSkipped++;
+      }
     }
   }
 
   const totalInns = unique.size;
   if(totalInns === 0){
-    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов с известным ИНН. Используй «📝 ИНН-мастер» — впиши ИНН руками и подтяни через buxbalans.</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов для обработки.</span>`;
     return;
   }
 
@@ -14623,9 +14785,45 @@ async function moexPullGirboBulk(){
   };
   let idx = 0;
   let consecutiveTimeouts = 0;
+  let egrulGiveUp = false; // пользователь отменил капчу → дальше не спрашиваем
   for(const [key, meta] of unique){
     idx++;
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: buxbalans ${idx}/${totalInns}: «${meta.name}» (ИНН ${meta.inn})</span>`;
+    // Шаг 2а: если ИНН неизвестен — пробуем найти через ЕГРЮЛ по имени.
+    if(!meta.inn && meta.needsInnLookup && !egrulGiveUp){
+      if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${idx}/${totalInns}: ЕГРЮЛ поиск ИНН «${meta.name}»…</span>`;
+      try {
+        const found = await egrulFindInnByName(meta.name);
+        if(found && found.inn){
+          meta.inn = found.inn;
+          if(found.name) meta.name = found.name;
+        } else {
+          totalErr++;
+          errors.push(`«${meta.name}»: ЕГРЮЛ не нашёл`);
+          await new Promise(r => setTimeout(r, 250));
+          continue;
+        }
+      } catch(e){
+        if(/отменена/.test(e.message)){
+          // Пользователь нажал «Отмена» на капче — прекращаем дальнейшие
+          // ЕГРЮЛ-запросы, но продолжаем обрабатывать тех, у кого ИНН уже есть.
+          egrulGiveUp = true;
+          totalErr++;
+          errors.push(`«${meta.name}»: капча ЕГРЮЛ отменена — остальные без ИНН пропускаются`);
+          continue;
+        }
+        totalErr++;
+        errors.push(`«${meta.name}» (ЕГРЮЛ): ${e.message}`);
+        await new Promise(r => setTimeout(r, 400));
+        continue;
+      }
+    }
+    if(!meta.inn){
+      // egrulGiveUp или не прошли по разным причинам — пропуск.
+      totalSkipped++;
+      continue;
+    }
+    // Шаг 2б: buxbalans по ИНН.
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${idx}/${totalInns}: buxbalans «${meta.name}» (ИНН ${meta.inn})</span>`;
     let data = null;
     try {
       data = await fetchBuxBalansByInn(meta.inn, 15);
