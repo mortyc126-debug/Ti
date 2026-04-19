@@ -16667,18 +16667,19 @@ async function moexPullGirboBulk(){
   let totalOk = 0, totalErr = 0, totalSkipped = 0, totalNewIssuers = 0;
   const errors = [];
 
-  // Шаг 1: собрать уникальных эмитентов.
-  // Сначала локальный справочник — мгновенно, без сети. Для оставшихся
-  // — через MOEX (info) и поиск по имени в ГИР БО.
+  // Шаг 1: собрать уникальных ИНН. Только быстрые пути:
+  // локальный справочник + имя из catalog. БЕЗ сетевых запросов
+  // к MOEX/ГИР БО — они в bulk давали кошмарную задержку
+  // (30+ сек на 60 бумаг при недоступной сети).
+  // Для неизвестных эмитентов путь: «📝 ИНН-мастер» после bulk.
   await _moexBuildLocalInnMap();
   let done = 0;
   let noInnCount = 0;
   let localHits = 0;
   for(const b of targets){
     done++;
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: ищу ИНН (${done}/${targets.length}, локально: ${localHits}): ${b.shortName}</span>`;
+    if(status && done % 20 === 0) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: ищу ИНН локально (${done}/${targets.length}, найдено: ${localHits})</span>`;
 
-    // 1.1 — локальный справочник.
     const local = _moexLocalInnLookup(b.shortName || b.secName);
     if(local){
       localHits++;
@@ -16687,22 +16688,8 @@ async function moexPullGirboBulk(){
       }
       continue;
     }
-
-    // 1.2 — MOEX info + его fallback'и (EMITTER_ID, имя).
-    let info;
-    try { info = await _moexFetchSecurityInfo(b.secid); }
-    catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
-
-    let inn = info.inn;
-    // Автоматический name-search через ГИР БО убран — он упирался в
-    // 522 и делал долгие заведомо неудачные попытки. Остаются только
-    // быстрые пути (локальный справочник, MOEX description). Для
-    // оставшихся бумаг — ручной ввод через «📝 ИНН-мастер».
-    if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет — используй 📝 ИНН-мастер`); continue; }
-    if(!unique.has(inn)){
-      unique.set(inn, { secid: b.secid, name: info.issuer || info.shortName });
-    }
-    await new Promise(r => setTimeout(r, 60));
+    noInnCount++;
+    errors.push(`${b.shortName}: ИНН нет локально — используй 📝 ИНН-мастер`);
   }
 
   const totalInns = unique.size;
@@ -16734,7 +16721,11 @@ async function moexPullGirboBulk(){
   }
 
   // Результат.
-  const msg = `✓ Готово: обработано ${totalInns} эмитентов (${localHits} локально, ${totalInns - localHits} через MOEX description), добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `, ошибок ГИР БО: ${totalErr}` : '') + (noInnCount ? `. Без ИНН: ${noInnCount} эмитентов — открой 📝 ИНН-мастер для ручного ввода.` : '');
+  const msg = totalInns === 0
+    ? (noInnCount > 0
+       ? `Без ИНН: ${noInnCount} эмитентов. В локальном справочнике (peers.json + reportsDB) таких нет. Открой 📝 ИНН-мастер — там список с ссылками на ФНС/RusProfile для ручного ввода.`
+       : `Нет бумаг для обработки`)
+    : `✓ Готово локально: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `, ошибок ГИР БО: ${totalErr}` : '') + (noInnCount ? `. Без ИНН: ${noInnCount} эмитентов — 📝 ИНН-мастер.` : '');
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
   if(errors.length){
     console.warn('GIR BO bulk errors:', errors);
