@@ -952,14 +952,12 @@ function girboLinkForInn(inn){
 // + rate-limit по IP), а из домашнего браузера страницы открываются
 // штатно. Поэтому — только ручная ссылка: пользователь кликает, сам
 // читает цифры и вбивает через форму периода.
-// Ссылка строится через Google Site Search, а не внутренний /search/
-// audit-it: у них сайтовый поиск капризный (по короткому бренду типа
-// «БалтЛиз» редиректит на главную), а Google индексирует все страницы
-// бух. отчётности и по любому тексту (ИНН, имя, бренд) первой строкой
-// даёт нужную.
+// По ИНН внутренний поиск audit-it /search/?q=<ИНН> находит точно — один
+// клик до страницы компании. По обрезанному бренду он капризный, там
+// Google Site Search надёжнее (см. _innWizOpenSearch в ИНН-мастере).
 function auditItLinkForInn(inn){
   if(!inn) return null;
-  return 'https://www.google.com/search?q=' + encodeURIComponent('site:audit-it.ru/buh_otchet ' + inn);
+  return 'https://www.audit-it.ru/search/?q=' + encodeURIComponent(inn);
 }
 
 // ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
@@ -6682,20 +6680,34 @@ function repOnRefFile(input){
   input.value = '';
 }
 
-function repOpenGirboForInn(){
-  const meta = window._reportMeta;
-  const inn = meta?.inn;
-  if(!inn){
-    const manual = prompt('ИНН не распознан в отчёте. Введите вручную (10 или 12 цифр):', '');
-    if(!manual) return;
-    if(!/^\d{10}(\d{2})?$/.test(manual.trim())){
-      alert('ИНН должен быть 10 цифр (юрлицо) или 12 (ИП).');
-      return;
-    }
-    window.open('https://bo.nalog.gov.ru/advanced-search/organizations/search?query=' + encodeURIComponent(manual.trim()), '_blank', 'noopener');
-  } else {
-    window.open(girboLinkForInn(inn), '_blank', 'noopener');
+// Берёт ИНН из: (1) распознанного отчёта, (2) уже сохранённого для
+// активного эмитента в reportsDB, (3) prompt'а вручную. Дополнительно
+// сохраняет введённый ИНН в reportsDB — чтобы в следующий раз не спрашивать.
+function _repResolveInnInteractive(reason){
+  const fromMeta = window._reportMeta?.inn;
+  if(fromMeta && /^\d{10}(\d{2})?$/.test(String(fromMeta).trim())) return String(fromMeta).trim();
+  const fromDB = repActiveIssuerId ? reportsDB[repActiveIssuerId]?.inn : null;
+  if(fromDB && /^\d{10}(\d{2})?$/.test(String(fromDB).trim())) return String(fromDB).trim();
+  const manual = prompt(reason || 'Введите ИНН эмитента (10 или 12 цифр):', '');
+  if(!manual) return null;
+  const v = String(manual).trim();
+  if(!/^\d{10}(\d{2})?$/.test(v)){
+    alert('ИНН должен быть 10 цифр (юрлицо) или 12 (ИП).');
+    return null;
   }
+  // Сохраняем ИНН в карточку активного эмитента, чтобы в следующий раз
+  // не спрашивать повторно.
+  if(repActiveIssuerId && reportsDB[repActiveIssuerId] && !reportsDB[repActiveIssuerId].inn){
+    reportsDB[repActiveIssuerId].inn = v;
+    save();
+  }
+  return v;
+}
+
+function repOpenGirboForInn(){
+  const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр):');
+  if(!inn) return;
+  window.open(girboLinkForInn(inn), '_blank', 'noopener');
   alert('1. На странице ГИР БО откройте карточку компании.\n2. Найдите нужный отчётный год → «Скачать» или «Открыть JSON».\n3. Сохраните файл на диск.\n4. Вернитесь и нажмите «📋 Импорт JSON».\n\nПодробнее: ГИР БО отдаёт только РСБУ-отчётность юрлица. Если ваш загруженный отчёт — МСФО-группа, приложение покажет это как справочную информацию, а не прямую сверку.');
 }
 
@@ -6706,17 +6718,8 @@ function repOpenGirboForInn(){
 // в домашнем браузере пользователя — там аудит-it отдаёт страницы
 // нормально. Цифры копируются в форму периода вручную.
 function repOpenAuditItForInn(){
-  const meta = window._reportMeta;
-  let inn = meta?.inn;
-  if(!inn){
-    const manual = prompt('ИНН не распознан в отчёте. Введите вручную (10 или 12 цифр) для поиска на audit-it:', '');
-    if(!manual) return;
-    if(!/^\d{10}(\d{2})?$/.test(manual.trim())){
-      alert('ИНН должен быть 10 цифр (юрлицо) или 12 (ИП).');
-      return;
-    }
-    inn = manual.trim();
-  }
+  const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр) для поиска на audit-it:');
+  if(!inn) return;
   window.open(auditItLinkForInn(inn), '_blank', 'noopener');
 }
 
@@ -6773,14 +6776,8 @@ function repClearReference(){
 // МСФО-группа, цифры будут существенно меньше консолидированных,
 // и блок сверки явно это подсветит как «не прямое сравнение».
 async function repFetchGirboSeries(){
-  const meta = window._reportMeta || {};
-  let inn = meta.inn;
-  if(!inn){
-    inn = prompt('ИНН не распознан в отчёте. Введите вручную (10 или 12 цифр):', '');
-    if(!inn) return;
-    inn = inn.trim();
-    if(!/^\d{10}(\d{2})?$/.test(inn)){ alert('ИНН должен быть 10 (юрлицо) или 12 (ИП) цифр.'); return; }
-  }
+  const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр):');
+  if(!inn) return;
   const box = document.getElementById('rep-np-ref-result');
   const wrap = document.getElementById('rep-np-ref-wrap');
   if(wrap) wrap.style.display = 'block';
@@ -14529,11 +14526,17 @@ function _innWizOpenSearch(event, key, source){
   // Если в input валидный ИНН (10 или 12 цифр) — используем его; иначе бренд.
   const query = /^\d{10}(\d{2})?$/.test(val) ? val : brand;
   if(!query) return false;
+  const isInn = /^\d{10}(\d{2})?$/.test(query);
   let url;
   if(source === 'fns'){
     url = 'https://bo.nalog.gov.ru/advanced-search/organizations/search?query=' + encodeURIComponent(query);
   } else if(source === 'auditit'){
-    url = 'https://www.google.com/search?q=' + encodeURIComponent('site:audit-it.ru/buh_otchet ' + query);
+    // По ИНН внутренний поиск audit-it работает и ведёт сразу на
+    // страницу компании (один клик). По обрезанному бренду он часто
+    // редиректит на главную — тогда пробрасываем через Google Site Search.
+    url = isInn
+      ? 'https://www.audit-it.ru/search/?q=' + encodeURIComponent(query)
+      : 'https://www.google.com/search?q=' + encodeURIComponent('site:audit-it.ru/buh_otchet ' + query);
   } else if(source === 'rusprofile'){
     url = 'https://www.rusprofile.ru/search?query=' + encodeURIComponent(query) + '&type=ul';
   } else {
