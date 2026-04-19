@@ -73,47 +73,20 @@ openapi: 3.0.0
 info:
   title: БондАналитик ГИР БО прокси
   version: '1.0.0'
-  description: Прокси для публичной РСБУ-отчётности bo.nalog.ru
 
 paths:
   /:
     get:
-      summary: Прокси GET-запросов к bo.nalog.ru
-      description: Передаёт запрос в функцию luna. Целевой URL берётся из параметра ?u=
-      parameters:
-        - name: u
-          in: query
-          required: false
-          description: Целевой URL на bo.nalog.ru (обязателен)
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Успешный ответ от bo.nalog.ru
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4e2bl39ls21fndpnkft
+      responses:
+        '200':
+          description: OK
     options:
-      summary: CORS preflight
-      responses:
-        '204':
-          description: CORS preflight OK
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: d4e2bl39ls21fndpnkft
-
-  /{proxy+}:
-    x-yc-apigateway-any-method:
-      summary: Прокси любых путей (запасной endpoint)
-      parameters:
-        - name: proxy
-          in: path
-          required: true
-          schema:
-            type: string
       responses:
         '200':
-          description: Успешный ответ
-      x-yc-apigateway-integration:
-        type: cloud_functions
-        function_id: d4e2bl39ls21fndpnkft
+          description: OK
