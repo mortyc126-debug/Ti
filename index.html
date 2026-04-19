@@ -1963,6 +1963,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
       <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе — подтянуть РСБУ из ГИР БО (ФНС) по ИНН. Каждый эмитент — 2-3 запроса к прокси, 1-2 секунды. Затем мультипликаторы появятся прямо в строке.">📡 ГИР БО для эмитентов в фильтре</button>
+      <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
@@ -2533,6 +2534,30 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-dossier')">Закрыть</button>
       <button class="btn btn-p" onclick="dossierSave()">💾 Сохранить досье</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ИНН-мастер — ручной ввод ИНН для MOEX-бумаг без matched эмитента -->
+<div class="modal-overlay" id="modal-inn-wizard">
+  <div class="modal" style="width:880px;max-width:98vw;max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      📝 ИНН-мастер: ручное заполнение
+      <span id="inn-wiz-count" style="font-size:.58rem;color:var(--text3);margin-left:auto;margin-right:12px"></span>
+      <button class="modal-x" onclick="closeModal('modal-inn-wizard')">✕</button>
+    </div>
+    <div style="padding:10px 14px;font-size:.6rem;color:var(--text2);line-height:1.5;border-bottom:1px solid var(--border)">
+      Для каждого выпуска без matched эмитента — две кнопки поиска:
+      <strong>🇷🇺 ФНС</strong> (bo.nalog.ru — официальный реестр, ИНН точно будет в карточке) и
+      <strong>🔎 RusProfile</strong> (быстрее и с названием проще). Нашла ИНН → вставила в поле → «💾 Сохранить всё». После сохранения можно сразу подтянуть ГИР БО для введённых.
+    </div>
+    <div class="modal-body" id="inn-wiz-body" style="overflow-y:auto;flex:1;padding:8px 14px"></div>
+    <div class="modal-ftr" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="closeModal('modal-inn-wizard')">Закрыть</button>
+      <label style="font-size:.6rem;color:var(--text2);display:flex;gap:4px;align-items:center;margin-left:auto;margin-right:6px;cursor:pointer">
+        <input type="checkbox" id="inn-wiz-autogirbo" checked style="margin:0"> И сразу подтянуть ГИР БО
+      </label>
+      <button class="btn btn-p" onclick="moexSaveInnWizard()">💾 Сохранить всё</button>
     </div>
   </div>
 </div>
@@ -16740,6 +16765,160 @@ async function moexPullGirboBulk(){
   moexApplyFilters();
   const sbRep = document.getElementById('sb-rep');
   if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+}
+
+// ───────── ИНН-мастер (ручной ввод ИНН массово) ─────────
+// MOEX не отдаёт ИНН в доступных нам API, name-search через ФНС
+// упирается в прокси. Для мелких ВДО единственный надёжный путь —
+// пользователь находит ИНН глазами на bo.nalog.ru / rusprofile.ru
+// и вводит в таблицу. Мастер это и делает — одна модалка, все
+// бумаги из текущего фильтра без matched эмитента, рядом с каждой
+// поле для ИНН + две ссылки.
+
+function moexOpenInnWizard(){
+  const cat = window._moexCatalog;
+  if(!cat){ alert('Сначала обнови каталог Мосбиржи.'); return; }
+  const filtered = window._moexFilteredCache || [];
+  const targets = filtered.filter(b => !b.issId);
+  if(!targets.length){
+    alert('В текущем фильтре нет бумаг без matched эмитента — всё уже найдено или фильтр слишком узкий.');
+    return;
+  }
+  // Группируем по предполагаемому имени эмитента, чтобы одна строка
+  // мастера покрывала все выпуски одного бренда. Ключ: _moexGuessIssuerName
+  // от shortName. Если угадать не удалось — используем сам shortName.
+  const groups = new Map(); // key (inferred brand) → {brand, name, items:[bonds]}
+  for(const b of targets){
+    const brand = _moexGuessIssuerName(b.shortName, b.secName) || b.shortName || b.secid;
+    const key = brand.toLowerCase();
+    if(!groups.has(key)){
+      groups.set(key, {
+        brand,
+        moexName: b.secName || b.shortName,
+        items: []
+      });
+    }
+    groups.get(key).items.push(b);
+  }
+
+  document.getElementById('inn-wiz-count').textContent = `${groups.size} эмитентов · ${targets.length} выпусков`;
+  const rows = [...groups.entries()].map(([key, g]) => {
+    const sample = g.items[0];
+    const issuesList = g.items.map(b => `<span style="color:var(--text3);font-family:var(--mono);font-size:.56rem">${b.shortName}</span>`).join(' · ');
+    const queryFns = encodeURIComponent(g.brand);
+    const queryRp = encodeURIComponent(g.brand);
+    return `<div class="inn-wiz-row" data-key="${key}" style="display:grid;grid-template-columns:1.6fr 1.2fr auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:.7rem;color:var(--text);font-weight:600">${g.brand}</div>
+        <div style="font-size:.55rem;color:var(--text3);margin-top:2px">${g.items.length} выпуск${g.items.length === 1 ? '' : g.items.length < 5 ? 'а' : 'ов'}: ${issuesList}</div>
+        <div style="font-size:.54rem;color:var(--text3);margin-top:2px">MOEX-имя: ${g.moexName || '—'}</div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input type="text" class="inn-wiz-input" data-key="${key}" placeholder="10 или 12 цифр" maxlength="12" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.7rem;padding:4px 6px;outline:none">
+      </div>
+      <div style="display:flex;gap:4px">
+        <a href="https://bo.nalog.ru/search?query=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.ru)">🇷🇺 ФНС</a>
+        <a href="https://www.rusprofile.ru/search?query=${queryRp}&type=ul" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru">🔎 RusProfile</a>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('inn-wiz-body').innerHTML = rows;
+  // Сохраняем группы для последующего save.
+  window._moexInnWizardGroups = groups;
+  document.getElementById('modal-inn-wizard').classList.add('open');
+}
+
+async function moexSaveInnWizard(){
+  const groups = window._moexInnWizardGroups;
+  if(!groups) return;
+  const autogirbo = document.getElementById('inn-wiz-autogirbo').checked;
+  const inputs = document.querySelectorAll('#inn-wiz-body .inn-wiz-input');
+  const toProcess = []; // {inn, name, sampleSecid}
+  for(const input of inputs){
+    const inn = input.value.trim();
+    if(!inn) continue;
+    if(!/^\d{10}$|^\d{12}$/.test(inn)){
+      input.style.borderColor = 'var(--danger)';
+      continue;
+    }
+    const key = input.dataset.key;
+    const g = groups.get(key);
+    if(!g) continue;
+    toProcess.push({ inn, name: g.brand, sampleSecid: g.items[0].secid });
+  }
+  if(!toProcess.length){
+    alert('Введи хотя бы один ИНН (10 или 12 цифр).');
+    return;
+  }
+
+  // 1. Создаём/обновляем эмитентов в reportsDB (этого достаточно,
+  //    чтобы в каталоге появился matched эмитент и мини-профиль
+  //    — пусть пока без мультипликаторов).
+  for(const item of toProcess){
+    _moexEnsureIssuer(item.inn, item.name);
+  }
+  save();
+  // Сброс кэша локального ИНН-индекса — чтобы новые эмитенты
+  // сразу попадали в поиск.
+  window._moexLocalInnMap = null;
+  closeModal('modal-inn-wizard');
+
+  // 2. Обновляем каталог (rebuild issuerIndex, mini-profile).
+  moexApplyFilters();
+
+  const sbRep = document.getElementById('sb-rep');
+  if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+
+  const statusEl = document.getElementById('moex-status');
+  if(statusEl) statusEl.innerHTML = `<span style="color:var(--green)">✓ Сохранено ${toProcess.length} эмитентов${autogirbo ? '. Запускаю подтяжку ГИР БО…' : ''}</span>`;
+
+  // 3. Опционально — сразу тянем ГИР БО.
+  if(autogirbo){
+    let ok = 0, err = 0;
+    for(let i = 0; i < toProcess.length; i++){
+      const item = toProcess[i];
+      if(statusEl) statusEl.innerHTML = `<span style="color:var(--warn)">⏳ ГИР БО ${i+1}/${toProcess.length}: ${item.name}</span>`;
+      try {
+        const data = await fetchGirboByInn(item.inn, 5);
+        // Добавляем периоды в reportsDB.
+        let issId = null;
+        for(const [id, iss] of Object.entries(reportsDB)){
+          if(iss.inn === item.inn){ issId = id; break; }
+        }
+        if(!issId) continue;
+        const iss = reportsDB[issId];
+        const fieldMap = {
+          'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+          'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+          'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+        };
+        for(const [lbl, values] of Object.entries(data.series || {})){
+          const ym = String(lbl).match(/(\d{4})/);
+          if(!ym) continue;
+          const year = ym[1];
+          const key = `${year}_FY_ГИРБО`;
+          if(iss.periods[key]) continue;
+          const period = {
+            year, period:'FY', type:'ГИРБО', note:'', analysisHTML:'',
+            rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+            assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+          };
+          for(const [fid, shortKey] of Object.entries(fieldMap)){
+            if(values[fid] != null) period[shortKey] = values[fid];
+          }
+          iss.periods[key] = period;
+        }
+        save();
+        ok++;
+      } catch(e){
+        err++;
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
+    if(statusEl) statusEl.innerHTML = `<span style="color:var(--green)">✓ Сохранено ${toProcess.length} эмитентов; ГИР БО: ${ok} успешно, ${err} упало (прокси/522 — ничего страшного, данные эмитента сохранятся, в следующий раз ГИР БО донесёт)</span>`;
+    moexApplyFilters();
+  }
 }
 
 function moexOpenDossier(issId){
