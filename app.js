@@ -952,9 +952,14 @@ function girboLinkForInn(inn){
 // + rate-limit по IP), а из домашнего браузера страницы открываются
 // штатно. Поэтому — только ручная ссылка: пользователь кликает, сам
 // читает цифры и вбивает через форму периода.
+// Ссылка строится через Google Site Search, а не внутренний /search/
+// audit-it: у них сайтовый поиск капризный (по короткому бренду типа
+// «БалтЛиз» редиректит на главную), а Google индексирует все страницы
+// бух. отчётности и по любому тексту (ИНН, имя, бренд) первой строкой
+// даёт нужную.
 function auditItLinkForInn(inn){
   if(!inn) return null;
-  return 'https://www.audit-it.ru/search/?q=' + encodeURIComponent(inn);
+  return 'https://www.google.com/search?q=' + encodeURIComponent('site:audit-it.ru/buh_otchet ' + inn);
 }
 
 // ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
@@ -14499,7 +14504,7 @@ function moexOpenInnWizard(){
       </div>
       <div style="display:flex;gap:4px">
         <a href="https://bo.nalog.gov.ru/advanced-search/organizations/search?query=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru)">🇷🇺 ФНС</a>
-        <a href="https://www.audit-it.ru/search/?q=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на audit-it.ru — глубже, чем ГИР БО (2015-2025, есть ВДО)">📗 audit-it</a>
+        <a href="https://www.google.com/search?q=${encodeURIComponent('site:audit-it.ru/buh_otchet ' + g.brand)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Найти компанию на audit-it.ru через Google (внутренний поиск audit-it по обрезанному бренду плохо работает, поэтому через Google — первая ссылка в выдаче ведёт на нужную страницу)">📗 audit-it</a>
         <a href="https://www.rusprofile.ru/search?query=${queryRp}&type=ul" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru">🔎 RusProfile</a>
       </div>
     </div>`;
