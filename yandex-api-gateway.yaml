@@ -1,0 +1,119 @@
+# Yandex Cloud API Gateway — OpenAPI-спецификация для ГИР БО прокси.
+#
+# Прямой invoke URL функции Yandex Cloud (functions.yandexcloud.net/<id>)
+# НЕ ПОДХОДИТ для HTTP-прокси: он возвращает JSON-обёртку или дебаг-
+# страницу, а не тело ответа функции. Чтобы получить полноценный HTTP-
+# endpoint с правильными headers и телом, нужен сервис API Gateway.
+#
+# Gateway принимает HTTP-запросы, пересылает их в функцию (формат
+# event как у AWS Lambda: httpMethod, queryStringParameters, path…),
+# и интерпретирует возвращаемый объект {statusCode, headers, body}
+# как HTTP-ответ. Именно то, что нужно.
+#
+# ═══════════════════════════════════════════════════════════════════
+# КАК ПРИМЕНИТЬ (10 минут, бесплатно)
+# ═══════════════════════════════════════════════════════════════════
+#
+# 1. ОТКРЫТЬ API GATEWAY
+#    • Консоль Yandex Cloud → левое меню «Все сервисы» → раздел
+#      «Бессерверные вычисления» → «API Gateway» (иконка шестерёнки
+#      со стрелками).
+#
+# 2. СОЗДАТЬ API-ШЛЮЗ
+#    • Кнопка «Создать API-шлюз».
+#    • Имя: bondan-girbo-gw (любое латиницей).
+#    • Описание: «Прокси для bo.nalog.ru» (необязательно).
+#    • Поле «Спецификация» — большое текстовое поле с дефолтным
+#      YAML. УДАЛИ весь дефолтный контент (Ctrl+A → Delete).
+#    • ВСТАВЬ всю спецификацию ниже (строки от `openapi:` до конца
+#      файла, без этих комментариев — комментарии в YAML через # ок,
+#      но лучше скопировать только чистый spec).
+#    • Проверь идентификатор функции в поле function_id — должен
+#      совпадать с ID твоей функции luna: d4e2bl39ls21fndpnkft
+#    • Если ID у тебя другой — замени в двух местах ниже.
+#    • Нажми «Создать».
+#
+# 3. ПОЛУЧИТЬ URL
+#    • На странице gateway → поле «Служебный домен» или «URL»:
+#        https://d5dAbcdef1234567890.apigw.yandexcloud.net
+#    • Скопируй его.
+#
+# 4. ВПИСАТЬ В ПРИЛОЖЕНИЕ
+#    • БондАналитик → ⚡ Sync → поле «📡 ГИР БО — прокси».
+#    • Сотри старый URL (invoke URL функции).
+#    • Вставь URL API Gateway и ДОПИШИ `/?u=` на конце:
+#        https://d5dAbcdef1234567890.apigw.yandexcloud.net/?u=
+#
+# 5. ПРОВЕРКА
+#    • Открой в браузере:
+#        https://<твой-gateway>.apigw.yandexcloud.net/?u=https://bo.nalog.ru/nbo/organizations/?query=7707083893
+#    • Должен вернуться JSON со Сбером (текст, не HTML Яндекс-дашборда).
+#
+# ═══════════════════════════════════════════════════════════════════
+# ВАЖНО: СЕРВИСНЫЙ АККАУНТ
+# ═══════════════════════════════════════════════════════════════════
+# При создании Gateway в большинстве случаев Yandex Cloud автоматически
+# создаёт нужный сервисный аккаунт с ролью functions.functionInvoker.
+# Если НЕ создаёт автоматически:
+#
+# 1. Создать сервисный аккаунт:
+#    • IAM → Сервисные аккаунты → Создать
+#    • Имя: bondan-gw-invoker
+#    • Роль: functions.functionInvoker
+#    • Сохранить ID сервисного аккаунта.
+#
+# 2. В YAML ниже добавь в каждый блок x-yc-apigateway-integration
+#    поле service_account_id: <ID-сервисного-аккаунта>
+#
+# ═══════════════════════════════════════════════════════════════════
+# НАЧАЛО OpenAPI SPEC — копируй отсюда:
+# ═══════════════════════════════════════════════════════════════════
+
+openapi: 3.0.0
+info:
+  title: БондАналитик ГИР БО прокси
+  version: '1.0.0'
+  description: Прокси для публичной РСБУ-отчётности bo.nalog.ru
+
+paths:
+  /:
+    get:
+      summary: Прокси GET-запросов к bo.nalog.ru
+      description: Передаёт запрос в функцию luna. Целевой URL берётся из параметра ?u=
+      parameters:
+        - name: u
+          in: query
+          required: false
+          description: Целевой URL на bo.nalog.ru (обязателен)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ от bo.nalog.ru
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e2bl39ls21fndpnkft
+    options:
+      summary: CORS preflight
+      responses:
+        '204':
+          description: CORS preflight OK
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e2bl39ls21fndpnkft
+
+  /{proxy+}:
+    x-yc-apigateway-any-method:
+      summary: Прокси любых путей (запасной endpoint)
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e2bl39ls21fndpnkft
