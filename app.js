@@ -13891,7 +13891,7 @@ async function _girboFindInnByName(name){
   const clean = String(name).replace(/[«»"„""]/g, '').replace(/\s+/g, ' ').trim();
   if(clean.length < 3) return null;
   try {
-    const search = await _girboFetchJson('/nbo/organizations/?query=' + encodeURIComponent(clean));
+    const search = await _girboFetchJson('/advanced-search/organizations/search?query=' + encodeURIComponent(clean) + '&page=0&size=20');
     const orgs = Array.isArray(search) ? search : (search.content || search.organizations || []);
     if(!orgs.length) return null;
     // Первая организация — обычно лучший матч. Возвращаем её ИНН.
@@ -14110,8 +14110,8 @@ async function moexPullGirboBulk(){
   const errors = [];
 
   // Шаг 1: группируем бумаги по ИМЕНИ эмитента (без сети).
-  // ГИР БО endpoint /nbo/organizations/?query= принимает ЛЮБУЮ
-  // строку — ИНН промежуточно не нужен. Для всех бумаг извлекаем
+  // ГИР БО endpoint /advanced-search/organizations/search?query= ищет
+  // по имени — ИНН промежуточно не нужен. Для всех бумаг извлекаем
   // бренд из MOEX shortName/secName (_moexGuessIssuerName) и
   // группируем. Локальный справочник используем только чтобы
   // приоритизировать уже известное полное имя из peers.json
