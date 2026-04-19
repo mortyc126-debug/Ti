@@ -947,6 +947,16 @@ function girboLinkForInn(inn){
   return 'https://bo.nalog.gov.ru/advanced-search/organizations/search?query=' + encodeURIComponent(inn);
 }
 
+// audit-it.ru — более глубокий агрегатор РСБУ (2015-2025, включая ВДО
+// и 2023-2025 у крупных). Серверный прокси туда не пускает (anti-bot
+// + rate-limit по IP), а из домашнего браузера страницы открываются
+// штатно. Поэтому — только ручная ссылка: пользователь кликает, сам
+// читает цифры и вбивает через форму периода.
+function auditItLinkForInn(inn){
+  if(!inn) return null;
+  return 'https://www.audit-it.ru/search/?q=' + encodeURIComponent(inn);
+}
+
 // ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
 // bo.nalog.gov.ru API доступен из РФ, но из браузера блокируется CORS
 // (Access-Control-Allow-Origin не выставлен). Решение — прокси:
@@ -1174,7 +1184,7 @@ async function fetchAuditItByInn(query, maxYears = 10){
 // /nbo/bfo/{id} (отчёт целиком) → два отдельных endpoint'а
 // /nbo/details/balance?id={id} и /nbo/details/financial_result?id={id}.
 // Возвращает {series, company, inn, count, errors} как раньше.
-async function fetchGirboByInnLegacy(inn, maxYears = 5){
+async function fetchGirboByInn(inn, maxYears = 5){
   if(!inn || !String(inn).trim()) throw new Error('query пустой');
   const query = String(inn).trim();
   const isInn = /^\d{10}(\d{2})?$/.test(query);
@@ -1641,7 +1651,7 @@ async function indBuildMedians(){
       const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
       status(`⏳ ${done}/${totalInns} · ${elapsed}с · <strong>${ind.label}</strong>: ${peer.name || peer.inn}…`, 'var(--warn)');
       try {
-        const result = await fetchAuditItByInn(peer.inn, 5);
+        const result = await fetchGirboByInn(peer.inn, 5);
         for(const [period, vals] of Object.entries(result.series || {})){
           byIndustry[indKey][period] = byIndustry[indKey][period] || {};
           for(const [fid, v] of Object.entries(vals)){
@@ -6684,6 +6694,27 @@ function repOpenGirboForInn(){
   alert('1. На странице ГИР БО откройте карточку компании.\n2. Найдите нужный отчётный год → «Скачать» или «Открыть JSON».\n3. Сохраните файл на диск.\n4. Вернитесь и нажмите «📋 Импорт JSON».\n\nПодробнее: ГИР БО отдаёт только РСБУ-отчётность юрлица. Если ваш загруженный отчёт — МСФО-группа, приложение покажет это как справочную информацию, а не прямую сверку.');
 }
 
+// Открывает страницу audit-it.ru по ИНН — альтернативный, более полный
+// источник РСБУ (2015-2025, включая ВДО и 2022-2025 у крупных, где ГИР
+// БО заморожен санкциями). Серверный прокси туда не пускает (anti-bot
+// + rate-limit на IP Я.Cloud), поэтому кнопка только открывает вкладку
+// в домашнем браузере пользователя — там аудит-it отдаёт страницы
+// нормально. Цифры копируются в форму периода вручную.
+function repOpenAuditItForInn(){
+  const meta = window._reportMeta;
+  let inn = meta?.inn;
+  if(!inn){
+    const manual = prompt('ИНН не распознан в отчёте. Введите вручную (10 или 12 цифр) для поиска на audit-it:', '');
+    if(!manual) return;
+    if(!/^\d{10}(\d{2})?$/.test(manual.trim())){
+      alert('ИНН должен быть 10 цифр (юрлицо) или 12 (ИП).');
+      return;
+    }
+    inn = manual.trim();
+  }
+  window.open(auditItLinkForInn(inn), '_blank', 'noopener');
+}
+
 function repExportCurrentAsRef(){
   const values = {};
   ['rep-np-rev','rep-np-ebitda','rep-np-ebit','rep-np-np','rep-np-int',
@@ -6748,9 +6779,9 @@ async function repFetchGirboSeries(){
   const box = document.getElementById('rep-np-ref-result');
   const wrap = document.getElementById('rep-np-ref-wrap');
   if(wrap) wrap.style.display = 'block';
-  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос audit-it по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
+  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос ГИР БО по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
   try {
-    const data = await fetchAuditItByInn(inn, 5);
+    const data = await fetchGirboByInn(inn, 5);
     if(!data.count){
       if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ГИР БО ничего не вернул (компания исключена из публикации? нет годовых отчётов?). Ошибки: ${data.errors.length}.</div>`;
       return;
@@ -8894,11 +8925,11 @@ async function repVerifyGirbo(){
   if(type === 'МСФО') warnings.push('⚠ Тип периода — МСФО (консолидация). ГИР БО отдаёт standalone РСБУ головной компании. Расхождения в разы — нормальны, это <strong>разная отчётность</strong>, не ошибка.');
   if(type === 'ГИРБО') warnings.push('⚠ Период уже помечен как ГИРБО — сверка потенциально круговая.');
 
-  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос к audit-it по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
+  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос к ГИР БО по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
 
   let data;
   try {
-    data = await fetchAuditItByInn(inn, 10);
+    data = await fetchGirboByInn(inn, 10);
   } catch(e){
     status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
     res.innerHTML = `<div style="font-size:.58rem;color:var(--text3);margin-top:6px">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Либо разверните свой Cloudflare Worker (см. cf-worker.js в репо) — надёжнее и приватнее.</div>`;
@@ -14201,7 +14232,7 @@ async function _moexAutoGirbo(secid, allowPrompt){
   const iss = reportsDB[issId];
 
   let data;
-  try { data = await fetchAuditItByInn(inn, 5); }
+  try { data = await fetchGirboByInn(inn, 5); }
   catch(e){ return { error: 'ГИР БО: ' + e.message, issId, issName: iss.name, inn }; }
 
   if(!data.count){
@@ -14335,7 +14366,7 @@ async function moexPullGirboBulk(){
     const cands = meta.candidates && meta.candidates.length ? meta.candidates : [meta.query];
     for(const q of cands){
       try {
-        const tryData = await fetchAuditItByInn(q, 5);
+        const tryData = await fetchGirboByInn(q, 5);
         consecutiveTimeouts = 0;
         if(tryData && tryData.count){
           data = tryData;
@@ -14468,6 +14499,7 @@ function moexOpenInnWizard(){
       </div>
       <div style="display:flex;gap:4px">
         <a href="https://bo.nalog.gov.ru/advanced-search/organizations/search?query=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru)">🇷🇺 ФНС</a>
+        <a href="https://www.audit-it.ru/search/?q=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на audit-it.ru — глубже, чем ГИР БО (2015-2025, есть ВДО)">📗 audit-it</a>
         <a href="https://www.rusprofile.ru/search?query=${queryRp}&type=ul" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru">🔎 RusProfile</a>
       </div>
     </div>`;
@@ -14530,7 +14562,7 @@ async function moexSaveInnWizard(){
       const item = toProcess[i];
       if(statusEl) statusEl.innerHTML = `<span style="color:var(--warn)">⏳ ГИР БО ${i+1}/${toProcess.length}: ${item.name}</span>`;
       try {
-        const data = await fetchAuditItByInn(item.inn, 5);
+        const data = await fetchGirboByInn(item.inn, 5);
         // Добавляем периоды в reportsDB.
         let issId = null;
         for(const [id, iss] of Object.entries(reportsDB)){
