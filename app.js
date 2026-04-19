@@ -13881,6 +13881,38 @@ function _moexGuessIssuerName(shortName, secName){
   return brand.length >= 3 ? brand : null;
 }
 
+// Кандидаты на поиск в ГИР БО для одной бумаги MOEX — от самого короткого
+// (сокращённый бренд) к самому длинному (secName без хвостов-выпусков).
+// Нужно потому что shortName часто урезан до нечитаемого вида
+// («Нафттрн», «CTRLлиз»), а secName MOEX'а содержит полную форму
+// («Нафтатранс выпуск 1РЗ» → «Нафтатранс»). Возвращаем уникальные
+// строки длиной ≥3, порядок важен: первые пробуются раньше.
+function _moexIssuerCandidates(shortName, secName){
+  const candidates = [];
+  const push = (s) => {
+    if(!s) return;
+    const v = String(s).trim();
+    if(v.length >= 3 && !candidates.includes(v)) candidates.push(v);
+  };
+  // 1. Короткий бренд из shortName.
+  push(_moexGuessIssuerName(shortName, ''));
+  // 2. Короткий бренд из secName.
+  push(_moexGuessIssuerName('', secName));
+  // 3. Очищенный secName: убираем хвостовые обозначения выпусков
+  // («выпуск 1РЗ», «БО-01», «001P-R», цифры в конце).
+  for(const src of [secName, shortName]){
+    if(!src) continue;
+    let s = String(src);
+    // Отсекаем с первого места, где начинается «выпуск N…» или цифры.
+    s = s.replace(/\s+(выпуск|серия|вып\.?)\s.*$/i, '');
+    s = s.replace(/\s+(БО|П|ПБО|БП|R|РЗ|П?Б?О?-?\d).*$/i, '');
+    s = s.replace(/\s*\d+.*$/, '');
+    s = s.trim();
+    push(s);
+  }
+  return candidates;
+}
+
 // Поиск ИНН через ГИР БО по названию эмитента.
 // MOEX часто не содержит ИНН (для структурных продуктов, бирж. облиг. и т.п.),
 // но ГИР БО позволяет искать организацию по имени. Если имя совпадает — вернёт
@@ -14123,7 +14155,7 @@ async function moexPullGirboBulk(){
     if(status && done % 20 === 0) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: группирую (${done}/${targets.length}, эмитентов: ${unique.size})</span>`;
 
     // Ищем имя — приоритет: полное имя из локального справочника
-    // (оно точнее для ГИР БО), потом MOEX guess.
+    // (оно точнее для ГИР БО), потом MOEX guess + fallback-кандидаты.
     let name = null;
     const local = _moexLocalInnLookup(b.shortName || b.secName);
     if(local) name = local.name;
@@ -14137,7 +14169,13 @@ async function moexPullGirboBulk(){
       : name.toLowerCase();
     if(!key) continue;
     if(!unique.has(key)){
-      unique.set(key, { name, query: name, sampleSecid: b.secid });
+      // Кандидаты на поиск: primary — name, дальше — варианты из
+      // shortName/secName (часто бренд в них длиннее, чем guess).
+      const cands = [name];
+      for(const c of _moexIssuerCandidates(b.shortName, b.secName)){
+        if(!cands.includes(c)) cands.push(c);
+      }
+      unique.set(key, { name, query: name, candidates: cands, sampleSecid: b.secid });
     }
   }
 
@@ -14163,29 +14201,45 @@ async function moexPullGirboBulk(){
   for(const [key, meta] of unique){
     idx++;
     if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: ГИР БО ${idx}/${totalInns}: «${meta.name}»</span>`;
-    let data;
-    try {
-      data = await fetchGirboByInn(meta.query, 5);
-      consecutiveTimeouts = 0;
-    } catch(e){
-      totalErr++;
-      errors.push(`${meta.name}: ${e.message}`);
-      // Если подряд 5 таймаутов/ошибок прокси — сеть нестабильна,
-      // дальнейшие попытки бесполезны. Прерываем bulk с честным
-      // сообщением, чтобы не ждать минуты впустую.
-      if(/timeout|CF→ФНС|Upstream unreachable|Failed to fetch|NetworkError/i.test(e.message || '')){
-        consecutiveTimeouts++;
-        if(consecutiveTimeouts >= 5){
-          if(status) status.innerHTML = `<span style="color:var(--danger)">✋ Остановлено: ${consecutiveTimeouts} таймаутов подряд — прокси/сеть нестабильны. Обработано ${idx-consecutiveTimeouts} из ${totalInns}. Попробуй позже или через «📝 ИНН-мастер».</span>`;
+    let data = null;
+    let lastErr = null;
+    // Перебираем кандидатов: первый успешный матч с годовыми отчётами
+    // останавливает поиск. Защита от фанатичного обхода при проблемах
+    // с сетью — ловим таймауты как в старом коде.
+    const cands = meta.candidates && meta.candidates.length ? meta.candidates : [meta.query];
+    for(const q of cands){
+      try {
+        const tryData = await fetchGirboByInn(q, 5);
+        consecutiveTimeouts = 0;
+        if(tryData && tryData.count){
+          data = tryData;
+          // Если нашли не с первого варианта — отметим, чтобы было понятно
+          // по какому имени матч реально случился.
+          if(q !== meta.query) meta.matchedBy = q;
+          break;
+        }
+        lastErr = new Error('0 годовых отчётов по «' + q + '»');
+      } catch(e){
+        lastErr = e;
+        if(/timeout|CF→ФНС|Upstream unreachable|Failed to fetch|NetworkError/i.test(e.message || '')){
+          consecutiveTimeouts++;
+          // При сетевой нестабильности не перебираем дальше кандидатов
+          // для этого эмитента — бессмысленно тратить попытки.
           break;
         }
       }
-      await new Promise(r => setTimeout(r, 400));
-      continue;
-    }
-    if(!data || !data.count){
-      errors.push(`${meta.name}: ГИР БО вернул 0 годовых отчётов`);
+      // Между кандидатами одного эмитента — короткая пауза, чтобы не
+      // нагружать прокси очередью.
       await new Promise(r => setTimeout(r, 150));
+    }
+    if(!data){
+      totalErr++;
+      errors.push(`${meta.name}: ${lastErr ? lastErr.message : 'не найден'}`);
+      if(consecutiveTimeouts >= 5){
+        if(status) status.innerHTML = `<span style="color:var(--danger)">✋ Остановлено: ${consecutiveTimeouts} таймаутов подряд — прокси/сеть нестабильны. Обработано ${idx-consecutiveTimeouts} из ${totalInns}. Попробуй позже или через «📝 ИНН-мастер».</span>`;
+        break;
+      }
+      await new Promise(r => setTimeout(r, 400));
       continue;
     }
     // ИНН настоящий — из ответа ГИР БО (не из нашей догадки).
