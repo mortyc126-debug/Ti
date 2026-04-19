@@ -3565,13 +3565,16 @@ function _girboMakeUrl(path){
   if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.ru' + path + cb;
   return proxy + path + cb;
 }
-async function _girboFetchJson(path, retries){
+async function _girboFetchJson(path, retries, timeoutMs){
   if(retries == null) retries = 2;
+  if(timeoutMs == null) timeoutMs = 12000; // 12s дефолт на одну попытку
   const url = _girboMakeUrl(path);
   let lastErr = null;
   for(let attempt = 0; attempt <= retries; attempt++){
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const to = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
     try {
-      const r = await fetch(url, {headers: {'Accept': 'application/json'}});
+      const r = await fetch(url, {headers: {'Accept': 'application/json'}, signal: ctrl ? ctrl.signal : undefined});
       if(r.ok){
         const ct = r.headers.get('content-type') || '';
         if(!/json/i.test(ct)){
@@ -3604,13 +3607,16 @@ async function _girboFetchJson(path, retries){
       }
       throw new Error('HTTP ' + r.status + ' ' + path);
     } catch(e){
-      // Сетевые ошибки тоже ретраим.
-      if(attempt < retries && /NetworkError|Failed to fetch|timeout/i.test(e.message || '')){
-        lastErr = e;
+      // AbortError от timeout — как сетевая ошибка.
+      const isAbort = e.name === 'AbortError';
+      if(attempt < retries && (isAbort || /NetworkError|Failed to fetch|timeout/i.test(e.message || ''))){
+        lastErr = isAbort ? new Error('timeout ' + timeoutMs + ' мс — ГИР БО не отвечает') : e;
         await new Promise(res => setTimeout(res, 800 * Math.pow(2, attempt)));
         continue;
       }
-      throw e;
+      throw isAbort ? new Error('timeout — ГИР БО не отвечает') : e;
+    } finally {
+      if(to) clearTimeout(to);
     }
   }
   throw lastErr || new Error('ГИР БО: исчерпаны попытки');
@@ -3619,16 +3625,28 @@ async function _girboFetchJson(path, retries){
 // Подтягиваем последние N годовых отчётов РСБУ по ИНН, складываем в
 // единую series (формат normaliseReference). Возвращает {series,
 // company, inn, count, errors}.
+// Универсальный поиск в ГИР БО — принимает ИНН или название.
+// ГИР БО endpoint /nbo/organizations/?query= принимает любую строку.
+// Изначально функция ожидала только ИНН, но это был искусственный
+// промежуточный шаг: раз прокси работает, можно сразу искать по имени
+// эмитента из MOEX и получать обратно и ИНН, и отчётность.
+// Возвращает {series, company, inn, count, errors} как раньше.
 async function fetchGirboByInn(inn, maxYears = 5){
-  if(!/^\d{10}(\d{2})?$/.test(inn)) throw new Error('ИНН должен быть 10 или 12 цифр');
+  if(!inn || !String(inn).trim()) throw new Error('query пустой');
+  const query = String(inn).trim();
+  const isInn = /^\d{10}(\d{2})?$/.test(query);
 
-  // 1. Поиск организации — может вернуть массив или {content:[...]}.
-  const search = await _girboFetchJson('/nbo/organizations/?query=' + encodeURIComponent(inn));
+  // 1. Поиск организации — по ИНН или по имени.
+  const search = await _girboFetchJson('/nbo/organizations/?query=' + encodeURIComponent(query));
   const orgs = Array.isArray(search) ? search : (search.content || search.organizations || []);
-  if(!orgs.length) throw new Error('ИНН не найден в ГИР БО');
-  const org = orgs.find(o => String(o.inn || o.organisationInn) === String(inn)) || orgs[0];
+  if(!orgs.length) throw new Error('В ГИР БО нет «' + query + '»');
+  // Если искали по ИНН — предпочитаем точное совпадение, иначе первый.
+  const org = isInn
+    ? (orgs.find(o => String(o.inn || o.organisationInn) === query) || orgs[0])
+    : orgs[0];
   const orgId = org.id || org.organizationId;
   if(!orgId) throw new Error('У ответа ГИР БО нет orgId');
+  const resolvedInn = String(org.inn || org.organisationInn || (isInn ? query : ''));
 
   // 2. Список отчётов организации.
   const bfoListResp = await _girboFetchJson('/nbo/organizations/' + orgId + '/bfo');
@@ -3683,7 +3701,7 @@ async function fetchGirboByInn(inn, maxYears = 5){
   return {
     series,
     company: org.name || org.shortName || org.fullName || null,
-    inn: String(inn),
+    inn: resolvedInn,
     count: Object.keys(series).length,
     errors
   };
@@ -16667,65 +16685,108 @@ async function moexPullGirboBulk(){
   let totalOk = 0, totalErr = 0, totalSkipped = 0, totalNewIssuers = 0;
   const errors = [];
 
-  // Шаг 1: собрать уникальных ИНН. Только быстрые пути:
-  // локальный справочник + имя из catalog. БЕЗ сетевых запросов
-  // к MOEX/ГИР БО — они в bulk давали кошмарную задержку
-  // (30+ сек на 60 бумаг при недоступной сети).
-  // Для неизвестных эмитентов путь: «📝 ИНН-мастер» после bulk.
+  // Шаг 1: группируем бумаги по ИМЕНИ эмитента (без сети).
+  // ГИР БО endpoint /nbo/organizations/?query= принимает ЛЮБУЮ
+  // строку — ИНН промежуточно не нужен. Для всех бумаг извлекаем
+  // бренд из MOEX shortName/secName (_moexGuessIssuerName) и
+  // группируем. Локальный справочник используем только чтобы
+  // приоритизировать уже известное полное имя из peers.json
+  // (там «ПАО Сбербанк» вместо MOEX-шного «Сбер»).
   await _moexBuildLocalInnMap();
   let done = 0;
-  let noInnCount = 0;
-  let localHits = 0;
   for(const b of targets){
     done++;
-    if(status && done % 20 === 0) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: ищу ИНН локально (${done}/${targets.length}, найдено: ${localHits})</span>`;
+    if(status && done % 20 === 0) status.innerHTML = `<span style="color:var(--warn)">⏳ 1/2: группирую (${done}/${targets.length}, эмитентов: ${unique.size})</span>`;
 
+    // Ищем имя — приоритет: полное имя из локального справочника
+    // (оно точнее для ГИР БО), потом MOEX guess.
+    let name = null;
     const local = _moexLocalInnLookup(b.shortName || b.secName);
-    if(local){
-      localHits++;
-      if(!unique.has(local.inn)){
-        unique.set(local.inn, { secid: b.secid, name: local.name });
-      }
-      continue;
+    if(local) name = local.name;
+    if(!name) name = _moexGuessIssuerName(b.shortName, b.secName);
+    if(!name) name = b.shortName || b.secName;
+    if(!name || name.length < 2) continue;
+
+    // Ключ группировки — нормализованное имя.
+    const key = (typeof _normIssuerName === 'function')
+      ? _normIssuerName(name)
+      : name.toLowerCase();
+    if(!key) continue;
+    if(!unique.has(key)){
+      unique.set(key, { name, query: name, sampleSecid: b.secid });
     }
-    noInnCount++;
-    errors.push(`${b.shortName}: ИНН нет локально — используй 📝 ИНН-мастер`);
   }
 
   const totalInns = unique.size;
-
-  // Если совсем ничего не нашлось — честно объясняем.
   if(totalInns === 0){
-    const why = noInnCount === targets.length
-      ? `ни у одной из ${targets.length} бумаг ИНН не оказалось в MOEX-описании. Это часто бывает у замещаек, структурных продуктов и старых выпусков. Можно по-одному нажимать «📡» на строке — там попросит ИНН вручную.`
-      : `что-то пошло не так. Ошибок: ${errors.length}. Подробности — в консоли браузера (chrome://inspect → Console). Также для каждой бумаги без ИНН в console.warn выведены все поля description — посмотри как там назвается поле с ИНН.`;
-    if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${why}</span>`;
-    console.warn('[GIR BO bulk] no INN errors:', errors.slice(0, 20));
+    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов для обработки — не удалось извлечь имя ни для одной бумаги.</span>`;
     return;
   }
 
-  // Шаг 2: по каждому уникальному ИНН — ГИР БО.
-  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: дёргаю ГИР БО для ${totalInns} уникальных эмитентов…</span>`;
+  // Шаг 2: каждого уникального эмитента ищем в ГИР БО по ИМЕНИ.
+  // fetchGirboByInn теперь принимает любую строку — внутри она
+  // делает поиск organizations/?query=<name>, берёт первый матч,
+  // тянет BFO. Результат возвращает и ИНН (из ответа ГИР БО),
+  // и финансы.
+  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: запрашиваю ГИР БО для ${totalInns} эмитентов…</span>`;
+  const fieldMap = {
+    'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+    'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+    'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+  };
   let idx = 0;
-  for(const [inn, meta] of unique){
+  for(const [key, meta] of unique){
     idx++;
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: ГИР БО ${idx}/${totalInns}: ${meta.name}</span>`;
-    const issIdBefore = _moexEnsureIssuer(inn, meta.name);
-    const existed = Object.keys(reportsDB[issIdBefore].periods || {}).length > 0;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: ГИР БО ${idx}/${totalInns}: «${meta.name}»</span>`;
+    let data;
+    try {
+      data = await fetchGirboByInn(meta.query, 5);
+    } catch(e){
+      totalErr++;
+      errors.push(`${meta.name}: ${e.message}`);
+      await new Promise(r => setTimeout(r, 150));
+      continue;
+    }
+    if(!data || !data.count){
+      errors.push(`${meta.name}: ГИР БО вернул 0 годовых отчётов`);
+      await new Promise(r => setTimeout(r, 150));
+      continue;
+    }
+    // ИНН настоящий — из ответа ГИР БО (не из нашей догадки).
+    const resolvedInn = data.inn || '';
+    const issId = _moexEnsureIssuer(resolvedInn || ('noInn_' + idx), data.company || meta.name);
+    const iss = reportsDB[issId];
+    if(resolvedInn && !iss.inn) iss.inn = resolvedInn;
+    const existed = Object.keys(iss.periods || {}).length > 0;
     if(!existed) totalNewIssuers++;
-    const res = await _moexAutoGirbo(meta.secid, false);
-    if(res.error){ totalErr++; errors.push(`${meta.name}: ${res.error}`); continue; }
-    totalOk += res.added || 0;
-    totalSkipped += res.skipped || 0;
+    // Сохраняем series в reportsDB.periods.
+    for(const [lbl, values] of Object.entries(data.series || {})){
+      const ym = String(lbl).match(/(\d{4})/);
+      if(!ym) continue;
+      const year = ym[1];
+      const pkey = `${year}_FY_ГИРБО`;
+      if(iss.periods[pkey]){ totalSkipped++; continue; }
+      const period = {
+        year, period:'FY', type:'ГИРБО', note:'', analysisHTML:'',
+        rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+        assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+      };
+      for(const [fid, shortKey] of Object.entries(fieldMap)){
+        if(values[fid] != null) period[shortKey] = values[fid];
+      }
+      iss.periods[pkey] = period;
+      totalOk++;
+    }
+    save();
     await new Promise(r => setTimeout(r, 150));
   }
+  // Сбрасываем кэш локального справочника — новые ИНН попадут туда.
+  window._moexLocalInnMap = null;
 
   // Результат.
   const msg = totalInns === 0
-    ? (noInnCount > 0
-       ? `Без ИНН: ${noInnCount} эмитентов. В локальном справочнике (peers.json + reportsDB) таких нет. Открой 📝 ИНН-мастер — там список с ссылками на ФНС/RusProfile для ручного ввода.`
-       : `Нет бумаг для обработки`)
-    : `✓ Готово локально: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `, ошибок ГИР БО: ${totalErr}` : '') + (noInnCount ? `. Без ИНН: ${noInnCount} эмитентов — 📝 ИНН-мастер.` : '');
+    ? `Нет эмитентов для обработки — отфильтруй каталог и попробуй снова.`
+    : `✓ Готово: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `. Не нашлось в ГИР БО: ${totalErr} — попробуй через 📝 ИНН-мастер.` : '');
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
   if(errors.length){
     console.warn('GIR BO bulk errors:', errors);
