@@ -14491,9 +14491,10 @@ function moexOpenInnWizard(){
   const rows = [...groups.entries()].map(([key, g]) => {
     const sample = g.items[0];
     const issuesList = g.items.map(b => `<span style="color:var(--text3);font-family:var(--mono);font-size:.56rem">${b.shortName}</span>`).join(' · ');
-    const queryFns = encodeURIComponent(g.brand);
-    const queryRp = encodeURIComponent(g.brand);
-    return `<div class="inn-wiz-row" data-key="${key}" style="display:grid;grid-template-columns:1.6fr 1.2fr auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border)">
+    // Атрибут для динамических ссылок: _innWizOpenSearch читает отсюда
+    // бренд как fallback, если в input ещё не введён ИНН.
+    const brandAttr = encodeURIComponent(g.brand);
+    return `<div class="inn-wiz-row" data-key="${key}" data-brand="${brandAttr}" style="display:grid;grid-template-columns:1.6fr 1.2fr auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:.7rem;color:var(--text);font-weight:600">${g.brand}</div>
         <div style="font-size:.55rem;color:var(--text3);margin-top:2px">${g.items.length} выпуск${g.items.length === 1 ? '' : g.items.length < 5 ? 'а' : 'ов'}: ${issuesList}</div>
@@ -14503,9 +14504,9 @@ function moexOpenInnWizard(){
         <input type="text" class="inn-wiz-input" data-key="${key}" placeholder="10 или 12 цифр" maxlength="12" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.7rem;padding:4px 6px;outline:none">
       </div>
       <div style="display:flex;gap:4px">
-        <a href="https://bo.nalog.gov.ru/advanced-search/organizations/search?query=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru)">🇷🇺 ФНС</a>
-        <a href="https://www.google.com/search?q=${encodeURIComponent('site:audit-it.ru/buh_otchet ' + g.brand)}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Найти компанию на audit-it.ru через Google (внутренний поиск audit-it по обрезанному бренду плохо работает, поэтому через Google — первая ссылка в выдаче ведёт на нужную страницу)">📗 audit-it</a>
-        <a href="https://www.rusprofile.ru/search?query=${queryRp}&type=ul" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru">🔎 RusProfile</a>
+        <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'fns')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru). Если в поле ИНН введён — искать по нему, иначе по бренду.">🇷🇺 ФНС</a>
+        <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'auditit')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Найти компанию на audit-it.ru через Google. Если в поле ИНН введён — искать по нему, иначе по бренду.">📗 audit-it</a>
+        <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'rusprofile')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru. Если в поле ИНН введён — искать по нему, иначе по бренду.">🔎 RusProfile</a>
       </div>
     </div>`;
   }).join('');
@@ -14514,6 +14515,32 @@ function moexOpenInnWizard(){
   // Сохраняем группы для последующего save.
   window._moexInnWizardGroups = groups;
   document.getElementById('modal-inn-wizard').classList.add('open');
+}
+
+// Открывает внешний поиск (ФНС / audit-it через Google / RusProfile) для
+// строки в ИНН-мастере. Если в input уже введён ИНН — ищем по нему
+// (точное совпадение всегда лучше). Иначе fallback на бренд (data-brand).
+function _innWizOpenSearch(event, key, source){
+  if(event && event.preventDefault) event.preventDefault();
+  const row = document.querySelector('.inn-wiz-row[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
+  const input = row ? row.querySelector('.inn-wiz-input') : null;
+  const val = (input && input.value || '').trim();
+  const brand = row && row.dataset && row.dataset.brand ? decodeURIComponent(row.dataset.brand) : '';
+  // Если в input валидный ИНН (10 или 12 цифр) — используем его; иначе бренд.
+  const query = /^\d{10}(\d{2})?$/.test(val) ? val : brand;
+  if(!query) return false;
+  let url;
+  if(source === 'fns'){
+    url = 'https://bo.nalog.gov.ru/advanced-search/organizations/search?query=' + encodeURIComponent(query);
+  } else if(source === 'auditit'){
+    url = 'https://www.google.com/search?q=' + encodeURIComponent('site:audit-it.ru/buh_otchet ' + query);
+  } else if(source === 'rusprofile'){
+    url = 'https://www.rusprofile.ru/search?query=' + encodeURIComponent(query) + '&type=ul';
+  } else {
+    return false;
+  }
+  window.open(url, '_blank', 'noopener');
+  return false;
 }
 
 async function moexSaveInnWizard(){
