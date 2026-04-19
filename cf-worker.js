@@ -66,32 +66,59 @@ export default {
     }
 
     try {
-      const upstream = await fetch(target, {
-        method: req.method,
-        headers: {
-          'Accept': 'application/json',
-          // Нейтральный User-Agent — иначе анти-бот может развернуть.
-          'User-Agent': 'Mozilla/5.0 BondanProxy'
-        },
-        cf: {
-          // Кэшируем ТОЛЬКО успешные ответы и только на стороне CF.
-          // cacheEverything=true раньше приводил к тому, что CF кэшировал
-          // и 522-ошибки тоже, а браузер получал их с Cache-Control:
-          // max-age=600 и отдавал из disk cache 10 минут подряд —
-          // retry на клиенте был бесполезен, мы даже в сеть не ходили.
-          cacheTtl: 600,
-          cacheTtlByStatus: { '200-299': 600, '300-599': 0 }
+      // Внутренний retry на уровне Worker'а: 522 (Cloudflare не установил
+      // TCP-соединение с origin) часто случайный — первый SYN дропнут,
+      // второй успешно дойдёт. CF-маршрутизатор для ретрая обычно выбирает
+      // другой исходный IP из пула, что иногда обходит ban.
+      // До 3 попыток с небольшой экспоненциальной паузой.
+      let upstream = null;
+      let lastStatus = 0;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          upstream = await fetch(target, {
+            method: req.method,
+            headers: {
+              'Accept': 'application/json',
+              // Чистый Chrome UA — на случай если origin реагирует на слово
+              // «Proxy» в User-Agent. Самый нейтральный фингерпринт.
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+              'Accept-Language': 'ru-RU,ru;q=0.9'
+            },
+            cf: {
+              // Кэшируем ТОЛЬКО успешные ответы. Ошибки не попадают в кэш,
+              // иначе один 522 застревает на 10 минут и retry бесполезен.
+              cacheTtl: 600,
+              cacheTtlByStatus: { '200-299': 600, '300-599': 0 }
+            }
+          });
+          lastStatus = upstream.status;
+          // Если получили 522/524/504 — повторяем попытку. 200-499 —
+          // legit ответ, отдаём как есть.
+          if (![502, 503, 504, 522, 524].includes(upstream.status)) break;
+        } catch (_) {
+          // Сетевая ошибка — тоже ретраим.
         }
-      });
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+        }
+      }
+
+      if (!upstream) {
+        return new Response('Upstream unreachable after 3 attempts (last status: ' + lastStatus + ')', {
+          status: 502,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+          }
+        });
+      }
 
       const headers = new Headers(upstream.headers);
       headers.set('Access-Control-Allow-Origin', '*');
       headers.delete('Set-Cookie');
       headers.delete('Strict-Transport-Security');
-      // Кэш в БРАУЗЕРЕ — только на успешные ответы. Ошибки (5xx, 4xx)
-      // не кэшируем, чтобы каждый retry на клиенте реально уходил в сеть.
-      // Иначе один 522 «застревал» на 10 минут в disk cache и казался
-      // постоянной проблемой.
+      // Кэш в БРАУЗЕРЕ — только на успешные ответы. Ошибки не кэшируем,
+      // чтобы client-side retry реально уходил в сеть.
       if (upstream.status >= 200 && upstream.status < 300) {
         headers.set('Cache-Control', 'public, max-age=600');
       } else {
