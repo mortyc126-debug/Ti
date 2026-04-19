@@ -970,7 +970,15 @@ function _girboMakeUrl(path){
   // потому что bo.nalog.gov.ru лишние параметры игнорирует.
   const cb = (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
   const target = 'https://bo.nalog.gov.ru' + path + cb;
-  if(/[?=]$/.test(proxy)) return proxy + target;
+  // proxy заканчивается на `=` (parameter-style, например `…/?u=`) —
+  // target становится значением query-параметра, поэтому обязательно
+  // percent-encode, иначе `&page=0&size=20` внутри target парсится
+  // как отдельные параметры внешнего URL и прокси получает обрезанный
+  // target (всё до первого `&`).
+  if(proxy.endsWith('=')) return proxy + encodeURIComponent(target);
+  // proxy заканчивается на `?` (root-query-style, corsproxy.io) —
+  // target идёт «хвостом», большинство таких прокси ждут URL как есть.
+  if(proxy.endsWith('?')) return proxy + target;
   if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.gov.ru' + path + cb;
   return proxy + path + cb;
 }
