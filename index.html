@@ -390,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-item" onclick="document.getElementById('import-file').click()" title="Восстановить данные из JSON-файла"><span class="sb-icon">⬆️</span>Импорт JSON</div>
     <div class="sb-item" onclick="openPasteImportModal()" title="Вставить JSON текстом (если файл не получается выбрать)"><span class="sb-icon">📋</span>Вставить JSON</div>
     <input type="file" id="girbo-file" accept="*/*" multiple style="display:none" onchange="importGirboCsv(this)">
-    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт ОДНОГО или НЕСКОЛЬКИХ файлов ГИРБО (bo.nalog.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
+    <div class="sb-item" onclick="document.getElementById('girbo-file').click()" title="Импорт ОДНОГО или НЕСКОЛЬКИХ файлов ГИРБО (bo.nalog.gov.ru) — CSV/TXT/XML в Windows-1251 или UTF-8"><span class="sb-icon">📥</span>Импорт ГИРБО (CSV/XML)</div>
     <div class="sb-item" onclick="fixMojibakeEverywhere()" title="Восстановить кириллицу, если эмитенты сохранились как РџР“Рљ"><span class="sb-icon">🔧</span>Починить кириллицу</div>
     <div class="sb-item" onclick="openGistModal()" title="Синхронизация через GitHub Gist"><span class="sb-icon">⚡</span>Sync (Gist)</div>
     <div class="sb-item" onclick="_perfShow()" title="Время загрузки приложения в миллисекундах. Клик — подробная диагностика (DOM, инициализация, какие тяжёлые библиотеки уже скачались)."><span class="sb-icon">⏱</span>Старт: <span id="sb-perf-time" style="color:var(--text3);font-size:.62rem;margin-left:auto">считаю…</span></div>
@@ -1275,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип">✎ Редактировать период</button>
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
-    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.ru — CSV/TXT/XML в Windows-1251 или UTF-8">📥 ГИРБО</button>
+    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8">📥 ГИРБО</button>
     <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут">🔗 Объединить</button>
     <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">🔍 Аудит данных</button>
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
@@ -1299,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <span style="font-size:.56rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Тип отчётности:</span>
       <button class="btn btn-sm rep-tf-btn" data-tf="all" onclick="repSetTypeFilter('all')" title="Показать все типы: МСФО, РСБУ, ГИРБО (ГИРБО — с низшим приоритетом при равных периодах)">Все</button>
       <button class="btn btn-sm rep-tf-btn" data-tf="no-girbo" onclick="repSetTypeFilter('no-girbo')" title="Скрыть ГИРБО — оставить только МСФО/РСБУ">Без ГИРБО</button>
-      <button class="btn btn-sm rep-tf-btn" data-tf="only-girbo" onclick="repSetTypeFilter('only-girbo')" title="Только выгрузки ГИРБО с bo.nalog.ru">Только ГИРБО</button>
+      <button class="btn btn-sm rep-tf-btn" data-tf="only-girbo" onclick="repSetTypeFilter('only-girbo')" title="Только выгрузки ГИРБО с bo.nalog.gov.ru">Только ГИРБО</button>
     </div>
     <!-- Period tabs -->
     <div style="display:flex;gap:1px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid var(--border)" id="rep-period-tabs"></div>
@@ -1444,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div id="rep-np-ref-wrap" style="display:none;margin-top:8px;padding:8px;background:var(--s1);border:1px solid var(--border)">
           <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">⚖️ Сверка с эталоном</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.ru">📋 Импорт JSON</button>
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru">📋 Импорт JSON</button>
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
             <button type="button" class="btn btn-sm btn-p" onclick="repFetchGirboSeries()" title="Через прокси автоматически подтянуть до 5 лет РСБУ-отчётности по ИНН (только standalone)">📡 5 лет</button>
@@ -1963,7 +1963,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
       <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе — подтянуть РСБУ из ГИР БО (ФНС) по ИНН. Каждый эмитент — 2-3 запроса к прокси, 1-2 секунды. Затем мультипликаторы появятся прямо в строке.">📡 ГИР БО для эмитентов в фильтре</button>
-      <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
+      <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
@@ -2028,7 +2028,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>📡 ГИР БО — прокси</strong> для автоматической подтяжки 5 лет РСБУ по ИНН</summary>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
           <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
-            ГИР БО (bo.nalog.ru) не отдаёт CORS-заголовки браузеру, поэтому нужен прокси. По умолчанию — публичный <code>corsproxy.io</code>. Для приватности и надёжности можно развернуть свой Cloudflare Worker (5 минут, бесплатно): код в файле <code>cf-worker.js</code> в репозитории, инструкция в README. URL вашего Worker'а вписывайте сюда.
+            ГИР БО (bo.nalog.gov.ru) не отдаёт CORS-заголовки браузеру, поэтому нужен прокси. По умолчанию — публичный <code>corsproxy.io</code>. Для приватности и надёжности можно развернуть свой Cloudflare Worker (5 минут, бесплатно): код в файле <code>cf-worker.js</code> в репозитории, инструкция в README. URL вашего Worker'а вписывайте сюда.
           </div>
           <div class="field" style="margin:0">
             <label style="font-size:.6rem">URL прокси</label>
@@ -2036,7 +2036,7 @@ document.addEventListener('DOMContentLoaded', () => {
               style="font-family:var(--mono);font-size:.65rem"
               oninput="localStorage.setItem('bondan_girbo_proxy', this.value || 'https://corsproxy.io/?')">
           </div>
-          <div style="font-size:.55rem;color:var(--text3)">Соглашение: если URL заканчивается на <code>?</code> или <code>=</code> — прокси получит target-URL после; если на <code>/</code> — добавится <code>https://bo.nalog.ru/...</code>; иначе — путь api подставится напрямую.</div>
+          <div style="font-size:.55rem;color:var(--text3)">Соглашение: если URL заканчивается на <code>?</code> или <code>=</code> — прокси получит target-URL после; если на <code>/</code> — добавится <code>https://bo.nalog.gov.ru/...</code>; иначе — путь api подставится напрямую.</div>
         </div>
       </details>
 
@@ -2148,7 +2148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="modal-hdr">📥 Импорт ГИРБО (CSV/XML) <button class="modal-x" onclick="closeModal('modal-girbo-import')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
-        Выгрузки с <strong>bo.nalog.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
+        Выгрузки с <strong>bo.nalog.gov.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
       </div>
       <input type="file" id="girbo-file-modal" accept="*/*" multiple style="display:none" onchange="girboQueueAdd(this)">
       <input type="file" id="girbo-file-modal-dir" webkitdirectory directory multiple style="display:none" onchange="girboQueueAdd(this)">
@@ -2548,7 +2548,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div style="padding:10px 14px;font-size:.6rem;color:var(--text2);line-height:1.5;border-bottom:1px solid var(--border)">
       Для каждого выпуска без matched эмитента — две кнопки поиска:
-      <strong>🇷🇺 ФНС</strong> (bo.nalog.ru — официальный реестр, ИНН точно будет в карточке) и
+      <strong>🇷🇺 ФНС</strong> (bo.nalog.gov.ru — официальный реестр, ИНН точно будет в карточке) и
       <strong>🔎 RusProfile</strong> (быстрее и с названием проще). Нашла ИНН → вставила в поле → «💾 Сохранить всё». После сохранения можно сразу подтянуть ГИР БО для введённых.
     </div>
     <div class="modal-body" id="inn-wiz-body" style="overflow-y:auto;flex:1;padding:8px 14px"></div>

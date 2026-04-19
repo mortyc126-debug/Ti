@@ -22,7 +22,7 @@
 # 2. СОЗДАТЬ API-ШЛЮЗ
 #    • Кнопка «Создать API-шлюз».
 #    • Имя: bondan-girbo-gw (любое латиницей).
-#    • Описание: «Прокси для bo.nalog.ru» (необязательно).
+#    • Описание: «Прокси для bo.nalog.gov.ru» (необязательно).
 #    • Поле «Спецификация» — большое текстовое поле с дефолтным
 #      YAML. УДАЛИ весь дефолтный контент (Ctrl+A → Delete).
 #    • ВСТАВЬ всю спецификацию ниже (строки от `openapi:` до конца
@@ -46,7 +46,7 @@
 #
 # 5. ПРОВЕРКА
 #    • Открой в браузере:
-#        https://<твой-gateway>.apigw.yandexcloud.net/?u=https://bo.nalog.ru/nbo/organizations/?query=7707083893
+#        https://<твой-gateway>.apigw.yandexcloud.net/?u=https://bo.nalog.gov.ru/advanced-search/organizations/search?query=7707083893&page=0&size=20
 #    • Должен вернуться JSON со Сбером (текст, не HTML Яндекс-дашборда).
 #
 # ═══════════════════════════════════════════════════════════════════

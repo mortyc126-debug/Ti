@@ -1,11 +1,11 @@
-// Яндекс Cloud Function — прокси для ГИР БО (bo.nalog.ru).
+// Яндекс Cloud Function — прокси для ГИР БО (bo.nalog.gov.ru).
 //
 // Зачем: Cloudflare Workers запускаются в датацентрах вне РФ
 // (Финляндия/Казахстан/Турция — после ухода CF из России в 2022),
 // и ФНС режет оттуда трафик (522 Connection Timed Out). Яндекс Облако
-// — российская инфраструктура, bo.nalog.ru пускает нормально.
+// — российская инфраструктура, bo.nalog.gov.ru пускает нормально.
 //
-// Протокол тот же, что у cf-worker.js: ?u=https://bo.nalog.ru/nbo/...
+// Протокол тот же, что у cf-worker.js: ?u=https://bo.nalog.gov.ru/nbo/...
 // В настройках БондАналитик-а ⚡ Sync → «📡 ГИР БО — прокси» просто
 // меняется URL на yandex-cloud, код приложения трогать не нужно.
 //
@@ -32,7 +32,7 @@
 //      не переводится).
 //    • Нажми кнопку «Создать функцию».
 //    • Имя: bondan-girbo (только латиница и дефисы — имя уникально).
-//    • Описание: «Прокси для bo.nalog.ru» (необязательно).
+//    • Описание: «Прокси для bo.nalog.gov.ru» (необязательно).
 //    • Нажми «Создать».
 //
 // 3. СОЗДАТЬ ВЕРСИЮ (сам код)
@@ -85,7 +85,7 @@
 // 7. ПРОВЕРКА
 //    • В любой вкладке браузера открой такой адрес (подставь свой
 //      идентификатор функции вместо d4e...):
-//        https://functions.yandexcloud.net/d4e.../?u=https://bo.nalog.ru/nbo/organizations/?query=7707083893
+//        https://functions.yandexcloud.net/d4e.../?u=https://bo.nalog.gov.ru/advanced-search/organizations/search?query=7707083893&page=0&size=20
 //    • Должен вернуться JSON с данными Сбербанка (много текста
 //      про ПАО Сбербанк). Если да — прокси работает, можно
 //      запускать массовую подтяжку в «🏛 Каталог Мосбиржи».
@@ -99,15 +99,15 @@ exports.handler = async (event) => {
     const qs = event.queryStringParameters || {};
     let target = qs.u;
 
-    // Альтернатива: путь повторяет bo.nalog.ru.
-    if (!target && event.path && event.path.startsWith('/nbo')) {
+    // Альтернатива: путь повторяет bo.nalog.gov.ru (/nbo/... или /advanced-search/...).
+    if (!target && event.path && (event.path.startsWith('/nbo') || event.path.startsWith('/advanced-search'))) {
         const qp = Object.entries(qs).filter(([k]) => k !== 'u').map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-        target = 'https://bo.nalog.ru' + event.path + (qp ? '?' + qp : '');
+        target = 'https://bo.nalog.gov.ru' + event.path + (qp ? '?' + qp : '');
     }
 
-    // Только bo.nalog.ru — ограничение безопасности. Нельзя превращать
+    // Только bo.nalog.gov.ru — ограничение безопасности. Нельзя превращать
     // прокси в general-purpose (иначе кто-то начнёт через неё DDoS'ить).
-    if (!target || !/^https:\/\/bo\.nalog\.ru\//.test(target)) {
+    if (!target || !/^https:\/\/bo\.nalog\.gov\.ru\//.test(target)) {
         return {
             statusCode: 400,
             headers: {
@@ -115,7 +115,7 @@ exports.handler = async (event) => {
                 'Cache-Control': 'no-store',
                 'Content-Type': 'text/plain; charset=utf-8'
             },
-            body: 'Allowed: bo.nalog.ru only. Pass URL via ?u=https://bo.nalog.ru/...'
+            body: 'Allowed: bo.nalog.gov.ru only. Pass URL via ?u=https://bo.nalog.gov.ru/...'
         };
     }
 

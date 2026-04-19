@@ -1,10 +1,11 @@
-// Cloudflare Worker — приватный CORS-прокси для ГИР БО (bo.nalog.ru).
+// Cloudflare Worker — приватный CORS-прокси для ГИР БО (bo.nalog.gov.ru).
 //
-// Зачем: bo.nalog.ru не отдаёт Access-Control-Allow-Origin браузеру,
+// Зачем: bo.nalog.gov.ru не отдаёт Access-Control-Allow-Origin браузеру,
 // поэтому БондАналитик не может напрямую запросить отчётность по ИНН.
-// Этот Worker пересылает GET-запросы к /nbo/* на bo.nalog.ru и
-// добавляет в ответ нужный CORS-заголовок. Только bo.nalog.ru —
-// больше никаких хостов, никакой записи, никакой авторизации.
+// Этот Worker пересылает GET-запросы к /nbo/* и /advanced-search/* на
+// bo.nalog.gov.ru и добавляет в ответ нужный CORS-заголовок. Только
+// bo.nalog.gov.ru — больше никаких хостов, никакой записи, никакой
+// авторизации.
 //
 // Развёртывание (бесплатно, 5 минут):
 //   1. Зарегистрируйтесь на dash.cloudflare.com (без карты).
@@ -32,13 +33,14 @@ export default {
     // Соглашение БондАналитика: target-URL передаётся через ?u=…
     let target = url.searchParams.get('u');
 
-    // Альтернатива — путь повторяет /nbo/... bo.nalog.ru напрямую.
-    if (!target && url.pathname.startsWith('/nbo')) {
-      target = 'https://bo.nalog.ru' + url.pathname + url.search;
+    // Альтернатива — путь повторяет /nbo/... или /advanced-search/...
+    // bo.nalog.gov.ru напрямую.
+    if (!target && (url.pathname.startsWith('/nbo') || url.pathname.startsWith('/advanced-search'))) {
+      target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
     }
 
-    if (!target || !/^https:\/\/bo\.nalog\.ru\//.test(target)) {
-      return new Response('Allowed: bo.nalog.ru only. Pass URL via ?u=https://bo.nalog.ru/...', {
+    if (!target || !/^https:\/\/bo\.nalog\.gov\.ru\//.test(target)) {
+      return new Response('Allowed: bo.nalog.gov.ru only. Pass URL via ?u=https://bo.nalog.gov.ru/...', {
         status: 400,
         headers: {'Access-Control-Allow-Origin': '*'}
       });

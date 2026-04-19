@@ -944,17 +944,19 @@ function repCompareReference(ref){
 
 function girboLinkForInn(inn){
   if(!inn) return null;
-  return 'https://bo.nalog.ru/search?query=' + encodeURIComponent(inn);
+  return 'https://bo.nalog.gov.ru/advanced-search/organizations/search?query=' + encodeURIComponent(inn);
 }
 
 // ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
-// bo.nalog.ru API доступен из РФ, но из браузера блокируется CORS
+// bo.nalog.gov.ru API доступен из РФ, но из браузера блокируется CORS
 // (Access-Control-Allow-Origin не выставлен). Решение — прокси:
 //   • по умолчанию используем публичный CORS-прокси corsproxy.io;
 //   • пользователь может вписать свой URL (например, развёрнутый
 //     Cloudflare Worker — см. cf-worker.js в репо), это надёжнее
 //     и приватнее (через свой Worker не идёт через сторонний сервис).
-// Запросы — только GET к /nbo/* (публичная отчётность РСБУ юрлиц).
+// Домен в 2026 переехал с bo.nalog.ru → bo.nalog.gov.ru, и API стал
+// дроблёным: раньше /nbo/bfo/{id} отдавал весь отчёт, теперь нужны
+// отдельные /nbo/details/balance?id=… и /nbo/details/financial_result?id=…
 function _girboProxyBase(){
   return localStorage.getItem('bondan_girbo_proxy') || 'https://corsproxy.io/?';
 }
@@ -965,11 +967,11 @@ function _girboMakeUrl(path){
   // перехватывались. В cf-worker.js (новая версия) ошибки уже не
   // кэшируются, но старый развёрнутый Worker мог закешировать —
   // этот параметр обходит обе проблемы одним махом. Ничего не ломает,
-  // потому что bo.nalog.ru лишние параметры игнорирует.
+  // потому что bo.nalog.gov.ru лишние параметры игнорирует.
   const cb = (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
-  const target = 'https://bo.nalog.ru' + path + cb;
+  const target = 'https://bo.nalog.gov.ru' + path + cb;
   if(/[?=]$/.test(proxy)) return proxy + target;
-  if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.ru' + path + cb;
+  if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.gov.ru' + path + cb;
   return proxy + path + cb;
 }
 async function _girboFetchJson(path, retries, timeoutMs){
@@ -990,7 +992,7 @@ async function _girboFetchJson(path, retries, timeoutMs){
         }
         return r.json();
       }
-      // 522/524 — Cloudflare Worker не достучался до bo.nalog.ru
+      // 522/524 — Cloudflare Worker не достучался до bo.nalog.gov.ru
       // (origin timeout / unreachable). Это transient: ФНС иногда
       // тормозит или периодически режет CF-трафик. Retry с задержкой
       // часто помогает — пробуем 2 раза с экспоненциальной паузой.
@@ -1010,7 +1012,7 @@ async function _girboFetchJson(path, retries, timeoutMs){
       }
       // 522/524 после всех retry — отдельное человеческое сообщение.
       if([502, 503, 504, 522, 524].includes(r.status)){
-        throw new Error('ФНС/CF недоступны (HTTP ' + r.status + ') — bo.nalog.ru не отвечает через Cloudflare. Подожди 5-10 мин и повтори. Если упорно — возможно, ФНС временно режет CF-трафик.');
+        throw new Error('ФНС/CF недоступны (HTTP ' + r.status + ') — bo.nalog.gov.ru не отвечает через Cloudflare. Подожди 5-10 мин и повтори. Если упорно — возможно, ФНС временно режет CF-трафик.');
       }
       throw new Error('HTTP ' + r.status + ' ' + path);
     } catch(e){
@@ -1033,10 +1035,10 @@ async function _girboFetchJson(path, retries, timeoutMs){
 // единую series (формат normaliseReference). Возвращает {series,
 // company, inn, count, errors}.
 // Универсальный поиск в ГИР БО — принимает ИНН или название.
-// ГИР БО endpoint /nbo/organizations/?query= принимает любую строку.
-// Изначально функция ожидала только ИНН, но это был искусственный
-// промежуточный шаг: раз прокси работает, можно сразу искать по имени
-// эмитента из MOEX и получать обратно и ИНН, и отчётность.
+// В 2026 API перерос: старый /nbo/organizations/?query= → новый
+// /advanced-search/organizations/search?query=&page=0&size=20; старый
+// /nbo/bfo/{id} (отчёт целиком) → два отдельных endpoint'а
+// /nbo/details/balance?id={id} и /nbo/details/financial_result?id={id}.
 // Возвращает {series, company, inn, count, errors} как раньше.
 async function fetchGirboByInn(inn, maxYears = 5){
   if(!inn || !String(inn).trim()) throw new Error('query пустой');
@@ -1044,7 +1046,7 @@ async function fetchGirboByInn(inn, maxYears = 5){
   const isInn = /^\d{10}(\d{2})?$/.test(query);
 
   // 1. Поиск организации — по ИНН или по имени.
-  const search = await _girboFetchJson('/nbo/organizations/?query=' + encodeURIComponent(query));
+  const search = await _girboFetchJson('/advanced-search/organizations/search?query=' + encodeURIComponent(query) + '&page=0&size=20');
   const orgs = Array.isArray(search) ? search : (search.content || search.organizations || []);
   if(!orgs.length) throw new Error('В ГИР БО нет «' + query + '»');
   // Если искали по ИНН — предпочитаем точное совпадение, иначе первый.
@@ -1055,8 +1057,8 @@ async function fetchGirboByInn(inn, maxYears = 5){
   if(!orgId) throw new Error('У ответа ГИР БО нет orgId');
   const resolvedInn = String(org.inn || org.organisationInn || (isInn ? query : ''));
 
-  // 2. Список отчётов организации.
-  const bfoListResp = await _girboFetchJson('/nbo/organizations/' + orgId + '/bfo');
+  // 2. Список отчётов организации (trailing slash обязателен на новом API).
+  const bfoListResp = await _girboFetchJson('/nbo/organizations/' + orgId + '/bfo/');
   const bfoList = Array.isArray(bfoListResp) ? bfoListResp : (bfoListResp.content || bfoListResp.bfo || []);
   // Только годовые, отсортированы от новых к старым.
   const annual = bfoList
@@ -1066,12 +1068,19 @@ async function fetchGirboByInn(inn, maxYears = 5){
   if(!annual.length) throw new Error('Нет годовых отчётов в ГИР БО');
 
   // 3. Детали каждого отчёта → values по нашим полям.
+  // Новое API разбило отчёт на две формы: balance (коды 1xxx) и
+  // financial_result (коды 2xxx). Тянем обе параллельно и мёржим в
+  // один объект — _GIRBO_FIELD_MAP отработает как раньше.
   const series = {};
   const errors = [];
   for(const b of annual){
     try {
       const bfoId = b.id || b.bfoId;
-      const det = await _girboFetchJson('/nbo/bfo/' + bfoId);
+      const [balance, pnl] = await Promise.all([
+        _girboFetchJson('/nbo/details/balance?id=' + bfoId),
+        _girboFetchJson('/nbo/details/financial_result?id=' + bfoId)
+      ]);
+      const det = Object.assign({}, balance, pnl);
       // Сам ответ содержит current{code} и previous{code} — есть две
       // соседние года в одном файле. Возьмём оба, чтобы получить больше
       // лет за меньшее число запросов.
@@ -6508,7 +6517,7 @@ function repOnRefFile(input){
       const raw = JSON.parse(reader.result);
       const ref = normaliseReference(raw);
       if(!ref){
-        alert('Формат JSON не распознан. Поддерживаются:\n• наш формат (schema: "bondan/ref/v1")\n• сырой JSON из bo.nalog.ru (поля current1110, current2110 и т.п.)');
+        alert('Формат JSON не распознан. Поддерживаются:\n• наш формат (schema: "bondan/ref/v1")\n• сырой JSON из bo.nalog.gov.ru (поля current1110, current2110 и т.п.)');
         return;
       }
       window._reportReference = ref;
@@ -6534,7 +6543,7 @@ function repOpenGirboForInn(){
       alert('ИНН должен быть 10 цифр (юрлицо) или 12 (ИП).');
       return;
     }
-    window.open('https://bo.nalog.ru/search?query=' + encodeURIComponent(manual.trim()), '_blank', 'noopener');
+    window.open('https://bo.nalog.gov.ru/advanced-search/organizations/search?query=' + encodeURIComponent(manual.trim()), '_blank', 'noopener');
   } else {
     window.open(girboLinkForInn(inn), '_blank', 'noopener');
   }
@@ -10110,7 +10119,7 @@ function analyzeAutoClick() {
 
 // Автоопределение РСБУ/МСФО/ГИРБО по тексту файла
 function detectReportType(text) {
-  // ГИРБО — госресурс бухучёта ФНС (bo.nalog.ru). Строго до МСФО/РСБУ,
+  // ГИРБО — госресурс бухучёта ФНС (bo.nalog.gov.ru). Строго до МСФО/РСБУ,
   // т.к. выгрузки ГИРБО сами содержат ключевые слова «РСБУ» в шапке.
   if (/ГИРБО|bo\.nalog\.ru|Госресурс\s+бухгалтерской|Ресурс\s+бухгалтерской\s+отч/i.test(text)) return 'ГИРБО';
   if (/IFRS|международн\w+ стандарт|IAS |МСФО/i.test(text)) return 'МСФО';
@@ -10431,7 +10440,7 @@ function importAllData(input) {
 
 // ═══ ИМПОРТ ГИРБО (CSV/TXT/XML, Windows-1251 или UTF-8) ═══
 // ГИРБО — Государственный информационный ресурс бухгалтерской отчётности
-// ФНС (bo.nalog.ru). Отдаёт выгрузки в двух форматах:
+// ФНС (bo.nalog.gov.ru). Отдаёт выгрузки в двух форматах:
 //   * CSV/TXT — строки баланса и ОФР с кодами РСБУ;
 //   * XML КНД 0710099 — машиночитаемая форма с тегами вида
 //     <стр2110>...</стр2110> или атрибутами Код="1600" Знач="...".
@@ -14013,7 +14022,7 @@ async function _moexAutoGirbo(secid, allowPrompt){
   // Если ИНН нет в description — пользователь получает имя эмитента
   // для ручного поиска через ИНН-мастер (кнопки ФНС/RusProfile).
   if(!inn && allowPrompt){
-    const ent = (prompt(`ИНН не нашёлся для «${info.shortName || secid}» (эмитент: ${info.issuer || '—'}).\n\nВведи вручную (10 или 12 цифр), или Cancel чтобы пропустить.\nМожно найти ИНН на rusprofile.ru или bo.nalog.ru по имени.`, '') || '').trim();
+    const ent = (prompt(`ИНН не нашёлся для «${info.shortName || secid}» (эмитент: ${info.issuer || '—'}).\n\nВведи вручную (10 или 12 цифр), или Cancel чтобы пропустить.\nМожно найти ИНН на rusprofile.ru или bo.nalog.gov.ru по имени.`, '') || '').trim();
     if(!ent) return { error: 'ИНН не введён, пропущено', secid };
     if(!/^\d{10}$|^\d{12}$/.test(ent)) return { error: 'ИНН должен быть 10 или 12 цифр', secid };
     inn = ent;
@@ -14223,7 +14232,7 @@ async function moexPullGirboBulk(){
 // ───────── ИНН-мастер (ручной ввод ИНН массово) ─────────
 // MOEX не отдаёт ИНН в доступных нам API, name-search через ФНС
 // упирается в прокси. Для мелких ВДО единственный надёжный путь —
-// пользователь находит ИНН глазами на bo.nalog.ru / rusprofile.ru
+// пользователь находит ИНН глазами на bo.nalog.gov.ru / rusprofile.ru
 // и вводит в таблицу. Мастер это и делает — одна модалка, все
 // бумаги из текущего фильтра без matched эмитента, рядом с каждой
 // поле для ИНН + две ссылки.
@@ -14270,7 +14279,7 @@ function moexOpenInnWizard(){
         <input type="text" class="inn-wiz-input" data-key="${key}" placeholder="10 или 12 цифр" maxlength="12" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.7rem;padding:4px 6px;outline:none">
       </div>
       <div style="display:flex;gap:4px">
-        <a href="https://bo.nalog.ru/search?query=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.ru)">🇷🇺 ФНС</a>
+        <a href="https://bo.nalog.gov.ru/advanced-search/organizations/search?query=${queryFns}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru)">🇷🇺 ФНС</a>
         <a href="https://www.rusprofile.ru/search?query=${queryRp}&type=ul" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru">🔎 RusProfile</a>
       </div>
     </div>`;
