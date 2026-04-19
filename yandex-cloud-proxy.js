@@ -181,10 +181,14 @@ exports.handler = async (event) => {
                     'Sec-Ch-Ua-Platform': '"Windows"',
                     'Sec-Fetch-Dest': 'document',
                     'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
+                    // same-origin + Referer на главную — как будто пользователь
+                    // кликнул по внутренней ссылке. none+прямой заход audit-it
+                    // отклоняет заглушкой «включите JS и cookies».
+                    'Sec-Fetch-Site': target.includes('audit-it.ru') ? 'same-origin' : 'none',
                     'Sec-Fetch-User': '?1',
                     'Upgrade-Insecure-Requests': '1',
-                    'Cache-Control': 'max-age=0'
+                    'Cache-Control': 'max-age=0',
+                    ...(target.includes('audit-it.ru') ? {'Referer': 'https://www.audit-it.ru/'} : {})
                 }
             });
 
