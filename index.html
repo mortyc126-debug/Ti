@@ -1450,6 +1450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
             <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН (агрегатор ФНС+Росстат, хранит удалённые данные, до 11+ лет истории)">📊 buxbalans</button>
             <button type="button" class="btn btn-sm" onclick="repOpenAuditItForInn()" title="Открыть страницу audit-it.ru по ИНН — 2015-2025, глубже ГИР БО. Цифры копируются в форму периода вручную (серверный парсинг audit-it блокирует anti-bot'ом).">📗 audit-it</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenCheckoForInn()" title="Открыть страницу checko.ru по ИНН — ЕГРЮЛ, аффилированные компании, руководители, базовые финансовые показатели. Для просмотра в живом браузере, серверный парсинг недоступен.">🔎 checko</button>
             <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
             <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)">📤 Все</button>
             <input type="file" id="rep-np-refs-bulk-file" accept=".json,application/json" style="display:none" onchange="repImportAllRefs(this)">

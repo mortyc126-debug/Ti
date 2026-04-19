@@ -960,6 +960,15 @@ function auditItLinkForInn(inn){
   return 'https://www.audit-it.ru/search/?q=' + encodeURIComponent(inn);
 }
 
+// checko.ru — агрегатор ЕГРЮЛ/Росстата. Сильная сторона — быстрый поиск
+// по названию с выдачей ИНН и базовой информации бесплатно. Серверный
+// парсинг недоступен (rate-limit на анонимные IP), но живой браузер
+// пользователя пускает без проблем. Кнопка — ссылка для ручного просмотра.
+function checkoLinkForInn(inn){
+  if(!inn) return null;
+  return 'https://checko.ru/search?query=' + encodeURIComponent(inn);
+}
+
 // ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
 // bo.nalog.gov.ru API доступен из РФ, но из браузера блокируется CORS
 // (Access-Control-Allow-Origin не выставлен). Решение — прокси:
@@ -6809,6 +6818,12 @@ function repOpenAuditItForInn(){
   const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр) для поиска на audit-it:');
   if(!inn) return;
   window.open(auditItLinkForInn(inn), '_blank', 'noopener');
+}
+
+function repOpenCheckoForInn(){
+  const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр) для поиска на checko:');
+  if(!inn) return;
+  window.open(checkoLinkForInn(inn), '_blank', 'noopener');
 }
 
 function repExportCurrentAsRef(){
@@ -14715,6 +14730,7 @@ function moexOpenInnWizard(){
       <div style="display:flex;gap:4px">
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'fns')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru). Если в поле ИНН введён — искать по нему, иначе по бренду.">🇷🇺 ФНС</a>
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'auditit')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Найти компанию на audit-it.ru через Google. Если в поле ИНН введён — искать по нему, иначе по бренду.">📗 audit-it</a>
+        <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'checko')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Поиск на checko.ru. Хорошо ищет по названию — в результатах сразу виден ИНН. Если в поле ИНН введён — искать по нему, иначе по бренду.">🔎 checko</a>
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'rusprofile')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru. Если в поле ИНН введён — искать по нему, иначе по бренду.">🔎 RusProfile</a>
       </div>
     </div>`;
@@ -14751,6 +14767,10 @@ function _innWizOpenSearch(event, key, source){
       : 'https://www.google.com/search?q=' + encodeURIComponent('site:audit-it.ru/buh_otchet ' + query);
   } else if(source === 'rusprofile'){
     url = 'https://www.rusprofile.ru/search?query=' + encodeURIComponent(query) + '&type=ul';
+  } else if(source === 'checko'){
+    // checko.ru — быстрый поиск с выдачей ИНН по названию. Их серверный
+    // API закрыт anti-bot'ом, но в живом браузере пускает нормально.
+    url = 'https://checko.ru/search?query=' + encodeURIComponent(query);
   } else {
     return false;
   }
