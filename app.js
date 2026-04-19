@@ -1328,14 +1328,17 @@ async function _egrulSubmitSearch(query, captchaValue, captchaToken){
   });
   if(!r.ok) throw new Error('ЕГРЮЛ HTTP ' + r.status);
   const ct = r.headers.get('content-type') || '';
-  if(/json/i.test(ct)) return await r.json();
-  const txt = await r.text();
-  try { return JSON.parse(txt); } catch(_) { return { _raw: txt }; }
+  let parsed;
+  if(/json/i.test(ct)) parsed = await r.json();
+  else {
+    const txt = await r.text();
+    try { parsed = JSON.parse(txt); } catch(_) { parsed = { _raw: txt }; }
+  }
+  console.log('[egrul] POST /', query, '→', JSON.stringify(parsed).slice(0, 600));
+  return parsed;
 }
 
 async function _egrulFetchResult(queryId, maxWaitMs){
-  // GET /search-result/<id> — ЕГРЮЛ может отвечать {status:'wait'} пока
-  // обрабатывает запрос; опрашиваем с паузами до maxWaitMs.
   const deadline = Date.now() + (maxWaitMs || 10000);
   while(Date.now() < deadline){
     const r = await fetch(_egrulMakeUrl('/search-result/' + encodeURIComponent(queryId)), {
@@ -1343,6 +1346,7 @@ async function _egrulFetchResult(queryId, maxWaitMs){
     });
     if(!r.ok) throw new Error('ЕГРЮЛ result HTTP ' + r.status);
     const j = await r.json();
+    console.log('[egrul] GET /search-result/' + queryId + ' →', JSON.stringify(j).slice(0, 600));
     if(!j || j.status === 'wait' || j.status === 'pending'){
       await new Promise(res => setTimeout(res, 500));
       continue;
@@ -1352,14 +1356,49 @@ async function _egrulFetchResult(queryId, maxWaitMs){
   throw new Error('ЕГРЮЛ не вернул результат за ' + (maxWaitMs/1000) + 'с');
 }
 
-// Вытаскивает капчу из ответа: PNG как base64 + token.
-// Структура может быть: {captchaPng, captchaToken} или {captchaImage, token}.
+// ЕГРЮЛ капчу отдаёт не в теле JSON-ответа, а как отдельный PNG
+// по токену. Путь ендпоинта у них менялся между версиями — пробуем
+// несколько вариантов, возвращаем base64 картинки или null.
+async function _egrulFetchCaptchaPng(token){
+  if(!token) return null;
+  const paths = [
+    '/static/captcha.bin?a=' + encodeURIComponent(token),
+    '/captcha.jpg?a=' + encodeURIComponent(token),
+    '/captcha.png?a=' + encodeURIComponent(token),
+    '/captcha.bin?a=' + encodeURIComponent(token),
+    '/vyp3Captcha.do?a=' + encodeURIComponent(token)
+  ];
+  for(const p of paths){
+    try {
+      const r = await fetch(_egrulMakeUrl(p), {headers: {'Accept': 'image/*'}});
+      if(!r.ok) continue;
+      const ct = r.headers.get('content-type') || '';
+      if(!/^image/i.test(ct)) continue;
+      const blob = await r.blob();
+      if(blob.size < 200) continue;
+      return await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result || '';
+          const m = String(dataUrl).match(/^data:[^;]+;base64,(.*)$/);
+          res(m ? m[1] : null);
+        };
+        reader.onerror = () => rej(new Error('FileReader error'));
+        reader.readAsDataURL(blob);
+      });
+    } catch(e){ /* пробуем следующий */ }
+  }
+  return null;
+}
+
 function _egrulExtractCaptcha(resp){
   if(!resp || typeof resp !== 'object') return null;
   const required = resp.captchaRequired === true || resp.captcha === true || /captcha/i.test(resp.status || '');
-  const png = resp.captchaPng || resp.captchaImage || resp.captcha || resp.image || null;
-  const token = resp.captchaToken || resp.token || resp.t || null;
-  if(required || (png && token)){
+  // Прямо вшитая PNG в base64.
+  const png = resp.captchaPng || resp.captchaImage || (typeof resp.captcha === 'string' ? resp.captcha : null) || resp.image || null;
+  // Токен — может называться по-разному.
+  const token = resp.captchaToken || resp.token || resp.t || resp.captchaId || null;
+  if(required || png || (token && /captcha/i.test(JSON.stringify(resp)))){
     return { png, token };
   }
   return null;
@@ -1392,19 +1431,28 @@ function _egrulCaptchaCancel(){
   if(window._egrulCaptchaResolve) window._egrulCaptchaResolve(null);
 }
 
-// Ищет первую подходящую организацию в ЕГРЮЛ по имени, возвращает
-// {inn, ogrn, name} или null. При капче показывает модалку — пользователь
-// вводит значение, запрос повторяется.
+// Универсальный шаг «получить капчу на экран и вернуть значение».
+// Если в ответе нет png — дёргаем отдельный endpoint по токену.
+async function _egrulAskCaptchaFor(captcha, hint){
+  let png = captcha.png;
+  if(!png && captcha.token){
+    png = await _egrulFetchCaptchaPng(captcha.token);
+  }
+  if(!png){
+    console.warn('[egrul] не удалось получить PNG капчи, token =', captcha.token);
+  }
+  return await _egrulAskCaptcha(png, hint || 'Введи буквы/цифры с картинки.');
+}
+
 async function egrulFindInnByName(query){
   if(!query || String(query).trim().length < 2) return null;
   const q = String(query).trim();
   // Шаг 1 — первичный POST.
   let resp = await _egrulSubmitSearch(q, '', '');
-  // Если сразу капча — просим пользователя.
   let captcha = _egrulExtractCaptcha(resp);
   let attempts = 0;
   while(captcha && attempts < 3){
-    const userVal = await _egrulAskCaptcha(captcha.png, attempts === 0
+    const userVal = await _egrulAskCaptchaFor(captcha, attempts === 0
       ? 'Введи буквы/цифры с картинки.'
       : 'Не распозналось, попробуй ещё раз.');
     if(!userVal){ throw new Error('ЕГРЮЛ: капча отменена пользователем'); }
@@ -1418,18 +1466,16 @@ async function egrulFindInnByName(query){
   else if(resp && (resp.t || resp.queryId)){
     const result = await _egrulFetchResult(resp.t || resp.queryId, 10000);
     rows = result.rows || result.results || null;
-    // На втором шаге тоже возможна капча.
     const cap2 = _egrulExtractCaptcha(result);
     if(cap2){
-      const val = await _egrulAskCaptcha(cap2.png);
+      const val = await _egrulAskCaptchaFor(cap2);
       if(!val) throw new Error('ЕГРЮЛ: капча отменена');
-      // Пересчитываем.
       const retry = await _egrulFetchResult(resp.t || resp.queryId, 10000);
       rows = retry.rows || retry.results || null;
     }
   }
   if(!Array.isArray(rows) || !rows.length) return null;
-  // Поля в rows: i=ИНН, o=ОГРН, c/n/t=название (в разных версиях разные).
+  // Поля в rows могут называться по-разному.
   const first = rows[0];
   const inn = first.i || first.inn || first.ИНН || null;
   const ogrn = first.o || first.ogrn || first.ОГРН || null;
