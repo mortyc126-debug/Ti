@@ -960,28 +960,21 @@ function girboLinkForInn(inn){
 function _girboProxyBase(){
   return localStorage.getItem('bondan_girbo_proxy') || 'https://corsproxy.io/?';
 }
-function _girboMakeUrl(path){
+function _proxyMakeUrl(host, path){
   const proxy = _girboProxyBase();
-  // Cache-busting: добавляем в путь параметр _t=<timestamp>, чтобы
-  // закешированные в браузере disk-cache ответы (включая 522!) не
-  // перехватывались. В cf-worker.js (новая версия) ошибки уже не
-  // кэшируются, но старый развёрнутый Worker мог закешировать —
-  // этот параметр обходит обе проблемы одним махом. Ничего не ломает,
-  // потому что bo.nalog.gov.ru лишние параметры игнорирует.
+  // Cache-busting: _t=<timestamp>, чтобы disk-cache не перехватил 522.
   const cb = (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
-  const target = 'https://bo.nalog.gov.ru' + path + cb;
-  // proxy заканчивается на `=` (parameter-style, например `…/?u=`) —
-  // target становится значением query-параметра, поэтому обязательно
-  // percent-encode, иначе `&page=0&size=20` внутри target парсится
-  // как отдельные параметры внешнего URL и прокси получает обрезанный
-  // target (всё до первого `&`).
+  const target = 'https://' + host + path + cb;
+  // proxy заканчивается на `=` (…/?u=) — target как query-параметр,
+  // обязательный percent-encode (иначе `&`-ы рвут внешний query).
   if(proxy.endsWith('=')) return proxy + encodeURIComponent(target);
-  // proxy заканчивается на `?` (root-query-style, corsproxy.io) —
-  // target идёт «хвостом», большинство таких прокси ждут URL как есть.
+  // root-query-style (corsproxy.io/?) — хвост как есть.
   if(proxy.endsWith('?')) return proxy + target;
-  if(proxy.endsWith('/')) return proxy + 'https://bo.nalog.gov.ru' + path + cb;
+  if(proxy.endsWith('/')) return proxy + 'https://' + host + path + cb;
   return proxy + path + cb;
 }
+function _girboMakeUrl(path){ return _proxyMakeUrl('bo.nalog.gov.ru', path); }
+function _auditItMakeUrl(path){ return _proxyMakeUrl('www.audit-it.ru', path); }
 async function _girboFetchJson(path, retries, timeoutMs){
   if(retries == null) retries = 2;
   if(timeoutMs == null) timeoutMs = 8000; // 8s — половина старого, меньше висеть
@@ -1039,6 +1032,139 @@ async function _girboFetchJson(path, retries, timeoutMs){
   throw lastErr || new Error('ГИР БО: исчерпаны попытки');
 }
 
+// audit-it.ru — коммерческий агрегатор РСБУ, покрывает свежее ФНС
+// (до 2025 вкл.) и глубже (есть ВДО, которых нет в ГИР БО). Отдаёт
+// HTML; в нём inline-скрипт с JSON-объектами `const Data = {…}` и
+// `const LastPeriodData = {…}` — оттуда парсим значения.
+async function _auditItFetchHtml(path, retries, timeoutMs){
+  if(retries == null) retries = 2;
+  if(timeoutMs == null) timeoutMs = 10000;
+  const url = _auditItMakeUrl(path);
+  let lastErr = null;
+  for(let attempt = 0; attempt <= retries; attempt++){
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const to = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+    try {
+      const r = await fetch(url, {headers: {'Accept': 'text/html,*/*;q=0.8'}, signal: ctrl ? ctrl.signal : undefined});
+      if(r.ok){
+        const txt = await r.text();
+        if(!txt || txt.length < 200) throw new Error('audit-it: пустой ответ (' + txt.length + ' байт)');
+        return txt;
+      }
+      if(r.status === 404){
+        // Страница/компания не найдена — это штатный результат поиска,
+        // не transient-ошибка. Возвращаем пустоту наверх.
+        throw new Error('404 ' + path);
+      }
+      if([502, 503, 504, 522, 524].includes(r.status) && attempt < retries){
+        lastErr = new Error('HTTP ' + r.status + ' (прокси→audit-it timeout)');
+        await new Promise(res => setTimeout(res, 800 * Math.pow(2, attempt)));
+        continue;
+      }
+      if(r.status === 403 || r.status === 429){
+        throw new Error('audit-it заблокировал запрос (' + r.status + ') — anti-scraping. Подожди, убавь скорость или смени IP.');
+      }
+      throw new Error('HTTP ' + r.status + ' ' + path);
+    } catch(e){
+      const isAbort = e.name === 'AbortError';
+      if(attempt < retries && (isAbort || /NetworkError|Failed to fetch|timeout/i.test(e.message || ''))){
+        lastErr = isAbort ? new Error('timeout ' + timeoutMs + ' мс — audit-it не отвечает') : e;
+        await new Promise(res => setTimeout(res, 800 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw isAbort ? new Error('timeout — audit-it не отвечает') : e;
+    } finally {
+      if(to) clearTimeout(to);
+    }
+  }
+  throw lastErr || new Error('audit-it: исчерпаны попытки');
+}
+
+// Находит URL страницы бухотчётности по ИНН через поиск audit-it.
+// Возвращает path вида `/buh_otchet/<inn>_<slug>` или null.
+async function _auditItFindBuhOtchetPath(query){
+  const html = await _auditItFetchHtml('/search/?q=' + encodeURIComponent(query));
+  // Ищем любую ссылку /buh_otchet/<цифры>_<slug>. Несколько может быть —
+  // берём первую (сайт сортирует по релевантности).
+  const m = html.match(/href="(\/buh_otchet\/\d{10,12}_[^"]+)"/);
+  return m ? m[1] : null;
+}
+
+// Парсер страницы бухотчётности audit-it. Извлекает inline-JSON
+// `const Data = {…}` (все года) и отдаёт его как-есть. "hidden"
+// строки для платных ячеек сохраняются — вызывающий код их отбрасывает.
+function _auditItParsePage(html){
+  // Надёжная привязка — `const Data = {` до `;` перед следующим `const`.
+  // JSON содержит только цифры/строки/null, без вложенных скриптов,
+  // поэтому ленивое [\s\S]*? до `};\s*const` даёт корректный матч.
+  const mData = html.match(/const\s+Data\s*=\s*(\{[\s\S]*?\});\s*const\s+CustomData/);
+  if(!mData) return null;
+  let data;
+  try { data = JSON.parse(mData[1]); } catch(e){ return null; }
+  // Название компании — из <strong> в firmInfo («Полное наименование: …»).
+  let company = null;
+  const mName = html.match(/Полное наименование:\s*<strong>([^<]+)<\/strong>/);
+  if(mName) company = mName[1].trim();
+  // ИНН (для подтверждения).
+  let inn = null;
+  const mInn = html.match(/ИНН:\s*<strong>(\d{10,12})<\/strong>/);
+  if(mInn) inn = mInn[1];
+  return { data, company, inn };
+}
+
+// Подтягиваем РСБУ-отчётность с audit-it за все доступные года.
+// Сигнатура как у fetchGirboByInn — одинаковая форма результата,
+// чтобы call-sites не различали источник.
+async function fetchAuditItByInn(query, maxYears = 10){
+  if(!query || !String(query).trim()) throw new Error('query пустой');
+  const q = String(query).trim();
+
+  // 1. Поиск → URL страницы.
+  const path = await _auditItFindBuhOtchetPath(q);
+  if(!path) throw new Error('audit-it: «' + q + '» не найден');
+
+  // 2. Сама страница с inline-JSON.
+  const html = await _auditItFetchHtml(path);
+  const parsed = _auditItParsePage(html);
+  if(!parsed) throw new Error('audit-it: на странице нет JSON Data');
+
+  // 3. Маппинг кодов РСБУ (те же, что в ГИР БО) → наши rep-np-*.
+  // Единицы у audit-it — тыс ₽, делим на 1e6 → млрд ₽.
+  const series = {};
+  const years = Object.keys(parsed.data).sort((a, b) => Number(b) - Number(a)).slice(0, maxYears);
+  for(const year of years){
+    const info = parsed.data[year];
+    if(!info || !info.values) continue;
+    const vals = info.values;
+    const out = {};
+    for(const [fid, code] of Object.entries(_GIRBO_FIELD_MAP)){
+      const codes = Array.isArray(code) ? code : [code];
+      let sum = 0, any = false;
+      for(const c of codes){
+        const x = vals[c];
+        // "hidden" — платное поле. Число может быть как JS-number,
+        // так и строкой ("16686" — audit-it иногда так хранит).
+        if(typeof x === 'number' && !isNaN(x)){ sum += x; any = true; }
+        else if(typeof x === 'string' && /^-?\d+$/.test(x)){ sum += parseInt(x, 10); any = true; }
+      }
+      if(any){
+        const isExpense = fid === 'rep-np-int' || (!Array.isArray(code) && code === '2410');
+        out[fid] = (isExpense ? Math.abs(sum) : sum) / 1e6;
+      }
+    }
+    if(Object.keys(out).length){
+      series[_periodLabel(year, 'FY')] = out;
+    }
+  }
+  return {
+    series,
+    company: parsed.company,
+    inn: parsed.inn || '',
+    count: Object.keys(series).length,
+    errors: []
+  };
+}
+
 // Подтягиваем последние N годовых отчётов РСБУ по ИНН, складываем в
 // единую series (формат normaliseReference). Возвращает {series,
 // company, inn, count, errors}.
@@ -1048,7 +1174,7 @@ async function _girboFetchJson(path, retries, timeoutMs){
 // /nbo/bfo/{id} (отчёт целиком) → два отдельных endpoint'а
 // /nbo/details/balance?id={id} и /nbo/details/financial_result?id={id}.
 // Возвращает {series, company, inn, count, errors} как раньше.
-async function fetchGirboByInn(inn, maxYears = 5){
+async function fetchGirboByInnLegacy(inn, maxYears = 5){
   if(!inn || !String(inn).trim()) throw new Error('query пустой');
   const query = String(inn).trim();
   const isInn = /^\d{10}(\d{2})?$/.test(query);
@@ -1515,7 +1641,7 @@ async function indBuildMedians(){
       const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
       status(`⏳ ${done}/${totalInns} · ${elapsed}с · <strong>${ind.label}</strong>: ${peer.name || peer.inn}…`, 'var(--warn)');
       try {
-        const result = await fetchGirboByInn(peer.inn, 5);
+        const result = await fetchAuditItByInn(peer.inn, 5);
         for(const [period, vals] of Object.entries(result.series || {})){
           byIndustry[indKey][period] = byIndustry[indKey][period] || {};
           for(const [fid, v] of Object.entries(vals)){
@@ -6622,9 +6748,9 @@ async function repFetchGirboSeries(){
   const box = document.getElementById('rep-np-ref-result');
   const wrap = document.getElementById('rep-np-ref-wrap');
   if(wrap) wrap.style.display = 'block';
-  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос ГИР БО по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
+  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ Запрос audit-it по ИНН ${inn} через прокси <code>${_girboProxyBase()}</code>…</div>`;
   try {
-    const data = await fetchGirboByInn(inn, 5);
+    const data = await fetchAuditItByInn(inn, 5);
     if(!data.count){
       if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ГИР БО ничего не вернул (компания исключена из публикации? нет годовых отчётов?). Ошибки: ${data.errors.length}.</div>`;
       return;
@@ -8768,11 +8894,11 @@ async function repVerifyGirbo(){
   if(type === 'МСФО') warnings.push('⚠ Тип периода — МСФО (консолидация). ГИР БО отдаёт standalone РСБУ головной компании. Расхождения в разы — нормальны, это <strong>разная отчётность</strong>, не ошибка.');
   if(type === 'ГИРБО') warnings.push('⚠ Период уже помечен как ГИРБО — сверка потенциально круговая.');
 
-  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос к ГИР БО по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
+  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос к audit-it по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
 
   let data;
   try {
-    data = await fetchGirboByInn(inn, 10);
+    data = await fetchAuditItByInn(inn, 10);
   } catch(e){
     status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
     res.innerHTML = `<div style="font-size:.58rem;color:var(--text3);margin-top:6px">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Либо разверните свой Cloudflare Worker (см. cf-worker.js в репо) — надёжнее и приватнее.</div>`;
@@ -14075,7 +14201,7 @@ async function _moexAutoGirbo(secid, allowPrompt){
   const iss = reportsDB[issId];
 
   let data;
-  try { data = await fetchGirboByInn(inn, 5); }
+  try { data = await fetchAuditItByInn(inn, 5); }
   catch(e){ return { error: 'ГИР БО: ' + e.message, issId, issName: iss.name, inn }; }
 
   if(!data.count){
@@ -14209,7 +14335,7 @@ async function moexPullGirboBulk(){
     const cands = meta.candidates && meta.candidates.length ? meta.candidates : [meta.query];
     for(const q of cands){
       try {
-        const tryData = await fetchGirboByInn(q, 5);
+        const tryData = await fetchAuditItByInn(q, 5);
         consecutiveTimeouts = 0;
         if(tryData && tryData.count){
           data = tryData;
@@ -14404,7 +14530,7 @@ async function moexSaveInnWizard(){
       const item = toProcess[i];
       if(statusEl) statusEl.innerHTML = `<span style="color:var(--warn)">⏳ ГИР БО ${i+1}/${toProcess.length}: ${item.name}</span>`;
       try {
-        const data = await fetchGirboByInn(item.inn, 5);
+        const data = await fetchAuditItByInn(item.inn, 5);
         // Добавляем периоды в reportsDB.
         let issId = null;
         for(const [id, iss] of Object.entries(reportsDB)){

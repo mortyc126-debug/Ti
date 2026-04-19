@@ -33,14 +33,25 @@ export default {
     // Соглашение БондАналитика: target-URL передаётся через ?u=…
     let target = url.searchParams.get('u');
 
-    // Альтернатива — путь повторяет /nbo/... или /advanced-search/...
-    // bo.nalog.gov.ru напрямую.
-    if (!target && (url.pathname.startsWith('/nbo') || url.pathname.startsWith('/advanced-search'))) {
-      target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
+    // Разрешённые upstream-домены: ФНС (bo.nalog.gov.ru) и audit-it.ru
+    // (агрегатор РСБУ-отчётности). Anti-abuse: только https + whitelist.
+    const ALLOWED = [
+      /^https:\/\/bo\.nalog\.gov\.ru\//,
+      /^https:\/\/(www\.)?audit-it\.ru\//
+    ];
+    const isAllowed = (u) => ALLOWED.some((re) => re.test(u));
+
+    // Альтернатива — префикс пути определяет upstream.
+    if (!target) {
+      if (url.pathname.startsWith('/nbo') || url.pathname.startsWith('/advanced-search')) {
+        target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
+      } else if (url.pathname.startsWith('/buh_otchet') || url.pathname.startsWith('/search') || url.pathname.startsWith('/contragent')) {
+        target = 'https://www.audit-it.ru' + url.pathname + url.search;
+      }
     }
 
-    if (!target || !/^https:\/\/bo\.nalog\.gov\.ru\//.test(target)) {
-      return new Response('Allowed: bo.nalog.gov.ru only. Pass URL via ?u=https://bo.nalog.gov.ru/...', {
+    if (!target || !isAllowed(target)) {
+      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru. Pass URL via ?u=https://…', {
         status: 400,
         headers: {'Access-Control-Allow-Origin': '*'}
       });
@@ -80,7 +91,9 @@ export default {
           upstream = await fetch(target, {
             method: req.method,
             headers: {
-              'Accept': 'application/json',
+              // У ФНС — JSON API, у audit-it — HTML. Универсальный
+              // Accept, чтобы оба пускали.
+              'Accept': 'text/html,application/json,application/xhtml+xml,*/*;q=0.8',
               // Чистый Chrome UA — на случай если origin реагирует на слово
               // «Proxy» в User-Agent. Самый нейтральный фингерпринт.
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',

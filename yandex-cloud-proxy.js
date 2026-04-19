@@ -99,15 +99,30 @@ exports.handler = async (event) => {
     const qs = event.queryStringParameters || {};
     let target = qs.u;
 
-    // Альтернатива: путь повторяет bo.nalog.gov.ru (/nbo/... или /advanced-search/...).
-    if (!target && event.path && (event.path.startsWith('/nbo') || event.path.startsWith('/advanced-search'))) {
+    // Разрешённые upstream-домены: ФНС (bo.nalog.gov.ru) и audit-it.ru
+    // (агрегатор РСБУ-отчётности, покрывает ВДО глубже и свежее ФНС).
+    // Формат: протокол обязательно https, первый сегмент пути —
+    // один из известных публичных (anti-abuse).
+    const ALLOWED = [
+        /^https:\/\/bo\.nalog\.gov\.ru\//,
+        /^https:\/\/(www\.)?audit-it\.ru\//
+    ];
+    const isAllowed = (url) => ALLOWED.some((re) => re.test(url));
+
+    // Альтернатива: путь повторяет upstream (/nbo/..., /advanced-search/...
+    // — ФНС; /buh_otchet/..., /search/... — audit-it). По префиксу пути
+    // выбираем целевой домен.
+    if (!target && event.path) {
         const qp = Object.entries(qs).filter(([k]) => k !== 'u').map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-        target = 'https://bo.nalog.gov.ru' + event.path + (qp ? '?' + qp : '');
+        const suffix = event.path + (qp ? '?' + qp : '');
+        if (event.path.startsWith('/nbo') || event.path.startsWith('/advanced-search')) {
+            target = 'https://bo.nalog.gov.ru' + suffix;
+        } else if (event.path.startsWith('/buh_otchet') || event.path.startsWith('/search') || event.path.startsWith('/contragent')) {
+            target = 'https://www.audit-it.ru' + suffix;
+        }
     }
 
-    // Только bo.nalog.gov.ru — ограничение безопасности. Нельзя превращать
-    // прокси в general-purpose (иначе кто-то начнёт через неё DDoS'ить).
-    if (!target || !/^https:\/\/bo\.nalog\.gov\.ru\//.test(target)) {
+    if (!target || !isAllowed(target)) {
         return {
             statusCode: 400,
             headers: {
@@ -115,7 +130,7 @@ exports.handler = async (event) => {
                 'Cache-Control': 'no-store',
                 'Content-Type': 'text/plain; charset=utf-8'
             },
-            body: 'Allowed: bo.nalog.gov.ru only. Pass URL via ?u=https://bo.nalog.gov.ru/...'
+            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru. Pass URL via ?u=https://…'
         };
     }
 
@@ -153,7 +168,9 @@ exports.handler = async (event) => {
             const upstream = await fetch(target, {
                 method: event.httpMethod,
                 headers: {
-                    'Accept': 'application/json',
+                    // У ФНС — JSON API, у audit-it — HTML. Универсальный
+                    // Accept, чтобы оба пускали.
+                    'Accept': 'text/html,application/json,application/xhtml+xml,*/*;q=0.8',
                     // Чистый Chrome UA — без «Proxy», чтобы анти-бот
                     // не реагировал на наличие слова в User-Agent.
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
