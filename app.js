@@ -969,6 +969,16 @@ function checkoLinkForInn(inn){
   return 'https://checko.ru/search?query=' + encodeURIComponent(inn);
 }
 
+// egrul.nalog.ru — официальный сайт ФНС для поиска сведений из ЕГРЮЛ/
+// ЕГРИП. Даёт точный ИНН по названию из первоисточника (не отчётность).
+// SPA на Angular — поисковое поле пустое, пользователь вводит сам.
+// Легально, официально, бесплатно.
+function egrulLinkForInn(_inn){
+  // Параметр игнорируется: egrul SPA не принимает query в URL.
+  // Открываем главную — пользователь вбивает текст в поле поиска.
+  return 'https://egrul.nalog.ru/index.html';
+}
+
 // ── Прокси к ГИР БО для автоматической подтяжки многолетней истории ──
 // bo.nalog.gov.ru API доступен из РФ, но из браузера блокируется CORS
 // (Access-Control-Allow-Origin не выставлен). Решение — прокси:
@@ -6824,6 +6834,16 @@ function repOpenCheckoForInn(){
   const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр) для поиска на checko:');
   if(!inn) return;
   window.open(checkoLinkForInn(inn), '_blank', 'noopener');
+}
+
+// Открывает главную ЕГРЮЛ и копирует ИНН/имя эмитента в буфер обмена,
+// чтобы пользователь сразу вставил в поисковое поле.
+function repOpenEgrulForInn(){
+  const inn = _repResolveInnInteractive('ИНН не распознан в отчёте и не сохранён у эмитента. Введите вручную (10 или 12 цифр) для поиска в ЕГРЮЛ:');
+  if(!inn) return;
+  // Кладём ИНН в буфер — на egrul поле пустое, но Ctrl+V сразу подставит.
+  if(navigator.clipboard) navigator.clipboard.writeText(inn).catch(() => {});
+  window.open(egrulLinkForInn(inn), '_blank', 'noopener');
 }
 
 function repExportCurrentAsRef(){
@@ -14731,6 +14751,7 @@ function moexOpenInnWizard(){
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'fns')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на сайте ФНС (bo.nalog.gov.ru). Если в поле ИНН введён — искать по нему, иначе по бренду.">🇷🇺 ФНС</a>
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'auditit')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Найти компанию на audit-it.ru через Google. Если в поле ИНН введён — искать по нему, иначе по бренду.">📗 audit-it</a>
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'checko')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Поиск на checko.ru. Хорошо ищет по названию — в результатах сразу виден ИНН. Если в поле ИНН введён — искать по нему, иначе по бренду.">🔎 checko</a>
+        <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'egrul')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="ЕГРЮЛ (ФНС) — официальный первоисточник. Имя/ИНН копируются в буфер, открывается поисковая страница — нажми Ctrl+V в поле и Enter.">🏛 ЕГРЮЛ</a>
         <a href="#" onclick="return _innWizOpenSearch(event, '${key}', 'rusprofile')" class="btn btn-sm" style="text-decoration:none;font-size:.54rem;padding:3px 7px" title="Открыть поиск на rusprofile.ru. Если в поле ИНН введён — искать по нему, иначе по бренду.">🔎 RusProfile</a>
       </div>
     </div>`;
@@ -14771,6 +14792,12 @@ function _innWizOpenSearch(event, key, source){
     // checko.ru — быстрый поиск с выдачей ИНН по названию. Их серверный
     // API закрыт anti-bot'ом, но в живом браузере пускает нормально.
     url = 'https://checko.ru/search?query=' + encodeURIComponent(query);
+  } else if(source === 'egrul'){
+    // ЕГРЮЛ (ФНС) — официальный первоисточник ИНН. SPA не принимает
+    // query через URL, поэтому копируем имя/ИНН в буфер обмена —
+    // пользователь на egrul вставляет в поле поиска одним Ctrl+V.
+    if(navigator.clipboard) navigator.clipboard.writeText(query).catch(() => {});
+    url = 'https://egrul.nalog.ru/index.html';
   } else {
     return false;
   }
