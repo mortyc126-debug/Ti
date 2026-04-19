@@ -1742,7 +1742,7 @@ async function indBuildMedians(){
       const elapsed = ((Date.now() - t0) / 1000).toFixed(0);
       status(`⏳ ${done}/${totalInns} · ${elapsed}с · <strong>${ind.label}</strong>: ${peer.name || peer.inn}…`, 'var(--warn)');
       try {
-        const result = await fetchGirboByInn(peer.inn, 5);
+        const result = await fetchBuxBalansByInn(peer.inn, 10);
         for(const [period, vals] of Object.entries(result.series || {})){
           byIndustry[indKey][period] = byIndustry[indKey][period] || {};
           for(const [fid, v] of Object.entries(vals)){
@@ -9027,11 +9027,11 @@ async function repVerifyGirbo(){
   if(type === 'МСФО') warnings.push('⚠ Тип периода — МСФО (консолидация). ГИР БО отдаёт standalone РСБУ головной компании. Расхождения в разы — нормальны, это <strong>разная отчётность</strong>, не ошибка.');
   if(type === 'ГИРБО') warnings.push('⚠ Период уже помечен как ГИРБО — сверка потенциально круговая.');
 
-  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос к ГИР БО по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
+  status.innerHTML = `<span style="color:var(--warn)">⏳ Запрос buxbalans по ИНН ${inn} через прокси <code style="font-size:.55rem">${_girboProxyBase()}</code>…</span>`;
 
   let data;
   try {
-    data = await fetchGirboByInn(inn, 10);
+    data = await fetchBuxBalansByInn(inn, 15);
   } catch(e){
     status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
     res.innerHTML = `<div style="font-size:.58rem;color:var(--text3);margin-top:6px">Если прокси не работает — поменяйте его в «⚡ Sync» → «📡 ГИР БО — прокси». Либо разверните свой Cloudflare Worker (см. cf-worker.js в репо) — надёжнее и приватнее.</div>`;
@@ -14481,7 +14481,7 @@ async function _moexAutoGirbo(secid, allowPrompt){
   const iss = reportsDB[issId];
 
   let data;
-  try { data = await fetchGirboByInn(inn, 5); }
+  try { data = await fetchBuxBalansByInn(inn, 10); }
   catch(e){ return { error: 'ГИР БО: ' + e.message, issId, issName: iss.name, inn }; }
 
   if(!data.count){
@@ -14547,13 +14547,9 @@ async function moexPullGirboBulk(){
   let totalOk = 0, totalErr = 0, totalSkipped = 0, totalNewIssuers = 0;
   const errors = [];
 
-  // Шаг 1: группируем бумаги по ИМЕНИ эмитента (без сети).
-  // ГИР БО endpoint /advanced-search/organizations/search?query= ищет
-  // по имени — ИНН промежуточно не нужен. Для всех бумаг извлекаем
-  // бренд из MOEX shortName/secName (_moexGuessIssuerName) и
-  // группируем. Локальный справочник используем только чтобы
-  // приоритизировать уже известное полное имя из peers.json
-  // (там «ПАО Сбербанк» вместо MOEX-шного «Сбер»).
+  // Шаг 1: группируем бумаги по ИНН эмитента (из локального справочника
+  // peers.json + reportsDB). buxbalans ищет только по ИНН — бумаги без
+  // известного ИНН bulk пропускает (для них «📝 ИНН-мастер»).
   await _moexBuildLocalInnMap();
   let done = 0;
   for(const b of targets){
@@ -14562,41 +14558,29 @@ async function moexPullGirboBulk(){
 
     // Ищем имя — приоритет: полное имя из локального справочника
     // (оно точнее для ГИР БО), потом MOEX guess + fallback-кандидаты.
-    let name = null;
+    // Нужен ИНН из локального справочника (peers.json + reportsDB).
+    // buxbalans ищет ТОЛЬКО по ИНН — эмитентов без ИНН bulk пропускает
+    // (для них — «📝 ИНН-мастер», где ИНН вводится руками).
     const local = _moexLocalInnLookup(b.shortName || b.secName);
-    if(local) name = local.name;
-    if(!name) name = _moexGuessIssuerName(b.shortName, b.secName);
-    if(!name) name = b.shortName || b.secName;
-    if(!name || name.length < 2) continue;
-
-    // Ключ группировки — нормализованное имя.
-    const key = (typeof _normIssuerName === 'function')
-      ? _normIssuerName(name)
-      : name.toLowerCase();
-    if(!key) continue;
+    if(!local || !local.inn){
+      totalSkipped++;
+      continue;
+    }
+    const key = local.inn;
     if(!unique.has(key)){
-      // Кандидаты на поиск: primary — name, дальше — варианты из
-      // shortName/secName (часто бренд в них длиннее, чем guess).
-      const cands = [name];
-      for(const c of _moexIssuerCandidates(b.shortName, b.secName)){
-        if(!cands.includes(c)) cands.push(c);
-      }
-      unique.set(key, { name, query: name, candidates: cands, sampleSecid: b.secid });
+      unique.set(key, { inn: local.inn, name: local.name || b.shortName || b.secName, sampleSecid: b.secid });
     }
   }
 
   const totalInns = unique.size;
   if(totalInns === 0){
-    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов для обработки — не удалось извлечь имя ни для одной бумаги.</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов с известным ИНН. Используй «📝 ИНН-мастер» — впиши ИНН руками и подтяни через buxbalans.</span>`;
     return;
   }
 
-  // Шаг 2: каждого уникального эмитента ищем в ГИР БО по ИМЕНИ.
-  // fetchGirboByInn теперь принимает любую строку — внутри она
-  // делает поиск organizations/?query=<name>, берёт первый матч,
-  // тянет BFO. Результат возвращает и ИНН (из ответа ГИР БО),
-  // и финансы.
-  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: запрашиваю ГИР БО для ${totalInns} эмитентов…</span>`;
+  // Шаг 2: каждого уникального эмитента тянем с buxbalans.ru по ИНН.
+  // Агрегатор отдаёт весь ряд лет за один HTTP-запрос.
+  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: запрашиваю buxbalans для ${totalInns} эмитентов…</span>`;
   const fieldMap = {
     'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
     'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
@@ -14606,46 +14590,27 @@ async function moexPullGirboBulk(){
   let consecutiveTimeouts = 0;
   for(const [key, meta] of unique){
     idx++;
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: ГИР БО ${idx}/${totalInns}: «${meta.name}»</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ 2/2: buxbalans ${idx}/${totalInns}: «${meta.name}» (ИНН ${meta.inn})</span>`;
     let data = null;
-    let lastErr = null;
-    // Перебираем кандидатов: первый успешный матч с годовыми отчётами
-    // останавливает поиск. Защита от фанатичного обхода при проблемах
-    // с сетью — ловим таймауты как в старом коде.
-    const cands = meta.candidates && meta.candidates.length ? meta.candidates : [meta.query];
-    for(const q of cands){
-      try {
-        const tryData = await fetchGirboByInn(q, 5);
-        consecutiveTimeouts = 0;
-        if(tryData && tryData.count){
-          data = tryData;
-          // Если нашли не с первого варианта — отметим, чтобы было понятно
-          // по какому имени матч реально случился.
-          if(q !== meta.query) meta.matchedBy = q;
-          break;
-        }
-        lastErr = new Error('0 годовых отчётов по «' + q + '»');
-      } catch(e){
-        lastErr = e;
-        if(/timeout|CF→ФНС|Upstream unreachable|Failed to fetch|NetworkError/i.test(e.message || '')){
-          consecutiveTimeouts++;
-          // При сетевой нестабильности не перебираем дальше кандидатов
-          // для этого эмитента — бессмысленно тратить попытки.
-          break;
-        }
-      }
-      // Между кандидатами одного эмитента — короткая пауза, чтобы не
-      // нагружать прокси очередью.
-      await new Promise(r => setTimeout(r, 150));
-    }
-    if(!data){
+    try {
+      data = await fetchBuxBalansByInn(meta.inn, 15);
+      consecutiveTimeouts = 0;
+    } catch(e){
       totalErr++;
-      errors.push(`${meta.name}: ${lastErr ? lastErr.message : 'не найден'}`);
-      if(consecutiveTimeouts >= 5){
-        if(status) status.innerHTML = `<span style="color:var(--danger)">✋ Остановлено: ${consecutiveTimeouts} таймаутов подряд — прокси/сеть нестабильны. Обработано ${idx-consecutiveTimeouts} из ${totalInns}. Попробуй позже или через «📝 ИНН-мастер».</span>`;
-        break;
+      errors.push(`${meta.name} (ИНН ${meta.inn}): ${e.message}`);
+      if(/timeout|Upstream unreachable|Failed to fetch|NetworkError/i.test(e.message || '')){
+        consecutiveTimeouts++;
+        if(consecutiveTimeouts >= 5){
+          if(status) status.innerHTML = `<span style="color:var(--danger)">✋ Остановлено: ${consecutiveTimeouts} таймаутов подряд — прокси/сеть нестабильны. Обработано ${idx-consecutiveTimeouts} из ${totalInns}.</span>`;
+          break;
+        }
       }
       await new Promise(r => setTimeout(r, 400));
+      continue;
+    }
+    if(!data.count){
+      errors.push(`${meta.name} (ИНН ${meta.inn}): buxbalans вернул 0 годовых отчётов`);
+      await new Promise(r => setTimeout(r, 150));
       continue;
     }
     // ИНН настоящий — из ответа ГИР БО (не из нашей догадки).
@@ -14682,7 +14647,7 @@ async function moexPullGirboBulk(){
   // Результат.
   const msg = totalInns === 0
     ? `Нет эмитентов для обработки — отфильтруй каталог и попробуй снова.`
-    : `✓ Готово: обработано ${totalInns} эмитентов, добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `. Не нашлось в ГИР БО: ${totalErr} — попробуй через 📝 ИНН-мастер.` : '');
+    : `✓ Готово: обработано ${totalInns} эмитентов с известным ИНН, добавлено ${totalOk} периодов, пропущено ${totalSkipped} (существовавших/без ИНН), новых эмитентов: ${totalNewIssuers}` + (totalErr ? `. Не нашлось в buxbalans: ${totalErr}.` : '');
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
   if(errors.length){
     console.warn('GIR BO bulk errors:', errors);
@@ -14844,7 +14809,7 @@ async function moexSaveInnWizard(){
       const item = toProcess[i];
       if(statusEl) statusEl.innerHTML = `<span style="color:var(--warn)">⏳ ГИР БО ${i+1}/${toProcess.length}: ${item.name}</span>`;
       try {
-        const data = await fetchGirboByInn(item.inn, 5);
+        const data = await fetchBuxBalansByInn(item.inn, 10);
         // Добавляем периоды в reportsDB.
         let issId = null;
         for(const [id, iss] of Object.entries(reportsDB)){

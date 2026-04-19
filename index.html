@@ -1448,8 +1448,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru">📋 Импорт JSON</button>
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
-            <button type="button" class="btn btn-sm btn-p" onclick="repFetchGirboSeries()" title="Через прокси автоматически подтянуть до 5 лет РСБУ-отчётности по ИНН (только standalone)">📡 5 лет</button>
-            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru (агрегатор ФНС+Росстат, хранит удалённые данные, до 11+ лет истории)">📊 buxbalans</button>
+            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН (агрегатор ФНС+Росстат, хранит удалённые данные, до 11+ лет истории)">📊 buxbalans</button>
             <button type="button" class="btn btn-sm" onclick="repOpenAuditItForInn()" title="Открыть страницу audit-it.ru по ИНН — 2015-2025, глубже ГИР БО. Цифры копируются в форму периода вручную (серверный парсинг audit-it блокирует anti-bot'ом).">📗 audit-it</button>
             <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
             <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)">📤 Все</button>
@@ -1965,7 +1964,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
-      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе — подтянуть РСБУ из ГИР БО (ФНС) по ИНН. Каждый эмитент — 2-3 запроса к прокси, 1-2 секунды. Затем мультипликаторы появятся прямо в строке.">📡 ГИР БО для эмитентов в фильтре</button>
+      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте «📝 ИНН-мастер».">📊 buxbalans для эмитентов в фильтре</button>
       <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
