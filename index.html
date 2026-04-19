@@ -16583,25 +16583,18 @@ async function _moexAutoGirbo(secid, allowPrompt){
   }
 
   let inn = info.inn;
-  // Note: MOEX search endpoint (/iss/securities.json?q=) пробовал добавить
-  // как fallback, но пользовательница подтвердила: MOEX не отдаёт ИНН
-  // в ISS API — никакой их endpoint этого не сделает. Убран.
-  // Поиск ИНН через ГИР БО по названию эмитента.
-  if(!inn){
-    const nameForSearch = info.issuer || _moexGuessIssuerName(info.shortName);
-    if(nameForSearch){
-      inn = await _girboFindInnByName(nameForSearch);
-    }
-  }
-  // Fallback: prompt для ручного клика.
+  // Автоматический name-search через ГИР БО убран — он упирался в
+  // 522 и с retry в cf-worker делал долгие заведомо неудачные попытки.
+  // Если ИНН нет в description — пользователь получает имя эмитента
+  // для ручного поиска через ИНН-мастер (кнопки ФНС/RusProfile).
   if(!inn && allowPrompt){
-    const ent = (prompt(`ИНН не нашёлся ни в локальном справочнике, ни в MOEX description, ни по имени в ГИР БО для «${info.shortName || secid}». Введи вручную (10 или 12 цифр), или Cancel чтобы пропустить:`, '') || '').trim();
+    const ent = (prompt(`ИНН не нашёлся для «${info.shortName || secid}» (эмитент: ${info.issuer || '—'}).\n\nВведи вручную (10 или 12 цифр), или Cancel чтобы пропустить.\nМожно найти ИНН на rusprofile.ru или bo.nalog.ru по имени.`, '') || '').trim();
     if(!ent) return { error: 'ИНН не введён, пропущено', secid };
     if(!/^\d{10}$|^\d{12}$/.test(ent)) return { error: 'ИНН должен быть 10 или 12 цифр', secid };
     inn = ent;
   }
   if(!inn){
-    return { error: 'ИНН не найден (локально, MOEX description, ГИР БО — ничего). Используй «📝 ИНН-мастер» для ручного ввода.', secid, _noInn: true };
+    return { error: 'ИНН не найден автоматически. Открой «📝 ИНН-мастер» для ручного ввода по списку.', secid, _noInn: true, _issuerName: info.issuer || info.shortName };
   }
 
   const issId = _moexEnsureIssuer(inn, info.issuer || info.shortName);
@@ -16701,17 +16694,10 @@ async function moexPullGirboBulk(){
     catch(e){ errors.push(`${b.shortName}: ${e.message}`); continue; }
 
     let inn = info.inn;
-    // MOEX search (был тут) убран — MOEX ИНН не отдаёт через ISS API.
-    // ГИР БО name-search (требует прокси).
-    if(!inn){
-      const nameGuess = info.issuer || _moexGuessIssuerName(b.shortName, info.shortName);
-      if(nameGuess){
-        try {
-          inn = await _girboFindInnByName(nameGuess);
-        } catch(e){ /* продолжаем */ }
-        await new Promise(r => setTimeout(r, 120));
-      }
-    }
+    // Автоматический name-search через ГИР БО убран — он упирался в
+    // 522 и делал долгие заведомо неудачные попытки. Остаются только
+    // быстрые пути (локальный справочник, MOEX description). Для
+    // оставшихся бумаг — ручной ввод через «📝 ИНН-мастер».
     if(!inn){ noInnCount++; errors.push(`${b.shortName}: ИНН нет — используй 📝 ИНН-мастер`); continue; }
     if(!unique.has(inn)){
       unique.set(inn, { secid: b.secid, name: info.issuer || info.shortName });
@@ -16748,7 +16734,7 @@ async function moexPullGirboBulk(){
   }
 
   // Результат.
-  const msg = `✓ Готово: обработано ${totalInns} эмитентов (${localHits} через локальный справочник, ${totalInns - localHits} через MOEX/ГИР БО), добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `, ошибок на шаге ГИР БО: ${totalErr}` : '') + (noInnCount ? `, без ИНН: ${noInnCount}` : '');
+  const msg = `✓ Готово: обработано ${totalInns} эмитентов (${localHits} локально, ${totalInns - localHits} через MOEX description), добавлено ${totalOk} периодов, пропущено ${totalSkipped} уже существовавших, новых эмитентов: ${totalNewIssuers}` + (totalErr ? `, ошибок ГИР БО: ${totalErr}` : '') + (noInnCount ? `. Без ИНН: ${noInnCount} эмитентов — открой 📝 ИНН-мастер для ручного ввода.` : '');
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
   if(errors.length){
     console.warn('GIR BO bulk errors:', errors);
