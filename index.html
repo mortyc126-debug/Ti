@@ -1303,6 +1303,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <option value="no_moex">нет выпусков на MOEX</option>
       </select>
     </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <label style="font-size:.54rem;color:var(--text3);white-space:nowrap" title="Фильтр по отрасли (определяется автоматически по ОКВЭД после подтяжки ГИР БО). «Холдинги / SPV» — подозрительные финансовые оболочки выпуска: ОКВЭД 64.20/64.30/70.10/70.22/66.19.">Отрасль:</label>
+      <select id="rep-sidebar-industry" onchange="repRenderIssuerList()"
+        style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 4px;outline:none">
+        <option value="all">все</option>
+      </select>
+    </div>
     <div>
       <div style="font-size:.54rem;color:var(--text3);margin-bottom:2px" title="Отметь годы, в которых должен быть последний отчёт эмитента. Пусто = все годы.">Годы последнего отчёта:</div>
       <div id="rep-sidebar-years" style="display:flex;gap:2px;flex-wrap:wrap"></div>

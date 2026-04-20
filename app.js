@@ -6442,9 +6442,14 @@ function repInit(){
   // Подсветим сохранённый фильтр по типу отчётности.
   document.querySelectorAll('.rep-tf-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.tf === repTypeFilter));
-  // Sidebar со списком эмитентов + чекбоксы годов.
+  // Sidebar со списком эмитентов + чекбоксы годов + фильтр отрасли.
   repRenderYearFilter();
-  repRenderIssuerList();
+  // _indLoad() асинхронный — делаем options после загрузки.
+  if(typeof _indLoad === 'function'){
+    _indLoad().then(() => { repRenderIndustryFilter(); repRenderIssuerList(); }).catch(() => repRenderIssuerList());
+  } else {
+    repRenderIssuerList();
+  }
 }
 
 function repRebuildSelect(){
@@ -6578,12 +6583,33 @@ function _repHasMoexBonds(id, iss){
   return false;
 }
 
+// Рендерит options для select'а отраслей (вызывается один раз после загрузки
+// industry-peers.json).
+function repRenderIndustryFilter(){
+  const sel = document.getElementById('rep-sidebar-industry');
+  if(!sel) return;
+  const cur = sel.value || 'all';
+  const industries = window._industryData?.industries || {};
+  const entries = Object.entries(industries).map(([k, v]) => [k, v?.label || k]);
+  // Сортируем по label, 'other' в конце.
+  entries.sort((a, b) => {
+    if(a[0] === 'other') return 1;
+    if(b[0] === 'other') return -1;
+    return a[1].localeCompare(b[1], 'ru');
+  });
+  sel.innerHTML = '<option value="all">все</option>' + entries.map(([k, label]) =>
+    `<option value="${k}">${_escHtml(label)}</option>`
+  ).join('');
+  if(cur !== 'all' && sel.querySelector(`option[value="${cur}"]`)) sel.value = cur;
+}
+
 function repRenderIssuerList(){
   const listEl = document.getElementById('rep-sidebar-list');
   if(!listEl) return;
   const search = ((document.getElementById('rep-sidebar-search')?.value) || '').trim().toLowerCase();
   const sort = (document.getElementById('rep-sidebar-sort')?.value) || 'name_asc';
   const status = (document.getElementById('rep-sidebar-status')?.value) || 'all';
+  const indFilter = (document.getElementById('rep-sidebar-industry')?.value) || 'all';
   const yearsSel = window._repSidebarYears && window._repSidebarYears.size ? window._repSidebarYears : null;
   const thisYear = new Date().getFullYear();
 
@@ -6606,6 +6632,7 @@ function repRenderIssuerList(){
     if(status === 'no_inn' && hasInn) continue;
     if(status === 'stale' && (!m.year || m.year >= thisYear - 2)) continue;
     if(status === 'no_moex' && _repHasMoexBonds(id, iss)) continue;
+    if(indFilter !== 'all' && (iss.ind || 'other') !== indFilter) continue;
     rows.push({ id, iss, m });
   }
 
@@ -6650,10 +6677,19 @@ function repRenderIssuerList(){
     const deStr  = _repFormatMult(m.de);
     const icrStr = _repFormatMult(m.icr);
     const ddeStr = _repFormatMult(m.dde);
+    // Отрасль (label из industry-peers.json) + подсветка SPV.
+    const indKey = iss.ind || 'other';
+    const indLabel = window._industryData?.industries?.[indKey]?.label || (indKey === 'other' ? 'отрасль?' : indKey);
+    const isSpv = indKey === 'holdings_spv';
+    const indBadgeColor = isSpv ? 'var(--warn)' : (indKey === 'other' ? 'var(--text3)' : 'var(--acc)');
+    const okvedTip = iss.okved ? `ОКВЭД ${iss.okved}${iss.okvedName ? ' — ' + iss.okvedName.slice(0, 80) : ''}` : 'ОКВЭД не известен — запусти «📡 ГИР БО (дописать)»';
     return `
-      <div class="rep-issuer-item" onclick="repSelectIssuerById('${id}')" style="padding:6px 8px;border:1px solid ${active ? 'var(--acc)' : 'var(--border2)'};background:${active ? 'var(--s3)' : 'var(--bg)'};margin-bottom:4px;cursor:pointer;font-size:.62rem">
+      <div class="rep-issuer-item" onclick="repSelectIssuerById('${id}')" style="padding:6px 8px;border:1px solid ${active ? 'var(--acc)' : (isSpv ? 'var(--warn)' : 'var(--border2)')};background:${active ? 'var(--s3)' : 'var(--bg)'};margin-bottom:4px;cursor:pointer;font-size:.62rem">
         <div style="color:${active ? 'var(--acc)' : 'var(--text)'};font-weight:${active ? '600' : '400'};line-height:1.2">${_escHtml(iss.name || 'без имени')}</div>
-        <div style="color:var(--text3);font-size:.52rem;margin-top:1px">${iss.inn ? 'ИНН ' + iss.inn + ' · ' : ''}${periods} периодов${m.year ? ' · посл. ' + m.year : ''}</div>
+        <div style="color:var(--text3);font-size:.52rem;margin-top:1px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+          <span>${iss.inn ? 'ИНН ' + iss.inn + ' · ' : ''}${periods} периодов${m.year ? ' · посл. ' + m.year : ''}</span>
+          <abbr title="${_escHtml(okvedTip)}" style="text-decoration:none;cursor:help;padding:0 4px;background:var(--s2);border:1px solid var(--border2);color:${indBadgeColor};font-size:.5rem">${isSpv ? '🏴 ' : ''}${_escHtml(indLabel)}</abbr>
+        </div>
         <div style="display:flex;gap:6px;margin-top:3px;font-family:var(--mono);font-size:.52rem;color:var(--text2);flex-wrap:wrap">
           <abbr title="ROE = Чистая прибыль / Собственный капитал. Показывает отдачу на капитал акционеров. ≥15% — норма для ВДО; отрицательный — убыток." style="text-decoration:none;cursor:help">ROE <span style="color:${m.roe != null && isFinite(m.roe) ? (m.roe >= 0.15 ? 'var(--green)' : m.roe < 0 ? 'var(--danger)' : 'var(--warn)') : 'var(--text3)'}">${roeStr}</span></abbr>
           <abbr title="Долг/EBITDA = Долг / EBITDA (или EBIT, если EBITDA нет). Закредитованность. ≤3 — нормально; >5 — высокий риск." style="text-decoration:none;cursor:help">Д/Е <span style="color:${m.de != null && isFinite(m.de) ? (m.de <= 3 ? 'var(--green)' : m.de <= 5 ? 'var(--warn)' : 'var(--danger)') : 'var(--text3)'}">${deStr}</span></abbr>
