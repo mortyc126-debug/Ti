@@ -1462,13 +1462,17 @@ function _egrulCaptchaCancel(){
 
 // Универсальный шаг «получить капчу на экран и вернуть значение».
 // Если в ответе нет png — дёргаем отдельный endpoint по токену.
+// Если PNG так и не удалось достать — возвращает специальную
+// метку 'unavailable', чтобы вызывающий код пропустил эмитента,
+// а не зависал с пустой модалкой.
 async function _egrulAskCaptchaFor(captcha, hint){
   let png = captcha.png;
   if(!png && captcha.token){
     png = await _egrulFetchCaptchaPng(captcha.token);
   }
   if(!png){
-    console.warn('[egrul] не удалось получить PNG капчи, token =', captcha.token);
+    console.warn('[egrul] PNG капчи недоступен (все endpoint\'ы вернули 404); эмитент пропускается, доведи через ИНН-мастер. token =', captcha.token);
+    return '__captcha_unavailable__';
   }
   return await _egrulAskCaptcha(png, hint || 'Введи буквы/цифры с картинки.');
 }
@@ -1487,6 +1491,9 @@ async function egrulFindInnByName(query){
     const userVal = await _egrulAskCaptchaFor(captcha, attempts === 0
       ? 'Введи буквы/цифры с картинки.'
       : 'Не распозналось, попробуй ещё раз.');
+    if(userVal === '__captcha_unavailable__'){
+      throw new Error('captcha-unavailable');
+    }
     if(!userVal){ throw new Error('ЕГРЮЛ: капча отменена пользователем'); }
     resp = await _egrulSubmitSearch(q, userVal, captcha.token || '');
     captcha = _egrulExtractCaptcha(resp);
@@ -1501,6 +1508,7 @@ async function egrulFindInnByName(query){
     const cap2 = _egrulExtractCaptcha(result);
     if(cap2){
       const val = await _egrulAskCaptchaFor(cap2);
+      if(val === '__captcha_unavailable__') throw new Error('captcha-unavailable');
       if(!val) throw new Error('ЕГРЮЛ: капча отменена');
       const retry = await _egrulFetchResult(resp.t || resp.queryId, 10000);
       rows = retry.rows || retry.results || null;
@@ -14899,6 +14907,15 @@ async function moexPullGirboBulk(){
           egrulGiveUp = true;
           totalErr++;
           errors.push(`«${meta.name}»: капча ЕГРЮЛ отменена — остальные без ИНН пропускаются`);
+          continue;
+        }
+        if(/captcha-unavailable/.test(e.message)){
+          // Прокси не смог достать PNG капчи с ЕГРЮЛ (endpoint неизвестен
+          // или заблокирован по IP). Пропускаем этого эмитента — добей
+          // вручную через «📝 ИНН-мастер».
+          totalErr++;
+          errors.push(`«${meta.name}»: ЕГРЮЛ просит капчу (недоступна из прокси) — впиши ИНН вручную через 📝 ИНН-мастер`);
+          await new Promise(r => setTimeout(r, 250));
           continue;
         }
         totalErr++;
