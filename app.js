@@ -6367,7 +6367,8 @@ function repInit(){
   // Подсветим сохранённый фильтр по типу отчётности.
   document.querySelectorAll('.rep-tf-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.tf === repTypeFilter));
-  // Sidebar со списком эмитентов.
+  // Sidebar со списком эмитентов + чекбоксы годов.
+  repRenderYearFilter();
   repRenderIssuerList();
 }
 
@@ -6428,12 +6429,61 @@ function _repFormatMult(val, kind){
   return val.toFixed(2);
 }
 
+// Рендер чекбоксов лет: current .. current-10. Вызывается из repInit.
+// Отмеченные годы хранятся в window._repSidebarYears (Set<number>).
+function repRenderYearFilter(){
+  const box = document.getElementById('rep-sidebar-years');
+  if(!box) return;
+  if(!window._repSidebarYears) window._repSidebarYears = new Set();
+  const selected = window._repSidebarYears;
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for(let y = thisYear; y >= thisYear - 10; y--) years.push(y);
+  box.innerHTML = years.map(y => {
+    const active = selected.has(y);
+    return `<button type="button" class="rep-year-chip" data-year="${y}"
+      onclick="repToggleYearFilter(${y})"
+      style="font-size:.54rem;padding:2px 6px;border:1px solid ${active ? 'var(--acc)' : 'var(--border2)'};background:${active ? 'var(--s3)' : 'var(--bg)'};color:${active ? 'var(--acc)' : 'var(--text2)'};cursor:pointer;font-family:var(--mono)">${y}</button>`;
+  }).join('') + `<button type="button" onclick="repClearYearFilter()" title="Сбросить выбор годов" style="font-size:.54rem;padding:2px 6px;border:1px dashed var(--border2);background:var(--bg);color:var(--text3);cursor:pointer">сбросить</button>`;
+}
+function repToggleYearFilter(y){
+  if(!window._repSidebarYears) window._repSidebarYears = new Set();
+  if(window._repSidebarYears.has(y)) window._repSidebarYears.delete(y);
+  else window._repSidebarYears.add(y);
+  repRenderYearFilter();
+  repRenderIssuerList();
+}
+function repClearYearFilter(){
+  window._repSidebarYears = new Set();
+  repRenderYearFilter();
+  repRenderIssuerList();
+}
+
+// Есть ли у эмитента хоть один выпуск в MOEX-каталоге (по issId/ИНН/имени).
+function _repHasMoexBonds(id, iss){
+  const cat = window._moexCatalog;
+  if(!cat || !Array.isArray(cat.items)) return false;
+  const inn = iss?.inn ? String(iss.inn) : '';
+  const normName = (typeof _normIssuerName === 'function' && iss?.name) ? _normIssuerName(iss.name) : '';
+  for(const b of cat.items){
+    if(b.issId === id) return true;
+    if(inn && b.inn && String(b.inn) === inn) return true;
+    if(normName && b.issuer){
+      const n2 = (typeof _normIssuerName === 'function') ? _normIssuerName(b.issuer) : String(b.issuer).toLowerCase();
+      if(n2 && n2 === normName) return true;
+    }
+  }
+  return false;
+}
+
 function repRenderIssuerList(){
   const listEl = document.getElementById('rep-sidebar-list');
   if(!listEl) return;
   const search = ((document.getElementById('rep-sidebar-search')?.value) || '').trim().toLowerCase();
   const sort = (document.getElementById('rep-sidebar-sort')?.value) || 'name_asc';
-  const yearMin = parseInt(document.getElementById('rep-sidebar-year-min')?.value, 10) || 0;
+  const status = (document.getElementById('rep-sidebar-status')?.value) || 'all';
+  const yearsSel = window._repSidebarYears && window._repSidebarYears.size ? window._repSidebarYears : null;
+  const thisYear = new Date().getFullYear();
 
   const rows = [];
   for(const [id, iss] of Object.entries(reportsDB || {})){
@@ -6442,7 +6492,18 @@ function repRenderIssuerList(){
     const inn = String(iss.inn || '').toLowerCase();
     if(search && !name.includes(search) && !inn.includes(search)) continue;
     const m = _repCalcMultipliers(iss);
-    if(yearMin && (!m.year || m.year < yearMin)) continue;
+    // Фильтр по выбранным годам: последний период эмитента должен быть
+    // в одном из отмеченных годов. Ничего не отмечено — любой год ок.
+    if(yearsSel && (!m.year || !yearsSel.has(m.year))) continue;
+    // Фильтр по статусу.
+    const periodCount = Object.keys(iss.periods || {}).length;
+    const hasInn = !!iss.inn;
+    if(status === 'has_periods' && periodCount === 0) continue;
+    if(status === 'no_periods' && periodCount > 0) continue;
+    if(status === 'only_inn' && (periodCount > 0 || !hasInn)) continue;
+    if(status === 'no_inn' && hasInn) continue;
+    if(status === 'stale' && (!m.year || m.year >= thisYear - 2)) continue;
+    if(status === 'no_moex' && _repHasMoexBonds(id, iss)) continue;
     rows.push({ id, iss, m });
   }
 
