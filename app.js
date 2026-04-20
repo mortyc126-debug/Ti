@@ -6335,6 +6335,8 @@ function repInit(){
   // Подсветим сохранённый фильтр по типу отчётности.
   document.querySelectorAll('.rep-tf-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.tf === repTypeFilter));
+  // Sidebar со списком эмитентов.
+  repRenderIssuerList();
 }
 
 function repRebuildSelect(){
@@ -6346,6 +6348,141 @@ function repRebuildSelect(){
     sel.add(new Option(`${iss.name} (${cnt} периодов)`, id));
   });
   if(cur && reportsDB[cur]) sel.value = cur;
+  // Перерисуем sidebar-список (количество периодов и мультипликаторы
+  // могли измениться).
+  if(typeof repRenderIssuerList === 'function') repRenderIssuerList();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIDEBAR СО СПИСКОМ ЭМИТЕНТОВ: поиск, сортировка, фильтр по году.
+// ═══════════════════════════════════════════════════════════════════
+// Мультипликаторы считаются по самому свежему периоду эмитента (с учётом
+// repTypeFilter — МСФО/РСБУ/ГИРБО или все). Подсказки в <abbr title>:
+// при наведении показывается формула — чтобы пользователь не забыл смысл.
+
+function _repLatestPeriod(iss){
+  if(!iss || !iss.periods) return null;
+  const keys = Object.keys(iss.periods);
+  if(!keys.length) return null;
+  // Находим период с максимальным годом.
+  let best = null, bestKey = null;
+  for(const k of keys){
+    const p = iss.periods[k];
+    if(!p) continue;
+    const year = parseInt(p.year || String(k).match(/\d{4}/)?.[0], 10);
+    if(!year) continue;
+    if(!best || year > parseInt(best.year, 10)){
+      best = p;
+      bestKey = k;
+    }
+  }
+  return best ? { period: best, key: bestKey, year: parseInt(best.year, 10) } : null;
+}
+
+function _repCalcMultipliers(iss){
+  const lp = _repLatestPeriod(iss);
+  if(!lp) return { year: null };
+  const p = lp.period;
+  const roe  = (p.np != null && p.eq && p.eq > 0) ? p.np / p.eq : null;
+  const de   = (p.debt != null && p.ebit != null && (p.debt > 0 || p.ebit > 0)) ? (p.debt || 0) / ((p.ebitda != null ? p.ebitda : p.ebit)) : null;
+  const icr  = (p.ebit != null && p.int && p.int > 0) ? p.ebit / p.int : null;
+  const dde  = (p.debt != null && p.eq && p.eq > 0) ? p.debt / p.eq : null;
+  return { year: lp.year, roe, de, icr, dde, rev: p.rev, np: p.np, assets: p.assets };
+}
+
+function _repFormatMult(val, kind){
+  if(val == null || !isFinite(val)) return '—';
+  if(kind === 'pct') return (val * 100).toFixed(1) + '%';
+  return val.toFixed(2);
+}
+
+function repRenderIssuerList(){
+  const listEl = document.getElementById('rep-sidebar-list');
+  if(!listEl) return;
+  const search = ((document.getElementById('rep-sidebar-search')?.value) || '').trim().toLowerCase();
+  const sort = (document.getElementById('rep-sidebar-sort')?.value) || 'name_asc';
+  const yearMin = parseInt(document.getElementById('rep-sidebar-year-min')?.value, 10) || 0;
+
+  const rows = [];
+  for(const [id, iss] of Object.entries(reportsDB || {})){
+    if(!iss || !iss.name) continue;
+    const name = String(iss.name).toLowerCase();
+    const inn = String(iss.inn || '').toLowerCase();
+    if(search && !name.includes(search) && !inn.includes(search)) continue;
+    const m = _repCalcMultipliers(iss);
+    if(yearMin && (!m.year || m.year < yearMin)) continue;
+    rows.push({ id, iss, m });
+  }
+
+  // Сортировка. «best/worst»: для ROE и ICR больше = лучше; для Долг/EBITDA и
+  // D/E меньше = лучше. null уходит в конец в любом порядке.
+  const byField = (field, bestIsHigher, reverse) => (a, b) => {
+    const va = a.m[field], vb = b.m[field];
+    const aOk = va != null && isFinite(va);
+    const bOk = vb != null && isFinite(vb);
+    if(!aOk && !bOk) return a.iss.name.localeCompare(b.iss.name, 'ru');
+    if(!aOk) return 1;
+    if(!bOk) return -1;
+    const cmp = bestIsHigher ? vb - va : va - vb;
+    return reverse ? -cmp : cmp;
+  };
+  if(sort === 'name_asc') rows.sort((a,b) => a.iss.name.localeCompare(b.iss.name, 'ru'));
+  else if(sort === 'name_desc') rows.sort((a,b) => b.iss.name.localeCompare(a.iss.name, 'ru'));
+  else if(sort === 'year_desc') rows.sort((a,b) => (b.m.year || 0) - (a.m.year || 0) || a.iss.name.localeCompare(b.iss.name, 'ru'));
+  else if(sort === 'roe_best') rows.sort(byField('roe', true, false));
+  else if(sort === 'roe_worst') rows.sort(byField('roe', true, true));
+  else if(sort === 'de_best') rows.sort(byField('de', false, false));
+  else if(sort === 'de_worst') rows.sort(byField('de', false, true));
+  else if(sort === 'icr_best') rows.sort(byField('icr', true, false));
+  else if(sort === 'icr_worst') rows.sort(byField('icr', true, true));
+  else if(sort === 'dde_best') rows.sort(byField('dde', false, false));
+  else if(sort === 'dde_worst') rows.sort(byField('dde', false, true));
+
+  const cnt = document.getElementById('rep-sidebar-count');
+  if(cnt) cnt.textContent = String(rows.length);
+
+  if(!rows.length){
+    listEl.innerHTML = `<div style="padding:14px;text-align:center;color:var(--text3);font-size:.6rem">${Object.keys(reportsDB||{}).length ? 'Нет совпадений по фильтру.' : 'Пусто. «＋ Эмитент» справа — создать.'}</div>`;
+    return;
+  }
+
+  const activeId = typeof repActiveIssuerId !== 'undefined' ? repActiveIssuerId : null;
+  const html = rows.map(({id, iss, m}) => {
+    const active = id === activeId;
+    const periods = Object.keys(iss.periods || {}).length;
+    // Мультипликаторы с всплывающими подсказками-формулами.
+    const roeStr = _repFormatMult(m.roe, 'pct');
+    const deStr  = _repFormatMult(m.de);
+    const icrStr = _repFormatMult(m.icr);
+    const ddeStr = _repFormatMult(m.dde);
+    return `
+      <div class="rep-issuer-item" onclick="repSelectIssuerById('${id}')" style="padding:6px 8px;border:1px solid ${active ? 'var(--acc)' : 'var(--border2)'};background:${active ? 'var(--s3)' : 'var(--bg)'};margin-bottom:4px;cursor:pointer;font-size:.62rem">
+        <div style="color:${active ? 'var(--acc)' : 'var(--text)'};font-weight:${active ? '600' : '400'};line-height:1.2">${_escHtml(iss.name || 'без имени')}</div>
+        <div style="color:var(--text3);font-size:.52rem;margin-top:1px">${iss.inn ? 'ИНН ' + iss.inn + ' · ' : ''}${periods} периодов${m.year ? ' · посл. ' + m.year : ''}</div>
+        <div style="display:flex;gap:6px;margin-top:3px;font-family:var(--mono);font-size:.52rem;color:var(--text2);flex-wrap:wrap">
+          <abbr title="ROE = Чистая прибыль / Собственный капитал. Показывает отдачу на капитал акционеров. ≥15% — норма для ВДО; отрицательный — убыток." style="text-decoration:none;cursor:help">ROE <span style="color:${m.roe != null && isFinite(m.roe) ? (m.roe >= 0.15 ? 'var(--green)' : m.roe < 0 ? 'var(--danger)' : 'var(--warn)') : 'var(--text3)'}">${roeStr}</span></abbr>
+          <abbr title="Долг/EBITDA = Долг / EBITDA (или EBIT, если EBITDA нет). Закредитованность. ≤3 — нормально; >5 — высокий риск." style="text-decoration:none;cursor:help">Д/Е <span style="color:${m.de != null && isFinite(m.de) ? (m.de <= 3 ? 'var(--green)' : m.de <= 5 ? 'var(--warn)' : 'var(--danger)') : 'var(--text3)'}">${deStr}</span></abbr>
+          <abbr title="ICR = EBIT / Проценты к уплате. Покрытие процентных расходов прибылью. ≥3 — комфортно; <1.5 — риск дефолта по купонам." style="text-decoration:none;cursor:help">ICR <span style="color:${m.icr != null && isFinite(m.icr) ? (m.icr >= 3 ? 'var(--green)' : m.icr >= 1.5 ? 'var(--warn)' : 'var(--danger)') : 'var(--text3)'}">${icrStr}</span></abbr>
+          <abbr title="D/E = Долг / Собственный капитал. Финансовый рычаг. ≤1 — консервативно; >2 — агрессивная структура." style="text-decoration:none;cursor:help">D/E <span style="color:${m.dde != null && isFinite(m.dde) ? (m.dde <= 1 ? 'var(--green)' : m.dde <= 2 ? 'var(--warn)' : 'var(--danger)') : 'var(--text3)'}">${ddeStr}</span></abbr>
+        </div>
+      </div>
+    `;
+  }).join('');
+  listEl.innerHTML = html;
+}
+
+function _escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Вариант repSelectIssuer, принимающий id явно (для клика по строке
+// sidebar'а). Синхронизирует legacy-select, затем вызывает основной
+// обработчик.
+function repSelectIssuerById(id){
+  const sel = document.getElementById('rep-issuer-sel');
+  if(sel) sel.value = id || '';
+  repSelectIssuer();
+  repRenderIssuerList();
 }
 
 function repSelectIssuer(){

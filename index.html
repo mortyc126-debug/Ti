@@ -1263,10 +1263,50 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
 
+  <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
+  <!-- Sidebar со списком эмитентов: постоянно виден, с поиском, сортировкой
+       по мультипликаторам и фильтром по году последнего отчёта. -->
+  <div id="rep-sidebar" style="width:340px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 120px);display:flex;flex-direction:column;gap:6px;background:var(--s2);border:1px solid var(--border);padding:8px">
+    <div style="display:flex;gap:4px;align-items:center">
+      <input type="search" id="rep-sidebar-search" placeholder="🔎 поиск по имени / ИНН…"
+        oninput="repRenderIssuerList()"
+        style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.64rem;padding:5px 8px;outline:none">
+      <span id="rep-sidebar-count" style="font-size:.54rem;color:var(--text3);min-width:32px;text-align:right">0</span>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <label style="font-size:.54rem;color:var(--text3);white-space:nowrap">Сорт:</label>
+      <select id="rep-sidebar-sort" onchange="repRenderIssuerList()"
+        style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 4px;outline:none">
+        <option value="name_asc">Имя А → Я</option>
+        <option value="name_desc">Имя Я → А</option>
+        <option value="year_desc">Свежесть отчёта (новые сверху)</option>
+        <option value="roe_best">ROE (лучшие сверху)</option>
+        <option value="roe_worst">ROE (худшие сверху)</option>
+        <option value="de_best">Долг/EBITDA (лучшие сверху)</option>
+        <option value="de_worst">Долг/EBITDA (худшие сверху)</option>
+        <option value="icr_best">ICR (лучшие сверху)</option>
+        <option value="icr_worst">ICR (худшие сверху)</option>
+        <option value="dde_best">D/E (лучшие сверху)</option>
+        <option value="dde_worst">D/E (худшие сверху)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <label style="font-size:.54rem;color:var(--text3);white-space:nowrap" title="Показывать только эмитентов, у которых последний отчёт не старше указанного года">Отчёт ≥</label>
+      <input type="number" id="rep-sidebar-year-min" min="2000" max="2030" step="1"
+        placeholder="напр. 2022" oninput="repRenderIssuerList()"
+        style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.6rem;padding:3px 6px;outline:none">
+    </div>
+    <div id="rep-sidebar-list" style="overflow-y:auto;flex:1;min-height:200px;border-top:1px solid var(--border);margin-top:2px;padding-top:4px">
+      <!-- сюда repRenderIssuerList() вставит строки-эмитенты -->
+    </div>
+  </div>
+  <div style="flex:1;min-width:0">
+
   <!-- Toolbar -->
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-    <div class="field" style="min-width:180px;margin:0">
-      <select id="rep-issuer-sel" onchange="repSelectIssuer()" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.72rem;padding:6px 10px;width:100%">
+    <div class="field" style="min-width:180px;margin:0;display:none">
+      <!-- legacy select: скрыт, оставлен чтобы не ломать repRebuildSelect -->
+      <select id="rep-issuer-sel" onchange="repSelectIssuer()">
         <option value="">— выберите эмитента —</option>
       </select>
     </div>
@@ -1350,6 +1390,8 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div id="rep-compare-table"></div>
   </div>
+  </div><!-- /right column -->
+  </div><!-- /flex wrapper -->
 </div>
 
 <!-- Modal: new/edit issuer -->
