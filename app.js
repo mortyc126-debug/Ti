@@ -7397,7 +7397,15 @@ async function repUpdateBuxBalansForActive(){
 async function repUpdateGirboForActive(){
   return _repUpdateFromSource({
     label: 'ГИР БО',
-    fetcher: (inn) => fetchGirboByInn(inn, 10),
+    // ГИР БО ищет по имени, не по ИНН. Передаём имя эмитента (или ИНН
+    // как fallback, хотя он почти всегда вернёт 0). Сверка ИНН — внутри
+    // fetchGirboByInn: если isInn, пытается найти точное совпадение
+    // в ответе.
+    fetcher: (_inn) => {
+      const iss = reportsDB[repActiveIssuerId];
+      const query = iss?.name || _inn;
+      return fetchGirboByInn(query, 10);
+    },
     note: 'ГИР БО'
   });
 }
@@ -15391,13 +15399,25 @@ async function moexPullGirboBulk(updateExisting){
 // чтобы видно было в другой вкладке: «🔄 135/847 · buxbalans + ГИР БО».
 // Существующие периоды не перезаписываются.
 async function moexPullFullBulk(){
+  return _moexPullBulkGeneric({ useBux: true, useGirbo: true, label: 'buxbalans + ГИР БО' });
+}
+
+// Только ГИР БО — отдельная кнопка. Для тех случаев, когда buxbalans
+// либо отсутствует у эмитента, либо отстаёт, либо пользователь хочет
+// сверить с первоисточником.
+async function moexPullGirboOnlyBulk(){
+  return _moexPullBulkGeneric({ useBux: false, useGirbo: true, label: 'ГИР БО' });
+}
+
+async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
   const list = window._moexFilteredCache || [];
   if(!list.length){ alert('Фильтр пуст.'); return; }
-  if(!confirm(`ПОЛНОЕ обновление: ${list.length} выпусков → эмитенты → buxbalans + ГИР БО.\n\nДля каждого эмитента с известным ИНН делается 1 запрос buxbalans (быстро) и до 10+ запросов ГИР БО (если у эмитента нет свежих годов в buxbalans).\n\nОжидаемое время: ~10-15 сек на эмитента. При 100 эмитентах — 15-25 минут. Можно переключиться на другую вкладку — в заголовке видно прогресс.\n\nПродолжить?`)) return;
+  const srcTxt = useBux && useGirbo ? 'buxbalans и ГИР БО последовательно' : useBux ? 'buxbalans' : 'ГИР БО';
+  if(!confirm(`Обновление через ${srcTxt}: ${list.length} выпусков.\n\nДля каждого эмитента с известным ИНН запрашиваются недостающие годы. Существующие периоды не трогаются.\n\n${useGirbo ? 'ГИР БО ищет по ИМЕНИ (не по ИНН) — используем имя из локального справочника, потом сверяем ИНН в результатах. Запрос к ГИР БО занимает 3-10 сек на эмитента.\n\n' : ''}Можно переключиться на другую вкладку — прогресс в заголовке. Продолжить?`)) return;
 
   const status = document.getElementById('moex-status');
   const originalTitle = document.title;
-  const uniqueByInn = new Map(); // inn → {inn, name, sampleSecid}
+  const uniqueByInn = new Map();
   for(const b of list){
     let inn = null, name = null;
     if(b.issId && reportsDB[b.issId]?.inn){
@@ -15409,24 +15429,13 @@ async function moexPullFullBulk(){
     }
     if(!inn) continue;
     if(uniqueByInn.has(inn)) continue;
-    uniqueByInn.set(inn, { inn, name: name || b.shortName || b.secName, sampleSecid: b.secid });
+    uniqueByInn.set(inn, { inn, name: name || b.shortName || b.secName, sampleSecid: b.secid, moexIssuer: b.issuer || null });
   }
   const total = uniqueByInn.size;
   if(!total){
-    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов с известным ИНН. Прогони сначала «📝 ИНН-мастер» или обычный bulk-поиск в ЕГРЮЛ.</span>`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов с известным ИНН.</span>`;
     return;
   }
-
-  // Эвристика: если у эмитента уже есть период за текущий или прошлый
-  // год — пропускаем ГИР БО (buxbalans считаем достаточным).
-  const thisYear = new Date().getFullYear();
-  const hasRecent = (iss) => {
-    if(!iss?.periods) return false;
-    return Object.keys(iss.periods).some(k => {
-      const y = parseInt(String(k).match(/\d{4}/)?.[0], 10);
-      return y && y >= thisYear - 1;
-    });
-  };
 
   let idx = 0, bxOk = 0, grOk = 0, bxErr = 0, grErr = 0, totalAdded = 0;
   const errors = [];
@@ -15436,45 +15445,62 @@ async function moexPullFullBulk(){
     document.title = `🔄 ${progress} · ${meta.name.slice(0, 40)}`;
     if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: «${_escHtml(meta.name)}» (ИНН ${inn})</span>`;
 
-    // Убедимся, что у эмитента есть запись в reportsDB (создадим если надо).
     const issId = _moexEnsureIssuer(inn, meta.name);
     const iss = reportsDB[issId];
 
-    // Шаг A: buxbalans.
-    try {
-      const bx = await fetchBuxBalansByInn(inn, 20);
-      if(bx.count){
-        const r = _repApplyPeriodsFromSeries(iss, bx.series, 'buxbalans');
-        totalAdded += r.added;
-        bxOk++;
+    if(useBux){
+      try {
+        const bx = await fetchBuxBalansByInn(inn, 20);
+        if(bx.count){
+          const r = _repApplyPeriodsFromSeries(iss, bx.series, 'buxbalans');
+          totalAdded += r.added;
+          bxOk++;
+        }
+      } catch(e){
+        bxErr++;
+        errors.push(`${meta.name} (buxbalans): ${e.message}`);
       }
-    } catch(e){
-      bxErr++;
-      errors.push(`${meta.name} (buxbalans): ${e.message}`);
     }
 
-    // Шаг B: ГИР БО — только если в base нет свежего года.
-    if(!hasRecent(iss)){
+    if(useGirbo){
       document.title = `🔄 ${progress} · ГИР БО ${meta.name.slice(0, 30)}`;
-      if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: ГИР БО для «${_escHtml(meta.name)}»…</span>`;
+      if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: ГИР БО по имени «${_escHtml(meta.name)}»…</span>`;
       try {
-        const gr = await fetchGirboByInn(inn, 10);
-        if(gr.count){
+        // ГИР БО ищет по имени, не по ИНН. Пробуем в таком порядке:
+        // 1) moexIssuer (полное юр-имя из MOEX ISSUERNAME)
+        // 2) iss.name из reportsDB (если ранее сохранилось)
+        // 3) meta.name (fallback)
+        const candidates = [meta.moexIssuer, iss?.name, meta.name].filter(Boolean);
+        let gr = null;
+        let lastErr = null;
+        for(const query of candidates){
+          try {
+            const r = await fetchGirboByInn(query, 10);
+            // Проверяем что найденный эмитент — действительно наш (по ИНН).
+            if(r && r.count && (!r.inn || String(r.inn) === String(inn))){
+              gr = r;
+              break;
+            }
+            lastErr = new Error('ИНН в ответе (' + (r?.inn || '—') + ') не совпал с ожидаемым ' + inn);
+          } catch(e){ lastErr = e; }
+        }
+        if(gr && gr.count){
           const r = _repApplyPeriodsFromSeries(iss, gr.series, 'ГИР БО');
           totalAdded += r.added;
           grOk++;
+        } else if(lastErr){
+          grErr++;
+          if(!/Нет годовых|не найден/i.test(lastErr.message || '')){
+            errors.push(`${meta.name} (ГИР БО): ${lastErr.message}`);
+          }
         }
       } catch(e){
         grErr++;
-        // ГИР БО часто пустой по ВДО — не шумим в errors для типичных 0-ошибок.
-        if(!/Нет годовых|не найден/i.test(e.message || '')){
-          errors.push(`${meta.name} (ГИР БО): ${e.message}`);
-        }
+        errors.push(`${meta.name} (ГИР БО): ${e.message}`);
       }
     }
 
     save();
-    // Пауза между эмитентами чтобы не спамить прокси/источники.
     await new Promise(r => setTimeout(r, 400));
   }
 
@@ -15483,21 +15509,22 @@ async function moexPullFullBulk(){
   moexApplyFilters();
   const sbRep = document.getElementById('sb-rep'); if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
 
-  const msg = `✓ Полный прогон: ${total} эмитентов, добавлено ${totalAdded} периодов.\nbuxbalans: OK ${bxOk}, ошибок ${bxErr}. ГИР БО: OK ${grOk}, ошибок ${grErr}.`;
+  const parts = [];
+  if(useBux) parts.push(`buxbalans: OK ${bxOk}, ошибок ${bxErr}`);
+  if(useGirbo) parts.push(`ГИР БО: OK ${grOk}, ошибок ${grErr}`);
+  const msg = `✓ ${label}: ${total} эмитентов, добавлено ${totalAdded} периодов.\n${parts.join('. ')}.`;
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg.replace(/\n/g, '<br>')}</span>`;
   if(errors.length){
-    console.warn('Full bulk errors:', errors);
+    console.warn('Bulk errors:', errors);
     setTimeout(() => {
       if(confirm(msg + `\n\nОшибок: ${errors.length}. Показать первые 10?`)){
         alert(errors.slice(0, 10).join('\n\n'));
       }
     }, 200);
   }
-  // Уведомление если пользователь на другой вкладке.
   if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
-    new Notification('БондАналитик: полное обновление готово', { body: msg });
+    new Notification('БондАналитик: обновление готово', { body: msg });
   } else if(typeof Notification !== 'undefined' && Notification.permission !== 'denied'){
-    // Попросим разрешение на будущее, но не в этот раз (если не было дано).
     Notification.requestPermission().catch(() => {});
   }
 }
