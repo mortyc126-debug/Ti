@@ -1664,10 +1664,14 @@ async function fetchGirboByInn(inn, maxYears = 5){
       errors.push({year: b.year, error: e.message});
     }
   }
+  // ОКВЭД: пробуем из org (search) и из первой bfo-карточки (detail).
+  const okved = _extractOkvedFromGirbo(org) || (annual[0] ? _extractOkvedFromGirbo(annual[0]) : null);
   return {
     series,
     company: org.name || org.shortName || org.fullName || null,
     inn: resolvedInn,
+    okved: okved?.id || null,
+    okvedName: okved?.name || null,
     count: Object.keys(series).length,
     errors
   };
@@ -1694,6 +1698,52 @@ const _IND_SEED_URL = 'references/industry-peers.json';
 window._industryData = null;       // {industries: {key: {label, okved2, peers:[{inn,name}]}}}
 window._industryMedians = null;    // {industryKey: {year: {fid: {p25,p50,p75,n}}}}
 window._indActiveKey = null;
+
+// Классификатор ОКВЭД → ключ отрасли из industry-peers.json.
+// Принимает код вроде "35.11.1" или "64.99" или "35" — возвращает ключ
+// ("utilities") или null если не нашлось. Работает по принципу «самый
+// длинный совпавший префикс побеждает»: для ОКВЭД "64.99" лучше возьмёт
+// "mfi" (окведы ["64.92","64.99"]) чем "banks" (["64","65"]).
+function _okvedToIndustry(okved){
+  if(!okved) return null;
+  const raw = String(okved).trim();
+  if(!raw) return null;
+  const industries = window._industryData?.industries;
+  if(!industries) return null;
+  let bestKey = null, bestLen = -1;
+  for(const [key, ind] of Object.entries(industries)){
+    if(key === 'other') continue;
+    const codes = Array.isArray(ind?.okved2) ? ind.okved2 : [];
+    for(const c of codes){
+      const cs = String(c);
+      if(!cs) continue;
+      // Совпадение если raw начинается с cs И следующий символ — точка
+      // либо конец (чтобы "64" не матчился на "641").
+      const matches = raw === cs || (raw.startsWith(cs) && (raw.charAt(cs.length) === '.' || raw.charAt(cs.length) === ''));
+      if(matches && cs.length > bestLen){
+        bestKey = key;
+        bestLen = cs.length;
+      }
+    }
+  }
+  return bestKey;
+}
+
+// Вытаскивает ОКВЭД из ответа ГИР БО (разные уровни вложенности в JSON).
+function _extractOkvedFromGirbo(orgOrBfo){
+  if(!orgOrBfo || typeof orgOrBfo !== 'object') return null;
+  // Варианты:
+  //   { okved2: "35.30.11" } — верхний уровень (поиск /search)
+  //   { okved2: {id: "35.11.1", name: "..."} } — organizationInfo
+  //   { organizationInfo: { okved2: {...} } } — bfo-элемент
+  const o = orgOrBfo.okved2
+         ?? orgOrBfo.organizationInfo?.okved2
+         ?? orgOrBfo.typeCorrections?.[0]?.correction?.bfoOrganizationInfo?.okved2;
+  if(!o) return null;
+  if(typeof o === 'string') return { id: o, name: null };
+  if(typeof o === 'object' && o.id) return { id: String(o.id), name: o.name || null };
+  return null;
+}
 
 async function _indLoad(){
   if(window._industryData) return window._industryData;
@@ -7496,6 +7546,33 @@ async function repFetchBuxBalansSeries(){
   return _repFetchSeriesGeneric({source: 'buxbalans', fetcher: fetchBuxBalansByInn, maxYears: 15});
 }
 
+// Сохраняет ОКВЭД эмитента и автоматически определяет отрасль, если
+// она ещё не установлена пользователем. Возвращает true если что-то
+// изменилось (для save()). Вызывается после fetchGirboByInn /
+// fetchBuxBalansByInn, где в result есть okved.
+function _repApplyOkved(iss, okved, okvedName){
+  if(!iss) return false;
+  let changed = false;
+  if(okved && iss.okved !== String(okved)){
+    iss.okved = String(okved);
+    changed = true;
+  }
+  if(okvedName && iss.okvedName !== String(okvedName)){
+    iss.okvedName = String(okvedName);
+    changed = true;
+  }
+  // Подставляем отрасль только если она ещё не задана или равна 'other'
+  // (чтобы не затирать ручной выбор пользователя).
+  if((!iss.ind || iss.ind === 'other') && iss.okved){
+    const key = _okvedToIndustry(iss.okved);
+    if(key && key !== iss.ind){
+      iss.ind = key;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 // Применяет series из любого источника (buxbalans/ГИР БО) как периоды
 // в reportsDB[issId].periods. Существующие периоды не трогает —
 // добавляет только те года, которых нет. Возвращает {added, skipped,
@@ -7572,6 +7649,7 @@ async function _repUpdateFromSource({label, fetcher, note}){
     return;
   }
   const r = _repApplyPeriodsFromSeries(iss, data.series, note);
+  _repApplyOkved(iss, data.okved, data.okvedName);
   save();
   repBuildPeriodTabs();
   repRenderIssuerList();
@@ -15488,6 +15566,7 @@ async function moexPullGirboBulk(updateExisting){
     const issId = _moexEnsureIssuer(resolvedInn || ('noInn_' + idx), data.company || meta.name);
     const iss = reportsDB[issId];
     if(resolvedInn && !iss.inn) iss.inn = resolvedInn;
+    _repApplyOkved(iss, data.okved, data.okvedName);
     const existed = Object.keys(iss.periods || {}).length > 0;
     if(!existed) totalNewIssuers++;
     // Сохраняем series в reportsDB.periods.
@@ -15605,6 +15684,7 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
         const bx = await fetchBuxBalansByInn(inn, 20);
         if(bx.count){
           const r = _repApplyPeriodsFromSeries(iss, bx.series, 'buxbalans');
+          _repApplyOkved(iss, bx.okved, bx.okvedName);
           totalAdded += r.added;
           bxOk++;
         }
@@ -15640,6 +15720,7 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
         }
         if(gr && gr.count){
           const r = _repApplyPeriodsFromSeries(iss, gr.series, 'ГИР БО');
+          _repApplyOkved(iss, gr.okved, gr.okvedName);
           totalAdded += r.added;
           grOk++;
         } else {
