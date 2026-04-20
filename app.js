@@ -15384,6 +15384,124 @@ async function moexPullGirboBulk(updateExisting){
 // капча ЕГРЮЛ. Строит таргеты из сохранённых имён и прогоняет тот же
 // алгоритм (ЕГРЮЛ → buxbalans). ЕГРЮЛ часто за 1-2 минуты «забывает»
 // о подозрительности и при повторе пускает без капчи.
+
+// ПОЛНЫЙ bulk: buxbalans → для каждого эмитента ещё ГИР БО, если у
+// него нет свежего года. Долгий — ~10-15 сек на эмитента, планируется
+// на фоновый запуск. Статус пишется и в DOM и в заголовок вкладки,
+// чтобы видно было в другой вкладке: «🔄 135/847 · buxbalans + ГИР БО».
+// Существующие периоды не перезаписываются.
+async function moexPullFullBulk(){
+  const list = window._moexFilteredCache || [];
+  if(!list.length){ alert('Фильтр пуст.'); return; }
+  if(!confirm(`ПОЛНОЕ обновление: ${list.length} выпусков → эмитенты → buxbalans + ГИР БО.\n\nДля каждого эмитента с известным ИНН делается 1 запрос buxbalans (быстро) и до 10+ запросов ГИР БО (если у эмитента нет свежих годов в buxbalans).\n\nОжидаемое время: ~10-15 сек на эмитента. При 100 эмитентах — 15-25 минут. Можно переключиться на другую вкладку — в заголовке видно прогресс.\n\nПродолжить?`)) return;
+
+  const status = document.getElementById('moex-status');
+  const originalTitle = document.title;
+  const uniqueByInn = new Map(); // inn → {inn, name, sampleSecid}
+  for(const b of list){
+    let inn = null, name = null;
+    if(b.issId && reportsDB[b.issId]?.inn){
+      inn = String(reportsDB[b.issId].inn);
+      name = reportsDB[b.issId].name;
+    } else {
+      const local = _moexLocalInnLookup(b.shortName || b.secName);
+      if(local && local.inn){ inn = String(local.inn); name = local.name; }
+    }
+    if(!inn) continue;
+    if(uniqueByInn.has(inn)) continue;
+    uniqueByInn.set(inn, { inn, name: name || b.shortName || b.secName, sampleSecid: b.secid });
+  }
+  const total = uniqueByInn.size;
+  if(!total){
+    if(status) status.innerHTML = `<span style="color:var(--warn)">Нет эмитентов с известным ИНН. Прогони сначала «📝 ИНН-мастер» или обычный bulk-поиск в ЕГРЮЛ.</span>`;
+    return;
+  }
+
+  // Эвристика: если у эмитента уже есть период за текущий или прошлый
+  // год — пропускаем ГИР БО (buxbalans считаем достаточным).
+  const thisYear = new Date().getFullYear();
+  const hasRecent = (iss) => {
+    if(!iss?.periods) return false;
+    return Object.keys(iss.periods).some(k => {
+      const y = parseInt(String(k).match(/\d{4}/)?.[0], 10);
+      return y && y >= thisYear - 1;
+    });
+  };
+
+  let idx = 0, bxOk = 0, grOk = 0, bxErr = 0, grErr = 0, totalAdded = 0;
+  const errors = [];
+  for(const [inn, meta] of uniqueByInn){
+    idx++;
+    const progress = `${idx}/${total}`;
+    document.title = `🔄 ${progress} · ${meta.name.slice(0, 40)}`;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: «${_escHtml(meta.name)}» (ИНН ${inn})</span>`;
+
+    // Убедимся, что у эмитента есть запись в reportsDB (создадим если надо).
+    const issId = _moexEnsureIssuer(inn, meta.name);
+    const iss = reportsDB[issId];
+
+    // Шаг A: buxbalans.
+    try {
+      const bx = await fetchBuxBalansByInn(inn, 20);
+      if(bx.count){
+        const r = _repApplyPeriodsFromSeries(iss, bx.series, 'buxbalans');
+        totalAdded += r.added;
+        bxOk++;
+      }
+    } catch(e){
+      bxErr++;
+      errors.push(`${meta.name} (buxbalans): ${e.message}`);
+    }
+
+    // Шаг B: ГИР БО — только если в base нет свежего года.
+    if(!hasRecent(iss)){
+      document.title = `🔄 ${progress} · ГИР БО ${meta.name.slice(0, 30)}`;
+      if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: ГИР БО для «${_escHtml(meta.name)}»…</span>`;
+      try {
+        const gr = await fetchGirboByInn(inn, 10);
+        if(gr.count){
+          const r = _repApplyPeriodsFromSeries(iss, gr.series, 'ГИР БО');
+          totalAdded += r.added;
+          grOk++;
+        }
+      } catch(e){
+        grErr++;
+        // ГИР БО часто пустой по ВДО — не шумим в errors для типичных 0-ошибок.
+        if(!/Нет годовых|не найден/i.test(e.message || '')){
+          errors.push(`${meta.name} (ГИР БО): ${e.message}`);
+        }
+      }
+    }
+
+    save();
+    // Пауза между эмитентами чтобы не спамить прокси/источники.
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  document.title = originalTitle;
+  window._moexLocalInnMap = null;
+  moexApplyFilters();
+  const sbRep = document.getElementById('sb-rep'); if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+
+  const msg = `✓ Полный прогон: ${total} эмитентов, добавлено ${totalAdded} периодов.\nbuxbalans: OK ${bxOk}, ошибок ${bxErr}. ГИР БО: OK ${grOk}, ошибок ${grErr}.`;
+  if(status) status.innerHTML = `<span style="color:var(--green)">${msg.replace(/\n/g, '<br>')}</span>`;
+  if(errors.length){
+    console.warn('Full bulk errors:', errors);
+    setTimeout(() => {
+      if(confirm(msg + `\n\nОшибок: ${errors.length}. Показать первые 10?`)){
+        alert(errors.slice(0, 10).join('\n\n'));
+      }
+    }, 200);
+  }
+  // Уведомление если пользователь на другой вкладке.
+  if(typeof Notification !== 'undefined' && Notification.permission === 'granted'){
+    new Notification('БондАналитик: полное обновление готово', { body: msg });
+  } else if(typeof Notification !== 'undefined' && Notification.permission !== 'denied'){
+    // Попросим разрешение на будущее, но не в этот раз (если не было дано).
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
 async function moexRetryCaptchaBlocked(){
   const blocked = window._moexCaptchaBlocked || [];
   if(!blocked.length){ alert('Нет эмитентов в списке «капчей-блокированных». Сначала запусти обычный bulk.'); return; }
