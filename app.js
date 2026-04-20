@@ -1544,9 +1544,35 @@ async function fetchGirboByInn(inn, maxYears = 5){
   const query = String(inn).trim();
   const isInn = /^\d{10}(\d{2})?$/.test(query);
 
-  // 1. Поиск организации — по ИНН или по имени.
-  const search = await _girboFetchJson('/advanced-search/organizations/search?query=' + encodeURIComponent(query) + '&page=0&size=20');
-  const orgs = Array.isArray(search) ? search : (search.content || search.organizations || []);
+  // 1. Поиск организации. ГИР БО в новом API имеет несколько endpoint'ов
+  // поиска с разной логикой. Для ИНН надёжнее всего прямой поиск по
+  // параметру `inn=` — query-search ищет по названию и может не найти
+  // (особенно если юр-имя не совпадает с тем, что мы передаём).
+  let orgs = [];
+  const pick = (r) => Array.isArray(r) ? r : (r?.content || r?.organizations || []);
+  if(isInn){
+    // Варианты endpoint'ов для поиска по ИНН — пробуем по очереди до
+    // первого, который вернёт непустой content.
+    const innVariants = [
+      '/advanced-search/organizations/search?inn=' + encodeURIComponent(query),
+      '/advanced-search/organizations/search?inn=' + encodeURIComponent(query) + '&page=0&size=20',
+      '/nbo/organizations/?inn=' + encodeURIComponent(query),
+      '/nbo/organizations/search?inn=' + encodeURIComponent(query)
+    ];
+    for(const path of innVariants){
+      try {
+        const r = await _girboFetchJson(path);
+        const got = pick(r);
+        if(got.length){ orgs = got; console.log('[girbo] search by inn ok:', path, '→', got.length); break; }
+      } catch(_){ /* пробуем следующий */ }
+    }
+  }
+  // Если ничего не нашли по ИНН или передано имя — fallback на поиск
+  // по query= (ищет по названию).
+  if(!orgs.length){
+    const r = await _girboFetchJson('/advanced-search/organizations/search?query=' + encodeURIComponent(query) + '&page=0&size=20');
+    orgs = pick(r);
+  }
   if(!orgs.length) throw new Error('В ГИР БО нет «' + query + '»');
   // Если искали по ИНН — предпочитаем точное совпадение, иначе первый.
   const org = isInn
@@ -7397,14 +7423,16 @@ async function repUpdateBuxBalansForActive(){
 async function repUpdateGirboForActive(){
   return _repUpdateFromSource({
     label: 'ГИР БО',
-    // ГИР БО ищет по имени, не по ИНН. Передаём имя эмитента (или ИНН
-    // как fallback, хотя он почти всегда вернёт 0). Сверка ИНН — внутри
-    // fetchGirboByInn: если isInn, пытается найти точное совпадение
-    // в ответе.
-    fetcher: (_inn) => {
+    // fetchGirboByInn теперь при передаче ИНН сам перебирает endpoint'ы
+    // поиска по inn (inn=…), и fallback на query=… если не нашёл. Отдаём
+    // ИНН первым — он надёжнее для редких/необычных имён компаний.
+    fetcher: async (inn) => {
+      try { return await fetchGirboByInn(inn, 10); } catch(_){}
       const iss = reportsDB[repActiveIssuerId];
-      const query = iss?.name || _inn;
-      return fetchGirboByInn(query, 10);
+      if(iss?.name && iss.name !== inn){
+        return fetchGirboByInn(iss.name, 10);
+      }
+      throw new Error('ГИР БО: не найдено ни по ИНН, ни по имени');
     },
     note: 'ГИР БО'
   });
@@ -15464,39 +15492,40 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
 
     if(useGirbo){
       document.title = `🔄 ${progress} · ГИР БО ${meta.name.slice(0, 30)}`;
-      if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: ГИР БО по имени «${_escHtml(meta.name)}»…</span>`;
+      if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${progress}: ГИР БО по ИНН ${inn}…</span>`;
       try {
-        // ГИР БО ищет по имени, не по ИНН. Пробуем в таком порядке:
-        // 1) moexIssuer (полное юр-имя из MOEX ISSUERNAME)
-        // 2) iss.name из reportsDB (если ранее сохранилось)
-        // 3) meta.name (fallback)
-        const candidates = [meta.moexIssuer, iss?.name, meta.name].filter(Boolean);
+        // Пробуем поиск по ИНН напрямую — fetchGirboByInn сам переберёт
+        // endpoint'ы `?inn=…` и fallback на `?query=…` при необходимости.
         let gr = null;
-        let lastErr = null;
-        for(const query of candidates){
-          try {
-            const r = await fetchGirboByInn(query, 10);
-            // Проверяем что найденный эмитент — действительно наш (по ИНН).
-            if(r && r.count && (!r.inn || String(r.inn) === String(inn))){
-              gr = r;
-              break;
-            }
-            lastErr = new Error('ИНН в ответе (' + (r?.inn || '—') + ') не совпал с ожидаемым ' + inn);
-          } catch(e){ lastErr = e; }
+        try {
+          gr = await fetchGirboByInn(inn, 10);
+        } catch(e1){ /* попробуем по имени ниже */ }
+        // Если по ИНН не нашлось — пробуем по имени (для случаев, когда
+        // ИНН-endpoint у ГИР БО для этой организации не работает).
+        if(!gr || !gr.count){
+          const candidates = [meta.moexIssuer, iss?.name, meta.name].filter(Boolean);
+          for(const q of candidates){
+            if(!q || q === inn) continue;
+            try {
+              const r = await fetchGirboByInn(q, 10);
+              if(r && r.count && (!r.inn || String(r.inn) === String(inn))){
+                gr = r; break;
+              }
+            } catch(_){}
+          }
         }
         if(gr && gr.count){
           const r = _repApplyPeriodsFromSeries(iss, gr.series, 'ГИР БО');
           totalAdded += r.added;
           grOk++;
-        } else if(lastErr){
+        } else {
           grErr++;
-          if(!/Нет годовых|не найден/i.test(lastErr.message || '')){
-            errors.push(`${meta.name} (ГИР БО): ${lastErr.message}`);
-          }
         }
       } catch(e){
         grErr++;
-        errors.push(`${meta.name} (ГИР БО): ${e.message}`);
+        if(!/Нет годовых|не найден/i.test(e.message || '')){
+          errors.push(`${meta.name} (ГИР БО): ${e.message}`);
+        }
       }
     }
 
