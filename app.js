@@ -1393,15 +1393,14 @@ async function _egrulFetchCaptchaPng(token){
 
 function _egrulExtractCaptcha(resp){
   if(!resp || typeof resp !== 'object') return null;
-  const required = resp.captchaRequired === true || resp.captcha === true || /captcha/i.test(resp.status || '');
-  // Прямо вшитая PNG в base64.
-  const png = resp.captchaPng || resp.captchaImage || (typeof resp.captcha === 'string' ? resp.captcha : null) || resp.image || null;
-  // Токен — может называться по-разному.
-  const token = resp.captchaToken || resp.token || resp.t || resp.captchaId || null;
-  if(required || png || (token && /captcha/i.test(JSON.stringify(resp)))){
-    return { png, token };
-  }
-  return null;
+  // Явные признаки капчи: captchaRequired === true ИЛИ пришла готовая
+  // PNG в base64. Поле `t` в ЕГРЮЛ — это идентификатор поискового
+  // запроса (для /search-result/<t>), а НЕ токен капчи. Не путать.
+  const needed = resp.captchaRequired === true;
+  const png = resp.captchaPng || resp.captchaImage || null;
+  if(!needed && !png) return null;
+  const token = resp.captchaToken || resp.captchaId || resp.t || null;
+  return { png, token };
 }
 
 // Показывает модалку с PNG капчи, возвращает Promise<строка-ответ> или null.
