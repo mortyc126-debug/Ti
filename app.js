@@ -14822,6 +14822,8 @@ async function moexPullGirboBulk(){
   const unique = new Map(); // inn → {secid, shortName}
   let totalOk = 0, totalErr = 0, totalSkipped = 0, totalNewIssuers = 0;
   const errors = [];
+  // Те, кому ЕГРЮЛ показал капчу (мы её не достали). Попадут в retry-кнопку.
+  const captchaBlocked = [];
 
   // Шаг 1: группируем бумаги по ИНН эмитента (из локального справочника
   // peers.json + reportsDB). buxbalans ищет только по ИНН — бумаги без
@@ -14910,11 +14912,13 @@ async function moexPullGirboBulk(){
           continue;
         }
         if(/captcha-unavailable/.test(e.message)){
-          // Прокси не смог достать PNG капчи с ЕГРЮЛ (endpoint неизвестен
-          // или заблокирован по IP). Пропускаем этого эмитента — добей
-          // вручную через «📝 ИНН-мастер».
+          // Прокси не смог достать PNG капчи с ЕГРЮЛ. Пропускаем этого
+          // эмитента, но сохраняем в список «капчей-блокированных» —
+          // по нему потом можно точечно прогнать retry (ЕГРЮЛ-капча
+          // нестабильна, при повторе через минуту часто пускает).
           totalErr++;
-          errors.push(`«${meta.name}»: ЕГРЮЛ просит капчу (недоступна из прокси) — впиши ИНН вручную через 📝 ИНН-мастер`);
+          errors.push(`«${meta.name}»: ЕГРЮЛ запросил капчу — попади в «🔁 Повторить для пропущенных»`);
+          captchaBlocked.push({ name: meta.name, sampleSecid: meta.sampleSecid });
           await new Promise(r => setTimeout(r, 250));
           continue;
         }
@@ -14984,13 +14988,21 @@ async function moexPullGirboBulk(){
   // Сбрасываем кэш локального справочника — новые ИНН попадут туда.
   window._moexLocalInnMap = null;
 
+  // Сохраняем список «капчей-блокированных» в глобальный state — для
+  // кнопки «🔁 Повторить для пропущенных». У ЕГРЮЛ капча нестабильная,
+  // через минуту-другую тот же запрос может пройти без неё.
+  window._moexCaptchaBlocked = captchaBlocked;
+
   // Результат.
+  const captchaNote = captchaBlocked.length
+    ? `<br><button class="btn btn-sm" style="margin-top:6px;font-size:.6rem;padding:4px 10px;border-color:var(--warn);color:var(--warn)" onclick="moexRetryCaptchaBlocked()">🔁 Повторить для ${captchaBlocked.length} (капча)</button>`
+    : '';
   const msg = totalInns === 0
     ? `Нет эмитентов для обработки — отфильтруй каталог и попробуй снова.`
-    : `✓ Готово: обработано ${totalInns} эмитентов с известным ИНН, добавлено ${totalOk} периодов, пропущено ${totalSkipped} (существовавших/без ИНН), новых эмитентов: ${totalNewIssuers}` + (totalErr ? `. Не нашлось в buxbalans: ${totalErr}.` : '');
-  if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
+    : `✓ Готово: обработано ${totalInns}, добавлено ${totalOk} периодов, пропущено ${totalSkipped} (существовавших/без ИНН), новых эмитентов: ${totalNewIssuers}` + (totalErr ? `. Ошибок/пропусков: ${totalErr}${captchaBlocked.length ? ` (из них капча: ${captchaBlocked.length})` : ''}.` : '');
+  if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>${captchaNote}`;
   if(errors.length){
-    console.warn('GIR BO bulk errors:', errors);
+    console.warn('bulk errors:', errors);
     setTimeout(() => {
       if(confirm(msg + `\n\nОшибок/пропусков: ${errors.length}. Показать первые 10?`)){
         alert(errors.slice(0, 10).join('\n\n'));
@@ -14998,6 +15010,79 @@ async function moexPullGirboBulk(){
     }, 100);
   }
   moexApplyFilters();
+  const sbRep = document.getElementById('sb-rep');
+  if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+}
+
+// Повторный проход по эмитентам, которых в прошлый bulk отбросила
+// капча ЕГРЮЛ. Строит таргеты из сохранённых имён и прогоняет тот же
+// алгоритм (ЕГРЮЛ → buxbalans). ЕГРЮЛ часто за 1-2 минуты «забывает»
+// о подозрительности и при повторе пускает без капчи.
+async function moexRetryCaptchaBlocked(){
+  const blocked = window._moexCaptchaBlocked || [];
+  if(!blocked.length){ alert('Нет эмитентов в списке «капчей-блокированных». Сначала запусти обычный bulk.'); return; }
+  const status = document.getElementById('moex-status');
+  if(!confirm(`Повторить поиск ИНН в ЕГРЮЛ для ${blocked.length} пропущенных? ЕГРЮЛ нестабильна — часть пройдёт без капчи.`)) return;
+  let ok = 0, stillCaptcha = 0, notFound = 0, errs = 0;
+  const stillBlocked = [];
+  for(let i = 0; i < blocked.length; i++){
+    const b = blocked[i];
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${i+1}/${blocked.length}: «${b.name}»…</span>`;
+    try {
+      const found = await egrulFindInnByName(b.name);
+      if(found && found.inn){
+        // Сразу сохраняем ИНН в заготовку issuer'а.
+        _moexEnsureIssuer(found.inn, found.name || b.name);
+        save();
+        // И тянем отчётность из buxbalans.
+        try {
+          const data = await fetchBuxBalansByInn(found.inn, 15);
+          if(data.count){
+            const issId = _moexEnsureIssuer(found.inn, data.company || found.name || b.name);
+            const iss = reportsDB[issId];
+            const fieldMap = {
+              'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+              'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+              'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+            };
+            for(const [lbl, values] of Object.entries(data.series || {})){
+              const ym = String(lbl).match(/(\d{4})/); if(!ym) continue;
+              const year = ym[1];
+              const pkey = `${year}_FY_ГИРБО`;
+              if(iss.periods[pkey]) continue;
+              const period = { year, period:'FY', type:'ГИРБО', note:'', analysisHTML:'', rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null, assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null };
+              for(const [fid, shortKey] of Object.entries(fieldMap)){ if(values[fid] != null) period[shortKey] = values[fid]; }
+              iss.periods[pkey] = period;
+            }
+            save();
+          }
+          ok++;
+        } catch(e){ errs++; }
+      } else {
+        notFound++;
+      }
+    } catch(e){
+      if(/captcha-unavailable/.test(e.message)){
+        stillCaptcha++;
+        stillBlocked.push(b);
+      } else if(/отменена/.test(e.message)){
+        // Пользователь нажал Отмена — прерываем, оставшихся не трогаем.
+        for(let j = i; j < blocked.length; j++) stillBlocked.push(blocked[j]);
+        break;
+      } else {
+        errs++;
+      }
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  window._moexCaptchaBlocked = stillBlocked;
+  window._moexLocalInnMap = null;
+  moexApplyFilters();
+  const summary = `🔁 Повтор готов: подтянуто ${ok}, не нашлось ${notFound}, снова капча ${stillCaptcha}, ошибок ${errs}.` + (stillBlocked.length ? ` Оставшихся ${stillBlocked.length} можно снова повторить или добить через 📝 ИНН-мастер.` : '');
+  const retryNote = stillBlocked.length
+    ? `<br><button class="btn btn-sm" style="margin-top:6px;font-size:.6rem;padding:4px 10px;border-color:var(--warn);color:var(--warn)" onclick="moexRetryCaptchaBlocked()">🔁 Ещё раз для ${stillBlocked.length}</button>`
+    : '';
+  if(status) status.innerHTML = `<span style="color:var(--green)">${summary}</span>${retryNote}`;
   const sbRep = document.getElementById('sb-rep');
   if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
 }
