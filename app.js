@@ -14560,7 +14560,9 @@ function _moexRenderTable(list){
         <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${b.isin}${matDate}</div>
       </td>
       <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">
-        ${issName ? `<div>${issName}</div>` : ''}
+        ${issName
+          ? `<div><a href="#" onclick="moexOpenIssuerPeek('${b.issId}'); return false" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--border2)" title="Открыть мини-профиль эмитента (не покидая каталог)">${_escHtml(issName)}</a></div>`
+          : ''}
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${typeBadge}${inDbBadge}${floatBadge}${offerBadge}</div>
         ${metricsLine}
       </td>
@@ -15554,12 +15556,96 @@ async function moexSaveInnWizard(){
 
 function moexOpenDossier(issId){
   if(!reportsDB[issId]){ alert('Эмитент не найден в базе'); return; }
-  showPage('reports');
-  setTimeout(() => {
-    const sel = document.getElementById('rep-issuer-sel');
-    if(sel){ sel.value = issId; if(typeof repSelectIssuer === 'function') repSelectIssuer(); }
-    dossierOpen();
-  }, 100);
+  // Не переключаем страницу — открываем досье как модалку поверх каталога.
+  // Достаточно выставить repActiveIssuerId: dossierOpen читает его и
+  // показывает свою модалку #modal-dossier независимо от текущей страницы.
+  repActiveIssuerId = issId;
+  dossierOpen();
+}
+
+// Открывает «мини-профиль» эмитента (модалка поверх каталога Мосбиржи):
+// имя, ИНН, ОКВЭД, последние периоды, выпуски. Закрытие — просто закрывает
+// модалку, пользователь остаётся на странице «🏛 Каталог Мосбиржи».
+// Есть кнопка «📂 Открыть в Базе отчётности» — для тех случаев, когда
+// хочется полноценный вид эмитента с редактированием периодов.
+function moexOpenIssuerPeek(issId){
+  if(!reportsDB[issId]){ alert('Эмитент не найден в базе'); return; }
+  const iss = reportsDB[issId];
+  const m = _repCalcMultipliers(iss);
+  const lp = _repLatestPeriod(iss);
+  const periods = Object.values(iss.periods || {})
+    .slice()
+    .sort((a, b) => (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0))
+    .slice(0, 5);
+  const fmtBln = v => v == null ? '—' : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' млрд';
+  const fmtPct = v => v == null || !isFinite(v) ? '—' : (v * 100).toFixed(1) + '%';
+  const fmtX = v => v == null || !isFinite(v) ? '—' : v.toFixed(2) + '×';
+  const color = (val, good, bad, inverse) => {
+    if(val == null || !isFinite(val)) return 'var(--text3)';
+    if(inverse) return val <= good ? 'var(--green)' : val <= bad ? 'var(--warn)' : 'var(--danger)';
+    return val >= good ? 'var(--green)' : val >= bad ? 'var(--warn)' : 'var(--danger)';
+  };
+  const perRows = periods.map(p => `
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:4px 8px;font-weight:600">${_escHtml(String(p.year || '—'))} · ${_escHtml(p.type || p.period || '')}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono)">${fmtBln(p.rev)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono)">${fmtBln(p.ebit)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono)">${fmtBln(p.np)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono)">${fmtBln(p.assets)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono)">${fmtBln(p.debt)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono)">${fmtBln(p.eq)}</td>
+    </tr>`).join('');
+  const cat = window._moexCatalog;
+  const innStr = iss.inn ? String(iss.inn) : '';
+  const bonds = (cat && Array.isArray(cat.items)) ? cat.items.filter(b => {
+    if(b.issId === issId) return true;
+    if(innStr && b.inn && String(b.inn) === innStr) return true;
+    return false;
+  }) : [];
+  const today = Date.now();
+  const liveBonds = bonds.filter(b => !b.matDate || new Date(b.matDate).getTime() > today);
+  const bondsList = liveBonds.slice(0, 10).map(b => {
+    const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
+    const mat = b.matDate ? b.matDate : '—';
+    return `<span style="display:inline-flex;gap:4px;align-items:center;background:var(--s3);padding:2px 6px;font-size:.58rem;font-family:var(--mono);margin:2px 2px 0 0"><strong>${_escHtml(b.shortName || b.secid)}</strong> YTM ${ytm} · ${mat}</span>`;
+  }).join('');
+  const moreBonds = liveBonds.length > 10 ? `<span style="font-size:.56rem;color:var(--text3)"> и ещё ${liveBonds.length - 10}</span>` : '';
+
+  document.getElementById('issuer-peek-name').textContent = iss.name || '—';
+  document.getElementById('issuer-peek-meta').innerHTML =
+    (iss.inn ? `ИНН <strong>${iss.inn}</strong> · ` : '') +
+    (iss.ind && iss.ind !== 'other' ? `Отрасль <strong>${iss.ind}</strong> · ` : '') +
+    `Периодов: <strong>${Object.keys(iss.periods || {}).length}</strong>` +
+    (m.year ? ` · посл. <strong>${m.year}</strong>` : '');
+  document.getElementById('issuer-peek-mults').innerHTML = `
+    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="ROE = Чистая прибыль / Собственный капитал. ≥15% норма для ВДО." style="cursor:help">ROE</abbr> <span style="color:${color(m.roe, 0.15, 0, false)};font-weight:600">${fmtPct(m.roe)}</span></span>
+    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="Долг/EBITDA. ≤3 хорошо; >5 риск." style="cursor:help">Д/Е</abbr> <span style="color:${color(m.de, 3, 5, true)};font-weight:600">${fmtX(m.de)}</span></span>
+    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="ICR = EBIT / Проценты. ≥3 комфортно; <1.5 риск." style="cursor:help">ICR</abbr> <span style="color:${color(m.icr, 3, 1.5, false)};font-weight:600">${fmtX(m.icr)}</span></span>
+    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="D/E = Долг / Капитал. ≤1 консервативно." style="cursor:help">D/E</abbr> <span style="color:${color(m.dde, 1, 2, true)};font-weight:600">${fmtX(m.dde)}</span></span>`;
+  document.getElementById('issuer-peek-periods').innerHTML = periods.length ? `
+    <table style="width:100%;border-collapse:collapse;font-size:.62rem">
+      <thead><tr style="background:var(--s2);color:var(--text3);font-size:.55rem;letter-spacing:.05em;text-transform:uppercase">
+        <th style="padding:4px 8px;text-align:left">Период</th>
+        <th style="padding:4px 8px;text-align:right">Выручка</th>
+        <th style="padding:4px 8px;text-align:right">EBIT</th>
+        <th style="padding:4px 8px;text-align:right">ЧП</th>
+        <th style="padding:4px 8px;text-align:right">Активы</th>
+        <th style="padding:4px 8px;text-align:right">Долг</th>
+        <th style="padding:4px 8px;text-align:right">Капитал</th>
+      </tr></thead>
+      <tbody>${perRows}</tbody>
+    </table>` : '<div style="padding:8px;color:var(--text3);font-size:.58rem">Периодов нет.</div>';
+  document.getElementById('issuer-peek-bonds').innerHTML = liveBonds.length
+    ? `<div style="margin-top:8px"><div style="font-size:.58rem;color:var(--text3);margin-bottom:4px">💼 Действующих выпусков на MOEX: <strong>${liveBonds.length}</strong></div>${bondsList}${moreBonds}</div>`
+    : '';
+  document.getElementById('issuer-peek-open-full').onclick = () => {
+    document.getElementById('modal-issuer-peek').classList.remove('open');
+    if(typeof showPage === 'function') showPage('reports');
+    setTimeout(() => {
+      if(typeof repSelectIssuerById === 'function') repSelectIssuerById(issId);
+    }, 80);
+  };
+  document.getElementById('modal-issuer-peek').classList.add('open');
 }
 
 // Открывает страницу «📂 База отчётности» и активирует заданного эмитента

@@ -2696,6 +2696,28 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+<!-- Modal: мини-профиль эмитента — быстрый просмотр поверх каталога MOEX.
+     Не покидая страницу «🏛 Каталог Мосбиржи», смотрим последние периоды
+     и мультипликаторы. Кнопка «Открыть в Базе отчётности» — полный переход. -->
+<div class="modal-overlay" id="modal-issuer-peek">
+  <div class="modal" style="width:820px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      <span id="issuer-peek-name">—</span>
+      <button class="modal-x" onclick="closeModal('modal-issuer-peek')">✕</button>
+    </div>
+    <div class="modal-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+      <div id="issuer-peek-meta" style="font-size:.62rem;color:var(--text2)"></div>
+      <div id="issuer-peek-mults" style="display:flex;gap:6px;flex-wrap:wrap;font-size:.62rem;font-family:var(--mono)"></div>
+      <div id="issuer-peek-periods" style="overflow-x:auto"></div>
+      <div id="issuer-peek-bonds"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-issuer-peek')">← Закрыть, вернуться к каталогу</button>
+      <button class="btn btn-p" id="issuer-peek-open-full">📂 Открыть в Базе отчётности</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: объединение эмитентов (слияние по ИНН или вручную) -->
 <div class="modal-overlay" id="modal-merge-issuers">
   <div class="modal" style="width:600px;max-width:96vw">
