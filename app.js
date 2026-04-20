@@ -1217,37 +1217,43 @@ async function fetchAuditItByInn(query, maxYears = 10){
 // Единицы — тыс ₽, формат совместим с _auditItDataToSeries.
 function _buxBalansParseHtml(html){
   if(!html || html.length < 1000) throw new Error('buxbalans: пустой ответ');
-  // Для каждого `data-key='КОД'` ищем хвост до следующего data-key
-  // (или до </table>) и там вытаскиваем все column_YYYY-ячейки.
-  const codeRe = /<span[^>]*data-key=['"](\d{3,4})['"][^>]*>\s*\d+\s*<\/span>/g;
+  // Разбиваем HTML на <tr>...</tr> и в каждой строке ищем data-key (код
+  // РСБУ) + набор ячеек <td class="column_YYYY">значение</td>. Это
+  // устойчивее к вариациям структуры, чем старый способ «слайс до
+  // следующего data-key» — ловит и те строки, где код повторяется в
+  // разных разделах (баланс vs аналитика), и свежие годы, которые
+  // иногда выносятся в отдельные таблицы.
   const data = {};
-  const matches = [];
+  const rowRe = /<tr\b[\s\S]*?<\/tr>/gi;
+  const keyRe = /data-key=['"](\d{3,4})['"]/;
+  const cellRe = /<td\s+class=["']column_(\d{4})["'][^>]*>\s*(-|[\d\-\s\u00A0]+?)(?=\s*<)/g;
+  let rowsFound = 0, cellsAdded = 0;
   let m;
-  while((m = codeRe.exec(html)) !== null){
-    matches.push({ code: m[1], idx: m.index + m[0].length });
-  }
-  for(let i = 0; i < matches.length; i++){
-    const { code, idx } = matches[i];
-    const end = i + 1 < matches.length ? matches[i + 1].idx : Math.min(idx + 8000, html.length);
-    const rowSlice = html.slice(idx, end);
-    // column_YYYY + число (может быть со знаком -, с пробелами-разделителями
-    // тысяч, либо через non-breaking space). Отрезаем до ближайшего <.
-    const cellRe = /<td\s+class=["']column_(\d{4})["'][^>]*>\s*(-|[\d\-\s\u00A0]+?)(?=\s*<)/g;
+  while((m = rowRe.exec(html)) !== null){
+    const row = m[0];
+    const k = row.match(keyRe);
+    if(!k) continue;
+    rowsFound++;
+    const code = k[1];
+    cellRe.lastIndex = 0;
     let c;
-    while((c = cellRe.exec(rowSlice)) !== null){
+    while((c = cellRe.exec(row)) !== null){
       const year = c[1];
       const raw = c[2];
       if(!raw || raw.trim() === '-') continue;
       const n = parseInt(raw.replace(/[\s\u00A0]/g, ''), 10);
       if(!Number.isFinite(n)) continue;
       data[year] = data[year] || { values: {} };
-      // Одна и та же строка РСБУ может встречаться дважды (в балансе и
-      // в разделе аналитики). Первое вхождение — из оригинальной
-      // отчётности, его и берём. Игнорируем последующие.
-      if(data[year].values[code] == null) data[year].values[code] = n;
+      // Первое непустое значение в rows побеждает: обычно оно из
+      // основной таблицы баланса, последующие — дубли в аналитике.
+      if(data[year].values[code] == null){
+        data[year].values[code] = n;
+        cellsAdded++;
+      }
     }
   }
-  // Метаданные.
+  console.log('[buxbalans] parsed rows:', rowsFound, 'cells:', cellsAdded, 'years:', Object.keys(data).sort().join(','));
+
   let company = null;
   const mCompany = html.match(/<title>[^<]*?([«"][^«"»"]+[»"])/);
   if(mCompany) company = mCompany[1].replace(/^["«]|["»]$/g, '').trim();
