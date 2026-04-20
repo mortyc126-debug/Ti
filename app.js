@@ -1611,22 +1611,25 @@ async function fetchGirboByInn(inn, maxYears = 5){
   const errors = [];
   for(const b of annual){
     try {
-      const bfoId = b.id || b.bfoId;
-      // Новая схема ФНС: в элементе bfo сразу лежит typeCorrections[0].correction
-      // с полями .balance и .financialResult (+ capitalChange, fundsMovement).
-      // Старая схема требовала ещё двух запросов. Пробуем новую — если нет,
-      // fallback на старые endpoint'ы.
+      // ФНС /bfo/ возвращает список bfo. Внутри каждого bfo:
+      //   id — идентификатор самого bfo (28601732 для 2025 ТГК-14),
+      //   typeCorrections[0].correction.id — id КОРРЕКЦИИ (56019474),
+      //     именно его принимают /nbo/details/balance?id= и financial_result?id=.
+      // Сами balance/financialResult могут быть либо inline (полный JSON
+      // внутри correction), либо пустыми — тогда подтягиваем отдельно.
       const corr = b?.typeCorrections?.[0]?.correction
                  || b?.corrections?.[0]?.correction
                  || b?.correction
                  || null;
+      const corrId = corr?.id || b.id || b.bfoId;
       let det;
-      if(corr && (corr.balance || corr.financialResult)){
+      if(corr && (corr.balance || corr.financialResult) &&
+         (corr.balance?.current1600 != null || corr.financialResult?.current2110 != null)){
         det = Object.assign({}, corr.balance || {}, corr.financialResult || {});
       } else {
         const [balance, pnl] = await Promise.all([
-          _girboFetchJson('/nbo/details/balance?id=' + bfoId),
-          _girboFetchJson('/nbo/details/financial_result?id=' + bfoId)
+          _girboFetchJson('/nbo/details/balance?id=' + corrId),
+          _girboFetchJson('/nbo/details/financial_result?id=' + corrId)
         ]);
         det = Object.assign({}, balance, pnl);
       }
