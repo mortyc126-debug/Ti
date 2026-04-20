@@ -6429,7 +6429,34 @@ function _repFormatMult(val, kind){
   return val.toFixed(2);
 }
 
-// Рендер чекбоксов лет: current .. current-10. Вызывается из repInit.
+// Рендер чипсов годов последнего отчёта для фильтра каталога MOEX.
+// Выбранные годы хранятся в window._moexSelectedYears (Set<number>).
+function moexRenderYearFilter(){
+  const box = document.getElementById('moex-f-years');
+  if(!box) return;
+  if(!window._moexSelectedYears) window._moexSelectedYears = new Set();
+  const selected = window._moexSelectedYears;
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for(let y = thisYear; y >= thisYear - 10; y--) years.push(y);
+  box.innerHTML = years.map(y => {
+    const active = selected.has(y);
+    return `<button type="button" data-year="${y}" onclick="moexToggleYearFilter(${y})"
+      style="font-size:.54rem;padding:2px 6px;border:1px solid ${active ? 'var(--acc)' : 'var(--border2)'};background:${active ? 'var(--s3)' : 'var(--bg)'};color:${active ? 'var(--acc)' : 'var(--text2)'};cursor:pointer;font-family:var(--mono)">${y}</button>`;
+  }).join('') + `<button type="button" onclick="moexClearYearFilter()" title="Сбросить выбор годов" style="font-size:.54rem;padding:2px 6px;border:1px dashed var(--border2);background:var(--bg);color:var(--text3);cursor:pointer">сбросить</button>`;
+}
+function moexToggleYearFilter(y){
+  if(!window._moexSelectedYears) window._moexSelectedYears = new Set();
+  if(window._moexSelectedYears.has(y)) window._moexSelectedYears.delete(y);
+  else window._moexSelectedYears.add(y);
+  moexRenderYearFilter();
+  moexApplyFilters();
+}
+function moexClearYearFilter(){
+  window._moexSelectedYears = new Set();
+  moexRenderYearFilter();
+  moexApplyFilters();
+}
 // Отмеченные годы хранятся в window._repSidebarYears (Set<number>).
 function repRenderYearFilter(){
   const box = document.getElementById('rep-sidebar-years');
@@ -14143,6 +14170,7 @@ const _MOEX_BASE_BOARD = 'https://iss.moex.com/iss/engines/stock/markets/bonds/b
 function moexInit(){
   if(!window._moexCatalog) _moexLoadCache();
   _moexRenderMeta();
+  moexRenderYearFilter();
   moexApplyFilters();
 }
 
@@ -14557,6 +14585,16 @@ function moexApplyFilters(){
       if(sizeM == null || sizeM < f.sizeMin) return false;
     }
     if(f.inDbOnly && !b.issId) return false;
+    // Фильтр «Год последнего отчёта эмитента»: бумаги проходят только
+    // если у эмитента в reportsDB последний период попал в отмеченный
+    // год. Без эмитента или без отчётности — отсекаем. Ничего не
+    // отмечено — фильтр не работает.
+    if(window._moexSelectedYears && window._moexSelectedYears.size){
+      if(!b.issId) return false;
+      const iss = reportsDB[b.issId];
+      const lp = iss ? _repLatestPeriod(iss) : null;
+      if(!lp || !lp.year || !window._moexSelectedYears.has(lp.year)) return false;
+    }
     // Фундамент-фильтры: если включены — нужен matched эмитент
     // с посчитанными мультипликаторами.
     if(fundActive){
