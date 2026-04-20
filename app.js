@@ -6518,6 +6518,76 @@ function repSelectIssuer(){
   const dosBtn = document.getElementById('rep-dossier-btn'); if(dosBtn) dosBtn.style.display='';
   repBuildPeriodTabs();
   _repSyncPeriodToolbar();
+  _repRenderIssuerBonds();
+}
+
+// Показывает все выпуски активного эмитента из MOEX-каталога: по ИНН
+// (точное совпадение) либо по issId (_moexMatchIssuer уже связал).
+function _repRenderIssuerBonds(){
+  const box = document.getElementById('rep-issuer-bonds');
+  if(!box) return;
+  const iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
+  if(!iss){ box.innerHTML = ''; return; }
+  const cat = window._moexCatalog;
+  if(!cat || !Array.isArray(cat.items) || !cat.items.length){ box.innerHTML = ''; return; }
+  const today = Date.now();
+  const innStr = iss.inn ? String(iss.inn) : '';
+  const bonds = cat.items.filter(b => {
+    if(b.issId && b.issId === repActiveIssuerId) return true;
+    if(innStr && b.inn && String(b.inn) === innStr) return true;
+    if(iss.name && b.issuer){
+      const n1 = (typeof _normIssuerName === 'function') ? _normIssuerName(iss.name) : String(iss.name).toLowerCase();
+      const n2 = (typeof _normIssuerName === 'function') ? _normIssuerName(b.issuer) : String(b.issuer).toLowerCase();
+      if(n1 && n1 === n2) return true;
+    }
+    return false;
+  });
+  if(!bonds.length){
+    box.innerHTML = `<div style="font-size:.58rem;color:var(--text3);padding:6px 10px;background:var(--s2);border:1px solid var(--border)">📭 Выпуски этого эмитента в каталоге MOEX не найдены. Обнови каталог («🏛 Каталог Мосбиржи» → «🔄 Обновить»).</div>`;
+    return;
+  }
+  bonds.sort((a, b) => {
+    const am = a.matDate ? new Date(a.matDate).getTime() : Infinity;
+    const bm = b.matDate ? new Date(b.matDate).getTime() : Infinity;
+    const aLive = am > today ? 0 : 1;
+    const bLive = bm > today ? 0 : 1;
+    if(aLive !== bLive) return aLive - bLive;
+    return am - bm;
+  });
+  const rows = bonds.map(b => {
+    const mat = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
+    const matLabel = mat != null ? (mat > 0 ? mat.toFixed(1) + ' л' : '<span style="color:var(--text3)">погашен</span>') : '—';
+    const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
+    const coup = b.coupon != null ? b.coupon.toFixed(2) + '%' : '—';
+    const sizeM = b.issueSize && b.faceValue ? Math.round(b.issueSize * b.faceValue / 1e6).toLocaleString('ru-RU') + ' млн' : '—';
+    const ytmColor = b.ytm > 20 ? 'var(--warn)' : b.ytm > 15 ? 'var(--green)' : 'var(--text)';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:3px 8px"><strong>${_escHtml(b.shortName || b.secid)}</strong> <span style="color:var(--text3);font-family:var(--mono);font-size:.54rem">${_escHtml(b.isin || b.secid)}</span></td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:${ytmColor}"><strong>${ytm}</strong></td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${coup}</td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${matLabel}${b.matDate ? `<span style="color:var(--text3);font-size:.54rem"> (${b.matDate})</span>` : ''}</td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${sizeM}</td>
+      <td style="padding:3px 8px;text-align:right"><button class="btn btn-sm" onclick="moexAddToYtm('${b.secid}')" style="padding:1px 6px;font-size:.52rem" title="Добавить в Сравнение YTM">+ YTM</button></td>
+    </tr>`;
+  }).join('');
+  box.innerHTML = `
+    <details style="background:var(--s2);border:1px solid var(--border)" open>
+      <summary style="cursor:pointer;padding:6px 10px;font-size:.62rem;color:var(--text)">💼 Выпуски эмитента на MOEX: <strong>${bonds.length}</strong></summary>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.6rem">
+          <thead><tr style="background:var(--s3);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
+            <th style="padding:4px 8px;text-align:left">Бумага</th>
+            <th style="padding:4px 8px;text-align:right">YTM</th>
+            <th style="padding:4px 8px;text-align:right">Купон</th>
+            <th style="padding:4px 8px;text-align:right">Срок</th>
+            <th style="padding:4px 8px;text-align:right">Объём</th>
+            <th style="padding:4px 8px"></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </details>
+  `;
 }
 
 // Видимость кнопок «✎ Редактировать / 🗑 Удалить период» — ON, если у
@@ -14328,14 +14398,71 @@ function moexApplyFilters(){
   // Прокидываем cache в рендер, чтобы показать мини-профиль без повторных расчётов.
   window._moexMetricsCache = metricsCache;
 
+  // Сортировки. Для фундаментальных — достаём мультипликаторы эмитента
+  // из reportsDB (через _moexIssuerMetrics + metricsCache). Бумаги без
+  // значения уходят в конец в любом направлении.
+  const _getMetric = (b, field) => {
+    if(!b.issId) return null;
+    const m = _moexIssuerMetrics(b.issId, metricsCache);
+    if(!m) return null;
+    if(field === 'de')  return m.debtEbitda;
+    if(field === 'icr') return m.icr;
+    if(field === 'roa') return m.roa;
+    if(field === 'ebm') return m.ebitdaMargin;
+    if(field === 'roe' || field === 'dde'){
+      // ROE и D/E в metricsCache нет — считаем на лету из reportsDB.
+      const iss = reportsDB[b.issId];
+      const lp = _repLatestPeriod(iss);
+      if(!lp) return null;
+      const p = lp.period;
+      if(field === 'roe') return (p.np != null && p.eq && p.eq > 0) ? p.np / p.eq : null;
+      if(field === 'dde') return (p.debt != null && p.eq && p.eq > 0) ? p.debt / p.eq : null;
+    }
+    return null;
+  };
+  const byMetric = (field, bestIsHigher, reverse) => (a, b) => {
+    const va = _getMetric(a, field), vb = _getMetric(b, field);
+    const aOk = va != null && isFinite(va);
+    const bOk = vb != null && isFinite(vb);
+    if(!aOk && !bOk) return 0;
+    if(!aOk) return 1;
+    if(!bOk) return -1;
+    const cmp = bestIsHigher ? vb - va : va - vb;
+    return reverse ? -cmp : cmp;
+  };
+
   const cmp = {
     'ytm-desc': (a,b) => (b.ytm||-999) - (a.ytm||-999),
     'ytm-asc':  (a,b) => (a.ytm||999) - (b.ytm||999),
     'mat-asc':  (a,b) => (a.matYears||999) - (b.matYears||999),
     'mat-desc': (a,b) => (b.matYears||-999) - (a.matYears||-999),
     'name-asc': (a,b) => String(a.shortName||'').localeCompare(String(b.shortName||''), 'ru'),
+    'name-desc':(a,b) => String(b.shortName||'').localeCompare(String(a.shortName||''), 'ru'),
+    'issuer-asc':(a,b) => {
+      const na = a.issId ? (reportsDB[a.issId]?.name || '') : (a.issuer || '');
+      const nb = b.issId ? (reportsDB[b.issId]?.name || '') : (b.issuer || '');
+      return String(na).localeCompare(String(nb), 'ru');
+    },
     'coupon-desc':(a,b) => (b.coupon||-999) - (a.coupon||-999),
+    'coupon-asc': (a,b) => (a.coupon||999) - (b.coupon||999),
+    'price-desc': (a,b) => (b.price||-999) - (a.price||-999),
+    'price-asc':  (a,b) => (a.price||999) - (b.price||999),
     'size-desc':(a,b) => ((b.issueSize||0) * (b.faceValue||0)) - ((a.issueSize||0) * (a.faceValue||0)),
+    'size-asc': (a,b) => ((a.issueSize||0) * (a.faceValue||0)) - ((b.issueSize||0) * (b.faceValue||0)),
+    'list-asc': (a,b) => (a.listLevel||99) - (b.listLevel||99),
+    // Фундаменталы: «лучшие сверху» / «худшие сверху» с учётом смысла.
+    'de-best':   byMetric('de', false, false),
+    'de-worst':  byMetric('de', false, true),
+    'icr-best':  byMetric('icr', true, false),
+    'icr-worst': byMetric('icr', true, true),
+    'roa-best':  byMetric('roa', true, false),
+    'roa-worst': byMetric('roa', true, true),
+    'roe-best':  byMetric('roe', true, false),
+    'roe-worst': byMetric('roe', true, true),
+    'dde-best':  byMetric('dde', false, false),
+    'dde-worst': byMetric('dde', false, true),
+    'ebm-best':  byMetric('ebm', true, false),
+    'ebm-worst': byMetric('ebm', true, true),
   }[f.sort];
   if(cmp) filtered.sort(cmp);
 
@@ -14392,8 +14519,9 @@ function _moexRenderTable(list){
     const actions = `
       <button class="btn btn-sm" onclick="moexAddToYtm('${b.secid}')" title="Добавить в Сравнение YTM" style="padding:2px 6px;font-size:.54rem">+ YTM</button>
       ${b.issId
-        ? `<button class="btn btn-sm" onclick="moexOpenDossier('${b.issId}')" title="Открыть досье эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📇</button>`
-        : `<button class="btn btn-sm" onclick="moexPullGirbo('${b.secid}')" title="Подтянуть РСБУ из ГИР БО по ИНН эмитента и создать его в базе (5 лет годовой отчётности ФНС). После этого мультипликаторы появятся прямо в этой строке." style="padding:2px 6px;font-size:.54rem;margin-left:4px;border-color:var(--acc);color:var(--acc)">📡</button>`}
+        ? `<button class="btn btn-sm" onclick="moexOpenDossier('${b.issId}')" title="Открыть досье эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📇</button>
+           <button class="btn btn-sm" onclick="moexOpenInReports('${b.issId}')" title="Перейти в «📂 База отчётности» и открыть этого эмитента" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📂</button>`
+        : `<button class="btn btn-sm" onclick="moexPullGirbo('${b.secid}')" title="Подтянуть РСБУ по ИНН эмитента. После этого мультипликаторы появятся прямо в этой строке." style="padding:2px 6px;font-size:.54rem;margin-left:4px;border-color:var(--acc);color:var(--acc)">📡</button>`}
     `;
     const ytmColor = b.ytm > 20 ? 'var(--warn)' : b.ytm > 15 ? 'var(--green)' : 'var(--text)';
     // Мини-профиль эмитента: Долг/EBITDA, ICR, ROA, EBITDA-маржа, рейтинг.
@@ -15431,6 +15559,21 @@ function moexOpenDossier(issId){
     const sel = document.getElementById('rep-issuer-sel');
     if(sel){ sel.value = issId; if(typeof repSelectIssuer === 'function') repSelectIssuer(); }
     dossierOpen();
+  }, 100);
+}
+
+// Открывает страницу «📂 База отчётности» и активирует заданного эмитента
+// (без открытия досье — просто его профиль с периодами и графиками).
+function moexOpenInReports(issId){
+  if(!reportsDB[issId]){ alert('Эмитент не найден в базе отчётности'); return; }
+  showPage('reports');
+  setTimeout(() => {
+    if(typeof repSelectIssuerById === 'function'){
+      repSelectIssuerById(issId);
+    } else {
+      const sel = document.getElementById('rep-issuer-sel');
+      if(sel){ sel.value = issId; if(typeof repSelectIssuer === 'function') repSelectIssuer(); }
+    }
   }, 100);
 }
 

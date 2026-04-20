@@ -1335,6 +1335,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <!-- Issuer view -->
   <div id="rep-issuer-view" style="display:none">
+    <!-- Выпуски эмитента из MOEX-каталога — показываются если в каталоге
+         находятся бумаги с совпадающим ИНН или issId. -->
+    <div id="rep-issuer-bonds" style="margin-bottom:14px"></div>
     <!-- Type filter (ГИРБО visibility) -->
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <span style="font-size:.56rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase">Тип отчётности:</span>
@@ -2015,13 +2018,36 @@ document.addEventListener('DOMContentLoaded', () => {
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
         <select id="moex-sort" onchange="moexApplyFilters()" style="font-size:.65rem;padding:2px 4px">
-          <option value="ytm-desc">YTM ↓</option>
-          <option value="ytm-asc">YTM ↑</option>
-          <option value="mat-asc">Срок ↑</option>
-          <option value="mat-desc">Срок ↓</option>
-          <option value="name-asc">Имя А–Я</option>
-          <option value="coupon-desc">Купон ↓</option>
-          <option value="size-desc">Объём ↓</option>
+          <optgroup label="Параметры выпуска">
+            <option value="ytm-desc">YTM ↓ (выше)</option>
+            <option value="ytm-asc">YTM ↑ (ниже)</option>
+            <option value="mat-asc">Срок ↑ (короче)</option>
+            <option value="mat-desc">Срок ↓ (длиннее)</option>
+            <option value="coupon-desc">Купон ↓</option>
+            <option value="coupon-asc">Купон ↑</option>
+            <option value="price-desc">Цена ↓</option>
+            <option value="price-asc">Цена ↑</option>
+            <option value="size-desc">Объём ↓</option>
+            <option value="size-asc">Объём ↑</option>
+            <option value="list-asc">Уровень листинга ↑</option>
+            <option value="name-asc">Имя А–Я</option>
+            <option value="name-desc">Имя Я–А</option>
+            <option value="issuer-asc">Эмитент А–Я</option>
+          </optgroup>
+          <optgroup label="Фундаментал эмитента">
+            <option value="de-best">Долг/EBITDA (лучшие сверху)</option>
+            <option value="de-worst">Долг/EBITDA (худшие сверху)</option>
+            <option value="icr-best">ICR (лучшие сверху)</option>
+            <option value="icr-worst">ICR (худшие сверху)</option>
+            <option value="roe-best">ROE (лучшие сверху)</option>
+            <option value="roe-worst">ROE (худшие сверху)</option>
+            <option value="roa-best">ROA (лучшие сверху)</option>
+            <option value="roa-worst">ROA (худшие сверху)</option>
+            <option value="dde-best">D/E (лучшие сверху)</option>
+            <option value="dde-worst">D/E (худшие сверху)</option>
+            <option value="ebm-best">EBITDA-маржа (лучшие сверху)</option>
+            <option value="ebm-worst">EBITDA-маржа (худшие сверху)</option>
+          </optgroup>
         </select>
       </label>
     </div>
