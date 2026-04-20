@@ -1586,9 +1586,20 @@ async function fetchGirboByInn(inn, maxYears = 5){
   const bfoListResp = await _girboFetchJson('/nbo/organizations/' + orgId + '/bfo/');
   const bfoList = Array.isArray(bfoListResp) ? bfoListResp : (bfoListResp.content || bfoListResp.bfo || []);
   // Только годовые, отсортированы от новых к старым.
+  // Только годовые. Новая схема ФНС: period = строка "2025", periodType = 12
+  // (см. typeCorrections[0].type и bfoPeriodTypes). Старая: period = "год"/"year".
+  const _isAnnual = (b) => {
+    if(/^\d{4}$/.test(String(b.period || ''))) return true;
+    if(/year|год/i.test(b.period || b.bfoPeriod || '')) return true;
+    if(b.periodType === 'YEAR' || b.periodType === 12) return true;
+    if(Array.isArray(b.bfoPeriodTypes) && b.bfoPeriodTypes.includes(12)) return true;
+    if(b.year && !b.quarter) return true;
+    return false;
+  };
+  const _yearOf = (b) => parseInt(b.period || b.year || '0', 10) || 0;
   const annual = bfoList
-    .filter(b => /year|год/i.test(b.period || b.bfoPeriod || '') || b.periodType === 'YEAR' || (b.year && !b.quarter))
-    .sort((a, b) => (b.year || 0) - (a.year || 0))
+    .filter(_isAnnual)
+    .sort((a, b) => _yearOf(b) - _yearOf(a))
     .slice(0, maxYears);
   if(!annual.length) throw new Error('Нет годовых отчётов в ГИР БО');
 
@@ -1601,16 +1612,27 @@ async function fetchGirboByInn(inn, maxYears = 5){
   for(const b of annual){
     try {
       const bfoId = b.id || b.bfoId;
-      const [balance, pnl] = await Promise.all([
-        _girboFetchJson('/nbo/details/balance?id=' + bfoId),
-        _girboFetchJson('/nbo/details/financial_result?id=' + bfoId)
-      ]);
-      const det = Object.assign({}, balance, pnl);
-      // Сам ответ содержит current{code} и previous{code} — есть две
-      // соседние года в одном файле. Возьмём оба, чтобы получить больше
-      // лет за меньшее число запросов.
-      const yearMain = b.year || det.year;
+      // Новая схема ФНС: в элементе bfo сразу лежит typeCorrections[0].correction
+      // с полями .balance и .financialResult (+ capitalChange, fundsMovement).
+      // Старая схема требовала ещё двух запросов. Пробуем новую — если нет,
+      // fallback на старые endpoint'ы.
+      const corr = b?.typeCorrections?.[0]?.correction
+                 || b?.corrections?.[0]?.correction
+                 || b?.correction
+                 || null;
+      let det;
+      if(corr && (corr.balance || corr.financialResult)){
+        det = Object.assign({}, corr.balance || {}, corr.financialResult || {});
+      } else {
+        const [balance, pnl] = await Promise.all([
+          _girboFetchJson('/nbo/details/balance?id=' + bfoId),
+          _girboFetchJson('/nbo/details/financial_result?id=' + bfoId)
+        ]);
+        det = Object.assign({}, balance, pnl);
+      }
+      const yearMain = b.year || (b.period ? parseInt(b.period, 10) : null) || det.year;
       const yearPrev = yearMain ? yearMain - 1 : null;
+      const yearBeforePrev = yearMain ? yearMain - 2 : null;
       const buildVals = (kind) => {
         const v = {};
         for(const [fid, code] of Object.entries(_GIRBO_FIELD_MAP)){
@@ -1621,10 +1643,7 @@ async function fetchGirboByInn(inn, maxYears = 5){
             if(typeof x === 'number'){ sum += x; any = true; }
           }
           if(any){
-            // Строки 2330 (проценты к уплате) и 2410 (налог на прибыль)
-            // в РСБУ-отчёте — это расходы; у нас они хранятся как
-            // положительные магнитуды. В XML/JSON от ГИР БО значение
-            // иногда приходит со знаком минус — нормализуем.
+            // Строки 2330/2410 — расходы (храним магнитудой, без знака).
             const isExpense = fid === 'rep-np-int' || (Array.isArray(code) ? false : code === '2410');
             v[fid] = (isExpense ? Math.abs(sum) : sum) / 1e6; // тыс ₽ → млрд ₽
           }
@@ -1635,6 +1654,9 @@ async function fetchGirboByInn(inn, maxYears = 5){
       if(cur && yearMain) series[_periodLabel(yearMain, 'FY')] = cur;
       const prev = buildVals('previous');
       if(prev && yearPrev) series[_periodLabel(yearPrev, 'FY')] = series[_periodLabel(yearPrev, 'FY')] || prev;
+      // Новая схема — есть ещё beforePrevious (позапрошлый год).
+      const bprev = buildVals('beforePrevious');
+      if(bprev && yearBeforePrev) series[_periodLabel(yearBeforePrev, 'FY')] = series[_periodLabel(yearBeforePrev, 'FY')] || bprev;
     } catch(e){
       errors.push({year: b.year, error: e.message});
     }
