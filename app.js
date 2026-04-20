@@ -7357,31 +7357,11 @@ async function repFetchBuxBalansSeries(){
   return _repFetchSeriesGeneric({source: 'buxbalans', fetcher: fetchBuxBalansByInn, maxYears: 15});
 }
 
-// Подтягивает отчётность с buxbalans для активного эмитента и
-// ДОПИСЫВАЕТ недостающие годы как периоды reportsDB[issId].periods.
-// В отличие от repFetchBuxBalansSeries (который строит reference-для-сверки),
-// эта функция сохраняет данные в основную базу и не перезаписывает
-// уже существующие периоды — только добавляет новые.
-async function repUpdateBuxBalansForActive(){
-  if(!repActiveIssuerId){ alert('Сначала выберите эмитента в списке слева.'); return; }
-  const iss = reportsDB[repActiveIssuerId];
-  const inn = iss?.inn;
-  if(!inn){ alert('У эмитента не сохранён ИНН. Отредактируйте эмитента (✎) и впишите ИНН — тогда buxbalans сможет его найти.'); return; }
-  const box = document.getElementById('rep-np-ref-result');
-  const wrap = document.getElementById('rep-np-ref-wrap');
-  if(wrap) wrap.style.display = 'block';
-  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ buxbalans по ИНН ${inn}…</div>`;
-  let data;
-  try {
-    data = await fetchBuxBalansByInn(inn, 20);
-  } catch(e){
-    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ buxbalans: ${e.message}</div>`;
-    return;
-  }
-  if(!data.count){
-    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ buxbalans ничего не вернул для ИНН ${inn}.</div>`;
-    return;
-  }
+// Применяет series из любого источника (buxbalans/ГИР БО) как периоды
+// в reportsDB[issId].periods. Существующие периоды не трогает —
+// добавляет только те года, которых нет. Возвращает {added, skipped,
+// addedYears}.
+function _repApplyPeriodsFromSeries(iss, series, note){
   const fieldMap = {
     'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
     'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
@@ -7389,13 +7369,13 @@ async function repUpdateBuxBalansForActive(){
   };
   let added = 0, skipped = 0;
   const addedYears = [];
-  for(const [lbl, values] of Object.entries(data.series || {})){
+  for(const [lbl, values] of Object.entries(series || {})){
     const ym = String(lbl).match(/(\d{4})/);
     if(!ym) continue;
     const year = ym[1];
     const pkey = `${year}_FY_ГИРБО`;
     if(iss.periods[pkey]){ skipped++; continue; }
-    const period = { year, period:'FY', type:'ГИРБО', note:'buxbalans', analysisHTML:'', rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null, assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null };
+    const period = { year, period:'FY', type:'ГИРБО', note: note || '', analysisHTML:'', rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null, assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null };
     for(const [fid, shortKey] of Object.entries(fieldMap)){
       if(values[fid] != null) period[shortKey] = values[fid];
     }
@@ -7403,16 +7383,55 @@ async function repUpdateBuxBalansForActive(){
     added++;
     addedYears.push(year);
   }
+  return { added, skipped, addedYears };
+}
+
+async function repUpdateBuxBalansForActive(){
+  return _repUpdateFromSource({
+    label: 'buxbalans',
+    fetcher: (inn) => fetchBuxBalansByInn(inn, 20),
+    note: 'buxbalans'
+  });
+}
+
+async function repUpdateGirboForActive(){
+  return _repUpdateFromSource({
+    label: 'ГИР БО',
+    fetcher: (inn) => fetchGirboByInn(inn, 10),
+    note: 'ГИР БО'
+  });
+}
+
+async function _repUpdateFromSource({label, fetcher, note}){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента в списке слева.'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  const inn = iss?.inn;
+  if(!inn){ alert('У эмитента не сохранён ИНН. Отредактируйте эмитента (✎) и впишите ИНН — тогда ' + label + ' сможет его найти.'); return; }
+  const box = document.getElementById('rep-np-ref-result');
+  const wrap = document.getElementById('rep-np-ref-wrap');
+  if(wrap) wrap.style.display = 'block';
+  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ ${label} по ИНН ${inn}…</div>`;
+  let data;
+  try {
+    data = await fetcher(inn);
+  } catch(e){
+    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ${label}: ${e.message}</div>`;
+    return;
+  }
+  if(!data.count){
+    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ ${label} ничего не вернул для ИНН ${inn}.</div>`;
+    return;
+  }
+  const r = _repApplyPeriodsFromSeries(iss, data.series, note);
   save();
   repBuildPeriodTabs();
   repRenderIssuerList();
   _repRenderIssuerBonds();
-  if(box){
-    if(added){
-      box.innerHTML = `<div style="color:var(--green);font-size:.6rem">✓ Добавлено ${added} новых годов: ${addedYears.sort().join(', ')}. Существовавших периодов не тронуто (${skipped}).</div>`;
-    } else {
-      box.innerHTML = `<div style="color:var(--text3);font-size:.6rem">ℹ Все ${skipped} годов уже есть в базе. Если хочешь перезаписать — удали нужные периоды (🗑) и запусти снова.</div>`;
-    }
+  if(!box) return;
+  if(r.added){
+    box.innerHTML = `<div style="color:var(--green);font-size:.6rem">✓ ${label}: добавлено ${r.added} новых годов (${r.addedYears.sort().join(', ')}). Существовавших периодов не тронуто (${r.skipped}).</div>`;
+  } else {
+    box.innerHTML = `<div style="color:var(--text3);font-size:.6rem">ℹ ${label}: все ${r.skipped} годов уже есть в базе. Если хочешь перезаписать — удали нужные периоды (🗑) и запусти снова.</div>`;
   }
 }
 async function _repFetchSeriesGeneric({source, fetcher, maxYears}){
