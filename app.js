@@ -1307,6 +1307,25 @@ async function fetchBuxBalansByInn(inn, maxYears = 15){
 // раз переделывал API). На первом живом тесте возможна правка парсинга —
 // ниже стоят гибкие detect'ы признаков капчи и ИНН.
 
+// Вычищает из строки-названия типовые хвосты выпусков облигаций, чтобы
+// в ЕГРЮЛ улетало ЧИСТОЕ имя эмитента. Без этого «ВОСТОК-ОЙЛ БО-01»
+// ищется как текст и первый матч — «БО \"БЕНЕФИЦИУМ\"» (совпадение по «БО»).
+function _cleanIssuerQuery(raw){
+  if(!raw) return raw;
+  let s = String(raw).trim();
+  // «выпуск N», «серия N», «вып. N» и далее — отрезаем.
+  s = s.replace(/\s+(выпуск|серия|вып\.?)\s.*$/i, '');
+  // Типичные коды выпусков: «БО-01», «ПБО-03», «БО П2», «001P-10R»,
+  // «1Р-20R», «П-БО-05» и т.п. Ключевой признак — сочетание букв
+  // с дефисом/цифрой сразу после пробела, у корня русского/латинского.
+  s = s.replace(/\s+[A-ZА-ЯЁ]{1,4}[-\s.]*\d+[A-ZА-ЯЁ\-\d.]*$/i, '');
+  s = s.replace(/\s+\d{1,4}[PРS][-\s.]*\d+[A-ZА-ЯЁ]?$/i, '');
+  s = s.replace(/\s+\d+[РPR][-\s.]*\d+[A-ZА-ЯЁ]?$/i, '');
+  // Убираем одиночные «-N» в самом хвосте.
+  s = s.replace(/\s*[-—]\s*\d+\s*$/i, '');
+  return s.trim();
+}
+
 async function _egrulSubmitSearch(query, captchaValue, captchaToken){
   // POST /
   const url = _egrulMakeUrl('/');
@@ -1361,18 +1380,27 @@ async function _egrulFetchResult(queryId, maxWaitMs){
 // несколько вариантов, возвращаем base64 картинки или null.
 async function _egrulFetchCaptchaPng(token){
   if(!token) return null;
+  const t = encodeURIComponent(token);
   const paths = [
-    '/static/captcha.bin?a=' + encodeURIComponent(token),
-    '/captcha.jpg?a=' + encodeURIComponent(token),
-    '/captcha.png?a=' + encodeURIComponent(token),
-    '/captcha.bin?a=' + encodeURIComponent(token),
-    '/vyp3Captcha.do?a=' + encodeURIComponent(token)
+    '/static/captcha.bin?a=' + t,
+    '/captcha.jpg?a=' + t,
+    '/captcha.png?a=' + t,
+    '/captcha.bin?a=' + t,
+    '/vyp3Captcha.do?a=' + t,
+    '/static/captcha?a=' + t,
+    '/captcha?a=' + t,
+    '/captcha-image?a=' + t,
+    '/captcha.bin?t=' + t,
+    '/captcha-dialog?a=' + t,
+    '/c/' + t
   ];
   for(const p of paths){
     try {
-      const r = await fetch(_egrulMakeUrl(p), {headers: {'Accept': 'image/*'}});
-      if(!r.ok) continue;
+      const url = _egrulMakeUrl(p);
+      const r = await fetch(url, {headers: {'Accept': 'image/*'}});
       const ct = r.headers.get('content-type') || '';
+      console.log('[egrul] captcha try', p, '→', r.status, ct);
+      if(!r.ok) continue;
       if(!/^image/i.test(ct)) continue;
       const blob = await r.blob();
       if(blob.size < 200) continue;
@@ -1386,7 +1414,9 @@ async function _egrulFetchCaptchaPng(token){
         reader.onerror = () => rej(new Error('FileReader error'));
         reader.readAsDataURL(blob);
       });
-    } catch(e){ /* пробуем следующий */ }
+    } catch(e){
+      console.log('[egrul] captcha try', p, 'ошибка', e.message);
+    }
   }
   return null;
 }
@@ -1445,7 +1475,10 @@ async function _egrulAskCaptchaFor(captcha, hint){
 
 async function egrulFindInnByName(query){
   if(!query || String(query).trim().length < 2) return null;
-  const q = String(query).trim();
+  // Очищаем хвосты выпусков — иначе ЕГРЮЛ возвращает нерелевантные
+  // совпадения по коду «БО», «ПБО» и т.п.
+  const q = _cleanIssuerQuery(String(query).trim());
+  if(!q || q.length < 2) return null;
   // Шаг 1 — первичный POST.
   let resp = await _egrulSubmitSearch(q, '', '');
   let captcha = _egrulExtractCaptcha(resp);
