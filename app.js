@@ -7356,6 +7356,65 @@ async function repFetchGirboSeries(){
 async function repFetchBuxBalansSeries(){
   return _repFetchSeriesGeneric({source: 'buxbalans', fetcher: fetchBuxBalansByInn, maxYears: 15});
 }
+
+// Подтягивает отчётность с buxbalans для активного эмитента и
+// ДОПИСЫВАЕТ недостающие годы как периоды reportsDB[issId].periods.
+// В отличие от repFetchBuxBalansSeries (который строит reference-для-сверки),
+// эта функция сохраняет данные в основную базу и не перезаписывает
+// уже существующие периоды — только добавляет новые.
+async function repUpdateBuxBalansForActive(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента в списке слева.'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  const inn = iss?.inn;
+  if(!inn){ alert('У эмитента не сохранён ИНН. Отредактируйте эмитента (✎) и впишите ИНН — тогда buxbalans сможет его найти.'); return; }
+  const box = document.getElementById('rep-np-ref-result');
+  const wrap = document.getElementById('rep-np-ref-wrap');
+  if(wrap) wrap.style.display = 'block';
+  if(box) box.innerHTML = `<div style="color:var(--warn);font-size:.6rem">⏳ buxbalans по ИНН ${inn}…</div>`;
+  let data;
+  try {
+    data = await fetchBuxBalansByInn(inn, 20);
+  } catch(e){
+    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ buxbalans: ${e.message}</div>`;
+    return;
+  }
+  if(!data.count){
+    if(box) box.innerHTML = `<div style="color:var(--danger);font-size:.6rem">❌ buxbalans ничего не вернул для ИНН ${inn}.</div>`;
+    return;
+  }
+  const fieldMap = {
+    'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+    'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+    'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+  };
+  let added = 0, skipped = 0;
+  const addedYears = [];
+  for(const [lbl, values] of Object.entries(data.series || {})){
+    const ym = String(lbl).match(/(\d{4})/);
+    if(!ym) continue;
+    const year = ym[1];
+    const pkey = `${year}_FY_ГИРБО`;
+    if(iss.periods[pkey]){ skipped++; continue; }
+    const period = { year, period:'FY', type:'ГИРБО', note:'buxbalans', analysisHTML:'', rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null, assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null };
+    for(const [fid, shortKey] of Object.entries(fieldMap)){
+      if(values[fid] != null) period[shortKey] = values[fid];
+    }
+    iss.periods[pkey] = period;
+    added++;
+    addedYears.push(year);
+  }
+  save();
+  repBuildPeriodTabs();
+  repRenderIssuerList();
+  _repRenderIssuerBonds();
+  if(box){
+    if(added){
+      box.innerHTML = `<div style="color:var(--green);font-size:.6rem">✓ Добавлено ${added} новых годов: ${addedYears.sort().join(', ')}. Существовавших периодов не тронуто (${skipped}).</div>`;
+    } else {
+      box.innerHTML = `<div style="color:var(--text3);font-size:.6rem">ℹ Все ${skipped} годов уже есть в базе. Если хочешь перезаписать — удали нужные периоды (🗑) и запусти снова.</div>`;
+    }
+  }
+}
 async function _repFetchSeriesGeneric({source, fetcher, maxYears}){
   const SOURCE_LABELS = {
     girbo: { name: 'ГИР БО', emoji: '📡', autoSource: 'ГИР БО', refSource: 'ГИР БО (прокси)' },
@@ -15081,15 +15140,22 @@ async function moexPullGirbo(secid){
   if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
 }
 
-async function moexPullGirboBulk(){
+async function moexPullGirboBulk(updateExisting){
   const list = window._moexFilteredCache || [];
-  const targets = list.filter(b => !b.issId);
+  // По умолчанию берём только бумаги, эмитента которых ещё НЕТ в базе
+  // (обычный сценарий — «подтяни новых»). Если позвали с updateExisting=true
+  // (кнопка «🔄 Обновить недостающие годы»), берём ВСЕ бумаги из фильтра —
+  // для существующих эмитентов buxbalans доберёт годы, которых нет в periods.
+  const targets = updateExisting ? list : list.filter(b => !b.issId);
   if(!targets.length){
-    alert('Нет выпусков, эмитент которых НЕ в базе — ничего подтягивать. Сузь фильтр до бумаг без мини-профиля.');
+    alert(updateExisting
+      ? 'Фильтр пуст — нечего обновлять.'
+      : 'Нет выпусков, эмитент которых НЕ в базе. Если хочешь дозапросить свежие годы для существующих — жми «🔄 Обновить недостающие годы».');
     return;
   }
   if(targets.length > 30){
-    if(!confirm(`В текущем фильтре ${targets.length} выпусков без matched эмитента. Это может быть 10-30 уникальных эмитентов (одна компания = несколько выпусков). Подтяжка ~1-2 сек на эмитента через прокси ГИР БО. Продолжить?`)) return;
+    const verb = updateExisting ? 'обновить' : 'подтянуть';
+    if(!confirm(`В текущем фильтре ${targets.length} выпусков. Это может быть 10-30 уникальных эмитентов. ${verb} ~1-2 сек на эмитента через прокси. Продолжить?`)) return;
   }
   const status = document.getElementById('moex-status');
   const unique = new Map(); // inn → {secid, shortName}
@@ -15112,11 +15178,19 @@ async function moexPullGirboBulk(){
     // «на поиск через ЕГРЮЛ» (по имени). ЕГРЮЛ может запросить капчу —
     // модалка предложит её ввести (одна капча обычно разблокирует 20-50
     // последующих запросов).
+    // Если эмитент уже в базе (b.issId) — берём его ИНН из reportsDB,
+    // чтобы в режиме «обновить недостающие» тоже попал в очередь.
+    let existingInn = null;
+    if(b.issId && reportsDB[b.issId]?.inn){
+      existingInn = String(reportsDB[b.issId].inn);
+    }
     const local = _moexLocalInnLookup(b.shortName || b.secName);
-    if(local && local.inn){
-      const key = local.inn;
+    const resolvedInn = (local && local.inn) || existingInn;
+    if(resolvedInn){
+      const key = resolvedInn;
       if(!unique.has(key)){
-        unique.set(key, { inn: local.inn, name: local.name || b.shortName || b.secName, sampleSecid: b.secid });
+        const resolvedName = (local && local.name) || reportsDB[b.issId]?.name || b.shortName || b.secName;
+        unique.set(key, { inn: resolvedInn, name: resolvedName, sampleSecid: b.secid });
       }
     } else {
       // Для ЕГРЮЛ нужен максимально полный текст имени эмитента.

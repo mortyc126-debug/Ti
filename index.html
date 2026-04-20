@@ -1493,7 +1493,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru">📋 Импорт JSON</button>
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
-            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН (агрегатор ФНС+Росстат, хранит удалённые данные, до 11+ лет истории)">📊 buxbalans</button>
+            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН как эталон для сверки (не сохраняется в периоды, только отображается)">📊 buxbalans (сверка)</button>
+            <button type="button" class="btn btn-sm" onclick="repUpdateBuxBalansForActive()" title="Подтянуть данные с buxbalans.ru по ИНН активного эмитента и ДОПИСАТЬ недостающие годы как периоды в базу. Существующие периоды не перезаписываются — только добавляются новые.">🔄 buxbalans (дописать)</button>
             <button type="button" class="btn btn-sm" onclick="repOpenAuditItForInn()" title="Открыть страницу audit-it.ru по ИНН — 2015-2025, глубже ГИР БО. Цифры копируются в форму периода вручную (серверный парсинг audit-it блокирует anti-bot'ом).">📗 audit-it</button>
             <button type="button" class="btn btn-sm" onclick="repOpenCheckoForInn()" title="Открыть страницу checko.ru по ИНН — ЕГРЮЛ, аффилированные компании, руководители, базовые финансовые показатели. Для просмотра в живом браузере, серверный парсинг недоступен.">🔎 checko</button>
             <button type="button" class="btn btn-sm" onclick="repOpenEgrulForInn()" title="ЕГРЮЛ (официальный сайт ФНС). ИНН копируется в буфер, открывается страница поиска — вставь Ctrl+V и нажми Enter. Первоисточник всех справочных данных.">🏛 ЕГРЮЛ</button>
@@ -2012,6 +2013,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
       <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте «📝 ИНН-мастер».">📊 buxbalans для эмитентов в фильтре</button>
+      <button class="btn btn-sm" onclick="moexPullGirboBulk(true)" title="Пройти по ВСЕМ эмитентам в фильтре (в том числе уже существующим в базе) и добавить недостающие годы с buxbalans.ru. Существующие периоды не перезаписываются — только дописываются новые. Используй, когда данные устарели.">🔄 Обновить недостающие годы</button>
       <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
