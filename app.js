@@ -14848,6 +14848,12 @@ async function moexPullGirboBulk(){
         if(found && found.inn){
           meta.inn = found.inn;
           if(found.name) meta.name = found.name;
+          // Сохраняем заготовку issuer-а прямо сейчас: если bulk прервётся
+          // на buxbalans-шаге (капча, таймаут, ошибка), то при следующем
+          // запуске _moexLocalInnLookup найдёт этот ИНН по имени и ЕГРЮЛ
+          // уже не дёрнется — капчу решать не придётся.
+          _moexEnsureIssuer(found.inn, found.name || meta.name);
+          save();
         } else {
           totalErr++;
           errors.push(`«${meta.name}»: ЕГРЮЛ не нашёл`);
