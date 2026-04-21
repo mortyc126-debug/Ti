@@ -1850,8 +1850,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <select id="cross-metric" onchange="crossRender()" style="font-size:.7rem;padding:3px 6px;min-width:220px"></select>
       </div>
       <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Фильтр по имени</label>
-        <input type="text" id="cross-filter" oninput="crossRender()" placeholder="например: лизинг" style="font-size:.7rem;padding:3px 6px;width:160px">
+        <label style="font-size:.55rem">Отрасль</label>
+        <select id="cross-industry" onchange="crossRender()" style="font-size:.7rem;padding:3px 6px;min-width:170px">
+          <option value="">Все</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0" title="Несколько имён через запятую — любое совпадение проходит (OR). Напр.: «сбер, втб, лукойл» покажет все три плюс вариации.">
+        <label style="font-size:.55rem">Фильтр по имени (через запятую)</label>
+        <input type="text" id="cross-filter" oninput="crossRender()" placeholder="сбер, втб, лукойл" style="font-size:.7rem;padding:3px 6px;width:200px">
       </div>
       <label style="font-size:.6rem;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer">
         <input type="checkbox" id="cross-same-scope" onchange="crossRender()" style="margin:0"> только той же scope

@@ -6139,7 +6139,7 @@ function crossSetView(mode, btn){
   crossRender();
 }
 
-function crossInit(){
+async function crossInit(){
   crossBuildPeriodSelector();
   crossBuildMetricSelector();
   // Подсвечиваем активную кнопку вида.
@@ -6148,6 +6148,11 @@ function crossInit(){
   });
   const mw = document.getElementById('cross-metric-wrap');
   if(mw) mw.style.display = _crossViewMode === 'bar' ? '' : 'none';
+  // Отраслевой селект нуждается в _industryData — подгружаем при первом заходе.
+  if(typeof _indLoad === 'function' && !window._industryData){
+    try { await _indLoad(); } catch(_){}
+  }
+  _crossFillIndustrySelect();
   crossRender();
 }
 
@@ -6178,13 +6183,19 @@ function _crossPickRow(iss, issId, year, period, scopeFilter){
 
 // Все эмитенты периода, с сырыми значениями по всем метрикам.
 function _crossCollectAll(periodKey, opts){
-  const filter = (opts.filter || '').trim().toLowerCase();
+  // Многотокенный поиск: «сбер, втб, лукойл» → любое из трёх ⇒ пройдёт (OR).
+  // Пустые токены после split'а игнорируются. Если токенов нет — фильтр не активен.
+  const tokens = String(opts.filter || '').toLowerCase().split(',')
+    .map(s => s.trim()).filter(Boolean);
+  const industry = (opts.industry || '').trim();
   const scopeFilter = opts.scopeFilter || null;
   const [yearStr, period] = periodKey.split('_');
   const year = +yearStr;
   const out = [];
   for(const [issId, iss] of Object.entries(reportsDB || {})){
-    if(filter && !String(iss?.name || '').toLowerCase().includes(filter)) continue;
+    const name = String(iss?.name || '').toLowerCase();
+    if(tokens.length && !tokens.some(t => name.includes(t))) continue;
+    if(industry && (iss?.ind || 'other') !== industry) continue;
     const row = _crossPickRow(iss, issId, year, period, scopeFilter);
     if(!row) continue;
     row.values = {};
@@ -6195,6 +6206,24 @@ function _crossCollectAll(periodKey, opts){
     out.push(row);
   }
   return out;
+}
+
+// Заполняет селект отраслей в «📊 Сравнение компаний» из _industryData.
+// Сохраняет выбор пользователя между рендерами.
+function _crossFillIndustrySelect(){
+  const sel = document.getElementById('cross-industry');
+  if(!sel) return;
+  const industries = window._industryData?.industries || {};
+  const cur = sel.value;
+  const entries = Object.entries(industries).map(([k, v]) => [k, v?.label || k]);
+  entries.sort((a, b) => {
+    if(a[0] === 'other') return 1;
+    if(b[0] === 'other') return -1;
+    return a[1].localeCompare(b[1], 'ru');
+  });
+  sel.innerHTML = '<option value="">Все отрасли</option>' +
+    entries.map(([k, label]) => `<option value="${k}">${label}</option>`).join('');
+  if(cur) sel.value = cur;
 }
 
 // Перцентиль-rank каждой компании по каждой метрике: 0 = худший,
@@ -6288,8 +6317,10 @@ function crossToggleAll(on){
 function crossRender(){
   crossBuildPeriodSelector();
   crossBuildMetricSelector();
+  _crossFillIndustrySelect();
   const periodKey = document.getElementById('cross-period')?.value || '';
   const filter    = document.getElementById('cross-filter')?.value || '';
+  const industry  = document.getElementById('cross-industry')?.value || '';
   const sameScopeChk = document.getElementById('cross-same-scope')?.checked;
   const chart  = document.getElementById('cross-chart');
   const status = document.getElementById('cross-status');
@@ -6316,7 +6347,7 @@ function crossRender(){
     }
     scopeFilter = Object.entries(freq).sort((a,b) => b[1] - a[1])[0]?.[0] || null;
   }
-  const rows = _crossCollectAll(periodKey, {filter, scopeFilter});
+  const rows = _crossCollectAll(periodKey, {filter, industry, scopeFilter});
   const ranks = _crossRanks(rows);
   window._crossLast = {rows, ranks, periodKey, scopeFilter};
   _crossRenderCompanies(rows);
