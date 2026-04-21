@@ -6868,11 +6868,10 @@ function _repStressScore(iss, opts){
   const prev = prior ? _computeStressFromPeriod(prior.period, iss.inn, 730) : null;
   const yearsBack = prior ? (lp.year - prior.year) : null;
 
-  // Красный флажок «долг обгоняет прибыль»: если за lookback период долг
-  // вырос заметно быстрее EBITDA — это скрытый риск даже при нормальном
-  // моментальном score. Порог 1.5× (долг растёт минимум в 1.5 раза
-  // быстрее прибыли). Не влияет на сам score, только индикация.
-  let debtOutpacingEbitda = null; // null = не посчитано, true/false = факт
+  // Соотношение роста долга к росту EBITDA за lookback-окно — если >1,
+  // каждый новый рубль долга даёт меньше операционки на обслуживание.
+  // Лидирующий индикатор: вырос раньше Altman/ICR.
+  let debtOutpacingEbitda = null;
   let debtRatio = null, ebitdaRatio = null;
   if(prior){
     const curEbitda = lp.period.ebitda != null ? lp.period.ebitda : lp.period.ebit;
@@ -6887,12 +6886,46 @@ function _repStressScore(iss, opts){
     }
   }
 
+  // Штраф за «долг обгоняет прибыль»: линейный, 1.0→0 баллов, 2.4+→−35.
+  // Применяем к базовому 3-компонентному score, чтобы леверидж-динамика
+  // реально роняла оценку в красную зону, а не оставалась бейджиком.
+  // Для тренда: пытаемся посчитать тот же штраф для прошлого периода
+  // (сравнивая prior vs 3 года до prior), чтобы дельта считалась
+  // согласованно (apples to apples).
+  const leveragePenalty = k => {
+    if(k == null) return 0;
+    if(k <= 1.0) return 0;
+    return Math.min(35, Math.round((k - 1.0) * 25));
+  };
+  const curPenalty = leveragePenalty(debtOutpacingEbitda);
+  const finalScore = cur.score != null ? Math.max(0, cur.score - curPenalty) : null;
+
+  // Штраф для прошлого score — нужна ещё одна «до-прошлая» точка.
+  let priorOutpace = null;
+  if(prior){
+    const priorPrior = _repPriorAnnualPeriod(dataIss, prior, 3)
+                    || _repPriorAnnualPeriod(dataIss, prior, 2)
+                    || _repPriorAnnualPeriod(dataIss, prior, 1);
+    if(priorPrior){
+      const pEb = prior.period.ebitda != null ? prior.period.ebitda : prior.period.ebit;
+      const ppEb = priorPrior.period.ebitda != null ? priorPrior.period.ebitda : priorPrior.period.ebit;
+      if(prior.period.debt != null && priorPrior.period.debt != null
+         && priorPrior.period.debt > 0 && pEb != null && ppEb != null && ppEb > 0){
+        priorOutpace = (prior.period.debt / priorPrior.period.debt) / (pEb / ppEb);
+      }
+    }
+  }
+  const priorPenalty = leveragePenalty(priorOutpace);
+  const finalPriorScore = prev && prev.score != null ? Math.max(0, prev.score - priorPenalty) : null;
+
   return {
-    score: cur.score, year: lp.year, usedParent,
+    score: finalScore, year: lp.year, usedParent,
+    baseScore: cur.score,              // 3-компонентный, до штрафа (для досье/дебага)
+    leveragePenalty: curPenalty,       // 0-35 баллов
     debtWallScore: cur.debtWallScore, debtWallRatio: cur.debtWallRatio, maturing24m: cur.maturingSum,
     stressIcrScore: cur.stressIcrScore, stressIcrVal: cur.stressIcrVal,
     altmanScore: cur.altmanScore, altmanZ: cur.altmanZ,
-    priorScore: prev ? prev.score : null,
+    priorScore: finalPriorScore,
     priorYear: prior ? prior.year : null,
     priorYearsBack: yearsBack,
     debtOutpacingEbitda, debtRatio, ebitdaRatio,
@@ -7219,7 +7252,8 @@ function _repRenderActiveIssuerHeader(){
     const suffix = yrs > 1 ? ` (${yrs}г)` : '';
     trendHtml = `<span style="font-size:.6rem;color:${color};font-family:var(--mono);margin-left:6px" title="Запас прочности ${yrs} ${yrs<5?'года':'лет'} назад был ${st.priorScore} (${st.priorYear}); сейчас ${st.score}. Тренд важнее уровня — устойчивая компания может ехать к проблемам, если score падает несколько лет подряд.">${arrow} ${sign}${delta} vs ${st.priorYear}${suffix}</span>`;
   }
-  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nВеса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
+  const penaltyNote = st.leveragePenalty > 0 ? `\nШтраф «долг обгоняет прибыль»: −${st.leveragePenalty} (базовый ${st.baseScore} − штраф = ${st.score}).` : '';
+  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nБазовые веса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.\nСверху линейный штраф 0..−35 если за lookback-окно долг рос быстрее EBITDA (k>1.0 → штраф начинает набегать, k≥2.4 → максимум −35).${penaltyNote}${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
   const stTile = `
     <div style="margin-top:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${stTooltip}">
       <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}${st.usedParent ? ' <span style="color:var(--purple);font-size:.5rem;border:1px solid var(--purple);padding:0 4px;margin-left:4px" title="Расчёт по данным материнской компании (у самого эмитента нет отчётности или включён тумблер)">мамы</span>' : ''}</div>
