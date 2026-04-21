@@ -136,6 +136,24 @@ function priceAtY(coupon,years,ytmPct){
   let pv=0; for(let t=1;t<=n;t++)pv+=c/Math.pow(1+r,t);
   return pv+100/Math.pow(1+r,n);
 }
+// Нормализация строки для поиска: lowercase + ё→е + замена Latin-
+// lookalikes на Cyrillic. Решает проблему, когда эмитент импортирован
+// с мусорными Latin-символами (визуально не отличимыми от Cyrillic,
+// частое дело в HTML-импортах rusprofile/e-disclosure/PDF-OCR).
+// Применяется с двух сторон — к поисковой строке и к данным эмитента —
+// поэтому симметрично и безопасно. Uppercase confusables обрабатываем
+// ДО lowercase, т.к. их набор шире (A B C E H K M O P T X Y).
+function _normForSearch(s){
+  if(s == null) return '';
+  let out = String(s).replace(/Ё/g, 'Е').replace(/ё/g, 'е');
+  const upMap = {'A':'А','B':'В','C':'С','E':'Е','H':'Н','K':'К','M':'М','O':'О','P':'Р','T':'Т','X':'Х','Y':'У'};
+  out = out.replace(/[ABCEHKMOPTXY]/g, ch => upMap[ch] || ch);
+  out = out.toLowerCase();
+  const loMap = {'a':'а','c':'с','e':'е','o':'о','p':'р','x':'х','y':'у'};
+  out = out.replace(/[aceopxy]/g, ch => loMap[ch] || ch);
+  out = out.replace(/\s+/g, ' ').trim();
+  return out;
+}
 function ytmCls(v){return v>=14?'val-pos':v>=10?'val-neu':'val-neg'}
 function rub(v,sign=false){return (sign&&v>0?'+':'')+v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₽'}
 // Срок до погашения/оферты: для <1 года показываем в месяцах
@@ -6318,16 +6336,17 @@ function _crossPickRow(iss, issId, year, period, scopeFilter){
 // Все эмитенты периода, с сырыми значениями по всем метрикам.
 function _crossCollectAll(periodKey, opts){
   // Многотокенный поиск: «сбер, втб, лукойл» → любое из трёх ⇒ пройдёт (OR).
-  // Пустые токены после split'а игнорируются. Если токенов нет — фильтр не активен.
-  const tokens = String(opts.filter || '').toLowerCase().split(',')
-    .map(s => s.trim()).filter(Boolean);
+  // Нормализация ё→е + Latin→Cyrillic lookalikes, чтобы не промахиваться
+  // по импортированным именам с мусорными символами.
+  const tokens = String(opts.filter || '').split(',')
+    .map(s => _normForSearch(s)).filter(Boolean);
   const industry = (opts.industry || '').trim();
   const scopeFilter = opts.scopeFilter || null;
   const [yearStr, period] = periodKey.split('_');
   const year = +yearStr;
   const out = [];
   for(const [issId, iss] of Object.entries(reportsDB || {})){
-    const name = String(iss?.name || '').toLowerCase();
+    const name = _normForSearch(iss?.name || '');
     if(tokens.length && !tokens.some(t => name.includes(t))) continue;
     if(industry && (iss?.ind || 'other') !== industry) continue;
     const row = _crossPickRow(iss, issId, year, period, scopeFilter);
@@ -7268,7 +7287,8 @@ function repRenderIndustryFilter(){
 function repRenderIssuerList(){
   const listEl = document.getElementById('rep-sidebar-list');
   if(!listEl) return;
-  const search = ((document.getElementById('rep-sidebar-search')?.value) || '').trim().toLowerCase();
+  const searchRaw = ((document.getElementById('rep-sidebar-search')?.value) || '').trim();
+  const search = _normForSearch(searchRaw);
   const sort = (document.getElementById('rep-sidebar-sort')?.value) || 'name_asc';
   const status = (document.getElementById('rep-sidebar-status')?.value) || 'all';
   const indFilter = (document.getElementById('rep-sidebar-industry')?.value) || 'all';
@@ -7278,9 +7298,15 @@ function repRenderIssuerList(){
   const rows = [];
   for(const [id, iss] of Object.entries(reportsDB || {})){
     if(!iss || !iss.name) continue;
-    const name = String(iss.name).toLowerCase();
-    const inn = String(iss.inn || '').toLowerCase();
-    if(search && !name.includes(search) && !inn.includes(search)) continue;
+    const name = _normForSearch(iss.name);
+    const inn = _normForSearch(iss.inn);
+    const okved = _normForSearch(iss.okved) + ' ' + _normForSearch(iss.okvedName);
+    // Искать и по связанным: по именам и ИНН материнской/связанных.
+    // Часто SPV именуется иначе чем головной — логично находить через родителя.
+    const relatedStr = Array.isArray(iss.related)
+      ? iss.related.map(r => _normForSearch(r?.name) + ' ' + _normForSearch(r?.inn)).join(' ')
+      : '';
+    if(search && !name.includes(search) && !inn.includes(search) && !okved.includes(search) && !relatedStr.includes(search)) continue;
     const m = _repCalcMultipliers(iss);
     // Фильтр по выбранным годам: последний период эмитента должен быть
     // в одном из отмеченных годов. Ничего не отмечено — любой год ок.
