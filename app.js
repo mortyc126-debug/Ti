@@ -2188,6 +2188,44 @@ async function indResetSeed(){
   await indRender();
 }
 
+// Сброс пользовательских правок + пересчёт iss.ind у всех эмитентов
+// reportsDB по новому классификатору _okvedToIndustry. Отрасли, которые
+// пользователь проставил ВРУЧНУЮ (iss.indManual=true), не трогаем.
+// Эмитенты без ОКВЭД остаются как есть — запусти «📡 ГИР БО (обновить
+// всех)» чтобы подтянуть код.
+async function indResetAndReclassify(){
+  const msg = 'СБРОС ОТРАСЛЕЙ:\n' +
+    '1) Ваши правки seed отраслей удалятся (вернётся встроенный v2-список).\n' +
+    '2) Медианы очистятся.\n' +
+    '3) У всех эмитентов в reportsDB, у которых известен ОКВЭД, iss.ind пересчитается по новому классификатору.\n' +
+    '4) Отрасль, которую вы ставили ВРУЧНУЮ (через ✎ отрасль на карточке), НЕ перезапишется.\n\nПродолжить?';
+  if(!confirm(msg)) return;
+  try { localStorage.removeItem('bondan_industry_peers'); } catch(e){}
+  try { localStorage.removeItem('bondan_industry_medians'); } catch(e){}
+  window._industryData = null;
+  window._industryMedians = null;
+  window._indActiveKey = null;
+  await _indLoad();
+
+  // Пересчёт.
+  let reclassified = 0, skipped = 0, manual = 0;
+  for(const [id, iss] of Object.entries(reportsDB || {})){
+    if(!iss) continue;
+    if(iss.indManual){ manual++; continue; }
+    if(!iss.okved){ skipped++; continue; }
+    const newInd = _okvedToIndustry(iss.okved) || 'other';
+    if(iss.ind !== newInd){
+      iss.ind = newInd;
+      reclassified++;
+    }
+  }
+  if(reclassified) save();
+  await indRender();
+  if(typeof repRenderIssuerList === 'function') repRenderIssuerList();
+  if(typeof repRenderIndustryFilter === 'function') repRenderIndustryFilter();
+  alert(`✓ Сброс выполнен.\n• Пересчитано отраслей: ${reclassified}\n• Пропущено без ОКВЭД: ${skipped}\n• Сохранён ручной выбор: ${manual}\n\nЕсли много «без ОКВЭД» — прогони «📡 ГИР БО (обновить всех)» в каталоге MOEX, затем ещё раз этот сброс (или он перепишет iss.ind автоматически при следующей подтяжке).`);
+}
+
 // Перцентиль по отсортированному по возрастанию массиву (линейная
 // интерполяция между соседними значениями). q ∈ [0,1].
 function _percentile(sortedArr, q){
@@ -6926,6 +6964,10 @@ async function repChangeIndustry(){
     return;
   }
   iss.ind = newKey;
+  // Помечаем ручной выбор, чтобы массовый пересчёт по ОКВЭД его не затёр.
+  // При явном возврате в 'other' снимаем отметку — это откат, не ручной выбор.
+  if(newKey === 'other'){ delete iss.indManual; }
+  else { iss.indManual = true; }
   save();
   _repRenderActiveIssuerHeader();
   repRenderIssuerList();

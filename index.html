@@ -1806,6 +1806,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <input type="file" id="ind-import-file" accept=".json" style="display:none" onchange="indImportPeers(this)">
       <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON">📥 Импорт</button>
       <button class="btn btn-sm" onclick="indResetSeed()" title="Откатить к встроенному стартовому списку (удаляет ваши правки)">♻️ Сбросить</button>
+      <button class="btn btn-sm btn-d" onclick="indResetAndReclassify()" title="Сбросить правки seed'а + очистить медианы + пересчитать отрасли у всех эмитентов по ОКВЭД (ручной выбор сохраняется)" style="background:var(--d);color:#fff">🗑 Сброс + пересчёт</button>
       <input type="file" id="ind-rosstat-file" accept=".xlsx,.xls" multiple style="display:none" onchange="rosstatImportFiles(this)">
       <button class="btn btn-sm" onclick="document.getElementById('ind-rosstat-file').click()" title="Импорт XLSX ФНС (ind2020.xlsx … ind2024.xls) — среднеотраслевые ROS/ROA по ОКВЭД. Можно выделить сразу несколько файлов.">🇷🇺 Импорт ФНС XLSX</button>
       <button class="btn btn-sm" onclick="rosstatClear()" title="Очистить загруженные данные ФНС">🗑️ ФНС</button>
