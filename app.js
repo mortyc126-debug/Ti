@@ -16264,6 +16264,35 @@ async function moexPullGirboOnlyBulk(){
 // reportsDB-entry (чтобы скоринг по материнской работал для всех её
 // дочерних SPV). Нужно для сценария «я хочу видеть настоящие цифры
 // под SPV-эмитентом», включается тумблером «По данным материнской».
+// Тянет РСБУ по ИНН из обоих источников и мёржит: buxbalans даёт
+// глубину по старым годам (до 15), ГИР БО — свежий год (ФНС публикует
+// раньше, чем buxbalans его переварит). Без мёржа для недавно сданных
+// годов (2025-й после 31 марта 2026) получался дыр из-за ранней отдачи
+// buxbalans без последних цифр — «return early» на его count>0 убивал
+// fallback на ГИР БО.
+async function _pullReportBothSources(inn){
+  let bx = null, gr = null;
+  try { bx = await fetchBuxBalansByInn(inn, 15); } catch(_){}
+  try { gr = await fetchGirboByInn(inn, 10); } catch(_){}
+  const haveBux = bx && bx.count;
+  const haveGr  = gr && gr.count;
+  if(!haveBux && !haveGr) return null;
+  // Стартуем от buxbalans (больше старых годов), ГИР БО добирает новые.
+  const base = haveBux
+    ? { ...bx, series: { ...bx.series } }
+    : { series: {}, count: 0, company: null, inn: null, okved: null, okvedName: null };
+  if(haveGr){
+    for(const [lbl, v] of Object.entries(gr.series)){
+      if(!base.series[lbl]) base.series[lbl] = v; // buxbalans приоритет на пересекающихся
+    }
+    if(!base.company && gr.company) base.company = gr.company;
+    if(!base.inn && gr.inn) base.inn = gr.inn;
+    if(!base.okved && gr.okved){ base.okved = gr.okved; base.okvedName = gr.okvedName; }
+  }
+  base.count = Object.keys(base.series).length;
+  return base;
+}
+
 async function moexPullParents(){
   const parents = new Map();
   for(const iss of Object.values(reportsDB || {})){
@@ -16294,11 +16323,7 @@ async function moexPullParents(){
   for(const meta of parents.values()){
     idx++;
     if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Материнская ${idx}/${total}: ${meta.name || meta.inn} (дочек: ${meta.childCount})…</span>`;
-    let data = null;
-    try { data = await fetchBuxBalansByInn(meta.inn, 15); } catch(e){ errors.push(`${meta.name || meta.inn}: buxbalans ${e.message}`); }
-    if(!data || !data.count){
-      try { data = await fetchGirboByInn(meta.inn, 10); } catch(e){ errors.push(`${meta.name || meta.inn}: girbo ${e.message}`); }
-    }
+    const data = await _pullReportBothSources(meta.inn);
     if(!data || !data.count){ errs++; await new Promise(r => setTimeout(r, 200)); continue; }
     const resolvedInn = data.inn || meta.inn;
     const name = data.company || meta.name || ('ИНН ' + resolvedInn);
@@ -16906,12 +16931,8 @@ async function _peekPullParent(issId){
   const parent = (iss.related || []).find(r => r.role === 'parent');
   if(!parent || !parent.inn){ alert('Нет материнской. Сначала привяжи через «🏛 привязать материнскую».'); return; }
   const status = document.getElementById('moex-status');
-  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Материнская ${parent.inn}…</span>`;
-  let data = null;
-  try { data = await fetchBuxBalansByInn(parent.inn, 15); } catch(_){}
-  if(!data || !data.count){
-    try { data = await fetchGirboByInn(parent.inn, 10); } catch(_){}
-  }
+  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Материнская ${parent.inn} (buxbalans+ГИР БО)…</span>`;
+  const data = await _pullReportBothSources(parent.inn);
   if(!data || !data.count){ alert(`Не удалось подтянуть ИНН ${parent.inn}. Попробуй через «📊 Подтянуть по материнским» (там подробный лог) или через «📂 Отчётность» вручную.`); return; }
   const resolvedInn = data.inn || parent.inn;
   const name = data.company || parent.name || ('ИНН ' + resolvedInn);
