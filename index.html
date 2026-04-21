@@ -2035,13 +2035,13 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="no">Только без рейтинга</option>
           </select>
         </div>
-        <div class="field" style="margin:0" title="Исключаем выпуски, у эмитента которых хотя бы одна из 8 ключевых метрик (EBITDA-маржа, чистая маржа, ROA, ROE, ICR, ND/EBITDA, Current, Equity ratio) попала в хвост своей отрасли. Сравнение внутри отрасли (iss.ind): для отраслей с <3 эмитентами в базе фильтр не работает — такие бумаги скрываются.">
-          <label style="font-size:.55rem">🏭 Скрыть «выбросы» в отрасли</label>
+        <div class="field" style="margin:0" title="Для каждого эмитента смотрим 8 ключевых метрик (EBITDA-маржа, чистая маржа, ROA, ROE, ICR, ND/EBITDA, Current, Equity ratio) и считаем его ранг внутри его же отрасли. Если хотя бы одна метрика попадает в худший хвост — выпуск скрываем. Сравнение per-industry: у банков D/E=10 — норма, у ритейла катастрофа. Отрасли с <3 эмитентами в базе исключаются как неинформативные.">
+          <label style="font-size:.55rem">🏭 Отсекать аутсайдеров отрасли</label>
           <select id="moex-f-pct-thresh" onchange="moexApplyFilters()">
-            <option value="">Не фильтровать</option>
-            <option value="5">Если метрика в худших 5% отрасли</option>
-            <option value="10">Если метрика в худших 10% отрасли</option>
-            <option value="25">Если метрика в худшем квартиле (25%)</option>
+            <option value="">Не отсекать</option>
+            <option value="25">Если хуже 75% отрасли хотя бы по 1 метрике</option>
+            <option value="10">Если хуже 90% отрасли хотя бы по 1 метрике</option>
+            <option value="5">Если хуже 95% отрасли хотя бы по 1 метрике</option>
           </select>
         </div>
       </div>
