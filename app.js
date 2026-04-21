@@ -7673,7 +7673,7 @@ function _repDynPick(){
   const t = document.getElementById('rep-dyn-to')?.value;
   window._repDynFrom = (f === '' || f == null) ? null : parseInt(f, 10);
   window._repDynTo   = (t === '' || t == null) ? null : parseInt(t, 10);
-  const iss = reportsDB[window.repActiveIssuerId];
+  const iss = reportsDB[repActiveIssuerId];
   if(iss) repRenderCharts(iss);
 }
 
@@ -7681,7 +7681,7 @@ function _repDynPick(){
 function _repDynReset(){
   window._repDynFrom = null;
   window._repDynTo = null;
-  const iss = reportsDB[window.repActiveIssuerId];
+  const iss = reportsDB[repActiveIssuerId];
   if(iss) repRenderCharts(iss);
 }
 
