@@ -138,6 +138,19 @@ function priceAtY(coupon,years,ytmPct){
 }
 function ytmCls(v){return v>=14?'val-pos':v>=10?'val-neu':'val-neg'}
 function rub(v,sign=false){return (sign&&v>0?'+':'')+v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' ₽'}
+// Срок до погашения/оферты: для <1 года показываем в месяцах
+// (пользовательнице «0.7 лет» читать неудобно), от 1 года — в годах с
+// 1 десятичной. short=true → компактная форма «8м»/«1.5г» для узких
+// ячеек таблиц; иначе «8 мес»/«1.5 лет».
+function _fmtMat(v, short){
+  if(v == null || !isFinite(v)) return '—';
+  if(v < 0) return short ? 'погаш' : 'погашен';
+  if(v < 1){
+    const m = Math.max(1, Math.round(v * 12));
+    return short ? (m + 'м') : (m + ' мес');
+  }
+  return short ? (v.toFixed(1) + 'г') : (v.toFixed(1) + ' лет');
+}
 
 // ══ YTM PAGE ══
 function onYtmCType(){
@@ -259,7 +272,7 @@ function renderYtm(){
       <td><span class="tag ${BT_TAG[b.btype]||'tag-corp'}">${b.btype}</span></td>
       <td><span class="tag ct-${b.ctype}" style="font-size:.54rem">${CT_LABELS[b.ctype]}</span></td>
       <td style="color:var(--text2)">${params}</td>
-      <td>${b.price.toFixed(2)}%</td><td>${b.years.toFixed(1)} л.</td>
+      <td>${b.price.toFixed(2)}%</td><td>${_fmtMat(b.years)}</td>
       <td><span class="${ytmCls(b.ytm)} val-big">${b.ytm.toFixed(2)}%</span></td>
       <td>${ytmBuyCell}</td>
       <td>${sCell}</td><td>${dCell}</td>
@@ -285,7 +298,7 @@ function renderYtm(){
       <div class="stat-card" style="min-width:75px;padding:9px 13px"><div class="sc-lbl">YTM сейчас</div><div class="sc-val val-pos">${top.ytm.toFixed(2)}%</div></div>
       <div class="stat-card" style="min-width:75px;padding:9px 13px"><div class="sc-lbl">При КС ${ytmRate}%</div><div class="sc-val val-pos">${top.ytmS.toFixed(2)}%</div></div>
       ${top.ctype!=='float'?`<div class="stat-card" style="min-width:75px;padding:9px 13px"><div class="sc-lbl">Δ цены</div><div class="sc-val ${top.dPct>=0?'val-pos':'val-neg'}">${top.dPct>=0?'+':''}${top.dPct.toFixed(1)}%</div></div>`:''}
-      <div class="stat-card" style="min-width:75px;padding:9px 13px"><div class="sc-lbl">До погаш.</div><div class="sc-val">${top.years.toFixed(1)} л.</div></div>
+      <div class="stat-card" style="min-width:75px;padding:9px 13px"><div class="sc-lbl">До погаш.</div><div class="sc-val">${_fmtMat(top.years)}</div></div>
     </div>
   </div>`;
 }
@@ -3384,6 +3397,43 @@ function addPortPos(){
 
 function removePortPos(id){portfolio=portfolio.filter(p=>p.id!==id);save();renderPort()}
 
+// Схлопывает дубликаты в портфеле (появляются после старых мёрджей —
+// тот же выпуск пушится под новым id, т.к. ключ дедупа был id+name).
+// Сравнение по «сути позиции»: name+isin+btype+ctype+buy+coupon+qty+nom.
+// Показывает превью перед удалением, ничего не делает без подтверждения.
+function pfDedupe(){
+  if(!portfolio.length){ alert('Портфель пуст'); return; }
+  const key = p => [
+    String(p.name || '').trim().toLowerCase(),
+    p.isin || '',
+    p.btype || '',
+    p.ctype || '',
+    Number(p.buy || 0).toFixed(2),
+    Number(p.coupon || 0).toFixed(3),
+    Number(p.qty || 0),
+    Number(p.nom || 0)
+  ].join('|');
+  const seen = new Set();
+  const keep = [];
+  const removedNames = [];
+  for(const p of portfolio){
+    const k = key(p);
+    if(seen.has(k)){ removedNames.push(p.name || '(без имени)'); continue; }
+    seen.add(k);
+    keep.push(p);
+  }
+  if(!removedNames.length){
+    alert('Дубликатов не найдено.\n\nСверяем по: name + isin + buy + coupon + qty + nom + btype + ctype. Если у «одинаковых» позиций отличается хоть одно из этих полей — они считаются разными.');
+    return;
+  }
+  const preview = removedNames.slice(0, 12).map(n => '• ' + n).join('\n');
+  const extra = removedNames.length > 12 ? `\n...и ещё ${removedNames.length - 12}` : '';
+  if(!confirm(`Найдено дубликатов: ${removedNames.length}.\n\nБудут удалены лишние копии:\n${preview}${extra}\n\nПродолжить?`)) return;
+  portfolio = keep;
+  save(); renderPort();
+  alert(`✓ Удалено дублей: ${removedNames.length}. Осталось позиций: ${portfolio.length}.`);
+}
+
 function editPortPos(id){
   const p=portfolio.find(x=>x.id===id); if(!p)return;
   document.getElementById('ep-id').value=id;
@@ -3816,7 +3866,7 @@ function renderWL(){
       <td><span class="tag ct-${b.ctype}" style="font-size:.54rem">${CT_LABELS[b.ctype]||'—'}</span></td>
       <td>${b.price!=null?b.price.toFixed(2)+'%':'—'}</td>
       <td>${b.coupon!=null?b.coupon.toFixed(2)+'%':'—'}</td>
-      <td>${b.years!=null?b.years.toFixed(1)+' л.':'—'}</td>
+      <td>${_fmtMat(b.years)}</td>
       <td>${b.ytm!=null?`<span class="${ytmCls(b.ytm)}">${b.ytm.toFixed(2)}%</span>`:'—'}</td>
       <td style="color:var(--text2);font-size:.67rem;max-width:130px">${b.note||'—'}</td>
       <td style="color:var(--text3);font-size:.61rem">${new Date(b.addedAt).toLocaleDateString('ru')}</td>
@@ -7008,7 +7058,7 @@ function _repRenderIssuerBonds(){
   });
   const rows = bonds.map(b => {
     const mat = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
-    const matLabel = mat != null ? (mat > 0 ? mat.toFixed(1) + ' л' : '<span style="color:var(--text3)">погашен</span>') : '—';
+    const matLabel = mat == null ? '—' : (mat <= 0 ? '<span style="color:var(--text3)">погашен</span>' : _fmtMat(mat));
     const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
     const coup = b.coupon != null ? b.coupon.toFixed(2) + '%' : '—';
     const sizeM = b.issueSize && b.faceValue ? Math.round(b.issueSize * b.faceValue / 1e6).toLocaleString('ru-RU') + ' млн' : '—';
@@ -13962,7 +14012,7 @@ function _dossierFmt(v, opts){
   opts = opts || {};
   if(v == null || !isFinite(v)) return '—';
   if(opts.pct) return (v * 100).toFixed(1) + '%';
-  if(opts.years) return v.toFixed(1) + ' лет';
+  if(opts.years) return _fmtMat(v);
   const a = Math.abs(v);
   if(a >= 100) return v.toFixed(1);
   if(a >= 10)  return v.toFixed(2);
@@ -15144,7 +15194,7 @@ function _moexRenderTable(list){
       : b._isSubfed ? '<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem">субфед</span>' : '';
     const floatBadge = b.isFloat ? '<span class="dossier-pill warn" style="padding:1px 6px;font-size:.52rem">флоатер</span>' : '';
     const offerBadge = b.offerDate ? `<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem" title="оферта ${b.offerDate}">оферта</span>` : '';
-    const mat = b.matYears != null ? b.matYears.toFixed(1) + ' л' : '—';
+    const mat = _fmtMat(b.matYears, true);
     const matDate = b.matDate ? ` <span style="color:var(--text3);font-size:.54rem">(${b.matDate})</span>` : '';
     const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
     const coup = b.coupon != null ? b.coupon.toFixed(2) + '%' : '—';
