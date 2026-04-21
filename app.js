@@ -6873,15 +6873,15 @@ function _repStressScore(iss, opts){
   const prev = prior ? _computeStressFromPeriod(prior.period, iss.inn, 730) : null;
   const yearsBack = prior ? (lp.year - prior.year) : null;
 
-  // Соотношение роста долга к росту EBITDA — берём МАКСИМУМ (худшее) по
-  // всем доступным окнам 1/2/3 года. Иначе длинное окно сглаживает
-  // свежее ускорение: 2022→2025 может дать мягкие 1.3×, а 2023→2025 —
-  // жёсткие 1.8×. Нам важнее, что рынок видит последнее.
+  // Соотношение роста долга к росту EBITDA. Берём 3-летнее окно
+  // (устойчивый тренд) с fallback на 2 и 1, НЕ максимум — максимум ловит
+  // одиночные плохие годы как систематический тренд и даёт false positives
+  // у молодых эмитентов в стадии роста.
   let debtOutpacingEbitda = null;
   let debtRatio = null, ebitdaRatio = null;
   let outpaceYearsBack = null;
   const curEbitda = lp.period.ebitda != null ? lp.period.ebitda : lp.period.ebit;
-  for(const back of [1, 2, 3]){
+  for(const back of [3, 2, 1]){
     const pp = _repPriorAnnualPeriod(dataIss, lp, back);
     if(!pp) continue;
     const ppEb = pp.period.ebitda != null ? pp.period.ebitda : pp.period.ebit;
@@ -6890,51 +6890,66 @@ function _repStressScore(iss, opts){
     const dr = lp.period.debt / pp.period.debt;
     const er = curEbitda / ppEb;
     if(er <= 0) continue;
-    const k = dr / er;
-    if(debtOutpacingEbitda == null || k > debtOutpacingEbitda){
-      debtOutpacingEbitda = k;
-      debtRatio = dr;
-      ebitdaRatio = er;
-      outpaceYearsBack = back;
-    }
+    debtOutpacingEbitda = dr / er;
+    debtRatio = dr;
+    ebitdaRatio = er;
+    outpaceYearsBack = back;
+    break; // берём самое длинное из доступных окон, не max
   }
 
-  // Штраф за «долг обгоняет прибыль»: линейный, 1.0→0 баллов, 2.4+→−35.
-  // Применяем к базовому 3-компонентному score, чтобы леверидж-динамика
-  // реально роняла оценку в красную зону, а не оставалась бейджиком.
-  // Для тренда: пытаемся посчитать тот же штраф для прошлого периода
-  // (сравнивая prior vs 3 года до prior), чтобы дельта считалась
-  // согласованно (apples to apples).
-  const leveragePenalty = k => {
-    if(k == null) return 0;
-    if(k <= 1.0) return 0;
-    return Math.min(35, Math.round((k - 1.0) * 25));
-  };
-  const curPenalty = leveragePenalty(debtOutpacingEbitda);
-  const finalScore = cur.score != null ? Math.max(0, cur.score - curPenalty) : null;
+  // Отраслевая нормализация: если в отрасли ≥5 эмитентов с валидным k,
+  // считаем медианный k и используем его как «нейтраль», а не абсолютный
+  // 1.0. То есть «норма для моей отрасли», а не «долг не должен расти
+  // быстрее прибыли в абсолюте». Сравнение k_relative = k / medianK.
+  const normInd = (dataIss.ind && dataIss.ind !== 'other') ? dataIss.ind : null;
+  const indMedianK = normInd ? _computeIndustryMedianK(normInd) : null;
+  const kRelative = (debtOutpacingEbitda != null && indMedianK != null && indMedianK > 0)
+    ? debtOutpacingEbitda / indMedianK
+    : debtOutpacingEbitda;
 
-  // Штраф для прошлого score — нужна ещё одна «до-прошлая» точка.
+  // Кривая штрафа/бонуса (применяется к kRelative):
+  //   k ≤ 0.8         → +10 (deleveraging, Moody's positive trigger)
+  //   0.8 < k ≤ 1.0   → +5 (линейно от +10 до +5: 0.8..1.0)
+  //   1.0 < k ≤ 1.3   → 0 (норма для роста)
+  //   1.3 < k ≤ 2.5   → линейный штраф 0 → −30
+  //   k > 2.5         → −30 max
+  // Мягче АКРА/Fitch, ближе к S&P middle-of-the-road.
+  const scoreAdjust = k => {
+    if(k == null) return 0;
+    if(k <= 0.8) return 10;
+    if(k <= 1.0) return Math.round(10 - (k - 0.8) / 0.2 * 5); // 10 → 5
+    if(k <= 1.3) return 0;
+    if(k >= 2.5) return -30;
+    return -Math.round((k - 1.3) / (2.5 - 1.3) * 30); // 0 → −30
+  };
+  const curAdjust = scoreAdjust(kRelative);
+  const finalScore = cur.score != null ? Math.max(0, Math.min(100, cur.score + curAdjust)) : null;
+
+  // Штраф/бонус для прошлого score — нужна ещё одна «до-прошлая» точка
+  // (сравниваем prior vs 3/2/1 года до prior).
   let priorOutpace = null;
   if(prior){
-    const priorPrior = _repPriorAnnualPeriod(dataIss, prior, 3)
-                    || _repPriorAnnualPeriod(dataIss, prior, 2)
-                    || _repPriorAnnualPeriod(dataIss, prior, 1);
-    if(priorPrior){
+    for(const back of [3, 2, 1]){
+      const priorPrior = _repPriorAnnualPeriod(dataIss, prior, back);
+      if(!priorPrior) continue;
       const pEb = prior.period.ebitda != null ? prior.period.ebitda : prior.period.ebit;
       const ppEb = priorPrior.period.ebitda != null ? priorPrior.period.ebitda : priorPrior.period.ebit;
-      if(prior.period.debt != null && priorPrior.period.debt != null
-         && priorPrior.period.debt > 0 && pEb != null && ppEb != null && ppEb > 0){
-        priorOutpace = (prior.period.debt / priorPrior.period.debt) / (pEb / ppEb);
-      }
+      if(prior.period.debt == null || priorPrior.period.debt == null
+         || priorPrior.period.debt <= 0 || pEb == null || ppEb == null || ppEb <= 0) continue;
+      priorOutpace = (prior.period.debt / priorPrior.period.debt) / (pEb / ppEb);
+      break;
     }
   }
-  const priorPenalty = leveragePenalty(priorOutpace);
-  const finalPriorScore = prev && prev.score != null ? Math.max(0, prev.score - priorPenalty) : null;
+  const priorKRel = (priorOutpace != null && indMedianK != null && indMedianK > 0)
+    ? priorOutpace / indMedianK
+    : priorOutpace;
+  const priorAdjust = scoreAdjust(priorKRel);
+  const finalPriorScore = prev && prev.score != null ? Math.max(0, Math.min(100, prev.score + priorAdjust)) : null;
 
   return {
     score: finalScore, year: lp.year, usedParent,
-    baseScore: cur.score,              // 3-компонентный, до штрафа (для досье/дебага)
-    leveragePenalty: curPenalty,       // 0-35 баллов
+    baseScore: cur.score,              // 3-компонентный, до корректировки
+    scoreAdjust: curAdjust,            // −30..+10
     debtWallScore: cur.debtWallScore, debtWallRatio: cur.debtWallRatio, maturing24m: cur.maturingSum,
     stressIcrScore: cur.stressIcrScore, stressIcrVal: cur.stressIcrVal,
     altmanScore: cur.altmanScore, altmanZ: cur.altmanZ,
@@ -6942,7 +6957,45 @@ function _repStressScore(iss, opts){
     priorYear: prior ? prior.year : null,
     priorYearsBack: yearsBack,
     debtOutpacingEbitda, debtRatio, ebitdaRatio, outpaceYearsBack,
+    indMedianK, kRelative,
   };
+}
+
+// Медианный k (debt_ratio / ebitda_ratio) по отрасли. Нужно ≥5 эмитентов
+// с валидным 3-летним окном, иначе возвращаем null (медиана по 2-3 не
+// надёжна — шум). Кэш в window._industryKCache, инвалидируется при
+// изменениях reportsDB (пока не инвалидируется автоматически — считаем
+// один раз на сессию).
+function _computeIndustryMedianK(ind){
+  if(!ind || ind === 'other') return null;
+  window._industryKCache = window._industryKCache || {};
+  if(window._industryKCache[ind] !== undefined) return window._industryKCache[ind];
+  const ks = [];
+  for(const iss of Object.values(reportsDB || {})){
+    if(!iss || iss.ind !== ind) continue;
+    const lp = _repLatestPeriod(iss);
+    if(!lp) continue;
+    let prior = null;
+    for(const back of [3, 2, 1]){
+      prior = _repPriorAnnualPeriod(iss, lp, back);
+      if(prior) break;
+    }
+    if(!prior) continue;
+    const cE = lp.period.ebitda != null ? lp.period.ebitda : lp.period.ebit;
+    const pE = prior.period.ebitda != null ? prior.period.ebitda : prior.period.ebit;
+    if(lp.period.debt == null || prior.period.debt == null || prior.period.debt <= 0
+       || cE == null || pE == null || pE <= 0) continue;
+    const k = (lp.period.debt / prior.period.debt) / (cE / pE);
+    if(isFinite(k) && k > 0) ks.push(k);
+  }
+  if(ks.length < 5){
+    window._industryKCache[ind] = null;
+    return null;
+  }
+  ks.sort((a, b) => a - b);
+  const median = ks[Math.floor(ks.length / 2)];
+  window._industryKCache[ind] = median;
+  return median;
 }
 
 // Цвет плитки/бара по значению score 0-100. null → серый.
@@ -7236,20 +7289,32 @@ function _repRenderActiveIssuerHeader(){
   const zPart = st.altmanScore != null
     ? `<span title="Альтман Z' (book-value). <1.23 = зона дефолта, >2.9 = безопасно" style="color:${_repStressColor(st.altmanScore)}">Altman Z' ${fmt(st.altmanZ)}</span>`
     : '<span style="color:var(--text3)" title="Нужны assets + ≥4 из (ca,cl,ret,ebit,eq,rev)">Altman Z\' —</span>';
-  // Красный флажок «долг обгоняет прибыль». >1.0 = жёлтый warning
-  // (изменение долга больше изменения прибыли — уже сомнительно),
-  // >1.5 = красный critical (долг растёт в 1.5+ раза быстрее).
+  // Бейдж leverage trajectory — теперь с бонусом/штрафом:
+  //   k (возможно нормализованный к медиане отрасли) ≤0.8 → зелёный бонус
+  //   0.8..1.0 → мягкий positive
+  //   1.0..1.3 → серый «в норме для роста»
+  //   1.3..1.8 → жёлтый warning
+  //   >1.8 → красный critical
   let outpaceBadge = '';
   if(st.debtOutpacingEbitda != null){
     const k = st.debtOutpacingEbitda;
+    const kRel = st.kRelative; // может совпадать с k если нет нормализации
     const debtPct = st.debtRatio != null ? ((st.debtRatio - 1) * 100).toFixed(0) : '—';
     const ebitPct = st.ebitdaRatio != null ? ((st.ebitdaRatio - 1) * 100).toFixed(0) : '—';
     const yrs = st.outpaceYearsBack || 1;
-    if(k >= 1.5){
-      outpaceBadge = `<span style="color:#fff;background:var(--danger);padding:1px 5px;font-weight:700;margin-right:6px" title="За ${yrs}г (худшее из доступных окон) долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Долг растёт заметно быстрее прибыли: каждый новый рубль долга даёт меньше операционки на его обслуживание. Лидирующий индикатор зависимости от рефинанса.">⚠ долг обгоняет прибыль ${k.toFixed(2)}× (${yrs}г)</span>`;
-    } else if(k > 1.0){
-      outpaceBadge = `<span style="color:var(--warn);border:1px solid var(--warn);padding:1px 5px;margin-right:6px" title="За ${yrs}г (худшее из доступных окон) долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Изменение долга больше изменения прибыли — сомнительная динамика, особенно если повторяется несколько лет.">долг > прибыль ${k.toFixed(2)}× (${yrs}г)</span>`;
+    const indNote = st.indMedianK != null ? ` Отраслевая медиана k=${st.indMedianK.toFixed(2)}, относительный ${kRel.toFixed(2)}.` : '';
+    const adj = st.scoreAdjust || 0;
+    const adjNote = adj > 0 ? ` Бонус к score: +${adj}.` : adj < 0 ? ` Штраф: ${adj}.` : '';
+    if(kRel >= 1.8){
+      outpaceBadge = `<span style="color:#fff;background:var(--danger);padding:1px 5px;font-weight:700;margin-right:6px" title="За ${yrs}г долг +${debtPct}%, EBITDA +${ebitPct}% → k=${k.toFixed(2)}.${indNote}${adjNote} Долг заметно обгоняет прибыль — лидирующий индикатор проблем с рефинансом.">⚠ долг обгоняет прибыль ${kRel.toFixed(2)}×${st.indMedianK != null ? ' отр.' : ''} (${yrs}г)</span>`;
+    } else if(kRel >= 1.3){
+      outpaceBadge = `<span style="color:var(--warn);border:1px solid var(--warn);padding:1px 5px;margin-right:6px" title="За ${yrs}г долг +${debtPct}%, EBITDA +${ebitPct}% → k=${k.toFixed(2)}.${indNote}${adjNote} Устойчиво растущий леверидж — кандидат на negative outlook по методологии S&P.">долг > прибыль ${kRel.toFixed(2)}×${st.indMedianK != null ? ' отр.' : ''} (${yrs}г)</span>`;
+    } else if(kRel <= 0.8){
+      outpaceBadge = `<span style="color:#fff;background:var(--green);padding:1px 5px;font-weight:700;margin-right:6px" title="За ${yrs}г долг +${debtPct}%, EBITDA +${ebitPct}% → k=${k.toFixed(2)}.${indNote}${adjNote} Deleveraging — прибыль обгоняет долг, positive outlook по методологии Moody's/S&P.">✓ deleveraging ${kRel.toFixed(2)}×${st.indMedianK != null ? ' отр.' : ''} (${yrs}г)</span>`;
+    } else if(kRel <= 1.0){
+      outpaceBadge = `<span style="color:var(--green);border:1px solid var(--green);padding:1px 5px;margin-right:6px" title="За ${yrs}г долг +${debtPct}%, EBITDA +${ebitPct}% → k=${k.toFixed(2)}.${indNote}${adjNote} Долг растёт не быстрее прибыли — устойчиво.">долг ≤ прибыль ${kRel.toFixed(2)}×${st.indMedianK != null ? ' отр.' : ''} (${yrs}г)</span>`;
     }
+    // 1.0 < k ≤ 1.3 — бейдж не показываем, нейтральная зона.
   }
   // Тренд: было vs стало. Стрелка + дельта. ≥3 пунктов — раскрашиваем.
   // Lookback предпочтительно 3 года (устойчивый тренд), с fallback 2/1.
@@ -7265,8 +7330,9 @@ function _repRenderActiveIssuerHeader(){
     const suffix = yrs > 1 ? ` (${yrs}г)` : '';
     trendHtml = `<span style="font-size:.6rem;color:${color};font-family:var(--mono);margin-left:6px" title="Запас прочности ${yrs} ${yrs<5?'года':'лет'} назад был ${st.priorScore} (${st.priorYear}); сейчас ${st.score}. Тренд важнее уровня — устойчивая компания может ехать к проблемам, если score падает несколько лет подряд.">${arrow} ${sign}${delta} vs ${st.priorYear}${suffix}</span>`;
   }
-  const penaltyNote = st.leveragePenalty > 0 ? `\nШтраф «долг обгоняет прибыль»: −${st.leveragePenalty} (базовый ${st.baseScore} − штраф = ${st.score}).` : '';
-  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nБазовые веса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.\nСверху линейный штраф 0..−35 если за lookback-окно долг рос быстрее EBITDA (k>1.0 → штраф начинает набегать, k≥2.4 → максимум −35).${penaltyNote}${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
+  const adj = st.scoreAdjust || 0;
+  const adjNote = adj !== 0 ? `\nКорректировка leverage trajectory: ${adj > 0 ? '+' + adj : adj} (базовый ${st.baseScore} ${adj > 0 ? '+' : '−'} ${Math.abs(adj)} = ${st.score}).` : '';
+  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nБазовые веса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.\nLeverage trajectory: +10 за deleveraging (k≤0.8), +5 за k≤1.0, 0 в норме (1.0<k≤1.3), штраф до −30 при k≥2.5. Если отрасль достаточно представлена (≥5 эмитентов) — k нормализуется на медиану отрасли (сравнение с пиром).${adjNote}${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
   const stTile = `
     <div style="margin-top:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${stTooltip}">
       <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}${st.usedParent ? ' <span style="color:var(--purple);font-size:.5rem;border:1px solid var(--purple);padding:0 4px;margin-left:4px" title="Расчёт по данным материнской компании (у самого эмитента нет отчётности или включён тумблер)">мамы</span>' : ''}</div>
