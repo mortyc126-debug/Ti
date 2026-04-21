@@ -6720,6 +6720,99 @@ function _repFormatMult(val, kind){
   return val.toFixed(2);
 }
 
+// Запас прочности 0-100 — композит 3 сигналов близости к дефолту:
+// 1) ДОЛГОВАЯ СТЕНА (25%): сумма погашений бондов за 12 мес (из MOEX по
+//    ИНН) делённая на ликвидный пул = cash + EBITDA. Ratio 0 → 100,
+//    1.0 → 50, ≥2 → 0. Если эмитент рассчитывает на рефинанс (>1) —
+//    это первое, что отваливается в кризис.
+// 2) STRESSED ICR (40%): (EBITDA×0.8) / (interest×1.2). Шок −20% прибыли
+//    +20% стоимости обслуживания. <0.5 → 0, 1.0 = перелом → 50, ≥3 → 100.
+// 3) ALTMAN Z' (35%): композит 5 коэффициентов, book-value вариант для
+//    непубличных/развивающихся: Z'=0.717·X1+0.847·X2+3.107·X3+0.420·X4+
+//    0.998·X5, где X1=(ca-cl)/assets, X2=ret/assets, X3=ebit/assets,
+//    X4=eq/(assets-eq), X5=rev/assets. Distress <1.23 → 0, safe >2.9 → 100.
+// Если сигнал null (нет данных) — его вес перераспределяется на
+// оставшиеся. Если ни одного — score=null.
+function _repStressScore(iss){
+  if(!iss) return { score: null };
+  const lp = _repLatestPeriod(iss);
+  if(!lp) return { score: null };
+  const p = lp.period;
+
+  // 1) Debt wall
+  let debtWallScore = null, debtWallRatio = null, maturing12m = null;
+  const cat = window._moexCatalog;
+  const ebitda12 = p.ebitda != null ? p.ebitda : p.ebit;
+  if(iss.inn && cat && Array.isArray(cat.items) && ebitda12 != null && ebitda12 > 0){
+    const now = Date.now(), horizon = now + 365 * 86400000;
+    let sum = 0;
+    for(const b of cat.items){
+      if(!b.matDate || !b.inn) continue;
+      if(String(b.inn) !== String(iss.inn)) continue;
+      const mat = new Date(b.matDate).getTime();
+      if(isNaN(mat) || mat <= now || mat > horizon) continue;
+      if(b.issueSize && b.faceValue) sum += b.issueSize * b.faceValue / 1e9; // млрд ₽
+    }
+    maturing12m = sum;
+    const liquid = (p.cash || 0) + ebitda12;
+    if(liquid > 0){
+      debtWallRatio = sum / liquid;
+      debtWallScore = Math.max(0, Math.min(100, Math.round(100 - debtWallRatio * 50)));
+    } else if(sum > 0) debtWallScore = 0;
+    else debtWallScore = 100;
+  }
+
+  // 2) Stressed ICR
+  let stressIcrScore = null, stressIcrVal = null;
+  const baseProf = p.ebitda != null ? p.ebitda : p.ebit;
+  if(baseProf != null && p.int != null && p.int > 0){
+    stressIcrVal = (baseProf * 0.8) / (p.int * 1.2);
+    if(stressIcrVal <= 0.5) stressIcrScore = 0;
+    else if(stressIcrVal >= 3.0) stressIcrScore = 100;
+    else stressIcrScore = Math.round((stressIcrVal - 0.5) / 2.5 * 100);
+  }
+
+  // 3) Altman Z' (book-value variant)
+  let altmanScore = null, altmanZ = null;
+  if(p.assets && p.assets > 0){
+    const A = p.assets;
+    const x1 = (p.ca != null && p.cl != null) ? (p.ca - p.cl) / A : null;
+    const x2 = (p.ret != null) ? p.ret / A : null;
+    const x3 = (p.ebit != null) ? p.ebit / A : null;
+    const x4 = (p.eq != null && A > p.eq) ? p.eq / (A - p.eq) : null;
+    const x5 = (p.rev != null) ? p.rev / A : null;
+    const parts = [x1, x2, x3, x4, x5];
+    if(parts.filter(x => x != null).length >= 4){
+      altmanZ = 0.717 * (x1 || 0) + 0.847 * (x2 || 0) + 3.107 * (x3 || 0) + 0.420 * (x4 || 0) + 0.998 * (x5 || 0);
+      if(altmanZ <= 1.23) altmanScore = 0;
+      else if(altmanZ >= 2.9) altmanScore = 100;
+      else altmanScore = Math.round((altmanZ - 1.23) / (2.9 - 1.23) * 100);
+    }
+  }
+
+  const weights = { debtWall: 25, stressIcr: 40, altman: 35 };
+  let num = 0, denom = 0;
+  if(debtWallScore != null){ num += debtWallScore * weights.debtWall; denom += weights.debtWall; }
+  if(stressIcrScore != null){ num += stressIcrScore * weights.stressIcr; denom += weights.stressIcr; }
+  if(altmanScore != null){ num += altmanScore * weights.altman; denom += weights.altman; }
+  const score = denom > 0 ? Math.round(num / denom) : null;
+
+  return {
+    score, year: lp.year,
+    debtWallScore, debtWallRatio, maturing12m,
+    stressIcrScore, stressIcrVal,
+    altmanScore, altmanZ,
+  };
+}
+
+// Цвет плитки/бара по значению score 0-100. null → серый.
+function _repStressColor(score){
+  if(score == null) return 'var(--text3)';
+  if(score >= 70) return 'var(--green)';
+  if(score >= 40) return 'var(--warn)';
+  return 'var(--danger)';
+}
+
 // Рендер чипсов годов последнего отчёта для фильтра каталога MOEX.
 // Выбранные годы хранятся в window._moexSelectedYears (Set<number>).
 function moexRenderYearFilter(){
@@ -6977,6 +7070,32 @@ function _repRenderActiveIssuerHeader(){
   const isSpv = indKey === 'holdings_spv';
   const indColor = isSpv ? 'var(--warn)' : (indKey === 'other' ? 'var(--text3)' : 'var(--acc)');
   const okvedStr = iss.okved ? `<span style="color:var(--text2);font-family:var(--mono)">${_escHtml(iss.okved)}</span>${iss.okvedName ? ' — <span style="color:var(--text3)">' + _escHtml(iss.okvedName.slice(0, 100)) + '</span>' : ''}` : '<span style="color:var(--text3)">не определён (запусти «📡 ГИР БО (дописать)»)</span>';
+  // Плитка «Запас прочности»: композит debt-wall/stressed-ICR/Altman-Z'.
+  const st = _repStressScore(iss);
+  const stColor = _repStressColor(st.score);
+  const stWidth = st.score != null ? st.score : 0;
+  const fmt = (v, d) => (v == null || !isFinite(v)) ? '—' : v.toFixed(d != null ? d : 2);
+  const dwPart = st.debtWallScore != null
+    ? `<span title="Погашения бондов за 12 мес / (cash + EBITDA). ≤1 = есть запас, >1 = нужен рефинанс" style="color:${_repStressColor(st.debtWallScore)}">Долг.стена ${fmt(st.debtWallRatio)}x</span>`
+    : '<span style="color:var(--text3)" title="Нет данных: нужен ИНН эмитента, MOEX-каталог и EBITDA">Долг.стена —</span>';
+  const icrPart = st.stressIcrScore != null
+    ? `<span title="EBITDA×0.8 / проценты×1.2 (шок −20%/+20%). 1.0 = перелом" style="color:${_repStressColor(st.stressIcrScore)}">Stress-ICR ${fmt(st.stressIcrVal)}</span>`
+    : '<span style="color:var(--text3)" title="Нет EBITDA или процентных расходов">Stress-ICR —</span>';
+  const zPart = st.altmanScore != null
+    ? `<span title="Альтман Z' (book-value). <1.23 = зона дефолта, >2.9 = безопасно" style="color:${_repStressColor(st.altmanScore)}">Altman Z' ${fmt(st.altmanZ)}</span>`
+    : '<span style="color:var(--text3)" title="Нужны assets + ≥4 из (ca,cl,ret,ebit,eq,rev)">Altman Z\' —</span>';
+  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nВеса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 25%. Если сигнал отсутствует — вес перераспределяется.`;
+  const stTile = `
+    <div style="margin-top:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${stTooltip}">
+      <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}</div>
+      <div style="flex:1;min-width:140px;height:8px;background:var(--s2);border:1px solid var(--border);position:relative">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:${stWidth}%;background:${stColor}"></div>
+      </div>
+      <div style="font-weight:700;font-size:.78rem;color:${stColor};font-family:var(--mono);min-width:50px;text-align:right">${st.score != null ? st.score : '—'}<span style="font-size:.5rem;color:var(--text3)">/100</span></div>
+      <div style="flex-basis:100%;font-size:.54rem;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">
+        ${dwPart} · ${icrPart} · ${zPart}
+      </div>
+    </div>`;
   box.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div style="flex:1;min-width:200px">
@@ -6987,7 +7106,8 @@ function _repRenderActiveIssuerHeader(){
         <span style="padding:3px 8px;background:var(--bg);border:1px solid ${indColor};color:${indColor};font-size:.62rem">${isSpv ? '🏴 ' : ''}${_escHtml(indLabel)}</span>
         <button class="btn btn-sm" onclick="repChangeIndustry()" title="Сменить отрасль вручную (не перезапишется при следующем bulk'е если только не сбросить в 'other')" style="font-size:.56rem;padding:3px 7px">✎ отрасль</button>
       </div>
-    </div>`;
+    </div>
+    ${stTile}`;
 }
 
 // Модалка смены отрасли — показывает список всех отраслей из
@@ -14961,6 +15081,7 @@ function moexApplyFilters(){
     ratingMin: document.getElementById('moex-f-rating-min')?.value || '',
     ratingHas: document.getElementById('moex-f-rating-has')?.value || '',
     pctThresh: _num(document.getElementById('moex-f-pct-thresh')?.value),
+    stressMin: _num(document.getElementById('moex-f-stress-min')?.value),
     sort: document.getElementById('moex-sort').value || 'ytm-desc',
   };
   // Любой из фундамент-фильтров → подразумевает «только есть в базе».
@@ -14970,6 +15091,12 @@ function moexApplyFilters(){
   const metricsCache = new Map();
   // Перцентили внутри отрасли: строим один раз на apply, если фильтр включён.
   const pctRanks = f.pctThresh != null ? _moexBuildIndustryRanks() : null;
+  // Кэш «Запас прочности» по issId — чтобы не пересчитывать на каждой строке.
+  const stressCache = new Map();
+  const getStress = issId => {
+    if(!stressCache.has(issId)) stressCache.set(issId, _repStressScore(reportsDB[issId]));
+    return stressCache.get(issId);
+  };
 
   const issIdx = _moexBuildIssuerIndex();
   const today = Date.now();
@@ -15080,6 +15207,13 @@ function moexApplyFilters(){
       for(const k in r){
         if(r[k] != null && r[k] < f.pctThresh) return false;
       }
+    }
+    // Фильтр «Запас прочности»: композит debt-wall / stress-ICR / Altman Z'.
+    // Без matched эмитента или без данных для расчёта — скрываем.
+    if(f.stressMin != null){
+      if(!b.issId) return false;
+      const s = getStress(b.issId);
+      if(s.score == null || s.score < f.stressMin) return false;
     }
     return true;
   });
@@ -15269,7 +15403,7 @@ function _moexRenderTable(list){
 
 function moexResetFilters(){
   ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min',
-   'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min'].forEach(id => {
+   'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min','moex-f-stress-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh'].forEach(id => {

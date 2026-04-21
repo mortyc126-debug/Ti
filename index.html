@@ -2038,6 +2038,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="no">Только без рейтинга</option>
           </select>
         </div>
+        <div class="field" style="margin:0" title="Запас прочности эмитента — композит 3 сигналов: Stressed-ICR (EBITDA×0.8/проценты×1.2, вес 40%), Altman Z' (35%), Долговая стена (погашения 12м / cash+EBITDA, 25%). Шкала 0–100: 0 = у критической точки, 100 = устойчиво. Красная зона <40, жёлтая 40–70, зелёная ≥70. Видно в плитке на странице «📂 Отчётность» для каждого эмитента.">
+          <label style="font-size:.55rem">🛡 Запас прочности ≥</label>
+          <input type="number" id="moex-f-stress-min" oninput="moexApplyFilters()" step="5" min="0" max="100" placeholder="напр. 40">
+        </div>
         <div class="field" style="margin:0" title="Для каждого эмитента смотрим 8 ключевых метрик (EBITDA-маржа, чистая маржа, ROA, ROE, ICR, ND/EBITDA, Current, Equity ratio) и считаем его ранг внутри его же отрасли. Если хотя бы одна метрика попадает в худший хвост — выпуск скрываем. Сравнение per-industry: у банков D/E=10 — норма, у ритейла катастрофа. Отрасли с <3 эмитентами в базе исключаются как неинформативные.">
           <label style="font-size:.55rem">🏭 Отсекать аутсайдеров отрасли</label>
           <select id="moex-f-pct-thresh" onchange="moexApplyFilters()">
