@@ -14941,8 +14941,10 @@ function moexApplyFilters(){
     ccy:  document.getElementById('moex-f-ccy').value,
     ytmMin: _num(document.getElementById('moex-f-ytm-min').value),
     ytmMax: _num(document.getElementById('moex-f-ytm-max').value),
-    matMin: _num(document.getElementById('moex-f-mat-min').value),
-    matMax: _num(document.getElementById('moex-f-mat-max').value),
+    // Срок в UI вводится в месяцах (пользовательнице так удобнее),
+    // b.matYears хранится в годах → делим на 12.
+    matMin: (() => { const m = _num(document.getElementById('moex-f-mat-min').value); return m != null ? m / 12 : null; })(),
+    matMax: (() => { const m = _num(document.getElementById('moex-f-mat-max').value); return m != null ? m / 12 : null; })(),
     coupon: document.getElementById('moex-f-coupon').value,
     freq: document.getElementById('moex-f-freq')?.value || '',
     offer: document.getElementById('moex-f-offer').value,

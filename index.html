@@ -1930,12 +1930,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <input type="number" id="moex-f-ytm-max" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 25">
       </div>
       <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Срок от, лет</label>
-        <input type="number" id="moex-f-mat-min" oninput="moexApplyFilters()" step="0.1" placeholder="0.5">
+        <label style="font-size:.55rem">Срок от, мес</label>
+        <input type="number" id="moex-f-mat-min" oninput="moexApplyFilters()" step="1" min="0" placeholder="6">
       </div>
       <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Срок до, лет</label>
-        <input type="number" id="moex-f-mat-max" oninput="moexApplyFilters()" step="0.5" placeholder="10">
+        <label style="font-size:.55rem">Срок до, мес</label>
+        <input type="number" id="moex-f-mat-max" oninput="moexApplyFilters()" step="1" min="0" placeholder="120">
       </div>
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Тип купона</label>
