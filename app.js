@@ -15070,6 +15070,8 @@ function moexApplyFilters(){
     offer: document.getElementById('moex-f-offer').value,
     amort: document.getElementById('moex-f-amort')?.value || '',
     sizeMin: _num(document.getElementById('moex-f-size-min').value),
+    priceMin: _num(document.getElementById('moex-f-price-min')?.value),
+    priceMax: _num(document.getElementById('moex-f-price-max')?.value),
     inDbOnly: document.getElementById('moex-f-indb').checked,
     showStructured: document.getElementById('moex-f-structured')?.checked || false,
     // Фильтры по фундаменталу:
@@ -15168,6 +15170,8 @@ function moexApplyFilters(){
       const sizeM = b.issueSize && b.faceValue ? (b.issueSize * b.faceValue / 1e6) : null;
       if(sizeM == null || sizeM < f.sizeMin) return false;
     }
+    if(f.priceMin != null && (b.price == null || b.price < f.priceMin)) return false;
+    if(f.priceMax != null && (b.price == null || b.price > f.priceMax)) return false;
     if(f.inDbOnly && !b.issId) return false;
     // Фильтр «Год последнего отчёта эмитента»: бумаги проходят только
     // если у эмитента в reportsDB последний период попал в отмеченный
@@ -15285,6 +15289,24 @@ function moexApplyFilters(){
     'dde-worst': byMetric('dde', false, true),
     'ebm-best':  byMetric('ebm', true, false),
     'ebm-worst': byMetric('ebm', true, true),
+    // Запас прочности: берём из кэша getStress (считается лениво, если
+    // сортировка активна — пробежит по всем бумагам с issId).
+    'stress-best': (a, b) => {
+      const va = a.issId ? getStress(a.issId).score : null;
+      const vb = b.issId ? getStress(b.issId).score : null;
+      if(va == null && vb == null) return 0;
+      if(va == null) return 1;
+      if(vb == null) return -1;
+      return vb - va;
+    },
+    'stress-worst': (a, b) => {
+      const va = a.issId ? getStress(a.issId).score : null;
+      const vb = b.issId ? getStress(b.issId).score : null;
+      if(va == null && vb == null) return 0;
+      if(va == null) return 1;
+      if(vb == null) return -1;
+      return va - vb;
+    },
   }[f.sort];
   if(cmp) filtered.sort(cmp);
 
@@ -15403,6 +15425,7 @@ function _moexRenderTable(list){
 
 function moexResetFilters(){
   ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min',
+   'moex-f-price-min','moex-f-price-max',
    'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min','moex-f-stress-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });

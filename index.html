@@ -1975,6 +1975,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <label style="font-size:.55rem">Объём выпуска от, млн ₽</label>
         <input type="number" id="moex-f-size-min" oninput="moexApplyFilters()" step="100" placeholder="500">
       </div>
+      <div class="field" style="margin:0" title="Цена в % от номинала. 100 = по номиналу, <100 = дисконт (бумага ниже номинала), >100 = премия.">
+        <label style="font-size:.55rem">Цена от, % номинала</label>
+        <input type="number" id="moex-f-price-min" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 80">
+      </div>
+      <div class="field" style="margin:0" title="Цена в % от номинала. 100 = по номиналу, <100 = дисконт, >100 = премия.">
+        <label style="font-size:.55rem">Цена до, % номинала</label>
+        <input type="number" id="moex-f-price-max" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 100">
+      </div>
       <div class="field" style="margin:0" title="Показать только выпуски эмитентов, у которых у тебя есть отчётность в reportsDB">
         <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
           <input type="checkbox" id="moex-f-indb" onchange="moexApplyFilters()" style="margin:0"> Только «есть в базе»
@@ -2093,6 +2101,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="dde-worst">D/E (худшие сверху)</option>
             <option value="ebm-best">EBITDA-маржа (лучшие сверху)</option>
             <option value="ebm-worst">EBITDA-маржа (худшие сверху)</option>
+            <option value="stress-best">🛡 Запас прочности ↓ (лучшие сверху)</option>
+            <option value="stress-worst">🛡 Запас прочности ↑ (худшие сверху)</option>
           </optgroup>
         </select>
       </label>
