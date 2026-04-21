@@ -6820,10 +6820,11 @@ function _computeStressFromPeriod(p, ownInn, horizonDays){
 }
 
 // Подбирает прошлогодний период (для тренда). Предпочитаем годовой того
-// же типа; если нет — любой период с year = latest.year - 1.
-function _repPriorAnnualPeriod(iss, latest){
+// же типа; если нет — любой период с year = latest.year - yearsBack.
+function _repPriorAnnualPeriod(iss, latest, yearsBack){
   if(!iss || !iss.periods || !latest) return null;
-  const targetYear = latest.year - 1;
+  const back = yearsBack || 1;
+  const targetYear = latest.year - back;
   let fallback = null;
   for(const [k, p] of Object.entries(iss.periods)){
     if(!p) continue;
@@ -6856,9 +6857,35 @@ function _repStressScore(iss, opts){
   if(!lp) return { score: null, usedParent };
 
   const cur = _computeStressFromPeriod(lp.period, iss.inn, 730);
-  // Тренд: тот же расчёт по прошлогоднему периоду.
-  const prior = _repPriorAnnualPeriod(dataIss, lp);
+  // Тренд: предпочитаем 3 года назад (устойчивый тренд для ВДО с
+  // экспансией, год-к-году шумный); fallback на 2 и 1 год если нужных
+  // периодов нет в reportsDB.
+  let prior = null;
+  for(const back of [3, 2, 1]){
+    prior = _repPriorAnnualPeriod(dataIss, lp, back);
+    if(prior) break;
+  }
   const prev = prior ? _computeStressFromPeriod(prior.period, iss.inn, 730) : null;
+  const yearsBack = prior ? (lp.year - prior.year) : null;
+
+  // Красный флажок «долг обгоняет прибыль»: если за lookback период долг
+  // вырос заметно быстрее EBITDA — это скрытый риск даже при нормальном
+  // моментальном score. Порог 1.5× (долг растёт минимум в 1.5 раза
+  // быстрее прибыли). Не влияет на сам score, только индикация.
+  let debtOutpacingEbitda = null; // null = не посчитано, true/false = факт
+  let debtRatio = null, ebitdaRatio = null;
+  if(prior){
+    const curEbitda = lp.period.ebitda != null ? lp.period.ebitda : lp.period.ebit;
+    const prevEbitda = prior.period.ebitda != null ? prior.period.ebitda : prior.period.ebit;
+    if(lp.period.debt != null && prior.period.debt != null
+       && prior.period.debt > 0 && curEbitda != null && prevEbitda != null && prevEbitda > 0){
+      debtRatio = lp.period.debt / prior.period.debt;
+      ebitdaRatio = curEbitda / prevEbitda;
+      if(ebitdaRatio > 0){
+        debtOutpacingEbitda = debtRatio / ebitdaRatio;
+      }
+    }
+  }
 
   return {
     score: cur.score, year: lp.year, usedParent,
@@ -6867,6 +6894,8 @@ function _repStressScore(iss, opts){
     altmanScore: cur.altmanScore, altmanZ: cur.altmanZ,
     priorScore: prev ? prev.score : null,
     priorYear: prior ? prior.year : null,
+    priorYearsBack: yearsBack,
+    debtOutpacingEbitda, debtRatio, ebitdaRatio,
   };
 }
 
@@ -7161,7 +7190,23 @@ function _repRenderActiveIssuerHeader(){
   const zPart = st.altmanScore != null
     ? `<span title="Альтман Z' (book-value). <1.23 = зона дефолта, >2.9 = безопасно" style="color:${_repStressColor(st.altmanScore)}">Altman Z' ${fmt(st.altmanZ)}</span>`
     : '<span style="color:var(--text3)" title="Нужны assets + ≥4 из (ca,cl,ret,ebit,eq,rev)">Altman Z\' —</span>';
+  // Красный флажок «долг обгоняет прибыль». >1.0 = жёлтый warning
+  // (изменение долга больше изменения прибыли — уже сомнительно),
+  // >1.5 = красный critical (долг растёт в 1.5+ раза быстрее).
+  let outpaceBadge = '';
+  if(st.debtOutpacingEbitda != null){
+    const k = st.debtOutpacingEbitda;
+    const debtPct = st.debtRatio != null ? ((st.debtRatio - 1) * 100).toFixed(0) : '—';
+    const ebitPct = st.ebitdaRatio != null ? ((st.ebitdaRatio - 1) * 100).toFixed(0) : '—';
+    const yrs = st.priorYearsBack || 1;
+    if(k >= 1.5){
+      outpaceBadge = `<span style="color:#fff;background:var(--danger);padding:1px 5px;font-weight:700;margin-right:6px" title="За ${yrs}г долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Долг растёт заметно быстрее прибыли: каждый новый рубль долга даёт меньше операционки на его обслуживание. Лидирующий индикатор зависимости от рефинанса.">⚠ долг обгоняет прибыль ${k.toFixed(2)}×</span>`;
+    } else if(k > 1.0){
+      outpaceBadge = `<span style="color:var(--warn);border:1px solid var(--warn);padding:1px 5px;margin-right:6px" title="За ${yrs}г долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Изменение долга больше изменения прибыли — сомнительная динамика, особенно если повторяется несколько лет.">долг > прибыль ${k.toFixed(2)}×</span>`;
+    }
+  }
   // Тренд: было vs стало. Стрелка + дельта. ≥3 пунктов — раскрашиваем.
+  // Lookback предпочтительно 3 года (устойчивый тренд), с fallback 2/1.
   let trendHtml = '';
   if(st.priorScore != null && st.score != null){
     const delta = st.score - st.priorScore;
@@ -7170,7 +7215,9 @@ function _repRenderActiveIssuerHeader(){
     else if(delta <= -3){ arrow = '↘'; color = 'var(--danger)'; }
     else { arrow = '→'; color = 'var(--text3)'; }
     const sign = delta > 0 ? '+' : '';
-    trendHtml = `<span style="font-size:.6rem;color:${color};font-family:var(--mono);margin-left:6px" title="Запас прочности год назад был ${st.priorScore} (${st.priorYear}); сейчас ${st.score}. Тренд важнее уровня — устойчивая компания может ехать к проблемам, если score падает несколько лет подряд.">${arrow} ${sign}${delta} vs ${st.priorYear}</span>`;
+    const yrs = st.priorYearsBack || 1;
+    const suffix = yrs > 1 ? ` (${yrs}г)` : '';
+    trendHtml = `<span style="font-size:.6rem;color:${color};font-family:var(--mono);margin-left:6px" title="Запас прочности ${yrs} ${yrs<5?'года':'лет'} назад был ${st.priorScore} (${st.priorYear}); сейчас ${st.score}. Тренд важнее уровня — устойчивая компания может ехать к проблемам, если score падает несколько лет подряд.">${arrow} ${sign}${delta} vs ${st.priorYear}${suffix}</span>`;
   }
   const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nВеса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
   const stTile = `
@@ -7180,8 +7227,8 @@ function _repRenderActiveIssuerHeader(){
         <div style="position:absolute;left:0;top:0;bottom:0;width:${stWidth}%;background:${stColor}"></div>
       </div>
       <div style="font-weight:700;font-size:.78rem;color:${stColor};font-family:var(--mono);min-width:50px;text-align:right">${st.score != null ? st.score : '—'}<span style="font-size:.5rem;color:var(--text3)">/100</span>${trendHtml}</div>
-      <div style="flex-basis:100%;font-size:.54rem;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">
-        ${dwPart} · ${icrPart} · ${zPart}
+      <div style="flex-basis:100%;font-size:.54rem;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${outpaceBadge}${dwPart} · ${icrPart} · ${zPart}
       </div>
     </div>`;
   // Строка со связанными компаниями (материнская / связанные ИНН).
