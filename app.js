@@ -6772,11 +6772,16 @@ function _computeStressFromPeriod(p, ownInn, horizonDays){
     }
     maturingSum = sum;
     const liquid = (p.cash || 0) + ebitda * horizonYears;
-    if(liquid > 0){
+    if(sum > 0 && liquid > 0){
       debtWallRatio = sum / liquid;
       debtWallScore = Math.max(0, Math.min(100, Math.round(100 - debtWallRatio * 50)));
-    } else if(sum > 0) debtWallScore = 0;
-    else debtWallScore = 100;
+    } else if(sum > 0 && liquid <= 0){
+      debtWallScore = 0;
+    }
+    // Если sum=0 — бонды эмитента в MOEX-каталоге не найдены: либо их
+    // действительно нет, либо каталог устарел / не матчится по ИНН
+    // (SPV с казахским резидентством и т.п.). Не даём 100 баллов зря —
+    // возвращаем null и перераспределяем вес на другие сигналы.
   }
   // 2) Stressed ICR (без изменений — годовая концепция)
   let stressIcrScore = null, stressIcrVal = null;
@@ -6868,21 +6873,29 @@ function _repStressScore(iss, opts){
   const prev = prior ? _computeStressFromPeriod(prior.period, iss.inn, 730) : null;
   const yearsBack = prior ? (lp.year - prior.year) : null;
 
-  // Соотношение роста долга к росту EBITDA за lookback-окно — если >1,
-  // каждый новый рубль долга даёт меньше операционки на обслуживание.
-  // Лидирующий индикатор: вырос раньше Altman/ICR.
+  // Соотношение роста долга к росту EBITDA — берём МАКСИМУМ (худшее) по
+  // всем доступным окнам 1/2/3 года. Иначе длинное окно сглаживает
+  // свежее ускорение: 2022→2025 может дать мягкие 1.3×, а 2023→2025 —
+  // жёсткие 1.8×. Нам важнее, что рынок видит последнее.
   let debtOutpacingEbitda = null;
   let debtRatio = null, ebitdaRatio = null;
-  if(prior){
-    const curEbitda = lp.period.ebitda != null ? lp.period.ebitda : lp.period.ebit;
-    const prevEbitda = prior.period.ebitda != null ? prior.period.ebitda : prior.period.ebit;
-    if(lp.period.debt != null && prior.period.debt != null
-       && prior.period.debt > 0 && curEbitda != null && prevEbitda != null && prevEbitda > 0){
-      debtRatio = lp.period.debt / prior.period.debt;
-      ebitdaRatio = curEbitda / prevEbitda;
-      if(ebitdaRatio > 0){
-        debtOutpacingEbitda = debtRatio / ebitdaRatio;
-      }
+  let outpaceYearsBack = null;
+  const curEbitda = lp.period.ebitda != null ? lp.period.ebitda : lp.period.ebit;
+  for(const back of [1, 2, 3]){
+    const pp = _repPriorAnnualPeriod(dataIss, lp, back);
+    if(!pp) continue;
+    const ppEb = pp.period.ebitda != null ? pp.period.ebitda : pp.period.ebit;
+    if(lp.period.debt == null || pp.period.debt == null
+       || pp.period.debt <= 0 || curEbitda == null || ppEb == null || ppEb <= 0) continue;
+    const dr = lp.period.debt / pp.period.debt;
+    const er = curEbitda / ppEb;
+    if(er <= 0) continue;
+    const k = dr / er;
+    if(debtOutpacingEbitda == null || k > debtOutpacingEbitda){
+      debtOutpacingEbitda = k;
+      debtRatio = dr;
+      ebitdaRatio = er;
+      outpaceYearsBack = back;
     }
   }
 
@@ -6928,7 +6941,7 @@ function _repStressScore(iss, opts){
     priorScore: finalPriorScore,
     priorYear: prior ? prior.year : null,
     priorYearsBack: yearsBack,
-    debtOutpacingEbitda, debtRatio, ebitdaRatio,
+    debtOutpacingEbitda, debtRatio, ebitdaRatio, outpaceYearsBack,
   };
 }
 
@@ -7231,11 +7244,11 @@ function _repRenderActiveIssuerHeader(){
     const k = st.debtOutpacingEbitda;
     const debtPct = st.debtRatio != null ? ((st.debtRatio - 1) * 100).toFixed(0) : '—';
     const ebitPct = st.ebitdaRatio != null ? ((st.ebitdaRatio - 1) * 100).toFixed(0) : '—';
-    const yrs = st.priorYearsBack || 1;
+    const yrs = st.outpaceYearsBack || 1;
     if(k >= 1.5){
-      outpaceBadge = `<span style="color:#fff;background:var(--danger);padding:1px 5px;font-weight:700;margin-right:6px" title="За ${yrs}г долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Долг растёт заметно быстрее прибыли: каждый новый рубль долга даёт меньше операционки на его обслуживание. Лидирующий индикатор зависимости от рефинанса.">⚠ долг обгоняет прибыль ${k.toFixed(2)}×</span>`;
+      outpaceBadge = `<span style="color:#fff;background:var(--danger);padding:1px 5px;font-weight:700;margin-right:6px" title="За ${yrs}г (худшее из доступных окон) долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Долг растёт заметно быстрее прибыли: каждый новый рубль долга даёт меньше операционки на его обслуживание. Лидирующий индикатор зависимости от рефинанса.">⚠ долг обгоняет прибыль ${k.toFixed(2)}× (${yrs}г)</span>`;
     } else if(k > 1.0){
-      outpaceBadge = `<span style="color:var(--warn);border:1px solid var(--warn);padding:1px 5px;margin-right:6px" title="За ${yrs}г долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Изменение долга больше изменения прибыли — сомнительная динамика, особенно если повторяется несколько лет.">долг > прибыль ${k.toFixed(2)}×</span>`;
+      outpaceBadge = `<span style="color:var(--warn);border:1px solid var(--warn);padding:1px 5px;margin-right:6px" title="За ${yrs}г (худшее из доступных окон) долг вырос на ${debtPct}%, EBITDA на ${ebitPct}% — соотношение ${k.toFixed(2)}×. Изменение долга больше изменения прибыли — сомнительная динамика, особенно если повторяется несколько лет.">долг > прибыль ${k.toFixed(2)}× (${yrs}г)</span>`;
     }
   }
   // Тренд: было vs стало. Стрелка + дельта. ≥3 пунктов — раскрашиваем.
@@ -7856,8 +7869,13 @@ function repRenderAnalysis(p, iss){
     sz:     null,
     peak:   null,
   };
-  window._lastAnalysis = { d, opts:{mode:'archive'}, containerId:'rep-analysis-area' };
-  area.innerHTML = buildAnalysisHTML(d, {mode:'archive'});
+  // Передаём stress-score в анализ, чтобы «Низкий/Умеренный/Высокий риск»
+  // учитывал динамику и штраф за leverage — а не только упрощённый
+  // 5-условный dangerCount по точечным метрикам.
+  const stress = (typeof _repStressScore === 'function') ? _repStressScore(iss) : null;
+  const opts = {mode:'archive', stress};
+  window._lastAnalysis = { d, opts, containerId:'rep-analysis-area' };
+  area.innerHTML = buildAnalysisHTML(d, opts);
 }
 
 // ── Compare ──
@@ -11796,6 +11814,23 @@ function buildAnalysisHTML(d, opts={}) {
     if(dangerCount===0){riskLevel='Низкий';riskColor='var(--green)';riskIcon='🟢';}
     else if(dangerCount===1){riskLevel='Умеренный';riskColor='var(--warn)';riskIcon='🟡';}
     else{riskLevel='Высокий';riskColor='var(--danger)';riskIcon='🔴';}
+  }
+  // Stress-score перекрывает упрощённый dangerCount: он видит тренд за
+  // 3 года, штраф за рост долга быстрее прибыли, Altman Z', долговую
+  // стену — это ближе к агентственной оценке, чем пять if'ов по точечным
+  // метрикам. Берём ХУДШИЙ из двух вердиктов (консервативно).
+  if(opts && opts.stress && opts.stress.score != null){
+    const s = opts.stress.score;
+    const rank = lvl => lvl === 'Высокий' ? 3 : lvl === 'Умеренный' ? 2 : lvl === 'Низкий' ? 1 : 0;
+    let stressLevel, stressColor, stressIcon;
+    if(s < 40){ stressLevel = 'Высокий'; stressColor = 'var(--danger)'; stressIcon = '🔴'; }
+    else if(s < 70){ stressLevel = 'Умеренный'; stressColor = 'var(--warn)'; stressIcon = '🟡'; }
+    else { stressLevel = 'Низкий'; stressColor = 'var(--green)'; stressIcon = '🟢'; }
+    if(rank(stressLevel) > rank(riskLevel)){
+      riskLevel = stressLevel;
+      riskColor = stressColor;
+      riskIcon = stressIcon;
+    }
   }
 
   const hasAny = debtSection||profSection||liqSection||bondSection;
