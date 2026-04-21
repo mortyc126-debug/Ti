@@ -7096,15 +7096,30 @@ function _repRenderActiveIssuerHeader(){
         ${dwPart} · ${icrPart} · ${zPart}
       </div>
     </div>`;
+  // Строка со связанными компаниями (материнская / связанные ИНН).
+  // Для SPV-эмитентов показывает на кого по факту смотреть в отчётах.
+  const related = Array.isArray(iss.related) ? iss.related : [];
+  const relatedRow = related.length
+    ? `<div style="color:var(--text3);font-size:.56rem;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="color:var(--text2)">🔗 Связи:</span>
+        ${related.map((r, i) => {
+          const icon = r.role === 'parent' ? '🏛' : '🔗';
+          const label = r.role === 'parent' ? 'материнская' : 'связанная';
+          return `<span style="border:1px solid var(--border2);padding:1px 5px;font-family:var(--mono);color:var(--text2)" title="${label}">${icon} ${_escHtml(r.inn)}${r.name ? ' · ' + _escHtml(r.name) : ''}</span>`;
+        }).join('')}
+       </div>`
+    : '';
   box.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div style="flex:1;min-width:200px">
         <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}</div>
         <div style="color:var(--text3);font-size:.58rem;margin-top:2px">${iss.inn ? 'ИНН <strong style="color:var(--text2);font-family:var(--mono)">' + iss.inn + '</strong>' : 'ИНН не задан'}${iss.okved ? ' · ОКВЭД ' + okvedStr : ''}</div>
+        ${relatedRow}
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <span style="padding:3px 8px;background:var(--bg);border:1px solid ${indColor};color:${indColor};font-size:.62rem">${isSpv ? '🏴 ' : ''}${_escHtml(indLabel)}</span>
         <button class="btn btn-sm" onclick="repChangeIndustry()" title="Сменить отрасль вручную (не перезапишется при следующем bulk'е если только не сбросить в 'other')" style="font-size:.56rem;padding:3px 7px">✎ отрасль</button>
+        <button class="btn btn-sm" onclick="repEditRelated()" title="Добавить материнскую или связанную компанию (ИНН). Нужно для SPV-эмитентов, у которых отчётность пустая — реальные цифры у головной. В будущем можно будет тянуть отчётность по связанным ИНН автоматом." style="font-size:.56rem;padding:3px 7px">🔗 связи</button>
       </div>
     </div>
     ${stTile}`;
@@ -7141,6 +7156,57 @@ async function repChangeIndustry(){
   save();
   _repRenderActiveIssuerHeader();
   repRenderIssuerList();
+}
+
+// Редактор связанных компаний для активного эмитента. Хранится в
+// iss.related = [{inn, role: 'parent'|'related', name}]. Нужно в первую
+// очередь для SPV: у эмитента-SPV бондов отчётность пустая, а цифры
+// лежат у головной компании. Сейчас просто сохраняем, в будущем
+// тут будет авто-подтяжка отчётности/скоринга по связанным ИНН.
+function repEditRelated(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  if(!Array.isArray(iss.related)) iss.related = [];
+  const list = iss.related.length
+    ? iss.related.map((r, i) => `${i+1}. [${r.role === 'parent' ? '🏛 материнская' : '🔗 связанная'}] ИНН ${r.inn}${r.name ? ' — ' + r.name : ''}`).join('\n')
+    : '(пусто)';
+  const cmd = prompt(
+    `Связанные компании эмитента «${iss.name}»:\n\n${list}\n\nКоманды:\n` +
+    `  p 7707083893 ПАО Сбербанк   — добавить материнскую\n` +
+    `  r 7707083893 ООО Дочка      — добавить связанную (дочку/сестру)\n` +
+    `  - 1                          — удалить запись #1\n\n` +
+    `Имя необязательно. Для SPV: указывайте ИНН материнской через «p».\n\nВведи команду:`,
+    ''
+  );
+  if(cmd === null) return;
+  const s = String(cmd).trim();
+  if(!s) return;
+  const add = s.match(/^([pr])\s+(\d{10,12})\s*(.*)$/i);
+  if(add){
+    const role = add[1].toLowerCase() === 'p' ? 'parent' : 'related';
+    const inn = add[2];
+    const name = (add[3] || '').trim() || null;
+    if(iss.related.some(r => r.inn === inn && r.role === role)){
+      alert(`ИНН ${inn} уже есть с ролью «${role}». Дубль не добавлен.`);
+      return;
+    }
+    iss.related.push({ inn, role, name });
+    save();
+    _repRenderActiveIssuerHeader();
+    return;
+  }
+  const del = s.match(/^-\s*(\d+)$/);
+  if(del){
+    const idx = parseInt(del[1], 10) - 1;
+    if(idx < 0 || idx >= iss.related.length){ alert('Нет такой записи'); return; }
+    const removed = iss.related.splice(idx, 1)[0];
+    save();
+    _repRenderActiveIssuerHeader();
+    alert(`Удалено: ${removed.role === 'parent' ? 'материнская' : 'связанная'} ${removed.inn}${removed.name ? ' (' + removed.name + ')' : ''}`);
+    return;
+  }
+  alert('Не понял команду. Примеры:\np 7707083893 ПАО Сбербанк\nr 1234567890 Дочка XYZ\n- 1');
 }
 
 // Показывает все выпуски активного эмитента из MOEX-каталога: по ИНН
