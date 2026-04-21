@@ -306,6 +306,75 @@ function renderYtm(){
 // ══ PORTFOLIO + MOEX ISIN LOOKUP ══
 
 // ══ REFRESH ALL PRICES ══
+// Тянет историю OHLC с MOEX ISS для одного бонда и возвращает
+// {chg7d, chg30d, last} в % от номинала. Нужен только secid (8-значный).
+// Последние 35 торговых дней — покрывают 30-дневное окно с запасом.
+async function fetchBondPriceHistory(secid){
+  if(!secid) return null;
+  // MOEX history endpoint отдаёт OHLC помесячно/подневно, используем last limit=35.
+  const resp = await moexFetch(`/iss/history/engines/stock/markets/bonds/securities/${encodeURIComponent(secid)}.json?limit=35&start=0`);
+  const hist = resp?.history;
+  if(!hist || !hist.data || !hist.data.length) return null;
+  const cols = hist.columns || [];
+  const iClose = cols.indexOf('CLOSE');
+  const iLegal = cols.indexOf('LEGALCLOSEPRICE');
+  const iDate = cols.indexOf('TRADEDATE');
+  // Берём хронологически последние 35 записей. MOEX обычно отдаёт
+  // отсортированно по возрастанию даты, но подстрахуемся.
+  const rows = hist.data.slice()
+    .sort((a, b) => String(a[iDate]).localeCompare(String(b[iDate])))
+    .filter(r => (r[iClose] != null && r[iClose] > 0) || (r[iLegal] != null && r[iLegal] > 0))
+    .map(r => ({ date: r[iDate], price: r[iClose] > 0 ? r[iClose] : r[iLegal] }));
+  if(!rows.length) return null;
+  const last = rows[rows.length - 1];
+  const pAt = (daysAgo) => {
+    // Ищем ближайшую запись ≤ (последняя дата − daysAgo).
+    const target = new Date(last.date); target.setDate(target.getDate() - daysAgo);
+    const targetStr = target.toISOString().slice(0, 10);
+    let best = null;
+    for(const r of rows){ if(r.date <= targetStr) best = r; else break; }
+    return best ? best.price : null;
+  };
+  const p7 = pAt(7), p30 = pAt(30);
+  return {
+    lastPrice: last.price,
+    lastDate: last.date,
+    chg7d: p7 ? (last.price - p7) / p7 * 100 : null,
+    chg30d: p30 ? (last.price - p30) / p30 * 100 : null,
+  };
+}
+
+// Батч-обновление истории цен для списка секидов. Прогресс через callback.
+// Результат сохраняется в window._moexPriceHistoryCache: {secid: {chg7d, chg30d, lastPrice, lastDate, ts}}.
+async function refreshBondPriceHistoryBatch(secids, onProgress){
+  window._moexPriceHistoryCache = window._moexPriceHistoryCache || {};
+  const cache = window._moexPriceHistoryCache;
+  let ok = 0, fail = 0;
+  for(let i = 0; i < secids.length; i++){
+    const secid = secids[i];
+    if(onProgress) onProgress(i + 1, secids.length, secid);
+    try {
+      const r = await fetchBondPriceHistory(secid);
+      if(r){
+        cache[secid] = { ...r, ts: Date.now() };
+        ok++;
+      } else fail++;
+    } catch(e){ fail++; }
+    await new Promise(r => setTimeout(r, 120)); // rate-limit дружелюбно
+  }
+  // Также сохраняем в localStorage чтобы выжило рефреш.
+  try { localStorage.setItem('bondan_price_history', JSON.stringify(cache)); } catch(_){}
+  return { ok, fail };
+}
+
+// Восстанавливает кэш истории цен при старте.
+(function _restorePriceHistoryCache(){
+  try {
+    const raw = localStorage.getItem('bondan_price_history');
+    if(raw) window._moexPriceHistoryCache = JSON.parse(raw);
+  } catch(_){ window._moexPriceHistoryCache = {}; }
+})();
+
 async function refreshAllPrices() {
   const btn = document.getElementById('refresh-all-btn');
   const status = document.getElementById('refresh-status');
@@ -3853,27 +3922,92 @@ function renderWL(){
   if(!keys.length){cont.innerHTML='<div class="empty"><div class="ei">⭐</div><p>Создайте список</p></div>';return}
   if(!activeWL||!watchlists[activeWL]){cont.innerHTML='<div class="empty"><div class="ei">👆</div><p>Выберите список выше</p></div>';return}
   const wl=watchlists[activeWL];
+  // Рендер колонки с изменением цены за 7/30 дней. Цвет зелёный при
+  // росте, красный при падении. Серый если данных нет (подтяни кнопкой).
+  const priceCache = window._moexPriceHistoryCache || {};
+  const renderChgCell = b => {
+    const secid = b.isin || b.secid;
+    // В watchlist у нас часто только isin. Но истории MOEX отдаёт по secid.
+    // Если сохранили по secid, то по isin не найдём — решение: при фетче
+    // сохранять под обоими ключами (см. ниже).
+    const h = priceCache[b.secid] || priceCache[b.isin];
+    if(!h) return '<span style="color:var(--text3);font-size:.54rem">нет</span>';
+    const fmt = (v) => {
+      if(v == null) return '—';
+      const col = v >= 0.1 ? 'var(--green)' : v <= -0.1 ? 'var(--danger)' : 'var(--text3)';
+      return `<span style="color:${col};font-family:var(--mono);font-size:.6rem">${v>=0?'+':''}${v.toFixed(1)}%</span>`;
+    };
+    return `<div style="font-size:.58rem;line-height:1.3">7д ${fmt(h.chg7d)}<br>30д ${fmt(h.chg30d)}</div>`;
+  };
   cont.innerHTML=`<div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
     <span style="font-family:var(--serif);font-size:1.1rem;color:var(--acc)">${wl.name}</span>
     <span style="font-size:.61rem;color:var(--text3)">${wl.bonds.length} выпусков</span>
-    <button class="btn btn-sm btn-d" onclick="delWL('${activeWL}')" style="margin-left:auto">Удалить список</button>
+    <button class="btn btn-sm" onclick="wlRefreshPriceHistory()" title="Подтянуть с MOEX ISS историю цен за 35 дней для каждой бумаги в этом списке. 1 запрос на бумагу, ~120мс задержка между запросами. Заполняет колонки «Δ 7д / 30д».">📈 Обновить 7д/30д цен</button>
+    <button class="btn btn-sm btn-d" onclick="delWL('${activeWL}')">Удалить список</button>
   </div>
   <div class="card"><div class="tbl-wrap"><table>
-    <thead><tr><th>Название</th><th>Бумага</th><th>Купон</th><th>Цена</th><th>Купон/%</th><th>Лет</th><th>YTM</th><th>Заметка</th><th>Дата</th><th></th></tr></thead>
+    <thead><tr><th>Название</th><th>Бумага</th><th>Купон</th><th>Цена</th><th>Δ 7д/30д</th><th>Купон/%</th><th>Лет</th><th>YTM</th><th>Заметка</th><th>Дата</th><th></th></tr></thead>
     <tbody>${wl.bonds.length?wl.bonds.map(b=>`<tr>
       <td style="font-weight:600">${b.name}</td>
       <td><span class="tag ${BT_TAG[b.btype]||'tag-corp'}">${b.btype||'—'}</span></td>
       <td><span class="tag ct-${b.ctype}" style="font-size:.54rem">${CT_LABELS[b.ctype]||'—'}</span></td>
       <td>${b.price!=null?b.price.toFixed(2)+'%':'—'}</td>
+      <td>${renderChgCell(b)}</td>
       <td>${b.coupon!=null?b.coupon.toFixed(2)+'%':'—'}</td>
       <td>${_fmtMat(b.years)}</td>
       <td>${b.ytm!=null?`<span class="${ytmCls(b.ytm)}">${b.ytm.toFixed(2)}%</span>`:'—'}</td>
       <td style="color:var(--text2);font-size:.67rem;max-width:130px">${b.note||'—'}</td>
       <td style="color:var(--text3);font-size:.61rem">${new Date(b.addedAt).toLocaleDateString('ru')}</td>
       <td><button class="btn btn-sm btn-d" onclick="removeFromWL('${activeWL}',${b.id})">✕</button></td>
-    </tr>`).join(''):'<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:22px">Список пуст</td></tr>'}
+    </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:22px">Список пуст</td></tr>'}
     </tbody>
   </table></div></div>`;
+}
+
+// Батч-обновление истории цен для всех бумаг активного watchlist'а.
+// Пишет прогресс, ре-рендерит список с заполненными колонками.
+async function wlRefreshPriceHistory(){
+  if(!activeWL || !watchlists[activeWL]){ alert('Нет активного списка'); return; }
+  const wl = watchlists[activeWL];
+  if(!wl.bonds.length){ alert('Список пуст'); return; }
+  // MOEX history работает по secid (обычно 8-11 символов). Сначала
+  // резолвим secid через /iss/securities.json?q=isin если не сохранён.
+  const targets = []; // [{secid, isin, name}]
+  for(const b of wl.bonds){
+    if(b.secid){ targets.push({ secid: b.secid, isin: b.isin, name: b.name }); continue; }
+    if(!b.isin){ continue; } // без isin ничего не сделаем
+    try {
+      const s = await moexFetch(`/iss/securities.json?q=${encodeURIComponent(b.isin)}&limit=3`);
+      const scols = s?.securities?.columns || [];
+      const srows = s?.securities?.data || [];
+      const sidIdx = scols.indexOf('secid');
+      if(!srows.length) continue;
+      const secid = sidIdx >= 0 ? srows[0][sidIdx] : srows[0][0];
+      b.secid = secid; // кешируем обратно в watchlist
+      targets.push({ secid, isin: b.isin, name: b.name });
+    } catch(_){}
+  }
+  save();
+  if(!targets.length){ alert('Не удалось сопоставить ни одну бумагу с MOEX'); return; }
+  const header = document.querySelector('#wl-content .card-hdr') || document.getElementById('wl-content');
+  const status = document.createElement('div');
+  status.style.cssText = 'font-size:.58rem;color:var(--warn);padding:6px 10px';
+  status.textContent = `⏳ 0/${targets.length}...`;
+  document.getElementById('wl-content').insertBefore(status, document.getElementById('wl-content').firstChild);
+  const { ok, fail } = await refreshBondPriceHistoryBatch(
+    targets.map(t => t.secid),
+    (i, total, secid) => { status.textContent = `⏳ ${i}/${total}: ${secid}`; }
+  );
+  // Дублируем в кэше по isin — чтобы отображение находило по любому ключу.
+  const cache = window._moexPriceHistoryCache || {};
+  for(const t of targets){
+    if(cache[t.secid] && t.isin) cache[t.isin] = cache[t.secid];
+  }
+  try { localStorage.setItem('bondan_price_history', JSON.stringify(cache)); } catch(_){}
+  status.textContent = `✓ Обновлено: ${ok}, ошибок: ${fail}`;
+  status.style.color = 'var(--green)';
+  renderWL();
+  setTimeout(() => status.remove(), 3000);
 }
 function renderSbLists(){
   document.getElementById('sb-lists').innerHTML=Object.entries(watchlists).map(([id,wl])=>
@@ -15540,6 +15674,40 @@ function _moexDetectBase(b){
   return null;
 }
 
+// Строит медианный YTM по отраслям из текущего MOEX-каталога. Peer =
+// эмитенты с matched issId и iss.ind != 'other'. Требуется ≥3 бумаги в
+// группе, иначе медиана ненадёжна. Возвращает {indKey: medianYTM}.
+function _moexBuildPeerYtmMedians(){
+  const cat = window._moexCatalog;
+  if(!cat || !Array.isArray(cat.items)) return {};
+  const groups = {};
+  for(const b of cat.items){
+    if(!b.issId || b.ytm == null || !isFinite(b.ytm)) continue;
+    const iss = reportsDB[b.issId];
+    const ind = iss?.ind || 'other';
+    if(ind === 'other') continue;
+    (groups[ind] ||= []).push(b.ytm);
+  }
+  const out = {};
+  for(const [ind, ytms] of Object.entries(groups)){
+    if(ytms.length < 3) continue;
+    ytms.sort((a, b) => a - b);
+    out[ind] = ytms[Math.floor(ytms.length / 2)];
+  }
+  return out;
+}
+
+// Спред YTM бумаги к медиане её отрасли. >+1 п.п. = рынок думает что
+// она рисковее пиров (премия за риск), <−1 п.п. = переоценка или что-то
+// положительное. Null если нет matched эмитента или отрасль незаполнена.
+function _moexPeerSpread(b, medians){
+  if(!b || !b.issId || b.ytm == null) return null;
+  const iss = reportsDB[b.issId];
+  const ind = iss?.ind || 'other';
+  if(ind === 'other' || medians[ind] == null) return null;
+  return b.ytm - medians[ind];
+}
+
 function moexApplyFilters(){
   const cat = window._moexCatalog;
   const filtersCard = document.getElementById('moex-filters-card');
@@ -15602,6 +15770,11 @@ function moexApplyFilters(){
     if(!stressCache.has(issId)) stressCache.set(issId, _repStressScore(reportsDB[issId], { useParent: preferParent }));
     return stressCache.get(issId);
   };
+  // Peer-медианы YTM по отраслям — для bond-level спреда «YTM vs отрасль».
+  const peerYtmMedians = _moexBuildPeerYtmMedians();
+  // Прокидываем в рендер таблицы и фильтрованный cache — пригодится в
+  // строке бонда и экспорте.
+  window._moexPeerYtmMedians = peerYtmMedians;
 
   const issIdx = _moexBuildIssuerIndex();
   const today = Date.now();
@@ -15842,6 +16015,24 @@ function moexApplyFilters(){
       if(db == null) return -1;
       return da - db; // большая отрицательная дельта сверху
     },
+    // Peer-спред: YTM бумаги vs медиана отрасли. Широкий спред = рынок
+    // видит риск, узкий = уверенность. Null уходит в конец.
+    'peer-wide': (a, b) => {
+      const va = _moexPeerSpread(a, peerYtmMedians);
+      const vb = _moexPeerSpread(b, peerYtmMedians);
+      if(va == null && vb == null) return 0;
+      if(va == null) return 1;
+      if(vb == null) return -1;
+      return vb - va;
+    },
+    'peer-narrow': (a, b) => {
+      const va = _moexPeerSpread(a, peerYtmMedians);
+      const vb = _moexPeerSpread(b, peerYtmMedians);
+      if(va == null && vb == null) return 0;
+      if(va == null) return 1;
+      if(vb == null) return -1;
+      return va - vb;
+    },
   }[f.dynSort || f.sort];
   if(cmp) filtered.sort(cmp);
 
@@ -15889,7 +16080,18 @@ function _moexRenderTable(list){
     const offerBadge = b.offerDate ? `<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem" title="оферта ${b.offerDate}">оферта</span>` : '';
     const mat = _fmtMat(b.matYears, true);
     const matDate = b.matDate ? ` <span style="color:var(--text3);font-size:.54rem">(${b.matDate})</span>` : '';
-    const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
+    // Peer-спред (YTM − медиана отрасли): зелёный если узкий (рынок спокоен),
+    // красный если широкий (рынок видит риск). ≥3 п.п. = явная премия.
+    const peerMedians = window._moexPeerYtmMedians || {};
+    const peerSpread = _moexPeerSpread(b, peerMedians);
+    const peerSpreadBadge = peerSpread != null
+      ? (() => {
+          const sign = peerSpread > 0 ? '+' : '';
+          const color = peerSpread >= 3 ? 'var(--danger)' : peerSpread <= -1 ? 'var(--green)' : 'var(--text3)';
+          return `<span title="Спред к медиане отрасли: ваш ${b.ytm.toFixed(2)}% vs отрасль ${(b.ytm - peerSpread).toFixed(2)}%. Широкий положительный = премия за риск (рынок думает что она опаснее пиров).">  <small style="color:${color};font-size:.52rem;font-family:var(--mono)">Δотр ${sign}${peerSpread.toFixed(1)}</small></span>`;
+        })()
+      : '';
+    const ytm = b.ytm != null ? (b.ytm.toFixed(2) + '%' + peerSpreadBadge) : '—';
     const coup = b.coupon != null ? b.coupon.toFixed(2) + '%' : '—';
     const price = b.price != null ? b.price.toFixed(2) : '—';
     const sizeM = b.issueSize && b.faceValue ? Math.round(b.issueSize * b.faceValue / 1e6) : null;
