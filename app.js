@@ -15471,6 +15471,44 @@ function _moexBuildIndustryRanks(){
   return out;
 }
 
+// Показать/скрыть подфильтры по типу купона: для «Фикс» — % от/до,
+// для «Флоатер» — база ставки. Вызывается при смене moex-f-coupon.
+function onMoexCouponType(){
+  const t = document.getElementById('moex-f-coupon')?.value || '';
+  const showFix = t === 'fix';
+  const showFloat = t === 'float';
+  const el1 = document.getElementById('moex-f-fix-sub-min');
+  const el2 = document.getElementById('moex-f-fix-sub-max');
+  const el3 = document.getElementById('moex-f-float-sub');
+  if(el1) el1.style.display = showFix ? '' : 'none';
+  if(el2) el2.style.display = showFix ? '' : 'none';
+  if(el3) el3.style.display = showFloat ? '' : 'none';
+  // Если переключили с fix на float (или наоборот) — подочистим значения
+  // соответствующих скрытых полей, иначе они продолжат фильтровать молча.
+  if(!showFix){
+    const cmin = document.getElementById('moex-f-coupon-min');
+    const cmax = document.getElementById('moex-f-coupon-max');
+    if(cmin) cmin.value = '';
+    if(cmax) cmax.value = '';
+  }
+  if(!showFloat){
+    const base = document.getElementById('moex-f-base');
+    if(base) base.value = '';
+  }
+  moexApplyFilters();
+}
+
+// Эвристика: определить базу ставки флоатера по имени/описанию выпуска.
+// MOEX не отдаёт базу структурно — она часто зашита в secName/shortName.
+// Возвращает 'КС' | 'RUONIA' | 'ИПЦ' | null (если не распознано).
+function _moexDetectBase(b){
+  const text = ((b.secName || '') + ' ' + (b.shortName || '')).toUpperCase();
+  if(/\bКС\b|КЛЮЧ|KEY\s?RATE/.test(text)) return 'КС';
+  if(/RUONIA|РУОНИЯ/.test(text)) return 'RUONIA';
+  if(/ИПЦ|ИНФЛ|CPI/.test(text)) return 'ИПЦ';
+  return null;
+}
+
 function moexApplyFilters(){
   const cat = window._moexCatalog;
   const filtersCard = document.getElementById('moex-filters-card');
@@ -15495,6 +15533,9 @@ function moexApplyFilters(){
     matMin: (() => { const m = _num(document.getElementById('moex-f-mat-min').value); return m != null ? m / 12 : null; })(),
     matMax: (() => { const m = _num(document.getElementById('moex-f-mat-max').value); return m != null ? m / 12 : null; })(),
     coupon: document.getElementById('moex-f-coupon').value,
+    couponMin: _num(document.getElementById('moex-f-coupon-min')?.value),
+    couponMax: _num(document.getElementById('moex-f-coupon-max')?.value),
+    baseRate: document.getElementById('moex-f-base')?.value || '',
     freq: document.getElementById('moex-f-freq')?.value || '',
     offer: document.getElementById('moex-f-offer').value,
     amort: document.getElementById('moex-f-amort')?.value || '',
@@ -15588,8 +15629,18 @@ function moexApplyFilters(){
     if(f.ytmMax != null && (b.ytm == null || b.ytm > f.ytmMax)) return false;
     if(f.matMin != null && (b.matYears == null || b.matYears < f.matMin)) return false;
     if(f.matMax != null && (b.matYears == null || b.matYears > f.matMax)) return false;
-    if(f.coupon === 'fix' && b.isFloat) return false;
-    if(f.coupon === 'float' && !b.isFloat) return false;
+    if(f.coupon === 'fix'){
+      if(b.isFloat) return false;
+      if(f.couponMin != null && (b.coupon == null || b.coupon < f.couponMin)) return false;
+      if(f.couponMax != null && (b.coupon == null || b.coupon > f.couponMax)) return false;
+    }
+    if(f.coupon === 'float'){
+      if(!b.isFloat) return false;
+      if(f.baseRate){
+        const detected = _moexDetectBase(b);
+        if(detected !== f.baseRate) return false;
+      }
+    }
     if(f.freq && b._freq !== f.freq) return false;
     if(!f.showStructured && b._isStructured) return false;
     if(f.offer === 'yes' && !hasOffer(b)) return false;
@@ -15856,12 +15907,20 @@ function _moexRenderTable(list){
 function moexResetFilters(){
   ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min',
    'moex-f-price-min','moex-f-price-max',
+   'moex-f-coupon-min','moex-f-coupon-max',
    'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min','moex-f-stress-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh'].forEach(id => {
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh','moex-f-base'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
+  // Сбросить и видимость подсекций купонного фильтра
+  const fixMin = document.getElementById('moex-f-fix-sub-min');
+  const fixMax = document.getElementById('moex-f-fix-sub-max');
+  const flt = document.getElementById('moex-f-float-sub');
+  if(fixMin) fixMin.style.display = 'none';
+  if(fixMax) fixMax.style.display = 'none';
+  if(flt) flt.style.display = 'none';
   document.getElementById('moex-f-indb').checked = false;
   const struct = document.getElementById('moex-f-structured');
   if(struct) struct.checked = false;

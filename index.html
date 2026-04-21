@@ -1940,10 +1940,29 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Тип купона</label>
-        <select id="moex-f-coupon" onchange="moexApplyFilters()">
+        <select id="moex-f-coupon" onchange="onMoexCouponType()">
           <option value="">Все</option>
           <option value="fix">Фиксированный</option>
           <option value="float">Флоатер</option>
+        </select>
+      </div>
+      <!-- Подфильтры фикс-купона: % от/до -->
+      <div class="field" style="margin:0;display:none" id="moex-f-fix-sub-min" title="Фильтр по купонной ставке фикс-купонных бумаг. Помогает искать «18% и выше» для скрининга ВДО.">
+        <label style="font-size:.55rem">Купон от, % год.</label>
+        <input type="number" id="moex-f-coupon-min" oninput="moexApplyFilters()" step="0.5" placeholder="18">
+      </div>
+      <div class="field" style="margin:0;display:none" id="moex-f-fix-sub-max">
+        <label style="font-size:.55rem">Купон до, % год.</label>
+        <input type="number" id="moex-f-coupon-max" oninput="moexApplyFilters()" step="0.5" placeholder="25">
+      </div>
+      <!-- Подфильтр флоатера: база -->
+      <div class="field" style="margin:0;display:none" id="moex-f-float-sub" title="База ставки, к которой привязан купон. Определяется по имени выпуска (содержит «КС»/«КЛЮЧ», «RUONIA», «ИПЦ»). У выпусков без явного упоминания — неопределённая база (не попадут в конкретный фильтр).">
+        <label style="font-size:.55rem">База флоатера</label>
+        <select id="moex-f-base" onchange="moexApplyFilters()">
+          <option value="">Любая</option>
+          <option value="КС">КС / Ключевая ЦБ</option>
+          <option value="RUONIA">RUONIA</option>
+          <option value="ИПЦ">ИПЦ (инфляция)</option>
         </select>
       </div>
       <div class="field" style="margin:0">
