@@ -7001,6 +7001,18 @@ function repRenderIssuerList(){
     if(status === 'no_inn' && hasInn) continue;
     if(status === 'stale' && (!m.year || m.year >= thisYear - 2)) continue;
     if(status === 'no_moex' && _repHasMoexBonds(id, iss)) continue;
+    if(status === 'spv_no_parent'){
+      // Признак SPV: iss.ind='holdings_spv' ИЛИ имя содержит Финанс/
+      // Капитал/СПВ/Финансы ИЛИ совсем нет периодов но есть ИНН (эмитент
+      // бондов без самостоятельной отчётности).
+      const nm = String(iss.name || '');
+      const spvName = /(Финанс|Капитал|Инвест|Холдинг|СПВ|SPV|Финансы)\b/i.test(nm);
+      const isSpvInd = iss.ind === 'holdings_spv';
+      const emptyButHasInn = periodCount === 0 && hasInn;
+      const isSpv = spvName || isSpvInd || emptyButHasInn;
+      const hasParent = Array.isArray(iss.related) && iss.related.some(r => r && r.role === 'parent');
+      if(!isSpv || hasParent) continue;
+    }
     if(indFilter !== 'all' && (iss.ind || 'other') !== indFilter) continue;
     rows.push({ id, iss, m });
   }
@@ -16985,11 +16997,36 @@ function moexOpenIssuerPeek(issId){
   const removeBtn = parent
     ? `<button class="btn btn-sm" onclick="_peekRemoveParent('${issId}')" style="font-size:.56rem;padding:2px 7px;margin-left:4px" title="Отвязать материнскую (саму её запись в reportsDB не трогаем)">✕ отвязать</button>`
     : '';
+  // Строка-инструкция «как найти мать»: прямые ссылки на открытые
+  // реестры. Ручной поиск — надёжнее автопарсинга (rusprofile имеет
+  // anti-bot, ЕГРЮЛ PDF капризный). Клик открывает вкладку с
+  // ИНН-запросом, пользовательница смотрит учредителей и возвращается
+  // сюда с готовым ИНН, жмёт «🏛 привязать».
+  const innForSearch = iss.inn ? encodeURIComponent(iss.inn) : '';
+  const searchLinks = iss.inn ? `
+    <div style="width:100%;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);font-size:.54rem;color:var(--text3);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span>🔍 Где искать мать:</span>
+      <a href="https://www.rusprofile.ru/search?query=${innForSearch}" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--acc)" title="Rusprofile — удобная HTML-страница с учредителями и их долями. На странице эмитента ищи раздел «Учредители» — юрлицо с долей >50% = материнская. Скопируй его ИНН и вставь через «🏛 привязать».">rusprofile.ru</a>
+      <a href="https://pb.nalog.ru/search.html?query=${innForSearch}" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--acc)" title="Прозрачный бизнес ФНС — официальные данные, без рекламы. Чуть сложнее читать, зато первоисточник.">pb.nalog.ru</a>
+      <a href="https://zachestnyibiznes.ru/search?query=${innForSearch}" target="_blank" rel="noopener" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--acc)" title="За честный бизнес — альтернативный агрегатор. Бывает точнее rusprofile у мелких ВДО.">zachestnyibiznes.ru</a>
+      ${(() => {
+        // Эвристика: если имя содержит «Финанс/Капитал/Инвест/Холдинг/СПВ»,
+        // базовое имя без этого хвоста — вероятный родитель. Только hint,
+        // не действие.
+        const n = String(iss.name || '');
+        const m = n.match(/^(.+?)\s+(Финанс|Капитал|Инвест|Холдинг|СПВ|SPV|Финансы)(\s+.*)?$/i);
+        if(m && m[1].length >= 3){
+          return `<span style="color:var(--warn)" title="Частая SPV-схема: «ООО X Финанс» выпускает бонды, настоящий бизнес у «X».">· вероятный родитель: <strong>${_escHtml(m[1].trim())}</strong></span>`;
+        }
+        return '';
+      })()}
+    </div>` : '';
   document.getElementById('issuer-peek-related').innerHTML = `
     <div style="padding:6px 8px;background:var(--bg);border:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <span style="color:var(--text2);white-space:nowrap">🔗 Связи:</span>
       ${parentLine}${otherLines}
       ${attachBtn}${pullBtn}${removeBtn}
+      ${searchLinks}
     </div>`;
   document.getElementById('issuer-peek-mults').innerHTML = `
     <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="ROE = Чистая прибыль / Собственный капитал. ≥15% норма для ВДО." style="cursor:help">ROE</abbr> <span style="color:${color(m.roe, 0.15, 0, false)};font-weight:600">${fmtPct(m.roe)}</span></span>
