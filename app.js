@@ -7608,34 +7608,52 @@ function repRenderCharts(iss){
     }
   }
 
-  // Селекты «от / до». При обоих выбранных — одна карточка с CAGR.
-  // Для явности: опции написаны в формате «2024 FY ГИРБО», чтобы было
-  // видно что именно выбрано (и что выбор сработал).
-  const selOptions = periods.map(([k,p], i) => `<option value="${i}">${p.year} ${p.period} ${p.type}</option>`).join('');
-  const fromSel = fromIdx != null ? ` value-selected` : '';
-  const toSel   = toIdx != null ? ` value-selected` : '';
-  const selBase = 'font-size:.66rem;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);min-width:150px';
-  const selActiveStyle = 'border-color:var(--acc);color:var(--acc)';
+  // Селекты «от / до». `selected` ставим прямо в HTML — так надёжнее,
+  // чем выставлять value после innerHTML (у нас element пересоздаётся
+  // на каждый рендер, без явного selected у некоторых браузеров значение
+  // не сохраняется при быстром изменении).
+  const optsFor = (activeIdx) => {
+    const head = `<option value=""${activeIdx == null ? ' selected' : ''}>— выбери —</option>`;
+    const list = periods.map(([k,p], i) => {
+      const sel = (i === activeIdx) ? ' selected' : '';
+      return `<option value="${i}"${sel}>${p.year} ${p.period} ${p.type}</option>`;
+    }).join('');
+    return head + list;
+  };
+  const selBase = 'font-size:.68rem;padding:5px 8px;font-family:var(--mono);min-width:160px;cursor:pointer';
+  const selInactive = 'background:var(--bg);border:1px solid var(--border2);color:var(--text)';
+  const selActive   = 'background:var(--s3);border:2px solid var(--acc);color:var(--acc);font-weight:700;padding:4px 7px';
   const rangeRow = `
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);padding:10px 12px;margin-bottom:10px">
       <span style="font-size:.58rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;font-weight:600">Диапазон сравнения</span>
-      <label style="display:flex;gap:5px;align-items:center;font-size:.6rem;color:var(--text2)">
-        <span style="color:${fromIdx != null ? 'var(--acc)' : 'var(--text3)'}">начало</span>
-        <select id="rep-dyn-from" onchange="_repDynPick()" style="${selBase}${fromIdx != null ? ';' + selActiveStyle : ''}">
-          <option value="">— выбери —</option>${selOptions}
+      <label style="display:flex;gap:5px;align-items:center;font-size:.6rem;color:${fromIdx != null ? 'var(--acc)' : 'var(--text2)'}">
+        начало
+        <select id="rep-dyn-from" onchange="_repDynPick()" style="${selBase};${fromIdx != null ? selActive : selInactive}">
+          ${optsFor(fromIdx)}
         </select>
       </label>
-      <span style="color:var(--text3)">→</span>
-      <label style="display:flex;gap:5px;align-items:center;font-size:.6rem;color:var(--text2)">
-        <span style="color:${toIdx != null ? 'var(--acc)' : 'var(--text3)'}">конец</span>
-        <select id="rep-dyn-to" onchange="_repDynPick()" style="${selBase}${toIdx != null ? ';' + selActiveStyle : ''}">
-          <option value="">— выбери —</option>${selOptions}
+      <span style="color:var(--text3);font-size:.9rem">→</span>
+      <label style="display:flex;gap:5px;align-items:center;font-size:.6rem;color:${toIdx != null ? 'var(--acc)' : 'var(--text2)'}">
+        конец
+        <select id="rep-dyn-to" onchange="_repDynPick()" style="${selBase};${toIdx != null ? selActive : selInactive}">
+          ${optsFor(toIdx)}
         </select>
       </label>
-      ${rangeMode ? `<button onclick="_repDynReset()" style="font-size:.56rem;padding:4px 10px;border:1px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer">↺ сбросить, показать все пары</button>` : ''}
+      ${rangeMode ? `<button onclick="_repDynReset()" style="font-size:.58rem;padding:5px 10px;border:1px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer">↺ сбросить, показать все пары</button>` : ''}
       <span style="flex:1"></span>
-      <span style="font-size:.55rem;color:var(--text3)">${rangeMode ? '1 пара (выбранный диапазон)' : 'Соседние пары: ' + cards.length}</span>
+      <span style="font-size:.55rem;color:var(--text3)">${rangeMode ? '1 пара (диапазон)' : 'Соседние пары: ' + cards.length}</span>
     </div>`;
+
+  // Крупный баннер-подтверждение: при активном диапазоне — что именно сравниваем.
+  const banner = rangeMode
+    ? `<div style="background:var(--s3);border-left:3px solid var(--acc);padding:8px 14px;margin-bottom:10px;font-size:.72rem">
+         <span style="color:var(--text3);letter-spacing:.08em;text-transform:uppercase;font-size:.54rem">Сравниваем</span>
+         <strong style="color:var(--acc);margin-left:8px;font-size:.85rem">${periods[leftIdx][1].year} ${periods[leftIdx][1].period}</strong>
+         <span style="color:var(--text3);margin:0 8px">→</span>
+         <strong style="color:var(--acc);font-size:.85rem">${periods[rightIdx][1].year} ${periods[rightIdx][1].period}</strong>
+         <span style="color:var(--text3);margin-left:10px;font-size:.6rem">(${periods[rightIdx][1].year - periods[leftIdx][1].year} ${(periods[rightIdx][1].year - periods[leftIdx][1].year) < 5 ? 'года' : 'лет'})</span>
+       </div>`
+    : '';
 
   const hint = rangeMode
     ? `Сравнение <strong>${periods[leftIdx][1].year}</strong> → <strong>${periods[rightIdx][1].year}</strong> (${periods[rightIdx][1].year - periods[leftIdx][1].year} ${(periods[rightIdx][1].year - periods[leftIdx][1].year) < 5 ? 'года' : 'лет'})${fromIdx == null ? ' · начало не выбрано — взят самый старый период' : ''}${toIdx == null ? ' · конец не выбран — взят самый свежий период' : ''}. <strong>%Δ</strong> — суммарное изменение; <strong>CAGR</strong> — среднегодовой темп (только для положительных значений).`
@@ -7643,19 +7661,10 @@ function repRenderCharts(iss){
 
   area.innerHTML = `
     ${rangeRow}
+    ${banner}
     <div style="font-size:.6rem;color:var(--text3);margin-bottom:10px">${hint}</div>
     ${cards.join('')}
   `;
-
-  // Восстанавливаем выбор селектов после перерисовки innerHTML.
-  if(fromIdx != null){
-    const f = document.getElementById('rep-dyn-from');
-    if(f) f.value = String(fromIdx);
-  }
-  if(toIdx != null){
-    const t = document.getElementById('rep-dyn-to');
-    if(t) t.value = String(toIdx);
-  }
 }
 
 // Обработчик смены одного из селектов диапазона.
