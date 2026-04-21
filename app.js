@@ -7587,16 +7587,21 @@ function repRenderCharts(iss){
     </div>`;
   }
 
-  // Режим: либо «все соседние пары» (по умолчанию), либо одна пара по
-  // явному диапазону (фиксированные «от» и «до» из селектов).
+  // Режим: либо «все соседние пары» (ничего не выбрано), либо одна
+  // пара по явному диапазону. Если выбран только один конец —
+  // второй подставляется: начало=первый период, конец=последний.
   const fromIdx = window._repDynFrom;
   const toIdx   = window._repDynTo;
-  const rangeMode = fromIdx != null && toIdx != null
-    && periods[fromIdx] && periods[toIdx] && fromIdx < toIdx;
+  const anySelected = fromIdx != null || toIdx != null;
+  const leftIdx = fromIdx != null ? fromIdx : 0;
+  const rightIdx = toIdx != null ? toIdx : periods.length - 1;
+  const rangeMode = anySelected
+    && periods[leftIdx] && periods[rightIdx]
+    && leftIdx < rightIdx;
 
   const cards = [];
   if(rangeMode){
-    cards.push(pairCard(periods[fromIdx], periods[toIdx]));
+    cards.push(pairCard(periods[leftIdx], periods[rightIdx]));
   } else {
     for(let i = 0; i < periods.length - 1; i++){
       cards.push(pairCard(periods[i], periods[i + 1]));
@@ -7633,8 +7638,8 @@ function repRenderCharts(iss){
     </div>`;
 
   const hint = rangeMode
-    ? `Сравнение <strong>${periods[fromIdx][1].year}</strong> → <strong>${periods[toIdx][1].year}</strong> (${periods[toIdx][1].year - periods[fromIdx][1].year} лет). <strong>%Δ</strong> — суммарное изменение за период; <strong>CAGR</strong> — среднегодовой темп (только для положительных значений).`
-    : `Сравнение между соседними периодами. Чтобы посмотреть изменения за 2-3+ лет — выбери <strong>начало</strong> и <strong>конец</strong> в селектах выше.`;
+    ? `Сравнение <strong>${periods[leftIdx][1].year}</strong> → <strong>${periods[rightIdx][1].year}</strong> (${periods[rightIdx][1].year - periods[leftIdx][1].year} ${(periods[rightIdx][1].year - periods[leftIdx][1].year) < 5 ? 'года' : 'лет'})${fromIdx == null ? ' · начало не выбрано — взят самый старый период' : ''}${toIdx == null ? ' · конец не выбран — взят самый свежий период' : ''}. <strong>%Δ</strong> — суммарное изменение; <strong>CAGR</strong> — среднегодовой темп (только для положительных значений).`
+    : `Все соседние пары (год-к-году). Чтобы увидеть только один конкретный интервал — выбери <strong>начало</strong> и/или <strong>конец</strong> в селектах выше; второй конец подставится автоматически.`;
 
   area.innerHTML = `
     ${rangeRow}
