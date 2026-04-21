@@ -2101,6 +2101,14 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
+      <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center" title="Сортировка по годовой динамике запаса прочности эмитента: Δ score за 3 года (fallback 2/1). Если включена — перекрывает основную сортировку ниже. Эмитенты без данных для сравнения уходят в конец.">
+        📈 Динамика:
+        <select id="moex-dyn-sort" onchange="moexApplyFilters()" style="font-size:.65rem;padding:2px 4px">
+          <option value="">— не сортировать —</option>
+          <option value="dyn-best">Лучшая динамика сверху (Δ score ↑)</option>
+          <option value="dyn-worst">Худшая динамика сверху (Δ score ↓)</option>
+        </select>
+      </label>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
         <select id="moex-sort" onchange="moexApplyFilters()" style="font-size:.65rem;padding:2px 4px">

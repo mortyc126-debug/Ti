@@ -15585,6 +15585,7 @@ function moexApplyFilters(){
     ratingHas: document.getElementById('moex-f-rating-has')?.value || '',
     pctThresh: _num(document.getElementById('moex-f-pct-thresh')?.value),
     stressMin: _num(document.getElementById('moex-f-stress-min')?.value),
+    dynSort: document.getElementById('moex-dyn-sort')?.value || '',
     sort: document.getElementById('moex-sort').value || 'ytm-desc',
   };
   // Любой из фундамент-фильтров → подразумевает «только есть в базе».
@@ -15819,7 +15820,29 @@ function moexApplyFilters(){
       if(vb == null) return -1;
       return va - vb;
     },
-  }[f.sort];
+    // Динамика — Δ score (текущий минус прошлый). Null-эмитенты в конец.
+    // Прошлый берётся из stress-объекта, который считает окно 3 (2/1) года.
+    'dyn-best': (a, b) => {
+      const sa = a.issId ? getStress(a.issId) : null;
+      const sb = b.issId ? getStress(b.issId) : null;
+      const da = (sa && sa.score != null && sa.priorScore != null) ? sa.score - sa.priorScore : null;
+      const db = (sb && sb.score != null && sb.priorScore != null) ? sb.score - sb.priorScore : null;
+      if(da == null && db == null) return 0;
+      if(da == null) return 1;
+      if(db == null) return -1;
+      return db - da; // большая положительная дельта сверху
+    },
+    'dyn-worst': (a, b) => {
+      const sa = a.issId ? getStress(a.issId) : null;
+      const sb = b.issId ? getStress(b.issId) : null;
+      const da = (sa && sa.score != null && sa.priorScore != null) ? sa.score - sa.priorScore : null;
+      const db = (sb && sb.score != null && sb.priorScore != null) ? sb.score - sb.priorScore : null;
+      if(da == null && db == null) return 0;
+      if(da == null) return 1;
+      if(db == null) return -1;
+      return da - db; // большая отрицательная дельта сверху
+    },
+  }[f.dynSort || f.sort];
   if(cmp) filtered.sort(cmp);
 
   document.getElementById('moex-count').textContent = `${filtered.length} из ${cat.items.length}`;
@@ -15956,6 +15979,8 @@ function moexResetFilters(){
   const struct = document.getElementById('moex-f-structured');
   if(struct) struct.checked = false;
   document.getElementById('moex-sort').value = 'ytm-desc';
+  const dyn = document.getElementById('moex-dyn-sort');
+  if(dyn) dyn.value = '';
   moexApplyFilters();
 }
 
