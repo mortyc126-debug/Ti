@@ -7468,14 +7468,6 @@ function repRenderCharts(iss){
     return;
   }
 
-  // Шаг сравнения в годах: 1 = соседние периоды, 2+ = через N-1 период.
-  // Нужно чтобы видеть суммарные изменения за 2-3 года, а не только год-к-году.
-  const maxStep = periods.length - 1;
-  let step = window._repDynStep || 1;
-  if(step > maxStep) step = maxStep;
-  if(step < 1) step = 1;
-  window._repDynStep = step;
-
   // Метрики: higher=true — рост хорошо (зелёный), higher=false — рост плохо (красный).
   const metrics = [
     {key:'rev',    label:'Выручка',              higher:true},
@@ -7595,38 +7587,86 @@ function repRenderCharts(iss){
     </div>`;
   }
 
+  // Режим: либо «все соседние пары» (по умолчанию), либо одна пара по
+  // явному диапазону (фиксированные «от» и «до» из селектов).
+  const fromIdx = window._repDynFrom;
+  const toIdx   = window._repDynTo;
+  const rangeMode = fromIdx != null && toIdx != null
+    && periods[fromIdx] && periods[toIdx] && fromIdx < toIdx;
+
   const cards = [];
-  for(let i = 0; i + step < periods.length; i++){
-    cards.push(pairCard(periods[i], periods[i + step]));
+  if(rangeMode){
+    cards.push(pairCard(periods[fromIdx], periods[toIdx]));
+  } else {
+    for(let i = 0; i < periods.length - 1; i++){
+      cards.push(pairCard(periods[i], periods[i + 1]));
+    }
   }
 
-  // Переключатель шага (годов между сравниваемыми периодами).
-  const stepButtons = [];
-  for(let s = 1; s <= maxStep; s++){
-    const active = s === step;
-    const label = s === 1 ? 'год к году' : ('за ' + s + ' ' + (s < 5 ? 'года' : 'лет'));
-    stepButtons.push(`<button type="button" onclick="_repSetDynStep(${s})" style="font-size:.56rem;padding:4px 10px;border:1px solid ${active ? 'var(--acc)' : 'var(--border2)'};background:${active ? 'var(--s3)' : 'var(--bg)'};color:${active ? 'var(--acc)' : 'var(--text2)'};cursor:pointer;font-family:var(--mono)">${label}</button>`);
-  }
-  const subtitle = step === 1
-    ? 'Сравнение между соседними периодами.'
-    : `Сравнение через ${step} ${step < 5 ? 'года' : 'лет'}. <strong>%Δ</strong> — суммарное изменение за период; <strong>CAGR</strong> рядом — среднегодовой темп (только когда оба значения положительны).`;
+  // Селекты «от / до». При обоих выбранных — одна карточка с CAGR.
+  // Для явности: опции написаны в формате «2024 FY ГИРБО», чтобы было
+  // видно что именно выбрано (и что выбор сработал).
+  const selOptions = periods.map(([k,p], i) => `<option value="${i}">${p.year} ${p.period} ${p.type}</option>`).join('');
+  const fromSel = fromIdx != null ? ` value-selected` : '';
+  const toSel   = toIdx != null ? ` value-selected` : '';
+  const selBase = 'font-size:.66rem;padding:4px 7px;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);min-width:150px';
+  const selActiveStyle = 'border-color:var(--acc);color:var(--acc)';
+  const rangeRow = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);padding:10px 12px;margin-bottom:10px">
+      <span style="font-size:.58rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;font-weight:600">Диапазон сравнения</span>
+      <label style="display:flex;gap:5px;align-items:center;font-size:.6rem;color:var(--text2)">
+        <span style="color:${fromIdx != null ? 'var(--acc)' : 'var(--text3)'}">начало</span>
+        <select id="rep-dyn-from" onchange="_repDynPick()" style="${selBase}${fromIdx != null ? ';' + selActiveStyle : ''}">
+          <option value="">— выбери —</option>${selOptions}
+        </select>
+      </label>
+      <span style="color:var(--text3)">→</span>
+      <label style="display:flex;gap:5px;align-items:center;font-size:.6rem;color:var(--text2)">
+        <span style="color:${toIdx != null ? 'var(--acc)' : 'var(--text3)'}">конец</span>
+        <select id="rep-dyn-to" onchange="_repDynPick()" style="${selBase}${toIdx != null ? ';' + selActiveStyle : ''}">
+          <option value="">— выбери —</option>${selOptions}
+        </select>
+      </label>
+      ${rangeMode ? `<button onclick="_repDynReset()" style="font-size:.56rem;padding:4px 10px;border:1px solid var(--border2);background:var(--bg);color:var(--text2);cursor:pointer">↺ сбросить, показать все пары</button>` : ''}
+      <span style="flex:1"></span>
+      <span style="font-size:.55rem;color:var(--text3)">${rangeMode ? '1 пара (выбранный диапазон)' : 'Соседние пары: ' + cards.length}</span>
+    </div>`;
+
+  const hint = rangeMode
+    ? `Сравнение <strong>${periods[fromIdx][1].year}</strong> → <strong>${periods[toIdx][1].year}</strong> (${periods[toIdx][1].year - periods[fromIdx][1].year} лет). <strong>%Δ</strong> — суммарное изменение за период; <strong>CAGR</strong> — среднегодовой темп (только для положительных значений).`
+    : `Сравнение между соседними периодами. Чтобы посмотреть изменения за 2-3+ лет — выбери <strong>начало</strong> и <strong>конец</strong> в селектах выше.`;
 
   area.innerHTML = `
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <span style="font-size:.58rem;color:var(--text3)">Шаг:</span>
-      ${stepButtons.join('')}
-      <span style="font-size:.55rem;color:var(--text3);margin-left:auto">Пар: ${cards.length}</span>
-    </div>
-    <div style="font-size:.6rem;color:var(--text3);margin-bottom:10px">
-      ${subtitle} ${periods.length>2?'Сверху — старые, снизу — свежие.':''} Цвет учитывает знак: рост долга — красный, рост выручки — зелёный.
-    </div>
+    ${rangeRow}
+    <div style="font-size:.6rem;color:var(--text3);margin-bottom:10px">${hint}</div>
     ${cards.join('')}
   `;
+
+  // Восстанавливаем выбор селектов после перерисовки innerHTML.
+  if(fromIdx != null){
+    const f = document.getElementById('rep-dyn-from');
+    if(f) f.value = String(fromIdx);
+  }
+  if(toIdx != null){
+    const t = document.getElementById('rep-dyn-to');
+    if(t) t.value = String(toIdx);
+  }
 }
 
-// Меняет шаг сравнения в «📈 Динамика» и перерисовывает.
-function _repSetDynStep(step){
-  window._repDynStep = step;
+// Обработчик смены одного из селектов диапазона.
+function _repDynPick(){
+  const f = document.getElementById('rep-dyn-from')?.value;
+  const t = document.getElementById('rep-dyn-to')?.value;
+  window._repDynFrom = (f === '' || f == null) ? null : parseInt(f, 10);
+  window._repDynTo   = (t === '' || t == null) ? null : parseInt(t, 10);
+  const iss = reportsDB[window.repActiveIssuerId];
+  if(iss) repRenderCharts(iss);
+}
+
+// Сброс диапазона — возвращаемся в режим «все соседние пары».
+function _repDynReset(){
+  window._repDynFrom = null;
+  window._repDynTo = null;
   const iss = reportsDB[window.repActiveIssuerId];
   if(iss) repRenderCharts(iss);
 }
