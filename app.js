@@ -6747,6 +6747,95 @@ function _repResolveParent(iss){
 //    X4=eq/(assets-eq), X5=rev/assets. Distress <1.23 → 0, safe >2.9 → 100.
 // Если сигнал null (нет данных) — его вес перераспределяется на
 // оставшиеся. Если ни одного — score=null.
+// Считает score из конкретного периода (без выбора latest/parent — это
+// делает обёртка _repStressScore). Используется и для текущего, и для
+// прошлогоднего периода (для тренда).
+// horizonDays: горизонт долговой стены (по умолчанию 730 = 2 года).
+// Знаменатель ликвидности масштабируется тем же горизонтом, чтобы
+// смысл «во сколько раз погашения превышают наш cash flow» не плыл.
+function _computeStressFromPeriod(p, ownInn, horizonDays){
+  const horizon = (horizonDays || 730);
+  const horizonYears = horizon / 365;
+  // 1) Долговая стена
+  let debtWallScore = null, debtWallRatio = null, maturingSum = null;
+  const cat = window._moexCatalog;
+  const ebitda = p.ebitda != null ? p.ebitda : p.ebit;
+  if(ownInn && cat && Array.isArray(cat.items) && ebitda != null && ebitda > 0){
+    const now = Date.now(), cutoff = now + horizon * 86400000;
+    let sum = 0;
+    for(const b of cat.items){
+      if(!b.matDate || !b.inn) continue;
+      if(String(b.inn) !== String(ownInn)) continue;
+      const mat = new Date(b.matDate).getTime();
+      if(isNaN(mat) || mat <= now || mat > cutoff) continue;
+      if(b.issueSize && b.faceValue) sum += b.issueSize * b.faceValue / 1e9;
+    }
+    maturingSum = sum;
+    const liquid = (p.cash || 0) + ebitda * horizonYears;
+    if(liquid > 0){
+      debtWallRatio = sum / liquid;
+      debtWallScore = Math.max(0, Math.min(100, Math.round(100 - debtWallRatio * 50)));
+    } else if(sum > 0) debtWallScore = 0;
+    else debtWallScore = 100;
+  }
+  // 2) Stressed ICR (без изменений — годовая концепция)
+  let stressIcrScore = null, stressIcrVal = null;
+  const baseProf = p.ebitda != null ? p.ebitda : p.ebit;
+  if(baseProf != null && p.int != null && p.int > 0){
+    stressIcrVal = (baseProf * 0.8) / (p.int * 1.2);
+    if(stressIcrVal <= 0.5) stressIcrScore = 0;
+    else if(stressIcrVal >= 3.0) stressIcrScore = 100;
+    else stressIcrScore = Math.round((stressIcrVal - 0.5) / 2.5 * 100);
+  }
+  // 3) Altman Z' book-value
+  let altmanScore = null, altmanZ = null;
+  if(p.assets && p.assets > 0){
+    const A = p.assets;
+    const x1 = (p.ca != null && p.cl != null) ? (p.ca - p.cl) / A : null;
+    const x2 = (p.ret != null) ? p.ret / A : null;
+    const x3 = (p.ebit != null) ? p.ebit / A : null;
+    const x4 = (p.eq != null && A > p.eq) ? p.eq / (A - p.eq) : null;
+    const x5 = (p.rev != null) ? p.rev / A : null;
+    const parts = [x1, x2, x3, x4, x5];
+    if(parts.filter(x => x != null).length >= 4){
+      altmanZ = 0.717 * (x1 || 0) + 0.847 * (x2 || 0) + 3.107 * (x3 || 0) + 0.420 * (x4 || 0) + 0.998 * (x5 || 0);
+      if(altmanZ <= 1.23) altmanScore = 0;
+      else if(altmanZ >= 2.9) altmanScore = 100;
+      else altmanScore = Math.round((altmanZ - 1.23) / (2.9 - 1.23) * 100);
+    }
+  }
+  const weights = { debtWall: 25, stressIcr: 40, altman: 35 };
+  let num = 0, denom = 0;
+  if(debtWallScore != null){ num += debtWallScore * weights.debtWall; denom += weights.debtWall; }
+  if(stressIcrScore != null){ num += stressIcrScore * weights.stressIcr; denom += weights.stressIcr; }
+  if(altmanScore != null){ num += altmanScore * weights.altman; denom += weights.altman; }
+  const score = denom > 0 ? Math.round(num / denom) : null;
+  return {
+    score,
+    debtWallScore, debtWallRatio, maturingSum,
+    stressIcrScore, stressIcrVal,
+    altmanScore, altmanZ,
+    horizonDays: horizon,
+  };
+}
+
+// Подбирает прошлогодний период (для тренда). Предпочитаем годовой того
+// же типа; если нет — любой период с year = latest.year - 1.
+function _repPriorAnnualPeriod(iss, latest){
+  if(!iss || !iss.periods || !latest) return null;
+  const targetYear = latest.year - 1;
+  let fallback = null;
+  for(const [k, p] of Object.entries(iss.periods)){
+    if(!p) continue;
+    if(parseInt(p.year, 10) !== targetYear) continue;
+    if(p.period && /год|FY|year/i.test(p.period)){
+      return { period: p, key: k, year: targetYear };
+    }
+    if(!fallback) fallback = { period: p, key: k, year: targetYear };
+  }
+  return fallback;
+}
+
 function _repStressScore(iss, opts){
   opts = opts || {};
   if(!iss) return { score: null };
@@ -6765,71 +6854,19 @@ function _repStressScore(iss, opts){
   }
   const lp = _repLatestPeriod(dataIss);
   if(!lp) return { score: null, usedParent };
-  const p = lp.period;
 
-  // 1) Debt wall
-  let debtWallScore = null, debtWallRatio = null, maturing12m = null;
-  const cat = window._moexCatalog;
-  const ebitda12 = p.ebitda != null ? p.ebitda : p.ebit;
-  if(iss.inn && cat && Array.isArray(cat.items) && ebitda12 != null && ebitda12 > 0){
-    const now = Date.now(), horizon = now + 365 * 86400000;
-    let sum = 0;
-    for(const b of cat.items){
-      if(!b.matDate || !b.inn) continue;
-      if(String(b.inn) !== String(iss.inn)) continue;
-      const mat = new Date(b.matDate).getTime();
-      if(isNaN(mat) || mat <= now || mat > horizon) continue;
-      if(b.issueSize && b.faceValue) sum += b.issueSize * b.faceValue / 1e9; // млрд ₽
-    }
-    maturing12m = sum;
-    const liquid = (p.cash || 0) + ebitda12;
-    if(liquid > 0){
-      debtWallRatio = sum / liquid;
-      debtWallScore = Math.max(0, Math.min(100, Math.round(100 - debtWallRatio * 50)));
-    } else if(sum > 0) debtWallScore = 0;
-    else debtWallScore = 100;
-  }
-
-  // 2) Stressed ICR
-  let stressIcrScore = null, stressIcrVal = null;
-  const baseProf = p.ebitda != null ? p.ebitda : p.ebit;
-  if(baseProf != null && p.int != null && p.int > 0){
-    stressIcrVal = (baseProf * 0.8) / (p.int * 1.2);
-    if(stressIcrVal <= 0.5) stressIcrScore = 0;
-    else if(stressIcrVal >= 3.0) stressIcrScore = 100;
-    else stressIcrScore = Math.round((stressIcrVal - 0.5) / 2.5 * 100);
-  }
-
-  // 3) Altman Z' (book-value variant)
-  let altmanScore = null, altmanZ = null;
-  if(p.assets && p.assets > 0){
-    const A = p.assets;
-    const x1 = (p.ca != null && p.cl != null) ? (p.ca - p.cl) / A : null;
-    const x2 = (p.ret != null) ? p.ret / A : null;
-    const x3 = (p.ebit != null) ? p.ebit / A : null;
-    const x4 = (p.eq != null && A > p.eq) ? p.eq / (A - p.eq) : null;
-    const x5 = (p.rev != null) ? p.rev / A : null;
-    const parts = [x1, x2, x3, x4, x5];
-    if(parts.filter(x => x != null).length >= 4){
-      altmanZ = 0.717 * (x1 || 0) + 0.847 * (x2 || 0) + 3.107 * (x3 || 0) + 0.420 * (x4 || 0) + 0.998 * (x5 || 0);
-      if(altmanZ <= 1.23) altmanScore = 0;
-      else if(altmanZ >= 2.9) altmanScore = 100;
-      else altmanScore = Math.round((altmanZ - 1.23) / (2.9 - 1.23) * 100);
-    }
-  }
-
-  const weights = { debtWall: 25, stressIcr: 40, altman: 35 };
-  let num = 0, denom = 0;
-  if(debtWallScore != null){ num += debtWallScore * weights.debtWall; denom += weights.debtWall; }
-  if(stressIcrScore != null){ num += stressIcrScore * weights.stressIcr; denom += weights.stressIcr; }
-  if(altmanScore != null){ num += altmanScore * weights.altman; denom += weights.altman; }
-  const score = denom > 0 ? Math.round(num / denom) : null;
+  const cur = _computeStressFromPeriod(lp.period, iss.inn, 730);
+  // Тренд: тот же расчёт по прошлогоднему периоду.
+  const prior = _repPriorAnnualPeriod(dataIss, lp);
+  const prev = prior ? _computeStressFromPeriod(prior.period, iss.inn, 730) : null;
 
   return {
-    score, year: lp.year, usedParent,
-    debtWallScore, debtWallRatio, maturing12m,
-    stressIcrScore, stressIcrVal,
-    altmanScore, altmanZ,
+    score: cur.score, year: lp.year, usedParent,
+    debtWallScore: cur.debtWallScore, debtWallRatio: cur.debtWallRatio, maturing24m: cur.maturingSum,
+    stressIcrScore: cur.stressIcrScore, stressIcrVal: cur.stressIcrVal,
+    altmanScore: cur.altmanScore, altmanZ: cur.altmanZ,
+    priorScore: prev ? prev.score : null,
+    priorYear: prior ? prior.year : null,
   };
 }
 
@@ -7104,7 +7141,7 @@ function _repRenderActiveIssuerHeader(){
   const stWidth = st.score != null ? st.score : 0;
   const fmt = (v, d) => (v == null || !isFinite(v)) ? '—' : v.toFixed(d != null ? d : 2);
   const dwPart = st.debtWallScore != null
-    ? `<span title="Погашения бондов за 12 мес / (cash + EBITDA). ≤1 = есть запас, >1 = нужен рефинанс" style="color:${_repStressColor(st.debtWallScore)}">Долг.стена ${fmt(st.debtWallRatio)}x</span>`
+    ? `<span title="Погашения бондов за 24 мес / (cash + 2×EBITDA). ≤1 = есть запас, >1 = нужен рефинанс" style="color:${_repStressColor(st.debtWallScore)}">Долг.стена 24м ${fmt(st.debtWallRatio)}x</span>`
     : '<span style="color:var(--text3)" title="Нет данных: нужен ИНН эмитента, MOEX-каталог и EBITDA">Долг.стена —</span>';
   const icrPart = st.stressIcrScore != null
     ? `<span title="EBITDA×0.8 / проценты×1.2 (шок −20%/+20%). 1.0 = перелом" style="color:${_repStressColor(st.stressIcrScore)}">Stress-ICR ${fmt(st.stressIcrVal)}</span>`
@@ -7112,14 +7149,25 @@ function _repRenderActiveIssuerHeader(){
   const zPart = st.altmanScore != null
     ? `<span title="Альтман Z' (book-value). <1.23 = зона дефолта, >2.9 = безопасно" style="color:${_repStressColor(st.altmanScore)}">Altman Z' ${fmt(st.altmanZ)}</span>`
     : '<span style="color:var(--text3)" title="Нужны assets + ≥4 из (ca,cl,ret,ebit,eq,rev)">Altman Z\' —</span>';
-  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nВеса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 25%. Если сигнал отсутствует — вес перераспределяется.`;
+  // Тренд: было vs стало. Стрелка + дельта. ≥3 пунктов — раскрашиваем.
+  let trendHtml = '';
+  if(st.priorScore != null && st.score != null){
+    const delta = st.score - st.priorScore;
+    let arrow, color;
+    if(delta >= 3){ arrow = '↗'; color = 'var(--green)'; }
+    else if(delta <= -3){ arrow = '↘'; color = 'var(--danger)'; }
+    else { arrow = '→'; color = 'var(--text3)'; }
+    const sign = delta > 0 ? '+' : '';
+    trendHtml = `<span style="font-size:.6rem;color:${color};font-family:var(--mono);margin-left:6px" title="Запас прочности год назад был ${st.priorScore} (${st.priorYear}); сейчас ${st.score}. Тренд важнее уровня — устойчивая компания может ехать к проблемам, если score падает несколько лет подряд.">${arrow} ${sign}${delta} vs ${st.priorYear}</span>`;
+  }
+  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nВеса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
   const stTile = `
     <div style="margin-top:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${stTooltip}">
       <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}${st.usedParent ? ' <span style="color:var(--purple);font-size:.5rem;border:1px solid var(--purple);padding:0 4px;margin-left:4px" title="Расчёт по данным материнской компании (у самого эмитента нет отчётности или включён тумблер)">мамы</span>' : ''}</div>
       <div style="flex:1;min-width:140px;height:8px;background:var(--s2);border:1px solid var(--border);position:relative">
         <div style="position:absolute;left:0;top:0;bottom:0;width:${stWidth}%;background:${stColor}"></div>
       </div>
-      <div style="font-weight:700;font-size:.78rem;color:${stColor};font-family:var(--mono);min-width:50px;text-align:right">${st.score != null ? st.score : '—'}<span style="font-size:.5rem;color:var(--text3)">/100</span></div>
+      <div style="font-weight:700;font-size:.78rem;color:${stColor};font-family:var(--mono);min-width:50px;text-align:right">${st.score != null ? st.score : '—'}<span style="font-size:.5rem;color:var(--text3)">/100</span>${trendHtml}</div>
       <div style="flex-basis:100%;font-size:.54rem;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">
         ${dwPart} · ${icrPart} · ${zPart}
       </div>
