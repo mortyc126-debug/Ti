@@ -1993,6 +1993,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0"> 🎭 Показывать структурные продукты (ИОС и т.п.)
         </label>
       </div>
+      <div class="field" style="margin:0" title="Для эмитентов, у которых через «🔗 связи» отмечена материнская компания — считать «Запас прочности», фильтр «аутсайдеров отрасли» и прочий скоринг по её отчётности, а не по своей. Это про SPV: у SPV-эмитента свой баланс обычно пустой, а реальные цифры у головной. Для пустых SPV fallback на материнскую работает автоматически; тумблер включает его и для тех SPV, у кого собственная отчётность тоже есть.">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="moex-f-prefer-parent" onchange="moexApplyFilters()" style="margin:0"> 🏛 По данным материнской (для SPV)
+        </label>
+      </div>
     </div>
     <div style="padding:0 12px 8px">
       <div style="font-size:.55rem;color:var(--text3);margin-bottom:4px" title="Оставить только бумаги, у которых последний отчёт эмитента в одном из отмеченных годов. Ничего не выбрано — любой год или эмитент без отчётности.">Год последнего отчёта эмитента:</div>
@@ -2066,6 +2071,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте «📝 ИНН-мастер».">📊 buxbalans для эмитентов в фильтре</button>
       <button class="btn btn-sm" onclick="moexPullGirboBulk(true)" title="Пройти по ВСЕМ эмитентам в фильтре (в том числе уже существующим в базе) и добавить недостающие годы с buxbalans.ru. Существующие периоды не перезаписываются — только дописываются новые. Используй, когда данные устарели.">🔄 buxbalans (обновить всех)</button>
       <button class="btn btn-sm" onclick="moexPullGirboOnlyBulk()" title="ТОЛЬКО ГИР БО (bo.nalog.gov.ru) для всех эмитентов в фильтре. Используй, когда buxbalans отстаёт или не содержит нужного года. ГИР БО ищет по ИМЕНИ (не по ИНН), мы берём имя из локального справочника и сверяем ИНН в результатах. Медленнее buxbalans (3-10 сек на эмитента), но это официальный первоисточник.">📡 ГИР БО (обновить всех)</button>
+      <button class="btn btn-sm" onclick="moexPullParents()" title="Обойти все эмитенты в reportsDB и для каждого, у кого отмечена материнская (через «🔗 связи»), подтянуть её отчётность (buxbalans → GIR BO fallback). Материнская сохраняется как отдельный эмитент в reportsDB; при включённом тумблере «По данным материнской» дочки будут скориться по её цифрам. 1-3 сек на ИНН.">👪 Подтянуть по материнским</button>
       <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
       <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
       <div style="flex:1"></div>
@@ -2763,6 +2769,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="modal-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
       <div id="issuer-peek-meta" style="font-size:.62rem;color:var(--text2)"></div>
+      <div id="issuer-peek-related" style="font-size:.58rem"></div>
       <div id="issuer-peek-mults" style="display:flex;gap:6px;flex-wrap:wrap;font-size:.62rem;font-family:var(--mono)"></div>
       <div id="issuer-peek-periods" style="overflow-x:auto"></div>
       <div id="issuer-peek-bonds"></div>

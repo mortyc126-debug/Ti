@@ -6720,6 +6720,20 @@ function _repFormatMult(val, kind){
   return val.toFixed(2);
 }
 
+// Ищет материнскую компанию в reportsDB по iss.related.role='parent'.
+// Возвращает {id, iss} или null (если материнская не помечена или её
+// нет в reportsDB — тогда нужна кнопка «📊 Подтянуть по материнским»).
+function _repResolveParent(iss){
+  if(!iss || !Array.isArray(iss.related)) return null;
+  const parent = iss.related.find(r => r && r.role === 'parent' && r.inn);
+  if(!parent) return null;
+  const innStr = String(parent.inn);
+  for(const [id, p] of Object.entries(reportsDB || {})){
+    if(p && String(p.inn || '') === innStr) return { id, iss: p };
+  }
+  return null;
+}
+
 // Запас прочности 0-100 — композит 3 сигналов близости к дефолту:
 // 1) ДОЛГОВАЯ СТЕНА (25%): сумма погашений бондов за 12 мес (из MOEX по
 //    ИНН) делённая на ликвидный пул = cash + EBITDA. Ratio 0 → 100,
@@ -6733,10 +6747,24 @@ function _repFormatMult(val, kind){
 //    X4=eq/(assets-eq), X5=rev/assets. Distress <1.23 → 0, safe >2.9 → 100.
 // Если сигнал null (нет данных) — его вес перераспределяется на
 // оставшиеся. Если ни одного — score=null.
-function _repStressScore(iss){
+function _repStressScore(iss, opts){
+  opts = opts || {};
   if(!iss) return { score: null };
-  const lp = _repLatestPeriod(iss);
-  if(!lp) return { score: null };
+  // Приоритет данных:
+  // 1) opts.useParent=true + есть parent в базе → ДАННЫЕ материнской
+  //    (но inn эмитента для подсчёта долговой стены — свой!).
+  // 2) У самого эмитента нет периодов, но есть parent в базе → авто-fallback.
+  // 3) Иначе — данные самого эмитента.
+  let dataIss = iss;
+  let usedParent = false;
+  const explicit = opts.useParent === true;
+  const hasOwn = iss.periods && Object.keys(iss.periods).length > 0;
+  if(explicit || !hasOwn){
+    const pp = _repResolveParent(iss);
+    if(pp){ dataIss = pp.iss; usedParent = true; }
+  }
+  const lp = _repLatestPeriod(dataIss);
+  if(!lp) return { score: null, usedParent };
   const p = lp.period;
 
   // 1) Debt wall
@@ -6798,7 +6826,7 @@ function _repStressScore(iss){
   const score = denom > 0 ? Math.round(num / denom) : null;
 
   return {
-    score, year: lp.year,
+    score, year: lp.year, usedParent,
     debtWallScore, debtWallRatio, maturing12m,
     stressIcrScore, stressIcrVal,
     altmanScore, altmanZ,
@@ -7087,7 +7115,7 @@ function _repRenderActiveIssuerHeader(){
   const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nВеса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 25%. Если сигнал отсутствует — вес перераспределяется.`;
   const stTile = `
     <div style="margin-top:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${stTooltip}">
-      <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}</div>
+      <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}${st.usedParent ? ' <span style="color:var(--purple);font-size:.5rem;border:1px solid var(--purple);padding:0 4px;margin-left:4px" title="Расчёт по данным материнской компании (у самого эмитента нет отчётности или включён тумблер)">мамы</span>' : ''}</div>
       <div style="flex:1;min-width:140px;height:8px;background:var(--s2);border:1px solid var(--border);position:relative">
         <div style="position:absolute;left:0;top:0;bottom:0;width:${stWidth}%;background:${stColor}"></div>
       </div>
@@ -15161,8 +15189,9 @@ function moexApplyFilters(){
   const pctRanks = f.pctThresh != null ? _moexBuildIndustryRanks() : null;
   // Кэш «Запас прочности» по issId — чтобы не пересчитывать на каждой строке.
   const stressCache = new Map();
+  const preferParent = !!document.getElementById('moex-f-prefer-parent')?.checked;
   const getStress = issId => {
-    if(!stressCache.has(issId)) stressCache.set(issId, _repStressScore(reportsDB[issId]));
+    if(!stressCache.has(issId)) stressCache.set(issId, _repStressScore(reportsDB[issId], { useParent: preferParent }));
     return stressCache.get(issId);
   };
 
@@ -16229,6 +16258,89 @@ async function moexPullGirboOnlyBulk(){
   return _moexPullBulkGeneric({ useBux: false, useGirbo: true, label: 'ГИР БО' });
 }
 
+// Обходит все эмитенты в reportsDB, собирает уникальные parent-INN из
+// iss.related (role='parent'), по каждому тянет отчётность через
+// buxbalans → GIR BO fallback и складывает периоды в отдельный
+// reportsDB-entry (чтобы скоринг по материнской работал для всех её
+// дочерних SPV). Нужно для сценария «я хочу видеть настоящие цифры
+// под SPV-эмитентом», включается тумблером «По данным материнской».
+async function moexPullParents(){
+  const parents = new Map();
+  for(const iss of Object.values(reportsDB || {})){
+    if(!iss || !Array.isArray(iss.related)) continue;
+    for(const r of iss.related){
+      if(!r || r.role !== 'parent' || !r.inn) continue;
+      const key = String(r.inn);
+      if(!parents.has(key)){
+        parents.set(key, { inn: key, name: r.name || null, childCount: 0 });
+      }
+      parents.get(key).childCount++;
+    }
+  }
+  if(!parents.size){
+    alert('В базе нет эмитентов с отмеченной материнской компанией.\n\nКак отметить: страница «📂 Отчётность» → выбери эмитента → кнопка «🔗 связи» в его шапке → введи «p 7707083893 ПАО Сбербанк» (p = parent).');
+    return;
+  }
+  const status = document.getElementById('moex-status');
+  const total = parents.size;
+  if(!confirm(`Материнских ИНН найдено: ${total}. Тяну через buxbalans → GIR BO fallback (~1-3 сек на ИНН). Продолжить?`)) return;
+  let idx = 0, ok = 0, errs = 0, created = 0, addedPeriods = 0, skippedPeriods = 0;
+  const errors = [];
+  const fieldMap = {
+    'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+    'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+    'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+  };
+  for(const meta of parents.values()){
+    idx++;
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Материнская ${idx}/${total}: ${meta.name || meta.inn} (дочек: ${meta.childCount})…</span>`;
+    let data = null;
+    try { data = await fetchBuxBalansByInn(meta.inn, 15); } catch(e){ errors.push(`${meta.name || meta.inn}: buxbalans ${e.message}`); }
+    if(!data || !data.count){
+      try { data = await fetchGirboByInn(meta.inn, 10); } catch(e){ errors.push(`${meta.name || meta.inn}: girbo ${e.message}`); }
+    }
+    if(!data || !data.count){ errs++; await new Promise(r => setTimeout(r, 200)); continue; }
+    const resolvedInn = data.inn || meta.inn;
+    const name = data.company || meta.name || ('ИНН ' + resolvedInn);
+    const issId = _moexEnsureIssuer(resolvedInn, name);
+    const iss = reportsDB[issId];
+    if(!Object.keys(iss.periods || {}).length) created++;
+    if(resolvedInn && !iss.inn) iss.inn = resolvedInn;
+    if(typeof _repApplyOkved === 'function') _repApplyOkved(iss, data.okved, data.okvedName);
+    for(const [lbl, values] of Object.entries(data.series || {})){
+      const ym = String(lbl).match(/(\d{4})/);
+      if(!ym) continue;
+      const year = ym[1];
+      const pkey = `${year}_FY_ГИРБО`;
+      if(iss.periods[pkey]){ skippedPeriods++; continue; }
+      const period = {
+        year, period:'FY', type:'ГИРБО', note:'', analysisHTML:'',
+        rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+        assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+      };
+      for(const [fid, shortKey] of Object.entries(fieldMap)){
+        if(values[fid] != null) period[shortKey] = values[fid];
+      }
+      iss.periods[pkey] = period;
+      addedPeriods++;
+    }
+    ok++;
+    save();
+    await new Promise(r => setTimeout(r, 300));
+  }
+  window._moexLocalInnMap = null;
+  const msg = `✓ Материнских обработано: ${ok}/${total}, новых эмитентов: ${created}, добавлено периодов: ${addedPeriods}, пропущено существующих: ${skippedPeriods}, ошибок: ${errs}.`;
+  if(status) status.innerHTML = `<span style="color:var(--green)">${msg}</span>`;
+  if(errors.length && errs > 0){
+    console.warn('pullParents errors:', errors);
+    setTimeout(() => { if(confirm(msg + `\n\nПоказать первые 5 ошибок?`)) alert(errors.slice(0, 5).join('\n\n')); }, 100);
+  }
+  if(typeof repRenderIssuerList === 'function') repRenderIssuerList();
+  if(typeof moexApplyFilters === 'function') moexApplyFilters();
+  const sbRep = document.getElementById('sb-rep');
+  if(sbRep) sbRep.textContent = Object.keys(reportsDB).length;
+}
+
 async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
   const list = window._moexFilteredCache || [];
   if(!list.length){ alert('Фильтр пуст.'); return; }
@@ -16687,6 +16799,32 @@ function moexOpenIssuerPeek(issId){
     (iss.ind && iss.ind !== 'other' ? `Отрасль <strong>${iss.ind}</strong> · ` : '') +
     `Периодов: <strong>${Object.keys(iss.periods || {}).length}</strong>` +
     (m.year ? ` · посл. <strong>${m.year}</strong>` : '');
+
+  // Блок связей: материнская + связанные. Есть кнопка добавить материнскую
+  // прямо отсюда — ключевое UX-требование («в меню на клик по названию»).
+  const rel = Array.isArray(iss.related) ? iss.related : [];
+  const parent = rel.find(r => r && r.role === 'parent');
+  const others = rel.filter(r => r && r.role !== 'parent');
+  const pInDb = parent ? _repResolveParent(iss) : null;
+  const parentLine = parent
+    ? `<span style="padding:2px 6px;background:var(--s3);border:1px solid var(--purple);color:var(--purple);margin-right:4px" title="Материнская компания (role=parent)">🏛 ${_escHtml(parent.inn)}${parent.name ? ' · ' + _escHtml(parent.name) : ''}${pInDb ? ' · <span style=\"color:var(--green)\">в базе</span>' : ' · <span style=\"color:var(--warn)\">нужна подтяжка</span>'}</span>`
+    : `<span style="color:var(--text3)">Материнская не указана.</span>`;
+  const otherLines = others.length
+    ? ' ' + others.map(r => `<span style="padding:2px 6px;background:var(--s3);border:1px solid var(--border2);color:var(--text2);margin-right:4px" title="Связанная компания">🔗 ${_escHtml(r.inn)}${r.name ? ' · ' + _escHtml(r.name) : ''}</span>`).join('')
+    : '';
+  const attachBtn = `<button class="btn btn-sm" onclick="_peekAttachParent('${issId}')" style="font-size:.56rem;padding:2px 7px;margin-left:4px" title="${parent ? 'Заменить материнскую' : 'Привязать материнскую компанию по ИНН — будет учитываться в скоринге дочернего SPV'}">${parent ? '✎ сменить' : '🏛 привязать материнскую'}</button>`;
+  const pullBtn = parent && !pInDb
+    ? `<button class="btn btn-sm" onclick="_peekPullParent('${issId}')" style="font-size:.56rem;padding:2px 7px;margin-left:4px;border-color:var(--acc);color:var(--acc)" title="Подтянуть отчётность материнской (buxbalans → GIR BO)">📊 подтянуть</button>`
+    : '';
+  const removeBtn = parent
+    ? `<button class="btn btn-sm" onclick="_peekRemoveParent('${issId}')" style="font-size:.56rem;padding:2px 7px;margin-left:4px" title="Отвязать материнскую (саму её запись в reportsDB не трогаем)">✕ отвязать</button>`
+    : '';
+  document.getElementById('issuer-peek-related').innerHTML = `
+    <div style="padding:6px 8px;background:var(--bg);border:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span style="color:var(--text2);white-space:nowrap">🔗 Связи:</span>
+      ${parentLine}${otherLines}
+      ${attachBtn}${pullBtn}${removeBtn}
+    </div>`;
   document.getElementById('issuer-peek-mults').innerHTML = `
     <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="ROE = Чистая прибыль / Собственный капитал. ≥15% норма для ВДО." style="cursor:help">ROE</abbr> <span style="color:${color(m.roe, 0.15, 0, false)};font-weight:600">${fmtPct(m.roe)}</span></span>
     <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="Долг/EBITDA. ≤3 хорошо; >5 риск." style="cursor:help">Д/Е</abbr> <span style="color:${color(m.de, 3, 5, true)};font-weight:600">${fmtX(m.de)}</span></span>
@@ -16716,6 +16854,98 @@ function moexOpenIssuerPeek(issId){
     }, 80);
   };
   document.getElementById('modal-issuer-peek').classList.add('open');
+}
+
+// Привязывает материнскую компанию к эмитенту через peek-модалку.
+// Открывает prompt, валидирует ИНН, перерисовывает модалку.
+function _peekAttachParent(issId){
+  const iss = reportsDB[issId];
+  if(!iss) return;
+  const cur = (iss.related || []).find(r => r.role === 'parent');
+  const promptText = cur
+    ? `Материнская компания сейчас: ИНН ${cur.inn}${cur.name ? ' · ' + cur.name : ''}.\n\nВведи новый ИНН и имя (через пробел) или пустую строку для отмены:`
+    : `Привязать материнскую компанию к «${iss.name}».\nФормат: ИНН ИмяКомпании (например: 7707083893 ПАО Сбербанк).\nИмя необязательно.`;
+  const input = prompt(promptText, cur ? `${cur.inn}${cur.name ? ' ' + cur.name : ''}` : '');
+  if(input == null) return;
+  const s = String(input).trim();
+  if(!s) return;
+  const m = s.match(/^(\d{10,12})\s*(.*)$/);
+  if(!m){ alert('Нужен ИНН (10-12 цифр) в начале строки. Пример: 7707083893 ПАО Сбербанк'); return; }
+  const inn = m[1];
+  const name = (m[2] || '').trim() || null;
+  iss.related = Array.isArray(iss.related) ? iss.related.filter(r => r.role !== 'parent') : [];
+  iss.related.push({ inn, role: 'parent', name });
+  save();
+  moexOpenIssuerPeek(issId);
+  if(typeof _repRenderActiveIssuerHeader === 'function' && window.repActiveIssuerId === issId){
+    _repRenderActiveIssuerHeader();
+  }
+}
+
+// Отвязывает материнскую (только запись в iss.related — сам эмитент-
+// материнская в reportsDB остаётся, если был подтянут).
+function _peekRemoveParent(issId){
+  const iss = reportsDB[issId];
+  if(!iss) return;
+  const cur = (iss.related || []).find(r => r.role === 'parent');
+  if(!cur) return;
+  if(!confirm(`Отвязать материнскую ИНН ${cur.inn}${cur.name ? ' (' + cur.name + ')' : ''}?\nСама её запись в reportsDB останется.`)) return;
+  iss.related = iss.related.filter(r => r.role !== 'parent');
+  save();
+  moexOpenIssuerPeek(issId);
+  if(typeof _repRenderActiveIssuerHeader === 'function' && window.repActiveIssuerId === issId){
+    _repRenderActiveIssuerHeader();
+  }
+}
+
+// Тянет отчётность материнской одного эмитента (отдельная точечная
+// операция — в отличие от bulk «📊 Подтянуть по материнским»).
+async function _peekPullParent(issId){
+  const iss = reportsDB[issId];
+  if(!iss) return;
+  const parent = (iss.related || []).find(r => r.role === 'parent');
+  if(!parent || !parent.inn){ alert('Нет материнской. Сначала привяжи через «🏛 привязать материнскую».'); return; }
+  const status = document.getElementById('moex-status');
+  if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ Материнская ${parent.inn}…</span>`;
+  let data = null;
+  try { data = await fetchBuxBalansByInn(parent.inn, 15); } catch(_){}
+  if(!data || !data.count){
+    try { data = await fetchGirboByInn(parent.inn, 10); } catch(_){}
+  }
+  if(!data || !data.count){ alert(`Не удалось подтянуть ИНН ${parent.inn}. Попробуй через «📊 Подтянуть по материнским» (там подробный лог) или через «📂 Отчётность» вручную.`); return; }
+  const resolvedInn = data.inn || parent.inn;
+  const name = data.company || parent.name || ('ИНН ' + resolvedInn);
+  const parentIssId = _moexEnsureIssuer(resolvedInn, name);
+  const parentIss = reportsDB[parentIssId];
+  if(resolvedInn && !parentIss.inn) parentIss.inn = resolvedInn;
+  if(typeof _repApplyOkved === 'function') _repApplyOkved(parentIss, data.okved, data.okvedName);
+  const fieldMap = {
+    'rep-np-rev':'rev', 'rep-np-ebit':'ebit', 'rep-np-np':'np', 'rep-np-int':'int',
+    'rep-np-assets':'assets', 'rep-np-ca':'ca', 'rep-np-cl':'cl', 'rep-np-debt':'debt',
+    'rep-np-cash':'cash', 'rep-np-ret':'ret', 'rep-np-eq':'eq'
+  };
+  let added = 0, skipped = 0;
+  for(const [lbl, values] of Object.entries(data.series || {})){
+    const ym = String(lbl).match(/(\d{4})/);
+    if(!ym) continue;
+    const year = ym[1];
+    const pkey = `${year}_FY_ГИРБО`;
+    if(parentIss.periods[pkey]){ skipped++; continue; }
+    const period = {
+      year, period:'FY', type:'ГИРБО', note:'', analysisHTML:'',
+      rev:null, ebitda:null, ebit:null, np:null, int:null, tax:null,
+      assets:null, ca:null, cl:null, debt:null, cash:null, ret:null, eq:null,
+    };
+    for(const [fid, shortKey] of Object.entries(fieldMap)){
+      if(values[fid] != null) period[shortKey] = values[fid];
+    }
+    parentIss.periods[pkey] = period;
+    added++;
+  }
+  save();
+  if(status) status.innerHTML = `<span style="color:var(--green)">✓ ${name}: +${added} периодов, пропущено ${skipped}.</span>`;
+  moexOpenIssuerPeek(issId);
+  if(typeof moexApplyFilters === 'function') moexApplyFilters();
 }
 
 // Открывает страницу «📂 База отчётности» и активирует заданного эмитента
