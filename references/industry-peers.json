@@ -1,11 +1,12 @@
 {
-  "schema": "bondan/industry-peers/v1",
-  "version": 1,
-  "note": "Стартовая база компаний по отраслям для расчёта медиан через ГИР БО. Редактируется через страницу «🏭 Отрасли» в приложении; изменения пользователя ложатся в localStorage['bondan_industry_peers'] и мёрджатся с этим файлом при загрузке. Включены только ИНН, проверенные на 100%. Остальные пусть накопится через UI.",
+  "schema": "bondan/industry-peers/v2",
+  "version": 2,
+  "note": "Стартовая база компаний по отраслям + маппинг ОКВЭД2. Поле `group` — для группировки узких отраслей в укрупнённые блоки. Редактируется через страницу «🏭 Отрасли» в приложении; изменения пользователя ложатся в localStorage['bondan_industry_peers'] и мёрджатся с этим файлом при загрузке. Чем длиннее префикс okved2 (например '64.20'), тем приоритетнее он в классификаторе — поэтому holdings_spv (64.20) побеждает banks (64)." ,
   "industries": {
     "oil_gas": {
       "label": "Нефть и газ",
-      "okved2": ["06", "09", "19"],
+      "group": "resources",
+      "okved2": ["06", "09.1", "19"],
       "peers": [
         {"inn": "7706107510", "name": "ПАО НК «Роснефть»"},
         {"inn": "7708004767", "name": "ПАО «Лукойл»"},
@@ -16,8 +17,9 @@
       ]
     },
     "metals_mining": {
-      "label": "Металлы и добыча",
-      "okved2": ["07", "08", "24"],
+      "label": "Металлы и добыча руд",
+      "group": "resources",
+      "okved2": ["07", "08", "09.9", "24"],
       "peers": [
         {"inn": "8401005730", "name": "ПАО «ГМК Норильский никель»"},
         {"inn": "3528000597", "name": "ПАО «Северсталь»"},
@@ -26,8 +28,128 @@
         {"inn": "1433000147", "name": "АК «АЛРОСА» (ПАО)"}
       ]
     },
+    "metal_products": {
+      "label": "Металлоизделия",
+      "group": "industry",
+      "okved2": ["25"],
+      "peers": []
+    },
+    "machinery": {
+      "label": "Машиностроение",
+      "group": "industry",
+      "okved2": ["28", "33"],
+      "peers": []
+    },
+    "auto": {
+      "label": "Автомобили, транспортная техника",
+      "group": "industry",
+      "okved2": ["29", "30"],
+      "peers": []
+    },
+    "electronics": {
+      "label": "Электроника и электрооборудование",
+      "group": "industry",
+      "okved2": ["26", "27"],
+      "peers": []
+    },
+    "chemistry": {
+      "label": "Химия и удобрения",
+      "group": "industry",
+      "okved2": ["20"],
+      "peers": []
+    },
+    "pharma": {
+      "label": "Фармацевтика",
+      "group": "industry",
+      "okved2": ["21"],
+      "peers": []
+    },
+    "plastic_rubber": {
+      "label": "Пластмассы и резина",
+      "group": "industry",
+      "okved2": ["22"],
+      "peers": []
+    },
+    "stroy_materials": {
+      "label": "Стройматериалы",
+      "group": "industry",
+      "okved2": ["23"],
+      "peers": []
+    },
+    "wood_paper": {
+      "label": "Дерево, бумага, печать",
+      "group": "industry",
+      "okved2": ["16", "17", "18"],
+      "peers": []
+    },
+    "textile_clothing": {
+      "label": "Текстиль и одежда",
+      "group": "industry",
+      "okved2": ["13", "14", "15"],
+      "peers": []
+    },
+    "furniture_other_mfg": {
+      "label": "Мебель и прочее производство",
+      "group": "industry",
+      "okved2": ["31", "32"],
+      "peers": []
+    },
+    "agro_food": {
+      "label": "Агро и пищевая промышленность",
+      "group": "resources",
+      "okved2": ["01", "02", "03", "10", "11", "12"],
+      "peers": []
+    },
+    "utilities": {
+      "label": "Электроэнергетика и ЖКХ",
+      "group": "utilities",
+      "okved2": ["35", "36", "37", "38", "39"],
+      "peers": []
+    },
+    "construction": {
+      "label": "Строительство и девелопмент",
+      "group": "construction",
+      "okved2": ["41", "42", "43"],
+      "peers": []
+    },
+    "real_estate": {
+      "label": "Недвижимость (аренда, управление)",
+      "group": "construction",
+      "okved2": ["68"],
+      "peers": []
+    },
+    "retail": {
+      "label": "Ритейл и опт",
+      "group": "trade",
+      "okved2": ["45", "46", "47"],
+      "peers": [
+        {"inn": "2310031475", "name": "ПАО «Магнит»"}
+      ]
+    },
+    "transport": {
+      "label": "Транспорт и логистика",
+      "group": "transport",
+      "okved2": ["49", "50", "51", "52", "53"],
+      "peers": [
+        {"inn": "7708503727", "name": "ОАО «РЖД»"},
+        {"inn": "7712040126", "name": "ПАО «Аэрофлот»"}
+      ]
+    },
+    "hotels_catering": {
+      "label": "Гостиницы и общепит",
+      "group": "services",
+      "okved2": ["55", "56"],
+      "peers": []
+    },
+    "media": {
+      "label": "Медиа и связь",
+      "group": "it",
+      "okved2": ["58", "59", "60"],
+      "peers": []
+    },
     "telecom": {
       "label": "Телеком",
+      "group": "it",
       "okved2": ["61"],
       "peers": [
         {"inn": "7740000076", "name": "ПАО «МТС»"},
@@ -35,76 +157,90 @@
         {"inn": "7707049388", "name": "ПАО «Ростелеком»"}
       ]
     },
+    "it_software": {
+      "label": "IT и разработка ПО",
+      "group": "it",
+      "okved2": ["62", "63"],
+      "peers": []
+    },
     "banks": {
-      "label": "Банки и финансы",
-      "okved2": ["64", "65"],
+      "label": "Банки",
+      "group": "finance",
+      "okved2": ["64.1", "64.9"],
       "peers": [
         {"inn": "7707083893", "name": "ПАО Сбербанк"},
         {"inn": "7702070139", "name": "Банк ВТБ (ПАО)"}
       ]
     },
-    "retail": {
-      "label": "Ритейл и потребительский сектор",
-      "okved2": ["46", "47"],
-      "peers": [
-        {"inn": "2310031475", "name": "ПАО «Магнит»"}
-      ]
-    },
-    "transport": {
-      "label": "Транспорт и логистика",
-      "okved2": ["49", "50", "51", "52"],
-      "peers": [
-        {"inn": "7708503727", "name": "ОАО «РЖД»"},
-        {"inn": "7712040126", "name": "ПАО «Аэрофлот»"}
-      ]
-    },
-    "it_software": {
-      "label": "IT и разработка ПО",
-      "okved2": ["62", "63"],
-      "peers": []
-    },
-    "utilities": {
-      "label": "Электроэнергетика и ЖКХ",
-      "okved2": ["35", "36", "38"],
-      "peers": []
-    },
-    "pharma": {
-      "label": "Фармацевтика и здравоохранение",
-      "okved2": ["21", "86"],
-      "peers": []
-    },
-    "chemistry": {
-      "label": "Химия и удобрения",
-      "okved2": ["20"],
-      "peers": []
-    },
-    "development": {
-      "label": "Девелопмент и строительство",
-      "okved2": ["41", "68"],
+    "insurance": {
+      "label": "Страхование",
+      "group": "finance",
+      "okved2": ["65", "66.2"],
       "peers": []
     },
     "leasing": {
       "label": "Лизинг",
+      "group": "finance",
       "okved2": ["77"],
       "peers": []
     },
     "mfi": {
       "label": "МФО и потребительское кредитование",
+      "group": "finance",
       "okved2": ["64.92", "64.99"],
-      "peers": []
-    },
-    "agro_food": {
-      "label": "Агро и пищевая промышленность",
-      "okved2": ["01", "10", "11"],
       "peers": []
     },
     "holdings_spv": {
       "label": "Холдинги / SPV",
-      "okved2": ["64.20", "64.30", "70.10", "70.22", "66.19"],
+      "group": "finance",
+      "okved2": ["64.20", "64.30", "70.10", "70.22", "66.19", "66.11", "66.12"],
+      "peers": []
+    },
+    "consulting": {
+      "label": "Проф. услуги, консалтинг",
+      "group": "services",
+      "okved2": ["69", "70.21", "71", "73", "74"],
+      "peers": []
+    },
+    "science_rnd": {
+      "label": "Наука и R&D",
+      "group": "services",
+      "okved2": ["72"],
+      "peers": []
+    },
+    "admin_services": {
+      "label": "Аренда, услуги, персонал",
+      "group": "services",
+      "okved2": ["78", "79", "80", "81", "82"],
+      "peers": []
+    },
+    "education": {
+      "label": "Образование",
+      "group": "services",
+      "okved2": ["85"],
+      "peers": []
+    },
+    "healthcare": {
+      "label": "Здравоохранение",
+      "group": "services",
+      "okved2": ["86", "87", "88"],
+      "peers": []
+    },
+    "arts_sport": {
+      "label": "Искусство, спорт, развлечения",
+      "group": "services",
+      "okved2": ["90", "91", "92", "93"],
+      "peers": []
+    },
+    "other_services": {
+      "label": "Прочие услуги",
+      "group": "services",
+      "okved2": ["94", "95", "96", "97"],
       "peers": []
     },
     "other": {
       "label": "Прочее",
+      "group": "other",
       "okved2": [],
       "peers": []
     }

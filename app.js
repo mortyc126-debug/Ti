@@ -1800,18 +1800,49 @@ async function indRender(){
     const k = iss?.ind || 'other';
     (myByInd[k] = myByInd[k] || []).push({ id: iid, name: iss.name || '', inn: iss.inn || '' });
   }
-  listEl.innerHTML = keys.map(k => {
-    const ind = data.industries[k];
-    const n = (ind.peers || []).length;
-    const mine = (myByInd[k] || []).length;
-    const hasMed = window._industryMedians?.[k] ? ' 📊' : '';
-    const active = k === window._indActiveKey;
-    const bg = active ? 'background:var(--acc);color:#000' : '';
-    const mineLabel = mine ? `<span style="color:${active?'#000':'var(--acc)'}" title="из твоей базы отчётности">+${mine}</span>` : '';
-    return `<div onclick="indSelect('${k}')" style="padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.65rem;${bg}">
-      ${ind.label}${hasMed} <span style="float:right;color:${active?'#000':'var(--text3)'}">${n} ${mineLabel}</span>
-    </div>`;
-  }).join('') + `<div style="padding:8px;border-top:1px solid var(--border)"><button class="btn btn-sm" onclick="indAddIndustry()" style="width:100%">+ новая отрасль</button></div>`;
+  // Группировка: отрасли → по group → сортировка внутри по label.
+  const GROUP_ORDER = ['resources', 'industry', 'utilities', 'construction', 'trade', 'transport', 'it', 'finance', 'services', 'other'];
+  const GROUP_LABELS = {
+    resources: '⛏ Ресурсы и сырьё',
+    industry: '🏭 Обрабатывающая промышленность',
+    utilities: '⚡ Энергетика и ЖКХ',
+    construction: '🏗 Стройка и недвижимость',
+    trade: '🛒 Торговля',
+    transport: '🚛 Транспорт',
+    it: '💻 IT, связь и медиа',
+    finance: '💰 Финансы',
+    services: '🛎 Услуги и разное',
+    other: '📦 Прочее'
+  };
+  const byGroup = {};
+  for(const k of keys){
+    const g = data.industries[k].group || 'other';
+    (byGroup[g] = byGroup[g] || []).push(k);
+  }
+  for(const g of Object.keys(byGroup)){
+    byGroup[g].sort((a, b) => String(data.industries[a].label).localeCompare(String(data.industries[b].label), 'ru'));
+  }
+  const groupsOrdered = GROUP_ORDER.filter(g => byGroup[g]);
+  // Оставшиеся группы (не из GROUP_ORDER) — в конец алфавитом.
+  for(const g of Object.keys(byGroup).sort()){
+    if(!groupsOrdered.includes(g)) groupsOrdered.push(g);
+  }
+  const listHtml = groupsOrdered.map(g => {
+    const items = byGroup[g].map(k => {
+      const ind = data.industries[k];
+      const n = (ind.peers || []).length;
+      const mine = (myByInd[k] || []).length;
+      const hasMed = window._industryMedians?.[k] ? ' 📊' : '';
+      const active = k === window._indActiveKey;
+      const bg = active ? 'background:var(--acc);color:#000' : '';
+      const mineLabel = mine ? `<span style="color:${active?'#000':'var(--acc)'}" title="из твоей базы отчётности">+${mine}</span>` : '';
+      return `<div onclick="indSelect('${k}')" style="padding:5px 8px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.63rem;${bg}">
+        ${ind.label}${hasMed} <span style="float:right;color:${active?'#000':'var(--text3)'}">${n} ${mineLabel}</span>
+      </div>`;
+    }).join('');
+    return `<div style="padding:6px 8px 2px;font-size:.52rem;color:var(--text3);background:var(--s2);letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--border)">${GROUP_LABELS[g] || g}</div>${items}`;
+  }).join('');
+  listEl.innerHTML = listHtml + `<div style="padding:8px;border-top:1px solid var(--border)"><button class="btn btn-sm" onclick="indAddIndustry()" style="width:100%">+ новая отрасль</button></div>`;
 
   // Детализация выбранной отрасли справа.
   const key = window._indActiveKey;
