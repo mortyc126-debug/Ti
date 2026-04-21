@@ -7468,6 +7468,14 @@ function repRenderCharts(iss){
     return;
   }
 
+  // Шаг сравнения в годах: 1 = соседние периоды, 2+ = через N-1 период.
+  // Нужно чтобы видеть суммарные изменения за 2-3 года, а не только год-к-году.
+  const maxStep = periods.length - 1;
+  let step = window._repDynStep || 1;
+  if(step > maxStep) step = maxStep;
+  if(step < 1) step = 1;
+  window._repDynStep = step;
+
   // Метрики: higher=true — рост хорошо (зелёный), higher=false — рост плохо (красный).
   const metrics = [
     {key:'rev',    label:'Выручка',              higher:true},
@@ -7487,10 +7495,11 @@ function repRenderCharts(iss){
   const fmtV = v => v==null ? '—' : v.toLocaleString('ru-RU',{maximumFractionDigits:2}) + ' млрд';
   const sign = n => n>0 ? '+' : '';
 
-  // Строим карточку-пару для двух соседних периодов
+  // Строим карточку-пару для двух периодов (соседних или через N лет).
   function pairCard(prev, curr){
     const [ka,pa] = prev;
     const [kb,pb] = curr;
+    const yearSpan = (parseInt(pb.year, 10) || 0) - (parseInt(pa.year, 10) || 0);
     const headerL = `${pa.year} ${pa.period} ${pa.type}`;
     const headerR = `${pb.year} ${pb.period} ${pb.type}`;
 
@@ -7524,6 +7533,13 @@ function repRenderCharts(iss){
         </div>`;
 
       const pctText = pct==null ? 'н/д' : `${sign(pct)}${pct.toFixed(1)}%`;
+      // CAGR — только при шаге ≥2 лет и когда оба значения положительны.
+      // Для минусовой базы (убыток → прибыль) CAGR некорректен.
+      let cagrText = '';
+      if(yearSpan >= 2 && a > 0 && b > 0){
+        const cagr = (Math.pow(b/a, 1/yearSpan) - 1) * 100;
+        cagrText = ` <span style="color:var(--text3);font-weight:400;font-size:.6rem" title="CAGR = среднегодовой темп роста за ${yearSpan} лет">· CAGR ${sign(cagr)}${cagr.toFixed(1)}%</span>`;
+      }
 
       return `<div style="padding:10px 0;border-bottom:1px solid rgba(30,48,72,.4)">
         <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:3px">
@@ -7531,7 +7547,7 @@ function repRenderCharts(iss){
           <span style="font-size:.64rem;color:var(--text3);margin-left:auto;font-variant-numeric:tabular-nums">${fmtV(a)} → ${fmtV(b)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:.78rem;font-weight:700;color:${color};min-width:80px">${arrow} ${pctText}</span>
+          <span style="font-size:.78rem;font-weight:700;color:${color};min-width:80px">${arrow} ${pctText}${cagrText}</span>
           <div style="flex:1;min-width:40px">${barHtml}</div>
         </div>
       </div>`;
@@ -7580,16 +7596,39 @@ function repRenderCharts(iss){
   }
 
   const cards = [];
-  for(let i=0; i<periods.length-1; i++){
-    cards.push(pairCard(periods[i], periods[i+1]));
+  for(let i = 0; i + step < periods.length; i++){
+    cards.push(pairCard(periods[i], periods[i + step]));
   }
 
+  // Переключатель шага (годов между сравниваемыми периодами).
+  const stepButtons = [];
+  for(let s = 1; s <= maxStep; s++){
+    const active = s === step;
+    const label = s === 1 ? 'год к году' : ('за ' + s + ' ' + (s < 5 ? 'года' : 'лет'));
+    stepButtons.push(`<button type="button" onclick="_repSetDynStep(${s})" style="font-size:.56rem;padding:4px 10px;border:1px solid ${active ? 'var(--acc)' : 'var(--border2)'};background:${active ? 'var(--s3)' : 'var(--bg)'};color:${active ? 'var(--acc)' : 'var(--text2)'};cursor:pointer;font-family:var(--mono)">${label}</button>`);
+  }
+  const subtitle = step === 1
+    ? 'Сравнение между соседними периодами.'
+    : `Сравнение через ${step} ${step < 5 ? 'года' : 'лет'}. <strong>%Δ</strong> — суммарное изменение за период; <strong>CAGR</strong> рядом — среднегодовой темп (только когда оба значения положительны).`;
+
   area.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <span style="font-size:.58rem;color:var(--text3)">Шаг:</span>
+      ${stepButtons.join('')}
+      <span style="font-size:.55rem;color:var(--text3);margin-left:auto">Пар: ${cards.length}</span>
+    </div>
     <div style="font-size:.6rem;color:var(--text3);margin-bottom:10px">
-      Сравнение между соседними периодами. ${periods.length>2?'Несколько пар — сверху старые, снизу свежие.':''} Цвет учитывает знак: рост долга — красный, рост выручки — зелёный.
+      ${subtitle} ${periods.length>2?'Сверху — старые, снизу — свежие.':''} Цвет учитывает знак: рост долга — красный, рост выручки — зелёный.
     </div>
     ${cards.join('')}
   `;
+}
+
+// Меняет шаг сравнения в «📈 Динамика» и перерисовывает.
+function _repSetDynStep(step){
+  window._repDynStep = step;
+  const iss = reportsDB[window.repActiveIssuerId];
+  if(iss) repRenderCharts(iss);
 }
 
 function repRenderAnalysis(p, iss){
