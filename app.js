@@ -15704,7 +15704,7 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
     return;
   }
 
-  let idx = 0, bxOk = 0, grOk = 0, bxErr = 0, grErr = 0, totalAdded = 0;
+  let idx = 0, bxOk = 0, grOk = 0, bxErr = 0, grErr = 0, totalAdded = 0, totalSkipped = 0;
   const errors = [];
   for(const [inn, meta] of uniqueByInn){
     idx++;
@@ -15722,6 +15722,7 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
           const r = _repApplyPeriodsFromSeries(iss, bx.series, 'buxbalans');
           _repApplyOkved(iss, bx.okved, bx.okvedName);
           totalAdded += r.added;
+          totalSkipped += r.skipped;
           bxOk++;
         }
       } catch(e){
@@ -15758,6 +15759,7 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
           const r = _repApplyPeriodsFromSeries(iss, gr.series, 'ГИР БО');
           _repApplyOkved(iss, gr.okved, gr.okvedName);
           totalAdded += r.added;
+          totalSkipped += r.skipped;
           grOk++;
         } else {
           grErr++;
@@ -15782,7 +15784,8 @@ async function _moexPullBulkGeneric({ useBux, useGirbo, label }){
   const parts = [];
   if(useBux) parts.push(`buxbalans: OK ${bxOk}, ошибок ${bxErr}`);
   if(useGirbo) parts.push(`ГИР БО: OK ${grOk}, ошибок ${grErr}`);
-  const msg = `✓ ${label}: ${total} эмитентов, добавлено ${totalAdded} периодов.\n${parts.join('. ')}.`;
+  const skippedNote = totalSkipped ? ` (пропущено ${totalSkipped} уже существовавших — не перезаписываем; чтобы заменить, удали периоды вручную)` : '';
+  const msg = `✓ ${label}: ${total} эмитентов, добавлено ${totalAdded} новых периодов${skippedNote}.\n${parts.join('. ')}.`;
   if(status) status.innerHTML = `<span style="color:var(--green)">${msg.replace(/\n/g, '<br>')}</span>`;
   if(errors.length){
     console.warn('Bulk errors:', errors);
