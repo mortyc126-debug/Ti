@@ -1353,6 +1353,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <!-- Issuer view -->
   <div id="rep-issuer-view" style="display:none">
+    <!-- Шапка активного эмитента: имя, ИНН, отрасль, ОКВЭД + кнопка
+         смены отрасли. Заполняется через _repRenderActiveIssuerHeader. -->
+    <div id="rep-issuer-header" style="margin-bottom:10px;padding:8px 10px;background:var(--s2);border:1px solid var(--border);font-size:.64rem;display:none"></div>
     <!-- Выпуски эмитента из MOEX-каталога — показываются если в каталоге
          находятся бумаги с совпадающим ИНН или issId. -->
     <div id="rep-issuer-bonds" style="margin-bottom:14px"></div>

@@ -6749,7 +6749,63 @@ function repSelectIssuer(){
   const dosBtn = document.getElementById('rep-dossier-btn'); if(dosBtn) dosBtn.style.display='';
   repBuildPeriodTabs();
   _repSyncPeriodToolbar();
+  _repRenderActiveIssuerHeader();
   _repRenderIssuerBonds();
+}
+
+// Рендерит шапку активного эмитента: имя, ИНН, отрасль, ОКВЭД.
+// Вызывается из repSelectIssuer.
+function _repRenderActiveIssuerHeader(){
+  const box = document.getElementById('rep-issuer-header');
+  if(!box) return;
+  const iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
+  if(!iss){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  const indKey = iss.ind || 'other';
+  const indLabel = window._industryData?.industries?.[indKey]?.label || (indKey === 'other' ? 'не определена' : indKey);
+  const isSpv = indKey === 'holdings_spv';
+  const indColor = isSpv ? 'var(--warn)' : (indKey === 'other' ? 'var(--text3)' : 'var(--acc)');
+  const okvedStr = iss.okved ? `<span style="color:var(--text2);font-family:var(--mono)">${_escHtml(iss.okved)}</span>${iss.okvedName ? ' — <span style="color:var(--text3)">' + _escHtml(iss.okvedName.slice(0, 100)) + '</span>' : ''}` : '<span style="color:var(--text3)">не определён (запусти «📡 ГИР БО (дописать)»)</span>';
+  box.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}</div>
+        <div style="color:var(--text3);font-size:.58rem;margin-top:2px">${iss.inn ? 'ИНН <strong style="color:var(--text2);font-family:var(--mono)">' + iss.inn + '</strong>' : 'ИНН не задан'}${iss.okved ? ' · ОКВЭД ' + okvedStr : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="padding:3px 8px;background:var(--bg);border:1px solid ${indColor};color:${indColor};font-size:.62rem">${isSpv ? '🏴 ' : ''}${_escHtml(indLabel)}</span>
+        <button class="btn btn-sm" onclick="repChangeIndustry()" title="Сменить отрасль вручную (не перезапишется при следующем bulk'е если только не сбросить в 'other')" style="font-size:.56rem;padding:3px 7px">✎ отрасль</button>
+      </div>
+    </div>`;
+}
+
+// Модалка смены отрасли — показывает список всех отраслей из
+// industry-peers.json + «Прочее». Сохраняет выбор в iss.ind.
+async function repChangeIndustry(){
+  if(!repActiveIssuerId){ alert('Сначала выберите эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  if(typeof _indLoad === 'function') await _indLoad();
+  const industries = window._industryData?.industries || {};
+  const entries = Object.entries(industries).map(([k, v]) => [k, v?.label || k]);
+  entries.sort((a, b) => {
+    if(a[0] === 'other') return 1;
+    if(b[0] === 'other') return -1;
+    return a[1].localeCompare(b[1], 'ru');
+  });
+  const current = iss.ind || 'other';
+  const list = entries.map(([k, label]) => `${k === current ? '● ' : '○ '}${label} (${k})`).join('\n');
+  const input = prompt(`Отрасль эмитента «${iss.name}»\nТекущая: ${current}\n\nДоступные отрасли:\n${list}\n\nВведи ключ (oil_gas, banks, holdings_spv, utilities, ...) или «other» для сброса:`, current);
+  if(input === null) return;
+  const newKey = String(input).trim();
+  if(!industries[newKey] && newKey !== 'other'){
+    alert('Нет такого ключа. Используй один из: ' + Object.keys(industries).join(', '));
+    return;
+  }
+  iss.ind = newKey;
+  save();
+  _repRenderActiveIssuerHeader();
+  repRenderIssuerList();
 }
 
 // Показывает все выпуски активного эмитента из MOEX-каталога: по ИНН
@@ -7689,6 +7745,7 @@ async function _repUpdateFromSource({label, fetcher, note}){
   save();
   repBuildPeriodTabs();
   repRenderIssuerList();
+  _repRenderActiveIssuerHeader();
   _repRenderIssuerBonds();
   if(!box) return;
   if(r.added){
