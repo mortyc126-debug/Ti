@@ -1794,14 +1794,22 @@ async function indRender(){
   if(!window._indActiveKey || !data.industries[window._indActiveKey]){
     window._indActiveKey = keys[0] || null;
   }
+  // Счётчик «моих» эмитентов по каждой отрасли — из reportsDB по iss.ind.
+  const myByInd = {};
+  for(const [iid, iss] of Object.entries(reportsDB || {})){
+    const k = iss?.ind || 'other';
+    (myByInd[k] = myByInd[k] || []).push({ id: iid, name: iss.name || '', inn: iss.inn || '' });
+  }
   listEl.innerHTML = keys.map(k => {
     const ind = data.industries[k];
     const n = (ind.peers || []).length;
+    const mine = (myByInd[k] || []).length;
     const hasMed = window._industryMedians?.[k] ? ' 📊' : '';
     const active = k === window._indActiveKey;
     const bg = active ? 'background:var(--acc);color:#000' : '';
+    const mineLabel = mine ? `<span style="color:${active?'#000':'var(--acc)'}" title="из твоей базы отчётности">+${mine}</span>` : '';
     return `<div onclick="indSelect('${k}')" style="padding:6px 8px;cursor:pointer;border-bottom:1px solid var(--border);font-size:.65rem;${bg}">
-      ${ind.label}${hasMed} <span style="color:${active?'#000':'var(--text3)'};float:right">${n}</span>
+      ${ind.label}${hasMed} <span style="float:right;color:${active?'#000':'var(--text3)'}">${n} ${mineLabel}</span>
     </div>`;
   }).join('') + `<div style="padding:8px;border-top:1px solid var(--border)"><button class="btn btn-sm" onclick="indAddIndustry()" style="width:100%">+ новая отрасль</button></div>`;
 
@@ -1833,12 +1841,96 @@ async function indRender(){
           </div>`).join('')}
       </div>
     ` : '<div style="color:var(--text3);padding:16px;text-align:center;font-size:.65rem">Список пуст. Добавьте хотя бы 5-10 ИНН, чтобы медианы были осмысленны.</div>'}
+    ${_indMyIssuersView(key)}
     ${_indMediansView(key)}
     ${_indRosstatView(key)}
   `;
   const cnt = keys.reduce((a,k) => a + (data.industries[k].peers||[]).length, 0);
   const bd = document.getElementById('sb-ind');
   if(bd) bd.textContent = cnt;
+}
+
+// Список эмитентов из reportsDB, у которых iss.ind === key. Клик
+// переходит в Базу отчётности и открывает соответствующего эмитента.
+// Кнопка «+ все в peers» одним движением добавляет всех в список peer'ов
+// этой отрасли — для расчёта медиан.
+function _indMyIssuersView(key){
+  const mine = [];
+  for(const [iid, iss] of Object.entries(reportsDB || {})){
+    if((iss?.ind || 'other') === key){
+      mine.push({
+        id: iid,
+        name: iss.name || '',
+        inn: iss.inn || '',
+        okved: iss.okved || '',
+        periods: Object.keys(iss.periods || {}).length
+      });
+    }
+  }
+  mine.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+  const cnt = mine.length;
+  if(!cnt){
+    return `<div style="margin-top:14px;padding:8px;border:1px dashed var(--border);color:var(--text3);font-size:.58rem;line-height:1.5">
+      В твоей базе отчётности нет эмитентов с отраслью <code>${key}</code>. Запусти «📡 ГИР БО (обновить всех)» в каталоге MOEX — ОКВЭД и отрасль подставятся автоматически.
+    </div>`;
+  }
+  const haveInns = mine.filter(m => m.inn).length;
+  const peersSet = new Set((window._industryData?.industries?.[key]?.peers || []).map(p => String(p.inn || '')));
+  const newForPeers = mine.filter(m => m.inn && !peersSet.has(String(m.inn))).length;
+  const addBtn = newForPeers
+    ? `<button class="btn btn-sm" onclick="indAddMineToPeers('${key}')" title="Добавить ${newForPeers} эмитентов из твоей базы в peers этой отрасли (для расчёта медиан). Дубли по ИНН не добавятся." style="font-size:.55rem;padding:3px 8px">+ добавить в peers (${newForPeers})</button>`
+    : `<span style="font-size:.55rem;color:var(--text3)">все твои эмитенты уже в peers</span>`;
+  return `<div style="margin-top:14px">
+    <div style="font-size:.58rem;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;display:flex;gap:10px;align-items:center">
+      📚 эмитенты из твоей базы: <strong style="color:var(--acc)">${cnt}</strong>
+      ${haveInns ? ' · с ИНН: ' + haveInns : ''}
+      <span style="margin-left:auto">${addBtn}</span>
+    </div>
+    <div style="max-height:260px;overflow:auto;border:1px solid var(--border);font-size:.62rem">
+      ${mine.map(m => `
+        <div style="display:flex;gap:6px;padding:4px 8px;border-bottom:1px solid var(--border);align-items:center;cursor:pointer" onclick="_indOpenMyIssuer('${m.id}')" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+          <span style="flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_escHtml(m.name)}</span>
+          ${m.inn ? `<span style="font-family:var(--mono);color:var(--text3);font-size:.56rem">${m.inn}</span>` : '<span style="color:var(--warn);font-size:.54rem">без ИНН</span>'}
+          ${m.okved ? `<span style="font-family:var(--mono);color:var(--text3);font-size:.54rem">${_escHtml(m.okved)}</span>` : ''}
+          <span style="color:var(--text3);font-size:.54rem">${m.periods}п</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// Переход из списка «мои эмитенты» в Базу отчётности.
+function _indOpenMyIssuer(issId){
+  if(!reportsDB[issId]){ alert('Эмитент не найден'); return; }
+  if(typeof showPage === 'function') showPage('reports');
+  setTimeout(() => {
+    if(typeof repSelectIssuerById === 'function') repSelectIssuerById(issId);
+  }, 80);
+}
+
+// Добавляет всех эмитентов из reportsDB (по iss.ind) в peers этой отрасли.
+// Дубли по ИНН не трогаем. Сохраняем в localStorage как user-override.
+function indAddMineToPeers(key){
+  const ind = window._industryData?.industries?.[key];
+  if(!ind){ alert('Отрасль не найдена'); return; }
+  const peers = ind.peers = ind.peers || [];
+  const peerInns = new Set(peers.map(p => String(p.inn || '')));
+  let added = 0;
+  for(const [iid, iss] of Object.entries(reportsDB || {})){
+    if((iss?.ind || 'other') !== key) continue;
+    if(!iss.inn) continue;
+    const inn = String(iss.inn);
+    if(peerInns.has(inn)) continue;
+    peers.push({ inn, name: iss.name || '' });
+    peerInns.add(inn);
+    added++;
+  }
+  if(added){
+    _indSaveUser();
+    indRender();
+    alert(`✓ Добавлено ${added} эмитентов в peers отрасли «${ind.label}». Для расчёта медиан — кнопка «🧮 Построить медианы».`);
+  } else {
+    alert('Нечего добавлять — все эмитенты без ИНН или уже в peers.');
+  }
 }
 
 // Таблица ROS/ROA из XLSX ФНС по годам для выбранной отрасли.
