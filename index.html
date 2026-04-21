@@ -2035,6 +2035,15 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="no">Только без рейтинга</option>
           </select>
         </div>
+        <div class="field" style="margin:0" title="Исключаем выпуски, у эмитента которых хотя бы одна из 8 ключевых метрик (EBITDA-маржа, чистая маржа, ROA, ROE, ICR, ND/EBITDA, Current, Equity ratio) попала в хвост своей отрасли. Сравнение внутри отрасли (iss.ind): для отраслей с <3 эмитентами в базе фильтр не работает — такие бумаги скрываются.">
+          <label style="font-size:.55rem">🏭 Скрыть «выбросы» в отрасли</label>
+          <select id="moex-f-pct-thresh" onchange="moexApplyFilters()">
+            <option value="">Не фильтровать</option>
+            <option value="5">Если метрика в худших 5% отрасли</option>
+            <option value="10">Если метрика в худших 10% отрасли</option>
+            <option value="25">Если метрика в худшем квартиле (25%)</option>
+          </select>
+        </div>
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">

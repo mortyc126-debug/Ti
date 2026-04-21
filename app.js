@@ -14831,6 +14831,47 @@ function _moexIssuerMetrics(issId, cache){
   return metrics;
 }
 
+// Перцентиль каждой из 8 радарных метрик у каждого эмитента ВНУТРИ его
+// отрасли. Используется фильтром каталога MOEX «исключить, если хоть
+// одна метрика ниже pX отрасли». Отрасли с <3 эмитентами пропускаются
+// (ранк ненадёжен на малой выборке). Берём всегда последний период
+// каждого эмитента. Возвращает {issId: {metricKey: 0..100}}.
+function _moexBuildIndustryRanks(){
+  const AXES = ['ebitdam','npm','roa','roe','icr','ndE','cur','eqr'];
+  const metricsByKey = Object.fromEntries(_CROSS_METRICS.map(m => [m.k, m]));
+  const groups = {};
+  for(const [issId, iss] of Object.entries(reportsDB || {})){
+    if(!iss) continue;
+    const ind = iss.ind || 'other';
+    if(ind === 'other') continue;
+    const lp = _repLatestPeriod(iss);
+    if(!lp || !lp.period) continue;
+    const values = {};
+    for(const k of AXES){
+      const m = metricsByKey[k];
+      const v = m && typeof m.calc === 'function' ? m.calc(lp.period) : null;
+      values[k] = (v == null || !isFinite(v)) ? null : v;
+    }
+    (groups[ind] ||= []).push({id: issId, values});
+  }
+  const out = {};
+  for(const rows of Object.values(groups)){
+    if(rows.length < 3) continue;
+    for(const k of AXES){
+      const m = metricsByKey[k];
+      const pairs = rows.map((r, i) => ({i, v: r.values[k]})).filter(p => p.v != null);
+      if(pairs.length < 3) continue;
+      pairs.sort((a, b) => m.higher === false ? (a.v - b.v) : (b.v - a.v));
+      const n = pairs.length;
+      pairs.forEach((p, idx) => {
+        const rank = n === 1 ? 100 : Math.round((n - 1 - idx) / (n - 1) * 100);
+        (out[rows[p.i].id] ||= {})[k] = rank;
+      });
+    }
+  }
+  return out;
+}
+
 function moexApplyFilters(){
   const cat = window._moexCatalog;
   const filtersCard = document.getElementById('moex-filters-card');
@@ -14867,6 +14908,7 @@ function moexApplyFilters(){
     ebmMin:  _num(document.getElementById('moex-f-ebm-min')?.value),
     ratingMin: document.getElementById('moex-f-rating-min')?.value || '',
     ratingHas: document.getElementById('moex-f-rating-has')?.value || '',
+    pctThresh: _num(document.getElementById('moex-f-pct-thresh')?.value),
     sort: document.getElementById('moex-sort').value || 'ytm-desc',
   };
   // Любой из фундамент-фильтров → подразумевает «только есть в базе».
@@ -14874,6 +14916,8 @@ function moexApplyFilters(){
                   || f.roaMin != null || f.ebmMin != null
                   || f.ratingMin || f.ratingHas;
   const metricsCache = new Map();
+  // Перцентили внутри отрасли: строим один раз на apply, если фильтр включён.
+  const pctRanks = f.pctThresh != null ? _moexBuildIndustryRanks() : null;
 
   const issIdx = _moexBuildIssuerIndex();
   const today = Date.now();
@@ -14972,6 +15016,18 @@ function moexApplyFilters(){
       }
       if(f.ratingHas === 'yes' && !m.ratingClass) return false;
       if(f.ratingHas === 'no'  &&  m.ratingClass) return false;
+    }
+    // Фильтр перцентиля в отрасли: отсекаем бумаги, у эмитента которых
+    // хотя бы одна из 8 радарных метрик в хвосте своей отрасли.
+    // Эмитент без matched id / в 'other' / в отрасли с <3 пирами → скрываем
+    // (согласованно с fundActive: нет данных = не показываем).
+    if(f.pctThresh != null){
+      if(!b.issId) return false;
+      const r = pctRanks && pctRanks[b.issId];
+      if(!r) return false;
+      for(const k in r){
+        if(r[k] != null && r[k] < f.pctThresh) return false;
+      }
     }
     return true;
   });
@@ -15164,7 +15220,7 @@ function moexResetFilters(){
    'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has'].forEach(id => {
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   document.getElementById('moex-f-indb').checked = false;
