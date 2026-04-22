@@ -101,12 +101,14 @@ exports.handler = async (event) => {
 
     // Разрешённые upstream-домены: ФНС БФО (bo.nalog.gov.ru), ЕГРЮЛ
     // (egrul.nalog.ru — POST API для поиска ИНН по имени + PNG капча),
-    // audit-it.ru (paste-режим), buxbalans.ru (автопарсер).
+    // audit-it.ru (paste-режим), buxbalans.ru (автопарсер),
+    // e-disclosure.ru (существенные факты эмитентов — поведенческий слой).
     const ALLOWED = [
         /^https:\/\/bo\.nalog\.gov\.ru\//,
         /^https:\/\/egrul\.nalog\.ru\//,
         /^https:\/\/(www\.)?audit-it\.ru\//,
-        /^https:\/\/(www\.)?buxbalans\.ru\//
+        /^https:\/\/(www\.)?buxbalans\.ru\//,
+        /^https:\/\/(www\.)?e-disclosure\.ru\//
     ];
     const isAllowed = (url) => ALLOWED.some((re) => re.test(url));
 
