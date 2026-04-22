@@ -1269,6 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
     <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую.">🧹 Удалить пустые периоды</button>
     <button class="btn btn-sm" onclick="repDiagnoseInn()" title="Запросить отчётность с buxbalans и ГИР БО по ИНН и показать что найдено — годы, ОКВЭД, название. Полезно когда bulk не обновляет конкретного эмитента и надо понять где ломается.">🔍 Диагностика по ИНН</button>
+    <button class="btn btn-sm" onclick="repCopyInnsForExtension()" title="Скопировать в буфер все уникальные ИНН из reportsDB (включая привязанные материнские). Дальше в расширении БондАналитик: попап → «📥 Загрузить из буфера» → «🚀 Запустить обход». Расширение само пройдётся по всем эмитентам на e-disclosure и соберёт раскрытия.">📥 ИНН для расширения</button>
   </div>
 
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">

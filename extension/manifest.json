@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "БондАналитик: сбор раскрытий",
-  "version": "1.1.0",
-  "description": "Автосбор существенных фактов с e-disclosure.ru. При посещении карточки компании данные сохраняются автоматически. Есть массовый режим по списку ИНН.",
-  "permissions": ["activeTab", "clipboardWrite", "tabs", "storage", "scripting"],
+  "version": "1.2.0",
+  "description": "Сбор существенных фактов с e-disclosure.ru. Автосбор + массовый обход + отслеживание новых событий с уведомлениями.",
+  "permissions": ["activeTab", "clipboardWrite", "clipboardRead", "tabs", "storage", "scripting", "notifications"],
   "host_permissions": ["*://*.e-disclosure.ru/*"],
   "background": {
     "service_worker": "background.js"

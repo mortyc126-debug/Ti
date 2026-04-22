@@ -2480,6 +2480,32 @@ async function indResetSeed(){
 
 // Сброс пользовательских правок + пересчёт iss.ind у всех эмитентов
 // reportsDB по новому классификатору _okvedToIndustry. Отрасли, которые
+// Собирает все уникальные ИНН из reportsDB (свои + привязанные
+// материнские/связанные) и копирует в буфер для расширения «БондАналитик:
+// сбор раскрытий». В расширении один клик «Загрузить из буфера» → массовый
+// обход без ручной вставки.
+function repCopyInnsForExtension(){
+  const inns = new Set();
+  const validInn = v => v && /^\d{10}(\d{2})?$/.test(String(v));
+  for(const iss of Object.values(reportsDB || {})){
+    if(!iss) continue;
+    if(validInn(iss.inn)) inns.add(String(iss.inn));
+    if(Array.isArray(iss.related)){
+      for(const r of iss.related){
+        if(r && validInn(r.inn)) inns.add(String(r.inn));
+      }
+    }
+  }
+  if(!inns.size){ alert('В reportsDB нет эмитентов с валидным ИНН'); return; }
+  const list = [...inns].sort().join('\n');
+  const fallback = () => prompt(`Скопируй вручную ${inns.size} ИНН (Ctrl+C, потом в расширении Ctrl+V):`, list);
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(list).then(() => {
+      alert(`✓ ${inns.size} ИНН скопировано в буфер.\n\nДальше:\n1) Открой расширение БондАналитик (иконка в Chrome справа сверху)\n2) В попапе нажми «📥 Загрузить из буфера»\n3) Жми «🚀 Запустить обход»\n4) После завершения «📋 Экспорт в буфер (JSON)»\n5) Здесь любой эмитент → «📢 факты» → вставь JSON → «Импортировать» (раскидается автоматом)`);
+    }).catch(fallback);
+  } else fallback();
+}
+
 // Удаляет из reportsDB периоды, где ВСЕ числовые поля пустые (null/undefined/0).
 // Такие «пустышки» появляются после неудачных импортов и блокируют
 // повторную подтяжку: bulk видит запись и пропускает как существующую,
