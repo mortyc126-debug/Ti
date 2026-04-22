@@ -18339,12 +18339,14 @@ function repImportEdisclosure(rawJson){
   let parsed = null;
   try { parsed = JSON.parse(String(rawJson || '').trim()); }
   catch(e){ alert('Не похоже на JSON:\n' + e.message); return; }
-  if(!parsed || parsed.source !== 'e-disclosure' || !Array.isArray(parsed.events)){
-    alert('Неправильный формат. Ожидается JSON из bookmarklet-а на e-disclosure.ru.');
-    return;
-  }
-  // Категоризируем события через существующий _edCategorize
-  const enriched = parsed.events.map(e => {
+  if(!parsed){ alert('Пустой JSON'); return; }
+
+  // Поддерживаем три формата:
+  //  A. Единичный — {source:'e-disclosure', events:[...]} → в активного эмитента.
+  //  B. Batch от расширения — {source:'e-disclosure-batch', items:[...]} → по
+  //     каждому item ищем эмитента по ИНН/имени в reportsDB и сохраняем.
+  //  C. Ошибка — всё остальное.
+  const enrichEvents = (events) => (events || []).map(e => {
     const cat = (typeof _edCategorize === 'function') ? _edCategorize(e.title) : null;
     return {
       date: e.date,
@@ -18353,17 +18355,74 @@ function repImportEdisclosure(rawJson){
       category: cat ? { key: cat.key, icon: cat.icon, color: cat.color, title: cat.title } : null,
     };
   });
-  iss.edisclosure = {
-    capturedAt: parsed.capturedAt || new Date().toISOString(),
-    edId: parsed.edId || null,
-    companyName: parsed.companyName || null,
-    inn: parsed.inn || null,
-    events: enriched,
-  };
-  save();
-  const categorized = enriched.filter(e => e.category);
-  alert(`✓ Импортировано ${enriched.length} событий по «${parsed.companyName || iss.name}».\n  Из них категоризировано: ${categorized.length} (смены аудитора/руководства, иски, дефолты и т.п.)\n\nДалее кнопка «📢 факты» будет показывать эти события, плюс можно будет открыть сайт чтобы обновить.`);
-  if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+
+  if(parsed.source === 'e-disclosure' && Array.isArray(parsed.events)){
+    // Формат A: вливаем в активного
+    iss.edisclosure = {
+      capturedAt: parsed.capturedAt || new Date().toISOString(),
+      edId: parsed.edId || null,
+      companyName: parsed.companyName || null,
+      inn: parsed.inn || null,
+      events: enrichEvents(parsed.events),
+    };
+    save();
+    const cat = iss.edisclosure.events.filter(e => e.category).length;
+    alert(`✓ Импортировано ${iss.edisclosure.events.length} событий по «${parsed.companyName || iss.name}».\n  Категоризировано: ${cat}.`);
+    if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+    return;
+  }
+
+  if(parsed.source === 'e-disclosure-batch' && Array.isArray(parsed.items)){
+    // Формат B: раскладываем по всем эмитентам в reportsDB
+    let matched = 0, skipped = 0, noMatch = 0;
+    const noMatchList = [];
+    for(const item of parsed.items){
+      if(!item || !Array.isArray(item.events)) { skipped++; continue; }
+      // Ищем эмитента по ИНН или по имени
+      let targetId = null;
+      if(item.inn){
+        for(const [id, emit] of Object.entries(reportsDB || {})){
+          if(emit && String(emit.inn || '') === String(item.inn)){ targetId = id; break; }
+        }
+      }
+      if(!targetId && item.companyName){
+        const needle = _normForSearch ? _normForSearch(item.companyName) : String(item.companyName).toLowerCase();
+        for(const [id, emit] of Object.entries(reportsDB || {})){
+          if(!emit || !emit.name) continue;
+          const hay = _normForSearch ? _normForSearch(emit.name) : String(emit.name).toLowerCase();
+          if(hay.includes(needle) || needle.includes(hay)){ targetId = id; break; }
+        }
+      }
+      if(!targetId){
+        noMatch++;
+        noMatchList.push(`${item.inn || '—'} · ${item.companyName || '(без имени)'}`);
+        continue;
+      }
+      reportsDB[targetId].edisclosure = {
+        capturedAt: item.capturedAt || new Date().toISOString(),
+        edId: item.edId || null,
+        companyName: item.companyName || null,
+        inn: item.inn || null,
+        events: enrichEvents(item.events),
+      };
+      matched++;
+    }
+    save();
+    let msg = `✓ Batch-импорт: ${parsed.items.length} записей.\n` +
+              `  Привязано к эмитентам: ${matched}\n` +
+              `  Пропущено (пустые): ${skipped}\n` +
+              `  Не найдены в reportsDB: ${noMatch}`;
+    if(noMatch && noMatchList.length){
+      msg += '\n\nНе привязанные:\n' + noMatchList.slice(0, 10).join('\n');
+      if(noMatchList.length > 10) msg += `\n...и ещё ${noMatchList.length - 10}`;
+    }
+    alert(msg);
+    if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+    if(typeof repRenderIssuerList === 'function') repRenderIssuerList();
+    return;
+  }
+
+  alert('Неправильный формат. Ожидается JSON из bookmarklet-а / расширения БондАналитик на e-disclosure.ru.');
 }
 
 // Открывает модалку «📢 факты»: если есть сохранённые события — показывает

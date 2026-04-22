@@ -1,10 +1,17 @@
 {
   "manifest_version": 3,
   "name": "БондАналитик: сбор раскрытий",
-  "version": "1.0.0",
-  "description": "Собирает существенные факты с e-disclosure.ru и копирует JSON в буфер обмена для импорта в БондАналитик.",
-  "permissions": ["activeTab", "clipboardWrite"],
+  "version": "1.1.0",
+  "description": "Автосбор существенных фактов с e-disclosure.ru. При посещении карточки компании данные сохраняются автоматически. Есть массовый режим по списку ИНН.",
+  "permissions": ["activeTab", "clipboardWrite", "tabs", "storage", "scripting"],
   "host_permissions": ["*://*.e-disclosure.ru/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "БондАналитик: сбор раскрытий"
+  },
   "content_scripts": [
     {
       "matches": ["*://*.e-disclosure.ru/*"],

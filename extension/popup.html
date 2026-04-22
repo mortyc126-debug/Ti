@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>БондАналитик: сбор раскрытий</title>
+<style>
+body {
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 14px;
+  width: 360px;
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+h1 { font-size: 14px; margin: 0 0 4px; font-weight: 600; color: #0a84ff; }
+.sub { font-size: 11px; color: #888; margin-bottom: 12px; }
+.section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #333; }
+.section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+label { display: block; font-size: 11px; color: #aaa; margin-bottom: 4px; }
+textarea, input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  border: 1px solid #444;
+  padding: 6px 8px;
+  font: 11px/1.3 ui-monospace, "SF Mono", Menlo, monospace;
+  border-radius: 3px;
+  resize: vertical;
+}
+textarea { min-height: 60px; }
+button {
+  background: #0a84ff; color: #fff; border: none; padding: 7px 12px;
+  font: 600 12px -apple-system, sans-serif; border-radius: 4px; cursor: pointer;
+  margin-right: 6px; margin-top: 6px;
+}
+button:hover { background: #0060df; }
+button.secondary { background: #444; }
+button.danger { background: #d32f2f; }
+button:disabled { background: #555; cursor: not-allowed; }
+.counter {
+  font-size: 12px; color: #34c759; font-weight: 600;
+}
+.progress {
+  font-size: 11px; color: #888; margin-top: 6px; font-family: ui-monospace, monospace;
+}
+.hint {
+  font-size: 10px; color: #777; margin-top: 4px; line-height: 1.4;
+}
+a { color: #0a84ff; }
+</style>
+</head>
+<body>
+<h1>📢 Сбор раскрытий с e-disclosure.ru</h1>
+<div class="sub">Собранные данные сохраняются в расширении. Экспортируй JSON и вставляй в БондАналитик.</div>
+
+<div class="section">
+  <label>Собрано компаний:</label>
+  <div class="counter" id="counter">0</div>
+  <button id="export-btn">📋 Экспорт в буфер (JSON)</button>
+  <button id="clear-btn" class="danger">🗑 Очистить</button>
+  <div class="hint">Данные автоматически собираются при открытии карточки компании на e-disclosure.ru.</div>
+</div>
+
+<div class="section">
+  <label>Массовый сбор: вставь ИНН (один на строку)</label>
+  <textarea id="inn-list" placeholder="7707083893&#10;7702070139&#10;5029169023"></textarea>
+  <button id="start-batch-btn">🚀 Запустить обход</button>
+  <div class="progress" id="progress"></div>
+  <div class="hint">Расширение по очереди откроет каждую компанию на e-disclosure, автоматически соберёт раскрытия, закроет вкладку. Пауза 2 сек между запросами. Уже собранные за последние 24ч — пропускаются.</div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
