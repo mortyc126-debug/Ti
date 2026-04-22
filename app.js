@@ -19184,18 +19184,27 @@ async function fetchSharesCatalog(){
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Загружаю…'; }
   const items = [];
   const seen = new Set();
+  const PAGE = 100;
   try {
     for(const [board, label] of _SHARES_BOARDS){
-      if(status) status.textContent = `📋 ${label} (${board})…`;
-      const url = `${_SHARES_BASE_BOARD}/${board}/securities.json?iss.meta=off`;
-      const r = await fetch(url, {cache:'no-store'});
-      if(!r.ok){ console.warn('shares board', board, 'HTTP', r.status); continue; }
-      const raw = await r.json();
-      const batch = _sharesParsePage(raw);
-      for(const s of batch){
-        if(seen.has(s.secid)) continue;
-        seen.add(s.secid);
-        items.push(s);
+      let start = 0, page = 0;
+      while(true){
+        if(status) status.textContent = `📋 ${label} (${board}) · стр. ${page+1} · всего: ${items.length}`;
+        const url = `${_SHARES_BASE_BOARD}/${board}/securities.json?iss.meta=off&start=${start}&limit=${PAGE}`;
+        const r = await fetch(url, {cache:'no-store'});
+        if(!r.ok){ console.warn('shares board', board, 'HTTP', r.status); break; }
+        const raw = await r.json();
+        const rawLen = (raw && raw.securities && raw.securities.data && raw.securities.data.length) || 0;
+        const batch = _sharesParsePage(raw);
+        for(const s of batch){
+          if(seen.has(s.secid)) continue;
+          seen.add(s.secid);
+          items.push(s);
+        }
+        page++;
+        if(rawLen < PAGE) break;
+        start += PAGE;
+        if(page > 10) break; // страховка — акций на одной доске ~300 максимум
       }
     }
     window._sharesCatalog = { items, updatedAt: new Date().toISOString() };
@@ -19210,26 +19219,29 @@ async function fetchSharesCatalog(){
   }
 }
 
-// P/E и P/B на лету из reportsDB + текущей цены × числа акций.
-// TTM берётся из последнего Year-периода (FY), не 9М/12М склейки — этим
-// занимается _moexIssuerMetrics уже. Здесь только обогащаем рыночными
-// множителями.
+// Кап-ция = price × issueSize — чисто MOEX-данные, reportsDB не нужна.
+// Вынесена отдельно, чтобы фильтр/сорт по cap работали и для эмитентов
+// без записи в reportsDB.
+function _sharesCap(share){
+  if(!share || !share.price || !share.issueSize) return null;
+  return (share.price * share.issueSize) / 1e9; // млрд ₽
+}
+
+// P/E, P/B, P/S, EV/EBITDA — нужен reportsDB (последний FY).
 function _sharesMarketMultiples(share){
-  if(!share || !share.issId || !share.price || !share.issueSize) return null;
-  const iss = reportsDB[share.issId]; if(!iss) return null;
+  const capBn = _sharesCap(share);
+  if(capBn == null || !share.issId) return capBn != null ? { capBn, pe:null, pb:null, ps:null, evEbitda:null, year:null } : null;
+  const iss = reportsDB[share.issId];
+  if(!iss) return { capBn, pe:null, pb:null, ps:null, evEbitda:null, year:null };
   let latest = null;
   for(const p of Object.values(iss.periods || {})){
     if(!p || !p.year) continue;
     if(!/год|FY|year/i.test(p.period || 'FY')) continue;
     if(!latest || parseInt(p.year, 10) > parseInt(latest.year, 10)) latest = p;
   }
-  if(!latest) return null;
-  // reportsDB — в млрд ₽. Капитализация = price × issueSize → в рублях.
-  const capRub = share.price * share.issueSize;
-  const capBn  = capRub / 1e9;
+  if(!latest) return { capBn, pe:null, pb:null, ps:null, evEbitda:null, year:null };
   const pe = (latest.np != null && latest.np > 0) ? capBn / latest.np : null;
   const pb = (latest.eq != null && latest.eq > 0) ? capBn / latest.eq : null;
-  // P/S и EV/EBITDA — бонусом (EV упрощённо: cap + debt − cash).
   const ps = (latest.rev != null && latest.rev > 0) ? capBn / latest.rev : null;
   const ev = capBn + (latest.debt || 0) - (latest.cash || 0);
   const base = latest.ebitda != null ? latest.ebitda : latest.ebit;
@@ -19297,19 +19309,24 @@ function sharesApplyFilters(){
   const metricsCache = new Map();
   const multiplesCache = new Map();
 
-  // Обогащаем акции issId и multiples (фильтры должны видеть вычисленные P/E/P/B).
+  // Обогащаем акции issId, капитализацией и multiples. capBn считается
+  // всегда (нужны только price × issueSize), а P/E и P/B — только если
+  // эмитент есть в reportsDB.
   for(const s of cat.items){
     s.issId = _moexMatchIssuer({ secName: s.issuer || s.secName, shortName: s.shortName }, issIdx);
-    const mm = _sharesMarketMultiples(s);
-    multiplesCache.set(s.secid, mm);
+    s.capBn = _sharesCap(s);
+    multiplesCache.set(s.secid, _sharesMarketMultiples(s));
   }
 
   // Перцентили отрасли — как у облигаций.
   const pctRanks = (f.pctThresh != null) ? _moexBuildIndustryRanks() : null;
+  // anyFund — фильтры, которым нужна запись в reportsDB. capMin и peMax/pbMax
+  // не сюда: capMin работает и без reportsDB; peMax/pbMax уже и так
+  // подразумевают наличие reportsDB (иначе multiplesCache вернёт null и бумага
+  // отсеется по собственной проверке).
   const anyFund = f.deMax != null || f.icrMin != null || f.roaMin != null || f.ebmMin != null
                || f.curMin != null || f.cashrMin != null || f.eqrMin != null
-               || f.ratingMin || f.ratingHas || f.stressMin != null || f.pctThresh != null
-               || f.peMax != null || f.pbMax != null;
+               || f.ratingMin || f.ratingHas === 'yes' || f.stressMin != null || f.pctThresh != null;
 
   const stressCache = new Map();
   const getStress = (issId) => {
@@ -19329,13 +19346,22 @@ function sharesApplyFilters(){
     if(f.priceMax != null && (s.price == null || s.price > f.priceMax)) return false;
     if(f.onlyInDb && !s.issId) return false;
 
+    // Кап-ция — считается из MOEX-данных, reportsDB не нужна.
+    if(f.capMin != null && (s.capBn == null || s.capBn < f.capMin)) return false;
+
+    // P/E и P/B требуют reportsDB.
+    if(f.peMax != null){
+      const mm = multiplesCache.get(s.secid);
+      if(!mm || mm.pe == null || mm.pe > f.peMax) return false;
+    }
+    if(f.pbMax != null){
+      const mm = multiplesCache.get(s.secid);
+      if(!mm || mm.pb == null || mm.pb > f.pbMax) return false;
+    }
+
     if(anyFund && !s.issId) return false;
     if(s.issId){
       const m = _moexIssuerMetrics(s.issId, metricsCache);
-      const mm = multiplesCache.get(s.secid);
-      if(f.peMax != null && (!mm || mm.pe == null || mm.pe > f.peMax)) return false;
-      if(f.pbMax != null && (!mm || mm.pb == null || mm.pb > f.pbMax)) return false;
-      if(f.capMin != null && (!mm || mm.capBn == null || mm.capBn < f.capMin)) return false;
       if(m){
         if(f.deMax != null && (m.debtEbitda == null || m.debtEbitda > f.deMax)) return false;
         if(f.icrMin != null && (m.icr == null || m.icr < f.icrMin)) return false;
@@ -19345,7 +19371,10 @@ function sharesApplyFilters(){
         if(f.cashrMin != null && (m.cashRatio == null || m.cashRatio < f.cashrMin)) return false;
         if(f.eqrMin != null && (m.equityRatio == null || (m.equityRatio * 100) < f.eqrMin)) return false;
         if(f.ratingMin){
-          const rank = (m.ratingRank != null) ? m.ratingRank : _moexRatingRank(m.ratingClass);
+          // Сравнение на единой «классовой» шкале 0..9 (_MOEX_RATING_ORDER):
+          // m.ratingRank раньше считался через _ratingRank в шкале 0..23 и
+          // ломал сравнение с f.ratingMin в шкале 0..9.
+          const rank = _moexRatingRank(m.ratingClass);
           const minRank = _moexRatingRank(f.ratingMin);
           if(rank < 0 || rank < minRank) return false;
         }
@@ -19374,8 +19403,8 @@ function sharesApplyFilters(){
     if(key === 'price') return s.price;
     if(key === 'val')   return s.valToday;
     if(key === 'change')return s.change;
+    if(key === 'cap')   return s.capBn; // от MOEX-данных, не от reportsDB
     const mm = multiplesCache.get(s.secid);
-    if(key === 'cap') return mm ? mm.capBn : null;
     if(key === 'pe')  return mm ? mm.pe : null;
     if(key === 'pb')  return mm ? mm.pb : null;
     if(key === 'ps')  return mm ? mm.ps : null;
