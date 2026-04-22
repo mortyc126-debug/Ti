@@ -87,15 +87,37 @@ function save(){
 }
 
 // ══ NAV ══
-function showPage(n){
+// История переходов — для кнопки «← Назад». showPage с fromBack=true
+// не сохраняет текущую страницу в стек. Без fromBack — это «навигация
+// через меню», которая чистит форму назначения и пишет прошлую в стек.
+let _navHistoryStack = [];
+let _currentPage = null; // выставляется при первом вызове showPage
+
+function showPage(n, opts){
+  opts = opts || {};
+  const fromBack = opts.fromBack === true;
+  // Если это НЕ возврат назад и НЕ первичная инициализация — пишем
+  // текущую страницу в историю, и чистим формы назначения (фреш-старт).
+  if(!fromBack && _currentPage && _currentPage !== n){
+    _navHistoryStack.push(_currentPage);
+    if(_navHistoryStack.length > 30) _navHistoryStack.shift();
+  }
+  // Чистим формы только если это не первая инициализация (_currentPage
+  // не установлен) и не возврат назад.
+  if(!fromBack && _currentPage && !opts.skipClear){
+    _clearPageForms(n);
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
   const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
-  // Сохраняем активную страницу, чтобы при перезагрузке / восстановлении
-  // сессии открывался тот же раздел, а не YTM по дефолту.
+  _currentPage = n;
+  // Сохраняем активную страницу в localStorage (переживает перезагрузку).
   try { localStorage.setItem('ba_active_page', n); } catch(_){}
+  // Обновляем кнопку back — прячем если истории нет.
+  const backBtn = document.getElementById('nav-back-btn');
+  if(backBtn) backBtn.style.visibility = _navHistoryStack.length ? 'visible' : 'hidden';
   if(n==='portfolio') renderPort();
   if(n==='watchlist') renderWL();
   if(n==='ytm') renderYtm();
@@ -104,6 +126,33 @@ function showPage(n){
   if(n==='industries') indRender();
   if(n==='cross') crossInit();
   if(n==='moex') moexInit();
+}
+
+// Назад: pop из стека, показать без очистки форм (данные сохраняются).
+function navigateBack(){
+  if(!_navHistoryStack.length) return;
+  const prev = _navHistoryStack.pop();
+  showPage(prev, { fromBack: true });
+}
+
+// Очистка форм/добавления для каждой страницы — вызывается при
+// обычной навигации через меню (не при back-ретурне).
+function _clearPageForms(n){
+  try {
+    if(n === 'portfolio' && typeof clearPortForm === 'function'){ clearPortForm(); return; }
+    if(n === 'ytm'){
+      ['yf-name','yf-isin','yf-price','yf-years','yf-buyprice','yf-coupon','yf-spread']
+        .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+      return;
+    }
+    if(n === 'watchlist'){
+      ['wl-bname','wl-bprice','wl-byears','wl-bcoup','wl-bspread','wl-note']
+        .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+      return;
+    }
+    // Для остальных страниц «форм для заполнения» как таковых нет —
+    // фильтры и редакторы персистят намеренно.
+  } catch(_){}
 }
 function sbAct(el){document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));el.classList.add('active')}
 function swIssTab(t,el){

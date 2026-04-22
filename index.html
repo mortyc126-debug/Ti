@@ -340,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="topbar">
   <div class="logo">Бонд<span>Аналитик</span></div>
   <nav class="nav">
+    <button class="nav-btn" id="nav-back-btn" onclick="navigateBack()" title="Вернуться в предыдущий открытый раздел. Данные в формах сохраняются при возврате (в отличие от обычного клика по пункту меню, который открывает раздел с чистой формой)." style="visibility:hidden;border-color:var(--acc);color:var(--acc)">← Назад</button>
     <button class="nav-btn active" onclick="showPage('ytm')">📊 YTM</button>
     <button class="nav-btn" onclick="showPage('issuer')">🏢 Эмитент</button>
     <button class="nav-btn nav-sep" onclick="showPage('reports')">📂 Отчётность</button>
