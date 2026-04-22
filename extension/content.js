@@ -1,82 +1,168 @@
-// Content-скрипт расширения «БондАналитик: сбор раскрытий».
-// Работает на страницах e-disclosure.ru. Два режима:
-//   1) Ручной: на странице карточки компании кнопка «📋 Собрать → БА» —
-//      клик собирает и копирует JSON в буфер.
-//   2) Авто: при открытии карточки компании автоматически собирает и
-//      отправляет данные в background service worker, который сохраняет
-//      их в chrome.storage. Массовый обход работает на этом.
-// Плюс: если страница — поисковая выдача (companyfind.aspx?query=ИНН),
-// и есть ровно один кандидат — автоматически переходит на его карточку.
-// Это нужно для batch-режима: из popup → search URL → сразу на нужную
-// компанию без ручного клика.
+// Content-скрипт расширения БондАналитик: сбор раскрытий.
+// v1.3: переписан под реальную структуру e-disclosure.ru (interfax).
+// Работает на /portal/company.aspx?id=XXX — карточка компании.
+// События подгружаются AJAX'ом в .js-events-container после загрузки
+// страницы, поэтому используем MutationObserver чтобы дождаться их.
+//
+// ИНН и имя — вытаскиваем из структурированной таблицы компании, а не
+// regex'ом по всему body. Это надёжно.
 
 (function(){
   const path = location.pathname.toLowerCase();
-  const isCompanyPage = /\/portal\/(files|company)\.aspx/i.test(path);
-  const isSearchPage  = /\/portal\/companyfind\.aspx/i.test(path);
+  const isCompanyPage = /\/portal\/company\.aspx/i.test(path);
+  const isFilesPage   = /\/portal\/files\.aspx/i.test(path);
+  const isSearchPage  = /\/portal\/companyfind\.aspx/i.test(path) ||
+                        /\/poisk-po-kompaniyam/i.test(path);
 
-  // Общая функция сбора — возвращает payload или null
-  const scrapePage = () => {
-    try {
+  // На поисковой SPA-странице — редиректить на первую найденную компанию.
+  // Ищем любую ссылку company.aspx в DOM (или data-attributes).
+  if(isSearchPage){
+    waitFor(() => {
+      const firstLink = document.querySelector('a[href*="company.aspx?id="]');
+      if(firstLink && firstLink.href){
+        location.href = firstLink.href;
+        return true;
+      }
+      return false;
+    }, 8000);
+    return;
+  }
+
+  if(!isCompanyPage && !isFilesPage) return;
+
+  // === Скрап имени компании из carded layout ===
+  const extractName = () => {
+    const h2 = document.querySelector('.infoblock h2, .title_basic + div h2, h1');
+    if(h2) return h2.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '"');
+    const t = document.querySelector('title');
+    if(t){
+      const m = t.textContent.match(/информации о компании\s+(.+?)(?:\s*$)/i);
+      return m ? m[1].trim().replace(/"/g, '"') : t.textContent.trim();
+    }
+    return '';
+  };
+
+  // === ИНН из таблицы .company-table ===
+  const extractInn = () => {
+    // Вариант 1: <td class="field-name">ИНН</td><td><strong>XXX</strong></td>
+    const rows = document.querySelectorAll('.company-table tr, tr');
+    for(const tr of rows){
+      const fn = tr.querySelector('.field-name, td:first-child');
+      if(fn && /^ИНН\s*$/i.test(fn.textContent.trim())){
+        const v = tr.querySelector('strong, td:nth-child(2)');
+        if(v){
+          const m = v.textContent.match(/(\d{10}(?:\d{2})?)/);
+          if(m) return m[1];
+        }
+      }
+    }
+    // Fallback: regex по всему тексту (старый подход)
+    const m2 = document.body.textContent.match(/ИНН[^0-9]{0,20}(\d{10}(?:\d{2})?)/);
+    return m2 ? m2[1] : null;
+  };
+
+  // === Id компании из hidden input или URL ===
+  const extractEdId = () => {
+    const hid = document.getElementById('hCompanyId');
+    if(hid && hid.value) return hid.value;
+    const m = location.href.match(/[?&]id=(\d+)/);
+    return m ? m[1] : null;
+  };
+
+  // === Скрап событий из js-events-container (или таблицы на /files.aspx) ===
+  const scrapeEvents = () => {
+    const events = [];
+    // Вариант A: events-container (на карточке company.aspx)
+    const container = document.querySelector('.js-events-container');
+    if(container){
+      const rows = container.querySelectorAll('tr, .event-item, .event');
+      rows.forEach(el => {
+        const text = el.textContent || '';
+        const dateM = text.match(/(\d{2}\.\d{2}\.\d{4})/);
+        if(!dateM) return;
+        const linkEl = el.querySelector('a[href*=".pdf"], a[href*=".html"], a[href*=".rtf"], a[href*=".doc"], a[href*="event.aspx"], a[href*="EventId"]')
+                    || el.querySelector('a');
+        const title = linkEl ? linkEl.textContent.trim() : text.replace(dateM[1], '').trim().slice(0, 200);
+        if(!title || title.length < 8) return;
+        const url = linkEl && linkEl.href ? linkEl.href : null;
+        events.push({ date: dateM[1], title, url });
+      });
+    }
+    // Вариант B: обычные tr в body (на /files.aspx и fallback)
+    if(!events.length){
       const rows = document.querySelectorAll('tr');
-      const events = [];
       rows.forEach(tr => {
         const text = tr.textContent || '';
         const dateM = text.match(/(\d{2}\.\d{2}\.\d{4})/);
         if(!dateM) return;
-        const linkEl = tr.querySelector('a[href*=".pdf"], a[href*=".html"], a[href*=".rtf"], a[href*=".doc"]')
+        const linkEl = tr.querySelector('a[href*=".pdf"], a[href*=".html"], a[href*=".rtf"], a[href*=".doc"], a[href*="event.aspx"], a[href*="EventId"]')
                     || tr.querySelector('a');
         const title = linkEl ? linkEl.textContent.trim() : '';
         if(!title || title.length < 8) return;
         const url = linkEl && linkEl.href ? linkEl.href : null;
         events.push({ date: dateM[1], title, url });
       });
-      if(!events.length) return null;
-      const titleEl = document.querySelector('h1, h2, .companyName') || document.querySelector('title');
-      const companyName = titleEl ? titleEl.textContent.trim().replace(/\s+/g, ' ') : '';
-      const idMatch = location.href.match(/id=(\d+)/);
-      const innMatch = document.body.textContent.match(/ИНН[^0-9]{0,20}(\d{10}(?:\d{2})?)/);
-      return {
-        source: 'e-disclosure',
-        edId: idMatch ? idMatch[1] : null,
-        companyName,
-        inn: innMatch ? innMatch[1] : null,
-        capturedAt: new Date().toISOString(),
-        events
-      };
-    } catch(e){
-      console.warn('[БондАналитик] ошибка сбора:', e);
-      return null;
+    }
+    return events;
+  };
+
+  const buildPayload = () => ({
+    source: 'e-disclosure',
+    edId: extractEdId(),
+    companyName: extractName(),
+    inn: extractInn(),
+    capturedAt: new Date().toISOString(),
+    events: scrapeEvents()
+  });
+
+  // === Ожидание AJAX-загрузки событий ===
+  // На company.aspx .js-events-container сначала пустой, потом наполняется.
+  // Даём ему до 10 сек на заполнение, потом скрапим.
+  let saved = false;
+  const tryCollectAndSave = () => {
+    if(saved) return;
+    const payload = buildPayload();
+    // Сохраняем даже если events пустые (мертвая компания) — чтобы знать
+    // что мы её проверили и batch-режим не висел
+    if(payload.edId || payload.inn){
+      saved = true;
+      try { chrome.runtime.sendMessage({ type: 'save-disclosure', payload }); } catch(_){}
+      // Через секунду после save — проверим не нужно ли закрыть вкладку (batch)
+      setTimeout(() => {
+        chrome.storage.local.get(['pendingBatchClose'], data => {
+          if(data.pendingBatchClose === location.href || data.pendingBatchMode){
+            try { chrome.runtime.sendMessage({ type: 'close-tab' }); } catch(_){}
+          }
+        });
+      }, 1000);
     }
   };
 
-  // Авто-редирект с поисковой выдачи — нужен для batch-режима.
-  // Когда popup открывает companyfind.aspx?query=ИНН и в результатах
-  // есть ссылки company.aspx?id=... — автоматически жмём первую.
-  if(isSearchPage){
-    const firstLink = document.querySelector('a[href*="company.aspx?id="]');
-    if(firstLink && firstLink.href){
-      // Отложенный переход — чтобы anti-bot сервер-page успел отреагировать
-      setTimeout(() => { location.href = firstLink.href; }, 1200);
-    }
-    return;
+  // Пытаемся сразу — вдруг данные уже есть
+  const initial = buildPayload();
+  if(initial.events.length > 0 || initial.edId){
+    tryCollectAndSave();
   }
 
-  if(!isCompanyPage) return;
-
-  // На карточке компании — автосбор (для batch) + кнопка (для ручного)
-  const payload = scrapePage();
-  if(payload){
-    // Отправляем в background для сохранения в chrome.storage
-    try {
-      chrome.runtime.sendMessage({ type: 'save-disclosure', payload });
-    } catch(e){
-      console.warn('[БондАналитик] sendMessage err:', e);
-    }
+  // Если events-container есть но пустой — ждём AJAX
+  const container = document.querySelector('.js-events-container');
+  if(container){
+    const observer = new MutationObserver(() => {
+      const payload = buildPayload();
+      if(payload.events.length > 0){
+        observer.disconnect();
+        tryCollectAndSave();
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    // Fallback: через 8 сек сохраняем что есть, даже если events пустой
+    setTimeout(() => {
+      observer.disconnect();
+      tryCollectAndSave();
+    }, 8000);
   }
 
-  // Кнопка для ручного копирования в буфер (если расширение используется
-  // без popup-пайплайна).
+  // === Кнопка для ручного копирования ===
   const btn = document.createElement('button');
   btn.id = 'bondan-collect-btn';
   btn.style.cssText = [
@@ -86,42 +172,29 @@
     'border-radius:6px','cursor:pointer','box-shadow:0 4px 12px rgba(0,0,0,.3)',
     'max-width:300px'
   ].join(';');
-
-  const updateBtn = (text, color, disabled) => {
-    btn.textContent = text;
-    btn.style.background = color;
-    btn.disabled = !!disabled;
-  };
-  const reset = () => updateBtn(
-    payload ? `📋 Скопировать (${payload.events.length} событий) → БА` : '📋 Нет событий на странице',
-    payload ? '#0a84ff' : '#8e8e93',
-    !payload
-  );
-  reset();
-
+  btn.textContent = '📋 Собрать → БА';
   btn.onclick = () => {
-    if(!payload){ alert('На странице нет таблицы существенных фактов. Найди карточку компании через поиск.'); return; }
+    const payload = buildPayload();
+    if(!payload.events.length && !payload.inn){
+      alert('На странице нет ни событий ни ИНН. Возможно AJAX ещё не загрузился — попробуй через пару секунд.');
+      return;
+    }
     const json = JSON.stringify(payload);
     navigator.clipboard.writeText(json).then(() => {
-      updateBtn(`✓ ${payload.events.length} событий скопировано`, '#34c759', true);
-      setTimeout(reset, 3500);
-    }).catch(() => {
-      prompt('Автокопирование не сработало. Скопируй вручную (Ctrl+A, Ctrl+C):', json);
-    });
+      btn.textContent = `✓ ${payload.events.length} событий · ИНН ${payload.inn || '—'}`;
+      btn.style.background = '#34c759';
+      setTimeout(() => { btn.textContent = '📋 Собрать → БА'; btn.style.background = '#0a84ff'; }, 3500);
+    }).catch(() => prompt('Скопируй вручную:', json));
   };
-
   document.body.appendChild(btn);
 
-  // Если страница открыта batch-режимом (есть метка в session storage)
-  // — закрываем вкладку после сбора. Флаг ставит background при открытии.
-  try {
-    chrome.storage.local.get(['pendingBatchClose'], data => {
-      if(data.pendingBatchClose === location.href){
-        chrome.storage.local.set({ pendingBatchClose: null });
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ type: 'close-tab' });
-        }, 800);
-      }
-    });
-  } catch(_){}
+  function waitFor(fn, timeoutMs){
+    const start = Date.now();
+    const tick = () => {
+      if(fn()) return;
+      if(Date.now() - start > timeoutMs) return;
+      setTimeout(tick, 400);
+    };
+    tick();
+  }
 })();
