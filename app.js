@@ -1529,7 +1529,30 @@ function _buxBalansParseHtml(html){
   let inn = null;
   const mInn = html.match(/ИНН\s*:?\s*<[^>]*>(\d{10,12})</);
   if(mInn) inn = mInn[1];
-  return { data, company, inn };
+  // ОКВЭД: несколько паттернов, т.к. buxbalans иногда кладёт код в
+  // ссылку /okved/XX.YY, иногда просто в тексте «ОКВЭД: 26.70», иногда
+  // в <td>/<dd> рядом с лейблом. Название отрасли (okvedName) — тот
+  // кусок текста после кода до конца тега.
+  let okved = null, okvedName = null;
+  // 1) Ссылка на справочник: /okved(?:2)?/XX.YY
+  const mOkvedLink = html.match(/\/okved2?\/(\d{1,2}(?:\.\d{1,2}){0,3})\b[^>]*>([^<]+)/i);
+  if(mOkvedLink){ okved = mOkvedLink[1]; okvedName = (mOkvedLink[2] || '').trim(); }
+  // 2) «ОКВЭД» в тексте: label + код (+ возможно название)
+  if(!okved){
+    const mOkvedText = html.match(/ОКВЭД[^:]*:?\s*<[^>]*>\s*(\d{1,2}(?:\.\d{1,2}){0,3})\s*[-–—]?\s*([^<]{0,80})?</i);
+    if(mOkvedText){ okved = mOkvedText[1]; okvedName = (mOkvedText[2] || '').trim() || null; }
+  }
+  // 3) «Основной вид деятельности: … 47.11 Розничная торговля …»
+  if(!okved){
+    const mOkvedMain = html.match(/Основной\s+вид\s+деятельности[^<]*<[^>]*>\s*(\d{1,2}(?:\.\d{1,2}){0,3})\s*[-–—]?\s*([^<]{0,100})?</i);
+    if(mOkvedMain){ okved = mOkvedMain[1]; okvedName = (mOkvedMain[2] || '').trim() || null; }
+  }
+  // 4) Голый regex «ОКВЭД» → код в любом месте рядом (последний шанс)
+  if(!okved){
+    const mOkvedBare = html.match(/ОКВЭД[^0-9]{0,40}(\d{1,2}\.\d{1,2}(?:\.\d{1,2}){0,2})\b/i);
+    if(mOkvedBare) okved = mOkvedBare[1];
+  }
+  return { data, company, inn, okved, okvedName };
 }
 
 async function fetchBuxBalansByInn(inn, maxYears = 15){
@@ -1552,6 +1575,8 @@ async function fetchBuxBalansByInn(inn, maxYears = 15){
     series,
     company: parsed.company,
     inn: parsed.inn || clean,
+    okved: parsed.okved || null,
+    okvedName: parsed.okvedName || null,
     count: Object.keys(series).length,
     errors: []
   };
