@@ -2524,39 +2524,58 @@ function repCleanEmptyPeriods(){
 // отладки когда bulk не добавляет периоды и неясно где ломается —
 // источник, прокси, парсер или merge в reportsDB.
 async function repDiagnoseInn(){
-  const inn = prompt('Введите ИНН эмитента (10 или 12 цифр) для диагностики:', '');
+  const inn = prompt('Введите ИНН (10 или 12 цифр) для диагностики:', '');
   if(!inn) return;
   const clean = String(inn).trim();
   if(!/^\d{10}(\d{2})?$/.test(clean)){ alert('ИНН должен быть 10 или 12 цифр.'); return; }
-  alert(`⏳ Запрос buxbalans + ГИР БО по ИНН ${clean}…\n(окно подтверждения закрой — через несколько секунд появится результат)`);
-  let r = null, err = null;
-  try { r = await _pullReportBothSources(clean); } catch(e){ err = e; }
-  if(err){ alert(`❌ Ошибка: ${err.message}`); return; }
-  if(!r || !r.count){
-    alert(`❌ Оба источника вернули пусто для ИНН ${clean}.\n\nВарианты:\n• Прокси недоступен (проверь в «⚡ Sync» → «📡 ГИР БО — прокси»)\n• Компания под ИНН не найдена\n• buxbalans / ГИР БО временно недоступны`);
-    return;
-  }
-  const years = Object.keys(r.series || {}).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort();
-  // Существует ли эмитент с этим ИНН в reportsDB
+  // Тянем оба источника ОТДЕЛЬНО, ловим ошибки каждого — так видно, где
+  // именно ломается (прокси, парсер, источник).
+  let bx = null, bxErr = null;
+  let gr = null, grErr = null;
+  try { bx = await fetchBuxBalansByInn(clean, 15); }
+  catch(e){ bxErr = e?.message || String(e); }
+  try { gr = await fetchGirboByInn(clean, 10); }
+  catch(e){ grErr = e?.message || String(e); }
+
+  const bxYears = bx && bx.series ? Object.keys(bx.series).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort().join(', ') : '—';
+  const grYears = gr && gr.series ? Object.keys(gr.series).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort().join(', ') : '—';
+
+  const bxReport = bxErr
+    ? `❌ buxbalans: ошибка\n   «${bxErr}»`
+    : bx && bx.count
+    ? `✓ buxbalans: ${bx.count} годов\n   годы: ${bxYears}\n   компания: ${bx.company || '—'}\n   ИНН в ответе: ${bx.inn || '—'}\n   ОКВЭД: ${bx.okved || '—'}${bx.okvedName ? ' · ' + bx.okvedName : ''}`
+    : `⚠ buxbalans: вернул пусто (нет данных на странице)`;
+
+  const grReport = grErr
+    ? `❌ ГИР БО: ошибка\n   «${grErr}»`
+    : gr && gr.count
+    ? `✓ ГИР БО: ${gr.count} годов\n   годы: ${grYears}\n   компания: ${gr.company || '—'}\n   ИНН в ответе: ${gr.inn || '—'}\n   ОКВЭД: ${gr.okved || '—'}${gr.okvedName ? ' · ' + gr.okvedName : ''}`
+    : `⚠ ГИР БО: вернул пусто`;
+
   let existingId = null;
   for(const [id, iss] of Object.entries(reportsDB || {})){
     if(iss && String(iss.inn || '') === clean){ existingId = id; break; }
   }
   const existing = existingId ? reportsDB[existingId] : null;
   const existingYears = existing && existing.periods
-    ? Object.keys(existing.periods).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort().join(',')
+    ? Object.keys(existing.periods).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort().join(', ')
     : '—';
-  const parts = [
-    `✓ ИНН ${clean}`,
-    `Компания: ${r.company || '(нет имени)'}`,
-    `ОКВЭД: ${r.okved || '—'}${r.okvedName ? ' · ' + r.okvedName : ''}`,
-    `Годы из источников: ${years.join(', ') || '—'} (${years.length})`,
-    ``,
-    existing
-      ? `В reportsDB уже есть: «${existing.name}» (id ${existingId})\nЕго периоды: ${existingYears}\nОтрасль: ${existing.ind || '—'}`
-      : 'В reportsDB ещё нет — bulk создаст новую запись при первом успешном пулле.',
-  ];
-  alert(parts.join('\n'));
+  const dbReport = existing
+    ? `📂 В reportsDB есть: «${existing.name}»\n   периоды: ${existingYears}\n   отрасль: ${existing.ind || '—'}`
+    : `📂 В reportsDB нет — bulk создаст новую запись при успехе.`;
+
+  // Прокси сейчас использует
+  const proxy = (typeof _girboProxyBase === 'function') ? _girboProxyBase() : '—';
+
+  alert(
+    `ДИАГНОСТИКА ИНН ${clean}\n` +
+    `Прокси: ${proxy}\n\n` +
+    `${bxReport}\n\n${grReport}\n\n${dbReport}\n\n` +
+    `Подсказки:\n` +
+    `• Оба источника — ошибка → прокси мёртв, меняй в «⚡ Sync» → «📡 ГИР БО — прокси».\n` +
+    `• buxbalans пусто, ГИР БО ok → buxbalans не знает эту компанию, норм — bulk возьмёт из ГИР БО.\n` +
+    `• buxbalans ok, 2025 нет в годах → buxbalans ещё не обновился, жди неделю или подтяни отдельно ГИР БО.`
+  );
 }
 
 // пользователь проставил ВРУЧНУЮ (iss.indManual=true), не трогаем.
