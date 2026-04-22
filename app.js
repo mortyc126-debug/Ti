@@ -303,12 +303,32 @@ function _copyBtn(text, opts){
 // клик по имени открывал peek-модалку, как в каталоге MOEX.
 function _findIssuerForBond(b){
   if(!b) return null;
-  // 1) По ISIN через MOEX-каталог
+  // 1) По ISIN через MOEX-каталог → issId (прямое совпадение)
+  let catItem = null;
   if(b.isin && window._moexCatalog && Array.isArray(window._moexCatalog.items)){
-    const m = window._moexCatalog.items.find(x => x.isin === b.isin);
-    if(m && m.issId && reportsDB[m.issId]) return m.issId;
+    catItem = window._moexCatalog.items.find(x => x.isin === b.isin) || null;
+    if(catItem && catItem.issId && reportsDB[catItem.issId]) return catItem.issId;
   }
-  // 2) По имени — нормализованный includes в обе стороны
+  // 2) Через ИНН — catalog знает ИНН бонда, эмитент в reportsDB знает
+  //    свой ИНН. Надёжнее fuzzy-match по имени, потому что имя в катало-
+  //    ге («ЗонлайнБ02») часто сильно отличается от полного юр-имени
+  //    («ООО «Зелёный Онлайн Банк»»). ИНН — идентификатор 1:1.
+  const innFromCat = catItem?.inn || b.inn;
+  if(innFromCat){
+    const innStr = String(innFromCat);
+    for(const [id, iss] of Object.entries(reportsDB || {})){
+      if(iss && String(iss.inn || '') === innStr) return id;
+      // И по iss.related (материнская/связанные): чтобы у SPV-бонда клик
+      // открывал профиль материнской, если та в базе, а SPV сам по себе
+      // не matched.
+      if(iss && Array.isArray(iss.related)){
+        for(const r of iss.related){
+          if(r && String(r.inn || '') === innStr) return id;
+        }
+      }
+    }
+  }
+  // 3) По имени — нормализованный includes в обе стороны (fallback)
   if(b.name && typeof _normForSearch === 'function'){
     const n = _normForSearch(b.name);
     if(!n || n.length < 3) return null;
@@ -318,7 +338,6 @@ function _findIssuerForBond(b){
       const iname = _normForSearch(iss.name);
       if(!iname) continue;
       if(n.includes(iname) || iname.includes(n)){
-        // Предпочитаем более длинное совпадение (точнее)
         if(!best || iname.length > best.iname.length) best = { id, iname };
       }
     }
