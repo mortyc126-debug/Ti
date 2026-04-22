@@ -20286,6 +20286,9 @@ function archiveApplyFilters(){
 
   _archiveRenderTable(sorted);
   window._archiveFilteredCache = sorted;
+  // Survival-панель не зависит от фильтров в таблице, но её рендер
+  // может быть отложен (ждёт _industryData) — вызываем здесь.
+  archiveRenderSurvival();
 }
 
 function _archiveRenderTable(list){
@@ -20395,6 +20398,202 @@ function archiveExportCsv(){
   const a = document.createElement('a');
   a.href = url;
   a.download = `archive-bonds-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 🔬 SURVIVAL / DEFAULT RATE ПО ОТРАСЛЯМ
+// ─────────────────────────────────────────────────────────────────────
+// Считаем cohort = matured + defaulted (suspended / cancelled / pre-launch
+// исключаем — они в состоянии «не решено» и искажают rate). Дефолт-рейт:
+//   unweighted: defaulted / cohort
+//   weighted:   defaultedVolumeRub / (defaultedVolume + maturedVolume)
+// Визуализация — горизонтальные бары, цвет по шкале:
+//   <5% зелёный, <15% жёлтый, ≥15% красный.
+// На этом уровне достаточно для практики (кто свалился, где не стоит
+// сидеть) — полноценная Kaplan-Meier требует дат размещения, которых
+// в MOEX-кэше нет (их нужно докачивать через /iss/securities/<SECID>).
+// Оставил задел: архив-каталог ведёт по каждому эмитенту ссылку в
+// reportsDB, и КМ можно добавить без переделки схемы.
+
+function _archiveSurvivalRows(opts){
+  const all = _archiveCollect();
+  const minN = opts.minN || 1;
+  const windowY = opts.windowY || null;
+  const weighted = !!opts.weighted;
+  const today = Date.now();
+  const filtered = all.filter(b => {
+    if(windowY == null) return true;
+    if(!b.matDate) return false;
+    const t = new Date(b.matDate).getTime();
+    if(!isFinite(t)) return false;
+    const yearsAgo = (today - t) / (365.25 * 86400000);
+    return yearsAgo >= 0 && yearsAgo <= windowY;
+  });
+
+  const byInd = new Map();
+  for(const b of filtered){
+    const k = b.industryKey || '__none__';
+    if(!byInd.has(k)) byInd.set(k, { matured:0, defaulted:0, restructured:0, suspended:0, cancelled:0, preLaunch:0, maturedVol:0, defaultedVol:0, earliestDeath: [] });
+    const v = byInd.get(k);
+    const sizeM = (b.issueSize && b.faceValue) ? b.issueSize * b.faceValue / 1e6 : 0;
+    if(b.reason === 'matured'){ v.matured++; v.maturedVol += sizeM; }
+    else if(b.reason === 'defaulted'){ v.defaulted++; v.defaultedVol += sizeM; }
+    else if(b.reason === 'restructured'){ v.restructured++; }
+    else if(b.reason === 'suspended'){ v.suspended++; }
+    else if(b.reason === 'cancelled'){ v.cancelled++; }
+    else if(b.reason === 'pre-launch'){ v.preLaunch++; }
+
+    // «Насколько раньше плановой даты случился дефолт» — прокси для
+    // ответа «как быстро сыпались». Дата события — самое раннее
+    // default-событие эмитента, matDate — плановое погашение.
+    if(b.reason === 'defaulted' && b.issId){
+      const iss = reportsDB[b.issId];
+      const defEvents = (iss?.edisclosure?.events || []).filter(e => e?.category?.key === 'default');
+      if(defEvents.length && b.matDate){
+        const eventT = defEvents
+          .map(e => e.date ? new Date(e.date).getTime() : 0)
+          .filter(t => t > 0)
+          .sort((a,b) => a - b)[0];
+        const matT = new Date(b.matDate).getTime();
+        if(eventT && isFinite(matT)){
+          const earlyYears = (matT - eventT) / (365.25 * 86400000);
+          if(isFinite(earlyYears) && earlyYears > -1 && earlyYears < 15) v.earliestDeath.push(earlyYears);
+        }
+      }
+    }
+  }
+
+  const indData = window._industryData?.industries || {};
+  const rows = [];
+  for(const [k, v] of byInd){
+    const n = v.matured + v.defaulted;
+    if(n < minN) continue;
+    const rate = weighted
+      ? (v.defaultedVol + v.maturedVol > 0 ? v.defaultedVol / (v.defaultedVol + v.maturedVol) : 0)
+      : (n > 0 ? v.defaulted / n : 0);
+    const earliestMedian = v.earliestDeath.length
+      ? (v.earliestDeath.sort((a,b)=>a-b)[Math.floor(v.earliestDeath.length / 2)])
+      : null;
+    rows.push({
+      key: k,
+      label: k === '__none__' ? '(нет отрасли)' : (indData[k]?.label || k),
+      matured: v.matured, defaulted: v.defaulted,
+      restructured: v.restructured, suspended: v.suspended, cancelled: v.cancelled, preLaunch: v.preLaunch,
+      n, rate,
+      volumeMn: Math.round(v.maturedVol + v.defaultedVol),
+      defaultVolumeMn: Math.round(v.defaultedVol),
+      earlyYearsMedian: earliestMedian,
+    });
+  }
+  rows.sort((a,b) => b.rate - a.rate || b.defaulted - a.defaulted);
+  return rows;
+}
+
+function archiveRenderSurvival(){
+  const card  = document.getElementById('arch-survival-card');
+  const meta  = document.getElementById('arch-survival-meta');
+  const chart = document.getElementById('arch-survival-chart');
+  const tblEl = document.getElementById('arch-survival-table');
+  if(!card || !chart || !tblEl) return;
+  const minN = parseInt(document.getElementById('arch-sv-min')?.value) || 3;
+  const winV = document.getElementById('arch-sv-window')?.value;
+  const windowY = winV ? parseFloat(winV) : null;
+  const weighted = document.getElementById('arch-sv-weighted')?.checked || false;
+
+  const rows = _archiveSurvivalRows({ minN, windowY, weighted });
+  if(!rows.length){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  if(meta){
+    const mode = weighted ? 'взвешенный (по объёму)' : 'по числу бумаг';
+    const win = windowY ? `окно ${windowY} лет` : 'всё время';
+    meta.textContent = `${rows.length} отраслей · ${mode} · ${win}`;
+  }
+
+  // Бар-чарт: ширина = default rate, цвет = градация риска.
+  const maxRate = Math.max(...rows.map(r => r.rate), 0.01);
+  const scale = 100 / Math.max(maxRate, 0.2); // не сжимать мелкие rate до 0
+  const color = rate => rate < 0.05 ? 'var(--green)' : rate < 0.15 ? 'var(--warn)' : 'var(--danger)';
+  chart.innerHTML = rows.map(r => {
+    const w = Math.min(100, Math.max(1, r.rate * scale));
+    const ratePct = (r.rate * 100).toFixed(1);
+    const earlyStr = r.earlyYearsMedian != null ? ` · медиана «свалился за ${r.earlyYearsMedian.toFixed(1)} лет до mat»` : '';
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:2px 0;cursor:pointer"
+           onclick="document.getElementById('arch-f-industry').value='${r.key}';archiveApplyFilters();document.getElementById('arch-filters-card').scrollIntoView({behavior:'smooth'})"
+           title="Кликни — отфильтровать таблицу ниже на эту отрасль${earlyStr}">
+        <div style="width:160px;font-size:.58rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${_escHtml(r.label)}">${_escHtml(r.label)}</div>
+        <div style="flex:1;background:var(--s2);height:14px;position:relative">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${w}%;background:${color(r.rate)}"></div>
+          <div style="position:relative;padding:0 6px;line-height:14px;font-size:.5rem;font-family:var(--mono);color:var(--text);display:flex;justify-content:space-between">
+            <span>${r.defaulted}/${r.n}</span>
+            <span style="font-weight:600">${ratePct}%</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Таблица — детали, включая объём и «ранний уход».
+  tblEl.innerHTML = `
+    <div style="margin-top:10px;max-height:280px;overflow-y:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--s2);color:var(--text3);font-size:.52rem;letter-spacing:.05em;text-transform:uppercase;position:sticky;top:0">
+        <th style="padding:4px 6px;text-align:left">Отрасль</th>
+        <th style="padding:4px 6px;text-align:right">Погашено</th>
+        <th style="padding:4px 6px;text-align:right">Дефолт</th>
+        <th style="padding:4px 6px;text-align:right">Default rate</th>
+        <th style="padding:4px 6px;text-align:right" title="Сумма погашенных+дефолтных выпусков в млн ₽">Объём, млн ₽</th>
+        <th style="padding:4px 6px;text-align:right" title="Из объёма — какая часть — дефолтная">Дефолт, млн ₽</th>
+        <th style="padding:4px 6px;text-align:right" title="Медиана «за сколько лет до планового погашения случился дефолт». Считается из event_date в e-disclosure и matDate бумаги.">Ранний уход, лет</th>
+        <th style="padding:4px 6px;text-align:right" title="Suspended / restructured / cancelled / pre-launch">Прочее</th>
+      </tr></thead><tbody>
+      ${rows.map(r => {
+        const rc = color(r.rate);
+        const pct = (r.rate * 100).toFixed(1);
+        const other = [
+          r.suspended ? `⏸${r.suspended}` : '',
+          r.restructured ? `🔀${r.restructured}` : '',
+          r.cancelled ? `❎${r.cancelled}` : '',
+          r.preLaunch ? `⏳${r.preLaunch}` : ''
+        ].filter(Boolean).join(' ');
+        const earlyStr = r.earlyYearsMedian != null ? r.earlyYearsMedian.toFixed(1) : '—';
+        return `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+          <td style="padding:4px 6px;color:var(--text)">${_escHtml(r.label)}</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono)">${r.matured}</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono);color:var(--danger);font-weight:600">${r.defaulted}</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono);color:${rc};font-weight:600">${pct}%</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono);color:var(--text3)">${r.volumeMn.toLocaleString('ru-RU')}</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono);color:var(--danger)">${r.defaultVolumeMn ? r.defaultVolumeMn.toLocaleString('ru-RU') : '—'}</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono);color:var(--text3)">${earlyStr}</td>
+          <td style="padding:4px 6px;text-align:right;font-family:var(--mono);color:var(--text3);font-size:.52rem">${other || '—'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function archiveExportSurvivalCsv(){
+  const minN = parseInt(document.getElementById('arch-sv-min')?.value) || 1;
+  const winV = document.getElementById('arch-sv-window')?.value;
+  const windowY = winV ? parseFloat(winV) : null;
+  const weighted = document.getElementById('arch-sv-weighted')?.checked || false;
+  const rows = _archiveSurvivalRows({ minN, windowY, weighted });
+  if(!rows.length){ alert('Нечего экспортировать.'); return; }
+  const esc = s => { const str = String(s == null ? '' : s); return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str; };
+  const header = ['industry','matured','defaulted','restructured','suspended','cancelled','pre_launch','cohort','default_rate','volume_mn','default_volume_mn','early_years_median'];
+  const body = rows.map(r => [r.label, r.matured, r.defaulted, r.restructured, r.suspended, r.cancelled, r.preLaunch, r.n, r.rate.toFixed(4), r.volumeMn, r.defaultVolumeMn, r.earlyYearsMedian != null ? r.earlyYearsMedian.toFixed(2) : '']);
+  const csv = [header, ...body].map(r => r.map(esc).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `archive-survival-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

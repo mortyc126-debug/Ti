@@ -2526,6 +2526,37 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="arch-industry-table" style="padding:0 12px 10px;font-size:.58rem;color:var(--text3)"></div>
   </div>
 
+  <div class="card" id="arch-survival-card" style="display:none;margin-top:12px">
+    <div class="card-hdr">
+      🔬 Анализ выживаемости по отраслям
+      <span id="arch-survival-meta" style="margin-left:auto;font-size:.55rem;color:var(--text3);font-weight:400"></span>
+    </div>
+    <div style="padding:8px 12px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0" title="Минимальный размер выборки по отрасли. Отрасли с ≤ этого числа мёртвых бумаг не показываются — у них default rate статистически недостоверен.">
+        <label style="font-size:.55rem">Минимум бумаг в отрасли</label>
+        <input type="number" id="arch-sv-min" value="3" step="1" min="1" oninput="archiveRenderSurvival()" style="width:60px">
+      </div>
+      <div class="field" style="margin:0" title="Только события за последние N лет. Убирает исторический шум 2008-2014, позволяет смотреть на актуальную картину.">
+        <label style="font-size:.55rem">Окно</label>
+        <select id="arch-sv-window" onchange="archiveRenderSurvival()">
+          <option value="">Всё время</option>
+          <option value="3">Последние 3 года</option>
+          <option value="5">Последние 5 лет</option>
+          <option value="10">Последние 10 лет</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0" title="Взвешивать дефолт-рейт по объёму выпуска (issueSize × faceValue). Без веса каждая бумага считается одинаково; с весом большая отрасль ≠ большой единичный выпуск.">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="arch-sv-weighted" onchange="archiveRenderSurvival()" style="margin:0"> Взвешивать по объёму
+        </label>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn btn-sm" onclick="archiveExportSurvivalCsv()" title="Экспорт таблицы survival-анализа в CSV">📊 CSV отрасли</button>
+    </div>
+    <div id="arch-survival-chart" style="padding:4px 12px 10px"></div>
+    <div id="arch-survival-table" style="padding:0 12px 10px;font-size:.58rem"></div>
+  </div>
+
   <div class="card" id="arch-filters-card" style="display:none;margin-top:12px">
     <div class="card-hdr">🎯 Фильтры <span id="arch-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
     <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
