@@ -7972,6 +7972,7 @@ function _repRenderActiveIssuerHeader(){
         <button class="btn btn-sm" onclick="repChangeIndustry()" title="Сменить отрасль вручную (не перезапишется при следующем bulk'е если только не сбросить в 'other')" style="font-size:.56rem;padding:3px 7px">✎ отрасль</button>
         <button class="btn btn-sm" onclick="repEditRelated()" title="Добавить материнскую или связанную компанию (ИНН). Нужно для SPV-эмитентов, у которых отчётность пустая — реальные цифры у головной. В будущем можно будет тянуть отчётность по связанным ИНН автоматом." style="font-size:.56rem;padding:3px 7px">🔗 связи</button>
         <button class="btn btn-sm" onclick="repShowEdisclosure()" title="Существенные факты эмитента с e-disclosure.ru: смены аудитора, руководства, продажи активов, судебные иски, дефолты. Это поведенческий слой, которого нет в балансе — ловит точки перелома до того как они попадут в цифры." style="font-size:.56rem;padding:3px 7px">📢 факты</button>
+        <button class="btn btn-sm" onclick="repSetEdisclosureId()" title="Ручная привязка e-disclosure ID: если парсер не находит компанию по ИНН (у e-disclosure индексация по внутренним ID, не по ИНН), открой поиск на сайте вручную и скопируй число из URL company.aspx?id=XXXXX — сохранится и дальше «📢 факты» будет открывать раскрытия сразу." style="font-size:.56rem;padding:3px 7px">✎ ed-id</button>
       </div>
     </div>
     ${stTile}
@@ -18177,11 +18178,15 @@ function _edCategorize(title){
   return null;
 }
 
-// Fetches и парсит существенные факты по ИНН. Возвращает
-// {events: [{date, title, url, category}], edId, companyName} или null.
-async function fetchEdisclosureEvents(inn){
-  if(!inn) return null;
-  // Шаг 1: поиск компании по ИНН
+// Fetches и парсит существенные факты. На вход — либо ИНН (ищет),
+// либо {inn, name} (ищет по ИНН, fallback на имя), либо {edId} (тянет
+// напрямую без поиска). Возвращает {events, edId, companyName, reason}.
+async function fetchEdisclosureEvents(input){
+  const inn = typeof input === 'string' ? input : input?.inn;
+  const name = typeof input === 'string' ? null : input?.name;
+  const knownEdId = typeof input === 'string' ? null : input?.edId;
+  if(!inn && !knownEdId) return null;
+
   const proxy = _girboProxyBase();
   const makeEdUrl = (path) => {
     const target = 'https://www.e-disclosure.ru' + path;
@@ -18199,25 +18204,43 @@ async function fetchEdisclosureEvents(inn){
     } finally { if(to) clearTimeout(to); }
   };
 
-  const searchUrl = makeEdUrl('/portal/companyfind.aspx?query=' + encodeURIComponent(inn));
-  const searchHtml = await fetchTxt(searchUrl);
-  // Ссылки вида company.aspx?id=NNNN с текстом-названием
-  const linkRe = /company\.aspx\?id=(\d+)[^>]*>([^<]+)</gi;
-  const candidates = [];
-  let m;
-  while((m = linkRe.exec(searchHtml)) !== null){
-    candidates.push({ id: m[1], name: m[2].trim() });
+  // Поиск: возвращает первого кандидата {id, name} или null.
+  const searchQuery = async (query) => {
+    const searchUrl = makeEdUrl('/portal/companyfind.aspx?query=' + encodeURIComponent(query));
+    const html = await fetchTxt(searchUrl);
+    const linkRe = /company\.aspx\?id=(\d+)[^>]*>([^<]+)</gi;
+    let m;
+    while((m = linkRe.exec(html)) !== null){
+      return { id: m[1], name: m[2].trim() };
+    }
+    return null;
+  };
+
+  // Шаг 1: определяем edId (id в e-disclosure).
+  let picked = null;
+  if(knownEdId){
+    picked = { id: String(knownEdId), name: name || null };
+  } else {
+    // Попытка 1: по ИНН
+    try { picked = await searchQuery(inn); } catch(_){}
+    // Попытка 2: по имени (e-disclosure часто не индексирует ИНН)
+    if(!picked && name){
+      const cleanName = String(name)
+        .replace(/^(ПАО|АО|ООО|ОАО|ЗАО|НАО|ПК|МКК|БАНК)\s+/i, '')
+        .replace(/«|»|"/g, '').trim();
+      if(cleanName.length >= 3){
+        try { picked = await searchQuery(cleanName); } catch(_){}
+      }
+    }
   }
-  if(!candidates.length) return { events: [], edId: null, companyName: null, reason: 'not-found' };
-  // Берём первого — обычно при поиске по ИНН результат один
-  const picked = candidates[0];
+  if(!picked) return { events: [], edId: null, companyName: null, reason: 'not-found' };
 
   // Шаг 2: лист существенных фактов
   const filesUrl = makeEdUrl('/portal/files.aspx?id=' + picked.id);
   const filesHtml = await fetchTxt(filesUrl);
-  // Парсим таблицу <tr> с датой и ссылкой на документ
   const rowRe = /<tr\b[\s\S]*?<\/tr>/gi;
   const events = [];
+  let m;
   while((m = rowRe.exec(filesHtml)) !== null){
     const row = m[0];
     const dateM = row.match(/(\d{2}\.\d{2}\.\d{4})/);
@@ -18241,28 +18264,65 @@ async function fetchEdisclosureEvents(inn){
   };
 }
 
+// Ручная привязка e-disclosure ID к эмитенту. Пользователь открывает
+// companyfind.aspx, находит компанию, копирует id из URL company.aspx?id=
+// и вставляет. Сохраняется в iss.edisclosureId.
+function repSetEdisclosureId(){
+  if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  const cur = iss.edisclosureId || '';
+  const input = prompt(
+    `E-disclosure ID для «${iss.name}»\n\n` +
+    `Это число из URL на e-disclosure.ru/portal/company.aspx?id=XXXXX.\n` +
+    `Открой поиск: https://www.e-disclosure.ru/portal/companyfind.aspx?query=${encodeURIComponent(iss.name)}\n` +
+    `Найди компанию в выдаче, скопируй число после ?id= из URL её страницы.\n\n` +
+    `Введи ID (или пустую строку чтобы удалить привязку):`,
+    cur
+  );
+  if(input === null) return;
+  const clean = String(input).trim();
+  if(!clean){
+    delete iss.edisclosureId;
+    save();
+    alert('Привязка удалена.');
+    return;
+  }
+  if(!/^\d+$/.test(clean)){ alert('ID должен быть числом'); return; }
+  iss.edisclosureId = clean;
+  save();
+  alert(`Сохранено. Теперь «📢 факты» будет сразу открывать раскрытия по id=${clean}.`);
+}
+
 // UI: показать список существенных фактов активного эмитента в модалке.
 // Если парсинг сработал — рендерим с категоризацией. Если упал (прокси
 // не знает e-disclosure или сайт недоступен) — показываем fallback-ссылки.
 async function repShowEdisclosure(){
   if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
   const iss = reportsDB[repActiveIssuerId];
-  if(!iss || !iss.inn){ alert('У эмитента не задан ИНН — не найти его на e-disclosure без ИНН.'); return; }
-  const inn = String(iss.inn);
+  if(!iss || (!iss.inn && !iss.edisclosureId)){ alert('У эмитента не задан ИНН и нет сохранённого e-disclosure ID. Открой «🔗 связи» чтобы указать ИНН.'); return; }
+  const inn = iss.inn ? String(iss.inn) : null;
   let result = null, err = null;
-  try { result = await fetchEdisclosureEvents(inn); }
-  catch(e){ err = e?.message || String(e); }
 
-  // Если по своему ИНН не нашли, пробуем материнскую. Для SPV (особенно
-  // казахские/кипрские дочки российских эмитентов) e-disclosure хранит
-  // раскрытия именно под ИНН головной компании.
+  // Стратегии поиска по приоритету:
+  // 1) Если сохранён iss.edisclosureId — тянем напрямую.
+  // 2) Иначе — поиск по ИНН, fallback на имя внутри fetchEdisclosureEvents.
+  try {
+    if(iss.edisclosureId){
+      result = await fetchEdisclosureEvents({ edId: iss.edisclosureId, name: iss.name });
+    } else {
+      result = await fetchEdisclosureEvents({ inn, name: iss.name });
+    }
+  } catch(e){ err = e?.message || String(e); }
+
+  // Если не нашли — пробуем материнскую (её ИНН или name). SPV часто
+  // скрывают раскрытия под маму.
   let usedParent = false;
-  let parentResult = null;
   if((!result || !result.events || !result.events.length || result.reason === 'not-found') && !err){
-    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent' && r.inn) : null;
+    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent' && (r.inn || r.name)) : null;
     if(parent){
       try {
-        parentResult = await fetchEdisclosureEvents(String(parent.inn));
+        const parentResult = await fetchEdisclosureEvents({ inn: parent.inn, name: parent.name });
         if(parentResult && parentResult.events && parentResult.events.length){
           result = parentResult;
           usedParent = true;
@@ -18296,18 +18356,22 @@ async function repShowEdisclosure(){
 
   if(!result || !result.events || !result.events.length){
     const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent') : null;
-    alert(
-      `📢 Существенные факты по ${iss.name} (ИНН ${inn})\n\n` +
+    const searchQuery = inn || encodeURIComponent(iss.name || '');
+    const manualIdTip = confirm(
+      `📢 Существенные факты по ${iss.name} (ИНН ${inn || '—'})\n\n` +
       (result && result.reason === 'not-found'
-        ? `⚠ Компания не найдена на e-disclosure.ru — возможно её там не раскрывают (частная, ООО без обязательств, иностранное юрлицо).`
+        ? `⚠ Компания не найдена на e-disclosure.ru ни по ИНН, ни по имени. У них внутренняя индексация — не всегда связывают по ИНН.`
         : `⚠ Список событий пустой или не распознан.`) +
       (parent
-        ? `\n\nУ эмитента есть привязанная материнская (${parent.inn}${parent.name ? ' · ' + parent.name : ''}), но и у неё ничего не нашлось.`
-        : `\n\nСовет: если это SPV, привяжи материнскую через «🔗 связи» — e-disclosure держит раскрытия под ИНН головной компании.`) +
-      `\n\nОткрой вручную:\n` +
-      `• https://www.e-disclosure.ru/portal/companyfind.aspx?query=${inn}\n` +
-      `• https://checko.ru/company/${inn}/activities`
+        ? `\nПроверено и по материнской (${parent.inn || parent.name}) — тоже пусто.`
+        : `\nСовет: если это SPV, привяжи материнскую через «🔗 связи».`) +
+      `\n\n💡 Можно ВРУЧНУЮ найти компанию на e-disclosure и скопировать её внутренний ID — тогда парсер будет работать точно.\n\n` +
+      `Нажми OK чтобы открыть e-disclosure в новой вкладке и ввести ID. Отмена — пропустить.`
     );
+    if(manualIdTip){
+      window.open('https://www.e-disclosure.ru/portal/companyfind.aspx?query=' + searchQuery, '_blank');
+      setTimeout(() => { if(typeof repSetEdisclosureId === 'function') repSetEdisclosureId(); }, 400);
+    }
     return;
   }
 
