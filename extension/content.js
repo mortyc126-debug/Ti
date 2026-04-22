@@ -82,9 +82,14 @@
   });
 
   let saved = false;
-  const tryCollectAndSave = () => {
+  // requireEvents=true — не сохраняем если events пусты. В batch-
+  // режиме это защита от мусорных записей: если страница не ответила
+  // или перенаправила на company.aspx — пусть background уйдёт в
+  // таймаут (summary.failed), а не запишет пустышку.
+  const tryCollectAndSave = (requireEvents) => {
     if(saved) return;
     const payload = buildPayload();
+    if(requireEvents && (!payload.events || !payload.events.length)) return;
     if(payload.edId || payload.inn){
       saved = true;
       try { chrome.runtime.sendMessage({ type: 'save-disclosure', payload }); } catch(_){}
@@ -96,15 +101,21 @@
     }
   };
   const initial = buildPayload();
-  if(initial.events.length || initial.edId) tryCollectAndSave();
+  if(initial.events.length) tryCollectAndSave(true);
   const container = document.querySelector('.js-events-container');
   if(container){
     const observer = new MutationObserver(() => {
       const p = buildPayload();
-      if(p.events.length){ observer.disconnect(); tryCollectAndSave(); }
+      if(p.events.length){ observer.disconnect(); tryCollectAndSave(true); }
     });
     observer.observe(container, { childList: true, subtree: true });
-    setTimeout(() => { observer.disconnect(); tryCollectAndSave(); }, 8000);
+    // Фолбэк через 8 сек: сохраняем что есть, включая пустое —
+    // для ручного режима (пользователь увидит счётчик по ИНН).
+    setTimeout(() => { observer.disconnect(); tryCollectAndSave(false); }, 8000);
+  } else {
+    // Нет events-container — таблица tr на files.aspx. Через 4 сек
+    // сохраняем то что наскрапили; пусто — значит пусто.
+    setTimeout(() => tryCollectAndSave(false), 4000);
   }
 
   const btn = document.createElement('button');
