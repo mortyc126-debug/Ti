@@ -15959,6 +15959,99 @@ function _moexBuildIndustryRanks(){
   return out;
 }
 
+// Сценарные пресеты — набор порогов под рыночную ситуацию / стратегию.
+// Каждый пресет = { label, desc, apply: { filterFieldId: value } }.
+// При активации мы сбрасываем все поля, применяем значения, триггерим
+// onMoexCouponType (раскрывает подсекции fix/float) и moexApplyFilters.
+const _MOEX_SCENARIOS = {
+  'conservative': {
+    label: '🎯 Устойчивый консерватор',
+    desc: 'IG-стандарт: ICR≥5, ND/EBITDA≤2, запас прочности 70+, фикс, цена ≤105%.',
+    apply: {
+      'moex-f-coupon':    'fix',
+      'moex-f-icr-min':   5,
+      'moex-f-nde-max':   2,
+      'moex-f-stress-min':70,
+      'moex-f-price-max': 105,
+    }
+  },
+  'balanced-vdo': {
+    label: '⚡ Балансированный ВДО',
+    desc: 'Основная масса ВДО: фикс, ICR≥2, ND/EBITDA≤5, запас прочности 40+.',
+    apply: {
+      'moex-f-coupon':    'fix',
+      'moex-f-icr-min':   2,
+      'moex-f-nde-max':   5,
+      'moex-f-stress-min':40,
+    }
+  },
+  'fix-high-coupon': {
+    label: '💰 Зафиксировать высокий купон',
+    desc: 'Ставка на снижение КС: фикс, срок ≥36 мес, купон ≥18%, цена 85–100, устойчивость 50+.',
+    apply: {
+      'moex-f-coupon':     'fix',
+      'moex-f-mat-min':    36,
+      'moex-f-coupon-min': 18,
+      'moex-f-price-min':  85,
+      'moex-f-price-max':  100,
+      'moex-f-stress-min': 50,
+    }
+  },
+  'debt-trap': {
+    label: '⚠ Долговая ловушка',
+    desc: 'Watch-лист рисковых: худшая динамика запаса прочности сверху. Для анализа «чего избегать».',
+    apply: {
+      'moex-f-indb':    true,   // только matched с данными
+      'moex-dyn-sort': 'dyn-worst',
+    }
+  }
+};
+
+// Применяет сценарий: сбрасывает поля, выставляет значения пресета.
+function moexApplyScenario(id){
+  const sc = _MOEX_SCENARIOS[id];
+  if(!sc) return;
+  moexResetFilters();
+  for(const [fieldId, value] of Object.entries(sc.apply)){
+    const el = document.getElementById(fieldId);
+    if(!el) continue;
+    if(el.type === 'checkbox') el.checked = !!value;
+    else el.value = value;
+  }
+  // Подсекции fix/float нужно раскрыть вручную — они слушают onchange,
+  // но прямая установка .value не триггерит событие.
+  if(sc.apply['moex-f-coupon'] && typeof onMoexCouponType === 'function'){
+    onMoexCouponType(); // сам вызовет moexApplyFilters
+  } else {
+    moexApplyFilters();
+  }
+  window._moexActiveScenario = id;
+  _moexRenderScenarioStatus();
+  // Подсветить активную кнопку-сценарий
+  document.querySelectorAll('#moex-scenarios [data-scenario]').forEach(b => {
+    b.classList.toggle('btn-p', b.dataset.scenario === id);
+  });
+}
+
+// Сброс активного сценария + очистка всех фильтров.
+function moexClearScenario(){
+  window._moexActiveScenario = null;
+  document.querySelectorAll('#moex-scenarios [data-scenario]').forEach(b => b.classList.remove('btn-p'));
+  moexResetFilters();
+  _moexRenderScenarioStatus();
+}
+
+// Отрисовка статус-строки под сценариями: какой активен + его описание.
+function _moexRenderScenarioStatus(){
+  const box = document.getElementById('moex-scenario-status');
+  if(!box) return;
+  const id = window._moexActiveScenario;
+  if(!id || !_MOEX_SCENARIOS[id]){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const sc = _MOEX_SCENARIOS[id];
+  box.style.display = '';
+  box.innerHTML = `<span style="color:var(--acc);font-weight:600">Активный сценарий: ${sc.label}</span> — ${sc.desc}`;
+}
+
 // Показать/скрыть подфильтры по типу купона: для «Фикс» — % от/до,
 // для «Флоатер» — база ставки. Вызывается при смене moex-f-coupon.
 function onMoexCouponType(){

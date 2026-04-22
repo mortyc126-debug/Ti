@@ -1899,6 +1899,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <div class="card" id="moex-filters-card" style="display:none;margin-top:12px">
     <div class="card-hdr">🎯 Фильтры <span id="moex-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <!-- Сценарные пресеты: набор порогов под конкретную рыночную ситуацию. -->
+    <div style="padding:8px 12px 4px;border-bottom:1px solid var(--border)">
+      <div style="font-size:.56rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">🎬 Сценарии (набор фильтров одним кликом)</div>
+      <div id="moex-scenarios" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" data-scenario="conservative" onclick="moexApplyScenario('conservative')" title="Инвест-грейд стандарт. Только фикс-купоны, ICR≥5, ND/EBITDA≤2, запас прочности 70+, цена до 105%. Минимум риска, минимум доходности.">🎯 Устойчивый консерватор</button>
+        <button class="btn btn-sm" data-scenario="balanced-vdo" onclick="moexApplyScenario('balanced-vdo')" title="Основная масса ВДО. Фикс, ICR≥2, ND/EBITDA≤5, запас прочности 40+. Средний риск, средняя доходность.">⚡ Балансированный ВДО</button>
+        <button class="btn btn-sm" data-scenario="fix-high-coupon" onclick="moexApplyScenario('fix-high-coupon')" title="Ставка на снижение КС. Длинные фиксы (≥3 лет) с купоном от 18%, цена 85-100%. Если КС пойдёт вниз — capital gain + зафиксированная высокая доходность на годы. Эмитент должен быть устойчивым (stress 50+) т.к. длинный срок = риск дожить.">💰 Зафиксировать купон</button>
+        <button class="btn btn-sm btn-d" data-scenario="debt-trap" onclick="moexApplyScenario('debt-trap')" title="Watch-лист рисковых — для анализа ЧЕГО ИЗБЕГАТЬ, не для покупки. Показывает ВДО с худшей динамикой запаса прочности (сортировка от самого плохого), только matched эмитенты с данными в reportsDB.">⚠ Долговая ловушка</button>
+        <button class="btn btn-sm" onclick="moexClearScenario()" title="Сбросить активный сценарий (если какой-то применён) и все фильтры.">↺ Сбросить сценарий</button>
+      </div>
+      <div id="moex-scenario-status" style="font-size:.54rem;color:var(--text3);margin-top:6px;display:none"></div>
+    </div>
     <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Поиск (название / ISIN / эмитент)</label>
