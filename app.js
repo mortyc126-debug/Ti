@@ -17026,11 +17026,15 @@ async function moexPullGirboBulk(updateExisting){
       totalSkipped++;
       continue;
     }
-    // Шаг 2б: buxbalans по ИНН.
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${idx}/${totalInns}: buxbalans «${meta.name}» (ИНН ${meta.inn})</span>`;
+    // Шаг 2б: отчётность по ИНН. Тянем ИЗ ОБОИХ источников — buxbalans
+    // даёт глубину по старым годам (до 15), ГИР БО — свежий год (ФНС
+    // публикует раньше, чем buxbalans переварит). Без мёржа для недавно
+    // сданных годов (2025 после 31 марта 2026) получался дыр: buxbalans
+    // возвращал 2010-2024 → count>0 → fallback не дёргался, 2025 терялся.
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${idx}/${totalInns}: buxbalans+ГИР БО «${meta.name}» (ИНН ${meta.inn})</span>`;
     let data = null;
     try {
-      data = await fetchBuxBalansByInn(meta.inn, 15);
+      data = await _pullReportBothSources(meta.inn);
       consecutiveTimeouts = 0;
     } catch(e){
       totalErr++;
@@ -17045,8 +17049,8 @@ async function moexPullGirboBulk(updateExisting){
       await new Promise(r => setTimeout(r, 400));
       continue;
     }
-    if(!data.count){
-      errors.push(`${meta.name} (ИНН ${meta.inn}): buxbalans вернул 0 годовых отчётов`);
+    if(!data || !data.count){
+      errors.push(`${meta.name} (ИНН ${meta.inn}): ни buxbalans, ни ГИР БО не вернули годовых отчётов`);
       await new Promise(r => setTimeout(r, 150));
       continue;
     }
