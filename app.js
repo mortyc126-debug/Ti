@@ -2484,6 +2484,208 @@ async function indResetSeed(){
 // материнские/связанные) и копирует в буфер для расширения «БондАналитик:
 // сбор раскрытий». В расширении один клик «Загрузить из буфера» → массовый
 // обход без ручной вставки.
+// Импорт аффилированных лиц из буфера. Расширение копирует JSON с
+// payload.pdfBase64 (PDF после распаковки ZIP). Тут мы парсим PDF через
+// pdf.js (уже подключен), вытаскиваем юрлица с ИНН, показываем список
+// и предлагаем привязать к активному эмитенту. Сам PDF не сохраняется —
+// только distilled-список оседает в iss.affiliatedList.
+async function repImportAffiliatedFromClipboard(){
+  if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  if(typeof pdfjsLib === 'undefined'){ alert('pdf.js не загружен — не получится распарсить.'); return; }
+
+  let text = '';
+  try { text = await navigator.clipboard.readText(); }
+  catch(e){
+    const fallback = prompt('Не получается прочитать буфер автоматически. Вставь JSON из буфера (Ctrl+V):', '');
+    if(!fallback) return;
+    text = fallback;
+  }
+  let parsed = null;
+  try { parsed = JSON.parse(String(text || '').trim()); }
+  catch(e){ alert('Не похоже на JSON из расширения: ' + e.message); return; }
+  if(!parsed || parsed.source !== 'affiliated-pdf' || !parsed.pdfBase64){
+    alert('Неверный формат. Ожидается payload от расширения (source=affiliated-pdf).');
+    return;
+  }
+
+  // base64 → Uint8Array
+  let pdfBytes = null;
+  try {
+    const binary = atob(parsed.pdfBase64);
+    pdfBytes = new Uint8Array(binary.length);
+    for(let i = 0; i < binary.length; i++) pdfBytes[i] = binary.charCodeAt(i);
+  } catch(e){ alert('Ошибка декодирования base64: ' + e.message); return; }
+
+  // Парсинг PDF
+  try {
+    if(!pdfjsLib.GlobalWorkerOptions.workerSrc){
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+    let fullText = '';
+    for(let p = 1; p <= pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const lines = {};
+      for(const item of content.items){
+        const y = Math.round(item.transform[5]);
+        if(!lines[y]) lines[y] = [];
+        lines[y].push(item.str);
+      }
+      const ySorted = Object.keys(lines).map(Number).sort((a, b) => b - a);
+      for(const y of ySorted){
+        fullText += lines[y].join(' ').trim() + '\n';
+      }
+    }
+
+    // Извлечение юрлиц: ищем паттерны с ИНН 10/12 цифр, имя и доля.
+    // Список аффилированных лиц обычно имеет таблицу с колонками
+    // «ФИО/наименование», «ОГРН», «ИНН», «Основание», «Доля».
+    const entries = [];
+    const seen = new Set();
+    // Режем текст на строки, ищем строки с ИНН
+    const lines = fullText.split(/\n+/);
+    for(let i = 0; i < lines.length; i++){
+      const line = lines[i];
+      const innM = line.match(/\b(\d{10}(?:\d{2})?)\b/);
+      if(!innM) continue;
+      const inn = innM[1];
+      // Пропуск если это чей-то другой ИНН (например в колонтитуле)
+      if(inn.length !== 10 && inn.length !== 12) continue;
+      if(seen.has(inn)) continue;
+      seen.add(inn);
+      // Попытка найти имя — обычно в той же строке или предыдущей,
+      // имя начинается с «ООО», «АО», «ПАО», «ЗАО», «ИП», или Фамилия
+      const context = (lines[i-1] || '') + ' ' + line + ' ' + (lines[i+1] || '');
+      const nameM = context.match(/(?:ООО|ОАО|ПАО|АО|ЗАО|НАО|ПК|МКК|ИП)\s*[«"]?([^«"»"]{3,80})[»"]?/i)
+                  || context.match(/([А-Я][а-я]+\s+[А-Я]\.\s*[А-Я]\.)/);  // Физлица типа «Иванов И.И.»
+      const name = nameM ? (nameM[0] || '').trim().replace(/\s+/g, ' ').slice(0, 120) : '';
+      // Доля — процент в строке
+      const shareM = context.match(/(\d{1,3}(?:[.,]\d{1,4})?)\s*%/);
+      const share = shareM ? parseFloat(shareM[1].replace(',', '.')) : null;
+      // Основание / роль (очень грубо)
+      const roleM = context.match(/(дочерн\w+|зависим\w+|преобладающ\w+|основн\w+ (общество|хозяйственное)|член совета|ген\w+ директор|единоличн\w+ исполн)/i);
+      const role = roleM ? roleM[1] : null;
+      entries.push({ inn, name, share, role, raw: line.trim().slice(0, 200) });
+    }
+
+    if(!entries.length){
+      alert('В PDF не найдено юрлиц с распознанными ИНН. Возможно формат нестандартный — открой PDF глазами и внеси через «🔗 связи» вручную.');
+      return;
+    }
+
+    // Помечаем, какие из найденных уже есть в reportsDB
+    const enriched = entries.map(e => {
+      let inDb = null;
+      for(const [id, em] of Object.entries(reportsDB || {})){
+        if(em && String(em.inn || '') === e.inn){ inDb = { id, name: em.name }; break; }
+      }
+      return { ...e, inDb };
+    });
+
+    // Сохраняем в эмитента только distilled-список (без PDF!)
+    iss.affiliatedList = {
+      capturedAt: parsed.capturedAt || new Date().toISOString(),
+      date: parsed.date || null,
+      sourceInn: parsed.inn || null,
+      sourceName: parsed.companyName || null,
+      entries: enriched.map(({ raw, ...rest }) => rest),  // raw-строка в долгое хранилище не нужна
+    };
+    save();
+
+    // Показ модалки
+    const inBase = enriched.filter(e => e.inDb).length;
+    const subsidiaries = enriched.filter(e => /дочерн|преобладающ|основн\w+ хоз/i.test(e.role || ''));
+    const rowsHtml = enriched.slice(0, 80).map(e => {
+      const nameDisplay = e.name || '<i style="color:var(--text3)">(имя не распознано)</i>';
+      const shareTxt = e.share != null ? `${e.share}%` : '—';
+      const roleTxt = e.role ? `<small style="color:var(--warn)">${e.role}</small>` : '';
+      const inDbBadge = e.inDb
+        ? `<span style="color:var(--green);font-size:.52rem;margin-left:4px">✓ в базе: ${_escHtml(e.inDb.name)}</span>`
+        : `<span style="color:var(--text3);font-size:.52rem;margin-left:4px">нет в базе</span>`;
+      return `<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:.6rem;display:flex;gap:6px">
+        <span style="color:var(--text3);font-family:var(--mono);min-width:95px">${e.inn}</span>
+        <span style="flex:1">${nameDisplay} ${roleTxt} ${inDbBadge}</span>
+        <span style="color:var(--text2);font-family:var(--mono);min-width:50px;text-align:right">${shareTxt}</span>
+      </div>`;
+    }).join('');
+
+    const existing = document.getElementById('affil-modal');
+    if(existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'affil-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = `
+      <div style="background:var(--s1);border:1px solid var(--border2);width:820px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
+        <div style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--s2)">
+          <strong>📇 Аффилированные — ${_escHtml(parsed.companyName || iss.name || '')}</strong>
+          <span style="color:var(--text3);font-size:.55rem">${parsed.date || ''} · ${enriched.length} юрлиц${inBase ? ' · ' + inBase + ' в базе' : ''}</span>
+          <button onclick="document.getElementById('affil-modal').remove()" style="margin-left:auto;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:10px 14px;font-size:.58rem;color:var(--text3);border-bottom:1px solid var(--border)">
+          Найдено: <strong>${enriched.length}</strong> юрлиц с ИНН · уже в reportsDB: <strong style="color:var(--green)">${inBase}</strong> · помечено как дочки/зависимые: <strong style="color:var(--warn)">${subsidiaries.length}</strong>
+        </div>
+        <div style="overflow-y:auto;flex:1">${rowsHtml}${enriched.length > 80 ? `<div style="padding:8px;text-align:center;color:var(--text3);font-size:.55rem">...и ещё ${enriched.length - 80}. Весь список сохранён в iss.affiliatedList</div>` : ''}</div>
+        <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:6px;align-items:center">
+          <button onclick="repLinkAffiliatedAll('${repActiveIssuerId}', true); document.getElementById('affil-modal').remove()" class="btn btn-sm btn-p" title="Для каждого найденного юрлица: если он УЖЕ есть в reportsDB, привязать его как связанного к текущему эмитенту (через iss.related role=related).">🔗 Привязать тех кто в базе (${inBase})</button>
+          <button onclick="repLinkAffiliatedAll('${repActiveIssuerId}', false); document.getElementById('affil-modal').remove()" class="btn btn-sm" title="Привязать ВСЕ найденные юрлица, создавая новые записи для тех кого ещё нет в reportsDB. Будут созданы заготовки (name + inn) без отчётности — дальше через bulk можно подтянуть РСБУ.">🔗 Привязать все ${enriched.length} (создать пустые)</button>
+          <button onclick="document.getElementById('affil-modal').remove()" class="btn btn-sm" style="margin-left:auto">Закрыть</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
+  } catch(e){
+    alert('Ошибка парсинга PDF: ' + (e.message || e));
+  }
+}
+
+// Привязывает все найденные юрлица к активному эмитенту как связанные.
+// Если createMissing=false — только те кто уже в reportsDB.
+// Если createMissing=true — создаём заготовки для отсутствующих.
+function repLinkAffiliatedAll(issId, onlyInDb){
+  const iss = reportsDB[issId];
+  if(!iss || !iss.affiliatedList || !Array.isArray(iss.affiliatedList.entries)) return;
+  iss.related = Array.isArray(iss.related) ? iss.related : [];
+  let linked = 0, created = 0, skipped = 0;
+  for(const e of iss.affiliatedList.entries){
+    if(!e.inn) { skipped++; continue; }
+    // Уже связан — пропускаем
+    if(iss.related.some(r => String(r.inn || '') === e.inn)) { skipped++; continue; }
+    let targetId = null;
+    if(e.inDb){ targetId = e.inDb.id; }
+    else if(!onlyInDb){
+      // Создаём заготовку
+      targetId = 'iss_affil_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      reportsDB[targetId] = {
+        name: e.name || ('ИНН ' + e.inn),
+        inn: e.inn,
+        ind: 'other',
+        periods: {},
+      };
+      created++;
+    } else {
+      skipped++;
+      continue;
+    }
+    // Роль — если основание говорит «дочерн/зависим» → related, иначе related тоже
+    iss.related.push({
+      inn: e.inn,
+      role: 'related',
+      name: e.name || null,
+      source: 'affiliated',
+      share: e.share || null,
+      roleHint: e.role || null,
+    });
+    linked++;
+  }
+  save();
+  if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+  if(typeof repRenderIssuerList === 'function') repRenderIssuerList();
+  alert(`✓ Привязано: ${linked} юрлиц.\n${created ? `Создано новых записей в reportsDB: ${created}\n` : ''}Пропущено (уже в связях или без ИНН): ${skipped}`);
+}
+
 function repCopyInnsForExtension(){
   const inns = new Set();
   const validInn = v => v && /^\d{10}(\d{2})?$/.test(String(v));
