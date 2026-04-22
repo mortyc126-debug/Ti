@@ -272,6 +272,61 @@ function addBondToWL(b){
   save(); alert(`Добавлено в «${watchlists[keys[0]].name}»`);
 }
 
+// Универсальные хелперы: копирование текста в буфер + готовая кнопка
+// «📋» с коротким визуальным feedback (меняет эмодзи на ✓ на 1.2 сек).
+// Используется везде где упоминается ISIN, ИНН, ОГРН — чтобы один клик.
+function _copyText(text, btn){
+  if(!text) return;
+  const fallback = () => { try { prompt('Скопируйте вручную (Ctrl+C):', text); } catch(_){} };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(String(text)).then(() => {
+      if(btn){
+        const orig = btn.innerHTML;
+        btn.innerHTML = '✓';
+        setTimeout(() => { btn.innerHTML = orig; }, 1200);
+      }
+    }).catch(fallback);
+  } else fallback();
+}
+function _copyBtn(text, opts){
+  if(!text) return '';
+  opts = opts || {};
+  const label = opts.label || '📋';
+  const title = opts.title || `Скопировать ${text}`;
+  const size = opts.size || '.52rem';
+  const safe = String(text).replace(/'/g, "\\'");
+  return `<button class="btn btn-sm" onclick="_copyText('${safe}', this); event.stopPropagation(); return false" title="${title}" style="padding:1px 4px;font-size:${size};margin-left:3px">${label}</button>`;
+}
+
+// Находит issId в reportsDB для бонда (по isin через MOEX-каталог, потом
+// по имени через нормализованный fuzzy-match). Нужно чтобы в YTM-таблице
+// клик по имени открывал peek-модалку, как в каталоге MOEX.
+function _findIssuerForBond(b){
+  if(!b) return null;
+  // 1) По ISIN через MOEX-каталог
+  if(b.isin && window._moexCatalog && Array.isArray(window._moexCatalog.items)){
+    const m = window._moexCatalog.items.find(x => x.isin === b.isin);
+    if(m && m.issId && reportsDB[m.issId]) return m.issId;
+  }
+  // 2) По имени — нормализованный includes в обе стороны
+  if(b.name && typeof _normForSearch === 'function'){
+    const n = _normForSearch(b.name);
+    if(!n || n.length < 3) return null;
+    let best = null;
+    for(const [id, iss] of Object.entries(reportsDB || {})){
+      if(!iss || !iss.name) continue;
+      const iname = _normForSearch(iss.name);
+      if(!iname) continue;
+      if(n.includes(iname) || iname.includes(n)){
+        // Предпочитаем более длинное совпадение (точнее)
+        if(!best || iname.length > best.iname.length) best = { id, iname };
+      }
+    }
+    if(best) return best.id;
+  }
+  return null;
+}
+
 function renderYtm(){
   const tbody=document.getElementById('ytm-tbody');
   const empty=document.getElementById('ytm-empty');
@@ -336,9 +391,23 @@ function renderYtm(){
     }
 
     const bs=JSON.stringify(b).replace(/'/g,"&#39;");
+    // Ссылка-в-эмитента: ищем issId в reportsDB, если нашли — клик
+    // открывает peek-модалку (как в каталоге MOEX). Плюс под именем
+    // бонда — имя компании (если известно) и ISIN с кнопкой копирования.
+    const issId = _findIssuerForBond(b);
+    const issName = issId ? (reportsDB[issId]?.name || '') : '';
+    const nameLink = issId
+      ? `<a href="#" onclick="moexOpenIssuerPeek('${issId}'); return false" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--acc)" title="Открыть мини-профиль эмитента «${_escHtml ? _escHtml(issName) : issName}» (не покидая YTM)">${b.name}</a>`
+      : b.name;
+    const issLine = issName && issName !== b.name
+      ? `<div style="font-size:.54rem;color:var(--text3);margin-top:2px">${_escHtml ? _escHtml(issName) : issName}</div>`
+      : '';
+    const isinLine = b.isin
+      ? `<div style="font-size:.52rem;color:var(--text3);margin-top:1px;font-family:var(--mono)">${b.isin}${_copyBtn(b.isin, {title: 'Скопировать ISIN'})}</div>`
+      : '';
     return`<tr class="${i===0?'tr-best':''}">
       <td style="color:var(--text3)">${i+1}</td>
-      <td style="font-weight:600">${b.name}</td>
+      <td style="font-weight:600">${nameLink}${issLine}${isinLine}</td>
       <td><span class="tag ${BT_TAG[b.btype]||'tag-corp'}">${b.btype}</span></td>
       <td><span class="tag ct-${b.ctype}" style="font-size:.54rem">${CT_LABELS[b.ctype]}</span></td>
       <td style="color:var(--text2)">${params}</td>
@@ -3694,8 +3763,12 @@ function renderPort(){
     if(p.offerDate) badges.push(`<span title="Оферта ${p.offerDate}" style="font-size:.52rem;color:var(--purple);border:1px solid var(--purple);padding:1px 4px;margin-left:5px">ОФ ${fmtOfferDate(p.offerDate)}</span>`);
     const badgesHtml = badges.join('');
 
+    // Имя позиции: имя + ISIN с копи-кнопкой, если есть.
+    const isinSub = p.isin
+      ? `<div style="font-size:.52rem;color:var(--text3);font-family:var(--mono);margin-top:2px">${p.isin}${_copyBtn(p.isin, {title:'Скопировать ISIN'})}</div>`
+      : '';
     return`<tr>
-      <td style="font-weight:600">${p.name}${badgesHtml}</td>
+      <td style="font-weight:600">${p.name}${badgesHtml}${isinSub}</td>
       <td><span class="tag ${BT_TAG[p.btype]||'tag-corp'}">${p.btype}</span></td>
       <td><span class="tag ct-${p.ctype}" style="font-size:.54rem">${CT_LABELS[p.ctype]}</span></td>
       <td>${p.buy.toFixed(2)}%</td><td>${p.cur.toFixed(2)}%</td><td>${p.qty}</td>
@@ -4018,7 +4091,7 @@ function renderWL(){
   <div class="card"><div class="tbl-wrap"><table>
     <thead><tr><th>Название</th><th>Бумага</th><th>Купон</th><th>Цена</th><th>Δ 7д/30д</th><th>Купон/%</th><th>Лет</th><th>YTM</th><th>Заметка</th><th>Дата</th><th></th></tr></thead>
     <tbody>${wl.bonds.length?wl.bonds.map(b=>`<tr>
-      <td style="font-weight:600">${b.name}</td>
+      <td style="font-weight:600">${b.name}${b.isin?`<div style="font-size:.52rem;color:var(--text3);font-family:var(--mono);margin-top:2px">${b.isin}${_copyBtn(b.isin,{title:'Скопировать ISIN'})}</div>`:''}</td>
       <td><span class="tag ${BT_TAG[b.btype]||'tag-corp'}">${b.btype||'—'}</span></td>
       <td><span class="tag ct-${b.ctype}" style="font-size:.54rem">${CT_LABELS[b.ctype]||'—'}</span></td>
       <td>${b.price!=null?b.price.toFixed(2)+'%':'—'}</td>
@@ -7604,7 +7677,7 @@ function _repRenderActiveIssuerHeader(){
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div style="flex:1;min-width:200px">
         <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}</div>
-        <div style="color:var(--text3);font-size:.58rem;margin-top:2px">${iss.inn ? 'ИНН <strong style="color:var(--text2);font-family:var(--mono)">' + iss.inn + '</strong>' : 'ИНН не задан'}${iss.okved ? ' · ОКВЭД ' + okvedStr : ''}</div>
+        <div style="color:var(--text3);font-size:.58rem;margin-top:2px">${iss.inn ? 'ИНН <strong style="color:var(--text2);font-family:var(--mono)">' + iss.inn + '</strong>' + _copyBtn(iss.inn, {title:'Скопировать ИНН'}) : 'ИНН не задан'}${iss.okved ? ' · ОКВЭД ' + okvedStr : ''}</div>
         ${relatedRow}
       </div>
       <div style="display:flex;gap:6px;align-items:center">
@@ -16216,7 +16289,7 @@ function _moexRenderTable(list){
     html += `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
       <td style="padding:5px 8px">
         <div style="font-weight:600;color:var(--text)">${b.shortName || b.secid}</div>
-        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${b.isin}${matDate}</div>
+        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${b.isin}${b.isin ? _copyBtn(b.isin, {title:'Скопировать ISIN'}) : ''}${matDate}</div>
       </td>
       <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">
         ${issName
