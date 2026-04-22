@@ -7960,10 +7960,37 @@ function _repRenderActiveIssuerHeader(){
         }).join('')}
        </div>`
     : '';
+
+  // Бейдж раскрытий: если в iss.edisclosure есть сохранённые события,
+  // считаем сколько критичных (категоризированных) случилось за 90д.
+  // Если ≥1 — показываем красный бейдж у эмитента, чтобы сразу видно.
+  let edBadge = '';
+  if(iss.edisclosure && Array.isArray(iss.edisclosure.events) && iss.edisclosure.events.length){
+    const cutoff = Date.now() - 90 * 86400000;
+    const recent = iss.edisclosure.events.filter(e => {
+      if(!e.category) return false;
+      const m = String(e.date || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+      if(!m) return false;
+      const ts = new Date(+m[3], +m[2] - 1, +m[1]).getTime();
+      return ts >= cutoff;
+    });
+    if(recent.length){
+      const byCat = {};
+      for(const e of recent) byCat[e.category.key] = (byCat[e.category.key] || 0) + 1;
+      const top = Object.entries(byCat).slice(0, 3).map(([k, n]) => {
+        const c = (_EDISCLOSURE_CATEGORIES || []).find(x => x.key === k);
+        return `${c?.icon || '•'}${n}`;
+      }).join(' ');
+      edBadge = `<span onclick="repShowEdisclosure()" style="color:#fff;background:var(--danger);padding:2px 7px;font-size:.54rem;font-weight:700;margin-left:6px;cursor:pointer" title="Критичные раскрытия за последние 90 дней. Клик — открыть детали.">⚠ ${recent.length} раскрытия · ${top}</span>`;
+    } else {
+      const ageDays = Math.round((Date.now() - new Date(iss.edisclosure.capturedAt).getTime()) / 86400000);
+      edBadge = `<span onclick="repShowEdisclosure()" style="color:var(--text3);border:1px solid var(--border2);padding:1px 6px;font-size:.52rem;margin-left:6px;cursor:pointer" title="Раскрытия импортированы ${ageDays}д назад, критичных событий за 90д нет.">✓ ${iss.edisclosure.events.length} раскр.</span>`;
+    }
+  }
   box.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div style="flex:1;min-width:200px">
-        <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}</div>
+        <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}${edBadge}</div>
         <div style="color:var(--text3);font-size:.58rem;margin-top:2px">${iss.inn ? 'ИНН <strong style="color:var(--text2);font-family:var(--mono)">' + iss.inn + '</strong>' + _copyBtn(iss.inn, {title:'Скопировать ИНН'}) : 'ИНН не задан'}${iss.okved ? ' · ОКВЭД ' + okvedStr : ''}</div>
         ${relatedRow}
       </div>
@@ -18296,38 +18323,135 @@ function repSetEdisclosureId(){
 // UI: показать список существенных фактов активного эмитента в модалке.
 // Если парсинг сработал — рендерим с категоризацией. Если упал (прокси
 // не знает e-disclosure или сайт недоступен) — показываем fallback-ссылки.
-// Открывает e-disclosure.ru в новой вкладке с заполненным полем поиска
-// по ИНН эмитента. Автопарсер убран — сайт за anti-bot защитой
-// (ServicePipe), proxy-парсинг не пробить. Но когда ТЫ открываешь сайт
-// в своём браузере с живым JS — всё работает. Это самый надёжный путь.
-// Если у эмитента нет ИНН но есть материнская — используем её ИНН.
+// Bookmarklet-код для e-disclosure.ru — запускается на странице
+// компании, собирает все существенные факты из таблицы, кладёт JSON в
+// буфер обмена. Пользовательница потом вставляет его в модалке
+// «📢 факты» → «Импорт из буфера», данные сохраняются в iss.edisclosure.
+// Минифицированная форма (одна строка) — для вставки в bookmark.
+const _EDISCLOSURE_BOOKMARKLET = "javascript:(function(){try{var rows=document.querySelectorAll('tr');var events=[];rows.forEach(function(tr){var text=tr.textContent||'';var dateM=text.match(/(\\d{2}\\.\\d{2}\\.\\d{4})/);if(!dateM)return;var linkEl=tr.querySelector('a[href*=\".pdf\"],a[href*=\".html\"],a[href*=\".rtf\"],a[href*=\".doc\"]')||tr.querySelector('a');var title=linkEl?linkEl.textContent.trim():'';if(!title||title.length<8)return;var url=linkEl&&linkEl.href?linkEl.href:null;events.push({date:dateM[1],title:title,url:url})});var titleEl=document.querySelector('h1,h2,.companyName')||document.querySelector('title');var companyName=titleEl?titleEl.textContent.trim():'';var idMatch=location.href.match(/id=(\\d+)/);var innMatch=document.body.textContent.match(/ИНН[^0-9]{0,20}(\\d{10}(?:\\d{2})?)/);var payload={source:'e-disclosure',edId:idMatch?idMatch[1]:null,companyName:companyName,inn:innMatch?innMatch[1]:null,capturedAt:new Date().toISOString(),events:events};var json=JSON.stringify(payload);if(navigator.clipboard){navigator.clipboard.writeText(json).then(function(){alert('\\u2713 '+events.length+' событий по «'+companyName+'» скопировано. Вставь в БондАналитик → 📢 факты → Импорт.')}).catch(function(){prompt('Скопируй вручную:',json)})}else{prompt('Скопируй вручную:',json)}}catch(e){alert('Ошибка bookmarklet: '+e.message)}})();";
+
+// Импорт раскрытий из буфера: парсит JSON собранный bookmarklet'ом,
+// категоризирует события через _edCategorize, сохраняет в iss.edisclosure.
+function repImportEdisclosure(rawJson){
+  if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
+  const iss = reportsDB[repActiveIssuerId];
+  if(!iss) return;
+  let parsed = null;
+  try { parsed = JSON.parse(String(rawJson || '').trim()); }
+  catch(e){ alert('Не похоже на JSON:\n' + e.message); return; }
+  if(!parsed || parsed.source !== 'e-disclosure' || !Array.isArray(parsed.events)){
+    alert('Неправильный формат. Ожидается JSON из bookmarklet-а на e-disclosure.ru.');
+    return;
+  }
+  // Категоризируем события через существующий _edCategorize
+  const enriched = parsed.events.map(e => {
+    const cat = (typeof _edCategorize === 'function') ? _edCategorize(e.title) : null;
+    return {
+      date: e.date,
+      title: e.title,
+      url: e.url || null,
+      category: cat ? { key: cat.key, icon: cat.icon, color: cat.color, title: cat.title } : null,
+    };
+  });
+  iss.edisclosure = {
+    capturedAt: parsed.capturedAt || new Date().toISOString(),
+    edId: parsed.edId || null,
+    companyName: parsed.companyName || null,
+    inn: parsed.inn || null,
+    events: enriched,
+  };
+  save();
+  const categorized = enriched.filter(e => e.category);
+  alert(`✓ Импортировано ${enriched.length} событий по «${parsed.companyName || iss.name}».\n  Из них категоризировано: ${categorized.length} (смены аудитора/руководства, иски, дефолты и т.п.)\n\nДалее кнопка «📢 факты» будет показывать эти события, плюс можно будет открыть сайт чтобы обновить.`);
+  if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+}
+
+// Открывает модалку «📢 факты»: если есть сохранённые события — показывает
+// их с категоризацией + кнопки «обновить с сайта» и «импорт из буфера».
+// Если нет — только инструкция + действия.
 function repShowEdisclosure(){
   if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
   const iss = reportsDB[repActiveIssuerId];
-  if(!iss){ return; }
+  if(!iss) return;
   let inn = iss.inn ? String(iss.inn) : null;
   let usedParent = false, parentName = null;
   if(!inn){
     const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent' && r.inn) : null;
     if(parent){ inn = String(parent.inn); usedParent = true; parentName = parent.name || null; }
   }
-  if(!inn){
-    alert('У эмитента не задан ИНН. Открой «🔗 связи» и укажи ИНН или материнскую.');
-    return;
+  const q = inn ? encodeURIComponent(inn) : '';
+  const openUrl = inn
+    ? 'https://www.e-disclosure.ru/poisk-po-kompaniyam?query=' + q
+    : 'https://www.e-disclosure.ru/poisk-po-kompaniyam';
+
+  const stored = iss.edisclosure;
+  let storedHtml = '';
+  if(stored && Array.isArray(stored.events) && stored.events.length){
+    const categorized = stored.events.filter(e => e.category);
+    const routine = stored.events.filter(e => !e.category).slice(0, 10);
+    const shown = [...categorized.slice(0, 40), ...routine];
+    const counts = {};
+    for(const e of categorized){ counts[e.category.key] = (counts[e.category.key] || 0) + 1; }
+    const countsRow = Object.entries(counts).map(([k, n]) => {
+      const c = (typeof _EDISCLOSURE_CATEGORIES !== 'undefined') ? _EDISCLOSURE_CATEGORIES.find(x => x.key === k) : null;
+      return `<span style="color:${c?.color || 'var(--text2)'};padding:2px 7px;border:1px solid ${c?.color || 'var(--border2)'};margin-right:4px;font-size:.55rem">${c?.icon || '•'} ${c?.title || k}: ${n}</span>`;
+    }).join('') || '<span style="color:var(--text3);font-size:.55rem">критичных событий нет</span>';
+    const rows = shown.map(e => {
+      const icon = e.category ? e.category.icon : '📄';
+      const color = e.category ? e.category.color : 'var(--text3)';
+      const titleHtml = e.url
+        ? `<a href="${e.url}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;border-bottom:1px dotted ${color}">${_escHtml(e.title)}</a>`
+        : `<span style="color:${color}">${_escHtml(e.title)}</span>`;
+      return `<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:.58rem;display:flex;gap:6px">
+        <span style="color:var(--text3);font-family:var(--mono);min-width:72px">${e.date}</span>
+        <span style="min-width:20px">${icon}</span>
+        <span style="flex:1">${titleHtml}${e.category ? ` <small style="color:var(--text3)">· ${e.category.title}</small>` : ''}</span>
+      </div>`;
+    }).join('');
+    const ageDays = Math.round((Date.now() - new Date(stored.capturedAt).getTime()) / 86400000);
+    storedHtml = `
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);background:var(--s2)">
+        <div style="font-size:.58rem;color:var(--text3)">
+          Сохранено ${ageDays}д назад · ${stored.events.length} событий · ${_escHtml(stored.companyName || '')}
+        </div>
+        <div style="margin-top:4px">${countsRow}</div>
+      </div>
+      <div style="max-height:320px;overflow-y:auto">${rows}</div>`;
+  } else {
+    storedHtml = `<div style="padding:12px;color:var(--text3);font-size:.6rem;text-align:center">Раскрытия ещё не импортированы. Используй шаги ниже.</div>`;
   }
-  const q = encodeURIComponent(inn);
-  // e-disclosure.ru новый URL с anti-bot-но-работает-в-реальном-браузере
-  const url = 'https://www.e-disclosure.ru/poisk-po-kompaniyam?query=' + q;
-  window.open(url, '_blank', 'noopener');
-  // Небольшой toast-оповещение вместо полной модалки — чтобы не спамить
-  // alert'ами когда ты используешь кнопку часто.
-  if(usedParent){
-    const tip = document.createElement('div');
-    tip.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--s3);border:1px solid var(--purple);color:var(--text);padding:8px 14px;z-index:3000;font-size:.62rem;max-width:420px';
-    tip.innerHTML = `🔗 Открыто по материнской (ИНН ${inn}${parentName ? ' · ' + (_escHtml ? _escHtml(parentName) : parentName) : ''}) — у эмитента своего ИНН нет.`;
-    document.body.appendChild(tip);
-    setTimeout(() => tip.remove(), 4000);
-  }
+
+  const existing = document.getElementById('ed-facts-modal');
+  if(existing) existing.remove();
+  const bmHref = _EDISCLOSURE_BOOKMARKLET.replace(/"/g, '&quot;');
+  const modal = document.createElement('div');
+  modal.id = 'ed-facts-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = `
+    <div style="background:var(--s1);border:1px solid var(--border2);width:820px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column">
+      <div style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--s2)">
+        <strong>📢 Существенные факты — ${_escHtml(iss.name || '')}</strong>
+        <span style="color:var(--text3);font-size:.55rem">ИНН ${inn || '—'}${usedParent ? ' (по материнской)' : ''}</span>
+        <button onclick="document.getElementById('ed-facts-modal').remove()" style="margin-left:auto;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer">✕</button>
+      </div>
+      ${storedHtml}
+      <div style="padding:10px 14px;border-top:1px solid var(--border);font-size:.58rem">
+        <strong>Как работать с раскрытиями</strong><br>
+        <div style="margin:4px 0 0;line-height:1.7">
+          <strong>1.</strong> <a href="${openUrl}" target="_blank" rel="noopener" style="color:var(--acc)">Открыть e-disclosure.ru</a> — найди компанию, открой её карточку с раскрытиями.<br>
+          <strong>2.</strong> Установи закладку-скрипт (один раз): <a href="${bmHref}" onclick="alert('Перетащи эту ссылку на панель закладок браузера — или нажми правой кнопкой → «Добавить в закладки». Затем открывай карточку компании на e-disclosure и жми эту закладку — события скопируются в буфер.');return false;" style="color:var(--acc);padding:2px 6px;border:1px dashed var(--acc)">📌 БондАналитик: сбор раскрытий</a>
+            &nbsp;<button class="btn btn-sm" onclick="navigator.clipboard.writeText(_EDISCLOSURE_BOOKMARKLET).then(()=>this.textContent='✓ скопирован код');setTimeout(()=>this.textContent='📋 копировать код закладки',1500)" style="font-size:.54rem;padding:2px 6px">📋 копировать код закладки</button><br>
+          <strong>3.</strong> На карточке компании на e-disclosure нажми закладку — она скопирует все события в буфер.<br>
+          <strong>4.</strong> Вернись сюда и вставь JSON в поле ниже → «Импортировать».
+        </div>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-start">
+        <textarea id="ed-import-area" placeholder='Вставь JSON из буфера (Ctrl+V)...' style="flex:1;height:60px;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:6px;font-family:var(--mono);font-size:.58rem"></textarea>
+        <button class="btn btn-p" onclick="repImportEdisclosure(document.getElementById('ed-import-area').value);document.getElementById('ed-facts-modal').remove()" style="font-size:.6rem">💾 Импортировать</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
 function _peekAttachParent(issId){
