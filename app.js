@@ -16213,10 +16213,11 @@ async function fetchMoexCatalog(){
   const items = [];
   const seen = new Set();
   let totalPages = 0;
+  const boardStats = []; // [{board, label, added, err}]
   try {
     for(const [board, label] of _MOEX_BOARDS){
       if(window._moexAbort) break;
-      let start = 0, pagesOnBoard = 0, addedOnBoard = 0;
+      let start = 0, pagesOnBoard = 0, addedOnBoard = 0, boardErr = null;
       while(true){
         if(window._moexAbort) break;
         if(status) status.textContent = `📋 ${label} (${board}) · страница ${pagesOnBoard+1} · всего уникальных: ${items.length}`;
@@ -16225,6 +16226,7 @@ async function fetchMoexCatalog(){
         if(!r.ok){
           // Некоторые доски могут отсутствовать — не валим всю выгрузку.
           console.warn('MOEX board', board, 'HTTP', r.status);
+          boardErr = `HTTP ${r.status}`;
           break;
         }
         const raw = await r.json();
@@ -16245,11 +16247,13 @@ async function fetchMoexCatalog(){
           break;
         }
       }
+      boardStats.push({ board, label, added: addedOnBoard, err: boardErr });
     }
-    window._moexCatalog = { items, updatedAt: new Date().toISOString() };
+    window._moexCatalog = { items, updatedAt: new Date().toISOString(), boardStats };
     _moexSaveCache();
     const abortedMsg = window._moexAbort ? ' (прервано — сохранил что успел)' : '';
-    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} бумаг за ${totalPages} запросов${abortedMsg}</span>`;
+    const perBoard = boardStats.map(s => `<span title="${s.err || ''}" style="color:${s.err ? 'var(--danger)' : s.added === 0 ? 'var(--warn)' : 'var(--text2)'}">${s.label}: <b>${s.added}</b>${s.err ? ' ❌' : ''}</span>`).join(' · ');
+    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} бумаг за ${totalPages} запросов${abortedMsg}</span><div style="margin-top:4px;font-size:.52rem;color:var(--text3)">${perBoard}</div>`;
     _moexRenderMeta();
     moexApplyFilters();
   } catch(e){
@@ -16745,11 +16749,19 @@ function moexApplyFilters(){
   });
 
   const filtered = enriched.filter(b => {
-    // «Мёртвые» бумаги — погашены (matYears<0) или приостановлены/не
-    // стартовали (STATUS != 'A'). Отсекаем по умолчанию.
+    // «Мёртвые» бумаги. Эвристика:
+    //   1. matDate в прошлом (matYears < 0) — уже погашены.
+    //   2. matDate мусорный (0000-00-00, пустая строка → matYears = NaN
+    //      при непустом b.matDate) — обычно старые делистинги.
+    //   3. STATUS явно не 'A' (включая 'N' — не стартовали, 'S' — suspended).
+    //      Пустой STATUS не трогаем: иногда MOEX его не заполняет.
+    //   4. issueSize == 0 — отменённый выпуск, формально в справочнике.
     if(!f.showDead){
-      if(b.matYears != null && b.matYears < 0) return false;
+      const matY = b.matYears;
+      if(matY != null && matY < 0) return false;
+      if(b.matDate && matY != null && !isFinite(matY)) return false;
       if(b.status && b.status !== 'A') return false;
+      if(b.issueSize === 0) return false;
     }
     if(f.text){
       const hay = ((b.shortName||'') + ' ' + (b.secName||'') + ' ' + b.isin + ' ' + b.secid).toLowerCase();
