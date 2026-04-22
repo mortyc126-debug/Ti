@@ -7660,7 +7660,40 @@ function _repStressScore(iss, opts){
     return -Math.round((k - 1.3) / (2.5 - 1.3) * 30); // 0 → −30
   };
   const curAdjust = scoreAdjust(kRelative);
-  const finalScore = cur.score != null ? Math.max(0, Math.min(100, cur.score + curAdjust)) : null;
+
+  // Рейтинговая корректировка: свежие действия РА (последние 6 мес) — сильный
+  // сигнал, поскольку агентства работают с инсайдом. Суммируем по агентствам,
+  // но клампим в [−20, +10], чтобы один каскад не уехал в ±∞.
+  const ratingAdjust = (() => {
+    if(!Array.isArray(iss.ratings) || !iss.ratings.length) return { delta: 0, reasons: [] };
+    const now = Date.now();
+    const SIX_MO = 183 * 86400000;
+    const ts = s => { const m = String(s||'').match(/(\d{2})\.(\d{2})\.(\d{4})/); return m ? new Date(+m[3], +m[2]-1, +m[1]).getTime() : 0; };
+    let delta = 0;
+    const reasons = [];
+    // По каждому агентству берём самое свежее действие в окне 6 мес —
+    // повторные «понижения» одного агентства в пределах 6 мес не удваиваем.
+    const byAgency = new Map();
+    for(const r of iss.ratings){
+      const t = ts(r.date);
+      if(!t || (now - t) > SIX_MO) continue;
+      const prev = byAgency.get(r.agency);
+      if(!prev || ts(r.date) > ts(prev.date)) byAgency.set(r.agency, r);
+    }
+    for(const r of byAgency.values()){
+      if(r.action === 'downgrade'){ delta -= 10; reasons.push(`${r.agency}: понижение (−10)`); }
+      else if(r.action === 'withdraw'){ delta -= 15; reasons.push(`${r.agency}: снятие (−15)`); }
+      else if(r.action === 'upgrade'){ delta += 5; reasons.push(`${r.agency}: повышение (+5)`); }
+      else if(r.outlook === 'negative'){ delta -= 5; reasons.push(`${r.agency}: негативный прогноз (−5)`); }
+      else if(r.outlook === 'positive'){ delta += 3; reasons.push(`${r.agency}: позитивный прогноз (+3)`); }
+    }
+    delta = Math.max(-20, Math.min(10, delta));
+    return { delta, reasons };
+  })();
+
+  const finalScore = cur.score != null
+    ? Math.max(0, Math.min(100, cur.score + curAdjust + ratingAdjust.delta))
+    : null;
 
   // Штраф/бонус для прошлого score — нужна ещё одна «до-прошлая» точка
   // (сравниваем prior vs 3/2/1 года до prior).
@@ -7687,6 +7720,8 @@ function _repStressScore(iss, opts){
     score: finalScore, year: lp.year, usedParent,
     baseScore: cur.score,              // 3-компонентный, до корректировки
     scoreAdjust: curAdjust,            // −30..+10
+    ratingAdjust: ratingAdjust.delta,  // −20..+10 за свежие действия РА
+    ratingReasons: ratingAdjust.reasons,
     debtWallScore: cur.debtWallScore, debtWallRatio: cur.debtWallRatio, maturing24m: cur.maturingSum,
     stressIcrScore: cur.stressIcrScore, stressIcrVal: cur.stressIcrVal,
     altmanScore: cur.altmanScore, altmanZ: cur.altmanZ,
@@ -7988,9 +8023,22 @@ function repRenderIssuerList(){
     const isSpv = indKey === 'holdings_spv';
     const indBadgeColor = isSpv ? 'var(--warn)' : (indKey === 'other' ? 'var(--text3)' : 'var(--acc)');
     const okvedTip = iss.okved ? `ОКВЭД ${iss.okved}${iss.okvedName ? ' — ' + iss.okvedName.slice(0, 80) : ''}` : 'ОКВЭД не известен — запусти «📡 ГИР БО (дописать)»';
+    // Рейтинговый мини-бейдж: берём максимальный из iss.ratings (если
+    // есть), цвет по grade: BBB+→green, B-BB→warn, ≤CCC→danger.
+    let ratingChip = '';
+    if(Array.isArray(iss.ratings) && iss.ratings.length){
+      const best = iss.ratings
+        .map(r => ({ r, rank: _ratingRank(r.rating) }))
+        .filter(x => x.rank != null)
+        .sort((a, b) => b.rank - a.rank)[0];
+      if(best){
+        const col = best.rank >= 12 ? 'var(--green)' : best.rank >= 6 ? 'var(--warn)' : 'var(--danger)';
+        ratingChip = ` <span style="color:${col};border:1px solid ${col};padding:0 4px;font-size:.5rem;font-family:var(--mono)" title="${_escHtml(best.r.agency + ' ' + best.r.rating + (best.r.outlook ? ' · ' + best.r.outlook : '') + (best.r.date ? ' · ' + best.r.date : ''))}">🏷 ${best.r.rating}</span>`;
+      }
+    }
     return `
       <div class="rep-issuer-item" onclick="repSelectIssuerById('${id}')" style="padding:6px 8px;border:1px solid ${active ? 'var(--acc)' : (isSpv ? 'var(--warn)' : 'var(--border2)')};background:${active ? 'var(--s3)' : 'var(--bg)'};margin-bottom:4px;cursor:pointer;font-size:.62rem">
-        <div style="color:${active ? 'var(--acc)' : 'var(--text)'};font-weight:${active ? '600' : '400'};line-height:1.2">${_escHtml(iss.name || 'без имени')}</div>
+        <div style="color:${active ? 'var(--acc)' : 'var(--text)'};font-weight:${active ? '600' : '400'};line-height:1.2">${_escHtml(iss.name || 'без имени')}${ratingChip}</div>
         <div style="color:var(--text3);font-size:.52rem;margin-top:1px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
           <span>${iss.inn ? 'ИНН ' + iss.inn + ' · ' : ''}${periods} периодов${m.year ? ' · посл. ' + m.year : ''}</span>
           <abbr title="${_escHtml(okvedTip)}" style="text-decoration:none;cursor:help;padding:0 4px;background:var(--s2);border:1px solid var(--border2);color:${indBadgeColor};font-size:.5rem">${isSpv ? '🏴 ' : ''}${_escHtml(indLabel)}</abbr>
@@ -8127,8 +8175,19 @@ function _repRenderActiveIssuerHeader(){
     trendHtml = `<span style="font-size:.6rem;color:${color};font-family:var(--mono);margin-left:6px" title="Запас прочности ${yrs} ${yrs<5?'года':'лет'} назад был ${st.priorScore} (${st.priorYear}); сейчас ${st.score}. Тренд важнее уровня — устойчивая компания может ехать к проблемам, если score падает несколько лет подряд.">${arrow} ${sign}${delta} vs ${st.priorYear}${suffix}</span>`;
   }
   const adj = st.scoreAdjust || 0;
-  const adjNote = adj !== 0 ? `\nКорректировка leverage trajectory: ${adj > 0 ? '+' + adj : adj} (базовый ${st.baseScore} ${adj > 0 ? '+' : '−'} ${Math.abs(adj)} = ${st.score}).` : '';
-  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nБазовые веса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.\nLeverage trajectory: +10 за deleveraging (k≤0.8), +5 за k≤1.0, 0 в норме (1.0<k≤1.3), штраф до −30 при k≥2.5. Если отрасль достаточно представлена (≥5 эмитентов) — k нормализуется на медиану отрасли (сравнение с пиром).${adjNote}${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
+  const adjNote = adj !== 0 ? `\nКорректировка leverage trajectory: ${adj > 0 ? '+' + adj : adj} (базовый ${st.baseScore} ${adj > 0 ? '+' : '−'} ${Math.abs(adj)}).` : '';
+  const rAdj = st.ratingAdjust || 0;
+  const rReasons = st.ratingReasons && st.ratingReasons.length ? ('\n  · ' + st.ratingReasons.join('\n  · ')) : '';
+  const rAdjNote = rAdj !== 0 ? `\nКорректировка по действиям РА за 6 мес: ${rAdj > 0 ? '+' + rAdj : rAdj}.${rReasons}` : '';
+  // Бейдж со свежим рейтинговым действием — рядом с outpaceBadge.
+  let ratingBadge = '';
+  if(rAdj !== 0 && st.ratingReasons && st.ratingReasons.length){
+    const summary = st.ratingReasons[0] + (st.ratingReasons.length > 1 ? ` +${st.ratingReasons.length - 1}` : '');
+    const col = rAdj < 0 ? 'var(--danger)' : 'var(--green)';
+    const sign = rAdj > 0 ? '+' : '';
+    ratingBadge = `<span style="color:${col};border:1px solid ${col};padding:1px 5px;margin-right:6px;font-weight:600" title="Свежие действия рейтинговых агентств (последние 6 мес):\n  · ${st.ratingReasons.join('\n  · ')}\nИтоговая корректировка стресс-скора: ${sign}${rAdj}.">🏷 ${summary}</span>`;
+  }
+  const stTooltip = `Запас прочности (${st.year || '—'}): композит близости к дефолту, 0 = критическая точка, 100 = устойчиво.\nБазовые веса: Stressed-ICR 40%, Altman Z\' 35%, Долговая стена 24 мес 25%. Если сигнал отсутствует — вес перераспределяется.\nLeverage trajectory: +10 за deleveraging (k≤0.8), +5 за k≤1.0, 0 в норме (1.0<k≤1.3), штраф до −30 при k≥2.5. Если отрасль достаточно представлена (≥5 эмитентов) — k нормализуется на медиану отрасли (сравнение с пиром).\nРейтинговые действия за 6 мес: downgrade −10, withdraw −15, upgrade +5, negative outlook −5, positive outlook +3. Суммарно клампится в [−20, +10].${adjNote}${rAdjNote}${st.priorScore != null ? '\nТренд: ' + st.priorYear + '→' + st.year + ': ' + st.priorScore + '→' + st.score + '.' : ''}`;
   const stTile = `
     <div style="margin-top:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${stTooltip}">
       <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">🛡 Запас прочности${st.year ? ' · ' + st.year : ''}${st.usedParent ? ' <span style="color:var(--purple);font-size:.5rem;border:1px solid var(--purple);padding:0 4px;margin-left:4px" title="Расчёт по данным материнской компании (у самого эмитента нет отчётности или включён тумблер)">мамы</span>' : ''}</div>
@@ -8137,7 +8196,7 @@ function _repRenderActiveIssuerHeader(){
       </div>
       <div style="font-weight:700;font-size:.78rem;color:${stColor};font-family:var(--mono);min-width:50px;text-align:right">${st.score != null ? st.score : '—'}<span style="font-size:.5rem;color:var(--text3)">/100</span>${trendHtml}</div>
       <div style="flex-basis:100%;font-size:.54rem;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        ${outpaceBadge}${dwPart} · ${icrPart} · ${zPart}
+        ${ratingBadge}${outpaceBadge}${dwPart} · ${icrPart} · ${zPart}
       </div>
     </div>`;
 
@@ -16311,7 +16370,30 @@ function _moexIssuerMetrics(issId, cache){
   // Fallback на EBIT, если EBITDA нет (как в досье).
   const base = p.ebitda != null ? p.ebitda : p.ebit;
   const netDebt = (p.debt != null && p.cash != null) ? (p.debt - p.cash) : null;
-  const rating = iss.dossier?.mod?.rating || '';
+  // Рейтинг: приоритет автоматическому из iss.ratings (берём максимальный
+  // из всех агентств), fallback на ручной dossier.mod.rating.
+  let rating = '', ratingRank = null, ratingSource = null;
+  if(Array.isArray(iss.ratings) && iss.ratings.length && typeof _ratingRank === 'function'){
+    let best = null;
+    for(const r of iss.ratings){
+      const rank = _ratingRank(r.rating);
+      if(rank == null) continue;
+      if(!best || rank > best.rank) best = { r, rank };
+    }
+    if(best){
+      rating = best.r.rating;
+      ratingRank = best.rank;
+      ratingSource = 'auto';
+    }
+  }
+  if(!rating){
+    const manual = iss.dossier?.mod?.rating || '';
+    if(manual){
+      rating = manual;
+      ratingSource = 'manual';
+      if(typeof _ratingRank === 'function') ratingRank = _ratingRank(_moexRatingClass(manual));
+    }
+  }
   const metrics = {
     year: p.year,
     debtEbitda:    div(p.debt, base),
@@ -16326,7 +16408,9 @@ function _moexIssuerMetrics(issId, cache){
     balanceQualityIndex: (typeof _repBalanceQuality === 'function') ? (_repBalanceQuality(iss, p)?.score ?? null) : null,
     usedEbit:      p.ebitda == null && p.ebit != null,
     rating:        rating,
-    ratingClass:   _moexRatingClass(rating)
+    ratingClass:   _moexRatingClass(rating),
+    ratingRank:    ratingRank,
+    ratingSource:  ratingSource
   };
   cache.set(issId, metrics);
   return metrics;
@@ -16762,6 +16846,7 @@ function moexApplyFilters(){
     if(field === 'cashr') return m.cashRatio;
     if(field === 'eqr')   return m.equityRatio;
     if(field === 'bqi')   return m.balanceQualityIndex;
+    if(field === 'rating') return m.ratingRank;
     if(field === 'roe' || field === 'dde'){
       // ROE и D/E в metricsCache нет — считаем на лету из reportsDB.
       const iss = reportsDB[b.issId];
@@ -16824,6 +16909,8 @@ function moexApplyFilters(){
     'eqr-worst': byMetric('eqr', true, true),
     'bqi-best':  byMetric('bqi', true, false),
     'bqi-worst': byMetric('bqi', true, true),
+    'rating-best':  byMetric('rating', true, false),
+    'rating-worst': byMetric('rating', true, true),
     // Запас прочности: берём из кэша getStress (считается лениво, если
     // сортировка активна — пробежит по всем бумагам с issId).
     'stress-best': (a, b) => {
