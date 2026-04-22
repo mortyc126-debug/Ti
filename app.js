@@ -16079,6 +16079,7 @@ const _MOEX_BOARDS = [
   ['TQIY', 'Замещайки'],
   ['TQOD', 'Евро / валютные'],
   ['TQRD', 'Суборды'],
+  ['TQCY', 'Юаневые'],      // CNY-корпоративные, без них картина по валютным неполная
   ['EQOB', 'Евробонды (T+)'],
   ['EQOD', 'Суборды доллар'],
   ['TQUD', 'USD-номинал'],
@@ -16659,6 +16660,10 @@ function moexApplyFilters(){
     priceMax: _num(document.getElementById('moex-f-price-max')?.value),
     inDbOnly: document.getElementById('moex-f-indb').checked,
     showStructured: document.getElementById('moex-f-structured')?.checked || false,
+    // «Мёртвые» бумаги: matDate в прошлом (MOEX держит их на доске ещё
+    // до 2 недель после погашения) или STATUS != 'A' (suspended / not
+    // started). По умолчанию прячем, чтобы каталог не забивался.
+    showDead: document.getElementById('moex-f-dead')?.checked || false,
     // Фильтры по фундаменталу:
     deMax:   _num(document.getElementById('moex-f-de-max')?.value),
     ndeMax:  _num(document.getElementById('moex-f-nde-max')?.value),
@@ -16740,6 +16745,12 @@ function moexApplyFilters(){
   });
 
   const filtered = enriched.filter(b => {
+    // «Мёртвые» бумаги — погашены (matYears<0) или приостановлены/не
+    // стартовали (STATUS != 'A'). Отсекаем по умолчанию.
+    if(!f.showDead){
+      if(b.matYears != null && b.matYears < 0) return false;
+      if(b.status && b.status !== 'A') return false;
+    }
     if(f.text){
       const hay = ((b.shortName||'') + ' ' + (b.secName||'') + ' ' + b.isin + ' ' + b.secid).toLowerCase();
       if(!hay.includes(f.text)) return false;
@@ -17119,6 +17130,8 @@ function moexResetFilters(){
   document.getElementById('moex-f-indb').checked = false;
   const struct = document.getElementById('moex-f-structured');
   if(struct) struct.checked = false;
+  const dead = document.getElementById('moex-f-dead');
+  if(dead) dead.checked = false;
   document.getElementById('moex-sort').value = 'ytm-desc';
   const dyn = document.getElementById('moex-dyn-sort');
   if(dyn) dyn.value = '';

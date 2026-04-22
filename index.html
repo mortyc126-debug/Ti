@@ -2042,6 +2042,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0"> 🎭 Показывать структурные продукты (ИОС и т.п.)
         </label>
       </div>
+      <div class="field" style="margin:0" title="Мёртвые бумаги — уже погашенные (matDate в прошлом — MOEX продолжает показывать их на доске до 2 недель после погашения) или STATUS не «A» (приостановлены, ещё не стартовали). По умолчанию скрыты — иначе в каталоге висит пачка облигаций, которые уже не торгуются.">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="moex-f-dead" onchange="moexApplyFilters()" style="margin:0"> 🪦 Показывать мёртвые (погашенные / suspended)
+        </label>
+      </div>
       <div class="field" style="margin:0" title="Для эмитентов, у которых через «🔗 связи» отмечена материнская компания — считать «Запас прочности», фильтр «аутсайдеров отрасли» и прочий скоринг по её отчётности, а не по своей. Это про SPV: у SPV-эмитента свой баланс обычно пустой, а реальные цифры у головной. Для пустых SPV fallback на материнскую работает автоматически; тумблер включает его и для тех SPV, у кого собственная отчётность тоже есть.">
         <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
           <input type="checkbox" id="moex-f-prefer-parent" onchange="moexApplyFilters()" style="margin:0"> 🏛 По данным материнской (для SPV)
