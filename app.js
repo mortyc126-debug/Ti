@@ -110,7 +110,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','shares'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -126,6 +126,7 @@ function showPage(n, opts){
   if(n==='industries') indRender();
   if(n==='cross') crossInit();
   if(n==='moex') moexInit();
+  if(n==='shares') sharesInit();
 }
 
 // Назад: pop из стека, показать без очистки форм (данные сохраняются).
@@ -19073,6 +19074,473 @@ function moexExportCsv(){
   try { _moexLoadCache(); _moexRenderMeta(); } catch(e){}
 })();
 
+// ═════════════════════════════════════════════════════════════════════
+// 📈 КАТАЛОГ АКЦИЙ MOEX
+// ─────────────────────────────────────────────────────────────────────
+// Источник: /iss/engines/stock/markets/shares/boards/TQBR/securities.json
+// TQBR — основной режим торгов акциями (T+). ~250 бумаг, одна страница.
+// Для ETF и неглавных бордов — не тянем, чтобы каталог был компактен.
+// Привязка к reportsDB — через имя эмитента (ISSUERNAME / EMITENT_TITLE).
+// P/E и P/B — считаются на лету из price × ISSUESIZE / (np|eq), данных
+// из reportsDB достаточно.
+// Хранение: localStorage['bondan_moex_shares'], вне sync-snapshot.
+// ═════════════════════════════════════════════════════════════════════
+
+const _SHARES_CACHE_KEY = 'bondan_moex_shares';
+const _SHARES_BOARDS = [
+  ['TQBR', 'Акции (T+)'],
+  ['TQPI', 'Прочие акции'],
+];
+const _SHARES_BASE_BOARD = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards';
+
+function sharesInit(){
+  if(!window._sharesCatalog) _sharesLoadCache();
+  _sharesRenderMeta();
+  sharesApplyFilters();
+}
+
+function _sharesLoadCache(){
+  try {
+    const raw = localStorage.getItem(_SHARES_CACHE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(parsed && Array.isArray(parsed.items)) window._sharesCatalog = parsed;
+  } catch(e){}
+}
+
+function _sharesSaveCache(){
+  if(!window._sharesCatalog) return;
+  try { localStorage.setItem(_SHARES_CACHE_KEY, JSON.stringify(window._sharesCatalog)); }
+  catch(e){ alert('Не удалось сохранить каталог акций: ' + e.message); }
+}
+
+function sharesClearCache(){
+  if(!confirm('Удалить кэш каталога акций?')) return;
+  localStorage.removeItem(_SHARES_CACHE_KEY);
+  window._sharesCatalog = null;
+  _sharesRenderMeta();
+  sharesApplyFilters();
+}
+
+function _sharesRenderMeta(){
+  const meta = document.getElementById('shares-meta');
+  const cat = window._sharesCatalog;
+  const sb = document.getElementById('sb-shares');
+  if(!cat || !cat.items){
+    if(meta) meta.textContent = 'Кэш пуст — нажми «Обновить каталог»';
+    if(sb) sb.textContent = '0';
+    return;
+  }
+  const age = Math.round((Date.now() - new Date(cat.updatedAt).getTime()) / 86400000 * 10) / 10;
+  if(meta) meta.textContent = `В кэше: ${cat.items.length} акций · обновлено ${new Date(cat.updatedAt).toLocaleString('ru-RU')}${age >= 1 ? ' · ≈ '+age+' дн. назад' : ''}`;
+  if(sb) sb.textContent = String(cat.items.length);
+}
+
+function _sharesParsePage(resp){
+  const sec = resp.securities || {};
+  const md  = resp.marketdata || {};
+  const secCols = sec.columns || [], secData = sec.data || [];
+  const mdCols  = md.columns  || [], mdData  = md.data  || [];
+  const ci = (cols, name) => cols.indexOf(name);
+  const sidIdx = ci(secCols, 'SECID');
+  const mdSidIdx = ci(mdCols, 'SECID');
+  const mdById = {};
+  for(const r of mdData){ const id = r[mdSidIdx]; if(id) mdById[id] = r; }
+  const out = [];
+  for(const r of secData){
+    const secid = r[sidIdx]; if(!secid) continue;
+    const g  = (name) => r[ci(secCols, name)];
+    const mdr = mdById[secid] || [];
+    const gm = (name) => mdr[ci(mdCols, name)];
+    out.push({
+      secid,
+      isin:        g('ISIN') || secid,
+      shortName:   g('SHORTNAME') || secid,
+      secName:     g('SECNAME') || g('LATNAME'),
+      issuer:      g('ISSUERNAME') || g('EMITENT_NAME') || g('EMITTER_NAME') || g('LATNAME') || null,
+      boardid:     g('BOARDID'),
+      currency:    g('CURRENCYID') || g('FACEUNIT') || 'SUR',
+      listLevel:   _num(g('LISTLEVEL')),
+      secType:     g('SECTYPE'),               // «1» обычка, «2» прив
+      lotSize:     _num(g('LOTSIZE')),
+      issueSize:   _num(g('ISSUESIZE')),        // число акций
+      faceValue:   _num(g('FACEVALUE')),        // номинал (не используем в расчётах рыночно)
+      regNumber:   g('REGNUMBER'),
+      price:       _num(gm('LAST')) || _num(g('PREVPRICE')) || _num(g('PREVLEGALCLOSEPRICE')),
+      prevPrice:   _num(g('PREVPRICE')),
+      change:      _num(gm('LASTTOPREVPRICE')),
+      valToday:    _num(gm('VALTODAY')) || _num(gm('VALTODAY_RUR')),
+      volToday:    _num(gm('VOLTODAY')),
+      high:        _num(gm('HIGH')),
+      low:         _num(gm('LOW')),
+    });
+  }
+  return out;
+}
+
+async function fetchSharesCatalog(){
+  const btn = document.getElementById('shares-refresh-btn');
+  const status = document.getElementById('shares-status');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Загружаю…'; }
+  const items = [];
+  const seen = new Set();
+  try {
+    for(const [board, label] of _SHARES_BOARDS){
+      if(status) status.textContent = `📋 ${label} (${board})…`;
+      const url = `${_SHARES_BASE_BOARD}/${board}/securities.json?iss.meta=off`;
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok){ console.warn('shares board', board, 'HTTP', r.status); continue; }
+      const raw = await r.json();
+      const batch = _sharesParsePage(raw);
+      for(const s of batch){
+        if(seen.has(s.secid)) continue;
+        seen.add(s.secid);
+        items.push(s);
+      }
+    }
+    window._sharesCatalog = { items, updatedAt: new Date().toISOString() };
+    _sharesSaveCache();
+    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} акций</span>`;
+    _sharesRenderMeta();
+    sharesApplyFilters();
+  } catch(e){
+    if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '📡 Обновить каталог'; }
+  }
+}
+
+// P/E и P/B на лету из reportsDB + текущей цены × числа акций.
+// TTM берётся из последнего Year-периода (FY), не 9М/12М склейки — этим
+// занимается _moexIssuerMetrics уже. Здесь только обогащаем рыночными
+// множителями.
+function _sharesMarketMultiples(share){
+  if(!share || !share.issId || !share.price || !share.issueSize) return null;
+  const iss = reportsDB[share.issId]; if(!iss) return null;
+  let latest = null;
+  for(const p of Object.values(iss.periods || {})){
+    if(!p || !p.year) continue;
+    if(!/год|FY|year/i.test(p.period || 'FY')) continue;
+    if(!latest || parseInt(p.year, 10) > parseInt(latest.year, 10)) latest = p;
+  }
+  if(!latest) return null;
+  // reportsDB — в млрд ₽. Капитализация = price × issueSize → в рублях.
+  const capRub = share.price * share.issueSize;
+  const capBn  = capRub / 1e9;
+  const pe = (latest.np != null && latest.np > 0) ? capBn / latest.np : null;
+  const pb = (latest.eq != null && latest.eq > 0) ? capBn / latest.eq : null;
+  // P/S и EV/EBITDA — бонусом (EV упрощённо: cap + debt − cash).
+  const ps = (latest.rev != null && latest.rev > 0) ? capBn / latest.rev : null;
+  const ev = capBn + (latest.debt || 0) - (latest.cash || 0);
+  const base = latest.ebitda != null ? latest.ebitda : latest.ebit;
+  const evEbitda = (base != null && base > 0) ? ev / base : null;
+  return { capBn, pe, pb, ps, evEbitda, year: latest.year };
+}
+
+function sharesResetFilters(){
+  ['shares-f-text','shares-f-price-min','shares-f-price-max','shares-f-pe-max','shares-f-pb-max',
+   'shares-f-cap-min','shares-f-de-max','shares-f-icr-min','shares-f-roa-min','shares-f-ebm-min',
+   'shares-f-cur-min','shares-f-cashr-min','shares-f-eqr-min','shares-f-stress-min'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  ['shares-f-list','shares-f-ccy','shares-f-sectype','shares-f-rating-min','shares-f-rating-has','shares-f-pct-thresh'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const indb = document.getElementById('shares-f-indb'); if(indb) indb.checked = false;
+  const sort = document.getElementById('shares-sort'); if(sort) sort.value = 'cap-desc';
+  sharesApplyFilters();
+}
+
+function sharesApplyFilters(){
+  const card = document.getElementById('shares-filters-card');
+  const tcard = document.getElementById('shares-table-card');
+  const cat = window._sharesCatalog;
+  if(!cat || !Array.isArray(cat.items)){
+    if(card) card.style.display = 'none';
+    if(tcard) tcard.style.display = 'none';
+    return;
+  }
+  if(card) card.style.display = '';
+  if(tcard) tcard.style.display = '';
+
+  // Сбор фильтров
+  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const vn = id => { const s = v(id); return s ? parseFloat(s) : null; };
+  const vc = id => { const el = document.getElementById(id); return el && el.checked; };
+  const f = {
+    text: v('shares-f-text').toLowerCase(),
+    list: v('shares-f-list'),
+    ccy:  v('shares-f-ccy'),
+    sectype: v('shares-f-sectype'),
+    priceMin: vn('shares-f-price-min'),
+    priceMax: vn('shares-f-price-max'),
+    peMax: vn('shares-f-pe-max'),
+    pbMax: vn('shares-f-pb-max'),
+    capMin: vn('shares-f-cap-min'), // млрд ₽
+    deMax: vn('shares-f-de-max'),
+    icrMin: vn('shares-f-icr-min'),
+    roaMin: vn('shares-f-roa-min'),
+    ebmMin: vn('shares-f-ebm-min'),
+    curMin: vn('shares-f-cur-min'),
+    cashrMin: vn('shares-f-cashr-min'),
+    eqrMin: vn('shares-f-eqr-min'),
+    stressMin: vn('shares-f-stress-min'),
+    ratingMin: v('shares-f-rating-min'),
+    ratingHas: v('shares-f-rating-has'),
+    pctThresh: vn('shares-f-pct-thresh'),
+    onlyInDb: vc('shares-f-indb'),
+  };
+
+  // Привязка к reportsDB — один раз на всю выборку.
+  const issIdx = _moexBuildIssuerIndex();
+  const sort = v('shares-sort') || 'cap-desc';
+  const metricsCache = new Map();
+  const multiplesCache = new Map();
+
+  // Обогащаем акции issId и multiples (фильтры должны видеть вычисленные P/E/P/B).
+  for(const s of cat.items){
+    s.issId = _moexMatchIssuer({ secName: s.issuer || s.secName, shortName: s.shortName }, issIdx);
+    const mm = _sharesMarketMultiples(s);
+    multiplesCache.set(s.secid, mm);
+  }
+
+  // Перцентили отрасли — как у облигаций.
+  const pctRanks = (f.pctThresh != null) ? _moexBuildIndustryRanks() : null;
+  const anyFund = f.deMax != null || f.icrMin != null || f.roaMin != null || f.ebmMin != null
+               || f.curMin != null || f.cashrMin != null || f.eqrMin != null
+               || f.ratingMin || f.ratingHas || f.stressMin != null || f.pctThresh != null
+               || f.peMax != null || f.pbMax != null;
+
+  const stressCache = new Map();
+  const getStress = (issId) => {
+    if(!stressCache.has(issId)) stressCache.set(issId, _repStressScore(reportsDB[issId]));
+    return stressCache.get(issId);
+  };
+
+  const filtered = cat.items.filter(s => {
+    if(f.text){
+      const hay = (s.shortName + ' ' + (s.isin || '') + ' ' + (s.issuer || '') + ' ' + (s.secName || '')).toLowerCase();
+      if(!hay.includes(f.text)) return false;
+    }
+    if(f.list && String(s.listLevel) !== f.list) return false;
+    if(f.ccy && s.currency !== f.ccy) return false;
+    if(f.sectype && String(s.secType) !== f.sectype) return false;
+    if(f.priceMin != null && (s.price == null || s.price < f.priceMin)) return false;
+    if(f.priceMax != null && (s.price == null || s.price > f.priceMax)) return false;
+    if(f.onlyInDb && !s.issId) return false;
+
+    if(anyFund && !s.issId) return false;
+    if(s.issId){
+      const m = _moexIssuerMetrics(s.issId, metricsCache);
+      const mm = multiplesCache.get(s.secid);
+      if(f.peMax != null && (!mm || mm.pe == null || mm.pe > f.peMax)) return false;
+      if(f.pbMax != null && (!mm || mm.pb == null || mm.pb > f.pbMax)) return false;
+      if(f.capMin != null && (!mm || mm.capBn == null || mm.capBn < f.capMin)) return false;
+      if(m){
+        if(f.deMax != null && (m.debtEbitda == null || m.debtEbitda > f.deMax)) return false;
+        if(f.icrMin != null && (m.icr == null || m.icr < f.icrMin)) return false;
+        if(f.roaMin != null && (m.roa == null || (m.roa * 100) < f.roaMin)) return false;
+        if(f.ebmMin != null && (m.ebitdaMargin == null || (m.ebitdaMargin * 100) < f.ebmMin)) return false;
+        if(f.curMin != null && (m.currentRatio == null || m.currentRatio < f.curMin)) return false;
+        if(f.cashrMin != null && (m.cashRatio == null || m.cashRatio < f.cashrMin)) return false;
+        if(f.eqrMin != null && (m.equityRatio == null || (m.equityRatio * 100) < f.eqrMin)) return false;
+        if(f.ratingMin){
+          const rank = (m.ratingRank != null) ? m.ratingRank : _moexRatingRank(m.ratingClass);
+          const minRank = _moexRatingRank(f.ratingMin);
+          if(rank < 0 || rank < minRank) return false;
+        }
+        if(f.ratingHas === 'yes' && !m.ratingClass) return false;
+        if(f.ratingHas === 'no' && m.ratingClass) return false;
+      } else {
+        if(f.deMax != null || f.icrMin != null || f.roaMin != null || f.ebmMin != null
+           || f.curMin != null || f.cashrMin != null || f.eqrMin != null
+           || f.ratingMin || f.ratingHas === 'yes') return false;
+      }
+      if(f.stressMin != null){
+        const st = getStress(s.issId);
+        if(st.score == null || st.score < f.stressMin) return false;
+      }
+      if(f.pctThresh != null && pctRanks){
+        const r = pctRanks[s.issId];
+        if(!r) return false;
+        for(const k in r){ if(r[k] != null && r[k] < f.pctThresh) return false; }
+      }
+    }
+    return true;
+  });
+
+  // Сортировки.
+  const getNum = (s, key) => {
+    if(key === 'price') return s.price;
+    if(key === 'val')   return s.valToday;
+    if(key === 'change')return s.change;
+    const mm = multiplesCache.get(s.secid);
+    if(key === 'cap') return mm ? mm.capBn : null;
+    if(key === 'pe')  return mm ? mm.pe : null;
+    if(key === 'pb')  return mm ? mm.pb : null;
+    if(key === 'ps')  return mm ? mm.ps : null;
+    if(key === 'evebitda') return mm ? mm.evEbitda : null;
+    if(!s.issId) return null;
+    const m = _moexIssuerMetrics(s.issId, metricsCache);
+    if(!m) return null;
+    if(key === 'de') return m.debtEbitda;
+    if(key === 'icr')return m.icr;
+    if(key === 'roa')return m.roa;
+    if(key === 'ebm')return m.ebitdaMargin;
+    if(key === 'cur')return m.currentRatio;
+    if(key === 'cashr')return m.cashRatio;
+    if(key === 'eqr')return m.equityRatio;
+    if(key === 'bqi')return m.balanceQualityIndex;
+    if(key === 'rating')return m.ratingRank;
+    if(key === 'stress') return getStress(s.issId).score;
+    return null;
+  };
+  const byK = (key, bestIsHigher) => (a, b) => {
+    const va = getNum(a, key), vb = getNum(b, key);
+    const aOk = va != null && isFinite(va), bOk = vb != null && isFinite(vb);
+    if(!aOk && !bOk) return 0;
+    if(!aOk) return 1;
+    if(!bOk) return -1;
+    return bestIsHigher ? vb - va : va - vb;
+  };
+  const cmp = {
+    'name-asc': (a,b) => String(a.shortName||'').localeCompare(String(b.shortName||''), 'ru'),
+    'name-desc':(a,b) => String(b.shortName||'').localeCompare(String(a.shortName||''), 'ru'),
+    'cap-desc':  byK('cap', true),
+    'cap-asc':   byK('cap', false),
+    'price-desc':byK('price', true),
+    'price-asc': byK('price', false),
+    'change-desc':byK('change', true),
+    'change-asc': byK('change', false),
+    'val-desc':  byK('val', true),
+    'pe-best':   byK('pe', false),   // низкое P/E = дешёвая
+    'pe-worst':  byK('pe', true),
+    'pb-best':   byK('pb', false),
+    'pb-worst':  byK('pb', true),
+    'ps-best':   byK('ps', false),
+    'evebitda-best': byK('evebitda', false),
+    'de-best':   byK('de', false), 'de-worst':   byK('de', true),
+    'icr-best':  byK('icr', true), 'icr-worst':  byK('icr', false),
+    'roa-best':  byK('roa', true), 'roa-worst':  byK('roa', false),
+    'ebm-best':  byK('ebm', true), 'ebm-worst':  byK('ebm', false),
+    'cur-best':  byK('cur', true), 'cashr-best': byK('cashr', true),
+    'eqr-best':  byK('eqr', true),
+    'bqi-best':  byK('bqi', true), 'bqi-worst':  byK('bqi', false),
+    'rating-best': byK('rating', true), 'rating-worst': byK('rating', false),
+    'stress-best': byK('stress', true), 'stress-worst': byK('stress', false),
+  };
+  const sorted = [...filtered].sort(cmp[sort] || cmp['cap-desc']);
+  const cnt = document.getElementById('shares-count'); if(cnt) cnt.textContent = `${sorted.length} акций`;
+
+  _sharesRenderTable(sorted, metricsCache, multiplesCache);
+  window._sharesFilteredCache = sorted;
+}
+
+function _sharesRenderTable(list, metricsCache, multiplesCache){
+  const box = document.getElementById('shares-table');
+  if(!box) return;
+  if(!list.length){
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:.65rem">По фильтрам ничего нет.</div>';
+    return;
+  }
+  const limit = 500;
+  const shown = list.slice(0, limit);
+  const moreHint = list.length > limit
+    ? `<div style="padding:8px 10px;font-size:.58rem;color:var(--text3);background:var(--s2)">Показано первых ${limit} из ${list.length} — сузь фильтры.</div>` : '';
+  let html = `${moreHint}<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--s2);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
+      <th style="padding:6px 8px;text-align:left">Тикер</th>
+      <th style="padding:6px 8px;text-align:left">Эмитент / фундаментал</th>
+      <th style="padding:6px 8px;text-align:right">Цена</th>
+      <th style="padding:6px 8px;text-align:right">Δ</th>
+      <th style="padding:6px 8px;text-align:right">Кап-ция, млрд ₽</th>
+      <th style="padding:6px 8px;text-align:right">P/E</th>
+      <th style="padding:6px 8px;text-align:right">P/B</th>
+      <th style="padding:6px 8px;text-align:right">Оборот, млн</th>
+      <th style="padding:6px 8px;text-align:center">Лист</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead><tbody>`;
+  for(const s of shown){
+    const issName = s.issId ? (reportsDB[s.issId]?.name || '') : '';
+    const metrics = s.issId ? _moexIssuerMetrics(s.issId, metricsCache) : null;
+    const mm = multiplesCache.get(s.secid);
+    const inDbBadge = s.issId ? '<span class="dossier-pill ok" style="padding:1px 6px;font-size:.52rem">в базе</span>' : '';
+    const prefBadge = String(s.secType) === '2' ? '<span class="dossier-pill nd" style="padding:1px 6px;font-size:.52rem">прив</span>' : '';
+    const price = s.price != null ? s.price.toLocaleString('ru-RU', {maximumFractionDigits: 2}) : '—';
+    const ch = s.change;
+    const chColor = ch == null ? 'var(--text3)' : ch > 0 ? 'var(--green)' : ch < 0 ? 'var(--danger)' : 'var(--text3)';
+    const chStr = ch != null ? (ch > 0 ? '+' : '') + ch.toFixed(2) + '%' : '—';
+    const cap = mm && mm.capBn != null ? mm.capBn.toLocaleString('ru-RU', {maximumFractionDigits: 1}) : '—';
+    const pe  = mm && mm.pe != null ? mm.pe.toFixed(1) : '—';
+    const peColor = mm && mm.pe != null ? (mm.pe < 6 ? 'var(--green)' : mm.pe < 15 ? 'var(--text)' : 'var(--warn)') : 'var(--text3)';
+    const pb  = mm && mm.pb != null ? mm.pb.toFixed(2) : '—';
+    const pbColor = mm && mm.pb != null ? (mm.pb < 1 ? 'var(--green)' : mm.pb < 3 ? 'var(--text)' : 'var(--warn)') : 'var(--text3)';
+    const val = s.valToday != null ? Math.round(s.valToday / 1e6).toLocaleString('ru-RU') : '—';
+    const lvl = s.listLevel || '—';
+    const actions = s.issId
+      ? `<button class="btn btn-sm" onclick="moexOpenIssuerPeek('${s.issId}')" title="Мини-профиль эмитента" style="padding:2px 6px;font-size:.54rem">👁</button>
+         <button class="btn btn-sm" onclick="moexOpenInReports('${s.issId}')" title="Открыть в «📂 База отчётности»" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📂</button>`
+      : `<span style="color:var(--text3);font-size:.54rem">нет в базе</span>`;
+
+    let metricsLine = '';
+    if(metrics){
+      const parts = [];
+      const pill = (txt, cls) => `<span style="color:${cls};font-family:var(--mono)">${txt}</span>`;
+      if(metrics.debtEbitda != null){
+        const c = metrics.debtEbitda < 3 ? 'var(--green)' : metrics.debtEbitda < 5 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('D/E ' + metrics.debtEbitda.toFixed(1) + '×', c));
+      }
+      if(metrics.icr != null){
+        const c = metrics.icr > 3 ? 'var(--green)' : metrics.icr > 1.5 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('ICR ' + metrics.icr.toFixed(1) + '×', c));
+      }
+      if(metrics.roa != null){
+        const roaP = metrics.roa * 100;
+        const c = roaP > 5 ? 'var(--green)' : roaP > 0 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('ROA ' + roaP.toFixed(1) + '%', c));
+      }
+      if(metrics.ebitdaMargin != null){
+        const mp = metrics.ebitdaMargin * 100;
+        const c = mp > 15 ? 'var(--green)' : mp > 7 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('EBITDA-м ' + mp.toFixed(0) + '%', c));
+      }
+      if(metrics.ratingClass) parts.push(`<span style="color:var(--acc);font-weight:600">${metrics.ratingClass}</span>`);
+      if(parts.length){
+        metricsLine = `<div style="font-size:.54rem;color:var(--text3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap" title="FY ${metrics.year}">${parts.join(' · ')}</div>`;
+      }
+    }
+
+    html += `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+      <td style="padding:5px 8px">
+        <div style="font-weight:600;color:var(--text);font-family:var(--mono)">${s.secid}</div>
+        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${s.isin}${_copyBtn(s.isin, {title:'Скопировать ISIN'})}</div>
+      </td>
+      <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">
+        ${issName
+          ? `<div><a href="#" onclick="moexOpenIssuerPeek('${s.issId}'); return false" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--border2)" title="Мини-профиль эмитента">${_escHtml(issName)}</a></div>`
+          : s.issuer ? `<div>${_escHtml(s.issuer)}</div>` : ''}
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${inDbBadge}${prefBadge}</div>
+        ${metricsLine}
+      </td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${price}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${chColor}">${chStr}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${cap}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${peColor}">${pe}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${pbColor}">${pb}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${val}</td>
+      <td style="padding:5px 8px;text-align:center">${lvl}</td>
+      <td style="padding:5px 8px;text-align:right;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+// Bootstrap — восстановить счётчик в сайдбаре.
+(function _sharesBootstrap(){
+  try { _sharesLoadCache(); _sharesRenderMeta(); } catch(e){}
+})();
+
 // Восстановление последнего открытого раздела при загрузке страницы.
 // Сохраняется в showPage() в 'ba_active_page'. Дефолт — 'ytm' (как и было).
 // Стартуем после DOMContentLoaded, чтобы все элементы уже существовали,
@@ -19081,7 +19549,7 @@ function moexExportCsv(){
   const run = () => {
     try {
       const saved = localStorage.getItem('ba_active_page');
-      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex'];
+      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex','shares'];
       if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
         showPage(saved);
       }

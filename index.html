@@ -350,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
     <button class="nav-btn nav-sep" onclick="showPage('industries')">🏭 Отрасли</button>
     <button class="nav-btn" onclick="showPage('cross')">📊 Сравнение</button>
+    <button class="nav-btn nav-sep" onclick="showPage('shares')">📈 Акции</button>
   </nav>
   <div class="topbar-right">
     <span class="pulse-dot"></span>
@@ -370,7 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-item" onclick="showPage('reports');sbAct(this)"><span class="sb-icon">📂</span>База отчётности<span class="sb-badge" id="sb-rep">0</span></div>
     <div class="sb-item" onclick="showPage('industries');sbAct(this)"><span class="sb-icon">🏭</span>Отрасли / медианы<span class="sb-badge" id="sb-ind">0</span></div>
     <div class="sb-item" onclick="showPage('cross');sbAct(this)"><span class="sb-icon">📊</span>Сравнение компаний</div>
-    <div class="sb-item" onclick="showPage('moex');sbAct(this)" title="Каталог всех торгуемых на Мосбирже облигаций — ОФЗ, корпораты, субфеды, ВДО. Фильтры, которых нет в самой MOEX."><span class="sb-icon">🏛</span>Каталог Мосбиржи<span class="sb-badge" id="sb-moex">0</span></div>
+    <div class="sb-item" onclick="showPage('moex');sbAct(this)" title="Каталог всех торгуемых на Мосбирже облигаций — ОФЗ, корпораты, субфеды, ВДО. Фильтры, которых нет в самой MOEX."><span class="sb-icon">🏛</span>Каталог облигаций<span class="sb-badge" id="sb-moex">0</span></div>
+    <div class="sb-item" onclick="showPage('shares');sbAct(this)" title="Каталог акций MOEX. Режим TQBR. P/E, P/B, Кап-ция считаются на лету из reportsDB, плюс все те же фундаментал-фильтры что и у облигаций."><span class="sb-icon">📈</span>Каталог акций<span class="sb-badge" id="sb-shares">0</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -2196,6 +2198,183 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="moex-table" style="overflow-x:auto;font-size:.64rem"></div>
   </div>
 
+</div>
+
+<!-- ═══════════════════════════ ПАГА АКЦИЙ ═══════════════════════════ -->
+<div class="page" id="page-shares">
+  <div class="page-title">📈 Каталог акций Мосбиржи</div>
+  <div class="page-sub">Режим TQBR (основной T+) · фундаментал из reportsDB · P/E, P/B, Кап-ция считаются на лету</div>
+
+  <div class="card">
+    <div class="card-hdr">
+      📡 Загрузка каталога акций
+      <span id="shares-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
+    </div>
+    <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-p" id="shares-refresh-btn" onclick="fetchSharesCatalog()">📡 Обновить каталог</button>
+      <button class="btn" onclick="sharesClearCache()" title="Удалить локальный кэш акций">🗑 Очистить кэш</button>
+      <span id="shares-status" style="font-size:.62rem;color:var(--text2);flex:1"></span>
+    </div>
+    <div style="padding:4px 12px 10px;font-size:.58rem;color:var(--text3);line-height:1.55">
+      Источник: публичный ISS API Мосбиржи, без ключа. ~250 акций за 1-2 запроса. Мультипликаторы (P/E, P/B, Кап-ция) считаются на лету из цены × числа акций и последнего FY из reportsDB — актуальность привязана к отчётности эмитента.
+    </div>
+  </div>
+
+  <div class="card" id="shares-filters-card" style="display:none;margin-top:12px">
+    <div class="card-hdr">🎯 Фильтры <span id="shares-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Поиск (тикер / ISIN / эмитент)</label>
+        <input type="text" id="shares-f-text" oninput="sharesApplyFilters()" placeholder="SBER, GAZP, Лукойл...">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Уровень листинга</label>
+        <select id="shares-f-list" onchange="sharesApplyFilters()">
+          <option value="">Все</option>
+          <option value="1">1 (котировальный)</option>
+          <option value="2">2</option>
+          <option value="3">3 (некотировальный)</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Валюта</label>
+        <select id="shares-f-ccy" onchange="sharesApplyFilters()">
+          <option value="">Все</option>
+          <option value="SUR">RUB</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0" title="Тип: 1 — обыкновенные, 2 — привилегированные (у многих эмитентов есть оба, отдельные тикеры)">
+        <label style="font-size:.55rem">Тип акции</label>
+        <select id="shares-f-sectype" onchange="sharesApplyFilters()">
+          <option value="">Обычные + прив</option>
+          <option value="1">Только обычные</option>
+          <option value="2">Только привилегированные</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Цена от</label>
+        <input type="number" id="shares-f-price-min" oninput="sharesApplyFilters()" step="1" placeholder="напр. 10">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Цена до</label>
+        <input type="number" id="shares-f-price-max" oninput="sharesApplyFilters()" step="1" placeholder="напр. 5000">
+      </div>
+      <div class="field" style="margin:0" title="P/E = капитализация / чистая прибыль за последний FY. Чем ниже, тем дешевле акция относительно прибыли. Осторожно на P/E < 3 — часто говорит о разовой прибыли или уже падающем бизнесе.">
+        <label style="font-size:.55rem">P/E до</label>
+        <input type="number" id="shares-f-pe-max" oninput="sharesApplyFilters()" step="0.5" placeholder="напр. 8">
+      </div>
+      <div class="field" style="margin:0" title="P/B = капитализация / собственный капитал. Меньше 1 = ниже балансовой оценки (value-ловушка или скрытая переоценка активов).">
+        <label style="font-size:.55rem">P/B до</label>
+        <input type="number" id="shares-f-pb-max" oninput="sharesApplyFilters()" step="0.1" placeholder="напр. 2">
+      </div>
+      <div class="field" style="margin:0" title="Капитализация = цена × число акций. В млрд ₽.">
+        <label style="font-size:.55rem">Кап-ция от, млрд ₽</label>
+        <input type="number" id="shares-f-cap-min" oninput="sharesApplyFilters()" step="10" placeholder="напр. 100">
+      </div>
+      <div class="field" style="margin:0" title="Только эмитенты у которых есть запись в твоём reportsDB">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="shares-f-indb" onchange="sharesApplyFilters()" style="margin:0"> Только «есть в базе»
+        </label>
+      </div>
+    </div>
+    <div style="padding:0 12px 8px">
+      <div style="font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--acc)">
+        🧮 Фундаментал эмитента (из reportsDB + досье)
+      </div>
+      <div style="font-size:.55rem;color:var(--text3);margin-bottom:6px;line-height:1.5">
+        Эти фильтры работают только для акций, эмитент которых есть в reportsDB. Включи хоть один — акции без matched эмитента скроются.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Долг / EBITDA ≤</label>
+          <input type="number" id="shares-f-de-max" oninput="sharesApplyFilters()" step="0.5" placeholder="напр. 3"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">ICR ≥</label>
+          <input type="number" id="shares-f-icr-min" oninput="sharesApplyFilters()" step="0.5" placeholder="напр. 3"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">ROA ≥, %</label>
+          <input type="number" id="shares-f-roa-min" oninput="sharesApplyFilters()" step="0.5" placeholder="напр. 5"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">EBITDA-маржа ≥, %</label>
+          <input type="number" id="shares-f-ebm-min" oninput="sharesApplyFilters()" step="1" placeholder="напр. 10"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Current Ratio ≥</label>
+          <input type="number" id="shares-f-cur-min" oninput="sharesApplyFilters()" step="0.1" placeholder="1.2"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Cash Ratio ≥</label>
+          <input type="number" id="shares-f-cashr-min" oninput="sharesApplyFilters()" step="0.05" placeholder="0.2"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Equity Ratio ≥, %</label>
+          <input type="number" id="shares-f-eqr-min" oninput="sharesApplyFilters()" step="5" placeholder="30"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Рейтинг ≥</label>
+          <select id="shares-f-rating-min" onchange="sharesApplyFilters()">
+            <option value="">Любой / не важно</option>
+            <option value="AAA">AAA</option>
+            <option value="AA">AA и выше</option>
+            <option value="A">A и выше</option>
+            <option value="BBB">BBB и выше (инвест)</option>
+            <option value="BB">BB и выше</option>
+            <option value="B">B и выше</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Наличие рейтинга</label>
+          <select id="shares-f-rating-has" onchange="sharesApplyFilters()">
+            <option value="">Не важно</option>
+            <option value="yes">Только с рейтингом</option>
+            <option value="no">Только без рейтинга</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">🛡 Запас прочности ≥</label>
+          <input type="number" id="shares-f-stress-min" oninput="sharesApplyFilters()" step="5" min="0" max="100" placeholder="40"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">🏭 Отсекать аутсайдеров отрасли</label>
+          <select id="shares-f-pct-thresh" onchange="sharesApplyFilters()">
+            <option value="">Не отсекать</option>
+            <option value="25">Хуже 75% отрасли</option>
+            <option value="10">Хуже 90% отрасли</option>
+            <option value="5">Хуже 95% отрасли</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="sharesResetFilters()">🧹 Сбросить</button>
+      <div style="flex:1"></div>
+      <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
+        Сортировка:
+        <select id="shares-sort" onchange="sharesApplyFilters()" style="font-size:.65rem;padding:2px 4px">
+          <optgroup label="Рынок">
+            <option value="cap-desc">Кап-ция ↓</option>
+            <option value="cap-asc">Кап-ция ↑</option>
+            <option value="price-desc">Цена ↓</option>
+            <option value="price-asc">Цена ↑</option>
+            <option value="change-desc">Δ за день ↓</option>
+            <option value="change-asc">Δ за день ↑</option>
+            <option value="val-desc">Оборот ↓</option>
+            <option value="name-asc">Тикер А–Я</option>
+          </optgroup>
+          <optgroup label="Мультипликаторы">
+            <option value="pe-best">P/E (дешёвые сверху)</option>
+            <option value="pe-worst">P/E (дорогие сверху)</option>
+            <option value="pb-best">P/B (дешёвые сверху)</option>
+            <option value="pb-worst">P/B (дорогие сверху)</option>
+            <option value="ps-best">P/S (дешёвые сверху)</option>
+            <option value="evebitda-best">EV/EBITDA (дешёвые сверху)</option>
+          </optgroup>
+          <optgroup label="Фундаментал эмитента">
+            <option value="de-best">Долг/EBITDA (лучшие сверху)</option>
+            <option value="icr-best">ICR (лучшие сверху)</option>
+            <option value="roa-best">ROA (лучшие сверху)</option>
+            <option value="ebm-best">EBITDA-маржа (лучшие сверху)</option>
+            <option value="cur-best">💧 Current Ratio (лучшие)</option>
+            <option value="cashr-best">💵 Cash Ratio (лучшие)</option>
+            <option value="eqr-best">🔷 Equity Ratio (лучшие)</option>
+            <option value="bqi-best">⚖ Качество баланса (лучшие)</option>
+            <option value="rating-best">🏷 Рейтинг ↓ (лучшие сверху)</option>
+            <option value="stress-best">🛡 Запас прочности ↓ (лучшие)</option>
+            <option value="stress-worst">🛡 Запас прочности ↑ (худшие)</option>
+          </optgroup>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" id="shares-table-card" style="display:none;margin-top:12px">
+    <div id="shares-table" style="overflow-x:auto;font-size:.64rem"></div>
+  </div>
 </div>
 
 </div><!-- /content -->
