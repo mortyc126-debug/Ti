@@ -8013,10 +8013,39 @@ function _repRenderActiveIssuerHeader(){
       edBadge = `<span onclick="repShowEdisclosure()" style="color:var(--text3);border:1px solid var(--border2);padding:1px 6px;font-size:.52rem;margin-left:6px;cursor:pointer" title="Раскрытия импортированы ${ageDays}д назад, критичных событий за 90д нет.">✓ ${iss.edisclosure.events.length} раскр.</span>`;
     }
   }
+
+  // Бейджи кредитных рейтингов: показываем самые свежие действия каждого
+  // агентства. Цвет — по grade (BBB+ → зелёный, BB → жёлтый, B и ниже →
+  // красный). Если есть прогноз — добавляем стрелочку (↗ позитивный,
+  // ↘ негативный, → стабильный).
+  let ratingsBadges = '';
+  if(Array.isArray(iss.ratings) && iss.ratings.length){
+    const byAgency = {};
+    for(const r of iss.ratings){
+      if(!r.agency) continue;
+      if(!byAgency[r.agency]) byAgency[r.agency] = r; // первая = самая свежая
+    }
+    const ratingColor = rating => {
+      const rk = _ratingRank(rating);
+      if(rk == null) return 'var(--text3)';
+      if(rk >= 12) return 'var(--green)';   // BBB и выше
+      if(rk >= 6)  return 'var(--warn)';    // B-BB
+      return 'var(--danger)';                // CCC и ниже
+    };
+    const outlookArrow = o => o === 'positive' ? '↗' : o === 'negative' ? '↘' : o === 'stable' ? '→' : o === 'developing' ? '↺' : '';
+    ratingsBadges = Object.values(byAgency).map(r => {
+      const col = ratingColor(r.rating);
+      const arrow = outlookArrow(r.outlook);
+      const ratingTxt = r.rating || '?';
+      const tip = `${r.agency} · ${r.action || 'действие'}\n${r.title || ''}\nДата: ${r.date}${r.outlook ? ' · прогноз: ' + r.outlook : ''}`;
+      return `<span style="background:var(--bg);border:1px solid ${col};color:${col};padding:1px 6px;font-size:.52rem;margin-left:4px;font-family:var(--mono);cursor:help" title="${_escHtml(tip)}">🏷 ${_escHtml(r.agency)} ${ratingTxt}${arrow}</span>`;
+    }).join('');
+  }
+
   box.innerHTML = `
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div style="flex:1;min-width:200px">
-        <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}${edBadge}</div>
+        <div style="font-weight:600;color:var(--text);font-size:.78rem">${_escHtml(iss.name || 'без имени')}${edBadge}${ratingsBadges}</div>
         <div style="color:var(--text3);font-size:.58rem;margin-top:2px">${iss.inn ? 'ИНН <strong style="color:var(--text2);font-family:var(--mono)">' + iss.inn + '</strong>' + _copyBtn(iss.inn, {title:'Скопировать ИНН'}) : 'ИНН не задан'}${iss.okved ? ' · ОКВЭД ' + okvedStr : ''}</div>
         ${relatedRow}
       </div>
@@ -18358,6 +18387,65 @@ const _EDISCLOSURE_BOOKMARKLET = "javascript:(function(){try{var rows=document.q
 
 // Импорт раскрытий из буфера: парсит JSON собранный bookmarklet'ом,
 // категоризирует события через _edCategorize, сохраняет в iss.edisclosure.
+// Извлекает структурированную информацию о рейтинговом действии из
+// заголовка существенного факта. Поддерживаем 6 агентств — российские
+// АКРА/Эксперт РА/НКР и глобальные Moody's/S&P/Fitch (для эмитентов
+// с международными рейтингами). Возвращает {agency, rating, action,
+// outlook, scale} или null если не распознано.
+function _parseRatingFromTitle(title){
+  if(!title) return null;
+  let agency = null;
+  if(/АКРА|ACRA/i.test(title)) agency = 'АКРА';
+  else if(/Эксперт\s*РА|RAEX|raexpert/i.test(title)) agency = 'Эксперт РА';
+  else if(/НКР\b|NKR\b/i.test(title)) agency = 'НКР';
+  else if(/Moody/i.test(title)) agency = "Moody's";
+  else if(/S&P|Standard\s*&?\s*Poor/i.test(title)) agency = 'S&P';
+  else if(/Fitch/i.test(title)) agency = 'Fitch';
+
+  let action = null;
+  if(/повышени|повыш\w+\s+(кредитн\w+\s+)?рейт/i.test(title)) action = 'upgrade';
+  else if(/понижени|пониж\w+\s+(кредитн\w+\s+)?рейт|снижени\w+\s+(кредитн\w+\s+)?рейт/i.test(title)) action = 'downgrade';
+  else if(/подтвержд/i.test(title)) action = 'affirm';
+  else if(/присвоени|присвое/i.test(title)) action = 'assign';
+  else if(/сняти|отзыв/i.test(title)) action = 'withdraw';
+  else if(/прогноз|outlook/i.test(title)) action = 'outlook-change';
+
+  // Рейтинг: AAA, AA+, BB-, ru-A+, BB(RU) и т.п.
+  // Берём самое длинное (более точное) совпадение.
+  let rating = null, scale = null;
+  const rm = title.match(/\b(ru)?([A-D]{1,3})([+\-]?)(\(RU\))?\b/);
+  if(rm){
+    const ru = rm[1] || rm[4]; // 'ru' префикс или '(RU)' суффикс
+    rating = (rm[2] + (rm[3] || ''));
+    scale = ru ? 'national' : 'international';
+    // Sanity: рейтинг должен быть валидной комбинацией
+    if(!/^(AAA|AA|A|BBB|BB|B|CCC|CC|C|D)[+\-]?$/.test(rating)) rating = null;
+  }
+
+  let outlook = null;
+  if(/стабильн/i.test(title)) outlook = 'stable';
+  else if(/позитивн/i.test(title)) outlook = 'positive';
+  else if(/негативн/i.test(title)) outlook = 'negative';
+  else if(/развивающ/i.test(title)) outlook = 'developing';
+
+  if(!agency && !rating && !action) return null;
+  return { agency, rating, action, outlook, scale };
+}
+
+// Числовая шкала рейтинга для сравнений (выше = лучше). Возвращает
+// 0..23 либо null. Учитывает плюс/минус (BB+ > BB > BB-) и шкалу
+// (ru = russian, без модификации).
+function _ratingRank(rating){
+  if(!rating) return null;
+  const map = { AAA:21, AA:18, A:15, BBB:12, BB:9, B:6, CCC:3, CC:2, C:1, D:0 };
+  const m = String(rating).match(/^([A-D]{1,3})([+\-]?)$/);
+  if(!m) return null;
+  const base = map[m[1]];
+  if(base == null) return null;
+  const mod = m[2] === '+' ? 1 : m[2] === '-' ? -1 : 0;
+  return base + mod;
+}
+
 function repImportEdisclosure(rawJson){
   if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
   const iss = reportsDB[repActiveIssuerId];
@@ -18382,18 +18470,47 @@ function repImportEdisclosure(rawJson){
     };
   });
 
+  // Извлекает рейтинговые действия из событий, объединяет историю,
+  // возвращает массив отсортированный по дате (свежие сверху).
+  // Дедуп по (agency, date, action) — если одно событие повторяется
+  // в разных снимках, оставляем одну запись.
+  const extractRatings = (events, prevRatings) => {
+    const fromEvents = (events || [])
+      .map(e => {
+        if(!e.category || e.category.key !== 'rating') return null;
+        const r = _parseRatingFromTitle(e.title);
+        if(!r || !r.agency) return null;
+        return { ...r, date: e.date, source: 'e-disclosure', sourceUrl: e.url || null, title: e.title };
+      })
+      .filter(Boolean);
+    // Дедуп: ключ agency|date|action|rating
+    const seen = new Map();
+    for(const r of [...(prevRatings || []), ...fromEvents]){
+      const k = (r.agency || '') + '|' + (r.date || '') + '|' + (r.action || '') + '|' + (r.rating || '');
+      if(!seen.has(k)) seen.set(k, r);
+    }
+    return [...seen.values()].sort((a, b) => {
+      // Дату вида DD.MM.YYYY переводим в timestamp для сравнения
+      const ts = s => { const m = String(s||'').match(/(\d{2})\.(\d{2})\.(\d{4})/); return m ? new Date(+m[3], +m[2]-1, +m[1]).getTime() : 0; };
+      return ts(b.date) - ts(a.date);
+    });
+  };
+
   if(parsed.source === 'e-disclosure' && Array.isArray(parsed.events)){
     // Формат A: вливаем в активного
+    const enriched = enrichEvents(parsed.events);
     iss.edisclosure = {
       capturedAt: parsed.capturedAt || new Date().toISOString(),
       edId: parsed.edId || null,
       companyName: parsed.companyName || null,
       inn: parsed.inn || null,
-      events: enrichEvents(parsed.events),
+      events: enriched,
     };
+    iss.ratings = extractRatings(enriched, iss.ratings);
     save();
-    const cat = iss.edisclosure.events.filter(e => e.category).length;
-    alert(`✓ Импортировано ${iss.edisclosure.events.length} событий по «${parsed.companyName || iss.name}».\n  Категоризировано: ${cat}.`);
+    const cat = enriched.filter(e => e.category).length;
+    const newRatings = (iss.ratings || []).length;
+    alert(`✓ Импортировано ${enriched.length} событий по «${parsed.companyName || iss.name}».\n  Категоризировано: ${cat}.\n  Распознано рейтинговых действий: ${newRatings}.`);
     if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
     return;
   }
@@ -18424,12 +18541,14 @@ function repImportEdisclosure(rawJson){
         noMatchList.push(`${item.inn || '—'} · ${item.companyName || '(без имени)'}`);
         continue;
       }
+      const enriched = enrichEvents(item.events);
+      reportsDB[targetId].ratings = extractRatings(enriched, reportsDB[targetId].ratings);
       reportsDB[targetId].edisclosure = {
         capturedAt: item.capturedAt || new Date().toISOString(),
         edId: item.edId || null,
         companyName: item.companyName || null,
         inn: item.inn || null,
-        events: enrichEvents(item.events),
+        events: enriched,
       };
       matched++;
     }
