@@ -93,6 +93,9 @@ function showPage(n){
   document.getElementById('page-'+n).classList.add('active');
   const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  // Сохраняем активную страницу, чтобы при перезагрузке / восстановлении
+  // сессии открывался тот же раздел, а не YTM по дефолту.
+  try { localStorage.setItem('ba_active_page', n); } catch(_){}
   if(n==='portfolio') renderPort();
   if(n==='watchlist') renderWL();
   if(n==='ytm') renderYtm();
@@ -17710,4 +17713,27 @@ function moexExportCsv(){
 // При старте — если в кэше что-то есть, покажем счётчик в sidebar.
 (function _moexBootstrap(){
   try { _moexLoadCache(); _moexRenderMeta(); } catch(e){}
+})();
+
+// Восстановление последнего открытого раздела при загрузке страницы.
+// Сохраняется в showPage() в 'ba_active_page'. Дефолт — 'ytm' (как и было).
+// Стартуем после DOMContentLoaded, чтобы все элементы уже существовали,
+// и после initial-state кода (чтобы не спорить с onload-вызовами).
+(function _restoreActivePage(){
+  const run = () => {
+    try {
+      const saved = localStorage.getItem('ba_active_page');
+      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex'];
+      if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
+        showPage(saved);
+      }
+    } catch(_){}
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', run, { once: true });
+  } else {
+    // DOM уже готов — отложим на следующий тик, чтобы не конкурировать
+    // с остальным init-кодом.
+    setTimeout(run, 0);
+  }
 })();
