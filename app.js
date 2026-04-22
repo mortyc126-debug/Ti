@@ -303,24 +303,49 @@ function _copyBtn(text, opts){
 // клик по имени открывал peek-модалку, как в каталоге MOEX.
 function _findIssuerForBond(b){
   if(!b) return null;
-  // 1) По ISIN через MOEX-каталог → issId (прямое совпадение)
+  // 1) Находим catalog-item по ISIN
   let catItem = null;
   if(b.isin && window._moexCatalog && Array.isArray(window._moexCatalog.items)){
     catItem = window._moexCatalog.items.find(x => x.isin === b.isin) || null;
     if(catItem && catItem.issId && reportsDB[catItem.issId]) return catItem.issId;
   }
-  // 2) Через ИНН — catalog знает ИНН бонда, эмитент в reportsDB знает
-  //    свой ИНН. Надёжнее fuzzy-match по имени, потому что имя в катало-
-  //    ге («ЗонлайнБ02») часто сильно отличается от полного юр-имени
-  //    («ООО «Зелёный Онлайн Банк»»). ИНН — идентификатор 1:1.
+  // 2) Через готовый _moexMatchIssuer — он режет хвосты «БО-01»/«1Р-20R»
+  //    из shortName и матчит очищенное имя на индекс reportsDB. Это тот
+  //    же резолвер, которым пользуется сам каталог MOEX.
+  if(catItem && typeof _moexMatchIssuer === 'function' && typeof _moexBuildIssuerIndex === 'function'){
+    try {
+      const idx = _moexBuildIssuerIndex();
+      const id = _moexMatchIssuer(catItem, idx);
+      if(id && reportsDB[id]) return id;
+    } catch(_){}
+  }
+  // 3) По ПОЛНОМУ имени эмитента (ISSUERNAME) из catalog-item — самое
+  //    надёжное совпадение, т.к. это юр-имя 1:1. shortName бонда
+  //    («ЗонлайнБ02») часто ничего не говорит, а b.issuer = полное
+  //    «ООО "Зелёный Онлайн Банк"».
+  if(catItem && catItem.issuer && typeof _normForSearch === 'function'){
+    const fullName = _normForSearch(catItem.issuer);
+    if(fullName && fullName.length >= 3){
+      let best = null;
+      for(const [id, iss] of Object.entries(reportsDB || {})){
+        if(!iss || !iss.name) continue;
+        const iname = _normForSearch(iss.name);
+        if(!iname) continue;
+        if(fullName.includes(iname) || iname.includes(fullName)){
+          if(!best || iname.length > best.iname.length) best = { id, iname };
+        }
+      }
+      if(best) return best.id;
+    }
+  }
+  // 4) Через ИНН (если каталог/бонд знает — обычно у catalog.inn нет,
+  //    но если мы сохраняли через moexPullGirbo/buxbalans — может быть).
+  //    Плюс сверяем с iss.related — чтобы SPV-бонд открывал мамин профиль.
   const innFromCat = catItem?.inn || b.inn;
   if(innFromCat){
     const innStr = String(innFromCat);
     for(const [id, iss] of Object.entries(reportsDB || {})){
       if(iss && String(iss.inn || '') === innStr) return id;
-      // И по iss.related (материнская/связанные): чтобы у SPV-бонда клик
-      // открывал профиль материнской, если та в базе, а SPV сам по себе
-      // не matched.
       if(iss && Array.isArray(iss.related)){
         for(const r of iss.related){
           if(r && String(r.inn || '') === innStr) return id;
@@ -328,7 +353,7 @@ function _findIssuerForBond(b){
       }
     }
   }
-  // 3) По имени — нормализованный includes в обе стороны (fallback)
+  // 5) По имени бонда (последний fallback)
   if(b.name && typeof _normForSearch === 'function'){
     const n = _normForSearch(b.name);
     if(!n || n.length < 3) return null;
