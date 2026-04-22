@@ -7971,8 +7971,7 @@ function _repRenderActiveIssuerHeader(){
         <span style="padding:3px 8px;background:var(--bg);border:1px solid ${indColor};color:${indColor};font-size:.62rem">${isSpv ? '🏴 ' : ''}${_escHtml(indLabel)}</span>
         <button class="btn btn-sm" onclick="repChangeIndustry()" title="Сменить отрасль вручную (не перезапишется при следующем bulk'е если только не сбросить в 'other')" style="font-size:.56rem;padding:3px 7px">✎ отрасль</button>
         <button class="btn btn-sm" onclick="repEditRelated()" title="Добавить материнскую или связанную компанию (ИНН). Нужно для SPV-эмитентов, у которых отчётность пустая — реальные цифры у головной. В будущем можно будет тянуть отчётность по связанным ИНН автоматом." style="font-size:.56rem;padding:3px 7px">🔗 связи</button>
-        <button class="btn btn-sm" onclick="repShowEdisclosure()" title="Существенные факты эмитента с e-disclosure.ru: смены аудитора, руководства, продажи активов, судебные иски, дефолты. Это поведенческий слой, которого нет в балансе — ловит точки перелома до того как они попадут в цифры." style="font-size:.56rem;padding:3px 7px">📢 факты</button>
-        <button class="btn btn-sm" onclick="repSetEdisclosureId()" title="Ручная привязка e-disclosure ID: если парсер не находит компанию по ИНН (у e-disclosure индексация по внутренним ID, не по ИНН), открой поиск на сайте вручную и скопируй число из URL company.aspx?id=XXXXX — сохранится и дальше «📢 факты» будет открывать раскрытия сразу." style="font-size:.56rem;padding:3px 7px">✎ ed-id</button>
+        <button class="btn btn-sm" onclick="repShowEdisclosure()" title="Открыть e-disclosure.ru в новой вкладке с заполненным ИНН. Там смотришь глазами: смены аудитора, руководства, продажи активов, судебные иски, дефолты. Если у эмитента нет ИНН но есть материнская — откроется по ИНН мамы.">📢 факты</button>
       </div>
     </div>
     ${stTile}
@@ -18297,141 +18296,38 @@ function repSetEdisclosureId(){
 // UI: показать список существенных фактов активного эмитента в модалке.
 // Если парсинг сработал — рендерим с категоризацией. Если упал (прокси
 // не знает e-disclosure или сайт недоступен) — показываем fallback-ссылки.
-async function repShowEdisclosure(){
+// Открывает e-disclosure.ru в новой вкладке с заполненным полем поиска
+// по ИНН эмитента. Автопарсер убран — сайт за anti-bot защитой
+// (ServicePipe), proxy-парсинг не пробить. Но когда ТЫ открываешь сайт
+// в своём браузере с живым JS — всё работает. Это самый надёжный путь.
+// Если у эмитента нет ИНН но есть материнская — используем её ИНН.
+function repShowEdisclosure(){
   if(!repActiveIssuerId){ alert('Сначала выбери эмитента'); return; }
   const iss = reportsDB[repActiveIssuerId];
-  if(!iss || (!iss.inn && !iss.edisclosureId)){ alert('У эмитента не задан ИНН и нет сохранённого e-disclosure ID. Открой «🔗 связи» чтобы указать ИНН.'); return; }
-  const inn = iss.inn ? String(iss.inn) : null;
-  let result = null, err = null;
-
-  // Стратегии поиска по приоритету:
-  // 1) Если сохранён iss.edisclosureId — тянем напрямую.
-  // 2) Иначе — поиск по ИНН, fallback на имя внутри fetchEdisclosureEvents.
-  try {
-    if(iss.edisclosureId){
-      result = await fetchEdisclosureEvents({ edId: iss.edisclosureId, name: iss.name });
-    } else {
-      result = await fetchEdisclosureEvents({ inn, name: iss.name });
-    }
-  } catch(e){ err = e?.message || String(e); }
-
-  // Если не нашли — пробуем материнскую (её ИНН или name). SPV часто
-  // скрывают раскрытия под маму.
-  let usedParent = false;
-  if((!result || !result.events || !result.events.length || result.reason === 'not-found') && !err){
-    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent' && (r.inn || r.name)) : null;
-    if(parent){
-      try {
-        const parentResult = await fetchEdisclosureEvents({ inn: parent.inn, name: parent.name });
-        if(parentResult && parentResult.events && parentResult.events.length){
-          result = parentResult;
-          usedParent = true;
-          result._parentInn = parent.inn;
-          result._parentName = parent.name;
-        }
-      } catch(_){}
-    }
+  if(!iss){ return; }
+  let inn = iss.inn ? String(iss.inn) : null;
+  let usedParent = false, parentName = null;
+  if(!inn){
+    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent' && r.inn) : null;
+    if(parent){ inn = String(parent.inn); usedParent = true; parentName = parent.name || null; }
   }
-
-  const effectiveInn = usedParent ? result._parentInn : inn;
-  const fallbackLinks = [
-    `<a href="https://www.e-disclosure.ru/portal/companyfind.aspx?query=${encodeURIComponent(effectiveInn)}" target="_blank" rel="noopener" style="color:var(--acc)">e-disclosure.ru — поиск по ИНН</a>`,
-    `<a href="https://checko.ru/company/${encodeURIComponent(effectiveInn)}/activities" target="_blank" rel="noopener" style="color:var(--acc)">checko.ru — существенные факты</a>`,
-    `<a href="https://kad.arbitr.ru/" target="_blank" rel="noopener" style="color:var(--acc)">kad.arbitr.ru — арбитражи (ищи по ИНН ${effectiveInn})</a>`,
-  ].join(' · ');
-
-  if(err){
-    alert(
-      `📢 Существенные факты по ${iss.name} (ИНН ${inn})\n\n` +
-      `❌ Парсер упал: ${err}\n\n` +
-      `Обычно это значит что прокси не разрешает e-disclosure.ru в whitelist.\n` +
-      `Переразверни yandex-cloud-proxy.js (там уже обновлённый whitelist) — и парсер заработает.\n\n` +
-      `Пока открой вручную:\n` +
-      `• https://www.e-disclosure.ru/portal/companyfind.aspx?query=${inn}\n` +
-      `• https://checko.ru/company/${inn}/activities\n` +
-      `• https://kad.arbitr.ru/`
-    );
+  if(!inn){
+    alert('У эмитента не задан ИНН. Открой «🔗 связи» и укажи ИНН или материнскую.');
     return;
   }
-
-  if(!result || !result.events || !result.events.length){
-    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent') : null;
-    const searchQuery = inn || encodeURIComponent(iss.name || '');
-    const manualIdTip = confirm(
-      `📢 Существенные факты по ${iss.name} (ИНН ${inn || '—'})\n\n` +
-      (result && result.reason === 'not-found'
-        ? `⚠ Компания не найдена на e-disclosure.ru ни по ИНН, ни по имени. У них внутренняя индексация — не всегда связывают по ИНН.`
-        : `⚠ Список событий пустой или не распознан.`) +
-      (parent
-        ? `\nПроверено и по материнской (${parent.inn || parent.name}) — тоже пусто.`
-        : `\nСовет: если это SPV, привяжи материнскую через «🔗 связи».`) +
-      `\n\n💡 Можно ВРУЧНУЮ найти компанию на e-disclosure и скопировать её внутренний ID — тогда парсер будет работать точно.\n\n` +
-      `Нажми OK чтобы открыть e-disclosure в новой вкладке и ввести ID. Отмена — пропустить.`
-    );
-    if(manualIdTip){
-      window.open('https://www.e-disclosure.ru/portal/companyfind.aspx?query=' + searchQuery, '_blank');
-      setTimeout(() => { if(typeof repSetEdisclosureId === 'function') repSetEdisclosureId(); }, 400);
-    }
-    return;
+  const q = encodeURIComponent(inn);
+  // e-disclosure.ru новый URL с anti-bot-но-работает-в-реальном-браузере
+  const url = 'https://www.e-disclosure.ru/poisk-po-kompaniyam?query=' + q;
+  window.open(url, '_blank', 'noopener');
+  // Небольшой toast-оповещение вместо полной модалки — чтобы не спамить
+  // alert'ами когда ты используешь кнопку часто.
+  if(usedParent){
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--s3);border:1px solid var(--purple);color:var(--text);padding:8px 14px;z-index:3000;font-size:.62rem;max-width:420px';
+    tip.innerHTML = `🔗 Открыто по материнской (ИНН ${inn}${parentName ? ' · ' + (_escHtml ? _escHtml(parentName) : parentName) : ''}) — у эмитента своего ИНН нет.`;
+    document.body.appendChild(tip);
+    setTimeout(() => tip.remove(), 4000);
   }
-
-  const categorized = result.events.filter(e => e.category);
-  const routine = result.events.filter(e => !e.category).slice(0, 15);
-  const allShown = [...categorized.slice(0, 30), ...routine];
-
-  const rows = allShown.map(e => {
-    const icon = e.category ? e.category.icon : '📄';
-    const color = e.category ? e.category.color : 'var(--text3)';
-    const titleHtml = e.url
-      ? `<a href="${e.url}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;border-bottom:1px dotted ${color}">${_escHtml ? _escHtml(e.title) : e.title}</a>`
-      : `<span style="color:${color}">${_escHtml ? _escHtml(e.title) : e.title}</span>`;
-    return `<div style="padding:6px 8px;border-bottom:1px solid var(--border);font-size:.62rem;display:flex;gap:8px">
-      <span style="color:var(--text3);font-family:var(--mono);min-width:80px">${e.date}</span>
-      <span style="min-width:20px">${icon}</span>
-      <span style="flex:1">${titleHtml}${e.category ? ` <small style="color:var(--text3)">· ${e.category.title}</small>` : ''}</span>
-    </div>`;
-  }).join('');
-
-  const counts = {};
-  for(const e of categorized){
-    const k = e.category.key;
-    counts[k] = (counts[k] || 0) + 1;
-  }
-  const countsRow = Object.entries(counts).map(([k, n]) => {
-    const c = _EDISCLOSURE_CATEGORIES.find(x => x.key === k);
-    return `<span style="color:${c?.color || 'var(--text2)'};padding:2px 7px;border:1px solid ${c?.color || 'var(--border2)'};margin-right:4px">${c?.icon || '•'} ${c?.title || k}: ${n}</span>`;
-  }).join('') || '<span style="color:var(--text3)">критичных событий нет</span>';
-
-  const parentBanner = usedParent
-    ? `<div style="padding:6px 12px;background:var(--s3);border-left:3px solid var(--purple);font-size:.58rem;color:var(--text2)">
-        ℹ Эмитент «${_escHtml ? _escHtml(iss.name) : iss.name}» на e-disclosure не найден — показаны факты по <strong style="color:var(--purple)">материнской</strong> ИНН ${result._parentInn}${result._parentName ? ' («' + (_escHtml ? _escHtml(result._parentName) : result._parentName) + '»)' : ''}.
-       </div>` : '';
-
-  const existing = document.getElementById('ed-facts-modal');
-  if(existing) existing.remove();
-  const modal = document.createElement('div');
-  modal.id = 'ed-facts-modal';
-  modal.className = 'modal-overlay open';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML = `
-    <div style="background:var(--s1);border:1px solid var(--border2);width:780px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column">
-      <div style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--s2)">
-        <strong>📢 Существенные факты — ${_escHtml ? _escHtml(result.companyName || iss.name) : (result.companyName || iss.name)}</strong>
-        <span style="color:var(--text3);font-size:.58rem">ИНН ${effectiveInn} · e-disclosure id ${result.edId}</span>
-        <button onclick="document.getElementById('ed-facts-modal').remove()" style="margin-left:auto;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer">✕</button>
-      </div>
-      ${parentBanner}
-      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:.6rem">
-        Найдено ${result.events.length} событий, из них категоризировано ${categorized.length}.<br>
-        <div style="margin-top:6px">${countsRow}</div>
-      </div>
-      <div style="overflow-y:auto;flex:1">${rows}</div>
-      <div style="padding:8px 14px;border-top:1px solid var(--border);font-size:.55rem;color:var(--text3)">
-        Альтернативные источники: ${fallbackLinks}
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
 function _peekAttachParent(issId){
