@@ -15910,6 +15910,9 @@ function _moexIssuerMetrics(issId, cache){
     roa:           div(p.np, p.assets),
     ebitdaMargin:  p.ebitda != null ? div(p.ebitda, p.rev) : null,
     ebitMargin:    div(p.ebit, p.rev),
+    currentRatio:  div(p.ca, p.cl),
+    cashRatio:     div(p.cash, p.cl),
+    equityRatio:   div(p.eq, p.assets),
     usedEbit:      p.ebitda == null && p.ebit != null,
     rating:        rating,
     ratingClass:   _moexRatingClass(rating)
@@ -16165,6 +16168,9 @@ function moexApplyFilters(){
     icrMin:  _num(document.getElementById('moex-f-icr-min')?.value),
     roaMin:  _num(document.getElementById('moex-f-roa-min')?.value),
     ebmMin:  _num(document.getElementById('moex-f-ebm-min')?.value),
+    curMin:    _num(document.getElementById('moex-f-cur-min')?.value),
+    cashrMin:  _num(document.getElementById('moex-f-cashr-min')?.value),
+    eqrMin:    _num(document.getElementById('moex-f-eqr-min')?.value),
     ratingMin: document.getElementById('moex-f-rating-min')?.value || '',
     ratingHas: document.getElementById('moex-f-rating-has')?.value || '',
     pctThresh: _num(document.getElementById('moex-f-pct-thresh')?.value),
@@ -16175,6 +16181,7 @@ function moexApplyFilters(){
   // Любой из фундамент-фильтров → подразумевает «только есть в базе».
   const fundActive = f.deMax != null || f.ndeMax != null || f.icrMin != null
                   || f.roaMin != null || f.ebmMin != null
+                  || f.curMin != null || f.cashrMin != null || f.eqrMin != null
                   || f.ratingMin || f.ratingHas;
   const metricsCache = new Map();
   // Перцентили внутри отрасли: строим один раз на apply, если фильтр включён.
@@ -16296,6 +16303,9 @@ function moexApplyFilters(){
       if(f.icrMin != null && (m.icr  == null || m.icr  < f.icrMin)) return false;
       if(f.roaMin != null && (m.roa  == null || m.roa * 100 < f.roaMin)) return false;
       if(f.ebmMin != null && (m.ebitdaMargin == null || m.ebitdaMargin * 100 < f.ebmMin)) return false;
+      if(f.curMin   != null && (m.currentRatio == null || m.currentRatio < f.curMin))    return false;
+      if(f.cashrMin != null && (m.cashRatio    == null || m.cashRatio    < f.cashrMin))  return false;
+      if(f.eqrMin   != null && (m.equityRatio  == null || m.equityRatio * 100 < f.eqrMin)) return false;
       if(f.ratingMin){
         if(_moexRatingRank(m.ratingClass) < _moexRatingRank(f.ratingMin)) return false;
       }
@@ -16337,6 +16347,9 @@ function moexApplyFilters(){
     if(field === 'icr') return m.icr;
     if(field === 'roa') return m.roa;
     if(field === 'ebm') return m.ebitdaMargin;
+    if(field === 'cur')   return m.currentRatio;
+    if(field === 'cashr') return m.cashRatio;
+    if(field === 'eqr')   return m.equityRatio;
     if(field === 'roe' || field === 'dde'){
       // ROE и D/E в metricsCache нет — считаем на лету из reportsDB.
       const iss = reportsDB[b.issId];
@@ -16391,6 +16404,12 @@ function moexApplyFilters(){
     'dde-worst': byMetric('dde', false, true),
     'ebm-best':  byMetric('ebm', true, false),
     'ebm-worst': byMetric('ebm', true, true),
+    'cur-best':  byMetric('cur', true, false),
+    'cur-worst': byMetric('cur', true, true),
+    'cashr-best':byMetric('cashr', true, false),
+    'cashr-worst':byMetric('cashr', true, true),
+    'eqr-best':  byMetric('eqr', true, false),
+    'eqr-worst': byMetric('eqr', true, true),
     // Запас прочности: берём из кэша getStress (считается лениво, если
     // сортировка активна — пробежит по всем бумагам с issId).
     'stress-best': (a, b) => {
@@ -16580,7 +16599,8 @@ function moexResetFilters(){
   ['moex-f-text','moex-f-ytm-min','moex-f-ytm-max','moex-f-mat-min','moex-f-mat-max','moex-f-size-min',
    'moex-f-price-min','moex-f-price-max',
    'moex-f-coupon-min','moex-f-coupon-max',
-   'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min','moex-f-stress-min'].forEach(id => {
+   'moex-f-de-max','moex-f-nde-max','moex-f-icr-min','moex-f-roa-min','moex-f-ebm-min',
+   'moex-f-cur-min','moex-f-cashr-min','moex-f-eqr-min','moex-f-stress-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh','moex-f-base'].forEach(id => {
@@ -17223,15 +17243,15 @@ async function moexPullGirboBulk(updateExisting){
       totalSkipped++;
       continue;
     }
-    // Шаг 2б: отчётность по ИНН. Тянем ИЗ ОБОИХ источников — buxbalans
-    // даёт глубину по старым годам (до 15), ГИР БО — свежий год (ФНС
-    // публикует раньше, чем buxbalans переварит). Без мёржа для недавно
-    // сданных годов (2025 после 31 марта 2026) получался дыр: buxbalans
-    // возвращал 2010-2024 → count>0 → fallback не дёргался, 2025 терялся.
-    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${idx}/${totalInns}: buxbalans+ГИР БО «${meta.name}» (ИНН ${meta.inn})</span>`;
+    // Шаг 2б: buxbalans по ИНН. Только buxbalans — для ГИР БО есть
+    // отдельная кнопка «📡 ГИР БО (обновить всех)». Раньше я объединял
+    // их здесь, но это делало buxbalans-кнопку медленной (x2 запросов)
+    // и путало разделение источников. Если buxbalans не отдал свежий
+    // год — запусти отдельно ГИР БО, он дополнит.
+    if(status) status.innerHTML = `<span style="color:var(--warn)">⏳ ${idx}/${totalInns}: buxbalans «${meta.name}» (ИНН ${meta.inn})</span>`;
     let data = null;
     try {
-      data = await _pullReportBothSources(meta.inn);
+      data = await fetchBuxBalansByInn(meta.inn, 15);
       consecutiveTimeouts = 0;
     } catch(e){
       totalErr++;
@@ -17247,7 +17267,7 @@ async function moexPullGirboBulk(updateExisting){
       continue;
     }
     if(!data || !data.count){
-      errors.push(`${meta.name} (ИНН ${meta.inn}): ни buxbalans, ни ГИР БО не вернули годовых отчётов`);
+      errors.push(`${meta.name} (ИНН ${meta.inn}): buxbalans вернул 0 годовых отчётов`);
       await new Promise(r => setTimeout(r, 150));
       continue;
     }

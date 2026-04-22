@@ -2074,6 +2074,18 @@ document.addEventListener('DOMContentLoaded', () => {
           <label style="font-size:.55rem">EBITDA-маржа ≥, %</label>
           <input type="number" id="moex-f-ebm-min" oninput="moexApplyFilters()" step="1" placeholder="напр. 10">
         </div>
+        <div class="field" style="margin:0" title="Current Ratio = оборотные активы / краткосрочные обязательства. Норма >1.2, критично <1. Отсекает компании у которых активов меньше чем долгов к погашению в ближайший год.">
+          <label style="font-size:.55rem">Current Ratio ≥</label>
+          <input type="number" id="moex-f-cur-min" oninput="moexApplyFilters()" step="0.1" placeholder="напр. 1.2">
+        </div>
+        <div class="field" style="margin:0" title="Cash Ratio = денежные средства / краткосрочные обязательства. Самая строгая ликвидность. Норма >0.2, критично <0.05.">
+          <label style="font-size:.55rem">Cash Ratio ≥</label>
+          <input type="number" id="moex-f-cashr-min" oninput="moexApplyFilters()" step="0.05" placeholder="напр. 0.2">
+        </div>
+        <div class="field" style="margin:0" title="Equity Ratio = собственный капитал / активы, в %. Доля активов, финансируемых своим капиталом. Норма >40%, критично <15%.">
+          <label style="font-size:.55rem">Equity Ratio ≥, %</label>
+          <input type="number" id="moex-f-eqr-min" oninput="moexApplyFilters()" step="5" placeholder="напр. 30">
+        </div>
         <div class="field" style="margin:0" title="Рейтинг берётся из dossier.mod.rating (заполняется вручную в досье эмитента). Шкала: AAA > AA > A > BBB > BB > B > CCC > D.">
           <label style="font-size:.55rem">Рейтинг ≥</label>
           <select id="moex-f-rating-min" onchange="moexApplyFilters()">
@@ -2158,6 +2170,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="dde-worst">D/E (худшие сверху)</option>
             <option value="ebm-best">EBITDA-маржа (лучшие сверху)</option>
             <option value="ebm-worst">EBITDA-маржа (худшие сверху)</option>
+            <option value="cur-best">💧 Current Ratio (лучшие сверху)</option>
+            <option value="cur-worst">💧 Current Ratio (худшие сверху)</option>
+            <option value="cashr-best">💵 Cash Ratio (лучшие сверху)</option>
+            <option value="cashr-worst">💵 Cash Ratio (худшие сверху)</option>
+            <option value="eqr-best">🔷 Equity Ratio (лучшие сверху)</option>
+            <option value="eqr-worst">🔷 Equity Ratio (худшие сверху)</option>
             <option value="stress-best">🛡 Запас прочности ↓ (лучшие сверху)</option>
             <option value="stress-worst">🛡 Запас прочности ↑ (худшие сверху)</option>
             <option value="peer-wide">📊 Спред YTM к отрасли ↓ (широкий сверху = рынок видит риск)</option>
