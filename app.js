@@ -110,7 +110,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','shares','futures'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','shares','futures','archive'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -128,6 +128,7 @@ function showPage(n, opts){
   if(n==='moex') moexInit();
   if(n==='shares') sharesInit();
   if(n==='futures') futuresInit();
+  if(n==='archive') archiveInit();
 }
 
 // Назад: pop из стека, показать без очистки форм (данные сохраняются).
@@ -20048,6 +20049,370 @@ function _futuresRenderTable(list, metricsCache, multiplesCache){
   try { _futuresLoadCache(); _futuresRenderMeta(); } catch(e){}
 })();
 
+// ═════════════════════════════════════════════════════════════════════
+// 🪦 АРХИВ ОБЛИГАЦИЙ — погашенные, дефолтные, приостановленные
+// ─────────────────────────────────────────────────────────────────────
+// Данные берём из того же _moexCatalog. «Мёртвых» отбираем по тем же
+// критериям, что в live-каталоге прячет f.showDead: matYears<0 (погашены),
+// STATUS≠'A' (suspended/не стартовали), issueSize=0 (отменены), NaN matDate.
+// Причина смерти классифицируется _archiveClassify с приоритетами:
+//   1. defaulted  — hasEdDefault в ±365 дней от matDate или
+//                  dossier.mod.defaultHistory === 'default'
+//   2. restructured — dossier.mod.defaultHistory === 'restructure'
+//   3. cancelled  — issueSize === 0
+//   4. pre-launch — STATUS === 'N'
+//   5. suspended  — STATUS === 'S' без сигналов дефолта
+//   6. matured    — всё остальное (нормальное погашение)
+// Никакого нового localStorage — архив живёт поверх _moexCatalog.
+// ═════════════════════════════════════════════════════════════════════
+
+const _ARCH_REASONS = {
+  defaulted:    { icon:'🚨', label:'Дефолт',             color:'var(--danger)', priority: 1 },
+  restructured: { icon:'🔀', label:'Реструктуризация',   color:'var(--warn)',   priority: 2 },
+  suspended:    { icon:'⏸',  label:'Приостановлено',     color:'var(--warn)',   priority: 3 },
+  cancelled:    { icon:'❎', label:'Отменено',           color:'var(--text3)',  priority: 4 },
+  'pre-launch': { icon:'⏳', label:'Не стартовало',      color:'var(--text3)',  priority: 5 },
+  matured:      { icon:'✓',  label:'Погашено',           color:'var(--green)',  priority: 6 },
+};
+
+function _archiveIsDead(b){
+  // Те же правила, что скрытие в moexApplyFilters при showDead=false.
+  if(b.issueSize === 0) return true;
+  if(b.status === 'N' || b.status === 'S') return true;
+  if(b.matYears != null && b.matYears < 0) return true;
+  if(b.matDate && b.matYears != null && !isFinite(b.matYears)) return true;
+  return false;
+}
+
+function _archiveClassify(b){
+  const iss = b.issId ? reportsDB[b.issId] : null;
+  const dossier = iss?.dossier?.mod || {};
+  const edEvents = iss?.edisclosure?.events || [];
+  const defEvents = edEvents.filter(e => e?.category?.key === 'default');
+
+  // Событие дефолта рядом с matDate (окно ±365 дней) — сильный сигнал.
+  const matT = b.matDate ? new Date(b.matDate).getTime() : null;
+  const WIN = 365 * 86400000;
+  const nearDefault = matT && defEvents.some(e => {
+    const t = e.date ? new Date(e.date).getTime() : 0;
+    return t && Math.abs(t - matT) < WIN;
+  });
+  const anyDefault = defEvents.length > 0;
+
+  if(dossier.defaultHistory === 'default' || nearDefault) return 'defaulted';
+  if(b.status === 'S' && anyDefault) return 'defaulted';
+  if(dossier.defaultHistory === 'restructure') return 'restructured';
+  if(b.issueSize === 0) return 'cancelled';
+  if(b.status === 'N') return 'pre-launch';
+  if(b.status === 'S') return 'suspended';
+  return 'matured';
+}
+
+function archiveInit(){
+  // Архив питается кэшем бондов — если пустой, попросим сначала обновить.
+  const cat = window._moexCatalog;
+  const filtersCard = document.getElementById('arch-filters-card');
+  const tableCard   = document.getElementById('arch-table-card');
+  const meta        = document.getElementById('arch-meta');
+  const sb          = document.getElementById('sb-archive');
+  if(!cat || !Array.isArray(cat.items) || !cat.items.length){
+    if(meta) meta.textContent = 'Кэш облигаций пуст — открой «🏛 Каталог облигаций» и нажми «📡 Обновить каталог».';
+    if(filtersCard) filtersCard.style.display = 'none';
+    if(tableCard) tableCard.style.display = 'none';
+    if(sb) sb.textContent = '0';
+    document.getElementById('arch-reasons').innerHTML = '';
+    document.getElementById('arch-industry-table').innerHTML = '';
+    return;
+  }
+  _archivePopulateIndustryFilter();
+  archiveApplyFilters();
+}
+
+// Заполняем dropdown отраслей из window._industryData (если загружено) + «Все».
+function _archivePopulateIndustryFilter(){
+  const sel = document.getElementById('arch-f-industry');
+  if(!sel || sel.options.length > 1) return;
+  sel.innerHTML = '<option value="">Все</option>';
+  const data = window._industryData?.industries || {};
+  const entries = Object.entries(data).sort((a,b) => (a[1].label||a[0]).localeCompare(b[1].label||b[0], 'ru'));
+  for(const [key, ind] of entries){
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = ind.label || key;
+    sel.appendChild(opt);
+  }
+  // Отдельная опция для тех, у кого эмитент не в отраслях.
+  const opt = document.createElement('option');
+  opt.value = '__none__'; opt.textContent = '(нет отрасли)';
+  sel.appendChild(opt);
+}
+
+function archiveResetFilters(){
+  ['arch-f-text'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['arch-f-reason','arch-f-industry','arch-f-age','arch-sort'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  const db = document.getElementById('arch-f-indb'); if(db) db.checked = false;
+  const sort = document.getElementById('arch-sort'); if(sort) sort.value = 'mat-desc';
+  archiveApplyFilters();
+}
+
+// Вся выборка мёртвых с обогащением issId, industryKey, reason — за один проход.
+function _archiveCollect(){
+  const cat = window._moexCatalog;
+  if(!cat || !Array.isArray(cat.items)) return [];
+  const issIdx = _moexBuildIssuerIndex();
+  const today = Date.now();
+  const out = [];
+  for(const b of cat.items){
+    const matY = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
+    const enriched = { ...b, matYears: matY };
+    if(!_archiveIsDead(enriched)) continue;
+    enriched.issId = _moexMatchIssuer(enriched, issIdx);
+    const iss = enriched.issId ? reportsDB[enriched.issId] : null;
+    enriched.industryKey = iss?.inn ? _industryKeyForInn(iss.inn) : null;
+    enriched.reason = _archiveClassify(enriched);
+    out.push(enriched);
+  }
+  return out;
+}
+
+function archiveApplyFilters(){
+  const filtersCard = document.getElementById('arch-filters-card');
+  const tableCard   = document.getElementById('arch-table-card');
+  const reasonsBox  = document.getElementById('arch-reasons');
+  const indBox      = document.getElementById('arch-industry-table');
+  const sb          = document.getElementById('sb-archive');
+
+  const all = _archiveCollect();
+  if(sb) sb.textContent = String(all.length);
+  document.getElementById('arch-meta').textContent = `Всего мёртвых в кэше: ${all.length}`;
+
+  if(!all.length){
+    if(filtersCard) filtersCard.style.display = 'none';
+    if(tableCard) tableCard.style.display = 'none';
+    if(reasonsBox) reasonsBox.innerHTML = '<span style="color:var(--text3)">Мёртвых бумаг в кэше не нашлось.</span>';
+    if(indBox) indBox.innerHTML = '';
+    return;
+  }
+  if(filtersCard) filtersCard.style.display = '';
+  if(tableCard) tableCard.style.display = '';
+
+  // Сводка по причинам — всегда по полному набору (игнорируем фильтры).
+  const byReason = {};
+  for(const k of Object.keys(_ARCH_REASONS)) byReason[k] = 0;
+  for(const b of all) byReason[b.reason] = (byReason[b.reason] || 0) + 1;
+  if(reasonsBox){
+    const sorted = Object.entries(_ARCH_REASONS).sort((a,b) => a[1].priority - b[1].priority);
+    reasonsBox.innerHTML = sorted.map(([k, meta]) => {
+      const n = byReason[k] || 0;
+      const pct = all.length ? Math.round(n / all.length * 100) : 0;
+      const dim = n === 0 ? 'opacity:.4' : '';
+      return `<div style="padding:6px 10px;border:1px solid ${meta.color};background:var(--bg);${dim};cursor:pointer" onclick="document.getElementById('arch-f-reason').value='${k}';archiveApplyFilters()" title="Кликни — отфильтровать">
+        <div style="color:${meta.color};font-weight:600;font-size:.68rem">${meta.icon} ${meta.label}</div>
+        <div style="color:var(--text);font-family:var(--mono);font-size:.7rem;margin-top:2px">${n}<span style="font-size:.5rem;color:var(--text3)"> · ${pct}%</span></div>
+      </div>`;
+    }).join('');
+  }
+
+  // Сводка по отраслям — сколько дефолтов в каждой (чтобы видеть «грязные»).
+  if(indBox){
+    const defByInd = {}; // industryKey -> {def, total}
+    for(const b of all){
+      const k = b.industryKey || '__none__';
+      if(!defByInd[k]) defByInd[k] = { def: 0, total: 0 };
+      defByInd[k].total++;
+      if(b.reason === 'defaulted') defByInd[k].def++;
+    }
+    const indData = window._industryData?.industries || {};
+    const rows = Object.entries(defByInd)
+      .filter(([, v]) => v.def > 0)
+      .sort((a, b) => b[1].def - a[1].def)
+      .slice(0, 8)
+      .map(([k, v]) => {
+        const label = k === '__none__' ? '(нет отрасли)' : (indData[k]?.label || k);
+        const rate = v.total ? Math.round(v.def / v.total * 100) : 0;
+        return `<span style="color:var(--danger);margin-right:12px">${_escHtml(label)}: <b>${v.def}</b>/${v.total} <span style="color:var(--text3)">(${rate}%)</span></span>`;
+      }).join('');
+    indBox.innerHTML = rows ? `<div style="margin-top:4px">Дефолты по отраслям (топ-8): ${rows}</div>` : '';
+  }
+
+  // Фильтры.
+  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const vc = id => { const el = document.getElementById(id); return el && el.checked; };
+  const f = {
+    text: v('arch-f-text').toLowerCase(),
+    reason: v('arch-f-reason'),
+    industry: v('arch-f-industry'),
+    age: v('arch-f-age') ? parseFloat(v('arch-f-age')) : null,
+    onlyInDb: vc('arch-f-indb'),
+    sort: v('arch-sort') || 'mat-desc',
+  };
+
+  const today = Date.now();
+  const filtered = all.filter(b => {
+    if(f.text){
+      const iss = b.issId ? reportsDB[b.issId] : null;
+      const hay = (b.secid + ' ' + (b.shortName||'') + ' ' + (b.secName||'') + ' ' + b.isin + ' ' + (b.issuer||'') + ' ' + (iss?.name||'')).toLowerCase();
+      if(!hay.includes(f.text)) return false;
+    }
+    if(f.reason && b.reason !== f.reason) return false;
+    if(f.industry){
+      if(f.industry === '__none__'){
+        if(b.industryKey) return false;
+      } else if(b.industryKey !== f.industry) return false;
+    }
+    if(f.age != null){
+      if(!b.matDate) return false;
+      const yearsAgo = (today - new Date(b.matDate).getTime()) / (365.25 * 86400000);
+      if(!isFinite(yearsAgo) || yearsAgo < 0 || yearsAgo > f.age) return false;
+    }
+    if(f.onlyInDb && !b.issId) return false;
+    return true;
+  });
+
+  const sortFns = {
+    'mat-desc': (a,b) => (b.matDate||'').localeCompare(a.matDate||''),
+    'mat-asc':  (a,b) => (a.matDate||'').localeCompare(b.matDate||''),
+    'reason':   (a,b) => (_ARCH_REASONS[a.reason]?.priority || 99) - (_ARCH_REASONS[b.reason]?.priority || 99),
+    'industry': (a,b) => String(a.industryKey||'~').localeCompare(String(b.industryKey||'~'), 'ru'),
+    'size-desc':(a,b) => ((b.issueSize||0) * (b.faceValue||0)) - ((a.issueSize||0) * (a.faceValue||0)),
+    'issuer':   (a,b) => {
+      const an = a.issId ? (reportsDB[a.issId]?.name||'') : (a.issuer||'');
+      const bn = b.issId ? (reportsDB[b.issId]?.name||'') : (b.issuer||'');
+      return an.localeCompare(bn, 'ru');
+    },
+  };
+  const sorted = [...filtered].sort(sortFns[f.sort] || sortFns['mat-desc']);
+  const cnt = document.getElementById('arch-count');
+  if(cnt) cnt.textContent = `${sorted.length} из ${all.length}`;
+
+  _archiveRenderTable(sorted);
+  window._archiveFilteredCache = sorted;
+}
+
+function _archiveRenderTable(list){
+  const box = document.getElementById('arch-table');
+  if(!box) return;
+  if(!list.length){
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:.65rem">По фильтрам ничего нет.</div>';
+    return;
+  }
+  const limit = 500;
+  const shown = list.slice(0, limit);
+  const moreHint = list.length > limit
+    ? `<div style="padding:8px 10px;font-size:.58rem;color:var(--text3);background:var(--s2)">Показано первых ${limit} из ${list.length}.</div>` : '';
+  const today = Date.now();
+  const indData = window._industryData?.industries || {};
+  let html = `${moreHint}<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--s2);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
+      <th style="padding:6px 8px;text-align:left">Бумага</th>
+      <th style="padding:6px 8px;text-align:left">Эмитент</th>
+      <th style="padding:6px 8px;text-align:left">Отрасль</th>
+      <th style="padding:6px 8px;text-align:left">Причина</th>
+      <th style="padding:6px 8px;text-align:right">Погашение</th>
+      <th style="padding:6px 8px;text-align:right">Лет назад</th>
+      <th style="padding:6px 8px;text-align:right">Объём, млн ₽</th>
+      <th style="padding:6px 8px;text-align:center">События ED</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead><tbody>`;
+  for(const b of shown){
+    const meta = _ARCH_REASONS[b.reason] || _ARCH_REASONS.matured;
+    const iss = b.issId ? reportsDB[b.issId] : null;
+    const issName = iss?.name || b.issuer || '';
+    const indLabel = b.industryKey ? (indData[b.industryKey]?.label || b.industryKey) : '<span style="color:var(--text3)">—</span>';
+    const sizeM = (b.issueSize && b.faceValue) ? Math.round(b.issueSize * b.faceValue / 1e6) : null;
+    const sizeStr = sizeM != null ? sizeM.toLocaleString('ru-RU') : '—';
+    const matStr = b.matDate || '—';
+    const yearsAgo = b.matDate ? (today - new Date(b.matDate).getTime()) / (365.25 * 86400000) : null;
+    const yearsAgoStr = yearsAgo != null && isFinite(yearsAgo) ? yearsAgo.toFixed(1) : '—';
+
+    // События из e-disclosure: сколько критичных + ссылки на дефолтные.
+    let edStr = '—';
+    if(iss?.edisclosure?.events?.length){
+      const defCount = iss.edisclosure.events.filter(e => e?.category?.key === 'default').length;
+      const total = iss.edisclosure.events.length;
+      if(defCount > 0){
+        edStr = `<span style="color:var(--danger);font-weight:600" title="Всего событий: ${total}, из них критичных (дефолт/просрочка): ${defCount}">🚨 ${defCount}</span>`;
+      } else {
+        edStr = `<span style="color:var(--text3)" title="Всего событий: ${total}">${total}</span>`;
+      }
+    }
+
+    const actions = b.issId
+      ? `<button class="btn btn-sm" onclick="moexOpenIssuerPeek('${b.issId}')" title="Мини-профиль эмитента" style="padding:2px 6px;font-size:.54rem">👁</button>
+         <button class="btn btn-sm" onclick="moexOpenInReports('${b.issId}')" title="Открыть в базе отчётности" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📂</button>`
+      : '';
+
+    html += `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+      <td style="padding:5px 8px">
+        <div style="font-weight:600;color:var(--text);font-family:var(--mono)">${b.secid}</div>
+        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${b.isin}</div>
+      </td>
+      <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">${_escHtml(issName)}</td>
+      <td style="padding:5px 8px;color:var(--text3);font-size:.54rem">${typeof indLabel === 'string' ? _escHtml(indLabel) : indLabel}</td>
+      <td style="padding:5px 8px">
+        <span style="color:${meta.color};font-weight:600;font-family:var(--mono);font-size:.58rem">${meta.icon} ${meta.label}</span>
+      </td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text2);font-size:.58rem">${matStr}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text3);font-size:.58rem">${yearsAgoStr}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${sizeStr}</td>
+      <td style="padding:5px 8px;text-align:center;font-family:var(--mono)">${edStr}</td>
+      <td style="padding:5px 8px;text-align:right;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+// Экспорт в CSV: secid, isin, issuer, industry, reason, matDate, yearsAgo, sizeM, defaultEvents.
+// Формат уже пригоден для R/Python (survival analysis): колонка reason =
+// тип события, matDate = время, issuer = group, industry = covariate.
+function archiveExportCsv(){
+  const list = window._archiveFilteredCache || [];
+  if(!list.length){ alert('Выборка пуста.'); return; }
+  const indData = window._industryData?.industries || {};
+  const today = Date.now();
+  const escape = s => {
+    if(s == null) return '';
+    const str = String(s);
+    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  };
+  const rows = [[
+    'secid','isin','issuer','inn','industry','reason','matDate','yearsAgo','sizeMln','defaultEventsCount','status'
+  ]];
+  for(const b of list){
+    const iss = b.issId ? reportsDB[b.issId] : null;
+    const defCount = iss?.edisclosure?.events?.filter(e => e?.category?.key === 'default').length || 0;
+    const sizeM = (b.issueSize && b.faceValue) ? Math.round(b.issueSize * b.faceValue / 1e6) : '';
+    const yearsAgo = b.matDate ? ((today - new Date(b.matDate).getTime()) / (365.25 * 86400000)).toFixed(2) : '';
+    rows.push([
+      b.secid, b.isin, iss?.name || b.issuer || '', iss?.inn || '',
+      b.industryKey ? (indData[b.industryKey]?.label || b.industryKey) : '',
+      b.reason, b.matDate || '', yearsAgo, sizeM, defCount, b.status || ''
+    ]);
+  }
+  const csv = rows.map(r => r.map(escape).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `archive-bonds-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Bootstrap: сразу обновить счётчик в сайдбаре после загрузки MOEX-кэша.
+(function _archiveBootstrap(){
+  try {
+    if(window._moexCatalog && Array.isArray(window._moexCatalog.items)){
+      const dead = window._moexCatalog.items.filter(b => {
+        const matY = b.matDate ? (new Date(b.matDate).getTime() - Date.now()) / (365.25 * 86400000) : null;
+        return _archiveIsDead({ ...b, matYears: matY });
+      }).length;
+      const sb = document.getElementById('sb-archive');
+      if(sb) sb.textContent = String(dead);
+    }
+  } catch(e){}
+})();
+
 // Восстановление последнего открытого раздела при загрузке страницы.
 // Сохраняется в showPage() в 'ba_active_page'. Дефолт — 'ytm' (как и было).
 // Стартуем после DOMContentLoaded, чтобы все элементы уже существовали,
@@ -20056,7 +20421,7 @@ function _futuresRenderTable(list, metricsCache, multiplesCache){
   const run = () => {
     try {
       const saved = localStorage.getItem('ba_active_page');
-      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex','shares','futures'];
+      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex','shares','futures','archive'];
       if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
         showPage(saved);
       }

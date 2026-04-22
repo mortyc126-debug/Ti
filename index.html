@@ -352,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn" onclick="showPage('cross')">📊 Сравнение</button>
     <button class="nav-btn nav-sep" onclick="showPage('shares')">📈 Акции</button>
     <button class="nav-btn" onclick="showPage('futures')">📉 Фьючерсы</button>
+    <button class="nav-btn" onclick="showPage('archive')">🪦 Архив</button>
   </nav>
   <div class="topbar-right">
     <span class="pulse-dot"></span>
@@ -375,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-item" onclick="showPage('moex');sbAct(this)" title="Каталог всех торгуемых на Мосбирже облигаций — ОФЗ, корпораты, субфеды, ВДО. Фильтры, которых нет в самой MOEX."><span class="sb-icon">🏛</span>Каталог облигаций<span class="sb-badge" id="sb-moex">0</span></div>
     <div class="sb-item" onclick="showPage('shares');sbAct(this)" title="Каталог акций MOEX. Режим TQBR. P/E, P/B, Кап-ция считаются на лету из reportsDB, плюс все те же фундаментал-фильтры что и у облигаций."><span class="sb-icon">📈</span>Каталог акций<span class="sb-badge" id="sb-shares">0</span></div>
     <div class="sb-item" onclick="showPage('futures');sbAct(this)" title="Фьючерсы FORTS на акции. Каждый фьюч привязан к базовой акции (SBRF→SBER, GAZR→GAZP…), через неё — к эмитенту в reportsDB: мультипликаторы и фундаментал. Мосбиржа ограничивает торги фьючерсами на санкционных бумагах, но все котируемые (Si, BR, индексы и акции) собираем."><span class="sb-icon">📉</span>Фьючерсы на акции<span class="sb-badge" id="sb-futures">0</span></div>
+    <div class="sb-item" onclick="showPage('archive');sbAct(this)" title="Кладбище облигаций: погашенные, приостановленные, дефолтные, отменённые выпуски. Источник — тот же MOEX-кэш. Причина «смерти» классифицируется автоматически с учётом раскрытий из e-disclosure и истории дефолтов в досье эмитента. Основа для survival-анализа и моделирования дефолтов по отраслям."><span class="sb-icon">🪦</span>Архив облигаций<span class="sb-badge" id="sb-archive">0</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -2507,6 +2509,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <div class="card" id="fut-table-card" style="display:none;margin-top:12px">
     <div id="fut-table" style="overflow-x:auto;font-size:.64rem"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ПАГА АРХИВА ═══════════════════════════ -->
+<div class="page" id="page-archive">
+  <div class="page-title">🪦 Архив облигаций</div>
+  <div class="page-sub">Погашенные, дефолтные, приостановленные и отменённые выпуски из MOEX-кэша. Причина «смерти» определяется автоматически: STATUS, matDate, issueSize + раскрытия e-disclosure и история дефолтов из досье. База для анализа «кто доехал до погашения, а кто свалился».</div>
+
+  <div class="card">
+    <div class="card-hdr">
+      📊 Распределение по причинам смерти
+      <span id="arch-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
+    </div>
+    <div id="arch-reasons" style="padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;font-size:.62rem"></div>
+    <div id="arch-industry-table" style="padding:0 12px 10px;font-size:.58rem;color:var(--text3)"></div>
+  </div>
+
+  <div class="card" id="arch-filters-card" style="display:none;margin-top:12px">
+    <div class="card-hdr">🎯 Фильтры <span id="arch-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Поиск (тикер / ISIN / эмитент)</label>
+        <input type="text" id="arch-f-text" oninput="archiveApplyFilters()" placeholder="RU000A, ТГК, Ивановский…">
+      </div>
+      <div class="field" style="margin:0" title="Дефолт — эмитент не исполнил обязательства (по e-disclosure или ручной отметке в досье). Реструктуризация — условия изменены. Suspended — торги приостановлены ЦБ/биржей. Погашен — нормальная редимпшн. Отменён — issueSize=0. Не стартовал — STATUS=N.">
+        <label style="font-size:.55rem">Причина смерти</label>
+        <select id="arch-f-reason" onchange="archiveApplyFilters()">
+          <option value="">Все</option>
+          <option value="defaulted">🚨 Дефолт</option>
+          <option value="restructured">🔀 Реструктуризация</option>
+          <option value="suspended">⏸ Приостановлено</option>
+          <option value="matured">✓ Погашено нормально</option>
+          <option value="cancelled">❎ Отменено (issueSize=0)</option>
+          <option value="pre-launch">⏳ Не стартовало</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Отрасль</label>
+        <select id="arch-f-industry" onchange="archiveApplyFilters()"></select>
+      </div>
+      <div class="field" style="margin:0" title="Сколько лет назад произошло событие (погашение / дефолт / suspend).">
+        <label style="font-size:.55rem">Возраст события</label>
+        <select id="arch-f-age" onchange="archiveApplyFilters()">
+          <option value="">Любой</option>
+          <option value="1">≤ 1 года</option>
+          <option value="3">≤ 3 лет</option>
+          <option value="5">≤ 5 лет</option>
+          <option value="10">≤ 10 лет</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0" title="Только бумаги, у которых эмитент есть в reportsDB — для них можно посмотреть фундаментал и события.">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="arch-f-indb" onchange="archiveApplyFilters()" style="margin:0"> Только «эмитент в базе»
+        </label>
+      </div>
+    </div>
+    <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="archiveResetFilters()">🧹 Сбросить</button>
+      <button class="btn btn-sm" onclick="archiveExportCsv()" title="Экспорт выборки в CSV для survival-анализа в R/Python">📊 Экспорт CSV</button>
+      <div style="flex:1"></div>
+      <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
+        Сортировка:
+        <select id="arch-sort" onchange="archiveApplyFilters()" style="font-size:.65rem;padding:2px 4px">
+          <option value="mat-desc">Дата погашения ↓ (недавние сверху)</option>
+          <option value="mat-asc">Дата погашения ↑ (старые сверху)</option>
+          <option value="reason">По причине</option>
+          <option value="industry">По отрасли</option>
+          <option value="size-desc">По размеру выпуска ↓</option>
+          <option value="issuer">По эмитенту</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" id="arch-table-card" style="display:none;margin-top:12px">
+    <div id="arch-table" style="overflow-x:auto;font-size:.64rem"></div>
   </div>
 </div>
 
