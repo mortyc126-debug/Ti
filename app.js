@@ -2480,6 +2480,85 @@ async function indResetSeed(){
 
 // Сброс пользовательских правок + пересчёт iss.ind у всех эмитентов
 // reportsDB по новому классификатору _okvedToIndustry. Отрасли, которые
+// Удаляет из reportsDB периоды, где ВСЕ числовые поля пустые (null/undefined/0).
+// Такие «пустышки» появляются после неудачных импортов и блокируют
+// повторную подтяжку: bulk видит запись и пропускает как существующую,
+// хотя данных в ней нет. Проходит по всем эмитентам, считает, запрашивает
+// подтверждение перед удалением.
+function repCleanEmptyPeriods(){
+  const numFields = ['rev','ebitda','ebit','np','int','tax','assets','ca','cl','debt','cash','ret','eq'];
+  const isEmpty = p => {
+    if(!p) return true;
+    for(const f of numFields){
+      const v = p[f];
+      if(v != null && v !== 0 && isFinite(v)) return false;
+    }
+    return true;
+  };
+  const toRemove = []; // [{issId, issName, pkey, pyear}]
+  for(const [issId, iss] of Object.entries(reportsDB || {})){
+    if(!iss || !iss.periods) continue;
+    for(const [pkey, p] of Object.entries(iss.periods)){
+      if(isEmpty(p)) toRemove.push({ issId, issName: iss.name || '(без имени)', pkey, pyear: p?.year });
+    }
+  }
+  if(!toRemove.length){ alert('Пустых периодов не найдено.'); return; }
+  // Группируем для превью
+  const byIss = {};
+  for(const r of toRemove){ (byIss[r.issName] = byIss[r.issName] || []).push(r.pkey); }
+  const lines = Object.entries(byIss).slice(0, 15).map(([name, keys]) => `• ${name}: ${keys.join(', ')}`);
+  const more = Object.entries(byIss).length > 15 ? `\n...и ещё ${Object.entries(byIss).length - 15} эмитентов` : '';
+  if(!confirm(`Найдено пустых периодов: ${toRemove.length} у ${Object.keys(byIss).length} эмитентов.\n\nПримеры:\n${lines.join('\n')}${more}\n\nУдалить?`)) return;
+  for(const r of toRemove){
+    const iss = reportsDB[r.issId];
+    if(iss && iss.periods) delete iss.periods[r.pkey];
+  }
+  save();
+  if(typeof repRenderIssuerList === 'function') repRenderIssuerList();
+  if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+  alert(`✓ Удалено ${toRemove.length} пустых периодов у ${Object.keys(byIss).length} эмитентов.\n\nТеперь bulk-обновление сможет переcкачать их заново.`);
+}
+
+// Диагностика: запрашивает ИНН и тянет отчётность с buxbalans + ГИР БО,
+// показывает что вернулось (годы, ОКВЭД, название) в alert. Нужно для
+// отладки когда bulk не добавляет периоды и неясно где ломается —
+// источник, прокси, парсер или merge в reportsDB.
+async function repDiagnoseInn(){
+  const inn = prompt('Введите ИНН эмитента (10 или 12 цифр) для диагностики:', '');
+  if(!inn) return;
+  const clean = String(inn).trim();
+  if(!/^\d{10}(\d{2})?$/.test(clean)){ alert('ИНН должен быть 10 или 12 цифр.'); return; }
+  alert(`⏳ Запрос buxbalans + ГИР БО по ИНН ${clean}…\n(окно подтверждения закрой — через несколько секунд появится результат)`);
+  let r = null, err = null;
+  try { r = await _pullReportBothSources(clean); } catch(e){ err = e; }
+  if(err){ alert(`❌ Ошибка: ${err.message}`); return; }
+  if(!r || !r.count){
+    alert(`❌ Оба источника вернули пусто для ИНН ${clean}.\n\nВарианты:\n• Прокси недоступен (проверь в «⚡ Sync» → «📡 ГИР БО — прокси»)\n• Компания под ИНН не найдена\n• buxbalans / ГИР БО временно недоступны`);
+    return;
+  }
+  const years = Object.keys(r.series || {}).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort();
+  // Существует ли эмитент с этим ИНН в reportsDB
+  let existingId = null;
+  for(const [id, iss] of Object.entries(reportsDB || {})){
+    if(iss && String(iss.inn || '') === clean){ existingId = id; break; }
+  }
+  const existing = existingId ? reportsDB[existingId] : null;
+  const existingYears = existing && existing.periods
+    ? Object.keys(existing.periods).map(k => (k.match(/\d{4}/)||[''])[0]).filter(Boolean).sort().join(',')
+    : '—';
+  const parts = [
+    `✓ ИНН ${clean}`,
+    `Компания: ${r.company || '(нет имени)'}`,
+    `ОКВЭД: ${r.okved || '—'}${r.okvedName ? ' · ' + r.okvedName : ''}`,
+    `Годы из источников: ${years.join(', ') || '—'} (${years.length})`,
+    ``,
+    existing
+      ? `В reportsDB уже есть: «${existing.name}» (id ${existingId})\nЕго периоды: ${existingYears}\nОтрасль: ${existing.ind || '—'}`
+      : 'В reportsDB ещё нет — bulk создаст новую запись при первом успешном пулле.',
+  ];
+  alert(parts.join('\n'));
+}
+
 // пользователь проставил ВРУЧНУЮ (iss.indManual=true), не трогаем.
 // Эмитенты без ОКВЭД остаются как есть — запусти «📡 ГИР БО (обновить
 // всех)» чтобы подтянуть код.

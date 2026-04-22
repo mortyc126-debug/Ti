@@ -1266,6 +1266,10 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="page" id="page-reports">
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+    <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую.">🧹 Удалить пустые периоды</button>
+    <button class="btn btn-sm" onclick="repDiagnoseInn()" title="Запросить отчётность с buxbalans и ГИР БО по ИНН и показать что найдено — годы, ОКВЭД, название. Полезно когда bulk не обновляет конкретного эмитента и надо понять где ломается.">🔍 Диагностика по ИНН</button>
+  </div>
 
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
   <!-- Sidebar со списком эмитентов: постоянно виден, с поиском, сортировкой
