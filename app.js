@@ -1560,7 +1560,7 @@ async function fetchBuxBalansByInn(inn, maxYears = 15){
   const clean = String(inn).trim();
   const url = _buxBalansMakeUrl('/' + clean + '.html');
   const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  const to = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+  const to = ctrl ? setTimeout(() => ctrl.abort(), 25000) : null;
   let html;
   try {
     const r = await fetch(url, {headers: {'Accept': 'text/html,*/*'}, signal: ctrl ? ctrl.signal : undefined});
