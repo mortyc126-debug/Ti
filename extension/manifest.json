@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "БондАналитик: сбор раскрытий",
+  "version": "1.0.0",
+  "description": "Собирает существенные факты с e-disclosure.ru и копирует JSON в буфер обмена для импорта в БондАналитик.",
+  "permissions": ["activeTab", "clipboardWrite"],
+  "host_permissions": ["*://*.e-disclosure.ru/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.e-disclosure.ru/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
