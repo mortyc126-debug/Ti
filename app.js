@@ -6336,6 +6336,13 @@ function repCalcRatios(d){
   if(d.np&&d.rev) r.npm = (d.np/d.rev*100).toFixed(1);
   if(d.ebitda&&d.rev) r.ebitdam = (d.ebitda/d.rev*100).toFixed(1);
   if(d.eq&&d.assets) r.eqr = (d.eq/d.assets*100).toFixed(1);
+  // Дополнительные метрики платёжеспособности/ликвидности:
+  // Cash Ratio — самая строгая ликвидность (только кеш / краткосрочка)
+  if(d.cash != null && d.cl) r.cashR = (d.cash/d.cl).toFixed(2);
+  // Working Capital — оборотные минус краткосрочные, в млрд ₽
+  if(d.ca != null && d.cl != null) r.wc = (d.ca - d.cl).toFixed(2);
+  // Debt Ratio — доля финансового долга в активах
+  if(d.debt != null && d.assets) r.debtR = (d.debt/d.assets*100).toFixed(1);
   return r;
 }
 
@@ -6357,6 +6364,9 @@ const _CROSS_METRICS = [
   {k:'ndE',     l:'ND / EBITDA',               unit:'x',    higher:false, calc:d => (d.ebitda && d.debt != null && d.cash != null) ? (d.debt - d.cash)/d.ebitda : null},
   {k:'icr',     l:'ICR (EBITDA / %проц.)',     unit:'x',    higher:true,  calc:d => (d.ebitda && d.int) ? d.ebitda/d.int : null},
   {k:'cur',     l:'Current Ratio (CA / CL)',   unit:'x',    higher:true,  calc:d => (d.ca && d.cl) ? d.ca/d.cl : null},
+  {k:'cashR',   l:'Cash Ratio (Cash / CL)',    unit:'x',    higher:true,  calc:d => (d.cash != null && d.cl) ? d.cash/d.cl : null},
+  {k:'wc',      l:'Working Capital, млрд ₽',   unit:'млрд', higher:true,  calc:d => (d.ca != null && d.cl != null) ? (d.ca - d.cl) : null},
+  {k:'debtR',   l:'Debt Ratio (Долг / Активы), %', unit:'%', higher:false, calc:d => (d.debt != null && d.assets) ? d.debt/d.assets*100 : null},
   {k:'eqr',     l:'Equity Ratio, %',           unit:'%',    higher:true,  calc:d => (d.eq && d.assets) ? d.eq/d.assets*100 : null},
   {k:'roa',     l:'ROA (ЧП / Активы), %',      unit:'%',    higher:true,  calc:d => (d.np != null && d.assets) ? d.np/d.assets*100 : null},
   {k:'roe',     l:'ROE (ЧП / Капитал), %',     unit:'%',    higher:true,  calc:d => (d.np != null && d.eq) ? d.np/d.eq*100 : null},
@@ -7064,7 +7074,12 @@ function _repCalcMultipliers(iss){
   const de   = (p.debt != null && p.ebit != null && (p.debt > 0 || p.ebit > 0)) ? (p.debt || 0) / ((p.ebitda != null ? p.ebitda : p.ebit)) : null;
   const icr  = (p.ebit != null && p.int && p.int > 0) ? p.ebit / p.int : null;
   const dde  = (p.debt != null && p.eq && p.eq > 0) ? p.debt / p.eq : null;
-  return { year: lp.year, roe, de, icr, dde, rev: p.rev, np: p.np, assets: p.assets };
+  const cur  = (p.ca && p.cl) ? p.ca / p.cl : null;
+  const cashR= (p.cash != null && p.cl) ? p.cash / p.cl : null;
+  const wc   = (p.ca != null && p.cl != null) ? (p.ca - p.cl) : null;
+  const debtR= (p.debt != null && p.assets) ? p.debt / p.assets : null;
+  const eqr  = (p.eq != null && p.assets) ? p.eq / p.assets : null;
+  return { year: lp.year, roe, de, icr, dde, cur, cashR, wc, debtR, eqr, rev: p.rev, np: p.np, assets: p.assets };
 }
 
 function _repFormatMult(val, kind){
@@ -7995,7 +8010,10 @@ function repRenderCards(p){
   const ratioCards = [
     ratios.ndE!=null ? repRatioCard('ND/EBITDA', ratios.ndE+'x', parseFloat(ratios.ndE)<2?'var(--green)':parseFloat(ratios.ndE)<4?'var(--warn)':'var(--danger)', 'Долговая нагрузка') : '',
     ratios.icr!=null ? repRatioCard('ICR (покр. %)', ratios.icr+'x', parseFloat(ratios.icr)>3?'var(--green)':parseFloat(ratios.icr)>1.5?'var(--warn)':'var(--danger)', 'EBITDA / проценты') : '',
-    ratios.cur!=null ? repRatioCard('Current Ratio', ratios.cur+'x', parseFloat(ratios.cur)>1.2?'var(--green)':parseFloat(ratios.cur)>0.8?'var(--warn)':'var(--danger)', 'Ликвидность') : '',
+    ratios.cur!=null ? repRatioCard('Current Ratio', ratios.cur+'x', parseFloat(ratios.cur)>1.2?'var(--green)':parseFloat(ratios.cur)>0.8?'var(--warn)':'var(--danger)', 'Ликвидность (ОА/КО)') : '',
+    ratios.cashR!=null ? repRatioCard('Cash Ratio', ratios.cashR+'x', parseFloat(ratios.cashR)>0.2?'var(--green)':parseFloat(ratios.cashR)>0.05?'var(--warn)':'var(--danger)', 'Абс. ликвидность (Cash/КО)') : '',
+    ratios.wc!=null ? repRatioCard('Working Capital', ratios.wc+' млрд', parseFloat(ratios.wc)>0?'var(--green)':'var(--danger)', 'Оборотные − краткосрочные') : '',
+    ratios.debtR!=null ? repRatioCard('Debt Ratio', ratios.debtR+'%', parseFloat(ratios.debtR)<40?'var(--green)':parseFloat(ratios.debtR)<60?'var(--warn)':'var(--danger)', 'Долг / Активы') : '',
     ratios.npm!=null ? repRatioCard('Чист. маржа', ratios.npm+'%', parseFloat(ratios.npm)>10?'var(--green)':parseFloat(ratios.npm)>0?'var(--warn)':'var(--danger)', 'Чист. прибыль / Выручка') : '',
     ratios.ebitdam!=null ? repRatioCard('EBITDA маржа', ratios.ebitdam+'%', parseFloat(ratios.ebitdam)>20?'var(--green)':parseFloat(ratios.ebitdam)>10?'var(--warn)':'var(--danger)', 'EBITDA / Выручка') : '',
     ratios.eqr!=null ? repRatioCard('Equity Ratio', ratios.eqr+'%', parseFloat(ratios.eqr)>40?'var(--green)':parseFloat(ratios.eqr)>20?'var(--warn)':'var(--danger)', 'Капитал / Активы') : '',
@@ -8147,6 +8165,9 @@ function repRenderCharts(iss){
       ratioRow('ND/EBITDA',      ra.ndE,    rb.ndE,    'x', false),
       ratioRow('ICR (покрытие)', ra.icr,    rb.icr,    'x', true),
       ratioRow('Current Ratio',  ra.cur,    rb.cur,    'x', true),
+      ratioRow('Cash Ratio',     ra.cashR,  rb.cashR,  'x', true),
+      ratioRow('Working Capital',ra.wc,     rb.wc,     ' млрд', true),
+      ratioRow('Debt Ratio',     ra.debtR,  rb.debtR,  '%', false),
       ratioRow('EBITDA маржа',   ra.ebitdam,rb.ebitdam,'%', true),
       ratioRow('Чист. маржа',    ra.npm,    rb.npm,    '%', true),
       ratioRow('Equity Ratio',   ra.eqr,    rb.eqr,    '%', true),
@@ -8357,6 +8378,9 @@ function repRenderCompare(){
     row('ND/EBITDA','📊',ra.ndE!=null?parseFloat(ra.ndE):null,rb.ndE!=null?parseFloat(rb.ndE):null,'down'),
     row('ICR (покр. %)','🔐',ra.icr!=null?parseFloat(ra.icr):null,rb.icr!=null?parseFloat(rb.icr):null,'up'),
     row('Current Ratio','💧',ra.cur!=null?parseFloat(ra.cur):null,rb.cur!=null?parseFloat(rb.cur):null,'up'),
+    row('Cash Ratio','💵',ra.cashR!=null?parseFloat(ra.cashR):null,rb.cashR!=null?parseFloat(rb.cashR):null,'up'),
+    row('Working Capital','🧮',ra.wc!=null?parseFloat(ra.wc):null,rb.wc!=null?parseFloat(rb.wc):null,'up'),
+    row('Debt Ratio %','⚖',ra.debtR!=null?parseFloat(ra.debtR):null,rb.debtR!=null?parseFloat(rb.debtR):null,'down'),
     row('EBITDA маржа %','💹',ra.ebitdam!=null?parseFloat(ra.ebitdam):null,rb.ebitdam!=null?parseFloat(rb.ebitdam):null,'up'),
     row('Чист. маржа %','💰',ra.npm!=null?parseFloat(ra.npm):null,rb.npm!=null?parseFloat(rb.npm):null,'up'),
     row('Equity Ratio %','🔷',ra.eqr!=null?parseFloat(ra.eqr):null,rb.eqr!=null?parseFloat(rb.eqr):null,'up'),
