@@ -126,6 +126,8 @@ exports.handler = async (event) => {
             target = 'https://buxbalans.ru' + suffix;
         } else if (event.path.startsWith('/search-result') || event.path.startsWith('/static/captcha') || event.path.startsWith('/captcha')) {
             target = 'https://egrul.nalog.ru' + suffix;
+        } else if (event.path.startsWith('/portal')) {
+            target = 'https://www.e-disclosure.ru' + suffix;
         }
     }
 
@@ -171,6 +173,7 @@ exports.handler = async (event) => {
 
     const isAuditIt = target.includes('audit-it.ru');
     const isEgrul = target.includes('egrul.nalog.ru');
+    const isEDisclosure = target.includes('e-disclosure.ru');
 
     // POST с формой — нужен для ЕГРЮЛ (/ принимает form-urlencoded).
     // Я.Cloud шлёт тело в event.body; при бинарных методах — base64.
@@ -201,12 +204,13 @@ exports.handler = async (event) => {
                 'Sec-Ch-Ua-Platform': '"Windows"',
                 'Sec-Fetch-Dest': 'document',
                 'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': (isAuditIt || isEgrul) ? 'same-origin' : 'none',
+                'Sec-Fetch-Site': (isAuditIt || isEgrul || isEDisclosure) ? 'same-origin' : 'none',
                 'Sec-Fetch-User': '?1',
                 'Upgrade-Insecure-Requests': '1',
                 'Cache-Control': 'max-age=0',
                 ...(isAuditIt ? {'Referer': 'https://www.audit-it.ru/'} : {}),
                 ...(isEgrul ? {'Referer': 'https://egrul.nalog.ru/index.html', 'Origin': 'https://egrul.nalog.ru', 'X-Requested-With': 'XMLHttpRequest'} : {}),
+                ...(isEDisclosure ? {'Referer': 'https://www.e-disclosure.ru/'} : {}),
                 ...(reqContentType ? {'Content-Type': reqContentType} : {})
             };
             const upstream = await fetch(target, {
