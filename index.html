@@ -351,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn nav-sep" onclick="showPage('industries')">🏭 Отрасли</button>
     <button class="nav-btn" onclick="showPage('cross')">📊 Сравнение</button>
     <button class="nav-btn nav-sep" onclick="showPage('shares')">📈 Акции</button>
+    <button class="nav-btn" onclick="showPage('futures')">📉 Фьючерсы</button>
   </nav>
   <div class="topbar-right">
     <span class="pulse-dot"></span>
@@ -373,6 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-item" onclick="showPage('cross');sbAct(this)"><span class="sb-icon">📊</span>Сравнение компаний</div>
     <div class="sb-item" onclick="showPage('moex');sbAct(this)" title="Каталог всех торгуемых на Мосбирже облигаций — ОФЗ, корпораты, субфеды, ВДО. Фильтры, которых нет в самой MOEX."><span class="sb-icon">🏛</span>Каталог облигаций<span class="sb-badge" id="sb-moex">0</span></div>
     <div class="sb-item" onclick="showPage('shares');sbAct(this)" title="Каталог акций MOEX. Режим TQBR. P/E, P/B, Кап-ция считаются на лету из reportsDB, плюс все те же фундаментал-фильтры что и у облигаций."><span class="sb-icon">📈</span>Каталог акций<span class="sb-badge" id="sb-shares">0</span></div>
+    <div class="sb-item" onclick="showPage('futures');sbAct(this)" title="Фьючерсы FORTS на акции. Каждый фьюч привязан к базовой акции (SBRF→SBER, GAZR→GAZP…), через неё — к эмитенту в reportsDB: мультипликаторы и фундаментал. Мосбиржа ограничивает торги фьючерсами на санкционных бумагах, но все котируемые (Si, BR, индексы и акции) собираем."><span class="sb-icon">📉</span>Фьючерсы на акции<span class="sb-badge" id="sb-futures">0</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -2374,6 +2376,132 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <div class="card" id="shares-table-card" style="display:none;margin-top:12px">
     <div id="shares-table" style="overflow-x:auto;font-size:.64rem"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ПАГА ФЬЮЧЕРСОВ ═══════════════════════════ -->
+<div class="page" id="page-futures">
+  <div class="page-title">📉 Фьючерсы FORTS на акции</div>
+  <div class="page-sub">Только stock-futures — по кодам ASSETCODE, для которых есть базовая акция на MOEX. Фундаментал и мультипликаторы берутся с базовой акции (она через <code>reportsDB</code> ведёт на эмитента).</div>
+
+  <div class="card">
+    <div class="card-hdr">
+      📡 Загрузка каталога фьючерсов
+      <span id="fut-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
+    </div>
+    <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-p" id="fut-refresh-btn" onclick="fetchFuturesCatalog()">📡 Обновить каталог</button>
+      <button class="btn" onclick="futuresClearCache()" title="Удалить локальный кэш фьючерсов">🗑 Очистить кэш</button>
+      <span id="fut-status" style="font-size:.62rem;color:var(--text2);flex:1"></span>
+    </div>
+    <div style="padding:4px 12px 10px;font-size:.58rem;color:var(--text3);line-height:1.55">
+      Источник: ISS Мосбиржи, доска <code>RFUD</code>. Фильтруем по ASSETCODE — оставляем только те, у которых базовый актив — акция из каталога акций. «Платежеспособность» эмитента (D/E, ICR, ROA, ⚖ BQI, 🛡 запас прочности) и мультипликаторы (P/E, P/B, кап-ция) — те же, что на «📈 Акции»: тянутся через SECID базовой акции.
+    </div>
+  </div>
+
+  <div class="card" id="fut-filters-card" style="display:none;margin-top:12px">
+    <div class="card-hdr">🎯 Фильтры <span id="fut-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Поиск (тикер / базовая акция / эмитент)</label>
+        <input type="text" id="fut-f-text" oninput="futuresApplyFilters()" placeholder="SBRF, GAZR, Лукойл…">
+      </div>
+      <div class="field" style="margin:0" title="Ближайшие серии истекают быстрее — больше ликвидности, но и быстрее закрываются. Дальние дают хедж на больший срок.">
+        <label style="font-size:.55rem">Срок до экспирации</label>
+        <select id="fut-f-expiry" onchange="futuresApplyFilters()">
+          <option value="">Все</option>
+          <option value="30">≤ 30 дней (ближайшие)</option>
+          <option value="90">≤ 90 дней</option>
+          <option value="180">≤ 180 дней</option>
+          <option value="365">≤ 1 год</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0" title="Открытый интерес — сколько контрактов открыто. Главный показатель ликвидности фьючерса.">
+        <label style="font-size:.55rem">Открытый интерес от</label>
+        <input type="number" id="fut-f-oi-min" oninput="futuresApplyFilters()" step="1000" placeholder="напр. 10000">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="font-size:.55rem">Оборот за день ≥, млн ₽</label>
+        <input type="number" id="fut-f-val-min" oninput="futuresApplyFilters()" step="1" placeholder="напр. 10">
+      </div>
+      <div class="field" style="margin:0" title="Капитализация эмитента базовой акции">
+        <label style="font-size:.55rem">Кап-ция эмитента от, млрд ₽</label>
+        <input type="number" id="fut-f-cap-min" oninput="futuresApplyFilters()" step="10" placeholder="напр. 100">
+      </div>
+      <div class="field" style="margin:0" title="Только базовые акции, эмитент которых есть в reportsDB">
+        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+          <input type="checkbox" id="fut-f-indb" onchange="futuresApplyFilters()" style="margin:0"> Только «эмитент в базе»
+        </label>
+      </div>
+    </div>
+    <div style="padding:0 12px 8px">
+      <div style="font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--acc)">
+        🧮 Фундаментал базового эмитента (из reportsDB)
+      </div>
+      <div style="font-size:.55rem;color:var(--text3);margin-bottom:6px;line-height:1.5">
+        Включи хоть один — фьючерсы без matched эмитента скроются.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+        <div class="field" style="margin:0"><label style="font-size:.55rem">P/E базовой акции до</label>
+          <input type="number" id="fut-f-pe-max" oninput="futuresApplyFilters()" step="0.5" placeholder="8"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">P/B базовой акции до</label>
+          <input type="number" id="fut-f-pb-max" oninput="futuresApplyFilters()" step="0.1" placeholder="2"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Долг / EBITDA ≤</label>
+          <input type="number" id="fut-f-de-max" oninput="futuresApplyFilters()" step="0.5" placeholder="3"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">ICR ≥</label>
+          <input type="number" id="fut-f-icr-min" oninput="futuresApplyFilters()" step="0.5" placeholder="3"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">ROA ≥, %</label>
+          <input type="number" id="fut-f-roa-min" oninput="futuresApplyFilters()" step="0.5" placeholder="5"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">🛡 Запас прочности ≥</label>
+          <input type="number" id="fut-f-stress-min" oninput="futuresApplyFilters()" step="5" min="0" max="100" placeholder="40"></div>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Рейтинг ≥</label>
+          <select id="fut-f-rating-min" onchange="futuresApplyFilters()">
+            <option value="">Любой / не важно</option>
+            <option value="AAA">AAA</option>
+            <option value="AA">AA и выше</option>
+            <option value="A">A и выше</option>
+            <option value="BBB">BBB и выше (инвест)</option>
+            <option value="BB">BB и выше</option>
+            <option value="B">B и выше</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="futuresResetFilters()">🧹 Сбросить</button>
+      <div style="flex:1"></div>
+      <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
+        Сортировка:
+        <select id="fut-sort" onchange="futuresApplyFilters()" style="font-size:.65rem;padding:2px 4px">
+          <optgroup label="Рынок / ликвидность">
+            <option value="oi-desc">Открытый интерес ↓</option>
+            <option value="val-desc">Оборот ↓</option>
+            <option value="expiry-asc">Дни до экспирации ↑ (ближайшие)</option>
+            <option value="expiry-desc">Дни до экспирации ↓</option>
+            <option value="change-desc">Δ за день ↓</option>
+            <option value="change-asc">Δ за день ↑</option>
+            <option value="name-asc">Тикер А–Я</option>
+          </optgroup>
+          <optgroup label="Мультипликаторы базовой акции">
+            <option value="cap-desc">Кап-ция эмитента ↓</option>
+            <option value="pe-best">P/E (дешёвые сверху)</option>
+            <option value="pb-best">P/B (дешёвые сверху)</option>
+          </optgroup>
+          <optgroup label="Фундаментал базового эмитента">
+            <option value="de-best">Долг/EBITDA (лучшие сверху)</option>
+            <option value="icr-best">ICR (лучшие сверху)</option>
+            <option value="roa-best">ROA (лучшие сверху)</option>
+            <option value="bqi-best">⚖ Качество баланса (лучшие)</option>
+            <option value="stress-best">🛡 Запас прочности ↓ (лучшие)</option>
+            <option value="stress-worst">🛡 Запас прочности ↑ (худшие)</option>
+          </optgroup>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" id="fut-table-card" style="display:none;margin-top:12px">
+    <div id="fut-table" style="overflow-x:auto;font-size:.64rem"></div>
   </div>
 </div>
 

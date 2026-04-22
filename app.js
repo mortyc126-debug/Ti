@@ -110,7 +110,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','shares'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','shares','futures'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -127,6 +127,7 @@ function showPage(n, opts){
   if(n==='cross') crossInit();
   if(n==='moex') moexInit();
   if(n==='shares') sharesInit();
+  if(n==='futures') futuresInit();
 }
 
 // Назад: pop из стека, показать без очистки форм (данные сохраняются).
@@ -19570,6 +19571,458 @@ function _sharesRenderTable(list, metricsCache, multiplesCache){
   try { _sharesLoadCache(); _sharesRenderMeta(); } catch(e){}
 })();
 
+// ═════════════════════════════════════════════════════════════════════
+// 📉 ФЬЮЧЕРСЫ FORTS НА АКЦИИ
+// ─────────────────────────────────────────────────────────────────────
+// Источник: /iss/engines/futures/markets/forts/boards/RFUD/securities.json
+// Оставляем только те, у кого ASSETCODE мапится на тикер акции с MOEX
+// (см. _FUT_STOCK_MAP). «Платежеспособность» и мультипликаторы —
+// берутся с базовой акции через _sharesCatalog: уже готовый issId,
+// capBn, multiplesCache. Весь фундаментальный код (metricsCache,
+// _repStressScore) переиспользуем 1:1.
+// Хранение: localStorage['bondan_moex_futures'] — вне sync-snapshot,
+// как и shares.
+// ═════════════════════════════════════════════════════════════════════
+
+const _FUT_CACHE_KEY = 'bondan_moex_futures';
+const _FUT_BASE_BOARD = 'https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD';
+
+// Мапа ASSETCODE фьючерса → SECID базовой акции на MOEX. Статическая,
+// меняется редко. Покрывает ~40 ликвидных стоковых серий FORTS.
+// Названия тикеров: TCSG→T и YNDX→YDEX — последние переименования.
+const _FUT_STOCK_MAP = {
+  SBRF:'SBER', SBPR:'SBERP',
+  GAZR:'GAZP', LKOH:'LKOH', ROSN:'ROSN', GMKN:'GMKN',
+  VTBR:'VTBR', NLMK:'NLMK', MTSI:'MTSS', MGNT:'MGNT',
+  CHMF:'CHMF', ALRS:'ALRS',
+  SNGR:'SNGS', SNGP:'SNGSP',
+  TATN:'TATN', TATP:'TATNP',
+  MOEX:'MOEX', AFLT:'AFLT', AFKS:'AFKS',
+  HYDR:'HYDR', IRAO:'IRAO', FEES:'FEES', FESH:'FESH',
+  MTLR:'MTLR',
+  RTKM:'RTKM', RTKP:'RTKMP',
+  PHOR:'PHOR', PLZL:'PLZL', RUAL:'RUAL', SIBN:'SIBN',
+  NVTK:'NVTK', PIKK:'PIKK', POSI:'POSI', FLOT:'FLOT',
+  MAGN:'MAGN', SMLT:'SMLT',
+  OZON:'OZON', VKCO:'VKCO',
+  TCSG:'T',      // T-Technologies (бывш. TCS Group)
+  YNDX:'YDEX',   // Yandex IT (бывш. Yandex N.V.)
+};
+
+function futuresInit(){
+  if(!window._futCatalog) _futuresLoadCache();
+  _futuresRenderMeta();
+  futuresApplyFilters();
+}
+
+function _futuresLoadCache(){
+  try {
+    const raw = localStorage.getItem(_FUT_CACHE_KEY);
+    if(!raw) return;
+    const parsed = JSON.parse(raw);
+    if(parsed && Array.isArray(parsed.items)) window._futCatalog = parsed;
+  } catch(e){}
+}
+
+function _futuresSaveCache(){
+  if(!window._futCatalog) return;
+  try { localStorage.setItem(_FUT_CACHE_KEY, JSON.stringify(window._futCatalog)); }
+  catch(e){ alert('Не удалось сохранить каталог фьючерсов: ' + e.message); }
+}
+
+function futuresClearCache(){
+  if(!confirm('Удалить кэш каталога фьючерсов?')) return;
+  localStorage.removeItem(_FUT_CACHE_KEY);
+  window._futCatalog = null;
+  _futuresRenderMeta();
+  futuresApplyFilters();
+}
+
+function _futuresRenderMeta(){
+  const meta = document.getElementById('fut-meta');
+  const sb = document.getElementById('sb-futures');
+  const cat = window._futCatalog;
+  if(!cat || !cat.items){
+    if(meta) meta.textContent = 'Кэш пуст — нажми «Обновить каталог»';
+    if(sb) sb.textContent = '0';
+    return;
+  }
+  const age = Math.round((Date.now() - new Date(cat.updatedAt).getTime()) / 86400000 * 10) / 10;
+  if(meta) meta.textContent = `В кэше: ${cat.items.length} фьючерсов · обновлено ${new Date(cat.updatedAt).toLocaleString('ru-RU')}${age >= 1 ? ' · ≈ '+age+' дн. назад' : ''}`;
+  if(sb) sb.textContent = String(cat.items.length);
+}
+
+function _futParsePage(resp){
+  const sec = resp.securities || {};
+  const md  = resp.marketdata || {};
+  const secCols = sec.columns || [], secData = sec.data || [];
+  const mdCols  = md.columns  || [], mdData  = md.data  || [];
+  const ci = (cols, name) => cols.indexOf(name);
+  const sidIdx = ci(secCols, 'SECID');
+  const mdSidIdx = ci(mdCols, 'SECID');
+  const mdById = {};
+  for(const r of mdData){ const id = r[mdSidIdx]; if(id) mdById[id] = r; }
+  const out = [];
+  for(const r of secData){
+    const secid = r[sidIdx]; if(!secid) continue;
+    const g  = (name) => r[ci(secCols, name)];
+    const mdr = mdById[secid] || [];
+    const gm = (name) => mdr[ci(mdCols, name)];
+    const assetcode = g('ASSETCODE');
+    // Фильтруем только стоковые фьючи (ASSETCODE → SECID акции).
+    const baseShare = _FUT_STOCK_MAP[String(assetcode || '').toUpperCase()];
+    if(!baseShare) continue;
+    out.push({
+      secid,
+      shortName:   g('SHORTNAME') || secid,
+      secName:     g('SECNAME') || g('LATNAME'),
+      assetcode:   assetcode,
+      baseShare:   baseShare,                 // SECID акции
+      lastTradeDate: g('LASTTRADEDATE') || g('MATDATE'),
+      lastDelivery: g('LASTDELDATE'),
+      lotVolume:   _num(g('LOTVOLUME')) || _num(g('CONTRACTSIZE')) || null,
+      minStep:     _num(g('MINSTEP')),
+      stepPrice:   _num(g('STEPPRICE')),
+      price:       _num(gm('LAST')) || _num(g('PREVSETTLEPRICE')) || _num(g('SETTLEPRICE')),
+      change:      _num(gm('LASTCHANGEPRCNT')),
+      oi:          _num(gm('OPENPOSITION')) || _num(gm('NUMTRADES')) || 0,
+      valToday:    _num(gm('VALTODAY')) || _num(gm('VALTODAY_RUR')),
+      volToday:    _num(gm('VOLTODAY')),
+      initialMargin: _num(g('INITIALMARGIN')),
+    });
+  }
+  return out;
+}
+
+// LASTTRADEDATE в формате YYYY-MM-DD. Считаем дней до экспирации.
+function _futExpiryDays(f){
+  if(!f.lastTradeDate) return null;
+  const t = new Date(f.lastTradeDate + 'T23:59:59').getTime();
+  if(!isFinite(t)) return null;
+  return Math.round((t - Date.now()) / 86400000);
+}
+
+async function fetchFuturesCatalog(){
+  const btn = document.getElementById('fut-refresh-btn');
+  const status = document.getElementById('fut-status');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Загружаю…'; }
+  const items = [];
+  const seen = new Set();
+  const PAGE = 100;
+  try {
+    let start = 0, page = 0;
+    while(true){
+      if(status) status.textContent = `📋 RFUD · стр. ${page+1} · собрано: ${items.length}`;
+      const url = `${_FUT_BASE_BOARD}/securities.json?iss.meta=off&start=${start}&limit=${PAGE}`;
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok){ console.warn('futures HTTP', r.status); break; }
+      const raw = await r.json();
+      const rawLen = (raw && raw.securities && raw.securities.data && raw.securities.data.length) || 0;
+      const batch = _futParsePage(raw);
+      for(const f of batch){
+        if(seen.has(f.secid)) continue;
+        seen.add(f.secid);
+        items.push(f);
+      }
+      page++;
+      if(rawLen < PAGE) break;
+      start += PAGE;
+      if(page > 30) break; // FORTS ~2.5k инструментов, но стоковых в норме <300
+    }
+    window._futCatalog = { items, updatedAt: new Date().toISOString() };
+    _futuresSaveCache();
+    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} стоковых фьючерсов</span>`;
+    _futuresRenderMeta();
+    futuresApplyFilters();
+  } catch(e){
+    if(status) status.innerHTML = `<span style="color:var(--danger)">❌ ${e.message}</span>`;
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '📡 Обновить каталог'; }
+  }
+}
+
+function futuresResetFilters(){
+  ['fut-f-text','fut-f-oi-min','fut-f-val-min','fut-f-cap-min',
+   'fut-f-pe-max','fut-f-pb-max','fut-f-de-max','fut-f-icr-min','fut-f-roa-min','fut-f-stress-min'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  ['fut-f-expiry','fut-f-rating-min'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const indb = document.getElementById('fut-f-indb'); if(indb) indb.checked = false;
+  const sort = document.getElementById('fut-sort'); if(sort) sort.value = 'oi-desc';
+  futuresApplyFilters();
+}
+
+// Индекс базовых акций: SECID акции → сам объект share (уже с issId и capBn).
+function _futBuildShareIndex(){
+  const idx = new Map();
+  const cat = window._sharesCatalog;
+  if(!cat || !Array.isArray(cat.items)) return idx;
+  const issIdx = _moexBuildIssuerIndex();
+  for(const s of cat.items){
+    // Гарантируем заполненные поля даже если sharesApplyFilters ещё не бегал.
+    if(s.issId === undefined) s.issId = _moexMatchIssuer({ secName: s.issuer || s.secName, shortName: s.shortName }, issIdx);
+    if(s.capBn === undefined) s.capBn = _sharesCap(s);
+    idx.set(s.secid, s);
+  }
+  return idx;
+}
+
+function futuresApplyFilters(){
+  const card = document.getElementById('fut-filters-card');
+  const tcard = document.getElementById('fut-table-card');
+  const cat = window._futCatalog;
+  if(!cat || !Array.isArray(cat.items)){
+    if(card) card.style.display = 'none';
+    if(tcard) tcard.style.display = 'none';
+    return;
+  }
+  if(card) card.style.display = '';
+  if(tcard) tcard.style.display = '';
+
+  const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const vn = id => { const s = v(id); return s ? parseFloat(s) : null; };
+  const vc = id => { const el = document.getElementById(id); return el && el.checked; };
+  const f = {
+    text: v('fut-f-text').toLowerCase(),
+    expiry: vn('fut-f-expiry'),
+    oiMin: vn('fut-f-oi-min'),
+    valMin: vn('fut-f-val-min'),
+    capMin: vn('fut-f-cap-min'),
+    peMax: vn('fut-f-pe-max'),
+    pbMax: vn('fut-f-pb-max'),
+    deMax: vn('fut-f-de-max'),
+    icrMin: vn('fut-f-icr-min'),
+    roaMin: vn('fut-f-roa-min'),
+    stressMin: vn('fut-f-stress-min'),
+    ratingMin: v('fut-f-rating-min'),
+    onlyInDb: vc('fut-f-indb'),
+  };
+
+  const shareIdx = _futBuildShareIndex();
+  const shareCatPresent = shareIdx.size > 0;
+  const metricsCache = new Map();
+  const multiplesCache = new Map();
+  const stressCache = new Map();
+  const getStress = (issId) => {
+    if(!stressCache.has(issId)) stressCache.set(issId, _repStressScore(reportsDB[issId]));
+    return stressCache.get(issId);
+  };
+
+  // Обогащаем фьючи ссылкой на базовую акцию + днями до экспирации.
+  for(const x of cat.items){
+    x.shareObj = shareIdx.get(x.baseShare) || null;
+    x.issId = x.shareObj ? x.shareObj.issId : null;
+    x.capBn = x.shareObj ? x.shareObj.capBn : null;
+    x.days = _futExpiryDays(x);
+    if(x.issId) multiplesCache.set(x.secid, _sharesMarketMultiples(x.shareObj));
+  }
+
+  const sort = v('fut-sort') || 'oi-desc';
+
+  const filtered = cat.items.filter(x => {
+    if(f.text){
+      const name = x.shareObj ? (reportsDB[x.issId]?.name || '') : '';
+      const hay = (x.secid + ' ' + x.shortName + ' ' + x.assetcode + ' ' + x.baseShare + ' ' + name).toLowerCase();
+      if(!hay.includes(f.text)) return false;
+    }
+    if(f.expiry != null && (x.days == null || x.days > f.expiry)) return false;
+    if(f.oiMin != null && (x.oi == null || x.oi < f.oiMin)) return false;
+    if(f.valMin != null){
+      const valMln = x.valToday != null ? x.valToday / 1e6 : null;
+      if(valMln == null || valMln < f.valMin) return false;
+    }
+    if(f.capMin != null && (x.capBn == null || x.capBn < f.capMin)) return false;
+    if(f.onlyInDb && !x.issId) return false;
+
+    // Мультипликаторы базовой акции.
+    if(f.peMax != null){
+      const mm = multiplesCache.get(x.secid);
+      if(!mm || mm.pe == null || mm.pe > f.peMax) return false;
+    }
+    if(f.pbMax != null){
+      const mm = multiplesCache.get(x.secid);
+      if(!mm || mm.pb == null || mm.pb > f.pbMax) return false;
+    }
+
+    const anyFund = f.deMax != null || f.icrMin != null || f.roaMin != null || f.stressMin != null || f.ratingMin;
+    if(anyFund && !x.issId) return false;
+    if(x.issId){
+      const m = _moexIssuerMetrics(x.issId, metricsCache);
+      if(m){
+        if(f.deMax != null && (m.debtEbitda == null || m.debtEbitda > f.deMax)) return false;
+        if(f.icrMin != null && (m.icr == null || m.icr < f.icrMin)) return false;
+        if(f.roaMin != null && (m.roa == null || (m.roa * 100) < f.roaMin)) return false;
+        if(f.ratingMin){
+          const rank = _moexRatingRank(m.ratingClass);
+          const minRank = _moexRatingRank(f.ratingMin);
+          if(rank < 0 || rank < minRank) return false;
+        }
+      } else if(anyFund) return false;
+      if(f.stressMin != null){
+        const st = getStress(x.issId);
+        if(st.score == null || st.score < f.stressMin) return false;
+      }
+    }
+    return true;
+  });
+
+  const getNum = (x, key) => {
+    if(key === 'oi')    return x.oi;
+    if(key === 'val')   return x.valToday;
+    if(key === 'change')return x.change;
+    if(key === 'expiry')return x.days;
+    if(key === 'cap')   return x.capBn;
+    const mm = multiplesCache.get(x.secid);
+    if(key === 'pe')  return mm ? mm.pe : null;
+    if(key === 'pb')  return mm ? mm.pb : null;
+    if(!x.issId) return null;
+    const m = _moexIssuerMetrics(x.issId, metricsCache);
+    if(!m) return null;
+    if(key === 'de') return m.debtEbitda;
+    if(key === 'icr')return m.icr;
+    if(key === 'roa')return m.roa;
+    if(key === 'bqi')return m.balanceQualityIndex;
+    if(key === 'stress') return getStress(x.issId).score;
+    return null;
+  };
+  const byK = (key, bestIsHigher) => (a, b) => {
+    const va = getNum(a, key), vb = getNum(b, key);
+    const aOk = va != null && isFinite(va), bOk = vb != null && isFinite(vb);
+    if(!aOk && !bOk) return 0;
+    if(!aOk) return 1;
+    if(!bOk) return -1;
+    return bestIsHigher ? vb - va : va - vb;
+  };
+  const cmp = {
+    'name-asc': (a,b) => String(a.shortName||'').localeCompare(String(b.shortName||''), 'ru'),
+    'oi-desc':     byK('oi', true),
+    'val-desc':    byK('val', true),
+    'expiry-asc':  byK('expiry', false),
+    'expiry-desc': byK('expiry', true),
+    'change-desc': byK('change', true),
+    'change-asc':  byK('change', false),
+    'cap-desc':    byK('cap', true),
+    'pe-best':     byK('pe', false),
+    'pb-best':     byK('pb', false),
+    'de-best':     byK('de', false),
+    'icr-best':    byK('icr', true),
+    'roa-best':    byK('roa', true),
+    'bqi-best':    byK('bqi', true),
+    'stress-best': byK('stress', true),
+    'stress-worst':byK('stress', false),
+  };
+  const sorted = [...filtered].sort(cmp[sort] || cmp['oi-desc']);
+  const cnt = document.getElementById('fut-count');
+  if(cnt){
+    const hint = shareCatPresent ? '' : ' · сначала обнови «Каталог акций» — базовые акции не загружены';
+    cnt.textContent = `${sorted.length} фьючей${hint}`;
+  }
+  _futuresRenderTable(sorted, metricsCache, multiplesCache);
+}
+
+function _futuresRenderTable(list, metricsCache, multiplesCache){
+  const box = document.getElementById('fut-table');
+  if(!box) return;
+  if(!list.length){
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:.65rem">По фильтрам ничего нет.</div>';
+    return;
+  }
+  const limit = 500;
+  const shown = list.slice(0, limit);
+  const moreHint = list.length > limit
+    ? `<div style="padding:8px 10px;font-size:.58rem;color:var(--text3);background:var(--s2)">Показано первых ${limit} из ${list.length}.</div>` : '';
+  let html = `${moreHint}<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--s2);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
+      <th style="padding:6px 8px;text-align:left">Фьюч / база</th>
+      <th style="padding:6px 8px;text-align:left">Эмитент / фундаментал</th>
+      <th style="padding:6px 8px;text-align:right">Цена</th>
+      <th style="padding:6px 8px;text-align:right">Δ</th>
+      <th style="padding:6px 8px;text-align:right">OI</th>
+      <th style="padding:6px 8px;text-align:right">Оборот, млн</th>
+      <th style="padding:6px 8px;text-align:right">До эксп., дн</th>
+      <th style="padding:6px 8px;text-align:right">Кап-ция, млрд ₽</th>
+      <th style="padding:6px 8px;text-align:right">P/E</th>
+      <th style="padding:6px 8px;text-align:right">P/B</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead><tbody>`;
+  for(const x of shown){
+    const issName = x.issId ? (reportsDB[x.issId]?.name || '') : '';
+    const metrics = x.issId ? _moexIssuerMetrics(x.issId, metricsCache) : null;
+    const mm = multiplesCache.get(x.secid);
+    const price = x.price != null ? x.price.toLocaleString('ru-RU', {maximumFractionDigits: 2}) : '—';
+    const ch = x.change;
+    const chColor = ch == null ? 'var(--text3)' : ch > 0 ? 'var(--green)' : ch < 0 ? 'var(--danger)' : 'var(--text3)';
+    const chStr = ch != null ? (ch > 0 ? '+' : '') + ch.toFixed(2) + '%' : '—';
+    const oi = x.oi != null ? x.oi.toLocaleString('ru-RU') : '—';
+    const val = x.valToday != null ? Math.round(x.valToday / 1e6).toLocaleString('ru-RU') : '—';
+    const days = x.days != null ? x.days : '—';
+    const daysColor = x.days == null ? 'var(--text3)' : x.days < 14 ? 'var(--warn)' : 'var(--text)';
+    const cap = x.capBn != null ? x.capBn.toLocaleString('ru-RU', {maximumFractionDigits: 1}) : '—';
+    const pe  = mm && mm.pe != null ? mm.pe.toFixed(1) : '—';
+    const peColor = mm && mm.pe != null ? (mm.pe < 6 ? 'var(--green)' : mm.pe < 15 ? 'var(--text)' : 'var(--warn)') : 'var(--text3)';
+    const pb  = mm && mm.pb != null ? mm.pb.toFixed(2) : '—';
+    const pbColor = mm && mm.pb != null ? (mm.pb < 1 ? 'var(--green)' : mm.pb < 3 ? 'var(--text)' : 'var(--warn)') : 'var(--text3)';
+    const actions = x.issId
+      ? `<button class="btn btn-sm" onclick="moexOpenIssuerPeek('${x.issId}')" title="Мини-профиль эмитента" style="padding:2px 6px;font-size:.54rem">👁</button>
+         <button class="btn btn-sm" onclick="moexOpenInReports('${x.issId}')" title="Открыть в «📂 База отчётности»" style="padding:2px 6px;font-size:.54rem;margin-left:4px">📂</button>`
+      : `<span style="color:var(--text3);font-size:.54rem">нет в базе</span>`;
+
+    let metricsLine = '';
+    if(metrics){
+      const parts = [];
+      const pill = (txt, cls) => `<span style="color:${cls};font-family:var(--mono)">${txt}</span>`;
+      if(metrics.debtEbitda != null){
+        const c = metrics.debtEbitda < 3 ? 'var(--green)' : metrics.debtEbitda < 5 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('D/E ' + metrics.debtEbitda.toFixed(1) + '×', c));
+      }
+      if(metrics.icr != null){
+        const c = metrics.icr > 3 ? 'var(--green)' : metrics.icr > 1.5 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('ICR ' + metrics.icr.toFixed(1) + '×', c));
+      }
+      if(metrics.roa != null){
+        const roaP = metrics.roa * 100;
+        const c = roaP > 5 ? 'var(--green)' : roaP > 0 ? 'var(--warn)' : 'var(--danger)';
+        parts.push(pill('ROA ' + roaP.toFixed(1) + '%', c));
+      }
+      if(metrics.ratingClass) parts.push(`<span style="color:var(--acc);font-weight:600">${metrics.ratingClass}</span>`);
+      if(parts.length){
+        metricsLine = `<div style="font-size:.54rem;color:var(--text3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap" title="FY ${metrics.year}">${parts.join(' · ')}</div>`;
+      }
+    }
+
+    html += `<tr style="border-top:1px solid var(--border)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+      <td style="padding:5px 8px">
+        <div style="font-weight:600;color:var(--text);font-family:var(--mono)">${x.secid}</div>
+        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${x.assetcode} → ${x.baseShare}</div>
+      </td>
+      <td style="padding:5px 8px;color:var(--text2);font-size:.58rem">
+        ${issName
+          ? `<div><a href="#" onclick="moexOpenIssuerPeek('${x.issId}'); return false" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--border2)" title="Мини-профиль эмитента">${_escHtml(issName)}</a></div>`
+          : x.shareObj ? `<div style="color:var(--text3)">${_escHtml(x.shareObj.issuer || x.shareObj.shortName || '')}</div>` : ''}
+        ${metricsLine}
+      </td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${price}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${chColor}">${chStr}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${oi}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${val}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${daysColor}">${days}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono)">${cap}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${peColor}">${pe}</td>
+      <td style="padding:5px 8px;text-align:right;font-family:var(--mono);color:${pbColor}">${pb}</td>
+      <td style="padding:5px 8px;text-align:right;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+// Bootstrap — восстановить счётчик в сайдбаре.
+(function _futuresBootstrap(){
+  try { _futuresLoadCache(); _futuresRenderMeta(); } catch(e){}
+})();
+
 // Восстановление последнего открытого раздела при загрузке страницы.
 // Сохраняется в showPage() в 'ba_active_page'. Дефолт — 'ytm' (как и было).
 // Стартуем после DOMContentLoaded, чтобы все элементы уже существовали,
@@ -19578,7 +20031,7 @@ function _sharesRenderTable(list, metricsCache, multiplesCache){
   const run = () => {
     try {
       const saved = localStorage.getItem('ba_active_page');
-      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex','shares'];
+      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex','shares','futures'];
       if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
         showPage(saved);
       }
