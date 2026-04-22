@@ -18253,10 +18253,31 @@ async function repShowEdisclosure(){
   try { result = await fetchEdisclosureEvents(inn); }
   catch(e){ err = e?.message || String(e); }
 
+  // Если по своему ИНН не нашли, пробуем материнскую. Для SPV (особенно
+  // казахские/кипрские дочки российских эмитентов) e-disclosure хранит
+  // раскрытия именно под ИНН головной компании.
+  let usedParent = false;
+  let parentResult = null;
+  if((!result || !result.events || !result.events.length || result.reason === 'not-found') && !err){
+    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent' && r.inn) : null;
+    if(parent){
+      try {
+        parentResult = await fetchEdisclosureEvents(String(parent.inn));
+        if(parentResult && parentResult.events && parentResult.events.length){
+          result = parentResult;
+          usedParent = true;
+          result._parentInn = parent.inn;
+          result._parentName = parent.name;
+        }
+      } catch(_){}
+    }
+  }
+
+  const effectiveInn = usedParent ? result._parentInn : inn;
   const fallbackLinks = [
-    `<a href="https://www.e-disclosure.ru/portal/companyfind.aspx?query=${encodeURIComponent(inn)}" target="_blank" rel="noopener" style="color:var(--acc)">e-disclosure.ru — поиск по ИНН</a>`,
-    `<a href="https://checko.ru/company/${encodeURIComponent(inn)}/activities" target="_blank" rel="noopener" style="color:var(--acc)">checko.ru — существенные факты</a>`,
-    `<a href="https://kad.arbitr.ru/" target="_blank" rel="noopener" style="color:var(--acc)">kad.arbitr.ru — арбитражи (ищи по ИНН ${inn})</a>`,
+    `<a href="https://www.e-disclosure.ru/portal/companyfind.aspx?query=${encodeURIComponent(effectiveInn)}" target="_blank" rel="noopener" style="color:var(--acc)">e-disclosure.ru — поиск по ИНН</a>`,
+    `<a href="https://checko.ru/company/${encodeURIComponent(effectiveInn)}/activities" target="_blank" rel="noopener" style="color:var(--acc)">checko.ru — существенные факты</a>`,
+    `<a href="https://kad.arbitr.ru/" target="_blank" rel="noopener" style="color:var(--acc)">kad.arbitr.ru — арбитражи (ищи по ИНН ${effectiveInn})</a>`,
   ].join(' · ');
 
   if(err){
@@ -18274,11 +18295,15 @@ async function repShowEdisclosure(){
   }
 
   if(!result || !result.events || !result.events.length){
+    const parent = Array.isArray(iss.related) ? iss.related.find(r => r && r.role === 'parent') : null;
     alert(
       `📢 Существенные факты по ${iss.name} (ИНН ${inn})\n\n` +
       (result && result.reason === 'not-found'
-        ? `⚠ Компания не найдена на e-disclosure.ru — возможно её там не раскрывают (частная, ООО без обязательств раскрытия).`
+        ? `⚠ Компания не найдена на e-disclosure.ru — возможно её там не раскрывают (частная, ООО без обязательств, иностранное юрлицо).`
         : `⚠ Список событий пустой или не распознан.`) +
+      (parent
+        ? `\n\nУ эмитента есть привязанная материнская (${parent.inn}${parent.name ? ' · ' + parent.name : ''}), но и у неё ничего не нашлось.`
+        : `\n\nСовет: если это SPV, привяжи материнскую через «🔗 связи» — e-disclosure держит раскрытия под ИНН головной компании.`) +
       `\n\nОткрой вручную:\n` +
       `• https://www.e-disclosure.ru/portal/companyfind.aspx?query=${inn}\n` +
       `• https://checko.ru/company/${inn}/activities`
@@ -18286,7 +18311,6 @@ async function repShowEdisclosure(){
     return;
   }
 
-  // Группируем события: критичные (категория есть) сверху, последние 30.
   const categorized = result.events.filter(e => e.category);
   const routine = result.events.filter(e => !e.category).slice(0, 15);
   const allShown = [...categorized.slice(0, 30), ...routine];
@@ -18314,7 +18338,11 @@ async function repShowEdisclosure(){
     return `<span style="color:${c?.color || 'var(--text2)'};padding:2px 7px;border:1px solid ${c?.color || 'var(--border2)'};margin-right:4px">${c?.icon || '•'} ${c?.title || k}: ${n}</span>`;
   }).join('') || '<span style="color:var(--text3)">критичных событий нет</span>';
 
-  // Показываем в модалке (переиспользуем rep-picker-modal стиль через простой overlay)
+  const parentBanner = usedParent
+    ? `<div style="padding:6px 12px;background:var(--s3);border-left:3px solid var(--purple);font-size:.58rem;color:var(--text2)">
+        ℹ Эмитент «${_escHtml ? _escHtml(iss.name) : iss.name}» на e-disclosure не найден — показаны факты по <strong style="color:var(--purple)">материнской</strong> ИНН ${result._parentInn}${result._parentName ? ' («' + (_escHtml ? _escHtml(result._parentName) : result._parentName) + '»)' : ''}.
+       </div>` : '';
+
   const existing = document.getElementById('ed-facts-modal');
   if(existing) existing.remove();
   const modal = document.createElement('div');
@@ -18325,9 +18353,10 @@ async function repShowEdisclosure(){
     <div style="background:var(--s1);border:1px solid var(--border2);width:780px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column">
       <div style="padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--s2)">
         <strong>📢 Существенные факты — ${_escHtml ? _escHtml(result.companyName || iss.name) : (result.companyName || iss.name)}</strong>
-        <span style="color:var(--text3);font-size:.58rem">ИНН ${inn} · e-disclosure id ${result.edId}</span>
+        <span style="color:var(--text3);font-size:.58rem">ИНН ${effectiveInn} · e-disclosure id ${result.edId}</span>
         <button onclick="document.getElementById('ed-facts-modal').remove()" style="margin-left:auto;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer">✕</button>
       </div>
+      ${parentBanner}
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:.6rem">
         Найдено ${result.events.length} событий, из них категоризировано ${categorized.length}.<br>
         <div style="margin-top:6px">${countsRow}</div>
@@ -18338,7 +18367,6 @@ async function repShowEdisclosure(){
       </div>
     </div>`;
   document.body.appendChild(modal);
-  // Клик вне модалки закрывает
   modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
