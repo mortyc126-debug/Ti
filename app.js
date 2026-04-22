@@ -6471,6 +6471,24 @@ const _CROSS_METRICS = [
   {k:'cashR',   l:'Cash Ratio (Cash / CL)',    unit:'x',    higher:true,  calc:d => (d.cash != null && d.cl) ? d.cash/d.cl : null},
   {k:'wc',      l:'Working Capital, млрд ₽',   unit:'млрд', higher:true,  calc:d => (d.ca != null && d.cl != null) ? (d.ca - d.cl) : null},
   {k:'debtR',   l:'Debt Ratio (Долг / Активы), %', unit:'%', higher:false, calc:d => (d.debt != null && d.assets) ? d.debt/d.assets*100 : null},
+  {k:'bqi',     l:'⚖ Качество баланса, 0-100',   unit:'',     higher:true,  calc:d => {
+    // Композит структурной надёжности. Берём те же 5 компонент что в
+    // _repBalanceQuality, но считаем встроенно — здесь у нас только d
+    // без iss-объекта.
+    if(!d.assets || d.assets <= 0) return null;
+    const A = d.assets;
+    const clamp = (x, lo, hi) => Math.max(0, Math.min(100, (x - lo) / (hi - lo) * 100));
+    const parts = [];
+    if(d.cash != null) parts.push(clamp(d.cash / A * 100, 1, 10));
+    if(d.ret != null) parts.push(clamp(d.ret / A * 100, 0, 30));
+    if(d.ca != null && d.cl != null) parts.push(clamp((d.ca - d.cl) / A * 100, 0, 20));
+    if(d.eq != null) parts.push(clamp(d.eq / A * 100, 10, 50));
+    if(d.eq != null && d.debt != null){
+      const otherOblig = Math.max(0, (A - d.eq - d.debt) / A * 100);
+      parts.push(clamp(50 - otherOblig, 0, 30));
+    }
+    return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null;
+  }},
   {k:'eqr',     l:'Equity Ratio, %',           unit:'%',    higher:true,  calc:d => (d.eq && d.assets) ? d.eq/d.assets*100 : null},
   {k:'roa',     l:'ROA (ЧП / Активы), %',      unit:'%',    higher:true,  calc:d => (d.np != null && d.assets) ? d.np/d.assets*100 : null},
   {k:'roe',     l:'ROE (ЧП / Капитал), %',     unit:'%',    higher:true,  calc:d => (d.np != null && d.eq) ? d.np/d.eq*100 : null},
@@ -7478,6 +7496,58 @@ function _repStressColor(score){
   return 'var(--danger)';
 }
 
+// Balance Quality Index (индекс качества баланса) 0-100 — оценивает
+// СТРУКТУРНУЮ надёжность баланса, отдельно от рентабельности/роста.
+// 5 компонент равного веса 20%:
+//   1) Cash / Активы         — реальная ликвидность
+//   2) Retained / Активы     — накопленные прибыли (история бизнеса)
+//   3) Working Capital / A   — подушка оборотных средств
+//   4) Equity Ratio          — доля собственного капитала
+//   5) Прочие обязательства — инвертировано: чем меньше «мутных» долгов
+//      (кредиторка, налоги, др.), тем чище структура
+// Компоненты с null-данными исключаются, вес перераспределяется.
+function _repBalanceQuality(iss, periodOverride){
+  const p = periodOverride || (iss && _repLatestPeriod(iss)?.period);
+  if(!p || !p.assets || p.assets <= 0) return { score: null };
+  const A = p.assets;
+  const clamp = (x, lo, hi) => {
+    if(x == null || !isFinite(x)) return null;
+    if(hi === lo) return x >= hi ? 100 : 0;
+    return Math.max(0, Math.min(100, (x - lo) / (hi - lo) * 100));
+  };
+  const parts = {};
+  if(p.cash != null) parts.cashShare  = clamp(p.cash / A * 100, 1, 10);       // 1% → 0, 10% → 100
+  if(p.ret != null) parts.retShare    = clamp(p.ret / A * 100, 0, 30);        // 0 → 0, 30% → 100
+  if(p.ca != null && p.cl != null) parts.wcShare = clamp((p.ca - p.cl) / A * 100, 0, 20);
+  if(p.eq != null) parts.eqShare      = clamp(p.eq / A * 100, 10, 50);        // 10% → 0, 50% → 100
+  if(p.eq != null && p.debt != null){
+    const otherOblig = Math.max(0, (A - p.eq - p.debt) / A * 100);
+    // 50% «прочих» → 0, 20% → 100. Инверсия через формулу.
+    parts.otherShare = clamp(50 - otherOblig, 0, 30);
+  }
+  const vals = Object.values(parts).filter(v => v != null && isFinite(v));
+  if(!vals.length) return { score: null };
+  const score = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+  return {
+    score,
+    year: p.year,
+    parts: {
+      cashShare:  parts.cashShare,
+      retShare:   parts.retShare,
+      wcShare:    parts.wcShare,
+      eqShare:    parts.eqShare,
+      otherShare: parts.otherShare,
+    },
+    raw: {
+      cashPct:  p.cash != null ? p.cash / A * 100 : null,
+      retPct:   p.ret != null ? p.ret / A * 100 : null,
+      wcPct:    (p.ca != null && p.cl != null) ? (p.ca - p.cl) / A * 100 : null,
+      eqPct:    p.eq != null ? p.eq / A * 100 : null,
+      otherPct: (p.eq != null && p.debt != null) ? Math.max(0, (A - p.eq - p.debt) / A * 100) : null,
+    }
+  };
+}
+
 // Рендер чипсов годов последнего отчёта для фильтра каталога MOEX.
 // Выбранные годы хранятся в window._moexSelectedYears (Set<number>).
 function moexRenderYearFilter(){
@@ -7823,6 +7893,41 @@ function _repRenderActiveIssuerHeader(){
         ${outpaceBadge}${dwPart} · ${icrPart} · ${zPart}
       </div>
     </div>`;
+
+  // Плитка «Качество баланса» — композит структурной надёжности.
+  // Дополняет «Запас прочности» (динамика + стресс-тест), здесь —
+  // моментальное состояние структуры активов и пассивов.
+  const bq = _repBalanceQuality(iss);
+  const bqColor = _repStressColor(bq.score);
+  const bqWidth = bq.score != null ? bq.score : 0;
+  const fmtPct = v => v == null ? '—' : v.toFixed(1) + '%';
+  const partPill = (label, raw, partScore, hint) => {
+    const col = partScore == null ? 'var(--text3)' : _repStressColor(partScore);
+    return `<span style="color:${col}" title="${hint}">${label} ${fmtPct(raw)}</span>`;
+  };
+  const bqTooltip = `Качество баланса (${bq.year || '—'}): композит структурной надёжности, 0 = мутная структура, 100 = прочная. 5 компонент равного веса 20%:
+1) Cash/Активы — реальная ликвидность (1%→0, 10%→100)
+2) Retained/Активы — накопленные прибыли (0→0, 30%→100)
+3) Working Capital/Активы — подушка оборотных (0→0, 20%→100)
+4) Equity Ratio — доля капитала (10%→0, 50%→100)
+5) Прочие обязательства — мутные долги, инверт (50%→0, 20%→100)
+Оценка СЕГОДНЯ, независимо от рентабельности и роста. СибСульфур: хорошая структура (Eq=50%, WC>0, CR>3), плохая рентабельность — отсюда CCC при внешне норм балансе.`;
+  const bqTile = bq.score != null ? `
+    <div style="margin-top:6px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap" title="${bqTooltip}">
+      <div style="font-size:.56rem;color:var(--text2);white-space:nowrap">⚖ Качество баланса${bq.year ? ' · ' + bq.year : ''}</div>
+      <div style="flex:1;min-width:140px;height:8px;background:var(--s2);border:1px solid var(--border);position:relative">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:${bqWidth}%;background:${bqColor}"></div>
+      </div>
+      <div style="font-weight:700;font-size:.78rem;color:${bqColor};font-family:var(--mono);min-width:50px;text-align:right">${bq.score}<span style="font-size:.5rem;color:var(--text3)">/100</span></div>
+      <div style="flex-basis:100%;font-size:.54rem;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${partPill('💵 Cash/A', bq.raw.cashPct, bq.parts.cashShare, 'Cash/Активы: реальная ликвидность. Хорошо >10%, плохо <1%.')} ·
+        ${partPill('📊 Ret/A', bq.raw.retPct, bq.parts.retShare, 'Нераспр.прибыль/Активы: накопленная история. Хорошо >30%, 0 = еле окупаются.')} ·
+        ${partPill('🧮 WC/A', bq.raw.wcPct, bq.parts.wcShare, '(ОА−КО)/Активы: подушка оборотных. Хорошо >20%, <0 = дефицит.')} ·
+        ${partPill('🔷 Eq/A', bq.raw.eqPct, bq.parts.eqShare, 'Капитал/Активы: доля своего капитала. Хорошо >50%, тревожно <10%.')} ·
+        ${partPill('❓ Прочие обяз./A', bq.raw.otherPct, bq.parts.otherShare, 'Активы - Капитал - Финансовый долг / Активы: кредиторка, налоги, прочие мутные долги. Хорошо <20%, плохо >50%.')}
+      </div>
+    </div>` : '';
+
   // Строка со связанными компаниями (материнская / связанные ИНН).
   // Для SPV-эмитентов показывает на кого по факту смотреть в отчётах.
   const related = Array.isArray(iss.related) ? iss.related : [];
@@ -7849,7 +7954,8 @@ function _repRenderActiveIssuerHeader(){
         <button class="btn btn-sm" onclick="repEditRelated()" title="Добавить материнскую или связанную компанию (ИНН). Нужно для SPV-эмитентов, у которых отчётность пустая — реальные цифры у головной. В будущем можно будет тянуть отчётность по связанным ИНН автоматом." style="font-size:.56rem;padding:3px 7px">🔗 связи</button>
       </div>
     </div>
-    ${stTile}`;
+    ${stTile}
+    ${bqTile}`;
 }
 
 // Модалка смены отрасли — показывает список всех отраслей из
@@ -15913,6 +16019,7 @@ function _moexIssuerMetrics(issId, cache){
     currentRatio:  div(p.ca, p.cl),
     cashRatio:     div(p.cash, p.cl),
     equityRatio:   div(p.eq, p.assets),
+    balanceQualityIndex: (typeof _repBalanceQuality === 'function') ? (_repBalanceQuality(iss, p)?.score ?? null) : null,
     usedEbit:      p.ebitda == null && p.ebit != null,
     rating:        rating,
     ratingClass:   _moexRatingClass(rating)
@@ -16350,6 +16457,7 @@ function moexApplyFilters(){
     if(field === 'cur')   return m.currentRatio;
     if(field === 'cashr') return m.cashRatio;
     if(field === 'eqr')   return m.equityRatio;
+    if(field === 'bqi')   return m.balanceQualityIndex;
     if(field === 'roe' || field === 'dde'){
       // ROE и D/E в metricsCache нет — считаем на лету из reportsDB.
       const iss = reportsDB[b.issId];
@@ -16410,6 +16518,8 @@ function moexApplyFilters(){
     'cashr-worst':byMetric('cashr', true, true),
     'eqr-best':  byMetric('eqr', true, false),
     'eqr-worst': byMetric('eqr', true, true),
+    'bqi-best':  byMetric('bqi', true, false),
+    'bqi-worst': byMetric('bqi', true, true),
     // Запас прочности: берём из кэша getStress (считается лениво, если
     // сортировка активна — пробежит по всем бумагам с issId).
     'stress-best': (a, b) => {
