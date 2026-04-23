@@ -16250,11 +16250,22 @@ async function fetchMoexCatalog(){
       }
       boardStats.push({ board, label, added: addedOnBoard, err: boardErr });
     }
-    window._moexCatalog = { items, updatedAt: new Date().toISOString(), boardStats };
+    // Merge-on-update вместо полной перезаписи:
+    // • secid есть и в prev, и в fresh → мержим (fresh wins для рыночных
+    //   полей — price/ytm/status/durationD; prev wins для статики, если
+    //   fresh её внезапно потерял — MOEX иногда отдаёт пустые поля).
+    // • secid только в fresh → добавляем как новый.
+    // • secid только в prev → это «исчезнувшая» бумага (MOEX сняла с
+    //   досок). Не удаляем: помечаем archivedAt=now, оставляем в кэше.
+    //   Так «🪦 Архив» накапливает историю, даже когда сами бумаги с
+    //   MOEX уже пропали.
+    const { merged, newCount, updatedCount, archivedCount, revivedCount } = _moexMergeCatalog(window._moexCatalog, items);
+    window._moexCatalog = { items: merged, updatedAt: new Date().toISOString(), boardStats };
     _moexSaveCache();
     const abortedMsg = window._moexAbort ? ' (прервано — сохранил что успел)' : '';
     const perBoard = boardStats.map(s => `<span title="${s.err || ''}" style="color:${s.err ? 'var(--danger)' : s.added === 0 ? 'var(--warn)' : 'var(--text2)'}">${s.label}: <b>${s.added}</b>${s.err ? ' ❌' : ''}</span>`).join(' · ');
-    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${items.length} бумаг за ${totalPages} запросов${abortedMsg}</span><div style="margin-top:4px;font-size:.52rem;color:var(--text3)">${perBoard}</div>`;
+    const mergeMsg = `↑ ${items.length} в снапшоте · новых ${newCount}, обновлено ${updatedCount}${archivedCount ? ', в архив ушло ' + archivedCount : ''}${revivedCount ? ', вернулось из архива ' + revivedCount : ''}`;
+    if(status) status.innerHTML = `<span style="color:var(--green)">✓ Готово: ${merged.length} бумаг в кэше (${mergeMsg}) за ${totalPages} запросов${abortedMsg}</span><div style="margin-top:4px;font-size:.52rem;color:var(--text3)">${perBoard}</div>`;
     _moexRenderMeta();
     moexApplyFilters();
   } catch(e){
@@ -16267,6 +16278,91 @@ async function fetchMoexCatalog(){
     }
     window._moexAbort = false;
   }
+}
+
+// Мержит свежий снапшот MOEX с предыдущим кэшем. Полная перезапись
+// была плоха двумя вещами:
+//   1. Статические поля (купон, объём, матуритет) иногда приходят null
+//      даже для корректных бумаг — из-за временных глюков MOEX. При
+//      полной замене это затирало валидные исторические значения.
+//   2. Бумаги, которые MOEX сняла с досок (делистинг через ~2 недели
+//      после погашения), просто пропадали из кэша. «🪦 Архив» терял
+//      историю при каждом обновлении.
+// Новая логика:
+//   • Для совпадений по secid — fresh wins для рыночных данных (price,
+//     ytm, status, durationD, listLevel), prev wins для статики если
+//     fresh её потерял.
+//   • Для безопертных бумаг (offer=none) купон особенно бережём: если
+//     fresh отдал null, а у нас был валидный — оставляем старый. После
+//     оферты купон может законно измениться — там fresh перекрывает.
+//   • Исчезнувшие (есть в prev, нет в fresh) — ставим archivedAt = now,
+//     держим в кэше. Если потом MOEX их опять отдаст — archivedAt
+//     снимется (revived).
+function _moexMergeCatalog(prev, fresh){
+  const prevItems = (prev && Array.isArray(prev.items)) ? prev.items : [];
+  const prevById = new Map();
+  for(const b of prevItems){ if(b?.secid) prevById.set(b.secid, b); }
+  const freshById = new Set();
+
+  const hadOffer = b => !!b.offerDate || /call|put|оферт/i.test(b.bondSubtype || '');
+  const preserveIfNull = (a, b) => a == null ? b : a;
+  const preserveIfEmpty = (a, b) => (a == null || a === '') ? b : a;
+
+  let newCount = 0, updatedCount = 0, archivedCount = 0, revivedCount = 0;
+  const merged = [];
+
+  for(const fb of fresh){
+    if(!fb.secid){ merged.push(fb); continue; }
+    freshById.add(fb.secid);
+    const old = prevById.get(fb.secid);
+    if(!old){
+      merged.push(fb);
+      newCount++;
+      continue;
+    }
+    // Есть совпадение — мержим.
+    const noOption = !hadOffer(old) && !hadOffer(fb);
+    const item = {
+      ...old,
+      ...fb,
+      // Статика: prev выигрывает, если fresh пришло пустым.
+      matDate:      preserveIfEmpty(fb.matDate, old.matDate),
+      offerDate:    preserveIfEmpty(fb.offerDate, old.offerDate),
+      issueSize:    preserveIfNull(fb.issueSize, old.issueSize),
+      faceValue:    preserveIfNull(fb.faceValue, old.faceValue),
+      couponPeriod: preserveIfNull(fb.couponPeriod, old.couponPeriod),
+      couponValue:  preserveIfNull(fb.couponValue, old.couponValue),
+      bondType:     preserveIfEmpty(fb.bondType, old.bondType),
+      bondSubtype:  preserveIfEmpty(fb.bondSubtype, old.bondSubtype),
+      secType:      preserveIfEmpty(fb.secType, old.secType),
+      issuer:       preserveIfEmpty(fb.issuer, old.issuer),
+      // Купон: для безопертных — особо бережно (не даём null перекрыть).
+      //        После оферты купон может законно измениться — тогда fresh win.
+      coupon: noOption ? preserveIfNull(fb.coupon, old.coupon) : fb.coupon,
+    };
+    if(old.archivedAt){
+      // Была в архиве — ожила.
+      delete item.archivedAt;
+      revivedCount++;
+    } else {
+      updatedCount++;
+    }
+    merged.push(item);
+  }
+
+  // Исчезнувшие — уводим в архив.
+  const nowIso = new Date().toISOString();
+  for(const [sec, old] of prevById){
+    if(freshById.has(sec)) continue;
+    const archived = { ...old };
+    if(!archived.archivedAt){
+      archived.archivedAt = nowIso;
+      archivedCount++;
+    }
+    merged.push(archived);
+  }
+
+  return { merged, newCount, updatedCount, archivedCount, revivedCount };
 }
 
 // Парсер для board-endpoint. На board-endpoint каждая бумага листится
@@ -16771,13 +16867,15 @@ function moexApplyFilters(){
 
   const filtered = enriched.filter(b => {
     // «Мёртвые» бумаги. Эвристика:
-    //   1. matDate в прошлом (matYears < 0) — уже погашены.
-    //   2. matDate мусорный (0000-00-00, пустая строка → matYears = NaN
+    //   1. archivedAt — MOEX сняла бумагу с досок (накопительный архив).
+    //   2. matDate в прошлом (matYears < 0) — уже погашены.
+    //   3. matDate мусорный (0000-00-00, пустая строка → matYears = NaN
     //      при непустом b.matDate) — обычно старые делистинги.
-    //   3. STATUS явно не 'A' (включая 'N' — не стартовали, 'S' — suspended).
+    //   4. STATUS явно не 'A' (включая 'N' — не стартовали, 'S' — suspended).
     //      Пустой STATUS не трогаем: иногда MOEX его не заполняет.
-    //   4. issueSize == 0 — отменённый выпуск, формально в справочнике.
+    //   5. issueSize == 0 — отменённый выпуск, формально в справочнике.
     if(!f.showDead){
+      if(b.archivedAt) return false;
       const matY = b.matYears;
       if(matY != null && matY < 0) return false;
       if(b.matDate && matY != null && !isFinite(matY)) return false;
@@ -20188,10 +20286,12 @@ const _ARCH_REASONS = {
   cancelled:    { icon:'❎', label:'Отменено',           color:'var(--text3)',  priority: 4 },
   'pre-launch': { icon:'⏳', label:'Не стартовало',      color:'var(--text3)',  priority: 5 },
   matured:      { icon:'✓',  label:'Погашено',           color:'var(--green)',  priority: 6 },
+  delisted:     { icon:'📤', label:'Делистинг',          color:'var(--text3)',  priority: 7 },
 };
 
 function _archiveIsDead(b){
   // Те же правила, что скрытие в moexApplyFilters при showDead=false.
+  if(b.archivedAt) return true; // MOEX сняла с досок — значит умерла
   if(b.issueSize === 0) return true;
   if(b.status === 'N' || b.status === 'S') return true;
   if(b.matYears != null && b.matYears < 0) return true;
@@ -20220,6 +20320,11 @@ function _archiveClassify(b){
   if(b.issueSize === 0) return 'cancelled';
   if(b.status === 'N') return 'pre-launch';
   if(b.status === 'S') return 'suspended';
+  if(b.matYears != null && b.matYears < 0) return 'matured';
+  // Бумага в архиве, но статус 'A' и матуритет ещё не наступил — значит
+  // MOEX сняла с досок без других сигналов. Делистинг «по неясной причине»
+  // (отзыв листинга, выкуп эмитентом до оферты, и т.п.).
+  if(b.archivedAt) return 'delisted';
   return 'matured';
 }
 
