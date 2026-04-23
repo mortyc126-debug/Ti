@@ -19212,16 +19212,78 @@ async function schedulesOpen(issId, opts){
     }
   }));
 
+  // Пост-процессинг: пересчёт купонов флоатеров по активному прогнозу КС.
+  // Идентифицируем флоатеры через ytmBonds (только бумаги, добавленные
+  // пользователем в YTM с ctype='float' имеют известный spread). Для них
+  // будущие купоны пересчитываем как faceValue × (KS_прогноз + spread) ×
+  // period_days / 365 × issueSize. Живёт рядом с events в {forecastInfo}.
+  const forecastStats = _schedApplyRateForecast(results);
+
   // State — нужен _schedRerender'у и _schedSetBucket'у.
   window._schedState = {
     issId,
     issuerName: iss.name,
     results,
+    forecastStats,
     selectedSecids: new Set(issues.map(b => b.secid)),
     bucket: 'month',
     highlightPeriod: null,
   };
   _schedRerender();
+}
+
+// Пересчёт купонов флоатеров по активному прогнозу КС.
+// Ищем bond в ytmBonds по secid/isin. Если нашли с ctype='float' и spread —
+// для будущих купонных событий подставляем значение rub из формулы.
+// Возвращаем { bondsRecalc, eventsRecalc, activeLabel, activeGeneratedAt }.
+function _schedApplyRateForecast(results){
+  const stats = { bondsRecalc: 0, eventsRecalc: 0, activeLabel: null, activeGeneratedAt: null, bondsDetails: [] };
+  const active = (typeof rateGetActiveForecast === 'function') ? rateGetActiveForecast() : null;
+  if(!active || !active.trajectory || !active.trajectory.length) return stats;
+  stats.activeLabel = active.label || active.method;
+  stats.activeGeneratedAt = active.generatedAt;
+  const userBonds = Array.isArray(window.ytmBonds) ? window.ytmBonds : [];
+  if(!userBonds.length) return stats;
+  const findUser = (bond) => userBonds.find(u => {
+    if(u.isin && bond.isin && u.isin === bond.isin) return true;
+    if(u.secid && bond.secid && u.secid === bond.secid) return true;
+    if(u.name && (u.name === bond.secid || u.name === bond.isin)) return true;
+    return false;
+  });
+  const today = new Date(); today.setHours(0,0,0,0);
+  for(const r of results){
+    if(!r.bond || !Array.isArray(r.events)) continue;
+    const user = findUser(r.bond);
+    if(!user || user.ctype !== 'float') continue;
+    const spread = parseFloat(user.spread) || 0;
+    const faceValue = r.bond.faceValue || 1000;
+    const issueSize = r.bond.issueSize || 1;
+    // Период купона — из catalog или дефолт 91 день (квартальный)
+    const periodDays = r.bond.couponPeriod || 91;
+    let recalcCount = 0;
+    for(const ev of r.events){
+      if(ev.type !== 'coupon') continue;
+      const evDate = new Date(ev.date);
+      if(evDate < today) continue;                       // прошлое не трогаем
+      const daysAhead = Math.max(0, (evDate - today) / 86400000);
+      const qAhead = Math.max(1, Math.ceil(daysAhead / 91));
+      const ksFc = rateGetActiveAtQuarter(qAhead);
+      if(ksFc == null) continue;
+      const annualRate = ksFc + spread;                  // в % годовых
+      const couponRub = faceValue * (annualRate / 100) * (periodDays / 365) * issueSize;
+      ev.rub = couponRub;
+      ev.forecastApplied = true;
+      ev.forecastKS = ksFc;
+      ev.forecastSpread = spread;
+      recalcCount++;
+    }
+    if(recalcCount > 0){
+      stats.bondsRecalc++;
+      stats.eventsRecalc += recalcCount;
+      stats.bondsDetails.push({ secid: r.bond.secid, shortName: r.bond.shortName, count: recalcCount, spread });
+    }
+  }
+  return stats;
 }
 
 function _schedSetBucket(bucket){
@@ -19341,7 +19403,10 @@ function _schedRerender(){
     sumCell('Пик 12 мес', peak12.key ? (fmtRub(peak12.total) + ', ' + _schedBucketLabel(peak12.key, bucket)) : '—', ebit ? `${pctEbit(peak12.total)} от ${ebit.metric}` : '', peak12.total > 0 && ebit && peak12.total / ebit.value > 0.3 ? 'var(--danger)' : 'var(--warn)') +
     sumCell('Погашения 12/24 мес', fmtRub(totalPrincipal12) + ' / ' + fmtRub(totalPrincipal24), ebit ? `${pctEbit(totalPrincipal12)} / ${pctEbit(totalPrincipal24)} от ${ebit.metric}` : ebitNote, totalPrincipal12 > 0 && ebit && totalPrincipal12 / ebit.value > 0.5 ? 'var(--danger)' : 'var(--warn)');
 
-  document.getElementById('sched-meta').textContent = `${st.results.length} выпусков · ${allEvents.length} событий в горизонте · EBIT${ebit ? ' ' + ebit.year : ' нет'}`;
+  const fcNote = st.forecastStats && st.forecastStats.bondsRecalc > 0
+    ? ` · 🏦 ${st.forecastStats.eventsRecalc} купонов флоатеров пересчитано по <${st.forecastStats.activeLabel}>`
+    : '';
+  document.getElementById('sched-meta').textContent = `${st.results.length} выпусков · ${allEvents.length} событий в горизонте · EBIT${ebit ? ' ' + ebit.year : ' нет'}${fcNote}`;
 
   // ── SVG бар-чарт ──────────────────────────────────────────────
   const chartBox = document.getElementById('sched-chart');
