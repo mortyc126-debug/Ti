@@ -19436,7 +19436,45 @@ function _schedRerender(){
   const fcNote = st.forecastStats && st.forecastStats.bondsRecalc > 0
     ? ` · 🏦 ${st.forecastStats.eventsRecalc} купонов флоатеров пересчитано по <${st.forecastStats.activeLabel}>`
     : '';
-  document.getElementById('sched-meta').textContent = `${st.results.length} выпусков · ${allEvents.length} событий в горизонте · EBIT${ebit ? ' ' + ebit.year : ' нет'}${fcNote}`;
+  // Активность 12 мес: сводка последних размещений без привязки к
+  // рефинансированию. Показывает насколько эмитент активен на долговом
+  // рынке в целом — отдельная метрика от «пирамиды» (та требует
+  // совпадения времени размещения и погашения).
+  const showActivity12m = document.getElementById('sched-show-activity-12m')?.checked !== false;
+  let activityNote = '';
+  if(showActivity12m){
+    const year12mStart = today - 365 * 86400000;
+    const recent = [];
+    for(const r of st.results){
+      for(const ev of (r.events || [])){
+        if(ev.type !== 'issuance') continue;
+        const t = new Date(ev.date).getTime();
+        if(isFinite(t) && t >= year12mStart && t <= today) recent.push({ t, rub: ev.rub, secid: ev.secid });
+      }
+    }
+    recent.sort((a, b) => a.t - b.t);
+    const fmtRub = v => v >= 1e9 ? (v/1e9).toFixed(1) + ' млрд' : (v/1e6).toFixed(0) + ' млн';
+    if(!recent.length){
+      activityNote = ' · 🕒 12 мес: <span style="color:var(--text3)">ни одного нового размещения</span>';
+    } else {
+      const total = recent.reduce((s, e) => s + e.rub, 0);
+      const last = recent[recent.length - 1];
+      const daysAgo = Math.round((today - last.t) / 86400000);
+      // Оценка «активности»: средняя пауза между выпусками. Если она
+      // меньше трёх месяцев — считаем «часто».
+      let freqTag = '';
+      if(recent.length >= 2){
+        const gaps = [];
+        for(let i = 1; i < recent.length; i++) gaps.push((recent[i].t - recent[i-1].t) / 86400000);
+        const avgGap = Math.round(gaps.reduce((s, g) => s + g, 0) / gaps.length);
+        const freqColor = avgGap < 60 ? '#f29a8a' : avgGap < 120 ? '#f2c94c' : '#6cba7c';
+        freqTag = ` <span style="color:${freqColor}">(в среднем раз в ${avgGap} дн)</span>`;
+      }
+      activityNote = ` · 🕒 12 мес: <b>${recent.length}</b> размещ. на <b>${fmtRub(total)}</b>, последнее ${daysAgo} дн назад${freqTag}`;
+    }
+  }
+  // innerHTML — нужно для форматирования span'ами в activityNote
+  document.getElementById('sched-meta').innerHTML = `${st.results.length} выпусков · ${allEvents.length} событий в горизонте · EBIT${ebit ? ' ' + ebit.year : ' нет'}${fcNote}${activityNote}`;
 
   // ── SVG бар-чарт ──────────────────────────────────────────────
   const chartBox = document.getElementById('sched-chart');
