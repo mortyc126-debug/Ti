@@ -19960,28 +19960,33 @@ async function rateAutoImportCbr(){
   // Per-файл прогресс. Состояние трёх файлов рендерим в строку статуса
   // после каждого изменения — пользователь видит, кто скачался, а кто нет.
   const N = _RATE_CBR_AUTO_FILES.length;
-  const fileState = _RATE_CBR_AUTO_FILES.map(it => ({ name: it.name, phase: '⏳' }));
+  const fileState = _RATE_CBR_AUTO_FILES.map(it => ({ name: it.name, phase: '[ждём]' }));
   const renderProgress = () => {
     _rateSetAutoStamp(fileState.map(s => s.phase + ' ' + s.name.replace('.xlsx','')).join(' · '));
   };
   renderProgress();
+  console.log('[ratecb] auto-import: старт, прокси =', proxy);
 
   // Фаза 1 — параллельный fetch с allSettled (не ломается от одного fail)
   // и таймаутом 60 сек на каждый запрос (AbortController).
   const fetchOne = async (item, idx) => {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 60000);
+    const t0 = performance.now();
     try {
+      console.log('[ratecb] fetch', item.name, '→', buildProxiedUrl(item.url));
       const r = await fetch(buildProxiedUrl(item.url), { cache: 'no-store', signal: ctrl.signal });
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const buf = await r.arrayBuffer();
+      console.log('[ratecb] fetched', item.name, buf.byteLength, 'байт за', Math.round(performance.now() - t0), 'мс');
       if(buf.byteLength < 100) throw new Error('пустой ответ (' + buf.byteLength + ' байт)');
-      fileState[idx].phase = '⬇';
+      fileState[idx].phase = '[скач]';
       renderProgress();
       return { item, buf, error: null };
     } catch(e){
       const msg = e.name === 'AbortError' ? 'таймаут 60с' : (e.message || String(e));
-      fileState[idx].phase = '✗';
+      console.warn('[ratecb] fetch FAIL', item.name, msg);
+      fileState[idx].phase = '[ошб]';
       renderProgress();
       return { item, buf: null, error: msg };
     } finally {
@@ -20001,13 +20006,16 @@ async function rateAutoImportCbr(){
       errors.push(item.name + ': ' + error);
       continue;
     }
-    fileState[i].phase = '⚙';
+    fileState[i].phase = '[парс]';
     renderProgress();
     // Двойной yield + микропауза — даём Edge точно перерисовать UI.
     await new Promise(r => setTimeout(r, 30));
+    const t0 = performance.now();
     try {
+      console.log('[ratecb] parsing', item.name, '(', buf.byteLength, 'байт)');
       const fakeFile = { name: item.name, arrayBuffer: async () => buf };
       const parsed = await _rateParseCbrXlsx(fakeFile);
+      console.log('[ratecb] parsed', item.name, '→', parsed.type, 'за', Math.round(performance.now() - t0), 'мс');
       store[parsed.type] = {
         updatedAt: Date.now(),
         fileName: parsed.fileName,
@@ -20016,14 +20024,16 @@ async function rateAutoImportCbr(){
         latestDate: parsed.latestDate
       };
       ok++;
-      fileState[i].phase = '✓';
+      fileState[i].phase = '[ok]';
     } catch(e){
-      fileState[i].phase = '✗';
+      console.warn('[ratecb] parse FAIL', item.name, e.message || e, e);
+      fileState[i].phase = '[ошб]';
       errors.push(item.name + ': парсинг — ' + (e.message || String(e)));
     }
     renderProgress();
     await new Promise(r => setTimeout(r, 30));
   }
+  console.log('[ratecb] auto-import: финиш, ok =', ok, 'errors =', errors);
 
   // Фаза 3 — сохранение, рендер, автофил. Без блокирующих alert.
   try { localStorage.setItem('bondan_ratecb_cbrdata', JSON.stringify(store)); } catch(e){}
