@@ -102,13 +102,15 @@ exports.handler = async (event) => {
     // Разрешённые upstream-домены: ФНС БФО (bo.nalog.gov.ru), ЕГРЮЛ
     // (egrul.nalog.ru — POST API для поиска ИНН по имени + PNG капча),
     // audit-it.ru (paste-режим), buxbalans.ru (автопарсер),
-    // e-disclosure.ru (существенные факты эмитентов — поведенческий слой).
+    // e-disclosure.ru (существенные факты эмитентов — поведенческий слой),
+    // cbr.ru/dataservice (REST API Банка России — инфляция, КС, курсы).
     const ALLOWED = [
         /^https:\/\/bo\.nalog\.gov\.ru\//,
         /^https:\/\/egrul\.nalog\.ru\//,
         /^https:\/\/(www\.)?audit-it\.ru\//,
         /^https:\/\/(www\.)?buxbalans\.ru\//,
-        /^https:\/\/(www\.)?e-disclosure\.ru\//
+        /^https:\/\/(www\.)?e-disclosure\.ru\//,
+        /^https:\/\/(www\.)?cbr\.ru\/dataservice\//
     ];
     const isAllowed = (url) => ALLOWED.some((re) => re.test(url));
 
@@ -122,6 +124,8 @@ exports.handler = async (event) => {
             target = 'https://bo.nalog.gov.ru' + suffix;
         } else if (event.path.startsWith('/buh_otchet') || event.path.startsWith('/search') || event.path.startsWith('/contragent')) {
             target = 'https://www.audit-it.ru' + suffix;
+        } else if (event.path.startsWith('/dataservice')) {
+            target = 'https://www.cbr.ru' + suffix;
         } else if (/^\/\d{10}(\d{2})?\.html$/.test(event.path)) {
             target = 'https://buxbalans.ru' + suffix;
         } else if (event.path.startsWith('/search-result') || event.path.startsWith('/static/captcha') || event.path.startsWith('/captcha')) {
@@ -139,7 +143,7 @@ exports.handler = async (event) => {
                 'Cache-Control': 'no-store',
                 'Content-Type': 'text/plain; charset=utf-8'
             },
-            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru. Pass URL via ?u=https://…'
+            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice. Pass URL via ?u=https://…'
         };
     }
 
@@ -174,6 +178,7 @@ exports.handler = async (event) => {
     const isAuditIt = target.includes('audit-it.ru');
     const isEgrul = target.includes('egrul.nalog.ru');
     const isEDisclosure = target.includes('e-disclosure.ru');
+    const isCbrApi = target.includes('cbr.ru/dataservice');
 
     // POST с формой — нужен для ЕГРЮЛ (/ принимает form-urlencoded).
     // Я.Cloud шлёт тело в event.body; при бинарных методах — base64.
@@ -193,7 +198,11 @@ exports.handler = async (event) => {
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
             const reqHeaders = {
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
+                // Для cbr.ru/dataservice жёстко просим JSON, иначе сервер
+                // может отдать HTML-страницу документации.
+                'Accept': isCbrApi
+                    ? 'application/json, */*;q=0.1'
+                    : 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
                 'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
                 'Accept-Encoding': 'gzip, deflate, br',
                 // Полный браузерный фингерпринт — audit-it без Sec-*
