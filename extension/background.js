@@ -219,7 +219,11 @@ async function runBatch(inns){
 
     let url;
     if(company && company.id){
-      url = `https://www.e-disclosure.ru/portal/company.aspx?id=${company.id}`;
+      // files.aspx — именно там таблица существенных фактов
+      // (events-container). company.aspx — общая карточка с датой
+      // регистрации и ссылкой-логотипом «ЦЕНТР РАСКРЫТИЯ…» в header,
+      // парсер на ней хватает эти метаданные вместо реальных событий.
+      url = `https://www.e-disclosure.ru/portal/files.aspx?id=${company.id}`;
     } else {
       // Fallback: открываем поисковую страницу, content.js сам
       // нажмёт на первую ссылку company.aspx?id=... Это работает,
