@@ -239,6 +239,64 @@ function onYtmRate(){
   ytmRate=parseFloat(document.getElementById('ytm-rate').value);
   document.getElementById('ytm-rate-val').textContent=ytmRate+'%';
   document.getElementById('ytm-sc-col').textContent=`При КС ${ytmRate}%`;
+  // Ручное движение слайдера — сбрасываем привязку к прогнозу
+  const badge = document.getElementById('ytm-forecast-badge');
+  if(badge) badge.textContent = '';
+  const sel = document.getElementById('ytm-forecast-horizon');
+  if(sel) sel.value = '';
+  renderYtm();
+}
+
+// Подставляет в ytmRate значение из активного прогноза ratecb
+// (QPM / HLW / BVAR / ансамбль). Горизонт — в кварталах: 1/2/4/8 или 'avg'.
+function applyForecastToYtm(){
+  const sel = document.getElementById('ytm-forecast-horizon');
+  const h = sel ? sel.value : '';
+  const badge = document.getElementById('ytm-forecast-badge');
+  if(!h){
+    if(badge) badge.textContent = '';
+    return;
+  }
+  if(typeof rateGetActiveForecast !== 'function'){
+    alert('Модуль прогноза не загружен.');
+    return;
+  }
+  const active = rateGetActiveForecast();
+  if(!active || !active.trajectory || !active.trajectory.length){
+    alert('Нет активного прогноза. Откройте 🏦 Ставка → рассчитайте QPM / HLW / BVAR → нажмите «★ Сделать активным».');
+    sel.value = '';
+    return;
+  }
+  let value;
+  if(h === 'avg'){
+    // Среднее за первые 8 кварталов (2 года)
+    const horizon = Math.min(8, active.trajectory.length);
+    let s = 0;
+    for(let i = 0; i < horizon; i++) s += active.trajectory[i].i;
+    value = s / horizon;
+  } else {
+    const q = parseInt(h, 10);
+    value = rateGetActiveAtQuarter(q);
+  }
+  if(value == null || !isFinite(value)){
+    alert('Прогноз не содержит значения для выбранного горизонта.');
+    return;
+  }
+  // Слайдер range 5…20 с step 0.5 — клампим и округляем
+  const slider = document.getElementById('ytm-rate');
+  const min = parseFloat(slider.min), max = parseFloat(slider.max);
+  const clamped = Math.max(min, Math.min(max, value));
+  const rounded = Math.round(clamped * 2) / 2;   // step=0.5
+  slider.value = rounded;
+  ytmRate = rounded;
+  document.getElementById('ytm-rate-val').textContent = rounded + '%';
+  document.getElementById('ytm-sc-col').textContent = `При КС ${rounded}%`;
+  if(badge){
+    const label = active.label || active.method || 'модель';
+    const rawStr = value.toFixed(2) + '%';
+    const note = Math.abs(value - rounded) > 0.05 ? ' (окр. ' + rounded + ')' : '';
+    badge.innerHTML = '🔮 <b style="color:var(--acc)">' + label + '</b> · ' + (h === 'avg' ? 'среднее 2 года' : '+' + h + 'Q') + ' = <b>' + rawStr + '</b>' + note;
+  }
   renderYtm();
 }
 function resetYtm(){if(!ytmBonds.length||confirm('Сбросить все выпуски?')){ytmBonds=[];save();renderYtm()}}

@@ -426,6 +426,15 @@ document.addEventListener('DOMContentLoaded', () => {
     <label>Прогноз КС через 2 года:</label>
     <input type="range" id="ytm-rate" min="5" max="20" step="0.5" value="10" oninput="onYtmRate()">
     <span class="rate-badge" id="ytm-rate-val">10%</span>
+    <select id="ytm-forecast-horizon" onchange="applyForecastToYtm()" title="Подставить ставку из активного прогноза (🏦 Ставка → QPM / HLW / BVAR / ансамбль). Изменение — сразу пересчитывает YTM всех выпусков." style="padding:3px 6px;font-size:.6rem;background:var(--bg);border:1px solid var(--acc);color:var(--text1);border-radius:4px">
+      <option value="" selected>🔮 По прогнозу…</option>
+      <option value="1">+1Q (3 мес)</option>
+      <option value="2">+2Q (6 мес)</option>
+      <option value="4">+4Q (1 год)</option>
+      <option value="8">+8Q (2 года)</option>
+      <option value="avg">среднее за 2 года</option>
+    </select>
+    <span id="ytm-forecast-badge" class="muted" style="font-size:.55rem"></span>
     <span style="font-size:.59rem;color:var(--text3)">← базовый прогноз ЦБ 2027</span>
     <div style="margin-left:auto;display:flex;gap:7px">
       <button class="btn btn-sm" onclick="showPage('watchlist')">+ В список</button>
