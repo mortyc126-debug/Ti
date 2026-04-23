@@ -230,7 +230,11 @@ async function runBatch(inns){
 
     const tab = await chrome.tabs.create({ url, active: false });
     const edId = (company && company.id) ? String(company.id) : '';
-    const ok = await waitForCollect(inn, edId, tab.id, 30000);
+    // Таймаут 40 сек для fallback-пути (надо успеть: загрузить поиск →
+    // content.js триггерит поиск → JS сайта делает AJAX → редирект на
+    // карточку → парсинг). Для прямого пути (есть id) обычно хватает 10.
+    const timeout = (company && company.id) ? 20000 : 40000;
+    const ok = await waitForCollect(inn, edId, tab.id, timeout);
     if(ok){
       summary.done++;
     } else {
@@ -238,7 +242,9 @@ async function runBatch(inns){
       if(!company || !company.id) summary.notFound++;
       try { await chrome.tabs.remove(tab.id); } catch(_){}
     }
-    await new Promise(r => setTimeout(r, 2000));
+    // Между ИНН 500мс — достаточно чтобы не задушить сервер и не
+    // ловить 429, но не жадно (было 2000мс — 2/3 времени тратилось зря).
+    await new Promise(r => setTimeout(r, 500));
     emit({ idx: i + 1, inn, ok });
   }
   return summary;
