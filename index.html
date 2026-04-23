@@ -658,6 +658,14 @@ document.addEventListener('DOMContentLoaded', () => {
   <div id="wl-content">
     <div class="empty"><div class="ei">⭐</div><p>Создайте список чтобы сохранять интересные выпуски</p></div>
   </div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="card-hdr">
+      🆚 Сохранённые сравнения эмитентов
+      <span style="margin-left:auto;font-size:.56rem;color:var(--text3);font-weight:400">Собираются из «🏛 Каталог» → карточка эмитента → «➕ в сравнение» → в модалке «💾 Сохранить как»</span>
+    </div>
+    <div id="wl-compare-list" style="padding:10px 12px"></div>
+  </div>
 </div>
 
 <!-- ═══ PAGE: P&L ═══ -->
@@ -3304,6 +3312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-compare')">Закрыть</button>
+      <button class="btn btn-p" onclick="compareSaveCurrent()" title="Сохранить текущую очередь как именованный сет в «⭐ Списки». Если введёшь имя существующего сета — эмитенты добавятся к нему (merge). Новое имя — создастся новый сет.">💾 Сохранить как / добавить в</button>
       <button class="btn" onclick="compareExportCsv()">📊 Экспорт CSV</button>
       <button class="btn" onclick="compareClear();closeModal('modal-compare')">🧹 Очистить очередь</button>
     </div>

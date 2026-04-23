@@ -74,16 +74,17 @@ const CT_COLOR={fix:'var(--acc2)',float:'var(--warn)',zero:'var(--purple)'};
 const BT_TAG={ОФЗ:'tag-ofz',Корп:'tag-corp',Муни:'tag-muni'};
 
 // ══ STATE ══
-let ytmRate=10, ytmBonds=[], portfolio=[], watchlists={}, activeWL=null, calEvents=[], reportsDB={};
+let ytmRate=10, ytmBonds=[], portfolio=[], watchlists={}, activeWL=null, calEvents=[], reportsDB={}, compareSets={};
 
 function loadState(){
   try{const d=JSON.parse(localStorage.getItem('ba_v2')||'{}');
     ytmBonds=d.ytmBonds||[]; portfolio=d.portfolio||[]; watchlists=d.watchlists||{};
     calEvents=d.calEvents||[]; reportsDB=d.reportsDB||{};
+    compareSets=d.compareSets||{};
   }catch(e){}
 }
 function save(){
-  try{localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,reportsDB}))}catch(e){}
+  try{localStorage.setItem('ba_v2',JSON.stringify({ytmBonds,portfolio,watchlists,calEvents,reportsDB,compareSets}))}catch(e){}
 }
 
 // ══ NAV ══
@@ -119,7 +120,7 @@ function showPage(n, opts){
   const backBtn = document.getElementById('nav-back-btn');
   if(backBtn) backBtn.style.visibility = _navHistoryStack.length ? 'visible' : 'hidden';
   if(n==='portfolio') renderPort();
-  if(n==='watchlist') renderWL();
+  if(n==='watchlist'){ renderWL(); _compareRenderSavedList(); }
   if(n==='ytm') renderYtm();
   if(n==='calendar'){renderCalendar();updateCalStats();}
   if(n==='reports') repInit();
@@ -13274,6 +13275,7 @@ function applyImportedJsonText(raw){
     if(d.watchlists) watchlists = d.watchlists;
     if(d.calEvents)  calEvents  = d.calEvents;
     if(d.reportsDB)  reportsDB  = d.reportsDB;
+    if(d.compareSets) compareSets = d.compareSets;
   } else {
     mergeImportedData(d);
   }
@@ -14849,14 +14851,14 @@ function _syncBuildSnapshot(){
   try { industryMedians = JSON.parse(localStorage.getItem('bondan_industry_medians') || 'null'); } catch(e){}
   try { rosstatRatios = JSON.parse(localStorage.getItem('bondan_rosstat_ratios') || 'null'); } catch(e){}
   return {
-    ytmBonds, portfolio, watchlists, calEvents, reportsDB,
+    ytmBonds, portfolio, watchlists, calEvents, reportsDB, compareSets,
     refs,
     industryPeers,
     industryMedians,
     rosstatRatios,
     girboProxy: localStorage.getItem('bondan_girbo_proxy') || '',
     apiKey: localStorage.getItem('ba_apikey') || '',
-    meta: {schemaVersion: 6}, // v6: reportsDB[id].dossier + .issues (досье эмитента + паспорта выпусков)
+    meta: {schemaVersion: 7}, // v7: compareSets — сохранённые сравнения эмитентов
     savedAt: new Date().toISOString()
   };
 }
@@ -14945,6 +14947,7 @@ async function syncCloudLoad(){
     if(d.watchlists) watchlists = d.watchlists;
     if(d.calEvents)  calEvents  = d.calEvents;
     if(d.reportsDB)  reportsDB  = d.reportsDB;
+    if(d.compareSets) compareSets = d.compareSets;
     if(Array.isArray(d.refs) && d.refs.length){
       try {
         const local = JSON.parse(localStorage.getItem('bondan_refs') || '[]');
@@ -15277,6 +15280,7 @@ async function gistLoad() {
     if(d.watchlists) watchlists = d.watchlists;
     if(d.calEvents)  calEvents  = d.calEvents;
     if(d.reportsDB)  reportsDB  = d.reportsDB;
+    if(d.compareSets) compareSets = d.compareSets;
     // Эталоны сверки — сливаем с локальными по ключу «ИНН+период»,
     // записи из gist перезаписывают локальные (приоритет облаку).
     if(Array.isArray(d.refs) && d.refs.length){
@@ -18933,6 +18937,142 @@ function compareOpen(){
 
   document.getElementById('compare-header-meta').textContent = `${items.length} эмитентов, ${_COMPARE_METRICS.length} метрик`;
   document.getElementById('modal-compare').classList.add('open');
+}
+
+// ── Сохранённые сравнения (compareSets) ───────────────────────────
+// Структура: compareSets[id] = { name, issuerIds: [...], createdAt, updatedAt }.
+// Живёт в ba_v2, попадает в sync snapshot (v7).
+
+function _compareSetNextId(){
+  let n = 1;
+  while(compareSets['cs_' + n]) n++;
+  return 'cs_' + n;
+}
+
+// Сохранить текущую очередь как новый сет либо добавить в существующий.
+function compareSaveCurrent(){
+  const set = window._compareIssuers;
+  if(!set || !set.size){ alert('Очередь пустая — нечего сохранять.'); return; }
+  const existing = Object.values(compareSets);
+  const hint = existing.length
+    ? `\nСуществующие сеты: ${existing.map(s => s.name).join(', ')}\nВведи существующее имя — добавится туда. Новое — создастся новый.`
+    : '';
+  const name = prompt('Имя сравнения (например «ВДО-застройщики 2026»):' + hint, '');
+  if(!name) return;
+  const clean = name.trim();
+  if(!clean) return;
+  // Ищем существующий по имени.
+  const existingEntry = Object.entries(compareSets).find(([, s]) => s.name === clean);
+  const now = new Date().toISOString();
+  let merged;
+  if(existingEntry){
+    const [id, s] = existingEntry;
+    const combined = new Set([...(s.issuerIds || []), ...set]);
+    compareSets[id] = { ...s, issuerIds: [...combined], updatedAt: now };
+    merged = compareSets[id];
+    alert(`Добавлено в «${clean}». Теперь в сете ${merged.issuerIds.length} эмитентов.`);
+  } else {
+    const id = _compareSetNextId();
+    compareSets[id] = { name: clean, issuerIds: [...set], createdAt: now, updatedAt: now };
+    merged = compareSets[id];
+    alert(`Сохранено «${clean}», эмитентов: ${merged.issuerIds.length}.`);
+  }
+  save();
+  _compareRenderSavedList();
+}
+
+// Загрузить сохранённый сет в очередь (заменяет текущую).
+function compareLoadSet(id){
+  const s = compareSets[id];
+  if(!s){ alert('Сет не найден'); return; }
+  window._compareIssuers = new Set(s.issuerIds || []);
+  _compareRenderFloater();
+  _compareRenderSavedList();
+  compareOpen();
+}
+
+// Добавить текущую очередь в сохранённый сет (merge).
+function compareAddToSet(id){
+  const s = compareSets[id];
+  if(!s){ alert('Сет не найден'); return; }
+  const before = new Set(s.issuerIds || []);
+  const beforeN = before.size;
+  for(const x of window._compareIssuers) before.add(x);
+  s.issuerIds = [...before];
+  s.updatedAt = new Date().toISOString();
+  const added = before.size - beforeN;
+  save();
+  _compareRenderSavedList();
+  alert(`Добавлено в «${s.name}»: ${added} новых, всего ${before.size}.`);
+}
+
+function compareDeleteSet(id){
+  const s = compareSets[id];
+  if(!s){ return; }
+  if(!confirm(`Удалить сет «${s.name}» (${(s.issuerIds||[]).length} эмитентов)?`)) return;
+  delete compareSets[id];
+  save();
+  _compareRenderSavedList();
+}
+
+function compareRenameSet(id){
+  const s = compareSets[id];
+  if(!s){ return; }
+  const n = prompt('Новое имя:', s.name);
+  if(!n) return;
+  const clean = n.trim();
+  if(!clean || clean === s.name) return;
+  s.name = clean;
+  s.updatedAt = new Date().toISOString();
+  save();
+  _compareRenderSavedList();
+}
+
+// Убрать одного эмитента из сохранённого сета без пересоздания.
+function compareRemoveFromSet(id, issId){
+  const s = compareSets[id];
+  if(!s) return;
+  s.issuerIds = (s.issuerIds || []).filter(x => x !== issId);
+  s.updatedAt = new Date().toISOString();
+  save();
+  _compareRenderSavedList();
+}
+
+// Рендер списка сохранённых в панели «⭐ Списки».
+function _compareRenderSavedList(){
+  const box = document.getElementById('wl-compare-list');
+  if(!box) return;
+  const ids = Object.keys(compareSets);
+  if(!ids.length){
+    box.innerHTML = '<div style="padding:10px;color:var(--text3);font-size:.62rem">Сохранённых сравнений пока нет. Открой «🏛 Каталог» → эмитента → «➕ в сравнение», собери очередь и в модалке «🆚 Сравнение» нажми «💾 Сохранить».</div>';
+    return;
+  }
+  const entries = ids.map(id => [id, compareSets[id]])
+    .sort((a, b) => (b[1].updatedAt || '').localeCompare(a[1].updatedAt || ''));
+  box.innerHTML = entries.map(([id, s]) => {
+    const names = (s.issuerIds || []).slice(0, 4).map(iId => _escHtml((reportsDB[iId]?.name || '?').split(' ').slice(0, 2).join(' '))).join(' · ');
+    const more = (s.issuerIds || []).length > 4 ? ` · и ещё ${s.issuerIds.length - 4}` : '';
+    const upd = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString('ru-RU') : '';
+    return `
+      <div style="padding:10px 12px;border:1px solid var(--border);background:var(--bg);margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="color:var(--acc);font-size:.72rem">${_escHtml(s.name)}</strong>
+          <span style="color:var(--text3);font-size:.56rem">${(s.issuerIds||[]).length} эмитентов · ${upd}</span>
+          <div style="flex:1"></div>
+          <button class="btn btn-sm btn-p" onclick="compareLoadSet('${id}')" title="Загрузить в очередь и открыть модалку сравнения">📂 Открыть</button>
+          <button class="btn btn-sm" onclick="compareAddToSet('${id}')" title="Добавить текущую очередь в этот сет (merge)">➕ Добавить текущую очередь</button>
+          <button class="btn btn-sm" onclick="compareRenameSet('${id}')" title="Переименовать">✎</button>
+          <button class="btn btn-sm btn-d" onclick="compareDeleteSet('${id}')" title="Удалить сет">🗑</button>
+        </div>
+        <div style="margin-top:6px;font-size:.58rem;color:var(--text3)">${names}${more}</div>
+        <div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap">
+          ${(s.issuerIds || []).map(iId => {
+            const name = reportsDB[iId]?.name || '?';
+            return `<span style="padding:1px 6px;background:var(--s2);border:1px solid var(--border2);font-size:.52rem;color:var(--text2)">${_escHtml(name.split(' ').slice(0,2).join(' '))} <span style="color:var(--text3);cursor:pointer;margin-left:3px" onclick="compareRemoveFromSet('${id}','${iId}')" title="Убрать из сета">✕</span></span>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 function compareExportCsv(){
