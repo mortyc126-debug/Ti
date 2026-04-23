@@ -19960,9 +19960,13 @@ async function rateAutoImportCbr(){
         const path = item.url.replace(/^https?:\/\/(www\.)?cbr\.ru/, '');
         proxiedUrl = base + path;
       }
-      const r = await fetch(proxiedUrl);
+      // cache: 'no-store' — обходим browser disk cache. Без этого если
+      // ранний запрос вернул 0 байт (прокси без актуального ALLOWED),
+      // повторные fetch будут отдавать пустоту бесконечно.
+      const r = await fetch(proxiedUrl, { cache: 'no-store' });
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const buf = await r.arrayBuffer();
+      if(buf.byteLength < 100) throw new Error('пустой ответ (' + buf.byteLength + ' байт) — проверьте, что прокси задеплоен с актуальным ALLOWED');
       // Имитируем интерфейс File (только нужное поле — arrayBuffer + name)
       const fakeFile = { name: item.name, arrayBuffer: async () => buf };
       const parsed = await _rateParseCbrXlsx(fakeFile);
