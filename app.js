@@ -235,11 +235,17 @@ function onYtmCType(){
   document.getElementById('yf-float-row').style.display=t==='float'?'':'none';
   document.getElementById('yf-zero-row').style.display=t==='zero'?'':'none';
 }
+// Режим расчёта YTM. false — одно число ytmRate для всех бумаг (старое
+// поведение). true — для каждой бумаги своя средняя КС по прогнозной
+// траектории до её срока погашения (правильный расчёт для флоатеров).
+let _ytmUseTrajectory = false;
+
 function onYtmRate(){
   ytmRate=parseFloat(document.getElementById('ytm-rate').value);
   document.getElementById('ytm-rate-val').textContent=ytmRate+'%';
   document.getElementById('ytm-sc-col').textContent=`При КС ${ytmRate}%`;
   // Ручное движение слайдера — сбрасываем привязку к прогнозу
+  _ytmUseTrajectory = false;
   const badge = document.getElementById('ytm-forecast-badge');
   if(badge) badge.textContent = '';
   const sel = document.getElementById('ytm-forecast-horizon');
@@ -247,13 +253,33 @@ function onYtmRate(){
   renderYtm();
 }
 
+// Средняя КС по прогнозной траектории за years лет (months = years*12).
+// Trajectory — массив из 8 квартальных точек; месяц m попадает в квартал
+// ceil(m/3). Для m > 24 (за пределами прогноза) используем last value
+// как flat-экстраполяцию.
+function _ytmAvgRateToMaturity(years){
+  if(typeof rateGetActiveForecast !== 'function') return null;
+  const active = rateGetActiveForecast();
+  if(!active || !Array.isArray(active.trajectory) || !active.trajectory.length) return null;
+  const traj = active.trajectory;
+  const monthsTotal = Math.max(1, Math.round(years * 12));
+  let sum = 0;
+  for(let m = 1; m <= monthsTotal; m++){
+    const qIdx = Math.min(traj.length - 1, Math.ceil(m / 3) - 1);
+    sum += traj[Math.max(0, qIdx)].i;
+  }
+  return sum / monthsTotal;
+}
+
 // Подставляет в ytmRate значение из активного прогноза ratecb
-// (QPM / HLW / BVAR / ансамбль). Горизонт — в кварталах: 1/2/4/8 или 'avg'.
+// (QPM / HLW / BVAR / ансамбль). Горизонт — в кварталах: 1/2/4/8 или 'avg',
+// либо 'traj' — режим «у каждой бумаги своя средняя КС до её погашения».
 function applyForecastToYtm(){
   const sel = document.getElementById('ytm-forecast-horizon');
   const h = sel ? sel.value : '';
   const badge = document.getElementById('ytm-forecast-badge');
   if(!h){
+    _ytmUseTrajectory = false;
     if(badge) badge.textContent = '';
     return;
   }
@@ -267,6 +293,19 @@ function applyForecastToYtm(){
     sel.value = '';
     return;
   }
+  // Режим траектории — включаем флаг, renderYtm сам посчитает для каждой
+  // бумаги свою среднюю.
+  if(h === 'traj'){
+    _ytmUseTrajectory = true;
+    if(badge){
+      const label = active.label || active.method || 'модель';
+      badge.innerHTML = '⚡ <b style="color:var(--acc)">' + label + '</b> · траектория до погашения каждой бумаги';
+    }
+    renderYtm();
+    return;
+  }
+  // Остальные режимы — одно число ytmRate
+  _ytmUseTrajectory = false;
   let value;
   if(h === 'avg'){
     // Среднее за первые 8 кварталов (2 года)
@@ -444,19 +483,27 @@ function renderYtm(){
 
   const en=ytmBonds.map(b=>{
     let ytmS,dPct;
+    // Эффективная ставка — своя для каждой бумаги в режиме траектории
+    // (средняя прогнозная КС за срок до её погашения), иначе одно число.
+    let eff = ytmRate;
+    let effLabel = null;
+    if(_ytmUseTrajectory){
+      const avg = _ytmAvgRateToMaturity(b.years);
+      if(avg != null){ eff = avg; effLabel = avg.toFixed(2); }
+    }
     if(b.ctype==='float'){
-      const fb=b.base==='RUONIA'?ytmRate-.5:ytmRate;
+      const fb=b.base==='RUONIA'?eff-.5:eff;
       ytmS=fb+(b.spread||0); dPct=0;
     }else if(b.ctype==='zero'){
-      const nY=b.ytm*(ytmRate/RATE_NOW);
+      const nY=b.ytm*(eff/RATE_NOW);
       const nP=100/Math.pow(1+nY/100,b.years);
       dPct=(nP-b.price)/b.price*100; ytmS=b.ytm+dPct/b.years;
     }else{
-      const nY=b.ytm*(ytmRate/RATE_NOW);
+      const nY=b.ytm*(eff/RATE_NOW);
       const nP=priceAtY(b.coupon,b.years,nY);
       dPct=(nP-b.price)/b.price*100; ytmS=b.ytm+dPct/b.years;
     }
-    return{...b,ytmS,dPct};
+    return{...b,ytmS,dPct,effRate:eff,effLabel};
   }).sort((a,b)=>b.ytmS-a.ytmS);
 
   const maxS=en[0].ytmS, minS=en[en.length-1].ytmS;
@@ -8259,32 +8306,73 @@ function _repRenderIssuerBonds(){
     if(aLive !== bLive) return aLive - bLive;
     return am - bm;
   });
+  // Запоминаем последний набор — для кнопки «📋 ISIN всех».
+  window._repLastIssuerBonds = bonds;
+
+  // Эвристика «флоатер?» — совпадает с той что используется на странице
+  // каталога MOEX (_moexParsePageBoard). Не идеально, но покрывает
+  // большинство реальных случаев.
+  const isFloater = (b) => {
+    if(b.bondType && /плавающ|переменн|флоат/i.test(b.bondType)) return true;
+    if(/КС\b|RUONIA|ИПЦ|FLT|флоат|переменн/i.test(b.secName || b.shortName || '')) return true;
+    if(b.coupon != null && b.coupon < 1 && b.couponPeriod && b.couponPeriod < 95) return true;
+    return false;
+  };
+  const hasOffer = (b) => !!b.offerDate;
+  let cntFloat0 = 0, cntOffer = 0;
+
   const rows = bonds.map(b => {
     const mat = b.matDate ? (new Date(b.matDate).getTime() - today) / (365.25 * 86400000) : null;
     const matLabel = mat == null ? '—' : (mat <= 0 ? '<span style="color:var(--text3)">погашен</span>' : _fmtMat(mat));
     const ytm = b.ytm != null ? b.ytm.toFixed(2) + '%' : '—';
-    const coup = b.coupon != null ? b.coupon.toFixed(2) + '%' : '—';
+    const fl = isFloater(b);
+    const coupZero = fl && (b.coupon == null || b.coupon === 0 || b.coupon < 0.01);
+    if(coupZero) cntFloat0++;
+    const coupLabel = coupZero
+      ? '<span title="Флоатер, купон = 0: следующий купон ещё не зафиксирован (ждёт заседания ЦБ). Когда зафиксируют — в MOEX появится значение. До этого реальная ставка примерно КС + спред." style="color:var(--warn)">⚠ КС+?</span>'
+      : fl
+        ? '<span title="Флоатер. Отображённый купон — последняя зафиксированная ставка. Следующие меняются по формуле КС + спред." style="color:var(--warn)">' + (b.coupon != null ? b.coupon.toFixed(2) + '%' : '—') + '</span>'
+        : (b.coupon != null ? b.coupon.toFixed(2) + '%' : '—');
+    const ofr = hasOffer(b);
+    if(ofr) cntOffer++;
+    const offerBadge = ofr
+      ? '<span title="Оферта ' + b.offerDate + '. Эмитент может выкупить бумагу досрочно либо держатель может предъявить её к выкупу. На эту дату рассчитывается YTM-to-put/call." style="color:var(--acc);font-size:.52rem;margin-left:4px">🔔</span>'
+      : '';
+    const floatBadge = fl && !coupZero ? '<span title="Флоатер" style="color:var(--warn);font-size:.52rem;margin-left:4px">⚡</span>' : '';
     const sizeM = b.issueSize && b.faceValue ? Math.round(b.issueSize * b.faceValue / 1e6).toLocaleString('ru-RU') + ' млн' : '—';
     const ytmColor = b.ytm > 20 ? 'var(--warn)' : b.ytm > 15 ? 'var(--green)' : 'var(--text)';
     return `<tr style="border-top:1px solid var(--border)">
-      <td style="padding:3px 8px"><strong>${_escHtml(b.shortName || b.secid)}</strong> <span style="color:var(--text3);font-family:var(--mono);font-size:.54rem">${_escHtml(b.isin || b.secid)}</span></td>
+      <td style="padding:3px 8px"><strong>${_escHtml(b.shortName || b.secid)}</strong>${floatBadge}${offerBadge} <span style="color:var(--text3);font-family:var(--mono);font-size:.54rem">${_escHtml(b.isin || b.secid)}</span></td>
       <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:${ytmColor}"><strong>${ytm}</strong></td>
-      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${coup}</td>
-      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${matLabel}${b.matDate ? `<span style="color:var(--text3);font-size:.54rem"> (${b.matDate})</span>` : ''}</td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono)">${coupLabel}</td>
+      <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${matLabel}${b.matDate ? `<span style="color:var(--text3);font-size:.54rem"> (${b.matDate})</span>` : ''}${ofr ? `<div style="color:var(--acc);font-size:.52rem">оферта ${b.offerDate}</div>` : ''}</td>
       <td style="padding:3px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${sizeM}</td>
       <td style="padding:3px 8px;text-align:right"><button class="btn btn-sm" onclick="moexAddToYtm('${b.secid}')" style="padding:1px 6px;font-size:.52rem" title="Добавить в Сравнение YTM">+ YTM</button></td>
     </tr>`;
   }).join('');
+
+  const badgesSummary = [];
+  if(cntFloat0 > 0) badgesSummary.push('<span style="color:var(--warn)">⚠ ' + cntFloat0 + ' флоатер(-ов) с нулевым купоном</span>');
+  if(cntOffer > 0)  badgesSummary.push('<span style="color:var(--acc)">🔔 ' + cntOffer + ' оферт(-а)</span>');
+  const summaryExtra = badgesSummary.length ? ' · ' + badgesSummary.join(' · ') : '';
+
+  // details БЕЗ open — по умолчанию свёрнут, иначе таблица 20+ бумаг
+  // занимала весь экран и мешала работе с отчётностью.
   box.innerHTML = `
-    <details style="background:var(--s2);border:1px solid var(--border)" open>
-      <summary style="cursor:pointer;padding:6px 10px;font-size:.62rem;color:var(--text)">💼 Выпуски эмитента на MOEX: <strong>${bonds.length}</strong></summary>
+    <details style="background:var(--s2);border:1px solid var(--border)">
+      <summary style="cursor:pointer;padding:6px 10px;font-size:.62rem;color:var(--text)">💼 Выпуски эмитента на MOEX: <strong>${bonds.length}</strong>${summaryExtra}</summary>
+      <div style="padding:6px 10px;background:var(--s3);display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-sm" onclick="_repCopyIssuerBondsISIN()" style="padding:2px 8px;font-size:.56rem" title="Скопировать ISIN всех выпусков эмитента, по одному на строку. Можно вставить в YTM-сравнение, watchlist и т.д.">📋 ISIN всех</button>
+        <button class="btn btn-sm" onclick="_repCopyIssuerBondsTable()" style="padding:2px 8px;font-size:.56rem" title="Скопировать всю таблицу в виде TSV (Tab-separated) — удобно вставлять в Excel/Sheets.">📋 Таблица TSV</button>
+        <span class="muted" style="font-size:.54rem">легенда: ⚡ флоатер · ⚠ флоатер без фикс. купона · 🔔 оферта</span>
+      </div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:.6rem">
           <thead><tr style="background:var(--s3);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
             <th style="padding:4px 8px;text-align:left">Бумага</th>
             <th style="padding:4px 8px;text-align:right">YTM</th>
             <th style="padding:4px 8px;text-align:right">Купон</th>
-            <th style="padding:4px 8px;text-align:right">Срок</th>
+            <th style="padding:4px 8px;text-align:right">Срок / оферта</th>
             <th style="padding:4px 8px;text-align:right">Объём</th>
             <th style="padding:4px 8px"></th>
           </tr></thead>
@@ -8293,6 +8381,54 @@ function _repRenderIssuerBonds(){
       </div>
     </details>
   `;
+}
+
+// Копирование всех ISIN текущего эмитента в буфер (по одному на строку).
+function _repCopyIssuerBondsISIN(){
+  const bonds = window._repLastIssuerBonds || [];
+  if(!bonds.length){ alert('Нет выпусков'); return; }
+  const text = bonds.map(b => b.isin || b.secid).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    _flashToast('📋 Скопировано: ' + bonds.length + ' ISIN');
+  }).catch(() => {
+    prompt('Скопируй вручную:', text);
+  });
+}
+
+// Копирование таблицы в формате TSV (Tab-Separated) — для Excel/Sheets.
+function _repCopyIssuerBondsTable(){
+  const bonds = window._repLastIssuerBonds || [];
+  if(!bonds.length){ alert('Нет выпусков'); return; }
+  const header = ['ISIN', 'SECID', 'Короткое имя', 'Полное имя', 'YTM %', 'Купон %', 'Дата погашения', 'Оферта', 'Объём млн', 'Тип'].join('\t');
+  const rows = bonds.map(b => [
+    b.isin || '', b.secid || '', b.shortName || '', b.secName || '',
+    b.ytm != null ? b.ytm.toFixed(2) : '',
+    b.coupon != null ? b.coupon.toFixed(2) : '',
+    b.matDate || '', b.offerDate || '',
+    b.issueSize && b.faceValue ? Math.round(b.issueSize * b.faceValue / 1e6) : '',
+    b.bondType || ''
+  ].join('\t'));
+  const text = [header, ...rows].join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    _flashToast('📋 Скопирована таблица: ' + bonds.length + ' строк');
+  }).catch(() => {
+    prompt('Скопируй вручную (TSV):', text);
+  });
+}
+
+// Простой toast-уведомление — используется для copy-сообщений.
+function _flashToast(msg){
+  let el = document.getElementById('_flash-toast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = '_flash-toast';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--acc);color:var(--bg);padding:8px 16px;border-radius:6px;font-size:.7rem;font-weight:600;z-index:9999;box-shadow:0 4px 14px rgba(0,0,0,.5);transition:opacity .3s';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 1800);
 }
 
 // Видимость кнопок «✎ Редактировать / 🗑 Удалить период» — ON, если у
