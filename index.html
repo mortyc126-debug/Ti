@@ -345,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn" onclick="showPage('issuer')">🏢 Эмитент</button>
     <button class="nav-btn nav-sep" onclick="showPage('reports')">📂 Отчётность</button>
     <button class="nav-btn" onclick="showPage('portfolio')">💼 Портфель</button>
+    <button class="nav-btn" onclick="showPage('portpay')" title="Календарь и график будущих выплат по бумагам в портфеле — купоны, амортизации, погашения, оферты. Сводно за 12 мес и поэтапно по датам.">📅 Выплаты</button>
     <button class="nav-btn" onclick="showPage('pnl')">💰 P&amp;L</button>
     <button class="nav-btn nav-sep" onclick="showPage('watchlist')">⭐ Списки</button>
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
@@ -385,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="sb-sec">
     <div class="sb-lbl">Портфель</div>
     <div class="sb-item" onclick="showPage('portfolio');sbAct(this)"><span class="sb-icon">💼</span>Позиции<span class="sb-badge" id="sb-pc">0</span></div>
+    <div class="sb-item" onclick="showPage('portpay');sbAct(this)" title="Календарь выплат портфеля + распределение fixed/floating, концентрация эмитентов и отраслей."><span class="sb-icon">📅</span>Выплаты по портфелю<span class="sb-badge" id="sb-pay" style="display:none">—</span></div>
     <div class="sb-item" onclick="showPage('pnl');sbAct(this)"><span class="sb-icon">💰</span>P&amp;L / Безубыток</div>
     <div class="sb-item" onclick="showPage('watchlist');sbAct(this)"><span class="sb-icon">⭐</span>Сравнение YTM (избранное)</div>
   </div>
@@ -679,6 +681,39 @@ document.addEventListener('DOMContentLoaded', () => {
       <span style="margin-left:auto;font-size:.56rem;color:var(--text3);font-weight:400">Собираются из «🏛 Каталог» → карточка эмитента → «➕ в сравнение» → в модалке «💾 Сохранить как»</span>
     </div>
     <div id="wl-compare-list" style="padding:10px 12px"></div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: PORTPAY (выплаты по портфелю) ═══ -->
+<div class="page" id="page-portpay">
+  <div class="page-title">📅 Выплаты по портфелю</div>
+  <div class="page-sub">Будущие купоны, амортизации, погашения, оферты — на 12 месяцев вперёд</div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:.66rem;color:var(--text2);line-height:1.55">
+    Расчёт выплат по позициям из <b>💼 Портфель</b> (только бумаги с ISIN). Купоны и амортизации тянутся из MOEX по каждому выпуску, умножаются на ваше количество. Купон считается <b>фиксированным</b>, если в bondization уже есть конкретное значение в рублях — для следующих периодов флоатеров оно ещё не зафиксировано (отдельная категория).
+  </div>
+
+  <!-- Шапка-сводка -->
+  <div id="portpay-summary" style="margin-top:12px"></div>
+
+  <!-- Месячный bar-chart -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📈 По месяцам — следующие 12</span>
+      <span class="muted" id="portpay-meta" style="font-size:.58rem"></span>
+    </div>
+    <div id="portpay-chart" style="margin-top:8px;min-height:240px"></div>
+  </div>
+
+  <!-- Список ближайших -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr">📋 Ближайшие выплаты</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 8px">
+      <button class="btn btn-sm" onclick="_portPayRefetch()" title="Перезагрузить bondization для всех позиций (минуя кэш). Может быть медленно при большом портфеле.">🔄 Обновить из MOEX</button>
+      <button class="btn btn-sm" onclick="_portPayExportCsv()" title="Экспорт всех будущих выплат в CSV для Excel/таблицы.">📥 CSV</button>
+      <span class="muted" id="portpay-status" style="font-size:.58rem;align-self:center;margin-left:8px"></span>
+    </div>
+    <div id="portpay-list" style="overflow-x:auto"></div>
   </div>
 </div>
 

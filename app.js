@@ -111,7 +111,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','links','shares','futures','archive'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','portpay','pnl','watchlist','calendar','ratecb','industries','cross','links','shares','futures','archive'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -120,6 +120,7 @@ function showPage(n, opts){
   const backBtn = document.getElementById('nav-back-btn');
   if(backBtn) backBtn.style.visibility = _navHistoryStack.length ? 'visible' : 'hidden';
   if(n==='portfolio') renderPort();
+  if(n==='portpay') portPayInit();
   if(n==='watchlist'){ renderWL(); _compareRenderSavedList(); }
   if(n==='ytm') renderYtm();
   if(n==='calendar'){renderCalendar();updateCalStats();}
@@ -21865,7 +21866,7 @@ function archiveExportSurvivalCsv(){
   const run = () => {
     try {
       const saved = localStorage.getItem('ba_active_page');
-      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','links','moex','shares','futures','archive'];
+      const valid = ['ytm','issuer','reports','portfolio','portpay','pnl','watchlist','calendar','ratecb','industries','cross','links','moex','shares','futures','archive'];
       if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
         showPage(saved);
       }
@@ -24410,4 +24411,379 @@ async function worldFetchAll(){
     await new Promise(r => setTimeout(r, 300));  // пауза чтобы не забить rate limit
   }
   if(st) st.innerHTML = '<span>Готово: ' + ok + ' из ' + _WORLD_PRESETS.length + ' загружено</span>';
+}
+
+// ═══ PORTPAY: выплаты по портфелю ═════════════════════════════════════════
+// Календарь и график будущих купонов/амортизаций/погашений по позициям
+// в portfolio. Используем bondization.json от MOEX (тот же что и
+// «📅 График выплат» эмитента), но per-bond значения умножаем на p.qty.
+
+const _PP_CACHE_KEY = 'bondan_portpay_bondization';   // отдельный от _SCHED
+const _PP_TTL_MS = 7 * 24 * 3600 * 1000;
+let _ppState = null;        // { events: [...], summary: {...}, loaded: 0, total: 0 }
+
+// Per-bond парсер bondization. В отличие от _schedParseBondization
+// возвращает значение на ОДНУ бумагу + флаги fixed/pending.
+function _ppParseBondization(resp, secid){
+  const events = [];
+  const cs = resp?.coupons;
+  if(cs && Array.isArray(cs.columns) && Array.isArray(cs.data)){
+    const dIdx = cs.columns.indexOf('coupondate');
+    const valRubIdx = cs.columns.indexOf('value_rub');
+    const valIdx = cs.columns.indexOf('value');
+    const rateIdx = cs.columns.indexOf('valueprc');
+    for(const row of cs.data){
+      const date = dIdx >= 0 ? row[dIdx] : null;
+      if(!date) continue;
+      let perBond = valRubIdx >= 0 ? parseFloat(row[valRubIdx]) : null;
+      if(perBond == null || !isFinite(perBond)) perBond = valIdx >= 0 ? parseFloat(row[valIdx]) : null;
+      const rate = rateIdx >= 0 ? parseFloat(row[rateIdx]) : null;
+      // Купон считается «зафиксированным», если есть конкретное значение в рублях
+      // (> 0). Для будущих периодов флоатеров MOEX отдаёт null/0 → pending.
+      const fixed = perBond != null && isFinite(perBond) && perBond > 0;
+      events.push({ date, type: 'coupon', perBond: fixed ? perBond : 0, rate: isFinite(rate) ? rate : null, fixed, secid });
+    }
+  }
+  const am = resp?.amortizations;
+  if(am && Array.isArray(am.columns) && Array.isArray(am.data)){
+    const dIdx = am.columns.indexOf('amortdate');
+    const valRubIdx = am.columns.indexOf('value_rub');
+    const valIdx = am.columns.indexOf('value');
+    for(const row of am.data){
+      const date = dIdx >= 0 ? row[dIdx] : null;
+      if(!date) continue;
+      let perBond = valRubIdx >= 0 ? parseFloat(row[valRubIdx]) : null;
+      if(perBond == null || !isFinite(perBond)) perBond = valIdx >= 0 ? parseFloat(row[valIdx]) : null;
+      if(perBond == null || !isFinite(perBond) || perBond <= 0) continue;
+      events.push({ date, type: 'principal', perBond, fixed: true, secid });
+    }
+  }
+  return events;
+}
+
+function _ppLoadCache(){
+  try { return JSON.parse(localStorage.getItem(_PP_CACHE_KEY) || '{}'); } catch(_){ return {}; }
+}
+function _ppSaveCache(c){
+  try { localStorage.setItem(_PP_CACHE_KEY, JSON.stringify(c)); } catch(_){}
+}
+
+async function _ppFetch(secid, force){
+  const cache = _ppLoadCache();
+  const now = Date.now();
+  if(!force && cache[secid] && (now - cache[secid].fetchedAt < _PP_TTL_MS)){
+    return cache[secid].events || [];
+  }
+  const resp = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}/bondization.json?iss.meta=off`);
+  const events = _ppParseBondization(resp, secid);
+  cache[secid] = { events, fetchedAt: now };
+  _ppSaveCache(cache);
+  return events;
+}
+
+async function portPayInit(opts){
+  const force = !!(opts && opts.force);
+  const summBox = document.getElementById('portpay-summary');
+  const chartBox = document.getElementById('portpay-chart');
+  const listBox = document.getElementById('portpay-list');
+  const status = document.getElementById('portpay-status');
+  const meta = document.getElementById('portpay-meta');
+  if(!Array.isArray(portfolio) || !portfolio.length){
+    summBox.innerHTML = '<div class="muted" style="padding:12px">Портфель пуст. Добавьте позиции на странице «💼 Портфель».</div>';
+    chartBox.innerHTML = ''; listBox.innerHTML = '';
+    return;
+  }
+  const positions = portfolio.filter(p => p.isin && p.qty > 0);
+  if(!positions.length){
+    summBox.innerHTML = '<div class="muted" style="padding:12px">В портфеле нет позиций с ISIN. Добавьте ISIN или перетяните выпуски с MOEX.</div>';
+    return;
+  }
+  if(status) status.textContent = '⏳ Загружаем bondization для ' + positions.length + ' позиций…';
+  // Параллельно тянем bondization
+  const fetchResults = await Promise.all(positions.map(async p => {
+    try {
+      const evs = await _ppFetch(p.isin, force);
+      return { pos: p, events: evs, error: null };
+    } catch(e){
+      return { pos: p, events: [], error: e.message || 'ошибка' };
+    }
+  }));
+  // Свести events
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayMs = today.getTime();
+  const horizonMs = todayMs + 365 * 86400000;
+  const all = [];
+  let nErrs = 0;
+  for(const r of fetchResults){
+    if(r.error){ nErrs++; continue; }
+    const p = r.pos;
+    const qty = parseFloat(p.qty) || 0;
+    for(const ev of r.events){
+      const t = new Date(ev.date).getTime();
+      if(!isFinite(t) || t < todayMs || t > horizonMs) continue;
+      const rub = (ev.perBond || 0) * qty;
+      all.push({
+        date: ev.date,
+        t,
+        type: ev.type,
+        rub,
+        fixed: ev.fixed,
+        rate: ev.rate,
+        qty,
+        secid: ev.secid,
+        isin: p.isin,
+        name: p.name || ev.secid,
+        offerDate: p.offerDate || null,
+        ctype: p.ctype || (ev.fixed ? 'fix' : 'float')
+      });
+    }
+    // Оферту добавляем как событие если в позиции есть offerDate
+    if(p.offerDate){
+      const t = new Date(p.offerDate).getTime();
+      if(isFinite(t) && t >= todayMs && t <= horizonMs){
+        all.push({
+          date: p.offerDate, t, type: 'offer',
+          rub: (parseFloat(p.nom) || 1000) * qty,    // оценка номинал × кол-во
+          fixed: true, qty, secid: p.isin, isin: p.isin,
+          name: p.name, ctype: p.ctype || 'fix'
+        });
+      }
+    }
+  }
+  all.sort((a, b) => a.t - b.t);
+  _ppState = { all, positions, nErrs, generatedAt: Date.now() };
+  if(status) status.textContent = (nErrs ? '⚠ ' + nErrs + ' позиций не загружено · ' : '') +
+    'Всего ' + all.length + ' выплат на 12 мес';
+  if(meta) meta.textContent = 'Кэш: bondization, TTL 7 дней. «🔄 Обновить» — заново.';
+  _ppRenderSummary();
+  _ppRenderChart();
+  _ppRenderList();
+  // Бэйдж в сайдбаре — общая сумма
+  const tot = all.reduce((s, e) => s + e.rub, 0);
+  const sb = document.getElementById('sb-pay');
+  if(sb){
+    sb.style.display = 'inline-block';
+    sb.textContent = tot >= 1e6 ? Math.round(tot/1e6) + 'м' : Math.round(tot/1e3) + 'к';
+  }
+}
+
+function _portPayRefetch(){ portPayInit({ force: true }); }
+
+function _ppRenderSummary(){
+  const box = document.getElementById('portpay-summary');
+  if(!box || !_ppState) return;
+  const all = _ppState.all;
+  const sumAll = all.reduce((s, e) => s + e.rub, 0);
+  const sumFixed = all.filter(e => e.fixed).reduce((s, e) => s + e.rub, 0);
+  const sumFloat = all.filter(e => !e.fixed && e.type === 'coupon').reduce((s, e) => s + e.rub, 0);
+  const sumPrincipal = all.filter(e => e.type === 'principal').reduce((s, e) => s + e.rub, 0);
+  const cntCoupon = all.filter(e => e.type === 'coupon').length;
+  const cntPrin = all.filter(e => e.type === 'principal').length;
+  const cntOffer = all.filter(e => e.type === 'offer').length;
+  const issuers = new Set(all.map(e => e.name));
+  const fmt = v => v >= 1e6 ? (v/1e6).toFixed(2) + ' млн ₽' : Math.round(v).toLocaleString('ru-RU') + ' ₽';
+  const tile = (lbl, val, sub, color) => `<div style="background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;flex:1;min-width:140px">
+    <div class="muted" style="font-size:.55rem;text-transform:uppercase;letter-spacing:.05em">${lbl}</div>
+    <div style="font-size:1.1rem;font-weight:600;color:${color || 'var(--text)'};margin-top:2px">${val}</div>
+    <div class="muted" style="font-size:.56rem;margin-top:1px">${sub}</div>
+  </div>`;
+  box.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    tile('Всего за 12 мес', fmt(sumAll), all.length + ' выплат · ' + issuers.size + ' эмитентов', 'var(--acc)') +
+    tile('Купоны', fmt(sumFixed + sumFloat), cntCoupon + ' выплат', '#6ec4d9') +
+    tile('Из них фиксированные', fmt(sumFixed), Math.round(sumFixed / Math.max(1, sumFixed + sumFloat) * 100) + '% от купонов', '#6cba7c') +
+    tile('Плавающие (не зафикс.)', fmt(sumFloat), 'будут пересчитаны', '#f2c94c') +
+    tile('Тело долга', fmt(sumPrincipal), cntPrin + ' амортизаций/погашений', '#f29a8a') +
+    (cntOffer > 0 ? tile('Оферты', fmt(all.filter(e => e.type === 'offer').reduce((s,e)=>s+e.rub,0)), cntOffer + ' оферт', 'var(--acc)') : '') +
+  '</div>';
+}
+
+function _ppRenderChart(){
+  const box = document.getElementById('portpay-chart');
+  if(!box || !_ppState) return;
+  const all = _ppState.all;
+  if(!all.length){ box.innerHTML = '<div class="muted" style="padding:30px;text-align:center">Нет выплат в горизонте 12 мес</div>'; return; }
+  // Группировка по месяцам YYYY-MM
+  const months = new Map();
+  for(let i = 0; i < 13; i++){
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(1); d.setMonth(d.getMonth() + i);
+    const k = d.toISOString().slice(0, 7);
+    months.set(k, { fixed: 0, floating: 0, principal: 0, offer: 0 });
+  }
+  for(const e of all){
+    const k = e.date.slice(0, 7);
+    if(!months.has(k)) continue;
+    const b = months.get(k);
+    if(e.type === 'principal') b.principal += e.rub;
+    else if(e.type === 'offer') b.offer += e.rub;
+    else if(e.fixed) b.fixed += e.rub;
+    else b.floating += e.rub;
+  }
+  const keys = [...months.keys()];
+  const W = 920, H = 240, padL = 56, padR = 12, padT = 16, padB = 32;
+  const chartH = H - padT - padB;
+  const maxVal = Math.max(...keys.map(k => {
+    const b = months.get(k); return b.fixed + b.floating + b.principal + b.offer;
+  }), 1);
+  const yOf = v => padT + (1 - v / maxVal) * chartH;
+  const barW = (W - padL - padR) / keys.length;
+  const inner = barW * 0.78;
+  const COL = { fixed: '#6cba7c', floating: '#f2c94c', principal: '#f29a8a', offer: '#a58cd9' };
+  let svg = '<svg width="' + W + '" height="' + H + '" style="display:block">';
+  for(let i = 0; i <= 4; i++){
+    const y = padT + chartH * i / 4;
+    const v = maxVal * (1 - i/4);
+    svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W-padR) + '" y2="' + y + '" stroke="var(--border)" stroke-dasharray="2,2"/>';
+    const lbl = v >= 1e6 ? (v/1e6).toFixed(1) + 'м' : Math.round(v/1e3) + 'к';
+    svg += '<text x="' + (padL-4) + '" y="' + (y+3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + lbl + '</text>';
+  }
+  keys.forEach((k, i) => {
+    const b = months.get(k);
+    const x = padL + i * barW + (barW - inner)/2;
+    let yCur = padT + chartH;
+    const stack = ['fixed', 'floating', 'principal', 'offer'];
+    for(const sk of stack){
+      const v = b[sk];
+      if(v <= 0) continue;
+      const h = (chartH * v / maxVal);
+      yCur -= h;
+      svg += '<rect x="' + x + '" y="' + yCur + '" width="' + inner + '" height="' + h + '" fill="' + COL[sk] + '" rx="1.5"><title>' + k + ': ' + sk + ' = ' + Math.round(v).toLocaleString('ru-RU') + ' ₽</title></rect>';
+    }
+    // Подпись месяца
+    const cx = padL + i * barW + barW/2;
+    const [y, m] = k.split('-');
+    const names = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+    svg += '<text x="' + cx + '" y="' + (H - padB + 12) + '" text-anchor="middle" font-size="9" fill="var(--text3)">' + (names[parseInt(m,10)-1]||'?') + ' ' + y.slice(2) + '</text>';
+  });
+  // Легенда
+  let lx = padL;
+  const legend = [
+    ['Фиксированные купоны', COL.fixed],
+    ['Плавающие (не зафикс.)', COL.floating],
+    ['Тело долга', COL.principal],
+    ['Оферты', COL.offer],
+  ];
+  svg += '<g transform="translate(0,' + (H - 6) + ')">';
+  legend.forEach(([lbl, c]) => {
+    svg += '<rect x="' + lx + '" y="-8" width="9" height="9" fill="' + c + '" rx="1"/>';
+    svg += '<text x="' + (lx + 12) + '" y="0" font-size="9" fill="var(--text2)">' + lbl + '</text>';
+    lx += lbl.length * 5.5 + 22;
+  });
+  svg += '</g>';
+  svg += '</svg>';
+  box.innerHTML = svg;
+}
+
+function _ppRenderList(){
+  const box = document.getElementById('portpay-list');
+  if(!box || !_ppState) return;
+  const all = _ppState.all;
+  if(!all.length){ box.innerHTML = '<div class="muted" style="padding:12px">Нет ближайших выплат</div>'; return; }
+  // Группируем по дате
+  const byDate = new Map();
+  for(const e of all){
+    if(!byDate.has(e.date)) byDate.set(e.date, []);
+    byDate.get(e.date).push(e);
+  }
+  const dates = [...byDate.keys()].sort();
+  const today = new Date(); today.setHours(0,0,0,0); const todayMs = today.getTime();
+  const fmt = v => v >= 1e6 ? (v/1e6).toFixed(2) + ' млн' : Math.round(v).toLocaleString('ru-RU');
+  const monthName = m => ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][m-1] || '?';
+  const linkIssuer = (name) => {
+    const id = _ppFindIssuerIdByName(name);
+    if(!id) return '<span style="color:var(--text2)">' + name + '</span>';
+    return '<a href="#" onclick="event.preventDefault();_ppOpenIssuer(\'' + id + '\');return false" style="color:var(--acc);text-decoration:none" title="Открыть в Отчётности">' + name + '</a>';
+  };
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:.62rem"><thead><tr style="background:var(--s3);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">' +
+    '<th style="padding:6px 8px;text-align:left">Дата</th>' +
+    '<th style="padding:6px 8px;text-align:left">Выпуск / Эмитент</th>' +
+    '<th style="padding:6px 8px;text-align:right">Тип</th>' +
+    '<th style="padding:6px 8px;text-align:right">Кол-во</th>' +
+    '<th style="padding:6px 8px;text-align:right">На 1 шт.</th>' +
+    '<th style="padding:6px 8px;text-align:right">Сумма</th>' +
+    '<th style="padding:6px 8px;text-align:left">Признак</th>' +
+  '</tr></thead><tbody>';
+  for(const d of dates){
+    const items = byDate.get(d);
+    const total = items.reduce((s, e) => s + e.rub, 0);
+    const dt = new Date(d);
+    const inDays = Math.round((dt.getTime() - todayMs) / 86400000);
+    const dayLabel = dt.getDate() + ' ' + monthName(dt.getMonth() + 1) + ' ' + String(dt.getFullYear()).slice(2);
+    const dayHint = inDays === 0 ? 'сегодня' : inDays === 1 ? 'завтра' : 'через ' + inDays + ' дн.';
+    html += '<tr style="background:var(--s2);border-top:1px solid var(--border)"><td colspan="7" style="padding:5px 8px;color:var(--acc);font-weight:600">' +
+      dayLabel + ' · <span class="muted" style="font-weight:400">' + dayHint + '</span> · итого <b>' + fmt(total) + ' ₽</b></td></tr>';
+    for(const e of items){
+      const typeIco = e.type === 'principal' ? '🏁 погашение/амортиз.' : e.type === 'offer' ? '🔔 оферта' : (e.fixed ? '💵 купон (фикс)' : '⚡ купон (флоат, ?)');
+      const rateStr = e.rate != null ? e.rate.toFixed(2) + '%' : '';
+      const tag = e.fixed
+        ? '<span style="color:#6cba7c">✓ зафикс.</span>'
+        : '<span style="color:#f2c94c">⚠ ждёт фикс.</span>';
+      html += '<tr style="border-top:1px solid var(--border)">' +
+        '<td style="padding:4px 8px;color:var(--text3);font-family:var(--mono)"></td>' +
+        '<td style="padding:4px 8px"><div style="font-weight:500">' + linkIssuer(e.name) + '</div><div style="font-size:.52rem;font-family:var(--mono);color:var(--text3)">' + e.isin + '</div></td>' +
+        '<td style="padding:4px 8px;text-align:right;font-size:.58rem">' + typeIco + (rateStr ? '<div class="muted" style="font-size:.52rem">ставка ' + rateStr + '</div>' : '') + '</td>' +
+        '<td style="padding:4px 8px;text-align:right;font-family:var(--mono)">' + e.qty + '</td>' +
+        '<td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">' + (e.perBond ? e.perBond.toFixed(2) : '—') + ' ₽</td>' +
+        '<td style="padding:4px 8px;text-align:right;font-family:var(--mono);font-weight:600">' + fmt(e.rub) + ' ₽</td>' +
+        '<td style="padding:4px 8px;font-size:.56rem">' + tag + '</td>' +
+      '</tr>';
+    }
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+// На каждом event должен быть perBond — добавил выше при сборе. Проверка.
+// Вспомогательная: найти id эмитента в reportsDB по «name» позиции.
+function _ppFindIssuerIdByName(name){
+  if(!name) return null;
+  const norm = (typeof _normIssuerName === 'function') ? _normIssuerName(name) : String(name).toLowerCase();
+  if(!norm) return null;
+  for(const id in reportsDB){
+    const iss = reportsDB[id];
+    if(!iss || !iss.name) continue;
+    const n = (typeof _normIssuerName === 'function') ? _normIssuerName(iss.name) : iss.name.toLowerCase();
+    if(n === norm) return id;
+  }
+  // Fallback substring
+  const lc = String(name).toLowerCase();
+  for(const id in reportsDB){
+    const iss = reportsDB[id];
+    if(!iss || !iss.name) continue;
+    const n = String(iss.name).toLowerCase();
+    if(n.includes(lc) || lc.includes(n)) return id;
+  }
+  return null;
+}
+
+// Открывает страницу «📂 Отчётность» с выбранным эмитентом.
+function _ppOpenIssuer(id){
+  if(typeof showPage === 'function') showPage('reports');
+  setTimeout(() => {
+    const sel = document.getElementById('rep-issuer-sel');
+    if(sel){
+      sel.value = id;
+      if(typeof repSelectIssuer === 'function') repSelectIssuer();
+    }
+  }, 80);
+}
+
+function _portPayExportCsv(){
+  if(!_ppState || !_ppState.all.length){ alert('Нет выплат'); return; }
+  const rows = [['Дата','ISIN','Эмитент','Тип','Количество','Per bond ₽','Сумма ₽','Зафиксирован','Ставка %']];
+  for(const e of _ppState.all){
+    rows.push([
+      e.date, e.isin, e.name, e.type, e.qty,
+      e.perBond ? e.perBond.toFixed(2) : '',
+      Math.round(e.rub),
+      e.fixed ? 'да' : 'нет',
+      e.rate != null ? e.rate.toFixed(2) : ''
+    ]);
+  }
+  const csv = rows.map(r => r.map(x => /[",;\n]/.test(String(x)) ? '"' + String(x).replace(/"/g, '""') + '"' : x).join(';')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'portfolio_payments_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
