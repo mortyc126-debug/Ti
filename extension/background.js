@@ -1,17 +1,24 @@
 // Service worker расширения БондАналитик: сбор раскрытий.
-// v1.3: использует открытый JSON-API e-disclosure.ru для поиска
-// компаний по ИНН, минуя SPA-интерфейс и ServicePipe anti-bot на
-// поисковой странице. API: /api/search/companies?query=<ИНН>
-// возвращает {foundCompaniesList: [{id, name, ...}]}.
+// v1.4.2: реальный API найден из Network-лога пользователя.
+//   • POST https://e-disclosure.ru/api/search/companies
+//   • Content-Type: application/x-www-form-urlencoded
+//   • Тело: textfield=<ИНН>&lastPageSize=10&lastPageNumber=1&…
+//   • Антифорджери: cookie .AspNetCore.Antiforgery.* + header
+//     RequestVerificationToken (ASP.NET Core double-submit).
+//   • Ответ JSON: {foundCompaniesList: [{id, ...}], ...}
 //
-// Flow batch-режима:
-//   1. Для каждого ИНН: fetch API → получаем company.id
-//   2. Открываем вкладку /portal/files.aspx?id=<id> — именно там
-//      живёт таблица существенных фактов. company.aspx — только
-//      общая карточка, events-container там пустой, поэтому batch
-//      раньше сохранял payload без events.
-//   3. Content.js скрапит таблицу, отправляет данные в background
-//   4. Вкладка закрывается, переходим к следующему ИНН
+// Получаем CSRF-токен один раз за сессию service worker:
+// GET /poisk-po-kompaniyam/ → вытаскиваем regex'ом value
+// <input name="__RequestVerificationToken" value="…"/>. Куку
+// .AspNetCore.Antiforgery.* браузер ставит сам.
+//
+// Если API вернул 400/403 — токен устарел, сбрасываем и повторяем.
+// Если всё равно пусто — tab-fallback: открыть /poisk-po-kompaniyam/
+// ?query=<ИНН>, content.js заполнит форму и кликнет «Искать», сайт
+// сам 302-редиректит на карточку при единственном совпадении.
+//
+// Прогресс batch пишется в chrome.storage.local.batchProgress, чтобы
+// popup мог восстановить UI при переоткрытии.
 
 const CRITICAL_PATTERNS = [
   { key: 'default', re: /неисполнени[еяю].*обязательств|просрочк|техническ\w* дефолт|\bдефолт|невыплат/i, label: 'Дефолт/просрочка' },
@@ -27,78 +34,77 @@ function detectCritical(title){
 }
 function eventKey(e){ return (e.date || '') + '|' + (e.title || '').slice(0, 80); }
 
-// Ищет компанию на e-disclosure по ИНН. Пробует несколько URL'ов
-// в порядке предпочтения — за годы паттерны менялись и ломались, так что
-// будем устойчивы к смене любого одного endpoint'а. Возвращает
-// {id, name, inn} или null.
-async function findCompanyByInn(inn){
-  // JSON-endpoint'ы (быстрые, малый трафик). Разные варианты — что-то
-  // из них обычно работает. Заголовки — как у XHR с самого сайта.
-  const jsonUrls = [
-    `https://www.e-disclosure.ru/api/search/companies?query=${encodeURIComponent(inn)}&page=1&itemsPerPage=5`,
-    `https://www.e-disclosure.ru/api/search/companies?query=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/search/companies?query=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/api/v1/search/companies?query=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/api/SearchCompany?q=${encodeURIComponent(inn)}`,
-  ];
-  for(const url of jsonUrls){
-    try {
-      const r = await fetch(url, {
-        headers: { 'Accept': 'application/json, text/plain, */*', 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
-      });
-      if(!r.ok) continue;
-      const txt = await r.text();
-      let data = null;
-      try { data = JSON.parse(txt); } catch(_){ continue; }
-      // Варианты формата ответа — пробуем разные поля
-      const list =
-        data?.foundCompaniesList ||
-        data?.items ||
-        data?.companies ||
-        data?.results ||
-        data?.data ||
-        (Array.isArray(data) ? data : null);
-      if(Array.isArray(list) && list.length){
-        const first = list[0];
-        const id = first.id || first.Id || first.companyId || first.code;
-        const name = first.name || first.Name || first.companyName || first.CompanyName || '';
-        if(id) return { id: String(id), name, inn: String(inn) };
-      }
-    } catch(_){}
+// Ищет компанию по ИНН через реальный POST-API e-disclosure.
+// Payload и response подтверждены Network-логом пользователя.
+// Antiforgery защита — cookie .AspNetCore.Antiforgery.*, автоматически
+// подставляется браузером при credentials:'include'.
+//
+// ВАЖНО про CORS: из service worker'а fetch идёт с origin
+// chrome-extension://<id>, т.е. cross-origin. Запрос должен остаться
+// «simple» (без preflight OPTIONS), иначе сервер отдаёт 404 на OPTIONS
+// и POST никогда не уходит. Поэтому НЕЛЬЗЯ добавлять X-Requested-With,
+// Referer и другие non-safelisted headers — только Accept и Content-Type
+// (последний — один из трёх разрешённых: urlencoded/multipart/plain).
+//
+// Если cookie ещё нет (первый запуск) или она протухла — делаем
+// GET /poisk-po-kompaniyam/, сервер ставит cookie, повторяем POST.
+async function findCompanyByInn(inn, retry = true){
+  const body = new URLSearchParams({
+    textfield: String(inn),
+    radReg: 'FederalDistricts',
+    districtsCheckboxGroup: '-1',
+    regionsCheckboxGroup: '-1',
+    branchesCheckboxGroup: '-1',
+    lastPageSize: '10',
+    lastPageNumber: '1',
+    query: String(inn),
+  });
+  try {
+    const r = await fetch('https://e-disclosure.ru/api/search/companies', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
+      body: body.toString(),
+    });
+    console.log('[bondanalit] api', inn, '→', r.status);
+    if((r.status === 400 || r.status === 401 || r.status === 403) && retry){
+      // Antiforgery-cookie отсутствует или протухла — подтянем её
+      // заходом на поисковую страницу и повторим один раз.
+      await fetch('https://e-disclosure.ru/poisk-po-kompaniyam/', { credentials: 'include' }).catch(() => {});
+      return findCompanyByInn(inn, false);
+    }
+    if(!r.ok) return null;
+    const data = await r.json();
+    const list = (data && data.foundCompaniesList) || [];
+    if(list.length){
+      const first = list[0];
+      console.log('[bondanalit] found id', first.id, first.name, 'for inn', inn);
+      return { id: String(first.id), name: first.name || '', inn: String(inn) };
+    }
+    console.log('[bondanalit] empty list for inn', inn);
+  } catch(e){
+    console.warn('[bondanalit] api err', inn, e && e.message);
   }
-
-  // HTML-фолбэк: открытая страница поиска обычно отдаёт список с ссылками
-  // вида /portal/company.aspx?id=<X>. Парсим первое совпадение.
-  const htmlUrls = [
-    `https://www.e-disclosure.ru/portal/search.aspx?query=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/portal/search.aspx?q=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/Search?q=${encodeURIComponent(inn)}`,
-  ];
-  for(const url of htmlUrls){
-    try {
-      const r = await fetch(url, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.7',
-          'Accept-Language': 'ru-RU,ru;q=0.9',
-        },
-        credentials: 'include',
-      });
-      if(!r.ok) continue;
-      const html = await r.text();
-      // Первый href содержащий id=<число> и рядом наш ИНН (в том же DOM-блоке).
-      // Делаем мягче: просто ищем первый id=<X> после упоминания ИНН.
-      const innIdx = html.indexOf(inn);
-      if(innIdx < 0) continue;
-      // Ищем id=<число> в пределах 2000 символов после ИНН (таблица строки)
-      // или 2000 символов до (если ссылка впереди ИНН).
-      const window = html.slice(Math.max(0, innIdx - 2000), innIdx + 2000);
-      const m = window.match(/\?id=(\d+)/);
-      if(m) return { id: m[1], name: '', inn: String(inn) };
-    } catch(_){}
-  }
-
   return null;
+}
+
+// Keep-alive для service worker: в MV3 SW засыпает через ~30 сек
+// простоя, и batch, крутящийся 20+ минут на 576 ИНН, может умереть.
+// Периодический вызов chrome.runtime.getPlatformInfo продлевает его
+// жизнь. Таймер храним на верхнем уровне, чтобы runBatch мог
+// start/stop.
+let _keepAliveTimer = null;
+function keepAliveStart(){
+  if(_keepAliveTimer) return;
+  _keepAliveTimer = setInterval(() => {
+    chrome.runtime.getPlatformInfo().catch(() => {});
+  }, 20 * 1000);
+}
+function keepAliveStop(){
+  if(_keepAliveTimer){ clearInterval(_keepAliveTimer); _keepAliveTimer = null; }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -126,13 +132,26 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if(msg.type === 'start-batch' && Array.isArray(msg.inns)){
+    chrome.storage.local.set({ pendingBatchMode: true });
+    keepAliveStart();
     runBatch(msg.inns).then(summary => {
+      keepAliveStop();
+      chrome.storage.local.set({
+        pendingBatchMode: false,
+        batchProgress: { running: false, summary, total: msg.inns.length, finishedAt: Date.now() }
+      });
       chrome.runtime.sendMessage({ type: 'batch-done', summary }).catch(() => {});
     });
     sendResponse({ ok: true });
     return true;
   }
 });
+
+// Пишет текущий прогресс в storage — чтобы popup восстановил UI
+// если его закрыли и снова открыли во время обхода.
+function persistProgress(state){
+  try { chrome.storage.local.set({ batchProgress: state }); } catch(_){}
+}
 
 function saveAndDiff(payload){
   const key = payload.edId || payload.inn || payload.companyName || ('entry_' + Date.now());
@@ -174,51 +193,60 @@ function saveAndDiff(payload){
 
 async function runBatch(inns){
   const summary = { total: inns.length, done: 0, failed: 0, skipped: 0, notFound: 0 };
-  // Помечаем что обход начался — popup.js при открытии прочитает.
-  await chrome.storage.local.set({ batchProgress: { running: true, idx: 0, total: inns.length, summary, startedAt: Date.now() } });
+  const emit = (extra) => {
+    persistProgress({ running: true, total: inns.length, summary, ...extra });
+    try { chrome.runtime.sendMessage({ type: 'batch-progress', total: inns.length, summary, ...extra }); } catch(_){}
+  };
   for(let i = 0; i < inns.length; i++){
     const inn = String(inns[i] || '').trim();
-    if(!inn || !/^\d{10}(\d{2})?$/.test(inn)){ summary.skipped++; continue; }
+    if(!inn || !/^\d{10}(\d{2})?$/.test(inn)){
+      summary.skipped++;
+      emit({ idx: i + 1, inn, ok: false, skipped: true });
+      continue;
+    }
 
     // Пропуск если собрано за 24ч
     const stored = await new Promise(r => chrome.storage.local.get(['collected'], d => r(d.collected || {})));
     const existing = Object.values(stored).find(e => e.payload && e.payload.inn === inn);
     if(existing && (Date.now() - (existing.savedAt || 0)) < 24 * 3600 * 1000){
       summary.skipped++;
-      const progress = { running: true, idx: i + 1, total: inns.length, inn, ok: true, skipped: true, summary };
-      await chrome.storage.local.set({ batchProgress: progress });
-      try { chrome.runtime.sendMessage({ type: 'batch-progress', ...progress }); } catch(_){}
+      emit({ idx: i + 1, inn, ok: true, skipped: true });
       continue;
     }
 
-    // Шаг 1: API-поиск по ИНН → получаем company.id
+    // Шаг 1: HTML-поиск по ИНН → company.id
     const company = await findCompanyByInn(inn);
-    if(!company || !company.id){
-      summary.notFound++;
-      summary.failed++;
-      const progress = { running: true, idx: i + 1, total: inns.length, inn, ok: false, notFound: true, summary };
-      await chrome.storage.local.set({ batchProgress: progress });
-      try { chrome.runtime.sendMessage({ type: 'batch-progress', ...progress }); } catch(_){}
-      await new Promise(r => setTimeout(r, 800));
-      continue;
+
+    let url;
+    if(company && company.id){
+      url = `https://www.e-disclosure.ru/portal/company.aspx?id=${company.id}`;
+    } else {
+      // Fallback: открываем поисковую страницу, content.js сам
+      // нажмёт на первую ссылку company.aspx?id=... Это работает,
+      // если на поиске есть хотя бы одно совпадение по ИНН.
+      url = `https://www.e-disclosure.ru/poisk-po-kompaniyam/?query=${encodeURIComponent(inn)}`;
+      console.log('[bondanalit] fallback search tab for inn', inn);
     }
 
-    // Шаг 2: открываем страницу раскрытий (именно files.aspx, не company.aspx)
-    const url = `https://www.e-disclosure.ru/portal/files.aspx?id=${company.id}`;
     const tab = await chrome.tabs.create({ url, active: false });
-    const ok = await waitForCollect(inn, company.id, tab.id, 25000);
-    if(ok) summary.done++;
-    else {
+    const edId = (company && company.id) ? String(company.id) : '';
+    // Таймаут 40 сек для fallback-пути (надо успеть: загрузить поиск →
+    // content.js триггерит поиск → JS сайта делает AJAX → редирект на
+    // карточку → парсинг). Для прямого пути (есть id) обычно хватает 10.
+    const timeout = (company && company.id) ? 20000 : 40000;
+    const ok = await waitForCollect(inn, edId, tab.id, timeout);
+    if(ok){
+      summary.done++;
+    } else {
       summary.failed++;
+      if(!company || !company.id) summary.notFound++;
       try { await chrome.tabs.remove(tab.id); } catch(_){}
     }
-    await new Promise(r => setTimeout(r, 2000));
-    const progress = { running: true, idx: i + 1, total: inns.length, inn, ok, summary };
-    await chrome.storage.local.set({ batchProgress: progress });
-    try { chrome.runtime.sendMessage({ type: 'batch-progress', ...progress }); } catch(_){}
+    // Между ИНН 500мс — достаточно чтобы не задушить сервер и не
+    // ловить 429, но не жадно (было 2000мс — 2/3 времени тратилось зря).
+    await new Promise(r => setTimeout(r, 500));
+    emit({ idx: i + 1, inn, ok });
   }
-  // Финальное состояние — обход завершён.
-  await chrome.storage.local.set({ batchProgress: { running: false, idx: inns.length, total: inns.length, summary, finishedAt: Date.now() } });
   return summary;
 }
 
@@ -228,18 +256,16 @@ function waitForCollect(inn, edId, tabId, timeoutMs){
     const check = () => {
       chrome.storage.local.get(['collected'], data => {
         const collected = data.collected || {};
-        // Ищем запись либо с правильным ИНН, либо с правильным edId,
-        // либо появившуюся после старта. ВАЖНО: засчитываем только
-        // если payload.events непустой — иначе «мёртвые» страницы
-        // (company.aspx без таблицы фактов, редирект ServicePipe и
-        // т.п.) дают пустой payload и батч считает обход успешным.
+        // Засчитываем если запись появилась после старта И относится
+        // к нашему ИНН (по полю inn или по совпадению edId, когда
+        // известен). Без этой строгости старые записи могли давать
+        // ложное «нашли».
         const hit = Object.values(collected).some(e => {
           if(!e.payload) return false;
-          const hasEvents = Array.isArray(e.payload.events) && e.payload.events.length > 0;
-          if(!hasEvents) return false;
+          const fresh = (e.savedAt || 0) > start;
           if(e.payload.inn === inn) return true;
-          if(String(e.payload.edId || '') === String(edId)) return true;
-          return (e.savedAt || 0) > start;
+          if(edId && String(e.payload.edId || '') === String(edId)) return true;
+          return fresh && !e.payload.inn && !edId;
         });
         if(hit){
           // Обогащаем запись ИНН если его нет (пришло из API search)

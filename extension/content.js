@@ -14,11 +14,57 @@
                         /\/poisk-po-kompaniyam/i.test(path);
 
   if(isSearchPage){
+    // Страница /poisk-po-kompaniyam/ отдаёт пустую форму, результаты
+    // рендерит JS (AMD-модуль ed.search.companies-page, загружается
+    // через require асинхронно). Жмём «Искать» пока не появится
+    // результат — с первой попытки handler может быть ещё не
+    // навешен, поэтому повторяем до срабатывания. Используем полный
+    // набор событий (mousedown/mouseup/click) — некоторые UI-либы
+    // слушают именно pointer-события. Форму тоже триггерим через
+    // requestSubmit как запасной путь.
+    const params = new URLSearchParams(location.search);
+    const q = params.get('query') || params.get('textfield') || params.get('q') || '';
+    console.log('[bondanalit/search] page loaded, q=', q);
+    let searchTriggered = false;
+    const kick = () => {
+      const tf = document.getElementById('textfield');
+      const btn = document.getElementById('sendButton');
+      const form = document.getElementById('searchCompanyForm');
+      if(!tf || !btn || !q) return;
+      if(!tf.value.trim()){
+        tf.value = q;
+        tf.dispatchEvent(new Event('input', { bubbles: true }));
+        tf.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      // Клик полным циклом pointer-событий
+      const opts = { bubbles: true, cancelable: true, view: window, button: 0 };
+      btn.dispatchEvent(new MouseEvent('mousedown', opts));
+      btn.dispatchEvent(new MouseEvent('mouseup', opts));
+      btn.dispatchEvent(new MouseEvent('click', opts));
+      // Запасной путь: submit формы
+      if(form && typeof form.requestSubmit === 'function'){
+        try { form.requestSubmit(); } catch(_){}
+      }
+      if(!searchTriggered){
+        console.log('[bondanalit/search] triggered search for', q);
+        searchTriggered = true;
+      }
+    };
     waitFor(() => {
-      const firstLink = document.querySelector('a[href*="company.aspx?id="]');
-      if(firstLink && firstLink.href){ location.href = firstLink.href; return true; }
+      // Если поисковый запрос уже выполнился и появилась ссылка
+      // company.aspx?id=<N> — переходим на первую (но исключаем
+      // ссылки из меню/хедера, они на company.aspx без результата).
+      const candidates = document.querySelectorAll('#searchResults a[href*="company.aspx?id="]');
+      const link = candidates[0] || document.querySelector('a[href*="company.aspx?id="]');
+      if(link && link.href){
+        console.log('[bondanalit/search] navigating to', link.href);
+        location.href = link.href;
+        return true;
+      }
+      // Ссылок пока нет — попробуем (пере)запустить поиск.
+      kick();
       return false;
-    }, 8000);
+    }, 20000);
     return;
   }
 
