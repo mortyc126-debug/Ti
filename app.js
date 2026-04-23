@@ -18737,8 +18737,229 @@ function moexOpenIssuerPeek(issId){
       if(typeof repSelectIssuerById === 'function') repSelectIssuerById(issId);
     }, 80);
   };
+  // Кнопка «➕ в сравнение» / «✓ в сравнении». Текст и цвет зависят от
+  // текущего состояния _compareIssuers.
+  const cmpBtn = document.getElementById('issuer-peek-compare-btn');
+  if(cmpBtn){
+    const inSet = window._compareIssuers instanceof Set && window._compareIssuers.has(issId);
+    cmpBtn.textContent = inSet ? '✓ в сравнении · убрать' : '➕ в сравнение';
+    cmpBtn.onclick = () => {
+      compareToggle(issId);
+      const nowIn = window._compareIssuers.has(issId);
+      cmpBtn.textContent = nowIn ? '✓ в сравнении · убрать' : '➕ в сравнение';
+    };
+  }
   document.getElementById('modal-issuer-peek').classList.add('open');
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// 🆚 СРАВНЕНИЕ ЭМИТЕНТОВ — мульти-выбор, side-by-side, вердикт
+// ─────────────────────────────────────────────────────────────────────
+// window._compareIssuers (Set<issId>) — глобальная «очередь сравнения»
+// между страницами. Плавающий индикатор #compare-floater виден на всех
+// страницах когда Set не пустой; клик по нему → compareOpen(), которая
+// строит таблицу метрик × эмитентов с подсветкой лидера / отстающего
+// в каждой строке и вердиктом по счёту побед.
+// ═════════════════════════════════════════════════════════════════════
+
+if(!(window._compareIssuers instanceof Set)) window._compareIssuers = new Set();
+
+function compareToggle(issId){
+  if(!issId) return;
+  if(window._compareIssuers.has(issId)) window._compareIssuers.delete(issId);
+  else window._compareIssuers.add(issId);
+  _compareRenderFloater();
+}
+
+function compareClear(){
+  window._compareIssuers.clear();
+  _compareRenderFloater();
+}
+
+function _compareRenderFloater(){
+  const el = document.getElementById('compare-floater');
+  if(!el) return;
+  const set = window._compareIssuers;
+  if(!set || !set.size){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  document.getElementById('compare-count').textContent = set.size;
+  const names = [...set].slice(0, 3).map(id => (reportsDB[id]?.name || '').split(' ').slice(0, 2).join(' ')).join(' · ');
+  const more = set.size > 3 ? ` · и ещё ${set.size - 3}` : '';
+  document.getElementById('compare-names').textContent = names + more;
+}
+
+// Строки сравнения: [label, getter(mults), kind, higherIsBetter, tooltip, group]
+// getter получает объект {base, moexM, stress, bq, ros, mkt, iss} и возвращает число.
+const _COMPARE_METRICS = [
+  { g:'📈 Рентабельность', label:'ROE',         get:x=>x.base?.roe,           kind:'pct', hi:true,  t:'Return on Equity = чистая прибыль / собственный капитал' },
+  { g:'📈 Рентабельность', label:'ROA',         get:x=>x.moexM?.roa,          kind:'pct', hi:true,  t:'Return on Assets = чистая прибыль / активы' },
+  { g:'📈 Рентабельность', label:'ROS',         get:x=>x.ros,                 kind:'pct', hi:true,  t:'Return on Sales = чистая прибыль / выручка' },
+  { g:'📈 Рентабельность', label:'EBITDA-маржа',get:x=>x.moexM?.ebitdaMargin, kind:'pct', hi:true,  t:'EBITDA / выручка' },
+  { g:'⚖ Долговая',        label:'Долг/EBITDA', get:x=>x.moexM?.debtEbitda,   kind:'x',   hi:false, t:'≤3 хорошо, >5 риск' },
+  { g:'⚖ Долговая',        label:'ND/EBITDA',   get:x=>x.moexM?.netDebtEbitda,kind:'x',   hi:false, t:'Net Debt (долг − кеш) / EBITDA; ≤2 IG' },
+  { g:'⚖ Долговая',        label:'D/eq',        get:x=>x.base?.dde,           kind:'x',   hi:false, t:'Долг / Собственный капитал; ≤1 консервативно' },
+  { g:'⚖ Долговая',        label:'Debt Ratio',  get:x=>x.base?.debtR,         kind:'pct', hi:false, t:'Долг / Активы; ≤0.5' },
+  { g:'⚖ Долговая',        label:'Equity Ratio',get:x=>x.moexM?.equityRatio,  kind:'pct', hi:true,  t:'Капитал / Активы; ≥30% прочно' },
+  { g:'🔒 Покрытие',       label:'ICR',         get:x=>x.moexM?.icr,          kind:'x',   hi:true,  t:'EBIT / проценты; ≥3 комфортно' },
+  { g:'💧 Ликвидность',    label:'Current',     get:x=>x.moexM?.currentRatio, kind:'x',   hi:true,  t:'Оборотные активы / краткосрочные; ≥1.2' },
+  { g:'💧 Ликвидность',    label:'Cash Ratio',  get:x=>x.moexM?.cashRatio,    kind:'x',   hi:true,  t:'Кеш / краткосрочные; ≥0.2' },
+  { g:'💧 Ликвидность',    label:'Working Cap', get:x=>x.base?.wc,            kind:'bln', hi:true,  t:'Оборотные активы − краткосрочные, млрд ₽' },
+  { g:'🎯 Скоринг',        label:'BQI',         get:x=>x.bq?.score,           kind:'raw', hi:true,  t:'Balance Quality Index 0-100' },
+  { g:'🎯 Скоринг',        label:"Altman Z'",   get:x=>x.stress?.altmanZ,     kind:'raw', hi:true,  t:'Z-score: >2.9 safe, <1.23 distress' },
+  { g:'🎯 Скоринг',        label:'🛡 Стресс',   get:x=>x.stress?.score,       kind:'raw', hi:true,  t:'Запас прочности 0-100' },
+  { g:'💰 Размер',         label:'Выручка',     get:x=>x.base?.rev,           kind:'bln', hi:true,  t:'Выручка, млрд ₽' },
+  { g:'💰 Размер',         label:'Активы',      get:x=>x.base?.assets,        kind:'bln', hi:true,  t:'Активы, млрд ₽' },
+  { g:'💰 Размер',         label:'Чистая приб.',get:x=>x.base?.np,            kind:'bln', hi:true,  t:'Чистая прибыль, млрд ₽' },
+  { g:'🏦 Рыночные',       label:'Кап-ция',     get:x=>x.mkt?.capBn,          kind:'bln', hi:true,  t:'Капитализация, млрд ₽ (требует акцию в _sharesCatalog)' },
+  { g:'🏦 Рыночные',       label:'P/E',         get:x=>x.mkt?.pe,             kind:'x',   hi:false, t:'P/E: <8 дешёвая, >20 дорогая' },
+  { g:'🏦 Рыночные',       label:'P/B',         get:x=>x.mkt?.pb,             kind:'x',   hi:false, t:'P/B: <1 ниже балансовой' },
+];
+
+function _compareFmt(val, kind){
+  if(val == null || !isFinite(val)) return '—';
+  if(kind === 'pct') return (val * 100).toFixed(1) + '%';
+  if(kind === 'x')   return val.toFixed(2) + '×';
+  if(kind === 'bln') return (Math.abs(val) >= 10 ? val.toFixed(1) : val.toFixed(2));
+  return val.toFixed(2);
+}
+
+function compareOpen(){
+  const set = window._compareIssuers;
+  if(!set || !set.size){ alert('Очередь сравнения пустая. Открой эмитента через «🏛 Каталог» или «🪦 Архив» и добавь «➕ в сравнение».'); return; }
+  if(set.size < 2){ alert('Для сравнения нужно хотя бы 2 эмитента. Сейчас: ' + set.size + '. Добавь ещё хотя бы одного.'); return; }
+
+  const ids = [...set].filter(id => reportsDB[id]);
+  if(ids.length < 2){ alert('Эмитенты в очереди не нашлись в базе. Попробуй переоткрыть через «🏛 Каталог».'); return; }
+
+  // Собираем мультипликаторы каждого эмитента.
+  const items = ids.map(id => ({ id, iss: reportsDB[id], mult: _peekAllMultiples(id, reportsDB[id]) }));
+  // Добавляем удобный год последнего отчёта.
+  for(const it of items) it.year = it.mult.base?.year || '—';
+
+  // Считаем победы по метрикам.
+  const wins = new Map(ids.map(id => [id, 0]));
+  const losses = new Map(ids.map(id => [id, 0]));
+  const ties = new Map(ids.map(id => [id, 0]));
+
+  const rows = _COMPARE_METRICS.map(m => {
+    const values = items.map(it => ({ id: it.id, v: (() => { try { return m.get(it.mult); } catch(_) { return null; } })() }));
+    const valid = values.filter(x => x.v != null && isFinite(x.v));
+    if(valid.length < 2) return { m, values, best:null, worst:null };
+    const sortedV = [...valid].sort((a,b) => m.hi ? b.v - a.v : a.v - b.v);
+    const best = sortedV[0].v;
+    const worst = sortedV[sortedV.length - 1].v;
+    // Побед / поражений: если best != worst (вообще есть разброс).
+    const EPS = Math.abs(best) * 0.001 + 1e-9;
+    if(Math.abs(best - worst) > EPS){
+      for(const x of valid){
+        if(Math.abs(x.v - best) <= EPS) wins.set(x.id, wins.get(x.id) + 1);
+        else if(Math.abs(x.v - worst) <= EPS) losses.set(x.id, losses.get(x.id) + 1);
+        else ties.set(x.id, ties.get(x.id) + 1);
+      }
+    } else {
+      for(const x of valid) ties.set(x.id, ties.get(x.id) + 1);
+    }
+    return { m, values, best, worst };
+  });
+
+  // Вердикт: сортируем по побед - поражения.
+  const ranking = [...wins.entries()].map(([id, w]) => ({ id, w, l: losses.get(id)||0, t: ties.get(id)||0 }))
+    .sort((a, b) => (b.w - b.l) - (a.w - a.l));
+  const leader = ranking[0];
+  const leaderIss = reportsDB[leader.id];
+  const verdict = ranking.map(r => {
+    const name = reportsDB[r.id]?.name || r.id;
+    return `<span style="color:${r.id === leader.id ? 'var(--green)' : 'var(--text)'};font-weight:${r.id === leader.id ? '600' : '400'}">${_escHtml(name.split(' ').slice(0, 3).join(' '))}: <span style="color:var(--green)">${r.w}W</span>/<span style="color:var(--danger)">${r.l}L</span>/<span style="color:var(--text3)">${r.t}=</span></span>`;
+  }).join(' &nbsp;·&nbsp; ');
+  // Что сильнее / слабее у лидера.
+  const leaderStrong = rows.filter(r => {
+    const v = r.values.find(x => x.id === leader.id)?.v;
+    return v != null && isFinite(v) && r.best != null && Math.abs(v - r.best) < Math.abs(r.best) * 0.001 + 1e-9 && r.best !== r.worst;
+  }).map(r => r.m.label);
+  const leaderWeak = rows.filter(r => {
+    const v = r.values.find(x => x.id === leader.id)?.v;
+    return v != null && isFinite(v) && r.worst != null && Math.abs(v - r.worst) < Math.abs(r.worst) * 0.001 + 1e-9 && r.best !== r.worst;
+  }).map(r => r.m.label);
+  document.getElementById('compare-verdict').innerHTML = `
+    <div>🏆 Лидер: <strong style="color:var(--green)">${_escHtml(leaderIss?.name || leader.id)}</strong> (${leader.w} побед, ${leader.l} поражений, ${leader.t} ничьих)</div>
+    <div style="margin-top:4px;color:var(--text3)">${verdict}</div>
+    ${leaderStrong.length ? `<div style="margin-top:6px;font-size:.58rem"><span style="color:var(--green)">✓ Лидер сильнее по:</span> ${leaderStrong.join(', ')}</div>` : ''}
+    ${leaderWeak.length ? `<div style="margin-top:2px;font-size:.58rem"><span style="color:var(--danger)">✗ Лидер слабее по:</span> ${leaderWeak.join(', ')}</div>` : ''}
+  `;
+
+  // Таблица: заголовок — эмитенты, группы метрик со строками.
+  const esc = s => _escHtml(String(s || ''));
+  const hdrCells = items.map(it => `<th style="padding:6px 8px;text-align:right;font-size:.56rem;min-width:120px;border-left:1px solid var(--border);color:${it.id === leader.id ? 'var(--green)' : 'var(--text)'}">${esc(it.iss.name).slice(0, 40)}<div style="font-size:.5rem;color:var(--text3);font-weight:400">ИНН ${it.iss.inn || '—'} · ${it.year}</div></th>`).join('');
+  const groupOrder = [];
+  for(const row of rows) if(!groupOrder.includes(row.m.g)) groupOrder.push(row.m.g);
+  const bodyRows = groupOrder.map(g => {
+    const gRows = rows.filter(r => r.m.g === g);
+    const gHeaderRow = `<tr><td colspan="${items.length + 1}" style="padding:6px 8px;background:var(--s2);font-size:.52rem;letter-spacing:.08em;color:var(--acc);text-transform:uppercase;border-top:1px solid var(--border)">${esc(g)}</td></tr>`;
+    const dataRows = gRows.map(r => {
+      const cells = items.map(it => {
+        const vObj = r.values.find(x => x.id === it.id);
+        const v = vObj?.v;
+        const valStr = _compareFmt(v, r.m.kind);
+        let bg = '', color = 'var(--text2)';
+        if(v != null && isFinite(v) && r.best !== null && r.best !== r.worst){
+          const EPS = Math.abs(r.best) * 0.001 + 1e-9;
+          if(Math.abs(v - r.best) <= EPS){ bg = 'rgba(60,179,113,0.12)'; color = 'var(--green)'; }
+          else if(Math.abs(v - r.worst) <= EPS){ bg = 'rgba(255,77,109,0.10)'; color = 'var(--danger)'; }
+        }
+        // Разница vs лидер: в процентах.
+        let delta = '';
+        if(v != null && isFinite(v) && r.best != null && r.best !== 0 && r.best !== v){
+          const pct = ((v - r.best) / Math.abs(r.best)) * 100;
+          if(Math.abs(pct) >= 1){
+            const sign = pct > 0 ? '+' : '';
+            delta = `<div style="font-size:.46rem;color:var(--text3)">${sign}${pct.toFixed(0)}%</div>`;
+          }
+        }
+        return `<td style="padding:4px 8px;text-align:right;font-family:var(--mono);border-left:1px solid var(--border);background:${bg};color:${color};font-weight:${bg ? '600' : '400'}">${valStr}${delta}</td>`;
+      }).join('');
+      return `<tr><td style="padding:4px 8px;font-size:.56rem;color:var(--text2)" title="${esc(r.m.t)}">${esc(r.m.label)}</td>${cells}</tr>`;
+    }).join('');
+    return gHeaderRow + dataRows;
+  }).join('');
+
+  document.getElementById('compare-table').innerHTML = `
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--s2);color:var(--text3);font-size:.56rem">
+        <th style="padding:6px 8px;text-align:left;min-width:120px">Метрика</th>
+        ${hdrCells}
+      </tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+
+  document.getElementById('compare-header-meta').textContent = `${items.length} эмитентов, ${_COMPARE_METRICS.length} метрик`;
+  document.getElementById('modal-compare').classList.add('open');
+}
+
+function compareExportCsv(){
+  const set = window._compareIssuers;
+  if(!set || set.size < 2){ alert('Пусто.'); return; }
+  const ids = [...set].filter(id => reportsDB[id]);
+  const items = ids.map(id => ({ id, iss: reportsDB[id], mult: _peekAllMultiples(id, reportsDB[id]) }));
+  const esc = s => { const str = String(s == null ? '' : s); return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str; };
+  const header = ['metric', ...items.map(it => (it.iss.name || it.id) + ' (' + (it.iss.inn || '—') + ')')];
+  const body = _COMPARE_METRICS.map(m => {
+    const vals = items.map(it => { try { const v = m.get(it.mult); return v != null && isFinite(v) ? v : ''; } catch(_){ return ''; } });
+    return [m.label, ...vals];
+  });
+  const csv = [header, ...body].map(r => r.map(esc).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `compare-issuers-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Bootstrap — нарисовать флоатер, если в Set что-то есть (например,
+// сохранится через сессию — сейчас Set сбрасывается на перезагрузке,
+// это сознательно: сравнение — сессионное действие).
+setTimeout(() => { try { _compareRenderFloater(); } catch(_){} }, 0);
 
 // Привязывает материнскую компанию к эмитенту через peek-модалку.
 // Открывает prompt, валидирует ИНН, перерисовывает модалку.
