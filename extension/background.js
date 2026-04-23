@@ -6,10 +6,11 @@
 //
 // Flow batch-режима:
 //   1. Для каждого ИНН: fetch API → получаем company.id
-//   2. Открываем вкладку /portal/company.aspx?id=<id> (старая URL ещё
-//      работает; у неё ServicePipe пропустит, т.к. у браузера уже cookies)
-//   3. Content.js на этой странице находит ссылку на раскрытия или
-//      скрапит таблицу, отправляет данные в background
+//   2. Открываем вкладку /portal/files.aspx?id=<id> — именно там
+//      живёт таблица существенных фактов. company.aspx — только
+//      общая карточка, events-container там пустой, поэтому batch
+//      раньше сохранял payload без events.
+//   3. Content.js скрапит таблицу, отправляет данные в background
 //   4. Вкладка закрывается, переходим к следующему ИНН
 
 const CRITICAL_PATTERNS = [
@@ -151,8 +152,8 @@ async function runBatch(inns){
       continue;
     }
 
-    // Шаг 2: открываем карточку компании
-    const url = `https://www.e-disclosure.ru/portal/company.aspx?id=${company.id}`;
+    // Шаг 2: открываем страницу раскрытий (именно files.aspx, не company.aspx)
+    const url = `https://www.e-disclosure.ru/portal/files.aspx?id=${company.id}`;
     const tab = await chrome.tabs.create({ url, active: false });
     const ok = await waitForCollect(inn, company.id, tab.id, 25000);
     if(ok) summary.done++;
@@ -173,10 +174,14 @@ function waitForCollect(inn, edId, tabId, timeoutMs){
       chrome.storage.local.get(['collected'], data => {
         const collected = data.collected || {};
         // Ищем запись либо с правильным ИНН, либо с правильным edId,
-        // либо появившуюся после старта (расширение могло сохранить
-        // по имени если ИНН не распознался на странице).
+        // либо появившуюся после старта. ВАЖНО: засчитываем только
+        // если payload.events непустой — иначе «мёртвые» страницы
+        // (company.aspx без таблицы фактов, редирект ServicePipe и
+        // т.п.) дают пустой payload и батч считает обход успешным.
         const hit = Object.values(collected).some(e => {
           if(!e.payload) return false;
+          const hasEvents = Array.isArray(e.payload.events) && e.payload.events.length > 0;
+          if(!hasEvents) return false;
           if(e.payload.inn === inn) return true;
           if(String(e.payload.edId || '') === String(edId)) return true;
           return (e.savedAt || 0) > start;
