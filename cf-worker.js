@@ -1,11 +1,10 @@
-// Cloudflare Worker — приватный CORS-прокси для ГИР БО (bo.nalog.gov.ru).
+// Cloudflare Worker — приватный CORS-прокси для ГИР БО (bo.nalog.gov.ru)
+// и API Банка России (www.cbr.ru/dataservice).
 //
-// Зачем: bo.nalog.gov.ru не отдаёт Access-Control-Allow-Origin браузеру,
-// поэтому БондАналитик не может напрямую запросить отчётность по ИНН.
-// Этот Worker пересылает GET-запросы к /nbo/* и /advanced-search/* на
-// bo.nalog.gov.ru и добавляет в ответ нужный CORS-заголовок. Только
-// bo.nalog.gov.ru — больше никаких хостов, никакой записи, никакой
-// авторизации.
+// Зачем: ни bo.nalog.gov.ru, ни cbr.ru не отдают Access-Control-Allow-Origin
+// браузеру, поэтому БондАналитик не может напрямую запросить отчётность
+// по ИНН или свежие ряды инфляции/КС. Этот Worker пересылает GET-запросы
+// на разрешённые upstream-хосты и добавляет в ответ нужный CORS-заголовок.
 //
 // Развёртывание (бесплатно, 5 минут):
 //   1. Зарегистрируйтесь на dash.cloudflare.com (без карты).
@@ -17,14 +16,15 @@
 //        https://bondan-girbo.<account>.workers.dev/?u=
 //      (точно так, с `?u=` на конце — таково соглашение приложения).
 //
-// Лимиты бесплатного плана CF Workers: 100 000 запросов/сутки
-// (одно нажатие «📡 5 лет» тратит ~6 запросов). Этого хватит на
-// тысячи компаний в день — заведомо больше, чем понадобится.
+// Лимиты бесплатного плана CF Workers: 100 000 запросов/сутки.
+// Для ЦБ один раунд «обновить все ряды» тратит 5–10 запросов, для ГИР БО
+// одно «📡 5 лет» — 6 запросов. Пользование в одиночку — заведомо внутри
+// лимита.
 //
-// Альтернатива: можно ничего не разворачивать, БондАналитик по умол-
-// чанию использует публичный corsproxy.io. Свой Worker — для тех,
-// кому важно (а) приватность (corsproxy видит ваши запросы), (б)
-// надёжность (corsproxy могут отключить).
+// Альтернатива: БондАналитик по умолчанию использует публичный corsproxy.io.
+// Свой Worker — для (а) приватности (corsproxy видит ваши запросы), (б)
+// надёжности (corsproxy могут отключить), (в) поддержки API ЦБ (corsproxy
+// иногда спотыкается на редиректах cbr.ru).
 
 export default {
   async fetch(req) {
@@ -33,11 +33,12 @@ export default {
     // Соглашение БондАналитика: target-URL передаётся через ?u=…
     let target = url.searchParams.get('u');
 
-    // Разрешённые upstream-домены: ФНС, audit-it.ru, buxbalans.ru.
+    // Разрешённые upstream-домены: ФНС, audit-it.ru, buxbalans.ru, API ЦБ РФ.
     const ALLOWED = [
       /^https:\/\/bo\.nalog\.gov\.ru\//,
       /^https:\/\/(www\.)?audit-it\.ru\//,
-      /^https:\/\/(www\.)?buxbalans\.ru\//
+      /^https:\/\/(www\.)?buxbalans\.ru\//,
+      /^https:\/\/(www\.)?cbr\.ru\/dataservice\//
     ];
     const isAllowed = (u) => ALLOWED.some((re) => re.test(u));
 
@@ -47,13 +48,15 @@ export default {
         target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
       } else if (url.pathname.startsWith('/buh_otchet') || url.pathname.startsWith('/search') || url.pathname.startsWith('/contragent')) {
         target = 'https://www.audit-it.ru' + url.pathname + url.search;
+      } else if (url.pathname.startsWith('/dataservice')) {
+        target = 'https://www.cbr.ru' + url.pathname + url.search;
       } else if (/^\/\d{10}(\d{2})?\.html$/.test(url.pathname)) {
         target = 'https://buxbalans.ru' + url.pathname + url.search;
       }
     }
 
     if (!target || !isAllowed(target)) {
-      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru. Pass URL via ?u=https://…', {
+      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice. Pass URL via ?u=https://…', {
         status: 400,
         headers: {'Access-Control-Allow-Origin': '*'}
       });
@@ -90,11 +93,15 @@ export default {
       let lastStatus = 0;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
+          // Для cbr.ru/dataservice — это JSON API, Accept должен быть json,
+          // иначе сервер может отдать HTML-страницу документации.
+          const isCbrApi = target.includes('cbr.ru/dataservice');
           upstream = await fetch(target, {
             method: req.method,
             headers: {
-              // У ФНС — JSON API, у audit-it — HTML. Универсальный Accept.
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
+              'Accept': isCbrApi
+                ? 'application/json, */*;q=0.1'
+                : 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
               'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
               'Accept-Encoding': 'gzip, deflate, br',
               // Полный браузерный фингерпринт — audit-it без Sec-* заголовков

@@ -1264,6 +1264,73 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+<!-- ═══ MODAL: API ЦБ (обозреватель данных) ═══ -->
+<div class="modal-overlay" id="modal-ratecb-api">
+  <div class="modal" style="width:860px;max-width:96vw;max-height:92vh">
+    <div class="modal-hdr">🔍 API ЦБ — обозреватель данных <button class="modal-x" onclick="closeModal('modal-ratecb-api')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;overflow:auto">
+
+      <!-- Настройка прокси -->
+      <div style="background:var(--bg2);padding:10px 12px;border-radius:6px">
+        <div style="font-size:.68rem;margin-bottom:6px"><b>⚙ URL прокси (Cloudflare Worker)</b></div>
+        <div class="muted" style="font-size:.58rem;margin-bottom:6px;line-height:1.5">
+          API ЦБ не отдаёт CORS-заголовок, поэтому браузер не может обращаться к нему напрямую. Нужен CF Worker. Если у вас уже настроен прокси для ГИР БО — используйте тот же URL (формат: <code>https://...workers.dev/?u=</code>). Иначе см. <code>cf-worker.js</code> в репо — инструкция в комментарии.
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="rate-api-proxy" placeholder="https://your-worker.workers.dev/?u=" style="flex:1;min-width:260px;padding:6px 8px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px">
+          <button class="btn btn-sm" onclick="rateApiSaveProxy()">💾 Сохранить</button>
+          <button class="btn btn-sm" onclick="rateApiTest()" title="Проверить доступность API через прокси (запрос к /publications).">🧪 Тест</button>
+        </div>
+        <div id="rate-api-proxy-status" class="muted" style="font-size:.58rem;margin-top:6px"></div>
+      </div>
+
+      <!-- Дерево категорий -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:.68rem"><b>📚 Публикации</b> <span class="muted" id="rate-api-pubs-count" style="font-size:.56rem"></span></div>
+          <button class="btn btn-sm" onclick="rateApiLoadPubs()">🔄 Загрузить</button>
+        </div>
+        <div id="rate-api-pubs" style="max-height:220px;overflow:auto;background:var(--bg2);border-radius:4px;padding:6px;font-size:.62rem">Не загружено. Нажмите «🔄 Загрузить».</div>
+      </div>
+
+      <!-- Datasets выбранной публикации -->
+      <div id="rate-api-ds" style="display:none">
+        <div style="font-size:.68rem;margin-bottom:6px"><b>📊 Показатели</b> <span class="muted" id="rate-api-ds-info" style="font-size:.56rem"></span></div>
+        <div id="rate-api-dslist" style="max-height:180px;overflow:auto;background:var(--bg2);border-radius:4px;padding:6px;font-size:.62rem"></div>
+      </div>
+
+      <!-- Превью данных и форма привязки -->
+      <div id="rate-api-preview" style="display:none">
+        <div style="font-size:.68rem;margin-bottom:6px"><b>📈 Превью данных</b> <span class="muted" id="rate-api-preview-info" style="font-size:.56rem"></span></div>
+        <div id="rate-api-preview-data" style="max-height:160px;overflow:auto;background:var(--bg2);border-radius:4px;padding:6px;font-size:.6rem;font-family:var(--mono)"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+          <label style="font-size:.62rem">🔗 Привязать как:</label>
+          <select id="rate-api-role" style="padding:4px 6px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px">
+            <option value="">— выбрать роль —</option>
+            <option value="headline_yoy">Headline YoY (инфляция годовая)</option>
+            <option value="trend5y">Трендовая инфляция (5Y)</option>
+            <option value="sa_all_mom">SA MoM (все товары и услуги)</option>
+            <option value="sa_core_mom">SA MoM (core, без ЖКХ/топлива)</option>
+            <option value="key_rate">Ключевая ставка</option>
+          </select>
+          <button class="btn btn-p btn-sm" onclick="rateApiAttach()">🔗 Связать</button>
+        </div>
+      </div>
+
+      <!-- Текущий маппинг -->
+      <div>
+        <div style="font-size:.68rem;margin-bottom:6px"><b>🗂 Связанные ряды</b></div>
+        <div id="rate-api-map" style="background:var(--bg2);border-radius:4px;padding:8px;font-size:.62rem"></div>
+      </div>
+
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-ratecb-api')">Закрыть</button>
+      <button class="btn btn-p btn-sm" onclick="rateApiRefreshAll()" id="rate-api-refresh-modal-btn">🔄 Обновить все ряды</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ PAGE: RATECB (прогноз ключевой ставки ЦБ) ═══ -->
 <div class="page" id="page-ratecb">
   <div class="page-title">🏦 Прогноз ключевой ставки ЦБ</div>
@@ -1283,13 +1350,15 @@ document.addEventListener('DOMContentLoaded', () => {
     <!-- Блок импорта с cbr.ru -->
     <div style="background:var(--bg2);border-left:2px solid var(--acc);padding:8px 12px;margin-bottom:10px;border-radius:4px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:.68rem"><b>🇷🇺 Импорт XLSX с cbr.ru</b></span>
+        <span style="font-size:.68rem"><b>🇷🇺 Данные с cbr.ru</b></span>
         <input type="file" id="rate-cbr-file" accept=".xlsx" multiple style="display:none" onchange="rateImportCbrXlsx(this)">
-        <button class="btn btn-sm" onclick="document.getElementById('rate-cbr-file').click()" title="Импорт файлов с cbr.ru/hd_base/infl/ (trend/core inflation, SA-динамика, региональный разрез). Автораспознавание по заголовку. Можно выделить сразу несколько.">📥 Выбрать файлы</button>
+        <button class="btn btn-sm" onclick="document.getElementById('rate-cbr-file').click()" title="Импорт файлов с cbr.ru/hd_base/infl/ (trend/core inflation, SA-динамика, региональный разрез). Автораспознавание по заголовку.">📥 Импорт XLSX</button>
+        <button class="btn btn-sm" onclick="rateApiOpenModal()" title="Прямой доступ к REST API ЦБ (www.cbr.ru/dataservice). Требует CF Worker для CORS. Позволяет исследовать все публикации, привязывать ряды к полям формы и обновлять их одной кнопкой.">🔍 API ЦБ</button>
+        <button class="btn btn-sm" onclick="rateApiRefreshAll()" id="rate-api-refresh-btn" style="display:none" title="Обновить все привязанные ряды через API (по сохранённому маппингу).">🔄 Обновить через API</button>
         <span class="muted" id="rate-cbr-stamp" style="font-size:.58rem"></span>
       </div>
       <div class="muted" style="font-size:.58rem;margin-top:4px">
-        Ссылки: <a href="https://www.cbr.ru/hd_base/infl/" target="_blank" style="color:var(--acc)">cbr.ru/hd_base/infl/</a> — трендовая и базовая инфляция. Скачайте три XLSX: est_infl, indicators_cpd, reg_cpd — приложение заполнит поля ниже и сохранит полную историю.
+        Ручной импорт: <a href="https://www.cbr.ru/hd_base/infl/" target="_blank" style="color:var(--acc)">cbr.ru/hd_base/infl/</a> (три XLSX — est_infl, indicators_cpd, reg_cpd). Или через API: <a href="https://www.cbr.ru/statistics/data-service/" target="_blank" style="color:var(--acc)">cbr.ru/statistics/data-service/</a> — автообновление без скачивания файлов.
       </div>
       <div id="rate-cbr-summary" style="display:none;margin-top:6px;font-size:.62rem;color:var(--text2)"></div>
     </div>

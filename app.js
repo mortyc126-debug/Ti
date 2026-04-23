@@ -19055,6 +19055,11 @@ function rateInit(){
     }
   } catch(e){}
   _rateRenderCbrSummary();
+  // Показать кнопку «🔄 Обновить через API», если есть привязки
+  const apiBtn = document.getElementById('rate-api-refresh-btn');
+  if(apiBtn && Object.keys(_rateApiReadMap()).length){
+    apiBtn.style.display = 'inline-block';
+  }
   _rateRenderActive();
   _rateUpdateAvgBtn();
 }
@@ -19529,6 +19534,16 @@ function _rateRenderCbrSummary(){
     lastUpd = Math.max(lastUpd, store.reg_cpd.updatedAt || 0);
     if(store.reg_cpd.latest.russia_yoy != null) parts.push('РФ YoY: <b>' + fmt(store.reg_cpd.latest.russia_yoy) + '%</b>');
   }
+  if(store.api && Object.keys(store.api).length){
+    loaded.push('API (' + Object.keys(store.api).length + ')');
+    for(const role in store.api){
+      const bucket = store.api[role];
+      lastUpd = Math.max(lastUpd, bucket.updatedAt || 0);
+      const info = _RATE_API_ROLES[role] || { label: role };
+      const mul = bucket.multiplier || 1;
+      if(bucket.latest != null) parts.push('<span title="ряд получен через API, '+bucket.dsName+'">'+info.label + ' (API): <b>' + fmt(bucket.latest * mul) + '%</b></span>');
+    }
+  }
   if(!loaded.length){
     el.style.display = 'none';
     if(stamp) stamp.textContent = '';
@@ -19561,5 +19576,358 @@ function _rateAutofillFromCbr(showNotice){
   if(showNotice){
     const stamp = document.getElementById('rate-saved-stamp');
     if(stamp) stamp.textContent = 'поля обновлены из cbr.ru · нажмите 💾 чтобы сохранить';
+  }
+}
+
+// ─── Клиент к API Банка России (www.cbr.ru/dataservice) ──────────────────
+// API отдаёт JSON: GET /publications → список категорий, /datasets?publicationId=X
+// → показатели категории, /data?datasetId=X&publicationId=P&y1=..&y2=.. → ряд.
+// Через CF Worker (cf-worker.js), так как cbr.ru не отдаёт CORS.
+//
+// UI — модалка-обозреватель: пользователь находит нужный ряд, привязывает к
+// роли (headline_yoy / trend5y / sa_all_mom / key_rate / …). Маппинг
+// сохраняется. Кнопка «🔄 Обновить» по маппингу тянет свежие данные всех
+// привязанных рядов одним раундом.
+
+const _RATE_API_ROLES = {
+  headline_yoy:  { label: 'Headline YoY',         field: 'rate-in-cpi',   storeKey: 'api_headline_yoy' },
+  trend5y:       { label: 'Трендовая 5Y',          field: 'rate-in-trend', storeKey: 'api_trend5y' },
+  sa_all_mom:    { label: 'SA MoM (все)',          field: 'rate-in-sa',    storeKey: 'api_sa_all',    multiplier: 12 },
+  sa_core_mom:   { label: 'SA MoM (core)',         field: null,            storeKey: 'api_sa_core',   multiplier: 12 },
+  key_rate:      { label: 'Ключевая ставка',       field: 'rate-in-ks',    storeKey: 'api_key_rate' }
+};
+
+let _rateApiState = { pubs: [], selection: null };
+
+function _rateApiProxyUrl(){
+  try {
+    const own = localStorage.getItem('bondan_ratecb_api_proxy');
+    if(own) return own;
+    // Фолбэк — общий прокси ГИР БО, если он настроен (cf-worker.js их умеет оба)
+    return localStorage.getItem('bondan_girbo_proxy') || '';
+  } catch(e){ return ''; }
+}
+
+function rateApiSaveProxy(){
+  const el = document.getElementById('rate-api-proxy');
+  if(!el) return;
+  const val = (el.value || '').trim();
+  try {
+    if(val) localStorage.setItem('bondan_ratecb_api_proxy', val);
+    else    localStorage.removeItem('bondan_ratecb_api_proxy');
+  } catch(e){}
+  const s = document.getElementById('rate-api-proxy-status');
+  if(s) s.innerHTML = val ? '<span style="color:#70d070">сохранено</span>' : '<span class="muted">очищено, будет использоваться прокси ГИР БО</span>';
+}
+
+// Формирует URL запроса через прокси. Поддерживает оба формата прокси:
+// - ?u=<URL>  (наш cf-worker.js)
+// - path-prefix (наш cf-worker.js тоже умеет, срабатывает на /dataservice/*)
+function _rateApiUrl(endpoint, params){
+  const proxy = _rateApiProxyUrl();
+  if(!proxy) throw new Error('Не задан URL прокси (CF Worker). Откройте «🔍 API ЦБ» и настройте.');
+  const qs = Object.keys(params || {}).map(k => {
+    const v = params[k];
+    if(Array.isArray(v)) return v.map(x => encodeURIComponent(k) + '=' + encodeURIComponent(x)).join('&');
+    return encodeURIComponent(k) + '=' + encodeURIComponent(v);
+  }).filter(Boolean).join('&');
+  const cbrPath = '/dataservice/' + endpoint.replace(/^\/+/, '') + (qs ? '?' + qs : '');
+  // Если прокси заканчивается на ?u= — передаём полный URL через параметр.
+  if(/[?&]u=$/.test(proxy)){
+    return proxy + encodeURIComponent('https://www.cbr.ru' + cbrPath);
+  }
+  // Иначе — path-proxy: склеиваем путь.
+  const base = proxy.replace(/\/+$/, '');
+  return base + cbrPath;
+}
+
+async function _rateApiFetch(endpoint, params){
+  const url = _rateApiUrl(endpoint, params);
+  const r = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+  if(!r.ok) throw new Error('HTTP ' + r.status + ' при запросе ' + endpoint);
+  const text = await r.text();
+  try { return JSON.parse(text); }
+  catch(e){ throw new Error('Ответ не JSON (' + text.slice(0, 80) + '…)'); }
+}
+
+function rateApiOpenModal(){
+  const el = document.getElementById('rate-api-proxy');
+  if(el) el.value = _rateApiProxyUrl();
+  _rateApiRenderMap();
+  document.getElementById('modal-ratecb-api').classList.add('open');
+}
+
+async function rateApiTest(){
+  const s = document.getElementById('rate-api-proxy-status');
+  if(s) s.innerHTML = '<span class="muted">тестируем…</span>';
+  try {
+    const data = await _rateApiFetch('publications');
+    if(Array.isArray(data) && data.length){
+      if(s) s.innerHTML = '<span style="color:#70d070">✓ OK, публикаций: ' + data.length + '</span>';
+    } else {
+      if(s) s.innerHTML = '<span style="color:#e0a070">ответ получен, но список пуст</span>';
+    }
+  } catch(e){
+    if(s) s.innerHTML = '<span style="color:#e07070">✗ ' + (e.message || e) + '</span>';
+  }
+}
+
+async function rateApiLoadPubs(){
+  const el = document.getElementById('rate-api-pubs');
+  const cnt = document.getElementById('rate-api-pubs-count');
+  if(el) el.innerHTML = '<span class="muted">загрузка…</span>';
+  try {
+    const pubs = await _rateApiFetch('publications');
+    if(!Array.isArray(pubs)) throw new Error('Неожиданный формат ответа');
+    _rateApiState.pubs = pubs;
+    _rateApiRenderPubsTree(pubs);
+    if(cnt) cnt.textContent = '(' + pubs.length + ')';
+  } catch(e){
+    if(el) el.innerHTML = '<span style="color:#e07070">Ошибка: ' + (e.message || e) + '</span>';
+  }
+}
+
+// Публикации могут иметь parent_id — строим плоский список с отступами.
+function _rateApiRenderPubsTree(pubs){
+  const el = document.getElementById('rate-api-pubs');
+  if(!el) return;
+  // Индексируем по parent_id. Корни — parent_id == null || 0
+  const byParent = {};
+  for(const p of pubs){
+    const pid = p.parent_id || 0;
+    (byParent[pid] = byParent[pid] || []).push(p);
+  }
+  const lines = [];
+  const walk = (parentId, depth) => {
+    const kids = byParent[parentId] || [];
+    for(const p of kids){
+      const pad = '&nbsp;'.repeat(depth * 3);
+      const name = String(p.category_name || '').replace(/</g, '&lt;');
+      const disabled = p.NoActive ? ' style="opacity:.5"' : '';
+      const clickable = '<a href="#" onclick="event.preventDefault();_rateApiSelectPub(' + p.id + ',' + JSON.stringify(p.category_name || '').replace(/"/g, '&quot;') + ')" style="color:var(--acc);text-decoration:none"' + disabled + '>' + name + '</a>';
+      lines.push(pad + '• ' + clickable + ' <span class="muted" style="font-size:.56rem">#' + p.id + '</span>');
+      walk(p.id, depth + 1);
+    }
+  };
+  walk(0, 0);
+  el.innerHTML = lines.length ? lines.join('<br>') : '<span class="muted">Нет категорий</span>';
+}
+
+async function _rateApiSelectPub(pubId, pubName){
+  const dsBlock = document.getElementById('rate-api-ds');
+  const dsList  = document.getElementById('rate-api-dslist');
+  const dsInfo  = document.getElementById('rate-api-ds-info');
+  if(dsBlock) dsBlock.style.display = 'block';
+  if(dsInfo)  dsInfo.textContent = pubName + ' · #' + pubId;
+  if(dsList)  dsList.innerHTML = '<span class="muted">загрузка…</span>';
+  document.getElementById('rate-api-preview').style.display = 'none';
+  try {
+    const ds = await _rateApiFetch('datasets', { publicationId: pubId });
+    if(!Array.isArray(ds) || !ds.length){
+      if(dsList) dsList.innerHTML = '<span class="muted">Показателей нет</span>';
+      return;
+    }
+    _rateApiState.selection = { pubId, pubName, datasets: ds };
+    const rows = ds.map(d => {
+      const nm = String(d.full_name || d.name || '?').replace(/</g, '&lt;');
+      return '<div style="padding:3px 0;border-bottom:1px dotted var(--border)">' +
+             '<a href="#" onclick="event.preventDefault();_rateApiSelectDs(' + d.id + ')" style="color:var(--acc);text-decoration:none">' + nm + '</a>' +
+             ' <span class="muted" style="font-size:.56rem">#' + d.id + (d.reporting ? ' · ' + d.reporting : '') + '</span>' +
+             '</div>';
+    }).join('');
+    if(dsList) dsList.innerHTML = rows;
+  } catch(e){
+    if(dsList) dsList.innerHTML = '<span style="color:#e07070">Ошибка: ' + (e.message || e) + '</span>';
+  }
+}
+
+async function _rateApiSelectDs(dsId){
+  const sel = _rateApiState.selection;
+  if(!sel) return;
+  const ds = (sel.datasets || []).find(x => x.id === dsId);
+  if(!ds) return;
+  const pv = document.getElementById('rate-api-preview');
+  const pd = document.getElementById('rate-api-preview-data');
+  const pi = document.getElementById('rate-api-preview-info');
+  if(pv) pv.style.display = 'block';
+  if(pi) pi.textContent = (ds.full_name || ds.name) + ' · #' + dsId;
+  if(pd) pd.innerHTML = '<span class="muted">загрузка…</span>';
+  const yNow = new Date().getFullYear();
+  try {
+    const resp = await _rateApiFetch('data', {
+      publicationId: sel.pubId, datasetId: dsId, measureId: -1,
+      y1: yNow - 3, y2: yNow
+    });
+    const raw = (resp && resp.RawData) || [];
+    const series = _rateApiRawToSeries(raw);
+    _rateApiState.current = {
+      pubId: sel.pubId, pubName: sel.pubName,
+      dsId, dsName: ds.full_name || ds.name,
+      series, raw
+    };
+    if(!series.length){
+      if(pd) pd.innerHTML = '<span class="muted">Нет данных за последние 3 года (попробуйте другой показатель).</span>';
+      return;
+    }
+    const last5 = series.slice(-5).map(x => x.date + '  →  ' + x.value).join('\n');
+    if(pd) pd.innerHTML = '<div>Всего точек: ' + series.length + ', первая: ' + series[0].date + ', последняя: ' + series[series.length-1].date + '</div>' +
+      '<div style="margin-top:4px;white-space:pre-wrap">' + last5 + '</div>';
+  } catch(e){
+    if(pd) pd.innerHTML = '<span style="color:#e07070">Ошибка: ' + (e.message || e) + '</span>';
+  }
+}
+
+// RawData ЦБ → унифицированные {date: YYYY-MM-DD, value: number}.
+function _rateApiRawToSeries(raw){
+  const out = [];
+  for(const r of (raw || [])){
+    if(typeof r.obs_val !== 'number' || !isFinite(r.obs_val)) continue;
+    let d = null;
+    if(r.date){
+      // ЦБ отдаёт поле date в разных форматах: "2024-12-01", "Dec 2024", "2024Q4"
+      const s = String(r.date);
+      const mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const mMonYr = s.match(/^([A-Za-zА-Яа-я]+)\s+(\d{4})/);
+      const mQ = s.match(/^(\d{4})Q([1-4])/);
+      if(mIso) d = mIso[1] + '-' + mIso[2] + '-' + mIso[3];
+      else if(mMonYr){
+        const months = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,янв:1,фев:2,мар:3,апр:4,май:5,июн:6,июл:7,авг:8,сен:9,окт:10,ноя:11,дек:12};
+        const mi = months[mMonYr[1].slice(0,3).toLowerCase()];
+        if(mi) d = mMonYr[2] + '-' + String(mi).padStart(2,'0') + '-01';
+      } else if(mQ){
+        d = mQ[1] + '-' + String((parseInt(mQ[2]) - 1) * 3 + 1).padStart(2,'0') + '-01';
+      }
+    }
+    if(!d && r.dt){
+      const s = String(r.dt);
+      const mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(mIso) d = mIso[1] + '-' + mIso[2] + '-' + mIso[3];
+    }
+    if(d) out.push({ date: d, value: r.obs_val });
+  }
+  out.sort((a,b) => a.date < b.date ? -1 : 1);
+  return out;
+}
+
+function rateApiAttach(){
+  const role = (document.getElementById('rate-api-role') || {}).value;
+  if(!role){ alert('Выберите роль из списка'); return; }
+  const cur = _rateApiState.current;
+  if(!cur){ alert('Сначала выберите показатель и дождитесь превью'); return; }
+  const map = _rateApiReadMap();
+  map[role] = {
+    pubId: cur.pubId, pubName: cur.pubName,
+    dsId: cur.dsId, dsName: cur.dsName,
+    measureId: -1,
+    attachedAt: Date.now()
+  };
+  try { localStorage.setItem('bondan_ratecb_cbrapi_map', JSON.stringify(map)); } catch(e){}
+  _rateApiRenderMap();
+  const roleInfo = _RATE_API_ROLES[role];
+  const sel = document.getElementById('rate-api-role');
+  if(sel) sel.value = '';
+  alert('Связано: ' + (roleInfo ? roleInfo.label : role) + ' ← ' + cur.dsName);
+}
+
+function _rateApiReadMap(){
+  try {
+    const raw = localStorage.getItem('bondan_ratecb_cbrapi_map');
+    return raw ? JSON.parse(raw) : {};
+  } catch(e){ return {}; }
+}
+
+function _rateApiRenderMap(){
+  const el = document.getElementById('rate-api-map');
+  const btn = document.getElementById('rate-api-refresh-btn');
+  if(!el) return;
+  const map = _rateApiReadMap();
+  const keys = Object.keys(map);
+  if(!keys.length){
+    el.innerHTML = '<span class="muted">Нет связанных рядов. Выберите показатель выше и нажмите «🔗 Связать».</span>';
+    if(btn) btn.style.display = 'none';
+    return;
+  }
+  const rows = keys.map(role => {
+    const info = _RATE_API_ROLES[role] || { label: role };
+    const m = map[role];
+    return '<div style="display:flex;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px dotted var(--border)">' +
+      '<div><b>' + info.label + '</b> <span class="muted" style="font-size:.56rem">← ' + (m.dsName || '?') + '</span></div>' +
+      '<button class="btn btn-sm" style="padding:1px 6px;font-size:.56rem" onclick="rateApiUnbind(' + JSON.stringify(role) + ')">✕</button>' +
+      '</div>';
+  }).join('');
+  el.innerHTML = rows;
+  if(btn) btn.style.display = 'inline-block';
+}
+
+function rateApiUnbind(role){
+  const map = _rateApiReadMap();
+  delete map[role];
+  try { localStorage.setItem('bondan_ratecb_cbrapi_map', JSON.stringify(map)); } catch(e){}
+  _rateApiRenderMap();
+}
+
+async function rateApiRefreshAll(){
+  const map = _rateApiReadMap();
+  const keys = Object.keys(map);
+  if(!keys.length){
+    alert('Нет связанных рядов. Откройте «🔍 API ЦБ» и привяжите хотя бы один показатель.');
+    return;
+  }
+  const btn1 = document.getElementById('rate-api-refresh-btn');
+  const btn2 = document.getElementById('rate-api-refresh-modal-btn');
+  [btn1, btn2].forEach(b => { if(b){ b.disabled = true; b.textContent = '⏳ Обновляем…'; }});
+  const store = _rateReadCbrStore();
+  // Отдельный бакет для API-данных, чтобы не конфликтовать с XLSX.
+  if(!store.api) store.api = {};
+  const errors = [];
+  let ok = 0;
+  const yNow = new Date().getFullYear();
+  for(const role of keys){
+    const m = map[role];
+    const info = _RATE_API_ROLES[role] || {};
+    try {
+      const resp = await _rateApiFetch('data', {
+        publicationId: m.pubId, datasetId: m.dsId, measureId: -1,
+        y1: yNow - 10, y2: yNow
+      });
+      const series = _rateApiRawToSeries(resp && resp.RawData);
+      if(!series.length){ errors.push(info.label + ': нет данных'); continue; }
+      store.api[role] = {
+        updatedAt: Date.now(),
+        pubName: m.pubName, dsName: m.dsName,
+        series,
+        latest: series[series.length-1].value,
+        latestDate: series[series.length-1].date,
+        multiplier: info.multiplier || 1
+      };
+      ok++;
+    } catch(e){
+      errors.push((info.label || role) + ': ' + (e.message || e));
+    }
+  }
+  try { localStorage.setItem('bondan_ratecb_cbrdata', JSON.stringify(store)); } catch(e){}
+  _rateRenderCbrSummary();
+  _rateApiAutofillFromApi();
+  [btn1, btn2].forEach(b => { if(b){ b.disabled = false; }});
+  if(btn1) btn1.textContent = '🔄 Обновить через API';
+  if(btn2) btn2.textContent = '🔄 Обновить все ряды';
+  const msg = 'Обновлено: ' + ok + ' · ошибок: ' + errors.length + (errors.length ? '\n\n' + errors.join('\n') : '');
+  alert(msg);
+}
+
+// Записать последние значения API-рядов в поля формы.
+function _rateApiAutofillFromApi(){
+  const store = _rateReadCbrStore();
+  if(!store.api) return;
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if(el && v != null && !isNaN(v)) el.value = Number(v).toFixed(2);
+  };
+  for(const role in store.api){
+    const info = _RATE_API_ROLES[role];
+    if(!info || !info.field) continue;
+    const v = store.api[role].latest;
+    const mul = info.multiplier || 1;
+    set(info.field, v * mul);
   }
 }
