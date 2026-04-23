@@ -19172,18 +19172,37 @@ async function _schedFetchBond(secid, issueSize, force){
 }
 
 // Собирает все выпуски эмитента из _moexCatalog (только живые, без
-// archivedAt и без matDate в прошлом).
+// archivedAt и без matDate в прошлом). issId в catalog.items сырой
+// после fetch не проставлен — matching делаем на ходу через ту же
+// функцию, что использует рендер каталога (_moexMatchIssuer).
 function _schedCollectIssues(issId){
   const cat = window._moexCatalog;
   if(!cat || !Array.isArray(cat.items)) return [];
   const iss = reportsDB[issId];
-  const inn = iss?.inn ? String(iss.inn) : '';
   const today = Date.now();
+  const issIdx = (typeof _moexBuildIssuerIndex === 'function') ? _moexBuildIssuerIndex() : null;
+  const matchFn = (typeof _moexMatchIssuer === 'function') ? _moexMatchIssuer : null;
   return cat.items.filter(b => {
     if(b.archivedAt) return false;
-    if(b.issId !== issId && !(inn && String(b.inn || '') === inn)) return false;
     if(b.matDate && new Date(b.matDate).getTime() < today - 7 * 86400000) return false;
-    return true;
+    // 1. Быстрая проверка: если issId уже проставлен (в enriched режиме).
+    if(b.issId === issId) return true;
+    // 2. Матчим на ходу — как делает рендер каталога.
+    if(issIdx && matchFn){
+      const bondIssId = matchFn(b, issIdx);
+      if(bondIssId === issId) return true;
+    }
+    // 3. Фолбэк — имя эмитента по подстроке (последняя надежда, для
+    //    эмитентов, у которых нормализация имени не даёт точного совпадения).
+    if(iss && iss.name){
+      const issName = String(iss.name).toLowerCase().replace(/\s+/g, ' ').trim();
+      const bondIssuer = String(b.issuer || '').toLowerCase();
+      const bondSecname = String(b.secName || b.shortName || '').toLowerCase();
+      if(issName.length >= 4 && (bondIssuer.includes(issName) || issName.includes(bondIssuer) || bondSecname.includes(issName))){
+        return true;
+      }
+    }
+    return false;
   });
 }
 
