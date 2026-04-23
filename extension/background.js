@@ -1,22 +1,24 @@
 // Service worker расширения БондАналитик: сбор раскрытий.
-// v1.4.1: подтверждено двумя HTML-дампами с живого сайта:
-//   • /api/search/companies?query=... возвращает 404 (мёртвый API);
-//   • /poisk-po-kompaniyam/ отдаёт пустую форму, результаты рендерит
-//     JS через AJAX — fetch в background ничего полезного не даст
-//     (+ антибот ServicePipe требует выполнения JS для получения куки);
-//   • зато при ОДНОМ совпадении сайт сам 302-редиректит на карточку
-//     company.aspx?id=<N> — это и используем.
+// v1.4.2: реальный API найден из Network-лога пользователя.
+//   • POST https://e-disclosure.ru/api/search/companies
+//   • Content-Type: application/x-www-form-urlencoded
+//   • Тело: textfield=<ИНН>&lastPageSize=10&lastPageNumber=1&…
+//   • Антифорджери: cookie .AspNetCore.Antiforgery.* + header
+//     RequestVerificationToken (ASP.NET Core double-submit).
+//   • Ответ JSON: {foundCompaniesList: [{id, ...}], ...}
 //
-// Стратегия: не угадываем API, а всегда открываем поисковую страницу
-// /poisk-po-kompaniyam/?query=<ИНН> во вкладке. content.js на этой
-// странице заполнит форму, нажмёт «Искать», а при одном совпадении
-// сайт сам перекинет на карточку (дальше уже известный flow).
-// Это стабильно работает в браузере пользователя — там уже есть
-// куки ServicePipe, пройденные капчей при первом заходе.
+// Получаем CSRF-токен один раз за сессию service worker:
+// GET /poisk-po-kompaniyam/ → вытаскиваем regex'ом value
+// <input name="__RequestVerificationToken" value="…"/>. Куку
+// .AspNetCore.Antiforgery.* браузер ставит сам.
+//
+// Если API вернул 400/403 — токен устарел, сбрасываем и повторяем.
+// Если всё равно пусто — tab-fallback: открыть /poisk-po-kompaniyam/
+// ?query=<ИНН>, content.js заполнит форму и кликнет «Искать», сайт
+// сам 302-редиректит на карточку при единственном совпадении.
 //
 // Прогресс batch пишется в chrome.storage.local.batchProgress, чтобы
-// popup мог восстановить UI при переоткрытии (раньше сообщения
-// chrome.runtime.sendMessage терялись когда popup закрыт).
+// popup мог восстановить UI при переоткрытии.
 
 const CRITICAL_PATTERNS = [
   { key: 'default', re: /неисполнени[еяю].*обязательств|просрочк|техническ\w* дефолт|\bдефолт|невыплат/i, label: 'Дефолт/просрочка' },
@@ -32,43 +34,52 @@ function detectCritical(title){
 }
 function eventKey(e){ return (e.date || '') + '|' + (e.title || '').slice(0, 80); }
 
-// Быстрый путь: пытаемся найти id через fetch поисковой страницы с
-// куками браузера. В большинстве случаев вернёт anti-bot ServicePipe
-// (пустой HTML с редиректом на /exhkqyad), но если у пользователя
-// уже есть куки ServicePipe от живых посещений сайта — страница
-// отрендерится на сервере (SSR) и id можно достать regex'ом.
-// Если не получилось — вернёт null, и runBatch упадёт на tab-fallback.
-async function findCompanyByInn(inn){
-  const url = `https://www.e-disclosure.ru/poisk-po-kompaniyam/?query=${encodeURIComponent(inn)}`;
+// Ищет компанию по ИНН через реальный POST-API e-disclosure.
+// Payload и response подтверждены Network-логом пользователя
+// (v1.4.2). Antiforgery защита — cookie .AspNetCore.Antiforgery.*,
+// автоматически подставляется браузером при credentials:'include'.
+// Если cookie ещё нет (первый запуск) или она протухла — делаем
+// GET /poisk-po-kompaniyam/, сервер ставит cookie, повторяем POST.
+async function findCompanyByInn(inn, retry = true){
+  const body = new URLSearchParams({
+    textfield: String(inn),
+    radReg: 'FederalDistricts',
+    districtsCheckboxGroup: '-1',
+    regionsCheckboxGroup: '-1',
+    branchesCheckboxGroup: '-1',
+    lastPageSize: '10',
+    lastPageNumber: '1',
+    query: String(inn),
+  });
   try {
-    const r = await fetch(url, {
+    const r = await fetch('https://e-disclosure.ru/api/search/companies', {
+      method: 'POST',
       credentials: 'include',
-      headers: { 'Accept': 'text/html,application/xhtml+xml' },
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: body.toString(),
     });
-    console.log('[bondanalit] search', inn, '→ status', r.status);
+    console.log('[bondanalit] api', inn, '→', r.status);
+    if((r.status === 400 || r.status === 401 || r.status === 403) && retry){
+      // Antiforgery-cookie отсутствует или протухла — подтянем её
+      // заходом на поисковую страницу и повторим один раз.
+      await fetch('https://e-disclosure.ru/poisk-po-kompaniyam/', { credentials: 'include' }).catch(() => {});
+      return findCompanyByInn(inn, false);
+    }
     if(!r.ok) return null;
-    const html = await r.text();
-    // Маркёр anti-bot: ServicePipe показывает страницу-заглушку со
-    // ссылкой /exhkqyad. Никаких company.aspx?id там нет — не тратим
-    // время на regex, сразу fallback.
-    if(/exhkqyad|<div class="load">/i.test(html)){
-      console.log('[bondanalit] antibot stub for', inn, '— tab fallback');
-      return null;
+    const data = await r.json();
+    const list = (data && data.foundCompaniesList) || [];
+    if(list.length){
+      const first = list[0];
+      console.log('[bondanalit] found id', first.id, first.name, 'for inn', inn);
+      return { id: String(first.id), name: first.name || '', inn: String(inn) };
     }
-    const re = /company\.aspx\?id=(\d+)/gi;
-    let match, picked = null;
-    while((match = re.exec(html)) !== null){
-      const ctx = html.slice(Math.max(0, match.index - 400), match.index + 400);
-      if(ctx.includes(inn)){ picked = match[1]; break; }
-      if(!picked) picked = match[1];
-    }
-    if(picked){
-      console.log('[bondanalit] fast-path id', picked, 'for inn', inn);
-      return { id: picked, name: '', inn: String(inn) };
-    }
-    console.log('[bondanalit] no id in html for', inn, '— tab fallback');
+    console.log('[bondanalit] empty list for inn', inn);
   } catch(e){
-    console.warn('[bondanalit] search err', e && e.message);
+    console.warn('[bondanalit] api err', inn, e && e.message);
   }
   return null;
 }
