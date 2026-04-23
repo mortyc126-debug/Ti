@@ -33,7 +33,8 @@ export default {
     // Соглашение БондАналитика: target-URL передаётся через ?u=…
     let target = url.searchParams.get('u');
 
-    // Разрешённые upstream-домены: ФНС, audit-it.ru, buxbalans.ru, API ЦБ РФ.
+    // Разрешённые upstream-домены: ФНС, audit-it.ru, buxbalans.ru, API ЦБ РФ,
+    // мировые макро-источники (FRED, Yahoo Finance, Stooq, ECB SDMX).
     const ALLOWED = [
       /^https:\/\/bo\.nalog\.gov\.ru\//,
       /^https:\/\/(www\.)?audit-it\.ru\//,
@@ -41,7 +42,12 @@ export default {
       /^https:\/\/(www\.)?cbr\.ru\/dataservice\//,
       // Прямые ссылки на XLSX/PDF документы ЦБ (статистика инфляции,
       // KeyRate и т.д.) — статические файлы под /Content/Document/File/<id>/
-      /^https:\/\/(www\.)?cbr\.ru\/Content\/Document\/File\//
+      /^https:\/\/(www\.)?cbr\.ru\/Content\/Document\/File\//,
+      // Мировые источники (для страницы «🔗 Связи»):
+      /^https:\/\/api\.stlouisfed\.org\/fred\//,    // FRED REST API (US Fed, world macro, требует API-key)
+      /^https:\/\/query[12]\.finance\.yahoo\.com\//, // Yahoo Finance — котировки, курсы, Brent, индексы
+      /^https:\/\/stooq\.com\//,                     // Stooq — CSV исторических котировок (без ключа)
+      /^https:\/\/data-api\.ecb\.europa\.eu\//       // ECB SDMX API — евро-ставки, HICP
     ];
     const isAllowed = (u) => ALLOWED.some((re) => re.test(u));
 
@@ -53,13 +59,19 @@ export default {
         target = 'https://www.audit-it.ru' + url.pathname + url.search;
       } else if (url.pathname.startsWith('/dataservice') || url.pathname.startsWith('/Content/Document/File/')) {
         target = 'https://www.cbr.ru' + url.pathname + url.search;
+      } else if (url.pathname.startsWith('/fred/')) {
+        target = 'https://api.stlouisfed.org' + url.pathname + url.search;
+      } else if (url.pathname.startsWith('/v7/finance/') || url.pathname.startsWith('/v8/finance/')) {
+        target = 'https://query1.finance.yahoo.com' + url.pathname + url.search;
+      } else if (url.pathname.startsWith('/q/d/l/')) {
+        target = 'https://stooq.com' + url.pathname + url.search;
       } else if (/^\/\d{10}(\d{2})?\.html$/.test(url.pathname)) {
         target = 'https://buxbalans.ru' + url.pathname + url.search;
       }
     }
 
     if (!target || !isAllowed(target)) {
-      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice, cbr.ru/Content/Document/File. Pass URL via ?u=https://…', {
+      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru, api.stlouisfed.org/fred, query*.finance.yahoo.com, stooq.com, data-api.ecb.europa.eu. Pass URL via ?u=https://…', {
         status: 400,
         headers: {'Access-Control-Allow-Origin': '*'}
       });
@@ -96,15 +108,21 @@ export default {
       let lastStatus = 0;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          // Для cbr.ru/dataservice — это JSON API, Accept должен быть json,
-          // иначе сервер может отдать HTML-страницу документации.
+          // Для JSON API (ЦБ, FRED, Yahoo Finance chart) — жёсткий Accept,
+          // иначе могут отдать HTML-заглушку или CSV. Stooq отдаёт text/csv.
           const isCbrApi = target.includes('cbr.ru/dataservice');
+          const isFred   = target.includes('api.stlouisfed.org');
+          const isYahoo  = target.includes('finance.yahoo.com');
+          const isStooq  = target.includes('stooq.com');
+          const isJsonApi = isCbrApi || isFred || isYahoo;
           upstream = await fetch(target, {
             method: req.method,
             headers: {
-              'Accept': isCbrApi
+              'Accept': isJsonApi
                 ? 'application/json, */*;q=0.1'
-                : 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
+                : isStooq
+                  ? 'text/csv, text/plain, */*;q=0.1'
+                  : 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
               'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
               'Accept-Encoding': 'gzip, deflate, br',
               // Полный браузерный фингерпринт — audit-it без Sec-* заголовков

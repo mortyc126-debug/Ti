@@ -23466,6 +23466,15 @@ function _linksCatalog(){
       }
     }
   }
+  if(store.world){
+    for(const id in store.world){
+      const w = store.world[id];
+      if(w && Array.isArray(w.series) && w.series.length){
+        pushIf('world', id, w.series, '🌍 ' + id + ' · ' + (w.label || ''),
+          (w.descr || '') + ' · Источник: ' + (w.provider || '').toUpperCase() + '. Загружено через CF Worker.', 1);
+      }
+    }
+  }
   return items;
 }
 
@@ -23778,4 +23787,217 @@ function _linksRenderCCF(){
   svg += '<text x="' + (Wg / 2) + '" y="' + (Hg - 3) + '" text-anchor="middle" font-size="9" fill="var(--text3)">сдвиг x относительно y (мес)</text>';
   svg += '</svg>';
   box.innerHTML = svg;
+}
+
+// ═══ WORLD DATA: FRED / Yahoo / Stooq через CF Worker ════════════════════
+// Мировые макро-ряды для страницы «🔗 Связи». Всё идёт через Cloudflare
+// Worker (не Yandex — мировые API часто режут РФ-IP, CF ближе к их edge).
+//
+// Хранилище:
+//   bondan_world_proxy       — URL CF Worker (отдельно от bondan_girbo_proxy)
+//   bondan_world_fred_apikey — FRED API key (бесплатно на fred.stlouisfed.org)
+// Сами ряды сохраняются в bondan_ratecb_cbrdata.world = { key: {series, latest, ...} }
+// — тот же бакет что и всё остальное, страница «🔗 Связи» автоматически
+// подхватит их в _linksCatalog.
+
+const _WORLD_PRESETS = [
+  // FRED — ключевые мировые индикаторы для российского инвестора
+  { id: 'FEDFUNDS',   prov: 'fred', label: 'Fed Funds Rate, %',           descr: 'Эффективная ставка ФРС США. Главный внешний драйвер для ЦБ РФ — сдвиги коррелируют с лагом ~3-6 мес.' },
+  { id: 'DGS10',      prov: 'fred', label: 'US Treasury 10Y, %',          descr: 'Доходность 10-летних казначейских облигаций США. Бенчмарк для длинного ОФЗ-спреда.' },
+  { id: 'DGS2',       prov: 'fred', label: 'US Treasury 2Y, %',           descr: 'Короткий US-бенчмарк. Разница DGS10-DGS2 — yield curve inversion, leading-индикатор рецессии.' },
+  { id: 'BAMLH0A0HYM2', prov: 'fred', label: 'US High Yield OAS, %',      descr: 'Спред американских ВДО (ICE BofA). Прямой аналог ваших спредов корпоратов vs ОФЗ. Корреляция с РФ-ВДО обычно 0.6-0.8.' },
+  { id: 'CPIAUCSL',   prov: 'fred', label: 'US CPI, index',               descr: 'Индекс потребительских цен США (level, 1982-84=100). Годовой темп считайте сами как diff.' },
+  { id: 'DTWEXBGS',   prov: 'fred', label: 'DXY (broad dollar)',          descr: 'Индекс доллара против корзины валют. Inverse к Brent, к EM-валютам.' },
+  { id: 'DCOILBRENTEU', prov: 'fred', label: 'Brent, $/barrel',           descr: 'Цена нефти Brent (EIA через FRED). Главный фактор USD/RUB через счёт текущих операций.' },
+  { id: 'VIXCLS',     prov: 'fred', label: 'VIX index',                   descr: 'Индекс волатильности S&P 500. Proxy «risk-off» режима глобальных рынков.' },
+];
+
+function _worldProxyUrl(){
+  try {
+    const own = localStorage.getItem('bondan_world_proxy');
+    if(own) return own;
+    return ''; // Мировой прокси отдельный, cbr-прокси (yandex) не подходит
+  } catch(_){ return ''; }
+}
+
+function _worldFredKey(){
+  try { return localStorage.getItem('bondan_world_fred_apikey') || ''; } catch(_){ return ''; }
+}
+
+// Собирает URL через CF Worker. Поддерживает ?u= и path-proxy.
+function _worldBuildUrl(origUrl){
+  const proxy = _worldProxyUrl();
+  if(!proxy) throw new Error('Не задан URL мирового CF Worker (откройте «🌍 Мировые» → сохраните URL)');
+  if(/[?&]u=$/.test(proxy)) return proxy + encodeURIComponent(origUrl);
+  // Path-proxy: заменить https://host на base
+  const base = proxy.replace(/\/+$/, '');
+  const u = new URL(origUrl);
+  return base + u.pathname + u.search;
+}
+
+async function _worldFetchFred(seriesId, startDate){
+  const key = _worldFredKey();
+  if(!key) throw new Error('FRED требует API-key (бесплатно на fred.stlouisfed.org/docs/api/api_key.html)');
+  const sd = startDate || '2010-01-01';
+  const orig = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + encodeURIComponent(seriesId) +
+               '&api_key=' + encodeURIComponent(key) +
+               '&file_type=json&observation_start=' + sd;
+  const url = _worldBuildUrl(orig);
+  const r = await fetch(url, { cache: 'no-store' });
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  const data = await r.json();
+  const obs = data && data.observations;
+  if(!Array.isArray(obs)) throw new Error('Неожиданный формат ответа FRED');
+  const series = [];
+  for(const o of obs){
+    const v = parseFloat(o.value);
+    if(isFinite(v) && o.date) series.push({ date: o.date, value: v });
+  }
+  return series;
+}
+
+async function _worldFetchYahoo(symbol){
+  // Помесячные 10 лет
+  const orig = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) +
+               '?interval=1mo&range=10y';
+  const url = _worldBuildUrl(orig);
+  const r = await fetch(url, { cache: 'no-store' });
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  const data = await r.json();
+  const res = data && data.chart && data.chart.result && data.chart.result[0];
+  if(!res) throw new Error('Yahoo: пустой ответ');
+  const ts = res.timestamp || [];
+  const closes = (res.indicators && res.indicators.quote && res.indicators.quote[0] && res.indicators.quote[0].close) || [];
+  const series = [];
+  for(let i = 0; i < ts.length; i++){
+    const v = closes[i];
+    if(v == null || !isFinite(v)) continue;
+    const d = new Date(ts[i] * 1000).toISOString().slice(0, 10);
+    series.push({ date: d, value: v });
+  }
+  return series;
+}
+
+async function _worldFetchStooq(symbol){
+  // Stooq: CSV с помесячными данными за всю доступную историю
+  // interval d=daily, w=weekly, m=monthly
+  const orig = 'https://stooq.com/q/d/l/?s=' + encodeURIComponent(symbol) + '&i=m';
+  const url = _worldBuildUrl(orig);
+  const r = await fetch(url, { cache: 'no-store' });
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  const text = await r.text();
+  const lines = text.trim().split(/\r?\n/);
+  if(lines.length < 2) throw new Error('Stooq: пустой CSV');
+  // Заголовок: Date,Open,High,Low,Close,Volume
+  const series = [];
+  for(let i = 1; i < lines.length; i++){
+    const parts = lines[i].split(',');
+    if(parts.length < 5) continue;
+    const date = parts[0], closeStr = parts[4];
+    const v = parseFloat(closeStr);
+    if(isFinite(v) && date) series.push({ date, value: v });
+  }
+  return series;
+}
+
+async function worldFetchOne(preset){
+  let series;
+  if(preset.prov === 'fred')   series = await _worldFetchFred(preset.id);
+  else if(preset.prov === 'yahoo') series = await _worldFetchYahoo(preset.id);
+  else if(preset.prov === 'stooq') series = await _worldFetchStooq(preset.id);
+  else throw new Error('Неизвестный provider: ' + preset.prov);
+  if(!series.length) throw new Error('Ряд пустой');
+  return series;
+}
+
+// Модалка «🌍 Мировые данные» для настройки прокси, ключа FRED и
+// массового скачивания пресетов.
+function worldOpenModal(){
+  document.getElementById('world-proxy').value  = _worldProxyUrl();
+  document.getElementById('world-fred-key').value = _worldFredKey();
+  _worldRenderPresets();
+  document.getElementById('modal-world').classList.add('open');
+}
+
+function worldSaveProxy(){
+  const v = (document.getElementById('world-proxy').value || '').trim();
+  try {
+    if(v) localStorage.setItem('bondan_world_proxy', v);
+    else  localStorage.removeItem('bondan_world_proxy');
+  } catch(_){}
+  document.getElementById('world-proxy-status').innerHTML = v ? '<span style="color:#70d070">сохранено</span>' : '<span class="muted">очищено</span>';
+}
+
+function worldSaveFredKey(){
+  const v = (document.getElementById('world-fred-key').value || '').trim();
+  try {
+    if(v) localStorage.setItem('bondan_world_fred_apikey', v);
+    else  localStorage.removeItem('bondan_world_fred_apikey');
+  } catch(_){}
+  document.getElementById('world-fred-status').innerHTML = v ? '<span style="color:#70d070">сохранён (' + v.length + ' симв)</span>' : '<span class="muted">очищен</span>';
+}
+
+function _worldRenderPresets(){
+  const el = document.getElementById('world-presets');
+  if(!el) return;
+  const store = _rateReadCbrStore();
+  const world = store.world || {};
+  const html = _WORLD_PRESETS.map(p => {
+    const has = world[p.id];
+    const info = has
+      ? '<span style="color:#70d070;font-size:.58rem">✓ ' + has.series.length + ' точек, ' + has.series[0].date + '…' + has.series[has.series.length-1].date + '</span>'
+      : '<span class="muted" style="font-size:.58rem">не загружено</span>';
+    return '<div style="padding:8px 10px;border:1px solid var(--border);border-radius:4px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:500"><code style="color:var(--acc)">' + p.id + '</code> <span style="margin-left:6px">' + p.label + '</span> <span class="muted" style="font-size:.52rem">[' + p.prov + ']</span></div>' +
+        '<div class="muted" style="font-size:.58rem;margin-top:2px;line-height:1.4">' + p.descr + '</div>' +
+        '<div style="margin-top:3px">' + info + '</div>' +
+      '</div>' +
+      '<button class="btn btn-sm" style="padding:2px 8px;font-size:.58rem" onclick="worldFetchPreset(\'' + p.id + '\')">📥</button>' +
+    '</div>';
+  }).join('');
+  el.innerHTML = html;
+}
+
+async function worldFetchPreset(id){
+  const p = _WORLD_PRESETS.find(x => x.id === id);
+  if(!p) return;
+  const st = document.getElementById('world-fetch-status');
+  if(st) st.innerHTML = '<span class="muted">⏳ Качаем ' + id + '…</span>';
+  try {
+    const series = await worldFetchOne(p);
+    const store = _rateReadCbrStore();
+    if(!store.world) store.world = {};
+    store.world[id] = {
+      updatedAt: Date.now(),
+      provider: p.prov,
+      label: p.label,
+      descr: p.descr,
+      series,
+      latest: series[series.length-1].value,
+      latestDate: series[series.length-1].date
+    };
+    try { localStorage.setItem('bondan_ratecb_cbrdata', JSON.stringify(store)); } catch(_){}
+    if(st) st.innerHTML = '<span style="color:#70d070">✓ ' + id + ': ' + series.length + ' точек, последнее ' + series[series.length-1].value.toFixed(2) + ' @ ' + series[series.length-1].date + '</span>';
+    _worldRenderPresets();
+    // Обновим каталог страницы «🔗 Связи» если она открыта
+    if(document.getElementById('links-series-list') && document.getElementById('page-links').classList.contains('active')){
+      linksInit();
+    }
+  } catch(e){
+    if(st) st.innerHTML = '<span style="color:#e07070">✗ ' + id + ': ' + (e.message || e) + '</span>';
+  }
+}
+
+async function worldFetchAll(){
+  const st = document.getElementById('world-fetch-status');
+  let ok = 0, fail = 0;
+  for(const p of _WORLD_PRESETS){
+    try {
+      await worldFetchPreset(p.id);
+      ok++;
+    } catch(_){ fail++; }
+    await new Promise(r => setTimeout(r, 300));  // пауза чтобы не забить rate limit
+  }
+  if(st) st.innerHTML = '<span>Готово: ' + ok + ' из ' + _WORLD_PRESETS.length + ' загружено</span>';
 }

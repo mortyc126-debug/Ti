@@ -1281,6 +1281,57 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- ═══ MODAL: API ЦБ (обозреватель данных) ═══ -->
+<!-- ═══ MODAL: мировые данные (FRED, Yahoo, Stooq через CF Worker) ═══ -->
+<div class="modal-overlay" id="modal-world">
+  <div class="modal" style="width:820px;max-width:96vw;max-height:92vh">
+    <div class="modal-hdr">🌍 Мировые данные <button class="modal-x" onclick="closeModal('modal-world')">✕</button></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;overflow:auto">
+
+      <!-- Прокси -->
+      <div style="background:var(--bg2);padding:10px 12px;border-radius:6px">
+        <div style="font-size:.68rem;margin-bottom:6px"><b>⚙ URL мирового Cloudflare Worker</b></div>
+        <div class="muted" style="font-size:.58rem;margin-bottom:6px;line-height:1.5">
+          Мировые API (FRED, Yahoo, Stooq, ECB) нередко режут РФ-IP, поэтому нужен отдельный прокси в не-РФ edge. Cloudflare Worker ходит из Финляндии/Казахстана/Турции и проходит. Это <b>отдельный</b> от ЦБ-прокси (тот Яндекс, для РФ-источников). Код в <code>cf-worker.js</code> — уже умеет все эти хосты после свежего push.
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="world-proxy" placeholder="https://your-worker.workers.dev/?u=" style="flex:1;min-width:260px;padding:6px 8px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px">
+          <button class="btn btn-sm" onclick="worldSaveProxy()">💾 Сохранить</button>
+        </div>
+        <div id="world-proxy-status" class="muted" style="font-size:.58rem;margin-top:6px"></div>
+      </div>
+
+      <!-- FRED API-key -->
+      <div style="background:var(--bg2);padding:10px 12px;border-radius:6px">
+        <div style="font-size:.68rem;margin-bottom:6px"><b>🔑 FRED API Key</b></div>
+        <div class="muted" style="font-size:.58rem;margin-bottom:6px;line-height:1.5">
+          FRED (Federal Reserve Bank of St. Louis) — самая богатая открытая база мировых макро-рядов. Требует бесплатный API-key:
+          <a href="https://fredaccount.stlouisfed.org/apikey" target="_blank" style="color:var(--acc)">fredaccount.stlouisfed.org/apikey</a>
+          (регистрация за 1 минуту, 32-символьный alphanumeric token). Ключ хранится в localStorage, никуда не уходит.
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="world-fred-key" placeholder="abcdef1234567890abcdef1234567890" style="flex:1;min-width:260px;padding:6px 8px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px;font-family:var(--mono)">
+          <button class="btn btn-sm" onclick="worldSaveFredKey()">💾 Сохранить</button>
+        </div>
+        <div id="world-fred-status" class="muted" style="font-size:.58rem;margin-top:6px"></div>
+      </div>
+
+      <!-- Пресеты -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:.68rem"><b>📊 Пресеты</b> <span class="muted" style="font-size:.56rem">8 самых полезных рядов для инвестора ВДО</span></div>
+          <button class="btn btn-sm" onclick="worldFetchAll()">📥 Загрузить все</button>
+        </div>
+        <div id="world-presets"></div>
+        <div id="world-fetch-status" style="margin-top:8px;font-size:.62rem"></div>
+      </div>
+
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-world')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-ratecb-api">
   <div class="modal" style="width:860px;max-width:96vw;max-height:92vh">
     <div class="modal-hdr">🔍 API ЦБ — обозреватель данных <button class="modal-x" onclick="closeModal('modal-ratecb-api')">✕</button></div>
@@ -2207,6 +2258,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-p btn-sm" onclick="linksBuild()">▶ Построить</button>
       <button class="btn btn-sm" onclick="linksClearSelection()">✕ Снять всё</button>
+      <button class="btn btn-sm" onclick="worldOpenModal()" title="Добавить мировые ряды (Fed funds, US 10Y, HY OAS, DXY, Brent, VIX) через Cloudflare Worker. Нужны свой CF Worker (развёртывание в readme.md) + FRED API-key (бесплатно).">🌍 Мировые</button>
       <span style="font-size:.6rem;color:var(--text2);margin-left:8px">Горизонт:</span>
       <select id="links-horizon" onchange="linksBuild()" style="padding:3px 6px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px">
         <option value="0">все данные</option>
