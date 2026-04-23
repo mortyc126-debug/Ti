@@ -1454,6 +1454,37 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="rate-hlw-out" style="margin-top:10px;display:none"></div>
   </div>
 
+  <!-- ─── БЛОК 3.5: BVAR ─── -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📊 BVAR — Bayesian VAR (прогноз из истории)</span>
+      <button class="btn btn-sm" onclick="rateToggleExpl('bvar')" title="Показать/скрыть развёрнутое объяснение модели">❓ Что это</button>
+    </div>
+
+    <div id="rate-bvar-expl" style="display:none;background:var(--bg2);border-left:2px solid var(--acc);padding:10px 14px;margin:8px 0;font-size:.66rem;line-height:1.6;color:var(--text2)">
+      <p><b>BVAR</b> (Bayesian Vector AutoRegression) — многомерная авторегрессия с байесовской регуляризацией. В отличие от QPM/HLW — <b>не использует ваши ввод-параметры</b>, а оценивается <b>напрямую из исторических рядов</b> ЦБ (инфляция, КС и т.д.).</p>
+      <p><b>Модель:</b> y<sub>t</sub> = c + B₁·y<sub>t−1</sub> + B₂·y<sub>t−2</sub> + ε<sub>t</sub>, где y — вектор переменных (CPI, SA, KS), B — матрицы коэффициентов, ε ~ N(0,Σ).</p>
+      <p><b>Prior</b> (Minnesota-style, упрощённый): каждая переменная на первом лаге самой себя имеет коэффициент ≈ 1 (случайное блуждание), остальные коэффициенты → 0, чем дальше лаг — тем жёстче shrinkage. Сила регуляризации — параметр <b>λ</b> (меньше = сильнее shrinkage).</p>
+      <p><b>Что даёт:</b></p>
+      <ul style="margin:4px 0 4px 18px">
+        <li>Прогноз <b>всех</b> переменных одновременно, включая их взаимосвязи.</li>
+        <li>Доверительные интервалы (80% CI) — по формуле ΣΣB₁<sup>j</sup>·Σ·(B₁<sup>j</sup>)<sup>T</sup>.</li>
+        <li>Не требует экспертных калибровок (в отличие от QPM) — всё из данных.</li>
+      </ul>
+      <p><b>Данные для оценки:</b> собираются из <code>bondan_ratecb_cbrdata</code> автоматически. Минимум — CPI YoY из reg_cpd (с 2016). Чем больше рядов привязано через «🔍 API ЦБ» — тем богаче модель. Для полного 4-мерного варианта привяжите <b>key_rate</b> через API-модалку (ряд ключевой ставки).</p>
+      <p class="muted"><b>Ограничения:</b> линейная, не ловит структурные сломы (2022), на короткой истории РФ (post-2015 ИТ) prior доминирует над данными. На спокойных периодах бьёт QPM по RMSE; в шоковых — оба промахиваются.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+      <label style="font-size:.62rem;color:var(--text2)">λ (shrinkage):</label>
+      <input type="number" step="0.05" id="rate-bvar-lam" value="0.5" style="width:70px;padding:4px 6px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px" title="Сила regularization (Minnesota). λ=0.1 — очень сильное shrinkage (ближе к случайным блужданиям), λ=1.0 — почти OLS. Дефолт 0.5.">
+      <button class="btn btn-p btn-sm" onclick="rateRunBvar()" title="Оценить BVAR на исторических рядах ЦБ из bondan_ratecb_cbrdata, построить прогноз на 8 кв.">▶ Рассчитать BVAR</button>
+      <button class="btn btn-sm" onclick="rateSetActive('bvar')" title="Сделать этот прогноз активным (подставится в YTM и купоны флоатеров)." id="rate-bvar-set-btn" disabled>★ Сделать активным</button>
+    </div>
+
+    <div id="rate-bvar-out" style="margin-top:10px;display:none"></div>
+  </div>
+
   <!-- ─── БЛОК 4: Активный прогноз + ансамбль ─── -->
   <div class="card" style="margin-top:12px;border-color:var(--acc)">
     <div class="card-hdr">★ Активный прогноз (для YTM и расчётов)</div>

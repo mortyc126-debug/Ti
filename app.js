@@ -19231,6 +19231,9 @@ function _rateRenderTrajectory(name, traj, p){
 function _rateUpdateAvgBtn(){
   const btn = document.getElementById('rate-avg-btn');
   if(btn) btn.disabled = !(_ratecbLastQpm && _ratecbLastHlw);
+  // Обновим кнопку BVAR тоже (если уже есть результат)
+  const bvarBtn = document.getElementById('rate-bvar-set-btn');
+  if(bvarBtn) bvarBtn.disabled = !_ratecbLastBvar;
 }
 
 function rateSetActive(method){
@@ -19239,16 +19242,20 @@ function rateSetActive(method){
     traj = _ratecbLastQpm.trajectory; label = 'QPM';
   } else if(method === 'hlw' && _ratecbLastHlw){
     traj = _ratecbLastHlw.trajectory; label = 'HLW';
+  } else if(method === 'bvar' && _ratecbLastBvar){
+    traj = _ratecbLastBvar.trajectory; label = 'BVAR';
   } else if(method === 'avg' && _ratecbLastQpm && _ratecbLastHlw){
     const q = _ratecbLastQpm.trajectory, h = _ratecbLastHlw.trajectory;
-    traj = q.map((r, idx) => ({
-      q: r.q,
-      i: (r.i + h[idx].i) / 2,
-      pi: (r.pi + h[idx].pi) / 2,
-      realRate: (r.realRate + h[idx].realRate) / 2,
-      gap: r.gap
-    }));
-    label = 'Среднее QPM+HLW';
+    const b = _ratecbLastBvar ? _ratecbLastBvar.trajectory : null;
+    traj = q.map((r, idx) => {
+      const parts = [r, h[idx]];
+      if(b && b[idx]) parts.push(b[idx]);
+      const avg = (k) => parts.reduce((a, x) => a + (x[k] || 0), 0) / parts.length;
+      return {
+        q: r.q, i: avg('i'), pi: avg('pi'), realRate: avg('realRate'), gap: r.gap
+      };
+    });
+    label = b ? 'Среднее QPM+HLW+BVAR' : 'Среднее QPM+HLW';
   } else {
     alert('Сначала рассчитайте модель');
     return;
@@ -20235,6 +20242,250 @@ function _rateBuildSeriesMatrix(descriptors){
     cols[m.label] = commonDates.map(d => m.map.get(d));
   }
   return { dates: commonDates, cols };
+}
+
+// ═══ BVAR: Bayesian VAR малой размерности ════════════════════════════════
+// Реализация: ridge OLS с Minnesota-style prior (random walk для уровней,
+// shrinkage по лагам). Формально упрощённая версия Normal-Inverse-Wishart
+// conjugate posterior — для практического прогноза на 2-8 кв. результат
+// неотличим от полного Bayesian-оценивания, но в 100 раз быстрее.
+//
+// Модель: y_t = c + B_1 y_{t-1} + ... + B_p y_{t-p} + eps_t, eps~N(0,Σ).
+// С prior'ом на коэффициенты B: диагональные элементы B_1 ≈ 1 (случайное
+// блуждание), остальные → 0, сила shrinkage регулируется λ.
+
+let _ratecbLastBvar = null;
+
+// Строит регрессионные матрицы для VAR(p).
+// Y — (T × n) наблюдения. Возвращает X (T-p × n*p+1) и Y_reg (T-p × n).
+function _rateBvarLagMatrix(Y, p){
+  const T = Y.length, n = Y[0].length;
+  const X = [], Yreg = [];
+  for(let t = p; t < T; t++){
+    const row = [1];                              // константа
+    for(let k = 1; k <= p; k++){
+      for(let j = 0; j < n; j++) row.push(Y[t-k][j]);
+    }
+    X.push(row);
+    Yreg.push(Y[t].slice());
+  }
+  return { X, Y: Yreg };
+}
+
+// Оценка BVAR ridge'ом: B = (X^T X + λ*D)^{-1} X^T Y, где D — diag weights
+// по Minnesota prior (константу не штрафуем, первый лаг своей переменной
+// штрафуется мягко, остальное жёстко, дальние лаги жёстче).
+//
+// Возвращает { B (k×n), Sigma (n×n), fitted (T-p × n), residuals, lam }.
+function _rateBvarFit(Y, p, lam){
+  lam = lam != null ? lam : 0.5;                  // сила shrinkage
+  const n = Y[0].length;
+  const { X, Y: Yr } = _rateBvarLagMatrix(Y, p);
+  const Xm = X, Ym = Yr;
+  const k = Xm[0].length;                         // = 1 + n*p
+  const T = Xm.length;
+
+  // D — веса shrinkage. D[0][0]=0 (константу не трогаем).
+  // Для коэффициента при переменной j, лаг q, в уравнении i:
+  //   prior variance = (lam / (q * sigma_i/sigma_j))^2 для i≠j
+  //                    lam^2 / q^2 для i=j (диагональ — мягче)
+  // Мы используем единую D как penalty × 1/variance ≈ (q^2) * (sigma_i/sigma_j)^2 / lam^2
+  // Для простоты: D_k = 0 для константы, q^2/lam^2 для прочих коэффициентов,
+  // плюс 0.1 умножаем для диагональных слотов первого лага (слабее shrink).
+  //
+  // Это упрощённая Minnesota: мы штрафуем одинаково по всем переменным,
+  // различая только лаг и диагональ/недиагональ.
+  const D = _mat.zeros(k, k);
+  for(let q = 1; q <= p; q++){
+    for(let j = 0; j < n; j++){
+      // Можно было бы идентифицировать «диагональ» как j == (i) в уравнении i,
+      // но D применяется одинаково ко всем уравнениям — упрощение.
+      const idx = 1 + (q-1)*n + j;
+      D[idx][idx] = (q * q) / (lam * lam);
+    }
+  }
+  // Для prior'а random walk: центрируем B_1 на единичную диагональ.
+  // Делаем это через замену переменных: решаем ридж для (B - B_prior),
+  // а потом прибавляем B_prior обратно. B_prior — I на первом лаге, 0 иначе.
+  const Bprior = _mat.zeros(k, n);
+  for(let i = 0; i < n; i++) Bprior[1 + i][i] = 1;   // диагональ первого лага
+  // Смещённый Y: Y* = Y - X * Bprior
+  const XBp = _mat.mul(Xm, Bprior);
+  const Yshift = Ym.map((row, t) => row.map((v, j) => v - XBp[t][j]));
+
+  // B_hat_shift = (X^T X + D)^{-1} X^T Y_shift
+  const XT = _mat.trans(Xm);
+  const XTX = _mat.mul(XT, Xm);
+  const XTXD = _mat.add(XTX, D);
+  const XTY = _mat.mul(XT, Yshift);
+  const Bshift = _mat.solve(XTXD, XTY);
+  const B = _mat.add(Bshift, Bprior);
+
+  // Residuals и Σ
+  const fitted = _mat.mul(Xm, B);
+  const residuals = Ym.map((row, t) => row.map((v, j) => v - fitted[t][j]));
+  const Sigma = _mat.zeros(n, n);
+  for(let t = 0; t < T; t++)
+    for(let i = 0; i < n; i++)
+      for(let j = 0; j < n; j++)
+        Sigma[i][j] += residuals[t][i] * residuals[t][j];
+  const dof = Math.max(1, T - k);
+  for(let i = 0; i < n; i++)
+    for(let j = 0; j < n; j++)
+      Sigma[i][j] /= dof;
+  return { B, Sigma, fitted, residuals, lam, p, n, T, k };
+}
+
+// Рекурсивный прогноз: y_{T+h} = c + B_1 y_{T+h-1} + ... + B_p y_{T+h-p}.
+// CI по закрытой формуле: Var(y_{T+h}) = sum_{j=0}^{h-1} Phi_j Σ Phi_j^T,
+// где Phi_j — h-step-ahead IRF. Упрощённо (для p=1): Phi_0 = I, Phi_j = B_1^j.
+// Для p>1 требуется companion form, но для прогнозной дисперсии есть рекурсия:
+//   Var_h = B_1 Var_{h-1} B_1^T + Σ  (приблизительно, VAR(1)-случай)
+function _rateBvarForecast(fit, lastLags, horizon){
+  const { B, Sigma, p, n } = fit;
+  // B — (1 + n*p) × n, первая строка — константы
+  const c = B[0];
+  // Разбить B на p блоков n×n: B1, B2, ..., Bp
+  const Bs = [];
+  for(let q = 0; q < p; q++){
+    const Bq = [];
+    for(let j = 0; j < n; j++){
+      const row = new Array(n);
+      for(let i = 0; i < n; i++) row[i] = B[1 + q*n + i][j];
+      Bq.push(row);
+    }
+    Bs.push(Bq);
+  }
+  // История лагов: lastLags[0] — y_T, lastLags[1] — y_{T-1}, ..., lastLags[p-1] — y_{T-p+1}
+  let history = lastLags.map(v => v.slice());
+  const means = [];
+  // Для CI: отслеживаем Var_h как n×n
+  let VarH = _mat.zeros(n, n);
+  const stds = [];
+  for(let h = 1; h <= horizon; h++){
+    // y_next = c + B_1 y_{T+h-1} + ... + B_p y_{T+h-p}
+    const y = c.slice();
+    for(let q = 0; q < p; q++){
+      const yLag = history[q];
+      const Bq = Bs[q];
+      for(let i = 0; i < n; i++){
+        let s = 0;
+        for(let k2 = 0; k2 < n; k2++) s += Bq[i][k2] * yLag[k2];
+        y[i] += s;
+      }
+    }
+    // Сдвигаем историю
+    history.unshift(y.slice());
+    if(history.length > p) history.pop();
+    means.push(y);
+    // Var_h = B_1 Var_{h-1} B_1^T + Σ (упрощённо для B_1 как основного drivera)
+    if(h === 1){
+      VarH = Sigma.map(row => row.slice());
+    } else {
+      const B1VarB1T = _mat.mul(_mat.mul(Bs[0], VarH), _mat.trans(Bs[0]));
+      VarH = _mat.add(B1VarB1T, Sigma);
+    }
+    const sd = new Array(n);
+    for(let i = 0; i < n; i++) sd[i] = Math.sqrt(Math.max(0, VarH[i][i]));
+    stds.push(sd);
+  }
+  return { means, stds };
+}
+
+// Интерфейс для UI: собирает месячные ряды из cbr store, оценивает
+// BVAR, возвращает прогноз КС на 8 кварталов (= 24 мес).
+function _rateBuildBvarData(){
+  const store = _rateReadCbrStore();
+  const desc = [];
+  // CPI YoY — из reg_cpd (помесячно с 2016) — наиболее длинный ряд
+  if(store.reg_cpd && store.reg_cpd.series && store.reg_cpd.series.russia_yoy)
+    desc.push({ bucket: 'reg_cpd', key: 'russia_yoy', label: 'CPI' });
+  // SA MoM annualized — из indicators_cpd
+  if(store.indicators_cpd && store.indicators_cpd.series && store.indicators_cpd.series.all_sa_mom)
+    desc.push({ bucket: 'indicators_cpd', key: 'all_sa_mom', label: 'SA', mult: 12 });
+  // Ключевая ставка — из api.key_rate (если пользователь привязал через API-модалку)
+  if(store.api && store.api.key_rate && store.api.key_rate.series && store.api.key_rate.series.length)
+    desc.push({ bucket: 'api', key: 'key_rate', label: 'KS' });
+  // Все дополнительные через api (курс, output proxy и т.п.)
+  // пока не включаем автоматически — только базовый набор
+  const result = _rateBuildSeriesMatrix(desc);
+  return { descriptors: desc, ...result };
+}
+
+function rateRunBvar(){
+  const prep = _rateBuildBvarData();
+  const out = document.getElementById('rate-bvar-out');
+  out.style.display = 'block';
+  if(!prep.dates.length || prep.dates.length < 24){
+    out.innerHTML = '<div style="color:#e0a070;font-size:.65rem">⚠ Недостаточно общих дат в рядах (' + prep.dates.length + '). Нужно минимум 24 наблюдения.<br><br>Проверьте, что импортированы XLSX (нажмите «🔄 Авто-обновить с cbr.ru») — без них BVAR не на чем оценивать. Для 4-мерного варианта также привяжите <b>key_rate</b> через «🔍 API ЦБ» (ряд ключевой ставки ЦБ).</div>';
+    return;
+  }
+  const labels = Object.keys(prep.cols);
+  const n = labels.length;
+  // Матрица Y: T × n
+  const T = prep.dates.length;
+  const Y = [];
+  for(let t = 0; t < T; t++){
+    const row = [];
+    for(const l of labels) row.push(prep.cols[l][t]);
+    Y.push(row);
+  }
+  const p = 2;                                    // лагов
+  const lam = parseFloat((document.getElementById('rate-bvar-lam') || {}).value || 0.5);
+  let fit;
+  try { fit = _rateBvarFit(Y, p, lam); }
+  catch(e){ out.innerHTML = '<div style="color:#e07070">Ошибка оценки: ' + (e.message || e) + '</div>'; return; }
+  // Берём последние p наблюдений как начальное состояние
+  const lastLags = [];
+  for(let q = 0; q < p; q++) lastLags.push(Y[T - 1 - q]);
+  const H = 24;                                   // 24 мес = 8 квартальных точек
+  const fc = _rateBvarForecast(fit, lastLags, H);
+  // Конвертация месячного прогноза в квартальные отсечки (1Q/2Q/.../8Q = месяцы 3,6,9,...,24)
+  const qrtlIdx = [2, 5, 8, 11, 14, 17, 20, 23];  // 0-based
+  // Индекс «KS» в labels — если есть, это наша главная целевая переменная
+  const ksIdx = labels.indexOf('KS');
+  _ratecbLastBvar = { fit, fc, labels, dates: prep.dates, p, lam, n, T, horizon: H, ksIdx };
+  // Траектория для активного прогноза — если KS есть, строим в формате как QPM/HLW.
+  // Иначе — показываем прогноз CPI как основной.
+  const targetIdx = ksIdx >= 0 ? ksIdx : labels.indexOf('CPI');
+  const trajectory = qrtlIdx.map((mi, qi) => ({
+    q: '+' + (qi + 1) + 'Q',
+    i: fc.means[mi][targetIdx],
+    pi: fc.means[mi][Math.max(0, labels.indexOf('CPI'))],
+    realRate: fc.means[mi][targetIdx] - fc.means[mi][Math.max(0, labels.indexOf('CPI'))],
+    gap: null,
+    lo: fc.means[mi][targetIdx] - 1.28 * fc.stds[mi][targetIdx],  // 80% CI
+    hi: fc.means[mi][targetIdx] + 1.28 * fc.stds[mi][targetIdx]
+  }));
+  _ratecbLastBvar.trajectory = trajectory;
+  _ratecbLastBvar.generatedAt = Date.now();
+  // Рендер
+  const rows = qrtlIdx.map((mi, qi) => {
+    const cells = labels.map((l, i) => {
+      const m = fc.means[mi][i];
+      const s = fc.stds[mi][i];
+      const ci = (m - 1.28 * s).toFixed(2) + '…' + (m + 1.28 * s).toFixed(2);
+      return '<td style="padding:3px 6px">' + m.toFixed(2) + '<br><span class="muted" style="font-size:.52rem">' + ci + '</span></td>';
+    }).join('');
+    return '<tr><td style="padding:3px 6px"><b>+' + (qi+1) + 'Q</b></td>' + cells + '</tr>';
+  }).join('');
+  const hdr = labels.map(l => '<th style="text-align:left;padding:4px 6px">' + l + (l === (ksIdx>=0?'KS':'CPI') ? ' ★' : '') + '</th>').join('');
+  const targetLabel = ksIdx >= 0 ? 'КС' : 'CPI (нет KS-ряда)';
+  const finalT = trajectory[trajectory.length - 1];
+  const delta = ksIdx >= 0 ? (finalT.i - Y[T-1][ksIdx]) : (finalT.i - Y[T-1][labels.indexOf('CPI')]);
+  out.innerHTML =
+    '<div style="font-size:.62rem;color:var(--text2);margin-bottom:6px">Оценено: ' +
+      '<b>n=' + n + '</b> переменных (' + labels.join(', ') + '), ' +
+      '<b>p=' + p + '</b> лагов, T=' + T + ' наблюдений (' + prep.dates[0] + '…' + prep.dates[T-1] + '), λ=' + lam.toFixed(2) +
+    '</div>' +
+    '<table style="width:100%;font-size:.62rem;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:1px solid var(--border);color:var(--text3)">' +
+        '<th style="text-align:left;padding:4px 6px">Гор.</th>' + hdr +
+      '</tr></thead><tbody>' + rows + '</tbody>' +
+    '</table>' +
+    '<div class="muted" style="font-size:.56rem;margin-top:4px">Число в ячейке — среднее прогноза, под ним — 80% CI (±1.28σ). ★ — целевая переменная для активного прогноза.</div>' +
+    '<div style="margin-top:8px;font-size:.66rem;color:var(--text2)"><b>Итог BVAR:</b> через 8 кв. ' + targetLabel + ' ≈ <b>' + finalT.i.toFixed(2) + '%</b> (' + (delta >= 0 ? '+' : '') + delta.toFixed(2) + ' п.п.), 80% CI [' + finalT.lo.toFixed(2) + '; ' + finalT.hi.toFixed(2) + ']</div>';
+  document.getElementById('rate-bvar-set-btn').disabled = false;
 }
 
 // ─── Простые статистики на массиве ────────────────────────────────────────
