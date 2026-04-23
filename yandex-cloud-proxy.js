@@ -239,10 +239,17 @@ exports.handler = async (event) => {
                 }
             }
 
-            // Читаем тело. Для PNG капчи (image/*) — как base64, иначе
-            // клиент получит мусор. Для всего остального — text.
+            // Читаем тело. Для бинарных типов (PNG, XLSX, PDF, ZIP, …) —
+            // как base64, иначе UTF-8 конвертация через .text() портит
+            // бинарь. Для всего остального — text.
             const contentType = upstream.headers.get('content-type') || 'text/plain; charset=utf-8';
-            const isBinary = /^(image|application\/octet-stream)/i.test(contentType);
+            // По Content-Type — стандартные бинарные MIME.
+            const isBinaryByType = /^(image|application\/octet-stream|application\/zip|application\/pdf|application\/vnd\.(openxmlformats-officedocument|ms-excel|ms-word|ms-powerpoint))/i.test(contentType);
+            // По URL — расширения файлов. cbr.ru иногда отдаёт XLSX с
+            // text/plain Content-Type (баг сервера), spasaem detection
+            // через расширение в URL.
+            const isBinaryByExt = /\.(xlsx?|docx?|pptx?|pdf|zip|png|jpe?g|gif|webp|bmp|ico)(\?|$)/i.test(target);
+            const isBinary = isBinaryByType || isBinaryByExt;
             let body;
             if (isBinary) {
                 const buf = Buffer.from(await upstream.arrayBuffer());
