@@ -23465,7 +23465,9 @@ function linksInit(){
     return;
   }
   _linksState.catalog = cat;
-  // Сохраняем выбор между визитами
+  // Восстанавливаем прошлый выбор из storage (если пользовательница
+  // уже собирала). Без дефолтной автопроставки — пусть явно выбирает.
+  _linksState.selected = new Set();
   try {
     const saved = localStorage.getItem('bondan_links_selected');
     if(saved){
@@ -23473,10 +23475,6 @@ function linksInit(){
       _linksState.selected = new Set(Array.isArray(arr) ? arr : []);
     }
   } catch(_){}
-  // Если впервые открыли — отметим первые 3 как дефолт
-  if(!_linksState.selected.size && cat.length){
-    for(let i = 0; i < Math.min(3, cat.length); i++) _linksState.selected.add(cat[i].key);
-  }
   list.innerHTML = cat.map(it => {
     const checked = _linksState.selected.has(it.key) ? 'checked' : '';
     return '<label style="display:flex;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer">' +
@@ -23502,10 +23500,19 @@ function linksClearSelection(){
 }
 
 function linksBuild(){
-  const sel = [..._linksState.selected];
+  // Читаем выбор прямо из DOM — это источник истины. Set может
+  // рассинхронизироваться с чекбоксами если кликают быстро, поэтому
+  // пересобираем Set каждый раз на момент клика «Построить».
+  const checked = [...document.querySelectorAll('#links-series-list input[type=checkbox]:checked')];
+  const sel = checked.map(cb => cb.dataset.k);
+  _linksState.selected = new Set(sel);
+  try { localStorage.setItem('bondan_links_selected', JSON.stringify(sel)); } catch(_){}
   const status = document.getElementById('links-status');
   if(sel.length < 2){
     status.textContent = '⚠ Выберите минимум 2 ряда';
+    document.getElementById('links-chart').innerHTML = '';
+    document.getElementById('links-corr-matrix').innerHTML = '';
+    document.getElementById('links-pair-card').hidden = true;
     return;
   }
   const cat = _linksState.catalog || _linksCatalog();
@@ -23522,7 +23529,7 @@ function linksBuild(){
     return;
   }
   _linksState.series = { ...merged, meta: chosen };
-  status.textContent = '✓ ' + merged.dates.length + ' точек, ' + merged.dates[0] + '…' + merged.dates[merged.dates.length-1];
+  status.textContent = '✓ ' + merged.dates.length + ' точек · ' + chosen.length + ' рядов · ' + merged.dates[0] + '…' + merged.dates[merged.dates.length-1];
   _linksRenderChart();
   _linksRenderCorrMatrix();
   document.getElementById('links-pair-card').hidden = true;
