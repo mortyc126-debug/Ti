@@ -19932,42 +19932,57 @@ const _RATE_CBR_AUTO_FILES = [
 
 // Скачивает три XLSX через прокси и прогоняет через тот же парсер
 // что и ручной импорт. Заполняет форму. Не требует кликов кроме одного.
+// Fetch идёт параллельно (Promise.all), парсинг — последовательно с
+// микропаузами, чтобы Edge/Chrome не думали что страница «не отвечает».
 async function rateAutoImportCbr(){
   const proxy = _rateApiProxyUrl();
   if(!proxy){
-    alert('Не настроен прокси. Откройте «🔍 API ЦБ» и сохраните URL Cloudflare/Yandex Worker.');
+    _rateSetAutoStamp('⚠ Не настроен прокси. Откройте «🔍 API ЦБ» и сохраните URL.');
     return;
   }
   const btn = document.getElementById('rate-cbr-auto-btn');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ Скачиваем…'; }
   if(typeof _ensureXlsx !== 'function'){
-    alert('Библиотека XLSX недоступна');
+    _rateSetAutoStamp('⚠ Библиотека XLSX недоступна');
     if(btn){ btn.disabled = false; btn.textContent = '🔄 Авто-обновить с cbr.ru'; }
     return;
   }
   await _ensureXlsx();
+
+  // Сборка proxied-URL для каждого файла.
+  const buildProxiedUrl = (origUrl) => {
+    if(/[?&]u=$/.test(proxy)) return proxy + encodeURIComponent(origUrl);
+    const base = proxy.replace(/\/+$/, '');
+    const path = origUrl.replace(/^https?:\/\/(www\.)?cbr\.ru/, '');
+    return base + path;
+  };
+
+  // Фаза 1 — fetch параллельно, собираем буферы.
+  _rateSetAutoStamp('⏳ Скачиваем 3 файла…');
+  const fetchResults = await Promise.all(_RATE_CBR_AUTO_FILES.map(async (item) => {
+    try {
+      const r = await fetch(buildProxiedUrl(item.url), { cache: 'no-store' });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const buf = await r.arrayBuffer();
+      if(buf.byteLength < 100) throw new Error('пустой ответ (' + buf.byteLength + ' байт) — задеплоен ли ALLOWED для cbr.ru/Content?');
+      return { item, buf, error: null };
+    } catch(e){
+      return { item, buf: null, error: e.message || String(e) };
+    }
+  }));
+
+  // Фаза 2 — парсинг последовательно с yield для UI-потока.
   const errors = [];
   let ok = 0;
   const store = _rateReadCbrStore();
-  for(const item of _RATE_CBR_AUTO_FILES){
+  for(let i = 0; i < fetchResults.length; i++){
+    const { item, buf, error } = fetchResults[i];
+    _rateSetAutoStamp('⏳ Обрабатываем ' + (i + 1) + '/' + fetchResults.length + ' · ' + item.name);
+    // Yield главному потоку — чтобы DOM успел перерисоваться и Edge не
+    // посчитал, что страница зависла.
+    await new Promise(r => setTimeout(r, 0));
+    if(error){ errors.push(item.name + ': ' + error); continue; }
     try {
-      // Собираем proxied-URL: либо ?u=<encoded>, либо path-prefix.
-      let proxiedUrl;
-      if(/[?&]u=$/.test(proxy)){
-        proxiedUrl = proxy + encodeURIComponent(item.url);
-      } else {
-        const base = proxy.replace(/\/+$/, '');
-        const path = item.url.replace(/^https?:\/\/(www\.)?cbr\.ru/, '');
-        proxiedUrl = base + path;
-      }
-      // cache: 'no-store' — обходим browser disk cache. Без этого если
-      // ранний запрос вернул 0 байт (прокси без актуального ALLOWED),
-      // повторные fetch будут отдавать пустоту бесконечно.
-      const r = await fetch(proxiedUrl, { cache: 'no-store' });
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      const buf = await r.arrayBuffer();
-      if(buf.byteLength < 100) throw new Error('пустой ответ (' + buf.byteLength + ' байт) — проверьте, что прокси задеплоен с актуальным ALLOWED');
-      // Имитируем интерфейс File (только нужное поле — arrayBuffer + name)
       const fakeFile = { name: item.name, arrayBuffer: async () => buf };
       const parsed = await _rateParseCbrXlsx(fakeFile);
       store[parsed.type] = {
@@ -19979,16 +19994,26 @@ async function rateAutoImportCbr(){
       };
       ok++;
     } catch(e){
-      errors.push(item.name + ': ' + (e.message || String(e)));
+      errors.push(item.name + ': парсинг — ' + (e.message || String(e)));
     }
   }
+
+  // Фаза 3 — сохранение, рендер, автофил. Без блокирующих alert.
   try { localStorage.setItem('bondan_ratecb_cbrdata', JSON.stringify(store)); } catch(e){}
   _rateRenderCbrSummary();
   if(ok) _rateAutofillFromCbr(true);
   if(btn){ btn.disabled = false; btn.textContent = '🔄 Авто-обновить с cbr.ru'; }
   if(errors.length){
-    alert('Скачано: ' + ok + ' из ' + _RATE_CBR_AUTO_FILES.length + '\n\nОшибки:\n' + errors.join('\n'));
+    _rateSetAutoStamp('⚠ ' + ok + '/' + _RATE_CBR_AUTO_FILES.length + ' · ' + errors[0]);
+    console.warn('[ratecb] Ошибки импорта:', errors);
+  } else {
+    _rateSetAutoStamp('✓ Обновлено ' + ok + '/' + _RATE_CBR_AUTO_FILES.length + ' · ' + new Date().toLocaleTimeString('ru-RU'));
   }
+}
+
+function _rateSetAutoStamp(msg){
+  const el = document.getElementById('rate-cbr-stamp');
+  if(el) el.textContent = msg;
 }
 
 // Записать последние значения API-рядов в поля формы.
