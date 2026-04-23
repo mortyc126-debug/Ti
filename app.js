@@ -20702,6 +20702,150 @@ function rateRunDfm(){
   out.innerHTML = html;
 }
 
+// ═══ LP: Local Projections (Jordà 2005) ══════════════════════════════════
+// Оценка IRF без полной VAR-модели. Для каждого горизонта h отдельно:
+//   y_{t+h} = α_h + β_h · shock_t + γ · y_{t-1} + δ · x_{t-1} + ε
+// Шок — residuals AR(1) переменной-источника. β_h — импульс-отклик.
+// Robust к misspecification, не требует полной модели динамики.
+
+let _ratecbLastLP = null;
+
+// OLS с возвратом β и SE каждого коэффициента.
+function _olsFit(X, y){
+  const XT = _mat.trans(X);
+  const XTX = _mat.mul(XT, X);
+  const ycol = y.map(v => [v]);
+  const XTY = _mat.mul(XT, ycol);
+  const B = _mat.solve(XTX, XTY);
+  // Residuals
+  const Yhat = _mat.mul(X, B);
+  let ssr = 0;
+  for(let i = 0; i < y.length; i++) ssr += (y[i] - Yhat[i][0])**2;
+  const dof = Math.max(1, y.length - X[0].length);
+  const sigma2 = ssr / dof;
+  const XTXinv = _mat.inv(XTX);
+  const ses = B.map((row, i) => Math.sqrt(Math.max(0, sigma2 * XTXinv[i][i])));
+  return { beta: B.map(r => r[0]), ses, n: y.length, sigma2 };
+}
+
+// AR(1) residuals: возвращает массив шоков, выровненный с исходным (первый — NaN).
+function _ar1Shocks(x){
+  const n = x.length;
+  if(n < 3) return new Array(n).fill(NaN);
+  const xLag = x.slice(0, -1);
+  const xNow = x.slice(1);
+  const mL = xLag.reduce((a,b)=>a+b,0)/xLag.length;
+  const mN = xNow.reduce((a,b)=>a+b,0)/xNow.length;
+  let sxy = 0, sxx = 0;
+  for(let i = 0; i < xLag.length; i++){
+    sxy += (xLag[i] - mL) * (xNow[i] - mN);
+    sxx += (xLag[i] - mL) * (xLag[i] - mL);
+  }
+  const b = sxx > 1e-12 ? sxy / sxx : 0;
+  const a = mN - b * mL;
+  const shocks = [NaN];
+  for(let i = 0; i < xLag.length; i++) shocks.push(xNow[i] - a - b * xLag[i]);
+  return shocks;
+}
+
+// Local Projections: оценивает β_h для h=0..H.
+// x — шок-источник (исходный ряд, шоки вычисляются внутри).
+// y — отклик.
+function _lpEstimate(x, y, H, lags){
+  H = H != null ? H : 12;
+  lags = lags || 2;
+  const n = Math.min(x.length, y.length);
+  if(n < H + lags + 10) return { error: 'мало наблюдений (' + n + ')' };
+  const shocks = _ar1Shocks(x);
+  const betas = [], ses = [], ns = [];
+  for(let h = 0; h <= H; h++){
+    const Xrows = [], yvec = [];
+    for(let t = lags; t < n - h; t++){
+      if(!isFinite(shocks[t]) || !isFinite(y[t+h])) continue;
+      if(!isFinite(y[t-1]) || !isFinite(x[t-1])) continue;
+      Xrows.push([1, shocks[t], y[t-1], x[t-1]]);
+      yvec.push(y[t+h]);
+    }
+    if(yvec.length < 10){ betas.push(NaN); ses.push(NaN); ns.push(0); continue; }
+    try {
+      const fit = _olsFit(Xrows, yvec);
+      betas.push(fit.beta[1]);
+      ses.push(fit.ses[1]);
+      ns.push(yvec.length);
+    } catch(e){
+      betas.push(NaN); ses.push(NaN); ns.push(0);
+    }
+  }
+  return { betas, ses, ns, H, lags };
+}
+
+function rateRunLP(){
+  const out = document.getElementById('rate-lp-out');
+  out.style.display = 'block';
+  const store = _rateReadCbrStore();
+  // Выбираем пару (source, response):
+  // 1. Если есть api.key_rate — KS → CPI (каноника)
+  // 2. Иначе — CPI YoY → SA MoM (реакция импульса на уровень)
+  let src, resp, srcLabel, respLabel, descr;
+  const cpi = store.reg_cpd && store.reg_cpd.series && store.reg_cpd.series.russia_yoy;
+  const sa  = store.indicators_cpd && store.indicators_cpd.series && store.indicators_cpd.series.all_sa_mom;
+  const ks  = store.api && store.api.key_rate && store.api.key_rate.series;
+  if(ks && cpi){
+    const pair = _rateAlignPair(ks, cpi);
+    src = pair.a; resp = pair.b; srcLabel = 'КС'; respLabel = 'CPI YoY';
+    descr = 'шок ключевой ставки → реакция инфляции (мес.)';
+  } else if(cpi && sa){
+    const pair = _rateAlignPair(cpi, sa.map(p => ({ date: p.date, value: p.value * 12 })));  // annualize SA
+    src = pair.a; resp = pair.b; srcLabel = 'CPI YoY'; respLabel = 'SA ann.';
+    descr = 'шок годовой инфляции → реакция текущего импульса (мес.)';
+  } else {
+    out.innerHTML = '<div style="color:#e0a070;font-size:.65rem">⚠ Нужны минимум 2 ряда из: CPI YoY (reg_cpd), SA MoM (indicators_cpd) или key_rate (API). Импортируйте данные через «🔄 Авто-обновить с cbr.ru».</div>';
+    return;
+  }
+  const H = 12;
+  const lp = _lpEstimate(src, resp, H, 2);
+  if(lp.error){ out.innerHTML = '<div style="color:#e0a070">⚠ ' + lp.error + '</div>'; return; }
+  _ratecbLastLP = { src, resp, srcLabel, respLabel, lp, generatedAt: Date.now() };
+  // Рендер — таблица IRF с 68% CI (±1σ)
+  const rows = lp.betas.map((b, h) => {
+    if(isNaN(b)) return '<tr><td style="padding:3px 6px">' + h + '</td><td colspan="3" class="muted">—</td></tr>';
+    const s = lp.ses[h];
+    const lo = b - s, hi = b + s;
+    const sig = Math.abs(b) > 1.96 * s ? '★' : Math.abs(b) > s ? '·' : '';
+    const color = b > 0 ? '#e07070' : b < 0 ? '#70d070' : 'var(--text2)';
+    return '<tr><td style="padding:3px 6px"><b>' + h + '</b> ' + (h === 0 ? '(имп.)' : 'мес') + '</td>' +
+      '<td style="padding:3px 6px;color:' + color + '">' + b.toFixed(3) + ' ' + sig + '</td>' +
+      '<td style="padding:3px 6px" class="muted">[' + lo.toFixed(3) + '; ' + hi.toFixed(3) + ']</td>' +
+      '<td style="padding:3px 6px;font-size:.56rem">n=' + lp.ns[h] + '</td></tr>';
+  }).join('');
+  const peakIdx = lp.betas.reduce((idx, b, i, arr) => isNaN(b) ? idx : (isNaN(arr[idx]) || Math.abs(b) > Math.abs(arr[idx]) ? i : idx), 0);
+  out.innerHTML =
+    '<div style="font-size:.62rem;color:var(--text2);margin-bottom:6px">' + descr + '</div>' +
+    '<table style="width:100%;font-size:.62rem;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:1px solid var(--border);color:var(--text3)">' +
+        '<th style="text-align:left;padding:4px 6px">Горизонт</th>' +
+        '<th style="text-align:left;padding:4px 6px">β (' + respLabel + ' на единичный шок ' + srcLabel + ')</th>' +
+        '<th style="text-align:left;padding:4px 6px">68% CI</th>' +
+        '<th style="text-align:left;padding:4px 6px">N</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody>' +
+    '</table>' +
+    '<div style="margin-top:6px;font-size:.62rem">' +
+      '<b>Пик реакции:</b> через ' + peakIdx + ' мес., β = ' + lp.betas[peakIdx].toFixed(3) +
+      ' (значим на 95%: ' + (Math.abs(lp.betas[peakIdx]) > 1.96 * lp.ses[peakIdx] ? '<span style="color:#70d070">да ★</span>' : '<span style="color:#e0a070">нет</span>') + ')' +
+    '</div>' +
+    '<div class="muted" style="font-size:.56rem;margin-top:4px">β — изменение отклика в п.п. на шок в 1 п.п. ★ = значимо на 95% (|β|>1.96σ). · = на 68% (|β|>σ). 68% CI из OLS SE.</div>';
+}
+
+// Вспомогалка — синхронизируем два массива {date, value} по общим датам.
+function _rateAlignPair(aSeries, bSeries){
+  const mB = new Map(bSeries.map(p => [p.date, p.value]));
+  const a = [], b = [];
+  for(const p of aSeries){
+    if(mB.has(p.date)){ a.push(p.value); b.push(mB.get(p.date)); }
+  }
+  return { a, b };
+}
+
 // ─── Простые статистики на массиве ────────────────────────────────────────
 const _stats = {
   mean(xs){ return xs.reduce((a,b) => a+b, 0) / xs.length; },

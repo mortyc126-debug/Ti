@@ -1512,6 +1512,35 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="rate-dfm-out" style="margin-top:10px;display:none"></div>
   </div>
 
+  <!-- ─── БЛОК 3.7: Local Projections ─── -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📉 LP — Local Projections (impulse response)</span>
+      <button class="btn btn-sm" onclick="rateToggleExpl('lp')" title="Показать/скрыть объяснение">❓ Что это</button>
+    </div>
+
+    <div id="rate-lp-expl" style="display:none;background:var(--bg2);border-left:2px solid var(--acc);padding:10px 14px;margin:8px 0;font-size:.66rem;line-height:1.6;color:var(--text2)">
+      <p><b>Local Projections</b> (Jordà 2005) — метод оценки impulse response function (IRF) без построения полной VAR-модели. Для каждого горизонта h отдельно оценивается простая регрессия:</p>
+      <pre style="background:var(--bg);padding:6px;border-radius:3px;font-size:.62rem;overflow:auto">y_{t+h} = α_h + β_h · shock_t + γ · y_{t-1} + δ · x_{t-1} + ε</pre>
+      <p>Коэффициент <b>β_h</b> — реакция отклика y на единичный шок источника x через h периодов. Шок — residuals AR(1) источника (неожиданное изменение).</p>
+      <p><b>Преимущество перед VAR-based IRF:</b> robust к misspecification модели динамики. Если истинный процесс — не VAR(p), LP всё равно даёт правильный impulse response, а VAR — смещённый.</p>
+      <p><b>Что ищем для инвестора ВДО:</b></p>
+      <ul style="margin:4px 0 4px 18px">
+        <li><b>Пик реакции</b> — через сколько месяцев отклик максимален. Для шока КС → инфляция: обычно 6-12 мес (трансмиссия ДКП).</li>
+        <li><b>Знак β_h</b> — ожидаем отрицательный (КС↑ → инфляция↓) через несколько месяцев. Если в данных знак обратный — структурный разрыв или пропущена переменная.</li>
+        <li><b>Значимость:</b> ★ = 95% (|β|&gt;1.96σ), · = 68%. Бары должны «вылезать» за 0.</li>
+      </ul>
+      <p><b>Выбор пары:</b> если в store.api есть привязанный <code>key_rate</code> — используется КС → CPI (каноника). Если нет — fallback на CPI YoY → SA annualized (реакция импульса на шок уровня).</p>
+      <p class="muted"><b>Ограничения:</b> на короткой истории (60-120 мес) CI широкие. Для РФ структурный разрыв 2022 — результаты оценённые «через него» могут искажаться. Идеально оценивать на режимах отдельно (2015-2021 и 2022+), но точек тогда ещё меньше.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" onclick="rateRunLP()" title="Оценить impulse response на горизонте 0-12 месяцев. Источник и отклик выбираются автоматически по доступным рядам.">▶ Оценить IRF</button>
+    </div>
+
+    <div id="rate-lp-out" style="margin-top:10px;display:none"></div>
+  </div>
+
   <!-- ─── БЛОК 4: Активный прогноз + ансамбль ─── -->
   <div class="card" style="margin-top:12px;border-color:var(--acc)">
     <div class="card-hdr">★ Активный прогноз (для YTM и расчётов)</div>
