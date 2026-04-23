@@ -19074,6 +19074,7 @@ const _SCHED_CACHE_KEY = 'bondan_bond_schedules';
 const _SCHED_TTL_MS = 7 * 24 * 3600 * 1000; // 7 дней
 
 window._schedState = null; // {issId, issueEvents: Map<secid, events[]>, mode, ...}
+let _schedPyramidKeys = null;  // Map<bucketKey, ratio> — рефинансирование в ±90 дней
 
 function _schedLoadCache(){
   try { return JSON.parse(localStorage.getItem(_SCHED_CACHE_KEY) || '{}'); } catch(_){ return {}; }
@@ -19363,6 +19364,39 @@ function _schedRerender(){
   }
   const sortedKeys = [...buckets.keys()].sort();
 
+  // «Пирамидные» bucket'ы: в окне ±90 дней вокруг даты погашения сумма
+  // размещений ≥ 50% от этого погашения. Используется для метки ♻
+  // на графике и в tooltip'ах.
+  const WINDOW_MS = 90 * 86400000;
+  const issEvents = [];
+  for(const r of st.results){
+    for(const ev of (r.events || [])){
+      if(ev.type !== 'issuance') continue;
+      const t = new Date(ev.date).getTime();
+      if(isFinite(t)) issEvents.push({ t, rub: ev.rub });
+    }
+  }
+  _schedPyramidKeys = new Map();                 // bucket key → ratio iss/principal
+  for(const r of st.results){
+    for(const ev of (r.events || [])){
+      if(ev.type !== 'principal') continue;
+      const tEv = new Date(ev.date).getTime();
+      if(!isFinite(tEv)) continue;
+      // Только те principal'ы, которые попадают в отображаемый диапазон
+      if(tEv < today - 30 * 86400000 || tEv > horizonEnd) continue;
+      let issSum = 0;
+      for(const i of issEvents){
+        if(Math.abs(i.t - tEv) <= WINDOW_MS) issSum += i.rub;
+      }
+      if(ev.rub > 0 && issSum / ev.rub >= 0.5){
+        const k = _schedBucketKey(ev.date, bucket);
+        // Сохраняем максимум ratio среди principal'ов того же bucket
+        const prev = _schedPyramidKeys.get(k) || 0;
+        _schedPyramidKeys.set(k, Math.max(prev, issSum / ev.rub));
+      }
+    }
+  }
+
   // EBIT для сопоставления — масштабируется под bucket.
   const ebit = _schedGetEbit(iss);
   const ebitPerMonth = ebit ? ebit.value / 12 : null;
@@ -19494,11 +19528,14 @@ function _schedRerender(){
           onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
           onclick="_schedBarClick('${k}')"/>`;
       }
-      // Индикатор «пирамиды»: если issuance ≥ 50% от principal в этом
-      // bucket (и principal > 0), ставим значок ⚠ над баром.
-      if(b.issuance > 0 && b.principal > 0 && b.issuance / b.principal >= 0.5){
+      // Индикатор «пирамиды» — считается в окне ±90 дней (квартал) вокруг
+      // даты погашения, а не только в пределах bucket'а. Иначе, если
+      // размещение было в августе, а погашение в сентябре (соседний
+      // месячный bucket), связь не ловилась.
+      if(b.principal > 0 && _schedPyramidKeys && _schedPyramidKeys.has(k)){
         const cx = x + barInnerW / 2;
-        svg += `<text x="${cx}" y="${padT - 2}" text-anchor="middle" font-size="11" fill="${COLOR_ISSUE}" title="Новое размещение покрывает ≥50% погашения этого периода — признак рефинансирования">♻</text>`;
+        const ratio = _schedPyramidKeys.get(k);
+        svg += `<text x="${cx}" y="${padT - 2}" text-anchor="middle" font-size="11" fill="${COLOR_ISSUE}"><title>Новые размещения в окне ±90 дней покрывают ${Math.round(ratio*100)}% погашения этого периода — признак рефинансирования</title>♻</text>`;
       }
       // X-подпись: каждый bucket. Для месяцев — ротируем.
       if(bucket === 'month'){
@@ -19561,8 +19598,9 @@ function _schedBarHover(ev, k){
     if(rec.issuance > 0) parts.push(`<span style="color:#6cba7c">размещение +${fmtRub(rec.issuance)}</span>`);
     return `<div>${sec}: ${parts.join(' · ')}</div>`;
   }).join('');
-  const pyramidFlag = (issSum > 0 && prinSum > 0 && issSum / prinSum >= 0.5)
-    ? `<div style="color:#6cba7c;font-size:.55rem;margin-top:3px">♻ рефинансирование: приток покрывает ${Math.round(issSum/prinSum*100)}% погашения</div>`
+  const pyramidRatio = _schedPyramidKeys && _schedPyramidKeys.get(k);
+  const pyramidFlag = pyramidRatio
+    ? `<div style="color:#6cba7c;font-size:.55rem;margin-top:3px">♻ рефинансирование: размещения в ±90 дней покрывают ${Math.round(pyramidRatio*100)}% погашения</div>`
     : '';
   const tt = document.getElementById('sched-tooltip');
   if(!tt) return;
