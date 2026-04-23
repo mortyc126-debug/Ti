@@ -3290,7 +3290,61 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-issuer-peek')">← Закрыть, вернуться к каталогу</button>
       <button class="btn" id="issuer-peek-compare-btn">➕ в сравнение</button>
+      <button class="btn" id="issuer-peek-schedule-btn" title="Открыть график выплат по всем выпускам этого эмитента — бар-чарт по месяцам, таблица с суммой к погашению и переплатой по каждому выпуску, сопоставление с EBIT.">📅 График выплат</button>
       <button class="btn btn-p" id="issuer-peek-open-full">📂 Открыть в Базе отчётности</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: график выплат эмитента -->
+<div class="modal-overlay" id="modal-schedule">
+  <div class="modal" style="width:1200px;max-width:98vw;max-height:96vh;display:flex;flex-direction:column">
+    <div class="modal-hdr">
+      📅 График выплат
+      <span id="sched-issuer-name" style="margin-left:10px;color:var(--acc);font-size:.75rem"></span>
+      <span id="sched-meta" style="margin-left:auto;color:var(--text3);font-size:.56rem;font-weight:400"></span>
+      <button class="modal-x" onclick="closeModal('modal-schedule')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow:auto;flex:1">
+      <div id="sched-summary" style="padding:10px 12px;background:var(--s2);border:1px solid var(--border);margin-bottom:10px;font-size:.62rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:.58rem">
+        <span style="color:var(--text3)">Агрегация:</span>
+        <div id="sched-bucket-group" style="display:flex;gap:2px">
+          <button class="btn btn-sm btn-p" data-bucket="month" onclick="_schedSetBucket('month')">Месяц</button>
+          <button class="btn btn-sm" data-bucket="quarter" onclick="_schedSetBucket('quarter')">Квартал</button>
+          <button class="btn btn-sm" data-bucket="year" onclick="_schedSetBucket('year')">Год</button>
+        </div>
+        <span style="color:var(--text3);margin-left:12px">Что показывать:</span>
+        <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer">
+          <input type="checkbox" id="sched-show-coupons" checked onchange="_schedRerender()" style="margin:0"> <span style="color:var(--acc)">■</span> Купоны
+        </label>
+        <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer">
+          <input type="checkbox" id="sched-show-principal" checked onchange="_schedRerender()" style="margin:0"> <span style="color:var(--warn)">■</span> Тело долга
+        </label>
+        <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer">
+          <input type="checkbox" id="sched-show-ebit" checked onchange="_schedRerender()" style="margin:0"> Линия EBIT/период
+        </label>
+        <span style="color:var(--text3);margin-left:12px">Горизонт:</span>
+        <select id="sched-horizon" onchange="_schedRerender()" style="font-size:.62rem;padding:2px 4px">
+          <option value="12">1 год</option>
+          <option value="36" selected>3 года</option>
+          <option value="60">5 лет</option>
+          <option value="120">10 лет</option>
+          <option value="0">Весь</option>
+        </select>
+        <div style="flex:1"></div>
+        <button class="btn btn-sm" onclick="_schedRefetch()" title="Заново подтянуть bondization.json со всех бумаг (кэш обновится)">🔄 Обновить данные</button>
+      </div>
+      <div id="sched-chart" style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);overflow-x:auto"></div>
+      <div id="sched-tooltip" style="position:absolute;display:none;background:var(--s1);border:1px solid var(--acc);padding:6px 8px;font-size:.56rem;pointer-events:none;z-index:2100;max-width:280px;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
+      <div style="margin-top:12px">
+        <div style="font-size:.58rem;color:var(--text3);margin-bottom:4px">💼 Выпуски эмитента на MOEX (клик по бару выше — подсветит бумаги, вносящие в этот период):</div>
+        <div id="sched-issues" style="font-size:.58rem"></div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeModal('modal-schedule')">Закрыть</button>
+      <button class="btn" onclick="_schedExportCsv()">📊 Экспорт CSV</button>
     </div>
   </div>
 </div>

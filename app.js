@@ -18741,6 +18741,9 @@ function moexOpenIssuerPeek(issId){
       if(typeof repSelectIssuerById === 'function') repSelectIssuerById(issId);
     }, 80);
   };
+  // Кнопка «📅 График выплат».
+  const schedBtn = document.getElementById('issuer-peek-schedule-btn');
+  if(schedBtn){ schedBtn.onclick = () => schedulesOpen(issId); }
   // Кнопка «➕ в сравнение» / «✓ в сравнении». Текст и цвет зависят от
   // текущего состояния _compareIssuers.
   const cmpBtn = document.getElementById('issuer-peek-compare-btn');
@@ -19100,6 +19103,472 @@ function compareExportCsv(){
 // сохранится через сессию — сейчас Set сбрасывается на перезагрузке,
 // это сознательно: сравнение — сессионное действие).
 setTimeout(() => { try { _compareRenderFloater(); } catch(_){} }, 0);
+
+// ═════════════════════════════════════════════════════════════════════
+// 📅 ГРАФИК ВЫПЛАТ — купоны + тело долга по всем выпускам эмитента
+// ─────────────────────────────────────────────────────────────────────
+// Источник: /iss/securities/<SECID>/bondization.json — отдаёт расписание
+// купонов / амортизаций / оферт по одной бумаге. По каждому выпуску
+// эмитента тянем один раз, кешируем в localStorage['bondan_bond_schedules'].
+//
+// Агрегат по эмитенту: {events: [{date, type, rub, secid}]}. rub — сумма
+// по всему выпуску (value_rub × issueSize). type ∈ {coupon, principal}.
+// Bар-чарт строим SVG'ом inline, без зависимостей. Hover → tooltip с
+// разбивкой по бумагам. Клик → подсветит выпуски в таблице ниже.
+// ═════════════════════════════════════════════════════════════════════
+
+const _SCHED_CACHE_KEY = 'bondan_bond_schedules';
+const _SCHED_TTL_MS = 7 * 24 * 3600 * 1000; // 7 дней
+
+window._schedState = null; // {issId, issueEvents: Map<secid, events[]>, mode, ...}
+
+function _schedLoadCache(){
+  try { return JSON.parse(localStorage.getItem(_SCHED_CACHE_KEY) || '{}'); } catch(_){ return {}; }
+}
+function _schedSaveCache(cache){
+  try { localStorage.setItem(_SCHED_CACHE_KEY, JSON.stringify(cache)); } catch(_){}
+}
+
+function _schedParseBondization(resp, secid, issueSize){
+  const events = [];
+  const tables = [
+    ['coupons', 'coupondate', 'coupon'],
+    ['amortizations', 'amortdate', 'principal'],
+  ];
+  for(const [tbl, dateField, type] of tables){
+    const t = resp?.[tbl];
+    if(!t || !Array.isArray(t.columns) || !Array.isArray(t.data)) continue;
+    const ci = (n) => t.columns.indexOf(n);
+    const dIdx = ci(dateField);
+    const valRubIdx = ci('value_rub');
+    const valIdx = ci('value');
+    for(const row of t.data){
+      const date = dIdx >= 0 ? row[dIdx] : null;
+      if(!date) continue;
+      // value_rub — per bond. Умножаем на issueSize (кол-во бумаг в выпуске).
+      let perBond = valRubIdx >= 0 ? parseFloat(row[valRubIdx]) : null;
+      if(perBond == null || !isFinite(perBond)) perBond = valIdx >= 0 ? parseFloat(row[valIdx]) : null;
+      if(perBond == null || !isFinite(perBond)) continue;
+      const totalRub = perBond * (issueSize || 1);
+      if(!isFinite(totalRub) || totalRub <= 0) continue;
+      events.push({ date, type, rub: totalRub, secid });
+    }
+  }
+  return events;
+}
+
+async function _schedFetchBond(secid, issueSize, force){
+  const cache = _schedLoadCache();
+  const now = Date.now();
+  if(!force && cache[secid] && (now - cache[secid].fetchedAt < _SCHED_TTL_MS)){
+    return cache[secid].events || [];
+  }
+  const resp = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}/bondization.json?iss.meta=off`);
+  const events = _schedParseBondization(resp, secid, issueSize);
+  cache[secid] = { events, fetchedAt: now, issueSize };
+  _schedSaveCache(cache);
+  return events;
+}
+
+// Собирает все выпуски эмитента из _moexCatalog (только живые, без
+// archivedAt и без matDate в прошлом).
+function _schedCollectIssues(issId){
+  const cat = window._moexCatalog;
+  if(!cat || !Array.isArray(cat.items)) return [];
+  const iss = reportsDB[issId];
+  const inn = iss?.inn ? String(iss.inn) : '';
+  const today = Date.now();
+  return cat.items.filter(b => {
+    if(b.archivedAt) return false;
+    if(b.issId !== issId && !(inn && String(b.inn || '') === inn)) return false;
+    if(b.matDate && new Date(b.matDate).getTime() < today - 7 * 86400000) return false;
+    return true;
+  });
+}
+
+async function schedulesOpen(issId, opts){
+  const iss = reportsDB[issId];
+  if(!iss){ alert('Эмитент не найден'); return; }
+  const issues = _schedCollectIssues(issId);
+  if(!issues.length){ alert('У эмитента нет живых выпусков в кэше MOEX. Обнови «🏛 Каталог облигаций» и привяжи этого эмитента.'); return; }
+
+  const modal = document.getElementById('modal-schedule');
+  modal.classList.add('open');
+  document.getElementById('sched-issuer-name').textContent = iss.name || '—';
+  document.getElementById('sched-meta').textContent = `${issues.length} выпусков · подтягиваю расписание…`;
+  document.getElementById('sched-chart').innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3)">⏳ Загрузка…</div>';
+  document.getElementById('sched-issues').innerHTML = '';
+  document.getElementById('sched-summary').innerHTML = '';
+
+  // Параллельно тянем bondization по всем выпускам.
+  const force = !!(opts && opts.force);
+  const results = await Promise.all(issues.map(async b => {
+    try {
+      const events = await _schedFetchBond(b.secid, b.issueSize, force);
+      return { bond: b, events, err: null };
+    } catch(e){
+      return { bond: b, events: [], err: e.message || 'ошибка' };
+    }
+  }));
+
+  // State — нужен _schedRerender'у и _schedSetBucket'у.
+  window._schedState = {
+    issId,
+    issuerName: iss.name,
+    results,
+    selectedSecids: new Set(issues.map(b => b.secid)),
+    bucket: 'month',
+    highlightPeriod: null,
+  };
+  _schedRerender();
+}
+
+function _schedSetBucket(bucket){
+  if(!window._schedState) return;
+  window._schedState.bucket = bucket;
+  document.querySelectorAll('#sched-bucket-group button').forEach(el => {
+    el.classList.toggle('btn-p', el.dataset.bucket === bucket);
+  });
+  _schedRerender();
+}
+
+function _schedRefetch(){
+  if(!window._schedState) return;
+  schedulesOpen(window._schedState.issId, { force: true });
+}
+
+function _schedBucketKey(dateStr, bucket){
+  if(bucket === 'year') return dateStr.slice(0, 4);
+  if(bucket === 'quarter'){
+    const y = dateStr.slice(0, 4);
+    const m = parseInt(dateStr.slice(5, 7), 10) || 1;
+    const q = Math.ceil(m / 3);
+    return `${y}-Q${q}`;
+  }
+  return dateStr.slice(0, 7); // month
+}
+
+function _schedBucketLabel(key, bucket){
+  if(bucket === 'year') return key;
+  if(bucket === 'quarter') return key; // 2026-Q2
+  // month 2026-04 → «апр 26»
+  const [y, m] = key.split('-');
+  const names = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return `${names[parseInt(m, 10) - 1] || '?'} ${y.slice(2)}`;
+}
+
+function _schedGetEbit(iss){
+  const lp = _repLatestPeriod(iss);
+  if(!lp) return null;
+  const p = lp.period;
+  // EBIT — предпочтительно, fallback на EBITDA.
+  if(p.ebit != null && isFinite(p.ebit)) return { value: p.ebit * 1e9, year: lp.year, metric: 'EBIT' };
+  if(p.ebitda != null && isFinite(p.ebitda)) return { value: p.ebitda * 1e9, year: lp.year, metric: 'EBITDA' };
+  return null;
+}
+
+function _schedRerender(){
+  const st = window._schedState;
+  if(!st) return;
+  const iss = reportsDB[st.issId];
+  const bucket = st.bucket;
+  const showCoupons = document.getElementById('sched-show-coupons')?.checked !== false;
+  const showPrincipal = document.getElementById('sched-show-principal')?.checked !== false;
+  const showEbit = document.getElementById('sched-show-ebit')?.checked !== false;
+  const horizonV = document.getElementById('sched-horizon')?.value || '36';
+  const horizonMonths = parseInt(horizonV, 10);
+
+  // Собираем все события с фильтрацией по типу.
+  const today = Date.now();
+  const horizonEnd = horizonMonths > 0 ? today + horizonMonths * 31 * 86400000 : Infinity;
+  const allEvents = [];
+  for(const r of st.results){
+    for(const ev of (r.events || [])){
+      if(ev.type === 'coupon' && !showCoupons) continue;
+      if(ev.type === 'principal' && !showPrincipal) continue;
+      const t = new Date(ev.date).getTime();
+      if(!isFinite(t) || t < today - 30 * 86400000 || t > horizonEnd) continue;
+      allEvents.push(ev);
+    }
+  }
+
+  // Группировка по bucket.
+  const buckets = new Map(); // key → { coupon, principal, events[] }
+  for(const ev of allEvents){
+    const k = _schedBucketKey(ev.date, bucket);
+    if(!buckets.has(k)) buckets.set(k, { coupon: 0, principal: 0, events: [] });
+    const b = buckets.get(k);
+    if(ev.type === 'coupon') b.coupon += ev.rub;
+    else if(ev.type === 'principal') b.principal += ev.rub;
+    b.events.push(ev);
+  }
+  const sortedKeys = [...buckets.keys()].sort();
+
+  // EBIT для сопоставления — масштабируется под bucket.
+  const ebit = _schedGetEbit(iss);
+  const ebitPerMonth = ebit ? ebit.value / 12 : null;
+  const ebitPerBucket = ebit ? (bucket === 'year' ? ebit.value : bucket === 'quarter' ? ebit.value / 4 : ebitPerMonth) : null;
+
+  // Сводка сверху.
+  const totalCoupons12 = allEvents.filter(e => e.type === 'coupon' && new Date(e.date).getTime() < today + 365 * 86400000).reduce((s, e) => s + e.rub, 0);
+  const totalPrincipal12 = allEvents.filter(e => e.type === 'principal' && new Date(e.date).getTime() < today + 365 * 86400000).reduce((s, e) => s + e.rub, 0);
+  const totalPrincipal24 = allEvents.filter(e => e.type === 'principal' && new Date(e.date).getTime() < today + 2 * 365 * 86400000).reduce((s, e) => s + e.rub, 0);
+  const totalDebt = st.results.reduce((s, r) => {
+    const b = r.bond;
+    return s + ((b.issueSize || 0) * (b.faceValue || 1000));
+  }, 0);
+  const fmtRub = v => {
+    if(v == null || !isFinite(v)) return '—';
+    if(Math.abs(v) >= 1e9) return (v/1e9).toFixed(1) + ' млрд ₽';
+    if(Math.abs(v) >= 1e6) return (v/1e6).toFixed(0) + ' млн ₽';
+    return v.toLocaleString('ru-RU', {maximumFractionDigits: 0}) + ' ₽';
+  };
+  const pctEbit = v => ebit ? (v / ebit.value * 100).toFixed(0) + '%' : '—';
+  const ebitNote = ebit ? `${ebit.metric} ${ebit.year}: ${fmtRub(ebit.value)}` : 'EBIT не найден в reportsDB';
+  // Пик 12м
+  let peak12 = { key: null, total: 0 };
+  for(const [k, b] of buckets){
+    const t = new Date(k.length === 4 ? k + '-01-01' : k.slice(0, 7) + '-01').getTime();
+    if(t < today || t > today + 365 * 86400000) continue;
+    const tot = b.coupon + b.principal;
+    if(tot > peak12.total) peak12 = { key: k, total: tot };
+  }
+  const sumCell = (title, val, sub, color) => `<div style="padding:6px 10px;border-left:3px solid ${color||'var(--acc)'};background:var(--bg)"><div style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em">${title}</div><div style="font-size:.85rem;font-weight:600;color:var(--text);font-family:var(--mono);margin-top:2px">${val}</div><div style="font-size:.52rem;color:var(--text3);margin-top:2px">${sub}</div></div>`;
+  document.getElementById('sched-summary').innerHTML =
+    sumCell('Общий долг (MOEX)', fmtRub(totalDebt), ebit ? `${pctEbit(totalDebt)} от ${ebit.metric} · ${st.results.length} выпусков` : `${st.results.length} выпусков`, 'var(--acc)') +
+    sumCell('Купоны, 12 мес', fmtRub(totalCoupons12), `${pctEbit(totalCoupons12)} от ${ebit?.metric || 'EBIT'} · ICR в доступе из скоринга`, totalCoupons12 > 0 && ebit && totalCoupons12 / ebit.value > 0.4 ? 'var(--danger)' : 'var(--warn)') +
+    sumCell('Пик 12 мес', peak12.key ? (fmtRub(peak12.total) + ', ' + _schedBucketLabel(peak12.key, bucket)) : '—', ebit ? `${pctEbit(peak12.total)} от ${ebit.metric}` : '', peak12.total > 0 && ebit && peak12.total / ebit.value > 0.3 ? 'var(--danger)' : 'var(--warn)') +
+    sumCell('Погашения 12/24 мес', fmtRub(totalPrincipal12) + ' / ' + fmtRub(totalPrincipal24), ebit ? `${pctEbit(totalPrincipal12)} / ${pctEbit(totalPrincipal24)} от ${ebit.metric}` : ebitNote, totalPrincipal12 > 0 && ebit && totalPrincipal12 / ebit.value > 0.5 ? 'var(--danger)' : 'var(--warn)');
+
+  document.getElementById('sched-meta').textContent = `${st.results.length} выпусков · ${allEvents.length} событий в горизонте · EBIT${ebit ? ' ' + ebit.year : ' нет'}`;
+
+  // ── SVG бар-чарт ──────────────────────────────────────────────
+  const chartBox = document.getElementById('sched-chart');
+  if(!sortedKeys.length){
+    chartBox.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3)">Событий в горизонте нет.</div>';
+  } else {
+    const W = Math.max(800, Math.min(2400, sortedKeys.length * (bucket === 'month' ? 26 : 42)));
+    const H = 280;
+    const padL = 50, padR = 10, padT = 10, padB = 38;
+    const chartH = H - padT - padB;
+    const maxVal = Math.max(...sortedKeys.map(k => buckets.get(k).coupon + buckets.get(k).principal), ebitPerBucket || 0);
+    const yScale = v => chartH * (1 - v / (maxVal || 1));
+    const barW = (W - padL - padR) / sortedKeys.length;
+    const barInnerW = Math.max(1, barW * 0.8);
+    let svg = `<svg width="${W}" height="${H}" style="display:block">`;
+    // Горизонтальные gridlines (каждые 25% от maxVal)
+    for(let i = 0; i <= 4; i++){
+      const y = padT + chartH * i / 4;
+      const v = maxVal * (1 - i / 4);
+      svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2,2"/>`;
+      svg += `<text x="${padL - 4}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">${fmtRub(v).replace(' ₽', '')}</text>`;
+    }
+    // EBIT-линия
+    if(showEbit && ebitPerBucket){
+      const y = padT + yScale(ebitPerBucket);
+      svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="6,3"/>`;
+      svg += `<text x="${W - padR - 4}" y="${y - 3}" text-anchor="end" font-size="9" fill="var(--green)">${ebit.metric}/${bucket === 'year' ? 'год' : bucket === 'quarter' ? 'кв' : 'мес'} ≈ ${fmtRub(ebitPerBucket)}</text>`;
+    }
+    // Бары
+    sortedKeys.forEach((k, i) => {
+      const b = buckets.get(k);
+      const x = padL + i * barW + (barW - barInnerW) / 2;
+      const yCoup = padT + yScale(b.coupon);
+      const hCoup = chartH - yScale(b.coupon);
+      const yPrin = padT + yScale(b.coupon + b.principal);
+      const hPrin = chartH - yScale(b.principal) - (chartH - yScale(0));
+      // Купон — нижний оранжевый-акцент, тело долга — верхний предупредительный.
+      if(b.coupon > 0){
+        svg += `<rect x="${x}" y="${yCoup}" width="${barInnerW}" height="${hCoup}" fill="var(--acc)" opacity="0.8"
+          data-k="${k}" class="sched-bar" style="cursor:pointer"
+          onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
+          onclick="_schedBarClick('${k}')"/>`;
+      }
+      if(b.principal > 0){
+        const yPrinAbs = padT + yScale(b.coupon + b.principal);
+        svg += `<rect x="${x}" y="${yPrinAbs}" width="${barInnerW}" height="${chartH - yScale(b.principal)}" fill="var(--warn)" opacity="0.9"
+          data-k="${k}" class="sched-bar" style="cursor:pointer"
+          onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
+          onclick="_schedBarClick('${k}')"/>`;
+      }
+      // X-подпись: каждый bucket. Для месяцев — ротируем.
+      if(bucket === 'month'){
+        const cx = padL + i * barW + barW / 2;
+        svg += `<text x="${cx}" y="${H - padB + 12}" text-anchor="end" font-size="9" fill="var(--text3)" transform="rotate(-45,${cx},${H - padB + 12})">${_schedBucketLabel(k, bucket)}</text>`;
+      } else {
+        const cx = padL + i * barW + barW / 2;
+        svg += `<text x="${cx}" y="${H - padB + 12}" text-anchor="middle" font-size="10" fill="var(--text3)">${_schedBucketLabel(k, bucket)}</text>`;
+      }
+      // Выделение активного bucket (при клике)
+      if(st.highlightPeriod === k){
+        svg += `<rect x="${padL + i * barW}" y="${padT}" width="${barW}" height="${chartH}" fill="none" stroke="var(--acc)" stroke-width="2"/>`;
+      }
+    });
+    svg += `</svg>`;
+    chartBox.innerHTML = svg;
+  }
+
+  // ── Таблица выпусков ────────────────────────────────────────
+  _schedRenderIssueTable();
+}
+
+function _schedBarHover(ev, k){
+  const st = window._schedState;
+  if(!st) return;
+  const bucket = st.bucket;
+  // Агрегируем события в этом bucket по secid.
+  const today = Date.now();
+  const horizonV = document.getElementById('sched-horizon')?.value || '36';
+  const horizonMonths = parseInt(horizonV, 10);
+  const horizonEnd = horizonMonths > 0 ? today + horizonMonths * 31 * 86400000 : Infinity;
+  const showCoupons = document.getElementById('sched-show-coupons')?.checked !== false;
+  const showPrincipal = document.getElementById('sched-show-principal')?.checked !== false;
+  const bySecid = new Map();
+  let total = 0, coupSum = 0, prinSum = 0;
+  for(const r of st.results){
+    for(const evx of (r.events || [])){
+      if(_schedBucketKey(evx.date, bucket) !== k) continue;
+      if(evx.type === 'coupon' && !showCoupons) continue;
+      if(evx.type === 'principal' && !showPrincipal) continue;
+      const t = new Date(evx.date).getTime();
+      if(!isFinite(t) || t < today - 30 * 86400000 || t > horizonEnd) continue;
+      if(!bySecid.has(evx.secid)) bySecid.set(evx.secid, { coupon: 0, principal: 0 });
+      const rec = bySecid.get(evx.secid);
+      if(evx.type === 'coupon'){ rec.coupon += evx.rub; coupSum += evx.rub; }
+      else { rec.principal += evx.rub; prinSum += evx.rub; }
+      total += evx.rub;
+    }
+  }
+  const fmtRub = v => Math.abs(v) >= 1e9 ? (v/1e9).toFixed(2) + ' млрд' : Math.abs(v) >= 1e6 ? (v/1e6).toFixed(0) + ' млн' : v.toLocaleString('ru-RU');
+  const list = [...bySecid.entries()].sort((a,b) => (b[1].coupon + b[1].principal) - (a[1].coupon + a[1].principal));
+  const lines = list.map(([sec, rec]) => {
+    const parts = [];
+    if(rec.coupon > 0) parts.push(`купон ${fmtRub(rec.coupon)}`);
+    if(rec.principal > 0) parts.push(`тело ${fmtRub(rec.principal)}`);
+    return `<div>${sec}: ${parts.join(' + ')}</div>`;
+  }).join('');
+  const tt = document.getElementById('sched-tooltip');
+  if(!tt) return;
+  tt.innerHTML = `<div style="font-weight:600;color:var(--acc);margin-bottom:4px">${_schedBucketLabel(k, bucket)}</div>
+    <div style="color:var(--text2)">Итого: <strong>${fmtRub(total)} ₽</strong></div>
+    <div style="color:var(--acc);font-size:.52rem">■ купоны ${fmtRub(coupSum)}</div>
+    <div style="color:var(--warn);font-size:.52rem">■ тело ${fmtRub(prinSum)}</div>
+    <div style="margin-top:4px;font-size:.52rem;color:var(--text3);border-top:1px dashed var(--border);padding-top:4px">${lines}</div>
+    <div style="margin-top:4px;font-size:.5rem;color:var(--text3)">Клик — подсветить выпуски ниже</div>`;
+  tt.style.display = 'block';
+  const x = Math.min(ev.clientX + 12, window.innerWidth - 290);
+  const y = Math.min(ev.clientY + 12, window.innerHeight - tt.offsetHeight - 20);
+  tt.style.left = x + 'px';
+  tt.style.top = y + 'px';
+}
+function _schedBarOut(){
+  const tt = document.getElementById('sched-tooltip');
+  if(tt) tt.style.display = 'none';
+}
+function _schedBarClick(k){
+  const st = window._schedState;
+  if(!st) return;
+  st.highlightPeriod = st.highlightPeriod === k ? null : k;
+  _schedRerender();
+}
+
+function _schedRenderIssueTable(){
+  const st = window._schedState;
+  if(!st) return;
+  const iss = reportsDB[st.issId];
+  const ebit = _schedGetEbit(iss);
+  const today = Date.now();
+  const highlighted = st.highlightPeriod ? new Set() : null;
+  if(highlighted){
+    for(const r of st.results){
+      for(const ev of (r.events || [])){
+        if(_schedBucketKey(ev.date, st.bucket) === st.highlightPeriod){
+          highlighted.add(r.bond.secid);
+          break;
+        }
+      }
+    }
+  }
+  const fmtRub = v => Math.abs(v) >= 1e9 ? (v/1e9).toFixed(2) + ' млрд' : Math.abs(v) >= 1e6 ? (v/1e6).toFixed(0) + ' млн' : v.toLocaleString('ru-RU');
+  // Считаем для каждого выпуска: осталось купонов (rub), осталось тела, переплата.
+  const rows = st.results.map(r => {
+    const b = r.bond;
+    const events = r.events || [];
+    let remCoup = 0, remPrin = 0;
+    for(const ev of events){
+      const t = new Date(ev.date).getTime();
+      if(!isFinite(t) || t < today) continue;
+      if(ev.type === 'coupon') remCoup += ev.rub;
+      else remPrin += ev.rub;
+    }
+    // Общий объём выпуска на эмиссии (рубли).
+    const fullIssue = (b.issueSize || 0) * (b.faceValue || 1000);
+    // Переплата = остаток купонов / остаток тела (сколько % «сверху» ещё платится).
+    const overpay = remPrin > 0 ? (remCoup / remPrin * 100) : null;
+    // Годовая нагрузка купонов (первые 12 мес)
+    const coup12 = events.filter(e => e.type === 'coupon' && new Date(e.date).getTime() > today && new Date(e.date).getTime() < today + 365 * 86400000).reduce((s, e) => s + e.rub, 0);
+    const coupPctEbit = ebit ? (coup12 / ebit.value * 100) : null;
+    return { bond: b, remCoup, remPrin, fullIssue, overpay, coup12, coupPctEbit, total: remCoup + remPrin, err: r.err };
+  }).sort((a, b) => b.total - a.total);
+
+  const box = document.getElementById('sched-issues');
+  if(!rows.length){ box.innerHTML = '<div style="padding:10px;color:var(--text3)">Выпусков не найдено.</div>'; return; }
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:.58rem">
+    <thead><tr style="background:var(--s2);color:var(--text3);font-size:.52rem;text-transform:uppercase;letter-spacing:.05em">
+      <th style="padding:5px 8px;text-align:left">Тикер / ISIN</th>
+      <th style="padding:5px 8px;text-align:right">Объём эмиссии</th>
+      <th style="padding:5px 8px;text-align:right">Ост. тело</th>
+      <th style="padding:5px 8px;text-align:right">Ост. купоны</th>
+      <th style="padding:5px 8px;text-align:right" title="Всего к выплате за оставшийся срок = остаток тела + остаток купонов">К погашению, всего</th>
+      <th style="padding:5px 8px;text-align:right" title="Отношение оставшихся купонов к остатку тела. Показывает сколько процентов «сверху» эмитент заплатит до погашения. Чем выше — тем дороже обслуживание.">Переплата</th>
+      <th style="padding:5px 8px;text-align:right">Купон %</th>
+      <th style="padding:5px 8px;text-align:right">Погашение</th>
+      <th style="padding:5px 8px;text-align:right" title="${ebit ? 'Годовой купон / ' + ebit.metric + ' ' + ebit.year : 'нет EBIT'}">Нагрузка/год vs ${ebit?.metric || 'EBIT'}</th>
+    </tr></thead><tbody>`;
+  for(const r of rows){
+    const b = r.bond;
+    const isHl = highlighted && highlighted.has(b.secid);
+    const coupClass = r.coupPctEbit == null ? 'var(--text3)' : r.coupPctEbit > 20 ? 'var(--danger)' : r.coupPctEbit > 10 ? 'var(--warn)' : 'var(--text2)';
+    const overpayColor = r.overpay == null ? 'var(--text3)' : r.overpay > 40 ? 'var(--danger)' : r.overpay > 20 ? 'var(--warn)' : 'var(--green)';
+    html += `<tr style="border-top:1px solid var(--border);${isHl ? 'background:rgba(60,179,113,0.1)' : ''}">
+      <td style="padding:4px 8px">
+        <div style="font-weight:600;color:var(--text);font-family:var(--mono)">${b.secid}</div>
+        <div style="color:var(--text3);font-family:var(--mono);font-size:.5rem">${b.isin}${b.shortName ? ' · ' + _escHtml(b.shortName) : ''}</div>
+        ${r.err ? `<div style="color:var(--danger);font-size:.5rem">⚠ ${_escHtml(r.err)}</div>` : ''}
+      </td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${fmtRub(r.fullIssue)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--warn)">${fmtRub(r.remPrin)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--acc)">${fmtRub(r.remCoup)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);font-weight:600">${fmtRub(r.total)}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:${overpayColor};font-weight:600">${r.overpay != null ? r.overpay.toFixed(1) + '%' : '—'}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">${b.coupon != null ? b.coupon.toFixed(2) + '%' : '—'}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--text3)">${b.matDate || '—'}</td>
+      <td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:${coupClass}">${r.coupPctEbit != null ? r.coupPctEbit.toFixed(1) + '%' : '—'}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+function _schedExportCsv(){
+  const st = window._schedState;
+  if(!st){ alert('Модалка не открыта'); return; }
+  const esc = s => { const str = String(s == null ? '' : s); return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str; };
+  const rows = [['issuer','secid','isin','date','type','rub']];
+  for(const r of st.results){
+    for(const ev of (r.events || [])){
+      rows.push([st.issuerName, ev.secid, r.bond.isin, ev.date, ev.type, Math.round(ev.rub)]);
+    }
+  }
+  const csv = rows.map(r => r.map(esc).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `schedule-${(st.issuerName || 'issuer').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // Привязывает материнскую компанию к эмитенту через peek-модалку.
 // Открывает prompt, валидирует ИНН, перерисовывает модалку.
