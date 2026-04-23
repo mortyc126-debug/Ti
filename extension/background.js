@@ -27,32 +27,77 @@ function detectCritical(title){
 }
 function eventKey(e){ return (e.date || '') + '|' + (e.title || '').slice(0, 80); }
 
-// Ищет компанию на e-disclosure по ИНН через их JSON-API.
-// Возвращает {id, name, inn} или null.
+// Ищет компанию на e-disclosure по ИНН. Пробует несколько URL'ов
+// в порядке предпочтения — за годы паттерны менялись и ломались, так что
+// будем устойчивы к смене любого одного endpoint'а. Возвращает
+// {id, name, inn} или null.
 async function findCompanyByInn(inn){
-  try {
-    // Пробуем несколько вариантов endpoint'а — у них API может быть
-    // с разными параметрами. Сначала канонический вариант.
-    const urls = [
-      `https://www.e-disclosure.ru/api/search/companies?query=${encodeURIComponent(inn)}&page=1&itemsPerPage=5`,
-      `https://www.e-disclosure.ru/api/search/companies?query=${encodeURIComponent(inn)}`,
-    ];
-    for(const url of urls){
-      try {
-        const r = await fetch(url, {
-          headers: { 'Accept': 'application/json, text/plain, */*' },
-          credentials: 'include',
-        });
-        if(!r.ok) continue;
-        const data = await r.json();
-        const list = data?.foundCompaniesList || data?.items || [];
-        if(list.length){
-          const first = list[0];
-          return { id: first.id, name: first.name || first.companyName || '', inn: String(inn) };
-        }
-      } catch(_){}
-    }
-  } catch(_){}
+  // JSON-endpoint'ы (быстрые, малый трафик). Разные варианты — что-то
+  // из них обычно работает. Заголовки — как у XHR с самого сайта.
+  const jsonUrls = [
+    `https://www.e-disclosure.ru/api/search/companies?query=${encodeURIComponent(inn)}&page=1&itemsPerPage=5`,
+    `https://www.e-disclosure.ru/api/search/companies?query=${encodeURIComponent(inn)}`,
+    `https://www.e-disclosure.ru/search/companies?query=${encodeURIComponent(inn)}`,
+    `https://www.e-disclosure.ru/api/v1/search/companies?query=${encodeURIComponent(inn)}`,
+    `https://www.e-disclosure.ru/api/SearchCompany?q=${encodeURIComponent(inn)}`,
+  ];
+  for(const url of jsonUrls){
+    try {
+      const r = await fetch(url, {
+        headers: { 'Accept': 'application/json, text/plain, */*', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include',
+      });
+      if(!r.ok) continue;
+      const txt = await r.text();
+      let data = null;
+      try { data = JSON.parse(txt); } catch(_){ continue; }
+      // Варианты формата ответа — пробуем разные поля
+      const list =
+        data?.foundCompaniesList ||
+        data?.items ||
+        data?.companies ||
+        data?.results ||
+        data?.data ||
+        (Array.isArray(data) ? data : null);
+      if(Array.isArray(list) && list.length){
+        const first = list[0];
+        const id = first.id || first.Id || first.companyId || first.code;
+        const name = first.name || first.Name || first.companyName || first.CompanyName || '';
+        if(id) return { id: String(id), name, inn: String(inn) };
+      }
+    } catch(_){}
+  }
+
+  // HTML-фолбэк: открытая страница поиска обычно отдаёт список с ссылками
+  // вида /portal/company.aspx?id=<X>. Парсим первое совпадение.
+  const htmlUrls = [
+    `https://www.e-disclosure.ru/portal/search.aspx?query=${encodeURIComponent(inn)}`,
+    `https://www.e-disclosure.ru/portal/search.aspx?q=${encodeURIComponent(inn)}`,
+    `https://www.e-disclosure.ru/Search?q=${encodeURIComponent(inn)}`,
+  ];
+  for(const url of htmlUrls){
+    try {
+      const r = await fetch(url, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.7',
+          'Accept-Language': 'ru-RU,ru;q=0.9',
+        },
+        credentials: 'include',
+      });
+      if(!r.ok) continue;
+      const html = await r.text();
+      // Первый href содержащий id=<число> и рядом наш ИНН (в том же DOM-блоке).
+      // Делаем мягче: просто ищем первый id=<X> после упоминания ИНН.
+      const innIdx = html.indexOf(inn);
+      if(innIdx < 0) continue;
+      // Ищем id=<число> в пределах 2000 символов после ИНН (таблица строки)
+      // или 2000 символов до (если ссылка впереди ИНН).
+      const window = html.slice(Math.max(0, innIdx - 2000), innIdx + 2000);
+      const m = window.match(/\?id=(\d+)/);
+      if(m) return { id: m[1], name: '', inn: String(inn) };
+    } catch(_){}
+  }
+
   return null;
 }
 
