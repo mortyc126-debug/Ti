@@ -19192,16 +19192,6 @@ function _schedCollectIssues(issId){
       const bondIssId = matchFn(b, issIdx);
       if(bondIssId === issId) return true;
     }
-    // 3. Фолбэк — имя эмитента по подстроке (последняя надежда, для
-    //    эмитентов, у которых нормализация имени не даёт точного совпадения).
-    if(iss && iss.name){
-      const issName = String(iss.name).toLowerCase().replace(/\s+/g, ' ').trim();
-      const bondIssuer = String(b.issuer || '').toLowerCase();
-      const bondSecname = String(b.secName || b.shortName || '').toLowerCase();
-      if(issName.length >= 4 && (bondIssuer.includes(issName) || issName.includes(bondIssuer) || bondSecname.includes(issName))){
-        return true;
-      }
-    }
     return false;
   });
 }
@@ -19440,7 +19430,27 @@ function _schedRerender(){
     const yScale = v => chartH * (1 - v / (maxVal || 1));
     const barW = (W - padL - padR) / sortedKeys.length;
     const barInnerW = Math.max(1, barW * 0.8);
+    // Палитра графика выплат: спокойный стальной-бирюзовый для купонов
+    // (регулярная, менее тревожная нагрузка) + тёплый коралловый для тела
+    // долга (пики погашений — то, на что нужно смотреть). EBIT-линия —
+    // насыщенно-жёлтая, чтобы выделяться на фоне баров без «кислотности».
+    const COLOR_COUP  = '#4ea0b8';   // steel teal
+    const COLOR_COUP2 = '#6ec4d9';   // lighter shade для градиента
+    const COLOR_PRIN  = '#e07a6a';   // warm coral
+    const COLOR_PRIN2 = '#f29a8a';   // lighter shade
+    const COLOR_EBIT  = '#f2c94c';   // golden yellow
     let svg = `<svg width="${W}" height="${H}" style="display:block">`;
+    // Градиенты для визуального объёма баров.
+    svg += `<defs>
+      <linearGradient id="gradCoup" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${COLOR_COUP2}"/>
+        <stop offset="100%" stop-color="${COLOR_COUP}"/>
+      </linearGradient>
+      <linearGradient id="gradPrin" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${COLOR_PRIN2}"/>
+        <stop offset="100%" stop-color="${COLOR_PRIN}"/>
+      </linearGradient>
+    </defs>`;
     // Горизонтальные gridlines (каждые 25% от maxVal)
     for(let i = 0; i <= 4; i++){
       const y = padT + chartH * i / 4;
@@ -19448,11 +19458,14 @@ function _schedRerender(){
       svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2,2"/>`;
       svg += `<text x="${padL - 4}" y="${y + 3}" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">${fmtRub(v).replace(' ₽', '')}</text>`;
     }
-    // EBIT-линия
+    // EBIT-линия. Label размещаем умно: если EBIT сверху графика — под линией,
+    // если снизу (< 70% высоты) — над линией, чтобы не перекрывало X-ось.
     if(showEbit && ebitPerBucket){
       const y = padT + yScale(ebitPerBucket);
-      svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="6,3"/>`;
-      svg += `<text x="${W - padR - 4}" y="${y - 3}" text-anchor="end" font-size="9" fill="var(--green)">${ebit.metric}/${bucket === 'year' ? 'год' : bucket === 'quarter' ? 'кв' : 'мес'} ≈ ${fmtRub(ebitPerBucket)}</text>`;
+      const relY = (y - padT) / chartH;
+      const labelY = relY > 0.7 ? y - 4 : y + 11;   // над линией если близко к оси X
+      svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="${COLOR_EBIT}" stroke-width="1.8" stroke-dasharray="6,3"/>`;
+      svg += `<text x="${padL + 6}" y="${labelY}" text-anchor="start" font-size="10" font-weight="600" fill="${COLOR_EBIT}">${ebit.metric}/${bucket === 'year' ? 'год' : bucket === 'quarter' ? 'кв' : 'мес'} ≈ ${fmtRub(ebitPerBucket)}</text>`;
     }
     // Бары
     sortedKeys.forEach((k, i) => {
@@ -19460,18 +19473,15 @@ function _schedRerender(){
       const x = padL + i * barW + (barW - barInnerW) / 2;
       const yCoup = padT + yScale(b.coupon);
       const hCoup = chartH - yScale(b.coupon);
-      const yPrin = padT + yScale(b.coupon + b.principal);
-      const hPrin = chartH - yScale(b.principal) - (chartH - yScale(0));
-      // Купон — нижний оранжевый-акцент, тело долга — верхний предупредительный.
       if(b.coupon > 0){
-        svg += `<rect x="${x}" y="${yCoup}" width="${barInnerW}" height="${hCoup}" fill="var(--acc)" opacity="0.8"
+        svg += `<rect x="${x}" y="${yCoup}" width="${barInnerW}" height="${hCoup}" fill="url(#gradCoup)" rx="1.5"
           data-k="${k}" class="sched-bar" style="cursor:pointer"
           onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
           onclick="_schedBarClick('${k}')"/>`;
       }
       if(b.principal > 0){
         const yPrinAbs = padT + yScale(b.coupon + b.principal);
-        svg += `<rect x="${x}" y="${yPrinAbs}" width="${barInnerW}" height="${chartH - yScale(b.principal)}" fill="var(--warn)" opacity="0.9"
+        svg += `<rect x="${x}" y="${yPrinAbs}" width="${barInnerW}" height="${chartH - yScale(b.principal)}" fill="url(#gradPrin)" rx="1.5"
           data-k="${k}" class="sched-bar" style="cursor:pointer"
           onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
           onclick="_schedBarClick('${k}')"/>`;
@@ -19486,7 +19496,7 @@ function _schedRerender(){
       }
       // Выделение активного bucket (при клике)
       if(st.highlightPeriod === k){
-        svg += `<rect x="${padL + i * barW}" y="${padT}" width="${barW}" height="${chartH}" fill="none" stroke="var(--acc)" stroke-width="2"/>`;
+        svg += `<rect x="${padL + i * barW}" y="${padT}" width="${barW}" height="${chartH}" fill="none" stroke="${COLOR_COUP2}" stroke-width="2" rx="3"/>`;
       }
     });
     svg += `</svg>`;
@@ -19534,10 +19544,10 @@ function _schedBarHover(ev, k){
   }).join('');
   const tt = document.getElementById('sched-tooltip');
   if(!tt) return;
-  tt.innerHTML = `<div style="font-weight:600;color:var(--acc);margin-bottom:4px">${_schedBucketLabel(k, bucket)}</div>
+  tt.innerHTML = `<div style="font-weight:600;color:#6ec4d9;margin-bottom:4px">${_schedBucketLabel(k, bucket)}</div>
     <div style="color:var(--text2)">Итого: <strong>${fmtRub(total)} ₽</strong></div>
-    <div style="color:var(--acc);font-size:.52rem">■ купоны ${fmtRub(coupSum)}</div>
-    <div style="color:var(--warn);font-size:.52rem">■ тело ${fmtRub(prinSum)}</div>
+    <div style="color:#6ec4d9;font-size:.52rem">■ купоны ${fmtRub(coupSum)}</div>
+    <div style="color:#f29a8a;font-size:.52rem">■ тело ${fmtRub(prinSum)}</div>
     <div style="margin-top:4px;font-size:.52rem;color:var(--text3);border-top:1px dashed var(--border);padding-top:4px">${lines}</div>
     <div style="margin-top:4px;font-size:.5rem;color:var(--text3)">Клик — подсветить выпуски ниже</div>`;
   tt.style.display = 'block';
