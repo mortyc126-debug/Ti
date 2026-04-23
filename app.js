@@ -110,7 +110,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -122,6 +122,7 @@ function showPage(n, opts){
   if(n==='watchlist') renderWL();
   if(n==='ytm') renderYtm();
   if(n==='calendar'){renderCalendar();updateCalStats();}
+  if(n==='ratecb') rateInit();
   if(n==='reports') repInit();
   if(n==='industries') indRender();
   if(n==='cross') crossInit();
@@ -18994,7 +18995,7 @@ function moexExportCsv(){
   const run = () => {
     try {
       const saved = localStorage.getItem('ba_active_page');
-      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','industries','cross','moex'];
+      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','moex'];
       if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
         showPage(saved);
       }
@@ -19008,3 +19009,284 @@ function moexExportCsv(){
     setTimeout(run, 0);
   }
 })();
+
+// ═══ RATECB: прогноз ключевой ставки ЦБ (QPM, HLW) ═══════════════════════
+// Модуль самодостаточный. Публичный API:
+//   rateInit()             — вызывается из showPage('ratecb')
+//   rateGetActiveAtQuarter(q) — внешним модулям (YTM, купоны флоатеров)
+//   rateGetActiveForecast() — вернуть активный прогноз целиком
+//
+// Хранилище:
+//   bondan_ratecb_inputs  — последний ввод параметров
+//   bondan_ratecb_active  — активный прогноз для внешних модулей
+
+// Дефолты — примерно на 2026Q1. При смене макро-картины — обновить.
+const _RATECB_DEFAULTS = {
+  ks: 21, cpi: 9.5, exp: 13.5, pitgt: 4,
+  gdp: 1.2, gstar: 1.5, gap: 0.8, rstar: 4
+};
+
+// Калибровка QPM (медиана по лит-ре для РФ: Крепцев-Селезнёв, working papers ЦБ РФ).
+// Все параметры безразмерные, gap и pi — в %.
+const _RATECB_QPM_CALIB = {
+  beta: 0.7,       // инерция output gap
+  delta: 0.15,     // чувствительность gap к реальной ставке
+  lambda: 0.5,     // инерция инфляции (backward-looking часть)
+  kappa: 0.2,      // наклон кривой Филлипса
+  rho: 0.7,        // сглаживание в правиле Тейлора
+  phiPi: 1.5,      // коэф. реакции на инфляционный разрыв
+  phiY: 0.5,       // коэф. реакции на output gap
+  expInertia: 0.85 // скорость якорения ожиданий к таргету
+};
+
+let _ratecbLastQpm = null;
+let _ratecbLastHlw = null;
+
+function rateInit(){
+  try {
+    const saved = localStorage.getItem('bondan_ratecb_inputs');
+    if(saved){
+      const p = JSON.parse(saved);
+      rateApplyInputs(p);
+      const el = document.getElementById('rate-saved-stamp');
+      if(el && p._savedAt){
+        el.textContent = 'Сохранено: ' + new Date(p._savedAt).toLocaleString('ru-RU');
+      }
+    }
+  } catch(e){}
+  _rateRenderActive();
+  _rateUpdateAvgBtn();
+}
+
+function rateApplyInputs(p){
+  const set = (id, v) => { const el = document.getElementById(id); if(el && v!=null) el.value = v; };
+  set('rate-in-ks', p.ks);
+  set('rate-in-cpi', p.cpi);
+  set('rate-in-exp', p.exp);
+  set('rate-in-pitgt', p.pitgt);
+  set('rate-in-gdp', p.gdp);
+  set('rate-in-gstar', p.gstar);
+  set('rate-in-gap', p.gap);
+  set('rate-in-rstar', p.rstar);
+}
+
+function rateSaveInputs(){
+  const p = rateReadInputs();
+  p._savedAt = Date.now();
+  try { localStorage.setItem('bondan_ratecb_inputs', JSON.stringify(p)); } catch(e){}
+  const el = document.getElementById('rate-saved-stamp');
+  if(el) el.textContent = 'Сохранено: ' + new Date().toLocaleString('ru-RU');
+}
+
+function rateLoadDefaults(){
+  rateApplyInputs(_RATECB_DEFAULTS);
+  const el = document.getElementById('rate-saved-stamp');
+  if(el) el.textContent = '(дефолты не сохранены — нажмите 💾)';
+}
+
+function rateReadInputs(){
+  const g = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  return {
+    ks: g('rate-in-ks'), cpi: g('rate-in-cpi'), exp: g('rate-in-exp'),
+    pitgt: g('rate-in-pitgt'), gdp: g('rate-in-gdp'), gstar: g('rate-in-gstar'),
+    gap: g('rate-in-gap'), rstar: g('rate-in-rstar')
+  };
+}
+
+function rateToggleExpl(which){
+  const el = document.getElementById('rate-' + which + '-expl');
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// QPM — итеративная симуляция 4 уравнений на 8 кв. вперёд.
+// Шоки ε=0 (базовый сценарий). Ожидания сходятся к таргету.
+function _rateQpm(p){
+  const c = _RATECB_QPM_CALIB;
+  let gap = p.gap, pi = p.cpi, i = p.ks, piExp = p.exp;
+  const traj = [];
+  for(let t = 1; t <= 8; t++){
+    const realRate = i - pi;                                    // ex-post реал. ставка
+    const newGap   = c.beta * gap - c.delta * (realRate - p.rstar);
+    const newExp   = c.expInertia * piExp + (1 - c.expInertia) * p.pitgt;
+    const newPi    = c.lambda * pi + (1 - c.lambda) * newExp + c.kappa * newGap;
+    const target_i = p.rstar + newExp + c.phiPi * (newPi - p.pitgt) + c.phiY * newGap;
+    const newI     = Math.max(0.25, c.rho * i + (1 - c.rho) * target_i);
+    traj.push({ q: '+' + t + 'Q', gap: newGap, pi: newPi, i: newI, realRate: newI - newPi, piExp: newExp });
+    gap = newGap; pi = newPi; i = newI; piExp = newExp;
+  }
+  return traj;
+}
+
+function rateRunQpm(){
+  const p = rateReadInputs();
+  const traj = _rateQpm(p);
+  _ratecbLastQpm = { params: p, trajectory: traj, generatedAt: Date.now() };
+  const out = document.getElementById('rate-qpm-out');
+  out.style.display = 'block';
+  out.innerHTML = _rateRenderTrajectory('QPM', traj, p);
+  document.getElementById('rate-qpm-set-btn').disabled = false;
+  _rateUpdateAvgBtn();
+}
+
+// Упрощённый HLW. Полный — с Kalman smoother на квартальных рядах ВВП и CPI,
+// 60+ наблюдений, совместная оценка r*, g*, y*. Здесь — «HLW-style» интерпретация:
+// r* берём из ввода, считаем текущий policy stance, прогнозируем сходимость
+// инфляции к таргету при сохранении/эволюции ставки. Полный HLW — задача
+// следующего этапа (когда добавим автоподгрузку рядов ЦБ/Росстата).
+function _rateHlw(p){
+  const i_eq = p.rstar + p.pitgt;
+  let pi = p.cpi, i = p.ks, piExp = p.exp;
+  const traj = [];
+  const rho = 0.75;                                             // инерция ставки
+  for(let t = 1; t <= 8; t++){
+    const realRate  = i - pi;
+    const policyGap = realRate - p.rstar;                       // >0 = жёстко
+    const newExp    = 0.85 * piExp + 0.15 * p.pitgt;
+    const newPi     = 0.7 * pi + 0.3 * p.pitgt - 0.35 * policyGap;
+    const target_i  = p.rstar + newPi + 1.5 * (newPi - p.pitgt);
+    const newI      = Math.max(0.25, rho * i + (1 - rho) * target_i);
+    traj.push({ q: '+' + t + 'Q', gap: null, pi: newPi, i: newI, realRate: newI - newPi, piExp: newExp });
+    pi = newPi; i = newI; piExp = newExp;
+  }
+  return { trajectory: traj, rStar: p.rstar, iEq: i_eq, policyStance: (p.ks - p.cpi) - p.rstar };
+}
+
+function rateRunHlw(){
+  const p = rateReadInputs();
+  const res = _rateHlw(p);
+  _ratecbLastHlw = { params: p, trajectory: res.trajectory, rStar: res.rStar, iEq: res.iEq, policyStance: res.policyStance, generatedAt: Date.now() };
+  const out = document.getElementById('rate-hlw-out');
+  out.style.display = 'block';
+  const stance = res.policyStance > 0.3
+    ? '<b style="color:#e07070">жёсткая на ' + res.policyStance.toFixed(2) + ' п.п.</b>'
+    : res.policyStance < -0.3
+      ? '<b style="color:#70d070">мягкая на ' + Math.abs(res.policyStance).toFixed(2) + ' п.п.</b>'
+      : '<b>близкая к нейтральной</b>';
+  out.innerHTML =
+    '<div style="background:var(--bg2);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:.66rem;line-height:1.55">' +
+      '<div>Нейтральная реальная r* = <b>' + res.rStar.toFixed(2) + '%</b>. Равновесная номинальная (r*+π*) = <b>' + res.iEq.toFixed(2) + '%</b>.</div>' +
+      '<div style="margin-top:4px">Текущая реальная ставка (КС−инфляция) = ' + (p.ks - p.cpi).toFixed(2) + '% → политика ' + stance + '.</div>' +
+    '</div>' +
+    _rateRenderTrajectory('HLW', res.trajectory, p);
+  document.getElementById('rate-hlw-set-btn').disabled = false;
+  _rateUpdateAvgBtn();
+}
+
+function _rateRenderTrajectory(name, traj, p){
+  const rows = traj.map(r => {
+    const gapStr = r.gap == null ? '<span class="muted">—</span>' : r.gap.toFixed(2) + '%';
+    return '<tr>' +
+      '<td style="padding:3px 6px"><b>' + r.q + '</b></td>' +
+      '<td style="padding:3px 6px">' + r.i.toFixed(2) + '%</td>' +
+      '<td style="padding:3px 6px">' + r.pi.toFixed(2) + '%</td>' +
+      '<td style="padding:3px 6px">' + r.realRate.toFixed(2) + '%</td>' +
+      '<td style="padding:3px 6px">' + gapStr + '</td>' +
+    '</tr>';
+  }).join('');
+  const fin = traj[traj.length - 1];
+  const delta = fin.i - p.ks;
+  const arrow = delta > 0.3 ? '↑' : delta < -0.3 ? '↓' : '→';
+  const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(2);
+  return '<table style="width:100%;font-size:.65rem;border-collapse:collapse">' +
+    '<thead><tr style="border-bottom:1px solid var(--border);color:var(--text3)">' +
+      '<th style="text-align:left;padding:4px 6px">Гор.</th>' +
+      '<th style="text-align:left;padding:4px 6px">КС, %</th>' +
+      '<th style="text-align:left;padding:4px 6px">Инфл. YoY, %</th>' +
+      '<th style="text-align:left;padding:4px 6px">Реал. ставка, %</th>' +
+      '<th style="text-align:left;padding:4px 6px">Output gap, %</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div style="margin-top:6px;font-size:.66rem;color:var(--text2)"><b>Итог ' + name + ':</b> через 8 кв. КС ≈ <b>' + fin.i.toFixed(2) + '%</b> ' + arrow + ' (' + deltaStr + ' п.п. от текущей), инфляция YoY ≈ ' + fin.pi.toFixed(2) + '%.</div>';
+}
+
+function _rateUpdateAvgBtn(){
+  const btn = document.getElementById('rate-avg-btn');
+  if(btn) btn.disabled = !(_ratecbLastQpm && _ratecbLastHlw);
+}
+
+function rateSetActive(method){
+  let traj = null, label = '';
+  if(method === 'qpm' && _ratecbLastQpm){
+    traj = _ratecbLastQpm.trajectory; label = 'QPM';
+  } else if(method === 'hlw' && _ratecbLastHlw){
+    traj = _ratecbLastHlw.trajectory; label = 'HLW';
+  } else if(method === 'avg' && _ratecbLastQpm && _ratecbLastHlw){
+    const q = _ratecbLastQpm.trajectory, h = _ratecbLastHlw.trajectory;
+    traj = q.map((r, idx) => ({
+      q: r.q,
+      i: (r.i + h[idx].i) / 2,
+      pi: (r.pi + h[idx].pi) / 2,
+      realRate: (r.realRate + h[idx].realRate) / 2,
+      gap: r.gap
+    }));
+    label = 'Среднее QPM+HLW';
+  } else {
+    alert('Сначала рассчитайте модель');
+    return;
+  }
+  const payload = { method, label, trajectory: traj, inputs: rateReadInputs(), generatedAt: Date.now() };
+  try { localStorage.setItem('bondan_ratecb_active', JSON.stringify(payload)); } catch(e){}
+  _rateRenderActive();
+}
+
+function rateClearActive(){
+  try { localStorage.removeItem('bondan_ratecb_active'); } catch(e){}
+  _rateRenderActive();
+}
+
+function _rateRenderActive(){
+  const out = document.getElementById('rate-active-out');
+  const badge = document.getElementById('sb-rate');
+  if(!out) return;
+  let active = null;
+  try {
+    const raw = localStorage.getItem('bondan_ratecb_active');
+    if(raw) active = JSON.parse(raw);
+  } catch(e){}
+  if(!active){
+    out.innerHTML = 'Ни один прогноз не выбран. Рассчитайте QPM или HLW выше и нажмите «★ Сделать активным».';
+    if(badge) badge.style.display = 'none';
+    return;
+  }
+  const t = active.trajectory;
+  const date = new Date(active.generatedAt).toLocaleString('ru-RU');
+  const ksNow = active.inputs.ks;
+  const cell = (lbl, v) =>
+    '<div style="background:var(--bg);border-radius:4px;padding:8px 10px">' +
+      '<div class="muted" style="font-size:.55rem">' + lbl + '</div>' +
+      '<div style="font-size:1.1rem;font-weight:600">' + v.toFixed(2) + '%</div>' +
+    '</div>';
+  out.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">' +
+      '<div><b style="color:var(--acc)">' + active.label + '</b> · обновлено ' + date + '</div>' +
+      '<div style="font-size:.6rem;color:var(--text3)">сейчас КС ' + ksNow.toFixed(2) + '%</div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">' +
+      cell('Через 1 кв', t[0].i) +
+      cell('Через 2 кв', t[1].i) +
+      cell('Через 1 год', t[3].i) +
+      cell('Через 2 года', t[7].i) +
+    '</div>';
+  if(badge){
+    badge.style.display = 'inline-block';
+    badge.textContent = t[3].i.toFixed(1) + '%';
+  }
+}
+
+// Публичные хелперы для других модулей (YTM, расчёт купонов флоатеров).
+// Возвращают null, если активного прогноза нет — вызывающий код должен
+// фолбэкать на текущую КС.
+function rateGetActiveForecast(){
+  try {
+    const raw = localStorage.getItem('bondan_ratecb_active');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+function rateGetActiveAtQuarter(q){
+  const a = rateGetActiveForecast();
+  if(!a || !a.trajectory || !a.trajectory.length) return null;
+  if(q <= 0) return (a.inputs && a.inputs.ks) || null;
+  if(q > a.trajectory.length) return a.trajectory[a.trajectory.length - 1].i;
+  return a.trajectory[q - 1].i;
+}

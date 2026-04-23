@@ -348,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn" onclick="showPage('pnl')">💰 P&amp;L</button>
     <button class="nav-btn nav-sep" onclick="showPage('watchlist')">⭐ Списки</button>
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
+    <button class="nav-btn" onclick="showPage('ratecb')" title="Прогноз ключевой ставки ЦБ РФ — QPM, HLW, ансамбль. Выбранный прогноз применяется в YTM и расчётах денежного потока.">🏦 Ставка</button>
     <button class="nav-btn nav-sep" onclick="showPage('industries')">🏭 Отрасли</button>
     <button class="nav-btn" onclick="showPage('cross')">📊 Сравнение</button>
   </nav>
@@ -383,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
   <div class="sb-sec">
     <div class="sb-lbl">События</div>
     <div class="sb-item" onclick="showPage('calendar');sbAct(this)"><span class="sb-icon">📅</span>Календарь событий<span class="sb-badge" id="sb-ev">0</span></div>
+    <div class="sb-item" onclick="showPage('ratecb');sbAct(this)" title="Прогноз ключевой ставки ЦБ (QPM, HLW, ансамбль). Активный прогноз подставляется в расчёты YTM и денежного потока эмитентов."><span class="sb-icon">🏦</span>Прогноз ставки<span class="sb-badge" id="sb-rate" style="display:none">—</span></div>
   </div>
   <div class="sb-div"></div>
   <div class="sb-sec">
@@ -1259,6 +1261,116 @@ document.addEventListener('DOMContentLoaded', () => {
       <button class="btn btn-d btn-sm" id="cal-ev-del" style="display:none" onclick="deleteCalEvent()">Удалить</button>
       <button class="btn btn-p" onclick="saveCalEvent()">💾 Сохранить</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: RATECB (прогноз ключевой ставки ЦБ) ═══ -->
+<div class="page" id="page-ratecb">
+  <div class="page-title">🏦 Прогноз ключевой ставки ЦБ</div>
+  <div class="page-sub">Модели ДКП · QPM · HLW · ансамбль · активный прогноз для YTM и денежного потока</div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:.68rem;color:var(--text2);line-height:1.55">
+    Задача блока — <b>оценить траекторию ключевой ставки</b> ЦБ РФ на 2–8 кварталов вперёд и подставлять её в расчёт YTM, спредов и купонов флоатеров. Ни одна макромодель не даёт точного прогноза, но расхождение между моделями и рынком (ОФЗ-кривая) — это сигнал.
+    <br><br>
+    <span style="color:var(--text3)">Иерархия: рынок (OIS/ОФЗ) — точнее всего на 1–3 мес. BVAR — на 1–8 кварталов. DSGE — для сценариев «а что если». QPM — полуструктурная середина. HLW — оценка нейтральной ставки r*. Здесь реализованы <b>QPM и HLW</b>; BVAR и DFM — на будущих этапах.</span>
+  </div>
+
+  <!-- ─── БЛОК 1: Макропараметры ─── -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr">📥 Текущее макросостояние</div>
+    <div class="muted" style="font-size:.62rem;margin-bottom:8px">Введите свежие значения. Источники: ЦБ РФ (cbr.ru), Росстат, ЕМИСС, MOEX. По умолчанию — оценки на последний квартал.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+      <div class="field"><label>Текущая КС, %<span class="muted" style="font-size:.55rem"> · cbr.ru</span></label><input type="number" step="0.25" id="rate-in-ks" value="21"></div>
+      <div class="field"><label>Инфляция YoY, %<span class="muted" style="font-size:.55rem"> · Росстат CPI</span></label><input type="number" step="0.1" id="rate-in-cpi" value="9.5"></div>
+      <div class="field"><label>Инф. ожидания, %<span class="muted" style="font-size:.55rem"> · опрос ООО «инФОМ»</span></label><input type="number" step="0.1" id="rate-in-exp" value="13.5"></div>
+      <div class="field"><label>Таргет инфляции, %<span class="muted" style="font-size:.55rem"> · цель ЦБ</span></label><input type="number" step="0.1" id="rate-in-pitgt" value="4"></div>
+      <div class="field"><label>ВВП YoY, %<span class="muted" style="font-size:.55rem"> · Росстат</span></label><input type="number" step="0.1" id="rate-in-gdp" value="1.2"></div>
+      <div class="field"><label>Потенц. рост, %<span class="muted" style="font-size:.55rem" title="Оценка темпа роста при полной загрузке. Для РФ — 1.5–2% в последних оценках ЦБ/МВФ.">· g*</span></label><input type="number" step="0.1" id="rate-in-gstar" value="1.5"></div>
+      <div class="field"><label>Разрыв выпуска, %<span class="muted" style="font-size:.55rem" title="(ВВП − потенциал) / потенциал. Положительный = перегрев, отрицательный = рецессия. Оценивается через HLW или прокси.">· output gap</span></label><input type="number" step="0.1" id="rate-in-gap" value="0.8"></div>
+      <div class="field"><label>Нейтральная r*, %<span class="muted" style="font-size:.55rem" title="Реальная нейтральная ставка. ЦБ РФ оценивает 3.5–4.5%. В QPM — экзогенная; в HLW — оценивается.">· ЦБ: 3.5–4.5</span></label><input type="number" step="0.1" id="rate-in-rstar" value="4"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="rateSaveInputs()" title="Сохранить текущие значения в localStorage (bondan_ratecb_inputs). Подтянутся при следующем открытии.">💾 Сохранить</button>
+      <button class="btn btn-sm" onclick="rateLoadDefaults()" title="Загрузить оценки на последний квартал (встроенные в код).">⟲ Дефолты</button>
+      <span class="muted" id="rate-saved-stamp" style="font-size:.58rem;align-self:center;margin-left:8px"></span>
+    </div>
+  </div>
+
+  <!-- ─── БЛОК 2: QPM ─── -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📐 QPM — Quarterly Projection Model</span>
+      <button class="btn btn-sm" onclick="rateToggleExpl('qpm')" id="rate-qpm-toggle-btn" title="Показать/скрыть развёрнутое объяснение модели">❓ Что это</button>
+    </div>
+
+    <div id="rate-qpm-expl" style="display:none;background:var(--bg2);border-left:2px solid var(--acc);padding:10px 14px;margin:8px 0;font-size:.66rem;line-height:1.6;color:var(--text2)">
+      <p><b>QPM — полуструктурная модель ЦБ</b> (Quarterly Projection Model). Используется Банком России, Банком Израиля, Чешским национальным банком как рабочая модель для прогноза ставки на горизонте 8–12 кварталов.</p>
+      <p><b>Четыре базовых уравнения:</b></p>
+      <ol style="margin:4px 0 4px 18px">
+        <li><b>IS-кривая:</b> output gap<sub>t</sub> = β·gap<sub>t−1</sub> − δ·(real_rate<sub>t−1</sub> − r*) + ε<sup>IS</sup>. Разрыв выпуска — от реальной ставки относительно нейтральной.</li>
+        <li><b>Кривая Филлипса:</b> π<sub>t</sub> = λ·π<sub>t−1</sub> + (1−λ)·π<sup>exp</sup> + κ·gap<sub>t</sub> + ε<sup>π</sup>. Инфляция — от инерции, ожиданий и разрыва.</li>
+        <li><b>Правило Тейлора:</b> i<sub>t</sub> = ρ·i<sub>t−1</sub> + (1−ρ)·[r* + π<sup>exp</sup> + φ<sub>π</sub>(π−π*) + φ<sub>y</sub>·gap] + ε<sup>i</sup>. Ставка со сглаживанием.</li>
+        <li><b>UIP с премией:</b> курс ≈ разность ставок + премия за риск. В упрощённом варианте — экзогенный.</li>
+      </ol>
+      <p><b>Калибровка (РФ):</b> β=0.7 (инерция gap), δ=0.15 (чувствительность gap к ставке), λ=0.5 (инерция инфляции), κ=0.2 (наклон Phillips), ρ=0.7 (сглаживание Taylor), φ<sub>π</sub>=1.5, φ<sub>y</sub>=0.5. Параметры — медианные по литературе (ЦБ РФ working papers, Крепцев–Селезнёв).</p>
+      <p><b>Прогноз:</b> итеративная симуляция 8 кварталов вперёд. Шоки ε=0 (базовый сценарий), начальные значения — из формы выше. На выходе — траектории gap, π, i.</p>
+      <p class="muted"><b>Ограничения:</b> линейная, не ловит ZLB/шоки, без финансового блока, без явной модели курса. На горизонте &lt; 4 кв. часто проигрывает рыночным форвардам.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" onclick="rateRunQpm()" title="Запустить симуляцию QPM на 8 кварталов вперёд по введённым параметрам.">▶ Рассчитать QPM</button>
+      <button class="btn btn-sm" onclick="rateSetActive('qpm')" title="Сделать этот прогноз активным. Будет подставляться в расчёты YTM и купоны флоатеров." id="rate-qpm-set-btn" disabled>★ Сделать активным</button>
+    </div>
+
+    <div id="rate-qpm-out" style="margin-top:10px;display:none"></div>
+  </div>
+
+  <!-- ─── БЛОК 3: HLW ─── -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📏 HLW — Holston–Laubach–Williams (оценка r*)</span>
+      <button class="btn btn-sm" onclick="rateToggleExpl('hlw')" title="Показать/скрыть развёрнутое объяснение модели">❓ Что это</button>
+    </div>
+
+    <div id="rate-hlw-expl" style="display:none;background:var(--bg2);border-left:2px solid var(--acc);padding:10px 14px;margin:8px 0;font-size:.66rem;line-height:1.6;color:var(--text2)">
+      <p><b>HLW</b> (Holston–Laubach–Williams, 2017) — полуструктурная state-space модель для совместной оценки трёх ненаблюдаемых величин:</p>
+      <ul style="margin:4px 0 4px 18px">
+        <li><b>r*</b> — равновесная (нейтральная) реальная ставка</li>
+        <li><b>g*</b> — потенциальный темп роста ВВП</li>
+        <li><b>y*</b> — потенциальный уровень ВВП (и, как следствие, output gap)</li>
+      </ul>
+      <p><b>Уравнения состояния</b> (random walk + смежное уравнение):</p>
+      <ul style="margin:4px 0 4px 18px">
+        <li>r*<sub>t</sub> = g*<sub>t</sub> + z<sub>t</sub>, где z — «прочие факторы» (random walk)</li>
+        <li>g*<sub>t</sub> = g*<sub>t−1</sub> + η<sup>g</sup>, z<sub>t</sub> = z<sub>t−1</sub> + η<sup>z</sup></li>
+        <li>y*<sub>t</sub> = y*<sub>t−1</sub> + g*<sub>t−1</sub>/4 + η<sup>y*</sup></li>
+      </ul>
+      <p><b>Уравнения наблюдения</b> — IS и Phillips, связывают латентные состояния с наблюдаемыми ВВП и инфляцией. Оценка через фильтр Калмана + сглаживатель (Kalman smoother).</p>
+      <p><b>Что даёт для прогноза ставки.</b> HLW сам не прогнозирует ставку напрямую. Он даёт <b>r*</b> — основу для правила Тейлора. Если фактическая реальная ставка &gt; r* на X п.п. — политика <i>жёсткая на X п.п.</i>, и наоборот. Используем r* из HLW вместо экзогенного значения → получаем альтернативную траекторию QPM-ставки.</p>
+      <p class="muted"><b>Упрощение здесь:</b> в браузере полный KF на рядах 60+ кварталов — реалистично, но медленно и зависит от качества данных. В этом MVP оцениваем r* <b>упрощённо</b>: текущая реальная ставка (КС − инфляция) сглаживается через экспоненциальное взвешивание исторических значений. Полный HLW с Kalman smoother — следующий этап, когда добавим автоматическую подгрузку рядов.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" onclick="rateRunHlw()" title="Оценить нейтральную ставку r* и прогноз КС на её основе.">▶ Рассчитать HLW</button>
+      <button class="btn btn-sm" onclick="rateSetActive('hlw')" title="Сделать этот прогноз активным." id="rate-hlw-set-btn" disabled>★ Сделать активным</button>
+    </div>
+
+    <div id="rate-hlw-out" style="margin-top:10px;display:none"></div>
+  </div>
+
+  <!-- ─── БЛОК 4: Активный прогноз + ансамбль ─── -->
+  <div class="card" style="margin-top:12px;border-color:var(--acc)">
+    <div class="card-hdr">★ Активный прогноз (для YTM и расчётов)</div>
+    <div class="muted" style="font-size:.62rem;margin-bottom:8px">Выбранный прогноз сохраняется в <code>bondan_ratecb_active</code> и используется другими модулями. Можно взять одну модель или среднее.</div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn btn-sm" onclick="rateSetActive('avg')" title="Среднее между QPM и HLW. Требует, чтобы обе модели были рассчитаны." id="rate-avg-btn" disabled>⚖ Среднее QPM+HLW</button>
+      <button class="btn btn-sm" onclick="rateClearActive()" title="Снять активный прогноз.">✕ Снять</button>
+    </div>
+
+    <div id="rate-active-out" style="padding:12px;background:var(--bg2);border-radius:6px;font-size:.68rem;color:var(--text2)">Ни один прогноз не выбран. Рассчитайте QPM или HLW выше и нажмите «★ Сделать активным».</div>
   </div>
 </div>
 
