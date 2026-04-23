@@ -19082,7 +19082,7 @@ function _schedSaveCache(cache){
   try { localStorage.setItem(_SCHED_CACHE_KEY, JSON.stringify(cache)); } catch(_){}
 }
 
-function _schedParseBondization(resp, secid, issueSize){
+function _schedParseBondization(resp, secid, issueSize, faceValue){
   const events = [];
   const tables = [
     ['coupons', 'coupondate', 'coupon'],
@@ -19107,18 +19107,41 @@ function _schedParseBondization(resp, secid, issueSize){
       events.push({ date, type, rub: totalRub, secid });
     }
   }
+  // Дата размещения — minimum startdate первого купона. В MOEX bondization
+  // поле startdate каждого купона = начало купонного периода, для первого
+  // купона это ≈ дата начала обращения выпуска.
+  const cs = resp?.coupons;
+  if(cs && Array.isArray(cs.columns) && Array.isArray(cs.data)){
+    const stIdx = cs.columns.indexOf('startdate');
+    if(stIdx >= 0){
+      let firstDate = null;
+      for(const row of cs.data){
+        const d = row[stIdx];
+        if(d && (!firstDate || d < firstDate)) firstDate = d;
+      }
+      const vol = (issueSize || 0) * (faceValue || 0);
+      if(firstDate && vol > 0){
+        // Приток — тип 'issuance'. rub положительный, но при рендере
+        // обозначается как «inflow».
+        events.push({ date: firstDate, type: 'issuance', rub: vol, secid });
+      }
+    }
+  }
   return events;
 }
 
-async function _schedFetchBond(secid, issueSize, force){
+async function _schedFetchBond(bond, force){
+  const secid = bond.secid;
+  const issueSize = bond.issueSize;
+  const faceValue = bond.faceValue || 1000;
   const cache = _schedLoadCache();
   const now = Date.now();
   if(!force && cache[secid] && (now - cache[secid].fetchedAt < _SCHED_TTL_MS)){
     return cache[secid].events || [];
   }
   const resp = await moexFetch(`/iss/securities/${encodeURIComponent(secid)}/bondization.json?iss.meta=off`);
-  const events = _schedParseBondization(resp, secid, issueSize);
-  cache[secid] = { events, fetchedAt: now, issueSize };
+  const events = _schedParseBondization(resp, secid, issueSize, faceValue);
+  cache[secid] = { events, fetchedAt: now, issueSize, faceValue };
   _schedSaveCache(cache);
   return events;
 }
@@ -19166,7 +19189,7 @@ async function schedulesOpen(issId, opts){
   const force = !!(opts && opts.force);
   const results = await Promise.all(issues.map(async b => {
     try {
-      const events = await _schedFetchBond(b.secid, b.issueSize, force);
+      const events = await _schedFetchBond(b, force);
       return { bond: b, events, err: null };
     } catch(e){
       return { bond: b, events: [], err: e.message || 'ошибка' };
@@ -19299,31 +19322,43 @@ function _schedRerender(){
   const showCoupons = document.getElementById('sched-show-coupons')?.checked !== false;
   const showPrincipal = document.getElementById('sched-show-principal')?.checked !== false;
   const showEbit = document.getElementById('sched-show-ebit')?.checked !== false;
+  const showIssuance = document.getElementById('sched-show-issuance')?.checked !== false;
   const horizonV = document.getElementById('sched-horizon')?.value || '36';
   const horizonMonths = parseInt(horizonV, 10);
 
   // Собираем все события с фильтрацией по типу.
+  // Для issuance показываем весь backfill (исторические размещения —
+  // чтобы увидеть «пирамиду»: новые деньги перед старыми погашениями).
   const today = Date.now();
   const horizonEnd = horizonMonths > 0 ? today + horizonMonths * 31 * 86400000 : Infinity;
+  // Назад смотрим на 3 года истории — достаточно чтобы увидеть цикл
+  // рефинансирования типичного корпоративного долга.
+  const pastStart = today - 3 * 365 * 86400000;
   const allEvents = [];
   for(const r of st.results){
     for(const ev of (r.events || [])){
       if(ev.type === 'coupon' && !showCoupons) continue;
       if(ev.type === 'principal' && !showPrincipal) continue;
+      if(ev.type === 'issuance' && !showIssuance) continue;
       const t = new Date(ev.date).getTime();
-      if(!isFinite(t) || t < today - 30 * 86400000 || t > horizonEnd) continue;
+      if(!isFinite(t)) continue;
+      // Для issuance пускаем прошлое на 3 года назад — для остальных только
+      // ближайший месяц назад (чтобы «только прошедший» купон не пропадал).
+      const minT = ev.type === 'issuance' ? pastStart : today - 30 * 86400000;
+      if(t < minT || t > horizonEnd) continue;
       allEvents.push(ev);
     }
   }
 
   // Группировка по bucket.
-  const buckets = new Map(); // key → { coupon, principal, events[] }
+  const buckets = new Map(); // key → { coupon, principal, issuance, events[] }
   for(const ev of allEvents){
     const k = _schedBucketKey(ev.date, bucket);
-    if(!buckets.has(k)) buckets.set(k, { coupon: 0, principal: 0, events: [] });
+    if(!buckets.has(k)) buckets.set(k, { coupon: 0, principal: 0, issuance: 0, events: [] });
     const b = buckets.get(k);
     if(ev.type === 'coupon') b.coupon += ev.rub;
     else if(ev.type === 'principal') b.principal += ev.rub;
+    else if(ev.type === 'issuance') b.issuance += ev.rub;
     b.events.push(ev);
   }
   const sortedKeys = [...buckets.keys()].sort();
@@ -19378,7 +19413,10 @@ function _schedRerender(){
     const H = 280;
     const padL = 50, padR = 10, padT = 10, padB = 38;
     const chartH = H - padT - padB;
-    const maxVal = Math.max(...sortedKeys.map(k => buckets.get(k).coupon + buckets.get(k).principal), ebitPerBucket || 0);
+    const maxVal = Math.max(
+      ...sortedKeys.map(k => Math.max(buckets.get(k).coupon + buckets.get(k).principal, buckets.get(k).issuance || 0)),
+      ebitPerBucket || 0
+    );
     const yScale = v => chartH * (1 - v / (maxVal || 1));
     const barW = (W - padL - padR) / sortedKeys.length;
     const barInnerW = Math.max(1, barW * 0.8);
@@ -19386,11 +19424,14 @@ function _schedRerender(){
     // (регулярная, менее тревожная нагрузка) + тёплый коралловый для тела
     // долга (пики погашений — то, на что нужно смотреть). EBIT-линия —
     // насыщенно-жёлтая, чтобы выделяться на фоне баров без «кислотности».
+    // Issuance (новые размещения = приток денег) — мягкий зелёный,
+    // рисуется ЗА баром расходов (толще, прозрачный) как «подкладка».
     const COLOR_COUP  = '#4ea0b8';   // steel teal
     const COLOR_COUP2 = '#6ec4d9';   // lighter shade для градиента
     const COLOR_PRIN  = '#e07a6a';   // warm coral
     const COLOR_PRIN2 = '#f29a8a';   // lighter shade
     const COLOR_EBIT  = '#f2c94c';   // golden yellow
+    const COLOR_ISSUE = '#6cba7c';   // приток — soft green
     let svg = `<svg width="${W}" height="${H}" style="display:block">`;
     // Градиенты для визуального объёма баров.
     svg += `<defs>
@@ -19419,10 +19460,25 @@ function _schedRerender(){
       svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="${COLOR_EBIT}" stroke-width="1.8" stroke-dasharray="6,3"/>`;
       svg += `<text x="${padL + 6}" y="${labelY}" text-anchor="start" font-size="10" font-weight="600" fill="${COLOR_EBIT}">${ebit.metric}/${bucket === 'year' ? 'год' : bucket === 'quarter' ? 'кв' : 'мес'} ≈ ${fmtRub(ebitPerBucket)}</text>`;
     }
-    // Бары
+    // Бары. Рисуем issuance ПЕРВЫМ (как фоновую заливку, широкую и
+    // полупрозрачную) — чтобы поверх неё ложился расходный бар и было
+    // видно насколько приток «покрывает» расход.
     sortedKeys.forEach((k, i) => {
       const b = buckets.get(k);
       const x = padL + i * barW + (barW - barInnerW) / 2;
+      // ИСТЕМА: issuance — зелёная подкладка (фон), на всю ширину bucket
+      if(b.issuance > 0){
+        const yIss = padT + yScale(b.issuance);
+        const hIss = chartH - yScale(b.issuance);
+        const fullX = padL + i * barW + 1;
+        const fullW = Math.max(1, barW - 2);
+        svg += `<rect x="${fullX}" y="${yIss}" width="${fullW}" height="${hIss}" fill="${COLOR_ISSUE}" opacity="0.28" rx="1"
+          data-k="${k}" class="sched-bar" style="cursor:pointer"
+          onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
+          onclick="_schedBarClick('${k}')"/>`;
+        // Короткая горизонтальная «шапочка» — выделяет контур притока
+        svg += `<line x1="${fullX}" y1="${yIss}" x2="${fullX + fullW}" y2="${yIss}" stroke="${COLOR_ISSUE}" stroke-width="1.5"/>`;
+      }
       const yCoup = padT + yScale(b.coupon);
       const hCoup = chartH - yScale(b.coupon);
       if(b.coupon > 0){
@@ -19437,6 +19493,12 @@ function _schedRerender(){
           data-k="${k}" class="sched-bar" style="cursor:pointer"
           onmouseover="_schedBarHover(event,'${k}')" onmouseout="_schedBarOut()"
           onclick="_schedBarClick('${k}')"/>`;
+      }
+      // Индикатор «пирамиды»: если issuance ≥ 50% от principal в этом
+      // bucket (и principal > 0), ставим значок ⚠ над баром.
+      if(b.issuance > 0 && b.principal > 0 && b.issuance / b.principal >= 0.5){
+        const cx = x + barInnerW / 2;
+        svg += `<text x="${cx}" y="${padT - 2}" text-anchor="middle" font-size="11" fill="${COLOR_ISSUE}" title="Новое размещение покрывает ≥50% погашения этого периода — признак рефинансирования">♻</text>`;
       }
       // X-подпись: каждый bucket. Для месяцев — ротируем.
       if(bucket === 'month'){
@@ -19470,36 +19532,46 @@ function _schedBarHover(ev, k){
   const horizonEnd = horizonMonths > 0 ? today + horizonMonths * 31 * 86400000 : Infinity;
   const showCoupons = document.getElementById('sched-show-coupons')?.checked !== false;
   const showPrincipal = document.getElementById('sched-show-principal')?.checked !== false;
+  const showIssuance = document.getElementById('sched-show-issuance')?.checked !== false;
   const bySecid = new Map();
-  let total = 0, coupSum = 0, prinSum = 0;
+  let total = 0, coupSum = 0, prinSum = 0, issSum = 0;
+  const pastStart = today - 3 * 365 * 86400000;
   for(const r of st.results){
     for(const evx of (r.events || [])){
       if(_schedBucketKey(evx.date, bucket) !== k) continue;
       if(evx.type === 'coupon' && !showCoupons) continue;
       if(evx.type === 'principal' && !showPrincipal) continue;
+      if(evx.type === 'issuance' && !showIssuance) continue;
       const t = new Date(evx.date).getTime();
-      if(!isFinite(t) || t < today - 30 * 86400000 || t > horizonEnd) continue;
-      if(!bySecid.has(evx.secid)) bySecid.set(evx.secid, { coupon: 0, principal: 0 });
+      const minT = evx.type === 'issuance' ? pastStart : today - 30 * 86400000;
+      if(!isFinite(t) || t < minT || t > horizonEnd) continue;
+      if(!bySecid.has(evx.secid)) bySecid.set(evx.secid, { coupon: 0, principal: 0, issuance: 0 });
       const rec = bySecid.get(evx.secid);
-      if(evx.type === 'coupon'){ rec.coupon += evx.rub; coupSum += evx.rub; }
-      else { rec.principal += evx.rub; prinSum += evx.rub; }
-      total += evx.rub;
+      if(evx.type === 'coupon'){ rec.coupon += evx.rub; coupSum += evx.rub; total += evx.rub; }
+      else if(evx.type === 'principal'){ rec.principal += evx.rub; prinSum += evx.rub; total += evx.rub; }
+      else if(evx.type === 'issuance'){ rec.issuance += evx.rub; issSum += evx.rub; /* не в total, это приход */ }
     }
   }
   const fmtRub = v => Math.abs(v) >= 1e9 ? (v/1e9).toFixed(2) + ' млрд' : Math.abs(v) >= 1e6 ? (v/1e6).toFixed(0) + ' млн' : v.toLocaleString('ru-RU');
-  const list = [...bySecid.entries()].sort((a,b) => (b[1].coupon + b[1].principal) - (a[1].coupon + a[1].principal));
+  const list = [...bySecid.entries()].sort((a,b) => (b[1].coupon + b[1].principal + b[1].issuance) - (a[1].coupon + a[1].principal + a[1].issuance));
   const lines = list.map(([sec, rec]) => {
     const parts = [];
     if(rec.coupon > 0) parts.push(`купон ${fmtRub(rec.coupon)}`);
     if(rec.principal > 0) parts.push(`тело ${fmtRub(rec.principal)}`);
-    return `<div>${sec}: ${parts.join(' + ')}</div>`;
+    if(rec.issuance > 0) parts.push(`<span style="color:#6cba7c">размещение +${fmtRub(rec.issuance)}</span>`);
+    return `<div>${sec}: ${parts.join(' · ')}</div>`;
   }).join('');
+  const pyramidFlag = (issSum > 0 && prinSum > 0 && issSum / prinSum >= 0.5)
+    ? `<div style="color:#6cba7c;font-size:.55rem;margin-top:3px">♻ рефинансирование: приток покрывает ${Math.round(issSum/prinSum*100)}% погашения</div>`
+    : '';
   const tt = document.getElementById('sched-tooltip');
   if(!tt) return;
   tt.innerHTML = `<div style="font-weight:600;color:#6ec4d9;margin-bottom:4px">${_schedBucketLabel(k, bucket)}</div>
-    <div style="color:var(--text2)">Итого: <strong>${fmtRub(total)} ₽</strong></div>
+    <div style="color:var(--text2)">Расход: <strong>${fmtRub(total)} ₽</strong></div>
     <div style="color:#6ec4d9;font-size:.52rem">■ купоны ${fmtRub(coupSum)}</div>
     <div style="color:#f29a8a;font-size:.52rem">■ тело ${fmtRub(prinSum)}</div>
+    ${issSum > 0 ? `<div style="color:#6cba7c;font-size:.52rem">■ размещения +${fmtRub(issSum)}</div>` : ''}
+    ${pyramidFlag}
     <div style="margin-top:4px;font-size:.52rem;color:var(--text3);border-top:1px dashed var(--border);padding-top:4px">${lines}</div>
     <div style="margin-top:4px;font-size:.5rem;color:var(--text3)">Клик — подсветить выпуски ниже</div>`;
   tt.style.display = 'block';

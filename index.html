@@ -3737,6 +3737,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer">
           <input type="checkbox" id="sched-show-ebit" checked onchange="_schedRerender()" style="margin:0"> Линия EBIT/период
         </label>
+        <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer" title="Показывать новые размещения облигаций эмитента — зелёной подкладкой под баром того периода, в который они пришлись. Если приток зелёного ≥ 50% от погашения периода, сверху ставится ♻ — признак рефинансирования (пирамидальная схема). Видно до 3 лет назад.">
+          <input type="checkbox" id="sched-show-issuance" checked onchange="_schedRerender()" style="margin:0"> <span style="color:#6cba7c">■</span> Новые размещения (приток)
+        </label>
         <span style="color:var(--text3);margin-left:12px">Горизонт:</span>
         <select id="sched-horizon" onchange="_schedRerender()" style="font-size:.62rem;padding:2px 4px">
           <option value="12">1 год</option>
