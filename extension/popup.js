@@ -101,5 +101,33 @@ $('clear-btn').onclick = clearAll;
 $('paste-clipboard-btn').onclick = pasteFromClipboard;
 $('start-batch-btn').onclick = startBatch;
 
+// При открытии попапа подтягиваем последний batch-progress из storage —
+// иначе пользователь видит «25 / 576» от старого запуска и думает что
+// обход застрял (на самом деле background работает молча и закидывает
+// progress в storage). Если running:true — выставляем «идёт обход».
+function restoreBatchState(){
+  chrome.storage.local.get(['batchProgress'], data => {
+    const p = data.batchProgress;
+    if(!p) return;
+    const ago = (ms) => {
+      const s = Math.round(ms / 1000);
+      if(s < 60) return s + ' сек назад';
+      const m = Math.round(s / 60);
+      if(m < 60) return m + ' мин назад';
+      return Math.round(m / 60) + ' ч назад';
+    };
+    if(p.running){
+      $('start-batch-btn').disabled = true;
+      $('start-batch-btn').textContent = '⏳ Идёт обход...';
+      const tag = p.skipped ? '⏭ скип' : (p.ok ? '✓' : '✗');
+      const innStr = p.inn ? ` · ${p.inn} · ${tag}` : '';
+      $('progress').textContent = `${p.idx || 0} / ${p.total || '?'}${innStr}`;
+    } else if(p.summary && p.finishedAt){
+      $('progress').textContent = `Готово ${ago(Date.now() - p.finishedAt)}: новых ${p.summary.done}, пропущено ${p.summary.skipped}, ошибок ${p.summary.failed}`;
+    }
+  });
+}
+
 refreshCounter();
-setInterval(refreshCounter, 1500);
+restoreBatchState();
+setInterval(() => { refreshCounter(); restoreBatchState(); }, 1500);

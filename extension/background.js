@@ -129,6 +129,8 @@ function saveAndDiff(payload){
 
 async function runBatch(inns){
   const summary = { total: inns.length, done: 0, failed: 0, skipped: 0, notFound: 0 };
+  // Помечаем что обход начался — popup.js при открытии прочитает.
+  await chrome.storage.local.set({ batchProgress: { running: true, idx: 0, total: inns.length, summary, startedAt: Date.now() } });
   for(let i = 0; i < inns.length; i++){
     const inn = String(inns[i] || '').trim();
     if(!inn || !/^\d{10}(\d{2})?$/.test(inn)){ summary.skipped++; continue; }
@@ -138,7 +140,9 @@ async function runBatch(inns){
     const existing = Object.values(stored).find(e => e.payload && e.payload.inn === inn);
     if(existing && (Date.now() - (existing.savedAt || 0)) < 24 * 3600 * 1000){
       summary.skipped++;
-      try { chrome.runtime.sendMessage({ type: 'batch-progress', idx: i + 1, total: inns.length, inn, ok: true, skipped: true, summary }); } catch(_){}
+      const progress = { running: true, idx: i + 1, total: inns.length, inn, ok: true, skipped: true, summary };
+      await chrome.storage.local.set({ batchProgress: progress });
+      try { chrome.runtime.sendMessage({ type: 'batch-progress', ...progress }); } catch(_){}
       continue;
     }
 
@@ -147,7 +151,9 @@ async function runBatch(inns){
     if(!company || !company.id){
       summary.notFound++;
       summary.failed++;
-      try { chrome.runtime.sendMessage({ type: 'batch-progress', idx: i + 1, total: inns.length, inn, ok: false, notFound: true, summary }); } catch(_){}
+      const progress = { running: true, idx: i + 1, total: inns.length, inn, ok: false, notFound: true, summary };
+      await chrome.storage.local.set({ batchProgress: progress });
+      try { chrome.runtime.sendMessage({ type: 'batch-progress', ...progress }); } catch(_){}
       await new Promise(r => setTimeout(r, 800));
       continue;
     }
@@ -162,8 +168,12 @@ async function runBatch(inns){
       try { await chrome.tabs.remove(tab.id); } catch(_){}
     }
     await new Promise(r => setTimeout(r, 2000));
-    try { chrome.runtime.sendMessage({ type: 'batch-progress', idx: i + 1, total: inns.length, inn, ok, summary }); } catch(_){}
+    const progress = { running: true, idx: i + 1, total: inns.length, inn, ok, summary };
+    await chrome.storage.local.set({ batchProgress: progress });
+    try { chrome.runtime.sendMessage({ type: 'batch-progress', ...progress }); } catch(_){}
   }
+  // Финальное состояние — обход завершён.
+  await chrome.storage.local.set({ batchProgress: { running: false, idx: inns.length, total: inns.length, summary, finishedAt: Date.now() } });
   return summary;
 }
 
