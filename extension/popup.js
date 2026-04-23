@@ -95,6 +95,27 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
+// Восстанавливает UI batch'а если popup открыли во время обхода
+// или уже после его завершения — без этого счётчик «X / N» терялся
+// при каждом закрытии popup'а (messaging ловил только открытый popup).
+function restoreBatchState(){
+  chrome.storage.local.get(['batchProgress'], data => {
+    const bp = data.batchProgress;
+    if(!bp) return;
+    if(bp.running){
+      $('start-batch-btn').disabled = true;
+      $('start-batch-btn').textContent = '⏳ Идёт обход...';
+      const s = bp.summary || {};
+      const tag = bp.skipped ? '⏭' : (bp.ok ? '✓' : '✗');
+      const idx = bp.idx || (s.done + s.failed + s.skipped) || 0;
+      $('progress').textContent = `${idx} / ${bp.total} · ${bp.inn || '…'} · ${tag} (done ${s.done||0}, skip ${s.skipped||0}, fail ${s.failed||0}, 404 ${s.notFound||0})`;
+    } else if(bp.summary){
+      const s = bp.summary;
+      $('progress').textContent = `Готово: новых ${s.done}, пропущено ${s.skipped}, ошибок ${s.failed}, не найдено ${s.notFound || 0}`;
+    }
+  });
+}
+
 $('export-btn').onclick = exportJson;
 $('mark-seen-btn').onclick = markAllSeen;
 $('clear-btn').onclick = clearAll;
@@ -102,4 +123,6 @@ $('paste-clipboard-btn').onclick = pasteFromClipboard;
 $('start-batch-btn').onclick = startBatch;
 
 refreshCounter();
+restoreBatchState();
 setInterval(refreshCounter, 1500);
+setInterval(restoreBatchState, 1500);
