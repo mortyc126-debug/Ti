@@ -1485,6 +1485,33 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="rate-bvar-out" style="margin-top:10px;display:none"></div>
   </div>
 
+  <!-- ─── БЛОК 3.6: DFM — индекс состояния ─── -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🧭 DFM — Dynamic Factor Model (индекс состояния)</span>
+      <button class="btn btn-sm" onclick="rateToggleExpl('dfm')" title="Показать/скрыть развёрнутое объяснение">❓ Что это</button>
+    </div>
+
+    <div id="rate-dfm-expl" style="display:none;background:var(--bg2);border-left:2px solid var(--acc);padding:10px 14px;margin:8px 0;font-size:.66rem;line-height:1.6;color:var(--text2)">
+      <p><b>DFM</b> (Dynamic Factor Model) — модель, которая сводит десятки рядов к 1-2 латентным «факторам» (главным компонентам). Каждый фактор — взвешенная комбинация наблюдаемых рядов, которая объясняет максимум их совместной дисперсии.</p>
+      <p><b>Здесь реализация:</b> упрощённая PCA (principal component analysis) через power iteration с deflation. Берём все ряды из <code>bondan_ratecb_cbrdata</code> (инфляция разных типов, региональная, api-привязанные показатели), стандартизируем (mean=0, std=1), строим ковариационную матрицу, находим 1-2 первых собственных вектора.</p>
+      <p><b>Как интерпретировать:</b></p>
+      <ul style="margin:4px 0 4px 18px">
+        <li><b>Фактор 1</b> — обычно «общий инфляционный импульс»: коррелирует с большинством ценовых рядов. Если он >1σ — «инфляция разогнана»; если <-1σ — «инфляция очень низкая».</li>
+        <li><b>Фактор 2</b> — то, что остаётся после первого. Может быть «региональный перекос» или «расхождение headline vs core».</li>
+        <li>Топ-загрузки (loadings) — какие ряды больше всего «весят» в факторе. Помогает понять, о чём именно говорит фактор.</li>
+      </ul>
+      <p><b>Зачем:</b> когда вы смотрите на 10 разных показателей инфляции — глазами сложно увидеть общий тренд. DFM сводит их в один индикатор. Также полезно для sanity check: если фактор 1 говорит «инфляция падает», а ЦБ держит жёсткую ставку — это сигнал, что ЦБ скоро начнёт снижать.</p>
+      <p class="muted"><b>Ограничения:</b> PCA — статическая модель, не учитывает time-dependency. Полный DFM с Kalman smoother (вместо PCA) даёт оценки рассогласованные во времени и обрабатывает пропуски. Для нашего use-case PCA достаточна, потому что пропусков в рядах мало.</p>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" onclick="rateRunDfm()" title="Построить 1-2 фактора PCA из всех рядов в bondan_ratecb_cbrdata. Автоматически подхватывает всё что импортировано.">▶ Построить факторы</button>
+    </div>
+
+    <div id="rate-dfm-out" style="margin-top:10px;display:none"></div>
+  </div>
+
   <!-- ─── БЛОК 4: Активный прогноз + ансамбль ─── -->
   <div class="card" style="margin-top:12px;border-color:var(--acc)">
     <div class="card-hdr">★ Активный прогноз (для YTM и расчётов)</div>

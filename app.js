@@ -20558,6 +20558,150 @@ function rateRunBvar(){
   document.getElementById('rate-bvar-set-btn').disabled = false;
 }
 
+// ═══ DFM: Dynamic Factor Model (упрощённая, через PCA) ════════════════════
+// Сводит N рядов к K главным факторам через decomposition ковариации.
+// Используется power iteration с deflation — для K=1-2 быстро и точно.
+//
+// Интерпретация фактора: взвешенная комбинация стандартизованных рядов,
+// объясняющая максимум дисперсии. Первый фактор обычно — «общий экономический
+// импульс», второй — «ценовой» или «внешний» (зависит от набора рядов).
+
+let _ratecbLastDfm = null;
+
+// Power iteration для нахождения главного собственного вектора sym. матрицы.
+// Возвращает { eigenvalue, eigenvector }.
+function _dfmPowerIter(A, maxIter, tol){
+  maxIter = maxIter || 200;
+  tol = tol || 1e-10;
+  const n = A.length;
+  let v = new Array(n).fill(0).map(() => Math.random() - 0.5);
+  // Нормализуем
+  let norm = Math.sqrt(v.reduce((a,x) => a + x*x, 0));
+  v = v.map(x => x / norm);
+  let lambda = 0;
+  for(let iter = 0; iter < maxIter; iter++){
+    // Av
+    const Av = new Array(n).fill(0);
+    for(let i = 0; i < n; i++)
+      for(let j = 0; j < n; j++) Av[i] += A[i][j] * v[j];
+    // Rayleigh quotient: lambda = v^T A v
+    const newLambda = v.reduce((a, x, i) => a + x * Av[i], 0);
+    // Нормализация
+    norm = Math.sqrt(Av.reduce((a,x) => a + x*x, 0));
+    if(norm < 1e-14) break;
+    const vNew = Av.map(x => x / norm);
+    if(Math.abs(newLambda - lambda) < tol){ v = vNew; lambda = newLambda; break; }
+    v = vNew; lambda = newLambda;
+  }
+  return { eigenvalue: lambda, eigenvector: v };
+}
+
+// PCA через deflation: находим первые K компонент последовательно.
+function _dfmPCA(X, K){
+  const T = X.length, N = X[0].length;
+  // Стандартизация: каждый столбец — mean=0, std=1
+  const means = new Array(N).fill(0);
+  const stds = new Array(N).fill(0);
+  for(let j = 0; j < N; j++){
+    let s = 0; for(let t = 0; t < T; t++) s += X[t][j];
+    means[j] = s / T;
+  }
+  for(let j = 0; j < N; j++){
+    let s = 0; for(let t = 0; t < T; t++) s += (X[t][j] - means[j])**2;
+    stds[j] = Math.sqrt(s / (T - 1)) || 1;
+  }
+  const Xs = X.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
+  // Cov = (1/(T-1)) X_s^T X_s, симметричная N×N
+  let Cov = _mat.scale(_mat.mul(_mat.trans(Xs), Xs), 1 / Math.max(1, T - 1));
+  const factors = []; // каждый: { lambda, loadings (N), scores (T) }
+  const totalVar = Cov.reduce((a, row, i) => a + row[i], 0);
+  let A = Cov;
+  for(let k = 0; k < K; k++){
+    const { eigenvalue, eigenvector } = _dfmPowerIter(A);
+    // Scores = X_s * v (T × 1)
+    const scores = Xs.map(row => {
+      let s = 0;
+      for(let j = 0; j < N; j++) s += row[j] * eigenvector[j];
+      return s;
+    });
+    factors.push({ lambda: eigenvalue, loadings: eigenvector.slice(), scores, variance_share: eigenvalue / totalVar });
+    // Deflation: A = A - lambda * v v^T
+    for(let i = 0; i < N; i++)
+      for(let j = 0; j < N; j++)
+        A[i][j] -= eigenvalue * eigenvector[i] * eigenvector[j];
+  }
+  return { factors, means, stds, T, N };
+}
+
+function rateRunDfm(){
+  const out = document.getElementById('rate-dfm-out');
+  out.style.display = 'block';
+  // Собираем все доступные ряды из cbr store
+  const store = _rateReadCbrStore();
+  const desc = [];
+  if(store.reg_cpd && store.reg_cpd.series){
+    if(store.reg_cpd.series.russia_yoy)    desc.push({ bucket: 'reg_cpd', key: 'russia_yoy',    label: 'CPI YoY' });
+    if(store.reg_cpd.series.russia_mom)    desc.push({ bucket: 'reg_cpd', key: 'russia_mom',    label: 'CPI MoM' });
+    if(store.reg_cpd.series.russia_sa_mom) desc.push({ bucket: 'reg_cpd', key: 'russia_sa_mom', label: 'CPI SA' });
+  }
+  if(store.indicators_cpd && store.indicators_cpd.series){
+    if(store.indicators_cpd.series.all_sa_mom)      desc.push({ bucket: 'indicators_cpd', key: 'all_sa_mom',      label: 'Все SA' });
+    if(store.indicators_cpd.series.core_sa_mom)     desc.push({ bucket: 'indicators_cpd', key: 'core_sa_mom',     label: 'Core SA' });
+    if(store.indicators_cpd.series.base_cpi_sa_mom) desc.push({ bucket: 'indicators_cpd', key: 'base_cpi_sa_mom', label: 'База ИПЦ SA' });
+  }
+  if(store.est_infl && store.est_infl.series){
+    if(store.est_infl.series.trend5y) desc.push({ bucket: 'est_infl', key: 'trend5y', label: 'Тренд 5Y' });
+    if(store.est_infl.series.trend3y) desc.push({ bucket: 'est_infl', key: 'trend3y', label: 'Тренд 3Y' });
+  }
+  if(store.api){
+    for(const role in store.api){
+      if(store.api[role].series && store.api[role].series.length)
+        desc.push({ bucket: 'api', key: role, label: role.toUpperCase() });
+    }
+  }
+  if(desc.length < 3){
+    out.innerHTML = '<div style="color:#e0a070;font-size:.65rem">⚠ Слишком мало рядов для PCA (' + desc.length + '). Нужно минимум 3. Импортируйте XLSX и/или привяжите больше показателей через «🔍 API ЦБ».</div>';
+    return;
+  }
+  const prep = _rateBuildSeriesMatrix(desc);
+  if(prep.dates.length < 12){
+    out.innerHTML = '<div style="color:#e0a070;font-size:.65rem">⚠ Общих дат слишком мало (' + prep.dates.length + '). Нужно ≥12.</div>';
+    return;
+  }
+  const labels = Object.keys(prep.cols);
+  const T = prep.dates.length, N = labels.length;
+  const X = [];
+  for(let t = 0; t < T; t++){
+    const row = [];
+    for(const l of labels) row.push(prep.cols[l][t]);
+    X.push(row);
+  }
+  const K = Math.min(2, N);
+  const pca = _dfmPCA(X, K);
+  _ratecbLastDfm = { pca, labels, dates: prep.dates, T, N, K, generatedAt: Date.now() };
+  // Рендер — загрузки (loadings) и свежая шкала индекса
+  let html = '<div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">Оценка: <b>N=' + N + '</b> рядов (' + prep.dates[0] + '…' + prep.dates[T-1] + ', T=' + T + '), <b>K=' + K + '</b> факторов</div>';
+  for(let k = 0; k < K; k++){
+    const f = pca.factors[k];
+    const shareRel = f.variance_share * 100;
+    const latest = f.scores[f.scores.length - 1];
+    const sign = latest > 0 ? '▲' : '▼';
+    const color = latest > 0.5 ? '#70d070' : latest < -0.5 ? '#e07070' : 'var(--text2)';
+    // Топ-3 loadings по модулю
+    const sortedLoadings = f.loadings.map((l, i) => ({ i, l, lbl: labels[i] })).sort((a,b) => Math.abs(b.l) - Math.abs(a.l));
+    const top = sortedLoadings.slice(0, 3).map(x => x.lbl + ' (' + x.l.toFixed(2) + ')').join(', ');
+    html += '<div style="background:var(--bg2);padding:8px 12px;border-radius:6px;margin-bottom:6px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<b>Фактор ' + (k+1) + '</b> · объясняет ' + shareRel.toFixed(1) + '% дисперсии' +
+        '<span style="color:' + color + ';font-size:.7rem">' + sign + ' ' + latest.toFixed(2) + ' σ</span>' +
+      '</div>' +
+      '<div class="muted" style="font-size:.58rem;margin-top:3px">Топ-загрузки: ' + top + '</div>' +
+    '</div>';
+  }
+  html += '<div class="muted" style="font-size:.56rem">Индекс в единицах стандартного отклонения (σ). >1 = существенно выше нормы, <-1 = существенно ниже.</div>';
+  out.innerHTML = html;
+}
+
 // ─── Простые статистики на массиве ────────────────────────────────────────
 const _stats = {
   mean(xs){ return xs.reduce((a,b) => a+b, 0) / xs.length; },
