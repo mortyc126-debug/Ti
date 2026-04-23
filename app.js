@@ -19688,13 +19688,16 @@ async function rateApiLoadPubs(){
 }
 
 // Публикации могут иметь parent_id — строим плоский список с отступами.
+// У ЦБ корневые имеют parent_id = -1 (а не 0/null), учитываем это.
 function _rateApiRenderPubsTree(pubs){
   const el = document.getElementById('rate-api-pubs');
   if(!el) return;
-  // Индексируем по parent_id. Корни — parent_id == null || 0
+  // Нормализуем «корневой» индикатор: -1 или null → 0
+  const rootKey = 0;
+  const normalize = pid => (pid == null || pid === -1 || pid === '-1') ? rootKey : pid;
   const byParent = {};
   for(const p of pubs){
-    const pid = p.parent_id || 0;
+    const pid = normalize(p.parent_id);
     (byParent[pid] = byParent[pid] || []).push(p);
   }
   const lines = [];
