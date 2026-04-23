@@ -18429,6 +18429,31 @@ function moexOpenDossier(issId){
 // модалку, пользователь остаётся на странице «🏛 Каталог Мосбиржи».
 // Есть кнопка «📂 Открыть в Базе отчётности» — для тех случаев, когда
 // хочется полноценный вид эмитента с редактированием периодов.
+// Собирает все доступные мультипликаторы эмитента в один объект.
+// Источники: _repCalcMultipliers (ROE/D/E/ICR/Current/...), _moexIssuerMetrics
+// (debtEbitda/netDebtEbitda/ROA/EBITDA-margin/BQI/ratingClass), _repStressScore
+// (🛡 score, altmanZ), плюс ROS из последнего периода. Рыночные (P/E, P/B,
+// cap) добавляются, если есть matched share в _sharesCatalog.
+function _peekAllMultiples(issId, iss){
+  const base = _repCalcMultipliers(iss) || { year: null };
+  const cache = new Map();
+  const moexM = (typeof _moexIssuerMetrics === 'function') ? _moexIssuerMetrics(issId, cache) || {} : {};
+  const stress = (typeof _repStressScore === 'function') ? _repStressScore(iss) || {} : {};
+  const bq = (typeof _repBalanceQuality === 'function') ? _repBalanceQuality(iss) || {} : {};
+  const lp = _repLatestPeriod(iss);
+  const p = lp?.period || {};
+  const ros = (p.np != null && p.rev && p.rev > 0) ? p.np / p.rev : null;
+  // Рыночные: ищем акцию этого эмитента в _sharesCatalog (по issId) →
+  // через неё P/E, P/B, Кап-ция (считаются в _sharesMarketMultiples).
+  let mkt = null;
+  const shares = window._sharesCatalog?.items;
+  if(Array.isArray(shares) && typeof _sharesMarketMultiples === 'function'){
+    const sh = shares.find(s => s.issId === issId);
+    if(sh) mkt = _sharesMarketMultiples(sh);
+  }
+  return { base, moexM, stress, bq, ros, mkt };
+}
+
 function moexOpenIssuerPeek(issId){
   if(!reportsDB[issId]){ alert('Эмитент не найден в базе'); return; }
   const iss = reportsDB[issId];
@@ -18529,11 +18554,68 @@ function moexOpenIssuerPeek(issId){
       ${attachBtn}${pullBtn}${removeBtn}
       ${searchLinks}
     </div>`;
-  document.getElementById('issuer-peek-mults').innerHTML = `
-    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="ROE = Чистая прибыль / Собственный капитал. ≥15% норма для ВДО." style="cursor:help">ROE</abbr> <span style="color:${color(m.roe, 0.15, 0, false)};font-weight:600">${fmtPct(m.roe)}</span></span>
-    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="Долг/EBITDA. ≤3 хорошо; >5 риск." style="cursor:help">Д/Е</abbr> <span style="color:${color(m.de, 3, 5, true)};font-weight:600">${fmtX(m.de)}</span></span>
-    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="ICR = EBIT / Проценты. ≥3 комфортно; <1.5 риск." style="cursor:help">ICR</abbr> <span style="color:${color(m.icr, 3, 1.5, false)};font-weight:600">${fmtX(m.icr)}</span></span>
-    <span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border)"><abbr title="D/E = Долг / Капитал. ≤1 консервативно." style="cursor:help">D/E</abbr> <span style="color:${color(m.dde, 1, 2, true)};font-weight:600">${fmtX(m.dde)}</span></span>`;
+  // Все мультипликаторы — сгруппированы в 6 секций (рентабельность /
+  // долговая / покрытие / ликвидность / скоринг / рыночные).
+  const all = _peekAllMultiples(issId, iss);
+  const pill = (title, label, val, kind, good, bad, inverse) => {
+    const fmt = kind === 'pct' ? fmtPct : kind === 'bln' ? fmtBln : fmtX;
+    const c = color(val, good, bad, inverse);
+    return `<span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border);white-space:nowrap"><abbr title="${title}" style="cursor:help">${label}</abbr> <span style="color:${c};font-weight:600">${fmt(val)}</span></span>`;
+  };
+  const sectionHdr = t => `<div style="width:100%;font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin:6px 0 2px">${t}</div>`;
+
+  const profitab = [
+    pill('ROE = Чистая прибыль / Собственный капитал. ≥15% норма для ВДО.', 'ROE', m.roe, 'pct', 0.15, 0, false),
+    pill('ROA = Чистая прибыль / Активы. ≥5% комфортно, <0 убыток.', 'ROA', all.moexM.roa, 'pct', 0.05, 0, false),
+    pill('ROS = Чистая прибыль / Выручка. Маржинальность бизнеса.', 'ROS', all.ros, 'pct', 0.05, 0, false),
+    pill('EBITDA-маржа = EBITDA / Выручка. ≥15% — индустриально сильный бизнес.', 'EBITDA-м', all.moexM.ebitdaMargin, 'pct', 0.15, 0.07, false),
+  ].join('');
+
+  const debt = [
+    pill('Долг/EBITDA. ≤3 хорошо; >5 риск.', 'Д/E', all.moexM.debtEbitda, 'x', 3, 5, true),
+    pill('Net Debt / EBITDA = (Долг − Кеш) / EBITDA. ≤2 IG-зона; >5 junk.', 'ND/E', all.moexM.netDebtEbitda, 'x', 2, 5, true),
+    pill('D/E (leverage) = Долг / Собственный капитал. ≤1 консервативно.', 'D/eq', m.dde, 'x', 1, 2, true),
+    pill('Debt Ratio = Долг / Активы. Доля заёмного финансирования. ≤0.5 ок.', 'D/A', m.debtR, 'pct', 0.3, 0.5, true),
+    pill('Equity Ratio = Капитал / Активы. ≥30% прочная структура, <15% тонко.', 'Eq-R', all.moexM.equityRatio, 'pct', 0.3, 0.15, false),
+  ].join('');
+
+  const coverage = [
+    pill('ICR = EBIT / Проценты. ≥3 комфортно; <1.5 риск.', 'ICR', all.moexM.icr, 'x', 3, 1.5, false),
+  ].join('');
+
+  const liq = [
+    pill('Current Ratio = Оборотные активы / Краткосрочные обязательства. ≥1.2 норма.', 'Current', all.moexM.currentRatio, 'x', 1.2, 1, false),
+    pill('Cash Ratio = Кеш / Краткосрочные обязательства. ≥0.2 комфортно.', 'Cash-R', all.moexM.cashRatio, 'x', 0.2, 0.1, false),
+    m.wc != null ? pill('Working Capital = Оборотные активы − Краткосрочные обязательства. Положительный = ликвидность позитивна.', 'WC', m.wc, 'bln', 0, -1, false) : '',
+  ].filter(Boolean).join('');
+
+  // Скоринг: BQI, Altman Z, 🛡 запас прочности, рейтинг-класс.
+  const score = [
+    all.bq?.score != null ? `<span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border);white-space:nowrap"><abbr title="Balance Quality Index = композит качества балансовой структуры (equity ratio, current ratio, accruals). Шкала 0-100, >70 качественный." style="cursor:help">⚖ BQI</abbr> <span style="color:${color(all.bq.score/100, 0.7, 0.4, false)};font-weight:600">${all.bq.score}/100</span></span>` : '',
+    all.stress?.altmanZ != null ? `<span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border);white-space:nowrap"><abbr title="Altman Z' = Z-score для непубличных компаний. >2.9 safe, 1.23-2.9 grey, <1.23 distress zone." style="cursor:help">Altman Z'</abbr> <span style="color:${color(all.stress.altmanZ, 2.9, 1.23, false)};font-weight:600">${all.stress.altmanZ.toFixed(2)}</span></span>` : '',
+    all.stress?.score != null ? `<span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border);white-space:nowrap"><abbr title="Запас прочности — композит ICR, Altman Z', долговой стены. 70+ устойчиво, 40-70 жёлтый, <40 красный." style="cursor:help">🛡 Стресс</abbr> <span style="color:${color(all.stress.score/100, 0.7, 0.4, false)};font-weight:600">${all.stress.score}/100</span></span>` : '',
+    all.moexM.ratingClass ? `<span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border);white-space:nowrap"><abbr title="Кредитный рейтинг (класс без +/−). Из iss.ratings или dossier.mod.rating." style="cursor:help">🏷</abbr> <span style="color:var(--acc);font-weight:600">${all.moexM.ratingClass}</span></span>` : '',
+  ].filter(Boolean).join('');
+
+  // Рыночные — только если у эмитента есть акция в _sharesCatalog.
+  const mkt = all.mkt;
+  const market = mkt ? [
+    mkt.capBn != null ? `<span style="padding:3px 7px;background:var(--s3);border:1px solid var(--border);white-space:nowrap"><abbr title="Капитализация = цена × число акций. В млрд ₽. Требует matched share в каталоге акций." style="cursor:help">Кап-ция</abbr> <span style="color:var(--text);font-weight:600">${mkt.capBn.toLocaleString('ru-RU', {maximumFractionDigits:1})} млрд</span></span>` : '',
+    pill('P/E = Кап-ция / Чистая прибыль. <8 дешёвая, >20 дорогая.', 'P/E', mkt.pe, 'x', 8, 20, true),
+    pill('P/B = Кап-ция / Собственный капитал. <1 ниже балансовой (value-ловушка или недооценка).', 'P/B', mkt.pb, 'x', 1, 3, true),
+    pill('P/S = Кап-ция / Выручка. Не требует прибыли, удобно для растущих.', 'P/S', mkt.ps, 'x', 2, 5, true),
+    pill('EV/EBITDA = (Кап + Долг − Кеш) / EBITDA. Классика M&A оценки.', 'EV/EBITDA', mkt.evEbitda, 'x', 8, 15, true),
+  ].filter(Boolean).join('') : '';
+
+  document.getElementById('issuer-peek-mults').innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">` +
+    sectionHdr('📈 Рентабельность') + profitab +
+    sectionHdr('⚖ Долговая нагрузка') + debt +
+    sectionHdr('🔒 Покрытие процентов') + coverage +
+    sectionHdr('💧 Ликвидность') + liq +
+    (score ? sectionHdr('🎯 Скоринг') + score : '') +
+    (market ? sectionHdr('🏦 Рыночные (по акции)') + market : '') +
+    `</div>`;
   document.getElementById('issuer-peek-periods').innerHTML = periods.length ? `
     <table style="width:100%;border-collapse:collapse;font-size:.62rem">
       <thead><tr style="background:var(--s2);color:var(--text3);font-size:.55rem;letter-spacing:.05em;text-transform:uppercase">
