@@ -110,7 +110,8 @@ exports.handler = async (event) => {
         /^https:\/\/(www\.)?audit-it\.ru\//,
         /^https:\/\/(www\.)?buxbalans\.ru\//,
         /^https:\/\/(www\.)?e-disclosure\.ru\//,
-        /^https:\/\/(www\.)?cbr\.ru\/dataservice\//
+        /^https:\/\/(www\.)?cbr\.ru\/dataservice\//,
+        /^https:\/\/(www\.)?cbr\.ru\/Content\/Document\/File\//
     ];
     const isAllowed = (url) => ALLOWED.some((re) => re.test(url));
 
@@ -124,7 +125,7 @@ exports.handler = async (event) => {
             target = 'https://bo.nalog.gov.ru' + suffix;
         } else if (event.path.startsWith('/buh_otchet') || event.path.startsWith('/search') || event.path.startsWith('/contragent')) {
             target = 'https://www.audit-it.ru' + suffix;
-        } else if (event.path.startsWith('/dataservice')) {
+        } else if (event.path.startsWith('/dataservice') || event.path.startsWith('/Content/Document/File/')) {
             target = 'https://www.cbr.ru' + suffix;
         } else if (/^\/\d{10}(\d{2})?\.html$/.test(event.path)) {
             target = 'https://buxbalans.ru' + suffix;
@@ -143,7 +144,7 @@ exports.handler = async (event) => {
                 'Cache-Control': 'no-store',
                 'Content-Type': 'text/plain; charset=utf-8'
             },
-            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice. Pass URL via ?u=https://…'
+            body: 'Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice, cbr.ru/Content/Document/File. Pass URL via ?u=https://…'
         };
     }
 

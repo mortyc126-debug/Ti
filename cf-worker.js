@@ -38,7 +38,10 @@ export default {
       /^https:\/\/bo\.nalog\.gov\.ru\//,
       /^https:\/\/(www\.)?audit-it\.ru\//,
       /^https:\/\/(www\.)?buxbalans\.ru\//,
-      /^https:\/\/(www\.)?cbr\.ru\/dataservice\//
+      /^https:\/\/(www\.)?cbr\.ru\/dataservice\//,
+      // Прямые ссылки на XLSX/PDF документы ЦБ (статистика инфляции,
+      // KeyRate и т.д.) — статические файлы под /Content/Document/File/<id>/
+      /^https:\/\/(www\.)?cbr\.ru\/Content\/Document\/File\//
     ];
     const isAllowed = (u) => ALLOWED.some((re) => re.test(u));
 
@@ -48,7 +51,7 @@ export default {
         target = 'https://bo.nalog.gov.ru' + url.pathname + url.search;
       } else if (url.pathname.startsWith('/buh_otchet') || url.pathname.startsWith('/search') || url.pathname.startsWith('/contragent')) {
         target = 'https://www.audit-it.ru' + url.pathname + url.search;
-      } else if (url.pathname.startsWith('/dataservice')) {
+      } else if (url.pathname.startsWith('/dataservice') || url.pathname.startsWith('/Content/Document/File/')) {
         target = 'https://www.cbr.ru' + url.pathname + url.search;
       } else if (/^\/\d{10}(\d{2})?\.html$/.test(url.pathname)) {
         target = 'https://buxbalans.ru' + url.pathname + url.search;
@@ -56,7 +59,7 @@ export default {
     }
 
     if (!target || !isAllowed(target)) {
-      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice. Pass URL via ?u=https://…', {
+      return new Response('Allowed: bo.nalog.gov.ru, audit-it.ru, buxbalans.ru, cbr.ru/dataservice, cbr.ru/Content/Document/File. Pass URL via ?u=https://…', {
         status: 400,
         headers: {'Access-Control-Allow-Origin': '*'}
       });

@@ -1351,10 +1351,11 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="background:var(--bg2);border-left:2px solid var(--acc);padding:8px 12px;margin-bottom:10px;border-radius:4px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-size:.68rem"><b>🇷🇺 Данные с cbr.ru</b></span>
+        <button class="btn btn-p btn-sm" id="rate-cbr-auto-btn" onclick="rateAutoImportCbr()" title="Автоматически скачать актуальные XLSX (est_infl, indicators_cpd, reg_cpd) с cbr.ru/statistics/ddkp/aipd через прокси и заполнить форму. Ничего не нужно качать вручную.">🔄 Авто-обновить с cbr.ru</button>
         <input type="file" id="rate-cbr-file" accept=".xlsx" multiple style="display:none" onchange="rateImportCbrXlsx(this)">
-        <button class="btn btn-sm" onclick="document.getElementById('rate-cbr-file').click()" title="Импорт файлов с cbr.ru/hd_base/infl/ (trend/core inflation, SA-динамика, региональный разрез). Автораспознавание по заголовку.">📥 Импорт XLSX</button>
-        <button class="btn btn-sm" onclick="rateApiOpenModal()" title="Прямой доступ к REST API ЦБ (www.cbr.ru/dataservice). Требует CF Worker для CORS. Позволяет исследовать все публикации, привязывать ряды к полям формы и обновлять их одной кнопкой.">🔍 API ЦБ</button>
-        <button class="btn btn-sm" onclick="rateApiRefreshAll()" id="rate-api-refresh-btn" style="display:none" title="Обновить все привязанные ряды через API (по сохранённому маппингу).">🔄 Обновить через API</button>
+        <button class="btn btn-sm" onclick="document.getElementById('rate-cbr-file').click()" title="Ручной импорт XLSX-файлов (если уже скачаны или прокси не работает). Автораспознавание по заголовку.">📥 Ручной XLSX</button>
+        <button class="btn btn-sm" onclick="rateApiOpenModal()" title="Обозреватель REST API ЦБ (www.cbr.ru/dataservice) — для других показателей (курс, денежная масса, мониторинг предприятий). Инфляция и КС в этом API отсутствуют — для них используйте «Авто-обновить» выше.">🔍 API ЦБ</button>
+        <button class="btn btn-sm" onclick="rateApiRefreshAll()" id="rate-api-refresh-btn" style="display:none" title="Обновить все привязанные через Explorer ряды.">🔄 Обновить API-ряды</button>
         <span class="muted" id="rate-cbr-stamp" style="font-size:.58rem"></span>
       </div>
       <div class="muted" style="font-size:.58rem;margin-top:4px">

@@ -19918,6 +19918,75 @@ async function rateApiRefreshAll(){
   alert(msg);
 }
 
+// ─── Автоматическое скачивание XLSX-инфляции с cbr.ru ──────────────────
+// Прямые URL трёх файлов на странице cbr.ru/statistics/ddkp/aipd/
+// (Аналитические показатели ценовой динамики). ID хэшей в /File/ ЦБ
+// меняет очень редко (раз в 1-2 года при пересмотре методологии).
+// Если URL «протухнет» — fetch вернёт 404, тогда нужно посмотреть
+// актуальные ссылки на странице AIPD и обновить здесь.
+const _RATE_CBR_AUTO_FILES = [
+  { url: 'https://www.cbr.ru/Content/Document/File/108633/est_infl.xlsx',       name: 'est_infl.xlsx' },
+  { url: 'https://www.cbr.ru/Content/Document/File/108632/indicators_cpd.xlsx', name: 'indicators_cpd.xlsx' },
+  { url: 'https://www.cbr.ru/Content/Document/File/175223/reg_cpd.xlsx',        name: 'reg_cpd.xlsx' }
+];
+
+// Скачивает три XLSX через прокси и прогоняет через тот же парсер
+// что и ручной импорт. Заполняет форму. Не требует кликов кроме одного.
+async function rateAutoImportCbr(){
+  const proxy = _rateApiProxyUrl();
+  if(!proxy){
+    alert('Не настроен прокси. Откройте «🔍 API ЦБ» и сохраните URL Cloudflare/Yandex Worker.');
+    return;
+  }
+  const btn = document.getElementById('rate-cbr-auto-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Скачиваем…'; }
+  if(typeof _ensureXlsx !== 'function'){
+    alert('Библиотека XLSX недоступна');
+    if(btn){ btn.disabled = false; btn.textContent = '🔄 Авто-обновить с cbr.ru'; }
+    return;
+  }
+  await _ensureXlsx();
+  const errors = [];
+  let ok = 0;
+  const store = _rateReadCbrStore();
+  for(const item of _RATE_CBR_AUTO_FILES){
+    try {
+      // Собираем proxied-URL: либо ?u=<encoded>, либо path-prefix.
+      let proxiedUrl;
+      if(/[?&]u=$/.test(proxy)){
+        proxiedUrl = proxy + encodeURIComponent(item.url);
+      } else {
+        const base = proxy.replace(/\/+$/, '');
+        const path = item.url.replace(/^https?:\/\/(www\.)?cbr\.ru/, '');
+        proxiedUrl = base + path;
+      }
+      const r = await fetch(proxiedUrl);
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const buf = await r.arrayBuffer();
+      // Имитируем интерфейс File (только нужное поле — arrayBuffer + name)
+      const fakeFile = { name: item.name, arrayBuffer: async () => buf };
+      const parsed = await _rateParseCbrXlsx(fakeFile);
+      store[parsed.type] = {
+        updatedAt: Date.now(),
+        fileName: parsed.fileName,
+        series: parsed.series,
+        latest: parsed.latest,
+        latestDate: parsed.latestDate
+      };
+      ok++;
+    } catch(e){
+      errors.push(item.name + ': ' + (e.message || String(e)));
+    }
+  }
+  try { localStorage.setItem('bondan_ratecb_cbrdata', JSON.stringify(store)); } catch(e){}
+  _rateRenderCbrSummary();
+  if(ok) _rateAutofillFromCbr(true);
+  if(btn){ btn.disabled = false; btn.textContent = '🔄 Авто-обновить с cbr.ru'; }
+  if(errors.length){
+    alert('Скачано: ' + ok + ' из ' + _RATE_CBR_AUTO_FILES.length + '\n\nОшибки:\n' + errors.join('\n'));
+  }
+}
+
 // Записать последние значения API-рядов в поля формы.
 function _rateApiAutofillFromApi(){
   const store = _rateReadCbrStore();
