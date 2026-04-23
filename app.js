@@ -22813,10 +22813,13 @@ const _mat = {
 // На вход: массив дескрипторов {bucket, key, mult?, label?}, где bucket —
 // est_infl/indicators_cpd/reg_cpd/api, key — имя ряда внутри bucket.
 // Возврат: { dates: ['YYYY-MM-01',...], cols: {label1: [v1,v2,...], ...} }
-// синхронизировано по общему диапазону дат (inner join).
+// синхронизировано по общему диапазону дат (inner join на уровне YYYY-MM).
+// Почему YYYY-MM: ЦБ XLSX отдают даты как «2026-02-28» (последний день),
+// FRED — «2026-02-01» (первый), MOEX — по разному. Нормализуем до уровня
+// месяца, чтобы inner-join находил пересечения.
 function _rateBuildSeriesMatrix(descriptors){
   const store = _rateReadCbrStore();
-  const maps = [];       // [{label, map: Map<date, value>}]
+  const maps = [];       // [{label, map: Map<'YYYY-MM', value>}]
   for(const d of descriptors){
     const bucket = store[d.bucket];
     if(!bucket || !bucket.series) continue;
@@ -22824,22 +22827,28 @@ function _rateBuildSeriesMatrix(descriptors){
     if(!Array.isArray(arr) || !arr.length) continue;
     const mult = (d.mult != null ? d.mult : 1);
     const m = new Map();
-    for(const p of arr) m.set(p.date, p.value * mult);
+    for(const p of arr){
+      const ym = String(p.date || '').slice(0, 7);   // YYYY-MM
+      if(ym.length !== 7) continue;
+      m.set(ym, p.value * mult);
+    }
     maps.push({ label: d.label || d.key, map: m });
   }
   if(!maps.length) return { dates: [], cols: {} };
-  // Общий набор дат — пересечение
-  let commonDates = Array.from(maps[0].map.keys());
+  // Общий набор месяцев — пересечение
+  let commonYM = Array.from(maps[0].map.keys());
   for(let i = 1; i < maps.length; i++){
     const keys = maps[i].map;
-    commonDates = commonDates.filter(d => keys.has(d));
+    commonYM = commonYM.filter(ym => keys.has(ym));
   }
-  commonDates.sort();
+  commonYM.sort();
   const cols = {};
   for(const m of maps){
-    cols[m.label] = commonDates.map(d => m.map.get(d));
+    cols[m.label] = commonYM.map(ym => m.map.get(ym));
   }
-  return { dates: commonDates, cols };
+  // dates представляем как YYYY-MM-01 — стабильно, читаемо.
+  const dates = commonYM.map(ym => ym + '-01');
+  return { dates, cols };
 }
 
 // ═══ BVAR: Bayesian VAR малой размерности ════════════════════════════════
@@ -23497,7 +23506,21 @@ function linksInit(){
       _linksState.selected = new Set(Array.isArray(arr) ? arr : []);
     }
   } catch(_){}
-  list.innerHTML = cat.map(it => {
+  // Группировка по bucket для удобной навигации (у пользовательницы
+  // много блоков и все похожи — ошибались при выборе).
+  const BUCKET_LABELS = {
+    est_infl:       '📏 ЦБ · трендовая / базовая инфляция',
+    indicators_cpd: '📊 ЦБ · SA-динамика (с 2002)',
+    reg_cpd:        '🇷🇺 Росстат · CPI по России',
+    api:            '🔌 API cbr.ru/dataservice (привязки)',
+    world:          '🌍 Мировые (FRED / Yahoo / Stooq)'
+  };
+  const groups = {};
+  for(const it of cat){
+    (groups[it.bucket] = groups[it.bucket] || []).push(it);
+  }
+  const order = ['reg_cpd', 'est_infl', 'indicators_cpd', 'api', 'world'];
+  const renderItem = it => {
     const checked = _linksState.selected.has(it.key) ? 'checked' : '';
     const descrAttr = (it.descr || '').replace(/"/g, '&quot;');
     return '<label title="' + descrAttr + '" style="display:flex;gap:6px;align-items:flex-start;padding:6px 8px;border:1px solid var(--border);border-radius:4px;cursor:pointer">' +
@@ -23505,10 +23528,20 @@ function linksInit(){
       '<div style="flex:1;min-width:0">' +
         '<div style="font-weight:500;color:var(--text)">' + it.label + '<span style="color:var(--text3);font-size:.52rem;margin-left:4px">ⓘ</span></div>' +
         '<div style="font-size:.56rem;color:var(--text2);line-height:1.4;margin-top:2px">' + (it.descr || '').split('. ')[0] + '.</div>' +
-        '<div class="muted" style="font-size:.52rem;margin-top:2px">' + it.bucket + ' · ' + it.count + ' точек · ' + it.firstDate + '…' + it.lastDate + '</div>' +
+        '<div class="muted" style="font-size:.52rem;margin-top:2px">' + it.count + ' точек · ' + it.firstDate.slice(0,7) + '…' + it.lastDate.slice(0,7) + '</div>' +
       '</div>' +
     '</label>';
-  }).join('');
+  };
+  const html = order
+    .filter(b => groups[b] && groups[b].length)
+    .map(b => {
+      const items = groups[b];
+      return '<div style="grid-column:1/-1;font-size:.62rem;color:var(--text2);padding:8px 4px 4px;font-weight:600;border-bottom:1px solid var(--border);margin-top:4px">' +
+          (BUCKET_LABELS[b] || b) + ' <span class="muted" style="font-weight:400">· ' + items.length + '</span>' +
+        '</div>' +
+        items.map(renderItem).join('');
+    }).join('');
+  list.innerHTML = html || '<div class="muted" style="grid-column:1/-1;padding:8px">Нет рядов</div>';
 }
 
 function _linksToggle(cb){
