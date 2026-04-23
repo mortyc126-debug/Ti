@@ -23548,22 +23548,31 @@ function _linksToggle(cb){
   if(cb.checked) _linksState.selected.add(cb.dataset.k);
   else _linksState.selected.delete(cb.dataset.k);
   try { localStorage.setItem('bondan_links_selected', JSON.stringify([..._linksState.selected])); } catch(_){}
+  // Авто-пересборка графика/матрицы — чтобы пользователь не жал
+  // «Построить» после каждой галочки. Короткий debounce 100мс —
+  // чтобы успел срабатывать только последний клик в серии.
+  clearTimeout(_linksState._autoT);
+  _linksState._autoT = setTimeout(() => linksBuild(), 120);
 }
 
 function linksClearSelection(){
   _linksState.selected.clear();
   try { localStorage.removeItem('bondan_links_selected'); } catch(_){}
   document.querySelectorAll('#links-series-list input[type=checkbox]').forEach(c => c.checked = false);
+  // И очистить последствия
+  document.getElementById('links-chart').innerHTML = '';
+  document.getElementById('links-corr-matrix').innerHTML = '';
+  document.getElementById('links-pair-card').hidden = true;
+  document.getElementById('links-status').textContent = '';
 }
 
 function linksBuild(){
-  // Читаем выбор прямо из DOM — это источник истины. Set может
-  // рассинхронизироваться с чекбоксами если кликают быстро, поэтому
-  // пересобираем Set каждый раз на момент клика «Построить».
+  // Читаем выбор прямо из DOM — это источник истины.
   const checked = [...document.querySelectorAll('#links-series-list input[type=checkbox]:checked')];
   const sel = checked.map(cb => cb.dataset.k);
   _linksState.selected = new Set(sel);
   try { localStorage.setItem('bondan_links_selected', JSON.stringify(sel)); } catch(_){}
+  console.log('[links] selected', sel.length, sel);
   const status = document.getElementById('links-status');
   if(sel.length < 2){
     status.textContent = '⚠ Выберите минимум 2 ряда';
@@ -23578,8 +23587,18 @@ function linksBuild(){
     status.textContent = '⚠ Ряды не найдены в store';
     return;
   }
-  // Inner-join по датам
-  const descs = chosen.map(c => ({ bucket: c.bucket, key: c.row, label: c.label, mult: c.mult }));
+  // Inner-join по датам. Гарантируем уникальность label — если кто-то
+  // из-за подписей совпал, добавляем суффикс, иначе _rateBuildSeriesMatrix
+  // перетирает в cols одним и тем же ключом.
+  const seenLabels = new Set();
+  const descs = chosen.map(c => {
+    let lbl = c.label;
+    if(seenLabels.has(lbl)){
+      lbl = lbl + ' [' + c.bucket + ':' + c.row + ']';
+    }
+    seenLabels.add(lbl);
+    return { bucket: c.bucket, key: c.row, label: lbl, mult: c.mult };
+  });
   const merged = _rateBuildSeriesMatrix(descs);
   if(!merged.dates.length){
     status.textContent = '⚠ Нет общих дат';
@@ -23596,7 +23615,13 @@ function linksBuild(){
     for(const k in merged.cols) cols[k] = merged.cols[k].slice(start);
   }
   _linksState.series = { dates, cols, meta: chosen };
-  status.textContent = '✓ ' + dates.length + ' точек · ' + chosen.length + ' рядов · ' + dates[0] + '…' + dates[dates.length-1];
+  const nLabels = Object.keys(cols).length;
+  console.log('[links] built: ' + nLabels + ' labels, ' + dates.length + ' dates. Labels:', Object.keys(cols));
+  let warn = '';
+  if(nLabels < chosen.length){
+    warn = ' ⚠ схлопнуто до ' + nLabels + ' (дубли label)';
+  }
+  status.textContent = '✓ ' + dates.length + ' точек · ' + nLabels + ' рядов · ' + dates[0] + '…' + dates[dates.length-1] + warn;
   _linksRenderChart();
   _linksRenderCorrMatrix();
   document.getElementById('links-pair-card').hidden = true;
