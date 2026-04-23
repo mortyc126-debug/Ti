@@ -24557,6 +24557,7 @@ async function portPayInit(opts){
   if(meta) meta.textContent = 'Кэш: bondization, TTL 7 дней. «🔄 Обновить» — заново.';
   _ppRenderSummary();
   _ppRenderChart();
+  _ppRenderConcentration();
   _ppRenderList();
   // Бэйдж в сайдбаре — общая сумма
   const tot = all.reduce((s, e) => s + e.rub, 0);
@@ -24753,6 +24754,76 @@ function _ppFindIssuerIdByName(name){
     if(n.includes(lc) || lc.includes(n)) return id;
   }
   return null;
+}
+
+// Концентрация портфеля по эмитентам и отраслям. Долю считаем
+// по рыночной стоимости позиции (qty × cur), fallback — qty × buy
+// или qty × nom (номинал = 1000 для большинства).
+function _ppRenderConcentration(){
+  const boxIss = document.getElementById('portpay-conc-issuers');
+  const boxInd = document.getElementById('portpay-conc-industries');
+  if(!boxIss || !boxInd) return;
+  if(!_ppState || !_ppState.positions || !_ppState.positions.length){
+    boxIss.innerHTML = boxInd.innerHTML = '<div class="muted" style="font-size:.6rem">Нет позиций</div>';
+    return;
+  }
+  // Стоимость позиции
+  const valueOf = p => {
+    const qty = parseFloat(p.qty) || 0;
+    const cur = parseFloat(p.cur) || parseFloat(p.buy) || parseFloat(p.nom) || 1000;
+    return qty * cur;
+  };
+  // Группа по эмитентам
+  const issuerMap = new Map();
+  for(const p of _ppState.positions){
+    const v = valueOf(p);
+    if(v <= 0) continue;
+    const key = p.name || '?';
+    issuerMap.set(key, (issuerMap.get(key) || 0) + v);
+  }
+  // Группа по отраслям (через reportsDB.iss.ind)
+  const indMap = new Map();
+  for(const p of _ppState.positions){
+    const v = valueOf(p);
+    if(v <= 0) continue;
+    const issId = _ppFindIssuerIdByName(p.name);
+    const ind = (issId && reportsDB[issId] && reportsDB[issId].ind) || '— нет в reportsDB';
+    indMap.set(ind, (indMap.get(ind) || 0) + v);
+  }
+  boxIss.innerHTML = _ppRenderConcBars(issuerMap, /*topN=*/8);
+  boxInd.innerHTML = _ppRenderConcBars(indMap, /*topN=*/8);
+}
+
+function _ppRenderConcBars(map, topN){
+  const total = [...map.values()].reduce((s, v) => s + v, 0);
+  if(total <= 0) return '<div class="muted" style="font-size:.6rem">Нет данных</div>';
+  const arr = [...map.entries()].map(([k, v]) => ({ k, v, pct: v/total*100 }));
+  arr.sort((a, b) => b.v - a.v);
+  let display = arr;
+  if(arr.length > topN){
+    const top = arr.slice(0, topN);
+    const rest = arr.slice(topN);
+    const restSum = rest.reduce((s, x) => s + x.v, 0);
+    display = top.concat([{ k: 'Прочие (' + rest.length + ')', v: restSum, pct: restSum/total*100 }]);
+  }
+  // Палитра — 9 цветов
+  const palette = ['#6ec4d9','#f29a8a','#f2c94c','#a58cd9','#6cba7c','#e07a6a','#4ea0b8','#d9a06e','#9aa0a6'];
+  const fmt = v => v >= 1e6 ? (v/1e6).toFixed(2) + ' млн' : Math.round(v/1e3) + ' тыс';
+  // Один stacked-bar сверху
+  let stackedBar = '<div style="display:flex;height:14px;border-radius:4px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px">';
+  display.forEach((d, i) => {
+    const color = palette[i % palette.length];
+    stackedBar += '<div style="width:' + d.pct.toFixed(2) + '%;background:' + color + '" title="' + d.k + ': ' + d.pct.toFixed(1) + '%"></div>';
+  });
+  stackedBar += '</div>';
+  // Список
+  const rows = display.map((d, i) => {
+    const color = palette[i % palette.length];
+    return '<tr><td style="padding:3px 6px"><span style="display:inline-block;width:9px;height:9px;background:' + color + ';border-radius:1px;margin-right:5px"></span>' + d.k + '</td>' +
+      '<td style="padding:3px 6px;text-align:right;font-family:var(--mono)">' + fmt(d.v) + ' ₽</td>' +
+      '<td style="padding:3px 6px;text-align:right;font-family:var(--mono);color:var(--text2)">' + d.pct.toFixed(1) + '%</td></tr>';
+  }).join('');
+  return stackedBar + '<table style="width:100%;font-size:.6rem;border-collapse:collapse"><tbody>' + rows + '</tbody></table>';
 }
 
 // Открывает страницу «📂 Отчётность» с выбранным эмитентом.

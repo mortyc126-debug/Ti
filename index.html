@@ -705,6 +705,22 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="portpay-chart" style="margin-top:8px;min-height:240px"></div>
   </div>
 
+  <!-- Концентрация: эмитенты + отрасли -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr">🥧 Концентрация портфеля</div>
+    <div class="muted" style="font-size:.6rem;margin-bottom:8px">Доли по рыночной стоимости позиций (qty × текущая цена). Помогает увидеть, насколько портфель сконцентрирован на одном эмитенте/отрасли.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px">
+      <div>
+        <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px"><b>По эмитентам</b></div>
+        <div id="portpay-conc-issuers"></div>
+      </div>
+      <div>
+        <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px"><b>По отраслям</b> <span class="muted" style="font-size:.55rem">(берётся из reportsDB · iss.ind)</span></div>
+        <div id="portpay-conc-industries"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Список ближайших -->
   <div class="card" style="margin-top:12px">
     <div class="card-hdr">📋 Ближайшие выплаты</div>
