@@ -19957,19 +19957,39 @@ async function rateAutoImportCbr(){
     return base + path;
   };
 
-  // Фаза 1 — fetch параллельно, собираем буферы.
-  _rateSetAutoStamp('⏳ Скачиваем 3 файла…');
-  const fetchResults = await Promise.all(_RATE_CBR_AUTO_FILES.map(async (item) => {
+  // Per-файл прогресс. Состояние трёх файлов рендерим в строку статуса
+  // после каждого изменения — пользователь видит, кто скачался, а кто нет.
+  const N = _RATE_CBR_AUTO_FILES.length;
+  const fileState = _RATE_CBR_AUTO_FILES.map(it => ({ name: it.name, phase: '⏳' }));
+  const renderProgress = () => {
+    _rateSetAutoStamp(fileState.map(s => s.phase + ' ' + s.name.replace('.xlsx','')).join(' · '));
+  };
+  renderProgress();
+
+  // Фаза 1 — параллельный fetch с allSettled (не ломается от одного fail)
+  // и таймаутом 60 сек на каждый запрос (AbortController).
+  const fetchOne = async (item, idx) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60000);
     try {
-      const r = await fetch(buildProxiedUrl(item.url), { cache: 'no-store' });
+      const r = await fetch(buildProxiedUrl(item.url), { cache: 'no-store', signal: ctrl.signal });
       if(!r.ok) throw new Error('HTTP ' + r.status);
       const buf = await r.arrayBuffer();
-      if(buf.byteLength < 100) throw new Error('пустой ответ (' + buf.byteLength + ' байт) — задеплоен ли ALLOWED для cbr.ru/Content?');
+      if(buf.byteLength < 100) throw new Error('пустой ответ (' + buf.byteLength + ' байт)');
+      fileState[idx].phase = '⬇';
+      renderProgress();
       return { item, buf, error: null };
     } catch(e){
-      return { item, buf: null, error: e.message || String(e) };
+      const msg = e.name === 'AbortError' ? 'таймаут 60с' : (e.message || String(e));
+      fileState[idx].phase = '✗';
+      renderProgress();
+      return { item, buf: null, error: msg };
+    } finally {
+      clearTimeout(timer);
     }
-  }));
+  };
+  const fetchSettled = await Promise.allSettled(_RATE_CBR_AUTO_FILES.map((it, i) => fetchOne(it, i)));
+  const fetchResults = fetchSettled.map(s => s.status === 'fulfilled' ? s.value : { item: { name: '?' }, buf: null, error: s.reason });
 
   // Фаза 2 — парсинг последовательно с yield для UI-потока.
   const errors = [];
@@ -19977,11 +19997,14 @@ async function rateAutoImportCbr(){
   const store = _rateReadCbrStore();
   for(let i = 0; i < fetchResults.length; i++){
     const { item, buf, error } = fetchResults[i];
-    _rateSetAutoStamp('⏳ Обрабатываем ' + (i + 1) + '/' + fetchResults.length + ' · ' + item.name);
-    // Yield главному потоку — чтобы DOM успел перерисоваться и Edge не
-    // посчитал, что страница зависла.
-    await new Promise(r => setTimeout(r, 0));
-    if(error){ errors.push(item.name + ': ' + error); continue; }
+    if(error){
+      errors.push(item.name + ': ' + error);
+      continue;
+    }
+    fileState[i].phase = '⚙';
+    renderProgress();
+    // Двойной yield + микропауза — даём Edge точно перерисовать UI.
+    await new Promise(r => setTimeout(r, 30));
     try {
       const fakeFile = { name: item.name, arrayBuffer: async () => buf };
       const parsed = await _rateParseCbrXlsx(fakeFile);
@@ -19993,9 +20016,13 @@ async function rateAutoImportCbr(){
         latestDate: parsed.latestDate
       };
       ok++;
+      fileState[i].phase = '✓';
     } catch(e){
+      fileState[i].phase = '✗';
       errors.push(item.name + ': парсинг — ' + (e.message || String(e)));
     }
+    renderProgress();
+    await new Promise(r => setTimeout(r, 30));
   }
 
   // Фаза 3 — сохранение, рендер, автофил. Без блокирующих alert.
@@ -20004,10 +20031,10 @@ async function rateAutoImportCbr(){
   if(ok) _rateAutofillFromCbr(true);
   if(btn){ btn.disabled = false; btn.textContent = '🔄 Авто-обновить с cbr.ru'; }
   if(errors.length){
-    _rateSetAutoStamp('⚠ ' + ok + '/' + _RATE_CBR_AUTO_FILES.length + ' · ' + errors[0]);
+    _rateSetAutoStamp('⚠ ' + ok + '/' + N + ' · ' + errors[0] + (errors.length > 1 ? ' (+' + (errors.length-1) + ' в Console)' : ''));
     console.warn('[ratecb] Ошибки импорта:', errors);
   } else {
-    _rateSetAutoStamp('✓ Обновлено ' + ok + '/' + _RATE_CBR_AUTO_FILES.length + ' · ' + new Date().toLocaleTimeString('ru-RU'));
+    _rateSetAutoStamp('✓ Обновлено ' + ok + '/' + N + ' · ' + new Date().toLocaleTimeString('ru-RU'));
   }
 }
 
