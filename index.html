@@ -351,6 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn" onclick="showPage('ratecb')" title="Прогноз ключевой ставки ЦБ РФ — QPM, HLW, ансамбль. Выбранный прогноз применяется в YTM и расчётах денежного потока.">🏦 Ставка</button>
     <button class="nav-btn nav-sep" onclick="showPage('industries')">🏭 Отрасли</button>
     <button class="nav-btn" onclick="showPage('cross')">📊 Сравнение</button>
+    <button class="nav-btn" onclick="showPage('links')" title="Связи и корреляции: наложение временных рядов (CPI, SA, трендовая, курс, ставка), Pearson/Spearman, lead-lag анализ. Источник — данные ЦБ из bondan_ratecb_cbrdata. Позже добавим FRED/Yahoo для мировых.">🔗 Связи</button>
     <button class="nav-btn nav-sep" onclick="showPage('shares')">📈 Акции</button>
     <button class="nav-btn" onclick="showPage('futures')">📉 Фьючерсы</button>
     <button class="nav-btn" onclick="showPage('archive')">🪦 Архив</button>
@@ -374,6 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-item" onclick="showPage('reports');sbAct(this)"><span class="sb-icon">📂</span>База отчётности<span class="sb-badge" id="sb-rep">0</span></div>
     <div class="sb-item" onclick="showPage('industries');sbAct(this)"><span class="sb-icon">🏭</span>Отрасли / медианы<span class="sb-badge" id="sb-ind">0</span></div>
     <div class="sb-item" onclick="showPage('cross');sbAct(this)"><span class="sb-icon">📊</span>Сравнение компаний</div>
+    <div class="sb-item" onclick="showPage('links');sbAct(this)" title="Связи и корреляции между макрорядами — визуализация зависимостей, lead-lag анализ, rolling correlation."><span class="sb-icon">🔗</span>Связи / корреляции</div>
     <div class="sb-item" onclick="showPage('moex');sbAct(this)" title="Каталог всех торгуемых на Мосбирже облигаций — ОФЗ, корпораты, субфеды, ВДО. Фильтры, которых нет в самой MOEX."><span class="sb-icon">🏛</span>Каталог облигаций<span class="sb-badge" id="sb-moex">0</span></div>
     <div class="sb-item" onclick="showPage('shares');sbAct(this)" title="Каталог акций MOEX. Режим TQBR. P/E, P/B, Кап-ция считаются на лету из reportsDB, плюс все те же фундаментал-фильтры что и у облигаций."><span class="sb-icon">📈</span>Каталог акций<span class="sb-badge" id="sb-shares">0</span></div>
     <div class="sb-item" onclick="showPage('futures');sbAct(this)" title="Фьючерсы FORTS на акции. Каждый фьюч привязан к базовой акции (SBRF→SBER, GAZR→GAZP…), через неё — к эмитенту в reportsDB: мультипликаторы и фундаментал. Мосбиржа ограничивает торги фьючерсами на санкционных бумагах, но все котируемые (Si, BR, индексы и акции) собираем."><span class="sb-icon">📉</span>Фьючерсы на акции<span class="sb-badge" id="sb-futures">0</span></div>
@@ -2183,6 +2185,53 @@ document.addEventListener('DOMContentLoaded', () => {
       <div id="cross-companies" style="flex:0 0 220px;min-width:200px;max-height:640px;overflow-y:auto;border:1px solid var(--border);background:var(--s1);font-size:.6rem"></div>
       <div id="cross-chart" style="flex:1;min-width:320px"></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ Страница «🔗 Связи / корреляции» ═══ -->
+<div class="page" id="page-links">
+  <div class="page-title">🔗 Связи между рядами</div>
+  <div class="page-sub">Multi-panel график · матрица корреляций · lead-lag · rolling 12м</div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:.68rem;color:var(--text2);line-height:1.55">
+    Что это: наложение временных рядов макро-индикаторов друг на друга. Можно увидеть как связаны разные показатели инфляции, как курс влияет на CPI с лагом, как трендовая инфляция «гонит» headline.
+    <br><br>
+    <span style="color:var(--text3)">Источник: <b>bondan_ratecb_cbrdata</b> (всё что импортировано с cbr.ru через «🏦 Ставка»). Чем больше рядов там — тем больше пар можно сопоставить. Мировые ряды (FRED, Yahoo) подключим отдельным коммитом через CF Worker.</span>
+  </div>
+
+  <!-- Блок выбора рядов -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr">📋 Доступные ряды</div>
+    <div class="muted" style="font-size:.62rem;margin-bottom:8px">Отметьте 2-6 рядов для сопоставления. Пересечение дат — автоматически (inner-join).</div>
+    <div id="links-series-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px;font-size:.64rem"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-p btn-sm" onclick="linksBuild()">▶ Построить</button>
+      <button class="btn btn-sm" onclick="linksClearSelection()">✕ Снять всё</button>
+      <span class="muted" id="links-status" style="font-size:.58rem;align-self:center;margin-left:8px"></span>
+    </div>
+  </div>
+
+  <!-- Multi-panel график -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr">📈 Наложенные графики</div>
+    <div id="links-chart" style="margin-top:8px;min-height:220px"></div>
+  </div>
+
+  <!-- Матрица корреляций -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🔢 Матрица корреляций</span>
+      <span class="muted" style="font-size:.58rem">Pearson (верх) / Spearman (низ)</span>
+    </div>
+    <div id="links-corr-matrix" style="margin-top:8px;overflow-x:auto"></div>
+  </div>
+
+  <!-- Rolling + lead-lag — появляется после выбора пары -->
+  <div class="card" style="margin-top:12px" id="links-pair-card" hidden>
+    <div class="card-hdr">🎯 Пара для углубления <span id="links-pair-label" class="muted" style="font-size:.62rem"></span></div>
+    <div class="muted" style="font-size:.62rem;margin-bottom:8px">Клик по ячейке матрицы выше → подробная разбивка: rolling corr скользящим окном 12м + lead-lag (CCF) ±12 мес.</div>
+    <div id="links-rolling" style="margin-top:8px;min-height:140px"></div>
+    <div id="links-ccf" style="margin-top:8px;min-height:140px"></div>
   </div>
 </div>
 

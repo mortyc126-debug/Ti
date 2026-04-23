@@ -111,7 +111,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','shares','futures','archive'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','links','shares','futures','archive'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -127,6 +127,7 @@ function showPage(n, opts){
   if(n==='reports') repInit();
   if(n==='industries') indRender();
   if(n==='cross') crossInit();
+  if(n==='links') linksInit();
   if(n==='moex') moexInit();
   if(n==='shares') sharesInit();
   if(n==='futures') futuresInit();
@@ -21522,7 +21523,7 @@ function archiveExportSurvivalCsv(){
   const run = () => {
     try {
       const saved = localStorage.getItem('ba_active_page');
-      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','moex','shares','futures','archive'];
+      const valid = ['ytm','issuer','reports','portfolio','pnl','watchlist','calendar','ratecb','industries','cross','links','moex','shares','futures','archive'];
       if(saved && valid.includes(saved) && document.getElementById('page-' + saved)){
         showPage(saved);
       }
@@ -23398,3 +23399,327 @@ const _stats = {
     return r;
   }
 };
+
+// ═══ LINKS: страница связей между рядами ════════════════════════════════
+// Visualizes overlaid time series + Pearson/Spearman matrix + rolling corr
+// + cross-correlation function (lead-lag) для выбранной пары.
+//
+// Источники: всё что импортировано в bondan_ratecb_cbrdata (est_infl,
+// indicators_cpd, reg_cpd, api/*). В будущем — мировые через CF Worker.
+
+let _linksState = { selected: new Set(), series: null, pairSel: null };
+
+// Собирает каталог всех доступных рядов из store. Возврат:
+// [{ key:'bucket:row', bucket, row, label, count, firstDate, lastDate, mult }]
+function _linksCatalog(){
+  const store = _rateReadCbrStore();
+  const items = [];
+  const pushIf = (bucket, row, series, label, mult) => {
+    if(!Array.isArray(series) || !series.length) return;
+    items.push({
+      key: bucket + ':' + row,
+      bucket, row, label,
+      count: series.length,
+      firstDate: series[0].date,
+      lastDate: series[series.length-1].date,
+      mult: mult || 1
+    });
+  };
+  if(store.est_infl && store.est_infl.series){
+    const s = store.est_infl.series;
+    if(s.trend5y) pushIf('est_infl','trend5y', s.trend5y, 'Трендовая 5Y, %YoY');
+    if(s.trend3y) pushIf('est_infl','trend3y', s.trend3y, 'Трендовая 3Y, %YoY');
+    if(s.mod_base_trim) pushIf('est_infl','mod_base_trim', s.mod_base_trim, 'Базовая (усеч.), ann.', 12);
+    if(s.mod_base_excl) pushIf('est_infl','mod_base_excl', s.mod_base_excl, 'Базовая (исключ.), ann.', 12);
+  }
+  if(store.indicators_cpd && store.indicators_cpd.series){
+    const s = store.indicators_cpd.series;
+    if(s.all_sa_mom) pushIf('indicators_cpd','all_sa_mom', s.all_sa_mom, 'SA ann. — все (ЦБ)', 12);
+    if(s.core_sa_mom) pushIf('indicators_cpd','core_sa_mom', s.core_sa_mom, 'SA ann. — core', 12);
+    if(s.base_cpi_sa_mom) pushIf('indicators_cpd','base_cpi_sa_mom', s.base_cpi_sa_mom, 'Базовый ИПЦ SA ann.', 12);
+  }
+  if(store.reg_cpd && store.reg_cpd.series){
+    const s = store.reg_cpd.series;
+    if(s.russia_yoy) pushIf('reg_cpd','russia_yoy', s.russia_yoy, 'CPI РФ, %YoY');
+    if(s.russia_mom) pushIf('reg_cpd','russia_mom', s.russia_mom, 'CPI РФ, %MoM');
+    if(s.russia_sa_mom) pushIf('reg_cpd','russia_sa_mom', s.russia_sa_mom, 'CPI РФ, SA MoM');
+  }
+  if(store.api){
+    for(const role in store.api){
+      const bucket = store.api[role];
+      if(bucket.series && bucket.series.length){
+        const label = (_RATE_API_ROLES[role] && _RATE_API_ROLES[role].label) || role.toUpperCase();
+        pushIf('api', role, bucket.series, 'API · ' + label, bucket.multiplier || 1);
+      }
+    }
+  }
+  return items;
+}
+
+function linksInit(){
+  const list = document.getElementById('links-series-list');
+  if(!list) return;
+  const cat = _linksCatalog();
+  if(!cat.length){
+    list.innerHTML = '<div class="muted" style="font-size:.62rem;padding:8px;grid-column:1/-1">Нет рядов в хранилище. Откройте «🏦 Ставка» → «🔄 Авто-обновить с cbr.ru» или импортируйте XLSX вручную. После этого вернитесь сюда.</div>';
+    return;
+  }
+  _linksState.catalog = cat;
+  // Сохраняем выбор между визитами
+  try {
+    const saved = localStorage.getItem('bondan_links_selected');
+    if(saved){
+      const arr = JSON.parse(saved);
+      _linksState.selected = new Set(Array.isArray(arr) ? arr : []);
+    }
+  } catch(_){}
+  // Если впервые открыли — отметим первые 3 как дефолт
+  if(!_linksState.selected.size && cat.length){
+    for(let i = 0; i < Math.min(3, cat.length); i++) _linksState.selected.add(cat[i].key);
+  }
+  list.innerHTML = cat.map(it => {
+    const checked = _linksState.selected.has(it.key) ? 'checked' : '';
+    return '<label style="display:flex;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer">' +
+      '<input type="checkbox" data-k="' + it.key + '" ' + checked + ' onchange="_linksToggle(this)">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:500;color:var(--text)">' + it.label + '</div>' +
+        '<div class="muted" style="font-size:.55rem">' + it.bucket + ' · ' + it.count + ' точек · ' + it.firstDate + '…' + it.lastDate + '</div>' +
+      '</div>' +
+    '</label>';
+  }).join('');
+}
+
+function _linksToggle(cb){
+  if(cb.checked) _linksState.selected.add(cb.dataset.k);
+  else _linksState.selected.delete(cb.dataset.k);
+  try { localStorage.setItem('bondan_links_selected', JSON.stringify([..._linksState.selected])); } catch(_){}
+}
+
+function linksClearSelection(){
+  _linksState.selected.clear();
+  try { localStorage.removeItem('bondan_links_selected'); } catch(_){}
+  document.querySelectorAll('#links-series-list input[type=checkbox]').forEach(c => c.checked = false);
+}
+
+function linksBuild(){
+  const sel = [..._linksState.selected];
+  const status = document.getElementById('links-status');
+  if(sel.length < 2){
+    status.textContent = '⚠ Выберите минимум 2 ряда';
+    return;
+  }
+  const cat = _linksState.catalog || _linksCatalog();
+  const chosen = sel.map(k => cat.find(c => c.key === k)).filter(Boolean);
+  if(chosen.length < 2){
+    status.textContent = '⚠ Ряды не найдены в store';
+    return;
+  }
+  // Inner-join по датам
+  const descs = chosen.map(c => ({ bucket: c.bucket, key: c.row, label: c.label, mult: c.mult }));
+  const merged = _rateBuildSeriesMatrix(descs);
+  if(!merged.dates.length){
+    status.textContent = '⚠ Нет общих дат';
+    return;
+  }
+  _linksState.series = { ...merged, meta: chosen };
+  status.textContent = '✓ ' + merged.dates.length + ' точек, ' + merged.dates[0] + '…' + merged.dates[merged.dates.length-1];
+  _linksRenderChart();
+  _linksRenderCorrMatrix();
+  document.getElementById('links-pair-card').hidden = true;
+}
+
+function _linksRenderChart(){
+  const box = document.getElementById('links-chart');
+  const s = _linksState.series;
+  if(!s){ box.innerHTML = ''; return; }
+  const labels = Object.keys(s.cols);
+  const T = s.dates.length;
+  const W = 900, H = 140, padT = 10, padB = 22, padL = 50, padR = 10;
+  const rowH = H;
+  // Общая X-шкала (линейная по индексу даты).
+  const xOf = i => padL + (i / Math.max(1, T - 1)) * (W - padL - padR);
+  const palette = ['#6ec4d9','#f29a8a','#f2c94c','#a58cd9','#8fcc7b','#e07a6a'];
+  const svgRows = labels.map((lbl, li) => {
+    const vals = s.cols[lbl];
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const span = (max - min) || 1;
+    const yOf = v => padT + (1 - (v - min) / span) * (rowH - padT - padB);
+    const pts = vals.map((v, i) => xOf(i) + ',' + yOf(v).toFixed(1)).join(' ');
+    const color = palette[li % palette.length];
+    // Ось Y минимальная — max/min слева
+    const yAxis = '<text x="' + (padL - 4) + '" y="' + (padT + 6) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + max.toFixed(2) + '</text>' +
+                  '<text x="' + (padL - 4) + '" y="' + (rowH - padB + 4) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + min.toFixed(2) + '</text>';
+    return '<svg width="' + W + '" height="' + rowH + '" style="display:block;margin-bottom:4px">' +
+      '<rect x="' + padL + '" y="' + padT + '" width="' + (W-padL-padR) + '" height="' + (rowH-padT-padB) + '" fill="none" stroke="var(--border)"/>' +
+      '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<text x="' + (padL + 4) + '" y="' + (padT + 10) + '" font-size="10" font-weight="600" fill="' + color + '">' + lbl + '</text>' +
+      yAxis +
+    '</svg>';
+  }).join('');
+  // Дата-шкала снизу
+  const nTicks = Math.min(8, T);
+  const dateLabels = [];
+  for(let t = 0; t < nTicks; t++){
+    const i = Math.round(t * (T - 1) / (nTicks - 1));
+    dateLabels.push('<text x="' + xOf(i) + '" y="12" text-anchor="middle" font-size="9" fill="var(--text3)">' + s.dates[i].slice(0, 7) + '</text>');
+  }
+  const dateAxis = '<svg width="' + W + '" height="16" style="display:block;margin-top:-4px">' + dateLabels.join('') + '</svg>';
+  box.innerHTML = svgRows + dateAxis;
+}
+
+// Pearson: cov(x,y)/(σx·σy)
+function _pearson(x, y){
+  const n = Math.min(x.length, y.length);
+  if(n < 3) return NaN;
+  let sx = 0, sy = 0;
+  for(let i = 0; i < n; i++){ sx += x[i]; sy += y[i]; }
+  const mx = sx / n, my = sy / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for(let i = 0; i < n; i++){
+    const dx = x[i] - mx, dy = y[i] - my;
+    sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+  }
+  const denom = Math.sqrt(sxx * syy);
+  return denom > 0 ? sxy / denom : NaN;
+}
+
+// Spearman: Pearson на рангах
+function _spearman(x, y){
+  const rank = (arr) => {
+    const idx = arr.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+    const r = new Array(arr.length);
+    for(let i = 0; i < idx.length; i++) r[idx[i][1]] = i + 1;
+    return r;
+  };
+  return _pearson(rank(x), rank(y));
+}
+
+function _linksRenderCorrMatrix(){
+  const box = document.getElementById('links-corr-matrix');
+  const s = _linksState.series;
+  if(!s){ box.innerHTML = ''; return; }
+  const labels = Object.keys(s.cols);
+  const N = labels.length;
+  const color = (c) => {
+    if(!isFinite(c)) return 'var(--text3)';
+    const a = Math.abs(c);
+    if(c > 0) return `rgba(110, 196, 217, ${0.25 + 0.55 * a})`;
+    return `rgba(242, 154, 138, ${0.25 + 0.55 * a})`;
+  };
+  let html = '<table style="border-collapse:collapse;font-size:.62rem"><thead><tr>';
+  html += '<th style="padding:4px 6px"></th>';
+  for(const l of labels) html += '<th style="padding:4px 6px;writing-mode:vertical-rl;transform:rotate(180deg);max-height:120px">' + l + '</th>';
+  html += '</tr></thead><tbody>';
+  for(let i = 0; i < N; i++){
+    html += '<tr><td style="padding:4px 6px;font-weight:600">' + labels[i] + '</td>';
+    for(let j = 0; j < N; j++){
+      const x = s.cols[labels[i]], y = s.cols[labels[j]];
+      // Верхний треугольник — Pearson, нижний — Spearman, диагональ — 1.00
+      const c = i === j ? 1 : (j > i ? _pearson(x, y) : _spearman(x, y));
+      const disp = isFinite(c) ? c.toFixed(2) : '—';
+      const bg = color(c);
+      html += '<td style="padding:4px 6px;text-align:center;background:' + bg + ';color:var(--text);cursor:' + (i!==j?'pointer':'default') + '" ' +
+              (i!==j ? 'onclick="_linksSelectPair(\'' + labels[i] + '\',\'' + labels[j] + '\')"' : '') + '>' + disp + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  html += '<div class="muted" style="font-size:.55rem;margin-top:4px">Голубое = положительная корреляция, розовое = отрицательная, насыщенность ∝ |r|. Клик по ячейке (вне диагонали) → разбор пары: rolling corr + lead-lag.</div>';
+  box.innerHTML = html;
+}
+
+function _linksSelectPair(a, b){
+  _linksState.pairSel = { a, b };
+  document.getElementById('links-pair-card').hidden = false;
+  document.getElementById('links-pair-label').textContent = '— ' + a + ' vs ' + b;
+  _linksRenderRolling();
+  _linksRenderCCF();
+}
+
+// Rolling correlation: для окна W=12 мес считаем Pearson в скользящем окне.
+function _linksRenderRolling(){
+  const box = document.getElementById('links-rolling');
+  const s = _linksState.series, p = _linksState.pairSel;
+  if(!s || !p){ box.innerHTML = ''; return; }
+  const x = s.cols[p.a], y = s.cols[p.b];
+  const n = x.length;
+  const W = 12;                                  // окно 12 наблюдений (≈ 1 год на месячных)
+  if(n < W + 3){ box.innerHTML = '<div class="muted" style="font-size:.62rem">Мало данных для rolling corr (нужно &gt; ' + (W + 3) + ').</div>'; return; }
+  const rolls = [];
+  for(let t = W; t <= n; t++){
+    const xw = x.slice(t - W, t), yw = y.slice(t - W, t);
+    rolls.push({ date: s.dates[t - 1], r: _pearson(xw, yw) });
+  }
+  const Wg = 900, Hg = 120, padT = 10, padB = 22, padL = 50, padR = 10;
+  const T = rolls.length;
+  const xOf = i => padL + (i / Math.max(1, T - 1)) * (Wg - padL - padR);
+  const yOf = v => padT + (1 - (v + 1) / 2) * (Hg - padT - padB);   // r ∈ [-1, 1]
+  const pts = rolls.map((r, i) => xOf(i) + ',' + yOf(isFinite(r.r) ? r.r : 0).toFixed(1)).join(' ');
+  let svg = '<svg width="' + Wg + '" height="' + Hg + '" style="display:block">';
+  svg += '<rect x="' + padL + '" y="' + padT + '" width="' + (Wg-padL-padR) + '" height="' + (Hg-padT-padB) + '" fill="none" stroke="var(--border)"/>';
+  // Линии y=0, y=±0.5
+  [-0.5, 0, 0.5].forEach(v => {
+    svg += '<line x1="' + padL + '" y1="' + yOf(v) + '" x2="' + (Wg-padR) + '" y2="' + yOf(v) + '" stroke="var(--border)" stroke-dasharray="2,2"/>';
+    svg += '<text x="' + (padL - 4) + '" y="' + (yOf(v) + 3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + v.toFixed(1) + '</text>';
+  });
+  svg += '<polyline points="' + pts + '" fill="none" stroke="#a58cd9" stroke-width="1.6"/>';
+  svg += '<text x="' + (padL + 4) + '" y="' + (padT + 10) + '" font-size="10" fill="#a58cd9" font-weight="600">Rolling Pearson (окно ' + W + ' мес)</text>';
+  svg += '<text x="' + padL + '" y="' + (Hg - 4) + '" font-size="9" fill="var(--text3)">' + rolls[0].date.slice(0,7) + '</text>';
+  svg += '<text x="' + (Wg - padR) + '" y="' + (Hg - 4) + '" text-anchor="end" font-size="9" fill="var(--text3)">' + rolls[rolls.length-1].date.slice(0,7) + '</text>';
+  svg += '</svg>';
+  box.innerHTML = svg;
+}
+
+// Cross-correlation function: Pearson(x_{t-k}, y_t) для k = -maxLag…+maxLag.
+// Положительный k — x ведёт (upstream driver), отрицательный — x отстаёт.
+function _linksRenderCCF(){
+  const box = document.getElementById('links-ccf');
+  const s = _linksState.series, p = _linksState.pairSel;
+  if(!s || !p){ box.innerHTML = ''; return; }
+  const x = s.cols[p.a], y = s.cols[p.b];
+  const n = x.length;
+  const maxLag = Math.min(12, Math.floor(n / 4));
+  const ccf = [];
+  for(let k = -maxLag; k <= maxLag; k++){
+    // x_{t-k} vs y_t. Если k > 0 — x сдвигаем назад (X лидирует)
+    let xs, ys;
+    if(k >= 0){ xs = x.slice(0, n - k); ys = y.slice(k); }
+    else { xs = x.slice(-k); ys = y.slice(0, n + k); }
+    ccf.push({ k, r: _pearson(xs, ys), n: xs.length });
+  }
+  const Wg = 900, Hg = 140, padT = 10, padB = 26, padL = 50, padR = 10;
+  const nBars = ccf.length;
+  const barW = (Wg - padL - padR) / nBars;
+  const barInner = Math.max(2, barW * 0.7);
+  const yOf = v => padT + (1 - (v + 1) / 2) * (Hg - padT - padB);
+  let svg = '<svg width="' + Wg + '" height="' + Hg + '" style="display:block">';
+  svg += '<line x1="' + padL + '" y1="' + yOf(0) + '" x2="' + (Wg-padR) + '" y2="' + yOf(0) + '" stroke="var(--border)"/>';
+  // Порог значимости ≈ 1.96/sqrt(N)
+  const thr = 1.96 / Math.sqrt(n);
+  [+thr, -thr].forEach(v => {
+    svg += '<line x1="' + padL + '" y1="' + yOf(v) + '" x2="' + (Wg-padR) + '" y2="' + yOf(v) + '" stroke="var(--text3)" stroke-dasharray="4,3" opacity=".5"/>';
+  });
+  // Бары
+  let maxAbs = 0, maxIdx = -1;
+  ccf.forEach((c, i) => {
+    if(isFinite(c.r) && Math.abs(c.r) > maxAbs){ maxAbs = Math.abs(c.r); maxIdx = i; }
+    const x0 = padL + i * barW + (barW - barInner) / 2;
+    const y0 = yOf(c.r >= 0 ? c.r : 0);
+    const h = Math.abs(yOf(0) - yOf(c.r));
+    const color = Math.abs(c.r) > thr ? (c.r > 0 ? '#6ec4d9' : '#f29a8a') : 'var(--text3)';
+    svg += '<rect x="' + x0 + '" y="' + y0 + '" width="' + barInner + '" height="' + h + '" fill="' + color + '"/>';
+    if(i % 2 === 0){
+      const cx = padL + i * barW + barW / 2;
+      svg += '<text x="' + cx + '" y="' + (Hg - padB + 12) + '" text-anchor="middle" font-size="9" fill="var(--text3)">' + c.k + '</text>';
+    }
+  });
+  // Аннотация пика
+  if(maxIdx >= 0){
+    const peak = ccf[maxIdx];
+    const who = peak.k > 0 ? (p.a + ' ведёт ' + p.b) : peak.k < 0 ? (p.b + ' ведёт ' + p.a) : 'синхронно';
+    svg += '<text x="' + (padL + 4) + '" y="' + (padT + 10) + '" font-size="10" font-weight="600" fill="var(--acc)">CCF (lead-lag): пик на k=' + peak.k + ' мес, r=' + peak.r.toFixed(2) + ' — ' + who + '</text>';
+  }
+  svg += '<text x="' + (Wg / 2) + '" y="' + (Hg - 3) + '" text-anchor="middle" font-size="9" fill="var(--text3)">сдвиг x относительно y (мес)</text>';
+  svg += '</svg>';
+  box.innerHTML = svg;
+}
