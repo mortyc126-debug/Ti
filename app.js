@@ -16658,7 +16658,13 @@ function moexApplyFilters(){
     couponMax: _num(document.getElementById('moex-f-coupon-max')?.value),
     baseRate: document.getElementById('moex-f-base')?.value || '',
     freq: document.getElementById('moex-f-freq')?.value || '',
-    offer: document.getElementById('moex-f-offer').value,
+    // 3 независимых чекбокса: без оферты / put / call. Если включён
+    // хоть один — проходят только бумаги, попадающие в отмеченные
+    // категории. Если все выключены — ничего не показываем (явное
+    // «ничего не хочу» == пустой результат).
+    offerNone: document.getElementById('moex-f-offer-none')?.checked !== false,
+    offerPut:  document.getElementById('moex-f-offer-put')?.checked  !== false,
+    offerCall: document.getElementById('moex-f-offer-call')?.checked !== false,
     amort: document.getElementById('moex-f-amort')?.value || '',
     sizeMin: _num(document.getElementById('moex-f-size-min').value),
     priceMin: _num(document.getElementById('moex-f-price-min')?.value),
@@ -16738,6 +16744,20 @@ function moexApplyFilters(){
   // опциона часто нет конкретной даты оферты в OFFERDATE, но по сути
   // это тоже оферта, только от эмитента.
   const hasOffer = b => !!b.offerDate || /оферт|\bcall\b|\bput\b/i.test(b.bondSubtype || '');
+  // Тип оферты: put (инвестор-инициатор) vs call (эмитент-инициатор).
+  // По умолчанию предполагаем put (чаще встречается), если BOND_SUBTYPE
+  // явно говорит «call» — то call. bondSubtype на русском может быть
+  // «До оферты (call)» / «До оферты (put)».
+  const offerKind = b => {
+    if(!hasOffer(b)) return 'none';
+    const s = (b.bondSubtype || '').toLowerCase();
+    if(/call|эмитент/.test(s)) return 'call';
+    if(/put|инвестор/.test(s)) return 'put';
+    // OFFERDATE без явного указания — чаще всего put (эмитент предлагает
+    // досрочный выкуп, держатель решает). Не идеально, но безопаснее
+    // чем угадывать call.
+    return b.offerDate ? 'put' : 'call';
+  };
   // Амортизация: BOND_TYPE типично «Амортизируемые облигации».
   const isAmort = b => /амортиз/i.test(b.bondType || '');
 
@@ -16792,8 +16812,17 @@ function moexApplyFilters(){
     }
     if(f.freq && b._freq !== f.freq) return false;
     if(!f.showStructured && b._isStructured) return false;
-    if(f.offer === 'yes' && !hasOffer(b)) return false;
-    if(f.offer === 'no' && hasOffer(b)) return false;
+    // 3 чекбокса: без оферты / put / call. Бумага проходит, если её
+    // тип разрешён. Все 3 выключены → ничего не показываем (защита
+    // от нечаянного «всё отключил» — пусть будет явно).
+    {
+      const kind = offerKind(b);
+      let pass = false;
+      if(kind === 'none' && f.offerNone) pass = true;
+      if(kind === 'put'  && f.offerPut)  pass = true;
+      if(kind === 'call' && f.offerCall) pass = true;
+      if(!pass) return false;
+    }
     if(f.amort === 'no' && isAmort(b)) return false;
     if(f.amort === 'yes' && !isAmort(b)) return false;
     if(f.sizeMin != null){
@@ -17130,7 +17159,7 @@ function moexResetFilters(){
    'moex-f-cur-min','moex-f-cashr-min','moex-f-eqr-min','moex-f-stress-min'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-offer','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh','moex-f-base'].forEach(id => {
+  ['moex-f-type','moex-f-list','moex-f-ccy','moex-f-coupon','moex-f-freq','moex-f-amort','moex-f-rating-min','moex-f-rating-has','moex-f-pct-thresh','moex-f-base'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
   // Сбросить и видимость подсекций купонного фильтра
@@ -17143,6 +17172,10 @@ function moexResetFilters(){
   document.getElementById('moex-f-indb').checked = false;
   const struct = document.getElementById('moex-f-structured');
   if(struct) struct.checked = false;
+  // 3 чекбокса оферты — после reset все включены (показываем всё).
+  ['moex-f-offer-none','moex-f-offer-put','moex-f-offer-call'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.checked = true;
+  });
   const dead = document.getElementById('moex-f-dead');
   if(dead) dead.checked = false;
   document.getElementById('moex-sort').value = 'ytm-desc';

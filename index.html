@@ -2006,13 +2006,19 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="year">Год (~365 дн)</option>
         </select>
       </div>
-      <div class="field" style="margin:0">
-        <label style="font-size:.55rem">Оферта (put/call)</label>
-        <select id="moex-f-offer" onchange="moexApplyFilters()">
-          <option value="">Не важно</option>
-          <option value="yes">Есть оферта (put или call)</option>
-          <option value="no">Без оферты (до погашения)</option>
-        </select>
+      <div class="field" style="margin:0" title="Оферта — право досрочного выкупа. Put — инициатива у инвестора (хорошо для нас), call — у эмитента (риск досрочного отзыва, обычно после оферты эмитент может пересмотреть ставку купона вниз). Чекбоксы независимые: можно включить любую комбинацию.">
+        <label style="font-size:.55rem">Тип выпуска по оферте</label>
+        <div style="display:flex;flex-direction:column;gap:2px;font-size:.54rem;line-height:1.3">
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer" title="Без оферты — бумага до погашения, % купона фиксирован весь срок">
+            <input type="checkbox" id="moex-f-offer-none" onchange="moexApplyFilters()" style="margin:0" checked> Без оферты (до погашения)
+          </label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer" title="Put — инвестор может предъявить бумагу к выкупу по оферте. Инициатива у держателя.">
+            <input type="checkbox" id="moex-f-offer-put" onchange="moexApplyFilters()" style="margin:0" checked> ✅ Put (право инвестора)
+          </label>
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer" title="Call — эмитент может отозвать бумагу. Часто после оферты пересматривают купон вниз. Риск для инвестора.">
+            <input type="checkbox" id="moex-f-offer-call" onchange="moexApplyFilters()" style="margin:0" checked> ❌ Call (право эмитента)
+          </label>
+        </div>
       </div>
       <div class="field" style="margin:0" title="Амортизация — постепенное погашение основного долга равными частями в даты купонов. У амортизируемых номинал уменьшается с каждой выплатой. Меняет профиль кешфлоу и дюрацию.">
         <label style="font-size:.55rem">Амортизация</label>
