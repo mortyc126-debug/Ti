@@ -23410,15 +23410,15 @@ const _stats = {
 let _linksState = { selected: new Set(), series: null, pairSel: null };
 
 // Собирает каталог всех доступных рядов из store. Возврат:
-// [{ key:'bucket:row', bucket, row, label, count, firstDate, lastDate, mult }]
+// [{ key:'bucket:row', bucket, row, label, descr, count, firstDate, lastDate, mult }]
 function _linksCatalog(){
   const store = _rateReadCbrStore();
   const items = [];
-  const pushIf = (bucket, row, series, label, mult) => {
+  const pushIf = (bucket, row, series, label, descr, mult) => {
     if(!Array.isArray(series) || !series.length) return;
     items.push({
       key: bucket + ':' + row,
-      bucket, row, label,
+      bucket, row, label, descr,
       count: series.length,
       firstDate: series[0].date,
       lastDate: series[series.length-1].date,
@@ -23427,29 +23427,42 @@ function _linksCatalog(){
   };
   if(store.est_infl && store.est_infl.series){
     const s = store.est_infl.series;
-    if(s.trend5y) pushIf('est_infl','trend5y', s.trend5y, 'Трендовая 5Y, %YoY');
-    if(s.trend3y) pushIf('est_infl','trend3y', s.trend3y, 'Трендовая 3Y, %YoY');
-    if(s.mod_base_trim) pushIf('est_infl','mod_base_trim', s.mod_base_trim, 'Базовая (усеч.), ann.', 12);
-    if(s.mod_base_excl) pushIf('est_infl','mod_base_excl', s.mod_base_excl, 'Базовая (исключ.), ann.', 12);
+    if(s.trend5y)       pushIf('est_infl','trend5y', s.trend5y, 'Трендовая 5Y, %YoY',
+      'Оценка ЦБ устойчивой долгосрочной инфляции, сглаженная по 5-летнему окну. Очищена от разовых шоков (курс, плодоовощные, тарифы). Именно на неё реально ориентируется ЦБ при решениях по ставке.');
+    if(s.trend3y)       pushIf('est_infl','trend3y', s.trend3y, 'Трендовая 3Y, %YoY',
+      'То же, но по 3-летнему окну — чувствительнее к недавним изменениям, менее стабильна.');
+    if(s.mod_base_trim) pushIf('est_infl','mod_base_trim', s.mod_base_trim, 'Базовая (усеч.), ann.',
+      'Модифицированная базовая инфляция методом усечения: каждый месяц убираются экстремальные компоненты (и сверху, и снизу), остаётся середина. В файле ЦБ — % MoM, здесь анноализовано ×12.', 12);
+    if(s.mod_base_excl) pushIf('est_infl','mod_base_excl', s.mod_base_excl, 'Базовая (исключ.), ann.',
+      'Альтернативный модифицированный показатель — исключаются наиболее волатильные за историю компоненты (яйца, сахар, фрукты, бензин, связь). MoM анноализовано.', 12);
   }
   if(store.indicators_cpd && store.indicators_cpd.series){
     const s = store.indicators_cpd.series;
-    if(s.all_sa_mom) pushIf('indicators_cpd','all_sa_mom', s.all_sa_mom, 'SA ann. — все (ЦБ)', 12);
-    if(s.core_sa_mom) pushIf('indicators_cpd','core_sa_mom', s.core_sa_mom, 'SA ann. — core', 12);
-    if(s.base_cpi_sa_mom) pushIf('indicators_cpd','base_cpi_sa_mom', s.base_cpi_sa_mom, 'Базовый ИПЦ SA ann.', 12);
+    if(s.all_sa_mom)      pushIf('indicators_cpd','all_sa_mom', s.all_sa_mom, 'SA ann. — все (ЦБ)',
+      'Общая инфляция с устранённой сезонностью, помесячно, анноализована. Видит разворот на 6-9 мес раньше YoY. История с 2002.', 12);
+    if(s.core_sa_mom)     pushIf('indicators_cpd','core_sa_mom', s.core_sa_mom, 'SA ann. — core',
+      'То же, но без плодоовощной, нефтепродуктов и ЖКХ — очищенный от самых волатильных составляющих core.', 12);
+    if(s.base_cpi_sa_mom) pushIf('indicators_cpd','base_cpi_sa_mom', s.base_cpi_sa_mom, 'Базовый ИПЦ SA ann.',
+      'Базовый ИПЦ Росстата (без плодоовощной, топлива, ЖКХ, услуг туризма) с устранённой сезонностью, анноализовано.', 12);
   }
   if(store.reg_cpd && store.reg_cpd.series){
     const s = store.reg_cpd.series;
-    if(s.russia_yoy) pushIf('reg_cpd','russia_yoy', s.russia_yoy, 'CPI РФ, %YoY');
-    if(s.russia_mom) pushIf('reg_cpd','russia_mom', s.russia_mom, 'CPI РФ, %MoM');
-    if(s.russia_sa_mom) pushIf('reg_cpd','russia_sa_mom', s.russia_sa_mom, 'CPI РФ, SA MoM');
+    if(s.russia_yoy)    pushIf('reg_cpd','russia_yoy', s.russia_yoy, 'CPI РФ, %YoY',
+      'Headline-инфляция — общая годовая. То число, которое в новостях и пресс-релизах ЦБ. Самый «шумный» показатель из всех: зависит от эффекта базы, не учитывает сезонность.');
+    if(s.russia_mom)    pushIf('reg_cpd','russia_mom', s.russia_mom, 'CPI РФ, %MoM',
+      'Месячная инфляция без устранённой сезонности. Сырой индикатор — для аналитиков обычно меньше полезен, чем SA-версия.');
+    if(s.russia_sa_mom) pushIf('reg_cpd','russia_sa_mom', s.russia_sa_mom, 'CPI РФ, SA MoM',
+      'Месячная инфляция с устранённой сезонностью (Росстат/X-13). Не анноализованная — значение ~0.5% в месяц = примерно 6% в год.');
   }
   if(store.api){
     for(const role in store.api){
       const bucket = store.api[role];
       if(bucket.series && bucket.series.length){
-        const label = (_RATE_API_ROLES[role] && _RATE_API_ROLES[role].label) || role.toUpperCase();
-        pushIf('api', role, bucket.series, 'API · ' + label, bucket.multiplier || 1);
+        const roleInfo = _RATE_API_ROLES[role] || {};
+        const label = roleInfo.label || role.toUpperCase();
+        pushIf('api', role, bucket.series, 'API · ' + label,
+          'Ряд привязан через «🔍 API ЦБ» (REST API cbr.ru/dataservice). Исходное имя: ' + (bucket.dsName || role) + '. Частота — как отдаёт публикация.',
+          bucket.multiplier || 1);
       }
     }
   }
@@ -23477,11 +23490,13 @@ function linksInit(){
   } catch(_){}
   list.innerHTML = cat.map(it => {
     const checked = _linksState.selected.has(it.key) ? 'checked' : '';
-    return '<label style="display:flex;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--border);border-radius:4px;cursor:pointer">' +
-      '<input type="checkbox" data-k="' + it.key + '" ' + checked + ' onchange="_linksToggle(this)">' +
+    const descrAttr = (it.descr || '').replace(/"/g, '&quot;');
+    return '<label title="' + descrAttr + '" style="display:flex;gap:6px;align-items:flex-start;padding:6px 8px;border:1px solid var(--border);border-radius:4px;cursor:pointer">' +
+      '<input type="checkbox" data-k="' + it.key + '" ' + checked + ' onchange="_linksToggle(this)" style="margin-top:2px">' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-weight:500;color:var(--text)">' + it.label + '</div>' +
-        '<div class="muted" style="font-size:.55rem">' + it.bucket + ' · ' + it.count + ' точек · ' + it.firstDate + '…' + it.lastDate + '</div>' +
+        '<div style="font-weight:500;color:var(--text)">' + it.label + '<span style="color:var(--text3);font-size:.52rem;margin-left:4px">ⓘ</span></div>' +
+        '<div style="font-size:.56rem;color:var(--text2);line-height:1.4;margin-top:2px">' + (it.descr || '').split('. ')[0] + '.</div>' +
+        '<div class="muted" style="font-size:.52rem;margin-top:2px">' + it.bucket + ' · ' + it.count + ' точек · ' + it.firstDate + '…' + it.lastDate + '</div>' +
       '</div>' +
     '</label>';
   }).join('');
@@ -23546,6 +23561,14 @@ function _linksRenderChart(){
   // Общая X-шкала (линейная по индексу даты).
   const xOf = i => padL + (i / Math.max(1, T - 1)) * (W - padL - padR);
   const palette = ['#6ec4d9','#f29a8a','#f2c94c','#a58cd9','#8fcc7b','#e07a6a'];
+  // Ищем индексы 1 января каждого года — для вертикальных gridlines
+  // и меток лет. Это даёт регулярную «год-сетку» независимо от длины ряда.
+  const yearIdx = [];
+  let prevYear = null;
+  for(let i = 0; i < T; i++){
+    const y = s.dates[i].slice(0, 4);
+    if(y !== prevYear){ yearIdx.push({ i, year: y }); prevYear = y; }
+  }
   const svgRows = labels.map((lbl, li) => {
     const vals = s.cols[lbl];
     const min = Math.min(...vals), max = Math.max(...vals);
@@ -23553,24 +23576,32 @@ function _linksRenderChart(){
     const yOf = v => padT + (1 - (v - min) / span) * (rowH - padT - padB);
     const pts = vals.map((v, i) => xOf(i) + ',' + yOf(v).toFixed(1)).join(' ');
     const color = palette[li % palette.length];
-    // Ось Y минимальная — max/min слева
-    const yAxis = '<text x="' + (padL - 4) + '" y="' + (padT + 6) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + max.toFixed(2) + '</text>' +
+    // Ось Y: max, середина, min
+    const mid = (min + max) / 2;
+    const yAxis = '<text x="' + (padL - 4) + '" y="' + (padT + 8) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + max.toFixed(2) + '</text>' +
+                  '<text x="' + (padL - 4) + '" y="' + (yOf(mid) + 3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + mid.toFixed(2) + '</text>' +
                   '<text x="' + (padL - 4) + '" y="' + (rowH - padB + 4) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + min.toFixed(2) + '</text>';
+    // Вертикальные линии по годам
+    const yearLines = yearIdx.map(({i}) => {
+      const x = xOf(i);
+      return '<line x1="' + x + '" y1="' + padT + '" x2="' + x + '" y2="' + (rowH - padB) + '" stroke="var(--border)" stroke-dasharray="1,3" opacity=".5"/>';
+    }).join('');
+    // Горизонтальная midline
+    const midLine = '<line x1="' + padL + '" y1="' + yOf(mid) + '" x2="' + (W - padR) + '" y2="' + yOf(mid) + '" stroke="var(--border)" stroke-dasharray="2,3" opacity=".4"/>';
     return '<svg width="' + W + '" height="' + rowH + '" style="display:block;margin-bottom:4px">' +
       '<rect x="' + padL + '" y="' + padT + '" width="' + (W-padL-padR) + '" height="' + (rowH-padT-padB) + '" fill="none" stroke="var(--border)"/>' +
-      '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round"/>' +
+      yearLines + midLine +
+      '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linejoin="round"/>' +
       '<text x="' + (padL + 4) + '" y="' + (padT + 10) + '" font-size="10" font-weight="600" fill="' + color + '">' + lbl + '</text>' +
       yAxis +
     '</svg>';
   }).join('');
-  // Дата-шкала снизу
-  const nTicks = Math.min(8, T);
-  const dateLabels = [];
-  for(let t = 0; t < nTicks; t++){
-    const i = Math.round(t * (T - 1) / (nTicks - 1));
-    dateLabels.push('<text x="' + xOf(i) + '" y="12" text-anchor="middle" font-size="9" fill="var(--text3)">' + s.dates[i].slice(0, 7) + '</text>');
-  }
-  const dateAxis = '<svg width="' + W + '" height="16" style="display:block;margin-top:-4px">' + dateLabels.join('') + '</svg>';
+  // Дата-шкала снизу: подпись каждого года
+  const dateLabels = yearIdx.map(({ i, year }) =>
+    '<text x="' + xOf(i) + '" y="12" text-anchor="middle" font-size="10" fill="var(--text2)" font-weight="500">' + year + '</text>' +
+    '<line x1="' + xOf(i) + '" y1="0" x2="' + xOf(i) + '" y2="3" stroke="var(--text3)"/>'
+  ).join('');
+  const dateAxis = '<svg width="' + W + '" height="18" style="display:block;margin-top:-4px">' + dateLabels + '</svg>';
   box.innerHTML = svgRows + dateAxis;
 }
 
@@ -23614,8 +23645,13 @@ function _linksRenderCorrMatrix(){
     return `rgba(242, 154, 138, ${0.25 + 0.55 * a})`;
   };
   let html = '<table style="border-collapse:collapse;font-size:.62rem"><thead><tr>';
-  html += '<th style="padding:4px 6px"></th>';
-  for(const l of labels) html += '<th style="padding:4px 6px;writing-mode:vertical-rl;transform:rotate(180deg);max-height:120px">' + l + '</th>';
+  html += '<th style="padding:4px 6px;vertical-align:bottom"></th>';
+  for(const l of labels){
+    // Читаемый вертикальный заголовок — writing-mode:vertical-rl поворачивает
+    // сверху вниз (читается наклонив голову вправо). Transform rotate(180)
+    // ранее переворачивал задом наперёд — убираем.
+    html += '<th style="padding:6px 4px;writing-mode:vertical-rl;text-orientation:mixed;vertical-align:bottom;max-height:130px;white-space:nowrap;font-weight:500">' + l + '</th>';
+  }
   html += '</tr></thead><tbody>';
   for(let i = 0; i < N; i++){
     html += '<tr><td style="padding:4px 6px;font-weight:600">' + labels[i] + '</td>';
