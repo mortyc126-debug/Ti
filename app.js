@@ -7852,18 +7852,26 @@ function repClearYearFilter(){
   repRenderIssuerList();
 }
 
-// Есть ли у эмитента хоть один выпуск в MOEX-каталоге (по issId/ИНН/имени).
+// Есть ли у эмитента хоть один выпуск в MOEX-каталоге. Сырые items
+// каталога не содержат issId/inn (они вычисляются ситуативно в
+// moexApplyFilters), поэтому гоняем тот же резолвер _moexMatchIssuer,
+// что и каталог — он режет «БО-01» из shortName и матчит на индекс
+// reportsDB. Плюс фолбэк через ИНН и частичное имя.
 function _repHasMoexBonds(id, iss){
   const cat = window._moexCatalog;
   if(!cat || !Array.isArray(cat.items)) return false;
   const inn = iss?.inn ? String(iss.inn) : '';
   const normName = (typeof _normIssuerName === 'function' && iss?.name) ? _normIssuerName(iss.name) : '';
+  const idx = (typeof _moexBuildIssuerIndex === 'function') ? _moexBuildIssuerIndex() : null;
   for(const b of cat.items){
-    if(b.issId === id) return true;
     if(inn && b.inn && String(b.inn) === inn) return true;
+    if(idx && typeof _moexMatchIssuer === 'function'){
+      const matched = _moexMatchIssuer(b, idx);
+      if(matched && matched === id) return true;
+    }
     if(normName && b.issuer){
       const n2 = (typeof _normIssuerName === 'function') ? _normIssuerName(b.issuer) : String(b.issuer).toLowerCase();
-      if(n2 && n2 === normName) return true;
+      if(n2 && (n2 === normName || n2.includes(normName) || normName.includes(n2))) return true;
     }
   }
   return false;
@@ -8346,8 +8354,12 @@ function repEditRelated(){
   alert('Не понял команду. Примеры:\np 7707083893 ПАО Сбербанк\nr 1234567890 Дочка XYZ\n- 1');
 }
 
-// Показывает все выпуски активного эмитента из MOEX-каталога: по ИНН
-// (точное совпадение) либо по issId (_moexMatchIssuer уже связал).
+// Показывает все выпуски активного эмитента из MOEX-каталога. Матчим
+// тем же резолвером, что и сам каталог (_moexMatchIssuer по индексу
+// reportsDB — он режет «БО-01»/«1Р-20R» из shortName), плюс ИНН и
+// частичное совпадение полного имени ISSUERNAME. Раньше проверяли
+// только b.issId/b.inn, которых на сырых items каталога нет — поэтому
+// у 80% эмитентов «📭 не найдены».
 function _repRenderIssuerBonds(){
   const box = document.getElementById('rep-issuer-bonds');
   if(!box) return;
@@ -8357,13 +8369,17 @@ function _repRenderIssuerBonds(){
   if(!cat || !Array.isArray(cat.items) || !cat.items.length){ box.innerHTML = ''; return; }
   const today = Date.now();
   const innStr = iss.inn ? String(iss.inn) : '';
+  const idx = (typeof _moexBuildIssuerIndex === 'function') ? _moexBuildIssuerIndex() : null;
+  const normOwn = (typeof _normIssuerName === 'function' && iss.name) ? _normIssuerName(iss.name) : '';
   const bonds = cat.items.filter(b => {
-    if(b.issId && b.issId === repActiveIssuerId) return true;
     if(innStr && b.inn && String(b.inn) === innStr) return true;
-    if(iss.name && b.issuer){
-      const n1 = (typeof _normIssuerName === 'function') ? _normIssuerName(iss.name) : String(iss.name).toLowerCase();
+    if(idx && typeof _moexMatchIssuer === 'function'){
+      const matched = _moexMatchIssuer(b, idx);
+      if(matched && matched === repActiveIssuerId) return true;
+    }
+    if(normOwn && b.issuer){
       const n2 = (typeof _normIssuerName === 'function') ? _normIssuerName(b.issuer) : String(b.issuer).toLowerCase();
-      if(n1 && n1 === n2) return true;
+      if(n2 && (n2 === normOwn || n2.includes(normOwn) || normOwn.includes(n2))) return true;
     }
     return false;
   });
