@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "БондАналитик: сбор раскрытий",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Сбор существенных фактов с e-disclosure.ru. Автосбор + массовый обход + отслеживание новых событий с уведомлениями.",
   "permissions": ["activeTab", "clipboardWrite", "clipboardRead", "tabs", "storage", "scripting", "notifications"],
   "host_permissions": ["*://*.e-disclosure.ru/*"],

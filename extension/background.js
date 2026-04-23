@@ -1,22 +1,22 @@
 // Service worker расширения БондАналитик: сбор раскрытий.
-// v1.4: JSON-API /api/search/companies отдаёт 404 (проверено у
-// пользователя в Network DevTools), поэтому ищем компанию по ИНН
-// через HTML-страницу поиска и regex'ом достаём company.aspx?id=<N>.
-// Если поиск ничего не вернул — fallback: открываем поисковую
-// страницу во вкладке и полагаемся на content.js (он умеет сам
-// кликнуть первую ссылку компании).
+// v1.4.1: подтверждено двумя HTML-дампами с живого сайта:
+//   • /api/search/companies?query=... возвращает 404 (мёртвый API);
+//   • /poisk-po-kompaniyam/ отдаёт пустую форму, результаты рендерит
+//     JS через AJAX — fetch в background ничего полезного не даст
+//     (+ антибот ServicePipe требует выполнения JS для получения куки);
+//   • зато при ОДНОМ совпадении сайт сам 302-редиректит на карточку
+//     company.aspx?id=<N> — это и используем.
 //
-// Прогресс batch пишется в chrome.storage.local.batchProgress,
-// чтобы popup мог восстановить UI при переоткрытии (раньше сообщения
+// Стратегия: не угадываем API, а всегда открываем поисковую страницу
+// /poisk-po-kompaniyam/?query=<ИНН> во вкладке. content.js на этой
+// странице заполнит форму, нажмёт «Искать», а при одном совпадении
+// сайт сам перекинет на карточку (дальше уже известный flow).
+// Это стабильно работает в браузере пользователя — там уже есть
+// куки ServicePipe, пройденные капчей при первом заходе.
+//
+// Прогресс batch пишется в chrome.storage.local.batchProgress, чтобы
+// popup мог восстановить UI при переоткрытии (раньше сообщения
 // chrome.runtime.sendMessage терялись когда popup закрыт).
-//
-// Flow batch-режима:
-//   1. Для каждого ИНН: HTML-поиск → company.id (или null)
-//   2. Если id есть — открываем /portal/company.aspx?id=<id>
-//      Если нет    — открываем поисковую страницу, content.js сам
-//                    найдёт первую ссылку и перейдёт
-//   3. Content.js скрапит таблицу, отправляет save-disclosure
-//   4. Вкладка закрывается, переходим к следующему ИНН
 
 const CRITICAL_PATTERNS = [
   { key: 'default', re: /неисполнени[еяю].*обязательств|просрочк|техническ\w* дефолт|\bдефолт|невыплат/i, label: 'Дефолт/просрочка' },
@@ -32,48 +32,44 @@ function detectCritical(title){
 }
 function eventKey(e){ return (e.date || '') + '|' + (e.title || '').slice(0, 80); }
 
-// Ищет компанию на e-disclosure по ИНН через HTML-поиск.
-// Возвращает {id, name, inn} или null.
-// Пробует несколько URL поисковой страницы, regex'ом достаёт
-// первый company.aspx?id=<N>. Все попытки логируются в service
-// worker console (chrome://extensions → Service worker → Console).
+// Быстрый путь: пытаемся найти id через fetch поисковой страницы с
+// куками браузера. В большинстве случаев вернёт anti-bot ServicePipe
+// (пустой HTML с редиректом на /exhkqyad), но если у пользователя
+// уже есть куки ServicePipe от живых посещений сайта — страница
+// отрендерится на сервере (SSR) и id можно достать regex'ом.
+// Если не получилось — вернёт null, и runBatch упадёт на tab-fallback.
 async function findCompanyByInn(inn){
-  const htmlUrls = [
-    `https://www.e-disclosure.ru/poisk-po-kompaniyam/?query=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/portal/companyfind.aspx?query=${encodeURIComponent(inn)}`,
-    `https://www.e-disclosure.ru/portal/companyfind.aspx?attempt=1&query=${encodeURIComponent(inn)}`,
-  ];
-  for(const url of htmlUrls){
-    try {
-      const r = await fetch(url, {
-        credentials: 'include',
-        headers: { 'Accept': 'text/html,application/xhtml+xml' },
-      });
-      console.log('[bondanalit] search', inn, '→', url, 'status', r.status);
-      if(!r.ok) continue;
-      const html = await r.text();
-      // Берём первый company.aspx?id=<N> на странице результатов.
-      // В поиске ИНН обычно единственное совпадение — это нужная
-      // компания. На всякий случай предпочитаем ссылку, рядом с
-      // которой есть наш ИНН (±400 символов).
-      const re = /company\.aspx\?id=(\d+)/gi;
-      let match, picked = null;
-      while((match = re.exec(html)) !== null){
-        const ctx = html.slice(Math.max(0, match.index - 400), match.index + 400);
-        if(ctx.includes(inn)){ picked = match[1]; break; }
-        if(!picked) picked = match[1];
-      }
-      if(picked){
-        const nm = html.match(/<title>([^<]+)<\/title>/i);
-        const name = nm ? nm[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim().slice(0, 200) : '';
-        console.log('[bondanalit] found id', picked, 'for inn', inn);
-        return { id: picked, name, inn: String(inn) };
-      }
-    } catch(e){
-      console.warn('[bondanalit] search err', url, e && e.message);
+  const url = `https://www.e-disclosure.ru/poisk-po-kompaniyam/?query=${encodeURIComponent(inn)}`;
+  try {
+    const r = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Accept': 'text/html,application/xhtml+xml' },
+    });
+    console.log('[bondanalit] search', inn, '→ status', r.status);
+    if(!r.ok) return null;
+    const html = await r.text();
+    // Маркёр anti-bot: ServicePipe показывает страницу-заглушку со
+    // ссылкой /exhkqyad. Никаких company.aspx?id там нет — не тратим
+    // время на regex, сразу fallback.
+    if(/exhkqyad|<div class="load">/i.test(html)){
+      console.log('[bondanalit] antibot stub for', inn, '— tab fallback');
+      return null;
     }
+    const re = /company\.aspx\?id=(\d+)/gi;
+    let match, picked = null;
+    while((match = re.exec(html)) !== null){
+      const ctx = html.slice(Math.max(0, match.index - 400), match.index + 400);
+      if(ctx.includes(inn)){ picked = match[1]; break; }
+      if(!picked) picked = match[1];
+    }
+    if(picked){
+      console.log('[bondanalit] fast-path id', picked, 'for inn', inn);
+      return { id: picked, name: '', inn: String(inn) };
+    }
+    console.log('[bondanalit] no id in html for', inn, '— tab fallback');
+  } catch(e){
+    console.warn('[bondanalit] search err', e && e.message);
   }
-  console.log('[bondanalit] search not-found inn', inn);
   return null;
 }
 

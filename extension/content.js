@@ -14,11 +14,33 @@
                         /\/poisk-po-kompaniyam/i.test(path);
 
   if(isSearchPage){
+    // Страница /poisk-po-kompaniyam/ отдаёт пустую форму, результаты
+    // рендерит JS. Если пришли с ?query=<ИНН>, но JS сайта не
+    // подхватил параметр сам — вставляем значение в #textfield и
+    // жмём «Искать». При одном совпадении сайт сам 302-редиректит
+    // на карточку; если совпадений несколько — ждём появления ссылок
+    // company.aspx?id=<N> и переходим на первую.
+    const params = new URLSearchParams(location.search);
+    const q = params.get('query') || params.get('textfield') || params.get('q') || '';
+    let kicked = false;
+    const kick = () => {
+      if(kicked) return;
+      const tf = document.getElementById('textfield');
+      const btn = document.getElementById('sendButton');
+      if(tf && btn && q && !tf.value.trim()){
+        tf.value = q;
+        tf.dispatchEvent(new Event('input', { bubbles: true }));
+        tf.dispatchEvent(new Event('change', { bubbles: true }));
+        btn.click();
+        kicked = true;
+      }
+    };
     waitFor(() => {
+      kick();
       const firstLink = document.querySelector('a[href*="company.aspx?id="]');
       if(firstLink && firstLink.href){ location.href = firstLink.href; return true; }
       return false;
-    }, 8000);
+    }, 15000);
     return;
   }
 
