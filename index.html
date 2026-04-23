@@ -1927,7 +1927,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div id="moex-scenario-status" style="font-size:.54rem;color:var(--text3);margin-top:6px;display:none"></div>
     </div>
-    <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+    <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end">
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Поиск (название / ISIN / эмитент)</label>
         <input type="text" id="moex-f-text" oninput="moexApplyFilters()" placeholder="пгк, офз 26238, RU000A...">
@@ -2014,17 +2014,17 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="year">Год (~365 дн)</option>
         </select>
       </div>
-      <div class="field" style="margin:0" title="Оферта — право досрочного выкупа. Put — инициатива у инвестора (хорошо для нас), call — у эмитента (риск досрочного отзыва, обычно после оферты эмитент может пересмотреть ставку купона вниз). Чекбоксы независимые: можно включить любую комбинацию.">
+      <div class="field" style="margin:0;grid-column:span 2" title="Оферта — право досрочного выкупа. Put — инициатива у инвестора, call — у эмитента (риск: после оферты обычно режут купон вниз). Чекбоксы независимые.">
         <label style="font-size:.55rem">Тип выпуска по оферте</label>
-        <div style="display:flex;flex-direction:column;gap:2px;font-size:.54rem;line-height:1.3">
-          <label style="display:flex;gap:4px;align-items:center;cursor:pointer" title="Без оферты — бумага до погашения, % купона фиксирован весь срок">
-            <input type="checkbox" id="moex-f-offer-none" onchange="moexApplyFilters()" style="margin:0" checked> Без оферты (до погашения)
+        <div style="display:flex;gap:12px;font-size:.58rem;line-height:1.3;align-items:center;flex-wrap:wrap;padding:6px 2px">
+          <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap" title="Без оферты — бумага до погашения, % купона фиксирован весь срок">
+            <input type="checkbox" id="moex-f-offer-none" onchange="moexApplyFilters()" style="margin:0" checked> Без оферты
           </label>
-          <label style="display:flex;gap:4px;align-items:center;cursor:pointer" title="Put — инвестор может предъявить бумагу к выкупу по оферте. Инициатива у держателя.">
-            <input type="checkbox" id="moex-f-offer-put" onchange="moexApplyFilters()" style="margin:0" checked> Put (право инвестора)
+          <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap" title="Put — инвестор может предъявить бумагу к выкупу. Инициатива у держателя.">
+            <input type="checkbox" id="moex-f-offer-put" onchange="moexApplyFilters()" style="margin:0" checked> Put
           </label>
-          <label style="display:flex;gap:4px;align-items:center;cursor:pointer" title="Call — эмитент может отозвать бумагу. Часто после оферты пересматривают купон вниз. Риск для инвестора.">
-            <input type="checkbox" id="moex-f-offer-call" onchange="moexApplyFilters()" style="margin:0" checked> Call (право эмитента)
+          <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap" title="Call — эмитент может отозвать бумагу. После оферты часто режут купон. Риск.">
+            <input type="checkbox" id="moex-f-offer-call" onchange="moexApplyFilters()" style="margin:0" checked> Call
           </label>
         </div>
       </div>
@@ -2048,24 +2048,24 @@ document.addEventListener('DOMContentLoaded', () => {
         <label style="font-size:.55rem">Цена до, % номинала</label>
         <input type="number" id="moex-f-price-max" oninput="moexApplyFilters()" step="0.5" placeholder="напр. 100">
       </div>
-      <div class="field" style="margin:0" title="Показать только выпуски эмитентов, у которых у тебя есть отчётность в reportsDB">
-        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
+      <div class="field" style="margin:0;padding:6px 0 4px" title="Показать только выпуски эмитентов, у которых у тебя есть отчётность в reportsDB">
+        <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
           <input type="checkbox" id="moex-f-indb" onchange="moexApplyFilters()" style="margin:0"> Только «есть в базе»
         </label>
       </div>
-      <div class="field" style="margin:0" title="Структурные продукты — СберИОС, ГазИОС и подобные. По сути это ставка на индекс/курс с мелким купоном и большой выплатой в конце — НЕ классический бонд. По умолчанию спрятаны, чтобы не засорять скрининг ВДО.">
-        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
-          <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0"> 🎭 Показывать структурные продукты (ИОС и т.п.)
+      <div class="field" style="margin:0;padding:6px 0 4px" title="Структурные продукты — СберИОС, ГазИОС и подобные. По сути это ставка на индекс/курс с мелким купоном и большой выплатой в конце — НЕ классический бонд. По умолчанию спрятаны.">
+        <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
+          <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0"> 🎭 Структурные (ИОС)
         </label>
       </div>
-      <div class="field" style="margin:0" title="Мёртвые бумаги — уже погашенные (matDate в прошлом — MOEX продолжает показывать их на доске до 2 недель после погашения) или STATUS не «A» (приостановлены, ещё не стартовали). По умолчанию скрыты — иначе в каталоге висит пачка облигаций, которые уже не торгуются.">
-        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
-          <input type="checkbox" id="moex-f-dead" onchange="moexApplyFilters()" style="margin:0"> 🪦 Показывать мёртвые (погашенные / suspended)
+      <div class="field" style="margin:0;padding:6px 0 4px" title="Мёртвые бумаги — уже погашенные (matDate в прошлом — MOEX продолжает показывать до ~2 недель после погашения) или STATUS не «A» (приостановлены, не стартовали). По умолчанию скрыты.">
+        <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
+          <input type="checkbox" id="moex-f-dead" onchange="moexApplyFilters()" style="margin:0"> 🪦 Мёртвые
         </label>
       </div>
-      <div class="field" style="margin:0" title="Для эмитентов, у которых через «🔗 связи» отмечена материнская компания — считать «Запас прочности», фильтр «аутсайдеров отрасли» и прочий скоринг по её отчётности, а не по своей. Это про SPV: у SPV-эмитента свой баланс обычно пустой, а реальные цифры у головной. Для пустых SPV fallback на материнскую работает автоматически; тумблер включает его и для тех SPV, у кого собственная отчётность тоже есть.">
-        <label style="font-size:.55rem;display:flex;gap:4px;align-items:center">
-          <input type="checkbox" id="moex-f-prefer-parent" onchange="moexApplyFilters()" style="margin:0"> 🏛 По данным материнской (для SPV)
+      <div class="field" style="margin:0;padding:6px 0 4px" title="Для эмитентов, у которых через «🔗 связи» отмечена материнская компания — считать «Запас прочности» и прочий скоринг по её отчётности, а не по своей. Это про SPV: у SPV-эмитента свой баланс обычно пустой, реальные цифры у головной.">
+        <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
+          <input type="checkbox" id="moex-f-prefer-parent" onchange="moexApplyFilters()" style="margin:0"> 🏛 По данным материнской
         </label>
       </div>
     </div>
