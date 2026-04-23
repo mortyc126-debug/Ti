@@ -2204,9 +2204,18 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="card-hdr">📋 Доступные ряды</div>
     <div class="muted" style="font-size:.62rem;margin-bottom:8px">Отметьте 2-6 рядов для сопоставления. Пересечение дат — автоматически (inner-join).</div>
     <div id="links-series-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px;font-size:.64rem"></div>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-p btn-sm" onclick="linksBuild()">▶ Построить</button>
       <button class="btn btn-sm" onclick="linksClearSelection()">✕ Снять всё</button>
+      <span style="font-size:.6rem;color:var(--text2);margin-left:8px">Горизонт:</span>
+      <select id="links-horizon" onchange="linksBuild()" style="padding:3px 6px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px">
+        <option value="0">все данные</option>
+        <option value="120">последние 10 лет</option>
+        <option value="60" selected>последние 5 лет</option>
+        <option value="36">последние 3 года</option>
+        <option value="24">последние 2 года</option>
+        <option value="12">последний год</option>
+      </select>
       <span class="muted" id="links-status" style="font-size:.58rem;align-self:center;margin-left:8px"></span>
     </div>
   </div>

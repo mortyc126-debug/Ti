@@ -23543,8 +23543,18 @@ function linksBuild(){
     status.textContent = '⚠ Нет общих дат';
     return;
   }
-  _linksState.series = { ...merged, meta: chosen };
-  status.textContent = '✓ ' + merged.dates.length + ' точек · ' + chosen.length + ' рядов · ' + merged.dates[0] + '…' + merged.dates[merged.dates.length-1];
+  // Обрезать до горизонта если выбран
+  const horizon = parseInt((document.getElementById('links-horizon') || {}).value || '0', 10);
+  let dates = merged.dates;
+  let cols = merged.cols;
+  if(horizon > 0 && dates.length > horizon){
+    const start = dates.length - horizon;
+    dates = dates.slice(start);
+    cols = {};
+    for(const k in merged.cols) cols[k] = merged.cols[k].slice(start);
+  }
+  _linksState.series = { dates, cols, meta: chosen };
+  status.textContent = '✓ ' + dates.length + ' точек · ' + chosen.length + ' рядов · ' + dates[0] + '…' + dates[dates.length-1];
   _linksRenderChart();
   _linksRenderCorrMatrix();
   document.getElementById('links-pair-card').hidden = true;
@@ -23556,7 +23566,7 @@ function _linksRenderChart(){
   if(!s){ box.innerHTML = ''; return; }
   const labels = Object.keys(s.cols);
   const T = s.dates.length;
-  const W = 900, H = 140, padT = 10, padB = 22, padL = 50, padR = 10;
+  const W = 900, H = 140, padT = 22, padB = 22, padL = 62, padR = 10;
   const rowH = H;
   // Общая X-шкала (линейная по индексу даты).
   const xOf = i => padL + (i / Math.max(1, T - 1)) * (W - padL - padR);
@@ -23576,11 +23586,12 @@ function _linksRenderChart(){
     const yOf = v => padT + (1 - (v - min) / span) * (rowH - padT - padB);
     const pts = vals.map((v, i) => xOf(i) + ',' + yOf(v).toFixed(1)).join(' ');
     const color = palette[li % palette.length];
-    // Ось Y: max, середина, min
+    // Ось Y: только max и min (раньше был mid, но на узких диапазонах
+    // он перекрывал min и читать было невозможно). Среднюю линию
+    // оставляем как guide, но без подписи.
     const mid = (min + max) / 2;
-    const yAxis = '<text x="' + (padL - 4) + '" y="' + (padT + 8) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + max.toFixed(2) + '</text>' +
-                  '<text x="' + (padL - 4) + '" y="' + (yOf(mid) + 3) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + mid.toFixed(2) + '</text>' +
-                  '<text x="' + (padL - 4) + '" y="' + (rowH - padB + 4) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + min.toFixed(2) + '</text>';
+    const yAxis = '<text x="' + (padL - 4) + '" y="' + (padT + 4) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + max.toFixed(2) + '</text>' +
+                  '<text x="' + (padL - 4) + '" y="' + (rowH - padB + 2) + '" text-anchor="end" font-size="9" fill="var(--text3)" font-family="monospace">' + min.toFixed(2) + '</text>';
     // Вертикальные линии по годам
     const yearLines = yearIdx.map(({i}) => {
       const x = xOf(i);
@@ -23588,11 +23599,13 @@ function _linksRenderChart(){
     }).join('');
     // Горизонтальная midline
     const midLine = '<line x1="' + padL + '" y1="' + yOf(mid) + '" x2="' + (W - padR) + '" y2="' + yOf(mid) + '" stroke="var(--border)" stroke-dasharray="2,3" opacity=".4"/>';
+    // Label ряда — в «шапке» над панелью (не внутри chart area),
+    // чтобы не накладываться на линию графика.
     return '<svg width="' + W + '" height="' + rowH + '" style="display:block;margin-bottom:4px">' +
+      '<text x="' + padL + '" y="12" font-size="10" font-weight="600" fill="' + color + '">' + lbl + '</text>' +
       '<rect x="' + padL + '" y="' + padT + '" width="' + (W-padL-padR) + '" height="' + (rowH-padT-padB) + '" fill="none" stroke="var(--border)"/>' +
       yearLines + midLine +
       '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linejoin="round"/>' +
-      '<text x="' + (padL + 4) + '" y="' + (padT + 10) + '" font-size="10" font-weight="600" fill="' + color + '">' + lbl + '</text>' +
       yAxis +
     '</svg>';
   }).join('');
