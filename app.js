@@ -23839,9 +23839,15 @@ async function _worldFetchFred(seriesId, startDate){
   const key = _worldFredKey();
   if(!key) throw new Error('FRED требует API-key (бесплатно на fred.stlouisfed.org/docs/api/api_key.html)');
   const sd = startDate || '2010-01-01';
+  // Принудительно месячная частота — иначе дневные ряды (DGS10 и т.д.)
+  // и месячные (FEDFUNDS, CPIAUCSL) имеют разные даты и inner-join
+  // при построении матрицы корреляций не находит общих точек.
+  // aggregation_method=avg — среднее за месяц (для дневных это правильно,
+  // для месячных нейтрально).
   const orig = 'https://api.stlouisfed.org/fred/series/observations?series_id=' + encodeURIComponent(seriesId) +
                '&api_key=' + encodeURIComponent(key) +
-               '&file_type=json&observation_start=' + sd;
+               '&file_type=json&observation_start=' + sd +
+               '&frequency=m&aggregation_method=avg';
   const url = _worldBuildUrl(orig);
   const r = await fetch(url, { cache: 'no-store' });
   if(!r.ok) throw new Error('HTTP ' + r.status);
@@ -23851,7 +23857,11 @@ async function _worldFetchFred(seriesId, startDate){
   const series = [];
   for(const o of obs){
     const v = parseFloat(o.value);
-    if(isFinite(v) && o.date) series.push({ date: o.date, value: v });
+    if(isFinite(v) && o.date){
+      // FRED отдаёт даты как «2024-03-01» для месячных — первый день месяца.
+      // Нормализуем на всякий случай.
+      series.push({ date: o.date.slice(0, 7) + '-01', value: v });
+    }
   }
   return series;
 }
