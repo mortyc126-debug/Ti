@@ -35,9 +35,17 @@ function detectCritical(title){
 function eventKey(e){ return (e.date || '') + '|' + (e.title || '').slice(0, 80); }
 
 // Ищет компанию по ИНН через реальный POST-API e-disclosure.
-// Payload и response подтверждены Network-логом пользователя
-// (v1.4.2). Antiforgery защита — cookie .AspNetCore.Antiforgery.*,
-// автоматически подставляется браузером при credentials:'include'.
+// Payload и response подтверждены Network-логом пользователя.
+// Antiforgery защита — cookie .AspNetCore.Antiforgery.*, автоматически
+// подставляется браузером при credentials:'include'.
+//
+// ВАЖНО про CORS: из service worker'а fetch идёт с origin
+// chrome-extension://<id>, т.е. cross-origin. Запрос должен остаться
+// «simple» (без preflight OPTIONS), иначе сервер отдаёт 404 на OPTIONS
+// и POST никогда не уходит. Поэтому НЕЛЬЗЯ добавлять X-Requested-With,
+// Referer и другие non-safelisted headers — только Accept и Content-Type
+// (последний — один из трёх разрешённых: urlencoded/multipart/plain).
+//
 // Если cookie ещё нет (первый запуск) или она протухла — делаем
 // GET /poisk-po-kompaniyam/, сервер ставит cookie, повторяем POST.
 async function findCompanyByInn(inn, retry = true){
@@ -58,7 +66,6 @@ async function findCompanyByInn(inn, retry = true){
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With': 'XMLHttpRequest',
       },
       body: body.toString(),
     });
@@ -82,6 +89,22 @@ async function findCompanyByInn(inn, retry = true){
     console.warn('[bondanalit] api err', inn, e && e.message);
   }
   return null;
+}
+
+// Keep-alive для service worker: в MV3 SW засыпает через ~30 сек
+// простоя, и batch, крутящийся 20+ минут на 576 ИНН, может умереть.
+// Периодический вызов chrome.runtime.getPlatformInfo продлевает его
+// жизнь. Таймер храним на верхнем уровне, чтобы runBatch мог
+// start/stop.
+let _keepAliveTimer = null;
+function keepAliveStart(){
+  if(_keepAliveTimer) return;
+  _keepAliveTimer = setInterval(() => {
+    chrome.runtime.getPlatformInfo().catch(() => {});
+  }, 20 * 1000);
+}
+function keepAliveStop(){
+  if(_keepAliveTimer){ clearInterval(_keepAliveTimer); _keepAliveTimer = null; }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -110,7 +133,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if(msg.type === 'start-batch' && Array.isArray(msg.inns)){
     chrome.storage.local.set({ pendingBatchMode: true });
+    keepAliveStart();
     runBatch(msg.inns).then(summary => {
+      keepAliveStop();
       chrome.storage.local.set({
         pendingBatchMode: false,
         batchProgress: { running: false, summary, total: msg.inns.length, finishedAt: Date.now() }
