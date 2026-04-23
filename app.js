@@ -19054,6 +19054,7 @@ function rateInit(){
       }
     }
   } catch(e){}
+  _rateRenderCbrSummary();
   _rateRenderActive();
   _rateUpdateAvgBtn();
 }
@@ -19062,6 +19063,9 @@ function rateApplyInputs(p){
   const set = (id, v) => { const el = document.getElementById(id); if(el && v!=null) el.value = v; };
   set('rate-in-ks', p.ks);
   set('rate-in-cpi', p.cpi);
+  set('rate-in-trend', p.trend);
+  set('rate-in-core', p.core);
+  set('rate-in-sa', p.sa);
   set('rate-in-exp', p.exp);
   set('rate-in-pitgt', p.pitgt);
   set('rate-in-gdp', p.gdp);
@@ -19086,11 +19090,24 @@ function rateLoadDefaults(){
 
 function rateReadInputs(){
   const g = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const gOpt = id => { const el = document.getElementById(id); if(!el) return null; const v = parseFloat(el.value); return isNaN(v) ? null : v; };
   return {
-    ks: g('rate-in-ks'), cpi: g('rate-in-cpi'), exp: g('rate-in-exp'),
+    ks: g('rate-in-ks'), cpi: g('rate-in-cpi'),
+    trend: gOpt('rate-in-trend'), core: gOpt('rate-in-core'), sa: gOpt('rate-in-sa'),
+    exp: g('rate-in-exp'),
     pitgt: g('rate-in-pitgt'), gdp: g('rate-in-gdp'), gstar: g('rate-in-gstar'),
     gap: g('rate-in-gap'), rstar: g('rate-in-rstar')
   };
+}
+
+// Выбор инфляции для QPM: по селектору rate-qpm-pisrc.
+// Если пользователь выбрал trend/core/sa, но поле пусто — падаем на cpi.
+function _rateResolvePi(p, source){
+  const s = source || (document.getElementById('rate-qpm-pisrc') || {}).value || 'cpi';
+  if(s === 'trend' && p.trend != null) return { value: p.trend, label: 'трендовая 5Y' };
+  if(s === 'core'  && p.core  != null) return { value: p.core,  label: 'модиф. базовая (ann.)' };
+  if(s === 'sa'    && p.sa    != null) return { value: p.sa,    label: 'SA annualized' };
+  return { value: p.cpi, label: 'CPI YoY (headline)' };
 }
 
 function rateToggleExpl(which){
@@ -19101,9 +19118,10 @@ function rateToggleExpl(which){
 
 // QPM — итеративная симуляция 4 уравнений на 8 кв. вперёд.
 // Шоки ε=0 (базовый сценарий). Ожидания сходятся к таргету.
-function _rateQpm(p){
+// pi0 — начальная инфляция (какой показатель брать — через селектор).
+function _rateQpm(p, pi0){
   const c = _RATECB_QPM_CALIB;
-  let gap = p.gap, pi = p.cpi, i = p.ks, piExp = p.exp;
+  let gap = p.gap, pi = (pi0 != null ? pi0 : p.cpi), i = p.ks, piExp = p.exp;
   const traj = [];
   for(let t = 1; t <= 8; t++){
     const realRate = i - pi;                                    // ex-post реал. ставка
@@ -19120,11 +19138,14 @@ function _rateQpm(p){
 
 function rateRunQpm(){
   const p = rateReadInputs();
-  const traj = _rateQpm(p);
-  _ratecbLastQpm = { params: p, trajectory: traj, generatedAt: Date.now() };
+  const piPick = _rateResolvePi(p);
+  const traj = _rateQpm(p, piPick.value);
+  _ratecbLastQpm = { params: p, trajectory: traj, piSource: piPick.label, pi0: piPick.value, generatedAt: Date.now() };
   const out = document.getElementById('rate-qpm-out');
   out.style.display = 'block';
-  out.innerHTML = _rateRenderTrajectory('QPM', traj, p);
+  out.innerHTML =
+    '<div class="muted" style="font-size:.6rem;margin-bottom:6px">На старте: инфляция = <b>' + piPick.value.toFixed(2) + '%</b> (' + piPick.label + '), КС = ' + p.ks.toFixed(2) + '%, output gap = ' + p.gap.toFixed(2) + '%</div>' +
+    _rateRenderTrajectory('QPM', traj, p);
   document.getElementById('rate-qpm-set-btn').disabled = false;
   _rateUpdateAvgBtn();
 }
@@ -19134,9 +19155,9 @@ function rateRunQpm(){
 // r* берём из ввода, считаем текущий policy stance, прогнозируем сходимость
 // инфляции к таргету при сохранении/эволюции ставки. Полный HLW — задача
 // следующего этапа (когда добавим автоподгрузку рядов ЦБ/Росстата).
-function _rateHlw(p){
+function _rateHlw(p, pi0){
   const i_eq = p.rstar + p.pitgt;
-  let pi = p.cpi, i = p.ks, piExp = p.exp;
+  let pi = (pi0 != null ? pi0 : p.cpi), i = p.ks, piExp = p.exp;
   const traj = [];
   const rho = 0.75;                                             // инерция ставки
   for(let t = 1; t <= 8; t++){
@@ -19149,13 +19170,15 @@ function _rateHlw(p){
     traj.push({ q: '+' + t + 'Q', gap: null, pi: newPi, i: newI, realRate: newI - newPi, piExp: newExp });
     pi = newPi; i = newI; piExp = newExp;
   }
-  return { trajectory: traj, rStar: p.rstar, iEq: i_eq, policyStance: (p.ks - p.cpi) - p.rstar };
+  const piStart = (pi0 != null ? pi0 : p.cpi);
+  return { trajectory: traj, rStar: p.rstar, iEq: i_eq, policyStance: (p.ks - piStart) - p.rstar, piStart };
 }
 
 function rateRunHlw(){
   const p = rateReadInputs();
-  const res = _rateHlw(p);
-  _ratecbLastHlw = { params: p, trajectory: res.trajectory, rStar: res.rStar, iEq: res.iEq, policyStance: res.policyStance, generatedAt: Date.now() };
+  const piPick = _rateResolvePi(p);
+  const res = _rateHlw(p, piPick.value);
+  _ratecbLastHlw = { params: p, trajectory: res.trajectory, rStar: res.rStar, iEq: res.iEq, policyStance: res.policyStance, piSource: piPick.label, pi0: piPick.value, generatedAt: Date.now() };
   const out = document.getElementById('rate-hlw-out');
   out.style.display = 'block';
   const stance = res.policyStance > 0.3
@@ -19165,8 +19188,9 @@ function rateRunHlw(){
       : '<b>близкая к нейтральной</b>';
   out.innerHTML =
     '<div style="background:var(--bg2);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:.66rem;line-height:1.55">' +
+      '<div class="muted" style="font-size:.58rem;margin-bottom:4px">Инфляция на старте: <b>' + piPick.value.toFixed(2) + '%</b> (' + piPick.label + ')</div>' +
       '<div>Нейтральная реальная r* = <b>' + res.rStar.toFixed(2) + '%</b>. Равновесная номинальная (r*+π*) = <b>' + res.iEq.toFixed(2) + '%</b>.</div>' +
-      '<div style="margin-top:4px">Текущая реальная ставка (КС−инфляция) = ' + (p.ks - p.cpi).toFixed(2) + '% → политика ' + stance + '.</div>' +
+      '<div style="margin-top:4px">Текущая реальная ставка (КС−инфляция) = ' + (p.ks - piPick.value).toFixed(2) + '% → политика ' + stance + '.</div>' +
     '</div>' +
     _rateRenderTrajectory('HLW', res.trajectory, p);
   document.getElementById('rate-hlw-set-btn').disabled = false;
@@ -19289,4 +19313,253 @@ function rateGetActiveAtQuarter(q){
   if(q <= 0) return (a.inputs && a.inputs.ks) || null;
   if(q > a.trajectory.length) return a.trajectory[a.trajectory.length - 1].i;
   return a.trajectory[q - 1].i;
+}
+
+// ─── Импорт XLSX с cbr.ru/hd_base/infl ────────────────────────────────────
+// Три файла с официальной страницы «Аналитические показатели динамики цен»:
+//   • est_infl.xlsx       — оценки трендовой (5Y/3Y) и модифицированной базовой
+//   • indicators_cpd.xlsx — SA MoM по всем категориям ИПЦ (с 2002)
+//   • reg_cpd.xlsx        — разрез по регионам, 3 листа (YoY/MoM/SA MoM)
+// Автораспознавание по заголовку первой строки.
+
+async function rateImportCbrXlsx(input){
+  const files = Array.from(input.files || []);
+  input.value = '';
+  if(!files.length) return;
+  if(typeof _ensureXlsx !== 'function'){
+    alert('Библиотека XLSX недоступна');
+    return;
+  }
+  await _ensureXlsx();
+  const store = _rateReadCbrStore();
+  const errors = [];
+  let loaded = 0;
+  for(const f of files){
+    try {
+      const parsed = await _rateParseCbrXlsx(f);
+      store[parsed.type] = {
+        updatedAt: Date.now(),
+        fileName: parsed.fileName,
+        series: parsed.series,
+        latest: parsed.latest,
+        latestDate: parsed.latestDate
+      };
+      loaded++;
+    } catch(e){
+      errors.push(f.name + ': ' + (e.message || e));
+    }
+  }
+  try { localStorage.setItem('bondan_ratecb_cbrdata', JSON.stringify(store)); } catch(e){
+    errors.push('localStorage: ' + e.message);
+  }
+  _rateRenderCbrSummary();
+  if(loaded){
+    _rateAutofillFromCbr(true);
+  }
+  if(errors.length){
+    alert('Импортировано файлов: ' + loaded + '\nОшибки:\n' + errors.join('\n'));
+  }
+}
+
+async function _rateParseCbrXlsx(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type: 'array', cellDates: true});
+  const sh = wb.Sheets[wb.SheetNames[0]];
+  if(!sh) throw new Error('Пустой файл');
+  const rows = XLSX.utils.sheet_to_json(sh, {header: 1, raw: true, defval: null});
+  const header = String((rows[0] || [])[0] || '').toLowerCase();
+  if(/трендовой инфляц|модифицированных показателей базовой/.test(header)){
+    return _rateParseEstInfl(file.name, rows);
+  }
+  if(/потребительских цен.*сезонность устранена/.test(header) &&
+     !/регионам/.test(header)){
+    return _rateParseIndicatorsCpd(file.name, rows);
+  }
+  if(/по рф и регионам|по регионам/i.test(header)){
+    return _rateParseRegCpd(file.name, wb);
+  }
+  throw new Error('Неизвестный формат заголовка: «' + header.slice(0, 60) + '…»');
+}
+
+// est_infl: row 2 — даты, row 3 — trend5y, row 4 — trend3y,
+//           row 6 — mod_base_trim, row 7 — mod_base_excl
+function _rateParseEstInfl(fileName, rows){
+  const dates = _rateExtractDates(rows[1]);
+  const extract = (rowIdx) => {
+    const vals = (rows[rowIdx] || []).slice(1);
+    const out = [];
+    for(let i = 0; i < dates.length; i++){
+      if(dates[i] && typeof vals[i] === 'number' && isFinite(vals[i])) out.push({date: dates[i], value: vals[i]});
+    }
+    return out;
+  };
+  const series = {
+    trend5y:         extract(2),
+    trend3y:         extract(3),
+    mod_base_trim:   extract(5),
+    mod_base_excl:   extract(6)
+  };
+  return _rateFinalize('est_infl', fileName, series);
+}
+
+// indicators_cpd: row 1 — даты, row 2 — «Все товары», row 3 — без плодоовощной/топлива/ЖКХ,
+// row 54 — Базовый ИПЦ. Значения — SA MoM (%).
+function _rateParseIndicatorsCpd(fileName, rows){
+  const dates = _rateExtractDates(rows[0]);
+  const extract = (rowIdx) => {
+    const vals = (rows[rowIdx] || []).slice(1);
+    const out = [];
+    for(let i = 0; i < dates.length; i++){
+      if(dates[i] && typeof vals[i] === 'number' && isFinite(vals[i])) out.push({date: dates[i], value: vals[i]});
+    }
+    return out;
+  };
+  // Поиск строк по имени — устойчивее, чем жёсткий индекс.
+  const findRow = (regex) => {
+    for(let r = 1; r < rows.length; r++){
+      const lbl = String((rows[r] || [])[0] || '').trim();
+      if(regex.test(lbl)) return r;
+    }
+    return -1;
+  };
+  const series = {};
+  const rAll  = findRow(/^Все товары и услуги/i);
+  const rCore = findRow(/^-?\s*без плодоовощной/i);
+  const rBase = findRow(/^Базовый ИПЦ(\s|$)/);
+  if(rAll  >= 0) series.all_sa_mom       = extract(rAll);
+  if(rCore >= 0) series.core_sa_mom      = extract(rCore);
+  if(rBase >= 0) series.base_cpi_sa_mom  = extract(rBase);
+  return _rateFinalize('indicators_cpd', fileName, series);
+}
+
+// reg_cpd: три листа — гг (YoY), мм (MoM), ммск (SA MoM). Берём ряд «Россия».
+function _rateParseRegCpd(fileName, wb){
+  const readSheet = (shName) => {
+    const sh = wb.Sheets[shName];
+    if(!sh) return [];
+    const rows = XLSX.utils.sheet_to_json(sh, {header: 1, raw: true, defval: null});
+    const dates = _rateExtractDates(rows[0]);
+    for(let r = 1; r < rows.length; r++){
+      const lbl = String((rows[r] || [])[0] || '').trim();
+      if(/^Россия$/i.test(lbl)){
+        const vals = (rows[r] || []).slice(1);
+        const out = [];
+        for(let i = 0; i < dates.length; i++){
+          if(dates[i] && typeof vals[i] === 'number' && isFinite(vals[i])) out.push({date: dates[i], value: vals[i]});
+        }
+        return out;
+      }
+    }
+    return [];
+  };
+  const series = {
+    russia_yoy:    readSheet('гг'),
+    russia_mom:    readSheet('мм'),
+    russia_sa_mom: readSheet('ммск')
+  };
+  return _rateFinalize('reg_cpd', fileName, series);
+}
+
+function _rateExtractDates(headerRow){
+  const out = [];
+  const cells = (headerRow || []).slice(1);
+  for(const v of cells){
+    if(v instanceof Date && !isNaN(v)){
+      out.push(v.toISOString().slice(0, 10));
+    } else if(typeof v === 'number' && v > 10000 && v < 80000){
+      // Excel serial date → JS Date
+      const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+      out.push(d.toISOString().slice(0, 10));
+    } else if(typeof v === 'string' && v){
+      const d = new Date(v);
+      out.push(isNaN(d) ? null : d.toISOString().slice(0, 10));
+    } else {
+      out.push(null);
+    }
+  }
+  return out;
+}
+
+function _rateFinalize(type, fileName, series){
+  const latest = {}, latestDate = {};
+  for(const k in series){
+    const arr = series[k];
+    if(arr && arr.length){
+      const last = arr[arr.length - 1];
+      latest[k]     = last.value;
+      latestDate[k] = last.date;
+    }
+  }
+  if(!Object.keys(latest).length){
+    throw new Error('Не удалось извлечь ни одного ряда из файла');
+  }
+  return {type, fileName, series, latest, latestDate};
+}
+
+function _rateReadCbrStore(){
+  try {
+    const raw = localStorage.getItem('bondan_ratecb_cbrdata');
+    return raw ? JSON.parse(raw) : {};
+  } catch(e){ return {}; }
+}
+
+function _rateRenderCbrSummary(){
+  const el = document.getElementById('rate-cbr-summary');
+  const stamp = document.getElementById('rate-cbr-stamp');
+  if(!el) return;
+  const store = _rateReadCbrStore();
+  const parts = [], loaded = [];
+  let lastUpd = 0;
+  const fmt = (v) => typeof v === 'number' ? v.toFixed(2) : '—';
+  if(store.est_infl){
+    loaded.push('est_infl');
+    lastUpd = Math.max(lastUpd, store.est_infl.updatedAt || 0);
+    const d = (store.est_infl.latestDate || {}).trend5y || '';
+    if(store.est_infl.latest.trend5y != null)       parts.push('Трендовая 5Y: <b>' + fmt(store.est_infl.latest.trend5y) + '%</b>' + (d ? ' <span class="muted">('+d+')</span>' : ''));
+    if(store.est_infl.latest.mod_base_trim != null) parts.push('Модиф.база (усеч., ann.): <b>' + fmt(store.est_infl.latest.mod_base_trim * 12) + '%</b>');
+  }
+  if(store.indicators_cpd){
+    loaded.push('indicators_cpd');
+    lastUpd = Math.max(lastUpd, store.indicators_cpd.updatedAt || 0);
+    if(store.indicators_cpd.latest.all_sa_mom != null)  parts.push('SA ann. (все): <b>' + fmt(store.indicators_cpd.latest.all_sa_mom * 12) + '%</b>');
+    if(store.indicators_cpd.latest.base_cpi_sa_mom != null) parts.push('Базовый ИПЦ SA ann.: <b>' + fmt(store.indicators_cpd.latest.base_cpi_sa_mom * 12) + '%</b>');
+  }
+  if(store.reg_cpd){
+    loaded.push('reg_cpd');
+    lastUpd = Math.max(lastUpd, store.reg_cpd.updatedAt || 0);
+    if(store.reg_cpd.latest.russia_yoy != null) parts.push('РФ YoY: <b>' + fmt(store.reg_cpd.latest.russia_yoy) + '%</b>');
+  }
+  if(!loaded.length){
+    el.style.display = 'none';
+    if(stamp) stamp.textContent = '';
+    return;
+  }
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div><b>Загружено:</b> ' + loaded.join(', ') + '</div>' +
+    (parts.length ? '<div style="margin-top:4px">' + parts.join(' · ') + '</div>' : '') +
+    '<div style="margin-top:4px"><button class="btn btn-sm" style="padding:2px 8px;font-size:.56rem" onclick="_rateAutofillFromCbr(true)" title="Заполнить поля «Трендовая», «Модиф.базовая», «SA annualized», «Инфляция YoY» из последних значений ЦБ.">⤵ Применить последние значения в форму</button></div>';
+  if(stamp) stamp.textContent = 'обновлено: ' + new Date(lastUpd).toLocaleString('ru-RU');
+}
+
+function _rateAutofillFromCbr(showNotice){
+  const store = _rateReadCbrStore();
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if(el && v != null && !isNaN(v)) el.value = Number(v).toFixed(2);
+  };
+  if(store.est_infl && store.est_infl.latest){
+    if(store.est_infl.latest.trend5y != null)       set('rate-in-trend', store.est_infl.latest.trend5y);
+    if(store.est_infl.latest.mod_base_trim != null) set('rate-in-core',  store.est_infl.latest.mod_base_trim * 12);
+  }
+  if(store.indicators_cpd && store.indicators_cpd.latest && store.indicators_cpd.latest.all_sa_mom != null){
+    set('rate-in-sa', store.indicators_cpd.latest.all_sa_mom * 12);
+  }
+  if(store.reg_cpd && store.reg_cpd.latest && store.reg_cpd.latest.russia_yoy != null){
+    set('rate-in-cpi', store.reg_cpd.latest.russia_yoy);
+  }
+  if(showNotice){
+    const stamp = document.getElementById('rate-saved-stamp');
+    if(stamp) stamp.textContent = 'поля обновлены из cbr.ru · нажмите 💾 чтобы сохранить';
+  }
 }

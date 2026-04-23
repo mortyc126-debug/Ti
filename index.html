@@ -1280,9 +1280,26 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="card-hdr">📥 Текущее макросостояние</div>
     <div class="muted" style="font-size:.62rem;margin-bottom:8px">Введите свежие значения. Источники: ЦБ РФ (cbr.ru), Росстат, ЕМИСС, MOEX. По умолчанию — оценки на последний квартал.</div>
 
+    <!-- Блок импорта с cbr.ru -->
+    <div style="background:var(--bg2);border-left:2px solid var(--acc);padding:8px 12px;margin-bottom:10px;border-radius:4px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:.68rem"><b>🇷🇺 Импорт XLSX с cbr.ru</b></span>
+        <input type="file" id="rate-cbr-file" accept=".xlsx" multiple style="display:none" onchange="rateImportCbrXlsx(this)">
+        <button class="btn btn-sm" onclick="document.getElementById('rate-cbr-file').click()" title="Импорт файлов с cbr.ru/hd_base/infl/ (trend/core inflation, SA-динамика, региональный разрез). Автораспознавание по заголовку. Можно выделить сразу несколько.">📥 Выбрать файлы</button>
+        <span class="muted" id="rate-cbr-stamp" style="font-size:.58rem"></span>
+      </div>
+      <div class="muted" style="font-size:.58rem;margin-top:4px">
+        Ссылки: <a href="https://www.cbr.ru/hd_base/infl/" target="_blank" style="color:var(--acc)">cbr.ru/hd_base/infl/</a> — трендовая и базовая инфляция. Скачайте три XLSX: est_infl, indicators_cpd, reg_cpd — приложение заполнит поля ниже и сохранит полную историю.
+      </div>
+      <div id="rate-cbr-summary" style="display:none;margin-top:6px;font-size:.62rem;color:var(--text2)"></div>
+    </div>
+
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
       <div class="field"><label>Текущая КС, %<span class="muted" style="font-size:.55rem"> · cbr.ru</span></label><input type="number" step="0.25" id="rate-in-ks" value="21"></div>
-      <div class="field"><label>Инфляция YoY, %<span class="muted" style="font-size:.55rem"> · Росстат CPI</span></label><input type="number" step="0.1" id="rate-in-cpi" value="9.5"></div>
+      <div class="field"><label>Инфляция YoY, %<span class="muted" style="font-size:.55rem"> · Росстат CPI · headline</span></label><input type="number" step="0.1" id="rate-in-cpi" value="9.5"></div>
+      <div class="field"><label>Трендовая YoY, %<span class="muted" style="font-size:.55rem" title="Оценка трендовой инфляции ЦБ (5-летнее скользящее окно). Очищена от разовых шоков (курс, тарифы, плодоовощные). На неё реально ориентируется ЦБ при решениях по ставке.">· ЦБ · тренд 5Y</span></label><input type="number" step="0.1" id="rate-in-trend" placeholder="опц."></div>
+      <div class="field"><label>Модиф. базовая ann., %<span class="muted" style="font-size:.55rem" title="Модифицированный показатель базовой инфляции (метод усечения). В файле ЦБ — MoM, здесь анноализовано ×12.">· ЦБ · aMoM</span></label><input type="number" step="0.1" id="rate-in-core" placeholder="опц."></div>
+      <div class="field"><label>SA annualized, %<span class="muted" style="font-size:.55rem" title="Месячная инфляция с устранённой сезонностью, анноализованная (×12). Самый свежий импульс — разворот виден на 6-9 мес раньше YoY.">· ЦБ · SA×12</span></label><input type="number" step="0.1" id="rate-in-sa" placeholder="опц."></div>
       <div class="field"><label>Инф. ожидания, %<span class="muted" style="font-size:.55rem"> · опрос ООО «инФОМ»</span></label><input type="number" step="0.1" id="rate-in-exp" value="13.5"></div>
       <div class="field"><label>Таргет инфляции, %<span class="muted" style="font-size:.55rem"> · цель ЦБ</span></label><input type="number" step="0.1" id="rate-in-pitgt" value="4"></div>
       <div class="field"><label>ВВП YoY, %<span class="muted" style="font-size:.55rem"> · Росстат</span></label><input type="number" step="0.1" id="rate-in-gdp" value="1.2"></div>
@@ -1319,7 +1336,14 @@ document.addEventListener('DOMContentLoaded', () => {
       <p class="muted"><b>Ограничения:</b> линейная, не ловит ZLB/шоки, без финансового блока, без явной модели курса. На горизонте &lt; 4 кв. часто проигрывает рыночным форвардам.</p>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+      <label style="font-size:.62rem;color:var(--text2)">Инфляция для расчёта:</label>
+      <select id="rate-qpm-pisrc" class="btn btn-sm" style="padding:4px 8px;font-size:.62rem" title="Какой показатель инфляции подставлять в начальные условия. Trend/core часто дают более плавный и реалистичный прогноз — они очищены от разовых шоков.">
+        <option value="cpi">CPI YoY (headline)</option>
+        <option value="trend">Трендовая 5Y</option>
+        <option value="core">Модиф. базовая (ann.)</option>
+        <option value="sa">SA annualized</option>
+      </select>
       <button class="btn btn-p btn-sm" onclick="rateRunQpm()" title="Запустить симуляцию QPM на 8 кварталов вперёд по введённым параметрам.">▶ Рассчитать QPM</button>
       <button class="btn btn-sm" onclick="rateSetActive('qpm')" title="Сделать этот прогноз активным. Будет подставляться в расчёты YTM и купоны флоатеров." id="rate-qpm-set-btn" disabled>★ Сделать активным</button>
     </div>
