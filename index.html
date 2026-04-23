@@ -705,6 +705,16 @@ document.addEventListener('DOMContentLoaded', () => {
     <div id="portpay-chart" style="margin-top:8px;min-height:240px"></div>
   </div>
 
+  <!-- Единый график выплат всех известных эмитентов -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🌐 Пики по всем эмитентам (не только в портфеле)</span>
+      <button class="btn btn-sm" onclick="_ppLoadGlobalPeaks()" id="portpay-peaks-btn" title="Просканировать всех эмитентов из reportsDB, у которых есть выпуски в каталоге MOEX. Берёт уже закешированные bondization (быстро). Показывает топ-N эмитентов по объёму ближайших погашений.">📡 Просканировать</button>
+    </div>
+    <div class="muted" style="font-size:.6rem;margin-bottom:8px">Ваш собственный список «крупные погашения скоро» — даже у эмитентов, бумаг которых сейчас нет в портфеле. Помогает решить «не пора ли купить» до того как рынок отыграет крупное событие.</div>
+    <div id="portpay-peaks" style="margin-top:8px"></div>
+  </div>
+
   <!-- Концентрация: эмитенты + отрасли -->
   <div class="card" style="margin-top:12px">
     <div class="card-hdr">🥧 Концентрация портфеля</div>

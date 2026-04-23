@@ -24826,6 +24826,114 @@ function _ppRenderConcBars(map, topN){
   return stackedBar + '<table style="width:100%;font-size:.6rem;border-collapse:collapse"><tbody>' + rows + '</tbody></table>';
 }
 
+// Глобальный сканер пиков — для всех эмитентов из reportsDB, у которых
+// есть живые выпуски в _moexCatalog. Использует ИСКЛЮЧИТЕЛЬНО уже
+// закэшированные bondization (свой кэш + кэш страницы «📅 График выплат
+// эмитента»), чтобы не дёргать MOEX лишний раз. Показывает топ-N
+// эмитентов по сумме предстоящих платежей.
+async function _ppLoadGlobalPeaks(){
+  const box = document.getElementById('portpay-peaks');
+  if(!box) return;
+  const cat = window._moexCatalog;
+  if(!cat || !Array.isArray(cat.items) || !cat.items.length){
+    box.innerHTML = '<div class="muted" style="font-size:.6rem">Каталог MOEX не загружен. Откройте «🏛 Каталог облигаций» → «🔄 Обновить».</div>';
+    return;
+  }
+  if(!reportsDB || !Object.keys(reportsDB).length){
+    box.innerHTML = '<div class="muted" style="font-size:.6rem">reportsDB пуст. Добавьте эмитентов на странице «📂 Отчётность».</div>';
+    return;
+  }
+  box.innerHTML = '<div class="muted" style="font-size:.6rem">⏳ Группируем выпуски по эмитентам…</div>';
+  const issIdx = (typeof _moexBuildIssuerIndex === 'function') ? _moexBuildIssuerIndex() : null;
+  const matchFn = (typeof _moexMatchIssuer === 'function') ? _moexMatchIssuer : null;
+  // Группируем выпуски по эмитенту
+  const today = Date.now();
+  const horizonMs = today + 365 * 86400000;
+  const byIssuer = new Map();
+  for(const b of cat.items){
+    if(b.archivedAt) continue;
+    if(b.matDate && new Date(b.matDate).getTime() < today - 7 * 86400000) continue;
+    let id = b.issId;
+    if(!id && issIdx && matchFn) id = matchFn(b, issIdx);
+    if(!id) continue;
+    if(!byIssuer.has(id)) byIssuer.set(id, []);
+    byIssuer.get(id).push(b);
+  }
+  if(!byIssuer.size){
+    box.innerHTML = '<div class="muted" style="font-size:.6rem">Не нашлось выпусков, которые можно сматчить с эмитентами в reportsDB.</div>';
+    return;
+  }
+  // Используем оба кэша: _PP (per-bond) и _SCHED (per-issue).
+  // _SCHED уже даёт rub * issueSize, его удобно для агрегации.
+  const schedCache = (typeof _schedLoadCache === 'function') ? _schedLoadCache() : {};
+  const ppCache = _ppLoadCache();
+  const peaks = [];
+  for(const [issId, bonds] of byIssuer){
+    let totalCoupon = 0, totalPrin = 0, peakDate = null, peakAmt = 0, n = 0, missing = 0;
+    for(const b of bonds){
+      const sec = b.secid;
+      const issueSize = b.issueSize || 0;
+      // Предпочитаем sched-кэш (per-issue rub уже посчитан)
+      let evs = null;
+      const sc = schedCache[sec];
+      if(sc && sc.events){ evs = sc.events; }
+      else {
+        const pp = ppCache[sec];
+        if(pp && pp.events && issueSize > 0){
+          // Конвертируем per_bond в per_issue
+          evs = pp.events.map(e => ({ ...e, rub: (e.perBond || 0) * issueSize }));
+        }
+      }
+      if(!evs){ missing++; continue; }
+      n++;
+      for(const ev of evs){
+        if(ev.type !== 'coupon' && ev.type !== 'principal') continue;
+        const t = new Date(ev.date).getTime();
+        if(!isFinite(t) || t < today || t > horizonMs) continue;
+        const r = ev.rub || 0;
+        if(ev.type === 'coupon') totalCoupon += r;
+        else { totalPrin += r; if(r > peakAmt){ peakAmt = r; peakDate = ev.date; } }
+      }
+    }
+    const total = totalCoupon + totalPrin;
+    if(total <= 0 && peakAmt <= 0) continue;
+    const iss = reportsDB[issId];
+    peaks.push({ issId, name: (iss && iss.name) || issId, totalCoupon, totalPrin, total, peakDate, peakAmt, n, missing });
+  }
+  peaks.sort((a, b) => b.peakAmt - a.peakAmt);
+  if(!peaks.length){
+    box.innerHTML = '<div class="muted" style="font-size:.6rem">Нет данных в кэше. Откройте «📅 График выплат» у нескольких эмитентов чтобы наполнить кэш, потом «📡 Просканировать».</div>';
+    return;
+  }
+  const topN = peaks.slice(0, 30);
+  const fmt = v => v >= 1e9 ? (v/1e9).toFixed(2) + ' млрд' : v >= 1e6 ? (v/1e6).toFixed(0) + ' млн' : Math.round(v/1e3) + 'к';
+  const totalIssuersScanned = byIssuer.size;
+  const cached = peaks.length;
+  let html = '<div class="muted" style="font-size:.58rem;margin-bottom:6px">Из ' + totalIssuersScanned + ' эмитентов в каталоге у ' + cached + ' есть закэшированные данные. ' +
+    'Топ-30 по размеру максимального предстоящего погашения за 12 мес.</div>';
+  html += '<table style="width:100%;font-size:.6rem;border-collapse:collapse"><thead><tr style="background:var(--s3);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">' +
+    '<th style="padding:5px 8px;text-align:left">Эмитент</th>' +
+    '<th style="padding:5px 8px;text-align:right">Пиковое погашение</th>' +
+    '<th style="padding:5px 8px;text-align:right">Дата</th>' +
+    '<th style="padding:5px 8px;text-align:right">Всего тело</th>' +
+    '<th style="padding:5px 8px;text-align:right">Купоны</th>' +
+    '<th style="padding:5px 8px;text-align:left">Выпусков</th>' +
+  '</tr></thead><tbody>';
+  for(const p of topN){
+    const link = '<a href="#" onclick="event.preventDefault();_ppOpenIssuer(\'' + p.issId + '\');return false" style="color:var(--acc);text-decoration:none">' + p.name + '</a>';
+    html += '<tr style="border-top:1px solid var(--border)">' +
+      '<td style="padding:4px 8px">' + link + '</td>' +
+      '<td style="padding:4px 8px;text-align:right;font-family:var(--mono);font-weight:600;color:#f29a8a">' + fmt(p.peakAmt) + ' ₽</td>' +
+      '<td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">' + (p.peakDate || '—') + '</td>' +
+      '<td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:var(--text2)">' + fmt(p.totalPrin) + '</td>' +
+      '<td style="padding:4px 8px;text-align:right;font-family:var(--mono);color:#6ec4d9">' + fmt(p.totalCoupon) + '</td>' +
+      '<td style="padding:4px 8px;font-size:.55rem;color:var(--text3)">' + p.n + (p.missing ? ' (' + p.missing + ' без кэша)' : '') + '</td>' +
+    '</tr>';
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
 // Открывает страницу «📂 Отчётность» с выбранным эмитентом.
 function _ppOpenIssuer(id){
   if(typeof showPage === 'function') showPage('reports');
