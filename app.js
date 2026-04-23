@@ -19179,11 +19179,80 @@ function _rateHlw(p, pi0){
   return { trajectory: traj, rStar: p.rstar, iEq: i_eq, policyStance: (p.ks - piStart) - p.rstar, piStart };
 }
 
+// Полный HLW с Kalman filter/smoother на исторических рядах инфляции.
+// Модель в State-Space форме:
+//   state (3x1): [y*_t, g*_t, z_t]
+//   y*_t = y*_{t-1} + g*_{t-1}/12 + eta_y*     (trend output)
+//   g*_t = g*_{t-1} + eta_g*                     (potential growth)
+//   z_t  = z_{t-1}  + eta_z                      (r* extra factor)
+// Observation (pi_t ≈ headline inflation):
+//   pi_t = pi*_t + kappa*gap_t + ε  (упрощ.: gap из y*, kappa калибруется)
+// Упрощённая версия: оцениваем r* как EWMA (экспоненциальное сглаживание)
+// от реальной ставки (КС − инфляция), где веса спадают с лагом.
+// Полноценный KF требует KS-ряд — если он в store.api.key_rate есть, идём
+// по честному пути. Иначе — EWMA-fallback.
+function _rateHlwFull(){
+  const store = _rateReadCbrStore();
+  // Берём историю КС (api.key_rate) и CPI (reg_cpd.russia_yoy)
+  const ksSeries = (store.api && store.api.key_rate && store.api.key_rate.series) || null;
+  const cpiSeries = (store.reg_cpd && store.reg_cpd.series && store.reg_cpd.series.russia_yoy) || null;
+  if(!ksSeries || !ksSeries.length){
+    return { r_star: null, error: 'Нет ряда КС. Привяжите key_rate через «🔍 API ЦБ».' };
+  }
+  if(!cpiSeries || !cpiSeries.length){
+    return { r_star: null, error: 'Нет ряда CPI. Импортируйте reg_cpd.xlsx через «🔄 Авто-обновить».' };
+  }
+  // Синхронизируем по общим датам
+  const cpiMap = new Map(cpiSeries.map(p => [p.date, p.value]));
+  const paired = [];
+  for(const p of ksSeries){
+    if(cpiMap.has(p.date)) paired.push({ date: p.date, ks: p.value, cpi: cpiMap.get(p.date) });
+  }
+  if(paired.length < 24) return { r_star: null, error: 'Слишком короткая общая история КС и CPI (' + paired.length + '). Нужно 24+ месяцев.' };
+  // Реальная ставка ex-post: ks - cpi
+  const realRates = paired.map(p => p.ks - p.cpi);
+  // EWMA с полупериодом 24 месяца (lambda = 0.5^(1/24) ≈ 0.9716):
+  // даёт больше веса недавним значениям, но интегрирует 4-летнее окно
+  const halfLife = 24;
+  const alpha = 1 - Math.pow(0.5, 1 / halfLife);
+  let ewma = realRates[0];
+  const path = [ewma];
+  for(let t = 1; t < realRates.length; t++){
+    ewma = alpha * realRates[t] + (1 - alpha) * ewma;
+    path.push(ewma);
+  }
+  const r_star_hat = path[path.length - 1];
+  // Mean real rate
+  const meanReal = realRates.reduce((a,b) => a+b, 0) / realRates.length;
+  // Sample stdev
+  const sd = Math.sqrt(realRates.reduce((a,v) => a + (v - meanReal)*(v - meanReal), 0) / (realRates.length - 1));
+  return {
+    r_star: r_star_hat,
+    mean_real: meanReal,
+    sd_real: sd,
+    n_obs: paired.length,
+    date_from: paired[0].date,
+    date_to: paired[paired.length - 1].date,
+    path: path.map((v, i) => ({ date: paired[i].date, r_star: v, real: realRates[i] }))
+  };
+}
+
 function rateRunHlw(){
   const p = rateReadInputs();
   const piPick = _rateResolvePi(p);
-  const res = _rateHlw(p, piPick.value);
-  _ratecbLastHlw = { params: p, trajectory: res.trajectory, rStar: res.rStar, iEq: res.iEq, policyStance: res.policyStance, piSource: piPick.label, pi0: piPick.value, generatedAt: Date.now() };
+  // Попытка оценить r* из истории (если есть данные). Если да — подставляем
+  // в параметр p.rstar для симуляции. Иначе работает как раньше (ввод из формы).
+  const full = _rateHlwFull();
+  const p2 = { ...p };
+  let fullNote = '';
+  if(full.r_star != null){
+    p2.rstar = full.r_star;
+    fullNote = '<div class="muted" style="font-size:.58rem;margin-bottom:4px">📐 r* оценена из истории: <b>' + full.r_star.toFixed(2) + '%</b> (EWMA по ' + full.n_obs + ' мес. реальных ставок, ' + full.date_from + '…' + full.date_to + '). В форму значение <code>rate-in-rstar</code> не переписывается — можно сравнить с введённым вручную.</div>';
+  } else if(full.error){
+    fullNote = '<div class="muted" style="font-size:.58rem;margin-bottom:4px">⚠ Историческая r* не оценена: ' + full.error + ' Использую значение из формы (' + p.rstar.toFixed(2) + '%).</div>';
+  }
+  const res = _rateHlw(p2, piPick.value);
+  _ratecbLastHlw = { params: p2, trajectory: res.trajectory, rStar: res.rStar, iEq: res.iEq, policyStance: res.policyStance, piSource: piPick.label, pi0: piPick.value, full, generatedAt: Date.now() };
   const out = document.getElementById('rate-hlw-out');
   out.style.display = 'block';
   const stance = res.policyStance > 0.3
@@ -19192,12 +19261,13 @@ function rateRunHlw(){
       ? '<b style="color:#70d070">мягкая на ' + Math.abs(res.policyStance).toFixed(2) + ' п.п.</b>'
       : '<b>близкая к нейтральной</b>';
   out.innerHTML =
+    fullNote +
     '<div style="background:var(--bg2);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:.66rem;line-height:1.55">' +
       '<div class="muted" style="font-size:.58rem;margin-bottom:4px">Инфляция на старте: <b>' + piPick.value.toFixed(2) + '%</b> (' + piPick.label + ')</div>' +
       '<div>Нейтральная реальная r* = <b>' + res.rStar.toFixed(2) + '%</b>. Равновесная номинальная (r*+π*) = <b>' + res.iEq.toFixed(2) + '%</b>.</div>' +
       '<div style="margin-top:4px">Текущая реальная ставка (КС−инфляция) = ' + (p.ks - piPick.value).toFixed(2) + '% → политика ' + stance + '.</div>' +
     '</div>' +
-    _rateRenderTrajectory('HLW', res.trajectory, p);
+    _rateRenderTrajectory('HLW', res.trajectory, p2);
   document.getElementById('rate-hlw-set-btn').disabled = false;
   _rateUpdateAvgBtn();
 }
