@@ -20069,3 +20069,196 @@ function _rateApiAutofillFromApi(){
     set(info.field, v * mul);
   }
 }
+
+// ═══ MATLIB: минимальные матричные операции для BVAR/HLW/DFM ═════════════
+// Матрица — массив массивов [[a,b],[c,d]]. Все функции чистые, без мутации.
+// Размер ожидается корректный, проверок dimensions нет (быстрее).
+
+const _mat = {
+  // I_n
+  eye(n){
+    const r = [];
+    for(let i = 0; i < n; i++){ r.push(new Array(n).fill(0)); r[i][i] = 1; }
+    return r;
+  },
+  // Нулевая m×n
+  zeros(m, n){
+    const r = [];
+    for(let i = 0; i < m; i++) r.push(new Array(n).fill(0));
+    return r;
+  },
+  // Скаляр × матрица
+  scale(A, s){
+    return A.map(row => row.map(v => v * s));
+  },
+  // Транспонирование
+  trans(A){
+    const m = A.length, n = A[0].length, r = [];
+    for(let j = 0; j < n; j++){
+      const row = new Array(m);
+      for(let i = 0; i < m; i++) row[i] = A[i][j];
+      r.push(row);
+    }
+    return r;
+  },
+  // Сложение A+B
+  add(A, B){
+    return A.map((row, i) => row.map((v, j) => v + B[i][j]));
+  },
+  // Вычитание A-B
+  sub(A, B){
+    return A.map((row, i) => row.map((v, j) => v - B[i][j]));
+  },
+  // Умножение A (m×k) × B (k×n) = C (m×n)
+  mul(A, B){
+    const m = A.length, k = A[0].length, n = B[0].length;
+    const C = [];
+    for(let i = 0; i < m; i++){
+      const row = new Array(n).fill(0);
+      for(let p = 0; p < k; p++){
+        const a = A[i][p];
+        if(a === 0) continue;
+        const Bp = B[p];
+        for(let j = 0; j < n; j++) row[j] += a * Bp[j];
+      }
+      C.push(row);
+    }
+    return C;
+  },
+  // Решение Ax = b методом Гаусса с частичным выбором (A квадратная n×n, b n×k)
+  solve(A, b){
+    const n = A.length;
+    // Клонируем расширенную матрицу [A | b]
+    const M = A.map((row, i) => row.concat(b[i]));
+    const ncols = M[0].length;
+    for(let i = 0; i < n; i++){
+      // Выбор главного по столбцу
+      let piv = i;
+      for(let k = i + 1; k < n; k++){
+        if(Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
+      }
+      if(piv !== i){ const tmp = M[i]; M[i] = M[piv]; M[piv] = tmp; }
+      const d = M[i][i];
+      if(Math.abs(d) < 1e-14) throw new Error('Singular matrix at row ' + i);
+      for(let j = i; j < ncols; j++) M[i][j] /= d;
+      for(let k = 0; k < n; k++){
+        if(k === i) continue;
+        const f = M[k][i];
+        if(f === 0) continue;
+        for(let j = i; j < ncols; j++) M[k][j] -= f * M[i][j];
+      }
+    }
+    // Извлечь решение из правого блока
+    const x = [];
+    for(let i = 0; i < n; i++) x.push(M[i].slice(n));
+    return x;
+  },
+  // Обратная матрица через solve(A, I)
+  inv(A){
+    return _mat.solve(A, _mat.eye(A.length));
+  },
+  // Cholesky: A = L L^T (нижнетреугольная). A должна быть SPD.
+  chol(A){
+    const n = A.length;
+    const L = _mat.zeros(n, n);
+    for(let i = 0; i < n; i++){
+      for(let j = 0; j <= i; j++){
+        let s = A[i][j];
+        for(let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
+        if(i === j){
+          if(s <= 0) throw new Error('chol: not positive definite at ' + i);
+          L[i][j] = Math.sqrt(s);
+        } else {
+          L[i][j] = s / L[j][j];
+        }
+      }
+    }
+    return L;
+  },
+  // Kronecker (A ⊗ B)
+  kron(A, B){
+    const mA = A.length, nA = A[0].length;
+    const mB = B.length, nB = B[0].length;
+    const R = _mat.zeros(mA * mB, nA * nB);
+    for(let i = 0; i < mA; i++)
+      for(let j = 0; j < nA; j++){
+        const a = A[i][j];
+        for(let k = 0; k < mB; k++)
+          for(let l = 0; l < nB; l++)
+            R[i * mB + k][j * nB + l] = a * B[k][l];
+      }
+    return R;
+  },
+  // Утилита: создать вектор-столбец из массива чисел
+  col(arr){ return arr.map(v => [v]); },
+  // Вектор-строка
+  row(arr){ return [arr.slice()]; },
+  // Выбрать диагональ
+  diag(A){ return A.map((row, i) => row[i]); },
+  // Диагональная матрица из вектора
+  diagOf(v){
+    const n = v.length;
+    const D = _mat.zeros(n, n);
+    for(let i = 0; i < n; i++) D[i][i] = v[i];
+    return D;
+  }
+};
+
+// ─── Сборка мульти-ряда из bondan_ratecb_cbrdata ──────────────────────────
+// На вход: массив дескрипторов {bucket, key, mult?, label?}, где bucket —
+// est_infl/indicators_cpd/reg_cpd/api, key — имя ряда внутри bucket.
+// Возврат: { dates: ['YYYY-MM-01',...], cols: {label1: [v1,v2,...], ...} }
+// синхронизировано по общему диапазону дат (inner join).
+function _rateBuildSeriesMatrix(descriptors){
+  const store = _rateReadCbrStore();
+  const maps = [];       // [{label, map: Map<date, value>}]
+  for(const d of descriptors){
+    const bucket = store[d.bucket];
+    if(!bucket || !bucket.series) continue;
+    const arr = bucket.series[d.key];
+    if(!Array.isArray(arr) || !arr.length) continue;
+    const mult = (d.mult != null ? d.mult : 1);
+    const m = new Map();
+    for(const p of arr) m.set(p.date, p.value * mult);
+    maps.push({ label: d.label || d.key, map: m });
+  }
+  if(!maps.length) return { dates: [], cols: {} };
+  // Общий набор дат — пересечение
+  let commonDates = Array.from(maps[0].map.keys());
+  for(let i = 1; i < maps.length; i++){
+    const keys = maps[i].map;
+    commonDates = commonDates.filter(d => keys.has(d));
+  }
+  commonDates.sort();
+  const cols = {};
+  for(const m of maps){
+    cols[m.label] = commonDates.map(d => m.map.get(d));
+  }
+  return { dates: commonDates, cols };
+}
+
+// ─── Простые статистики на массиве ────────────────────────────────────────
+const _stats = {
+  mean(xs){ return xs.reduce((a,b) => a+b, 0) / xs.length; },
+  variance(xs){
+    const m = _stats.mean(xs);
+    return xs.reduce((a,v) => a + (v-m)*(v-m), 0) / (xs.length - 1);
+  },
+  std(xs){ return Math.sqrt(_stats.variance(xs)); },
+  diff(xs, lag){
+    lag = lag || 1;
+    const r = [];
+    for(let i = lag; i < xs.length; i++) r.push(xs[i] - xs[i-lag]);
+    return r;
+  },
+  // Аннуализированная месячная лог-доходность (ln(x_t/x_{t-1}) * 12 * 100)
+  logGrowth(xs, ann){
+    ann = ann || 1;
+    const r = [];
+    for(let i = 1; i < xs.length; i++){
+      if(xs[i] > 0 && xs[i-1] > 0) r.push(Math.log(xs[i]/xs[i-1]) * ann * 100);
+      else r.push(NaN);
+    }
+    return r;
+  }
+};
