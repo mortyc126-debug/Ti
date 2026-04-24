@@ -1,0 +1,45 @@
+name: Deploy Backend Worker
+
+# Деплой Cloudflare Worker (backend/) через wrangler.
+# Нужен repository secret: CLOUDFLARE_API_TOKEN (шаблон "Edit Cloudflare Workers").
+# Опциональный secret ADMIN_TOKEN — для /collect/* endpoints; ставится вручную
+# через workflow_dispatch с input=set-admin-token.
+
+on:
+  push:
+    branches:
+      - claude/determined-brahmagupta-XsEm4
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+    inputs:
+      set-admin-token:
+        description: "Обновить ADMIN_TOKEN из GitHub Secrets (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Deploy Worker
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@latest deploy
+
+      - name: Set ADMIN_TOKEN secret (on demand)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs['set-admin-token'] == 'true' }}
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          printf '%s' "$ADMIN_TOKEN" | npx --yes wrangler@latest secret put ADMIN_TOKEN
