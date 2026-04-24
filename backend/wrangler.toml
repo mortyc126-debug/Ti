@@ -16,8 +16,8 @@ compatibility_date = "2026-04-20"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "bondan-db"
-database_id   = "PUT_YOUR_DATABASE_ID_HERE"
+database_name = "coldline"
+database_id   = "4a99f3da-c0ab-e2b3-dac7-85733acaa3c3"
 
 # Ежедневный сбор в 10:30 по Москве (07:30 UTC).
 # TQBR (акции) и FORTS (фьючерсы) дёргаем за один cron-вызов, обе
