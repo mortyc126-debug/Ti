@@ -1,0 +1,41 @@
+# Cloudflare Workers + D1 — конфигурация для бэкенда БондАналитика.
+#
+# Деплой:
+#   npx wrangler login                          # один раз, OAuth в браузере
+#   npx wrangler d1 create bondan-db            # создать БД, взять database_id
+#   # вставить database_id в поле ниже
+#   npx wrangler d1 execute bondan-db --file=backend/schema.sql
+#   npx wrangler deploy                         # деплой Worker
+#
+# После deploy Worker URL будет вида https://bondan-backend.<account>.workers.dev
+# Cron-триггеры включаются автоматически по расписанию ниже.
+
+name = "bondan-backend"
+main = "worker.js"
+compatibility_date = "2026-04-20"
+
+# Free tier: 100k запросов/день, 10 мс CPU на запрос.
+# Для нашего объёма (ручные клики + 1 cron/сутки) — запасы огромные.
+
+[[d1_databases]]
+binding = "DB"              # в коде доступ через env.DB
+database_name = "bondan-db"
+database_id   = "PUT_YOUR_DATABASE_ID_HERE"   # <<< поставить после `d1 create`
+
+# Ежедневный сбор котировок в 10:00 по Москве (07:00 UTC).
+# В это время MOEX уже обновил вчерашний снапшот. До 10 утра данные
+# могут быть неполными.
+[triggers]
+crons = ["0 7 * * *"]
+
+# Переменные окружения (не секреты — просто конфиг).
+[vars]
+MOEX_BASE = "https://iss.moex.com"
+# Доски для сбора: ОФЗ (Т+), корпоративные облигации (Т+).
+# Можно добавить TQOD (замещающие), TQIR (USD-выпуски) по мере надобности.
+COLLECT_BOARDS = "TQOB,TQCB"
+
+# Секреты (для админ-endpoint'ов). Установить через:
+#   npx wrangler secret put ADMIN_TOKEN
+# Будет запрошено значение, сохранено зашифрованным.
+# ADMIN_TOKEN — в коде через env.ADMIN_TOKEN.
