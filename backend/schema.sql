@@ -1,35 +1,58 @@
 -- БондАналитик · бэкенд · D1 (SQLite) schema
 -- Выполняется одним вызовом `npx wrangler d1 execute <db> --file=backend/schema.sql`
 --
--- Минимальная стартовая схема для пилота: ежедневные котировки ОФЗ
--- с Т+ доски MOEX + лог запусков cron'а. Остальные таблицы добавляем
--- по мере переноса данных с localStorage.
+-- Пилотная схема: ежедневные котировки акций MOEX (доска TQBR) и
+-- фьючерсов на акции (FORTS). Основная аналитическая ценность — basis
+-- между спотовой ценой акции и ближайшим фьючерсом на неё.
 
--- ── Ежедневные котировки ОФЗ ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS ofz_daily (
-  secid       TEXT NOT NULL,        -- SU26238RMFS4, SU26233RMFS5 и т.д.
-  date        TEXT NOT NULL,        -- YYYY-MM-DD (дата срезa)
-  shortname   TEXT,                 -- «ОФЗ 26238» и т.п.
-  close_price REAL,                 -- PREVWAPRICE или LAST, % от номинала
-  ytm         REAL,                 -- YIELDATPREVWAPRICE, доходность % годовых
-  coupon      REAL,                 -- текущий купон, % годовых
-  mat_date    TEXT,                 -- YYYY-MM-DD, дата погашения
-  duration_d  INTEGER,              -- дюрация в днях
-  issue_size  INTEGER,              -- кол-во бумаг в выпуске
-  face_value  REAL,                 -- номинал, обычно 1000
-  updated_at  TEXT NOT NULL,        -- ISO-timestamp последнего апдейта строки
+-- ── Ежедневные котировки акций (spot, TQBR) ───────────────────────────
+CREATE TABLE IF NOT EXISTS stock_daily (
+  secid        TEXT NOT NULL,        -- SBER, GAZP, LKOH, YNDX и т.д.
+  date         TEXT NOT NULL,        -- YYYY-MM-DD
+  shortname    TEXT,                 -- «Сбер», «Газпром»
+  price        REAL,                 -- LAST или PREVPRICE, руб за акцию
+  prev_close   REAL,                 -- закрытие прошлого дня
+  open_price   REAL,
+  high_price   REAL,
+  low_price    REAL,
+  volume_rub   REAL,                 -- оборот в рублях
+  issue_size   INTEGER,              -- кол-во акций в обращении (для market cap)
+  face_value   REAL,                 -- номинал
+  updated_at   TEXT NOT NULL,        -- ISO timestamp
   PRIMARY KEY (secid, date)
 );
-CREATE INDEX IF NOT EXISTS idx_ofz_date ON ofz_daily(date);
-CREATE INDEX IF NOT EXISTS idx_ofz_secid ON ofz_daily(secid);
-CREATE INDEX IF NOT EXISTS idx_ofz_mat ON ofz_daily(mat_date);
+CREATE INDEX IF NOT EXISTS idx_stock_date ON stock_daily(date);
+CREATE INDEX IF NOT EXISTS idx_stock_secid ON stock_daily(secid);
+
+-- ── Ежедневные котировки фьючерсов на акции (FORTS) ──────────────────
+-- secid в FORTS: "SBER-3.26" / "GAZP-6.26" / короткий код "SBRH6"
+-- asset_code — код базовой акции (SBER, GAZP). По нему линкуем со stock_daily.
+CREATE TABLE IF NOT EXISTS futures_daily (
+  secid              TEXT NOT NULL,
+  date               TEXT NOT NULL,
+  asset_code         TEXT,           -- SBER / GAZP — связь с акцией
+  shortname          TEXT,
+  price              REAL,           -- LAST, в пунктах (не рублях — см. step_price)
+  prev_close         REAL,
+  last_delivery_date TEXT,           -- YYYY-MM-DD, дата экспирации
+  step_price         REAL,           -- рублей за 1 пункт изменения цены
+  min_step           REAL,           -- минимальный шаг цены
+  lot_size           INTEGER,        -- акций в одном контракте (обычно 100)
+  volume_rub         REAL,
+  open_position      INTEGER,        -- открытые позиции, контрактов
+  updated_at         TEXT NOT NULL,
+  PRIMARY KEY (secid, date)
+);
+CREATE INDEX IF NOT EXISTS idx_fut_asset ON futures_daily(asset_code);
+CREATE INDEX IF NOT EXISTS idx_fut_expiry ON futures_daily(last_delivery_date);
+CREATE INDEX IF NOT EXISTS idx_fut_date ON futures_daily(date);
 
 -- ── Лог запусков cron'а ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS collection_log (
   run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  started_at    TEXT NOT NULL,         -- ISO
+  started_at    TEXT NOT NULL,
   finished_at   TEXT,
-  source        TEXT NOT NULL,         -- 'moex_tqob', 'moex_tqcb', 'cbr_rates' и т.д.
+  source        TEXT NOT NULL,         -- 'moex_tqbr', 'moex_forts' и т.д.
   status        TEXT NOT NULL,         -- 'ok', 'partial', 'error'
   rows_inserted INTEGER DEFAULT 0,
   rows_updated  INTEGER DEFAULT 0,

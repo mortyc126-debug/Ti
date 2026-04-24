@@ -1,62 +1,60 @@
 # Backend — бэкенд БондАналитика
 
 Серверная часть для автоматизированного фонового сбора данных и долговременного
-хранения. Пилотная версия: один Cloudflare Worker + D1 (SQLite) + ежедневный
-cron, который тянет котировки ОФЗ с MOEX.
+хранения. Пилот: ежедневный сбор акций MOEX (TQBR) + фьючерсов на акции (FORTS)
++ расчёт **basis** — расхождения между спотом и ближайшим фьючерсом.
 
-## Зачем это
+## Почему basis
 
-До сих пор всё хранилось в браузерном `localStorage` (лимит ~5 МБ) и собиралось
-только когда вы сами открывали приложение. Бэкенд снимает оба ограничения:
-5 ГБ бесплатной БД и фоновой сбор данных каждую ночь без вашего участия.
+`basis = цена фьючерса − (цена акции × размер лота)`
 
-**Стоимость**: $0/мес на вашем объёме и в обозримом будущем. Cloudflare
-Workers free tier — 100k запросов/день, D1 free tier — 5 ГБ / 5M чтений / 100k
-записей в сутки. Превышений не ожидается.
+- Положительный basis (**контанго**) — фьючерс дороже спота. Обычно отражает
+  стоимость удержания позиции (процентная ставка) или ожидание роста.
+- Отрицательный (**бэквордация**) — фьючерс дешевле. Может означать
+  ожидание дивидендов, давление продаж, конкретные события.
+- Аннуализированный basis (`basis_ann = basis_pct × 365/days_to_expiry`)
+  сравнивает между разными экспирациями, удобно строить единый ряд.
+
+Изменения basis часто **упреждают** движение самой цены акции — это одна
+из классических стратегий (cash-and-carry arbitrage, событийный шорт).
+
+## Стоимость
+
+**$0/мес** на вашем объёме: Cloudflare Workers free tier (100k req/день),
+D1 free tier (5 ГБ, 5M чтений/день). Накопленные данные годами уложатся
+в лимиты.
 
 ## Разворачивание (15 минут, один раз)
 
 ### 0. Предварительно
 
-- У вас должен быть аккаунт на https://dash.cloudflare.com (уже есть).
-- Установлен Node.js 18+ (проверить: `node --version`).
-- Локально склонирован этот репозиторий.
+- Аккаунт на https://dash.cloudflare.com (у вас уже есть).
+- Node.js 18+ (`node --version`).
+- Репозиторий склонирован локально.
 
-### 1. Установить wrangler (Cloudflare CLI)
+### 1. Установить wrangler
 
 ```sh
 npm install -g wrangler
 ```
 
-### 2. Логин в Cloudflare
+### 2. Логин
 
 ```sh
 wrangler login
 ```
 
-Откроется браузер, подтверждаете доступ wrangler'а к аккаунту.
-
-### 3. Создать БД D1
+### 3. Создать БД
 
 ```sh
 wrangler d1 create bondan-db
 ```
 
-В ответе будет что-то вроде:
-
-```
-✅ Successfully created DB 'bondan-db'
-[[d1_databases]]
-binding = "DB"
-database_name = "bondan-db"
-database_id = "abc123de-4567-89ab-cdef-0123456789ab"
-```
-
-**Скопируйте `database_id`** (32-значный hex с дефисами).
+Ответ будет содержать `database_id` (hex с дефисами). Скопировать.
 
 ### 4. Вписать database_id в wrangler.toml
 
-Откройте `backend/wrangler.toml` и замените `PUT_YOUR_DATABASE_ID_HERE` на
+В `backend/wrangler.toml` заменить `PUT_YOUR_DATABASE_ID_HERE` на
 скопированный ID.
 
 ### 5. Создать схему таблиц
@@ -65,115 +63,131 @@ database_id = "abc123de-4567-89ab-cdef-0123456789ab"
 wrangler d1 execute bondan-db --file=backend/schema.sql
 ```
 
-Должно ответить «Executed 2 commands in XXms» или подобное.
+Три таблицы: `stock_daily`, `futures_daily`, `collection_log`.
 
-### 6. Задать секрет для админ-endpoint'а (для /collect POST)
+### 6. Задать секрет для админ-endpoint'ов
 
 ```sh
 wrangler secret put ADMIN_TOKEN
 ```
 
-Попросит ввести значение — придумайте длинную случайную строку
-(например `openssl rand -hex 16`) и сохраните её где-то. Она нужна для
-ручного запуска коллектора по HTTP.
+Ввести длинную случайную строку (например, `openssl rand -hex 16`).
+Нужна для `/collect/*` POST-вызовов.
 
-### 7. Задеплоить Worker
+### 7. Задеплоить
 
 ```sh
 cd backend && wrangler deploy
 ```
 
-(Или из корня: `wrangler deploy --config backend/wrangler.toml`.)
+В ответе будет URL вида `https://bondan-backend.<account>.workers.dev`.
 
-В ответе будет URL Worker'а:
-
-```
-https://bondan-backend.<ваш-аккаунт>.workers.dev
-```
-
-Сохраните — это адрес бэкенда.
-
-### 8. Проверить что живо
+### 8. Проверка
 
 ```sh
-curl https://bondan-backend.<ваш-аккаунт>.workers.dev/status
+curl https://bondan-backend.<account>.workers.dev/status
 ```
 
-Должен вернуть JSON вида:
+Должно быть `{"ok": true, "db": {"stock_daily_rows": 0, ...}}`.
 
-```json
-{
-  "ok": true,
-  "db": { "ofz_daily_rows": 0, "ofz_latest_date": null },
-  "last_run": null,
-  "version": "0.1-pilot"
-}
-```
-
-### 9. Запустить первый сбор руками (чтобы не ждать 10:00 утра)
+### 9. Первый сбор руками
 
 ```sh
-curl -X POST -H "X-Admin-Token: ВАШ_ADMIN_TOKEN" \
-  https://bondan-backend.<ваш-аккаунт>.workers.dev/collect/ofz
+curl -X POST -H "X-Admin-Token: ВАШ_ТОКЕН" \
+  https://bondan-backend.<account>.workers.dev/collect/stock
+
+curl -X POST -H "X-Admin-Token: ВАШ_ТОКЕН" \
+  https://bondan-backend.<account>.workers.dev/collect/futures
 ```
 
-Ответ:
-
-```json
-{
-  "status": "ok",
-  "boards": ["TQOB", "TQCB"],
-  "rowsTotal": { "inserted": 47, "updated": 0 },
-  "duration_ms": 1823
-}
-```
-
-После этого `/status` покажет `ofz_daily_rows: 47` и дату последнего запуска.
-
-Повторите `/status` и `/ofz/latest` чтобы убедиться что данные
-действительно сохранились.
+После этого `/status` покажет заполненные таблицы.
 
 ## Endpoints
 
-| Метод + путь | Что делает |
-|---|---|
-| `GET /status` | Диагностика: сколько строк в БД, когда последний сбор. |
-| `GET /ofz/latest?limit=N` | Свежий снапшот ОФЗ (одна строка на выпуск). |
-| `GET /ofz/history?secid=SU26238RMFS4&from=2026-01-01&to=2026-12-31` | История одной бумаги. |
-| `POST /collect/ofz` | Ручной запуск коллектора. Требует заголовок `X-Admin-Token`. |
+### Статус
+
+`GET /status` — строк в БД, последние 5 запусков cron.
+
+### Акции
+
+- `GET /stock/latest?limit=500` — свежий снапшот всех акций TQBR,
+  отсортировано по обороту.
+- `GET /stock/history?secid=SBER&from=2024-01-01&to=2026-12-31` —
+  история одной акции.
+
+### Фьючерсы
+
+- `GET /futures/latest?asset=SBER` — все живые фьючерсы на SBER
+  (с разными экспирациями). Без `asset` — все.
+- Без фильтра выводит по порядку `asset_code → expiry`.
+
+### Basis
+
+- `GET /basis?asset=SBER` — прямо сейчас:
+  ```json
+  {
+    "asset": "SBER",
+    "stock": { "price": 312.45, "spot_value_per_lot": 31245 },
+    "futures": { "secid": "SBRU6", "price": 31500, "expiry": "2026-09-15" },
+    "basis": { "rub": 255, "pct": 0.816, "pct_annualized": 2.12,
+               "days_to_expiry": 140, "direction": "contango..." }
+  }
+  ```
+- `GET /basis/history?asset=SBER&from=2020-01-01` — временной ряд для
+  построения графика basis_pct за всё накопленное.
+
+### Ручной запуск
+
+- `POST /collect/stock` — запросить TQBR прямо сейчас.
+- `POST /collect/futures` — FORTS.
+- Оба требуют заголовок `X-Admin-Token: <ваш секрет>`.
 
 ## Cron
 
-Каждое утро в 10:00 по Москве (07:00 UTC) Worker автоматически дёргает
-`collectOfz`. Вы ничего не нажимаете.
+Каждое утро в 10:30 по Москве (07:30 UTC) Worker автоматически:
+1. Тянет TQBR → пишет в `stock_daily` (UPSERT).
+2. Тянет FORTS → пишет в `futures_daily` (UPSERT).
+3. Логирует оба запуска в `collection_log`.
 
-Проверить что cron сработал: `GET /status` — смотреть `last_run.started_at`.
+Проверить что cron сработал: `GET /status`, смотреть `recent_runs[0]`.
 
 ## Дальше
 
-Следующие шаги (не в этом коммите):
+После того как бэкенд живёт неделю-две и накопились данные:
 
-1. **Фронтенд подключается к бэкенду.** Новый модуль в `app.js`,
-   endpoint `BACKEND_URL` хранится в `localStorage['bondan_backend_url']`.
-   Страница «🔗 Связи» при необходимости подтягивает ряды из бэкенда
-   вместо клиентского `localStorage.bondan_ratecb_cbrdata`.
-2. **Добавить коллекторы**: CPI/КС/курс с cbr.ru, существенные факты
-   с e-disclosure, корпоративные облигации (TQCB с пагинацией).
-3. **Cerebras интеграция.** ИИ-парсер для страниц с нестандартной
-   разметкой. Прокси через этот же Worker (плюсом ключ хранится в
-   секретах Cloudflare, не в браузере).
-4. **Миграция localStorage → D1.** По одному разделу за раз:
-   `portfolio`, `reportsDB`, `ytmBonds`. Клиент ходит в API, не в
-   `localStorage`.
+1. **Клиент подключается к бэкенду.** Новый модуль в `app.js` —
+   `BACKEND_URL` в `localStorage['bondan_backend_url']`. Страница
+   «🔗 Связи» или новая «📉 Basis» читает ряды из `/basis/history`.
+2. **Добавить коллекторы**: FRED (сырьё, DXY, US ставки), CPI/КС
+   с cbr.ru. Каждый источник → своя таблица + endpoint.
+3. **Cerebras через Worker.** Ключ хранится в секретах Cloudflare
+   (не в браузере). Endpoints `/ai/extract` для HTML-парсинга.
+4. **Миграция localStorage → D1.** `portfolio`, `reportsDB` по одному
+   разделу переходят из клиента в БД.
+5. **ML-сигналы.** Отдельная Python-функция (Fly.io free) или скрипт
+   в D1-query: Granger-causality, feature importance, event study.
+6. **Алерты.** Telegram-бот при срабатывании сигнала.
 
 ## Troubleshooting
 
-- **`D1_ERROR: no such table: ofz_daily`** — не запустили `schema.sql`.
-  Повторите шаг 5.
-- **`401 unauthorized` на /collect** — неправильный `X-Admin-Token` или
-  секрет не задан. Перепроверьте `wrangler secret put ADMIN_TOKEN`.
-- **Cron не срабатывает** — проверьте вкладку Triggers в dashboard
-  Cloudflare (Workers → bondan-backend → Triggers). Должна быть запись
-  `0 7 * * *`.
-- **Ошибки в логах** — `wrangler tail bondan-backend` показывает
-  realtime-логи Worker'а (включая `console.error` из cron).
+- **`D1_ERROR: no such table`** — не запустили `schema.sql`. Шаг 5.
+- **`401 unauthorized`** на `/collect` — не совпадает `X-Admin-Token`.
+  Перепроверить `wrangler secret put ADMIN_TOKEN`.
+- **Cron не срабатывает** — проверить в dashboard Cloudflare: Workers
+  → bondan-backend → Triggers. Должна быть строка `30 7 * * *`.
+- **Логи в реальном времени**: `wrangler tail bondan-backend`.
+- **Фьючерсы не нашлись** — у MOEX FORTS `ASSETCODE` может для
+  некоторых старых контрактов отличаться. В парсере стоит фильтр
+  `^[A-Z]{4,6}$` (только буквы, 4-6 символов). Для специфичных случаев
+  (Si, Eu) фильтр пропустит — это нормально для MVP фокуса на акциях.
+
+## Ограничения этой версии
+
+- Собирается только **«текущий срез»** — одна строка на бумагу в день.
+  Внутридневных данных нет. Для вашей задачи этого пока достаточно.
+- Исторических данных **назад во времени нет** — БД наполняется с
+  сегодняшнего дня. Через 6 месяцев будет полгода истории, через
+  год — год.
+- Для построения исторических basis нужно, чтобы и акция, и фьючерс
+  торговались в эти даты. Экспирация каждые 3 месяца, поэтому для
+  каждой конкретной пары basis непрерывен в пределах 3 мес.
