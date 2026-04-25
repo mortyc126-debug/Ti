@@ -1,8 +1,8 @@
 // Cloudflare Worker — бэкенд БондАналитика.
 //
-// Пилот: ежедневный сбор акций (TQBR) и фьючерсов на акции (FORTS) +
-// endpoint для расчёта basis (расхождение между спотом и ближайшим
-// фьючерсом).
+// Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB корпораты,
+// TQOB ОФЗ). На этом стенде строится basis для акций и spread-to-OFZ
+// для бондов.
 //
 // Endpoints:
 //   GET  /status                       диагностика БД
@@ -11,10 +11,16 @@
 //   GET  /futures/latest?asset=SBER    фьючерсы (все экспирации) на актив
 //   GET  /basis?asset=SBER             текущий basis по ближайшему фьючерсу
 //   GET  /basis/history?asset=SBER     история basis за всё время
+//   GET  /bond/latest?board=TQCB       последний срез всех облигаций
+//                    &limit=N&min_yield=&max_yield=
+//                    &inn=&issuer=     фильтры по эмитенту
+//   GET  /bond/history?secid=X         история одной облигации
+//   GET  /bond/issuer?inn=X            все живые бумаги одного эмитента
 //   POST /collect/stock                ручной сбор акций (X-Admin-Token)
 //   POST /collect/futures              ручной сбор фьючерсов
+//   POST /collect/bonds                ручной сбор облигаций
 //
-// Cron: 0 7 * * * (10:00 MSK) — собирает обе доски за раз.
+// Cron: 30 7 * * * (10:30 MSK) — собирает все три доски за раз.
 //
 // Basis = futures.price_rub - stock.price × lot_size
 // В процентах: basis_pct = basis / (stock.price × lot_size) × 100
@@ -46,18 +52,23 @@ export default {
       if(url.pathname === '/futures/latest')  return await handleFuturesLatest(env, url);
       if(url.pathname === '/basis')           return await handleBasis(env, url);
       if(url.pathname === '/basis/history')   return await handleBasisHistory(env, url);
+      if(url.pathname === '/bond/latest')     return await handleBondLatest(env, url);
+      if(url.pathname === '/bond/history')    return await handleBondHistory(env, url);
+      if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
 
-      if(req.method === 'POST' && (url.pathname === '/collect/stock' || url.pathname === '/collect/futures')){
+      if(req.method === 'POST' && (url.pathname === '/collect/stock' || url.pathname === '/collect/futures' || url.pathname === '/collect/bonds')){
         const token = req.headers.get('X-Admin-Token') || '';
         if(!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) return errResp('unauthorized', 401);
         if(url.pathname === '/collect/stock')   return jsonResp(await collectStocks(env));
         if(url.pathname === '/collect/futures') return jsonResp(await collectFutures(env));
+        if(url.pathname === '/collect/bonds')   return jsonResp(await collectBonds(env));
       }
 
       return errResp(
         'Not Found. Endpoints: /status, /stock/latest, /stock/history?secid=X, '
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
-        + 'POST /collect/{stock|futures}',
+        + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
+        + 'POST /collect/{stock|futures|bonds}',
         404
       );
     } catch(e){
@@ -65,11 +76,12 @@ export default {
     }
   },
 
-  // Cron — ежедневный сбор обеих досок.
+  // Cron — ежедневный сбор всех досок.
   async scheduled(event, env, ctx){
     ctx.waitUntil((async () => {
       try { await collectStocks(env); }  catch(e){ console.error('cron stocks:',  e.message); }
       try { await collectFutures(env); } catch(e){ console.error('cron futures:', e.message); }
+      try { await collectBonds(env); }   catch(e){ console.error('cron bonds:',   e.message); }
     })());
   },
 };
@@ -77,6 +89,22 @@ export default {
 // ═══ Endpoints ════════════════════════════════════════════════════════════
 
 async function handleStatus(env){
+  // bond_daily может ещё не существовать при первом деплое v0.3 —
+  // оборачиваем в try-catch, чтобы /status оставался живым.
+  let bondCount = null, bondLatest = null, bondTqcb = null, bondTqob = null;
+  try {
+    const [rb, lb, tqcb, tqob] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) as c FROM bond_daily').first(),
+      env.DB.prepare('SELECT MAX(date) as d FROM bond_daily').first(),
+      env.DB.prepare("SELECT COUNT(DISTINCT secid) as c FROM bond_daily WHERE board = 'TQCB'").first(),
+      env.DB.prepare("SELECT COUNT(DISTINCT secid) as c FROM bond_daily WHERE board = 'TQOB'").first(),
+    ]);
+    bondCount = rb?.c ?? 0;
+    bondLatest = lb?.d ?? null;
+    bondTqcb = tqcb?.c ?? 0;
+    bondTqob = tqob?.c ?? 0;
+  } catch(_){ /* таблицы ещё нет — миграция не запускалась */ }
+
   const [rowsStock, rowsFut, lastLog, latestStockDate, latestFutDate] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) as c FROM stock_daily').first(),
     env.DB.prepare('SELECT COUNT(*) as c FROM futures_daily').first(),
@@ -91,9 +119,13 @@ async function handleStatus(env){
       stock_latest_date: latestStockDate?.d ?? null,
       futures_daily_rows: rowsFut?.c ?? 0,
       futures_latest_date: latestFutDate?.d ?? null,
+      bond_daily_rows: bondCount,
+      bond_latest_date: bondLatest,
+      bond_unique_tqcb: bondTqcb,
+      bond_unique_tqob: bondTqob,
     },
     recent_runs: lastLog.results || [],
-    version: '0.2-pilot-stocks-futures',
+    version: '0.3-pilot-bonds',
   });
 }
 
@@ -240,6 +272,70 @@ async function handleBasisHistory(env, url){
   return jsonResp({ asset, count: series.length, data: series });
 }
 
+// ═══ Endpoints: облигации ═════════════════════════════════════════════════
+
+// Последний срез облигаций. Фильтры: board (TQCB/TQOB), доходность, объём,
+// ИНН эмитента, поиск по имени. Сортировка по обороту (как у акций).
+async function handleBondLatest(env, url){
+  const limit    = Math.min(2000, parseInt(url.searchParams.get('limit') || '500', 10));
+  const board    = (url.searchParams.get('board') || '').toUpperCase();
+  const minYield = url.searchParams.get('min_yield');
+  const maxYield = url.searchParams.get('max_yield');
+  const inn      = url.searchParams.get('inn');
+  const issuer   = url.searchParams.get('issuer');
+
+  const where = ['s.date = m.maxd'];
+  const binds = [];
+  if(board)   { where.push('s.board = ?'); binds.push(board); }
+  if(minYield){ where.push('s.yield >= ?'); binds.push(parseFloat(minYield)); }
+  if(maxYield){ where.push('s.yield <= ?'); binds.push(parseFloat(maxYield)); }
+  if(inn)     { where.push('s.emitent_inn = ?'); binds.push(String(inn)); }
+  if(issuer)  { where.push('LOWER(s.emitent_name) LIKE ?'); binds.push('%' + String(issuer).toLowerCase() + '%'); }
+
+  const sql = `
+    SELECT s.*
+    FROM bond_daily s
+    INNER JOIN (
+      SELECT secid, MAX(date) AS maxd FROM bond_daily GROUP BY secid
+    ) m ON s.secid = m.secid
+    WHERE ${where.join(' AND ')}
+    ORDER BY COALESCE(s.volume_rub, 0) DESC, s.yield DESC
+    LIMIT ?
+  `;
+  binds.push(limit);
+  const rows = await env.DB.prepare(sql).bind(...binds).all();
+  return jsonResp({ count: rows.results.length, data: rows.results });
+}
+
+async function handleBondHistory(env, url){
+  const secid = (url.searchParams.get('secid') || '').toUpperCase();
+  if(!secid) return errResp('secid required, e.g. RU000A106DZ4');
+  const from = url.searchParams.get('from') || '2020-01-01';
+  const to   = url.searchParams.get('to')   || '2099-12-31';
+  const rows = await env.DB.prepare(
+    'SELECT date, price, prev_close, yield, duration_days, accrued_int, volume_rub, num_trades, status FROM bond_daily WHERE secid = ? AND date BETWEEN ? AND ? ORDER BY date ASC'
+  ).bind(secid, from, to).all();
+  return jsonResp({ secid, count: rows.results.length, data: rows.results });
+}
+
+async function handleBondIssuer(env, url){
+  const inn = url.searchParams.get('inn');
+  if(!inn) return errResp('inn required');
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await env.DB.prepare(`
+    SELECT s.*
+    FROM bond_daily s
+    INNER JOIN (
+      SELECT secid, MAX(date) AS maxd FROM bond_daily GROUP BY secid
+    ) m ON s.secid = m.secid AND s.date = m.maxd
+    WHERE s.emitent_inn = ?
+      AND (s.mat_date IS NULL OR s.mat_date >= ?)
+      AND (s.status IS NULL OR s.status = 'A')
+    ORDER BY s.mat_date ASC
+  `).bind(String(inn), today).all();
+  return jsonResp({ inn, count: rows.results.length, data: rows.results });
+}
+
 // ═══ Коллекторы ═══════════════════════════════════════════════════════════
 
 async function collectStocks(env){
@@ -322,6 +418,95 @@ async function collectFutures(env){
   return { source: 'moex_forts', rowsWritten, errors, duration_ms: Date.now() - t0 };
 }
 
+// Собираем TQCB (корпорат) + TQOB (ОФЗ). MOEX отдаёт страницами по
+// 100 строк по умолчанию, поэтому пагинация. Используем D1 batch чтобы
+// ~2000 INSERT'ов поместились в один scheduled-вызов (CPU-time cron'а
+// 30 сек, но без батча per-row INSERT нагрузка значительная).
+async function collectBonds(env){
+  const startedAt = new Date().toISOString();
+  const t0 = Date.now();
+  const base = env.MOEX_BASE || 'https://iss.moex.com';
+  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date().toISOString();
+  let rowsWritten = 0;
+  const errors = [];
+
+  // INSERT-шаблон вынесен — у D1 batch одинаковые prepared-statements
+  // объединяются в одну транзакцию.
+  const insertSql = `
+    INSERT INTO bond_daily (
+      secid, date, isin, shortname, board,
+      price, prev_close, open_price, high_price, low_price,
+      yield, duration_days, accrued_int,
+      volume_rub, num_trades,
+      face_value, face_unit, coupon_pct, coupon_value, coupon_period_days,
+      next_coupon_date, mat_date, offer_date,
+      issue_size, list_level, status,
+      emitent_name, emitent_inn,
+      updated_at
+    )
+    VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?, ?,?, ?,?,?,?,?, ?,?,?, ?,?,?, ?,?, ?)
+    ON CONFLICT(secid, date) DO UPDATE SET
+      isin=excluded.isin, shortname=excluded.shortname, board=excluded.board,
+      price=excluded.price, prev_close=excluded.prev_close,
+      open_price=excluded.open_price, high_price=excluded.high_price, low_price=excluded.low_price,
+      yield=excluded.yield, duration_days=excluded.duration_days, accrued_int=excluded.accrued_int,
+      volume_rub=excluded.volume_rub, num_trades=excluded.num_trades,
+      face_value=excluded.face_value, face_unit=excluded.face_unit,
+      coupon_pct=excluded.coupon_pct, coupon_value=excluded.coupon_value, coupon_period_days=excluded.coupon_period_days,
+      next_coupon_date=excluded.next_coupon_date, mat_date=excluded.mat_date, offer_date=excluded.offer_date,
+      issue_size=excluded.issue_size, list_level=excluded.list_level, status=excluded.status,
+      emitent_name=excluded.emitent_name, emitent_inn=excluded.emitent_inn,
+      updated_at=excluded.updated_at
+  `;
+
+  for(const board of ['TQCB', 'TQOB']){
+    let start = 0;
+    let pages = 0;
+    const PAGE = 500;
+    const MAX_PAGES = 8; // защита от бесконечной пагинации, ~4000 бумаг хватит
+    try {
+      while(pages < MAX_PAGES){
+        const url = `${base}/iss/engines/stock/markets/bonds/boards/${board}/securities.json`
+          + `?iss.meta=off&iss.only=securities,marketdata&start=${start}&limit=${PAGE}`;
+        const r = await fetch(url, { headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 0 } });
+        if(!r.ok) throw new Error(`${board} HTTP ${r.status}`);
+        const json = await r.json();
+        const parsed = parseBondPage(json, board);
+        if(!parsed.length) break;
+
+        // D1 batch — все INSERT'ы одной страницы в одной транзакции
+        const stmts = [];
+        for(const b of parsed){
+          if(!b.secid) continue;
+          stmts.push(env.DB.prepare(insertSql).bind(
+            b.secid, today, b.isin, b.shortname, board,
+            b.price, b.prevClose, b.open, b.high, b.low,
+            b.yield, b.duration, b.accruedInt,
+            b.volumeRub, b.numTrades,
+            b.faceValue, b.faceUnit, b.couponPct, b.couponValue, b.couponPeriod,
+            b.nextCouponDate, b.matDate, b.offerDate,
+            b.issueSize, b.listLevel, b.status,
+            b.emitentName, b.emitentInn,
+            now
+          ));
+        }
+        if(stmts.length){
+          const results = await env.DB.batch(stmts);
+          rowsWritten += results.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
+        }
+
+        if(parsed.length < PAGE) break; // последняя страница
+        start += parsed.length;
+        pages++;
+      }
+    } catch(e){ errors.push(`${board}: ${e.message}`); }
+  }
+
+  await logRun(env, startedAt, 'moex_bonds', rowsWritten, errors, Date.now() - t0);
+  return { source: 'moex_bonds', rowsWritten, errors, duration_ms: Date.now() - t0 };
+}
+
 async function logRun(env, startedAt, source, rowsWritten, errors, durationMs){
   const finishedAt = new Date().toISOString();
   const status = errors.length === 0 ? 'ok' : (rowsWritten > 0 ? 'partial' : 'error');
@@ -361,6 +546,72 @@ function parseStockPage(resp){
       volumeRub:  _num(gm('VALTODAY')) || _num(gm('VALTODAY_RUR')),
       issueSize:  _num(g('ISSUESIZE')),
       faceValue:  _num(g('FACEVALUE')),
+    });
+  }
+  return out;
+}
+
+// MOEX `/iss/engines/stock/markets/bonds/boards/{TQCB|TQOB}/securities.json`
+// возвращает два блока — securities (статика выпуска) и marketdata
+// (последние сделки/котировки). Объединяем по SECID.
+//
+// Поля немного отличаются от акций. На корпоратах есть:
+// COUPONPERCENT, COUPONVALUE, COUPONPERIOD, NEXTCOUPON, MATDATE, OFFERDATE,
+// EMITENT_TITLE, EMITENT_INN. На marketdata: YIELD, DURATION, ACCRUEDINT.
+function parseBondPage(resp, board){
+  const sec = resp.securities || {};
+  const md  = resp.marketdata || {};
+  const secCols = sec.columns || [], secData = sec.data || [];
+  const mdCols  = md.columns  || [], mdData  = md.data  || [];
+  const idx = (c, n) => c.indexOf(n);
+  const sidIdx = idx(secCols, 'SECID');
+  const mdSidIdx = idx(mdCols, 'SECID');
+  const mdById = {};
+  for(const r of mdData){ const id = r[mdSidIdx]; if(id) mdById[id] = r; }
+
+  // ISO-нормализация даты: MOEX иногда отдаёт '0000-00-00' для отсутствующих.
+  const dnorm = v => (typeof v === 'string' && v.length >= 10 && !v.startsWith('0000')) ? v.slice(0, 10) : null;
+
+  const out = [];
+  for(const r of secData){
+    const secid = r[sidIdx]; if(!secid) continue;
+    const g  = n => r[idx(secCols, n)];
+    const mdr = mdById[secid] || [];
+    const gm = n => mdr[idx(mdCols, n)];
+
+    out.push({
+      secid,
+      isin:        g('ISIN') || secid,
+      shortname:   g('SHORTNAME') || g('SECNAME') || secid,
+      // Цены: LAST → PREVPRICE → PREVLEGALCLOSEPRICE — fallback цепочка.
+      // Для бондов цена обычно в % от номинала.
+      price:       _num(gm('LAST')) || _num(g('PREVPRICE')) || _num(g('PREVLEGALCLOSEPRICE')),
+      prevClose:   _num(g('PREVLEGALCLOSEPRICE')) || _num(g('PREVPRICE')),
+      open:        _num(gm('OPEN')),
+      high:        _num(gm('HIGH')),
+      low:         _num(gm('LOW')),
+      // Доходности и риск-метрики (только в marketdata)
+      yield:       _num(gm('YIELD')),
+      duration:    _num(gm('DURATION')),    // в днях
+      accruedInt:  _num(gm('ACCRUEDINT')),  // НКД, ₽
+      // Объёмы
+      volumeRub:   _num(gm('VALTODAY')) || _num(gm('VALTODAY_RUR')),
+      numTrades:   _num(gm('NUMTRADES')),
+      // Параметры выпуска
+      faceValue:    _num(g('FACEVALUE')),
+      faceUnit:     g('FACEUNIT') || 'SUR',
+      couponPct:    _num(g('COUPONPERCENT')),
+      couponValue:  _num(g('COUPONVALUE')),
+      couponPeriod: _num(g('COUPONPERIOD')),
+      nextCouponDate: dnorm(g('NEXTCOUPON')),
+      matDate:      dnorm(g('MATDATE')),
+      offerDate:    dnorm(g('OFFERDATE')) || dnorm(g('BUYBACKDATE')),
+      issueSize:    _num(g('ISSUESIZE')),
+      listLevel:    _num(g('LISTLEVEL')),
+      status:       g('STATUS') || null,
+      // Эмитент. Для TQOB (ОФЗ) эмитент Минфин — оставляем как есть.
+      emitentName:  g('EMITENT_TITLE') || g('LATNAME') || null,
+      emitentInn:   g('EMITENT_INN') ? String(g('EMITENT_INN')) : null,
     });
   }
   return out;

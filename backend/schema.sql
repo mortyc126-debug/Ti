@@ -61,3 +61,58 @@ CREATE TABLE IF NOT EXISTS collection_log (
 );
 CREATE INDEX IF NOT EXISTS idx_log_started ON collection_log(started_at);
 CREATE INDEX IF NOT EXISTS idx_log_source ON collection_log(source);
+
+-- ── Ежедневные котировки облигаций (TQCB корпораты + TQOB ОФЗ) ────────
+-- Главная таблица для ВДО-аналитики. По каждой бумаге раз в день
+-- снимается срез с ценой, доходностью, дюрацией, оборотом, статусом
+-- и параметрами выпуска (купон, сроки, оферта). На этой таблице
+-- строятся: spread-to-OFZ, метрика стресса, event-study и survival.
+--
+-- secid — уникальный идентификатор MOEX (RU000A106DZ4, SU26221RMFS0).
+-- board — TQCB / TQOB. По ней узнаём корпорат это или ОФЗ.
+-- emitent_inn — связка с reportsDB и rating_actions.
+CREATE TABLE IF NOT EXISTS bond_daily (
+  secid              TEXT NOT NULL,
+  date               TEXT NOT NULL,        -- YYYY-MM-DD
+  isin               TEXT,
+  shortname          TEXT,
+  board              TEXT,                 -- 'TQCB' | 'TQOB'
+  -- Цены (% от номинала)
+  price              REAL,                 -- LAST или PREVPRICE
+  prev_close         REAL,
+  open_price         REAL,
+  high_price         REAL,
+  low_price          REAL,
+  -- Доходности и риск-метрики
+  yield              REAL,                 -- YTM, %
+  duration_days      INTEGER,              -- Macaulay duration, дней
+  accrued_int        REAL,                 -- НКД, ₽ за бумагу
+  -- Объёмы торгов
+  volume_rub         REAL,                 -- оборот за день, ₽
+  num_trades         INTEGER,
+  -- Параметры выпуска
+  face_value         REAL,
+  face_unit          TEXT,                 -- 'SUR', 'USD' и т.д.
+  coupon_pct         REAL,                 -- купонная ставка, %
+  coupon_value       REAL,                 -- купон, ₽ на бумагу
+  coupon_period_days INTEGER,
+  next_coupon_date   TEXT,
+  mat_date           TEXT,                 -- дата погашения
+  offer_date         TEXT,                 -- ближайшая оферта (put/call)
+  issue_size         REAL,                 -- размер выпуска, шт.
+  list_level         INTEGER,              -- 1/2/3
+  status             TEXT,                 -- 'A' | 'S' | 'D' | 'N'
+  -- Эмитент (для матчинга с reportsDB и АКРА/RAEX)
+  emitent_name       TEXT,
+  emitent_inn        TEXT,
+  -- Метаданные
+  updated_at         TEXT NOT NULL,
+  PRIMARY KEY (secid, date)
+);
+CREATE INDEX IF NOT EXISTS idx_bond_date    ON bond_daily(date);
+CREATE INDEX IF NOT EXISTS idx_bond_board   ON bond_daily(board);
+CREATE INDEX IF NOT EXISTS idx_bond_mat     ON bond_daily(mat_date);
+CREATE INDEX IF NOT EXISTS idx_bond_offer   ON bond_daily(offer_date);
+CREATE INDEX IF NOT EXISTS idx_bond_inn     ON bond_daily(emitent_inn);
+CREATE INDEX IF NOT EXISTS idx_bond_status  ON bond_daily(status);
+CREATE INDEX IF NOT EXISTS idx_bond_yield   ON bond_daily(yield);
