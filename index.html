@@ -346,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <button class="nav-btn nav-sep" onclick="showPage('reports')">📂 Отчётность</button>
     <button class="nav-btn" onclick="showPage('portfolio')">💼 Портфель</button>
     <button class="nav-btn" onclick="showPage('portpay')" title="Календарь и график будущих выплат по бумагам в портфеле — купоны, амортизации, погашения, оферты. Сводно за 12 мес и поэтапно по датам.">📅 Выплаты</button>
+    <button class="nav-btn" onclick="showPage('risks')" title="Риски портфеля: средние мультипликаторы по эмитентам, гистограммы распределений (Долг/EBITDA, ICR, ROA и т.п.) — какие эмитенты в зоне риска.">📊 Риски</button>
     <button class="nav-btn" onclick="showPage('pnl')">💰 P&amp;L</button>
     <button class="nav-btn nav-sep" onclick="showPage('watchlist')">⭐ Списки</button>
     <button class="nav-btn" onclick="showPage('calendar')">📅 Календарь</button>
@@ -387,6 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="sb-lbl">Портфель</div>
     <div class="sb-item" onclick="showPage('portfolio');sbAct(this)"><span class="sb-icon">💼</span>Позиции<span class="sb-badge" id="sb-pc">0</span></div>
     <div class="sb-item" onclick="showPage('portpay');sbAct(this)" title="Календарь выплат портфеля + распределение fixed/floating, концентрация эмитентов и отраслей."><span class="sb-icon">📅</span>Выплаты по портфелю<span class="sb-badge" id="sb-pay" style="display:none">—</span></div>
+    <div class="sb-item" onclick="showPage('risks');sbAct(this)" title="Риски портфеля: средние мультипликаторы по эмитентам и гистограммы распределений. Зелёный/жёлтый/красный по индикативным порогам кредитного риска."><span class="sb-icon">📊</span>Риски портфеля<span class="sb-badge" id="sb-risks" style="display:none">—</span></div>
     <div class="sb-item" onclick="showPage('pnl');sbAct(this)"><span class="sb-icon">💰</span>P&amp;L / Безубыток</div>
     <div class="sb-item" onclick="showPage('watchlist');sbAct(this)"><span class="sb-icon">⭐</span>Сравнение YTM (избранное)</div>
   </div>
@@ -740,6 +742,48 @@ document.addEventListener('DOMContentLoaded', () => {
       <span class="muted" id="portpay-status" style="font-size:.58rem;align-self:center;margin-left:8px"></span>
     </div>
     <div id="portpay-list" style="overflow-x:auto"></div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: РИСКИ ПОРТФЕЛЯ ═══ -->
+<div class="page" id="page-risks">
+  <div class="page-title">📊 Риски портфеля</div>
+  <div class="page-sub">Сводка мультипликаторов по эмитентам портфеля + распределения. Кликни столбец — увидишь кто там.</div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:.66rem;color:var(--text2);line-height:1.55">
+    Берутся уникальные эмитенты из <b>💼 Портфель</b> (один эмитент = одна точка, даже если у него несколько выпусков). Метрики — последний годовой период из <b>📂 Базы отчётности</b>. Цвет столбца — индикативные пороги для оценки кредитного риска (зелёный = безопасно, жёлтый = осторожно, красный = тревожно).
+  </div>
+
+  <div id="risks-empty" style="display:none;padding:32px;text-align:center;color:var(--text3);background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-top:14px"></div>
+
+  <div id="risks-content" style="display:none">
+    <!-- Сводная таблица: средние/медианы/min/max -->
+    <div class="card" style="margin-top:12px">
+      <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 Сводка по эмитентам</span>
+        <span class="muted" id="risks-meta" style="font-size:.58rem"></span>
+      </div>
+      <div id="risks-summary" style="margin-top:8px;overflow-x:auto"></div>
+    </div>
+
+    <!-- Гистограммы распределений -->
+    <div class="card" style="margin-top:12px">
+      <div class="card-hdr">📈 Распределение по мультипликаторам</div>
+      <div class="muted" style="font-size:.6rem;margin-bottom:8px">
+        Каждая гистограмма — раскладка эмитентов портфеля по диапазонам метрики.
+        Клик по столбцу раскрывает список эмитентов в нём (и переход в Отчётность).
+      </div>
+      <div id="risks-histograms" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px"></div>
+    </div>
+
+    <!-- Раскрывающийся список эмитентов выбранного бакета -->
+    <div class="card" id="risks-drill-card" style="margin-top:12px;display:none">
+      <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
+        <span id="risks-drill-title">Эмитенты в выбранном диапазоне</span>
+        <button class="btn btn-sm" onclick="risksClearDrill()">✕ закрыть</button>
+      </div>
+      <div id="risks-drill-list" style="margin-top:8px"></div>
+    </div>
   </div>
 </div>
 

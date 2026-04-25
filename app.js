@@ -111,7 +111,7 @@ function showPage(n, opts){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+n).classList.add('active');
-  const idx=['ytm','issuer','reports','portfolio','portpay','pnl','watchlist','calendar','ratecb','industries','cross','links','shares','futures','archive'].indexOf(n);
+  const idx=['ytm','issuer','reports','portfolio','portpay','risks','pnl','watchlist','calendar','ratecb','industries','cross','links','shares','futures','archive'].indexOf(n);
   if(idx>=0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
   _currentPage = n;
   // Сохраняем активную страницу в localStorage (переживает перезагрузку).
@@ -121,6 +121,7 @@ function showPage(n, opts){
   if(backBtn) backBtn.style.visibility = _navHistoryStack.length ? 'visible' : 'hidden';
   if(n==='portfolio') renderPort();
   if(n==='portpay') portPayInit();
+  if(n==='risks') risksInit();
   if(n==='watchlist'){ renderWL(); _compareRenderSavedList(); }
   if(n==='ytm') renderYtm();
   if(n==='calendar'){renderCalendar();updateCalStats();}
@@ -4271,11 +4272,18 @@ function renderPort(){
     const badgesHtml = badges.join('');
 
     // Имя позиции: имя + ISIN с копи-кнопкой, если есть.
+    // Эмитент: если бумагу удалось сматчить с reportsDB — показываем имя
+    // эмитента подзаголовком и делаем кликабельным (peek-модалка).
+    const issId = _findIssuerForBond(p);
+    const issName = issId ? (reportsDB[issId]?.name || '') : '';
+    const issLine = issId && issName && _normForSearch(issName) !== _normForSearch(p.name)
+      ? `<div style="font-size:.54rem;color:var(--text3);margin-top:2px"><a href="#" onclick="moexOpenIssuerPeek('${issId}'); return false" style="color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--border2)" title="Открыть мини-профиль эмитента">${_escHtml(issName)}</a></div>`
+      : '';
     const isinSub = p.isin
       ? `<div style="font-size:.52rem;color:var(--text3);font-family:var(--mono);margin-top:2px">${p.isin}${_copyBtn(p.isin, {title:'Скопировать ISIN'})}</div>`
       : '';
     return`<tr>
-      <td style="font-weight:600">${p.name}${badgesHtml}${isinSub}</td>
+      <td style="font-weight:600">${p.name}${badgesHtml}${issLine}${isinSub}</td>
       <td><span class="tag ${BT_TAG[p.btype]||'tag-corp'}">${p.btype}</span></td>
       <td><span class="tag ct-${p.ctype}" style="font-size:.54rem">${CT_LABELS[p.ctype]}</span></td>
       <td>${p.buy.toFixed(2)}%</td><td>${p.cur.toFixed(2)}%</td><td>${p.qty}</td>
@@ -24965,4 +24973,472 @@ function _portPayExportCsv(){
   a.href = url; a.download = 'portfolio_payments_' + new Date().toISOString().slice(0,10) + '.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 📊 РИСКИ ПОРТФЕЛЯ — мультипликаторы + распределения
+// ─────────────────────────────────────────────────────────────────────
+// Задача: на одном экране увидеть кредитный профиль портфеля.
+//   1) Сводная таблица: для каждой метрики avg / median / min / max
+//      по уникальным эмитентам портфеля.
+//   2) Гистограммы: распределение эмитентов по бакетам каждой метрики.
+//      Цвет столбца — индикативный кредит-риск (зелёный/жёлтый/красный).
+//      Клик по столбцу — drill-down список эмитентов с переходом в Отчётность.
+//
+// Один эмитент = одна точка, даже если у него 5 бумаг в портфеле — иначе
+// крупный эмитент перевешивал бы распределение. Это _credit profile_,
+// а не _exposure profile_ (для exposure есть концентрация на странице
+// «Выплаты по портфелю»).
+//
+// Метрики берутся из последнего годового периода reportsDB. Если у
+// эмитента нет годового — используем последний доступный.
+// ═════════════════════════════════════════════════════════════════════
+
+// Описание метрик: ключ → как считать, единица, бакеты, пороги цветов.
+// `lower` — true если меньше = лучше (долг, debt-ratio); false — наоборот.
+// Пороги ok/warn — границы зелёного/жёлтого, остальное красное.
+const _RISKS_METRICS = [
+  {
+    k: 'ndE', l: 'ND / EBITDA', unit: '×',
+    fmt: v => v == null ? '—' : (v >= 0 ? v.toFixed(1) : v.toFixed(1)) + '×',
+    bins: [-Infinity, 0, 1, 2, 3, 4, 6, Infinity],
+    binLabels: ['<0', '0-1', '1-2', '2-3', '3-4', '4-6', '>6'],
+    lower: true, ok: 3, warn: 5,
+    desc: 'Чистый долг к EBITDA. <3 — нормально, >5 — высокая закредитованность.'
+  },
+  {
+    k: 'icr', l: 'ICR (EBIT / %проц.)', unit: '×',
+    fmt: v => v == null ? '—' : (Math.abs(v) > 99 ? '>99' : v.toFixed(1)) + '×',
+    bins: [-Infinity, 0, 1, 1.5, 3, 5, 10, Infinity],
+    binLabels: ['<0', '0-1', '1-1.5', '1.5-3', '3-5', '5-10', '>10'],
+    lower: false, ok: 3, warn: 1.5,
+    desc: 'EBIT / процентные расходы. <1.5 — компания едва тянет проценты.'
+  },
+  {
+    k: 'debtR', l: 'Debt / Активы, %', unit: '%',
+    fmt: v => v == null ? '—' : v.toFixed(0) + '%',
+    bins: [0, 15, 30, 45, 60, 75, Infinity],
+    binLabels: ['<15%', '15-30%', '30-45%', '45-60%', '60-75%', '>75%'],
+    lower: true, ok: 45, warn: 60,
+    desc: 'Доля заёмных средств в балансе.'
+  },
+  {
+    k: 'eqr', l: 'Equity / Активы, %', unit: '%',
+    fmt: v => v == null ? '—' : v.toFixed(0) + '%',
+    bins: [-Infinity, 0, 15, 30, 45, 60, Infinity],
+    binLabels: ['<0', '0-15%', '15-30%', '30-45%', '45-60%', '>60%'],
+    lower: false, ok: 30, warn: 15,
+    desc: 'Доля собственного капитала. <0 — отрицательный капитал, тревожно.'
+  },
+  {
+    k: 'cur', l: 'Current Ratio', unit: '×',
+    fmt: v => v == null ? '—' : v.toFixed(2) + '×',
+    bins: [0, 0.5, 1, 1.5, 2, 3, Infinity],
+    binLabels: ['<0.5', '0.5-1', '1-1.5', '1.5-2', '2-3', '>3'],
+    lower: false, ok: 1.5, warn: 1,
+    desc: 'Обор. активы / тек. обязательства. <1 — кассовый разрыв.'
+  },
+  {
+    k: 'ebitdam', l: 'EBITDA-маржа, %', unit: '%',
+    fmt: v => v == null ? '—' : v.toFixed(0) + '%',
+    bins: [-Infinity, 0, 5, 10, 15, 25, Infinity],
+    binLabels: ['<0', '0-5%', '5-10%', '10-15%', '15-25%', '>25%'],
+    lower: false, ok: 15, warn: 7,
+    desc: 'EBITDA / выручка — операционная рентабельность.'
+  },
+  {
+    k: 'roa', l: 'ROA, %', unit: '%',
+    fmt: v => v == null ? '—' : v.toFixed(1) + '%',
+    bins: [-Infinity, 0, 2, 5, 10, Infinity],
+    binLabels: ['<0', '0-2%', '2-5%', '5-10%', '>10%'],
+    lower: false, ok: 5, warn: 0,
+    desc: 'Чистая прибыль / активы.'
+  },
+  {
+    k: 'roe', l: 'ROE, %', unit: '%',
+    fmt: v => v == null ? '—' : v.toFixed(1) + '%',
+    bins: [-Infinity, 0, 5, 10, 20, 30, Infinity],
+    binLabels: ['<0', '0-5%', '5-10%', '10-20%', '20-30%', '>30%'],
+    lower: false, ok: 15, warn: 5,
+    desc: 'Чистая прибыль / капитал.'
+  },
+  {
+    k: 'bqi', l: '⚖ Качество баланса', unit: '/100',
+    fmt: v => v == null ? '—' : v.toFixed(0),
+    bins: [0, 30, 50, 70, 85, 100.001],
+    binLabels: ['0-30', '30-50', '50-70', '70-85', '85-100'],
+    lower: false, ok: 70, warn: 50,
+    desc: 'Композит структурной надёжности (5 компонент: cash/A, ret/A, WC/A, eq/A, прочие/A).'
+  },
+];
+
+// Стейт раскрытого бакета. Нужен чтобы при перерисовке (например после
+// смены портфеля) состояние drill-down не терялось.
+let _risksDrillState = null; // {metricKey, binIdx}
+
+function risksInit(){
+  const empty = document.getElementById('risks-empty');
+  const content = document.getElementById('risks-content');
+  if(!empty || !content) return;
+
+  if(!portfolio || !portfolio.length){
+    empty.style.display = 'block';
+    empty.innerHTML = '<div style="font-size:1.05rem">Портфель пуст</div><div style="margin-top:6px;font-size:.65rem">Добавьте позиции в <b>💼 Портфель</b> — здесь появится анализ рисков.</div>';
+    content.style.display = 'none';
+    return;
+  }
+
+  // Собираем уникальных эмитентов: один эмитент = одна точка
+  const issMap = new Map();
+  let unmatched = 0;
+  for(const p of portfolio){
+    const issId = _findIssuerForBond(p);
+    if(!issId){ unmatched++; continue; }
+    if(!issMap.has(issId)){
+      const iss = reportsDB[issId];
+      issMap.set(issId, {
+        issId,
+        name: iss?.name || p.name,
+        ind: iss?.ind || 'other',
+        bonds: []
+      });
+    }
+    issMap.get(issId).bonds.push(p);
+  }
+
+  if(!issMap.size){
+    empty.style.display = 'block';
+    empty.innerHTML = `
+      <div style="font-size:1.05rem">Не нашлось ни одного эмитента в Базе отчётности</div>
+      <div style="margin-top:8px;font-size:.65rem;line-height:1.5">
+        Из ${portfolio.length} позиций ни одна не сматчилась с reportsDB.<br>
+        Чтобы появился анализ — у бумаг должен быть проставлен ISIN, и эмитент должен быть в <b>📂 Базе отчётности</b>.
+      </div>
+    `;
+    content.style.display = 'none';
+    return;
+  }
+
+  // Считаем метрики для каждого эмитента
+  const issuersWithMetrics = [];
+  for(const info of issMap.values()){
+    const m = _risksMetricsFor(info.issId);
+    if(!m) continue;
+    issuersWithMetrics.push({...info, metrics: m});
+  }
+
+  if(!issuersWithMetrics.length){
+    empty.style.display = 'block';
+    empty.innerHTML = `
+      <div style="font-size:1.05rem">У эмитентов нет годовых отчётов</div>
+      <div style="margin-top:8px;font-size:.65rem;line-height:1.5">
+        ${issMap.size} эмитентов сматчилось, но ни у одного нет годового периода в reportsDB.<br>
+        Откройте <b>📂 Базу отчётности</b> и добавьте отчёты.
+      </div>
+    `;
+    content.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  content.style.display = 'block';
+
+  // Мета — сколько эмитентов охвачено
+  const meta = document.getElementById('risks-meta');
+  if(meta){
+    const note = unmatched > 0 ? ` · ${unmatched} позиций без матча в reportsDB` : '';
+    meta.textContent = `${issuersWithMetrics.length} эмитентов · ${portfolio.length} позиций${note}`;
+  }
+
+  _risksRenderSummary(issuersWithMetrics);
+  _risksRenderHistograms(issuersWithMetrics);
+
+  // Если был открыт drill — перерисуем его поверх обновлённых данных
+  if(_risksDrillState){
+    _risksOpenDrill(_risksDrillState.metricKey, _risksDrillState.binIdx, issuersWithMetrics);
+  }
+}
+
+// Достаём из reportsDB все ключевые мультипликаторы для одного эмитента.
+// Берём последний годовой период (FY/год). Если нет — последний любой.
+function _risksMetricsFor(issId){
+  const iss = reportsDB[issId];
+  if(!iss) return null;
+
+  let p = null, fallback = null;
+  for(const period of Object.values(iss.periods || {})){
+    if(!period?.year) continue;
+    const isAnnual = /год|FY|year/i.test(period.period || 'FY');
+    if(isAnnual){
+      if(!p || parseInt(period.year, 10) > parseInt(p.year, 10)) p = period;
+    } else {
+      if(!fallback || parseInt(period.year, 10) > parseInt(fallback.year, 10)) fallback = period;
+    }
+  }
+  if(!p) p = fallback;
+  if(!p) return null;
+
+  const div = (a, b) => (a != null && b != null && b !== 0) ? a / b : null;
+  const base = p.ebitda != null ? p.ebitda : p.ebit;
+  const netDebt = (p.debt != null && p.cash != null) ? (p.debt - p.cash) : null;
+
+  const ebitdaMarginFrac = (p.ebitda != null) ? div(p.ebitda, p.rev) : null;
+  const debtRFrac        = div(p.debt, p.assets);
+  const eqrFrac          = div(p.eq, p.assets);
+  const roaFrac          = div(p.np, p.assets);
+  const roeFrac          = div(p.np, p.eq);
+
+  return {
+    year: p.year,
+    period: p.period || 'FY',
+    type: p.type || '',
+    raw: p,
+    ndE:     div(netDebt, base),
+    icr:     div(p.ebit, p.int),
+    debtR:   debtRFrac    != null ? debtRFrac    * 100 : null,
+    eqr:     eqrFrac      != null ? eqrFrac      * 100 : null,
+    cur:     div(p.ca, p.cl),
+    ebitdam: ebitdaMarginFrac != null ? ebitdaMarginFrac * 100 : null,
+    roa:     roaFrac      != null ? roaFrac      * 100 : null,
+    roe:     roeFrac      != null ? roeFrac      * 100 : null,
+    bqi:     (typeof _repBalanceQuality === 'function') ? (_repBalanceQuality(iss, p)?.score ?? null) : null
+  };
+}
+
+// Цвет ячейки по метрике и значению — на базе порогов из _RISKS_METRICS.
+function _risksColorFor(metric, value){
+  if(value == null || !isFinite(value)) return 'var(--text3)';
+  if(metric.lower){
+    if(value <= metric.ok)   return 'var(--green)';
+    if(value <= metric.warn) return 'var(--warn)';
+    return 'var(--danger)';
+  } else {
+    if(value >= metric.ok)   return 'var(--green)';
+    if(value >= metric.warn) return 'var(--warn)';
+    return 'var(--danger)';
+  }
+}
+
+function _risksMedian(arr){
+  const xs = arr.filter(v => v != null && isFinite(v)).slice().sort((a,b) => a - b);
+  if(!xs.length) return null;
+  const m = Math.floor(xs.length / 2);
+  return xs.length % 2 ? xs[m] : (xs[m-1] + xs[m]) / 2;
+}
+
+function _risksAvg(arr){
+  const xs = arr.filter(v => v != null && isFinite(v));
+  if(!xs.length) return null;
+  return xs.reduce((a,b) => a + b, 0) / xs.length;
+}
+
+// Сводная таблица — для каждой метрики avg/median/min/max + закраска avg
+// по тем же порогам что и гистограммы.
+function _risksRenderSummary(issuers){
+  const box = document.getElementById('risks-summary');
+  if(!box) return;
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:.62rem">
+    <thead>
+      <tr style="background:var(--s2);color:var(--text3);font-size:.54rem;letter-spacing:.05em;text-transform:uppercase">
+        <th style="padding:7px 9px;text-align:left">Метрика</th>
+        <th style="padding:7px 9px;text-align:right">N</th>
+        <th style="padding:7px 9px;text-align:right">Среднее</th>
+        <th style="padding:7px 9px;text-align:right">Медиана</th>
+        <th style="padding:7px 9px;text-align:right">Min</th>
+        <th style="padding:7px 9px;text-align:right">Max</th>
+        <th style="padding:7px 9px;text-align:left">Что значит</th>
+      </tr>
+    </thead><tbody>`;
+
+  for(const m of _RISKS_METRICS){
+    const vals = issuers.map(i => i.metrics[m.k]);
+    const valid = vals.filter(v => v != null && isFinite(v));
+    const n = valid.length;
+    if(!n){
+      html += `<tr style="border-top:1px solid var(--border);color:var(--text3)">
+        <td style="padding:6px 9px;font-weight:600">${m.l}</td>
+        <td colspan="5" style="padding:6px 9px;text-align:center">—</td>
+        <td style="padding:6px 9px;font-size:.56rem">${m.desc}</td>
+      </tr>`;
+      continue;
+    }
+    const avg = _risksAvg(valid);
+    const med = _risksMedian(valid);
+    const mn  = Math.min(...valid);
+    const mx  = Math.max(...valid);
+    const cAvg = _risksColorFor(m, avg);
+    const cMed = _risksColorFor(m, med);
+    const cMn  = _risksColorFor(m, mn);
+    const cMx  = _risksColorFor(m, mx);
+
+    html += `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:6px 9px;font-weight:600">${m.l}</td>
+      <td style="padding:6px 9px;text-align:right;color:var(--text3);font-family:var(--mono)">${n}</td>
+      <td style="padding:6px 9px;text-align:right;font-family:var(--mono);color:${cAvg};font-weight:600">${m.fmt(avg)}</td>
+      <td style="padding:6px 9px;text-align:right;font-family:var(--mono);color:${cMed}">${m.fmt(med)}</td>
+      <td style="padding:6px 9px;text-align:right;font-family:var(--mono);color:${cMn}">${m.fmt(mn)}</td>
+      <td style="padding:6px 9px;text-align:right;font-family:var(--mono);color:${cMx}">${m.fmt(mx)}</td>
+      <td style="padding:6px 9px;color:var(--text2);font-size:.56rem">${m.desc}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+// Сетка гистограмм. Каждая — миниатюра 6-7 столбцов с количеством эмитентов.
+// Кликаем по столбцу → drill-down список.
+function _risksRenderHistograms(issuers){
+  const box = document.getElementById('risks-histograms');
+  if(!box) return;
+
+  let html = '';
+  for(const m of _RISKS_METRICS){
+    // Бакетизация
+    const buckets = m.binLabels.map(lbl => ({label: lbl, list: []}));
+    for(const iss of issuers){
+      const v = iss.metrics[m.k];
+      if(v == null || !isFinite(v)) continue;
+      // Найти бакет: ищем такой j, что bins[j] <= v < bins[j+1]
+      for(let j = 0; j < m.binLabels.length; j++){
+        const lo = m.bins[j], hi = m.bins[j+1];
+        if(v >= lo && v < hi){
+          buckets[j].list.push(iss);
+          break;
+        }
+      }
+    }
+    const maxCount = Math.max(1, ...buckets.map(b => b.list.length));
+    const totalValid = buckets.reduce((s,b) => s + b.list.length, 0);
+    const totalAll = issuers.length;
+    const missing = totalAll - totalValid;
+
+    // Собираем bars
+    let barsHtml = '';
+    for(let j = 0; j < buckets.length; j++){
+      const b = buckets[j];
+      const cnt = b.list.length;
+      const pct = (cnt / maxCount) * 100;
+      // Цвет столбца — по центру диапазона (грубая прикидка)
+      const lo = m.bins[j], hi = m.bins[j+1];
+      const mid = (isFinite(lo) && isFinite(hi)) ? (lo + hi) / 2
+                : isFinite(hi) ? hi - 0.5
+                : isFinite(lo) ? lo + 1
+                : 0;
+      const color = cnt ? _risksColorFor(m, mid) : 'var(--border2)';
+      const opacity = cnt ? 1 : 0.3;
+      const cursor = cnt ? 'pointer' : 'default';
+      const handler = cnt ? `onclick="risksOpenDrill('${m.k}', ${j})"` : '';
+      const tooltip = cnt
+        ? `${cnt} эмитент${cnt === 1 ? '' : (cnt < 5 ? 'а' : 'ов')} · кликни для списка`
+        : 'нет данных';
+      barsHtml += `<div ${handler} title="${b.label}: ${tooltip}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:${cursor}">
+        <div style="font-size:.56rem;color:var(--text3);font-family:var(--mono);min-height:14px">${cnt || ''}</div>
+        <div style="width:100%;height:60px;background:var(--s2);position:relative;border-radius:2px">
+          <div style="position:absolute;bottom:0;left:0;right:0;height:${pct}%;background:${color};opacity:${opacity};border-radius:2px;transition:height .25s"></div>
+        </div>
+        <div style="font-size:.5rem;color:var(--text3);text-align:center;line-height:1.1;min-height:18px">${b.label}</div>
+      </div>`;
+    }
+
+    const missingBadge = missing > 0
+      ? ` <span style="font-size:.54rem;color:var(--text3)">· ${missing} без данных</span>`
+      : '';
+
+    html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+        <div style="font-weight:600;font-size:.66rem">${m.l}</div>
+        <div style="font-size:.54rem;color:var(--text3);font-family:var(--mono)">${totalValid}/${totalAll}${missingBadge}</div>
+      </div>
+      <div style="display:flex;gap:3px;align-items:flex-end;margin-top:4px">${barsHtml}</div>
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
+// Раскрыть бакет: показать список эмитентов с переходом в Отчётность.
+function risksOpenDrill(metricKey, binIdx){
+  // Пересобираем issuersWithMetrics (быстро)
+  const issMap = new Map();
+  for(const p of portfolio){
+    const issId = _findIssuerForBond(p);
+    if(!issId) continue;
+    if(!issMap.has(issId)){
+      const iss = reportsDB[issId];
+      issMap.set(issId, {issId, name: iss?.name || p.name, ind: iss?.ind || 'other', bonds: []});
+    }
+    issMap.get(issId).bonds.push(p);
+  }
+  const issuers = [];
+  for(const info of issMap.values()){
+    const m = _risksMetricsFor(info.issId);
+    if(!m) continue;
+    issuers.push({...info, metrics: m});
+  }
+  _risksOpenDrill(metricKey, binIdx, issuers);
+}
+
+function _risksOpenDrill(metricKey, binIdx, issuers){
+  const m = _RISKS_METRICS.find(x => x.k === metricKey);
+  if(!m) return;
+  const card = document.getElementById('risks-drill-card');
+  const title = document.getElementById('risks-drill-title');
+  const list = document.getElementById('risks-drill-list');
+  if(!card || !title || !list) return;
+
+  const lo = m.bins[binIdx], hi = m.bins[binIdx+1];
+  const matched = issuers.filter(iss => {
+    const v = iss.metrics[metricKey];
+    return v != null && isFinite(v) && v >= lo && v < hi;
+  });
+  // Сортируем по значению этой метрики (от плохого к хорошему)
+  matched.sort((a, b) => {
+    const va = a.metrics[metricKey], vb = b.metrics[metricKey];
+    return m.lower ? (vb - va) : (va - vb);
+  });
+
+  _risksDrillState = { metricKey, binIdx };
+
+  title.innerHTML = `📌 ${m.l} · диапазон <span style="font-family:var(--mono);color:var(--acc)">${m.binLabels[binIdx]}</span> · ${matched.length} эмитент${matched.length === 1 ? '' : (matched.length < 5 ? 'а' : 'ов')}`;
+
+  if(!matched.length){
+    list.innerHTML = '<div style="padding:14px;color:var(--text3);text-align:center;font-size:.62rem">Пусто</div>';
+  } else {
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:.62rem">
+      <thead><tr style="background:var(--s2);color:var(--text3);font-size:.52rem;letter-spacing:.05em;text-transform:uppercase">
+        <th style="padding:6px 9px;text-align:left">Эмитент</th>
+        <th style="padding:6px 9px;text-align:left">Отрасль</th>
+        <th style="padding:6px 9px;text-align:right">Значение</th>
+        <th style="padding:6px 9px;text-align:right">Период</th>
+        <th style="padding:6px 9px;text-align:right">Бумаг</th>
+        <th style="padding:6px 9px"></th>
+      </tr></thead><tbody>`;
+    for(const iss of matched){
+      const v = iss.metrics[metricKey];
+      const c = _risksColorFor(m, v);
+      const indLabel = (window._industryData?.industries?.[iss.ind]?.label) || iss.ind;
+      html += `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:6px 9px;font-weight:600">
+          <a href="#" onclick="moexOpenIssuerPeek('${iss.issId}'); return false" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--acc)" title="Открыть мини-профиль эмитента">${_escHtml(iss.name)}</a>
+        </td>
+        <td style="padding:6px 9px;color:var(--text2)">${_escHtml(indLabel)}</td>
+        <td style="padding:6px 9px;text-align:right;font-family:var(--mono);color:${c};font-weight:600">${m.fmt(v)}</td>
+        <td style="padding:6px 9px;text-align:right;color:var(--text3);font-family:var(--mono);font-size:.56rem">${iss.metrics.year} ${iss.metrics.period} ${iss.metrics.type}</td>
+        <td style="padding:6px 9px;text-align:right;color:var(--text2);font-family:var(--mono)">${iss.bonds.length}</td>
+        <td style="padding:6px 9px;text-align:right;white-space:nowrap">
+          <button class="btn btn-sm" onclick="moexOpenInReports('${iss.issId}')" title="Открыть в Базе отчётности" style="padding:2px 6px;font-size:.54rem">📂</button>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    list.innerHTML = html;
+  }
+  card.style.display = '';
+  card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function risksClearDrill(){
+  _risksDrillState = null;
+  const card = document.getElementById('risks-drill-card');
+  if(card) card.style.display = 'none';
 }
