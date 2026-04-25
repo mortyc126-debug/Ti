@@ -1,9 +1,10 @@
 name: Deploy Backend Worker
 
 # Деплой Cloudflare Worker (backend/) через wrangler.
-# Нужен repository secret: CLOUDFLARE_API_TOKEN (шаблон "Edit Cloudflare Workers").
-# Опциональный secret ADMIN_TOKEN — для /collect/* endpoints; ставится вручную
-# через workflow_dispatch с input=set-admin-token.
+# Нужны repository secrets:
+#   - mist                  — Cloudflare API Token (шаблон "Edit Cloudflare Workers")
+#   - CLOUDFLARE_ACCOUNT_ID — Account ID (32-символьный hex, sidebar в dash.cloudflare.com)
+#   - ADMIN_TOKEN           — секрет для /collect/* endpoints (опционально)
 
 on:
   push:
@@ -29,17 +30,45 @@ jobs:
         with:
           node-version: "20"
 
+      # Чистим токен от случайных пробелов/переносов и кладём в env
+      # для следующих шагов. Заодно проверяем что secret вообще задан.
+      - name: Sanitize and verify token
+        env:
+          RAW_TOKEN: ${{ secrets.mist }}
+        run: |
+          if [ -z "$RAW_TOKEN" ]; then
+            echo "::error::Secret 'mist' is empty or not set."
+            exit 1
+          fi
+          # Убираем CR/LF/TAB/пробелы по краям (мобильная вставка часто цепляет \n).
+          CLEAN_TOKEN="$(printf '%s' "$RAW_TOKEN" | tr -d '\r\n\t ')"
+          echo "TOKEN_LEN=${#CLEAN_TOKEN}"
+          # Проверяем токен напрямую — это даст осмысленную ошибку, если токен битый.
+          HTTP=$(curl -s -o /tmp/verify.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CLEAN_TOKEN" \
+            https://api.cloudflare.com/client/v4/user/tokens/verify)
+          echo "verify HTTP=$HTTP"
+          cat /tmp/verify.json
+          echo
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Token verification failed. См. JSON выше."
+            exit 1
+          fi
+          # Прокидываем дальше через GITHUB_ENV, чтобы wrangler-шаги его получили.
+          echo "::add-mask::$CLEAN_TOKEN"
+          echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
+
       - name: Deploy Worker
         working-directory: backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.mist }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@latest deploy
 
       - name: Set ADMIN_TOKEN secret (on demand)
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs['set-admin-token'] == 'true' }}
         working-directory: backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.mist }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
           printf '%s' "$ADMIN_TOKEN" | npx --yes wrangler@latest secret put ADMIN_TOKEN
