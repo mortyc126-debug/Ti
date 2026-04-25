@@ -2,8 +2,8 @@ name: Deploy Backend Worker
 
 # Деплой Cloudflare Worker (backend/) через wrangler.
 # Нужны repository secrets:
-#   - mist                  — Cloudflare API Token (шаблон "Edit Cloudflare Workers")
-#   - CLOUDFLARE_ACCOUNT_ID — Account ID (32-символьный hex, sidebar в dash.cloudflare.com)
+#   - mist                  — Cloudflare API Token
+#   - CLOUDFLARE_ACCOUNT_ID — Account ID (32-символьный hex)
 #   - ADMIN_TOKEN           — секрет для /collect/* endpoints (опционально)
 
 on:
@@ -20,9 +20,16 @@ on:
         required: false
         default: "false"
 
+# Автоматически отменяет предыдущий run при новом push — чтобы зависший
+# job не блокировал диагностику.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -30,67 +37,47 @@ jobs:
         with:
           node-version: "20"
 
-      # Чистим токен от случайных пробелов/переносов и кладём в env
-      # для следующих шагов. Заодно проверяем что secret вообще задан
-      # и сверяем «начало/конец» — чтобы было видно, бьётся ли значение
-      # с тем, что показывает Cloudflare на экране создания.
       - name: Sanitize and verify token
         env:
           RAW_TOKEN: ${{ secrets.mist }}
         run: |
+          set -e
           if [ -z "$RAW_TOKEN" ]; then
             echo "::error::Secret 'mist' is empty or not set."
             exit 1
           fi
-          # 1. Чистим CR/LF/TAB/обычные пробелы по всей строке.
+          # Убираем CR/LF/TAB/обычные пробелы (мобильная вставка часто цепляет \n).
           CLEAN_TOKEN="$(printf '%s' "$RAW_TOKEN" | tr -d '\r\n\t ')"
-
-          # 2. Дополнительно убираем «невидимые» Unicode-символы:
-          #    BOM (U+FEFF), zero-width space (U+200B), zero-width joiner (U+200D),
-          #    NBSP (U+00A0). Часто прицепляется при копировании на мобильных.
-          CLEAN_TOKEN="$(printf '%s' "$CLEAN_TOKEN" \
-            | python3 -c "import sys; s=sys.stdin.read(); print(''.join(c for c in s if c not in '﻿​‌‍ ‬ '), end='')")"
-
           LEN=${#CLEAN_TOKEN}
           echo "TOKEN_LEN=$LEN"
 
-          # 3. Показываем первые 6 и последние 6 символов токена — этого хватит
-          #    чтобы сверить с экраном Cloudflare, и не достаточно чтобы кто-то
-          #    использовал значение из публичных логов.
+          # Первые 6 / последние 6 — для сверки с экраном Cloudflare.
           if [ "$LEN" -ge 12 ]; then
-            HEAD="${CLEAN_TOKEN:0:6}"
-            TAIL="${CLEAN_TOKEN: -6}"
-            echo "TOKEN_PREFIX=$HEAD..."
-            echo "TOKEN_SUFFIX=...$TAIL"
+            echo "TOKEN_PREFIX=${CLEAN_TOKEN:0:6}..."
+            echo "TOKEN_SUFFIX=...${CLEAN_TOKEN: -6}"
           fi
 
-          # 4. Проверяем символьный класс — должны быть только ASCII-печатные
-          #    (a-z A-Z 0-9 _-.). Если попадётся что-то иное — выводим коды.
-          NON_ASCII_COUNT=$(printf '%s' "$CLEAN_TOKEN" | LC_ALL=C grep -c '[^[:print:]]' || true)
-          NON_TOKEN_COUNT=$(printf '%s' "$CLEAN_TOKEN" | LC_ALL=C tr -d 'a-zA-Z0-9_.-' | wc -c)
-          echo "NON_ASCII_COUNT=$NON_ASCII_COUNT"
+          # Считаем символы вне ожидаемого набора API-токена.
+          NON_TOKEN_COUNT=$(printf '%s' "$CLEAN_TOKEN" | LC_ALL=C tr -d 'a-zA-Z0-9_.-' | wc -c | tr -d ' ')
           echo "NON_TOKEN_CHARS_COUNT=$NON_TOKEN_COUNT"
           if [ "$NON_TOKEN_COUNT" -gt 0 ]; then
-            echo "::warning::В токене есть символы вне набора [a-zA-Z0-9_.-]."
-            echo "Hex-дамп подозрительных мест:"
+            echo "::warning::В токене есть символы вне [a-zA-Z0-9_.-]:"
             printf '%s' "$CLEAN_TOKEN" | LC_ALL=C tr -d 'a-zA-Z0-9_.-' | xxd
           fi
 
-          # 5. Проверяем токен через /user/tokens/verify — даёт прямой ответ
-          #    Cloudflare что не так.
-          HTTP=$(curl -s -o /tmp/verify.json -w "%{http_code}" \
+          # Проверяем токен через /user/tokens/verify (с таймаутом).
+          HTTP=$(curl --max-time 15 -s -o /tmp/verify.json -w "%{http_code}" \
             -H "Authorization: Bearer $CLEAN_TOKEN" \
-            https://api.cloudflare.com/client/v4/user/tokens/verify)
+            https://api.cloudflare.com/client/v4/user/tokens/verify || echo "000")
           echo "verify HTTP=$HTTP"
-          cat /tmp/verify.json
+          cat /tmp/verify.json 2>/dev/null || true
           echo
           if [ "$HTTP" != "200" ]; then
-            echo "::error::Cloudflare не признаёт токен (см. JSON и prefix/suffix выше)."
-            echo "::error::Сверьте TOKEN_PREFIX/TOKEN_SUFFIX с экраном Cloudflare."
+            echo "::error::Cloudflare не признаёт токен."
+            echo "::error::Сверьте TOKEN_PREFIX/SUFFIX с экраном Cloudflare."
             exit 1
           fi
 
-          # 6. Прокидываем валидный токен в env для следующих шагов.
           echo "::add-mask::$CLEAN_TOKEN"
           echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
 
