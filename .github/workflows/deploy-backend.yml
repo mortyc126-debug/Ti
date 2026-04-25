@@ -2,7 +2,7 @@ name: Deploy Backend Worker
 
 # Деплой Cloudflare Worker (backend/) через wrangler.
 # Нужны repository secrets:
-#   - mist                  — Cloudflare API Token
+#   - BEZDNA                — Cloudflare API Token
 #   - CLOUDFLARE_ACCOUNT_ID — Account ID (32-символьный hex)
 #   - ADMIN_TOKEN           — секрет для /collect/* endpoints (опционально)
 
@@ -39,7 +39,7 @@ jobs:
 
       - name: Sanitize and verify token
         env:
-          RAW_TOKEN: ${{ secrets.mist }}
+          RAW_TOKEN: ${{ secrets.BEZDNA }}
         run: |
           set -e
           if [ -z "$RAW_TOKEN" ]; then
