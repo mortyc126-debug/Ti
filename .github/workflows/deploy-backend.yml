@@ -32,14 +32,14 @@ jobs:
       - name: Deploy Worker
         working-directory: backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.mist }}
         run: npx --yes wrangler@latest deploy
 
       - name: Set ADMIN_TOKEN secret (on demand)
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs['set-admin-token'] == 'true' }}
         working-directory: backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.mist }}
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
           printf '%s' "$ADMIN_TOKEN" | npx --yes wrangler@latest secret put ADMIN_TOKEN
