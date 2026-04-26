@@ -1,0 +1,4 @@
+# Cloudflare Pages: SPA-fallback. Любой путь который не найден как
+# статический файл — отдаём index.html, дальше React Router сам
+# поймёт куда переключиться.
+/*  /index.html  200

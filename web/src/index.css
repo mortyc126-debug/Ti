@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Глобальная база — чтобы скролл и фокус выглядели ровно во всех браузерах. */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Скроллбары в стиле текущего SPA. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: theme('colors.bg2'); }
+::-webkit-scrollbar-thumb { background: theme('colors.border2'); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: theme('colors.text3'); }
