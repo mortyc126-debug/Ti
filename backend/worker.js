@@ -2,7 +2,8 @@
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB корпораты,
 // TQOB ОФЗ). На этом стенде строится basis для акций и spread-to-OFZ
-// для бондов.
+// для бондов. Дополнительно — Cerebras-парсер для извлечения структуры
+// из текстов отчётов / новостей / раскрытий.
 //
 // Endpoints:
 //   GET  /status                       диагностика БД
@@ -16,6 +17,8 @@
 //                    &inn=&issuer=     фильтры по эмитенту
 //   GET  /bond/history?secid=X         история одной облигации
 //   GET  /bond/issuer?inn=X            все живые бумаги одного эмитента
+//   POST /ai/extract                   извлечение структуры из текста
+//                                      (X-Admin-Token, body: {text, schema, hints?})
 //   POST /collect/stock                ручной сбор акций (X-Admin-Token)
 //   POST /collect/futures              ручной сбор фьючерсов
 //   POST /collect/bonds                ручной сбор облигаций
@@ -56,19 +59,22 @@ export default {
       if(url.pathname === '/bond/history')    return await handleBondHistory(env, url);
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
 
-      if(req.method === 'POST' && (url.pathname === '/collect/stock' || url.pathname === '/collect/futures' || url.pathname === '/collect/bonds')){
+      if(req.method === 'POST'){
+        // Все POST-эндпоинты требуют X-Admin-Token (используют квоту Cerebras
+        // или пишут в БД — публиковать без авторизации опасно).
         const token = req.headers.get('X-Admin-Token') || '';
         if(!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) return errResp('unauthorized', 401);
         if(url.pathname === '/collect/stock')   return jsonResp(await collectStocks(env));
         if(url.pathname === '/collect/futures') return jsonResp(await collectFutures(env));
         if(url.pathname === '/collect/bonds')   return jsonResp(await collectBonds(env));
+        if(url.pathname === '/ai/extract')      return await handleAiExtract(env, req);
       }
 
       return errResp(
         'Not Found. Endpoints: /status, /stock/latest, /stock/history?secid=X, '
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
         + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
-        + 'POST /collect/{stock|futures|bonds}',
+        + 'POST /collect/{stock|futures|bonds}, POST /ai/extract',
         404
       );
     } catch(e){
@@ -125,7 +131,8 @@ async function handleStatus(env){
       bond_unique_tqob: bondTqob,
     },
     recent_runs: lastLog.results || [],
-    version: '0.3-pilot-bonds',
+    cerebras_configured: !!env.CEREBRAS_API_KEY,
+    version: '0.4-pilot-cerebras',
   });
 }
 
@@ -334,6 +341,192 @@ async function handleBondIssuer(env, url){
     ORDER BY s.mat_date ASC
   `).bind(String(inn), today).all();
   return jsonResp({ inn, count: rows.results.length, data: rows.results });
+}
+
+// ═══ Endpoints: AI-экстракция через Cerebras ══════════════════════════════
+//
+// Принимает текст (выжатый из PDF/DOCX/XLSX в браузере или сырой HTML
+// раскрытия), возвращает структурированный JSON по выбранной схеме.
+// Сейчас поддерживаются:
+//   schema = 'report'   → финансовые показатели (rev/ebitda/np/...)
+//   schema = 'event'    → корпоративное событие из e-disclosure
+//   schema = 'supplier' → информация о контрагентах из MSFO-нот
+//
+// Cerebras — Llama 3.3 70B, ~2000 tokens/sec. Один отчёт парсится за
+// 5-15 секунд. Free tier: 1M tokens/день, ~14400 запросов/день.
+
+const CEREBRAS_BASE = 'https://api.cerebras.ai/v1';
+
+async function callCerebras(env, prompt, opts){
+  if(!env.CEREBRAS_API_KEY) throw new Error('CEREBRAS_API_KEY not set in Worker secrets');
+  const model = opts?.model || 'llama-3.3-70b';
+  const r = await fetch(CEREBRAS_BASE + '/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + env.CEREBRAS_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: opts?.temperature ?? 0.1,
+      max_tokens: opts?.max_tokens ?? 2000,
+      response_format: { type: 'json_object' },
+    }),
+  });
+  if(!r.ok){
+    const errText = await r.text().catch(() => '');
+    throw new Error(`Cerebras ${r.status}: ${errText.slice(0, 300)}`);
+  }
+  const j = await r.json();
+  const content = j.choices?.[0]?.message?.content || '';
+  return { content, usage: j.usage };
+}
+
+// Промпты по схемам — extracts function-style structured JSON.
+function buildPrompt(schema, text, hints){
+  const ctx = hints
+    ? '\n\nКОНТЕКСТ ОТ ПОЛЬЗОВАТЕЛЯ:\n' + JSON.stringify(hints, null, 2)
+    : '';
+
+  if(schema === 'report'){
+    return `Ты эксперт по финансовой отчётности. Извлеки из текста структурированные данные.${ctx}
+
+ТЕКСТ ОТЧЁТА:
+"""
+${text.slice(0, 60000)}
+"""
+
+ВЕРНИ ТОЛЬКО JSON по схеме (без пояснений):
+{
+  "year": число (4 цифры) или null,
+  "period": "Год" | "9М" | "Полугодие" | "1 квартал" | "3 квартал" | null,
+  "type": "МСФО" | "РСБУ" | null,
+  "currency": "RUB" | "USD" | "EUR",
+  "unit_used": "млрд" | "млн" | "тыс" | "руб",
+  "metrics": {
+    "rev":    число (выручка)              или null,
+    "ebitda": число (EBITDA)               или null,
+    "ebit":   число (операц. прибыль)      или null,
+    "np":     число (чистая прибыль)       или null,
+    "int":    число (процентные расходы)   или null,
+    "tax":    число (налог на прибыль)     или null,
+    "assets": число (всего активов)        или null,
+    "ca":     число (оборотные активы)     или null,
+    "cl":     число (текущие обязательства) или null,
+    "debt":   число (общий долг)           или null,
+    "cash":   число (денежные средства)    или null,
+    "ret":    число (нераспред. прибыль)   или null,
+    "eq":     число (собственный капитал)  или null
+  },
+  "issuer_name": строка или null,
+  "confidence": число от 0 до 1
+}
+
+ПРАВИЛА:
+- ВСЕ суммы переводи в МЛРД ₽. Если в отчёте млн — делишь на 1000. Если тыс — на 1М.
+- Если поле неоднозначно или отсутствует — null. НЕ УГАДЫВАЙ.
+- "type": МСФО (международная) или РСБУ (российская). Если unclear — null.
+- Возвращай ТОЛЬКО валидный JSON, никакого markdown или объяснений.`;
+  }
+
+  if(schema === 'event'){
+    return `Извлеки из текста раскрытия корпоративное событие.${ctx}
+
+ТЕКСТ:
+"""
+${text.slice(0, 30000)}
+"""
+
+ВЕРНИ JSON:
+{
+  "issuer_name": строка или null,
+  "issuer_inn":  строка (10-12 цифр) или null,
+  "event_date":  "YYYY-MM-DD" или null,
+  "event_type":  "default" | "restructuring" | "rating_change" | "share_issue" |
+                 "asset_sale" | "management_change" | "litigation" | "merger" |
+                 "dividend" | "guidance_change" | "covenant_breach" | "other",
+  "severity":    "critical" | "high" | "medium" | "low",
+  "summary":     строка (1-2 предложения),
+  "amount_rub":  число или null,
+  "confidence":  число от 0 до 1
+}`;
+  }
+
+  if(schema === 'supplier'){
+    return `Извлеки из текста (раздел МСФО «Концентрация выручки/закупок» или аналог) информацию о контрагентах.${ctx}
+
+ТЕКСТ:
+"""
+${text.slice(0, 40000)}
+"""
+
+ВЕРНИ JSON:
+{
+  "issuer_name": строка,
+  "year":        число (4 цифры),
+  "side":        "revenue" (мы продаём) | "costs" (мы покупаем),
+  "edges": [
+    {
+      "counterparty_name": строка,
+      "counterparty_inn":  строка или null,
+      "share_pct":         число (доля контрагента в выручке/закупках, %)
+    }
+  ],
+  "total_concentration_pct": число (сумма топ-N, %),
+  "confidence": число от 0 до 1
+}`;
+  }
+
+  throw new Error('Unknown schema: ' + schema + '. Supported: report | event | supplier');
+}
+
+async function handleAiExtract(env, req){
+  let body;
+  try { body = await req.json(); }
+  catch(_){ return errResp('Invalid JSON body'); }
+
+  const text = body?.text;
+  const schema = body?.schema || 'report';
+  const hints = body?.hints || null;
+
+  if(!text || typeof text !== 'string') return errResp('text (string) required');
+  if(text.length < 50) return errResp('text too short (need >50 chars)');
+  if(text.length > 100000) return errResp('text too long (max 100K chars — отрежь до 60K и вызови повторно)');
+
+  const t0 = Date.now();
+  const prompt = buildPrompt(schema, text, hints);
+  let raw;
+  try {
+    raw = await callCerebras(env, prompt);
+  } catch(e){
+    return errResp('Cerebras call failed: ' + e.message, 502);
+  }
+
+  // Llama 3.3 в JSON-mode возвращает строго валидный JSON, но на всякий
+  // случай оборачиваем в try — иногда модель добавляет markdown-обёртку.
+  let extracted;
+  try {
+    let jsonStr = raw.content.trim();
+    // Убираем ```json ... ``` если LLM его добавила
+    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    extracted = JSON.parse(jsonStr);
+  } catch(e){
+    return jsonResp({
+      ok: false,
+      error: 'Failed to parse LLM JSON output',
+      raw_response: raw.content.slice(0, 1000),
+      duration_ms: Date.now() - t0,
+    }, 500);
+  }
+
+  return jsonResp({
+    ok: true,
+    schema,
+    extracted,
+    usage: raw.usage,
+    duration_ms: Date.now() - t0,
+  });
 }
 
 // ═══ Коллекторы ═══════════════════════════════════════════════════════════
