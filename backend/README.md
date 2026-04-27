@@ -216,8 +216,11 @@ curl -X POST -H "X-Admin-Token: ВАШ_ТОКЕН" \
 действующей БД:
 
 ```sh
-npx wrangler d1 execute bondan-db --file=backend/schema.sql --remote
+npx wrangler d1 execute coldline --file=backend/schema.sql --remote
 ```
+
+> Имя `coldline` — фактическое (см. `database_name` в `backend/wrangler.toml`).
+> Если у тебя другое — посмотри список своих D1: `npx wrangler d1 list`.
 
 После этого первый ручной прогон сборщиков:
 
