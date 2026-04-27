@@ -1,8 +1,14 @@
 name: Deploy Backend Worker
 
 # Деплой Cloudflare Worker (backend/) через wrangler.
+# Используем Global API Key (CF_EMAIL + CF_API_KEY) — самый надёжный
+# способ авторизации wrangler в CI. Bearer-токены через secrets.BEZDNA
+# у нас исторически не приживались (CF возвращал 401 даже на правильно
+# скоупленных токенах).
+#
 # Нужны repository secrets:
-#   - BEZDNA                — Cloudflare API Token
+#   - CF_EMAIL              — email аккаунта Cloudflare
+#   - CF_API_KEY            — Global API Key (My Profile → API Tokens → View)
 #   - CLOUDFLARE_ACCOUNT_ID — Account ID (32-символьный hex)
 #   - ADMIN_TOKEN           — секрет для /collect/* endpoints (опционально)
 
@@ -21,8 +27,6 @@ on:
         required: false
         default: "false"
 
-# Автоматически отменяет предыдущий run при новом push — чтобы зависший
-# job не блокировал диагностику.
 concurrency:
   group: deploy-backend
   cancel-in-progress: true
@@ -38,64 +42,35 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Sanitize and verify token
+      - name: Verify Global API Key
         env:
-          RAW_TOKEN: ${{ secrets.BEZDNA }}
+          CF_EMAIL:   ${{ secrets.CF_EMAIL }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
         run: |
           set -e
-          if [ -z "$RAW_TOKEN" ]; then
-            echo "::error::Secret 'mist' is empty or not set."
+          if [ -z "$CF_EMAIL" ] || [ -z "$CF_API_KEY" ]; then
+            echo "::error::Не заданы CF_EMAIL или CF_API_KEY в repo secrets."
             exit 1
           fi
-          # Убираем CR/LF/TAB/обычные пробелы (мобильная вставка часто цепляет \n).
-          CLEAN_TOKEN="$(printf '%s' "$RAW_TOKEN" | tr -d '\r\n\t ')"
-          LEN=${#CLEAN_TOKEN}
-          echo "TOKEN_LEN=$LEN"
-
-          # Первые 6 / последние 6 — для сверки с экраном Cloudflare.
-          if [ "$LEN" -ge 12 ]; then
-            echo "TOKEN_PREFIX=${CLEAN_TOKEN:0:6}..."
-            echo "TOKEN_SUFFIX=...${CLEAN_TOKEN: -6}"
-          fi
-
-          # Считаем символы вне ожидаемого набора API-токена.
-          NON_TOKEN_COUNT=$(printf '%s' "$CLEAN_TOKEN" | LC_ALL=C tr -d 'a-zA-Z0-9_.-' | wc -c | tr -d ' ')
-          echo "NON_TOKEN_CHARS_COUNT=$NON_TOKEN_COUNT"
-          if [ "$NON_TOKEN_COUNT" -gt 0 ]; then
-            echo "::warning::В токене есть символы вне [a-zA-Z0-9_.-]:"
-            printf '%s' "$CLEAN_TOKEN" | LC_ALL=C tr -d 'a-zA-Z0-9_.-' | xxd
-          fi
-
-          # Проверяем токен через /user/tokens/verify (с таймаутом).
-          HTTP=$(curl --max-time 15 -s -o /tmp/verify.json -w "%{http_code}" \
-            -H "Authorization: Bearer $CLEAN_TOKEN" \
-            https://api.cloudflare.com/client/v4/user/tokens/verify || echo "000")
+          # /user — самый простой эндпоинт для проверки Global API Key.
+          HTTP=$(curl --max-time 15 -s -o /tmp/u.json -w "%{http_code}" \
+            -H "X-Auth-Email: $CF_EMAIL" \
+            -H "X-Auth-Key: $CF_API_KEY" \
+            https://api.cloudflare.com/client/v4/user || echo "000")
           echo "verify HTTP=$HTTP"
-          cat /tmp/verify.json 2>/dev/null || true
-          echo
           if [ "$HTTP" != "200" ]; then
-            echo "::error::Cloudflare не признаёт токен."
-            echo ""
-            echo "=== Диагностика: содержимое секрета по символам ==="
-            echo "(GitHub не маскирует — символы разнесены по строкам)"
-            echo ""
-            echo "--- по 5 символов в строке ---"
-            printf '%s' "$CLEAN_TOKEN" | fold -w5 | nl -ba
-            echo ""
-            echo "--- по одному символу + hex-код ---"
-            for (( i=0; i<${#CLEAN_TOKEN}; i++ )); do
-              ch="${CLEAN_TOKEN:$i:1}"
-              printf "%2d: %s  (0x%02x)\n" "$((i+1))" "$ch" "'$ch"
-            done
+            echo "::error::Cloudflare не признаёт Global API Key (HTTP $HTTP)."
+            head -c 800 /tmp/u.json || true
             exit 1
           fi
-
-          echo "::add-mask::$CLEAN_TOKEN"
-          echo "CLOUDFLARE_API_TOKEN=$CLEAN_TOKEN" >> "$GITHUB_ENV"
+          # покажем какой email распознан — на случай если в секрете опечатка
+          node -e "let d=JSON.parse(require('fs').readFileSync('/tmp/u.json','utf8')); console.log('email:', d.result?.email, 'id:', d.result?.id?.slice(0,8)+'...')"
 
       - name: Deploy Worker
         working-directory: backend
         env:
+          CLOUDFLARE_API_KEY:    ${{ secrets.CF_API_KEY }}
+          CLOUDFLARE_EMAIL:      ${{ secrets.CF_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@latest deploy
 
@@ -103,7 +78,9 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs['set-admin-token'] == 'true' }}
         working-directory: backend
         env:
+          CLOUDFLARE_API_KEY:    ${{ secrets.CF_API_KEY }}
+          CLOUDFLARE_EMAIL:      ${{ secrets.CF_EMAIL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          ADMIN_TOKEN:           ${{ secrets.ADMIN_TOKEN }}
         run: |
           printf '%s' "$ADMIN_TOKEN" | npx --yes wrangler@latest secret put ADMIN_TOKEN
