@@ -229,7 +229,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.8-buxbalans-retry',
+    version: '0.8.9-no-live-search',
   });
 }
 
@@ -695,14 +695,15 @@ async function callXai(env, prompt, opts){
     max_tokens: opts?.max_tokens ?? 3000,
     response_format: { type: 'json_object' },
   };
-  // Live Search включается явно. По умолчанию — auto (модель сама
-  // решит, нужен ли поиск). Для report-схемы всегда полезен → 'on'.
-  if(opts?.search !== false){
-    body.search_parameters = {
-      mode: opts?.search || 'auto',
-      max_search_results: opts?.max_search_results || 5,
-    };
-  }
+  // search_parameters / Live Search отключены: с конца 2025/начала 2026
+  // xAI deprecated этот режим (HTTP 410 «Live search is deprecated.
+  // Please switch to the Agent Tools API»). Grok работает в режиме
+  // training-knowledge — для крупных эмитентов с публичной историей
+  // это ок (Сбербанк, Газпром, МТС известны), для свежих ВДО SPV —
+  // почти бесполезно, нужен отдельный pre-fetch HTML с e-disclosure.
+  // TODO: либо мигрировать на Agent Tools API (`tools: [...]` с
+  // function-calling), либо в xaiFetchByInn делать pre-fetch
+  // e-disclosure HTML и передавать его в prompt как контекст.
   const r = await fetch(XAI_BASE + '/chat/completions', {
     method: 'POST',
     headers: {
@@ -993,10 +994,15 @@ async function xaiFetchByInn(inn, opts){
   ИНН: ${inn}
   Название: ${name}${ticker ? '\n  Тикер: ' + ticker : ''}
 
-ЗАДАЧА: найди в открытых источниках (e-disclosure.ru, audit-it.ru,
-buxbalans.ru, годовые отчёты на сайте эмитента, новости РБК/Интерфакс,
-центр раскрытия) РСБУ-показатели за последние 3 года, особенно за ${expected} год
-(публикуется по 31 марта ${expected + 1}).
+ЗАДАЧА: используя свои тренировочные данные (без выхода в интернет —
+Live Search отключён), укажи известные тебе РСБУ-показатели по этому
+эмитенту за последние 3 года, особенно за ${expected} год (публикуется
+по 31 марта ${expected + 1}). Источниками могут быть годовые отчёты,
+известные пресс-релизы РБК/Интерфакс, раскрытие на e-disclosure,
+агрегаторы аудит-ит/buxbalans.
+
+ВАЖНО: если ты не уверен в значении или ИНН тебе не известен —
+ставь null. НЕ ВЫДУМЫВАЙ цифры, лучше пустой ответ чем неточный.
 
 ВЕРНИ ТОЛЬКО JSON по схеме (без markdown, без пояснений):
 {
@@ -1037,8 +1043,8 @@ buxbalans.ru, годовые отчёты на сайте эмитента, но
     cacheKey: `report|${inn}|${expected}`,
     cacheTtlDays: 30,
     model: opts?.model || 'grok-4-fast-reasoning',
-    search: 'on', // явно включаем Live Search — без него Grok не пойдёт в e-disclosure
-    max_search_results: 6,
+    // Live Search в xAI deprecated → используем training-knowledge.
+    // Для известных эмитентов работает, для SPV нужен отдельный pre-fetch.
     max_tokens: 3500,
   });
 
