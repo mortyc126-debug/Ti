@@ -33,4 +33,10 @@ html = html.replace(/<title>[^<]*<\/title>/, `<title>БондАналитик ·
   <meta name="generated" content="${new Date().toISOString()}">`);
 
 writeFileSync(out, html);
+// Также кладём копию рядом с собранным dist/, чтобы CF Pages раздавала
+// её под /standalone.html — это резервный URL на случай проблем со
+// SPA-fallback'ом.
+const distCopy = resolve(dist, 'standalone.html');
+writeFileSync(distCopy, html);
 console.log(`OK · ${out} · ${(html.length / 1024).toFixed(1)} KB`);
+console.log(`OK · ${distCopy}`);
