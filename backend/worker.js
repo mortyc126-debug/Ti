@@ -229,7 +229,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.7-issuer-kind',
+    version: '0.8.8-buxbalans-retry',
   });
 }
 
@@ -1761,22 +1761,53 @@ function pickRaw(det, kind){
 // Ограничения: только РСБУ (МСФО на buxbalans нет), значения «как у
 // ФНС опубликовано», без агрегации по группе компаний.
 async function buxBalansFetchByInn(inn, opts){
-  const tout = opts?.timeoutMs || 15000;
-  const ctrl = new AbortController();
-  const tm = setTimeout(() => ctrl.abort(), tout);
-  let html;
-  try {
-    const r = await fetch(`https://buxbalans.ru/${inn}.html`, {
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml',
-        'User-Agent': 'Mozilla/5.0 (compatible; BondAnalytics/0.7; +github.com/mortyc126-debug/ti)',
-      },
-      signal: ctrl.signal,
-    });
-    if(r.status === 404) throw new Error('buxbalans: ИНН ' + inn + ' не найден');
-    if(!r.ok) throw new Error('buxbalans HTTP ' + r.status);
-    html = await r.text();
-  } finally { clearTimeout(tm); }
+  const tout = opts?.timeoutMs || 12000;
+  // Один retry на 502/503/network — у buxbalans бывают короткие
+  // блипы (видим из логов прода). Без retry «не найден» ставится
+  // ошибочно и ИНН выпадает из очереди на 14 дней.
+  let lastErr = null;
+  for(let attempt = 0; attempt < 2; attempt++){
+    const ctrl = new AbortController();
+    const tm = setTimeout(() => ctrl.abort(), tout);
+    let html;
+    try {
+      const r = await fetch(`https://buxbalans.ru/${inn}.html`, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml',
+          'User-Agent': 'Mozilla/5.0 (compatible; BondAnalytics/0.8; +github.com/mortyc126-debug/ti)',
+        },
+        signal: ctrl.signal,
+      });
+      if(r.status === 404) throw new Error('buxbalans: ИНН ' + inn + ' не найден');
+      if(r.status === 502 || r.status === 503){
+        if(attempt < 1){
+          lastErr = new Error('buxbalans HTTP ' + r.status + ' (retry)');
+          await new Promise(s => setTimeout(s, 1200));
+          continue;
+        }
+        throw new Error('buxbalans HTTP ' + r.status);
+      }
+      if(!r.ok) throw new Error('buxbalans HTTP ' + r.status);
+      html = await r.text();
+      // выходим из retry-цикла, парсим html
+      return parseBuxBalansHtml(html, inn);
+    } catch(e){
+      // 404 — стабильное «не найдено», не повторяем
+      if(/не найден/.test(e.message)) throw e;
+      if(attempt < 1){
+        lastErr = e;
+        await new Promise(s => setTimeout(s, 1200));
+        continue;
+      }
+      throw e;
+    } finally { clearTimeout(tm); }
+  }
+  throw lastErr || new Error('buxbalans: исчерпаны попытки');
+}
+
+// Парсер HTML-страницы buxbalans — выделен в отдельную функцию, чтобы
+// retry-обёртка выше была компактнее.
+function parseBuxBalansHtml(html, inn){
   if(!html || html.length < 2000) throw new Error('buxbalans: пустой ответ (' + (html?.length || 0) + ')');
 
   // Имя компании — обычно в <h1> заголовке.
