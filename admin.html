@@ -92,13 +92,13 @@
       <button class="secondary" onclick="run('/collect/issuers?start_page=50&max_pages=25')">🏢 Справочник · стр. 50-74</button>
     </div>
     <div class="row" style="margin-top:8px">
-      <button onclick="run('/collect/reports?limit=30&only_traded=1')">📊 Отчётность · 30 (торгуемые)</button>
-      <button onclick="run('/collect/reports?limit=50&only_traded=1')">📊 Отчётность · 50 (торгуемые)</button>
-      <button class="secondary" onclick="run('/collect/reports?limit=30')">📊 Отчётность · 30 (все ИНН)</button>
+      <button onclick="run('/collect/reports?limit=15&only_traded=1')">📊 Отчётность · 15 (торгуемые)</button>
+      <button onclick="run('/collect/reports?limit=15')">📊 Отчётность · 15 (все ИНН)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=30&only_traded=1&max_ms=280000')">📊 · 30 (paid plan)</button>
     </div>
     <div class="row" style="margin-top:8px">
-      <button onclick="run('/collect/reports?limit=10&only_traded=1&include_ai=1&ai_budget=5')">🤖 Grok-fallback · 10 (5 AI)</button>
-      <button class="secondary" onclick="run('/collect/reports?limit=20&only_traded=1&include_ai=1&ai_budget=10')">🤖 Grok-fallback · 20 (10 AI)</button>
+      <button onclick="run('/collect/reports?limit=10&only_traded=1&include_ai=1&ai_budget=3')">🤖 Grok-fallback · 10 (3 AI)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=20&only_traded=1&include_ai=1&ai_budget=8&max_ms=280000')">🤖 · 20 / 8 AI (paid)</button>
     </div>
     <div class="sub" style="margin-top:12px">
       Порядок при первом запуске: <b>облигации → акции → справочник → отчётность</b>.

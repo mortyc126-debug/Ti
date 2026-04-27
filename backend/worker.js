@@ -225,7 +225,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.2-buxbalans-first',
+    version: '0.8.3-time-budget',
   });
 }
 
@@ -1808,6 +1808,11 @@ async function collectReports(env, url){
   // skip_girbo=1 — пропустить ГИР БО (например когда ФНС блокирует CF
   // Worker IP и все запросы идут впустую, тратя subrequest-квоту).
   const skipGirbo = url?.searchParams?.get('skip_girbo') === '1';
+  // Внутренний бюджет времени (мс). Workers free tier режет на 30 сек
+  // wall-clock; ставим 25 сек, чтобы успеть отдать ответ. Paid plan
+  // даёт 5 минут — там можно поднять до 280000.
+  const maxDurationMs = parseInt(url?.searchParams?.get('max_ms') || '25000', 10);
+  const tBudgetStart = Date.now();
   // Адаптивный auto-disable: если первые N ИНН подряд получают «не
   // найден» от ГИР БО, отключаем источник до конца прогона (явный
   // признак, что ФНС нас режет / гео-блок).
@@ -1928,9 +1933,17 @@ async function collectReports(env, url){
   `;
 
   // ── Обработка ИНН: каскад источников ──────────────────────────────
+  let timedOut = false;
   for(const item of queue){
     const inn = item.inn;
     if(!inn) continue;
+    // Бюджет времени — чтобы не ловить CF wall-clock kill (free tier 30с).
+    // Если осталось меньше времени, чем нужно на один ИНН (~3 сек),
+    // выходим и отдаём то что есть. Очередь сама довезёт остальных.
+    if(Date.now() - tBudgetStart > maxDurationMs - 3000){
+      timedOut = true;
+      break;
+    }
     processed++;
     let usedSource = null;
     let lastErr = null;
@@ -2088,6 +2101,7 @@ async function collectReports(env, url){
     rowsWritten,
     aiUsed,
     aiBudget: includeAi ? aiBudget : 0,
+    timedOut,
     sourceStats,
     errors: errors.slice(0, 20),
     duration_ms: Date.now() - t0,
