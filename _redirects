@@ -1,4 +1,0 @@
-# Cloudflare Pages: корневой _redirects на случай, если Pages раздаёт
-# корень репозитория без сборки. Корневой / отдаст старое приложение
-# (index.html, 11k строк), а /app — новое (standalone-сборка).
-/app   /bondan-standalone.html   302

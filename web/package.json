@@ -12,7 +12,7 @@
   "dependencies": {
     "fuse.js": "^7.0.0",
     "lightweight-charts": "^4.2.1",
-    "lucide-react": "^1.11.0",
+    "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-rnd": "^10.4.13",
