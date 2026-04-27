@@ -263,3 +263,29 @@ CREATE TABLE IF NOT EXISTS ai_calls_log (
 );
 CREATE INDEX IF NOT EXISTS idx_aic_log_at  ON ai_calls_log(called_at);
 CREATE INDEX IF NOT EXISTS idx_aic_log_eng ON ai_calls_log(engine);
+
+-- ── Аффилиации эмитентов (учредители + связи холдингов) ───────────────
+-- Источник по умолчанию — DaData (10к запросов/день free), берёт данные
+-- из ЕГРЮЛ. Один child_inn может иметь нескольких parent (если у SPV
+-- два-три учредителя). Также храним физлица-руководителей (role=
+-- 'management') — может пригодиться для поиска связей через CEO.
+--
+-- Идея использования: для SPV/ВДО, по которым buxbalans/ГИР БО не дают
+-- РСБУ, через эту таблицу находим parent (у которого buxbalans уже
+-- собрал отчётность) и работаем с цифрами материнской компании. Это
+-- закрывает «другие пути» из ТЗ для случаев, когда сама эмитент-
+-- структура нечего не публикует.
+CREATE TABLE IF NOT EXISTS issuer_affiliations (
+  child_inn   TEXT NOT NULL,           -- ИНН эмитента-«дочки»
+  parent_inn  TEXT,                    -- ИНН материнской (NULL если физлицо)
+  parent_name TEXT,                    -- имя как в ЕГРЮЛ
+  share_pct   REAL,                    -- доля в УК
+  role        TEXT NOT NULL,           -- 'founder' | 'management'
+  parent_kind TEXT,                    -- 'LEGAL' | 'PHYSICAL' | 'STATE'
+  source      TEXT NOT NULL,           -- 'dadata' | 'manual' | 'inferred'
+  fetched_at  TEXT NOT NULL,
+  PRIMARY KEY (child_inn, parent_inn, role)
+);
+CREATE INDEX IF NOT EXISTS idx_aff_parent ON issuer_affiliations(parent_inn);
+CREATE INDEX IF NOT EXISTS idx_aff_child  ON issuer_affiliations(child_inn);
+CREATE INDEX IF NOT EXISTS idx_aff_role   ON issuer_affiliations(role);
