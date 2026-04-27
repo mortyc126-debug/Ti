@@ -225,7 +225,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.5-tight-timeouts',
+    version: '0.8.6-muni-cooldown',
   });
 }
 
@@ -2101,10 +2101,20 @@ async function collectReports(env, url){
       } catch(_){}
     } else {
       sourceStats.none++;
-      // Ни один источник не дал ничего. Если у эмитента есть торгуемые
-      // бумаги — всё равно держим в очереди (next_due = +14 дней),
-      // иначе тоже +14, но с увеличенным attempts.
-      const offset = item.is_traded ? '+14 days' : '+14 days';
+      // Ни один источник не дал ничего. Это типично для:
+      //   • муниципальных и региональных облигаций (Томская обл,
+      //     ИНН 7000000885 и т.п.) — у них нет РСБУ по 402-ФЗ.
+      //   • SPV-структур, недавно созданных юрлиц без публичной
+      //     отчётности.
+      //   • ликвидированных компаний.
+      // Прошлая попытка ставила +14 дней независимо ни от чего.
+      // Теперь:
+      //   • если уже было ≥3 попыток подряд → +90 дней (стабильно
+      //     отсутствует, через 3 месяца перепроверим);
+      //   • если первая-вторая попытка → +14 дней (вдруг buxbalans
+      //     или ФНС добавит данные).
+      const tries = (item.attempts || 0) + 1;
+      const offset = tries >= 3 ? '+90 days' : '+14 days';
       const errMsg = (sourceErrors.join(' | ') || 'no sources').slice(0, 200);
       errors.push({ inn, error: errMsg });
       try {
