@@ -225,7 +225,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.1-girbo-autodisable',
+    version: '0.8.2-buxbalans-first',
   });
 }
 
@@ -1762,11 +1762,26 @@ function expectedFyYear(d){
   return x.getUTCMonth() >= 3 ? x.getUTCFullYear() - 1 : x.getUTCFullYear() - 2;
 }
 
-// Источники в порядке приоритета. Каждый источник возвращает один и
-// тот же контракт {series, rawByYear, company, inn, ogrn, errors}.
+// Источники в порядке приоритета. Каждый возвращает контракт
+// {series, rawByYear, company, inn, ogrn, errors}.
+//
+// Порядок ВАЖЕН и противоречит интуиции «официальный → агрегатор»:
+// buxbalans стоит ПЕРВЫМ потому что:
+//   • даёт всю историю с 2011 (ГИР БО держит только 5 свежих лет —
+//     для трендов когорты этого мало);
+//   • стабильно отвечает CF Worker'у (ФНС часто блокирует CF IP);
+//   • один HTTP-запрос даёт сразу все коды РСБУ (vs 2+ у ГИР БО).
+// Один запрос → за прогон укладывается в 7× больше ИНН, чем когда
+// первым шёл ГИР БО (~50 subrequest free-tier лимита делятся на
+// одного ИНН вместо семи).
+//
+// ГИР БО добавляем вторым уровнем — он нужен ТОЛЬКО когда у buxbalans
+// нет ожидаемого года (свежий годовой отчёт публикуется в ФНС за 1-2
+// недели до того, как buxbalans его поскрейпит). Обычно через 30 дней
+// после 31 марта оба источника выровняются и ГИР БО уже не нужен.
 const REPORT_SOURCES = [
-  { name: 'girbo',     fn: girboFetchByInn      },
   { name: 'buxbalans', fn: buxBalansFetchByInn  },
+  { name: 'girbo',     fn: girboFetchByInn      },
 ];
 
 // Главный коллектор отчётности. Поддерживает каскад источников и
