@@ -169,17 +169,37 @@ async function handleStatus(env){
   // Статистика по отчётности: сколько ИНН покрыто, последние fetched_at.
   let reportsStats = {};
   try {
-    const [rRows, rIssuers, rRecent, qPending] = await Promise.all([
+    const [rRows, rIssuers, rRecent, qPending, bySrc] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as c FROM issuer_reports').first(),
       env.DB.prepare('SELECT COUNT(DISTINCT inn) as c FROM issuer_reports').first(),
       env.DB.prepare('SELECT MAX(fetched_at) as t FROM issuer_reports').first(),
       env.DB.prepare("SELECT COUNT(*) as c FROM reports_queue WHERE last_success IS NULL OR last_success < datetime('now', '-30 days')").first(),
+      env.DB.prepare('SELECT source, COUNT(*) AS c FROM issuer_reports GROUP BY source').all(),
     ]);
     reportsStats = {
       reports_rows: rRows?.c ?? 0,
       reports_issuers_covered: rIssuers?.c ?? 0,
       reports_last_fetched: rRecent?.t ?? null,
       reports_queue_pending: qPending?.c ?? 0,
+      reports_by_source: Object.fromEntries((bySrc.results || []).map(r => [r.source, r.c])),
+    };
+  } catch(_){}
+
+  // AI-статистика — за сегодня и за месяц
+  let aiStats = {};
+  try {
+    const [calls24h, calls30d, tokens30d, cacheHit24h] = await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) as c FROM ai_calls_log WHERE called_at >= datetime('now', '-1 day')").first(),
+      env.DB.prepare("SELECT COUNT(*) as c FROM ai_calls_log WHERE called_at >= datetime('now', '-30 days')").first(),
+      env.DB.prepare("SELECT COALESCE(SUM(tokens_in),0) as i, COALESCE(SUM(tokens_out),0) as o FROM ai_calls_log WHERE called_at >= datetime('now', '-30 days')").first(),
+      env.DB.prepare("SELECT COUNT(*) as c FROM ai_calls_log WHERE called_at >= datetime('now', '-1 day') AND cache_hit = 1").first(),
+    ]);
+    aiStats = {
+      ai_calls_24h: calls24h?.c ?? 0,
+      ai_calls_30d: calls30d?.c ?? 0,
+      ai_tokens_in_30d: tokens30d?.i ?? 0,
+      ai_tokens_out_30d: tokens30d?.o ?? 0,
+      ai_cache_hits_24h: cacheHit24h?.c ?? 0,
     };
   } catch(_){}
 
@@ -203,7 +223,9 @@ async function handleStatus(env){
     },
     recent_runs: lastLog.results || [],
     cerebras_configured: !!env.CEREBRAS_API_KEY,
-    version: '0.7-cascade',
+    xai_configured: !!env.XAI_API_KEY,
+    ...aiStats,
+    version: '0.8-ai-cascade',
   });
 }
 
@@ -623,6 +645,7 @@ async function handleIssuerCard(env, url){
 // 5-15 секунд. Free tier: 1M tokens/день, ~14400 запросов/день.
 
 const CEREBRAS_BASE = 'https://api.cerebras.ai/v1';
+const XAI_BASE      = 'https://api.x.ai/v1';
 
 async function callCerebras(env, prompt, opts){
   if(!env.CEREBRAS_API_KEY) throw new Error('CEREBRAS_API_KEY not set in Worker secrets');
@@ -648,6 +671,125 @@ async function callCerebras(env, prompt, opts){
   const j = await r.json();
   const content = j.choices?.[0]?.message?.content || '';
   return { content, usage: j.usage };
+}
+
+// xAI Grok через OpenAI-совместимый chat/completions. Ключевая фича для
+// нас — `search_parameters` (Live Search): Grok сам ходит в открытый
+// интернет (e-disclosure, audit-it, новости) и вытаскивает данные. Это
+// именно «другие пути» из ТЗ, когда ГИР БО + buxbalans не сработали.
+//
+// Модель по умолчанию — `grok-4` (с reasoning), но это медленно/дорого.
+// Для массового сбора пользуемся `grok-4-fast-reasoning` (быстрее в ~3x).
+// Для коротких событий из новостей — `grok-3-mini` (минимально-дёшево).
+async function callXai(env, prompt, opts){
+  if(!env.XAI_API_KEY) throw new Error('XAI_API_KEY not set in Worker secrets');
+  const model = opts?.model || 'grok-4-fast-reasoning';
+  const body = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: opts?.temperature ?? 0.1,
+    max_tokens: opts?.max_tokens ?? 3000,
+    response_format: { type: 'json_object' },
+  };
+  // Live Search включается явно. По умолчанию — auto (модель сама
+  // решит, нужен ли поиск). Для report-схемы всегда полезен → 'on'.
+  if(opts?.search !== false){
+    body.search_parameters = {
+      mode: opts?.search || 'auto',
+      max_search_results: opts?.max_search_results || 5,
+    };
+  }
+  const r = await fetch(XAI_BASE + '/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + env.XAI_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if(!r.ok){
+    const errText = await r.text().catch(() => '');
+    throw new Error(`xAI ${r.status}: ${errText.slice(0, 300)}`);
+  }
+  const j = await r.json();
+  const content = j.choices?.[0]?.message?.content || '';
+  return { content, usage: j.usage, citations: j.citations || [] };
+}
+
+// Универсальная обёртка: kind = 'cerebras' | 'grok'. Логирует вызов в
+// ai_calls_log, при необходимости кладёт в ai_cache. Кеш-ключ —
+// sha256('{engine}|{schema}|{cacheKey}').
+async function callAi(env, engine, prompt, opts){
+  const t0 = Date.now();
+  const schema = opts?.schema || 'free';
+  const inn = opts?.inn || null;
+  const cacheTtlDays = opts?.cacheTtlDays || 30;
+
+  // Кеш-lookup
+  let cacheKey = null;
+  if(opts?.cacheKey){
+    cacheKey = await sha256(`${engine}|${schema}|${opts.cacheKey}`);
+    try {
+      const hit = await env.DB.prepare(
+        `SELECT response, tokens_in, tokens_out FROM ai_cache
+          WHERE cache_key = ? AND ttl_until >= datetime('now')`
+      ).bind(cacheKey).first();
+      if(hit){
+        await logAiCall(env, engine, schema, inn, true, true, hit.tokens_in, hit.tokens_out, Date.now() - t0, null);
+        return { content: hit.response, usage: { prompt_tokens: hit.tokens_in, completion_tokens: hit.tokens_out }, cache_hit: true };
+      }
+    } catch(_){ /* нет таблицы — игнор */ }
+  }
+
+  let res;
+  try {
+    res = engine === 'grok'
+      ? await callXai(env, prompt, opts)
+      : await callCerebras(env, prompt, opts);
+  } catch(e){
+    await logAiCall(env, engine, schema, inn, false, false, null, null, Date.now() - t0, e.message);
+    throw e;
+  }
+  const tIn  = res.usage?.prompt_tokens     ?? null;
+  const tOut = res.usage?.completion_tokens ?? null;
+  await logAiCall(env, engine, schema, inn, true, false, tIn, tOut, Date.now() - t0, null);
+
+  // Кеш-write
+  if(cacheKey){
+    try {
+      await env.DB.prepare(`
+        INSERT INTO ai_cache (cache_key, engine, schema, inn, response, tokens_in, tokens_out, fetched_at, ttl_until)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now', ?))
+        ON CONFLICT(cache_key) DO UPDATE SET
+          response   = excluded.response,
+          tokens_in  = excluded.tokens_in,
+          tokens_out = excluded.tokens_out,
+          fetched_at = excluded.fetched_at,
+          ttl_until  = excluded.ttl_until
+      `).bind(
+        cacheKey, engine, schema, inn, res.content, tIn, tOut,
+        `+${cacheTtlDays} days`
+      ).run();
+    } catch(_){ /* нет таблицы — игнор */ }
+  }
+
+  return res;
+}
+
+async function logAiCall(env, engine, schema, inn, ok, cacheHit, tIn, tOut, durMs, err){
+  try {
+    await env.DB.prepare(`
+      INSERT INTO ai_calls_log (engine, schema, inn, ok, cache_hit, tokens_in, tokens_out, duration_ms, error, called_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(engine, schema, inn, ok ? 1 : 0, cacheHit ? 1 : 0, tIn, tOut, durMs, err ? String(err).slice(0, 300) : null).run();
+  } catch(_){ /* нет таблицы — игнор */ }
+}
+
+// SHA-256 hex (Web Crypto, доступен в Workers без импортов).
+async function sha256(input){
+  const buf = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Промпты по схемам — extracts function-style structured JSON.
@@ -756,6 +898,12 @@ async function handleAiExtract(env, req){
   const text = body?.text;
   const schema = body?.schema || 'report';
   const hints = body?.hints || null;
+  // engine = 'cerebras' (default, быстро и дёшево) | 'grok' (с Live Search,
+  // полезно когда text — это не сам отчёт, а описание/ссылка/выжимка).
+  const engine = (body?.engine || 'cerebras').toLowerCase();
+  if(!['cerebras', 'grok'].includes(engine)){
+    return errResp('engine must be cerebras|grok');
+  }
 
   if(!text || typeof text !== 'string') return errResp('text (string) required');
   if(text.length < 50) return errResp('text too short (need >50 chars)');
@@ -765,9 +913,15 @@ async function handleAiExtract(env, req){
   const prompt = buildPrompt(schema, text, hints);
   let raw;
   try {
-    raw = await callCerebras(env, prompt);
+    raw = await callAi(env, engine, prompt, {
+      schema,
+      // Для одинаковых текстов (повторные парсы) — лезем в кеш на 7 дней.
+      // Текст может быть длинным, но в ключ кладём sha256 целого payload'а.
+      cacheKey: text.slice(0, 200) + '|' + (hints ? JSON.stringify(hints) : ''),
+      cacheTtlDays: 7,
+    });
   } catch(e){
-    return errResp('Cerebras call failed: ' + e.message, 502);
+    return errResp(`${engine} call failed: ${e.message}`, 502);
   }
 
   // Llama 3.3 в JSON-mode возвращает строго валидный JSON, но на всякий
@@ -790,10 +944,134 @@ async function handleAiExtract(env, req){
   return jsonResp({
     ok: true,
     schema,
+    engine,
     extracted,
     usage: raw.usage,
+    cache_hit: !!raw.cache_hit,
+    citations: raw.citations || null,
     duration_ms: Date.now() - t0,
   });
+}
+
+// ═══ Grok-fallback для отчётности ═════════════════════════════════════
+//
+// Третий уровень каскада в collectReports. Используется ТОЛЬКО когда:
+//   1. ГИР БО и buxbalans уже не дали свежий год для этого ИНН;
+//   2. У эмитента есть активные торгуемые бумаги (is_traded=1);
+//   3. В env есть XAI_API_KEY;
+//   4. AI-бюджет на текущий прогон ещё не исчерпан.
+//
+// Grok с Live Search умеет ходить в открытый интернет (e-disclosure.ru,
+// audit-it.ru, новости, годовые отчёты), что закрывает «другие пути» из
+// ТЗ для эмитентов, у которых ФНС не выкатила и/или buxbalans не успел.
+async function xaiFetchByInn(inn, opts){
+  const env = opts?.env;
+  if(!env?.XAI_API_KEY) throw new Error('XAI_API_KEY not set');
+  const expected = expectedFyYear(new Date());
+
+  // Подтащим имя эмитента для контекста, чтобы Grok искал не по
+  // сухому ИНН а по «Дельтакапиталресурс ИНН 7728…».
+  let name = `ИНН ${inn}`;
+  let ticker = null;
+  try {
+    const row = await env.DB.prepare(
+      'SELECT name, short_name, ticker FROM issuers WHERE inn = ?'
+    ).bind(inn).first();
+    if(row){
+      name = row.short_name || row.name || name;
+      ticker = row.ticker || null;
+    }
+  } catch(_){}
+
+  const prompt = `Ты помогаешь собирать РСБУ-отчётность российских эмитентов облигаций.
+
+ЭМИТЕНТ:
+  ИНН: ${inn}
+  Название: ${name}${ticker ? '\n  Тикер: ' + ticker : ''}
+
+ЗАДАЧА: найди в открытых источниках (e-disclosure.ru, audit-it.ru,
+buxbalans.ru, годовые отчёты на сайте эмитента, новости РБК/Интерфакс,
+центр раскрытия) РСБУ-показатели за последние 3 года, особенно за ${expected} год
+(публикуется по 31 марта ${expected + 1}).
+
+ВЕРНИ ТОЛЬКО JSON по схеме (без markdown, без пояснений):
+{
+  "company": "точное название с ОПФ или null",
+  "ogrn": "ОГРН (13-15 цифр) или null",
+  "series": {
+    "${expected}": {
+      "rev": число (выручка, стр. 2110)         или null,
+      "ebit": число (операц. прибыль, 2200)     или null,
+      "np":  число (чистая прибыль, 2400)       или null,
+      "int_exp": число (% к уплате, 2330)       или null,
+      "tax_exp": число (налог, 2410)            или null,
+      "assets": число (всего активов, 1600)     или null,
+      "ca":   число (оборотные активы, 1200)    или null,
+      "cl":   число (краткосроч. обяз., 1500)   или null,
+      "debt": число (1410+1510 займы)           или null,
+      "cash": число (ден. средства, 1250)       или null,
+      "ret":  число (нераспред. прибыль, 1370)  или null,
+      "eq":   число (собств. капитал, 1300)     или null
+    },
+    "${expected - 1}": { ... те же поля ... },
+    "${expected - 2}": { ... те же поля ... }
+  },
+  "source_urls": ["https://...", "..."],
+  "confidence": число от 0 до 1
+}
+
+ПРАВИЛА:
+- ВСЕ суммы переводи в МЛРД ₽. В источнике в тыс ₽ → /1e6, в млн → /1000.
+- Если поля нет в источнике — null. НЕ ВЫДУМЫВАЙ.
+- Если по этому ИНН вообще нет данных в открытых источниках — верни
+  {"series": {}, "errors": ["причина"]}.
+- Только валидный JSON, никакого markdown.`;
+
+  const res = await callAi(env, 'grok', prompt, {
+    schema: 'report',
+    inn,
+    cacheKey: `report|${inn}|${expected}`,
+    cacheTtlDays: 30,
+    model: opts?.model || 'grok-4-fast-reasoning',
+    search: 'on', // явно включаем Live Search — без него Grok не пойдёт в e-disclosure
+    max_search_results: 6,
+    max_tokens: 3500,
+  });
+
+  let parsed;
+  try {
+    let s = res.content.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    parsed = JSON.parse(s);
+  } catch(e){
+    throw new Error('grok: невалидный JSON');
+  }
+  if(!parsed.series || !Object.keys(parsed.series).length){
+    throw new Error('grok: ничего не найдено' + (parsed.errors ? ': ' + parsed.errors.join(', ') : ''));
+  }
+
+  const series = {};
+  const rawByYear = {};
+  for(const [yearStr, vals] of Object.entries(parsed.series)){
+    const y = parseInt(yearStr, 10);
+    if(!y || !vals || typeof vals !== 'object') continue;
+    series[y] = {};
+    for(const k of ['rev','ebit','np','int_exp','tax_exp','assets','ca','cl','debt','cash','ret','eq']){
+      if(typeof vals[k] === 'number' && isFinite(vals[k])) series[y][k] = vals[k];
+    }
+    rawByYear[y] = {
+      _from_grok: true,
+      source_urls: parsed.source_urls || [],
+      confidence: parsed.confidence ?? null,
+    };
+  }
+  return {
+    series,
+    rawByYear,
+    company: parsed.company || name,
+    inn,
+    ogrn: parsed.ogrn || null,
+    errors: [],
+  };
 }
 
 // ═══ Коллекторы ═══════════════════════════════════════════════════════════
@@ -1499,11 +1777,16 @@ async function collectReports(env, url){
   const onlyInn = url?.searchParams?.get('inn');
   const force   = url?.searchParams?.get('force') === '1';
   const onlyTraded = url?.searchParams?.get('only_traded') === '1';
+  // include_ai=1 — разрешает Grok как третий fallback. Default off, чтобы
+  // случайный запуск не сжёг квоту xAI. ai_budget — максимум вызовов
+  // Grok за этот прогон (помимо кеш-хитов).
+  const includeAi = url?.searchParams?.get('include_ai') === '1';
+  const aiBudget  = Math.min(20, parseInt(url?.searchParams?.get('ai_budget') || '5', 10));
   const today = new Date().toISOString().slice(0, 10);
   const expected = expectedFyYear(new Date());
   const errors = [];
-  let processed = 0, succeeded = 0, rowsWritten = 0;
-  const sourceStats = { girbo: 0, buxbalans: 0, none: 0 };
+  let processed = 0, succeeded = 0, rowsWritten = 0, aiUsed = 0;
+  const sourceStats = { girbo: 0, buxbalans: 0, grok: 0, none: 0 };
 
   // ── Формирование очереди ──────────────────────────────────────────
   // Приоритет:
@@ -1623,65 +1906,97 @@ async function collectReports(env, url){
     let totalRows = 0;
     const sourceErrors = [];
 
+    // Внутренняя функция: применить результат от любого источника —
+    // upsert строк в issuer_reports + апдейт имени/ОГРН в issuers.
+    // Возвращает кол-во записанных лет и обновляет maxYearGot/usedSource
+    // через замыкание.
+    const applyFetched = async (srcName, fetched) => {
+      if(!fetched?.series || !Object.keys(fetched.series).length) return 0;
+      const yearStmts = [];
+      for(const [yearStr, vals] of Object.entries(fetched.series)){
+        const fy = parseInt(yearStr, 10);
+        if(!fy) continue;
+        if(fy > maxYearGot) maxYearGot = fy;
+        const rev = vals.rev ?? null;
+        const np  = vals.np  ?? null;
+        const eq  = vals.eq  ?? null;
+        const debt = vals.debt ?? null;
+        const cash = vals.cash ?? null;
+        const assets = vals.assets ?? null;
+        const ebitda = (vals.ebit != null && vals.int_exp != null)
+          ? (vals.ebit + vals.int_exp) : null;
+        const roa  = (np != null && assets) ? np / assets * 100 : null;
+        const ros  = (np != null && rev)    ? np / rev * 100    : null;
+        const em   = (ebitda != null && rev) ? ebitda / rev * 100 : null;
+        const nde  = (debt != null && cash != null && eq) ? (debt - cash) / eq : null;
+        const raw  = JSON.stringify(fetched.rawByYear?.[fy] || {});
+        yearStmts.push(env.DB.prepare(upsertReport).bind(
+          inn, fy,
+          rev, ebitda, vals.ebit ?? null, np, vals.int_exp ?? null, vals.tax_exp ?? null,
+          assets, vals.ca ?? null, vals.cl ?? null, debt, cash, vals.ret ?? null, eq,
+          roa, ros, em, nde,
+          srcName, raw, now,
+        ));
+      }
+      let rows = 0;
+      if(yearStmts.length){
+        for(let i = 0; i < yearStmts.length; i += 200){
+          const chunk = yearStmts.slice(i, i + 200);
+          const res = await env.DB.batch(chunk);
+          rows += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
+        }
+      }
+      if(fetched.company || fetched.ogrn){
+        try {
+          await env.DB.prepare(`
+            UPDATE issuers
+               SET name  = COALESCE(?, name),
+                   ogrn  = COALESCE(issuers.ogrn, ?),
+                   updated_at = ?
+             WHERE inn = ?
+          `).bind(fetched.company || null, fetched.ogrn || null, now, inn).run();
+        } catch(_){}
+      }
+      usedSource = srcName;
+      return rows;
+    };
+
+    // ── Слой 1+2: ГИР БО, buxbalans ─────────────────────────────────
     for(const src of REPORT_SOURCES){
       try {
         const fetched = await src.fn(inn, 5);
         if(!fetched.series || !Object.keys(fetched.series).length){
           throw new Error(src.name + ': пустой series');
         }
-        const yearStmts = [];
-        for(const [yearStr, vals] of Object.entries(fetched.series)){
-          const fy = parseInt(yearStr, 10);
-          if(!fy) continue;
-          if(fy > maxYearGot) maxYearGot = fy;
-          const rev = vals.rev ?? null;
-          const np  = vals.np  ?? null;
-          const eq  = vals.eq  ?? null;
-          const debt = vals.debt ?? null;
-          const cash = vals.cash ?? null;
-          const assets = vals.assets ?? null;
-          const ebitda = (vals.ebit != null && vals.int_exp != null)
-            ? (vals.ebit + vals.int_exp) : null;
-          const roa  = (np != null && assets) ? np / assets * 100 : null;
-          const ros  = (np != null && rev)    ? np / rev * 100    : null;
-          const em   = (ebitda != null && rev) ? ebitda / rev * 100 : null;
-          const nde  = (debt != null && cash != null && eq) ? (debt - cash) / eq : null;
-          const raw  = JSON.stringify(fetched.rawByYear?.[fy] || {});
-          yearStmts.push(env.DB.prepare(upsertReport).bind(
-            inn, fy,
-            rev, ebitda, vals.ebit ?? null, np, vals.int_exp ?? null, vals.tax_exp ?? null,
-            assets, vals.ca ?? null, vals.cl ?? null, debt, cash, vals.ret ?? null, eq,
-            roa, ros, em, nde,
-            src.name, raw, now,
-          ));
-        }
-        if(yearStmts.length){
-          // Дробим на батчи по 200, как в collectIssuers
-          for(let i = 0; i < yearStmts.length; i += 200){
-            const chunk = yearStmts.slice(i, i + 200);
-            const res = await env.DB.batch(chunk);
-            totalRows += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
-          }
-        }
-        usedSource = src.name;
-        // Обновим имя/ОГРН в issuers
-        if(fetched.company || fetched.ogrn){
-          try {
-            await env.DB.prepare(`
-              UPDATE issuers
-                 SET name  = COALESCE(?, name),
-                     ogrn  = COALESCE(issuers.ogrn, ?),
-                     updated_at = ?
-               WHERE inn = ?
-            `).bind(fetched.company || null, fetched.ogrn || null, now, inn).run();
-          } catch(_){}
-        }
+        totalRows += await applyFetched(src.name, fetched);
         // Если получили ожидаемый год — каскад дальше не идём.
-        // Иначе — пробуем следующий источник, может он даст свежее.
         if(maxYearGot >= expected) break;
       } catch(e){
         const msg = (e.message || String(e)).slice(0, 200);
         sourceErrors.push(`${src.name}: ${msg}`);
+        lastErr = msg;
+      }
+    }
+
+    // ── Слой 3: Grok-fallback ────────────────────────────────────────
+    // Запускаем только если:
+    //   • include_ai=1 в query (явный opt-in)
+    //   • есть xAI ключ в Worker secrets
+    //   • эмитент с торгуемыми бумагами (для рандомных левых ИНН смысла
+    //     палить квоту нет)
+    //   • первые два источника не дали ожидаемый год
+    //   • бюджет ai_budget на текущий прогон не исчерпан
+    if(includeAi && env.XAI_API_KEY && item.is_traded
+        && maxYearGot < expected && aiUsed < aiBudget){
+      try {
+        const fetched = await xaiFetchByInn(inn, { env });
+        if(fetched.series && Object.keys(fetched.series).length){
+          totalRows += await applyFetched('grok', fetched);
+        }
+        aiUsed++;
+      } catch(e){
+        const msg = (e.message || String(e)).slice(0, 200);
+        sourceErrors.push(`grok: ${msg}`);
         lastErr = msg;
       }
     }
@@ -1725,6 +2040,8 @@ async function collectReports(env, url){
     processed,
     succeeded,
     rowsWritten,
+    aiUsed,
+    aiBudget: includeAi ? aiBudget : 0,
     sourceStats,
     errors: errors.slice(0, 20),
     duration_ms: Date.now() - t0,

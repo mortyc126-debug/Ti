@@ -218,3 +218,42 @@ CREATE TABLE IF NOT EXISTS reports_queue (
   priority       INTEGER DEFAULT 0      -- 0 = обычный, выше = чаще
 );
 CREATE INDEX IF NOT EXISTS idx_queue_due ON reports_queue(next_due);
+
+-- ── Кеш AI-вызовов ────────────────────────────────────────────────────
+-- Чтобы не платить за один и тот же запрос дважды (особенно Grok с Live
+-- Search — стоимость порядка $0.015/1k токенов, плюс за поиск). Ключ
+-- `cache_key` = sha256(engine|schema|payload) — payload обычно {inn,
+-- expected_year}. TTL 30 дней — данные ФНС не меняются чаще.
+CREATE TABLE IF NOT EXISTS ai_cache (
+  cache_key    TEXT PRIMARY KEY,         -- sha256
+  engine       TEXT NOT NULL,            -- 'grok' | 'cerebras'
+  schema       TEXT NOT NULL,            -- 'report' | 'event' | 'supplier'
+  inn          TEXT,                     -- для группировки/чистки
+  response     TEXT NOT NULL,            -- сырой JSON из LLM
+  tokens_in    INTEGER,
+  tokens_out   INTEGER,
+  fetched_at   TEXT NOT NULL,
+  ttl_until    TEXT NOT NULL             -- после этой даты считается просроченным
+);
+CREATE INDEX IF NOT EXISTS idx_aic_inn   ON ai_cache(inn);
+CREATE INDEX IF NOT EXISTS idx_aic_ttl   ON ai_cache(ttl_until);
+CREATE INDEX IF NOT EXISTS idx_aic_engin ON ai_cache(engine);
+
+-- Журнал использования AI — для бюджета и мониторинга. На каждый
+-- успешный/неуспешный вызов одна строка. По нему /status считает
+-- ai_calls_today / ai_tokens_today.
+CREATE TABLE IF NOT EXISTS ai_calls_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  engine      TEXT NOT NULL,
+  schema      TEXT,
+  inn         TEXT,
+  ok          INTEGER NOT NULL DEFAULT 0,  -- 1 если вернул валидный JSON
+  cache_hit   INTEGER NOT NULL DEFAULT 0,
+  tokens_in   INTEGER,
+  tokens_out  INTEGER,
+  duration_ms INTEGER,
+  error       TEXT,
+  called_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_aic_log_at  ON ai_calls_log(called_at);
+CREATE INDEX IF NOT EXISTS idx_aic_log_eng ON ai_calls_log(engine);
