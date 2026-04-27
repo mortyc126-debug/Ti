@@ -11,6 +11,13 @@ body {
   margin: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  background-color: #0a0e14;
+  /* Тонкий радиальный «дыхающий» градиент сверху — мягко добавляет
+     глубины фону без декоративного шума. */
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(0,212,255,0.05), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(167,139,250,0.04), transparent 55%);
+  background-attachment: fixed;
 }
 
 /* Скроллбары в стиле текущего SPA. */
@@ -18,3 +25,28 @@ body {
 ::-webkit-scrollbar-track { background: theme('colors.bg2'); }
 ::-webkit-scrollbar-thumb { background: theme('colors.border2'); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: theme('colors.text3'); }
+
+/* Единый focus-visible — синяя обводка везде, где интерактив. */
+:focus-visible {
+  outline: 2px solid theme('colors.acc');
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
+/* Выделение текста — в тон акценту, читаемое. */
+::selection {
+  background: rgba(0, 212, 255, 0.25);
+  color: #e6edf3;
+}
+
+/* Числа — равноширинные tabular-nums, чтобы колонки в таблицах не плясали. */
+.font-mono, table {
+  font-variant-numeric: tabular-nums;
+}
