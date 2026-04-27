@@ -229,7 +229,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.9-no-live-search',
+    version: '0.9.0-grok-context',
   });
 }
 
@@ -974,34 +974,60 @@ async function xaiFetchByInn(inn, opts){
   if(!env?.XAI_API_KEY) throw new Error('XAI_API_KEY not set');
   const expected = expectedFyYear(new Date());
 
-  // Подтащим имя эмитента для контекста, чтобы Grok искал не по
-  // сухому ИНН а по «Дельтакапиталресурс ИНН 7728…».
+  // Подтащим из БД всё что знаем об эмитенте — это контекст для Grok'а.
+  // Особенно важно для SPV-структур (СФО, ООО, ЗАО) — Grok'у нужна
+  // подсказка про материнскую компанию, иначе он не свяжет.
   let name = `ИНН ${inn}`;
   let ticker = null;
+  let ogrn = null;
+  let kind = null;
   try {
     const row = await env.DB.prepare(
-      'SELECT name, short_name, ticker FROM issuers WHERE inn = ?'
+      'SELECT name, short_name, ticker, ogrn, kind FROM issuers WHERE inn = ?'
     ).bind(inn).first();
     if(row){
       name = row.short_name || row.name || name;
       ticker = row.ticker || null;
+      ogrn = row.ogrn || null;
+      kind = row.kind || null;
     }
   } catch(_){}
+
+  // Подтащим список активных бумаг — из их кратких имён часто видна
+  // материнская компания (например, «СПб-Бан БО-001» → Газпромбанк, или
+  // «РОЛЬФ БО-2Р» → Группа РОЛЬФ).
+  let bondHints = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT DISTINCT shortname FROM bond_daily
+       WHERE emitent_inn = ? AND date = (SELECT MAX(date) FROM bond_daily)
+       LIMIT 6
+    `).bind(inn).all();
+    bondHints = (r.results || []).map(x => x.shortname).filter(Boolean);
+  } catch(_){}
+
+  // Эвристика «материнской компании» — для SPV-имени (ООО «СФО ХХХ»,
+  // ООО «Финанс ХХХ») вычленяем второе слово как кандидата.
+  let parentHint = null;
+  const spvMatch = String(name).match(/\b(?:сфо|финанс|капитал)\s+["«]?([А-Яа-яA-Za-z][А-Яа-яA-Za-z\-]{2,30})/i);
+  if(spvMatch) parentHint = spvMatch[1];
 
   const prompt = `Ты помогаешь собирать РСБУ-отчётность российских эмитентов облигаций.
 
 ЭМИТЕНТ:
   ИНН: ${inn}
-  Название: ${name}${ticker ? '\n  Тикер: ' + ticker : ''}
+  Название: ${name}${ticker ? '\n  Тикер MOEX: ' + ticker : ''}${ogrn ? '\n  ОГРН: ' + ogrn : ''}${kind ? '\n  Тип: ' + kind : ''}
+${bondHints.length ? '\nКраткие имена выпусков на MOEX:\n  ' + bondHints.map(b => '• ' + b).join('\n  ') : ''}
+${parentHint ? '\nПодсказка: похоже это SPV/дочка компании "' + parentHint + '". Укажи показатели либо самой SPV (если известны), либо группы.' : ''}
 
 ЗАДАЧА: используя свои тренировочные данные (без выхода в интернет —
 Live Search отключён), укажи известные тебе РСБУ-показатели по этому
 эмитенту за последние 3 года, особенно за ${expected} год (публикуется
-по 31 марта ${expected + 1}). Источниками могут быть годовые отчёты,
-известные пресс-релизы РБК/Интерфакс, раскрытие на e-disclosure,
-агрегаторы аудит-ит/buxbalans.
+по 31 марта ${expected + 1}). Если самого эмитента не знаешь, но
+знаешь группу/материнскую — укажи показатели группы и в поле
+"company" поясни, чьи именно цифры даёшь.
 
-ВАЖНО: если ты не уверен в значении или ИНН тебе не известен —
+ВАЖНО: если ты не уверен в значении или эмитент тебе не известен —
 ставь null. НЕ ВЫДУМЫВАЙ цифры, лучше пустой ответ чем неточный.
 
 ВЕРНИ ТОЛЬКО JSON по схеме (без markdown, без пояснений):
