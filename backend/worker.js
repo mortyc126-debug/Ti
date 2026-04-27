@@ -225,7 +225,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.3-time-budget',
+    version: '0.8.4-fast-buxbalans',
   });
 }
 
@@ -1700,49 +1700,71 @@ async function buxBalansFetchByInn(inn, opts){
 
   const series = {};
   const rawByYear = {};
-  // Сначала — какие коды нас интересуют. Расходы (interest, tax) —
-  // отдельным флагом, чтобы в ряд клались по модулю.
-  const want = [
-    { code: '2110', field: 'rev'     },
-    { code: '2200', field: 'ebit'    },
-    { code: '2400', field: 'np'      },
-    { code: '2330', field: 'int_exp', expense: true },
-    { code: '2410', field: 'tax_exp', expense: true },
-    { code: '1600', field: 'assets'  },
-    { code: '1200', field: 'ca'      },
-    { code: '1500', field: 'cl'      },
-    { code: '1410', field: 'debt_long'  },
-    { code: '1510', field: 'debt_short' },
-    { code: '1250', field: 'cash'    },
-    { code: '1370', field: 'ret'     },
-    { code: '1300', field: 'eq'      },
-  ];
-  for(const w of want){
-    // Привязываемся к метке myChart_chart_{inn}_{code}, ищем дальше
-    // первый блок `labels: [...]` и затем первый `data: [...]`. Между
-    // меткой и labels всегда коротко (объект options/responsive).
-    const re = new RegExp(
-      `myChart_chart_${inn}_${w.code}\\b[\\s\\S]{0,4000}?labels\\s*:\\s*\\[([^\\]]+)\\][\\s\\S]{0,1500}?data\\s*:\\s*\\[([^\\]]+)\\]`
-    );
-    const m = html.match(re);
-    if(!m) continue;
-    const years = m[1].split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
-    const vals  = m[2].split(',').map(s => {
-      const t = s.trim().replace(/[^0-9.\-]/g, '');
-      return t ? parseFloat(t) : NaN;
-    });
-    for(let i = 0; i < years.length && i < vals.length; i++){
-      const y = years[i];
-      const v = vals[i];
-      if(!isFinite(v) || !y) continue;
-      series[y]    = series[y]    || {};
-      rawByYear[y] = rawByYear[y] || {};
-      rawByYear[y][w.code] = v;
-      const out = (w.expense ? Math.abs(v) : v) / 1e6; // тыс ₽ → млрд ₽
-      if(w.field === 'debt_long' || w.field === 'debt_short'){
-        series[y].debt = (series[y].debt || 0) + out;
-      } else {
-        series[y][w.field] = out;
+  // Маппинг код РСБУ → наше короткое поле + флаг расхода.
+  // Ключевое наблюдение: на странице buxbalans каждый chart-блок
+  // содержит сразу 3-4 датасета (например, в chart_INN_2110 идут
+  // 2110/2120/2100/2400 — все KPI отчёта о финрезультатах). Поэтому
+  // достаточно пройти по ИМЕЮЩИМСЯ блокам и из каждого вытащить
+  // ВСЕ полезные коды разом, а не искать каждый код отдельным
+  // regex'ом по 240KB HTML (это был катастрофический backtracking,
+  // 25 сек на ИНН).
+  const codeMap = {
+    '2110': { field: 'rev'     },
+    '2200': { field: 'ebit'    },
+    '2400': { field: 'np'      },
+    '2330': { field: 'int_exp', expense: true },
+    '2410': { field: 'tax_exp', expense: true },
+    '1600': { field: 'assets'  },
+    '1200': { field: 'ca'      },
+    '1500': { field: 'cl'      },
+    '1410': { field: 'debt_long'  },
+    '1510': { field: 'debt_short' },
+    '1250': { field: 'cash'    },
+    '1370': { field: 'ret'     },
+    '1300': { field: 'eq'      },
+  };
+  // Все стартовые позиции chart-блоков ИМЕННО ДЛЯ ЭТОГО ИНН (а не
+  // user-charts с placeholder'ами).
+  const blockRe = new RegExp(`myChart_chart_${inn}_\\d+`, 'g');
+  const positions = [];
+  let mb;
+  while((mb = blockRe.exec(html)) !== null){
+    positions.push(mb.index);
+    if(positions.length > 30) break; // безопасный потолок
+  }
+  for(const pos of positions){
+    const win = html.substr(pos, 12000);
+    const mLabels = win.match(/labels\s*:\s*\[([^\]]+)\]/);
+    if(!mLabels) continue;
+    const years = mLabels[1].split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
+    if(!years.length) continue;
+    // Внутри блока перечисляем все датасеты `{ key: NNNN, ... data: [...] }`.
+    // Между `key:` и `data:` обычно 50-150 символов (label, fill).
+    const ds = win.matchAll(/key\s*:\s*(\d+)\s*,[\s\S]{0,400}?data\s*:\s*\[([^\]]+)\]/g);
+    for(const d of ds){
+      const code = d[1];
+      const meta = codeMap[code];
+      if(!meta) continue;
+      const vals = d[2].split(',').map(s => {
+        const t = s.trim().replace(/[^0-9.\-]/g, '');
+        return t ? parseFloat(t) : NaN;
+      });
+      for(let i = 0; i < years.length && i < vals.length; i++){
+        const y = years[i];
+        const v = vals[i];
+        if(!isFinite(v) || !y) continue;
+        rawByYear[y] = rawByYear[y] || {};
+        // Не перезатираем то, что уже распарсили из предыдущего блока
+        // (один и тот же код может встретиться в двух chart-блоках).
+        if(rawByYear[y][code] != null) continue;
+        rawByYear[y][code] = v;
+        series[y] = series[y] || {};
+        const out = (meta.expense ? Math.abs(v) : v) / 1e6;
+        if(meta.field === 'debt_long' || meta.field === 'debt_short'){
+          series[y].debt = (series[y].debt || 0) + out;
+        } else {
+          series[y][meta.field] = out;
+        }
       }
     }
   }
