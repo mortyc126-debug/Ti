@@ -225,7 +225,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.4-fast-buxbalans',
+    version: '0.8.5-tight-timeouts',
   });
 }
 
@@ -1514,9 +1514,12 @@ const GIRBO_CODES = {
 };
 
 // Один fetch с timeout и единым retry-протоколом для ГИР БО.
+// Timeout короткий (5с): если ФНС режет CF Worker IP — нет смысла
+// ждать 12+ сек, всё равно вернётся пусто; лучше быстро провалиться
+// и отдать буджет buxbalans/Grok'у.
 async function girboFetch(path, opts){
   const url  = 'https://bo.nalog.gov.ru' + path;
-  const tout = opts?.timeoutMs || 12000;
+  const tout = opts?.timeoutMs || 5000;
   const ctrl = new AbortController();
   const tm = setTimeout(() => ctrl.abort(), tout);
   try {
@@ -1835,10 +1838,11 @@ async function collectReports(env, url){
   // даёт 5 минут — там можно поднять до 280000.
   const maxDurationMs = parseInt(url?.searchParams?.get('max_ms') || '25000', 10);
   const tBudgetStart = Date.now();
-  // Адаптивный auto-disable: если первые N ИНН подряд получают «не
-  // найден» от ГИР БО, отключаем источник до конца прогона (явный
-  // признак, что ФНС нас режет / гео-блок).
-  const GIRBO_GIVE_UP_AFTER = 3;
+  // Адаптивный auto-disable: если 1 ИНН подряд получил «не найден» от
+  // ГИР БО, отключаем источник до конца прогона (явный признак, что
+  // ФНС нас режет / гео-блок). Раньше был порог 3, но при limit=15 на
+  // free tier ждать три фейла — это уже -36 сек в никуда.
+  const GIRBO_GIVE_UP_AFTER = 1;
   let girboFailStreak = 0;
   let girboDisabled = skipGirbo;
   const today = new Date().toISOString().slice(0, 10);
