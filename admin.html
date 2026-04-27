@@ -147,6 +147,36 @@ function logEntry(level, label, body){
 }
 function escape(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+// Один POST с retry на network-ошибки. CF edge изредка возвращает
+// «DNS cache overflow» (503 без CORS-заголовков → браузер пишет
+// «Failed to fetch»). Retry с экспоненциальной задержкой решает 90%
+// таких случаев.
+async function postWithRetry(url, opts, retries){
+  if(retries == null) retries = 2;
+  let lastErr = null;
+  for(let attempt = 0; attempt <= retries; attempt++){
+    try {
+      const r = await fetch(url, opts);
+      // Повторим если 503 / 502 (типично для CF flake)
+      if((r.status === 503 || r.status === 502) && attempt < retries){
+        lastErr = new Error('HTTP ' + r.status + ' (retry ' + (attempt+1) + ')');
+        await new Promise(res => setTimeout(res, 1500 * (attempt + 1)));
+        continue;
+      }
+      return r;
+    } catch(e){
+      // network-ошибки (включая «Failed to fetch» от CF flake)
+      if(attempt < retries){
+        lastErr = e;
+        await new Promise(res => setTimeout(res, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error('исчерпаны попытки');
+}
+
 async function run(path){
   const url   = urlEl.value.replace(/\/+$/, '');
   const token = tokenEl.value.trim();
@@ -154,14 +184,17 @@ async function run(path){
   logEntry('info', `POST ${path} …`, '');
   const btns = document.querySelectorAll('button'); btns.forEach(b => b.disabled = true);
   try {
-    const r = await fetch(url + path, { method: 'POST', headers: { 'X-Admin-Token': token } });
+    const r = await postWithRetry(url + path, {
+      method: 'POST',
+      headers: { 'X-Admin-Token': token },
+    }, 2);
     const text = await r.text();
     let body = text;
     try { body = JSON.stringify(JSON.parse(text), null, 2); } catch(_){}
     if(r.ok) logEntry('ok',  `POST ${path} → ${r.status}`, body);
     else     logEntry('err', `POST ${path} → ${r.status}`, body);
   } catch(e){
-    logEntry('err', `POST ${path} → network`, e.message);
+    logEntry('err', `POST ${path} → network (после 3 попыток)`, e.message);
   } finally {
     btns.forEach(b => b.disabled = false);
   }
@@ -171,7 +204,7 @@ async function checkStatus(){
   const url = urlEl.value.replace(/\/+$/, '');
   logEntry('info', `GET /status …`, '');
   try {
-    const r = await fetch(url + '/status');
+    const r = await postWithRetry(url + '/status', { method: 'GET' }, 2);
     const j = await r.json();
     const box = document.getElementById('status-box');
     box.style.display = 'grid';
@@ -193,7 +226,7 @@ async function checkCatalog(){
   const url = urlEl.value.replace(/\/+$/, '');
   logEntry('info', `GET /catalog …`, '');
   try {
-    const r = await fetch(url + '/catalog');
+    const r = await postWithRetry(url + '/catalog', { method: 'GET' }, 2);
     const j = await r.json();
     const c = j.counts || {};
     logEntry('ok', `GET /catalog → ${r.status}`,
