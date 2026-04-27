@@ -225,7 +225,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8-ai-cascade',
+    version: '0.8.1-girbo-autodisable',
   });
 }
 
@@ -1282,8 +1282,16 @@ async function collectIssuers(env, url){
   let rowsWritten = 0;
   const errors = [];
 
-  const maxPages   = parseInt(url?.searchParams?.get('max_pages') || '60', 10);
-  const cardLimit  = parseInt(url?.searchParams?.get('cards')     || '40', 10);
+  // 25 страниц × 100 = 2500 эмитентов за прогон. На free tier лимит
+  // subrequest 50; bulk + emitter cards (40) ≈ 65 — слишком много, а
+  // 25 + 15 cards = 40 укладывается. Оставшиеся ИНН подтянутся при
+  // следующих прогонах cron'а (start = pagesRead × 100).
+  // На paid plan можно ставить 60+ через ?max_pages=60.
+  const maxPages   = parseInt(url?.searchParams?.get('max_pages') || '25', 10);
+  const startPage  = parseInt(url?.searchParams?.get('start_page') || '0', 10);
+  // emitter-card subrequest по top-N эмитентам — уже потратили 25 на
+  // bulk; с 15 картами укладываемся в 40 (запас 10 от 50).
+  const cardLimit  = parseInt(url?.searchParams?.get('cards')     || '15', 10);
 
   // ── Шаг 1: bulk MOEX → secid → {emitter_id, name, inn} ─────────────
   // Карта по secid (для апдейта bond_daily) и отдельная по emitter_id
@@ -1293,7 +1301,7 @@ async function collectIssuers(env, url){
   let pagesRead = 0, secidsSeen = 0;
   try {
     for(let page = 0; page < maxPages; page++){
-      const u = `${base}/iss/securities.json?iss.meta=off&engine=stock&market=bonds&iss.only=securities&limit=100&start=${page * 100}`;
+      const u = `${base}/iss/securities.json?iss.meta=off&engine=stock&market=bonds&iss.only=securities&limit=100&start=${(startPage + page) * 100}`;
       const r = await fetch(u, { headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 0 } });
       if(!r.ok){ errors.push(`bulk page ${page}: HTTP ${r.status}`); break; }
       const json = await r.json();
@@ -1782,6 +1790,15 @@ async function collectReports(env, url){
   // Grok за этот прогон (помимо кеш-хитов).
   const includeAi = url?.searchParams?.get('include_ai') === '1';
   const aiBudget  = Math.min(20, parseInt(url?.searchParams?.get('ai_budget') || '5', 10));
+  // skip_girbo=1 — пропустить ГИР БО (например когда ФНС блокирует CF
+  // Worker IP и все запросы идут впустую, тратя subrequest-квоту).
+  const skipGirbo = url?.searchParams?.get('skip_girbo') === '1';
+  // Адаптивный auto-disable: если первые N ИНН подряд получают «не
+  // найден» от ГИР БО, отключаем источник до конца прогона (явный
+  // признак, что ФНС нас режет / гео-блок).
+  const GIRBO_GIVE_UP_AFTER = 3;
+  let girboFailStreak = 0;
+  let girboDisabled = skipGirbo;
   const today = new Date().toISOString().slice(0, 10);
   const expected = expectedFyYear(new Date());
   const errors = [];
@@ -1963,18 +1980,32 @@ async function collectReports(env, url){
 
     // ── Слой 1+2: ГИР БО, buxbalans ─────────────────────────────────
     for(const src of REPORT_SOURCES){
+      // Адаптивно пропускаем ГИР БО, если он уже фейлится подряд —
+      // экономим subrequest-квоту, особенно на free tier (50/cron).
+      if(src.name === 'girbo' && girboDisabled){
+        sourceErrors.push('girbo: skipped (auto-disabled or skip_girbo=1)');
+        continue;
+      }
       try {
         const fetched = await src.fn(inn, 5);
         if(!fetched.series || !Object.keys(fetched.series).length){
           throw new Error(src.name + ': пустой series');
         }
         totalRows += await applyFetched(src.name, fetched);
+        if(src.name === 'girbo') girboFailStreak = 0; // успех → сброс
         // Если получили ожидаемый год — каскад дальше не идём.
         if(maxYearGot >= expected) break;
       } catch(e){
         const msg = (e.message || String(e)).slice(0, 200);
         sourceErrors.push(`${src.name}: ${msg}`);
         lastErr = msg;
+        if(src.name === 'girbo'){
+          girboFailStreak++;
+          if(girboFailStreak >= GIRBO_GIVE_UP_AFTER){
+            girboDisabled = true;
+            // оставшимся ИНН ГИР БО не дёргаем — экономим subrequest
+          }
+        }
       }
     }
 
