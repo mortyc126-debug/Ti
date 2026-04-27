@@ -89,18 +89,11 @@ function IssuerPanel({ value, onPatch }){
       </div>
 
       <div>
-        <Label>🛡 Запас прочности (≥)</Label>
-        <input
-          type="number" step="5" min="0" max="100" placeholder="40"
-          value={value.safetyMin}
-          onChange={e => onPatch({ safetyMin: e.target.value })}
-          className="bg-s2 border border-border rounded h-8 px-2 w-24 font-mono text-xs focus:border-acc outline-none"
-        />
-        <span className="text-text3 text-[10px] font-mono ml-2">0–100, composite по ICR/ND-EBITDA/Current/EBITDA-маржа</span>
-      </div>
-
-      <div>
-        <Label>Мультипликаторы</Label>
+        <Label>Мультипликаторы и индексы</Label>
+        <div className="text-text3 text-[10px] font-mono mb-2 leading-relaxed">
+          Клик по названию — включить сортировку (зелёный = от лучших, красный = от худших, ↕ = выкл).
+          Поля «min – max» — фильтр (можно без сортировки). Hover на названии — примечание.
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           {MULTIPLIERS.map(m => (
             <MultiplierFilter

@@ -5,7 +5,7 @@ import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import Filters from '../components/bonds/Filters.jsx';
 import { DEFAULT_FILTERS, applyFilters } from '../components/bonds/applyFilters.js';
-import { bondsMock, BOND_TYPES, safetyScore } from '../data/bondsCatalog.js';
+import { bondsMock, BOND_TYPES, safetyScore, bqiScore } from '../data/bondsCatalog.js';
 import { INDUSTRIES } from '../data/industries.js';
 import { useFavorites } from '../store/favorites.js';
 import { useRecent } from '../store/recent.js';
@@ -90,7 +90,8 @@ function BondTable({ rows }){
               <th className="text-right p-2">Дюр.</th>
               <th className="text-right p-2">Объём</th>
               <th className="text-left p-2">Рейтинг</th>
-              <th className="text-right p-2">🛡</th>
+              <th className="text-right p-2" title="🛡 Запас прочности — composite ICR/ND-EBITDA/Current/EBITDA-маржа">🛡</th>
+              <th className="text-right p-2" title="⚖ Качество баланса (BQI) — Cash/Equity/Current Ratio">⚖</th>
               <th className="text-right p-2 pr-5"></th>
             </tr>
           </thead>
@@ -98,7 +99,7 @@ function BondTable({ rows }){
             {rows.map(b => <BondRow key={b.secid} b={b} />)}
             {!rows.length && (
               <tr>
-                <td colSpan={9} className="p-10 text-center text-text3 text-sm">
+                <td colSpan={10} className="p-10 text-center text-text3 text-sm">
                   По текущим фильтрам ничего не нашлось — попробуй сбросить часть условий.
                 </td>
               </tr>
@@ -115,6 +116,7 @@ function BondRow({ b }){
   const addFav  = useFavorites(s => s.add);
   const pushRecent = useRecent(s => s.push);
   const safety = safetyScore(b);
+  const bqi    = bqiScore(b);
 
   const openIssuer = () => {
     const item = { kind: 'issuer', refId: b.issuer, title: b.issuer, ticker: null, ind: b.industry };
@@ -151,6 +153,9 @@ function BondRow({ b }){
       </td>
       <td className="p-2 text-right font-mono">
         <SafetyCell s={safety} />
+      </td>
+      <td className="p-2 text-right font-mono">
+        <SafetyCell s={bqi} />
       </td>
       <td className="p-2 pr-5 text-right">
         <button

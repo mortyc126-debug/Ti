@@ -5,12 +5,12 @@ import SearchBar from './SearchBar.jsx';
 import Brand from './Brand.jsx';
 import NavLinks from './NavLinks.jsx';
 import Footer from './Footer.jsx';
+import AppSidebar from './AppSidebar.jsx';
 
 export default function Layout(){
   const [menuOpen, setMenuOpen] = useState(false);
   const loc = useLocation();
 
-  // Закрывать бургер при смене роута — иначе оверлей залипает.
   useEffect(() => { setMenuOpen(false); }, [loc.pathname]);
 
   return (
@@ -38,9 +38,12 @@ export default function Layout(){
         </div>
       )}
 
-      <main className="flex-1 px-4 sm:px-6 py-5 max-w-7xl w-full mx-auto">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex">
+        <main className="flex-1 px-4 sm:px-6 py-5 max-w-7xl w-full mx-auto min-w-0">
+          <Outlet />
+        </main>
+        <AppSidebar />
+      </div>
       <Footer />
     </div>
   );

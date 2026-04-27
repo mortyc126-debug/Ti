@@ -7,7 +7,6 @@ import Card from '../components/ui/Card.jsx';
 import Stat from '../components/ui/Stat.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import RightPanel from '../components/home/RightPanel.jsx';
-import SectionsGrid from '../components/home/SectionsGrid.jsx';
 import { portfolioKpi, recentEvents } from '../data/mockHome.js';
 
 const fmtRub = n => {
@@ -34,20 +33,15 @@ export default function Home(){
     <div className="space-y-5">
       <PageHead status={status} error={error} />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px] xl:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="space-y-5 min-w-0">
-          <div className="grid lg:grid-cols-2 gap-5">
-            <div className="space-y-5">
-              <PortfolioToday />
-              <EventsFeed />
-            </div>
-            <div className="space-y-5">
-              <RightPanel />
-              <BackendStrip status={status} error={error} />
-            </div>
-          </div>
+      <div className="grid lg:grid-cols-2 gap-5">
+        <div className="space-y-5">
+          <PortfolioToday />
+          <EventsFeed />
         </div>
-        <SectionsGrid layout="sidebar" />
+        <div className="space-y-5">
+          <RightPanel />
+          <BackendStrip status={status} error={error} />
+        </div>
       </div>
     </div>
   );

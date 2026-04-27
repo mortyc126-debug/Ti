@@ -52,15 +52,24 @@ export const RATING_TRENDS = [
 
 // Метрики эмитента для мультипликатор-фильтра.
 // higher: true → больше = лучше; false → меньше = лучше.
+// tip — короткое примечание в HTML title по hover.
+// resolver(b) — если задан, метрика считается из bond, а не из b.mults
+//              (для composite-метрик типа safety/bqi).
 export const MULTIPLIERS = [
-  { id: 'de',         label: 'Долг/EBITDA',        higher: false, suggest: 3,    fmt: 'x' },
-  { id: 'nde',        label: 'Чистый долг/EBITDA', higher: false, suggest: 2.5,  fmt: 'x' },
-  { id: 'icr',        label: 'ICR (EBIT/%)',       higher: true,  suggest: 3,    fmt: 'x' },
-  { id: 'roa',        label: 'ROA',                higher: true,  suggest: 3,    fmt: '%' },
-  { id: 'ebitdaMarg', label: 'EBITDA-маржа',       higher: true,  suggest: 10,   fmt: '%' },
-  { id: 'currentR',   label: 'Current Ratio',      higher: true,  suggest: 1.2,  fmt: 'x' },
-  { id: 'cashR',      label: 'Cash Ratio',         higher: true,  suggest: 0.2,  fmt: 'x' },
-  { id: 'equityR',    label: 'Equity Ratio',       higher: true,  suggest: 30,   fmt: '%' },
+  { id: 'safety',     label: '🛡 Запас прочности',  higher: true,  suggest: 50,   fmt: '',
+    tip: 'Composite-индекс 0..100. Среднее по 4 осям равного веса: ICR (покрытие %), Net Debt/EBITDA, Current Ratio (текущая ликвидность) и EBITDA-маржа. Чем выше, тем устойчивее эмитент к росту ставок и падению выручки.',
+    resolver: b => safetyScore(b) },
+  { id: 'bqi',        label: '⚖ Качество баланса',   higher: true,  suggest: 50,   fmt: '',
+    tip: 'Balance Quality Index 0..100 — структурная надёжность баланса. Среднее по Cash Ratio, Equity Ratio и Current Ratio (упрощённо: cash, доля собственного капитала, оборотная подушка). Низкий BQI = высокая доля «мутных» обязательств и слабый запас ликвидности.',
+    resolver: b => bqiScore(b) },
+  { id: 'de',         label: 'Долг/EBITDA',         higher: false, suggest: 3,    fmt: 'x' },
+  { id: 'nde',        label: 'Чистый долг/EBITDA',  higher: false, suggest: 2.5,  fmt: 'x' },
+  { id: 'icr',        label: 'ICR (EBIT/%)',        higher: true,  suggest: 3,    fmt: 'x' },
+  { id: 'roa',        label: 'ROA',                 higher: true,  suggest: 3,    fmt: '%' },
+  { id: 'ebitdaMarg', label: 'EBITDA-маржа',        higher: true,  suggest: 10,   fmt: '%' },
+  { id: 'currentR',   label: 'Current Ratio',       higher: true,  suggest: 1.2,  fmt: 'x' },
+  { id: 'cashR',      label: 'Cash Ratio',          higher: true,  suggest: 0.2,  fmt: 'x' },
+  { id: 'equityR',    label: 'Equity Ratio',        higher: true,  suggest: 30,   fmt: '%' },
 ];
 
 // 24 mock-облигации с правдоподобными значениями. Цены/YTM выбраны так,
@@ -121,6 +130,22 @@ export function safetyScore(b){
   if(m.nde != null)        parts.push(clamp01((6 - m.nde) / (6 - 1)));
   if(m.currentR != null)   parts.push(clamp01((m.currentR - 0.5) / (2 - 0.5)));
   if(m.ebitdaMarg != null) parts.push(clamp01(m.ebitdaMarg / 25));
+  if(!parts.length) return null;
+  const avg = parts.reduce((s, x) => s + x, 0) / parts.length;
+  return Math.round(avg * 100);
+}
+
+// «Качество баланса» (BQI) 0..100 — структурная надёжность.
+// Упрощённая версия _repBalanceQuality из old SPA. Среднее по
+// Cash Ratio (1%→0, 50%→100), Equity Ratio (10%→0, 50%→100) и
+// Current Ratio (0.5x→0, 2x→100).
+export function bqiScore(b){
+  if(!b.mults) return null;
+  const m = b.mults;
+  const parts = [];
+  if(m.cashR    != null) parts.push(clamp01((m.cashR    - 0.05) / (0.5 - 0.05)));
+  if(m.equityR  != null) parts.push(clamp01((m.equityR  - 10)   / (50 - 10)));
+  if(m.currentR != null) parts.push(clamp01((m.currentR - 0.5)  / (2 - 0.5)));
   if(!parts.length) return null;
   const avg = parts.reduce((s, x) => s + x, 0) / parts.length;
   return Math.round(avg * 100);
