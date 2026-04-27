@@ -9,7 +9,8 @@ name: Deploy Backend Worker
 on:
   push:
     branches:
-      - claude/determined-brahmagupta-XsEm4
+      - main
+      - "claude/**"
     paths:
       - "backend/**"
       - ".github/workflows/deploy-backend.yml"
