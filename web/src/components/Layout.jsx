@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import SearchBar from './SearchBar.jsx';
 
 const NAV = [
   { to: '/',          label: '🏠 Главная',    end: true },
@@ -10,10 +11,13 @@ const NAV = [
 export default function Layout(){
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-bg2 border-b border-border px-5 py-3 flex items-center gap-4 sticky top-0 z-10">
-        <div className="font-mono text-acc text-lg font-bold tracking-wider">БондАналитик</div>
-        <div className="text-text3 text-xs font-mono">v0.1 • Pages</div>
-        <nav className="flex gap-1 ml-auto">
+      <header className="bg-bg2 border-b border-border px-5 py-2.5 flex items-center gap-4 sticky top-0 z-40">
+        <div className="flex flex-col leading-tight shrink-0">
+          <div className="font-mono text-acc text-base font-bold tracking-wider">БондАналитик</div>
+          <div className="text-text3 text-[10px] font-mono">v0.2 • Pages</div>
+        </div>
+        <SearchBar />
+        <nav className="hidden md:flex gap-1 ml-2 shrink-0">
           {NAV.map(item => (
             <NavLink
               key={item.to}

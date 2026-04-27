@@ -58,6 +58,7 @@ export default {
       if(url.pathname === '/bond/latest')     return await handleBondLatest(env, url);
       if(url.pathname === '/bond/history')    return await handleBondHistory(env, url);
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
+      if(url.pathname === '/catalog')         return await handleCatalog(env);
 
       if(req.method === 'POST'){
         // Все POST-эндпоинты требуют X-Admin-Token (используют квоту Cerebras
@@ -74,7 +75,7 @@ export default {
         'Not Found. Endpoints: /status, /stock/latest, /stock/history?secid=X, '
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
         + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
-        + 'POST /collect/{stock|futures|bonds}, POST /ai/extract',
+        + '/catalog, POST /collect/{stock|futures|bonds}, POST /ai/extract',
         404
       );
     } catch(e){
@@ -341,6 +342,87 @@ async function handleBondIssuer(env, url){
     ORDER BY s.mat_date ASC
   `).bind(String(inn), today).all();
   return jsonResp({ inn, count: rows.results.length, data: rows.results });
+}
+
+// ═══ Endpoints: каталог для глобального поиска ════════════════════════════
+//
+// Собирает три плоских списка (компании, облигации, акции) из текущих
+// таблиц D1 — фронт грузит этот JSON один раз, индексирует через fuse.js
+// и фильтрует локально по ходу набора. Пока возвращаем сырой набор без
+// тикеров/секторов в issuers (этих полей у нас в bond_daily нет —
+// добавятся, когда появится отдельная таблица issuers).
+
+async function handleCatalog(env){
+  const today = new Date().toISOString().slice(0, 10);
+  let issuers = [], bonds = [], stocks = [];
+
+  try {
+    // живые эмитенты с активными выпусками
+    const r = await env.DB.prepare(`
+      SELECT emitent_inn AS inn,
+             MAX(emitent_name) AS name,
+             COUNT(DISTINCT secid) AS bonds_count
+      FROM bond_daily
+      WHERE emitent_inn IS NOT NULL AND emitent_inn != ''
+        AND (mat_date IS NULL OR mat_date >= ?)
+        AND (status IS NULL OR status = 'A')
+      GROUP BY emitent_inn
+      ORDER BY name
+    `).bind(today).all();
+    issuers = r.results || [];
+  } catch(_){ /* таблицы может ещё не быть */ }
+
+  try {
+    // последний срез живых облигаций
+    const r = await env.DB.prepare(`
+      SELECT s.secid AS isin,
+             s.emitent_inn AS issuerInn,
+             s.short_name AS name,
+             s.yield AS ytm,
+             s.coupon_rate AS coupon,
+             s.mat_date AS maturity,
+             s.board
+      FROM bond_daily s
+      INNER JOIN (
+        SELECT secid, MAX(date) AS maxd FROM bond_daily GROUP BY secid
+      ) m ON s.secid = m.secid AND s.date = m.maxd
+      WHERE (s.mat_date IS NULL OR s.mat_date >= ?)
+        AND (s.status IS NULL OR s.status = 'A')
+      ORDER BY COALESCE(s.volume_rub, 0) DESC
+      LIMIT 5000
+    `).bind(today).all();
+    bonds = r.results || [];
+  } catch(_){}
+
+  try {
+    // последний срез акций — тикер, имя, цена, изменение
+    const r = await env.DB.prepare(`
+      SELECT s.secid AS ticker,
+             s.shortname AS name,
+             s.last AS price,
+             s.lastchange_pct AS changePct
+      FROM stock_daily s
+      INNER JOIN (
+        SELECT secid, MAX(date) AS maxd FROM stock_daily GROUP BY secid
+      ) m ON s.secid = m.secid AND s.date = m.maxd
+      ORDER BY s.secid
+    `).all();
+    stocks = r.results || [];
+  } catch(_){}
+
+  return new Response(JSON.stringify({
+    issuers, bonds, stocks,
+    counts: { issuers: issuers.length, bonds: bonds.length, stocks: stocks.length },
+    generatedAt: new Date().toISOString(),
+  }), {
+    status: 200,
+    headers: {
+      ...JSON_HEADERS,
+      // каталог обновляется кроном раз в сутки — браузер может
+      // спокойно держать его в кеше час-два
+      'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+    },
+  });
 }
 
 // ═══ Endpoints: AI-экстракция через Cerebras ══════════════════════════════
