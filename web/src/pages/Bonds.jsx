@@ -1,39 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Search, RefreshCw, Download } from 'lucide-react';
-import { api } from '../api.js';
+import { useMemo, useState } from 'react';
+import { Star, RefreshCw, Download, Clock, Filter as FilterIcon } from 'lucide-react';
 import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
+import Filters from '../components/bonds/Filters.jsx';
+import { DEFAULT_FILTERS, applyFilters } from '../components/bonds/applyFilters.js';
+import { bondsMock, BOND_TYPES, safetyScore } from '../data/bondsCatalog.js';
+import { INDUSTRIES } from '../data/industries.js';
+import { useFavorites } from '../store/favorites.js';
+import { useRecent } from '../store/recent.js';
+import { useWindows } from '../store/windows.js';
+
+// Страница «Облигации». Большой фильтр в две вкладки (Бумага/Эмитент)
+// + таблица с цветовой индикацией YTM, бейджами рейтинга и кнопкой
+// добавления эмитента в избранное. Клик по имени эмитента открывает
+// плавающее окно (через useWindows). Внутри страницы три вкладки:
+// Список / Избранное-просмотр-результата / Последние просмотренные.
+
+const TYPE_LABEL = Object.fromEntries(BOND_TYPES.map(t => [t.id, t.label]));
 
 export default function Bonds(){
-  const [bonds, setBonds] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [board, setBoard] = useState('TQCB');
-  const [minYield, setMinYield] = useState('');
-  const [q, setQ] = useState('');
-  const [reloadTick, setReloadTick] = useState(0);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [tab, setTab] = useState('list');         // list | favs | recent
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    const params = { board, limit: 100 };
-    if(minYield) params.min_yield = minYield;
-    api.bondLatest(params)
-      .then(d => setBonds(d.data || []))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [board, minYield, reloadTick]);
-
-  const filtered = useMemo(() => {
-    if(!q) return bonds;
-    const s = q.toLowerCase();
-    return bonds.filter(b =>
-      b.secid?.toLowerCase().includes(s) ||
-      b.shortname?.toLowerCase().includes(s) ||
-      b.emitent_name?.toLowerCase().includes(s),
-    );
-  }, [bonds, q]);
+  const patch = (p) => setFilters(p == null ? DEFAULT_FILTERS : { ...filters, ...p });
+  const filtered = useMemo(() => applyFilters(bondsMock, filters), [filters]);
 
   return (
     <div className="space-y-5">
@@ -41,148 +32,250 @@ export default function Bonds(){
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Облигации</h1>
           <p className="text-text2 text-sm mt-1">
-            Свежие котировки и доходности с MOEX. Обновляются ежедневно cron-задачей бэкенда.
+            Каталог mock — фильтры работают на клиенте. Реальные данные
+            подсосутся через api.bondLatest когда backend научится отдавать
+            расширенный набор полей.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => setReloadTick(t => t + 1)} loading={loading}>
-            Обновить
-          </Button>
+          <Button variant="ghost" size="sm" icon={RefreshCw}>Обновить</Button>
           <Button variant="outline" size="sm" icon={Download}>CSV</Button>
         </div>
       </div>
 
-      <Card padded={false}>
-        <div className="px-5 py-3 border-b border-border/60 flex flex-wrap items-end gap-3">
-          <SegBoard value={board} onChange={setBoard} />
-          <Field label="YTM, % от">
-            <input
-              type="number" step="0.5" placeholder="20"
-              className="bg-s2 border border-border rounded px-2 h-8 text-xs font-mono w-20 focus:border-acc"
-              value={minYield} onChange={e => setMinYield(e.target.value)}
-            />
-          </Field>
-          <Field label="Поиск">
-            <div className="flex items-center gap-1.5 bg-s2 border border-border rounded h-8 px-2 focus-within:border-acc">
-              <Search size={12} className="text-text3" />
-              <input
-                type="text" placeholder="SECID / эмитент"
-                className="bg-transparent outline-none text-xs font-mono w-44 placeholder-text3"
-                value={q} onChange={e => setQ(e.target.value)}
-              />
-            </div>
-          </Field>
-          <div className="text-text3 text-xs ml-auto self-center font-mono">
-            {loading ? 'загрузка…' : `${filtered.length} / ${bonds.length}`}
-          </div>
-        </div>
+      <Filters value={filters} onPatch={patch} />
 
-        {error && (
-          <div className="px-5 py-4 text-danger text-sm border-b border-border/60">{error}</div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-s2/40 text-text3 uppercase text-[10px]">
-              <tr>
-                <th className="text-left p-2 pl-5">SECID</th>
-                <th className="text-left p-2">Название</th>
-                <th className="text-right p-2">Цена, %</th>
-                <th className="text-right p-2">YTM, %</th>
-                <th className="text-right p-2">Дюрация</th>
-                <th className="text-right p-2">Оборот</th>
-                <th className="text-left p-2">Погашение</th>
-                <th className="text-left p-2 pr-5">Эмитент</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(b => (
-                <tr key={b.secid} className="border-t border-border/60 hover:bg-s2/40 transition-colors">
-                  <td className="p-2 pl-5 font-mono text-text">{b.secid}</td>
-                  <td className="p-2 text-text2 truncate max-w-[220px]" title={b.shortname}>{b.shortname}</td>
-                  <td className="p-2 text-right font-mono">{b.price?.toFixed(2) ?? '—'}</td>
-                  <td className="p-2 text-right font-mono">
-                    <YieldCell v={b.yield} />
-                  </td>
-                  <td className="p-2 text-right font-mono text-text3">{fmtDur(b.duration_days)}</td>
-                  <td className="p-2 text-right font-mono text-text3">{fmtRub(b.volume_rub)}</td>
-                  <td className="p-2 font-mono text-text3">{b.mat_date ?? '—'}</td>
-                  <td className="p-2 pr-5 text-text2 truncate max-w-[200px]" title={b.emitent_name}>
-                    {b.emitent_name ?? '—'}
-                  </td>
-                </tr>
-              ))}
-              {!loading && !filtered.length && (
-                <tr>
-                  <td colSpan={8} className="p-10 text-center text-text3 text-sm">
-                    {bonds.length
-                      ? 'По фильтру ничего не нашлось'
-                      : <>Пусто. Запустите <code className="text-acc font-mono">POST /collect/bonds</code>.</>}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function SegBoard({ value, onChange }){
-  const opts = [
-    { id: 'TQCB', label: 'TQCB · корпораты' },
-    { id: 'TQOB', label: 'TQOB · ОФЗ' },
-  ];
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-text3 text-[10px] uppercase tracking-wider font-mono">Площадка</span>
-      <div className="inline-flex bg-s2 border border-border rounded p-0.5 h-8">
-        {opts.map(o => (
-          <button
-            key={o.id}
-            onClick={() => onChange(o.id)}
-            className={[
-              'px-2.5 text-[11px] font-mono uppercase tracking-wider rounded transition-colors',
-              value === o.id ? 'bg-acc-dim text-acc' : 'text-text2 hover:text-text',
-            ].join(' ')}
-          >{o.label}</button>
-        ))}
+      <div className="flex border-b border-border">
+        <ResultTab id="list"   icon={FilterIcon} label="Список" count={filtered.length} active={tab} onClick={setTab} />
+        <ResultTab id="favs"   icon={Star}       label="Избранное" active={tab} onClick={setTab} />
+        <ResultTab id="recent" icon={Clock}      label="Последнее" active={tab} onClick={setTab} />
       </div>
+
+      {tab === 'list'   && <BondTable rows={filtered} />}
+      {tab === 'favs'   && <FavsView />}
+      {tab === 'recent' && <RecentView />}
     </div>
   );
 }
 
-function Field({ label, children }){
+function ResultTab({ id, icon: Icon, label, count, active, onClick }){
+  const on = id === active;
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-text3 text-[10px] uppercase tracking-wider font-mono">{label}</span>
-      {children}
-    </label>
+    <button
+      type="button"
+      onClick={() => onClick(id)}
+      className={[
+        'flex items-center gap-1.5 px-4 py-2 text-[11px] font-mono uppercase tracking-wider border-b-2 -mb-px transition-colors',
+        on ? 'border-acc text-acc' : 'border-transparent text-text2 hover:text-text',
+      ].join(' ')}
+    >
+      <Icon size={13} />
+      {label}
+      {count != null && <span className="text-text3">· {count}</span>}
+    </button>
+  );
+}
+
+function BondTable({ rows }){
+  return (
+    <Card padded={false}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-s2/40 text-text3 uppercase text-[10px]">
+            <tr>
+              <th className="text-left p-2 pl-5">Тип</th>
+              <th className="text-left p-2">SECID / Эмитент</th>
+              <th className="text-right p-2">Цена</th>
+              <th className="text-right p-2">YTM</th>
+              <th className="text-right p-2">Дюр.</th>
+              <th className="text-right p-2">Объём</th>
+              <th className="text-left p-2">Рейтинг</th>
+              <th className="text-right p-2">🛡</th>
+              <th className="text-right p-2 pr-5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(b => <BondRow key={b.secid} b={b} />)}
+            {!rows.length && (
+              <tr>
+                <td colSpan={9} className="p-10 text-center text-text3 text-sm">
+                  По текущим фильтрам ничего не нашлось — попробуй сбросить часть условий.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+function BondRow({ b }){
+  const openWin = useWindows(s => s.open);
+  const addFav  = useFavorites(s => s.add);
+  const pushRecent = useRecent(s => s.push);
+  const safety = safetyScore(b);
+
+  const openIssuer = () => {
+    const item = { kind: 'issuer', refId: b.issuer, title: b.issuer, ticker: null, ind: b.industry };
+    openWin({ kind: 'issuer', id: b.issuer, title: b.issuer, ticker: null, mode: 'medium' });
+    pushRecent(item);
+  };
+  const star = (e) => {
+    e.stopPropagation();
+    addFav({ kind: 'issuer', refId: b.issuer, title: b.issuer, ticker: null, ind: b.industry });
+  };
+
+  return (
+    <tr className="border-t border-border/60 hover:bg-s2/40 transition-colors">
+      <td className="p-2 pl-5">
+        <Badge tone={b.type === 'ofz' ? 'green' : b.type === 'municipal' ? 'purple' : b.type === 'corporate' ? 'acc' : 'neutral'}>
+          {TYPE_LABEL[b.type] ?? b.type}
+        </Badge>
+      </td>
+      <td className="p-2">
+        <div className="font-mono text-text">{b.name}</div>
+        <button onClick={openIssuer} className="text-text3 text-[10px] font-mono hover:text-acc transition-colors">
+          {b.secid} · {b.issuer}
+          {b.industry && b.industry !== 'none' && (
+            <span className="text-text3"> · {INDUSTRIES[b.industry]?.label || b.industry}</span>
+          )}
+        </button>
+      </td>
+      <td className="p-2 text-right font-mono">{b.price.toFixed(2)}</td>
+      <td className="p-2 text-right font-mono"><YieldCell v={b.ytm} /></td>
+      <td className="p-2 text-right font-mono text-text3">{b.duration_years.toFixed(1)} г.</td>
+      <td className="p-2 text-right font-mono text-text3">{b.volume_bn} млрд</td>
+      <td className="p-2">
+        <RatingBadge r={b.rating} t={b.ratingTrend} />
+      </td>
+      <td className="p-2 text-right font-mono">
+        <SafetyCell s={safety} />
+      </td>
+      <td className="p-2 pr-5 text-right">
+        <button
+          onClick={star}
+          title="В избранное"
+          className="text-text3 hover:text-warn transition-colors"
+        >
+          <Star size={14} />
+        </button>
+      </td>
+    </tr>
   );
 }
 
 function YieldCell({ v }){
   if(v == null) return <span className="text-text3">—</span>;
-  let tone = 'neutral';
-  if(v >= 25) tone = 'danger';
-  else if(v >= 18) tone = 'warn';
-  else if(v >= 12) tone = 'green';
-  const colors = {
-    neutral: 'text-text', danger: 'text-danger', warn: 'text-warn', green: 'text-green',
-  };
-  return <span className={colors[tone]}>{v.toFixed(2)}</span>;
+  let cls = 'text-text';
+  if(v >= 25)      cls = 'text-danger';
+  else if(v >= 18) cls = 'text-warn';
+  else if(v >= 12) cls = 'text-green';
+  return <span className={cls}>{v.toFixed(2)}%</span>;
 }
 
-function fmtRub(v){
-  if(v == null) return '—';
-  if(v >= 1e9) return (v / 1e9).toFixed(1) + ' млрд';
-  if(v >= 1e6) return (v / 1e6).toFixed(1) + ' млн';
-  if(v >= 1e3) return (v / 1e3).toFixed(1) + ' тыс';
-  return v.toFixed(0);
+function RatingBadge({ r, t }){
+  if(!r || r === 'none') return <span className="text-text3 text-[10px] font-mono">—</span>;
+  let tone = 'neutral';
+  if(/^A/.test(r))           tone = 'green';
+  else if(/^BBB/.test(r))    tone = 'acc';
+  else if(/^BB/.test(r))     tone = 'warn';
+  else if(/^B/.test(r))      tone = 'danger';
+  else if(/^C|^D/.test(r))   tone = 'danger';
+  const arr = t === 'up' ? '▲' : t === 'down' ? '▼' : '·';
+  const arrCls = t === 'up' ? 'text-green' : t === 'down' ? 'text-danger' : 'text-text3';
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Badge tone={tone}>{r}</Badge>
+      <span className={`font-mono text-[10px] ${arrCls}`}>{arr}</span>
+    </span>
+  );
 }
-function fmtDur(d){
-  if(d == null) return '—';
-  if(d >= 365) return (d / 365).toFixed(1) + ' г.';
-  return d + ' д.';
+
+function SafetyCell({ s }){
+  if(s == null) return <span className="text-text3">—</span>;
+  let cls = 'text-text';
+  if(s >= 70) cls = 'text-green';
+  else if(s >= 40) cls = 'text-warn';
+  else cls = 'text-danger';
+  return <span className={cls}>{s}</span>;
+}
+
+function FavsView(){
+  const slots = useFavorites(s => s.slots);
+  const filled = slots.filter(Boolean);
+  if(!filled.length){
+    return (
+      <Card>
+        <div className="text-text3 text-sm">
+          Избранного пока нет. Кликни на ⭐ в строке таблицы — эмитент окажется здесь.
+          <br />Полная страница с ячейками-карточками — на <a href="#/favorites" className="text-acc hover:underline">/favorites</a>.
+        </div>
+      </Card>
+    );
+  }
+  return (
+    <Card padded={false}>
+      <ul className="divide-y divide-border/60">
+        {filled.map(f => <FavRow key={`${f.kind}:${f.refId}`} f={f} />)}
+      </ul>
+    </Card>
+  );
+}
+
+function FavRow({ f }){
+  const openWin = useWindows(s => s.open);
+  return (
+    <li className="px-5 py-3 flex items-center gap-3">
+      <Star size={14} className="text-warn shrink-0" />
+      <button
+        onClick={() => openWin({ kind: f.kind, id: f.refId, title: f.title, ticker: f.ticker, mode: 'medium' })}
+        className="font-mono text-text hover:text-acc transition-colors"
+      >
+        {f.title}
+      </button>
+      {f.ind && f.ind !== 'none' && (
+        <span className="text-text3 text-xs">{INDUSTRIES[f.ind]?.label || f.ind}</span>
+      )}
+    </li>
+  );
+}
+
+function RecentView(){
+  const items = useRecent(s => s.items);
+  const clear = useRecent(s => s.clear);
+  const openWin = useWindows(s => s.open);
+  if(!items.length){
+    return (
+      <Card>
+        <div className="text-text3 text-sm">
+          Список пуст. Кликни на эмитента в таблице — он появится здесь.
+        </div>
+      </Card>
+    );
+  }
+  return (
+    <Card
+      title={`${items.length} последних`}
+      action={<button onClick={clear} className="text-text3 hover:text-danger text-[10px] font-mono uppercase">очистить</button>}
+      padded={false}
+    >
+      <ul className="divide-y divide-border/60">
+        {items.map(it => (
+          <li key={`${it.kind}:${it.refId}:${it.at}`} className="px-5 py-2.5 flex items-center gap-3 text-xs">
+            <Clock size={12} className="text-text3 shrink-0" />
+            <button
+              onClick={() => openWin({ kind: it.kind, id: it.refId, title: it.title, ticker: it.ticker, mode: 'medium' })}
+              className="font-mono text-text hover:text-acc transition-colors"
+            >
+              {it.title}
+            </button>
+            <span className="text-text3 ml-auto font-mono">
+              {new Date(it.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
 }

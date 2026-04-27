@@ -5,6 +5,7 @@ import Home from './pages/Home.jsx';
 import Portfolio from './pages/Portfolio.jsx';
 import Bonds from './pages/Bonds.jsx';
 import Live from './pages/Live.jsx';
+import Favorites from './pages/Favorites.jsx';
 
 export default function App(){
   return (
@@ -15,6 +16,7 @@ export default function App(){
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="bonds" element={<Bonds />} />
           <Route path="live" element={<Live />} />
+          <Route path="favorites" element={<Favorites />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

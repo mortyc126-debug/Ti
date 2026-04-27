@@ -31,21 +31,24 @@ export default function Home(){
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHead status={status} error={error} />
 
-      <div className="grid lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 space-y-5">
-          <PortfolioToday />
-          <EventsFeed />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px] xl:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="space-y-5 min-w-0">
+          <div className="grid lg:grid-cols-2 gap-5">
+            <div className="space-y-5">
+              <PortfolioToday />
+              <EventsFeed />
+            </div>
+            <div className="space-y-5">
+              <RightPanel />
+              <BackendStrip status={status} error={error} />
+            </div>
+          </div>
         </div>
-        <div className="space-y-5">
-          <RightPanel />
-          <BackendStrip status={status} error={error} />
-        </div>
+        <SectionsGrid layout="sidebar" />
       </div>
-
-      <SectionsGrid />
     </div>
   );
 }
