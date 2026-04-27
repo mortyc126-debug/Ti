@@ -203,7 +203,7 @@ async function handleStatus(env){
     },
     recent_runs: lastLog.results || [],
     cerebras_configured: !!env.CEREBRAS_API_KEY,
-    version: '0.6-reports',
+    version: '0.7-cascade',
   });
 }
 
