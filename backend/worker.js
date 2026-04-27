@@ -154,15 +154,19 @@ async function handleStatus(env){
 
   let issuersStats = {};
   try {
-    const [c, withTicker, withInn] = await Promise.all([
+    const [c, withTicker, withInn, byKind] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as c FROM issuers').first(),
       env.DB.prepare('SELECT COUNT(*) as c FROM issuers WHERE ticker IS NOT NULL').first(),
       env.DB.prepare("SELECT COUNT(*) as c FROM bond_daily WHERE date = (SELECT MAX(date) FROM bond_daily) AND emitent_inn IS NOT NULL AND emitent_inn != ''").first(),
+      // kind может ещё не быть в схеме (старые БД до миграции 0.8.7) —
+      // try-catch для отдельного запроса, чтобы остальные не падали.
+      env.DB.prepare(`SELECT COALESCE(kind, 'unknown') AS k, COUNT(*) AS c FROM issuers GROUP BY k`).all().catch(() => ({ results: [] })),
     ]);
     issuersStats = {
       issuers_count: c?.c ?? 0,
       issuers_with_ticker: withTicker?.c ?? 0,
       bonds_with_inn_today: withInn?.c ?? 0,
+      issuers_by_kind: Object.fromEntries((byKind.results || []).map(r => [r.k, r.c])),
     };
   } catch(_){}
 
@@ -225,7 +229,7 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     ...aiStats,
-    version: '0.8.6-muni-cooldown',
+    version: '0.8.7-issuer-kind',
   });
 }
 
@@ -1313,7 +1317,7 @@ async function collectIssuers(env, url){
       const idxSecid = i('secid'), idxEid = i('emitent_id'),
             idxTitle = i('emitent_title'), idxInn = i('emitent_inn'),
             idxOkpo  = i('emitent_okpo'), idxIsin  = i('isin'),
-            idxBoard = i('primary_boardid');
+            idxBoard = i('primary_boardid'), idxType = i('type');
       for(const row of data){
         const secid = row[idxSecid]; if(!secid) continue;
         const eid   = row[idxEid];
@@ -1321,11 +1325,18 @@ async function collectIssuers(env, url){
         const inn   = row[idxInn] != null ? String(row[idxInn]) : null;
         const okpo  = row[idxOkpo] != null ? String(row[idxOkpo]) : null;
         const board = row[idxBoard] || null;
-        bySecid.set(secid, { eid, title, inn, board });
+        const btype = row[idxType] || null; // corporate_bond / exchange_bond /
+                                             // subfederal_bond / municipal_bond /
+                                             // ofz_bond
+        bySecid.set(secid, { eid, title, inn, board, btype });
         if(eid != null && !byEmitter.has(eid)){
-          byEmitter.set(eid, { eid, title, inn, okpo, bonds_count: 0 });
+          byEmitter.set(eid, { eid, title, inn, okpo, bonds_count: 0, types: {} });
         }
-        if(eid != null){ byEmitter.get(eid).bonds_count++; }
+        if(eid != null){
+          const e = byEmitter.get(eid);
+          e.bonds_count++;
+          if(btype) e.types[btype] = (e.types[btype] || 0) + 1;
+        }
       }
       secidsSeen += data.length;
       pagesRead++;
@@ -1401,13 +1412,23 @@ async function collectIssuers(env, url){
     }
   } catch(e){ errors.push('stocks for ticker matching: ' + e.message); }
 
+  // ── Шаг 4.5: миграция — добавить колонку kind в issuers ────────────
+  // Идемпотентно: SQLite ругнётся если колонка уже есть, ловим в catch.
+  // Запускается на каждом collectIssuers — overhead ~1мс.
+  try {
+    await env.DB.prepare("ALTER TABLE issuers ADD COLUMN kind TEXT").run();
+  } catch(_){ /* колонка уже есть — ок */ }
+
   // ── Шаг 5: upsert в issuers (не затираем ручные правки) ───────────
-  // Поля name/short_name/bonds_count перезаписываем (актуализируем),
-  // ticker/sector/okved/aliases — только если они null.
+  // Поля name/short_name/bonds_count/kind перезаписываем (актуализируем),
+  // ticker/sector/aliases — только если они null. kind вычисляется по
+  // большинству типов бумаг этого эмитента: если есть хотя бы одна
+  // корпоративная — kind='corporate' (есть РСБУ); иначе самый частый
+  // тип среди subfederal/municipal/ofz/exchange → одно из этих значений.
   const upsertSql = `
     INSERT INTO issuers (
-      inn, ogrn, name, short_name, ticker, bonds_count, aliases, meta, source, updated_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?)
+      inn, ogrn, name, short_name, ticker, bonds_count, aliases, meta, source, kind, updated_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(inn) DO UPDATE SET
       ogrn        = COALESCE(excluded.ogrn, issuers.ogrn),
       name        = excluded.name,
@@ -1417,8 +1438,44 @@ async function collectIssuers(env, url){
       aliases     = COALESCE(issuers.aliases, excluded.aliases),
       meta        = COALESCE(excluded.meta, issuers.meta),
       source      = COALESCE(issuers.source, excluded.source),
+      kind        = COALESCE(excluded.kind, issuers.kind),
       updated_at  = excluded.updated_at
   `;
+  // pickKind — возвращает 'corporate' если есть хотя бы одна корпорат-
+  // бумага (corporate_bond/exchange_bond), иначе самый частый из
+  // subfederal/municipal/ofz. Дополнительно: если по названию это БАНК,
+  // ставим 'bank' даже если бумаги формально corporate_bond — у банков
+  // нет РСБУ по 402-ФЗ, отчётность по 86-ФЗ (формы 101/102 ЦБ),
+  // отдельный источник cbr.ru. Эта классификация затем используется в
+  // collectReports чтобы пропускать не-корпоративных (у них нет РСБУ).
+  // pickKind — возвращает 'corporate' если есть хотя бы одна корпорат-
+  // бумага, и не банк. Банки — это 86-ФЗ (формы ЦБ 101/102), не 402-ФЗ
+  // РСБУ; ни ФНС/buxbalans их не индексируют, нужен отдельный коллектор
+  // с cbr.ru — поэтому из очереди отчётности их исключаем.
+  // Распознавание по имени: \b в JS не работает с кириллицей, поэтому
+  // прямые substring-проверки + список исключений (лизинг/страх/брокер/
+  // капитал/управляющая/инвест — это дочерние, не банки).
+  function pickKind(types, name){
+    const n = String(name || '').toLowerCase();
+    if(n){
+      // Сначала исключения — иначе «ВТБ Капитал», «Газпром Капитал»,
+      // «АльфаСтрахование», «Сбербанк Лизинг» помечались бы как банки.
+      const isAffiliate = /лизинг|страх|брокер|управляющ|инвест(?!иц)|капитал|финанс\b|секьюрит/i.test(n);
+      if(!isAffiliate){
+        // Банк-маркеры: слово «банк» (включая Сбербанк/Газпромбанк/
+        // Альфабанк), английский bank, КБ/АКБ/НКО/РНКО как отдельные
+        // токены в начале или после пробела.
+        if(/банк|bank/.test(n)) return 'bank';
+        if(/(^|\s)(кб|акб|нко|рнко)(\s|"|«)/.test(n)) return 'bank';
+      }
+    }
+    if(!types) return null;
+    if(types.corporate_bond || types.exchange_bond) return 'corporate';
+    if(types.subfederal_bond) return 'subfederal';
+    if(types.municipal_bond) return 'municipal';
+    if(types.ofz_bond) return 'federal';
+    return null;
+  }
   const stmts = [];
   for(const e of byEmitter.values()){
     if(!e.inn) continue; // без ИНН эмитент бесполезен — не пишем
@@ -1432,9 +1489,10 @@ async function collectIssuers(env, url){
     const aliases   = (fullName && shortName && fullName !== shortName)
       ? JSON.stringify([fullName, shortName])
       : null;
+    const kind      = pickKind(e.types, fullName || shortName);
     stmts.push(env.DB.prepare(upsertSql).bind(
       e.inn, e.ogrn || null, fullName, shortName, ticker,
-      e.bonds_count || 0, aliases, meta, 'moex', now
+      e.bonds_count || 0, aliases, meta, 'moex', kind, now
     ));
   }
   if(stmts.length){
@@ -1450,18 +1508,43 @@ async function collectIssuers(env, url){
 
   // ── Шаг 6: пополняем reports_queue новыми ИНН ──────────────────────
   // Чтобы коллектор отчётности знал, кого ещё не пытался обработать.
+  // Сразу фильтруем по типу: муниципалов/субфедералов/ОФЗ в очередь
+  // отчётности НЕ добавляем — у них нет РСБУ по 402-ФЗ. Если у такого
+  // ИНН вдруг есть и корпоративные бумаги (kind='corporate'), он попадёт
+  // в очередь.
   if(byEmitter.size){
     try {
       const qSql = `INSERT OR IGNORE INTO reports_queue (inn, next_due) VALUES (?, datetime('now'))`;
       const qStmts = [];
+      let skipped = 0;
       for(const e of byEmitter.values()){
-        if(e.inn) qStmts.push(env.DB.prepare(qSql).bind(e.inn));
+        if(!e.inn) continue;
+        const kind = pickKind(e.types);
+        if(kind && kind !== 'corporate'){ skipped++; continue; }
+        qStmts.push(env.DB.prepare(qSql).bind(e.inn));
       }
       for(let i = 0; i < qStmts.length; i += 200){
         await env.DB.batch(qStmts.slice(i, i + 200));
       }
+      if(skipped) errors.push(`queue: пропущено ${skipped} не-корпоративных эмитентов (нет РСБУ)`);
     } catch(e){ errors.push('queue seed: ' + e.message); }
   }
+
+  // Дополнительно: подчистим очередь от уже накопленных не-корпоративных
+  // (subfederal, municipal, federal, bank). Один UPDATE ставит им
+  // next_due = +180 дней — фактически выводит из активной выборки,
+  // не удаляя истории попыток. Если в будущем сделаем коллектор для
+  // ЦБ-форм 101/102, банки можно будет вернуть в работу.
+  try {
+    await env.DB.prepare(`
+      UPDATE reports_queue
+         SET next_due = datetime('now', '+180 days')
+       WHERE inn IN (
+         SELECT inn FROM issuers
+          WHERE kind IS NOT NULL AND kind != 'corporate'
+       )
+    `).run();
+  } catch(_){ /* нет колонки kind ещё — нормально */ }
 
   await logRun(env, startedAt, 'issuers', rowsWritten, errors, Date.now() - t0);
   return {
@@ -1863,12 +1946,17 @@ async function collectReports(env, url){
     queue = [{ inn: onlyInn, max_year: null, is_traded: 1 }];
   } else {
     const tradedFilter = onlyTraded ? 'AND COALESCE(t.is_traded, 0) = 1' : '';
+    // Дополнительный фильтр по kind: муниципалов/субфедералов/ОФЗ
+    // вытаскивать в очередь нет смысла — у них нет РСБУ. issuers.kind
+    // могут быть NULL (старые записи до миграции) — их не отбрасываем.
     const sql = `
       SELECT q.inn,
              COALESCE(t.is_traded, 0) AS is_traded,
              rmax.max_year             AS max_year,
-             q.attempts                AS attempts
+             q.attempts                AS attempts,
+             i.kind                    AS kind
       FROM reports_queue q
+      LEFT JOIN issuers i ON i.inn = q.inn
       LEFT JOIN (
         SELECT emitent_inn AS inn, 1 AS is_traded
         FROM bond_daily
@@ -1882,6 +1970,7 @@ async function collectReports(env, url){
         SELECT inn, MAX(fy_year) AS max_year FROM issuer_reports GROUP BY inn
       ) rmax ON rmax.inn = q.inn
       WHERE (q.next_due IS NULL OR q.next_due <= datetime('now'))
+        AND (i.kind IS NULL OR i.kind = 'corporate')
         ${tradedFilter}
         AND (
           ? = 1                              -- force: берём всех

@@ -141,11 +141,17 @@ CREATE TABLE IF NOT EXISTS issuers (
                                          --   ["Газпром", "Gazprom", "ОАО Газпром"]
   meta         TEXT,                     -- JSON, всё лишнее (telegram, сайт, ИКАО ...)
   source       TEXT,                     -- 'moex' | 'girbo' | 'edisc' | 'manual'
+  kind         TEXT,                     -- 'corporate' | 'subfederal' | 'municipal' | 'federal' | 'bank'
+                                         -- corporate сдают РСБУ по 402-ФЗ (ГИР БО/buxbalans),
+                                         -- остальные — нет: subfederal/municipal/federal —
+                                         -- бюджет 86н, bank — формы ЦБ 101/102. Очередь
+                                         -- reports_queue фильтрует по kind='corporate'.
   updated_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_issuers_ticker ON issuers(ticker);
 CREATE INDEX IF NOT EXISTS idx_issuers_sector ON issuers(sector);
 CREATE INDEX IF NOT EXISTS idx_issuers_name   ON issuers(short_name);
+CREATE INDEX IF NOT EXISTS idx_issuers_kind   ON issuers(kind);
 
 -- ── Известные ISIN/secid акций по ИНН ─────────────────────────────────
 -- Один эмитент может иметь несколько secid акций (обычная + префы:
