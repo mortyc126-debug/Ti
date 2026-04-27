@@ -34,8 +34,10 @@ function buildAliasPattern(){
     for(const a of m.aliases) all.add(a);
   }
   const sorted = [...all].sort((a, b) => b.length - a.length);
-  // экранируем regex-метасимволы внутри алиасов: /, ., точки, скобки
-  return sorted.map(a => a.replace(/[-/\\^$.*+?()[\]{}|]/g, '\\$&')).join('|');
+  // экранируем regex-метасимволы внутри алиасов: /, ., точки, скобки.
+  // ВАЖНО: «-» НЕ экранируем — в Unicode-mode (флаг 'u') escape \- невалиден
+  // и валит весь regex с SyntaxError. Вне character class «-» это литерал.
+  return sorted.map(a => a.replace(/[/\\^$.*+?()[\]{}|]/g, '\\$&')).join('|');
 }
 
 const ALIAS_PATTERN = buildAliasPattern();
