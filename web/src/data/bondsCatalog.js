@@ -102,21 +102,34 @@ export const bondsMock = [
 ];
 
 function mk(secid, name, issuer, type, list, trend, price, ytm, ytm2, durY, mat, volBn, freqPerY, amort, offer, rating, ratingTrend, mode, spread, ind, mults){
-  // freqPerY → id частоты
   const freqMap = { 12: 'month', 4: 'quarter', 2: 'half', 1: 'year', 6: 'month' };
+  // Псевдо-даты публикации последнего отчёта эмитента: год + сколько
+  // дней назад. Mock-генератор детерминирован — id-хэш из issuer.
+  // Когда backend начнёт отдавать реальные периоды из reportsDB,
+  // эти поля сменим на настоящие.
+  const h = hashStr(issuer);
+  const reportYear = h % 10 === 0 ? 2022 : h % 7 === 0 ? 2023 : h % 5 === 0 ? 2024 : 2025;
+  const reportDaysAgo = (h * 13) % 720;          // 0..720 дней
   return {
     secid, name, issuer, type, listing: list, currency: 'RUB',
     trend, price, ytm, yield_to_mat: ytm2,
     duration_years: durY, mat_date: mat,
-    volume_bn: volBn,                          // объём выпуска, млрд ₽
+    volume_bn: volBn,
     coupon_freq: freqMap[freqPerY] || 'quarter',
     coupon_period_days: Math.round(365 / freqPerY),
     amort, offer, rating, ratingTrend,
-    coupon_mode: mode,                          // 'fix' | 'float'
-    coupon_spread: spread,                      // строка-описание для флоатера
+    coupon_mode: mode,
+    coupon_spread: spread,
     industry: ind,
-    mults,                                      // финансовые метрики эмитента
+    mults,
+    report: { year: reportYear, daysAgo: reportDaysAgo },
   };
+}
+
+function hashStr(s){
+  let h = 0;
+  for(let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
 }
 
 // «Запас прочности» — упрощённый composite score 0..100, как в old SPA,

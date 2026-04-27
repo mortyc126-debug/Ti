@@ -28,7 +28,10 @@ function FloatingWindow({ win }){
     : { size: { width: win.w, height: win.h },
         position: { x: win.x, y: win.y },
         bounds: 'window',
-        dragHandleClassName: 'win-drag',
+        // drag за любой участок окна, КРОМЕ интерактивных элементов и
+        // ссылок на разделы — нужно тащить за «пустоту» поля, чтобы
+        // ссылки и кнопки внутри работали как обычно.
+        cancel: 'button, a, input, textarea, select, [data-no-drag]',
         minWidth: 280, minHeight: 160,
         onDragStop: (_, d) => patch(win.wid, { x: d.x, y: d.y }),
         onResizeStop: (_, __, ref, ___, pos) =>
@@ -41,8 +44,9 @@ function FloatingWindow({ win }){
       onMouseDown={() => focus(win.wid)}
     >
       <div className="w-full h-full bg-bg2 border border-border2 rounded-lg shadow-2xl flex flex-col overflow-hidden">
-        {/* шапка окна */}
-        <div className="win-drag flex items-center gap-2 px-3 h-9 bg-s2 border-b border-border cursor-move select-none">
+        {/* шапка окна — больше не единственный drag-handle: Rnd теперь
+            тащит за любой не-интерактивный пиксель окна (см. cancel выше). */}
+        <div className="flex items-center gap-2 px-3 h-9 bg-s2 border-b border-border cursor-move select-none">
           <span className="text-acc text-xs">●</span>
           <span className="font-mono text-text text-sm font-semibold truncate">{win.title}</span>
           {win.ticker && <span className="font-mono text-text3 text-xs">{win.ticker}</span>}

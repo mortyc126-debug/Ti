@@ -13,8 +13,13 @@ export const DEFAULT_FILTERS = {
   freq: [], amort: 'any', offer: 'any',
   volMin: '', volMax: '',
   ratings: [], ratingTrend: 'any', outsiders: 'off',
+  industries: [],
+  reportYears: [],
+  reportAge: 'any',
   mults: {},
 };
+
+const REPORT_AGE_DAYS = { m6: 183, y1: 365, y2: 730, y3: 1095 };
 
 const num = v => (v === '' || v == null ? null : Number(v));
 
@@ -105,6 +110,23 @@ function issuerOk(b, f){
     if(!f.ratings.includes(tag)) return false;
   }
   if(f.ratingTrend && f.ratingTrend !== 'any' && b.ratingTrend !== f.ratingTrend) return false;
+
+  if(f.industries && f.industries.length){
+    if(!f.industries.includes(b.industry)) return false;
+  }
+  if(f.reportYears && f.reportYears.length){
+    if(!b.report || !f.reportYears.includes(b.report.year)) return false;
+  }
+  if(f.reportAge && f.reportAge !== 'any'){
+    const days = b.report?.daysAgo;
+    if(days == null) return false;
+    if(f.reportAge === 'old'){
+      if(days <= REPORT_AGE_DAYS.y3) return false;
+    } else {
+      const limit = REPORT_AGE_DAYS[f.reportAge];
+      if(limit == null || days > limit) return false;
+    }
+  }
 
   // Мультипликаторы и composite-индексы (safety/bqi) — единый цикл.
   for(const spec of MULTIPLIERS){

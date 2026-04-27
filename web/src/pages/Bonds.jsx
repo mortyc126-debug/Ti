@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Star, RefreshCw, Download, Clock, Filter as FilterIcon } from 'lucide-react';
+import { Star, RefreshCw, Download, Clock, Filter as FilterIcon, Copy, Check } from 'lucide-react';
 import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
@@ -137,12 +137,12 @@ function BondRow({ b }){
       </td>
       <td className="p-2">
         <div className="font-mono text-text">{b.name}</div>
-        <button onClick={openIssuer} className="text-text3 text-[10px] font-mono hover:text-acc transition-colors">
-          {b.secid} · {b.issuer}
-          {b.industry && b.industry !== 'none' && (
-            <span className="text-text3"> · {INDUSTRIES[b.industry]?.label || b.industry}</span>
-          )}
-        </button>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <button onClick={openIssuer} className="text-text3 text-[10px] font-mono hover:text-acc transition-colors text-left">
+            {b.secid} · {b.issuer}
+          </button>
+          <CopyBtn value={b.secid} />
+        </div>
       </td>
       <td className="p-2 text-right font-mono">{b.price.toFixed(2)}</td>
       <td className="p-2 text-right font-mono"><YieldCell v={b.ytm} /></td>
@@ -167,6 +167,29 @@ function BondRow({ b }){
         </button>
       </td>
     </tr>
+  );
+}
+
+function CopyBtn({ value }){
+  const [done, setDone] = useState(false);
+  const click = (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(value).then(() => {
+      setDone(true);
+      setTimeout(() => setDone(false), 1200);
+    });
+  };
+  return (
+    <button
+      onClick={click}
+      title={done ? 'Скопировано' : `Скопировать ${value}`}
+      className={[
+        'inline-flex items-center justify-center w-4 h-4 rounded transition-colors',
+        done ? 'text-green' : 'text-text3 hover:text-acc',
+      ].join(' ')}
+    >
+      {done ? <Check size={11} /> : <Copy size={11} />}
+    </button>
   );
 }
 

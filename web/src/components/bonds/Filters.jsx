@@ -4,7 +4,18 @@ import {
   BOND_TYPES, CURRENCIES, TRENDS, COUPON_FREQ, AMORT, OFFER,
   RATINGS, RATING_TRENDS, MULTIPLIERS,
 } from '../../data/bondsCatalog.js';
+import { INDUSTRY_GROUPS } from '../../data/industries.js';
 import MultiplierFilter from './MultiplierFilter.jsx';
+
+const REPORT_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const REPORT_AGES = [
+  { id: 'any',   label: 'Любая давность' },
+  { id: 'm6',    label: '≤ 6 месяцев' },
+  { id: 'y1',    label: '≤ 1 года' },
+  { id: 'y2',    label: '≤ 2 лет' },
+  { id: 'y3',    label: '≤ 3 лет' },
+  { id: 'old',   label: '> 3 лет (старые)' },
+];
 
 // Фильтры облигаций. Делятся на две вкладки — «Бумага» и «Эмитент».
 // Все значения хранятся снаружи (state в Bonds.jsx), мы только
@@ -74,6 +85,7 @@ function PaperPanel({ value, onPatch }){
 }
 
 function IssuerPanel({ value, onPatch }){
+  const allIndustries = INDUSTRY_GROUPS.flatMap(g => g.items.map(it => ({ id: it.id, label: `${g.label} · ${it.label}` })));
   return (
     <div className="p-4 space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3">
@@ -86,6 +98,29 @@ function IssuerPanel({ value, onPatch }){
           { id: 'p90',  label: 'Отсекать хуже 90% отрасли' },
           { id: 'only', label: 'Только аутсайдеры' },
         ]} value={value.outsiders} onChange={v => onPatch({ outsiders: v })} />
+      </div>
+
+      <MultiPills
+        label="Отрасли (любое количество)"
+        options={allIndustries}
+        value={value.industries}
+        onChange={v => onPatch({ industries: v })}
+        cap={8}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-5 gap-y-3">
+        <MultiPills
+          label="Год публикации последнего отчёта"
+          options={REPORT_YEARS.map(y => ({ id: y, label: String(y) }))}
+          value={value.reportYears}
+          onChange={v => onPatch({ reportYears: v })}
+        />
+        <Select
+          label="Свежесть отчёта"
+          options={REPORT_AGES}
+          value={value.reportAge}
+          onChange={v => onPatch({ reportAge: v })}
+        />
       </div>
 
       <div>
