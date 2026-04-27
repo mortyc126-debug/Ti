@@ -88,14 +88,21 @@
     </div>
     <div class="row" style="margin-top:8px">
       <button onclick="run('/collect/issuers')">🏢 Справочник + ИНН в bond_daily</button>
-      <button onclick="run('/collect/reports?limit=10')">📊 Отчётность ГИР БО · 10 ИНН</button>
-      <button onclick="run('/collect/reports?limit=30')">📊 Отчётность ГИР БО · 30 ИНН</button>
+      <button onclick="run('/collect/reports?limit=10&only_traded=1')">📊 Отчётность · 10 (торгуемые)</button>
+      <button onclick="run('/collect/reports?limit=30&only_traded=1')">📊 Отчётность · 30 (торгуемые)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=30')">📊 Отчётность · 30 (все)</button>
     </div>
     <div class="sub" style="margin-top:12px">
       Порядок при первом запуске: <b>облигации → акции → справочник → отчётность</b>.
-      Справочник тянет MOEX bulk и заполняет <code>emitent_inn</code> в bond_daily — без него
-      ничего не показывается. Отчётность тянет ГИР БО (~7 запросов на ИНН), за один раз
-      берёт следующие N ИНН из очереди — на free tier разумно по 10, на paid — до 30.
+      Справочник тянет MOEX bulk и заполняет <code>emitent_inn</code> в bond_daily —
+      без этого каталог пустой. <b>Отчётность</b> ходит по каскаду источников
+      <b>ГИР БО → buxbalans.ru</b>: если ГИР БО не отдаёт свежий год (или ИНН вообще
+      не нашёлся), пробуем второй источник. Старые отчёты в БД не блокируют поиск
+      новых: после 1 апреля система ждёт от каждого ИНН год тек.−1 и снова идёт в
+      источники, если его нет.<br>
+      «<b>торгуемые</b>» — фильтр по эмитентам, у которых есть активные бумаги в
+      bond_daily; такие имеют приоритет в очереди. На free tier безопасно
+      <code>limit=10</code> (50 subrequest на cron), на paid — до <code>limit=30</code>.
     </div>
   </div>
 

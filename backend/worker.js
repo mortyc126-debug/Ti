@@ -2,8 +2,10 @@
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
-// эмитентов из ГИР БО (bo.nalog.gov.ru). Дополнительно — Cerebras-парсер
-// для извлечения структуры из текстов отчётов / новостей / раскрытий.
+// по каскаду источников: ГИР БО (bo.nalog.gov.ru) → buxbalans.ru.
+// Каскад срабатывает если первый источник не отдал ожидаемый последний
+// год (старые отчёты не блокируют поиск новых). Дополнительно —
+// Cerebras-парсер для извлечения структуры из текстов отчётов / новостей.
 //
 // Endpoints:
 //   GET  /status                       диагностика БД
@@ -27,8 +29,14 @@
 //   POST /collect/bonds                ручной сбор облигаций
 //   POST /collect/issuers              справочник эмитентов: bulk-обогащение
 //                                      bond_daily.emitent_inn + issuers
-//   POST /collect/reports?limit=20     РСБУ-показатели из ГИР БО для
-//                                      следующих N эмитентов в очереди
+//   POST /collect/reports?limit=20     РСБУ-показатели по каскаду
+//                                      ГИР БО → buxbalans для следующих N
+//                                      ИНН в очереди.
+//                                      ?only_traded=1 — только эмитенты
+//                                      с активными бумагами в bond_daily.
+//                                      ?force=1 — игнорировать «свежие»
+//                                      и прогнать заново.
+//                                      ?inn=X — обработать конкретный ИНН.
 //
 // Cron: 30 7 * * * (10:30 MSK) — стандартный сбор досок и обогащение
 // эмитентов; раз в сутки также подтягивает по 50 ИНН из reports_queue.
@@ -1360,54 +1368,212 @@ function pickRaw(det, kind){
   return out;
 }
 
-// Главный коллектор отчётности. ?limit=N&inn=X для ручного вызова.
-// Без INN берёт top-N эмитентов из reports_queue (самые старые/новые).
+// ═══ Альтернативный источник: buxbalans.ru ════════════════════════════
+//
+// buxbalans.ru — публичный агрегатор бухотчётности, пускает без капчи.
+// На странице `/{INN}.html` для каждого кода РСБУ (1300, 1600, 2110,
+// 2400 и т.д.) встроен chart-блок:
+//   var myChart_chart_{INN}_{CODE} = new Chart(...)
+//   data: { labels: [2011,2012,...,2024],
+//           datasets: [{ data: [v1, v2, ..., vN], ... }] }
+// Регексом цепляем первое `labels:[…]` после метки и первое `data:[…]`
+// после labels — это и есть ряд значений конкретного кода (нижестоящие
+// data: — сравнения/тренды, нам не нужны). Все суммы, как и в ГИР БО,
+// в тыс ₽ (страница так и подписывает) → делим на 1e6 → млрд ₽.
+//
+// Зачем нужен: у buxbalans глубже история (с 2011, ГИР БО держит ~5 лет)
+// и шире покрытие — там появляются ИНН ВДО, которые ФНС не успевает
+// или не хочет публиковать через свой /nbo. Кеш на стороне Cloudflare
+// даёт стабильность.
+//
+// Ограничения: только РСБУ (МСФО на buxbalans нет), значения «как у
+// ФНС опубликовано», без агрегации по группе компаний.
+async function buxBalansFetchByInn(inn, opts){
+  const tout = opts?.timeoutMs || 15000;
+  const ctrl = new AbortController();
+  const tm = setTimeout(() => ctrl.abort(), tout);
+  let html;
+  try {
+    const r = await fetch(`https://buxbalans.ru/${inn}.html`, {
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (compatible; BondAnalytics/0.7; +github.com/mortyc126-debug/ti)',
+      },
+      signal: ctrl.signal,
+    });
+    if(r.status === 404) throw new Error('buxbalans: ИНН ' + inn + ' не найден');
+    if(!r.ok) throw new Error('buxbalans HTTP ' + r.status);
+    html = await r.text();
+  } finally { clearTimeout(tm); }
+  if(!html || html.length < 2000) throw new Error('buxbalans: пустой ответ (' + (html?.length || 0) + ')');
+
+  // Имя компании — обычно в <h1> заголовке.
+  let company = null;
+  const mH1 = html.match(/<h1[^>]*>([^<]{3,200})<\/h1>/);
+  if(mH1) company = mH1[1].replace(/\s+/g, ' ').trim();
+
+  const series = {};
+  const rawByYear = {};
+  // Сначала — какие коды нас интересуют. Расходы (interest, tax) —
+  // отдельным флагом, чтобы в ряд клались по модулю.
+  const want = [
+    { code: '2110', field: 'rev'     },
+    { code: '2200', field: 'ebit'    },
+    { code: '2400', field: 'np'      },
+    { code: '2330', field: 'int_exp', expense: true },
+    { code: '2410', field: 'tax_exp', expense: true },
+    { code: '1600', field: 'assets'  },
+    { code: '1200', field: 'ca'      },
+    { code: '1500', field: 'cl'      },
+    { code: '1410', field: 'debt_long'  },
+    { code: '1510', field: 'debt_short' },
+    { code: '1250', field: 'cash'    },
+    { code: '1370', field: 'ret'     },
+    { code: '1300', field: 'eq'      },
+  ];
+  for(const w of want){
+    // Привязываемся к метке myChart_chart_{inn}_{code}, ищем дальше
+    // первый блок `labels: [...]` и затем первый `data: [...]`. Между
+    // меткой и labels всегда коротко (объект options/responsive).
+    const re = new RegExp(
+      `myChart_chart_${inn}_${w.code}\\b[\\s\\S]{0,4000}?labels\\s*:\\s*\\[([^\\]]+)\\][\\s\\S]{0,1500}?data\\s*:\\s*\\[([^\\]]+)\\]`
+    );
+    const m = html.match(re);
+    if(!m) continue;
+    const years = m[1].split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
+    const vals  = m[2].split(',').map(s => {
+      const t = s.trim().replace(/[^0-9.\-]/g, '');
+      return t ? parseFloat(t) : NaN;
+    });
+    for(let i = 0; i < years.length && i < vals.length; i++){
+      const y = years[i];
+      const v = vals[i];
+      if(!isFinite(v) || !y) continue;
+      series[y]    = series[y]    || {};
+      rawByYear[y] = rawByYear[y] || {};
+      rawByYear[y][w.code] = v;
+      const out = (w.expense ? Math.abs(v) : v) / 1e6; // тыс ₽ → млрд ₽
+      if(w.field === 'debt_long' || w.field === 'debt_short'){
+        series[y].debt = (series[y].debt || 0) + out;
+      } else {
+        series[y][w.field] = out;
+      }
+    }
+  }
+  if(!Object.keys(series).length) throw new Error('buxbalans: ни одного chart-блока не разобрано');
+  return { series, rawByYear, company, inn, ogrn: null, errors: [] };
+}
+
+// ═══ Каскад источников и логика «свежести» ═══════════════════════════
+//
+// Ожидаемый последний публикованный год РСБУ. Дедлайн годовой
+// отчётности — 31 марта следующего года. Поэтому:
+//   с 1 апреля     → ожидаем тек.год − 1 (свежий годовик уже сдан)
+//   до 31 марта    → ожидаем тек.год − 2 (за прошлый год ещё могут
+//                    не успеть, не считаем «устаревшими»).
+function expectedFyYear(d){
+  const x = d || new Date();
+  return x.getUTCMonth() >= 3 ? x.getUTCFullYear() - 1 : x.getUTCFullYear() - 2;
+}
+
+// Источники в порядке приоритета. Каждый источник возвращает один и
+// тот же контракт {series, rawByYear, company, inn, ogrn, errors}.
+const REPORT_SOURCES = [
+  { name: 'girbo',     fn: girboFetchByInn      },
+  { name: 'buxbalans', fn: buxBalansFetchByInn  },
+];
+
+// Главный коллектор отчётности. Поддерживает каскад источников и
+// перепроверку, если последний имеющийся год < ожидаемого.
+//
+// Параметры (query string):
+//   ?limit=N            — взять top-N из очереди (default 20, max 50)
+//   ?inn=X              — обработать конкретный ИНН (тогда limit игнорируется)
+//   ?force=1            — игнорировать «уже свежие», прогнать заново
+//   ?only_traded=1      — только эмитенты с активными бумагами в bond_daily
 async function collectReports(env, url){
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
   const now = new Date().toISOString();
   const limit = Math.min(50, parseInt(url?.searchParams?.get('limit') || '20', 10));
   const onlyInn = url?.searchParams?.get('inn');
+  const force   = url?.searchParams?.get('force') === '1';
+  const onlyTraded = url?.searchParams?.get('only_traded') === '1';
+  const today = new Date().toISOString().slice(0, 10);
+  const expected = expectedFyYear(new Date());
   const errors = [];
   let processed = 0, succeeded = 0, rowsWritten = 0;
+  const sourceStats = { girbo: 0, buxbalans: 0, none: 0 };
 
-  // Список ИНН для обработки
+  // ── Формирование очереди ──────────────────────────────────────────
+  // Приоритет:
+  //   1. ИНН с активными бумагами (bond_daily.status='A' AND mat_date >= today)
+  //   2. Те, у кого нет свежего года (или нет вообще ничего)
+  //   3. Самые старые next_due
+  // SQL-подзапрос is_traded считает, есть ли у ИНН живая бумага сейчас;
+  // max_year — самый свежий год в issuer_reports (NULL если никогда не было).
   let queue = [];
   if(onlyInn){
-    queue = [{ inn: onlyInn }];
+    queue = [{ inn: onlyInn, max_year: null, is_traded: 1 }];
   } else {
+    const tradedFilter = onlyTraded ? 'AND COALESCE(t.is_traded, 0) = 1' : '';
+    const sql = `
+      SELECT q.inn,
+             COALESCE(t.is_traded, 0) AS is_traded,
+             rmax.max_year             AS max_year,
+             q.attempts                AS attempts
+      FROM reports_queue q
+      LEFT JOIN (
+        SELECT emitent_inn AS inn, 1 AS is_traded
+        FROM bond_daily
+        WHERE date = (SELECT MAX(date) FROM bond_daily)
+          AND emitent_inn IS NOT NULL AND emitent_inn != ''
+          AND (status IS NULL OR status = 'A')
+          AND (mat_date IS NULL OR mat_date >= ?)
+        GROUP BY emitent_inn
+      ) t ON t.inn = q.inn
+      LEFT JOIN (
+        SELECT inn, MAX(fy_year) AS max_year FROM issuer_reports GROUP BY inn
+      ) rmax ON rmax.inn = q.inn
+      WHERE (q.next_due IS NULL OR q.next_due <= datetime('now'))
+        ${tradedFilter}
+        AND (
+          ? = 1                              -- force: берём всех
+          OR rmax.max_year IS NULL           -- никогда не пробовали
+          OR rmax.max_year < ?               -- последний год < ожидаемого
+        )
+      ORDER BY
+        COALESCE(t.is_traded, 0) DESC,       -- сначала торгуемые
+        COALESCE(rmax.max_year, 0) ASC,      -- потом самые «отставшие»
+        q.attempts ASC,
+        COALESCE(q.last_attempt, '0') ASC
+      LIMIT ?
+    `;
     try {
-      const r = await env.DB.prepare(`
-        SELECT q.inn
-        FROM reports_queue q
-        WHERE q.next_due IS NULL OR q.next_due <= datetime('now')
-        ORDER BY COALESCE(q.last_attempt, '0') ASC, q.attempts ASC
-        LIMIT ?
-      `).bind(limit).all();
+      const r = await env.DB.prepare(sql)
+        .bind(today, force ? 1 : 0, expected, limit).all();
       queue = r.results || [];
-    } catch(e){
-      // fallback: если очередь ещё пуста (первый запуск) — берём из issuers
-      try {
-        const r = await env.DB.prepare(`
-          SELECT i.inn
-          FROM issuers i
-          LEFT JOIN issuer_reports r
-                 ON r.inn = i.inn AND r.fy_year >= ${new Date().getUTCFullYear() - 2}
-          WHERE i.inn IS NOT NULL AND r.inn IS NULL
-          ORDER BY i.bonds_count DESC
-          LIMIT ?
-        `).bind(limit).all();
-        queue = r.results || [];
-      } catch(e2){ errors.push('queue: ' + e.message + ' / ' + e2.message); }
-    }
+    } catch(e){ errors.push('queue: ' + e.message); }
   }
 
   if(!queue.length){
-    await logRun(env, startedAt, 'reports', 0, ['queue empty'], Date.now() - t0);
-    return { source: 'reports', processed: 0, succeeded: 0, rowsWritten: 0, errors: ['queue empty'], duration_ms: Date.now() - t0 };
+    await logRun(env, startedAt, 'reports', 0, ['queue empty / nothing stale'], Date.now() - t0);
+    return {
+      source: 'reports',
+      expected_year: expected,
+      processed: 0,
+      succeeded: 0,
+      rowsWritten: 0,
+      sourceStats,
+      errors: ['queue empty / nothing stale'],
+      duration_ms: Date.now() - t0,
+    };
   }
 
-  // Подготавливаем prepared statement для upsert отчётов и для очереди
+  // ── Подготовка prepared SQL ───────────────────────────────────────
+  // PK issuer_reports — (inn, fy_year, period, std). source — обычное
+  // поле, при пересчёте источником с более высоким приоритетом
+  // переписываем (DO UPDATE).
   const upsertReport = `
     INSERT INTO issuer_reports (
       inn, fy_year, period, std,
@@ -1419,7 +1585,7 @@ async function collectReports(env, url){
               ?, ?, ?, ?, ?, ?,
               ?, ?, ?, ?, ?, ?, ?,
               ?, ?, ?, ?,
-              'girbo', ?, ?)
+              ?, ?, ?)
     ON CONFLICT(inn, fy_year, period, std) DO UPDATE SET
       rev = excluded.rev, ebitda = excluded.ebitda, ebit = excluded.ebit,
       np = excluded.np, int_exp = excluded.int_exp, tax_exp = excluded.tax_exp,
@@ -1429,91 +1595,137 @@ async function collectReports(env, url){
       ebitda_marg = excluded.ebitda_marg, net_debt_eq = excluded.net_debt_eq,
       source = excluded.source, raw = excluded.raw, fetched_at = excluded.fetched_at
   `;
-  const updateQueueOk = `
+  // Очередь: динамический cooldown в зависимости от результата.
+  //   fresh   = +30 дней (ожидаемый год получен)
+  //   partial = +7  дней (что-то получено, но не ожидаемый)
+  //   miss    = +14 дней (ничего не вышло)
+  const updateQueue = `
     INSERT INTO reports_queue (inn, last_attempt, last_success, attempts, last_error, next_due)
-    VALUES (?, ?, ?, 0, NULL, datetime(?, '+30 days'))
+    VALUES (?, ?, ?, ?, ?, datetime(?, ?))
     ON CONFLICT(inn) DO UPDATE SET
       last_attempt = excluded.last_attempt,
-      last_success = excluded.last_success,
-      attempts = 0,
-      last_error = NULL,
-      next_due = excluded.next_due
-  `;
-  // Ставим базовые поля при сбое (ON CONFLICT — оставляем attempts на
-  // действующем значении, увеличим его отдельным UPDATE'ом ниже).
-  const updateQueueFail = `
-    INSERT INTO reports_queue (inn, last_attempt, attempts, last_error, next_due)
-    VALUES (?, ?, 1, ?, datetime(?, '+7 days'))
-    ON CONFLICT(inn) DO UPDATE SET
-      last_attempt = excluded.last_attempt,
-      attempts = reports_queue.attempts + 1,
-      last_error = excluded.last_error,
-      next_due = excluded.next_due
+      last_success = COALESCE(excluded.last_success, reports_queue.last_success),
+      attempts     = CASE WHEN excluded.last_success IS NOT NULL
+                          THEN 0
+                          ELSE reports_queue.attempts + 1 END,
+      last_error   = excluded.last_error,
+      next_due     = excluded.next_due
   `;
 
+  // ── Обработка ИНН: каскад источников ──────────────────────────────
   for(const item of queue){
     const inn = item.inn;
     if(!inn) continue;
     processed++;
-    try {
-      const fetched = await girboFetchByInn(inn, 3);
-      const yearStmts = [];
-      for(const [yearStr, vals] of Object.entries(fetched.series || {})){
-        const fy = parseInt(yearStr, 10);
-        if(!fy) continue;
-        const rev = vals.rev ?? null;
-        const np  = vals.np  ?? null;
-        const eq  = vals.eq  ?? null;
-        const debt = vals.debt ?? null;
-        const cash = vals.cash ?? null;
-        const assets = vals.assets ?? null;
-        const ebitda = (vals.ebit != null && vals.int_exp != null) ? (vals.ebit + vals.int_exp) : null;
-        const roa  = (np != null && assets) ? np / assets * 100 : null;
-        const ros  = (np != null && rev)    ? np / rev * 100    : null;
-        const em   = (ebitda != null && rev) ? ebitda / rev * 100 : null;
-        const nde  = (debt != null && cash != null && eq) ? (debt - cash) / eq : null;
-        const raw  = JSON.stringify(fetched.rawByYear?.[fy] || {});
-        yearStmts.push(env.DB.prepare(upsertReport).bind(
-          inn, fy,
-          rev, ebitda, vals.ebit ?? null, np, vals.int_exp ?? null, vals.tax_exp ?? null,
-          assets, vals.ca ?? null, vals.cl ?? null, debt, cash, vals.ret ?? null, eq,
-          roa, ros, em, nde,
-          raw, now,
-        ));
-      }
-      if(yearStmts.length){
-        const res = await env.DB.batch(yearStmts);
-        rowsWritten += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
-      }
-      // Обновляем имя/ОГРН в issuers, если ФНС вернул что-то полезное
-      if(fetched.company || fetched.ogrn){
-        try {
-          await env.DB.prepare(`
-            UPDATE issuers
-               SET name  = COALESCE(?, name),
-                   ogrn  = COALESCE(ogrn, ?),
-                   updated_at = ?
-             WHERE inn = ?
-          `).bind(fetched.company || null, fetched.ogrn || null, now, inn).run();
-        } catch(_){}
-      }
-      await env.DB.prepare(updateQueueOk).bind(inn, now, now, now).run();
-      succeeded++;
-    } catch(e){
-      const msg = (e.message || String(e)).slice(0, 200);
-      errors.push({ inn, error: msg });
+    let usedSource = null;
+    let lastErr = null;
+    let maxYearGot = 0;
+    let totalRows = 0;
+    const sourceErrors = [];
+
+    for(const src of REPORT_SOURCES){
       try {
-        await env.DB.prepare(updateQueueFail).bind(inn, now, msg, now).run();
+        const fetched = await src.fn(inn, 5);
+        if(!fetched.series || !Object.keys(fetched.series).length){
+          throw new Error(src.name + ': пустой series');
+        }
+        const yearStmts = [];
+        for(const [yearStr, vals] of Object.entries(fetched.series)){
+          const fy = parseInt(yearStr, 10);
+          if(!fy) continue;
+          if(fy > maxYearGot) maxYearGot = fy;
+          const rev = vals.rev ?? null;
+          const np  = vals.np  ?? null;
+          const eq  = vals.eq  ?? null;
+          const debt = vals.debt ?? null;
+          const cash = vals.cash ?? null;
+          const assets = vals.assets ?? null;
+          const ebitda = (vals.ebit != null && vals.int_exp != null)
+            ? (vals.ebit + vals.int_exp) : null;
+          const roa  = (np != null && assets) ? np / assets * 100 : null;
+          const ros  = (np != null && rev)    ? np / rev * 100    : null;
+          const em   = (ebitda != null && rev) ? ebitda / rev * 100 : null;
+          const nde  = (debt != null && cash != null && eq) ? (debt - cash) / eq : null;
+          const raw  = JSON.stringify(fetched.rawByYear?.[fy] || {});
+          yearStmts.push(env.DB.prepare(upsertReport).bind(
+            inn, fy,
+            rev, ebitda, vals.ebit ?? null, np, vals.int_exp ?? null, vals.tax_exp ?? null,
+            assets, vals.ca ?? null, vals.cl ?? null, debt, cash, vals.ret ?? null, eq,
+            roa, ros, em, nde,
+            src.name, raw, now,
+          ));
+        }
+        if(yearStmts.length){
+          // Дробим на батчи по 200, как в collectIssuers
+          for(let i = 0; i < yearStmts.length; i += 200){
+            const chunk = yearStmts.slice(i, i + 200);
+            const res = await env.DB.batch(chunk);
+            totalRows += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
+          }
+        }
+        usedSource = src.name;
+        // Обновим имя/ОГРН в issuers
+        if(fetched.company || fetched.ogrn){
+          try {
+            await env.DB.prepare(`
+              UPDATE issuers
+                 SET name  = COALESCE(?, name),
+                     ogrn  = COALESCE(issuers.ogrn, ?),
+                     updated_at = ?
+               WHERE inn = ?
+            `).bind(fetched.company || null, fetched.ogrn || null, now, inn).run();
+          } catch(_){}
+        }
+        // Если получили ожидаемый год — каскад дальше не идём.
+        // Иначе — пробуем следующий источник, может он даст свежее.
+        if(maxYearGot >= expected) break;
+      } catch(e){
+        const msg = (e.message || String(e)).slice(0, 200);
+        sourceErrors.push(`${src.name}: ${msg}`);
+        lastErr = msg;
+      }
+    }
+
+    rowsWritten += totalRows;
+    if(usedSource){
+      sourceStats[usedSource] = (sourceStats[usedSource] || 0) + 1;
+      succeeded++;
+      // Cooldown: получили ожидаемый год → +30, иначе +7 (вернёмся скоро,
+      // вдруг ФНС/buxbalans скоро дотянут).
+      const isFresh = maxYearGot >= expected;
+      const offset  = isFresh ? '+30 days' : '+7 days';
+      const errStr  = sourceErrors.length ? sourceErrors.join(' | ').slice(0, 200) : null;
+      try {
+        await env.DB.prepare(updateQueue)
+          .bind(inn, now, now, 0, errStr, now, offset).run();
+      } catch(_){}
+    } else {
+      sourceStats.none++;
+      // Ни один источник не дал ничего. Если у эмитента есть торгуемые
+      // бумаги — всё равно держим в очереди (next_due = +14 дней),
+      // иначе тоже +14, но с увеличенным attempts.
+      const offset = item.is_traded ? '+14 days' : '+14 days';
+      const errMsg = (sourceErrors.join(' | ') || 'no sources').slice(0, 200);
+      errors.push({ inn, error: errMsg });
+      try {
+        await env.DB.prepare(updateQueue)
+          .bind(inn, now, null, item.attempts || 0, errMsg, now, offset).run();
       } catch(_){}
     }
   }
 
-  await logRun(env, startedAt, 'reports', rowsWritten, errors.map(e => e.inn ? `${e.inn}: ${e.error}` : e), Date.now() - t0);
+  await logRun(
+    env, startedAt, 'reports', rowsWritten,
+    errors.map(e => e.inn ? `${e.inn}: ${e.error}` : e),
+    Date.now() - t0
+  );
   return {
     source: 'reports',
+    expected_year: expected,
     processed,
     succeeded,
     rowsWritten,
+    sourceStats,
     errors: errors.slice(0, 20),
     duration_ms: Date.now() - t0,
   };
