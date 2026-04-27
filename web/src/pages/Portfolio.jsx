@@ -5,17 +5,13 @@ import Stat from '../components/ui/Stat.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import { positions, rowPnl, totals, bySector } from '../data/mockPortfolio.js';
+import { INDUSTRIES } from '../data/industries.js';
 
 const fmtRub = n => {
   if(n == null) return '—';
   if(Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + ' млн ₽';
   if(Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + ' тыс ₽';
   return Math.round(n).toLocaleString('ru-RU') + ' ₽';
-};
-
-const SECTOR_LABELS = {
-  wood: 'Лесопром', transport: 'Транспорт', leasing: 'Лизинг',
-  retail: 'Ритейл', construction: 'Стройка',
 };
 
 export default function Portfolio(){
@@ -108,28 +104,61 @@ export default function Portfolio(){
         </div>
 
         <Card title="Структура по отраслям" padded={false}>
-          <div className="px-5 py-4 space-y-2.5">
-            {sectors.map(s => {
-              const pct = (s.value / t.navRub) * 100;
-              return (
-                <div key={s.name}>
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-text2">{SECTOR_LABELS[s.name] || s.name}</span>
-                    <span className="font-mono text-text">{pct.toFixed(1)}%</span>
-                  </div>
-                  <div className="relative h-1.5 bg-s2 rounded mt-1 overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-acc/70 rounded" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <SectorBreakdown sectors={sectors} nav={t.navRub} />
           <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between">
             <span className="text-text3 text-[11px] font-mono">всего</span>
             <Badge tone="acc">{rows.length} позиций</Badge>
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function SectorBreakdown({ sectors, nav }){
+  // Группируем плоский список секторов по INDUSTRIES.groupId; внутри
+  // группы — отрасли с собственным процентом от NAV.
+  const groups = new Map();
+  for(const s of sectors){
+    const meta = INDUSTRIES[s.name] || { groupId: 'other', groupLabel: 'Прочее', label: s.name };
+    if(!groups.has(meta.groupId)){
+      groups.set(meta.groupId, { id: meta.groupId, label: meta.groupLabel, total: 0, items: [] });
+    }
+    const g = groups.get(meta.groupId);
+    g.total += s.value;
+    g.items.push({ id: s.name, label: meta.label, value: s.value });
+  }
+  const list = [...groups.values()].sort((a, b) => b.total - a.total);
+
+  return (
+    <div className="px-5 py-4 space-y-4">
+      {list.map(g => {
+        const gPct = (g.total / nav) * 100;
+        return (
+          <div key={g.id}>
+            <div className="flex items-baseline justify-between text-xs mb-1">
+              <span className="text-text2 uppercase tracking-wider text-[10px] font-mono">{g.label}</span>
+              <span className="font-mono text-text">{gPct.toFixed(1)}%</span>
+            </div>
+            <div className="space-y-1.5 pl-5 mt-1.5">
+              {g.items.map(it => {
+                const pct = (it.value / nav) * 100;
+                return (
+                  <div key={it.id}>
+                    <div className="flex items-baseline justify-between text-[11px]">
+                      <span className="text-text3 truncate">{it.label}</span>
+                      <span className="font-mono text-text2">{pct.toFixed(1)}%</span>
+                    </div>
+                    <div className="relative h-1 bg-s2 rounded mt-0.5 overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 bg-acc/70 rounded" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -32,10 +32,10 @@ export default function SectionsGrid(){
               className="group bg-bg2 border border-border rounded-lg p-4 hover:border-acc/60 hover:bg-s2/40 transition-colors"
             >
               <div className="flex items-center justify-between">
-                <Icon size={16} className="text-text3 group-hover:text-acc transition-colors" />
-                <ArrowUpRight size={12} className="text-text3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Icon size={18} className="text-text3 group-hover:text-acc transition-colors" />
+                <ArrowUpRight size={13} className="text-text3 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <div className="mt-3 text-text font-medium">{it.title}</div>
+              <div className="mt-3 text-text text-base font-semibold tracking-tight">{it.title}</div>
               <div className="text-text3 text-[11px] font-mono mt-0.5">{it.sub}</div>
             </Link>
           );

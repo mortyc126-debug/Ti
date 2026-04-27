@@ -2,7 +2,7 @@
 
 export const positions = [
   { isin: 'RU000A105RH2', name: 'Сегежа 002Р-04R',  qty: 50,  avg: 92.4,  last: 94.1, ytm: 24.5, dur: 1.6, mat: '2027-09-15', issuer: 'Сегежа',     ind: 'wood' },
-  { isin: 'RU000A106Y90', name: 'ПГК 001Р-04',      qty: 30,  avg: 99.0,  last: 99.6, ytm: 19.8, dur: 0.9, mat: '2026-11-02', issuer: 'ПГК',         ind: 'transport' },
+  { isin: 'RU000A106Y90', name: 'ПГК 001Р-04',      qty: 30,  avg: 99.0,  last: 99.6, ytm: 19.8, dur: 0.9, mat: '2026-11-02', issuer: 'ПГК',         ind: 'logistics' },
   { isin: 'RU000A107456', name: 'Делимобиль 002Р',   qty: 100, avg: 100.2, last: 102.8,ytm: 22.4, dur: 2.1, mat: '2028-04-10', issuer: 'Делимобиль', ind: 'leasing' },
   { isin: 'RU000A1054X9', name: 'РОЛЬФ БО-001Р-03', qty: 80,  avg: 95.5,  last: 91.2, ytm: 27.6, dur: 1.2, mat: '2027-02-22', issuer: 'РОЛЬФ',       ind: 'retail' },
   { isin: 'RU000A105HJ4', name: 'М.Видео 001Р-03',  qty: 40,  avg: 98.0,  last: 100.0,ytm: 18.9, dur: 0.4, mat: '2026-07-18', issuer: 'М.Видео',     ind: 'retail' },
