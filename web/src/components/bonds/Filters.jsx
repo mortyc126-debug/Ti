@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   BOND_TYPES, CURRENCIES, TRENDS, COUPON_FREQ, AMORT, OFFER,
   RATINGS, RATING_TRENDS, MULTIPLIERS,
@@ -86,8 +86,10 @@ function PaperPanel({ value, onPatch }){
 
 function IssuerPanel({ value, onPatch }){
   const allIndustries = INDUSTRY_GROUPS.flatMap(g => g.items.map(it => ({ id: it.id, label: `${g.label} · ${it.label}` })));
+  const indCount = (value.industries || []).length;
+  const yrCount  = (value.reportYears || []).length;
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3">
         <MultiPills label="Кредитный рейтинг" options={RATINGS.map(r => ({ id: r, label: r === 'none' ? 'без рейтинга' : r }))} value={value.ratings} onChange={v => onPatch({ ratings: v })} cap={9} />
         <Select label="Тенденция рейтинга" options={[{id:'any',label:'Любая'}, ...RATING_TRENDS]} value={value.ratingTrend} onChange={v => onPatch({ ratingTrend: v })} />
@@ -100,31 +102,43 @@ function IssuerPanel({ value, onPatch }){
         ]} value={value.outsiders} onChange={v => onPatch({ outsiders: v })} />
       </div>
 
-      <MultiPills
-        label="Отрасли (любое количество)"
-        options={allIndustries}
-        value={value.industries}
-        onChange={v => onPatch({ industries: v })}
-        cap={8}
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-5 gap-y-3">
+      <Collapsible
+        title="Отрасли"
+        badge={indCount ? `${indCount} выбрано` : null}
+        defaultOpen={false}
+      >
         <MultiPills
-          label="Год публикации последнего отчёта"
-          options={REPORT_YEARS.map(y => ({ id: y, label: String(y) }))}
-          value={value.reportYears}
-          onChange={v => onPatch({ reportYears: v })}
+          options={allIndustries}
+          value={value.industries}
+          onChange={v => onPatch({ industries: v })}
         />
-        <Select
-          label="Свежесть отчёта"
-          options={REPORT_AGES}
-          value={value.reportAge}
-          onChange={v => onPatch({ reportAge: v })}
-        />
-      </div>
+      </Collapsible>
 
-      <div>
-        <Label>Мультипликаторы и индексы</Label>
+      <Collapsible
+        title="Дата отчёта"
+        badge={yrCount || (value.reportAge && value.reportAge !== 'any') ? 'фильтр' : null}
+        defaultOpen={false}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-5 gap-y-3">
+          <MultiPills
+            label="Год публикации последнего отчёта"
+            options={REPORT_YEARS.map(y => ({ id: y, label: String(y) }))}
+            value={value.reportYears}
+            onChange={v => onPatch({ reportYears: v })}
+          />
+          <Select
+            label="Свежесть отчёта"
+            options={REPORT_AGES}
+            value={value.reportAge}
+            onChange={v => onPatch({ reportAge: v })}
+          />
+        </div>
+      </Collapsible>
+
+      <Collapsible
+        title="Мультипликаторы и индексы"
+        defaultOpen={true}
+      >
         <div className="text-text3 text-[10px] font-mono mb-2 leading-relaxed">
           Клик по названию — включить сортировку (зелёный = от лучших, красный = от худших, ↕ = выкл).
           Поля «min – max» — фильтр (можно без сортировки). Hover на названии — примечание.
@@ -139,7 +153,32 @@ function IssuerPanel({ value, onPatch }){
             />
           ))}
         </div>
-      </div>
+      </Collapsible>
+    </div>
+  );
+}
+
+// Сворачиваемый блок: шапка-кнопка + содержимое. Используем нативное
+// состояние useState, без animate-height — на тёмной теме «дёрг» уже
+// почти не виден, экономим JS.
+function Collapsible({ title, badge, defaultOpen = false, children }){
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-border rounded bg-s2/30">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-s2/60 transition-colors"
+      >
+        {open
+          ? <ChevronDown size={14} className="text-text3 shrink-0" />
+          : <ChevronRight size={14} className="text-text3 shrink-0" />}
+        <span className="text-[11px] font-mono uppercase tracking-wider text-text2">{title}</span>
+        {badge && (
+          <span className="ml-auto text-[10px] font-mono text-acc bg-acc-dim px-2 py-0.5 rounded">{badge}</span>
+        )}
+      </button>
+      {open && <div className="p-3 border-t border-border/60">{children}</div>}
     </div>
   );
 }
