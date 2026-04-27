@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>БондАналитик · admin</title>
+  <style>
+    :root {
+      --bg: #0a0e14; --bg2: #11161e; --s2: #1a212c;
+      --border: #222a37; --text: #e6edf3; --text2: #9ba3b1; --text3: #5e6573;
+      --acc: #00d4ff; --acc-dim: #0a3a4a;
+      --green: #22d3a0; --warn: #f5a623; --danger: #ff4d6d;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, sans-serif; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 24px; }
+    h1 { font-family: ui-monospace, Menlo, monospace; color: var(--acc); font-size: 20px; margin: 0 0 4px; }
+    .sub { color: var(--text3); font-size: 13px; margin-bottom: 24px; }
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    input[type=text], input[type=password] {
+      width: 100%; background: var(--s2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 12px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 13px;
+    }
+    input:focus { outline: none; border-color: var(--acc); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      background: var(--acc-dim); color: var(--acc); border: 1px solid var(--acc);
+      padding: 9px 16px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace;
+      font-size: 13px; cursor: pointer; font-weight: 600;
+    }
+    button:hover:not(:disabled) { background: var(--acc); color: var(--bg); }
+    button:disabled { opacity: 0.4; cursor: wait; }
+    button.secondary { background: transparent; border-color: var(--border); color: var(--text2); }
+    button.secondary:hover:not(:disabled) { color: var(--text); border-color: var(--text2); background: var(--s2); }
+    .log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 320px; overflow-y: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.5; }
+    .log-entry { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+    .log-entry:last-child { border-bottom: 0; }
+    .log-time { color: var(--text3); }
+    .log-ok { color: var(--green); }
+    .log-err { color: var(--danger); }
+    .log-info { color: var(--text2); }
+    pre { white-space: pre-wrap; word-break: break-all; margin: 4px 0 0 0; color: var(--text2); font-size: 11px; }
+    .status-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .stat { background: var(--s2); padding: 10px 12px; border-radius: 6px; }
+    .stat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-value { font-family: ui-monospace, Menlo, monospace; font-size: 18px; color: var(--text); margin-top: 2px; }
+    .ver { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: var(--acc-dim); color: var(--acc); margin-left: 8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛠 БондАналитик · admin</h1>
+  <div class="sub">Запуск сборщиков и проверка состояния backend Worker'а вручную.</div>
+
+  <div class="card">
+    <label for="url">Worker URL</label>
+    <input id="url" type="text" value="https://bondan-backend.marginacall.workers.dev">
+    <div style="height:12px"></div>
+    <label for="token">X-Admin-Token <span style="color:var(--text3);text-transform:none;font-size:11px">(хранится в localStorage этого устройства)</span></label>
+    <input id="token" type="password" placeholder="вставь сюда ADMIN_TOKEN из CF Workers Variables">
+  </div>
+
+  <div class="card">
+    <label>Состояние backend</label>
+    <div class="row">
+      <button class="secondary" onclick="checkStatus()">/status</button>
+      <button class="secondary" onclick="checkCatalog()">/catalog (счётчики)</button>
+    </div>
+    <div class="status-row" id="status-box" style="display:none">
+      <div class="stat"><div class="stat-label">Версия</div><div class="stat-value" id="s-ver">—</div></div>
+      <div class="stat"><div class="stat-label">Бумаги в bond_daily</div><div class="stat-value" id="s-bonds">—</div></div>
+      <div class="stat"><div class="stat-label">Эмитенты в issuers</div><div class="stat-value" id="s-iss">—</div></div>
+      <div class="stat"><div class="stat-label">Акции в stock_daily</div><div class="stat-value" id="s-stocks">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Сбор данных (требует X-Admin-Token)</label>
+    <div class="row">
+      <button onclick="run('/collect/bonds')">📄 Облигации (TQCB+TQOB+TQIR+TQOD+TQOY+TQED)</button>
+      <button onclick="run('/collect/stock')">📈 Акции (TQBR)</button>
+      <button onclick="run('/collect/futures')">🔮 Фьючерсы (FORTS)</button>
+      <button onclick="run('/collect/issuers')">🏢 Справочник эмитентов</button>
+    </div>
+    <div class="sub" style="margin-top:12px">
+      Рекомендованный порядок при первом запуске: облигации → акции → справочник. Справочник
+      опирается на bond_daily и stock_daily, поэтому его лучше запускать последним.
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Лог</label>
+    <div class="log" id="log"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="secondary" onclick="document.getElementById('log').innerHTML=''">Очистить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const tokenEl = document.getElementById('token');
+const urlEl   = document.getElementById('url');
+tokenEl.value = localStorage.getItem('bondan_admin_token') || '';
+urlEl.value   = localStorage.getItem('bondan_url') || urlEl.value;
+tokenEl.addEventListener('change', () => localStorage.setItem('bondan_admin_token', tokenEl.value));
+urlEl  .addEventListener('change', () => localStorage.setItem('bondan_url',         urlEl.value));
+
+function logEntry(level, label, body){
+  const t = new Date().toLocaleTimeString('ru');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  const cls = level === 'ok' ? 'log-ok' : level === 'err' ? 'log-err' : 'log-info';
+  el.innerHTML = `<span class="log-time">${t}</span> <span class="${cls}">${label}</span>` +
+                 (body ? `<pre>${escape(body)}</pre>` : '');
+  const log = document.getElementById('log');
+  log.insertBefore(el, log.firstChild);
+}
+function escape(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function run(path){
+  const url   = urlEl.value.replace(/\/+$/, '');
+  const token = tokenEl.value.trim();
+  if(!token){ logEntry('err', 'Нет токена', 'Вставь X-Admin-Token в поле выше.'); return; }
+  logEntry('info', `POST ${path} …`, '');
+  const btns = document.querySelectorAll('button'); btns.forEach(b => b.disabled = true);
+  try {
+    const r = await fetch(url + path, { method: 'POST', headers: { 'X-Admin-Token': token } });
+    const text = await r.text();
+    let body = text;
+    try { body = JSON.stringify(JSON.parse(text), null, 2); } catch(_){}
+    if(r.ok) logEntry('ok',  `POST ${path} → ${r.status}`, body);
+    else     logEntry('err', `POST ${path} → ${r.status}`, body);
+  } catch(e){
+    logEntry('err', `POST ${path} → network`, e.message);
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+async function checkStatus(){
+  const url = urlEl.value.replace(/\/+$/, '');
+  logEntry('info', `GET /status …`, '');
+  try {
+    const r = await fetch(url + '/status');
+    const j = await r.json();
+    const box = document.getElementById('status-box');
+    box.style.display = 'grid';
+    document.getElementById('s-ver').innerHTML    = `<span class="ver">${j.version || '?'}</span>`;
+    document.getElementById('s-bonds').textContent = (j.db?.bond_daily_rows ?? '—').toLocaleString('ru');
+    document.getElementById('s-iss').textContent   = (j.db?.issuers_count   ?? 0).toLocaleString('ru');
+    document.getElementById('s-stocks').textContent= (j.db?.stock_daily_rows?? 0).toLocaleString('ru');
+    logEntry('ok', `GET /status → 200`, JSON.stringify(j, null, 2));
+  } catch(e){
+    logEntry('err', `GET /status`, e.message);
+  }
+}
+
+async function checkCatalog(){
+  const url = urlEl.value.replace(/\/+$/, '');
+  logEntry('info', `GET /catalog …`, '');
+  try {
+    const r = await fetch(url + '/catalog');
+    const j = await r.json();
+    const c = j.counts || {};
+    logEntry('ok', `GET /catalog → ${r.status}`,
+      `Эмитентов: ${c.issuers ?? '?'}\nОблигаций: ${c.bonds ?? '?'}\nАкций: ${c.stocks ?? '?'}\nСгенерирован: ${j.generatedAt || '?'}`);
+  } catch(e){
+    logEntry('err', `GET /catalog`, e.message);
+  }
+}
+
+// автозапрос статуса при загрузке
+checkStatus();
+</script>
+</body>
+</html>
