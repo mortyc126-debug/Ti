@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { searchCatalog, findIssuerByTicker } from '../lib/search.js';
+import { searchCatalog, findIssuerByTicker, subscribeCatalog } from '../lib/search.js';
 import { useWindows } from '../store/windows.js';
 
 // Глобальный поиск в шапке. Дебаунс 120мс, дропдаун с тремя группами
@@ -24,6 +24,11 @@ export default function SearchBar(){
     }, 120);
     return () => clearTimeout(t);
   }, [q]);
+
+  // когда каталог обновится с бэка — пересчитать текущие результаты
+  useEffect(() => subscribeCatalog(() => {
+    setResults(searchCatalog(q, 5));
+  }), [q]);
 
   // закрытие по клику вне дропдауна
   useEffect(() => {

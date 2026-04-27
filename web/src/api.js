@@ -29,4 +29,6 @@ export const api = {
   },
   bondHistory: (secid)       => req(`/bond/history?secid=${secid}`),
   bondIssuer: (inn)          => req(`/bond/issuer?inn=${inn}`),
+  catalog: ()                => req('/catalog'),
+  issuerCard: (inn)          => req(`/issuer/${encodeURIComponent(inn)}`),
 };

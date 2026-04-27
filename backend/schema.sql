@@ -116,3 +116,47 @@ CREATE INDEX IF NOT EXISTS idx_bond_offer   ON bond_daily(offer_date);
 CREATE INDEX IF NOT EXISTS idx_bond_inn     ON bond_daily(emitent_inn);
 CREATE INDEX IF NOT EXISTS idx_bond_status  ON bond_daily(status);
 CREATE INDEX IF NOT EXISTS idx_bond_yield   ON bond_daily(yield);
+
+-- ── Справочник эмитентов ──────────────────────────────────────────────
+-- Единая точка истины: ИНН ↔ имя ↔ тикер акции ↔ сектор ↔ ОКВЭД ↔ регион.
+-- Всё остальное (отчёты, события, связи, графики цен) ссылается сюда
+-- по inn. Источники: MOEX issuers + ГИР БО meta + e-disclosure cards.
+-- Обновляется кроном раз в неделю; ИНН — из bond_daily.emitent_inn,
+-- ОКВЭД и регион — из ГИР БО, тикер — из MOEX securities.
+CREATE TABLE IF NOT EXISTS issuers (
+  inn          TEXT PRIMARY KEY,         -- 7736050003
+  ogrn         TEXT,                     -- 1027700070518
+  name         TEXT,                     -- ПАО «Газпром»
+  short_name   TEXT,                     -- Газпром
+  ticker       TEXT,                     -- GAZP (если торгуется акцией)
+  isin_eq      TEXT,                     -- ISIN акции (RU0007661625)
+  sector       TEXT,                     -- наша 15-секторная классификация
+  okved        TEXT,                     -- 35.21
+  okved_name   TEXT,
+  region       TEXT,                     -- регион регистрации
+  country      TEXT,                     -- по умолчанию RU
+  founded      TEXT,                     -- год регистрации
+  bonds_count  INTEGER DEFAULT 0,        -- активных выпусков (денормализованный счётчик)
+  aliases      TEXT,                     -- JSON-массив дополнительных написаний
+                                         --   ["Газпром", "Gazprom", "ОАО Газпром"]
+  meta         TEXT,                     -- JSON, всё лишнее (telegram, сайт, ИКАО ...)
+  source       TEXT,                     -- 'moex' | 'girbo' | 'edisc' | 'manual'
+  updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_issuers_ticker ON issuers(ticker);
+CREATE INDEX IF NOT EXISTS idx_issuers_sector ON issuers(sector);
+CREATE INDEX IF NOT EXISTS idx_issuers_name   ON issuers(short_name);
+
+-- ── Известные ISIN/secid акций по ИНН ─────────────────────────────────
+-- Один эмитент может иметь несколько secid акций (обычная + префы:
+-- SBER + SBERP, TRMK + TRMKP). Issuers.ticker — основная (обычная);
+-- этот линкер — для всех.
+CREATE TABLE IF NOT EXISTS issuer_securities (
+  inn      TEXT NOT NULL,
+  secid    TEXT NOT NULL,                -- SBER, SBERP, GAZP
+  isin     TEXT,
+  kind     TEXT,                         -- 'common' | 'preferred' | 'depository_receipt'
+  board    TEXT,                         -- 'TQBR' | 'TQTF' | 'TQIF'
+  PRIMARY KEY (inn, secid)
+);
+CREATE INDEX IF NOT EXISTS idx_issec_secid ON issuer_securities(secid);

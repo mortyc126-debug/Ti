@@ -59,23 +59,26 @@ export default {
       if(url.pathname === '/bond/history')    return await handleBondHistory(env, url);
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
       if(url.pathname === '/catalog')         return await handleCatalog(env);
+      if(url.pathname.startsWith('/issuer/')) return await handleIssuerCard(env, url);
 
       if(req.method === 'POST'){
         // Все POST-эндпоинты требуют X-Admin-Token (используют квоту Cerebras
         // или пишут в БД — публиковать без авторизации опасно).
         const token = req.headers.get('X-Admin-Token') || '';
         if(!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) return errResp('unauthorized', 401);
-        if(url.pathname === '/collect/stock')   return jsonResp(await collectStocks(env));
-        if(url.pathname === '/collect/futures') return jsonResp(await collectFutures(env));
-        if(url.pathname === '/collect/bonds')   return jsonResp(await collectBonds(env));
-        if(url.pathname === '/ai/extract')      return await handleAiExtract(env, req);
+        if(url.pathname === '/collect/stock')    return jsonResp(await collectStocks(env));
+        if(url.pathname === '/collect/futures')  return jsonResp(await collectFutures(env));
+        if(url.pathname === '/collect/bonds')    return jsonResp(await collectBonds(env));
+        if(url.pathname === '/collect/issuers')  return jsonResp(await collectIssuers(env));
+        if(url.pathname === '/ai/extract')       return await handleAiExtract(env, req);
       }
 
       return errResp(
         'Not Found. Endpoints: /status, /stock/latest, /stock/history?secid=X, '
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
         + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
-        + '/catalog, POST /collect/{stock|futures|bonds}, POST /ai/extract',
+        + '/catalog, /issuer/:inn, '
+        + 'POST /collect/{stock|futures|bonds|issuers}, POST /ai/extract',
         404
       );
     } catch(e){
@@ -83,12 +86,17 @@ export default {
     }
   },
 
-  // Cron — ежедневный сбор всех досок.
+  // Cron — ежедневный сбор всех досок. Справочник эмитентов
+  // обновляем по понедельникам (новые ИНН/тикеры появляются медленно).
   async scheduled(event, env, ctx){
     ctx.waitUntil((async () => {
-      try { await collectStocks(env); }  catch(e){ console.error('cron stocks:',  e.message); }
-      try { await collectFutures(env); } catch(e){ console.error('cron futures:', e.message); }
-      try { await collectBonds(env); }   catch(e){ console.error('cron bonds:',   e.message); }
+      try { await collectStocks(env); }   catch(e){ console.error('cron stocks:',  e.message); }
+      try { await collectFutures(env); }  catch(e){ console.error('cron futures:', e.message); }
+      try { await collectBonds(env); }    catch(e){ console.error('cron bonds:',   e.message); }
+      const dow = new Date().getUTCDay(); // 0=Sun, 1=Mon
+      if(dow === 1){
+        try { await collectIssuers(env); } catch(e){ console.error('cron issuers:', e.message); }
+      }
     })());
   },
 };
@@ -96,26 +104,38 @@ export default {
 // ═══ Endpoints ════════════════════════════════════════════════════════════
 
 async function handleStatus(env){
-  // bond_daily может ещё не существовать при первом деплое v0.3 —
-  // оборачиваем в try-catch, чтобы /status оставался живым.
-  let bondCount = null, bondLatest = null, bondTqcb = null, bondTqob = null;
+  // Любая таблица может ещё не существовать при первом деплое —
+  // оборачиваем каждый блок в try/catch, чтобы /status оставался живым.
+  let bondStats = {};
   try {
-    const [rb, lb, tqcb, tqob] = await Promise.all([
+    const [rb, lb, byBoard] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as c FROM bond_daily').first(),
       env.DB.prepare('SELECT MAX(date) as d FROM bond_daily').first(),
-      env.DB.prepare("SELECT COUNT(DISTINCT secid) as c FROM bond_daily WHERE board = 'TQCB'").first(),
-      env.DB.prepare("SELECT COUNT(DISTINCT secid) as c FROM bond_daily WHERE board = 'TQOB'").first(),
+      env.DB.prepare("SELECT board, COUNT(DISTINCT secid) AS c FROM bond_daily GROUP BY board").all(),
     ]);
-    bondCount = rb?.c ?? 0;
-    bondLatest = lb?.d ?? null;
-    bondTqcb = tqcb?.c ?? 0;
-    bondTqob = tqob?.c ?? 0;
-  } catch(_){ /* таблицы ещё нет — миграция не запускалась */ }
+    bondStats = {
+      bond_daily_rows: rb?.c ?? 0,
+      bond_latest_date: lb?.d ?? null,
+      bond_unique_by_board: Object.fromEntries((byBoard.results || []).map(r => [r.board, r.c])),
+    };
+  } catch(_){}
+
+  let issuersStats = {};
+  try {
+    const [c, withTicker] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) as c FROM issuers').first(),
+      env.DB.prepare('SELECT COUNT(*) as c FROM issuers WHERE ticker IS NOT NULL').first(),
+    ]);
+    issuersStats = {
+      issuers_count: c?.c ?? 0,
+      issuers_with_ticker: withTicker?.c ?? 0,
+    };
+  } catch(_){}
 
   const [rowsStock, rowsFut, lastLog, latestStockDate, latestFutDate] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) as c FROM stock_daily').first(),
     env.DB.prepare('SELECT COUNT(*) as c FROM futures_daily').first(),
-    env.DB.prepare('SELECT * FROM collection_log ORDER BY started_at DESC LIMIT 5').all(),
+    env.DB.prepare('SELECT * FROM collection_log ORDER BY started_at DESC LIMIT 8').all(),
     env.DB.prepare('SELECT MAX(date) as d FROM stock_daily').first(),
     env.DB.prepare('SELECT MAX(date) as d FROM futures_daily').first(),
   ]);
@@ -126,14 +146,12 @@ async function handleStatus(env){
       stock_latest_date: latestStockDate?.d ?? null,
       futures_daily_rows: rowsFut?.c ?? 0,
       futures_latest_date: latestFutDate?.d ?? null,
-      bond_daily_rows: bondCount,
-      bond_latest_date: bondLatest,
-      bond_unique_tqcb: bondTqcb,
-      bond_unique_tqob: bondTqob,
+      ...bondStats,
+      ...issuersStats,
     },
     recent_runs: lastLog.results || [],
     cerebras_configured: !!env.CEREBRAS_API_KEY,
-    version: '0.4-pilot-cerebras',
+    version: '0.5-issuers',
   });
 }
 
@@ -348,40 +366,56 @@ async function handleBondIssuer(env, url){
 //
 // Собирает три плоских списка (компании, облигации, акции) из текущих
 // таблиц D1 — фронт грузит этот JSON один раз, индексирует через fuse.js
-// и фильтрует локально по ходу набора. Пока возвращаем сырой набор без
-// тикеров/секторов в issuers (этих полей у нас в bond_daily нет —
-// добавятся, когда появится отдельная таблица issuers).
+// и фильтрует локально по ходу набора. Источник эмитентов — таблица
+// issuers (если уже наполнена), иначе fallback на DISTINCT из bond_daily.
 
 async function handleCatalog(env){
   const today = new Date().toISOString().slice(0, 10);
   let issuers = [], bonds = [], stocks = [];
 
+  // эмитенты — пробуем сначала из справочника, иначе fallback
   try {
-    // живые эмитенты с активными выпусками
     const r = await env.DB.prepare(`
-      SELECT emitent_inn AS inn,
-             MAX(emitent_name) AS name,
-             COUNT(DISTINCT secid) AS bonds_count
-      FROM bond_daily
-      WHERE emitent_inn IS NOT NULL AND emitent_inn != ''
-        AND (mat_date IS NULL OR mat_date >= ?)
-        AND (status IS NULL OR status = 'A')
-      GROUP BY emitent_inn
-      ORDER BY name
-    `).bind(today).all();
-    issuers = r.results || [];
-  } catch(_){ /* таблицы может ещё не быть */ }
+      SELECT inn, short_name AS name, ticker, sector, bonds_count, aliases
+      FROM issuers
+      WHERE inn IS NOT NULL
+      ORDER BY short_name
+    `).all();
+    issuers = (r.results || []).map(x => ({
+      ...x,
+      aliases: x.aliases ? safeJsonParse(x.aliases, []) : null,
+    }));
+  } catch(_){}
+
+  // fallback — если справочник пустой, агрегируем уникальные ИНН из bond_daily
+  if(!issuers.length){
+    try {
+      const r = await env.DB.prepare(`
+        SELECT emitent_inn AS inn,
+               MAX(emitent_name) AS name,
+               COUNT(DISTINCT secid) AS bonds_count
+        FROM bond_daily
+        WHERE emitent_inn IS NOT NULL AND emitent_inn != ''
+          AND (mat_date IS NULL OR mat_date >= ?)
+          AND (status IS NULL OR status = 'A')
+        GROUP BY emitent_inn
+        ORDER BY name
+      `).bind(today).all();
+      issuers = r.results || [];
+    } catch(_){}
+  }
 
   try {
     // последний срез живых облигаций
     const r = await env.DB.prepare(`
-      SELECT s.secid AS isin,
+      SELECT s.secid       AS isin,
              s.emitent_inn AS issuerInn,
-             s.short_name AS name,
-             s.yield AS ytm,
-             s.coupon_rate AS coupon,
-             s.mat_date AS maturity,
-             s.board
+             s.shortname   AS name,
+             s.yield       AS ytm,
+             s.coupon_pct  AS coupon,
+             s.mat_date    AS maturity,
+             s.offer_date  AS offer,
+             s.board       AS board
       FROM bond_daily s
       INNER JOIN (
         SELECT secid, MAX(date) AS maxd FROM bond_daily GROUP BY secid
@@ -389,25 +423,33 @@ async function handleCatalog(env){
       WHERE (s.mat_date IS NULL OR s.mat_date >= ?)
         AND (s.status IS NULL OR s.status = 'A')
       ORDER BY COALESCE(s.volume_rub, 0) DESC
-      LIMIT 5000
+      LIMIT 8000
     `).bind(today).all();
     bonds = r.results || [];
   } catch(_){}
 
   try {
-    // последний срез акций — тикер, имя, цена, изменение
+    // последний срез акций — change_pct считаем из price/prev_close
     const r = await env.DB.prepare(`
-      SELECT s.secid AS ticker,
+      SELECT s.secid     AS ticker,
              s.shortname AS name,
-             s.last AS price,
-             s.lastchange_pct AS changePct
+             s.price     AS price,
+             s.prev_close AS prevClose,
+             s.volume_rub AS volumeRub
       FROM stock_daily s
       INNER JOIN (
         SELECT secid, MAX(date) AS maxd FROM stock_daily GROUP BY secid
       ) m ON s.secid = m.secid AND s.date = m.maxd
-      ORDER BY s.secid
+      ORDER BY COALESCE(s.volume_rub, 0) DESC
     `).all();
-    stocks = r.results || [];
+    stocks = (r.results || []).map(x => ({
+      ticker: x.ticker,
+      name: x.name,
+      price: x.price,
+      changePct: (x.price && x.prevClose)
+        ? Number((((x.price - x.prevClose) / x.prevClose) * 100).toFixed(2))
+        : null,
+    }));
   } catch(_){}
 
   return new Response(JSON.stringify({
@@ -418,11 +460,84 @@ async function handleCatalog(env){
     status: 200,
     headers: {
       ...JSON_HEADERS,
-      // каталог обновляется кроном раз в сутки — браузер может
-      // спокойно держать его в кеше час-два
       'Cache-Control': 'public, max-age=3600, s-maxage=3600',
     },
   });
+}
+
+function safeJsonParse(s, fallback){
+  try { return JSON.parse(s); } catch(_) { return fallback; }
+}
+
+// Карточка одного эмитента: справочные данные + активные выпуски +
+// тикер акции, если есть. Используется фронтом при открытии Medium-окна.
+async function handleIssuerCard(env, url){
+  const inn = url.pathname.replace('/issuer/', '').split('/')[0];
+  if(!inn || !/^\d{10,12}$/.test(inn)) return errResp('inn required, 10-12 digits, e.g. /issuer/7736050003');
+  const today = new Date().toISOString().slice(0, 10);
+
+  // справочные данные
+  let issuer = null;
+  try {
+    const r = await env.DB.prepare('SELECT * FROM issuers WHERE inn = ?').bind(inn).first();
+    if(r){
+      issuer = { ...r, aliases: r.aliases ? safeJsonParse(r.aliases, null) : null };
+    }
+  } catch(_){}
+
+  // имя из bond_daily — на случай если справочник ещё не наполнен
+  if(!issuer){
+    try {
+      const r = await env.DB.prepare(
+        'SELECT MAX(emitent_name) AS name FROM bond_daily WHERE emitent_inn = ?'
+      ).bind(inn).first();
+      if(r?.name) issuer = { inn, name: r.name, short_name: shortenIssuerName(r.name) };
+    } catch(_){}
+  }
+
+  // активные облигации
+  let bonds = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT s.secid, s.shortname, s.board, s.yield, s.coupon_pct, s.price,
+             s.mat_date, s.offer_date, s.face_value, s.face_unit, s.list_level
+      FROM bond_daily s
+      INNER JOIN (
+        SELECT secid, MAX(date) AS maxd FROM bond_daily GROUP BY secid
+      ) m ON s.secid = m.secid AND s.date = m.maxd
+      WHERE s.emitent_inn = ?
+        AND (s.mat_date IS NULL OR s.mat_date >= ?)
+        AND (s.status IS NULL OR s.status = 'A')
+      ORDER BY s.mat_date ASC
+    `).bind(inn, today).all();
+    bonds = r.results || [];
+  } catch(_){}
+
+  // последняя цена акции по тикеру из справочника
+  let stock = null;
+  if(issuer?.ticker){
+    try {
+      const r = await env.DB.prepare(`
+        SELECT s.secid AS ticker, s.shortname, s.price, s.prev_close, s.volume_rub, s.date
+        FROM stock_daily s
+        INNER JOIN (
+          SELECT secid, MAX(date) AS maxd FROM stock_daily GROUP BY secid
+        ) m ON s.secid = m.secid AND s.date = m.maxd
+        WHERE s.secid = ?
+      `).bind(issuer.ticker).first();
+      if(r){
+        stock = {
+          ...r,
+          changePct: (r.price && r.prev_close)
+            ? Number((((r.price - r.prev_close) / r.prev_close) * 100).toFixed(2))
+            : null,
+        };
+      }
+    } catch(_){}
+  }
+
+  if(!issuer && !bonds.length) return errResp('issuer not found', 404);
+  return jsonResp({ issuer, bonds, stock, generatedAt: new Date().toISOString() });
 }
 
 // ═══ Endpoints: AI-экстракция через Cerebras ══════════════════════════════
@@ -735,11 +850,14 @@ async function collectBonds(env){
       updated_at=excluded.updated_at
   `;
 
-  for(const board of ['TQCB', 'TQOB']){
+  // TQCB корпораты (рубль), TQOB ОФЗ, TQIR валютные корпораты, TQOD юань,
+  // TQOY юаневые суверены, TQED евробонды. Все эти доски парсятся
+  // одной и той же функцией parseBondPage — поля одинаковые.
+  for(const board of ['TQCB', 'TQOB', 'TQIR', 'TQOD', 'TQOY', 'TQED']){
     let start = 0;
     let pages = 0;
     const PAGE = 500;
-    const MAX_PAGES = 8; // защита от бесконечной пагинации, ~4000 бумаг хватит
+    const MAX_PAGES = 8; // защита от бесконечной пагинации, ~4000 бумаг на доску
     try {
       while(pages < MAX_PAGES){
         const url = `${base}/iss/engines/stock/markets/bonds/boards/${board}/securities.json`
@@ -780,6 +898,117 @@ async function collectBonds(env){
 
   await logRun(env, startedAt, 'moex_bonds', rowsWritten, errors, Date.now() - t0);
   return { source: 'moex_bonds', rowsWritten, errors, duration_ms: Date.now() - t0 };
+}
+
+// Сбор справочника эмитентов. Берём все ИНН, которые когда-либо
+// упоминались в bond_daily, дополняем тем что знаем сами (имя из
+// bond_daily, сектор пока пустой — в следующем коммите подтянем
+// ОКВЭД из ГИР БО), пытаемся подбить тикер акции через MOEX
+// issuer-card. Запускается раз в неделю — справочник меняется
+// медленно (новые ИНН — это IPO/новые эмиссии).
+async function collectIssuers(env){
+  const startedAt = new Date().toISOString();
+  const t0 = Date.now();
+  const base = env.MOEX_BASE || 'https://iss.moex.com';
+  const now = new Date().toISOString();
+  let rowsWritten = 0;
+  const errors = [];
+
+  // 1. Все живые ИНН из bond_daily с актуальными именами
+  let raw = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT emitent_inn AS inn,
+             MAX(emitent_name) AS name,
+             COUNT(DISTINCT secid) AS bonds_count
+      FROM bond_daily
+      WHERE emitent_inn IS NOT NULL AND emitent_inn != ''
+      GROUP BY emitent_inn
+    `).all();
+    raw = r.results || [];
+  } catch(e){ errors.push('select inns: ' + e.message); }
+
+  // 2. Подтянем тикеры акций: MOEX TQBR — последний срез stock_daily
+  //    плюс попытка матчить по INN через MOEX `/iss/securities.json`
+  //    (поиск по эмитенту), но это медленно, поэтому делаем минимум:
+  //    matching по «самой узнаваемой подстроке» имени из bond_daily.
+  //    Точнее обогатим при следующих проходах.
+  let stockMap = {}; // shortname-prefix → ticker
+  try {
+    const r = await env.DB.prepare(`
+      SELECT s.secid AS ticker, s.shortname AS name
+      FROM stock_daily s
+      INNER JOIN (
+        SELECT secid, MAX(date) AS maxd FROM stock_daily GROUP BY secid
+      ) m ON s.secid = m.secid AND s.date = m.maxd
+    `).all();
+    for(const row of (r.results || [])){
+      if(!row.ticker || !row.name) continue;
+      // нормализуем — короткое имя, нижний регистр, без префиксов
+      const key = normalizeIssuerName(row.name);
+      if(key && !stockMap[key]) stockMap[key] = row.ticker;
+    }
+  } catch(e){ errors.push('stocks for ticker matching: ' + e.message); }
+
+  // 3. Пишем справочник, не затирая ручные правки (поля sector/okved/aliases
+  //    обновляем только если они NULL — иначе уважаем существующее).
+  const upsertSql = `
+    INSERT INTO issuers (
+      inn, name, short_name, ticker, bonds_count, source, updated_at
+    ) VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(inn) DO UPDATE SET
+      name        = excluded.name,
+      short_name  = excluded.short_name,
+      bonds_count = excluded.bonds_count,
+      ticker      = COALESCE(issuers.ticker, excluded.ticker),
+      source      = COALESCE(issuers.source, excluded.source),
+      updated_at  = excluded.updated_at
+  `;
+  const stmts = [];
+  for(const row of raw){
+    if(!row.inn) continue;
+    const fullName  = row.name || '';
+    const shortName = shortenIssuerName(fullName);
+    const matchKey  = normalizeIssuerName(shortName);
+    const ticker    = stockMap[matchKey] || null;
+    stmts.push(env.DB.prepare(upsertSql).bind(
+      row.inn, fullName, shortName, ticker, row.bonds_count || 0, 'moex', now
+    ));
+  }
+  if(stmts.length){
+    try {
+      const results = await env.DB.batch(stmts);
+      rowsWritten = results.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
+    } catch(e){ errors.push('batch upsert: ' + e.message); }
+  }
+
+  await logRun(env, startedAt, 'issuers', rowsWritten, errors, Date.now() - t0);
+  return { source: 'issuers', rowsWritten, errors, scanned: raw.length, duration_ms: Date.now() - t0 };
+}
+
+// Сократить имя: убрать ОПФ-префиксы и лишние «‎» — для дисплея и
+// для матчинга со стоковым тикером.
+function shortenIssuerName(name){
+  if(!name) return '';
+  let s = String(name).trim();
+  // ОПФ-префиксы вначале
+  s = s.replace(/^(публичное\s+акционерное\s+общество|открытое\s+акционерное\s+общество|закрытое\s+акционерное\s+общество|акционерное\s+общество|общество\s+с\s+ограниченной\s+ответственностью|пао|оао|зао|ао|ооо)\s+/i, '');
+  // кавычки вокруг названия
+  s = s.replace(/^[«"']+|[»"']+$/g, '').trim();
+  return s || name;
+}
+
+// Нормализация для матчинга: нижний регистр, только буквы/цифры,
+// первые два слова достаточно. «ПАО Газпром» и «GAZP — Газпром»
+// сводятся к одному ключу.
+function normalizeIssuerName(name){
+  if(!name) return '';
+  return shortenIssuerName(name)
+    .toLowerCase()
+    .replace(/[^a-zа-я0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ').slice(0, 2).join(' ');
 }
 
 async function logRun(env, startedAt, source, rowsWritten, errors, durationMs){
