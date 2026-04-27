@@ -160,3 +160,61 @@ CREATE TABLE IF NOT EXISTS issuer_securities (
   PRIMARY KEY (inn, secid)
 );
 CREATE INDEX IF NOT EXISTS idx_issec_secid ON issuer_securities(secid);
+
+-- ── Финансовая отчётность эмитентов (РСБУ из ГИР БО) ──────────────────
+-- Одна строка = (ИНН, год, тип отчётности). Значения хранятся в МЛРД ₽
+-- (внутренняя единица БондАналитика). Источник по умолчанию — ГИР БО,
+-- но схема готова и для аудит-it / e-disclosure / ручного ввода.
+--
+-- Зачем именно длинные колонки, а не JSON: SQL-агрегации (медианы по
+-- отрасли, ранжирование, топ-N по EBITDA-марже) гораздо быстрее идут по
+-- столбцам. Все 13 наших коротких метрик (rev/ebitda/ebit/np/...) +
+-- сырые строки ГИР БО (на случай если понадобится восстановить
+-- расчёт) ложатся в одну строку.
+CREATE TABLE IF NOT EXISTS issuer_reports (
+  inn          TEXT NOT NULL,           -- ИНН эмитента, FK на issuers
+  fy_year      INTEGER NOT NULL,        -- финансовый год (например 2024)
+  period       TEXT NOT NULL DEFAULT 'FY', -- 'FY' | 'H1' | '9M' | 'Q1' | 'Q3'
+  std          TEXT NOT NULL DEFAULT 'РСБУ', -- 'РСБУ' | 'МСФО'
+  -- Все суммы в МЛРД ₽
+  rev          REAL,                    -- Выручка (стр. 2110)
+  ebitda       REAL,                    -- EBITDA (расчётная)
+  ebit         REAL,                    -- Операц. прибыль (стр. 2200)
+  np           REAL,                    -- Чистая прибыль (стр. 2400)
+  int_exp      REAL,                    -- Процентные расходы (стр. 2330, по модулю)
+  tax_exp      REAL,                    -- Налог на прибыль (стр. 2410)
+  assets       REAL,                    -- Всего активов (стр. 1600)
+  ca           REAL,                    -- Оборотные активы (стр. 1200)
+  cl           REAL,                    -- Краткосрочные обязательства (стр. 1500)
+  debt         REAL,                    -- Общий долг (стр. 1410+1510)
+  cash         REAL,                    -- Денежные средства (стр. 1250)
+  ret          REAL,                    -- Нераспределённая прибыль (стр. 1370)
+  eq           REAL,                    -- Собственный капитал (стр. 1300)
+  -- Производные коэффициенты (заполняются триггером или коллектором)
+  roa_pct      REAL,                    -- np / assets × 100
+  ros_pct      REAL,                    -- np / rev × 100
+  ebitda_marg  REAL,                    -- ebitda / rev × 100
+  net_debt_eq  REAL,                    -- (debt - cash) / eq
+  -- Метаданные
+  source       TEXT NOT NULL DEFAULT 'girbo', -- 'girbo' | 'audit-it' | 'edisc' | 'manual'
+  raw          TEXT,                    -- сырой JSON ГИР БО (current<code>) — для дебага
+  fetched_at   TEXT NOT NULL,
+  PRIMARY KEY (inn, fy_year, period, std)
+);
+CREATE INDEX IF NOT EXISTS idx_reports_inn   ON issuer_reports(inn);
+CREATE INDEX IF NOT EXISTS idx_reports_year  ON issuer_reports(fy_year);
+CREATE INDEX IF NOT EXISTS idx_reports_fetch ON issuer_reports(fetched_at);
+
+-- Очередь сбора отчётности. Используется коллектором collectReports
+-- чтобы не дёргать ГИР БО для одних и тех же ИНН на каждом запуске,
+-- а равномерно проходить весь список эмитентов раз в N дней.
+CREATE TABLE IF NOT EXISTS reports_queue (
+  inn            TEXT PRIMARY KEY,
+  last_attempt   TEXT,                  -- когда последний раз пытались
+  last_success   TEXT,                  -- когда последний раз успешно
+  attempts       INTEGER DEFAULT 0,     -- неудачных попыток подряд
+  last_error     TEXT,
+  next_due       TEXT,                  -- когда снова можно дёрнуть
+  priority       INTEGER DEFAULT 0      -- 0 = обычный, выше = чаще
+);
+CREATE INDEX IF NOT EXISTS idx_queue_due ON reports_queue(next_due);

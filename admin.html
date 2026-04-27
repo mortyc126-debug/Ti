@@ -72,6 +72,10 @@
       <div class="stat"><div class="stat-label">Бумаги в bond_daily</div><div class="stat-value" id="s-bonds">—</div></div>
       <div class="stat"><div class="stat-label">Эмитенты в issuers</div><div class="stat-value" id="s-iss">—</div></div>
       <div class="stat"><div class="stat-label">Акции в stock_daily</div><div class="stat-value" id="s-stocks">—</div></div>
+      <div class="stat"><div class="stat-label">Бумаги с ИНН (сегодня)</div><div class="stat-value" id="s-binn">—</div></div>
+      <div class="stat"><div class="stat-label">Отчёты (issuer_reports)</div><div class="stat-value" id="s-rep">—</div></div>
+      <div class="stat"><div class="stat-label">Эмитентов с отчётностью</div><div class="stat-value" id="s-repiss">—</div></div>
+      <div class="stat"><div class="stat-label">В очереди ГИР БО</div><div class="stat-value" id="s-q">—</div></div>
     </div>
   </div>
 
@@ -81,11 +85,17 @@
       <button onclick="run('/collect/bonds')">📄 Облигации (TQCB+TQOB+TQIR+TQOD+TQOY+TQED)</button>
       <button onclick="run('/collect/stock')">📈 Акции (TQBR)</button>
       <button onclick="run('/collect/futures')">🔮 Фьючерсы (FORTS)</button>
-      <button onclick="run('/collect/issuers')">🏢 Справочник эмитентов</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button onclick="run('/collect/issuers')">🏢 Справочник + ИНН в bond_daily</button>
+      <button onclick="run('/collect/reports?limit=10')">📊 Отчётность ГИР БО · 10 ИНН</button>
+      <button onclick="run('/collect/reports?limit=30')">📊 Отчётность ГИР БО · 30 ИНН</button>
     </div>
     <div class="sub" style="margin-top:12px">
-      Рекомендованный порядок при первом запуске: облигации → акции → справочник. Справочник
-      опирается на bond_daily и stock_daily, поэтому его лучше запускать последним.
+      Порядок при первом запуске: <b>облигации → акции → справочник → отчётность</b>.
+      Справочник тянет MOEX bulk и заполняет <code>emitent_inn</code> в bond_daily — без него
+      ничего не показывается. Отчётность тянет ГИР БО (~7 запросов на ИНН), за один раз
+      берёт следующие N ИНН из очереди — на free tier разумно по 10, на paid — до 30.
     </div>
   </div>
 
@@ -150,6 +160,10 @@ async function checkStatus(){
     document.getElementById('s-bonds').textContent = (j.db?.bond_daily_rows ?? '—').toLocaleString('ru');
     document.getElementById('s-iss').textContent   = (j.db?.issuers_count   ?? 0).toLocaleString('ru');
     document.getElementById('s-stocks').textContent= (j.db?.stock_daily_rows?? 0).toLocaleString('ru');
+    document.getElementById('s-binn').textContent  = (j.db?.bonds_with_inn_today ?? 0).toLocaleString('ru');
+    document.getElementById('s-rep').textContent   = (j.db?.reports_rows ?? 0).toLocaleString('ru');
+    document.getElementById('s-repiss').textContent= (j.db?.reports_issuers_covered ?? 0).toLocaleString('ru');
+    document.getElementById('s-q').textContent     = (j.db?.reports_queue_pending ?? 0).toLocaleString('ru');
     logEntry('ok', `GET /status → 200`, JSON.stringify(j, null, 2));
   } catch(e){
     logEntry('err', `GET /status`, e.message);

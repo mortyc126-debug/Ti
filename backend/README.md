@@ -136,20 +136,75 @@ curl -X POST -H "X-Admin-Token: ВАШ_ТОКЕН" \
 - `GET /basis/history?asset=SBER&from=2020-01-01` — временной ряд для
   построения графика basis_pct за всё накопленное.
 
+### Эмитенты и отчётность
+
+- `GET /catalog` — единый каталог `{issuers, bonds, stocks}` для фронта.
+- `GET /issuer/{inn}` — карточка эмитента: справочник + активные
+  выпуски + последняя цена акции + последние 5 годовых РСБУ-периодов.
+- `GET /issuer/{inn}/reports` — все накопленные годовые отчёты
+  (rev/ebitda/np/assets/debt/eq + ROA/ROS/EBITDA-маржа/Net Debt-Eq).
+- `GET /reports/latest?limit=50` — что обновили за последний прогон
+  (для витрины «свежие данные ФНС» на главной).
+
 ### Ручной запуск
 
 - `POST /collect/stock` — запросить TQBR прямо сейчас.
 - `POST /collect/futures` — FORTS.
-- Оба требуют заголовок `X-Admin-Token: <ваш секрет>`.
+- `POST /collect/bonds` — все облигационные доски за раз.
+- `POST /collect/issuers` — справочник эмитентов + критическое:
+  заполняет `bond_daily.emitent_inn` и `emitent_name` через bulk-API
+  MOEX (`/iss/securities.json?engine=stock&market=bonds`). Без этого
+  шага в каталоге **0 эмитентов** даже при заполненном bond_daily —
+  per-board endpoint MOEX этих полей не отдаёт. Запускается ежедневно.
+- `POST /collect/reports?limit=N` — для следующих N эмитентов из
+  очереди `reports_queue` тянет ГИР БО (bo.nalog.gov.ru): поиск по
+  ИНН → список годовых отчётов → balance + financial_result. Пишет
+  результаты в `issuer_reports`. На free tier safe-значения N=10..15
+  (50 subrequest на cron-вызов, ~7 запросов на ИНН), на paid — до 30.
+  Очередь автоматически перепланирует ИНН на +30 дней при успехе и
+  на +7 дней при ошибке.
+
+Все требуют заголовок `X-Admin-Token: <ваш секрет>`. Удобный UI —
+`admin.html` в корне репо (открывается напрямую через githack).
 
 ## Cron
 
 Каждое утро в 10:30 по Москве (07:30 UTC) Worker автоматически:
 1. Тянет TQBR → пишет в `stock_daily` (UPSERT).
 2. Тянет FORTS → пишет в `futures_daily` (UPSERT).
-3. Логирует оба запуска в `collection_log`.
+3. Тянет облигационные доски → пишет в `bond_daily` (UPSERT).
+4. **Обогащает эмитентов** (collectIssuers): bulk MOEX +
+   `/iss/emitters/{id}` для top-40 → справочник `issuers` и
+   `bond_daily.emitent_inn`. Раньше запускался по понедельникам и
+   фейлился (per-board endpoint без INN), теперь правильный bulk и
+   ежедневно.
+5. По понедельникам — `collectReports(limit=50)`: следующие 50 ИНН
+   из очереди в ГИР БО.
 
-Проверить что cron сработал: `GET /status`, смотреть `recent_runs[0]`.
+Проверить что cron сработал: `GET /status`, смотреть `recent_runs[0]`
+и поля `db.bonds_with_inn_today`, `db.reports_rows`.
+
+## Миграция схемы при апгрейде
+
+Новые таблицы (`issuer_reports`, `reports_queue`) появляются только
+после повторного запуска `wrangler d1 execute … --file=schema.sql`.
+Идемпотентно (`CREATE TABLE IF NOT EXISTS`), безопасно гонять на
+действующей БД:
+
+```sh
+npx wrangler d1 execute bondan-db --file=backend/schema.sql --remote
+```
+
+После этого первый ручной прогон сборщиков:
+
+```sh
+# 1. Заполнить ИНН в bond_daily и справочник:
+curl -X POST -H "X-Admin-Token: $TOKEN" .../collect/issuers
+# 2. Подтянуть отчётность для топ-30 эмитентов:
+curl -X POST -H "X-Admin-Token: $TOKEN" '.../collect/reports?limit=30'
+```
+
+Дальше очередь сама будет добирать ИНН порциями через еженедельный cron.
 
 ## Дальше
 

@@ -1,9 +1,9 @@
 // Cloudflare Worker — бэкенд БондАналитика.
 //
-// Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB корпораты,
-// TQOB ОФЗ). На этом стенде строится basis для акций и spread-to-OFZ
-// для бондов. Дополнительно — Cerebras-парсер для извлечения структуры
-// из текстов отчётов / новостей / раскрытий.
+// Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
+// + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
+// эмитентов из ГИР БО (bo.nalog.gov.ru). Дополнительно — Cerebras-парсер
+// для извлечения структуры из текстов отчётов / новостей / раскрытий.
 //
 // Endpoints:
 //   GET  /status                       диагностика БД
@@ -17,13 +17,21 @@
 //                    &inn=&issuer=     фильтры по эмитенту
 //   GET  /bond/history?secid=X         история одной облигации
 //   GET  /bond/issuer?inn=X            все живые бумаги одного эмитента
+//   GET  /issuer/:inn                  карточка эмитента (имя, бумаги, акция)
+//   GET  /issuer/:inn/reports          годовые РСБУ-показатели из ГИР БО
+//   GET  /reports/latest?limit=N       свежие отчёты у эмитентов
 //   POST /ai/extract                   извлечение структуры из текста
 //                                      (X-Admin-Token, body: {text, schema, hints?})
 //   POST /collect/stock                ручной сбор акций (X-Admin-Token)
 //   POST /collect/futures              ручной сбор фьючерсов
 //   POST /collect/bonds                ручной сбор облигаций
+//   POST /collect/issuers              справочник эмитентов: bulk-обогащение
+//                                      bond_daily.emitent_inn + issuers
+//   POST /collect/reports?limit=20     РСБУ-показатели из ГИР БО для
+//                                      следующих N эмитентов в очереди
 //
-// Cron: 30 7 * * * (10:30 MSK) — собирает все три доски за раз.
+// Cron: 30 7 * * * (10:30 MSK) — стандартный сбор досок и обогащение
+// эмитентов; раз в сутки также подтягивает по 50 ИНН из reports_queue.
 //
 // Basis = futures.price_rub - stock.price × lot_size
 // В процентах: basis_pct = basis / (stock.price × lot_size) × 100
@@ -59,7 +67,13 @@ export default {
       if(url.pathname === '/bond/history')    return await handleBondHistory(env, url);
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
       if(url.pathname === '/catalog')         return await handleCatalog(env);
-      if(url.pathname.startsWith('/issuer/')) return await handleIssuerCard(env, url);
+      if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
+      if(url.pathname.startsWith('/issuer/')){
+        // /issuer/:inn        — карточка
+        // /issuer/:inn/reports — годовые РСБУ-показатели
+        if(url.pathname.endsWith('/reports')) return await handleIssuerReports(env, url);
+        return await handleIssuerCard(env, url);
+      }
 
       if(req.method === 'POST'){
         // Все POST-эндпоинты требуют X-Admin-Token (используют квоту Cerebras
@@ -69,7 +83,8 @@ export default {
         if(url.pathname === '/collect/stock')    return jsonResp(await collectStocks(env));
         if(url.pathname === '/collect/futures')  return jsonResp(await collectFutures(env));
         if(url.pathname === '/collect/bonds')    return jsonResp(await collectBonds(env));
-        if(url.pathname === '/collect/issuers')  return jsonResp(await collectIssuers(env));
+        if(url.pathname === '/collect/issuers')  return jsonResp(await collectIssuers(env, url));
+        if(url.pathname === '/collect/reports')  return jsonResp(await collectReports(env, url));
         if(url.pathname === '/ai/extract')       return await handleAiExtract(env, req);
       }
 
@@ -77,8 +92,8 @@ export default {
         'Not Found. Endpoints: /status, /stock/latest, /stock/history?secid=X, '
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
         + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
-        + '/catalog, /issuer/:inn, '
-        + 'POST /collect/{stock|futures|bonds|issuers}, POST /ai/extract',
+        + '/catalog, /issuer/:inn, /issuer/:inn/reports, /reports/latest, '
+        + 'POST /collect/{stock|futures|bonds|issuers|reports}, POST /ai/extract',
         404
       );
     } catch(e){
@@ -86,16 +101,25 @@ export default {
     }
   },
 
-  // Cron — ежедневный сбор всех досок. Справочник эмитентов
-  // обновляем по понедельникам (новые ИНН/тикеры появляются медленно).
+  // Cron — ежедневный сбор. Доски TQBR/FORTS/bonds — каждый день, плюс
+  // обогащение справочника эмитентов (collectIssuers — bulk MOEX,
+  // быстрый, без квоты ФНС). По понедельникам — догрузка отчётности
+  // ГИР БО (REPORTS_BATCH = 50 эмитентов за раз, остальные подтянутся
+  // в следующие недели через очередь reports_queue).
   async scheduled(event, env, ctx){
     ctx.waitUntil((async () => {
       try { await collectStocks(env); }   catch(e){ console.error('cron stocks:',  e.message); }
       try { await collectFutures(env); }  catch(e){ console.error('cron futures:', e.message); }
       try { await collectBonds(env); }    catch(e){ console.error('cron bonds:',   e.message); }
+      // Эмитентов обогащаем каждый день — bulk-вызов MOEX дешёвый,
+      // а без него bond_daily.emitent_inn остаётся пустым и ничего
+      // не показывается в каталоге.
+      try { await collectIssuers(env); }  catch(e){ console.error('cron issuers:', e.message); }
       const dow = new Date().getUTCDay(); // 0=Sun, 1=Mon
       if(dow === 1){
-        try { await collectIssuers(env); } catch(e){ console.error('cron issuers:', e.message); }
+        try {
+          await collectReports(env, new URL('https://x/?limit=50'));
+        } catch(e){ console.error('cron reports:', e.message); }
       }
     })());
   },
@@ -122,13 +146,32 @@ async function handleStatus(env){
 
   let issuersStats = {};
   try {
-    const [c, withTicker] = await Promise.all([
+    const [c, withTicker, withInn] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as c FROM issuers').first(),
       env.DB.prepare('SELECT COUNT(*) as c FROM issuers WHERE ticker IS NOT NULL').first(),
+      env.DB.prepare("SELECT COUNT(*) as c FROM bond_daily WHERE date = (SELECT MAX(date) FROM bond_daily) AND emitent_inn IS NOT NULL AND emitent_inn != ''").first(),
     ]);
     issuersStats = {
       issuers_count: c?.c ?? 0,
       issuers_with_ticker: withTicker?.c ?? 0,
+      bonds_with_inn_today: withInn?.c ?? 0,
+    };
+  } catch(_){}
+
+  // Статистика по отчётности: сколько ИНН покрыто, последние fetched_at.
+  let reportsStats = {};
+  try {
+    const [rRows, rIssuers, rRecent, qPending] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) as c FROM issuer_reports').first(),
+      env.DB.prepare('SELECT COUNT(DISTINCT inn) as c FROM issuer_reports').first(),
+      env.DB.prepare('SELECT MAX(fetched_at) as t FROM issuer_reports').first(),
+      env.DB.prepare("SELECT COUNT(*) as c FROM reports_queue WHERE last_success IS NULL OR last_success < datetime('now', '-30 days')").first(),
+    ]);
+    reportsStats = {
+      reports_rows: rRows?.c ?? 0,
+      reports_issuers_covered: rIssuers?.c ?? 0,
+      reports_last_fetched: rRecent?.t ?? null,
+      reports_queue_pending: qPending?.c ?? 0,
     };
   } catch(_){}
 
@@ -148,10 +191,11 @@ async function handleStatus(env){
       futures_latest_date: latestFutDate?.d ?? null,
       ...bondStats,
       ...issuersStats,
+      ...reportsStats,
     },
     recent_runs: lastLog.results || [],
     cerebras_configured: !!env.CEREBRAS_API_KEY,
-    version: '0.5-issuers',
+    version: '0.6-reports',
   });
 }
 
@@ -537,7 +581,25 @@ async function handleIssuerCard(env, url){
   }
 
   if(!issuer && !bonds.length) return errResp('issuer not found', 404);
-  return jsonResp({ issuer, bonds, stock, generatedAt: new Date().toISOString() });
+
+  // Последние 3 года РСБУ-показателей из issuer_reports — чтобы фронт
+  // мог в одном запросе показать «выручка / прибыль / долг» под именем.
+  let reports = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT fy_year, period, std, rev, ebitda, ebit, np,
+             assets, debt, cash, eq,
+             roa_pct, ros_pct, ebitda_marg, net_debt_eq,
+             source, fetched_at
+      FROM issuer_reports
+      WHERE inn = ?
+      ORDER BY fy_year DESC
+      LIMIT 5
+    `).bind(inn).all();
+    reports = r.results || [];
+  } catch(_){}
+
+  return jsonResp({ issuer, bonds, stock, reports, generatedAt: new Date().toISOString() });
 }
 
 // ═══ Endpoints: AI-экстракция через Cerebras ══════════════════════════════
@@ -900,40 +962,136 @@ async function collectBonds(env){
   return { source: 'moex_bonds', rowsWritten, errors, duration_ms: Date.now() - t0 };
 }
 
-// Сбор справочника эмитентов. Берём все ИНН, которые когда-либо
-// упоминались в bond_daily, дополняем тем что знаем сами (имя из
-// bond_daily, сектор пока пустой — в следующем коммите подтянем
-// ОКВЭД из ГИР БО), пытаемся подбить тикер акции через MOEX
-// issuer-card. Запускается раз в неделю — справочник меняется
-// медленно (новые ИНН — это IPO/новые эмиссии).
-async function collectIssuers(env){
+// Сбор справочника эмитентов и обогащение bond_daily ИННами.
+//
+// Корень проблемы: per-board endpoint `/iss/engines/.../boards/{board}/securities.json`
+// НЕ возвращает поля EMITENT_TITLE / EMITENT_INN — там только LATNAME
+// (латиницей) и базовая статика выпуска. Без INN мы не можем ни группировать
+// бумаги по эмитенту, ни сверять с reportsDB, ни искать в каталоге.
+//
+// Правильный источник — bulk `/iss/securities.json?engine=stock&market=bonds&iss.only=securities`.
+// Он отдаёт по 100 строк на страницу с колонками emitent_id/emitent_title/
+// emitent_inn/emitent_okpo. Активных бумаг ~6000, итого ~60 страниц = ~60
+// subrequest'ов на запуск. Free tier CF Workers — 50 subrequest на cron,
+// поэтому MAX_PAGES = 60 (в crone у Unbound лимит существенно выше; на
+// free tier лишние страницы упадут, но первая партия пройдёт).
+//
+// Что делаем:
+//   1. Идём страницами по bulk-endpoint, собираем секмапу secid → emitter.
+//   2. Одной транзакцией обновляем bond_daily.{emitent_inn, emitent_name}
+//      для последнего среза (date = MAX(date)). Старые срезы не трогаем —
+//      история торговых данных не должна задним числом меняться.
+//   3. Из этой же выборки собираем уникальных emitter_id и подтягиваем
+//      OGRN/полный INN/legal address из /iss/emitters/{id}.json — но
+//      только для top-N по числу выпусков (чтобы не сжечь subrequest'ы).
+//   4. Upsert'им issuers с актуальными bonds_count.
+//
+// Запускается ежедневно cron'ом — без него каталог пустой.
+async function collectIssuers(env, url){
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
   const base = env.MOEX_BASE || 'https://iss.moex.com';
   const now = new Date().toISOString();
+  const today = new Date().toISOString().slice(0, 10);
   let rowsWritten = 0;
   const errors = [];
 
-  // 1. Все живые ИНН из bond_daily с актуальными именами
-  let raw = [];
-  try {
-    const r = await env.DB.prepare(`
-      SELECT emitent_inn AS inn,
-             MAX(emitent_name) AS name,
-             COUNT(DISTINCT secid) AS bonds_count
-      FROM bond_daily
-      WHERE emitent_inn IS NOT NULL AND emitent_inn != ''
-      GROUP BY emitent_inn
-    `).all();
-    raw = r.results || [];
-  } catch(e){ errors.push('select inns: ' + e.message); }
+  const maxPages   = parseInt(url?.searchParams?.get('max_pages') || '60', 10);
+  const cardLimit  = parseInt(url?.searchParams?.get('cards')     || '40', 10);
 
-  // 2. Подтянем тикеры акций: MOEX TQBR — последний срез stock_daily
-  //    плюс попытка матчить по INN через MOEX `/iss/securities.json`
-  //    (поиск по эмитенту), но это медленно, поэтому делаем минимум:
-  //    matching по «самой узнаваемой подстроке» имени из bond_daily.
-  //    Точнее обогатим при следующих проходах.
-  let stockMap = {}; // shortname-prefix → ticker
+  // ── Шаг 1: bulk MOEX → secid → {emitter_id, name, inn} ─────────────
+  // Карта по secid (для апдейта bond_daily) и отдельная по emitter_id
+  // (для сбора уникальных эмитентов в issuers).
+  const bySecid    = new Map();
+  const byEmitter  = new Map();
+  let pagesRead = 0, secidsSeen = 0;
+  try {
+    for(let page = 0; page < maxPages; page++){
+      const u = `${base}/iss/securities.json?iss.meta=off&engine=stock&market=bonds&iss.only=securities&limit=100&start=${page * 100}`;
+      const r = await fetch(u, { headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 0 } });
+      if(!r.ok){ errors.push(`bulk page ${page}: HTTP ${r.status}`); break; }
+      const json = await r.json();
+      const sec  = json.securities || {};
+      const cols = sec.columns || [];
+      const data = sec.data || [];
+      if(!data.length) break;
+      const i = (n) => cols.indexOf(n);
+      const idxSecid = i('secid'), idxEid = i('emitent_id'),
+            idxTitle = i('emitent_title'), idxInn = i('emitent_inn'),
+            idxOkpo  = i('emitent_okpo'), idxIsin  = i('isin'),
+            idxBoard = i('primary_boardid');
+      for(const row of data){
+        const secid = row[idxSecid]; if(!secid) continue;
+        const eid   = row[idxEid];
+        const title = row[idxTitle];
+        const inn   = row[idxInn] != null ? String(row[idxInn]) : null;
+        const okpo  = row[idxOkpo] != null ? String(row[idxOkpo]) : null;
+        const board = row[idxBoard] || null;
+        bySecid.set(secid, { eid, title, inn, board });
+        if(eid != null && !byEmitter.has(eid)){
+          byEmitter.set(eid, { eid, title, inn, okpo, bonds_count: 0 });
+        }
+        if(eid != null){ byEmitter.get(eid).bonds_count++; }
+      }
+      secidsSeen += data.length;
+      pagesRead++;
+      if(data.length < 100) break; // последняя страница
+    }
+  } catch(e){ errors.push('bulk fetch: ' + e.message); }
+
+  // ── Шаг 2: апдейтим bond_daily.emitent_inn / emitent_name на сегодня ──
+  // Только последний срез — старые даты не трогаем. Делаем батчем, без
+  // INSERT — только UPDATE существующих строк (если бумага числится в
+  // bond_daily, у неё точно есть строка за date=today).
+  let bondsUpdated = 0;
+  if(bySecid.size){
+    try {
+      const upd = `UPDATE bond_daily SET emitent_name = ?, emitent_inn = ? WHERE secid = ? AND date = ?`;
+      const stmts = [];
+      for(const [secid, e] of bySecid){
+        if(!e.title && !e.inn) continue;
+        stmts.push(env.DB.prepare(upd).bind(e.title || null, e.inn || null, secid, today));
+      }
+      // batch-ом по 200 — у D1 лимит ~1000 операторов на batch
+      for(let i = 0; i < stmts.length; i += 200){
+        const chunk = stmts.slice(i, i + 200);
+        const res = await env.DB.batch(chunk);
+        bondsUpdated += res.reduce((s, r) => s + (r.meta?.changes || r.meta?.rows_written || 0), 0);
+      }
+    } catch(e){ errors.push('bond_daily update: ' + e.message); }
+  }
+
+  // ── Шаг 3: подтянуть OGRN / полный INN / legal_address для top-N ───
+  // /iss/emitters/{id}.json даёт TITLE, SHORT_TITLE, INN, OGRN, OKPO,
+  // OKSM, LEGAL_ADDRESS, URL, EMITTER_CAPITALIZATION. На free tier
+  // экономим subrequest'ы — берём top-N эмитентов по числу бумаг.
+  const topEmitters = [...byEmitter.values()]
+    .filter(e => e.eid != null)
+    .sort((a, b) => b.bonds_count - a.bonds_count)
+    .slice(0, cardLimit);
+  for(const e of topEmitters){
+    try {
+      const u = `${base}/iss/emitters/${e.eid}.json?iss.meta=off`;
+      const r = await fetch(u, { headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 86400 } });
+      if(!r.ok) continue;
+      const j = await r.json();
+      const cols = j?.emitter?.columns || [];
+      const row  = j?.emitter?.data?.[0];
+      if(!row) continue;
+      const get = (n) => row[cols.indexOf(n)];
+      e.title    = get('TITLE')         || e.title;
+      e.short    = get('SHORT_TITLE')   || null;
+      e.inn      = get('INN')           || e.inn;
+      e.ogrn     = get('OGRN')          || null;
+      e.okpo     = get('OKPO')          || e.okpo;
+      e.address  = get('LEGAL_ADDRESS') || null;
+      e.url      = get('URL')           || null;
+      e.capRub   = get('EMITTER_CAPITALIZATION') || null;
+    } catch(_){ /* игнорим единичные неудачи */ }
+  }
+
+  // ── Шаг 4: тикеры акций: маппинг shortname-prefix → ticker ─────────
+  let stockMap = {};
   try {
     const r = await env.DB.prepare(`
       SELECT s.secid AS ticker, s.shortname AS name
@@ -944,46 +1102,461 @@ async function collectIssuers(env){
     `).all();
     for(const row of (r.results || [])){
       if(!row.ticker || !row.name) continue;
-      // нормализуем — короткое имя, нижний регистр, без префиксов
       const key = normalizeIssuerName(row.name);
       if(key && !stockMap[key]) stockMap[key] = row.ticker;
     }
   } catch(e){ errors.push('stocks for ticker matching: ' + e.message); }
 
-  // 3. Пишем справочник, не затирая ручные правки (поля sector/okved/aliases
-  //    обновляем только если они NULL — иначе уважаем существующее).
+  // ── Шаг 5: upsert в issuers (не затираем ручные правки) ───────────
+  // Поля name/short_name/bonds_count перезаписываем (актуализируем),
+  // ticker/sector/okved/aliases — только если они null.
   const upsertSql = `
     INSERT INTO issuers (
-      inn, name, short_name, ticker, bonds_count, source, updated_at
-    ) VALUES (?,?,?,?,?,?,?)
+      inn, ogrn, name, short_name, ticker, bonds_count, aliases, meta, source, updated_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(inn) DO UPDATE SET
+      ogrn        = COALESCE(excluded.ogrn, issuers.ogrn),
       name        = excluded.name,
       short_name  = excluded.short_name,
       bonds_count = excluded.bonds_count,
       ticker      = COALESCE(issuers.ticker, excluded.ticker),
+      aliases     = COALESCE(issuers.aliases, excluded.aliases),
+      meta        = COALESCE(excluded.meta, issuers.meta),
       source      = COALESCE(issuers.source, excluded.source),
       updated_at  = excluded.updated_at
   `;
   const stmts = [];
-  for(const row of raw){
-    if(!row.inn) continue;
-    const fullName  = row.name || '';
-    const shortName = shortenIssuerName(fullName);
+  for(const e of byEmitter.values()){
+    if(!e.inn) continue; // без ИНН эмитент бесполезен — не пишем
+    const fullName  = e.title || '';
+    const shortName = e.short || shortenIssuerName(fullName);
     const matchKey  = normalizeIssuerName(shortName);
     const ticker    = stockMap[matchKey] || null;
+    const meta      = (e.address || e.url || e.capRub != null)
+      ? JSON.stringify({ address: e.address || null, url: e.url || null, cap_rub: e.capRub ?? null, moex_id: e.eid })
+      : null;
+    const aliases   = (fullName && shortName && fullName !== shortName)
+      ? JSON.stringify([fullName, shortName])
+      : null;
     stmts.push(env.DB.prepare(upsertSql).bind(
-      row.inn, fullName, shortName, ticker, row.bonds_count || 0, 'moex', now
+      e.inn, e.ogrn || null, fullName, shortName, ticker,
+      e.bonds_count || 0, aliases, meta, 'moex', now
     ));
   }
   if(stmts.length){
     try {
-      const results = await env.DB.batch(stmts);
-      rowsWritten = results.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
-    } catch(e){ errors.push('batch upsert: ' + e.message); }
+      // Дробим на 200 — лимит D1 batch ~1000 stmts
+      for(let i = 0; i < stmts.length; i += 200){
+        const chunk = stmts.slice(i, i + 200);
+        const results = await env.DB.batch(chunk);
+        rowsWritten += results.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
+      }
+    } catch(e){ errors.push('issuers batch upsert: ' + e.message); }
+  }
+
+  // ── Шаг 6: пополняем reports_queue новыми ИНН ──────────────────────
+  // Чтобы коллектор отчётности знал, кого ещё не пытался обработать.
+  if(byEmitter.size){
+    try {
+      const qSql = `INSERT OR IGNORE INTO reports_queue (inn, next_due) VALUES (?, datetime('now'))`;
+      const qStmts = [];
+      for(const e of byEmitter.values()){
+        if(e.inn) qStmts.push(env.DB.prepare(qSql).bind(e.inn));
+      }
+      for(let i = 0; i < qStmts.length; i += 200){
+        await env.DB.batch(qStmts.slice(i, i + 200));
+      }
+    } catch(e){ errors.push('queue seed: ' + e.message); }
   }
 
   await logRun(env, startedAt, 'issuers', rowsWritten, errors, Date.now() - t0);
-  return { source: 'issuers', rowsWritten, errors, scanned: raw.length, duration_ms: Date.now() - t0 };
+  return {
+    source: 'issuers',
+    rowsWritten,
+    bondsUpdated,
+    pagesRead,
+    secidsSeen,
+    issuersSeen: byEmitter.size,
+    cardsFetched: topEmitters.length,
+    errors,
+    duration_ms: Date.now() - t0,
+  };
+}
+
+// ═══ Коллектор: РСБУ-показатели из ГИР БО ════════════════════════════
+//
+// ГИР БО (bo.nalog.gov.ru) — официальный реестр бухотчётности ФНС.
+// Из браузера он недоступен (нет CORS), но Worker — это серверный код,
+// поэтому стучимся напрямую. На каждого эмитента: 1 поиск по ИНН +
+// 1 список отчётов + 2 формы (balance + financial_result) на каждый
+// год. Берём 3 свежих года → ~7 subrequest'ов на эмитента. На free
+// tier лимит 50 subrequest'ов на cron-вызов, поэтому в одном проходе
+// успеваем 6-7 эмитентов; ставим limit=20 при ручном вызове из админки
+// (в paid plan лимита фактически нет).
+//
+// Очередь reports_queue решает «справедливое распределение»: на каждом
+// запуске берём top-N эмитентов с самым старым last_attempt
+// (или null). После успеха next_due ставим +30 дней.
+//
+// Маппинг кодов ГИР БО → короткие метрики БондАналитика — тот же,
+// что в app.js (_GIRBO_FIELD_MAP). Все суммы из ФНС в тыс ₽,
+// делим на 1e6 → млрд ₽ (внутренняя единица).
+
+// Маппинг короткие имена → коды строк РСБУ. 2330 — расходы (берём
+// модуль), debt = 1410 (долгосрочные займы) + 1510 (краткосрочные).
+const GIRBO_CODES = {
+  rev:     ['2110'],
+  ebit:    ['2200'],
+  np:      ['2400'],
+  int_exp: ['2330'],
+  tax_exp: ['2410'],
+  assets:  ['1600'],
+  ca:      ['1200'],
+  cl:      ['1500'],
+  debt:    ['1410', '1510'],
+  cash:    ['1250'],
+  ret:     ['1370'],
+  eq:      ['1300'],
+};
+
+// Один fetch с timeout и единым retry-протоколом для ГИР БО.
+async function girboFetch(path, opts){
+  const url  = 'https://bo.nalog.gov.ru' + path;
+  const tout = opts?.timeoutMs || 12000;
+  const ctrl = new AbortController();
+  const tm = setTimeout(() => ctrl.abort(), tout);
+  try {
+    const r = await fetch(url, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'BondAnalytics/0.6 (+github.com/mortyc126-debug/ti)' },
+      signal: ctrl.signal,
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const ct = r.headers.get('content-type') || '';
+    if(!/json/i.test(ct)){
+      const txt = await r.text();
+      if(txt.startsWith('<')) throw new Error('ГИР БО вернул HTML (капча или блок)');
+    }
+    return await r.json();
+  } finally { clearTimeout(tm); }
+}
+
+// Один эмитент: ИНН → series {год: {rev, ebit, np, ...}}.
+// Возвращает {series, company, ogrn, errors}. Бросает Error если
+// ГИР БО вообще ничего не нашёл по ИНН.
+async function girboFetchByInn(inn, maxYears = 3){
+  // 1. Поиск организации по ИНН
+  let orgs = [];
+  for(const path of [
+    `/advanced-search/organizations/search?inn=${inn}`,
+    `/nbo/organizations/?inn=${inn}`,
+  ]){
+    try {
+      const r = await girboFetch(path);
+      const got = Array.isArray(r) ? r : (r?.content || r?.organizations || []);
+      if(got.length){ orgs = got; break; }
+    } catch(_){ /* пробуем следующий */ }
+  }
+  if(!orgs.length) throw new Error('ГИР БО: ИНН ' + inn + ' не найден');
+  const org = orgs.find(o => String(o.inn || o.organisationInn) === inn) || orgs[0];
+  const orgId = org.id || org.organizationId;
+  if(!orgId) throw new Error('ГИР БО: нет orgId в ответе');
+
+  // 2. Список годовых отчётов
+  const bfoListResp = await girboFetch(`/nbo/organizations/${orgId}/bfo/`);
+  const bfoList = Array.isArray(bfoListResp)
+    ? bfoListResp
+    : (bfoListResp.content || bfoListResp.bfo || []);
+  const isAnnual = (b) => {
+    if(/^\d{4}$/.test(String(b.period || ''))) return true;
+    if(/year|год/i.test(b.period || b.bfoPeriod || '')) return true;
+    if(b.periodType === 'YEAR' || b.periodType === 12) return true;
+    if(Array.isArray(b.bfoPeriodTypes) && b.bfoPeriodTypes.includes(12)) return true;
+    return false;
+  };
+  const yearOf = (b) => parseInt(b.period || b.year || '0', 10) || 0;
+  const annual = bfoList
+    .filter(isAnnual)
+    .sort((a, b) => yearOf(b) - yearOf(a))
+    .slice(0, maxYears);
+  if(!annual.length) throw new Error('ГИР БО: нет годовых отчётов');
+
+  // 3. Детали каждого отчёта: balance + financial_result
+  const series = {};
+  const rawByYear = {};
+  const errors = [];
+  for(const b of annual){
+    try {
+      const corr = b?.typeCorrections?.[0]?.correction
+                || b?.corrections?.[0]?.correction
+                || b?.correction
+                || null;
+      const corrId = corr?.id || b.id || b.bfoId;
+      let det;
+      if(corr && (corr.balance || corr.financialResult) &&
+         (corr.balance?.current1600 != null || corr.financialResult?.current2110 != null)){
+        det = Object.assign({}, corr.balance || {}, corr.financialResult || {});
+      } else {
+        const [balance, pnl] = await Promise.all([
+          girboFetch('/nbo/details/balance?id=' + corrId).catch(() => ({})),
+          girboFetch('/nbo/details/financial_result?id=' + corrId).catch(() => ({})),
+        ]);
+        det = Object.assign({}, balance, pnl);
+      }
+      const yearMain = b.year || (b.period ? parseInt(b.period, 10) : null) || det.year;
+      const yearPrev = yearMain ? yearMain - 1 : null;
+      // build* — формирует {rev, ebit, ...} из current<code>/previous<code>.
+      // ГИР БО даёт «текущий» и «прошлый» годы внутри одного отчёта,
+      // поэтому 1 годовой отчёт = 2 года данных бесплатно.
+      const buildVals = (kind) => {
+        const v = {};
+        for(const [field, codes] of Object.entries(GIRBO_CODES)){
+          let sum = 0, any = false;
+          for(const c of codes){
+            const x = det[kind + c];
+            if(typeof x === 'number'){ sum += x; any = true; }
+          }
+          if(any){
+            const isExpense = field === 'int_exp' || field === 'tax_exp';
+            v[field] = (isExpense ? Math.abs(sum) : sum) / 1e6; // тыс ₽ → млрд ₽
+          }
+        }
+        return Object.keys(v).length ? v : null;
+      };
+      const cur = buildVals('current');
+      if(cur && yearMain && !series[yearMain]){
+        series[yearMain] = cur;
+        rawByYear[yearMain] = pickRaw(det, 'current');
+      }
+      const prev = buildVals('previous');
+      if(prev && yearPrev && !series[yearPrev]){
+        series[yearPrev] = prev;
+        rawByYear[yearPrev] = pickRaw(det, 'previous');
+      }
+    } catch(e){
+      errors.push({ year: yearOf(b), error: e.message });
+    }
+  }
+  return {
+    series,
+    rawByYear,
+    company: org.name || org.shortName || org.fullName || null,
+    inn,
+    ogrn: org.ogrn || org.organisationOgrn || null,
+    errors,
+  };
+}
+
+// Выкусываем из json все интересующие нас current<code>/previous<code> —
+// сохраняем в issuer_reports.raw как маленький JSON, чтобы при
+// необходимости пересчитать без повторного похода в ФНС.
+function pickRaw(det, kind){
+  const out = {};
+  for(const codes of Object.values(GIRBO_CODES)){
+    for(const c of codes){
+      const x = det[kind + c];
+      if(typeof x === 'number') out[c] = x;
+    }
+  }
+  return out;
+}
+
+// Главный коллектор отчётности. ?limit=N&inn=X для ручного вызова.
+// Без INN берёт top-N эмитентов из reports_queue (самые старые/новые).
+async function collectReports(env, url){
+  const startedAt = new Date().toISOString();
+  const t0 = Date.now();
+  const now = new Date().toISOString();
+  const limit = Math.min(50, parseInt(url?.searchParams?.get('limit') || '20', 10));
+  const onlyInn = url?.searchParams?.get('inn');
+  const errors = [];
+  let processed = 0, succeeded = 0, rowsWritten = 0;
+
+  // Список ИНН для обработки
+  let queue = [];
+  if(onlyInn){
+    queue = [{ inn: onlyInn }];
+  } else {
+    try {
+      const r = await env.DB.prepare(`
+        SELECT q.inn
+        FROM reports_queue q
+        WHERE q.next_due IS NULL OR q.next_due <= datetime('now')
+        ORDER BY COALESCE(q.last_attempt, '0') ASC, q.attempts ASC
+        LIMIT ?
+      `).bind(limit).all();
+      queue = r.results || [];
+    } catch(e){
+      // fallback: если очередь ещё пуста (первый запуск) — берём из issuers
+      try {
+        const r = await env.DB.prepare(`
+          SELECT i.inn
+          FROM issuers i
+          LEFT JOIN issuer_reports r
+                 ON r.inn = i.inn AND r.fy_year >= ${new Date().getUTCFullYear() - 2}
+          WHERE i.inn IS NOT NULL AND r.inn IS NULL
+          ORDER BY i.bonds_count DESC
+          LIMIT ?
+        `).bind(limit).all();
+        queue = r.results || [];
+      } catch(e2){ errors.push('queue: ' + e.message + ' / ' + e2.message); }
+    }
+  }
+
+  if(!queue.length){
+    await logRun(env, startedAt, 'reports', 0, ['queue empty'], Date.now() - t0);
+    return { source: 'reports', processed: 0, succeeded: 0, rowsWritten: 0, errors: ['queue empty'], duration_ms: Date.now() - t0 };
+  }
+
+  // Подготавливаем prepared statement для upsert отчётов и для очереди
+  const upsertReport = `
+    INSERT INTO issuer_reports (
+      inn, fy_year, period, std,
+      rev, ebitda, ebit, np, int_exp, tax_exp,
+      assets, ca, cl, debt, cash, ret, eq,
+      roa_pct, ros_pct, ebitda_marg, net_debt_eq,
+      source, raw, fetched_at
+    ) VALUES (?, ?, 'FY', 'РСБУ',
+              ?, ?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?, ?, ?,
+              ?, ?, ?, ?,
+              'girbo', ?, ?)
+    ON CONFLICT(inn, fy_year, period, std) DO UPDATE SET
+      rev = excluded.rev, ebitda = excluded.ebitda, ebit = excluded.ebit,
+      np = excluded.np, int_exp = excluded.int_exp, tax_exp = excluded.tax_exp,
+      assets = excluded.assets, ca = excluded.ca, cl = excluded.cl,
+      debt = excluded.debt, cash = excluded.cash, ret = excluded.ret, eq = excluded.eq,
+      roa_pct = excluded.roa_pct, ros_pct = excluded.ros_pct,
+      ebitda_marg = excluded.ebitda_marg, net_debt_eq = excluded.net_debt_eq,
+      source = excluded.source, raw = excluded.raw, fetched_at = excluded.fetched_at
+  `;
+  const updateQueueOk = `
+    INSERT INTO reports_queue (inn, last_attempt, last_success, attempts, last_error, next_due)
+    VALUES (?, ?, ?, 0, NULL, datetime(?, '+30 days'))
+    ON CONFLICT(inn) DO UPDATE SET
+      last_attempt = excluded.last_attempt,
+      last_success = excluded.last_success,
+      attempts = 0,
+      last_error = NULL,
+      next_due = excluded.next_due
+  `;
+  // Ставим базовые поля при сбое (ON CONFLICT — оставляем attempts на
+  // действующем значении, увеличим его отдельным UPDATE'ом ниже).
+  const updateQueueFail = `
+    INSERT INTO reports_queue (inn, last_attempt, attempts, last_error, next_due)
+    VALUES (?, ?, 1, ?, datetime(?, '+7 days'))
+    ON CONFLICT(inn) DO UPDATE SET
+      last_attempt = excluded.last_attempt,
+      attempts = reports_queue.attempts + 1,
+      last_error = excluded.last_error,
+      next_due = excluded.next_due
+  `;
+
+  for(const item of queue){
+    const inn = item.inn;
+    if(!inn) continue;
+    processed++;
+    try {
+      const fetched = await girboFetchByInn(inn, 3);
+      const yearStmts = [];
+      for(const [yearStr, vals] of Object.entries(fetched.series || {})){
+        const fy = parseInt(yearStr, 10);
+        if(!fy) continue;
+        const rev = vals.rev ?? null;
+        const np  = vals.np  ?? null;
+        const eq  = vals.eq  ?? null;
+        const debt = vals.debt ?? null;
+        const cash = vals.cash ?? null;
+        const assets = vals.assets ?? null;
+        const ebitda = (vals.ebit != null && vals.int_exp != null) ? (vals.ebit + vals.int_exp) : null;
+        const roa  = (np != null && assets) ? np / assets * 100 : null;
+        const ros  = (np != null && rev)    ? np / rev * 100    : null;
+        const em   = (ebitda != null && rev) ? ebitda / rev * 100 : null;
+        const nde  = (debt != null && cash != null && eq) ? (debt - cash) / eq : null;
+        const raw  = JSON.stringify(fetched.rawByYear?.[fy] || {});
+        yearStmts.push(env.DB.prepare(upsertReport).bind(
+          inn, fy,
+          rev, ebitda, vals.ebit ?? null, np, vals.int_exp ?? null, vals.tax_exp ?? null,
+          assets, vals.ca ?? null, vals.cl ?? null, debt, cash, vals.ret ?? null, eq,
+          roa, ros, em, nde,
+          raw, now,
+        ));
+      }
+      if(yearStmts.length){
+        const res = await env.DB.batch(yearStmts);
+        rowsWritten += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
+      }
+      // Обновляем имя/ОГРН в issuers, если ФНС вернул что-то полезное
+      if(fetched.company || fetched.ogrn){
+        try {
+          await env.DB.prepare(`
+            UPDATE issuers
+               SET name  = COALESCE(?, name),
+                   ogrn  = COALESCE(ogrn, ?),
+                   updated_at = ?
+             WHERE inn = ?
+          `).bind(fetched.company || null, fetched.ogrn || null, now, inn).run();
+        } catch(_){}
+      }
+      await env.DB.prepare(updateQueueOk).bind(inn, now, now, now).run();
+      succeeded++;
+    } catch(e){
+      const msg = (e.message || String(e)).slice(0, 200);
+      errors.push({ inn, error: msg });
+      try {
+        await env.DB.prepare(updateQueueFail).bind(inn, now, msg, now).run();
+      } catch(_){}
+    }
+  }
+
+  await logRun(env, startedAt, 'reports', rowsWritten, errors.map(e => e.inn ? `${e.inn}: ${e.error}` : e), Date.now() - t0);
+  return {
+    source: 'reports',
+    processed,
+    succeeded,
+    rowsWritten,
+    errors: errors.slice(0, 20),
+    duration_ms: Date.now() - t0,
+  };
+}
+
+// ═══ Endpoints: отчётность эмитентов ══════════════════════════════════
+
+async function handleIssuerReports(env, url){
+  // /issuer/{inn}/reports → series по годам со всеми метриками
+  const m = url.pathname.match(/^\/issuer\/(\d{10,12})\/reports$/);
+  if(!m) return errResp('inn required, /issuer/{inn}/reports', 400);
+  const inn = m[1];
+  let rows = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT fy_year, period, std, rev, ebitda, ebit, np, int_exp, tax_exp,
+             assets, ca, cl, debt, cash, ret, eq,
+             roa_pct, ros_pct, ebitda_marg, net_debt_eq,
+             source, fetched_at
+      FROM issuer_reports
+      WHERE inn = ?
+      ORDER BY fy_year DESC, period
+    `).bind(inn).all();
+    rows = r.results || [];
+  } catch(_){}
+  return jsonResp({ inn, count: rows.length, data: rows });
+}
+
+async function handleReportsLatest(env, url){
+  // /reports/latest?limit=N — самые свежие отчёты у эмитентов (для
+  // витрины «обновили данные за неделю»).
+  const limit = Math.min(500, parseInt(url.searchParams.get('limit') || '50', 10));
+  const r = await env.DB.prepare(`
+    SELECT r.inn, r.fy_year, r.period, r.std, r.rev, r.ebitda, r.np,
+           r.assets, r.debt, r.eq, r.roa_pct, r.ros_pct, r.ebitda_marg,
+           r.fetched_at,
+           i.short_name AS issuer_name, i.ticker, i.bonds_count
+    FROM issuer_reports r
+    LEFT JOIN issuers i ON i.inn = r.inn
+    ORDER BY r.fetched_at DESC
+    LIMIT ?
+  `).bind(limit).all();
+  return jsonResp({ count: r.results?.length || 0, data: r.results || [] });
 }
 
 // Сократить имя: убрать ОПФ-префиксы и лишние «‎» — для дисплея и
