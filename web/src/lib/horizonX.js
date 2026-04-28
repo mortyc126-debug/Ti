@@ -9,26 +9,35 @@ import { percentileRanks } from './percentile.js';
 import { resolveNorm, classifyValue } from './norms.js';
 import { getAllIssuers } from '../data/issuersMock.js';
 
-const X_LABELS = {
-  maturity: 'срок до погашения, лет',
-  rating:   'кредитный рейтинг',
-};
-
-// Подпись X-оси по spec'у.
+// Подпись X-оси: основная подпись + краткое уточнение направления
+// (что значит «правее» / «лучше»). Возвращает { main, hint }.
 export function horizonXLabel(spec){
-  if(spec.source === 'maturity') return X_LABELS.maturity;
-  if(spec.source === 'rating')   return X_LABELS.rating;
+  if(spec.source === 'maturity'){
+    return { main: 'срок до погашения, лет', hint: '← короткие · длинные →' };
+  }
+  if(spec.source === 'rating'){
+    return { main: 'кредитный рейтинг', hint: '← D · AAA → (надёжнее справа)' };
+  }
   if(spec.source === 'multiplier'){
     const m = COMP_METRICS[spec.multiplier];
-    return m ? `${m.label}` : 'мультипликатор';
+    if(!m) return { main: 'мультипликатор', hint: '' };
+    const dir = m.higher
+      ? '← хуже · лучше →'
+      : '← лучше · хуже →';
+    return { main: m.label, hint: dir };
   }
   if(spec.source === 'composite'){
-    if(!spec.metrics?.length) return 'композит — выбери метрики';
+    if(!spec.metrics?.length){
+      return { main: 'композит — выбери метрики', hint: '' };
+    }
     const names = spec.metrics.map(id => COMP_METRICS[id]?.short || id).join(' + ');
     const mode = spec.mode === 'sequential' ? 'воронка по нормам' : 'сумма перцентилей';
-    return `композит: ${names} · ${mode}`;
+    return {
+      main: `композит: ${names}`,
+      hint: `${mode} · ← хуже · лучше → (0..100)`,
+    };
   }
-  return '';
+  return { main: '', hint: '' };
 }
 
 // Главная функция: вернёт points с дополненным `xH` (значение для X

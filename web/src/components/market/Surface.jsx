@@ -51,12 +51,23 @@ export default function Surface(){
 
 function Legend(){
   return (
-    <div className="px-4 py-2 border-t border-border/60 text-[10px] font-mono text-text3 flex items-center flex-wrap gap-3">
-      <span>↑ выше поверхности (z &gt; 0) — рынок требует премию</span>
-      <span className="w-2 h-2 rounded-full bg-danger inline-block" />
-      <span>↓ ниже поверхности (z &lt; 0) — дороже аналогов</span>
-      <span className="w-2 h-2 rounded-full bg-acc inline-block" />
-      <span className="ml-auto">размер = объём выпуска · фон = E[YTM]</span>
+    <div className="px-4 py-3 border-t border-border/60 text-[11px] font-mono text-text2 space-y-1.5">
+      <div className="leading-relaxed">
+        <span className="text-text3">Каждая точка — облигация.</span>{' '}
+        <span className="text-text">Y</span> — насколько её фактическая YTM отличается от ожидаемой
+        (поверхность E[YTM] — kernel-регрессия по сроку и качеству всех бумаг каталога).{' '}
+        <span className="text-text">X</span> — то, как разложить бумаги по горизонтали (срок, рейтинг,
+        мультипликатор или композит).
+      </div>
+      <div className="flex items-center flex-wrap gap-3 text-[10px] text-text3">
+        <span className="inline-flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-danger" /> выше горизонта — рынок требует премию (риск или паника)
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-acc" /> ниже — дороже аналогов (жадный рынок или скрытое преимущество)
+        </span>
+        <span className="ml-auto">размер кружка = объём выпуска (лог)</span>
+      </div>
     </div>
   );
 }

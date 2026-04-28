@@ -155,13 +155,23 @@ export default function SurfaceChart({ fitted }){
           );
         })}
 
-        {/* Подписи осей */}
-        <text x={W / 2} y={H - 6} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
-          {xLabel}
+        {/* Подписи осей. X — основная + hint направления.
+            Y — поясняющий текст «отклонение фактической от ожидаемой». */}
+        <text x={W / 2} y={H - 18} fill="#9ba3b1" fontSize="11" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+          {xLabel.main}
         </text>
-        <text x={14} y={H / 2} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace"
-          transform={`rotate(-90 14 ${H / 2})`} textAnchor="middle">
-          residual, bps
+        {xLabel.hint && (
+          <text x={W / 2} y={H - 5} fill="#5e6573" fontSize="9" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+            {xLabel.hint}
+          </text>
+        )}
+        <text x={14} y={H / 2 - 10} fill="#9ba3b1" fontSize="11" fontFamily="JetBrains Mono, monospace"
+          transform={`rotate(-90 14 ${H / 2 - 10})`} textAnchor="middle">
+          фактическая YTM − ожидаемая
+        </text>
+        <text x={26} y={H / 2 + 10} fill="#5e6573" fontSize="9" fontFamily="JetBrains Mono, monospace"
+          transform={`rotate(-90 26 ${H / 2 + 10})`} textAnchor="middle">
+          bps · ↑ премия · ↓ дороже аналогов
         </text>
 
         {/* Точки */}
@@ -198,7 +208,7 @@ export default function SurfaceChart({ fitted }){
         })}
       </svg>
 
-      {tip && <PointTooltip tip={tip} containerWidth={containerSize.w} containerHeight={containerSize.h} xLabel={xLabel} />}
+      {tip && <PointTooltip tip={tip} containerWidth={containerSize.w} containerHeight={containerSize.h} xLabel={xLabel.main} />}
 
       {!points.length && (
         <div className="absolute inset-0 grid place-items-center text-text3 text-sm pointer-events-none">
