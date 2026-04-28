@@ -3,14 +3,14 @@
 // карты. Полоса ядра — в свернутом блоке «параметры».
 
 import { useState } from 'react';
-import { Sliders, Map, Layers, Square, BarChart3, Box } from 'lucide-react';
+import { Sliders, Map, Layers, Square, BarChart3, Waves } from 'lucide-react';
 import { Y_MODES } from '../../lib/qualityComposite.js';
 import { useMarketSurface } from '../../store/marketSurface.js';
 
 const VIEW_MODES = [
-  { id: 'flat',   label: 'Плоский',  icon: Square,    tip: 'Точки на плоскости, цвет = z-score. Высота отклонения только цветом.' },
-  { id: 'sticks', label: 'Стержни',  icon: BarChart3, tip: 'Стержень от поверхности до точки: длина и цвет показывают величину и знак residual\'а.' },
-  { id: 'iso',    label: '3D',       icon: Box,       tip: 'Аксонометрия: плоскость уходит в перспективу, точки парят над/под поверхностью на residual.' },
+  { id: 'flat',    label: 'Плоский',  icon: Square,    tip: 'Точки на 2D-плоскости (срок × качество), цвет = z-score. Высота отклонения только цветом.' },
+  { id: 'sticks',  label: 'Стержни',  icon: BarChart3, tip: 'Стержень от поверхности до точки: длина и цвет показывают величину и знак residual\'а.' },
+  { id: 'horizon', label: 'Горизонт', icon: Waves,     tip: 'Взгляд от поверхности: X = срок (или качество), Y = residual в bps. Точки выше горизонта — «торчат», ниже — «утонули».' },
 ];
 
 const TYPE_LIST = [
@@ -35,6 +35,8 @@ export default function SurfaceFilters(){
   const showContours = useMarketSurface(s => s.showContours);
   const viewMode = useMarketSurface(s => s.viewMode);
   const setViewMode = useMarketSurface(s => s.setViewMode);
+  const horizonX = useMarketSurface(s => s.horizonX);
+  const setHorizonX = useMarketSurface(s => s.setHorizonX);
   const setRange = useMarketSurface(s => s.setRange);
   const setBandwidth = useMarketSurface(s => s.setBandwidth);
   const toggleHeatmap = useMarketSurface(s => s.toggleHeatmap);
@@ -96,6 +98,20 @@ export default function SurfaceFilters(){
               );
             })}
           </div>
+          {viewMode === 'horizon' && (
+            <div className="ml-1 flex gap-0.5 rounded overflow-hidden border border-border" title="По чему развернуть горизонт">
+              <button type="button" onClick={() => setHorizonX('maturity')}
+                className={['px-2 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors',
+                  horizonX === 'maturity' ? 'bg-acc-dim text-acc' : 'bg-s2 text-text3 hover:text-text'].join(' ')}>
+                по сроку
+              </button>
+              <button type="button" onClick={() => setHorizonX('quality')}
+                className={['px-2 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors',
+                  horizonX === 'quality' ? 'bg-acc-dim text-acc' : 'bg-s2 text-text3 hover:text-text'].join(' ')}>
+                по качеству
+              </button>
+            </div>
+          )}
           <button
             type="button"
             onClick={toggleHeatmap}

@@ -22,11 +22,14 @@ const initial = {
   // Изолинии E[YTM] поверх heatmap.
   showContours: true,
   // Режим визуализации высоты (residual'а):
-  //   'flat'   — точки на плоскости, цвет = z-score (исходный вид)
-  //   'sticks' — стержни от плоскости с приподнятой головкой
-  //   'iso'    — псевдо-3D аксонометрия: плоскость уезжает в перспективу,
-  //              точки парят над/под на величину residual'а
+  //   'flat'    — точки на плоскости, цвет = z-score (исходный вид)
+  //   'sticks'  — стержни от плоскости с приподнятой головкой
+  //   'horizon' — взгляд «от нулевой линии»: X = срок (или качество),
+  //               Y = residual в bps. 0 = поверхность; точки выше
+  //               торчат как горы, ниже — «утонули» под уровень.
   viewMode: 'sticks',
+  // Что развёрнуто по горизонтали в режиме 'horizon'.
+  horizonX: 'maturity',  // 'maturity' | 'quality'
 };
 
 export const useMarketSurface = create(
@@ -46,6 +49,7 @@ export const useMarketSurface = create(
       toggleHeatmap(){ set({ showHeatmap: !get().showHeatmap }); },
       toggleContours(){ set({ showContours: !get().showContours }); },
       setViewMode(m){ set({ viewMode: m }); },
+      setHorizonX(x){ set({ horizonX: x }); },
       setHover(id){ set({ hoverId: id }); },
       setSelected(id){ set({ selectedId: id }); },
       reset(){ set({ ...initial, hoverId: null, selectedId: null }); },
@@ -59,7 +63,7 @@ export const useMarketSurface = create(
         matMin: s.matMin, matMax: s.matMax,
         bwX: s.bwX, bwY: s.bwY,
         showHeatmap: s.showHeatmap, showContours: s.showContours,
-        viewMode: s.viewMode,
+        viewMode: s.viewMode, horizonX: s.horizonX,
       }),
     }
   )

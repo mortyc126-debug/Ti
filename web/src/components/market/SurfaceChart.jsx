@@ -1,11 +1,10 @@
 // Чарт поверхности с тремя видами:
-//   flat   — точки на плоскости, цвет = z-score (исходный 2D-вид).
-//   sticks — стержни от плоскости до точки: длина = |residual|,
-//            направление = знак, цвет = z-score. Видна высота
-//            отклонения каждой бумаги от ожидаемой YTM.
-//   iso    — псевдо-3D: плоскость уезжает в перспективу
-//            (axonometric), точки парят над/под на residual'е.
-//            Wow-эффект «горы» поверхности.
+//   flat    — точки на плоскости (срок × качество), цвет = z-score.
+//   sticks  — стержни от плоскости до точки: длина = |residual|,
+//             направление = знак, цвет = z-score.
+//   horizon — взгляд от поверхности (residual=0 — горизонтальная
+//             линия): X = срок (или качество), Y = residual в bps.
+//             Точки выше горизонта — «торчат», ниже — «утонули».
 // Изолинии поверх heatmap включаются отдельным тогглером.
 
 import { useMemo, useRef, useState } from 'react';
@@ -15,13 +14,24 @@ import { ytmColor, zScoreColor } from '../../lib/kernelSurface.js';
 import {
   ratingTier, tierColor, RATING_TICKS, ratingFromOrd,
 } from '../../lib/qualityComposite.js';
-import { makeProjection, marchingSquares, contourLevels, ISO_ROOM_HEIGHT } from '../../lib/surfaceGeom.js';
+import { makeProjection, marchingSquares, contourLevels } from '../../lib/surfaceGeom.js';
 
 const PAD = { top: 16, right: 32, bottom: 36, left: 56 };
-const W = 880, H = 520;
+const W = 880, H = 500;
 const RES_K = 10;        // px на 1% residual'а — масштаб «высоты»
 
 export default function SurfaceChart({ fitted }){
+  const viewMode = useMarketSurface(s => s.viewMode);
+  // Горизонт — отдельный сценарий рендера, выходит наружу сразу.
+  if(viewMode === 'horizon'){
+    return <HorizonView fitted={fitted} />;
+  }
+  // 'iso' остался от прошлой версии в localStorage у некоторых
+  // пользователей — рендерим как 'sticks' (логически ближе всего).
+  return <PlanarView fitted={fitted} />;
+}
+
+function PlanarView({ fitted }){
   const showHeatmap  = useMarketSurface(s => s.showHeatmap);
   const showContours = useMarketSurface(s => s.showContours);
   const viewMode     = useMarketSurface(s => s.viewMode);
@@ -50,13 +60,10 @@ export default function SurfaceChart({ fitted }){
     return { xMin, xMax, yMin, yMax };
   }, [points]);
 
-  // В iso-режиме оставляем сверху место под «комнату» (высоту парящих
-  // точек) и справа — под Z-ось (residual).
-  const reservedTop = viewMode === 'iso' ? ISO_ROOM_HEIGHT : 0;
-  const reservedRight = viewMode === 'iso' ? 64 : 0;
-  const innerW = W - PAD.left - PAD.right - reservedRight;
-  const innerH = H - PAD.top - PAD.bottom - reservedTop;
-  const padTop = PAD.top + reservedTop;
+  // Плоский режим: всю площадь под чарт.
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+  const padTop = PAD.top;
 
   // Базовые data → screen координаты (на «полу» — до проекции).
   const sx = v => PAD.left + (v - bbox.xMin) / (bbox.xMax - bbox.xMin) * innerW;
@@ -128,7 +135,6 @@ export default function SurfaceChart({ fitted }){
 
   const onBackgroundMove = (e) => {
     if(tip) return;
-    if(viewMode === 'iso'){ setCrosshair(null); return; }   // в перспективе перекрестие путает
     const svg = svgRef.current;
     if(!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -155,13 +161,6 @@ export default function SurfaceChart({ fitted }){
         onMouseMove={onBackgroundMove}
         onMouseLeave={onBackgroundLeave}
       >
-        {/* В 3D — задние стенки комнаты (рендерятся ПОД полом, чтобы
-            пол накладывался). В плоских режимах не рисуются. */}
-        {proj.isIso && (
-          <RoomBack proj={proj} sx={sx} sy={sy} bbox={bbox}
-            yTicks={yTicks} xTicks={xTicks} yMode={yMode} />
-        )}
-
         {/* Плоскость-плашка (пол) */}
         <PlaneFrame proj={proj} sx={sx} sy={sy} bbox={bbox} />
 
@@ -184,14 +183,9 @@ export default function SurfaceChart({ fitted }){
           yMode={yMode}
         />
 
-        {/* В 3D — Z-ось residual'а на правой стенке: вертикальная
-            шкала «отклонение от поверхности» с делениями. */}
-        {proj.isIso && (
-          <ResidualAxis proj={proj} sx={sx} sy={sy} bbox={bbox} resK={RES_K} />
-        )}
 
-        {/* Перекрестие (только в плоских режимах) */}
-        {crosshair && !tip && viewMode !== 'iso' && (
+        {/* Перекрестие */}
+        {crosshair && !tip && (
           <g pointerEvents="none">
             <line x1={crosshair.x} x2={crosshair.x} y1={padTop} y2={H - PAD.bottom}
               stroke="#00d4ff" strokeOpacity="0.4" strokeDasharray="4 4" />
@@ -224,7 +218,7 @@ export default function SurfaceChart({ fitted }){
       </svg>
 
       {tip && <PointTooltip tip={tip} containerWidth={containerSize.w} containerHeight={containerSize.h} />}
-      {crosshair && !tip && viewMode !== 'iso' && (
+      {crosshair && !tip && (
         <CrosshairTooltip crosshair={crosshair} yMode={yMode} />
       )}
 
@@ -240,102 +234,7 @@ export default function SurfaceChart({ fitted }){
 // Задняя «комната» в 3D-режиме: левая и задняя стенки + потолок-каркас.
 // Стенки делают ощущение объёма, на них же — горизонтальные сетки
 // для шкал residual'а.
-function RoomBack({ proj, sx, sy, bbox, yTicks, xTicks, yMode }){
-  // 4 угла пола.
-  const fbl = proj.project(sx(bbox.xMin), sy(bbox.yMin));    // front-bottom-left (передний-низ-лево)
-  const fbr = proj.project(sx(bbox.xMax), sy(bbox.yMin));    // front-bottom-right
-  const ftr = proj.project(sx(bbox.xMax), sy(bbox.yMax));    // back-right
-  const ftl = proj.project(sx(bbox.xMin), sy(bbox.yMax));    // back-left
-
-  // 4 угла потолка (поднятые на ISO_ROOM_HEIGHT).
-  const tbl = [fbl[0], fbl[1] - ISO_ROOM_HEIGHT];
-  const tbr = [fbr[0], fbr[1] - ISO_ROOM_HEIGHT];
-  const ttr = [ftr[0], ftr[1] - ISO_ROOM_HEIGHT];
-  const ttl = [ftl[0], ftl[1] - ISO_ROOM_HEIGHT];
-
-  // Задняя стенка (между ftl-ftr и ttl-ttr).
-  const backD = `M${ftl[0]},${ftl[1]} L${ftr[0]},${ftr[1]} L${ttr[0]},${ttr[1]} L${ttl[0]},${ttl[1]} Z`;
-  // Левая стенка (между fbl-ftl и tbl-ttl).
-  const leftD = `M${fbl[0]},${fbl[1]} L${ftl[0]},${ftl[1]} L${ttl[0]},${ttl[1]} L${tbl[0]},${tbl[1]} Z`;
-
-  return (
-    <g pointerEvents="none">
-      {/* Стенки — очень слабая заливка градиентом для ощущения тени */}
-      <defs>
-        <linearGradient id="wallGradLeft" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor="#0e1320" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#0a0e14" stopOpacity="0.10" />
-        </linearGradient>
-        <linearGradient id="wallGradBack" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor="#0e1320" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#0a0e14" stopOpacity="0.15" />
-        </linearGradient>
-      </defs>
-      <path d={leftD} fill="url(#wallGradLeft)" stroke="#222a37" strokeWidth="1" />
-      <path d={backD} fill="url(#wallGradBack)" stroke="#222a37" strokeWidth="1" />
-
-      {/* Горизонтальные направляющие на задней стенке —
-          горизонты residual'а 0/+50/−50/+100/−100/... bps. */}
-      {[-200, -100, -50, 0, 50, 100, 200].map(bps => {
-        const lift = bps / 100 * 10;     // RES_K = 10 px / 1%
-        const a = [ftl[0], ftl[1] - lift];
-        const b = [ftr[0], ftr[1] - lift];
-        const isZero = bps === 0;
-        return (
-          <g key={bps}>
-            <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]}
-              stroke={isZero ? '#3a4150' : '#1a212c'}
-              strokeWidth={isZero ? 1.4 : 1}
-              strokeDasharray={isZero ? '0' : '2 4'} />
-          </g>
-        );
-      })}
-
-      {/* Линии-направляющие от углов пола к потолку — «опоры комнаты». */}
-      <line x1={fbl[0]} y1={fbl[1]} x2={tbl[0]} y2={tbl[1]} stroke="#222a37" strokeOpacity="0.6" />
-      <line x1={fbr[0]} y1={fbr[1]} x2={tbr[0]} y2={tbr[1]} stroke="#222a37" strokeOpacity="0.6" />
-      <line x1={ftr[0]} y1={ftr[1]} x2={ttr[0]} y2={ttr[1]} stroke="#222a37" strokeOpacity="0.4" />
-      <line x1={ftl[0]} y1={ftl[1]} x2={ttl[0]} y2={ttl[1]} stroke="#222a37" strokeOpacity="0.4" />
-    </g>
-  );
-}
-
-// Z-ось — residual в bps на правой задней грани комнаты.
-function ResidualAxis({ proj, sx, sy, bbox, resK }){
-  const ftr = proj.project(sx(bbox.xMax), sy(bbox.yMax));
-  const lvls = [-200, -100, -50, 0, 50, 100, 200];
-  return (
-    <g pointerEvents="none">
-      {/* Сама ось вверх. */}
-      <line
-        x1={ftr[0]} y1={ftr[1]}
-        x2={ftr[0]} y2={ftr[1] - 200 / 100 * resK - 6}
-        stroke="#3a4150" strokeWidth="1"
-      />
-      {lvls.map(bps => {
-        const lift = bps / 100 * resK;
-        const y = ftr[1] - lift;
-        const c = bps > 0 ? '#ff4d6d' : bps < 0 ? '#00d4ff' : '#9ba3b1';
-        return (
-          <g key={bps}>
-            <line x1={ftr[0] - 3} y1={y} x2={ftr[0] + 3} y2={y} stroke={c} strokeOpacity="0.9" />
-            <text x={ftr[0] + 8} y={y + 3}
-              fill={c} fillOpacity="0.85"
-              fontSize="9" fontFamily="JetBrains Mono, monospace" textAnchor="start">
-              {bps > 0 ? '+' : ''}{bps}{bps !== 0 ? 'bps' : ''}
-            </text>
-          </g>
-        );
-      })}
-      <text x={ftr[0] + 8} y={ftr[1] - 200 / 100 * resK - 12}
-        fill="#5e6573" fontSize="9" fontFamily="JetBrains Mono, monospace" textAnchor="start">
-        residual
-      </text>
-    </g>
-  );
-}
-
-// «Рамка» плоскости. В iso рисуем как трапецию (4 угла после скоса).
+// «Рамка» плоскости.
 function PlaneFrame({ proj, sx, sy, bbox }){
   const c1 = proj.project(sx(bbox.xMin), sy(bbox.yMin));
   const c2 = proj.project(sx(bbox.xMax), sy(bbox.yMin));
@@ -367,7 +266,7 @@ function Heatmap({ grid, sx, sy, proj }){
   return (
     <g pointerEvents="none">
       {cells.map((c, k) => (
-        <path key={k} d={c.d} fill={ytmColor(c.v)} fillOpacity={proj.isIso ? 0.7 : 0.55} />
+        <path key={k} d={c.d} fill={ytmColor(c.v)} fillOpacity={0.55} />
       ))}
     </g>
   );
@@ -626,3 +525,232 @@ function CrosshairTooltip({ crosshair, yMode }){
     </div>
   );
 }
+
+
+// ═══════════════════════════════════════════════════════════════════
+// «Горизонт» — взгляд от поверхности.
+// X = срок (или качество, тогглер), Y = residual в bps.
+// 0 = поверхность; точки выше — солидные, ниже — полу-прозрачные с
+// диагональной штриховкой («утонули»). Идея: видна именно высота
+// отклонения, а пара (срок, качество) свёрнута в одну ось.
+// ═══════════════════════════════════════════════════════════════════
+function HorizonView({ fitted }){
+  const yMode      = useMarketSurface(s => s.yMode);
+  const horizonX   = useMarketSurface(s => s.horizonX);
+  const hoverId    = useMarketSurface(s => s.hoverId);
+  const setHover   = useMarketSurface(s => s.setHover);
+  const setSelected = useMarketSurface(s => s.setSelected);
+  const selectedId = useMarketSurface(s => s.selectedId);
+  const openWin    = useWindows(s => s.open);
+
+  const { points } = fitted || { points: [] };
+
+  // Bbox по X (срок или качество) и Y (residual в %).
+  const xKey = horizonX === 'quality' ? 'y' : 'x';     // p.y = quality, p.x = maturity
+  const xLabel = horizonX === 'quality'
+    ? (yMode === 'rating' ? 'кредитный рейтинг' : 'качество')
+    : 'срок до погашения, лет';
+
+  const ref = useRef(null);
+  const svgRef = useRef(null);
+
+  const bbox = useMemo(() => {
+    if(!points.length) return { xMin: 0, xMax: 10, yMin: -2, yMax: 2 };
+    const xs = points.map(p => p[xKey]);
+    let xMin = Math.min(...xs), xMax = Math.max(...xs);
+    const padX = (xMax - xMin) * 0.06 + 0.2;
+    xMin -= padX; xMax += padX;
+    if(horizonX === 'quality'){ xMin = Math.max(0, xMin); xMax = Math.min(100, xMax); }
+    // Residual в % YTM. Симметричный диапазон вокруг 0.
+    const rs = points.map(p => p.residual).filter(v => v != null && isFinite(v));
+    const maxAbs = rs.length ? Math.max(0.5, Math.max(...rs.map(Math.abs)) * 1.15) : 2;
+    return { xMin, xMax, yMin: -maxAbs, yMax: maxAbs };
+  }, [points, xKey, horizonX]);
+
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+  const padTop = PAD.top;
+  const sx = v => PAD.left + (v - bbox.xMin) / (bbox.xMax - bbox.xMin) * innerW;
+  const sy = v => padTop + (1 - (v - bbox.yMin) / (bbox.yMax - bbox.yMin)) * innerH;
+
+  const sr = (vol) => {
+    if(!vol || vol <= 0) return 4;
+    const t = Math.log10(vol);
+    return 4 + Math.max(0, Math.min(1, t / 2.2)) * 10;
+  };
+
+  // Тики X.
+  const xTicks = useMemo(() => {
+    if(horizonX === 'quality' && yMode === 'rating'){
+      return RATING_TICKS
+        .filter(t => t.ord >= bbox.xMin && t.ord <= bbox.xMax)
+        .map(t => ({ v: t.ord, label: t.label }));
+    }
+    if(horizonX === 'quality'){
+      const out = [];
+      for(let v = 0; v <= 100; v += 20){
+        if(v >= bbox.xMin && v <= bbox.xMax) out.push({ v, label: String(v) });
+      }
+      return out;
+    }
+    const ticks = [];
+    const start = Math.ceil(bbox.xMin), end = Math.floor(bbox.xMax);
+    let step = 1;
+    if(end - start > 12) step = 2;
+    if(end - start > 25) step = 5;
+    for(let v = start; v <= end; v += step) ticks.push({ v, label: String(v) });
+    return ticks;
+  }, [bbox.xMin, bbox.xMax, horizonX, yMode]);
+
+  // Тики Y по shapely-уровням ±N bps.
+  const yTicks = useMemo(() => {
+    const span = (bbox.yMax - bbox.yMin) / 2;
+    let step;
+    if(span > 5) step = 2;
+    else if(span > 2) step = 1;
+    else if(span > 1) step = 0.5;
+    else step = 0.25;
+    const ticks = [];
+    for(let v = -10; v <= 10; v += step){
+      if(v >= bbox.yMin && v <= bbox.yMax) ticks.push(+v.toFixed(2));
+    }
+    return ticks;
+  }, [bbox.yMin, bbox.yMax]);
+
+  const [tip, setTip] = useState(null);
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+
+  const onPointEnter = (p, e) => {
+    setHover(p.secid);
+    const r = ref.current?.getBoundingClientRect();
+    if(!r) return;
+    setContainerSize({ w: r.width, h: r.height });
+    setTip({ p, x: e.clientX - r.left, y: e.clientY - r.top });
+  };
+  const onPointLeave = () => { setHover(null); setTip(null); };
+  const onPointClick = (p) => {
+    setSelected(p.secid);
+    openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: null, mode: 'medium' });
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto select-none"
+        preserveAspectRatio="xMidYMid meet">
+
+        {/* Фон-плашка */}
+        <rect x={PAD.left} y={padTop} width={innerW} height={innerH}
+          fill="#0a0e14" stroke="#222a37" />
+
+        {/* Зоны: верхняя половина (выше горизонта) — мягкий тёплый
+            оттенок; нижняя — холодный. Создаёт сразу ощущение
+            «небо ↑ / вода ↓». */}
+        <rect x={PAD.left} y={padTop} width={innerW} height={sy(0) - padTop}
+          fill="#ff4d6d" fillOpacity="0.03" pointerEvents="none" />
+        <rect x={PAD.left} y={sy(0)} width={innerW} height={padTop + innerH - sy(0)}
+          fill="#00d4ff" fillOpacity="0.04" pointerEvents="none" />
+
+        {/* Горизонтальные сетки на каждом тике Y */}
+        {yTicks.map(t => (
+          <line key={'gy' + t}
+            x1={PAD.left} x2={W - PAD.right}
+            y1={sy(t)} y2={sy(t)}
+            stroke="#1a212c" strokeDasharray="2 4" pointerEvents="none" />
+        ))}
+        {/* Вертикальные сетки */}
+        {xTicks.map(t => (
+          <line key={'gx' + t.v}
+            x1={sx(t.v)} x2={sx(t.v)} y1={padTop} y2={padTop + innerH}
+            stroke="#1a212c" strokeDasharray="2 4" pointerEvents="none" />
+        ))}
+
+        {/* Линия горизонта (residual = 0) */}
+        <line x1={PAD.left} x2={W - PAD.right} y1={sy(0)} y2={sy(0)}
+          stroke="#9ba3b1" strokeOpacity="0.85" strokeWidth="1.4" />
+        <text x={W - PAD.right - 4} y={sy(0) - 4}
+          fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="end">
+          поверхность · E[YTM]
+        </text>
+
+        {/* Подписи тиков */}
+        {xTicks.map(t => (
+          <text key={'tx' + t.v}
+            x={sx(t.v)} y={padTop + innerH + 14}
+            fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+            {t.label}
+          </text>
+        ))}
+        {yTicks.map(t => {
+          const bps = Math.round(t * 100);
+          const c = bps > 0 ? '#ff4d6d' : bps < 0 ? '#00d4ff' : '#9ba3b1';
+          if(bps === 0) return null;
+          return (
+            <text key={'ty' + t}
+              x={PAD.left - 6} y={sy(t) + 3}
+              fill={c} fillOpacity="0.7"
+              fontSize="9" fontFamily="JetBrains Mono, monospace" textAnchor="end">
+              {bps > 0 ? '+' : ''}{bps}bps
+            </text>
+          );
+        })}
+
+        {/* Подписи осей */}
+        <text x={W / 2} y={H - 6} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+          {xLabel}
+        </text>
+        <text x={14} y={H / 2} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace"
+          transform={`rotate(-90 14 ${H / 2})`} textAnchor="middle">
+          residual, bps
+        </text>
+
+        {/* Точки. У каждой стержень от линии горизонта до её
+            позиции — наглядно видно, насколько торчит/утонула. */}
+        {points.map(p => {
+          if(p.residual == null) return null;
+          const r = sr(p.volumeBn);
+          const xPos = sx(p[xKey]);
+          const yPos = sy(p.residual);
+          const yZero = sy(0);
+          const isHover = hoverId === p.secid;
+          const isSel = selectedId === p.secid;
+          const above = p.residual > 0;
+          const stickColor = above ? '#ff4d6d' : '#00d4ff';
+          const fill = zScoreColor(p.zscore);
+          // «Утонувшие» точки полу-прозрачные.
+          const fillOpacity = above ? (p.sparse ? 0.5 : 0.95) : (p.sparse ? 0.18 : 0.4);
+          const stroke = isSel ? '#00d4ff' : '#0a0e14';
+          return (
+            <g key={p.secid}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={e => onPointEnter(p, e)}
+              onMouseMove={e => onPointEnter(p, e)}
+              onMouseLeave={onPointLeave}
+              onClick={() => onPointClick(p)}>
+              {/* Стержень от поверхности до точки */}
+              <line x1={xPos} y1={yZero} x2={xPos} y2={yPos}
+                stroke={stickColor} strokeOpacity={isHover ? 0.9 : 0.6}
+                strokeWidth={isHover ? 2 : 1.2} />
+              {/* Тень-точка на горизонте */}
+              <circle cx={xPos} cy={yZero} r={Math.max(2, r * 0.4)}
+                fill="#000" fillOpacity="0.25" />
+              {/* Сама точка */}
+              <circle cx={xPos} cy={yPos} r={isHover ? r + 2 : r}
+                fill={fill} fillOpacity={fillOpacity}
+                stroke={stroke} strokeWidth={isSel ? 2.5 : 1} />
+            </g>
+          );
+        })}
+      </svg>
+
+      {tip && <PointTooltip tip={tip} containerWidth={containerSize.w} containerHeight={containerSize.h} />}
+
+      {!points.length && (
+        <div className="absolute inset-0 grid place-items-center text-text3 text-sm pointer-events-none">
+          Нет точек по текущим фильтрам.
+        </div>
+      )}
+    </div>
+  );
+}
+
