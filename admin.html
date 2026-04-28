@@ -95,7 +95,8 @@
     </div>
     <div class="row" style="margin-top:8px">
       <button onclick="run('/collect/reports?limit=15&only_traded=1')">📊 Отчётность · 15 (торгуемые)</button>
-      <button onclick="run('/collect/reports?limit=15')">📊 Отчётность · 15 (все ИНН)</button>
+      <button onclick="run('/collect/reports?limit=15&only_traded=1&force=1')">♻️ Force · 15 (перепрогон новой версии парсера)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=15')">📊 · 15 (все ИНН)</button>
       <button class="secondary" onclick="run('/collect/reports?limit=30&only_traded=1&max_ms=280000')">📊 · 30 (paid plan)</button>
     </div>
     <div class="row" style="margin-top:8px">

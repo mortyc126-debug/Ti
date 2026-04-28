@@ -280,7 +280,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.4-zachbiz-chain',  // фундамент: MOEX, DaData, buxbalans, ГИР БО
+      core:        '0.9.5-force-refetch',  // фундамент: MOEX, DaData, buxbalans, ГИР БО
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -291,7 +291,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.4-zachbiz-chain',
+    version: '0.9.5-force-refetch',
   });
 }
 
@@ -2637,11 +2637,15 @@ async function collectReports(env, url){
       LEFT JOIN (
         SELECT inn, MAX(fy_year) AS max_year FROM issuer_reports GROUP BY inn
       ) rmax ON rmax.inn = q.inn
-      WHERE (q.next_due IS NULL OR q.next_due <= datetime('now'))
+      WHERE (
+              ? = 1                              -- force: игнорировать cooldown тоже
+              OR q.next_due IS NULL
+              OR q.next_due <= datetime('now')
+            )
         AND (i.kind IS NULL OR i.kind = 'corporate')
         ${tradedFilter}
         AND (
-          ? = 1                              -- force: берём всех
+          ? = 1                              -- force: max_year не важен
           OR rmax.max_year IS NULL           -- никогда не пробовали
           OR rmax.max_year < ?               -- последний год < ожидаемого
         )
@@ -2653,8 +2657,11 @@ async function collectReports(env, url){
       LIMIT ?
     `;
     try {
+      // bind в порядке параметров: today (для is_traded), force (для
+      // первого ?, cooldown), force (для второго ?, max_year),
+      // expected, limit.
       const r = await env.DB.prepare(sql)
-        .bind(today, force ? 1 : 0, expected, limit).all();
+        .bind(today, force ? 1 : 0, force ? 1 : 0, expected, limit).all();
       queue = r.results || [];
     } catch(e){ errors.push('queue: ' + e.message); }
   }
