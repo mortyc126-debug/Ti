@@ -137,7 +137,7 @@ export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, ov
           stroke="#9ba3b1" strokeOpacity="0.85" strokeWidth="1.4" />
         <text x={W - PAD.right - 4} y={sy(0) - 4}
           fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="end">
-          поверхность · E[YTM]
+          поверхность · E[{kind === 'bond' ? 'YTM' : 'E/P'}]
         </text>
 
         {/* Inline-подсказки направлений Y. Рисуются у правой границы
