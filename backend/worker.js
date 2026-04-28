@@ -1,4 +1,4 @@
-// Cloudflare Worker — бэкенд БондАналитика. v0.9.7-diag-girbo
+// Cloudflare Worker — бэкенд БондАналитика. v0.9.8-girbo-discover
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
@@ -287,7 +287,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.7-diag-girbo',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
+      core:        '0.9.8-girbo-discover',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -298,7 +298,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.7-diag-girbo',
+    version: '0.9.8-girbo-discover',
   });
 }
 
@@ -1482,12 +1482,22 @@ async function handleDiagGirbo(env, url){
     steps: [],
   };
 
-  // Шаг 1: поиск ИНН — пробуем оба варианта endpoint
+  // Шаг 1: поиск ИНН — пробуем расширенный набор вариантов endpoint.
+  // ФНС за 2024-2026 несколько раз меняла структуру. Перебираем
+  // популярные форматы query string и paths.
   const searchPaths = [
     `/advanced-search/organizations/search?inn=${inn}`,
     `/advanced-search/organizations/search?query=${inn}`,
+    `/advanced-search/organizations/search?query=${inn}&page=0&size=20`,
+    `/advanced-search/organizations/search?text=${inn}`,
     `/nbo/organizations/?inn=${inn}`,
     `/nbo/organizations/search?inn=${inn}`,
+    `/nbo/organizations?query=${inn}`,
+    // Возможны новые API-paths — проверим
+    `/api/v1/organizations?inn=${inn}`,
+    `/api/v1/organizations/search?query=${inn}`,
+    // Поиск по названию (для РусГидро)
+    `/advanced-search/organizations/search?query=РусГидро&page=0&size=20`,
   ];
   let org = null;
   for(const path of searchPaths){
@@ -1496,13 +1506,17 @@ async function handleDiagGirbo(env, url){
       const r = await girboFetch(path, { proxy });
       const got = Array.isArray(r) ? r : (r?.content || r?.organizations || []);
       step.ok = true;
-      step.totalElements = r?.totalElements ?? null;
+      step.responseType = Array.isArray(r) ? 'array' : (typeof r === 'object' ? 'object' : typeof r);
+      step.responseKeys = (typeof r === 'object' && r) ? Object.keys(r).slice(0, 10) : null;
+      step.totalElements = r?.totalElements ?? r?.total ?? null;
+      step.contentLength = Array.isArray(got) ? got.length : null;
       step.contentSample = Array.isArray(got) && got.length > 0
         ? { keys: Object.keys(got[0]), first: got[0] }
         : (Array.isArray(got) ? '[]' : 'no array');
       result.steps.push(step);
       if(Array.isArray(got) && got.length > 0){
         org = got.find(o => String(o.inn || o.organisationInn) === inn) || got[0];
+        // прерываем на первом непустом
         break;
       }
     } catch(e){
