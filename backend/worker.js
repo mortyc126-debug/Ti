@@ -1,4 +1,4 @@
-// Cloudflare Worker — бэкенд БондАналитика. v0.9.8-girbo-discover
+// Cloudflare Worker — бэкенд БондАналитика. v0.9.9-girbo-2026
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
@@ -287,7 +287,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.8-girbo-discover',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
+      core:        '0.9.9-girbo-2026',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -298,7 +298,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.8-girbo-discover',
+    version: '0.9.9-girbo-2026',
   });
 }
 
@@ -2370,36 +2370,70 @@ async function girboFetch(path, opts){
 // Один эмитент: ИНН → series {год: {rev, ebit, np, ...}}.
 // Возвращает {series, company, ogrn, errors}. Бросает Error если
 // ГИР БО вообще ничего не нашёл по ИНН.
-async function girboFetchByInn(inn, maxYears = 3, opts){
+async function girboFetchByInn(inn, maxYears = 5, opts){
   // opts.proxy — URL Yandex Cloud API Gateway (типа
   // https://xxx.apigw.yandexcloud.net/?u=) для обхода гео-блока
   // bo.nalog.gov.ru. Если null — пробуем напрямую (упадёт на CF Worker).
+  // opts.env — для доступа к issuers (нужно имя для query).
   const proxy = opts?.proxy || null;
-  // 1. Поиск организации по ИНН
-  let orgs = [];
-  for(const path of [
-    `/advanced-search/organizations/search?inn=${inn}`,
-    `/nbo/organizations/?inn=${inn}`,
-  ]){
-    try {
-      const r = await girboFetch(path, { proxy });
-      const got = Array.isArray(r) ? r : (r?.content || r?.organizations || []);
-      if(got.length){ orgs = got; break; }
-    } catch(_){ /* пробуем следующий */ }
-  }
-  if(!orgs.length) throw new Error('ГИР БО: ИНН ' + inn + ' не найден');
-  const org = orgs.find(o => String(o.inn || o.organisationInn) === inn) || orgs[0];
-  const orgId = org.id || org.organizationId;
-  if(!orgId) throw new Error('ГИР БО: нет orgId в ответе');
+  const env = opts?.env;
 
-  // 2. Список годовых отчётов
-  const bfoListResp = await girboFetch(`/nbo/organizations/${orgId}/bfo/`, { proxy });
+  // ФНС в 2025-2026 переделала API:
+  //   • Поиск только через `?query=<имя>` (НЕ по ИНН — даёт HTTP 400).
+  //   • bfo возвращается с полной детализацией balance/financialResult
+  //     внутри `typeCorrections[0].correction` — отдельные запросы
+  //     /nbo/details/* НЕ нужны.
+  // Берём имя эмитента из issuers/bond_daily, ищем по нему, фильтруем
+  // по точному совпадению ИНН (поиск по тексту даёт 20-30 кандидатов
+  // с похожими названиями).
+
+  // 1. Получим имя эмитента
+  let companyName = null;
+  if(env?.DB){
+    try {
+      const r = await env.DB.prepare(
+        'SELECT short_name, name FROM issuers WHERE inn = ?'
+      ).bind(inn).first();
+      companyName = r?.short_name || r?.name || null;
+    } catch(_){}
+    if(!companyName){
+      // Fallback на bond_daily
+      try {
+        const r = await env.DB.prepare(
+          "SELECT MAX(emitent_name) AS n FROM bond_daily WHERE emitent_inn = ?"
+        ).bind(inn).first();
+        companyName = r?.n || null;
+        if(companyName) companyName = shortenIssuerName(companyName);
+      } catch(_){}
+    }
+  }
+  if(!companyName){
+    throw new Error('ГИР БО: для поиска нужно имя эмитента (issuers.short_name пуст)');
+  }
+
+  // 2. Поиск по имени. ФНС ищет полнотекстово, поэтому может вернуть
+  //    20-30 организаций со словом из имени. Берём первые 50.
+  const searchUrl = `/advanced-search/organizations/search?query=${encodeURIComponent(companyName)}&page=0&size=50`;
+  const sr = await girboFetch(searchUrl, { proxy });
+  const candidates = sr?.content || [];
+  if(!candidates.length){
+    throw new Error(`ГИР БО: «${companyName}» не найдено в ФНС`);
+  }
+  // Фильтр по точному ИНН
+  const org = candidates.find(c => String(c.inn) === inn);
+  if(!org){
+    throw new Error(`ГИР БО: ИНН ${inn} не среди ${candidates.length} результатов по «${companyName}»`);
+  }
+
+  // 3. Список годовых отчётов с полной детализацией
+  const bfoListResp = await girboFetch(`/nbo/organizations/${org.id}/bfo/`, { proxy });
   const bfoList = Array.isArray(bfoListResp)
     ? bfoListResp
     : (bfoListResp.content || bfoListResp.bfo || []);
+
+  // Только годовые. Новая схема: period — это строка "2024" / "2025".
   const isAnnual = (b) => {
     if(/^\d{4}$/.test(String(b.period || ''))) return true;
-    if(/year|год/i.test(b.period || b.bfoPeriod || '')) return true;
     if(b.periodType === 'YEAR' || b.periodType === 12) return true;
     if(Array.isArray(b.bfoPeriodTypes) && b.bfoPeriodTypes.includes(12)) return true;
     return false;
@@ -2411,57 +2445,35 @@ async function girboFetchByInn(inn, maxYears = 3, opts){
     .slice(0, maxYears);
   if(!annual.length) throw new Error('ГИР БО: нет годовых отчётов');
 
-  // 3. Детали каждого отчёта: balance + financial_result
+  // 4. Извлекаем current<code> для каждого года.
+  //    balance + financialResult уже здесь — отдельные запросы НЕ нужны!
   const series = {};
   const rawByYear = {};
   const errors = [];
   for(const b of annual){
     try {
-      const corr = b?.typeCorrections?.[0]?.correction
-                || b?.corrections?.[0]?.correction
-                || b?.correction
-                || null;
-      const corrId = corr?.id || b.id || b.bfoId;
-      let det;
-      if(corr && (corr.balance || corr.financialResult) &&
-         (corr.balance?.current1600 != null || corr.financialResult?.current2110 != null)){
-        det = Object.assign({}, corr.balance || {}, corr.financialResult || {});
-      } else {
-        const [balance, pnl] = await Promise.all([
-          girboFetch('/nbo/details/balance?id=' + corrId, { proxy }).catch(() => ({})),
-          girboFetch('/nbo/details/financial_result?id=' + corrId, { proxy }).catch(() => ({})),
-        ]);
-        det = Object.assign({}, balance, pnl);
-      }
-      const yearMain = b.year || (b.period ? parseInt(b.period, 10) : null) || det.year;
-      const yearPrev = yearMain ? yearMain - 1 : null;
-      // build* — формирует {rev, ebit, ...} из current<code>/previous<code>.
-      // ГИР БО даёт «текущий» и «прошлый» годы внутри одного отчёта,
-      // поэтому 1 годовой отчёт = 2 года данных бесплатно.
-      const buildVals = (kind) => {
-        const v = {};
-        for(const [field, codes] of Object.entries(GIRBO_CODES)){
-          let sum = 0, any = false;
-          for(const c of codes){
-            const x = det[kind + c];
-            if(typeof x === 'number'){ sum += x; any = true; }
-          }
-          if(any){
-            const isExpense = field === 'int_exp' || field === 'tax_exp';
-            v[field] = (isExpense ? Math.abs(sum) : sum) / 1e6; // тыс ₽ → млрд ₽
-          }
+      const corr = b?.typeCorrections?.[0]?.correction;
+      if(!corr){ errors.push({ year: yearOf(b), error: 'no correction' }); continue; }
+      const det = Object.assign({}, corr.balance || {}, corr.financialResult || {});
+      const year = yearOf(b);
+      if(!year) continue;
+
+      // build из current<code>: коды РСБУ → наши короткие метрики (млрд ₽)
+      const v = {};
+      for(const [field, codes] of Object.entries(GIRBO_CODES)){
+        let sum = 0, any = false;
+        for(const c of codes){
+          const x = det['current' + c];
+          if(typeof x === 'number'){ sum += x; any = true; }
         }
-        return Object.keys(v).length ? v : null;
-      };
-      const cur = buildVals('current');
-      if(cur && yearMain && !series[yearMain]){
-        series[yearMain] = cur;
-        rawByYear[yearMain] = pickRaw(det, 'current');
+        if(any){
+          const isExpense = field === 'int_exp' || field === 'tax_exp';
+          v[field] = (isExpense ? Math.abs(sum) : sum) / 1e6; // тыс ₽ → млрд ₽
+        }
       }
-      const prev = buildVals('previous');
-      if(prev && yearPrev && !series[yearPrev]){
-        series[yearPrev] = prev;
-        rawByYear[yearPrev] = pickRaw(det, 'previous');
+      if(Object.keys(v).length){
+        series[year] = v;
+        rawByYear[year] = pickRaw(det, 'current');
       }
     } catch(e){
       errors.push({ year: yearOf(b), error: e.message });
@@ -2470,9 +2482,9 @@ async function girboFetchByInn(inn, maxYears = 3, opts){
   return {
     series,
     rawByYear,
-    company: org.name || org.shortName || org.fullName || null,
+    company: org.shortName || org.fullName || companyName,
     inn,
-    ogrn: org.ogrn || org.organisationOgrn || null,
+    ogrn: org.ogrn || null,
     errors,
   };
 }
