@@ -20,7 +20,9 @@ export const useWindows = create(
       zTop: 1,
 
       open(payload){
-        // payload: {kind: 'issuer'|'bond'|'stock', id, title, ticker?, mode?, tab?}
+        // payload: {kind: 'issuer'|'bond'|'stock', id, title, ticker?, mode?, tab?, inn?}
+        // Для kind='issuer' хранится отдельное поле inn (даже если совпадает
+        // с id), чтобы WindowLayer мог его передать в api.issuerCard().
         const wins = get().windows;
         const same = wins.find(w => w.kind === payload.kind && w.id === payload.id);
         if(same){
@@ -38,6 +40,7 @@ export const useWindows = create(
           wid: nextId(),
           kind: payload.kind,
           id: payload.id,
+          inn: payload.inn || null,
           title: payload.title || payload.id,
           ticker: payload.ticker || null,
           mode,

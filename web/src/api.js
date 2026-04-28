@@ -27,8 +27,12 @@ export const api = {
     const q = new URLSearchParams(params).toString();
     return req(`/bond/latest${q ? '?' + q : ''}`);
   },
-  bondHistory: (secid)       => req(`/bond/history?secid=${secid}`),
-  bondIssuer: (inn)          => req(`/bond/issuer?inn=${inn}`),
-  catalog: ()                => req('/catalog'),
-  issuerCard: (inn)          => req(`/issuer/${encodeURIComponent(inn)}`),
+  bondHistory: (secid)         => req(`/bond/history?secid=${secid}`),
+  bondIssuer: (inn)            => req(`/bond/issuer?inn=${inn}`),
+  catalog: ()                  => req('/catalog'),
+  issuerCard: (inn)            => req(`/issuer/${encodeURIComponent(inn)}`),
+  // Расширенные endpoint'ы (бэкенд v0.9.x)
+  issuerReports: (inn)         => req(`/issuer/${encodeURIComponent(inn)}/reports`),
+  issuerAffiliations: (inn)    => req(`/issuer/${encodeURIComponent(inn)}/affiliations`),
+  reportsLatest: (limit = 50)  => req(`/reports/latest?limit=${limit}`),
 };

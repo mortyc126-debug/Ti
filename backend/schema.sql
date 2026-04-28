@@ -141,11 +141,17 @@ CREATE TABLE IF NOT EXISTS issuers (
                                          --   ["Газпром", "Gazprom", "ОАО Газпром"]
   meta         TEXT,                     -- JSON, всё лишнее (telegram, сайт, ИКАО ...)
   source       TEXT,                     -- 'moex' | 'girbo' | 'edisc' | 'manual'
+  kind         TEXT,                     -- 'corporate' | 'subfederal' | 'municipal' | 'federal' | 'bank'
+                                         -- corporate сдают РСБУ по 402-ФЗ (ГИР БО/buxbalans),
+                                         -- остальные — нет: subfederal/municipal/federal —
+                                         -- бюджет 86н, bank — формы ЦБ 101/102. Очередь
+                                         -- reports_queue фильтрует по kind='corporate'.
   updated_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_issuers_ticker ON issuers(ticker);
 CREATE INDEX IF NOT EXISTS idx_issuers_sector ON issuers(sector);
 CREATE INDEX IF NOT EXISTS idx_issuers_name   ON issuers(short_name);
+CREATE INDEX IF NOT EXISTS idx_issuers_kind   ON issuers(kind);
 
 -- ── Известные ISIN/secid акций по ИНН ─────────────────────────────────
 -- Один эмитент может иметь несколько secid акций (обычная + префы:
@@ -160,3 +166,126 @@ CREATE TABLE IF NOT EXISTS issuer_securities (
   PRIMARY KEY (inn, secid)
 );
 CREATE INDEX IF NOT EXISTS idx_issec_secid ON issuer_securities(secid);
+
+-- ── Финансовая отчётность эмитентов (РСБУ из ГИР БО) ──────────────────
+-- Одна строка = (ИНН, год, тип отчётности). Значения хранятся в МЛРД ₽
+-- (внутренняя единица БондАналитика). Источник по умолчанию — ГИР БО,
+-- но схема готова и для аудит-it / e-disclosure / ручного ввода.
+--
+-- Зачем именно длинные колонки, а не JSON: SQL-агрегации (медианы по
+-- отрасли, ранжирование, топ-N по EBITDA-марже) гораздо быстрее идут по
+-- столбцам. Все 13 наших коротких метрик (rev/ebitda/ebit/np/...) +
+-- сырые строки ГИР БО (на случай если понадобится восстановить
+-- расчёт) ложатся в одну строку.
+CREATE TABLE IF NOT EXISTS issuer_reports (
+  inn          TEXT NOT NULL,           -- ИНН эмитента, FK на issuers
+  fy_year      INTEGER NOT NULL,        -- финансовый год (например 2024)
+  period       TEXT NOT NULL DEFAULT 'FY', -- 'FY' | 'H1' | '9M' | 'Q1' | 'Q3'
+  std          TEXT NOT NULL DEFAULT 'РСБУ', -- 'РСБУ' | 'МСФО'
+  -- Все суммы в МЛРД ₽
+  rev          REAL,                    -- Выручка (стр. 2110)
+  ebitda       REAL,                    -- EBITDA (расчётная)
+  ebit         REAL,                    -- Операц. прибыль (стр. 2200)
+  np           REAL,                    -- Чистая прибыль (стр. 2400)
+  int_exp      REAL,                    -- Процентные расходы (стр. 2330, по модулю)
+  tax_exp      REAL,                    -- Налог на прибыль (стр. 2410)
+  assets       REAL,                    -- Всего активов (стр. 1600)
+  ca           REAL,                    -- Оборотные активы (стр. 1200)
+  cl           REAL,                    -- Краткосрочные обязательства (стр. 1500)
+  debt         REAL,                    -- Общий долг (стр. 1410+1510)
+  cash         REAL,                    -- Денежные средства (стр. 1250)
+  ret          REAL,                    -- Нераспределённая прибыль (стр. 1370)
+  eq           REAL,                    -- Собственный капитал (стр. 1300)
+  -- Производные коэффициенты (заполняются триггером или коллектором)
+  roa_pct      REAL,                    -- np / assets × 100
+  ros_pct      REAL,                    -- np / rev × 100
+  ebitda_marg  REAL,                    -- ebitda / rev × 100
+  net_debt_eq  REAL,                    -- (debt - cash) / eq
+  -- Метаданные
+  source       TEXT NOT NULL DEFAULT 'girbo', -- 'girbo' | 'audit-it' | 'edisc' | 'manual'
+  raw          TEXT,                    -- сырой JSON ГИР БО (current<code>) — для дебага
+  fetched_at   TEXT NOT NULL,
+  PRIMARY KEY (inn, fy_year, period, std)
+);
+CREATE INDEX IF NOT EXISTS idx_reports_inn   ON issuer_reports(inn);
+CREATE INDEX IF NOT EXISTS idx_reports_year  ON issuer_reports(fy_year);
+CREATE INDEX IF NOT EXISTS idx_reports_fetch ON issuer_reports(fetched_at);
+
+-- Очередь сбора отчётности. Используется коллектором collectReports
+-- чтобы не дёргать ГИР БО для одних и тех же ИНН на каждом запуске,
+-- а равномерно проходить весь список эмитентов раз в N дней.
+CREATE TABLE IF NOT EXISTS reports_queue (
+  inn            TEXT PRIMARY KEY,
+  last_attempt   TEXT,                  -- когда последний раз пытались
+  last_success   TEXT,                  -- когда последний раз успешно
+  attempts       INTEGER DEFAULT 0,     -- неудачных попыток подряд
+  last_error     TEXT,
+  next_due       TEXT,                  -- когда снова можно дёрнуть
+  priority       INTEGER DEFAULT 0      -- 0 = обычный, выше = чаще
+);
+CREATE INDEX IF NOT EXISTS idx_queue_due ON reports_queue(next_due);
+
+-- ── Кеш AI-вызовов ────────────────────────────────────────────────────
+-- Чтобы не платить за один и тот же запрос дважды (особенно Grok с Live
+-- Search — стоимость порядка $0.015/1k токенов, плюс за поиск). Ключ
+-- `cache_key` = sha256(engine|schema|payload) — payload обычно {inn,
+-- expected_year}. TTL 30 дней — данные ФНС не меняются чаще.
+CREATE TABLE IF NOT EXISTS ai_cache (
+  cache_key    TEXT PRIMARY KEY,         -- sha256
+  engine       TEXT NOT NULL,            -- 'grok' | 'cerebras'
+  schema       TEXT NOT NULL,            -- 'report' | 'event' | 'supplier'
+  inn          TEXT,                     -- для группировки/чистки
+  response     TEXT NOT NULL,            -- сырой JSON из LLM
+  tokens_in    INTEGER,
+  tokens_out   INTEGER,
+  fetched_at   TEXT NOT NULL,
+  ttl_until    TEXT NOT NULL             -- после этой даты считается просроченным
+);
+CREATE INDEX IF NOT EXISTS idx_aic_inn   ON ai_cache(inn);
+CREATE INDEX IF NOT EXISTS idx_aic_ttl   ON ai_cache(ttl_until);
+CREATE INDEX IF NOT EXISTS idx_aic_engin ON ai_cache(engine);
+
+-- Журнал использования AI — для бюджета и мониторинга. На каждый
+-- успешный/неуспешный вызов одна строка. По нему /status считает
+-- ai_calls_today / ai_tokens_today.
+CREATE TABLE IF NOT EXISTS ai_calls_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  engine      TEXT NOT NULL,
+  schema      TEXT,
+  inn         TEXT,
+  ok          INTEGER NOT NULL DEFAULT 0,  -- 1 если вернул валидный JSON
+  cache_hit   INTEGER NOT NULL DEFAULT 0,
+  tokens_in   INTEGER,
+  tokens_out  INTEGER,
+  duration_ms INTEGER,
+  error       TEXT,
+  called_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_aic_log_at  ON ai_calls_log(called_at);
+CREATE INDEX IF NOT EXISTS idx_aic_log_eng ON ai_calls_log(engine);
+
+-- ── Аффилиации эмитентов (учредители + связи холдингов) ───────────────
+-- Источник по умолчанию — DaData (10к запросов/день free), берёт данные
+-- из ЕГРЮЛ. Один child_inn может иметь нескольких parent (если у SPV
+-- два-три учредителя). Также храним физлица-руководителей (role=
+-- 'management') — может пригодиться для поиска связей через CEO.
+--
+-- Идея использования: для SPV/ВДО, по которым buxbalans/ГИР БО не дают
+-- РСБУ, через эту таблицу находим parent (у которого buxbalans уже
+-- собрал отчётность) и работаем с цифрами материнской компании. Это
+-- закрывает «другие пути» из ТЗ для случаев, когда сама эмитент-
+-- структура нечего не публикует.
+CREATE TABLE IF NOT EXISTS issuer_affiliations (
+  child_inn   TEXT NOT NULL,           -- ИНН эмитента-«дочки»
+  parent_inn  TEXT,                    -- ИНН материнской (NULL если физлицо)
+  parent_name TEXT,                    -- имя как в ЕГРЮЛ
+  share_pct   REAL,                    -- доля в УК
+  role        TEXT NOT NULL,           -- 'founder' | 'management'
+  parent_kind TEXT,                    -- 'LEGAL' | 'PHYSICAL' | 'STATE'
+  source      TEXT NOT NULL,           -- 'dadata' | 'manual' | 'inferred'
+  fetched_at  TEXT NOT NULL,
+  PRIMARY KEY (child_inn, parent_inn, role)
+);
+CREATE INDEX IF NOT EXISTS idx_aff_parent ON issuer_affiliations(parent_inn);
+CREATE INDEX IF NOT EXISTS idx_aff_child  ON issuer_affiliations(child_inn);
+CREATE INDEX IF NOT EXISTS idx_aff_role   ON issuer_affiliations(role);

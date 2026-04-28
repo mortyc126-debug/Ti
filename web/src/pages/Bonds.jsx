@@ -1,30 +1,76 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Star, RefreshCw, Download, Clock, Filter as FilterIcon, Copy, Check } from 'lucide-react';
 import Card from '../components/ui/Card.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Button from '../components/ui/Button.jsx';
 import Filters from '../components/bonds/Filters.jsx';
 import { DEFAULT_FILTERS, applyFilters } from '../components/bonds/applyFilters.js';
-import { bondsMock, BOND_TYPES, safetyScore, bqiScore } from '../data/bondsCatalog.js';
+import { BOND_TYPES, safetyScore, bqiScore } from '../data/bondsCatalog.js';
+import { normalizeBond } from '../data/normalizeBond.js';
 import { INDUSTRIES } from '../data/industries.js';
 import { useFavorites } from '../store/favorites.js';
 import { useRecent } from '../store/recent.js';
 import { useWindows } from '../store/windows.js';
+import { api } from '../api.js';
 
 // Страница «Облигации». Большой фильтр в две вкладки (Бумага/Эмитент)
 // + таблица с цветовой индикацией YTM, бейджами рейтинга и кнопкой
 // добавления эмитента в избранное. Клик по имени эмитента открывает
 // плавающее окно (через useWindows). Внутри страницы три вкладки:
 // Список / Избранное-просмотр-результата / Последние просмотренные.
+//
+// Данные тащатся из бэкенда через api.bondLatest(limit=2000). Кешируем
+// в localStorage 5 минут чтобы не дёргать каждый рендер.
 
 const TYPE_LABEL = Object.fromEntries(BOND_TYPES.map(t => [t.id, t.label]));
+const CACHE_KEY = 'bonds_latest_v1';
+const CACHE_TTL = 5 * 60 * 1000; // 5 минут
+
+function loadCached(){
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return null;
+    const { at, data } = JSON.parse(raw);
+    if(Date.now() - at > CACHE_TTL) return null;
+    return data;
+  } catch(_){ return null; }
+}
+function saveCache(data){
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data })); } catch(_){}
+}
 
 export default function Bonds(){
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [tab, setTab] = useState('list');         // list | favs | recent
+  const [bonds, setBonds] = useState(() => loadCached() || []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [updatedAt, setUpdatedAt] = useState(null);
+
+  const fetchBonds = async (force = false) => {
+    if(!force){
+      const cached = loadCached();
+      if(cached?.length){ setBonds(cached); return; }
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await api.bondLatest({ limit: 2000 });
+      const norm = (r.data || []).map(normalizeBond);
+      setBonds(norm);
+      saveCache(norm);
+      setUpdatedAt(new Date().toISOString());
+    } catch(e){
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchBonds(false); /* eslint-disable-line */ }, []);
 
   const patch = (p) => setFilters(p == null ? DEFAULT_FILTERS : { ...filters, ...p });
-  const filtered = useMemo(() => applyFilters(bondsMock, filters), [filters]);
+  const filtered = useMemo(() => applyFilters(bonds, filters), [bonds, filters]);
 
   return (
     <div className="space-y-5">
@@ -32,14 +78,23 @@ export default function Bonds(){
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Облигации</h1>
           <p className="text-text2 text-sm mt-1">
-            Каталог mock — фильтры работают на клиенте. Реальные данные
-            подсосутся через api.bondLatest когда backend научится отдавать
-            расширенный набор полей.
+            {loading && 'Загружаю свежий снимок MOEX…'}
+            {error && (
+              <span className="text-danger">Ошибка: {error}. Используется кеш {bonds.length ? `(${bonds.length} бумаг)` : ''}.</span>
+            )}
+            {!loading && !error && bonds.length > 0 && (
+              <>В базе {bonds.length.toLocaleString('ru')} бумаг с MOEX. Фильтры работают на клиенте.{updatedAt && <> Обновлено {new Date(updatedAt).toLocaleTimeString('ru')}.</>}</>
+            )}
+            {!loading && !error && bonds.length === 0 && (
+              <>Нет данных — backend не вернул результата. Попробуй обновить.</>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" icon={RefreshCw}>Обновить</Button>
-          <Button variant="outline" size="sm" icon={Download}>CSV</Button>
+          <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => fetchBonds(true)} disabled={loading}>
+            {loading ? 'Загрузка…' : 'Обновить'}
+          </Button>
+          <Button variant="outline" size="sm" icon={Download} onClick={() => exportCsv(filtered)}>CSV</Button>
         </div>
       </div>
 
@@ -51,11 +106,25 @@ export default function Bonds(){
         <ResultTab id="recent" icon={Clock}      label="Последнее" active={tab} onClick={setTab} />
       </div>
 
-      {tab === 'list'   && <BondTable rows={filtered} />}
+      {tab === 'list'   && <BondTable rows={filtered} loading={loading} />}
       {tab === 'favs'   && <FavsView />}
       {tab === 'recent' && <RecentView />}
     </div>
   );
+}
+
+function exportCsv(rows){
+  if(!rows?.length) return;
+  const cols = ['secid','isin','name','issuer','issuerInn','type','listing','price','ytm','duration_years','volume_bn','mat_date','currency','rating'];
+  const esc = (v) => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+  const lines = [cols.join(',')];
+  for(const r of rows) lines.push(cols.map(c => esc(r[c])).join(','));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `bonds-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function ResultTab({ id, icon: Icon, label, count, active, onClick }){
@@ -76,7 +145,7 @@ function ResultTab({ id, icon: Icon, label, count, active, onClick }){
   );
 }
 
-function BondTable({ rows }){
+function BondTable({ rows, loading }){
   return (
     <Card padded={false}>
       <div className="overflow-x-auto">
@@ -97,10 +166,17 @@ function BondTable({ rows }){
           </thead>
           <tbody>
             {rows.map(b => <BondRow key={b.secid} b={b} />)}
-            {!rows.length && (
+            {!rows.length && !loading && (
               <tr>
                 <td colSpan={10} className="p-10 text-center text-text3 text-sm">
                   По текущим фильтрам ничего не нашлось — попробуй сбросить часть условий.
+                </td>
+              </tr>
+            )}
+            {loading && !rows.length && (
+              <tr>
+                <td colSpan={10} className="p-10 text-center text-text3 text-sm">
+                  Загружаю с сервера…
                 </td>
               </tr>
             )}
@@ -118,14 +194,19 @@ function BondRow({ b }){
   const safety = safetyScore(b);
   const bqi    = bqiScore(b);
 
+  // Идентификатор окна — ИНН эмитента (если есть). Без ИНН берём имя
+  // как fallback, но в этом случае WindowLayer не сможет дофетчить
+  // отчётность — покажет минимум.
+  const winId = b.issuerInn || b.issuer || '—';
+
   const openIssuer = () => {
-    const item = { kind: 'issuer', refId: b.issuer, title: b.issuer, ticker: null, ind: b.industry };
-    openWin({ kind: 'issuer', id: b.issuer, title: b.issuer, ticker: null, mode: 'medium' });
+    const item = { kind: 'issuer', refId: winId, title: b.issuer, ticker: null, ind: b.industry, inn: b.issuerInn };
+    openWin({ kind: 'issuer', id: winId, title: b.issuer, ticker: null, mode: 'medium', inn: b.issuerInn });
     pushRecent(item);
   };
   const star = (e) => {
     e.stopPropagation();
-    addFav({ kind: 'issuer', refId: b.issuer, title: b.issuer, ticker: null, ind: b.industry });
+    addFav({ kind: 'issuer', refId: winId, title: b.issuer, ticker: null, ind: b.industry, inn: b.issuerInn });
   };
 
   return (
