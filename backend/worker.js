@@ -276,6 +276,21 @@ async function handleStatus(env){
     xai_configured: !!env.XAI_API_KEY,
     dadata_configured: !!env.DADATA_API_KEY,
     ...aiStats,
+    // Список активных треков — каждый track-branch при merge добавит
+    // сюда свою строчку с фактической версией. Помогает понимать
+    // «что уже залито в прод», особенно при параллельной разработке.
+    tracks: {
+      core:        '0.9.4-zachbiz-chain',  // фундамент: MOEX, DaData, buxbalans, ГИР БО
+      orderbook:   null,                    // TRACK A
+      macro:       null,                    // TRACK B
+      events:      null,                    // TRACK C
+      ratings:     null,                    // TRACK D
+      stress:      null,                    // TRACK E
+      risk:        null,                    // TRACK F
+      frontend:    null,                    // TRACK G (бэкенд не задействован)
+      cbr_bank:    null,                    // TRACK H
+      telegram:    null,                    // TRACK I (отдельный воркер)
+    },
     version: '0.9.4-zachbiz-chain',
   });
 }
