@@ -1,4 +1,4 @@
-// Cloudflare Worker — бэкенд БондАналитика.
+// Cloudflare Worker — бэкенд БондАналитика. v0.9.7-diag-girbo
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
