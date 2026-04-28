@@ -1,13 +1,14 @@
-// Страница «Карта». Пока единственный таб — Облигации (поверхность).
-// Акции/фьючерсы — следующая итерация.
+// Страница «Карта». Три таба, у всех одинаковый «горизонт»-вью с
+// kind-специфичным набором данных и фильтров.
 
 import { useEffect, useState } from 'react';
 import Tabs from '../components/industries/Tabs.jsx';
 import Surface from '../components/market/Surface.jsx';
 
 const TABS = [
-  { id: 'bonds',  label: 'Облигации (поверхность)' },
-  { id: 'stocks', label: 'Акции' },
+  { id: 'bonds',   label: 'Облигации' },
+  { id: 'stocks',  label: 'Акции' },
+  { id: 'futures', label: 'Фьючерсы' },
 ];
 
 function readTab(){
@@ -36,14 +37,9 @@ export default function Market(){
       <Tabs items={TABS} value={tab} onChange={setTab} />
 
       <div className="pt-2">
-        {tab === 'bonds' && <Surface />}
-        {tab === 'stocks' && (
-          <div className="bg-bg2 border border-border rounded-lg p-6 text-text3 text-sm">
-            Поверхность Earnings Yield для акций — следующая итерация. По акциям
-            оси X (EV/EBITDA или бета) и Z (E/P) шкала иная, поэтому отдельный
-            фит. Фьючерсы будут тонким слоем поверх.
-          </div>
-        )}
+        {tab === 'bonds'   && <Surface kind="bond" />}
+        {tab === 'stocks'  && <Surface kind="stock" />}
+        {tab === 'futures' && <Surface kind="future" />}
       </div>
     </div>
   );

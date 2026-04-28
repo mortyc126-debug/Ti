@@ -1,12 +1,12 @@
-// Фильтры «Карты». Единственный режим — Горизонт; вместо тогглера
-// видов — конфигуратор X-оси (срок / рейтинг / один мультипликатор /
-// композит).
+// Фильтры карты, kind-aware. Bonds: типы выпуска + диапазон срока.
+// Stocks/Futures: диапазон капитализации (млрд ₽). Шапка с Y-mode,
+// рейтинг-диапазон, X-ось горизонта — общие.
 
 import { useState } from 'react';
 import { Sliders } from 'lucide-react';
 import { Y_MODES } from '../../lib/qualityComposite.js';
 import { COMP_METRICS } from '../../data/comparisonMetrics.js';
-import { useMarketSurface } from '../../store/marketSurface.js';
+import { useMarketStore } from '../../store/marketSurface.js';
 
 const TYPE_LIST = [
   { id: 'ofz',        label: 'ОФЗ' },
@@ -15,42 +15,61 @@ const TYPE_LIST = [
   { id: 'exchange',   label: 'Биржевые' },
 ];
 
-const X_SOURCES = [
-  { id: 'maturity',   label: 'Срок' },
-  { id: 'rating',     label: 'Рейтинг' },
-  { id: 'multiplier', label: '1 параметр' },
-  { id: 'composite',  label: 'Композит' },
-];
+// Какие источники X-оси показывать в зависимости от kind.
+function xSourcesFor(kind){
+  if(kind === 'bond'){
+    return [
+      { id: 'maturity',   label: 'Срок' },
+      { id: 'rating',     label: 'Рейтинг' },
+      { id: 'multiplier', label: '1 параметр' },
+      { id: 'composite',  label: 'Композит' },
+    ];
+  }
+  return [
+    { id: 'marketCap',  label: 'Кап-ция' },
+    { id: 'rating',     label: 'Рейтинг' },
+    { id: 'multiplier', label: '1 параметр' },
+    { id: 'composite',  label: 'Композит' },
+  ];
+}
 
-const MULT_OPTIONS = ['safety','bqi','icr','nde','de','roa','ebitdaMarg','currentR','equityR','cashR'];
+const BOND_MULT_OPTIONS  = ['safety','bqi','icr','nde','de','roa','ebitdaMarg','currentR','equityR','cashR'];
+const STOCK_MULT_OPTIONS = ['safety','bqi','pe','roa','icr','nde','ebitdaMarg','currentR','equityR'];
 
-export default function SurfaceFilters(){
-  const yMode             = useMarketSurface(s => s.yMode);
-  const setYMode          = useMarketSurface(s => s.setYMode);
-  const types             = useMarketSurface(s => s.types);
-  const toggleType        = useMarketSurface(s => s.toggleType);
-  const ratingMin         = useMarketSurface(s => s.ratingMin);
-  const ratingMax         = useMarketSurface(s => s.ratingMax);
-  const matMin            = useMarketSurface(s => s.matMin);
-  const matMax            = useMarketSurface(s => s.matMax);
-  const bwX               = useMarketSurface(s => s.bwX);
-  const bwY               = useMarketSurface(s => s.bwY);
-  const setRange          = useMarketSurface(s => s.setRange);
-  const setBandwidth      = useMarketSurface(s => s.setBandwidth);
-  const horizonX          = useMarketSurface(s => s.horizonX);
-  const setHorizonX       = useMarketSurface(s => s.setHorizonX);
-  const horizonMultiplier = useMarketSurface(s => s.horizonMultiplier);
-  const setHorizonMult    = useMarketSurface(s => s.setHorizonMultiplier);
-  const horizonMetrics    = useMarketSurface(s => s.horizonMetrics);
-  const toggleMetric      = useMarketSurface(s => s.toggleHorizonMetric);
-  const horizonMode       = useMarketSurface(s => s.horizonMode);
-  const setHorizonMode    = useMarketSurface(s => s.setHorizonMode);
+export default function SurfaceFilters({ kind = 'bond' }){
+  const useStore = useMarketStore(kind);
+
+  const yMode             = useStore(s => s.yMode);
+  const setYMode          = useStore(s => s.setYMode);
+  const types             = useStore(s => s.types);
+  const toggleType        = useStore(s => s.toggleType);
+  const ratingMin         = useStore(s => s.ratingMin);
+  const ratingMax         = useStore(s => s.ratingMax);
+  const matMin            = useStore(s => s.matMin);
+  const matMax            = useStore(s => s.matMax);
+  const mktCapMin         = useStore(s => s.mktCapMin);
+  const mktCapMax         = useStore(s => s.mktCapMax);
+  const bwX               = useStore(s => s.bwX);
+  const bwY               = useStore(s => s.bwY);
+  const setRange          = useStore(s => s.setRange);
+  const setBandwidth      = useStore(s => s.setBandwidth);
+  const horizonX          = useStore(s => s.horizonX);
+  const setHorizonX       = useStore(s => s.setHorizonX);
+  const horizonMultiplier = useStore(s => s.horizonMultiplier);
+  const setHorizonMult    = useStore(s => s.setHorizonMultiplier);
+  const horizonMetrics    = useStore(s => s.horizonMetrics);
+  const toggleMetric      = useStore(s => s.toggleHorizonMetric);
+  const horizonMode       = useStore(s => s.horizonMode);
+  const setHorizonMode    = useStore(s => s.setHorizonMode);
 
   const [paramsOpen, setParamsOpen] = useState(false);
+  const X_SOURCES   = xSourcesFor(kind);
+  const MULT_LIST   = kind === 'bond' ? BOND_MULT_OPTIONS : STOCK_MULT_OPTIONS;
+  const isBond      = kind === 'bond';
 
   return (
     <div className="space-y-2">
-      {/* Y-mode + типы */}
+      {/* Y-mode + (для бондов) типы */}
       <div className="flex items-center flex-wrap gap-2">
         <span className="text-text3 text-[10px] uppercase tracking-wider font-mono mr-1">фит по Y</span>
         <div className="flex gap-0.5 rounded overflow-hidden border border-border">
@@ -59,7 +78,7 @@ export default function SurfaceFilters(){
               key={m.id}
               type="button"
               onClick={() => setYMode(m.id)}
-              title="Влияет на расчёт ожидаемой YTM (поверхности): qualityY(b, mode)"
+              title="Что считается за «качество» при фите поверхности"
               className={[
                 'px-2.5 py-1 text-[11px] font-mono uppercase tracking-wider transition-colors',
                 yMode === m.id ? 'bg-acc-dim text-acc' : 'bg-s2 text-text3 hover:text-text',
@@ -67,18 +86,22 @@ export default function SurfaceFilters(){
             >{m.label}</button>
           ))}
         </div>
-        <span className="text-text3 text-[10px] uppercase tracking-wider font-mono ml-2 mr-1">типы</span>
-        {TYPE_LIST.map(t => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => toggleType(t.id)}
-            className={[
-              'px-2 py-1 rounded text-[11px] font-mono border transition-colors',
-              types[t.id] ? 'bg-acc-dim text-acc border-acc/40' : 'bg-s2 text-text2 border-border hover:text-text',
-            ].join(' ')}
-          >{t.label}</button>
-        ))}
+        {isBond && types && (
+          <>
+            <span className="text-text3 text-[10px] uppercase tracking-wider font-mono ml-2 mr-1">типы</span>
+            {TYPE_LIST.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => toggleType(t.id)}
+                className={[
+                  'px-2 py-1 rounded text-[11px] font-mono border transition-colors',
+                  types[t.id] ? 'bg-acc-dim text-acc border-acc/40' : 'bg-s2 text-text2 border-border hover:text-text',
+                ].join(' ')}
+              >{t.label}</button>
+            ))}
+          </>
+        )}
         <button
           type="button"
           onClick={() => setParamsOpen(v => !v)}
@@ -97,13 +120,23 @@ export default function SurfaceFilters(){
           onMin={v => setRange('ratingMin', v)}
           onMax={v => setRange('ratingMax', v)}
         />
-        <RangeBlock
-          label="срок, лет"
-          min={matMin} max={matMax}
-          absMin={0} absMax={30}
-          onMin={v => setRange('matMin', v)}
-          onMax={v => setRange('matMax', v)}
-        />
+        {isBond ? (
+          <RangeBlock
+            label="срок, лет"
+            min={matMin} max={matMax}
+            absMin={0} absMax={30}
+            onMin={v => setRange('matMin', v)}
+            onMax={v => setRange('matMax', v)}
+          />
+        ) : (
+          <RangeBlock
+            label="кап-ция, млрд ₽"
+            min={mktCapMin} max={mktCapMax}
+            absMin={0} absMax={50000}
+            onMin={v => setRange('mktCapMin', v)}
+            onMax={v => setRange('mktCapMax', v)}
+          />
+        )}
       </div>
 
       {/* X-ось горизонта */}
@@ -130,7 +163,7 @@ export default function SurfaceFilters(){
               onChange={e => setHorizonMult(e.target.value)}
               className="bg-s2 border border-border rounded px-2 h-7 text-[11px] font-mono focus:border-acc"
             >
-              {MULT_OPTIONS.map(id => (
+              {MULT_LIST.map(id => (
                 <option key={id} value={id}>{COMP_METRICS[id]?.label || id}</option>
               ))}
             </select>
@@ -156,7 +189,7 @@ export default function SurfaceFilters(){
 
         {horizonX === 'composite' && (
           <div className="flex flex-wrap gap-1">
-            {MULT_OPTIONS.map(id => {
+            {MULT_LIST.map(id => {
               const on = horizonMetrics.includes(id);
               return (
                 <button
@@ -179,12 +212,14 @@ export default function SurfaceFilters(){
       {paramsOpen && (
         <div className="bg-s2/40 border border-border rounded px-3 py-2 flex items-center flex-wrap gap-3 text-[11px] font-mono">
           <span className="text-text3 uppercase tracking-wider text-[10px]">ядро (для фита поверхности)</span>
-          <label className="flex items-center gap-2 text-text2">
-            σx (срок, лет):
-            <input type="number" step="0.1" min="0.2" max="6"
-              value={bwX} onChange={e => setBandwidth('x', parseFloat(e.target.value) || 0.5)}
-              className="bg-bg border border-border rounded px-1.5 h-6 w-16 focus:border-acc outline-none" />
-          </label>
+          {isBond && (
+            <label className="flex items-center gap-2 text-text2">
+              σx (срок, лет):
+              <input type="number" step="0.1" min="0.2" max="6"
+                value={bwX} onChange={e => setBandwidth('x', parseFloat(e.target.value) || 0.5)}
+                className="bg-bg border border-border rounded px-1.5 h-6 w-16 focus:border-acc outline-none" />
+            </label>
+          )}
           <label className="flex items-center gap-2 text-text2">
             σy (качество, пт):
             <input type="number" step="1" min="3" max="50"
@@ -206,11 +241,11 @@ function RangeBlock({ label, min, max, absMin, absMax, onMin, onMax }){
       <span className="text-text3 uppercase tracking-wider text-[10px]">{label}</span>
       <input type="number" step="any" min={absMin} max={absMax}
         value={min} onChange={e => onMin(parseFloat(e.target.value))}
-        className="bg-bg border border-border rounded px-1.5 h-6 w-16 focus:border-acc outline-none" />
+        className="bg-bg border border-border rounded px-1.5 h-6 w-20 focus:border-acc outline-none" />
       <span className="text-text3">–</span>
       <input type="number" step="any" min={absMin} max={absMax}
         value={max} onChange={e => onMax(parseFloat(e.target.value))}
-        className="bg-bg border border-border rounded px-1.5 h-6 w-16 focus:border-acc outline-none" />
+        className="bg-bg border border-border rounded px-1.5 h-6 w-20 focus:border-acc outline-none" />
     </div>
   );
 }

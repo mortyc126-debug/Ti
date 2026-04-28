@@ -6,7 +6,7 @@
 // «утонули».
 
 import { useMemo, useRef, useState } from 'react';
-import { useMarketSurface } from '../../store/marketSurface.js';
+import { useMarketStore } from '../../store/marketSurface.js';
 import { useWindows } from '../../store/windows.js';
 import { zScoreColor } from '../../lib/kernelSurface.js';
 import { buildHorizonX, horizonXLabel } from '../../lib/horizonX.js';
@@ -14,17 +14,17 @@ import { buildHorizonX, horizonXLabel } from '../../lib/horizonX.js';
 const PAD = { top: 18, right: 32, bottom: 36, left: 56 };
 const W = 880, H = 500;
 
-export default function SurfaceChart({ fitted }){
-  const yMode             = useMarketSurface(s => s.yMode);
-  const horizonX          = useMarketSurface(s => s.horizonX);
-  const horizonMultiplier = useMarketSurface(s => s.horizonMultiplier);
-  const horizonMetrics    = useMarketSurface(s => s.horizonMetrics);
-  const horizonMode       = useMarketSurface(s => s.horizonMode);
+export default function SurfaceChart({ kind = 'bond', fitted }){
+  const useStore          = useMarketStore(kind);
+  const horizonX          = useStore(s => s.horizonX);
+  const horizonMultiplier = useStore(s => s.horizonMultiplier);
+  const horizonMetrics    = useStore(s => s.horizonMetrics);
+  const horizonMode       = useStore(s => s.horizonMode);
 
-  const hoverId      = useMarketSurface(s => s.hoverId);
-  const setHover     = useMarketSurface(s => s.setHover);
-  const setSelected  = useMarketSurface(s => s.setSelected);
-  const selectedId   = useMarketSurface(s => s.selectedId);
+  const hoverId      = useStore(s => s.hoverId);
+  const setHover     = useStore(s => s.setHover);
+  const setSelected  = useStore(s => s.setSelected);
+  const selectedId   = useStore(s => s.selectedId);
   const openWin      = useWindows(s => s.open);
 
   const { points: rawPoints } = fitted || { points: [] };
@@ -154,23 +154,26 @@ export default function SurfaceChart({ fitted }){
             {t.label}
           </text>
         ))}
-        {/* Подписи тиков Y (bps) */}
+        {/* Подписи тиков Y. Для бондов — bps (×100), для акций/фьюч — п.п. */}
         {yTicks.map(t => {
-          const bps = Math.round(t * 100);
-          const c = bps > 0 ? '#ff4d6d' : bps < 0 ? '#00d4ff' : '#9ba3b1';
-          if(bps === 0) return null;
+          const isBps = kind === 'bond';
+          const val = isBps ? Math.round(t * 100) : +t.toFixed(1);
+          const suffix = isBps ? 'bps' : 'пп';
+          const c = val > 0 ? '#ff4d6d' : val < 0 ? '#00d4ff' : '#9ba3b1';
+          if(val === 0) return null;
           return (
             <text key={'ty' + t}
               x={PAD.left - 6} y={sy(t) + 3}
               fill={c} fillOpacity="0.7"
               fontSize="9" fontFamily="JetBrains Mono, monospace" textAnchor="end">
-              {bps > 0 ? '+' : ''}{bps}bps
+              {val > 0 ? '+' : ''}{val}{suffix}
             </text>
           );
         })}
 
         {/* Подписи осей. X — основная + hint направления внизу.
-            Y — одна вертикальная строка с расшифровкой residual'а. */}
+            Y — одна вертикальная строка с расшифровкой residual'а
+            (название и единицы зависят от kind'а). */}
         <text x={W / 2} y={H - 18} fill="#cce4f0" fontSize="12" fontFamily="JetBrains Mono, monospace" textAnchor="middle" fontWeight="500">
           {xLabel.main}
         </text>
@@ -181,7 +184,9 @@ export default function SurfaceChart({ fitted }){
         )}
         <text x={16} y={H / 2} fill="#cce4f0" fontSize="11" fontFamily="JetBrains Mono, monospace" fontWeight="500"
           transform={`rotate(-90 16 ${H / 2})`} textAnchor="middle">
-          фактическая YTM − ожидаемая (bps)
+          {kind === 'bond'
+            ? 'фактическая YTM − ожидаемая (bps)'
+            : 'фактическая E/P − ожидаемая (п.п.)'}
         </text>
 
         {/* Точки */}
@@ -218,7 +223,7 @@ export default function SurfaceChart({ fitted }){
         })}
       </svg>
 
-      {tip && <PointTooltip tip={tip} containerWidth={containerSize.w} containerHeight={containerSize.h} xLabel={xLabel.main} />}
+      {tip && <PointTooltip tip={tip} kind={kind} containerWidth={containerSize.w} containerHeight={containerSize.h} xLabel={xLabel.main} />}
 
       {!points.length && (
         <div className="absolute inset-0 grid place-items-center text-text3 text-sm pointer-events-none">
@@ -233,8 +238,9 @@ export default function SurfaceChart({ fitted }){
   );
 }
 
-function PointTooltip({ tip, containerWidth, containerHeight, xLabel }){
+function PointTooltip({ tip, kind = 'bond', containerWidth, containerHeight, xLabel }){
   const { p } = tip;
+  const isBond = kind === 'bond';
   const TIP_W = 260, TIP_H = 165;
   let left = tip.x + 14;
   let top  = tip.y - 8;
@@ -260,18 +266,29 @@ function PointTooltip({ tip, containerWidth, containerHeight, xLabel }){
         {xLabel}: <span className="text-text">{fmtX(p.xH)}</span>
       </div>
       <div className="text-text2">
-        срок: <span className="text-text">{p.x.toFixed(2)} лет</span>
-        {' · '}
+        {isBond
+          ? <>срок: <span className="text-text">{p.x.toFixed(2)} лет</span>{' · '}</>
+          : p.volumeBn != null
+            ? <>кап-ция: <span className="text-text">{fmtCap(p.volumeBn)}</span>{' · '}</>
+            : null}
         качество: <span className="text-text">{Math.round(p.y)}</span>
         {p.rating && <span className="text-text3 ml-1">({p.rating})</span>}
       </div>
-      <div className="text-text2">YTM: <span className="text-text">{p.z.toFixed(2)}%</span></div>
+      <div className="text-text2">
+        {isBond ? 'YTM' : 'E/P'}:{' '}
+        <span className="text-text">{p.z.toFixed(2)}%</span>
+        {!isBond && p.pe != null && (
+          <span className="text-text3 ml-1">(P/E {p.pe.toFixed(1)})</span>
+        )}
+      </div>
       {p.expected != null && (
         <div className="text-text2">
-          E[YTM]: <span className="text-text">{p.expected.toFixed(2)}%</span>
+          E[{isBond ? 'YTM' : 'E/P'}]:{' '}
+          <span className="text-text">{p.expected.toFixed(2)}%</span>
           {' · '}
           <span className={p.residual > 0 ? 'text-danger' : 'text-acc'}>
-            {p.residual >= 0 ? '+' : ''}{(p.residual * 100).toFixed(0)} bps
+            {p.residual >= 0 ? '+' : ''}
+            {isBond ? (p.residual * 100).toFixed(0) + ' bps' : p.residual.toFixed(2) + ' пп'}
           </span>
         </div>
       )}
@@ -297,4 +314,10 @@ function fmtX(v){
   if(Math.abs(v) >= 100) return v.toFixed(0);
   if(Math.abs(v) >= 10)  return v.toFixed(1);
   return v.toFixed(2);
+}
+
+function fmtCap(bn){
+  if(bn == null) return '—';
+  if(bn >= 1000) return (bn / 1000).toFixed(1) + ' трлн ₽';
+  return bn.toFixed(0) + ' млрд ₽';
 }

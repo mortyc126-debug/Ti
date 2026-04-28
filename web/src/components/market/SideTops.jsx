@@ -3,21 +3,22 @@
 // Сортировка по |z|, фильтр по видимости (только не sparse).
 
 import { useComparison } from '../../store/comparison.js';
-import { useMarketSurface } from '../../store/marketSurface.js';
+import { useMarketStore } from '../../store/marketSurface.js';
 import { useWindows } from '../../store/windows.js';
 
 const TOP_N = 8;
 
-export default function SideTops({ points }){
-  const setSelected = useMarketSurface(s => s.setSelected);
-  const setHover    = useMarketSurface(s => s.setHover);
-  const selectedId  = useMarketSurface(s => s.selectedId);
+export default function SideTops({ kind = 'bond', points }){
+  const useStore = useMarketStore(kind);
+  const setSelected = useStore(s => s.setSelected);
+  const setHover    = useStore(s => s.setHover);
+  const selectedId  = useStore(s => s.selectedId);
   const addToComparison = useComparison(s => s.addIssuer);
   const openWin     = useWindows(s => s.open);
 
   const onOpen = p => {
     setSelected(p.secid);
-    openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: null, mode: 'medium' });
+    openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: p.ticker || null, mode: 'medium' });
   };
 
   const valid = points.filter(p => p.zscore != null && !p.sparse);
@@ -34,7 +35,7 @@ export default function SideTops({ points }){
         selectedId={selectedId}
         onSelect={onOpen}
         onHover={p => setHover(p?.secid || null)}
-        onAddCompare={p => addToComparison(p.issuer, 'bond')}
+        onAddCompare={p => addToComparison(p.issuer, kind)}
       />
       <Block
         title="Ниже поверхности"
@@ -44,7 +45,7 @@ export default function SideTops({ points }){
         selectedId={selectedId}
         onSelect={onOpen}
         onHover={p => setHover(p?.secid || null)}
-        onAddCompare={p => addToComparison(p.issuer, 'bond')}
+        onAddCompare={p => addToComparison(p.issuer, kind)}
       />
     </div>
   );

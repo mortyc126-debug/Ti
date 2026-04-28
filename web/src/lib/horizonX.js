@@ -15,6 +15,9 @@ export function horizonXLabel(spec){
   if(spec.source === 'maturity'){
     return { main: 'срок до погашения, лет', hint: '← короткие · длинные →' };
   }
+  if(spec.source === 'marketCap'){
+    return { main: 'капитализация, млрд ₽ (лог)', hint: '← мелкие · крупные →' };
+  }
   if(spec.source === 'rating'){
     return { main: 'кредитный рейтинг', hint: '← D · AAA → (надёжнее справа)' };
   }
@@ -54,6 +57,14 @@ export function buildHorizonX(points, spec){
 
   if(spec.source === 'maturity'){
     return makeFromValues(points, p => p.x, { numericTicks: true });
+  }
+  if(spec.source === 'marketCap'){
+    // Лог-шкала: крупные эмитенты не должны прижимать карликов.
+    return makeFromValues(
+      points,
+      p => p.volumeBn != null && p.volumeBn > 0 ? Math.log10(p.volumeBn) : null,
+      { logTicks: true },
+    );
   }
   if(spec.source === 'rating'){
     return makeFromValues(points, p => ratingOrd(p.rating), { ratingTicks: true });
@@ -159,6 +170,19 @@ function makeTicks(xMin, xMax, opts){
   }
   if(opts?.quartileTicks){
     return [0, 25, 50, 75, 100].map(v => ({ v, label: String(v) }));
+  }
+  if(opts?.logTicks){
+    // Шкала log10: тики на каждом порядке (1, 10, 100, 1000…).
+    const ticks = [];
+    const start = Math.floor(xMin), end = Math.ceil(xMax);
+    for(let v = start; v <= end; v++){
+      const real = Math.pow(10, v);
+      const lab = real >= 1000 ? (real / 1000).toFixed(real >= 10000 ? 0 : 0) + 'тр.' :
+                  real >= 1   ? real.toFixed(0) + ' млрд' :
+                                real.toFixed(2);
+      ticks.push({ v, label: lab });
+    }
+    return ticks;
   }
   // Numeric: подбираем шаг.
   const span = xMax - xMin;
