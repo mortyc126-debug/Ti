@@ -1,4 +1,4 @@
-// Cloudflare Worker — бэкенд БондАналитика. v0.9.9-girbo-2026
+// Cloudflare Worker — бэкенд БондАналитика. v0.9.10-girbo-paging
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
@@ -287,7 +287,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.9-girbo-2026',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
+      core:        '0.9.10-girbo-paging',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -298,7 +298,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.9-girbo-2026',
+    version: '0.9.10-girbo-paging',
   });
 }
 
@@ -2411,18 +2411,58 @@ async function girboFetchByInn(inn, maxYears = 5, opts){
     throw new Error('ГИР БО: для поиска нужно имя эмитента (issuers.short_name пуст)');
   }
 
-  // 2. Поиск по имени. ФНС ищет полнотекстово, поэтому может вернуть
-  //    20-30 организаций со словом из имени. Берём первые 50.
-  const searchUrl = `/advanced-search/organizations/search?query=${encodeURIComponent(companyName)}&page=0&size=50`;
-  const sr = await girboFetch(searchUrl, { proxy });
-  const candidates = sr?.content || [];
-  if(!candidates.length){
-    throw new Error(`ГИР БО: «${companyName}» не найдено в ФНС`);
+  // ФНС ищет полнотекстово (полнотекст по словам имени). Полное юр-имя
+  // типа «ФЕДЕРАЛЬНАЯ ГИДРОГЕНЕРИРУЮЩАЯ КОМПАНИЯ - РУСГИДРО» даёт мало
+  // результатов и наша запись может не попасть в первую страницу.
+  // Стратегия: пробуем варианты от самого специфичного к более широкому,
+  // на каждом шаге фильтруем по точному совпадению ИНН.
+  const queries = [];
+  queries.push(companyName);                      // полное
+  // Самое длинное «брендовое» слово (обычно последнее после дефиса)
+  const tokens = companyName.split(/[\s\-]+/).filter(t => t.length >= 4);
+  const brand = tokens.sort((a, b) => b.length - a.length)[0];
+  if(brand && !queries.includes(brand)) queries.push(brand);
+  // Без ОПФ-префиксов и кавычек (ещё короче)
+  const stripped = shortenIssuerName(companyName);
+  if(stripped !== companyName && !queries.includes(stripped)){
+    queries.push(stripped);
   }
-  // Фильтр по точному ИНН
-  const org = candidates.find(c => String(c.inn) === inn);
+
+  let org = null;
+  let triedQueries = [];
+  for(const q of queries){
+    triedQueries.push({ q, found: 0, hit: false });
+    let totalScanned = 0;
+    let foundCount = 0;
+    // Paging до 5 страниц по 50 — итого до 250 кандидатов на запрос
+    for(let page = 0; page < 5; page++){
+      const url = `/advanced-search/organizations/search?query=${encodeURIComponent(q)}&page=${page}&size=50`;
+      let sr;
+      try {
+        sr = await girboFetch(url, { proxy });
+      } catch(e){
+        triedQueries[triedQueries.length - 1].error = e.message;
+        break;
+      }
+      const candidates = sr?.content || [];
+      foundCount = sr?.totalElements ?? foundCount;
+      totalScanned += candidates.length;
+      const hit = candidates.find(c => String(c.inn) === inn);
+      if(hit){ org = hit; break; }
+      if(candidates.length < 50) break; // последняя страница
+    }
+    triedQueries[triedQueries.length - 1].found = foundCount;
+    triedQueries[triedQueries.length - 1].scanned = totalScanned;
+    triedQueries[triedQueries.length - 1].hit = !!org;
+    if(org) break;
+  }
+
   if(!org){
-    throw new Error(`ГИР БО: ИНН ${inn} не среди ${candidates.length} результатов по «${companyName}»`);
+    const summary = triedQueries.map(t =>
+      t.error ? `«${t.q}»:err(${t.error.slice(0,50)})`
+              : `«${t.q}»:${t.found}t/${t.scanned}s`
+    ).join('; ');
+    throw new Error(`ГИР БО: ИНН ${inn} не найден. Запросы: ${summary}`);
   }
 
   // 3. Список годовых отчётов с полной детализацией
@@ -2990,6 +3030,14 @@ async function collectReports(env, url){
       const isFresh = maxYearGot >= expected;
       const offset  = isFresh ? '+30 days' : '+7 days';
       const errStr  = sourceErrors.length ? sourceErrors.join(' | ').slice(0, 200) : null;
+      // Даже при success фиксируем ошибки других источников в общий
+      // лог — иначе диагностировать «почему girbo не сработал, хоть
+      // buxbalans дал старое» невозможно.
+      if(sourceErrors.length){
+        for(const sErr of sourceErrors){
+          errors.push({ inn, error: sErr.slice(0, 200), partial: true });
+        }
+      }
       try {
         await env.DB.prepare(updateQueue)
           .bind(inn, now, now, 0, errStr, now, offset).run();
