@@ -5,7 +5,7 @@
 // Сейчас источник: bondsMock из bondsCatalog.js + локальные хелперы
 // для maturity/quality.
 
-import { bondsMock } from './bondsCatalog.js';
+import { bondsMock, safetyScore, bqiScore } from './bondsCatalog.js';
 import { qualityY, maturityYears } from '../lib/qualityComposite.js';
 
 // Получить точки для surface-плоскости.
@@ -28,6 +28,14 @@ export function loadBondPoints({ yMode = 'scoring', typeFilter = null } = {}){
       rating:   b.rating,
       industry: b.industry,
       volumeBn: b.volume_bn,
+      // Мультипликаторы — нужны для X-оси «Горизонта» в режимах
+      // «один параметр» и «композит». Composite-метрики (safety/BQI)
+      // считаем тут же, чтобы дальше не пересчитывать на каждый рендер.
+      mults: {
+        ...b.mults,
+        safety: safetyScore(b),
+        bqi:    bqiScore(b),
+      },
       // Координаты для регрессии.
       x, y, z,
     });

@@ -1,43 +1,37 @@
-// UI-состояние «Карты»: режим Y, фильтры по типу/рейтингу/сроку,
-// hover/selected точка. Persist — только настройки фильтров (не
-// hover/selected, они эфемерны).
+// UI-состояние «Карты». Сейчас единственный режим — «Горизонт»:
+// X = configurable (срок / рейтинг / один мультипликатор / композит),
+// Y = residual (отклонение от поверхности E[YTM]).
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 const initial = {
-  yMode: 'scoring',                   // rating | scoring | mix
+  yMode: 'scoring',                   // влияет на фит поверхности (квартиль quality)
   types: { ofz: true, corporate: true, municipal: true, exchange: true },
-  // Диапазоны рейтинга (по нашему ординалу 0..100).
   ratingMin: 30,
   ratingMax: 100,
-  // Диапазон срока (годы).
   matMin: 0,
   matMax: 20,
-  // Полоса ядра: настраиваемо в UI «Поверхность · параметры».
-  bwX: 1.2,    // годы
-  bwY: 12,     // пунктов качества
-  // Показывать ли фоновую тепловую карту.
-  showHeatmap: true,
-  // Изолинии E[YTM] поверх heatmap.
-  showContours: true,
-  // Режим визуализации высоты (residual'а):
-  //   'flat'    — точки на плоскости, цвет = z-score (исходный вид)
-  //   'sticks'  — стержни от плоскости с приподнятой головкой
-  //   'horizon' — взгляд «от нулевой линии»: X = срок (или качество),
-  //               Y = residual в bps. 0 = поверхность; точки выше
-  //               торчат как горы, ниже — «утонули» под уровень.
-  viewMode: 'sticks',
-  // Что развёрнуто по горизонтали в режиме 'horizon'.
-  horizonX: 'maturity',  // 'maturity' | 'quality'
+  bwX: 1.2,
+  bwY: 12,
+  // Конфигурация X-оси горизонта:
+  //   'maturity'   — срок до погашения, лет
+  //   'rating'     — кредитный рейтинг (ord 0..100)
+  //   'multiplier' — один выбранный мультипликатор
+  //   'composite'  — композит из набора (sum-перцентиль или
+  //                  последовательная воронка по нормам отрасли)
+  horizonX: 'maturity',
+  horizonMultiplier: 'icr',
+  horizonMetrics: ['safety', 'bqi'],
+  horizonMode: 'sum',                 // 'sum' | 'sequential'
 };
 
 export const useMarketSurface = create(
   persist(
     (set, get) => ({
       ...initial,
-      hoverId: null,        // secid под мышью
-      selectedId: null,     // выбранный кликом
+      hoverId: null,
+      selectedId: null,
 
       setYMode(m){ set({ yMode: m }); },
       toggleType(t){ set({ types: { ...get().types, [t]: !get().types[t] } }); },
@@ -46,25 +40,41 @@ export const useMarketSurface = create(
         if(axis === 'x') set({ bwX: value });
         else set({ bwY: value });
       },
-      toggleHeatmap(){ set({ showHeatmap: !get().showHeatmap }); },
-      toggleContours(){ set({ showContours: !get().showContours }); },
-      setViewMode(m){ set({ viewMode: m }); },
+
       setHorizonX(x){ set({ horizonX: x }); },
+      setHorizonMultiplier(id){ set({ horizonMultiplier: id }); },
+      toggleHorizonMetric(id){
+        const cur = get().horizonMetrics;
+        const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+        set({ horizonMetrics: next });
+      },
+      setHorizonMode(m){ set({ horizonMode: m }); },
+
       setHover(id){ set({ hoverId: id }); },
       setSelected(id){ set({ selectedId: id }); },
       reset(){ set({ ...initial, hoverId: null, selectedId: null }); },
     }),
     {
       name: 'bondan_market_surface',
-      version: 1,
+      version: 2,
       partialize: (s) => ({
         yMode: s.yMode, types: s.types,
         ratingMin: s.ratingMin, ratingMax: s.ratingMax,
         matMin: s.matMin, matMax: s.matMax,
         bwX: s.bwX, bwY: s.bwY,
-        showHeatmap: s.showHeatmap, showContours: s.showContours,
-        viewMode: s.viewMode, horizonX: s.horizonX,
+        horizonX: s.horizonX, horizonMultiplier: s.horizonMultiplier,
+        horizonMetrics: s.horizonMetrics, horizonMode: s.horizonMode,
       }),
+      // При апгрейде с v1 (где были viewMode / showHeatmap / showContours)
+      // — отбрасываем старые поля. Дефолты подставятся из initial.
+      migrate: (persisted) => {
+        if(!persisted) return undefined;
+        const out = { ...persisted };
+        delete out.viewMode;
+        delete out.showHeatmap;
+        delete out.showContours;
+        return out;
+      },
     }
   )
 );
