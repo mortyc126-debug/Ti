@@ -19,6 +19,14 @@ const initial = {
   bwY: 12,     // пунктов качества
   // Показывать ли фоновую тепловую карту.
   showHeatmap: true,
+  // Изолинии E[YTM] поверх heatmap.
+  showContours: true,
+  // Режим визуализации высоты (residual'а):
+  //   'flat'   — точки на плоскости, цвет = z-score (исходный вид)
+  //   'sticks' — стержни от плоскости с приподнятой головкой
+  //   'iso'    — псевдо-3D аксонометрия: плоскость уезжает в перспективу,
+  //              точки парят над/под на величину residual'а
+  viewMode: 'sticks',
 };
 
 export const useMarketSurface = create(
@@ -36,6 +44,8 @@ export const useMarketSurface = create(
         else set({ bwY: value });
       },
       toggleHeatmap(){ set({ showHeatmap: !get().showHeatmap }); },
+      toggleContours(){ set({ showContours: !get().showContours }); },
+      setViewMode(m){ set({ viewMode: m }); },
       setHover(id){ set({ hoverId: id }); },
       setSelected(id){ set({ selectedId: id }); },
       reset(){ set({ ...initial, hoverId: null, selectedId: null }); },
@@ -47,7 +57,9 @@ export const useMarketSurface = create(
         yMode: s.yMode, types: s.types,
         ratingMin: s.ratingMin, ratingMax: s.ratingMax,
         matMin: s.matMin, matMax: s.matMax,
-        bwX: s.bwX, bwY: s.bwY, showHeatmap: s.showHeatmap,
+        bwX: s.bwX, bwY: s.bwY,
+        showHeatmap: s.showHeatmap, showContours: s.showContours,
+        viewMode: s.viewMode,
       }),
     }
   )

@@ -1,8 +1,12 @@
-// Чарт поверхности. Фон-тепловая карта E[YTM | срок, качество] +
-// scatter точек, окрашенных по z-score residual'а. Размер точки —
-// объём выпуска. Клик по точке открывает окно эмитента + помечает
-// выбранным. Hover показывает тултип; перекрестие на фоне — живой
-// readout координат и E[YTM] в позиции курсора.
+// Чарт поверхности с тремя видами:
+//   flat   — точки на плоскости, цвет = z-score (исходный 2D-вид).
+//   sticks — стержни от плоскости до точки: длина = |residual|,
+//            направление = знак, цвет = z-score. Видна высота
+//            отклонения каждой бумаги от ожидаемой YTM.
+//   iso    — псевдо-3D: плоскость уезжает в перспективу
+//            (axonometric), точки парят над/под на residual'е.
+//            Wow-эффект «горы» поверхности.
+// Изолинии поверх heatmap включаются отдельным тогглером.
 
 import { useMemo, useRef, useState } from 'react';
 import { useMarketSurface } from '../../store/marketSurface.js';
@@ -11,27 +15,29 @@ import { ytmColor, zScoreColor } from '../../lib/kernelSurface.js';
 import {
   ratingTier, tierColor, RATING_TICKS, ratingFromOrd,
 } from '../../lib/qualityComposite.js';
+import { makeProjection, marchingSquares, contourLevels } from '../../lib/surfaceGeom.js';
 
 const PAD = { top: 16, right: 32, bottom: 36, left: 56 };
-const W = 880, H = 480;
+const W = 880, H = 500;
+const RES_K = 10;        // px на 1% residual'а — масштаб «высоты»
 
 export default function SurfaceChart({ fitted }){
-  const showHeatmap = useMarketSurface(s => s.showHeatmap);
-  const yMode       = useMarketSurface(s => s.yMode);
-  const hoverId     = useMarketSurface(s => s.hoverId);
-  const setHover    = useMarketSurface(s => s.setHover);
-  const setSelected = useMarketSurface(s => s.setSelected);
-  const selectedId  = useMarketSurface(s => s.selectedId);
-  const openWin     = useWindows(s => s.open);
+  const showHeatmap  = useMarketSurface(s => s.showHeatmap);
+  const showContours = useMarketSurface(s => s.showContours);
+  const viewMode     = useMarketSurface(s => s.viewMode);
+  const yMode        = useMarketSurface(s => s.yMode);
+  const hoverId      = useMarketSurface(s => s.hoverId);
+  const setHover     = useMarketSurface(s => s.setHover);
+  const setSelected  = useMarketSurface(s => s.setSelected);
+  const selectedId   = useMarketSurface(s => s.selectedId);
+  const openWin      = useWindows(s => s.open);
 
   const { points, gridExpected } = fitted || { points: [], gridExpected: null };
   const ref = useRef(null);
   const svgRef = useRef(null);
 
   const bbox = useMemo(() => {
-    if(!points.length){
-      return { xMin: 0, xMax: 10, yMin: 0, yMax: 100 };
-    }
+    if(!points.length) return { xMin: 0, xMax: 10, yMin: 0, yMax: 100 };
     const xs = points.map(p => p.x), ys = points.map(p => p.y);
     let xMin = Math.min(...xs), xMax = Math.max(...xs);
     let yMin = Math.min(...ys), yMax = Math.max(...ys);
@@ -44,12 +50,21 @@ export default function SurfaceChart({ fitted }){
     return { xMin, xMax, yMin, yMax };
   }, [points]);
 
+  // В iso-режиме оставляем сверху больше места для «парящих» точек.
+  const reservedTop = viewMode === 'iso' ? 80 : 0;
   const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
+  const innerH = H - PAD.top - PAD.bottom - reservedTop;
+  const padTop = PAD.top + reservedTop;
+
+  // Базовые data → screen координаты (на «полу» — до проекции).
   const sx = v => PAD.left + (v - bbox.xMin) / (bbox.xMax - bbox.xMin) * innerW;
-  const sy = v => PAD.top + (1 - (v - bbox.yMin) / (bbox.yMax - bbox.yMin)) * innerH;
+  const sy = v => padTop + (1 - (v - bbox.yMin) / (bbox.yMax - bbox.yMin)) * innerH;
+  // Обратная трансформация — для перекрестия.
   const ix = px => bbox.xMin + (px - PAD.left) / innerW * (bbox.xMax - bbox.xMin);
-  const iy = py => bbox.yMin + (1 - (py - PAD.top) / innerH) * (bbox.yMax - bbox.yMin);
+  const iy = py => bbox.yMin + (1 - (py - padTop) / innerH) * (bbox.yMax - bbox.yMin);
+
+  const layout = { padTop, padLeft: PAD.left, innerW, innerH };
+  const proj = useMemo(() => makeProjection(viewMode, layout), [viewMode, padTop, innerW, innerH]);
 
   const sr = (vol) => {
     if(!vol || vol <= 0) return 4;
@@ -68,8 +83,6 @@ export default function SurfaceChart({ fitted }){
     return ticks;
   }, [bbox.xMin, bbox.xMax]);
 
-  // Y-тики: в режиме «рейтинг» — буквенные метки (AAA, AA, A, ...),
-  // иначе — каждые 20 пунктов.
   const yTicks = useMemo(() => {
     if(yMode === 'rating'){
       return RATING_TICKS
@@ -83,8 +96,14 @@ export default function SurfaceChart({ fitted }){
     return ticks;
   }, [bbox.yMin, bbox.yMax, yMode]);
 
+  // Уровни изолиний — кэшируем по сетке.
+  const levels = useMemo(() => {
+    if(!gridExpected) return [];
+    return contourLevels(gridExpected);
+  }, [gridExpected]);
+
   const [tip, setTip] = useState(null);
-  const [crosshair, setCrosshair] = useState(null);   // { x, y, dataX, dataY, e[ytm] }
+  const [crosshair, setCrosshair] = useState(null);
 
   const onPointEnter = (p, e) => {
     setHover(p.secid);
@@ -103,22 +122,20 @@ export default function SurfaceChart({ fitted }){
     openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: null, mode: 'medium' });
   };
 
-  // Перекрестие на фоновой плоскости — пока курсор не на точке.
   const onBackgroundMove = (e) => {
-    if(tip) return;            // на точке — отдельный тултип
+    if(tip) return;
+    if(viewMode === 'iso'){ setCrosshair(null); return; }   // в перспективе перекрестие путает
     const svg = svgRef.current;
     if(!svg) return;
     const rect = svg.getBoundingClientRect();
-    // Переводим клиентские координаты в viewBox-координаты.
     const cx = (e.clientX - rect.left) / rect.width * W;
     const cy = (e.clientY - rect.top) / rect.height * H;
-    if(cx < PAD.left || cx > W - PAD.right || cy < PAD.top || cy > H - PAD.bottom){
+    if(cx < PAD.left || cx > W - PAD.right || cy < padTop || cy > H - PAD.bottom){
       setCrosshair(null);
       return;
     }
     const dataX = ix(cx);
     const dataY = iy(cy);
-    // E[YTM] из сетки — линейная интерполяция по 4 ближайшим узлам.
     const eytm = lerpGrid(gridExpected, dataX, dataY);
     setCrosshair({ x: cx, y: cy, dataX, dataY, eytm });
   };
@@ -134,82 +151,65 @@ export default function SurfaceChart({ fitted }){
         onMouseMove={onBackgroundMove}
         onMouseLeave={onBackgroundLeave}
       >
-        <rect x={PAD.left} y={PAD.top} width={innerW} height={innerH} fill="#0a0e14" stroke="#222a37" />
+        {/* Плоскость-плашка */}
+        <PlaneFrame proj={proj} sx={sx} sy={sy} bbox={bbox} />
 
-        {showHeatmap && gridExpected && <Heatmap grid={gridExpected} sx={sx} sy={sy} />}
+        {showHeatmap && gridExpected && (
+          <Heatmap grid={gridExpected} sx={sx} sy={sy} proj={proj} />
+        )}
 
-        {/* Сетка */}
-        {xTicks.map(t => (
-          <line key={'gx' + t}
-            x1={sx(t)} x2={sx(t)} y1={PAD.top} y2={H - PAD.bottom}
-            stroke="#1a212c" strokeDasharray="2 4" />
-        ))}
-        {yTicks.map(t => (
-          <line key={'gy' + t.v}
-            x1={PAD.left} x2={W - PAD.right} y1={sy(t.v)} y2={sy(t.v)}
-            stroke="#1a212c" strokeDasharray="2 4" />
-        ))}
+        {/* Сетка под точками */}
+        <Gridlines xTicks={xTicks} yTicks={yTicks} sx={sx} sy={sy} bbox={bbox} proj={proj} />
+
+        {/* Изолинии */}
+        {showContours && gridExpected && (
+          <Contours grid={gridExpected} levels={levels} sx={sx} sy={sy} proj={proj} />
+        )}
 
         {/* Оси и подписи */}
-        {xTicks.map(t => (
-          <text key={'tx' + t}
-            x={sx(t)} y={H - PAD.bottom + 14}
-            fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
-            {t}
-          </text>
-        ))}
-        {yTicks.map(t => (
-          <text key={'ty' + t.v}
-            x={PAD.left - 8} y={sy(t.v) + 3}
-            fill={yMode === 'rating' ? tierColor(ratingTier(t.label)) || '#9ba3b1' : '#9ba3b1'}
-            fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="end">
-            {t.label}
-          </text>
-        ))}
-        <text x={W / 2} y={H - 6} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
-          срок до погашения, лет
-        </text>
-        <text x={14} y={H / 2} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace"
-          transform={`rotate(-90 14 ${H / 2})`} textAnchor="middle">
-          {yMode === 'rating' ? 'кредитный рейтинг' : yMode === 'mix' ? 'качество (микс)' : 'качество (скоринг)'}
-        </text>
+        <Axes
+          xTicks={xTicks} yTicks={yTicks}
+          sx={sx} sy={sy} bbox={bbox} proj={proj}
+          yMode={yMode}
+        />
 
-        {/* Перекрестие */}
-        {crosshair && !tip && (
+        {/* Перекрестие (только в плоских режимах) */}
+        {crosshair && !tip && viewMode !== 'iso' && (
           <g pointerEvents="none">
-            <line x1={crosshair.x} x2={crosshair.x} y1={PAD.top} y2={H - PAD.bottom}
+            <line x1={crosshair.x} x2={crosshair.x} y1={padTop} y2={H - PAD.bottom}
               stroke="#00d4ff" strokeOpacity="0.4" strokeDasharray="4 4" />
             <line x1={PAD.left} x2={W - PAD.right} y1={crosshair.y} y2={crosshair.y}
               stroke="#00d4ff" strokeOpacity="0.4" strokeDasharray="4 4" />
           </g>
         )}
 
-        {/* Точки */}
-        {points.map(p => {
-          const r = sr(p.volumeBn);
-          const fill = zScoreColor(p.zscore);
-          const isHover = hoverId === p.secid;
-          const isSel = selectedId === p.secid;
-          const stroke = yMode === 'mix' ? tierColor(ratingTier(p.rating)) : '#0a0e14';
-          return (
-            <circle key={p.secid}
-              cx={sx(p.x)} cy={sy(p.y)} r={isHover ? r + 2 : r}
-              fill={fill}
-              stroke={isSel ? '#00d4ff' : stroke}
-              strokeWidth={isSel ? 2.5 : (yMode === 'mix' ? 1.6 : 1)}
-              fillOpacity={p.sparse ? 0.4 : 0.85}
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={e => onPointEnter(p, e)}
-              onMouseMove={e => onPointEnter(p, e)}
-              onMouseLeave={onPointLeave}
-              onClick={() => onPointClick(p)}
+        {/* Точки и стержни — в зависимости от режима. Сортируем
+            по Y данных (от верхних к нижним), чтобы передние точки
+            рисовались поверх задних в iso. */}
+        {[...points]
+          .sort((a, b) => (b.y - a.y))
+          .map(p => (
+            <PointMark
+              key={p.secid}
+              p={p}
+              viewMode={viewMode}
+              sx={sx} sy={sy}
+              proj={proj}
+              sr={sr}
+              hoverId={hoverId}
+              selectedId={selectedId}
+              yMode={yMode}
+              onEnter={onPointEnter}
+              onLeave={onPointLeave}
+              onClick={onPointClick}
             />
-          );
-        })}
+          ))}
       </svg>
 
       {tip && <PointTooltip tip={tip} openWin={openWin} />}
-      {crosshair && !tip && <CrosshairTooltip crosshair={crosshair} yMode={yMode} />}
+      {crosshair && !tip && viewMode !== 'iso' && (
+        <CrosshairTooltip crosshair={crosshair} yMode={yMode} />
+      )}
 
       {!points.length && (
         <div className="absolute inset-0 grid place-items-center text-text3 text-sm pointer-events-none">
@@ -220,8 +220,187 @@ export default function SurfaceChart({ fitted }){
   );
 }
 
-// Билинейная интерполяция по сетке E[YTM]. Возвращает null если
-// курсор вне сетки или ячейка пустая.
+// «Рамка» плоскости. В iso рисуем как трапецию (4 угла после скоса).
+function PlaneFrame({ proj, sx, sy, bbox }){
+  const c1 = proj.project(sx(bbox.xMin), sy(bbox.yMin));
+  const c2 = proj.project(sx(bbox.xMax), sy(bbox.yMin));
+  const c3 = proj.project(sx(bbox.xMax), sy(bbox.yMax));
+  const c4 = proj.project(sx(bbox.xMin), sy(bbox.yMax));
+  const d = `M${c1[0]},${c1[1]} L${c2[0]},${c2[1]} L${c3[0]},${c3[1]} L${c4[0]},${c4[1]} Z`;
+  return <path d={d} fill="#0a0e14" stroke="#222a37" />;
+}
+
+// Тепловая карта поверхности. В iso ячейка — четырёхугольник
+// (после проекции). В плоском — обычный rect.
+function Heatmap({ grid, sx, sy, proj }){
+  const { xs, ys, z } = grid;
+  const NX = xs.length, NY = ys.length;
+  const cells = [];
+  for(let i = 0; i < NX - 1; i++){
+    for(let j = 0; j < NY - 1; j++){
+      const v = avg4(z[i][j], z[i+1][j], z[i][j+1], z[i+1][j+1]);
+      const p1 = proj.project(sx(xs[i]),     sy(ys[j]));
+      const p2 = proj.project(sx(xs[i+1]),   sy(ys[j]));
+      const p3 = proj.project(sx(xs[i+1]),   sy(ys[j+1]));
+      const p4 = proj.project(sx(xs[i]),     sy(ys[j+1]));
+      cells.push({
+        d: `M${p1[0]},${p1[1]} L${p2[0]},${p2[1]} L${p3[0]},${p3[1]} L${p4[0]},${p4[1]} Z`,
+        v,
+      });
+    }
+  }
+  return (
+    <g pointerEvents="none">
+      {cells.map((c, k) => (
+        <path key={k} d={c.d} fill={ytmColor(c.v)} fillOpacity={proj.isIso ? 0.7 : 0.55} />
+      ))}
+    </g>
+  );
+}
+
+function Gridlines({ xTicks, yTicks, sx, sy, bbox, proj }){
+  return (
+    <g pointerEvents="none">
+      {xTicks.map(t => {
+        const a = proj.project(sx(t), sy(bbox.yMin));
+        const b = proj.project(sx(t), sy(bbox.yMax));
+        return <line key={'gx' + t}
+          x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]}
+          stroke="#1a212c" strokeDasharray="2 4" />;
+      })}
+      {yTicks.map(t => {
+        const a = proj.project(sx(bbox.xMin), sy(t.v));
+        const b = proj.project(sx(bbox.xMax), sy(t.v));
+        return <line key={'gy' + t.v}
+          x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]}
+          stroke="#1a212c" strokeDasharray="2 4" />;
+      })}
+    </g>
+  );
+}
+
+// Изолинии E[YTM] поверх heatmap — marching squares + проекция.
+function Contours({ grid, levels, sx, sy, proj }){
+  const segs = [];
+  for(const lv of levels){
+    const ms = marchingSquares(grid, lv);
+    for(const s of ms){
+      const a = proj.project(sx(s.x1), sy(s.y1));
+      const b = proj.project(sx(s.x2), sy(s.y2));
+      segs.push({ a, b, lv });
+    }
+  }
+  return (
+    <g pointerEvents="none">
+      {segs.map((s, k) => (
+        <line key={k}
+          x1={s.a[0]} y1={s.a[1]} x2={s.b[0]} y2={s.b[1]}
+          stroke="#3a4150" strokeOpacity="0.7" strokeWidth="1" />
+      ))}
+    </g>
+  );
+}
+
+function Axes({ xTicks, yTicks, sx, sy, bbox, proj, yMode }){
+  // X-ось: подписи внизу (на проекции — у нижнего края плоскости).
+  return (
+    <g pointerEvents="none">
+      {xTicks.map(t => {
+        const [tx, ty] = proj.project(sx(t), sy(bbox.yMin));
+        return (
+          <text key={'tx' + t}
+            x={tx} y={ty + 14}
+            fill="#9ba3b1" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+            {t}
+          </text>
+        );
+      })}
+      {yTicks.map(t => {
+        const [tx, ty] = proj.project(sx(bbox.xMin), sy(t.v));
+        const color = yMode === 'rating' ? (tierColor(ratingTier(t.label)) || '#9ba3b1') : '#9ba3b1';
+        return (
+          <text key={'ty' + t.v}
+            x={tx - 8} y={ty + 3}
+            fill={color}
+            fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="end">
+            {t.label}
+          </text>
+        );
+      })}
+      <text x={W / 2} y={H - 6} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+        срок до погашения, лет
+      </text>
+      <text x={14} y={H / 2} fill="#5e6573" fontSize="10" fontFamily="JetBrains Mono, monospace"
+        transform={`rotate(-90 14 ${H / 2})`} textAnchor="middle">
+        {yMode === 'rating' ? 'кредитный рейтинг' : yMode === 'mix' ? 'качество (микс)' : 'качество (скоринг)'}
+      </text>
+    </g>
+  );
+}
+
+// Точка-маркер: тень на плоскости + (опционально) стержень + головка.
+function PointMark({
+  p, viewMode, sx, sy, proj, sr,
+  hoverId, selectedId, yMode,
+  onEnter, onLeave, onClick,
+}){
+  const r = sr(p.volumeBn);
+  const fill = zScoreColor(p.zscore);
+  const isHover = hoverId === p.secid;
+  const isSel = selectedId === p.secid;
+  const stroke = yMode === 'mix' ? tierColor(ratingTier(p.rating)) : '#0a0e14';
+  const sw = isSel ? 2.5 : (yMode === 'mix' ? 1.6 : 1);
+  const fillOpacity = p.sparse ? 0.4 : 0.85;
+
+  // «Шаговая» позиция на плоскости (тень).
+  const [shadowX, shadowY] = proj.project(sx(p.x), sy(p.y));
+  // «Высота» точки относительно плоскости — пиксели.
+  // residual в %; масштаб RES_K — px/%.
+  const res = p.residual ?? 0;
+  const lift = res * RES_K;
+
+  let headX, headY;
+  if(viewMode === 'flat'){
+    headX = shadowX; headY = shadowY;
+  } else {
+    [headX, headY] = proj.lift(sx(p.x), sy(p.y), lift);
+  }
+
+  const showStick = viewMode !== 'flat' && Math.abs(lift) > 1;
+  const stickColor = res > 0 ? '#ff4d6d' : '#00d4ff';
+
+  return (
+    <g
+      style={{ cursor: 'pointer' }}
+      onMouseEnter={e => onEnter(p, e)}
+      onMouseMove={e => onEnter(p, e)}
+      onMouseLeave={onLeave}
+      onClick={() => onClick(p)}
+    >
+      {/* Тень — кружочек на плоскости (только если есть стержень) */}
+      {showStick && (
+        <circle cx={shadowX} cy={shadowY} r={Math.max(2, r * 0.4)}
+          fill="#000" fillOpacity="0.35" stroke="#222a37" strokeOpacity="0.6" />
+      )}
+      {/* Стержень */}
+      {showStick && (
+        <line
+          x1={shadowX} y1={shadowY} x2={headX} y2={headY}
+          stroke={stickColor} strokeOpacity="0.75" strokeWidth={isHover ? 2 : 1.4}
+        />
+      )}
+      {/* Головка точки */}
+      <circle
+        cx={headX} cy={headY} r={isHover ? r + 2 : r}
+        fill={fill} fillOpacity={fillOpacity}
+        stroke={isSel ? '#00d4ff' : stroke}
+        strokeWidth={sw}
+      />
+    </g>
+  );
+}
+
+// Билинейная интерполяция по сетке.
 function lerpGrid(grid, x, y){
   if(!grid) return null;
   const { xs, ys, z } = grid;
@@ -241,45 +420,18 @@ function lerpGrid(grid, x, y){
   return z0 * (1 - ty) + z1 * ty;
 }
 
-function Heatmap({ grid, sx, sy }){
-  const { xs, ys, z } = grid;
-  const NX = xs.length, NY = ys.length;
-  const cells = [];
-  for(let i = 0; i < NX - 1; i++){
-    for(let j = 0; j < NY - 1; j++){
-      const v = avg4(z[i][j], z[i+1][j], z[i][j+1], z[i+1][j+1]);
-      const x1 = sx(xs[i]),     x2 = sx(xs[i+1]);
-      const y1 = sy(ys[j+1]),   y2 = sy(ys[j]);
-      cells.push({ x: x1, y: y1, w: x2 - x1, h: y2 - y1, v });
-    }
-  }
-  return (
-    <g pointerEvents="none">
-      {cells.map((c, k) => (
-        <rect key={k}
-          x={c.x} y={c.y} width={c.w + 0.5} height={c.h + 0.5}
-          fill={ytmColor(c.v)} fillOpacity={0.55}
-        />
-      ))}
-    </g>
-  );
-}
-
 function avg4(a, b, c, d){
   const arr = [a, b, c, d].filter(x => x != null && isFinite(x));
   if(!arr.length) return null;
   return arr.reduce((s, x) => s + x, 0) / arr.length;
 }
 
-// Тултип точки. Имя компании — кликабельная ссылка, открывает окно
-// эмитента (как поиск в шапке).
 function PointTooltip({ tip, openWin }){
   const { p } = tip;
   const left = Math.min(tip.x + 12, 700);
   const top  = Math.max(tip.y - 8, 8);
   const z = p.zscore;
   const zCls = z == null ? 'text-text3' : z > 1 ? 'text-danger' : z < -1 ? 'text-acc' : 'text-text2';
-
   return (
     <div
       className="absolute bg-bg2 border border-border rounded px-3 py-2 shadow-cardHover text-[11px] font-mono space-y-0.5 z-10"
@@ -331,8 +483,6 @@ function PointTooltip({ tip, openWin }){
   );
 }
 
-// Тултип-readout для пустого фона: координаты курсора и E[YTM] в этой
-// точке поверхности.
 function CrosshairTooltip({ crosshair, yMode }){
   const { dataX, dataY, eytm } = crosshair;
   const left = Math.min(crosshair.x + 12, 720);

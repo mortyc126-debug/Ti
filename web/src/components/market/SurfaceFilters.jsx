@@ -3,9 +3,15 @@
 // карты. Полоса ядра — в свернутом блоке «параметры».
 
 import { useState } from 'react';
-import { Sliders, Map } from 'lucide-react';
+import { Sliders, Map, Layers, Square, BarChart3, Box } from 'lucide-react';
 import { Y_MODES } from '../../lib/qualityComposite.js';
 import { useMarketSurface } from '../../store/marketSurface.js';
+
+const VIEW_MODES = [
+  { id: 'flat',   label: 'Плоский',  icon: Square,    tip: 'Точки на плоскости, цвет = z-score. Высота отклонения только цветом.' },
+  { id: 'sticks', label: 'Стержни',  icon: BarChart3, tip: 'Стержень от поверхности до точки: длина и цвет показывают величину и знак residual\'а.' },
+  { id: 'iso',    label: '3D',       icon: Box,       tip: 'Аксонометрия: плоскость уходит в перспективу, точки парят над/под поверхностью на residual.' },
+];
 
 const TYPE_LIST = [
   { id: 'ofz',        label: 'ОФЗ' },
@@ -26,9 +32,13 @@ export default function SurfaceFilters(){
   const bwX = useMarketSurface(s => s.bwX);
   const bwY = useMarketSurface(s => s.bwY);
   const showHeatmap = useMarketSurface(s => s.showHeatmap);
+  const showContours = useMarketSurface(s => s.showContours);
+  const viewMode = useMarketSurface(s => s.viewMode);
+  const setViewMode = useMarketSurface(s => s.setViewMode);
   const setRange = useMarketSurface(s => s.setRange);
   const setBandwidth = useMarketSurface(s => s.setBandwidth);
   const toggleHeatmap = useMarketSurface(s => s.toggleHeatmap);
+  const toggleContours = useMarketSurface(s => s.toggleContours);
 
   const [paramsOpen, setParamsOpen] = useState(false);
 
@@ -65,26 +75,57 @@ export default function SurfaceFilters(){
           >{t.label}</button>
         ))}
 
-        <button
-          type="button"
-          onClick={toggleHeatmap}
-          title="Фон — поле E[YTM | срок, качество]"
-          className={[
-            'ml-auto inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono border transition-colors',
-            showHeatmap
-              ? 'bg-acc-dim text-acc border-acc/40'
-              : 'bg-s2 text-text2 border-border hover:text-text',
-          ].join(' ')}
-        >
-          <Map size={11} /> поверхность
-        </button>
-        <button
-          type="button"
-          onClick={() => setParamsOpen(v => !v)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono border border-border bg-s2 text-text2 hover:text-text"
-        >
-          <Sliders size={11} /> параметры
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          <span className="text-text3 text-[10px] uppercase tracking-wider font-mono mr-1">вид</span>
+          <div className="flex gap-0.5 rounded overflow-hidden border border-border">
+            {VIEW_MODES.map(m => {
+              const Icon = m.icon;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  title={m.tip}
+                  onClick={() => setViewMode(m.id)}
+                  className={[
+                    'inline-flex items-center gap-1 px-2 py-1 text-[11px] font-mono uppercase tracking-wider transition-colors',
+                    viewMode === m.id ? 'bg-acc-dim text-acc' : 'bg-s2 text-text3 hover:text-text',
+                  ].join(' ')}
+                >
+                  <Icon size={11} /> {m.label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={toggleHeatmap}
+            title="Фон — поле E[YTM | срок, качество]"
+            className={[
+              'ml-1 inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono border transition-colors',
+              showHeatmap ? 'bg-acc-dim text-acc border-acc/40' : 'bg-s2 text-text2 border-border hover:text-text',
+            ].join(' ')}
+          >
+            <Map size={11} /> заливка
+          </button>
+          <button
+            type="button"
+            onClick={toggleContours}
+            title="Изолинии равной E[YTM] поверх поверхности"
+            className={[
+              'inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono border transition-colors',
+              showContours ? 'bg-acc-dim text-acc border-acc/40' : 'bg-s2 text-text2 border-border hover:text-text',
+            ].join(' ')}
+          >
+            <Layers size={11} /> изолинии
+          </button>
+          <button
+            type="button"
+            onClick={() => setParamsOpen(v => !v)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono border border-border bg-s2 text-text2 hover:text-text"
+          >
+            <Sliders size={11} /> параметры
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center flex-wrap gap-3 text-[11px] font-mono">
