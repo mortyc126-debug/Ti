@@ -275,12 +275,13 @@ async function handleStatus(env){
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     dadata_configured: !!env.DADATA_API_KEY,
+    girbo_proxy_configured: !!env.GIRBO_PROXY,
     ...aiStats,
     // Список активных треков — каждый track-branch при merge добавит
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.5-force-refetch',  // фундамент: MOEX, DaData, buxbalans, ГИР БО
+      core:        '0.9.6-girbo-proxy',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -291,7 +292,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.5-force-refetch',
+    version: '0.9.6-girbo-proxy',
   });
 }
 
@@ -2237,9 +2238,21 @@ const GIRBO_CODES = {
 // Timeout короткий (5с): если ФНС режет CF Worker IP — нет смысла
 // ждать 12+ сек, всё равно вернётся пусто; лучше быстро провалиться
 // и отдать буджет buxbalans/Grok'у.
+//
+// Прокси через российский IP (опционально): если в env.GIRBO_PROXY
+// задан URL вида `https://xxx.apigw.yandexcloud.net/?u=`, ходим
+// через него. Yandex Cloud API Gateway → Cloud Function (см.
+// yandex-cloud-proxy.js + yandex-api-gateway.yaml в репо). С РФ-IP
+// ФНС не блочит — получаем актуальный 2025 год сразу как только
+// эмитент сдал отчёт.
 async function girboFetch(path, opts){
-  const url  = 'https://bo.nalog.gov.ru' + path;
-  const tout = opts?.timeoutMs || 5000;
+  const proxy = opts?.proxy || '';
+  const directUrl = 'https://bo.nalog.gov.ru' + path;
+  // Формат прокси: `<base>/?u=` или `<base>?u=` — допускаем оба.
+  const url = proxy
+    ? proxy + (proxy.endsWith('?u=') || proxy.endsWith('&u=') ? '' : (proxy.includes('?') ? '&u=' : '?u=')) + encodeURIComponent(directUrl)
+    : directUrl;
+  const tout = opts?.timeoutMs || (proxy ? 12000 : 5000);  // через прокси даём больше времени
   const ctrl = new AbortController();
   const tm = setTimeout(() => ctrl.abort(), tout);
   try {
@@ -2260,7 +2273,11 @@ async function girboFetch(path, opts){
 // Один эмитент: ИНН → series {год: {rev, ebit, np, ...}}.
 // Возвращает {series, company, ogrn, errors}. Бросает Error если
 // ГИР БО вообще ничего не нашёл по ИНН.
-async function girboFetchByInn(inn, maxYears = 3){
+async function girboFetchByInn(inn, maxYears = 3, opts){
+  // opts.proxy — URL Yandex Cloud API Gateway (типа
+  // https://xxx.apigw.yandexcloud.net/?u=) для обхода гео-блока
+  // bo.nalog.gov.ru. Если null — пробуем напрямую (упадёт на CF Worker).
+  const proxy = opts?.proxy || null;
   // 1. Поиск организации по ИНН
   let orgs = [];
   for(const path of [
@@ -2268,7 +2285,7 @@ async function girboFetchByInn(inn, maxYears = 3){
     `/nbo/organizations/?inn=${inn}`,
   ]){
     try {
-      const r = await girboFetch(path);
+      const r = await girboFetch(path, { proxy });
       const got = Array.isArray(r) ? r : (r?.content || r?.organizations || []);
       if(got.length){ orgs = got; break; }
     } catch(_){ /* пробуем следующий */ }
@@ -2279,7 +2296,7 @@ async function girboFetchByInn(inn, maxYears = 3){
   if(!orgId) throw new Error('ГИР БО: нет orgId в ответе');
 
   // 2. Список годовых отчётов
-  const bfoListResp = await girboFetch(`/nbo/organizations/${orgId}/bfo/`);
+  const bfoListResp = await girboFetch(`/nbo/organizations/${orgId}/bfo/`, { proxy });
   const bfoList = Array.isArray(bfoListResp)
     ? bfoListResp
     : (bfoListResp.content || bfoListResp.bfo || []);
@@ -2314,8 +2331,8 @@ async function girboFetchByInn(inn, maxYears = 3){
         det = Object.assign({}, corr.balance || {}, corr.financialResult || {});
       } else {
         const [balance, pnl] = await Promise.all([
-          girboFetch('/nbo/details/balance?id=' + corrId).catch(() => ({})),
-          girboFetch('/nbo/details/financial_result?id=' + corrId).catch(() => ({})),
+          girboFetch('/nbo/details/balance?id=' + corrId, { proxy }).catch(() => ({})),
+          girboFetch('/nbo/details/financial_result?id=' + corrId, { proxy }).catch(() => ({})),
         ]);
         det = Object.assign({}, balance, pnl);
       }
@@ -2397,7 +2414,10 @@ function pickRaw(det, kind){
 //
 // Ограничения: только РСБУ (МСФО на buxbalans нет), значения «как у
 // ФНС опубликовано», без агрегации по группе компаний.
-async function buxBalansFetchByInn(inn, opts){
+// Сигнатура (inn, maxYears, opts) — унифицирована с girboFetchByInn,
+// чтобы каскад в collectReports вызывал все источники одинаково.
+// maxYears у buxbalans игнорируется (страница отдаёт всю историю).
+async function buxBalansFetchByInn(inn, _maxYears, opts){
   const tout = opts?.timeoutMs || 12000;
   // Один retry на 502/503/network — у buxbalans бывают короткие
   // блипы (видим из логов прода). Без retry «не найден» ставится
@@ -2805,7 +2825,9 @@ async function collectReports(env, url){
         continue;
       }
       try {
-        const fetched = await src.fn(inn, 5);
+        // Передаём env для тех источников, что могут его использовать
+        // (girbo — для GIRBO_PROXY, buxbalans пока ничего не нужно).
+        const fetched = await src.fn(inn, 5, { env, proxy: env.GIRBO_PROXY || null });
         if(!fetched.series || !Object.keys(fetched.series).length){
           throw new Error(src.name + ': пустой series');
         }
