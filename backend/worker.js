@@ -34,6 +34,11 @@
 //   GET  /diag/dadata?inn=X&token=...  диагностика: сырой ответ DaData
 //                                      + распарсенные связи. Только для
 //                                      админа (?token=ADMIN_TOKEN).
+//   GET  /diag/girbo?inn=X&token=...   диагностика ФНС/ГИР БО через
+//                                      (опциональный) GIRBO_PROXY:
+//                                      какой endpoint ответил, есть ли
+//                                      организация в индексе, список
+//                                      годовых отчётов.
 //   POST /collect/affiliations?limit=N тащит ЕГРЮЛ-связи через DaData
 //                                      (требует DADATA_API_KEY в Worker
 //                                      secrets, 10к запросов/день free).
@@ -85,6 +90,7 @@ export default {
       if(url.pathname === '/catalog')         return await handleCatalog(env);
       if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
       if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
+      if(url.pathname === '/diag/girbo')      return await handleDiagGirbo(env, url);
       if(url.pathname.startsWith('/issuer/')){
         // /issuer/:inn               — карточка
         // /issuer/:inn/reports        — годовые РСБУ-показатели
@@ -281,7 +287,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.6-girbo-proxy',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
+      core:        '0.9.7-diag-girbo',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -292,7 +298,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.6-girbo-proxy',
+    version: '0.9.7-diag-girbo',
   });
 }
 
@@ -1451,6 +1457,83 @@ async function handleDiagDadata(env, url){
     extracted,
     raw,
   });
+}
+
+// /diag/girbo?inn=XXX — диагностический endpoint для ГИР БО через
+// (опциональный) GIRBO_PROXY. Возвращает каждый шаг каскада:
+//   1. поиск по ИНН (сырой ответ ФНС, какие поля)
+//   2. список годовых отчётов
+//   3. balance + financial_result для свежего года
+// По JSON сразу видно: ФНС отвечает, парсер ловит, или где-то
+// падает.
+async function handleDiagGirbo(env, url){
+  const token = (url.searchParams.get('token') || '').trim();
+  if(!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN){
+    return errResp('unauthorized — добавьте ?token=ADMIN_TOKEN', 401);
+  }
+  const inn = url.searchParams.get('inn');
+  if(!inn || !/^\d{10,12}$/.test(inn)){
+    return errResp('?inn=XXXXXXXXXX (10 или 12 цифр) обязателен', 400);
+  }
+  const proxy = env.GIRBO_PROXY || null;
+  const result = {
+    inn,
+    proxy_configured: !!proxy,
+    steps: [],
+  };
+
+  // Шаг 1: поиск ИНН — пробуем оба варианта endpoint
+  const searchPaths = [
+    `/advanced-search/organizations/search?inn=${inn}`,
+    `/advanced-search/organizations/search?query=${inn}`,
+    `/nbo/organizations/?inn=${inn}`,
+    `/nbo/organizations/search?inn=${inn}`,
+  ];
+  let org = null;
+  for(const path of searchPaths){
+    const step = { path, ok: false };
+    try {
+      const r = await girboFetch(path, { proxy });
+      const got = Array.isArray(r) ? r : (r?.content || r?.organizations || []);
+      step.ok = true;
+      step.totalElements = r?.totalElements ?? null;
+      step.contentSample = Array.isArray(got) && got.length > 0
+        ? { keys: Object.keys(got[0]), first: got[0] }
+        : (Array.isArray(got) ? '[]' : 'no array');
+      result.steps.push(step);
+      if(Array.isArray(got) && got.length > 0){
+        org = got.find(o => String(o.inn || o.organisationInn) === inn) || got[0];
+        break;
+      }
+    } catch(e){
+      step.error = (e.message || String(e)).slice(0, 300);
+      result.steps.push(step);
+    }
+  }
+  if(!org){
+    return jsonResp({ ...result, found: false });
+  }
+  result.found = true;
+  result.org = { id: org.id || org.organizationId, name: org.name || org.shortName, inn: org.inn };
+
+  // Шаг 2: список годовых отчётов
+  const orgId = org.id || org.organizationId;
+  if(orgId){
+    try {
+      const r = await girboFetch(`/nbo/organizations/${orgId}/bfo/`, { proxy });
+      const list = Array.isArray(r) ? r : (r?.content || r?.bfo || []);
+      result.bfo = {
+        ok: true,
+        count: list.length,
+        years: list.map(b => b.year || b.period).filter(Boolean),
+        firstSample: list[0] || null,
+      };
+    } catch(e){
+      result.bfo = { ok: false, error: (e.message || String(e)).slice(0, 300) };
+    }
+  }
+
+  return jsonResp(result);
 }
 
 // Коллектор аффилиаций. По умолчанию идёт по тем же ИНН, что и
