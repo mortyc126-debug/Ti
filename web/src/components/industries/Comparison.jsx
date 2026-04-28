@@ -34,6 +34,9 @@ export default function Comparison(){
   const overrides = useIndustryNorms(s => s.overrides);
 
   const [showPicker, setShowPicker] = useState(false);
+  // Транзиентное hover-состояние: какой полигон/строку сейчас выделить.
+  // Локально (не в persistent store) — эфемерное.
+  const [hoveredKey, setHoveredKey] = useState(null);
 
   // Глобальный Ctrl+Z / Ctrl+Y для undo/redo вкладки.
   useEffect(() => {
@@ -100,12 +103,18 @@ export default function Comparison(){
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
         <div className="bg-bg2 border border-border rounded-lg p-3">
-          <ComparisonRadar selectedView={selectedView} />
+          <ComparisonRadar
+            selectedView={selectedView}
+            hoveredKey={hoveredKey}
+            onHover={setHoveredKey}
+          />
         </div>
         <CompaniesPanel
           selectedView={selectedView}
           candidates={candidates}
           onShowPicker={() => setShowPicker(true)}
+          hoveredKey={hoveredKey}
+          onHover={setHoveredKey}
         />
       </div>
 

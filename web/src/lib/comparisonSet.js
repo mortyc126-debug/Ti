@@ -127,13 +127,16 @@ export function buildSelectedView(selected, visibleOnly){
 }
 
 // Сборка данных для recharts RadarChart. Возвращает массив точек,
-// одна точка на ось.
+// одна точка на ось. Помимо ранга (для отрисовки полигона) кладём
+// сырое значение под ключом 'raw|<key>' — пригодится в хоккеях
+// меток.
 //   [
-//     { axis: 'ND/EBITDA', SBER: 12, LKOH: 90, ... },
+//     { axis: 'ND/EBITDA', axisId: 'nde',
+//       'SBER|stock': 80, 'raw|SBER|stock': 1.2,
+//       'LKOH|stock': 95, 'raw|LKOH|stock': 0.4,
+//       ... },
 //     ...
 //   ]
-// Значения нормированы в 0..100 через percentile-rank внутри текущего
-// набора видимых эмитентов (как в old _crossRanks).
 export function buildRadarData(selectedView){
   const visible = selectedView.filter(x => x.visible);
   if(!visible.length) return [];
@@ -141,9 +144,11 @@ export function buildRadarData(selectedView){
     const spec = metricSpec(axisId);
     const vals = visible.map(x => x.iss.mults?.[axisId] ?? null);
     const ranks = percentileRanks(vals, spec.higher !== false);
-    const point = { axis: spec.short, axisId };
+    const point = { axis: spec.short, axisId, fmt: spec.fmt || '' };
     visible.forEach((x, i) => {
-      point[x.id + '|' + x.kind] = ranks[i] ?? 0;
+      const key = x.id + '|' + x.kind;
+      point[key] = ranks[i] ?? 0;
+      point['raw|' + key] = vals[i];
     });
     return point;
   });

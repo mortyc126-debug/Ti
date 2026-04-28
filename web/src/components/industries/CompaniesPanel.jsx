@@ -21,7 +21,7 @@ const KIND_GROUPS = [
   { kind: 'future', title: 'Фьючерсы',      tone: 'text-purple' },
 ];
 
-export default function CompaniesPanel({ selectedView, candidates, onShowPicker }){
+export default function CompaniesPanel({ selectedView, candidates, onShowPicker, hoveredKey, onHover }){
   const showLayer = useComparison(s => s.showLayer);
   const toggleVis = useComparison(s => s.toggleVisible);
   const removeIss = useComparison(s => s.removeIssuer);
@@ -72,16 +72,22 @@ export default function CompaniesPanel({ selectedView, candidates, onShowPicker 
                 {g.title} ({items.length}) {!layerOn && <span className="ml-1 text-text3">— слой скрыт</span>}
               </div>
               <ul>
-                {items.map(x => (
-                  <CompanyRow
-                    key={x.id + '|' + x.kind}
-                    item={x}
-                    color={colorFor(x.kind, idxInKind.get(x.id + '|' + x.kind), items.length)}
-                    layerOn={layerOn}
-                    onToggleVis={() => toggleVis(x.id, x.kind)}
-                    onRemove={() => removeIss(x.id, x.kind)}
-                  />
-                ))}
+                {items.map(x => {
+                  const k = x.id + '|' + x.kind;
+                  return (
+                    <CompanyRow
+                      key={k}
+                      item={x}
+                      hovered={hoveredKey === k}
+                      onHoverEnter={() => onHover && onHover(k)}
+                      onHoverLeave={() => onHover && onHover(null)}
+                      color={colorFor(x.kind, idxInKind.get(k), items.length)}
+                      layerOn={layerOn}
+                      onToggleVis={() => toggleVis(x.id, x.kind)}
+                      onRemove={() => removeIss(x.id, x.kind)}
+                    />
+                  );
+                })}
               </ul>
             </section>
           );
@@ -91,7 +97,7 @@ export default function CompaniesPanel({ selectedView, candidates, onShowPicker 
   );
 }
 
-function CompanyRow({ item, color, layerOn, onToggleVis, onRemove }){
+function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHoverEnter, onHoverLeave }){
   const iss = item.iss;
   const visible = item.visible && layerOn;
   const openWin = useWindows(s => s.open);
@@ -100,10 +106,14 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove }){
   });
   return (
     <li
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
       className={[
-        'px-4 py-2 border-t border-border/30 first:border-t-0',
+        'px-4 py-2 border-t border-border/30 first:border-t-0 transition-colors',
         visible ? '' : 'opacity-50',
+        hovered ? 'bg-acc-dim/30' : '',
       ].join(' ')}
+      style={hovered ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
     >
       <div className="flex items-center gap-2">
         <button
