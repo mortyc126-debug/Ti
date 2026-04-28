@@ -103,8 +103,9 @@
       <button class="secondary" onclick="run('/collect/reports?limit=20&only_traded=1&include_ai=1&ai_budget=8&max_ms=280000')">🤖 · 20 / 8 AI (paid)</button>
     </div>
     <div class="row" style="margin-top:8px">
-      <button onclick="run('/collect/affiliations?limit=30')">🔗 ЕГРЮЛ-связи · 30 (DaData)</button>
-      <button class="secondary" onclick="run('/collect/affiliations?limit=100&max_ms=280000')">🔗 · 100 связей (paid)</button>
+      <button onclick="run('/collect/affiliations?limit=20&zachbiz_budget=10')">🔗 ЕГРЮЛ + zachBiz · 20 (10 zb)</button>
+      <button class="secondary" onclick="run('/collect/affiliations?limit=30&zachbiz=0')">🔗 · 30 (только DaData)</button>
+      <button class="secondary" onclick="run('/collect/affiliations?limit=20&only_traded=0&only_missing=1')">🔗 · цепочка вверх (только новые)</button>
     </div>
     <div class="sub" style="margin-top:12px">
       Порядок при первом запуске: <b>облигации → акции → справочник → отчётность</b>.
