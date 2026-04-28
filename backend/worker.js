@@ -1,4 +1,4 @@
-// Cloudflare Worker — бэкенд БондАналитика. v0.9.11-girbo-brand
+// Cloudflare Worker — бэкенд БондАналитика. v0.9.12-year-stats
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
@@ -191,12 +191,13 @@ async function handleStatus(env){
   // Статистика по отчётности: сколько ИНН покрыто, последние fetched_at.
   let reportsStats = {};
   try {
-    const [rRows, rIssuers, rRecent, qPending, bySrc] = await Promise.all([
+    const [rRows, rIssuers, rRecent, qPending, bySrc, byYear] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as c FROM issuer_reports').first(),
       env.DB.prepare('SELECT COUNT(DISTINCT inn) as c FROM issuer_reports').first(),
       env.DB.prepare('SELECT MAX(fetched_at) as t FROM issuer_reports').first(),
       env.DB.prepare("SELECT COUNT(*) as c FROM reports_queue WHERE last_success IS NULL OR last_success < datetime('now', '-30 days')").first(),
       env.DB.prepare('SELECT source, COUNT(*) AS c FROM issuer_reports GROUP BY source').all(),
+      env.DB.prepare('SELECT fy_year, COUNT(*) AS c FROM issuer_reports WHERE fy_year >= 2018 GROUP BY fy_year ORDER BY fy_year DESC').all(),
     ]);
     reportsStats = {
       reports_rows: rRows?.c ?? 0,
@@ -204,6 +205,7 @@ async function handleStatus(env){
       reports_last_fetched: rRecent?.t ?? null,
       reports_queue_pending: qPending?.c ?? 0,
       reports_by_source: Object.fromEntries((bySrc.results || []).map(r => [r.source, r.c])),
+      reports_by_year: Object.fromEntries((byYear.results || []).map(r => [r.fy_year, r.c])),
     };
   } catch(_){}
 
@@ -287,7 +289,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.11-girbo-brand',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
+      core:        '0.9.12-year-stats',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -298,7 +300,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.11-girbo-brand',
+    version: '0.9.12-year-stats',
   });
 }
 
