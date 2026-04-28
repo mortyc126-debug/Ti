@@ -93,11 +93,13 @@ function makeStore(name, defaults){
 export const useMarketBonds   = makeStore('bondan_market_bonds',   BOND_DEFAULTS);
 export const useMarketStocks  = makeStore('bondan_market_stocks',  STOCK_DEFAULTS);
 export const useMarketFutures = makeStore('bondan_market_futures', FUTURE_DEFAULTS);
+export const useMarketOverlay = makeStore('bondan_market_overlay', STOCK_DEFAULTS);
 
 // Удобный хелпер: возвращает store hook по kind'у.
 export function useMarketStore(kind){
-  if(kind === 'stock')  return useMarketStocks;
-  if(kind === 'future') return useMarketFutures;
+  if(kind === 'stock')   return useMarketStocks;
+  if(kind === 'future')  return useMarketFutures;
+  if(kind === 'overlay') return useMarketOverlay;
   return useMarketBonds;
 }
 

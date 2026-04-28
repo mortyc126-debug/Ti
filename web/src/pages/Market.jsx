@@ -9,6 +9,7 @@ const TABS = [
   { id: 'bonds',   label: 'Облигации' },
   { id: 'stocks',  label: 'Акции' },
   { id: 'futures', label: 'Фьючерсы' },
+  { id: 'spread',  label: 'Спред (акции + фьюч)' },
 ];
 
 function readTab(){
@@ -40,6 +41,7 @@ export default function Market(){
         {tab === 'bonds'   && <Surface kind="bond" />}
         {tab === 'stocks'  && <Surface kind="stock" />}
         {tab === 'futures' && <Surface kind="future" />}
+        {tab === 'spread'  && <Surface kind="overlay" />}
       </div>
     </div>
   );

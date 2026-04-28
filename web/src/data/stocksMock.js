@@ -36,19 +36,18 @@ export const stocksMock = [
 ];
 
 // Фьючерсы привязаны к акции (или к индексу) и наследуют её
-// мультипликаторы. Для фьюча на акцию residual считается так же —
-// E/P фьюча (через расчётную цену исполнения) против ожидания.
-// Для индексных/валютных — нет финансовых мультипликаторов, X-ось
-// «по композиту» для них работать не будет; на горизонте они могут
-// быть отдельным слоем.
+// мультипликаторы. basisPp — базис фьюч-спот в процентных пунктах
+// E/P (положительный = контанго, фьюч дороже спота; отрицательный
+// = бэквардация, фьюч дешевле спота). В реальности базис = (F-S)/S
+// + cost-of-carry; здесь — псевдо-данные для визуальной демонстрации.
 export const futuresMock = [
-  fu('SBRF',  'Сбербанк-фьюч',     'SBER', 'banks'),
-  fu('GAZR',  'Газпром-фьюч',      'GAZP', 'oil-gas'),
-  fu('LKOH-F','Лукойл-фьюч',       'LKOH', 'oil-gas'),
-  fu('GMKN-F','ГМК-фьюч',          'GMKN', 'metals'),
-  fu('YDEX-F','Яндекс-фьюч',       'YDEX', 'it'),
-  fu('TATN-F','Татнефть-фьюч',     'TATN', 'oil-gas'),
-  fu('NLMK-F','НЛМК-фьюч',         'NLMK', 'metals'),
+  fu('SBRF',   'Сбербанк-фьюч',  'SBER', 'banks',    +0.6),
+  fu('GAZR',   'Газпром-фьюч',   'GAZP', 'oil-gas',  +0.4),
+  fu('LKOH-F', 'Лукойл-фьюч',    'LKOH', 'oil-gas',  -0.3),
+  fu('GMKN-F', 'ГМК-фьюч',       'GMKN', 'metals',   +0.8),
+  fu('YDEX-F', 'Яндекс-фьюч',    'YDEX', 'it',       -0.5),
+  fu('TATN-F', 'Татнефть-фьюч',  'TATN', 'oil-gas',  +0.2),
+  fu('NLMK-F', 'НЛМК-фьюч',      'NLMK', 'metals',   -0.7),
 ];
 
 function st(ticker, name, ind, pe, marketCapBn, beta, ratingC, mults){
@@ -67,9 +66,7 @@ function st(ticker, name, ind, pe, marketCapBn, beta, ratingC, mults){
   };
 }
 
-function fu(ticker, name, baseTicker, ind){
-  // Фьючерс наследует мультипликаторы от base-акции; pe/ep/cap
-  // подтянутся уже при сборке точек (loadFuturePoints).
+function fu(ticker, name, baseTicker, ind, basisPp){
   return {
     secid: ticker,
     ticker,
@@ -77,5 +74,6 @@ function fu(ticker, name, baseTicker, ind){
     issuer: name,
     industry: ind,
     baseTicker,
+    basisPp: basisPp ?? 0,    // в п.п. earnings yield
   };
 }

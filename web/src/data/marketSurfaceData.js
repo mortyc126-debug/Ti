@@ -71,8 +71,8 @@ export function loadStockPoints({ yMode = 'scoring' } = {}){
 
 // ─── ФЬЮЧЕРСЫ ─────────────────────────────────────────────────────
 // Фьюч на акцию наследует мультипликаторы базовой бумаги. Для фьюча
-// «доходность» приравниваем к E/P базовой акции (точнее моделирование
-// — отдельная история, тут — заглушка).
+// «доходность» = E/P базовой акции − basisPp (контанго → ниже E/P,
+// бэквардация → выше E/P). basisPp задан в futuresMock.
 export function loadFuturePoints({ yMode = 'scoring' } = {}){
   const stockMap = new Map(stocksMock.map(s => [s.ticker, s]));
   const out = [];
@@ -82,21 +82,43 @@ export function loadFuturePoints({ yMode = 'scoring' } = {}){
     const y = qualityY(base, yMode);
     if(y == null) continue;
     const fakeBondForScores = { mults: base.mults };
+    // Базис: контанго (фьюч дороже спота) → доходность фьюча ниже,
+    // т.е. ep_future = ep_stock − basisPp.
+    const basis = f.basisPp || 0;
+    const epF = base.ep - basis;
     out.push({
       secid: f.secid, name: f.name, issuer: f.issuer, ticker: f.ticker,
       industry: f.industry, rating: base.rating,
       baseTicker: f.baseTicker,
+      basisPp: basis,
       volumeBn: base.marketCapBn,
-      pe: base.pe, beta: base.beta,
+      pe: epF > 0 ? 100 / epF : null, beta: base.beta,
       mults: {
-        ...base.mults, pe: base.pe,
+        ...base.mults, pe: epF > 0 ? 100 / epF : null,
         safety: safetyScore(fakeBondForScores),
         bqi: bqiScore(fakeBondForScores),
       },
-      x: y, y, z: base.ep,
+      x: y, y, z: epF,
     });
   }
   return out;
+}
+
+// ─── СПРЕД (overlay) ─────────────────────────────────────────────
+// Возвращает обе серии + пары. Используется в табе «Спред» — на
+// одном горизонте видны и акции, и фьючерсы, плюс соединительная
+// линия акция↔фьюч.
+export function loadOverlayPoints(opts = {}){
+  const stocks = loadStockPoints(opts);
+  const futures = loadFuturePoints(opts);
+  // Пары по baseTicker → соответствующая stock-точка.
+  const stockByTicker = new Map(stocks.map(s => [s.ticker, s]));
+  const pairs = [];
+  for(const f of futures){
+    const s = stockByTicker.get(f.baseTicker);
+    if(s) pairs.push({ stock: s, future: f });
+  }
+  return { stocks, futures, pairs };
 }
 
 // ─── Универсальный вход (используется страницей через kind) ───────

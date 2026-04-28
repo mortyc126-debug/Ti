@@ -14,7 +14,7 @@ import { buildHorizonX, horizonXLabel } from '../../lib/horizonX.js';
 const PAD = { top: 18, right: 32, bottom: 36, left: 56 };
 const W = 880, H = 500;
 
-export default function SurfaceChart({ kind = 'bond', fitted }){
+export default function SurfaceChart({ kind = 'bond', fitted, overlayFutures, overlayPairs }){
   const useStore          = useMarketStore(kind);
   const horizonX          = useStore(s => s.horizonX);
   const horizonMultiplier = useStore(s => s.horizonMultiplier);
@@ -44,12 +44,20 @@ export default function SurfaceChart({ kind = 'bond', fitted }){
     [rawPoints, xSpec]
   );
 
-  // Bbox по Y (residual в %).
+  // Для overlay: фьючерсы тоже прогоняем через тот же X-spec.
+  const overlayFutWithX = useMemo(() => {
+    if(!overlayFutures?.length) return [];
+    return buildHorizonX(overlayFutures, xSpec).points;
+  }, [overlayFutures, xSpec]);
+
+  // Bbox по Y. Учитываем и фьюч-residual'ы — иначе обрежет.
   const yBbox = useMemo(() => {
     const rs = points.map(p => p.residual).filter(v => v != null && isFinite(v));
-    const maxAbs = rs.length ? Math.max(0.5, Math.max(...rs.map(Math.abs)) * 1.15) : 2;
+    const fr = overlayFutWithX.map(p => p.residual).filter(v => v != null && isFinite(v));
+    const all = rs.concat(fr);
+    const maxAbs = all.length ? Math.max(0.5, Math.max(...all.map(Math.abs)) * 1.15) : 2;
     return { yMin: -maxAbs, yMax: maxAbs };
-  }, [points]);
+  }, [points, overlayFutWithX]);
 
   const xMin = xMinRaw, xMax = xMaxRaw;
   const innerW = W - PAD.left - PAD.right;
@@ -189,7 +197,26 @@ export default function SurfaceChart({ kind = 'bond', fitted }){
             : 'фактическая E/P − ожидаемая (п.п.)'}
         </text>
 
-        {/* Точки */}
+        {/* Соединительные линии акция↔фьюч (только в overlay).
+            Рисуем под точками, чтобы не перекрывали маркеры. */}
+        {kind === 'overlay' && overlayFutWithX.map(f => {
+          const stk = points.find(p => p.secid === f.baseTicker);
+          if(!stk || stk.xH == null || stk.residual == null) return null;
+          if(f.residual == null) return null;
+          const x1 = sx(stk.xH), y1 = sy(stk.residual);
+          const x2 = sx(f.xH),   y2 = sy(f.residual);
+          // Контанго (basis>0) → фьюч ниже стопа по Y → жёлтый;
+          // бэквардация (basis<0) → фьюч выше → пурпурный.
+          const c = (f.basisPp || 0) > 0 ? '#f5a623' : '#a78bfa';
+          return (
+            <line key={'pair-' + f.secid}
+              x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={c} strokeOpacity="0.7" strokeWidth="1.6"
+              strokeDasharray="3 2" pointerEvents="none" />
+          );
+        })}
+
+        {/* Точки (акции/бонды/фьючерсы/overlay-stocks) */}
         {points.map(p => {
           if(p.residual == null || p.xH == null) return null;
           const r = sr(p.volumeBn);
@@ -218,6 +245,34 @@ export default function SurfaceChart({ kind = 'bond', fitted }){
               <circle cx={xPos} cy={yPos} r={isHover ? r + 2 : r}
                 fill={fill} fillOpacity={fillOpacity}
                 stroke={stroke} strokeWidth={isSel ? 2.5 : 1} />
+            </g>
+          );
+        })}
+
+        {/* Фьючерсы поверх (overlay-режим). Маркер — пустой кружок
+            (hollow), чтобы отличался от акции. */}
+        {kind === 'overlay' && overlayFutWithX.map(f => {
+          if(f.residual == null || f.xH == null) return null;
+          const r = sr(f.volumeBn);
+          const xPos = sx(f.xH);
+          const yPos = sy(f.residual);
+          const isHover = hoverId === f.secid;
+          const isSel = selectedId === f.secid;
+          const fill = zScoreColor(f.zscore);
+          // Слегка смещаем фьюч по X, чтобы маркер акции не перекрывал.
+          const xOff = 6;
+          return (
+            <g key={f.secid}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={e => onPointEnter(f, e)}
+              onMouseMove={e => onPointEnter(f, e)}
+              onMouseLeave={onPointLeave}
+              onClick={() => onPointClick(f)}>
+              <circle cx={xPos + xOff} cy={yPos} r={isHover ? r + 1 : r * 0.85}
+                fill="transparent"
+                stroke={isSel ? '#00d4ff' : (fill || '#9ba3b1')}
+                strokeWidth={isSel ? 2.5 : 1.8}
+                strokeDasharray="2 2" />
             </g>
           );
         })}
