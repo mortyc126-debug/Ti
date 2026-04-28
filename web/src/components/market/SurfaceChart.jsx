@@ -132,6 +132,20 @@ export default function SurfaceChart({ fitted }){
           поверхность · E[YTM]
         </text>
 
+        {/* Inline-подсказки направлений Y. Рисуются у правой границы
+            чарта, прямо в зонах «выше / ниже горизонта» — чтобы
+            не нужно было читать боковую подпись оси. */}
+        <text x={W - PAD.right - 4} y={Math.max(padTop + 16, sy(0) - 24)}
+          fill="#ff4d6d" fillOpacity="0.85"
+          fontSize="11" fontFamily="JetBrains Mono, monospace" textAnchor="end">
+          ↑ премия за риск
+        </text>
+        <text x={W - PAD.right - 4} y={Math.min(padTop + innerH - 6, sy(0) + 28)}
+          fill="#00d4ff" fillOpacity="0.85"
+          fontSize="11" fontFamily="JetBrains Mono, monospace" textAnchor="end">
+          ↓ дороже аналогов
+        </text>
+
         {/* Подписи тиков X */}
         {xTicks.map(t => (
           <text key={'tx' + t.v}
@@ -155,23 +169,19 @@ export default function SurfaceChart({ fitted }){
           );
         })}
 
-        {/* Подписи осей. X — основная + hint направления.
-            Y — поясняющий текст «отклонение фактической от ожидаемой». */}
-        <text x={W / 2} y={H - 18} fill="#9ba3b1" fontSize="11" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+        {/* Подписи осей. X — основная + hint направления внизу.
+            Y — одна вертикальная строка с расшифровкой residual'а. */}
+        <text x={W / 2} y={H - 18} fill="#cce4f0" fontSize="12" fontFamily="JetBrains Mono, monospace" textAnchor="middle" fontWeight="500">
           {xLabel.main}
         </text>
         {xLabel.hint && (
-          <text x={W / 2} y={H - 5} fill="#5e6573" fontSize="9" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
+          <text x={W / 2} y={H - 4} fill="#7aa0b8" fontSize="10" fontFamily="JetBrains Mono, monospace" textAnchor="middle">
             {xLabel.hint}
           </text>
         )}
-        <text x={14} y={H / 2 - 10} fill="#9ba3b1" fontSize="11" fontFamily="JetBrains Mono, monospace"
-          transform={`rotate(-90 14 ${H / 2 - 10})`} textAnchor="middle">
-          фактическая YTM − ожидаемая
-        </text>
-        <text x={26} y={H / 2 + 10} fill="#5e6573" fontSize="9" fontFamily="JetBrains Mono, monospace"
-          transform={`rotate(-90 26 ${H / 2 + 10})`} textAnchor="middle">
-          bps · ↑ премия · ↓ дороже аналогов
+        <text x={16} y={H / 2} fill="#cce4f0" fontSize="11" fontFamily="JetBrains Mono, monospace" fontWeight="500"
+          transform={`rotate(-90 16 ${H / 2})`} textAnchor="middle">
+          фактическая YTM − ожидаемая (bps)
         </text>
 
         {/* Точки */}
