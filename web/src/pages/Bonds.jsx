@@ -222,7 +222,10 @@ function BondRow({ b }){
           <button onClick={openIssuer} className="text-text3 text-[10px] font-mono hover:text-acc transition-colors text-left">
             {b.secid} · {b.issuer}
           </button>
-          <CopyBtn value={b.secid} />
+          <CopyBtn
+            value={b.secid}
+            onCopied={() => pushRecent({ kind: 'issuer', refId: b.issuer, title: b.issuer, ticker: null, ind: b.industry })}
+          />
         </div>
       </td>
       <td className="p-2 text-right font-mono">{b.price.toFixed(2)}</td>
@@ -251,13 +254,14 @@ function BondRow({ b }){
   );
 }
 
-function CopyBtn({ value }){
+function CopyBtn({ value, onCopied }){
   const [done, setDone] = useState(false);
   const click = (e) => {
     e.stopPropagation();
     navigator.clipboard?.writeText(value).then(() => {
       setDone(true);
       setTimeout(() => setDone(false), 1200);
+      onCopied?.();
     });
   };
   return (

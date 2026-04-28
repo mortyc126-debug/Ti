@@ -1,12 +1,13 @@
 // Навигация между страницами. orient: row (десктоп) | column (моб. меню).
 // Иконки lucide — единообразно во всех местах.
 import { NavLink } from 'react-router-dom';
-import { Home, Briefcase, ListChecks, Activity, Star } from 'lucide-react';
+import { Home, Briefcase, ListChecks, Activity, Star, Map } from 'lucide-react';
 
 const ITEMS = [
   { to: '/',          label: 'Главная',   end: true,  icon: Home },
   { to: '/portfolio', label: 'Портфель',  icon: Briefcase },
   { to: '/bonds',     label: 'Облигации', icon: ListChecks },
+  { to: '/market',    label: 'Карта',     icon: Map },
   { to: '/live',      label: 'Live',      icon: Activity },
   { to: '/favorites', label: 'Избранное', icon: Star },
 ];

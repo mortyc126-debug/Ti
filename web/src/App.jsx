@@ -6,6 +6,8 @@ import Portfolio from './pages/Portfolio.jsx';
 import Bonds from './pages/Bonds.jsx';
 import Live from './pages/Live.jsx';
 import Favorites from './pages/Favorites.jsx';
+import Industries from './pages/Industries.jsx';
+import Market from './pages/Market.jsx';
 
 export default function App(){
   return (
@@ -17,6 +19,8 @@ export default function App(){
           <Route path="bonds" element={<Bonds />} />
           <Route path="live" element={<Live />} />
           <Route path="favorites" element={<Favorites />} />
+          <Route path="industries" element={<Industries />} />
+          <Route path="market" element={<Market />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
