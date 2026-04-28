@@ -6,6 +6,7 @@
 //   (полоски 0-100),
 // - кнопка [✕] = удалить из списка.
 
+import { useEffect, useRef } from 'react';
 import { X, Plus, Eye, EyeOff } from 'lucide-react';
 import { useComparison } from '../../store/comparison.js';
 import { useIndustryNorms } from '../../store/industryNorms.js';
@@ -101,11 +102,23 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove, hovered, onHo
   const iss = item.iss;
   const visible = item.visible && layerOn;
   const openWin = useWindows(s => s.open);
+  const ref = useRef(null);
+
+  // Когда строка становится подсвеченной (например, через hover на
+  // полигоне радара) — мягко скроллим её в зону видимости. block:
+  // 'nearest' не двигает, если строка уже видна.
+  useEffect(() => {
+    if(hovered && ref.current){
+      ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [hovered]);
+
   const openIssuer = () => openWin({
     kind: 'issuer', id: iss.id, title: iss.name, ticker: iss.ticker || null, mode: 'medium',
   });
   return (
     <li
+      ref={ref}
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
       className={[

@@ -2,6 +2,8 @@
 // При наведении (как на полигон, так и на строку в правой панели —
 // hoveredKey прокидывается сверху) полигон выделяется, остальные
 // уходят в фон. На вершинах выделенного — числовые значения метрик.
+// В углу радара во время hover'а — карточка с именем эмитента и
+// типом бумаги, чтобы было ясно «кто это» когда список длинный.
 
 import { useMemo } from 'react';
 import {
@@ -10,6 +12,8 @@ import {
 } from 'recharts';
 import { buildRadarData } from '../../lib/comparisonSet.js';
 import { colorFor, fillOpacity, strokeOpacity } from './colorPalette.js';
+
+const KIND_LABEL = { stock: 'акции', bond: 'облиг.', future: 'фьюч.' };
 
 export default function ComparisonRadar({ selectedView, hoveredKey, onHover }){
   const visible = selectedView.filter(x => x.visible);
@@ -36,8 +40,22 @@ export default function ComparisonRadar({ selectedView, hoveredKey, onHover }){
   const baseFill = fillOpacity(visible.length);
   const baseStroke = strokeOpacity(visible.length);
 
+  // Подсвеченная компания — для карточки в углу радара.
+  const hoveredItem = hoveredKey
+    ? visible.find(x => (x.id + '|' + x.kind) === hoveredKey)
+    : null;
+  const hoveredColor = hoveredItem
+    ? colorFor(hoveredItem.kind, idxInKind.get(hoveredKey), totalInKind[hoveredItem.kind])
+    : null;
+
   return (
-    <div className="h-[460px]">
+    <div className="h-[460px] relative">
+      {hoveredItem && (
+        <NameCard
+          item={hoveredItem}
+          color={hoveredColor}
+        />
+      )}
       <ResponsiveContainer>
         <RadarChart data={data} outerRadius="72%" margin={{ top: 22, right: 70, bottom: 16, left: 70 }}>
           <PolarGrid stroke="#222a37" />
@@ -106,7 +124,8 @@ function AxisTick({ x, y, cx, cy, payload }){
 }
 
 // Числовая метка сырого значения на вершине выделенного полигона.
-// Выводится за вершину (~10px наружу).
+// Выводится за вершину (~14px наружу), на одной линии с подписью оси
+// — сама подпись оси отжата на 14px дальше, поэтому не сталкиваются.
 function ValueLabel({ x, y, cx, cy, payload, dataKey, color }){
   if(payload == null) return null;
   const raw = payload['raw|' + dataKey];
@@ -114,22 +133,51 @@ function ValueLabel({ x, y, cx, cy, payload, dataKey, color }){
   const fmt = payload.fmt || '';
   const dx = x - cx, dy = y - cy;
   const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const k = (dist + 10) / dist;
+  const k = (dist + 6) / dist;
+  const text = format(raw, fmt);
+  // Ширина бэйджа подгоняется под длину текста, чтобы коротые числа
+  // не плавали в большом прямоугольнике.
+  const w = Math.max(28, text.length * 6 + 8);
   return (
     <g pointerEvents="none">
       <rect
-        x={cx + dx * k - 14} y={cy + dy * k - 7}
-        width="28" height="13" rx="2"
-        fill="#0a0e14" fillOpacity="0.85" stroke={color} strokeOpacity="0.5"
+        x={cx + dx * k - w / 2} y={cy + dy * k - 8}
+        width={w} height="15" rx="3"
+        fill="#0a0e14" fillOpacity="0.92" stroke={color} strokeOpacity="0.7"
       />
       <text
         x={cx + dx * k} y={cy + dy * k + 3}
         fill={color}
-        fontSize="9"
+        fontSize="10" fontWeight="600"
         fontFamily="JetBrains Mono, monospace"
         textAnchor="middle"
-      >{format(raw, fmt)}</text>
+      >{text}</text>
     </g>
+  );
+}
+
+// Карточка-индикатор «кто сейчас выделен» — рисуется в углу радара
+// поверх SVG. Полезно когда список справа длинный и подсвеченную
+// строку не видно без скролла.
+function NameCard({ item, color }){
+  const iss = item.iss;
+  return (
+    <div
+      className="absolute top-2 left-2 z-10 bg-bg2/95 border rounded px-3 py-1.5 shadow-card pointer-events-none flex items-center gap-2"
+      style={{ borderColor: color }}
+    >
+      <span
+        className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+        style={{ background: color }}
+      />
+      <span className="font-mono text-text text-sm truncate max-w-[260px]">
+        {iss.name}
+        {iss.ticker && <span className="text-text3 ml-1.5 text-[11px]">{iss.ticker}</span>}
+      </span>
+      <span className="text-[10px] uppercase tracking-wider text-text3 font-mono">
+        {KIND_LABEL[item.kind] || item.kind}
+      </span>
+    </div>
   );
 }
 
@@ -140,5 +188,5 @@ function format(v, fmt){
 }
 
 function kindLabel(k){
-  return k === 'stock' ? 'акции' : k === 'bond' ? 'облиг.' : k === 'future' ? 'фьюч.' : k;
+  return KIND_LABEL[k] || k;
 }
