@@ -31,6 +31,9 @@
 //                                      bond_daily.emitent_inn + issuers
 //   GET  /issuer/:inn/affiliations     учредители + руководитель + дочки
 //                                      (из ЕГРЮЛ через DaData).
+//   GET  /diag/dadata?inn=X&token=...  диагностика: сырой ответ DaData
+//                                      + распарсенные связи. Только для
+//                                      админа (?token=ADMIN_TOKEN).
 //   POST /collect/affiliations?limit=N тащит ЕГРЮЛ-связи через DaData
 //                                      (требует DADATA_API_KEY в Worker
 //                                      secrets, 10к запросов/день free).
@@ -81,6 +84,7 @@ export default {
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
       if(url.pathname === '/catalog')         return await handleCatalog(env);
       if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
+      if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
       if(url.pathname.startsWith('/issuer/')){
         // /issuer/:inn               — карточка
         // /issuer/:inn/reports        — годовые РСБУ-показатели
@@ -218,17 +222,30 @@ async function handleStatus(env){
   // Аффилиации — сколько эмитентов уже разобрано через DaData
   let affStats = {};
   try {
-    const [edges, kids, parents, dadataAvail] = await Promise.all([
+    const [edges, kids, parents, kindBreak] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) as c FROM issuer_affiliations').first(),
       env.DB.prepare('SELECT COUNT(DISTINCT child_inn) as c FROM issuer_affiliations').first(),
-      env.DB.prepare("SELECT COUNT(DISTINCT parent_inn) as c FROM issuer_affiliations WHERE parent_kind = 'LEGAL' AND parent_inn != ''").first(),
-      Promise.resolve(!!env.DADATA_API_KEY),
+      env.DB.prepare("SELECT COUNT(DISTINCT parent_inn) as c FROM issuer_affiliations WHERE parent_kind = 'LEGAL' AND parent_inn IS NOT NULL AND parent_inn != ''").first(),
+      env.DB.prepare("SELECT COALESCE(parent_kind, 'unknown') AS k, COUNT(*) AS c FROM issuer_affiliations GROUP BY k").all().catch(() => ({ results: [] })),
     ]);
     affStats = {
       affiliations_edges: edges?.c ?? 0,
       affiliations_children: kids?.c ?? 0,
       affiliations_parents: parents?.c ?? 0,
-      dadata_configured: dadataAvail,
+      affiliations_by_kind: Object.fromEntries((kindBreak.results || []).map(r => [r.k, r.c])),
+    };
+  } catch(_){}
+
+  // Отрасли — сколько эмитентов покрыто, разбивка по sector
+  let sectorStats = {};
+  try {
+    const [withSector, breakdown] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) AS c FROM issuers WHERE sector IS NOT NULL').first().catch(() => ({ c: 0 })),
+      env.DB.prepare(`SELECT sector, COUNT(*) AS c FROM issuers WHERE sector IS NOT NULL GROUP BY sector ORDER BY c DESC`).all().catch(() => ({ results: [] })),
+    ]);
+    sectorStats = {
+      issuers_with_sector: withSector?.c ?? 0,
+      issuers_by_sector: Object.fromEntries((breakdown.results || []).map(r => [r.sector, r.c])),
     };
   } catch(_){}
 
@@ -250,13 +267,14 @@ async function handleStatus(env){
       ...issuersStats,
       ...reportsStats,
       ...affStats,
+      ...sectorStats,
     },
     recent_runs: lastLog.results || [],
     cerebras_configured: !!env.CEREBRAS_API_KEY,
     xai_configured: !!env.XAI_API_KEY,
     dadata_configured: !!env.DADATA_API_KEY,
     ...aiStats,
-    version: '0.9.1-affiliations',
+    version: '0.9.2-okved-sector',
   });
 }
 
@@ -1199,19 +1217,80 @@ async function dadataFindParty(env, inn){
 // или явное имя для физика (для дальнейших группировок).
 function dadataExtractAffiliations(data){
   const out = [];
-  // founders
-  for(const f of (data.founders || [])){
-    const kind = f.fund_type || f.type || (f.inn?.length === 12 ? 'PHYSICAL' : 'LEGAL');
+
+  // DaData отдаёт founders в нескольких форматах в зависимости от
+  // версии API. Собираем все варианты:
+  //   v3 «новый»:  { ogrn, inn, fio: {surname,name,patronymic}, name, share }
+  //   v3 «прежний»: { type: 'LEGAL'|'PHYSICAL', name, inn, share }
+  //   v3.1 nested: { ulFounder: {ogrn, inn, name}, fl: {fio, inn} } — гибрид
+  //   у некоторых эмитентов: data.founders[] и/или data.fl_founders[],
+  //   data.ul_founders[]. Учитываем все.
+  const flatten = (arr) => Array.isArray(arr) ? arr : [];
+  const allFounders = [
+    ...flatten(data.founders),
+    ...flatten(data.ul_founders),
+    ...flatten(data.fl_founders),
+  ];
+
+  for(const f of allFounders){
+    if(!f || typeof f !== 'object') continue;
+
+    // Распакуем «вложенные» структуры если есть
+    const ul = f.ul || f.ulFounder || (f.type === 'LEGAL' || f.type === 'LEGAL_ENTITY' ? f : null);
+    const fl = f.fl || f.flFounder || (f.fio || f.surname ? f : null);
+
+    // Собственно учредитель — юр.лицо ИЛИ физ.лицо
+    let parentInn = null, parentName = null, parentKind = null;
+    if(ul){
+      parentInn  = ul.inn || f.inn || null;
+      parentName = ul.name?.full || ul.name?.short || ul.name || f.name || null;
+      parentKind = 'LEGAL';
+    } else if(fl){
+      parentInn  = fl.inn || f.inn || null;
+      // ФИО собирается из частей или берётся из готового поля
+      const fio = fl.fio || fl;
+      const fullName = [fio.surname, fio.name, fio.patronymic].filter(Boolean).join(' ').trim();
+      parentName = fullName || fl.name || f.name || null;
+      parentKind = 'PHYSICAL';
+    } else {
+      // Без явного флага — гадаем по длине ИНН (физик 12, юрик 10).
+      parentInn  = f.inn || null;
+      parentName = f.name || null;
+      parentKind = (parentInn && parentInn.length === 12) ? 'PHYSICAL' : 'LEGAL';
+    }
+    // Спец-маркер «государство» — Росимущество / казённые / Минфин
+    if(parentName && /росимущест|казенн|казённ|минфин|министерств/i.test(parentName)){
+      parentKind = 'STATE';
+    }
+    if(!parentName && !parentInn) continue;
     out.push({
-      parent_inn: f.inn || null,
-      parent_name: f.name || null,
-      share_pct: typeof f.share?.value === 'number' ? f.share.value : null,
+      parent_inn: parentInn,
+      parent_name: parentName,
+      share_pct: typeof f.share?.value === 'number' ? f.share.value
+                : typeof f.share === 'number' ? f.share
+                : null,
       role: 'founder',
-      parent_kind: kind === 'PHYSICAL' ? 'PHYSICAL' : (kind === 'STATE' || /росим|казен/i.test(f.name || '') ? 'STATE' : 'LEGAL'),
+      parent_kind: parentKind,
     });
   }
-  // management — гендиректор
-  if(data.management?.name || data.management?.inn){
+
+  // Менеджер. DaData v3+ кладёт его как массив `managers[]` (с post,
+  // disqualified и fio). Старая структура — объект `management`.
+  const managers = flatten(data.managers);
+  if(managers.length){
+    for(const m of managers){
+      const fio = m.fio || m;
+      const fullName = m.name || [fio.surname, fio.name, fio.patronymic].filter(Boolean).join(' ').trim();
+      if(!fullName && !m.inn) continue;
+      out.push({
+        parent_inn: m.inn || null,
+        parent_name: fullName || null,
+        share_pct: null,
+        role: 'management',
+        parent_kind: 'PHYSICAL',
+      });
+    }
+  } else if(data.management?.name || data.management?.inn){
     out.push({
       parent_inn: data.management.inn || null,
       parent_name: data.management.name || null,
@@ -1220,7 +1299,76 @@ function dadataExtractAffiliations(data){
       parent_kind: 'PHYSICAL',
     });
   }
+
   return out;
+}
+
+// Маппинг ОКВЭД (первые 2 цифры) → наш 15-секторный ключ. Тот же
+// набор, что в references/industry-peers.json и app.js. Возвращает
+// null для редких/неклассифицированных кодов — пользователь может
+// доразмечать вручную.
+function okvedToSector(okved){
+  if(!okved) return null;
+  const m = String(okved).match(/^(\d{2})/);
+  if(!m) return null;
+  const k = parseInt(m[1], 10);
+  if(k >= 1 && k <= 3)   return 'agro';            // сельское хозяйство, рыболовство
+  if(k >= 5 && k <= 9)   return 'oil-gas';         // добыча (включая нефть/газ — 06)
+  if(k === 10 || k === 11 || k === 12) return 'food'; // пищевая, напитки, табак
+  if(k >= 13 && k <= 18) return 'manufacturing';   // лёгкая, бумага, печать
+  if(k === 19) return 'oil-gas';                   // нефтепереработка
+  if(k >= 20 && k <= 21) return 'chemistry';       // химия, фарма
+  if(k >= 22 && k <= 23) return 'manufacturing';   // резина, стройматериалы
+  if(k === 24 || k === 25) return 'metals';        // металлургия и металлоизделия
+  if(k >= 26 && k <= 28) return 'machinery';       // электроника, машины
+  if(k === 29 || k === 30) return 'machinery';     // авто, прочий транспорт
+  if(k >= 31 && k <= 33) return 'manufacturing';   // мебель, прочее, ремонт
+  if(k === 35) return 'utilities';                  // электроэнергия, газ, пар
+  if(k >= 36 && k <= 39) return 'utilities';        // вода, отходы
+  if(k >= 41 && k <= 43) return 'construction';
+  if(k >= 45 && k <= 47) return 'retail';           // торговля
+  if(k >= 49 && k <= 53) return 'logistics';        // транспорт, склады, почта
+  if(k >= 55 && k <= 56) return 'services';         // гостиницы, общепит
+  if(k >= 58 && k <= 63) return 'it';               // ИТ, связь, медиа
+  if(k === 64) return 'banks';                      // финансовые услуги, банки
+  if(k === 65) return 'insurance';                  // страхование
+  if(k === 66) return 'finance';                    // вспомогательные финуслуги, лизинг
+  if(k >= 68 && k <= 68) return 'realestate';       // операции с недвижимостью
+  if(k >= 69 && k <= 75) return 'services';         // профуслуги, R&D
+  if(k >= 77 && k <= 82) return 'services';         // аренда, услуги
+  if(k >= 84 && k <= 84) return 'state';            // гос. управление
+  if(k >= 85 && k <= 88) return 'services';         // образование, здравоохранение
+  if(k >= 90 && k <= 99) return 'services';         // искусство, прочее
+  return null;
+}
+
+// /diag/dadata?inn=XXX — диагностический endpoint для отладки парсера.
+// Возвращает СЫРОЙ ответ DaData + что мы из него распарсили. Только
+// для админа — требует X-Admin-Token. По JSON сразу видно, какие
+// поля пришли и как они вложены.
+async function handleDiagDadata(env, url){
+  const token = (url.searchParams.get('token') || '').trim();
+  if(!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN){
+    return errResp('unauthorized — добавьте ?token=ADMIN_TOKEN', 401);
+  }
+  const inn = url.searchParams.get('inn');
+  if(!inn || !/^\d{10,12}$/.test(inn)){
+    return errResp('?inn=XXXXXXXXXX (10 или 12 цифр) обязателен', 400);
+  }
+  let raw, extracted, error = null;
+  try {
+    raw = await dadataFindParty(env, inn);
+    extracted = dadataExtractAffiliations(raw);
+  } catch(e){
+    error = e.message || String(e);
+  }
+  return jsonResp({
+    inn,
+    error,
+    extracted_count: extracted?.length || 0,
+    extracted,
+    raw,
+  });
 }
 
 // Коллектор аффилиаций. По умолчанию идёт по тем же ИНН, что и
@@ -1330,15 +1478,27 @@ async function collectAffiliations(env, url){
           edgesWritten += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
         }
       }
-      // Также обновим ОГРН/имя в issuers если ещё не было
+      // Также обновим ОГРН/имя/ОКВЭД/отрасль в issuers (sector — наша
+      // 15-секторная классификация по первым двум цифрам ОКВЭД).
+      const okved = data.okved || null;
+      const okvedName = data.okved_type || null;
+      const sector = okvedToSector(okved);
       try {
         await env.DB.prepare(`
           UPDATE issuers
-             SET name = COALESCE(?, name),
-                 ogrn = COALESCE(issuers.ogrn, ?),
+             SET name       = COALESCE(?, name),
+                 ogrn       = COALESCE(issuers.ogrn, ?),
+                 okved      = COALESCE(?, issuers.okved),
+                 okved_name = COALESCE(?, issuers.okved_name),
+                 sector     = COALESCE(?, issuers.sector),
                  updated_at = ?
            WHERE inn = ?
-        `).bind(data.name?.full || data.name?.short || null, data.ogrn || null, now, inn).run();
+        `).bind(
+          data.name?.full || data.name?.short || null,
+          data.ogrn || null,
+          okved, okvedName, sector,
+          now, inn
+        ).run();
       } catch(_){}
       succeeded++;
     } catch(e){
