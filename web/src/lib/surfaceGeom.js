@@ -5,34 +5,37 @@
 // верхние строки уходят в глубину направо, всё сжимается по вертикали.
 // alpha = коэф. сдвига (X получает +alpha·Y), beta = сжатие по Y.
 //
+// Параметры подобраны посильнее, чем в первой версии — чтобы
+// «3D» действительно ощущался как 3D, а не как чуть-перекошенный
+// прямоугольник.
+const ISO_ALPHA = 0.55;
+const ISO_BETA  = 0.42;
+// Высота «комнаты» над полом в пикселях — даёт пространство для
+// парящих точек и стенок-каркаса.
+export const ISO_ROOM_HEIGHT = 140;
+
 // Обычные координаты на плоскости (sx, sy) → экранные (xx, yy):
 //   xx = sx + alpha * (innerHeight - (sy - top)) ≈ sx + alpha*(sy_top_relative)
 //   yy = top + (sy - top) * beta
-// где top = верхний отступ, innerHeight = высота рабочей области.
-//
-// Подбираем так, чтобы (top + innerHeight) совпало с базовой нижней
-// границей plane'а, а верхняя строка ушла в правый-верхний угол.
 export function makeProjection(viewMode, layout){
-  const { padTop, padLeft, innerW, innerH } = layout;
+  const { padTop, innerH } = layout;
   if(viewMode === 'iso'){
-    // alpha задаём через долю innerW, чтобы скос был «адекватным»
-    // независимо от размера. beta < 1 — сжатие плоскости.
-    const alpha = 0.42;            // X-скос, относительно высоты
-    const beta  = 0.55;            // сжатие плоскости по Y
+    const project = (sx, sy) => {
+      const yRel = sy - padTop;                          // 0..innerH
+      const xx = sx + ISO_ALPHA * (innerH - yRel);
+      const yy = padTop + yRel * ISO_BETA;
+      return [xx, yy];
+    };
     return {
-      project: (sx, sy) => {
-        const yRel = sy - padTop;                          // 0..innerH
-        const xx = sx + alpha * (innerH - yRel);
-        const yy = padTop + yRel * beta;
-        return [xx, yy];
-      },
+      project,
       // Подъём «головки» точки над плоскостью на pixels (positive
       // residual → вверх, отрицательный → вниз/сквозь).
       lift: (sx, sy, pixels) => {
-        const [xx, yy] = makeProjection('iso', layout).project(sx, sy);
+        const [xx, yy] = project(sx, sy);
         return [xx, yy - pixels];
       },
       isIso: true,
+      alpha: ISO_ALPHA, beta: ISO_BETA,
     };
   }
   // 'flat' и 'sticks' — без скоса.
@@ -40,6 +43,7 @@ export function makeProjection(viewMode, layout){
     project: (sx, sy) => [sx, sy],
     lift: (sx, sy, pixels) => [sx, sy - pixels],
     isIso: false,
+    alpha: 0, beta: 1,
   };
 }
 
