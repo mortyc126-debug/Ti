@@ -55,8 +55,27 @@ export default function Bonds(){
     setLoading(true);
     setError(null);
     try {
-      const r = await api.bondLatest({ limit: 2000 });
-      const norm = (r.data || []).map(normalizeBond);
+      // Параллельно: список бумаг + карта max_fy_year по эмитентам.
+      // Карта нужна чтобы фильтр «свежесть отчёта» работал — иначе
+      // reportYear=null на каждой бумаге даёт 0 результатов в фильтре.
+      const [r, yMap] = await Promise.all([
+        api.bondLatest({ limit: 2000 }),
+        api.issuerReportYears().catch(() => ({ map: {} })),
+      ]);
+      const yearMap = yMap?.map || {};
+      const thisYear = new Date().getUTCFullYear();
+      const norm = (r.data || []).map(b => {
+        const out = normalizeBond(b);
+        const y = out.issuerInn ? yearMap[out.issuerInn] : null;
+        if(y){
+          out.reportYear = y;
+          // Дни от 1 января года отчёта до сегодняшнего дня — простая
+          // эвристика «давность отчёта» для существующего фильтра.
+          const yearStart = new Date(`${y}-01-01T00:00:00Z`).getTime();
+          out.reportDaysAgo = Math.max(0, Math.floor((Date.now() - yearStart) / 86400000));
+        }
+        return out;
+      });
       setBonds(norm);
       saveCache(norm);
       setUpdatedAt(new Date().toISOString());

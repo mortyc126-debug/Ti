@@ -35,4 +35,6 @@ export const api = {
   issuerReports: (inn)         => req(`/issuer/${encodeURIComponent(inn)}/reports`),
   issuerAffiliations: (inn)    => req(`/issuer/${encodeURIComponent(inn)}/affiliations`),
   reportsLatest: (limit = 50)  => req(`/reports/latest?limit=${limit}`),
+  // map { inn: max_fy_year } — для фильтра «свежесть отчёта» в таблице
+  issuerReportYears: ()        => req('/issuers/report_years'),
 };

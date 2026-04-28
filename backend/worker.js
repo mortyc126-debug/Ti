@@ -1,4 +1,4 @@
-// Cloudflare Worker — бэкенд БондАналитика. v0.9.12-year-stats
+// Cloudflare Worker — бэкенд БондАналитика. v0.9.13-report-year-map
 //
 // Сбор: акции (TQBR) + фьючерсы (FORTS) + облигации (TQCB/TQOB/TQOD/TQOY)
 // + справочник эмитентов (MOEX bulk + emitter card) + РСБУ-показатели
@@ -89,6 +89,7 @@ export default {
       if(url.pathname === '/bond/issuer')     return await handleBondIssuer(env, url);
       if(url.pathname === '/catalog')         return await handleCatalog(env);
       if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
+      if(url.pathname === '/issuers/report_years') return await handleIssuerReportYears(env, url);
       if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
       if(url.pathname === '/diag/girbo')      return await handleDiagGirbo(env, url);
       if(url.pathname.startsWith('/issuer/')){
@@ -289,7 +290,7 @@ async function handleStatus(env){
     // сюда свою строчку с фактической версией. Помогает понимать
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
-      core:        '0.9.12-year-stats',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
+      core:        '0.9.13-report-year-map',  // фундамент: MOEX, DaData, buxbalans, ГИР БО (через прокси)
       orderbook:   null,                    // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
@@ -300,7 +301,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.12-year-stats',
+    version: '0.9.13-report-year-map',
   });
 }
 
@@ -3184,6 +3185,36 @@ async function handleIssuerAffiliations(env, url){
     succession,
     children,
     generatedAt: new Date().toISOString(),
+  });
+}
+
+// /issuers/report_years — компактный JSON `{ inn: max_fy_year }` для
+// всех эмитентов у которых есть хоть одна запись в issuer_reports.
+// Используется фронтом чтобы при загрузке таблицы облигаций сразу
+// раздать каждой бумаге `reportYear` (для фильтра «свежесть отчёта»).
+// CDN-кеш 5 минут, размер ~20 байт на ИНН × несколько сотен =
+// единицы килобайт.
+async function handleIssuerReportYears(env, url){
+  let rows = [];
+  try {
+    const r = await env.DB.prepare(`
+      SELECT inn, MAX(fy_year) AS max_year
+      FROM issuer_reports
+      WHERE inn IS NOT NULL AND fy_year IS NOT NULL
+      GROUP BY inn
+    `).all();
+    rows = r.results || [];
+  } catch(_){}
+  const map = {};
+  for(const r of rows){
+    if(r.inn) map[r.inn] = r.max_year;
+  }
+  return new Response(JSON.stringify({ count: rows.length, map }), {
+    status: 200,
+    headers: {
+      ...JSON_HEADERS,
+      'Cache-Control': 'public, max-age=300, s-maxage=300',
+    },
   });
 }
 
