@@ -239,13 +239,15 @@ async function handleStatus(env){
   // Отрасли — сколько эмитентов покрыто, разбивка по sector
   let sectorStats = {};
   try {
-    const [withSector, breakdown] = await Promise.all([
+    const [withSector, breakdown, byStatus] = await Promise.all([
       env.DB.prepare('SELECT COUNT(*) AS c FROM issuers WHERE sector IS NOT NULL').first().catch(() => ({ c: 0 })),
       env.DB.prepare(`SELECT sector, COUNT(*) AS c FROM issuers WHERE sector IS NOT NULL GROUP BY sector ORDER BY c DESC`).all().catch(() => ({ results: [] })),
+      env.DB.prepare(`SELECT status, COUNT(*) AS c FROM issuers WHERE status IS NOT NULL GROUP BY status`).all().catch(() => ({ results: [] })),
     ]);
     sectorStats = {
       issuers_with_sector: withSector?.c ?? 0,
       issuers_by_sector: Object.fromEntries((breakdown.results || []).map(r => [r.sector, r.c])),
+      issuers_by_status: Object.fromEntries((byStatus.results || []).map(r => [r.status, r.c])),
     };
   } catch(_){}
 
@@ -274,7 +276,7 @@ async function handleStatus(env){
     xai_configured: !!env.XAI_API_KEY,
     dadata_configured: !!env.DADATA_API_KEY,
     ...aiStats,
-    version: '0.9.2-okved-sector',
+    version: '0.9.3-state-succession',
   });
 }
 
@@ -1478,11 +1480,22 @@ async function collectAffiliations(env, url){
           edgesWritten += res.reduce((s, r) => s + (r.meta?.rows_written || 0), 0);
         }
       }
-      // Также обновим ОГРН/имя/ОКВЭД/отрасль в issuers (sector — наша
-      // 15-секторная классификация по первым двум цифрам ОКВЭД).
+      // Также обновим ОГРН/имя/ОКВЭД/отрасль/статус в issuers.
+      // sector — наша 15-секторная классификация по первым двум
+      // цифрам ОКВЭД. status (ACTIVE/LIQUIDATING/LIQUIDATED/BANKRUPT/
+      // REORGANIZING) важен для ВДО — банкротство/ликвидация эмитента
+      // надо подсвечивать сразу.
+      // okved_name — название из okveds[main=true], если есть; иначе
+      // из okved_type (это вообще «версия классификатора», но как
+      // fallback сойдёт).
       const okved = data.okved || null;
-      const okvedName = data.okved_type || null;
+      const mainOkved = (data.okveds || []).find(x => x?.main) || null;
+      const okvedName = mainOkved?.name || data.okved_type || null;
       const sector = okvedToSector(okved);
+      const status = data.state?.status || null;
+      const stateDate = data.state?.actuality_date
+        ? new Date(data.state.actuality_date).toISOString().slice(0, 10)
+        : null;
       try {
         await env.DB.prepare(`
           UPDATE issuers
@@ -1491,14 +1504,40 @@ async function collectAffiliations(env, url){
                  okved      = COALESCE(?, issuers.okved),
                  okved_name = COALESCE(?, issuers.okved_name),
                  sector     = COALESCE(?, issuers.sector),
+                 status     = ?,
+                 state_date = COALESCE(?, issuers.state_date),
                  updated_at = ?
            WHERE inn = ?
         `).bind(
           data.name?.full || data.name?.short || null,
           data.ogrn || null,
           okved, okvedName, sector,
+          status, stateDate,
           now, inn
         ).run();
+      } catch(_){}
+
+      // Predecessors/successors — пишем как отдельные связи (роль
+      // 'predecessor' / 'successor'). Для отслеживания цепочек
+      // переименований и реорганизаций. ИНН там обычно есть.
+      try {
+        const succStmts = [];
+        for(const p of (data.predecessors || [])){
+          if(!p || (!p.inn && !p.name)) continue;
+          succStmts.push(env.DB.prepare(upsertSql).bind(
+            inn, p.inn || '', p.name || null, null, 'predecessor', 'LEGAL', now
+          ));
+        }
+        for(const s of (data.successors || [])){
+          if(!s || (!s.inn && !s.name)) continue;
+          succStmts.push(env.DB.prepare(upsertSql).bind(
+            inn, s.inn || '', s.name || null, null, 'successor', 'LEGAL', now
+          ));
+        }
+        if(succStmts.length){
+          await env.DB.batch(succStmts);
+          edgesWritten += succStmts.length;
+        }
       } catch(_){}
       succeeded++;
     } catch(e){
@@ -1870,12 +1909,16 @@ async function collectIssuers(env, url){
     }
   } catch(e){ errors.push('stocks for ticker matching: ' + e.message); }
 
-  // ── Шаг 4.5: миграция — добавить колонку kind в issuers ────────────
+  // ── Шаг 4.5: миграция — добавить колонки kind/status/state_date ─────
   // Идемпотентно: SQLite ругнётся если колонка уже есть, ловим в catch.
   // Запускается на каждом collectIssuers — overhead ~1мс.
-  try {
-    await env.DB.prepare("ALTER TABLE issuers ADD COLUMN kind TEXT").run();
-  } catch(_){ /* колонка уже есть — ок */ }
+  for(const col of [
+    'kind TEXT',
+    'status TEXT',          // ACTIVE | LIQUIDATING | LIQUIDATED | BANKRUPT | REORGANIZING
+    'state_date TEXT',      // дата последнего изменения статуса (registration_date / liquidation_date)
+  ]){
+    try { await env.DB.prepare(`ALTER TABLE issuers ADD COLUMN ${col}`).run(); } catch(_){}
+  }
 
   // ── Шаг 5: upsert в issuers (не затираем ручные правки) ───────────
   // Поля name/short_name/bonds_count/kind перезаписываем (актуализируем),
@@ -2747,34 +2790,52 @@ async function handleIssuerReports(env, url){
 
 async function handleIssuerAffiliations(env, url){
   // /issuer/{inn}/affiliations → учредители + руководитель + дочки
-  // (у кого в parent_inn стоит этот ИНН)
+  // + предшественники/преемники + сам issuer (имя, статус, отрасль).
   const m = url.pathname.match(/^\/issuer\/(\d{10,12})\/affiliations$/);
   if(!m) return errResp('inn required, /issuer/{inn}/affiliations', 400);
   const inn = m[1];
-  let parents = [], children = [];
+  let issuer = null;
+  let founders = [], management = [], succession = [], children = [];
+  try {
+    issuer = await env.DB.prepare(
+      'SELECT inn, name, short_name, ticker, ogrn, kind, sector, okved, okved_name, status, state_date FROM issuers WHERE inn = ?'
+    ).bind(inn).first();
+  } catch(_){}
   try {
     const r = await env.DB.prepare(`
       SELECT parent_inn, parent_name, share_pct, role, parent_kind, source, fetched_at
       FROM issuer_affiliations
       WHERE child_inn = ?
-      ORDER BY share_pct DESC NULLS LAST
+      ORDER BY role, share_pct DESC NULLS LAST
     `).bind(inn).all();
-    parents = r.results || [];
+    for(const row of (r.results || [])){
+      if(row.role === 'founder')           founders.push(row);
+      else if(row.role === 'management')   management.push(row);
+      else                                 succession.push(row); // predecessor/successor
+    }
   } catch(_){}
   try {
     // Дочки (где этот ИНН — учредитель). Используется для холдингов.
     const r = await env.DB.prepare(`
       SELECT a.child_inn, a.share_pct, a.role,
-             i.short_name AS child_name, i.bonds_count
+             i.short_name AS child_name, i.bonds_count, i.status, i.sector
       FROM issuer_affiliations a
       LEFT JOIN issuers i ON i.inn = a.child_inn
       WHERE a.parent_inn = ?
       ORDER BY a.share_pct DESC NULLS LAST
-      LIMIT 100
+      LIMIT 200
     `).bind(inn).all();
     children = r.results || [];
   } catch(_){}
-  return jsonResp({ inn, parents, children, generatedAt: new Date().toISOString() });
+  return jsonResp({
+    inn,
+    issuer,
+    founders,
+    management,
+    succession,
+    children,
+    generatedAt: new Date().toISOString(),
+  });
 }
 
 async function handleReportsLatest(env, url){
