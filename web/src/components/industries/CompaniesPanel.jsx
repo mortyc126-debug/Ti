@@ -9,6 +9,7 @@
 import { X, Plus, Eye, EyeOff } from 'lucide-react';
 import { useComparison } from '../../store/comparison.js';
 import { useIndustryNorms } from '../../store/industryNorms.js';
+import { useWindows } from '../../store/windows.js';
 import { metricSpec } from '../../data/comparisonMetrics.js';
 import { colorFor } from './colorPalette.js';
 import { resolveNorm, classifyValue } from '../../lib/norms.js';
@@ -93,6 +94,10 @@ export default function CompaniesPanel({ selectedView, candidates, onShowPicker 
 function CompanyRow({ item, color, layerOn, onToggleVis, onRemove }){
   const iss = item.iss;
   const visible = item.visible && layerOn;
+  const openWin = useWindows(s => s.open);
+  const openIssuer = () => openWin({
+    kind: 'issuer', id: iss.id, title: iss.name, ticker: iss.ticker || null, mode: 'medium',
+  });
   return (
     <li
       className={[
@@ -117,10 +122,15 @@ function CompanyRow({ item, color, layerOn, onToggleVis, onRemove }){
           }
         </button>
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-text text-sm truncate">
+          <button
+            type="button"
+            onClick={openIssuer}
+            title="Открыть карточку эмитента"
+            className="font-mono text-text text-sm truncate text-left hover:text-acc transition-colors w-full"
+          >
             {iss.name}
             {iss.ticker && <span className="text-text3 ml-1.5 text-[11px]">{iss.ticker}</span>}
-          </div>
+          </button>
           <MiniMetrics mults={iss.mults} industry={iss.industry} />
         </div>
         <button

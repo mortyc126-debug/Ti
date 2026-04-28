@@ -4,6 +4,7 @@
 
 import { useComparison } from '../../store/comparison.js';
 import { useMarketSurface } from '../../store/marketSurface.js';
+import { useWindows } from '../../store/windows.js';
 
 const TOP_N = 8;
 
@@ -12,6 +13,12 @@ export default function SideTops({ points }){
   const setHover    = useMarketSurface(s => s.setHover);
   const selectedId  = useMarketSurface(s => s.selectedId);
   const addToComparison = useComparison(s => s.addIssuer);
+  const openWin     = useWindows(s => s.open);
+
+  const onOpen = p => {
+    setSelected(p.secid);
+    openWin({ kind: 'issuer', id: p.issuer, title: p.issuer, ticker: null, mode: 'medium' });
+  };
 
   const valid = points.filter(p => p.zscore != null && !p.sparse);
   const above = [...valid].filter(p => p.zscore > 0).sort((a, b) => b.zscore - a.zscore).slice(0, TOP_N);
@@ -25,7 +32,7 @@ export default function SideTops({ points }){
         tone="danger"
         items={above}
         selectedId={selectedId}
-        onSelect={p => setSelected(p.secid)}
+        onSelect={onOpen}
         onHover={p => setHover(p?.secid || null)}
         onAddCompare={p => addToComparison(p.issuer, 'bond')}
       />
@@ -35,7 +42,7 @@ export default function SideTops({ points }){
         tone="acc"
         items={below}
         selectedId={selectedId}
-        onSelect={p => setSelected(p.secid)}
+        onSelect={onOpen}
         onHover={p => setHover(p?.secid || null)}
         onAddCompare={p => addToComparison(p.issuer, 'bond')}
       />

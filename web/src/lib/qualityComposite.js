@@ -82,6 +82,30 @@ export function maturityYears(matISO){
   return yrs > 0 ? yrs : null;
 }
 
+// Тики для Y-оси в режиме «рейтинг»: основные точки шкалы.
+export const RATING_TICKS = [
+  { ord: 100, label: 'AAA' },
+  { ord: 92,  label: 'AA' },
+  { ord: 82,  label: 'A' },
+  { ord: 72,  label: 'BBB' },
+  { ord: 62,  label: 'BB' },
+  { ord: 52,  label: 'B' },
+  { ord: 35,  label: 'CCC' },
+  { ord: 10,  label: 'D' },
+];
+
+// Обратное отображение ord → ближайшая буква (для тултипов в скоринге).
+export function ratingFromOrd(ord){
+  if(ord == null) return '';
+  let best = RATING_TICKS[0];
+  let dist = Math.abs(ord - best.ord);
+  for(const t of RATING_TICKS){
+    const d = Math.abs(ord - t.ord);
+    if(d < dist){ dist = d; best = t; }
+  }
+  return best.label;
+}
+
 // Для тогглера в UI.
 export const Y_MODES = [
   { id: 'rating',  label: 'Рейтинг'  },
