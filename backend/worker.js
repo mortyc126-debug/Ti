@@ -46,8 +46,18 @@
 //                                      и прогнать заново.
 //                                      ?inn=X — обработать конкретный ИНН.
 //
+// TRACK A endpoints (стакан / FORTS intraday):
+//   GET  /orderbook/watchlist                список горячих фьючерсов
+//   GET  /futures/{secid}/orderbook?bars=20  последние снапшоты стакана
+//   GET  /futures/{secid}/intraday?from=&to= 5-минутки сделок
+//   GET  /futures/{secid}/depth_signal       summary (spread/imbalance/agg_ratio за час)
+//   POST /collect/orderbook?limit=15&max_ms=25000   снять стакан + тики
+//   POST /collect/orderbook/seed?limit=15           заполнить watchlist топом по обороту
+//
 // Cron: 30 7 * * * (10:30 MSK) — стандартный сбор досок и обогащение
 // эмитентов; раз в сутки также подтягивает по 50 ИНН из reports_queue.
+// TRACK A добавляет intraday-cron `*/10 7-15 * * 1-5` (каждые 10 минут
+// в рабочие часы MOEX) для снятия стакана.
 //
 // Basis = futures.price_rub - stock.price × lot_size
 // В процентах: basis_pct = basis / (stock.price × lot_size) × 100
@@ -85,6 +95,11 @@ export default {
       if(url.pathname === '/catalog')         return await handleCatalog(env);
       if(url.pathname === '/reports/latest')  return await handleReportsLatest(env, url);
       if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
+      // TRACK A routes: orderbook / FORTS intraday
+      if(url.pathname === '/orderbook/watchlist') return await handleObWatchlist(env);
+      if(url.pathname.startsWith('/futures/') && url.pathname.endsWith('/orderbook'))    return await handleFuturesOrderbook(env, url);
+      if(url.pathname.startsWith('/futures/') && url.pathname.endsWith('/intraday'))     return await handleFuturesIntraday(env, url);
+      if(url.pathname.startsWith('/futures/') && url.pathname.endsWith('/depth_signal')) return await handleFuturesDepthSignal(env, url);
       if(url.pathname.startsWith('/issuer/')){
         // /issuer/:inn               — карточка
         // /issuer/:inn/reports        — годовые РСБУ-показатели
@@ -106,6 +121,9 @@ export default {
         if(url.pathname === '/collect/reports')      return jsonResp(await collectReports(env, url));
         if(url.pathname === '/collect/affiliations') return jsonResp(await collectAffiliations(env, url));
         if(url.pathname === '/ai/extract')       return await handleAiExtract(env, req);
+        // TRACK A POST routes
+        if(url.pathname === '/collect/orderbook')      return jsonResp(await trackACollectOrderbook(env, url));
+        if(url.pathname === '/collect/orderbook/seed') return jsonResp(await trackASeedWatchlist(env, url));
       }
 
       return errResp(
@@ -113,7 +131,9 @@ export default {
         + '/futures/latest?asset=X, /basis?asset=X, /basis/history?asset=X, '
         + '/bond/latest?board=TQCB, /bond/history?secid=X, /bond/issuer?inn=X, '
         + '/catalog, /issuer/:inn, /issuer/:inn/reports, /reports/latest, '
-        + 'POST /collect/{stock|futures|bonds|issuers|reports}, POST /ai/extract',
+        + '/orderbook/watchlist, /futures/{secid}/{orderbook|intraday|depth_signal}, '
+        + 'POST /collect/{stock|futures|bonds|issuers|reports|orderbook|orderbook/seed}, '
+        + 'POST /ai/extract',
         404
       );
     } catch(e){
@@ -128,19 +148,32 @@ export default {
   // в следующие недели через очередь reports_queue).
   async scheduled(event, env, ctx){
     ctx.waitUntil((async () => {
-      try { await collectStocks(env); }   catch(e){ console.error('cron stocks:',  e.message); }
-      try { await collectFutures(env); }  catch(e){ console.error('cron futures:', e.message); }
-      try { await collectBonds(env); }    catch(e){ console.error('cron bonds:',   e.message); }
-      // Эмитентов обогащаем каждый день — bulk-вызов MOEX дешёвый,
-      // а без него bond_daily.emitent_inn остаётся пустым и ничего
-      // не показывается в каталоге.
-      try { await collectIssuers(env); }  catch(e){ console.error('cron issuers:', e.message); }
-      const dow = new Date().getUTCDay(); // 0=Sun, 1=Mon
-      if(dow === 1){
-        try {
-          await collectReports(env, new URL('https://x/?limit=50'));
-        } catch(e){ console.error('cron reports:', e.message); }
+      // Дневной cron (доски + эмитенты + раз в неделю отчёты) — только
+      // если фактический cron-pattern это «30 7 * * *». Для intraday-
+      // паттернов (TRACK A) дневные коллекторы пропускаем, чтобы не
+      // дёргать MOEX bulk каждые 10 минут.
+      const isDaily = !event?.cron || event.cron === '30 7 * * *';
+      if(isDaily){
+        try { await collectStocks(env); }   catch(e){ console.error('cron stocks:',  e.message); }
+        try { await collectFutures(env); }  catch(e){ console.error('cron futures:', e.message); }
+        try { await collectBonds(env); }    catch(e){ console.error('cron bonds:',   e.message); }
+        // Эмитентов обогащаем каждый день — bulk-вызов MOEX дешёвый,
+        // а без него bond_daily.emitent_inn остаётся пустым и ничего
+        // не показывается в каталоге.
+        try { await collectIssuers(env); }  catch(e){ console.error('cron issuers:', e.message); }
+        const dow = new Date().getUTCDay(); // 0=Sun, 1=Mon
+        if(dow === 1){
+          try {
+            await collectReports(env, new URL('https://x/?limit=50'));
+          } catch(e){ console.error('cron reports:', e.message); }
+        }
       }
+      // TRACK A cron: intraday-снапшот стакана. Безопасно вызывать
+      // и в дневном cron'е (поверх watchlist'а — один проход), и в
+      // intraday `*/10 7-15 * * 1-5`. Сам коллектор не работает,
+      // если watchlist пуст.
+      try { await trackACollectOrderbook(env); }
+      catch(e){ console.error('cron orderbook:', e.message); }
     })());
   },
 };
@@ -251,6 +284,27 @@ async function handleStatus(env){
     };
   } catch(_){}
 
+  // TRACK A: orderbook + intraday stats. Все таблицы создаёт миграция
+  // A_orderbook.sql / coллектор; до первого запуска — пусто, но /status
+  // не должен падать.
+  let trackAStats = {};
+  try {
+    const [obRows, ob24h, obSecids, watch, trades24h] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) AS c FROM orderbook_snapshots').first().catch(() => ({ c: 0 })),
+      env.DB.prepare("SELECT COUNT(*) AS c FROM orderbook_snapshots WHERE ts >= datetime('now', '-1 day')").first().catch(() => ({ c: 0 })),
+      env.DB.prepare('SELECT COUNT(DISTINCT secid) AS c FROM orderbook_snapshots').first().catch(() => ({ c: 0 })),
+      env.DB.prepare('SELECT COUNT(*) AS c FROM orderbook_watchlist WHERE enabled = 1').first().catch(() => ({ c: 0 })),
+      env.DB.prepare("SELECT COUNT(*) AS c FROM intraday_trades_5m WHERE bucket >= datetime('now', '-1 day')").first().catch(() => ({ c: 0 })),
+    ]);
+    trackAStats = {
+      orderbook_snapshots_total: obRows?.c ?? 0,
+      orderbook_snapshots_24h:   ob24h?.c ?? 0,
+      orderbook_secids_seen:     obSecids?.c ?? 0,
+      orderbook_watchlist_enabled: watch?.c ?? 0,
+      intraday_5m_buckets_24h:   trades24h?.c ?? 0,
+    };
+  } catch(_){}
+
   const [rowsStock, rowsFut, lastLog, latestStockDate, latestFutDate] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) as c FROM stock_daily').first(),
     env.DB.prepare('SELECT COUNT(*) as c FROM futures_daily').first(),
@@ -270,6 +324,7 @@ async function handleStatus(env){
       ...reportsStats,
       ...affStats,
       ...sectorStats,
+      ...trackAStats,
     },
     recent_runs: lastLog.results || [],
     cerebras_configured: !!env.CEREBRAS_API_KEY,
@@ -281,7 +336,7 @@ async function handleStatus(env){
     // «что уже залито в прод», особенно при параллельной разработке.
     tracks: {
       core:        '0.9.4-zachbiz-chain',  // фундамент: MOEX, DaData, buxbalans, ГИР БО
-      orderbook:   null,                    // TRACK A
+      orderbook:   '0.10.0-orderbook',     // TRACK A
       macro:       null,                    // TRACK B
       events:      null,                    // TRACK C
       ratings:     null,                    // TRACK D
@@ -291,7 +346,7 @@ async function handleStatus(env){
       cbr_bank:    null,                    // TRACK H
       telegram:    null,                    // TRACK I (отдельный воркер)
     },
-    version: '0.9.4-zachbiz-chain',
+    version: '0.10.0-orderbook',
   });
 }
 
@@ -3166,3 +3221,438 @@ function parseFuturesPage(resp){
   }
   return out;
 }
+
+// ═══ TRACK A: Order Book / FORTS intraday ════════════════════════════════
+// Сбор стакана (10 уровней с обеих сторон) и тиковых сделок по watchlist'у
+// «горячих» фьючерсов FORTS. MOEX отдаёт публичные данные с задержкой
+// ~15 минут — этого достаточно для baseline-метрик (spread, imbalance,
+// agg_ratio), для UI «pre-trade hint». Работа в зоне:
+//
+//   • orderbook_snapshots — срез стакана раз в N минут;
+//   • intraday_trades_5m  — 5-минутные агрегаты сделок (buy/sell volume, VWAP);
+//   • orderbook_watchlist — какие тикеры собирать.
+//
+// Endpoint'ы:
+//   GET  /orderbook/watchlist
+//   GET  /futures/{secid}/orderbook?bars=20
+//   GET  /futures/{secid}/intraday?from=...&to=...
+//   GET  /futures/{secid}/depth_signal
+//   POST /collect/orderbook?limit=15&max_ms=25000
+//   POST /collect/orderbook/seed?limit=15
+//
+// Subrequest budget: 1 секьюрити = 2 fetch (orderbook + trades) ≈ 0.5 c.
+// limit=15 → 30 fetch'ей, ~7 с — укладывается во free tier (50 sub, 30 c).
+
+const _A_NUM = v => { const n = parseFloat(v); return isFinite(n) ? n : null; };
+
+// Гарантирует наличие TRACK A-таблиц на любой БД (повторно вызвать —
+// безопасно: всё IF NOT EXISTS). Дублирует SQL миграции, чтобы воркер
+// поднимался даже если миграция не была выполнена руками.
+async function trackAEnsureSchema(env){
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS orderbook_snapshots (
+      secid TEXT NOT NULL, ts TEXT NOT NULL,
+      best_bid REAL, best_ask REAL, mid REAL, spread_pct REAL,
+      bid_volume INTEGER, ask_volume INTEGER, imbalance REAL,
+      depth_5pct INTEGER, raw_levels TEXT,
+      PRIMARY KEY (secid, ts)
+    )`).run();
+  } catch(_){}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_ob_secid_ts ON orderbook_snapshots(secid, ts)').run(); } catch(_){}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_ob_ts ON orderbook_snapshots(ts)').run(); } catch(_){}
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS intraday_trades_5m (
+      secid TEXT NOT NULL, bucket TEXT NOT NULL,
+      trades_count INTEGER, volume_lots INTEGER, volume_rub REAL,
+      vwap REAL, high REAL, low REAL,
+      buy_volume INTEGER, sell_volume INTEGER, agg_ratio REAL,
+      PRIMARY KEY (secid, bucket)
+    )`).run();
+  } catch(_){}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_it5_secid ON intraday_trades_5m(secid)').run(); } catch(_){}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_it5_bucket ON intraday_trades_5m(bucket)').run(); } catch(_){}
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS orderbook_watchlist (
+      secid TEXT PRIMARY KEY, asset_code TEXT,
+      added_at TEXT NOT NULL, enabled INTEGER DEFAULT 1, note TEXT
+    )`).run();
+  } catch(_){}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_obw_enabled ON orderbook_watchlist(enabled)').run(); } catch(_){}
+}
+
+// MOEX `iss/.../securities/{secid}/orderbook.json` отдаёт по 10 уровней
+// bid/ask. Колонки: BOARDID, SECID, BUYSELL ('B'|'S'), PRICE, QUANTITY,
+// SEQNUM, UPDATETIME. На случай отсутствия данных — пустой массив.
+//
+// Пример input → output:
+//   columns: ['BOARDID','SECID','BUYSELL','PRICE','QUANTITY']
+//   data: [['RFUD','SBRH6','B',32500,12], ['RFUD','SBRH6','S',32510,9]]
+//   →  bids=[{px:32500,qty:12}], asks=[{px:32510,qty:9}]
+function trackAParseOrderBook(json){
+  const ob = json?.orderbook || {};
+  const cols = ob.columns || [];
+  const data = ob.data || [];
+  const i = (n) => cols.indexOf(n);
+  const idxSide = i('BUYSELL'), idxPx = i('PRICE'), idxQty = i('QUANTITY');
+  if(idxSide < 0 || idxPx < 0 || idxQty < 0) return { bids: [], asks: [] };
+  const bids = [], asks = [];
+  for(const r of data){
+    const side = r[idxSide];
+    const px = _A_NUM(r[idxPx]), qty = _A_NUM(r[idxQty]);
+    if(px === null || qty === null) continue;
+    if(side === 'B') bids.push({ px, qty });
+    else if(side === 'S') asks.push({ px, qty });
+  }
+  bids.sort((a, b) => b.px - a.px);
+  asks.sort((a, b) => a.px - b.px);
+  return { bids, asks };
+}
+
+// Считает производные метрики из распарсенных уровней. depth_5pct —
+// суммарный объём (bid+ask) в радиусе 5 % от mid: показатель «толщины»
+// книги вблизи рынка. imbalance — стандартный bid-ask volume imbalance,
+// диапазон [-1, +1]: положительный → давление покупателей.
+function trackAComputeMetrics(bids, asks){
+  const bestBid = bids[0]?.px ?? null;
+  const bestAsk = asks[0]?.px ?? null;
+  const mid = (bestBid != null && bestAsk != null) ? (bestBid + bestAsk) / 2 : null;
+  const spreadPct = (mid && bestAsk > bestBid) ? ((bestAsk - bestBid) / mid) * 100 : null;
+  const bidVol = bids.reduce((s, x) => s + x.qty, 0);
+  const askVol = asks.reduce((s, x) => s + x.qty, 0);
+  const totalVol = bidVol + askVol;
+  const imbalance = totalVol > 0 ? (bidVol - askVol) / totalVol : null;
+  let depth5 = 0;
+  if(mid){
+    const lo = mid * 0.95, hi = mid * 1.05;
+    for(const b of bids) if(b.px >= lo) depth5 += b.qty;
+    for(const a of asks) if(a.px <= hi) depth5 += a.qty;
+  }
+  return { bestBid, bestAsk, mid, spreadPct, bidVol, askVol, imbalance, depth5 };
+}
+
+// MOEX `.../securities/{secid}/trades.json` — последние ~5000 тиков за
+// сессию. Колонки обычно: SECID, TRADENO, TRADETIME, BOARDID, PRICE,
+// QUANTITY, VALUE, BUYSELL, TRADETYPE, SYSTIME. BUYSELL='B' → агрессивный
+// покупатель (сделка по ask), 'S' → продавец. Если флаг отсутствует —
+// fallback tick rule (px > prev → buy, < prev → sell).
+//
+// Возвращаем массив объектов { ts, px, qty, val, side }.
+function trackAParseTrades(json, todayISO){
+  const t = json?.trades || {};
+  const cols = t.columns || [];
+  const data = t.data || [];
+  const i = n => cols.indexOf(n);
+  const iPx = i('PRICE'), iQty = i('QUANTITY'), iVal = i('VALUE');
+  const iSide = i('BUYSELL'), iTm = i('TRADETIME'), iSys = i('SYSTIME');
+  if(iPx < 0 || iQty < 0) return [];
+  const out = [];
+  let prevPx = null;
+  for(const r of data){
+    const px = _A_NUM(r[iPx]), qty = _A_NUM(r[iQty]);
+    if(px === null || qty === null || qty === 0) continue;
+    const val = _A_NUM(r[iVal]);
+    let side = (iSide >= 0) ? r[iSide] : null;
+    if(side !== 'B' && side !== 'S'){
+      // tick rule fallback
+      if(prevPx != null){
+        if(px > prevPx) side = 'B';
+        else if(px < prevPx) side = 'S';
+        else side = null;
+      } else side = null;
+    }
+    // TRADETIME у MOEX — 'HH:MM:SS' (MSK). Без даты пара бессмысленна;
+    // берём дату из SYSTIME (если есть) или today (UTC уже сдвинут на MSK).
+    const tm = r[iTm] || '00:00:00';
+    const sys = r[iSys] || '';
+    const dPart = (sys && sys.length >= 10) ? sys.slice(0, 10) : todayISO;
+    const ts = `${dPart}T${tm}`;
+    out.push({ ts, px, qty, val: val != null ? val : px * qty, side });
+    prevPx = px;
+  }
+  return out;
+}
+
+// Раскладывает массив сделок в 5-минутные buckets и считает агрегаты.
+// bucket = ISO timestamp начала 5-минутки (округление вниз).
+function trackABucketTrades(trades){
+  const map = {};
+  for(const t of trades){
+    if(!t.ts || t.ts.length < 16) continue;
+    // ts вида 'YYYY-MM-DDTHH:MM:SS' → округление минут до 5.
+    const min = parseInt(t.ts.slice(14, 16), 10);
+    const bucketMin = Math.floor(min / 5) * 5;
+    const bucket = t.ts.slice(0, 14) + String(bucketMin).padStart(2, '0') + ':00';
+    if(!map[bucket]){
+      map[bucket] = { trades: 0, volLots: 0, volRub: 0, vwapNum: 0, hi: -Infinity, lo: Infinity, buyVol: 0, sellVol: 0 };
+    }
+    const m = map[bucket];
+    m.trades += 1;
+    m.volLots += t.qty;
+    m.volRub += t.val;
+    m.vwapNum += t.px * t.qty;
+    if(t.px > m.hi) m.hi = t.px;
+    if(t.px < m.lo) m.lo = t.px;
+    if(t.side === 'B') m.buyVol += t.qty;
+    else if(t.side === 'S') m.sellVol += t.qty;
+  }
+  const out = [];
+  for(const [bucket, m] of Object.entries(map)){
+    const aggTotal = m.buyVol + m.sellVol;
+    out.push({
+      bucket,
+      tradesCount: m.trades,
+      volumeLots: m.volLots,
+      volumeRub: m.volRub,
+      vwap: m.volLots > 0 ? m.vwapNum / m.volLots : null,
+      high: m.hi === -Infinity ? null : m.hi,
+      low: m.lo === Infinity ? null : m.lo,
+      buyVolume: m.buyVol,
+      sellVolume: m.sellVol,
+      aggRatio: aggTotal > 0 ? m.buyVol / aggTotal : null,
+    });
+  }
+  return out;
+}
+
+// Главный коллектор. Один проход по всем enabled-записям watchlist'а.
+// Для каждой секьюрити: orderbook.json + trades.json (2 fetch),
+// разбор + UPSERT снапшота, UPSERT 5-минуток.
+async function trackACollectOrderbook(env, url){
+  await trackAEnsureSchema(env);
+  const startedAt = new Date().toISOString();
+  const t0 = Date.now();
+  const base = env.MOEX_BASE || 'https://iss.moex.com';
+  const limit = Math.min(50, parseInt(url?.searchParams?.get('limit') || '15', 10));
+  const maxMs = parseInt(url?.searchParams?.get('max_ms') || '25000', 10);
+  const onlySecid = (url?.searchParams?.get('secid') || '').toUpperCase();
+
+  let snapshotsWritten = 0, bucketsWritten = 0, processed = 0;
+  const errors = [];
+  let timedOut = false;
+
+  // Список к сбору. Если ?secid=X — только он, иначе watchlist enabled=1.
+  let queue = [];
+  try {
+    if(onlySecid){
+      queue = [{ secid: onlySecid }];
+    } else {
+      const r = await env.DB.prepare(
+        'SELECT secid FROM orderbook_watchlist WHERE enabled = 1 ORDER BY secid ASC LIMIT ?'
+      ).bind(limit).all();
+      queue = (r.results || []);
+    }
+  } catch(e){ errors.push('queue: ' + e.message); }
+
+  if(queue.length === 0){
+    await logRun(env, startedAt, 'orderbook', 0, errors, Date.now() - t0);
+    return { source: 'orderbook', processed: 0, snapshots: 0, buckets: 0,
+      errors, hint: 'watchlist пуст — POST /collect/orderbook/seed', duration_ms: Date.now() - t0 };
+  }
+
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const todayISO = nowISO.slice(0, 10);
+
+  for(const { secid } of queue){
+    if(Date.now() - t0 > maxMs - 3000){ timedOut = true; break; }
+    if(!secid) continue;
+    processed += 1;
+    try {
+      // 1) Стакан.
+      const obUrl = `${base}/iss/engines/futures/markets/forts/securities/${encodeURIComponent(secid)}/orderbook.json?iss.meta=off`;
+      const obR = await fetch(obUrl, { headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 0 } });
+      if(!obR.ok){ errors.push(`${secid} ob HTTP ${obR.status}`); continue; }
+      const obJson = await obR.json();
+      const { bids, asks } = trackAParseOrderBook(obJson);
+      // Пустой стакан (нерабочее время, экспирация) — не пишем нулевой
+      // снапшот, чтобы не засорять БД. Но обработка trades продолжается:
+      // сделки за день могут существовать.
+      if(bids.length || asks.length){
+        const m = trackAComputeMetrics(bids, asks);
+        const raw = JSON.stringify([
+          ...bids.map(b => ({ px: b.px, qty: b.qty, side: 'B' })),
+          ...asks.map(a => ({ px: a.px, qty: a.qty, side: 'S' })),
+        ]);
+        try {
+          const res = await env.DB.prepare(`
+            INSERT INTO orderbook_snapshots
+              (secid, ts, best_bid, best_ask, mid, spread_pct, bid_volume, ask_volume, imbalance, depth_5pct, raw_levels)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(secid, ts) DO UPDATE SET
+              best_bid=excluded.best_bid, best_ask=excluded.best_ask, mid=excluded.mid,
+              spread_pct=excluded.spread_pct, bid_volume=excluded.bid_volume,
+              ask_volume=excluded.ask_volume, imbalance=excluded.imbalance,
+              depth_5pct=excluded.depth_5pct, raw_levels=excluded.raw_levels
+          `).bind(secid, nowISO, m.bestBid, m.bestAsk, m.mid, m.spreadPct,
+                  m.bidVol, m.askVol, m.imbalance, m.depth5, raw).run();
+          snapshotsWritten += res.meta?.rows_written || 0;
+        } catch(e){ errors.push(`${secid} ob INSERT: ${e.message}`); }
+      }
+
+      if(Date.now() - t0 > maxMs - 2000){ timedOut = true; break; }
+
+      // 2) Сделки → 5-минутки.
+      const trUrl = `${base}/iss/engines/futures/markets/forts/securities/${encodeURIComponent(secid)}/trades.json?iss.meta=off`;
+      const trR = await fetch(trUrl, { headers: { 'Accept': 'application/json' }, cf: { cacheTtl: 0 } });
+      if(!trR.ok){ errors.push(`${secid} tr HTTP ${trR.status}`); continue; }
+      const trJson = await trR.json();
+      const trades = trackAParseTrades(trJson, todayISO);
+      const buckets = trackABucketTrades(trades);
+      for(const b of buckets){
+        try {
+          const res = await env.DB.prepare(`
+            INSERT INTO intraday_trades_5m
+              (secid, bucket, trades_count, volume_lots, volume_rub, vwap, high, low, buy_volume, sell_volume, agg_ratio)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(secid, bucket) DO UPDATE SET
+              trades_count=excluded.trades_count, volume_lots=excluded.volume_lots,
+              volume_rub=excluded.volume_rub, vwap=excluded.vwap,
+              high=excluded.high, low=excluded.low,
+              buy_volume=excluded.buy_volume, sell_volume=excluded.sell_volume,
+              agg_ratio=excluded.agg_ratio
+          `).bind(secid, b.bucket, b.tradesCount, b.volumeLots, b.volumeRub,
+                  b.vwap, b.high, b.low, b.buyVolume, b.sellVolume, b.aggRatio).run();
+          bucketsWritten += res.meta?.rows_written || 0;
+        } catch(e){ errors.push(`${secid} bucket INSERT: ${e.message}`); }
+      }
+    } catch(e){ errors.push(`${secid}: ${e.message}`); }
+  }
+
+  await logRun(env, startedAt, 'orderbook', snapshotsWritten + bucketsWritten, errors, Date.now() - t0);
+  return {
+    source: 'orderbook', processed,
+    snapshots: snapshotsWritten, buckets: bucketsWritten,
+    errors, timedOut, duration_ms: Date.now() - t0,
+  };
+}
+
+// Заполняет watchlist топом по обороту из futures_daily на последнюю
+// дату. Берём только акционные фьючерсы (asset_code 4-6 латинских букв)
+// и не-экспирированные. limit ограничивает количество добавляемых.
+async function trackASeedWatchlist(env, url){
+  await trackAEnsureSchema(env);
+  const t0 = Date.now();
+  const limit = Math.min(50, parseInt(url?.searchParams?.get('limit') || '15', 10));
+  const today = new Date().toISOString().slice(0, 10);
+  let added = 0;
+  const errors = [];
+  try {
+    const rows = await env.DB.prepare(`
+      SELECT f.secid, f.asset_code, f.volume_rub
+      FROM futures_daily f
+      INNER JOIN (
+        SELECT secid, MAX(date) AS maxd FROM futures_daily GROUP BY secid
+      ) m ON f.secid = m.secid AND f.date = m.maxd
+      WHERE (f.last_delivery_date IS NULL OR f.last_delivery_date >= ?)
+        AND f.asset_code IS NOT NULL
+        AND f.volume_rub IS NOT NULL
+      ORDER BY f.volume_rub DESC
+      LIMIT ?
+    `).bind(today, limit).all();
+    const now = new Date().toISOString();
+    for(const r of rows.results || []){
+      try {
+        const res = await env.DB.prepare(`
+          INSERT INTO orderbook_watchlist (secid, asset_code, added_at, enabled, note)
+          VALUES (?, ?, ?, 1, 'auto-seed top-volume')
+          ON CONFLICT(secid) DO UPDATE SET
+            asset_code = excluded.asset_code, enabled = 1
+        `).bind(r.secid, r.asset_code, now).run();
+        added += res.meta?.rows_written || 0;
+      } catch(e){ errors.push(`${r.secid}: ${e.message}`); }
+    }
+  } catch(e){ errors.push('seed: ' + e.message); }
+  return { source: 'orderbook_seed', added, errors, duration_ms: Date.now() - t0 };
+}
+
+// ── TRACK A handlers (read-only, без X-Admin-Token) ──────────────────────
+
+async function handleObWatchlist(env){
+  await trackAEnsureSchema(env);
+  const rows = await env.DB.prepare(
+    'SELECT secid, asset_code, added_at, enabled, note FROM orderbook_watchlist ORDER BY enabled DESC, secid ASC'
+  ).all();
+  return jsonResp({ count: (rows.results || []).length, data: rows.results || [] });
+}
+
+// /futures/{secid}/orderbook?bars=20 — последние N снапшотов одного фьючерса.
+async function handleFuturesOrderbook(env, url){
+  await trackAEnsureSchema(env);
+  const m = url.pathname.match(/^\/futures\/([^/]+)\/orderbook$/);
+  const secid = m ? decodeURIComponent(m[1]).toUpperCase() : '';
+  if(!secid) return errResp('secid required in path: /futures/{secid}/orderbook');
+  const bars = Math.min(500, Math.max(1, parseInt(url.searchParams.get('bars') || '20', 10)));
+  const rows = await env.DB.prepare(`
+    SELECT ts, best_bid, best_ask, mid, spread_pct, bid_volume, ask_volume, imbalance, depth_5pct
+    FROM orderbook_snapshots
+    WHERE secid = ?
+    ORDER BY ts DESC
+    LIMIT ?
+  `).bind(secid, bars).all();
+  // Возвращаем по возрастанию ts чтобы фронту проще строить graph.
+  const data = (rows.results || []).slice().reverse();
+  return jsonResp({ secid, count: data.length, data });
+}
+
+// /futures/{secid}/intraday?from=...&to=... — 5-минутки за период.
+async function handleFuturesIntraday(env, url){
+  await trackAEnsureSchema(env);
+  const m = url.pathname.match(/^\/futures\/([^/]+)\/intraday$/);
+  const secid = m ? decodeURIComponent(m[1]).toUpperCase() : '';
+  if(!secid) return errResp('secid required in path: /futures/{secid}/intraday');
+  const from = url.searchParams.get('from') || '1970-01-01';
+  const to   = url.searchParams.get('to')   || '2999-12-31';
+  const limit = Math.min(2000, Math.max(1, parseInt(url.searchParams.get('limit') || '500', 10)));
+  const rows = await env.DB.prepare(`
+    SELECT bucket, trades_count, volume_lots, volume_rub, vwap, high, low,
+           buy_volume, sell_volume, agg_ratio
+    FROM intraday_trades_5m
+    WHERE secid = ? AND bucket BETWEEN ? AND ?
+    ORDER BY bucket ASC
+    LIMIT ?
+  `).bind(secid, from, to, limit).all();
+  return jsonResp({ secid, from, to, count: (rows.results || []).length, data: rows.results || [] });
+}
+
+// /futures/{secid}/depth_signal — короткое summary последнего часа:
+// последний spread/imbalance + средний agg_ratio за час. Для UI «pre-trade hint».
+async function handleFuturesDepthSignal(env, url){
+  await trackAEnsureSchema(env);
+  const m = url.pathname.match(/^\/futures\/([^/]+)\/depth_signal$/);
+  const secid = m ? decodeURIComponent(m[1]).toUpperCase() : '';
+  if(!secid) return errResp('secid required in path: /futures/{secid}/depth_signal');
+  const last = await env.DB.prepare(`
+    SELECT ts, best_bid, best_ask, mid, spread_pct, imbalance, depth_5pct
+    FROM orderbook_snapshots
+    WHERE secid = ?
+    ORDER BY ts DESC LIMIT 1
+  `).bind(secid).first();
+  const win1h = await env.DB.prepare(`
+    SELECT AVG(spread_pct) AS avg_spread, AVG(imbalance) AS avg_imb,
+           AVG(depth_5pct) AS avg_depth, COUNT(*) AS bars
+    FROM orderbook_snapshots
+    WHERE secid = ? AND ts >= datetime('now', '-1 hour')
+  `).bind(secid).first();
+  const trades1h = await env.DB.prepare(`
+    SELECT SUM(buy_volume) AS buy, SUM(sell_volume) AS sell, SUM(volume_lots) AS lots
+    FROM intraday_trades_5m
+    WHERE secid = ? AND bucket >= datetime('now', '-1 hour')
+  `).bind(secid).first();
+  const buy = trades1h?.buy || 0, sell = trades1h?.sell || 0;
+  const aggRatio1h = (buy + sell) > 0 ? buy / (buy + sell) : null;
+  return jsonResp({
+    secid,
+    latest: last || null,
+    window_1h: {
+      avg_spread_pct: win1h?.avg_spread ?? null,
+      avg_imbalance: win1h?.avg_imb ?? null,
+      avg_depth_5pct: win1h?.avg_depth ?? null,
+      bars: win1h?.bars ?? 0,
+      agg_ratio: aggRatio1h,
+      lots_traded: trades1h?.lots ?? 0,
+    },
+    generated_at: new Date().toISOString(),
+  });
+}
+
+// ═══ END TRACK A ═════════════════════════════════════════════════════════

@@ -131,3 +131,48 @@ MOEX trades.json даёт сделки с полем `BUYSELL` или с tick ru
   ~15-мин задержка).
 - Не считать прогноз цены — только регистрируем поведение стакана.
 - Не строить графики на бэке — это задача frontend track G.
+
+## Состояние ветки `claude/track-A-orderbook`
+
+Версия `0.10.0-orderbook` (см. `tracks.orderbook` в `/status`).
+
+Сделано:
+
+- `backend/migrations/A_orderbook.sql` — таблицы `orderbook_snapshots`,
+  `intraday_trades_5m`, `orderbook_watchlist` (всё `IF NOT EXISTS`).
+- `backend/worker.js` — зона `// ═══ TRACK A ═══`:
+  - `trackAEnsureSchema(env)` — auto-migrate (повторяет SQL миграции
+    в `try/catch`), вызывается на каждом collector/handler-входе.
+  - `trackACollectOrderbook(env, url)` — основной коллектор:
+    `?secid=X` или весь watchlist, `?limit=15`, `?max_ms=25000`.
+    Для каждого ID: `orderbook.json` + `trades.json` (2 fetch),
+    UPSERT снапшота, UPSERT 5-минуток.
+  - `trackASeedWatchlist(env, url)` — `INSERT ... ON CONFLICT` топа
+    по `futures_daily.volume_rub` за последнюю дату.
+  - Парсеры: `trackAParseOrderBook`, `trackAComputeMetrics`,
+    `trackAParseTrades`, `trackABucketTrades`.
+  - Handlers: `handleObWatchlist`, `handleFuturesOrderbook`,
+    `handleFuturesIntraday`, `handleFuturesDepthSignal`.
+- `backend/wrangler.toml` — добавлен intraday-cron
+  `*/10 7-15 * * 1-5` (каждые 10 мин в раб. часы MOEX).
+- `worker.js scheduled()` — диспатч по `event.cron`: дневной cron
+  оставляет существующие коллекторы; intraday запускает только
+  `trackACollectOrderbook`.
+- `handleStatus` — добавлен блок `trackAStats`
+  (`orderbook_snapshots_24h`, `intraday_5m_buckets_24h` и пр.) и
+  `tracks.orderbook = '0.10.0-orderbook'`.
+- Шапка-комментарий `worker.js` дополнена секцией TRACK A endpoints.
+
+Что нужно после merge:
+
+- Прогнать миграцию: `npx wrangler d1 execute coldline --file=backend/migrations/A_orderbook.sql --remote`.
+- Заполнить watchlist: `POST /collect/orderbook/seed?limit=15` с
+  `X-Admin-Token`. После этого intraday-cron начнёт писать снапшоты.
+- Проверить `/status.tracks.orderbook == "0.10.0-orderbook"` —
+  значит код задеплоился.
+
+Не сделано (вне scope первой итерации):
+
+- Auto-disable экспирированных контрактов в watchlist (поле `enabled=0`
+  при наступлении `last_delivery_date`). Сейчас правится руками.
+- Frontend для `depth_signal` — это TRACK G.
