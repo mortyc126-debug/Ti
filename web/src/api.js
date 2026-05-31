@@ -37,4 +37,9 @@ export const api = {
   reportsLatest: (limit = 50)  => req(`/reports/latest?limit=${limit}`),
   // map { inn: max_fy_year } — для фильтра «свежесть отчёта» в таблице
   issuerReportYears: ()        => req('/issuers/report_years'),
+
+  // Telegram Bot алерты
+  tgAlerts:       (chatId)            => req(`/tg/alerts?chat_id=${encodeURIComponent(chatId)}`),
+  tgAlertCreate:  (body)              => req('/tg/alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  tgAlertDelete:  (id, chatId)        => req(`/tg/alerts/${id}?chat_id=${encodeURIComponent(chatId)}`, { method: 'DELETE' }),
 };

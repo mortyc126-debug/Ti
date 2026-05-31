@@ -7,6 +7,7 @@ import Card from '../components/ui/Card.jsx';
 import Stat from '../components/ui/Stat.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import RightPanel from '../components/home/RightPanel.jsx';
+import TelegramAlerts from '../components/TelegramAlerts.jsx';
 import { portfolioKpi, recentEvents } from '../data/mockHome.js';
 
 const fmtRub = n => {
@@ -40,6 +41,7 @@ export default function Home(){
         </div>
         <div className="space-y-5">
           <RightPanel />
+          <TelegramAlerts />
           <BackendStrip status={status} error={error} />
         </div>
       </div>

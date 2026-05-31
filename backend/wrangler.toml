@@ -26,5 +26,11 @@ database_id   = "6a486b95-c5aa-4700-9adb-fc34512d9494"
 crons = ["30 7 * * *"]
 
 [vars]
-MOEX_BASE = "https://iss.moex.com"
+MOEX_BASE    = "https://iss.moex.com"
+WORKER_URL   = "https://bondan-backend.marginacall.workers.dev"
+
+# Секреты — задаются через `wrangler secret put <NAME>` (не коммитить в git!):
+#   wrangler secret put ADMIN_TOKEN
+#   wrangler secret put TELEGRAM_BOT_TOKEN   ← токен @BotFather
+#   wrangler secret put TG_WEBHOOK_SECRET    ← произвольная строка для валидации webhook
 # ADMIN_TOKEN задаётся через `wrangler secret put ADMIN_TOKEN`.

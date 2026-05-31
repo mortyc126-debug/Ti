@@ -289,3 +289,35 @@ CREATE TABLE IF NOT EXISTS issuer_affiliations (
 CREATE INDEX IF NOT EXISTS idx_aff_parent ON issuer_affiliations(parent_inn);
 CREATE INDEX IF NOT EXISTS idx_aff_child  ON issuer_affiliations(child_inn);
 CREATE INDEX IF NOT EXISTS idx_aff_role   ON issuer_affiliations(role);
+
+-- ── Telegram Bot — подписчики и алерты ────────────────────────────────
+-- Пользователь отправляет /start боту → chat_id сохраняется здесь.
+-- Без регистрации REST-API не даст создать алерт.
+CREATE TABLE IF NOT EXISTS tg_subscribers (
+  chat_id     TEXT PRIMARY KEY,
+  username    TEXT,
+  first_name  TEXT,
+  joined_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Ценовые/доходностные алерты. kind строго из CHECK-списка.
+-- cooldown_h — минимальная пауза между повторными уведомлениями.
+CREATE TABLE IF NOT EXISTS tg_alerts (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id     TEXT NOT NULL,
+  secid       TEXT NOT NULL,
+  kind        TEXT NOT NULL CHECK(kind IN (
+                'price_above','price_below',
+                'yield_above','yield_below',
+                'basis_above','basis_below'
+              )),
+  threshold   REAL NOT NULL,
+  note        TEXT,
+  last_sent   TEXT,
+  cooldown_h  INTEGER NOT NULL DEFAULT 24,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  active      INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_tg_alerts_chat   ON tg_alerts(chat_id);
+CREATE INDEX IF NOT EXISTS idx_tg_alerts_secid  ON tg_alerts(secid);
+CREATE INDEX IF NOT EXISTS idx_tg_alerts_active ON tg_alerts(active, last_sent);

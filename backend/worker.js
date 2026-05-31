@@ -92,6 +92,27 @@ export default {
       if(url.pathname === '/issuers/report_years') return await handleIssuerReportYears(env, url);
       if(url.pathname === '/diag/dadata')     return await handleDiagDadata(env, url);
       if(url.pathname === '/diag/girbo')      return await handleDiagGirbo(env, url);
+
+      // ── Telegram Bot ──────────────────────────────────────────────────
+      // /tg/webhook — POST от Telegram (секрет в заголовке)
+      if(url.pathname === '/tg/webhook')      return await handleTgWebhook(req, env);
+      // /tg/alerts — CRUD алертов для веб-интерфейса
+      if(url.pathname === '/tg/alerts' || url.pathname.startsWith('/tg/alerts/'))
+        return await handleTgAlertsRoute(req, env, url);
+      // /tg/setup?token=ADMIN — регистрирует webhook в Telegram (один раз)
+      if(url.pathname === '/tg/setup'){
+        const adminTok = url.searchParams.get('token') || '';
+        if(!env.ADMIN_TOKEN || adminTok !== env.ADMIN_TOKEN) return errResp('unauthorized', 401);
+        return await handleTgSetup(env, url);
+      }
+      // /tg/subscribers — список подписчиков (admin)
+      if(url.pathname === '/tg/subscribers'){
+        const adminTok = url.searchParams.get('token') || '';
+        if(!env.ADMIN_TOKEN || adminTok !== env.ADMIN_TOKEN) return errResp('unauthorized', 401);
+        const rows = await env.DB.prepare('SELECT chat_id, username, first_name, joined_at FROM tg_subscribers ORDER BY joined_at DESC').all();
+        return jsonResp({ subscribers: rows.results });
+      }
+
       if(url.pathname.startsWith('/issuer/')){
         // /issuer/:inn               — карточка
         // /issuer/:inn/reports        — годовые РСБУ-показатели
@@ -148,6 +169,11 @@ export default {
           await collectReports(env, new URL('https://x/?limit=50'));
         } catch(e){ console.error('cron reports:', e.message); }
       }
+      // Telegram алерты — каждый cron-запуск (ежедневно)
+      try {
+        const tgRes = await checkAndSendAlerts(env);
+        console.log('cron tg-alerts:', JSON.stringify(tgRes));
+      } catch(e){ console.error('cron tg-alerts:', e.message); }
     })());
   },
 };
@@ -3409,4 +3435,329 @@ function parseFuturesPage(resp){
     });
   }
   return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TELEGRAM BOT — уведомления об алертах
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Токен бота хранится в Cloudflare Worker Secret (TELEGRAM_BOT_TOKEN).
+// Зарегистрировать webhook: GET /tg/setup?token=<ADMIN_TOKEN>
+// Бот работает в режиме webhook (не polling) — Telegram сам присылает
+// обновления на /tg/webhook при каждом сообщении.
+//
+// Сценарий использования:
+//   1. Пользователь отправляет /start боту → chat_id сохраняется в D1
+//   2. В веб-интерфейсе (или командой /add) создаёт алерт
+//   3. Cron (30 7 UTC) проверяет цены и шлёт уведомления при срабатывании
+
+const TG_API = 'https://api.telegram.org/bot';
+
+// ── Отправка сообщения ────────────────────────────────────────────────────
+async function sendTelegram(env, chatId, text, opts = {}){
+  const token = env.TELEGRAM_BOT_TOKEN;
+  if(!token) throw new Error('TELEGRAM_BOT_TOKEN not configured in Worker secrets');
+  const r = await fetch(`${TG_API}${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: String(chatId),
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...opts,
+    }),
+  });
+  if(!r.ok){
+    const t = await r.text();
+    throw new Error(`Telegram API ${r.status}: ${t.slice(0, 200)}`);
+  }
+  return r.json();
+}
+
+function fmtAlertKind(kind){
+  const map = {
+    price_above: '↑ цена >',  price_below: '↓ цена <',
+    yield_above: '↑ доходность >', yield_below: '↓ доходность <',
+    basis_above: '↑ базис >',  basis_below: '↓ базис <',
+  };
+  return map[kind] || kind;
+}
+
+// ── Webhook — принимает обновления от Telegram ────────────────────────────
+async function handleTgWebhook(req, env){
+  // Проверяем X-Telegram-Bot-Api-Secret-Token если задан TG_WEBHOOK_SECRET
+  const secret = req.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+  if(env.TG_WEBHOOK_SECRET && secret !== env.TG_WEBHOOK_SECRET)
+    return new Response('forbidden', { status: 403 });
+
+  let update;
+  try { update = await req.json(); }
+  catch(_){ return new Response('bad json', { status: 400 }); }
+
+  const msg = update.message || update.edited_message;
+  if(!msg || !msg.text) return new Response('ok');
+
+  const chatId = String(msg.chat.id);
+  const text   = (msg.text || '').trim();
+  const username  = msg.from?.username  || null;
+  const firstName = msg.from?.first_name || null;
+
+  // Регистрируем/обновляем подписчика при каждом сообщении
+  await env.DB.prepare(`
+    INSERT INTO tg_subscribers(chat_id, username, first_name)
+    VALUES(?,?,?)
+    ON CONFLICT(chat_id) DO UPDATE SET username=excluded.username, first_name=excluded.first_name
+  `).bind(chatId, username, firstName).run();
+
+  const parts = text.split(/\s+/);
+  const cmd   = parts[0].toLowerCase().replace(/@\w+$/, '');
+  const args  = parts.slice(1);
+
+  try {
+    if(cmd === '/start' || cmd === '/help'){
+      await sendTelegram(env, chatId,
+        `👋 <b>БондАналитик · Алерты</b>\n\n` +
+        `Ваш chat_id: <code>${chatId}</code>\n\n` +
+        `<b>Команды:</b>\n` +
+        `/alerts — список ваших алертов\n` +
+        `/add SECID TYPE VALUE — добавить алерт\n` +
+        `/del ID — удалить алерт\n\n` +
+        `<b>Типы алертов:</b>\n` +
+        `• <code>price_above</code> / <code>price_below</code> — цена акции/фьючерса\n` +
+        `• <code>yield_above</code> / <code>yield_below</code> — доходность облигации (% YTM)\n` +
+        `• <code>basis_above</code> / <code>basis_below</code> — базис фьючерса (% ann.)\n\n` +
+        `<b>Примеры:</b>\n` +
+        `<code>/add SBER price_below 150</code>\n` +
+        `<code>/add SU26243RMFS7 yield_above 16</code>\n` +
+        `<code>/add SBRH6 basis_above 20</code>`
+      );
+
+    } else if(cmd === '/alerts'){
+      const rows = await env.DB.prepare(
+        `SELECT id, secid, kind, threshold, last_sent FROM tg_alerts WHERE chat_id=? AND active=1 ORDER BY id`
+      ).bind(chatId).all();
+
+      if(!rows.results.length){
+        await sendTelegram(env, chatId,
+          `📭 Нет активных алертов.\n\nДобавьте командой:\n<code>/add SBER price_below 150</code>`);
+      } else {
+        const lines = rows.results.map(r => {
+          const ls = r.last_sent ? r.last_sent.slice(0, 10) : 'не срабатывал';
+          return `[${r.id}] <b>${r.secid}</b> ${fmtAlertKind(r.kind)} <b>${r.threshold}</b> — ${ls}`;
+        });
+        await sendTelegram(env, chatId,
+          `📋 <b>Ваши алерты (${rows.results.length}):</b>\n\n${lines.join('\n')}\n\n` +
+          `/del ID — удалить`);
+      }
+
+    } else if(cmd === '/add'){
+      const VALID_KINDS = ['price_above','price_below','yield_above','yield_below','basis_above','basis_below'];
+      const [secid, kind, valStr] = args;
+      if(!secid || !kind || !valStr){
+        await sendTelegram(env, chatId,
+          `❌ Формат: <code>/add SECID TYPE VALUE</code>\n\nПример: <code>/add SBER price_below 150</code>`);
+      } else if(!VALID_KINDS.includes(kind.toLowerCase())){
+        await sendTelegram(env, chatId,
+          `❌ Неизвестный тип <code>${kind}</code>.\n\nДоступные:\n${VALID_KINDS.join(', ')}`);
+      } else {
+        const threshold = parseFloat(valStr.replace(',', '.'));
+        if(isNaN(threshold)){
+          await sendTelegram(env, chatId, `❌ Значение должно быть числом, например: <code>150.5</code>`);
+        } else {
+          const res = await env.DB.prepare(
+            `INSERT INTO tg_alerts(chat_id, secid, kind, threshold) VALUES(?,?,?,?)`
+          ).bind(chatId, secid.toUpperCase(), kind.toLowerCase(), threshold).run();
+          await sendTelegram(env, chatId,
+            `✅ Алерт #${res.meta.last_row_id} добавлен!\n\n` +
+            `<b>${secid.toUpperCase()}</b> ${fmtAlertKind(kind.toLowerCase())} <b>${threshold}</b>\n\n` +
+            `Проверка: ежедневно в 10:30 МСК.`);
+        }
+      }
+
+    } else if(cmd === '/del'){
+      const id = parseInt(args[0]);
+      if(!id || isNaN(id)){
+        await sendTelegram(env, chatId, `❌ Укажите ID алерта. Посмотреть список: /alerts`);
+      } else {
+        const res = await env.DB.prepare(
+          `UPDATE tg_alerts SET active=0 WHERE id=? AND chat_id=?`
+        ).bind(id, chatId).run();
+        if(res.meta.changes === 0)
+          await sendTelegram(env, chatId, `❌ Алерт #${id} не найден.`);
+        else
+          await sendTelegram(env, chatId, `🗑 Алерт #${id} удалён.`);
+      }
+
+    } else {
+      await sendTelegram(env, chatId, `Неизвестная команда. Введите /help`);
+    }
+  } catch(e){
+    console.error('tg webhook handler:', e.message);
+  }
+
+  return new Response('ok');
+}
+
+// ── REST API для веб-интерфейса ───────────────────────────────────────────
+async function handleTgAlertsRoute(req, env, url){
+  const parts  = url.pathname.split('/').filter(Boolean); // ['tg','alerts','id?']
+  const method = req.method;
+
+  // GET /tg/alerts?chat_id=X — список
+  if(method === 'GET' && parts.length === 2){
+    const chatId = url.searchParams.get('chat_id');
+    if(!chatId) return errResp('chat_id required');
+    const rows = await env.DB.prepare(
+      `SELECT id, secid, kind, threshold, note, last_sent, cooldown_h, created_at
+       FROM tg_alerts WHERE chat_id=? AND active=1 ORDER BY id`
+    ).bind(chatId).all();
+    return jsonResp({ alerts: rows.results, chat_id: chatId });
+  }
+
+  // POST /tg/alerts — создать
+  if(method === 'POST' && parts.length === 2){
+    let body;
+    try { body = await req.json(); } catch(_){ return errResp('bad json'); }
+    const { chat_id, secid, kind, threshold, note } = body || {};
+    const VALID_KINDS = ['price_above','price_below','yield_above','yield_below','basis_above','basis_below'];
+    if(!chat_id || !secid || !kind || threshold == null) return errResp('chat_id, secid, kind, threshold required');
+    if(!VALID_KINDS.includes(kind)) return errResp(`invalid kind, use: ${VALID_KINDS.join('|')}`);
+    const val = parseFloat(threshold);
+    if(isNaN(val)) return errResp('threshold must be number');
+    // Проверяем что chat_id зарегистрирован
+    const sub = await env.DB.prepare('SELECT chat_id FROM tg_subscribers WHERE chat_id=?').bind(String(chat_id)).first();
+    if(!sub) return errResp('chat_id not registered — send /start to the bot first', 404);
+    const res = await env.DB.prepare(
+      `INSERT INTO tg_alerts(chat_id, secid, kind, threshold, note) VALUES(?,?,?,?,?)`
+    ).bind(String(chat_id), String(secid).toUpperCase(), kind, val, note || null).run();
+    return jsonResp({ id: res.meta.last_row_id, ok: true });
+  }
+
+  // DELETE /tg/alerts/:id?chat_id=X
+  if(method === 'DELETE' && parts.length === 3){
+    const id     = parseInt(parts[2]);
+    const chatId = url.searchParams.get('chat_id');
+    if(!chatId) return errResp('chat_id required');
+    if(!id || isNaN(id)) return errResp('invalid id');
+    const res = await env.DB.prepare(
+      `UPDATE tg_alerts SET active=0 WHERE id=? AND chat_id=?`
+    ).bind(id, chatId).run();
+    if(res.meta.changes === 0) return errResp('alert not found', 404);
+    return jsonResp({ ok: true, deleted: id });
+  }
+
+  return errResp('Not Found', 404);
+}
+
+// ── Cron: проверить алерты и разослать уведомления ───────────────────────
+async function checkAndSendAlerts(env){
+  if(!env.TELEGRAM_BOT_TOKEN) return { skipped: 'TELEGRAM_BOT_TOKEN not set' };
+
+  // Все активные алерты с истёкшим cooldown
+  const rows = await env.DB.prepare(`
+    SELECT id, chat_id, secid, kind, threshold, cooldown_h
+    FROM tg_alerts
+    WHERE active = 1
+      AND (last_sent IS NULL
+           OR last_sent < datetime('now', '-' || cooldown_h || ' hours'))
+    ORDER BY secid, id
+  `).all();
+
+  if(!rows.results.length) return { checked: 0, sent: 0 };
+
+  let sent = 0, errors = 0;
+
+  for(const alert of rows.results){
+    try {
+      const { id, chat_id, secid, kind, threshold } = alert;
+      const isYield = kind.startsWith('yield');
+      const isBasis = kind.startsWith('basis');
+      const isAbove = kind.endsWith('above');
+
+      let currentVal = null;
+      let displayStr = '';
+      let unit = '';
+
+      if(isYield){
+        // bond_daily.ytm — в процентах
+        const r = await env.DB.prepare(
+          `SELECT ytm FROM bond_daily WHERE secid=? AND ytm IS NOT NULL ORDER BY date DESC LIMIT 1`
+        ).bind(secid).first();
+        if(r){ currentVal = r.ytm; displayStr = r.ytm.toFixed(2); unit = '% YTM'; }
+
+      } else if(isBasis){
+        // futures_daily.basis_ann — аннуализированный базис %
+        const r = await env.DB.prepare(
+          `SELECT basis_ann FROM futures_daily WHERE secid=? AND basis_ann IS NOT NULL ORDER BY date DESC LIMIT 1`
+        ).bind(secid).first();
+        if(r){ currentVal = r.basis_ann; displayStr = r.basis_ann.toFixed(1); unit = '% (ann. basis)'; }
+
+      } else {
+        // Цена: сначала акции, затем фьючерсы
+        const s = await env.DB.prepare(
+          `SELECT price FROM stock_daily WHERE secid=? AND price IS NOT NULL ORDER BY date DESC LIMIT 1`
+        ).bind(secid).first();
+        if(s){
+          currentVal = s.price; displayStr = s.price.toFixed(2); unit = '₽';
+        } else {
+          const f = await env.DB.prepare(
+            `SELECT price FROM futures_daily WHERE secid=? AND price IS NOT NULL ORDER BY date DESC LIMIT 1`
+          ).bind(secid).first();
+          if(f){ currentVal = f.price; displayStr = f.price.toFixed(0); unit = 'пт'; }
+        }
+      }
+
+      if(currentVal == null) continue; // данных нет — пропускаем
+
+      const triggered = isAbove ? (currentVal > threshold) : (currentVal < threshold);
+      if(!triggered) continue;
+
+      const arrow = isAbove ? '🔺' : '🔻';
+      await sendTelegram(env, chat_id,
+        `${arrow} <b>Алерт сработал!</b>\n\n` +
+        `<b>${secid}</b>\n` +
+        `Текущее: <b>${displayStr} ${unit}</b>\n` +
+        `Условие: ${fmtAlertKind(kind)} ${threshold} ${unit}\n\n` +
+        `<i>Алерт #${id} · следующая проверка через ${alert.cooldown_h}ч</i>`
+      );
+
+      await env.DB.prepare(
+        `UPDATE tg_alerts SET last_sent = datetime('now') WHERE id = ?`
+      ).bind(id).run();
+      sent++;
+
+    } catch(e){
+      console.error(`tg alert #${alert.id}:`, e.message);
+      errors++;
+    }
+  }
+
+  return { checked: rows.results.length, sent, errors };
+}
+
+// ── Admin: зарегистрировать webhook URL в Telegram ────────────────────────
+async function handleTgSetup(env, url){
+  const token = env.TELEGRAM_BOT_TOKEN;
+  if(!token) return errResp('TELEGRAM_BOT_TOKEN not set in Worker secrets');
+
+  // Определяем базовый URL воркера
+  const workerUrl = env.WORKER_URL
+    || `${url.protocol}//${url.host}`;
+  const webhookUrl = `${workerUrl}/tg/webhook`;
+
+  const body = { url: webhookUrl, allowed_updates: ['message'] };
+  if(env.TG_WEBHOOK_SECRET) body.secret_token = env.TG_WEBHOOK_SECRET;
+
+  const r = await fetch(`${TG_API}${token}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const res = await r.json();
+
+  // Также получаем инфо о боте
+  const me = await fetch(`${TG_API}${token}/getMe`).then(x => x.json()).catch(() => null);
+
+  return jsonResp({ webhookUrl, bot: me?.result || null, telegram: res });
 }
