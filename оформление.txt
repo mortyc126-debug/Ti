@@ -1,0 +1,555 @@
+Ниже — максимально подробный разбор визуального языка интерфейса, чтобы другой ИИ/дизайнер/фронтендер смог воспроизвести стиль практически 1:1.
+
+---
+
+# Общий стиль
+
+Это **dark fintech / cyber trading dashboard UI** с уклоном в:
+
+* neon-magenta accents
+* глубокие фиолетово-черные фоны
+* стеклянные полупрозрачные панели
+* тонкие glowing-обводки
+* минималистичный premium fintech aesthetic
+* стиль между:
+
+  * crypto terminal
+  * cyberpunk lite
+  * modern quant dashboard
+  * Tinkoff/Bybit/Hyperliquid dark UI vibes
+
+Главное ощущение:
+
+> “дорогой неоновый трейдинг-интерфейс”
+
+---
+
+# Цветовая палитра (очень важно)
+
+## Базовый фон
+
+Главный фон страницы:
+
+```css
+background:
+linear-gradient(
+180deg,
+#0A0615 0%,
+#0D0718 35%,
+#12091F 100%
+);
+```
+
+Либо:
+
+```css
+#0B0613
+```
+
+Это почти черный, но с сильным purple tint.
+
+---
+
+# Панели / карточки
+
+Основной цвет контейнеров:
+
+```css
+#140A24
+```
+
+Внутренние блоки:
+
+```css
+#1A1030
+```
+
+Иногда:
+
+```css
+#1B1233
+```
+
+---
+
+# Границы
+
+Очень важная часть стиля.
+
+У панелей:
+
+* тонкая
+* полупрозрачная
+* фиолетовая
+* слегка glowing
+
+```css
+border: 1px solid rgba(255, 0, 128, 0.12);
+```
+
+или:
+
+```css
+border: 1px solid rgba(170, 90, 255, 0.12);
+```
+
+---
+
+# Glow эффект
+
+Очень мягкий.
+
+НЕТ:
+
+* сильного blur
+* яркого свечения
+
+ДА:
+
+* subtle neon
+
+```css
+box-shadow:
+0 0 0 1px rgba(255,0,140,0.05),
+0 0 18px rgba(255,0,140,0.06),
+inset 0 0 20px rgba(255,255,255,0.01);
+```
+
+---
+
+# Accent color (главный неон)
+
+Основной акцент:
+
+```css
+#FF006E
+```
+
+Чуть более мягкие версии:
+
+```css
+#FF0A78
+#FF1177
+#FF2A8A
+```
+
+---
+
+# Secondary accent
+
+Бирюзово-мятный для positive metrics:
+
+```css
+#57E3C2
+```
+
+или:
+
+```css
+#52F2C9
+```
+
+---
+
+# Negative / loss color
+
+```css
+#FF4D6D
+```
+
+---
+
+# Текст
+
+## Основной текст
+
+```css
+#F2F0FF
+```
+
+---
+
+## Secondary text
+
+```css
+#A79BC9
+```
+
+---
+
+## Muted labels
+
+```css
+#6F648F
+```
+
+---
+
+# Типографика
+
+## Шрифт
+
+Очень похоже на:
+
+* Inter
+* SF Pro Display
+* Manrope
+
+Лучше всего:
+
+```css
+font-family: 'Inter', sans-serif;
+```
+
+---
+
+# Размеры текста
+
+## Заголовки секций
+
+```css
+font-size: 13px;
+font-weight: 700;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+```
+
+Цвет:
+
+```css
+#7E74A8
+```
+
+---
+
+## Основные значения
+
+```css
+font-size: 28px;
+font-weight: 700;
+```
+
+---
+
+## Мелкие подписи
+
+```css
+font-size: 12px;
+font-weight: 500;
+```
+
+---
+
+# Скругления
+
+Очень важны.
+
+## Большие панели
+
+```css
+border-radius: 24px;
+```
+
+---
+
+## Малые элементы
+
+```css
+border-radius: 14px;
+```
+
+---
+
+## Pills / buttons
+
+```css
+border-radius: 999px;
+```
+
+---
+
+# Кнопки / segmented controls
+
+Стиль:
+
+* capsule pills
+* dark filled
+* neon active state
+
+## Неактивная
+
+```css
+background: rgba(255,255,255,0.03);
+border: 1px solid rgba(255,255,255,0.05);
+color: #B9B2D3;
+```
+
+---
+
+## Активная
+
+```css
+background:
+linear-gradient(
+180deg,
+rgba(255,0,128,0.22),
+rgba(255,0,128,0.12)
+);
+
+border: 1px solid rgba(255,0,128,0.5);
+
+box-shadow:
+0 0 18px rgba(255,0,128,0.18);
+```
+
+---
+
+# Слайдеры
+
+Очень характерный элемент.
+
+## Линия
+
+```css
+height: 2px;
+background: rgba(255,255,255,0.08);
+```
+
+---
+
+## Активная часть
+
+```css
+background: linear-gradient(
+90deg,
+#FF006E,
+#FF2A8A
+);
+```
+
+---
+
+## Thumb
+
+Ромб.
+
+Это КЛЮЧЕВАЯ особенность.
+
+```css
+width: 14px;
+height: 14px;
+transform: rotate(45deg);
+background: #140A24;
+border: 2px solid #FF006E;
+```
+
+С glow:
+
+```css
+box-shadow:
+0 0 12px rgba(255,0,128,0.5);
+```
+
+---
+
+# Карточки статистики снизу
+
+Стиль:
+
+* compact fintech cards
+* low height
+* subtle border
+* value-focused layout
+
+```css
+background: rgba(255,255,255,0.02);
+border: 1px solid rgba(255,255,255,0.05);
+border-radius: 16px;
+padding: 18px 20px;
+```
+
+---
+
+# Цвета показателей
+
+## Positive
+
+```css
+#52F2C9
+```
+
+---
+
+## Negative
+
+```css
+#FF4D7A
+```
+
+---
+
+# Layout
+
+## Общая структура
+
+Очень ровная grid-система.
+
+Пример:
+
+```css
+display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 16px;
+```
+
+---
+
+# Отступы
+
+Очень consistent spacing.
+
+Основные:
+
+```css
+8px
+12px
+16px
+24px
+32px
+```
+
+---
+
+# Визуальная философия
+
+Интерфейс строится на:
+
+## 1. Low contrast dark surfaces
+
+Нет чистого черного.
+
+---
+
+## 2. Neon edge lighting
+
+Неон только по:
+
+* active states
+* slider progress
+* key metrics
+
+---
+
+## 3. Minimal gradients
+
+Градиенты:
+
+* очень мягкие
+* почти незаметные
+
+---
+
+## 4. Dense premium layout
+
+Очень высокая плотность информации,
+но:
+
+* воздух сохраняется
+* нет ощущения clutter
+
+---
+
+# CSS-токены (готовые)
+
+```css
+:root {
+
+--bg-main: #0B0613;
+--bg-panel: #140A24;
+--bg-card: #1A1030;
+
+--accent: #FF006E;
+--accent-2: #FF2A8A;
+
+--positive: #52F2C9;
+--negative: #FF4D7A;
+
+--text-primary: #F2F0FF;
+--text-secondary: #A79BC9;
+--text-muted: #6F648F;
+
+--border: rgba(255,255,255,0.06);
+
+--glow:
+0 0 18px rgba(255,0,128,0.15);
+
+}
+```
+
+---
+
+# Очень важные детали
+
+## 1. НЕТ ярких белых элементов
+
+Белый всегда:
+
+* приглушенный
+* tinted
+* soft
+
+---
+
+## 2. НЕТ flat black
+
+Все поверхности:
+
+* purple tinted
+* layered
+
+---
+
+## 3. Glow всегда subtle
+
+Никогда:
+
+* huge bloom
+* aggressive cyberpunk
+
+---
+
+## 4. Интерфейс ultra-clean
+
+НЕТ:
+
+* лишних иконок
+* теней material design
+* жирных бордеров
+* heavy gradients
+
+---
+
+# Как описывать стиль ИИ (готовый prompt)
+
+Можно вставлять буквально это:
+
+> Premium dark fintech dashboard UI, deep purple-black background, neon magenta accents, subtle glassmorphism, soft glowing borders, cyber trading terminal aesthetic, rounded 24px cards, minimal gradients, elegant quantitative finance interface, dense but clean layout, Inter font, magenta neon sliders with diamond thumbs, soft purple surfaces, low contrast luxury UI, modern crypto analytics dashboard, subtle cyan positive metrics, premium dark mode trading platform.
+
+---
+
+# Что критично для совпадения 1:1
+
+Самые узнаваемые элементы:
+
+1. diamond slider thumbs
+2. magenta neon accent
+3. purple-tinted blacks
+4. ultra-soft glow
+5. pill segmented controls
+6. thin transparent borders
+7. compact metric cards
+8. uppercase muted section titles
+9. dense quant-layout
+10. glassy dark surfaces
+
+Именно это создаёт цельность дизайна.
