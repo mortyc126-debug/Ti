@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOEX Toolkit</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0B0613;
+  --panel:   #140A24;
+  --card:    #1A1030;
+  --input:   #0F081A;
+  --accent:  #FF006E;
+  --pos:     #52F2C9;
+  --neg:     #FF4D7A;
+  --warn:    #FFB86C;
+  --text:    #F2F0FF;
+  --text2:   #A79BC9;
+  --muted:   #6F648F;
+  --border:  rgba(255,255,255,0.06);
+  --mono:    'IBM Plex Mono', monospace;
+  --sans:    'Inter', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);font-family:var(--sans);}
+
+/* ── TOPBAR ── */
+#topbar{
+  height:52px;display:flex;align-items:center;gap:0;padding:0 16px;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  position:relative;z-index:10;flex-shrink:0;
+}
+#logo{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);
+  letter-spacing:.04em;margin-right:20px;flex-shrink:0;}
+#logo span{color:var(--muted);}
+
+#nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;}
+#nav::-webkit-scrollbar{display:none;}
+
+.ntab{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:7px;
+  font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;
+  border:1px solid transparent;background:none;font-family:var(--sans);transition:all .15s;}
+.ntab:hover{color:var(--text2);background:rgba(255,255,255,0.04);}
+.ntab.active{color:var(--text);background:rgba(255,0,110,0.12);border-color:rgba(255,0,110,0.2);}
+.ntab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+.ntab.active .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.ntab .close{margin-left:2px;opacity:0;font-size:14px;line-height:1;color:var(--muted);
+  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;}
+.ntab:hover .close{opacity:1;}
+
+#topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;}
+
+.pill{display:flex;align-items:center;gap:6px;background:var(--card);
+  border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
+.pill label{font-size:10px;color:var(--muted);font-family:var(--mono);
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+.pill input{background:none;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:12px;}
+.pill input::placeholder{color:var(--muted);}
+#ticker-input{width:76px;font-size:13px;font-weight:500;letter-spacing:.05em;}
+#token-input{width:88px;}
+#token-st{font-size:10px;font-family:var(--mono);}
+#token-st.ok{color:var(--pos);}
+#btn-go{background:rgba(255,0,110,0.14);border:1px solid rgba(255,0,110,0.25);
+  color:var(--accent);border-radius:5px;font-size:10px;padding:3px 7px;
+  cursor:pointer;font-family:var(--mono);transition:all .15s;}
+#btn-go:hover{background:rgba(255,0,110,0.24);}
+
+/* ── MAIN ── */
+#main{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+#frame-wrap{flex:1;position:relative;}
+#mod-frame{width:100%;height:100%;border:none;display:block;}
+
+/* ── DROP ZONE ── */
+#dropzone{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;
+  background:var(--bg);z-index:5;
+}
+#dropzone.hidden{display:none;}
+#drop-box{
+  width:440px;max-width:92vw;
+  border:2px dashed rgba(255,0,110,0.3);border-radius:16px;
+  padding:40px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;
+  transition:border-color .2s,background .2s;cursor:pointer;
+  background:rgba(255,0,110,0.03);
+}
+#drop-box.over{border-color:var(--accent);background:rgba(255,0,110,0.07);}
+#drop-icon{font-size:36px;opacity:.5;}
+#drop-title{font-size:16px;font-weight:500;color:var(--text);}
+#drop-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;}
+#file-list{width:440px;max-width:92vw;display:flex;flex-direction:column;gap:6px;}
+.fitem{display:flex;align-items:center;gap:10px;background:var(--card);
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
+.fitem .fname{font-family:var(--mono);font-size:12px;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fitem .fbadge{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:4px;}
+.fitem .fbadge.ok{background:rgba(82,242,201,0.12);color:var(--pos);}
+.fitem .fbadge.wait{background:rgba(255,184,108,0.12);color:var(--warn);}
+#btn-open{
+  background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:10px 28px;font-size:13px;font-weight:500;cursor:pointer;
+  font-family:var(--sans);transition:opacity .15s;opacity:.4;pointer-events:none;
+}
+#btn-open.ready{opacity:1;pointer-events:auto;}
+#btn-open.ready:hover{opacity:.88;}
+#file-input{display:none;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:7px 16px;font-size:12px;font-family:var(--mono);color:var(--text2);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);z-index:100;
+  white-space:nowrap;pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body style="display:flex;flex-direction:column;height:100%;">
+
+<div id="topbar">
+  <div id="logo" onclick="showDropzone()" style="cursor:pointer" title="Добавить модуль">MOEX<span>/</span>toolkit</div>
+  <nav id="nav"></nav>
+    <button class="ntab" id="btn-add" onclick="showDropzone()" title="Добавить модуль" style="color:var(--accent);border-color:rgba(255,0,110,0.2);background:rgba(255,0,110,0.05);flex-shrink:0">＋ модуль</button>
+  <div id="topbar-right">
+    <div class="pill" title="Тикер — передаётся в активный модуль">
+      <label>тикер</label>
+      <input id="ticker-input" type="text" placeholder="SBER…"
+        oninput="this.value=this.value.toUpperCase()"
+        onkeydown="if(event.key==='Enter')sendTicker()">
+      <button id="btn-go" onclick="sendTicker()">→</button>
+    </div>
+    <div class="pill" title="Токен T-Invest — сохраняется и передаётся во все модули">
+      <label>T-токен</label>
+      <input id="token-input" type="password" placeholder="••••••••"
+        oninput="onTokenInput(this.value)">
+      <span id="token-st">—</span>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <!-- DROP ZONE -->
+  <div id="dropzone">
+    <div id="drop-box"
+      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
+      onclick="document.getElementById('file-input').click()">
+      <div id="drop-icon">📂</div>
+      <div id="drop-title">Перетащите файлы модулей сюда</div>
+      <div id="drop-sub">
+        Или нажмите чтобы выбрать файлы<br>
+        
+        <span style="font-size:11px;opacity:.6">Можно добавлять любые HTML-файлы — они появятся в навигации</span>
+      </div>
+    </div>
+    <input id="file-input" type="file" accept=".html" multiple onchange="onFilePick(event)">
+    <div id="file-list"></div>
+    <button id="btn-open" onclick="openFirst()">Открыть</button>
+  </div>
+
+  <!-- IFRAME -->
+  <div id="frame-wrap" style="display:none;">
+    <iframe id="mod-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  СОСТОЯНИЕ
+// ══════════════════════════════════════════════
+const KEY_TOKEN  = 't_api_token';
+const KEY_TICKER = 'shared_ticker';
+
+// Загруженные модули: { name, label, blobUrl }
+let modules = [];
+let activeIdx = -1;
+let currentBlobUrl = null;
+
+// ══════════════════════════════════════════════
+//  ЗАГРУЗКА ФАЙЛОВ
+// ══════════════════════════════════════════════
+function labelFor(name) {
+  if (/v22/i.test(name))           return 'Сканер';
+  if (/indlab/i.test(name))        return 'Индикаторы';
+  if (/долг|nagruzka|debt/i.test(name)) return 'Долг';
+  return name.replace(/\.html?$/i,'');
+}
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    if (!f.name.match(/\.html?$/i)) continue;
+    if (modules.find(m => m.name === f.name)) continue;
+    const reader = new FileReader();
+    reader.onload = e => {
+      // Вставляем патч перед </body>
+      let html = e.target.result;
+      html = html.replace(/<\/body>/i, PATCH + '\n</body>');
+      modules.push({ name: f.name, label: labelFor(f.name), html: html });
+      renderFileList();
+      rebuildNav();
+      if (modules.length === 1) openModule(0);
+    };
+    reader.readAsText(f, 'utf-8');
+  }
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = modules.map(m => `
+    <div class="fitem">
+      <span class="fname">${m.name}</span>
+      <span class="fbadge ok">готов</span>
+    </div>`).join('');
+  const btn = document.getElementById('btn-open');
+  if (modules.length > 0) btn.classList.add('ready');
+}
+
+function onDragOver(e)  { e.preventDefault(); e.currentTarget.classList.add('over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('over'); }
+function onDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('over');
+  addFiles(e.dataTransfer.files);
+}
+function onFilePick(e) { addFiles(e.target.files); }
+function openFirst()   { if (modules.length) openModule(0); }
+
+// ══════════════════════════════════════════════
+//  НАВИГАЦИЯ
+// ══════════════════════════════════════════════
+function rebuildNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = '';
+  modules.forEach((m, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'ntab' + (i === activeIdx ? ' active' : '');
+    btn.innerHTML = `<span class="dot"></span>${m.label}<button class="close" onclick="removeModule(event,${i})">×</button>`;
+    btn.onclick = () => openModule(i);
+    nav.appendChild(btn);
+  });
+}
+
+function showDropzone() {
+  document.getElementById('dropzone').classList.remove('hidden');
+  document.getElementById('frame-wrap').style.display = 'none';
+}
+
+function openModule(idx) {
+  if (idx < 0 || idx >= modules.length) return;
+  activeIdx = idx;
+
+  document.getElementById('dropzone').classList.add('hidden');
+  const fw = document.getElementById('frame-wrap');
+  fw.style.display = 'block';
+
+  const frame = document.getElementById('mod-frame');
+  // Use srcdoc to avoid blob URL + sandbox + localStorage issues
+  frame.removeAttribute('src');
+  frame.srcdoc = modules[idx].html;
+  frame.onload = () => setTimeout(pushState, 300);
+
+  rebuildNav();
+}
+
+function removeModule(e, idx) {
+  e.stopPropagation();
+  modules.splice(idx, 1);
+  if (activeIdx >= modules.length) activeIdx = modules.length - 1;
+  rebuildNav();
+  if (modules.length === 0) {
+    document.getElementById('frame-wrap').style.display = 'none';
+    document.getElementById('dropzone').classList.remove('hidden');
+    document.getElementById('file-list').innerHTML = '';
+    document.getElementById('btn-open').classList.remove('ready');
+  } else {
+    openModule(activeIdx);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  ОБЩЕЕ СОСТОЯНИЕ → iframe
+// ══════════════════════════════════════════════
+function pushState() {
+  const frame = document.getElementById('mod-frame');
+  if (!frame.contentWindow) return;
+  try {
+    frame.contentWindow.postMessage({
+      type:   'SHELL_STATE',
+      token:  localStorage.getItem(KEY_TOKEN)  || '',
+      ticker: localStorage.getItem(KEY_TICKER) || '',
+    }, '*');
+  } catch(e) {}
+}
+
+// When module signals ready, push state immediately
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'MODULE_READY') {
+    setTimeout(pushState, 100);
+  }
+});
+
+function sendTicker() {
+  const v = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!v) return;
+  localStorage.setItem(KEY_TICKER, v);
+  pushState();
+  toast('Тикер ' + v + ' → ' + (modules[activeIdx]?.label || '—'));
+}
+
+function onTokenInput(v) {
+  v = v.trim();
+  const st = document.getElementById('token-st');
+  if (v) {
+    localStorage.setItem(KEY_TOKEN, v);
+    // синхронизируем оба ключа (indlab использует другой)
+    localStorage.setItem('tinkoff_token', v);
+    st.textContent = '✓'; st.className = 'ok';
+    pushState();
+  } else {
+    localStorage.removeItem(KEY_TOKEN);
+    localStorage.removeItem('tinkoff_token');
+    st.textContent = '—'; st.className = '';
+  }
+}
+
+// Принимаем события от модулей
+window.addEventListener('message', e => {
+  const d = e.data;
+  if (!d) return;
+  if (d.type === 'MODULE_EVENT') {
+    if (d.action === 'SET_TICKER' && d.ticker) {
+      const t = String(d.ticker).toUpperCase();
+      document.getElementById('ticker-input').value = t;
+      localStorage.setItem(KEY_TICKER, t);
+      toast('Тикер обновлён: ' + t);
+    }
+    if (d.action === 'SET_TOKEN' && d.token) {
+      onTokenInput(d.token);
+      document.getElementById('token-input').value = '';
+      toast('Токен сохранён');
+    }
+  }
+});
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+let _tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ══════════════════════════════════════════════
+//  ВОССТАНОВЛЕНИЕ ПРИ СТАРТЕ
+// ══════════════════════════════════════════════
+(function init() {
+  const tok    = localStorage.getItem(KEY_TOKEN);
+  const ticker = localStorage.getItem(KEY_TICKER);
+  if (tok)    { document.getElementById('token-st').textContent = '✓';
+                document.getElementById('token-st').className = 'ok'; }
+  if (ticker) { document.getElementById('ticker-input').value = ticker; }
+})();
+
+// ══════════════════════════════════════════════
+//  ПАТЧ — вставляется в каждый модуль автоматически
+// ══════════════════════════════════════════════
+const PATCH = `<script>
+(function(){
+  var KEY = 't_api_token';
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if(!d || d.type !== 'SHELL_STATE') return;
+    if(d.token){
+      localStorage.setItem('t_api_token', d.token);
+      localStorage.setItem('tinkoff_token', d.token);
+      ['tApiToken','chart-token','tApiTokenInput'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(el && !el.value) el.value = d.token;
+      });
+    }
+    if(d.ticker){ setTimeout(function(){ _applyTicker(d.ticker); }, 200); }
+  });
+  function _applyTicker(ticker){
+    var chartInput = document.getElementById('chart-ticker');
+    if(chartInput){
+      chartInput.value = ticker;
+      if(typeof chartLoad === 'function') setTimeout(chartLoad, 300);
+    }
+    var qInput = document.getElementById('qinput');
+    if(qInput){
+      qInput.value = ticker;
+      // selectedQuery must be set before go()
+      if(typeof selectedQuery !== 'undefined') {
+        selectedQuery = ticker;
+        if(typeof selectedOrigQ !== 'undefined') selectedOrigQ = ticker;
+        var btn = document.getElementById('btngo');
+        if(btn) btn.disabled = false;
+      }
+      if(typeof go === 'function') setTimeout(go, 300);
+    }
+  }
+  window.shellNotify = function(action, data){
+    try{ window.parent.postMessage(
+      Object.assign({type:'MODULE_EVENT', action:action}, data), '*'
+    ); }catch(e){}
+  };
+})();
+<\/script>`;
+</script>
+</body>
+</html>
