@@ -279,14 +279,34 @@ function patchHtml(html) {
   return html + '\n' + SHELL_BRIDGE;
 }
 
-// Записываем HTML прямо в iframe через document.write — origin наследуется от shell,
-// поэтому fetch/XHR работают так же как если бы модуль открыли напрямую.
-function writeToFrame(frameEl, html) {
+// Записываем HTML в iframe через document.write.
+// Для больших файлов (>200KB) пишем кусками с микропаузой —
+// иначе браузер может зависнуть или отказаться парсить.
+function writeToFrame(frameEl, html, onDone) {
   frameEl.removeAttribute('src');
   const doc = frameEl.contentDocument || frameEl.contentWindow.document;
+  const CHUNK = 200 * 1024; // 200KB за раз
+  if (html.length <= CHUNK) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+    if (onDone) onDone();
+    return;
+  }
+  // Крупный файл: открываем документ, пишем кусками
   doc.open();
-  doc.write(html);
-  doc.close();
+  let offset = 0;
+  function writeNext() {
+    if (offset >= html.length) {
+      doc.close();
+      if (onDone) onDone();
+      return;
+    }
+    doc.write(html.slice(offset, offset + CHUNK));
+    offset += CHUNK;
+    setTimeout(writeNext, 0);
+  }
+  writeNext();
 }
 
 function addFiles(fileList) {
