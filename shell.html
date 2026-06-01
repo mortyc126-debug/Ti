@@ -203,6 +203,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
         oninput="onTokenInput(this.value)">
       <span id="token-st">—</span>
     </div>
+    <div class="pill" title="URL Cloudflare Worker с D1-базой данных">
+      <label>API</label>
+      <input id="api-url-input" type="text" placeholder="https://bondan-backend…workers.dev"
+        style="width:180px" oninput="onApiUrlInput(this.value)">
+      <span id="api-st">—</span>
+    </div>
   </div>
 </div>
 
@@ -255,8 +261,31 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
 
 <script>
 // ══ СОСТОЯНИЕ ══
-const KEY_TOKEN  = 't_api_token';
-const KEY_TICKER = 'shared_ticker';
+const KEY_TOKEN   = 't_api_token';
+const KEY_TICKER  = 'shared_ticker';
+const KEY_API_URL = 'shell_api_url';
+
+function onApiUrlInput(v) {
+  const url = v.trim().replace(/\/$/, '');
+  if (url) {
+    localStorage.setItem(KEY_API_URL, url);
+    checkApiStatus(url);
+  } else {
+    localStorage.removeItem(KEY_API_URL);
+    document.getElementById('api-st').textContent = '—';
+    document.getElementById('api-st').className = '';
+  }
+}
+
+async function checkApiStatus(url) {
+  const el = document.getElementById('api-st');
+  el.textContent = '…'; el.className = '';
+  try {
+    const r = await fetch((url || localStorage.getItem(KEY_API_URL) || '') + '/status', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) { el.textContent = '✓'; el.className = 'ok'; }
+    else       { el.textContent = r.status; el.className = 'err'; }
+  } catch(e) { el.textContent = '✗'; el.className = 'err'; }
+}
 
 let modules   = [];
 let activeIdx = -1;
@@ -471,6 +500,7 @@ function dbBroadcast(msg, except) {
   dbGetAllFrames().forEach(w => { if (w !== except) try { w.postMessage(msg, '*'); } catch(e){} });
 }
 
+// Читает из localStorage (кеш). Если промахнулись и есть воркер — идёт в D1.
 function dbHandleRead(d, source) {
   let value = null;
   try {
@@ -480,41 +510,79 @@ function dbHandleRead(d, source) {
   try { source.postMessage({ type: 'DB_RESPONSE', reqId: d.reqId, key: d.key, value }, '*'); } catch(e) {}
 }
 
+// Пишет в localStorage и рассылает уведомление всем модулям.
 function dbHandleWrite(d, source) {
   try {
     localStorage.setItem(d.key, typeof d.value === 'string' ? d.value : JSON.stringify(d.value));
   } catch(e) { console.warn('DB_WRITE failed:', e); return; }
-  // Оповещаем все модули кроме источника
   dbBroadcast({ type: 'DB_NOTIFY', key: d.key }, source);
 }
 
-function dbHandleQuery(d, source) {
-  // Структурированные запросы — поиск по reportsDB
+// Структурированные запросы — сначала кеш, потом воркер (D1).
+async function dbHandleQuery(d, source) {
+  const apiUrl = localStorage.getItem(KEY_API_URL);
   let result = null;
-  try {
-    if (d.kind === 'issuer_by_inn' || d.kind === 'issuer_by_name') {
-      const raw = localStorage.getItem('ba_v2');
-      const store = raw ? JSON.parse(raw) : {};
-      const db = store.reportsDB || {};
-      const key = d.kind === 'issuer_by_inn' ? 'inn' : 'name';
-      const val = (d.params || {})[key];
-      if (val) {
-        const entry = Object.entries(db).find(([,v]) =>
-          String(v[key] || '').toLowerCase().includes(String(val).toLowerCase())
-        );
-        result = entry ? { id: entry[0], ...entry[1] } : null;
+
+  // ── Маппинг kind → endpoint воркера ──────────────────────────────
+  const endpointMap = {
+    'issuer':            inn  => `/issuer/${inn}`,
+    'issuer_reports':    inn  => `/issuer/${inn}/reports`,
+    'issuer_bonds':      inn  => `/bond/issuer?inn=${inn}`,
+    'issuer_affiliations': inn => `/issuer/${inn}/affiliations`,
+    'bond_latest':       p    => `/bond/latest?${new URLSearchParams(p)}`,
+    'stock_latest':      p    => `/stock/latest?${new URLSearchParams(p)}`,
+    'issuer_by_inn':     p    => `/issuer/${p.inn}`,
+    'issuer_by_name':    p    => `/issuer/search?name=${encodeURIComponent(p.name)}`,
+    'issuer_list':       ()   => `/bond/latest?limit=2000&board=TQCB`,
+  };
+
+  const p = d.params || {};
+
+  // Попытка через воркер если URL задан
+  if (apiUrl && endpointMap[d.kind]) {
+    try {
+      const path = typeof endpointMap[d.kind] === 'function'
+        ? endpointMap[d.kind](p.inn || p)
+        : endpointMap[d.kind];
+      const resp = await fetch(apiUrl + path, { signal: AbortSignal.timeout(8000) });
+      if (resp.ok) {
+        result = await resp.json();
+        // Кешируем результат в localStorage
+        try { localStorage.setItem('db_cache_' + d.kind + '_' + (p.inn||''), JSON.stringify({ t: Date.now(), v: result })); } catch(_) {}
       }
+    } catch(e) {
+      // Нет сети — берём из кеша
+      try {
+        const cached = JSON.parse(localStorage.getItem('db_cache_' + d.kind + '_' + (p.inn||'')) || 'null');
+        if (cached) result = cached.v;
+      } catch(_) {}
     }
-    if (d.kind === 'issuer_list') {
-      const raw = localStorage.getItem('ba_v2');
-      const store = raw ? JSON.parse(raw) : {};
-      const db = store.reportsDB || {};
-      result = Object.entries(db).map(([id, v]) => ({
-        id, name: v.name, inn: v.inn, ind: v.ind,
-        periods: Object.keys(v.periods || {}).length
-      }));
-    }
-  } catch(e) { result = null; }
+  }
+
+  // Фоллбек: ищем в reportsDB (localStorage) если воркер не настроен
+  if (result === null) {
+    try {
+      const store = JSON.parse(localStorage.getItem('ba_v2') || '{}');
+      const rdb = store.reportsDB || {};
+      if (d.kind === 'issuer_by_inn') {
+        const e = Object.entries(rdb).find(([,v]) => v.inn === p.inn);
+        result = e ? { inn: e[1].inn, name: e[1].name, ind: e[1].ind } : null;
+      } else if (d.kind === 'issuer_by_name') {
+        const e = Object.entries(rdb).find(([,v]) =>
+          (v.name||'').toLowerCase().includes((p.name||'').toLowerCase()));
+        result = e ? { inn: e[1].inn, name: e[1].name, ind: e[1].ind } : null;
+      } else if (d.kind === 'issuer_list') {
+        result = Object.entries(rdb).map(([id,v]) => ({
+          id, name: v.name, inn: v.inn, ind: v.ind,
+          periods: Object.keys(v.periods||{}).length
+        }));
+      } else if (d.kind === 'issuer_reports') {
+        const e = Object.entries(rdb).find(([,v]) => v.inn === p.inn);
+        result = e ? Object.values(e[1].periods||{}) : null;
+      }
+    } catch(_) {}
+  }
+
   try { source.postMessage({ type: 'DB_RESPONSE', reqId: d.reqId, kind: d.kind, value: result }, '*'); } catch(e) {}
 }
 
@@ -717,9 +785,14 @@ function isValidTicker(v) {
 (function init() {
   const tok    = localStorage.getItem(KEY_TOKEN);
   const ticker = localStorage.getItem(KEY_TICKER);
+  const apiUrl = localStorage.getItem(KEY_API_URL);
   if (tok)    { document.getElementById('token-st').textContent = '✓';
                 document.getElementById('token-st').className = 'ok'; }
   if (isValidTicker(ticker)) { document.getElementById('ticker-input').value = ticker; }
+  if (apiUrl) {
+    document.getElementById('api-url-input').value = apiUrl;
+    checkApiStatus(apiUrl);
+  }
 })();
 
 // ══ МОСТ — вставляется в каждый модуль автоматически ══
