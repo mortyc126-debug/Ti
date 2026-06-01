@@ -372,30 +372,34 @@ function openFirst()    { if (modules.length) openModule(0); }
 
 // ══ ВСТРОЕННЫЕ МОДУЛИ (автозагрузка при старте) ══
 const BUILTIN_MODULES = [
-  { file: 'modules/reports-full.html', label: 'Отчётность' },
+  { file: 'modules/reports-full.html', fallback: 'reports-full.html', label: 'Отчётность' },
 ];
 
 function autoLoadBuiltins() {
-  const base = (location.href.replace(/\/[^/]*$/, '/'));
+  const base = location.href.replace(/\/[^/]*$/, '/');
   let pending = BUILTIN_MODULES.length;
   if (!pending) return;
   BUILTIN_MODULES.forEach(function(m) {
-    fetch(base + m.file)
-      .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
-      .then(function(html) {
-        modules.push({ name: m.file, label: m.label, html: patchHtml(html) });
-        rebuildNav();
-        if (modules.length === 1) openModule(0);
-      })
-      .catch(function(e) {
-        console.warn('Builtin load failed:', m.file, e);
-        toast('Папка modules/ не найдена — перетащите ' + m.label + '.html вручную');
+    const urls = [base + m.file];
+    if (m.fallback) urls.push(base + m.fallback);
+    function tryNext(i) {
+      if (i >= urls.length) {
+        toast('Не найден модуль ' + m.label + ' — перетащите файл вручную');
         showDropzone();
-      })
-      .finally(function() {
-        pending--;
-        if (pending === 0) renderFileList();
-      });
+        pending--; if (pending === 0) renderFileList();
+        return;
+      }
+      fetch(urls[i])
+        .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function(html) {
+          modules.push({ name: m.file, label: m.label, html: patchHtml(html) });
+          rebuildNav();
+          if (modules.length === 1) openModule(0);
+          pending--; if (pending === 0) renderFileList();
+        })
+        .catch(function() { tryNext(i + 1); });
+    }
+    tryNext(0);
   });
 }
 
