@@ -206,7 +206,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
   </div>
 
   <div id="frame-wrap" style="display:none;">
-    <iframe id="mod-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+    <iframe id="mod-frame"></iframe>
   </div>
 </div>
 
@@ -237,8 +237,9 @@ function labelFor(name) {
 }
 
 function patchHtml(html) {
-  // Вставляем мост перед </body> — он слушает SHELL_STATE и умеет отвечать MODULE_EVENT
-  return html.replace(/<\/body>/i, SHELL_BRIDGE + '\n</body>');
+  // Вставляем мост: если есть </body> — перед ним, иначе просто в конец
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, SHELL_BRIDGE + '\n</body>');
+  return html + '\n' + SHELL_BRIDGE;
 }
 
 function addFiles(fileList) {
@@ -426,7 +427,7 @@ function openWindow(modIdx, opts) {
       `</div>` +
     `</div>` +
     `<div class="fwin-body">` +
-      `<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>` +
+      `<iframe></iframe>` +
     `</div>` +
     `<div class="fwin-resize"></div>`;
 
