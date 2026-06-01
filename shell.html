@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOEX Toolkit</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0B0613;
+  --panel:   #140A24;
+  --card:    #1A1030;
+  --input:   #0F081A;
+  --accent:  #FF006E;
+  --pos:     #52F2C9;
+  --neg:     #FF4D7A;
+  --warn:    #FFB86C;
+  --text:    #F2F0FF;
+  --text2:   #A79BC9;
+  --muted:   #6F648F;
+  --border:  rgba(255,255,255,0.06);
+  --mono:    'IBM Plex Mono', monospace;
+  --sans:    'Inter', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);font-family:var(--sans);}
+
+/* ── TOPBAR ── */
+#topbar{
+  height:52px;display:flex;align-items:center;gap:0;padding:0 16px;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  position:relative;z-index:200;flex-shrink:0;
+}
+#logo{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);
+  letter-spacing:.04em;margin-right:20px;flex-shrink:0;cursor:pointer;}
+#logo span{color:var(--muted);}
+
+#nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;}
+#nav::-webkit-scrollbar{display:none;}
+
+.ntab{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:7px;
+  font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;
+  border:1px solid transparent;background:none;font-family:var(--sans);transition:all .15s;}
+.ntab:hover{color:var(--text2);background:rgba(255,255,255,0.04);}
+.ntab.active{color:var(--text);background:rgba(255,0,110,0.12);border-color:rgba(255,0,110,0.2);}
+.ntab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+.ntab.active .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.ntab .close{margin-left:2px;opacity:0;font-size:14px;line-height:1;color:var(--muted);
+  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;}
+.ntab:hover .close{opacity:1;}
+.ntab .pop-btn{margin-left:2px;opacity:0;font-size:11px;line-height:1;color:var(--muted);
+  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;
+  title:"Открыть в окне";}
+.ntab:hover .pop-btn{opacity:1;}
+
+#topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;}
+
+.pill{display:flex;align-items:center;gap:6px;background:var(--card);
+  border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
+.pill label{font-size:10px;color:var(--muted);font-family:var(--mono);
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+.pill input{background:none;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:12px;}
+.pill input::placeholder{color:var(--muted);}
+#ticker-input{width:76px;font-size:13px;font-weight:500;letter-spacing:.05em;}
+#token-input{width:88px;}
+#token-st{font-size:10px;font-family:var(--mono);}
+#token-st.ok{color:var(--pos);}
+#btn-go{background:rgba(255,0,110,0.14);border:1px solid rgba(255,0,110,0.25);
+  color:var(--accent);border-radius:5px;font-size:10px;padding:3px 7px;
+  cursor:pointer;font-family:var(--mono);transition:all .15s;}
+#btn-go:hover{background:rgba(255,0,110,0.24);}
+
+/* ── MAIN ── */
+#main{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+#frame-wrap{flex:1;position:relative;}
+#mod-frame{width:100%;height:100%;border:none;display:block;}
+
+/* ── DROP ZONE ── */
+#dropzone{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;
+  background:var(--bg);z-index:5;
+}
+#dropzone.hidden{display:none;}
+#drop-box{
+  width:440px;max-width:92vw;
+  border:2px dashed rgba(255,0,110,0.3);border-radius:16px;
+  padding:40px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;
+  transition:border-color .2s,background .2s;cursor:pointer;
+  background:rgba(255,0,110,0.03);
+}
+#drop-box.over{border-color:var(--accent);background:rgba(255,0,110,0.07);}
+#drop-icon{font-size:36px;opacity:.5;}
+#drop-title{font-size:16px;font-weight:500;color:var(--text);}
+#drop-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;}
+#file-list{width:440px;max-width:92vw;display:flex;flex-direction:column;gap:6px;}
+.fitem{display:flex;align-items:center;gap:10px;background:var(--card);
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
+.fitem .fname{font-family:var(--mono);font-size:12px;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fitem .fbadge{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:4px;}
+.fitem .fbadge.ok{background:rgba(82,242,201,0.12);color:var(--pos);}
+#btn-open{
+  background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:10px 28px;font-size:13px;font-weight:500;cursor:pointer;
+  font-family:var(--sans);transition:opacity .15s;opacity:.4;pointer-events:none;
+}
+#btn-open.ready{opacity:1;pointer-events:auto;}
+#btn-open.ready:hover{opacity:.88;}
+#file-input{display:none;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:7px 16px;font-size:12px;font-family:var(--mono);color:var(--text2);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1);z-index:9999;
+  white-space:nowrap;pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+/* ── FLOATING WINDOWS ── */
+#win-layer{
+  position:fixed;inset:0;top:52px;pointer-events:none;z-index:100;
+}
+.fwin{
+  position:absolute;pointer-events:auto;
+  display:flex;flex-direction:column;
+  background:var(--card);border:1px solid rgba(255,255,255,0.1);
+  border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6);
+  overflow:hidden;min-width:240px;min-height:140px;
+}
+.fwin.focused{border-color:rgba(255,0,110,0.35);box-shadow:0 8px 40px rgba(255,0,110,.15);}
+.fwin-bar{
+  height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  background:var(--panel);cursor:move;user-select:none;flex-shrink:0;
+  border-bottom:1px solid var(--border);
+}
+.fwin-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 5px var(--accent);flex-shrink:0;}
+.fwin-title{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fwin-btns{display:flex;align-items:center;gap:2px;flex-shrink:0;}
+.fwbtn{width:22px;height:22px;border:none;background:none;cursor:pointer;
+  color:var(--muted);border-radius:4px;font-size:12px;display:flex;
+  align-items:center;justify-content:center;transition:all .12s;}
+.fwbtn:hover{background:rgba(255,255,255,0.08);color:var(--text);}
+.fwin-body{flex:1;position:relative;overflow:hidden;}
+.fwin-body iframe{width:100%;height:100%;border:none;display:block;}
+.fwin.micro .fwin-body{display:none;}
+.fwin.micro{height:34px !important;min-height:34px;resize:none;}
+.fwin-resize{
+  position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:se-resize;
+  opacity:0;
+}
+.fwin:hover .fwin-resize{opacity:1;}
+/* резайз-ручка — маленький уголок */
+.fwin-resize::after{
+  content:'';position:absolute;right:3px;bottom:3px;
+  width:8px;height:8px;
+  border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+  border-radius:1px;
+}
+</style>
+</head>
+<body style="display:flex;flex-direction:column;height:100%;">
+
+<div id="topbar">
+  <div id="logo" onclick="showDropzone()" title="Добавить модуль">MOEX<span>/</span>toolkit</div>
+  <nav id="nav"></nav>
+  <button class="ntab" id="btn-add" onclick="showDropzone()"
+    style="color:var(--accent);border-color:rgba(255,0,110,0.2);background:rgba(255,0,110,0.05);flex-shrink:0">
+    ＋ модуль
+  </button>
+  <div id="topbar-right">
+    <div class="pill" title="Тикер — передаётся в активный модуль">
+      <label>тикер</label>
+      <input id="ticker-input" type="text" placeholder="SBER…"
+        oninput="this.value=this.value.toUpperCase()"
+        onkeydown="if(event.key==='Enter')sendTicker()">
+      <button id="btn-go" onclick="sendTicker()">→</button>
+    </div>
+    <div class="pill" title="Токен T-Invest — сохраняется и передаётся во все модули">
+      <label>T-токен</label>
+      <input id="token-input" type="password" placeholder="••••••••"
+        oninput="onTokenInput(this.value)">
+      <span id="token-st">—</span>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="dropzone">
+    <div id="drop-box"
+      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
+      onclick="document.getElementById('file-input').click()">
+      <div id="drop-icon">📂</div>
+      <div id="drop-title">Перетащите файлы модулей сюда</div>
+      <div id="drop-sub">
+        Или нажмите чтобы выбрать файлы<br>
+        <span style="font-size:11px;opacity:.6">HTML-файлы появятся в навигации · кнопка ⧉ открывает модуль в плавающем окне</span>
+      </div>
+    </div>
+    <input id="file-input" type="file" accept=".html" multiple onchange="onFilePick(event)">
+    <div id="file-list"></div>
+    <button id="btn-open" onclick="openFirst()">Открыть</button>
+  </div>
+
+  <div id="frame-wrap" style="display:none;">
+    <iframe id="mod-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+  </div>
+</div>
+
+<!-- слой плавающих окон -->
+<div id="win-layer"></div>
+
+<div id="toast"></div>
+
+<script>
+// ══ СОСТОЯНИЕ ══
+const KEY_TOKEN  = 't_api_token';
+const KEY_TICKER = 'shared_ticker';
+
+let modules   = [];
+let activeIdx = -1;
+
+// ══ ЗАГРУЗКА ФАЙЛОВ ══
+function labelFor(name) {
+  if (/v22/i.test(name))                return 'Сканер';
+  if (/indlab/i.test(name))             return 'Индикаторы';
+  if (/долг|nagruzka|debt/i.test(name)) return 'Долг';
+  if (/bond|облиг/i.test(name))         return 'Облигации';
+  if (/market|рынок/i.test(name))       return 'Рынок';
+  if (/report|отчёт/i.test(name))       return 'Отчётность';
+  if (/portfolio|портфель/i.test(name)) return 'Портфель';
+  if (/monte|карло/i.test(name))        return 'Монте-Карло';
+  return name.replace(/\.html?$/i, '');
+}
+
+function patchHtml(html) {
+  // Вставляем мост перед </body> — он слушает SHELL_STATE и умеет отвечать MODULE_EVENT
+  return html.replace(/<\/body>/i, SHELL_BRIDGE + '\n</body>');
+}
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    if (!f.name.match(/\.html?$/i)) continue;
+    if (modules.find(m => m.name === f.name)) continue;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const html    = patchHtml(e.target.result);
+      const blob    = new Blob([html], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      modules.push({ name: f.name, label: labelFor(f.name), blobUrl, html });
+      renderFileList();
+      rebuildNav();
+      if (modules.length === 1) openModule(0);
+    };
+    reader.readAsText(f, 'utf-8');
+  }
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = modules.map(m => `
+    <div class="fitem">
+      <span class="fname">${m.name}</span>
+      <span class="fbadge ok">готов</span>
+    </div>`).join('');
+  const btn = document.getElementById('btn-open');
+  if (modules.length > 0) btn.classList.add('ready');
+}
+
+function onDragOver(e)  { e.preventDefault(); e.currentTarget.classList.add('over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('over'); }
+function onDrop(e)      { e.preventDefault(); e.currentTarget.classList.remove('over'); addFiles(e.dataTransfer.files); }
+function onFilePick(e)  { addFiles(e.target.files); }
+function openFirst()    { if (modules.length) openModule(0); }
+
+// ══ НАВИГАЦИЯ (вкладки) ══
+function rebuildNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = '';
+  modules.forEach((m, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'ntab' + (i === activeIdx ? ' active' : '');
+    btn.innerHTML =
+      `<span class="dot"></span>` +
+      `<span>${m.label}</span>` +
+      `<button class="pop-btn" title="Открыть в окне" onclick="event.stopPropagation();openWindow(${i})">⧉</button>` +
+      `<button class="close"   title="Закрыть вкладку" onclick="event.stopPropagation();removeModule(${i})">×</button>`;
+    btn.onclick = () => openModule(i);
+    nav.appendChild(btn);
+  });
+}
+
+function showDropzone() {
+  document.getElementById('dropzone').classList.remove('hidden');
+  document.getElementById('frame-wrap').style.display = 'none';
+}
+
+function openModule(idx) {
+  if (idx < 0 || idx >= modules.length) return;
+  activeIdx = idx;
+  document.getElementById('dropzone').classList.add('hidden');
+  const fw = document.getElementById('frame-wrap');
+  fw.style.display = 'block';
+  const frame = document.getElementById('mod-frame');
+  frame.src = modules[idx].blobUrl;
+  frame.onload = () => setTimeout(pushState, 400);
+  rebuildNav();
+}
+
+function removeModule(idx) {
+  if (modules[idx].blobUrl) URL.revokeObjectURL(modules[idx].blobUrl);
+  modules.splice(idx, 1);
+  if (activeIdx >= modules.length) activeIdx = modules.length - 1;
+  rebuildNav();
+  if (modules.length === 0) {
+    document.getElementById('frame-wrap').style.display = 'none';
+    document.getElementById('dropzone').classList.remove('hidden');
+    document.getElementById('file-list').innerHTML = '';
+    document.getElementById('btn-open').classList.remove('ready');
+  } else {
+    openModule(activeIdx);
+  }
+}
+
+// ══ ОБЩЕЕ СОСТОЯНИЕ → iframe ══
+function pushState(frameEl) {
+  const target = frameEl || document.getElementById('mod-frame');
+  if (!target || !target.contentWindow) return;
+  try {
+    target.contentWindow.postMessage({
+      type:   'SHELL_STATE',
+      token:  localStorage.getItem(KEY_TOKEN)  || '',
+      ticker: localStorage.getItem(KEY_TICKER) || '',
+    }, '*');
+  } catch(e) {}
+}
+
+function pushStateToAll() {
+  // рассылаем текущий тикер/токен во все открытые iframe (вкладка + окна)
+  pushState(document.getElementById('mod-frame'));
+  document.querySelectorAll('.fwin iframe').forEach(f => pushState(f));
+}
+
+window.addEventListener('message', e => {
+  const d = e.data;
+  if (!d) return;
+  if (d.type === 'MODULE_READY') { setTimeout(() => pushState(e.source._frameEl), 100); }
+  if (d.type === 'MODULE_EVENT') {
+    if (d.action === 'SET_TICKER' && d.ticker) {
+      const t = String(d.ticker).toUpperCase();
+      document.getElementById('ticker-input').value = t;
+      localStorage.setItem(KEY_TICKER, t);
+      toast('Тикер обновлён: ' + t);
+      pushStateToAll();
+    }
+    if (d.action === 'SET_TOKEN' && d.token) {
+      onTokenInput(d.token);
+      document.getElementById('token-input').value = '';
+      toast('Токен сохранён');
+    }
+  }
+});
+
+function sendTicker() {
+  const v = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!v) return;
+  localStorage.setItem(KEY_TICKER, v);
+  pushStateToAll();
+  toast('Тикер ' + v + ' → все модули');
+}
+
+function onTokenInput(v) {
+  v = v.trim();
+  const st = document.getElementById('token-st');
+  if (v) {
+    localStorage.setItem(KEY_TOKEN, v);
+    localStorage.setItem('tinkoff_token', v);
+    st.textContent = '✓'; st.className = 'ok';
+    pushStateToAll();
+  } else {
+    localStorage.removeItem(KEY_TOKEN);
+    localStorage.removeItem('tinkoff_token');
+    st.textContent = '—'; st.className = '';
+  }
+}
+
+// ══ ПЛАВАЮЩИЕ ОКНА ══
+let _zTop = 10;
+const wins = {};   // id → { el, frameEl, micro }
+
+function openWindow(modIdx, opts) {
+  opts = opts || {};
+  const m = modules[modIdx];
+  if (!m) return;
+  const id  = 'w' + Date.now();
+  const w   = opts.w || 560;
+  const h   = opts.h || 480;
+  const x   = opts.x || (80 + Object.keys(wins).length * 28);
+  const y   = opts.y || (80 + Object.keys(wins).length * 28);
+
+  const el = document.createElement('div');
+  el.className = 'fwin';
+  el.id = id;
+  el.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;z-index:${++_zTop}`;
+
+  el.innerHTML =
+    `<div class="fwin-bar">` +
+      `<div class="fwin-dot"></div>` +
+      `<div class="fwin-title">${m.label}</div>` +
+      `<div class="fwin-btns">` +
+        `<button class="fwbtn" title="Свернуть/развернуть" onclick="toggleMicro('${id}')">▭</button>` +
+        `<button class="fwbtn" title="Дублировать"         onclick="dupWindow('${id}',${modIdx})">⧉</button>` +
+        `<button class="fwbtn" title="Закрыть"             onclick="closeWindow('${id}')">✕</button>` +
+      `</div>` +
+    `</div>` +
+    `<div class="fwin-body">` +
+      `<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>` +
+    `</div>` +
+    `<div class="fwin-resize"></div>`;
+
+  document.getElementById('win-layer').appendChild(el);
+
+  const frameEl = el.querySelector('iframe');
+  frameEl.src = m.blobUrl;
+  frameEl.onload = () => setTimeout(() => pushState(frameEl), 400);
+
+  wins[id] = { el, frameEl, micro: false };
+
+  // фокус при клике
+  el.addEventListener('mousedown', () => focusWindow(id));
+
+  // drag за titlebar
+  makeDraggable(el, el.querySelector('.fwin-bar'));
+
+  // resize за уголок
+  makeResizable(el, el.querySelector('.fwin-resize'));
+
+  focusWindow(id);
+  toast(m.label + ' → окно');
+}
+
+function focusWindow(id) {
+  const w = wins[id];
+  if (!w) return;
+  Object.values(wins).forEach(x => x.el.classList.remove('focused'));
+  w.el.style.zIndex = ++_zTop;
+  w.el.classList.add('focused');
+}
+
+function closeWindow(id) {
+  const w = wins[id];
+  if (!w) return;
+  w.el.remove();
+  delete wins[id];
+}
+
+function toggleMicro(id) {
+  const w = wins[id];
+  if (!w) return;
+  w.micro = !w.micro;
+  w.el.classList.toggle('micro', w.micro);
+  w.el.querySelector('.fwbtn').textContent = w.micro ? '↕' : '▭';
+}
+
+function dupWindow(id, modIdx) {
+  const w = wins[id];
+  if (!w) return;
+  const r = w.el.getBoundingClientRect();
+  openWindow(modIdx, { x: r.left + 28, y: r.top + 28, w: r.width, h: r.height });
+}
+
+// drag
+function makeDraggable(el, handle) {
+  let ox, oy;
+  handle.addEventListener('mousedown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    ox = e.clientX - el.offsetLeft;
+    oy = e.clientY - el.offsetTop;
+    const onMove = e => {
+      el.style.left = Math.max(0, e.clientX - ox) + 'px';
+      el.style.top  = Math.max(0, e.clientY - oy) + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// resize
+function makeResizable(el, handle) {
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX, startY = e.clientY;
+    const startW = el.offsetWidth, startH = el.offsetHeight;
+    const onMove = e => {
+      const nw = Math.max(240, startW + e.clientX - startX);
+      const nh = Math.max(140, startH + e.clientY - startY);
+      el.style.width  = nw + 'px';
+      el.style.height = nh + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// ══ TOAST ══
+let _tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ══ ИНИЦИАЛИЗАЦИЯ ══
+(function init() {
+  const tok    = localStorage.getItem(KEY_TOKEN);
+  const ticker = localStorage.getItem(KEY_TICKER);
+  if (tok)    { document.getElementById('token-st').textContent = '✓';
+                document.getElementById('token-st').className = 'ok'; }
+  if (ticker) { document.getElementById('ticker-input').value = ticker; }
+})();
+
+// ══ МОСТ — вставляется в каждый модуль автоматически ══
+// Слушает SHELL_STATE, пробрасывает токен/тикер в поля модуля.
+// Отвечает MODULE_EVENT когда модуль хочет обновить общий тикер/токен.
+const SHELL_BRIDGE = `<script>
+(function(){
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (!d || d.type !== 'SHELL_STATE') return;
+    if (d.token) {
+      localStorage.setItem('t_api_token', d.token);
+      localStorage.setItem('tinkoff_token', d.token);
+      ['tApiToken','chart-token','tApiTokenInput'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el && !el.value) el.value = d.token;
+      });
+    }
+    if (d.ticker) {
+      setTimeout(function(){ _shellApplyTicker(d.ticker); }, 200);
+    }
+    window.parent.postMessage({ type:'MODULE_READY' }, '*');
+  });
+
+  function _shellApplyTicker(ticker) {
+    var ids = ['chart-ticker','qinput','ticker-input','search-input'];
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.value = ticker;
+    });
+    if (typeof selectedQuery    !== 'undefined') selectedQuery    = ticker;
+    if (typeof selectedOrigQ    !== 'undefined') selectedOrigQ    = ticker;
+    if (typeof chartLoad === 'function') setTimeout(chartLoad, 300);
+    if (typeof go        === 'function') setTimeout(go, 300);
+  }
+
+  // API для модуля: сообщить оболочке о смене тикера/токена
+  window.shellNotify = function(action, data) {
+    try { window.parent.postMessage(Object.assign({ type:'MODULE_EVENT', action:action }, data), '*'); }
+    catch(e) {}
+  };
+})();
+<\/script>`;
+</script>
+</body>
+</html>
