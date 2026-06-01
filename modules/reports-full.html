@@ -27924,14 +27924,17 @@ async function _repD1Load(){
     setLog('Шаг 1/3: каталог ✓ (' + issuers.length + ' эмитентов)');
 
     // 2. Мёрдж эмитентов в reportsDB
+    // ВАЖНО: мутируем объект на месте, не переприсваиваем window.reportsDB —
+    // иначе app.js потеряет ссылку и repRenderIssuerList увидит старые данные
     setBtn('↻ мёрдж…');
     setLog('Шаг 2/3: мёрдж в базу…');
     var added = 0, updated = 0;
+    if(!window.reportsDB) window.reportsDB = {};
+    var rdb = window.reportsDB;
     for(var ci = 0; ci < issuers.length; ci++){
       var ci2 = issuers[ci];
       if(!ci2.inn) continue;
       var existId = null;
-      var rdb = window.reportsDB || (window.reportsDB = {});
       for(var eid in rdb){
         if(rdb[eid] && rdb[eid].inn === ci2.inn){ existId = eid; break; }
       }
@@ -27990,17 +27993,31 @@ async function _repD1Load(){
     }
 
     // 4. Сохранить и перерисовать
-    try{ saveState(); }catch(e){ console.warn('saveState:', e); }
+    var saveErr = null;
+    try {
+      saveState();
+    } catch(e) {
+      saveErr = e;
+      // Fallback: попробовать сохранить напрямую через postMessage к shell
+      try {
+        var snap = JSON.stringify({ reportsDB: window.reportsDB });
+        localStorage.setItem('ba_rep_d1_cache', snap);
+      } catch(e2) {
+        try { window.parent.postMessage({ type: 'DB_WRITE', key: 'ba_rep_d1_cache', value: JSON.stringify({ reportsDB: window.reportsDB }) }, '*'); } catch(e3) {}
+      }
+    }
     repRenderIssuerList();
-    // Итоговый подсчёт базы
+    // Обновить счётчик явно (без фильтра _repFilterApplyDOM не трогает его)
     var rdbFinal = window.reportsDB || {};
     var totalIss = Object.keys(rdbFinal).length;
     var withPeriods = Object.keys(rdbFinal).filter(function(k){ return Object.keys(rdbFinal[k].periods||{}).length > 0; }).length;
-    var summary = added > 0 ? '+' + added + ' эм.' : '';
-    var loadedStr = loaded > 0 ? (summary ? ', ' : '') + '+' + loaded + ' отч.' : '';
-    var statusStr = '✓ ' + (summary + loadedStr || 'без изменений') + ' | база: ' + withPeriods + '/' + totalIss;
-    setBtn('✓ ' + withPeriods + '/' + totalIss + ' с отчётами');
-    setLog(statusStr + (errors ? ' (ошибок: ' + errors + ')' : ''));
+    var cntEl = document.getElementById('rep-sidebar-count');
+    if(cntEl) cntEl.textContent = String(totalIss);
+    var summary = (added > 0 ? '+' + added + ' эм.' : '') + (loaded > 0 ? (added?' ':'') + '+' + loaded + ' отч.' : '') || 'без изменений';
+    setBtn('✓ ' + withPeriods + '/' + totalIss);
+    setLog('Готово: ' + summary + ' | с отчётами: ' + withPeriods + '/' + totalIss +
+      (errors ? ' | ошибок: ' + errors : '') +
+      (saveErr ? ' | ⚠ сохранение: ' + saveErr.message : ''));
     if(btn) btn.disabled = false;
 
   }catch(e){

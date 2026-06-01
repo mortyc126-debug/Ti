@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>БондАналитик · admin</title>
+  <style>
+    :root {
+      --bg: #0a0e14; --bg2: #11161e; --s2: #1a212c;
+      --border: #222a37; --text: #e6edf3; --text2: #9ba3b1; --text3: #5e6573;
+      --acc: #00d4ff; --acc-dim: #0a3a4a;
+      --green: #22d3a0; --warn: #f5a623; --danger: #ff4d6d;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, sans-serif; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 24px; }
+    h1 { font-family: ui-monospace, Menlo, monospace; color: var(--acc); font-size: 20px; margin: 0 0 4px; }
+    .sub { color: var(--text3); font-size: 13px; margin-bottom: 24px; }
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    input[type=text], input[type=password] {
+      width: 100%; background: var(--s2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 12px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 13px;
+    }
+    input:focus { outline: none; border-color: var(--acc); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      background: var(--acc-dim); color: var(--acc); border: 1px solid var(--acc);
+      padding: 9px 16px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace;
+      font-size: 13px; cursor: pointer; font-weight: 600;
+    }
+    button:hover:not(:disabled) { background: var(--acc); color: var(--bg); }
+    button:disabled { opacity: 0.4; cursor: wait; }
+    button.secondary { background: transparent; border-color: var(--border); color: var(--text2); }
+    button.secondary:hover:not(:disabled) { color: var(--text); border-color: var(--text2); background: var(--s2); }
+    .log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; max-height: 320px; overflow-y: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.5; }
+    .log-entry { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+    .log-entry:last-child { border-bottom: 0; }
+    .log-time { color: var(--text3); }
+    .log-ok { color: var(--green); }
+    .log-err { color: var(--danger); }
+    .log-info { color: var(--text2); }
+    pre { white-space: pre-wrap; word-break: break-all; margin: 4px 0 0 0; color: var(--text2); font-size: 11px; }
+    .status-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .stat { background: var(--s2); padding: 10px 12px; border-radius: 6px; }
+    .stat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; }
+    .stat-value { font-family: ui-monospace, Menlo, monospace; font-size: 18px; color: var(--text); margin-top: 2px; }
+    .ver { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: var(--acc-dim); color: var(--acc); margin-left: 8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛠 БондАналитик · admin</h1>
+  <div class="sub">Запуск сборщиков и проверка состояния backend Worker'а вручную.</div>
+
+  <div class="card">
+    <label for="url">Worker URL</label>
+    <input id="url" type="text" value="https://bondan-backend.marginacall.workers.dev">
+    <div style="height:12px"></div>
+    <label for="token">X-Admin-Token <span style="color:var(--text3);text-transform:none;font-size:11px">(хранится в localStorage этого устройства)</span></label>
+    <input id="token" type="password" placeholder="вставь сюда ADMIN_TOKEN из CF Workers Variables">
+  </div>
+
+  <div class="card">
+    <label>Состояние backend</label>
+    <div class="row">
+      <button class="secondary" onclick="checkStatus()">/status</button>
+      <button class="secondary" onclick="checkCatalog()">/catalog (счётчики)</button>
+    </div>
+    <div class="status-row" id="status-box" style="display:none">
+      <div class="stat"><div class="stat-label">Версия</div><div class="stat-value" id="s-ver">—</div></div>
+      <div class="stat"><div class="stat-label">Бумаги в bond_daily</div><div class="stat-value" id="s-bonds">—</div></div>
+      <div class="stat"><div class="stat-label">Эмитенты в issuers</div><div class="stat-value" id="s-iss">—</div></div>
+      <div class="stat"><div class="stat-label">Акции в stock_daily</div><div class="stat-value" id="s-stocks">—</div></div>
+      <div class="stat"><div class="stat-label">Бумаги с ИНН (сегодня)</div><div class="stat-value" id="s-binn">—</div></div>
+      <div class="stat"><div class="stat-label">Отчёты (issuer_reports)</div><div class="stat-value" id="s-rep">—</div></div>
+      <div class="stat"><div class="stat-label">Эмитентов с отчётностью</div><div class="stat-value" id="s-repiss">—</div></div>
+      <div class="stat"><div class="stat-label">В очереди ГИР БО</div><div class="stat-value" id="s-q">—</div></div>
+      <div class="stat"><div class="stat-label">ЕГРЮЛ-связей (рёбер)</div><div class="stat-value" id="s-aff">—</div></div>
+      <div class="stat"><div class="stat-label">Эмитентов в ЕГРЮЛ</div><div class="stat-value" id="s-affc">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Сбор данных (требует X-Admin-Token)</label>
+    <div class="row">
+      <button onclick="run('/collect/bonds')">📄 Облигации (TQCB+TQOB+TQIR+TQOD+TQOY+TQED)</button>
+      <button onclick="run('/collect/stock')">📈 Акции (TQBR)</button>
+      <button onclick="run('/collect/futures')">🔮 Фьючерсы (FORTS)</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button onclick="run('/collect/issuers')">🏢 Справочник · стр. 0-24</button>
+      <button class="secondary" onclick="run('/collect/issuers?start_page=25&max_pages=25')">🏢 Справочник · стр. 25-49</button>
+      <button class="secondary" onclick="run('/collect/issuers?start_page=50&max_pages=25')">🏢 Справочник · стр. 50-74</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button onclick="run('/collect/reports?limit=15&only_traded=1')">📊 Отчётность · 15 (торгуемые)</button>
+      <button onclick="run('/collect/reports?limit=15&only_traded=1&force=1')">♻️ Force · 15 (перепрогон новой версии парсера)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=15')">📊 · 15 (все ИНН)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=30&only_traded=1&max_ms=280000')">📊 · 30 (paid plan)</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button onclick="run('/collect/reports?limit=10&only_traded=1&include_ai=1&ai_budget=3')">🤖 Grok-fallback · 10 (3 AI)</button>
+      <button class="secondary" onclick="run('/collect/reports?limit=20&only_traded=1&include_ai=1&ai_budget=8&max_ms=280000')">🤖 · 20 / 8 AI (paid)</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button onclick="run('/collect/affiliations?limit=20&zachbiz_budget=10')">🔗 ЕГРЮЛ + zachBiz · 20 (10 zb)</button>
+      <button class="secondary" onclick="run('/collect/affiliations?limit=30&zachbiz=0')">🔗 · 30 (только DaData)</button>
+      <button class="secondary" onclick="run('/collect/affiliations?limit=20&only_traded=0&only_missing=1')">🔗 · цепочка вверх (только новые)</button>
+    </div>
+    <div class="sub" style="margin-top:12px">
+      Порядок при первом запуске: <b>облигации → акции → справочник → отчётность</b>.
+      Справочник тянет MOEX bulk и заполняет <code>emitent_inn</code> в bond_daily.
+      На free tier один прогон забирает 25 страниц = ~2500 эмитентов; для остатка
+      жми вторую/третью кнопку («стр. 25-49»…) — пройдём всю базу за 3 клика.<br>
+      <b>Отчётность</b> идёт каскадом <b>buxbalans.ru → ГИР БО → Grok</b>. buxbalans
+      первый: один HTTP-запрос отдаёт сразу всю историю с 2011 года, и CF к нему
+      ходит без блока. ГИР БО запускается только если buxbalans дал год старее
+      ожидаемого (т.е. ФНС обогнала скрейпер). Старые отчёты в БД не блокируют
+      поиск новых: после 1 апреля система ждёт от каждого ИНН год тек.−1 и снова
+      идёт в источники, если его нет.<br>
+      «<b>торгуемые</b>» — фильтр по эмитентам с активными бумагами в bond_daily;
+      такие имеют приоритет в очереди и для них включается Grok-fallback (только если
+      <code>include_ai=1</code> + есть <code>XAI_API_KEY</code>). Бюджет AI на прогон —
+      <code>ai_budget</code> (default 5).
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Лог</label>
+    <div class="log" id="log"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="secondary" onclick="document.getElementById('log').innerHTML=''">Очистить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const tokenEl = document.getElementById('token');
+const urlEl   = document.getElementById('url');
+tokenEl.value = localStorage.getItem('bondan_admin_token') || '';
+urlEl.value   = localStorage.getItem('bondan_url') || urlEl.value;
+tokenEl.addEventListener('change', () => localStorage.setItem('bondan_admin_token', tokenEl.value));
+urlEl  .addEventListener('change', () => localStorage.setItem('bondan_url',         urlEl.value));
+
+function logEntry(level, label, body){
+  const t = new Date().toLocaleTimeString('ru');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  const cls = level === 'ok' ? 'log-ok' : level === 'err' ? 'log-err' : 'log-info';
+  el.innerHTML = `<span class="log-time">${t}</span> <span class="${cls}">${label}</span>` +
+                 (body ? `<pre>${escape(body)}</pre>` : '');
+  const log = document.getElementById('log');
+  log.insertBefore(el, log.firstChild);
+}
+function escape(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function postWithRetry(url, opts, retries){
+  if(retries == null) retries = 2;
+  let lastErr = null;
+  for(let attempt = 0; attempt <= retries; attempt++){
+    try {
+      const r = await fetch(url, opts);
+      if((r.status === 503 || r.status === 502) && attempt < retries){
+        lastErr = new Error('HTTP ' + r.status + ' (retry ' + (attempt+1) + ')');
+        await new Promise(res => setTimeout(res, 1500 * (attempt + 1)));
+        continue;
+      }
+      return r;
+    } catch(e){
+      if(attempt < retries){
+        lastErr = e;
+        await new Promise(res => setTimeout(res, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error('исчерпаны попытки');
+}
+
+async function run(path){
+  const url   = urlEl.value.replace(/\/+$/, '');
+  const token = tokenEl.value.trim();
+  if(!token){ logEntry('err', 'Нет токена', 'Вставь X-Admin-Token в поле выше.'); return; }
+  logEntry('info', `POST ${path} …`, '');
+  const btns = document.querySelectorAll('button'); btns.forEach(b => b.disabled = true);
+  try {
+    const r = await postWithRetry(url + path, {
+      method: 'POST',
+      headers: { 'X-Admin-Token': token },
+    }, 2);
+    const text = await r.text();
+    let body = text;
+    try { body = JSON.stringify(JSON.parse(text), null, 2); } catch(_){}
+    if(r.ok) logEntry('ok',  `POST ${path} → ${r.status}`, body);
+    else     logEntry('err', `POST ${path} → ${r.status}`, body);
+  } catch(e){
+    logEntry('err', `POST ${path} → network (после 3 попыток)`, e.message);
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+async function checkStatus(){
+  const url = urlEl.value.replace(/\/+$/, '');
+  logEntry('info', `GET /status …`, '');
+  try {
+    const r = await postWithRetry(url + '/status', { method: 'GET' }, 2);
+    const j = await r.json();
+    const box = document.getElementById('status-box');
+    box.style.display = 'grid';
+    document.getElementById('s-ver').innerHTML    = `<span class="ver">${j.version || '?'}</span>`;
+    document.getElementById('s-bonds').textContent = (j.db?.bond_daily_rows ?? '—').toLocaleString('ru');
+    document.getElementById('s-iss').textContent   = (j.db?.issuers_count   ?? 0).toLocaleString('ru');
+    document.getElementById('s-stocks').textContent= (j.db?.stock_daily_rows?? 0).toLocaleString('ru');
+    document.getElementById('s-binn').textContent  = (j.db?.bonds_with_inn_today ?? 0).toLocaleString('ru');
+    document.getElementById('s-rep').textContent   = (j.db?.reports_rows ?? 0).toLocaleString('ru');
+    document.getElementById('s-repiss').textContent= (j.db?.reports_issuers_covered ?? 0).toLocaleString('ru');
+    document.getElementById('s-q').textContent     = (j.db?.reports_queue_pending ?? 0).toLocaleString('ru');
+    document.getElementById('s-aff').textContent   = (j.db?.affiliations_edges ?? 0).toLocaleString('ru');
+    document.getElementById('s-affc').textContent  = (j.db?.affiliations_children ?? 0).toLocaleString('ru');
+    logEntry('ok', `GET /status → 200`, JSON.stringify(j, null, 2));
+  } catch(e){
+    logEntry('err', `GET /status`, e.message);
+  }
+}
+
+async function checkCatalog(){
+  const url = urlEl.value.replace(/\/+$/, '');
+  logEntry('info', `GET /catalog …`, '');
+  try {
+    const r = await postWithRetry(url + '/catalog', { method: 'GET' }, 2);
+    const j = await r.json();
+    const c = j.counts || {};
+    logEntry('ok', `GET /catalog → ${r.status}`,
+      `Эмитентов: ${c.issuers ?? '?'}\nОблигаций: ${c.bonds ?? '?'}\nАкций: ${c.stocks ?? '?'}\nСгенерирован: ${j.generatedAt || '?'}`);
+  } catch(e){
+    logEntry('err', `GET /catalog`, e.message);
+  }
+}
+
+checkStatus();
+</script>
+</body>
+</html>
