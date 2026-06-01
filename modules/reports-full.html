@@ -2460,7 +2460,10 @@ html,body{overflow:auto!important}
     focus:function(){}, click:function(){}, select:function(){},
     appendChild:function(){return this;}, querySelector:function(){return null;},
     querySelectorAll:function(){return [];}, closest:function(){return null;},
-    getBoundingClientRect:function(){return {top:0,left:0,width:0,height:0};}
+    getBoundingClientRect:function(){return {top:0,left:0,width:0,height:0};},
+    contains:function(){return false;},
+    matches:function(){return false;},
+    dispatchEvent:function(){return false;}
   };
   document.getElementById = function(id){ return _orig(id) || _dummy; };
 })();
