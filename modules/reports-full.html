@@ -27930,6 +27930,14 @@ function risksClearDrill(){
 }
 
 
+// Принудительно показываем только страницу отчётности
+// (переопределяем ПОСЛЕ app.js, чтобы заглушить _restoreActivePage)
+showPage = function(n){
+  document.querySelectorAll('.page').forEach(function(p){ p.style.display = 'none'; });
+  var rp = document.getElementById('page-reports');
+  if(rp) rp.style.display = '';
+};
+
 // Запуск модуля отчётности
 try { loadState(); } catch(e) { console.warn('loadState:', e); }
 try { repInit(); } catch(e) { console.error('repInit:', e); }
