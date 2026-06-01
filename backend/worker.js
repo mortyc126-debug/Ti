@@ -1785,6 +1785,17 @@ async function collectAffiliations(env, url){
       succeeded++;
     } catch(e){
       errors.push({ inn, error: (e.message || String(e)).slice(0, 200) });
+      // «не найден в ЕГРЮЛ» — ИНН не существует; пишем сентинел-строку чтобы
+      // следующий прогон не выбирал его снова (LEFT JOIN WHERE IS NULL не совпадёт).
+      if(/не найден в ЕГРЮЛ|not found in egrul/i.test(e.message)){
+        try {
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO issuer_affiliations
+              (child_inn, parent_inn, parent_name, share_pct, role, parent_kind, source, fetched_at)
+            VALUES (?, '', NULL, NULL, 'not_in_egrul', NULL, 'dadata_404', ?)
+          `).bind(inn, now).run();
+        } catch(_){}
+      }
     }
   }
 
