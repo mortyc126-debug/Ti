@@ -453,13 +453,84 @@ function closePanel(side) {
   doc.open(); doc.write(''); doc.close();
 }
 
+// ══ ШИНА ДАННЫХ ══
+// Shell — единственный владелец localStorage. Модули читают/пишут через него.
+// Это гарантирует консистентность и позволяет рассылать уведомления всем.
+
+function dbGetAllFrames() {
+  const frames = [];
+  const mf = document.getElementById('mod-frame');
+  if (mf && mf.contentWindow) frames.push(mf.contentWindow);
+  document.querySelectorAll('.fwin iframe, .side-frame').forEach(f => {
+    if (f.contentWindow) frames.push(f.contentWindow);
+  });
+  return frames;
+}
+
+function dbBroadcast(msg, except) {
+  dbGetAllFrames().forEach(w => { if (w !== except) try { w.postMessage(msg, '*'); } catch(e){} });
+}
+
+function dbHandleRead(d, source) {
+  let value = null;
+  try {
+    const raw = localStorage.getItem(d.key);
+    value = raw ? JSON.parse(raw) : null;
+  } catch(e) { value = localStorage.getItem(d.key); }
+  try { source.postMessage({ type: 'DB_RESPONSE', reqId: d.reqId, key: d.key, value }, '*'); } catch(e) {}
+}
+
+function dbHandleWrite(d, source) {
+  try {
+    localStorage.setItem(d.key, typeof d.value === 'string' ? d.value : JSON.stringify(d.value));
+  } catch(e) { console.warn('DB_WRITE failed:', e); return; }
+  // Оповещаем все модули кроме источника
+  dbBroadcast({ type: 'DB_NOTIFY', key: d.key }, source);
+}
+
+function dbHandleQuery(d, source) {
+  // Структурированные запросы — поиск по reportsDB
+  let result = null;
+  try {
+    if (d.kind === 'issuer_by_inn' || d.kind === 'issuer_by_name') {
+      const raw = localStorage.getItem('ba_v2');
+      const store = raw ? JSON.parse(raw) : {};
+      const db = store.reportsDB || {};
+      const key = d.kind === 'issuer_by_inn' ? 'inn' : 'name';
+      const val = (d.params || {})[key];
+      if (val) {
+        const entry = Object.entries(db).find(([,v]) =>
+          String(v[key] || '').toLowerCase().includes(String(val).toLowerCase())
+        );
+        result = entry ? { id: entry[0], ...entry[1] } : null;
+      }
+    }
+    if (d.kind === 'issuer_list') {
+      const raw = localStorage.getItem('ba_v2');
+      const store = raw ? JSON.parse(raw) : {};
+      const db = store.reportsDB || {};
+      result = Object.entries(db).map(([id, v]) => ({
+        id, name: v.name, inn: v.inn, ind: v.ind,
+        periods: Object.keys(v.periods || {}).length
+      }));
+    }
+  } catch(e) { result = null; }
+  try { source.postMessage({ type: 'DB_RESPONSE', reqId: d.reqId, kind: d.kind, value: result }, '*'); } catch(e) {}
+}
+
 window.addEventListener('message', e => {
   const d = e.data;
   if (!d) return;
+
+  // Шина данных
+  if (d.type === 'DB_READ')  { dbHandleRead(d, e.source);  return; }
+  if (d.type === 'DB_WRITE') { dbHandleWrite(d, e.source); return; }
+  if (d.type === 'DB_QUERY') { dbHandleQuery(d, e.source); return; }
+
   if (d.type === 'MODULE_EVENT') {
     if (d.action === 'SET_TICKER' && d.ticker) {
       const t = String(d.ticker).trim().toUpperCase();
-      if (!isValidTicker(t)) return; // игнорируем названия компаний
+      if (!isValidTicker(t)) return;
       document.getElementById('ticker-input').value = t;
       localStorage.setItem(KEY_TICKER, t);
       toast('Тикер: ' + t);
@@ -693,6 +764,61 @@ const SHELL_BRIDGE = `<script>
     try { window.parent.postMessage(Object.assign({ type:'MODULE_EVENT', action:action }, data), '*'); }
     catch(e) {}
   };
+
+  // ══ window.db — единая шина данных ══
+  // Все обращения идут через shell (parent), который владеет localStorage.
+  // Это гарантирует что данные одинаковые во всех модулях одновременно.
+  (function(){
+    var _pending = {};  // reqId → {resolve, reject}
+    var _subs    = {};  // key → [callback, ...]
+    var _reqSeq  = 1;
+
+    window.addEventListener('message', function(e) {
+      var d = e.data;
+      if (!d) return;
+      if (d.type === 'DB_RESPONSE' && d.reqId && _pending[d.reqId]) {
+        _pending[d.reqId].resolve(d.value);
+        delete _pending[d.reqId];
+      }
+      if (d.type === 'DB_NOTIFY' && d.key && _subs[d.key]) {
+        _subs[d.key].forEach(function(cb){ try { cb(d.key); } catch(e){} });
+      }
+    });
+
+    function send(msg) {
+      return new Promise(function(resolve, reject) {
+        if (!msg.reqId) { window.parent.postMessage(msg, '*'); resolve(null); return; }
+        _pending[msg.reqId] = { resolve: resolve, reject: reject };
+        setTimeout(function(){ if(_pending[msg.reqId]){ delete _pending[msg.reqId]; reject('timeout'); }}, 5000);
+        window.parent.postMessage(msg, '*');
+      });
+    }
+
+    window.db = {
+      // Прочитать ключ localStorage (возвращает Promise)
+      get: function(key) {
+        return send({ type: 'DB_READ', reqId: 'r' + _reqSeq++, key: key });
+      },
+      // Записать ключ (данные попадут во все модули через DB_NOTIFY)
+      set: function(key, value) {
+        return send({ type: 'DB_WRITE', key: key, value: value });
+      },
+      // Структурированный запрос: kind = 'issuer_by_inn' | 'issuer_by_name' | 'issuer_list'
+      query: function(kind, params) {
+        return send({ type: 'DB_QUERY', reqId: 'q' + _reqSeq++, kind: kind, params: params || {} });
+      },
+      // Подписаться на изменения ключа
+      on: function(key, cb) {
+        if (!_subs[key]) _subs[key] = [];
+        _subs[key].push(cb);
+      },
+      // Отписаться
+      off: function(key, cb) {
+        if (!_subs[key]) return;
+        _subs[key] = _subs[key].filter(function(f){ return f !== cb; });
+      },
+    };
+  })();
 
   // Перехват буфера обмена — если скопировали тикер или ISIN, шлём в shell
   document.addEventListener('copy', function() {
