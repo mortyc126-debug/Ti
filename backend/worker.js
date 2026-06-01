@@ -96,10 +96,18 @@ export default {
         // /issuer/:inn               — карточка
         // /issuer/:inn/reports        — годовые РСБУ-показатели
         // /issuer/:inn/affiliations   — учредители + руководитель из ЕГРЮЛ
-        if(url.pathname.endsWith('/reports'))      return await handleIssuerReports(env, url);
+        if(url.pathname.endsWith('/reports')){
+          if(req.method === 'POST') return await handleSaveIssuerReports(env, req, url);
+          return await handleIssuerReports(env, url);
+        }
         if(url.pathname.endsWith('/affiliations')) return await handleIssuerAffiliations(env, url);
+        if(req.method === 'PUT') return await handleUpsertIssuer(env, req, url);
         return await handleIssuerCard(env, url);
       }
+
+      // Bulk-пуш всего reportsDB из модуля (без токена — данные пользователя)
+      if(req.method === 'POST' && url.pathname === '/sync/push')
+        return await handleSyncPush(env, req);
 
       if(req.method === 'POST'){
         // Все POST-эндпоинты требуют X-Admin-Token (используют квоту Cerebras
@@ -3409,4 +3417,170 @@ function parseFuturesPage(resp){
     });
   }
   return out;
+}
+
+// ── Запись отчётности из модуля ───────────────────────────────────────
+// POST /issuer/:inn/reports
+// Body: [{fy_year, period, std, rev, ebitda, ebit, np, int_exp, tax_exp,
+//         assets, ca, cl, debt, cash, ret, eq, source?}]
+// Без токена — данные приходят от пользователя (ручной импорт / ГИРБО).
+async function handleSaveIssuerReports(env, req, url){
+  const m = url.pathname.match(/^\/issuer\/(\d{10,12})\/reports$/);
+  if(!m) return errResp('inn required', 400);
+  const inn = m[1];
+  let rows;
+  try { rows = await req.json(); } catch(e){ return errResp('invalid JSON', 400); }
+  if(!Array.isArray(rows) || !rows.length) return errResp('expected non-empty array', 400);
+
+  const now = new Date().toISOString();
+  let inserted = 0, updated = 0;
+  for(const r of rows){
+    const fy = parseInt(r.fy_year);
+    if(!fy) continue;
+    const period = r.period || 'FY';
+    const std    = r.std    || 'РСБУ';
+    const n = v => (v === undefined || v === null || v === '') ? null : Number(v);
+    const roa = (n(r.np) != null && n(r.assets)) ? n(r.np)/n(r.assets)*100 : null;
+    const ros = (n(r.np) != null && n(r.rev))    ? n(r.np)/n(r.rev)*100    : null;
+    const em  = (n(r.ebitda) != null && n(r.rev)) ? n(r.ebitda)/n(r.rev)*100 : null;
+    const nde = (n(r.debt) != null && n(r.cash) != null && n(r.eq)) ?
+                (n(r.debt)-n(r.cash))/n(r.eq) : null;
+    try {
+      const res = await env.DB.prepare(`
+        INSERT INTO issuer_reports
+          (inn, fy_year, period, std, rev, ebitda, ebit, np, int_exp, tax_exp,
+           assets, ca, cl, debt, cash, ret, eq,
+           roa_pct, ros_pct, ebitda_marg, net_debt_eq, source, fetched_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(inn, fy_year, period, std) DO UPDATE SET
+          rev=excluded.rev, ebitda=excluded.ebitda, ebit=excluded.ebit,
+          np=excluded.np, int_exp=excluded.int_exp, tax_exp=excluded.tax_exp,
+          assets=excluded.assets, ca=excluded.ca, cl=excluded.cl,
+          debt=excluded.debt, cash=excluded.cash, ret=excluded.ret, eq=excluded.eq,
+          roa_pct=excluded.roa_pct, ros_pct=excluded.ros_pct,
+          ebitda_marg=excluded.ebitda_marg, net_debt_eq=excluded.net_debt_eq,
+          source=excluded.source, fetched_at=excluded.fetched_at
+      `).bind(
+        inn, fy, period, std,
+        n(r.rev), n(r.ebitda), n(r.ebit), n(r.np), n(r.int_exp||r.int), n(r.tax_exp||r.tax),
+        n(r.assets), n(r.ca), n(r.cl), n(r.debt), n(r.cash), n(r.ret), n(r.eq),
+        roa, ros, em, nde,
+        r.source || 'user', now
+      ).run();
+      if(res.changes > 0) inserted++;
+      else updated++;
+    } catch(e){ console.error('insert report row', inn, fy, e.message); }
+  }
+  return jsonResp({ ok: true, inn, inserted, updated });
+}
+
+// PUT /issuer/:inn
+// Body: {name, short_name?, ticker?, sector?, okved?, inn?, ...}
+async function handleUpsertIssuer(env, req, url){
+  const m = url.pathname.match(/^\/issuer\/(\d{10,12})$/);
+  if(!m) return errResp('inn required', 400);
+  const inn = m[1];
+  let body;
+  try { body = await req.json(); } catch(e){ return errResp('invalid JSON', 400); }
+  if(!body.name) return errResp('name required', 400);
+  const now = new Date().toISOString();
+  await env.DB.prepare(`
+    INSERT INTO issuers (inn, name, short_name, ticker, sector, okved, source, updated_at)
+    VALUES (?,?,?,?,?,?,?,?)
+    ON CONFLICT(inn) DO UPDATE SET
+      name=excluded.name,
+      short_name=COALESCE(excluded.short_name, issuers.short_name),
+      ticker=COALESCE(excluded.ticker, issuers.ticker),
+      sector=COALESCE(excluded.sector, issuers.sector),
+      okved=COALESCE(excluded.okved, issuers.okved),
+      source=CASE WHEN excluded.source='user' THEN excluded.source ELSE issuers.source END,
+      updated_at=excluded.updated_at
+  `).bind(
+    inn, body.name, body.short_name||null, body.ticker||null,
+    body.sector||null, body.okved||null, 'user', now
+  ).run();
+  return jsonResp({ ok: true, inn });
+}
+
+// POST /sync/push
+// Body: {reportsDB: {...}} — весь reportsDB из localStorage.
+// Проходит по всем эмитентам и периодам, пишет в D1.
+// Возвращает статистику: сколько эмитентов/периодов записано.
+async function handleSyncPush(env, req){
+  let body;
+  try { body = await req.json(); } catch(e){ return errResp('invalid JSON', 400); }
+  const rdb = body.reportsDB;
+  if(!rdb || typeof rdb !== 'object') return errResp('reportsDB required', 400);
+
+  const now = new Date().toISOString();
+  let issuersOk = 0, periodsOk = 0, errors = 0;
+
+  for(const [id, iss] of Object.entries(rdb)){
+    const inn = iss.inn;
+    if(!inn || !/^\d{10,12}$/.test(inn)) continue;
+
+    // Эмитент
+    try {
+      await env.DB.prepare(`
+        INSERT INTO issuers (inn, name, short_name, sector, source, updated_at)
+        VALUES (?,?,?,?,?,?)
+        ON CONFLICT(inn) DO UPDATE SET
+          name=excluded.name,
+          short_name=COALESCE(issuers.short_name, excluded.short_name),
+          sector=COALESCE(issuers.sector, excluded.sector),
+          updated_at=excluded.updated_at
+      `).bind(inn, iss.name||id, iss.name||null, iss.ind||null, 'user', now).run();
+      issuersOk++;
+    } catch(e){ errors++; }
+
+    // Периоды
+    const periods = iss.periods || {};
+    for(const [, p] of Object.entries(periods)){
+      const fy = parseInt(p.year);
+      if(!fy) continue;
+      // Маппинг period из reportsDB → D1 period enum
+      const periodMap = {'Год':'FY','9М':'9M','Полугодие':'H1','1 квартал':'Q1','3 квартал':'Q3'};
+      const period = periodMap[p.period] || 'FY';
+      const std    = p.type || 'РСБУ';
+      const n = v => (v===undefined||v===null||v==='') ? null : Number(v);
+      const roa = (n(p.np)!=null && n(p.assets)) ? n(p.np)/n(p.assets)*100 : null;
+      const ros = (n(p.np)!=null && n(p.rev))    ? n(p.np)/n(p.rev)*100    : null;
+      const em  = (n(p.ebitda)!=null && n(p.rev)) ? n(p.ebitda)/n(p.rev)*100 : null;
+      const nde = (n(p.debt)!=null && n(p.cash)!=null && n(p.eq)) ?
+                  (n(p.debt)-n(p.cash))/n(p.eq) : null;
+      try {
+        await env.DB.prepare(`
+          INSERT INTO issuer_reports
+            (inn, fy_year, period, std, rev, ebitda, ebit, np, int_exp, tax_exp,
+             assets, ca, cl, debt, cash, ret, eq,
+             roa_pct, ros_pct, ebitda_marg, net_debt_eq, source, fetched_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          ON CONFLICT(inn, fy_year, period, std) DO UPDATE SET
+            rev=COALESCE(excluded.rev, issuer_reports.rev),
+            ebitda=COALESCE(excluded.ebitda, issuer_reports.ebitda),
+            ebit=COALESCE(excluded.ebit, issuer_reports.ebit),
+            np=COALESCE(excluded.np, issuer_reports.np),
+            int_exp=COALESCE(excluded.int_exp, issuer_reports.int_exp),
+            tax_exp=COALESCE(excluded.tax_exp, issuer_reports.tax_exp),
+            assets=COALESCE(excluded.assets, issuer_reports.assets),
+            ca=COALESCE(excluded.ca, issuer_reports.ca),
+            cl=COALESCE(excluded.cl, issuer_reports.cl),
+            debt=COALESCE(excluded.debt, issuer_reports.debt),
+            cash=COALESCE(excluded.cash, issuer_reports.cash),
+            ret=COALESCE(excluded.ret, issuer_reports.ret),
+            eq=COALESCE(excluded.eq, issuer_reports.eq),
+            roa_pct=excluded.roa_pct, ros_pct=excluded.ros_pct,
+            ebitda_marg=excluded.ebitda_marg, net_debt_eq=excluded.net_debt_eq,
+            fetched_at=excluded.fetched_at
+        `).bind(
+          inn, fy, period, std,
+          n(p.rev), n(p.ebitda), n(p.ebit), n(p.np), n(p.int), n(p.tax),
+          n(p.assets), n(p.ca), n(p.cl), n(p.debt), n(p.cash), n(p.ret), n(p.eq),
+          roa, ros, em, nde, 'user', now
+        ).run();
+        periodsOk++;
+      } catch(e){ errors++; }
+    }
+  }
+  return jsonResp({ ok: true, issuers: issuersOk, periods: periodsOk, errors });
 }

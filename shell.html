@@ -791,9 +791,34 @@ function isValidTicker(v) {
   if (isValidTicker(ticker)) { document.getElementById('ticker-input').value = ticker; }
   if (apiUrl) {
     document.getElementById('api-url-input').value = apiUrl;
-    checkApiStatus(apiUrl);
+    checkApiStatus(apiUrl).then(() => syncPushToD1(apiUrl));
   }
 })();
+
+// При старте пушим накопленный reportsDB в D1 — молча, в фоне.
+// Повторные запуски безопасны: ON CONFLICT DO UPDATE не затирает D1-данные
+// если пользовательское значение null, а D1 уже знает.
+async function syncPushToD1(apiUrl) {
+  try {
+    const raw = localStorage.getItem('ba_v2');
+    if (!raw) return;
+    const store = JSON.parse(raw);
+    const rdb = store.reportsDB;
+    if (!rdb || !Object.keys(rdb).length) return;
+    const r = await fetch(apiUrl + '/sync/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportsDB: rdb }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (r.ok) {
+      const res = await r.json();
+      console.log('[shell] sync/push →', res);
+      if (res.issuers || res.periods)
+        toast(`Синхронизировано с D1: ${res.issuers} эмитентов, ${res.periods} периодов`);
+    }
+  } catch(e) { console.warn('[shell] sync/push failed:', e.message); }
+}
 
 // ══ МОСТ — вставляется в каждый модуль автоматически ══
 // Слушает SHELL_STATE, пробрасывает токен/тикер в поля модуля.
