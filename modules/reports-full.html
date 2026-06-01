@@ -3,253 +3,109 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>База отчётности — БондАналитик</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<title>База отчётности</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
-<style>
+
 :root{
-  --bg:#06080a;--s1:#0c1014;--s2:#111820;--s3:#162030;
-  --border:#1e3048;--border2:#2a4060;
-  --acc:#00d4ff;--acc2:#0099cc;--acc-dim:rgba(0,212,255,.08);
-  --green:#22d3a0;--green-dim:rgba(34,211,160,.08);
-  --warn:#f5a623;--danger:#ff4d6d;--danger-dim:rgba(255,77,109,.08);
+  --bg:#0B0613;
+  --s1:#140A24;
+  --s2:#1A1030;
+  --s3:#1f1438;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(255,255,255,0.12);
+  --acc:#FF006E;
+  --acc2:#cc0058;
+  --acc-dim:rgba(255,0,110,0.08);
+  --green:#52F2C9;
+  --green-dim:rgba(82,242,201,0.08);
+  --warn:#FFB86C;
+  --danger:#FF4D7A;
+  --danger-dim:rgba(255,77,109,0.08);
   --purple:#a78bfa;
-  --text:#cce4f0;--text2:#7aa0b8;--text3:#3a6080;
-  --mono:'JetBrains Mono','Fira Mono','Cascadia Code','Consolas','Courier New',Courier,monospace;
-  --serif:'Cormorant Garamond','Palatino Linotype','Book Antiqua',Palatino,Georgia,serif;
+  --pos:#52F2C9;
+  --neg:#FF4D7A;
+  --text:#F2F0FF;
+  --text1:#F2F0FF;
+  --text2:#A79BC9;
+  --text3:#6F648F;
+  --mono:'IBM Plex Mono','JetBrains Mono',monospace;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --sans:'Inter',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--text);font-family:var(--mono);display:flex;flex-direction:column}
-body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03)2px,rgba(0,0,0,.03)3px);pointer-events:none;z-index:9999}
-
-/* TOPBAR */
-.topbar{display:flex;align-items:center;height:44px;border-bottom:1px solid var(--border);background:var(--s1);flex-shrink:0}
-.logo{padding:0 20px;font-family:var(--serif);font-size:1.3rem;color:var(--acc);border-right:1px solid var(--border);height:100%;display:flex;align-items:center;white-space:nowrap}
-.logo span{color:var(--text2);font-size:.9rem}
-.nav{display:flex;height:100%}
-.nav-btn{background:none;border:none;border-right:1px solid var(--border);color:var(--text2);font-family:var(--mono);font-size:.67rem;letter-spacing:.08em;text-transform:uppercase;padding:0 16px;cursor:pointer;transition:all .15s;white-space:nowrap;position:relative}
-.nav-btn:hover{color:var(--acc);background:var(--acc-dim)}
-.nav-btn.active{color:var(--acc);background:var(--acc-dim)}
-.nav-btn.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--acc)}
-.nav-btn.nav-sep{border-left:2px solid var(--border2)}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 14px}
-.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pdot 2s infinite}
-@keyframes pdot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,211,160,.4)}50%{opacity:.7;box-shadow:0 0 0 5px transparent}}
-.ks-badge{font-size:.62rem;color:var(--text2);border:1px solid var(--border2);padding:3px 10px}
-
-/* LAYOUT */
-.main{display:flex;flex:1;overflow:hidden}
-.sidebar{width:214px;border-right:1px solid var(--border);background:var(--s1);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
-.content{flex:1;overflow-y:auto;overflow-x:hidden}
-
-/* SIDEBAR */
-.sb-sec{padding:8px 0}
-.sb-lbl{font-size:.54rem;letter-spacing:.15em;text-transform:uppercase;color:var(--text3);padding:6px 14px 3px}
-.sb-item{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:.69rem;color:var(--text2);transition:all .15s;border-left:2px solid transparent}
-.sb-item:hover{color:var(--text);background:var(--s2);border-left-color:var(--border2)}
-.sb-item.active{color:var(--acc);background:var(--acc-dim);border-left-color:var(--acc)}
-.sb-icon{width:14px;text-align:center;font-size:.75rem}
-.sb-badge{margin-left:auto;font-size:.54rem;background:var(--border);padding:1px 5px;color:var(--text3)}
-.sb-div{height:1px;background:var(--border);margin:4px 0}
-.sb-list-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sb-add{display:flex;align-items:center;gap:6px;padding:6px 14px;cursor:pointer;font-size:.64rem;color:var(--text3);transition:all .15s}
-.sb-add:hover{color:var(--acc)}
-
-/* PAGES */
-.page{display:none;padding:20px 24px;min-height:100%}
-.page.active{display:block}
-.page-title{font-family:var(--serif);font-size:1.55rem;color:var(--acc);margin-bottom:3px}
-.page-sub{font-size:.61rem;color:var(--text2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:18px}
-
-/* CARDS */
-.card{background:var(--s1);border:1px solid var(--border);margin-bottom:14px}
-.card-hdr{padding:9px 15px;border-bottom:1px solid var(--border);font-size:.59rem;letter-spacing:.11em;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;gap:8px}
-.card-body{padding:15px}
-
-/* BUTTONS */
-.btn{background:none;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);font-size:.65rem;letter-spacing:.07em;text-transform:uppercase;padding:7px 13px;cursor:pointer;transition:all .15s}
-.btn:hover{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
-.btn-p{background:var(--acc);color:var(--bg);border-color:var(--acc);font-weight:600}
-.btn-p:hover{background:#00bbee;color:var(--bg)}
-.btn-d{border-color:var(--danger);color:var(--danger)}
-.btn-d:hover{background:var(--danger-dim)}
-.btn-sm{padding:4px 8px;font-size:.59rem}
-
-/* FIELDS */
-.field label{display:block;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
-.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.79rem;padding:7px 10px;outline:none;transition:border-color .2s;resize:vertical}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--acc)}
-.field select option{background:var(--s1)}
-.field textarea{min-height:54px}
-.gap-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
-
-/* TABLES */
-.tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:.72rem}
-thead tr{border-bottom:1px solid var(--border)}
-th{padding:9px 11px;font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:400;text-align:left;white-space:nowrap}
-td{padding:9px 11px;border-bottom:1px solid rgba(30,48,72,.5);vertical-align:middle}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:var(--s2)}
-.tr-best td:first-child{border-left:2px solid var(--green)}
-
-/* TAGS */
-.tag{display:inline-block;font-size:.55rem;padding:2px 6px;letter-spacing:.05em}
-.tag-ofz{background:rgba(96,165,250,.12);color:#60a5fa;border:1px solid rgba(96,165,250,.2)}
-.tag-corp{background:rgba(167,139,250,.12);color:var(--purple);border:1px solid rgba(167,139,250,.2)}
-.tag-muni{background:rgba(34,211,160,.12);color:var(--green);border:1px solid rgba(34,211,160,.2)}
-.ct-fix{color:var(--acc2);border:1px solid var(--acc2)}
-.ct-float{color:var(--warn);border:1px solid var(--warn)}
-.ct-zero{color:var(--purple);border:1px solid var(--purple)}
-
-/* VALUES */
-.val-pos{color:var(--green)}.val-neg{color:var(--danger)}.val-neu{color:var(--warn)}
-.val-big{font-size:.93rem;font-weight:600}
-
-/* SCORE BAR */
-.score-bar{width:70px;height:3px;background:var(--border)}
-.score-fill{height:100%;transition:width .5s}
-.score-hi{background:var(--green)}.score-md{background:var(--warn)}.score-lo{background:var(--danger)}
-
-/* STAT CARDS */
-.stat-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.stat-card{background:var(--s1);border:1px solid var(--border);padding:12px 16px;flex:1;min-width:110px}
-.sc-lbl{font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
-.sc-val{font-size:1.25rem;font-weight:600}
-.sc-sub{font-size:.59rem;color:var(--text2);margin-top:2px}
-
-/* METER */
-.meter{height:7px;background:var(--border);overflow:hidden;margin:5px 0}
-.meter-fill{height:100%;transition:width .6s}
-
-/* SCENARIO STRIP */
-.strip{display:flex;align-items:center;gap:12px;padding:9px 15px;background:var(--s2);border:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
-.strip label{font-size:.59rem;letter-spacing:.09em;text-transform:uppercase;color:var(--text2)}
-.strip input[type=range]{accent-color:var(--acc);width:130px}
-.rate-badge{font-size:.7rem;font-weight:600;color:var(--warn);min-width:36px}
-
-/* PTABS */
-.ptabs{display:flex;gap:1px;border-bottom:1px solid var(--border);margin-bottom:0}
-.ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);font-family:var(--mono);font-size:.63rem;letter-spacing:.07em;text-transform:uppercase;padding:8px 15px;cursor:pointer;transition:all .15s;margin-bottom:-1px}
-.ptab:hover{color:var(--text)}
-.ptab.active{color:var(--acc);border-bottom-color:var(--acc)}
-.ptab-c{display:none;padding-top:16px}.ptab-c.active{display:block}
-
-/* VERDICT BADGE */
-.v-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;font-size:.67rem;font-weight:600;letter-spacing:.06em}
-.vb-s{background:var(--green-dim);border:1px solid var(--green);color:var(--green)}
-.vb-w{background:rgba(245,166,35,.1);border:1px solid var(--warn);color:var(--warn)}
-.vb-d{background:var(--danger-dim);border:1px solid var(--danger);color:var(--danger)}
-
-/* BREAKEVEN */
-.be-track{position:relative;height:26px;background:var(--bg);border:1px solid var(--border);margin:7px 0;overflow:hidden}
-.be-dz{position:absolute;top:0;bottom:0;background:rgba(255,77,109,.1)}
-.be-sz{position:absolute;top:0;bottom:0;background:rgba(34,211,160,.07)}
-.be-ln{position:absolute;top:0;bottom:0;width:1px}
-.be-buy{background:var(--acc2)}.be-be{background:var(--warn)}.be-sell{background:var(--green)}
-.be-labels{display:flex;justify-content:space-between;font-size:.57rem;color:var(--text3);margin-top:2px}
-.be-legend{display:flex;gap:14px;margin-top:5px;flex-wrap:wrap}
-.be-leg{display:flex;align-items:center;gap:5px;font-size:.59rem;color:var(--text2)}
-.be-leg-line{width:12px;height:2px}
-
-/* AI PANEL */
-.ai-panel{background:linear-gradient(135deg,rgba(0,212,255,.04),rgba(167,139,250,.04));border:1px solid rgba(0,212,255,.2);padding:15px;position:relative;overflow:hidden}
-.ai-panel::before{content:'AI';position:absolute;top:8px;right:12px;font-size:.54rem;letter-spacing:.15em;color:rgba(0,212,255,.25)}
-.ai-text{font-size:.73rem;line-height:1.75;color:var(--text)}
-.ai-loading{display:flex;align-items:center;gap:10px;color:var(--text2);font-size:.71rem}
-.ai-spin{width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-/* DATA SEARCH PANEL */
-.search-panel{background:linear-gradient(135deg,rgba(0,212,255,.03),rgba(167,139,250,.03));border:1px solid rgba(0,212,255,.18);padding:14px 15px;margin-bottom:14px;position:relative}
-.search-panel::before{content:'ПОИСК ДАННЫХ';position:absolute;top:8px;right:12px;font-size:.49rem;letter-spacing:.2em;color:rgba(0,212,255,.2)}
-.sp-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
-.sp-title{font-size:.57rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin-bottom:10px}
-.sp-status{font-size:.64rem;color:var(--text2);line-height:1.7;max-height:220px;overflow-y:auto}
-.sp-status .sp-found{color:var(--green)}.sp-status .sp-partial{color:var(--warn)}.sp-status .sp-miss{color:var(--text3)}
-.sp-field-btn{background:none;border:1px solid var(--border);color:var(--text3);font-family:var(--mono);font-size:.52rem;padding:2px 6px;cursor:pointer;transition:all .12s;white-space:nowrap;margin-left:2px;vertical-align:middle}
-.sp-field-btn:hover{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
-.sp-field-btn.loading{border-color:var(--warn);color:var(--warn)}
-.sp-field-btn.found{border-color:var(--green);color:var(--green)}
-.field-wrap{position:relative;display:flex;align-items:center;gap:0}
-.field-wrap .field{flex:1;margin:0}
-.field-wrap .sp-field-btn{flex-shrink:0;height:32px;margin-top:auto;margin-bottom:0;align-self:flex-end}
-
-/* EMPTY */
-.empty{text-align:center;padding:44px 20px;color:var(--text3)}
-.empty .ei{font-size:1.7rem;margin-bottom:9px;opacity:.4}
-.empty p{font-size:.71rem;line-height:1.6}
-
-/* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center}
-.modal-overlay.open{display:flex}
-.modal{background:var(--s1);border:1px solid var(--border2);width:440px;max-width:95vw;max-height:90vh;overflow-y:auto}
-.modal-hdr{padding:13px 17px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
-.modal-body{padding:17px}
-.modal-ftr{padding:11px 17px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
-.modal-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:1rem}
-.modal-x:hover{color:var(--danger)}
-
-/* SCROLLBAR */
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:var(--s1)}
-::-webkit-scrollbar-thumb{background:var(--border2)}
-
-/* CAL FILTER */
-.cal-flt.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
-.rep-view-btn.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
-.rep-tf-btn.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc)}
-
-@media(max-width:800px){.sidebar{display:none}.g3,.g4{grid-template-columns:1fr 1fr}}
-/* Плавающее меню синхронизации/экспорта — всегда видно в правом
-   нижнем углу на любом экране. Нужно, потому что на телефоне
-   кнопки ⚡Sync/⬇️/⬆️ в правой части топбара уезжают за экран
-   (topbar flex-row без wrap). */
-.fab{position:fixed;right:16px;bottom:16px;z-index:2000;display:flex;flex-direction:column-reverse;align-items:flex-end;gap:8px;pointer-events:none}
-.fab>*{pointer-events:auto}
-.fab-btn{width:46px;height:46px;border-radius:50%;border:1px solid var(--border2);background:var(--acc);color:#000;font-size:1.15rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);font-weight:600}
-.fab-btn:hover{transform:scale(1.05)}
-.fab-items{display:none;flex-direction:column;gap:6px;align-items:flex-end}
-.fab.open .fab-items{display:flex}
-.fab-item{padding:8px 14px;background:var(--s1);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;border-radius:22px;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;min-width:140px;text-align:left}
-.fab-item:hover{background:var(--s2);border-color:var(--acc)}
-
-/* Досье эмитента — модалка с вкладками */
-.dossier-tab-btn{background:none;color:var(--text2);cursor:pointer}
-.dossier-tab-btn:hover{color:var(--text)}
-.dossier-tab-btn.active{color:var(--acc);border-bottom-color:var(--acc)!important}
-.dossier-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
-@media(max-width:700px){.dossier-grid{grid-template-columns:1fr}}
-.dossier-field{display:flex;flex-direction:column;gap:3px}
-.dossier-field>span{font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;gap:4px}
-.dossier-field input,.dossier-field select,.dossier-field textarea{
-  width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
-  font-family:var(--mono);font-size:.74rem;padding:6px 9px;outline:none;transition:border-color .2s;
-}
-.dossier-field input:focus,.dossier-field select:focus,.dossier-field textarea:focus{border-color:var(--acc)}
-.dossier-hint{cursor:help;opacity:.55;font-size:.65rem;transition:opacity .15s}
-.dossier-hint:hover{opacity:1}
-.dossier-issue-card{border:1px solid var(--border);background:var(--s2);padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s}
-.dossier-issue-card:hover{border-color:var(--acc);background:var(--s3)}
-.dossier-fin-row{display:grid;grid-template-columns:1.6fr .7fr .8fr 1fr;gap:10px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:.66rem;align-items:center}
-.dossier-fin-row.hdr{font-size:.54rem;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border2)}
-.dossier-fin-sec{font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:10px 0 4px;padding-left:8px;border-left:2px solid var(--acc)}
-.dossier-pill{display:inline-block;padding:1px 8px;font-size:.56rem;letter-spacing:.05em;border-radius:10px;font-weight:600}
-.dossier-pill.ok{background:rgba(34,211,160,.14);color:var(--green)}
-.dossier-pill.warn{background:rgba(245,166,35,.14);color:var(--warn)}
-.dossier-pill.err{background:rgba(255,77,109,.14);color:var(--danger)}
-.dossier-pill.nd{background:var(--border);color:var(--text3)}
-
-html,body{overflow:auto!important}
-.page{display:none}
+html,body{overflow:auto!important;background:var(--bg);color:var(--text2);font-family:var(--mono)}
+.page{display:none;padding:16px 20px}
 #page-reports{display:block!important}
+
+/* Кнопки */
+.btn{background:none;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);
+  font-size:.65rem;padding:4px 10px;cursor:pointer;border-radius:2px;transition:all .15s;letter-spacing:.04em}
+.btn:hover{color:var(--text);border-color:var(--acc);background:var(--acc-dim)}
+.btn-sm{font-size:.6rem;padding:3px 8px}
+.btn-p,.btn-primary{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
+.btn-p:hover,.btn-primary:hover{background:var(--acc);color:#fff}
+.btn-d,.btn-danger{border-color:var(--danger);color:var(--danger)}
+.btn-d:hover,.btn-danger:hover{background:var(--danger-dim)}
+.btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
+
+/* Текст */
+.page-title{font-family:var(--serif);font-size:1.4rem;color:var(--acc);margin-bottom:2px}
+.page-sub{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+
+/* Инпуты */
+input,select,textarea{
+  background:var(--s2);border:1px solid var(--border2);color:var(--text);
+  font-family:var(--mono);font-size:.65rem;padding:4px 8px;outline:none;border-radius:2px}
+input:focus,select:focus{border-color:var(--acc)}
+input::placeholder{color:var(--text3)}
+select option{background:var(--s1)}
+
+/* Таблицы */
+table{width:100%;border-collapse:collapse;font-size:.65rem}
+th{color:var(--text3);font-weight:500;text-align:left;padding:4px 8px;
+  border-bottom:1px solid var(--border2);letter-spacing:.06em;text-transform:uppercase;font-size:.57rem}
+td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+tr:hover td{background:var(--s2);color:var(--text)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* Карточки/секции */
+.rep-card,.card{background:var(--s1);border:1px solid var(--border);padding:12px 16px;margin-bottom:10px}
+.section-title,.rep-sec-title{font-size:.57rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--acc);margin:12px 0 6px;padding-left:8px;border-left:2px solid var(--acc)}
+
+/* Лейблы/пиллы */
+.badge,.pill-label{font-size:.54rem;padding:1px 6px;border-radius:2px;background:var(--border2);color:var(--text3)}
+.badge.ok,.pill-label.ok{background:var(--green-dim);color:var(--green)}
+.badge.err,.pill-label.err{background:var(--danger-dim);color:var(--danger)}
+.badge.warn,.pill-label.warn{background:rgba(255,184,108,.1);color:var(--warn)}
+
+/* Sidebar эмитентов */
+.rep-sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--border);
+  background:var(--s1);overflow-y:auto;max-height:calc(100vh - 120px)}
+.rep-issuer-item{padding:7px 12px;cursor:pointer;font-size:.65rem;color:var(--text2);
+  border-left:2px solid transparent;transition:all .12s}
+.rep-issuer-item:hover{color:var(--text);background:var(--s2);border-left-color:var(--border2)}
+.rep-issuer-item.active{color:var(--acc);background:var(--acc-dim);border-left-color:var(--acc)}
+
+/* Модалки */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal-box{background:var(--s1);border:1px solid var(--border2);padding:20px;min-width:360px;max-width:90vw;max-height:90vh;overflow-y:auto}
+.modal-title{font-family:var(--serif);font-size:1.1rem;color:var(--acc);margin-bottom:14px}
+
+/* Прочее */
+.text-muted{color:var(--text3)}
+.text-acc{color:var(--acc)}
+.text-green{color:var(--green)}
+.text-danger{color:var(--danger)}
+.text-warn{color:var(--warn)}
+.flex{display:flex}.gap-6{gap:6px}.gap-10{gap:10px}.flex-wrap{flex-wrap:wrap}
+.mt-8{margin-top:8px}.mb-8{margin-bottom:8px}
+.rep-tf-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
+
 </style>
 </head>
-<body style="overflow:auto">
+<body>
 
 <div style="display:none">
   <span id="sb-rep">0</span>
@@ -261,10 +117,15 @@ html,body{overflow:auto!important}
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-    <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую.">🧹 Удалить пустые периоды</button>
-    <button class="btn btn-sm" onclick="repDiagnoseInn()" title="Запросить отчётность с buxbalans и ГИР БО по ИНН и показать что найдено — годы, ОКВЭД, название. Полезно когда bulk не обновляет конкретного эмитента и надо понять где ломается.">🔍 Диагностика по ИНН</button>
+    <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую.">Удалить пустые периоды</button>
+    <button class="btn btn-sm" onclick="repDiagnoseInn()" title="Запросить отчётность с buxbalans и ГИР БО по ИНН и показать что найдено — годы, ОКВЭД, название. Полезно когда bulk не обновляет конкретного эмитента и надо понять где ломается.">Диагностика по ИНН</button>
+<div style="display:flex;gap:6px;align-items:center;margin-top:8px;margin-bottom:4px">
+  <input id="rep-inn-search-input" type="text" placeholder="ИНН или название для диагностики..."
+    style="flex:1;max-width:320px" onkeydown="if(event.key==='Enter')repDiagnoseInn()">
+  <button class="btn btn-sm" onclick="repDiagnoseInn()">Диагностика</button>
+</div>
     
-    <button class="btn btn-sm" onclick="repImportAffiliatedFromClipboard()" title="Импорт списка аффилированных лиц из буфера обмена. Формат: JSON из расширения БондАналитик (кнопка «📦 Распаковать список аффилированных» на странице e-disclosure в разделе type=6). PDF распаковывается в памяти, парсится, извлекаются юрлица с ИНН. Сам PDF не сохраняется, в базе оседает только структурированный список.">📇 Импорт аффилированных</button>
+    <button class="btn btn-sm" onclick="repImportAffiliatedFromClipboard()" title="Импорт списка аффилированных лиц из буфера обмена. Формат: JSON из расширения БондАналитик (кнопка «📦 Распаковать список аффилированных» на странице e-disclosure в разделе type=6). PDF распаковывается в памяти, парсится, извлекаются юрлица с ИНН. Сам PDF не сохраняется, в базе оседает только структурированный список.">Импорт аффилированных</button>
   </div>
 
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
@@ -338,17 +199,17 @@ html,body{overflow:auto!important}
     <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип">✎ Редактировать период</button>
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
-    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8">📥 ГИРБО</button>
+    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8">ГИРБО</button>
     <button class="btn btn-sm" onclick="openAuditItImportModal()" title="Импорт данных audit-it.ru — вставить HTML страницы компании (Ctrl+U → Ctrl+A → Ctrl+C) либо JSON от bookmarklet. До 11 лет РСБУ за один импорт.">📗 audit-it HTML</button>
-    <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут">🔗 Объединить</button>
-    <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">🔍 Аудит данных</button>
+    <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут">Объединить</button>
+    <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">Аудит данных</button>
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
-    <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов.">📥 Импорт эмитента</button>
+    <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов.">Импорт эмитента</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
-      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств.">📇 Досье</button>
+      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств.">Досье</button>
       <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие">✎ Редактировать</button>
-      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">⬇️ Экспорт эмитента</button>
+      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">Экспорт эмитента</button>
       <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
     </div>
   </div>
@@ -379,7 +240,7 @@ html,body{overflow:auto!important}
       <button class="btn btn-sm rep-view-btn active" id="rep-vb-cards" onclick="repSetView('cards',this)">▦ Показатели</button>
       <button class="btn btn-sm rep-view-btn" id="rep-vb-text" onclick="repSetView('text',this)">≡ Резюме</button>
       <button class="btn btn-sm rep-view-btn" id="rep-vb-chart" onclick="repSetView('chart',this)">📈 Динамика</button>
-      <button class="btn btn-sm rep-view-btn" id="rep-vb-analysis" onclick="repSetView('analysis',this)" style="border-color:var(--acc);color:var(--acc)">📊 Анализ</button>
+      <button class="btn btn-sm rep-view-btn" id="rep-vb-analysis" onclick="repSetView('analysis',this)" style="border-color:var(--acc);color:var(--acc)">Анализ</button>
       <span style="margin-left:12px;font-size:.59rem;color:var(--text3)" id="rep-period-meta"></span>
     </div>
 
@@ -445,7 +306,7 @@ html,body{overflow:auto!important}
           <div class="field" style="flex:1;min-width:180px"><label>ISIN (опц.)</label>
             <input id="rep-ni-isin" placeholder="RU000A10EAC6" style="text-transform:uppercase">
           </div>
-          <button class="btn btn-sm" type="button" onclick="repNiFetchMoex()" title="Подтянуть ИНН/ОГРН по ISIN из MOEX">🔍 С MOEX</button>
+          <button class="btn btn-sm" type="button" onclick="repNiFetchMoex()" title="Подтянуть ИНН/ОГРН по ISIN из MOEX">С MOEX</button>
         </div>
         <div class="g2">
           <div class="field"><label>ИНН</label><input id="rep-ni-inn" placeholder="7736050003" inputmode="numeric"></div>
@@ -516,10 +377,10 @@ html,body{overflow:auto!important}
         <div id="rep-np-ref-wrap" style="display:none;margin-top:8px;padding:8px;background:var(--s1);border:1px solid var(--border)">
           <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">⚖️ Сверка с эталоном</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru">📋 Импорт JSON</button>
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru">Импорт JSON</button>
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
             <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
-            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН как эталон для сверки (не сохраняется в периоды, только отображается)">📊 buxbalans (сверка)</button>
+            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН как эталон для сверки (не сохраняется в периоды, только отображается)">buxbalans (сверка)</button>
             <button type="button" class="btn btn-sm" onclick="repUpdateBuxBalansForActive()" title="Подтянуть данные с buxbalans.ru по ИНН активного эмитента и ДОПИСАТЬ недостающие годы как периоды в базу. Существующие периоды не перезаписываются — только добавляются новые.">🔄 buxbalans (дописать)</button>
             <button type="button" class="btn btn-sm" onclick="repUpdateGirboForActive()" title="Подтянуть данные с ГИР БО (ФНС, bo.nalog.gov.ru) по ИНН и дописать недостающие годы. buxbalans и ГИР БО — «рваная» система: то что есть у одного, часто отсутствует у другого. Прогоняй оба последовательно.">📡 ГИР БО (дописать)</button>
             <button type="button" class="btn btn-sm" onclick="repOpenAuditItForInn()" title="Открыть страницу audit-it.ru по ИНН — 2015-2025, глубже ГИР БО. Цифры копируются в форму периода вручную (серверный парсинг audit-it блокирует anti-bot'ом).">📗 audit-it</button>
@@ -528,7 +389,7 @@ html,body{overflow:auto!important}
             <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
             <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)">📤 Все</button>
             <input type="file" id="rep-np-refs-bulk-file" accept=".json,application/json" style="display:none" onchange="repImportAllRefs(this)">
-            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-refs-bulk-file').click()" title="Импортировать коллекцию эталонов из файла (результат repExportAllRefs)">📥 Все</button>
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-refs-bulk-file').click()" title="Импортировать коллекцию эталонов из файла (результат repExportAllRefs)">Все</button>
             <button type="button" class="btn btn-sm" onclick="repClearReference()" title="Очистить импортированный эталон">✗</button>
           </div>
           <div id="rep-np-ref-result" style="font-size:.62rem;color:var(--text2);line-height:1.7"></div>
@@ -536,7 +397,7 @@ html,body{overflow:auto!important}
         <div id="rep-np-raw-wrap" style="display:none;margin-top:8px">
           <div id="rep-np-tools-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button type="button" class="btn btn-sm" onclick="repToggleRawText()" id="rep-np-raw-btn">📄 Показать распознанный текст</button>
-            <button type="button" class="btn btn-sm" onclick="repCopyRawText()" title="Скопировать в буфер — можно прислать для отладки">📋 Скопировать</button>
+            <button type="button" class="btn btn-sm" onclick="repCopyRawText()" title="Скопировать в буфер — можно прислать для отладки">Скопировать</button>
             <button type="button" class="btn btn-sm" onclick="repOpenPicker()" title="Кликать по числам в распознанном тексте и раскидывать их по полям вручную">🎯 Ручной подбор</button>
           </div>
           <textarea id="rep-np-raw-text" readonly style="display:none;width:100%;margin-top:6px;min-height:150px;max-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:8px;white-space:pre"></textarea>
@@ -588,7 +449,7 @@ html,body{overflow:auto!important}
            Работает только для годовых РСБУ (других у ФНС нет). -->
       <div id="rep-np-girbo-wrap" style="display:none;margin-top:10px;border:1px solid var(--border2);padding:8px 10px;background:var(--bg)">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-          <strong style="font-size:.62rem;letter-spacing:.05em">🔍 Сверка с ГИР БО (ФНС)</strong>
+          <strong style="font-size:.62rem;letter-spacing:.05em">Сверка с ГИР БО (ФНС)</strong>
           <span id="rep-np-girbo-status" style="font-size:.58rem;color:var(--text3);flex:1"></span>
           <button type="button" class="btn btn-sm" onclick="_repGirboHide()" style="font-size:.55rem;padding:2px 6px">✗ Закрыть</button>
         </div>
@@ -597,7 +458,7 @@ html,body{overflow:auto!important}
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-period')">Отмена</button>
-      <button class="btn" onclick="repVerifyGirbo()" title="Сверить каждое поле с официальной РСБУ-строкой из ГИР БО по ИНН эмитента. Единственный в приложении способ проверить введённые цифры на соответствие реальности (а не только на внутреннюю логику).">🔍 Сверить с ГИР БО</button>
+      <button class="btn" onclick="repVerifyGirbo()" title="Сверить каждое поле с официальной РСБУ-строкой из ГИР БО по ИНН эмитента. Единственный в приложении способ проверить введённые цифры на соответствие реальности (а не только на внутреннюю логику).">Сверить с ГИР БО</button>
       <button class="btn btn-p" onclick="repSavePeriod()">💾 Сохранить</button>
     </div>
   </div>
@@ -606,7 +467,7 @@ html,body{overflow:auto!important}
 <!-- Field lookup menu: маленькая модалка с выбором источника -->
 <div class="modal-overlay" id="modal-field-lookup">
   <div class="modal" style="width:380px;max-width:96vw">
-    <div class="modal-hdr">🔍 Найти: <span id="fl-field-label" style="color:var(--acc)"></span><button class="modal-x" onclick="closeModal('modal-field-lookup')">✕</button></div>
+    <div class="modal-hdr">Найти: <span id="fl-field-label" style="color:var(--acc)"></span><button class="modal-x" onclick="closeModal('modal-field-lookup')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:8px">
       <button type="button" class="btn" style="text-align:left" onclick="flRunAiSearch()">🤖 AI-поиск (интернет)</button>
       <button type="button" class="btn" style="text-align:left" onclick="flLoadPdf()">📂 Ручной подбор из PDF</button>
@@ -638,7 +499,7 @@ html,body{overflow:auto!important}
 <!-- Audit modal: проверка логических нестыковок в reportsDB -->
 <div class="modal-overlay" id="modal-rep-audit">
   <div class="modal" style="width:820px;max-width:96vw">
-    <div class="modal-hdr">🔍 Аудит данных <button class="modal-x" onclick="closeModal('modal-rep-audit')">✕</button></div>
+    <div class="modal-hdr">Аудит данных <button class="modal-x" onclick="closeModal('modal-rep-audit')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto">
       <div id="rep-audit-summary" style="font-size:.65rem;color:var(--text2)"></div>
       <div id="rep-audit-body" style="font-size:.62rem"></div>
@@ -797,10 +658,10 @@ html,body{overflow:auto!important}
   </div>
 </div>
 
-<!-- ═══ Страница «🏭 Отрасли / медианы» ═══ -->
+<!-- ═══ Страница «Отрасли / медианы» ═══ -->
 <div class="page" id="page-industries">
   <div class="card">
-    <div class="card-hdr">🏭 Отрасли и медианы</div>
+    <div class="card-hdr">Отрасли и медианы</div>
     <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
       База компаний-аналогов по секторам — нужна для расчёта медиан (p25 / p50 / p75) по каждому показателю. Данные тянутся из ГИР БО по ИНН (только РСБУ standalone).
       <br><span style="color:var(--text3)">Встроенный стартовый список — 20+ крупнейших публичных эмитентов. Добавляйте свои, чтобы покрыть отрасли ВДО. Ваши правки хранятся в localStorage и синхронизируются между устройствами (⚡ Sync).</span>
@@ -809,7 +670,7 @@ html,body{overflow:auto!important}
       <button class="btn btn-sm btn-p" onclick="indBuildMedians()" title="Для каждой отрасли обойти все ИНН через прокси ГИР БО, посчитать медианы за 5 лет и сохранить">🧮 Построить медианы</button>
       <button class="btn btn-sm" onclick="indExportPeers()" title="Сохранить текущую базу отраслей как JSON">💾 Экспорт</button>
       <input type="file" id="ind-import-file" accept=".json" style="display:none" onchange="indImportPeers(this)">
-      <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON">📥 Импорт</button>
+      <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON">Импорт</button>
       <button class="btn btn-sm" onclick="indResetSeed()" title="Откатить к встроенному стартовому списку (удаляет ваши правки)">♻️ Сбросить</button>
       <button class="btn btn-sm btn-d" onclick="indResetAndReclassify()" title="Сбросить правки seed'а + очистить медианы + пересчитать отрасли у всех эмитентов по ОКВЭД (ручной выбор сохраняется)" style="background:var(--d);color:#fff">🗑 Сброс + пересчёт</button>
       <input type="file" id="ind-rosstat-file" accept=".xlsx,.xls" multiple style="display:none" onchange="rosstatImportFiles(this)">
@@ -826,10 +687,10 @@ html,body{overflow:auto!important}
   </div>
 </div>
 
-<!-- ═══ Страница «📊 Сравнение компаний» ═══ -->
+<!-- ═══ Страница «Сравнение компаний» ═══ -->
 <div class="page" id="page-cross">
   <div class="card">
-    <div class="card-hdr">📊 Сравнение компаний — все показатели сразу</div>
+    <div class="card-hdr">Сравнение компаний — все показатели сразу</div>
     <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
       На одной диаграмме видно, в чём каждая компания сильна, а в чём слаба. Каждая ось — отдельный показатель, нормированный <strong>в процентиль от остальных</strong> в этом же периоде (0 = худший, 100 = лучший). Для «меньше — лучше» метрик (ND/EBITDA, Долг) знак перевёрнут, так что на радаре всегда «чем дальше от центра, тем лучше».
     </div>
@@ -843,7 +704,7 @@ html,body{overflow:auto!important}
         <div style="display:flex;gap:0">
           <button class="btn btn-sm cross-view-btn" data-view="radar"   onclick="crossSetView('radar', this)">📡 Радар</button>
           <button class="btn btn-sm cross-view-btn" data-view="heatmap" onclick="crossSetView('heatmap', this)">🌡️ Тепло</button>
-          <button class="btn btn-sm cross-view-btn" data-view="bar"     onclick="crossSetView('bar', this)">📊 Бар</button>
+          <button class="btn btn-sm cross-view-btn" data-view="bar"     onclick="crossSetView('bar', this)">Бар</button>
         </div>
       </div>
       <div class="field" style="margin:0" id="cross-metric-wrap">
@@ -886,7 +747,7 @@ html,body{overflow:auto!important}
 
   <!-- Блок выбора рядов -->
   <div class="card" style="margin-top:12px">
-    <div class="card-hdr">📋 Доступные ряды</div>
+    <div class="card-hdr">Доступные ряды</div>
     <div class="muted" style="font-size:.62rem;margin-bottom:8px">Отметьте 2-6 рядов для сопоставления. Пересечение дат — автоматически (inner-join).</div>
     <div id="links-series-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px;font-size:.64rem"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
@@ -1175,7 +1036,7 @@ html,body{overflow:auto!important}
           <input type="number" id="moex-f-stress-min" oninput="moexApplyFilters()" step="5" min="0" max="100" placeholder="напр. 40">
         </div>
         <div class="field" style="margin:0" title="Для каждого эмитента смотрим 8 ключевых метрик (EBITDA-маржа, чистая маржа, ROA, ROE, ICR, ND/EBITDA, Current, Equity ratio) и считаем его ранг внутри его же отрасли. Если хотя бы одна метрика попадает в худший хвост — выпуск скрываем. Сравнение per-industry: у банков D/E=10 — норма, у ритейла катастрофа. Отрасли с <3 эмитентами в базе исключаются как неинформативные.">
-          <label style="font-size:.55rem">🏭 Отсекать аутсайдеров отрасли</label>
+          <label style="font-size:.55rem">Отсекать аутсайдеров отрасли</label>
           <select id="moex-f-pct-thresh" onchange="moexApplyFilters()">
             <option value="">Не отсекать</option>
             <option value="25">Если хуже 75% отрасли хотя бы по 1 метрике</option>
@@ -1186,8 +1047,8 @@ html,body{overflow:auto!important}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="moexResetFilters()">🧹 Сбросить фильтры</button>
-      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте «📝 ИНН-мастер».">📊 buxbalans для эмитентов в фильтре</button>
+      <button class="btn btn-sm" onclick="moexResetFilters()">Сбросить фильтры</button>
+      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте «📝 ИНН-мастер».">buxbalans для эмитентов в фильтре</button>
       <button class="btn btn-sm" onclick="moexPullGirboBulk(true)" title="Пройти по ВСЕМ эмитентам в фильтре (в том числе уже существующим в базе) и добавить недостающие годы с buxbalans.ru. Существующие периоды не перезаписываются — только дописываются новые. Используй, когда данные устарели.">🔄 buxbalans (обновить всех)</button>
       <button class="btn btn-sm" onclick="moexPullGirboOnlyBulk()" title="ТОЛЬКО ГИР БО (bo.nalog.gov.ru) для всех эмитентов в фильтре. Используй, когда buxbalans отстаёт или не содержит нужного года. ГИР БО ищет по ИМЕНИ (не по ИНН), мы берём имя из локального справочника и сверяем ИНН в результатах. Медленнее buxbalans (3-10 сек на эмитента), но это официальный первоисточник.">📡 ГИР БО (обновить всех)</button>
       <button class="btn btn-sm" onclick="moexPullParents()" title="Обойти все эмитенты в reportsDB и для каждого, у кого отмечена материнская (через «🔗 связи»), подтянуть её отчётность (buxbalans → GIR BO fallback). Материнская сохраняется как отдельный эмитент в reportsDB; при включённом тумблере «По данным материнской» дочки будут скориться по её цифрам. 1-3 сек на ИНН.">👪 Подтянуть по материнским</button>
@@ -1246,8 +1107,8 @@ html,body{overflow:auto!important}
             <option value="rating-worst">🏷 Рейтинг ↑ (худшие сверху)</option>
             <option value="stress-best">🛡 Запас прочности ↓ (лучшие сверху)</option>
             <option value="stress-worst">🛡 Запас прочности ↑ (худшие сверху)</option>
-            <option value="peer-wide">📊 Спред YTM к отрасли ↓ (широкий сверху = рынок видит риск)</option>
-            <option value="peer-narrow">📊 Спред YTM к отрасли ↑ (узкий сверху = рынок спокоен)</option>
+            <option value="peer-wide">Спред YTM к отрасли ↓ (широкий сверху = рынок видит риск)</option>
+            <option value="peer-narrow">Спред YTM к отрасли ↑ (узкий сверху = рынок спокоен)</option>
           </optgroup>
         </select>
       </label>
@@ -1380,7 +1241,7 @@ html,body{overflow:auto!important}
         </div>
         <div class="field" style="margin:0"><label style="font-size:.55rem">🛡 Запас прочности ≥</label>
           <input type="number" id="shares-f-stress-min" oninput="sharesApplyFilters()" step="5" min="0" max="100" placeholder="40"></div>
-        <div class="field" style="margin:0"><label style="font-size:.55rem">🏭 Отсекать аутсайдеров отрасли</label>
+        <div class="field" style="margin:0"><label style="font-size:.55rem">Отсекать аутсайдеров отрасли</label>
           <select id="shares-f-pct-thresh" onchange="sharesApplyFilters()">
             <option value="">Не отсекать</option>
             <option value="25">Хуже 75% отрасли</option>
@@ -1391,7 +1252,7 @@ html,body{overflow:auto!important}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="sharesResetFilters()">🧹 Сбросить</button>
+      <button class="btn btn-sm" onclick="sharesResetFilters()">Сбросить</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
@@ -1526,7 +1387,7 @@ html,body{overflow:auto!important}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="futuresResetFilters()">🧹 Сбросить</button>
+      <button class="btn btn-sm" onclick="futuresResetFilters()">Сбросить</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
@@ -1570,7 +1431,7 @@ html,body{overflow:auto!important}
 
   <div class="card">
     <div class="card-hdr">
-      📊 Распределение по причинам смерти
+      Распределение по причинам смерти
       <span id="arch-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
     </div>
     <div id="arch-reasons" style="padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;font-size:.62rem"></div>
@@ -1602,7 +1463,7 @@ html,body{overflow:auto!important}
         </label>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-sm" onclick="archiveExportSurvivalCsv()" title="Экспорт таблицы survival-анализа в CSV">📊 CSV отрасли</button>
+      <button class="btn btn-sm" onclick="archiveExportSurvivalCsv()" title="Экспорт таблицы survival-анализа в CSV">CSV отрасли</button>
     </div>
     <div id="arch-survival-chart" style="padding:4px 12px 10px"></div>
     <div id="arch-survival-table" style="padding:0 12px 10px;font-size:.58rem"></div>
@@ -1649,8 +1510,8 @@ html,body{overflow:auto!important}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="archiveResetFilters()">🧹 Сбросить</button>
-      <button class="btn btn-sm" onclick="archiveExportCsv()" title="Экспорт выборки в CSV для survival-анализа в R/Python">📊 Экспорт CSV</button>
+      <button class="btn btn-sm" onclick="archiveResetFilters()">Сбросить</button>
+      <button class="btn btn-sm" onclick="archiveExportCsv()" title="Экспорт выборки в CSV для survival-анализа в R/Python">Экспорт CSV</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
@@ -1701,10 +1562,10 @@ html,body{overflow:auto!important}
         <div id="sync-cloud-status" style="font-size:.6rem;padding:5px 8px;display:none;border:1px solid var(--border)"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm" onclick="syncMakeCode()" id="sync-make-btn" title="Создать новый зашифрованный blob и код доступа к нему">🆕 Создать код</button>
-          <button class="btn btn-sm btn-p" onclick="syncCloudSave()" id="sync-save-btn">⬆️ Сохранить</button>
-          <button class="btn btn-sm" onclick="syncCloudLoad()" id="sync-load-btn">⬇️ Загрузить</button>
+          <button class="btn btn-sm btn-p" onclick="syncCloudSave()" id="sync-save-btn">Сохранить</button>
+          <button class="btn btn-sm" onclick="syncCloudLoad()" id="sync-load-btn">Загрузить</button>
           <button class="btn btn-sm" onclick="syncShowQR()" title="Показать код как QR — удобно сканировать между ноутбуком и телефоном">📷 QR</button>
-          <button class="btn btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('sync-code').value)" title="Скопировать код в буфер">📋 Скопировать</button>
+          <button class="btn btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('sync-code').value)" title="Скопировать код в буфер">Скопировать</button>
         </div>
       </div>
 
@@ -1730,12 +1591,12 @@ html,body{overflow:auto!important}
           <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
             Собираем тот же снапшот (портфель, watchlist, reportsDB, эталоны, AI-ключ), сжимаем gzip'ом и кодируем в base64. Длинная текстовая строка копируется на другое устройство любым способом (Telegram Saved Messages, e-mail себе, AirDrop, заметки) и вставляется в это же поле. Никаких внешних серверов.
           </div>
-          <textarea id="offline-code" rows="4" placeholder="Нажмите «🧳 Собрать» — здесь появится код для копирования; либо вставьте сюда чужой код и нажмите «📥 Применить»" style="width:100%;font-family:var(--mono);font-size:.55rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:6px;resize:vertical;min-height:80px"></textarea>
+          <textarea id="offline-code" rows="4" placeholder="Нажмите «🧳 Собрать» — здесь появится код для копирования; либо вставьте сюда чужой код и нажмите «Применить»" style="width:100%;font-family:var(--mono);font-size:.55rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:6px;resize:vertical;min-height:80px"></textarea>
           <div id="offline-status" style="font-size:.6rem;padding:4px 8px;display:none;border:1px solid var(--border)"></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm" onclick="offlineMakeCode()" title="Собрать текущие данные в строку-код">🧳 Собрать</button>
-            <button class="btn btn-sm btn-p" onclick="offlineApplyCode()" title="Применить вставленный в textarea код">📥 Применить</button>
-            <button class="btn btn-sm" onclick="offlineCopyCode()" title="Скопировать содержимое textarea в буфер">📋 Скопировать</button>
+            <button class="btn btn-sm btn-p" onclick="offlineApplyCode()" title="Применить вставленный в textarea код">Применить</button>
+            <button class="btn btn-sm" onclick="offlineCopyCode()" title="Скопировать содержимое textarea в буфер">Скопировать</button>
             <button class="btn btn-sm" onclick="offlineDownloadFile()" title="Скачать полный снапшот как .json-файл">💾 Файл</button>
             <input type="file" id="offline-file" accept=".json,application/json" style="display:none" onchange="offlineLoadFile(this)">
             <button class="btn btn-sm" onclick="document.getElementById('offline-file').click()" title="Загрузить снапшот из .json-файла">📂 Из файла</button>
@@ -1768,8 +1629,8 @@ html,body{overflow:auto!important}
             </div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-sm" onclick="gistLoad()" id="gist-load-btn">⬇️ Загрузить с Gist</button>
-            <button class="btn btn-sm btn-p" onclick="gistSave()" id="gist-save-btn">⬆️ Сохранить в Gist</button>
+            <button class="btn btn-sm" onclick="gistLoad()" id="gist-load-btn">Загрузить с Gist</button>
+            <button class="btn btn-sm btn-p" onclick="gistSave()" id="gist-save-btn">Сохранить в Gist</button>
           </div>
         </div>
       </details>
@@ -1811,7 +1672,7 @@ html,body{overflow:auto!important}
 
 <div class="modal-overlay" id="modal-import-paste">
   <div class="modal" style="width:600px;max-width:96vw">
-    <div class="modal-hdr">📋 Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')">✕</button></div>
+    <div class="modal-hdr">Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')">✕</button></div>
     <div class="modal-body">
       <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px;line-height:1.6">
         Вставьте содержимое JSON-файла целиком — если файл не удаётся открыть через выбор с диска. Начинается с <code>{</code> и заканчивается <code>}</code>.
@@ -1829,7 +1690,7 @@ html,body{overflow:auto!important}
 <!-- Modal: импорт ГИРБО (CSV/XML) — дублирует сайдбар-пункт для мобильных -->
 <div class="modal-overlay" id="modal-girbo-import">
   <div class="modal" style="width:560px;max-width:96vw">
-    <div class="modal-hdr">📥 Импорт ГИРБО (CSV/XML) <button class="modal-x" onclick="closeModal('modal-girbo-import')">✕</button></div>
+    <div class="modal-hdr">Импорт ГИРБО (CSV/XML) <button class="modal-x" onclick="closeModal('modal-girbo-import')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Выгрузки с <strong>bo.nalog.gov.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
@@ -1854,12 +1715,12 @@ html,body{overflow:auto!important}
       <div id="girbo-drop"
            style="border:1px dashed var(--border2);padding:10px;text-align:center;background:var(--bg);cursor:pointer;user-select:none;font-size:.58rem;color:var(--text3)"
            onclick="document.getElementById('girbo-file-modal').click()">
-        📥 или перетащите файлы сюда (десктоп)
+        или перетащите файлы сюда (десктоп)
       </div>
       <!-- Очередь: список уже добавленных файлов + кнопка импорта -->
       <div id="girbo-queue-wrap" style="display:none;border:1px solid var(--border2);padding:8px 10px;background:var(--bg)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-          <span style="font-size:.62rem;color:var(--text2);font-weight:600">📋 В очереди: <span id="girbo-queue-count">0</span></span>
+          <span style="font-size:.62rem;color:var(--text2);font-weight:600">В очереди: <span id="girbo-queue-count">0</span></span>
           <button class="btn btn-sm" type="button" onclick="girboQueueClear()" style="margin-left:auto;font-size:.56rem;padding:2px 8px">Очистить</button>
           <button class="btn btn-sm btn-p" type="button" onclick="girboQueueRun()" style="font-size:.58rem;padding:3px 10px">▶ Импортировать все</button>
         </div>
@@ -1898,21 +1759,21 @@ html,body{overflow:auto!important}
           <li>Нажми кнопку ниже → в буфер скопируется код закладки.</li>
           <li>В браузере: Ctrl+Shift+B (панель закладок) → правый клик на панели → «Добавить страницу» → Имя: «📗 audit-it → БондАналитик», URL: Ctrl+V (вставить из буфера) → Сохранить.</li>
           <li>Теперь на любой странице audit-it.ru/buh_otchet/… клик по этой закладке → JSON в буфере.</li>
-          <li>Возвращайся сюда → «📋 Вставить из буфера» ниже.</li>
+          <li>Возвращайся сюда → «Вставить из буфера» ниже.</li>
         </ol>
-        <button class="btn btn-sm btn-p" onclick="auditItCopyBookmarklet()" style="font-size:.58rem;padding:4px 10px">📋 Скопировать bookmarklet</button>
+        <button class="btn btn-sm btn-p" onclick="auditItCopyBookmarklet()" style="font-size:.58rem;padding:4px 10px">Скопировать bookmarklet</button>
       </details>
       <details style="font-size:.62rem;color:var(--text2);background:var(--s2);padding:8px 10px;border:1px solid var(--border)">
-        <summary style="cursor:pointer;font-weight:600">📋 Способ 2: paste HTML (без настройки)</summary>
+        <summary style="cursor:pointer;font-weight:600">Способ 2: paste HTML (без настройки)</summary>
         <ol style="margin:8px 0 0 16px;padding:0;line-height:1.7">
           <li>На странице компании на audit-it нажми Ctrl+U (просмотр исходного кода).</li>
           <li>В открывшейся вкладке: Ctrl+A → Ctrl+C (скопировать всё).</li>
-          <li>Вернись сюда → Ctrl+V в поле ниже → «🔍 Распознать».</li>
+          <li>Вернись сюда → Ctrl+V в поле ниже → «Распознать».</li>
         </ol>
       </details>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="auditItPasteFromClipboard()" style="font-size:.58rem;padding:4px 10px" title="Прочитать буфер обмена (требует разрешения браузера)">📋 Вставить из буфера</button>
-        <button class="btn btn-sm" onclick="auditItParseInput()" style="font-size:.58rem;padding:4px 10px;border-color:var(--acc);color:var(--acc)">🔍 Распознать</button>
+        <button class="btn btn-sm" onclick="auditItPasteFromClipboard()" style="font-size:.58rem;padding:4px 10px" title="Прочитать буфер обмена (требует разрешения браузера)">Вставить из буфера</button>
+        <button class="btn btn-sm" onclick="auditItParseInput()" style="font-size:.58rem;padding:4px 10px;border-color:var(--acc);color:var(--acc)">Распознать</button>
         <button class="btn btn-sm" onclick="document.getElementById('auditit-paste').value = ''; document.getElementById('auditit-preview').innerHTML = ''; document.getElementById('auditit-modal-status').innerHTML = ''" style="font-size:.58rem;padding:4px 10px">🗑 Очистить</button>
       </div>
       <textarea id="auditit-paste" placeholder="Сюда HTML страницы audit-it либо JSON от bookmarklet. Содержимое может быть длинное — несколько МБ, это нормально."
@@ -1956,7 +1817,7 @@ html,body{overflow:auto!important}
       </div>
       <textarea id="girbo-diag-text" readonly
         style="width:100%;min-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px;white-space:pre;overflow:auto"></textarea>
-      <button class="btn btn-sm btn-p" onclick="_girboDiagCopy()" style="align-self:flex-start">📋 Попробовать скопировать</button>
+      <button class="btn btn-sm btn-p" onclick="_girboDiagCopy()" style="align-self:flex-start">Попробовать скопировать</button>
       <div id="girbo-diag-copy-status" style="font-size:.58rem;color:var(--text3)"></div>
     </div>
     <div class="modal-ftr">
@@ -1969,7 +1830,7 @@ html,body{overflow:auto!important}
 <div class="modal-overlay" id="modal-dossier">
   <div class="modal" style="width:920px;max-width:98vw;max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
     <div class="modal-hdr">
-      📇 Досье эмитента: <span id="dossier-issuer-name" style="color:var(--acc)"></span>
+      Досье эмитента: <span id="dossier-issuer-name" style="color:var(--acc)"></span>
       <span id="dossier-updated" style="font-size:.54rem;color:var(--text3);margin-left:auto;margin-right:12px"></span>
       <button class="modal-x" onclick="closeModal('modal-dossier')">✕</button>
     </div>
@@ -2387,7 +2248,7 @@ html,body{overflow:auto!important}
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-schedule')">Закрыть</button>
-      <button class="btn" onclick="_schedExportCsv()">📊 Экспорт CSV</button>
+      <button class="btn" onclick="_schedExportCsv()">Экспорт CSV</button>
     </div>
   </div>
 </div>
@@ -2410,8 +2271,8 @@ html,body{overflow:auto!important}
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-compare')">Закрыть</button>
       <button class="btn btn-p" onclick="compareSaveCurrent()" title="Сохранить текущую очередь как именованный сет в «⭐ Списки». Если введёшь имя существующего сета — эмитенты добавятся к нему (merge). Новое имя — создастся новый сет.">💾 Сохранить как / добавить в</button>
-      <button class="btn" onclick="compareExportCsv()">📊 Экспорт CSV</button>
-      <button class="btn" onclick="compareClear();closeModal('modal-compare')">🧹 Очистить очередь</button>
+      <button class="btn" onclick="compareExportCsv()">Экспорт CSV</button>
+      <button class="btn" onclick="compareClear();closeModal('modal-compare')">Очистить очередь</button>
     </div>
   </div>
 </div>
@@ -2419,7 +2280,7 @@ html,body{overflow:auto!important}
 <!-- Modal: объединение эмитентов (слияние по ИНН или вручную) -->
 <div class="modal-overlay" id="modal-merge-issuers">
   <div class="modal" style="width:600px;max-width:96vw">
-    <div class="modal-hdr">🔗 Объединить эмитентов <button class="modal-x" onclick="closeModal('modal-merge-issuers')">✕</button></div>
+    <div class="modal-hdr">Объединить эмитентов <button class="modal-x" onclick="closeModal('modal-merge-issuers')">✕</button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Все периоды ИСТОЧНИКА переедут в ЦЕЛЕВОГО эмитента. Дубли периодов (ключ <code>год_период_тип</code>) пропускаются — в целевом остаются свои. Источник после слияния удаляется.
@@ -2439,7 +2300,7 @@ html,body{overflow:auto!important}
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-merge-issuers')">Отмена</button>
-      <button class="btn btn-p" onclick="repDoMerge()">🔗 Объединить</button>
+      <button class="btn btn-p" onclick="repDoMerge()">Объединить</button>
     </div>
   </div>
 </div>
@@ -2468,7 +2329,6 @@ html,body{overflow:auto!important}
   document.getElementById = function(id){ return _orig(id) || _dummy; };
 })();
 
-// Заглушки render-функций других страниц
 function showPage(){}
 function renderYtm(){}
 function renderPort(){}
@@ -2486,7 +2346,6 @@ function compareInit(){}
 function portfolioInit(){}
 function issuerInit(){}
 
-// Весь app.js (с вырезанными авто-вызовами init других страниц)
 'use strict';
 
 // ══ ГЛОБАЛЬНЫЕ ОШИБКИ → тост ══
@@ -7022,7 +6881,7 @@ document.addEventListener('click',e=>{
 });
 
 // Allow pressing Enter in ISIN field to trigger lookup
-document.getElementById('pp-isin').addEventListener('keydown',e=>{
+document.getElementById('pp-isin')?.addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();document.getElementById('pp-suggest').style.display='none';lookupIsin()}
 });
 
@@ -7622,7 +7481,7 @@ ${ctx?'Контекст: '+ctx:''}
 // ══ ISSUER DATA SEARCH ══
 
 // Синхронизировать поле поиска с названием компании
-document.getElementById('is-co').addEventListener('input', function(){
+document.getElementById('is-co')?.addEventListener('input', function(){
   const sp = document.getElementById('sp-query');
   if(!sp.value || sp.value === sp.dataset.synced) {
     sp.value = this.value;
@@ -7657,7 +7516,7 @@ function parseAiFieldValues(text, fieldHints){
 // ══ AUTONOMOUS DATA SEARCH (MOEX + CBR, no API key) ══
 
 // Синхронизация поля ISIN с полем выпуска
-document.getElementById('is-bond').addEventListener('input', function(){
+document.getElementById('is-bond')?.addEventListener('input', function(){
   const sp = document.getElementById('sp-isin');
   if(!sp.value) sp.value = this.value;
 });
@@ -27933,15 +27792,11 @@ function risksClearDrill(){
 }
 
 
-// Принудительно показываем только страницу отчётности
-// (переопределяем ПОСЛЕ app.js, чтобы заглушить _restoreActivePage)
-showPage = function(n){
-  document.querySelectorAll('.page').forEach(function(p){ p.style.display = 'none'; });
+showPage = function(){
   var rp = document.getElementById('page-reports');
-  if(rp) rp.style.display = '';
+  if(rp){ rp.style.display=''; }
 };
 
-// Запуск модуля отчётности
 try { loadState(); } catch(e) { console.warn('loadState:', e); }
 try { repInit(); } catch(e) { console.error('repInit:', e); }
 
