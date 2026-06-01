@@ -279,19 +279,15 @@ function patchHtml(html) {
   return html + '\n' + SHELL_BRIDGE;
 }
 
-// Записываем HTML в iframe через Blob URL — единственный способ
-// гарантированно выполнить скрипты в большом файле без разрыва парсера.
-// Blob наследует origin shell'а (file:// или http://), поэтому
-// localStorage доступен.
+// Записываем HTML в iframe через document.write — синхронно одним куском.
+// Сохраняет origin shell'а (localStorage работает).
 function writeToFrame(frameEl, html, onDone) {
-  const blob = new Blob([html], { type: 'text/html' });
-  const url  = URL.createObjectURL(blob);
-  frameEl.onload = function() {
-    URL.revokeObjectURL(url);
-    frameEl.onload = null;
-    if (onDone) onDone();
-  };
-  frameEl.src = url;
+  frameEl.removeAttribute('src');
+  const doc = frameEl.contentDocument || frameEl.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  if (onDone) onDone();
 }
 
 function addFiles(fileList) {
