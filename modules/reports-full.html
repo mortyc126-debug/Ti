@@ -4,105 +4,136 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>База отчётности</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root{
-  --bg:#0B0613;
-  --s1:#140A24;
-  --s2:#1A1030;
-  --s3:#1f1438;
-  --border:rgba(255,255,255,0.06);
-  --border2:rgba(255,255,255,0.12);
-  --acc:#FF006E;
-  --acc2:#cc0058;
-  --acc-dim:rgba(255,0,110,0.08);
-  --green:#52F2C9;
-  --green-dim:rgba(82,242,201,0.08);
-  --warn:#FFB86C;
-  --danger:#FF4D7A;
-  --danger-dim:rgba(255,77,109,0.08);
+  --bg:#0a0e14;
+  --s1:#11161e;
+  --s2:#1a212c;
+  --s3:#1f2836;
+  --border:#222a37;
+  --border2:#2e3847;
+  --acc:#00d4ff;
+  --acc2:#0099bb;
+  --acc-dim:#0a3a4a;
+  --green:#22d3a0;
+  --green-dim:rgba(34,211,160,.1);
+  --warn:#f5a623;
+  --danger:#ff4d6d;
+  --danger-dim:rgba(255,77,109,.1);
   --purple:#a78bfa;
-  --pos:#52F2C9;
-  --neg:#FF4D7A;
-  --text:#F2F0FF;
-  --text1:#F2F0FF;
-  --text2:#A79BC9;
-  --text3:#6F648F;
-  --mono:'IBM Plex Mono','JetBrains Mono',monospace;
+  --pos:#22d3a0;
+  --neg:#ff4d6d;
+  --text:#e6edf3;
+  --text1:#e6edf3;
+  --text2:#9ba3b1;
+  --text3:#5e6573;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sans:'Inter',ui-sans-serif,system-ui,sans-serif;
   --serif:'Cormorant Garamond',Georgia,serif;
-  --sans:'Inter',sans-serif;
+  --radius:6px;
+  --radius-md:8px;
+  --radius-lg:10px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{overflow:auto!important;background:var(--bg);color:var(--text2);font-family:var(--mono)}
+html,body{overflow:auto!important;background:var(--bg);color:var(--text2);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
+
 .page{display:none;padding:16px 20px}
 #page-reports{display:block!important}
 
-/* Кнопки */
-.btn{background:none;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);
-  font-size:.65rem;padding:4px 10px;cursor:pointer;border-radius:2px;transition:all .15s;letter-spacing:.04em}
+/* Скроллбар */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--s1)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* Кнопки — Inter, скруглённые */
+.btn{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--s2);border:1px solid var(--border2);color:var(--text2);
+  font-family:var(--sans);font-size:.75rem;font-weight:500;
+  padding:6px 12px;cursor:pointer;border-radius:var(--radius);
+  transition:all .15s;white-space:nowrap;letter-spacing:.01em}
 .btn:hover{color:var(--text);border-color:var(--acc);background:var(--acc-dim)}
-.btn-sm{font-size:.6rem;padding:3px 8px}
+.btn-sm{font-size:.7rem;padding:4px 10px}
 .btn-p,.btn-primary{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
-.btn-p:hover,.btn-primary:hover{background:var(--acc);color:#fff}
-.btn-d,.btn-danger{border-color:var(--danger);color:var(--danger)}
-.btn-d:hover,.btn-danger:hover{background:var(--danger-dim)}
-.btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
+.btn-p:hover,.btn-primary:hover{background:var(--acc);color:var(--bg)}
+.btn-d,.btn-danger{border-color:var(--danger);color:var(--danger);background:transparent}
+.btn-d:hover{background:var(--danger-dim)}
+.btn.active,.btn-sm.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
+.rep-tf-btn{font-size:.68rem;padding:3px 10px;border-radius:20px}
+.rep-tf-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
 
 /* Текст */
-.page-title{font-family:var(--serif);font-size:1.4rem;color:var(--acc);margin-bottom:2px}
-.page-sub{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+.page-title{font-family:var(--serif);font-size:1.5rem;color:var(--acc);margin-bottom:2px;font-weight:600}
+.page-sub{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:14px}
 
 /* Инпуты */
 input,select,textarea{
   background:var(--s2);border:1px solid var(--border2);color:var(--text);
-  font-family:var(--mono);font-size:.65rem;padding:4px 8px;outline:none;border-radius:2px}
-input:focus,select:focus{border-color:var(--acc)}
+  font-family:var(--sans);font-size:.8rem;padding:6px 10px;
+  outline:none;border-radius:var(--radius);transition:border .15s}
+input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,212,255,.1)}
 input::placeholder{color:var(--text3)}
-select option{background:var(--s1)}
+select option{background:var(--s1);color:var(--text)}
 
 /* Таблицы */
-table{width:100%;border-collapse:collapse;font-size:.65rem}
-th{color:var(--text3);font-weight:500;text-align:left;padding:4px 8px;
-  border-bottom:1px solid var(--border2);letter-spacing:.06em;text-transform:uppercase;font-size:.57rem}
-td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+table{width:100%;border-collapse:collapse;font-size:.75rem;font-family:var(--mono)}
+th{color:var(--text3);font-weight:500;text-align:left;padding:6px 10px;
+  border-bottom:1px solid var(--border2);letter-spacing:.06em;
+  text-transform:uppercase;font-size:.62rem;font-family:var(--sans)}
+td{padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
 tr:hover td{background:var(--s2);color:var(--text)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 
-/* Карточки/секции */
-.rep-card,.card{background:var(--s1);border:1px solid var(--border);padding:12px 16px;margin-bottom:10px}
-.section-title,.rep-sec-title{font-size:.57rem;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--acc);margin:12px 0 6px;padding-left:8px;border-left:2px solid var(--acc)}
+/* Карточки */
+.rep-card,.card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:14px 16px;margin-bottom:10px;
+  box-shadow:0 1px 0 rgba(255,255,255,.02) inset,0 4px 16px -8px rgba(0,0,0,.5)}
+.section-title,.rep-sec-title{
+  font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--acc);margin:14px 0 8px;padding-left:8px;
+  border-left:2px solid var(--acc);font-family:var(--sans);font-weight:600}
 
-/* Лейблы/пиллы */
-.badge,.pill-label{font-size:.54rem;padding:1px 6px;border-radius:2px;background:var(--border2);color:var(--text3)}
-.badge.ok,.pill-label.ok{background:var(--green-dim);color:var(--green)}
-.badge.err,.pill-label.err{background:var(--danger-dim);color:var(--danger)}
-.badge.warn,.pill-label.warn{background:rgba(255,184,108,.1);color:var(--warn)}
+/* Бейджи */
+.badge{font-size:.65rem;padding:2px 7px;border-radius:20px;
+  background:var(--s2);border:1px solid var(--border2);color:var(--text3);font-family:var(--sans)}
+.badge.ok{background:var(--green-dim);border-color:rgba(34,211,160,.3);color:var(--green)}
+.badge.err{background:var(--danger-dim);border-color:rgba(255,77,109,.3);color:var(--danger)}
+.badge.warn{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.3);color:var(--warn)}
 
-/* Sidebar эмитентов */
-.rep-sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--border);
+/* Сайдбар эмитентов */
+.rep-sidebar{width:230px;flex-shrink:0;border-right:1px solid var(--border);
   background:var(--s1);overflow-y:auto;max-height:calc(100vh - 120px)}
-.rep-issuer-item{padding:7px 12px;cursor:pointer;font-size:.65rem;color:var(--text2);
-  border-left:2px solid transparent;transition:all .12s}
+.rep-issuer-item{padding:8px 14px;cursor:pointer;font-size:.75rem;color:var(--text2);
+  border-left:2px solid transparent;transition:all .12s;font-family:var(--sans)}
 .rep-issuer-item:hover{color:var(--text);background:var(--s2);border-left-color:var(--border2)}
 .rep-issuer-item.active{color:var(--acc);background:var(--acc-dim);border-left-color:var(--acc)}
 
 /* Модалки */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center}
-.modal-box{background:var(--s1);border:1px solid var(--border2);padding:20px;min-width:360px;max-width:90vw;max-height:90vh;overflow-y:auto}
-.modal-title{font-family:var(--serif);font-size:1.1rem;color:var(--acc);margin-bottom:14px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;
+  display:flex;align-items:center;justify-content:center}
+.modal-box{background:var(--s1);border:1px solid var(--border2);
+  border-radius:var(--radius-lg);padding:24px;min-width:380px;
+  max-width:90vw;max-height:90vh;overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,.6)}
+.modal-title{font-family:var(--serif);font-size:1.15rem;color:var(--acc);
+  margin-bottom:16px;font-weight:600}
 
-/* Прочее */
-.text-muted{color:var(--text3)}
-.text-acc{color:var(--acc)}
-.text-green{color:var(--green)}
-.text-danger{color:var(--danger)}
-.text-warn{color:var(--warn)}
+/* Утилиты */
+.text-muted{color:var(--text3)}.text-acc{color:var(--acc)}
+.text-green{color:var(--green)}.text-danger{color:var(--danger)}.text-warn{color:var(--warn)}
 .flex{display:flex}.gap-6{gap:6px}.gap-10{gap:10px}.flex-wrap{flex-wrap:wrap}
 .mt-8{margin-top:8px}.mb-8{margin-bottom:8px}
-.rep-tf-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
 
+/* Дополнительное из оригинала */
+.dossier-pill{display:inline-block;padding:2px 8px;font-size:.62rem;border-radius:20px;font-weight:500}
+.dossier-pill.ok{background:var(--green-dim);color:var(--green)}
+.dossier-pill.warn{background:rgba(245,166,35,.1);color:var(--warn)}
+.dossier-pill.err{background:var(--danger-dim);color:var(--danger)}
+.dossier-pill.nd{background:var(--s2);color:var(--text3)}
 </style>
 </head>
 <body>
@@ -117,15 +148,15 @@ tr:hover td{background:var(--s2);color:var(--text)}
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-    <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую.">Удалить пустые периоды</button>
-    <button class="btn btn-sm" onclick="repDiagnoseInn()" title="Запросить отчётность с buxbalans и ГИР БО по ИНН и показать что найдено — годы, ОКВЭД, название. Полезно когда bulk не обновляет конкретного эмитента и надо понять где ломается.">Диагностика по ИНН</button>
-<div style="display:flex;gap:6px;align-items:center;margin-top:8px;margin-bottom:4px">
-  <input id="rep-inn-search-input" type="text" placeholder="ИНН или название для диагностики..."
-    style="flex:1;max-width:320px" onkeydown="if(event.key==='Enter')repDiagnoseInn()">
+    <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую."> Удалить пустые периоды</button>
+    <button class="btn btn-sm" onclick="repDiagnoseInn()" title="Запросить отчётность с buxbalans и ГИР БО по ИНН и показать что найдено — годы, ОКВЭД, название. Полезно когда bulk не обновляет конкретного эмитента и надо понять где ломается."> Диагностика по ИНН</button>
+<div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+  <input id="rep-inn-search-input" type="text" placeholder="ИНН или название..."
+    style="width:260px" onkeydown="if(event.key==='Enter')repDiagnoseInn()">
   <button class="btn btn-sm" onclick="repDiagnoseInn()">Диагностика</button>
 </div>
     
-    <button class="btn btn-sm" onclick="repImportAffiliatedFromClipboard()" title="Импорт списка аффилированных лиц из буфера обмена. Формат: JSON из расширения БондАналитик (кнопка «📦 Распаковать список аффилированных» на странице e-disclosure в разделе type=6). PDF распаковывается в памяти, парсится, извлекаются юрлица с ИНН. Сам PDF не сохраняется, в базе оседает только структурированный список.">Импорт аффилированных</button>
+    <button class="btn btn-sm" onclick="repImportAffiliatedFromClipboard()" title="Импорт списка аффилированных лиц из буфера обмена. Формат: JSON из расширения БондАналитик (кнопка « Распаковать список аффилированных» на странице e-disclosure в разделе type=6). PDF распаковывается в памяти, парсится, извлекаются юрлица с ИНН. Сам PDF не сохраняется, в базе оседает только структурированный список."> Импорт аффилированных</button>
   </div>
 
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
@@ -133,7 +164,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
        по мультипликаторам и фильтром по году последнего отчёта. -->
   <div id="rep-sidebar" style="width:340px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 120px);display:flex;flex-direction:column;gap:6px;background:var(--s2);border:1px solid var(--border);padding:8px">
     <div style="display:flex;gap:4px;align-items:center">
-      <input type="search" id="rep-sidebar-search" placeholder="🔎 поиск по имени / ИНН…"
+      <input type="search" id="rep-sidebar-search" placeholder=" поиск по имени / ИНН…"
         oninput="repRenderIssuerList()"
         style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.64rem;padding:5px 8px;outline:none">
       <span id="rep-sidebar-count" style="font-size:.54rem;color:var(--text3);min-width:32px;text-align:right">0</span>
@@ -166,7 +197,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <option value="no_inn">без ИНН</option>
         <option value="stale">нет свежего (&gt;2 лет давности)</option>
         <option value="no_moex">нет выпусков на MOEX</option>
-        <option value="spv_no_parent">🔗 SPV без матери (нужна привязка)</option>
+        <option value="spv_no_parent"> SPV без матери (нужна привязка)</option>
       </select>
     </div>
     <div style="display:flex;gap:4px;align-items:center">
@@ -196,26 +227,26 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <button class="btn btn-sm btn-p" onclick="repNewIssuerModal()">＋ Эмитент</button>
     <button class="btn btn-sm" id="rep-add-period-btn" style="display:none" onclick="repNewPeriodModal()">＋ Добавить период</button>
-    <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип">✎ Редактировать период</button>
-    <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)">🗑 Удалить период</button>
-    <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)">📂 Загрузить отчёт</button>
-    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8">ГИРБО</button>
-    <button class="btn btn-sm" onclick="openAuditItImportModal()" title="Импорт данных audit-it.ru — вставить HTML страницы компании (Ctrl+U → Ctrl+A → Ctrl+C) либо JSON от bookmarklet. До 11 лет РСБУ за один импорт.">📗 audit-it HTML</button>
-    <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут">Объединить</button>
-    <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п.">Аудит данных</button>
+    <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип"> Редактировать период</button>
+    <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)"> Удалить период</button>
+    <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)"> Загрузить отчёт</button>
+    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8"> ГИРБО</button>
+    <button class="btn btn-sm" onclick="openAuditItImportModal()" title="Импорт данных audit-it.ru — вставить HTML страницы компании (Ctrl+U → Ctrl+A → Ctrl+C) либо JSON от bookmarklet. До 11 лет РСБУ за один импорт."> audit-it HTML</button>
+    <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут"> Объединить</button>
+    <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал > активов, EBIT > EBITDA, ДС > оборотных активов и т.п."> Аудит данных</button>
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
-    <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов.">Импорт эмитента</button>
+    <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов."> Импорт эмитента</button>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="btn btn-sm" id="rep-compare-btn" style="display:none" onclick="repShowCompare()">⇄ Сравнить периоды</button>
-      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств.">Досье</button>
-      <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие">✎ Редактировать</button>
-      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту">Экспорт эмитента</button>
-      <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()">🗑 Удалить эмитента</button>
+      <button class="btn btn-sm" id="rep-dossier-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="dossierOpen()" title="Досье эмитента: финансовый профиль (авто), бизнес-профиль, модификаторы, параметры выпусков. Шаблон анализа в духе рейтинговых агентств."> Досье</button>
+      <button class="btn btn-sm" id="rep-edit-issuer-btn" style="display:none" onclick="repEditIssuerModal()" title="Редактировать эмитента: ISIN, ИНН, ОГРН, ссылка на раскрытие"> Редактировать</button>
+      <button class="btn btn-sm" id="rep-export-issuer-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repExportIssuer()" title="Скачать JSON только по текущему эмитенту"> Экспорт эмитента</button>
+      <button class="btn btn-sm" id="rep-del-issuer-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeleteIssuer()"> Удалить эмитента</button>
     </div>
   </div>
 
   <!-- Empty state -->
-  <div id="rep-empty" class="empty"><div class="ei">📂</div><p>Добавьте эмитента и загрузите отчётность<br><span style="font-size:.65rem">PDF · DOCX · XLSX</span></p></div>
+  <div id="rep-empty" class="empty"><div class="ei"></div><p>Добавьте эмитента и загрузите отчётность<br><span style="font-size:.65rem">PDF · DOCX · XLSX</span></p></div>
 
   <!-- Issuer view -->
   <div id="rep-issuer-view" style="display:none">
@@ -239,8 +270,8 @@ tr:hover td{background:var(--s2);color:var(--text)}
     <div style="display:flex;gap:4px;margin-bottom:14px;align-items:center">
       <button class="btn btn-sm rep-view-btn active" id="rep-vb-cards" onclick="repSetView('cards',this)">▦ Показатели</button>
       <button class="btn btn-sm rep-view-btn" id="rep-vb-text" onclick="repSetView('text',this)">≡ Резюме</button>
-      <button class="btn btn-sm rep-view-btn" id="rep-vb-chart" onclick="repSetView('chart',this)">📈 Динамика</button>
-      <button class="btn btn-sm rep-view-btn" id="rep-vb-analysis" onclick="repSetView('analysis',this)" style="border-color:var(--acc);color:var(--acc)">Анализ</button>
+      <button class="btn btn-sm rep-view-btn" id="rep-vb-chart" onclick="repSetView('chart',this)"> Динамика</button>
+      <button class="btn btn-sm rep-view-btn" id="rep-vb-analysis" onclick="repSetView('analysis',this)" style="border-color:var(--acc);color:var(--acc)"> Анализ</button>
       <span style="margin-left:12px;font-size:.59rem;color:var(--text3)" id="rep-period-meta"></span>
     </div>
 
@@ -287,7 +318,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Modal: new/edit issuer -->
 <div class="modal-overlay" id="modal-rep-issuer">
   <div class="modal" style="width:480px;max-width:96vw">
-    <div class="modal-hdr" id="rep-ni-title">Новый эмитент <button class="modal-x" onclick="closeModal('modal-rep-issuer')">✕</button></div>
+    <div class="modal-hdr" id="rep-ni-title">Новый эмитент <button class="modal-x" onclick="closeModal('modal-rep-issuer')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
       <input type="hidden" id="rep-ni-id">
       <div class="field"><label>Название компании</label><input id="rep-ni-name" placeholder="ПАО Газпром"></div>
@@ -306,7 +337,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
           <div class="field" style="flex:1;min-width:180px"><label>ISIN (опц.)</label>
             <input id="rep-ni-isin" placeholder="RU000A10EAC6" style="text-transform:uppercase">
           </div>
-          <button class="btn btn-sm" type="button" onclick="repNiFetchMoex()" title="Подтянуть ИНН/ОГРН по ISIN из MOEX">С MOEX</button>
+          <button class="btn btn-sm" type="button" onclick="repNiFetchMoex()" title="Подтянуть ИНН/ОГРН по ISIN из MOEX"> С MOEX</button>
         </div>
         <div class="g2">
           <div class="field"><label>ИНН</label><input id="rep-ni-inn" placeholder="7736050003" inputmode="numeric"></div>
@@ -331,7 +362,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Modal: new period -->
 <div class="modal-overlay" id="modal-rep-period">
   <div class="modal" style="width:520px">
-    <div class="modal-hdr">Добавить период отчётности <button class="modal-x" onclick="closeModal('modal-rep-period')">✕</button></div>
+    <div class="modal-hdr">Добавить период отчётности <button class="modal-x" onclick="closeModal('modal-rep-period')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
       <div class="g2">
         <div class="field"><label>Год</label>
@@ -356,10 +387,10 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
       <!-- File upload -->
       <div style="border:1px solid var(--border2);padding:10px;background:var(--bg)">
-        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:7px">📎 Загрузить файл (необязательно)</div>
+        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:7px"> Загрузить файл (необязательно)</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="file" id="rep-np-file" accept=".pdf,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none" onchange="repParseFile(this)">
-          <button class="btn btn-sm" onclick="document.getElementById('rep-np-file').click()">📂 PDF / DOCX / XLSX / 🖼 фото</button>
+          <button class="btn btn-sm" onclick="document.getElementById('rep-np-file').click()"> PDF / DOCX / XLSX /  фото</button>
           <div id="rep-np-file-status" style="font-size:.63rem;color:var(--text3)">файл не выбран</div>
         </div>
         <div style="margin-top:6px;font-size:.56rem;color:var(--text3)" id="rep-lib-status"></div>
@@ -375,30 +406,30 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <div id="rep-np-parse-log" style="display:none;margin-top:8px;font-size:.62rem;line-height:1.8;color:var(--text2);max-height:180px;overflow-y:auto"></div>
         <div id="rep-np-meta-wrap" style="display:none;margin-top:6px;font-size:.62rem;color:var(--text2);padding:6px 8px;background:var(--s1);border-left:2px solid var(--acc)"></div>
         <div id="rep-np-ref-wrap" style="display:none;margin-top:8px;padding:8px;background:var(--s1);border:1px solid var(--border)">
-          <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px">⚖️ Сверка с эталоном</div>
+          <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:5px"> Сверка с эталоном</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru">Импорт JSON</button>
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-ref-file').click()" title="Загрузить JSON-эталон: наш формат bondan/ref/v1 или сырой JSON из bo.nalog.gov.ru"> Импорт JSON</button>
             <input type="file" id="rep-np-ref-file" accept=".json,application/json" style="display:none" onchange="repOnRefFile(this)">
-            <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки">🔗 ГИР БО</button>
-            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН как эталон для сверки (не сохраняется в периоды, только отображается)">buxbalans (сверка)</button>
-            <button type="button" class="btn btn-sm" onclick="repUpdateBuxBalansForActive()" title="Подтянуть данные с buxbalans.ru по ИНН активного эмитента и ДОПИСАТЬ недостающие годы как периоды в базу. Существующие периоды не перезаписываются — только добавляются новые.">🔄 buxbalans (дописать)</button>
-            <button type="button" class="btn btn-sm" onclick="repUpdateGirboForActive()" title="Подтянуть данные с ГИР БО (ФНС, bo.nalog.gov.ru) по ИНН и дописать недостающие годы. buxbalans и ГИР БО — «рваная» система: то что есть у одного, часто отсутствует у другого. Прогоняй оба последовательно.">📡 ГИР БО (дописать)</button>
-            <button type="button" class="btn btn-sm" onclick="repOpenAuditItForInn()" title="Открыть страницу audit-it.ru по ИНН — 2015-2025, глубже ГИР БО. Цифры копируются в форму периода вручную (серверный парсинг audit-it блокирует anti-bot'ом).">📗 audit-it</button>
-            <button type="button" class="btn btn-sm" onclick="repOpenCheckoForInn()" title="Открыть страницу checko.ru по ИНН — ЕГРЮЛ, аффилированные компании, руководители, базовые финансовые показатели. Для просмотра в живом браузере, серверный парсинг недоступен.">🔎 checko</button>
-            <button type="button" class="btn btn-sm" onclick="repOpenEgrulForInn()" title="ЕГРЮЛ (официальный сайт ФНС). ИНН копируется в буфер, открывается страница поиска — вставь Ctrl+V и нажми Enter. Первоисточник всех справочных данных.">🏛 ЕГРЮЛ</button>
-            <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)">💾 Экспорт эталона</button>
-            <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)">📤 Все</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenGirboForInn()" title="Открыть страницу ГИР БО по ИНН и скачать JSON для сверки"> ГИР БО</button>
+            <button type="button" class="btn btn-sm btn-p" onclick="repFetchBuxBalansSeries()" title="Автоматически подтянуть отчётность с buxbalans.ru по ИНН как эталон для сверки (не сохраняется в периоды, только отображается)"> buxbalans (сверка)</button>
+            <button type="button" class="btn btn-sm" onclick="repUpdateBuxBalansForActive()" title="Подтянуть данные с buxbalans.ru по ИНН активного эмитента и ДОПИСАТЬ недостающие годы как периоды в базу. Существующие периоды не перезаписываются — только добавляются новые."> buxbalans (дописать)</button>
+            <button type="button" class="btn btn-sm" onclick="repUpdateGirboForActive()" title="Подтянуть данные с ГИР БО (ФНС, bo.nalog.gov.ru) по ИНН и дописать недостающие годы. buxbalans и ГИР БО — «рваная» система: то что есть у одного, часто отсутствует у другого. Прогоняй оба последовательно."> ГИР БО (дописать)</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenAuditItForInn()" title="Открыть страницу audit-it.ru по ИНН — 2015-2025, глубже ГИР БО. Цифры копируются в форму периода вручную (серверный парсинг audit-it блокирует anti-bot'ом)."> audit-it</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenCheckoForInn()" title="Открыть страницу checko.ru по ИНН — ЕГРЮЛ, аффилированные компании, руководители, базовые финансовые показатели. Для просмотра в живом браузере, серверный парсинг недоступен."> checko</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenEgrulForInn()" title="ЕГРЮЛ (официальный сайт ФНС). ИНН копируется в буфер, открывается страница поиска — вставь Ctrl+V и нажми Enter. Первоисточник всех справочных данных."> ЕГРЮЛ</button>
+            <button type="button" class="btn btn-sm" onclick="repExportCurrentAsRef()" title="Сохранить текущие значения как эталон (для будущих регрессий)"> Экспорт эталона</button>
+            <button type="button" class="btn btn-sm" onclick="repExportAllRefs()" title="Выгрузить ВСЕ сохранённые эталоны одним файлом (оффлайн-бэкап)"> Все</button>
             <input type="file" id="rep-np-refs-bulk-file" accept=".json,application/json" style="display:none" onchange="repImportAllRefs(this)">
-            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-refs-bulk-file').click()" title="Импортировать коллекцию эталонов из файла (результат repExportAllRefs)">Все</button>
-            <button type="button" class="btn btn-sm" onclick="repClearReference()" title="Очистить импортированный эталон">✗</button>
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('rep-np-refs-bulk-file').click()" title="Импортировать коллекцию эталонов из файла (результат repExportAllRefs)"> Все</button>
+            <button type="button" class="btn btn-sm" onclick="repClearReference()" title="Очистить импортированный эталон"></button>
           </div>
           <div id="rep-np-ref-result" style="font-size:.62rem;color:var(--text2);line-height:1.7"></div>
         </div>
         <div id="rep-np-raw-wrap" style="display:none;margin-top:8px">
           <div id="rep-np-tools-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <button type="button" class="btn btn-sm" onclick="repToggleRawText()" id="rep-np-raw-btn">📄 Показать распознанный текст</button>
-            <button type="button" class="btn btn-sm" onclick="repCopyRawText()" title="Скопировать в буфер — можно прислать для отладки">Скопировать</button>
-            <button type="button" class="btn btn-sm" onclick="repOpenPicker()" title="Кликать по числам в распознанном тексте и раскидывать их по полям вручную">🎯 Ручной подбор</button>
+            <button type="button" class="btn btn-sm" onclick="repToggleRawText()" id="rep-np-raw-btn"> Показать распознанный текст</button>
+            <button type="button" class="btn btn-sm" onclick="repCopyRawText()" title="Скопировать в буфер — можно прислать для отладки"> Скопировать</button>
+            <button type="button" class="btn btn-sm" onclick="repOpenPicker()" title="Кликать по числам в распознанном тексте и раскидывать их по полям вручную"> Ручной подбор</button>
           </div>
           <textarea id="rep-np-raw-text" readonly style="display:none;width:100%;margin-top:6px;min-height:150px;max-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:8px;white-space:pre"></textarea>
         </div>
@@ -449,17 +480,17 @@ tr:hover td{background:var(--s2);color:var(--text)}
            Работает только для годовых РСБУ (других у ФНС нет). -->
       <div id="rep-np-girbo-wrap" style="display:none;margin-top:10px;border:1px solid var(--border2);padding:8px 10px;background:var(--bg)">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-          <strong style="font-size:.62rem;letter-spacing:.05em">Сверка с ГИР БО (ФНС)</strong>
+          <strong style="font-size:.62rem;letter-spacing:.05em"> Сверка с ГИР БО (ФНС)</strong>
           <span id="rep-np-girbo-status" style="font-size:.58rem;color:var(--text3);flex:1"></span>
-          <button type="button" class="btn btn-sm" onclick="_repGirboHide()" style="font-size:.55rem;padding:2px 6px">✗ Закрыть</button>
+          <button type="button" class="btn btn-sm" onclick="_repGirboHide()" style="font-size:.55rem;padding:2px 6px"> Закрыть</button>
         </div>
         <div id="rep-np-girbo-result" style="font-size:.6rem;color:var(--text2)"></div>
       </div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-rep-period')">Отмена</button>
-      <button class="btn" onclick="repVerifyGirbo()" title="Сверить каждое поле с официальной РСБУ-строкой из ГИР БО по ИНН эмитента. Единственный в приложении способ проверить введённые цифры на соответствие реальности (а не только на внутреннюю логику).">Сверить с ГИР БО</button>
-      <button class="btn btn-p" onclick="repSavePeriod()">💾 Сохранить</button>
+      <button class="btn" onclick="repVerifyGirbo()" title="Сверить каждое поле с официальной РСБУ-строкой из ГИР БО по ИНН эмитента. Единственный в приложении способ проверить введённые цифры на соответствие реальности (а не только на внутреннюю логику)."> Сверить с ГИР БО</button>
+      <button class="btn btn-p" onclick="repSavePeriod()"> Сохранить</button>
     </div>
   </div>
 </div>
@@ -467,11 +498,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Field lookup menu: маленькая модалка с выбором источника -->
 <div class="modal-overlay" id="modal-field-lookup">
   <div class="modal" style="width:380px;max-width:96vw">
-    <div class="modal-hdr">Найти: <span id="fl-field-label" style="color:var(--acc)"></span><button class="modal-x" onclick="closeModal('modal-field-lookup')">✕</button></div>
+    <div class="modal-hdr"> Найти: <span id="fl-field-label" style="color:var(--acc)"></span><button class="modal-x" onclick="closeModal('modal-field-lookup')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:8px">
-      <button type="button" class="btn" style="text-align:left" onclick="flRunAiSearch()">🤖 AI-поиск (интернет)</button>
-      <button type="button" class="btn" style="text-align:left" onclick="flLoadPdf()">📂 Ручной подбор из PDF</button>
-      <button type="button" class="btn" style="text-align:left" onclick="flPasteText()">📝 Вставить распознанный текст</button>
+      <button type="button" class="btn" style="text-align:left" onclick="flRunAiSearch()"> AI-поиск (интернет)</button>
+      <button type="button" class="btn" style="text-align:left" onclick="flLoadPdf()"> Ручной подбор из PDF</button>
+      <button type="button" class="btn" style="text-align:left" onclick="flPasteText()"> Вставить распознанный текст</button>
       <div id="fl-recent-info" style="font-size:.58rem;color:var(--text3);line-height:1.5"></div>
       <input type="file" id="fl-pdf-input" accept=".pdf,.docx,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.bmp,.gif,image/*" style="display:none">
     </div>
@@ -484,7 +515,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Paste-text modal -->
 <div class="modal-overlay" id="modal-paste-text">
   <div class="modal" style="width:600px;max-width:96vw">
-    <div class="modal-hdr">📝 Вставить распознанный текст <button class="modal-x" onclick="closeModal('modal-paste-text')">✕</button></div>
+    <div class="modal-hdr"> Вставить распознанный текст <button class="modal-x" onclick="closeModal('modal-paste-text')"></button></div>
     <div class="modal-body">
       <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px">Вставьте текст из PDF (например через Adobe Reader / копирование со страницы), после — откроется ручной подбор.</div>
       <textarea id="fl-paste-area" style="width:100%;min-height:220px;font-family:var(--mono);font-size:.62rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px"></textarea>
@@ -499,7 +530,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Audit modal: проверка логических нестыковок в reportsDB -->
 <div class="modal-overlay" id="modal-rep-audit">
   <div class="modal" style="width:820px;max-width:96vw">
-    <div class="modal-hdr">Аудит данных <button class="modal-x" onclick="closeModal('modal-rep-audit')">✕</button></div>
+    <div class="modal-hdr"> Аудит данных <button class="modal-x" onclick="closeModal('modal-rep-audit')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto">
       <div id="rep-audit-summary" style="font-size:.65rem;color:var(--text2)"></div>
       <div id="rep-audit-body" style="font-size:.62rem"></div>
@@ -512,7 +543,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
 <!-- Manual picker modal: кликать по числам в распознанном тексте --><div class="modal-overlay" id="modal-rep-picker">
   <div class="modal" style="width:760px;max-width:96vw">
-    <div class="modal-hdr">🎯 Ручной подбор значений <button class="modal-x" onclick="closeModal('modal-rep-picker')">✕</button></div>
+    <div class="modal-hdr"> Ручной подбор значений <button class="modal-x" onclick="closeModal('modal-rep-picker')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
       <div style="font-size:.63rem;color:var(--text2);line-height:1.6">
         Выберите поле и единицы, затем кликните по числу в тексте — оно попадёт в выбранное поле, курсор сам перейдёт на следующее.
@@ -566,14 +597,14 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px;background:var(--s2);border:1px solid var(--border);font-size:.62rem">
         <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">Или вручную:</div>
         <input type="text" id="rep-picker-manual" placeholder="напр. 63 540 или 435 877" style="width:160px;padding:3px 6px;font-family:var(--mono)">
-        <button type="button" class="btn btn-sm" onclick="repPickerGrabSelection()" title="Подхватить выделенный мышью фрагмент">📌 взять выделение</button>
-        <button type="button" class="btn btn-sm" onclick="repPickerApplyManual()">✓ Применить к текущему полю</button>
-        <button type="button" class="btn btn-sm" onclick="repPickerSkip()" title="Значения в отчёте нет — очистить поле и перейти к следующему" style="color:var(--danger,#c44);border-color:var(--danger,#c44)">✗ нет в отчёте</button>
+        <button type="button" class="btn btn-sm" onclick="repPickerGrabSelection()" title="Подхватить выделенный мышью фрагмент"> взять выделение</button>
+        <button type="button" class="btn btn-sm" onclick="repPickerApplyManual()"> Применить к текущему полю</button>
+        <button type="button" class="btn btn-sm" onclick="repPickerSkip()" title="Значения в отчёте нет — очистить поле и перейти к следующему" style="color:var(--danger,#c44);border-color:var(--danger,#c44)"> нет в отчёте</button>
       </div>
 
       <!-- Top-кандидаты: строки с наибольшей релевантностью к активному полю -->
       <div id="rep-picker-suggest" style="display:none;flex-direction:column;gap:4px;padding:8px;background:linear-gradient(180deg,var(--s2),var(--s1));border:1px solid var(--acc);font-size:.62rem">
-        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)">★ Кандидаты для «<span id="rep-picker-suggest-label">—</span>»</div>
+        <div style="font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--acc)"> Кандидаты для «<span id="rep-picker-suggest-label">—</span>»</div>
         <div id="rep-picker-suggest-list" style="display:flex;flex-direction:column;gap:4px"></div>
         <div style="font-size:.56rem;color:var(--text3)">Клик по числу справа → значение попадёт в выбранное поле с учётом единиц.</div>
       </div>
@@ -589,7 +620,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Просмотрщик контекста (pre-formatted, без переносов) -->
 <div class="modal-overlay" id="modal-picker-context">
   <div class="modal" style="width:92vw;max-width:1200px;height:82vh;display:flex;flex-direction:column">
-    <div class="modal-hdr">📖 Контекст отчёта <span id="ctx-info" style="font-size:.6rem;color:var(--text3);margin-left:8px"></span><button class="modal-x" onclick="pickerCtxClose()">✕</button></div>
+    <div class="modal-hdr"> Контекст отчёта <span id="ctx-info" style="font-size:.6rem;color:var(--text3);margin-left:8px"></span><button class="modal-x" onclick="pickerCtxClose()"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:8px;overflow:hidden;flex:1">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.6rem;padding:6px;background:var(--s1);border:1px solid var(--border)">
         <label>строк до:<input type="number" id="ctx-before" value="5" min="0" max="500" style="width:55px;margin-left:4px;padding:2px 4px" oninput="repPickerCtxRender()"></label>
@@ -601,8 +632,8 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <span style="color:var(--text3)">·</span>
         <span>поиск:</span>
         <input type="text" id="ctx-search" placeholder="подсветить…" style="padding:2px 6px;width:150px" oninput="repPickerCtxRender()">
-        <button type="button" class="btn btn-sm" id="ctx-pdf-toggle" style="padding:2px 8px;font-size:.58rem" onclick="ctxTogglePdfPane()" title="Показать/скрыть мини-окно с оригиналом PDF">🖼️ оригинал</button>
-        <button type="button" class="btn btn-sm btn-p" style="padding:2px 8px;font-size:.58rem;margin-left:auto" onclick="pdfvOpenFromCtx()" title="Показать исходную страницу PDF с кликабельными числами">📄 PDF-вид</button>
+        <button type="button" class="btn btn-sm" id="ctx-pdf-toggle" style="padding:2px 8px;font-size:.58rem" onclick="ctxTogglePdfPane()" title="Показать/скрыть мини-окно с оригиналом PDF"> оригинал</button>
+        <button type="button" class="btn btn-sm btn-p" style="padding:2px 8px;font-size:.58rem;margin-left:auto" onclick="pdfvOpenFromCtx()" title="Показать исходную страницу PDF с кликабельными числами"> PDF-вид</button>
       </div>
       <div id="ctx-split" style="display:flex;flex:1;gap:8px;min-height:0;flex-wrap:wrap">
         <div id="ctx-text" style="flex:1 1 55%;min-width:260px;overflow:auto;white-space:pre;font-family:var(--mono);font-size:.58rem;background:var(--bg);border:1px solid var(--border2);padding:10px;line-height:1.7;color:var(--text2)"></div>
@@ -612,7 +643,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <span id="ctx-pdf-info" style="flex:1;text-align:center;min-width:60px">—</span>
             <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfNav(1)" title="Следующая страница">▶</button>
             <button type="button" class="btn btn-sm" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfSyncToAnchor()" title="Вернуться к странице якоря">⌖</button>
-            <button type="button" class="btn btn-sm" id="ctx-pdf-mask-btn" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfToggleMask()" title="Маска распознавания: рамки колонок и классификация items (desc/value/note/code/period)">🎭 маска</button>
+            <button type="button" class="btn btn-sm" id="ctx-pdf-mask-btn" style="padding:2px 6px;font-size:.55rem" onclick="ctxPdfToggleMask()" title="Маска распознавания: рамки колонок и классификация items (desc/value/note/code/period)"> маска</button>
           </div>
           <div id="ctx-pdf-scroll" style="flex:1;overflow:auto;text-align:center;padding:4px">
             <div id="ctx-pdf-stage" style="position:relative;display:inline-block;max-width:100%">
@@ -642,7 +673,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <div class="modal-overlay" id="modal-pdf-view">
   <div class="modal" style="width:96vw;max-width:1400px;height:94vh;display:flex;flex-direction:column">
     <div class="modal-hdr">
-      📄 PDF стр. <span id="pdfv-page">?</span> / <span id="pdfv-total">?</span>
+       PDF стр. <span id="pdfv-page">?</span> / <span id="pdfv-total">?</span>
       <span style="margin-left:12px;display:inline-flex;gap:4px">
         <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvNav(-1)">◀</button>
         <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvNav(1)">▶</button>
@@ -650,7 +681,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="pdfvZoom(1)">+</button>
       </span>
       <span id="pdfv-hint" style="font-size:.58rem;color:var(--text3);margin-left:8px">тапни по числу — применится к текущему полю</span>
-      <button class="modal-x" onclick="pdfvClose()">✕</button>
+      <button class="modal-x" onclick="pdfvClose()"></button>
     </div>
     <div id="pdfv-scroll" style="flex:1;overflow:auto;background:#2a2a2a;padding:8px;text-align:center">
       <div id="pdfv-container" style="position:relative;display:inline-block;background:#fff"></div>
@@ -658,24 +689,24 @@ tr:hover td{background:var(--s2);color:var(--text)}
   </div>
 </div>
 
-<!-- ═══ Страница «Отрасли / медианы» ═══ -->
+<!-- ═══ Страница « Отрасли / медианы» ═══ -->
 <div class="page" id="page-industries">
   <div class="card">
-    <div class="card-hdr">Отрасли и медианы</div>
+    <div class="card-hdr"> Отрасли и медианы</div>
     <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
       База компаний-аналогов по секторам — нужна для расчёта медиан (p25 / p50 / p75) по каждому показателю. Данные тянутся из ГИР БО по ИНН (только РСБУ standalone).
-      <br><span style="color:var(--text3)">Встроенный стартовый список — 20+ крупнейших публичных эмитентов. Добавляйте свои, чтобы покрыть отрасли ВДО. Ваши правки хранятся в localStorage и синхронизируются между устройствами (⚡ Sync).</span>
+      <br><span style="color:var(--text3)">Встроенный стартовый список — 20+ крупнейших публичных эмитентов. Добавляйте свои, чтобы покрыть отрасли ВДО. Ваши правки хранятся в localStorage и синхронизируются между устройствами ( Sync).</span>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:0 4px">
-      <button class="btn btn-sm btn-p" onclick="indBuildMedians()" title="Для каждой отрасли обойти все ИНН через прокси ГИР БО, посчитать медианы за 5 лет и сохранить">🧮 Построить медианы</button>
-      <button class="btn btn-sm" onclick="indExportPeers()" title="Сохранить текущую базу отраслей как JSON">💾 Экспорт</button>
+      <button class="btn btn-sm btn-p" onclick="indBuildMedians()" title="Для каждой отрасли обойти все ИНН через прокси ГИР БО, посчитать медианы за 5 лет и сохранить"> Построить медианы</button>
+      <button class="btn btn-sm" onclick="indExportPeers()" title="Сохранить текущую базу отраслей как JSON"> Экспорт</button>
       <input type="file" id="ind-import-file" accept=".json" style="display:none" onchange="indImportPeers(this)">
-      <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON">Импорт</button>
-      <button class="btn btn-sm" onclick="indResetSeed()" title="Откатить к встроенному стартовому списку (удаляет ваши правки)">♻️ Сбросить</button>
-      <button class="btn btn-sm btn-d" onclick="indResetAndReclassify()" title="Сбросить правки seed'а + очистить медианы + пересчитать отрасли у всех эмитентов по ОКВЭД (ручной выбор сохраняется)" style="background:var(--d);color:#fff">🗑 Сброс + пересчёт</button>
+      <button class="btn btn-sm" onclick="document.getElementById('ind-import-file').click()" title="Загрузить базу отраслей из JSON"> Импорт</button>
+      <button class="btn btn-sm" onclick="indResetSeed()" title="Откатить к встроенному стартовому списку (удаляет ваши правки)"> Сбросить</button>
+      <button class="btn btn-sm btn-d" onclick="indResetAndReclassify()" title="Сбросить правки seed'а + очистить медианы + пересчитать отрасли у всех эмитентов по ОКВЭД (ручной выбор сохраняется)" style="background:var(--d);color:#fff"> Сброс + пересчёт</button>
       <input type="file" id="ind-rosstat-file" accept=".xlsx,.xls" multiple style="display:none" onchange="rosstatImportFiles(this)">
       <button class="btn btn-sm" onclick="document.getElementById('ind-rosstat-file').click()" title="Импорт XLSX ФНС (ind2020.xlsx … ind2024.xls) — среднеотраслевые ROS/ROA по ОКВЭД. Можно выделить сразу несколько файлов.">🇷🇺 Импорт ФНС XLSX</button>
-      <button class="btn btn-sm" onclick="rosstatClear()" title="Очистить загруженные данные ФНС">🗑️ ФНС</button>
+      <button class="btn btn-sm" onclick="rosstatClear()" title="Очистить загруженные данные ФНС"> ФНС</button>
     </div>
     <div id="ind-status" style="font-size:.6rem;padding:4px 8px;display:none;border:1px solid var(--border);margin-bottom:8px"></div>
     <div id="ind-layout" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
@@ -687,10 +718,10 @@ tr:hover td{background:var(--s2);color:var(--text)}
   </div>
 </div>
 
-<!-- ═══ Страница «Сравнение компаний» ═══ -->
+<!-- ═══ Страница « Сравнение компаний» ═══ -->
 <div class="page" id="page-cross">
   <div class="card">
-    <div class="card-hdr">Сравнение компаний — все показатели сразу</div>
+    <div class="card-hdr"> Сравнение компаний — все показатели сразу</div>
     <div style="font-size:.65rem;color:var(--text2);line-height:1.6;padding:0 4px 10px">
       На одной диаграмме видно, в чём каждая компания сильна, а в чём слаба. Каждая ось — отдельный показатель, нормированный <strong>в процентиль от остальных</strong> в этом же периоде (0 = худший, 100 = лучший). Для «меньше — лучше» метрик (ND/EBITDA, Долг) знак перевёрнут, так что на радаре всегда «чем дальше от центра, тем лучше».
     </div>
@@ -702,9 +733,9 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Вид</label>
         <div style="display:flex;gap:0">
-          <button class="btn btn-sm cross-view-btn" data-view="radar"   onclick="crossSetView('radar', this)">📡 Радар</button>
-          <button class="btn btn-sm cross-view-btn" data-view="heatmap" onclick="crossSetView('heatmap', this)">🌡️ Тепло</button>
-          <button class="btn btn-sm cross-view-btn" data-view="bar"     onclick="crossSetView('bar', this)">Бар</button>
+          <button class="btn btn-sm cross-view-btn" data-view="radar"   onclick="crossSetView('radar', this)"> Радар</button>
+          <button class="btn btn-sm cross-view-btn" data-view="heatmap" onclick="crossSetView('heatmap', this)"> Тепло</button>
+          <button class="btn btn-sm cross-view-btn" data-view="bar"     onclick="crossSetView('bar', this)"> Бар</button>
         </div>
       </div>
       <div class="field" style="margin:0" id="cross-metric-wrap">
@@ -724,7 +755,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <label style="font-size:.6rem;color:var(--text2);display:flex;align-items:center;gap:4px;cursor:pointer">
         <input type="checkbox" id="cross-same-scope" onchange="crossRender()" style="margin:0"> только той же scope
       </label>
-      <button class="btn btn-sm" onclick="crossExportCsv()" title="Выгрузить сводную матрицу в CSV" style="margin-left:auto">💾 CSV</button>
+      <button class="btn btn-sm" onclick="crossExportCsv()" title="Выгрузить сводную матрицу в CSV" style="margin-left:auto"> CSV</button>
     </div>
     <div id="cross-status" style="font-size:.6rem;padding:4px 8px;color:var(--text3)"></div>
     <div id="cross-layout" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;padding:4px">
@@ -734,26 +765,26 @@ tr:hover td{background:var(--s2);color:var(--text)}
   </div>
 </div>
 
-<!-- ═══ Страница «🔗 Связи / корреляции» ═══ -->
+<!-- ═══ Страница « Связи / корреляции» ═══ -->
 <div class="page" id="page-links">
-  <div class="page-title">🔗 Связи между рядами</div>
+  <div class="page-title"> Связи между рядами</div>
   <div class="page-sub">Multi-panel график · матрица корреляций · lead-lag · rolling 12м</div>
 
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:.68rem;color:var(--text2);line-height:1.55">
     Что это: наложение временных рядов макро-индикаторов друг на друга. Можно увидеть как связаны разные показатели инфляции, как курс влияет на CPI с лагом, как трендовая инфляция «гонит» headline.
     <br><br>
-    <span style="color:var(--text3)">Источник: <b>bondan_ratecb_cbrdata</b> (всё что импортировано с cbr.ru через «🏦 Ставка»). Чем больше рядов там — тем больше пар можно сопоставить. Мировые ряды (FRED, Yahoo) подключим отдельным коммитом через CF Worker.</span>
+    <span style="color:var(--text3)">Источник: <b>bondan_ratecb_cbrdata</b> (всё что импортировано с cbr.ru через « Ставка»). Чем больше рядов там — тем больше пар можно сопоставить. Мировые ряды (FRED, Yahoo) подключим отдельным коммитом через CF Worker.</span>
   </div>
 
   <!-- Блок выбора рядов -->
   <div class="card" style="margin-top:12px">
-    <div class="card-hdr">Доступные ряды</div>
+    <div class="card-hdr"> Доступные ряды</div>
     <div class="muted" style="font-size:.62rem;margin-bottom:8px">Отметьте 2-6 рядов для сопоставления. Пересечение дат — автоматически (inner-join).</div>
     <div id="links-series-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px;font-size:.64rem"></div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-p btn-sm" onclick="linksBuild()">▶ Построить</button>
-      <button class="btn btn-sm" onclick="linksClearSelection()">✕ Снять всё</button>
-      <button class="btn btn-sm" onclick="worldOpenModal()" title="Добавить мировые ряды (Fed funds, US 10Y, HY OAS, DXY, Brent, VIX) через Cloudflare Worker. Нужны свой CF Worker (развёртывание в readme.md) + FRED API-key (бесплатно).">🌍 Мировые</button>
+      <button class="btn btn-sm" onclick="linksClearSelection()"> Снять всё</button>
+      <button class="btn btn-sm" onclick="worldOpenModal()" title="Добавить мировые ряды (Fed funds, US 10Y, HY OAS, DXY, Brent, VIX) через Cloudflare Worker. Нужны свой CF Worker (развёртывание в readme.md) + FRED API-key (бесплатно)."> Мировые</button>
       <span style="font-size:.6rem;color:var(--text2);margin-left:8px">Горизонт:</span>
       <select id="links-horizon" onchange="linksBuild()" style="padding:3px 6px;font-size:.62rem;background:var(--bg);border:1px solid var(--border);color:var(--text1);border-radius:4px">
         <option value="0">все данные</option>
@@ -769,14 +800,14 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
   <!-- Multi-panel график -->
   <div class="card" style="margin-top:12px">
-    <div class="card-hdr">📈 Наложенные графики</div>
+    <div class="card-hdr"> Наложенные графики</div>
     <div id="links-chart" style="margin-top:8px;min-height:220px"></div>
   </div>
 
   <!-- Матрица корреляций -->
   <div class="card" style="margin-top:12px">
     <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center">
-      <span>🔢 Матрица корреляций</span>
+      <span> Матрица корреляций</span>
       <span class="muted" style="font-size:.58rem">Pearson (верх) / Spearman (низ)</span>
     </div>
     <div id="links-corr-matrix" style="margin-top:8px;overflow-x:auto"></div>
@@ -784,26 +815,26 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
   <!-- Rolling + lead-lag — появляется после выбора пары -->
   <div class="card" style="margin-top:12px" id="links-pair-card" hidden>
-    <div class="card-hdr">🎯 Пара для углубления <span id="links-pair-label" class="muted" style="font-size:.62rem"></span></div>
+    <div class="card-hdr"> Пара для углубления <span id="links-pair-label" class="muted" style="font-size:.62rem"></span></div>
     <div class="muted" style="font-size:.62rem;margin-bottom:8px">Клик по ячейке матрицы выше → подробная разбивка: rolling corr скользящим окном 12м + lead-lag (CCF) ±12 мес.</div>
     <div id="links-rolling" style="margin-top:8px;min-height:140px"></div>
     <div id="links-ccf" style="margin-top:8px;min-height:140px"></div>
   </div>
 </div>
 
-<!-- ═══ Страница «🏛 Каталог Мосбиржи» ═══ -->
+<!-- ═══ Страница « Каталог Мосбиржи» ═══ -->
 <div class="page" id="page-moex">
-  <div class="page-title">🏛 Каталог облигаций Мосбиржи</div>
+  <div class="page-title"> Каталог облигаций Мосбиржи</div>
   <div class="page-sub">Все торгуемые выпуски · ОФЗ · корпораты · субфеды · ВДО · замещайки · флоатеры</div>
 
   <div class="card">
     <div class="card-hdr">
-      📡 Загрузка каталога с MOEX ISS
+       Загрузка каталога с MOEX ISS
       <span id="moex-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
     </div>
     <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-p" id="moex-refresh-btn" onclick="fetchMoexCatalog()">📡 Обновить каталог</button>
-      <button class="btn" onclick="moexClearCache()" title="Удалить локальный кэш и начать с чистого листа">🗑 Очистить кэш</button>
+      <button class="btn btn-p" id="moex-refresh-btn" onclick="fetchMoexCatalog()"> Обновить каталог</button>
+      <button class="btn" onclick="moexClearCache()" title="Удалить локальный кэш и начать с чистого листа"> Очистить кэш</button>
       <span id="moex-status" style="font-size:.62rem;color:var(--text2);flex:1"></span>
     </div>
     <div style="padding:4px 12px 10px;font-size:.58rem;color:var(--text3);line-height:1.55">
@@ -812,15 +843,15 @@ tr:hover td{background:var(--s2);color:var(--text)}
   </div>
 
   <div class="card" id="moex-filters-card" style="display:none;margin-top:12px">
-    <div class="card-hdr">🎯 Фильтры <span id="moex-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div class="card-hdr"> Фильтры <span id="moex-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
     <!-- Сценарные пресеты: набор порогов под конкретную рыночную ситуацию. -->
     <div style="padding:8px 12px 4px;border-bottom:1px solid var(--border)">
-      <div style="font-size:.56rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">🎬 Сценарии (набор фильтров одним кликом)</div>
+      <div style="font-size:.56rem;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px"> Сценарии (набор фильтров одним кликом)</div>
       <div id="moex-scenarios" style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-sm" data-scenario="conservative" onclick="moexApplyScenario('conservative')" title="Инвест-грейд стандарт. Только фикс-купоны, ICR≥5, ND/EBITDA≤2, запас прочности 70+, цена до 105%. Минимум риска, минимум доходности.">🎯 Устойчивый консерватор</button>
-        <button class="btn btn-sm" data-scenario="balanced-vdo" onclick="moexApplyScenario('balanced-vdo')" title="Основная масса ВДО. Фикс, ICR≥2, ND/EBITDA≤5, запас прочности 40+. Средний риск, средняя доходность.">⚡ Балансированный ВДО</button>
-        <button class="btn btn-sm" data-scenario="fix-high-coupon" onclick="moexApplyScenario('fix-high-coupon')" title="Ставка на снижение КС. Длинные фиксы (≥3 лет) с купоном от 18%, цена 85-100%. Если КС пойдёт вниз — capital gain + зафиксированная высокая доходность на годы. Эмитент должен быть устойчивым (stress 50+) т.к. длинный срок = риск дожить.">💰 Зафиксировать купон</button>
-        <button class="btn btn-sm btn-d" data-scenario="debt-trap" onclick="moexApplyScenario('debt-trap')" title="Watch-лист рисковых — для анализа ЧЕГО ИЗБЕГАТЬ, не для покупки. Показывает ВДО с худшей динамикой запаса прочности (сортировка от самого плохого), только matched эмитенты с данными в reportsDB.">⚠ Долговая ловушка</button>
+        <button class="btn btn-sm" data-scenario="conservative" onclick="moexApplyScenario('conservative')" title="Инвест-грейд стандарт. Только фикс-купоны, ICR≥5, ND/EBITDA≤2, запас прочности 70+, цена до 105%. Минимум риска, минимум доходности."> Устойчивый консерватор</button>
+        <button class="btn btn-sm" data-scenario="balanced-vdo" onclick="moexApplyScenario('balanced-vdo')" title="Основная масса ВДО. Фикс, ICR≥2, ND/EBITDA≤5, запас прочности 40+. Средний риск, средняя доходность."> Балансированный ВДО</button>
+        <button class="btn btn-sm" data-scenario="fix-high-coupon" onclick="moexApplyScenario('fix-high-coupon')" title="Ставка на снижение КС. Длинные фиксы (≥3 лет) с купоном от 18%, цена 85-100%. Если КС пойдёт вниз — capital gain + зафиксированная высокая доходность на годы. Эмитент должен быть устойчивым (stress 50+) т.к. длинный срок = риск дожить."> Зафиксировать купон</button>
+        <button class="btn btn-sm btn-d" data-scenario="debt-trap" onclick="moexApplyScenario('debt-trap')" title="Watch-лист рисковых — для анализа ЧЕГО ИЗБЕГАТЬ, не для покупки. Показывает ВДО с худшей динамикой запаса прочности (сортировка от самого плохого), только matched эмитенты с данными в reportsDB."> Долговая ловушка</button>
         <button class="btn btn-sm" onclick="moexClearScenario()" title="Сбросить активный сценарий (если какой-то применён) и все фильтры.">↺ Сбросить сценарий</button>
       </div>
       <div id="moex-scenario-status" style="font-size:.54rem;color:var(--text3);margin-top:6px;display:none"></div>
@@ -953,17 +984,17 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
       <div class="field" style="margin:0;padding:6px 0 4px" title="Структурные продукты — СберИОС, ГазИОС и подобные. По сути это ставка на индекс/курс с мелким купоном и большой выплатой в конце — НЕ классический бонд. По умолчанию спрятаны.">
         <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
-          <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0"> 🎭 Структурные (ИОС)
+          <input type="checkbox" id="moex-f-structured" onchange="moexApplyFilters()" style="margin:0">  Структурные (ИОС)
         </label>
       </div>
       <div class="field" style="margin:0;padding:6px 0 4px" title="Мёртвые бумаги — уже погашенные (matDate в прошлом — MOEX продолжает показывать до ~2 недель после погашения) или STATUS не «A» (приостановлены, не стартовали). По умолчанию скрыты.">
         <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
-          <input type="checkbox" id="moex-f-dead" onchange="moexApplyFilters()" style="margin:0"> 🪦 Мёртвые
+          <input type="checkbox" id="moex-f-dead" onchange="moexApplyFilters()" style="margin:0">  Мёртвые
         </label>
       </div>
-      <div class="field" style="margin:0;padding:6px 0 4px" title="Для эмитентов, у которых через «🔗 связи» отмечена материнская компания — считать «Запас прочности» и прочий скоринг по её отчётности, а не по своей. Это про SPV: у SPV-эмитента свой баланс обычно пустой, реальные цифры у головной.">
+      <div class="field" style="margin:0;padding:6px 0 4px" title="Для эмитентов, у которых через « связи» отмечена материнская компания — считать «Запас прочности» и прочий скоринг по её отчётности, а не по своей. Это про SPV: у SPV-эмитента свой баланс обычно пустой, реальные цифры у головной.">
         <label style="font-size:.58rem;display:flex;gap:5px;align-items:center;cursor:pointer;line-height:1.2">
-          <input type="checkbox" id="moex-f-prefer-parent" onchange="moexApplyFilters()" style="margin:0"> 🏛 По данным материнской
+          <input type="checkbox" id="moex-f-prefer-parent" onchange="moexApplyFilters()" style="margin:0">  По данным материнской
         </label>
       </div>
     </div>
@@ -973,7 +1004,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <div style="padding:0 12px 8px">
       <div style="font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--acc)">
-        🧮 Фундаментал эмитента (из reportsDB + досье)
+         Фундаментал эмитента (из reportsDB + досье)
       </div>
       <div style="font-size:.55rem;color:var(--text3);margin-bottom:6px;line-height:1.5">
         Эти фильтры работают только для выпусков, эмитент которых есть в твоём reportsDB. Если включить хоть один — бумаги без matched эмитента скроются автоматически.
@@ -1031,12 +1062,12 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <option value="no">Только без рейтинга</option>
           </select>
         </div>
-        <div class="field" style="margin:0" title="Запас прочности эмитента — композит 3 сигналов: Stressed-ICR (EBITDA×0.8/проценты×1.2, вес 40%), Altman Z' (35%), Долговая стена (погашения 12м / cash+EBITDA, 25%). Шкала 0–100: 0 = у критической точки, 100 = устойчиво. Красная зона <40, жёлтая 40–70, зелёная ≥70. Видно в плитке на странице «📂 Отчётность» для каждого эмитента.">
-          <label style="font-size:.55rem">🛡 Запас прочности ≥</label>
+        <div class="field" style="margin:0" title="Запас прочности эмитента — композит 3 сигналов: Stressed-ICR (EBITDA×0.8/проценты×1.2, вес 40%), Altman Z' (35%), Долговая стена (погашения 12м / cash+EBITDA, 25%). Шкала 0–100: 0 = у критической точки, 100 = устойчиво. Красная зона <40, жёлтая 40–70, зелёная ≥70. Видно в плитке на странице « Отчётность» для каждого эмитента.">
+          <label style="font-size:.55rem"> Запас прочности ≥</label>
           <input type="number" id="moex-f-stress-min" oninput="moexApplyFilters()" step="5" min="0" max="100" placeholder="напр. 40">
         </div>
         <div class="field" style="margin:0" title="Для каждого эмитента смотрим 8 ключевых метрик (EBITDA-маржа, чистая маржа, ROA, ROE, ICR, ND/EBITDA, Current, Equity ratio) и считаем его ранг внутри его же отрасли. Если хотя бы одна метрика попадает в худший хвост — выпуск скрываем. Сравнение per-industry: у банков D/E=10 — норма, у ритейла катастрофа. Отрасли с <3 эмитентами в базе исключаются как неинформативные.">
-          <label style="font-size:.55rem">Отсекать аутсайдеров отрасли</label>
+          <label style="font-size:.55rem"> Отсекать аутсайдеров отрасли</label>
           <select id="moex-f-pct-thresh" onchange="moexApplyFilters()">
             <option value="">Не отсекать</option>
             <option value="25">Если хуже 75% отрасли хотя бы по 1 метрике</option>
@@ -1047,16 +1078,16 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="moexResetFilters()">Сбросить фильтры</button>
-      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте «📝 ИНН-мастер».">buxbalans для эмитентов в фильтре</button>
-      <button class="btn btn-sm" onclick="moexPullGirboBulk(true)" title="Пройти по ВСЕМ эмитентам в фильтре (в том числе уже существующим в базе) и добавить недостающие годы с buxbalans.ru. Существующие периоды не перезаписываются — только дописываются новые. Используй, когда данные устарели.">🔄 buxbalans (обновить всех)</button>
-      <button class="btn btn-sm" onclick="moexPullGirboOnlyBulk()" title="ТОЛЬКО ГИР БО (bo.nalog.gov.ru) для всех эмитентов в фильтре. Используй, когда buxbalans отстаёт или не содержит нужного года. ГИР БО ищет по ИМЕНИ (не по ИНН), мы берём имя из локального справочника и сверяем ИНН в результатах. Медленнее buxbalans (3-10 сек на эмитента), но это официальный первоисточник.">📡 ГИР БО (обновить всех)</button>
-      <button class="btn btn-sm" onclick="moexPullParents()" title="Обойти все эмитенты в reportsDB и для каждого, у кого отмечена материнская (через «🔗 связи»), подтянуть её отчётность (buxbalans → GIR BO fallback). Материнская сохраняется как отдельный эмитент в reportsDB; при включённом тумблере «По данным материнской» дочки будут скориться по её цифрам. 1-3 сек на ИНН.">👪 Подтянуть по материнским</button>
-      <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь.">📝 ИНН-мастер</button>
-      <button class="btn btn-sm" onclick="moexExportCsv()">💾 CSV текущего среза</button>
+      <button class="btn btn-sm" onclick="moexResetFilters()"> Сбросить фильтры</button>
+      <button class="btn btn-sm" onclick="moexPullGirboBulk()" title="Для всех отфильтрованных выпусков, эмитент которых ещё НЕ в базе и чей ИНН уже известен — подтянуть РСБУ с buxbalans.ru. 1 запрос на эмитента. Для бумаг без ИНН используйте « ИНН-мастер»."> buxbalans для эмитентов в фильтре</button>
+      <button class="btn btn-sm" onclick="moexPullGirboBulk(true)" title="Пройти по ВСЕМ эмитентам в фильтре (в том числе уже существующим в базе) и добавить недостающие годы с buxbalans.ru. Существующие периоды не перезаписываются — только дописываются новые. Используй, когда данные устарели."> buxbalans (обновить всех)</button>
+      <button class="btn btn-sm" onclick="moexPullGirboOnlyBulk()" title="ТОЛЬКО ГИР БО (bo.nalog.gov.ru) для всех эмитентов в фильтре. Используй, когда buxbalans отстаёт или не содержит нужного года. ГИР БО ищет по ИМЕНИ (не по ИНН), мы берём имя из локального справочника и сверяем ИНН в результатах. Медленнее buxbalans (3-10 сек на эмитента), но это официальный первоисточник."> ГИР БО (обновить всех)</button>
+      <button class="btn btn-sm" onclick="moexPullParents()" title="Обойти все эмитенты в reportsDB и для каждого, у кого отмечена материнская (через « связи»), подтянуть её отчётность (buxbalans → GIR BO fallback). Материнская сохраняется как отдельный эмитент в reportsDB; при включённом тумблере «По данным материнской» дочки будут скориться по её цифрам. 1-3 сек на ИНН."> Подтянуть по материнским</button>
+      <button class="btn btn-sm" onclick="moexOpenInnWizard()" title="Ручной ввод ИНН для бумаг, где автомат не справился. Даёт ссылки на bo.nalog.gov.ru и rusprofile.ru для поиска — ты находишь, копируешь, вставляешь. Для мелких ВДО это единственный надёжный путь."> ИНН-мастер</button>
+      <button class="btn btn-sm" onclick="moexExportCsv()"> CSV текущего среза</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center" title="Сортировка по годовой динамике запаса прочности эмитента: Δ score за 3 года (fallback 2/1). Если включена — перекрывает основную сортировку ниже. Эмитенты без данных для сравнения уходят в конец.">
-        📈 Динамика:
+         Динамика:
         <select id="moex-dyn-sort" onchange="moexApplyFilters()" style="font-size:.65rem;padding:2px 4px">
           <option value="">— не сортировать —</option>
           <option value="dyn-best">Лучшая динамика сверху (Δ score ↑)</option>
@@ -1095,20 +1126,20 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <option value="dde-worst">D/E (худшие сверху)</option>
             <option value="ebm-best">EBITDA-маржа (лучшие сверху)</option>
             <option value="ebm-worst">EBITDA-маржа (худшие сверху)</option>
-            <option value="cur-best">💧 Current Ratio (лучшие сверху)</option>
-            <option value="cur-worst">💧 Current Ratio (худшие сверху)</option>
-            <option value="cashr-best">💵 Cash Ratio (лучшие сверху)</option>
-            <option value="cashr-worst">💵 Cash Ratio (худшие сверху)</option>
-            <option value="eqr-best">🔷 Equity Ratio (лучшие сверху)</option>
-            <option value="eqr-worst">🔷 Equity Ratio (худшие сверху)</option>
-            <option value="bqi-best">⚖ Качество баланса (лучшие сверху)</option>
-            <option value="bqi-worst">⚖ Качество баланса (худшие сверху)</option>
-            <option value="rating-best">🏷 Рейтинг ↓ (лучшие сверху)</option>
-            <option value="rating-worst">🏷 Рейтинг ↑ (худшие сверху)</option>
-            <option value="stress-best">🛡 Запас прочности ↓ (лучшие сверху)</option>
-            <option value="stress-worst">🛡 Запас прочности ↑ (худшие сверху)</option>
-            <option value="peer-wide">Спред YTM к отрасли ↓ (широкий сверху = рынок видит риск)</option>
-            <option value="peer-narrow">Спред YTM к отрасли ↑ (узкий сверху = рынок спокоен)</option>
+            <option value="cur-best"> Current Ratio (лучшие сверху)</option>
+            <option value="cur-worst"> Current Ratio (худшие сверху)</option>
+            <option value="cashr-best"> Cash Ratio (лучшие сверху)</option>
+            <option value="cashr-worst"> Cash Ratio (худшие сверху)</option>
+            <option value="eqr-best"> Equity Ratio (лучшие сверху)</option>
+            <option value="eqr-worst"> Equity Ratio (худшие сверху)</option>
+            <option value="bqi-best"> Качество баланса (лучшие сверху)</option>
+            <option value="bqi-worst"> Качество баланса (худшие сверху)</option>
+            <option value="rating-best"> Рейтинг ↓ (лучшие сверху)</option>
+            <option value="rating-worst"> Рейтинг ↑ (худшие сверху)</option>
+            <option value="stress-best"> Запас прочности ↓ (лучшие сверху)</option>
+            <option value="stress-worst"> Запас прочности ↑ (худшие сверху)</option>
+            <option value="peer-wide"> Спред YTM к отрасли ↓ (широкий сверху = рынок видит риск)</option>
+            <option value="peer-narrow"> Спред YTM к отрасли ↑ (узкий сверху = рынок спокоен)</option>
           </optgroup>
         </select>
       </label>
@@ -1123,17 +1154,17 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
 <!-- ═══════════════════════════ ПАГА АКЦИЙ ═══════════════════════════ -->
 <div class="page" id="page-shares">
-  <div class="page-title">📈 Каталог акций Мосбиржи</div>
+  <div class="page-title"> Каталог акций Мосбиржи</div>
   <div class="page-sub">Режим TQBR (основной T+) · фундаментал из reportsDB · P/E, P/B, Кап-ция считаются на лету</div>
 
   <div class="card">
     <div class="card-hdr">
-      📡 Загрузка каталога акций
+       Загрузка каталога акций
       <span id="shares-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
     </div>
     <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-p" id="shares-refresh-btn" onclick="fetchSharesCatalog()">📡 Обновить каталог</button>
-      <button class="btn" onclick="sharesClearCache()" title="Удалить локальный кэш акций">🗑 Очистить кэш</button>
+      <button class="btn btn-p" id="shares-refresh-btn" onclick="fetchSharesCatalog()"> Обновить каталог</button>
+      <button class="btn" onclick="sharesClearCache()" title="Удалить локальный кэш акций"> Очистить кэш</button>
       <span id="shares-status" style="font-size:.62rem;color:var(--text2);flex:1"></span>
     </div>
     <div style="padding:4px 12px 10px;font-size:.58rem;color:var(--text3);line-height:1.55">
@@ -1142,7 +1173,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
   </div>
 
   <div class="card" id="shares-filters-card" style="display:none;margin-top:12px">
-    <div class="card-hdr">🎯 Фильтры <span id="shares-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div class="card-hdr"> Фильтры <span id="shares-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
     <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Поиск (тикер / ISIN / эмитент)</label>
@@ -1201,7 +1232,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <div style="padding:0 12px 8px">
       <div style="font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--acc)">
-        🧮 Фундаментал эмитента (из reportsDB + досье)
+         Фундаментал эмитента (из reportsDB + досье)
       </div>
       <div style="font-size:.55rem;color:var(--text3);margin-bottom:6px;line-height:1.5">
         Эти фильтры работают только для акций, эмитент которых есть в reportsDB. Включи хоть один — акции без matched эмитента скроются.
@@ -1239,9 +1270,9 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <option value="no">Только без рейтинга</option>
           </select>
         </div>
-        <div class="field" style="margin:0"><label style="font-size:.55rem">🛡 Запас прочности ≥</label>
+        <div class="field" style="margin:0"><label style="font-size:.55rem"> Запас прочности ≥</label>
           <input type="number" id="shares-f-stress-min" oninput="sharesApplyFilters()" step="5" min="0" max="100" placeholder="40"></div>
-        <div class="field" style="margin:0"><label style="font-size:.55rem">Отсекать аутсайдеров отрасли</label>
+        <div class="field" style="margin:0"><label style="font-size:.55rem"> Отсекать аутсайдеров отрасли</label>
           <select id="shares-f-pct-thresh" onchange="sharesApplyFilters()">
             <option value="">Не отсекать</option>
             <option value="25">Хуже 75% отрасли</option>
@@ -1252,7 +1283,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="sharesResetFilters()">Сбросить</button>
+      <button class="btn btn-sm" onclick="sharesResetFilters()"> Сбросить</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
@@ -1280,13 +1311,13 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <option value="icr-best">ICR (лучшие сверху)</option>
             <option value="roa-best">ROA (лучшие сверху)</option>
             <option value="ebm-best">EBITDA-маржа (лучшие сверху)</option>
-            <option value="cur-best">💧 Current Ratio (лучшие)</option>
-            <option value="cashr-best">💵 Cash Ratio (лучшие)</option>
-            <option value="eqr-best">🔷 Equity Ratio (лучшие)</option>
-            <option value="bqi-best">⚖ Качество баланса (лучшие)</option>
-            <option value="rating-best">🏷 Рейтинг ↓ (лучшие сверху)</option>
-            <option value="stress-best">🛡 Запас прочности ↓ (лучшие)</option>
-            <option value="stress-worst">🛡 Запас прочности ↑ (худшие)</option>
+            <option value="cur-best"> Current Ratio (лучшие)</option>
+            <option value="cashr-best"> Cash Ratio (лучшие)</option>
+            <option value="eqr-best"> Equity Ratio (лучшие)</option>
+            <option value="bqi-best"> Качество баланса (лучшие)</option>
+            <option value="rating-best"> Рейтинг ↓ (лучшие сверху)</option>
+            <option value="stress-best"> Запас прочности ↓ (лучшие)</option>
+            <option value="stress-worst"> Запас прочности ↑ (худшие)</option>
           </optgroup>
         </select>
       </label>
@@ -1300,26 +1331,26 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
 <!-- ═══════════════════════════ ПАГА ФЬЮЧЕРСОВ ═══════════════════════════ -->
 <div class="page" id="page-futures">
-  <div class="page-title">📉 Фьючерсы FORTS на акции</div>
+  <div class="page-title"> Фьючерсы FORTS на акции</div>
   <div class="page-sub">Только stock-futures — по кодам ASSETCODE, для которых есть базовая акция на MOEX. Фундаментал и мультипликаторы берутся с базовой акции (она через <code>reportsDB</code> ведёт на эмитента).</div>
 
   <div class="card">
     <div class="card-hdr">
-      📡 Загрузка каталога фьючерсов
+       Загрузка каталога фьючерсов
       <span id="fut-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
     </div>
     <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-p" id="fut-refresh-btn" onclick="fetchFuturesCatalog()">📡 Обновить каталог</button>
-      <button class="btn" onclick="futuresClearCache()" title="Удалить локальный кэш фьючерсов">🗑 Очистить кэш</button>
+      <button class="btn btn-p" id="fut-refresh-btn" onclick="fetchFuturesCatalog()"> Обновить каталог</button>
+      <button class="btn" onclick="futuresClearCache()" title="Удалить локальный кэш фьючерсов"> Очистить кэш</button>
       <span id="fut-status" style="font-size:.62rem;color:var(--text2);flex:1"></span>
     </div>
     <div style="padding:4px 12px 10px;font-size:.58rem;color:var(--text3);line-height:1.55">
-      Источник: ISS Мосбиржи, доска <code>RFUD</code>. Фильтруем по ASSETCODE — оставляем только те, у которых базовый актив — акция из каталога акций. «Платежеспособность» эмитента (D/E, ICR, ROA, ⚖ BQI, 🛡 запас прочности) и мультипликаторы (P/E, P/B, кап-ция) — те же, что на «📈 Акции»: тянутся через SECID базовой акции.
+      Источник: ISS Мосбиржи, доска <code>RFUD</code>. Фильтруем по ASSETCODE — оставляем только те, у которых базовый актив — акция из каталога акций. «Платежеспособность» эмитента (D/E, ICR, ROA,  BQI,  запас прочности) и мультипликаторы (P/E, P/B, кап-ция) — те же, что на « Акции»: тянутся через SECID базовой акции.
     </div>
   </div>
 
   <div class="card" id="fut-filters-card" style="display:none;margin-top:12px">
-    <div class="card-hdr">🎯 Фильтры <span id="fut-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div class="card-hdr"> Фильтры <span id="fut-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
     <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Поиск (тикер / базовая акция / эмитент)</label>
@@ -1355,7 +1386,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <div style="padding:0 12px 8px">
       <div style="font-size:.56rem;letter-spacing:.1em;color:var(--acc);text-transform:uppercase;margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--acc)">
-        🧮 Фундаментал базового эмитента (из reportsDB)
+         Фундаментал базового эмитента (из reportsDB)
       </div>
       <div style="font-size:.55rem;color:var(--text3);margin-bottom:6px;line-height:1.5">
         Включи хоть один — фьючерсы без matched эмитента скроются.
@@ -1371,7 +1402,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
           <input type="number" id="fut-f-icr-min" oninput="futuresApplyFilters()" step="0.5" placeholder="3"></div>
         <div class="field" style="margin:0"><label style="font-size:.55rem">ROA ≥, %</label>
           <input type="number" id="fut-f-roa-min" oninput="futuresApplyFilters()" step="0.5" placeholder="5"></div>
-        <div class="field" style="margin:0"><label style="font-size:.55rem">🛡 Запас прочности ≥</label>
+        <div class="field" style="margin:0"><label style="font-size:.55rem"> Запас прочности ≥</label>
           <input type="number" id="fut-f-stress-min" oninput="futuresApplyFilters()" step="5" min="0" max="100" placeholder="40"></div>
         <div class="field" style="margin:0"><label style="font-size:.55rem">Рейтинг ≥</label>
           <select id="fut-f-rating-min" onchange="futuresApplyFilters()">
@@ -1387,7 +1418,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="futuresResetFilters()">Сбросить</button>
+      <button class="btn btn-sm" onclick="futuresResetFilters()"> Сбросить</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
@@ -1410,9 +1441,9 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <option value="de-best">Долг/EBITDA (лучшие сверху)</option>
             <option value="icr-best">ICR (лучшие сверху)</option>
             <option value="roa-best">ROA (лучшие сверху)</option>
-            <option value="bqi-best">⚖ Качество баланса (лучшие)</option>
-            <option value="stress-best">🛡 Запас прочности ↓ (лучшие)</option>
-            <option value="stress-worst">🛡 Запас прочности ↑ (худшие)</option>
+            <option value="bqi-best"> Качество баланса (лучшие)</option>
+            <option value="stress-best"> Запас прочности ↓ (лучшие)</option>
+            <option value="stress-worst"> Запас прочности ↑ (худшие)</option>
           </optgroup>
         </select>
       </label>
@@ -1426,12 +1457,12 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
 <!-- ═══════════════════════════ ПАГА АРХИВА ═══════════════════════════ -->
 <div class="page" id="page-archive">
-  <div class="page-title">🪦 Архив облигаций</div>
+  <div class="page-title"> Архив облигаций</div>
   <div class="page-sub">Погашенные, дефолтные, приостановленные и отменённые выпуски из MOEX-кэша. Причина «смерти» определяется автоматически: STATUS, matDate, issueSize + раскрытия e-disclosure и история дефолтов из досье. База для анализа «кто доехал до погашения, а кто свалился».</div>
 
   <div class="card">
     <div class="card-hdr">
-      Распределение по причинам смерти
+       Распределение по причинам смерти
       <span id="arch-meta" style="margin-left:auto;font-size:.58rem;color:var(--text3);font-weight:400"></span>
     </div>
     <div id="arch-reasons" style="padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;font-size:.62rem"></div>
@@ -1440,7 +1471,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
   <div class="card" id="arch-survival-card" style="display:none;margin-top:12px">
     <div class="card-hdr">
-      🔬 Анализ выживаемости по отраслям
+       Анализ выживаемости по отраслям
       <span id="arch-survival-meta" style="margin-left:auto;font-size:.55rem;color:var(--text3);font-weight:400"></span>
     </div>
     <div style="padding:8px 12px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
@@ -1463,14 +1494,14 @@ tr:hover td{background:var(--s2);color:var(--text)}
         </label>
       </div>
       <div style="flex:1"></div>
-      <button class="btn btn-sm" onclick="archiveExportSurvivalCsv()" title="Экспорт таблицы survival-анализа в CSV">CSV отрасли</button>
+      <button class="btn btn-sm" onclick="archiveExportSurvivalCsv()" title="Экспорт таблицы survival-анализа в CSV"> CSV отрасли</button>
     </div>
     <div id="arch-survival-chart" style="padding:4px 12px 10px"></div>
     <div id="arch-survival-table" style="padding:0 12px 10px;font-size:.58rem"></div>
   </div>
 
   <div class="card" id="arch-filters-card" style="display:none;margin-top:12px">
-    <div class="card-hdr">🎯 Фильтры <span id="arch-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
+    <div class="card-hdr"> Фильтры <span id="arch-count" style="margin-left:auto;color:var(--acc);font-weight:600"></span></div>
     <div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
       <div class="field" style="margin:0">
         <label style="font-size:.55rem">Поиск (тикер / ISIN / эмитент)</label>
@@ -1480,13 +1511,13 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <label style="font-size:.55rem">Причина смерти</label>
         <select id="arch-f-reason" onchange="archiveApplyFilters()">
           <option value="">Все</option>
-          <option value="defaulted">🚨 Дефолт</option>
-          <option value="restructured">🔀 Реструктуризация</option>
+          <option value="defaulted"> Дефолт</option>
+          <option value="restructured"> Реструктуризация</option>
           <option value="suspended">⏸ Приостановлено</option>
-          <option value="matured">✓ Погашено нормально</option>
-          <option value="cancelled">❎ Отменено (issueSize=0)</option>
+          <option value="matured"> Погашено нормально</option>
+          <option value="cancelled"> Отменено (issueSize=0)</option>
           <option value="pre-launch">⏳ Не стартовало</option>
-          <option value="delisted">📤 Делистинг (снята MOEX без др. сигналов)</option>
+          <option value="delisted"> Делистинг (снята MOEX без др. сигналов)</option>
         </select>
       </div>
       <div class="field" style="margin:0">
@@ -1510,8 +1541,8 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
     </div>
     <div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="archiveResetFilters()">Сбросить</button>
-      <button class="btn btn-sm" onclick="archiveExportCsv()" title="Экспорт выборки в CSV для survival-анализа в R/Python">Экспорт CSV</button>
+      <button class="btn btn-sm" onclick="archiveResetFilters()"> Сбросить</button>
+      <button class="btn btn-sm" onclick="archiveExportCsv()" title="Экспорт выборки в CSV для survival-анализа в R/Python"> Экспорт CSV</button>
       <div style="flex:1"></div>
       <label style="font-size:.58rem;color:var(--text2);display:flex;gap:4px;align-items:center">
         Сортировка:
@@ -1539,7 +1570,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- GitHub Gist Sync Modal -->
 <div class="modal-overlay" id="modal-gist">
   <div class="modal" style="width:540px;max-width:94vw">
-    <div class="modal-hdr">⚡ Синхронизация между устройствами <button class="modal-x" onclick="closeModal('modal-gist')">✕</button></div>
+    <div class="modal-hdr"> Синхронизация между устройствами <button class="modal-x" onclick="closeModal('modal-gist')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
 
       <div style="font-size:.67rem;color:var(--text2);line-height:1.6;padding:6px 10px;background:var(--s2);border:1px solid var(--border)">
@@ -1549,7 +1580,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
       <div style="padding:8px 10px;background:var(--s2);border:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
         <div style="font-size:.68rem;color:var(--text2);line-height:1.5">
-          <strong style="color:var(--acc)">🔑 Код синхронизации</strong> — без GitHub, без регистрации, без аккаунтов.
+          <strong style="color:var(--acc)"> Код синхронизации</strong> — без GitHub, без регистрации, без аккаунтов.
           Данные шифруются <span style="color:var(--text3)">AES-256-GCM</span> у вас в браузере и кладутся анонимным blob'ом на jsonblob.com.
           Тот же код на другом устройстве расшифровывает и подгружает. Ключ шифрования — часть кода, сервер его не видит.
         </div>
@@ -1562,15 +1593,15 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <div id="sync-cloud-status" style="font-size:.6rem;padding:5px 8px;display:none;border:1px solid var(--border)"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm" onclick="syncMakeCode()" id="sync-make-btn" title="Создать новый зашифрованный blob и код доступа к нему">🆕 Создать код</button>
-          <button class="btn btn-sm btn-p" onclick="syncCloudSave()" id="sync-save-btn">Сохранить</button>
-          <button class="btn btn-sm" onclick="syncCloudLoad()" id="sync-load-btn">Загрузить</button>
-          <button class="btn btn-sm" onclick="syncShowQR()" title="Показать код как QR — удобно сканировать между ноутбуком и телефоном">📷 QR</button>
-          <button class="btn btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('sync-code').value)" title="Скопировать код в буфер">Скопировать</button>
+          <button class="btn btn-sm btn-p" onclick="syncCloudSave()" id="sync-save-btn"> Сохранить</button>
+          <button class="btn btn-sm" onclick="syncCloudLoad()" id="sync-load-btn"> Загрузить</button>
+          <button class="btn btn-sm" onclick="syncShowQR()" title="Показать код как QR — удобно сканировать между ноутбуком и телефоном"> QR</button>
+          <button class="btn btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('sync-code').value)" title="Скопировать код в буфер"> Скопировать</button>
         </div>
       </div>
 
       <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
-        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>📡 ГИР БО — прокси</strong> для автоматической подтяжки 5 лет РСБУ по ИНН</summary>
+        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong> ГИР БО — прокси</strong> для автоматической подтяжки 5 лет РСБУ по ИНН</summary>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
           <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
             ГИР БО (bo.nalog.gov.ru) не отдаёт CORS-заголовки браузеру, поэтому нужен прокси. По умолчанию — публичный <code>corsproxy.io</code>. Для приватности и надёжности можно развернуть свой Cloudflare Worker (5 минут, бесплатно): код в файле <code>cf-worker.js</code> в репозитории, инструкция в README. URL вашего Worker'а вписывайте сюда.
@@ -1586,20 +1617,20 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </details>
 
       <details style="padding:8px 10px;background:var(--s2);border:1px solid var(--border)">
-        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong>💼 Офлайн-код</strong> — без сети и без сервера, подходит когда блокировщик / корпоративный firewall режет fetch</summary>
+        <summary style="font-size:.65rem;color:var(--text2);cursor:pointer"><strong> Офлайн-код</strong> — без сети и без сервера, подходит когда блокировщик / корпоративный firewall режет fetch</summary>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
           <div style="font-size:.6rem;color:var(--text3);line-height:1.5">
             Собираем тот же снапшот (портфель, watchlist, reportsDB, эталоны, AI-ключ), сжимаем gzip'ом и кодируем в base64. Длинная текстовая строка копируется на другое устройство любым способом (Telegram Saved Messages, e-mail себе, AirDrop, заметки) и вставляется в это же поле. Никаких внешних серверов.
           </div>
-          <textarea id="offline-code" rows="4" placeholder="Нажмите «🧳 Собрать» — здесь появится код для копирования; либо вставьте сюда чужой код и нажмите «Применить»" style="width:100%;font-family:var(--mono);font-size:.55rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:6px;resize:vertical;min-height:80px"></textarea>
+          <textarea id="offline-code" rows="4" placeholder="Нажмите « Собрать» — здесь появится код для копирования; либо вставьте сюда чужой код и нажмите « Применить»" style="width:100%;font-family:var(--mono);font-size:.55rem;background:var(--bg);color:var(--text2);border:1px solid var(--border2);padding:6px;resize:vertical;min-height:80px"></textarea>
           <div id="offline-status" style="font-size:.6rem;padding:4px 8px;display:none;border:1px solid var(--border)"></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick="offlineMakeCode()" title="Собрать текущие данные в строку-код">🧳 Собрать</button>
-            <button class="btn btn-sm btn-p" onclick="offlineApplyCode()" title="Применить вставленный в textarea код">Применить</button>
-            <button class="btn btn-sm" onclick="offlineCopyCode()" title="Скопировать содержимое textarea в буфер">Скопировать</button>
-            <button class="btn btn-sm" onclick="offlineDownloadFile()" title="Скачать полный снапшот как .json-файл">💾 Файл</button>
+            <button class="btn btn-sm" onclick="offlineMakeCode()" title="Собрать текущие данные в строку-код"> Собрать</button>
+            <button class="btn btn-sm btn-p" onclick="offlineApplyCode()" title="Применить вставленный в textarea код"> Применить</button>
+            <button class="btn btn-sm" onclick="offlineCopyCode()" title="Скопировать содержимое textarea в буфер"> Скопировать</button>
+            <button class="btn btn-sm" onclick="offlineDownloadFile()" title="Скачать полный снапшот как .json-файл"> Файл</button>
             <input type="file" id="offline-file" accept=".json,application/json" style="display:none" onchange="offlineLoadFile(this)">
-            <button class="btn btn-sm" onclick="document.getElementById('offline-file').click()" title="Загрузить снапшот из .json-файла">📂 Из файла</button>
+            <button class="btn btn-sm" onclick="document.getElementById('offline-file').click()" title="Загрузить снапшот из .json-файла"> Из файла</button>
           </div>
         </div>
       </details>
@@ -1629,8 +1660,8 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-sm" onclick="gistLoad()" id="gist-load-btn">Загрузить с Gist</button>
-            <button class="btn btn-sm btn-p" onclick="gistSave()" id="gist-save-btn">Сохранить в Gist</button>
+            <button class="btn btn-sm" onclick="gistLoad()" id="gist-load-btn"> Загрузить с Gist</button>
+            <button class="btn btn-sm btn-p" onclick="gistSave()" id="gist-save-btn"> Сохранить в Gist</button>
           </div>
         </div>
       </details>
@@ -1646,7 +1677,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Крупный график показателя по периодам — открывается из матрицы сверки -->
 <div class="modal-overlay" id="modal-ref-chart">
   <div class="modal" style="width:840px;max-width:96vw">
-    <div class="modal-hdr">📈 <span id="ref-chart-title">График</span> <button class="modal-x" onclick="closeModal('modal-ref-chart')">✕</button></div>
+    <div class="modal-hdr"> <span id="ref-chart-title">График</span> <button class="modal-x" onclick="closeModal('modal-ref-chart')"></button></div>
     <div class="modal-body">
       <div id="ref-chart-svg" style="overflow:auto"></div>
       <div style="font-size:.55rem;color:var(--text3);margin-top:8px;text-align:center">Источник: эталоны + reportsDB. Чем больше периодов накоплено, тем точнее динамика.</div>
@@ -1664,7 +1695,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 </div>
 <div class="modal-overlay" id="modal-nl">
   <div class="modal">
-    <div class="modal-hdr">Создать список <button class="modal-x" onclick="closeModal('modal-nl')">✕</button></div>
+    <div class="modal-hdr">Создать список <button class="modal-x" onclick="closeModal('modal-nl')"></button></div>
     <div class="modal-body"><div class="field"><label>Название</label><input id="nl-name" placeholder="Потенциальные покупки..."></div></div>
     <div class="modal-ftr"><button class="btn" onclick="closeModal('modal-nl')">Отмена</button><button class="btn btn-p" onclick="createList()">Создать</button></div>
   </div>
@@ -1672,7 +1703,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
 <div class="modal-overlay" id="modal-import-paste">
   <div class="modal" style="width:600px;max-width:96vw">
-    <div class="modal-hdr">Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')">✕</button></div>
+    <div class="modal-hdr"> Вставить JSON бэкапа <button class="modal-x" onclick="closeModal('modal-import-paste')"></button></div>
     <div class="modal-body">
       <div style="font-size:.62rem;color:var(--text2);margin-bottom:6px;line-height:1.6">
         Вставьте содержимое JSON-файла целиком — если файл не удаётся открыть через выбор с диска. Начинается с <code>{</code> и заканчивается <code>}</code>.
@@ -1690,7 +1721,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Modal: импорт ГИРБО (CSV/XML) — дублирует сайдбар-пункт для мобильных -->
 <div class="modal-overlay" id="modal-girbo-import">
   <div class="modal" style="width:560px;max-width:96vw">
-    <div class="modal-hdr">Импорт ГИРБО (CSV/XML) <button class="modal-x" onclick="closeModal('modal-girbo-import')">✕</button></div>
+    <div class="modal-hdr"> Импорт ГИРБО (CSV/XML) <button class="modal-x" onclick="closeModal('modal-girbo-import')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Выгрузки с <strong>bo.nalog.gov.ru</strong> (ФНС). Поддерживается CSV/TXT и XML (КНД 0710099), Windows-1251 или UTF-8. Суммы в тысячах ₽ — пересчитываются автоматически.
@@ -1700,12 +1731,12 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn btn-p" style="flex:1;min-width:180px;padding:14px 12px;font-size:.72rem"
           onclick="document.getElementById('girbo-file-modal').click()">
-          📄 + Добавить файл
+           + Добавить файл
         </button>
         <button type="button" class="btn" style="flex:1;min-width:180px;padding:14px 12px;font-size:.72rem"
           onclick="document.getElementById('girbo-file-modal-dir').click()"
           title="Выбрать папку — все файлы из неё (и вложенных) добавятся в очередь. Работает, если сложишь все ГИРБО-файлы в отдельную папку.">
-          📁 Выбрать папку
+           Выбрать папку
         </button>
       </div>
       <div style="font-size:.57rem;color:var(--text3);line-height:1.5;margin-top:-4px">
@@ -1715,12 +1746,12 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <div id="girbo-drop"
            style="border:1px dashed var(--border2);padding:10px;text-align:center;background:var(--bg);cursor:pointer;user-select:none;font-size:.58rem;color:var(--text3)"
            onclick="document.getElementById('girbo-file-modal').click()">
-        или перетащите файлы сюда (десктоп)
+         или перетащите файлы сюда (десктоп)
       </div>
       <!-- Очередь: список уже добавленных файлов + кнопка импорта -->
       <div id="girbo-queue-wrap" style="display:none;border:1px solid var(--border2);padding:8px 10px;background:var(--bg)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-          <span style="font-size:.62rem;color:var(--text2);font-weight:600">В очереди: <span id="girbo-queue-count">0</span></span>
+          <span style="font-size:.62rem;color:var(--text2);font-weight:600"> В очереди: <span id="girbo-queue-count">0</span></span>
           <button class="btn btn-sm" type="button" onclick="girboQueueClear()" style="margin-left:auto;font-size:.56rem;padding:2px 8px">Очистить</button>
           <button class="btn btn-sm btn-p" type="button" onclick="girboQueueRun()" style="font-size:.58rem;padding:3px 10px">▶ Импортировать все</button>
         </div>
@@ -1748,33 +1779,33 @@ tr:hover td{background:var(--s2);color:var(--text)}
      отдаёт её html/json в БондАналитик через буфер обмена. -->
 <div class="modal-overlay" id="modal-auditit-import">
   <div class="modal" style="width:640px;max-width:96vw">
-    <div class="modal-hdr">📗 Импорт audit-it <button class="modal-x" onclick="closeModal('modal-auditit-import')">✕</button></div>
+    <div class="modal-hdr"> Импорт audit-it <button class="modal-x" onclick="closeModal('modal-auditit-import')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         <strong>audit-it.ru</strong> даёт до 11 лет РСБУ (2015-2025), включая ВДО и санкционные компании. Серверный парсинг блокируется anti-bot'ом, но <strong>твой браузер</strong> страницы открывает нормально. Два способа:
       </div>
       <details style="font-size:.62rem;color:var(--text2);background:var(--s2);padding:8px 10px;border:1px solid var(--border)">
-        <summary style="cursor:pointer;font-weight:600">🔖 Способ 1: bookmarklet (1 клик после настройки)</summary>
+        <summary style="cursor:pointer;font-weight:600"> Способ 1: bookmarklet (1 клик после настройки)</summary>
         <ol style="margin:8px 0 8px 16px;padding:0;line-height:1.7">
           <li>Нажми кнопку ниже → в буфер скопируется код закладки.</li>
-          <li>В браузере: Ctrl+Shift+B (панель закладок) → правый клик на панели → «Добавить страницу» → Имя: «📗 audit-it → БондАналитик», URL: Ctrl+V (вставить из буфера) → Сохранить.</li>
+          <li>В браузере: Ctrl+Shift+B (панель закладок) → правый клик на панели → «Добавить страницу» → Имя: « audit-it → БондАналитик», URL: Ctrl+V (вставить из буфера) → Сохранить.</li>
           <li>Теперь на любой странице audit-it.ru/buh_otchet/… клик по этой закладке → JSON в буфере.</li>
-          <li>Возвращайся сюда → «Вставить из буфера» ниже.</li>
+          <li>Возвращайся сюда → « Вставить из буфера» ниже.</li>
         </ol>
-        <button class="btn btn-sm btn-p" onclick="auditItCopyBookmarklet()" style="font-size:.58rem;padding:4px 10px">Скопировать bookmarklet</button>
+        <button class="btn btn-sm btn-p" onclick="auditItCopyBookmarklet()" style="font-size:.58rem;padding:4px 10px"> Скопировать bookmarklet</button>
       </details>
       <details style="font-size:.62rem;color:var(--text2);background:var(--s2);padding:8px 10px;border:1px solid var(--border)">
-        <summary style="cursor:pointer;font-weight:600">Способ 2: paste HTML (без настройки)</summary>
+        <summary style="cursor:pointer;font-weight:600"> Способ 2: paste HTML (без настройки)</summary>
         <ol style="margin:8px 0 0 16px;padding:0;line-height:1.7">
           <li>На странице компании на audit-it нажми Ctrl+U (просмотр исходного кода).</li>
           <li>В открывшейся вкладке: Ctrl+A → Ctrl+C (скопировать всё).</li>
-          <li>Вернись сюда → Ctrl+V в поле ниже → «Распознать».</li>
+          <li>Вернись сюда → Ctrl+V в поле ниже → « Распознать».</li>
         </ol>
       </details>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="auditItPasteFromClipboard()" style="font-size:.58rem;padding:4px 10px" title="Прочитать буфер обмена (требует разрешения браузера)">Вставить из буфера</button>
-        <button class="btn btn-sm" onclick="auditItParseInput()" style="font-size:.58rem;padding:4px 10px;border-color:var(--acc);color:var(--acc)">Распознать</button>
-        <button class="btn btn-sm" onclick="document.getElementById('auditit-paste').value = ''; document.getElementById('auditit-preview').innerHTML = ''; document.getElementById('auditit-modal-status').innerHTML = ''" style="font-size:.58rem;padding:4px 10px">🗑 Очистить</button>
+        <button class="btn btn-sm" onclick="auditItPasteFromClipboard()" style="font-size:.58rem;padding:4px 10px" title="Прочитать буфер обмена (требует разрешения браузера)"> Вставить из буфера</button>
+        <button class="btn btn-sm" onclick="auditItParseInput()" style="font-size:.58rem;padding:4px 10px;border-color:var(--acc);color:var(--acc)"> Распознать</button>
+        <button class="btn btn-sm" onclick="document.getElementById('auditit-paste').value = ''; document.getElementById('auditit-preview').innerHTML = ''; document.getElementById('auditit-modal-status').innerHTML = ''" style="font-size:.58rem;padding:4px 10px"> Очистить</button>
       </div>
       <textarea id="auditit-paste" placeholder="Сюда HTML страницы audit-it либо JSON от bookmarklet. Содержимое может быть длинное — несколько МБ, это нормально."
         style="width:100%;min-height:180px;font-family:var(--mono);font-size:.56rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px;resize:vertical"></textarea>
@@ -1792,13 +1823,13 @@ tr:hover td{background:var(--s2);color:var(--text)}
      запрос повторяется с введённым словом — тогда ЕГРЮЛ пропускает. -->
 <div class="modal-overlay" id="modal-egrul-captcha">
   <div class="modal" style="width:360px;max-width:96vw">
-    <div class="modal-hdr">🏛 Капча ЕГРЮЛ <button class="modal-x" onclick="_egrulCaptchaCancel()">✕</button></div>
+    <div class="modal-hdr"> Капча ЕГРЮЛ <button class="modal-x" onclick="_egrulCaptchaCancel()"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;align-items:center">
       <div id="egrul-captcha-msg" style="font-size:.65rem;color:var(--text2);text-align:center">Введи буквы/цифры с картинки и нажми «Продолжить».</div>
       <img id="egrul-captcha-img" alt="captcha" style="max-width:100%;background:#fff;padding:4px;border:1px solid var(--border);image-rendering:pixelated">
       <input type="text" id="egrul-captcha-input" autocomplete="off" autocapitalize="none" spellcheck="false" style="width:100%;font-family:var(--mono);font-size:.85rem;padding:8px;background:var(--bg);color:var(--text);border:1px solid var(--border2);text-align:center;letter-spacing:2px" onkeydown="if(event.key==='Enter'){ event.preventDefault(); _egrulCaptchaSubmit(); }">
       <div style="display:flex;gap:6px;width:100%">
-        <button class="btn btn-sm btn-p" style="flex:1" onclick="_egrulCaptchaSubmit()">✓ Продолжить</button>
+        <button class="btn btn-sm btn-p" style="flex:1" onclick="_egrulCaptchaSubmit()"> Продолжить</button>
         <button class="btn btn-sm" onclick="_egrulCaptchaCancel()">Отмена</button>
       </div>
     </div>
@@ -1808,7 +1839,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Modal: диагностика XML — дамп всех тегов для ручной отправки в чат -->
 <div class="modal-overlay" id="modal-girbo-diag">
   <div class="modal" style="width:600px;max-width:96vw">
-    <div class="modal-hdr">🔎 Диагностика XML <button class="modal-x" onclick="closeModal('modal-girbo-diag')">✕</button></div>
+    <div class="modal-hdr"> Диагностика XML <button class="modal-x" onclick="closeModal('modal-girbo-diag')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.5">
         Список всех тегов из твоего XML. Что делать:<br>
@@ -1817,7 +1848,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
       </div>
       <textarea id="girbo-diag-text" readonly
         style="width:100%;min-height:260px;font-family:var(--mono);font-size:.58rem;background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:8px;white-space:pre;overflow:auto"></textarea>
-      <button class="btn btn-sm btn-p" onclick="_girboDiagCopy()" style="align-self:flex-start">Попробовать скопировать</button>
+      <button class="btn btn-sm btn-p" onclick="_girboDiagCopy()" style="align-self:flex-start"> Попробовать скопировать</button>
       <div id="girbo-diag-copy-status" style="font-size:.58rem;color:var(--text3)"></div>
     </div>
     <div class="modal-ftr">
@@ -1830,9 +1861,9 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <div class="modal-overlay" id="modal-dossier">
   <div class="modal" style="width:920px;max-width:98vw;max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
     <div class="modal-hdr">
-      Досье эмитента: <span id="dossier-issuer-name" style="color:var(--acc)"></span>
+       Досье эмитента: <span id="dossier-issuer-name" style="color:var(--acc)"></span>
       <span id="dossier-updated" style="font-size:.54rem;color:var(--text3);margin-left:auto;margin-right:12px"></span>
-      <button class="modal-x" onclick="closeModal('modal-dossier')">✕</button>
+      <button class="modal-x" onclick="closeModal('modal-dossier')"></button>
     </div>
     <div style="display:flex;gap:2px;border-bottom:1px solid var(--border);flex-shrink:0">
       <button class="btn btn-sm dossier-tab-btn active" data-dt="fin"  onclick="dossierTab('fin')"  style="border:none;border-bottom:2px solid var(--acc);border-radius:0;padding:10px 16px">A · Финансы <span style="color:var(--text3);font-size:.54rem">(авто)</span></button>
@@ -1851,11 +1882,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <!-- Tab B: Бизнес-профиль (ручной ввод + подсказки) -->
       <div id="dossier-tab-biz" class="dossier-tab-pane" style="display:none">
         <div style="font-size:.6rem;color:var(--text3);margin-bottom:12px;line-height:1.5">
-          Наводи на 📖 рядом с каждым полем — подскажу, где конкретно брать данные. Ничего обязательного — заполняй по ходу, что смогла найти.
+          Наводи на  рядом с каждым полем — подскажу, где конкретно брать данные. Ничего обязательного — заполняй по ходу, что смогла найти.
         </div>
         <div class="dossier-grid">
           <label class="dossier-field">
-            <span>Рыночная позиция <span class="dossier-hint" data-hint="Качественная градация, не требует одной цифры. Если у эмитента много рынков/регионов, подробности опиши ниже в «Сегменты и доли». Монополист = &gt; 50% на основном рынке или единственный (ЖКХ, сети). Доминирующий = 30-50%. Крупный = 15-30%. Средний = 5-15%. Малый = &lt; 5%. Нишевый = специализация без прямой конкуренции.">📖</span></span>
+            <span>Рыночная позиция <span class="dossier-hint" data-hint="Качественная градация, не требует одной цифры. Если у эмитента много рынков/регионов, подробности опиши ниже в «Сегменты и доли». Монополист = &gt; 50% на основном рынке или единственный (ЖКХ, сети). Доминирующий = 30-50%. Крупный = 15-30%. Средний = 5-15%. Малый = &lt; 5%. Нишевый = специализация без прямой конкуренции."></span></span>
             <select id="dos-biz-marketPosition">
               <option value="">—</option>
               <option value="monopoly">Монополист / квази-монополист (&gt; 50%)</option>
@@ -1867,19 +1898,19 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field" style="grid-column:span 2">
-            <span>Сегменты и доли — свободный текст <span class="dossier-hint" data-hint="Честно покажи структуру, если рынок не один. Пример для ТГК-14: «тепло Забайкалье 26%, тепло Бурятия 30%, Чита+У-У — монополист по теплоснабжению; электро Забайкалье 31%, электро Бурятия 11%». Одной цифрой такое не описать.">📖</span></span>
+            <span>Сегменты и доли — свободный текст <span class="dossier-hint" data-hint="Честно покажи структуру, если рынок не один. Пример для ТГК-14: «тепло Забайкалье 26%, тепло Бурятия 30%, Чита+У-У — монополист по теплоснабжению; электро Забайкалье 31%, электро Бурятия 11%». Одной цифрой такое не описать."></span></span>
             <textarea id="dos-biz-segments" placeholder="тепло Забайкалье 26%, тепло Бурятия 30%, Чита+Улан-Удэ — монополист; электро Забайкалье 31%, электро Бурятия 11%" style="min-height:50px"></textarea>
           </label>
           <label class="dossier-field">
-            <span>Топ-3 клиента = % выручки <span class="dossier-hint" data-hint="Годовой отчёт — раздел «Существенные риски», «Концентрация клиентов» или «Выручка по клиентам». Часто в МСФО в примечаниях к выручке (Note 3-4). &gt;50% — высокая концентрация = риск.">📖</span></span>
+            <span>Топ-3 клиента = % выручки <span class="dossier-hint" data-hint="Годовой отчёт — раздел «Существенные риски», «Концентрация клиентов» или «Выручка по клиентам». Часто в МСФО в примечаниях к выручке (Note 3-4). &gt;50% — высокая концентрация = риск."></span></span>
             <input type="number" id="dos-biz-clientsTop3" step="1" min="0" max="100" placeholder="0..100">
           </label>
           <label class="dossier-field">
-            <span>Топ-3 поставщика = % закупок <span class="dossier-hint" data-hint="МСФО примечания — «Существенные контрагенты по закупкам». У торговли / дистрибуции критично. Часто раскрывают &gt; 10%.">📖</span></span>
+            <span>Топ-3 поставщика = % закупок <span class="dossier-hint" data-hint="МСФО примечания — «Существенные контрагенты по закупкам». У торговли / дистрибуции критично. Часто раскрывают &gt; 10%."></span></span>
             <input type="number" id="dos-biz-suppliersTop3" step="1" min="0" max="100" placeholder="0..100">
           </label>
           <label class="dossier-field">
-            <span>Географическая диверсификация <span class="dossier-hint" data-hint="МСФО — «Сегментная отчётность». Признак: количество стран с операциями + доля каждой.">📖</span></span>
+            <span>Географическая диверсификация <span class="dossier-hint" data-hint="МСФО — «Сегментная отчётность». Признак: количество стран с операциями + доля каждой."></span></span>
             <select id="dos-biz-geoDiv">
               <option value="">—</option>
               <option value="local">Один регион РФ</option>
@@ -1889,11 +1920,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Доля экспорта, % <span class="dossier-hint" data-hint="МСФО — «Выручка по географии». Высокий экспорт = валютная подушка + санкционный риск.">📖</span></span>
+            <span>Доля экспорта, % <span class="dossier-hint" data-hint="МСФО — «Выручка по географии». Высокий экспорт = валютная подушка + санкционный риск."></span></span>
             <input type="number" id="dos-biz-exportShare" step="1" min="0" max="100" placeholder="0..100">
           </label>
           <label class="dossier-field">
-            <span>Цикличность отрасли <span class="dossier-hint" data-hint="Оценка чувствительности к фазам делового цикла. Строительство, металлургия, автопром — высокая. Энергетика, связь, продукты питания — низкая. В Подходе 2 будет шаблон по отрасли.">📖</span></span>
+            <span>Цикличность отрасли <span class="dossier-hint" data-hint="Оценка чувствительности к фазам делового цикла. Строительство, металлургия, автопром — высокая. Энергетика, связь, продукты питания — низкая. В Подходе 2 будет шаблон по отрасли."></span></span>
             <select id="dos-biz-cyclicality">
               <option value="">—</option>
               <option value="low">Низкая (потребительский базис, коммуналка)</option>
@@ -1902,7 +1933,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Барьеры входа в отрасль <span class="dossier-hint" data-hint="Лицензирование, капитальные затраты, технологии, эффект масштаба. Высокие = защита маржи. Низкие = новые игроки давят цену.">📖</span></span>
+            <span>Барьеры входа в отрасль <span class="dossier-hint" data-hint="Лицензирование, капитальные затраты, технологии, эффект масштаба. Высокие = защита маржи. Низкие = новые игроки давят цену."></span></span>
             <select id="dos-biz-barriers">
               <option value="">—</option>
               <option value="low">Низкие (услуги, торговля)</option>
@@ -1911,7 +1942,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Регуляторная зависимость <span class="dossier-hint" data-hint="Насколько финрезультат зависит от тарифов/регуляции. Энергосетевые, ЖКХ — высокая. Импортёры — средняя. IT, B2B-услуги — низкая.">📖</span></span>
+            <span>Регуляторная зависимость <span class="dossier-hint" data-hint="Насколько финрезультат зависит от тарифов/регуляции. Энергосетевые, ЖКХ — высокая. Импортёры — средняя. IT, B2B-услуги — низкая."></span></span>
             <select id="dos-biz-regDependency">
               <option value="">—</option>
               <option value="low">Низкая</option>
@@ -1920,7 +1951,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Капексоёмкость <span class="dossier-hint" data-hint="Отношение CAPEX / EBITDA за год. Высокая (&gt; 50%) — все деньги уходят в развитие, свободного кешфлоу почти нет. Низкая (&lt; 20%) — компания может гасить долг и платить дивиденды.">📖</span></span>
+            <span>Капексоёмкость <span class="dossier-hint" data-hint="Отношение CAPEX / EBITDA за год. Высокая (&gt; 50%) — все деньги уходят в развитие, свободного кешфлоу почти нет. Низкая (&lt; 20%) — компания может гасить долг и платить дивиденды."></span></span>
             <select id="dos-biz-capexIntensity">
               <option value="">—</option>
               <option value="low">Низкая (&lt; 20% EBITDA)</option>
@@ -1929,7 +1960,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Сезонность <span class="dossier-hint" data-hint="Смотрим квартальные выручки в МСФО. Сильная — если Q4/Q1 отличается &gt; 2×. У ритейла, туризма, ЖКХ — выражена; у связи, аренды — слабая.">📖</span></span>
+            <span>Сезонность <span class="dossier-hint" data-hint="Смотрим квартальные выручки в МСФО. Сильная — если Q4/Q1 отличается &gt; 2×. У ритейла, туризма, ЖКХ — выражена; у связи, аренды — слабая."></span></span>
             <select id="dos-biz-seasonality">
               <option value="">—</option>
               <option value="none">Нет / слабая</option>
@@ -1938,7 +1969,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Валютные риски <span class="dossier-hint" data-hint="МСФО — «Управление валютным риском» или «Финансовые инструменты». Хеджируется или открытая позиция?">📖</span></span>
+            <span>Валютные риски <span class="dossier-hint" data-hint="МСФО — «Управление валютным риском» или «Финансовые инструменты». Хеджируется или открытая позиция?"></span></span>
             <select id="dos-biz-currencyRisk">
               <option value="">—</option>
               <option value="none">Нет (всё рубли)</option>
@@ -1960,7 +1991,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
         </div>
         <div class="dossier-grid">
           <label class="dossier-field">
-            <span>Аудитор <span class="dossier-hint" data-hint="Титульный лист МСФО (справа внизу) или Аудиторское заключение в начале отчёта. Big-4 (Deloitte/PwC/EY/KPMG) ушли из РФ — у крупных теперь «российская 4» (Б1, Технологии Доверия, Кэпт, ФБК).">📖</span></span>
+            <span>Аудитор <span class="dossier-hint" data-hint="Титульный лист МСФО (справа внизу) или Аудиторское заключение в начале отчёта. Big-4 (Deloitte/PwC/EY/KPMG) ушли из РФ — у крупных теперь «российская 4» (Б1, Технологии Доверия, Кэпт, ФБК)."></span></span>
             <select id="dos-mod-auditor">
               <option value="">—</option>
               <option value="big4">Big-4 / их правопреемники в РФ</option>
@@ -1970,7 +2001,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Частота раскрытий МСФО <span class="dossier-hint" data-hint="Смотри архив на e-disclosure.ru или в разделе «Инвесторам» сайта эмитента. Ежеквартально = прозрачно + много данных для анализа. Только годовой = слепая зона 9+ месяцев.">📖</span></span>
+            <span>Частота раскрытий МСФО <span class="dossier-hint" data-hint="Смотри архив на e-disclosure.ru или в разделе «Инвесторам» сайта эмитента. Ежеквартально = прозрачно + много данных для анализа. Только годовой = слепая зона 9+ месяцев."></span></span>
             <select id="dos-mod-disclosureFreq">
               <option value="">—</option>
               <option value="quarterly">Ежеквартально</option>
@@ -1981,7 +2012,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Господдержка <span class="dossier-hint" data-hint="Явная = основной акционер РФ/субъект/ФНБ/госкорпорация. Неявная = стратегическое предприятие, спецпроекты, bail-out в прошлом. Проверить: акционеры в годовом отчёте + СОЭП реестр.">📖</span></span>
+            <span>Господдержка <span class="dossier-hint" data-hint="Явная = основной акционер РФ/субъект/ФНБ/госкорпорация. Неявная = стратегическое предприятие, спецпроекты, bail-out в прошлом. Проверить: акционеры в годовом отчёте + СОЭП реестр."></span></span>
             <select id="dos-mod-stateSupport">
               <option value="">—</option>
               <option value="explicit">Явная (государство/госкомпания акционер)</option>
@@ -1990,7 +2021,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Структура акционеров <span class="dossier-hint" data-hint="Годовой отчёт — список акционеров &gt; 5%. Или disclosure.ru — «Список лиц, контролирующих эмитента».">📖</span></span>
+            <span>Структура акционеров <span class="dossier-hint" data-hint="Годовой отчёт — список акционеров &gt; 5%. Или disclosure.ru — «Список лиц, контролирующих эмитента»."></span></span>
             <select id="dos-mod-ownership">
               <option value="">—</option>
               <option value="state">Государство / госкомпания</option>
@@ -2001,11 +2032,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field" style="grid-column:span 2">
-            <span>Кредитные рейтинги <span class="dossier-hint" data-hint="raexpert.ru/ratings, acra-ratings.ru, ratings.ru (НКР). Формат: «AA-(RU) Эксперт РА, стабильный / A+(RU) АКРА». Укажи все актуальные, через запятую.">📖</span></span>
+            <span>Кредитные рейтинги <span class="dossier-hint" data-hint="raexpert.ru/ratings, acra-ratings.ru, ratings.ru (НКР). Формат: «AA-(RU) Эксперт РА, стабильный / A+(RU) АКРА». Укажи все актуальные, через запятую."></span></span>
             <input type="text" id="dos-mod-rating" placeholder="AA-(RU) Эксперт РА · A+(RU) АКРА">
           </label>
           <label class="dossier-field">
-            <span>История дефолтов <span class="dossier-hint" data-hint="cbonds.ru или raexpert.ru — «Дефолты» в поиске по эмитенту. Реструктуризация купона / основной суммы считается техническим дефолтом.">📖</span></span>
+            <span>История дефолтов <span class="dossier-hint" data-hint="cbonds.ru или raexpert.ru — «Дефолты» в поиске по эмитенту. Реструктуризация купона / основной суммы считается техническим дефолтом."></span></span>
             <select id="dos-mod-defaultHistory">
               <option value="">—</option>
               <option value="none">Нет</option>
@@ -2014,11 +2045,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Доля краткосрочного долга, % <span class="dossier-hint" data-hint="МСФО — «Заимствования», разделение на long-term / short-term. Или грубо: cl / (cl + non-current debt). &gt; 50% = риск рефинансирования.">📖</span></span>
+            <span>Доля краткосрочного долга, % <span class="dossier-hint" data-hint="МСФО — «Заимствования», разделение на long-term / short-term. Или грубо: cl / (cl + non-current debt). &gt; 50% = риск рефинансирования."></span></span>
             <input type="number" id="dos-mod-shortDebtShare" step="1" min="0" max="100" placeholder="0..100">
           </label>
           <label class="dossier-field">
-            <span>Риск рефинансирования <span class="dossier-hint" data-hint="Субъективная оценка: если в ближайшие 12 мес. надо гасить &gt; cash + 50% EBITDA, а в портфеле нет откр. кредитных линий — высокий.">📖</span></span>
+            <span>Риск рефинансирования <span class="dossier-hint" data-hint="Субъективная оценка: если в ближайшие 12 мес. надо гасить &gt; cash + 50% EBITDA, а в портфеле нет откр. кредитных линий — высокий."></span></span>
             <select id="dos-mod-refinanceRisk">
               <option value="">—</option>
               <option value="low">Низкий</option>
@@ -2027,7 +2058,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Ковенанты в выпусках <span class="dossier-hint" data-hint="Эмиссионная документация — Проспект или Решение о выпуске на e-disclosure.ru. Ищи «Финансовые ковенанты» или «Обязательства эмитента». Типично: Долг/EBITDA &lt; X, ICR &gt; Y.">📖</span></span>
+            <span>Ковенанты в выпусках <span class="dossier-hint" data-hint="Эмиссионная документация — Проспект или Решение о выпуске на e-disclosure.ru. Ищи «Финансовые ковенанты» или «Обязательства эмитента». Типично: Долг/EBITDA &lt; X, ICR &gt; Y."></span></span>
             <select id="dos-mod-covenants">
               <option value="">—</option>
               <option value="strict">Жёсткие (2+ финансовых ковенанта)</option>
@@ -2036,7 +2067,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
             </select>
           </label>
           <label class="dossier-field">
-            <span>Старшинство выпусков <span class="dossier-hint" data-hint="Senior unsecured — обычный бонд. Субординированные = банковские / hybrid capital, погашаются после обычных. Обеспеченные — залог имущества.">📖</span></span>
+            <span>Старшинство выпусков <span class="dossier-hint" data-hint="Senior unsecured — обычный бонд. Субординированные = банковские / hybrid capital, погашаются после обычных. Обеспеченные — залог имущества."></span></span>
             <select id="dos-mod-subordination">
               <option value="">—</option>
               <option value="senior">Senior (обычные)</option>
@@ -2068,7 +2099,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
           <input type="hidden" id="dos-iss-origKey">
           <div class="dossier-grid">
             <label class="dossier-field">
-              <span>ISIN <span class="dossier-hint" data-hint="12 символов: 2 буквы страны + 10 цифр. На MOEX.com в карточке бумаги. Пример: RU000A107SV1.">📖</span></span>
+              <span>ISIN <span class="dossier-hint" data-hint="12 символов: 2 буквы страны + 10 цифр. На MOEX.com в карточке бумаги. Пример: RU000A107SV1."></span></span>
               <input type="text" id="dos-iss-isin" placeholder="RU000A107SV1" maxlength="12">
             </label>
             <label class="dossier-field">
@@ -2112,11 +2143,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
               <input type="date" id="dos-iss-offerDate">
             </label>
             <label class="dossier-field">
-              <span>Объём выпуска, млн ₽ <span class="dossier-hint" data-hint="MOEX → карточка бумаги → «Номинальный объём выпуска». У мелких выпусков часто &lt; 500 млн = плохая ликвидность, разрыв bid/ask.">📖</span></span>
+              <span>Объём выпуска, млн ₽ <span class="dossier-hint" data-hint="MOEX → карточка бумаги → «Номинальный объём выпуска». У мелких выпусков часто &lt; 500 млн = плохая ликвидность, разрыв bid/ask."></span></span>
               <input type="number" id="dos-iss-issueSize" step="1" min="0">
             </label>
             <label class="dossier-field">
-              <span>Уровень листинга <span class="dossier-hint" data-hint="MOEX → карточка бумаги → «Уровень листинга». 1 = котировальный, для институционалов / НПФ. 2 = квалификация попроще. 3 = некотировальный.">📖</span></span>
+              <span>Уровень листинга <span class="dossier-hint" data-hint="MOEX → карточка бумаги → «Уровень листинга». 1 = котировальный, для институционалов / НПФ. 2 = квалификация попроще. 3 = некотировальный."></span></span>
               <select id="dos-iss-listLevel">
                 <option value="">—</option>
                 <option value="1">1 уровень</option>
@@ -2130,9 +2161,9 @@ tr:hover td{background:var(--s2);color:var(--text)}
             <textarea id="dos-iss-note" placeholder="Специфические ковенанты, условия put-опциона, amortization schedule..." style="min-height:50px"></textarea>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-sm btn-p" onclick="dossierIssueSave()">💾 Сохранить выпуск</button>
+            <button class="btn btn-sm btn-p" onclick="dossierIssueSave()"> Сохранить выпуск</button>
             <button class="btn btn-sm" onclick="document.getElementById('dossier-iss-form').style.display='none'">Отмена</button>
-            <button class="btn btn-sm" id="dos-iss-del-btn" style="display:none;margin-left:auto;border-color:var(--danger);color:var(--danger)" onclick="dossierIssueDelete()">🗑 Удалить</button>
+            <button class="btn btn-sm" id="dos-iss-del-btn" style="display:none;margin-left:auto;border-color:var(--danger);color:var(--danger)" onclick="dossierIssueDelete()"> Удалить</button>
           </div>
         </div>
       </div>
@@ -2140,7 +2171,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-dossier')">Закрыть</button>
-      <button class="btn btn-p" onclick="dossierSave()">💾 Сохранить досье</button>
+      <button class="btn btn-p" onclick="dossierSave()"> Сохранить досье</button>
     </div>
   </div>
 </div>
@@ -2149,14 +2180,14 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <div class="modal-overlay" id="modal-inn-wizard">
   <div class="modal" style="width:880px;max-width:98vw;max-height:92vh;overflow:hidden;display:flex;flex-direction:column">
     <div class="modal-hdr">
-      📝 ИНН-мастер: ручное заполнение
+       ИНН-мастер: ручное заполнение
       <span id="inn-wiz-count" style="font-size:.58rem;color:var(--text3);margin-left:auto;margin-right:12px"></span>
-      <button class="modal-x" onclick="closeModal('modal-inn-wizard')">✕</button>
+      <button class="modal-x" onclick="closeModal('modal-inn-wizard')"></button>
     </div>
     <div style="padding:10px 14px;font-size:.6rem;color:var(--text2);line-height:1.5;border-bottom:1px solid var(--border)">
       Для каждого выпуска без matched эмитента — две кнопки поиска:
       <strong>🇷🇺 ФНС</strong> (bo.nalog.gov.ru — официальный реестр, ИНН точно будет в карточке) и
-      <strong>🔎 RusProfile</strong> (быстрее и с названием проще). Нашла ИНН → вставила в поле → «💾 Сохранить всё». После сохранения можно сразу подтянуть ГИР БО для введённых.
+      <strong> RusProfile</strong> (быстрее и с названием проще). Нашла ИНН → вставила в поле → « Сохранить всё». После сохранения можно сразу подтянуть ГИР БО для введённых.
     </div>
     <div class="modal-body" id="inn-wiz-body" style="overflow-y:auto;flex:1;padding:8px 14px"></div>
     <div class="modal-ftr" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2164,19 +2195,19 @@ tr:hover td{background:var(--s2);color:var(--text)}
       <label style="font-size:.6rem;color:var(--text2);display:flex;gap:4px;align-items:center;margin-left:auto;margin-right:6px;cursor:pointer">
         <input type="checkbox" id="inn-wiz-autogirbo" checked style="margin:0"> И сразу подтянуть ГИР БО
       </label>
-      <button class="btn btn-p" onclick="moexSaveInnWizard()">💾 Сохранить всё</button>
+      <button class="btn btn-p" onclick="moexSaveInnWizard()"> Сохранить всё</button>
     </div>
   </div>
 </div>
 
 <!-- Modal: мини-профиль эмитента — быстрый просмотр поверх каталога MOEX.
-     Не покидая страницу «🏛 Каталог Мосбиржи», смотрим последние периоды
+     Не покидая страницу « Каталог Мосбиржи», смотрим последние периоды
      и мультипликаторы. Кнопка «Открыть в Базе отчётности» — полный переход. -->
 <div class="modal-overlay" id="modal-issuer-peek">
   <div class="modal" style="width:820px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column">
     <div class="modal-hdr">
       <span id="issuer-peek-name">—</span>
-      <button class="modal-x" onclick="closeModal('modal-issuer-peek')">✕</button>
+      <button class="modal-x" onclick="closeModal('modal-issuer-peek')"></button>
     </div>
     <div class="modal-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
       <div id="issuer-peek-meta" style="font-size:.62rem;color:var(--text2)"></div>
@@ -2187,9 +2218,9 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-issuer-peek')">← Закрыть, вернуться к каталогу</button>
-      <button class="btn" id="issuer-peek-compare-btn">➕ в сравнение</button>
-      <button class="btn" id="issuer-peek-schedule-btn" title="Открыть график выплат по всем выпускам этого эмитента — бар-чарт по месяцам, таблица с суммой к погашению и переплатой по каждому выпуску, сопоставление с EBIT.">📅 График выплат</button>
-      <button class="btn btn-p" id="issuer-peek-open-full">📂 Открыть в Базе отчётности</button>
+      <button class="btn" id="issuer-peek-compare-btn"> в сравнение</button>
+      <button class="btn" id="issuer-peek-schedule-btn" title="Открыть график выплат по всем выпускам этого эмитента — бар-чарт по месяцам, таблица с суммой к погашению и переплатой по каждому выпуску, сопоставление с EBIT."> График выплат</button>
+      <button class="btn btn-p" id="issuer-peek-open-full"> Открыть в Базе отчётности</button>
     </div>
   </div>
 </div>
@@ -2198,10 +2229,10 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <div class="modal-overlay" id="modal-schedule">
   <div class="modal" style="width:1200px;max-width:98vw;max-height:96vh;display:flex;flex-direction:column">
     <div class="modal-hdr">
-      📅 График выплат
+       График выплат
       <span id="sched-issuer-name" style="margin-left:10px;color:var(--acc);font-size:.75rem"></span>
       <span id="sched-meta" style="margin-left:auto;color:var(--text3);font-size:.56rem;font-weight:400"></span>
-      <button class="modal-x" onclick="closeModal('modal-schedule')">✕</button>
+      <button class="modal-x" onclick="closeModal('modal-schedule')"></button>
     </div>
     <div class="modal-body" style="overflow:auto;flex:1">
       <div id="sched-summary" style="padding:10px 12px;background:var(--s2);border:1px solid var(--border);margin-bottom:10px;font-size:.62rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px"></div>
@@ -2222,11 +2253,11 @@ tr:hover td{background:var(--s2);color:var(--text)}
         <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer">
           <input type="checkbox" id="sched-show-ebit" checked onchange="_schedRerender()" style="margin:0"> Линия EBIT/период
         </label>
-        <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer" title="Показывать новые размещения облигаций эмитента — зелёной подкладкой под баром того периода, в который они пришлись. Если приток зелёного ≥ 50% от погашения периода, сверху ставится ♻ — признак рефинансирования (пирамидальная схема). Видно до 3 лет назад.">
+        <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer" title="Показывать новые размещения облигаций эмитента — зелёной подкладкой под баром того периода, в который они пришлись. Если приток зелёного ≥ 50% от погашения периода, сверху ставится  — признак рефинансирования (пирамидальная схема). Видно до 3 лет назад.">
           <input type="checkbox" id="sched-show-issuance" checked onchange="_schedRerender()" style="margin:0"> <span style="color:#6cba7c">■</span> Новые размещения (приток)
         </label>
         <label style="display:inline-flex;gap:4px;align-items:center;cursor:pointer" title="Сводка размещений за последние 12 месяцев. Показывает насколько эмитент активен на рынке долга: много выпусков с короткими перерывами — активно занимает; пусто — тишина (возможно, нет доступа либо не нуждается). Не связано с рефинансированием — отдельная метрика активности.">
-          <input type="checkbox" id="sched-show-activity-12m" checked onchange="_schedRerender()" style="margin:0"> 🕒 Активность 12м
+          <input type="checkbox" id="sched-show-activity-12m" checked onchange="_schedRerender()" style="margin:0">  Активность 12м
         </label>
         <span style="color:var(--text3);margin-left:12px">Горизонт:</span>
         <select id="sched-horizon" onchange="_schedRerender()" style="font-size:.62rem;padding:2px 4px">
@@ -2237,18 +2268,18 @@ tr:hover td{background:var(--s2);color:var(--text)}
           <option value="0">Весь</option>
         </select>
         <div style="flex:1"></div>
-        <button class="btn btn-sm" onclick="_schedRefetch()" title="Заново подтянуть bondization.json со всех бумаг (кэш обновится)">🔄 Обновить данные</button>
+        <button class="btn btn-sm" onclick="_schedRefetch()" title="Заново подтянуть bondization.json со всех бумаг (кэш обновится)"> Обновить данные</button>
       </div>
       <div id="sched-chart" style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);overflow-x:auto"></div>
       <div id="sched-tooltip" style="position:absolute;display:none;background:var(--s1);border:1px solid var(--acc);padding:6px 8px;font-size:.56rem;pointer-events:none;z-index:2100;max-width:280px;box-shadow:0 4px 12px rgba(0,0,0,.4)"></div>
       <div style="margin-top:12px">
-        <div style="font-size:.58rem;color:var(--text3);margin-bottom:4px">💼 Выпуски эмитента на MOEX (клик по бару выше — подсветит бумаги, вносящие в этот период):</div>
+        <div style="font-size:.58rem;color:var(--text3);margin-bottom:4px"> Выпуски эмитента на MOEX (клик по бару выше — подсветит бумаги, вносящие в этот период):</div>
         <div id="sched-issues" style="font-size:.58rem"></div>
       </div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-schedule')">Закрыть</button>
-      <button class="btn" onclick="_schedExportCsv()">Экспорт CSV</button>
+      <button class="btn" onclick="_schedExportCsv()"> Экспорт CSV</button>
     </div>
   </div>
 </div>
@@ -2257,22 +2288,22 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <div id="compare-floater" style="display:none;position:fixed;right:20px;bottom:20px;z-index:1500;background:var(--s2);border:1px solid var(--acc);padding:8px 12px;cursor:pointer;font-size:.66rem;color:var(--text);box-shadow:0 4px 14px rgba(0,0,0,.4);user-select:none" onclick="compareOpen()" title="Открыть модалку сравнения">
   <span style="color:var(--acc);font-weight:600">🆚 <span id="compare-count">0</span> в сравнении</span>
   <span id="compare-names" style="color:var(--text3);margin-left:8px"></span>
-  <button onclick="event.stopPropagation();compareClear()" style="margin-left:8px;background:none;border:1px solid var(--border2);color:var(--text3);padding:1px 6px;font-size:.54rem;cursor:pointer" title="Очистить очередь">✕</button>
+  <button onclick="event.stopPropagation();compareClear()" style="margin-left:8px;background:none;border:1px solid var(--border2);color:var(--text3);padding:1px 6px;font-size:.54rem;cursor:pointer" title="Очистить очередь"></button>
 </div>
 
 <!-- Modal: сравнение выбранных эмитентов -->
 <div class="modal-overlay" id="modal-compare">
   <div class="modal" style="width:1100px;max-width:98vw;max-height:96vh;display:flex;flex-direction:column">
-    <div class="modal-hdr">🆚 Сравнение эмитентов <span id="compare-header-meta" style="margin-left:10px;color:var(--text3);font-size:.58rem;font-weight:400"></span> <button class="modal-x" onclick="closeModal('modal-compare')">✕</button></div>
+    <div class="modal-hdr">🆚 Сравнение эмитентов <span id="compare-header-meta" style="margin-left:10px;color:var(--text3);font-size:.58rem;font-weight:400"></span> <button class="modal-x" onclick="closeModal('modal-compare')"></button></div>
     <div class="modal-body" style="overflow:auto;flex:1">
       <div id="compare-verdict" style="padding:8px 12px;background:var(--s2);border:1px solid var(--border);margin-bottom:10px;font-size:.62rem"></div>
       <div id="compare-table" style="font-size:.6rem"></div>
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-compare')">Закрыть</button>
-      <button class="btn btn-p" onclick="compareSaveCurrent()" title="Сохранить текущую очередь как именованный сет в «⭐ Списки». Если введёшь имя существующего сета — эмитенты добавятся к нему (merge). Новое имя — создастся новый сет.">💾 Сохранить как / добавить в</button>
-      <button class="btn" onclick="compareExportCsv()">Экспорт CSV</button>
-      <button class="btn" onclick="compareClear();closeModal('modal-compare')">Очистить очередь</button>
+      <button class="btn btn-p" onclick="compareSaveCurrent()" title="Сохранить текущую очередь как именованный сет в «⭐ Списки». Если введёшь имя существующего сета — эмитенты добавятся к нему (merge). Новое имя — создастся новый сет."> Сохранить как / добавить в</button>
+      <button class="btn" onclick="compareExportCsv()"> Экспорт CSV</button>
+      <button class="btn" onclick="compareClear();closeModal('modal-compare')"> Очистить очередь</button>
     </div>
   </div>
 </div>
@@ -2280,7 +2311,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Modal: объединение эмитентов (слияние по ИНН или вручную) -->
 <div class="modal-overlay" id="modal-merge-issuers">
   <div class="modal" style="width:600px;max-width:96vw">
-    <div class="modal-hdr">Объединить эмитентов <button class="modal-x" onclick="closeModal('modal-merge-issuers')">✕</button></div>
+    <div class="modal-hdr"> Объединить эмитентов <button class="modal-x" onclick="closeModal('modal-merge-issuers')"></button></div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="font-size:.62rem;color:var(--text2);line-height:1.55">
         Все периоды ИСТОЧНИКА переедут в ЦЕЛЕВОГО эмитента. Дубли периодов (ключ <code>год_период_тип</code>) пропускаются — в целевом остаются свои. Источник после слияния удаляется.
@@ -2300,7 +2331,7 @@ tr:hover td{background:var(--s2);color:var(--text)}
     </div>
     <div class="modal-ftr">
       <button class="btn" onclick="closeModal('modal-merge-issuers')">Отмена</button>
-      <button class="btn btn-p" onclick="repDoMerge()">Объединить</button>
+      <button class="btn btn-p" onclick="repDoMerge()"> Объединить</button>
     </div>
   </div>
 </div>
@@ -2308,25 +2339,53 @@ tr:hover td{background:var(--s2);color:var(--text)}
 <!-- Основной код приложения вынесен в app.js и подключён с defer — чтобы браузер параллельно качал его и парсил HTML, а не блокировал рендер на ~10 сек. -->
 
 <script>
-// Безопасный getElementById — null → dummy
+
+(function(){
+  var _ok = true;
+  try { localStorage.getItem('__test__'); } catch(e){ _ok = false; }
+  if(_ok) return;
+  // Блокировка localStorage — используем in-memory + синк с shell через postMessage
+  var _store = {};
+  var _fake = {
+    getItem:    function(k){ return k in _store ? _store[k] : null; },
+    setItem:    function(k,v){ _store[k]=String(v); try{window.parent.postMessage({type:'DB_WRITE',key:k,value:String(v)},'*');}catch(e){} },
+    removeItem: function(k){ delete _store[k]; },
+    clear:      function(){ _store={}; },
+    key:        function(i){ return Object.keys(_store)[i]||null; },
+    get length(){ return Object.keys(_store).length; }
+  };
+  try{ Object.defineProperty(window,'localStorage',{value:_fake,writable:false,configurable:true}); }catch(e){}
+  // Запросить начальные данные у shell
+  ['ba_v2','bondan_refs','bondan_girbo_proxy','ba_apikey','bondan_windows'].forEach(function(k){
+    var reqId = 'ls_init_'+k;
+    window.parent.postMessage({type:'DB_READ',reqId:reqId,key:k},'*');
+  });
+  window.addEventListener('message',function(e){
+    var d=e.data; if(!d) return;
+    if(d.type==='DB_RESPONSE' && d.key && d.value!==undefined && d.value!==null){
+      _store[d.key] = typeof d.value==='string' ? d.value : JSON.stringify(d.value);
+    }
+  });
+})();
+
+
 (function(){
   var _orig = document.getElementById.bind(document);
   var _dummy = {
-    value:'', textContent:'', innerHTML:'', checked:false, disabled:false,
-    selectedIndex:0, selectedOptions:[],
-    style: new Proxy({},{get:function(){return '';},set:function(){return true;}}),
+    value:'',textContent:'',innerHTML:'',checked:false,disabled:false,
+    selectedIndex:0,selectedOptions:[],
+    style:new Proxy({},{get:function(){return '';},set:function(){return true;}}),
     classList:{add:function(){},remove:function(){},toggle:function(){return false;},contains:function(){return false;}},
     options:{length:0,add:function(){}},
-    addEventListener:function(){}, removeEventListener:function(){},
-    focus:function(){}, click:function(){}, select:function(){},
-    appendChild:function(){return this;}, querySelector:function(){return null;},
-    querySelectorAll:function(){return [];}, closest:function(){return null;},
+    addEventListener:function(){},removeEventListener:function(){},
+    focus:function(){},click:function(){},select:function(){},
+    appendChild:function(){return this;},querySelector:function(){return null;},
+    querySelectorAll:function(){return [];},closest:function(){return null;},
     getBoundingClientRect:function(){return {top:0,left:0,width:0,height:0};},
-    contains:function(){return false;},
-    matches:function(){return false;},
+    contains:function(){return false;},matches:function(){return false;},
     dispatchEvent:function(){return false;}
   };
-  document.getElementById = function(id){ return _orig(id) || _dummy; };
+  document.getElementById = function(id){ return _orig(id)||_dummy; };
 })();
 
 function showPage(){}
@@ -27794,16 +27853,20 @@ function risksClearDrill(){
 
 showPage = function(){
   var rp = document.getElementById('page-reports');
-  if(rp){ rp.style.display=''; }
+  if(rp) rp.style.display = '';
 };
 
-try { loadState(); } catch(e) { console.warn('loadState:', e); }
-try { repInit(); } catch(e) { console.error('repInit:', e); }
+// Запуск — даём localStorage-прокси 200мс заполниться данными от shell
+setTimeout(function(){
+  try { loadState(); } catch(e){ console.warn('loadState:',e); }
+  try { repInit(); } catch(e){ console.error('repInit:',e); }
+}, 200);
 
-window.addEventListener('message', function(e){
-  var d = e.data;
-  if(!d || d.type !== 'SHELL_STATE') return;
-  if(d.token) localStorage.setItem('ba_apikey', d.token);
+window.addEventListener('message',function(e){
+  var d=e.data; if(!d) return;
+  if(d.type==='SHELL_STATE'){
+    if(d.token) try{ localStorage.setItem('ba_apikey',d.token); }catch(ex){}
+  }
 });
 </script>
 </body>
