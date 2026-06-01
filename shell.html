@@ -66,6 +66,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
 #token-input{width:88px;}
 #token-st{font-size:10px;font-family:var(--mono);}
 #token-st.ok{color:var(--pos);}
+#api-st{font-size:10px;font-family:var(--mono);}
+#api-st.ok{color:var(--pos);}
+#api-st.err{color:#ff4d6d;}
 #btn-go{background:rgba(255,0,110,0.14);border:1px solid rgba(255,0,110,0.25);
   color:var(--accent);border-radius:5px;font-size:10px;padding:3px 7px;
   cursor:pointer;font-family:var(--mono);transition:all .15s;}
@@ -280,11 +283,18 @@ function onApiUrlInput(v) {
 async function checkApiStatus(url) {
   const el = document.getElementById('api-st');
   el.textContent = '…'; el.className = '';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
-    const r = await fetch((url || localStorage.getItem(KEY_API_URL) || '') + '/status', { signal: AbortSignal.timeout(5000) });
+    const r = await fetch((url || localStorage.getItem(KEY_API_URL) || '') + '/status', { signal: ctrl.signal });
+    clearTimeout(timer);
     if (r.ok) { el.textContent = '✓'; el.className = 'ok'; }
     else       { el.textContent = r.status; el.className = 'err'; }
-  } catch(e) { el.textContent = '✗'; el.className = 'err'; }
+  } catch(e) {
+    clearTimeout(timer);
+    el.textContent = '✗'; el.className = 'err';
+    console.warn('API check failed:', e.message);
+  }
 }
 
 let modules   = [];
