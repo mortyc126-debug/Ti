@@ -171,14 +171,16 @@ details summary{outline:none}
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
   <!-- Sidebar со списком эмитентов: постоянно виден, с поиском, сортировкой
        по мультипликаторам и фильтром по году последнего отчёта. -->
-  <div id="rep-sidebar" style="width:290px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+  <div id="rep-sidebar" style="width:340px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
 
   <!-- Строка 1: загрузка D1 + счётчик + источники -->
   <div style="display:flex;align-items:center;gap:4px;padding:8px 8px 4px;flex-shrink:0">
-    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.6rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase;transition:all .15s">↓ Загрузить базу</button>
+    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.62rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase;transition:all .15s">↓ Загрузить базу</button>
     <span id="rep-sidebar-count" style="font-size:.52rem;color:var(--text3);min-width:28px;text-align:center;font-family:var(--mono)">0</span>
     <button type="button" onclick="_repSourcesModal()" title="Источники данных, импорт, инструменты" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);color:var(--text3);cursor:pointer;font-size:.8rem;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s">⚙</button>
   </div>
+  <!-- Строка статуса загрузки -->
+  <div id="rep-d1-log" style="display:none;padding:2px 8px 5px;font-size:.54rem;color:var(--text3);font-family:var(--mono);line-height:1.4;border-bottom:1px solid var(--border)"></div>
 
   <!-- Строка 2: поиск с выпадашкой -->
   <div style="position:relative;padding:0 8px 6px;flex-shrink:0">
@@ -27895,48 +27897,59 @@ function _getD1Base(){
 var _d1Catalog = null; // {issuers, bonds, stocks}
 
 // ── D1 Загрузка ────────────────────────────────────────────────────
+var _d1Loading = false;
 async function _repD1Load(){
+  if(_d1Loading) return;
+  _d1Loading = true;
   var btn = document.getElementById('rep-d1-load-btn');
-  function setBtn(t, ok){ if(btn){ btn.textContent = t; btn.disabled = !ok; } }
-  setBtn('↻ каталог…', false);
+  var log = document.getElementById('rep-d1-log');
+  function setBtn(t){ if(btn){ btn.textContent = t; } }
+  function setLog(t, isErr){
+    if(!log) return;
+    log.style.display = t ? '' : 'none';
+    log.style.color = isErr ? 'var(--danger)' : 'var(--text3)';
+    log.textContent = t;
+  }
+  if(btn) btn.disabled = true;
+  setBtn('↻ каталог…');
+  setLog('Шаг 1/3: загрузка каталога…');
   try{
     var base = _getD1Base();
-    // 1. Каталог — список эмитентов и облигаций
+    // 1. Каталог
     var r = await fetch(base + '/catalog');
-    if(!r.ok) throw new Error('catalog ' + r.status);
+    if(!r.ok) throw new Error('HTTP ' + r.status + ' при /catalog');
     var cat = await r.json();
     _d1Catalog = cat;
-    var issuers = cat.issuers || [];
+    var issuers = Array.isArray(cat.issuers) ? cat.issuers : [];
+    setLog('Шаг 1/3: каталог ✓ (' + issuers.length + ' эмитентов)');
 
     // 2. Мёрдж эмитентов в reportsDB
-    var added = 0;
+    setBtn('↻ мёрдж…');
+    setLog('Шаг 2/3: мёрдж в базу…');
+    var added = 0, updated = 0;
     for(var ci = 0; ci < issuers.length; ci++){
       var ci2 = issuers[ci];
       if(!ci2.inn) continue;
-      // Найти существующую запись по ИНН
       var existId = null;
-      var rdb = window.reportsDB || {};
+      var rdb = window.reportsDB || (window.reportsDB = {});
       for(var eid in rdb){
         if(rdb[eid] && rdb[eid].inn === ci2.inn){ existId = eid; break; }
       }
       if(!existId){
         var nid = 'i_' + ci2.inn;
         if(!rdb[nid]){
-          rdb[nid] = {
-            name: ci2.name || ci2.short_name || ci2.inn,
-            inn: ci2.inn,
-            ind: _d1SectorToInd(ci2.sector),
-            periods: {}
-          };
-          window.reportsDB = rdb;
+          rdb[nid] = { name: ci2.name || ci2.short_name || ci2.inn, inn: ci2.inn, ind: _d1SectorToInd(ci2.sector), periods: {} };
           added++;
         }
       } else {
-        // Обновить имя и отрасль если есть новые данные
         var ex = rdb[existId];
         if(!ex.ind || ex.ind === 'other') ex.ind = _d1SectorToInd(ci2.sector);
+        if(!ex.name && (ci2.name || ci2.short_name)) ex.name = ci2.name || ci2.short_name;
+        updated++;
       }
     }
+    setLog('Шаг 2/3: +' + added + ' новых, ' + updated + ' обновлено');
+    repRenderIssuerList();
 
     // 3. Подтянуть отчёты для эмитентов без периодов
     var toFetch = [];
@@ -27947,35 +27960,44 @@ async function _repD1Load(){
         toFetch.push({ id: eid2, inn: e2.inn });
       }
     }
-    var loaded = 0;
+    var loaded = 0, errors = 0;
     var total = toFetch.length;
-    for(var ti = 0; ti < total; ti += 5){
-      var batch = toFetch.slice(ti, ti + 5);
-      setBtn('↻ ' + ti + '/' + total, false);
+    setBtn('↻ 0/' + total);
+    setLog('Шаг 3/3: загрузка отчётов 0/' + total + '…');
+    var BATCH = 4;
+    for(var ti = 0; ti < total; ti += BATCH){
+      var batch = toFetch.slice(ti, ti + BATCH);
       await Promise.all(batch.map(function(entry){
         return fetch(base + '/issuer/' + entry.inn + '/reports')
           .then(function(r2){ return r2.ok ? r2.json() : null; })
           .then(function(data){
-            if(data && data.data && data.data.length){
+            if(data && Array.isArray(data.data) && data.data.length){
               _d1MergeReports(entry.id, entry.inn, data.data);
               loaded++;
             }
           })
-          .catch(function(){});
+          .catch(function(err){ errors++; console.warn('reports fetch:', entry.inn, err); });
       }));
+      var done = Math.min(ti + BATCH, total);
+      setBtn('↻ ' + done + '/' + total);
+      setLog('Шаг 3/3: ' + done + '/' + total + ' отчётов' + (errors ? ', ошибок: ' + errors : '') + '…');
     }
 
     // 4. Сохранить и перерисовать
-    try{ saveState(); }catch(e){}
+    try{ saveState(); }catch(e){ console.warn('saveState:', e); }
     repRenderIssuerList();
-    setBtn('✓ +' + added + ' эм, ' + loaded + ' отч.', true);
-    setTimeout(function(){ setBtn('↓ D1', true); }, 5000);
+    var summary = '✓ ' + added + ' эм., ' + loaded + ' отч.';
+    setBtn(summary);
+    setLog('Готово: ' + summary + (errors ? ', ошибок: ' + errors : ''));
+    if(btn) btn.disabled = false;
 
   }catch(e){
     console.error('D1 load:', e);
-    setBtn('✗ ' + (e.message||'ошибка'), true);
-    setTimeout(function(){ setBtn('↓ D1', true); }, 4000);
+    setBtn('↓ Загрузить базу');
+    setLog('Ошибка: ' + (e.message || String(e)), true);
+    if(btn) btn.disabled = false;
   }
+  _d1Loading = false;
 }
 
 function _d1MergeReports(issId, inn, rows){
