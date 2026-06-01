@@ -16,6 +16,90 @@ reportsHtmlRaw = reportsHtmlRaw.replace(
 const emojiRe = /[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}⬇️⬆️]/gu;
 reportsHtmlRaw = reportsHtmlRaw.replace(emojiRe, '').replace(/^\s+/gm, s => s);
 
+// ── Заменяем sidebar целиком новой структурой (D1 + поиск + фильтры) ──────
+const newSidebar = `<div id="rep-sidebar" style="width:290px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+
+  <!-- Строка 1: загрузка D1 + счётчик + источники -->
+  <div style="display:flex;align-items:center;gap:4px;padding:8px 8px 4px;flex-shrink:0">
+    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.6rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase;transition:all .15s">↓ D1</button>
+    <span id="rep-sidebar-count" style="font-size:.52rem;color:var(--text3);min-width:28px;text-align:center;font-family:var(--mono)">0</span>
+    <button type="button" onclick="_repSourcesModal()" title="Источники данных, импорт, инструменты" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);color:var(--text3);cursor:pointer;font-size:.8rem;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s">⚙</button>
+  </div>
+
+  <!-- Строка 2: поиск с выпадашкой -->
+  <div style="position:relative;padding:0 8px 6px;flex-shrink:0">
+    <input id="rep-search-main" type="search" placeholder="Поиск: эмитент, ИНН, облигация…"
+      oninput="_repSearchInput(this.value)"
+      onfocus="if(this.value.trim())_repSearchDropRender(this.value.trim())"
+      style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.65rem;padding:6px 10px;outline:none;border-radius:var(--radius)">
+    <div id="rep-search-drop" style="display:none;position:absolute;left:8px;right:8px;top:calc(100% - 4px);background:var(--s1);border:1px solid var(--border2);border-radius:var(--radius-md);z-index:200;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
+    <!-- скрыт, нужен repRenderIssuerList для чтения текста поиска -->
+    <input id="rep-sidebar-search" value="" style="display:none" oninput="repRenderIssuerList()">
+  </div>
+
+  <!-- Collapsible: фильтры и сортировка -->
+  <details id="rep-filter-details" style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-shrink:0">
+    <summary style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;font-size:.52rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-weight:600;background:var(--s2);list-style:none;outline:none;user-select:none" onclick="var a=document.getElementById('rep-filter-arrow');if(a)setTimeout(function(){a.textContent=document.getElementById('rep-filter-details').open?'▾':'▸'},0)">
+      <span id="rep-filter-arrow" style="color:var(--acc);font-size:.65rem">▸</span>
+      <span>Фильтры</span>
+      <span id="rep-filter-badge" style="margin-left:auto;font-size:.46rem;color:var(--acc);background:var(--acc-dim);padding:1px 6px;border-radius:10px;display:none">●</span>
+    </summary>
+    <div style="padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--s1);overflow-y:auto;max-height:55vh">
+      <label style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Сорт:</span>
+        <select id="rep-sidebar-sort" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
+          <option value="name_asc">Имя А → Я</option>
+          <option value="name_desc">Имя Я → А</option>
+          <option value="year_desc">Свежесть (новые сверху)</option>
+          <option value="roe_best">ROE (лучшие)</option>
+          <option value="roe_worst">ROE (худшие)</option>
+          <option value="de_best">Долг/EBITDA (лучшие)</option>
+          <option value="de_worst">Долг/EBITDA (худшие)</option>
+          <option value="icr_best">ICR (лучшие)</option>
+          <option value="icr_worst">ICR (худшие)</option>
+          <option value="dde_best">D/E (лучшие)</option>
+          <option value="dde_worst">D/E (худшие)</option>
+        </select>
+      </label>
+      <label style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>
+        <select id="rep-sidebar-status" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
+          <option value="all">все</option>
+          <option value="has_periods">есть периоды</option>
+          <option value="no_periods">нет периодов</option>
+          <option value="only_inn">только ИНН, пусто</option>
+          <option value="no_inn">без ИНН</option>
+          <option value="stale">нет свежего (&gt;2 лет)</option>
+          <option value="no_moex">нет бумаг на MOEX</option>
+          <option value="spv_no_parent">SPV без матери</option>
+        </select>
+      </label>
+      <label style="display:flex;gap:4px;align-items:center">
+        <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Отрасль:</span>
+        <select id="rep-sidebar-industry" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
+          <option value="all">все</option>
+        </select>
+      </label>
+      <div>
+        <div style="font-size:.5rem;color:var(--text3);margin-bottom:3px;font-family:var(--sans)">Год последнего отчёта:</div>
+        <div id="rep-sidebar-years" style="display:flex;gap:2px;flex-wrap:wrap"></div>
+      </div>
+      <!-- расширенный фильтр: рейтинги / отрасли-пилюли / мультипликаторы -->
+      <div id="rep-filter-extra"></div>
+    </div>
+  </details>
+
+  <!-- Список эмитентов -->
+  <div id="rep-sidebar-list" style="overflow-y:auto;flex:1;padding:4px;min-height:120px">
+  </div>
+</div>`;
+
+// Заменяем sidebar в reportsHtmlRaw
+reportsHtmlRaw = reportsHtmlRaw.replace(
+  /<div id="rep-sidebar"[\s\S]*?<\/div>\s*(?=<div style="flex:1;min-width:0">)/,
+  newSidebar + '\n'
+);
+
 // app.js — вырезаем авто-init
 let allJs = lines_js.slice();
 allJs[5873] = '// (renderYtm/renderSbLists — skip in module)';
@@ -454,124 +538,28 @@ function _repSearchDropClose(){
   _repSearchOpen = false;
 }
 
-// ── Перестройка сайдбара ───────────────────────────────────────────
+// ── Инициализация сайдбара (HTML уже вшит в сборке) ──────────────
 function _repStructureSidebar(){
-  var sidebar = document.getElementById('rep-sidebar');
-  if(!sidebar || sidebar.dataset.restructured) return;
-  sidebar.dataset.restructured = '1';
+  // Скрыть кнопки тулбара которые переехали в модалку ⚙
+  ['openGirboImportModal','openAuditItImportModal','repOpenMergeModal',
+   'repRunAudit','repImportAffiliatedFromClipboard','repCleanEmptyPeriods',
+   'repDiagnoseInn'].forEach(function(fn){
+    document.querySelectorAll('[onclick*="' + fn + '"]').forEach(function(b){
+      b.style.display = 'none';
+    });
+  });
+  // Скрыть контейнер innSearch-виджета (добавлен build-скриптом)
+  var innWrap = document.getElementById('rep-inn-search-input');
+  if(innWrap && innWrap.parentElement) innWrap.parentElement.style.display = 'none';
 
-  // Сохраняем существующие элементы
-  var origSearch  = document.getElementById('rep-sidebar-search');
-  var origSort    = document.getElementById('rep-sidebar-sort');
-  var origStatus  = document.getElementById('rep-sidebar-status');
-  var origInd     = document.getElementById('rep-sidebar-industry');
-  var origYears   = document.getElementById('rep-sidebar-years');
-  var listEl      = document.getElementById('rep-sidebar-list');
-  var countEl     = document.getElementById('rep-sidebar-count');
-
-  if(!origSearch || !listEl) return;
-
-  // Скрываем существующие wrapper'ы (но не сами элементы — они нужны)
-  sidebar.style.cssText = 'width:300px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;gap:0;background:var(--s1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden';
-
-  // Очищаем сайдбар
-  while(sidebar.firstChild) sidebar.removeChild(sidebar.firstChild);
-
-  // ─── Строка 1: D1-загрузка + счётчик + источники ────────────────
-  var row1 = document.createElement('div');
-  row1.style.cssText = 'display:flex;align-items:center;gap:4px;padding:8px 8px 4px';
-  row1.innerHTML =
-    '<button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.6rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase">↓ D1</button>' +
-    '<span id="rep-sidebar-count" style="font-size:.52rem;color:var(--text3);min-width:28px;text-align:center;font-family:var(--mono)">0</span>' +
-    '<button type="button" onclick="_repSourcesModal()" title="Источники данных, импорт, инструменты" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);color:var(--text3);cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--sans)">⚙</button>';
-  sidebar.appendChild(row1);
-
-  // ─── Строка 2: Поиск с выпадашкой ───────────────────────────────
-  var searchWrap = document.createElement('div');
-  searchWrap.style.cssText = 'position:relative;padding:0 8px 6px';
-
-  var mainSearch = document.createElement('input');
-  mainSearch.id = 'rep-search-main';
-  mainSearch.type = 'search';
-  mainSearch.placeholder = 'Поиск: эмитент, ИНН, облигация…';
-  mainSearch.style.cssText = 'width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.65rem;padding:6px 10px;outline:none;border-radius:var(--radius)';
-  mainSearch.oninput = function(){ _repSearchInput(this.value); };
-  mainSearch.onfocus = function(){ if(this.value.trim()) _repSearchDropRender(this.value.trim()); };
-  searchWrap.appendChild(mainSearch);
-
-  var drop = document.createElement('div');
-  drop.id = 'rep-search-drop';
-  drop.style.display = 'none';
-  searchWrap.appendChild(drop);
-
-  // Оригинальный инпут скрываем но оставляем (читается repRenderIssuerList)
-  origSearch.style.display = 'none';
-  searchWrap.appendChild(origSearch);
-
-  sidebar.appendChild(searchWrap);
-
-  // Клик вне поиска — закрыть выпадашку
+  // Закрытие выпадашки поиска по клику вне
   document.addEventListener('click', function(e){
-    if(!searchWrap.contains(e.target)) _repSearchDropClose();
+    var drop = document.getElementById('rep-search-drop');
+    var inp  = document.getElementById('rep-search-main');
+    if(drop && inp && !inp.parentElement.contains(e.target)){
+      _repSearchDropClose();
+    }
   });
-
-  // ─── Блок фильтров (collapsible) ────────────────────────────────
-  var det = document.createElement('details');
-  det.style.cssText = 'border-top:1px solid var(--border);border-bottom:1px solid var(--border)';
-
-  var sum = document.createElement('summary');
-  sum.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;font-size:.52rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-weight:600;background:var(--s2);user-select:none';
-  sum.innerHTML = '<span id="rep-filter-arrow" style="color:var(--acc);font-size:.6rem">▸</span><span>Фильтры и сортировка</span><span id="rep-filter-badge" style="margin-left:auto;font-size:.48rem;color:var(--acc);background:var(--acc-dim);padding:1px 6px;border-radius:10px;display:none">active</span>';
-  det.addEventListener('toggle', function(){
-    var arr = document.getElementById('rep-filter-arrow');
-    if(arr) arr.textContent = det.open ? '▾' : '▸';
-  });
-  det.appendChild(sum);
-
-  var filBody = document.createElement('div');
-  filBody.style.cssText = 'padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--s1);overflow-y:auto;max-height:50vh';
-
-  // Sort
-  var sortWrap = document.createElement('label');
-  sortWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
-  sortWrap.innerHTML = '<span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Сорт:</span>';
-  origSort.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)';
-  sortWrap.appendChild(origSort);
-  filBody.appendChild(sortWrap);
-
-  // Status
-  var statWrap = document.createElement('label');
-  statWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
-  statWrap.innerHTML = '<span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>';
-  origStatus.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)';
-  statWrap.appendChild(origStatus);
-  filBody.appendChild(statWrap);
-
-  // Industry
-  var indWrap = document.createElement('label');
-  indWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
-  indWrap.innerHTML = '<span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Отрасль:</span>';
-  origInd.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)';
-  indWrap.appendChild(origInd);
-  filBody.appendChild(indWrap);
-
-  // Years
-  var yrDiv = document.createElement('div');
-  yrDiv.innerHTML = '<div style="font-size:.5rem;color:var(--text3);margin-bottom:2px;font-family:var(--sans)">Год последнего отчёта:</div>';
-  yrDiv.appendChild(origYears);
-  filBody.appendChild(yrDiv);
-
-  // Расширенный фильтр (рейтинги + отрасли-пилюли + мультипликаторы)
-  var extFil = document.createElement('div');
-  extFil.id = 'rep-filter-extra';
-  filBody.appendChild(extFil);
-
-  det.appendChild(filBody);
-  sidebar.appendChild(det);
-
-  // ─── Список эмитентов ────────────────────────────────────────────
-  listEl.style.cssText = 'overflow-y:auto;flex:1;padding:4px;min-height:120px';
-  sidebar.appendChild(listEl);
 
   // Инициализировать расширенный фильтр
   _repFilterRender();
