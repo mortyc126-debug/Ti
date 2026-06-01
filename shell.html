@@ -279,34 +279,19 @@ function patchHtml(html) {
   return html + '\n' + SHELL_BRIDGE;
 }
 
-// Записываем HTML в iframe через document.write.
-// Для больших файлов (>200KB) пишем кусками с микропаузой —
-// иначе браузер может зависнуть или отказаться парсить.
+// Записываем HTML в iframe через Blob URL — единственный способ
+// гарантированно выполнить скрипты в большом файле без разрыва парсера.
+// Blob наследует origin shell'а (file:// или http://), поэтому
+// localStorage доступен.
 function writeToFrame(frameEl, html, onDone) {
-  frameEl.removeAttribute('src');
-  const doc = frameEl.contentDocument || frameEl.contentWindow.document;
-  const CHUNK = 200 * 1024; // 200KB за раз
-  if (html.length <= CHUNK) {
-    doc.open();
-    doc.write(html);
-    doc.close();
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  frameEl.onload = function() {
+    URL.revokeObjectURL(url);
+    frameEl.onload = null;
     if (onDone) onDone();
-    return;
-  }
-  // Крупный файл: открываем документ, пишем кусками
-  doc.open();
-  let offset = 0;
-  function writeNext() {
-    if (offset >= html.length) {
-      doc.close();
-      if (onDone) onDone();
-      return;
-    }
-    doc.write(html.slice(offset, offset + CHUNK));
-    offset += CHUNK;
-    setTimeout(writeNext, 0);
-  }
-  writeNext();
+  };
+  frameEl.src = url;
 }
 
 function addFiles(fileList) {
