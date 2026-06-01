@@ -319,7 +319,7 @@ function openModule(idx) {
   const fw = document.getElementById('frame-wrap');
   fw.style.display = 'block';
   const frame = document.getElementById('mod-frame');
-  frame.onload = () => setTimeout(pushState, 400);
+  frame.addEventListener('load', () => setTimeout(pushState, 400), { once: true });
   writeToFrame(frame, modules[idx].html);
   rebuildNav();
 }
@@ -360,7 +360,6 @@ function pushStateToAll() {
 window.addEventListener('message', e => {
   const d = e.data;
   if (!d) return;
-  if (d.type === 'MODULE_READY') { setTimeout(() => pushState(e.source._frameEl), 100); }
   if (d.type === 'MODULE_EVENT') {
     if (d.action === 'SET_TICKER' && d.ticker) {
       const t = String(d.ticker).toUpperCase();
@@ -437,7 +436,7 @@ function openWindow(modIdx, opts) {
   document.getElementById('win-layer').appendChild(el);
 
   const frameEl = el.querySelector('iframe');
-  frameEl.onload = () => setTimeout(() => pushState(frameEl), 400);
+  frameEl.addEventListener('load', () => setTimeout(() => pushState(frameEl), 400), { once: true });
   writeToFrame(frameEl, m.html);
 
   wins[id] = { el, frameEl, micro: false };
