@@ -27852,6 +27852,201 @@ function risksClearDrill(){
 }
 
 
+
+window._repFilter = { ratings: [], industries: [], mults: {} };
+
+var _FILTER_RATINGS = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-','BB+','BB','BB-','B+','B','B-','CCC','D','none'];
+
+var _FILTER_IND_GROUPS = [
+  { label:'Ресурсы и сырьё', items:[{id:'agro',label:'Агро'},{id:'metals',label:'Металлы'},{id:'oil-gas',label:'Нефть/газ'}] },
+  { label:'Промышленность', items:[{id:'auto',label:'Авто'},{id:'wood',label:'Дерево'},{id:'machinery',label:'Машиностроение'},{id:'furniture',label:'Мебель'},{id:'metalware',label:'Металлоизделия'},{id:'plastics',label:'Пластмассы'},{id:'building-mat',label:'Стройматериалы'},{id:'textile',label:'Текстиль'},{id:'pharma',label:'Фармацевтика'},{id:'chemistry',label:'Химия'},{id:'electronics',label:'Электроника'}] },
+  { label:'Энергетика и ЖКХ', items:[{id:'utilities',label:'Электроэнергетика'}] },
+  { label:'Стройка', items:[{id:'realestate',label:'Недвижимость'},{id:'construction',label:'Строительство'}] },
+  { label:'Торговля', items:[{id:'retail',label:'Ритейл'}] },
+  { label:'Транспорт', items:[{id:'logistics',label:'Транспорт/логистика'}] },
+  { label:'IT и медиа', items:[{id:'media',label:'Медиа'},{id:'telecom',label:'Телеком'},{id:'it',label:'IT'}] },
+  { label:'Финансы', items:[{id:'banks',label:'Банки'},{id:'leasing',label:'Лизинг'},{id:'mfo',label:'МФО'},{id:'insurance',label:'Страхование'},{id:'holdings',label:'Холдинги'}] },
+  { label:'Услуги', items:[{id:'rental',label:'Аренда'},{id:'hospitality',label:'Гостиницы'},{id:'healthcare',label:'Медицина'},{id:'entertainment',label:'Развлечения'},{id:'science',label:'Наука'},{id:'education',label:'Образование'},{id:'consulting',label:'Консалтинг'},{id:'services-etc',label:'Прочие услуги'}] },
+  { label:'Прочее', items:[{id:'other',label:'Прочее'}] }
+];
+
+var _FILTER_MULTS = [
+  { id:'de',         label:'Долг/EBITDA',       fmt:'x', tip:'≤3 норма, >5 риск' },
+  { id:'nde',        label:'Чист.долг/EBITDA',  fmt:'x', tip:'(Долг−Кэш)/EBITDA' },
+  { id:'icr',        label:'ICR',               fmt:'x', tip:'EBIT/Проценты. ≥3 хорошо' },
+  { id:'roa',        label:'ROA, %',            fmt:'%', tip:'ЧП/Активы×100' },
+  { id:'ebitdaMarg', label:'EBITDA-маржа, %',   fmt:'%', tip:'EBITDA/Выручка×100' },
+  { id:'currentR',   label:'Current Ratio',     fmt:'x', tip:'ОА/КО. ≥1.2 хорошо' },
+  { id:'cashR',      label:'Cash Ratio',        fmt:'x', tip:'Кэш/КО' },
+  { id:'equityR',    label:'Equity Ratio, %',   fmt:'%', tip:'Капитал/Активы×100' },
+];
+
+function _repInjectFilterPanel() {
+  var sidebar = document.getElementById('rep-sidebar');
+  if (!sidebar || document.getElementById('rep-filter-extra')) return;
+  var wrap = document.createElement('div');
+  wrap.id = 'rep-filter-extra';
+  sidebar.appendChild(wrap);
+  _repFilterRender();
+}
+
+function _repFilterRender() {
+  var el = document.getElementById('rep-filter-extra');
+  if (!el) return;
+  var f = window._repFilter;
+  var hasFilter = f.ratings.length || f.industries.length ||
+    Object.values(f.mults).some(function(m){ return m && (m.min !== '' || m.max !== ''); });
+
+  var ratHtml = _FILTER_RATINGS.map(function(r) {
+    var on = f.ratings.indexOf(r) !== -1;
+    var lbl = r === 'none' ? 'без рейтинга' : r;
+    return '<button type="button" onclick="_repFilterToggleRating(\'' + r + '\')" style="padding:1px 5px;border-radius:12px;font-size:.5rem;font-family:var(--mono);border:1px solid ' + (on?'var(--acc)':'var(--border2)') + ';background:' + (on?'var(--acc-dim)':'var(--s2)') + ';color:' + (on?'var(--acc)':'var(--text3)') + ';cursor:pointer;margin:1px;white-space:nowrap">' + lbl + '</button>';
+  }).join('');
+
+  var indHtml = _FILTER_IND_GROUPS.map(function(g) {
+    return '<div style="font-size:.48rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:4px 0 2px;font-family:var(--sans)">' + g.label + '</div>' +
+      g.items.map(function(it) {
+        var on = f.industries.indexOf(it.id) !== -1;
+        return '<button type="button" onclick="_repFilterToggleInd(\'' + it.id + '\')" style="padding:1px 5px;border-radius:12px;font-size:.5rem;font-family:var(--mono);border:1px solid ' + (on?'var(--acc)':'var(--border2)') + ';background:' + (on?'var(--acc-dim)':'var(--s2)') + ';color:' + (on?'var(--acc)':'var(--text3)') + ';cursor:pointer;margin:1px;white-space:nowrap">' + it.label + '</button>';
+      }).join('');
+  }).join('');
+
+  var multHtml = _FILTER_MULTS.map(function(m) {
+    var mf = f.mults[m.id] || {min:'',max:''};
+    return '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">' +
+      '<span title="' + m.tip + '" style="font-size:.52rem;font-family:var(--mono);color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help">' + m.label + '</span>' +
+      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'min\',this.value)" style="width:42px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<span style="color:var(--text3);font-size:.5rem">–</span>' +
+      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'max\',this.value)" style="width:42px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<span style="color:var(--text3);font-size:.48rem;width:10px;text-align:right">' + m.fmt + '</span>' +
+      '</div>';
+  }).join('');
+
+  el.innerHTML =
+    '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">' +
+    '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">' +
+      '<span style="font-size:.54rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);flex:1">Фильтр по эмитенту</span>' +
+      (hasFilter ? '<button type="button" onclick="_repFilterReset()" style="font-size:.5rem;color:var(--danger);background:none;border:none;cursor:pointer;font-family:var(--mono);padding:0">сброс</button>' : '') +
+    '</div>' +
+    '<div style="margin-bottom:8px">' +
+      '<div style="font-size:.48rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;font-family:var(--sans)">Рейтинг</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:1px">' + ratHtml + '</div>' +
+    '</div>' +
+    '<details style="margin-bottom:6px">' +
+      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);list-style:none;display:flex;align-items:center;gap:4px;outline:none">' +
+        '<span style="color:var(--acc)">▸</span><span>Отрасли</span>' +
+        (f.industries.length ? '<span style="color:var(--acc);font-size:.48rem">' + f.industries.length + ' выбрано</span>' : '') +
+      '</summary>' +
+      '<div style="margin-top:6px">' + indHtml + '</div>' +
+    '</details>' +
+    '<details open style="margin-bottom:4px">' +
+      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);list-style:none;display:flex;align-items:center;gap:4px;outline:none;margin-bottom:6px">' +
+        '<span style="color:var(--acc)">▸</span><span>Мультипликаторы</span>' +
+      '</summary>' +
+      multHtml +
+    '</details>' +
+    '</div>';
+}
+
+function _repFilterToggleRating(r) {
+  var f = window._repFilter;
+  var idx = f.ratings.indexOf(r);
+  if (idx === -1) f.ratings.push(r); else f.ratings.splice(idx, 1);
+  _repFilterRender();
+  repRenderIssuerList();
+}
+
+function _repFilterToggleInd(id) {
+  var f = window._repFilter;
+  var idx = f.industries.indexOf(id);
+  if (idx === -1) f.industries.push(id); else f.industries.splice(idx, 1);
+  _repFilterRender();
+  repRenderIssuerList();
+}
+
+function _repFilterSetMult(mid, key, val) {
+  var f = window._repFilter;
+  if (!f.mults[mid]) f.mults[mid] = {min:'',max:''};
+  f.mults[mid][key] = val;
+  repRenderIssuerList();
+}
+
+function _repFilterReset() {
+  window._repFilter = { ratings: [], industries: [], mults: {} };
+  _repFilterRender();
+  repRenderIssuerList();
+}
+
+function _repFilterMatch(id, iss) {
+  var f = window._repFilter || {};
+  if (f.industries && f.industries.length > 0) {
+    if (f.industries.indexOf(iss.ind || 'other') === -1) return false;
+  }
+  if (f.ratings && f.ratings.length > 0) {
+    var issRatings = (iss.ratings || []).map(function(r){ return r && r.rating; }).filter(Boolean);
+    var hasMatch = issRatings.some(function(r){ return f.ratings.indexOf(r) !== -1; });
+    var wantsNone = f.ratings.indexOf('none') !== -1;
+    if (!hasMatch && !(wantsNone && issRatings.length === 0)) return false;
+  }
+  if (f.mults) {
+    var calcM = _repCalcMultipliers(iss);
+    var lp = _repLatestPeriod(iss);
+    var p = lp ? lp.period : null;
+    var allMults = {
+      de: calcM.de,
+      icr: calcM.icr,
+      currentR: calcM.cur,
+      cashR: calcM.cashR,
+      equityR: calcM.eqr != null ? calcM.eqr * 100 : null,
+      nde: (p && p.ebitda != null && p.ebitda !== 0) ? ((p.debt||0) - (p.cash||0)) / p.ebitda : null,
+      roa: (p && p.assets) ? ((p.np||0) / p.assets * 100) : null,
+      ebitdaMarg: (p && p.rev) ? ((p.ebitda||0) / p.rev * 100) : null,
+    };
+    for (var mid in f.mults) {
+      var mf = f.mults[mid];
+      if (!mf) continue;
+      var val = allMults[mid];
+      if (val == null || !isFinite(val)) continue;
+      if (mf.min !== '' && mf.min !== null && val < parseFloat(mf.min)) return false;
+      if (mf.max !== '' && mf.max !== null && val > parseFloat(mf.max)) return false;
+    }
+  }
+  return true;
+}
+
+function _repFilterApplyDOM() {
+  var f = window._repFilter || {};
+  var hasRating = f.ratings && f.ratings.length > 0;
+  var hasInd = f.industries && f.industries.length > 0;
+  var hasMult = f.mults && Object.values(f.mults).some(function(m){ return m && (m.min !== '' || m.max !== ''); });
+  if (!hasRating && !hasInd && !hasMult) return;
+  var listEl = document.getElementById('rep-sidebar-list');
+  if (!listEl) return;
+  var items = listEl.querySelectorAll('[onclick]');
+  var shown = 0;
+  items.forEach(function(el) {
+    var oc = el.getAttribute('onclick') || '';
+    var m2 = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+    if (!m2) { shown++; return; }
+    var issId = m2[1];
+    var iss = (window.reportsDB || {})[issId];
+    if (iss && _repFilterMatch(issId, iss)) { el.style.display = ''; shown++; }
+    else el.style.display = 'none';
+  });
+  var cnt = document.getElementById('rep-sidebar-count');
+  if (cnt) cnt.textContent = String(shown);
+}
+
+// Monkeypatch repRenderIssuerList to apply extra DOM filter pass
+(function(){
+  var _orig = repRenderIssuerList;
+  window.repRenderIssuerList = function() {
+    _orig();
+    _repFilterApplyDOM();
+  };
+})();
+
+
 showPage = function(){
   var rp = document.getElementById('page-reports');
   if(rp) rp.style.display = '';
@@ -27861,6 +28056,7 @@ showPage = function(){
 setTimeout(function(){
   try { loadState(); } catch(e){ console.warn('loadState:',e); }
   try { repInit(); } catch(e){ console.error('repInit:',e); }
+  setTimeout(_repInjectFilterPanel, 80);
 }, 200);
 
 window.addEventListener('message',function(e){
