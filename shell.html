@@ -279,15 +279,17 @@ function patchHtml(html) {
   return html + '\n' + SHELL_BRIDGE;
 }
 
-// Записываем HTML в iframe через document.write — синхронно одним куском.
-// Сохраняет origin shell'а (localStorage работает).
+// Записываем HTML в iframe через Blob URL.
+// Требует HTTP-сервера (file:// не работает из-за null-origin localStorage).
 function writeToFrame(frameEl, html, onDone) {
-  frameEl.removeAttribute('src');
-  const doc = frameEl.contentDocument || frameEl.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  if (onDone) onDone();
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  frameEl.onload = function() {
+    URL.revokeObjectURL(url);
+    frameEl.onload = null;
+    if (onDone) onDone();
+  };
+  frameEl.src = url;
 }
 
 function addFiles(fileList) {
