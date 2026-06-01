@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>База отчётности</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root{
   --bg:#0a0e14;
@@ -114,7 +114,8 @@ tr:hover td{background:var(--s2);color:var(--text)}
 
 /* Модалки */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;
-  display:flex;align-items:center;justify-content:center}
+  display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
 .modal-box{background:var(--s1);border:1px solid var(--border2);
   border-radius:var(--radius-lg);padding:24px;min-width:380px;
   max-width:90vw;max-height:90vh;overflow-y:auto;
