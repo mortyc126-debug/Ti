@@ -135,6 +135,24 @@ tr:hover td{background:var(--s2);color:var(--text)}
 .dossier-pill.warn{background:rgba(245,166,35,.1);color:var(--warn)}
 .dossier-pill.err{background:var(--danger-dim);color:var(--danger)}
 .dossier-pill.nd{background:var(--s2);color:var(--text3)}
+
+/* Поиск — выпадающий список */
+#rep-search-drop{position:absolute;left:0;right:0;top:100%;margin-top:2px;
+  background:var(--s1);border:1px solid var(--border2);border-radius:var(--radius-md);
+  z-index:200;max-height:340px;overflow-y:auto;
+  box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#rep-search-drop .sd-group{padding:4px 8px 2px;font-size:.48rem;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);border-top:1px solid var(--border)}
+#rep-search-drop .sd-item{display:flex;align-items:center;gap:6px;padding:5px 10px;
+  cursor:pointer;font-size:.68rem;transition:background .1s}
+#rep-search-drop .sd-item:hover{background:var(--s2)}
+#rep-search-drop .sd-item .sd-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+#rep-search-drop .sd-item .sd-sub{font-size:.56rem;color:var(--text3);font-family:var(--mono);white-space:nowrap}
+#rep-search-drop .sd-item .sd-acc{font-size:.6rem;color:var(--acc);font-family:var(--mono);white-space:nowrap}
+
+/* Сайдбар — пилюли деталей */
+details summary::-webkit-details-marker{display:none}
+details summary{outline:none}
 </style>
 </head>
 <body>
@@ -27853,194 +27871,585 @@ function risksClearDrill(){
 
 
 
+// ── D1 API base ────────────────────────────────────────────────────
+var _d1Base = null;
+function _getD1Base(){
+  if(_d1Base) return _d1Base;
+  var v = localStorage.getItem('bondan_girbo_proxy') || localStorage.getItem('shell_api_url') || '';
+  _d1Base = v.replace(/\/$/, '') || 'https://bondan-backend.marginacall.workers.dev';
+  return _d1Base;
+}
+var _d1Catalog = null; // {issuers, bonds, stocks}
+
+// ── D1 Загрузка ────────────────────────────────────────────────────
+async function _repD1Load(){
+  var btn = document.getElementById('rep-d1-load-btn');
+  function setBtn(t, ok){ if(btn){ btn.textContent = t; btn.disabled = !ok; } }
+  setBtn('↻ каталог…', false);
+  try{
+    var base = _getD1Base();
+    // 1. Каталог — список эмитентов и облигаций
+    var r = await fetch(base + '/catalog');
+    if(!r.ok) throw new Error('catalog ' + r.status);
+    var cat = await r.json();
+    _d1Catalog = cat;
+    var issuers = cat.issuers || [];
+
+    // 2. Мёрдж эмитентов в reportsDB
+    var added = 0;
+    for(var ci = 0; ci < issuers.length; ci++){
+      var ci2 = issuers[ci];
+      if(!ci2.inn) continue;
+      // Найти существующую запись по ИНН
+      var existId = null;
+      var rdb = window.reportsDB || {};
+      for(var eid in rdb){
+        if(rdb[eid] && rdb[eid].inn === ci2.inn){ existId = eid; break; }
+      }
+      if(!existId){
+        var nid = 'i_' + ci2.inn;
+        if(!rdb[nid]){
+          rdb[nid] = {
+            name: ci2.name || ci2.short_name || ci2.inn,
+            inn: ci2.inn,
+            ind: _d1SectorToInd(ci2.sector),
+            periods: {}
+          };
+          window.reportsDB = rdb;
+          added++;
+        }
+      } else {
+        // Обновить имя и отрасль если есть новые данные
+        var ex = rdb[existId];
+        if(!ex.ind || ex.ind === 'other') ex.ind = _d1SectorToInd(ci2.sector);
+      }
+    }
+
+    // 3. Подтянуть отчёты для эмитентов без периодов
+    var toFetch = [];
+    var rdb2 = window.reportsDB || {};
+    for(var eid2 in rdb2){
+      var e2 = rdb2[eid2];
+      if(e2 && e2.inn && Object.keys(e2.periods || {}).length === 0){
+        toFetch.push({ id: eid2, inn: e2.inn });
+      }
+    }
+    var loaded = 0;
+    var total = toFetch.length;
+    for(var ti = 0; ti < total; ti += 5){
+      var batch = toFetch.slice(ti, ti + 5);
+      setBtn('↻ ' + ti + '/' + total, false);
+      await Promise.all(batch.map(function(entry){
+        return fetch(base + '/issuer/' + entry.inn + '/reports')
+          .then(function(r2){ return r2.ok ? r2.json() : null; })
+          .then(function(data){
+            if(data && data.data && data.data.length){
+              _d1MergeReports(entry.id, entry.inn, data.data);
+              loaded++;
+            }
+          })
+          .catch(function(){});
+      }));
+    }
+
+    // 4. Сохранить и перерисовать
+    try{ saveState(); }catch(e){}
+    repRenderIssuerList();
+    setBtn('✓ +' + added + ' эм, ' + loaded + ' отч.', true);
+    setTimeout(function(){ setBtn('↓ D1', true); }, 5000);
+
+  }catch(e){
+    console.error('D1 load:', e);
+    setBtn('✗ ' + (e.message||'ошибка'), true);
+    setTimeout(function(){ setBtn('↓ D1', true); }, 4000);
+  }
+}
+
+function _d1MergeReports(issId, inn, rows){
+  var rdb = window.reportsDB || {};
+  if(!rdb[issId]) return;
+  var iss = rdb[issId];
+  if(!iss.periods) iss.periods = {};
+  for(var i = 0; i < rows.length; i++){
+    var row = rows[i];
+    var pk = row.fy_year + '_' + (row.period || 'Год') + '_' + (row.std || 'РСБУ');
+    if(!iss.periods[pk]){
+      iss.periods[pk] = {
+        year: row.fy_year, period: row.period || 'Год', type: row.std || 'РСБУ',
+        rev:    _d1v(row.rev),   ebitda: _d1v(row.ebitda), ebit: _d1v(row.ebit),
+        np:     _d1v(row.np),    int:    _d1v(row.int_exp), tax: _d1v(row.tax_exp),
+        assets: _d1v(row.assets),ca:     _d1v(row.ca),      cl:  _d1v(row.cl),
+        debt:   _d1v(row.debt),  cash:   _d1v(row.cash),    ret: _d1v(row.ret),
+        eq:     _d1v(row.eq),    _src: 'd1'
+      };
+    }
+  }
+}
+function _d1v(v){ return v != null ? Number(v) : null; }
+
+// Маппинг sector (из D1 issuers) → ind (наши ключи из industry-peers)
+var _D1_SECTOR_MAP = {
+  'metals': 'metals', 'oil-gas': 'oil-gas', 'chemistry': 'chemistry',
+  'agro': 'agro', 'retail': 'retail', 'construction': 'construction',
+  'realestate': 'realestate', 'logistics': 'logistics', 'banks': 'banks',
+  'leasing': 'leasing', 'mfo': 'mfo', 'holdings': 'holdings',
+  'it': 'it', 'telecom': 'telecom', 'utilities': 'utilities',
+  'media': 'media', 'pharma': 'pharma', 'machinery': 'machinery',
+  'auto': 'auto', 'wood': 'wood', 'finance': 'holdings',
+  'municipal': 'other',
+};
+function _d1SectorToInd(s){ return (s && _D1_SECTOR_MAP[s]) || 'other'; }
+
+// ── Поиск (fuzzy по reportsDB + catalog) ──────────────────────────
+var _repSearchTimer = null;
+var _repSearchOpen = false;
+
+function _repSearchInput(val){
+  clearTimeout(_repSearchTimer);
+  // Синхронизировать с оригинальным инпутом для repRenderIssuerList
+  var orig = document.getElementById('rep-sidebar-search');
+  if(orig && orig !== document.getElementById('rep-search-main')) orig.value = val;
+  _repSearchTimer = setTimeout(function(){
+    if(val.trim().length < 1){ _repSearchDropClose(); repRenderIssuerList(); return; }
+    _repSearchDropRender(val.trim());
+    repRenderIssuerList();
+  }, 120);
+}
+
+function _repSearchDropRender(q){
+  var drop = document.getElementById('rep-search-drop');
+  if(!drop) return;
+  var ql = q.toLowerCase();
+
+  // Эмитенты из reportsDB
+  var rdb = window.reportsDB || {};
+  var issuers = [];
+  for(var id in rdb){
+    var iss = rdb[id];
+    if(!iss || !iss.name) continue;
+    var nm = (iss.name || '').toLowerCase();
+    var inn = (iss.inn || '').toLowerCase();
+    if(nm.includes(ql) || inn.includes(ql)){
+      issuers.push({ id: id, iss: iss });
+      if(issuers.length >= 6) break;
+    }
+  }
+
+  // Облигации из каталога D1
+  var bonds = [];
+  if(_d1Catalog && _d1Catalog.bonds){
+    var bl = _d1Catalog.bonds;
+    for(var bi = 0; bi < bl.length && bonds.length < 5; bi++){
+      var b = bl[bi];
+      var bn = ((b.name || b.shortname || '') + ' ' + (b.isin || '')).toLowerCase();
+      if(bn.includes(ql)) bonds.push(b);
+    }
+  }
+
+  var html = '';
+  if(issuers.length){
+    html += '<div class="sd-group">Эмитенты · ' + issuers.length + '</div>';
+    html += issuers.map(function(x){
+      var m = _repCalcMultipliers(x.iss);
+      var yr = m.year ? ' · ' + m.year : '';
+      return '<div class="sd-item" onclick="_repSearchSelectIssuer('' + x.id + '')">' +
+        '<span style="color:var(--text3)">🏢</span>' +
+        '<span class="sd-name">' + _escHtml(x.iss.name) + '</span>' +
+        '<span class="sd-sub">' + (x.iss.inn ? x.iss.inn : '') + yr + '</span>' +
+        '</div>';
+    }).join('');
+  }
+  if(bonds.length){
+    html += '<div class="sd-group">Облигации · ' + bonds.length + '</div>';
+    html += bonds.map(function(b){
+      var ytm = b.ytm != null ? '<span class="sd-acc">' + Number(b.ytm).toFixed(1) + '%</span>' : '';
+      return '<div class="sd-item">' +
+        '<span style="color:var(--text3)">📄</span>' +
+        '<span class="sd-name">' + _escHtml(b.name || b.shortname || b.isin) + '</span>' +
+        '<span class="sd-sub">' + (b.isin || '') + '</span>' +
+        ytm +
+        '</div>';
+    }).join('');
+  }
+  if(!html) html = '<div style="padding:10px;text-align:center;font-size:.62rem;color:var(--text3)">Ничего не найдено</div>';
+
+  drop.innerHTML = html;
+  drop.style.display = 'block';
+  _repSearchOpen = true;
+}
+
+function _repSearchSelectIssuer(id){
+  repSelectIssuerById(id);
+  _repSearchDropClose();
+  var inp = document.getElementById('rep-search-main');
+  if(inp){ inp.value = ''; var orig = document.getElementById('rep-sidebar-search'); if(orig) orig.value = ''; }
+  repRenderIssuerList();
+}
+
+function _repSearchDropClose(){
+  var drop = document.getElementById('rep-search-drop');
+  if(drop) drop.style.display = 'none';
+  _repSearchOpen = false;
+}
+
+// ── Перестройка сайдбара ───────────────────────────────────────────
+function _repStructureSidebar(){
+  var sidebar = document.getElementById('rep-sidebar');
+  if(!sidebar || sidebar.dataset.restructured) return;
+  sidebar.dataset.restructured = '1';
+
+  // Сохраняем существующие элементы
+  var origSearch  = document.getElementById('rep-sidebar-search');
+  var origSort    = document.getElementById('rep-sidebar-sort');
+  var origStatus  = document.getElementById('rep-sidebar-status');
+  var origInd     = document.getElementById('rep-sidebar-industry');
+  var origYears   = document.getElementById('rep-sidebar-years');
+  var listEl      = document.getElementById('rep-sidebar-list');
+  var countEl     = document.getElementById('rep-sidebar-count');
+
+  if(!origSearch || !listEl) return;
+
+  // Скрываем существующие wrapper'ы (но не сами элементы — они нужны)
+  sidebar.style.cssText = 'width:300px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;gap:0;background:var(--s1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden';
+
+  // Очищаем сайдбар
+  while(sidebar.firstChild) sidebar.removeChild(sidebar.firstChild);
+
+  // ─── Строка 1: D1-загрузка + счётчик + источники ────────────────
+  var row1 = document.createElement('div');
+  row1.style.cssText = 'display:flex;align-items:center;gap:4px;padding:8px 8px 4px';
+  row1.innerHTML =
+    '<button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.6rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase">↓ D1</button>' +
+    '<span id="rep-sidebar-count" style="font-size:.52rem;color:var(--text3);min-width:28px;text-align:center;font-family:var(--mono)">0</span>' +
+    '<button type="button" onclick="_repSourcesModal()" title="Источники данных, импорт, инструменты" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);color:var(--text3);cursor:pointer;font-size:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--sans)">⚙</button>';
+  sidebar.appendChild(row1);
+
+  // ─── Строка 2: Поиск с выпадашкой ───────────────────────────────
+  var searchWrap = document.createElement('div');
+  searchWrap.style.cssText = 'position:relative;padding:0 8px 6px';
+
+  var mainSearch = document.createElement('input');
+  mainSearch.id = 'rep-search-main';
+  mainSearch.type = 'search';
+  mainSearch.placeholder = 'Поиск: эмитент, ИНН, облигация…';
+  mainSearch.style.cssText = 'width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.65rem;padding:6px 10px;outline:none;border-radius:var(--radius)';
+  mainSearch.oninput = function(){ _repSearchInput(this.value); };
+  mainSearch.onfocus = function(){ if(this.value.trim()) _repSearchDropRender(this.value.trim()); };
+  searchWrap.appendChild(mainSearch);
+
+  var drop = document.createElement('div');
+  drop.id = 'rep-search-drop';
+  drop.style.display = 'none';
+  searchWrap.appendChild(drop);
+
+  // Оригинальный инпут скрываем но оставляем (читается repRenderIssuerList)
+  origSearch.style.display = 'none';
+  searchWrap.appendChild(origSearch);
+
+  sidebar.appendChild(searchWrap);
+
+  // Клик вне поиска — закрыть выпадашку
+  document.addEventListener('click', function(e){
+    if(!searchWrap.contains(e.target)) _repSearchDropClose();
+  });
+
+  // ─── Блок фильтров (collapsible) ────────────────────────────────
+  var det = document.createElement('details');
+  det.style.cssText = 'border-top:1px solid var(--border);border-bottom:1px solid var(--border)';
+
+  var sum = document.createElement('summary');
+  sum.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;font-size:.52rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-weight:600;background:var(--s2);user-select:none';
+  sum.innerHTML = '<span id="rep-filter-arrow" style="color:var(--acc);font-size:.6rem">▸</span><span>Фильтры и сортировка</span><span id="rep-filter-badge" style="margin-left:auto;font-size:.48rem;color:var(--acc);background:var(--acc-dim);padding:1px 6px;border-radius:10px;display:none">active</span>';
+  det.addEventListener('toggle', function(){
+    var arr = document.getElementById('rep-filter-arrow');
+    if(arr) arr.textContent = det.open ? '▾' : '▸';
+  });
+  det.appendChild(sum);
+
+  var filBody = document.createElement('div');
+  filBody.style.cssText = 'padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--s1);overflow-y:auto;max-height:50vh';
+
+  // Sort
+  var sortWrap = document.createElement('label');
+  sortWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
+  sortWrap.innerHTML = '<span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Сорт:</span>';
+  origSort.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)';
+  sortWrap.appendChild(origSort);
+  filBody.appendChild(sortWrap);
+
+  // Status
+  var statWrap = document.createElement('label');
+  statWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
+  statWrap.innerHTML = '<span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>';
+  origStatus.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)';
+  statWrap.appendChild(origStatus);
+  filBody.appendChild(statWrap);
+
+  // Industry
+  var indWrap = document.createElement('label');
+  indWrap.style.cssText = 'display:flex;gap:4px;align-items:center';
+  indWrap.innerHTML = '<span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Отрасль:</span>';
+  origInd.style.cssText = 'flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)';
+  indWrap.appendChild(origInd);
+  filBody.appendChild(indWrap);
+
+  // Years
+  var yrDiv = document.createElement('div');
+  yrDiv.innerHTML = '<div style="font-size:.5rem;color:var(--text3);margin-bottom:2px;font-family:var(--sans)">Год последнего отчёта:</div>';
+  yrDiv.appendChild(origYears);
+  filBody.appendChild(yrDiv);
+
+  // Расширенный фильтр (рейтинги + отрасли-пилюли + мультипликаторы)
+  var extFil = document.createElement('div');
+  extFil.id = 'rep-filter-extra';
+  filBody.appendChild(extFil);
+
+  det.appendChild(filBody);
+  sidebar.appendChild(det);
+
+  // ─── Список эмитентов ────────────────────────────────────────────
+  listEl.style.cssText = 'overflow-y:auto;flex:1;padding:4px;min-height:120px';
+  sidebar.appendChild(listEl);
+
+  // Инициализировать расширенный фильтр
+  _repFilterRender();
+}
+
+// ── Модалка «Источники» ────────────────────────────────────────────
+function _repSourcesModal(){
+  var overlay = document.getElementById('rep-sources-overlay');
+  if(overlay){ overlay.classList.add('open'); return; }
+
+  overlay = document.createElement('div');
+  overlay.id = 'rep-sources-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e){ if(e.target === overlay) overlay.classList.remove('open'); };
+
+  var box = document.createElement('div');
+  box.className = 'modal-box';
+  box.style.minWidth = '420px';
+
+  // Собираем кнопки из тулбара
+  var toolbar = document.querySelector('#page-reports .btn-sm[onclick="repNewIssuerModal()"]')?.parentElement;
+  var btns = toolbar ? Array.from(toolbar.querySelectorAll('button.btn')) : [];
+  // Фильтруем: оставляем инструменты импорта/работы (не ＋ период, не сравнение)
+  var keep = ['openGirboImportModal','openAuditItImportModal','repOpenMergeModal','repRunAudit',
+               'repImportIssuerJson','repNewIssuerModal','repCleanEmptyPeriods',
+               'repImportAffiliatedFromClipboard','repDiagnoseInn'];
+  var sourceBtns = btns.filter(function(b){
+    var oc = b.getAttribute('onclick') || '';
+    return keep.some(function(fn){ return oc.includes(fn); });
+  });
+
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+      '<span class="modal-title" style="margin:0">Источники и инструменты</span>' +
+      '<button type="button" onclick="document.getElementById('rep-sources-overlay').classList.remove('open')" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>' +
+    '</div>' +
+    '<div style="font-size:.6rem;color:var(--text3);margin-bottom:12px;font-family:var(--sans)">Импорт и обработка данных. Главный источник — D1 (кнопка «↓ D1» в панели). Остальные — ручные источники и утилиты.</div>' +
+    '<div id="rep-sources-btn-list" style="display:flex;flex-direction:column;gap:6px"></div>';
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Заполняем список кнопок
+  var list = box.querySelector('#rep-sources-btn-list');
+  if(sourceBtns.length){
+    sourceBtns.forEach(function(b){
+      var clone = b.cloneNode(true);
+      clone.style.cssText = 'width:100%;justify-content:flex-start;padding:8px 12px;font-size:.7rem';
+      clone.addEventListener('click', function(){
+        overlay.classList.remove('open');
+        b.click();
+      });
+      list.appendChild(clone);
+    });
+  } else {
+    list.innerHTML = '<div style="color:var(--text3);font-size:.62rem">Кнопки не найдены</div>';
+  }
+
+  overlay.classList.add('open');
+}
+
+// ── Расширенный фильтр (рейтинги + пилюли-отрасли + мульты) ──────
 window._repFilter = { ratings: [], industries: [], mults: {} };
 
 var _FILTER_RATINGS = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-','BB+','BB','BB-','B+','B','B-','CCC','D','none'];
 
 var _FILTER_IND_GROUPS = [
-  { label:'Ресурсы и сырьё', items:[{id:'agro',label:'Агро'},{id:'metals',label:'Металлы'},{id:'oil-gas',label:'Нефть/газ'}] },
-  { label:'Промышленность', items:[{id:'auto',label:'Авто'},{id:'wood',label:'Дерево'},{id:'machinery',label:'Машиностроение'},{id:'furniture',label:'Мебель'},{id:'metalware',label:'Металлоизделия'},{id:'plastics',label:'Пластмассы'},{id:'building-mat',label:'Стройматериалы'},{id:'textile',label:'Текстиль'},{id:'pharma',label:'Фармацевтика'},{id:'chemistry',label:'Химия'},{id:'electronics',label:'Электроника'}] },
-  { label:'Энергетика и ЖКХ', items:[{id:'utilities',label:'Электроэнергетика'}] },
+  { label:'Ресурсы', items:[{id:'agro',label:'Агро'},{id:'metals',label:'Металлы'},{id:'oil-gas',label:'Нефть/газ'}] },
+  { label:'Промышленность', items:[{id:'auto',label:'Авто'},{id:'wood',label:'Дерево'},{id:'machinery',label:'Машиностроение'},{id:'furniture',label:'Мебель'},{id:'metalware',label:'Металлоизделия'},{id:'plastics',label:'Пластмассы'},{id:'building-mat',label:'Стройматериалы'},{id:'textile',label:'Текстиль'},{id:'pharma',label:'Фарма'},{id:'chemistry',label:'Химия'},{id:'electronics',label:'Электроника'}] },
+  { label:'Энергетика', items:[{id:'utilities',label:'ЭЭ и ЖКХ'}] },
   { label:'Стройка', items:[{id:'realestate',label:'Недвижимость'},{id:'construction',label:'Строительство'}] },
   { label:'Торговля', items:[{id:'retail',label:'Ритейл'}] },
-  { label:'Транспорт', items:[{id:'logistics',label:'Транспорт/логистика'}] },
+  { label:'Транспорт', items:[{id:'logistics',label:'Транспорт/лог.'}] },
   { label:'IT и медиа', items:[{id:'media',label:'Медиа'},{id:'telecom',label:'Телеком'},{id:'it',label:'IT'}] },
   { label:'Финансы', items:[{id:'banks',label:'Банки'},{id:'leasing',label:'Лизинг'},{id:'mfo',label:'МФО'},{id:'insurance',label:'Страхование'},{id:'holdings',label:'Холдинги'}] },
-  { label:'Услуги', items:[{id:'rental',label:'Аренда'},{id:'hospitality',label:'Гостиницы'},{id:'healthcare',label:'Медицина'},{id:'entertainment',label:'Развлечения'},{id:'science',label:'Наука'},{id:'education',label:'Образование'},{id:'consulting',label:'Консалтинг'},{id:'services-etc',label:'Прочие услуги'}] },
+  { label:'Услуги', items:[{id:'rental',label:'Аренда'},{id:'hospitality',label:'Гостиницы'},{id:'healthcare',label:'Медицина'},{id:'entertainment',label:'Развлечения'},{id:'education',label:'Образование'},{id:'consulting',label:'Консалтинг'}] },
   { label:'Прочее', items:[{id:'other',label:'Прочее'}] }
 ];
 
 var _FILTER_MULTS = [
-  { id:'de',         label:'Долг/EBITDA',       fmt:'x', tip:'≤3 норма, >5 риск' },
-  { id:'nde',        label:'Чист.долг/EBITDA',  fmt:'x', tip:'(Долг−Кэш)/EBITDA' },
-  { id:'icr',        label:'ICR',               fmt:'x', tip:'EBIT/Проценты. ≥3 хорошо' },
-  { id:'roa',        label:'ROA, %',            fmt:'%', tip:'ЧП/Активы×100' },
-  { id:'ebitdaMarg', label:'EBITDA-маржа, %',   fmt:'%', tip:'EBITDA/Выручка×100' },
-  { id:'currentR',   label:'Current Ratio',     fmt:'x', tip:'ОА/КО. ≥1.2 хорошо' },
-  { id:'cashR',      label:'Cash Ratio',        fmt:'x', tip:'Кэш/КО' },
-  { id:'equityR',    label:'Equity Ratio, %',   fmt:'%', tip:'Капитал/Активы×100' },
+  { id:'de',         label:'Долг/EBITDA',      fmt:'x' },
+  { id:'nde',        label:'ЧД/EBITDA',        fmt:'x' },
+  { id:'icr',        label:'ICR',              fmt:'x' },
+  { id:'roa',        label:'ROA',              fmt:'%' },
+  { id:'ebitdaMarg', label:'EBITDA-маржа',     fmt:'%' },
+  { id:'currentR',   label:'Current Ratio',   fmt:'x' },
+  { id:'cashR',      label:'Cash Ratio',      fmt:'x' },
+  { id:'equityR',    label:'Equity Ratio',    fmt:'%' },
 ];
 
-function _repInjectFilterPanel() {
-  var sidebar = document.getElementById('rep-sidebar');
-  if (!sidebar || document.getElementById('rep-filter-extra')) return;
-  var wrap = document.createElement('div');
-  wrap.id = 'rep-filter-extra';
-  sidebar.appendChild(wrap);
-  _repFilterRender();
-}
-
-function _repFilterRender() {
+function _repFilterRender(){
   var el = document.getElementById('rep-filter-extra');
-  if (!el) return;
+  if(!el) return;
   var f = window._repFilter;
-  var hasFilter = f.ratings.length || f.industries.length ||
-    Object.values(f.mults).some(function(m){ return m && (m.min !== '' || m.max !== ''); });
+  var hasRat = f.ratings.length > 0;
+  var hasInd = f.industries.length > 0;
+  var hasMult = Object.values(f.mults).some(function(m){ return m && (m.min !== '' || m.max !== ''); });
+  var hasFilter = hasRat || hasInd || hasMult;
 
-  var ratHtml = _FILTER_RATINGS.map(function(r) {
-    var on = f.ratings.indexOf(r) !== -1;
-    var lbl = r === 'none' ? 'без рейтинга' : r;
-    return '<button type="button" onclick="_repFilterToggleRating(\'' + r + '\')" style="padding:1px 5px;border-radius:12px;font-size:.5rem;font-family:var(--mono);border:1px solid ' + (on?'var(--acc)':'var(--border2)') + ';background:' + (on?'var(--acc-dim)':'var(--s2)') + ';color:' + (on?'var(--acc)':'var(--text3)') + ';cursor:pointer;margin:1px;white-space:nowrap">' + lbl + '</button>';
+  // Обновить бейдж на summary
+  var badge = document.getElementById('rep-filter-badge');
+  if(badge) badge.style.display = hasFilter ? 'inline' : 'none';
+
+  function pill(lbl, on, onclick){
+    return '<button type="button" onclick="' + onclick + '" style="padding:1px 6px;border-radius:12px;font-size:.5rem;font-family:var(--mono);border:1px solid ' + (on?'var(--acc)':'var(--border2)') + ';background:' + (on?'var(--acc-dim)':'var(--bg)') + ';color:' + (on?'var(--acc)':'var(--text3)') + ';cursor:pointer;margin:1px;white-space:nowrap">' + lbl + '</button>';
+  }
+
+  var ratHtml = _FILTER_RATINGS.map(function(r){
+    return pill(r==='none'?'без рейтинга':r, f.ratings.indexOf(r)!==-1, "_repFilterToggleRating('" + r + "')");
   }).join('');
 
-  var indHtml = _FILTER_IND_GROUPS.map(function(g) {
-    return '<div style="font-size:.48rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:4px 0 2px;font-family:var(--sans)">' + g.label + '</div>' +
-      g.items.map(function(it) {
-        var on = f.industries.indexOf(it.id) !== -1;
-        return '<button type="button" onclick="_repFilterToggleInd(\'' + it.id + '\')" style="padding:1px 5px;border-radius:12px;font-size:.5rem;font-family:var(--mono);border:1px solid ' + (on?'var(--acc)':'var(--border2)') + ';background:' + (on?'var(--acc-dim)':'var(--s2)') + ';color:' + (on?'var(--acc)':'var(--text3)') + ';cursor:pointer;margin:1px;white-space:nowrap">' + it.label + '</button>';
+  var indHtml = _FILTER_IND_GROUPS.map(function(g){
+    return '<div style="font-size:.46rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:5px 0 2px;font-family:var(--sans)">' + g.label + '</div>' +
+      g.items.map(function(it){
+        return pill(it.label, f.industries.indexOf(it.id)!==-1, "_repFilterToggleInd('" + it.id + "')");
       }).join('');
   }).join('');
 
-  var multHtml = _FILTER_MULTS.map(function(m) {
+  var multHtml = _FILTER_MULTS.map(function(m){
     var mf = f.mults[m.id] || {min:'',max:''};
     return '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">' +
-      '<span title="' + m.tip + '" style="font-size:.52rem;font-family:var(--mono);color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help">' + m.label + '</span>' +
-      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'min\',this.value)" style="width:42px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<span style="font-size:.52rem;font-family:var(--mono);color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + m.label + '</span>' +
+      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult('' + m.id + '','min',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
       '<span style="color:var(--text3);font-size:.5rem">–</span>' +
-      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'max\',this.value)" style="width:42px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
-      '<span style="color:var(--text3);font-size:.48rem;width:10px;text-align:right">' + m.fmt + '</span>' +
+      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult('' + m.id + '','max',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<span style="color:var(--text3);font-size:.46rem;width:9px;text-align:right">' + m.fmt + '</span>' +
       '</div>';
   }).join('');
 
   el.innerHTML =
-    '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">' +
-    '<div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">' +
-      '<span style="font-size:.54rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);flex:1">Фильтр по эмитенту</span>' +
-      (hasFilter ? '<button type="button" onclick="_repFilterReset()" style="font-size:.5rem;color:var(--danger);background:none;border:none;cursor:pointer;font-family:var(--mono);padding:0">сброс</button>' : '') +
-    '</div>' +
-    '<div style="margin-bottom:8px">' +
-      '<div style="font-size:.48rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;font-family:var(--sans)">Рейтинг</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:1px">' + ratHtml + '</div>' +
-    '</div>' +
-    '<details style="margin-bottom:6px">' +
-      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);list-style:none;display:flex;align-items:center;gap:4px;outline:none">' +
-        '<span style="color:var(--acc)">▸</span><span>Отрасли</span>' +
-        (f.industries.length ? '<span style="color:var(--acc);font-size:.48rem">' + f.industries.length + ' выбрано</span>' : '') +
+    '<div style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">' +
+    (hasFilter ? '<div style="text-align:right;margin-bottom:4px"><button type="button" onclick="_repFilterReset()" style="font-size:.5rem;color:var(--danger);background:none;border:none;cursor:pointer;font-family:var(--mono)">× сброс фильтра</button></div>' : '') +
+
+    '<details style="margin-bottom:4px">' +
+      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);font-weight:600;display:flex;align-items:center;gap:4px;padding:2px 0">' +
+        '<span style="color:var(--acc)">▸</span><span>Рейтинг</span>' +
+        (hasRat ? '<span style="margin-left:auto;font-size:.46rem;color:var(--acc)">' + f.ratings.length + '</span>' : '') +
       '</summary>' +
-      '<div style="margin-top:6px">' + indHtml + '</div>' +
+      '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:1px">' + ratHtml + '</div>' +
     '</details>' +
+
+    '<details style="margin-bottom:4px">' +
+      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);font-weight:600;display:flex;align-items:center;gap:4px;padding:2px 0">' +
+        '<span style="color:var(--acc)">▸</span><span>Отрасли</span>' +
+        (hasInd ? '<span style="margin-left:auto;font-size:.46rem;color:var(--acc)">' + f.industries.length + '</span>' : '') +
+      '</summary>' +
+      '<div style="margin-top:4px">' + indHtml + '</div>' +
+    '</details>' +
+
     '<details open style="margin-bottom:4px">' +
-      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);list-style:none;display:flex;align-items:center;gap:4px;outline:none;margin-bottom:6px">' +
-        '<span style="color:var(--acc)">▸</span><span>Мультипликаторы</span>' +
+      '<summary style="font-size:.5rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;cursor:pointer;font-family:var(--sans);font-weight:600;display:flex;align-items:center;gap:4px;padding:2px 0;margin-bottom:4px">' +
+        '<span style="color:var(--acc)">▾</span><span>Мультипликаторы</span>' +
+        (hasMult ? '<span style="margin-left:auto;font-size:.46rem;color:var(--acc)">active</span>' : '') +
       '</summary>' +
       multHtml +
     '</details>' +
     '</div>';
 }
 
-function _repFilterToggleRating(r) {
-  var f = window._repFilter;
-  var idx = f.ratings.indexOf(r);
-  if (idx === -1) f.ratings.push(r); else f.ratings.splice(idx, 1);
-  _repFilterRender();
-  repRenderIssuerList();
+function _repFilterToggleRating(r){
+  var f = window._repFilter, idx = f.ratings.indexOf(r);
+  if(idx===-1) f.ratings.push(r); else f.ratings.splice(idx,1);
+  _repFilterRender(); repRenderIssuerList();
 }
-
-function _repFilterToggleInd(id) {
-  var f = window._repFilter;
-  var idx = f.industries.indexOf(id);
-  if (idx === -1) f.industries.push(id); else f.industries.splice(idx, 1);
-  _repFilterRender();
-  repRenderIssuerList();
+function _repFilterToggleInd(id){
+  var f = window._repFilter, idx = f.industries.indexOf(id);
+  if(idx===-1) f.industries.push(id); else f.industries.splice(idx,1);
+  _repFilterRender(); repRenderIssuerList();
 }
-
-function _repFilterSetMult(mid, key, val) {
+function _repFilterSetMult(mid, key, val){
   var f = window._repFilter;
-  if (!f.mults[mid]) f.mults[mid] = {min:'',max:''};
+  if(!f.mults[mid]) f.mults[mid] = {min:'',max:''};
   f.mults[mid][key] = val;
   repRenderIssuerList();
 }
-
-function _repFilterReset() {
+function _repFilterReset(){
   window._repFilter = { ratings: [], industries: [], mults: {} };
-  _repFilterRender();
-  repRenderIssuerList();
+  _repFilterRender(); repRenderIssuerList();
 }
 
-function _repFilterMatch(id, iss) {
+function _repFilterMatch(id, iss){
   var f = window._repFilter || {};
-  if (f.industries && f.industries.length > 0) {
-    if (f.industries.indexOf(iss.ind || 'other') === -1) return false;
+  if(f.industries && f.industries.length > 0){
+    if(f.industries.indexOf(iss.ind || 'other') === -1) return false;
   }
-  if (f.ratings && f.ratings.length > 0) {
+  if(f.ratings && f.ratings.length > 0){
     var issRatings = (iss.ratings || []).map(function(r){ return r && r.rating; }).filter(Boolean);
     var hasMatch = issRatings.some(function(r){ return f.ratings.indexOf(r) !== -1; });
     var wantsNone = f.ratings.indexOf('none') !== -1;
-    if (!hasMatch && !(wantsNone && issRatings.length === 0)) return false;
+    if(!hasMatch && !(wantsNone && issRatings.length === 0)) return false;
   }
-  if (f.mults) {
+  if(f.mults){
     var calcM = _repCalcMultipliers(iss);
     var lp = _repLatestPeriod(iss);
     var p = lp ? lp.period : null;
     var allMults = {
-      de: calcM.de,
-      icr: calcM.icr,
-      currentR: calcM.cur,
-      cashR: calcM.cashR,
+      de: calcM.de, icr: calcM.icr, currentR: calcM.cur, cashR: calcM.cashR,
       equityR: calcM.eqr != null ? calcM.eqr * 100 : null,
-      nde: (p && p.ebitda != null && p.ebitda !== 0) ? ((p.debt||0) - (p.cash||0)) / p.ebitda : null,
-      roa: (p && p.assets) ? ((p.np||0) / p.assets * 100) : null,
-      ebitdaMarg: (p && p.rev) ? ((p.ebitda||0) / p.rev * 100) : null,
+      nde: (p && p.ebitda != null && p.ebitda !== 0) ? ((p.debt||0)-(p.cash||0))/p.ebitda : null,
+      roa: (p && p.assets) ? ((p.np||0)/p.assets*100) : null,
+      ebitdaMarg: (p && p.rev) ? ((p.ebitda||0)/p.rev*100) : null,
     };
-    for (var mid in f.mults) {
+    for(var mid in f.mults){
       var mf = f.mults[mid];
-      if (!mf) continue;
+      if(!mf) continue;
       var val = allMults[mid];
-      if (val == null || !isFinite(val)) continue;
-      if (mf.min !== '' && mf.min !== null && val < parseFloat(mf.min)) return false;
-      if (mf.max !== '' && mf.max !== null && val > parseFloat(mf.max)) return false;
+      if(val == null || !isFinite(val)) continue;
+      if(mf.min !== '' && mf.min !== null && val < parseFloat(mf.min)) return false;
+      if(mf.max !== '' && mf.max !== null && val > parseFloat(mf.max)) return false;
     }
   }
   return true;
 }
 
-function _repFilterApplyDOM() {
+function _repFilterApplyDOM(){
   var f = window._repFilter || {};
   var hasRating = f.ratings && f.ratings.length > 0;
   var hasInd = f.industries && f.industries.length > 0;
-  var hasMult = f.mults && Object.values(f.mults).some(function(m){ return m && (m.min !== '' || m.max !== ''); });
-  if (!hasRating && !hasInd && !hasMult) return;
+  var hasMult = f.mults && Object.values(f.mults).some(function(m){ return m && (m.min!==''||m.max!==''); });
+  if(!hasRating && !hasInd && !hasMult) return;
   var listEl = document.getElementById('rep-sidebar-list');
-  if (!listEl) return;
+  if(!listEl) return;
   var items = listEl.querySelectorAll('[onclick]');
   var shown = 0;
-  items.forEach(function(el) {
+  items.forEach(function(el){
     var oc = el.getAttribute('onclick') || '';
     var m2 = oc.match(/repSelectIssuerById\('([^']+)'\)/);
-    if (!m2) { shown++; return; }
+    if(!m2){ shown++; return; }
     var issId = m2[1];
     var iss = (window.reportsDB || {})[issId];
-    if (iss && _repFilterMatch(issId, iss)) { el.style.display = ''; shown++; }
-    else el.style.display = 'none';
+    if(iss && _repFilterMatch(issId, iss)){ el.style.display=''; shown++; }
+    else el.style.display='none';
   });
   var cnt = document.getElementById('rep-sidebar-count');
-  if (cnt) cnt.textContent = String(shown);
+  if(cnt) cnt.textContent = String(shown);
 }
 
-// Monkeypatch repRenderIssuerList to apply extra DOM filter pass
+// Monkeypatch repRenderIssuerList после загрузки app.js
 (function(){
   var _orig = repRenderIssuerList;
-  window.repRenderIssuerList = function() {
+  window.repRenderIssuerList = function(){
     _orig();
     _repFilterApplyDOM();
   };
@@ -28056,7 +28465,7 @@ showPage = function(){
 setTimeout(function(){
   try { loadState(); } catch(e){ console.warn('loadState:',e); }
   try { repInit(); } catch(e){ console.error('repInit:',e); }
-  setTimeout(_repInjectFilterPanel, 80);
+  setTimeout(_repStructureSidebar, 80);
 }, 200);
 
 window.addEventListener('message',function(e){
