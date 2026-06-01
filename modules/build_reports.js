@@ -895,7 +895,8 @@ setTimeout(function(){
 window.addEventListener('message',function(e){
   var d=e.data; if(!d) return;
   if(d.type==='SHELL_STATE'){
-    if(d.token) try{ localStorage.setItem('ba_apikey',d.token); }catch(ex){}
+    if(d.token)  try{ localStorage.setItem('ba_apikey',d.token); }catch(ex){}
+    if(d.apiUrl) try{ localStorage.setItem('bondan_girbo_proxy',d.apiUrl); _d1Base=d.apiUrl.replace(/\\/$/,''); }catch(ex){}
   }
 });
 <\/script>

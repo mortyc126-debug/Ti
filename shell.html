@@ -465,6 +465,7 @@ function pushState(frameEl, silent) {
       type:   'SHELL_STATE',
       token:  localStorage.getItem(KEY_TOKEN)  || '',
       ticker: silent ? '' : (localStorage.getItem(KEY_TICKER) || ''),
+      apiUrl: localStorage.getItem('bondan_girbo_proxy') || localStorage.getItem(KEY_API_URL) || '',
       silent: !!silent,
     }, '*');
   } catch(e) {}
