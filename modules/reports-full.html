@@ -244,14 +244,13 @@ tr:hover td{background:var(--s2)}
 .dossier-pill.err{background:rgba(255,77,109,.14);color:var(--danger)}
 .dossier-pill.nd{background:var(--border);color:var(--text3)}
 </style>
-/* module overrides: скрываем навигацию оболочки, страница занимает весь экран */
 html,body{overflow:auto!important}
-.page{display:block!important}
+.page{display:none}
+#page-reports{display:block!important}
 </style>
 </head>
 <body style="overflow:auto">
 
-<!-- ── СТРАНИЦА ОТЧЁТНОСТИ ── -->
 <div class="page" id="page-reports">
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
@@ -2442,26 +2441,14 @@ html,body{overflow:auto!important}
 <!-- Основной код приложения вынесен в app.js и подключён с defer — чтобы браузер параллельно качал его и парсил HTML, а не блокировал рендер на ~10 сек. -->
 
 <script>
-// ── ЗАГЛУШКИ для функций из других разделов ──
-// (reports зависит от глобального состояния и утилит, но не от других страниц)
+// ── заглушки ──
 function showPage(){}
 function ytmInit(){}
 function calInit(){}
 function industriesInit(){}
-function showToast(msg,kind){
-  const colorMap={info:'var(--acc)',warn:'var(--warn)',err:'var(--danger)',ok:'var(--green)'};
-  const color=colorMap[kind]||colorMap.info;
-  const t=document.createElement('div');
-  t.style.cssText=`position:fixed;bottom:20px;right:20px;max-width:min(92vw,480px);
-    background:var(--s2);border:1px solid ${color};color:${color};
-    font-family:var(--mono);font-size:.66rem;padding:9px 14px;z-index:99999;
-    box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;word-break:break-word`;
-  t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), kind==='err'?12000:5000);
-}
+function compareInit(){}
+function portfolioInit(){}
 
-// ── ОБЩИЕ УТИЛИТЫ (ГИРБО, бухбаланс, sparkline, state) ──
 'use strict';
 
 // ══ ГЛОБАЛЬНЫЕ ОШИБКИ → тост ══
@@ -6997,7 +6984,7 @@ document.addEventListener('click',e=>{
 });
 
 // Allow pressing Enter in ISIN field to trigger lookup
-document.getElementById('pp-isin').addEventListener('keydown',e=>{
+document.getElementById('pp-isin')?.addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();document.getElementById('pp-suggest').style.display='none';lookupIsin()}
 });
 
@@ -7597,7 +7584,7 @@ ${ctx?'Контекст: '+ctx:''}
 // ══ ISSUER DATA SEARCH ══
 
 // Синхронизировать поле поиска с названием компании
-document.getElementById('is-co').addEventListener('input', function(){
+document.getElementById('is-co')?.addEventListener('input', function(){
   const sp = document.getElementById('sp-query');
   if(!sp.value || sp.value === sp.dataset.synced) {
     sp.value = this.value;
@@ -7632,7 +7619,7 @@ function parseAiFieldValues(text, fieldHints){
 // ══ AUTONOMOUS DATA SEARCH (MOEX + CBR, no API key) ══
 
 // Синхронизация поля ISIN с полем выпуска
-document.getElementById('is-bond').addEventListener('input', function(){
+document.getElementById('is-bond')?.addEventListener('input', function(){
   const sp = document.getElementById('sp-isin');
   if(!sp.value) sp.value = this.value;
 });
@@ -8986,7 +8973,6 @@ updateCalStats();
 
 // ══════════════════════════════════════════════════════
 
-// ── МОДУЛЬ ОТЧЁТНОСТИ ──
 // ══ REPORTS MODULE ══
 // ══════════════════════════════════════════════════════
 
@@ -17157,18 +17143,12 @@ document.getElementById('is-rep-period')?.addEventListener('change', function() 
 
 // ══ GITHUB GIST SYNC ══
 
-// ── ИНИЦИАЛИЗАЦИЯ ──
+// ── старт ──
 (function(){
-  // Загружаем состояние из того же ba_v2
-  loadState();
-  // Показываем только страницу reports
-  document.querySelectorAll('.page').forEach(p => {
-    p.style.display = p.id === 'page-reports' ? 'block' : 'none';
-  });
-  repInit();
-  // shell bridge
-  window.addEventListener('message', e => {
-    const d = e.data;
+  try { loadState(); } catch(e) { console.warn('loadState:', e); }
+  try { repInit(); } catch(e) { console.error('repInit:', e); }
+  window.addEventListener('message', function(e){
+    var d = e.data;
     if(!d || d.type !== 'SHELL_STATE') return;
     if(d.token) localStorage.setItem('ba_apikey', d.token);
   });
