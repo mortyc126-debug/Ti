@@ -348,6 +348,33 @@ function onDrop(e)      { e.preventDefault(); e.currentTarget.classList.remove('
 function onFilePick(e)  { addFiles(e.target.files); }
 function openFirst()    { if (modules.length) openModule(0); }
 
+// ══ ВСТРОЕННЫЕ МОДУЛИ (автозагрузка при старте) ══
+const BUILTIN_MODULES = [
+  { file: 'modules/reports-full.html', label: 'Отчётность' },
+];
+
+function autoLoadBuiltins() {
+  const base = (location.href.replace(/\/[^/]*$/, '/'));
+  let pending = BUILTIN_MODULES.length;
+  if (!pending) return;
+  BUILTIN_MODULES.forEach(function(m) {
+    fetch(base + m.file)
+      .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
+      .then(function(html) {
+        modules.push({ name: m.file, label: m.label, html: patchHtml(html) });
+        rebuildNav();
+        if (modules.length === 1) openModule(0);
+      })
+      .catch(function(e) { console.warn('Builtin load failed:', m.file, e); })
+      .finally(function() {
+        pending--;
+        if (pending === 0) renderFileList();
+      });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', autoLoadBuiltins);
+
 // ══ НАВИГАЦИЯ (вкладки) ══
 function rebuildNav() {
   const nav = document.getElementById('nav');
