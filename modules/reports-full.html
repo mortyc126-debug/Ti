@@ -27951,14 +27951,16 @@ async function _repD1Load(){
     setLog('Шаг 2/3: +' + added + ' новых, ' + updated + ' обновлено');
     repRenderIssuerList();
 
-    // 3. Подтянуть отчёты для эмитентов без периодов
+    // 3. Подтянуть отчёты для эмитентов без периодов И ещё не проверенных
     var toFetch = [];
     var rdb2 = window.reportsDB || {};
     for(var eid2 in rdb2){
       var e2 = rdb2[eid2];
-      if(e2 && e2.inn && Object.keys(e2.periods || {}).length === 0){
-        toFetch.push({ id: eid2, inn: e2.inn });
-      }
+      // Пропускаем: нет ИНН, уже есть периоды, уже проверялись в D1 и вернули пусто
+      if(!e2 || !e2.inn) continue;
+      if(Object.keys(e2.periods || {}).length > 0) continue;
+      if(e2._d1_checked) continue;
+      toFetch.push({ id: eid2, inn: e2.inn });
     }
     var loaded = 0, errors = 0;
     var total = toFetch.length;
@@ -27974,6 +27976,10 @@ async function _repD1Load(){
             if(data && Array.isArray(data.data) && data.data.length){
               _d1MergeReports(entry.id, entry.inn, data.data);
               loaded++;
+            } else {
+              // Пометить как проверенный — пустой ответ, не перезапрашивать
+              var rdbRef = window.reportsDB || {};
+              if(rdbRef[entry.id]) rdbRef[entry.id]._d1_checked = true;
             }
           })
           .catch(function(err){ errors++; console.warn('reports fetch:', entry.inn, err); });
@@ -27986,9 +27992,15 @@ async function _repD1Load(){
     // 4. Сохранить и перерисовать
     try{ saveState(); }catch(e){ console.warn('saveState:', e); }
     repRenderIssuerList();
-    var summary = '✓ ' + added + ' эм., ' + loaded + ' отч.';
-    setBtn(summary);
-    setLog('Готово: ' + summary + (errors ? ', ошибок: ' + errors : ''));
+    // Итоговый подсчёт базы
+    var rdbFinal = window.reportsDB || {};
+    var totalIss = Object.keys(rdbFinal).length;
+    var withPeriods = Object.keys(rdbFinal).filter(function(k){ return Object.keys(rdbFinal[k].periods||{}).length > 0; }).length;
+    var summary = added > 0 ? '+' + added + ' эм.' : '';
+    var loadedStr = loaded > 0 ? (summary ? ', ' : '') + '+' + loaded + ' отч.' : '';
+    var statusStr = '✓ ' + (summary + loadedStr || 'без изменений') + ' | база: ' + withPeriods + '/' + totalIss;
+    setBtn('✓ ' + withPeriods + '/' + totalIss + ' с отчётами');
+    setLog(statusStr + (errors ? ' (ошибок: ' + errors + ')' : ''));
     if(btn) btn.disabled = false;
 
   }catch(e){
