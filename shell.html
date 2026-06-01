@@ -237,9 +237,18 @@ function labelFor(name) {
 }
 
 function patchHtml(html) {
-  // Вставляем мост: если есть </body> — перед ним, иначе просто в конец
   if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, SHELL_BRIDGE + '\n</body>');
   return html + '\n' + SHELL_BRIDGE;
+}
+
+// Записываем HTML прямо в iframe через document.write — origin наследуется от shell,
+// поэтому fetch/XHR работают так же как если бы модуль открыли напрямую.
+function writeToFrame(frameEl, html) {
+  frameEl.removeAttribute('src');
+  const doc = frameEl.contentDocument || frameEl.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
 }
 
 function addFiles(fileList) {
@@ -247,19 +256,14 @@ function addFiles(fileList) {
     if (!f.name.match(/\.html?$/i)) continue;
     const reader = new FileReader();
     reader.onload = e => {
-      const html    = patchHtml(e.target.result);
-      const blob    = new Blob([html], { type: 'text/html' });
-      const blobUrl = URL.createObjectURL(blob);
+      const html     = patchHtml(e.target.result);
       const existing = modules.findIndex(m => m.name === f.name);
       if (existing !== -1) {
-        // обновляем существующий модуль — старый blob освобождаем
-        URL.revokeObjectURL(modules[existing].blobUrl);
-        modules[existing] = { name: f.name, label: labelFor(f.name), blobUrl, html };
-        // если вкладка активна — перезагружаем iframe
+        modules[existing] = { name: f.name, label: labelFor(f.name), html };
         if (existing === activeIdx) openModule(existing);
         toast(modules[existing].label + ' — обновлён');
       } else {
-        modules.push({ name: f.name, label: labelFor(f.name), blobUrl, html });
+        modules.push({ name: f.name, label: labelFor(f.name), html });
         if (modules.length === 1) openModule(0);
       }
       renderFileList();
@@ -315,13 +319,12 @@ function openModule(idx) {
   const fw = document.getElementById('frame-wrap');
   fw.style.display = 'block';
   const frame = document.getElementById('mod-frame');
-  frame.src = modules[idx].blobUrl;
   frame.onload = () => setTimeout(pushState, 400);
+  writeToFrame(frame, modules[idx].html);
   rebuildNav();
 }
 
 function removeModule(idx) {
-  if (modules[idx].blobUrl) URL.revokeObjectURL(modules[idx].blobUrl);
   modules.splice(idx, 1);
   if (activeIdx >= modules.length) activeIdx = modules.length - 1;
   rebuildNav();
@@ -434,8 +437,8 @@ function openWindow(modIdx, opts) {
   document.getElementById('win-layer').appendChild(el);
 
   const frameEl = el.querySelector('iframe');
-  frameEl.src = m.blobUrl;
   frameEl.onload = () => setTimeout(() => pushState(frameEl), 400);
+  writeToFrame(frameEl, m.html);
 
   wins[id] = { el, frameEl, micro: false };
 
