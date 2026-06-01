@@ -244,12 +244,13 @@ tr:hover td{background:var(--s2)}
 .dossier-pill.err{background:rgba(255,77,109,.14);color:var(--danger)}
 .dossier-pill.nd{background:var(--border);color:var(--text3)}
 </style>
-html,body{overflow:auto!important}
+html,body{overflow:auto!important;background:#1a0a0a!important}
 .page{display:none}
 #page-reports{display:block!important}
 </style>
 </head>
 <body style="overflow:auto">
+<div style="position:fixed;top:0;left:0;z-index:99999;background:red;color:white;padding:8px;font-size:14px;font-family:monospace" id="_dbg">МОДУЛЬ ЗАГРУЖЕН — JS ЕЩЁ НЕ ЗАПУСТИЛСЯ</div>
 
 <div style="display:none">
   <span id="sb-rep">0</span>
@@ -27942,8 +27943,12 @@ showPage = function(n){
 };
 
 // Запуск модуля отчётности
-try { loadState(); } catch(e) { console.warn('loadState:', e); }
-try { repInit(); } catch(e) { console.error('repInit:', e); }
+var _dbg = document.getElementById('_dbg');
+if(_dbg) _dbg.textContent = 'JS запустился — до loadState';
+try { loadState(); } catch(e) { console.warn('loadState:', e); if(_dbg) _dbg.textContent += ' | loadState ОШИБКА: ' + e.message; }
+if(_dbg) _dbg.textContent += ' | loadState OK — до repInit';
+try { repInit(); } catch(e) { console.error('repInit:', e); if(_dbg) _dbg.textContent += ' | repInit ОШИБКА: ' + e.message; }
+if(_dbg) _dbg.textContent += ' | repInit OK';
 
 window.addEventListener('message', function(e){
   var d = e.data;
