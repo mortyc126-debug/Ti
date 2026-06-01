@@ -72,7 +72,25 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
 #btn-go:hover{background:rgba(255,0,110,0.24);}
 
 /* ── MAIN ── */
-#main{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+#main{flex:1;overflow:hidden;display:flex;flex-direction:row;}
+#left-panel,#right-panel{
+  width:320px;flex-shrink:0;display:flex;flex-direction:column;
+  border-right:1px solid var(--border);position:relative;
+  transition:width .2s;
+}
+#right-panel{border-right:none;border-left:1px solid var(--border);}
+#left-panel.closed,#right-panel.closed{width:0;overflow:hidden;}
+.side-bar{
+  height:32px;display:flex;align-items:center;padding:0 8px;gap:6px;
+  background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.side-bar span{font-family:var(--mono);font-size:10px;color:var(--muted);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.side-close{background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:13px;padding:0 3px;}
+.side-close:hover{color:var(--text);}
+.side-frame{flex:1;border:none;display:block;width:100%;}
+#center{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}
 #frame-wrap{flex:1;position:relative;}
 #mod-frame{width:100%;height:100%;border:none;display:block;}
 
@@ -189,6 +207,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
 </div>
 
 <div id="main">
+  <!-- левая боковая панель -->
+  <div id="left-panel" class="closed">
+    <div class="side-bar">
+      <span id="left-label">—</span>
+      <button class="side-close" onclick="closePanel('left')" title="Закрыть">✕</button>
+    </div>
+    <iframe id="left-frame" class="side-frame"></iframe>
+  </div>
+
+  <div id="center">
   <div id="dropzone">
     <div id="drop-box"
       ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
@@ -207,6 +235,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
 
   <div id="frame-wrap" style="display:none;">
     <iframe id="mod-frame"></iframe>
+  </div>
+  </div><!-- /center -->
+
+  <!-- правая боковая панель -->
+  <div id="right-panel" class="closed">
+    <div class="side-bar">
+      <span id="right-label">—</span>
+      <button class="side-close" onclick="closePanel('right')" title="Закрыть">✕</button>
+    </div>
+    <iframe id="right-frame" class="side-frame"></iframe>
   </div>
 </div>
 
@@ -300,7 +338,9 @@ function rebuildNav() {
     btn.innerHTML =
       `<span class="dot"></span>` +
       `<span>${m.label}</span>` +
-      `<button class="pop-btn" title="Открыть в окне" onclick="event.stopPropagation();openWindow(${i})">⧉</button>` +
+      `<button class="pop-btn" title="В левую панель"  onclick="event.stopPropagation();openPanel('left',${i})">◧</button>` +
+      `<button class="pop-btn" title="В правую панель" onclick="event.stopPropagation();openPanel('right',${i})">◨</button>` +
+      `<button class="pop-btn" title="Открыть в окне"  onclick="event.stopPropagation();openWindow(${i})">⧉</button>` +
       `<button class="close"   title="Закрыть вкладку" onclick="event.stopPropagation();removeModule(${i})">×</button>`;
     btn.onclick = () => openModule(i);
     nav.appendChild(btn);
@@ -319,7 +359,7 @@ function openModule(idx) {
   const fw = document.getElementById('frame-wrap');
   fw.style.display = 'block';
   const frame = document.getElementById('mod-frame');
-  frame.addEventListener('load', () => setTimeout(pushState, 400), { once: true });
+  frame.addEventListener('load', () => setTimeout(() => pushState(frame, true), 400), { once: true });
   writeToFrame(frame, modules[idx].html);
   rebuildNav();
 }
@@ -339,22 +379,48 @@ function removeModule(idx) {
 }
 
 // ══ ОБЩЕЕ СОСТОЯНИЕ → iframe ══
-function pushState(frameEl) {
+// silent=true: передать только токен, тикер не трогать (не запускать автопоиск при загрузке)
+function pushState(frameEl, silent) {
   const target = frameEl || document.getElementById('mod-frame');
   if (!target || !target.contentWindow) return;
   try {
     target.contentWindow.postMessage({
       type:   'SHELL_STATE',
       token:  localStorage.getItem(KEY_TOKEN)  || '',
-      ticker: localStorage.getItem(KEY_TICKER) || '',
+      ticker: silent ? '' : (localStorage.getItem(KEY_TICKER) || ''),
+      silent: !!silent,
     }, '*');
   } catch(e) {}
 }
 
 function pushStateToAll() {
-  // рассылаем текущий тикер/токен во все открытые iframe (вкладка + окна)
   pushState(document.getElementById('mod-frame'));
-  document.querySelectorAll('.fwin iframe').forEach(f => pushState(f));
+  document.querySelectorAll('.fwin iframe, .side-frame').forEach(f => pushState(f));
+}
+
+// ══ БОКОВЫЕ ПАНЕЛИ ══
+const panelState = { left: -1, right: -1 };
+
+function openPanel(side, modIdx) {
+  const m = modules[modIdx];
+  if (!m) return;
+  panelState[side] = modIdx;
+  const panel = document.getElementById(side + '-panel');
+  const frame = document.getElementById(side + '-frame');
+  const label = document.getElementById(side + '-label');
+  panel.classList.remove('closed');
+  label.textContent = m.label;
+  frame.addEventListener('load', () => setTimeout(() => pushState(frame, true), 400), { once: true });
+  writeToFrame(frame, m.html);
+  toast(m.label + ' → ' + (side === 'left' ? 'левая' : 'правая') + ' панель');
+}
+
+function closePanel(side) {
+  panelState[side] = -1;
+  document.getElementById(side + '-panel').classList.add('closed');
+  const frame = document.getElementById(side + '-frame');
+  const doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open(); doc.write(''); doc.close();
 }
 
 window.addEventListener('message', e => {
@@ -562,10 +628,13 @@ const SHELL_BRIDGE = `<script>
         if (el && !el.value) el.value = d.token;
       });
     }
-    if (d.ticker) {
+    if (d.ticker && !d.silent) {
       setTimeout(function(){ _shellApplyTicker(d.ticker); }, 200);
+    } else if (d.ticker && d.silent) {
+      // тихий режим — только заполнить поле, без автозапуска поиска
+      var ids = ['chart-ticker','qinput','ticker-input','search-input'];
+      ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=d.ticker; });
     }
-    window.parent.postMessage({ type:'MODULE_READY' }, '*');
   });
 
   function _shellApplyTicker(ticker) {
