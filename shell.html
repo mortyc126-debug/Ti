@@ -387,7 +387,11 @@ function autoLoadBuiltins() {
         rebuildNav();
         if (modules.length === 1) openModule(0);
       })
-      .catch(function(e) { console.warn('Builtin load failed:', m.file, e); })
+      .catch(function(e) {
+        console.warn('Builtin load failed:', m.file, e);
+        toast('Папка modules/ не найдена — перетащите ' + m.label + '.html вручную');
+        showDropzone();
+      })
       .finally(function() {
         pending--;
         if (pending === 0) renderFileList();
