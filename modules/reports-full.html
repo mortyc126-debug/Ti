@@ -251,6 +251,13 @@ html,body{overflow:auto!important}
 </head>
 <body style="overflow:auto">
 
+<!-- заглушки элементов навигации / других страниц -->
+<div style="display:none">
+  <span id="sb-rep">0</span>
+  <input id="rep-dyn-from"><input id="rep-dyn-to">
+  <input id="api-key-input">
+</div>
+
 <div class="page" id="page-reports">
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
@@ -2441,7 +2448,6 @@ html,body{overflow:auto!important}
 <!-- Основной код приложения вынесен в app.js и подключён с defer — чтобы браузер параллельно качал его и парсил HTML, а не блокировал рендер на ~10 сек. -->
 
 <script>
-// ── заглушки всех render/init других страниц ──
 function showPage(){}
 function ytmInit(){}
 function calInit(){}
@@ -8332,7 +8338,7 @@ if(!ytmBonds.length){
   });
 }
 
-// (renderYtm — не нужен в модуле)
+// (renderYtm — skip)
 document.getElementById('sb-pc').textContent=portfolio.length;
 
 // Метка «инициализация завершена». Видно пользователю в сайдбаре.
@@ -17153,7 +17159,6 @@ document.getElementById('is-rep-period')?.addEventListener('change', function() 
 
 // ══ GITHUB GIST SYNC ══
 
-// ── старт ──
 (function(){
   try { loadState(); } catch(e) { console.warn('loadState:', e); }
   try { repInit(); } catch(e) { console.error('repInit:', e); }
