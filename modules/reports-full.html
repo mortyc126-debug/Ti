@@ -251,7 +251,6 @@ html,body{overflow:auto!important}
 </head>
 <body style="overflow:auto">
 
-<!-- заглушки nav-элементов -->
 <div style="display:none">
   <span id="sb-rep">0</span>
   <input id="rep-dyn-from"><input id="rep-dyn-to">
@@ -2448,7 +2447,7 @@ html,body{overflow:auto!important}
 <!-- Основной код приложения вынесен в app.js и подключён с defer — чтобы браузер параллельно качал его и парсил HTML, а не блокировал рендер на ~10 сек. -->
 
 <script>
-// заглушки других страниц
+// Заглушки функций других страниц
 function showPage(){}
 function ytmInit(){}
 function calInit(){}
@@ -2465,17 +2464,36 @@ function renderCalendarMonth(){}
 function renderEventCard(){}
 function renderIssuer(){}
 function issuerInit(){}
+
+// Безопасный getElementById — никогда не возвращает null.
+// Все вызовы из app.js для чужих страниц уходят в dummy-объект
+// и не ломают инициализацию.
+(function(){
+  var _orig = document.getElementById.bind(document);
+  var _dummy = {
+    value: '', textContent: '', innerHTML: '',
+    style: new Proxy({}, { get: function(){ return ''; }, set: function(){ return true; } }),
+    classList: { add:function(){}, remove:function(){}, toggle:function(){}, contains:function(){ return false; } },
+    options: { length: 0, add: function(){} },
+    checked: false, disabled: false, selectedIndex: 0,
+    addEventListener: function(){}, removeEventListener: function(){},
+    focus: function(){}, click: function(){}, select: function(){},
+    appendChild: function(){ return _dummy; },
+    querySelectorAll: function(){ return []; },
+    closest: function(){ return null; }
+  };
+  document.getElementById = function(id) {
+    return _orig(id) || _dummy;
+  };
+})();
 </script>
 
-<!-- JS: сначала пробуем соседний app.js, потом CDN -->
 <script>
 (function(){
   var CDN = 'https://rawcdn.githack.com/mortyc126-debug/Ti/main/app.js';
-  var LOCAL = 'app.js';
 
   function startApp(){
     try { loadState(); } catch(e) { console.warn('loadState:', e); }
-    // renderYtm заменён заглушкой — пропускаем основной init
     try { repInit(); } catch(e) { console.error('repInit:', e); }
     window.addEventListener('message', function(e){
       var d = e.data;
@@ -2484,17 +2502,18 @@ function issuerInit(){}
     });
   }
 
-  // Пробуем загрузить локальный app.js, при ошибке — CDN
   var s = document.createElement('script');
   s.onerror = function(){
     var s2 = document.createElement('script');
     s2.src = CDN;
     s2.onload = startApp;
-    s2.onerror = function(){ document.body.innerHTML += '<div style="color:red;padding:20px">Не удалось загрузить app.js ни локально ни с CDN</div>'; };
+    s2.onerror = function(){
+      document.body.innerHTML += '<div style="color:red;padding:20px;font-family:monospace">Не удалось загрузить app.js.<br>Положи reports-full.html рядом с app.js или обеспечь доступ к интернету.</div>';
+    };
     document.head.appendChild(s2);
   };
   s.onload = startApp;
-  s.src = LOCAL;
+  s.src = 'app.js';
   document.head.appendChild(s);
 })();
 </script>
