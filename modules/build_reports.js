@@ -21,7 +21,7 @@ const newSidebar = `<div id="rep-sidebar" style="width:290px;flex-shrink:0;posit
 
   <!-- Строка 1: загрузка D1 + счётчик + источники -->
   <div style="display:flex;align-items:center;gap:4px;padding:8px 8px 4px;flex-shrink:0">
-    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.6rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase;transition:all .15s">↓ D1</button>
+    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.6rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase;transition:all .15s">↓ Загрузить базу</button>
     <span id="rep-sidebar-count" style="font-size:.52rem;color:var(--text3);min-width:28px;text-align:center;font-family:var(--mono)">0</span>
     <button type="button" onclick="_repSourcesModal()" title="Источники данных, импорт, инструменты" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);color:var(--text3);cursor:pointer;font-size:.8rem;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s">⚙</button>
   </div>
@@ -98,6 +98,31 @@ const newSidebar = `<div id="rep-sidebar" style="width:290px;flex-shrink:0;posit
 reportsHtmlRaw = reportsHtmlRaw.replace(
   /<div id="rep-sidebar"[\s\S]*?<\/div>\s*(?=<div style="flex:1;min-width:0">)/,
   newSidebar + '\n'
+);
+
+// Скрываем кнопки тулбара которые переехали в модалку ⚙
+// (через style="display:none" прямо в HTML — надёжнее чем JS)
+const toolbarHideOnclick = [
+  'openGirboImportModal', 'openAuditItImportModal', 'repOpenMergeModal',
+  'repRunAudit', 'repImportAffiliatedFromClipboard', 'repCleanEmptyPeriods',
+  'repDiagnoseInn',
+];
+for (const fn of toolbarHideOnclick) {
+  reportsHtmlRaw = reportsHtmlRaw.replace(
+    new RegExp(`(<button[^>]*onclick="${fn}[^"]*"[^>]*)(>)`, 'g'),
+    '$1 style="display:none" $2'
+  );
+}
+// Скрываем весь первый тулбар (верхняя строка с ИНН-поиском и аффилированными)
+// Оставляем только второй тулбар (с + Эмитент)
+reportsHtmlRaw = reportsHtmlRaw.replace(
+  /(<div[^>]*style="[^"]*display:flex[^"]*gap:6px[^"]*flex-wrap:wrap[^"]*margin-top:8px[^"]*">)([\s\S]*?)(<\/div>)/,
+  (m, open, body, close) => open + body.replace(/<button[^>]*onclick="repDiagnoseInn[^>]*>[\s\S]*?<\/button>/g, '') + close
+);
+// Скрываем INN-виджет (добавлен в начале build)
+reportsHtmlRaw = reportsHtmlRaw.replace(
+  /(<div[^>]*style="[^"]*display:flex[^"]*gap:6px[^"]*align-items:center[^"]*margin-top:6px[^"]*">[\s\S]*?<\/div>)/,
+  '<div style="display:none">$1</div>'
 );
 
 // app.js — вырезаем авто-init
@@ -538,34 +563,32 @@ function _repSearchDropClose(){
   _repSearchOpen = false;
 }
 
-// ── Инициализация сайдбара (HTML уже вшит в сборке) ──────────────
+// ── Инициализация после repInit (HTML sidebar уже вшит в сборке) ──
 function _repStructureSidebar(){
-  // Скрыть кнопки тулбара которые переехали в модалку ⚙
-  ['openGirboImportModal','openAuditItImportModal','repOpenMergeModal',
-   'repRunAudit','repImportAffiliatedFromClipboard','repCleanEmptyPeriods',
-   'repDiagnoseInn'].forEach(function(fn){
-    document.querySelectorAll('[onclick*="' + fn + '"]').forEach(function(b){
-      b.style.display = 'none';
-    });
-  });
-  // Скрыть контейнер innSearch-виджета (добавлен build-скриптом)
-  var innWrap = document.getElementById('rep-inn-search-input');
-  if(innWrap && innWrap.parentElement) innWrap.parentElement.style.display = 'none';
-
-  // Закрытие выпадашки поиска по клику вне
+  // Закрытие выпадашки поиска по клику вне контейнера
   document.addEventListener('click', function(e){
+    var wrap = document.getElementById('rep-search-main');
     var drop = document.getElementById('rep-search-drop');
-    var inp  = document.getElementById('rep-search-main');
-    if(drop && inp && !inp.parentElement.contains(e.target)){
+    if(drop && wrap && !wrap.parentElement.contains(e.target)){
       _repSearchDropClose();
     }
   });
-
-  // Инициализировать расширенный фильтр
-  _repFilterRender();
+  // Рендерим расширенный фильтр (рейтинги/отрасли/мультипликаторы)
+  try { _repFilterRender(); } catch(err){ console.warn('filterRender:', err); }
 }
 
 // ── Модалка «Источники» ────────────────────────────────────────────
+var _SRC_BTNS = [
+  { label: 'Импорт ГИРБО (CSV/XML)',        fn: 'openGirboImportModal()',               desc: 'Выгрузка с bo.nalog.gov.ru' },
+  { label: 'Импорт audit-it HTML',           fn: 'openAuditItImportModal()',             desc: 'HTML страницы или JSON от bookmarklet, до 11 лет РСБУ' },
+  { label: 'Объединить эмитентов',           fn: 'repOpenMergeModal()',                  desc: 'Перенести периоды из одного в другой' },
+  { label: 'Аудит данных',                  fn: 'repRunAudit()',                        desc: '14 правил проверки консистентности' },
+  { label: 'Диагностика по ИНН',            fn: 'repDiagnoseInn()',                     desc: 'Запросить данные с ГИР БО по ИНН' },
+  { label: 'Импорт аффилированных',         fn: 'repImportAffiliatedFromClipboard()',   desc: 'JSON структуры аффилированных из расширения' },
+  { label: 'Удалить пустые периоды',        fn: 'repCleanEmptyPeriods()',               desc: 'Удалить периоды без числовых значений' },
+  { label: 'Импорт JSON эмитента',          fn: 'document.getElementById(\'rep-issuer-import\').click()', desc: 'Импорт одного эмитента из JSON-файла' },
+];
+
 function _repSourcesModal(){
   var overlay = document.getElementById('rep-sources-overlay');
   if(overlay){ overlay.classList.add('open'); return; }
@@ -575,48 +598,22 @@ function _repSourcesModal(){
   overlay.className = 'modal-overlay';
   overlay.onclick = function(e){ if(e.target === overlay) overlay.classList.remove('open'); };
 
-  var box = document.createElement('div');
-  box.className = 'modal-box';
-  box.style.minWidth = '420px';
+  var btnS = 'display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:6px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);cursor:pointer;font-family:var(--sans);transition:all .15s';
+  var rows = _SRC_BTNS.map(function(b){
+    return '<button type="button" style="' + btnS + '" onclick="document.getElementById(\'rep-sources-overlay\').classList.remove(\'open\');' + b.fn + '">' +
+      '<div style="font-size:.72rem;font-weight:500;color:var(--text);margin-bottom:2px">' + b.label + '</div>' +
+      '<div style="font-size:.6rem;color:var(--text3)">' + b.desc + '</div>' +
+    '</button>';
+  }).join('');
 
-  // Собираем кнопки из тулбара
-  var toolbar = document.querySelector('#page-reports .btn-sm[onclick="repNewIssuerModal()"]')?.parentElement;
-  var btns = toolbar ? Array.from(toolbar.querySelectorAll('button.btn')) : [];
-  // Фильтруем: оставляем инструменты импорта/работы (не ＋ период, не сравнение)
-  var keep = ['openGirboImportModal','openAuditItImportModal','repOpenMergeModal','repRunAudit',
-               'repImportIssuerJson','repNewIssuerModal','repCleanEmptyPeriods',
-               'repImportAffiliatedFromClipboard','repDiagnoseInn'];
-  var sourceBtns = btns.filter(function(b){
-    var oc = b.getAttribute('onclick') || '';
-    return keep.some(function(fn){ return oc.includes(fn); });
-  });
-
-  box.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
+  overlay.innerHTML = '<div class="modal-box" style="min-width:420px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
       '<span class="modal-title" style="margin:0">Источники и инструменты</span>' +
       '<button type="button" onclick="document.getElementById(\'rep-sources-overlay\').classList.remove(\'open\')" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>' +
     '</div>' +
-    '<div style="font-size:.6rem;color:var(--text3);margin-bottom:12px;font-family:var(--sans)">Импорт и обработка данных. Главный источник — D1 (кнопка «↓ D1» в панели). Остальные — ручные источники и утилиты.</div>' +
-    '<div id="rep-sources-btn-list" style="display:flex;flex-direction:column;gap:6px"></div>';
-  overlay.appendChild(box);
+    '<div style="font-size:.6rem;color:var(--text3);margin-bottom:14px">Основной источник — «↓ Загрузить базу» в панели. Остальные — ручной импорт и утилиты.</div>' +
+    rows + '</div>';
   document.body.appendChild(overlay);
-
-  // Заполняем список кнопок
-  var list = box.querySelector('#rep-sources-btn-list');
-  if(sourceBtns.length){
-    sourceBtns.forEach(function(b){
-      var clone = b.cloneNode(true);
-      clone.style.cssText = 'width:100%;justify-content:flex-start;padding:8px 12px;font-size:.7rem';
-      clone.addEventListener('click', function(){
-        overlay.classList.remove('open');
-        b.click();
-      });
-      list.appendChild(clone);
-    });
-  } else {
-    list.innerHTML = '<div style="color:var(--text3);font-size:.62rem">Кнопки не найдены</div>';
-  }
-
   overlay.classList.add('open');
 }
 
