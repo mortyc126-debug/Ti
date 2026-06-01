@@ -2441,13 +2441,23 @@ html,body{overflow:auto!important}
 <!-- Основной код приложения вынесен в app.js и подключён с defer — чтобы браузер параллельно качал его и парсил HTML, а не блокировал рендер на ~10 сек. -->
 
 <script>
-// ── заглушки ──
+// ── заглушки всех render/init других страниц ──
 function showPage(){}
 function ytmInit(){}
 function calInit(){}
 function industriesInit(){}
 function compareInit(){}
 function portfolioInit(){}
+function renderYtm(){}
+function renderPort(){}
+function renderPortCharts(){}
+function renderWL(){}
+function renderSbLists(){}
+function renderCalendar(){}
+function renderCalendarMonth(){}
+function renderEventCard(){}
+function renderIssuer(){}
+function issuerInit(){}
 
 'use strict';
 
@@ -8322,7 +8332,7 @@ if(!ytmBonds.length){
   });
 }
 
-renderYtm(); renderSbLists();
+// (renderYtm — не нужен в модуле)
 document.getElementById('sb-pc').textContent=portfolio.length;
 
 // Метка «инициализация завершена». Видно пользователю в сайдбаре.
