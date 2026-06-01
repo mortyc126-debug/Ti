@@ -101,7 +101,7 @@ reportsHtmlRaw = reportsHtmlRaw.replace(
 );
 
 // Скрываем кнопки тулбара которые переехали в модалку ⚙
-// (через style="display:none" прямо в HTML — надёжнее чем JS)
+// [^<]* вместо [^>]* — не ломается на > внутри title атрибутов
 const toolbarHideOnclick = [
   'openGirboImportModal', 'openAuditItImportModal', 'repOpenMergeModal',
   'repRunAudit', 'repImportAffiliatedFromClipboard', 'repCleanEmptyPeriods',
@@ -109,20 +109,14 @@ const toolbarHideOnclick = [
 ];
 for (const fn of toolbarHideOnclick) {
   reportsHtmlRaw = reportsHtmlRaw.replace(
-    new RegExp(`(<button[^>]*onclick="${fn}[^"]*"[^>]*)(>)`, 'g'),
-    '$1 style="display:none" $2'
+    new RegExp(`<button[^<]*onclick="${fn}\\(\\)"[^<]*<\\/button>`, 'g'),
+    ''
   );
 }
-// Скрываем весь первый тулбар (верхняя строка с ИНН-поиском и аффилированными)
-// Оставляем только второй тулбар (с + Эмитент)
+// Скрываем весь первый тулбар (верхняя строка — Удалить / Диагностика / ИНН-виджет)
 reportsHtmlRaw = reportsHtmlRaw.replace(
-  /(<div[^>]*style="[^"]*display:flex[^"]*gap:6px[^"]*flex-wrap:wrap[^"]*margin-top:8px[^"]*">)([\s\S]*?)(<\/div>)/,
-  (m, open, body, close) => open + body.replace(/<button[^>]*onclick="repDiagnoseInn[^>]*>[\s\S]*?<\/button>/g, '') + close
-);
-// Скрываем INN-виджет (добавлен в начале build)
-reportsHtmlRaw = reportsHtmlRaw.replace(
-  /(<div[^>]*style="[^"]*display:flex[^"]*gap:6px[^"]*align-items:center[^"]*margin-top:6px[^"]*">[\s\S]*?<\/div>)/,
-  '<div style="display:none">$1</div>'
+  /<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">[\s\S]*?<\/div>/,
+  ''
 );
 
 // app.js — вырезаем авто-init
@@ -523,7 +517,7 @@ function _repSearchDropRender(q){
     html += issuers.map(function(x){
       var m = _repCalcMultipliers(x.iss);
       var yr = m.year ? ' · ' + m.year : '';
-      return '<div class="sd-item" onclick="_repSearchSelectIssuer(\'' + x.id + '\')">' +
+      return '<div class="sd-item" onclick="_repSearchSelectIssuer(\\'' + x.id + '\\')">' +
         '<span style="color:var(--text3)">🏢</span>' +
         '<span class="sd-name">' + _escHtml(x.iss.name) + '</span>' +
         '<span class="sd-sub">' + (x.iss.inn ? x.iss.inn : '') + yr + '</span>' +
@@ -586,7 +580,7 @@ var _SRC_BTNS = [
   { label: 'Диагностика по ИНН',            fn: 'repDiagnoseInn()',                     desc: 'Запросить данные с ГИР БО по ИНН' },
   { label: 'Импорт аффилированных',         fn: 'repImportAffiliatedFromClipboard()',   desc: 'JSON структуры аффилированных из расширения' },
   { label: 'Удалить пустые периоды',        fn: 'repCleanEmptyPeriods()',               desc: 'Удалить периоды без числовых значений' },
-  { label: 'Импорт JSON эмитента',          fn: 'document.getElementById(\'rep-issuer-import\').click()', desc: 'Импорт одного эмитента из JSON-файла' },
+  { label: 'Импорт JSON эмитента',          fn: "document.getElementById('rep-issuer-import').click()", desc: 'Импорт одного эмитента из JSON-файла' },
 ];
 
 function _repSourcesModal(){
@@ -600,7 +594,7 @@ function _repSourcesModal(){
 
   var btnS = 'display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:6px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);cursor:pointer;font-family:var(--sans);transition:all .15s';
   var rows = _SRC_BTNS.map(function(b){
-    return '<button type="button" style="' + btnS + '" onclick="document.getElementById(\'rep-sources-overlay\').classList.remove(\'open\');' + b.fn + '">' +
+    return '<button type="button" style="' + btnS + '" onclick="document.getElementById(\\'rep-sources-overlay\\').classList.remove(\\'open\\');' + b.fn + '">' +
       '<div style="font-size:.72rem;font-weight:500;color:var(--text);margin-bottom:2px">' + b.label + '</div>' +
       '<div style="font-size:.6rem;color:var(--text3)">' + b.desc + '</div>' +
     '</button>';
@@ -609,7 +603,7 @@ function _repSourcesModal(){
   overlay.innerHTML = '<div class="modal-box" style="min-width:420px">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
       '<span class="modal-title" style="margin:0">Источники и инструменты</span>' +
-      '<button type="button" onclick="document.getElementById(\'rep-sources-overlay\').classList.remove(\'open\')" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>' +
+      '<button type="button" onclick="document.getElementById(\\'rep-sources-overlay\\').classList.remove(\\'open\\')" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>' +
     '</div>' +
     '<div style="font-size:.6rem;color:var(--text3);margin-bottom:14px">Основной источник — «↓ Загрузить базу» в панели. Остальные — ручной импорт и утилиты.</div>' +
     rows + '</div>';
@@ -678,9 +672,9 @@ function _repFilterRender(){
     var mf = f.mults[m.id] || {min:'',max:''};
     return '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">' +
       '<span style="font-size:.52rem;font-family:var(--mono);color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + m.label + '</span>' +
-      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'min\',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult(\\'' + m.id + '\\',\\'min\\',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
       '<span style="color:var(--text3);font-size:.5rem">–</span>' +
-      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'max\',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult(\\'' + m.id + '\\',\\'max\\',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
       '<span style="color:var(--text3);font-size:.46rem;width:9px;text-align:right">' + m.fmt + '</span>' +
       '</div>';
   }).join('');

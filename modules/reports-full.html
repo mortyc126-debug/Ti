@@ -166,12 +166,7 @@ details summary{outline:none}
 <div class="page" id="page-reports">
   <div class="page-title">База отчётности</div>
   <div class="page-sub">РСБУ · МСФО · Динамика · Сравнение периодов</div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-    <button class="btn btn-sm" onclick="repCleanEmptyPeriods()" title="Пройти по всем эмитентам и удалить периоды, в которых все числовые поля (выручка, EBIT, активы, долг и т.д.) пустые. Такие «пустышки» появляются после частичных импортов и ломают повторную подтяжку — bulk видит запись и пропускает как существующую." style="display:none" > Удалить пустые периоды</button>
-    
-    
-    <button class="btn btn-sm" onclick="repImportAffiliatedFromClipboard()" title="Импорт списка аффилированных лиц из буфера обмена. Формат: JSON из расширения БондАналитик (кнопка « Распаковать список аффилированных» на странице e-disclosure в разделе type=6). PDF распаковывается в памяти, парсится, извлекаются юрлица с ИНН. Сам PDF не сохраняется, в базе оседает только структурированный список." style="display:none" > Импорт аффилированных</button>
-  </div>
+  
 
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
   <!-- Sidebar со списком эмитентов: постоянно виден, с поиском, сортировкой
@@ -267,10 +262,10 @@ details summary{outline:none}
     <button class="btn btn-sm" id="rep-edit-period-btn" style="display:none" onclick="repEditPeriod()" title="Открыть форму с заполненными значениями активного периода — поправить значения, дату или тип"> Редактировать период</button>
     <button class="btn btn-sm" id="rep-del-period-btn" style="display:none;border-color:var(--danger);color:var(--danger)" onclick="repDeletePeriod()" title="Удалить активный период (с подтверждением)"> Удалить период</button>
     <button class="btn btn-sm" id="rep-pdf-btn" style="display:none;border-color:var(--acc);color:var(--acc)" onclick="repUploadFileShortcut()" title="Прочитать отчёт и создать период автоматически (PDF, DOCX, XLSX; для PDF-сканов — OCR)"> Загрузить отчёт</button>
-    <button class="btn btn-sm" onclick="openGirboImportModal()" title="Импорт выгрузки ГИРБО с bo.nalog.gov.ru — CSV/TXT/XML в Windows-1251 или UTF-8" style="display:none" > ГИРБО</button>
-    <button class="btn btn-sm" onclick="openAuditItImportModal()" title="Импорт данных audit-it.ru — вставить HTML страницы компании (Ctrl+U → Ctrl+A → Ctrl+C) либо JSON от bookmarklet. До 11 лет РСБУ за один импорт." style="display:none" > audit-it HTML</button>
-    <button class="btn btn-sm" onclick="repOpenMergeModal()" title="Объединить двух эмитентов в одного: все периоды из источника перейдут в целевого, дубли периодов переживут" style="display:none" > Объединить</button>
-    <button class="btn btn-sm" onclick="repRunAudit()" title="Проверить все периоды всех эмитентов на логические нестыковки: капитал  style="display:none" > активов, EBIT > EBITDA, ДС > оборотных активов и т.п."> Аудит данных</button>
+    
+    
+    
+    
     <input type="file" id="rep-issuer-import" accept=".json" style="display:none" onchange="repImportIssuerJson(this)">
     <button class="btn btn-sm" onclick="document.getElementById('rep-issuer-import').click()" title="Импорт одного эмитента с периодами из JSON-файла (bondan/issuer/v1). Не затирает остальных эмитентов."> Импорт эмитента</button>
     <div style="margin-left:auto;display:flex;gap:6px">
@@ -28070,7 +28065,7 @@ function _repSearchDropRender(q){
     html += issuers.map(function(x){
       var m = _repCalcMultipliers(x.iss);
       var yr = m.year ? ' · ' + m.year : '';
-      return '<div class="sd-item" onclick="_repSearchSelectIssuer('' + x.id + '')">' +
+      return '<div class="sd-item" onclick="_repSearchSelectIssuer(\'' + x.id + '\')">' +
         '<span style="color:var(--text3)">🏢</span>' +
         '<span class="sd-name">' + _escHtml(x.iss.name) + '</span>' +
         '<span class="sd-sub">' + (x.iss.inn ? x.iss.inn : '') + yr + '</span>' +
@@ -28133,7 +28128,7 @@ var _SRC_BTNS = [
   { label: 'Диагностика по ИНН',            fn: 'repDiagnoseInn()',                     desc: 'Запросить данные с ГИР БО по ИНН' },
   { label: 'Импорт аффилированных',         fn: 'repImportAffiliatedFromClipboard()',   desc: 'JSON структуры аффилированных из расширения' },
   { label: 'Удалить пустые периоды',        fn: 'repCleanEmptyPeriods()',               desc: 'Удалить периоды без числовых значений' },
-  { label: 'Импорт JSON эмитента',          fn: 'document.getElementById('rep-issuer-import').click()', desc: 'Импорт одного эмитента из JSON-файла' },
+  { label: 'Импорт JSON эмитента',          fn: "document.getElementById('rep-issuer-import').click()", desc: 'Импорт одного эмитента из JSON-файла' },
 ];
 
 function _repSourcesModal(){
@@ -28147,7 +28142,7 @@ function _repSourcesModal(){
 
   var btnS = 'display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:6px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);cursor:pointer;font-family:var(--sans);transition:all .15s';
   var rows = _SRC_BTNS.map(function(b){
-    return '<button type="button" style="' + btnS + '" onclick="document.getElementById('rep-sources-overlay').classList.remove('open');' + b.fn + '">' +
+    return '<button type="button" style="' + btnS + '" onclick="document.getElementById(\'rep-sources-overlay\').classList.remove(\'open\');' + b.fn + '">' +
       '<div style="font-size:.72rem;font-weight:500;color:var(--text);margin-bottom:2px">' + b.label + '</div>' +
       '<div style="font-size:.6rem;color:var(--text3)">' + b.desc + '</div>' +
     '</button>';
@@ -28156,7 +28151,7 @@ function _repSourcesModal(){
   overlay.innerHTML = '<div class="modal-box" style="min-width:420px">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
       '<span class="modal-title" style="margin:0">Источники и инструменты</span>' +
-      '<button type="button" onclick="document.getElementById('rep-sources-overlay').classList.remove('open')" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>' +
+      '<button type="button" onclick="document.getElementById(\'rep-sources-overlay\').classList.remove(\'open\')" style="background:none;border:none;color:var(--text3);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>' +
     '</div>' +
     '<div style="font-size:.6rem;color:var(--text3);margin-bottom:14px">Основной источник — «↓ Загрузить базу» в панели. Остальные — ручной импорт и утилиты.</div>' +
     rows + '</div>';
@@ -28225,9 +28220,9 @@ function _repFilterRender(){
     var mf = f.mults[m.id] || {min:'',max:''};
     return '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px">' +
       '<span style="font-size:.52rem;font-family:var(--mono);color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + m.label + '</span>' +
-      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult('' + m.id + '','min',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<input type="number" step="any" placeholder="min" value="' + (mf.min||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'min\',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
       '<span style="color:var(--text3);font-size:.5rem">–</span>' +
-      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult('' + m.id + '','max',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
+      '<input type="number" step="any" placeholder="max" value="' + (mf.max||'') + '" oninput="_repFilterSetMult(\'' + m.id + '\',\'max\',this.value)" style="width:44px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:.52rem;font-family:var(--mono);color:var(--text);outline:none">' +
       '<span style="color:var(--text3);font-size:.46rem;width:9px;text-align:right">' + m.fmt + '</span>' +
       '</div>';
   }).join('');
