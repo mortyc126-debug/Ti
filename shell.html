@@ -458,10 +458,11 @@ window.addEventListener('message', e => {
   if (!d) return;
   if (d.type === 'MODULE_EVENT') {
     if (d.action === 'SET_TICKER' && d.ticker) {
-      const t = String(d.ticker).toUpperCase();
+      const t = String(d.ticker).trim().toUpperCase();
+      if (!isValidTicker(t)) return; // игнорируем названия компаний
       document.getElementById('ticker-input').value = t;
       localStorage.setItem(KEY_TICKER, t);
-      toast('Тикер обновлён: ' + t);
+      toast('Тикер: ' + t);
       pushStateToAll();
     }
     if (d.action === 'SET_TOKEN' && d.token) {
@@ -633,13 +634,21 @@ function toast(msg) {
   _tt = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
+// Тикер валидный: ≤12 символов, без пробелов, только латиница/цифры/дефис
+// Отсекает полные названия компаний («Публичное акционерное общество...»)
+function isValidTicker(v) {
+  if (!v) return false;
+  const s = String(v).trim();
+  return s.length <= 12 && !/\s/.test(s) && /^[A-Za-z0-9\-]+$/.test(s);
+}
+
 // ══ ИНИЦИАЛИЗАЦИЯ ══
 (function init() {
   const tok    = localStorage.getItem(KEY_TOKEN);
   const ticker = localStorage.getItem(KEY_TICKER);
   if (tok)    { document.getElementById('token-st').textContent = '✓';
                 document.getElementById('token-st').className = 'ok'; }
-  if (ticker) { document.getElementById('ticker-input').value = ticker; }
+  if (isValidTicker(ticker)) { document.getElementById('ticker-input').value = ticker; }
 })();
 
 // ══ МОСТ — вставляется в каждый модуль автоматически ══
@@ -684,6 +693,24 @@ const SHELL_BRIDGE = `<script>
     try { window.parent.postMessage(Object.assign({ type:'MODULE_EVENT', action:action }, data), '*'); }
     catch(e) {}
   };
+
+  // Перехват буфера обмена — если скопировали тикер или ISIN, шлём в shell
+  document.addEventListener('copy', function() {
+    setTimeout(function() {
+      try {
+        navigator.clipboard.readText().then(function(txt) {
+          var s = (txt || '').trim();
+          // Тикер: ≤10 символов, только латиница/цифры/дефис
+          // ISIN: 12 символов, начинается с 2 букв
+          var isTicker = /^[A-Za-z][A-Za-z0-9\-]{0,9}$/.test(s);
+          var isIsin   = /^[A-Z]{2}[A-Z0-9]{10}$/.test(s);
+          if (isTicker || isIsin) {
+            window.shellNotify('SET_TICKER', { ticker: s });
+          }
+        }).catch(function(){});
+      } catch(e) {}
+    }, 50);
+  });
 })();
 <\/script>`;
 </script>
