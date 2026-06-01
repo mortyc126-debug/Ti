@@ -244,16 +244,25 @@ function patchHtml(html) {
 function addFiles(fileList) {
   for (const f of fileList) {
     if (!f.name.match(/\.html?$/i)) continue;
-    if (modules.find(m => m.name === f.name)) continue;
     const reader = new FileReader();
     reader.onload = e => {
       const html    = patchHtml(e.target.result);
       const blob    = new Blob([html], { type: 'text/html' });
       const blobUrl = URL.createObjectURL(blob);
-      modules.push({ name: f.name, label: labelFor(f.name), blobUrl, html });
+      const existing = modules.findIndex(m => m.name === f.name);
+      if (existing !== -1) {
+        // обновляем существующий модуль — старый blob освобождаем
+        URL.revokeObjectURL(modules[existing].blobUrl);
+        modules[existing] = { name: f.name, label: labelFor(f.name), blobUrl, html };
+        // если вкладка активна — перезагружаем iframe
+        if (existing === activeIdx) openModule(existing);
+        toast(modules[existing].label + ' — обновлён');
+      } else {
+        modules.push({ name: f.name, label: labelFor(f.name), blobUrl, html });
+        if (modules.length === 1) openModule(0);
+      }
       renderFileList();
       rebuildNav();
-      if (modules.length === 1) openModule(0);
     };
     reader.readAsText(f, 'utf-8');
   }
