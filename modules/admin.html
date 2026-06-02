@@ -179,12 +179,42 @@
 </div>
 
 <script>
+// Коммуникация с shell — localStorage недоступен в blob-iframe
+// Все операции хранения идут через DB_WRITE/DB_READ postMessage к parent
+
+function shellWrite(key, value){
+  try { window.parent.postMessage({ type: 'DB_WRITE', key, value }, '*'); } catch(_){}
+}
+function shellRead(key, cb){
+  const reqId = 'adm_' + Math.random().toString(36).slice(2);
+  function handler(e){
+    if(!e.data || e.data.type !== 'DB_RESPONSE' || e.data.reqId !== reqId) return;
+    window.removeEventListener('message', handler);
+    cb(e.data.value || null);
+  }
+  window.addEventListener('message', handler);
+  try { window.parent.postMessage({ type: 'DB_READ', reqId, key }, '*'); } catch(_){ cb(null); }
+  setTimeout(() => { window.removeEventListener('message', handler); cb(null); }, 2000);
+}
+
 const tokenEl = document.getElementById('token');
 const urlEl   = document.getElementById('url');
-tokenEl.value = localStorage.getItem('bondan_admin_token') || '';
-urlEl.value   = localStorage.getItem('bondan_url') || urlEl.value;
-tokenEl.addEventListener('input', () => localStorage.setItem('bondan_admin_token', tokenEl.value));
-urlEl  .addEventListener('input', () => localStorage.setItem('bondan_url',         urlEl.value));
+
+// Загрузить сохранённые значения через шину shell
+shellRead('bondan_admin_token', v => { if(v) tokenEl.value = v; });
+shellRead('bondan_admin_url',   v => { if(v) urlEl.value   = v; });
+
+// Также слушаем SHELL_STATE — шелл пушит apiUrl при загрузке модуля
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d) return;
+  if(d.type === 'SHELL_STATE' && d.apiUrl && !urlEl.value){
+    urlEl.value = d.apiUrl;
+  }
+});
+
+tokenEl.addEventListener('input', () => shellWrite('bondan_admin_token', tokenEl.value));
+urlEl  .addEventListener('input', () => shellWrite('bondan_admin_url',   urlEl.value));
 
 function logEntry(level, label, body){
   const t = new Date().toLocaleTimeString('ru');
