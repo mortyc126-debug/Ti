@@ -120,6 +120,26 @@ export default {
         if(url.pathname === '/collect/issuers')      return jsonResp(await collectIssuers(env, url));
         if(url.pathname === '/collect/reports')      return jsonResp(await collectReports(env, url));
         if(url.pathname === '/collect/affiliations') return jsonResp(await collectAffiliations(env, url));
+        // Пакетный прогон: bonds + stocks (skip if today) + issuers (1 стр) + reports×N без AI
+        if(url.pathname === '/collect/daily'){
+          const runs = Math.min(10, parseInt(url.searchParams.get('report_runs') || '3', 10));
+          const results = [];
+          try { results.push(await collectBonds(env)); }   catch(e){ results.push({source:'bonds',error:e.message}); }
+          try { results.push(await collectStocks(env)); }  catch(e){ results.push({source:'stocks',error:e.message}); }
+          try { results.push(await collectFutures(env)); } catch(e){ results.push({source:'futures',error:e.message}); }
+          // Справочник: 1 страница (0-24) — чтобы подхватить новые ИНН
+          const issUrl = new URL(url); issUrl.searchParams.set('max_pages','5');
+          try { results.push(await collectIssuers(env, issUrl)); } catch(e){ results.push({source:'issuers',error:e.message}); }
+          // Отчёты: runs прогонов по 15 торгуемых, без AI
+          const repUrl = new URL(url);
+          repUrl.searchParams.set('limit','15');
+          repUrl.searchParams.set('only_traded','1');
+          repUrl.searchParams.delete('include_ai');
+          for(let i = 0; i < runs; i++){
+            try { results.push(await collectReports(env, repUrl)); } catch(e){ results.push({source:'reports',error:e.message}); }
+          }
+          return jsonResp({ source: 'daily', runs: results, total: results.length });
+        }
         if(url.pathname === '/ai/extract')       return await handleAiExtract(env, req);
       }
 
@@ -1833,12 +1853,24 @@ async function findControllingParent(env, childInn){
 
 // ═══ Коллекторы ═══════════════════════════════════════════════════════════
 
-async function collectStocks(env){
+async function collectStocks(env, opts = {}){
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
   const base = env.MOEX_BASE || 'https://iss.moex.com';
-  let rowsWritten = 0;
+  let rowsNew = 0, rowsUpdated = 0;
   const errors = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Пропустить если данные за сегодня уже есть и не передан force
+  if(!opts.force){
+    try {
+      const ex = await env.DB.prepare('SELECT COUNT(*) as c FROM stock_daily WHERE date = ?').bind(today).first();
+      if((ex?.c ?? 0) > 5){
+        await logRun(env, startedAt, 'moex_tqbr', 0, [], Date.now() - t0);
+        return { source: 'moex_tqbr', rowsNew: 0, rowsUpdated: 0, skipped: true, reason: 'already_today' };
+      }
+    } catch(_){}
+  }
 
   try {
     const url = `${base}/iss/engines/stock/markets/shares/boards/TQBR/securities.json?iss.meta=off&iss.only=securities,marketdata`;
@@ -1863,12 +1895,15 @@ async function collectStocks(env){
         s.secid, today, s.shortname, s.price, s.prevClose, s.open, s.high, s.low,
         s.volumeRub, s.issueSize, s.faceValue, now
       ).run();
-      rowsWritten += res.meta?.rows_written || 0;
+      // last_row_id изменится только при реальном INSERT, не при UPDATE
+      if(res.meta?.last_row_id && res.meta?.changes === 1) rowsNew++;
+      else if((res.meta?.rows_written || 0) > 0) rowsUpdated++;
     }
   } catch(e){ errors.push(e.message); }
 
+  const rowsWritten = rowsNew + rowsUpdated;
   await logRun(env, startedAt, 'moex_tqbr', rowsWritten, errors, Date.now() - t0);
-  return { source: 'moex_tqbr', rowsWritten, errors, duration_ms: Date.now() - t0 };
+  return { source: 'moex_tqbr', rowsNew, rowsUpdated, rowsWritten, errors, duration_ms: Date.now() - t0 };
 }
 
 async function collectFutures(env){

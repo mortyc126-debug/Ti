@@ -83,8 +83,18 @@
 
   <div class="card">
     <label>Сбор данных (требует X-Admin-Token)</label>
+    <!-- Ежедневный прогон одной кнопкой -->
+    <div style="background:var(--acc-dim);border:1px solid var(--acc);border-radius:6px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--acc);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Ежедневный прогон (без AI)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button onclick="runDaily(3)" style="font-size:14px;padding:10px 20px">▶ Запустить всё · 3× отчёты</button>
+        <button class="secondary" onclick="runDaily(5)">▶ 5× отчёты (~75 ИНН)</button>
+        <button class="secondary" onclick="runDaily(8)">▶ 8× отчёты (~120 ИНН)</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">bonds → акции (пропустит если уже сегодня) → фьючерсы → справочник → отчёты N раз · free tier: ~25 сек/прогон</div>
+    </div>
     <div class="row">
-      <button onclick="run('/collect/bonds')">📄 Облигации (TQCB+TQOB+TQIR+TQOD+TQOY+TQED)</button>
+      <button onclick="run('/collect/bonds')">📄 Облигации</button>
       <button onclick="run('/collect/stock')">📈 Акции (TQBR)</button>
       <button onclick="run('/collect/futures')">🔮 Фьючерсы (FORTS)</button>
     </div>
@@ -177,6 +187,41 @@ async function postWithRetry(url, opts, retries){
     }
   }
   throw lastErr || new Error('исчерпаны попытки');
+}
+
+async function runDaily(reportRuns){
+  const url = urlEl.value.replace(/\/+$/, '');
+  const token = tokenEl.value.trim();
+  if(!token){ logEntry('err', 'Нет токена', 'Вставь X-Admin-Token в поле выше.'); return; }
+  logEntry('info', `POST /collect/daily · ${reportRuns}× отчёты …`, 'Это займёт ~' + Math.round(reportRuns * 25 + 30) + ' сек');
+  const btns = document.querySelectorAll('button'); btns.forEach(b => b.disabled = true);
+  try {
+    const r = await fetch(url + '/collect/daily?report_runs=' + reportRuns, {
+      method: 'POST',
+      headers: { 'X-Admin-Token': token },
+    });
+    const text = await r.text();
+    let body = text;
+    try {
+      const j = JSON.parse(text);
+      // Краткая сводка по каждому прогону
+      const lines = (j.runs || []).map(run => {
+        if(run.error) return `✗ ${run.source}: ${run.error}`;
+        if(run.source === 'moex_tqbr') return `✓ акции: +${run.rowsNew ?? 0} новых, ${run.rowsUpdated ?? 0} обновлено${run.skipped ? ' (пропущено — уже сегодня)' : ''}`;
+        if(run.source === 'reports') return `✓ отчёты: обработано ${run.processed ?? 0}, успешно ${run.succeeded ?? 0}, строк ${run.rowsWritten ?? 0}`;
+        if(run.source === 'moex_bonds') return `✓ облигации: ${run.rowsWritten ?? 0} строк`;
+        if(run.source === 'issuers') return `✓ справочник: +${run.added ?? 0} эм.`;
+        return `✓ ${run.source}: ${JSON.stringify(run).slice(0, 120)}`;
+      });
+      body = lines.join('\n') || JSON.stringify(j, null, 2);
+    } catch(_){}
+    if(r.ok) logEntry('ok',  `/collect/daily → ${r.status}`, body);
+    else     logEntry('err', `/collect/daily → ${r.status}`, body);
+  } catch(e){
+    logEntry('err', `/collect/daily → network`, e.message);
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
 }
 
 async function run(path){
