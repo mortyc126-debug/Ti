@@ -27938,16 +27938,32 @@ async function _repD1Load(){
       for(var eid in rdb){
         if(rdb[eid] && rdb[eid].inn === ci2.inn){ existId = eid; break; }
       }
+      var ind = _d1SectorToInd(ci2.sector);
+      // Аффилиация из каталога: основной учредитель-юрлицо
+      var related = null;
+      if(ci2.parent_inn){
+        related = [{ inn: ci2.parent_inn, name: ci2.parent_name || null, role: 'related', source: 'd1', roleHint: 'founder' }];
+      }
       if(!existId){
         var nid = 'i_' + ci2.inn;
         if(!rdb[nid]){
-          rdb[nid] = { name: ci2.name || ci2.short_name || ci2.inn, inn: ci2.inn, ind: _d1SectorToInd(ci2.sector), periods: {} };
+          rdb[nid] = {
+            name: ci2.name || ci2.inn, inn: ci2.inn,
+            ind: ind, kind: ci2.kind || null, status: ci2.status || null,
+            ogrn: ci2.ogrn || null, okved: ci2.okved || null,
+            related: related || [],
+            periods: {}
+          };
           added++;
         }
       } else {
         var ex = rdb[existId];
-        if(!ex.ind || ex.ind === 'other') ex.ind = _d1SectorToInd(ci2.sector);
-        if(!ex.name && (ci2.name || ci2.short_name)) ex.name = ci2.name || ci2.short_name;
+        if(!ex.ind || ex.ind === 'other') ex.ind = ind;
+        if(!ex.name && ci2.name) ex.name = ci2.name;
+        if(!ex.kind && ci2.kind) ex.kind = ci2.kind;
+        if(!ex.status && ci2.status) ex.status = ci2.status;
+        if(!ex.ogrn && ci2.ogrn) ex.ogrn = ci2.ogrn;
+        if((!ex.related || !ex.related.length) && related) ex.related = related;
         updated++;
       }
     }
@@ -28071,7 +28087,8 @@ var _D1_SECTOR_MAP = {
   'it': 'it', 'telecom': 'telecom', 'utilities': 'utilities',
   'media': 'media', 'pharma': 'pharma', 'machinery': 'machinery',
   'auto': 'auto', 'wood': 'wood', 'finance': 'holdings',
-  'municipal': 'other',
+  'food': 'agro', 'manufacturing': 'machinery', 'services': 'other',
+  'insurance': 'holdings', 'state': 'other', 'municipal': 'other',
 };
 function _d1SectorToInd(s){ return (s && _D1_SECTOR_MAP[s]) || 'other'; }
 
@@ -28403,6 +28420,50 @@ function _repFilterApplyDOM(){
   window.repRenderIssuerList = function(){
     _orig();
     _repFilterApplyDOM();
+  };
+})();
+
+// Подгрузка аффилиаций из D1 при выборе эмитента
+(function(){
+  var _origSel = repSelectIssuerById;
+  var _lastFetched = {};
+  window.repSelectIssuerById = function(id){
+    _origSel(id);
+    // Загружаем аффилиации если ещё не грузили для этого id
+    if(!id || _lastFetched[id]) return;
+    _lastFetched[id] = true;
+    var iss = reportsDB[id];
+    if(!iss || !iss.inn) return;
+    var base = _getD1Base();
+    fetch(base + '/issuer/' + iss.inn + '/affiliations')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data){
+        if(!data) return;
+        var iss2 = reportsDB[id];
+        if(!iss2) return;
+        var rel = [];
+        // Учредители
+        (data.founders || []).forEach(function(f){
+          if(f.role === 'not_in_egrul') return;
+          rel.push({ inn: f.parent_inn||null, name: f.parent_name||null, role: 'related', source: 'd1', roleHint: 'founder', share: f.share_pct||null });
+        });
+        // Руководство
+        (data.management || []).forEach(function(f){
+          rel.push({ inn: null, name: f.parent_name||null, role: 'related', source: 'd1', roleHint: f.role||'management' });
+        });
+        // Дочки
+        (data.children || []).forEach(function(c){
+          rel.push({ inn: c.child_inn||null, name: c.child_name||null, role: 'related', source: 'd1', roleHint: 'child', share: c.share_pct||null });
+        });
+        if(rel.length){
+          iss2.related = rel;
+          // Перерисовать если этот эмитент сейчас активен
+          if(typeof repActiveIssuerId !== 'undefined' && repActiveIssuerId === id){
+            if(typeof _repRenderActiveIssuerHeader === 'function') _repRenderActiveIssuerHeader();
+          }
+        }
+      })
+      .catch(function(){});
   };
 })();
 
