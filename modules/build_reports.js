@@ -66,6 +66,7 @@ const newSidebar = `<div id="rep-sidebar" style="width:340px;flex-shrink:0;posit
       <label style="display:flex;gap:4px;align-items:center">
         <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>
         <select id="rep-sidebar-status" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
+          <option value="has_moex" selected>есть бумаги на MOEX</option>
           <option value="all">все</option>
           <option value="has_periods">есть периоды</option>
           <option value="no_periods">нет периодов</option>
@@ -404,6 +405,7 @@ async function _repD1Load(){
             ind: ind, kind: ci2.kind || null, status: ci2.status || null,
             ogrn: ci2.ogrn || null, okved: ci2.okved || null,
             related: related || [],
+            bondsCount: ci2.bonds_count || 0,
             periods: {}
           };
           added++;
@@ -416,6 +418,7 @@ async function _repD1Load(){
         if(!ex.status && ci2.status) ex.status = ci2.status;
         if(!ex.ogrn && ci2.ogrn) ex.ogrn = ci2.ogrn;
         if((!ex.related || !ex.related.length) && related) ex.related = related;
+        if(ci2.bonds_count != null) ex.bondsCount = ci2.bonds_count;
         updated++;
       }
     }
@@ -866,11 +869,48 @@ function _repFilterApplyDOM(){
   if(cnt) cnt.textContent = String(shown);
 }
 
-// Monkeypatch repRenderIssuerList после загрузки app.js
+// Переопределяем _repHasMoexBonds — используем bondsCount из D1
+// (window._moexCatalog в модуле не загружается)
+window._repHasMoexBonds = function(id, iss){
+  if(!iss) return false;
+  // bondsCount > 0 — есть активные выпуски по данным D1 на момент загрузки
+  if(iss.bondsCount != null) return iss.bondsCount > 0;
+  // Fallback: есть периоды → скорее всего эмитент
+  return Object.keys(iss.periods || {}).length > 0;
+};
+
+// Обработка status='has_moex' в repRenderIssuerList:
+// оригинальная функция не знает этот код — перехватываем через патч
 (function(){
-  var _orig = repRenderIssuerList;
+  var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
-    _orig();
+    var st = document.getElementById('rep-sidebar-status');
+    var origVal = st ? st.value : '';
+    // Временно переключить has_moex → no_moex (обратный фильтр),
+    // потом вернуть и инвертировать видимость — проще переопределить фильтр
+    // напрямую через патч items после рендера.
+    // Проще: заменим has_moex на all перед вызовом, потом скроем лишних.
+    if(st && origVal === 'has_moex') st.value = 'all';
+    _origRIL();
+    if(st && origVal === 'has_moex'){
+      st.value = 'has_moex';
+      // Скрыть записи у кого bondsCount=0
+      var listEl = document.getElementById('rep-sidebar-list');
+      if(listEl){
+        var shown = 0;
+        listEl.querySelectorAll('[onclick]').forEach(function(el){
+          var oc = el.getAttribute('onclick') || '';
+          var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+          if(!m){ shown++; return; }
+          var iss = reportsDB[m[1]];
+          var hasB = iss && (iss.bondsCount > 0);
+          el.style.display = hasB ? '' : 'none';
+          if(hasB) shown++;
+        });
+        var cnt = document.getElementById('rep-sidebar-count');
+        if(cnt) cnt.textContent = String(shown);
+      }
+    }
     _repFilterApplyDOM();
   };
 })();
