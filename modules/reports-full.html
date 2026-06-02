@@ -27954,15 +27954,26 @@ async function _repD1Load(){
     setLog('Шаг 2/3: +' + added + ' новых, ' + updated + ' обновлено');
     repRenderIssuerList();
 
-    // 3. Подтянуть отчёты для эмитентов без периодов И ещё не проверенных
+    // 3. Подтянуть отчёты — только для эмитентов у которых has_reports:true в каталоге
+    // Остальные точно пустые — не тратим N×1355 запросов
+    var catalogByInn = {};
+    for(var ci3 = 0; ci3 < issuers.length; ci3++){
+      if(issuers[ci3].inn) catalogByInn[issuers[ci3].inn] = issuers[ci3];
+    }
+
     var toFetch = [];
     var rdb2 = window.reportsDB || {};
     for(var eid2 in rdb2){
       var e2 = rdb2[eid2];
-      // Пропускаем: нет ИНН, уже есть периоды, уже проверялись в D1 и вернули пусто
       if(!e2 || !e2.inn) continue;
       if(Object.keys(e2.periods || {}).length > 0) continue;
       if(e2._d1_checked) continue;
+      // Пропускаем если каталог говорит has_reports:false (пустой эмитент)
+      var catEntry = catalogByInn[e2.inn];
+      if(catEntry && catEntry.has_reports === false) {
+        e2._d1_checked = true; // помечаем без запроса
+        continue;
+      }
       toFetch.push({ id: eid2, inn: e2.inn });
     }
     var loaded = 0, errors = 0;

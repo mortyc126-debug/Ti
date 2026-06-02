@@ -554,13 +554,19 @@ async function handleCatalog(env){
   // эмитенты — пробуем сначала из справочника, иначе fallback
   try {
     const r = await env.DB.prepare(`
-      SELECT inn, short_name AS name, ticker, sector, bonds_count, aliases
-      FROM issuers
-      WHERE inn IS NOT NULL
-      ORDER BY short_name
+      SELECT i.inn, i.short_name AS name, i.ticker, i.sector, i.bonds_count, i.aliases,
+             CASE WHEN rmax.max_year IS NOT NULL THEN 1 ELSE 0 END AS has_reports,
+             rmax.max_year AS latest_report_year
+      FROM issuers i
+      LEFT JOIN (
+        SELECT inn, MAX(fy_year) AS max_year FROM issuer_reports GROUP BY inn
+      ) rmax ON rmax.inn = i.inn
+      WHERE i.inn IS NOT NULL
+      ORDER BY i.short_name
     `).all();
     issuers = (r.results || []).map(x => ({
       ...x,
+      has_reports: !!x.has_reports,
       aliases: x.aliases ? safeJsonParse(x.aliases, []) : null,
     }));
   } catch(_){}
