@@ -137,6 +137,16 @@
   </div>
 
   <div class="card">
+    <label>Диагностика одного ИНН</label>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="diag-inn" type="text" placeholder="ИНН (10 или 12 цифр)" style="flex:1;min-width:180px">
+      <button onclick="diagInn()">🔍 Отчёты</button>
+      <button class="secondary" onclick="diagInnForce()">♻️ Force-перепрогон</button>
+      <button class="secondary" onclick="diagInnAffil()">🔗 Аффилиации</button>
+    </div>
+  </div>
+
+  <div class="card">
     <label>Лог</label>
     <div class="log" id="log"></div>
     <div class="row" style="margin-top:8px">
@@ -150,8 +160,8 @@ const tokenEl = document.getElementById('token');
 const urlEl   = document.getElementById('url');
 tokenEl.value = localStorage.getItem('bondan_admin_token') || '';
 urlEl.value   = localStorage.getItem('bondan_url') || urlEl.value;
-tokenEl.addEventListener('change', () => localStorage.setItem('bondan_admin_token', tokenEl.value));
-urlEl  .addEventListener('change', () => localStorage.setItem('bondan_url',         urlEl.value));
+tokenEl.addEventListener('input', () => localStorage.setItem('bondan_admin_token', tokenEl.value));
+urlEl  .addEventListener('input', () => localStorage.setItem('bondan_url',         urlEl.value));
 
 function logEntry(level, label, body){
   const t = new Date().toLocaleTimeString('ru');
@@ -245,6 +255,42 @@ async function run(path){
   } finally {
     btns.forEach(b => b.disabled = false);
   }
+}
+
+async function diagInn(force){
+  const inn = document.getElementById('diag-inn').value.trim();
+  if(!/^\d{10,12}$/.test(inn)){ logEntry('err', 'Неверный ИНН', 'Введи 10 или 12 цифр'); return; }
+  const url = urlEl.value.replace(/\/+$/, '');
+  const token = tokenEl.value.trim();
+  const path = force
+    ? `/collect/reports?limit=1&inn=${inn}&force=1`
+    : `/issuer/${inn}/reports`;
+  logEntry('info', `${force ? 'POST' : 'GET'} ${path} …`, '');
+  try {
+    const r = await fetch(url + path, {
+      method: force ? 'POST' : 'GET',
+      headers: force && token ? { 'X-Admin-Token': token } : {},
+    });
+    const text = await r.text();
+    let body = text;
+    try { body = JSON.stringify(JSON.parse(text), null, 2); } catch(_){}
+    logEntry(r.ok ? 'ok' : 'err', `${r.status} ${path}`, body);
+  } catch(e){ logEntry('err', path, e.message); }
+}
+function diagInnForce(){ diagInn(true); }
+async function diagInnAffil(){
+  const inn = document.getElementById('diag-inn').value.trim();
+  if(!/^\d{10,12}$/.test(inn)){ logEntry('err', 'Неверный ИНН', 'Введи 10 или 12 цифр'); return; }
+  const url = urlEl.value.replace(/\/+$/, '');
+  const path = `/issuer/${inn}/affiliations`;
+  logEntry('info', `GET ${path} …`, '');
+  try {
+    const r = await fetch(url + path);
+    const text = await r.text();
+    let body = text;
+    try { body = JSON.stringify(JSON.parse(text), null, 2); } catch(_){}
+    logEntry(r.ok ? 'ok' : 'err', `${r.status} ${path}`, body);
+  } catch(e){ logEntry('err', path, e.message); }
 }
 
 async function checkStatus(){
