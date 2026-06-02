@@ -512,6 +512,9 @@ async function _repD1Load(){
   _d1Loading = false;
 }
 
+// D1 period codes → app.js period names
+var _D1_PERIOD_MAP = { 'FY':'Год', '9M':'9М', 'H1':'Полугодие', 'Q1':'1 квартал', 'Q3':'3 квартал' };
+
 function _d1MergeReports(issId, inn, rows){
   var rdb = reportsDB || {};
   if(!rdb[issId]) return;
@@ -519,10 +522,11 @@ function _d1MergeReports(issId, inn, rows){
   if(!iss.periods) iss.periods = {};
   for(var i = 0; i < rows.length; i++){
     var row = rows[i];
-    var pk = row.fy_year + '_' + (row.period || 'Год') + '_' + (row.std || 'РСБУ');
+    var periodName = _D1_PERIOD_MAP[row.period] || row.period || 'Год';
+    var pk = row.fy_year + '_' + periodName + '_' + (row.std || 'РСБУ');
     if(!iss.periods[pk]){
       iss.periods[pk] = {
-        year: row.fy_year, period: row.period || 'Год', type: row.std || 'РСБУ',
+        year: row.fy_year, period: periodName, type: row.std || 'РСБУ',
         // D1 хранит значения в млн ₽, app.js ожидает млрд → делим на 1000
         rev:    _d1bn(row.rev),   ebitda: _d1bn(row.ebitda), ebit: _d1bn(row.ebit),
         np:     _d1bn(row.np),    int:    _d1bn(row.int_exp), tax: _d1bn(row.tax_exp),
