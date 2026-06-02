@@ -113,6 +113,29 @@
       <button onclick="run('/collect/reports?limit=10&only_traded=1&include_ai=1&ai_budget=3')">🤖 Grok-fallback · 10 (3 AI)</button>
       <button class="secondary" onclick="run('/collect/reports?limit=20&only_traded=1&include_ai=1&ai_budget=8&max_ms=280000')">🤖 · 20 / 8 AI (paid)</button>
     </div>
+    <!-- Автоцикл прокачки очереди -->
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-top:12px">
+      <div style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🔁 Автоцикл — прокачать очередь отчётов</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="loop-count" style="background:var(--s2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-family:ui-monospace,Menlo,monospace;font-size:13px">
+          <option value="10">10 прогонов (~150 ИНН)</option>
+          <option value="20" selected>20 прогонов (~300 ИНН)</option>
+          <option value="40">40 прогонов (~600 ИНН)</option>
+          <option value="60">60 прогонов (~900 ИНН)</option>
+        </select>
+        <select id="loop-limit" style="background:var(--s2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-family:ui-monospace,Menlo,monospace;font-size:13px">
+          <option value="15" selected>15 ИНН / прогон</option>
+          <option value="20">20 ИНН / прогон</option>
+          <option value="30">30 ИНН / прогон (paid)</option>
+        </select>
+        <label style="display:flex;gap:5px;align-items:center;font-size:12px;color:var(--text2);text-transform:none;margin:0;cursor:pointer">
+          <input type="checkbox" id="loop-force"> force (перепрогнать все)
+        </label>
+        <button id="loop-btn" onclick="startLoop()">▶ Старт</button>
+        <button id="loop-stop-btn" class="secondary" onclick="stopLoop()" style="display:none;color:var(--danger);border-color:var(--danger)">■ Стоп</button>
+      </div>
+      <div id="loop-progress" style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--text3);display:none"></div>
+    </div>
     <div class="row" style="margin-top:8px">
       <button onclick="run('/collect/affiliations?limit=20&zachbiz_budget=10')">🔗 ЕГРЮЛ + zachBiz · 20 (10 zb)</button>
       <button class="secondary" onclick="run('/collect/affiliations?limit=30&zachbiz=0')">🔗 · 30 (только DaData)</button>
@@ -330,6 +353,58 @@ async function checkCatalog(){
     logEntry('err', `GET /catalog`, e.message);
   }
 }
+
+let _loopRunning = false;
+let _loopStop = false;
+
+async function startLoop(){
+  if(_loopRunning) return;
+  const token = tokenEl.value.trim();
+  if(!token){ logEntry('err', 'Нет токена', ''); return; }
+  const total  = parseInt(document.getElementById('loop-count').value);
+  const limit  = parseInt(document.getElementById('loop-limit').value);
+  const force  = document.getElementById('loop-force').checked;
+  const base   = urlEl.value.replace(/\/+$/, '');
+  const path   = `/collect/reports?limit=${limit}&only_traded=1${force ? '&force=1' : ''}`;
+  const prog   = document.getElementById('loop-progress');
+  const btn    = document.getElementById('loop-btn');
+  const stopBtn= document.getElementById('loop-stop-btn');
+
+  _loopRunning = true; _loopStop = false;
+  btn.disabled = true; stopBtn.style.display = '';
+  prog.style.display = '';
+
+  let totalProcessed = 0, totalRows = 0, done = 0;
+  for(let i = 0; i < total; i++){
+    if(_loopStop) break;
+    prog.textContent = `Прогон ${i+1}/${total} · обработано всего: ${totalProcessed} ИНН, строк: ${totalRows}`;
+    try {
+      const r = await fetch(base + path, { method: 'POST', headers: { 'X-Admin-Token': token } });
+      const j = await r.json().catch(() => ({}));
+      totalProcessed += j.processed ?? 0;
+      totalRows      += j.rowsWritten ?? 0;
+      done++;
+      if((j.processed ?? 0) === 0 && !force){
+        // очередь исчерпана
+        prog.textContent = `✓ Очередь пуста после ${done} прогонов · ${totalProcessed} ИНН, ${totalRows} строк`;
+        logEntry('ok', `Автоцикл завершён — очередь пуста`, `Прогонов: ${done}, ИНН: ${totalProcessed}, строк: ${totalRows}`);
+        break;
+      }
+    } catch(e){
+      logEntry('err', `Автоцикл: прогон ${i+1} — ошибка`, e.message);
+      break;
+    }
+    // небольшая пауза между прогонами чтобы не перегружать воркер
+    if(i < total - 1 && !_loopStop) await new Promise(r => setTimeout(r, 800));
+  }
+  if(!prog.textContent.startsWith('✓'))
+    prog.textContent = `Готово: ${done} прогонов · ${totalProcessed} ИНН · ${totalRows} строк`;
+  logEntry('ok', `Автоцикл завершён`, `Прогонов: ${done}/${total}, ИНН: ${totalProcessed}, строк: ${totalRows}`);
+  _loopRunning = false; _loopStop = false;
+  btn.disabled = false; stopBtn.style.display = 'none';
+}
+
+function stopLoop(){ _loopStop = true; }
 
 checkStatus();
 </script>
