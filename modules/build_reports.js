@@ -477,7 +477,7 @@ async function _repD1Load(){
     // 4. Сохранить и перерисовать
     var saveErr = null;
     try {
-      saveState();
+      save();
     } catch(e) {
       saveErr = e;
       // Fallback: попробовать сохранить напрямую через postMessage к shell
@@ -489,12 +489,10 @@ async function _repD1Load(){
       }
     }
     repRenderIssuerList();
-    // Обновить счётчик явно (без фильтра _repFilterApplyDOM не трогает его)
     var rdbFinal = reportsDB || {};
     var totalIss = Object.keys(rdbFinal).length;
     var withPeriods = Object.keys(rdbFinal).filter(function(k){ return Object.keys(rdbFinal[k].periods||{}).length > 0; }).length;
-    var cntEl = document.getElementById('rep-sidebar-count');
-    if(cntEl) cntEl.textContent = String(totalIss);
+    // Счётчик не перезаписываем — repRenderIssuerList уже поставил отфильтрованный
     var summary = (added > 0 ? '+' + added + ' эм.' : '') + (loaded > 0 ? (added?' ':'') + '+' + loaded + ' отч.' : '') || 'без изменений';
     setBtn('✓ ' + withPeriods + '/' + totalIss);
     setLog('Готово: ' + summary + ' | с отчётами: ' + withPeriods + '/' + totalIss +
@@ -886,32 +884,31 @@ window._repHasMoexBonds = function(id, iss){
   window.repRenderIssuerList = function(){
     var st = document.getElementById('rep-sidebar-status');
     var origVal = st ? st.value : '';
-    // Временно переключить has_moex → no_moex (обратный фильтр),
-    // потом вернуть и инвертировать видимость — проще переопределить фильтр
-    // напрямую через патч items после рендера.
-    // Проще: заменим has_moex на all перед вызовом, потом скроем лишних.
+    // has_moex не поддерживается родным кодом — рендерим как 'all', потом фильтруем
     if(st && origVal === 'has_moex') st.value = 'all';
     _origRIL();
+    // Сначала применяем фильтры по рейтингу/отрасли/мультипликаторам
+    _repFilterApplyDOM();
     if(st && origVal === 'has_moex'){
       st.value = 'has_moex';
-      // Скрыть записи у кого bondsCount=0
+      // Скрыть записи у кого bondsCount=0 (поверх уже применённых фильтров)
       var listEl = document.getElementById('rep-sidebar-list');
       if(listEl){
         var shown = 0;
         listEl.querySelectorAll('[onclick]').forEach(function(el){
+          if(el.style.display === 'none') return; // уже скрыт предыдущим фильтром
           var oc = el.getAttribute('onclick') || '';
           var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
           if(!m){ shown++; return; }
           var iss = reportsDB[m[1]];
           var hasB = iss && (iss.bondsCount > 0);
-          el.style.display = hasB ? '' : 'none';
-          if(hasB) shown++;
+          if(!hasB) el.style.display = 'none';
+          else shown++;
         });
         var cnt = document.getElementById('rep-sidebar-count');
         if(cnt) cnt.textContent = String(shown);
       }
     }
-    _repFilterApplyDOM();
   };
 })();
 
