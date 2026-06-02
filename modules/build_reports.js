@@ -490,6 +490,8 @@ async function _repD1Load(){
       }
     }
     repRenderIssuerList();
+    // Перестроить legacy-select чтобы repSelectIssuerById работал после D1-загрузки
+    try { repRebuildSelect(); } catch(_){}
     var rdbFinal = reportsDB || {};
     var totalIss = Object.keys(rdbFinal).length;
     var withPeriods = Object.keys(rdbFinal).filter(function(k){ return Object.keys(rdbFinal[k].periods||{}).length > 0; }).length;
