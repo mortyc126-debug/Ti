@@ -3610,6 +3610,8 @@ async function handleSyncPush(env, req){
       const period = periodMap[p.period] || 'FY';
       const std    = p.type || 'РСБУ';
       const n = v => (v===undefined||v===null||v==='') ? null : Number(v);
+      // Пользователь хранит данные в млрд ₽, D1 — в млн ₽ (как buxbalans/ГИРБО)
+      const bn2mn = v => n(v) != null ? n(v) * 1000 : null;
       const roa = (n(p.np)!=null && n(p.assets)) ? n(p.np)/n(p.assets)*100 : null;
       const ros = (n(p.np)!=null && n(p.rev))    ? n(p.np)/n(p.rev)*100    : null;
       const em  = (n(p.ebitda)!=null && n(p.rev)) ? n(p.ebitda)/n(p.rev)*100 : null;
@@ -3641,8 +3643,8 @@ async function handleSyncPush(env, req){
             fetched_at=excluded.fetched_at
         `).bind(
           inn, fy, period, std,
-          n(p.rev), n(p.ebitda), n(p.ebit), n(p.np), n(p.int), n(p.tax),
-          n(p.assets), n(p.ca), n(p.cl), n(p.debt), n(p.cash), n(p.ret), n(p.eq),
+          bn2mn(p.rev), bn2mn(p.ebitda), bn2mn(p.ebit), bn2mn(p.np), bn2mn(p.int), bn2mn(p.tax),
+          bn2mn(p.assets), bn2mn(p.ca), bn2mn(p.cl), bn2mn(p.debt), bn2mn(p.cash), bn2mn(p.ret), bn2mn(p.eq),
           roa, ros, em, nde, 'user', now
         ).run();
         periodsOk++;
