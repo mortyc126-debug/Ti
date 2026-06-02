@@ -376,13 +376,13 @@ async function _repD1Load(){
     setLog('Шаг 1/3: каталог ✓ (' + issuers.length + ' эмитентов)');
 
     // 2. Мёрдж эмитентов в reportsDB
-    // ВАЖНО: мутируем объект на месте, не переприсваиваем window.reportsDB —
+    // ВАЖНО: мутируем объект на месте, не переприсваиваем reportsDB —
     // иначе app.js потеряет ссылку и repRenderIssuerList увидит старые данные
     setBtn('↻ мёрдж…');
     setLog('Шаг 2/3: мёрдж в базу…');
     var added = 0, updated = 0;
-    if(!window.reportsDB) window.reportsDB = {};
-    var rdb = window.reportsDB;
+    if(!reportsDB) reportsDB = {};
+    var rdb = reportsDB;
     for(var ci = 0; ci < issuers.length; ci++){
       var ci2 = issuers[ci];
       if(!ci2.inn) continue;
@@ -414,7 +414,7 @@ async function _repD1Load(){
     }
 
     var toFetch = [];
-    var rdb2 = window.reportsDB || {};
+    var rdb2 = reportsDB || {};
     for(var eid2 in rdb2){
       var e2 = rdb2[eid2];
       if(!e2 || !e2.inn) continue;
@@ -444,7 +444,7 @@ async function _repD1Load(){
               loaded++;
             } else {
               // Пометить как проверенный — пустой ответ, не перезапрашивать
-              var rdbRef = window.reportsDB || {};
+              var rdbRef = reportsDB || {};
               if(rdbRef[entry.id]) rdbRef[entry.id]._d1_checked = true;
             }
           })
@@ -463,15 +463,15 @@ async function _repD1Load(){
       saveErr = e;
       // Fallback: попробовать сохранить напрямую через postMessage к shell
       try {
-        var snap = JSON.stringify({ reportsDB: window.reportsDB });
+        var snap = JSON.stringify({ reportsDB: reportsDB });
         localStorage.setItem('ba_rep_d1_cache', snap);
       } catch(e2) {
-        try { window.parent.postMessage({ type: 'DB_WRITE', key: 'ba_rep_d1_cache', value: JSON.stringify({ reportsDB: window.reportsDB }) }, '*'); } catch(e3) {}
+        try { window.parent.postMessage({ type: 'DB_WRITE', key: 'ba_rep_d1_cache', value: JSON.stringify({ reportsDB: reportsDB }) }, '*'); } catch(e3) {}
       }
     }
     repRenderIssuerList();
     // Обновить счётчик явно (без фильтра _repFilterApplyDOM не трогает его)
-    var rdbFinal = window.reportsDB || {};
+    var rdbFinal = reportsDB || {};
     var totalIss = Object.keys(rdbFinal).length;
     var withPeriods = Object.keys(rdbFinal).filter(function(k){ return Object.keys(rdbFinal[k].periods||{}).length > 0; }).length;
     var cntEl = document.getElementById('rep-sidebar-count');
@@ -493,7 +493,7 @@ async function _repD1Load(){
 }
 
 function _d1MergeReports(issId, inn, rows){
-  var rdb = window.reportsDB || {};
+  var rdb = reportsDB || {};
   if(!rdb[issId]) return;
   var iss = rdb[issId];
   if(!iss.periods) iss.periods = {};
@@ -549,7 +549,7 @@ function _repSearchDropRender(q){
   var ql = q.toLowerCase();
 
   // Эмитенты из reportsDB
-  var rdb = window.reportsDB || {};
+  var rdb = reportsDB || {};
   var issuers = [];
   for(var id in rdb){
     var iss = rdb[id];
@@ -841,7 +841,7 @@ function _repFilterApplyDOM(){
     var m2 = oc.match(/repSelectIssuerById\\('([^']+)'\\)/);
     if(!m2){ shown++; return; }
     var issId = m2[1];
-    var iss = (window.reportsDB || {})[issId];
+    var iss = (reportsDB || {})[issId];
     if(iss && _repFilterMatch(issId, iss)){ el.style.display=''; shown++; }
     else el.style.display='none';
   });
