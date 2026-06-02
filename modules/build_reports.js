@@ -66,7 +66,8 @@ const newSidebar = `<div id="rep-sidebar" style="width:340px;flex-shrink:0;posit
       <label style="display:flex;gap:4px;align-items:center">
         <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>
         <select id="rep-sidebar-status" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
-          <option value="has_moex" selected>есть бумаги на MOEX</option>
+          <option value="corp_moex" selected>корпоративные (MOEX)</option>
+          <option value="has_moex">все с бумагами на MOEX</option>
           <option value="all">все</option>
           <option value="has_periods">есть периоды</option>
           <option value="no_periods">нет периодов</option>
@@ -520,15 +521,18 @@ function _d1MergeReports(issId, inn, rows){
     if(!iss.periods[pk]){
       iss.periods[pk] = {
         year: row.fy_year, period: row.period || 'Год', type: row.std || 'РСБУ',
-        rev:    _d1v(row.rev),   ebitda: _d1v(row.ebitda), ebit: _d1v(row.ebit),
-        np:     _d1v(row.np),    int:    _d1v(row.int_exp), tax: _d1v(row.tax_exp),
-        assets: _d1v(row.assets),ca:     _d1v(row.ca),      cl:  _d1v(row.cl),
-        debt:   _d1v(row.debt),  cash:   _d1v(row.cash),    ret: _d1v(row.ret),
-        eq:     _d1v(row.eq),    _src: 'd1'
+        // D1 хранит значения в млн ₽, app.js ожидает млрд → делим на 1000
+        rev:    _d1bn(row.rev),   ebitda: _d1bn(row.ebitda), ebit: _d1bn(row.ebit),
+        np:     _d1bn(row.np),    int:    _d1bn(row.int_exp), tax: _d1bn(row.tax_exp),
+        assets: _d1bn(row.assets),ca:     _d1bn(row.ca),      cl:  _d1bn(row.cl),
+        debt:   _d1bn(row.debt),  cash:   _d1bn(row.cash),    ret: _d1bn(row.ret),
+        eq:     _d1bn(row.eq),    _src: 'd1'
       };
     }
   }
 }
+// D1 хранит финансовые показатели в млн ₽; app.js везде работает в млрд ₽
+function _d1bn(v){ return v != null ? Number(v) / 1000 : null; }
 function _d1v(v){ return v != null ? Number(v) : null; }
 
 // Маппинг sector (из D1 issuers) → ind (наши ключи из industry-peers)
@@ -877,32 +881,32 @@ window._repHasMoexBonds = function(id, iss){
   return Object.keys(iss.periods || {}).length > 0;
 };
 
-// Обработка status='has_moex' в repRenderIssuerList:
-// оригинальная функция не знает этот код — перехватываем через патч
+// Обработка status='has_moex'/'corp_moex' — оригинал не знает эти коды
+var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
 (function(){
   var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
     var st = document.getElementById('rep-sidebar-status');
     var origVal = st ? st.value : '';
-    // has_moex не поддерживается родным кодом — рендерим как 'all', потом фильтруем
-    if(st && origVal === 'has_moex') st.value = 'all';
+    var needCustom = origVal === 'has_moex' || origVal === 'corp_moex';
+    if(st && needCustom) st.value = 'all';
     _origRIL();
-    // Сначала применяем фильтры по рейтингу/отрасли/мультипликаторам
     _repFilterApplyDOM();
-    if(st && origVal === 'has_moex'){
-      st.value = 'has_moex';
-      // Скрыть записи у кого bondsCount=0 (поверх уже применённых фильтров)
+    if(st && needCustom){
+      st.value = origVal;
       var listEl = document.getElementById('rep-sidebar-list');
       if(listEl){
         var shown = 0;
         listEl.querySelectorAll('[onclick]').forEach(function(el){
-          if(el.style.display === 'none') return; // уже скрыт предыдущим фильтром
+          if(el.style.display === 'none') return;
           var oc = el.getAttribute('onclick') || '';
           var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
           if(!m){ shown++; return; }
           var iss = reportsDB[m[1]];
           var hasB = iss && (iss.bondsCount > 0);
-          if(!hasB) el.style.display = 'none';
+          // corp_moex: дополнительно исключаем субфедеральные/мун./ОФЗ/банки
+          var isCorpOk = origVal !== 'corp_moex' || (iss && !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank');
+          if(!hasB || !isCorpOk) el.style.display = 'none';
           else shown++;
         });
         var cnt = document.getElementById('rep-sidebar-count');
