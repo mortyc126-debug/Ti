@@ -388,8 +388,6 @@ async function _repD1Load(){
     for(var ci = 0; ci < issuers.length; ci++){
       var ci2 = issuers[ci];
       if(!ci2.inn) continue;
-      // Пропускаем «пустышки» — только ИНН, нет имени и ничего ценного
-      if(!ci2.name && !ci2.has_reports && !(ci2.bonds_count > 0)) continue;
       var existId = null;
       for(var eid in rdb){
         if(rdb[eid] && rdb[eid].inn === ci2.inn){ existId = eid; break; }
