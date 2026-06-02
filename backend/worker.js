@@ -572,7 +572,12 @@ async function handleCatalog(env){
         HAVING MAX(COALESCE(share_pct, 0))
       ) pa ON pa.child_inn = i.inn
       WHERE i.inn IS NOT NULL
-      ORDER BY i.short_name
+        AND (
+          i.short_name IS NOT NULL          -- есть имя (попал через MOEX/DaData)
+          OR rmax.max_year IS NOT NULL       -- есть отчёты
+          OR COALESCE(i.bonds_count, 0) > 0 -- есть бумаги на MOEX
+        )
+      ORDER BY i.short_name NULLS LAST
     `).all();
     issuers = (r.results || []).map(x => ({
       ...x,
