@@ -220,7 +220,8 @@ details summary{outline:none}
       <label style="display:flex;gap:4px;align-items:center">
         <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>
         <select id="rep-sidebar-status" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
-          <option value="has_moex" selected>есть бумаги на MOEX</option>
+          <option value="corp_moex" selected>корпоративные (MOEX)</option>
+          <option value="has_moex">все с бумагами на MOEX</option>
           <option value="all">все</option>
           <option value="has_periods">есть периоды</option>
           <option value="no_periods">нет периодов</option>
@@ -27987,10 +27988,10 @@ async function _repD1Load(){
       if(!e2 || !e2.inn) continue;
       if(Object.keys(e2.periods || {}).length > 0) continue;
       if(e2._d1_checked) continue;
-      // Пропускаем если каталог говорит has_reports:false (пустой эмитент)
       var catEntry = catalogByInn[e2.inn];
-      if(catEntry && catEntry.has_reports === false) {
-        e2._d1_checked = true; // помечаем без запроса
+      // Загружаем только тех у кого has_reports:true в каталоге
+      if(!catEntry || !catEntry.has_reports){
+        e2._d1_checked = true;
         continue;
       }
       toFetch.push({ id: eid2, inn: e2.inn });
@@ -27999,23 +28000,31 @@ async function _repD1Load(){
     var total = toFetch.length;
     setBtn('↻ 0/' + total);
     setLog('Шаг 3/3: загрузка отчётов 0/' + total + '…');
-    var BATCH = 4;
+
+    // Перерисовать список сразу — не ждать конца загрузки
+    repRenderIssuerList();
+    try { repRebuildSelect(); } catch(_){}
+
+    var BATCH = 8;
     for(var ti = 0; ti < total; ti += BATCH){
       var batch = toFetch.slice(ti, ti + BATCH);
       await Promise.all(batch.map(function(entry){
-        return fetch(base + '/issuer/' + entry.inn + '/reports')
-          .then(function(r2){ return r2.ok ? r2.json() : null; })
+        var ctrl = new AbortController();
+        var t = setTimeout(function(){ ctrl.abort(); }, 8000);
+        return fetch(base + '/issuer/' + entry.inn + '/reports', { signal: ctrl.signal })
+          .then(function(r2){ clearTimeout(t); return r2.ok ? r2.json() : null; })
           .then(function(data){
             if(data && Array.isArray(data.data) && data.data.length){
               _d1MergeReports(entry.id, entry.inn, data.data);
               loaded++;
-            } else {
-              // Пометить как проверенный — пустой ответ, не перезапрашивать
-              var rdbRef = reportsDB || {};
-              if(rdbRef[entry.id]) rdbRef[entry.id]._d1_checked = true;
             }
+            var rdbRef = reportsDB || {};
+            if(rdbRef[entry.id]) rdbRef[entry.id]._d1_checked = true;
           })
-          .catch(function(err){ errors++; console.warn('reports fetch:', entry.inn, err); });
+          .catch(function(err){
+            clearTimeout(t);
+            errors++;
+          });
       }));
       var done = Math.min(ti + BATCH, total);
       setBtn('↻ ' + done + '/' + total);
@@ -28025,7 +28034,7 @@ async function _repD1Load(){
     // 4. Сохранить и перерисовать
     var saveErr = null;
     try {
-      saveState();
+      save();
     } catch(e) {
       saveErr = e;
       // Fallback: попробовать сохранить напрямую через postMessage к shell
@@ -28037,12 +28046,12 @@ async function _repD1Load(){
       }
     }
     repRenderIssuerList();
-    // Обновить счётчик явно (без фильтра _repFilterApplyDOM не трогает его)
+    // Перестроить legacy-select чтобы repSelectIssuerById работал после D1-загрузки
+    try { repRebuildSelect(); } catch(_){}
     var rdbFinal = reportsDB || {};
     var totalIss = Object.keys(rdbFinal).length;
     var withPeriods = Object.keys(rdbFinal).filter(function(k){ return Object.keys(rdbFinal[k].periods||{}).length > 0; }).length;
-    var cntEl = document.getElementById('rep-sidebar-count');
-    if(cntEl) cntEl.textContent = String(totalIss);
+    // Счётчик не перезаписываем — repRenderIssuerList уже поставил отфильтрованный
     var summary = (added > 0 ? '+' + added + ' эм.' : '') + (loaded > 0 ? (added?' ':'') + '+' + loaded + ' отч.' : '') || 'без изменений';
     setBtn('✓ ' + withPeriods + '/' + totalIss);
     setLog('Готово: ' + summary + ' | с отчётами: ' + withPeriods + '/' + totalIss +
@@ -28059,6 +28068,9 @@ async function _repD1Load(){
   _d1Loading = false;
 }
 
+// D1 period codes → app.js period names
+var _D1_PERIOD_MAP = { 'FY':'Год', '9M':'9М', 'H1':'Полугодие', 'Q1':'1 квартал', 'Q3':'3 квартал' };
+
 function _d1MergeReports(issId, inn, rows){
   var rdb = reportsDB || {};
   if(!rdb[issId]) return;
@@ -28066,19 +28078,23 @@ function _d1MergeReports(issId, inn, rows){
   if(!iss.periods) iss.periods = {};
   for(var i = 0; i < rows.length; i++){
     var row = rows[i];
-    var pk = row.fy_year + '_' + (row.period || 'Год') + '_' + (row.std || 'РСБУ');
+    var periodName = _D1_PERIOD_MAP[row.period] || row.period || 'Год';
+    var pk = row.fy_year + '_' + periodName + '_' + (row.std || 'РСБУ');
     if(!iss.periods[pk]){
       iss.periods[pk] = {
-        year: row.fy_year, period: row.period || 'Год', type: row.std || 'РСБУ',
-        rev:    _d1v(row.rev),   ebitda: _d1v(row.ebitda), ebit: _d1v(row.ebit),
-        np:     _d1v(row.np),    int:    _d1v(row.int_exp), tax: _d1v(row.tax_exp),
-        assets: _d1v(row.assets),ca:     _d1v(row.ca),      cl:  _d1v(row.cl),
-        debt:   _d1v(row.debt),  cash:   _d1v(row.cash),    ret: _d1v(row.ret),
-        eq:     _d1v(row.eq),    _src: 'd1'
+        year: row.fy_year, period: periodName, type: row.std || 'РСБУ',
+        // D1 хранит значения в млн ₽, app.js ожидает млрд → делим на 1000
+        rev:    _d1bn(row.rev),   ebitda: _d1bn(row.ebitda), ebit: _d1bn(row.ebit),
+        np:     _d1bn(row.np),    int:    _d1bn(row.int_exp), tax: _d1bn(row.tax_exp),
+        assets: _d1bn(row.assets),ca:     _d1bn(row.ca),      cl:  _d1bn(row.cl),
+        debt:   _d1bn(row.debt),  cash:   _d1bn(row.cash),    ret: _d1bn(row.ret),
+        eq:     _d1bn(row.eq),    _src: 'd1'
       };
     }
   }
 }
+// D1 хранит финансовые показатели в млн ₽; app.js везде работает в млрд ₽
+function _d1bn(v){ return v != null ? Number(v) / 1000 : null; }
 function _d1v(v){ return v != null ? Number(v) : null; }
 
 // Маппинг sector (из D1 issuers) → ind (наши ключи из industry-peers)
@@ -28427,50 +28443,81 @@ window._repHasMoexBonds = function(id, iss){
   return Object.keys(iss.periods || {}).length > 0;
 };
 
-// Обработка status='has_moex' в repRenderIssuerList:
-// оригинальная функция не знает этот код — перехватываем через патч
+// Обработка status='has_moex'/'corp_moex' — оригинал не знает эти коды
+var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
+var _NON_CORP_SECTORS = { state: 1 };
+var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление)/i;
 (function(){
   var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
     var st = document.getElementById('rep-sidebar-status');
     var origVal = st ? st.value : '';
-    // Временно переключить has_moex → no_moex (обратный фильтр),
-    // потом вернуть и инвертировать видимость — проще переопределить фильтр
-    // напрямую через патч items после рендера.
-    // Проще: заменим has_moex на all перед вызовом, потом скроем лишних.
-    if(st && origVal === 'has_moex') st.value = 'all';
+    var needCustom = origVal === 'has_moex' || origVal === 'corp_moex';
+    if(st && needCustom) st.value = 'all';
     _origRIL();
-    if(st && origVal === 'has_moex'){
-      st.value = 'has_moex';
-      // Скрыть записи у кого bondsCount=0
+    _repFilterApplyDOM();
+    if(st && needCustom){
+      st.value = origVal;
       var listEl = document.getElementById('rep-sidebar-list');
       if(listEl){
         var shown = 0;
         listEl.querySelectorAll('[onclick]').forEach(function(el){
+          if(el.style.display === 'none') return;
           var oc = el.getAttribute('onclick') || '';
           var m = oc.match(/repSelectIssuerById('([^']+)')/);
           if(!m){ shown++; return; }
           var iss = reportsDB[m[1]];
           var hasB = iss && (iss.bondsCount > 0);
-          el.style.display = hasB ? '' : 'none';
-          if(hasB) shown++;
+          // corp_moex: исключаем субфедеральные/мун./ОФЗ/банки/гос.органы
+          var isCorpOk = origVal !== 'corp_moex' || (iss &&
+            !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank' &&
+            !_NON_CORP_SECTORS[iss.ind] &&
+            !_GOV_NAME_RE.test(iss.name || ''));
+          if(!hasB || !isCorpOk) el.style.display = 'none';
+          else shown++;
         });
         var cnt = document.getElementById('rep-sidebar-count');
         if(cnt) cnt.textContent = String(shown);
       }
     }
-    _repFilterApplyDOM();
   };
 })();
 
-// Подгрузка аффилиаций из D1 при выборе эмитента
+// Надёжный выбор эмитента: напрямую через repActiveIssuerId + рендер,
+// не через legacy-select (второй клик на тот же id не триггерит change)
 (function(){
-  var _origSel = repSelectIssuerById;
   var _lastFetched = {};
   window.repSelectIssuerById = function(id){
-    _origSel(id);
-    // Загружаем аффилиации если ещё не грузили для этого id
-    if(!id || _lastFetched[id]) return;
+    if(!id) return;
+    // Синхронно устанавливаем активного — напрямую, без select
+    repActiveIssuerId = id;
+    var sel = document.getElementById('rep-issuer-sel');
+    if(sel) sel.value = id;
+    // Показать панель, скрыть empty-state
+    var ev = document.getElementById('rep-issuer-view');
+    var em = document.getElementById('rep-empty');
+    if(ev) ev.style.display = 'block';
+    if(em) em.style.display = 'none';
+    ['rep-add-period-btn','rep-pdf-btn','rep-del-issuer-btn',
+     'rep-compare-btn','rep-edit-issuer-btn','rep-export-issuer-btn',
+     'rep-dossier-btn','rep-edit-period-btn','rep-del-period-btn'].forEach(function(bid){
+      var b = document.getElementById(bid); if(b) b.style.display = '';
+    });
+    // Рендерим шапку и периоды
+    try { _repRenderActiveIssuerHeader(); } catch(_){}
+    try { repRenderRef(); } catch(_){}
+    try { repBuildPeriodTabs(); } catch(_){}
+    // Подсветка активного в списке — только классы, без полного перерендера
+    document.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc = el.getAttribute('onclick') || '';
+      var m = oc.match(/repSelectIssuerById('([^']+)')/);
+      var itemId = m ? m[1] : null;
+      var active = itemId === id;
+      el.style.background = active ? 'var(--s3)' : 'var(--bg)';
+      el.style.borderColor = active ? 'var(--acc)' : 'var(--border2)';
+    });
+    // Аффилиации из D1 — один раз на id
+    if(_lastFetched[id]) return;
     _lastFetched[id] = true;
     var iss = reportsDB[id];
     if(!iss || !iss.inn) return;
@@ -28503,7 +28550,7 @@ window._repHasMoexBonds = function(id, iss){
           }
         }
       })
-      .catch(function(){});
+      .catch(function(e){ console.warn('affiliations fetch:', id, e); });
   };
 })();
 
