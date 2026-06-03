@@ -187,13 +187,29 @@
 </div>
 
 <script>
-// Коммуникация с shell — localStorage недоступен в blob-iframe
-// Все операции хранения идут через DB_WRITE/DB_READ postMessage к parent
+// Admin может быть открыт напрямую (прямой URL) или в blob-iframe через shell.
+// В прямом режиме localStorage доступен напрямую (тот же origin что shell.html).
+// В blob-iframe localStorage изолирован — нужен postMessage к parent.
+const _inIframe = (function(){ try{ return window.self !== window.top; }catch(_){ return true; } })();
+
+const ADMIN_TOKEN_KEY = 'bondan_admin_token';
+const ADMIN_URL_KEY   = 'bondan_admin_url';
 
 function shellWrite(key, value){
-  try { window.parent.postMessage({ type: 'DB_WRITE', key, value }, '*'); } catch(_){}
+  if(!_inIframe){
+    try{ localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); }catch(_){}
+  } else {
+    try{ window.parent.postMessage({ type: 'DB_WRITE', key, value }, '*'); }catch(_){}
+  }
 }
 function shellRead(key, cb){
+  if(!_inIframe){
+    try{
+      const raw = localStorage.getItem(key);
+      cb(raw !== null ? raw : null);
+    }catch(_){ cb(null); }
+    return;
+  }
   const reqId = 'adm_' + Math.random().toString(36).slice(2);
   function handler(e){
     if(!e.data || e.data.type !== 'DB_RESPONSE' || e.data.reqId !== reqId) return;
@@ -201,30 +217,27 @@ function shellRead(key, cb){
     cb(e.data.value || null);
   }
   window.addEventListener('message', handler);
-  try { window.parent.postMessage({ type: 'DB_READ', reqId, key }, '*'); } catch(_){ cb(null); }
+  try{ window.parent.postMessage({ type: 'DB_READ', reqId, key }, '*'); }catch(_){ cb(null); }
   setTimeout(() => { window.removeEventListener('message', handler); cb(null); }, 2000);
 }
 
 const tokenEl = document.getElementById('token');
 const urlEl   = document.getElementById('url');
 
-// Загрузить сохранённые значения через шину shell
-// Читаем из тех же ключей что использует shell.html (t_api_token, shell_api_url)
-shellRead('t_api_token',  v => { if(v) tokenEl.value = v; });
-shellRead('shell_api_url', v => { if(v) urlEl.value   = v; });
+shellRead(ADMIN_TOKEN_KEY, v => { if(v) tokenEl.value = v; });
+shellRead(ADMIN_URL_KEY,   v => { if(v) urlEl.value   = v; });
 
-// Также слушаем SHELL_STATE — шелл пушит apiUrl при загрузке модуля
-window.addEventListener('message', function(e){
-  var d = e.data;
-  if(!d) return;
-  if(d.type === 'SHELL_STATE' && d.apiUrl && !urlEl.value){
-    urlEl.value = d.apiUrl;
-  }
-});
+// Если в iframe — также ловим SHELL_STATE для URL воркера
+if(_inIframe){
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if(!d) return;
+    if(d.type === 'SHELL_STATE' && d.apiUrl && !urlEl.value) urlEl.value = d.apiUrl;
+  });
+}
 
-// Сохраняем в те же ключи что shell.html — токен подхватится автоматически
-tokenEl.addEventListener('input', () => shellWrite('t_api_token',  tokenEl.value));
-urlEl  .addEventListener('input', () => shellWrite('shell_api_url', urlEl.value));
+tokenEl.addEventListener('input', () => shellWrite(ADMIN_TOKEN_KEY, tokenEl.value));
+urlEl  .addEventListener('input', () => shellWrite(ADMIN_URL_KEY,   urlEl.value));
 
 function logEntry(level, label, body){
   const t = new Date().toLocaleTimeString('ru');
