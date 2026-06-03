@@ -14,9 +14,9 @@
   --s3:#1f2836;
   --border:#222a37;
   --border2:#2e3847;
-  --acc:#00d4ff;
-  --acc2:#0099bb;
-  --acc-dim:#0a3a4a;
+  --acc:#a78bfa;
+  --acc2:#7c5fc9;
+  --acc-dim:rgba(167,139,250,.1);
   --green:#22d3a0;
   --green-dim:rgba(34,211,160,.1);
   --warn:#f5a623;
@@ -28593,6 +28593,19 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
     '.rhp-w{border-color:rgba(245,166,35,.4);background:rgba(245,166,35,.08);color:var(--warn)}',
     '.rhp-r{border-color:rgba(255,77,109,.4);background:rgba(255,77,109,.08);color:var(--danger)}',
     '.rhp-n{border-color:var(--border2);background:var(--s2);color:var(--text3)}',
+    // Плитки Запас прочности / Качество баланса — светлее для визуального отделения
+    '#rep-issuer-header [title*="Запас прочности"]:not(label),',
+    '#rep-issuer-header [title*="Altman"]{',
+    '  background:var(--s2) !important;border-color:var(--border2) !important;',
+    '  border-radius:8px !important;margin-top:6px !important;}',
+    // Кнопки — фиолетовый акцент
+    '.btn-p,.btn-primary{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}',
+    '.btn-p:hover,.btn-primary:hover{background:var(--acc);color:var(--bg)}',
+    '.btn.active,.btn-sm.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}',
+    '.rep-tf-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}',
+    // Динамика: бары → фиолетовый
+    '.dyn-bar-pos{background:var(--acc) !important}',
+    '.dyn-bar-fill{background:var(--acc) !important}',
   ].join('');
   document.head.appendChild(st);
 })();
