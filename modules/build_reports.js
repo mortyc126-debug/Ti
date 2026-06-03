@@ -897,7 +897,8 @@ window._repHasMoexBonds = function(id, iss){
 
 // Обработка status='has_moex'/'corp_moex' — оригинал не знает эти коды
 var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
-var _NON_CORP_SECTORS = { state: 1, services: 1 }; // гос. управление и подобные
+var _NON_CORP_SECTORS = { state: 1 };
+var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление)\b/i;
 (function(){
   var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
@@ -919,10 +920,11 @@ var _NON_CORP_SECTORS = { state: 1, services: 1 }; // гос. управлени
           if(!m){ shown++; return; }
           var iss = reportsDB[m[1]];
           var hasB = iss && (iss.bondsCount > 0);
-          // corp_moex: исключаем субфедеральные/мун./ОФЗ/банки/гос.сектор
+          // corp_moex: исключаем субфедеральные/мун./ОФЗ/банки/гос.органы
           var isCorpOk = origVal !== 'corp_moex' || (iss &&
             !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank' &&
-            !_NON_CORP_SECTORS[iss.ind]);
+            !_NON_CORP_SECTORS[iss.ind] &&
+            !_GOV_NAME_RE.test(iss.name || ''));
           if(!hasB || !isCorpOk) el.style.display = 'none';
           else shown++;
         });
@@ -933,14 +935,34 @@ var _NON_CORP_SECTORS = { state: 1, services: 1 }; // гос. управлени
   };
 })();
 
-// Подгрузка аффилиаций из D1 при выборе эмитента
+// Надёжный выбор эмитента: напрямую через repActiveIssuerId + рендер,
+// не через legacy-select (второй клик на тот же id не триггерит change)
 (function(){
-  var _origSel = repSelectIssuerById;
   var _lastFetched = {};
   window.repSelectIssuerById = function(id){
-    _origSel(id);
-    // Загружаем аффилиации если ещё не грузили для этого id
-    if(!id || _lastFetched[id]) return;
+    if(!id) return;
+    // Синхронно устанавливаем активного — напрямую, без select
+    repActiveIssuerId = id;
+    var sel = document.getElementById('rep-issuer-sel');
+    if(sel) sel.value = id;
+    // Показать панель, скрыть empty-state
+    var ev = document.getElementById('rep-issuer-view');
+    var em = document.getElementById('rep-empty');
+    if(ev) ev.style.display = 'block';
+    if(em) em.style.display = 'none';
+    ['rep-add-period-btn','rep-pdf-btn','rep-del-issuer-btn',
+     'rep-compare-btn','rep-edit-issuer-btn','rep-export-issuer-btn',
+     'rep-dossier-btn','rep-edit-period-btn','rep-del-period-btn'].forEach(function(bid){
+      var b = document.getElementById(bid); if(b) b.style.display = '';
+    });
+    // Рендерим шапку и периоды
+    try { _repRenderActiveIssuerHeader(); } catch(_){}
+    try { repRenderRef(); } catch(_){}
+    try { repBuildPeriodTabs(); } catch(_){}
+    // Перерисовать список (подсветка активного)
+    try { repRenderIssuerList(); } catch(_){}
+    // Аффилиации из D1 — один раз на id
+    if(_lastFetched[id]) return;
     _lastFetched[id] = true;
     var iss = reportsDB[id];
     if(!iss || !iss.inn) return;
