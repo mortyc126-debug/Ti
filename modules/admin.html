@@ -209,8 +209,9 @@ const tokenEl = document.getElementById('token');
 const urlEl   = document.getElementById('url');
 
 // Загрузить сохранённые значения через шину shell
-shellRead('bondan_admin_token', v => { if(v) tokenEl.value = v; });
-shellRead('bondan_admin_url',   v => { if(v) urlEl.value   = v; });
+// Читаем из тех же ключей что использует shell.html (t_api_token, shell_api_url)
+shellRead('t_api_token',  v => { if(v) tokenEl.value = v; });
+shellRead('shell_api_url', v => { if(v) urlEl.value   = v; });
 
 // Также слушаем SHELL_STATE — шелл пушит apiUrl при загрузке модуля
 window.addEventListener('message', function(e){
@@ -221,8 +222,9 @@ window.addEventListener('message', function(e){
   }
 });
 
-tokenEl.addEventListener('input', () => shellWrite('bondan_admin_token', tokenEl.value));
-urlEl  .addEventListener('input', () => shellWrite('bondan_admin_url',   urlEl.value));
+// Сохраняем в те же ключи что shell.html — токен подхватится автоматически
+tokenEl.addEventListener('input', () => shellWrite('t_api_token',  tokenEl.value));
+urlEl  .addEventListener('input', () => shellWrite('shell_api_url', urlEl.value));
 
 function logEntry(level, label, body){
   const t = new Date().toLocaleTimeString('ru');

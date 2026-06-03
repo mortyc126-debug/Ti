@@ -959,8 +959,15 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
     try { _repRenderActiveIssuerHeader(); } catch(_){}
     try { repRenderRef(); } catch(_){}
     try { repBuildPeriodTabs(); } catch(_){}
-    // Перерисовать список (подсветка активного)
-    try { repRenderIssuerList(); } catch(_){}
+    // Подсветка активного в списке — только классы, без полного перерендера
+    document.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc = el.getAttribute('onclick') || '';
+      var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+      var itemId = m ? m[1] : null;
+      var active = itemId === id;
+      el.style.background = active ? 'var(--s3)' : 'var(--bg)';
+      el.style.borderColor = active ? 'var(--acc)' : 'var(--border2)';
+    });
     // Аффилиации из D1 — один раз на id
     if(_lastFetched[id]) return;
     _lastFetched[id] = true;
