@@ -440,10 +440,10 @@ async function _repD1Load(){
       if(!e2 || !e2.inn) continue;
       if(Object.keys(e2.periods || {}).length > 0) continue;
       if(e2._d1_checked) continue;
-      // Пропускаем если каталог говорит has_reports:false (пустой эмитент)
       var catEntry = catalogByInn[e2.inn];
-      if(catEntry && catEntry.has_reports === false) {
-        e2._d1_checked = true; // помечаем без запроса
+      // Загружаем только тех у кого has_reports:true в каталоге
+      if(!catEntry || !catEntry.has_reports){
+        e2._d1_checked = true;
         continue;
       }
       toFetch.push({ id: eid2, inn: e2.inn });
@@ -452,23 +452,31 @@ async function _repD1Load(){
     var total = toFetch.length;
     setBtn('↻ 0/' + total);
     setLog('Шаг 3/3: загрузка отчётов 0/' + total + '…');
-    var BATCH = 4;
+
+    // Перерисовать список сразу — не ждать конца загрузки
+    repRenderIssuerList();
+    try { repRebuildSelect(); } catch(_){}
+
+    var BATCH = 8;
     for(var ti = 0; ti < total; ti += BATCH){
       var batch = toFetch.slice(ti, ti + BATCH);
       await Promise.all(batch.map(function(entry){
-        return fetch(base + '/issuer/' + entry.inn + '/reports')
-          .then(function(r2){ return r2.ok ? r2.json() : null; })
+        var ctrl = new AbortController();
+        var t = setTimeout(function(){ ctrl.abort(); }, 8000);
+        return fetch(base + '/issuer/' + entry.inn + '/reports', { signal: ctrl.signal })
+          .then(function(r2){ clearTimeout(t); return r2.ok ? r2.json() : null; })
           .then(function(data){
             if(data && Array.isArray(data.data) && data.data.length){
               _d1MergeReports(entry.id, entry.inn, data.data);
               loaded++;
-            } else {
-              // Пометить как проверенный — пустой ответ, не перезапрашивать
-              var rdbRef = reportsDB || {};
-              if(rdbRef[entry.id]) rdbRef[entry.id]._d1_checked = true;
             }
+            var rdbRef = reportsDB || {};
+            if(rdbRef[entry.id]) rdbRef[entry.id]._d1_checked = true;
           })
-          .catch(function(err){ errors++; console.warn('reports fetch:', entry.inn, err); });
+          .catch(function(err){
+            clearTimeout(t);
+            errors++;
+          });
       }));
       var done = Math.min(ti + BATCH, total);
       setBtn('↻ ' + done + '/' + total);
@@ -889,6 +897,7 @@ window._repHasMoexBonds = function(id, iss){
 
 // Обработка status='has_moex'/'corp_moex' — оригинал не знает эти коды
 var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
+var _NON_CORP_SECTORS = { state: 1, services: 1 }; // гос. управление и подобные
 (function(){
   var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
@@ -910,8 +919,10 @@ var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
           if(!m){ shown++; return; }
           var iss = reportsDB[m[1]];
           var hasB = iss && (iss.bondsCount > 0);
-          // corp_moex: дополнительно исключаем субфедеральные/мун./ОФЗ/банки
-          var isCorpOk = origVal !== 'corp_moex' || (iss && !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank');
+          // corp_moex: исключаем субфедеральные/мун./ОФЗ/банки/гос.сектор
+          var isCorpOk = origVal !== 'corp_moex' || (iss &&
+            !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank' &&
+            !_NON_CORP_SECTORS[iss.ind]);
           if(!hasB || !isCorpOk) el.style.display = 'none';
           else shown++;
         });
