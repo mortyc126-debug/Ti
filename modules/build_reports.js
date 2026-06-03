@@ -1005,6 +1005,163 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
       .catch(function(e){ console.warn('affiliations fetch:', id, e); });
   };
 })();
+
+// ── Визуальные улучшения ───────────────────────────────────────────────────
+// Цветная левая полоска в карточках + мини-бар запаса прочности
+function _repPostStyleCards(){
+  var listEl = document.getElementById('rep-sidebar-list');
+  if(!listEl) return;
+  listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
+    if(el.dataset.styled) return;
+    el.dataset.styled = '1';
+    var oc = el.getAttribute('onclick') || '';
+    var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+    if(!m) return;
+    var id = m[1];
+    var iss = (reportsDB||{})[id];
+    if(!iss) return;
+    var mult = _repCalcMultipliers(iss);
+    var de = mult.de;
+    // Цвет по уровню долговой нагрузки
+    var riskColor = (de == null || !isFinite(de)) ? 'var(--border)'
+      : de <= 3   ? 'var(--green)'
+      : de <= 5   ? 'var(--warn)'
+      : 'var(--danger)';
+    // Убираем box border, ставим только левую полоску + тонкую рамку
+    var isActive = String(repActiveIssuerId) === String(id);
+    if(!isActive){
+      el.style.borderLeft = '3px solid ' + riskColor;
+      el.style.borderTop = '1px solid var(--border)';
+      el.style.borderRight = '1px solid var(--border)';
+      el.style.borderBottom = '1px solid var(--border)';
+    }
+    // Мини-бар запаса прочности если данных нет — не добавляем
+    if(typeof _repStressScore !== 'function') return;
+    var st = _repStressScore(iss);
+    if(st.score == null) return;
+    var sc = st.score;
+    var barColor = sc >= 60 ? 'var(--green)' : sc >= 35 ? 'var(--warn)' : 'var(--danger)';
+    var barHtml = '<div style="display:flex;align-items:center;gap:4px;margin-top:3px">'
+      + '<div style="flex:1;height:3px;background:var(--s2);border-radius:2px;overflow:hidden">'
+      + '<div style="width:' + sc + '%;height:100%;background:' + barColor + ';border-radius:2px"></div>'
+      + '</div>'
+      + '<span style="font-size:.48rem;color:' + barColor + ';font-family:var(--mono);white-space:nowrap">' + sc + '</span>'
+      + '</div>';
+    el.insertAdjacentHTML('beforeend', barHtml);
+  });
+}
+
+// Заменяем _repRenderActiveIssuerHeader: вставляем строку пилюль ПЕРЕД стресс-тайлом
+(function(){
+  var _origHeader = _repRenderActiveIssuerHeader;
+  window._repRenderActiveIssuerHeader = function(){
+    _origHeader();
+    var box = document.getElementById('rep-issuer-header');
+    if(!box) return;
+    var iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
+    if(!iss) return;
+    // Убираем старую строку пилюль если уже вставляли
+    var old = box.querySelector('.rep-metrics-pills');
+    if(old) old.remove();
+    var mult = _repCalcMultipliers(iss);
+    var lp = _repLatestPeriod ? _repLatestPeriod(iss) : null;
+    var p = lp ? lp.period : null;
+    function pill(label, val, fmt, good, warn, bad){
+      var txt = (val == null || !isFinite(val)) ? '—' : (fmt === 'pct' ? (val*100).toFixed(1)+'%' : val.toFixed(1)+'×');
+      var col = (val == null || !isFinite(val)) ? 'var(--text3)'
+        : (val <= good) ? 'var(--green)'
+        : (val <= warn)  ? 'var(--warn)'
+        : 'var(--danger)';
+      // Для метрик где "больше = лучше" инвертируем
+      return '<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;'
+        + 'background:var(--bg);border:1px solid ' + col + ';border-radius:12px;'
+        + 'font-size:.58rem;font-family:var(--mono);color:var(--text3)">'
+        + '<span style="font-size:.52rem">' + label + '</span>'
+        + '<span style="color:' + col + ';font-weight:600">' + txt + '</span>'
+        + '</span>';
+    }
+    function pillHigh(label, val, fmt, bad, warn, good){
+      // "больше = лучше"
+      var txt = (val == null || !isFinite(val)) ? '—' : (fmt === 'pct' ? (val*100).toFixed(1)+'%' : val.toFixed(1)+'×');
+      var col = (val == null || !isFinite(val)) ? 'var(--text3)'
+        : (val >= good) ? 'var(--green)'
+        : (val >= warn)  ? 'var(--warn)'
+        : 'var(--danger)';
+      return '<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;'
+        + 'background:var(--bg);border:1px solid ' + col + ';border-radius:12px;'
+        + 'font-size:.58rem;font-family:var(--mono);color:var(--text3)">'
+        + '<span style="font-size:.52rem">' + label + '</span>'
+        + '<span style="color:' + col + ';font-weight:600">' + txt + '</span>'
+        + '</span>';
+    }
+    var ebitdaMargin = (p && p.ebitda != null && p.rev > 0) ? p.ebitda / p.rev : null;
+    var roa = (p && p.np != null && p.assets > 0) ? p.np / p.assets : null;
+    var ndEbitda = (p && p.debt != null && p.cash != null && p.ebitda > 0) ? (p.debt - p.cash) / p.ebitda : null;
+    var pills = '<div class="rep-metrics-pills" style="display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 4px">'
+      + pill('Д/EBITDA', mult.de, 'x', 2.5, 4.5, 999)
+      + pill('ЧД/EBITDA', ndEbitda, 'x', 2.5, 4.0, 999)
+      + pillHigh('ICR', mult.icr, 'x', 0, 1.5, 3.0)
+      + pillHigh('ROA', roa, 'pct', 0, 0.03, 0.10)
+      + pillHigh('EBITDA%', ebitdaMargin, 'pct', 0, 0.10, 0.25)
+      + pill('D/E', mult.dde, 'x', 1.0, 2.5, 999)
+      + pillHigh('Текущ.', mult.cur, 'x', 0, 1.0, 1.5)
+      + '</div>';
+    // Вставляем после первой строки (имя/ИНН/отрасль), перед стресс-тайлом
+    var stTile = box.querySelector('[title*="Запас прочности"]');
+    if(stTile){
+      stTile.insertAdjacentHTML('beforebegin', pills);
+    } else {
+      box.insertAdjacentHTML('beforeend', pills);
+    }
+  };
+})();
+
+// Индикатор полноты периода в табах (● полный / ◐ частичный / ○ пустой)
+(function(){
+  var _origBuild = typeof repBuildPeriodTabs === 'function' ? repBuildPeriodTabs : null;
+  if(!_origBuild) return;
+  window.repBuildPeriodTabs = function(){
+    _origBuild();
+    // После рендера табов — добавить индикатор в каждый таб
+    var tabsEl = document.getElementById('rep-period-tabs') || document.querySelector('.rep-period-tabs-wrap');
+    if(!tabsEl) return;
+    var iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
+    if(!iss || !iss.periods) return;
+    tabsEl.querySelectorAll('[data-pkey],[onclick*="repSelectPeriod"]').forEach(function(btn){
+      var pkey = btn.dataset.pkey;
+      if(!pkey){
+        var oc = btn.getAttribute('onclick')||'';
+        var m = oc.match(/repSelectPeriod\(['"]([^'"]+)['"]\)/);
+        if(m) pkey = m[1];
+      }
+      if(!pkey) return;
+      var pd = iss.periods[pkey];
+      if(!pd) return;
+      var fields = ['rev','ebitda','ebit','np','int','tax','assets','ca','cl','debt','cash','eq'];
+      var filled = fields.filter(function(f){ return pd[f] != null; }).length;
+      var dot = filled >= 10 ? '●' : filled >= 5 ? '◐' : '○';
+      var dotColor = filled >= 10 ? 'var(--green)' : filled >= 5 ? 'var(--warn)' : 'var(--text3)';
+      // Убрать старый dot если уже добавлен
+      var old = btn.querySelector('.pkey-dot');
+      if(old) old.remove();
+      var dotEl = document.createElement('span');
+      dotEl.className = 'pkey-dot';
+      dotEl.style.cssText = 'font-size:.55rem;color:' + dotColor + ';margin-left:3px';
+      dotEl.title = filled + '/12 полей заполнено';
+      dotEl.textContent = dot;
+      btn.appendChild(dotEl);
+    });
+  };
+})();
+
+// Запускаем постобработку карточек после каждого repRenderIssuerList
+(function(){
+  var _origRIL2 = window.repRenderIssuerList;
+  window.repRenderIssuerList = function(){
+    _origRIL2();
+    setTimeout(_repPostStyleCards, 0);
+  };
+})();
 `;
 
 const out = `<!DOCTYPE html>
