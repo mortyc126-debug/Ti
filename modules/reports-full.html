@@ -206,7 +206,7 @@ tr:hover td{background:rgba(255,255,255,0.012);color:var(--text)}
 .d-vals{display:flex;align-items:baseline;gap:4px;flex-shrink:0;font-family:var(--mono);font-size:10.5px;margin-left:auto}
 .d-old{color:var(--t3)}.d-arr{color:var(--t3);font-size:9px}.d-new{font-weight:600;color:var(--t)}
 .d-new.red{color:var(--neg)}.d-new.wrn{color:var(--warn)}
-.d-bar{height:4px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden}
+.d-bar{height:4px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden;max-width:200px}
 .d-bar-ax{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)}
 .d-bar-f{position:absolute;top:0;bottom:0}
 
@@ -216,7 +216,7 @@ tr:hover td{background:rgba(255,255,255,0.012);color:var(--text)}
 .rrow:hover{background:rgba(255,255,255,0.013)}
 .rrow-top{display:flex;align-items:baseline;gap:7px;margin-bottom:5px;flex-wrap:wrap}
 .r-norm{margin-left:auto;font-size:9px;color:var(--t3);font-family:var(--mono)}
-.r-track{height:5px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden}
+.r-track{height:5px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden;max-width:240px}
 .r-zone{position:absolute;top:0;bottom:0}
 .r-fill{position:absolute;left:0;top:0;bottom:0}
 .r-prev{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.5);z-index:2}
@@ -330,7 +330,7 @@ details summary{outline:none}
   <div style="display:flex;gap:14px;align-items:flex-start;margin-top:10px">
   <!-- Sidebar со списком эмитентов: постоянно виден, с поиском, сортировкой
        по мультипликаторам и фильтром по году последнего отчёта. -->
-  <div id="rep-sidebar" style="width:320px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--brdm);overflow:hidden">
+  <div id="rep-sidebar" style="width:400px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--brdm);overflow:hidden">
 
   <!-- Поиск -->
   <div style="padding:9px 10px 8px;border-bottom:1px solid var(--brd);flex-shrink:0">
@@ -29181,10 +29181,10 @@ function _repRenderMfGrid(){
     var rng=window._repMfRange[d.key]||{};
     return '<div class="'+cls+'" id="'+d.id+'" onclick="cycleMfSort(\''+d.id+'\')">'
       +'<div class="mf-lbl">'+d.lbl+'</div>'
-      +'<div class="mf-inputs" onclick="event.stopPropagation()">'
-      +'<input class="mf-in" placeholder="min" value="'+(rng.min!=null?rng.min:'')+'" oninput="_repMfOnInput(\''+d.id+'\')">'
+      +'<div class="mf-inputs">'
+      +'<input class="mf-in" placeholder="min" value="'+(rng.min!=null?rng.min:'')+'" onclick="event.stopPropagation()" oninput="_repMfOnInput(\''+d.id+'\')">'
       +'<span class="mf-sep">–</span>'
-      +'<input class="mf-in" placeholder="max" value="'+(rng.max!=null?rng.max:'')+'" oninput="_repMfOnInput(\''+d.id+'\')">'
+      +'<input class="mf-in" placeholder="max" value="'+(rng.max!=null?rng.max:'')+'" onclick="event.stopPropagation()" oninput="_repMfOnInput(\''+d.id+'\')">'
       +(d.unit?'<span class="mf-unit">'+d.unit+'</span>':'')
       +'</div>'
       +'<div class="mf-sort" onclick="event.stopPropagation();resetMf(\''+d.id+'\')">'+stx+'</div>'
