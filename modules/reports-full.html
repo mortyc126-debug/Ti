@@ -135,7 +135,7 @@ tr:hover td{background:rgba(255,255,255,0.012);color:var(--text)}
 .iss-item:hover{background:rgba(255,255,255,0.016);border-color:var(--brdm)}
 .iss-item[data-active="1"]{background:var(--card);border-color:var(--brdm);box-shadow:var(--glow)}
 .iss-item[data-active="1"]::before{background:var(--acc)}
-.iss-name{font-size:11px;font-weight:600;color:var(--t);line-height:1.3;margin-bottom:2px;
+.iss-name{font-size:13px;font-weight:600;color:var(--t);line-height:1.3;margin-bottom:2px;
   display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .iss-meta{font-size:9px;color:var(--t3);font-family:var(--mono);
   display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
@@ -28635,7 +28635,7 @@ window._repHasMoexBonds = function(id, iss){
 // Обработка status='has_moex'/'corp_moex' — оригинал не знает эти коды
 var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
 var _NON_CORP_SECTORS = { state: 1 };
-var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление)/i;
+var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление|муниципальн|мбу|мку|мао|маоу|мбоу|гбу|гку|гуп|муп|фгуп|фку|фгку|казна|казённ|государственн.*учрежд|бюджетн.*учрежд)/i;
 (function(){
   var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
@@ -28785,8 +28785,7 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
 // ── Генератор новой шапки эмитента (.iss-hdr) ─────────────────────────────
 function _repBuildIssuerHeader(iss, issId){
   var indKey = iss.ind||'other';
-  var indLabel = (window._industryData&&window._industryData.industries&&
-    window._industryData.industries[indKey]&&window._industryData.industries[indKey].label)||indKey;
+  var indLabel = _indLbl(indKey);
   var innStr = iss.inn ? '<span>ИНН <strong style="color:var(--t2);font-weight:600">'+_escHtml(iss.inn)+'</strong></span><span>·</span>' : '';
   var ratingsHtml = '';
   if(Array.isArray(iss.ratings)&&iss.ratings.length){
@@ -29095,7 +29094,7 @@ function _repRenderIssuerCard(id, iss){
   var de=m.de;
   var stripe=(de==null||!isFinite(de))?'rgba(255,255,255,0.08)':de<=2.5?'rgba(82,242,201,0.7)':de<=4.5?'rgba(232,137,90,0.7)':'rgba(255,77,122,0.7)';
   var indKey=iss.ind||'other';
-  var indLabel=(window._industryData&&window._industryData.industries&&window._industryData.industries[indKey]&&window._industryData.industries[indKey].label)||indKey;
+  var indLabel=_indLbl(indKey);
   var ratingHtml='';
   if(Array.isArray(iss.ratings)&&iss.ratings.length){
     var best=iss.ratings.slice().sort(function(a,b){return((typeof _ratingRank==='function'&&_ratingRank(b.rating))||0)-((typeof _ratingRank==='function'&&_ratingRank(a.rating))||0);})[0];
@@ -29155,6 +29154,28 @@ function _repRenderIssuerCard(id, iss){
 })();
 
 // ── Мультипликаторы — определения ────────────────────────────────────────
+// Статический фолбэк русских названий отраслей (на случай если _industryData ещё не загружен)
+var _IND_LABELS_RU = {
+  oil_gas:'Нефть и газ', metals_mining:'Металлы и добыча', metals_products:'Металлоизделия',
+  machinery:'Машиностроение', auto_transport:'Автомобили, транспортная техника',
+  electronics:'Электроника и электрооборудование', chemistry:'Химия и удобрения',
+  pharma:'Фармацевтика', plastics:'Пластмассы и резина', construction_materials:'Стройматериалы',
+  wood_paper:'Дерево, бумага, печать', textile:'Текстиль и одежда', furniture:'Мебель и прочее',
+  agro_food:'Агро и пищевая', energy_utilities:'Электроэнергетика и ЖКХ',
+  construction:'Строительство и девелопмент', real_estate:'Недвижимость', retail:'Ритейл и опт',
+  transport:'Транспорт и логистика', hospitality:'Гостиницы и общепит', media:'Медиа и связь',
+  telecom:'Телеком', it:'IT и разработка ПО', banks:'Банки', insurance:'Страхование',
+  leasing:'Лизинг', mfo:'МФО и потребкредитование', holding:'Холдинги / SPV',
+  prof_services:'Проф. услуги, консалтинг', science:'Наука и R&D',
+  state:'Гос. органы и муниципалитеты', other:'Прочее'
+};
+function _indLbl(key){
+  if(!key) return '—';
+  var d=window._industryData;
+  if(d&&d.industries&&d.industries[key]&&d.industries[key].label) return d.industries[key].label;
+  return _IND_LABELS_RU[key]||key;
+}
+
 var _MF_DEFS = [
   {id:'mf-de',  key:'de',  lbl:'Долг/EBITDA', loBetter:true},
   {id:'mf-nd',  key:'nd',  lbl:'ЧД/EBITDA',   loBetter:true},
@@ -29281,7 +29302,7 @@ function _repRenderIndChips(){
   var box=document.getElementById('ind-chips'); if(!box) return;
   if(!window._repIndFilter) window._repIndFilter=new Set();
   var inds=(window._industryData&&window._industryData.industries)||{};
-  var entries=Object.keys(inds).map(function(k){return [k,(inds[k]&&inds[k].label)||k];});
+  var entries=Object.keys(inds).map(function(k){return [k,_indLbl(k)];});
   entries.sort(function(a,b){if(a[0]==='other')return 1;if(b[0]==='other')return -1;return a[1].localeCompare(b[1],'ru');});
   if(!entries.length){box.innerHTML='<span style="font-size:9px;color:var(--t3)">нет данных</span>';return;}
   box.innerHTML=entries.map(function(e){
