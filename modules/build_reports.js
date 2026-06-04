@@ -95,18 +95,19 @@ const newSidebar = `<div id="rep-sidebar" style="width:400px;flex-shrink:0;posit
     <div class="fs" id="fs-mult">
       <div class="fs-hdr" onclick="toggleFs('fs-mult')">Мультипликаторы<span class="fs-chev">▾</span></div>
       <div class="fs-body" style="padding-bottom:8px">
-        <div class="mf-hint">Клик по названию — сортировка ↑↓. Поля — диапазон. × — сброс.</div>
+        <div style="display:flex;align-items:center;gap:6px;padding:4px 8px 6px;border-bottom:1px solid rgba(255,255,255,0.06)">
+          <span class="f-lbl" style="padding-top:0;flex-shrink:0">Вид:</span>
+          <button class="mf-mode-btn active" id="mf-mode-sum" onclick="_repSetMfMode('sum')">Сумма</button>
+          <button class="mf-mode-btn" id="mf-mode-queue" onclick="_repSetMfMode('queue')">Очередь</button>
+        </div>
+        <div class="mf-hint" id="mf-hint-text">Клик — добавить в скоринг ↑↓. × — сброс. Поля — диапазон фильтра.</div>
         <div class="mf-grid" id="mf-grid"></div>
         <div style="margin-top:6px;display:flex;align-items:center;gap:5px">
           <span class="f-lbl" style="padding-top:0">Сорт.</span>
-          <select id="rep-sidebar-sort" onchange="window._repMfSort=null;repRenderIssuerList()" class="f-select">
+          <select id="rep-sidebar-sort" onchange="window._repMfSorts=[];_repRenderMfGrid();repRenderIssuerList()" class="f-select">
             <option value="name_asc">Имя А → Я</option>
             <option value="name_desc">Имя Я → А</option>
             <option value="year_desc">Свежесть</option>
-            <option value="de_best">Долг/EBITDA ↑</option>
-            <option value="de_worst">Долг/EBITDA ↓</option>
-            <option value="icr_best">ICR ↑</option>
-            <option value="icr_worst">ICR ↓</option>
           </select>
         </div>
       </div>
@@ -213,6 +214,9 @@ html,body{overflow:auto!important;background:linear-gradient(180deg,#0A0615 0%,#
 
 .page{display:none;padding:16px 20px}
 #page-reports{display:block!important}
+/* Правая панель скроллится независимо, не выезжает за экран */
+#page-reports>div[style*="display:flex"]{align-items:stretch!important}
+#page-reports>div[style*="display:flex"]>div[style*="flex:1"]{overflow-y:auto;max-height:calc(100vh - 70px);min-width:0}
 
 /* Скроллбар */
 ::-webkit-scrollbar{width:8px;height:8px}
@@ -472,7 +476,10 @@ details summary{outline:none}
 .mf-unit{font-size:8px;color:var(--t3)}
 .mf-sort{padding:4px 6px;font-size:9px;color:var(--t3);cursor:pointer;border-left:1px solid var(--brd);background:transparent;transition:all .1s;flex-shrink:0}
 .mf-sort:hover{color:var(--t);background:rgba(255,255,255,0.03)}
-.mf-hint{font-size:8.5px;color:var(--t3);margin-bottom:6px;line-height:1.5}
+.mf-hint{font-size:8.5px;color:var(--t3);margin-bottom:6px;line-height:1.5;padding:4px 8px}
+.mf-mode-btn{font-size:9px;padding:2px 9px;border:1px solid var(--brd);background:transparent;color:var(--t3);cursor:pointer;border-radius:3px;transition:all .1s}
+.mf-mode-btn.active{background:rgba(255,0,128,0.1);border-color:rgba(255,0,128,0.4);color:var(--acc)}
+.mf-badge{display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;width:13px;height:13px;border-radius:2px;background:rgba(82,242,201,0.15);color:var(--pos);margin-right:2px;flex-shrink:0}
 `;
 
 // localStorage прокси — если браузер блокирует в blob-iframe
@@ -1622,18 +1629,37 @@ function _repGetMult(iss){
   return {de:m.de, nd:nd, icr:m.icr, roa:roa, em:em, dde:m.dde, cur:m.cur, eq:eq};
 }
 
+// _repMfMode: 'sum' (скоринг по сумме перцентилей) | 'queue' (последовательная сортировка)
+if(!window._repMfMode) window._repMfMode='sum';
+if(!window._repMfSorts) window._repMfSorts=[];  // [{id,key,dir}, ...]
+if(!window._repMfRange) window._repMfRange={};
+
+function _repSetMfMode(mode){
+  window._repMfMode=mode;
+  document.querySelectorAll('.mf-mode-btn').forEach(function(b){b.classList.toggle('active',b.id==='mf-mode-'+mode);});
+  var hint=document.getElementById('mf-hint-text');
+  if(hint) hint.textContent=mode==='sum'
+    ?'Клик — добавить в скоринг ↑↓. × — сброс. Поля — диапазон фильтра.'
+    :'Клик — добавить в очередь ①②③. × — сброс. Поля — диапазон фильтра.';
+  _repRenderMfGrid(); repRenderIssuerList();
+}
+
 function _repRenderMfGrid(){
   var grid=document.getElementById('mf-grid'); if(!grid) return;
-  if(!window._repMfSort) window._repMfSort=null;
+  if(!window._repMfSorts) window._repMfSorts=[];
   if(!window._repMfRange) window._repMfRange={};
+  var mode=window._repMfMode||'sum';
+  var numBadges=['\\u2460','\\u2461','\\u2462','\\u2463','\\u2464','\\u2465','\\u2466','\\u2467'];
   grid.innerHTML=_MF_DEFS.map(function(d){
-    var act=window._repMfSort&&window._repMfSort.id===d.id;
-    var dir=act?window._repMfSort.dir:null;
+    var si=window._repMfSorts.findIndex(function(s){return s.id===d.id;});
+    var act=si>=0;
+    var dir=act?window._repMfSorts[si].dir:null;
     var cls='mf-row'+(act?(dir==='asc'?' sort-asc':' sort-desc'):'');
+    var badge=act?(mode==='queue'?'<span class="mf-badge">'+numBadges[si]+'</span>':''):'';
     var stx=act?(dir==='asc'?'\\u2191':'\\u2193'):'\\u00d7';
     var rng=window._repMfRange[d.key]||{};
     return '<div class="'+cls+'" id="'+d.id+'" onclick="cycleMfSort(\\\''+d.id+'\\\')">'
-      +'<div class="mf-lbl">'+d.lbl+'</div>'
+      +'<div class="mf-lbl">'+badge+d.lbl+'</div>'
       +'<div class="mf-inputs">'
       +'<input class="mf-in" placeholder="min" value="'+(rng.min!=null?rng.min:'')+'" onclick="event.stopPropagation()" oninput="_repMfOnInput(\\\''+d.id+'\\\')">'
       +'<span class="mf-sep">–</span>'
@@ -1646,22 +1672,29 @@ function _repRenderMfGrid(){
 }
 
 function cycleMfSort(id){
-  if(!window._repMfSort) window._repMfSort=null;
+  if(!window._repMfSorts) window._repMfSorts=[];
   var def=null; for(var i=0;i<_MF_DEFS.length;i++){if(_MF_DEFS[i].id===id){def=_MF_DEFS[i];break;}} if(!def) return;
   var first=def.loBetter?'asc':'desc', second=def.loBetter?'desc':'asc';
-  if(!window._repMfSort||window._repMfSort.id!==id) window._repMfSort={id:id,key:def.key,dir:first};
-  else if(window._repMfSort.dir===first) window._repMfSort.dir=second;
-  else window._repMfSort=null;
+  var si=window._repMfSorts.findIndex(function(s){return s.id===id;});
+  if(si<0){
+    window._repMfSorts.push({id:id,key:def.key,dir:first});
+  } else if(window._repMfSorts[si].dir===first){
+    window._repMfSorts[si].dir=second;
+  } else {
+    window._repMfSorts.splice(si,1);
+  }
   _repRenderMfGrid(); repRenderIssuerList();
 }
 
 function resetMf(id){
+  if(!window._repMfSorts) window._repMfSorts=[];
+  var si=window._repMfSorts.findIndex(function(s){return s.id===id;});
+  if(si>=0) window._repMfSorts.splice(si,1);
   var row=document.getElementById(id);
-  if(row){row.classList.remove('sort-asc','sort-desc');var sb=row.querySelector('.mf-sort');if(sb)sb.textContent='×';row.querySelectorAll('.mf-in').forEach(function(i){i.value='';});}
+  if(row){row.querySelectorAll('.mf-in').forEach(function(i){i.value='';});}
   var def=null; for(var i=0;i<_MF_DEFS.length;i++){if(_MF_DEFS[i].id===id){def=_MF_DEFS[i];break;}}
   if(def){if(!window._repMfRange)window._repMfRange={};delete window._repMfRange[def.key];}
-  if(window._repMfSort&&window._repMfSort.id===id) window._repMfSort=null;
-  repRenderIssuerList();
+  _repRenderMfGrid(); repRenderIssuerList();
 }
 
 function _repMfOnInput(id){
@@ -1742,11 +1775,18 @@ function _repToggleInd(key){
 (function(){
   var _orig=window.repInit;
   window.repInit=function(){
+    var savedId=(typeof repActiveIssuerId!=='undefined'&&repActiveIssuerId)?repActiveIssuerId:null;
     if(_orig) _orig();
     _repRenderRatingChips();
     _repRenderMfGrid();
+    // Синхронизируем кнопки режима mf
+    document.querySelectorAll('.mf-mode-btn').forEach(function(b){b.classList.toggle('active',b.id==='mf-mode-'+(window._repMfMode||'sum'));});
     var tf=(typeof repTypeFilter!=='undefined')?repTypeFilter:'all';
     document.querySelectorAll('.rep-tf-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tf===tf);});
+    // Восстанавливаем выбранного эмитента если был открыт
+    if(savedId&&(reportsDB||{})[savedId]&&typeof repSelectIssuerById==='function'){
+      setTimeout(function(){repSelectIssuerById(savedId);},30);
+    }
   };
 })();
 
@@ -1799,18 +1839,49 @@ function _repToggleInd(key){
         }
       });
     }
-    // Сортировка по mf
-    if(window._repMfSort&&window._repMfSort.key){
+    // Сортировка по mf (Сумма или Очередь)
+    var sorts=window._repMfSorts||[];
+    if(sorts.length>0){
       var items=Array.from(listEl.querySelectorAll('.rep-issuer-item')).filter(function(el){return el.style.display!=='none';});
-      items.sort(function(a,b){
-        var am=(a.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
-        var bm=(b.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
-        if(!am||!bm) return 0;
-        var ai=(reportsDB||{})[am[1]],bi=(reportsDB||{})[bm[1]]; if(!ai||!bi) return 0;
-        var av=_repGetMult(ai)[window._repMfSort.key],bv=_repGetMult(bi)[window._repMfSort.key];
-        if(av==null&&bv==null) return 0; if(av==null) return 1; if(bv==null) return -1;
-        return window._repMfSort.dir==='asc'?av-bv:bv-av;
-      });
+      var mode=window._repMfMode||'sum';
+      if(mode==='sum'){
+        // Скоринг: для каждого критерия считаем перцентиль, суммируем
+        var vals=sorts.map(function(s){
+          return items.map(function(el){
+            var mm=(el.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return null;
+            var iss=(reportsDB||{})[mm[1]]; if(!iss) return null;
+            return _repGetMult(iss)[s.key];
+          });
+        });
+        var scores=items.map(function(_,i){
+          var total=0;
+          sorts.forEach(function(s,si){
+            var v=vals[si][i]; if(v==null||!isFinite(v)) return;
+            var rank=0; vals[si].forEach(function(ov){if(ov!=null&&isFinite(ov)&&ov<v)rank++;});
+            var pct=vals[si].filter(function(x){return x!=null&&isFinite(x);}).length;
+            var score=pct>1?rank/(pct-1)*100:50;
+            total+=s.dir==='asc'?(100-score):score;
+          });
+          return total;
+        });
+        items.sort(function(a,b){return scores[items.indexOf(b)]-scores[items.indexOf(a)];});
+      } else {
+        // Очередь: лексикографическая сортировка
+        items.sort(function(a,b){
+          for(var si=0;si<sorts.length;si++){
+            var s=sorts[si];
+            var am=(a.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
+            var bm=(b.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
+            if(!am||!bm) continue;
+            var ai=(reportsDB||{})[am[1]],bi=(reportsDB||{})[bm[1]]; if(!ai||!bi) continue;
+            var av=_repGetMult(ai)[s.key],bv=_repGetMult(bi)[s.key];
+            if(av==null&&bv==null) continue; if(av==null) return 1; if(bv==null) return -1;
+            var cmp=s.dir==='asc'?av-bv:bv-av;
+            if(cmp!==0) return cmp;
+          }
+          return 0;
+        });
+      }
       items.forEach(function(el){listEl.appendChild(el);});
     }
   };
