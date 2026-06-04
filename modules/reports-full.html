@@ -28699,6 +28699,21 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
     '.rhp-n{border-color:var(--brdp);background:rgba(255,255,255,.02);color:var(--t3)}',
     '#rep-dyn-panel{margin-bottom:4px}',
     '.score-comps{font-size:9px;color:var(--t3);font-family:var(--mono)}',
+    // Фильтр-чипы из макета
+    '.yr{padding:2px 7px;border:1px solid var(--brd);background:transparent;color:var(--t3);font-size:10px;font-family:var(--mono);font-weight:600;cursor:pointer;border-radius:0;transition:all .1s}',
+    '.yr:hover{border-color:var(--acc);color:var(--acc)}',
+    '.yr.active{background:rgba(255,0,128,0.08);border-color:rgba(255,0,128,0.4);color:var(--acc)}',
+    '.ic{padding:2px 7px;border:1px solid var(--brd);background:transparent;color:var(--t3);font-size:9.5px;cursor:pointer;border-radius:0;transition:all .1s;line-height:1.4}',
+    '.ic:hover{border-color:rgba(170,90,255,0.3);color:var(--t2)}',
+    '.ic.active{background:rgba(170,90,255,0.1);border-color:rgba(170,90,255,0.45);color:var(--pur)}',
+    '.rc{padding:2px 7px;border:1px solid var(--brd);background:transparent;color:var(--t3);font-size:10px;font-family:var(--mono);font-weight:600;cursor:pointer;border-radius:0;transition:all .1s}',
+    '.rc:hover{border-color:rgba(170,90,255,0.35);color:var(--t2)}',
+    '.rc.active{background:rgba(170,90,255,0.12);border-color:rgba(170,90,255,0.5);color:var(--pur)}',
+    '.yr-chips,.rating-chips,.industry-chips{display:flex;flex-wrap:wrap;gap:3px}',
+    // Секции фильтра (аккордеон в сайдбаре)
+    '#rep-filter-details summary{font-size:9px!important;letter-spacing:.12em}',
+    '#rep-filter-details select{font-size:10px!important;padding:4px 7px!important}',
+    '#rep-filter-details label span:first-child{font-size:9px!important;letter-spacing:.09em!important}',
   ].join('');
   document.head.appendChild(st);
 })();
@@ -28854,7 +28869,7 @@ function _repBuildIssuerHeader(iss, issId){
 function _repBuildDynPanel(iss){
   var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
   if(!lp) return '';
-  var p = lp.period, pkey = lp.pkey;
+  var p = lp.period, pkey = lp.key;
   var periods = Object.keys(iss.periods||{}).sort(function(a,b){
     var pa=iss.periods[a],pb=iss.periods[b];
     return ((pa.year||0)*100+(pa.period==='Год'?12:pa.period==='9М'?9:pa.period==='Полугодие'?6:3))
@@ -28863,7 +28878,15 @@ function _repBuildDynPanel(iss){
   var ci=periods.indexOf(pkey);
   var prev=ci>0?iss.periods[periods[ci-1]]:null;
   var fmt=function(v){if(v==null||!isFinite(v))return '—';return Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);};
-  var fmtBn=function(v){if(v==null||!isFinite(v))return '—';return(Math.abs(v)>=1000?(v/1000).toFixed(0)+'T':Math.abs(v)>=100?v.toFixed(0):v.toFixed(1))+' млрд ₽';};
+  var fmtBn=function(v){
+    if(v==null||!isFinite(v))return '—';
+    var av=Math.abs(v);
+    if(av>=1000) return (v/1000).toFixed(1)+' трлн ₽';
+    if(av>=1)    return (av>=100?v.toFixed(0):av>=10?v.toFixed(1):v.toFixed(2))+' млрд ₽';
+    if(av>=0.001)return (v*1000).toFixed(av>=0.1?0:1)+' млн ₽';
+    if(av>0)     return (v*1000000).toFixed(0)+' тыс ₽';
+    return '0';
+  };
 
   function drow(lbl, key, bold, isDebtLike){
     var cur=p[key],prv=prev?prev[key]:null;
@@ -28875,8 +28898,9 @@ function _repBuildDynPanel(iss){
     var arrow=delta==null?'':delta>0?'▲ +':'▼ ';
     var deltaStr=delta!=null?'<span style="font-size:11px;font-family:var(--mono);font-weight:700;color:'+dColor+'">'+arrow+(deltaPct!=null?Math.abs(deltaPct).toFixed(1)+'%':fmtBn(Math.abs(delta)))+'</span>':'';
     var barW=deltaPct!=null?Math.min(45,Math.abs(deltaPct)/2):0;
-    var barSide=delta!=null&&delta>0?'left:50%;background:rgba(82,242,201,0.55)':'right:50%;background:rgba(255,77,122,0.55)';
-    if(dir==='neg'&&delta!=null) barSide=delta>0?'left:50%;background:rgba(255,77,122,0.65)':'right:50%;background:rgba(82,242,201,0.55)';
+    var isGood=delta==null?null:(isDebtLike?delta<0:delta>0);
+    var barColor=isGood===null?'':(isGood?'rgba(82,242,201,0.55)':'rgba(255,77,122,0.65)');
+    var barSide=delta!=null?(delta>0?'left:50%':'right:50%')+';background:'+barColor:'';
     var valClass=(cur<0||(isDebtLike&&delta!=null&&delta>0))?'red':'';
     return '<div class="drow'+(bold?' key':'')+'">'
       +'<div class="drow-top"><div class="d-lbl'+(bold?' bold':'')+'">'+_escHtml(lbl)+'</div>'
@@ -28910,8 +28934,8 @@ function _repBuildDynPanel(iss){
       +'</div><div class="r-track">'
       +'<div class="r-zone" style="'+zGood+'"></div>'
       +'<div class="r-zone" style="'+zBad+'"></div>'
-      +'<div class="r-fill" style="width:'+fillPct+'%;background:'+fillColor+'"></div>'
-      +(prevPct!=null?'<div class="r-prev" style="left:'+prevPct+'%"></div>':'')
+      +'<div class="r-fill" style="'+(lowerBetter?'left:0':'right:0;left:auto')+';width:'+fillPct+'%;background:'+fillColor+'"></div>'
+      +(prevPct!=null?'<div class="r-prev" style="'+(lowerBetter?'left:'+prevPct+'%':'right:'+prevPct+'%;left:auto')+'"></div>':'')
       +'<div class="r-nl" style="left:'+normPct+'%"></div>'
       +'</div><div class="r-ticks">'
       +'<span class="r-tick-start">'+scaleMin+unit+'</span>'
@@ -29062,6 +29086,26 @@ function _repRenderIssuerCard(id, iss){
       if(wasHidden) card.style.display='none';
       el.parentNode.replaceChild(card,el);
     });
+  };
+})();
+
+// ── Override repRenderYearFilter — используем .yr чипы вместо inline-стилей ──
+(function(){
+  var _origRYF = window.repRenderYearFilter;
+  window.repRenderYearFilter = function(){
+    var box = document.getElementById('rep-sidebar-years');
+    if(!box){ if(_origRYF) _origRYF(); return; }
+    if(!window._repSidebarYears) window._repSidebarYears = new Set();
+    var sel = window._repSidebarYears;
+    var thisYear = new Date().getFullYear();
+    var html = '<div class="yr-chips">';
+    for(var y=thisYear;y>=thisYear-8;y--){
+      var act=sel.has(y);
+      html+='<button type="button" class="yr'+(act?' active':'')+'" data-year="'+y+'" onclick="repToggleYearFilter('+y+')">'+y+'</button>';
+    }
+    html+='<button type="button" class="yr" style="border-style:dashed;opacity:.6" onclick="repClearYearFilter()">сбр.</button>';
+    html+='</div>';
+    box.innerHTML=html;
   };
 })();
 
