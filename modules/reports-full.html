@@ -15,20 +15,20 @@
   --s2:#1A1030;
   --s3:#221640;
   --border:rgba(255,255,255,0.06);
-  --border2:rgba(170,90,255,0.12);
+  --border2:rgba(255,0,128,0.12);
   --brd:rgba(255,255,255,0.06);
   --brdm:rgba(255,0,128,0.12);
   --brdp:rgba(170,90,255,0.12);
-  --acc:#a78bfa;
-  --acc2:#7c5fc9;
-  --acc-dim:rgba(167,139,250,.1);
+  --acc:#FF006E;
+  --acc2:#cc0058;
+  --acc-dim:rgba(255,0,110,.08);
   --pur:#AA5AFF;
   --green:#52F2C9;
   --green-dim:rgba(82,242,201,.1);
   --warn:#E8895A;
   --danger:#FF4D7A;
   --danger-dim:rgba(255,77,122,.1);
-  --purple:#a78bfa;
+  --purple:#AA5AFF;
   --pos:#52F2C9;
   --neg:#FF4D7A;
   --text:#F2F0FF;
@@ -39,7 +39,7 @@
   --t2:#A79BC9;
   --t3:#6F648F;
   --t4:#7E74A8;
-  --glow:0 0 0 1px rgba(170,90,255,0.08),0 0 18px rgba(170,90,255,0.06),inset 0 0 20px rgba(255,255,255,0.01);
+  --glow:0 0 0 1px rgba(255,0,140,0.05),0 0 18px rgba(255,0,140,0.06),inset 0 0 20px rgba(255,255,255,0.01);
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --sans:'Inter',ui-sans-serif,system-ui,sans-serif;
   --serif:'Cormorant Garamond',Georgia,serif;
@@ -68,8 +68,8 @@ html,body{overflow:auto!important;background:linear-gradient(180deg,#0A0615 0%,#
   transition:all .13s;white-space:nowrap;letter-spacing:.04em}
 .btn:hover{color:var(--text);border-color:var(--brdp);background:rgba(255,255,255,0.04)}
 .btn-sm{font-size:.65rem;padding:3px 8px}
-.btn-p,.btn-primary,.btn-acc{border-color:rgba(167,139,250,.4);color:var(--acc);background:rgba(167,139,250,.08)}
-.btn-p:hover,.btn-primary:hover,.btn-acc:hover{background:rgba(167,139,250,.15)}
+.btn-p,.btn-primary,.btn-acc{border-color:rgba(255,0,110,.4);color:var(--acc);background:rgba(255,0,110,.08)}
+.btn-p:hover,.btn-primary:hover,.btn-acc:hover{background:rgba(255,0,110,.15)}
 .btn-d,.btn-danger{border-color:rgba(255,77,122,.3);color:var(--danger);background:transparent}
 .btn-d:hover{background:var(--danger-dim)}
 .btn.active,.btn-sm.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
@@ -85,7 +85,7 @@ input,select,textarea{
   background:var(--bg);border:1px solid var(--brdp);color:var(--text);
   font-family:var(--sans);font-size:.75rem;padding:5px 9px;
   outline:none;border-radius:0;transition:border .15s}
-input:focus,select:focus{border-color:rgba(167,139,250,.5);box-shadow:none}
+input:focus,select:focus{border-color:rgba(255,0,110,.5);box-shadow:none}
 input::placeholder{color:var(--t3)}
 select option{background:var(--panel);color:var(--text)}
 
@@ -145,7 +145,7 @@ tr:hover td{background:rgba(255,255,255,0.012);color:var(--text)}
 .c-pos{color:var(--pos)}.c-warn{color:var(--warn)}.c-neg{color:var(--neg)}
 
 /* Issuer header */
-.iss-hdr{padding:16px 20px 14px;border-bottom:1px solid rgba(170,90,255,0.18);
+.iss-hdr{padding:16px 20px 14px;border-bottom:1px solid rgba(255,0,128,0.18);
   background:linear-gradient(180deg,rgba(36,20,64,0.95) 0%,rgba(28,14,52,0.85) 100%)}
 .iss-hdr-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:11px}
 .iss-title-blk{flex:1}
@@ -178,7 +178,7 @@ tr:hover td{background:rgba(255,255,255,0.012);color:var(--text)}
   height:1px;background:rgba(26,16,48,0.85)}
 .p-badge{font-size:9px;padding:1px 4px;background:rgba(255,255,255,0.04);
   color:var(--t3);border:1px solid rgba(255,255,255,0.05)}
-.ptab.active .p-badge{background:rgba(167,139,250,.09);color:var(--acc);border-color:rgba(167,139,250,.22)}
+.ptab.active .p-badge{background:rgba(255,0,110,.09);color:var(--acc);border-color:rgba(255,0,110,.22)}
 
 /* Zone accordion */
 .zone{margin-bottom:4px;border:1px solid var(--brd);overflow:hidden}
