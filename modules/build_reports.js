@@ -78,10 +78,11 @@ const newSidebar = `<div id="rep-sidebar" style="width:400px;flex-shrink:0;posit
         <div class="f-row2" style="margin-top:4px">
           <span class="f-lbl">Стат.</span>
           <select id="rep-sidebar-status" onchange="repRenderIssuerList()" class="f-select">
-            <option value="corp_moex" selected>MOEX корп.</option>
-            <option value="has_moex">все с MOEX</option>
+            <option value="corp_clean" selected>Корп. (без гос.)</option>
             <option value="all">все</option>
             <option value="has_periods">есть периоды</option>
+            <option value="corp_moex">MOEX корп.</option>
+            <option value="has_moex">все с MOEX</option>
             <option value="no_periods">нет периодов</option>
             <option value="stale">нет свежего (&gt;2л)</option>
             <option value="no_moex">нет бумаг MOEX</option>
@@ -1063,7 +1064,7 @@ function _repFilterApplyDOM(){
   var shown = 0;
   items.forEach(function(el){
     var oc = el.getAttribute('onclick') || '';
-    var m2 = oc.match(/repSelectIssuerById\\('([^']+)'\\)/);
+    var m2 = null; var m2id = el.dataset.issid; if(m2id) m2=[null,m2id];
     if(!m2){ shown++; return; }
     var issId = m2[1];
     var iss = (reportsDB || {})[issId];
@@ -1084,17 +1085,24 @@ window._repHasMoexBonds = function(id, iss){
   return Object.keys(iss.periods || {}).length > 0;
 };
 
-// Обработка status='has_moex'/'corp_moex' — оригинал не знает эти коды
+// Фильтрация по статусу для кодов которые оригинал не знает
 var _NON_CORP_KINDS = { subfederal: 1, municipal: 1, federal: 1 };
 var _NON_CORP_SECTORS = { state: 1 };
-var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление|муниципальн|мбу\b|мку\b|мао\b|маоу\b|мбоу\b|гбу\b|гку\b|гуп\b|муп\b|фгуп\b|фку\b|фгку\b|казна|казённ|государственн.*учрежд|бюджетн.*учрежд)/i;
+// Расширенный regex для гос. организаций: имя начинается с любого из ключевых слов
+var _GOV_NAME_RE = /^(администрация|правительство|министерство|департамент|комитет|служба|агентство|инспекция|управление|муниципальн|мкоу|мбу|мку|мао|маоу|мбоу|гбу|гку|гуп|муп|фгуп|фку|фгку|казна|казённ|государственн|бюджетн|городской округ|городское поселение|сельское поселение|муниципальное образование|район\b|область\b|край\b|республика\b|автономн.*округ|федеральн.*служб|федеральн.*агентств|территориальн)/i;
+function _isGovEntity(iss){
+  if(!iss) return false;
+  if(_NON_CORP_KINDS[iss.kind]||_NON_CORP_SECTORS[iss.ind]) return true;
+  return _GOV_NAME_RE.test(iss.name||'');
+}
 (function(){
   var _origRIL = repRenderIssuerList;
   window.repRenderIssuerList = function(){
     var st = document.getElementById('rep-sidebar-status');
     var origVal = st ? st.value : '';
-    var needCustom = origVal === 'has_moex' || origVal === 'corp_moex';
-    if(st && needCustom) st.value = 'all';
+    var customModes = {has_moex:1, corp_moex:1, corp_clean:1};
+    var needCustom = !!customModes[origVal];
+    if(st && needCustom) st.value = origVal === 'corp_clean' ? 'has_periods' : 'all';
     _origRIL();
     _repFilterApplyDOM();
     if(st && needCustom){
@@ -1105,17 +1113,20 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
         listEl.querySelectorAll('[onclick]').forEach(function(el){
           if(el.style.display === 'none') return;
           var oc = el.getAttribute('onclick') || '';
-          var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+          var m = null; var mid2 = el.dataset.issid; if(mid2) m=[null,mid2];
           if(!m){ shown++; return; }
           var iss = reportsDB[m[1]];
-          var hasB = iss && (iss.bondsCount > 0);
-          // corp_moex: исключаем субфедеральные/мун./ОФЗ/банки/гос.органы
-          var isCorpOk = origVal !== 'corp_moex' || (iss &&
-            !_NON_CORP_KINDS[iss.kind] && iss.kind !== 'bank' &&
-            !_NON_CORP_SECTORS[iss.ind] &&
-            !_GOV_NAME_RE.test(iss.name || ''));
-          if(!hasB || !isCorpOk) el.style.display = 'none';
-          else shown++;
+          if(!iss){ shown++; return; }
+          var isGov = _isGovEntity(iss);
+          var hasBonds = iss.bondsCount == null ? true : iss.bondsCount > 0; // без данных D1 — не фильтруем
+          if(origVal === 'corp_clean'){
+            if(isGov){ el.style.display='none'; return; }
+          } else if(origVal === 'corp_moex'){
+            if(isGov||!hasBonds){ el.style.display='none'; return; }
+          } else if(origVal === 'has_moex'){
+            if(!hasBonds){ el.style.display='none'; return; }
+          }
+          shown++;
         });
         var cnt = document.getElementById('rep-sidebar-count');
         if(cnt) cnt.textContent = String(shown);
@@ -1151,7 +1162,7 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
     // Подсветка активного в списке — только классы, без полного перерендера
     document.querySelectorAll('.rep-issuer-item').forEach(function(el){
       var oc = el.getAttribute('onclick') || '';
-      var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+      var m = null; var mid2 = el.dataset.issid; if(mid2) m=[null,mid2];
       var itemId = m ? m[1] : null;
       var active = itemId === id;
       el.style.background = active ? 'var(--s3)' : 'var(--bg)';
@@ -1557,7 +1568,7 @@ function _repRenderIssuerCard(id, iss){
   var p2=lp2?lp2.period:null;
   var ndEb3=p2&&p2.debt!=null&&p2.cash!=null&&p2.ebitda&&p2.ebitda>0?(p2.debt-p2.cash)/p2.ebitda:null;
   var eM3=p2&&p2.rev>0&&p2.ebitda!=null?p2.ebitda/p2.rev:null;
-  return '<div class="rep-issuer-item iss-item" data-active="'+(active?'1':'0')+'" onclick="repSelectIssuerById(\\\''+id+'\\\')">'
+  return '<div class="rep-issuer-item iss-item" data-active="'+(active?'1':'0')+'" data-issid="'+id+'" onclick="repSelectIssuerById(\\\''+id+'\\\')">'
     +'<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:'+stripe+'"></div>'
     +'<div class="iss-name" style="padding-left:7px">'+_escHtml(iss.name||'—')+ratingHtml+'</div>'
     +'<div class="iss-meta" style="padding-left:7px">'+(iss.inn?'<span>'+iss.inn+'</span>':'')+'<span class="ind-badge" style="color:var(--pur);border-color:rgba(170,90,255,0.25)">'+_escHtml(indLabel)+'</span>'+(m.year?'<span>'+m.year+'</span>':'')+(periods>0?'<span>'+periods+' пер.</span>':'<span style="opacity:.4">нет данных</span>')+'</div>'
@@ -1572,7 +1583,7 @@ function _repRenderIssuerCard(id, iss){
     _prevSel(id);
     document.querySelectorAll('.rep-issuer-item').forEach(function(el){
       var oc=el.getAttribute('onclick')||'';
-      var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/);
+      var mm=null; var mmid=el.dataset.issid; if(mmid) mm=[null,mmid];
       el.dataset.active=(mm&&mm[1]===id)?'1':'0';
     });
     setTimeout(function(){
@@ -1594,7 +1605,7 @@ function _repRenderIssuerCard(id, iss){
     var listEl=document.getElementById('rep-sidebar-list'); if(!listEl) return;
     listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
       var oc=el.getAttribute('onclick')||'';
-      var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return;
+      var mm=null; var mmid=el.dataset.issid; if(mmid) mm=[null,mmid]; if(!mm) return;
       var id=mm[1],iss=(reportsDB||{})[id]; if(!iss) return;
       var wasHidden=el.style.display==='none';
       var tmp=document.createElement('div'); tmp.innerHTML=_repRenderIssuerCard(id,iss);
@@ -1829,7 +1840,7 @@ function _repToggleInd(key){
     // Заменяем карточки
     listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
       var oc=el.getAttribute('onclick')||'';
-      var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return;
+      var mm=null; var mmid=el.dataset.issid; if(mmid) mm=[null,mmid]; if(!mm) return;
       var id=mm[1],iss=(reportsDB||{})[id]; if(!iss) return;
       var wasHidden=el.style.display==='none';
       var tmp=document.createElement('div'); tmp.innerHTML=_repRenderIssuerCard(id,iss);
@@ -1845,7 +1856,7 @@ function _repToggleInd(key){
       listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
         if(el.style.display==='none') return;
         var oc=el.getAttribute('onclick')||'';
-        var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return;
+        var mm=null; var mmid=el.dataset.issid; if(mmid) mm=[null,mmid]; if(!mm) return;
         var id=mm[1],iss=(reportsDB||{})[id]; if(!iss) return;
         if(hasR){
           var rt=iss.ratings||[];
@@ -1869,8 +1880,8 @@ function _repToggleInd(key){
         // Скоринг: для каждого критерия считаем перцентиль, суммируем
         var vals=sorts.map(function(s){
           return items.map(function(el){
-            var mm=(el.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return null;
-            var iss=(reportsDB||{})[mm[1]]; if(!iss) return null;
+            var mmid=el.dataset.issid; if(!mmid) return null;
+            var iss=(reportsDB||{})[mmid]; if(!iss) return null;
             return _repGetMult(iss)[s.key];
           });
         });
@@ -1891,10 +1902,9 @@ function _repToggleInd(key){
         items.sort(function(a,b){
           for(var si=0;si<sorts.length;si++){
             var s=sorts[si];
-            var am=(a.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
-            var bm=(b.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
-            if(!am||!bm) continue;
-            var ai=(reportsDB||{})[am[1]],bi=(reportsDB||{})[bm[1]]; if(!ai||!bi) continue;
+            var amid=a.dataset.issid, bmid=b.dataset.issid;
+            if(!amid||!bmid) continue;
+            var ai=(reportsDB||{})[amid],bi=(reportsDB||{})[bmid]; if(!ai||!bi) continue;
             var av=_repGetMult(ai)[s.key],bv=_repGetMult(bi)[s.key];
             if(av==null&&bv==null) continue; if(av==null) return 1; if(bv==null) return -1;
             var cmp=s.dir==='asc'?av-bv:bv-av;
