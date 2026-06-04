@@ -16,86 +16,109 @@ reportsHtmlRaw = reportsHtmlRaw.replace(
 const emojiRe = /[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}⬇️⬆️]/gu;
 reportsHtmlRaw = reportsHtmlRaw.replace(emojiRe, '').replace(/^\s+/gm, s => s);
 
-// ── Заменяем sidebar целиком новой структурой (D1 + поиск + фильтры) ──────
-const newSidebar = `<div id="rep-sidebar" style="width:340px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
+// ── Заменяем sidebar целиком новой структурой ────────────────────────────
+const newSidebar = `<div id="rep-sidebar" style="width:320px;flex-shrink:0;position:sticky;top:8px;max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--s1);border:1px solid var(--brdm);overflow:hidden">
 
-  <!-- Строка 1: загрузка D1 + счётчик + источники -->
-  <div style="display:flex;align-items:center;gap:4px;padding:8px 8px 4px;flex-shrink:0">
-    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:.62rem;font-family:var(--sans);font-weight:600;padding:5px 10px;border:1px solid var(--acc);border-radius:var(--radius);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.02em;text-transform:uppercase;transition:all .15s">↓ Загрузить базу</button>
-    <span id="rep-sidebar-count" style="font-size:.52rem;color:var(--text3);min-width:28px;text-align:center;font-family:var(--mono)">0</span>
-    <button type="button" onclick="_repSourcesModal()" title="Источники данных, импорт, инструменты" style="width:28px;height:28px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--s2);color:var(--text3);cursor:pointer;font-size:.8rem;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s">⚙</button>
-  </div>
-  <!-- Строка статуса загрузки -->
-  <div id="rep-d1-log" style="display:none;padding:2px 8px 5px;font-size:.54rem;color:var(--text3);font-family:var(--mono);line-height:1.4;border-bottom:1px solid var(--border)"></div>
-
-  <!-- Строка 2: поиск с выпадашкой -->
-  <div style="position:relative;padding:0 8px 6px;flex-shrink:0">
-    <input id="rep-search-main" type="search" placeholder="Поиск: эмитент, ИНН, облигация…"
-      oninput="_repSearchInput(this.value)"
-      onfocus="if(this.value.trim())_repSearchDropRender(this.value.trim())"
-      style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.65rem;padding:6px 10px;outline:none;border-radius:var(--radius)">
-    <div id="rep-search-drop" style="display:none;position:absolute;left:8px;right:8px;top:calc(100% - 4px);background:var(--s1);border:1px solid var(--border2);border-radius:var(--radius-md);z-index:200;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
-    <!-- скрыт, нужен repRenderIssuerList для чтения текста поиска -->
+  <!-- Поиск -->
+  <div style="padding:9px 10px 8px;border-bottom:1px solid var(--brd);flex-shrink:0">
+    <div style="position:relative">
+      <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:12px;pointer-events:none">⌕</span>
+      <input id="rep-search-main" type="search" placeholder="Компания, ИНН, тикер…"
+        oninput="_repSearchInput(this.value)"
+        onfocus="if(this.value.trim())_repSearchDropRender(this.value.trim())"
+        style="width:100%;padding:6px 9px 6px 26px;background:var(--bg);border:1px solid var(--brdp);color:var(--t);font-family:var(--mono);font-size:11px;outline:none">
+    </div>
+    <div id="rep-search-drop" style="display:none;position:absolute;left:10px;right:10px;top:calc(100% - 2px);background:var(--s1);border:1px solid var(--brdp);z-index:200;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)"></div>
     <input id="rep-sidebar-search" value="" style="display:none" oninput="repRenderIssuerList()">
   </div>
 
-  <!-- Collapsible: фильтры и сортировка -->
-  <details id="rep-filter-details" style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-shrink:0">
-    <summary style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;font-size:.52rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);font-weight:600;background:var(--s2);list-style:none;outline:none;user-select:none" onclick="var a=document.getElementById('rep-filter-arrow');if(a)setTimeout(function(){a.textContent=document.getElementById('rep-filter-details').open?'▾':'▸'},0)">
-      <span id="rep-filter-arrow" style="color:var(--acc);font-size:.65rem">▸</span>
-      <span>Фильтры</span>
-      <span id="rep-filter-badge" style="margin-left:auto;font-size:.46rem;color:var(--acc);background:var(--acc-dim);padding:1px 6px;border-radius:10px;display:none">●</span>
-    </summary>
-    <div style="padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--s1);overflow-y:auto;max-height:55vh">
-      <label style="display:flex;gap:4px;align-items:center">
-        <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Сорт:</span>
-        <select id="rep-sidebar-sort" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
-          <option value="name_asc">Имя А → Я</option>
-          <option value="name_desc">Имя Я → А</option>
-          <option value="year_desc">Свежесть (новые сверху)</option>
-          <option value="roe_best">ROE (лучшие)</option>
-          <option value="roe_worst">ROE (худшие)</option>
-          <option value="de_best">Долг/EBITDA (лучшие)</option>
-          <option value="de_worst">Долг/EBITDA (худшие)</option>
-          <option value="icr_best">ICR (лучшие)</option>
-          <option value="icr_worst">ICR (худшие)</option>
-          <option value="dde_best">D/E (лучшие)</option>
-          <option value="dde_worst">D/E (худшие)</option>
-        </select>
-      </label>
-      <label style="display:flex;gap:4px;align-items:center">
-        <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Данные:</span>
-        <select id="rep-sidebar-status" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
-          <option value="corp_moex" selected>корпоративные (MOEX)</option>
-          <option value="has_moex">все с бумагами на MOEX</option>
-          <option value="all">все</option>
-          <option value="has_periods">есть периоды</option>
-          <option value="no_periods">нет периодов</option>
-          <option value="only_inn">только ИНН, пусто</option>
-          <option value="no_inn">без ИНН</option>
-          <option value="stale">нет свежего (&gt;2 лет)</option>
-          <option value="no_moex">нет бумаг на MOEX</option>
-          <option value="spv_no_parent">SPV без матери</option>
-        </select>
-      </label>
-      <label style="display:flex;gap:4px;align-items:center">
-        <span style="font-size:.5rem;color:var(--text3);white-space:nowrap;font-family:var(--sans)">Отрасль:</span>
-        <select id="rep-sidebar-industry" onchange="repRenderIssuerList()" style="flex:1;background:var(--bg);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:.58rem;padding:3px 5px;outline:none;border-radius:var(--radius)">
-          <option value="all">все</option>
-        </select>
-      </label>
-      <div>
-        <div style="font-size:.5rem;color:var(--text3);margin-bottom:3px;font-family:var(--sans)">Год последнего отчёта:</div>
-        <div id="rep-sidebar-years" style="display:flex;gap:2px;flex-wrap:wrap"></div>
+  <!-- Загрузка D1 -->
+  <div style="display:flex;align-items:center;gap:4px;padding:5px 8px;border-bottom:1px solid var(--brd);flex-shrink:0">
+    <button id="rep-d1-load-btn" type="button" onclick="_repD1Load()" style="flex:1;font-size:10px;font-family:var(--sans);font-weight:600;padding:4px 10px;border:1px solid var(--acc);background:var(--acc-dim);color:var(--acc);cursor:pointer;letter-spacing:.04em;text-transform:uppercase">↓ Загрузить базу</button>
+    <span id="rep-sidebar-count" style="font-size:10px;color:var(--t3);min-width:24px;text-align:center;font-family:var(--mono)">0</span>
+    <button type="button" onclick="_repSourcesModal()" title="Источники" style="width:26px;height:26px;border:1px solid var(--brd);background:var(--s2);color:var(--t3);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">⚙</button>
+  </div>
+  <div id="rep-d1-log" style="display:none;padding:2px 8px 4px;font-size:9px;color:var(--t3);font-family:var(--mono);line-height:1.4;border-bottom:1px solid var(--brd)"></div>
+
+  <!-- Фильтры -->
+  <div class="sb-filters" style="flex-shrink:0;max-height:52vh">
+
+    <!-- Кредитный рейтинг -->
+    <div class="fs collapsed" id="fs-rating">
+      <div class="fs-hdr" onclick="toggleFs('fs-rating')">Кредитный рейтинг<span class="fs-chev">▾</span></div>
+      <div class="fs-body">
+        <div class="rating-chips" id="rc-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
       </div>
-      <!-- расширенный фильтр: рейтинги / отрасли-пилюли / мультипликаторы -->
-      <div id="rep-filter-extra"></div>
     </div>
-  </details>
+
+    <!-- Отрасли -->
+    <div class="fs collapsed" id="fs-ind">
+      <div class="fs-hdr" onclick="toggleFs('fs-ind')">Отрасли<span class="fs-chev">▾</span></div>
+      <div class="fs-body">
+        <div class="industry-chips" id="ind-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+      </div>
+    </div>
+
+    <!-- Дата / Тип -->
+    <div class="fs collapsed" id="fs-date">
+      <div class="fs-hdr" onclick="toggleFs('fs-date')">Дата отчёта<span class="fs-chev">▾</span></div>
+      <div class="fs-body">
+        <div class="f-row2">
+          <span class="f-lbl">Год</span>
+          <div id="rep-sidebar-years" class="yr-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+        </div>
+        <div class="f-row2" style="margin-top:4px">
+          <span class="f-lbl">Тип</span>
+          <div class="type-pills">
+            <button class="tp rep-tf-btn" data-tf="all" onclick="repSetTypeFilter('all')">Все</button>
+            <button class="tp rep-tf-btn" data-tf="no-girbo" onclick="repSetTypeFilter('no-girbo')">МСФО/РСБУ</button>
+            <button class="tp rep-tf-btn" data-tf="only-girbo" onclick="repSetTypeFilter('only-girbo')">ГИР БО</button>
+          </div>
+        </div>
+        <div class="f-row2" style="margin-top:4px">
+          <span class="f-lbl">Стат.</span>
+          <select id="rep-sidebar-status" onchange="repRenderIssuerList()" class="f-select">
+            <option value="corp_moex" selected>MOEX корп.</option>
+            <option value="has_moex">все с MOEX</option>
+            <option value="all">все</option>
+            <option value="has_periods">есть периоды</option>
+            <option value="no_periods">нет периодов</option>
+            <option value="stale">нет свежего (&gt;2л)</option>
+            <option value="no_moex">нет бумаг MOEX</option>
+            <option value="only_inn">только ИНН</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Мультипликаторы -->
+    <div class="fs" id="fs-mult">
+      <div class="fs-hdr" onclick="toggleFs('fs-mult')">Мультипликаторы<span class="fs-chev">▾</span></div>
+      <div class="fs-body" style="padding-bottom:8px">
+        <div class="mf-hint">Клик по названию — сортировка ↑↓. Поля — диапазон. × — сброс.</div>
+        <div class="mf-grid" id="mf-grid"></div>
+        <div style="margin-top:6px;display:flex;align-items:center;gap:5px">
+          <span class="f-lbl" style="padding-top:0">Сорт.</span>
+          <select id="rep-sidebar-sort" onchange="window._repMfSort=null;repRenderIssuerList()" class="f-select">
+            <option value="name_asc">Имя А → Я</option>
+            <option value="name_desc">Имя Я → А</option>
+            <option value="year_desc">Свежесть</option>
+            <option value="de_best">Долг/EBITDA ↑</option>
+            <option value="de_worst">Долг/EBITDA ↓</option>
+            <option value="icr_best">ICR ↑</option>
+            <option value="icr_worst">ICR ↓</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- hidden compat -->
+  <select id="rep-sidebar-industry" style="display:none" onchange="repRenderIssuerList()"><option value="all">все</option></select>
 
   <!-- Список эмитентов -->
-  <div id="rep-sidebar-list" style="overflow-y:auto;flex:1;padding:4px;min-height:120px">
-  </div>
+  <div id="rep-sidebar-list" style="overflow-y:auto;flex:1;padding:4px;min-height:120px"></div>
 </div>`;
 
 // Заменяем sidebar в reportsHtmlRaw
@@ -416,6 +439,40 @@ details summary{outline:none}
 ::-webkit-scrollbar-track{background:var(--panel)}
 ::-webkit-scrollbar-thumb{background:var(--brdp);border-radius:0}
 ::-webkit-scrollbar-thumb:hover{background:var(--acc-dim)}
+
+/* Filter accordion */
+.sb-filters{overflow-y:auto;flex-shrink:0;border-bottom:1px solid var(--brd)}
+.fs{border-bottom:1px solid rgba(255,255,255,0.035)}
+.fs:last-child{border-bottom:none}
+.fs-hdr{display:flex;align-items:center;padding:7px 11px;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--t4);background:rgba(255,255,255,0.01);transition:background .1s;user-select:none}
+.fs-hdr:hover{background:rgba(255,255,255,0.025)}
+.fs-chev{font-size:8px;color:var(--t3);transition:transform .15s;margin-left:auto}
+.fs.collapsed .fs-chev{transform:rotate(-90deg)}
+.fs.collapsed .fs-body{display:none}
+.fs-body{padding:8px 11px 10px}
+.f-row2{display:flex;gap:6px;align-items:flex-start;margin-bottom:5px}
+.f-lbl{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);white-space:nowrap;min-width:26px;padding-top:3px}
+.f-select{flex:1;padding:4px 7px;background:var(--bg);border:1px solid var(--brdp);color:var(--t2);font-family:var(--mono);font-size:10px;outline:none;border-radius:0}
+/* type pills */
+.type-pills{display:flex;flex-wrap:wrap;gap:3px}
+.tp{padding:2px 7px;border:1px solid var(--brd);background:transparent;color:var(--t3);font-size:9px;cursor:pointer;border-radius:0;transition:all .1s}
+.tp:hover{border-color:var(--brdm);color:var(--t2)}
+.tp.active{background:rgba(255,0,128,0.08);border-color:rgba(255,0,128,0.4);color:var(--acc)}
+/* multiplier filter grid */
+.mf-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mf-row{display:flex;align-items:center;border:1px solid var(--brd);background:rgba(255,255,255,0.01);overflow:hidden;transition:border-color .1s;cursor:pointer}
+.mf-row:hover{border-color:rgba(170,90,255,0.2)}
+.mf-lbl{padding:4px 6px;font-size:9px;font-family:var(--mono);font-weight:600;color:var(--t2);white-space:nowrap;transition:all .1s;flex-shrink:0;border-right:1px solid var(--brd)}
+.mf-row.sort-asc .mf-lbl{background:rgba(82,242,201,0.1);color:var(--pos);border-color:rgba(82,242,201,0.3)}
+.mf-row.sort-desc .mf-lbl{background:rgba(255,77,122,0.1);color:var(--neg);border-color:rgba(255,77,122,0.3)}
+.mf-inputs{display:flex;align-items:center;gap:2px;padding:2px 4px;flex:1;min-width:0}
+.mf-in{width:24px;background:transparent;border:none;color:var(--t2);font-family:var(--mono);font-size:9px;outline:none;text-align:center}
+.mf-in::placeholder{color:var(--t3)}
+.mf-sep{color:var(--t3);font-size:8px}
+.mf-unit{font-size:8px;color:var(--t3)}
+.mf-sort{padding:4px 6px;font-size:9px;color:var(--t3);cursor:pointer;border-left:1px solid var(--brd);background:transparent;transition:all .1s;flex-shrink:0}
+.mf-sort:hover{color:var(--t);background:rgba(255,255,255,0.03)}
+.mf-hint{font-size:8.5px;color:var(--t3);margin-bottom:6px;line-height:1.5}
 `;
 
 // localStorage прокси — если браузер блокирует в blob-iframe
@@ -1541,23 +1598,220 @@ function _repRenderIssuerCard(id, iss){
   };
 })();
 
-// ── Override repRenderYearFilter — используем .yr чипы вместо inline-стилей ──
+// ── Мультипликаторы — определения ────────────────────────────────────────
+var _MF_DEFS = [
+  {id:'mf-de',  key:'de',  lbl:'Долг/EBITDA', loBetter:true},
+  {id:'mf-nd',  key:'nd',  lbl:'ЧД/EBITDA',   loBetter:true},
+  {id:'mf-icr', key:'icr', lbl:'ICR',          loBetter:false},
+  {id:'mf-dde', key:'dde', lbl:'D/E',          loBetter:true},
+  {id:'mf-roa', key:'roa', lbl:'ROA',          loBetter:false, unit:'%'},
+  {id:'mf-em',  key:'em',  lbl:'EBITDA%',      loBetter:false, unit:'%'},
+  {id:'mf-cur', key:'cur', lbl:'Current R.',   loBetter:false},
+  {id:'mf-eq',  key:'eq',  lbl:'Equity R.',    loBetter:false, unit:'%'},
+];
+
+function _repGetMult(iss){
+  var m=_repCalcMultipliers(iss);
+  var lp=(typeof _repLatestPeriod==='function')?_repLatestPeriod(iss):null;
+  var p=lp?lp.period:null;
+  var nd=(p&&p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0)?(p.debt-p.cash)/p.ebitda:null;
+  var roa=(p&&p.np!=null&&p.assets>0)?p.np/p.assets*100:null;
+  var em=(p&&p.ebitda!=null&&p.rev>0)?p.ebitda/p.rev*100:null;
+  var eq=(p&&p.assets>0&&p.eq!=null)?p.eq/p.assets*100:null;
+  return {de:m.de, nd:nd, icr:m.icr, roa:roa, em:em, dde:m.dde, cur:m.cur, eq:eq};
+}
+
+function _repRenderMfGrid(){
+  var grid=document.getElementById('mf-grid'); if(!grid) return;
+  if(!window._repMfSort) window._repMfSort=null;
+  if(!window._repMfRange) window._repMfRange={};
+  grid.innerHTML=_MF_DEFS.map(function(d){
+    var act=window._repMfSort&&window._repMfSort.id===d.id;
+    var dir=act?window._repMfSort.dir:null;
+    var cls='mf-row'+(act?(dir==='asc'?' sort-asc':' sort-desc'):'');
+    var stx=act?(dir==='asc'?'\\u2191':'\\u2193'):'\\u00d7';
+    var rng=window._repMfRange[d.key]||{};
+    return '<div class="'+cls+'" id="'+d.id+'" onclick="cycleMfSort(\\\''+d.id+'\\\')">'
+      +'<div class="mf-lbl">'+d.lbl+'</div>'
+      +'<div class="mf-inputs" onclick="event.stopPropagation()">'
+      +'<input class="mf-in" placeholder="min" value="'+(rng.min!=null?rng.min:'')+'" oninput="_repMfOnInput(\\\''+d.id+'\\\')">'
+      +'<span class="mf-sep">–</span>'
+      +'<input class="mf-in" placeholder="max" value="'+(rng.max!=null?rng.max:'')+'" oninput="_repMfOnInput(\\\''+d.id+'\\\')">'
+      +(d.unit?'<span class="mf-unit">'+d.unit+'</span>':'')
+      +'</div>'
+      +'<div class="mf-sort" onclick="event.stopPropagation();resetMf(\\\''+d.id+'\\\')">'+stx+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function cycleMfSort(id){
+  if(!window._repMfSort) window._repMfSort=null;
+  var def=null; for(var i=0;i<_MF_DEFS.length;i++){if(_MF_DEFS[i].id===id){def=_MF_DEFS[i];break;}} if(!def) return;
+  var first=def.loBetter?'asc':'desc', second=def.loBetter?'desc':'asc';
+  if(!window._repMfSort||window._repMfSort.id!==id) window._repMfSort={id:id,key:def.key,dir:first};
+  else if(window._repMfSort.dir===first) window._repMfSort.dir=second;
+  else window._repMfSort=null;
+  _repRenderMfGrid(); repRenderIssuerList();
+}
+
+function resetMf(id){
+  var row=document.getElementById(id);
+  if(row){row.classList.remove('sort-asc','sort-desc');var sb=row.querySelector('.mf-sort');if(sb)sb.textContent='×';row.querySelectorAll('.mf-in').forEach(function(i){i.value='';});}
+  var def=null; for(var i=0;i<_MF_DEFS.length;i++){if(_MF_DEFS[i].id===id){def=_MF_DEFS[i];break;}}
+  if(def){if(!window._repMfRange)window._repMfRange={};delete window._repMfRange[def.key];}
+  if(window._repMfSort&&window._repMfSort.id===id) window._repMfSort=null;
+  repRenderIssuerList();
+}
+
+function _repMfOnInput(id){
+  var row=document.getElementById(id); if(!row) return;
+  var ins=row.querySelectorAll('.mf-in');
+  var mn=ins[0]?ins[0].value:'', mx=ins[1]?ins[1].value:'';
+  var mnV=mn!==''&&!isNaN(parseFloat(mn))?parseFloat(mn):null;
+  var mxV=mx!==''&&!isNaN(parseFloat(mx))?parseFloat(mx):null;
+  if(!window._repMfRange) window._repMfRange={};
+  var def=null; for(var i=0;i<_MF_DEFS.length;i++){if(_MF_DEFS[i].id===id){def=_MF_DEFS[i];break;}} if(!def) return;
+  if(mnV===null&&mxV===null) delete window._repMfRange[def.key];
+  else window._repMfRange[def.key]={min:mnV,max:mxV};
+  repRenderIssuerList();
+}
+
+function toggleFs(id){var el=document.getElementById(id);if(el)el.classList.toggle('collapsed');}
+
+// ── Рейтинг-чипы ─────────────────────────────────────────────────────────
+var _REP_RATING_GRADES=['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BB+','BB','BB-','B+','B','B-','CCC'];
+
+function _repRenderRatingChips(){
+  var box=document.getElementById('rc-chips'); if(!box) return;
+  if(!window._repRatingFilter) window._repRatingFilter=new Set();
+  box.innerHTML=_REP_RATING_GRADES.map(function(r){
+    return '<button class="rc'+(window._repRatingFilter.has(r)?' active':'')+'" onclick="_repToggleRating(\\\''+r+'\\\')">'+r+'</button>';
+  }).join('')+'<button class="rc" style="opacity:.55;border-style:dashed" onclick="_repToggleRating(\\\'NR\\\')">Нет</button>';
+}
+function _repToggleRating(r){
+  if(!window._repRatingFilter) window._repRatingFilter=new Set();
+  if(window._repRatingFilter.has(r)) window._repRatingFilter.delete(r); else window._repRatingFilter.add(r);
+  _repRenderRatingChips(); repRenderIssuerList();
+}
+
+// ── Отрасль-чипы ─────────────────────────────────────────────────────────
+function _repRenderIndChips(){
+  var box=document.getElementById('ind-chips'); if(!box) return;
+  if(!window._repIndFilter) window._repIndFilter=new Set();
+  var inds=(window._industryData&&window._industryData.industries)||{};
+  var entries=Object.keys(inds).map(function(k){return [k,(inds[k]&&inds[k].label)||k];});
+  entries.sort(function(a,b){if(a[0]==='other')return 1;if(b[0]==='other')return -1;return a[1].localeCompare(b[1],'ru');});
+  if(!entries.length){box.innerHTML='<span style="font-size:9px;color:var(--t3)">нет данных</span>';return;}
+  box.innerHTML=entries.map(function(e){
+    var k=e[0],lbl=e[1],act=window._repIndFilter.has(k);
+    return '<button class="ic'+(act?' active':'')+'" onclick="_repToggleInd(\\\''+k+'\\\')" title="'+lbl+'">'+lbl+'</button>';
+  }).join('');
+}
+function _repToggleInd(key){
+  if(!window._repIndFilter) window._repIndFilter=new Set();
+  if(window._repIndFilter.has(key)) window._repIndFilter.delete(key); else window._repIndFilter.add(key);
+  _repRenderIndChips(); repRenderIssuerList();
+}
+
+// ── Override repRenderYearFilter — .yr чипы ───────────────────────────────
 (function(){
-  var _origRYF = window.repRenderYearFilter;
-  window.repRenderYearFilter = function(){
-    var box = document.getElementById('rep-sidebar-years');
-    if(!box){ if(_origRYF) _origRYF(); return; }
-    if(!window._repSidebarYears) window._repSidebarYears = new Set();
-    var sel = window._repSidebarYears;
-    var thisYear = new Date().getFullYear();
-    var html = '<div class="yr-chips">';
-    for(var y=thisYear;y>=thisYear-8;y--){
-      var act=sel.has(y);
-      html+='<button type="button" class="yr'+(act?' active':'')+'" data-year="'+y+'" onclick="repToggleYearFilter('+y+')">'+y+'</button>';
-    }
-    html+='<button type="button" class="yr" style="border-style:dashed;opacity:.6" onclick="repClearYearFilter()">сбр.</button>';
-    html+='</div>';
+  var _orig=window.repRenderYearFilter;
+  window.repRenderYearFilter=function(){
+    var box=document.getElementById('rep-sidebar-years');
+    if(!box){if(_orig)_orig();return;}
+    if(!window._repSidebarYears) window._repSidebarYears=new Set();
+    var sel=window._repSidebarYears, ty=new Date().getFullYear(), html='';
+    for(var y=ty;y>=ty-8;y--) html+='<button type="button" class="yr'+(sel.has(y)?' active':'')+'" onclick="repToggleYearFilter('+y+')">'+y+'</button>';
+    html+='<button type="button" class="yr" style="border-style:dashed;opacity:.5" onclick="repClearYearFilter()">сбр.</button>';
     box.innerHTML=html;
+  };
+})();
+
+// ── Override repRenderIndustryFilter ─────────────────────────────────────
+(function(){
+  var _orig=window.repRenderIndustryFilter;
+  window.repRenderIndustryFilter=function(){
+    if(_orig) _orig();
+    _repRenderIndChips();
+    _repRenderMfGrid();
+  };
+})();
+
+// ── Override repInit ──────────────────────────────────────────────────────
+(function(){
+  var _orig=window.repInit;
+  window.repInit=function(){
+    if(_orig) _orig();
+    _repRenderRatingChips();
+    _repRenderMfGrid();
+    var tf=(typeof repTypeFilter!=='undefined')?repTypeFilter:'all';
+    document.querySelectorAll('.rep-tf-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tf===tf);});
+  };
+})();
+
+// ── Override repSetTypeFilter — синхронизирует .tp-кнопки ────────────────
+(function(){
+  var _orig=window.repSetTypeFilter;
+  window.repSetTypeFilter=function(mode){
+    if(_orig) _orig(mode);
+    document.querySelectorAll('.rep-tf-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tf===mode);});
+  };
+})();
+
+// ── Override repRenderIssuerList — доп. фильтры + mf-sort ────────────────
+(function(){
+  var _origRIL=window.repRenderIssuerList;
+  window.repRenderIssuerList=function(){
+    _origRIL();
+    var listEl=document.getElementById('rep-sidebar-list'); if(!listEl) return;
+    // Заменяем карточки
+    listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc=el.getAttribute('onclick')||'';
+      var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return;
+      var id=mm[1],iss=(reportsDB||{})[id]; if(!iss) return;
+      var wasHidden=el.style.display==='none';
+      var tmp=document.createElement('div'); tmp.innerHTML=_repRenderIssuerCard(id,iss);
+      var card=tmp.firstElementChild; if(!card) return;
+      if(wasHidden) card.style.display='none';
+      el.parentNode.replaceChild(card,el);
+    });
+    // Доп. фильтры
+    var hasR=window._repRatingFilter&&window._repRatingFilter.size>0;
+    var hasI=window._repIndFilter&&window._repIndFilter.size>0;
+    var hasM=window._repMfRange&&Object.keys(window._repMfRange).length>0;
+    if(hasR||hasI||hasM){
+      listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
+        if(el.style.display==='none') return;
+        var oc=el.getAttribute('onclick')||'';
+        var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return;
+        var id=mm[1],iss=(reportsDB||{})[id]; if(!iss) return;
+        if(hasR){
+          var rt=iss.ratings||[];
+          var ok=window._repRatingFilter.has('NR')?(!rt.length||!rt.some(function(r){return r&&r.rating;})):rt.some(function(r){return r&&window._repRatingFilter.has(r.rating);});
+          if(!ok){el.style.display='none';return;}
+        }
+        if(hasI&&!window._repIndFilter.has(iss.ind||'other')){el.style.display='none';return;}
+        if(hasM){
+          var mult=_repGetMult(iss),filtered=false;
+          for(var k in window._repMfRange){var rng=window._repMfRange[k],val=mult[k];if(val==null||!isFinite(val))continue;if(rng.min!==null&&val<rng.min){filtered=true;break;}if(rng.max!==null&&val>rng.max){filtered=true;break;}}
+          if(filtered){el.style.display='none';return;}
+        }
+      });
+    }
+    // Сортировка по mf
+    if(window._repMfSort&&window._repMfSort.key){
+      var items=Array.from(listEl.querySelectorAll('.rep-issuer-item')).filter(function(el){return el.style.display!=='none';});
+      items.sort(function(a,b){
+        var am=(a.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
+        var bm=(b.getAttribute('onclick')||'').match(/repSelectIssuerById\('([^']+)'\)/);
+        if(!am||!bm) return 0;
+        var ai=(reportsDB||{})[am[1]],bi=(reportsDB||{})[bm[1]]; if(!ai||!bi) return 0;
+        var av=_repGetMult(ai)[window._repMfSort.key],bv=_repGetMult(bi)[window._repMfSort.key];
+        if(av==null&&bv==null) return 0; if(av==null) return 1; if(bv==null) return -1;
+        return window._repMfSort.dir==='asc'?av-bv:bv-av;
+      });
+      items.forEach(function(el){listEl.appendChild(el);});
+    }
   };
 })();
 `;
