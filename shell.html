@@ -25,6 +25,13 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);font-family:var(--sans);}
 
+/* Fix 1: dark scrollbars on shell itself */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#140A24}
+::-webkit-scrollbar-thumb{background:#3d2d60;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#52F2C9}
+*{scrollbar-width:thin;scrollbar-color:#3d2d60 #140A24;}
+
 /* ── TOPBAR ── */
 #topbar{
   height:52px;display:flex;align-items:center;gap:0;padding:0 16px;
@@ -35,23 +42,51 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
   letter-spacing:.04em;margin-right:20px;flex-shrink:0;cursor:pointer;}
 #logo span{color:var(--muted);}
 
-#nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;}
+/* Fix 4: drawer toggle button */
+#drawer-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;margin-right:8px;padding:4px 6px;}
+#drawer-btn:hover{color:var(--text);}
+
+#nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;position:relative;}
 #nav::-webkit-scrollbar{display:none;}
 
+/* Fix 3: compact tabs */
 .ntab{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:7px;
   font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;
-  border:1px solid transparent;background:none;font-family:var(--sans);transition:all .15s;}
+  border:1px solid transparent;background:none;font-family:var(--sans);transition:all .15s;
+  max-width:180px;}
 .ntab:hover{color:var(--text2);background:rgba(255,255,255,0.04);}
 .ntab.active{color:var(--text);background:rgba(255,0,110,0.12);border-color:rgba(255,0,110,0.2);}
 .ntab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;}
 .ntab.active .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+.ntab .tlabel{overflow:hidden;text-overflow:ellipsis;max-width:12ch;display:inline-block;vertical-align:middle;}
 .ntab .close{margin-left:2px;opacity:0;font-size:14px;line-height:1;color:var(--muted);
   background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;}
 .ntab:hover .close{opacity:1;}
 .ntab .pop-btn{margin-left:2px;opacity:0;font-size:11px;line-height:1;color:var(--muted);
-  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;
-  title:"Открыть в окне";}
+  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;}
 .ntab:hover .pop-btn{opacity:1;}
+
+/* Fix 3: overflow button + menu */
+#nav-overflow-btn{
+  flex-shrink:0;background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--muted);cursor:pointer;font-size:13px;padding:3px 8px;margin-left:4px;
+  display:none;position:relative;
+}
+#nav-overflow-btn:hover{color:var(--text);background:rgba(255,255,255,0.05);}
+#nav-overflow-menu{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;
+  min-width:160px;z-index:500;padding:4px 0;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+#nav-overflow-menu.open{display:block;}
+.nov-item{
+  display:block;width:100%;text-align:left;background:none;border:none;
+  color:var(--text2);font-family:var(--sans);font-size:12px;
+  padding:6px 14px;cursor:pointer;white-space:nowrap;
+}
+.nov-item:hover{background:rgba(255,255,255,0.06);color:var(--text);}
+.nov-item.active{color:var(--accent);}
 
 #topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;}
 
@@ -169,25 +204,71 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);fo
 .fwin-body iframe{width:100%;height:100%;border:none;display:block;}
 .fwin.micro .fwin-body{display:none;}
 .fwin.micro{height:34px !important;min-height:34px;resize:none;}
-.fwin-resize{
-  position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:se-resize;
-  opacity:0;
-}
-.fwin:hover .fwin-resize{opacity:1;}
-/* резайз-ручка — маленький уголок */
-.fwin-resize::after{
+
+/* Fix 2: all-sides resize handles */
+.fwin-edge{position:absolute;z-index:10;}
+.fwin-edge.n{top:0;left:8px;right:8px;height:6px;cursor:n-resize;}
+.fwin-edge.s{bottom:0;left:8px;right:8px;height:6px;cursor:s-resize;}
+.fwin-edge.e{right:0;top:8px;bottom:8px;width:6px;cursor:e-resize;}
+.fwin-edge.w{left:0;top:8px;bottom:8px;width:6px;cursor:w-resize;}
+.fwin-edge.ne{top:0;right:0;width:10px;height:10px;cursor:ne-resize;}
+.fwin-edge.nw{top:0;left:0;width:10px;height:10px;cursor:nw-resize;}
+.fwin-edge.se{bottom:0;right:0;width:10px;height:10px;cursor:se-resize;}
+.fwin-edge.sw{bottom:0;left:0;width:10px;height:10px;cursor:sw-resize;}
+/* show corner indicator on hover */
+.fwin:hover .fwin-edge.se::after{
   content:'';position:absolute;right:3px;bottom:3px;
   width:8px;height:8px;
   border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
   border-radius:1px;
 }
+
+/* Fix 4: left drawer */
+.drawer{
+  position:fixed;left:0;top:52px;bottom:0;width:220px;
+  background:var(--panel);border-right:1px solid var(--border);
+  transform:translateX(-100%);transition:transform .2s;
+  z-index:150;display:flex;flex-direction:column;
+}
+.drawer.open{transform:translateX(0);}
+#drawer-header{
+  padding:10px 12px 8px;font-family:var(--mono);font-size:10px;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#drawer-list{flex:1;overflow-y:auto;}
+.dmod{
+  display:flex;align-items:center;gap:6px;padding:7px 10px;
+  border-bottom:1px solid var(--border);cursor:pointer;font-size:11px;color:var(--text2);
+}
+.dmod:hover{background:rgba(255,255,255,0.04);color:var(--text);}
+.dmod-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dmod-btns{display:flex;gap:2px;margin-left:auto;}
+.dmod-btn{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:11px;padding:1px 4px;border-radius:3px;
+}
+.dmod-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);}
 </style>
 </head>
 <body style="display:flex;flex-direction:column;height:100%;">
 
+<!-- Fix 4: drawer -->
+<div class="drawer" id="drawer">
+  <div id="drawer-header">Модули</div>
+  <div id="drawer-list"></div>
+</div>
+
 <div id="topbar">
+  <!-- Fix 4: drawer toggle -->
+  <button id="drawer-btn" onclick="toggleDrawer()" title="Список модулей">≡</button>
   <div id="logo" onclick="showDropzone()" title="Добавить модуль">MOEX<span>/</span>toolkit</div>
   <nav id="nav"></nav>
+  <!-- Fix 3: overflow button with dropdown -->
+  <div style="position:relative;flex-shrink:0;">
+    <button id="nav-overflow-btn" onclick="toggleOverflowMenu()" title="Все модули">≡</button>
+    <div id="nav-overflow-menu"></div>
+  </div>
   <button class="ntab" id="btn-add" onclick="showDropzone()"
     style="color:var(--accent);border-color:rgba(255,0,110,0.2);background:rgba(255,0,110,0.05);flex-shrink:0">
     ＋ модуль
@@ -414,7 +495,7 @@ function rebuildNav() {
     btn.className = 'ntab' + (i === activeIdx ? ' active' : '');
     btn.innerHTML =
       `<span class="dot"></span>` +
-      `<span>${m.label}</span>` +
+      `<span class="tlabel" title="${m.label}">${m.label}</span>` +
       `<button class="pop-btn" title="В левую панель"  onclick="event.stopPropagation();openPanel('left',${i})">◧</button>` +
       `<button class="pop-btn" title="В правую панель" onclick="event.stopPropagation();openPanel('right',${i})">◨</button>` +
       `<button class="pop-btn" title="Открыть в окне"  onclick="event.stopPropagation();openWindow(${i})">⧉</button>` +
@@ -422,6 +503,65 @@ function rebuildNav() {
     btn.onclick = () => openModule(i);
     nav.appendChild(btn);
   });
+
+  // Fix 3: overflow indicator
+  requestAnimationFrame(() => {
+    const overflowBtn = document.getElementById('nav-overflow-btn');
+    if (nav.scrollWidth > nav.clientWidth + 4) {
+      overflowBtn.style.display = 'block';
+    } else {
+      overflowBtn.style.display = 'none';
+    }
+    rebuildOverflowMenu();
+  });
+
+  // Fix 4: rebuild drawer
+  rebuildDrawer();
+}
+
+// Fix 3: overflow dropdown
+function rebuildOverflowMenu() {
+  const menu = document.getElementById('nav-overflow-menu');
+  menu.innerHTML = modules.map((m, i) =>
+    `<button class="nov-item${i === activeIdx ? ' active' : ''}" onclick="openModule(${i});closeOverflowMenu()">${m.label}</button>`
+  ).join('');
+}
+
+function toggleOverflowMenu() {
+  document.getElementById('nav-overflow-menu').classList.toggle('open');
+}
+
+function closeOverflowMenu() {
+  document.getElementById('nav-overflow-menu').classList.remove('open');
+}
+
+// Close overflow menu on outside click
+document.addEventListener('click', function(e) {
+  const btn = document.getElementById('nav-overflow-btn');
+  const menu = document.getElementById('nav-overflow-menu');
+  if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
+// Fix 4: drawer toggle + rebuild
+function toggleDrawer() {
+  document.getElementById('drawer').classList.toggle('open');
+}
+
+function rebuildDrawer() {
+  const list = document.getElementById('drawer-list');
+  if (!list) return;
+  list.innerHTML = modules.map((m, i) => `
+    <div class="dmod">
+      <span class="dmod-name" title="${m.label}">${m.label}</span>
+      <div class="dmod-btns">
+        <button class="dmod-btn" title="Открыть" onclick="openModule(${i});document.getElementById('drawer').classList.remove('open')">↗</button>
+        <button class="dmod-btn" title="В левую панель" onclick="openPanel('left',${i})">◧</button>
+        <button class="dmod-btn" title="В правую панель" onclick="openPanel('right',${i})">◨</button>
+        <button class="dmod-btn" title="Открыть в окне" onclick="openWindow(${i})">⧉</button>
+      </div>
+    </div>`).join('');
 }
 
 function showDropzone() {
@@ -673,6 +813,7 @@ function openWindow(modIdx, opts) {
   el.id = id;
   el.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;z-index:${++_zTop}`;
 
+  // Fix 2: 8 resize handles
   el.innerHTML =
     `<div class="fwin-bar">` +
       `<div class="fwin-dot"></div>` +
@@ -686,7 +827,14 @@ function openWindow(modIdx, opts) {
     `<div class="fwin-body">` +
       `<iframe></iframe>` +
     `</div>` +
-    `<div class="fwin-resize"></div>`;
+    `<div class="fwin-edge n"  data-dir="n"></div>` +
+    `<div class="fwin-edge s"  data-dir="s"></div>` +
+    `<div class="fwin-edge e"  data-dir="e"></div>` +
+    `<div class="fwin-edge w"  data-dir="w"></div>` +
+    `<div class="fwin-edge ne" data-dir="ne"></div>` +
+    `<div class="fwin-edge nw" data-dir="nw"></div>` +
+    `<div class="fwin-edge se" data-dir="se"></div>` +
+    `<div class="fwin-edge sw" data-dir="sw"></div>`;
 
   document.getElementById('win-layer').appendChild(el);
 
@@ -702,8 +850,10 @@ function openWindow(modIdx, opts) {
   // drag за titlebar
   makeDraggable(el, el.querySelector('.fwin-bar'));
 
-  // resize за уголок
-  makeResizable(el, el.querySelector('.fwin-resize'));
+  // Fix 2: resize all 8 handles
+  el.querySelectorAll('.fwin-edge').forEach(handle => {
+    makeResizable(el, handle, handle.dataset.dir);
+  });
 
   focusWindow(id);
   toast(m.label + ' → окно');
@@ -760,18 +910,26 @@ function makeDraggable(el, handle) {
   });
 }
 
-// resize
-function makeResizable(el, handle) {
+// Fix 2: resize with direction support
+function makeResizable(el, handle, dir) {
   handle.addEventListener('mousedown', e => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX, startY = e.clientY;
     const startW = el.offsetWidth, startH = el.offsetHeight;
+    const startL = el.offsetLeft, startT = el.offsetTop;
     const onMove = e => {
-      const nw = Math.max(240, startW + e.clientX - startX);
-      const nh = Math.max(140, startH + e.clientY - startY);
-      el.style.width  = nw + 'px';
-      el.style.height = nh + 'px';
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      let newL = startL, newT = startT, newW = startW, newH = startH;
+      if (dir === 'e'  || dir === 'ne' || dir === 'se') newW = Math.max(240, startW + dx);
+      if (dir === 'w'  || dir === 'nw' || dir === 'sw') { newW = Math.max(240, startW - dx); newL = startL + startW - newW; }
+      if (dir === 's'  || dir === 'se' || dir === 'sw') newH = Math.max(140, startH + dy);
+      if (dir === 'n'  || dir === 'ne' || dir === 'nw') { newH = Math.max(140, startH - dy); newT = startT + startH - newH; }
+      el.style.left   = newL + 'px';
+      el.style.top    = newT + 'px';
+      el.style.width  = newW + 'px';
+      el.style.height = newH + 'px';
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
@@ -842,8 +1000,16 @@ async function syncPushToD1(apiUrl) {
 // ══ МОСТ — вставляется в каждый модуль автоматически ══
 // Слушает SHELL_STATE, пробрасывает токен/тикер в поля модуля.
 // Отвечает MODULE_EVENT когда модуль хочет обновить общий тикер/токен.
+// Fix 1: injected dark scrollbar CSS with hardcoded colors (vars not available in iframe)
 const SHELL_BRIDGE = `<script>
 (function(){
+  // Вставляем тёмные скроллбары в iframe
+  (function(){
+    var s = document.createElement('style');
+    s.textContent = '::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#140A24}::-webkit-scrollbar-thumb{background:#3d2d60;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#52F2C9}*{scrollbar-width:thin;scrollbar-color:#3d2d60 #140A24;}';
+    document.head.appendChild(s);
+  })();
+
   window.addEventListener('message', function(e){
     var d = e.data;
     if (!d || d.type !== 'SHELL_STATE') return;
