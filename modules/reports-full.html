@@ -8,36 +8,47 @@
 <style>
 
 :root{
-  --bg:#0a0e14;
-  --s1:#11161e;
-  --s2:#1a212c;
-  --s3:#1f2836;
-  --border:#222a37;
-  --border2:#2e3847;
+  --bg:#0B0613;
+  --panel:#140A24;
+  --card:#1A1030;
+  --s1:#140A24;
+  --s2:#1A1030;
+  --s3:#221640;
+  --border:rgba(255,255,255,0.06);
+  --border2:rgba(170,90,255,0.12);
+  --brd:rgba(255,255,255,0.06);
+  --brdm:rgba(255,0,128,0.12);
+  --brdp:rgba(170,90,255,0.12);
   --acc:#a78bfa;
   --acc2:#7c5fc9;
   --acc-dim:rgba(167,139,250,.1);
-  --green:#22d3a0;
-  --green-dim:rgba(34,211,160,.1);
-  --warn:#f5a623;
-  --danger:#ff4d6d;
-  --danger-dim:rgba(255,77,109,.1);
+  --pur:#AA5AFF;
+  --green:#52F2C9;
+  --green-dim:rgba(82,242,201,.1);
+  --warn:#E8895A;
+  --danger:#FF4D7A;
+  --danger-dim:rgba(255,77,122,.1);
   --purple:#a78bfa;
-  --pos:#22d3a0;
-  --neg:#ff4d6d;
-  --text:#e6edf3;
-  --text1:#e6edf3;
-  --text2:#9ba3b1;
-  --text3:#5e6573;
+  --pos:#52F2C9;
+  --neg:#FF4D7A;
+  --text:#F2F0FF;
+  --text1:#F2F0FF;
+  --text2:#A79BC9;
+  --text3:#6F648F;
+  --t:#F2F0FF;
+  --t2:#A79BC9;
+  --t3:#6F648F;
+  --t4:#7E74A8;
+  --glow:0 0 0 1px rgba(170,90,255,0.08),0 0 18px rgba(170,90,255,0.06),inset 0 0 20px rgba(255,255,255,0.01);
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --sans:'Inter',ui-sans-serif,system-ui,sans-serif;
   --serif:'Cormorant Garamond',Georgia,serif;
-  --radius:6px;
-  --radius-md:8px;
-  --radius-lg:10px;
+  --radius:0px;
+  --radius-md:0px;
+  --radius-lg:0px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{overflow:auto!important;background:var(--bg);color:var(--text2);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
+html,body{overflow:auto!important;background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);color:var(--text2);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
 
 .page{display:none;padding:16px 20px}
 #page-reports{display:block!important}
@@ -48,111 +59,225 @@ html,body{overflow:auto!important;background:var(--bg);color:var(--text2);font-f
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:var(--text3)}
 
-/* Кнопки — Inter, скруглённые */
+/* Кнопки */
 .btn{
   display:inline-flex;align-items:center;gap:5px;
-  background:var(--s2);border:1px solid var(--border2);color:var(--text2);
-  font-family:var(--sans);font-size:.75rem;font-weight:500;
-  padding:6px 12px;cursor:pointer;border-radius:var(--radius);
-  transition:all .15s;white-space:nowrap;letter-spacing:.01em}
-.btn:hover{color:var(--text);border-color:var(--acc);background:var(--acc-dim)}
-.btn-sm{font-size:.7rem;padding:4px 10px}
-.btn-p,.btn-primary{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
-.btn-p:hover,.btn-primary:hover{background:var(--acc);color:var(--bg)}
-.btn-d,.btn-danger{border-color:var(--danger);color:var(--danger);background:transparent}
+  background:rgba(255,255,255,0.02);border:1px solid var(--brd);color:var(--text2);
+  font-family:var(--sans);font-size:.72rem;font-weight:600;
+  padding:5px 12px;cursor:pointer;border-radius:0;
+  transition:all .13s;white-space:nowrap;letter-spacing:.04em}
+.btn:hover{color:var(--text);border-color:var(--brdp);background:rgba(255,255,255,0.04)}
+.btn-sm{font-size:.65rem;padding:3px 8px}
+.btn-p,.btn-primary,.btn-acc{border-color:rgba(167,139,250,.4);color:var(--acc);background:rgba(167,139,250,.08)}
+.btn-p:hover,.btn-primary:hover,.btn-acc:hover{background:rgba(167,139,250,.15)}
+.btn-d,.btn-danger{border-color:rgba(255,77,122,.3);color:var(--danger);background:transparent}
 .btn-d:hover{background:var(--danger-dim)}
 .btn.active,.btn-sm.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
-.rep-tf-btn{font-size:.68rem;padding:3px 10px;border-radius:20px}
+.rep-tf-btn{font-size:.65rem;padding:2px 8px;border-radius:0}
 .rep-tf-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}
 
 /* Текст */
-.page-title{font-family:var(--serif);font-size:1.5rem;color:var(--acc);margin-bottom:2px;font-weight:600}
-.page-sub{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:14px}
+.page-title{font-family:var(--serif);font-size:1.4rem;color:var(--acc);margin-bottom:2px;font-weight:600}
+.page-sub{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:14px}
 
 /* Инпуты */
 input,select,textarea{
-  background:var(--s2);border:1px solid var(--border2);color:var(--text);
-  font-family:var(--sans);font-size:.8rem;padding:6px 10px;
-  outline:none;border-radius:var(--radius);transition:border .15s}
-input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,212,255,.1)}
-input::placeholder{color:var(--text3)}
-select option{background:var(--s1);color:var(--text)}
+  background:var(--bg);border:1px solid var(--brdp);color:var(--text);
+  font-family:var(--sans);font-size:.75rem;padding:5px 9px;
+  outline:none;border-radius:0;transition:border .15s}
+input:focus,select:focus{border-color:rgba(167,139,250,.5);box-shadow:none}
+input::placeholder{color:var(--t3)}
+select option{background:var(--panel);color:var(--text)}
 
 /* Таблицы */
-table{width:100%;border-collapse:collapse;font-size:.75rem;font-family:var(--mono)}
-th{color:var(--text3);font-weight:500;text-align:left;padding:6px 10px;
-  border-bottom:1px solid var(--border2);letter-spacing:.06em;
-  text-transform:uppercase;font-size:.62rem;font-family:var(--sans)}
-td{padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
-tr:hover td{background:var(--s2);color:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:.72rem;font-family:var(--mono)}
+th{color:var(--t3);font-weight:600;text-align:left;padding:6px 10px;
+  border-bottom:1px solid var(--brd);letter-spacing:.1em;
+  text-transform:uppercase;font-size:.58rem;font-family:var(--sans)}
+td{padding:5px 10px;border-bottom:1px solid var(--brd);color:var(--t2);vertical-align:top}
+tr:hover td{background:rgba(255,255,255,0.012);color:var(--text)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 
 /* Карточки */
 .rep-card,.card{
-  background:var(--s1);border:1px solid var(--border);
-  border-radius:var(--radius-md);padding:14px 16px;margin-bottom:10px;
-  box-shadow:0 1px 0 rgba(255,255,255,.02) inset,0 4px 16px -8px rgba(0,0,0,.5)}
+  background:var(--panel);border:1px solid var(--brd);
+  border-radius:0;padding:14px 16px;margin-bottom:10px}
 .section-title,.rep-sec-title{
-  font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--acc);margin:14px 0 8px;padding-left:8px;
-  border-left:2px solid var(--acc);font-family:var(--sans);font-weight:600}
+  font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t4);margin:14px 0 8px;display:flex;align-items:center;gap:9px;
+  font-family:var(--sans);font-weight:700}
+.section-title::after,.rep-sec-title::after{content:'';flex:1;height:1px;background:var(--brd)}
 
 /* Бейджи */
-.badge{font-size:.65rem;padding:2px 7px;border-radius:20px;
-  background:var(--s2);border:1px solid var(--border2);color:var(--text3);font-family:var(--sans)}
-.badge.ok{background:var(--green-dim);border-color:rgba(34,211,160,.3);color:var(--green)}
-.badge.err{background:var(--danger-dim);border-color:rgba(255,77,109,.3);color:var(--danger)}
-.badge.warn{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.3);color:var(--warn)}
+.badge{font-size:.62rem;padding:1px 6px;border-radius:0;
+  background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--t3);font-family:var(--sans)}
+.badge.ok{background:rgba(82,242,201,.08);border-color:rgba(82,242,201,.3);color:var(--green)}
+.badge.err{background:var(--danger-dim);border-color:rgba(255,77,122,.3);color:var(--danger)}
+.badge.warn{background:rgba(232,137,90,.1);border-color:rgba(232,137,90,.3);color:var(--warn)}
 
 /* Сайдбар эмитентов */
-.rep-sidebar{width:230px;flex-shrink:0;border-right:1px solid var(--border);
-  background:var(--s1);overflow-y:auto;max-height:calc(100vh - 120px)}
-.rep-issuer-item{padding:8px 14px;cursor:pointer;font-size:.75rem;color:var(--text2);
-  border-left:2px solid transparent;transition:all .12s;font-family:var(--sans)}
-.rep-issuer-item:hover{color:var(--text);background:var(--s2);border-left-color:var(--border2)}
-.rep-issuer-item.active{color:var(--acc);background:var(--acc-dim);border-left-color:var(--acc)}
+.rep-sidebar{width:230px;flex-shrink:0;border-right:1px solid var(--brdm);
+  background:var(--panel);overflow-y:auto;max-height:calc(100vh - 120px)}
+.rep-issuer-item{padding:8px 9px;cursor:pointer;font-size:.72rem;color:var(--t2);
+  border:1px solid var(--brd);border-left:2px solid transparent;
+  transition:all .12s;font-family:var(--sans);position:relative;margin-bottom:3px;background:transparent}
+.rep-issuer-item:hover{background:rgba(255,255,255,0.016);border-color:var(--brdm)}
+.rep-issuer-item[data-active="1"]{background:var(--card);border-color:var(--brdm);box-shadow:var(--glow)}
+
+/* Issuer list items — новый стиль */
+.iss-item{padding:8px 9px;border:1px solid var(--brd);margin-bottom:3px;
+  cursor:pointer;transition:background .1s,border-color .1s;position:relative;background:transparent}
+.iss-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
+  background:transparent;transition:background .1s}
+.iss-item:hover{background:rgba(255,255,255,0.016);border-color:var(--brdm)}
+.iss-item[data-active="1"]{background:var(--card);border-color:var(--brdm);box-shadow:var(--glow)}
+.iss-item[data-active="1"]::before{background:var(--acc)}
+.iss-name{font-size:11px;font-weight:600;color:var(--t);line-height:1.3;margin-bottom:2px;
+  display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.iss-meta{font-size:9px;color:var(--t3);font-family:var(--mono);
+  display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.ind-badge{padding:1px 4px;font-size:8.5px;font-weight:600;border:1px solid;border-radius:0}
+.rtg-badge{padding:1px 4px;font-size:8.5px;font-family:var(--mono);font-weight:600;border:1px solid;border-radius:0}
+.mult-row{display:flex;gap:9px}
+.mult-item{display:flex;flex-direction:column;gap:1px}
+.mult-lbl{font-size:8px;letter-spacing:.07em;color:var(--t3);text-transform:uppercase}
+.mult-val{font-size:10.5px;font-weight:600;font-family:var(--mono)}
+.c-pos{color:var(--pos)}.c-warn{color:var(--warn)}.c-neg{color:var(--neg)}
+
+/* Issuer header */
+.iss-hdr{padding:16px 20px 14px;border-bottom:1px solid rgba(170,90,255,0.18);
+  background:linear-gradient(180deg,rgba(36,20,64,0.95) 0%,rgba(28,14,52,0.85) 100%)}
+.iss-hdr-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:11px}
+.iss-title-blk{flex:1}
+.iss-title{font-size:18px;font-weight:700;color:var(--t);letter-spacing:-.02em;
+  display:flex;align-items:center;gap:9px}
+.iss-sub{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:3px;
+  display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.iss-actions{display:flex;gap:4px;align-items:center;flex-shrink:0}
+
+/* Score tiles */
+.score-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}
+.score-tile{padding:10px 13px;background:rgba(255,255,255,0.018);border:1px solid var(--brd);
+  display:flex;align-items:center;gap:12px}
+.score-info{flex:1;min-width:0}
+.score-lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin-bottom:5px}
+.score-bw{height:2px;background:rgba(255,255,255,0.05);margin-bottom:5px}
+.score-b{height:100%;transition:width .55s}
+.score-comps{font-size:9px;color:var(--t3);font-family:var(--mono)}
+.score-val{font-size:20px;font-weight:700;font-family:var(--mono);letter-spacing:-.03em;flex-shrink:0}
+
+/* Period nav */
+.period-nav-new{padding:0 20px;border-bottom:1px solid var(--brd);
+  display:flex;align-items:flex-end;gap:2px;background:rgba(20,10,36,0.28);flex-shrink:0}
+.ptab{padding:7px 13px;font-size:11px;font-weight:600;cursor:pointer;
+  border:1px solid transparent;border-bottom:none;color:var(--t3);background:transparent;
+  transition:all .1s;position:relative;display:flex;align-items:center;gap:5px}
+.ptab:hover{color:var(--t2);border-color:var(--brdm)}
+.ptab.active{background:rgba(26,16,48,0.85);border-color:var(--brdm);color:var(--t)}
+.ptab.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;
+  height:1px;background:rgba(26,16,48,0.85)}
+.p-badge{font-size:9px;padding:1px 4px;background:rgba(255,255,255,0.04);
+  color:var(--t3);border:1px solid rgba(255,255,255,0.05)}
+.ptab.active .p-badge{background:rgba(167,139,250,.09);color:var(--acc);border-color:rgba(167,139,250,.22)}
+
+/* Zone accordion */
+.zone{margin-bottom:4px;border:1px solid var(--brd);overflow:hidden}
+.zone-hdr{display:flex;align-items:stretch;border-bottom:1px solid var(--brd);
+  cursor:pointer;background:rgba(255,255,255,0.01);transition:background .1s}
+.zone-hdr:hover{background:rgba(255,255,255,0.02)}
+.zone-stripe{width:3px;flex-shrink:0}
+.zone-inner{flex:1;padding:7px 12px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.zone-name{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--t4)}
+.zone-summ{display:flex;gap:12px;margin-left:auto;flex-wrap:wrap}
+.zone-si{display:flex;align-items:center;gap:3px;font-size:9.5px;font-family:var(--mono)}
+.zone-sl{color:var(--t3);font-size:9px;margin-right:2px}
+.zone-chev{padding:7px 11px;font-size:9px;color:var(--t3);display:flex;align-items:center;transition:transform .18s}
+.zone.collapsed .zone-chev{transform:rotate(-90deg)}
+.zone.collapsed .zone-body{display:none}
+
+/* Dynamics row */
+.drow{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.026);transition:background .08s}
+.drow:last-child{border-bottom:none}
+.drow:hover{background:rgba(255,255,255,0.013)}
+.drow-top{display:flex;align-items:baseline;gap:7px;margin-bottom:5px}
+.d-lbl{font-size:11px;color:var(--t2);display:flex;align-items:center;gap:5px;flex:1}
+.d-lbl.bold{color:var(--t);font-weight:600}
+.d-pct{font-size:11px;font-family:var(--mono);font-weight:700}
+.d-vals{display:flex;align-items:baseline;gap:4px;flex-shrink:0;font-family:var(--mono);font-size:10.5px;margin-left:auto}
+.d-old{color:var(--t3)}.d-arr{color:var(--t3);font-size:9px}.d-new{font-weight:600;color:var(--t)}
+.d-new.red{color:var(--neg)}.d-new.wrn{color:var(--warn)}
+.d-bar{height:4px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden}
+.d-bar-ax{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)}
+.d-bar-f{position:absolute;top:0;bottom:0}
+
+/* Ratio row */
+.rrow{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.026);transition:background .08s}
+.rrow:last-child{border-bottom:none}
+.rrow:hover{background:rgba(255,255,255,0.013)}
+.rrow-top{display:flex;align-items:baseline;gap:7px;margin-bottom:5px;flex-wrap:wrap}
+.r-norm{margin-left:auto;font-size:9px;color:var(--t3);font-family:var(--mono)}
+.r-track{height:5px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden}
+.r-zone{position:absolute;top:0;bottom:0}
+.r-fill{position:absolute;left:0;top:0;bottom:0}
+.r-prev{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.5);z-index:2}
+.r-nl{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2);z-index:1}
+/* Засечки: relative container, absolute positions */
+.r-ticks{position:relative;height:14px;font-size:8px;font-family:var(--mono);color:var(--t3);margin-top:3px}
+.r-tick{position:absolute;transform:translateX(-50%)}
+.r-tick-start{position:absolute;left:0;transform:none}
+.r-tick-end{position:absolute;right:0;transform:none}
+
+/* Note row */
+.note-row{padding:6px 14px;font-size:9px;color:var(--t3);font-family:var(--mono);
+  border-bottom:1px solid rgba(255,255,255,0.025);display:flex;align-items:flex-start;gap:6px;
+  line-height:1.5;background:rgba(232,137,90,0.03)}
+.note-row::before{content:'△';font-size:8px;color:var(--warn);flex-shrink:0;margin-top:1px}
 
 /* Модалки */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;
   display:none;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
-.modal-box{background:var(--s1);border:1px solid var(--border2);
-  border-radius:var(--radius-lg);padding:24px;min-width:380px;
+.modal-box{background:var(--panel);border:1px solid var(--brdp);
+  border-radius:0;padding:24px;min-width:380px;
   max-width:90vw;max-height:90vh;overflow-y:auto;
-  box-shadow:0 8px 32px rgba(0,0,0,.6)}
-.modal-title{font-family:var(--serif);font-size:1.15rem;color:var(--acc);
-  margin-bottom:16px;font-weight:600}
+  box-shadow:0 8px 32px rgba(0,0,0,.7)}
+.modal-title{font-size:1.1rem;color:var(--acc);
+  margin-bottom:16px;font-weight:700}
 
 /* Утилиты */
-.text-muted{color:var(--text3)}.text-acc{color:var(--acc)}
+.text-muted{color:var(--t3)}.text-acc{color:var(--acc)}
 .text-green{color:var(--green)}.text-danger{color:var(--danger)}.text-warn{color:var(--warn)}
 .flex{display:flex}.gap-6{gap:6px}.gap-10{gap:10px}.flex-wrap{flex-wrap:wrap}
 .mt-8{margin-top:8px}.mb-8{margin-bottom:8px}
 
 /* Дополнительное из оригинала */
-.dossier-pill{display:inline-block;padding:2px 8px;font-size:.62rem;border-radius:20px;font-weight:500}
-.dossier-pill.ok{background:var(--green-dim);color:var(--green)}
-.dossier-pill.warn{background:rgba(245,166,35,.1);color:var(--warn)}
+.dossier-pill{display:inline-block;padding:1px 6px;font-size:.6rem;border-radius:0;font-weight:600}
+.dossier-pill.ok{background:rgba(82,242,201,.08);color:var(--green)}
+.dossier-pill.warn{background:rgba(232,137,90,.1);color:var(--warn)}
 .dossier-pill.err{background:var(--danger-dim);color:var(--danger)}
-.dossier-pill.nd{background:var(--s2);color:var(--text3)}
+.dossier-pill.nd{background:rgba(255,255,255,.04);color:var(--t3)}
 
 /* Поиск — выпадающий список */
 #rep-search-drop{position:absolute;left:0;right:0;top:100%;margin-top:2px;
-  background:var(--s1);border:1px solid var(--border2);border-radius:var(--radius-md);
+  background:var(--panel);border:1px solid var(--brdp);border-radius:0;
   z-index:200;max-height:340px;overflow-y:auto;
-  box-shadow:0 8px 24px rgba(0,0,0,.5)}
-#rep-search-drop .sd-group{padding:4px 8px 2px;font-size:.48rem;color:var(--text3);
-  text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);border-top:1px solid var(--border)}
+  box-shadow:0 8px 24px rgba(0,0,0,.6)}
+#rep-search-drop .sd-group{padding:4px 8px 2px;font-size:.46rem;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.1em;font-family:var(--sans);border-top:1px solid var(--brd)}
 #rep-search-drop .sd-item{display:flex;align-items:center;gap:6px;padding:5px 10px;
-  cursor:pointer;font-size:.68rem;transition:background .1s}
-#rep-search-drop .sd-item:hover{background:var(--s2)}
-#rep-search-drop .sd-item .sd-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
-#rep-search-drop .sd-item .sd-sub{font-size:.56rem;color:var(--text3);font-family:var(--mono);white-space:nowrap}
-#rep-search-drop .sd-item .sd-acc{font-size:.6rem;color:var(--acc);font-family:var(--mono);white-space:nowrap}
+  cursor:pointer;font-size:.65rem;transition:background .1s}
+#rep-search-drop .sd-item:hover{background:rgba(255,255,255,0.03)}
+#rep-search-drop .sd-item .sd-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t)}
+#rep-search-drop .sd-item .sd-sub{font-size:.54rem;color:var(--t3);font-family:var(--mono);white-space:nowrap}
+#rep-search-drop .sd-item .sd-acc{font-size:.58rem;color:var(--acc);font-family:var(--mono);white-space:nowrap}
 
-/* Сайдбар — пилюли деталей */
+/* Сайдбар */
 details summary::-webkit-details-marker{display:none}
 details summary{outline:none}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:var(--panel)}
+::-webkit-scrollbar-thumb{background:var(--brdp);border-radius:0}
+::-webkit-scrollbar-thumb:hover{background:var(--acc-dim)}
 </style>
 </head>
 <body>
@@ -28555,131 +28680,148 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
 })();
 
 // ── Визуальные улучшения ───────────────────────────────────────────────────
-// Инжектируем CSS — только улучшения поверх существующего дизайна
 (function(){
   var st = document.createElement('style');
   st.textContent = [
-    // Карточки: чёткое разделение, левая цветная полоска
-    '#rep-sidebar-list{display:flex;flex-direction:column;gap:4px;padding:6px 8px;}',
-    '.rep-issuer-item{',
-    '  padding:8px 10px 7px !important;',
-    '  border-radius:6px !important;',
-    '  border:1px solid var(--border) !important;',
-    '  border-left:3px solid var(--border2) !important;',
-    '  background:var(--bg) !important;',
-    '  transition:border-color .15s,background .15s !important;',
-    '  margin-bottom:0 !important;',
-    '}',
-    '.rep-issuer-item:hover{background:var(--s2) !important;border-color:var(--border2) !important;}',
-    '.rep-issuer-item[data-active="1"]{',
-    '  background:var(--acc-dim) !important;',
-    '  border-color:var(--acc) !important;',
-    '  border-left-color:var(--acc) !important;',
-    '}',
-    '.rep-iss-name{font-size:.68rem !important;font-weight:600 !important;line-height:1.3 !important}',
-    '.rep-iss-mults{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}',
-    '.rep-iss-pill{font-size:.55rem;font-family:var(--mono);padding:1px 6px;',
-    '  border-radius:10px;border:1px solid;white-space:nowrap}',
-    '.rep-iss-pill-nd{border-color:var(--border2);color:var(--text3);background:var(--s2)}',
-    '.rep-iss-info{font-size:.56rem;color:var(--text3);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}',
+    '#rep-sidebar-list{display:flex;flex-direction:column;gap:0;padding:4px;}',
     // Пилюли в шапке эмитента
     '.rep-header-pills{display:flex;flex-wrap:wrap;gap:5px;padding:8px 0 6px;',
-    '  border-bottom:1px solid var(--border);margin-bottom:6px}',
-    '.rhp{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;',
-    '  border:1px solid;font-size:.62rem;font-family:var(--mono)}',
-    '.rhp-label{font-size:.52rem;color:inherit;opacity:.7}',
+    '  border-bottom:1px solid var(--brd);margin-bottom:6px}',
+    '.rhp{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;',
+    '  border:1px solid;font-size:.6rem;font-family:var(--mono)}',
+    '.rhp-label{font-size:.5rem;color:inherit;opacity:.7}',
     '.rhp-val{font-weight:700}',
-    '.rhp-g{border-color:rgba(34,211,160,.4);background:rgba(34,211,160,.08);color:var(--green)}',
-    '.rhp-w{border-color:rgba(245,166,35,.4);background:rgba(245,166,35,.08);color:var(--warn)}',
-    '.rhp-r{border-color:rgba(255,77,109,.4);background:rgba(255,77,109,.08);color:var(--danger)}',
-    '.rhp-n{border-color:var(--border2);background:var(--s2);color:var(--text3)}',
-    // Плитки Запас прочности / Качество баланса — светлее для визуального отделения
-    '#rep-issuer-header [title*="Запас прочности"]:not(label),',
-    '#rep-issuer-header [title*="Altman"]{',
-    '  background:var(--s2) !important;border-color:var(--border2) !important;',
-    '  border-radius:8px !important;margin-top:6px !important;}',
-    // Кнопки — фиолетовый акцент
-    '.btn-p,.btn-primary{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}',
-    '.btn-p:hover,.btn-primary:hover{background:var(--acc);color:var(--bg)}',
-    '.btn.active,.btn-sm.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}',
-    '.rep-tf-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc-dim)}',
-    // Динамика: бары → фиолетовый
-    '.dyn-bar-pos{background:var(--acc) !important}',
-    '.dyn-bar-fill{background:var(--acc) !important}',
+    '.rhp-g{border-color:rgba(82,242,201,.35);background:rgba(82,242,201,.07);color:var(--green)}',
+    '.rhp-w{border-color:rgba(232,137,90,.35);background:rgba(232,137,90,.07);color:var(--warn)}',
+    '.rhp-r{border-color:rgba(255,77,122,.35);background:rgba(255,77,122,.07);color:var(--danger)}',
+    '.rhp-n{border-color:var(--brdp);background:rgba(255,255,255,.03);color:var(--t3)}',
+    // Секция динамики под периодом
+    '#rep-dynamics-zone{margin-top:0}',
+    // Обновление фона страницы
+    '#page-reports{background:transparent}',
+    // Основной сайдбар
+    '#rep-sidebar{background:var(--panel) !important;border-color:var(--brdm) !important}',
+    // Строка инструментов
+    '#rep-d1-load-btn{border-color:var(--acc) !important;color:var(--acc) !important;background:var(--acc-dim) !important;border-radius:0 !important}',
+    // Поиск
+    '#rep-search-main{border-radius:0 !important;border-color:var(--brdp) !important}',
+    // Фильтры
+    '#rep-filter-details{border-color:var(--brd) !important}',
+    '#rep-filter-details summary{background:var(--panel) !important;border-radius:0 !important}',
+    // Форма периода
+    '#rep-np-form,#rep-np-form *{border-radius:0 !important}',
   ].join('');
   document.head.appendChild(st);
 })();
 
-// Рендер одной карточки эмитента
+// Рендер одной карточки эмитента — стиль mockup с .iss-item
 function _repRenderIssuerCard(id, iss){
   var active = String(repActiveIssuerId) === String(id);
   var m = _repCalcMultipliers(iss);
-  // Пилюли метрик
-  function pill(label, val, fmt, lowGood){
-    // lowGood=true: меньше = лучше (долговые метрики)
+
+  // mult-item: label, val, color class
+  function multItem(lbl, val, fmt, lowGood, tGood, tWarn){
     var txt = (val == null || !isFinite(val)) ? '—'
-      : fmt === 'pct' ? (val*100).toFixed(0)+'%'
-      : val.toFixed(1)+'×';
-    var cls = 'rep-iss-pill rep-iss-pill-nd';
-    if(val != null && isFinite(val)){
-      var good, warn;
-      if(label === 'Д/Е')   { good=3; warn=5; }
-      else if(label === 'ICR'){ good=3; warn=1.5; lowGood=false; }
-      else if(label === 'ROE'){ good=0.15; warn=0; lowGood=false; }
-      else if(label === 'D/E'){ good=1; warn=2.5; }
-      else { good=null; }
-      if(good != null){
-        var ok = lowGood ? val<=good : val>=good;
-        var med = lowGood ? (val<=warn) : (val>=warn);
-        var col = ok ? 'color:var(--green);background:rgba(34,211,160,.09);border-color:rgba(34,211,160,.35)'
-                 : med ? 'color:var(--warn);background:rgba(245,166,35,.09);border-color:rgba(245,166,35,.35)'
-                 : 'color:var(--danger);background:rgba(255,77,109,.09);border-color:rgba(255,77,109,.35)';
-        cls = 'rep-iss-pill';
-        return '<span class="' + cls + '" style="' + col + '">' + label + ' ' + txt + '</span>';
-      }
+      : fmt === 'pct' ? (val*100).toFixed(1)+'%'
+      : val.toFixed(2)+'×';
+    var cls = '';
+    if(val != null && isFinite(val) && tGood != null){
+      var ok  = lowGood ? val <= tGood : val >= tGood;
+      var mid = lowGood ? val <= tWarn : val >= tWarn;
+      cls = ok ? 'c-pos' : mid ? 'c-warn' : 'c-neg';
     }
-    return '<span class="' + cls + '">' + label + ' ' + txt + '</span>';
+    return '<div class="mult-item"><div class="mult-lbl">'+lbl+'</div>'
+      +'<div class="mult-val'+(cls?' '+cls:'')+'">'+txt+'</div></div>';
   }
+
   // Левая полоска — цвет по Долг/EBITDA
   var de = m.de;
-  var borderColor = (de == null||!isFinite(de)) ? 'var(--border2)'
-    : de<=3 ? 'var(--green)' : de<=5 ? 'var(--warn)' : 'var(--danger)';
-  if(active) borderColor = 'var(--acc)';
-  var bg = active ? 'var(--acc-dim)' : 'var(--s1)';
-  var nameColor = active ? 'var(--acc)' : 'var(--text)';
+  var stripeColor = (de == null||!isFinite(de)) ? 'rgba(255,255,255,0.08)'
+    : de<=2.5 ? 'rgba(82,242,201,0.6)' : de<=4.5 ? 'rgba(232,137,90,0.6)' : 'rgba(255,77,122,0.6)';
+
   var indKey = iss.ind || 'other';
   var indLabel = (window._industryData&&window._industryData.industries&&window._industryData.industries[indKey]&&window._industryData.industries[indKey].label) || indKey;
+
   // Рейтинг
-  var rating = '';
+  var ratingHtml = '';
   if(Array.isArray(iss.ratings)&&iss.ratings.length){
     var best = iss.ratings.slice().sort(function(a,b){ return (_ratingRank(b.rating)||0)-(_ratingRank(a.rating)||0); })[0];
     if(best&&best.rating){
       var rk = _ratingRank(best.rating)||0;
-      var rc = rk>=12?'var(--green)':rk>=6?'var(--warn)':'var(--danger)';
-      rating = ' <span style="font-size:.5rem;color:'+rc+';border:1px solid '+rc+';padding:0 4px;border-radius:3px">'+_escHtml(best.rating)+'</span>';
+      var rc = rk>=12?'var(--green)':rk>=6?'var(--warn)':'var(--neg)';
+      ratingHtml = ' <span class="rtg-badge" style="color:'+rc+';border-color:'+rc+'55">'+_escHtml(best.rating)+'</span>';
     }
   }
+
   var periods = Object.keys(iss.periods||{}).length;
-  var periodsTxt = periods>0 ? periods+' пер.' : '<span style="color:var(--text3)">нет данных</span>';
-  return '<div class="rep-issuer-item" data-active="'+(active?'1':'0')+'" onclick="repSelectIssuerById(\'' + id + '\')"'
-    +' style="border-left-color:'+borderColor+';background:'+bg+'">'
-    +'<div class="rep-iss-name" style="color:'+nameColor+'">'+_escHtml(iss.name||'без имени')+rating+'</div>'
-    +'<div class="rep-iss-info">'
-    + (iss.inn?'<span style="font-family:var(--mono)">'+iss.inn+'</span>':'')
-    + '<span style="background:var(--s2);padding:0 5px;border-radius:3px;border:1px solid var(--border2);color:var(--text2)">'+_escHtml(indLabel)+'</span>'
+  var metaStr = (iss.inn?'<span>'+iss.inn+'</span>':'')
+    + '<span class="ind-badge" style="color:var(--pur);border-color:var(--brdp)">'+_escHtml(indLabel)+'</span>'
     + (m.year?'<span>'+m.year+'</span>':'')
-    + '<span>'+periodsTxt+'</span>'
-    +'</div>'
-    +'<div class="rep-iss-mults">'
-    + pill('Д/Е', m.de, 'x', true)
-    + pill('ICR', m.icr, 'x', false)
-    + pill('ROE', m.roe, 'pct', false)
-    + pill('D/E', m.dde, 'x', true)
-    +'</div>'
+    + (periods>0 ? '<span>'+periods+' пер.</span>' : '<span style="opacity:.5">нет данных</span>');
+
+  var lp = (typeof _repLatestPeriod === 'function') ? _repLatestPeriod(iss) : null;
+  var p = lp ? lp.period : null;
+  var ndEb = (p&&p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
+  var ebitdaM = (p&&p.ebitda!=null&&p.rev>0) ? p.ebitda/p.rev : null;
+
+  var multsHtml = '<div class="mult-row">'
+    + multItem('Д/EBITDA', m.de,     'x',   true,  2.5, 4.5)
+    + multItem('ICR',      m.icr,    'x',   false, 3.0, 1.5)
+    + (ebitdaM!=null ? multItem('EBITDA%', ebitdaM, 'pct', false, 0.25, 0.10) : '')
+    + (ndEb!=null    ? multItem('ЧД/Е',   ndEb,    'x',   true,  2.5, 4.0)   : '')
+    + '</div>';
+
+  return '<div class="rep-issuer-item iss-item" data-active="'+(active?'1':'0')+'"'
+    +' onclick="repSelectIssuerById(\'' + id + '\')"'
+    +' style="--stripe:'+stripeColor+'">'
+    +'<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:'+stripeColor+'"></div>'
+    +'<div class="iss-name" style="padding-left:6px">'+_escHtml(iss.name||'без имени')+ratingHtml+'</div>'
+    +'<div class="iss-meta" style="padding-left:6px">'+metaStr+'</div>'
+    +'<div style="padding-left:6px">'+multsHtml+'</div>'
     +'</div>';
 }
 
-// Добавляем строку пилюль мультипликаторов в шапку эмитента
+// Вычисление score 0-100 для плиток шапки
+function _repScoreStress(mult, p){
+  var scores = [];
+  if(mult.icr!=null&&isFinite(mult.icr)){
+    // ICR: >3=100, 1.5-3=50-100, 0.5-1.5=0-50, <0.5=0
+    scores.push(mult.icr>=3 ? 100 : mult.icr>=1.5 ? 50+(mult.icr-1.5)/1.5*50 : mult.icr>=0.5 ? (mult.icr-0.5)*50 : 0);
+  }
+  if(mult.de!=null&&isFinite(mult.de)){
+    // ND/EBITDA: <2=100, 2-5=50-100 inv, >8=0
+    var de = Math.max(0, mult.de);
+    scores.push(de<=2 ? 100 : de<=5 ? 100-(de-2)/3*50 : de<=8 ? 50-(de-5)/3*50 : 0);
+  }
+  if(p&&p.debt!=null&&p.rev&&p.rev>0){
+    // Долг/Выручка: <1=100, 1-3=50-100 inv, >5=0
+    var dr = p.debt/p.rev;
+    scores.push(dr<=1 ? 100 : dr<=3 ? 100-(dr-1)/2*50 : dr<=5 ? 50-(dr-3)/2*50 : 0);
+  }
+  if(!scores.length) return null;
+  return Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
+}
+function _repScoreQuality(mult, p){
+  var scores = [];
+  if(mult.cur!=null&&isFinite(mult.cur)){
+    var cr = Math.max(0,mult.cur);
+    scores.push(cr>=2 ? 100 : cr>=1 ? (cr-1)*100 : cr>=0.5 ? (cr-0.5)*100 : 0);
+  }
+  if(p&&p.assets&&p.assets>0){
+    if(p.eq!=null){
+      var er = p.eq/p.assets;
+      scores.push(er>=0.5 ? 100 : er>=0.2 ? er/0.5*100 : er>=0 ? er/0.2*40 : 0);
+    }
+    if(p.cash!=null){
+      var cashR = p.cash/p.assets;
+      scores.push(cashR>=0.15 ? 100 : cashR>=0.05 ? cashR/0.15*100 : cashR/0.05*30);
+    }
+  }
+  if(!scores.length) return null;
+  return Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
+}
+
+// Переопределяем шапку: добавляем score tiles и пилюли метрик
 (function(){
   var _origHeader = _repRenderActiveIssuerHeader;
   window._repRenderActiveIssuerHeader = function(){
@@ -28688,15 +28830,61 @@ function _repRenderIssuerCard(id, iss){
     if(!box) return;
     var iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
     if(!iss) return;
-    var old = box.querySelector('.rep-header-pills');
-    if(old) old.remove();
+
+    // Убрать старые элементы
+    ['.rep-header-pills','.rep-score-row-wrap'].forEach(function(sel){
+      var old = box.querySelector(sel); if(old) old.remove();
+    });
+
     var mult = _repCalcMultipliers(iss);
     var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
     var p = lp ? lp.period : null;
     var ebitdaM = (p&&p.ebitda!=null&&p.rev>0) ? p.ebitda/p.rev : null;
     var roa     = (p&&p.np!=null&&p.assets>0)  ? p.np/p.assets  : null;
-    var ndEb    = (p&&p.debt!=null&&p.cash!=null&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
-    // Пилюля: label, val, fmt(pct/x), lowGood(меньше=лучше), [thresholds good,warn]
+    var ndEb    = (p&&p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
+    var yr      = mult.year ? ' · '+mult.year : '';
+
+    var ss = _repScoreStress(mult, p);
+    var sq = _repScoreQuality(mult, p);
+
+    function scoreColor(s){ return s>=70?'var(--pos)':s>=40?'var(--warn)':'var(--neg)'; }
+
+    // Score tiles
+    var stressComp = [
+      mult.icr!=null&&isFinite(mult.icr) ? 'ICR '+mult.icr.toFixed(2)+'×' : null,
+      ndEb!=null ? 'ЧД/Е '+ndEb.toFixed(1)+'×' : null,
+    ].filter(Boolean).join(' · ') || '—';
+    var qualComp = [
+      p&&p.assets>0&&p.eq!=null ? 'E/A '+(p.eq/p.assets*100).toFixed(1)+'%' : null,
+      mult.cur!=null&&isFinite(mult.cur) ? 'CR '+mult.cur.toFixed(2)+'×' : null,
+    ].filter(Boolean).join(' · ') || '—';
+
+    var scHtml = '<div class="rep-score-row-wrap score-row">';
+    if(ss!=null){
+      var sc = scoreColor(ss);
+      scHtml += '<div class="score-tile">'
+        +'<div class="score-info">'
+        +'<div class="score-lbl">Запас прочности'+yr+'</div>'
+        +'<div class="score-bw"><div class="score-b" style="width:'+ss+'%;background:'+sc+'"></div></div>'
+        +'<div class="score-comps">'+stressComp+'</div>'
+        +'</div>'
+        +'<div class="score-val" style="color:'+sc+'">'+ss+'<span style="font-size:9px;color:var(--t3)">/100</span></div>'
+        +'</div>';
+    }
+    if(sq!=null){
+      var qc = scoreColor(sq);
+      scHtml += '<div class="score-tile">'
+        +'<div class="score-info">'
+        +'<div class="score-lbl">Качество баланса'+yr+'</div>'
+        +'<div class="score-bw"><div class="score-b" style="width:'+sq+'%;background:'+qc+'"></div></div>'
+        +'<div class="score-comps">'+qualComp+'</div>'
+        +'</div>'
+        +'<div class="score-val" style="color:'+qc+'">'+sq+'<span style="font-size:9px;color:var(--t3)">/100</span></div>'
+        +'</div>';
+    }
+    scHtml += '</div>';
+
+    // Пилюли метрик
     function rhp(label, val, fmt, lowGood, tGood, tWarn){
       var txt = (val==null||!isFinite(val)) ? '—'
         : fmt==='pct' ? (val*100).toFixed(1)+'%'
@@ -28710,7 +28898,7 @@ function _repRenderIssuerCard(id, iss){
       return '<span class="rhp '+cls+'"><span class="rhp-label">'+label+'</span>'
         +'<span class="rhp-val">'+txt+'</span></span>';
     }
-    var html = '<div class="rep-header-pills">'
+    var pillsHtml = '<div class="rep-header-pills">'
       + rhp('Долг/EBITDA', mult.de,    'x',   true,  2.5, 4.5)
       + rhp('ЧД/EBITDA',  ndEb,        'x',   true,  2.5, 4.0)
       + rhp('ICR',         mult.icr,   'x',   false, 3.0, 1.5)
@@ -28719,10 +28907,11 @@ function _repRenderIssuerCard(id, iss){
       + rhp('D/E',         mult.dde,   'x',   true,  1.0, 2.5)
       + rhp('Current',     mult.cur,   'x',   false, 1.5, 1.0)
       + '</div>';
-    // Вставляем сразу после строки с именем (первый child box'а)
-    var first = box.firstElementChild;
-    if(first) first.insertAdjacentHTML('afterend', html);
-    else box.insertAdjacentHTML('afterbegin', html);
+
+    // Инжектируем после первого ребёнка (строки с именем)
+    var insertAfter = box.firstElementChild || null;
+    if(insertAfter) insertAfter.insertAdjacentHTML('afterend', scHtml + pillsHtml);
+    else box.insertAdjacentHTML('afterbegin', scHtml + pillsHtml);
   };
 })();
 
@@ -28761,6 +28950,135 @@ function _repRenderIssuerCard(id, iss){
       dotEl.textContent = dot;
       btn.appendChild(dotEl);
     });
+  };
+})();
+
+// ── Блок «Коэффициенты» с .rrow/.r-track и правильно позиционированными засечками ──
+function _repRenderRatioZone(iss){
+  var mult = _repCalcMultipliers(iss);
+  var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
+  var p = lp ? lp.period : null;
+  if(!p) return '';
+
+  // prev period для сравнения
+  var periods = Object.keys(iss.periods||{}).sort(function(a,b){
+    var pa = iss.periods[a], pb = iss.periods[b];
+    return (pa.year||0) - (pb.year||0);
+  });
+  var prevPk = null;
+  if(lp && periods.length >= 2){
+    var ci = periods.indexOf(lp.pkey);
+    if(ci > 0) prevPk = periods[ci-1];
+  }
+  var prev = prevPk ? iss.periods[prevPk] : null;
+
+  var ndEb    = (p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
+  var ndEbPrev= prev&&(prev.debt!=null&&prev.cash!=null&&prev.ebitda&&prev.ebitda>0) ? (prev.debt-prev.cash)/prev.ebitda : null;
+  var ebitdaM = (p.ebitda!=null&&p.rev>0) ? p.ebitda/p.rev*100 : null;
+  var ebitdaMPrev = prev&&(prev.ebitda!=null&&prev.rev>0) ? prev.ebitda/prev.rev*100 : null;
+  var eqR     = (p.assets>0&&p.eq!=null) ? p.eq/p.assets*100 : null;
+  var eqRPrev = prev&&(prev.assets>0&&prev.eq!=null) ? prev.eq/prev.assets*100 : null;
+
+  // rrow(lbl, val, prevVal, min, max, normVal, normDir, unit, isLower)
+  function rrow(lbl, val, prevVal, scaleMin, scaleMax, normVal, normDir, unit, lowerBetter){
+    if(val==null||!isFinite(val)) return '';
+    var range = scaleMax - scaleMin;
+    if(range <= 0) return '';
+    var normPct = Math.min(100, Math.max(0, (normVal - scaleMin) / range * 100));
+    var fillPct = Math.min(100, Math.max(0, (val  - scaleMin) / range * 100));
+    var prevPct = (prevVal!=null&&isFinite(prevVal)) ? Math.min(100, Math.max(0, (prevVal - scaleMin) / range * 100)) : null;
+
+    var good = lowerBetter ? val<=normVal : val>=normVal;
+    var fillColor = good ? 'rgba(82,242,201,0.55)' : 'rgba(255,77,122,0.55)';
+    var delta = (prevVal!=null&&isFinite(prevVal)) ? val - prevVal : null;
+    var deltaColor = (delta==null) ? '' : (lowerBetter ? (delta<0?'var(--pos)':'var(--neg)') : (delta>0?'var(--pos)':'var(--neg)'));
+    var deltaStr = delta==null ? '' : '<span class="d-pct" style="color:'+deltaColor+'">'
+      +(delta>0?'▲ +':'▼ ')+(Math.abs(delta)<10?delta.toFixed(2):delta.toFixed(1))+unit+'</span>';
+
+    var valStr = val.toFixed(val>=100?0:2)+unit;
+    var prevStr = prevVal!=null&&isFinite(prevVal) ? '<span class="d-old">'+prevVal.toFixed(prevVal>=100?0:2)+unit+'</span><span class="d-arr">→</span>' : '';
+    var valClass = good ? '' : ' red';
+    var normStr = normDir+''+normVal+(normVal<10?normVal.toFixed(1):normVal.toFixed(0))+unit;
+
+    // Фоновые зоны: хорошая / плохая
+    var zoneGood  = lowerBetter
+      ? 'left:0;width:'+normPct+'%;background:rgba(82,242,201,0.06)'
+      : 'left:'+normPct+'%;right:0;background:rgba(82,242,201,0.06)';
+    var zoneBad   = lowerBetter
+      ? 'left:'+normPct+'%;right:0;background:rgba(255,77,122,0.06)'
+      : 'left:0;width:'+normPct+'%;background:rgba(255,77,122,0.06)';
+
+    // Засечки с абсолютным позиционированием — FIX главного бага
+    var tickMin  = scaleMin+(unit==='x'?'x':'%');
+    var tickNorm = (normVal>=100?normVal.toFixed(0):normVal.toFixed(1))+unit+(good?' ✓':'');
+    var tickMax  = scaleMax+(unit==='x'?'x':'%');
+    var normTickColor = good ? 'var(--pos)' : 'var(--warn)';
+
+    return '<div class="rrow">'
+      +'<div class="rrow-top">'
+      +'<div class="d-lbl bold">'+_escHtml(lbl)+'</div>'
+      +deltaStr
+      +'<div class="d-vals">'+prevStr+'<span class="d-new'+valClass+'">'+valStr+'</span></div>'
+      +'<span class="r-norm">норма '+normDir+(normVal<10?normVal.toFixed(1):normVal.toFixed(0))+unit+'</span>'
+      +'</div>'
+      +'<div class="r-track">'
+      +'<div class="r-zone" style="'+zoneGood+'"></div>'
+      +'<div class="r-zone" style="'+zoneBad+'"></div>'
+      +'<div class="r-fill" style="width:'+fillPct+'%;background:'+fillColor+'"></div>'
+      +(prevPct!=null ? '<div class="r-prev" style="left:'+prevPct+'%"></div>' : '')
+      +'<div class="r-nl" style="left:'+normPct+'%"></div>'
+      +'</div>'
+      // засечки: start/norm/end — абсолютное позиционирование
+      +'<div class="r-ticks">'
+      +'<span class="r-tick-start">'+tickMin+'</span>'
+      +'<span class="r-tick" style="left:'+normPct+'%;color:'+normTickColor+'">'+tickNorm+'</span>'
+      +'<span class="r-tick-end">'+tickMax+'</span>'
+      +'</div>'
+      +'</div>';
+  }
+
+  var rows = ''
+    + rrow('ND / EBITDA', ndEb,     ndEbPrev,  0, 7,  3, '<',  'x', true)
+    + rrow('ICR (покр. %)', mult.icr, null,    0, 5,  1.5, '>','x', false)
+    + rrow('EBITDA маржа', ebitdaM,  ebitdaMPrev, 0, 50, 15, '>', '%', false)
+    + rrow('D/E',          mult.dde, null,     0, 10, 2, '<',   'x', true)
+    + rrow('Equity Ratio', eqR,      eqRPrev,  0, 100, 30, '>','%', false);
+
+  if(!rows) return '';
+
+  var yr = mult.year ? ' · '+mult.year : '';
+  return '<div id="rep-dynamics-zone">'
+    +'<div class="zone" id="rep-ratio-zone">'
+    +'<div class="zone-hdr" onclick="var z=document.getElementById(\'rep-ratio-zone\');z.classList.toggle(\'collapsed\')">'
+    +'<div class="zone-stripe" style="background:var(--acc)"></div>'
+    +'<div class="zone-inner"><div class="zone-name">Коэффициенты'+yr+'</div></div>'
+    +'<div class="zone-chev">▾</div>'
+    +'</div>'
+    +'<div class="zone-body">'+rows+'<div class="note-row">Заливка = текущий период. Черта = предыдущий. Зоны = нормативы.</div></div>'
+    +'</div>'
+    +'</div>';
+}
+
+// После каждого выбора эмитента — обновить/создать блок коэффициентов
+(function(){
+  var _origSel = window.repSelectIssuerById;
+  window.repSelectIssuerById = function(id){
+    _origSel(id);
+    setTimeout(function(){
+      var iss = (reportsDB||{})[id];
+      if(!iss) return;
+      var old = document.getElementById('rep-dynamics-zone');
+      if(old) old.remove();
+      var html = _repRenderRatioZone(iss);
+      if(!html) return;
+      // Вставляем после блока reference
+      var refWrap = document.getElementById('rep-np-ref-wrap');
+      if(refWrap && refWrap.parentNode){
+        var div = document.createElement('div');
+        div.innerHTML = html;
+        refWrap.parentNode.insertBefore(div.firstElementChild, refWrap.nextSibling);
+      }
+    }, 120);
   };
 })();
 
