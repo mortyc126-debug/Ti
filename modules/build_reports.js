@@ -1131,249 +1131,147 @@ var _GOV_NAME_RE = /^(администрация|правительство|ми
   };
 })();
 
-// ── Визуальные улучшения ───────────────────────────────────────────────────
+// ── Дополнительные стили ──────────────────────────────────────────────────────
 (function(){
   var st = document.createElement('style');
   st.textContent = [
-    '#rep-sidebar-list{display:flex;flex-direction:column;gap:0;padding:4px;}',
-    // Пилюли в шапке эмитента
-    '.rep-header-pills{display:flex;flex-wrap:wrap;gap:5px;padding:8px 0 6px;',
-    '  border-bottom:1px solid var(--brd);margin-bottom:6px}',
-    '.rhp{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;',
-    '  border:1px solid;font-size:.6rem;font-family:var(--mono)}',
-    '.rhp-label{font-size:.5rem;color:inherit;opacity:.7}',
+    '#rep-sidebar-list{display:flex;flex-direction:column;gap:0;padding:4px}',
+    '#rep-issuer-header{padding:0!important;background:transparent!important;border:none!important}',
+    '#rep-period-tabs{display:flex;align-items:flex-end;gap:2px;flex-wrap:wrap;padding:0 16px;border-bottom:1px solid var(--brd);background:rgba(20,10,36,0.28)}',
+    '#rep-period-tabs .ptab,.ptab{padding:7px 13px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid transparent;border-bottom:none;color:var(--t3);background:transparent;transition:all .1s;position:relative;display:inline-flex;align-items:center;gap:5px;font-family:var(--sans);border-radius:0;margin-bottom:0}',
+    '#rep-period-tabs .ptab:hover,.ptab:hover{color:var(--t2);border-color:var(--brdm)}',
+    '#rep-period-tabs .ptab.active,.ptab.active{background:rgba(26,16,48,.85);border-color:var(--brdm);color:var(--t)}',
+    "#rep-period-tabs .ptab.active::after,.ptab.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:rgba(26,16,48,.85)}",
+    '.rhp{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border:1px solid;font-size:10px;font-family:var(--mono);border-radius:0}',
+    '.rhp-label{font-size:8px;opacity:.7}',
     '.rhp-val{font-weight:700}',
-    '.rhp-g{border-color:rgba(82,242,201,.35);background:rgba(82,242,201,.07);color:var(--green)}',
-    '.rhp-w{border-color:rgba(232,137,90,.35);background:rgba(232,137,90,.07);color:var(--warn)}',
-    '.rhp-r{border-color:rgba(255,77,122,.35);background:rgba(255,77,122,.07);color:var(--danger)}',
-    '.rhp-n{border-color:var(--brdp);background:rgba(255,255,255,.03);color:var(--t3)}',
-    // Секция динамики под периодом
-    '#rep-dynamics-zone{margin-top:0}',
-    // Обновление фона страницы
-    '#page-reports{background:transparent}',
-    // Основной сайдбар
-    '#rep-sidebar{background:var(--panel) !important;border-color:var(--brdm) !important}',
-    // Строка инструментов
-    '#rep-d1-load-btn{border-color:var(--acc) !important;color:var(--acc) !important;background:var(--acc-dim) !important;border-radius:0 !important}',
-    // Поиск
-    '#rep-search-main{border-radius:0 !important;border-color:var(--brdp) !important}',
-    // Фильтры
-    '#rep-filter-details{border-color:var(--brd) !important}',
-    '#rep-filter-details summary{background:var(--panel) !important;border-radius:0 !important}',
-    // Форма периода
-    '#rep-np-form,#rep-np-form *{border-radius:0 !important}',
+    '.rhp-g{border-color:rgba(82,242,201,.35);background:rgba(82,242,201,.06);color:var(--pos)}',
+    '.rhp-w{border-color:rgba(232,137,90,.35);background:rgba(232,137,90,.06);color:var(--warn)}',
+    '.rhp-r{border-color:rgba(255,77,122,.35);background:rgba(255,77,122,.06);color:var(--neg)}',
+    '.rhp-n{border-color:var(--brdp);background:rgba(255,255,255,.02);color:var(--t3)}',
+    '#rep-dyn-panel{margin-bottom:4px}',
+    '.score-comps{font-size:9px;color:var(--t3);font-family:var(--mono)}',
   ].join('');
   document.head.appendChild(st);
 })();
 
-// Рендер одной карточки эмитента — стиль mockup с .iss-item
-function _repRenderIssuerCard(id, iss){
-  var active = String(repActiveIssuerId) === String(id);
-  var m = _repCalcMultipliers(iss);
-
-  // mult-item: label, val, color class
-  function multItem(lbl, val, fmt, lowGood, tGood, tWarn){
-    var txt = (val == null || !isFinite(val)) ? '—'
-      : fmt === 'pct' ? (val*100).toFixed(1)+'%'
-      : val.toFixed(2)+'×';
-    var cls = '';
-    if(val != null && isFinite(val) && tGood != null){
-      var ok  = lowGood ? val <= tGood : val >= tGood;
-      var mid = lowGood ? val <= tWarn : val >= tWarn;
-      cls = ok ? 'c-pos' : mid ? 'c-warn' : 'c-neg';
-    }
-    return '<div class="mult-item"><div class="mult-lbl">'+lbl+'</div>'
-      +'<div class="mult-val'+(cls?' '+cls:'')+'">'+txt+'</div></div>';
-  }
-
-  // Левая полоска — цвет по Долг/EBITDA
-  var de = m.de;
-  var stripeColor = (de == null||!isFinite(de)) ? 'rgba(255,255,255,0.08)'
-    : de<=2.5 ? 'rgba(82,242,201,0.6)' : de<=4.5 ? 'rgba(232,137,90,0.6)' : 'rgba(255,77,122,0.6)';
-
-  var indKey = iss.ind || 'other';
-  var indLabel = (window._industryData&&window._industryData.industries&&window._industryData.industries[indKey]&&window._industryData.industries[indKey].label) || indKey;
-
-  // Рейтинг
-  var ratingHtml = '';
+// ── Генератор новой шапки эмитента (.iss-hdr) ─────────────────────────────
+function _repBuildIssuerHeader(iss, issId){
+  var indKey = iss.ind||'other';
+  var indLabel = (window._industryData&&window._industryData.industries&&
+    window._industryData.industries[indKey]&&window._industryData.industries[indKey].label)||indKey;
+  var innStr = iss.inn ? '<span>ИНН <strong style="color:var(--t2);font-weight:600">'+_escHtml(iss.inn)+'</strong></span><span>·</span>' : '';
+  var ratingsHtml = '';
   if(Array.isArray(iss.ratings)&&iss.ratings.length){
-    var best = iss.ratings.slice().sort(function(a,b){ return (_ratingRank(b.rating)||0)-(_ratingRank(a.rating)||0); })[0];
-    if(best&&best.rating){
-      var rk = _ratingRank(best.rating)||0;
-      var rc = rk>=12?'var(--green)':rk>=6?'var(--warn)':'var(--neg)';
-      ratingHtml = ' <span class="rtg-badge" style="color:'+rc+';border-color:'+rc+'55">'+_escHtml(best.rating)+'</span>';
-    }
+    ratingsHtml = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">'
+      + iss.ratings.slice(0,4).map(function(r){
+        if(!r||!r.rating) return '';
+        var rk = (typeof _ratingRank==='function'&&_ratingRank(r.rating))||0;
+        var rc = rk>=12?'var(--pos)':rk>=6?'var(--warn)':'var(--neg)';
+        var outlook = r.outlook==='positive'?'↗':r.outlook==='negative'?'↘':r.outlook==='stable'?'→':'';
+        return '<span class="rtg-badge" style="color:'+rc+';border-color:'+rc+'44">'
+          +(r.agency?_escHtml(r.agency)+' ':'')+_escHtml(r.rating)+outlook+'</span>';
+      }).join('')+'</div>';
   }
-
-  var periods = Object.keys(iss.periods||{}).length;
-  var metaStr = (iss.inn?'<span>'+iss.inn+'</span>':'')
-    + '<span class="ind-badge" style="color:var(--pur);border-color:var(--brdp)">'+_escHtml(indLabel)+'</span>'
-    + (m.year?'<span>'+m.year+'</span>':'')
-    + (periods>0 ? '<span>'+periods+' пер.</span>' : '<span style="opacity:.5">нет данных</span>');
-
-  var lp = (typeof _repLatestPeriod === 'function') ? _repLatestPeriod(iss) : null;
-  var p = lp ? lp.period : null;
-  var ndEb = (p&&p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
-  var ebitdaM = (p&&p.ebitda!=null&&p.rev>0) ? p.ebitda/p.rev : null;
-
-  var multsHtml = '<div class="mult-row">'
-    + multItem('Д/EBITDA', m.de,     'x',   true,  2.5, 4.5)
-    + multItem('ICR',      m.icr,    'x',   false, 3.0, 1.5)
-    + (ebitdaM!=null ? multItem('EBITDA%', ebitdaM, 'pct', false, 0.25, 0.10) : '')
-    + (ndEb!=null    ? multItem('ЧД/Е',   ndEb,    'x',   true,  2.5, 4.0)   : '')
+  var indHtml = '<span style="color:var(--pur);border:1px solid rgba(170,90,255,0.22);padding:1px 5px;font-size:9px">'+_escHtml(indLabel)+'</span>';
+  var actHtml = '<div style="display:flex;gap:4px;align-items:center;flex-shrink:0">'
+    + '<button class="btn" onclick="repEditIssuer&&repEditIssuer()">✎ отрасль</button>'
+    + '<button class="btn" onclick="repRunAudit&&repRunAudit()">аудит</button>'
+    + '<button class="btn" id="rep-add-period-btn" onclick="repNewPeriodModal&&repNewPeriodModal()">+ период</button>'
+    + '<button class="btn btn-acc" id="rep-compare-btn" onclick="repOpenCrossCompare&&repOpenCrossCompare()">≡ Сравнить</button>'
     + '</div>';
-
-  return '<div class="rep-issuer-item iss-item" data-active="'+(active?'1':'0')+'"'
-    +' onclick="repSelectIssuerById(\\'' + id + '\\')"'
-    +' style="--stripe:'+stripeColor+'">'
-    +'<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:'+stripeColor+'"></div>'
-    +'<div class="iss-name" style="padding-left:6px">'+_escHtml(iss.name||'без имени')+ratingHtml+'</div>'
-    +'<div class="iss-meta" style="padding-left:6px">'+metaStr+'</div>'
-    +'<div style="padding-left:6px">'+multsHtml+'</div>'
+  var mult = _repCalcMultipliers(iss);
+  var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
+  var p = lp ? lp.period : null;
+  var yr = mult.year ? ' · '+mult.year : '';
+  var ndEb = p&&p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0 ? (p.debt-p.cash)/p.ebitda : null;
+  // Stress score
+  var stressScore=null, stressColor='var(--warn)', stressComps='—';
+  try {
+    var st2 = (typeof _repStressScore==='function') ? _repStressScore(iss) : null;
+    if(st2&&st2.score!=null){ stressScore=st2.score; stressColor=(typeof _repStressColor==='function'&&_repStressColor(st2.score))||'var(--warn)'; }
+    var icrTxt=(st2&&st2.stressIcrVal!=null)?'Stress-ICR '+st2.stressIcrVal.toFixed(2):(mult.icr!=null&&isFinite(mult.icr)?'ICR '+mult.icr.toFixed(2)+'×':'ICR —');
+    var dwTxt=(st2&&st2.debtWallRatio!=null)?'Долг.стена '+st2.debtWallRatio.toFixed(2)+'×':(ndEb!=null?'ЧД/Е '+ndEb.toFixed(1)+'×':'');
+    stressComps = icrTxt+(dwTxt?' · '+dwTxt:'');
+  } catch(e2){
+    stressComps=(mult.icr!=null&&isFinite(mult.icr)?'ICR '+mult.icr.toFixed(2)+'×':'—');
+  }
+  if(stressScore==null){
+    var ss2=[];
+    if(mult.icr!=null&&isFinite(mult.icr)) ss2.push(mult.icr>=3?100:mult.icr>=1.5?(mult.icr-1.5)/1.5*50+50:mult.icr/1.5*50);
+    if(mult.de!=null&&isFinite(mult.de)) ss2.push(mult.de<=2?100:mult.de<=5?100-(mult.de-2)/3*50:mult.de<=8?50-(mult.de-5)/3*50:0);
+    if(ss2.length) stressScore=Math.round(ss2.reduce(function(a,b){return a+b;},0)/ss2.length);
+    stressColor=stressScore!=null?(stressScore>=70?'var(--pos)':stressScore>=40?'var(--warn)':'var(--neg)'):'var(--t3)';
+  }
+  // Quality score
+  var qualScore=null, qualColor='var(--warn)', qualComps='—';
+  var qs2=[];
+  if(mult.cur!=null&&isFinite(mult.cur)){ var cr2=Math.max(0,mult.cur); qs2.push(cr2>=2?100:cr2>=1?(cr2-1)*100:cr2>=0.5?(cr2-0.5)*100:0); }
+  if(p&&p.assets>0&&p.eq!=null){ var er2=p.eq/p.assets; qs2.push(er2>=0.5?100:er2>=0.2?er2/0.5*100:er2>=0?er2/0.2*40:0); }
+  if(qs2.length) qualScore=Math.round(qs2.reduce(function(a,b){return a+b;},0)/qs2.length);
+  qualColor=qualScore!=null?(qualScore>=70?'var(--pos)':qualScore>=40?'var(--warn)':'var(--neg)'):'var(--t3)';
+  if(p){
+    var cashPct=p.assets>0&&p.cash!=null?(p.cash/p.assets*100).toFixed(1)+'%':null;
+    var eqPct=p.assets>0&&p.eq!=null?(p.eq/p.assets*100).toFixed(1)+'%':null;
+    qualComps=[cashPct?'Cash/A '+cashPct:null,eqPct?'Eq/A '+eqPct:null,mult.cur!=null&&isFinite(mult.cur)?'CR '+mult.cur.toFixed(2)+'×':null].filter(Boolean).join(' · ')||'—';
+  }
+  function scoreTile(lbl, score, color, comps){
+    var sw=score!=null?score:0;
+    return '<div class="score-tile"><div class="score-info">'
+      +'<div class="score-lbl">'+lbl+yr+'</div>'
+      +'<div class="score-bw"><div class="score-b" style="width:'+sw+'%;background:'+color+'"></div></div>'
+      +'<div class="score-comps">'+comps+'</div>'
+      +'</div><div class="score-val" style="color:'+color+'">'+(score!=null?score:'—')
+      +'<span style="font-size:9px;color:var(--t3)">/100</span></div></div>';
+  }
+  function rhp(lbl,val,fmt,lowGood,tGood,tWarn){
+    var txt=(val==null||!isFinite(val))?'—':fmt==='pct'?(val*100).toFixed(1)+'%':val.toFixed(2)+'×';
+    var cls='rhp-n';
+    if(val!=null&&isFinite(val)&&tGood!=null){var ok=lowGood?val<=tGood:val>=tGood,med=lowGood?val<=tWarn:val>=tWarn;cls=ok?'rhp-g':med?'rhp-w':'rhp-r';}
+    return '<span class="rhp '+cls+'"><span class="rhp-label">'+lbl+'</span><span class="rhp-val">'+txt+'</span></span>';
+  }
+  var ebitdaM=(p&&p.ebitda!=null&&p.rev>0)?p.ebitda/p.rev:null;
+  var roa=(p&&p.np!=null&&p.assets>0)?p.np/p.assets:null;
+  var pillsHtml='<div style="display:flex;flex-wrap:wrap;gap:5px;padding:10px 16px;border-bottom:1px solid var(--brd)">'
+    +rhp('Долг/EBITDA',mult.de,'x',true,2.5,4.5)
+    +rhp('ЧД/EBITDA',ndEb,'x',true,2.5,4.0)
+    +rhp('ICR',mult.icr,'x',false,3.0,1.5)
+    +rhp('ROA',roa,'pct',false,0.10,0.03)
+    +rhp('EBITDA%',ebitdaM,'pct',false,0.25,0.10)
+    +rhp('D/E',mult.dde,'x',true,1.0,2.5)
+    +rhp('Current',mult.cur,'x',false,1.5,1.0)
     +'</div>';
+  return '<div class="iss-hdr">'
+    +'<div class="iss-hdr-top">'
+    +'<div class="iss-title-blk">'
+    +'<div class="iss-title">'+_escHtml(iss.name||'—')+'</div>'
+    +'<div class="iss-sub">'+innStr+indHtml+'</div>'
+    +ratingsHtml+'</div>'+actHtml+'</div>'
+    +'<div class="score-row" style="margin-top:10px">'
+    +scoreTile('Запас прочности',stressScore,stressColor,stressComps)
+    +scoreTile('Качество баланса',qualScore,qualColor,qualComps)
+    +'</div></div>'+pillsHtml;
 }
 
-// Вычисление score 0-100 для плиток шапки
-function _repScoreStress(mult, p){
-  var scores = [];
-  if(mult.icr!=null&&isFinite(mult.icr)){
-    // ICR: >3=100, 1.5-3=50-100, 0.5-1.5=0-50, <0.5=0
-    scores.push(mult.icr>=3 ? 100 : mult.icr>=1.5 ? 50+(mult.icr-1.5)/1.5*50 : mult.icr>=0.5 ? (mult.icr-0.5)*50 : 0);
-  }
-  if(mult.de!=null&&isFinite(mult.de)){
-    // ND/EBITDA: <2=100, 2-5=50-100 inv, >8=0
-    var de = Math.max(0, mult.de);
-    scores.push(de<=2 ? 100 : de<=5 ? 100-(de-2)/3*50 : de<=8 ? 50-(de-5)/3*50 : 0);
-  }
-  if(p&&p.debt!=null&&p.rev&&p.rev>0){
-    // Долг/Выручка: <1=100, 1-3=50-100 inv, >5=0
-    var dr = p.debt/p.rev;
-    scores.push(dr<=1 ? 100 : dr<=3 ? 100-(dr-1)/2*50 : dr<=5 ? 50-(dr-3)/2*50 : 0);
-  }
-  if(!scores.length) return null;
-  return Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
-}
-function _repScoreQuality(mult, p){
-  var scores = [];
-  if(mult.cur!=null&&isFinite(mult.cur)){
-    var cr = Math.max(0,mult.cur);
-    scores.push(cr>=2 ? 100 : cr>=1 ? (cr-1)*100 : cr>=0.5 ? (cr-0.5)*100 : 0);
-  }
-  if(p&&p.assets&&p.assets>0){
-    if(p.eq!=null){
-      var er = p.eq/p.assets;
-      scores.push(er>=0.5 ? 100 : er>=0.2 ? er/0.5*100 : er>=0 ? er/0.2*40 : 0);
-    }
-    if(p.cash!=null){
-      var cashR = p.cash/p.assets;
-      scores.push(cashR>=0.15 ? 100 : cashR>=0.05 ? cashR/0.15*100 : cashR/0.05*30);
-    }
-  }
-  if(!scores.length) return null;
-  return Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
-}
-
-// Переопределяем шапку: добавляем score tiles и пилюли метрик
+// ── Override header: REPLACE innerHTML entirely ────────────────────────────
 (function(){
-  var _origHeader = _repRenderActiveIssuerHeader;
+  var _origHdr = _repRenderActiveIssuerHeader;
   window._repRenderActiveIssuerHeader = function(){
-    _origHeader();
+    _origHdr();
     var box = document.getElementById('rep-issuer-header');
     if(!box) return;
     var iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
     if(!iss) return;
-
-    // Убрать старые элементы
-    ['.rep-header-pills','.rep-score-row-wrap'].forEach(function(sel){
-      var old = box.querySelector(sel); if(old) old.remove();
-    });
-
-    var mult = _repCalcMultipliers(iss);
-    var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
-    var p = lp ? lp.period : null;
-    var ebitdaM = (p&&p.ebitda!=null&&p.rev>0) ? p.ebitda/p.rev : null;
-    var roa     = (p&&p.np!=null&&p.assets>0)  ? p.np/p.assets  : null;
-    var ndEb    = (p&&p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
-    var yr      = mult.year ? ' · '+mult.year : '';
-
-    var ss = _repScoreStress(mult, p);
-    var sq = _repScoreQuality(mult, p);
-
-    function scoreColor(s){ return s>=70?'var(--pos)':s>=40?'var(--warn)':'var(--neg)'; }
-
-    // Score tiles
-    var stressComp = [
-      mult.icr!=null&&isFinite(mult.icr) ? 'ICR '+mult.icr.toFixed(2)+'×' : null,
-      ndEb!=null ? 'ЧД/Е '+ndEb.toFixed(1)+'×' : null,
-    ].filter(Boolean).join(' · ') || '—';
-    var qualComp = [
-      p&&p.assets>0&&p.eq!=null ? 'E/A '+(p.eq/p.assets*100).toFixed(1)+'%' : null,
-      mult.cur!=null&&isFinite(mult.cur) ? 'CR '+mult.cur.toFixed(2)+'×' : null,
-    ].filter(Boolean).join(' · ') || '—';
-
-    var scHtml = '<div class="rep-score-row-wrap score-row">';
-    if(ss!=null){
-      var sc = scoreColor(ss);
-      scHtml += '<div class="score-tile">'
-        +'<div class="score-info">'
-        +'<div class="score-lbl">Запас прочности'+yr+'</div>'
-        +'<div class="score-bw"><div class="score-b" style="width:'+ss+'%;background:'+sc+'"></div></div>'
-        +'<div class="score-comps">'+stressComp+'</div>'
-        +'</div>'
-        +'<div class="score-val" style="color:'+sc+'">'+ss+'<span style="font-size:9px;color:var(--t3)">/100</span></div>'
-        +'</div>';
-    }
-    if(sq!=null){
-      var qc = scoreColor(sq);
-      scHtml += '<div class="score-tile">'
-        +'<div class="score-info">'
-        +'<div class="score-lbl">Качество баланса'+yr+'</div>'
-        +'<div class="score-bw"><div class="score-b" style="width:'+sq+'%;background:'+qc+'"></div></div>'
-        +'<div class="score-comps">'+qualComp+'</div>'
-        +'</div>'
-        +'<div class="score-val" style="color:'+qc+'">'+sq+'<span style="font-size:9px;color:var(--t3)">/100</span></div>'
-        +'</div>';
-    }
-    scHtml += '</div>';
-
-    // Пилюли метрик
-    function rhp(label, val, fmt, lowGood, tGood, tWarn){
-      var txt = (val==null||!isFinite(val)) ? '—'
-        : fmt==='pct' ? (val*100).toFixed(1)+'%'
-        : val.toFixed(2)+'×';
-      var cls = 'rhp-n';
-      if(val!=null&&isFinite(val)&&tGood!=null){
-        var ok  = lowGood ? val<=tGood : val>=tGood;
-        var med = lowGood ? val<=tWarn : val>=tWarn;
-        cls = ok ? 'rhp-g' : med ? 'rhp-w' : 'rhp-r';
-      }
-      return '<span class="rhp '+cls+'"><span class="rhp-label">'+label+'</span>'
-        +'<span class="rhp-val">'+txt+'</span></span>';
-    }
-    var pillsHtml = '<div class="rep-header-pills">'
-      + rhp('Долг/EBITDA', mult.de,    'x',   true,  2.5, 4.5)
-      + rhp('ЧД/EBITDA',  ndEb,        'x',   true,  2.5, 4.0)
-      + rhp('ICR',         mult.icr,   'x',   false, 3.0, 1.5)
-      + rhp('ROA',         roa,        'pct', false, 0.10,0.03)
-      + rhp('EBITDA%',     ebitdaM,    'pct', false, 0.25,0.10)
-      + rhp('D/E',         mult.dde,   'x',   true,  1.0, 2.5)
-      + rhp('Current',     mult.cur,   'x',   false, 1.5, 1.0)
-      + '</div>';
-
-    // Инжектируем после первого ребёнка (строки с именем)
-    var insertAfter = box.firstElementChild || null;
-    if(insertAfter) insertAfter.insertAdjacentHTML('afterend', scHtml + pillsHtml);
-    else box.insertAdjacentHTML('afterbegin', scHtml + pillsHtml);
+    box.innerHTML = _repBuildIssuerHeader(iss, repActiveIssuerId);
   };
 })();
 
-// Индикатор полноты периода в табах (● полный / ◐ частичный / ○ пустой)
+// ── Индикатор полноты периода в табах ─────────────────────────────────────
 (function(){
   var _origBuild = typeof repBuildPeriodTabs === 'function' ? repBuildPeriodTabs : null;
   if(!_origBuild) return;
   window.repBuildPeriodTabs = function(){
     _origBuild();
-    // После рендера табов — добавить индикатор в каждый таб
     var tabsEl = document.getElementById('rep-period-tabs') || document.querySelector('.rep-period-tabs-wrap');
     if(!tabsEl) return;
     var iss = repActiveIssuerId ? reportsDB[repActiveIssuerId] : null;
@@ -1392,7 +1290,6 @@ function _repScoreQuality(mult, p){
       var filled = fields.filter(function(f){ return pd[f] != null; }).length;
       var dot = filled >= 10 ? '●' : filled >= 5 ? '◐' : '○';
       var dotColor = filled >= 10 ? 'var(--green)' : filled >= 5 ? 'var(--warn)' : 'var(--text3)';
-      // Убрать старый dot если уже добавлен
       var old = btn.querySelector('.pkey-dot');
       if(old) old.remove();
       var dotEl = document.createElement('span');
@@ -1405,159 +1302,217 @@ function _repScoreQuality(mult, p){
   };
 })();
 
-// ── Блок «Коэффициенты» с .rrow/.r-track и правильно позиционированными засечками ──
-function _repRenderRatioZone(iss){
-  var mult = _repCalcMultipliers(iss);
+// ── Генератор 4 зон динамики ──────────────────────────────────────────────
+function _repBuildDynPanel(iss){
   var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
-  var p = lp ? lp.period : null;
-  if(!p) return '';
-
-  // prev period для сравнения
+  if(!lp) return '';
+  var p = lp.period, pkey = lp.pkey;
   var periods = Object.keys(iss.periods||{}).sort(function(a,b){
-    var pa = iss.periods[a], pb = iss.periods[b];
-    return (pa.year||0) - (pb.year||0);
+    var pa=iss.periods[a],pb=iss.periods[b];
+    return ((pa.year||0)*100+(pa.period==='Год'?12:pa.period==='9М'?9:pa.period==='Полугодие'?6:3))
+          -((pb.year||0)*100+(pb.period==='Год'?12:pb.period==='9М'?9:pb.period==='Полугодие'?6:3));
   });
-  var prevPk = null;
-  if(lp && periods.length >= 2){
-    var ci = periods.indexOf(lp.pkey);
-    if(ci > 0) prevPk = periods[ci-1];
+  var ci=periods.indexOf(pkey);
+  var prev=ci>0?iss.periods[periods[ci-1]]:null;
+  var fmt=function(v){if(v==null||!isFinite(v))return '—';return Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);};
+  var fmtBn=function(v){if(v==null||!isFinite(v))return '—';return(Math.abs(v)>=1000?(v/1000).toFixed(0)+'T':Math.abs(v)>=100?v.toFixed(0):v.toFixed(1))+' млрд ₽';};
+
+  function drow(lbl, key, bold, isDebtLike){
+    var cur=p[key],prv=prev?prev[key]:null;
+    if(cur==null||!isFinite(cur)) return '';
+    var delta=(prv!=null&&isFinite(prv))?cur-prv:null;
+    var deltaPct=(delta!=null&&prv&&prv!==0)?delta/Math.abs(prv)*100:null;
+    var dir=delta==null?null:(isDebtLike?(delta>0?'neg':'pos'):(delta>0?'pos':'neg'));
+    var dColor=dir==='pos'?'var(--pos)':dir==='neg'?'var(--neg)':'var(--t3)';
+    var arrow=delta==null?'':delta>0?'▲ +':'▼ ';
+    var deltaStr=delta!=null?'<span style="font-size:11px;font-family:var(--mono);font-weight:700;color:'+dColor+'">'+arrow+(deltaPct!=null?Math.abs(deltaPct).toFixed(1)+'%':fmtBn(Math.abs(delta)))+'</span>':'';
+    var barW=deltaPct!=null?Math.min(45,Math.abs(deltaPct)/2):0;
+    var barSide=delta!=null&&delta>0?'left:50%;background:rgba(82,242,201,0.55)':'right:50%;background:rgba(255,77,122,0.55)';
+    if(dir==='neg'&&delta!=null) barSide=delta>0?'left:50%;background:rgba(255,77,122,0.65)':'right:50%;background:rgba(82,242,201,0.55)';
+    var valClass=(cur<0||(isDebtLike&&delta!=null&&delta>0))?'red':'';
+    return '<div class="drow'+(bold?' key':'')+'">'
+      +'<div class="drow-top"><div class="d-lbl'+(bold?' bold':'')+'">'+_escHtml(lbl)+'</div>'
+      +deltaStr
+      +'<div class="d-vals">'+(prv!=null?'<span class="d-old">'+fmtBn(prv)+'</span><span class="d-arr">→</span>':'')+'<span class="d-new'+(valClass?' '+valClass:'')+'">'+fmtBn(cur)+'</span></div>'
+      +'</div><div class="d-bar"><div class="d-bar-ax"></div>'
+      +(barW>0?'<div class="d-bar-f" style="width:'+barW+'%;'+barSide+'"></div>':'')
+      +'</div></div>';
   }
-  var prev = prevPk ? iss.periods[prevPk] : null;
 
-  var ndEb    = (p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0) ? (p.debt-p.cash)/p.ebitda : null;
-  var ndEbPrev= prev&&(prev.debt!=null&&prev.cash!=null&&prev.ebitda&&prev.ebitda>0) ? (prev.debt-prev.cash)/prev.ebitda : null;
-  var ebitdaM = (p.ebitda!=null&&p.rev>0) ? p.ebitda/p.rev*100 : null;
-  var ebitdaMPrev = prev&&(prev.ebitda!=null&&prev.rev>0) ? prev.ebitda/prev.rev*100 : null;
-  var eqR     = (p.assets>0&&p.eq!=null) ? p.eq/p.assets*100 : null;
-  var eqRPrev = prev&&(prev.assets>0&&prev.eq!=null) ? prev.eq/prev.assets*100 : null;
-
-  // rrow(lbl, val, prevVal, min, max, normVal, normDir, unit, isLower)
-  function rrow(lbl, val, prevVal, scaleMin, scaleMax, normVal, normDir, unit, lowerBetter){
+  function rrow(lbl,val,prevVal,scaleMin,scaleMax,normVal,normDir,unit,lowerBetter){
     if(val==null||!isFinite(val)) return '';
-    var range = scaleMax - scaleMin;
-    if(range <= 0) return '';
-    var normPct = Math.min(100, Math.max(0, (normVal - scaleMin) / range * 100));
-    var fillPct = Math.min(100, Math.max(0, (val  - scaleMin) / range * 100));
-    var prevPct = (prevVal!=null&&isFinite(prevVal)) ? Math.min(100, Math.max(0, (prevVal - scaleMin) / range * 100)) : null;
-
-    var good = lowerBetter ? val<=normVal : val>=normVal;
-    var fillColor = good ? 'rgba(82,242,201,0.55)' : 'rgba(255,77,122,0.55)';
-    var delta = (prevVal!=null&&isFinite(prevVal)) ? val - prevVal : null;
-    var deltaColor = (delta==null) ? '' : (lowerBetter ? (delta<0?'var(--pos)':'var(--neg)') : (delta>0?'var(--pos)':'var(--neg)'));
-    var deltaStr = delta==null ? '' : '<span class="d-pct" style="color:'+deltaColor+'">'
-      +(delta>0?'▲ +':'▼ ')+(Math.abs(delta)<10?delta.toFixed(2):delta.toFixed(1))+unit+'</span>';
-
-    var valStr = val.toFixed(val>=100?0:2)+unit;
-    var prevStr = prevVal!=null&&isFinite(prevVal) ? '<span class="d-old">'+prevVal.toFixed(prevVal>=100?0:2)+unit+'</span><span class="d-arr">→</span>' : '';
-    var valClass = good ? '' : ' red';
-    var normStr = normDir+''+normVal+(normVal<10?normVal.toFixed(1):normVal.toFixed(0))+unit;
-
-    // Фоновые зоны: хорошая / плохая
-    var zoneGood  = lowerBetter
-      ? 'left:0;width:'+normPct+'%;background:rgba(82,242,201,0.06)'
-      : 'left:'+normPct+'%;right:0;background:rgba(82,242,201,0.06)';
-    var zoneBad   = lowerBetter
-      ? 'left:'+normPct+'%;right:0;background:rgba(255,77,122,0.06)'
-      : 'left:0;width:'+normPct+'%;background:rgba(255,77,122,0.06)';
-
-    // Засечки с абсолютным позиционированием — FIX главного бага
-    var tickMin  = scaleMin+(unit==='x'?'x':'%');
-    var tickNorm = (normVal>=100?normVal.toFixed(0):normVal.toFixed(1))+unit+(good?' ✓':'');
-    var tickMax  = scaleMax+(unit==='x'?'x':'%');
-    var normTickColor = good ? 'var(--pos)' : 'var(--warn)';
-
-    return '<div class="rrow">'
-      +'<div class="rrow-top">'
+    var range=scaleMax-scaleMin; if(range<=0) return '';
+    var normPct=Math.min(100,Math.max(0,(normVal-scaleMin)/range*100));
+    var fillPct=Math.min(100,Math.max(0,(val-scaleMin)/range*100));
+    var prevPct=(prevVal!=null&&isFinite(prevVal))?Math.min(100,Math.max(0,(prevVal-scaleMin)/range*100)):null;
+    var good=lowerBetter?val<=normVal:val>=normVal;
+    var fillColor=good?'rgba(82,242,201,0.55)':'rgba(255,77,122,0.55)';
+    var delta=(prevVal!=null&&isFinite(prevVal))?val-prevVal:null;
+    var dColor=(delta==null)?'':(lowerBetter?(delta<0?'var(--pos)':'var(--neg)'):(delta>0?'var(--pos)':'var(--neg)'));
+    var arrow=delta==null?'':Math.abs(delta)<0.01?'':delta>0?'▲ +':'▼ ';
+    var deltaStr=delta!=null&&Math.abs(delta)>0.001?'<span class="d-pct" style="font-size:10px;font-family:var(--mono);font-weight:700;color:'+dColor+'">'+arrow+fmt(Math.abs(delta))+unit+'</span>':'';
+    var valCls=good?'':' red';
+    var zGood=lowerBetter?'left:0;width:'+normPct+'%;background:rgba(82,242,201,0.06)':'left:'+normPct+'%;right:0;background:rgba(82,242,201,0.06)';
+    var zBad=lowerBetter?'left:'+normPct+'%;right:0;background:rgba(255,77,122,0.06)':'left:0;width:'+normPct+'%;background:rgba(255,77,122,0.06)';
+    return '<div class="rrow"><div class="rrow-top">'
       +'<div class="d-lbl bold">'+_escHtml(lbl)+'</div>'
       +deltaStr
-      +'<div class="d-vals">'+prevStr+'<span class="d-new'+valClass+'">'+valStr+'</span></div>'
+      +'<div class="d-vals">'+(prevVal!=null&&isFinite(prevVal)?'<span class="d-old">'+fmt(prevVal)+unit+'</span><span class="d-arr">→</span>':'')+'<span class="d-new'+valCls+'">'+fmt(val)+unit+'</span></div>'
       +'<span class="r-norm">норма '+normDir+(normVal<10?normVal.toFixed(1):normVal.toFixed(0))+unit+'</span>'
-      +'</div>'
-      +'<div class="r-track">'
-      +'<div class="r-zone" style="'+zoneGood+'"></div>'
-      +'<div class="r-zone" style="'+zoneBad+'"></div>'
+      +'</div><div class="r-track">'
+      +'<div class="r-zone" style="'+zGood+'"></div>'
+      +'<div class="r-zone" style="'+zBad+'"></div>'
       +'<div class="r-fill" style="width:'+fillPct+'%;background:'+fillColor+'"></div>'
-      +(prevPct!=null ? '<div class="r-prev" style="left:'+prevPct+'%"></div>' : '')
+      +(prevPct!=null?'<div class="r-prev" style="left:'+prevPct+'%"></div>':'')
       +'<div class="r-nl" style="left:'+normPct+'%"></div>'
-      +'</div>'
-      // засечки: start/norm/end — абсолютное позиционирование
-      +'<div class="r-ticks">'
-      +'<span class="r-tick-start">'+tickMin+'</span>'
-      +'<span class="r-tick" style="left:'+normPct+'%;color:'+normTickColor+'">'+tickNorm+'</span>'
-      +'<span class="r-tick-end">'+tickMax+'</span>'
-      +'</div>'
-      +'</div>';
+      +'</div><div class="r-ticks">'
+      +'<span class="r-tick-start">'+scaleMin+unit+'</span>'
+      +'<span class="r-tick" style="left:'+normPct+'%;color:'+(good?'var(--pos)':'var(--warn)')+'">'+normVal.toFixed(normVal<10?1:0)+unit+(good?' ✓':'')+'</span>'
+      +'<span class="r-tick-end">'+scaleMax+unit+'</span>'
+      +'</div></div>';
   }
 
-  var rows = ''
-    + rrow('ND / EBITDA', ndEb,     ndEbPrev,  0, 7,  3, '<',  'x', true)
-    + rrow('ICR (покр. %)', mult.icr, null,    0, 5,  1.5, '>','x', false)
-    + rrow('EBITDA маржа', ebitdaM,  ebitdaMPrev, 0, 50, 15, '>', '%', false)
-    + rrow('D/E',          mult.dde, null,     0, 10, 2, '<',   'x', true)
-    + rrow('Equity Ratio', eqR,      eqRPrev,  0, 100, 30, '>','%', false);
+  function zone(id,stripeColor,title,summItems,body){
+    var summ=summItems.length?'<div class="zone-summ">'+summItems.map(function(s){
+      return '<div class="zone-si"><span class="zone-sl">'+s.lbl+'</span><span style="color:'+s.c+'">'+s.v+'</span></div>';
+    }).join('')+'</div>':'';
+    return '<div class="zone" id="'+id+'">'
+      +'<div class="zone-hdr" onclick="var z=document.getElementById(\\\''+id+'\\\');z.classList.toggle(\\\'collapsed\\\')">'
+      +'<div class="zone-stripe" style="background:'+stripeColor+'"></div>'
+      +'<div class="zone-inner"><div class="zone-name">'+title+'</div>'+summ+'</div>'
+      +'<div class="zone-chev">▾</div></div>'
+      +'<div class="zone-body">'+body+'</div></div>';
+  }
 
-  if(!rows) return '';
+  function pctStr(a,b){if(!a||!b||b===0)return null;var d=(a-b)/Math.abs(b)*100;return(d>0?'▲+':'▼')+Math.abs(d).toFixed(1)+'%';}
+  function pctCol(v,inv){if(v==null)return'var(--t3)';var n=parseFloat(v);return inv?(n<0?'var(--pos)':'var(--neg)'):(n>0?'var(--pos)':'var(--neg)');}
 
-  var yr = mult.year ? ' · '+mult.year : '';
-  return '<div id="rep-dynamics-zone">'
-    +'<div class="zone" id="rep-ratio-zone">'
-    +'<div class="zone-hdr" onclick="var z=document.getElementById(\\'rep-ratio-zone\\');z.classList.toggle(\\'collapsed\\')">'
-    +'<div class="zone-stripe" style="background:var(--acc)"></div>'
-    +'<div class="zone-inner"><div class="zone-name">Коэффициенты'+yr+'</div></div>'
-    +'<div class="zone-chev">▾</div>'
-    +'</div>'
-    +'<div class="zone-body">'+rows+'<div class="note-row">Заливка = текущий период. Черта = предыдущий. Зоны = нормативы.</div></div>'
-    +'</div>'
+  var plBody=drow('Выручка','rev',true,false)+drow('EBITDA','ebitda',true,false)+drow('EBIT','ebit',false,false)+drow('Проц. расходы','int',true,true)+drow('Чист. прибыль','np',true,false);
+  var plSumm=[];
+  if(p.rev&&prev&&prev.rev){var ps=pctStr(p.rev,prev.rev);if(ps)plSumm.push({lbl:'Выручка',v:ps,c:pctCol(ps,false)});}
+  if(p.ebitda&&prev&&prev.ebitda){var es=pctStr(p.ebitda,prev.ebitda);if(es)plSumm.push({lbl:'EBITDA',v:es,c:pctCol(es,false)});}
+
+  var bsBody=drow('Активы','assets',true,false)+drow('Собств. капитал','eq',false,false)+drow('Долг','debt',true,true)+drow('Ден. средства','cash',false,false);
+  var bsSumm=[];
+  if(p.debt&&prev&&prev.debt){var ds=pctStr(p.debt,prev.debt);if(ds)bsSumm.push({lbl:'Долг',v:ds,c:pctCol(ds,true)});}
+  if(p.assets&&prev&&prev.assets){var as2=pctStr(p.assets,prev.assets);if(as2)bsSumm.push({lbl:'Активы',v:as2,c:pctCol(as2,false)});}
+
+  var ndEb2=(p.debt!=null&&p.cash!=null&&p.ebitda&&p.ebitda>0)?(p.debt-p.cash)/p.ebitda:null;
+  var ndEbPrev2=prev&&(prev.debt!=null&&prev.cash!=null&&prev.ebitda&&prev.ebitda>0)?(prev.debt-prev.cash)/prev.ebitda:null;
+  var eM2=p.rev>0&&p.ebitda!=null?p.ebitda/p.rev*100:null;
+  var eMPrev2=prev&&prev.rev>0&&prev.ebitda!=null?prev.ebitda/prev.rev*100:null;
+  var eqR2=p.assets>0&&p.eq!=null?p.eq/p.assets*100:null;
+  var eqRPrev2=prev&&prev.assets>0&&prev.eq!=null?prev.eq/prev.assets*100:null;
+  var mult2=_repCalcMultipliers(iss);
+  var ratBody=rrow('ND / EBITDA',ndEb2,ndEbPrev2,0,7,3,'<','x',true)
+    +rrow('ICR (покр. %)',mult2.icr,null,0,5,1.5,'>','x',false)
+    +rrow('EBITDA маржа',eM2,eMPrev2,0,50,15,'>','%',false)
+    +rrow('D/E',mult2.dde,null,0,10,2,'<','x',true)
+    +rrow('Equity Ratio',eqR2,eqRPrev2,0,100,30,'>','%',false);
+  var ratSumm=[];
+  if(ndEb2!=null)ratSumm.push({lbl:'ND/Е',v:ndEb2.toFixed(1)+'x',c:ndEb2<=3?'var(--pos)':ndEb2<=5?'var(--warn)':'var(--neg)'});
+  if(mult2.icr!=null&&isFinite(mult2.icr))ratSumm.push({lbl:'ICR',v:mult2.icr.toFixed(2)+'x',c:mult2.icr>=3?'var(--pos)':mult2.icr>=1.5?'var(--warn)':'var(--neg)'});
+
+  var roe2=p.eq&&p.eq>0&&p.np!=null?p.np/p.eq*100:null;
+  var roa2=p.assets>0&&p.np!=null?p.np/p.assets*100:null;
+  var npm2=p.rev>0&&p.np!=null?p.np/p.rev*100:null;
+  var roePrev2=prev&&prev.eq&&prev.eq>0&&prev.np!=null?prev.np/prev.eq*100:null;
+  var roaPrev2=prev&&prev.assets>0&&prev.np!=null?prev.np/prev.assets*100:null;
+  function profRow(lbl,val,prevV,key2){
+    if(val==null||!isFinite(val))return '';
+    var d2=prevV!=null&&isFinite(prevV)?val-prevV:null;
+    var dGood2=d2==null?null:d2>0;
+    var dStr2=d2!=null?'<span style="font-size:10px;font-family:var(--mono);font-weight:700;color:'+(dGood2?'var(--pos)':'var(--neg)')+'">'+((d2>0?'▲ +':'▼ ')+Math.abs(d2).toFixed(1)+'%')+'</span>':'';
+    var barW2=d2!=null?Math.min(45,Math.abs(d2)/2):0;
+    var barSide2=d2!=null&&d2>0?'left:50%;background:rgba(82,242,201,0.45)':'right:50%;background:rgba(255,77,122,0.45)';
+    return '<div class="drow'+(key2?' key':'')+'">'
+      +'<div class="drow-top"><div class="d-lbl bold">'+lbl+'</div>'+dStr2
+      +'<div class="d-vals">'+(prevV!=null?'<span class="d-old">'+prevV.toFixed(1)+'%</span><span class="d-arr">→</span>':'')+'<span class="d-new'+(val>=0?'':' red')+'">'+val.toFixed(1)+'%</span></div>'
+      +'</div><div class="d-bar"><div class="d-bar-ax"></div>'+(barW2>0?'<div class="d-bar-f" style="width:'+barW2+'%;'+barSide2+'"></div>':'')+'</div></div>';
+  }
+  var rentBody=profRow('ROE',roe2,roePrev2,true)+profRow('ROA',roa2,roaPrev2,false);
+  if(npm2!=null&&isFinite(npm2))rentBody+=profRow('Чист. маржа',npm2,null,false);
+  var rentSumm=[];
+  if(roe2!=null&&isFinite(roe2))rentSumm.push({lbl:'ROE',v:roe2.toFixed(1)+'%',c:roe2>=15?'var(--pos)':roe2>=0?'var(--warn)':'var(--neg)'});
+  if(roa2!=null&&isFinite(roa2))rentSumm.push({lbl:'ROA',v:roa2.toFixed(1)+'%',c:roa2>=10?'var(--pos)':roa2>=3?'var(--warn)':'var(--neg)'});
+
+  var yr2=mult2.year||'';
+  var plHtml2=plBody?zone('rdz-pl','var(--pur)','П&L — '+(yr2||'период'),plSumm,plBody):'';
+  var bsHtml2=bsBody?zone('rdz-bs','rgba(170,90,255,0.5)','Баланс',bsSumm,bsBody):'';
+  var ratHtml2=ratBody?zone('rdz-rat','var(--acc)','Коэффициенты',ratSumm,ratBody):'';
+  var rentHtml2=rentBody?zone('rdz-rent','rgba(82,242,201,0.55)','Рентабельность',rentSumm,rentBody):'';
+  if(!plHtml2&&!bsHtml2&&!ratHtml2&&!rentHtml2) return '';
+  return '<div id="rep-dyn-panel" style="padding:0 0 8px">'+plHtml2+bsHtml2+ratHtml2+rentHtml2+'</div>';
+}
+
+// ── Карточка эмитента ─────────────────────────────────────────────────────
+function _repRenderIssuerCard(id, iss){
+  var active=String(repActiveIssuerId)===String(id);
+  var m=_repCalcMultipliers(iss);
+  function multItem(lbl,val,fmt,lowGood,tGood,tWarn){
+    var txt=(val==null||!isFinite(val))?'—':fmt==='pct'?(val*100).toFixed(1)+'%':val.toFixed(2)+'×';
+    var cls='';
+    if(val!=null&&isFinite(val)&&tGood!=null){var ok=lowGood?val<=tGood:val>=tGood,mid=lowGood?val<=tWarn:val>=tWarn;cls=ok?'c-pos':mid?'c-warn':'c-neg';}
+    return '<div class="mult-item"><div class="mult-lbl">'+lbl+'</div><div class="mult-val'+(cls?' '+cls:'')+'">'+txt+'</div></div>';
+  }
+  var de=m.de;
+  var stripe=(de==null||!isFinite(de))?'rgba(255,255,255,0.08)':de<=2.5?'rgba(82,242,201,0.7)':de<=4.5?'rgba(232,137,90,0.7)':'rgba(255,77,122,0.7)';
+  var indKey=iss.ind||'other';
+  var indLabel=(window._industryData&&window._industryData.industries&&window._industryData.industries[indKey]&&window._industryData.industries[indKey].label)||indKey;
+  var ratingHtml='';
+  if(Array.isArray(iss.ratings)&&iss.ratings.length){
+    var best=iss.ratings.slice().sort(function(a,b){return((typeof _ratingRank==='function'&&_ratingRank(b.rating))||0)-((typeof _ratingRank==='function'&&_ratingRank(a.rating))||0);})[0];
+    if(best&&best.rating){var rk=(typeof _ratingRank==='function'&&_ratingRank(best.rating))||0;var rc=rk>=12?'var(--pos)':rk>=6?'var(--warn)':'var(--neg)';ratingHtml=' <span class="rtg-badge" style="color:'+rc+';border-color:'+rc+'44">'+_escHtml(best.rating)+'</span>';}
+  }
+  var periods=Object.keys(iss.periods||{}).length;
+  var lp2=(typeof _repLatestPeriod==='function')?_repLatestPeriod(iss):null;
+  var p2=lp2?lp2.period:null;
+  var ndEb3=p2&&p2.debt!=null&&p2.cash!=null&&p2.ebitda&&p2.ebitda>0?(p2.debt-p2.cash)/p2.ebitda:null;
+  var eM3=p2&&p2.rev>0&&p2.ebitda!=null?p2.ebitda/p2.rev:null;
+  return '<div class="rep-issuer-item iss-item" data-active="'+(active?'1':'0')+'" onclick="repSelectIssuerById(\\\''+id+'\\\')">'
+    +'<div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:'+stripe+'"></div>'
+    +'<div class="iss-name" style="padding-left:7px">'+_escHtml(iss.name||'—')+ratingHtml+'</div>'
+    +'<div class="iss-meta" style="padding-left:7px">'+(iss.inn?'<span>'+iss.inn+'</span>':'')+'<span class="ind-badge" style="color:var(--pur);border-color:rgba(170,90,255,0.25)">'+_escHtml(indLabel)+'</span>'+(m.year?'<span>'+m.year+'</span>':'')+(periods>0?'<span>'+periods+' пер.</span>':'<span style="opacity:.4">нет данных</span>')+'</div>'
+    +'<div class="mult-row" style="padding-left:7px">'+multItem('Д/EBITDA',m.de,'x',true,2.5,4.5)+multItem('ICR',m.icr,'x',false,3.0,1.5)+(eM3!=null?multItem('EBITDA%',eM3,'pct',false,0.25,0.10):'')+(ndEb3!=null?multItem('ЧД/Е',ndEb3,'x',true,2.5,4.0):'')+'</div>'
     +'</div>';
 }
 
-// После каждого выбора эмитента — обновить/создать блок коэффициентов
+// ── Override repSelectIssuerById — inject 4-zone dynamics panel ───────────
 (function(){
-  var _origSel = window.repSelectIssuerById;
-  window.repSelectIssuerById = function(id){
-    _origSel(id);
+  var _prevSel=window.repSelectIssuerById;
+  window.repSelectIssuerById=function(id){
+    _prevSel(id);
+    document.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc=el.getAttribute('onclick')||'';
+      var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/);
+      el.dataset.active=(mm&&mm[1]===id)?'1':'0';
+    });
     setTimeout(function(){
-      var iss = (reportsDB||{})[id];
-      if(!iss) return;
-      var old = document.getElementById('rep-dynamics-zone');
-      if(old) old.remove();
-      var html = _repRenderRatioZone(iss);
-      if(!html) return;
-      // Вставляем после блока reference
-      var refWrap = document.getElementById('rep-np-ref-wrap');
-      if(refWrap && refWrap.parentNode){
-        var div = document.createElement('div');
-        div.innerHTML = html;
-        refWrap.parentNode.insertBefore(div.firstElementChild, refWrap.nextSibling);
-      }
-    }, 120);
+      var iss=(reportsDB||{})[id]; if(!iss) return;
+      var old=document.getElementById('rep-dyn-panel'); if(old) old.remove();
+      var html=_repBuildDynPanel(iss); if(!html) return;
+      var div=document.createElement('div'); div.innerHTML=html;
+      var target=document.getElementById('rep-np-ref-wrap');
+      if(target&&target.parentNode) target.parentNode.insertBefore(div.firstElementChild,target);
+    },150);
   };
 })();
 
-// Полностью заменяем генерацию карточек в списке
+// ── Replace cards after each render ──────────────────────────────────────
 (function(){
-  var _origRIL2 = window.repRenderIssuerList;
-  window.repRenderIssuerList = function(){
-    // Сначала оригинал — он заполняет listEl.innerHTML стандартными карточками
+  var _origRIL2=window.repRenderIssuerList;
+  window.repRenderIssuerList=function(){
     _origRIL2();
-    // Затем заменяем HTML каждой карточки на наш вариант
-    var listEl = document.getElementById('rep-sidebar-list');
-    if(!listEl) return;
-    var items = listEl.querySelectorAll('.rep-issuer-item');
-    items.forEach(function(el){
-      var oc = el.getAttribute('onclick')||'';
-      var m = oc.match(/repSelectIssuerById\('([^']+)'\)/);
-      if(!m) return;
-      var id = m[1];
-      var iss = (reportsDB||{})[id];
-      if(!iss) return;
-      var wasHidden = el.style.display === 'none';
-      var newCard = document.createElement('div');
-      newCard.innerHTML = _repRenderIssuerCard(id, iss);
-      var card = newCard.firstElementChild;
-      if(!card) return;
-      if(wasHidden) card.style.display = 'none';
-      el.parentNode.replaceChild(card, el);
+    var listEl=document.getElementById('rep-sidebar-list'); if(!listEl) return;
+    listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc=el.getAttribute('onclick')||'';
+      var mm=oc.match(/repSelectIssuerById\('([^']+)'\)/); if(!mm) return;
+      var id=mm[1],iss=(reportsDB||{})[id]; if(!iss) return;
+      var wasHidden=el.style.display==='none';
+      var tmp=document.createElement('div'); tmp.innerHTML=_repRenderIssuerCard(id,iss);
+      var card=tmp.firstElementChild; if(!card) return;
+      if(wasHidden) card.style.display='none';
+      el.parentNode.replaceChild(card,el);
     });
   };
 })();
