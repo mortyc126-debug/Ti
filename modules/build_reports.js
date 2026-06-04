@@ -1378,7 +1378,8 @@ function _repBuildIssuerHeader(iss, issId){
 function _repBuildDynPanel(iss){
   var lp = (typeof _repLatestPeriod==='function') ? _repLatestPeriod(iss) : null;
   if(!lp) return '';
-  var p = lp.period, pkey = lp.key;
+  var pkey = lp.key;
+  var p = iss.periods[pkey] || {};
   var periods = Object.keys(iss.periods||{}).sort(function(a,b){
     var pa=iss.periods[a],pb=iss.periods[b];
     return ((pa.year||0)*100+(pa.period==='Год'?12:pa.period==='9М'?9:pa.period==='Полугодие'?6:3))
