@@ -90,6 +90,17 @@ async function handleSync(url, auth) {
   // Сортируем хронологически для FIFO
   allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
+  // Проход 1: собираем figi фьючерсов/опционов по любому признаку.
+  // Varmargin-операции приходят без instrumentType — определяем фьючерс по наличию
+  // varmargin-записи для того же figi, либо по явному instrumentType.
+  const futuresFigis = new Set();
+  for (const op of allItems) {
+    const f = op.figi || op.instrumentUid || '';
+    if (!f) continue;
+    if (op.instrumentType === 'futures' || op.instrumentType === 'option') futuresFigis.add(f);
+    if (VAR_PLUS.has(op.type || '') || VAR_MINUS.has(op.type || '')) futuresFigis.add(f);
+  }
+
   // Два FIFO-стека на инструмент: длинные позиции и короткие
   // longs[figi]  = [{qty, costPerUnit}]   — себестоимость лонга
   // shorts[figi] = [{qty, procPerUnit}]   — выручка при открытии шорта
@@ -142,13 +153,13 @@ async function handleSync(url, auth) {
     const date = op.date ? op.date.slice(0, 10) : '';
     const name = op.name || figi;
     const afterFrom = date >= userFrom;
-    // Вариационная маржа — всегда реализованный P&L фьючерсов.
-    // ВАЖНО: у этих операций instrumentType=null, поэтому проверяем ДО isFutures.
+    // Вариационная маржа — реализованный P&L фьючерсов (instrumentType=null у этих операций)
     if (VAR_PLUS.has(opType) || VAR_MINUS.has(opType)) {
       if (afterFrom) addTrade(date, name, payment);
 
-    // Фьючерсы/опционы: BUY/SELL пропускаем — payment там ≠ реальная стоимость сделки
-    } else if (op.instrumentType === 'futures' || op.instrumentType === 'option') {
+    // Фьючерсы/опционы: BUY/SELL пропускаем — payment там ≠ реальная стоимость сделки.
+    // Проверяем по futuresFigis (собранных на проходе 1), т.к. instrumentType может быть null.
+    } else if (futuresFigis.has(figi)) {
       // skip
 
     } else if (STOCK_BUY.has(opType) && qty > 0) {
