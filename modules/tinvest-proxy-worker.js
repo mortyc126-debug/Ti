@@ -54,21 +54,11 @@ async function handleAccounts(auth) {
   return new Response(JSON.stringify(accounts), { status: 200, headers: CORS_JSON });
 }
 
-// GET /sync?accountId=X&from=YYYY-MM-DD
-// Возвращает {entries:[{id,date,position,pnl,type,note}], portfolioValue, syncedAt}
-// Группирует операции по (дата, инструмент, тип): суммирует payment.
-async function handleSync(url, auth) {
-  const accountId = url.searchParams.get('accountId');
-  if (!accountId) return new Response(JSON.stringify({ error: 'accountId required' }), { status: 400, headers: CORS_JSON });
-
-  const fromStr = url.searchParams.get('from');
-  const from = fromStr ? new Date(fromStr + 'T00:00:00Z').toISOString() : new Date(Date.now() - 365 * 86400000).toISOString();
-  const to = new Date().toISOString();
-
-  // Собираем все операции постранично
+// Постраничный сбор операций за период
+async function fetchOps(accountId, from, to, auth) {
   let cursor = '';
-  let allItems = [];
-  for (let i = 0; i < 20; i++) {
+  let items = [];
+  for (let i = 0; i < 30; i++) {
     const body = { accountId, from, to, limit: 1000 };
     if (cursor) body.cursor = cursor;
     const data = await tiPost(
@@ -76,41 +66,92 @@ async function handleSync(url, auth) {
       body, auth
     );
     if (data.code || data.message) throw new Error(data.message || 'API error');
-    allItems = allItems.concat(data.items || []);
+    items = items.concat(data.items || []);
     if (!data.hasNext || !data.nextCursor) break;
     cursor = data.nextCursor;
   }
+  return items;
+}
 
-  // Группируем по (date, name, category)
-  const map = {};
-  let entryIdx = 0;
+// GET /sync?accountId=X&from=YYYY-MM-DD
+// P&L считается методом FIFO: продал − себестоимость по FIFO.
+// Чтобы иметь базис для позиций, открытых до from, запрашиваем BUY-историю
+// на 2 года назад относительно from.
+async function handleSync(url, auth) {
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId) return new Response(JSON.stringify({ error: 'accountId required' }), { status: 400, headers: CORS_JSON });
+
+  const fromStr = url.searchParams.get('from');
+  const userFrom = fromStr ? fromStr : new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+  const to = new Date().toISOString();
+
+  // Берём операции с запасом на 2 года назад для расчёта себестоимости
+  const historyFrom = new Date(new Date(userFrom + 'T00:00:00Z').getTime() - 730 * 86400000).toISOString();
+  const allItems = await fetchOps(accountId, historyFrom, to, auth);
+
+  // Сортируем хронологически для FIFO
+  allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  // FIFO-очереди себестоимости: figi → [{qty, costPerUnit}]
+  const positions = {};
+
+  // Накапливаем готовые entry-записи (только для дат >= userFrom)
+  const tradeMap = {};   // "date|name" → pnl (суммируем несколько sell в один день)
+  const otherEntries = [];
+
   for (const op of allItems) {
     const opType = op.type || '';
-    let category;
-    if (opType.includes('BROKER_FEE') || opType.includes('SERVICE_FEE') || opType.includes('MARGIN_FEE') || opType.includes('TAX')) {
-      category = 'fee';
-    } else if (opType.includes('DIVIDEND') || opType.includes('COUPON') || opType.includes('BOND_REPAYMENT')) {
-      category = 'dividend';
-    } else if (opType.includes('BUY') || opType.includes('SELL')) {
-      category = 'trade';
-    } else {
-      continue; // пополнения/выводы пропускаем
-    }
-
-    const date = op.date ? op.date.slice(0, 10) : '';
-    const name = op.name || op.figi || 'Unknown';
-    const key = date + '|' + name + '|' + category;
+    const figi = op.figi || op.instrumentUid || 'unknown';
+    const qty = parseFloat(op.quantity || '0');
     const payment = moneyVal(op.payment);
+    const date = op.date ? op.date.slice(0, 10) : '';
+    const name = op.name || figi;
+    const afterFrom = date >= userFrom;
 
-    if (!map[key]) {
-      map[key] = { id: ++entryIdx, date, position: name, pnl: 0, type: category, note: '' };
+    if (opType.includes('BUY') && qty > 0) {
+      // Пополняем FIFO-очередь: цена покупки = |payment| / qty
+      if (!positions[figi]) positions[figi] = [];
+      positions[figi].push({ qty, costPerUnit: Math.abs(payment) / qty });
+
+    } else if (opType.includes('SELL') && qty > 0) {
+      // FIFO: вычитаем из очереди и считаем себестоимость
+      let remaining = qty;
+      let cost = 0;
+      const lots = positions[figi] || [];
+      while (remaining > 0 && lots.length > 0) {
+        const lot = lots[0];
+        const used = Math.min(lot.qty, remaining);
+        cost += used * lot.costPerUnit;
+        lot.qty -= used;
+        remaining -= used;
+        if (lot.qty <= 0) lots.shift();
+      }
+      // Для части без известного базиса (remaining > 0) просто не учитываем
+      const matched = qty - remaining;
+      if (afterFrom && matched > 0) {
+        const pnl = payment * (matched / qty) - cost;
+        const key = date + '|' + name;
+        tradeMap[key] = (tradeMap[key] || { date, position: name, pnl: 0 });
+        tradeMap[key].pnl += pnl;
+      }
+
+    } else if (afterFrom && (opType.includes('DIVIDEND') || opType.includes('COUPON') || opType.includes('BOND_REPAYMENT'))) {
+      otherEntries.push({ date, position: name, pnl: payment, type: 'dividend', note: '' });
+
+    } else if (afterFrom && (opType.includes('BROKER_FEE') || opType.includes('SERVICE_FEE') || opType.includes('MARGIN_FEE') || opType.includes('TAX'))) {
+      otherEntries.push({ date, position: name, pnl: payment, type: 'fee', note: '' });
     }
-    map[key].pnl += payment;
   }
 
-  const entries = Object.values(map)
-    .map(e => ({ ...e, pnl: Math.round(e.pnl * 100) / 100 }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  let idx = 0;
+  const tradeEntries = Object.values(tradeMap).map(e => ({
+    id: ++idx, date: e.date, position: e.position,
+    pnl: Math.round(e.pnl * 100) / 100, type: 'trade', note: ''
+  }));
+  const entries = [
+    ...tradeEntries,
+    ...otherEntries.map(e => ({ id: ++idx, ...e, pnl: Math.round(e.pnl * 100) / 100 }))
+  ].sort((a, b) => a.date.localeCompare(b.date));
 
   // Стоимость портфеля
   let portfolioValue = null;
