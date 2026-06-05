@@ -85,7 +85,7 @@ tr:hover td{background:rgba(255,255,255,0.012)}
     <div style="font-size:20px;font-weight:700;color:var(--t1)">P&L Dashboard</div>
   </div>
   <div style="text-align:right">
-    <div class="lbl" style="margin-bottom:2px">Депозит сейчас</div>
+    <div class="lbl" style="margin-bottom:2px" id="top-dep-lbl">Депозит сейчас</div>
     <div style="font-size:18px;font-weight:700;color:var(--t1)" id="top-dep-val">—</div>
   </div>
 </div>
@@ -356,11 +356,25 @@ function daysAgo(n){var d=new Date();d.setDate(d.getDate()-n);return d.toISOStri
 function ytdStart(){return new Date().getFullYear()+'-01-01'}
 function monthStart(){var d=new Date();return d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'))+'-01'}
 
-function save(){try{localStorage.setItem('pnl3-e',JSON.stringify(entries));localStorage.setItem('pnl3-i',JSON.stringify({d:initDep,dt:initDate}));}catch(e){}}
-function load(){try{var r=localStorage.getItem('pnl3-e');if(r)entries=JSON.parse(r);var i=localStorage.getItem('pnl3-i');if(i){var x=JSON.parse(i);initDep=x.d||0;initDate=x.dt||null;}}catch(e){}}
+var syncedPortfolio=null; // реальный баланс из T-Invest, null если не синкали
+
+function save(){try{localStorage.setItem('pnl3-e',JSON.stringify(entries));localStorage.setItem('pnl3-i',JSON.stringify({d:initDep,dt:initDate}));if(syncedPortfolio!==null)localStorage.setItem('pnl3-pv',String(syncedPortfolio));}catch(e){}}
+function load(){try{var r=localStorage.getItem('pnl3-e');if(r)entries=JSON.parse(r);var i=localStorage.getItem('pnl3-i');if(i){var x=JSON.parse(i);initDep=x.d||0;initDate=x.dt||null;}var pv=localStorage.getItem('pnl3-pv');if(pv)syncedPortfolio=parseFloat(pv);}catch(e){}}
 // Форматирование рублей: rubS = со знаком, rubAbs = только число+знак валюты
 function rubS(v){return(v>=0?'+':'−')+Math.round(Math.abs(v)).toLocaleString('ru')+'₽'}
 function rubAbs(v){return Math.round(Math.abs(v)).toLocaleString('ru')+'₽'}
+
+function updateTopDep(){
+  var lbl=document.getElementById('top-dep-lbl');
+  var val=document.getElementById('top-dep-val');
+  if(syncedPortfolio!==null){
+    lbl.textContent='Баланс счёта (из Т-Инвест)';
+    val.textContent=rubAbs(syncedPortfolio);
+  } else {
+    lbl.textContent='Накопленный P&L';
+    val.textContent=rubAbs(currentDeposit());
+  }
+}
 
 function showTab(id){
   document.querySelectorAll('.tab').forEach(function(t,i){var ids=['chart','add','log','stats','sync','data'];t.classList.toggle('on',ids[i]===id)});
@@ -412,7 +426,7 @@ function renderChart(){
     {l:'Ср./день',v:days.length?rubS(totalPnl/days.length):'—',c:totalPnl>=0?'pos':'neg'},
   ].map(function(x){return'<div class="card"><div class="lbl">'+x.l+'</div><div class="val sm '+x.c+'">'+x.v+'</div></div>'}).join('');
 
-  document.getElementById('top-dep-val').textContent=rubAbs(currentDeposit());
+  updateTopDep();
   if(chartMain){chartMain.destroy();chartMain=null;}
   if(!grouped.length)return;
 
@@ -420,6 +434,7 @@ function renderChart(){
   var rawData=grouped.map(function(d){return parseFloat(d.pnl.toFixed(2))});
   var datasets=[];
 
+  var dailyPnl=grouped.map(function(d){return d.pnl;});
   if(cMode==='line'){
     var dep=baseVal;var lineData=grouped.map(function(d){dep+=d.pnl;return parseFloat(dep.toFixed(2))});
     datasets=[{data:lineData,borderColor:ACC,borderWidth:2,backgroundColor:'rgba(255,0,110,0.06)',fill:true,tension:0,pointRadius:grouped.length<=60?2:0,pointBackgroundColor:ACC,pointBorderColor:'#140A24',pointBorderWidth:1,pointHoverRadius:5}];
@@ -435,7 +450,20 @@ function renderChart(){
     type:(cMode==='line')?'line':'bar',data:{labels:labels,datasets:datasets},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{backgroundColor:'#1B1233',titleColor:'#A79BC9',bodyColor:'#F2F0FF',borderColor:'rgba(255,0,128,0.28)',borderWidth:1,
-        callbacks:{label:function(c){var v=c.raw;if(cMode==='pct')return(v>=0?'+':'')+v.toFixed(2)+'%';return rubS(v)}}}},
+        callbacks:{
+          title:function(items){return items[0]?items[0].label:'';},
+          label:function(c){
+            var v=c.raw;
+            if(cMode==='pct'){return ' '+(v>=0?'+':'')+v.toFixed(2)+'%';}
+            if(cMode==='line'){
+              var dp=(dailyPnl&&dailyPnl[c.dataIndex]!==undefined)?dailyPnl[c.dataIndex]:null;
+              var lines=[' Накоплено: '+rubAbs(v)];
+              if(dp!==null){lines.push(' За день: '+rubS(dp));}
+              return lines;
+            }
+            return ' '+rubS(v);
+          }
+        }}},
       scales:{
         x:{ticks:{color:'#6F648F',font:{size:10},maxRotation:45,autoSkip:true},grid:{color:'rgba(255,255,255,0.03)'},border:{color:'rgba(255,255,255,0.05)'}},
         y:{ticks:{color:'#6F648F',font:{size:10},callback:function(v){if(cMode==='pct')return v.toFixed(1)+'%';return Math.round(v).toLocaleString('ru')+'₽'}},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.05)'}}
@@ -501,7 +529,7 @@ function addEntry(){
   entries.push({id:Date.now(),date:date,position:pos,pnl:pnl,type:type,note:note});
   entries.sort(function(a,b){return a.date.localeCompare(b.date)});updatePosList();save();
   document.getElementById('e-pnl').value='';document.getElementById('e-note').value='';
-  showMsg('e-msg','Добавлено ✓','var(--pos)');document.getElementById('top-dep-val').textContent=rubAbs(currentDeposit());
+  showMsg('e-msg','Добавлено ✓','var(--pos)');updateTopDep();
 }
 function delEntry(id){entries=entries.filter(function(e){return e.id!==id});save();renderLog();}
 function showMsg(id,txt,col){var el=document.getElementById(id);el.style.display='block';el.style.color=col;el.textContent=txt;setTimeout(function(){el.style.display='none'},2500);}
@@ -648,8 +676,9 @@ async function syncNow() {
   document.getElementById('sync-result').style.display = 'none';
   try {
     var data = await syncDoLoad(proxy, accountId, from);
+    if (data.portfolioValue) { syncedPortfolio = data.portfolioValue; save(); updateTopDep(); }
     document.getElementById('sync-count').textContent = data.entries.length;
-    document.getElementById('sync-portfolio').textContent = data.portfolioValue ? '₽'+Number(data.portfolioValue).toLocaleString('ru',{maximumFractionDigits:0}) : '—';
+    document.getElementById('sync-portfolio').textContent = data.portfolioValue ? rubAbs(data.portfolioValue) : '—';
     document.getElementById('sync-time').textContent = new Date(data.syncedAt).toLocaleString('ru');
     document.getElementById('sync-result').style.display = 'block';
     var msg = '✓ Синхронизировано';
