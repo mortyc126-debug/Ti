@@ -118,6 +118,21 @@ async function handleSync(url, auth) {
     return { matched: qty - remaining, value };
   }
 
+  // Точные типы операций для торговли акциями/облигациями (FIFO)
+  const STOCK_BUY  = new Set(['OPERATION_TYPE_BUY', 'OPERATION_TYPE_BUY_CARD', 'OPERATION_TYPE_BUY_MARGIN']);
+  const STOCK_SELL = new Set(['OPERATION_TYPE_SELL', 'OPERATION_TYPE_SELL_CARD', 'OPERATION_TYPE_SELL_MARGIN']);
+  // Вариационная маржа фьючерсов — это и есть реализованный P&L
+  const VAR_PLUS   = new Set(['OPERATION_TYPE_ACCRUING_VARMARGIN', 'OPERATION_TYPE_ACCRUING_VARMARGIN_DELIVERY']);
+  const VAR_MINUS  = new Set(['OPERATION_TYPE_WRITING_OFF_VARMARGIN', 'OPERATION_TYPE_WRITING_OFF_VARMARGIN_DELIVERY']);
+  // Доходы
+  const INCOME     = new Set(['OPERATION_TYPE_DIVIDEND', 'OPERATION_TYPE_COUPON',
+                               'OPERATION_TYPE_BOND_REPAYMENT', 'OPERATION_TYPE_BOND_REPAYMENT_FULL',
+                               'OPERATION_TYPE_DIV_EXT', 'OPERATION_TYPE_DIVIDEND_TRANSFER']);
+  // Расходы/комиссии
+  const FEE_TYPES  = new Set(['OPERATION_TYPE_BROKER_FEE', 'OPERATION_TYPE_SERVICE_FEE',
+                               'OPERATION_TYPE_MARGIN_FEE', 'OPERATION_TYPE_OVERNIGHT',
+                               'OPERATION_TYPE_BROKER_FEE_PROGRESSIVE', 'OPERATION_TYPE_SERVICE_FEE_PROGRESSIVE']);
+
   for (const op of allItems) {
     const opType = op.type || '';
     const figi = op.figi || op.instrumentUid || 'unknown';
@@ -126,50 +141,54 @@ async function handleSync(url, auth) {
     const date = op.date ? op.date.slice(0, 10) : '';
     const name = op.name || figi;
     const afterFrom = date >= userFrom;
+    // Фьючерсы и опционы — P&L через вариационную маржу, не FIFO
+    const isFutures = op.instrumentType === 'futures' || op.instrumentType === 'option';
 
-    if (opType.includes('BUY') && qty > 0) {
+    if (isFutures) {
+      // Вариационная маржа — реализованный P&L по фьючерсам
+      if (afterFrom && (VAR_PLUS.has(opType) || VAR_MINUS.has(opType))) {
+        addTrade(date, name, payment);
+      }
+      // BUY/SELL фьючерсов пропускаем: payment там ≠ реальная стоимость сделки
+
+    } else if (STOCK_BUY.has(opType) && qty > 0) {
+      // Акции/облигации/ETF: FIFO — открываем лонг или закрываем шорт
       if (shorts[figi] && shorts[figi].length > 0) {
-        // Закрываем шорт: P&L = выручка при открытии − стоимость закрытия
         const { matched, value: proceeds } = fifoConsume(shorts[figi], qty);
         if (afterFrom && matched > 0) {
-          const buyCost = Math.abs(payment) * (matched / qty);
-          addTrade(date, name, proceeds - buyCost);
+          addTrade(date, name, proceeds - Math.abs(payment) * (matched / qty));
         }
-        // Остаток qty (если шорт меньше объёма) → открываем лонг
         const longQty = qty - matched;
         if (longQty > 0) {
           if (!longs[figi]) longs[figi] = [];
           longs[figi].push({ qty: longQty, costPerUnit: Math.abs(payment) / qty });
         }
       } else {
-        // Открываем лонг
         if (!longs[figi]) longs[figi] = [];
         longs[figi].push({ qty, costPerUnit: Math.abs(payment) / qty });
       }
 
-    } else if (opType.includes('SELL') && qty > 0) {
+    } else if (STOCK_SELL.has(opType) && qty > 0) {
+      // Акции/облигации/ETF: FIFO — закрываем лонг или открываем шорт
       if (longs[figi] && longs[figi].length > 0) {
-        // Закрываем лонг: P&L = выручка − себестоимость
         const { matched, value: cost } = fifoConsume(longs[figi], qty);
         if (afterFrom && matched > 0) {
           addTrade(date, name, payment * (matched / qty) - cost);
         }
-        // Остаток → открываем шорт
         const shortQty = qty - matched;
         if (shortQty > 0) {
           if (!shorts[figi]) shorts[figi] = [];
           shorts[figi].push({ qty: shortQty, procPerUnit: payment / qty });
         }
       } else {
-        // Открываем шорт
         if (!shorts[figi]) shorts[figi] = [];
         shorts[figi].push({ qty, procPerUnit: payment / qty });
       }
 
-    } else if (afterFrom && (opType.includes('DIVIDEND') || opType.includes('COUPON') || opType.includes('BOND_REPAYMENT'))) {
+    } else if (afterFrom && INCOME.has(opType)) {
       otherEntries.push({ date, position: name, pnl: payment, type: 'dividend', note: '' });
 
-    } else if (afterFrom && (opType.includes('BROKER_FEE') || opType.includes('SERVICE_FEE') || opType.includes('MARGIN_FEE') || opType.includes('TAX'))) {
+    } else if (afterFrom && FEE_TYPES.has(opType)) {
       otherEntries.push({ date, position: name, pnl: payment, type: 'fee', note: '' });
     }
   }
