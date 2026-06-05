@@ -1173,10 +1173,10 @@ const TBASE='https://invest-public-api.tinkoff.ru/rest';
 
 // ===================== MULTI-TF FETCH =====================
 const TF_INTERVALS={
-  '1min':'CANDLE_INTERVAL_1_MIN',
-  '5min':'CANDLE_INTERVAL_5_MIN',
-  '1h':'CANDLE_INTERVAL_HOUR',
-  '1d':'CANDLE_INTERVAL_DAY'
+  '1min':1,  // CANDLE_INTERVAL_1_MIN
+  '5min':2,  // CANDLE_INTERVAL_5_MIN
+  '1h':4,    // CANDLE_INTERVAL_HOUR
+  '1d':5     // CANDLE_INTERVAL_DAY
 };
 
 function selTF(btn,tf){
@@ -1198,7 +1198,7 @@ async function fetchOneTF(figi, tf, from, to, token){
     headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
     body:JSON.stringify({figi, from:from.toISOString(), to:to.toISOString(), interval:TF_INTERVALS[tf]})
   });
-  if(!res.ok)throw new Error('HTTP '+res.status+' для '+tf);
+  if(!res.ok){const errText=await res.text().catch(()=>'');throw new Error('HTTP '+res.status+' для '+tf+(errText?' · '+errText.slice(0,200):''));}
   const d=await res.json();
   return d.candles||[];
 }
