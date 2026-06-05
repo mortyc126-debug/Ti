@@ -1428,7 +1428,14 @@ function isTodayOrFuture(dateISO){
 }
 
 async function fetchCandles(){
-  const token=document.getElementById('tokenInput').value.trim();
+  const rawToken=document.getElementById('tokenInput').value.trim();
+  // Убираем символы вне ISO-8859-1 (кириллица и пр. которые ломают fetch headers)
+  const token=rawToken.replace(/[^\x00-\xFF]/g,'');
+  if(token!==rawToken){
+    setApi(false,'Токен содержит недопустимые символы — проверьте копирование');
+    document.getElementById('tokenInput').value=token;
+    return;
+  }
   if(!token){setApi(false,'Токен не введён');return;}
   if(!curInstr){alert('Выберите тикер');return;}
   const area=document.getElementById('candleArea');
