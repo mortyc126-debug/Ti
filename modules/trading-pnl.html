@@ -589,6 +589,8 @@ async function syncDoLoad(proxyBase, accountId, from) {
   var r = await fetch(url, { headers: syncAuthHeaders(), signal: AbortSignal.timeout(60000) });
   var data = await r.json();
   if (data.error) throw new Error(data.error);
+  // Сначала всегда выкидываем демо-записи, потом фильтруем по дате
+  entries = entries.filter(function(e){ return !e._demo; });
   if (from) { entries = entries.filter(function(e){ return e.date < from; }); } else { entries = []; }
   entries = entries.concat(data.entries);
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
@@ -626,27 +628,27 @@ async function init(){
   if(!entries.length){
     function demoDate(daysAgo){var d=new Date();d.setDate(d.getDate()-daysAgo);return d.toISOString().slice(0,10);}
     entries=[
-      {id:1,date:demoDate(95),position:'SBER',pnl:3200,type:'trade',note:''},
-      {id:2,date:demoDate(90),position:'GAZP',pnl:-14500,type:'trade',note:'Стоп'},
-      {id:3,date:demoDate(86),position:'SBER',pnl:5100,type:'trade',note:''},
-      {id:4,date:demoDate(82),position:'LKOH',pnl:19000,type:'trade',note:''},
-      {id:5,date:demoDate(76),position:'SBER',pnl:-38000,type:'trade',note:'Ложный пробой'},
-      {id:6,date:demoDate(72),position:'GAZP',pnl:24000,type:'trade',note:''},
-      {id:7,date:demoDate(65),position:'SBER',pnl:-900,type:'fee',note:'Комиссия'},
-      {id:8,date:demoDate(61),position:'LKOH',pnl:43000,type:'trade',note:''},
-      {id:9,date:demoDate(57),position:'SBER',pnl:6700,type:'trade',note:''},
-      {id:10,date:demoDate(50),position:'GMKN',pnl:-21000,type:'trade',note:''},
-      {id:11,date:demoDate(44),position:'SBER',pnl:-52000,type:'trade',note:'Плохой вход'},
-      {id:12,date:demoDate(40),position:'LKOH',pnl:89000,type:'trade',note:''},
-      {id:13,date:demoDate(36),position:'GAZP',pnl:17000,type:'trade',note:''},
-      {id:14,date:demoDate(29),position:'SBER',pnl:-18000,type:'trade',note:''},
-      {id:15,date:demoDate(22),position:'GMKN',pnl:56000,type:'trade',note:''},
-      {id:16,date:demoDate(16),position:'LKOH',pnl:120000,type:'trade',note:'Трендовый день'},
-      {id:17,date:demoDate(11),position:'SBER',pnl:-65000,type:'trade',note:'Новости'},
-      {id:18,date:demoDate(7),position:'GAZP',pnl:71000,type:'trade',note:''},
-      {id:19,date:demoDate(4),position:'SBER',pnl:-44000,type:'trade',note:''},
-      {id:20,date:demoDate(2),position:'LKOH',pnl:59000,type:'trade',note:''},
-      {id:21,date:demoDate(0),position:'SBER',pnl:83000,type:'trade',note:''},
+      {id:1,date:demoDate(95),position:'SBER',pnl:3200,type:'trade',note:'',_demo:true},
+      {id:2,date:demoDate(90),position:'GAZP',pnl:-14500,type:'trade',note:'Стоп',_demo:true},
+      {id:3,date:demoDate(86),position:'SBER',pnl:5100,type:'trade',note:'',_demo:true},
+      {id:4,date:demoDate(82),position:'LKOH',pnl:19000,type:'trade',note:'',_demo:true},
+      {id:5,date:demoDate(76),position:'SBER',pnl:-38000,type:'trade',note:'Ложный пробой',_demo:true},
+      {id:6,date:demoDate(72),position:'GAZP',pnl:24000,type:'trade',note:'',_demo:true},
+      {id:7,date:demoDate(65),position:'SBER',pnl:-900,type:'fee',note:'Комиссия',_demo:true},
+      {id:8,date:demoDate(61),position:'LKOH',pnl:43000,type:'trade',note:'',_demo:true},
+      {id:9,date:demoDate(57),position:'SBER',pnl:6700,type:'trade',note:'',_demo:true},
+      {id:10,date:demoDate(50),position:'GMKN',pnl:-21000,type:'trade',note:'',_demo:true},
+      {id:11,date:demoDate(44),position:'SBER',pnl:-52000,type:'trade',note:'Плохой вход',_demo:true},
+      {id:12,date:demoDate(40),position:'LKOH',pnl:89000,type:'trade',note:'',_demo:true},
+      {id:13,date:demoDate(36),position:'GAZP',pnl:17000,type:'trade',note:'',_demo:true},
+      {id:14,date:demoDate(29),position:'SBER',pnl:-18000,type:'trade',note:'',_demo:true},
+      {id:15,date:demoDate(22),position:'GMKN',pnl:56000,type:'trade',note:'',_demo:true},
+      {id:16,date:demoDate(16),position:'LKOH',pnl:120000,type:'trade',note:'Трендовый день',_demo:true},
+      {id:17,date:demoDate(11),position:'SBER',pnl:-65000,type:'trade',note:'Новости',_demo:true},
+      {id:18,date:demoDate(7),position:'GAZP',pnl:71000,type:'trade',note:'',_demo:true},
+      {id:19,date:demoDate(4),position:'SBER',pnl:-44000,type:'trade',note:'',_demo:true},
+      {id:20,date:demoDate(2),position:'LKOH',pnl:59000,type:'trade',note:'',_demo:true},
+      {id:21,date:demoDate(0),position:'SBER',pnl:83000,type:'trade',note:'',_demo:true},
     ];
   }
   if(entries.length>0)document.getElementById('c-from').value=entries[0].date;
