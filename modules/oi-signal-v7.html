@@ -224,6 +224,7 @@ table.oit{width:100%;border-collapse:collapse;font-size:11px;}
   <div class="hrow">
     <span class="api-status"><span class="sdot err" id="apiDot"></span><span id="apiTxt">Ожидание токена</span></span>
     <input class="tok-inp" id="tokenInput" placeholder="T-Invest API токен..." type="password">
+    <input class="tok-inp" id="proxyInput" placeholder="Прокси (необязательно): https://tinvest-proxy.xxx.workers.dev" style="width:320px;" title="CF Worker прокси для обхода CORS. Оставьте пустым для прямого подключения.">
     <button class="btn-pill" onclick="fetchCandles()">Загрузить свечи</button>
   </div>
 </div>
@@ -1170,6 +1171,7 @@ function loadLearnedWeights(ticker){
 
 // ===================== MAIN LOGIC =====================
 const TBASE='https://invest-public-api.tinkoff.ru/rest';
+let tinvestProxy=''; // если задан — все запросы идут через него
 
 // ===================== MULTI-TF FETCH =====================
 const TF_INTERVALS={
@@ -1193,7 +1195,9 @@ function withTimeout(promise, ms, label){
 }
 
 async function fetchOneTF(figi, tf, from, to, token){
-  const res=await fetch(`${TBASE}/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles`,{
+  const path='/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles';
+  const url=tinvestProxy?(tinvestProxy.replace(/\/$/,'')+path):(TBASE+path);
+  const res=await fetch(url,{
     method:'POST',
     headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
     body:JSON.stringify({figi, from:from.toISOString(), to:to.toISOString(), interval:TF_INTERVALS[tf]})
@@ -2107,6 +2111,14 @@ function init(){
     document.getElementById('memAdjWrap').style.display='';
     document.getElementById('fMemRow').style.display='';
   }
+
+  // Proxy
+  tinvestProxy=localStorage.getItem('oisignal_tinvest_proxy')||'';
+  if(tinvestProxy)document.getElementById('proxyInput').value=tinvestProxy;
+  document.getElementById('proxyInput').addEventListener('change',function(){
+    tinvestProxy=this.value.trim();
+    localStorage.setItem('oisignal_tinvest_proxy',tinvestProxy);
+  });
 
   // Tickers
   tickers=loadTickers();
