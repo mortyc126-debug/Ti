@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0B0613;--panel:#140A24;--card:#1A1030;--card2:#1B1233;
+--acc:#FF006E;--acc2:#FF2A8A;
+--pos:#2BB894;--pos-bar:rgba(43,184,148,0.55);--pos-tag-bg:rgba(43,184,148,0.1);--pos-tag-border:rgba(43,184,148,0.25);
+--neg:#D94466;--neg-bar:rgba(217,68,102,0.65);--neg-tag-bg:rgba(217,68,102,0.1);--neg-tag-border:rgba(217,68,102,0.25);
+--t1:#F2F0FF;--t2:#A79BC9;--tm:#6F648F;
+--b0:rgba(255,255,255,0.04);--b1:rgba(255,255,255,0.07);
+--input-bg:#110820;--input-border:rgba(140,80,220,0.28);--input-focus:rgba(255,0,128,0.45);
+}
+body{font-family:'Inter',sans-serif;background:linear-gradient(180deg,#0A0615 0%,#0D0718 40%,#12091F 100%);color:var(--t1);min-height:100vh;padding:16px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.panel{background:var(--panel);border:1px solid rgba(150,80,255,0.12);border-radius:22px;padding:18px;margin-bottom:14px}
+.card{background:rgba(255,255,255,0.025);border:1px solid var(--b0);border-radius:14px;padding:14px 16px}
+.lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tm);margin-bottom:5px}
+.val{font-size:22px;font-weight:700}
+.val.sm{font-size:16px}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.grid{display:grid;gap:10px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pill-row{display:flex;gap:5px;flex-wrap:wrap}
+.pill{padding:5px 13px;border-radius:999px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);color:var(--t2);transition:all .12s;letter-spacing:.03em}
+.pill:hover{border-color:rgba(255,0,128,0.28);color:var(--t1)}
+.pill.on{background:linear-gradient(180deg,rgba(255,0,128,0.22),rgba(255,0,128,0.1));border-color:rgba(255,0,128,0.5);box-shadow:0 0 12px rgba(255,0,128,0.14);color:var(--t1)}
+.tabs{display:flex;gap:2px;background:rgba(255,255,255,0.03);border-radius:13px;padding:4px;margin-bottom:14px}
+.tab{flex:1;padding:7px;border-radius:9px;font-size:11px;font-weight:600;cursor:pointer;text-align:center;color:var(--tm);transition:all .12s;letter-spacing:.03em}
+.tab.on{background:var(--card2);color:var(--t1);box-shadow:0 0 8px rgba(255,0,128,0.07)}
+.sec{display:none}.sec.vis{display:block}
+
+input[type=date],input[type=text],input[type=number],select{
+background:var(--input-bg);border:1px solid var(--input-border);border-radius:9px;
+color:var(--t1);font-family:'Inter',sans-serif;font-size:12px;padding:7px 11px;outline:none;
+color-scheme:dark;width:100%;transition:border-color .12s}
+input[type=date]:focus,input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--input-focus)}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.5) sepia(1) saturate(2) hue-rotate(250deg);opacity:.7;cursor:pointer}
+select option{background:#1A1030;color:var(--t1)}
+
+.btn{padding:7px 16px;border-radius:999px;font-size:10px;font-weight:700;cursor:pointer;
+background:linear-gradient(180deg,rgba(255,0,128,0.24),rgba(255,0,128,0.11));
+border:1px solid rgba(255,0,128,0.5);box-shadow:0 0 12px rgba(255,0,128,0.12);
+color:var(--t1);transition:all .12s;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.btn:hover{box-shadow:0 0 20px rgba(255,0,128,0.25)}
+.btn-ghost{padding:6px 13px;border-radius:999px;font-size:10px;font-weight:700;cursor:pointer;
+background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.09);color:var(--t2);
+transition:all .12s;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.btn-ghost:hover{border-color:rgba(255,0,128,0.3);color:var(--t1)}
+.btn-danger{padding:6px 13px;border-radius:999px;font-size:10px;font-weight:700;cursor:pointer;
+background:rgba(217,68,102,0.08);border:1px solid rgba(217,68,102,0.3);color:var(--neg);
+transition:all .12s;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.btn-danger:hover{background:rgba(217,68,102,0.15)}
+
+.tag-p{display:inline-flex;align-items:center;background:var(--pos-tag-bg);border:1px solid var(--pos-tag-border);color:var(--pos);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600}
+.tag-n{display:inline-flex;align-items:center;background:var(--neg-tag-bg);border:1px solid var(--neg-tag-border);color:var(--neg);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600}
+
+.frow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:4px}.fg .lbl{margin-bottom:0}
+table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tm);padding:7px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.05)}
+td{padding:8px 8px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.012)}
+.notice{font-size:12px;color:var(--tm);padding:20px 0;text-align:center}
+.divider{height:1px;background:rgba(255,255,255,0.05);margin:14px 0}
+.range-quick{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.ctrl-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.ctrl-row .lbl{margin:0;white-space:nowrap}
+</style>
+
+<h2 class="sr-only">Трейдинговый P&L дашборд</h2>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+  <div>
+    <div class="lbl" style="margin-bottom:3px">Trading Journal</div>
+    <div style="font-size:20px;font-weight:700;color:var(--t1)">P&L Dashboard</div>
+  </div>
+  <div style="text-align:right">
+    <div class="lbl" style="margin-bottom:2px">Депозит сейчас</div>
+    <div style="font-size:18px;font-weight:700;color:var(--t1)" id="top-dep-val">—</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" onclick="showTab('chart')">График</div>
+  <div class="tab" onclick="showTab('add')">+ Запись</div>
+  <div class="tab" onclick="showTab('log')">Журнал</div>
+  <div class="tab" onclick="showTab('stats')">Статистика</div>
+  <div class="tab" onclick="showTab('sync')" style="color:#FF8C42">Т-Инвест</div>
+  <div class="tab" onclick="showTab('data')">Данные</div>
+</div>
+
+<!-- ═══ CHART ═══ -->
+<div id="tab-chart" class="sec vis">
+  <div class="panel">
+
+    <div class="ctrl-row">
+      <span class="lbl">Период</span>
+      <input type="date" id="c-from" style="width:148px" onchange="onRangeChange()">
+      <span style="color:var(--tm);font-size:13px">—</span>
+      <input type="date" id="c-to" style="width:148px" onchange="onRangeChange()">
+    </div>
+
+    <div class="range-quick">
+      <div class="pill on" id="rq-all" onclick="setRQ('all',this)">Всё</div>
+      <div class="pill" id="rq-7" onclick="setRQ('7',this)">7 дн</div>
+      <div class="pill" id="rq-14" onclick="setRQ('14',this)">14 дн</div>
+      <div class="pill" id="rq-30" onclick="setRQ('30',this)">30 дн</div>
+      <div class="pill" id="rq-90" onclick="setRQ('90',this)">3 мес</div>
+      <div class="pill" id="rq-180" onclick="setRQ('180',this)">6 мес</div>
+      <div class="pill" id="rq-365" onclick="setRQ('365',this)">1 год</div>
+      <div class="pill" id="rq-ytd" onclick="setRQ('ytd',this)">YTD</div>
+      <div class="pill" id="rq-cm" onclick="setRQ('cm',this)">Тек. мес</div>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="lbl">Точка отсчёта</span>
+      <input type="date" id="c-base" style="width:148px" onchange="onBaseChange()">
+      <span id="c-base-info" style="font-size:11px;color:var(--tm)"></span>
+      <button class="btn-ghost" onclick="clearBase()">Сброс</button>
+    </div>
+
+    <div class="ctrl-row" style="margin-bottom:10px">
+      <span class="lbl">Вид</span>
+      <div class="pill-row">
+        <div class="pill on" onclick="setMode('line',this)" id="m-line">Нарастающий</div>
+        <div class="pill" onclick="setMode('bar',this)" id="m-bar">По дням</div>
+        <div class="pill" onclick="setMode('pct',this)" id="m-pct">% от базы</div>
+      </div>
+      <span class="lbl" style="margin-left:8px">Группировка</span>
+      <div class="pill-row" id="group-pills">
+        <div class="pill on" onclick="setGroup(1,this)">1д</div>
+        <div class="pill" onclick="setGroup(2,this)">2д</div>
+        <div class="pill" onclick="setGroup(3,this)">3д</div>
+        <div class="pill" onclick="setGroup(5,this)">5д</div>
+        <div class="pill" onclick="setGroup(7,this)">Нед</div>
+        <div class="pill" onclick="setGroup(14,this)">2нед</div>
+        <div class="pill" onclick="setGroup(30,this)">Мес</div>
+      </div>
+    </div>
+
+    <div class="grid g4" id="c-cards" style="margin-bottom:14px"></div>
+    <div style="position:relative;width:100%;height:260px">
+      <canvas id="mainChart" role="img" aria-label="График динамики P&L"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lbl">По позициям — выбранный период</div>
+    <div id="pos-chart-wrap" style="position:relative;width:100%;height:190px;margin-top:10px">
+      <canvas id="posChart" role="img" aria-label="P&L по позициям"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD ═══ -->
+<div id="tab-add" class="sec">
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">Начальный депозит</div>
+    <div class="frow" style="margin-top:10px">
+      <div class="fg" style="flex:1;min-width:130px"><div class="lbl">Сумма</div><input type="number" id="id-dep" placeholder="10000" step="any"></div>
+      <div class="fg" style="flex:1;min-width:130px"><div class="lbl">Дата</div><input type="date" id="id-date"></div>
+      <button class="btn" onclick="saveInitial()">Сохранить</button>
+    </div>
+    <div id="id-info" style="font-size:11px;color:var(--tm);margin-top:8px"></div>
+  </div>
+  <div class="panel">
+    <div class="lbl">Новая запись</div>
+    <div class="frow" style="margin-top:10px">
+      <div class="fg" style="flex:1;min-width:120px"><div class="lbl">Дата</div><input type="date" id="e-date"></div>
+      <div class="fg" style="flex:1;min-width:120px"><div class="lbl">Позиция</div><input type="text" id="e-pos" placeholder="BTC, ETH…" list="pos-list"></div>
+      <div class="fg" style="flex:1;min-width:100px"><div class="lbl">P&L ($)</div><input type="number" id="e-pnl" placeholder="+500 / -200" step="any"></div>
+      <div class="fg" style="flex:1;min-width:110px"><div class="lbl">Тип</div>
+        <select id="e-type">
+          <option value="trade">Сделка</option>
+          <option value="fee">Комиссия</option>
+          <option value="deposit">Пополнение</option>
+          <option value="withdrawal">Вывод</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow" style="margin-top:10px">
+      <div class="fg" style="flex:2;min-width:200px"><div class="lbl">Заметка</div><input type="text" id="e-note" placeholder="Необязательно"></div>
+      <button class="btn" onclick="addEntry()">Добавить</button>
+    </div>
+    <datalist id="pos-list"></datalist>
+    <div id="e-msg" style="font-size:11px;margin-top:8px;display:none"></div>
+  </div>
+</div>
+
+<!-- ═══ LOG ═══ -->
+<div id="tab-log" class="sec">
+  <div class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div class="lbl" style="margin:0">Журнал записей</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="l-from" style="width:130px" onchange="renderLog()">
+        <span style="color:var(--tm);font-size:11px">—</span>
+        <input type="date" id="l-to" style="width:130px" onchange="renderLog()">
+        <button class="btn-ghost" onclick="clearLogFilter()">Сброс</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto" id="log-wrap"></div>
+  </div>
+</div>
+
+<!-- ═══ STATS ═══ -->
+<div id="tab-stats" class="sec">
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">По позициям (всё время)</div>
+    <div id="stats-pos" style="margin-top:10px;overflow-x:auto"></div>
+  </div>
+  <div class="panel">
+    <div class="lbl">Распределение результатов по дням</div>
+    <div style="position:relative;width:100%;height:180px;margin-top:10px">
+      <canvas id="distChart" role="img" aria-label="Гистограмма P&L по дням"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SYNC ═══ -->
+<div id="tab-sync" class="sec">
+
+  <!-- Токен -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">Токен T-Invest</div>
+    <div class="frow" style="margin-top:10px">
+      <div class="fg" style="flex:1">
+        <input type="password" id="sync-token" placeholder="t.xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+      </div>
+      <button class="btn-ghost" onclick="syncSaveToken()">Сохранить</button>
+    </div>
+    <div id="sync-token-msg" style="font-size:11px;margin-top:6px;color:var(--tm);display:none"></div>
+    <div style="font-size:11px;color:var(--tm);margin-top:8px;line-height:1.6">
+      Токен хранится только локально в браузере. Найти: Т-Инвестиции → Настройки → Приложения и API → Получить токен.
+    </div>
+  </div>
+
+  <!-- CF Worker прокси -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">Cloudflare Worker прокси</div>
+    <div class="frow" style="margin-top:10px">
+      <div class="fg" style="flex:1">
+        <input type="text" id="sync-proxy-url" placeholder="https://tinvest-proxy.ВАШ-АККАУНТ.workers.dev" autocomplete="off">
+      </div>
+      <button class="btn-ghost" onclick="syncSaveProxy()">Сохранить</button>
+    </div>
+    <div id="sync-proxy-msg" style="font-size:11px;margin-top:6px;display:none"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="sync-dot" style="width:8px;height:8px;border-radius:50%;background:var(--tm);display:inline-block;flex-shrink:0"></span>
+        <span id="sync-status" style="font-size:12px;color:var(--tm)">Не проверялся</span>
+      </div>
+      <button class="btn-ghost" onclick="syncCheckProxy()">Проверить</button>
+    </div>
+    <div style="font-size:11px;color:var(--tm);margin-top:10px;line-height:1.6">
+      Разверни Cloudflare Worker из файла <code style="background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:11px">tinvest-proxy-worker.js</code> и вставь его URL выше.
+    </div>
+  </div>
+
+  <!-- Выбор счёта и синхронизация -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">Синхронизация</div>
+    <div class="frow" style="margin-top:10px">
+      <div class="fg" style="flex:2">
+        <div class="lbl">Счёт</div>
+        <select id="sync-account-select"><option value="">— сначала нажми «Проверить» —</option></select>
+      </div>
+      <div class="fg" style="flex:1;min-width:130px">
+        <div class="lbl">Загрузить с даты</div>
+        <input type="date" id="sync-from">
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn" onclick="syncNow()">↓ Синхронизировать</button>
+    </div>
+    <div id="sync-msg" style="font-size:11px;margin-top:10px;display:none"></div>
+    <div id="sync-result" style="margin-top:12px;display:none">
+      <div class="divider"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px">
+        <div><div class="lbl">Загружено записей</div><div class="val sm" id="sync-count">—</div></div>
+        <div><div class="lbl">Стоимость портфеля</div><div class="val sm" id="sync-portfolio">—</div></div>
+        <div><div class="lbl">Обновлено</div><div style="font-size:12px;color:var(--tm);margin-top:4px" id="sync-time">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Подсказка: CF Worker работает везде -->
+  <div class="panel">
+    <div class="lbl">С телефона / с любого устройства</div>
+    <div style="font-size:11px;color:var(--tm);margin-top:8px;line-height:1.6">
+      CF Worker доступен из любой точки без VPN и локального сервера. Просто открой этот файл в браузере телефона, введи тот же токен и URL Worker'а — и нажми «Синхронизировать».
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ DATA ═══ -->
+<div id="tab-data" class="sec">
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">Экспорт</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn" onclick="exportJSON()">Скачать JSON</button>
+      <button class="btn" onclick="exportCSV()">Скачать CSV</button>
+    </div>
+    <div style="font-size:11px;color:var(--tm);margin-top:8px">Все записи и начальный депозит сохраняются в файл на ваш компьютер</div>
+  </div>
+  <div class="panel" style="margin-bottom:14px">
+    <div class="lbl">Импорт</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
+      <label id="file-label" style="display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border-radius:999px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.09);color:var(--t2);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;transition:all .12s" onmouseover="this.style.borderColor='rgba(255,0,128,0.3)';this.style.color='var(--t1)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.09)';this.style.color='var(--t2)'">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 1v7M3 5l3-4 3 4M1 9.5h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="file-label-text">Выбрать файл</span>
+        <input type="file" id="import-file" accept=".json,.csv" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" onchange="var n=this.files[0]?this.files[0].name:'Выбрать файл';document.getElementById('file-label-text').textContent=n.length>22?n.slice(0,20)+'…':n">
+      </label>
+      <button class="btn" onclick="importFile()">Загрузить</button>
+    </div>
+    <div id="import-msg" style="font-size:11px;margin-top:8px;display:none"></div>
+  </div>
+  <div class="panel">
+    <div class="lbl">Удаление данных</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <div class="fg" style="flex:1;min-width:130px"><div class="lbl">Удалить от</div><input type="date" id="del-from"></div>
+      <div class="fg" style="flex:1;min-width:130px"><div class="lbl">до</div><input type="date" id="del-to"></div>
+      <button class="btn-danger" style="margin-top:18px" onclick="deleteRange()">Удалить период</button>
+    </div>
+    <div class="divider"></div>
+    <button class="btn-danger" onclick="deleteAll()">Удалить всё</button>
+    <div id="del-msg" style="font-size:11px;margin-top:8px;display:none"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+var entries=[];var initDep=10000;var initDate=null;
+var cFrom=null,cTo=null,cBase=null,cMode='line',cGroup=1;
+var chartMain=null,chartPos=null,chartDist=null;
+
+var POS_BAR='rgba(43,184,148,0.52)';
+var NEG_BAR='rgba(217,68,102,0.62)';
+var POS_LINE='#2BB894';
+var NEG_LINE='#D94466';
+var ACC='#FF006E';
+
+function today(){return new Date().toISOString().slice(0,10)}
+function daysAgo(n){var d=new Date();d.setDate(d.getDate()-n);return d.toISOString().slice(0,10)}
+function ytdStart(){return new Date().getFullYear()+'-01-01'}
+function monthStart(){var d=new Date();return d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'))+'-01'}
+
+async function save(){try{await window.storage.set('pnl3-e',JSON.stringify(entries));await window.storage.set('pnl3-i',JSON.stringify({d:initDep,dt:initDate}));}catch(e){}}
+async function load(){try{var r=await window.storage.get('pnl3-e');if(r)entries=JSON.parse(r.value);var i=await window.storage.get('pnl3-i');if(i){var x=JSON.parse(i.value);initDep=x.d||10000;initDate=x.dt||null;}}catch(e){}}
+
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(function(t,i){var ids=['chart','add','log','stats','sync','data'];t.classList.toggle('on',ids[i]===id)});
+  document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('vis')});
+  document.getElementById('tab-'+id).classList.add('vis');
+  if(id==='chart')renderChart();if(id==='log')renderLog();if(id==='stats')renderStats();if(id==='sync')syncCheckProxy();
+}
+
+function setRQ(q,el){
+  document.querySelectorAll('.range-quick .pill').forEach(function(p){p.classList.remove('on')});el.classList.add('on');
+  var t=today();
+  if(q==='all'){cFrom=null;cTo=null;}else if(q==='ytd'){cFrom=ytdStart();cTo=t;}else if(q==='cm'){cFrom=monthStart();cTo=t;}else{cFrom=daysAgo(parseInt(q));cTo=t;}
+  document.getElementById('c-from').value=cFrom||'';document.getElementById('c-to').value=cTo||'';renderChart();
+}
+function onRangeChange(){
+  cFrom=document.getElementById('c-from').value||null;cTo=document.getElementById('c-to').value||null;
+  document.querySelectorAll('.range-quick .pill').forEach(function(p){p.classList.remove('on')});renderChart();
+}
+function onBaseChange(){cBase=document.getElementById('c-base').value||null;updateBaseInfo();renderChart();}
+function clearBase(){cBase=null;document.getElementById('c-base').value='';updateBaseInfo();renderChart();}
+function updateBaseInfo(){var inf=document.getElementById('c-base-info');if(cBase){var bd=getDepositAt(cBase);inf.textContent='Депозит на '+cBase+': $'+bd.toFixed(2);}else inf.textContent='';}
+function setMode(m,el){cMode=m;['line','bar','pct'].forEach(function(x){document.getElementById('m-'+x).classList.toggle('on',x===m)});renderChart();}
+function setGroup(n,el){cGroup=n;document.querySelectorAll('#group-pills .pill').forEach(function(p){p.classList.remove('on')});el.classList.add('on');renderChart();}
+
+function fltEntries(){return entries.filter(function(e){return(!cFrom||e.date>=cFrom)&&(!cTo||e.date<=cTo)})}
+function groupByDay(arr){var m={};arr.forEach(function(e){if(!m[e.date])m[e.date]={date:e.date,pnl:0};m[e.date].pnl+=e.pnl});return Object.values(m).sort(function(a,b){return a.date.localeCompare(b.date)})}
+function groupN(days,n){if(n<=1)return days;var res=[];for(var i=0;i<days.length;i+=n){var c=days.slice(i,i+n);res.push({date:c[0].date+(c.length>1?' – '+c[c.length-1].date.slice(5):''),pnl:c.reduce(function(s,d){return s+d.pnl},0)})}return res}
+function getDepositAt(date){var dep=initDep;entries.filter(function(e){return e.date<date}).forEach(function(e){dep+=e.pnl});return dep}
+function currentDeposit(){var dep=initDep;entries.forEach(function(e){dep+=e.pnl});return dep}
+
+function renderChart(){
+  var arr=fltEntries();var days=groupByDay(arr);var grouped=groupN(days,cGroup);
+  var baseVal=cBase?getDepositAt(cBase):(days.length>0?getDepositAt(days[0].date):initDep);
+  var totalPnl=arr.reduce(function(s,e){return s+e.pnl},0);
+  var winDays=days.filter(function(d){return d.pnl>0}).length;
+  var wr=days.length?Math.round(winDays/days.length*100):0;
+  var maxW=days.length?Math.max.apply(null,days.map(function(d){return d.pnl})):0;
+  var maxL=days.length?Math.min.apply(null,days.map(function(d){return d.pnl})):0;
+  var pct=baseVal?totalPnl/baseVal*100:0;
+
+  document.getElementById('c-cards').innerHTML=[
+    {l:'P&L за период',v:(totalPnl>=0?'+$':'-$')+Math.abs(totalPnl).toFixed(2),c:totalPnl>=0?'pos':'neg'},
+    {l:'% от базы',v:(pct>=0?'+':'')+pct.toFixed(2)+'%',c:pct>=0?'pos':'neg'},
+    {l:'Win Rate',v:wr+'%',c:''},
+    {l:'Лучший день',v:'+$'+maxW.toFixed(2),c:'pos'},
+    {l:'Худший день',v:(maxL>=0?'+$':'-$')+Math.abs(maxL).toFixed(2),c:'neg'},
+    {l:'Торг. дней',v:days.length,c:''},
+    {l:'Сделок',v:arr.length,c:''},
+    {l:'Ср./день',v:days.length?((totalPnl/days.length>=0?'+$':'-$')+Math.abs(totalPnl/days.length).toFixed(2)):'—',c:totalPnl>=0?'pos':'neg'},
+  ].map(function(x){return'<div class="card"><div class="lbl">'+x.l+'</div><div class="val sm '+x.c+'">'+x.v+'</div></div>'}).join('');
+
+  document.getElementById('top-dep-val').textContent='$'+currentDeposit().toFixed(2);
+  if(chartMain){chartMain.destroy();chartMain=null;}
+  if(!grouped.length)return;
+
+  var labels=grouped.map(function(d){return d.date});
+  var rawData=grouped.map(function(d){return parseFloat(d.pnl.toFixed(2))});
+  var datasets=[];
+
+  if(cMode==='line'){
+    var dep=baseVal;var lineData=grouped.map(function(d){dep+=d.pnl;return parseFloat(dep.toFixed(2))});
+    datasets=[{data:lineData,borderColor:ACC,borderWidth:2,backgroundColor:'rgba(255,0,110,0.06)',fill:true,tension:0.35,pointRadius:grouped.length<=40?3:0,pointBackgroundColor:ACC,pointBorderColor:'#140A24',pointBorderWidth:2,pointHoverRadius:5}];
+  } else if(cMode==='pct'){
+    var dep2=baseVal;var pctData=grouped.map(function(d){dep2+=d.pnl;return parseFloat(((dep2-baseVal)/baseVal*100).toFixed(2))});
+    datasets=[{data:pctData,backgroundColor:pctData.map(function(v){return v>=0?POS_BAR:NEG_BAR}),borderRadius:4,borderSkipped:false}];
+  } else {
+    datasets=[{data:rawData,backgroundColor:rawData.map(function(v){return v>=0?POS_BAR:NEG_BAR}),borderRadius:4,borderSkipped:false}];
+  }
+
+  var ctx=document.getElementById('mainChart').getContext('2d');
+  chartMain=new Chart(ctx,{
+    type:(cMode==='line')?'line':'bar',data:{labels:labels,datasets:datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1B1233',titleColor:'#A79BC9',bodyColor:'#F2F0FF',borderColor:'rgba(255,0,128,0.28)',borderWidth:1,
+        callbacks:{label:function(c){var v=c.raw;if(cMode==='pct')return(v>=0?'+':'')+v.toFixed(2)+'%';return(v>=0?'+$':'-$')+Math.abs(v).toFixed(2)}}}},
+      scales:{
+        x:{ticks:{color:'#6F648F',font:{size:10},maxRotation:45,autoSkip:true},grid:{color:'rgba(255,255,255,0.03)'},border:{color:'rgba(255,255,255,0.05)'}},
+        y:{ticks:{color:'#6F648F',font:{size:10},callback:function(v){if(cMode==='pct')return v.toFixed(1)+'%';return(v>=0?'$':'-$')+Math.abs(v).toLocaleString()}},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.05)'}}
+      }
+    }
+  });
+  renderPosChart(arr);
+}
+
+function renderPosChart(arr){
+  if(chartPos){chartPos.destroy();chartPos=null;}
+  var map={};arr.filter(function(e){return e.position&&e.position!=='—'}).forEach(function(e){if(!map[e.position])map[e.position]=0;map[e.position]+=e.pnl});
+  var sorted=Object.entries(map).sort(function(a,b){return Math.abs(b[1])-Math.abs(a[1])}).slice(0,12);
+  var wrap=document.getElementById('pos-chart-wrap');
+  if(!sorted.length){wrap.innerHTML='<div class="notice">Нет данных по позициям</div>';return;}
+  if(!document.getElementById('posChart')){wrap.innerHTML='<canvas id="posChart" role="img" aria-label="P&L по позициям" style="position:relative;width:100%;height:190px"></canvas>';}
+  var labels=sorted.map(function(x){return x[0]});
+  var data=sorted.map(function(x){return parseFloat(x[1].toFixed(2))});
+  var ctx=document.getElementById('posChart').getContext('2d');
+  chartPos=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{data:data,backgroundColor:data.map(function(v){return v>=0?POS_BAR:NEG_BAR}),borderRadius:4,borderSkipped:false}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1B1233',titleColor:'#A79BC9',bodyColor:'#F2F0FF',borderColor:'rgba(255,0,128,0.28)',borderWidth:1,callbacks:{label:function(c){var v=c.raw;return(v>=0?'+$':'-$')+Math.abs(v).toFixed(2)}}}},
+    scales:{x:{ticks:{color:'#6F648F',font:{size:10},callback:function(v){return(v>=0?'$':'-$')+Math.abs(v).toLocaleString()}},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#A79BC9',font:{size:11,weight:'600'}},grid:{display:false},border:{color:'rgba(255,255,255,0.05)'}}}}}
+  );
+}
+
+function renderLog(){
+  var from=document.getElementById('l-from').value,to=document.getElementById('l-to').value;
+  var arr=entries.filter(function(e){return(!from||e.date>=from)&&(!to||e.date<=to)}).slice().reverse();
+  var w=document.getElementById('log-wrap');
+  if(!arr.length){w.innerHTML='<div class="notice">Нет записей</div>';return;}
+  var tmap={trade:'Сделка',fee:'Комиссия',deposit:'Пополнение',withdrawal:'Вывод'};
+  w.innerHTML='<table><thead><tr><th style="width:90px">Дата</th><th style="width:80px">Позиция</th><th style="width:110px">P&L</th><th style="width:80px">Тип</th><th>Заметка</th><th style="width:36px"></th></tr></thead><tbody>'+
+    arr.map(function(e){return'<tr><td style="color:var(--tm)">'+e.date+'</td><td style="color:var(--t1);font-weight:600">'+e.position+'</td><td><span class="'+(e.pnl>=0?'tag-p':'tag-n')+'">'+(e.pnl>=0?'+$':'-$')+Math.abs(e.pnl).toFixed(2)+'</span></td><td style="color:var(--tm)">'+(tmap[e.type]||e.type)+'</td><td style="color:var(--tm);font-size:11px">'+e.note+'</td><td><button onclick="delEntry('+e.id+')" style="background:rgba(217,68,102,0.08);border:1px solid rgba(217,68,102,0.22);color:var(--neg);border-radius:7px;padding:2px 8px;font-size:10px;cursor:pointer;font-family:Inter,sans-serif">✕</button></td></tr>'}).join('')+
+  '</tbody></table>';
+}
+function clearLogFilter(){document.getElementById('l-from').value='';document.getElementById('l-to').value='';renderLog();}
+
+function renderStats(){
+  var map={};entries.forEach(function(e){var p=e.position||'—';if(!map[p])map[p]={t:0,n:0,w:0};map[p].t+=e.pnl;map[p].n++;if(e.pnl>0)map[p].w++});
+  var sorted=Object.entries(map).sort(function(a,b){return b[1].t-a[1].t});
+  document.getElementById('stats-pos').innerHTML=sorted.length?
+    '<table><thead><tr><th>Позиция</th><th>Итог P&L</th><th>Win Rate</th><th>Сделок</th><th>Ср. P&L</th></tr></thead><tbody>'+
+    sorted.map(function(x){var d=x[1];var avg=d.t/d.n;return'<tr><td style="color:var(--t1);font-weight:600">'+x[0]+'</td><td><span class="'+(d.t>=0?'tag-p':'tag-n')+'">'+(d.t>=0?'+$':'-$')+Math.abs(d.t).toFixed(2)+'</span></td><td style="color:var(--t2)">'+(d.n?Math.round(d.w/d.n*100)+'%':'—')+'</td><td style="color:var(--tm)">'+d.n+'</td><td style="color:var(--tm)">'+(avg>=0?'+$':'-$')+Math.abs(avg).toFixed(2)+'</td></tr>'}).join('')+'</tbody></table>':
+    '<div class="notice">Нет данных</div>';
+
+  if(chartDist){chartDist.destroy();chartDist=null;}
+  var days=groupByDay(entries);if(!days.length)return;
+  var vals=days.map(function(d){return d.pnl});var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals);
+  var bk=10;var step=(mx-mn)/bk||1;
+  var buckets=Array.from({length:bk},function(_,i){var lo=mn+i*step,hi=lo+step;return{lo:lo,cnt:vals.filter(function(v){return v>=lo&&v<hi+(i===bk-1?0.01:0)}).length}});
+  var ctx=document.getElementById('distChart').getContext('2d');
+  chartDist=new Chart(ctx,{type:'bar',
+    data:{labels:buckets.map(function(b){return(b.lo>=0?'+$':'-$')+Math.abs(b.lo).toFixed(0)}),datasets:[{data:buckets.map(function(b){return b.cnt}),backgroundColor:buckets.map(function(b){return b.lo>=0?POS_BAR:NEG_BAR}),borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1B1233',titleColor:'#A79BC9',bodyColor:'#F2F0FF',borderColor:'rgba(255,0,128,0.28)',borderWidth:1,callbacks:{label:function(c){return c.raw+' дней'}}}},
+    scales:{x:{ticks:{color:'#6F648F',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.03)'},border:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#6F648F',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'rgba(255,255,255,0.05)'}}}}
+  });
+}
+
+function saveInitial(){var d=parseFloat(document.getElementById('id-dep').value);var dt=document.getElementById('id-date').value;if(isNaN(d)||d<=0){showMsg('e-msg','Введите корректную сумму','var(--neg)');return;}initDep=d;initDate=dt||null;save();document.getElementById('id-info').textContent='Депозит: $'+d.toFixed(2)+(dt?' с '+dt:'');}
+function addEntry(){
+  var date=document.getElementById('e-date').value,pos=document.getElementById('e-pos').value.trim()||'—',pnl=parseFloat(document.getElementById('e-pnl').value),type=document.getElementById('e-type').value,note=document.getElementById('e-note').value.trim();
+  if(!date){showMsg('e-msg','Укажите дату','var(--neg)');return;}if(isNaN(pnl)){showMsg('e-msg','Укажите P&L','var(--neg)');return;}
+  entries.push({id:Date.now(),date:date,position:pos,pnl:pnl,type:type,note:note});
+  entries.sort(function(a,b){return a.date.localeCompare(b.date)});updatePosList();save();
+  document.getElementById('e-pnl').value='';document.getElementById('e-note').value='';
+  showMsg('e-msg','Добавлено ✓','var(--pos)');document.getElementById('top-dep-val').textContent='$'+currentDeposit().toFixed(2);
+}
+function delEntry(id){entries=entries.filter(function(e){return e.id!==id});save();renderLog();}
+function showMsg(id,txt,col){var el=document.getElementById(id);el.style.display='block';el.style.color=col;el.textContent=txt;setTimeout(function(){el.style.display='none'},2500);}
+function updatePosList(){var p=[...new Set(entries.map(function(e){return e.position}).filter(function(p){return p&&p!=='—'}))];document.getElementById('pos-list').innerHTML=p.map(function(x){return'<option value="'+x+'">'}).join('');}
+function exportJSON(){var blob=new Blob([JSON.stringify({initialDeposit:initDep,initialDate:initDate,entries:entries},null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pnl_journal.json';a.click();}
+function exportCSV(){var rows=['date,position,pnl,type,note'];entries.forEach(function(e){rows.push([e.date,e.position,e.pnl,e.type,'"'+(e.note||'')+'"'].join(','))});var blob=new Blob([rows.join('\n')],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pnl_journal.csv';a.click();}
+function importFile(){var f=document.getElementById('import-file').files[0];if(!f){showMsg('import-msg','Выберите файл','var(--neg)');return;}var r=new FileReader();r.onload=function(e){try{var data=JSON.parse(e.target.result);if(data.entries){entries=data.entries;if(data.initialDeposit)initDep=data.initialDeposit;if(data.initialDate)initDate=data.initialDate;}else if(Array.isArray(data)){entries=data;}save();updatePosList();showMsg('import-msg','Импортировано: '+entries.length+' записей','var(--pos)');}catch(err){showMsg('import-msg','Ошибка формата','var(--neg)');}};r.readAsText(f);}
+function deleteRange(){var from=document.getElementById('del-from').value,to=document.getElementById('del-to').value;if(!from&&!to){showMsg('del-msg','Укажите период','var(--neg)');return;}var b=entries.length;entries=entries.filter(function(e){return(from&&e.date<from)||(to&&e.date>to)||(!from&&e.date>to)||(!to&&e.date<from)});save();showMsg('del-msg','Удалено: '+(b-entries.length)+' записей','var(--pos)');}
+function deleteAll(){if(!confirm('Удалить все записи?'))return;entries=[];save();showMsg('del-msg','Все записи удалены','var(--pos)');}
+
+// ─── T-INVEST SYNC (CF Worker) ───────────────────────────────────────────────
+
+function syncGetProxy() {
+  try { return localStorage.getItem('tinvest_proxy') || ''; } catch(e) { return ''; }
+}
+
+function syncGetToken() {
+  try { return localStorage.getItem('tinvest_token') || ''; } catch(e) { return ''; }
+}
+
+function syncSaveToken() {
+  var t = document.getElementById('sync-token').value.trim();
+  if (!t) return;
+  try { localStorage.setItem('tinvest_token', t); } catch(e) {}
+  var msg = document.getElementById('sync-token-msg');
+  msg.style.display = 'block'; msg.style.color = 'var(--pos)';
+  msg.textContent = 'Токен сохранён ✓';
+  setTimeout(function(){ msg.style.display='none'; }, 2000);
+}
+
+function syncSaveProxy() {
+  var u = document.getElementById('sync-proxy-url').value.trim().replace(/\/$/, '');
+  if (!u) return;
+  try { localStorage.setItem('tinvest_proxy', u); } catch(e) {}
+  var msg = document.getElementById('sync-proxy-msg');
+  msg.style.display = 'block'; msg.style.color = 'var(--pos)';
+  msg.textContent = 'URL сохранён ✓';
+  setTimeout(function(){ msg.style.display='none'; }, 2000);
+}
+
+function syncLoadSaved() {
+  try {
+    var t = localStorage.getItem('tinvest_token'); if (t) document.getElementById('sync-token').value = t;
+    var p = localStorage.getItem('tinvest_proxy'); if (p) document.getElementById('sync-proxy-url').value = p;
+  } catch(e) {}
+}
+
+function syncSetStatus(ok, text) {
+  var dot = document.getElementById('sync-dot'), st = document.getElementById('sync-status');
+  dot.style.background = ok ? 'var(--pos)' : ok === null ? '#FF8C42' : 'var(--tm)';
+  st.style.color = dot.style.background; st.textContent = text;
+}
+
+function syncMsg(id, text, col) {
+  var el = document.getElementById(id);
+  el.style.display = 'block'; el.style.color = col; el.textContent = text;
+}
+
+function syncAuthHeaders() {
+  var token = syncGetToken();
+  return token ? { 'Authorization': 'Bearer ' + token } : {};
+}
+
+async function syncCheckProxy() {
+  syncLoadSaved();
+  var proxy = syncGetProxy();
+  if (!proxy) { syncSetStatus(false, 'Введи URL Worker\'а выше и нажми «Сохранить»'); return; }
+  syncSetStatus(null, 'Проверяю...');
+  try {
+    var r = await fetch(proxy + '/accounts', { headers: syncAuthHeaders(), signal: AbortSignal.timeout(8000) });
+    var accounts = await r.json();
+    if (accounts.error) throw new Error(accounts.error);
+    syncSetStatus(true, 'Подключено ✓  (' + accounts.length + ' счёт' + (accounts.length===1?'':'а') + ')');
+    var sel = document.getElementById('sync-account-select');
+    sel.innerHTML = accounts.map(function(a){ return '<option value="'+a.id+'">'+(a.name||a.id)+'</option>'; }).join('');
+    if (!document.getElementById('sync-from').value) {
+      var d = new Date(); d.setFullYear(d.getFullYear()-1);
+      document.getElementById('sync-from').value = d.toISOString().slice(0,10);
+    }
+  } catch(e) { syncSetStatus(false, 'Ошибка: ' + e.message); }
+}
+
+async function syncDoLoad(proxyBase, accountId, from) {
+  var url = proxyBase + '/sync?accountId=' + encodeURIComponent(accountId) + (from ? '&from=' + from : '');
+  var r = await fetch(url, { headers: syncAuthHeaders(), signal: AbortSignal.timeout(60000) });
+  var data = await r.json();
+  if (data.error) throw new Error(data.error);
+  if (from) { entries = entries.filter(function(e){ return e.date < from; }); } else { entries = []; }
+  entries = entries.concat(data.entries);
+  entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  save(); updatePosList(); renderChart(); renderLog();
+  return data;
+}
+
+async function syncNow() {
+  var proxy = syncGetProxy();
+  var accountId = document.getElementById('sync-account-select').value;
+  var from = document.getElementById('sync-from').value;
+  if (!proxy) { syncMsg('sync-msg', 'Введи URL Worker\'а и нажми «Сохранить»', 'var(--neg)'); return; }
+  if (!accountId) { syncMsg('sync-msg', 'Сначала нажми «Проверить» и выбери счёт', 'var(--neg)'); return; }
+  syncMsg('sync-msg', 'Загружаю операции...', 'var(--t2)');
+  document.getElementById('sync-result').style.display = 'none';
+  try {
+    var data = await syncDoLoad(proxy, accountId, from);
+    document.getElementById('sync-count').textContent = data.entries.length;
+    document.getElementById('sync-portfolio').textContent = data.portfolioValue ? '₽'+Number(data.portfolioValue).toLocaleString('ru',{maximumFractionDigits:0}) : '—';
+    document.getElementById('sync-time').textContent = new Date(data.syncedAt).toLocaleString('ru');
+    document.getElementById('sync-result').style.display = 'block';
+    syncMsg('sync-msg', '✓ Синхронизировано', 'var(--pos)');
+  } catch(e) { syncMsg('sync-msg', 'Ошибка: ' + e.message, 'var(--neg)'); }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
+async function init(){
+  await load();
+  syncLoadSaved();
+  var t=today();
+  document.getElementById('e-date').value=t;document.getElementById('c-to').value=t;
+  if(initDate){document.getElementById('id-date').value=initDate;document.getElementById('id-dep').value=initDep;document.getElementById('id-info').textContent='Депозит: $'+initDep.toFixed(2)+(initDate?' с '+initDate:'');}
+  else document.getElementById('id-date').value=t;
+  if(!entries.length){
+    function demoDate(daysAgo){var d=new Date();d.setDate(d.getDate()-daysAgo);return d.toISOString().slice(0,10);}
+    entries=[
+      {id:1,date:demoDate(95),position:'BTC',pnl:320,type:'trade',note:'Long breakout'},
+      {id:2,date:demoDate(90),position:'ETH',pnl:-145,type:'trade',note:'Stop loss'},
+      {id:3,date:demoDate(86),position:'BTC',pnl:510,type:'trade',note:''},
+      {id:4,date:demoDate(82),position:'SOL',pnl:190,type:'trade',note:''},
+      {id:5,date:demoDate(76),position:'BTC',pnl:-380,type:'trade',note:'False breakout'},
+      {id:6,date:demoDate(72),position:'ETH',pnl:240,type:'trade',note:''},
+      {id:7,date:demoDate(65),position:'BTC',pnl:-90,type:'fee',note:'Funding'},
+      {id:8,date:demoDate(61),position:'ETH',pnl:430,type:'trade',note:''},
+      {id:9,date:demoDate(57),position:'BTC',pnl:670,type:'trade',note:''},
+      {id:10,date:demoDate(50),position:'SOL',pnl:-210,type:'trade',note:''},
+      {id:11,date:demoDate(44),position:'BTC',pnl:-520,type:'trade',note:'Bad entry'},
+      {id:12,date:demoDate(40),position:'BTC',pnl:890,type:'trade',note:''},
+      {id:13,date:demoDate(36),position:'ETH',pnl:170,type:'trade',note:''},
+      {id:14,date:demoDate(29),position:'BTC',pnl:-180,type:'trade',note:''},
+      {id:15,date:demoDate(22),position:'ETH',pnl:560,type:'trade',note:''},
+      {id:16,date:demoDate(16),position:'BTC',pnl:1200,type:'trade',note:'Trend day'},
+      {id:17,date:demoDate(11),position:'BTC',pnl:-650,type:'trade',note:'News spike'},
+      {id:18,date:demoDate(7),position:'ETH',pnl:710,type:'trade',note:''},
+      {id:19,date:demoDate(4),position:'BTC',pnl:-440,type:'trade',note:''},
+      {id:20,date:demoDate(2),position:'ETH',pnl:590,type:'trade',note:''},
+      {id:21,date:demoDate(0),position:'BTC',pnl:830,type:'trade',note:''},
+    ];
+  }
+  if(entries.length>0)document.getElementById('c-from').value=entries[0].date;
+  updatePosList();renderChart();
+}
+init();
+</script>
+</body>
+</html>

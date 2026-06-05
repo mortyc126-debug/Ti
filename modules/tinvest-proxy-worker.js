@@ -1,15 +1,21 @@
 // Cloudflare Worker — CORS-прокси для T-Invest (T-Bank) API
 //
-// Зачем: браузер не может напрямую обращаться к invest-public-api.tinkoff.ru
-// из-за CORS / HTTP2-ограничений. Worker пересылает POST-запросы к API
-// и добавляет CORS-заголовки.
+// Поддерживает два режима:
+//
+// 1. Прозрачный POST-прокси (для OI Signal):
+//    POST /<путь T-Invest API> — пересылает запрос как есть.
+//    Пример: POST /tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles
+//
+// 2. Высокоуровневые GET-маршруты (для Trading P&L Dashboard):
+//    GET /accounts            → список счетов [{id, name}]
+//    GET /sync?accountId=X&from=YYYY-MM-DD  → операции в формате entries
 //
 // Развёртывание (бесплатно, 5 минут):
 //   1. dash.cloudflare.com → Workers & Pages → Create Worker
 //   2. Дайте имя, например `tinvest-proxy`
 //   3. Edit code → вставьте этот файл → Deploy
 //   4. Скопируйте URL вида https://tinvest-proxy.<account>.workers.dev
-//   5. В OI Signal вставьте этот URL в поле «T-Invest прокси»
+//   5. В OI Signal / Trading P&L вставьте этот URL в поле «T-Invest прокси»
 //
 // Безопасность: Worker не хранит токены. Authorization-заголовок
 // передаётся напрямую от браузера → Worker → T-Invest API.
@@ -23,6 +29,105 @@ const CORS = {
   'Access-Control-Max-Age': '86400'
 };
 
+const CORS_JSON = { ...CORS, 'Content-Type': 'application/json' };
+
+// MoneyValue {units: string, nano: number} → number
+function moneyVal(m) {
+  if (!m) return 0;
+  return (parseInt(m.units || '0', 10) + (m.nano || 0) / 1e9);
+}
+
+async function tiPost(path, body, auth) {
+  const r = await fetch(TBASE + path, {
+    method: 'POST',
+    headers: { 'Authorization': auth, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+// GET /accounts → [{id, name}]
+async function handleAccounts(auth) {
+  const data = await tiPost('/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts', {}, auth);
+  if (data.code || data.message) throw new Error(data.message || 'API error');
+  const accounts = (data.accounts || []).map(a => ({ id: a.id, name: a.name || a.id }));
+  return new Response(JSON.stringify(accounts), { status: 200, headers: CORS_JSON });
+}
+
+// GET /sync?accountId=X&from=YYYY-MM-DD
+// Возвращает {entries:[{id,date,position,pnl,type,note}], portfolioValue, syncedAt}
+// Группирует операции по (дата, инструмент, тип): суммирует payment.
+async function handleSync(url, auth) {
+  const accountId = url.searchParams.get('accountId');
+  if (!accountId) return new Response(JSON.stringify({ error: 'accountId required' }), { status: 400, headers: CORS_JSON });
+
+  const fromStr = url.searchParams.get('from');
+  const from = fromStr ? new Date(fromStr + 'T00:00:00Z').toISOString() : new Date(Date.now() - 365 * 86400000).toISOString();
+  const to = new Date().toISOString();
+
+  // Собираем все операции постранично
+  let cursor = '';
+  let allItems = [];
+  for (let i = 0; i < 20; i++) {
+    const body = { accountId, from, to, limit: 1000 };
+    if (cursor) body.cursor = cursor;
+    const data = await tiPost(
+      '/tinkoff.public.invest.api.contract.v1.OperationsService/GetOperationsByCursor',
+      body, auth
+    );
+    if (data.code || data.message) throw new Error(data.message || 'API error');
+    allItems = allItems.concat(data.items || []);
+    if (!data.hasNext || !data.nextCursor) break;
+    cursor = data.nextCursor;
+  }
+
+  // Группируем по (date, name, category)
+  const map = {};
+  let entryIdx = 0;
+  for (const op of allItems) {
+    const opType = op.type || '';
+    let category;
+    if (opType.includes('BROKER_FEE') || opType.includes('SERVICE_FEE') || opType.includes('MARGIN_FEE') || opType.includes('TAX')) {
+      category = 'fee';
+    } else if (opType.includes('DIVIDEND') || opType.includes('COUPON') || opType.includes('BOND_REPAYMENT')) {
+      category = 'dividend';
+    } else if (opType.includes('BUY') || opType.includes('SELL')) {
+      category = 'trade';
+    } else {
+      continue; // пополнения/выводы пропускаем
+    }
+
+    const date = op.date ? op.date.slice(0, 10) : '';
+    const name = op.name || op.figi || 'Unknown';
+    const key = date + '|' + name + '|' + category;
+    const payment = moneyVal(op.payment);
+
+    if (!map[key]) {
+      map[key] = { id: ++entryIdx, date, position: name, pnl: 0, type: category, note: '' };
+    }
+    map[key].pnl += payment;
+  }
+
+  const entries = Object.values(map)
+    .map(e => ({ ...e, pnl: Math.round(e.pnl * 100) / 100 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Стоимость портфеля
+  let portfolioValue = null;
+  try {
+    const pd = await tiPost(
+      '/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio',
+      { accountId, currency: 'RUB' }, auth
+    );
+    portfolioValue = moneyVal(pd.totalAmountPortfolio);
+  } catch (_) {}
+
+  return new Response(
+    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString() }),
+    { status: 200, headers: CORS_JSON }
+  );
+}
+
 export default {
   async fetch(req) {
     // CORS preflight
@@ -30,28 +135,35 @@ export default {
       return new Response(null, { status: 204, headers: CORS });
     }
 
-    if (req.method !== 'POST') {
-      return new Response('Only POST allowed', { status: 405, headers: CORS });
+    const url = new URL(req.url);
+    const auth = req.headers.get('Authorization') || '';
+
+    // ── Высокоуровневые GET-маршруты для Trading P&L ──────────────────────────
+    if (req.method === 'GET') {
+      try {
+        if (url.pathname === '/accounts') return await handleAccounts(auth);
+        if (url.pathname === '/sync') return await handleSync(url, auth);
+        return new Response('Unknown route', { status: 404, headers: CORS });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 502, headers: CORS_JSON });
+      }
     }
 
-    // Путь запроса = имя сервиса T-Invest, например:
-    // /tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles
-    const url = new URL(req.url);
-    const target = TBASE + url.pathname;
+    // ── POST-прокси для OI Signal (прозрачная пересылка) ──────────────────────
+    if (req.method !== 'POST') {
+      return new Response('Only POST or GET allowed', { status: 405, headers: CORS });
+    }
 
-    // Разрешаем только T-Invest API пути
     if (!url.pathname.startsWith('/tinkoff.public.invest.api.contract.v')) {
       return new Response('Only T-Invest API paths allowed', { status: 403, headers: CORS });
     }
 
     try {
       const body = await req.text();
-      const authHeader = req.headers.get('Authorization') || '';
-
-      const upstream = await fetch(target, {
+      const upstream = await fetch(TBASE + url.pathname, {
         method: 'POST',
         headers: {
-          'Authorization': authHeader,
+          'Authorization': auth,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -66,7 +178,7 @@ export default {
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message }), {
         status: 502,
-        headers: { ...CORS, 'Content-Type': 'application/json' }
+        headers: CORS_JSON
       });
     }
   }
