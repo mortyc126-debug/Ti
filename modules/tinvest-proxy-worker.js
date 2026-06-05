@@ -85,9 +85,7 @@ async function handleSync(url, auth) {
   const userFrom = fromStr ? fromStr : new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
   const to = new Date().toISOString();
 
-  // Берём операции с запасом на 2 года назад для расчёта себестоимости
-  const historyFrom = new Date(new Date(userFrom + 'T00:00:00Z').getTime() - 730 * 86400000).toISOString();
-  const allItems = await fetchOps(accountId, historyFrom, to, auth);
+  const allItems = await fetchOps(accountId, userFrom + 'T00:00:00Z', to, auth);
 
   // Сортируем хронологически для FIFO
   allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
