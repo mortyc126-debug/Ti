@@ -689,6 +689,7 @@ function initTickerChipsDelegate(){
   if(!chips||chips._delegated)return;
   chips._delegated=true;
   chips.addEventListener('click',function(e){
+    console.log('[OI] chip container click, target:', e.target, 'btn:', e.target.closest('button[data-ticker]'));
     const btn=e.target.closest('button[data-ticker]');
     if(btn)selectTicker(btn.dataset.ticker);
   });
@@ -2238,7 +2239,13 @@ function showCalDayPopup(day,key,snap){
     </div>`;
 }
 
+// Глобальный лог кликов — показывает любой клик в консоли
+document.addEventListener('click', function(e){
+  console.log('[OI] click on:', e.target.tagName, e.target.className, e.target.id||'', e.target.dataset?.ticker||'');
+}, true); // capture phase — срабатывает раньше всего
+
 init();
+console.log('[OI] init complete, tickers:', tickers.map(x=>x.t), 'curInstr:', curInstr);
 </script>
 </body>
 </html>
