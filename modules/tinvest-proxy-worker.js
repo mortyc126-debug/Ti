@@ -90,6 +90,18 @@ async function handleSync(url, auth) {
   // Сортируем хронологически для FIFO
   allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
+  // Точные типы операций (объявляем здесь — используются и в проходе 1, и в проходе 2)
+  const STOCK_BUY  = new Set(['OPERATION_TYPE_BUY', 'OPERATION_TYPE_BUY_CARD', 'OPERATION_TYPE_BUY_MARGIN']);
+  const STOCK_SELL = new Set(['OPERATION_TYPE_SELL', 'OPERATION_TYPE_SELL_CARD', 'OPERATION_TYPE_SELL_MARGIN']);
+  const VAR_PLUS   = new Set(['OPERATION_TYPE_ACCRUING_VARMARGIN', 'OPERATION_TYPE_ACCRUING_VARMARGIN_DELIVERY']);
+  const VAR_MINUS  = new Set(['OPERATION_TYPE_WRITING_OFF_VARMARGIN', 'OPERATION_TYPE_WRITING_OFF_VARMARGIN_DELIVERY']);
+  const INCOME     = new Set(['OPERATION_TYPE_DIVIDEND', 'OPERATION_TYPE_COUPON',
+                               'OPERATION_TYPE_BOND_REPAYMENT', 'OPERATION_TYPE_BOND_REPAYMENT_FULL',
+                               'OPERATION_TYPE_DIV_EXT', 'OPERATION_TYPE_DIVIDEND_TRANSFER']);
+  const FEE_TYPES  = new Set(['OPERATION_TYPE_BROKER_FEE', 'OPERATION_TYPE_SERVICE_FEE',
+                               'OPERATION_TYPE_MARGIN_FEE', 'OPERATION_TYPE_OVERNIGHT',
+                               'OPERATION_TYPE_BROKER_FEE_PROGRESSIVE', 'OPERATION_TYPE_SERVICE_FEE_PROGRESSIVE']);
+
   // Проход 1: собираем figi фьючерсов/опционов по любому признаку.
   // Varmargin-операции приходят без instrumentType — определяем фьючерс по наличию
   // varmargin-записи для того же figi, либо по явному instrumentType.
@@ -130,20 +142,6 @@ async function handleSync(url, auth) {
     return { matched: qty - remaining, value };
   }
 
-  // Точные типы операций для торговли акциями/облигациями (FIFO)
-  const STOCK_BUY  = new Set(['OPERATION_TYPE_BUY', 'OPERATION_TYPE_BUY_CARD', 'OPERATION_TYPE_BUY_MARGIN']);
-  const STOCK_SELL = new Set(['OPERATION_TYPE_SELL', 'OPERATION_TYPE_SELL_CARD', 'OPERATION_TYPE_SELL_MARGIN']);
-  // Вариационная маржа фьючерсов — это и есть реализованный P&L
-  const VAR_PLUS   = new Set(['OPERATION_TYPE_ACCRUING_VARMARGIN', 'OPERATION_TYPE_ACCRUING_VARMARGIN_DELIVERY']);
-  const VAR_MINUS  = new Set(['OPERATION_TYPE_WRITING_OFF_VARMARGIN', 'OPERATION_TYPE_WRITING_OFF_VARMARGIN_DELIVERY']);
-  // Доходы
-  const INCOME     = new Set(['OPERATION_TYPE_DIVIDEND', 'OPERATION_TYPE_COUPON',
-                               'OPERATION_TYPE_BOND_REPAYMENT', 'OPERATION_TYPE_BOND_REPAYMENT_FULL',
-                               'OPERATION_TYPE_DIV_EXT', 'OPERATION_TYPE_DIVIDEND_TRANSFER']);
-  // Расходы/комиссии
-  const FEE_TYPES  = new Set(['OPERATION_TYPE_BROKER_FEE', 'OPERATION_TYPE_SERVICE_FEE',
-                               'OPERATION_TYPE_MARGIN_FEE', 'OPERATION_TYPE_OVERNIGHT',
-                               'OPERATION_TYPE_BROKER_FEE_PROGRESSIVE', 'OPERATION_TYPE_SERVICE_FEE_PROGRESSIVE']);
 
   for (const op of allItems) {
     const opType = op.type || '';
