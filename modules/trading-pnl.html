@@ -695,6 +695,7 @@ async function syncNow() {
   document.getElementById('sync-result').style.display = 'none';
   try {
     var data = await syncDoLoad(proxy, accountId, from);
+    console.log('[PNL DEBUG]', JSON.stringify(data).slice(0, 2000));
     if (data.portfolioValue) { syncedPortfolio = data.portfolioValue; save(); updateTopDep(); }
     document.getElementById('sync-count').textContent = data.entries.length;
     document.getElementById('sync-portfolio').textContent = data.portfolioValue ? rubAbs(data.portfolioValue) : '—';
