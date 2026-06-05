@@ -664,11 +664,25 @@ async function syncDoLoad(proxyBase, accountId, from) {
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
   save(); updatePosList(); renderChart(); renderLog();
 
+  // Объединяем _debug по всем счетам (суммируем cnt/sum)
+  var mergedDebug = {};
+  results.forEach(function(r) {
+    if (!r._debug) return;
+    Object.entries(r._debug).forEach(function(kv) {
+      var k = kv[0], v = kv[1];
+      if (!mergedDebug[k]) mergedDebug[k] = { count: 0, sum: 0, instrTypes: [] };
+      mergedDebug[k].count += v.count;
+      mergedDebug[k].sum += v.sum;
+      v.instrTypes.forEach(function(t) { if (!mergedDebug[k].instrTypes.includes(t)) mergedDebug[k].instrTypes.push(t); });
+    });
+  });
+
   return {
     entries: allNew,
     portfolioValue: totalPortfolio || null,
     syncedAt: results[0] ? results[0].syncedAt : new Date().toISOString(),
-    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; })
+    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; }),
+    _debug: Object.keys(mergedDebug).length ? mergedDebug : null
   };
 }
 
