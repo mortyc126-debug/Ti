@@ -242,16 +242,16 @@ table.oit{width:100%;border-collapse:collapse;font-size:11px;}
 
 <!-- Ticker panel (collapsible, editable) -->
 <div class="ticker-panel">
-  <div class="ticker-header" onclick="toggleTickerPanel(event)">
-    <span class="sec-title" style="margin-bottom:0;white-space:nowrap;">Базовые активы</span>
+  <div class="ticker-header">
+    <span class="sec-title" style="margin-bottom:0;white-space:nowrap;cursor:pointer;" onclick="toggleTickerPanel()">Базовые активы</span>
     <div class="ticker-chips" id="tickerChips"></div>
     <div class="tf-bar" style="margin-left:auto;">
-      <button class="btn-ghost active" id="tf1m" onclick="event.stopPropagation();selTF(this,'1min')">1m</button>
-      <button class="btn-ghost" id="tf5m" onclick="event.stopPropagation();selTF(this,'5min')">5m</button>
-      <button class="btn-ghost" id="tf1h" onclick="event.stopPropagation();selTF(this,'1h')">1h</button>
-      <button class="btn-ghost" id="tf1d" onclick="event.stopPropagation();selTF(this,'1d')">1D</button>
+      <button class="btn-ghost active" id="tf1m" onclick="selTF(this,'1min')">1m</button>
+      <button class="btn-ghost" id="tf5m" onclick="selTF(this,'5min')">5m</button>
+      <button class="btn-ghost" id="tf1h" onclick="selTF(this,'1h')">1h</button>
+      <button class="btn-ghost" id="tf1d" onclick="selTF(this,'1d')">1D</button>
     </div>
-    <span class="ticker-chevron" id="tickerChev">▼</span>
+    <span class="ticker-chevron" id="tickerChev" style="cursor:pointer;" onclick="toggleTickerPanel()">▼</span>
   </div>
   <div class="ticker-body" id="tickerBody">
     <div class="ticker-grid" id="tickerGrid"></div>
@@ -725,8 +725,7 @@ function removeTicker(i){
   renderTickerChips();
   renderTickerGrid();
 }
-function toggleTickerPanel(e){
-  if(e&&e.target.closest('.ticker-chips,.tf-bar'))return;
+function toggleTickerPanel(){
   tickerPanelOpen=!tickerPanelOpen;
   document.getElementById('tickerBody').className='ticker-body'+(tickerPanelOpen?' open':'');
   document.getElementById('tickerChev').className='ticker-chevron'+(tickerPanelOpen?' open':'');
