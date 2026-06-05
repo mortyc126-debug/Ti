@@ -677,9 +677,20 @@ function renderTickerChips(){
     const b=document.createElement('button');
     b.className='btn-ghost ticker-chip'+(t===curInstr?' active':'');
     b.title=n||t;
+    b.dataset.ticker=t;
     b.innerHTML=`<span class="chip-code">${t}</span>${n?`<span class="chip-name">${n}</span>`:''}`;
-    b.onclick=(e)=>{e.stopPropagation();selectTicker(t);};
     chips.appendChild(b);
+  });
+}
+
+// Делегирование: один обработчик на контейнере — надёжнее, чем onclick на каждой кнопке
+function initTickerChipsDelegate(){
+  const chips=document.getElementById('tickerChips');
+  if(!chips||chips._delegated)return;
+  chips._delegated=true;
+  chips.addEventListener('click',function(e){
+    const btn=e.target.closest('button[data-ticker]');
+    if(btn)selectTicker(btn.dataset.ticker);
   });
 }
 
@@ -2080,6 +2091,7 @@ function init(){
   // Tickers
   tickers=loadTickers();
   renderTickerChips();
+  initTickerChipsDelegate();
 
   // Restore date
   const savedDate=localStorage.getItem(LS.ACTIVE_DATE);
