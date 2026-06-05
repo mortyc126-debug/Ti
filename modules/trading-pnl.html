@@ -576,7 +576,10 @@ async function syncCheckProxy() {
     if (accounts.error) throw new Error(accounts.error);
     syncSetStatus(true, 'Подключено ✓  (' + accounts.length + ' счёт' + (accounts.length===1?'':'а') + ')');
     var sel = document.getElementById('sync-account-select');
-    sel.innerHTML = accounts.map(function(a){ return '<option value="'+a.id+'">'+(a.name||a.id)+'</option>'; }).join('');
+    // Сохраняем список счетов для режима «все»
+    sel._allAccounts = accounts;
+    sel.innerHTML = '<option value="__ALL__">★ Все счета (объединить)</option>' +
+      accounts.map(function(a){ return '<option value="'+a.id+'">'+(a.name||a.id)+'</option>'; }).join('');
     if (!document.getElementById('sync-from').value) {
       var d = new Date(); d.setFullYear(d.getFullYear()-1);
       document.getElementById('sync-from').value = d.toISOString().slice(0,10);
@@ -584,18 +587,56 @@ async function syncCheckProxy() {
   } catch(e) { syncSetStatus(false, 'Ошибка: ' + e.message); }
 }
 
-async function syncDoLoad(proxyBase, accountId, from) {
+async function syncFetchOne(proxyBase, accountId, from) {
   var url = proxyBase + '/sync?accountId=' + encodeURIComponent(accountId) + (from ? '&from=' + from : '');
   var r = await fetch(url, { headers: syncAuthHeaders(), signal: AbortSignal.timeout(60000) });
   var data = await r.json();
   if (data.error) throw new Error(data.error);
-  // Сначала всегда выкидываем демо-записи, потом фильтруем по дате
+  return data;
+}
+
+async function syncDoLoad(proxyBase, accountId, from) {
+  var sel = document.getElementById('sync-account-select');
+  var allAccounts = sel._allAccounts || [];
+  var isAll = accountId === '__ALL__';
+  var ids = isAll ? allAccounts.map(function(a){ return a.id; }) : [accountId];
+
+  if (!ids.length) throw new Error('Нет счетов');
+
+  syncMsg('sync-msg', isAll ? 'Загружаю ' + ids.length + ' счетов...' : 'Загружаю операции...', 'var(--t2)');
+
+  // Параллельно грузим все счета
+  var results = await Promise.all(ids.map(function(id, i) {
+    return syncFetchOne(proxyBase, id, from).catch(function(e) {
+      return { entries: [], portfolioValue: 0, syncedAt: new Date().toISOString(), _error: e.message };
+    });
+  }));
+
+  // Мёрджим: снимаем демо и старые записи, добавляем новые
   entries = entries.filter(function(e){ return !e._demo; });
   if (from) { entries = entries.filter(function(e){ return e.date < from; }); } else { entries = []; }
-  entries = entries.concat(data.entries);
+
+  var totalPortfolio = 0;
+  var allNew = [];
+  results.forEach(function(data) {
+    allNew = allNew.concat(data.entries || []);
+    totalPortfolio += data.portfolioValue || 0;
+  });
+
+  // При мёрдже нескольких счетов на один день может быть несколько записей
+  // одного инструмента — это ок, оставляем все (разные счета)
+  var idx = Date.now();
+  allNew.forEach(function(e){ e.id = ++idx; });
+  entries = entries.concat(allNew);
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
   save(); updatePosList(); renderChart(); renderLog();
-  return data;
+
+  return {
+    entries: allNew,
+    portfolioValue: totalPortfolio || null,
+    syncedAt: results[0] ? results[0].syncedAt : new Date().toISOString(),
+    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; })
+  };
 }
 
 async function syncNow() {
@@ -604,7 +645,6 @@ async function syncNow() {
   var from = document.getElementById('sync-from').value;
   if (!proxy) { syncMsg('sync-msg', 'Введи URL Worker\'а и нажми «Сохранить»', 'var(--neg)'); return; }
   if (!accountId) { syncMsg('sync-msg', 'Сначала нажми «Проверить» и выбери счёт', 'var(--neg)'); return; }
-  syncMsg('sync-msg', 'Загружаю операции...', 'var(--t2)');
   document.getElementById('sync-result').style.display = 'none';
   try {
     var data = await syncDoLoad(proxy, accountId, from);
@@ -612,7 +652,9 @@ async function syncNow() {
     document.getElementById('sync-portfolio').textContent = data.portfolioValue ? '₽'+Number(data.portfolioValue).toLocaleString('ru',{maximumFractionDigits:0}) : '—';
     document.getElementById('sync-time').textContent = new Date(data.syncedAt).toLocaleString('ru');
     document.getElementById('sync-result').style.display = 'block';
-    syncMsg('sync-msg', '✓ Синхронизировано', 'var(--pos)');
+    var msg = '✓ Синхронизировано';
+    if (data.errors && data.errors.length) msg += ' (ошибки: ' + data.errors.join('; ') + ')';
+    syncMsg('sync-msg', msg, data.errors && data.errors.length ? '#FF8C42' : 'var(--pos)');
   } catch(e) { syncMsg('sync-msg', 'Ошибка: ' + e.message, 'var(--neg)'); }
 }
 
