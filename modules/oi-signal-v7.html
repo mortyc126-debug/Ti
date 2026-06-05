@@ -672,15 +672,12 @@ let tickerPanelOpen=false;
 
 function renderTickerChips(){
   const chips=document.getElementById('tickerChips');
-  chips.innerHTML='';
-  tickers.forEach(({t,n})=>{
-    const b=document.createElement('button');
-    b.className='btn-ghost ticker-chip'+(t===curInstr?' active':'');
-    b.title=n||t;
-    b.dataset.ticker=t;
-    b.innerHTML=`<span class="chip-code">${t}</span>${n?`<span class="chip-name">${n}</span>`:''}`;
-    chips.appendChild(b);
-  });
+  // Собираем через innerHTML — onclick как атрибут, самый надёжный способ
+  chips.innerHTML=tickers.map(({t,n})=>`
+    <button class="btn-ghost ticker-chip${t===curInstr?' active':''}" title="${n||t}"
+      onclick="selectTicker('${t.replace(/'/g,"\\'")}')">
+      <span class="chip-code">${t}</span>${n?`<span class="chip-name">${n}</span>`:''}
+    </button>`).join('');
 }
 
 // Делегирование: один обработчик на контейнере — надёжнее, чем onclick на каждой кнопке
