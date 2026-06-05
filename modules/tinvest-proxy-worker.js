@@ -142,15 +142,14 @@ async function handleSync(url, auth) {
     const date = op.date ? op.date.slice(0, 10) : '';
     const name = op.name || figi;
     const afterFrom = date >= userFrom;
-    // Фьючерсы и опционы — P&L через вариационную маржу, не FIFO
-    const isFutures = op.instrumentType === 'futures' || op.instrumentType === 'option';
+    // Вариационная маржа — всегда реализованный P&L фьючерсов.
+    // ВАЖНО: у этих операций instrumentType=null, поэтому проверяем ДО isFutures.
+    if (VAR_PLUS.has(opType) || VAR_MINUS.has(opType)) {
+      if (afterFrom) addTrade(date, name, payment);
 
-    if (isFutures) {
-      // Вариационная маржа — реализованный P&L по фьючерсам
-      if (afterFrom && (VAR_PLUS.has(opType) || VAR_MINUS.has(opType))) {
-        addTrade(date, name, payment);
-      }
-      // BUY/SELL фьючерсов пропускаем: payment там ≠ реальная стоимость сделки
+    // Фьючерсы/опционы: BUY/SELL пропускаем — payment там ≠ реальная стоимость сделки
+    } else if (op.instrumentType === 'futures' || op.instrumentType === 'option') {
+      // skip
 
     } else if (STOCK_BUY.has(opType) && qty > 0) {
       // Акции/облигации/ETF: FIFO — открываем лонг или закрываем шорт
