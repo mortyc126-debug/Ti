@@ -90,12 +90,33 @@ async function handleSync(url, auth) {
   // Сортируем хронологически для FIFO
   allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-  // FIFO-очереди себестоимости: figi → [{qty, costPerUnit}]
-  const positions = {};
+  // Два FIFO-стека на инструмент: длинные позиции и короткие
+  // longs[figi]  = [{qty, costPerUnit}]   — себестоимость лонга
+  // shorts[figi] = [{qty, procPerUnit}]   — выручка при открытии шорта
+  const longs = {}, shorts = {};
 
-  // Накапливаем готовые entry-записи (только для дат >= userFrom)
-  const tradeMap = {};   // "date|name" → pnl (суммируем несколько sell в один день)
+  const tradeMap = {};  // "date|name" → {date,position,pnl}
   const otherEntries = [];
+
+  function addTrade(date, name, pnl) {
+    const key = date + '|' + name;
+    if (!tradeMap[key]) tradeMap[key] = { date, position: name, pnl: 0 };
+    tradeMap[key].pnl += pnl;
+  }
+
+  function fifoConsume(queue, qty) {
+    // Списывает qty лотов из FIFO, возвращает {matched, valuePerUnit}
+    let remaining = qty, value = 0;
+    while (remaining > 0 && queue.length > 0) {
+      const lot = queue[0];
+      const used = Math.min(lot.qty, remaining);
+      value += used * (lot.costPerUnit || lot.procPerUnit || 0);
+      lot.qty -= used;
+      remaining -= used;
+      if (lot.qty <= 0) queue.shift();
+    }
+    return { matched: qty - remaining, value };
+  }
 
   for (const op of allItems) {
     const opType = op.type || '';
@@ -107,30 +128,42 @@ async function handleSync(url, auth) {
     const afterFrom = date >= userFrom;
 
     if (opType.includes('BUY') && qty > 0) {
-      // Пополняем FIFO-очередь: цена покупки = |payment| / qty
-      if (!positions[figi]) positions[figi] = [];
-      positions[figi].push({ qty, costPerUnit: Math.abs(payment) / qty });
+      if (shorts[figi] && shorts[figi].length > 0) {
+        // Закрываем шорт: P&L = выручка при открытии − стоимость закрытия
+        const { matched, value: proceeds } = fifoConsume(shorts[figi], qty);
+        if (afterFrom && matched > 0) {
+          const buyCost = Math.abs(payment) * (matched / qty);
+          addTrade(date, name, proceeds - buyCost);
+        }
+        // Остаток qty (если шорт меньше объёма) → открываем лонг
+        const longQty = qty - matched;
+        if (longQty > 0) {
+          if (!longs[figi]) longs[figi] = [];
+          longs[figi].push({ qty: longQty, costPerUnit: Math.abs(payment) / qty });
+        }
+      } else {
+        // Открываем лонг
+        if (!longs[figi]) longs[figi] = [];
+        longs[figi].push({ qty, costPerUnit: Math.abs(payment) / qty });
+      }
 
     } else if (opType.includes('SELL') && qty > 0) {
-      // FIFO: вычитаем из очереди и считаем себестоимость
-      let remaining = qty;
-      let cost = 0;
-      const lots = positions[figi] || [];
-      while (remaining > 0 && lots.length > 0) {
-        const lot = lots[0];
-        const used = Math.min(lot.qty, remaining);
-        cost += used * lot.costPerUnit;
-        lot.qty -= used;
-        remaining -= used;
-        if (lot.qty <= 0) lots.shift();
-      }
-      // Для части без известного базиса (remaining > 0) просто не учитываем
-      const matched = qty - remaining;
-      if (afterFrom && matched > 0) {
-        const pnl = payment * (matched / qty) - cost;
-        const key = date + '|' + name;
-        tradeMap[key] = (tradeMap[key] || { date, position: name, pnl: 0 });
-        tradeMap[key].pnl += pnl;
+      if (longs[figi] && longs[figi].length > 0) {
+        // Закрываем лонг: P&L = выручка − себестоимость
+        const { matched, value: cost } = fifoConsume(longs[figi], qty);
+        if (afterFrom && matched > 0) {
+          addTrade(date, name, payment * (matched / qty) - cost);
+        }
+        // Остаток → открываем шорт
+        const shortQty = qty - matched;
+        if (shortQty > 0) {
+          if (!shorts[figi]) shorts[figi] = [];
+          shorts[figi].push({ qty: shortQty, procPerUnit: payment / qty });
+        }
+      } else {
+        // Открываем шорт
+        if (!shorts[figi]) shorts[figi] = [];
+        shorts[figi].push({ qty, procPerUnit: payment / qty });
       }
 
     } else if (afterFrom && (opType.includes('DIVIDEND') || opType.includes('COUPON') || opType.includes('BOND_REPAYMENT'))) {
