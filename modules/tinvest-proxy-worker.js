@@ -97,6 +97,7 @@ async function handleSync(url, auth) {
 
   const tradeMap = {};  // "date|name" → {date,position,pnl}
   const otherEntries = [];
+  const opStats = {};   // opType → {count, sum, instrTypes} — только для диагностики
 
   function addTrade(date, name, pnl) {
     const key = date + '|' + name;
@@ -191,6 +192,12 @@ async function handleSync(url, auth) {
     } else if (afterFrom && FEE_TYPES.has(opType)) {
       otherEntries.push({ date, position: name, pnl: payment, type: 'fee', note: '' });
     }
+
+    // Собираем статистику по типам для диагностики
+    if (!opStats[opType]) opStats[opType] = { count: 0, sum: 0, instrTypes: new Set() };
+    opStats[opType].count++;
+    opStats[opType].sum += payment;
+    opStats[opType].instrTypes.add(op.instrumentType || '?');
   }
 
   let idx = 0;
@@ -213,8 +220,17 @@ async function handleSync(url, auth) {
     portfolioValue = moneyVal(pd.totalAmountPortfolio);
   } catch (_) {}
 
+  // Сериализуем opStats (Set → Array для JSON)
+  const debug = Object.fromEntries(
+    Object.entries(opStats).map(([k, v]) => [k, {
+      count: v.count,
+      sum: Math.round(v.sum),
+      instrTypes: [...v.instrTypes]
+    }])
+  );
+
   return new Response(
-    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString() }),
+    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(), _debug: debug }),
     { status: 200, headers: CORS_JSON }
   );
 }

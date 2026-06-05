@@ -291,6 +291,11 @@ tr:hover td{background:rgba(255,255,255,0.012)}
         <div><div class="lbl">Стоимость портфеля</div><div class="val sm" id="sync-portfolio">—</div></div>
         <div><div class="lbl">Обновлено</div><div style="font-size:12px;color:var(--tm);margin-top:4px" id="sync-time">—</div></div>
       </div>
+      <div id="sync-debug" style="margin-top:12px;display:none">
+        <div class="divider"></div>
+        <div class="lbl" style="margin-bottom:6px">🔍 Диагностика типов операций</div>
+        <div id="sync-debug-table" style="font-size:10px;color:var(--t2);font-family:monospace;line-height:1.8;overflow-x:auto;white-space:pre"></div>
+      </div>
     </div>
   </div>
 
@@ -681,6 +686,15 @@ async function syncNow() {
     document.getElementById('sync-portfolio').textContent = data.portfolioValue ? rubAbs(data.portfolioValue) : '—';
     document.getElementById('sync-time').textContent = new Date(data.syncedAt).toLocaleString('ru');
     document.getElementById('sync-result').style.display = 'block';
+    if (data._debug) {
+      var dbg = document.getElementById('sync-debug');
+      var tbl = document.getElementById('sync-debug-table');
+      var rows = Object.entries(data._debug)
+        .sort(function(a,b){ return Math.abs(b[1].sum)-Math.abs(a[1].sum); })
+        .map(function(e){ return e[0].padEnd(52)+' cnt:'+String(e[1].count).padStart(4)+' sum:'+String(e[1].sum).padStart(10)+'₽  ['+e[1].instrTypes.join(',')+']'; });
+      tbl.textContent = rows.join('\n');
+      dbg.style.display = 'block';
+    }
     var msg = '✓ Синхронизировано';
     if (data.errors && data.errors.length) msg += ' (ошибки: ' + data.errors.join('; ') + ')';
     syncMsg('sync-msg', msg, data.errors && data.errors.length ? '#FF8C42' : 'var(--pos)');
