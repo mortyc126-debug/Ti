@@ -242,7 +242,7 @@ table.oit{width:100%;border-collapse:collapse;font-size:11px;}
 
 <!-- Ticker panel (collapsible, editable) -->
 <div class="ticker-panel">
-  <div class="ticker-header" onclick="toggleTickerPanel()">
+  <div class="ticker-header" onclick="toggleTickerPanel(event)">
     <span class="sec-title" style="margin-bottom:0;white-space:nowrap;">Базовые активы</span>
     <div class="ticker-chips" id="tickerChips"></div>
     <div class="tf-bar" style="margin-left:auto;">
@@ -725,7 +725,8 @@ function removeTicker(i){
   renderTickerChips();
   renderTickerGrid();
 }
-function toggleTickerPanel(){
+function toggleTickerPanel(e){
+  if(e&&e.target.closest('.ticker-chips,.tf-bar'))return;
   tickerPanelOpen=!tickerPanelOpen;
   document.getElementById('tickerBody').className='ticker-body'+(tickerPanelOpen?' open':'');
   document.getElementById('tickerChev').className='ticker-chevron'+(tickerPanelOpen?' open':'');
@@ -1758,7 +1759,7 @@ function parsePaste(){
   // Row "Количество лиц":   физ.длинные, физ.короткие, юр.длинные, юр.короткие, (итого)
   
   // Remove non-numeric except spaces, minus, digits
-  const clean=raw.replace(/\u00a0/g,' ');
+  const clean=raw.replace(/[\u00a0\u202f\u2009\u2008\u2007\u2006\u2005\u2004\u2003\u2002\u2001\u2000\u1680\u180e\ufeff]/g,' ');
   
   // Split into tokens, pick numbers (possibly space-separated thousands like "1 091 101")
   // We'll join consecutive digit groups separated by single spaces as one number
@@ -1813,7 +1814,7 @@ function extractAllNumbers(text){
   // 1. Normalise non-breaking spaces
   // 2. Split on 2+ spaces OR sequences of non-digit/non-space/non-minus chars
   // 3. Within each token, strip inner single spaces to collapse thousands
-  const norm = text.replace(/\u00a0/g,' ');
+  const norm = text.replace(/[\u00a0\u202f\u2009\u2008\u2007\u2006\u2005\u2004\u2003\u2002\u2001\u2000\u1680\u180e\ufeff]/g,' ');
   const tokens = norm.split(/(?:\s{2,}|[^\d\s\-]+)/);
   const nums = [];
   for(const tok of tokens){
@@ -2220,6 +2221,9 @@ function showCalDayPopup(day,key,snap){
       <div class="cal-popup-row"><span>Δ Юр. шорт:</span><span style="color:${jSC>0?'var(--neg)':jSC<0?'var(--pos)':'var(--txt3)'}">${fmt(jSC)}</span></div>
       <div class="cal-popup-row"><span>Δ Физ. лонг:</span><span>${fmt(fLC)}</span></div>
       <div class="cal-popup-row"><span>Δ Физ. шорт:</span><span>${fmt(fSC)}</span></div>
+      <div style="margin-top:8px;text-align:right;">
+        <button class="btn-pill" style="font-size:10px;padding:4px 12px;" onclick="closeCalendar();selectDate('${key}')">→ Перейти к этому дню</button>
+      </div>
     </div>`;
 }
 
