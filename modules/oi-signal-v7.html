@@ -1,0 +1,2233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OI · SIGNAL v3 — Анализ открытого интереса MOEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0B0613;--panel:#140A24;--card:#1A1030;
+  --accent:#FF006E;--accent2:#FF2A8A;
+  --pos:#52F2C9;--neg:#FF4D7A;
+  --mem:#A78BFA;
+  --txt:#F2F0FF;--txt2:#A79BC9;--txt3:#6F648F;
+  --border:rgba(255,0,128,0.12);--border2:rgba(170,90,255,0.10);
+}
+body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min-height:100vh;font-family:'JetBrains Mono',monospace;color:var(--txt);padding:18px 20px;}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border2);flex-wrap:wrap;gap:10px;}
+.logo{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.12em;color:var(--accent);text-shadow:0 0 20px rgba(255,0,110,0.35);}
+.logo-sub{font-size:9px;color:var(--txt3);letter-spacing:0.08em;margin-top:2px;}
+.hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.tok-inp{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:6px 14px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;width:210px;outline:none;}
+.tok-inp:focus{border-color:rgba(255,0,110,0.4);}
+.btn-pill{background:linear-gradient(180deg,rgba(255,0,128,0.22),rgba(255,0,128,0.12));border:1px solid rgba(255,0,128,0.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:0.06em;padding:6px 16px;cursor:pointer;transition:all 0.15s;}
+.btn-pill:hover{box-shadow:0 0 14px rgba(255,0,128,0.25);}
+.btn-ghost{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:999px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 12px;cursor:pointer;transition:all 0.15s;}
+.btn-ghost:hover{border-color:rgba(255,0,128,0.25);color:var(--txt);}
+.btn-ghost.active{background:linear-gradient(180deg,rgba(255,0,128,0.18),rgba(255,0,128,0.08));border-color:rgba(255,0,128,0.45);color:var(--accent);}
+.ticker-chip{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 10px;}
+.chip-code{font-size:11px;font-weight:600;line-height:1.2;}
+.chip-name{font-size:8px;color:var(--txt3);font-family:'JetBrains Mono',monospace;letter-spacing:0.02em;line-height:1;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;}
+.btn-ghost.ticker-chip.active .chip-name{color:rgba(255,0,128,0.6);}
+.btn-ghost.ticker-chip:hover .chip-name{color:var(--txt3);}
+.btn-sm{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;cursor:pointer;}
+.btn-sm:hover{color:var(--txt2);border-color:rgba(255,255,255,0.15);}
+.btn-danger{border-color:rgba(255,77,122,0.3);color:var(--neg);}
+.btn-danger:hover{background:rgba(255,77,122,0.08);}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:18px;}
+.sec-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:12px;}
+.metrics-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+@media(max-width:700px){.metrics-row{grid-template-columns:repeat(2,1fr);}.grid-main{grid-template-columns:1fr!important;}}
+.mc{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:12px 14px;}
+.mc-lbl{font-size:10px;color:var(--txt3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:5px;}
+.mc-val{font-family:'Unbounded',sans-serif;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;}
+.mc-sub{font-size:10px;color:var(--txt3);margin-top:2px;}
+.grid-main{display:grid;grid-template-columns:1fr 430px;gap:14px;margin-bottom:14px;}
+.candle-placeholder{width:100%;height:190px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.04);border-radius:12px;color:var(--txt3);font-size:11px;flex-direction:column;gap:8px;}
+.signal-block{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;}
+.sig-dir{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:5px;}
+.arrow-up{color:var(--pos);}.arrow-down{color:var(--neg);}.neutral{color:var(--txt2);}
+.sig-lbl{font-size:11px;color:var(--txt3);letter-spacing:0.06em;margin-bottom:10px;}
+.sbar-wrap{height:3px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-bottom:4px;}
+.sbar-fill{height:100%;border-radius:999px;transition:width 0.4s ease;}
+.sbar-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--txt3);}
+.factors{margin-top:12px;}
+.fi{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03);}
+.fdot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.fn{font-size:11px;color:var(--txt2);flex:1;}
+.fs{font-size:11px;font-weight:600;}
+.sp{color:var(--pos);}.sn{color:var(--neg);}.su{color:var(--txt3);}.sm{color:var(--mem);}
+.formula-block{background:rgba(255,0,128,0.04);border:1px solid rgba(255,0,128,0.12);border-radius:12px;padding:10px 12px;margin-top:10px;}
+.formula-title{font-size:10px;color:var(--txt3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+.formula-line{font-size:10px;color:var(--txt2);line-height:1.9;}
+.formula-line span{color:var(--accent);}
+.oi-wrap{overflow-x:auto;}
+table.oit{width:100%;border-collapse:collapse;font-size:11px;}
+.oit th{color:var(--txt3);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;font-size:10px;padding:7px 6px;text-align:center;background:rgba(255,0,128,0.05);border:1px solid rgba(255,255,255,0.06);}
+.oit th.left{text-align:left;}
+.oit td{padding:6px 6px;text-align:right;border:1px solid rgba(255,255,255,0.05);font-variant-numeric:tabular-nums;color:var(--txt2);vertical-align:middle;}
+.oit td.row-label{text-align:left;color:var(--txt);font-weight:500;font-size:10px;white-space:nowrap;background:rgba(255,255,255,0.02);}
+.oit input{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:5px;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 6px;width:100%;outline:none;text-align:right;font-variant-numeric:tabular-nums;}
+.oit input:focus{border-color:rgba(255,0,128,0.4);}
+.dp{color:var(--pos);font-weight:600;}.dn{color:var(--neg);font-weight:600;}
+.date-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.tabs-row{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+.oi-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.04);}
+@media(max-width:500px){.oi-sum{grid-template-columns:repeat(2,1fr);}}
+.api-status{font-size:10px;color:var(--txt3);}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px rgba(82,242,201,0.5);display:inline-block;margin-right:5px;vertical-align:middle;}
+.sdot.err{background:var(--neg);box-shadow:0 0 8px rgba(255,77,122,0.5);}
+.sdot.mem{background:var(--mem);box-shadow:0 0 8px rgba(167,139,250,0.5);}
+.spinner{width:13px;height:13px;border:2px solid rgba(255,0,128,0.2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.expb{background:rgba(255,0,128,0.1);border:1px solid rgba(255,0,128,0.25);border-radius:999px;color:var(--accent);font-size:10px;padding:2px 8px;}
+.tf-bar{display:flex;gap:4px;}
+.oi-note{font-size:10px;color:var(--txt3);margin-top:8px;line-height:1.6;font-style:italic;}
+.row-controls{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+
+/* ---- Ticker panel ---- */
+.ticker-panel{background:var(--panel);border:1px solid var(--border2);border-radius:16px;margin-bottom:14px;overflow:hidden;}
+.ticker-header{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;user-select:none;}
+.ticker-header:hover{background:rgba(255,255,255,0.02);}
+.ticker-chevron{font-size:11px;color:var(--txt3);transition:transform 0.2s;flex-shrink:0;}
+.ticker-chevron.open{transform:rotate(180deg);}
+.ticker-chips{display:flex;gap:5px;flex-wrap:wrap;flex:1;}
+.ticker-body{display:none;padding:10px 16px 14px;border-top:1px solid rgba(255,255,255,0.05);}
+.ticker-body.open{display:block;}
+.ticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;margin-bottom:8px;}
+.ticker-row{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:5px 8px;}
+.ticker-row input{background:transparent;border:none;outline:none;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:11px;width:100%;}
+.ticker-row input::placeholder{color:var(--txt3);}
+.ticker-add-row{display:flex;gap:6px;margin-top:6px;}
+.ticker-add-row input{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:5px 10px;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;width:110px;}
+.ticker-add-row input:focus{border-color:rgba(255,0,128,0.4);}
+
+/* ---- Memory panel ---- */
+.mem-panel{background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.15);border-radius:12px;padding:10px 14px;margin-bottom:12px;}
+.mem-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.mem-title{font-size:10px;color:var(--mem);letter-spacing:0.1em;text-transform:uppercase;}
+.mem-toggle{display:flex;align-items:center;gap:7px;cursor:pointer;}
+.toggle-track{width:32px;height:16px;background:rgba(255,255,255,0.08);border-radius:999px;position:relative;border:1px solid rgba(255,255,255,0.12);transition:background 0.2s;}
+.toggle-track.on{background:rgba(167,139,250,0.4);border-color:rgba(167,139,250,0.5);}
+.toggle-thumb{width:12px;height:12px;background:var(--txt3);border-radius:50%;position:absolute;top:1px;left:1px;transition:left 0.2s,background 0.2s;}
+.toggle-track.on .toggle-thumb{left:17px;background:var(--mem);}
+.toggle-lbl{font-size:10px;color:var(--txt3);}
+.mem-stats{display:flex;gap:10px;font-size:10px;color:var(--txt3);}
+.mem-stat{display:flex;gap:4px;align-items:center;}
+.mem-adj{font-size:11px;color:var(--mem);font-weight:600;}
+.mem-history{margin-top:8px;max-height:100px;overflow-y:auto;}
+.mh-row{display:flex;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:10px;color:var(--txt3);}
+.mh-date{width:65px;flex-shrink:0;}
+.mh-sig{width:60px;flex-shrink:0;}
+.mh-out{flex:1;}
+.mh-acc{width:32px;text-align:right;flex-shrink:0;}
+
+/* ---- Paste module ---- */
+.paste-panel{background:rgba(255,0,128,0.03);border:1px solid rgba(255,0,128,0.15);border-radius:12px;padding:10px 12px;margin-bottom:10px;}
+.paste-label{font-size:10px;color:var(--txt3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;}
+.paste-ta{width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:7px 10px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
+.paste-ta:focus{border-color:rgba(255,0,128,0.4);}
+.paste-ta::placeholder{color:var(--txt3);}
+.paste-row{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+.parse-status{font-size:10px;flex:1;}
+.parse-ok{color:var(--pos);}
+.parse-err{color:var(--neg);}
+
+/* ---- Pattern block ---- */
+.pattern-block{background:rgba(167,139,250,0.04);border:1px solid rgba(167,139,250,0.18);border-radius:16px;padding:14px;margin-top:14px;}
+.pattern-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;}
+.pattern-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--mem);}
+.period-bar{display:flex;gap:3px;}
+.pbtn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:999px;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 9px;cursor:pointer;transition:all 0.15s;}
+.pbtn:hover{color:var(--txt2);}
+.pbtn.active{background:rgba(167,139,250,0.2);border-color:rgba(167,139,250,0.45);color:var(--mem);}
+.pattern-tabs{display:flex;gap:4px;margin-bottom:10px;}
+.ptab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 0;margin-right:10px;cursor:pointer;transition:all 0.15s;}
+.ptab.active{color:var(--mem);border-bottom-color:var(--mem);}
+.ptab-content{display:none;}.ptab-content.active{display:block;}
+.pstat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+.pstat{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:8px 10px;text-align:center;}
+.pstat-val{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:600;margin-bottom:2px;}
+.pstat-lbl{font-size:9px;color:var(--txt3);letter-spacing:0.06em;text-transform:uppercase;}
+.pexample{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:10px;}
+.pex-date{width:60px;flex-shrink:0;color:var(--txt3);}
+.pex-sig{width:55px;flex-shrink:0;}
+.pex-delta{flex:1;color:var(--txt2);}
+.pex-out{width:55px;text-align:right;flex-shrink:0;}
+.pno-data{font-size:10px;color:var(--txt3);padding:8px 0;text-align:center;font-style:italic;}
+.psim-bar{height:3px;background:rgba(167,139,250,0.15);border-radius:999px;margin-bottom:8px;overflow:hidden;}
+.psim-fill{height:100%;background:linear-gradient(90deg,var(--mem),#c4b5fd);border-radius:999px;transition:width 0.4s;}
+
+/* ---- Save bar ---- */
+.save-bar{display:flex;align-items:center;gap:8px;padding:8px 0;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.save-bar span{font-size:10px;color:var(--txt3);}
+.save-indicator{font-size:10px;color:var(--pos);opacity:0;transition:opacity 0.3s;}
+.save-indicator.show{opacity:1;}
+
+/* ---- Outcome recording ---- */
+.outcome-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;}
+.outcome-lbl{font-size:10px;color:var(--txt3);flex:1;}
+.outcome-sel{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
+.outcome-sel:focus{border-color:rgba(255,0,128,0.4);}
+
+/* ---- Day save bar ---- */
+.day-save-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,0,128,0.06);border:1px solid rgba(255,0,128,0.2);border-radius:12px;margin-bottom:10px;}
+.day-save-bar span{font-size:10px;color:var(--txt2);flex:1;}
+.btn-save-day{background:linear-gradient(180deg,rgba(82,242,201,0.22),rgba(82,242,201,0.1));border:1px solid rgba(82,242,201,0.45);border-radius:999px;color:var(--pos);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;transition:all 0.15s;}
+.btn-save-day:hover{box-shadow:0 0 12px rgba(82,242,201,0.2);}
+.btn-cal{background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:999px;color:var(--mem);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 12px;cursor:pointer;transition:all 0.15s;}
+.btn-cal:hover{box-shadow:0 0 10px rgba(167,139,250,0.15);}
+
+/* ---- Calendar modal ---- */
+.cal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.cal-modal{background:var(--panel);border:1px solid rgba(167,139,250,0.25);border-radius:20px;padding:20px;width:360px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.cal-title{font-family:'Unbounded',sans-serif;font-size:13px;color:var(--mem);}
+.cal-nav{display:flex;align-items:center;gap:8px;}
+.cal-nav button{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:var(--txt2);font-size:13px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.cal-nav button:hover{border-color:rgba(167,139,250,0.3);color:var(--mem);}
+.cal-month-lbl{font-size:12px;color:var(--txt);font-family:'JetBrains Mono',monospace;min-width:110px;text-align:center;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px;}
+.cal-dow{text-align:center;font-size:9px;color:var(--txt3);letter-spacing:0.06em;padding:3px 0;text-transform:uppercase;}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:11px;font-family:'JetBrains Mono',monospace;cursor:default;position:relative;}
+.cal-day.empty{background:transparent;}
+.cal-day.today{border:1px solid rgba(255,0,128,0.4);color:var(--accent);}
+.cal-day.has-data{cursor:pointer;font-weight:600;}
+.cal-day.has-data:hover{transform:scale(1.08);}
+.cal-day.sig-long{background:rgba(82,242,201,0.15);color:var(--pos);border:1px solid rgba(82,242,201,0.25);}
+.cal-day.sig-short{background:rgba(255,77,122,0.15);color:var(--neg);border:1px solid rgba(255,77,122,0.25);}
+.cal-day.sig-neutral{background:rgba(255,255,255,0.06);color:var(--txt2);border:1px solid rgba(255,255,255,0.08);}
+.cal-day.no-sig{background:rgba(255,255,255,0.03);color:var(--txt3);border:1px dashed rgba(255,255,255,0.08);}
+.cal-day-num{font-size:10px;}
+.cal-dot{width:4px;height:4px;border-radius:50%;position:absolute;bottom:3px;left:50%;transform:translateX(-50%);}
+.cal-legend{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;}
+.cal-leg-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--txt3);}
+.cal-leg-dot{width:8px;height:8px;border-radius:3px;}
+.cal-popup{background:var(--card);border:1px solid rgba(167,139,250,0.2);border-radius:10px;padding:10px 12px;margin-top:10px;}
+.cal-popup-date{font-size:10px;color:var(--mem);font-weight:600;margin-bottom:6px;}
+.cal-popup-row{display:flex;justify-content:space-between;font-size:10px;color:var(--txt2);padding:2px 0;}
+.cal-popup-sig{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;margin-bottom:4px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">OI · SIGNAL</div>
+    <div class="logo-sub">v4 · паттерны · вставка · память · календарь</div>
+  </div>
+  <div class="hrow">
+    <span class="api-status"><span class="sdot err" id="apiDot"></span><span id="apiTxt">Ожидание токена</span></span>
+    <input class="tok-inp" id="tokenInput" placeholder="T-Invest API токен..." type="password">
+    <button class="btn-pill" onclick="fetchCandles()">Загрузить свечи</button>
+  </div>
+</div>
+
+<!-- Save bar -->
+<div class="save-bar">
+  <span>Данные:</span>
+  <button class="btn-sm" onclick="saveAll()">💾 Сохранить</button>
+  <button class="btn-sm" onclick="exportJSON()">↑ Экспорт JSON</button>
+  <button class="btn-sm" onclick="document.getElementById('importFile').click()">↓ Импорт JSON</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+  <span class="save-indicator" id="saveInd">✓ сохранено</span>
+  <div style="flex:1;"></div>
+  <button class="btn-sm btn-danger" onclick="clearAll()">✕ Очистить всё</button>
+</div>
+
+<!-- Ticker panel (collapsible, editable) -->
+<div class="ticker-panel">
+  <div class="ticker-header" onclick="toggleTickerPanel(event)">
+    <span class="sec-title" style="margin-bottom:0;white-space:nowrap;">Базовые активы</span>
+    <div class="ticker-chips" id="tickerChips"></div>
+    <div class="tf-bar" style="margin-left:auto;">
+      <button class="btn-ghost active" id="tf1m" onclick="event.stopPropagation();selTF(this,'1min')">1m</button>
+      <button class="btn-ghost" id="tf5m" onclick="event.stopPropagation();selTF(this,'5min')">5m</button>
+      <button class="btn-ghost" id="tf1h" onclick="event.stopPropagation();selTF(this,'1h')">1h</button>
+      <button class="btn-ghost" id="tf1d" onclick="event.stopPropagation();selTF(this,'1d')">1D</button>
+    </div>
+    <span class="ticker-chevron" id="tickerChev">▼</span>
+  </div>
+  <div class="ticker-body" id="tickerBody">
+    <div class="ticker-grid" id="tickerGrid"></div>
+    <div class="ticker-add-row">
+      <input id="addTicker" placeholder="Тикер (напр. SBER)" maxlength="12">
+      <input id="addTickerName" placeholder="Название (напр. Сбербанк)" maxlength="30" style="flex:1.2">
+      <input id="addFIGI" placeholder="FIGI (BBG...)" maxlength="30">
+      <button class="btn-pill" style="font-size:10px;padding:4px 12px;" onclick="addTickerRow()">+ Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Метрики -->
+<div class="metrics-row">
+  <div class="mc">
+    <div class="mc-lbl">Цена</div>
+    <div class="mc-val" id="mPrice" style="color:var(--txt3);">—</div>
+    <div class="mc-sub" id="mPriceSub">ожидание</div>
+  </div>
+  <div class="mc">
+    <div class="mc-lbl">Объём</div>
+    <div class="mc-val" id="mVol" style="color:var(--txt3);">—</div>
+    <div class="mc-sub" id="mVolSub">последняя свеча</div>
+  </div>
+  <div class="mc">
+    <div class="mc-lbl">Δ OI юр. длинные</div>
+    <div class="mc-val" id="mOIJur" style="color:var(--txt3);">—</div>
+    <div class="mc-sub" id="mOIJurSub">изменение</div>
+  </div>
+  <div class="mc">
+    <div class="mc-lbl">Сигнал</div>
+    <div class="mc-val" id="mSignal" style="color:var(--txt3);">—</div>
+    <div class="mc-sub" id="mSignalSub">нет данных OI</div>
+  </div>
+</div>
+
+<div class="grid-main">
+  <!-- Левая: свечи + сигнал -->
+  <div>
+    <div class="panel" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span class="sec-title" style="margin-bottom:0;">График свечей — <span id="chartTicker" style="color:var(--accent);">—</span> <span id="chartDateCtx" style="color:var(--txt3);font-size:9px;font-weight:400;letter-spacing:0.04em;"></span></span>
+        <span class="api-status"><span class="sdot err" id="candleDot"></span><span id="candleTxt">Не загружено</span></span>
+      </div>
+      <div id="candleArea" class="candle-placeholder">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="9" y="2" width="6" height="20" rx="1"/><line x1="12" y1="2" x2="12" y2="0"/><line x1="12" y1="22" x2="12" y2="24"/><rect x="2" y="6" width="6" height="12" rx="1"/><rect x="16" y="8" width="6" height="8" rx="1"/></svg>
+        <span>Введите токен и нажмите «Загрузить свечи»</span>
+        <button class="btn-pill" style="margin-top:6px;font-size:10px;" onclick="fetchCandles()">↺ Загрузить</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span class="sec-title" style="margin-bottom:0;">Анализ сигнала</span>
+        <span class="expb" id="expBadge">—</span>
+      </div>
+      <div class="signal-block">
+        <div class="sig-dir" id="sigDir"><span class="neutral">→ НЕЙТРАЛЬ</span></div>
+        <div class="sig-lbl" id="sigLbl">Введите данные OI для расчёта</div>
+        <div class="sbar-wrap"><div class="sbar-fill" id="sigBar" style="width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div></div>
+        <div class="sbar-labels"><span>Сила сигнала</span><span id="sigStr">0%</span></div>
+      </div>
+
+      <!-- Memory panel -->
+      <div class="mem-panel">
+        <div class="mem-header">
+          <span class="mem-title">🧠 Память по тикеру</span>
+          <div class="mem-toggle" onclick="toggleMemory()">
+            <div class="toggle-track" id="memTrack"><div class="toggle-thumb"></div></div>
+            <span class="toggle-lbl" id="memLbl">выкл</span>
+          </div>
+        </div>
+        <div class="mem-stats" id="memStats">
+          <span class="mem-stat"><span id="memCount">0</span>&nbsp;записей</span>
+          <span class="mem-stat">точность: <span id="memAcc">—</span></span>
+          <span class="mem-stat" id="memAdjWrap" style="display:none">поправка: <span class="mem-adj" id="memAdj">0</span></span>
+        </div>
+        <div class="mem-history" id="memHistory"></div>
+      </div>
+
+      <div class="factors">
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Δ OI юр. длинные</span><span class="fs su" id="fJurL">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Δ OI юр. короткие</span><span class="fs su" id="fJurS">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Δ OI физ. длинные</span><span class="fs su" id="fFizL">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Δ OI физ. короткие</span><span class="fs su" id="fFizS">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Перекос юр. лонг/шорт</span><span class="fs su" id="fBias">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Ускорение набора OI</span><span class="fs su" id="fAccel">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--mem);"></div><span class="fn">Тренд OI (история 3д)</span><span class="fs su" id="fHist">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Price Action (OI-день)</span><span class="fs su" id="fPA">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">Объём (аномалия)</span><span class="fs su" id="fVol">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--txt3);"></div><span class="fn">OI vs Price дивергенция</span><span class="fs su" id="fDiv">—</span></div>
+        <div class="fi"><div class="fdot" style="background:var(--accent2);"></div><span class="fn">Свечи прогноз-дня (early)</span><span class="fs su" id="fForecastCandle">—</span></div>
+        <div class="fi" id="fMemRow" style="display:none;"><div class="fdot" style="background:var(--mem);"></div><span class="fn">Поправка памяти</span><span class="fs sm" id="fMem">—</span></div>
+      </div>
+
+      <!-- Record outcome -->
+      <div class="outcome-row" id="outcomeRow" style="display:none;">
+        <span class="outcome-lbl">Факт. движение <span id="outcomeDateLbl" style="color:var(--accent);">след. дня</span>:</span>
+        <select class="outcome-sel" id="outcomeSelect">
+          <option value="">— выбрать —</option>
+          <option value="up">↑ Рост</option>
+          <option value="down">↓ Падение</option>
+          <option value="flat">→ Боковик</option>
+        </select>
+        <button class="btn-sm" onclick="recordOutcome()">Записать</button>
+      </div>
+
+      <div class="formula-block">
+        <div class="formula-title">Логика сигнала · данные за <span id="fOIDateLbl" style="color:var(--accent)">—</span> → прогноз на <span id="fFcDateLbl" style="color:var(--pos)">—</span></div>
+        <div class="formula-line">
+          <span>Юр. открывают лонги</span> → бычий (+2)<br>
+          <span>Юр. открывают шорты</span> → медвежий (−2)<br>
+          <span>Физ. открывают лонги</span> → контрариан −0.5<br>
+          <span>Физ. закрывают позиции</span> → контрариан +0.5<br>
+          <span>Перекос юр. лонг/шорт &gt;1.5×</span> → ±0.5<br>
+          <span>Ускорение набора OI</span> → ±0.5<br>
+          <span>Тренд OI 3 дня</span> → ±0.5 (накопление)<br>
+          <span>Дивергенция OI↑ / цена↓</span> → сигнал ×0.7 · требует свечи<br>
+          <span>MTF согласованность (1m/5m/1h/1D)</span> → ±0.5 · требует свечи<br>
+          <span>Объём (аномалия ×1.5+)</span> → контекст · требует свечи<br>
+          <span>Свечи прогноз-дня (если уже есть)</span> → контекст<br>
+          <span>Память (вкл.)</span> → поправка на истор. точность
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Правая: OI таблица -->
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span class="sec-title" style="margin-bottom:0;">Открытые позиции (MOEX)</span>
+    </div>
+
+    <!-- Day save + calendar -->
+    <div class="day-save-bar">
+      <span id="daySaveHint">Выберите дату и введите данные OI</span>
+      <button class="btn-cal" onclick="openCalendar()">📅 Календарь</button>
+      <button class="btn-save-day" onclick="saveDayAndClear()">✓ Зафиксировать</button>
+    </div>
+
+    <div class="paste-panel">
+      <div class="paste-label">📋 Вставить данные с MOEX</div>
+      <textarea class="paste-ta" id="pasteInput" placeholder="Вставьте скопированный текст таблицы MOEX, например:&#10;Физические лица  Юридические лица  Итого ДлинныеКороткиеДлинныеКороткиеОткрытые позиции 1 091 101  522 582  462 247  1 030 766  3 106 696 Изменение 37 134  28 695  20 684  29 123  115 636 Количество лиц 2 135  648  12  18  2 813"></textarea>
+      <div class="paste-row">
+        <button class="btn-pill" style="font-size:10px;padding:4px 12px;" onclick="parsePaste()">⚡ Распознать</button>
+        <span class="parse-status" id="parseStatus"></span>
+      </div>
+    </div>
+
+    <div class="date-row">
+      <span style="font-size:10px;color:var(--txt3);">Дата:</span>
+      <input type="date" id="oiDate" class="tok-inp" style="width:150px;border-radius:8px;" onchange="selectDate(this.value)">
+      <button class="btn-sm" style="font-size:10px;padding:5px 10px;" onclick="goToday()" title="Сегодня">сегодня</button>
+      <button class="btn-sm btn-danger" style="font-size:10px;padding:5px 10px;" onclick="clearSnapshot()" title="Очистить поля текущего дня">🗑 Очистить день</button>
+    </div>
+
+    <div class="tabs-row" id="dateTabs"></div>
+    <div id="oiTabsContent"></div>
+
+    <div class="oi-sum">
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Σ Юр. лонг</div><div class="mc-val" id="sJL" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Σ Юр. шорт</div><div class="mc-val" id="sJS" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Δ Юр. лонг</div><div class="mc-val" id="sdJL" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Δ Юр. шорт</div><div class="mc-val" id="sdJS" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Σ Физ. лонг</div><div class="mc-val" id="sFzL" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Σ Физ. шорт</div><div class="mc-val" id="sFzS" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Δ Физ. лонг</div><div class="mc-val" id="sdFzL" style="font-size:13px;">—</div></div>
+      <div class="mc" style="padding:10px 12px;"><div class="mc-lbl">Δ Физ. шорт</div><div class="mc-val" id="sdFzS" style="font-size:13px;">—</div></div>
+    </div>
+
+    <div class="oi-note">* Данные вводятся вручную с сайта MOEX или вставкой текста. Сохраняются в браузере (localStorage). Используйте Экспорт JSON для резервной копии.</div>
+
+    <!-- Pattern matching block -->
+    <div class="pattern-block" id="patternBlock">
+      <div class="pattern-header">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="pattern-title">🔍 Паттерны OI + свечи</span>
+          <span id="cpStatusBadge" style="font-size:9px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:2px 7px;color:var(--txt3);">без свечей</span>
+        </div>
+        <div class="period-bar">
+          <button class="pbtn" id="pb1w" onclick="selPeriod('1w',this)">1н</button>
+          <button class="pbtn" id="pb2w" onclick="selPeriod('2w',this)">2н</button>
+          <button class="pbtn" id="pb1m" onclick="selPeriod('1m',this)">1м</button>
+          <button class="pbtn active" id="pb3m" onclick="selPeriod('3m',this)">3м</button>
+          <button class="pbtn" id="pball" onclick="selPeriod('all',this)">все</button>
+        </div>
+      </div>
+      <div class="psim-bar"><div class="psim-fill" id="psimFill" style="width:0%"></div></div>
+      <div id="patternSummary" class="pno-data">Нет данных для поиска паттернов. Введите OI и запишите несколько исходов.</div>
+      <div class="pattern-tabs" id="patternTabs" style="display:none;">
+        <button class="ptab active" onclick="selPTab('stats',this)">Статистика</button>
+        <button class="ptab" onclick="selPTab('examples',this)">Примеры</button>
+      </div>
+      <div class="ptab-content active" id="ptab-stats"></div>
+      <div class="ptab-content" id="ptab-examples"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar modal -->
+<div class="cal-overlay" id="calOverlay" style="display:none;" onclick="if(event.target===this)closeCalendar()">
+  <div class="cal-modal">
+    <div class="cal-header">
+      <span class="cal-title">📅 Журнал OI</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="cal-nav">
+          <button onclick="calPrevMonth()">‹</button>
+          <span class="cal-month-lbl" id="calMonthLbl"></span>
+          <button onclick="calNextMonth()">›</button>
+        </div>
+        <button class="btn-sm" onclick="closeCalendar()">✕</button>
+      </div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(82,242,201,0.3);border:1px solid rgba(82,242,201,0.4);"></div>Лонг</div>
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(255,77,122,0.3);border:1px solid rgba(255,77,122,0.4);"></div>Шорт</div>
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);"></div>Нейтраль</div>
+      <div class="cal-leg-item"><div class="cal-leg-dot" style="background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.12);"></div>Нет сигнала</div>
+    </div>
+    <div id="calDayPopup"></div>
+  </div>
+</div>
+
+<script>
+// ===================== STATE =====================
+let curInstr='',curTF='1min',candleChart=null,candleData=[],candleOIDayData=[],candleForecastData=[];
+let memoryOn=false;
+let lastScore=null,lastDir=null;
+let patternPeriod='3m';
+// Multi-TF candle stores: keyed by TF string
+let mtfCandles={};   // {tf: [candles]}
+let mtfOIDay={};     // {tf: [oiDayCandles]}
+let mtfProfiles={};  // {tf: candleProfile object}
+
+// curDate: ISO string "YYYY-MM-DD" — the currently viewed day
+let curDate=new Date().toISOString().split('T')[0];
+
+// Default tickers
+const DEFAULT_TICKERS=[
+  {t:'SMLT',f:'BBG00F6NKQX3',n:'Самолёт'},
+  {t:'KMAZ',f:'BBG004S68598',n:'КамАЗ'},
+  {t:'WUSH',f:'BBG00YR1T3C5',n:'Вуш (самокаты)'},
+  {t:'MGNT',f:'BBG004RVFCY3',n:'Магнит'},
+  {t:'MAGN',f:'BBG004TLS680',n:'ММК'},
+  {t:'RASP',f:'BBG00475KHX6',n:'Распадская'},
+  {t:'SGZH',f:'BBG0100R9963',n:'Сегежа'},
+  {t:'SOFL',f:'BBG00VVTQ0J3',n:'Софтлайн'},
+  {t:'SFIN',f:'BBG00QPYJ5H0',n:'ЭсЭфАй (СФИ)'}
+];
+
+// ===================== STORAGE =====================
+// Key scheme:
+//   oisignal_tickers            → JSON array of {t,f}
+//   oisignal_day_{ticker}_{YYYY-MM-DD} → JSON snap object
+//   oisignal_memory_{ticker}    → JSON array of memory records
+//   oisignal_mem_on             → '1'|'0'
+//   oisignal_active_ticker      → string
+//   oisignal_active_date        → YYYY-MM-DD string
+const LS={
+  TICKERS:'oisignal_tickers',
+  DAY:'oisignal_day_',         // + ticker + '_' + YYYY-MM-DD
+  MEMORY:'oisignal_memory_',
+  MEM_ON:'oisignal_mem_on',
+  ACTIVE_TICKER:'oisignal_active_ticker',
+  ACTIVE_DATE:'oisignal_active_date'
+};
+
+function dayKey(ticker,dateISO){return LS.DAY+ticker+'_'+dateISO;}
+
+function loadTickers(){
+  try{const r=localStorage.getItem(LS.TICKERS);return r?JSON.parse(r):[...DEFAULT_TICKERS];}
+  catch{return[...DEFAULT_TICKERS];}
+}
+function saveTickers(arr){localStorage.setItem(LS.TICKERS,JSON.stringify(arr));}
+
+function makeSnap(dateISO){
+  return{dateISO,jurLong:'',jurShort:'',fizLong:'',fizShort:'',
+    jurLongChg:'',jurShortChg:'',fizLongChg:'',fizShortChg:'',
+    jurLongN:'',jurShortN:'',fizLongN:'',fizShortN:'',
+    _signal:null,_score:0,_savedAt:null};
+}
+
+function loadDay(ticker,dateISO){
+  try{
+    const r=localStorage.getItem(dayKey(ticker,dateISO));
+    if(r){const d=JSON.parse(r);d.dateISO=d.dateISO||dateISO;return d;}
+  }catch{}
+  return makeSnap(dateISO);
+}
+
+function saveDay(ticker,dateISO,snap){
+  snap.dateISO=dateISO;
+  localStorage.setItem(dayKey(ticker,dateISO),JSON.stringify(snap));
+}
+
+function getAllDayKeys(ticker){
+  const prefix=LS.DAY+ticker+'_';
+  return Object.keys(localStorage).filter(k=>k.startsWith(prefix));
+}
+
+function loadMemory(ticker){
+  try{const r=localStorage.getItem(LS.MEMORY+ticker);return r?JSON.parse(r):[];}
+  catch{return[];}
+}
+function saveMemory(ticker,arr){localStorage.setItem(LS.MEMORY+ticker,JSON.stringify(arr));}
+
+// ===================== STRUCTURAL OI =====================
+// Returns rolling median of absolute jurLong values over last N saved days.
+// Used to normalise ΔOI so a +200 on base 1000 is treated differently to +200 on base 50000.
+function getBaseOI(ticker, dateISO, field='jurLong', window=20){
+  const vals=[];
+  const d=new Date(dateISO+'T12:00:00');
+  for(let i=1;i<=window;i++){
+    const dd=new Date(d.getTime()-i*86400000);
+    const iso=dd.toISOString().split('T')[0];
+    const s=loadDay(ticker,iso);
+    const v=parseFloat(s[field])||0;
+    if(v>0)vals.push(v);
+  }
+  if(!vals.length)return 0;
+  vals.sort((a,b)=>a-b);
+  return vals[Math.floor(vals.length/2)];
+}
+
+// Returns relative change in [−1..+1], normalised by base OI.
+// If base is unknown returns raw sign.
+function relOIChange(chg, base){
+  if(!base)return Math.sign(chg)*0.5;
+  return Math.max(-1, Math.min(1, chg/base));
+}
+
+
+// The single "live" snapshot for the current ticker+date
+let snap=null;
+
+function loadCurrentSnap(){
+  snap=loadDay(curInstr,curDate);
+}
+
+function saveCurrentSnap(){
+  if(!curInstr)return;
+  saveDay(curInstr,curDate,snap);
+}
+
+// ===================== EXPORT / IMPORT / CLEAR =====================
+let saveTimer=null;
+function saveAll(){
+  saveTickers(loadTickers());
+  saveCurrentSnap();
+  flashSave();
+}
+function flashSave(){
+  const el=document.getElementById('saveInd');
+  el.classList.add('show');
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>el.classList.remove('show'),2000);
+}
+function autoSave(){if(curInstr&&snap)saveCurrentSnap();}
+
+function exportJSON(){
+  const tickers=loadTickers();
+  const data={version:3,exported:new Date().toISOString(),tickers,daysByTicker:{},memoryByTicker:{}};
+  tickers.forEach(({t})=>{
+    data.daysByTicker[t]={};
+    getAllDayKeys(t).forEach(k=>{
+      const dateISO=k.replace(LS.DAY+t+'_','');
+      try{data.daysByTicker[t][dateISO]=JSON.parse(localStorage.getItem(k));}catch{}
+    });
+    data.memoryByTicker[t]=loadMemory(t);
+  });
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='oi-signal-export-'+new Date().toISOString().split('T')[0]+'.json';
+  a.click();
+}
+
+function importJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(data.tickers)saveTickers(data.tickers);
+      // v3 format
+      if(data.daysByTicker){
+        Object.entries(data.daysByTicker).forEach(([t,days])=>{
+          Object.entries(days).forEach(([dateISO,s])=>saveDay(t,dateISO,s));
+        });
+      }
+      // v2 legacy: snapsByTicker — import as best-effort
+      if(data.snapsByTicker){
+        Object.entries(data.snapsByTicker).forEach(([t,snaps])=>{
+          snaps.forEach((s,i)=>{
+            const d=s._savedAt?new Date(s._savedAt).toISOString().split('T')[0]
+              :new Date(Date.now()-i*86400000).toISOString().split('T')[0];
+            saveDay(t,d,s);
+          });
+        });
+      }
+      if(data.memoryByTicker)Object.entries(data.memoryByTicker).forEach(([t,m])=>saveMemory(t,m));
+      location.reload();
+    }catch{alert('Ошибка импорта: неверный формат файла');}
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+function clearAll(){
+  if(!confirm('Очистить ВСЕ сохранённые данные? Это необратимо.'))return;
+  Object.keys(localStorage).filter(k=>k.startsWith('oisignal_')).forEach(k=>localStorage.removeItem(k));
+  location.reload();
+}
+
+// ===================== TICKER PANEL =====================
+let tickers=loadTickers();
+let tickerPanelOpen=false;
+
+function renderTickerChips(){
+  const chips=document.getElementById('tickerChips');
+  chips.innerHTML='';
+  tickers.forEach(({t,n})=>{
+    const b=document.createElement('button');
+    b.className='btn-ghost ticker-chip'+(t===curInstr?' active':'');
+    b.title=n||t;
+    b.innerHTML=`<span class="chip-code">${t}</span>${n?`<span class="chip-name">${n}</span>`:''}`;
+    b.onclick=(e)=>{e.stopPropagation();selectTicker(t);};
+    chips.appendChild(b);
+  });
+}
+
+function renderTickerGrid(){
+  const grid=document.getElementById('tickerGrid');
+  grid.innerHTML='';
+  tickers.forEach(({t,f,n},i)=>{
+    const row=document.createElement('div');
+    row.className='ticker-row';
+    row.innerHTML=`
+      <input value="${t}" placeholder="Тикер" style="width:60px;font-weight:600;color:${t===curInstr?'var(--accent)':'var(--txt)'}" 
+        onchange="editTicker(${i},'t',this.value)" onblur="saveTickers(tickers);renderTickerChips()">
+      <input value="${n||''}" placeholder="Название..." style="width:110px;font-size:10px;color:var(--txt2)" 
+        onchange="editTicker(${i},'n',this.value)" onblur="saveTickers(tickers);renderTickerChips()">
+      <input value="${f}" placeholder="FIGI..." style="flex:1;font-size:10px;color:var(--txt3)" 
+        onchange="editTicker(${i},'f',this.value)" onblur="saveTickers(tickers)">
+      <button class="btn-sm btn-danger" onclick="removeTicker(${i})" title="Удалить">✕</button>`;
+    grid.appendChild(row);
+  });
+}
+
+function editTicker(i,field,val){
+  tickers[i][field]=field==='n'?val.trim():val.toUpperCase().trim();
+}
+function addTickerRow(){
+  const t=document.getElementById('addTicker').value.toUpperCase().trim();
+  const f=document.getElementById('addFIGI').value.trim();
+  const n=document.getElementById('addTickerName').value.trim();
+  if(!t)return;
+  tickers.push({t,f,n});
+  saveTickers(tickers);
+  document.getElementById('addTicker').value='';
+  document.getElementById('addFIGI').value='';
+  document.getElementById('addTickerName').value='';
+  renderTickerChips();
+  renderTickerGrid();
+}
+function removeTicker(i){
+  if(!confirm('Удалить тикер '+tickers[i].t+'?'))return;
+  if(tickers[i].t===curInstr)curInstr='';
+  tickers.splice(i,1);
+  saveTickers(tickers);
+  renderTickerChips();
+  renderTickerGrid();
+}
+function toggleTickerPanel(e){
+  if(e&&e.target.closest('.ticker-chips,.tf-bar'))return;
+  tickerPanelOpen=!tickerPanelOpen;
+  document.getElementById('tickerBody').className='ticker-body'+(tickerPanelOpen?' open':'');
+  document.getElementById('tickerChev').className='ticker-chevron'+(tickerPanelOpen?' open':'');
+  if(tickerPanelOpen)renderTickerGrid();
+}
+
+function selectTicker(t){
+  autoSave();
+  curInstr=t;
+  localStorage.setItem(LS.ACTIVE_TICKER,t);
+  const meta=tickers.find(x=>x.t===t);
+  const el=document.getElementById('chartTicker');
+  el.textContent=t;
+  el.title=meta?.n||'';
+  document.getElementById('expBadge').textContent=t;
+  renderTickerChips();
+  loadCurrentSnap();
+  renderSnapForm();
+  updateSummary();computeSignal();findPatterns();updateDaySaveHint();updateChartDateCtx();updateCPBadge();
+  updateMemoryPanel();
+}
+
+// ===================== DATE NAVIGATION =====================
+function updateChartDateCtx(){
+  const el=document.getElementById('chartDateCtx');
+  if(!el||!curDate)return;
+  const nd=nextDayISO(curDate);
+  el.textContent='· OI: '+curDate.slice(5)+' → прогноз: '+nd.slice(5);
+}
+
+function selectDate(dateISO){
+  if(!dateISO)return;
+  autoSave();
+  curDate=dateISO;
+  localStorage.setItem(LS.ACTIVE_DATE,curDate);
+  document.getElementById('oiDate').value=curDate;
+  // Reset candle context
+  candleOIDayData=[];candleForecastData=[];mtfCandles={};mtfOIDay={};mtfProfiles={};
+  // Show placeholder with reload button (not a stale chart/spinner)
+  const area=document.getElementById('candleArea');
+  area.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--txt3);font-size:11px;">
+    <span>Дата изменена: <span style="color:var(--txt)">${dateISO}</span></span>
+    <button class="btn-pill" style="font-size:10px;" onclick="fetchCandles()">↺ Загрузить свечи</button>
+  </div>`;
+  area.style.height='190px';
+  loadCurrentSnap();
+  renderSnapForm();
+  updateSummary();computeSignal();findPatterns();updateDaySaveHint();updateChartDateCtx();updateCPBadge();
+  // clear paste area when switching days
+  document.getElementById('pasteInput').value='';
+  document.getElementById('parseStatus').textContent='';
+  // Auto-reload candles for new date if token is present
+  const token=document.getElementById('tokenInput').value.trim();
+  if(token&&curInstr)fetchCandles();
+}
+
+function goToday(){
+  selectDate(new Date().toISOString().split('T')[0]);
+}
+
+// ===================== SNAP FORM =====================
+function renderSnapForm(){
+  const container=document.getElementById('oiTabsContent');
+  container.innerHTML='';
+  if(!snap)return;
+  const s=snap;
+  const dateLabel=formatDateLabel(curDate);
+  container.innerHTML=`
+  <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;padding:4px 2px;">
+    Снимок за <span style="color:var(--txt);font-weight:600;">${dateLabel}</span>
+    ${s._savedAt?'<span style="color:var(--pos);margin-left:8px;">✓ зафиксирован '+new Date(s._savedAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+'</span>':'<span style="color:var(--txt3);margin-left:8px;">не зафиксирован</span>'}
+  </div>
+  <div class="oi-wrap">
+    <table class="oit" aria-label="Открытый интерес по категориям участников">
+      <thead>
+        <tr><th class="left" rowspan="2" style="width:115px;"></th><th colspan="2">Физические лица</th><th colspan="2">Юридические лица</th></tr>
+        <tr><th>Длинные</th><th>Короткие</th><th>Длинные</th><th>Короткие</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="row-label">Открытые позиции</td>
+          <td><input value="${s.fizLong}" placeholder="0" oninput="updSnap('fizLong',this.value)"></td>
+          <td><input value="${s.fizShort}" placeholder="0" oninput="updSnap('fizShort',this.value)"></td>
+          <td><input value="${s.jurLong}" placeholder="0" oninput="updSnap('jurLong',this.value)"></td>
+          <td><input value="${s.jurShort}" placeholder="0" oninput="updSnap('jurShort',this.value)"></td>
+        </tr>
+        <tr><td class="row-label">Изменение</td>
+          <td><input value="${s.fizLongChg}" placeholder="0" oninput="updSnap('fizLongChg',this.value)"></td>
+          <td><input value="${s.fizShortChg}" placeholder="0" oninput="updSnap('fizShortChg',this.value)"></td>
+          <td><input value="${s.jurLongChg}" placeholder="0" oninput="updSnap('jurLongChg',this.value)"></td>
+          <td><input value="${s.jurShortChg}" placeholder="0" oninput="updSnap('jurShortChg',this.value)"></td>
+        </tr>
+        <tr><td class="row-label">Кол-во лиц</td>
+          <td><input value="${s.fizLongN}" placeholder="0" oninput="updSnap('fizLongN',this.value)"></td>
+          <td><input value="${s.fizShortN}" placeholder="0" oninput="updSnap('fizShortN',this.value)"></td>
+          <td><input value="${s.jurLongN}" placeholder="0" oninput="updSnap('jurLongN',this.value)"></td>
+          <td><input value="${s.jurShortN}" placeholder="0" oninput="updSnap('jurShortN',this.value)"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function formatDateLabel(dateISO){
+  if(!dateISO)return'';
+  const d=new Date(dateISO+'T12:00:00');
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+}
+
+let _saveDebounce=null;
+function updSnap(field,val){
+  if(!snap)return;
+  snap[field]=val;
+  updateSummary();computeSignal();findPatterns();updateDaySaveHint();
+  clearTimeout(_saveDebounce);
+  _saveDebounce=setTimeout(()=>{saveCurrentSnap();flashSave();},600);
+}
+
+// ===================== CLEAR SNAPSHOT =====================
+function clearSnapshot(){
+  if(!snap)return;
+  if(!confirm('Очистить все данные за '+formatDateLabel(curDate)+'?'))return;
+  const fields=['jurLong','jurShort','fizLong','fizShort','jurLongChg','jurShortChg','fizLongChg','fizShortChg','jurLongN','jurShortN','fizLongN','fizShortN'];
+  fields.forEach(f=>snap[f]='');
+  snap._signal=null;snap._score=0;snap._savedAt=null;
+  saveCurrentSnap();
+  renderSnapForm();
+  updateSummary();computeSignal();findPatterns();updateDaySaveHint();
+  document.getElementById('pasteInput').value='';
+  document.getElementById('parseStatus').textContent='';
+}
+
+// ===================== DAY SAVE =====================
+function saveDayAndClear(){
+  if(!snap||!curInstr)return;
+  const hasData=snap.jurLong||snap.jurShort||snap.fizLong||snap.fizShort||snap.jurLongChg||snap.jurShortChg;
+  if(!hasData){alert('Нет данных для сохранения');return;}
+  snap._signal=lastDir||null;
+  snap._score=lastScore||0;
+  snap._savedAt=Date.now();
+  saveCurrentSnap();
+  flashSave();
+  renderSnapForm();
+  updateDaySaveHint();
+  document.getElementById('pasteInput').value='';
+  document.getElementById('parseStatus').textContent='';
+}
+
+function updateDaySaveHint(){
+  const hint=document.getElementById('daySaveHint');
+  if(!hint||!snap)return;
+  const hasData=snap.jurLong||snap.jurShort||snap.jurLongChg||snap.jurShortChg;
+  if(snap._savedAt){
+    hint.textContent='✓ '+formatDateLabel(curDate)+' — зафиксирован';
+    hint.style.color='var(--pos)';
+  } else if(hasData){
+    hint.textContent='Данные введены — нажмите «Зафиксировать» для записи в календарь';
+    hint.style.color='var(--accent)';
+  } else {
+    hint.textContent='Выберите дату и введите данные OI';
+    hint.style.color='var(--txt3)';
+  }
+}
+
+// ===================== SAVE ALL =====================
+// (kept for save bar button)
+
+// ===================== MEMORY =====================
+function toggleMemory(){
+  memoryOn=!memoryOn;
+  localStorage.setItem(LS.MEM_ON,memoryOn?'1':'0');
+  const track=document.getElementById('memTrack');
+  track.className='toggle-track'+(memoryOn?' on':'');
+  document.getElementById('memLbl').textContent=memoryOn?'вкл':'выкл';
+  document.getElementById('memAdjWrap').style.display=memoryOn?'':'none';
+  document.getElementById('fMemRow').style.display=memoryOn?'':'none';
+  computeSignal();
+}
+
+function updateMemoryPanel(){
+  const mem=loadMemory(curInstr||'');
+  document.getElementById('memCount').textContent=mem.length;
+  if(!mem.length){document.getElementById('memAcc').textContent='—';renderMemHistory(mem);return;}
+  const correct=mem.filter(m=>m.correct).length;
+  const acc=Math.round(correct/mem.length*100);
+  document.getElementById('memAcc').textContent=acc+'%';
+  renderMemHistory(mem);
+  if(memoryOn)computeSignal();
+}
+
+function renderMemHistory(mem){
+  const el=document.getElementById('memHistory');
+  if(!mem.length){el.innerHTML='<div style="font-size:10px;color:var(--txt3);padding:4px 0;">Нет записей. После расчёта сигнала укажи факт. исход.</div>';return;}
+  el.innerHTML=mem.slice(-8).reverse().map(m=>{
+    const cls=m.correct?'sp':'sn';
+    return`<div class="mh-row">
+      <span class="mh-date">${m.date}</span>
+      <span class="mh-sig" style="color:${m.dir==='ЛОНГ'?'var(--pos)':m.dir==='ШОРТ'?'var(--neg)':'var(--txt3)'}">${m.dir}</span>
+      <span class="mh-out">${m.outcome==='up'?'↑ рост':m.outcome==='down'?'↓ падение':'→ боковик'}</span>
+      <span class="mh-acc ${cls}">${m.correct?'✓':'✗'}</span>
+    </div>`;
+  }).join('');
+}
+
+function getMemoryAdj(){
+  if(!curInstr||!memoryOn)return 0;
+  const mem=loadMemory(curInstr);
+  if(mem.length<3)return 0;
+  const last5=mem.slice(-5);
+  const correct=last5.filter(m=>m.correct).length;
+  const rate=correct/last5.length;
+  if(rate>=0.7)return 0.5;
+  if(rate<=0.3)return -0.5;
+  return 0;
+}
+
+// ===================== CANDLE PROFILE =====================
+// Extracts a normalized 10-component fingerprint from a candle array.
+// Works on any TF — the profile captures shape, not absolute values.
+function candleProfile(candles, rollingAvgVol){
+  if(!candles||candles.length<2)return null;
+  const closes=candles.map(c=>toP(c.close));
+  const opens=candles.map(c=>toP(c.open));
+  const highs=candles.map(c=>toP(c.high));
+  const lows=candles.map(c=>toP(c.low));
+  const vols=candles.map(c=>parseInt(c.volume)||0);
+
+  const first=closes[0],last=closes[closes.length-1];
+  const hi=Math.max(...highs),lo=Math.min(...lows);
+  const range=hi-lo||1;
+
+  const dir=(last-first)/(first||1);
+  const mid=(hi+lo)/2||1;
+  const vol_rel=range/mid;
+  const closeInRange=(last-lo)/range;
+
+  const half=Math.floor(vols.length/2);
+  const volFirst=vols.slice(0,half).reduce((s,v)=>s+v,0)/(half||1);
+  const volSecond=vols.slice(half).reduce((s,v)=>s+v,0)/((vols.length-half)||1);
+  const volTrend=volSecond>0?(volFirst-volSecond)/volSecond:0;
+
+  const avgVol=vols.reduce((s,v)=>s+v,0)/(vols.length||1);
+  const peakVol=Math.max(...vols);
+  const volSpike=avgVol>0?peakVol/avgVol:1;
+
+  // Relative volume vs historical rolling average (passed in)
+  const relVol=rollingAvgVol>0?avgVol/rollingAvgVol:1;
+
+  const firstHalfMid=closes.slice(0,half).reduce((s,v)=>s+v,0)/(half||1);
+  const secHalfMid=closes.slice(half).reduce((s,v)=>s+v,0)/((closes.length-half)||1);
+  const momentum=firstHalfMid>0?(secHalfMid-firstHalfMid)/firstHalfMid:0;
+
+  const bullCount=closes.filter((c,i)=>c>=opens[i]).length;
+  const bullRatio=bullCount/closes.length;
+  const openInRange=(opens[0]-lo)/range;
+  const maxDD=opens[0]>0?Math.max(...lows.map(l=>opens[0]-l))/opens[0]:0;
+  const nLog=Math.log10(Math.max(candles.length,1))/3;
+
+  // Three-thirds shape: direction of each third of the day
+  const t=candles.length;
+  const t1=Math.floor(t/3),t2=Math.floor(t*2/3);
+  const seg=(a,b)=>{
+    const sl=closes.slice(a,b);
+    if(sl.length<2)return 0;
+    return(sl[sl.length-1]-sl[0])/(sl[0]||1);
+  };
+  const shape=[seg(0,t1),seg(t1,t2),seg(t2,t)]; // morning, midday, evening
+
+  return{
+    dir, vol_rel, closeInRange, volTrend, volSpike, relVol,
+    momentum, bullRatio, openInRange, maxDD, nLog,
+    shape, // [morning, midday, evening] direction
+    tf:curTF, n:candles.length
+  };
+}
+
+// Similarity between two candle profiles [0..1]
+function candleProfileSimilarity(a,b){
+  if(!a||!b)return 0;
+  const keys=[
+    ['dir',3],['closeInRange',2],['momentum',2],
+    ['bullRatio',1.5],['volTrend',1],['relVol',1.5],['volSpike',0.5],
+    ['openInRange',1],['maxDD',0.5]
+  ];
+  let score=0,weight=0;
+  for(const[k,w]of keys){
+    const av=a[k]||0,bv=b[k]||0;
+    if(Math.sign(av)===Math.sign(bv)||Math.abs(av-bv)<0.05){
+      const diff=Math.abs(av-bv);
+      const scale=Math.max(Math.abs(av),Math.abs(bv),0.01);
+      const closeness=Math.max(0,1-diff/scale*0.5);
+      score+=w*closeness;
+    }
+    weight+=w;
+  }
+  // Shape similarity: compare three-thirds direction
+  if(a.shape&&b.shape){
+    let shapeSim=0;
+    for(let i=0;i<3;i++){
+      if(Math.sign(a.shape[i])===Math.sign(b.shape[i]))shapeSim++;
+    }
+    score+=shapeSim*0.5; weight+=1.5;
+  }
+  if(a.tf&&b.tf&&a.tf===b.tf)score+=1,weight+=1;
+  return weight>0?Math.min(score/weight,1):0;
+}
+
+function recordOutcome(){
+  const outcome=document.getElementById('outcomeSelect').value;
+  if(!outcome||!lastDir||!curInstr)return;
+  const mem=loadMemory(curInstr);
+  const correct=(lastDir==='ЛОНГ'&&outcome==='up')||(lastDir==='ШОРТ'&&outcome==='down')||(lastDir==='НЕЙТРАЛЬ'&&outcome==='flat');
+  const cp=candleProfile(candleOIDayData.length>1?candleOIDayData:candleData);
+
+  // Lag: which day was this outcome for? (forecast day = curDate+1)
+  const forecastISO=nextDayISO(curDate);
+  // Store all MTF profiles snapshot
+  const mtfSnap={};
+  Object.entries(mtfProfiles).forEach(([tf,p])=>{mtfSnap[tf]=p;});
+
+  // Structural OI context
+  const baseJL=getBaseOI(curInstr,curDate,'jurLong');
+  const baseJS=getBaseOI(curInstr,curDate,'jurShort');
+
+  mem.push({
+    date:new Date(curDate+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'}),
+    dateTs:new Date(curDate+'T12:00:00').getTime(),
+    forecastISO,
+    lagDays:1, // days between OI date and outcome date
+    dir:lastDir,score:lastScore,outcome,correct,
+    oi:{
+      jLC:parseFloat(snap.jurLongChg)||0,jSC:parseFloat(snap.jurShortChg)||0,
+      fLC:parseFloat(snap.fizLongChg)||0,fSC:parseFloat(snap.fizShortChg)||0,
+      jL:parseFloat(snap.jurLong)||0,jS:parseFloat(snap.jurShort)||0,
+      baseJL,baseJS,
+      relJLC:relOIChange(parseFloat(snap.jurLongChg)||0,baseJL),
+      relJSC:relOIChange(parseFloat(snap.jurShortChg)||0,baseJS),
+    },
+    cp,
+    mtf:mtfSnap
+  });
+  saveMemory(curInstr,mem);
+  document.getElementById('outcomeSelect').value='';
+  document.getElementById('outcomeRow').style.display='none';
+  updateMemoryPanel();
+  findPatterns();
+  // Auto-calibrate weights if enough data
+  calibrateWeightsIfReady(curInstr);
+  const cpNote=cp?` + свечной профиль (${cp.n} св. ${cp.tf})`:'';
+  alert((correct?'✓ Записано как верный сигнал':'✗ Записано как ошибочный сигнал')+cpNote);
+}
+
+// ===================== WEIGHT CALIBRATION =====================
+// Simple logistic regression on accumulated outcomes.
+// Fires automatically after 20+ records. Updates learnedWeights state.
+let learnedWeights=null;
+const LS_WEIGHTS='oisignal_weights_';
+
+function calibrateWeightsIfReady(ticker){
+  const mem=loadMemory(ticker).filter(m=>m.oi&&m.outcome);
+  if(mem.length<20){learnedWeights=null;updateWeightsPanel();return;}
+  // Features: [relJLC, -relJSC, relFLC, relFSC, bias, accel(approx)]
+  // Labels: outcome=up → +1, down → -1, flat → 0 (skip flat for binary)
+  const samples=mem.filter(m=>m.outcome!=='flat');
+  if(samples.length<15){learnedWeights=null;updateWeightsPanel();return;}
+
+  // Simple gradient descent — 200 iterations
+  let w=[0.5,-0.5,0.1,-0.1,0.1,0.1]; // initial
+  const lr=0.05;
+  for(let iter=0;iter<200;iter++){
+    const grad=w.map(()=>0);
+    for(const s of samples){
+      const x=getFeatureVec(s);
+      const label=s.outcome==='up'?1:-1;
+      let dot=0;for(let i=0;i<w.length;i++)dot+=w[i]*(x[i]||0);
+      const pred=1/(1+Math.exp(-dot));
+      const err=(pred-(label===1?1:0));
+      for(let i=0;i<w.length;i++)grad[i]+=(err*(x[i]||0))/samples.length;
+    }
+    for(let i=0;i<w.length;i++)w[i]-=lr*grad[i];
+  }
+  learnedWeights=w;
+  try{localStorage.setItem(LS_WEIGHTS+ticker,JSON.stringify(w));}catch{}
+  updateWeightsPanel();
+}
+
+function getFeatureVec(memRecord){
+  const o=memRecord.oi||{};
+  const bias=o.jS>0?(o.jL||0)/o.jS:1;
+  return[
+    o.relJLC||Math.sign(o.jLC||0)*0.5,
+    -(o.relJSC||Math.sign(o.jSC||0)*0.5),
+    (o.fLC||0)>0?-0.5:(o.fLC||0)<0?0.5:0,
+    (o.fSC||0)>0?0.5:(o.fSC||0)<0?-0.5:0,
+    Math.min(1,Math.max(-1,(bias-1)/2)),
+    memRecord.score||0
+  ];
+}
+
+function updateWeightsPanel(){
+  const el=document.getElementById('weightsPanel');
+  if(!el)return;
+  const mem=loadMemory(curInstr||'').filter(m=>m.oi&&m.outcome);
+  const needed=Math.max(0,20-mem.filter(m=>m.outcome!=='flat').length);
+  if(!learnedWeights||needed>0){
+    el.innerHTML=`<span style="font-size:9px;color:var(--txt3);">Автокалибровка весов: нужно ещё <b style="color:var(--mem);">${needed}</b> исходов (мин. 20, без боковика)</span>`;
+    return;
+  }
+  const names=['Δ Юр.Л (отн.)','Δ Юр.Ш (отн.)','Δ Физ.Л','Δ Физ.Ш','Перекос','Сила сигн.'];
+  const bars=learnedWeights.map((w,i)=>{
+    const pct=Math.round(Math.abs(w)/Math.max(...learnedWeights.map(Math.abs))*100);
+    const clr=w>0?'var(--pos)':'var(--neg)';
+    return`<div style="display:flex;align-items:center;gap:5px;font-size:9px;padding:1px 0;">
+      <span style="color:var(--txt3);width:90px;flex-shrink:0;">${names[i]}</span>
+      <div style="flex:1;height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:${clr};border-radius:3px;"></div>
+      </div>
+      <span style="color:${clr};width:32px;text-align:right;">${w>0?'+':''}${w.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div style="font-size:9px;color:var(--mem);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">Откалиброванные веса (${mem.filter(m=>m.outcome!=='flat').length} исходов)</div>${bars}`;
+}
+
+// Load saved weights on init
+function loadLearnedWeights(ticker){
+  try{
+    const r=localStorage.getItem(LS_WEIGHTS+ticker);
+    if(r){learnedWeights=JSON.parse(r);updateWeightsPanel();}
+    else learnedWeights=null;
+  }catch{learnedWeights=null;}
+}
+
+
+
+// ===================== MAIN LOGIC =====================
+const TBASE='https://invest-public-api.tinkoff.ru/rest';
+
+// ===================== MULTI-TF FETCH =====================
+const TF_INTERVALS={
+  '1min':'CANDLE_INTERVAL_1_MIN',
+  '5min':'CANDLE_INTERVAL_5_MIN',
+  '1h':'CANDLE_INTERVAL_HOUR',
+  '1d':'CANDLE_INTERVAL_DAY'
+};
+
+function selTF(btn,tf){
+  document.querySelectorAll('.tf-bar .btn-ghost').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');curTF=tf;
+  switchDisplayTF(tf);
+}
+
+function withTimeout(promise, ms, label){
+  return new Promise((res,rej)=>{
+    const t=setTimeout(()=>rej(new Error('Таймаут '+ms/1000+'с для '+label)),ms);
+    promise.then(v=>{clearTimeout(t);res(v);},e=>{clearTimeout(t);rej(e);});
+  });
+}
+
+async function fetchOneTF(figi, tf, from, to, token){
+  const res=await fetch(`${TBASE}/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({figi, from:from.toISOString(), to:to.toISOString(), interval:TF_INTERVALS[tf]})
+  });
+  if(!res.ok)throw new Error('HTTP '+res.status+' для '+tf);
+  const d=await res.json();
+  return d.candles||[];
+}
+
+// Make date range for a given OI date — always in UTC+3 (Moscow) trading hours
+function makeDateRange(dateISO, offsetDays){
+  // Moscow offset: UTC+3 = -180 minutes shift
+  // Start: 00:00 MSK = 21:00 UTC previous day → use explicit UTC offset
+  const mskFrom=new Date(dateISO+'T00:00:00+03:00');
+  const mskTo=new Date(dateISO+'T23:59:59+03:00');
+  const from=offsetDays?new Date(mskFrom.getTime()-offsetDays*86400000):mskFrom;
+  return[from, mskTo];
+}
+
+function makeToTime(dateISO){
+  const todayISO=new Date().toISOString().split('T')[0];
+  const nextDay=nextDayISO(dateISO);
+  if(nextDay<todayISO){
+    // Historical: include next day fully (for forecast candles)
+    return new Date(nextDay+'T23:59:59+03:00');
+  } else if(nextDay===todayISO){
+    return new Date(); // now
+  } else {
+    // curDate is today or future — include up to end of curDate
+    return new Date(dateISO+'T23:59:59+03:00');
+  }
+}
+
+async function fetchAllTF(){
+  const token=document.getElementById('tokenInput').value.trim();
+  if(!token||!curInstr)return;
+  const figi=tickers.find(x=>x.t===curInstr)?.f||curInstr;
+  const nextDay=nextDayISO(curDate);
+  const toTime=makeToTime(curDate);
+
+  // For each TF define appropriate look-back window (MSK timezone aware)
+  const [from1m]=makeDateRange(curDate,0);
+  const [from5m]=makeDateRange(curDate,0);
+  const [from1h]=makeDateRange(curDate,5);
+  const [from1d]=makeDateRange(curDate,89);
+
+  const tfWindows={
+    '1min': [from1m, toTime],
+    '5min': [from5m, toTime],
+    '1h':   [from1h, toTime],
+    '1d':   [from1d, toTime]
+  };
+
+  // Fetch all 4 TFs in parallel with 15s timeout each
+  const TIMEOUT_MS=15000;
+  const results=await Promise.allSettled(
+    Object.entries(tfWindows).map(([tf,[from,to]])=>
+      withTimeout(
+        fetchOneTF(figi,tf,from,to,token).then(c=>({tf,c})),
+        TIMEOUT_MS, tf
+      )
+    )
+  );
+
+  mtfCandles={};mtfOIDay={};mtfProfiles={};
+  const nextDayStr=nextDay+'T';
+
+  // Calculate rolling average volume from 1D candles for relVol normalization
+  let rollingAvgVol1d=0;
+  const r1d=results.find(r=>r.status==='fulfilled'&&r.value.tf==='1d');
+  if(r1d){
+    const dc=r1d.value.c.filter(c=>!c.time.startsWith(nextDayStr));
+    const past=dc.slice(-20);
+    rollingAvgVol1d=past.reduce((s,c)=>s+parseInt(c.volume||0),0)/(past.length||1);
+  }
+
+  let loadedTFs=[],failedTFs=[];
+  results.forEach(r=>{
+    if(r.status!=='fulfilled'){
+      // Extract TF label from error message if possible
+      const errMsg=r.reason?.message||'';
+      const tfLabel=errMsg.match(/для (\S+)/)?.[1]||errMsg.match(/Таймаут.+для (\S+)/)?.[1]||'?';
+      failedTFs.push({tf:tfLabel,err:errMsg});
+      return;
+    }
+    const {tf,c}=r.value;
+    loadedTFs.push(tf);
+    const oi=c.filter(cv=>!cv.time.startsWith(nextDayStr));
+    mtfCandles[tf]=c;
+    mtfOIDay[tf]=oi;
+    const avgV=tf==='1d'?rollingAvgVol1d:0;
+    const prof=candleProfile(oi.length>1?oi:c, avgV);
+    if(prof){prof.tf=tf;mtfProfiles[tf]=prof;}
+  });
+
+  // Refresh UI with currently-selected TF
+  const mainCandles=mtfCandles[curTF]||[];
+  const mainOI=mtfOIDay[curTF]||[];
+  const area=document.getElementById('candleArea');
+
+  if(mainCandles.length){
+    candleData=mainCandles;
+    candleOIDayData=mainOI;
+    candleForecastData=mainCandles.filter(c=>c.time.startsWith(nextDayStr));
+    renderCandleChart(mainCandles,curInstr,mainOI.length,nextDay);
+    updateMetrics(mainOI.length>0?mainOI:mainCandles);
+  } else {
+    // No candles loaded for the selected TF — show retry button
+    const failInfo=failedTFs.length>0?failedTFs.map(f=>f.err).join('; '):'нет данных за '+curDate;
+    area.innerHTML=`<div class="candle-placeholder" style="color:var(--neg);">
+      <span>Свечи не загружены: ${failInfo}</span>
+      <span style="font-size:10px;color:var(--txt3);margin-top:2px;">Дата: ${curDate} · TF: ${curTF}</span>
+      <button class="btn-pill" style="margin-top:8px;" onclick="fetchCandles()">↺ Повторить запрос</button>
+    </div>`;
+  }
+
+  // Build status text
+  let statusParts=[];
+  if(loadedTFs.length)statusParts.push('✓ '+loadedTFs.join(' ')+(mainOI.length?' ('+mainOI.length+' св. OI-дня)':''));
+  if(failedTFs.length)statusParts.push('✗ ошибка: '+failedTFs.map(f=>f.tf||'TF').join(','));
+  const fcC=(mtfCandles[curTF]||[]).filter(c=>c.time.startsWith(nextDayStr));
+  if(fcC.length)statusParts.push(fcC.length+' св. прогноз');
+  setCandleSt(loadedTFs.length>0, statusParts.join(' · ')||'нет данных');
+
+  updateCPBadge();
+  updateMTFPanel();
+  computeSignal();
+  findPatterns();
+}
+
+// Called when user switches TF manually — swap displayed chart without re-fetching
+function switchDisplayTF(tf){
+  if(!mtfCandles[tf])return;
+  const nextDay=nextDayISO(curDate);
+  const nextDayStr=nextDay+'T';
+  candleData=mtfCandles[tf];
+  candleOIDayData=mtfOIDay[tf]||[];
+  candleForecastData=mtfCandles[tf].filter(c=>c.time.startsWith(nextDayStr));
+  renderCandleChart(candleData,curInstr,candleOIDayData.length,nextDay);
+  updateMetrics(candleOIDayData.length>0?candleOIDayData:candleData);
+  updateMTFPanel();
+}
+
+function mtfAgreement(){
+  // Returns {bullish: N, bearish: N, neutral: N, total: N, agreement: 'bull'|'bear'|'mixed'}
+  const tfs=['1min','5min','1h','1d'];
+  let bull=0,bear=0,neut=0;
+  tfs.forEach(tf=>{
+    const p=mtfProfiles[tf];
+    if(!p)return;
+    if(p.dir>0.002)bull++;
+    else if(p.dir<-0.002)bear++;
+    else neut++;
+  });
+  const total=bull+bear+neut;
+  const agreement=bull>=3?'bull':bear>=3?'bear':bull>bear?'mild-bull':bear>bull?'mild-bear':'mixed';
+  return{bull,bear,neut,total,agreement};
+}
+
+function updateMTFPanel(){
+  const el=document.getElementById('mtfPanel');
+  if(!el)return;
+  const tfs=['1min','5min','1h','1d'];
+  const labels={'1min':'1m','5min':'5m','1h':'1h','1d':'1D'};
+  const agr=mtfAgreement();
+  const agrTxt=agr.agreement==='bull'?'↑ Все TF бычьи':agr.agreement==='bear'?'↓ Все TF медвежьи':agr.agreement==='mild-bull'?'↗ Больше бычьих':agr.agreement==='mild-bear'?'↙ Больше медвежьих':'⇄ Расхождение TF';
+  const agrClr=agr.agreement.includes('bull')?'var(--pos)':agr.agreement.includes('bear')?'var(--neg)':'var(--txt2)';
+
+  const rows=tfs.map(tf=>{
+    const p=mtfProfiles[tf];
+    if(!p)return`<div style="display:flex;gap:6px;font-size:10px;color:var(--txt3);padding:2px 0;"><span style="width:20px">${labels[tf]}</span><span>— нет данных</span></div>`;
+    const dirTxt=p.dir>0.002?'↑':p.dir<-0.002?'↓':'→';
+    const dirClr=p.dir>0.002?'var(--pos)':p.dir<-0.002?'var(--neg)':'var(--txt2)';
+    const bullPct=Math.round(p.bullRatio*100);
+    const shapeTxt=(p.shape||[]).map(s=>s>0.001?'↑':s<-0.001?'↓':'→').join('');
+    const rvTxt=p.relVol>0?(p.relVol>1.3?`+${p.relVol.toFixed(1)}×`:p.relVol<0.7?`${p.relVol.toFixed(1)}×`:'норм'):'—';
+    const rvClr=p.relVol>1.3?'var(--accent)':p.relVol<0.7?'var(--txt3)':'var(--txt2)';
+    return`<div style="display:flex;gap:6px;font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center;">
+      <span style="width:20px;color:var(--txt3);flex-shrink:0;">${labels[tf]}</span>
+      <span style="color:${dirClr};font-weight:600;width:12px;">${dirTxt}</span>
+      <span style="color:var(--txt3);width:36px;">${(p.dir*100).toFixed(2)}%</span>
+      <span style="color:var(--txt3);width:32px;font-size:9px;">бык:${bullPct}%</span>
+      <span style="color:var(--txt2);width:24px;font-size:9px;letter-spacing:1px;">${shapeTxt}</span>
+      <span style="color:${rvClr};font-size:9px;">об:${rvTxt}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:9px;color:var(--txt3);letter-spacing:0.1em;text-transform:uppercase;">Мультитаймфрейм</span>
+      <span style="font-size:10px;font-weight:600;color:${agrClr};">${agrTxt}</span>
+    </div>
+    ${rows}`;
+}
+
+
+function setApi(ok,txt){
+  document.getElementById('apiDot').className='sdot'+(ok?'':' err');
+  document.getElementById('apiTxt').textContent=txt;
+}
+function setCandleSt(ok,txt){
+  document.getElementById('candleDot').className='sdot'+(ok?'':' err');
+  document.getElementById('candleTxt').textContent=txt;
+}
+function toP(q){if(!q)return 0;return parseFloat(q.units||0)+parseInt(q.nano||0)/1e9;}
+
+// Returns ISO string for the next calendar day
+function nextDayISO(dateISO){
+  const d=new Date(dateISO+'T12:00:00');
+  d.setDate(d.getDate()+1);
+  return d.toISOString().split('T')[0];
+}
+
+// Returns true if dateISO is today or in the future
+function isTodayOrFuture(dateISO){
+  return dateISO>=new Date().toISOString().split('T')[0];
+}
+
+async function fetchCandles(){
+  const token=document.getElementById('tokenInput').value.trim();
+  if(!token){setApi(false,'Токен не введён');return;}
+  if(!curInstr){alert('Выберите тикер');return;}
+  const area=document.getElementById('candleArea');
+  area.innerHTML='<div style="display:flex;align-items:center;gap:8px;color:var(--txt3);font-size:11px;"><div class="spinner"></div>Загружаем свечи за '+curDate+' (все TF)...</div>';
+  setApi(true,'Подключение...');
+  try{
+    await fetchAllTF();
+    setApi(true,'Подключено · '+curDate);
+  }catch(e){
+    setApi(false,'Ошибка: '+e.message);
+    setCandleSt(false,'Ошибка сети');
+    area.innerHTML=`<div class="candle-placeholder" style="color:var(--neg);">
+      <span>${e.message}</span>
+      <span style="font-size:10px;color:var(--txt3);">Проверьте токен и FIGI</span>
+      <button class="btn-pill" style="margin-top:8px;" onclick="fetchCandles()">↺ Повторить запрос</button>
+    </div>`;
+  }
+}
+
+function renderCandleChart(candles,ticker,oiDayCount,nextDayISO_){
+  const area=document.getElementById('candleArea');
+  area.innerHTML='';area.style.height='190px';
+  const canvas=document.createElement('canvas');
+  canvas.setAttribute('role','img');canvas.setAttribute('aria-label','График '+ticker);
+  canvas.style.cssText='width:100%;height:190px;';
+  area.appendChild(canvas);
+  if(candleChart)candleChart.destroy();
+  const slice=candles.slice(-80);
+  // Determine boundary index (where forecast day starts in the slice)
+  const sliceOICount=oiDayCount!=null?Math.min(oiDayCount,slice.length):slice.length;
+  const labels=slice.map((c,i)=>{
+    const d=new Date(c.time);
+    if(curTF==='1d')return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+    return d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  });
+  const closes=slice.map(c=>toP(c.close));
+  const opens=slice.map(c=>toP(c.open));
+  // OI-day candles: normal opacity; forecast-day candles: highlighted with border
+  const colors=closes.map((c,i)=>{
+    const isForecast=i>=sliceOICount;
+    const up=c>=opens[i];
+    if(isForecast)return up?'rgba(82,242,201,1)':'rgba(255,77,122,1)';
+    return up?'rgba(82,242,201,0.65)':'rgba(255,77,122,0.65)';
+  });
+  const borderColors=closes.map((c,i)=>{
+    const isForecast=i>=sliceOICount;
+    const up=c>=opens[i];
+    if(isForecast)return up?'rgba(82,242,201,1)':'rgba(255,77,122,1)';
+    return up?'rgba(82,242,201,0.5)':'rgba(255,77,122,0.5)';
+  });
+  const borderWidths=slice.map((_,i)=>i>=sliceOICount?2:1);
+
+  // Vertical annotation line at boundary
+  const vertLinePlugin={
+    id:'vertLine',
+    afterDraw(chart){
+      if(sliceOICount>=slice.length||sliceOICount===0)return;
+      const ctx=chart.ctx;
+      const x=chart.scales.x.getPixelForValue(sliceOICount-0.5);
+      ctx.save();
+      ctx.setLineDash([3,4]);
+      ctx.strokeStyle='rgba(255,0,128,0.45)';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(x,chart.chartArea.top);ctx.lineTo(x,chart.chartArea.bottom);ctx.stroke();
+      // Label
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(255,0,128,0.75)';
+      ctx.font='8px JetBrains Mono,monospace';
+      ctx.textAlign='left';
+      const lbl=nextDayISO_?'→ '+nextDayISO_.slice(5):'→ прогноз';
+      ctx.fillText(lbl,x+3,chart.chartArea.top+10);
+      ctx.restore();
+    }
+  };
+
+  candleChart=new Chart(canvas,{
+    type:'bar',
+    plugins:[vertLinePlugin],
+    data:{labels,datasets:[{label:'Close',data:closes,backgroundColor:colors,borderColor:borderColors,borderWidth:borderWidths,borderRadius:2}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{
+        callbacks:{label:(ctx)=>{const c=slice[ctx.dataIndex];const isFc=ctx.dataIndex>=sliceOICount;return[isFc?'▶ ПРОГНОЗ-ДЕНЬ':'◀ OI-день',`O: ${toP(c.open).toFixed(2)}`,`H: ${toP(c.high).toFixed(2)}`,`L: ${toP(c.low).toFixed(2)}`,`C: ${toP(c.close).toFixed(2)}`,`V: ${c.volume}`];}},
+        backgroundColor:'#1A1030',borderColor:'rgba(255,0,128,0.3)',borderWidth:1,titleColor:'#F2F0FF',bodyColor:'#A79BC9'
+      }},
+      scales:{
+        x:{ticks:{color:'#6F648F',font:{size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.03)'}},
+        y:{ticks:{color:'#6F648F',font:{size:9},callback:v=>parseFloat(v).toFixed(0)},grid:{color:'rgba(255,255,255,0.04)'},position:'right'}
+      }
+    }
+  });
+}
+
+function updateCPBadge(){
+  const badge=document.getElementById('cpStatusBadge');
+  if(!badge)return;
+  const cp=candleProfile(candleOIDayData.length>1?candleOIDayData:candleData);
+  if(!cp){badge.textContent='без свечей';badge.style.color='var(--txt3)';badge.style.borderColor='rgba(255,255,255,0.08)';return;}
+  const mem=loadMemory(curInstr||'');
+  const withCP=mem.filter(m=>m.cp).length;
+  badge.textContent=`свечи: ${cp.n} св. ${cp.tf} · история с профилем: ${withCP}`;
+  badge.style.color='var(--mem)';
+  badge.style.borderColor='rgba(167,139,250,0.3)';
+}
+
+function updateMetrics(candles){
+  if(!candles.length)return;
+  const last=candles[candles.length-1],prev=candles.length>1?candles[candles.length-2]:last;
+  const price=toP(last.close),prevP=toP(prev.close);
+  const pct=((price-prevP)/prevP*100).toFixed(2);
+  const isUp=price>=prevP;
+  const mP=document.getElementById('mPrice');
+  mP.textContent=price.toLocaleString('ru-RU',{maximumFractionDigits:2});
+  mP.style.color=isUp?'var(--pos)':'var(--neg)';
+  document.getElementById('mPriceSub').textContent=(isUp?'▲ +':'▼ ')+pct+'%';
+  document.getElementById('mPriceSub').style.color=isUp?'var(--pos)':'var(--neg)';
+  document.getElementById('mVol').textContent=parseInt(last.volume||0).toLocaleString('ru-RU');
+  document.getElementById('mVolSub').textContent=curTF+' свеча';
+  const avg=candles.slice(-20).reduce((s,c)=>s+parseInt(c.volume||0),0)/20;
+  const va=parseInt(last.volume||0)/avg;
+  document.getElementById('fPA').textContent=isUp?'+бычий':'-медвежий';
+  document.getElementById('fPA').className='fs '+(isUp?'sp':'sn');
+  document.getElementById('fVol').textContent=va>=1.5?'+аномалия ×'+va.toFixed(1):'норма';
+  document.getElementById('fVol').className='fs '+(va>=1.5?'sp':'su');
+}
+
+function fmtDelta(v){if(v===0||isNaN(v))return'—';return(v>0?'+':'')+v.toLocaleString('ru-RU');}
+function colorDelta(el,v){el.style.color=v>0?'var(--pos)':v<0?'var(--neg)':'var(--txt3)';}
+
+function updateSummary(){
+  if(!snap)return;
+  const s=snap;
+  const jL=parseFloat(s.jurLong)||0,jS=parseFloat(s.jurShort)||0;
+  const fL=parseFloat(s.fizLong)||0,fS=parseFloat(s.fizShort)||0;
+  const jLC=parseFloat(s.jurLongChg)||0,jSC=parseFloat(s.jurShortChg)||0;
+  const fLC=parseFloat(s.fizLongChg)||0,fSC=parseFloat(s.fizShortChg)||0;
+  document.getElementById('sJL').textContent=jL?jL.toLocaleString('ru-RU'):'—';
+  document.getElementById('sJS').textContent=jS?jS.toLocaleString('ru-RU'):'—';
+  document.getElementById('sFzL').textContent=fL?fL.toLocaleString('ru-RU'):'—';
+  document.getElementById('sFzS').textContent=fS?fS.toLocaleString('ru-RU'):'—';
+  const djL=document.getElementById('sdJL');djL.textContent=fmtDelta(jLC);colorDelta(djL,jLC);
+  const djS=document.getElementById('sdJS');djS.textContent=fmtDelta(jSC);colorDelta(djS,jSC);
+  const dfL=document.getElementById('sdFzL');dfL.textContent=fmtDelta(fLC);colorDelta(dfL,fLC);
+  const dfS=document.getElementById('sdFzS');dfS.textContent=fmtDelta(fSC);colorDelta(dfS,fSC);
+  const mJur=document.getElementById('mOIJur');
+  mJur.textContent=jLC?fmtDelta(jLC):'—';
+  mJur.style.color=jLC>0?'var(--pos)':jLC<0?'var(--neg)':'var(--txt3)';
+  document.getElementById('mOIJurSub').textContent=jLC>0?'юр. открыв. лонги':jLC<0?'юр. закрывают':'нет изменений';
+}
+
+function computeSignal(){
+  if(!snap)return;
+  const s=snap;
+  const jLC=parseFloat(s.jurLongChg)||0,jSC=parseFloat(s.jurShortChg)||0;
+  const fLC=parseFloat(s.fizLongChg)||0,fSC=parseFloat(s.fizShortChg)||0;
+  const jL=parseFloat(s.jurLong)||0,jS=parseFloat(s.jurShort)||0;
+  const hasData=jLC||jSC||fLC||fSC;
+
+  const forecastDateISO=nextDayISO(curDate);
+  const forecastLabel=formatDateLabel(forecastDateISO);
+  const foiLbl=document.getElementById('fOIDateLbl');
+  const ffcLbl=document.getElementById('fFcDateLbl');
+  if(foiLbl)foiLbl.textContent=formatDateLabel(curDate);
+  if(ffcLbl)ffcLbl.textContent=forecastLabel;
+
+  if(!hasData){
+    document.getElementById('mSignal').textContent='—';
+    document.getElementById('mSignal').style.color='var(--txt3)';
+    document.getElementById('mSignalSub').textContent='нет данных OI';
+    document.getElementById('sigLbl').textContent='Введите данные OI за '+formatDateLabel(curDate)+' для расчёта прогноза на '+forecastLabel;
+    document.getElementById('outcomeRow').style.display='none';
+    return;
+  }
+
+  // ---- Structural OI: get base for normalization ----
+  const baseJL=getBaseOI(curInstr,curDate,'jurLong');
+  const baseJS=getBaseOI(curInstr,curDate,'jurShort');
+  const relJLC=relOIChange(jLC,baseJL);  // in [-1..+1]
+  const relJSC=relOIChange(jSC,baseJS);
+  const structuralEl=document.getElementById('fStructural');
+  if(structuralEl){
+    const baseKnown=baseJL>0;
+    const jLpct=baseJL>0?Math.round(jLC/baseJL*100):null;
+    const jSpct=baseJS>0?Math.round(jSC/baseJS*100):null;
+    if(baseKnown){
+      structuralEl.textContent=`Юр.Л ${jLpct!==null?(jLpct>0?'+':'')+jLpct+'%':'—'} / Юр.Ш ${jSpct!==null?(jSpct>0?'+':'')+jSpct+'%':'—'} от базы`;
+      structuralEl.className='fs '+(jLpct>5?'sp':jSpct>5?'sn':'su');
+    } else {
+      structuralEl.textContent='нет исторической базы';
+      structuralEl.className='fs su';
+    }
+  }
+
+  let score=0;
+  // Use relative OI for scoring instead of absolute (cap at ±2)
+  score+=Math.max(-2,Math.min(2,relJLC*2));
+  score+=Math.max(-2,Math.min(2,-relJSC*2));
+  score+=fLC>0?-0.5:fLC<0?0.5:0;
+  score+=fSC>0?0.5:fSC<0?-0.5:0;
+
+  let biasScore=0,biasText='—',biasCls='su';
+  if(jL>0&&jS>0){
+    const ratio=jL/jS;
+    if(ratio>=1.5){biasScore=0.5;biasText=`лонги доминируют ×${ratio.toFixed(1)}`;biasCls='sp';}
+    else if(ratio<=0.67){biasScore=-0.5;biasText=`шорты доминируют ×${(1/ratio).toFixed(1)}`;biasCls='sn';}
+    else{biasText='баланс';biasCls='su';}
+    score+=biasScore;
+  }
+  document.getElementById('fBias').textContent=biasText;
+  document.getElementById('fBias').className='fs '+biasCls;
+
+  let accelScore=0,accelText='нет данных',accelCls='su';
+  const yesterday=new Date(curDate+'T12:00:00');
+  yesterday.setDate(yesterday.getDate()-1);
+  const yISO=yesterday.toISOString().split('T')[0];
+  const prevSnap=curInstr?loadDay(curInstr,yISO):null;
+  if(prevSnap&&(parseFloat(prevSnap.jurLongChg)||0)!==0){
+    const prevJLC=parseFloat(prevSnap.jurLongChg)||0;
+    const prevBaseJL=getBaseOI(curInstr,yISO,'jurLong');
+    const prevRelJLC=relOIChange(prevJLC,prevBaseJL);
+    if(prevRelJLC!==0&&relJLC!==0){
+      const accel=relJLC-prevRelJLC;
+      if(Math.abs(accel)>0.15){
+        accelScore=accel>0?0.5:-0.5;
+        accelText=accel>0?'+ускорение лонгов':'-ускорение шортов';
+        accelCls=accel>0?'sp':'sn';
+      }else{accelText='стабильно';}
+    }
+    score+=accelScore;
+  }
+  document.getElementById('fAccel').textContent=accelText;
+  document.getElementById('fAccel').className='fs '+accelCls;
+
+  // Historical OI trend (3 days)
+  let histScore=0,histText='нет истории',histCls='su';
+  if(curInstr){
+    const histDays=[];
+    for(let i=1;i<=3;i++){
+      const d=new Date(curDate+'T12:00:00');d.setDate(d.getDate()-i);
+      const dISO=d.toISOString().split('T')[0];
+      const hs=loadDay(curInstr,dISO);
+      if(hs&&(parseFloat(hs.jurLongChg)||0)!==0)histDays.push(hs);
+    }
+    if(histDays.length>=2){
+      const bullDays=histDays.filter(h=>parseFloat(h.jurLongChg)>0).length;
+      const bearDays=histDays.filter(h=>parseFloat(h.jurShortChg)>0).length;
+      if(bullDays>=2&&jLC>0){histScore=0.5;histText=`накопление лонгов ${bullDays}д подряд`;histCls='sp';}
+      else if(bearDays>=2&&jSC>0){histScore=-0.5;histText=`накопление шортов ${bearDays}д подряд`;histCls='sn';}
+      else{histText=`${histDays.length} дней истории · нет тренда`;}
+      score+=histScore;
+    }
+  }
+  document.getElementById('fHist').textContent=histText;
+  document.getElementById('fHist').className='fs '+histCls;
+
+  const setF=(id,val,dir)=>{const el=document.getElementById(id);if(!el)return;el.textContent=dir;el.className='fs '+(val>0?'sp':val<0?'sn':'su');};
+  setF('fJurL',jLC,jLC>0?`+растут (${relJLC>0?'+':''}${(relJLC*100).toFixed(0)}% от базы)`:jLC<0?`-падают (${(relJLC*100).toFixed(0)}% от базы)`:'нейтрально');
+  setF('fJurS',-jSC,jSC>0?'+растут (медвежий)':jSC<0?'-закрывают (бычий)':'нейтрально');
+  setF('fFizL',-fLC,fLC>0?'контра −0.5':fLC<0?'контра +0.5':'нейтрально');
+  setF('fFizS',fSC,fSC>0?'контра +0.5':fSC<0?'контра −0.5':'нейтрально');
+
+  // MTF agreement factor
+  const agr=mtfAgreement();
+  const mtfEl=document.getElementById('fMTF');
+  if(mtfEl){
+    if(agr.total>0){
+      let mtfScore=0,mtfTxt='',mtfCls='su';
+      if(agr.agreement==='bull'){mtfScore=0.5;mtfTxt=`↑ все ${agr.total} TF бычьи`;mtfCls='sp';}
+      else if(agr.agreement==='bear'){mtfScore=-0.5;mtfTxt=`↓ все ${agr.total} TF медвежьи`;mtfCls='sn';}
+      else if(agr.agreement==='mild-bull'){mtfScore=0.3;mtfTxt=`↗ ${agr.bull}↑ ${agr.bear}↓ ${agr.neut}→`;mtfCls='sp';}
+      else if(agr.agreement==='mild-bear'){mtfScore=-0.3;mtfTxt=`↙ ${agr.bull}↑ ${agr.bear}↓ ${agr.neut}→`;mtfCls='sn';}
+      else{mtfTxt=`⇄ расхождение: ${agr.bull}↑ ${agr.bear}↓`;mtfCls='su';}
+      score+=mtfScore;
+      mtfEl.textContent=mtfTxt;
+      mtfEl.className='fs '+mtfCls;
+    } else {
+      mtfEl.textContent='загрузите свечи';
+      mtfEl.className='fs su';
+    }
+  }
+
+  // Divergence check using OI-day candles
+  const divCandles=candleOIDayData.length>1?candleOIDayData:candleData;
+  if(divCandles.length>1){
+    const last=divCandles[divCandles.length-1],prev=divCandles[divCandles.length-2];
+    const prUp=toP(last.close)>toP(prev.close),oiUp=jLC>0;
+    if(prUp===oiUp){document.getElementById('fDiv').textContent='нет дивергенции';document.getElementById('fDiv').className='fs sp';score+=prUp?0.5:-0.5;}
+    else{document.getElementById('fDiv').textContent='⚠ дивергенция';document.getElementById('fDiv').className='fs sn';score*=0.7;}
+  }
+
+  // Forecast-day candle early action
+  const fEl=document.getElementById('fForecastCandle');
+  if(fEl){
+    if(candleForecastData&&candleForecastData.length>0){
+      const fc=candleForecastData[candleForecastData.length-1];
+      const fcFirst=candleForecastData[0];
+      const fcUp=toP(fc.close)>toP(fcFirst.open);
+      fEl.textContent=`${candleForecastData.length} св. · ${fcUp?'↑ растёт':'↓ падает'} (${toP(fc.close).toFixed(2)})`;
+      fEl.className='fs '+(fcUp?'sp':'sn');
+    } else {
+      fEl.textContent='свечи ещё не загружены';
+      fEl.className='fs su';
+    }
+  }
+
+  const memAdj=getMemoryAdj();
+  if(memoryOn&&memAdj!==0){
+    score+=memAdj;
+    document.getElementById('memAdj').textContent=(memAdj>0?'+':'')+memAdj;
+    document.getElementById('fMem').textContent=(memAdj>0?'+':'')+memAdj+' (точность '+Math.round(loadMemory(curInstr||'').slice(-5).filter(m=>m.correct).length/Math.min(loadMemory(curInstr||'').length,5)*100)+'%)';
+    document.getElementById('fMem').className='fs sm';
+  }else{
+    const fMem=document.getElementById('fMem');
+    if(fMem)fMem.textContent='—';
+  }
+
+  const maxScore=8.5;
+  const strength=Math.min(Math.abs(score)/maxScore*100,100);
+  const dir=score>0.5?'ЛОНГ':score<-0.5?'ШОРТ':'НЕЙТРАЛЬ';
+  const arrow=score>0.5?'↑':score<-0.5?'↓':'→';
+  const cls=score>0.5?'arrow-up':score<-0.5?'arrow-down':'neutral';
+
+  lastScore=score;lastDir=dir;
+
+  document.getElementById('sigDir').innerHTML=`<span class="${cls}">${arrow} ${dir}</span>`;
+  const sigSubtitle=score>0.5?'Юр. лица наращивают лонги':score<-0.5?'Юр. лица наращивают шорты':'Баланс сил неопределён';
+  document.getElementById('sigLbl').textContent=`${sigSubtitle} · прогноз на ${forecastLabel}`;
+  document.getElementById('sigBar').style.width=strength.toFixed(0)+'%';
+  document.getElementById('sigBar').style.background=score>0?'linear-gradient(90deg,var(--pos),#3dcba8)':score<0?'linear-gradient(90deg,var(--neg),#e8365a)':'linear-gradient(90deg,var(--txt3),var(--txt2))';
+  document.getElementById('sigStr').textContent=strength.toFixed(0)+'%';
+  const mS=document.getElementById('mSignal');
+  mS.textContent=arrow+' '+dir;
+  mS.style.color=score>0.5?'var(--pos)':score<-0.5?'var(--neg)':'var(--txt2)';
+  document.getElementById('mSignalSub').textContent='→ '+forecastLabel;
+  document.getElementById('outcomeRow').style.display='flex';
+  const outLbl=document.getElementById('outcomeDateLbl');
+  if(outLbl)outLbl.textContent=forecastLabel;
+}
+
+// ===================== PASTE PARSER =====================
+function parsePaste(){
+  const raw=document.getElementById('pasteInput').value.trim();
+  const st=document.getElementById('parseStatus');
+  if(!raw){st.textContent='Введите текст';st.className='parse-status parse-err';return;}
+  
+  // Normalize: collapse spaces, remove thousand separators (non-breaking & regular space in numbers)
+  // Strategy: extract all number sequences (with optional leading sign)
+  // Expected order from MOEX table:
+  // Row "Открытые позиции": физ.длинные, физ.короткие, юр.длинные, юр.короткие, (итого)
+  // Row "Изменение":        физ.длинные, физ.короткие, юр.длинные, юр.короткие, (итого)
+  // Row "Количество лиц":   физ.длинные, физ.короткие, юр.длинные, юр.короткие, (итого)
+  
+  // Remove non-numeric except spaces, minus, digits
+  const clean=raw.replace(/[\u00a0\u202f\u2009\u2008\u2007\u2006\u2005\u2004\u2003\u2002\u2001\u2000\u1680\u180e\ufeff]/g,' ');
+  
+  // Split into tokens, pick numbers (possibly space-separated thousands like "1 091 101")
+  // We'll join consecutive digit groups separated by single spaces as one number
+  // First, find all row blocks
+  const posMatch=extractRow(clean,'Открытые позиции','Изменение');
+  const chgMatch=extractRow(clean,'Изменение','Количество лиц');
+  const cntMatch=extractRow(clean,'Количество лиц',null);
+
+  if(!posMatch||!chgMatch){
+    // Fallback: just grab all numbers in order
+    const nums=extractAllNumbers(clean);
+    if(nums.length>=8){
+      // MOEX table order: физ.длинн, физ.кор, юр.длинн, юр.кор, итого (skip)
+      // Row 0 (pos): indices 0,1,2,3 (+4=итого skip)
+      // Row 1 (chg): indices 5,6,7,8 (+9=итого skip)
+      // Row 2 (cnt): indices 10,11,12,13
+      applyParsed({
+        fizLong:nums[0],fizShort:nums[1],jurLong:nums[2],jurShort:nums[3],
+        fizLongChg:nums[5]||'',fizShortChg:nums[6]||'',jurLongChg:nums[7]||'',jurShortChg:nums[8]||'',
+        fizLongN:nums[10]||'',fizShortN:nums[11]||'',jurLongN:nums[12]||'',jurShortN:nums[13]||''
+      },st);
+    }else{st.textContent='Не удалось распознать данные';st.className='parse-status parse-err';}
+    return;
+  }
+
+  const pos=extractAllNumbers(posMatch);
+  const chg=extractAllNumbers(chgMatch);
+  const cnt=cntMatch?extractAllNumbers(cntMatch):[];
+
+  if(pos.length<4||chg.length<4){
+    st.textContent='Не удалось извлечь значения';st.className='parse-status parse-err';return;
+  }
+
+  applyParsed({
+    fizLong:pos[0],fizShort:pos[1],jurLong:pos[2],jurShort:pos[3],
+    fizLongChg:chg[0],fizShortChg:chg[1],jurLongChg:chg[2],jurShortChg:chg[3],
+    fizLongN:cnt[0]||'',fizShortN:cnt[1]||'',jurLongN:cnt[2]||'',jurShortN:cnt[3]||''
+  },st);
+}
+
+function extractRow(text,startKw,endKw){
+  const s=text.indexOf(startKw);
+  if(s===-1)return null;
+  const start=s+startKw.length;
+  const end=endKw?text.indexOf(endKw,start):-1;
+  return end===-1?text.slice(start):text.slice(start,end);
+}
+
+function extractAllNumbers(text){
+  // MOEX numbers use single space as thousands separator ("1 091 101")
+  // Multiple numbers are separated by 2+ spaces or non-digit chars.
+  // 1. Normalise non-breaking spaces
+  // 2. Split on 2+ spaces OR sequences of non-digit/non-space/non-minus chars
+  // 3. Within each token, strip inner single spaces to collapse thousands
+  const norm = text.replace(/[\u00a0\u202f\u2009\u2008\u2007\u2006\u2005\u2004\u2003\u2002\u2001\u2000\u1680\u180e\ufeff]/g,' ');
+  const tokens = norm.split(/(?:\s{2,}|[^\d\s\-]+)/);
+  const nums = [];
+  for(const tok of tokens){
+    const t = tok.trim();
+    if(!t) continue;
+    const candidate = t.replace(/\s+/g,'');
+    if(/^-?\d+$/.test(candidate)) nums.push(candidate);
+  }
+  return nums;
+}
+
+function applyParsed(data,st){
+  if(!snap)return;
+  const fields=['fizLong','fizShort','jurLong','jurShort','fizLongChg','fizShortChg','jurLongChg','jurShortChg','fizLongN','fizShortN','jurLongN','jurShortN'];
+  fields.forEach(f=>{if(data[f]!==undefined)snap[f]=data[f];});
+  renderSnapForm();
+  updateSummary();computeSignal();saveCurrentSnap();flashSave();updateDaySaveHint();
+  st.textContent=`✓ Распознано: Ф.длинн=${data.fizLong} Ф.кор=${data.fizShort} Ю.длинн=${data.jurLong} Ю.кор=${data.jurShort}`;
+  st.className='parse-status parse-ok';
+  document.getElementById('pasteInput').value='';
+}
+
+// ===================== PATTERN ENGINE =====================
+function selPeriod(period,btn){
+  patternPeriod=period;
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  findPatterns();
+}
+
+function selPTab(tab,btn){
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.ptab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('ptab-'+tab).classList.add('active');
+}
+
+function getPeriodCutoff(){
+  const now=Date.now();
+  if(patternPeriod==='1w')return now-7*24*3600*1000;
+  if(patternPeriod==='2w')return now-14*24*3600*1000;
+  if(patternPeriod==='1m')return now-30*24*3600*1000;
+  if(patternPeriod==='3m')return now-90*24*3600*1000;
+  return 0;
+}
+
+function oiVector(oi){
+  // 6-component normalized vector for similarity
+  const jL=oi.jL||0,jS=oi.jS||0;
+  const bias=jS>0?jL/jS:1;
+  return[
+    oi.jLC,oi.jSC,oi.fLC,oi.fSC,
+    bias,
+    (oi.jLC>0?1:oi.jLC<0?-1:0)  // sign context
+  ];
+}
+
+function vecSimilarity(a,b){
+  // Sign-based + magnitude similarity for each component
+  let score=0,weight=0;
+  const weights=[2,2,0.5,0.5,0.5,1];
+  for(let i=0;i<Math.min(a.length,b.length);i++){
+    const w=weights[i]||1;
+    weight+=w;
+    // Same sign
+    if(Math.sign(a[i])===Math.sign(b[i])){
+      score+=w;
+      // Magnitude similarity (closer = higher)
+      if(a[i]!==0&&b[i]!==0){
+        const ratio=Math.min(Math.abs(a[i]),Math.abs(b[i]))/Math.max(Math.abs(a[i]),Math.abs(b[i]));
+        score+=w*ratio*0.5;
+        weight+=w*0.5;
+      }
+    }
+  }
+  return weight>0?score/weight:0;
+}
+
+let crossTickerOn=false;
+
+function toggleCrossTicker(){
+  crossTickerOn=!crossTickerOn;
+  localStorage.setItem('oisignal_cross',crossTickerOn?'1':'0');
+  document.getElementById('crossLbl').textContent=crossTickerOn?'вкл':'выкл';
+  document.getElementById('crossTrack').className='toggle-track'+(crossTickerOn?' on':'');
+  findPatterns();
+}
+
+// Simple Pearson correlation of outcomes between two tickers over shared dates
+function tickerCorrelation(tA, tB){
+  const memA=loadMemory(tA).filter(m=>m.forecastISO&&m.outcome);
+  const memB=loadMemory(tB).filter(m=>m.forecastISO&&m.outcome);
+  const shared=[];
+  const mapB=new Map(memB.map(m=>[m.forecastISO,m.outcome==='up'?1:m.outcome==='down'?-1:0]));
+  memA.forEach(m=>{
+    const bVal=mapB.get(m.forecastISO);
+    if(bVal!==undefined)shared.push([m.outcome==='up'?1:m.outcome==='down'?-1:0,bVal]);
+  });
+  if(shared.length<5)return null; // not enough shared dates
+  const n=shared.length;
+  const mA=shared.reduce((s,p)=>s+p[0],0)/n;
+  const mB=shared.reduce((s,p)=>s+p[1],0)/n;
+  const num=shared.reduce((s,p)=>s+(p[0]-mA)*(p[1]-mB),0);
+  const dA=Math.sqrt(shared.reduce((s,p)=>s+(p[0]-mA)**2,0));
+  const dB=Math.sqrt(shared.reduce((s,p)=>s+(p[1]-mB)**2,0));
+  if(!dA||!dB)return null;
+  return{r:num/(dA*dB),n};
+}
+
+function findPatterns(){
+  if(!curInstr)return;
+  const mem=loadMemory(curInstr).filter(m=>m.oi);
+  const cutoff=getPeriodCutoff();
+  const filtered=mem.filter(m=>(m.dateTs||0)>=cutoff);
+
+  const sumEl=document.getElementById('patternSummary');
+  const tabsEl=document.getElementById('patternTabs');
+  const psimFill=document.getElementById('psimFill');
+
+  if(filtered.length<2){
+    sumEl.textContent=filtered.length===0?'Нет записей с данными OI за выбранный период.':'Нужно минимум 2 записи с исходами для поиска паттернов.';
+    sumEl.style.display='block';
+    tabsEl.style.display='none';
+    psimFill.style.width='0%';
+    return;
+  }
+
+  // Current OI vector
+  const s=snap||{};
+  const hasData=(parseFloat(s.jurLongChg)||0)||(parseFloat(s.jurShortChg)||0);
+  if(!hasData){
+    sumEl.textContent='Введите данные OI текущего снимка для поиска похожих паттернов.';
+    sumEl.style.display='block';
+    tabsEl.style.display='none';
+    psimFill.style.width='0%';
+    return;
+  }
+
+  const curOIVec=oiVector({
+    jLC:parseFloat(s.jurLongChg)||0,jSC:parseFloat(s.jurShortChg)||0,
+    fLC:parseFloat(s.fizLongChg)||0,fSC:parseFloat(s.fizShortChg)||0,
+    jL:parseFloat(s.jurLong)||0,jS:parseFloat(s.jurShort)||0
+  });
+
+  // Current candle profile (OI-day candles)
+  const curCP=candleProfile(candleOIDayData.length>1?candleOIDayData:candleData);
+  const hasCandleProfile=!!curCP;
+
+  // Score all records with combined similarity
+  const scored=filtered.map(m=>{
+    const oiSim=vecSimilarity(curOIVec,oiVector(m.oi));
+    const cpSim=hasCandleProfile&&m.cp?candleProfileSimilarity(curCP,m.cp):null;
+    // Combined: if both available, 65% OI + 35% candle; else 100% OI
+    const combined=cpSim!==null?(oiSim*0.65+cpSim*0.35):oiSim;
+    return{...m,oiSim,cpSim,sim:combined};
+  }).sort((a,b)=>b.sim-a.sim);
+
+  // Adaptive threshold: use top 40% of scores or min 0.45
+  const maxSim=scored[0]?.sim||0;
+  const threshold=Math.max(0.45, maxSim*0.6);
+  const matches=scored.filter(m=>m.sim>=threshold);
+  const avgSim=matches.length?matches.reduce((s,m)=>s+m.sim,0)/matches.length:0;
+
+  psimFill.style.width=Math.round(avgSim*100)+'%';
+
+  if(!matches.length){
+    sumEl.innerHTML=`Похожих паттернов не найдено среди ${filtered.length} записей (порог ${Math.round(threshold*100)}%). Лучшее: <b style="color:var(--mem)">${Math.round(maxSim*100)}%</b> (OI) ${hasCandleProfile?'+ свечи':'— загрузите свечи для расширенного поиска'}.`;
+    sumEl.style.display='block';
+    tabsEl.style.display='none';
+    return;
+  }
+
+  // Stats
+  const upCount=matches.filter(m=>m.outcome==='up').length;
+  const downCount=matches.filter(m=>m.outcome==='down').length;
+  const flatCount=matches.filter(m=>m.outcome==='flat').length;
+  const total=matches.length;
+  const pctUp=Math.round(upCount/total*100);
+  const pctDown=Math.round(downCount/total*100);
+  const pctFlat=Math.round(flatCount/total*100);
+
+  const cpMatchCount=matches.filter(m=>m.cpSim!==null).length;
+  const cpNote=cpMatchCount>0?` · свечи совпали в ${cpMatchCount} из ${total}`:'';
+  sumEl.innerHTML=`<b style="color:var(--mem)">${total}</b> похожих паттернов из ${filtered.length} · сходство ${Math.round(avgSim*100)}%${cpNote}`;
+  sumEl.style.display='block';
+  tabsEl.style.display='flex';
+
+  // Stats tab
+  const statsEl=document.getElementById('ptab-stats');
+  const domColor=pctUp>=pctDown&&pctUp>=pctFlat?'var(--pos)':pctDown>=pctUp&&pctDown>=pctFlat?'var(--neg)':'var(--txt2)';
+  const domLabel=pctUp>=pctDown&&pctUp>=pctFlat?'↑ РОСТ':pctDown>=pctUp&&pctDown>=pctFlat?'↓ ПАДЕНИЕ':'→ БОКОВИК';
+
+  // Candle profile comparison block
+  let cpHtml='';
+  if(curCP){
+    const fmt2=v=>(v>=0?'+':'')+v.toFixed(3);
+    const pct=v=>Math.round(v*100)+'%';
+    const avgCPSim=cpMatchCount>0?matches.filter(m=>m.cpSim!==null).reduce((s,m)=>s+m.cpSim,0)/cpMatchCount:null;
+    const dirTxt=curCP.dir>0.005?'↑ рост':curCP.dir<-0.005?'↓ падение':'→ боковик';
+    cpHtml=`
+    <div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.15);border-radius:10px;padding:8px 10px;margin-bottom:8px;">
+      <div style="font-size:9px;color:var(--mem);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Свечной профиль текущего дня · ${curCP.n} св. · ${curCP.tf}</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px 10px;font-size:10px;">
+        <span style="color:var(--txt3);">Направление:</span><span style="color:${curCP.dir>0.005?'var(--pos)':curCP.dir<-0.005?'var(--neg)':'var(--txt2)'};">${dirTxt} (${fmt2(curCP.dir)})</span>
+        <span style="color:var(--txt3);">Закрытие в диапазоне:</span><span style="color:var(--txt2);">${pct(curCP.closeInRange)}</span>
+        <span style="color:var(--txt3);">Бычьих свечей:</span><span style="color:var(--txt2);">${pct(curCP.bullRatio)}</span>
+        <span style="color:var(--txt3);">Моментум 2п/1п:</span><span style="color:${curCP.momentum>0.002?'var(--pos)':curCP.momentum<-0.002?'var(--neg)':'var(--txt2)'};">${fmt2(curCP.momentum)}</span>
+        <span style="color:var(--txt3);">Объём (пик/ср):</span><span style="color:${curCP.volSpike>=2?'var(--accent)':'var(--txt2)'};">${curCP.volSpike.toFixed(1)}×</span>
+        <span style="color:var(--txt3);">Тренд объёма:</span><span style="color:var(--txt2);">${fmt2(curCP.volTrend)}</span>
+      </div>
+      ${avgCPSim!==null?`<div style="margin-top:5px;font-size:10px;color:var(--txt3);">Среднее сходство свечей с историей: <span style="color:var(--mem);font-weight:600;">${Math.round(avgCPSim*100)}%</span></div>`:''}
+    </div>`;
+  } else {
+    cpHtml=`<div style="font-size:10px;color:var(--txt3);font-style:italic;margin-bottom:8px;">Загрузите свечи для включения свечного профиля в сравнение.</div>`;
+  }
+
+  statsEl.innerHTML=`
+    ${cpHtml}
+    <div class="pstat-grid">
+      <div class="pstat"><div class="pstat-val" style="color:var(--pos)">${pctUp}%</div><div class="pstat-lbl">↑ Рост</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:var(--neg)">${pctDown}%</div><div class="pstat-lbl">↓ Падение</div></div>
+      <div class="pstat"><div class="pstat-val" style="color:var(--txt2)">${pctFlat}%</div><div class="pstat-lbl">→ Боковик</div></div>
+    </div>
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:8px 10px;font-size:10px;">
+      <span style="color:var(--txt3);">Вероятный исход:</span> <span style="color:${domColor};font-weight:600;">${domLabel}</span>
+      &nbsp;·&nbsp;<span style="color:var(--txt3);">Совпадений:</span> <span style="color:var(--mem);">${total}</span>
+      &nbsp;·&nbsp;<span style="color:var(--txt3);">Верных:</span> <span style="color:var(--pos);">${matches.filter(m=>m.correct).length}</span>
+    </div>`;
+
+  // Examples tab
+  const examplesEl=document.getElementById('ptab-examples');
+  const top=matches.slice(0,10);
+  examplesEl.innerHTML=top.map(m=>{
+    const outTxt=m.outcome==='up'?'↑ рост':m.outcome==='down'?'↓ падение':'→ боков.';
+    const outClr=m.outcome==='up'?'var(--pos)':m.outcome==='down'?'var(--neg)':'var(--txt2)';
+    const dirClr=m.dir==='ЛОНГ'?'var(--pos)':m.dir==='ШОРТ'?'var(--neg)':'var(--txt3)';
+    const oiPct=Math.round(m.oiSim*100);
+    const cpPct=m.cpSim!==null?Math.round(m.cpSim*100):null;
+    const simPct=Math.round(m.sim*100);
+    const jlc=m.oi.jLC>0?'+'+m.oi.jLC.toLocaleString('ru-RU'):m.oi.jLC.toLocaleString('ru-RU');
+    const cpTag=cpPct!==null?`<span style="font-size:9px;color:var(--mem);margin-left:3px;">св:${cpPct}%</span>`:'';
+    const cpDirHint=m.cp?(m.cp.dir>0.005?'↑':m.cp.dir<-0.005?'↓':'→'):'';
+    return`<div class="pexample" style="flex-wrap:wrap;gap:2px 8px;">
+      <span class="pex-date">${m.date}</span>
+      <span class="pex-sig" style="color:${dirClr}">${m.dir}</span>
+      <span class="pex-delta" style="font-size:10px;">Ю.л ${jlc}${m.cp?` · св${cpDirHint}`:''}</span>
+      <span style="font-size:9px;color:var(--txt2);white-space:nowrap;">OI:${oiPct}%${cpTag} → <b>${simPct}%</b></span>
+      <span class="pex-out" style="color:${outClr};margin-left:auto;">${outTxt}</span>
+    </div>`;
+  }).join('');
+}
+
+
+function init(){
+  // Memory toggle
+  memoryOn=localStorage.getItem(LS.MEM_ON)==='1';
+  if(memoryOn){
+    document.getElementById('memTrack').className='toggle-track on';
+    document.getElementById('memLbl').textContent='вкл';
+    document.getElementById('memAdjWrap').style.display='';
+    document.getElementById('fMemRow').style.display='';
+  }
+
+  // Tickers
+  tickers=loadTickers();
+  renderTickerChips();
+
+  // Restore date
+  const savedDate=localStorage.getItem(LS.ACTIVE_DATE);
+  curDate=savedDate||new Date().toISOString().split('T')[0];
+  document.getElementById('oiDate').value=curDate;
+  updateChartDateCtx();
+
+  // Restore last active ticker (this loads the snap for curDate)
+  const lastTicker=localStorage.getItem(LS.ACTIVE_TICKER)||tickers[0]?.t||'';
+  if(lastTicker&&tickers.find(x=>x.t===lastTicker)){
+    selectTicker(lastTicker);
+  } else if(tickers.length){
+    selectTicker(tickers[0].t);
+  }
+
+  // Token enter
+  document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key==='Enter')fetchCandles();});
+
+  // Save on tab close / refresh
+  window.addEventListener('beforeunload',()=>autoSave());
+  // Save when tab goes to background (mobile)
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)autoSave();});
+}
+// ===================== CALENDAR =====================
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+
+function openCalendar(){
+  calYear=new Date().getFullYear();calMonth=new Date().getMonth();
+  document.getElementById('calOverlay').style.display='flex';
+  renderCalendar();
+}
+function closeCalendar(){document.getElementById('calOverlay').style.display='none';}
+function calPrevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}renderCalendar();}
+function calNextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();}
+
+function getCalendarSnaps(){
+  // Build map: dateKey (YYYY-MM-DD) → snapshot object
+  if(!curInstr)return{};
+  const prefix=LS.DAY+curInstr+'_';
+  const map={};
+  Object.keys(localStorage).filter(k=>k.startsWith(prefix)).forEach(k=>{
+    const dateISO=k.replace(prefix,'');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateISO))return;
+    try{
+      const s=JSON.parse(localStorage.getItem(k));
+      // Only show days that have some data
+      const hasData=s.jurLong||s.jurShort||s.fizLong||s.fizShort||s.jurLongChg||s.jurShortChg;
+      if(hasData)map[dateISO]=s;
+    }catch{}
+  });
+  return map;
+}
+
+const RU_MONTHS={'янв':0,'фев':1,'мар':2,'апр':3,'май':4,'мая':4,'июн':5,'июл':6,'авг':7,'сен':8,'окт':9,'ноя':10,'дек':11};
+function snapLabelToDateKey(label,savedAt){
+  // Try ISO
+  if(/^\d{4}-\d{2}-\d{2}$/.test(label))return label;
+  // Try "DD MMM" or "D MMM"
+  const m=label.match(/(\d{1,2})\s+([а-яё]+)/i);
+  if(m){
+    const day=parseInt(m[1]);
+    const mon=RU_MONTHS[m[2].toLowerCase().substring(0,3)];
+    if(mon!==undefined&&day>=1&&day<=31){
+      // Determine year: use savedAt timestamp or current year
+      const year=savedAt?new Date(savedAt).getFullYear():new Date().getFullYear();
+      return `${year}-${String(mon+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    }
+  }
+  // Try "Снимок N" — can't determine date
+  return null;
+}
+
+function renderCalendar(){
+  const MONTHS_RU=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const DAYS_RU=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  document.getElementById('calMonthLbl').textContent=MONTHS_RU[calMonth]+' '+calYear;
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML='';
+  // Day headers
+  DAYS_RU.forEach(d=>{const el=document.createElement('div');el.className='cal-dow';el.textContent=d;grid.appendChild(el);});
+
+  const snapsMap=getCalendarSnaps();
+  const today=new Date();
+  const todayKey=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // First day of month (Monday=0)
+  const first=new Date(calYear,calMonth,1);
+  let startDow=first.getDay()-1;if(startDow<0)startDow=6; // Mon-based
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+
+  // Empty cells
+  for(let i=0;i<startDow;i++){const el=document.createElement('div');el.className='cal-day empty';grid.appendChild(el);}
+
+  for(let d=1;d<=daysInMonth;d++){
+    const key=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const snap=snapsMap[key];
+    const el=document.createElement('div');
+    el.className='cal-day';
+    if(key===todayKey)el.classList.add('today');
+    if(snap){
+      el.classList.add('has-data');
+      const sig=snap._signal;
+      if(sig==='ЛОНГ')el.classList.add('sig-long');
+      else if(sig==='ШОРТ')el.classList.add('sig-short');
+      else if(sig==='НЕЙТРАЛЬ')el.classList.add('sig-neutral');
+      else el.classList.add('no-sig');
+      el.title=snap.label+(sig?' · '+sig:'');
+      el.onclick=()=>showCalDayPopup(d,key,snap);
+      // Dot
+      const dot=document.createElement('div');
+      dot.className='cal-dot';
+      dot.style.background=sig==='ЛОНГ'?'var(--pos)':sig==='ШОРТ'?'var(--neg)':sig==='НЕЙТРАЛЬ'?'var(--txt2)':'var(--txt3)';
+      el.appendChild(dot);
+    }
+    const num=document.createElement('div');num.className='cal-day-num';num.textContent=d;el.appendChild(num);
+    grid.appendChild(el);
+  }
+  document.getElementById('calDayPopup').innerHTML='';
+}
+
+function showCalDayPopup(day,key,snap){
+  const popup=document.getElementById('calDayPopup');
+  const sig=snap._signal||'—';
+  const sigColor=sig==='ЛОНГ'?'var(--pos)':sig==='ШОРТ'?'var(--neg)':'var(--txt2)';
+  const jL=parseFloat(snap.jurLong)||0,jS=parseFloat(snap.jurShort)||0;
+  const jLC=parseFloat(snap.jurLongChg)||0,jSC=parseFloat(snap.jurShortChg)||0;
+  const fLC=parseFloat(snap.fizLongChg)||0,fSC=parseFloat(snap.fizShortChg)||0;
+  const fmt=v=>v?((v>0?'+':'')+v.toLocaleString('ru-RU')):'—';
+  const dateLabel=formatDateLabel(key);
+  popup.innerHTML=`
+    <div class="cal-popup">
+      <div class="cal-popup-date">${dateLabel}${snap._savedAt?' · '+new Date(snap._savedAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):''}  ·  ${curInstr}</div>
+      <div class="cal-popup-sig" style="color:${sigColor}">${sig==='ЛОНГ'?'↑ ЛОНГ':sig==='ШОРТ'?'↓ ШОРТ':sig==='НЕЙТРАЛЬ'?'→ НЕЙТРАЛЬ':'— нет сигнала'}</div>
+      ${snap._score!==undefined?`<div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Сила сигнала: <span style="color:var(--txt2);">${Math.abs(Math.round((snap._score||0)/6*100))}%</span></div>`:''}
+      <div class="cal-popup-row"><span>Юр. лонг:</span><span>${jL?jL.toLocaleString('ru-RU'):'—'}</span></div>
+      <div class="cal-popup-row"><span>Юр. шорт:</span><span>${jS?jS.toLocaleString('ru-RU'):'—'}</span></div>
+      <div class="cal-popup-row"><span>Δ Юр. лонг:</span><span style="color:${jLC>0?'var(--pos)':jLC<0?'var(--neg)':'var(--txt3)'}">${fmt(jLC)}</span></div>
+      <div class="cal-popup-row"><span>Δ Юр. шорт:</span><span style="color:${jSC>0?'var(--neg)':jSC<0?'var(--pos)':'var(--txt3)'}">${fmt(jSC)}</span></div>
+      <div class="cal-popup-row"><span>Δ Физ. лонг:</span><span>${fmt(fLC)}</span></div>
+      <div class="cal-popup-row"><span>Δ Физ. шорт:</span><span>${fmt(fSC)}</span></div>
+      <div style="margin-top:8px;text-align:right;">
+        <button class="btn-pill" style="font-size:10px;padding:4px 12px;" onclick="closeCalendar();selectDate('${key}')">→ Перейти к этому дню</button>
+      </div>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
