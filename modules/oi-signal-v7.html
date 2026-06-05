@@ -1203,6 +1203,21 @@ async function fetchOneTF(figi, tf, from, to, token){
   return d.candles||[];
 }
 
+// T-Invest ограничивает 1min/5min одним днём на запрос.
+// Если диапазон > 1 дня — делаем два запроса и склеиваем.
+async function fetchOneTFSafe(figi, tf, from, to, token){
+  const MS_DAY=86400000;
+  if((tf==='1min'||tf==='5min') && (to-from)>MS_DAY*1.05){
+    const mid=new Date(from.getTime()+MS_DAY);
+    const [c1,c2]=await Promise.all([
+      fetchOneTF(figi,tf,from,mid,token),
+      fetchOneTF(figi,tf,mid,to,token)
+    ]);
+    return[...c1,...c2];
+  }
+  return fetchOneTF(figi,tf,from,to,token);
+}
+
 // Make date range for a given OI date — always in UTC+3 (Moscow) trading hours
 function makeDateRange(dateISO, offsetDays){
   // Moscow offset: UTC+3 = -180 minutes shift
@@ -1252,7 +1267,7 @@ async function fetchAllTF(){
   const results=await Promise.allSettled(
     Object.entries(tfWindows).map(([tf,[from,to]])=>
       withTimeout(
-        fetchOneTF(figi,tf,from,to,token).then(c=>({tf,c})),
+        fetchOneTFSafe(figi,tf,from,to,token).then(c=>({tf,c})),
         TIMEOUT_MS, tf
       )
     )
