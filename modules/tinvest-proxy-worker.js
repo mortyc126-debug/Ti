@@ -15,7 +15,7 @@
 //   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
-const WORKER_VERSION = 'v8';
+const WORKER_VERSION = 'v9';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -134,6 +134,7 @@ async function handleSync(url, auth) {
     const figi = rawFigi || ('_nofigi_' + opType);
     const qty = parseFloat(op.quantity || '0');
     const payment = moneyVal(op.payment);
+    const opPrice = moneyVal(op.price);  // цена исполнения за единицу
     const date = op.date ? op.date.slice(0, 10) : '';
     const name = op.name || rawFigi || opType;
     const afterFrom = date >= userFrom;
@@ -143,6 +144,13 @@ async function handleSync(url, auth) {
     opStats[opType].count++;
     opStats[opType].sum += payment;
     opStats[opType].instrTypes.add(op.instrumentType || '?');
+
+    // T-Invest возвращает парные settlement-компоненты: реальная сделка + adjustment
+    // с payment/qty намного ниже цены исполнения. Фильтруем их из FIFO.
+    if (opPrice > 0 && qty > 0 && (STOCK_BUY.has(opType) || STOCK_SELL.has(opType))) {
+      const payPerUnit = Math.abs(payment) / qty;
+      if (payPerUnit < opPrice * 0.6) continue;
+    }
 
     // Вариационная маржа — реализованный P&L фьючерсов.
     // instrumentType у этих операций null, проверяем по типу операции.
