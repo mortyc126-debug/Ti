@@ -29546,6 +29546,236 @@ window.addEventListener('message',function(e){
     if(d.apiUrl) try{ localStorage.setItem('bondan_girbo_proxy',d.apiUrl); _d1Base=d.apiUrl.replace(/\/$/,''); }catch(ex){}
   }
 });
+
+// ══════════════════════════════════════════════════════════════════
+// СТОП-ЛИСТ ИНН — заблокированные эмитенты (администрации и пр.)
+// bondan_ignored_inns: JSON-массив строк ИНН
+// ══════════════════════════════════════════════════════════════════
+var _repIgnoredInns = new Set();
+(function(){
+  try{
+    var raw = localStorage.getItem('bondan_ignored_inns');
+    if(raw) JSON.parse(raw).forEach(function(inn){ _repIgnoredInns.add(String(inn)); });
+  }catch(e){}
+})();
+
+function _repIgnoreSave(){
+  try{ localStorage.setItem('bondan_ignored_inns', JSON.stringify(Array.from(_repIgnoredInns))); }catch(e){}
+}
+
+function _repIgnoreAdd(inn){
+  if(!inn) return;
+  _repIgnoredInns.add(String(inn));
+  _repIgnoreSave();
+}
+
+function _repIgnoreRemove(inn){
+  _repIgnoredInns.delete(String(inn));
+  _repIgnoreSave();
+}
+
+// Кнопка "Стоп-лист" в сайдбаре — показывает список заблокированных ИНН
+// с возможностью разблокировки
+function _repIgnoreModal(){
+  var inns = Array.from(_repIgnoredInns).sort();
+  if(!inns.length){ alert('Стоп-лист пуст.'); return; }
+  var html = '<div style="padding:16px 20px;max-height:70vh;overflow-y:auto">'
+    + '<div style="font-size:13px;color:var(--t3);margin-bottom:12px">ИНН в стоп-листе не загружаются из базы D1 и скрыты из списка. Нажмите ✕ чтобы разблокировать.</div>'
+    + inns.map(function(inn){
+        var nm = '';
+        for(var id in (reportsDB||{})){
+          if((reportsDB[id]||{}).inn === inn){ nm = reportsDB[id].name || ''; break; }
+        }
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--brd)">'
+          + '<span style="font-family:var(--mono);font-size:12px;color:var(--t)">' + inn + '</span>'
+          + (nm ? '<span style="font-size:12px;color:var(--t3);flex:1">' + _escHtml(nm) + '</span>' : '<span style="flex:1"></span>')
+          + '<button onclick="_repIgnoreRemove(\''+inn+'\');repRenderIssuerList();this.closest(\'.rep-ignore-modal\').remove()" style="background:none;border:1px solid var(--danger);color:var(--danger);cursor:pointer;font-size:11px;padding:2px 8px">✕ Снять</button>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+  var wrap = document.createElement('div');
+  wrap.className = 'modal-overlay open rep-ignore-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000;display:flex;align-items:center;justify-content:center';
+  wrap.innerHTML = '<div class="modal" style="width:520px;max-width:96vw">'
+    + '<div class="modal-hdr">Стоп-лист ИНН (' + inns.length + ')'
+    + '<button onclick="this.closest(\'.rep-ignore-modal\').remove()" class="modal-x">✕</button></div>'
+    + html
+    + '<div class="modal-ftr"><button class="btn" onclick="if(confirm(\'Очистить весь стоп-лист?\')){'
+    + '_repIgnoredInns.clear();_repIgnoreSave();repRenderIssuerList();this.closest(\'.rep-ignore-modal\').remove()}'
+    + '">Очистить всё</button>'
+    + '<button class="btn" onclick="this.closest(\'.rep-ignore-modal\').remove()">Закрыть</button></div>'
+    + '</div>';
+  document.body.appendChild(wrap);
+}
+
+// Вставить кнопку «Стоп-лист» в блок загрузки базы
+(function(){
+  var once = false;
+  var _orig4 = window.repRenderIssuerList;
+  window.repRenderIssuerList = function(){
+    if(!once){
+      once = true;
+      var btn = document.getElementById('rep-d1-load-btn');
+      if(btn && btn.parentNode && !document.getElementById('rep-ignore-list-btn')){
+        var b2 = document.createElement('button');
+        b2.id = 'rep-ignore-list-btn';
+        b2.type = 'button';
+        b2.title = 'Управление стоп-листом заблокированных ИНН';
+        b2.textContent = '🚫';
+        b2.style.cssText = 'width:28px;height:28px;border:1px solid var(--brd);background:var(--s2);color:var(--t3);cursor:pointer;font-size:13px;flex-shrink:0';
+        b2.onclick = _repIgnoreModal;
+        btn.parentNode.appendChild(b2);
+      }
+    }
+    _orig4.apply(this, arguments);
+    // После рендера: скрыть карточки с заблокированным ИНН + добавить кнопку 🚫
+    var listEl = document.getElementById('rep-sidebar-list'); if(!listEl) return;
+    listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc = el.getAttribute('onclick') || '';
+      var mm = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+      var id = (mm && mm[1]) || el.dataset.issid;
+      if(!id) return;
+      var iss = (reportsDB||{})[id]; if(!iss) return;
+      // Скрыть заблокированных
+      if(iss.inn && _repIgnoredInns.has(String(iss.inn))){ el.style.display = 'none'; return; }
+      // Добавить кнопку 🚫 если нет
+      if(!el.querySelector('.iss-ignore-btn')){
+        el.style.position = 'relative';
+        var btn2 = document.createElement('button');
+        btn2.className = 'iss-ignore-btn';
+        btn2.title = 'Добавить в стоп-лист (скрыть навсегда)';
+        btn2.textContent = '🚫';
+        btn2.style.cssText = 'position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);'
+          + 'border:1px solid rgba(255,77,122,.3);cursor:pointer;font-size:10px;opacity:0;'
+          + 'transition:opacity .15s;padding:1px 5px;z-index:2;line-height:1';
+        btn2.onclick = function(ev){
+          ev.stopPropagation();
+          var iss2 = (reportsDB||{})[id]; if(!iss2) return;
+          var inn2 = iss2.inn;
+          if(!inn2){ alert('У этого эмитента нет ИНН — нечего блокировать.'); return; }
+          var hasPeriods = Object.keys(iss2.periods||{}).length > 0;
+          var msg = 'Добавить ИНН ' + inn2 + '\n(«' + (iss2.name||id) + '»)\nв стоп-лист?'
+            + '\n\nЭмитент скроется из списка и не будет загружаться при обновлении базы D1.'
+            + (hasPeriods ? '\n\n⚠ У этого эмитента есть периоды — они останутся в базе (только скрыто из списка).' : '');
+          if(!confirm(msg)) return;
+          _repIgnoreAdd(inn2);
+          if(!hasPeriods){ delete reportsDB[id]; try{ save(); }catch(ex){} }
+          repRenderIssuerList();
+        };
+        el.addEventListener('mouseenter', function(){ btn2.style.opacity = '1'; });
+        el.addEventListener('mouseleave', function(){ btn2.style.opacity = '0'; });
+        el.appendChild(btn2);
+      }
+    });
+  };
+})();
+
+// Переопределяем repDeleteIssuer: предлагать заблокировать ИНН при удалении
+(function(){
+  var _origDel = window.repDeleteIssuer;
+  window.repDeleteIssuer = function(){
+    if(!repActiveIssuerId) return;
+    var iss = (reportsDB||{})[repActiveIssuerId];
+    if(!iss) return;
+    var nm = iss.name || repActiveIssuerId;
+    if(!confirm('Удалить эмитента «' + nm + '» и все его периоды?')) return;
+    var inn2 = iss.inn;
+    if(inn2 && confirm('Добавить ИНН ' + inn2 + ' в стоп-лист?\n«' + nm + '» больше не будет появляться при обновлении базы D1.')){
+      _repIgnoreAdd(inn2);
+    }
+    delete reportsDB[repActiveIssuerId];
+    repActiveIssuerId = null; repActivePeriodKey = null;
+    try{ save(); }catch(e){}
+    repRenderIssuerList();
+    var v = document.getElementById('rep-issuer-view');
+    var ep = document.getElementById('rep-empty');
+    if(v) v.style.display = 'none';
+    if(ep) ep.style.display = 'block';
+  };
+})();
+
+// Патч D1-загрузки: после мёрджа удалять пустые (без периодов) заблокированные записи
+(function(){
+  var _origD1 = window._repD1Load;
+  if(typeof _origD1 !== 'function') return;
+  window._repD1Load = async function(){
+    var r = await _origD1.apply(this, arguments);
+    // Удалить записи с игнорируемым ИНН у которых нет пользовательских данных
+    var rdb = reportsDB || {};
+    var cleaned = 0;
+    for(var eid in rdb){
+      var e = rdb[eid];
+      if(!e || !e.inn) continue;
+      if(!_repIgnoredInns.has(String(e.inn))) continue;
+      var userPeriods = Object.keys(e.periods||{}).filter(function(pk){ return !e.periods[pk]._src || e.periods[pk]._src !== 'd1'; });
+      if(userPeriods.length === 0){ delete rdb[eid]; cleaned++; }
+    }
+    if(cleaned > 0){ try{ save(); }catch(ex){} repRenderIssuerList(); }
+    return r;
+  };
+})();
+
+// ══════════════════════════════════════════════════════════════════
+// ЗАЩИТА ПОЛЬЗОВАТЕЛЬСКИХ ДАННЫХ
+// При ручном добавлении/редактировании периода — помечаем _src:'user'
+// D1 не перезапишет период у которого _src не 'd1' (уже гарантируется
+// проверкой if(!iss.periods[pk]), но добавляем явный маркер для
+// уверенности и для будущих проверок).
+// ══════════════════════════════════════════════════════════════════
+(function(){
+  var _origSP = window.repSavePeriod;
+  if(typeof _origSP !== 'function') return;
+  window.repSavePeriod = function(){
+    _origSP.apply(this, arguments);
+    // После сохранения: найти только что сохранённый период и пометить _src:'user'
+    var iss = (reportsDB||{})[repActiveIssuerId]; if(!iss) return;
+    var pk = repActivePeriodKey; if(!pk) return;
+    var p = iss.periods && iss.periods[pk];
+    if(p && !p._src) p._src = 'user';
+    // Связи (related) — отметить пользовательские
+    if(Array.isArray(iss.related)){
+      iss.related.forEach(function(r){
+        if(r && !r.source) r.source = 'user';
+      });
+    }
+  };
+})();
+
+// Патч D1-мёрдж related-связей: не затирать пользовательские связи
+// даже если у них был source:'d1' ранее — проверяем по полю role
+(function(){
+  // Мёрдж каталога происходит внутри _repD1Load, не вынесен в отдельную функцию.
+  // Защищаем через перехват reportsDB-мутаций: после мёрджа
+  // восстанавливаем пользовательские related которые могли быть потеряны.
+  // Сохраняем снапшот related перед каждым D1-запуском.
+  var _userRelated = {};
+  var _origD1b = window._repD1Load;
+  if(typeof _origD1b !== 'function') return;
+  window._repD1Load = async function(){
+    // Снапшот пользовательских related (source !== 'd1')
+    var rdb = reportsDB || {};
+    _userRelated = {};
+    for(var eid in rdb){
+      var e = rdb[eid]; if(!e || !Array.isArray(e.related)) continue;
+      var userLinks = e.related.filter(function(r){ return r && r.source && r.source !== 'd1'; });
+      if(userLinks.length) _userRelated[eid] = userLinks;
+    }
+    var result = await _origD1b.apply(this, arguments);
+    // Восстановить пользовательские related которые могли исчезнуть
+    var rdb2 = reportsDB || {};
+    for(var eid2 in _userRelated){
+      if(!rdb2[eid2]) continue;
+      var cur = rdb2[eid2].related || [];
+      _userRelated[eid2].forEach(function(ul){
+        var exists = cur.some(function(r){ return r && r.inn === ul.inn && r.role === ul.role; });
+        if(!exists) cur.push(ul);
+      });
+      rdb2[eid2].related = cur;
+    }
+    _userRelated = {};
+    return result;
+  };
+})();
 </script>
 </body>
 </html>
