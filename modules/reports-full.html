@@ -318,6 +318,37 @@ details summary{outline:none}
 .mf-mode-btn{font-size:9px;padding:2px 9px;border:1px solid var(--brd);background:transparent;color:var(--t3);cursor:pointer;border-radius:3px;transition:all .1s}
 .mf-mode-btn.active{background:rgba(255,0,128,0.1);border-color:rgba(255,0,128,0.4);color:var(--acc)}
 .mf-badge{display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;width:13px;height:13px;border-radius:2px;background:rgba(82,242,201,0.15);color:var(--pos);margin-right:2px;flex-shrink:0}
+
+/* ── Форма периода: поля и модалки ───────── */
+.field label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:5px;font-family:var(--sans);font-weight:600}
+.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1px solid var(--brdp);color:var(--t);font-family:var(--mono);font-size:13px;padding:8px 11px;outline:none;transition:border-color .2s;resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--acc)}
+.field select option{background:var(--s1)}
+.field textarea{min-height:60px}
+.gap-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.modal{background:var(--s1);border:1px solid var(--brdm);width:560px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.85)}
+.modal-hdr{padding:16px 22px;border-bottom:1px solid rgba(255,0,128,0.2);display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;color:var(--t);letter-spacing:0}
+.modal-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.modal-ftr{padding:14px 22px;border-top:1px solid var(--brd);display:flex;gap:8px;justify-content:flex-end;background:rgba(255,255,255,0.012)}
+.modal-x{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:0 2px;line-height:1;opacity:.6;transition:opacity .12s}
+.modal-x:hover{opacity:1;color:var(--t)}
+/* подавить крошечные inline font-size в теле модала */
+#modal-rep-period .modal-body [style*="font-size:.5"],
+#modal-rep-period .modal-body [style*="font-size:.6"]{font-size:11px!important;line-height:1.55!important}
+#modal-rep-period .modal-body strong{font-size:12px}
+
+/* ── Зоны динамики: читаемая типографика ─ */
+.zone-name{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t4)}
+.zone-si{display:flex;align-items:center;gap:3px;font-size:11px;font-family:var(--mono)}
+.zone-sl{color:var(--t3);font-size:10px;margin-right:2px}
+.d-lbl{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:5px;flex:1}
+.d-lbl.bold{color:var(--t);font-weight:600}
+.d-vals{display:flex;align-items:baseline;gap:4px;flex-shrink:0;font-family:var(--mono);font-size:12px;margin-left:auto}
+.r-norm{margin-left:auto;font-size:10px;color:var(--t3);font-family:var(--mono)}
+.score-lbl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:5px}
+.score-val{font-size:22px;font-weight:700;font-family:var(--mono);letter-spacing:-.03em;flex-shrink:0}
 </style>
 </head>
 <body>
