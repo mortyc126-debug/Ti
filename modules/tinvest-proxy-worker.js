@@ -85,7 +85,13 @@ async function handleSync(url, auth) {
   const userFrom = fromStr ? fromStr : new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
   const to = new Date().toISOString();
 
-  const allItems = await fetchOps(accountId, userFrom + 'T00:00:00Z', to, auth);
+  // Для корректного FIFO нужен базис: загружаем историю на 5 лет назад относительно userFrom.
+  // Если записей нет — API вернёт пустой список, ошибки не будет.
+  const basisFrom = new Date(userFrom);
+  basisFrom.setFullYear(basisFrom.getFullYear() - 5);
+  const fetchFrom = basisFrom.toISOString().slice(0, 10);
+
+  const allItems = await fetchOps(accountId, fetchFrom + 'T00:00:00Z', to, auth);
 
   // Сортируем хронологически для FIFO
   allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
