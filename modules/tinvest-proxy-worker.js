@@ -15,7 +15,7 @@
 //   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
-const WORKER_VERSION = 'v12';
+const WORKER_VERSION = 'v13';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -139,7 +139,10 @@ async function handleSync(url, auth) {
     const payment = moneyVal(op.payment);
     const opPrice = moneyVal(op.price);  // цена исполнения за единицу
     const date = op.date ? op.date.slice(0, 10) : '';
-    const name = op.name || figiNames[rawFigi] || rawFigi || opType;
+    const isVarmargin = VAR_PLUS.has(opType) || VAR_MINUS.has(opType);
+    // T-Invest не передаёт figi/name для varmargin — показываем читаемое имя
+    const name = op.name || figiNames[rawFigi] || rawFigi ||
+                 (isVarmargin ? 'Вариационная маржа' : opType);
     const afterFrom = date >= userFrom;
 
     // Статистика для диагностики
