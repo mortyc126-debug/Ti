@@ -507,12 +507,33 @@ function renderLog(){
 function clearLogFilter(){document.getElementById('l-from').value='';document.getElementById('l-to').value='';renderLog();}
 
 function renderStats(){
-  var map={};entries.forEach(function(e){var p=e.position||'—';if(!map[p])map[p]={t:0,n:0,w:0};map[p].t+=e.pnl;map[p].n++;if(e.pnl>0)map[p].w++});
+  var VAR_NAME = 'Вариационная маржа';
+  var varEntries = entries.filter(function(e){return e.position===VAR_NAME;});
+  var map={};entries.forEach(function(e){
+    if(e.position===VAR_NAME) return; // варм. — отдельно
+    var p=e.position||'—';if(!map[p])map[p]={t:0,n:0,w:0};map[p].t+=e.pnl;map[p].n++;if(e.pnl>0)map[p].w++;
+  });
   var sorted=Object.entries(map).sort(function(a,b){return b[1].t-a[1].t});
-  document.getElementById('stats-pos').innerHTML=sorted.length?
+
+  // Блок вариационной маржи — по дням
+  var varHtml = '';
+  if(varEntries.length){
+    var varTotal=varEntries.reduce(function(s,e){return s+e.pnl;},0);
+    var varPos=varEntries.filter(function(e){return e.pnl>0;}).length;
+    varHtml='<div style="margin-bottom:10px">'
+      +'<div class="lbl" style="margin-bottom:4px">Вариационная маржа — итого: <span class="'+(varTotal>=0?'tag-p':'tag-n')+'">'+rubS(varTotal)+'</span>'
+      +' &nbsp; прибыльных дней: '+varPos+' / '+varEntries.length+'</div>'
+      +'<table><thead><tr><th>Дата</th><th>P&L</th></tr></thead><tbody>'
+      +varEntries.slice().sort(function(a,b){return b.pnl-a.pnl;}).map(function(e){
+        return'<tr><td style="color:var(--t2)">'+e.date+'</td><td><span class="'+(e.pnl>=0?'tag-p':'tag-n')+'">'+rubS(e.pnl)+'</span></td></tr>';
+      }).join('')
+      +'</tbody></table></div>';
+  }
+
+  document.getElementById('stats-pos').innerHTML=varHtml+(sorted.length?
     '<table><thead><tr><th>Позиция</th><th>Итог P&L</th><th>Win Rate</th><th>Сделок</th><th>Ср. P&L</th></tr></thead><tbody>'+
     sorted.map(function(x){var d=x[1];var avg=d.t/d.n;return'<tr><td style="color:var(--t1);font-weight:600">'+x[0]+'</td><td><span class="'+(d.t>=0?'tag-p':'tag-n')+'">'+rubS(d.t)+'</span></td><td style="color:var(--t2)">'+(d.n?Math.round(d.w/d.n*100)+'%':'—')+'</td><td style="color:var(--tm)">'+d.n+'</td><td style="color:var(--tm)">'+rubS(avg)+'</td></tr>'}).join('')+'</tbody></table>':
-    '<div class="notice">Нет данных</div>';
+    (varHtml?'':'<div class="notice">Нет данных</div>'));
 
   if(chartDist){chartDist.destroy();chartDist=null;}
   var days=groupByDay(entries);if(!days.length)return;
