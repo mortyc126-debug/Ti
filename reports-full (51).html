@@ -318,6 +318,97 @@ details summary{outline:none}
 .mf-mode-btn{font-size:9px;padding:2px 9px;border:1px solid var(--brd);background:transparent;color:var(--t3);cursor:pointer;border-radius:3px;transition:all .1s}
 .mf-mode-btn.active{background:rgba(255,0,128,0.1);border-color:rgba(255,0,128,0.4);color:var(--acc)}
 .mf-badge{display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;width:13px;height:13px;border-radius:2px;background:rgba(82,242,201,0.15);color:var(--pos);margin-right:2px;flex-shrink:0}
+
+/* ══════════════════════════════════════════════════════
+   ТИПОГРАФИЧЕСКАЯ ШКАЛА — финансовый интерфейс
+   Базовый размер 16 px, минимум текста 13 px
+   ══════════════════════════════════════════════════════ */
+:root{
+  --font-xs:13px; --font-sm:14px; --font-base:16px;
+  --font-md:18px; --font-lg:20px; --font-xl:24px;
+  --font-2xl:28px; --font-3xl:32px;
+}
+
+/* ── База ── */
+html,body{font-size:var(--font-base)!important}
+
+/* ── Название компании ── */
+.iss-title{font-size:26px!important}
+.iss-sub{font-size:13px!important}
+
+/* ── Список эмитентов ── */
+.iss-name{font-size:15px!important}
+.iss-meta{font-size:11px!important}
+.ind-badge,.rtg-badge{font-size:10.5px!important}
+.mult-lbl{font-size:10px!important}
+.mult-val{font-size:15px!important;font-weight:700!important}
+
+/* ── Вкладки периодов ── */
+.ptab{font-size:13px!important}
+
+/* ── Кнопки ── */
+.btn{font-size:13px!important}
+.btn-sm{font-size:12px!important}
+
+/* ── Инпуты/селекты ── */
+input:not([type=radio]):not([type=checkbox]),select,textarea{font-size:14px!important}
+.f-select{font-size:13px!important}
+.f-lbl{font-size:11px!important}
+.tp{font-size:11px!important}
+
+/* ── Сайдбар — аккордеон ── */
+.fs-hdr{font-size:12px!important}
+
+/* ── Фильтры мультипликаторов ── */
+.mf-lbl,.mf-in,.mf-sort{font-size:11px!important}
+.mf-unit,.mf-sep{font-size:10px!important}
+.mf-hint{font-size:11px!important}
+.mf-mode-btn{font-size:11px!important}
+
+/* ── Зоны динамики и коэффициентов ── */
+.zone-name{font-size:13px!important;letter-spacing:.1em!important}
+.zone-si{font-size:13px!important}
+.zone-sl{font-size:12px!important}
+.d-lbl{font-size:16px!important}
+.d-lbl.bold{font-weight:700!important}
+.d-pct{font-size:14px!important}
+.d-vals{font-size:14px!important}
+.d-old{font-size:13px!important}
+.d-new{font-size:15px!important;font-weight:700!important}
+.d-arr{font-size:11px!important}
+.r-norm{font-size:12px!important}
+.r-ticks{font-size:10px!important;height:18px!important}
+
+/* ── Score tiles (KPI-плитки) ── */
+.score-lbl{font-size:11px!important}
+.score-val{font-size:30px!important}
+.score-comps{font-size:11px!important}
+.score-bw{margin-bottom:8px!important}
+
+/* ── Форма периода и модалки ── */
+.field label{display:block!important;font-size:12px!important;letter-spacing:.06em!important;text-transform:uppercase!important;color:var(--t3)!important;margin-bottom:6px!important;font-weight:600!important}
+.field input,.field select,.field textarea{width:100%!important;background:var(--bg)!important;border:1px solid var(--brdp)!important;color:var(--t)!important;font-family:var(--mono)!important;font-size:14px!important;padding:9px 12px!important;outline:none!important;transition:border-color .2s!important;resize:vertical!important}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--acc)!important}
+.field textarea{min-height:64px!important}
+.g2{display:grid!important;grid-template-columns:1fr 1fr!important;gap:14px!important}
+.g3{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:10px!important}
+.modal{background:var(--s1)!important;border:1px solid var(--brdm)!important;width:580px!important;max-width:96vw!important;max-height:92vh!important;overflow-y:auto!important;box-shadow:0 20px 60px rgba(0,0,0,.85)!important}
+.modal-hdr{padding:18px 24px!important;border-bottom:1px solid rgba(255,0,128,0.2)!important;display:flex!important;align-items:center!important;justify-content:space-between!important;font-size:15px!important;font-weight:700!important;color:var(--t)!important;letter-spacing:0!important;text-transform:none!important}
+.modal-body{padding:22px 24px!important;display:flex!important;flex-direction:column!important;gap:16px!important}
+.modal-ftr{padding:16px 24px!important;border-top:1px solid var(--brd)!important;display:flex!important;gap:8px!important;justify-content:flex-end!important;background:rgba(255,255,255,0.012)!important}
+.modal-x{background:none!important;border:none!important;color:var(--t3)!important;cursor:pointer!important;font-size:20px!important;padding:0 4px!important;line-height:1!important;opacity:.6!important}
+.modal-x:hover{opacity:1!important;color:var(--t)!important}
+
+/* Inline tiny font-sizes внутри модала периода */
+#modal-rep-period .modal-body [style*="font-size:.5"],
+#modal-rep-period .modal-body [style*="font-size:.6"],
+#modal-rep-period .modal-body [style*="font-size:.7"]{font-size:13px!important;line-height:1.6!important}
+
+/* ── Section titles ── */
+.section-title,.rep-sec-title{font-size:11px!important}
+
+/* ── Поиск в сайдбаре ── */
+#rep-search-main{font-size:14px!important;padding:7px 10px 7px 28px!important}
 </style>
 </head>
 <body>
