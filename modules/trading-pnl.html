@@ -291,6 +291,11 @@ tr:hover td{background:rgba(255,255,255,0.012)}
         <div><div class="lbl">Стоимость портфеля</div><div class="val sm" id="sync-portfolio">—</div></div>
         <div><div class="lbl">Обновлено</div><div style="font-size:12px;color:var(--tm);margin-top:4px" id="sync-time">—</div></div>
       </div>
+      <div id="sync-debug" style="margin-top:12px;display:none">
+        <div class="divider"></div>
+        <div class="lbl" style="margin-bottom:6px">🔍 Диагностика</div>
+        <div id="sync-debug-table" style="font-size:10px;color:var(--t2);font-family:monospace;line-height:1.7;overflow-x:auto;white-space:pre"></div>
+      </div>
     </div>
   </div>
 
@@ -659,11 +664,30 @@ async function syncDoLoad(proxyBase, accountId, from) {
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
   save(); updatePosList(); renderChart(); renderLog();
 
+  // Мёрдж _debug, _debugTrades, _debugRaw, _v из всех ответов
+  var mergedDebug = {};
+  var allDT = [], mergedDR = {};
+  results.forEach(function(r) {
+    if (r._debug) Object.entries(r._debug).forEach(function(kv){
+      var k=kv[0],v=kv[1];
+      if (!mergedDebug[k]) mergedDebug[k]={count:0,sum:0,instrTypes:[]};
+      mergedDebug[k].count+=v.count; mergedDebug[k].sum+=v.sum;
+      (v.instrTypes||[]).forEach(function(t){if(!mergedDebug[k].instrTypes.includes(t))mergedDebug[k].instrTypes.push(t);});
+    });
+    if (r._debugTrades) allDT=allDT.concat(r._debugTrades);
+    if (r._debugRaw) Object.assign(mergedDR, r._debugRaw);
+  });
+  allDT.sort(function(a,b){return a.pnl-b.pnl;});
+
   return {
     entries: allNew,
     portfolioValue: totalPortfolio || null,
     syncedAt: results[0] ? results[0].syncedAt : new Date().toISOString(),
-    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; })
+    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; }),
+    _debug: Object.keys(mergedDebug).length ? mergedDebug : null,
+    _debugTrades: allDT.length ? allDT.slice(0,5).concat(allDT.slice(-5)) : null,
+    _debugRaw: Object.keys(mergedDR).length ? mergedDR : null,
+    _v: results[0] ? results[0]._v : null
   };
 }
 
@@ -681,6 +705,25 @@ async function syncNow() {
     document.getElementById('sync-portfolio').textContent = data.portfolioValue ? rubAbs(data.portfolioValue) : '—';
     document.getElementById('sync-time').textContent = new Date(data.syncedAt).toLocaleString('ru');
     document.getElementById('sync-result').style.display = 'block';
+    var rows = ['v: ' + (data._v || '?')];
+    if (data._debug) {
+      rows.push('');
+      Object.entries(data._debug).sort(function(a,b){return Math.abs(b[1].sum)-Math.abs(a[1].sum);})
+        .forEach(function(e){ rows.push(e[0].replace('OPERATION_TYPE_','').padEnd(38)+' cnt:'+String(e[1].count).padStart(4)+' sum:'+String(e[1].sum).padStart(10)+'₽  ['+e[1].instrTypes.join(',')+']'); });
+    }
+    if (data._debugTrades && data._debugTrades.length) {
+      rows.push(''); rows.push('--- топ худших/лучших ---');
+      data._debugTrades.forEach(function(t){ rows.push(t.date+'  '+String(Math.round(t.pnl)).padStart(10)+'₽  '+(t.position||'').slice(0,40)); });
+    }
+    if (data._debugRaw && Object.keys(data._debugRaw).length) {
+      rows.push(''); rows.push('--- сырые операции по худшим инструментам ---');
+      Object.entries(data._debugRaw).forEach(function(kv){
+        rows.push('figi: '+kv[0]);
+        kv[1].forEach(function(op){ rows.push('  '+op.d+' '+op.t.replace('OPERATION_TYPE_','').padEnd(18)+' qty:'+String(op.qty).padStart(5)+' pay:'+String(op.pay).padStart(9)+'₽ ['+op.it+'] '+op.n); });
+      });
+    }
+    document.getElementById('sync-debug-table').textContent = rows.join('\n');
+    document.getElementById('sync-debug').style.display = 'block';
     var msg = '✓ Синхронизировано';
     if (data.errors && data.errors.length) msg += ' (ошибки: ' + data.errors.join('; ') + ')';
     syncMsg('sync-msg', msg, data.errors && data.errors.length ? '#FF8C42' : 'var(--pos)');

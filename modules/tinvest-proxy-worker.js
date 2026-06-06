@@ -200,6 +200,22 @@ async function handleSync(url, auth) {
     }
   }
 
+  // Сырые операции по топ-проблемным инструментам (для диагностики)
+  const rawByFigi = {};
+  for (const op of allItems) {
+    const f = op.figi || op.instrumentUid || '';
+    if (!f) continue;
+    if (!rawByFigi[f]) rawByFigi[f] = [];
+    rawByFigi[f].push({
+      d: (op.date || '').slice(0, 10),
+      t: op.type || '',
+      qty: op.quantity || '0',
+      pay: Math.round(moneyVal(op.payment)),
+      it: op.instrumentType || '?',
+      n: op.name || ''
+    });
+  }
+
   let idx = 0;
   const tradeEntries = Object.values(tradeMap).map(e => ({
     id: ++idx, date: e.date, position: e.position,
@@ -228,9 +244,20 @@ async function handleSync(url, auth) {
   const sortedTrades = [...tradeEntries].sort((a, b) => a.pnl - b.pnl);
   const debugTrades = [...sortedTrades.slice(0, 5), ...sortedTrades.slice(-5)];
 
+  // Для топ-5 худших позиций — выгружаем все сырые операции
+  const worstFigis = sortedTrades.slice(0, 5).map(e => {
+    const key = Object.keys(tradeMap).find(k => tradeMap[k] === Object.values(tradeMap).find(v => v.position === e.position && v.date === e.date));
+    const figi = key ? key.split('|')[1] : null;
+    return figi;
+  }).filter(Boolean);
+  const debugRaw = {};
+  for (const f of worstFigis) {
+    if (rawByFigi[f]) debugRaw[f] = rawByFigi[f];
+  }
+
   return new Response(
     JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(),
-                     _debug: debug, _debugTrades: debugTrades, _v: WORKER_VERSION }),
+                     _debug: debug, _debugTrades: debugTrades, _debugRaw: debugRaw, _v: WORKER_VERSION }),
     { status: 200, headers: CORS_JSON }
   );
 }
