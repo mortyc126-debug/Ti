@@ -15,7 +15,7 @@
 //   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
-const WORKER_VERSION = 'v9';
+const WORKER_VERSION = 'v10';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -155,7 +155,8 @@ async function handleSync(url, auth) {
     // Вариационная маржа — реализованный P&L фьючерсов.
     // instrumentType у этих операций null, проверяем по типу операции.
     if (VAR_PLUS.has(opType) || VAR_MINUS.has(opType)) {
-      if (afterFrom) addTrade(date, name, payment, rawFigi);
+      // Группируем по figi если есть; иначе каждая операция отдельно (по id)
+      if (afterFrom) addTrade(date, name, payment, rawFigi || op.id || (opType + '_' + op.date));
 
     // Фьючерсы/опционы: пропускаем BUY/SELL — реальный P&L только в varmargin.
     // Также пропускаем инструменты без figi — нельзя корректно вести FIFO.
