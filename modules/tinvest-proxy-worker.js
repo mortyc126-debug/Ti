@@ -15,7 +15,7 @@
 //   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
-const WORKER_VERSION = 'v7';
+const WORKER_VERSION = 'v8';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -108,8 +108,9 @@ async function handleSync(url, auth) {
   const otherEntries = [];
   const opStats = {};
 
-  function addTrade(date, name, pnl) {
-    const key = date + '|' + name;
+  // Ключ по figi чтобы не смешивать акции и облигации одного эмитента
+  function addTrade(date, name, pnl, figiKey) {
+    const key = date + '|' + (figiKey || name);
     if (!tradeMap[key]) tradeMap[key] = { date, position: name, pnl: 0 };
     tradeMap[key].pnl += pnl;
   }
@@ -146,7 +147,7 @@ async function handleSync(url, auth) {
     // Вариационная маржа — реализованный P&L фьючерсов.
     // instrumentType у этих операций null, проверяем по типу операции.
     if (VAR_PLUS.has(opType) || VAR_MINUS.has(opType)) {
-      if (afterFrom) addTrade(date, name, payment);
+      if (afterFrom) addTrade(date, name, payment, rawFigi);
 
     // Фьючерсы/опционы: пропускаем BUY/SELL — реальный P&L только в varmargin.
     // Также пропускаем инструменты без figi — нельзя корректно вести FIFO.
@@ -160,7 +161,7 @@ async function handleSync(url, auth) {
       if (shorts[figi] && shorts[figi].length > 0) {
         const { matched, value: proceeds } = fifoConsume(shorts[figi], qty);
         if (afterFrom && matched > 0) {
-          addTrade(date, name, proceeds - Math.abs(payment) * (matched / qty));
+          addTrade(date, name, proceeds - Math.abs(payment) * (matched / qty), rawFigi);
         }
         const longQty = qty - matched;
         if (longQty > 0) {
@@ -179,7 +180,7 @@ async function handleSync(url, auth) {
       if (longs[figi] && longs[figi].length > 0) {
         const { matched, value: cost } = fifoConsume(longs[figi], qty);
         if (afterFrom && matched > 0) {
-          addTrade(date, name, payment * (matched / qty) - cost);
+          addTrade(date, name, payment * (matched / qty) - cost, rawFigi);
         }
         const shortQty = qty - matched;
         if (shortQty > 0) {
