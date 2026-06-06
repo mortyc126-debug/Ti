@@ -29548,16 +29548,230 @@ window.addEventListener('message',function(e){
 });
 
 // ══════════════════════════════════════════════════════════════════
-// СТОП-ЛИСТ ИНН — заблокированные эмитенты (администрации и пр.)
-// bondan_ignored_inns: JSON-массив строк ИНН
+// АРХИВ ЭМИТЕНТОВ — мягкое скрытие через флаг iss.hidden = true
+// Запись остаётся в reportsDB (ссылки из облигаций не рвутся),
+// просто не отображается в списках. D1-мёрдж флаг не снимает.
 // ══════════════════════════════════════════════════════════════════
-var _repIgnoredInns = new Set();
+
+// Архивировать эмитента: ставим hidden:true, сохраняем
+function _repArchiveIssuer(id){
+  var iss = (reportsDB||{})[id]; if(!iss) return;
+  iss.hidden = true;
+  try{ save(); }catch(e){}
+  repRenderIssuerList();
+}
+
+// Разархивировать
+function _repUnarchiveIssuer(id){
+  var iss = (reportsDB||{})[id]; if(!iss) return;
+  delete iss.hidden;
+  try{ save(); }catch(e){}
+  repRenderIssuerList();
+}
+
+// Окно «Архив» — все скрытые эмитенты с кнопкой восстановления
+function _repArchiveModal(){
+  var rdb = reportsDB || {};
+  var hidden = Object.keys(rdb).filter(function(id){ return rdb[id] && rdb[id].hidden; })
+    .sort(function(a,b){ return (rdb[a].name||'').localeCompare(rdb[b].name||'','ru'); });
+  var wrap = document.createElement('div');
+  wrap.className = 'modal-overlay open rep-archive-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000;display:flex;align-items:center;justify-content:center';
+  function buildHtml(){
+    var rdb2 = reportsDB || {};
+    var ids = Object.keys(rdb2).filter(function(id){ return rdb2[id] && rdb2[id].hidden; })
+      .sort(function(a,b){ return (rdb2[a].name||'').localeCompare(rdb2[b].name||'','ru'); });
+    if(!ids.length) return '<div style="padding:20px;text-align:center;color:var(--t3);font-size:13px">Архив пуст.</div>';
+    return '<div style="max-height:60vh;overflow-y:auto">'
+      + ids.map(function(id){
+          var iss = rdb2[id];
+          var periods = Object.keys(iss.periods||{}).length;
+          return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--brd)">'
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:14px;color:var(--t);font-weight:500">' + _escHtml(iss.name||id) + '</div>'
+            + '<div style="font-size:11px;color:var(--t3);margin-top:2px;font-family:var(--mono)">'
+            + (iss.inn ? 'ИНН ' + iss.inn + ' · ' : '') + periods + ' периодов'
+            + '</div></div>'
+            + '<button onclick="_repUnarchiveIssuer(\''+id+'\');this.closest(\'.arch-row\').remove();'
+            + 'if(!document.querySelector(\'.arch-row\')){document.querySelector(\'.rep-archive-modal .arch-body\').innerHTML=\'<div style=&quot;padding:20px;text-align:center;color:var(--t3);font-size:13px&quot;>Архив пуст.</div>\';}"'
+            + ' class="arch-row btn btn-sm" style="flex-shrink:0;border-color:rgba(82,242,201,.4);color:var(--pos)"> Восстановить</button>'
+            + '<button onclick="if(confirm(\'Удалить навсегда?\')){'
+            + 'delete reportsDB[\''+id+'\'];try{save();}catch(ex){}this.closest(\'.arch-row\').remove();'
+            + 'if(!document.querySelector(\'.arch-row\')){document.querySelector(\'.rep-archive-modal .arch-body\').innerHTML=\'<div style=&quot;padding:20px;text-align:center;color:var(--t3);font-size:13px&quot;>Архив пуст.</div>\';}}"'
+            + ' class="arch-row btn btn-sm btn-d" style="flex-shrink:0"> Удалить</button>'
+            + '</div>';
+        }).join('');
+    + '</div>';
+  }
+  wrap.innerHTML = '<div class="modal" style="width:560px;max-width:96vw">'
+    + '<div class="modal-hdr">Архив эмитентов'
+    + '<button onclick="repRenderIssuerList();this.closest(\'.rep-archive-modal\').remove()" class="modal-x">✕</button></div>'
+    + '<div class="modal-body arch-body" style="padding:16px 22px">'
+    + buildHtml()
+    + '</div>'
+    + '<div class="modal-ftr">'
+    + '<button class="btn" onclick="repRenderIssuerList();this.closest(\'.rep-archive-modal\').remove()">Закрыть</button>'
+    + '</div></div>';
+  document.body.appendChild(wrap);
+}
+
+// Добавить пункт «Архив» в селектор статуса + кнопку «Архив» рядом с «↓ Загрузить»
 (function(){
-  try{
-    var raw = localStorage.getItem('bondan_ignored_inns');
-    if(raw) JSON.parse(raw).forEach(function(inn){ _repIgnoredInns.add(String(inn)); });
-  }catch(e){}
+  var _uiOnce = false;
+  var _origRIL = window.repRenderIssuerList;
+  window.repRenderIssuerList = function(){
+    if(!_uiOnce){
+      _uiOnce = true;
+      // Пункт «Архив (скрытые)» в select
+      var sel = document.getElementById('rep-sidebar-status');
+      if(sel && !sel.querySelector('option[value="hidden"]')){
+        var opt = document.createElement('option');
+        opt.value = 'hidden'; opt.textContent = 'Архив (скрытые)';
+        sel.appendChild(opt);
+      }
+      // Кнопка «📦» открыть архив
+      var loadBtn = document.getElementById('rep-d1-load-btn');
+      if(loadBtn && loadBtn.parentNode && !document.getElementById('rep-archive-btn')){
+        var ab = document.createElement('button');
+        ab.id = 'rep-archive-btn'; ab.type = 'button';
+        ab.title = 'Архив скрытых эмитентов';
+        ab.textContent = '📦';
+        ab.style.cssText = 'width:28px;height:28px;border:1px solid var(--brd);background:var(--s2);color:var(--t3);cursor:pointer;font-size:13px;flex-shrink:0';
+        ab.onclick = _repArchiveModal;
+        loadBtn.parentNode.appendChild(ab);
+      }
+    }
+    _origRIL.apply(this, arguments);
+    var sel2 = document.getElementById('rep-sidebar-status');
+    var status = sel2 ? sel2.value : 'all';
+    var listEl = document.getElementById('rep-sidebar-list'); if(!listEl) return;
+    listEl.querySelectorAll('.rep-issuer-item').forEach(function(el){
+      var oc = el.getAttribute('onclick') || '';
+      var mm = oc.match(/repSelectIssuerById\('([^']+)'\)/);
+      var id = (mm && mm[1]) || el.dataset.issid;
+      if(!id) return;
+      var iss = (reportsDB||{})[id]; if(!iss) return;
+      if(status === 'hidden'){
+        // В режиме «Архив» показываем только скрытых
+        if(!iss.hidden) el.style.display = 'none';
+        return;
+      }
+      // В остальных режимах скрываем hidden
+      if(iss.hidden){ el.style.display = 'none'; return; }
+      // Добавить кнопку архивирования
+      if(!el.querySelector('.iss-archive-btn')){
+        el.style.position = 'relative';
+        var btn = document.createElement('button');
+        btn.className = 'iss-archive-btn';
+        btn.title = 'Скрыть в архив (запись сохраняется, ссылки из облигаций не рвутся)';
+        btn.textContent = '📦';
+        btn.style.cssText = 'position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);'
+          + 'border:1px solid rgba(255,255,255,.12);cursor:pointer;font-size:10px;opacity:0;'
+          + 'transition:opacity .15s;padding:1px 5px;z-index:2;line-height:1.4;color:var(--t3)';
+        btn.onclick = function(ev){
+          ev.stopPropagation();
+          var iss2 = (reportsDB||{})[id]; if(!iss2) return;
+          var nm = iss2.name || id;
+          var periods = Object.keys(iss2.periods||{}).length;
+          if(!confirm(
+            'Скрыть «' + nm + '» в архив?\n\n'
+            + 'Запись останется в базе — ссылки из облигаций и других модулей сохранятся.\n'
+            + 'D1-обновления продолжат обновлять метаданные.\n'
+            + (periods ? 'Периодов: ' + periods + ' (не удаляются).\n' : '')
+            + '\nВосстановить: кнопка 📦 в шапке → Архив.'
+          )) return;
+          _repArchiveIssuer(id);
+        };
+        el.addEventListener('mouseenter', function(){ btn.style.opacity = '1'; });
+        el.addEventListener('mouseleave', function(){ btn.style.opacity = '0'; });
+        el.appendChild(btn);
+      }
+    });
+  };
 })();
+
+// Переопределяем repDeleteIssuer: предлагать архивировать, а не удалять
+(function(){
+  var _origDel = window.repDeleteIssuer;
+  window.repDeleteIssuer = function(){
+    if(!repActiveIssuerId) return;
+    var iss = (reportsDB||{})[repActiveIssuerId]; if(!iss) return;
+    var nm = iss.name || repActiveIssuerId;
+    var periods = Object.keys(iss.periods||{}).length;
+    var msg = '«' + nm + '»\n\nЧто сделать с эмитентом?';
+    var choice = periods
+      ? confirm(msg + '\n\nОК → Скрыть в архив (безопасно: данные сохранятся, ссылки из облигаций не рвутся)'
+             + '\nОтмена → Ничего не делать')
+      : confirm(msg + '\n\nОК → Удалить полностью (периодов нет, удаление безопасно)'
+             + '\nОтмена → Ничего не делать');
+    if(!choice) return;
+    if(periods){
+      _repArchiveIssuer(repActiveIssuerId);
+    } else {
+      delete reportsDB[repActiveIssuerId];
+      repActiveIssuerId = null; repActivePeriodKey = null;
+      try{ save(); }catch(e){}
+      repRenderIssuerList();
+      var v = document.getElementById('rep-issuer-view');
+      var ep = document.getElementById('rep-empty');
+      if(v) v.style.display = 'none';
+      if(ep) ep.style.display = 'block';
+    }
+  };
+})();
+
+// D1-мёрдж: не снимать флаг hidden при обновлении записи
+(function(){
+  var _origD1 = window._repD1Load;
+  if(typeof _origD1 !== 'function') return;
+  // Снапшот hidden-флагов и пользовательских related перед загрузкой
+  window._repD1Load = async function(){
+    var rdb = reportsDB || {};
+    var snap = {};
+    for(var eid in rdb){
+      var e = rdb[eid]; if(!e) continue;
+      snap[eid] = {
+        hidden: e.hidden || false,
+        userRelated: Array.isArray(e.related)
+          ? e.related.filter(function(r){ return r && r.source && r.source !== 'd1'; })
+          : []
+      };
+    }
+    var result = await _origD1.apply(this, arguments);
+    // Восстановить hidden и пользовательские related
+    var rdb2 = reportsDB || {};
+    for(var eid2 in snap){
+      if(!rdb2[eid2]) continue;
+      if(snap[eid2].hidden) rdb2[eid2].hidden = true;
+      if(snap[eid2].userRelated.length){
+        var cur = rdb2[eid2].related || [];
+        snap[eid2].userRelated.forEach(function(ul){
+          var exists = cur.some(function(r){ return r && r.inn === ul.inn && r.role === ul.role; });
+          if(!exists) cur.push(ul);
+        });
+        rdb2[eid2].related = cur;
+      }
+    }
+    return result;
+  };
+})();
+
+// Защита периодов: пометить _src:'user' при ручном сохранении
+(function(){
+  var _origSP = window.repSavePeriod;
+  if(typeof _origSP !== 'function') return;
+  window.repSavePeriod = function(){
+    _origSP.apply(this, arguments);
+    var iss = (reportsDB||{})[repActiveIssuerId]; if(!iss) return;
+    var pk = repActivePeriodKey; if(!pk) return;
+    var p = iss.periods && iss.periods[pk];
+    if(p && !p._src) p._src = 'user';
+    if(Array.isArray(iss.related)){
+      iss.related.forEach(function(r){ if(r && !r.source) r.source = 'user'; });
+    }
+  };
+})();
+</script>
 
 function _repIgnoreSave(){
   try{ localStorage.setItem('bondan_ignored_inns', JSON.stringify(Array.from(_repIgnoredInns))); }catch(e){}
