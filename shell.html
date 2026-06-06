@@ -399,17 +399,22 @@ function patchHtml(html) {
   return html + '\n' + SHELL_BRIDGE;
 }
 
-// Записываем HTML в iframe через Blob URL.
-// Требует HTTP-сервера (file:// не работает из-за null-origin localStorage).
-function writeToFrame(frameEl, html, onDone) {
-  const blob = new Blob([html], { type: 'text/html' });
-  const url  = URL.createObjectURL(blob);
-  frameEl.onload = function() {
-    URL.revokeObjectURL(url);
-    frameEl.onload = null;
-    if (onDone) onDone();
-  };
-  frameEl.src = url;
+// Загружаем iframe: если есть url — через src (тот же origin, тот же localStorage).
+// Если только html — через Blob (для файлов перетащенных вручную).
+function writeToFrame(frameEl, mod, onDone) {
+  if (mod.url) {
+    if (onDone) frameEl.addEventListener('load', onDone, { once: true });
+    frameEl.src = mod.url;
+  } else {
+    const blob = new Blob([mod.html], { type: 'text/html' });
+    const burl = URL.createObjectURL(blob);
+    frameEl.onload = function() {
+      URL.revokeObjectURL(burl);
+      frameEl.onload = null;
+      if (onDone) onDone();
+    };
+    frameEl.src = burl;
+  }
 }
 
 function addFiles(fileList) {
@@ -420,6 +425,7 @@ function addFiles(fileList) {
       const html     = patchHtml(e.target.result);
       const existing = modules.findIndex(m => m.name === f.name);
       if (existing !== -1) {
+        // url не обнуляем — если был URL-модуль с тем же именем, оставляем URL
         modules[existing] = { name: f.name, label: labelFor(f.name), html };
         if (existing === activeIdx) openModule(existing);
         toast(modules[existing].label + ' — обновлён');
@@ -470,10 +476,12 @@ function autoLoadBuiltins() {
         pending--; if (pending === 0) renderFileList();
         return;
       }
-      fetch(urls[i])
-        .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
-        .then(function(html) {
-          modules.push({ name: m.file, label: m.label, html: patchHtml(html) });
+      // Проверяем доступность по HEAD, но грузим через iframe.src (тот же origin)
+      fetch(urls[i], { method: 'HEAD' })
+        .then(function(r) {
+          if (!r.ok) return Promise.reject(r.status);
+          // Сохраняем URL — iframe будет грузить напрямую, без Blob
+          modules.push({ name: m.file, label: m.label, url: urls[i] });
           rebuildNav();
           if (modules.length === 1) openModule(0);
           pending--; if (pending === 0) renderFileList();
@@ -577,7 +585,7 @@ function openModule(idx) {
   fw.style.display = 'block';
   const frame = document.getElementById('mod-frame');
   frame.addEventListener('load', () => setTimeout(() => pushState(frame, true), 400), { once: true });
-  writeToFrame(frame, modules[idx].html);
+  writeToFrame(frame, modules[idx]);
   rebuildNav();
 }
 
@@ -629,7 +637,7 @@ function openPanel(side, modIdx) {
   panel.classList.remove('closed');
   label.textContent = m.label;
   frame.addEventListener('load', () => setTimeout(() => pushState(frame, true), 400), { once: true });
-  writeToFrame(frame, m.html);
+  writeToFrame(frame, m);
   toast(m.label + ' → ' + (side === 'left' ? 'левая' : 'правая') + ' панель');
 }
 
@@ -840,7 +848,7 @@ function openWindow(modIdx, opts) {
 
   const frameEl = el.querySelector('iframe');
   frameEl.addEventListener('load', () => setTimeout(() => pushState(frameEl), 400), { once: true });
-  writeToFrame(frameEl, m.html);
+  writeToFrame(frameEl, m);
 
   wins[id] = { el, frameEl, micro: false };
 
