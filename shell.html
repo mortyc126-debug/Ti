@@ -399,22 +399,19 @@ function patchHtml(html) {
   return html + '\n' + SHELL_BRIDGE;
 }
 
-// Загружаем iframe: если есть url — через src (тот же origin, тот же localStorage).
-// Если только html — через Blob (для файлов перетащенных вручную).
+// Загружаем iframe через Blob URL (работает везде: file://, rawgithack, localhost).
+// Blob URL изолирован от localStorage шелла — модуль должен использовать
+// window.db (postMessage-шина) для чтения/записи данных через шелл.
 function writeToFrame(frameEl, mod, onDone) {
-  if (mod.url) {
-    if (onDone) frameEl.addEventListener('load', onDone, { once: true });
-    frameEl.src = mod.url;
-  } else {
-    const blob = new Blob([mod.html], { type: 'text/html' });
-    const burl = URL.createObjectURL(blob);
-    frameEl.onload = function() {
-      URL.revokeObjectURL(burl);
-      frameEl.onload = null;
-      if (onDone) onDone();
-    };
-    frameEl.src = burl;
-  }
+  const html = mod.html || '';
+  const blob = new Blob([html], { type: 'text/html' });
+  const burl = URL.createObjectURL(blob);
+  frameEl.onload = function() {
+    URL.revokeObjectURL(burl);
+    frameEl.onload = null;
+    if (onDone) onDone();
+  };
+  frameEl.src = burl;
 }
 
 function addFiles(fileList) {
@@ -476,12 +473,10 @@ function autoLoadBuiltins() {
         pending--; if (pending === 0) renderFileList();
         return;
       }
-      // Проверяем доступность по HEAD, но грузим через iframe.src (тот же origin)
-      fetch(urls[i], { method: 'HEAD' })
-        .then(function(r) {
-          if (!r.ok) return Promise.reject(r.status);
-          // Сохраняем URL — iframe будет грузить напрямую, без Blob
-          modules.push({ name: m.file, label: m.label, url: urls[i] });
+      fetch(urls[i])
+        .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
+        .then(function(html) {
+          modules.push({ name: m.file, label: m.label, html: patchHtml(html) });
           rebuildNav();
           if (modules.length === 1) openModule(0);
           pending--; if (pending === 0) renderFileList();

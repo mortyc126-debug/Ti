@@ -2567,29 +2567,40 @@ details summary{outline:none}
 <script>
 
 (function(){
-  var _ok = true;
-  try { localStorage.getItem('__test__'); } catch(e){ _ok = false; }
+  // Активируем прокси если мы внутри iframe (shell) — тогда localStorage
+  // изолирован (Blob/null origin) и данных там нет. Запрашиваем у родителя.
+  var _inShell = (window !== window.top);
+  var _ok = !_inShell;
+  if(!_ok){
+    try { localStorage.getItem('__test__'); } catch(e){ /* уже false */ }
+  }
   if(_ok) return;
-  // Блокировка localStorage — используем in-memory + синк с shell через postMessage
+  // In-memory store + синк с shell через postMessage
   var _store = {};
   var _fake = {
     getItem:    function(k){ return k in _store ? _store[k] : null; },
     setItem:    function(k,v){ _store[k]=String(v); try{window.parent.postMessage({type:'DB_WRITE',key:k,value:String(v)},'*');}catch(e){} },
-    removeItem: function(k){ delete _store[k]; },
+    removeItem: function(k){ delete _store[k]; try{window.parent.postMessage({type:'DB_WRITE',key:k,value:null},'*');}catch(e){} },
     clear:      function(){ _store={}; },
     key:        function(i){ return Object.keys(_store)[i]||null; },
     get length(){ return Object.keys(_store).length; }
   };
   try{ Object.defineProperty(window,'localStorage',{value:_fake,writable:false,configurable:true}); }catch(e){}
   // Запросить начальные данные у shell
-  ['ba_v2','bondan_refs','bondan_girbo_proxy','ba_apikey','bondan_windows'].forEach(function(k){
-    var reqId = 'ls_init_'+k;
-    window.parent.postMessage({type:'DB_READ',reqId:reqId,key:k},'*');
+  var _keys = ['ba_v2','bondan_refs','bondan_girbo_proxy','ba_apikey',
+               'bondan_industry_peers','bondan_industry_medians','bondan_rosstat_ratios',
+               'bondan_girbo_proxy','ba_sync_code','ba_gist_id','ba_gist_token'];
+  _keys.forEach(function(k){
+    window.parent.postMessage({type:'DB_READ',reqId:'ls_init_'+k,key:k},'*');
   });
   window.addEventListener('message',function(e){
     var d=e.data; if(!d) return;
     if(d.type==='DB_RESPONSE' && d.key && d.value!==undefined && d.value!==null){
       _store[d.key] = typeof d.value==='string' ? d.value : JSON.stringify(d.value);
+    }
+    // Когда shell рассылает об изменении — обновляем и у себя
+    if(d.type==='DB_NOTIFY' && d.key){
+      window.parent.postMessage({type:'DB_READ',reqId:'ls_ntf_'+d.key,key:d.key},'*');
     }
   });
 })();
