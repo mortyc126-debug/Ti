@@ -291,11 +291,6 @@ tr:hover td{background:rgba(255,255,255,0.012)}
         <div><div class="lbl">Стоимость портфеля</div><div class="val sm" id="sync-portfolio">—</div></div>
         <div><div class="lbl">Обновлено</div><div style="font-size:12px;color:var(--tm);margin-top:4px" id="sync-time">—</div></div>
       </div>
-      <div id="sync-debug" style="margin-top:12px;display:none">
-        <div class="divider"></div>
-        <div class="lbl" style="margin-bottom:6px">🔍 Диагностика типов операций</div>
-        <div id="sync-debug-table" style="font-size:10px;color:var(--t2);font-family:monospace;line-height:1.8;overflow-x:auto;white-space:pre"></div>
-      </div>
     </div>
   </div>
 
@@ -664,33 +659,11 @@ async function syncDoLoad(proxyBase, accountId, from) {
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
   save(); updatePosList(); renderChart(); renderLog();
 
-  // Объединяем _debug по всем счетам (суммируем cnt/sum)
-  var mergedDebug = {};
-  results.forEach(function(r) {
-    if (!r._debug) return;
-    Object.entries(r._debug).forEach(function(kv) {
-      var k = kv[0], v = kv[1];
-      if (!mergedDebug[k]) mergedDebug[k] = { count: 0, sum: 0, instrTypes: [] };
-      mergedDebug[k].count += v.count;
-      mergedDebug[k].sum += v.sum;
-      v.instrTypes.forEach(function(t) { if (!mergedDebug[k].instrTypes.includes(t)) mergedDebug[k].instrTypes.push(t); });
-    });
-  });
-
-  // Собираем _debugTrades из всех ответов (объединяем, сортируем по pnl)
-  var allDebugTrades = [];
-  results.forEach(function(r) { if (r._debugTrades) allDebugTrades = allDebugTrades.concat(r._debugTrades); });
-  allDebugTrades.sort(function(a,b){ return a.pnl - b.pnl; });
-  var mergedDebugTrades = allDebugTrades.slice(0,5).concat(allDebugTrades.slice(-5));
-
   return {
     entries: allNew,
     portfolioValue: totalPortfolio || null,
     syncedAt: results[0] ? results[0].syncedAt : new Date().toISOString(),
-    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; }),
-    _debug: Object.keys(mergedDebug).length ? mergedDebug : null,
-    _debugTrades: mergedDebugTrades.length ? mergedDebugTrades : null,
-    _v: results[0] ? results[0]._v : null
+    errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; })
   };
 }
 
@@ -703,29 +676,11 @@ async function syncNow() {
   document.getElementById('sync-result').style.display = 'none';
   try {
     var data = await syncDoLoad(proxy, accountId, from);
-    console.log('[PNL DEBUG]', JSON.stringify(data).slice(0, 2000));
     if (data.portfolioValue) { syncedPortfolio = data.portfolioValue; save(); updateTopDep(); }
     document.getElementById('sync-count').textContent = data.entries.length;
     document.getElementById('sync-portfolio').textContent = data.portfolioValue ? rubAbs(data.portfolioValue) : '—';
     document.getElementById('sync-time').textContent = new Date(data.syncedAt).toLocaleString('ru');
     document.getElementById('sync-result').style.display = 'block';
-    if (data._debug) {
-      var dbg = document.getElementById('sync-debug');
-      var tbl = document.getElementById('sync-debug-table');
-      var rows = ['=== Версия воркера: ' + (data._v || '?') + ' ===', ''];
-      rows = rows.concat(Object.entries(data._debug)
-        .sort(function(a,b){ return Math.abs(b[1].sum)-Math.abs(a[1].sum); })
-        .map(function(e){ return e[0].padEnd(52)+' cnt:'+String(e[1].count).padStart(4)+' sum:'+String(e[1].sum).padStart(10)+'₽  ['+e[1].instrTypes.join(',')+']'; }));
-      if (data._debugTrades && data._debugTrades.length) {
-        rows.push('');
-        rows.push('=== Топ-5 худших / топ-5 лучших торговых записей ===');
-        data._debugTrades.forEach(function(t){
-          rows.push(t.date + '  ' + String(Math.round(t.pnl)).padStart(10) + '₽  ' + (t.position||'').slice(0,40));
-        });
-      }
-      tbl.textContent = rows.join('\n');
-      dbg.style.display = 'block';
-    }
     var msg = '✓ Синхронизировано';
     if (data.errors && data.errors.length) msg += ' (ошибки: ' + data.errors.join('; ') + ')';
     syncMsg('sync-msg', msg, data.errors && data.errors.length ? '#FF8C42' : 'var(--pos)');

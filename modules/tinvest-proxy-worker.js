@@ -4,23 +4,18 @@
 //
 // 1. Прозрачный POST-прокси (для OI Signal):
 //    POST /<путь T-Invest API> — пересылает запрос как есть.
-//    Пример: POST /tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles
 //
 // 2. Высокоуровневые GET-маршруты (для Trading P&L Dashboard):
 //    GET /accounts            → список счетов [{id, name}]
 //    GET /sync?accountId=X&from=YYYY-MM-DD  → операции в формате entries
 //
-// Развёртывание (бесплатно, 5 минут):
+// Развёртывание:
 //   1. dash.cloudflare.com → Workers & Pages → Create Worker
-//   2. Дайте имя, например `tinvest-proxy`
-//   3. Edit code → вставьте этот файл → Deploy
-//   4. Скопируйте URL вида https://tinvest-proxy.<account>.workers.dev
-//   5. В OI Signal / Trading P&L вставьте этот URL в поле «T-Invest прокси»
-//
-// Безопасность: Worker не хранит токены. Authorization-заголовок
-// передаётся напрямую от браузера → Worker → T-Invest API.
+//   2. Edit code → вставьте этот файл → Deploy
+//   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
+const WORKER_VERSION = 'v7';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -28,10 +23,8 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
   'Access-Control-Max-Age': '86400'
 };
-
 const CORS_JSON = { ...CORS, 'Content-Type': 'application/json' };
 
-// MoneyValue {units: string, nano: number} → number
 function moneyVal(m) {
   if (!m) return 0;
   return (parseInt(m.units || '0', 10) + (m.nano || 0) / 1e9);
@@ -46,7 +39,6 @@ async function tiPost(path, body, auth) {
   return r.json();
 }
 
-// GET /accounts → [{id, name}]
 async function handleAccounts(auth) {
   const data = await tiPost('/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts', {}, auth);
   if (data.code || data.message) throw new Error(data.message || 'API error');
@@ -54,7 +46,6 @@ async function handleAccounts(auth) {
   return new Response(JSON.stringify(accounts), { status: 200, headers: CORS_JSON });
 }
 
-// Постраничный сбор операций за период
 async function fetchOps(accountId, from, to, auth) {
   let cursor = '';
   let items = [];
@@ -73,10 +64,6 @@ async function fetchOps(accountId, from, to, auth) {
   return items;
 }
 
-// GET /sync?accountId=X&from=YYYY-MM-DD
-// P&L считается методом FIFO: продал − себестоимость по FIFO.
-// Чтобы иметь базис для позиций, открытых до from, запрашиваем BUY-историю
-// на 2 года назад относительно from.
 async function handleSync(url, auth) {
   const accountId = url.searchParams.get('accountId');
   if (!accountId) return new Response(JSON.stringify({ error: 'accountId required' }), { status: 400, headers: CORS_JSON });
@@ -85,18 +72,15 @@ async function handleSync(url, auth) {
   const userFrom = fromStr ? fromStr : new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
   const to = new Date().toISOString();
 
-  // Для корректного FIFO нужен базис: загружаем историю на 5 лет назад относительно userFrom.
-  // Если записей нет — API вернёт пустой список, ошибки не будет.
+  // Загружаем 5 лет истории чтобы иметь FIFO-базис для позиций,
+  // открытых до начала отчётного периода.
   const basisFrom = new Date(userFrom);
   basisFrom.setFullYear(basisFrom.getFullYear() - 5);
-  const fetchFrom = basisFrom.toISOString().slice(0, 10);
+  const allItems = await fetchOps(accountId, basisFrom.toISOString().slice(0, 10) + 'T00:00:00Z', to, auth);
 
-  const allItems = await fetchOps(accountId, fetchFrom + 'T00:00:00Z', to, auth);
-
-  // Сортируем хронологически для FIFO
   allItems.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-  // Точные типы операций (объявляем здесь — используются и в проходе 1, и в проходе 2)
+  // Типы операций
   const STOCK_BUY  = new Set(['OPERATION_TYPE_BUY', 'OPERATION_TYPE_BUY_CARD', 'OPERATION_TYPE_BUY_MARGIN']);
   const STOCK_SELL = new Set(['OPERATION_TYPE_SELL', 'OPERATION_TYPE_SELL_CARD', 'OPERATION_TYPE_SELL_MARGIN']);
   const VAR_PLUS   = new Set(['OPERATION_TYPE_ACCRUING_VARMARGIN', 'OPERATION_TYPE_ACCRUING_VARMARGIN_DELIVERY']);
@@ -108,9 +92,9 @@ async function handleSync(url, auth) {
                                'OPERATION_TYPE_MARGIN_FEE', 'OPERATION_TYPE_OVERNIGHT',
                                'OPERATION_TYPE_BROKER_FEE_PROGRESSIVE', 'OPERATION_TYPE_SERVICE_FEE_PROGRESSIVE']);
 
-  // Проход 1: собираем figi фьючерсов/опционов по любому признаку.
-  // Varmargin-операции приходят без instrumentType — определяем фьючерс по наличию
-  // varmargin-записи для того же figi, либо по явному instrumentType.
+  // Проход 1: собираем figi фьючерсов по любому признаку.
+  // Varmargin-операции приходят без instrumentType — но их figi совпадает
+  // с figi BUY/SELL того же инструмента.
   const futuresFigis = new Set();
   for (const op of allItems) {
     const f = op.figi || op.instrumentUid || '';
@@ -119,14 +103,10 @@ async function handleSync(url, auth) {
     if (VAR_PLUS.has(op.type || '') || VAR_MINUS.has(op.type || '')) futuresFigis.add(f);
   }
 
-  // Два FIFO-стека на инструмент: длинные позиции и короткие
-  // longs[figi]  = [{qty, costPerUnit}]   — себестоимость лонга
-  // shorts[figi] = [{qty, procPerUnit}]   — выручка при открытии шорта
   const longs = {}, shorts = {};
-
-  const tradeMap = {};  // "date|name" → {date,position,pnl}
+  const tradeMap = {};
   const otherEntries = [];
-  const opStats = {};   // opType → {count, sum, instrTypes} — только для диагностики
+  const opStats = {};
 
   function addTrade(date, name, pnl) {
     const key = date + '|' + name;
@@ -135,7 +115,6 @@ async function handleSync(url, auth) {
   }
 
   function fifoConsume(queue, qty) {
-    // Списывает qty лотов из FIFO, возвращает {matched, valuePerUnit}
     let remaining = qty, value = 0;
     while (remaining > 0 && queue.length > 0) {
       const lot = queue[0];
@@ -148,26 +127,36 @@ async function handleSync(url, auth) {
     return { matched: qty - remaining, value };
   }
 
-
   for (const op of allItems) {
     const opType = op.type || '';
-    const figi = op.figi || op.instrumentUid || 'unknown';
+    const rawFigi = op.figi || op.instrumentUid || '';
+    const figi = rawFigi || ('_nofigi_' + opType);
     const qty = parseFloat(op.quantity || '0');
     const payment = moneyVal(op.payment);
     const date = op.date ? op.date.slice(0, 10) : '';
-    const name = op.name || figi;
+    const name = op.name || rawFigi || opType;
     const afterFrom = date >= userFrom;
-    // Вариационная маржа — реализованный P&L фьючерсов (instrumentType=null у этих операций)
+
+    // Статистика для диагностики
+    if (!opStats[opType]) opStats[opType] = { count: 0, sum: 0, instrTypes: new Set() };
+    opStats[opType].count++;
+    opStats[opType].sum += payment;
+    opStats[opType].instrTypes.add(op.instrumentType || '?');
+
+    // Вариационная маржа — реализованный P&L фьючерсов.
+    // instrumentType у этих операций null, проверяем по типу операции.
     if (VAR_PLUS.has(opType) || VAR_MINUS.has(opType)) {
       if (afterFrom) addTrade(date, name, payment);
 
-    // Фьючерсы/опционы: BUY/SELL пропускаем — payment там ≠ реальная стоимость сделки.
-    // Проверяем по futuresFigis (собранных на проходе 1), т.к. instrumentType может быть null.
-    } else if (futuresFigis.has(figi)) {
+    // Фьючерсы/опционы: пропускаем BUY/SELL — реальный P&L только в varmargin.
+    // Также пропускаем инструменты без figi — нельзя корректно вести FIFO.
+    // Также пропускаем SELL с нулевым payment — технические операции (pre-redemption).
+    } else if (futuresFigis.has(rawFigi) ||
+               op.instrumentType === 'futures' || op.instrumentType === 'option' ||
+               !rawFigi) {
       // skip
 
     } else if (STOCK_BUY.has(opType) && qty > 0) {
-      // Акции/облигации/ETF: FIFO — открываем лонг или закрываем шорт
       if (shorts[figi] && shorts[figi].length > 0) {
         const { matched, value: proceeds } = fifoConsume(shorts[figi], qty);
         if (afterFrom && matched > 0) {
@@ -184,7 +173,9 @@ async function handleSync(url, auth) {
       }
 
     } else if (STOCK_SELL.has(opType) && qty > 0) {
-      // Акции/облигации/ETF: FIFO — закрываем лонг или открываем шорт
+      // Пропускаем технические продажи с нулевым payment (pre-redemption clearing)
+      if (Math.abs(payment) < 0.01) continue;
+
       if (longs[figi] && longs[figi].length > 0) {
         const { matched, value: cost } = fifoConsume(longs[figi], qty);
         if (afterFrom && matched > 0) {
@@ -206,12 +197,6 @@ async function handleSync(url, auth) {
     } else if (afterFrom && FEE_TYPES.has(opType)) {
       otherEntries.push({ date, position: name, pnl: payment, type: 'fee', note: '' });
     }
-
-    // Собираем статистику по типам для диагностики
-    if (!opStats[opType]) opStats[opType] = { count: 0, sum: 0, instrTypes: new Set() };
-    opStats[opType].count++;
-    opStats[opType].sum += payment;
-    opStats[opType].instrTypes.add(op.instrumentType || '?');
   }
 
   let idx = 0;
@@ -224,7 +209,6 @@ async function handleSync(url, auth) {
     ...otherEntries.map(e => ({ id: ++idx, ...e, pnl: Math.round(e.pnl * 100) / 100 }))
   ].sort((a, b) => a.date.localeCompare(b.date));
 
-  // Стоимость портфеля
   let portfolioValue = null;
   try {
     const pd = await tiPost(
@@ -234,31 +218,24 @@ async function handleSync(url, auth) {
     portfolioValue = moneyVal(pd.totalAmountPortfolio);
   } catch (_) {}
 
-  // Сериализуем opStats (Set → Array для JSON)
   const debug = Object.fromEntries(
     Object.entries(opStats).map(([k, v]) => [k, {
-      count: v.count,
-      sum: Math.round(v.sum),
-      instrTypes: [...v.instrTypes]
+      count: v.count, sum: Math.round(v.sum), instrTypes: [...v.instrTypes]
     }])
   );
 
-  // Топ худших/лучших торговых записей для диагностики
   const sortedTrades = [...tradeEntries].sort((a, b) => a.pnl - b.pnl);
-  const debugTrades = [
-    ...sortedTrades.slice(0, 5),
-    ...sortedTrades.slice(-5)
-  ];
+  const debugTrades = [...sortedTrades.slice(0, 5), ...sortedTrades.slice(-5)];
 
   return new Response(
-    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(), _debug: debug, _debugTrades: debugTrades, _v: 'v6' }),
+    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(),
+                     _debug: debug, _debugTrades: debugTrades, _v: WORKER_VERSION }),
     { status: 200, headers: CORS_JSON }
   );
 }
 
 export default {
   async fetch(req) {
-    // CORS preflight
     if (req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS });
     }
@@ -266,7 +243,6 @@ export default {
     const url = new URL(req.url);
     const auth = req.headers.get('Authorization') || '';
 
-    // ── Высокоуровневые GET-маршруты для Trading P&L ──────────────────────────
     if (req.method === 'GET') {
       try {
         if (url.pathname === '/accounts') return await handleAccounts(auth);
@@ -277,11 +253,9 @@ export default {
       }
     }
 
-    // ── POST-прокси для OI Signal (прозрачная пересылка) ──────────────────────
     if (req.method !== 'POST') {
       return new Response('Only POST or GET allowed', { status: 405, headers: CORS });
     }
-
     if (!url.pathname.startsWith('/tinkoff.public.invest.api.contract.v')) {
       return new Response('Only T-Invest API paths allowed', { status: 403, headers: CORS });
     }
@@ -290,24 +264,15 @@ export default {
       const body = await req.text();
       const upstream = await fetch(TBASE + url.pathname, {
         method: 'POST',
-        headers: {
-          'Authorization': auth,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: { 'Authorization': auth, 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body
       });
-
       const respBody = await upstream.text();
       const respHeaders = new Headers(CORS);
       respHeaders.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json');
-
       return new Response(respBody, { status: upstream.status, headers: respHeaders });
     } catch (e) {
-      return new Response(JSON.stringify({ error: e.message }), {
-        status: 502,
-        headers: CORS_JSON
-      });
+      return new Response(JSON.stringify({ error: e.message }), { status: 502, headers: CORS_JSON });
     }
   }
 };
