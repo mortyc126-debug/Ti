@@ -15,7 +15,7 @@
 //   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
-const WORKER_VERSION = 'v11';
+const WORKER_VERSION = 'v12';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -267,9 +267,21 @@ async function handleSync(url, auth) {
     if (rawByFigi[f]) debugRaw[f] = rawByFigi[f];
   }
 
+  // Дамп первых 5 varmargin-операций чтобы видеть какие поля реально приходят
+  const debugVarSample = allItems
+    .filter(op => VAR_PLUS.has(op.type || '') || VAR_MINUS.has(op.type || ''))
+    .slice(0, 5)
+    .map(op => ({
+      type: op.type, date: (op.date||'').slice(0,10),
+      figi: op.figi||'', uid: op.instrumentUid||'', assetUid: op.assetUid||'',
+      name: op.name||'', instrType: op.instrumentType||'',
+      pay: Math.round(moneyVal(op.payment)), id: op.id||''
+    }));
+
   return new Response(
     JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(),
-                     _debug: debug, _debugTrades: debugTrades, _debugRaw: debugRaw, _v: WORKER_VERSION }),
+                     _debug: debug, _debugTrades: debugTrades, _debugRaw: debugRaw,
+                     _debugVarSample: debugVarSample, _v: WORKER_VERSION }),
     { status: 200, headers: CORS_JSON }
   );
 }

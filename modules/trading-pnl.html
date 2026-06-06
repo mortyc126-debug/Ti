@@ -678,6 +678,8 @@ async function syncDoLoad(proxyBase, accountId, from) {
     if (r._debugRaw) Object.assign(mergedDR, r._debugRaw);
   });
   allDT.sort(function(a,b){return a.pnl-b.pnl;});
+  var allVarSample = [];
+  results.forEach(function(r){ if (r._debugVarSample) allVarSample=allVarSample.concat(r._debugVarSample); });
 
   return {
     entries: allNew,
@@ -687,6 +689,7 @@ async function syncDoLoad(proxyBase, accountId, from) {
     _debug: Object.keys(mergedDebug).length ? mergedDebug : null,
     _debugTrades: allDT.length ? allDT.slice(0,5).concat(allDT.slice(-5)) : null,
     _debugRaw: Object.keys(mergedDR).length ? mergedDR : null,
+    _debugVarSample: allVarSample.length ? allVarSample : null,
     _v: results[0] ? results[0]._v : null
   };
 }
@@ -720,6 +723,12 @@ async function syncNow() {
       Object.entries(data._debugRaw).forEach(function(kv){
         rows.push('figi: '+kv[0]);
         kv[1].forEach(function(op){ rows.push('  '+op.d+' '+op.t.replace('OPERATION_TYPE_','').padEnd(18)+' qty:'+String(op.qty).padStart(5)+' pay:'+String(op.pay).padStart(9)+'₽ ['+op.it+'] '+op.n); });
+      });
+    }
+    if (data._debugVarSample && data._debugVarSample.length) {
+      rows.push(''); rows.push('--- поля varmargin-операций (сырые) ---');
+      data._debugVarSample.forEach(function(op){
+        rows.push(op.date+' pay:'+op.pay+'₽ figi:"'+op.figi+'" uid:"'+op.uid+'" assetUid:"'+op.assetUid+'" name:"'+op.name+'" id:"'+op.id+'"');
       });
     }
     document.getElementById('sync-debug-table').textContent = rows.join('\n');
