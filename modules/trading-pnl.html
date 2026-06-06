@@ -677,12 +677,20 @@ async function syncDoLoad(proxyBase, accountId, from) {
     });
   });
 
+  // Собираем _debugTrades из всех ответов (объединяем, сортируем по pnl)
+  var allDebugTrades = [];
+  results.forEach(function(r) { if (r._debugTrades) allDebugTrades = allDebugTrades.concat(r._debugTrades); });
+  allDebugTrades.sort(function(a,b){ return a.pnl - b.pnl; });
+  var mergedDebugTrades = allDebugTrades.slice(0,5).concat(allDebugTrades.slice(-5));
+
   return {
     entries: allNew,
     portfolioValue: totalPortfolio || null,
     syncedAt: results[0] ? results[0].syncedAt : new Date().toISOString(),
     errors: results.filter(function(r){ return r._error; }).map(function(r){ return r._error; }),
-    _debug: Object.keys(mergedDebug).length ? mergedDebug : null
+    _debug: Object.keys(mergedDebug).length ? mergedDebug : null,
+    _debugTrades: mergedDebugTrades.length ? mergedDebugTrades : null,
+    _v: results[0] ? results[0]._v : null
   };
 }
 
