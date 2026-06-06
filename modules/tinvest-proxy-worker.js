@@ -243,8 +243,15 @@ async function handleSync(url, auth) {
     }])
   );
 
+  // Топ худших/лучших торговых записей для диагностики
+  const sortedTrades = [...tradeEntries].sort((a, b) => a.pnl - b.pnl);
+  const debugTrades = [
+    ...sortedTrades.slice(0, 5),
+    ...sortedTrades.slice(-5)
+  ];
+
   return new Response(
-    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(), _debug: debug }),
+    JSON.stringify({ entries, portfolioValue, syncedAt: new Date().toISOString(), _debug: debug, _debugTrades: debugTrades, _v: 'v6' }),
     { status: 200, headers: CORS_JSON }
   );
 }
