@@ -15,7 +15,7 @@
 //   3. Скопируйте URL и вставьте в поле «T-Invest прокси»
 
 const TBASE = 'https://invest-public-api.tinkoff.ru/rest';
-const WORKER_VERSION = 'v10';
+const WORKER_VERSION = 'v11';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -96,11 +96,14 @@ async function handleSync(url, auth) {
   // Varmargin-операции приходят без instrumentType — но их figi совпадает
   // с figi BUY/SELL того же инструмента.
   const futuresFigis = new Set();
+  // figi → читаемое название из BUY/SELL-операций (у varmargin name обычно пустой)
+  const figiNames = {};
   for (const op of allItems) {
     const f = op.figi || op.instrumentUid || '';
     if (!f) continue;
     if (op.instrumentType === 'futures' || op.instrumentType === 'option') futuresFigis.add(f);
     if (VAR_PLUS.has(op.type || '') || VAR_MINUS.has(op.type || '')) futuresFigis.add(f);
+    if (op.name && !figiNames[f]) figiNames[f] = op.name;
   }
 
   const longs = {}, shorts = {};
@@ -136,7 +139,7 @@ async function handleSync(url, auth) {
     const payment = moneyVal(op.payment);
     const opPrice = moneyVal(op.price);  // цена исполнения за единицу
     const date = op.date ? op.date.slice(0, 10) : '';
-    const name = op.name || rawFigi || opType;
+    const name = op.name || figiNames[rawFigi] || rawFigi || opType;
     const afterFrom = date >= userFrom;
 
     // Статистика для диагностики
