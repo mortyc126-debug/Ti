@@ -7,789 +7,383 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:      #0B0613;
-  --panel:   #140A24;
-  --card:    #1A1030;
-  --input:   #0F081A;
-  --accent:  #FF006E;
-  --pos:     #52F2C9;
-  --neg:     #FF4D7A;
-  --warn:    #FFB86C;
-  --text:    #F2F0FF;
-  --text2:   #A79BC9;
-  --muted:   #6F648F;
-  --border:  rgba(255,255,255,0.06);
-  --mono:    'IBM Plex Mono', monospace;
-  --sans:    'Inter', sans-serif;
+  --bg:     #0B0613;
+  --panel:  #140A24;
+  --card:   #1A1030;
+  --acc:    #FF006E;
+  --pos:    #52F2C9;
+  --neg:    #FF4D7A;
+  --text:   #F2F0FF;
+  --text2:  #A79BC9;
+  --muted:  #6F648F;
+  --brd:    rgba(255,255,255,0.06);
+  --mono:   'IBM Plex Mono', monospace;
+  --sans:   'Inter', sans-serif;
 }
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);font-family:var(--sans);}
-
-/* Fix 1: dark scrollbars on shell itself */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);font-family:var(--sans)}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:#140A24}
 ::-webkit-scrollbar-thumb{background:#3d2d60;border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:#52F2C9}
-*{scrollbar-width:thin;scrollbar-color:#3d2d60 #140A24;}
+*{scrollbar-width:thin;scrollbar-color:#3d2d60 #140A24}
 
 /* ── TOPBAR ── */
 #topbar{
-  height:52px;display:flex;align-items:center;gap:0;padding:0 16px;
-  background:var(--panel);border-bottom:1px solid var(--border);
-  position:relative;z-index:200;flex-shrink:0;
+  height:48px;display:flex;align-items:center;gap:2px;padding:0 12px;
+  background:var(--panel);border-bottom:1px solid var(--brd);
+  position:relative;z-index:200;flex-shrink:0;overflow-x:auto;
+  scrollbar-width:none;
 }
-#logo{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);
-  letter-spacing:.04em;margin-right:20px;flex-shrink:0;cursor:pointer;}
-#logo span{color:var(--muted);}
+#topbar::-webkit-scrollbar{display:none}
+#logo{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--acc);
+  letter-spacing:.04em;margin-right:16px;flex-shrink:0;white-space:nowrap}
+#logo span{color:var(--muted)}
 
-/* Fix 4: drawer toggle button */
-#drawer-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;margin-right:8px;padding:4px 6px;}
-#drawer-btn:hover{color:var(--text);}
-
-#nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;position:relative;}
-#nav::-webkit-scrollbar{display:none;}
-
-/* Fix 3: compact tabs */
-.ntab{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:7px;
+.ntab{
+  display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:6px;
   font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;
-  border:1px solid transparent;background:none;font-family:var(--sans);transition:all .15s;
-  max-width:180px;}
-.ntab:hover{color:var(--text2);background:rgba(255,255,255,0.04);}
-.ntab.active{color:var(--text);background:rgba(255,0,110,0.12);border-color:rgba(255,0,110,0.2);}
-.ntab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;}
-.ntab.active .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
-.ntab .tlabel{overflow:hidden;text-overflow:ellipsis;max-width:12ch;display:inline-block;vertical-align:middle;}
-.ntab .close{margin-left:2px;opacity:0;font-size:14px;line-height:1;color:var(--muted);
-  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;}
-.ntab:hover .close{opacity:1;}
-.ntab .pop-btn{margin-left:2px;opacity:0;font-size:11px;line-height:1;color:var(--muted);
-  background:none;border:none;cursor:pointer;padding:0 2px;transition:opacity .15s;}
-.ntab:hover .pop-btn{opacity:1;}
-
-/* Fix 3: overflow button + menu */
-#nav-overflow-btn{
-  flex-shrink:0;background:none;border:1px solid var(--border);border-radius:6px;
-  color:var(--muted);cursor:pointer;font-size:13px;padding:3px 8px;margin-left:4px;
-  display:none;position:relative;
+  border:1px solid transparent;background:none;font-family:var(--sans);
+  transition:all .12s;flex-shrink:0
 }
-#nav-overflow-btn:hover{color:var(--text);background:rgba(255,255,255,0.05);}
-#nav-overflow-menu{
-  display:none;position:absolute;top:calc(100% + 6px);right:0;
-  background:var(--panel);border:1px solid var(--border);border-radius:8px;
-  min-width:160px;z-index:500;padding:4px 0;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);
-}
-#nav-overflow-menu.open{display:block;}
-.nov-item{
-  display:block;width:100%;text-align:left;background:none;border:none;
-  color:var(--text2);font-family:var(--sans);font-size:12px;
-  padding:6px 14px;cursor:pointer;white-space:nowrap;
-}
-.nov-item:hover{background:rgba(255,255,255,0.06);color:var(--text);}
-.nov-item.active{color:var(--accent);}
+.ntab:hover{color:var(--text2);background:rgba(255,255,255,.04)}
+.ntab.active{color:var(--text);background:rgba(255,0,110,.1);border-color:rgba(255,0,110,.22)}
+.ntab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.ntab.active .dot{background:var(--acc);box-shadow:0 0 6px var(--acc)}
+.ntab.loading .dot{background:var(--warn, #FFB86C);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-#topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;}
+#topbar-spacer{flex:1}
 
-.pill{display:flex;align-items:center;gap:6px;background:var(--card);
-  border:1px solid var(--border);border-radius:8px;padding:4px 10px;}
+#topbar-right{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px}
+.pill{display:flex;align-items:center;gap:5px;background:var(--card);
+  border:1px solid var(--brd);border-radius:7px;padding:3px 9px}
 .pill label{font-size:10px;color:var(--muted);font-family:var(--mono);
-  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
 .pill input{background:none;border:none;outline:none;color:var(--text);
-  font-family:var(--mono);font-size:12px;}
-.pill input::placeholder{color:var(--muted);}
-#ticker-input{width:76px;font-size:13px;font-weight:500;letter-spacing:.05em;}
-#token-input{width:88px;}
-#token-st{font-size:10px;font-family:var(--mono);}
-#token-st.ok{color:var(--pos);}
-#api-st{font-size:10px;font-family:var(--mono);}
-#api-st.ok{color:var(--pos);}
-#api-st.err{color:#ff4d6d;}
-#btn-go{background:rgba(255,0,110,0.14);border:1px solid rgba(255,0,110,0.25);
-  color:var(--accent);border-radius:5px;font-size:10px;padding:3px 7px;
-  cursor:pointer;font-family:var(--mono);transition:all .15s;}
-#btn-go:hover{background:rgba(255,0,110,0.24);}
+  font-family:var(--mono);font-size:12px}
+.pill input::placeholder{color:var(--muted)}
+#ticker-input{width:72px;font-size:13px;font-weight:500;letter-spacing:.05em}
+#token-input{width:80px}
+#token-st{font-size:10px;font-family:var(--mono)}
+#token-st.ok{color:var(--pos)}
+#btn-go{background:rgba(255,0,110,.14);border:1px solid rgba(255,0,110,.25);
+  color:var(--acc);border-radius:4px;font-size:10px;padding:2px 6px;
+  cursor:pointer;font-family:var(--mono)}
+#btn-go:hover{background:rgba(255,0,110,.24)}
 
-/* ── MAIN ── */
-#main{flex:1;overflow:hidden;display:flex;flex-direction:row;}
-#left-panel,#right-panel{
-  width:320px;flex-shrink:0;display:flex;flex-direction:column;
-  border-right:1px solid var(--border);position:relative;
-  transition:width .2s;
+/* ── FRAME AREA ── */
+#frame-area{
+  flex:1;position:relative;overflow:hidden
 }
-#right-panel{border-right:none;border-left:1px solid var(--border);}
-#left-panel.closed,#right-panel.closed{width:0;overflow:hidden;}
-.side-bar{
-  height:32px;display:flex;align-items:center;padding:0 8px;gap:6px;
-  background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;
+/* каждый модуль — iframe на всю площадь, скрытый по умолчанию */
+.mod-frame{
+  position:absolute;inset:0;width:100%;height:100%;
+  border:none;display:none
 }
-.side-bar span{font-family:var(--mono);font-size:10px;color:var(--muted);flex:1;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.side-close{background:none;border:none;color:var(--muted);cursor:pointer;
-  font-size:13px;padding:0 3px;}
-.side-close:hover{color:var(--text);}
-.side-frame{flex:1;border:none;display:block;width:100%;}
-#center{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}
-#frame-wrap{flex:1;position:relative;}
-#mod-frame{width:100%;height:100%;border:none;display:block;}
+.mod-frame.active{display:block}
 
-/* ── DROP ZONE ── */
-#dropzone{
-  position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:20px;
-  background:var(--bg);z-index:5;
+/* ── LOADING OVERLAY ── */
+.mod-loading{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);flex-direction:column;gap:12px;pointer-events:none;
+  font-size:13px;color:var(--muted);font-family:var(--mono)
 }
-#dropzone.hidden{display:none;}
-#drop-box{
-  width:440px;max-width:92vw;
-  border:2px dashed rgba(255,0,110,0.3);border-radius:16px;
-  padding:40px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;
-  transition:border-color .2s,background .2s;cursor:pointer;
-  background:rgba(255,0,110,0.03);
-}
-#drop-box.over{border-color:var(--accent);background:rgba(255,0,110,0.07);}
-#drop-icon{font-size:36px;opacity:.5;}
-#drop-title{font-size:16px;font-weight:500;color:var(--text);}
-#drop-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;}
-#file-list{width:440px;max-width:92vw;display:flex;flex-direction:column;gap:6px;}
-.fitem{display:flex;align-items:center;gap:10px;background:var(--card);
-  border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
-.fitem .fname{font-family:var(--mono);font-size:12px;color:var(--text);flex:1;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fitem .fbadge{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:4px;}
-.fitem .fbadge.ok{background:rgba(82,242,201,0.12);color:var(--pos);}
-#btn-open{
-  background:var(--accent);color:#fff;border:none;border-radius:8px;
-  padding:10px 28px;font-size:13px;font-weight:500;cursor:pointer;
-  font-family:var(--sans);transition:opacity .15s;opacity:.4;pointer-events:none;
-}
-#btn-open.ready{opacity:1;pointer-events:auto;}
-#btn-open.ready:hover{opacity:.88;}
-#file-input{display:none;}
+.mod-loading.done{display:none}
+.spinner{width:24px;height:24px;border:2px solid var(--brd);
+  border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);
-  background:var(--card);border:1px solid var(--border);border-radius:8px;
-  padding:7px 16px;font-size:12px;font-family:var(--mono);color:var(--text2);
-  transition:transform .25s cubic-bezier(.34,1.56,.64,1);z-index:9999;
-  white-space:nowrap;pointer-events:none;}
-#toast.show{transform:translateX(-50%) translateY(0);}
+#toast{
+  position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(50px);
+  background:var(--card);border:1px solid var(--brd);border-radius:7px;
+  padding:6px 14px;font-size:12px;font-family:var(--mono);color:var(--text2);
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1);z-index:9999;
+  white-space:nowrap;pointer-events:none
+}
+#toast.show{transform:translateX(-50%) translateY(0)}
 
 /* ── FLOATING WINDOWS ── */
-#win-layer{
-  position:fixed;inset:0;top:52px;pointer-events:none;z-index:100;
-}
+#win-layer{position:fixed;inset:0;top:48px;pointer-events:none;z-index:100}
 .fwin{
-  position:absolute;pointer-events:auto;
-  display:flex;flex-direction:column;
-  background:var(--card);border:1px solid rgba(255,255,255,0.1);
+  position:absolute;pointer-events:auto;display:flex;flex-direction:column;
+  background:var(--card);border:1px solid rgba(255,255,255,.1);
   border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6);
-  overflow:hidden;min-width:240px;min-height:140px;
+  overflow:hidden;min-width:240px;min-height:140px
 }
-.fwin.focused{border-color:rgba(255,0,110,0.35);box-shadow:0 8px 40px rgba(255,0,110,.15);}
+.fwin.focused{border-color:rgba(255,0,110,.35)}
 .fwin-bar{
-  height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  height:32px;display:flex;align-items:center;gap:6px;padding:0 10px;
   background:var(--panel);cursor:move;user-select:none;flex-shrink:0;
-  border-bottom:1px solid var(--border);
+  border-bottom:1px solid var(--brd)
 }
-.fwin-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);
-  box-shadow:0 0 5px var(--accent);flex-shrink:0;}
+.fwin-dot{width:5px;height:5px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 5px var(--acc);flex-shrink:0}
 .fwin-title{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fwin-btns{display:flex;align-items:center;gap:2px;flex-shrink:0;}
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fwin-btns{display:flex;align-items:center;gap:2px;flex-shrink:0}
 .fwbtn{width:22px;height:22px;border:none;background:none;cursor:pointer;
   color:var(--muted);border-radius:4px;font-size:12px;display:flex;
-  align-items:center;justify-content:center;transition:all .12s;}
-.fwbtn:hover{background:rgba(255,255,255,0.08);color:var(--text);}
-.fwin-body{flex:1;position:relative;overflow:hidden;}
-.fwin-body iframe{width:100%;height:100%;border:none;display:block;}
-.fwin.micro .fwin-body{display:none;}
-.fwin.micro{height:34px !important;min-height:34px;resize:none;}
-
-/* Fix 2: all-sides resize handles */
-.fwin-edge{position:absolute;z-index:10;}
-.fwin-edge.n{top:0;left:8px;right:8px;height:6px;cursor:n-resize;}
-.fwin-edge.s{bottom:0;left:8px;right:8px;height:6px;cursor:s-resize;}
-.fwin-edge.e{right:0;top:8px;bottom:8px;width:6px;cursor:e-resize;}
-.fwin-edge.w{left:0;top:8px;bottom:8px;width:6px;cursor:w-resize;}
-.fwin-edge.ne{top:0;right:0;width:10px;height:10px;cursor:ne-resize;}
-.fwin-edge.nw{top:0;left:0;width:10px;height:10px;cursor:nw-resize;}
-.fwin-edge.se{bottom:0;right:0;width:10px;height:10px;cursor:se-resize;}
-.fwin-edge.sw{bottom:0;left:0;width:10px;height:10px;cursor:sw-resize;}
-/* show corner indicator on hover */
-.fwin:hover .fwin-edge.se::after{
-  content:'';position:absolute;right:3px;bottom:3px;
-  width:8px;height:8px;
-  border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
-  border-radius:1px;
-}
-
-/* Fix 4: left drawer */
-.drawer{
-  position:fixed;left:0;top:52px;bottom:0;width:220px;
-  background:var(--panel);border-right:1px solid var(--border);
-  transform:translateX(-100%);transition:transform .2s;
-  z-index:150;display:flex;flex-direction:column;
-}
-.drawer.open{transform:translateX(0);}
-#drawer-header{
-  padding:10px 12px 8px;font-family:var(--mono);font-size:10px;
-  color:var(--muted);text-transform:uppercase;letter-spacing:.06em;
-  border-bottom:1px solid var(--border);flex-shrink:0;
-}
-#drawer-list{flex:1;overflow-y:auto;}
-.dmod{
-  display:flex;align-items:center;gap:6px;padding:7px 10px;
-  border-bottom:1px solid var(--border);cursor:pointer;font-size:11px;color:var(--text2);
-}
-.dmod:hover{background:rgba(255,255,255,0.04);color:var(--text);}
-.dmod-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dmod-btns{display:flex;gap:2px;margin-left:auto;}
-.dmod-btn{
-  background:none;border:none;color:var(--muted);cursor:pointer;
-  font-size:11px;padding:1px 4px;border-radius:3px;
-}
-.dmod-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);}
+  align-items:center;justify-content:center;transition:all .12s}
+.fwbtn:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.fwin-body{flex:1;position:relative;overflow:hidden}
+.fwin-body iframe{width:100%;height:100%;border:none;display:block}
+.fwin.micro .fwin-body{display:none}
+.fwin.micro{height:32px!important;min-height:32px;resize:none}
+.fwin-edge{position:absolute;z-index:10}
+.fwin-edge.n{top:0;left:8px;right:8px;height:6px;cursor:n-resize}
+.fwin-edge.s{bottom:0;left:8px;right:8px;height:6px;cursor:s-resize}
+.fwin-edge.e{right:0;top:8px;bottom:8px;width:6px;cursor:e-resize}
+.fwin-edge.w{left:0;top:8px;bottom:8px;width:6px;cursor:w-resize}
+.fwin-edge.ne{top:0;right:0;width:10px;height:10px;cursor:ne-resize}
+.fwin-edge.nw{top:0;left:0;width:10px;height:10px;cursor:nw-resize}
+.fwin-edge.se{bottom:0;right:0;width:10px;height:10px;cursor:se-resize}
+.fwin-edge.sw{bottom:0;left:0;width:10px;height:10px;cursor:sw-resize}
 </style>
 </head>
-<body style="display:flex;flex-direction:column;height:100%;">
-
-<!-- Fix 4: drawer -->
-<div class="drawer" id="drawer">
-  <div id="drawer-header">Модули</div>
-  <div id="drawer-list"></div>
-</div>
+<body style="display:flex;flex-direction:column;height:100%">
 
 <div id="topbar">
-  <!-- Fix 4: drawer toggle -->
-  <button id="drawer-btn" onclick="toggleDrawer()" title="Список модулей">≡</button>
-  <div id="logo" onclick="showDropzone()" title="Добавить модуль">MOEX<span>/</span>toolkit</div>
-  <nav id="nav"></nav>
-  <!-- Fix 3: overflow button with dropdown -->
-  <div style="position:relative;flex-shrink:0;">
-    <button id="nav-overflow-btn" onclick="toggleOverflowMenu()" title="Все модули">≡</button>
-    <div id="nav-overflow-menu"></div>
-  </div>
-  <button class="ntab" id="btn-add" onclick="showDropzone()"
-    style="color:var(--accent);border-color:rgba(255,0,110,0.2);background:rgba(255,0,110,0.05);flex-shrink:0">
-    ＋ модуль
-  </button>
+  <div id="logo">MOEX<span>/</span>toolkit</div>
+  <!-- вкладки генерируются JS -->
+  <div id="topbar-spacer"></div>
   <div id="topbar-right">
-    <div class="pill" title="Тикер — передаётся в активный модуль">
+    <div class="pill">
       <label>тикер</label>
       <input id="ticker-input" type="text" placeholder="SBER…"
         oninput="this.value=this.value.toUpperCase()"
         onkeydown="if(event.key==='Enter')sendTicker()">
       <button id="btn-go" onclick="sendTicker()">→</button>
     </div>
-    <div class="pill" title="Токен T-Invest — сохраняется и передаётся во все модули">
+    <div class="pill">
       <label>T-токен</label>
       <input id="token-input" type="password" placeholder="••••••••"
         oninput="onTokenInput(this.value)">
       <span id="token-st">—</span>
     </div>
-    <div class="pill" title="URL Cloudflare Worker с D1-базой данных">
-      <label>API</label>
-      <input id="api-url-input" type="text" placeholder="https://bondan-backend…workers.dev"
-        style="width:180px" oninput="onApiUrlInput(this.value)">
-      <span id="api-st">—</span>
-    </div>
   </div>
 </div>
 
-<div id="main">
-  <!-- левая боковая панель -->
-  <div id="left-panel" class="closed">
-    <div class="side-bar">
-      <span id="left-label">—</span>
-      <button class="side-close" onclick="closePanel('left')" title="Закрыть">✕</button>
-    </div>
-    <iframe id="left-frame" class="side-frame"></iframe>
-  </div>
-
-  <div id="center">
-  <div id="dropzone">
-    <div id="drop-box"
-      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
-      onclick="document.getElementById('file-input').click()">
-      <div id="drop-icon">📂</div>
-      <div id="drop-title">Перетащите файлы модулей сюда</div>
-      <div id="drop-sub">
-        Или нажмите чтобы выбрать файлы<br>
-        <span style="font-size:11px;opacity:.6">HTML-файлы появятся в навигации · кнопка ⧉ открывает модуль в плавающем окне</span>
-      </div>
-    </div>
-    <input id="file-input" type="file" accept=".html" multiple onchange="onFilePick(event)">
-    <div id="file-list"></div>
-    <button id="btn-open" onclick="openFirst()">Открыть</button>
-  </div>
-
-  <div id="frame-wrap" style="display:none;">
-    <iframe id="mod-frame"></iframe>
-  </div>
-  </div><!-- /center -->
-
-  <!-- правая боковая панель -->
-  <div id="right-panel" class="closed">
-    <div class="side-bar">
-      <span id="right-label">—</span>
-      <button class="side-close" onclick="closePanel('right')" title="Закрыть">✕</button>
-    </div>
-    <iframe id="right-frame" class="side-frame"></iframe>
-  </div>
-</div>
-
-<!-- слой плавающих окон -->
+<div id="frame-area"></div>
 <div id="win-layer"></div>
-
 <div id="toast"></div>
 
 <script>
-// ══ СОСТОЯНИЕ ══
-const KEY_TOKEN   = 't_api_token';
-const KEY_TICKER  = 'shared_ticker';
-const KEY_API_URL = 'shell_api_url';
+// ══ КОНФИГ ══
+// modules.json читается относительно shell.html.
+// Если недоступен — работает через ручную загрузку (drag-and-drop будущая фича).
+const KEY_TOKEN  = 't_api_token';
+const KEY_TICKER = 'shared_ticker';
 
-function onApiUrlInput(v) {
-  const url = v.trim().replace(/\/$/, '');
-  if (url) {
-    localStorage.setItem(KEY_API_URL, url);
-    checkApiStatus(url);
-  } else {
-    localStorage.removeItem(KEY_API_URL);
-    document.getElementById('api-st').textContent = '—';
-    document.getElementById('api-st').className = '';
-  }
-}
+// ══ APP-мост (window.APP) ══
+// Модуль в своём iframe может вызвать функцию другого модуля:
+//   window.parent.APP.call('debt', 'getMetrics', { inn: '...' })
+//   window.parent.APP.on('ticker', fn)          // подписка на смену тикера
+//   window.parent.APP.emit('ticker', 'SBER')    // сгенерировать событие
+window.APP = (function(){
+  const _modules  = {};   // id → { iframe, ready, api:{fnName→fn} }
+  const _subs     = {};   // event → [fn, ...]
+  const _queue    = {};   // id → [{fn,args,resolve}, ...]  (до готовности)
 
-async function checkApiStatus(url) {
-  const el = document.getElementById('api-st');
-  el.textContent = '…'; el.className = '';
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 5000);
-  try {
-    const r = await fetch((url || localStorage.getItem(KEY_API_URL) || '') + '/status', { signal: ctrl.signal });
-    clearTimeout(timer);
-    if (r.ok) { el.textContent = '✓'; el.className = 'ok'; }
-    else       { el.textContent = r.status; el.className = 'err'; }
-  } catch(e) {
-    clearTimeout(timer);
-    el.textContent = '✗'; el.className = 'err';
-    console.warn('API check failed:', e.message);
-  }
-}
+  return {
+    // Вызвать функцию другого модуля (возвращает Promise)
+    call: function(moduleId, fnName, args) {
+      return new Promise(function(resolve, reject) {
+        var m = _modules[moduleId];
+        if (!m) { reject('Module not found: ' + moduleId); return; }
+        if (m.ready && m.api[fnName]) {
+          try { resolve(m.api[fnName](args)); }
+          catch(e) { reject(e); }
+        } else {
+          // Ставим в очередь до готовности модуля
+          if (!_queue[moduleId]) _queue[moduleId] = [];
+          _queue[moduleId].push({ fn: fnName, args: args, resolve: resolve, reject: reject });
+        }
+      });
+    },
 
-let modules   = [];
-let activeIdx = -1;
+    // Подписаться на событие (ticker, token, custom)
+    on: function(event, fn) {
+      if (!_subs[event]) _subs[event] = [];
+      _subs[event].push(fn);
+    },
 
-// ══ ЗАГРУЗКА ФАЙЛОВ ══
-function labelFor(name) {
-  if (/v22/i.test(name))                return 'Сканер';
-  if (/indlab/i.test(name))             return 'Индикаторы';
-  if (/долг|nagruzka|debt/i.test(name)) return 'Долг';
-  if (/bond|облиг/i.test(name))         return 'Облигации';
-  if (/market|рынок/i.test(name))       return 'Рынок';
-  if (/report|отчёт/i.test(name))       return 'Отчётность';
-  if (/portfolio|портфель/i.test(name)) return 'Портфель';
-  if (/monte|карло/i.test(name))        return 'Монте-Карло';
-  return name.replace(/\.html?$/i, '');
-}
+    // Отписаться
+    off: function(event, fn) {
+      if (!_subs[event]) return;
+      _subs[event] = _subs[event].filter(function(f){ return f !== fn; });
+    },
 
-function patchHtml(html) {
-  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, SHELL_BRIDGE + '\n</body>');
-  return html + '\n' + SHELL_BRIDGE;
-}
+    // Сгенерировать событие (из шелла или модуля через shellNotify)
+    emit: function(event, data) {
+      (_subs[event] || []).forEach(function(fn){ try{ fn(data); }catch(e){} });
+    },
 
-// Загружаем iframe через Blob URL (работает везде: file://, rawgithack, localhost).
-// Blob URL изолирован от localStorage шелла — модуль должен использовать
-// window.db (postMessage-шина) для чтения/записи данных через шелл.
-function writeToFrame(frameEl, mod, onDone) {
-  const html = mod.html || '';
-  const blob = new Blob([html], { type: 'text/html' });
-  const burl = URL.createObjectURL(blob);
-  frameEl.onload = function() {
-    URL.revokeObjectURL(burl);
-    frameEl.onload = null;
-    if (onDone) onDone();
+    // Зарегистрировать модуль — вызывается из iframe модуля
+    _register: function(id, api) {
+      if (!_modules[id]) _modules[id] = { ready: false, api: {}, iframe: null };
+      _modules[id].api   = api || {};
+      _modules[id].ready = true;
+      // Разгрести очередь
+      var q = _queue[id] || [];
+      delete _queue[id];
+      q.forEach(function(item){
+        try { item.resolve((_modules[id].api[item.fn] || function(){})(item.args)); }
+        catch(e) { item.reject(e); }
+      });
+    },
+
+    // Внутреннее: зарегистрировать iframe при создании
+    _addFrame: function(id, iframeEl) {
+      if (!_modules[id]) _modules[id] = { ready: false, api: {}, iframe: null };
+      _modules[id].iframe = iframeEl;
+    },
+
+    modules: _modules,
   };
-  frameEl.src = burl;
+})();
+
+// ══ СОСТОЯНИЕ МОДУЛЕЙ ══
+var activeId   = null;
+var modConfigs = []; // из modules.json
+
+// ══ ЗАГРУЗКА КОНФИГА ══
+function loadModules() {
+  var base = location.href.replace(/\/[^/]*$/, '/');
+  fetch(base + 'modules.json')
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function(list){
+      modConfigs = list.filter(function(m){ return m.enabled !== false; });
+      buildFrames(base);
+      buildNav();
+      // Открыть первый модуль
+      if (modConfigs.length > 0) {
+        var saved = localStorage.getItem('shell_active_module');
+        var first = modConfigs.find(function(m){ return m.id === saved; }) || modConfigs[0];
+        showModule(first.id);
+      }
+    })
+    .catch(function(e){
+      console.error('modules.json not found:', e);
+      document.getElementById('frame-area').innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;' +
+        'font-family:monospace;color:#6F648F;font-size:13px">modules.json не найден</div>';
+    });
 }
 
-function addFiles(fileList) {
-  for (const f of fileList) {
-    if (!f.name.match(/\.html?$/i)) continue;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const html     = patchHtml(e.target.result);
-      const existing = modules.findIndex(m => m.name === f.name);
-      if (existing !== -1) {
-        // url не обнуляем — если был URL-модуль с тем же именем, оставляем URL
-        modules[existing] = { name: f.name, label: labelFor(f.name), html };
-        if (existing === activeIdx) openModule(existing);
-        toast(modules[existing].label + ' — обновлён');
-      } else {
-        modules.push({ name: f.name, label: labelFor(f.name), html });
-        if (modules.length === 1) openModule(0);
-      }
-      renderFileList();
-      rebuildNav();
+// ══ СОЗДАНИЕ IFRAME ДЛЯ КАЖДОГО МОДУЛЯ ══
+function buildFrames(base) {
+  var area = document.getElementById('frame-area');
+  modConfigs.forEach(function(mod) {
+    // Обёртка (для overlay загрузки)
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute;inset:0;display:none';
+    wrap.id = 'wrap-' + mod.id;
+
+    // Спиннер пока грузится
+    var loading = document.createElement('div');
+    loading.className = 'mod-loading';
+    loading.innerHTML = '<div class="spinner"></div><span>' + (mod.label || mod.id) + '…</span>';
+    loading.id = 'loading-' + mod.id;
+
+    var iframe = document.createElement('iframe');
+    iframe.className = 'mod-frame';
+    iframe.id = 'frame-' + mod.id;
+    iframe.title = mod.label || mod.id;
+
+    wrap.appendChild(loading);
+    wrap.appendChild(iframe);
+    area.appendChild(wrap);
+
+    APP._addFrame(mod.id, iframe);
+
+    // Загружаем src напрямую (тот же origin — rawgithack или localhost)
+    iframe.onload = function(){
+      document.getElementById('loading-' + mod.id).classList.add('done');
+      // Пушим токен/тикер
+      setTimeout(function(){ pushStateToFrame(iframe, true); }, 300);
+      // Обновляем точку в навбаре
+      var btn = document.getElementById('nav-' + mod.id);
+      if (btn) btn.classList.remove('loading');
     };
-    reader.readAsText(f, 'utf-8');
-  }
-}
-
-function renderFileList() {
-  const el = document.getElementById('file-list');
-  el.innerHTML = modules.map(m => `
-    <div class="fitem">
-      <span class="fname">${m.name}</span>
-      <span class="fbadge ok">готов</span>
-    </div>`).join('');
-  const btn = document.getElementById('btn-open');
-  if (modules.length > 0) btn.classList.add('ready');
-}
-
-function onDragOver(e)  { e.preventDefault(); e.currentTarget.classList.add('over'); }
-function onDragLeave(e) { e.currentTarget.classList.remove('over'); }
-function onDrop(e)      { e.preventDefault(); e.currentTarget.classList.remove('over'); addFiles(e.dataTransfer.files); }
-function onFilePick(e)  { addFiles(e.target.files); }
-function openFirst()    { if (modules.length) openModule(0); }
-
-// ══ ВСТРОЕННЫЕ МОДУЛИ (автозагрузка при старте) ══
-const BUILTIN_MODULES = [
-  { file: 'modules/reports-full.html', fallback: 'reports-full.html', label: 'Отчётность' },
-];
-
-function autoLoadBuiltins() {
-  const base = location.href.replace(/\/[^/]*$/, '/');
-  let pending = BUILTIN_MODULES.length;
-  if (!pending) return;
-  BUILTIN_MODULES.forEach(function(m) {
-    const urls = [base + m.file];
-    if (m.fallback) urls.push(base + m.fallback);
-    function tryNext(i) {
-      if (i >= urls.length) {
-        toast('Не найден модуль ' + m.label + ' — перетащите файл вручную');
-        showDropzone();
-        pending--; if (pending === 0) renderFileList();
-        return;
-      }
-      fetch(urls[i])
-        .then(function(r) { return r.ok ? r.text() : Promise.reject(r.status); })
-        .then(function(html) {
-          modules.push({ name: m.file, label: m.label, html: patchHtml(html) });
-          rebuildNav();
-          if (modules.length === 1) openModule(0);
-          pending--; if (pending === 0) renderFileList();
-        })
-        .catch(function() { tryNext(i + 1); });
-    }
-    tryNext(0);
+    iframe.src = base + mod.file;
   });
 }
 
-document.addEventListener('DOMContentLoaded', autoLoadBuiltins);
-
-// ══ НАВИГАЦИЯ (вкладки) ══
-function rebuildNav() {
-  const nav = document.getElementById('nav');
-  nav.innerHTML = '';
-  modules.forEach((m, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'ntab' + (i === activeIdx ? ' active' : '');
+// ══ НАВИГАЦИЯ ══
+function buildNav() {
+  var spacer = document.getElementById('topbar-spacer');
+  modConfigs.forEach(function(mod){
+    var btn = document.createElement('button');
+    btn.className = 'ntab loading';
+    btn.id = 'nav-' + mod.id;
     btn.innerHTML =
-      `<span class="dot"></span>` +
-      `<span class="tlabel" title="${m.label}">${m.label}</span>` +
-      `<button class="pop-btn" title="В левую панель"  onclick="event.stopPropagation();openPanel('left',${i})">◧</button>` +
-      `<button class="pop-btn" title="В правую панель" onclick="event.stopPropagation();openPanel('right',${i})">◨</button>` +
-      `<button class="pop-btn" title="Открыть в окне"  onclick="event.stopPropagation();openWindow(${i})">⧉</button>` +
-      `<button class="close"   title="Закрыть вкладку" onclick="event.stopPropagation();removeModule(${i})">×</button>`;
-    btn.onclick = () => openModule(i);
-    nav.appendChild(btn);
+      '<span class="dot"></span>' +
+      '<span>' + (mod.icon || '') + ' ' + (mod.label || mod.id) + '</span>' +
+      '<button style="margin-left:4px;opacity:0;background:none;border:none;color:#6F648F;' +
+      'cursor:pointer;font-size:11px;padding:0 2px;border-radius:3px" ' +
+      'title="Открыть в окне" ' +
+      'onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0" ' +
+      'onclick="event.stopPropagation();openWindow(\'' + mod.id + '\')">⧉</button>';
+    btn.onclick = function(){ showModule(mod.id); };
+    spacer.parentNode.insertBefore(btn, spacer);
   });
+}
 
-  // Fix 3: overflow indicator
-  requestAnimationFrame(() => {
-    const overflowBtn = document.getElementById('nav-overflow-btn');
-    if (nav.scrollWidth > nav.clientWidth + 4) {
-      overflowBtn.style.display = 'block';
-    } else {
-      overflowBtn.style.display = 'none';
-    }
-    rebuildOverflowMenu();
+function showModule(id) {
+  activeId = id;
+  localStorage.setItem('shell_active_module', id);
+
+  // Показываем нужный wrap, скрываем остальные
+  modConfigs.forEach(function(m){
+    var wrap = document.getElementById('wrap-' + m.id);
+    if (wrap) wrap.style.display = (m.id === id) ? 'block' : 'none';
+    var btn  = document.getElementById('nav-' + m.id);
+    if (btn) btn.classList.toggle('active', m.id === id);
   });
-
-  // Fix 4: rebuild drawer
-  rebuildDrawer();
-}
-
-// Fix 3: overflow dropdown
-function rebuildOverflowMenu() {
-  const menu = document.getElementById('nav-overflow-menu');
-  menu.innerHTML = modules.map((m, i) =>
-    `<button class="nov-item${i === activeIdx ? ' active' : ''}" onclick="openModule(${i});closeOverflowMenu()">${m.label}</button>`
-  ).join('');
-}
-
-function toggleOverflowMenu() {
-  document.getElementById('nav-overflow-menu').classList.toggle('open');
-}
-
-function closeOverflowMenu() {
-  document.getElementById('nav-overflow-menu').classList.remove('open');
-}
-
-// Close overflow menu on outside click
-document.addEventListener('click', function(e) {
-  const btn = document.getElementById('nav-overflow-btn');
-  const menu = document.getElementById('nav-overflow-menu');
-  if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
-    menu.classList.remove('open');
-  }
-});
-
-// Fix 4: drawer toggle + rebuild
-function toggleDrawer() {
-  document.getElementById('drawer').classList.toggle('open');
-}
-
-function rebuildDrawer() {
-  const list = document.getElementById('drawer-list');
-  if (!list) return;
-  list.innerHTML = modules.map((m, i) => `
-    <div class="dmod">
-      <span class="dmod-name" title="${m.label}">${m.label}</span>
-      <div class="dmod-btns">
-        <button class="dmod-btn" title="Открыть" onclick="openModule(${i});document.getElementById('drawer').classList.remove('open')">↗</button>
-        <button class="dmod-btn" title="В левую панель" onclick="openPanel('left',${i})">◧</button>
-        <button class="dmod-btn" title="В правую панель" onclick="openPanel('right',${i})">◨</button>
-        <button class="dmod-btn" title="Открыть в окне" onclick="openWindow(${i})">⧉</button>
-      </div>
-    </div>`).join('');
-}
-
-function showDropzone() {
-  document.getElementById('dropzone').classList.remove('hidden');
-  document.getElementById('frame-wrap').style.display = 'none';
-}
-
-function openModule(idx) {
-  if (idx < 0 || idx >= modules.length) return;
-  activeIdx = idx;
-  document.getElementById('dropzone').classList.add('hidden');
-  const fw = document.getElementById('frame-wrap');
-  fw.style.display = 'block';
-  const frame = document.getElementById('mod-frame');
-  frame.addEventListener('load', () => setTimeout(() => pushState(frame, true), 400), { once: true });
-  writeToFrame(frame, modules[idx]);
-  rebuildNav();
-}
-
-function removeModule(idx) {
-  modules.splice(idx, 1);
-  if (activeIdx >= modules.length) activeIdx = modules.length - 1;
-  rebuildNav();
-  if (modules.length === 0) {
-    document.getElementById('frame-wrap').style.display = 'none';
-    document.getElementById('dropzone').classList.remove('hidden');
-    document.getElementById('file-list').innerHTML = '';
-    document.getElementById('btn-open').classList.remove('ready');
-  } else {
-    openModule(activeIdx);
-  }
 }
 
 // ══ ОБЩЕЕ СОСТОЯНИЕ → iframe ══
-// silent=true: передать только токен, тикер не трогать (не запускать автопоиск при загрузке)
-function pushState(frameEl, silent) {
-  const target = frameEl || document.getElementById('mod-frame');
-  if (!target || !target.contentWindow) return;
+function pushStateToFrame(frameEl, silent) {
+  if (!frameEl || !frameEl.contentWindow) return;
   try {
-    target.contentWindow.postMessage({
+    frameEl.contentWindow.postMessage({
       type:   'SHELL_STATE',
       token:  localStorage.getItem(KEY_TOKEN)  || '',
       ticker: silent ? '' : (localStorage.getItem(KEY_TICKER) || ''),
-      apiUrl: localStorage.getItem('bondan_girbo_proxy') || localStorage.getItem(KEY_API_URL) || '',
       silent: !!silent,
     }, '*');
   } catch(e) {}
 }
 
-function pushStateToAll() {
-  pushState(document.getElementById('mod-frame'));
-  document.querySelectorAll('.fwin iframe, .side-frame').forEach(f => pushState(f));
-}
-
-// ══ БОКОВЫЕ ПАНЕЛИ ══
-const panelState = { left: -1, right: -1 };
-
-function openPanel(side, modIdx) {
-  const m = modules[modIdx];
-  if (!m) return;
-  panelState[side] = modIdx;
-  const panel = document.getElementById(side + '-panel');
-  const frame = document.getElementById(side + '-frame');
-  const label = document.getElementById(side + '-label');
-  panel.classList.remove('closed');
-  label.textContent = m.label;
-  frame.addEventListener('load', () => setTimeout(() => pushState(frame, true), 400), { once: true });
-  writeToFrame(frame, m);
-  toast(m.label + ' → ' + (side === 'left' ? 'левая' : 'правая') + ' панель');
-}
-
-function closePanel(side) {
-  panelState[side] = -1;
-  document.getElementById(side + '-panel').classList.add('closed');
-  const frame = document.getElementById(side + '-frame');
-  const doc = frame.contentDocument || frame.contentWindow.document;
-  doc.open(); doc.write(''); doc.close();
-}
-
-// ══ ШИНА ДАННЫХ ══
-// Shell — единственный владелец localStorage. Модули читают/пишут через него.
-// Это гарантирует консистентность и позволяет рассылать уведомления всем.
-
-function dbGetAllFrames() {
-  const frames = [];
-  const mf = document.getElementById('mod-frame');
-  if (mf && mf.contentWindow) frames.push(mf.contentWindow);
-  document.querySelectorAll('.fwin iframe, .side-frame').forEach(f => {
-    if (f.contentWindow) frames.push(f.contentWindow);
+function pushStateToAll(silent) {
+  modConfigs.forEach(function(m){
+    var f = document.getElementById('frame-' + m.id);
+    if (f) pushStateToFrame(f, silent);
   });
-  return frames;
+  document.querySelectorAll('.fwin iframe').forEach(function(f){
+    pushStateToFrame(f, silent);
+  });
 }
-
-function dbBroadcast(msg, except) {
-  dbGetAllFrames().forEach(w => { if (w !== except) try { w.postMessage(msg, '*'); } catch(e){} });
-}
-
-// Читает из localStorage (кеш). Если промахнулись и есть воркер — идёт в D1.
-function dbHandleRead(d, source) {
-  let value = null;
-  try {
-    const raw = localStorage.getItem(d.key);
-    value = raw ? JSON.parse(raw) : null;
-  } catch(e) { value = localStorage.getItem(d.key); }
-  try { source.postMessage({ type: 'DB_RESPONSE', reqId: d.reqId, key: d.key, value }, '*'); } catch(e) {}
-}
-
-// Пишет в localStorage и рассылает уведомление всем модулям.
-function dbHandleWrite(d, source) {
-  try {
-    localStorage.setItem(d.key, typeof d.value === 'string' ? d.value : JSON.stringify(d.value));
-  } catch(e) { console.warn('DB_WRITE failed:', e); return; }
-  dbBroadcast({ type: 'DB_NOTIFY', key: d.key }, source);
-}
-
-// Структурированные запросы — сначала кеш, потом воркер (D1).
-async function dbHandleQuery(d, source) {
-  const apiUrl = localStorage.getItem(KEY_API_URL);
-  let result = null;
-
-  // ── Маппинг kind → endpoint воркера ──────────────────────────────
-  const endpointMap = {
-    'issuer':            inn  => `/issuer/${inn}`,
-    'issuer_reports':    inn  => `/issuer/${inn}/reports`,
-    'issuer_bonds':      inn  => `/bond/issuer?inn=${inn}`,
-    'issuer_affiliations': inn => `/issuer/${inn}/affiliations`,
-    'bond_latest':       p    => `/bond/latest?${new URLSearchParams(p)}`,
-    'stock_latest':      p    => `/stock/latest?${new URLSearchParams(p)}`,
-    'issuer_by_inn':     p    => `/issuer/${p.inn}`,
-    'issuer_by_name':    p    => `/issuer/search?name=${encodeURIComponent(p.name)}`,
-    'issuer_list':       ()   => `/bond/latest?limit=2000&board=TQCB`,
-  };
-
-  const p = d.params || {};
-
-  // Попытка через воркер если URL задан
-  if (apiUrl && endpointMap[d.kind]) {
-    try {
-      const path = typeof endpointMap[d.kind] === 'function'
-        ? endpointMap[d.kind](p.inn || p)
-        : endpointMap[d.kind];
-      const resp = await fetch(apiUrl + path, { signal: AbortSignal.timeout(8000) });
-      if (resp.ok) {
-        result = await resp.json();
-        // Кешируем результат в localStorage
-        try { localStorage.setItem('db_cache_' + d.kind + '_' + (p.inn||''), JSON.stringify({ t: Date.now(), v: result })); } catch(_) {}
-      }
-    } catch(e) {
-      // Нет сети — берём из кеша
-      try {
-        const cached = JSON.parse(localStorage.getItem('db_cache_' + d.kind + '_' + (p.inn||'')) || 'null');
-        if (cached) result = cached.v;
-      } catch(_) {}
-    }
-  }
-
-  // Фоллбек: ищем в reportsDB (localStorage) если воркер не настроен
-  if (result === null) {
-    try {
-      const store = JSON.parse(localStorage.getItem('ba_v2') || '{}');
-      const rdb = store.reportsDB || {};
-      if (d.kind === 'issuer_by_inn') {
-        const e = Object.entries(rdb).find(([,v]) => v.inn === p.inn);
-        result = e ? { inn: e[1].inn, name: e[1].name, ind: e[1].ind } : null;
-      } else if (d.kind === 'issuer_by_name') {
-        const e = Object.entries(rdb).find(([,v]) =>
-          (v.name||'').toLowerCase().includes((p.name||'').toLowerCase()));
-        result = e ? { inn: e[1].inn, name: e[1].name, ind: e[1].ind } : null;
-      } else if (d.kind === 'issuer_list') {
-        result = Object.entries(rdb).map(([id,v]) => ({
-          id, name: v.name, inn: v.inn, ind: v.ind,
-          periods: Object.keys(v.periods||{}).length
-        }));
-      } else if (d.kind === 'issuer_reports') {
-        const e = Object.entries(rdb).find(([,v]) => v.inn === p.inn);
-        result = e ? Object.values(e[1].periods||{}) : null;
-      }
-    } catch(_) {}
-  }
-
-  try { source.postMessage({ type: 'DB_RESPONSE', reqId: d.reqId, kind: d.kind, value: result }, '*'); } catch(e) {}
-}
-
-window.addEventListener('message', e => {
-  const d = e.data;
-  if (!d) return;
-
-  // Шина данных
-  if (d.type === 'DB_READ')  { dbHandleRead(d, e.source);  return; }
-  if (d.type === 'DB_WRITE') { dbHandleWrite(d, e.source); return; }
-  if (d.type === 'DB_QUERY') { dbHandleQuery(d, e.source); return; }
-
-  if (d.type === 'MODULE_EVENT') {
-    if (d.action === 'SET_TICKER' && d.ticker) {
-      const t = String(d.ticker).trim().toUpperCase();
-      if (!isValidTicker(t)) return;
-      document.getElementById('ticker-input').value = t;
-      localStorage.setItem(KEY_TICKER, t);
-      toast('Тикер: ' + t);
-      pushStateToAll();
-    }
-    if (d.action === 'SET_TOKEN' && d.token) {
-      onTokenInput(d.token);
-      document.getElementById('token-input').value = '';
-      toast('Токен сохранён');
-    }
-  }
-});
 
 function sendTicker() {
-  const v = document.getElementById('ticker-input').value.trim().toUpperCase();
+  var v = document.getElementById('ticker-input').value.trim().toUpperCase();
   if (!v) return;
   localStorage.setItem(KEY_TICKER, v);
-  pushStateToAll();
+  pushStateToAll(false);
+  APP.emit('ticker', v);
   toast('Тикер ' + v + ' → все модули');
 }
 
 function onTokenInput(v) {
   v = v.trim();
-  const st = document.getElementById('token-st');
+  var st = document.getElementById('token-st');
   if (v) {
     localStorage.setItem(KEY_TOKEN, v);
     localStorage.setItem('tinkoff_token', v);
     st.textContent = '✓'; st.className = 'ok';
-    pushStateToAll();
+    pushStateToAll(true);
   } else {
     localStorage.removeItem(KEY_TOKEN);
     localStorage.removeItem('tinkoff_token');
@@ -797,334 +391,188 @@ function onTokenInput(v) {
   }
 }
 
+// ══ СООБЩЕНИЯ ОТ МОДУЛЕЙ ══
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if (!d) return;
+
+  // Модуль регистрирует своё API
+  if (d.type === 'APP_REGISTER') {
+    APP._register(d.id, d.api || {});
+    return;
+  }
+
+  // Модуль хочет вызвать функцию другого модуля
+  if (d.type === 'APP_CALL') {
+    APP.call(d.target, d.fn, d.args).then(function(result){
+      try { e.source.postMessage({ type: 'APP_CALL_RESULT', reqId: d.reqId, result: result }, '*'); } catch(_){}
+    }).catch(function(err){
+      try { e.source.postMessage({ type: 'APP_CALL_RESULT', reqId: d.reqId, error: String(err) }, '*'); } catch(_){}
+    });
+    return;
+  }
+
+  // Стандартные события
+  if (d.type === 'MODULE_EVENT') {
+    if (d.action === 'SET_TICKER' && d.ticker) {
+      var t = String(d.ticker).trim().toUpperCase();
+      if (!/^[A-Za-z][A-Za-z0-9\-]{0,11}$/.test(t)) return;
+      document.getElementById('ticker-input').value = t;
+      localStorage.setItem(KEY_TICKER, t);
+      pushStateToAll(false);
+      APP.emit('ticker', t);
+    }
+    if (d.action === 'SET_TOKEN' && d.token) {
+      onTokenInput(d.token);
+      document.getElementById('token-input').value = '';
+    }
+    if (d.action === 'APP_EMIT' && d.event) {
+      APP.emit(d.event, d.data);
+    }
+  }
+});
+
 // ══ ПЛАВАЮЩИЕ ОКНА ══
-let _zTop = 10;
-const wins = {};   // id → { el, frameEl, micro }
+var _zTop = 10;
+var _wins = {};
 
-function openWindow(modIdx, opts) {
+function openWindow(modId, opts) {
   opts = opts || {};
-  const m = modules[modIdx];
-  if (!m) return;
-  const id  = 'w' + Date.now();
-  const w   = opts.w || 560;
-  const h   = opts.h || 480;
-  const x   = opts.x || (80 + Object.keys(wins).length * 28);
-  const y   = opts.y || (80 + Object.keys(wins).length * 28);
+  var mod = modConfigs.find(function(m){ return m.id === modId; });
+  if (!mod) return;
 
-  const el = document.createElement('div');
+  var id  = 'w' + Date.now();
+  var w   = opts.w || 600;
+  var h   = opts.h || 500;
+  var x   = opts.x || 80 + Object.keys(_wins).length * 24;
+  var y   = opts.y || 80 + Object.keys(_wins).length * 24;
+  var base = location.href.replace(/\/[^/]*$/, '/');
+
+  var el = document.createElement('div');
   el.className = 'fwin';
   el.id = id;
-  el.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;z-index:${++_zTop}`;
+  el.style.cssText = 'left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;z-index:'+( ++_zTop);
 
-  // Fix 2: 8 resize handles
   el.innerHTML =
-    `<div class="fwin-bar">` +
-      `<div class="fwin-dot"></div>` +
-      `<div class="fwin-title">${m.label}</div>` +
-      `<div class="fwin-btns">` +
-        `<button class="fwbtn" title="Свернуть/развернуть" onclick="toggleMicro('${id}')">▭</button>` +
-        `<button class="fwbtn" title="Дублировать"         onclick="dupWindow('${id}',${modIdx})">⧉</button>` +
-        `<button class="fwbtn" title="Закрыть"             onclick="closeWindow('${id}')">✕</button>` +
-      `</div>` +
-    `</div>` +
-    `<div class="fwin-body">` +
-      `<iframe></iframe>` +
-    `</div>` +
-    `<div class="fwin-edge n"  data-dir="n"></div>` +
-    `<div class="fwin-edge s"  data-dir="s"></div>` +
-    `<div class="fwin-edge e"  data-dir="e"></div>` +
-    `<div class="fwin-edge w"  data-dir="w"></div>` +
-    `<div class="fwin-edge ne" data-dir="ne"></div>` +
-    `<div class="fwin-edge nw" data-dir="nw"></div>` +
-    `<div class="fwin-edge se" data-dir="se"></div>` +
-    `<div class="fwin-edge sw" data-dir="sw"></div>`;
+    '<div class="fwin-bar">' +
+      '<div class="fwin-dot"></div>' +
+      '<div class="fwin-title">' + (mod.icon||'') + ' ' + mod.label + '</div>' +
+      '<div class="fwin-btns">' +
+        '<button class="fwbtn" title="Свернуть" onclick="toggleMicro(\''+id+'\')">▭</button>' +
+        '<button class="fwbtn" title="Закрыть"  onclick="closeWindow(\''+id+'\')">✕</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="fwin-body"><iframe></iframe></div>' +
+    '<div class="fwin-edge n"  data-dir="n"></div><div class="fwin-edge s" data-dir="s"></div>' +
+    '<div class="fwin-edge e"  data-dir="e"></div><div class="fwin-edge w" data-dir="w"></div>' +
+    '<div class="fwin-edge ne" data-dir="ne"></div><div class="fwin-edge nw" data-dir="nw"></div>' +
+    '<div class="fwin-edge se" data-dir="se"></div><div class="fwin-edge sw" data-dir="sw"></div>';
 
   document.getElementById('win-layer').appendChild(el);
 
-  const frameEl = el.querySelector('iframe');
-  frameEl.addEventListener('load', () => setTimeout(() => pushState(frameEl), 400), { once: true });
-  writeToFrame(frameEl, m);
+  var iframe = el.querySelector('iframe');
+  iframe.onload = function(){ setTimeout(function(){ pushStateToFrame(iframe, true); }, 300); };
+  iframe.src = base + mod.file;
 
-  wins[id] = { el, frameEl, micro: false };
-
-  // фокус при клике
-  el.addEventListener('mousedown', () => focusWindow(id));
-
-  // drag за titlebar
+  _wins[id] = { el: el, iframe: iframe, micro: false };
+  el.addEventListener('mousedown', function(){ focusWindow(id); });
   makeDraggable(el, el.querySelector('.fwin-bar'));
-
-  // Fix 2: resize all 8 handles
-  el.querySelectorAll('.fwin-edge').forEach(handle => {
-    makeResizable(el, handle, handle.dataset.dir);
-  });
-
+  el.querySelectorAll('.fwin-edge').forEach(function(h){ makeResizable(el, h, h.dataset.dir); });
   focusWindow(id);
-  toast(m.label + ' → окно');
+  toast((mod.icon||'') + ' ' + mod.label + ' → окно');
 }
 
 function focusWindow(id) {
-  const w = wins[id];
-  if (!w) return;
-  Object.values(wins).forEach(x => x.el.classList.remove('focused'));
-  w.el.style.zIndex = ++_zTop;
-  w.el.classList.add('focused');
+  Object.values(_wins).forEach(function(w){ w.el.classList.remove('focused'); });
+  if (_wins[id]) { _wins[id].el.style.zIndex = ++_zTop; _wins[id].el.classList.add('focused'); }
 }
 
 function closeWindow(id) {
-  const w = wins[id];
-  if (!w) return;
-  w.el.remove();
-  delete wins[id];
+  if (_wins[id]) { _wins[id].el.remove(); delete _wins[id]; }
 }
 
 function toggleMicro(id) {
-  const w = wins[id];
-  if (!w) return;
+  var w = _wins[id]; if (!w) return;
   w.micro = !w.micro;
   w.el.classList.toggle('micro', w.micro);
   w.el.querySelector('.fwbtn').textContent = w.micro ? '↕' : '▭';
 }
 
-function dupWindow(id, modIdx) {
-  const w = wins[id];
-  if (!w) return;
-  const r = w.el.getBoundingClientRect();
-  openWindow(modIdx, { x: r.left + 28, y: r.top + 28, w: r.width, h: r.height });
-}
-
-// drag
 function makeDraggable(el, handle) {
-  let ox, oy;
-  handle.addEventListener('mousedown', e => {
+  var ox, oy;
+  handle.addEventListener('mousedown', function(e){
     if (e.target.tagName === 'BUTTON') return;
     e.preventDefault();
-    ox = e.clientX - el.offsetLeft;
-    oy = e.clientY - el.offsetTop;
-    const onMove = e => {
-      el.style.left = Math.max(0, e.clientX - ox) + 'px';
-      el.style.top  = Math.max(0, e.clientY - oy) + 'px';
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
+    ox = e.clientX - el.offsetLeft; oy = e.clientY - el.offsetTop;
+    function onMove(e){ el.style.left = Math.max(0,e.clientX-ox)+'px'; el.style.top = Math.max(0,e.clientY-oy)+'px'; }
+    function onUp(){ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
 }
 
-// Fix 2: resize with direction support
 function makeResizable(el, handle, dir) {
-  handle.addEventListener('mousedown', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX, startY = e.clientY;
-    const startW = el.offsetWidth, startH = el.offsetHeight;
-    const startL = el.offsetLeft, startT = el.offsetTop;
-    const onMove = e => {
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      let newL = startL, newT = startT, newW = startW, newH = startH;
-      if (dir === 'e'  || dir === 'ne' || dir === 'se') newW = Math.max(240, startW + dx);
-      if (dir === 'w'  || dir === 'nw' || dir === 'sw') { newW = Math.max(240, startW - dx); newL = startL + startW - newW; }
-      if (dir === 's'  || dir === 'se' || dir === 'sw') newH = Math.max(140, startH + dy);
-      if (dir === 'n'  || dir === 'ne' || dir === 'nw') { newH = Math.max(140, startH - dy); newT = startT + startH - newH; }
-      el.style.left   = newL + 'px';
-      el.style.top    = newT + 'px';
-      el.style.width  = newW + 'px';
-      el.style.height = newH + 'px';
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault(); e.stopPropagation();
+    var sx=e.clientX, sy=e.clientY, sw=el.offsetWidth, sh=el.offsetHeight, sl=el.offsetLeft, st=el.offsetTop;
+    function onMove(e){
+      var dx=e.clientX-sx, dy=e.clientY-sy, nw=sw, nh=sh, nl=sl, nt=st;
+      if (/e/.test(dir)) nw = Math.max(240, sw+dx);
+      if (/w/.test(dir)) { nw = Math.max(240, sw-dx); nl = sl+sw-nw; }
+      if (/s/.test(dir)) nh = Math.max(140, sh+dy);
+      if (/n/.test(dir)) { nh = Math.max(140, sh-dy); nt = st+sh-nh; }
+      el.style.cssText = 'left:'+nl+'px;top:'+nt+'px;width:'+nw+'px;height:'+nh+'px;z-index:'+el.style.zIndex;
+    }
+    function onUp(){ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   });
 }
 
 // ══ TOAST ══
-let _tt;
+var _tt;
 function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
   clearTimeout(_tt);
-  _tt = setTimeout(() => el.classList.remove('show'), 2200);
+  _tt = setTimeout(function(){ el.classList.remove('show'); }, 2200);
 }
 
-// Тикер валидный: ≤12 символов, без пробелов, только латиница/цифры/дефис
-// Отсекает полные названия компаний («Публичное акционерное общество...»)
-function isValidTicker(v) {
-  if (!v) return false;
-  const s = String(v).trim();
-  return s.length <= 12 && !/\s/.test(s) && /^[A-Za-z0-9\-]+$/.test(s);
-}
-
-// ══ ИНИЦИАЛИЗАЦИЯ ══
-(function init() {
-  const tok    = localStorage.getItem(KEY_TOKEN);
-  const ticker = localStorage.getItem(KEY_TICKER);
-  const apiUrl = localStorage.getItem(KEY_API_URL);
-  if (tok)    { document.getElementById('token-st').textContent = '✓';
-                document.getElementById('token-st').className = 'ok'; }
-  if (isValidTicker(ticker)) { document.getElementById('ticker-input').value = ticker; }
-  if (apiUrl) {
-    document.getElementById('api-url-input').value = apiUrl;
-    checkApiStatus(apiUrl).then(() => syncPushToD1(apiUrl));
-  }
-})();
-
-// При старте пушим накопленный reportsDB в D1 — молча, в фоне.
-// Повторные запуски безопасны: ON CONFLICT DO UPDATE не затирает D1-данные
-// если пользовательское значение null, а D1 уже знает.
-async function syncPushToD1(apiUrl) {
-  try {
-    const raw = localStorage.getItem('ba_v2');
-    if (!raw) return;
-    const store = JSON.parse(raw);
-    const rdb = store.reportsDB;
-    if (!rdb || !Object.keys(rdb).length) return;
-    const r = await fetch(apiUrl + '/sync/push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reportsDB: rdb }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (r.ok) {
-      const res = await r.json();
-      console.log('[shell] sync/push →', res);
-      if (res.issuers || res.periods)
-        toast(`Синхронизировано с D1: ${res.issuers} эмитентов, ${res.periods} периодов`);
-    }
-  } catch(e) { console.warn('[shell] sync/push failed:', e.message); }
-}
-
-// ══ МОСТ — вставляется в каждый модуль автоматически ══
-// Слушает SHELL_STATE, пробрасывает токен/тикер в поля модуля.
-// Отвечает MODULE_EVENT когда модуль хочет обновить общий тикер/токен.
-// Fix 1: injected dark scrollbar CSS with hardcoded colors (vars not available in iframe)
-const SHELL_BRIDGE = `<script>
+// ══ INIT ══
 (function(){
-  // Вставляем тёмные скроллбары в iframe
-  (function(){
-    var s = document.createElement('style');
-    s.textContent = '::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#140A24}::-webkit-scrollbar-thumb{background:#3d2d60;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#52F2C9}*{scrollbar-width:thin;scrollbar-color:#3d2d60 #140A24;}';
-    document.head.appendChild(s);
-  })();
-
-  window.addEventListener('message', function(e){
-    var d = e.data;
-    if (!d || d.type !== 'SHELL_STATE') return;
-    if (d.token) {
-      localStorage.setItem('t_api_token', d.token);
-      localStorage.setItem('tinkoff_token', d.token);
-      ['tApiToken','chart-token','tApiTokenInput'].forEach(function(id){
-        var el = document.getElementById(id);
-        if (el && !el.value) el.value = d.token;
-      });
-    }
-    if (d.ticker && !d.silent) {
-      setTimeout(function(){ _shellApplyTicker(d.ticker); }, 200);
-    } else if (d.ticker && d.silent) {
-      // тихий режим — только заполнить поле, без автозапуска поиска
-      var ids = ['chart-ticker','qinput','ticker-input','search-input'];
-      ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.value=d.ticker; });
-    }
-  });
-
-  function _shellApplyTicker(ticker) {
-    var ids = ['chart-ticker','qinput','ticker-input','search-input'];
-    ids.forEach(function(id){
-      var el = document.getElementById(id);
-      if (el) el.value = ticker;
-    });
-    if (typeof selectedQuery    !== 'undefined') selectedQuery    = ticker;
-    if (typeof selectedOrigQ    !== 'undefined') selectedOrigQ    = ticker;
-    if (typeof chartLoad === 'function') setTimeout(chartLoad, 300);
-    if (typeof go        === 'function') setTimeout(go, 300);
+  var tok    = localStorage.getItem(KEY_TOKEN);
+  var ticker = localStorage.getItem(KEY_TICKER);
+  if (tok) { document.getElementById('token-st').textContent = '✓'; document.getElementById('token-st').className = 'ok'; }
+  if (ticker && /^[A-Za-z][A-Za-z0-9\-]{0,11}$/.test(ticker.trim())) {
+    document.getElementById('ticker-input').value = ticker;
   }
-
-  // API для модуля: сообщить оболочке о смене тикера/токена
-  window.shellNotify = function(action, data) {
-    try { window.parent.postMessage(Object.assign({ type:'MODULE_EVENT', action:action }, data), '*'); }
-    catch(e) {}
-  };
-
-  // ══ window.db — единая шина данных ══
-  // Все обращения идут через shell (parent), который владеет localStorage.
-  // Это гарантирует что данные одинаковые во всех модулях одновременно.
-  (function(){
-    var _pending = {};  // reqId → {resolve, reject}
-    var _subs    = {};  // key → [callback, ...]
-    var _reqSeq  = 1;
-
-    window.addEventListener('message', function(e) {
-      var d = e.data;
-      if (!d) return;
-      if (d.type === 'DB_RESPONSE' && d.reqId && _pending[d.reqId]) {
-        _pending[d.reqId].resolve(d.value);
-        delete _pending[d.reqId];
-      }
-      if (d.type === 'DB_NOTIFY' && d.key && _subs[d.key]) {
-        _subs[d.key].forEach(function(cb){ try { cb(d.key); } catch(e){} });
-      }
-    });
-
-    function send(msg) {
-      return new Promise(function(resolve, reject) {
-        if (!msg.reqId) { window.parent.postMessage(msg, '*'); resolve(null); return; }
-        _pending[msg.reqId] = { resolve: resolve, reject: reject };
-        setTimeout(function(){ if(_pending[msg.reqId]){ delete _pending[msg.reqId]; reject('timeout'); }}, 5000);
-        window.parent.postMessage(msg, '*');
-      });
-    }
-
-    window.db = {
-      // Прочитать ключ localStorage (возвращает Promise)
-      get: function(key) {
-        return send({ type: 'DB_READ', reqId: 'r' + _reqSeq++, key: key });
-      },
-      // Записать ключ (данные попадут во все модули через DB_NOTIFY)
-      set: function(key, value) {
-        return send({ type: 'DB_WRITE', key: key, value: value });
-      },
-      // Структурированный запрос: kind = 'issuer_by_inn' | 'issuer_by_name' | 'issuer_list'
-      query: function(kind, params) {
-        return send({ type: 'DB_QUERY', reqId: 'q' + _reqSeq++, kind: kind, params: params || {} });
-      },
-      // Подписаться на изменения ключа
-      on: function(key, cb) {
-        if (!_subs[key]) _subs[key] = [];
-        _subs[key].push(cb);
-      },
-      // Отписаться
-      off: function(key, cb) {
-        if (!_subs[key]) return;
-        _subs[key] = _subs[key].filter(function(f){ return f !== cb; });
-      },
-    };
-  })();
-
-  // Перехват буфера обмена — если скопировали тикер или ISIN, шлём в shell
-  document.addEventListener('copy', function() {
-    setTimeout(function() {
-      try {
-        navigator.clipboard.readText().then(function(txt) {
-          var s = (txt || '').trim();
-          // Тикер: ≤10 символов, только латиница/цифры/дефис
-          // ISIN: 12 символов, начинается с 2 букв
-          var isTicker = /^[A-Za-z][A-Za-z0-9\-]{0,9}$/.test(s);
-          var isIsin   = /^[A-Z]{2}[A-Z0-9]{10}$/.test(s);
-          if (isTicker || isIsin) {
-            window.shellNotify('SET_TICKER', { ticker: s });
-          }
-        }).catch(function(){});
-      } catch(e) {}
-    }, 50);
-  });
+  loadModules();
 })();
-<\/script>`;
 </script>
+
+<!-- ══ SHELL_BRIDGE — вставляется в каждый модуль при необходимости ══
+     В данном шелле модули загружаются напрямую по URL, мост инжектируется
+     через postMessage. Если модуль хочет зарегистрировать API — он делает:
+
+       window.parent.postMessage({
+         type: 'APP_REGISTER',
+         id:   'debt',               // свой id из modules.json
+         api:  { getMetrics: function(){ ... } }
+       }, '*');
+
+     Или короче (вставить в конец модуля):
+
+       if (window.parent !== window) {
+         window.parent.postMessage({ type:'APP_REGISTER', id:'debt', api:{ getMetrics } }, '*');
+       }
+
+     Вызвать функцию другого модуля (из любого модуля):
+
+       window.parent.APP.call('reports', 'getIssuers').then(function(list){ ... });
+
+     Подписаться на смену тикера:
+
+       if (window.parent !== window) window.parent.APP.on('ticker', function(t){ ... });
+-->
 </body>
 </html>
