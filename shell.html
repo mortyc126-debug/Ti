@@ -244,32 +244,32 @@ window.APP = (function(){
   };
 })();
 
+// ══ СПИСОК МОДУЛЕЙ ══
+// Редактировать здесь: добавить/убрать/переименовать модули.
+// file — путь относительно shell.html (они должны лежать рядом).
+var MODULES_CONFIG = [
+  { id: 'reports',  file: 'reports-full (51).html', label: 'Отчётность',      icon: '📂' },
+  { id: 'debt',     file: 'debt_v7.html',            label: 'Долговая нагрузка', icon: '📊' },
+  { id: 'oisignal', file: 'oi-signal-v3.html',       label: 'OI Signal',        icon: '📡' },
+  // { id: 'indlab', file: 'indlab_v10 (1).html',   label: 'ИндикаторЛаб',    icon: '🧪' },
+  // { id: 'futures', file: 'v22Срочный_рынок (4).html', label: 'Срочный рынок', icon: '⚡' },
+];
+
 // ══ СОСТОЯНИЕ МОДУЛЕЙ ══
 var activeId   = null;
-var modConfigs = []; // из modules.json
+var modConfigs = [];
 
-// ══ ЗАГРУЗКА КОНФИГА ══
+// ══ ЗАПУСК ══
 function loadModules() {
   var base = location.href.replace(/\/[^/]*$/, '/');
-  fetch(base + 'modules.json')
-    .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function(list){
-      modConfigs = list.filter(function(m){ return m.enabled !== false; });
-      buildFrames(base);
-      buildNav();
-      // Открыть первый модуль
-      if (modConfigs.length > 0) {
-        var saved = localStorage.getItem('shell_active_module');
-        var first = modConfigs.find(function(m){ return m.id === saved; }) || modConfigs[0];
-        showModule(first.id);
-      }
-    })
-    .catch(function(e){
-      console.error('modules.json not found:', e);
-      document.getElementById('frame-area').innerHTML =
-        '<div style="display:flex;align-items:center;justify-content:center;height:100%;' +
-        'font-family:monospace;color:#6F648F;font-size:13px">modules.json не найден</div>';
-    });
+  modConfigs = MODULES_CONFIG;
+  buildFrames(base);
+  buildNav();
+  if (modConfigs.length > 0) {
+    var saved = localStorage.getItem('shell_active_module');
+    var first = modConfigs.find(function(m){ return m.id === saved; }) || modConfigs[0];
+    showModule(first.id);
+  }
 }
 
 // ══ СОЗДАНИЕ IFRAME ДЛЯ КАЖДОГО МОДУЛЯ ══
