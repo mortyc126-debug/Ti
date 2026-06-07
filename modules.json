@@ -1,0 +1,30 @@
+[
+  {
+    "id": "reports",
+    "file": "reports-full (51).html",
+    "label": "Отчётность",
+    "icon": "📂",
+    "enabled": true
+  },
+  {
+    "id": "debt",
+    "file": "debt_v7.html",
+    "label": "Долговая нагрузка",
+    "icon": "📊",
+    "enabled": true
+  },
+  {
+    "id": "oisignal",
+    "file": "oi-signal-v3.html",
+    "label": "OI Signal",
+    "icon": "📡",
+    "enabled": true
+  },
+  {
+    "id": "indlab",
+    "file": "indlab_v10 (1).html",
+    "label": "ИндикаторЛаб",
+    "icon": "🧪",
+    "enabled": false
+  }
+]
