@@ -215,20 +215,40 @@ function cors() {
   </div>
 </div>
 
-<!-- Ticker editor (collapsible) -->
-<div id="tickerEditorWrap" style="display:none;background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:12px;margin-bottom:10px;">
-  <div class="sec" style="margin-bottom:8px;">Редактор тикеров</div>
-  <div id="tickerEditorRows" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;margin-bottom:8px;"></div>
-  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-    <input id="newTickerT" class="inp" placeholder="Тикер" style="width:80px;">
-    <select class="select-inp" id="newTickerType">
-      <option value="stocks">Акции (TQBR)</option>
-      <option value="futures">Фьючерсы (FORTS)</option>
-      <option value="currency">Валюта (CETS)</option>
-    </select>
-    <input id="newTickerFigi" class="inp" placeholder="FIGI/UID (T-Invest)" style="width:180px;">
-    <input id="newTickerName" class="inp" placeholder="Название" style="width:140px;">
-    <button class="btn-sm" onclick="addTicker()">+ Добавить</button>
+<!-- Ticker panel -->
+<div class="ticker-panel" id="tickerPanel">
+  <div class="ticker-panel-hdr" onclick="toggleTickerPanel()">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;" id="pinnedChips">
+      <!-- pinned chips rendered here -->
+    </div>
+    <span style="font-size:10px;color:var(--txt3);white-space:nowrap;margin-left:6px;" id="tickerPanelChev">▼ тикеры</span>
+  </div>
+  <div class="ticker-panel-body" id="tickerPanelBody" style="display:none;">
+    <!-- Search + tabs -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <input class="inp" id="tickerSearch" placeholder="🔍 Поиск тикера или названия..." style="flex:1;min-width:200px;" oninput="renderCatalog()">
+      <div style="display:flex;gap:3px;" id="catTabs">
+        <button class="btn-ghost active" data-cat="" onclick="selectCatTab(this,'')">Все</button>
+        <button class="btn-ghost" data-cat="stocks" onclick="selectCatTab(this,'stocks')">Акции</button>
+        <button class="btn-ghost" data-cat="futures" onclick="selectCatTab(this,'futures')">Фьючерсы</button>
+        <button class="btn-ghost" data-cat="currency" onclick="selectCatTab(this,'currency')">Валюта</button>
+        <button class="btn-ghost" data-cat="index" onclick="selectCatTab(this,'index')">Индексы</button>
+      </div>
+    </div>
+    <div id="catalogGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px;max-height:260px;overflow-y:auto;"></div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:10px;color:var(--txt3);">Добавить свой:</span>
+      <input id="custT" class="inp" placeholder="ТИКЕР" style="width:80px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <select class="select-inp" id="custType">
+        <option value="stocks">Акции</option>
+        <option value="futures">Фьючерсы</option>
+        <option value="currency">Валюта</option>
+        <option value="index">Индекс</option>
+      </select>
+      <input id="custName" class="inp" placeholder="Название" style="width:130px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <input id="custFigi" class="inp" placeholder="FIGI/UID" style="width:160px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <button class="btn-sm" onclick="addCustomTicker()">+ Добавить</button>
+    </div>
   </div>
 </div>
 
@@ -389,6 +409,65 @@ const METHODS = [
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
 ];
 
+const CATALOG = [
+  // Акции TQBR
+  {t:'SBER',  cat:'stocks',  name:'Сбербанк',      sector:'Банки'},
+  {t:'GAZP',  cat:'stocks',  name:'Газпром',        sector:'Нефтегаз'},
+  {t:'LKOH',  cat:'stocks',  name:'Лукойл',         sector:'Нефтегаз'},
+  {t:'ROSN',  cat:'stocks',  name:'Роснефть',       sector:'Нефтегаз'},
+  {t:'NVTK',  cat:'stocks',  name:'Новатэк',        sector:'Нефтегаз'},
+  {t:'VTBR',  cat:'stocks',  name:'ВТБ',            sector:'Банки'},
+  {t:'TCSG',  cat:'stocks',  name:'Т-Банк',         sector:'Банки'},
+  {t:'BSPB',  cat:'stocks',  name:'Банк СПБ',       sector:'Банки'},
+  {t:'GMKN',  cat:'stocks',  name:'Норникель',      sector:'Металлы'},
+  {t:'CHMF',  cat:'stocks',  name:'Северсталь',     sector:'Металлы'},
+  {t:'NLMK',  cat:'stocks',  name:'НЛМК',           sector:'Металлы'},
+  {t:'RUAL',  cat:'stocks',  name:'РУСАЛ',          sector:'Металлы'},
+  {t:'PLZL',  cat:'stocks',  name:'Полюс',          sector:'Металлы'},
+  {t:'ALRS',  cat:'stocks',  name:'АЛРОСА',         sector:'Металлы'},
+  {t:'YNDX',  cat:'stocks',  name:'Яндекс',         sector:'Технологии'},
+  {t:'VKCO',  cat:'stocks',  name:'ВКонтакте',      sector:'Технологии'},
+  {t:'POSI',  cat:'stocks',  name:'Позитив',        sector:'Технологии'},
+  {t:'OZON',  cat:'stocks',  name:'Ozon',           sector:'Технологии'},
+  {t:'TATN',  cat:'stocks',  name:'Татнефть',       sector:'Нефтегаз'},
+  {t:'SNGS',  cat:'stocks',  name:'Сургутнефтегаз', sector:'Нефтегаз'},
+  {t:'MGNT',  cat:'stocks',  name:'Магнит',         sector:'Ритейл'},
+  {t:'FIVE',  cat:'stocks',  name:'X5 Retail',      sector:'Ритейл'},
+  {t:'MTSS',  cat:'stocks',  name:'МТС',            sector:'Телеком'},
+  {t:'RTKM',  cat:'stocks',  name:'Ростелеком',     sector:'Телеком'},
+  {t:'AFLT',  cat:'stocks',  name:'Аэрофлот',       sector:'Транспорт'},
+  {t:'FLOT',  cat:'stocks',  name:'Совкомфлот',     sector:'Транспорт'},
+  {t:'PIKK',  cat:'stocks',  name:'ПИК',            sector:'Строительство'},
+  {t:'SMLT',  cat:'stocks',  name:'Самолёт',        sector:'Строительство'},
+  {t:'AFKS',  cat:'stocks',  name:'АФК Система',    sector:'Холдинги'},
+  {t:'IRAO',  cat:'stocks',  name:'Интер РАО',      sector:'Энергетика'},
+  {t:'FEES',  cat:'stocks',  name:'ФСК ЕЭС',        sector:'Энергетика'},
+  {t:'HYDR',  cat:'stocks',  name:'РусГидро',       sector:'Энергетика'},
+  {t:'CBOM',  cat:'stocks',  name:'Совкомбанк',     sector:'Банки'},
+  // Индексы
+  {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс'},
+  {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс'},
+  {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс'},
+  // Фьючерсы FORTS
+  {t:'SiH5',  cat:'futures', name:'USD/RUB',         sector:'Валюта'},
+  {t:'EuH5',  cat:'futures', name:'EUR/RUB',         sector:'Валюта'},
+  {t:'CNH5',  cat:'futures', name:'CNY/RUB',         sector:'Валюта'},
+  {t:'RIH5',  cat:'futures', name:'RTS индекс',      sector:'Индекс'},
+  {t:'MXH5',  cat:'futures', name:'МосБиржа',        sector:'Индекс'},
+  {t:'GDH5',  cat:'futures', name:'Золото',          sector:'Сырьё'},
+  {t:'SVH5',  cat:'futures', name:'Серебро',         sector:'Сырьё'},
+  {t:'BRH5',  cat:'futures', name:'Brent',           sector:'Сырьё'},
+  {t:'NGH5',  cat:'futures', name:'Газ (Henry Hub)', sector:'Сырьё'},
+  {t:'GZH5',  cat:'futures', name:'Газпром фьюч',   sector:'Акции'},
+  {t:'SRH5',  cat:'futures', name:'Сбербанк фьюч',  sector:'Акции'},
+  {t:'LKH5',  cat:'futures', name:'Лукойл фьюч',    sector:'Акции'},
+  {t:'GKH5',  cat:'futures', name:'Норникель фьюч', sector:'Акции'},
+  // Валюта CETS
+  {t:'USD000UTSTOM', cat:'currency', name:'Доллар США',  sector:'Валюта'},
+  {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
+  {t:'CNY000000TOM', cat:'currency', name:'Юань',        sector:'Валюта'},
+];
+
 // ============================================================
 // STATE
 // ============================================================
@@ -398,15 +477,8 @@ let curTF = '1min';
 let autoInterval = 60;
 let autoTimer = null;
 
-let tickers = [
-  {t:'SBER', type:'stocks',  name:'Сбербанк',  f:''},
-  {t:'GAZP', type:'stocks',  name:'Газпром',   f:''},
-  {t:'LKOH', type:'stocks',  name:'Лукойл',    f:''},
-  {t:'VTBR', type:'stocks',  name:'ВТБ',       f:''},
-  {t:'YNDX', type:'stocks',  name:'Яндекс',    f:''},
-  {t:'SiM5', type:'futures', name:'Si фьючерс',f:''},
-  {t:'RIM5', type:'futures', name:'RTS фьючерс',f:''},
-];
+let tickers = [];
+let pinnedTickers = ['SBER','GAZP','LKOH','SiH5']; // default pins
 
 // Rolling history per ticker (last 100 bars each source)
 let tsHistory = [];   // tradestats bars
@@ -1308,7 +1380,7 @@ function toggleCollapsible(id){
 // ============================================================
 function toggleProxyHelp(){
   const el = document.getElementById('proxyHelpBox');
-  el.style.display = el.style.display==='none'?'':'none';
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
 }
 function copyWorkerCode(){
   const code = document.getElementById('workerCodeEl').textContent;
