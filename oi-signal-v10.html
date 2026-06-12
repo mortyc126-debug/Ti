@@ -1083,31 +1083,51 @@ function renderCandleChart(candles){
   if(!candles || !candles.length){
     area.style.height='200px'; area.innerHTML='<span>Нет свечей</span>'; return;
   }
-  area.innerHTML = ''; area.style.height = '200px';
+  area.innerHTML = ''; area.style.height = '220px';
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'width:100%;height:200px;';
+  canvas.style.cssText = 'width:100%;height:220px;';
   area.appendChild(canvas);
   if(candleChart) candleChart.destroy();
-  const slice = candles.slice(-80);
+  const slice = candles.slice(-60);
   const labels = slice.map(c=>{
     const d = new Date(c.time);
     if(curTF==='1d') return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
     return d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   });
-  const closes = slice.map(c=>toP(c.close));
-  const opens  = slice.map(c=>toP(c.open));
-  const colors = closes.map((c,i)=>c>=opens[i]?'rgba(82,242,201,0.65)':'rgba(255,77,122,0.65)');
+  const O = slice.map(c=>toP(c.open));
+  const H = slice.map(c=>toP(c.high));
+  const L = slice.map(c=>toP(c.low));
+  const C = slice.map(c=>toP(c.close));
+  const bull = O.map((_,i)=>C[i]>=O[i]);
+  // Floating bar: body = [min(O,C), max(O,C)]
+  const bodyData = O.map((_,i)=>[Math.min(O[i],C[i]), Math.max(O[i],C[i])]);
+  const bodyColors = bull.map(b=>b?'rgba(82,242,201,0.85)':'rgba(255,77,122,0.85)');
+  // Wick = [L, H] rendered as thin bar behind body
+  const wickData = L.map((_,i)=>[L[i],H[i]]);
+  const wickColors = bull.map(b=>b?'rgba(82,242,201,0.4)':'rgba(255,77,122,0.4)');
+  // Y range with small padding
+  const allPrices = [...H,...L].filter(Boolean);
+  const yMin = Math.min(...allPrices)*0.9995;
+  const yMax = Math.max(...allPrices)*1.0005;
   candleChart = new Chart(canvas,{
     type:'bar',
-    data:{labels,datasets:[{label:'Close',data:closes,backgroundColor:colors,borderColor:colors,borderWidth:1,borderRadius:2}]},
+    data:{labels, datasets:[
+      {label:'Wick', data:wickData, backgroundColor:wickColors, barPercentage:0.15, categoryPercentage:1},
+      {label:'Body', data:bodyData, backgroundColor:bodyColors, borderColor:bodyColors, borderWidth:1, barPercentage:0.6, categoryPercentage:1, borderRadius:1},
+    ]},
     options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{
-        callbacks:{label:(ctx)=>{const c=slice[ctx.dataIndex];return[`O:${toP(c.open).toFixed(2)}`,`H:${toP(c.high).toFixed(2)}`,`L:${toP(c.low).toFixed(2)}`,`C:${toP(c.close).toFixed(2)}`];}},
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false}, tooltip:{
+        callbacks:{label:(ctx)=>{ if(ctx.datasetIndex!==1) return null;
+          const c=slice[ctx.dataIndex];
+          return [`O:${toP(c.open).toFixed(2)}`,`H:${toP(c.high).toFixed(2)}`,`L:${toP(c.low).toFixed(2)}`,`C:${toP(c.close).toFixed(2)}`];
+        }},
         backgroundColor:'#1A1030',borderColor:'rgba(255,0,128,0.3)',borderWidth:1,titleColor:'#F2F0FF',bodyColor:'#A79BC9'
       }},
-      scales:{x:{display:true,ticks:{color:'#6F648F',font:{size:9},maxRotation:0,maxTicksLimit:10}},
-              y:{display:true,ticks:{color:'#6F648F',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}
+      scales:{
+        x:{stacked:false, display:true, ticks:{color:'#6F648F',font:{size:9},maxRotation:0,maxTicksLimit:10}, grid:{display:false}},
+        y:{stacked:false, display:true, min:yMin, max:yMax, ticks:{color:'#6F648F',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}}
+      }
     }
   });
 }
@@ -1118,9 +1138,11 @@ function renderCandleChart(candles){
 function renderTsPanel(){
   if(!tsHistory.length){ document.getElementById('tsPanel').innerHTML='<div style="font-size:10px;color:var(--txt3)">Нет данных</div>'; return; }
   const r = last(tsHistory);
+  // Debug: log field names for first run
+  if(!renderTsPanel._logged){ console.log('[tradestats fields]', Object.keys(r)); renderTsPanel._logged=true; }
   const vol = toNum(r.vol||r.volume||0);
-  const bv  = toNum(r.buy_vol||r.buyVolume||0);
-  const sv  = toNum(r.sell_vol||r.sellVolume||0);
+  const bv  = toNum(r.buy_vol||r.buytrades||r.buyVol||0);
+  const sv  = toNum(r.sell_vol||r.selltrades||r.sellVol||0);
   const pr  = toNum(r.pr_cl||r.prCl||r.close||0);
   const vwap= toNum(r.pr_vwap||r.prVwap||0);
   const lv  = toNum(r.large_vol||r.largeVolume||0);
