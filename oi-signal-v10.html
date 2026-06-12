@@ -123,6 +123,22 @@ a{color:var(--accent);text-decoration:none;}
 pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow-x:auto;font-size:9px;color:#c9d1d9;line-height:1.5;white-space:pre;}
 .select-inp{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
 .select-inp:focus{border-color:rgba(255,0,128,.4);}
+.ticker-panel{background:var(--panel);border:1px solid var(--border2);border-radius:14px;margin-bottom:10px;overflow:hidden;}
+.ticker-panel-hdr{display:flex;align-items:center;padding:8px 14px;cursor:pointer;user-select:none;min-height:38px;}
+.ticker-panel-hdr:hover{background:rgba(255,255,255,.02);}
+.ticker-panel-body{padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,.05);}
+.cat-item{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;cursor:pointer;transition:all .15s;}
+.cat-item:hover{border-color:rgba(255,0,128,.25);background:rgba(255,0,128,.04);}
+.cat-item.active-ticker{border-color:rgba(255,0,128,.5);background:rgba(255,0,128,.1);}
+.cat-item.pinned .pin-btn{color:var(--accent);}
+.cat-item-code{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}
+.cat-item-name{font-size:9px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.cat-item-sector{font-size:8px;color:var(--txt3);opacity:.6;white-space:nowrap;}
+.pin-btn{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;flex-shrink:0;}
+.pin-btn:hover{color:var(--accent);}
+.pchip{display:flex;align-items:center;gap:3px;padding:3px 8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;font-size:11px;font-weight:600;color:var(--txt2);white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.pchip:hover{border-color:rgba(255,0,128,.3);color:var(--txt);}
+.pchip.active{background:rgba(255,0,128,.15);border-color:rgba(255,0,128,.5);color:var(--accent);}
 </style>
 </head>
 <body>
@@ -131,28 +147,21 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
 <div class="hdr">
   <div>
     <div class="logo">OI · INTEL</div>
-    <div class="logo-sub">v10 · AlgoPack + T-Invest · 10 методов · обучение</div>
+    <div class="logo-sub">v10 · AlgoPack + T-Invest · 10 методов</div>
   </div>
   <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-    <!-- Ticker chips -->
     <div class="hdr-row">
-      <div class="chips" id="tickerChips"></div>
-      <button class="btn-sm" onclick="toggleTickerEdit()" title="Редактировать тикеры">✎</button>
-    </div>
-    <!-- API Keys row -->
-    <div class="hdr-row">
-      <input class="inp mid" id="moexKeyInp" placeholder="MOEX AlgoPack API ключ..." type="password" title="Ключ подписки MOEX AlgoPack">
+      <input class="inp mid" id="moexKeyInp" placeholder="MOEX AlgoPack API ключ..." type="password">
       <input class="inp mid" id="tinvestInp" placeholder="T-Invest токен..." type="password">
-      <input class="inp wide" id="proxyInp" placeholder="https://your-worker.workers.dev  ← прокси (обязателен)">
-      <button class="btn-sm" onclick="toggleProxyHelp()" title="Как настроить прокси">⚙ Прокси?</button>
+      <input class="inp wide" id="proxyInp" placeholder="https://your-worker.workers.dev  (прокси)">
+      <button class="btn-sm" onclick="toggleProxyHelp()">⚙ Прокси?</button>
     </div>
-    <!-- Refresh row -->
     <div class="hdr-row">
       <button class="btn-pill" id="btnRefresh" onclick="refreshAll()">↺ Обновить</button>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;">
         <input type="checkbox" id="autoChk" onchange="toggleAuto()" style="cursor:pointer;"> Авто
       </label>
-      <select class="select-inp" id="intervalSel" onchange="setInterval_()" title="Интервал авто-обновления">
+      <select class="select-inp" id="intervalSel" onchange="setInterval_()">
         <option value="30">30с</option>
         <option value="60" selected>1 мин</option>
         <option value="120">2 мин</option>
@@ -501,7 +510,7 @@ let candleLastUpdate = null;
 // ============================================================
 function saveAll(){
   const d = {
-    tickers, methodWeights, signalLog,
+    tickers, pinnedTickers, methodWeights, signalLog,
     moexKey: document.getElementById('moexKeyInp').value,
     tinvest: document.getElementById('tinvestInp').value,
     proxy: document.getElementById('proxyInp').value,
@@ -518,6 +527,7 @@ function loadAll(){
   try{
     const d = JSON.parse(localStorage.getItem(LS)||'{}');
     if(d.tickers?.length) tickers = d.tickers;
+    if(d.pinnedTickers?.length) pinnedTickers = d.pinnedTickers;
     if(d.methodWeights) methodWeights = d.methodWeights;
     if(d.signalLog) signalLog = d.signalLog;
     if(d.moexKey) document.getElementById('moexKeyInp').value = d.moexKey;
@@ -551,7 +561,7 @@ function importData(ev){
       if(d.tickers) tickers = d.tickers;
       if(d.methodWeights) methodWeights = d.methodWeights;
       if(d.signalLog) signalLog = d.signalLog;
-      renderTickerChips(); renderHistory(); saveAll();
+      renderPinnedChips(); renderHistory(); saveAll();
     } catch(ex){ alert('Ошибка импорта: ' + ex.message); }
   };
   r.readAsText(f);
@@ -560,7 +570,7 @@ function clearAll(){
   if(!confirm('Очистить все данные?')) return;
   localStorage.removeItem(LS);
   methodWeights = {}; signalLog = []; tickers = [];
-  renderTickerChips(); renderHistory(); renderMethodsTable([]);
+  renderPinnedChips(); renderHistory(); renderMethodsTable([]);
 }
 function clearHistory(){
   if(!confirm('Очистить историю сигналов?')) return;
@@ -631,9 +641,9 @@ function tinvestUrl(path){
 }
 
 async function fetchCandles(ticker, tf){
-  const meta = tickers.find(x=>x.t===ticker);
+  const meta = tickers.find(x=>x.t===ticker) || CATALOG.find(x=>x.t===ticker);
   const figi = meta?.f;
-  if(!figi) return null;
+  if(!figi) return null; // No FIGI set - candles unavailable
   const token = getTinvestToken();
   if(!token) return null;
 
@@ -1202,73 +1212,98 @@ function renderHistory(){
 }
 
 // ============================================================
-// TICKER CHIPS
+// TICKER PANEL
 // ============================================================
-function renderTickerChips(){
-  const el = document.getElementById('tickerChips');
-  el.innerHTML = tickers.map((tk,i)=>`
-    <div class="chip ${tk.t===curTicker?'active':''}" onclick="selectTicker('${tk.t}')">
-      <span class="chip-code">${tk.t}</span>
-      <span class="chip-name">${tk.name||tk.t}</span>
-    </div>`).join('');
+let activeCatFilter = '';
+
+function toggleTickerPanel(){
+  const body = document.getElementById('tickerPanelBody');
+  const chev = document.getElementById('tickerPanelChev');
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  chev.textContent = open ? '▲ тикеры' : '▼ тикеры';
+  if(open) renderCatalog();
 }
 
-function selectTicker(t){
+function selectCatTab(btn, cat){
+  document.querySelectorAll('#catTabs .btn-ghost').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeCatFilter = cat;
+  renderCatalog();
+}
+
+function renderCatalog(){
+  const search = (document.getElementById('tickerSearch')?.value||'').toLowerCase();
+  const items = [...CATALOG, ...tickers.filter(t=>!CATALOG.find(c=>c.t===t.t))]
+    .filter(item=>{
+      if(activeCatFilter && item.cat !== activeCatFilter) return false;
+      if(search && !item.t.toLowerCase().includes(search) && !item.name.toLowerCase().includes(search)) return false;
+      return true;
+    });
+  const el = document.getElementById('catalogGrid');
+  if(!el) return;
+  el.innerHTML = items.map(item=>{
+    const isPin = pinnedTickers.includes(item.t);
+    const isActive = item.t === curTicker;
+    return `<div class="cat-item${isActive?' active-ticker':''}${isPin?' pinned':''}" onclick="selectTicker('${item.t}','${item.cat||'stocks'}')">
+      <div style="flex:1;min-width:0;">
+        <div class="cat-item-code">${item.t}</div>
+        <div class="cat-item-name">${item.name}</div>
+        <div class="cat-item-sector">${item.sector||item.cat||''}</div>
+      </div>
+      <button class="pin-btn" onclick="event.stopPropagation();togglePin('${item.t}')" title="${isPin?'Открепить':'Закрепить'}">${isPin?'★':'☆'}</button>
+    </div>`;
+  }).join('');
+}
+
+function renderPinnedChips(){
+  const el = document.getElementById('pinnedChips');
+  if(!el) return;
+  const items = pinnedTickers.map(t=>CATALOG.find(c=>c.t===t)||tickers.find(c=>c.t===t)||{t,cat:'stocks',name:t});
+  el.innerHTML = items.map(item=>`<div class="pchip${item.t===curTicker?' active':''}" onclick="selectTicker('${item.t}','${item.cat||'stocks'}')">${item.t}</div>`).join('');
+}
+
+function togglePin(t){
+  const idx = pinnedTickers.indexOf(t);
+  if(idx>=0) pinnedTickers.splice(idx,1);
+  else pinnedTickers.push(t);
+  renderPinnedChips();
+  renderCatalog();
+  saveAll();
+}
+
+function addCustomTicker(){
+  const t = (document.getElementById('custT').value||'').trim().toUpperCase();
+  const type = document.getElementById('custType').value;
+  const name = (document.getElementById('custName').value||'').trim() || t;
+  const f = (document.getElementById('custFigi').value||'').trim();
+  if(!t) return;
+  if(!tickers.find(x=>x.t===t)) tickers.push({t, cat:type, type, name, f, sector:type, custom:true});
+  if(!pinnedTickers.includes(t)) pinnedTickers.push(t);
+  document.getElementById('custT').value='';
+  document.getElementById('custName').value='';
+  document.getElementById('custFigi').value='';
+  renderPinnedChips(); renderCatalog(); saveAll();
+}
+
+function selectTicker(t, type){
   curTicker = t;
-  const meta = tickers.find(x=>x.t===t);
-  curType = meta?.type || 'stocks';
+  const meta = CATALOG.find(x=>x.t===t) || tickers.find(x=>x.t===t);
+  curType = type || meta?.cat || meta?.type || 'stocks';
+  // sync tickers array (for FIGI lookup)
+  if(!tickers.find(x=>x.t===t)){
+    const cat = CATALOG.find(x=>x.t===t);
+    if(cat) tickers.push({...cat, type:cat.cat, f:''});
+  }
   tsHistory=[]; obHistory=[]; osHistory=[]; futoiData=[];
-  renderTickerChips();
+  renderPinnedChips();
+  renderCatalog();
   renderMethodsTable({});
   renderGauge(0, 0);
   document.getElementById('candleArea').innerHTML = '<span>Нажмите ↺ Обновить</span>';
   document.getElementById('tsPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('futoiPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('obPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
-}
-
-// ============================================================
-// TICKER EDITOR
-// ============================================================
-function toggleTickerEdit(){
-  const el = document.getElementById('tickerEditorWrap');
-  el.style.display = el.style.display==='none' ? '' : 'none';
-  renderTickerEditor();
-}
-
-function renderTickerEditor(){
-  const el = document.getElementById('tickerEditorRows');
-  el.innerHTML = tickers.map((tk,i)=>`
-    <div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:5px 8px;">
-      <input value="${tk.t}" style="width:60px;background:transparent;border:none;outline:none;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;" onchange="updateTicker(${i},'t',this.value)">
-      <select class="select-inp" style="font-size:9px;" onchange="updateTicker(${i},'type',this.value)">
-        <option value="stocks" ${tk.type==='stocks'?'selected':''}>TQBR</option>
-        <option value="futures" ${tk.type==='futures'?'selected':''}>FORTS</option>
-        <option value="currency" ${tk.type==='currency'?'selected':''}>CETS</option>
-      </select>
-      <input value="${tk.f||''}" placeholder="FIGI/UID" style="flex:1;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.08);outline:none;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:10px;" onchange="updateTicker(${i},'f',this.value)">
-      <input value="${tk.name||''}" placeholder="Имя" style="width:100px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.08);outline:none;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;" onchange="updateTicker(${i},'name',this.value)">
-      <button class="btn-sm btn-danger" style="font-size:9px;padding:2px 6px;" onclick="removeTicker(${i})">✕</button>
-    </div>`).join('');
-}
-
-function updateTicker(i, key, val){ tickers[i][key]=val; renderTickerChips(); }
-function removeTicker(i){
-  if(tickers[i].t===curTicker) curTicker='';
-  tickers.splice(i,1);
-  renderTickerChips(); renderTickerEditor();
-}
-function addTicker(){
-  const t = document.getElementById('newTickerT').value.trim().toUpperCase();
-  const type = document.getElementById('newTickerType').value;
-  const f = document.getElementById('newTickerFigi').value.trim();
-  const name = document.getElementById('newTickerName').value.trim();
-  if(!t) return;
-  tickers.push({t, type, f, name: name||t});
-  document.getElementById('newTickerT').value='';
-  document.getElementById('newTickerFigi').value='';
-  document.getElementById('newTickerName').value='';
-  renderTickerChips(); renderTickerEditor();
 }
 
 // ============================================================
@@ -1397,7 +1432,7 @@ setInterval(updateAges, 10000);
 // ============================================================
 (function init(){
   loadAll();
-  renderTickerChips();
+  renderPinnedChips();
   renderHistory();
   renderMethodsTable({});
   renderGauge(0, 0);
@@ -1411,10 +1446,12 @@ setInterval(updateAges, 10000);
   });
 
   if(curTicker){
-    const meta = tickers.find(x=>x.t===curTicker);
-    if(meta) curType = meta.type || 'stocks';
-  } else if(tickers.length){
-    selectTicker(tickers[0].t);
+    const meta = CATALOG.find(x=>x.t===curTicker) || tickers.find(x=>x.t===curTicker);
+    curType = meta?.cat || meta?.type || 'stocks';
+  } else if(pinnedTickers.length){
+    const first = pinnedTickers[0];
+    const meta = CATALOG.find(x=>x.t===first) || tickers.find(x=>x.t===first);
+    selectTicker(first, meta?.cat||'stocks');
   }
 
   setStatus('Готово · выберите тикер и нажмите ↺ Обновить');
