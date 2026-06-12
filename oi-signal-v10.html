@@ -615,7 +615,7 @@ async function fetchMoex(secid, metric, type, params={}){
   const hdrs = {'Accept':'application/json'};
   if(key) hdrs['Authorization'] = `Bearer ${key}`;
   const resp = await fetchWithTimeout(url, {headers: hdrs});
-  if(!resp.ok) throw new Error(`MOEX ${metric} HTTP ${resp.status}`);
+  if(!resp.ok) throw new Error(`MOEX ${metric} HTTP ${resp.status} (${url.slice(0,80)})`);
   const json = await resp.json();
   return issToObjects(json, metric);
 }
@@ -678,7 +678,7 @@ async function fetchCandles(ticker, tf){
   });
   if(!resp.ok){
     const txt = await resp.text().catch(()=>'');
-    throw new Error(`T-Invest HTTP ${resp.status}: ${txt.slice(0,120)}`);
+    throw new Error(`T-Invest HTTP ${resp.status} → ${url.slice(0,80)}: ${txt.slice(0,100)}`);
   }
   const d = await resp.json();
   return d.candles || [];
