@@ -519,6 +519,14 @@ function loadAll(){
     const d = JSON.parse(localStorage.getItem(LS)||'{}');
     if(d.tickers?.length) tickers = d.tickers;
     if(d.pinnedTickers?.length) pinnedTickers = d.pinnedTickers;
+    // Миграция: заменить истёкшие фьючерсы 2025 на 2026
+    const FUT_MIGRATE = {SiH5:'SiU6',SiM5:'SiU6',SiU5:'SiU6',SiZ5:'SiZ6',EuH5:'EuU6',EuM5:'EuU6',EuU5:'EuU6',
+      RIH5:'RIU6',RIM5:'RIU6',RIU5:'RIU6',MXH5:'MXU6',MXM5:'MXU6',MXU5:'MXU6',
+      GDH5:'GDU6',GDM5:'GDU6',GDU5:'GDU6',BRH5:'BRU6',BRM5:'BRU6',BRU5:'BRU6',
+      NGH5:'NGU6',NGM5:'NGU6',NGU5:'NGU6',GZH5:'GZU6',GZM5:'GZU6',GZU5:'GZU6',
+      SRH5:'SRU6',SRM5:'SRU6',SRU5:'SRU6'};
+    pinnedTickers = [...new Set(pinnedTickers.map(t=>FUT_MIGRATE[t]||t))];
+    if(d.curTicker && FUT_MIGRATE[d.curTicker]) d.curTicker = FUT_MIGRATE[d.curTicker];
     if(d.methodWeights) methodWeights = d.methodWeights;
     if(d.signalLog) signalLog = d.signalLog;
     if(d.moexKey) document.getElementById('moexKeyInp').value = d.moexKey;
