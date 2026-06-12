@@ -451,17 +451,17 @@ const CATALOG = [
   {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс',        f:''},
   {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс',        f:''},
   {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс',        f:''},
-  // Фьючерсы FORTS — актуальные контракты (обновляй f при смене серии)
-  {t:'SiM5',  cat:'futures', name:'USD/RUB июнь',    sector:'Валюта',        f:'FUTSI0625'},
-  {t:'SiU5',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:'FUTSI0925'},
-  {t:'EuM5',  cat:'futures', name:'EUR/RUB июнь',    sector:'Валюта',        f:'FUTEU0625'},
-  {t:'RIM5',  cat:'futures', name:'RTS июнь',        sector:'Индекс',        f:'FUTRI0625'},
-  {t:'MXM5',  cat:'futures', name:'МосБиржа июнь',   sector:'Индекс',        f:'FUTMX0625'},
-  {t:'GDM5',  cat:'futures', name:'Золото июнь',     sector:'Сырьё',         f:'FUTGD0625'},
-  {t:'BRM5',  cat:'futures', name:'Brent июнь',      sector:'Сырьё',         f:'FUTBR0625'},
-  {t:'NGM5',  cat:'futures', name:'Газ июнь',        sector:'Сырьё',         f:'FUTNG0625'},
-  {t:'GZM5',  cat:'futures', name:'Газпром июнь',    sector:'Акции',         f:'FUTGZ0625'},
-  {t:'SRM5',  cat:'futures', name:'Сбербанк июнь',   sector:'Акции',         f:'FUTSR0625'},
+  // Фьючерсы FORTS — актуальные контракты (U6=сент2026, Z6=дек2026)
+  {t:'SiU6',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:'FUTSI0926'},
+  {t:'SiZ6',  cat:'futures', name:'USD/RUB дек',     sector:'Валюта',        f:'FUTSI1226'},
+  {t:'EuU6',  cat:'futures', name:'EUR/RUB сент',    sector:'Валюта',        f:'FUTEU0926'},
+  {t:'RIU6',  cat:'futures', name:'RTS сент',        sector:'Индекс',        f:'FUTRI0926'},
+  {t:'MXU6',  cat:'futures', name:'МосБиржа сент',   sector:'Индекс',        f:'FUTMX0926'},
+  {t:'GDU6',  cat:'futures', name:'Золото сент',     sector:'Сырьё',         f:'FUTGD0926'},
+  {t:'BRU6',  cat:'futures', name:'Brent сент',      sector:'Сырьё',         f:'FUTBR0926'},
+  {t:'NGU6',  cat:'futures', name:'Газ сент',        sector:'Сырьё',         f:'FUTNG0926'},
+  {t:'GZU6',  cat:'futures', name:'Газпром сент',    sector:'Акции',         f:'FUTGZ0926'},
+  {t:'SRU6',  cat:'futures', name:'Сбербанк сент',   sector:'Акции',         f:'FUTSR0926'},
   // Валюта CETS
   {t:'USD000UTSTOM', cat:'currency', name:'Доллар США',  sector:'Валюта'},
   {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
@@ -478,7 +478,7 @@ let autoInterval = 60;
 let autoTimer = null;
 
 let tickers = [];
-let pinnedTickers = ['SBER','GAZP','LKOH','SiH5']; // default pins
+let pinnedTickers = ['SBER','GAZP','LKOH','BRU6']; // default pins
 
 // Rolling history per ticker (last 100 bars each source)
 let tsHistory = [];   // tradestats bars
@@ -1420,9 +1420,9 @@ async function refreshAll(){
       errs.push(`T-Invest(${tf}): `+e.message.slice(0,80));
     }
   }
-  if(candleErr && !candleData[curTF]){
+  if(candleErr){
     document.getElementById('candleArea').innerHTML =
-      `<div style="color:#e57373;padding:16px;font-size:12px;">⚠ ${candleErr}</div>`;
+      `<div style="color:#e57373;padding:16px;font-size:12px;border:1px solid #e5737355;border-radius:6px;">⚠ Свечи: ${candleErr}</div>`;
   }
 
   // 3. Compute signals
