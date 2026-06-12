@@ -674,13 +674,9 @@ async function fetchCandles(ticker, tf){
   else fromDate = new Date(now - 90*dayMs);
 
   const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles');
-  // BBG FIGI → поле figi; T-Invest UUID (8-4-4-4-12) → поле instrument_id
-  const isBBG = /^BBG/.test(figi);
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(figi);
+  // instrument_id принимает BBG FIGI, UID или ticker_CLASS — используем его
   const body = {
-    ...(isBBG ? {figi} : {}),
-    ...(isUUID ? {instrument_id: figi} : {}),
-    ...(!isBBG && !isUUID ? {figi} : {}),
+    instrument_id: figi,
     from: fromDate.toISOString(),
     to: now.toISOString(),
     interval: TF_INTERVALS[tf],
