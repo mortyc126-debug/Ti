@@ -185,37 +185,30 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
   async fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname + url.search;
-    if (request.method === 'OPTIONS')
-      return new Response(null, { headers: cors() });
-
     const auth = request.headers.get('Authorization') || '';
-    let target, hdrs;
+    const ch = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type' };
 
+    if (request.method === 'OPTIONS') return new Response(null, { status:204, headers: ch });
+
+    let target, hdrs, body;
     if (path.startsWith('/iss/')) {
-      // MOEX AlgoPack
+      // MOEX AlgoPack — требует Bearer-ключ подписки
       target = 'https://apim.moex.com' + path;
       hdrs = { 'Authorization': auth, 'Accept': 'application/json' };
     } else {
-      // T-Invest REST API
+      // T-Invest REST API — path начинается с /tinkoff...
       target = 'https://invest-public-api.tinkoff.ru/rest' + path;
       hdrs = { 'Authorization': auth, 'Content-Type': request.headers.get('Content-Type') || 'application/json' };
+      if (request.method === 'POST') body = await request.arrayBuffer();
     }
 
-    const body = request.method !== 'GET' ? await request.arrayBuffer() : undefined;
     const resp = await fetch(target, { method: request.method, headers: hdrs, body });
-    return new Response(await resp.arrayBuffer(), {
+    return new Response(resp.body, {
       status: resp.status,
-      headers: { ...cors(), 'Content-Type': resp.headers.get('Content-Type') || 'application/json' }
+      headers: { ...ch, 'Content-Type': resp.headers.get('Content-Type') || 'application/json' }
     });
   }
-};
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-  };
-}</pre>
+};</pre>
   <b style="color:var(--accent);">3.</b> Save &amp; Deploy → скопируй URL (вида <code style="color:var(--pos)">https://xxx.workers.dev</code>)<br>
   <b style="color:var(--accent);">4.</b> Вставь URL в поле "прокси" выше → Enter<br><br>
   <div style="display:flex;gap:6px;">
@@ -636,6 +629,7 @@ async function fetchAllMoex(ticker, type){
 // ============================================================
 function tinvestUrl(path){
   const proxy = getProxy();
+  // path = /tinkoff..., воркер prepend'ит https://invest-public-api.tinkoff.ru/rest
   if(proxy) return proxy + path;
   return 'https://invest-public-api.tinkoff.ru/rest' + path;
 }

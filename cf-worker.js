@@ -31,35 +31,29 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname + url.search;
 
-    // OI·INTEL маршруты: /iss/... → MOEX AlgoPack, /rest/... → T-Invest
-    // Это позволяет использовать один Worker и для БондАналитик, и для OI·INTEL.
+    // OI·INTEL маршруты (обрабатываются до ?u= логики БондАналитика).
+    // /iss/...        → MOEX AlgoPack (apim.moex.com, требует Bearer-ключ)
+    // /tinkoff...     → T-Invest REST API (для свечей и котировок из OI·INTEL)
+    const corsHdr = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    };
+    if (req.method === 'OPTIONS' && (path.startsWith('/iss/') || path.startsWith('/tinkoff'))) {
+      return new Response(null, {status:204, headers: corsHdr});
+    }
     if (path.startsWith('/iss/')) {
-      if (req.method === 'OPTIONS') {
-        return new Response(null, { headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-        }});
-      }
       const auth = req.headers.get('Authorization') || '';
       const target = 'https://apim.moex.com' + path;
-      const resp = await fetch(target, { method: 'GET', headers: { 'Authorization': auth, 'Accept': 'application/json' } });
+      const resp = await fetch(target, { headers: { 'Authorization': auth, 'Accept': 'application/json' } });
       return new Response(resp.body, {
         status: resp.status,
         headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': resp.headers.get('Content-Type') || 'application/json' }
       });
     }
-    if (path.startsWith('/rest/')) {
-      if (req.method === 'OPTIONS') {
-        return new Response(null, { headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-        }});
-      }
+    if (path.startsWith('/tinkoff')) {
       const auth = req.headers.get('Authorization') || '';
-      const tinvestPath = path.slice(5); // убираем /rest
-      const target = 'https://invest-public-api.tinkoff.ru/rest' + tinvestPath;
+      const target = 'https://invest-public-api.tinkoff.ru/rest' + path;
       const body = req.method === 'POST' ? await req.arrayBuffer() : undefined;
       const resp = await fetch(target, { method: req.method, headers: { 'Authorization': auth, 'Content-Type': req.headers.get('Content-Type') || 'application/json' }, body });
       return new Response(resp.body, {
