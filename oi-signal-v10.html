@@ -597,12 +597,24 @@ function issToObjects(json, blockName){
   });
 }
 
+async function fetchWithTimeout(url, opts={}, ms=15000){
+  const ctrl = new AbortController();
+  const tid = setTimeout(()=>ctrl.abort(), ms);
+  try{
+    const r = await fetch(url, {...opts, signal: ctrl.signal});
+    return r;
+  } catch(e){
+    if(e.name==='AbortError') throw new Error('Таймаут запроса (15с)');
+    throw e;
+  } finally{ clearTimeout(tid); }
+}
+
 async function fetchMoex(secid, metric, type, params={}){
   const url = moexUrl(secid, metric, type, params);
   const key = getMoexKey();
   const hdrs = {'Accept':'application/json'};
   if(key) hdrs['Authorization'] = `Bearer ${key}`;
-  const resp = await fetch(url, {headers: hdrs});
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
   if(!resp.ok) throw new Error(`MOEX ${metric} HTTP ${resp.status}`);
   const json = await resp.json();
   return issToObjects(json, metric);
@@ -659,12 +671,15 @@ async function fetchCandles(ticker, tf){
     to: now.toISOString(),
     interval: TF_INTERVALS[tf],
   };
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method:'POST',
     headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
     body: JSON.stringify(body),
   });
-  if(!resp.ok) throw new Error(`T-Invest HTTP ${resp.status}`);
+  if(!resp.ok){
+    const txt = await resp.text().catch(()=>'');
+    throw new Error(`T-Invest HTTP ${resp.status}: ${txt.slice(0,120)}`);
+  }
   const d = await resp.json();
   return d.candles || [];
 }
