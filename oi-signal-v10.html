@@ -640,9 +640,9 @@ function tinvestUrl(path){
 async function fetchCandles(ticker, tf){
   const meta = tickers.find(x=>x.t===ticker) || CATALOG.find(x=>x.t===ticker);
   const figi = meta?.f || CATALOG.find(x=>x.t===ticker)?.f;
-  if(!figi) return null; // No FIGI set - candles unavailable
+  if(!figi) throw new Error(`FIGI не задан для ${ticker}. Нажмите 🔍 рядом с тикером.`);
   const token = getTinvestToken();
-  if(!token) return null;
+  if(!token) throw new Error('Введите T-Invest токен (поле сверху)');
 
   const now = new Date();
   const dayMs = 86400000;
@@ -1395,11 +1395,19 @@ async function refreshAll(){
   // 2. T-Invest candles for active TF
   const tfsToLoad = [curTF];
   if(curTF !== '1d') tfsToLoad.push('1d'); // always keep 1D for PRICE_TREND
+  let candleErr = null;
   for(const tf of tfsToLoad){
     try{
       const c = await fetchCandles(curTicker, tf);
       if(c) { candleData[tf] = c; if(tf===curTF) candleLastUpdate = Date.now(); }
-    } catch(e){ errs.push(`T-Invest(${tf}): `+e.message.slice(0,60)); }
+    } catch(e){
+      if(tf === curTF) candleErr = e.message;
+      errs.push(`T-Invest(${tf}): `+e.message.slice(0,80));
+    }
+  }
+  if(candleErr && !candleData[curTF]){
+    document.getElementById('candleArea').innerHTML =
+      `<div style="color:#e57373;padding:16px;font-size:12px;">⚠ ${candleErr}</div>`;
   }
 
   // 3. Compute signals
