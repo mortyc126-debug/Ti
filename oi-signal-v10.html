@@ -631,15 +631,13 @@ async function fetchMoex(secid, metric, type, params={}){
 }
 
 async function fetchAllMoex(ticker, type){
-  const today = new Date().toISOString().split('T')[0];
   const lim = {limit: 100};
-  // futoi для фьючерсов — отдельный endpoint с tradedate, не secid-level
-  const futoiType = 'futures'; // futoi всегда в сегменте fo
+  // futoi — данные конец дня, запрашиваем без tradedate → вернёт последние доступные
   const prom = {
     ts:    fetchMoex(ticker, 'tradestats', type, lim).catch(()=>[]),
     ob:    fetchMoex(ticker, 'obstats',    type, lim).catch(()=>[]),
     os:    fetchMoex(ticker, 'orderstats', type, lim).catch(()=>[]),
-    futoi: type==='futures' ? fetchMoex(ticker, 'futoi', futoiType, {tradedate: today}).catch(()=>[]) : Promise.resolve([]),
+    futoi: type==='futures' ? fetchMoex(ticker, 'futoi', 'futures', lim).catch(()=>[]) : Promise.resolve([]),
   };
   return {
     ts:    await prom.ts,
