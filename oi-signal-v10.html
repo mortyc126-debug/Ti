@@ -452,16 +452,16 @@ const CATALOG = [
   {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс',        f:''},
   {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс',        f:''},
   // Фьючерсы FORTS — актуальные контракты (U6=сент2026, Z6=дек2026)
-  {t:'SiU6',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:'FUTSI0926'},
-  {t:'SiZ6',  cat:'futures', name:'USD/RUB дек',     sector:'Валюта',        f:'FUTSI1226'},
-  {t:'EuU6',  cat:'futures', name:'EUR/RUB сент',    sector:'Валюта',        f:'FUTEU0926'},
-  {t:'RIU6',  cat:'futures', name:'RTS сент',        sector:'Индекс',        f:'FUTRI0926'},
-  {t:'MXU6',  cat:'futures', name:'МосБиржа сент',   sector:'Индекс',        f:'FUTMX0926'},
-  {t:'GDU6',  cat:'futures', name:'Золото сент',     sector:'Сырьё',         f:'FUTGD0926'},
-  {t:'BRU6',  cat:'futures', name:'Brent сент',      sector:'Сырьё',         f:'FUTBR0926'},
-  {t:'NGU6',  cat:'futures', name:'Газ сент',        sector:'Сырьё',         f:'FUTNG0926'},
-  {t:'GZU6',  cat:'futures', name:'Газпром сент',    sector:'Акции',         f:'FUTGZ0926'},
-  {t:'SRU6',  cat:'futures', name:'Сбербанк сент',   sector:'Акции',         f:'FUTSR0926'},
+  {t:'SiU6',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:''},
+  {t:'SiZ6',  cat:'futures', name:'USD/RUB дек',     sector:'Валюта',        f:''},
+  {t:'EuU6',  cat:'futures', name:'EUR/RUB сент',    sector:'Валюта',        f:''},
+  {t:'RIU6',  cat:'futures', name:'RTS сент',        sector:'Индекс',        f:''},
+  {t:'MXU6',  cat:'futures', name:'МосБиржа сент',   sector:'Индекс',        f:''},
+  {t:'GDU6',  cat:'futures', name:'Золото сент',     sector:'Сырьё',         f:''},
+  {t:'BRU6',  cat:'futures', name:'Brent сент',      sector:'Сырьё',         f:''},
+  {t:'NGU6',  cat:'futures', name:'Газ сент',        sector:'Сырьё',         f:''},
+  {t:'GZU6',  cat:'futures', name:'Газпром сент',    sector:'Акции',         f:''},
+  {t:'SRU6',  cat:'futures', name:'Сбербанк сент',   sector:'Акции',         f:''},
   // Валюта CETS
   {t:'USD000UTSTOM', cat:'currency', name:'Доллар США',  sector:'Валюта'},
   {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
@@ -526,6 +526,8 @@ function loadAll(){
       NGH5:'NGU6',NGM5:'NGU6',NGU5:'NGU6',GZH5:'GZU6',GZM5:'GZU6',GZU5:'GZU6',
       SRH5:'SRU6',SRM5:'SRU6',SRU5:'SRU6'};
     pinnedTickers = [...new Set(pinnedTickers.map(t=>FUT_MIGRATE[t]||t))];
+    // Очистить фиктивные FUT* FIGIs из сохранённых tickers (не BBG-формат)
+    tickers.forEach(tk=>{ if(tk.f && tk.f.startsWith('FUT')) tk.f = ''; });
     if(d.curTicker && FUT_MIGRATE[d.curTicker]) d.curTicker = FUT_MIGRATE[d.curTicker];
     if(d.methodWeights) methodWeights = d.methodWeights;
     if(d.signalLog) signalLog = d.signalLog;
