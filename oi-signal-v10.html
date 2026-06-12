@@ -498,7 +498,118 @@ let moexLastUpdate = null;
 let candleLastUpdate = null;
 
 // ============================================================
-// STORAGE
+// INDEXEDDB — основное хранилище для обучения
+// ============================================================
+const DB_NAME = 'oisignal_v10';
+const DB_VER  = 1;
+let db = null;
+
+function dbOpen(){
+  return new Promise((res, rej)=>{
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e=>{
+      const d = e.target.result;
+      // Свечи: ticker+tf+time — уникальный ключ
+      if(!d.objectStoreNames.contains('candles')){
+        const cs = d.createObjectStore('candles', {keyPath:'key'});
+        cs.createIndex('by_ticker_tf', ['ticker','tf'], {unique:false});
+        cs.createIndex('by_ticker_tf_time', ['ticker','tf','time'], {unique:false});
+      }
+      // Сигналы
+      if(!d.objectStoreNames.contains('signals')){
+        const ss = d.createObjectStore('signals', {autoIncrement:true, keyPath:'id'});
+        ss.createIndex('by_ticker', 'ticker', {unique:false});
+        ss.createIndex('by_resolved', 'resolved', {unique:false});
+        ss.createIndex('by_ticker_resolved', ['ticker','resolved'], {unique:false});
+      }
+      // Веса методов
+      if(!d.objectStoreNames.contains('weights')){
+        d.createObjectStore('weights', {keyPath:'key'}); // key = ticker__methodId
+      }
+    };
+    req.onsuccess = e=>{ db = e.target.result; res(db); };
+    req.onerror   = e=>rej(e.target.error);
+  });
+}
+
+function dbTx(store, mode='readonly'){
+  return db.transaction(store, mode).objectStore(store);
+}
+
+function dbPut(store, obj){ return new Promise((res,rej)=>{ const r=dbTx(store,'readwrite').put(obj); r.onsuccess=()=>res(r.result); r.onerror=e=>rej(e.target.error); }); }
+function dbGet(store, key){ return new Promise((res,rej)=>{ const r=dbTx(store).get(key); r.onsuccess=()=>res(r.result); r.onerror=e=>rej(e.target.error); }); }
+function dbGetAll(store){ return new Promise((res,rej)=>{ const r=dbTx(store).getAll(); r.onsuccess=()=>res(r.result); r.onerror=e=>rej(e.target.error); }); }
+function dbGetByIndex(store, idxName, key){ return new Promise((res,rej)=>{ const r=dbTx(store).index(idxName).getAll(key); r.onsuccess=()=>res(r.result); r.onerror=e=>rej(e.target.error); }); }
+function dbUpdate(store, key, patch){ return new Promise((res,rej)=>{
+  const tx = db.transaction(store,'readwrite'); const os = tx.objectStore(store);
+  const r = os.get(key);
+  r.onsuccess=()=>{ const obj=Object.assign(r.result||{},patch); const w=os.put(obj); w.onsuccess=()=>res(); w.onerror=e=>rej(e.target.error); };
+  r.onerror=e=>rej(e.target.error);
+});}
+
+// Сохранить пачку свечей (upsert по ticker+tf+time)
+async function dbSaveCandles(ticker, tf, candles){
+  if(!db || !candles.length) return;
+  const tx = db.transaction('candles','readwrite');
+  const os = tx.objectStore('candles');
+  for(const c of candles){
+    const time = new Date(c.time).getTime();
+    os.put({
+      key: `${ticker}__${tf}__${time}`,
+      ticker, tf, time,
+      o:toP(c.open), h:toP(c.high), l:toP(c.low), cl:toP(c.close),
+      vol: c.volume?.units ? parseInt(c.volume.units)||0 : 0,
+    });
+  }
+  return new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=e=>rej(e.target.error); });
+}
+
+// Получить свечи после timestamp
+async function dbGetCandlesAfter(ticker, tf, fromTs){
+  if(!db) return [];
+  const all = await dbGetByIndex('candles','by_ticker_tf',[ticker,tf]);
+  return all.filter(c=>c.time >= fromTs).sort((a,b)=>a.time-b.time);
+}
+
+// Сохранить сигнал
+async function dbSaveSignal(sig){
+  if(!db) return null;
+  const tx = db.transaction('signals','readwrite');
+  const os = tx.objectStore('signals');
+  const r = os.add(sig);
+  return new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=e=>rej(e.target.error); });
+}
+
+// Обновить сигнал по id
+async function dbUpdateSignal(id, patch){
+  if(!db) return;
+  await dbUpdate('signals', id, patch);
+}
+
+// Незакрытые сигналы по тикеру
+async function dbGetOpenSignals(ticker){
+  if(!db) return [];
+  const all = await dbGetByIndex('signals','by_ticker_resolved',[ticker, 0]);
+  return all;
+}
+
+// Сохранить/обновить вес метода
+async function dbSaveWeight(ticker, methodId, data){
+  if(!db) return;
+  await dbPut('weights', {key:`${ticker}__${methodId}`, ticker, methodId, ...data});
+}
+
+// Загрузить все веса для тикера
+async function dbLoadWeights(ticker){
+  if(!db) return {};
+  const all = await dbGetAll('weights');
+  const out = {};
+  all.filter(w=>w.ticker===ticker).forEach(w=>{ out[w.methodId]=w; });
+  return out;
+}
+
+// ============================================================
+// STORAGE (localStorage — только UI-настройки и пины)
 // ============================================================
 function saveAll(){
   const d = {
@@ -934,54 +1045,92 @@ function computeComposite(methodResults, ticker){
 }
 
 // ============================================================
-// LEARNING ENGINE
+// LEARNING ENGINE — MFE/MAE через IndexedDB
 // ============================================================
-// Автоматическая запись исходов по свечам.
-// Через OUTCOME_BARS баров после сигнала сравниваем цену — и обновляем веса.
-const OUTCOME_BARS = 3;
-function autoRecordOutcomes(){
-  if(!signalLog.length) return;
-  // Строим плоский список свечей с timestamps
-  const candles = candleData[curTF] || [];
-  if(candles.length < OUTCOME_BARS + 1) return;
+// Сигнал закрывается когда:
+//   - MAE > STOP_PCT (стоп выбит) — outcome = противоположный направлению
+//   - Прошло MAX_BARS баров — outcome по соотношению MFE/MAE
+// quality = MFE / (MFE + MAE + ε) ∈ [0,1] — непрерывная метрика точности
+const STOP_PCT  = 0.005;  // 0.5% — стоп-лосс для закрытия сигнала
+const MAX_BARS  = 20;     // максимум баров до принудительного закрытия
 
-  let updated = false;
-  signalLog.forEach(entry=>{
-    if(entry.outcome || entry.ticker !== curTicker) return;
-    const sigTs = new Date(entry.ts).getTime();
-    // Ищем свечу на момент сигнала и через OUTCOME_BARS после
-    const sigIdx = candles.findIndex(c=>new Date(c.time).getTime() >= sigTs);
-    if(sigIdx < 0) return;
-    const futureIdx = sigIdx + OUTCOME_BARS;
-    if(futureIdx >= candles.length) return; // ещё не прошло нужное кол-во баров
-    const priceAt   = toP(candles[sigIdx].close);
-    const priceLater= toP(candles[futureIdx].close);
-    if(!priceAt || !priceLater) return;
-    const chg = (priceLater - priceAt) / priceAt;
-    // Порог 0.05% для нейтрального сигнала
-    const outcome = chg > 0.0005 ? 'long' : chg < -0.0005 ? 'short' : 'neutral';
-    entry.outcome = outcome;
-    entry.autoRecorded = true;
+async function autoRecordOutcomes(){
+  if(!db) return;
+  const openSigs = await dbGetOpenSignals(curTicker).catch(()=>[]);
+  if(!openSigs.length) return;
 
-    // Обновляем веса методов
-    const ticker = entry.ticker;
-    if(!methodWeights[ticker]) methodWeights[ticker] = {};
-    METHODS.forEach(m=>{
-      const score = entry.methods?.[m.id] ?? 0;
-      if(Math.abs(score) < 0.05) return;
-      const correct =
-        (score >  0.1 && outcome === 'long')  ||
-        (score < -0.1 && outcome === 'short') ||
-        (Math.abs(score) <= 0.1 && outcome === 'neutral');
-      if(!methodWeights[ticker][m.id])
-        methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0};
-      const mw = methodWeights[ticker][m.id];
-      mw.total++; if(correct) mw.correct++;
-      mw.weight = 0.85*mw.weight + 0.15*(mw.correct/mw.total);
+  const now = Date.now();
+  let weightsUpdated = false;
+
+  for(const sig of openSigs){
+    const afterCandles = await dbGetCandlesAfter(sig.ticker, sig.tf, sig.entryTs).catch(()=>[]);
+    if(afterCandles.length < 2) continue; // ждём больше данных
+
+    const ep = sig.entryPrice;
+    if(!ep) continue;
+
+    // Считаем MFE и MAE по всей траектории после сигнала
+    let mfe = 0, mae = 0;
+    for(const c of afterCandles){
+      // Для long-сигнала: MFE = max upside, MAE = max downside
+      const upside   = (c.h - ep) / ep;
+      const downside = (ep - c.l) / ep;
+      if(sig.dir === 'short'){
+        // Для short: инвертируем
+        mfe = Math.max(mfe, downside);
+        mae = Math.max(mae, upside);
+      } else {
+        mfe = Math.max(mfe, upside);
+        mae = Math.max(mae, downside);
+      }
+    }
+
+    const barsElapsed = afterCandles.length;
+    const stopped = mae >= STOP_PCT;
+    const expired = barsElapsed >= MAX_BARS;
+    if(!stopped && !expired) continue; // ещё не закрыт
+
+    // Непрерывная метрика качества [0..1]
+    const quality = mfe / (mfe + mae + 1e-8);
+
+    // Обновляем веса методов в IndexedDB
+    const weights = await dbLoadWeights(sig.ticker).catch(()=>({}));
+    for(const m of METHODS){
+      const score = sig.methods?.[m.id] ?? 0;
+      if(Math.abs(score) < 0.05) continue;
+      // Ожидаемая точность метода: 1 если score совпадает с исходом, иначе 0
+      // quality > 0.5 → сигнал сработал, quality < 0.5 → не сработал
+      const methodAligned = (score > 0.1 && sig.dir !== 'short') ||
+                            (score < -0.1 && sig.dir === 'short');
+      // target_accuracy = quality если aligned, (1-quality) если против
+      const targetAcc = methodAligned ? quality : (1 - quality);
+
+      const prev = weights[m.id] || {weight:0.5, correct:0, total:0, sumQ:0};
+      prev.total++;
+      prev.sumQ = (prev.sumQ||0) + targetAcc;
+      const rollingAcc = prev.sumQ / prev.total;
+      // EWA update: медленный α=0.1 чтобы не болтало
+      prev.weight = 0.9 * prev.weight + 0.1 * rollingAcc;
+      prev.weight = Math.max(0.05, Math.min(1, prev.weight));
+      await dbSaveWeight(sig.ticker, m.id, prev);
+      // Синхронизируем в памяти тоже
+      if(!methodWeights[sig.ticker]) methodWeights[sig.ticker] = {};
+      methodWeights[sig.ticker][m.id] = prev;
+    }
+
+    // Закрываем сигнал
+    await dbUpdateSignal(sig.id, {
+      resolved: 1, mfe, mae, quality,
+      barsElapsed, stoppedOut: stopped,
+      resolvedAt: now,
     });
-    updated = true;
-  });
-  if(updated){ saveAll(); renderHistory(); }
+    // Обновляем в signalLog для отображения
+    const li = signalLog.findIndex(x=>x.dbId === sig.id);
+    if(li>=0){ signalLog[li].outcome = quality > 0.55 ? sig.dir : (sig.dir==='long'?'short':'long');
+               signalLog[li].quality = quality; }
+    weightsUpdated = true;
+  }
+  if(weightsUpdated){ saveAll(); renderHistory(); renderMethodsTable(computeAllMethods()); }
 }
 
 function recordOutcome(){
@@ -1453,6 +1602,8 @@ function selectTicker(t, type){
   curTicker = t;
   const meta = CATALOG.find(x=>x.t===t) || tickers.find(x=>x.t===t);
   curType = type || meta?.cat || meta?.type || 'stocks';
+  // Загружаем веса из IndexedDB
+  dbLoadWeights(t).then(w=>{ if(Object.keys(w).length) methodWeights[t]=w; }).catch(()=>{});
   // sync tickers array (for FIGI lookup)
   if(!tickers.find(x=>x.t===t)){
     const cat = CATALOG.find(x=>x.t===t);
@@ -1525,7 +1676,11 @@ async function refreshAll(){
   for(const tf of tfsToLoad){
     try{
       const c = await fetchCandles(curTicker, tf);
-      if(c) { candleData[tf] = c; if(tf===curTF) candleLastUpdate = Date.now(); }
+      if(c) {
+        candleData[tf] = c;
+        if(tf===curTF) candleLastUpdate = Date.now();
+        dbSaveCandles(curTicker, tf, c).catch(()=>{}); // персистим в IndexedDB
+      }
     } catch(e){
       if(tf === curTF) candleErr = e.message;
       errs.push(`T-Invest(${tf}): `+e.message.slice(0,80));
@@ -1544,16 +1699,25 @@ async function refreshAll(){
   // Save snapshot
   lastSnapshot = {ts: Date.now(), ticker: curTicker, methodResults, composite};
 
-  // Add to log (without outcome yet)
-  signalLog.unshift({
+  // Цена входа — последняя свеча
+  const lastCandle = (candleData[curTF]||[]).slice(-1)[0];
+  const entryPrice = lastCandle ? toP(lastCandle.close) : 0;
+  const entryTs    = lastCandle ? new Date(lastCandle.time).getTime() : Date.now();
+  const dir = scoreToDir(composite).dir;
+  const sigObj = {
     snapshotTs: lastSnapshot.ts,
     ts: new Date().toISOString(),
     ticker: curTicker,
-    composite,
-    dir: scoreToDir(composite).dir,
-    outcome: null,
+    tf: curTF,
+    entryPrice, entryTs,
+    composite, dir,
+    outcome: null, quality: null,
+    resolved: 0, mfe: 0, mae: 0,
     methods: Object.fromEntries(METHODS.map(m=>[m.id, methodResults[m.id]?.score??0])),
-  });
+  };
+  // Сохраняем в IndexedDB и получаем id
+  dbSaveSignal(sigObj).then(id=>{ sigObj.dbId = id; }).catch(()=>{});
+  signalLog.unshift(sigObj);
   if(signalLog.length > 500) signalLog.splice(500);
 
   // 4. Render
@@ -1604,7 +1768,8 @@ setInterval(updateAges, 10000);
 // ============================================================
 // INIT
 // ============================================================
-(function init(){
+(async function init(){
+  await dbOpen().catch(e=>console.warn('IndexedDB недоступен:', e));
   loadAll();
   renderPinnedChips();
   renderHistory();
