@@ -192,7 +192,8 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
 
     let target, hdrs, body;
     if (path.startsWith('/iss/')) {
-      // MOEX AlgoPack — требует Bearer-ключ подписки
+      // MOEX AlgoPack (SuperCandles, FUTOI и др.) — требует Bearer-ключ подписки
+      // Пути: /iss/datashop/algopack/... и /iss/analyticalproducts/futoi/...
       target = 'https://apim.moex.com' + path;
       hdrs = { 'Authorization': auth, 'Accept': 'application/json' };
     } else {
@@ -704,14 +705,46 @@ async function fetchMoex(secid, metric, type, params={}){
   return issToObjects(json, metric);
 }
 
+// FUTOI использует отдельный endpoint: /iss/analyticalproducts/futoi/securities
+// Тикер — двухсимвольный код контракта: BR, Si, RI, GD, MX, GZ, SR, NG, EU
+function futoi2sym(ticker){
+  // Из кода контракта вида BRU6, SiU6, RIU6 и т.д. → двухсимвольный базовый тикер
+  const m = ticker.match(/^([A-Za-z]{2,3})/);
+  if(!m) return ticker;
+  const base = m[1].toUpperCase();
+  // Известные маппинги
+  const MAP = {BR:'BR',SI:'Si',RI:'RI',GD:'GD',MX:'MX',GZ:'GZ',SR:'SR',NG:'NG',EU:'ED',NG:'NG'};
+  return MAP[base] || base;
+}
+
+async function fetchFutoi(ticker){
+  const sym = futoi2sym(ticker);
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const url = prefix + `/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=20`;
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX futoi HTTP ${resp.status}`);
+  const json = await resp.json();
+  // Блок называется 'futoi' или первый ключ
+  const block = json['futoi'] || json[Object.keys(json).find(k=>k!=='metadata'&&k!=='history')];
+  if(!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c,i) => obj[c] = row[i]);
+    return obj;
+  });
+}
+
 async function fetchAllMoex(ticker, type){
   const lim = {limit: 100};
-  // futoi — данные конец дня, запрашиваем без tradedate → вернёт последние доступные
   const prom = {
     ts:    fetchMoex(ticker, 'tradestats', type, lim).catch(()=>[]),
     ob:    fetchMoex(ticker, 'obstats',    type, lim).catch(()=>[]),
     os:    fetchMoex(ticker, 'orderstats', type, lim).catch(()=>[]),
-    futoi: type==='futures' ? fetchMoex(ticker, 'futoi', 'futures', lim).catch(()=>[]) : Promise.resolve([]),
+    futoi: type==='futures' ? fetchFutoi(ticker).catch(()=>[]) : Promise.resolve([]),
   };
   return {
     ts:    await prom.ts,
@@ -912,49 +945,52 @@ function m_CANCEL_SIGNAL(os){
   return {score, confidence, detail:`отм.B:${pct(rateB)} отм.S:${pct(rateS)}`};
 }
 
-// --- Method 8: Institutional OI (futoi юрлица) ---
+// --- Method 8: Institutional OI (futoi юрлица YUR) ---
+// AlgoPack FUTOI: clgroup='YUR'/'FIZ', pos_long >= 0, pos_short <= 0 (отрицательное)
+// pos = нетто-позиция (pos_long + pos_short)
 function m_INST_OI(futoi){
   if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
-  // Find юрлица rows
+  // API возвращает clgroup = 'YUR' (юрлица) согласно документации AlgoPack
   const jur = futoi.filter(r=>{
-    const g = (r.clgroup||r.group||'').toLowerCase();
-    return g.includes('юр') || g.includes('jur') || g.includes('legal') || g === 'j';
+    const g = (r.clgroup||r.group||'').toUpperCase();
+    return g === 'YUR' || g.includes('ЮР') || g.includes('LEGAL');
   });
-  if(!jur.length) return {score:0, confidence:0.1, detail:'нет данных юрлиц'};
-  let longNet=0, shortNet=0, longChg=0, shortChg=0;
+  if(!jur.length) return {score:0, confidence:0.1, detail:'нет данных YUR'};
+  let longNet=0, shortNet=0;
   jur.forEach(r=>{
-    longNet  += toNum(r.pos_long||r.posLong||r.long_qty||r.longQty||0);
-    shortNet += toNum(r.pos_short||r.posShort||r.short_qty||r.shortQty||0);
-    longChg  += toNum(r.pos_long_change||r.posLongChange||r.long_change||r.longChange||0);
-    shortChg += toNum(r.pos_short_change||r.posShortChange||r.short_change||r.shortChange||0);
+    longNet  += toNum(r.pos_long || 0);
+    // pos_short в API отрицательное — берём абсолютное значение
+    shortNet += Math.abs(toNum(r.pos_short || 0));
   });
+  // Изменение считаем по pos (нетто): берём последнее значение
+  const netPos = jur.reduce((s,r)=>s+toNum(r.pos||0),0);
   const net = longNet - shortNet;
-  const netChg = longChg - shortChg;
   const absTotal = longNet + shortNet || 1;
-  const score = tanh((net / absTotal) * 3 + (netChg / (absTotal*0.1 || 1)) * 0.5);
+  const score = tanh((net / absTotal) * 3 + (netPos / (absTotal || 1)) * 0.5);
   const confidence = absTotal > 0 ? 0.75 : 0.1;
-  return {score, confidence, detail:`L:${snum(longNet)} S:${snum(shortNet)} Δ:${snum(netChg)}`};
+  return {score, confidence, detail:`YUR L:${snum(longNet)} S:${snum(shortNet)} net:${snum(netPos)}`};
 }
 
-// --- Method 9: Retail contrarian (futoi физлица — обычно ошибаются) ---
+// --- Method 9: Retail contrarian (futoi физлица FIZ — обычно ошибаются) ---
 function m_RETAIL_CONTRA(futoi){
   if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  // API возвращает clgroup = 'FIZ' (физлица)
   const phiz = futoi.filter(r=>{
-    const g = (r.clgroup||r.group||'').toLowerCase();
-    return g.includes('физ') || g.includes('phiz') || g.includes('physical') || g.includes('natural') || g === 'f';
+    const g = (r.clgroup||r.group||'').toUpperCase();
+    return g === 'FIZ' || g.includes('ФИЗ') || g.includes('PHIZ') || g.includes('NATURAL');
   });
-  if(!phiz.length) return {score:0, confidence:0.1, detail:'нет данных физлиц'};
+  if(!phiz.length) return {score:0, confidence:0.1, detail:'нет данных FIZ'};
   let longNet=0, shortNet=0;
   phiz.forEach(r=>{
-    longNet  += toNum(r.pos_long||r.posLong||r.long_qty||r.longQty||0);
-    shortNet += toNum(r.pos_short||r.posShort||r.short_qty||r.shortQty||0);
+    longNet  += toNum(r.pos_long || 0);
+    shortNet += Math.abs(toNum(r.pos_short || 0));
   });
   const net = longNet - shortNet;
   const absTotal = longNet + shortNet || 1;
   // Противоположный сигнал: если физики лонг → короткий сигнал
   const score = -tanh((net / absTotal) * 2.5);
   const confidence = absTotal > 0 ? 0.55 : 0.1;
-  return {score, confidence, detail:`(против) L:${snum(longNet)} S:${snum(shortNet)}`};
+  return {score, confidence, detail:`FIZ L:${snum(longNet)} S:${snum(shortNet)}`};
 }
 
 // --- Method 10: Price trend (candles) ---
@@ -1370,23 +1406,37 @@ function renderFutoiPanel(){
     el.innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных (только для фьючерсов)</div>';
     return;
   }
-  const rows = futoiData.map(r=>{
-    const group = r.clgroup || r.group || r.name || '—';
-    const lg = toNum(r.pos_long||r.posLong||r.long_qty||r.longQty||0);
-    const sh = toNum(r.pos_short||r.posShort||r.short_qty||r.shortQty||0);
-    const net = lg - sh;
-    const lgChg = toNum(r.pos_long_change||r.posLongChange||r.long_change||r.longChange||0);
-    const shChg = toNum(r.pos_short_change||r.posShortChange||r.short_change||r.shortChange||0);
-    const netChg = lgChg - shChg;
+  // Группируем по clgroup, берём последнюю запись для каждой группы
+  const byGroup = {};
+  futoiData.forEach(r=>{
+    const g = (r.clgroup||r.group||'—').toUpperCase();
+    if(!byGroup[g] || (r.tradetime||r.systime||'') > (byGroup[g].tradetime||byGroup[g].systime||''))
+      byGroup[g] = r;
+  });
+  // Определяем время данных
+  const sample = futoiData[futoiData.length-1] || {};
+  const dataTime = sample.tradetime || sample.systime || '';
+  const dataDate = sample.tradedate || '';
+
+  const rows = Object.entries(byGroup).map(([group, r])=>{
+    const lg  = toNum(r.pos_long  || 0);
+    // pos_short в FUTOI API — отрицательное число
+    const sh  = Math.abs(toNum(r.pos_short || 0));
+    const net = toNum(r.pos || 0); // нетто = pos_long + pos_short (pos_short < 0)
+    const groupLabel = group === 'YUR' ? 'ЮЛ (YUR)' : group === 'FIZ' ? 'ФЛ (FIZ)' : group;
     return `<div class="futoi-row">
-      <span style="color:var(--txt);font-weight:500;">${group.slice(0,14)}</span>
+      <span style="color:var(--txt);font-weight:500;">${groupLabel}</span>
       <span class="dp">${snum(lg)}</span>
       <span class="dn">${snum(sh)}</span>
-      <span style="color:${net>=0?'var(--pos)':'var(--neg)'};font-weight:600;">${snum(net)} <small style="font-size:9px;opacity:.6">(${netChg>=0?'+':''}${snum(netChg)})</small></span>
+      <span style="color:${net>=0?'var(--pos)':'var(--neg)'};font-weight:600;">${net>=0?'+':''}${snum(net)}</span>
     </div>`;
   }).join('');
+
   el.innerHTML = `
-    <div class="futoi-row futoi-hdr"><span>Группа</span><span>Лонг</span><span>Шорт</span><span>Нетто (Δ)</span></div>
+    <div style="font-size:9px;color:var(--txt3);margin-bottom:6px;">
+      ${dataDate} ${dataTime ? dataTime.slice(0,5) : ''} · ticker: ${futoi2sym(curTicker)}
+    </div>
+    <div class="futoi-row futoi-hdr"><span>Группа</span><span>Лонг</span><span>Шорт</span><span>Нетто</span></div>
     ${rows}`;
 }
 
