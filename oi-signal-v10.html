@@ -307,7 +307,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <span style="font-size:9px;color:var(--txt3);">вес · точность</span>
       </div>
       <div id="methodsTable"></div>
-      <div class="outcome-row" id="outcomeRow" style="display:none;">
+      <div class="outcome-row" id="outcomeRow" style="display:none;opacity:0.4;" title="Авто-запись включена — исходы фиксируются через 3 бара по свечам">
         <span class="outcome-lbl">Записать исход:</span>
         <select class="outcome-sel" id="outcomeSel">
           <option value="">— выбрать —</option>
@@ -936,6 +936,54 @@ function computeComposite(methodResults, ticker){
 // ============================================================
 // LEARNING ENGINE
 // ============================================================
+// Автоматическая запись исходов по свечам.
+// Через OUTCOME_BARS баров после сигнала сравниваем цену — и обновляем веса.
+const OUTCOME_BARS = 3;
+function autoRecordOutcomes(){
+  if(!signalLog.length) return;
+  // Строим плоский список свечей с timestamps
+  const candles = candleData[curTF] || [];
+  if(candles.length < OUTCOME_BARS + 1) return;
+
+  let updated = false;
+  signalLog.forEach(entry=>{
+    if(entry.outcome || entry.ticker !== curTicker) return;
+    const sigTs = new Date(entry.ts).getTime();
+    // Ищем свечу на момент сигнала и через OUTCOME_BARS после
+    const sigIdx = candles.findIndex(c=>new Date(c.time).getTime() >= sigTs);
+    if(sigIdx < 0) return;
+    const futureIdx = sigIdx + OUTCOME_BARS;
+    if(futureIdx >= candles.length) return; // ещё не прошло нужное кол-во баров
+    const priceAt   = toP(candles[sigIdx].close);
+    const priceLater= toP(candles[futureIdx].close);
+    if(!priceAt || !priceLater) return;
+    const chg = (priceLater - priceAt) / priceAt;
+    // Порог 0.05% для нейтрального сигнала
+    const outcome = chg > 0.0005 ? 'long' : chg < -0.0005 ? 'short' : 'neutral';
+    entry.outcome = outcome;
+    entry.autoRecorded = true;
+
+    // Обновляем веса методов
+    const ticker = entry.ticker;
+    if(!methodWeights[ticker]) methodWeights[ticker] = {};
+    METHODS.forEach(m=>{
+      const score = entry.methods?.[m.id] ?? 0;
+      if(Math.abs(score) < 0.05) return;
+      const correct =
+        (score >  0.1 && outcome === 'long')  ||
+        (score < -0.1 && outcome === 'short') ||
+        (Math.abs(score) <= 0.1 && outcome === 'neutral');
+      if(!methodWeights[ticker][m.id])
+        methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0};
+      const mw = methodWeights[ticker][m.id];
+      mw.total++; if(correct) mw.correct++;
+      mw.weight = 0.85*mw.weight + 0.15*(mw.correct/mw.total);
+    });
+    updated = true;
+  });
+  if(updated){ saveAll(); renderHistory(); }
+}
+
 function recordOutcome(){
   const sel = document.getElementById('outcomeSel');
   const outcome = sel.value;
@@ -1517,6 +1565,8 @@ async function refreshAll(){
   renderObPanel();
   renderHistory();
   updateAges();
+
+  autoRecordOutcomes(); // авто-запись исходов по свечам через 3 бара
 
   const msg = errs.length ? `Готово (ошибки: ${errs.join('; ')})` : `Обновлено ${new Date().toLocaleTimeString('ru-RU')}`;
   setStatus(msg, false);
