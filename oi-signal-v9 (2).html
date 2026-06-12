@@ -240,7 +240,7 @@ table.oit{width:100%;border-collapse:collapse;font-size:11px;}
     if (request.method === 'OPTIONS')
       return new Response(null, { headers: cors() });
     const path = new URL(request.url).pathname + new URL(request.url).search;
-    const target = 'https://invest-public-api.tinkoff.ru' + path;
+    const target = 'https://invest-public-api.tinkoff.ru/rest' + path;
     const body = request.method !== 'GET' ? await request.arrayBuffer() : undefined;
     const resp = await fetch(target, {
       method: request.method,
@@ -1613,7 +1613,7 @@ async function fetchOneTF(instrumentId, tf, from, to, token){
   const url=tinvestProxy?(tinvestProxy.replace(/\/$/,'')+path):(TBASE+path);
   // T-Invest API v2: instrumentId is the universal field (accepts figi, uid, isin, ticker+class)
   // Also send figi for backward compat with older proxy setups
-  const body={figi:instrumentId, from:from.toISOString(), to:to.toISOString(), interval:TF_INTERVALS[tf]};
+  const body={figi:instrumentId, instrument_id:instrumentId, from:from.toISOString(), to:to.toISOString(), interval:TF_INTERVALS[tf]};
   const res=await fetch(url,{
     method:'POST',
     headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
