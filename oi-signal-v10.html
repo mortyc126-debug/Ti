@@ -248,8 +248,9 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <option value="index">Индекс</option>
       </select>
       <input id="custName" class="inp" placeholder="Название" style="width:130px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
-      <input id="custFigi" class="inp" placeholder="FIGI/UID" style="width:160px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <input id="custFigi" class="inp" placeholder="FIGI/UID (или 🔍)" style="width:160px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
       <button class="btn-sm" onclick="addCustomTicker()">+ Добавить</button>
+      <button class="btn-sm" onclick="lookupAllFIGI()" title="Найти FIGI для всех закреплённых тикеров без FIGI через T-Invest API">🔍 Авто-FIGI</button>
     </div>
   </div>
 </div>
@@ -412,58 +413,55 @@ const METHODS = [
 ];
 
 const CATALOG = [
-  // Акции TQBR
-  {t:'SBER',  cat:'stocks',  name:'Сбербанк',      sector:'Банки'},
-  {t:'GAZP',  cat:'stocks',  name:'Газпром',        sector:'Нефтегаз'},
-  {t:'LKOH',  cat:'stocks',  name:'Лукойл',         sector:'Нефтегаз'},
-  {t:'ROSN',  cat:'stocks',  name:'Роснефть',       sector:'Нефтегаз'},
-  {t:'NVTK',  cat:'stocks',  name:'Новатэк',        sector:'Нефтегаз'},
-  {t:'VTBR',  cat:'stocks',  name:'ВТБ',            sector:'Банки'},
-  {t:'TCSG',  cat:'stocks',  name:'Т-Банк',         sector:'Банки'},
-  {t:'BSPB',  cat:'stocks',  name:'Банк СПБ',       sector:'Банки'},
-  {t:'GMKN',  cat:'stocks',  name:'Норникель',      sector:'Металлы'},
-  {t:'CHMF',  cat:'stocks',  name:'Северсталь',     sector:'Металлы'},
-  {t:'NLMK',  cat:'stocks',  name:'НЛМК',           sector:'Металлы'},
-  {t:'RUAL',  cat:'stocks',  name:'РУСАЛ',          sector:'Металлы'},
-  {t:'PLZL',  cat:'stocks',  name:'Полюс',          sector:'Металлы'},
-  {t:'ALRS',  cat:'stocks',  name:'АЛРОСА',         sector:'Металлы'},
-  {t:'YNDX',  cat:'stocks',  name:'Яндекс',         sector:'Технологии'},
-  {t:'VKCO',  cat:'stocks',  name:'ВКонтакте',      sector:'Технологии'},
-  {t:'POSI',  cat:'stocks',  name:'Позитив',        sector:'Технологии'},
-  {t:'OZON',  cat:'stocks',  name:'Ozon',           sector:'Технологии'},
-  {t:'TATN',  cat:'stocks',  name:'Татнефть',       sector:'Нефтегаз'},
-  {t:'SNGS',  cat:'stocks',  name:'Сургутнефтегаз', sector:'Нефтегаз'},
-  {t:'MGNT',  cat:'stocks',  name:'Магнит',         sector:'Ритейл'},
-  {t:'FIVE',  cat:'stocks',  name:'X5 Retail',      sector:'Ритейл'},
-  {t:'MTSS',  cat:'stocks',  name:'МТС',            sector:'Телеком'},
-  {t:'RTKM',  cat:'stocks',  name:'Ростелеком',     sector:'Телеком'},
-  {t:'AFLT',  cat:'stocks',  name:'Аэрофлот',       sector:'Транспорт'},
-  {t:'FLOT',  cat:'stocks',  name:'Совкомфлот',     sector:'Транспорт'},
-  {t:'PIKK',  cat:'stocks',  name:'ПИК',            sector:'Строительство'},
-  {t:'SMLT',  cat:'stocks',  name:'Самолёт',        sector:'Строительство'},
-  {t:'AFKS',  cat:'stocks',  name:'АФК Система',    sector:'Холдинги'},
-  {t:'IRAO',  cat:'stocks',  name:'Интер РАО',      sector:'Энергетика'},
-  {t:'FEES',  cat:'stocks',  name:'ФСК ЕЭС',        sector:'Энергетика'},
-  {t:'HYDR',  cat:'stocks',  name:'РусГидро',       sector:'Энергетика'},
-  {t:'CBOM',  cat:'stocks',  name:'Совкомбанк',     sector:'Банки'},
-  // Индексы
-  {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс'},
-  {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс'},
-  {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс'},
-  // Фьючерсы FORTS
-  {t:'SiH5',  cat:'futures', name:'USD/RUB',         sector:'Валюта'},
-  {t:'EuH5',  cat:'futures', name:'EUR/RUB',         sector:'Валюта'},
-  {t:'CNH5',  cat:'futures', name:'CNY/RUB',         sector:'Валюта'},
-  {t:'RIH5',  cat:'futures', name:'RTS индекс',      sector:'Индекс'},
-  {t:'MXH5',  cat:'futures', name:'МосБиржа',        sector:'Индекс'},
-  {t:'GDH5',  cat:'futures', name:'Золото',          sector:'Сырьё'},
-  {t:'SVH5',  cat:'futures', name:'Серебро',         sector:'Сырьё'},
-  {t:'BRH5',  cat:'futures', name:'Brent',           sector:'Сырьё'},
-  {t:'NGH5',  cat:'futures', name:'Газ (Henry Hub)', sector:'Сырьё'},
-  {t:'GZH5',  cat:'futures', name:'Газпром фьюч',   sector:'Акции'},
-  {t:'SRH5',  cat:'futures', name:'Сбербанк фьюч',  sector:'Акции'},
-  {t:'LKH5',  cat:'futures', name:'Лукойл фьюч',    sector:'Акции'},
-  {t:'GKH5',  cat:'futures', name:'Норникель фьюч', sector:'Акции'},
+  // Акции TQBR — f: FIGI для T-Invest свечей
+  {t:'SBER',  cat:'stocks',  name:'Сбербанк',      sector:'Банки',         f:'BBG004730N88'},
+  {t:'GAZP',  cat:'stocks',  name:'Газпром',        sector:'Нефтегаз',      f:'BBG004730RP0'},
+  {t:'LKOH',  cat:'stocks',  name:'Лукойл',         sector:'Нефтегаз',      f:'BBG004731032'},
+  {t:'ROSN',  cat:'stocks',  name:'Роснефть',       sector:'Нефтегаз',      f:'BBG004731354'},
+  {t:'NVTK',  cat:'stocks',  name:'Новатэк',        sector:'Нефтегаз',      f:'BBG00475KKY8'},
+  {t:'VTBR',  cat:'stocks',  name:'ВТБ',            sector:'Банки',         f:'BBG004730ZJ9'},
+  {t:'TCSG',  cat:'stocks',  name:'Т-Банк',         sector:'Банки',         f:'BBG00QPYJ5H0'},
+  {t:'BSPB',  cat:'stocks',  name:'Банк СПБ',       sector:'Банки',         f:'BBG000QJW156'},
+  {t:'GMKN',  cat:'stocks',  name:'Норникель',      sector:'Металлы',       f:'BBG004731489'},
+  {t:'CHMF',  cat:'stocks',  name:'Северсталь',     sector:'Металлы',       f:'BBG00475K6C3'},
+  {t:'NLMK',  cat:'stocks',  name:'НЛМК',           sector:'Металлы',       f:'BBG004S681B4'},
+  {t:'RUAL',  cat:'stocks',  name:'РУСАЛ',          sector:'Металлы',       f:'BBG008F2T3T2'},
+  {t:'PLZL',  cat:'stocks',  name:'Полюс',          sector:'Металлы',       f:'BBG000R607Y3'},
+  {t:'ALRS',  cat:'stocks',  name:'АЛРОСА',         sector:'Металлы',       f:'BBG004S68473'},
+  {t:'YNDX',  cat:'stocks',  name:'Яндекс',         sector:'Технологии',    f:'BBG006L8G4H1'},
+  {t:'VKCO',  cat:'stocks',  name:'ВКонтакте',      sector:'Технологии',    f:'BBG00Y6XVMF5'},
+  {t:'POSI',  cat:'stocks',  name:'Позитив',        sector:'Технологии',    f:'BBG013LGHHZ5'},
+  {t:'OZON',  cat:'stocks',  name:'Ozon',           sector:'Технологии',    f:'BBG00JN4FXG8'},
+  {t:'TATN',  cat:'stocks',  name:'Татнефть',       sector:'Нефтегаз',      f:'BBG004RVFFC0'},
+  {t:'SNGS',  cat:'stocks',  name:'Сургутнефтегаз', sector:'Нефтегаз',      f:'BBG004S681M2'},
+  {t:'MGNT',  cat:'stocks',  name:'Магнит',         sector:'Ритейл',        f:'BBG004RVFCY3'},
+  {t:'FIVE',  cat:'stocks',  name:'X5 Retail',      sector:'Ритейл',        f:'BBG00JXPFBN0'},
+  {t:'MTSS',  cat:'stocks',  name:'МТС',            sector:'Телеком',       f:'BBG004S681W1'},
+  {t:'RTKM',  cat:'stocks',  name:'Ростелеком',     sector:'Телеком',       f:'BBG004S682Z6'},
+  {t:'AFLT',  cat:'stocks',  name:'Аэрофлот',       sector:'Транспорт',     f:'BBG004S683W7'},
+  {t:'FLOT',  cat:'stocks',  name:'Совкомфлот',     sector:'Транспорт',     f:'BBG000R70SP1'},
+  {t:'PIKK',  cat:'stocks',  name:'ПИК',            sector:'Строительство', f:'BBG002GHV6L9'},
+  {t:'SMLT',  cat:'stocks',  name:'Самолёт',        sector:'Строительство', f:'BBG001M2SC01'},
+  {t:'AFKS',  cat:'stocks',  name:'АФК Система',    sector:'Холдинги',      f:'BBG004S68758'},
+  {t:'IRAO',  cat:'stocks',  name:'Интер РАО',      sector:'Энергетика',    f:'BBG004S68829'},
+  {t:'FEES',  cat:'stocks',  name:'ФСК ЕЭС',        sector:'Энергетика',    f:'BBG004S686W0'},
+  {t:'HYDR',  cat:'stocks',  name:'РусГидро',       sector:'Энергетика',    f:'BBG004S68614'},
+  {t:'CBOM',  cat:'stocks',  name:'Совкомбанк',     sector:'Банки',         f:'BBG013HJD9B6'},
+  // Индексы (FIGI нет — только MOEX данные)
+  {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс',        f:''},
+  {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс',        f:''},
+  {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс',        f:''},
+  // Фьючерсы FORTS — актуальные контракты (обновляй f при смене серии)
+  {t:'SiM5',  cat:'futures', name:'USD/RUB июнь',    sector:'Валюта',        f:'FUTSI0625'},
+  {t:'SiU5',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:'FUTSI0925'},
+  {t:'EuM5',  cat:'futures', name:'EUR/RUB июнь',    sector:'Валюта',        f:'FUTEU0625'},
+  {t:'RIM5',  cat:'futures', name:'RTS июнь',        sector:'Индекс',        f:'FUTRI0625'},
+  {t:'MXM5',  cat:'futures', name:'МосБиржа июнь',   sector:'Индекс',        f:'FUTMX0625'},
+  {t:'GDM5',  cat:'futures', name:'Золото июнь',     sector:'Сырьё',         f:'FUTGD0625'},
+  {t:'BRM5',  cat:'futures', name:'Brent июнь',      sector:'Сырьё',         f:'FUTBR0625'},
+  {t:'NGM5',  cat:'futures', name:'Газ июнь',        sector:'Сырьё',         f:'FUTNG0625'},
+  {t:'GZM5',  cat:'futures', name:'Газпром июнь',    sector:'Акции',         f:'FUTGZ0625'},
+  {t:'SRM5',  cat:'futures', name:'Сбербанк июнь',   sector:'Акции',         f:'FUTSR0625'},
   // Валюта CETS
   {t:'USD000UTSTOM', cat:'currency', name:'Доллар США',  sector:'Валюта'},
   {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
@@ -1244,12 +1242,14 @@ function renderCatalog(){
   el.innerHTML = items.map(item=>{
     const isPin = pinnedTickers.includes(item.t);
     const isActive = item.t === curTicker;
+    const hasFigi = !!(item.f);
     return `<div class="cat-item${isActive?' active-ticker':''}${isPin?' pinned':''}" onclick="selectTicker('${item.t}','${item.cat||'stocks'}')">
       <div style="flex:1;min-width:0;">
-        <div class="cat-item-code">${item.t}</div>
+        <div class="cat-item-code">${item.t} <span style="font-size:8px;color:${hasFigi?'var(--pos)':'var(--txt3)'}">${hasFigi?'●':'○'}</span></div>
         <div class="cat-item-name">${item.name}</div>
         <div class="cat-item-sector">${item.sector||item.cat||''}</div>
       </div>
+      ${!hasFigi?`<button class="pin-btn" onclick="event.stopPropagation();lookupFIGI('${item.t}')" title="Найти FIGI через T-Invest API" style="font-size:10px;">🔍</button>`:''}
       <button class="pin-btn" onclick="event.stopPropagation();togglePin('${item.t}')" title="${isPin?'Открепить':'Закрепить'}">${isPin?'★':'☆'}</button>
     </div>`;
   }).join('');
@@ -1269,6 +1269,45 @@ function togglePin(t){
   renderPinnedChips();
   renderCatalog();
   saveAll();
+}
+
+// Авто-поиск FIGI через T-Invest FindInstrument
+async function lookupFIGI(ticker){
+  const token = getTinvestToken();
+  if(!token){ alert('Введи T-Invest токен'); return; }
+  const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument');
+  try{
+    const resp = await fetch(url, {
+      method:'POST',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body: JSON.stringify({query: ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false}),
+    });
+    const d = await resp.json();
+    const instr = (d.instruments||[]);
+    // Prefer exact ticker match on MOEX (classCode TQBR/SPBFUT etc)
+    const match = instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
+                 || instr.find(x=>x.ticker===ticker)
+                 || instr[0];
+    if(!match){ alert(`FIGI для ${ticker} не найден (результатов: ${instr.length})`); return; }
+    const figi = match.figi || match.uid || match.instrumentUid || '';
+    if(!figi){ alert('У инструмента нет FIGI/UID'); return; }
+    // Обновить в CATALOG и tickers
+    const catItem = CATALOG.find(x=>x.t===ticker);
+    if(catItem) catItem.f = figi;
+    const tkItem = tickers.find(x=>x.t===ticker);
+    if(tkItem) tkItem.f = figi; else tickers.push({t:ticker, f:figi, cat:'stocks', type:'stocks', name:ticker});
+    saveAll(); renderCatalog();
+    setStatus(`✓ FIGI для ${ticker}: ${figi}`);
+    return figi;
+  } catch(e){ alert('Ошибка поиска: '+e.message); }
+}
+
+async function lookupAllFIGI(){
+  const noFigi = [...CATALOG, ...tickers].filter(x=>!x.f && pinnedTickers.includes(x.t));
+  if(!noFigi.length){ setStatus('У всех закреплённых тикеров уже есть FIGI'); return; }
+  setStatus(`Поиск FIGI для ${noFigi.length} тикеров…`, true);
+  for(const item of noFigi){ await lookupFIGI(item.t); }
+  setStatus('✓ Поиск FIGI завершён');
 }
 
 function addCustomTicker(){
