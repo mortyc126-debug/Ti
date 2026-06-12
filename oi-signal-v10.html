@@ -333,6 +333,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         </div>
       </div>
       <div id="candleArea"><span>Нажмите ↺ Обновить для загрузки свечей</span></div>
+      <div id="candleTip" style="display:none;position:fixed;background:#1A1030;border:1px solid rgba(255,0,128,.3);border-radius:4px;padding:4px 8px;font-size:10px;color:#F2F0FF;pointer-events:none;z-index:99;white-space:nowrap;"></div>
     </div>
 
     <!-- TradeStats mini panel -->
@@ -1081,62 +1082,84 @@ function renderMethodsTable(methodResults){
 // ============================================================
 function renderCandleChart(candles){
   const area = document.getElementById('candleArea');
+  if(candleChart){ candleChart.destroy(); candleChart=null; }
   if(!candles || !candles.length){
-    area.style.height='200px'; area.innerHTML='<span>Нет свечей</span>'; return;
+    area.style.height='220px'; area.innerHTML='<span style="color:var(--txt3);font-size:11px;">Нет свечей</span>'; return;
   }
-  area.innerHTML = ''; area.style.height = '220px';
+  area.innerHTML=''; area.style.height='220px';
+  const dpr = window.devicePixelRatio||1;
+  const W = area.clientWidth||600, H2 = 220;
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'width:100%;height:220px;';
+  canvas.width = W*dpr; canvas.height = H2*dpr;
+  canvas.style.cssText=`width:${W}px;height:${H2}px;`;
   area.appendChild(canvas);
-  if(candleChart) candleChart.destroy();
-  const slice = candles.slice(-60);
-  const labels = slice.map(c=>{
-    const d = new Date(c.time);
-    if(curTF==='1d') return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
-    return d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  const ctx2 = canvas.getContext('2d');
+  ctx2.scale(dpr,dpr);
+
+  const slice = candles.slice(-80);
+  const O=slice.map(c=>toP(c.open)), H=slice.map(c=>toP(c.high)),
+        L=slice.map(c=>toP(c.low)),  C=slice.map(c=>toP(c.close));
+
+  const pad={l:44,r:8,t:8,b:28};
+  const chartW=W-pad.l-pad.r, chartH=H2-pad.t-pad.b;
+  const allH2=H.filter(v=>v>0), allL2=L.filter(v=>v>0);
+  const yMax=allH2.length?Math.max(...allH2):1, yMin2=allL2.length?Math.min(...allL2):0;
+  const yRange=yMax-yMin2||1;
+  const toY=v=>pad.t+chartH*(1-(v-yMin2)/yRange);
+  const n=slice.length;
+  const slotW=chartW/n;
+  const bodyW=Math.max(1,slotW*0.6);
+
+  // Grid lines
+  ctx2.strokeStyle='rgba(255,255,255,0.04)'; ctx2.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+chartH*i/4;
+    ctx2.beginPath(); ctx2.moveTo(pad.l,y); ctx2.lineTo(pad.l+chartW,y); ctx2.stroke();
+  }
+  // Y labels
+  ctx2.fillStyle='#6F648F'; ctx2.font='9px sans-serif'; ctx2.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const v=yMin2+yRange*(1-i/4);
+    ctx2.fillText(v.toFixed(2),pad.l-3,pad.t+chartH*i/4+3);
+  }
+
+  // Candles
+  slice.forEach((c,i)=>{
+    const cx=pad.l+slotW*i+slotW/2;
+    const o=toY(O[i]),h=toY(H[i]),l=toY(L[i]),cl=toY(C[i]);
+    const bull=C[i]>=O[i];
+    const col=bull?'#52F2C9':'#FF4D7A';
+    // Wick
+    ctx2.strokeStyle=col; ctx2.lineWidth=1;
+    ctx2.beginPath(); ctx2.moveTo(cx,h); ctx2.lineTo(cx,l); ctx2.stroke();
+    // Body
+    const by=Math.min(o,cl), bh=Math.max(1,Math.abs(o-cl));
+    ctx2.fillStyle=bull?'rgba(82,242,201,0.9)':'rgba(255,77,122,0.9)';
+    ctx2.fillRect(cx-bodyW/2, by, bodyW, bh);
   });
-  const O = slice.map(c=>toP(c.open));
-  const H = slice.map(c=>toP(c.high));
-  const L = slice.map(c=>toP(c.low));
-  const C = slice.map(c=>toP(c.close));
-  const bull = O.map((_,i)=>C[i]>=O[i]);
-  // Floating bar: body = [min(O,C), max(O,C)]
-  const bodyData = O.map((_,i)=>[Math.min(O[i],C[i]), Math.max(O[i],C[i])]);
-  const bodyColors = bull.map(b=>b?'rgba(82,242,201,0.85)':'rgba(255,77,122,0.85)');
-  // Wick = [L, H] rendered as thin bar behind body
-  const wickData = L.map((_,i)=>[L[i],H[i]]);
-  const wickColors = bull.map(b=>b?'rgba(82,242,201,0.4)':'rgba(255,77,122,0.4)');
-  // Y range with small padding
-  const allL = L.filter(v=>v>0);
-  const allH = H.filter(v=>v>0);
-  const yMin = allL.length ? Math.min(...allL)*0.999 : 0;
-  const yMax = allH.length ? Math.max(...allH)*1.001 : 1;
-  candleChart = new Chart(canvas,{
-    type:'bar',
-    data:{labels, datasets:[
-      // Wick (тонкая линия high-low)
-      {label:'Wick', data:wickData, backgroundColor:wickColors, borderColor:wickColors,
-       barPercentage:0.1, categoryPercentage:1.0, order:2},
-      // Body (open-close)
-      {label:'Body', data:bodyData, backgroundColor:bodyColors, borderColor:bodyColors, borderWidth:0,
-       barPercentage:0.55, categoryPercentage:1.0, order:1, borderRadius:1},
-    ]},
-    options:{
-      responsive:true, maintainAspectRatio:false, animation:false,
-      plugins:{legend:{display:false}, tooltip:{
-        filter:(item)=>item.datasetIndex===1,
-        callbacks:{label:(ctx)=>{
-          const c=slice[ctx.dataIndex];
-          return [`O:${toP(c.open).toFixed(2)}`,`H:${toP(c.high).toFixed(2)}`,`L:${toP(c.low).toFixed(2)}`,`C:${toP(c.close).toFixed(2)}`];
-        }},
-        backgroundColor:'#1A1030',borderColor:'rgba(255,0,128,0.3)',borderWidth:1,titleColor:'#F2F0FF',bodyColor:'#A79BC9'
-      }},
-      scales:{
-        x:{display:true, ticks:{color:'#6F648F',font:{size:9},maxRotation:0,maxTicksLimit:10}, grid:{display:false}},
-        y:{display:true, min:yMin, max:yMax, ticks:{color:'#6F648F',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}}
-      }
-    }
+
+  // X labels (every ~10 candles)
+  ctx2.fillStyle='#6F648F'; ctx2.font='9px sans-serif'; ctx2.textAlign='center';
+  const step=Math.max(1,Math.floor(n/8));
+  slice.forEach((c,i)=>{
+    if(i%step!==0) return;
+    const d=new Date(c.time);
+    const lbl=curTF==='1d'?d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    ctx2.fillText(lbl,pad.l+slotW*i+slotW/2,H2-8);
   });
+
+  // Hover tooltip
+  canvas.onmousemove=e=>{
+    const rect=canvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left);
+    const idx=Math.floor((mx-pad.l)/slotW);
+    if(idx<0||idx>=n) return;
+    const c=slice[idx];
+    const tt=document.getElementById('candleTip');
+    if(tt){ tt.style.left=(e.clientX+10)+'px'; tt.style.top=(e.clientY-10)+'px';
+      tt.innerHTML=`O:${toP(c.open).toFixed(2)} H:${toP(c.high).toFixed(2)} L:${toP(c.low).toFixed(2)} C:${toP(c.close).toFixed(2)}`; tt.style.display='block'; }
+  };
+  canvas.onmouseleave=()=>{ const tt=document.getElementById('candleTip'); if(tt) tt.style.display='none'; };
 }
 
 // ============================================================
@@ -1152,7 +1175,7 @@ function renderTsPanel(){
   const sval   = toNum(r.val_s||0);   // sell value
   const btrades= toNum(r.trades_b||0);
   const strades= toNum(r.trades_s||0);
-  const pr     = toNum(r.pr_close||0);
+  const pr     = toNum(r.pr_close||r.sec_pr_close||0);
   const vwap   = toNum(r.pr_vwap||0);
   const disb   = toNum(r.disb||0);    // дисбаланс (signed)
   const trades = toNum(r.trades||0);
