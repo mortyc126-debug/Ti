@@ -577,12 +577,15 @@ function getProxy(){ return (document.getElementById('proxyInp').value||'').trim
 function getMoexKey(){ return (document.getElementById('moexKeyInp').value||'').trim(); }
 function getTinvestToken(){ return (document.getElementById('tinvestInp').value||'').trim(); }
 
+// Реальный путь MOEX AlgoPack DataShop: /iss/datashop/algopack/{segment}/{metric}.json?secid=...
+const MOEX_SEGMENTS = {stocks:'eq', futures:'fo', currency:'currency', index:'eq'};
+
 function moexUrl(secid, metric, type, params={}){
-  const m = MOEX_MARKETS[type] || MOEX_MARKETS.stocks;
+  const seg = MOEX_SEGMENTS[type] || 'eq';
   const base = getProxy();
   const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
-  const path = `/engines/${m.engine}/markets/${m.market}/boards/${m.board}/securities/${secid}/algopack/metrics/${metric}.json`;
-  const q = new URLSearchParams({...params, 'iss.meta':'off'}).toString();
+  const path = `/datashop/algopack/${seg}/${metric}.json`;
+  const q = new URLSearchParams({secid, ...params, 'iss.meta':'off'}).toString();
   return prefix + path + '?' + q;
 }
 
@@ -610,11 +613,13 @@ async function fetchMoex(secid, metric, type, params={}){
 async function fetchAllMoex(ticker, type){
   const today = new Date().toISOString().split('T')[0];
   const lim = {limit: 100};
+  // futoi для фьючерсов — отдельный endpoint с tradedate, не secid-level
+  const futoiType = 'futures'; // futoi всегда в сегменте fo
   const prom = {
     ts:    fetchMoex(ticker, 'tradestats', type, lim).catch(()=>[]),
     ob:    fetchMoex(ticker, 'obstats',    type, lim).catch(()=>[]),
     os:    fetchMoex(ticker, 'orderstats', type, lim).catch(()=>[]),
-    futoi: type==='futures' ? fetchMoex(ticker, 'futoi', type, {date: today}).catch(()=>[]) : Promise.resolve([]),
+    futoi: type==='futures' ? fetchMoex(ticker, 'futoi', futoiType, {tradedate: today}).catch(()=>[]) : Promise.resolve([]),
   };
   return {
     ts:    await prom.ts,
