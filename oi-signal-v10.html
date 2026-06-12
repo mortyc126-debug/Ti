@@ -639,7 +639,7 @@ function tinvestUrl(path){
 
 async function fetchCandles(ticker, tf){
   const meta = tickers.find(x=>x.t===ticker) || CATALOG.find(x=>x.t===ticker);
-  const figi = meta?.f;
+  const figi = meta?.f || CATALOG.find(x=>x.t===ticker)?.f;
   if(!figi) return null; // No FIGI set - candles unavailable
   const token = getTinvestToken();
   if(!token) return null;
@@ -1331,7 +1331,7 @@ function selectTicker(t, type){
   // sync tickers array (for FIGI lookup)
   if(!tickers.find(x=>x.t===t)){
     const cat = CATALOG.find(x=>x.t===t);
-    if(cat) tickers.push({...cat, type:cat.cat, f:''});
+    if(cat) tickers.push({...cat, type:cat.cat}); // f берётся из CATALOG
   }
   tsHistory=[]; obHistory=[]; osHistory=[]; futoiData=[];
   renderPinnedChips();
