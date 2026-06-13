@@ -422,7 +422,8 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
     <div class="sec" style="margin-bottom:0;">Статистика по завершённым сценариям</div>
     <div style="display:flex;gap:6px;">
-      <button class="btn-sm" onclick="runHistoricalBacktest()" title="Построить сценарии по дневным свечам текущего тикера за всю сохранённую историю">📜 Построить историю</button>
+      <button class="btn-sm" onclick="runHistoricalBacktest()" title="Построить сценарии по дневным свечам текущего тикера за всю сохранённую историю (только ценовой тренд)">📜 По дням (тренд)</button>
+      <button class="btn-sm" onclick="runIntradayBacktest()" title="Прогнать все методы по сохранённым внутридневным данным AlgoPack (до 90 дней)">📊 По AlgoPack (все методы)</button>
       <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
     </div>
   </div>
@@ -2304,6 +2305,88 @@ async function runHistoricalBacktest(){
     inserted++;
   }
   setStatus(`✓ Добавлено ${inserted} исторических сценариев по ${curTicker} (дневной тренд, ${bars.length} дней истории)`);
+  loadScenarioStats();
+}
+
+// Бэктест по AlgoPack за сохранённые ~90 дней — прогоняет ВСЕ методы (кроме
+// ценового тренда — нет внутридневных свечей в истории, и связей с другими
+// тикерами — нет смысла без живого signalLog) на каждом баре tradestats.
+// Перцентили считаются один раз по всей выборке (немного forward-looking,
+// но иначе пересчёт на каждый бар слишком дорог) — для грубой базовой
+// статистики этого достаточно, дальше она будет уточняться в реальном времени.
+async function runIntradayBacktest(){
+  if(!curTicker){ setStatus('Выберите тикер'); return; }
+  setStatus(`Загрузка внутридневной истории AlgoPack для ${curTicker}…`, true);
+  let ts, ob, os, fo;
+  try{
+    [ts, ob, os, fo] = await Promise.all([
+      dbLoadAlgopack(curTicker,'tradestats',90),
+      dbLoadAlgopack(curTicker,'obstats',90),
+      dbLoadAlgopack(curTicker,'orderstats',90),
+      dbLoadAlgopack(curTicker,'futoi',90),
+    ]);
+  }catch(e){ setStatus('Ошибка загрузки AlgoPack: '+e.message); return; }
+  if(!ts || ts.length < 30){
+    setStatus(`Мало данных AlgoPack по ${curTicker} (${ts?.length||0} баров) — сделайте Бэкфилл`);
+    return;
+  }
+  const tsKey = r=>new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime();
+  [ts,ob,os,fo].forEach(arr=>arr.sort((a,b)=>tsKey(a)-tsKey(b)));
+
+  // Сохраняем текущее «живое» состояние, чтобы бэктест его не затёр
+  const saved = {tsHistory, obHistory, osHistory, futoiData, candleData, corrEnabled, deepHistory: deepHistory[curTicker]};
+
+  let inserted = 0, checked = 0;
+  try{
+    deepHistory[curTicker] = {tradestats: ts, obstats: ob, orderstats: os, futoi: fo};
+    computeAndCachePercentiles(curTicker);
+    candleData = {};
+    corrEnabled = false;
+
+    for(let i=10; i<ts.length-1; i++){
+      tsHistory = ts.slice(Math.max(0,i-4), i+1);
+      const curTs = tsKey(ts[i]);
+      obHistory = ob.filter(r=>tsKey(r)<=curTs).slice(-5);
+      osHistory = os.filter(r=>tsKey(r)<=curTs).slice(-5);
+      futoiData = fo.filter(r=>r.tradedate===ts[i].tradedate);
+
+      const methodResults = computeAllMethods();
+      const composite = computeComposite(methodResults, curTicker);
+      if(Math.abs(composite) < 0.05) continue;
+      checked++;
+
+      const ep = toNum(ts[i].pr_close || ts[i].pr_cl || 0);
+      if(!ep) continue;
+      const dir = composite>0 ? 'long' : 'short';
+      const future = ts.slice(i+1, i+1+MAX_BARS);
+      if(!future.length) continue;
+      let mfe=0, mae=0;
+      future.forEach(r=>{
+        const p = toNum(r.pr_close || r.pr_cl || 0);
+        if(!p) return;
+        const upside=(p-ep)/ep, downside=(ep-p)/ep;
+        if(dir==='short'){ mfe=Math.max(mfe,downside); mae=Math.max(mae,upside); }
+        else { mfe=Math.max(mfe,upside); mae=Math.max(mae,downside); }
+      });
+      const quality = mfe/(mfe+mae+1e-8);
+      const id = await dbSaveSignal({
+        ts: new Date(curTs).toISOString(), ticker: curTicker, tf:'1min',
+        entryPrice: ep, entryTs: curTs,
+        composite, dir,
+        methods: Object.fromEntries(METHODS.map(m=>[m.id, methodResults[m.id]?.score ?? 0])),
+      }).catch(()=>null);
+      if(id == null) continue;
+      await dbUpdateSignal(id, {mfe, mae, quality, resolved:1, resolved_at: Date.now()}).catch(()=>{});
+      inserted++;
+      if(i % 200 === 0) setStatus(`Бэктест ${curTicker}: ${i}/${ts.length} баров, найдено сигналов ${inserted}…`, true);
+    }
+    setStatus(`✓ Бэктест по AlgoPack: ${inserted} сценариев из ${checked} сигналов / ${ts.length} баров (${curTicker})`);
+  } finally {
+    tsHistory = saved.tsHistory; obHistory = saved.obHistory; osHistory = saved.osHistory;
+    futoiData = saved.futoiData; candleData = saved.candleData; corrEnabled = saved.corrEnabled;
+    if(saved.deepHistory) deepHistory[curTicker] = saved.deepHistory; else delete deepHistory[curTicker];
+    computeAndCachePercentiles(curTicker);
+  }
   loadScenarioStats();
 }
 
