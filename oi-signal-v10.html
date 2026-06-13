@@ -404,6 +404,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       <button class="btn-sm btn-danger" onclick="clearHistory()">✕</button>
     </div>
   </div>
+  <div id="historyStats"></div>
   <div id="historyArea"><div style="font-size:10px;color:var(--txt3);">История пуста</div></div>
 </div>
 
@@ -2098,18 +2099,48 @@ function renderObPanel(){
 // ============================================================
 function renderHistory(){
   const el = document.getElementById('historyArea');
-  if(!signalLog.length){ el.innerHTML='<div style="font-size:10px;color:var(--txt3)">История пуста</div>'; return; }
+  const statsEl = document.getElementById('historyStats');
+  if(!signalLog.length){
+    el.innerHTML='<div style="font-size:10px;color:var(--txt3)">История пуста</div>';
+    if(statsEl) statsEl.innerHTML = '';
+    return;
+  }
+  if(statsEl) statsEl.innerHTML = renderHistoryStats();
   el.innerHTML = signalLog.slice(0,30).map(e=>{
     const d = scoreToDir(e.composite || 0);
     const out = e.outcome ? (e.outcome==='long'?'<span class="dp">↑ Рост</span>':e.outcome==='short'?'<span class="dn">↓ Падение</span>':'<span class="dm">→ Боковик</span>') : '<span style="color:var(--txt3)">—</span>';
     const t = e.ts ? new Date(e.ts).toLocaleString('ru-RU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    const dirMatch = e.outcome ? (
+      (e.outcome==='long' && (e.composite||0) > 0.25) ||
+      (e.outcome==='short' && (e.composite||0) < -0.25) ||
+      (e.outcome==='neutral' && Math.abs(e.composite||0) <= 0.25)
+    ) : null;
+    const matchTag = dirMatch===null ? '' : (dirMatch ? '<span style="color:var(--pos)">✓</span>' : '<span style="color:var(--neg)">✗</span>');
     return `<div class="hist-row">
       <span class="hist-date">${t}</span>
       <span class="hist-ticker">${e.ticker||'—'}</span>
       <span class="hist-dir" style="color:${scoreColor(e.composite||0)}">${d.arrow} ${e.composite>=0?'+':''}${((e.composite||0)*100).toFixed(0)}</span>
-      <span class="hist-outcome">${out}</span>
+      <span class="hist-outcome">${out} ${matchTag}</span>
     </div>`;
   }).join('');
+}
+
+// Сводная статистика по signalLog: всего/закрыто/нейтральных/точность по направлению
+function renderHistoryStats(){
+  const total = signalLog.length;
+  const resolved = signalLog.filter(e=>e.outcome);
+  const neutralSig = signalLog.filter(e=>Math.abs(e.composite||0) <= 0.25).length;
+  if(!resolved.length){
+    return `<div class="hist-acc" style="margin-bottom:6px;">Всего сигналов: ${total} · нейтральных: ${neutralSig} (${(neutralSig/total*100).toFixed(0)}%) · исходов записано: 0 — статистика точности появится после первых исходов</div>`;
+  }
+  let hits = 0;
+  resolved.forEach(e=>{
+    const c = e.composite||0;
+    const ok = (e.outcome==='long' && c>0.25) || (e.outcome==='short' && c<-0.25) || (e.outcome==='neutral' && Math.abs(c)<=0.25);
+    if(ok) hits++;
+  });
+  const acc = (hits/resolved.length*100).toFixed(0);
+  return `<div class="hist-acc" style="margin-bottom:6px;">Всего сигналов: ${total} · нейтральных: ${neutralSig} (${(neutralSig/total*100).toFixed(0)}%) · исходов записано: ${resolved.length} · совпало с направлением: <b style="color:${acc>=55?'var(--pos)':acc>=45?'var(--warn)':'var(--neg)'}">${hits}/${resolved.length} (${acc}%)</b></div>`;
 }
 
 // ============================================================
