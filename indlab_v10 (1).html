@@ -7432,6 +7432,80 @@ function ilCalcMFI(c, period) {
   return res;
 }
 
+function ilSMA(arr, period){
+  const res=[];
+  for(let i=0;i<arr.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let s=0; for(let j=i-period+1;j<=i;j++) s+=arr[j];
+    res.push(s/period);
+  }
+  return res;
+}
+function ilShift(arr, n){ // сдвиг вперёд на n баров (значение i берётся из i-n)
+  return arr.map((_,i)=> i>=n ? arr[i-n] : null);
+}
+function ilCalcAO(c){
+  const med = c.map(x=>(x.high+x.low)/2);
+  const s5 = ilSMA(med,5), s34 = ilSMA(med,34);
+  return med.map((_,i)=> (s5[i]==null||s34[i]==null)?null:s5[i]-s34[i]);
+}
+function ilCalcATR(c, period){
+  const tr = c.map((x,i)=> i===0 ? x.high-x.low : Math.max(x.high-x.low, Math.abs(x.high-c[i-1].close), Math.abs(x.low-c[i-1].close)));
+  return ilSMA(tr, period);
+}
+function ilCalcADX(c, period){
+  const res=[];
+  const plusDM=[], minusDM=[], tr=[];
+  for(let i=0;i<c.length;i++){
+    if(i===0){plusDM.push(null);minusDM.push(null);tr.push(null);continue;}
+    const upMove = c[i].high-c[i-1].high, downMove = c[i-1].low-c[i].low;
+    plusDM.push((upMove>downMove&&upMove>0)?upMove:0);
+    minusDM.push((downMove>upMove&&downMove>0)?downMove:0);
+    tr.push(Math.max(c[i].high-c[i].low, Math.abs(c[i].high-c[i-1].close), Math.abs(c[i].low-c[i-1].close)));
+  }
+  const atr = ilSMA(tr.map(v=>v??0), period);
+  const pDM = ilSMA(plusDM.map(v=>v??0), period);
+  const mDM = ilSMA(minusDM.map(v=>v??0), period);
+  for(let i=0;i<c.length;i++){
+    if(atr[i]==null || !atr[i]){ res.push(null); continue; }
+    const diPlus = pDM[i]/atr[i]*100, diMinus = mDM[i]/atr[i]*100;
+    const dx = (diPlus+diMinus)===0 ? 0 : Math.abs(diPlus-diMinus)/(diPlus+diMinus)*100;
+    res.push({dx, diPlus, diMinus});
+  }
+  // ADX = сглаженный DX
+  const dxArr = res.map(r=>r?r.dx:null);
+  const adxArr = ilSMA(dxArr.map(v=>v??0), period);
+  return res.map((r,i)=> r ? {adx:adxArr[i], diPlus:r.diPlus, diMinus:r.diMinus} : null);
+}
+function ilCalcDonchian(c, period){
+  return c.map((_,i)=>{
+    if(i<period-1) return null;
+    let hh=-Infinity, ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){ if(c[j].high>hh)hh=c[j].high; if(c[j].low<ll)ll=c[j].low; }
+    return {upper:hh, lower:ll};
+  });
+}
+function ilCalcKeltner(closes, c, period, mult){
+  const basis = _chartCalcEMA(closes, period);
+  const atr = ilCalcATR(c, period);
+  return closes.map((_,i)=> (basis[i]==null||atr[i]==null)?null:{upper:basis[i]+mult*atr[i], lower:basis[i]-mult*atr[i]});
+}
+function ilCalcEnvelopes(closes, period, pct){
+  const basis = ilSMA(closes, period);
+  return closes.map((_,i)=> basis[i]==null?null:{upper:basis[i]*(1+pct), lower:basis[i]*(1-pct)});
+}
+function ilCalcIchimoku(c){
+  const don9 = ilCalcDonchian(c,9), don26 = ilCalcDonchian(c,26);
+  const tenkan = don9.map(d=>d?(d.upper+d.lower)/2:null);
+  const kijun = don26.map(d=>d?(d.upper+d.lower)/2:null);
+  return c.map((_,i)=>({tenkan:tenkan[i], kijun:kijun[i]}));
+}
+function ilCalcAlligator(c){
+  const med = c.map(x=>(x.high+x.low)/2);
+  const jaw = ilShift(ilSMA(med,13),8), teeth = ilShift(ilSMA(med,8),5), lips = ilShift(ilSMA(med,5),3);
+  return c.map((_,i)=>({jaw:jaw[i], teeth:teeth[i], lips:lips[i]}));
+}
+
 // ── Оценка score (-2..2) текущего значения по той же шкале, что и UI «Гид» ──
 const ilScore = {
   rsi:  x => x<=30?2 : x<=40?1 : x<=60?0 : x<=70?-1 : -2,
@@ -7460,8 +7534,51 @@ function ilScoreMACD(macdArr,sigArr,histArr,i){
   return 0;
 }
 
-const IL_INDICATORS = ['rsi','wr','cci','mfi','stoch','macd','bb'];
-const IL_NAMES = {rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B'};
+// Позиция цены в канале [lower,upper] → score по той же логике, что Bollinger (mean-reversion)
+function ilScoreChannel(close, lower, upper){
+  if(lower==null||upper==null||upper===lower) return null;
+  const pos = (close-lower)/(upper-lower)*100;
+  return ilScore.bb(pos);
+}
+function ilScoreAO(arr,i){
+  const v=arr[i], p=arr[i-1];
+  if(v==null||p==null) return null;
+  if(v>0) return v>p?2:1;
+  if(v<0) return v<p?-2:-1;
+  return 0;
+}
+// Пересечение/положение пары линий (EMA12/EMA26, Tenkan/Kijun): 2/-2 на кроссе, 1/-1 на удержании
+function ilScoreCross(fArr,sArr,i){
+  const f=fArr[i], s=sArr[i], pf=fArr[i-1], ps=sArr[i-1];
+  if(f==null||s==null||pf==null||ps==null) return null;
+  if(pf<=ps && f>s) return 2;
+  if(pf>=ps && f<s) return -2;
+  return f>s?1:(f<s?-1:0);
+}
+function ilScoreADX(arr,i){
+  const a=arr[i];
+  if(!a||a.adx==null) return null;
+  const bull = a.diPlus>a.diMinus;
+  if(a.adx<20) return 0;
+  if(a.adx>=40) return bull?2:-2;
+  return bull?1:-1;
+}
+// Аллигатор: упорядоченность линий губы/зубы/пасть = направление и сила тренда
+function ilScoreAlligator(arr,i){
+  const a=arr[i];
+  if(!a||a.jaw==null||a.teeth==null||a.lips==null) return null;
+  const spread = Math.abs(a.lips-a.jaw)/a.jaw;
+  if(a.lips>a.teeth && a.teeth>a.jaw) return spread>0.01?2:1;
+  if(a.lips<a.teeth && a.teeth<a.jaw) return spread>0.01?-2:-1;
+  return 0; // линии сплетены — флэт
+}
+
+const IL_INDICATORS = ['rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator'];
+const IL_NAMES = {
+  rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
+  ao:'Awesome Oscillator', ema:'EMA 12/26 (тренд)', adx:'ADX/DI', donchian:'Канал Дончиана',
+  keltner:'Канал Кельтнера', envelopes:'Конверты', ichimoku:'Ишимоку (Tenkan/Kijun)', alligator:'Аллигатор Вильямса',
+};
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
 // Для каждого индикатора считается историческая серия score'ов и бэктест:
@@ -7496,6 +7613,14 @@ async function ilGetVerdict({ticker, token}) {
   const stochArr = ilCalcStoch(candles,14,3);
   const macdR = _chartCalcMACD(closes,12,26,9);
   const bbArr = _chartCalcBB(closes,20,2);
+  const aoArr = ilCalcAO(candles);
+  const emaF = _chartCalcEMA(closes,12), emaS = _chartCalcEMA(closes,26);
+  const adxArr = ilCalcADX(candles,14);
+  const donArr = ilCalcDonchian(candles,20);
+  const keltArr = ilCalcKeltner(closes,candles,20,2);
+  const envArr = ilCalcEnvelopes(closes,20,0.025);
+  const ichiArr = ilCalcIchimoku(candles);
+  const allArr = ilCalcAlligator(candles);
 
   const seriesScore = {};
   seriesScore.rsi = rsiArr.map(v=>v==null?null:ilScore.rsi(v));
@@ -7503,8 +7628,16 @@ async function ilGetVerdict({ticker, token}) {
   seriesScore.cci = cciArr.map(v=>v==null?null:ilScore.cci(v));
   seriesScore.mfi = mfiArr.map(v=>v==null?null:ilScore.mfi(v));
   seriesScore.stoch = stochArr.map(v=>(v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d));
-  seriesScore.macd = closes.map((_,i)=>ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i)===0&&macdR.macd[i]==null?null:ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i));
+  seriesScore.macd = closes.map((_,i)=>macdR.macd[i]==null?null:ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i));
   seriesScore.bb = bbArr.map((b,i)=> b==null ? null : ilScore.bb((closes[i]-b.lower)/((b.upper-b.lower)||1)*100));
+  seriesScore.ao = aoArr.map((_,i)=>ilScoreAO(aoArr,i));
+  seriesScore.ema = closes.map((_,i)=>ilScoreCross(emaF,emaS,i));
+  seriesScore.adx = adxArr.map((_,i)=>ilScoreADX(adxArr,i));
+  seriesScore.donchian = donArr.map((d,i)=> d?ilScoreChannel(closes[i],d.lower,d.upper):null);
+  seriesScore.keltner = keltArr.map((k,i)=> k?ilScoreChannel(closes[i],k.lower,k.upper):null);
+  seriesScore.envelopes = envArr.map((e,i)=> e?ilScoreChannel(closes[i],e.lower,e.upper):null);
+  seriesScore.ichimoku = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
+  seriesScore.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
 
   // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
   const horizon = 5;
@@ -7533,6 +7666,14 @@ async function ilGetVerdict({ticker, token}) {
     stoch: `Stochastic %K/%D = ${stochArr[last]?.k?.toFixed(1) ?? '—'} / ${stochArr[last]?.d?.toFixed(1) ?? '—'}`,
     macd: `MACD ${macdR.macd[last]?.toFixed(2) ?? '—'} / сигнальная ${macdR.signal[last]?.toFixed(2) ?? '—'}`,
     bb: bbArr[last] ? `позиция цены в полосах Боллинджера = ${((closes[last]-bbArr[last].lower)/((bbArr[last].upper-bbArr[last].lower)||1)*100).toFixed(0)}%` : 'недостаточно данных',
+    ao: `AO = ${aoArr[last]?.toFixed(2) ?? '—'}`,
+    ema: `EMA12 ${emaF[last]?.toFixed(2) ?? '—'} / EMA26 ${emaS[last]?.toFixed(2) ?? '—'}`,
+    adx: adxArr[last] ? `ADX = ${adxArr[last].adx.toFixed(1)}, DI+ ${adxArr[last].diPlus.toFixed(1)} / DI− ${adxArr[last].diMinus.toFixed(1)}` : 'недостаточно данных',
+    donchian: donArr[last] ? `канал ${donArr[last].lower.toFixed(2)}–${donArr[last].upper.toFixed(2)}, цена ${closes[last].toFixed(2)}` : 'недостаточно данных',
+    keltner: keltArr[last] ? `канал ${keltArr[last].lower.toFixed(2)}–${keltArr[last].upper.toFixed(2)}, цена ${closes[last].toFixed(2)}` : 'недостаточно данных',
+    envelopes: envArr[last] ? `конверт ${envArr[last].lower.toFixed(2)}–${envArr[last].upper.toFixed(2)}, цена ${closes[last].toFixed(2)}` : 'недостаточно данных',
+    ichimoku: `Tenkan ${ichiArr[last]?.tenkan?.toFixed(2) ?? '—'} / Kijun ${ichiArr[last]?.kijun?.toFixed(2) ?? '—'}`,
+    alligator: allArr[last] ? `губы ${allArr[last].lips?.toFixed(2) ?? '—'} / зубы ${allArr[last].teeth?.toFixed(2) ?? '—'} / пасть ${allArr[last].jaw?.toFixed(2) ?? '—'}` : 'недостаточно данных',
   };
 
   const details = IL_INDICATORS.map(id=>{

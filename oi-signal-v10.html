@@ -702,6 +702,14 @@ async function dbLoadAtr(ticker){
   return dbFetch(`/db/atr?ticker=${encodeURIComponent(ticker)}`);
 }
 
+// ── Кэш вердиктов модуля индикаторов (indlab) ──
+async function dbSaveIndVerdict(ticker, verdict){
+  return dbFetch('/db/indverdict', {method:'POST', body: JSON.stringify({ticker, ...verdict})});
+}
+async function dbLoadIndVerdict(ticker){
+  return dbFetch(`/db/indverdict?ticker=${encodeURIComponent(ticker)}`);
+}
+
 
 // STORAGE (localStorage — только UI-настройки и пины)
 // ============================================================
@@ -1614,20 +1622,35 @@ function m_CORR_PEERS(){
 // ============================================================
 let extIndicatorsCache = {}; // ticker -> {score, label, details, ts}
 let extIndicatorsPending = {};
-function _ilRequestVerdict(ticker){
+const EXT_IND_MAX_AGE = 6*3600*1000; // 6 часов — индикаторы за 90 дней не меняются быстро
+
+// Загружает свежий вердикт: сперва пробует кэш в D1 (быстро, бесплатно),
+// если там пусто/устарело — считает в indlab и сохраняет результат в D1.
+async function _ilRequestVerdict(ticker){
   if(extIndicatorsPending[ticker]) return;
-  if(!window.parent || !window.parent.APP || typeof window.parent.APP.call !== 'function') return;
   extIndicatorsPending[ticker] = true;
-  window.parent.APP.call('indlab','getVerdict',{ticker})
-    .then(res=>{ extIndicatorsCache[ticker] = {...res, ts:Date.now()}; })
-    .catch(err=>{ extIndicatorsCache[ticker] = {error:String(err&&err.message||err), ts:Date.now()}; })
-    .finally(()=>{ delete extIndicatorsPending[ticker]; });
+  try{
+    try{
+      const cached = await dbLoadIndVerdict(ticker);
+      if(cached && cached.updated_at && Date.now()-cached.updated_at < EXT_IND_MAX_AGE){
+        extIndicatorsCache[ticker] = {...cached, ts:cached.updated_at};
+        return;
+      }
+    }catch(e){ /* нет прокси/таблицы — просто считаем заново */ }
+    if(!window.parent || !window.parent.APP || typeof window.parent.APP.call !== 'function') return;
+    const res = await window.parent.APP.call('indlab','getVerdict',{ticker});
+    extIndicatorsCache[ticker] = {...res, ts:Date.now()};
+    dbSaveIndVerdict(ticker, res).catch(()=>{});
+  }catch(err){
+    extIndicatorsCache[ticker] = {error:String(err&&err.message||err), ts:Date.now()};
+  }finally{
+    delete extIndicatorsPending[ticker];
+  }
 }
 function m_EXT_INDICATORS(){
   if(!extIndEnabled) return {score:0, confidence:0, detail:'учёт модуля индикаторов выключен (тумблер «Индикаторы»)'};
   const cached = extIndicatorsCache[curTicker];
-  const maxAge = 10*60*1000;
-  if(!cached || Date.now()-cached.ts > maxAge){
+  if(!cached || Date.now()-cached.ts > EXT_IND_MAX_AGE){
     _ilRequestVerdict(curTicker);
   }
   if(!cached) return {score:0, confidence:0, detail:'запрос к модулю индикаторов отправлен, ответа пока нет'};

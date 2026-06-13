@@ -17,6 +17,8 @@
 //   /db/percentiles?ticker=&window=   GET  — загрузить кэш перцентилей
 //   /db/atr                           POST — upsert ATR по тикеру
 //   /db/atr?ticker=                   GET  — ATR тикера
+//   /db/indverdict                    POST — сохранить вердикт модуля indlab
+//   /db/indverdict?ticker=            GET  — последний сохранённый вердикт
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -114,6 +116,13 @@ const SCHEMA_STMTS = [
     atr        REAL NOT NULL,
     atr_pct    REAL NOT NULL,
     n          INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT 0
+  )`,
+
+  // Кэш вердиктов модуля indlab (RSI/MACD/... за 90 дней) — чтобы не пересчитывать на каждый запрос
+  `CREATE TABLE IF NOT EXISTS ind_verdicts (
+    ticker     TEXT PRIMARY KEY,
+    payload    TEXT NOT NULL,
     updated_at INTEGER DEFAULT 0
   )`,
 ];
@@ -314,6 +323,27 @@ async function handleDb(path, req, env) {
     if (!ticker) return json({ error: 'ticker required' }, 400);
     const { results } = await db.prepare('SELECT * FROM atr WHERE ticker=?').bind(ticker).all();
     return json(results);
+  }
+
+  // ── Кэш вердиктов indlab ──
+  // POST body: { ticker, ...verdict }
+  if (p === '/indverdict' && req.method === 'POST') {
+    const r = await req.json();
+    const { ticker, ...verdict } = r;
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    await db.prepare(
+      `INSERT OR REPLACE INTO ind_verdicts(ticker,payload,updated_at) VALUES(?,?,?)`
+    ).bind(ticker, JSON.stringify(verdict), Date.now()).run();
+    return json({ ok: true });
+  }
+
+  if (p.startsWith('/indverdict') && req.method === 'GET') {
+    const ticker = new URL(req.url).searchParams.get('ticker');
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    const row = await db.prepare('SELECT payload, updated_at FROM ind_verdicts WHERE ticker=?').bind(ticker).first();
+    if (!row) return json(null);
+    let verdict; try { verdict = JSON.parse(row.payload); } catch(_) { verdict = {}; }
+    return json({ ...verdict, updated_at: row.updated_at });
   }
 
   return json({ error: 'unknown db route: ' + p }, 404);
