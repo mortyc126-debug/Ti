@@ -381,6 +381,23 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <div id="tsPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных</div></div>
       </div>
     </div>
+
+    <!-- Статистика по завершённым сценариям -->
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <div class="sec" style="margin-bottom:0;">Статистика по завершённым сценариям</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <select class="select-inp" id="scenTickerSel" onchange="loadScenarioStats()" title="Фильтр по тикеру — показать эффективность методов именно для него">
+            <option value="">Все тикеры</option>
+          </select>
+          <button class="btn-sm" onclick="runHistoricalBacktest()" title="Построить сценарии по дневным свечам текущего тикера за всю сохранённую историю (только ценовой тренд)">📜 По дням (тренд)</button>
+          <button class="btn-sm" onclick="runIntradayBacktest()" title="Прогнать все методы по сохранённым внутридневным данным AlgoPack (до 90 дней) для текущего тикера">📊 По AlgoPack: тикер</button>
+          <button class="btn-sm" id="btnBfBacktest" onclick="toggleBacktestQueue()" title="Прогнать «По AlgoPack» по очереди для всех тикеров из списка бэкфилла">🚀 По AlgoPack: все тикеры</button>
+          <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
+        </div>
+      </div>
+      <div id="scenarioStats" style="font-size:10px;color:var(--txt3);">Нажмите «Обновить» — статистика собирается по всем завершённым сценариям из базы (не только по текущему тикеру)</div>
+    </div>
   </div>
 
   <!-- RIGHT: OI data panels -->
@@ -397,7 +414,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
     </div>
 
     <!-- OBStats + OrderStats -->
-    <div class="panel">
+    <div class="panel" style="margin-bottom:10px;">
       <div class="collapsible-hdr" onclick="toggleCollapsible('obBody')">
         <div class="sec" style="margin-bottom:0;">OBStats / OrderStats</div>
         <span style="font-size:10px;color:var(--txt3);" id="obChev">▼</span>
@@ -406,38 +423,23 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <div id="obPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных</div></div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- ============================================================ HISTORY -->
-<div class="panel">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-    <div class="sec" style="margin-bottom:0;">История сигналов</div>
-    <div style="display:flex;gap:6px;">
-      <button class="btn-sm" onclick="renderHistory()">↺</button>
-      <button class="btn-sm btn-danger" onclick="clearHistory()">✕</button>
+    <!-- История сигналов -->
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="sec" style="margin-bottom:0;">История сигналов</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-sm" onclick="renderHistory()">↺</button>
+          <button class="btn-sm btn-danger" onclick="clearHistory()">✕</button>
+        </div>
+      </div>
+      <div id="historyStats"></div>
+      <div id="historyArea"><div style="font-size:10px;color:var(--txt3);">История пуста</div></div>
     </div>
   </div>
-  <div id="historyStats"></div>
-  <div id="historyArea"><div style="font-size:10px;color:var(--txt3);">История пуста</div></div>
 </div>
 
-<div class="panel">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-    <div class="sec" style="margin-bottom:0;">Статистика по завершённым сценариям</div>
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-      <select class="select-inp" id="scenTickerSel" onchange="loadScenarioStats()" title="Фильтр по тикеру — показать эффективность методов именно для него">
-        <option value="">Все тикеры</option>
-      </select>
-      <button class="btn-sm" onclick="runHistoricalBacktest()" title="Построить сценарии по дневным свечам текущего тикера за всю сохранённую историю (только ценовой тренд)">📜 По дням (тренд)</button>
-      <button class="btn-sm" onclick="runIntradayBacktest()" title="Прогнать все методы по сохранённым внутридневным данным AlgoPack (до 90 дней) для текущего тикера">📊 По AlgoPack: тикер</button>
-      <button class="btn-sm" id="btnBfBacktest" onclick="toggleBacktestQueue()" title="Прогнать «По AlgoPack» по очереди для всех тикеров из списка бэкфилла">🚀 По AlgoPack: все тикеры</button>
-      <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
-    </div>
-  </div>
-  <div id="scenarioStats" style="font-size:10px;color:var(--txt3);">Нажмите «Обновить» — статистика собирается по всем завершённым сценариям из базы (не только по текущему тикеру)</div>
 
-</div>
 
 <script>
 // ============================================================
@@ -465,7 +467,7 @@ const METHODS = [
   {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
   {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FF9F40'},
-  {id:'EXT_INDICATORS', label:'Индикаторы (RSI/MACD)',src:'indlab', color:'#52F2C9'},
+  {id:'EXT_INDICATORS', label:'Индикаторы (15 шт., модуль indlab)',src:'indlab', color:'#52F2C9'},
 ];
 
 // ============================================================
@@ -1637,8 +1639,12 @@ async function _ilRequestVerdict(ticker){
         return;
       }
     }catch(e){ /* нет прокси/таблицы — просто считаем заново */ }
-    if(!window.parent || !window.parent.APP || typeof window.parent.APP.call !== 'function') return;
-    const res = await window.parent.APP.call('indlab','getVerdict',{ticker});
+    if(!window.parent || !window.parent.APP || typeof window.parent.APP.call !== 'function'){
+      extIndicatorsCache[ticker] = {error:'модуль indlab не открыт в shell (нет window.parent.APP)', ts:Date.now()};
+      return;
+    }
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('таймаут 20с — модуль indlab не ответил')), 20000));
+    const res = await Promise.race([window.parent.APP.call('indlab','getVerdict',{ticker}), timeout]);
     extIndicatorsCache[ticker] = {...res, ts:Date.now()};
     dbSaveIndVerdict(ticker, res).catch(()=>{});
   }catch(err){
