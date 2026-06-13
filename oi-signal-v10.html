@@ -318,6 +318,11 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom:10px;padding:8px 12px;">
+      <div class="sec" style="margin-bottom:6px;">Режим рынка</div>
+      <div id="regimeBadge" style="display:flex;"></div>
+    </div>
+
     <div class="panel">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <div class="sec" style="margin-bottom:0;">Методы</div>
@@ -2569,6 +2574,195 @@ function m_PRICE_TREND(candles){
 }
 
 // ============================================================
+// REGIME CLASSIFIER MODULE v1.0
+// ============================================================
+const REGIME_LS_KEY = 'oi_regime_cache_v1';
+
+function regimeSave(ticker, state) {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGIME_LS_KEY) || '{}');
+    all[ticker] = { ...state, savedAt: Date.now() };
+    localStorage.setItem(REGIME_LS_KEY, JSON.stringify(all));
+  } catch(e) {}
+}
+
+function regimeLoad(ticker) {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGIME_LS_KEY) || '{}');
+    return all[ticker] || null;
+  } catch(e) { return null; }
+}
+
+function rc_avg(arr) { return arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0; }
+function rc_toNum(v) { return parseFloat(v)||0; }
+function rc_toPrice(p) { if(!p) return 0; return (rc_toNum(p.units)||0)+(rc_toNum(p.nano)||0)/1e9; }
+function rc_trueRange(candle, prevClose) {
+  const h=rc_toPrice(candle.high), l=rc_toPrice(candle.low), c=prevClose||rc_toPrice(candle.open);
+  return Math.max(h-l, Math.abs(h-c), Math.abs(l-c));
+}
+function rc_atr(candles, period=14) {
+  if(candles.length<2) return 0;
+  const trs=[];
+  for(let i=1;i<candles.length;i++) trs.push(rc_trueRange(candles[i], rc_toPrice(candles[i-1].close)));
+  return rc_avg(trs.slice(-period));
+}
+function rc_percentileRank(x, history) {
+  if(!history.length) return 0.5;
+  return history.filter(v=>v<x).length/history.length;
+}
+function rc_slope(arr) {
+  const n=arr.length; if(n<2) return 0;
+  const xs=arr.map((_,i)=>i), mx=rc_avg(xs), my=rc_avg(arr);
+  const num=xs.reduce((s,x,i)=>s+(x-mx)*(arr[i]-my),0);
+  const den=xs.reduce((s,x)=>s+(x-mx)**2,0);
+  return den?num/den:0;
+}
+
+function rc_trendStrength(candles) {
+  if(candles.length<10) return {trend:0,dir:0};
+  const closes=candles.slice(-20).map(c=>rc_toPrice(c.close)).filter(Boolean);
+  if(closes.length<5) return {trend:0,dir:0};
+  const xs=closes.map((_,i)=>i), mx=rc_avg(xs), my=rc_avg(closes);
+  const sl=rc_slope(closes);
+  const ssRes=closes.reduce((s,y,i)=>s+(y-(my+sl*(i-mx)))**2,0);
+  const ssTot=closes.reduce((s,y)=>s+(y-my)**2,0);
+  const r2=ssTot>0?1-ssRes/ssTot:0;
+  return {trend:Math.max(0,r2), dir:Math.sign(sl)};
+}
+
+function rc_volRegime(candles, atrHistory=[]) {
+  if(candles.length<5) return {raw:0,pct:0.5,level:'normal'};
+  const atr=rc_atr(candles,14);
+  const lastClose=rc_toPrice(candles[candles.length-1].close);
+  const atrPct=lastClose>0?atr/lastClose:0;
+  const pct=rc_percentileRank(atrPct, atrHistory.length>10?atrHistory:[atrPct]);
+  let level='normal';
+  if(pct>=0.80) level='high_vol';
+  else if(pct>=0.60) level='elevated';
+  else if(pct<=0.20) level='low_vol';
+  return {raw:atrPct, pct, level};
+}
+
+function rc_microStress(obHistory, osHistory) {
+  if(!obHistory.length&&!osHistory.length) return 0;
+  let spreadScore=0;
+  if(obHistory.length>=3){
+    const spreads=obHistory.slice(-10).map(r=>rc_toNum(r.spread_bbo||r.spreadBbo||0)).filter(Boolean);
+    if(spreads.length>=3){
+      spreadScore=rc_percentileRank(spreads[spreads.length-1], spreads.slice(0,-1));
+    }
+  }
+  let cancelScore=0;
+  if(osHistory.length>=3){
+    const recent=osHistory.slice(-5);
+    let totalCancel=0, totalPut=0;
+    recent.forEach(r=>{
+      totalCancel+=rc_toNum(r.cancel_orders_b||0)+rc_toNum(r.cancel_orders_s||0);
+      totalPut   +=rc_toNum(r.put_orders_b   ||0)+rc_toNum(r.put_orders_s   ||0);
+    });
+    cancelScore=totalPut>0?Math.min(1,totalCancel/totalPut):0;
+  }
+  return Math.min(1,(spreadScore*0.5+cancelScore*0.5));
+}
+
+function rc_oiPressure(tsHistory) {
+  if(tsHistory.length<5) return 0;
+  const oi=tsHistory.map(r=>rc_toNum(r.oi||r.open_interest||0)).filter(Boolean);
+  if(oi.length<5) return 0;
+  const diffs=oi.slice(1).map((v,i)=>Math.abs(v-oi[i])/(oi[i]||1));
+  const curDiff=diffs[diffs.length-1]||0;
+  return rc_percentileRank(curDiff, diffs.slice(0,-1).length>3?diffs.slice(0,-1):diffs);
+}
+
+function rc_volumeSpike(tsHistory) {
+  if(tsHistory.length<5) return 0;
+  const vols=tsHistory.map(r=>rc_toNum(r.vol||r.volume||0));
+  return rc_percentileRank(vols[vols.length-1], vols.slice(0,-1));
+}
+
+const REGIME_WEIGHT_MODS = {
+  trending_up:   {BS_PRESSURE:1.3,AGGRESSOR_FLOW:1.3,LARGE_IMPACT:1.2,VWAP_SIGNAL:1.1,VOL_MOMENTUM:1.4,OB_IMBALANCE:1.0,CANCEL_SIGNAL:0.8,INST_OI:1.2,RETAIL_CONTRA:1.1,PRICE_TREND:1.4},
+  trending_down: {BS_PRESSURE:1.3,AGGRESSOR_FLOW:1.3,LARGE_IMPACT:1.2,VWAP_SIGNAL:1.1,VOL_MOMENTUM:1.4,OB_IMBALANCE:1.0,CANCEL_SIGNAL:0.8,INST_OI:1.2,RETAIL_CONTRA:1.1,PRICE_TREND:1.4},
+  ranging:       {BS_PRESSURE:0.9,AGGRESSOR_FLOW:0.9,LARGE_IMPACT:0.8,VWAP_SIGNAL:1.4,VOL_MOMENTUM:0.7,OB_IMBALANCE:1.3,CANCEL_SIGNAL:1.2,INST_OI:1.0,RETAIL_CONTRA:0.9,PRICE_TREND:0.5},
+  high_vol:      {BS_PRESSURE:0.8,AGGRESSOR_FLOW:0.8,LARGE_IMPACT:1.2,VWAP_SIGNAL:0.6,VOL_MOMENTUM:0.7,OB_IMBALANCE:0.7,CANCEL_SIGNAL:1.3,INST_OI:1.1,RETAIL_CONTRA:1.4,PRICE_TREND:0.5},
+  low_vol:       {BS_PRESSURE:0.7,AGGRESSOR_FLOW:0.7,LARGE_IMPACT:1.3,VWAP_SIGNAL:1.2,VOL_MOMENTUM:0.6,OB_IMBALANCE:1.4,CANCEL_SIGNAL:1.1,INST_OI:1.0,RETAIL_CONTRA:0.8,PRICE_TREND:0.7},
+  stress:        {BS_PRESSURE:0.5,AGGRESSOR_FLOW:0.5,LARGE_IMPACT:0.9,VWAP_SIGNAL:0.4,VOL_MOMENTUM:0.5,OB_IMBALANCE:0.5,CANCEL_SIGNAL:0.9,INST_OI:1.5,RETAIL_CONTRA:1.5,PRICE_TREND:0.3},
+};
+
+let currentRegimeState = null;
+
+function classifyRegime(tsHistory, candleData, obHistory, osHistory, ticker, options={}) {
+  const {atrWindow=14, minCandles=10} = options;
+  const dailyCandles=(candleData['1d']||[]).slice(-60);
+  const curCandles=(candleData['1h']||candleData['5min']||candleData['1d']||[]).slice(-30);
+  const cached=regimeLoad(ticker)||{};
+  const atrHistory=cached.atrHistory||[];
+
+  const {trend, dir:trendDir}=rc_trendStrength(dailyCandles.length>=minCandles?dailyCandles:curCandles);
+  const volInfo=rc_volRegime(curCandles, atrHistory);
+  const microSt=rc_microStress(obHistory, osHistory);
+  const oiPress=rc_oiPressure(tsHistory);
+  const volSpike=rc_volumeSpike(tsHistory);
+  const newAtrHistory=[...atrHistory, volInfo.raw].slice(-90);
+
+  const p_stress=Math.min(1, volInfo.pct*0.35 + microSt*0.30 + oiPress*0.20 + volSpike*0.15);
+
+  let regime, confidence, label, color;
+  if(p_stress>=0.75){
+    regime='stress'; confidence=Math.min(1,(p_stress-0.75)/0.25+0.6); label='⚡ Стресс'; color='#FF4D7A';
+  } else if(volInfo.level==='high_vol'&&trend<0.3){
+    regime='high_vol'; confidence=volInfo.pct; label='🌪 Высокая волат.'; color='#FF9F40';
+  } else if(volInfo.level==='low_vol'&&trend<0.3){
+    regime='low_vol'; confidence=1-volInfo.pct; label='😴 Низкая волат.'; color='#A78BFA';
+  } else if(trend>=0.45&&trendDir>0){
+    regime='trending_up'; confidence=trend; label='📈 Тренд вверх'; color='#52F2C9';
+  } else if(trend>=0.45&&trendDir<0){
+    regime='trending_down'; confidence=trend; label='📉 Тренд вниз'; color='#FF4D7A';
+  } else {
+    regime='ranging'; confidence=Math.max(0.3,1-trend-volInfo.pct*0.5); label='↔ Боковик'; color='#A79BC9';
+  }
+
+  const weightMod=REGIME_WEIGHT_MODS[regime]||REGIME_WEIGHT_MODS['ranging'];
+  const state={
+    regime, confidence, label, color, p_stress,
+    scores:{trend, trendDir, vol:volInfo.pct, microStress:microSt, oiPressure:oiPress, volumeSpike:volSpike},
+    atr:rc_atr(curCandles,atrWindow), atrPct:volInfo.raw, weightMod,
+    updatedAt:Date.now(), atrHistory:newAtrHistory,
+  };
+  regimeSave(ticker, state);
+  return state;
+}
+
+function adaptiveThresholds(regimeState, baseThresh=0.25) {
+  if(!regimeState) return {longThresh:baseThresh, shortThresh:-baseThresh};
+  const mods={trending_up:0.85, trending_down:0.85, ranging:1.00, high_vol:1.25, low_vol:0.90, stress:1.40};
+  const t=baseThresh*(mods[regimeState.regime]||1.0);
+  return {longThresh:t, shortThresh:-t};
+}
+
+function renderRegimeBadge(regimeState) {
+  if(!regimeState) return '<span style="color:#6F648F;font-size:10px;">Режим: —</span>';
+  const {label, color, confidence, p_stress, scores, atrPct}=regimeState;
+  const confPct=Math.round(confidence*100);
+  const stressPct=Math.round(p_stress*100);
+  const atrStr=atrPct>0?(atrPct*100).toFixed(2)+'%':'—';
+  return `<div style="display:inline-flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.03);border:1px solid ${color}44;border-radius:10px;padding:8px 12px;min-width:160px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:11px;font-weight:600;color:${color};letter-spacing:.05em;">${label}</span>
+      <span style="font-size:9px;color:#6F648F;margin-left:auto;">уверен. ${confPct}%</span>
+    </div>
+    <div style="display:flex;gap:8px;font-size:9px;color:#A79BC9;flex-wrap:wrap;">
+      <span>стресс ${stressPct}%</span><span>ATR ${atrStr}</span><span>тренд ${Math.round(scores.trend*100)}%</span>
+    </div>
+    <div style="height:2px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;">
+      <div style="height:100%;width:${stressPct}%;background:${color};border-radius:999px;transition:width .4s;"></div>
+    </div>
+  </div>`;
+}
+
+
+
+// ============================================================
 // COMPOSITE SIGNAL ENGINE
 // ============================================================
 function computeAllMethods(){
@@ -2592,13 +2786,18 @@ function getWeights(ticker){
 
 function computeComposite(methodResults, ticker){
   const weights = getWeights(ticker);
+  // Берём режимные модификаторы весов если классификатор уже отработал
+  const regimeMod = (currentRegimeState && currentRegimeState.weightMod) || {};
   let wSum = 0, wTotal = 0;
   METHODS.forEach(m=>{
     const r = methodResults[m.id];
     if(!r || r.confidence < 0.05) return;
     const mw = weights[m.id];
-    // Используем адаптивный вес только если накоплено >= 30 наблюдений
-    const w = (mw && mw.total >= 30) ? mw.weight : 0.5;
+    // Базовый обученный вес (или 0.5 если данных мало)
+    const baseW = (mw && mw.total >= 30) ? mw.weight : 0.5;
+    // Умножаем на режимный коэффициент (по умолчанию 1.0)
+    const regW = regimeMod[m.id] != null ? regimeMod[m.id] : 1.0;
+    const w = baseW * regW;
     wSum   += r.score * w * r.confidence;
     wTotal += w * r.confidence;
   });
@@ -3269,6 +3468,15 @@ async function refreshAll(){
       `<div style="color:#e57373;padding:16px;font-size:12px;border:1px solid #e5737355;border-radius:6px;">⚠ Свечи: ${candleErr}</div>`;
   }
 
+  // 3. Classify market regime (uses candles + MOEX data gathered above)
+  try {
+    currentRegimeState = classifyRegime(
+      tsHistory, candleData,
+      obHistory, osHistory,
+      curTicker
+    );
+  } catch(e) { console.warn('Regime classifier error:', e); currentRegimeState = null; }
+
   // 3. Compute signals
   const methodResults = computeAllMethods();
   const composite = computeComposite(methodResults, curTicker);
@@ -3300,6 +3508,9 @@ async function refreshAll(){
 
   // 4. Render
   renderGauge(composite, avgConf);
+  // Render regime badge
+  const regBadgeEl = document.getElementById('regimeBadge');
+  if(regBadgeEl) regBadgeEl.innerHTML = renderRegimeBadge(currentRegimeState);
   renderMethodsTable(methodResults);
   if(candleData[curTF]) renderCandleChart(candleData[curTF]);
   renderTsPanel();
