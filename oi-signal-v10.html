@@ -2494,10 +2494,14 @@ async function refreshAll(){
     resolved: 0, mfe: 0, mae: 0,
     methods: Object.fromEntries(METHODS.map(m=>[m.id, methodResults[m.id]?.score??0])),
   };
-  // Сохраняем в IndexedDB и получаем id
-  dbSaveSignal(sigObj).then(id=>{ sigObj.dbId = id; }).catch(()=>{});
-  signalLog.unshift(sigObj);
-  if(signalLog.length > 500) signalLog.splice(500);
+  // Не пишем дубль, если последняя свеча для этого тикера та же, что и в прошлый раз
+  // (например, авто-обновление ночью при закрытом рынке гоняет одни и те же данные)
+  const prevForTicker = signalLog.find(e=>e.ticker===curTicker);
+  if(!prevForTicker || prevForTicker.entryTs !== entryTs){
+    dbSaveSignal(sigObj).then(id=>{ sigObj.dbId = id; }).catch(()=>{});
+    signalLog.unshift(sigObj);
+    if(signalLog.length > 500) signalLog.splice(500);
+  }
 
   // 4. Render
   renderGauge(composite, avgConf);
