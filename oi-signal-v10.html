@@ -2263,7 +2263,9 @@ setInterval(updateAges, 10000);
 
   // Input persistence
   ['moexKeyInp','tinvestInp','proxyInp'].forEach(id=>{
-    document.getElementById(id).addEventListener('change', saveAll);
+    const el = document.getElementById(id);
+    el.addEventListener('change', saveAll);
+    el.addEventListener('input', saveAll);
   });
   document.getElementById('proxyInp').addEventListener('keydown', e=>{
     if(e.key==='Enter') refreshAll();
