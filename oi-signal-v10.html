@@ -421,7 +421,10 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
 <div class="panel">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
     <div class="sec" style="margin-bottom:0;">Статистика по завершённым сценариям</div>
-    <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
+    <div style="display:flex;gap:6px;">
+      <button class="btn-sm" onclick="runHistoricalBacktest()" title="Построить сценарии по дневным свечам текущего тикера за всю сохранённую историю">📜 Построить историю</button>
+      <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
+    </div>
   </div>
   <div id="scenarioStats" style="font-size:10px;color:var(--txt3);">Нажмите «Обновить» — статистика собирается по всем завершённым сценариям из базы (не только по текущему тикеру)</div>
 </div>
@@ -1292,10 +1295,12 @@ async function fetchCandles(ticker, tf){
   const now = new Date();
   const dayMs = 86400000;
   let fromDate;
-  if(tf==='1min') fromDate = new Date(now - dayMs);
-  else if(tf==='5min') fromDate = new Date(now - 3*dayMs);
-  else if(tf==='1h') fromDate = new Date(now - 14*dayMs);
-  else fromDate = new Date(now - 30*dayMs);
+  // T-Invest API ограничивает диапазон запроса в зависимости от интервала свечи —
+  // если превысить лимит, GetCandles вернёт ошибку и весь ТФ перестанет грузиться
+  if(tf==='1min') fromDate = new Date(now - dayMs);          // лимит 1 день
+  else if(tf==='5min') fromDate = new Date(now - dayMs);      // лимит 1 день
+  else if(tf==='1h') fromDate = new Date(now - 7*dayMs);      // лимит 7 дней
+  else fromDate = new Date(now - 30*dayMs);                   // 1d — лимит до года
 
   const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles');
   // instrument_id принимает BBG FIGI, UID или ticker_CLASS — используем его
@@ -2249,6 +2254,57 @@ function renderHistory(){
       <span class="hist-outcome">${out} ${matchTag}</span>
     </div>`;
   }).join('');
+}
+
+// Строим исторические сценарии по дневным свечам тикера (из БД, не из памяти),
+// чтобы статистика по "силе сигнала" не была пустой с самого начала.
+// Метод оценки — упрощённый ценовой тренд (как m_PRICE_TREND), считается
+// для каждого дня прошлого, исход — MFE/MAE по следующим MAX_BARS дням.
+async function runHistoricalBacktest(){
+  if(!curTicker){ setStatus('Выберите тикер'); return; }
+  setStatus(`Строю историю сценариев по ${curTicker}…`, true);
+  let bars;
+  try{
+    bars = await dbFetch(`/db/candles?ticker=${encodeURIComponent(curTicker)}&tf=1d&from=0`);
+  } catch(e){ setStatus('Ошибка загрузки свечей: '+e.message); return; }
+  if(!bars || bars.length < 15){
+    setStatus(`Мало дневных свечей (${bars?.length||0}) — сначала сделайте Бэкфилл для ${curTicker}`);
+    return;
+  }
+  bars.sort((a,b)=>a.time-b.time);
+  const closes = bars.map(b=>b.cl);
+  const rets = closes.slice(1).map((c,i)=>Math.abs(c-closes[i])/(closes[i]||1));
+  const atrPct = rets.length ? avg(rets) : 0.02;
+  let inserted = 0;
+  for(let i=11; i<bars.length-1; i++){
+    const cur=closes[i], p3=closes[i-3], p10=closes[i-10];
+    const roc3  = (cur-p3)/(p3||1)/(atrPct*3||0.015);
+    const roc10 = (cur-p10)/(p10||1)/(atrPct*10||0.05);
+    const score = Math.tanh(roc3*0.6+roc10*0.4);
+    if(Math.abs(score) < 0.05) continue;
+    const dir = score>0 ? 'long' : 'short';
+    const ep = closes[i];
+    const future = bars.slice(i+1, i+1+MAX_BARS);
+    if(!future.length) continue;
+    let mfe=0, mae=0;
+    future.forEach(b=>{
+      const upside=(b.h-ep)/ep, downside=(ep-b.l)/ep;
+      if(dir==='short'){ mfe=Math.max(mfe,downside); mae=Math.max(mae,upside); }
+      else { mfe=Math.max(mfe,upside); mae=Math.max(mae,downside); }
+    });
+    const quality = mfe/(mfe+mae+1e-8);
+    const id = await dbSaveSignal({
+      ts: new Date(bars[i].time).toISOString(), ticker: curTicker, tf:'1d',
+      entryPrice: ep, entryTs: bars[i].time,
+      composite: score, dir,
+      methods: {PRICE_TREND: score},
+    }).catch(()=>null);
+    if(id == null) continue;
+    await dbUpdateSignal(id, {mfe, mae, quality, resolved:1, resolved_at: Date.now()}).catch(()=>{});
+    inserted++;
+  }
+  setStatus(`✓ Добавлено ${inserted} исторических сценариев по ${curTicker} (дневной тренд, ${bars.length} дней истории)`);
+  loadScenarioStats();
 }
 
 // Статистика по завершённым сценариям из общей базы (все тикеры).
