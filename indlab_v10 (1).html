@@ -7708,7 +7708,17 @@ async function ilGetVerdict({ticker, token}) {
   return {score, label, details};
 }
 
-window.parent.postMessage({type:'APP_REGISTER', id:'indlab', api:{getVerdict: ilGetVerdict}}, '*');
+// Отвечаем на запросы вердикта от других модулей (через релей MODULE_RPC_* в shell).
+// Функции нельзя передать через postMessage, поэтому вместо APP_REGISTER слушаем запросы напрямую.
+window.addEventListener('message', (ev) => {
+  const d = ev.data;
+  if (!d || d.type !== 'MODULE_RPC_REQUEST') return;
+  const payload = d.payload || {};
+  if (payload.api !== 'getVerdict') return;
+  ilGetVerdict({ticker: payload.ticker, token: payload.token})
+    .then(result => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*'))
+    .catch(err => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*'));
+});
 </script>
 </body>
 </html>

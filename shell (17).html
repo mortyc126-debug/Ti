@@ -499,6 +499,7 @@ function onTokenInput(v){
 }
 
 // ══ СООБЩЕНИЯ ОТ МОДУЛЕЙ ══
+var pendingRpc = {}; // reqId → source window, для релея MODULE_RPC_*
 window.addEventListener('message', function(e){
   var d = e.data; if (!d) return;
   if (d.type==='APP_REGISTER'){
@@ -511,6 +512,24 @@ window.addEventListener('message', function(e){
     }).catch(function(err){
       try{ e.source.postMessage({type:'APP_CALL_RESULT',reqId:d.reqId,error:String(err)},'*'); }catch(_){}
     });
+    return;
+  }
+  // Релей между модулями для запросов, которые не сериализуются через APP_REGISTER
+  // (например, indlab отдаёт вердикт по индикаторам через MODULE_RPC_*)
+  if (d.type==='MODULE_RPC_REQUEST'){
+    var target = mods.find(function(m){ return /indlab|индикатор/i.test(m.id) || /indlab|индикатор/i.test(m.label); });
+    if (!target || !target.iframe || !target.iframe.contentWindow){
+      try{ e.source.postMessage({type:'MODULE_RPC_RESPONSE',reqId:d.reqId,error:'модуль indlab не открыт в shell'},'*'); }catch(_){}
+      return;
+    }
+    pendingRpc[d.reqId] = e.source;
+    target.iframe.contentWindow.postMessage({type:'MODULE_RPC_REQUEST',reqId:d.reqId,payload:d.payload}, '*');
+    return;
+  }
+  if (d.type==='MODULE_RPC_RESPONSE'){
+    var caller = pendingRpc[d.reqId];
+    delete pendingRpc[d.reqId];
+    if (caller){ try{ caller.postMessage(d,'*'); }catch(_){} }
     return;
   }
   if (d.type==='MODULE_EVENT'){

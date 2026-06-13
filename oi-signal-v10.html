@@ -1622,6 +1622,29 @@ function m_CORR_PEERS(){
 // метод использует последний кешированный результат, новый запрос
 // запускается в фоне и подхватится на следующий пересчёт.
 // ============================================================
+// ── RPC к другим модулям через релей в shell (MODULE_RPC_*) ──
+let _ilRpcSeq = 0;
+const _ilRpcPending = {};
+window.addEventListener('message', (ev)=>{
+  const d = ev.data;
+  if(!d || d.type !== 'MODULE_RPC_RESPONSE') return;
+  const p = _ilRpcPending[d.reqId];
+  if(!p) return;
+  delete _ilRpcPending[d.reqId];
+  clearTimeout(p.timer);
+  if(d.error) p.reject(new Error(d.error)); else p.resolve(d.result);
+});
+function _ilRpcCall(api, args){
+  const reqId = 'il'+(++_ilRpcSeq)+'_'+Date.now();
+  return new Promise((resolve,reject)=>{
+    _ilRpcPending[reqId] = {resolve, reject, timer: setTimeout(()=>{
+      delete _ilRpcPending[reqId];
+      reject(new Error('таймаут 20с — модуль indlab не ответил'));
+    }, 20000)};
+    window.parent.postMessage({type:'MODULE_RPC_REQUEST', reqId, payload:{api, ...args}}, '*');
+  });
+}
+
 let extIndicatorsCache = {}; // ticker -> {score, label, details, ts}
 let extIndicatorsPending = {};
 const EXT_IND_MAX_AGE = 6*3600*1000; // 6 часов — индикаторы за 90 дней не меняются быстро
@@ -1639,12 +1662,11 @@ async function _ilRequestVerdict(ticker){
         return;
       }
     }catch(e){ /* нет прокси/таблицы — просто считаем заново */ }
-    if(!window.parent || !window.parent.APP || typeof window.parent.APP.call !== 'function'){
-      extIndicatorsCache[ticker] = {error:'модуль indlab не открыт в shell (нет window.parent.APP)', ts:Date.now()};
+    if(!window.parent || window.parent === window){
+      extIndicatorsCache[ticker] = {error:'модуль открыт не внутри shell — нет window.parent', ts:Date.now()};
       return;
     }
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('таймаут 20с — модуль indlab не ответил')), 20000));
-    const res = await Promise.race([window.parent.APP.call('indlab','getVerdict',{ticker}), timeout]);
+    const res = await _ilRpcCall('getVerdict', {ticker, token: getTinvestToken()});
     extIndicatorsCache[ticker] = {...res, ts:Date.now()};
     dbSaveIndVerdict(ticker, res).catch(()=>{});
   }catch(err){
@@ -1671,7 +1693,8 @@ function m_EXT_INDICATORS(){
   });
   const score = Math.max(-1, Math.min(1, cached.score/2));
   const confidence = used.length ? Math.min(0.5, 0.15*used.length) : 0.05;
-  return {score, confidence, detail:`модуль индикаторов (${ageMin} мин назад) — ${cached.label}. Учтено ${used.length} из ${details.length}. ${parts.join(' ')}`};
+  const header = `модуль индикаторов (${ageMin} мин назад) — ${cached.label}. Учтено ${used.length} из ${details.length}:`;
+  return {score, confidence, detail:`${header}<br>${parts.join('<br>')}`};
 }
 
 // ============================================================
@@ -1917,7 +1940,7 @@ const STOP_PCT  = 0.005;  // 0.5% — стоп-лосс для закрытия 
 const MAX_BARS  = 20;     // максимум баров до принудительного закрытия
 
 async function autoRecordOutcomes(){
-  if(!db) return;
+  if(!dbBase()) return;
   const openSigs = await dbGetOpenSignals(curTicker).catch(()=>[]);
   if(!openSigs.length) return;
 
