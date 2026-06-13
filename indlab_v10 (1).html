@@ -7354,9 +7354,17 @@ try { chartPageInit(); } catch(e) { console.error('chartPageInit crash:', e); }
 // МОСТ МОДУЛЕЙ (shell): выдача вердикта по индикаторам для тикера
 // ═══════════════════════════════════════════
 let _ilShellToken = '';
+function _ilFillTokenField(tok){
+  if(!tok) return;
+  const inp = document.getElementById('chart-token');
+  if(inp && !inp.value) inp.value = tok;
+}
 window.addEventListener('message', (ev) => {
   const d = ev.data;
-  if (d && d.type === 'SHELL_STATE' && d.token) _ilShellToken = d.token;
+  if (d && d.type === 'SHELL_STATE' && d.token){
+    _ilShellToken = d.token;
+    _ilFillTokenField(d.token);
+  }
 });
 try {
   _ilShellToken = localStorage.getItem('t_api_token') || _ilShellToken;
