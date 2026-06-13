@@ -907,10 +907,25 @@ async function backfillOne(ticker, type){
   {
     // AlgoPack: tradestats / obstats / orderstats — постранично через start
     for(const metric of ['tradestats','obstats','orderstats']){
+      // Проверяем, что уже есть в базе — если данные за вчера/сегодня уже
+      // загружены, повторно качать все 90 дней не нужно
+      let metricFromStr = fromStr;
+      try{
+        const existing = await dbLoadAlgopack(ticker, metric, 2);
+        if(existing.length){
+          const lastDate = existing.map(r=>r.tradedate).sort().pop();
+          const yesterday = new Date(till.getTime()-86400000).toISOString().slice(0,10);
+          if(lastDate >= yesterday){
+            setStatus(`Бэкфилл ${ticker}: ${metric} — уже актуально (по ${lastDate})`, true);
+            continue;
+          }
+          metricFromStr = lastDate; // докачиваем только недостающий хвост
+        }
+      } catch(e){}
       let start = 0;
       for(let page=0; page<60; page++){
         let rows;
-        try{ rows = await fetchMoex(ticker, metric, type, {from:fromStr, till:tillStr, start, limit:100}); }
+        try{ rows = await fetchMoex(ticker, metric, type, {from:metricFromStr, till:tillStr, start, limit:100}); }
         catch(e){ break; }
         if(!rows.length) break;
         await dbSaveAlgopack(ticker, metric, rows).catch(()=>{});
@@ -924,10 +939,24 @@ async function backfillOne(ticker, type){
 
     // FUTOI — только для фьючерсов
     if(type === 'futures'){
+      let futoiFromStr = fromStr;
+      try{
+        const existing = await dbLoadAlgopack(ticker, 'futoi', 2);
+        if(existing.length){
+          const lastDate = existing.map(r=>r.tradedate).sort().pop();
+          const yesterday = new Date(till.getTime()-86400000).toISOString().slice(0,10);
+          if(lastDate >= yesterday){
+            setStatus(`Бэкфилл ${ticker}: futoi — уже актуально (по ${lastDate})`, true);
+            futoiFromStr = null;
+          } else {
+            futoiFromStr = lastDate;
+          }
+        }
+      } catch(e){}
       let start = 0;
-      for(let page=0; page<60; page++){
+      for(let page=0; page<60 && futoiFromStr; page++){
         let rows;
-        try{ rows = await fetchFutoiHist(ticker, fromStr, tillStr, start); }
+        try{ rows = await fetchFutoiHist(ticker, futoiFromStr, tillStr, start); }
         catch(e){ break; }
         if(!rows.length) break;
         await dbSaveAlgopack(ticker, 'futoi', rows).catch(()=>{});
