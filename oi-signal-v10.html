@@ -166,6 +166,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
     </div>
     <div class="hdr-row">
       <button class="btn-pill" id="btnRefresh" onclick="refreshAll()">↺ Обновить</button>
+      <button class="btn-ghost" id="btnBackfill" onclick="backfillHistory()" title="Загрузить ~90 дней истории AlgoPack/свечей для текущего тикера в D1">📥 История (90д)</button>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;">
         <input type="checkbox" id="autoChk" onchange="toggleAuto()" style="cursor:pointer;"> Авто
       </label>
@@ -807,6 +808,104 @@ async function fetchFutoi(ticker){
     block.columns.forEach((c,i) => obj[c] = row[i]);
     return obj;
   });
+}
+
+// Историческая выгрузка FUTOI с пагинацией (from/till/start)
+async function fetchFutoiHist(ticker, fromStr, tillStr, start){
+  const sym = futoi2sym(ticker);
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const q = new URLSearchParams({ticker:sym, from:fromStr, till:tillStr, start, 'iss.meta':'off', limit:100}).toString();
+  const url = prefix + `/analyticalproducts/futoi/securities.json?${q}`;
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX futoi HTTP ${resp.status}`);
+  const json = await resp.json();
+  const block = json['futoi'] || json[Object.keys(json).find(k=>k!=='metadata'&&k!=='history')];
+  if(!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c,i) => obj[c] = row[i]);
+    return obj;
+  });
+}
+
+// ============================================================
+// BACKFILL — загрузка глубокой истории (по умолчанию 90 дней) для текущего тикера
+// ============================================================
+async function backfillHistory(){
+  if(!curTicker){ setStatus('Выберите тикер'); return; }
+  const ticker = curTicker, type = curType;
+  const till = new Date();
+  const from = new Date(till.getTime() - 90*86400000);
+  const fromStr = from.toISOString().slice(0,10);
+  const tillStr = till.toISOString().slice(0,10);
+  let total = 0;
+
+  document.getElementById('btnBackfill').disabled = true;
+  try{
+    // AlgoPack: tradestats / obstats / orderstats — постранично через start
+    for(const metric of ['tradestats','obstats','orderstats']){
+      let start = 0;
+      for(let page=0; page<60; page++){
+        let rows;
+        try{ rows = await fetchMoex(ticker, metric, type, {from:fromStr, till:tillStr, start, limit:100}); }
+        catch(e){ break; }
+        if(!rows.length) break;
+        await dbSaveAlgopack(ticker, metric, rows).catch(()=>{});
+        total += rows.length;
+        setStatus(`Бэкфилл ${ticker}: ${metric} — ${start+rows.length} запис.`, true);
+        start += rows.length;
+        if(rows.length < 100) break;
+        await new Promise(r=>setTimeout(r, 250));
+      }
+    }
+
+    // FUTOI — только для фьючерсов
+    if(type === 'futures'){
+      let start = 0;
+      for(let page=0; page<60; page++){
+        let rows;
+        try{ rows = await fetchFutoiHist(ticker, fromStr, tillStr, start); }
+        catch(e){ break; }
+        if(!rows.length) break;
+        await dbSaveAlgopack(ticker, 'futoi', rows).catch(()=>{});
+        total += rows.length;
+        setStatus(`Бэкфилл ${ticker}: futoi — ${start+rows.length} запис.`, true);
+        start += rows.length;
+        if(rows.length < 100) break;
+        await new Promise(r=>setTimeout(r, 250));
+      }
+    }
+
+    // Дневные свечи T-Invest за 90 дней (для ATR/тренда)
+    try{
+      const meta = tickers.find(x=>x.t===ticker) || CATALOG.find(x=>x.t===ticker);
+      const figi = meta?.f;
+      const token = getTinvestToken();
+      if(figi && token){
+        const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles');
+        const resp = await fetchWithTimeout(url, {
+          method:'POST',
+          headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+          body: JSON.stringify({instrument_id:figi, from:from.toISOString(), to:till.toISOString(), interval:TF_INTERVALS['1d']}),
+        });
+        if(resp.ok){
+          const d = await resp.json();
+          const c = d.candles || [];
+          if(c.length){ await dbSaveCandles(ticker, '1d', c); total += c.length; }
+        }
+      }
+    } catch(e){}
+
+    deepHistory[ticker] = null;
+    await loadDeepHistory(ticker);
+    setStatus(`✓ Бэкфилл завершён: ${total} записей за ${fromStr}..${tillStr}`);
+  } finally {
+    document.getElementById('btnBackfill').disabled = false;
+  }
 }
 
 async function fetchAllMoex(ticker, type){
