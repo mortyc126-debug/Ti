@@ -84,7 +84,7 @@ const SCHEMA_STMTS = [
     ts         INTEGER NOT NULL,
     tradedate  TEXT,
     tradetime  TEXT,
-    values     TEXT NOT NULL
+    "values"   TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_algopack_ttt ON algopack(ticker, type, ts)`,
 
@@ -234,7 +234,7 @@ async function handleDb(path, req, env) {
         const tsMs = date ? new Date(`${date}T${time}Z`).getTime() : Date.now();
         const key  = `${ticker}__${type}__${date}__${time}`;
         return db.prepare(
-          `INSERT OR REPLACE INTO algopack(key,ticker,type,ts,tradedate,tradetime,values)
+          `INSERT OR REPLACE INTO algopack(key,ticker,type,ts,tradedate,tradetime,"values")
            VALUES(?,?,?,?,?,?,?)`
         ).bind(key, ticker, type, tsMs, date, time, JSON.stringify(r));
       }));
@@ -251,13 +251,13 @@ async function handleDb(path, req, env) {
     if (!ticker || !type) return json({ error: 'ticker and type required' }, 400);
     const from = Date.now() - days * 86400 * 1000;
     const { results } = await db.prepare(
-      `SELECT tradedate, tradetime, values FROM algopack
+      `SELECT tradedate, tradetime, "values" FROM algopack
        WHERE ticker=? AND type=? AND ts>=?
        ORDER BY ts ASC LIMIT ?`
     ).bind(ticker, type, from, limit).all();
     // Разворачиваем JSON-поле values обратно в объекты
     const parsed = results.map(r => {
-      try { return JSON.parse(r.values); } catch(_) { return {}; }
+      try { return JSON.parse(r["values"]); } catch(_) { return {}; }
     });
     return json(parsed);
   }
