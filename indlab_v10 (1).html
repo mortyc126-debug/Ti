@@ -7349,6 +7349,80 @@ try { initSketch(); } catch(e) { console.error('initSketch crash:', e); }
 try { updateExt(); } catch(e) { console.error('updateExt crash:', e); }
 try { renderFib(); } catch(e) { console.error('renderFib crash:', e); }
 try { chartPageInit(); } catch(e) { console.error('chartPageInit crash:', e); }
+
+// ═══════════════════════════════════════════
+// МОСТ МОДУЛЕЙ (shell): выдача вердикта по индикаторам для тикера
+// ═══════════════════════════════════════════
+let _ilShellToken = '';
+window.addEventListener('message', (ev) => {
+  const d = ev.data;
+  if (d && d.type === 'SHELL_STATE' && d.token) _ilShellToken = d.token;
+});
+try {
+  _ilShellToken = localStorage.getItem('t_api_token') || _ilShellToken;
+} catch(e) {}
+
+async function ilFindFigi(ticker, token) {
+  const r = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+    method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
+    body: JSON.stringify({query:ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false})
+  });
+  if (!r.ok) throw new Error('FindInstrument '+r.status);
+  const d = await r.json();
+  const list = d.instruments||[];
+  return list.find(i=>i.ticker===ticker) || list[0];
+}
+
+// Вердикт по индикаторам (RSI/MACD) на дневках за ~90 дней.
+// Возвращает {score: -2..2, label, details:[{name,text,score}]}
+async function ilGetVerdict({ticker, token}) {
+  token = token || _ilShellToken;
+  if (!token) throw new Error('Нет API-токена');
+  const found = await ilFindFigi(ticker, token);
+  if (!found) throw new Error('Тикер не найден: '+ticker);
+  const now = new Date(), from = new Date(now);
+  from.setDate(from.getDate()-90);
+  const cr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+    method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
+    body: JSON.stringify({figi:found.figi, from:from.toISOString(), to:now.toISOString(), interval:'CANDLE_INTERVAL_DAY'})
+  });
+  if (!cr.ok) throw new Error('GetCandles '+cr.status);
+  const cd = await cr.json();
+  const closes = (cd.candles||[]).map(c=>chartQuotation(c.close)).filter(c=>c>0);
+  if (closes.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+closes.length+' свечей)');
+
+  const rsiArr = _chartCalcRSI(closes, 14);
+  const macdR = _chartCalcMACD(closes, 12, 26, 9);
+  const rsi = Math.round(rsiArr[rsiArr.length-1]*10)/10;
+
+  const hist = macdR.hist;
+  let histTrend = 'иссякает';
+  const lastH = hist[hist.length-1], prevH = hist[hist.length-2];
+  if (lastH!==null && prevH!==null) {
+    if (lastH > prevH) histTrend = lastH>0 ? 'растёт' : 'падает';
+    else histTrend = 'иссякает';
+  }
+  const macdF = macdR.macd[macdR.macd.length-1], macdS = macdR.signal[macdR.signal.length-1];
+
+  const rsiR = interpRSI(rsi);
+  const macdRes = (macdF!==null && macdS!==null) ? interpMACD(macdF, macdS, histTrend) : {s:'neutral', t:'MACD недоступен'};
+
+  const details = [
+    {name:'RSI', text: rsiR.t, score: SC[rsiR.s]},
+    {name:'MACD', text: macdRes.t, score: SC[macdRes.s]},
+  ];
+  const score = details.reduce((a,b)=>a+b.score,0) / details.length;
+  let label;
+  if (score >= 1.5) label = 'сильный сигнал на рост';
+  else if (score >= 0.5) label = 'сигнал на рост';
+  else if (score <= -1.5) label = 'сильный сигнал на падение';
+  else if (score <= -0.5) label = 'сигнал на падение';
+  else label = 'нейтрально';
+
+  return {score, label, details};
+}
+
+window.parent.postMessage({type:'APP_REGISTER', id:'indlab', api:{getVerdict: ilGetVerdict}}, '*');
 </script>
 </body>
 </html>

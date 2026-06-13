@@ -461,6 +461,7 @@ const METHODS = [
   {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
   {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FF9F40'},
+  {id:'EXT_INDICATORS', label:'Индикаторы (RSI/MACD)',src:'indlab', color:'#52F2C9'},
 ];
 
 // ============================================================
@@ -1588,6 +1589,38 @@ function m_CORR_PEERS(){
 }
 
 // ============================================================
+// ВНЕШНИЕ ИНДИКАТОРЫ (модуль indlab через shell-мост)
+// Запрос идёт асинхронно и кешируется на 10 минут на тикер;
+// метод использует последний кешированный результат, новый запрос
+// запускается в фоне и подхватится на следующий пересчёт.
+// ============================================================
+let extIndicatorsCache = {}; // ticker -> {score, label, details, ts}
+let extIndicatorsPending = {};
+function _ilRequestVerdict(ticker){
+  if(extIndicatorsPending[ticker]) return;
+  if(!window.parent || !window.parent.APP || typeof window.parent.APP.call !== 'function') return;
+  extIndicatorsPending[ticker] = true;
+  window.parent.APP.call('indlab','getVerdict',{ticker})
+    .then(res=>{ extIndicatorsCache[ticker] = {...res, ts:Date.now()}; })
+    .catch(err=>{ extIndicatorsCache[ticker] = {error:String(err&&err.message||err), ts:Date.now()}; })
+    .finally(()=>{ delete extIndicatorsPending[ticker]; });
+}
+function m_EXT_INDICATORS(){
+  const cached = extIndicatorsCache[curTicker];
+  const maxAge = 10*60*1000;
+  if(!cached || Date.now()-cached.ts > maxAge){
+    _ilRequestVerdict(curTicker);
+  }
+  if(!cached) return {score:0, confidence:0, detail:'запрос к модулю индикаторов отправлен, ответа пока нет'};
+  if(cached.error) return {score:0, confidence:0, detail:`модуль индикаторов: ошибка — ${cached.error}`};
+  const ageMin = Math.round((Date.now()-cached.ts)/60000);
+  const parts = (cached.details||[]).map(d=>`${d.name}: ${d.text}`);
+  const score = Math.max(-1, Math.min(1, cached.score/2));
+  const confidence = 0.4;
+  return {score, confidence, detail:`модуль индикаторов (${ageMin} мин назад) — ${cached.label}. ${parts.join(' ')}`};
+}
+
+// ============================================================
 // REGIME CLASSIFIER MODULE v1.0
 // ============================================================
 const REGIME_LS_KEY = 'oi_regime_cache_v1';
@@ -1792,6 +1825,7 @@ function computeAllMethods(){
   results.RETAIL_CONTRA  = m_RETAIL_CONTRA(futoiData);
   results.PRICE_TREND    = m_PRICE_TREND(candleData);
   results.CORR_PEERS     = m_CORR_PEERS();
+  results.EXT_INDICATORS = m_EXT_INDICATORS();
   return results;
 }
 
