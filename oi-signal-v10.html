@@ -166,7 +166,10 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
     </div>
     <div class="hdr-row">
       <button class="btn-pill" id="btnRefresh" onclick="refreshAll()">↺ Обновить</button>
-      <button class="btn-ghost" id="btnBackfill" onclick="backfillHistory()" title="Загрузить ~90 дней истории AlgoPack/свечей для текущего тикера в D1">📥 История (90д)</button>
+      <button class="btn-ghost" id="btnBackfill" onclick="backfillHistory()" title="Загрузить ~90 дней истории AlgoPack/свечей для текущего тикера в D1">📥 Тикер (90д)</button>
+      <button class="btn-ghost" onclick="bfAddAll()" title="Добавить все тикеры каталога в очередь фоновой загрузки">📥 Все → очередь</button>
+      <button class="btn-ghost" id="btnBfQueue" onclick="toggleBfQueue()">▶ Очередь</button>
+      <span style="font-size:10px;color:var(--txt3);" id="bfBadge"></span>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;">
         <input type="checkbox" id="autoChk" onchange="toggleAuto()" style="cursor:pointer;"> Авто
       </label>
@@ -632,7 +635,7 @@ async function dbLoadAtr(ticker){
 // ============================================================
 function saveAll(){
   const d = {
-    tickers, pinnedTickers, methodWeights, signalLog,
+    tickers, pinnedTickers, methodWeights, signalLog, bfQueue,
     moexKey: document.getElementById('moexKeyInp').value,
     tinvest: document.getElementById('tinvestInp').value,
     proxy: document.getElementById('proxyInp').value,
@@ -662,6 +665,7 @@ function loadAll(){
     if(d.curTicker && FUT_MIGRATE[d.curTicker]) d.curTicker = FUT_MIGRATE[d.curTicker];
     if(d.methodWeights) methodWeights = d.methodWeights;
     if(d.signalLog) signalLog = d.signalLog;
+    if(d.bfQueue?.length) bfQueue = d.bfQueue;
     if(d.moexKey) document.getElementById('moexKeyInp').value = d.moexKey;
     if(d.tinvest) document.getElementById('tinvestInp').value = d.tinvest;
     if(d.proxy) document.getElementById('proxyInp').value = d.proxy;
@@ -833,19 +837,16 @@ async function fetchFutoiHist(ticker, fromStr, tillStr, start){
 }
 
 // ============================================================
-// BACKFILL — загрузка глубокой истории (по умолчанию 90 дней) для текущего тикера
+// BACKFILL — загрузка глубокой истории (по умолчанию 90 дней)
 // ============================================================
-async function backfillHistory(){
-  if(!curTicker){ setStatus('Выберите тикер'); return; }
-  const ticker = curTicker, type = curType;
+async function backfillOne(ticker, type){
   const till = new Date();
   const from = new Date(till.getTime() - 90*86400000);
   const fromStr = from.toISOString().slice(0,10);
   const tillStr = till.toISOString().slice(0,10);
   let total = 0;
 
-  document.getElementById('btnBackfill').disabled = true;
-  try{
+  {
     // AlgoPack: tradestats / obstats / orderstats — постранично через start
     for(const metric of ['tradestats','obstats','orderstats']){
       let start = 0;
@@ -901,11 +902,72 @@ async function backfillHistory(){
     } catch(e){}
 
     deepHistory[ticker] = null;
-    await loadDeepHistory(ticker);
-    setStatus(`✓ Бэкфилл завершён: ${total} записей за ${fromStr}..${tillStr}`);
-  } finally {
-    document.getElementById('btnBackfill').disabled = false;
+    if(ticker === curTicker) await loadDeepHistory(ticker);
+    setStatus(`✓ ${ticker}: ${total} записей за ${fromStr}..${tillStr}`);
   }
+  return total;
+}
+
+// Бэкфилл одного (текущего) тикера
+async function backfillHistory(){
+  if(!curTicker){ setStatus('Выберите тикер'); return; }
+  document.getElementById('btnBackfill').disabled = true;
+  try{ await backfillOne(curTicker, curType); }
+  finally{ document.getElementById('btnBackfill').disabled = false; }
+}
+
+// ── Очередь фоновой загрузки ──
+let bfQueue = [];
+let bfRunning = false;
+let bfStop = false;
+
+function bfAllTickers(){
+  const seen = new Set();
+  const out = [];
+  [...CATALOG, ...tickers].forEach(t=>{
+    if(seen.has(t.t)) return;
+    seen.add(t.t);
+    out.push({t:t.t, cat:t.cat||'stocks'});
+  });
+  return out;
+}
+
+function bfToggle(t, cat){
+  const idx = bfQueue.findIndex(x=>x.t===t);
+  if(idx>=0) bfQueue.splice(idx,1);
+  else bfQueue.push({t, cat});
+  saveAll(); updateBfBadge(); renderCatalog();
+}
+
+function bfAddAll(){
+  const seen = new Set(bfQueue.map(x=>x.t));
+  bfAllTickers().forEach(x=>{ if(!seen.has(x.t)){ bfQueue.push(x); seen.add(x.t); } });
+  saveAll(); updateBfBadge(); renderCatalog();
+  setStatus(`В очередь добавлено ${bfQueue.length} тикеров`);
+}
+
+function updateBfBadge(){
+  const el = document.getElementById('bfBadge');
+  if(!el) return;
+  el.textContent = bfQueue.length ? `📦 очередь: ${bfQueue.length}` : '';
+}
+
+async function toggleBfQueue(){
+  if(bfRunning){ bfStop = true; setStatus('Останавливаю очередь...'); return; }
+  if(!bfQueue.length){ setStatus('Очередь пуста — добавь тикеры кнопкой 📥 в каталоге или «Все»'); return; }
+  bfRunning = true; bfStop = false;
+  const btn = document.getElementById('btnBfQueue');
+  btn.textContent = '⏸ Стоп очередь';
+  while(bfQueue.length && !bfStop){
+    const {t, cat} = bfQueue[0];
+    setStatus(`Очередь (осталось ${bfQueue.length}): ${t}...`, true);
+    try{ await backfillOne(t, cat); } catch(e){}
+    bfQueue.shift();
+    saveAll(); updateBfBadge(); renderCatalog();
+  }
+  bfRunning = false;
+  btn.textContent = '▶ Очередь';
+  setStatus(bfStop ? 'Очередь остановлена' : '✓ Очередь завершена');
 }
 
 async function fetchAllMoex(ticker, type){
@@ -2092,6 +2154,7 @@ function renderCatalog(){
         <div class="cat-item-sector">${item.sector||item.cat||''}</div>
       </div>
       ${!hasFigi?`<button class="pin-btn" onclick="event.stopPropagation();lookupFIGI('${item.t}')" title="Найти FIGI через T-Invest API" style="font-size:10px;">🔍</button>`:''}
+      <button class="pin-btn" onclick="event.stopPropagation();bfToggle('${item.t}','${item.cat||'stocks'}')" title="${bfQueue.find(x=>x.t===item.t)?'Убрать из очереди бэкфилла':'В очередь бэкфилла (90д)'}" style="${bfQueue.find(x=>x.t===item.t)?'color:var(--mem);':''}">📥</button>
       <button class="pin-btn" onclick="event.stopPropagation();togglePin('${item.t}')" title="${isPin?'Открепить':'Закрепить'}">${isPin?'★':'☆'}</button>
     </div>`;
   }).join('');
@@ -2355,6 +2418,7 @@ setInterval(updateAges, 10000);
 (async function init(){
   dbOpen(); // инит схемы D1, не блокируем запуск
   loadAll();
+  updateBfBadge();
   renderPinnedChips();
   renderHistory();
   renderMethodsTable({});
