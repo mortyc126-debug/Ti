@@ -69,8 +69,10 @@ a{color:var(--accent);text-decoration:none;}
 .gauge-dir{font-size:10px;letter-spacing:.1em;text-align:center;margin-top:2px;}
 .gauge-conf{font-size:9px;color:var(--txt3);text-align:center;margin-top:1px;}
 /* ---- Methods table ---- */
-.meth-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.meth-row{display:flex;flex-direction:column;gap:2px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.meth-row-main{display:flex;align-items:center;gap:6px;}
 .meth-name{font-size:10px;color:var(--txt2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meth-detail{font-size:9px;color:var(--txt3);line-height:1.3;padding-left:18px;}
 .meth-bar-wrap{width:60px;height:4px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
 .meth-bar{height:100%;border-radius:999px;transition:width .4s;}
 .meth-score{font-size:10px;font-weight:600;width:32px;text-align:right;flex-shrink:0;}
@@ -1291,7 +1293,7 @@ function toP(p){ if(!p) return 0; return (toNum(p.units)||0) + (toNum(p.nano)||0
 
 // --- Method 1: Buy/Sell Pressure (адаптивный) ---
 function m_BS_PRESSURE(ts){
-  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных по сделкам — рынок закрыт или тикер не торгуется'};
   const recent = ts.slice(-5);
   const vb = avg(recent.map(r=>toNum(r.vol_b||0)));
   const vs = avg(recent.map(r=>toNum(r.vol_s||0)));
@@ -1308,12 +1310,12 @@ function m_BS_PRESSURE(ts){
     score = Math.tanh(ratio * 4);
   }
   const confidence = Math.min(0.9, total > 0 ? 0.7 : 0.1);
-  return {score, confidence, detail:`vB:${snum(vb)} vS:${snum(vs)} r:${ratio.toFixed(2)}`};
+  return {score, confidence, detail:`покупки ${snum(vb)} лотов vs продажи ${snum(vs)} лотов — перевес ${(ratio*100).toFixed(0)}% в сторону ${ratio>=0?'покупателей':'продавцов'}`};
 }
 
 // --- Method 2: Aggressor Flow (адаптивный) ---
 function m_AGGRESSOR_FLOW(ts){
-  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных по сделкам — рынок закрыт или тикер не торгуется'};
   const recent = ts.slice(-5);
   const valB = avg(recent.map(r=>toNum(r.val_b||0)));
   const valS = avg(recent.map(r=>toNum(r.val_s||0)));
@@ -1334,33 +1336,33 @@ function m_AGGRESSOR_FLOW(ts){
     score = Math.tanh(vr*3 + tr*2);
   }
   const confidence = (valB+valS)>0 ? 0.7 : 0.1;
-  return {score, confidence, detail:`valB:${snum(valB)} valS:${snum(valS)}`};
+  return {score, confidence, detail:`объём агрессивных покупок ${snum(valB)}₸ vs продаж ${snum(valS)}₸ за последние 5 баров`};
 }
 
 // --- Method 3: Large Trade Impact (адаптивный) ---
 function m_LARGE_IMPACT(ts){
-  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных по сделкам — рынок закрыт или тикер не торгуется'};
   const recent = ts.slice(-5);
   const pVol = getPct(curTicker,'tradestats','vol');
   const threshold = pVol?.p75 || 0;
   const largeB = avg(recent.map(r=>{ const v=toNum(r.vol_b||0); return v>threshold?v:0; }));
   const largeS = avg(recent.map(r=>{ const v=toNum(r.vol_s||0); return v>threshold?v:0; }));
   const total = largeB+largeS||1;
-  if(total < 1) return {score:0, confidence:0.1, detail:'нет крупных сделок'};
+  if(total < 1) return {score:0, confidence:0.1, detail:'крупных сделок не было'};
   const ratio = (largeB-largeS)/total;
   const totalVol = avg(recent.map(r=>toNum(r.vol||0)))||1;
   const largeFrac = (largeB+largeS)/(totalVol*2);
   const score = Math.tanh(ratio*3.5);
   const confidence = Math.min(0.8, largeFrac*2);
-  return {score, confidence, detail:`lgB:${snum(largeB)} lgS:${snum(largeS)} thr>${snum(threshold)}`};
+  return {score, confidence, detail:`крупные сделки (> ${snum(threshold)} лотов): на покупку ${snum(largeB)}, на продажу ${snum(largeS)}`};
 }
 
 // --- Method 4: VWAP Signal (адаптивный) ---
 function m_VWAP_SIGNAL(ts){
-  if(ts.length<3) return {score:0, confidence:0, detail:'мало данных'};
+  if(ts.length<3) return {score:0, confidence:0, detail:'недостаточно истории для расчёта'};
   const prices = ts.map(r=>toNum(r.pr_close||r.pr_cl||0)).filter(Boolean);
   const vols   = ts.map(r=>toNum(r.vol||0));
-  if(!prices.length) return {score:0, confidence:0.1, detail:'нет цены'};
+  if(!prices.length) return {score:0, confidence:0.1, detail:'нет данных по цене'};
   const vwap = prices.reduce((s,p,i)=>s+p*(vols[i]||1),0)/prices.reduce((s,_,i)=>s+(vols[i]||1),0);
   const curPrice = prices[prices.length-1];
   const atrPct = getAtrPct(curTicker, curTF);
@@ -1368,12 +1370,12 @@ function m_VWAP_SIGNAL(ts){
   const z = (curPrice-vwap)/(scale||1);
   const score = Math.tanh(z*1.5);
   const confidence = scale>0 ? 0.6 : 0.2;
-  return {score, confidence, detail:`price:${curPrice.toFixed(2)} vwap:${vwap.toFixed(2)} z:${z.toFixed(2)}`};
+  return {score, confidence, detail:`цена ${curPrice.toFixed(2)} ${curPrice>=vwap?'выше':'ниже'} VWAP ${vwap.toFixed(2)} на ${Math.abs(z).toFixed(1)}× от обычного отклонения`};
 }
 
 // --- Method 5: Volume Momentum (адаптивный) ---
 function m_VOL_MOMENTUM(ts){
-  if(ts.length<5) return {score:0, confidence:0, detail:'мало данных'};
+  if(ts.length<5) return {score:0, confidence:0, detail:'недостаточно истории для расчёта'};
   const pVol = getPct(curTicker,'tradestats','vol');
   const vols  = ts.map(r=>toNum(r.vol||0));
   const curVol = avg(vols.slice(-3));
@@ -1388,12 +1390,12 @@ function m_VOL_MOMENTUM(ts){
   const dir = prices.length>=2 ? Math.sign(prices[prices.length-1]-prices[prices.length-2]) : 0;
   const score = Math.tanh(zVol*dir*1.5);
   const confidence = Math.abs(zVol)>0.3 ? 0.65 : 0.3;
-  return {score, confidence, detail:`vol:${snum(curVol)} z:${zVol.toFixed(2)} dir:${dir>0?'↑':dir<0?'↓':'→'}`};
+  return {score, confidence, detail:`объём ${snum(curVol)} — это ${zVol>=0?'выше':'ниже'} обычного в ${Math.abs(zVol).toFixed(1)}× при цене ${dir>0?'вверх':dir<0?'вниз':'без изменений'}`};
 }
 
 // --- Method 6: Order Book Imbalance (адаптивный) ---
 function m_OB_IMBALANCE(ob){
-  if(!ob.length) return {score:0, confidence:0, detail:'нет данных'};
+  if(!ob.length) return {score:0, confidence:0, detail:'нет данных по сделкам — рынок закрыт или тикер не торгуется'};
   const recent = ob.slice(-5);
   const imb    = avg(recent.map(r=>toNum(r.imbalance_vol_bbo||r.imbalance_val_bbo||0)));
   const spread = avg(recent.map(r=>toNum(r.spread_bbo||0)));
@@ -1407,12 +1409,12 @@ function m_OB_IMBALANCE(ob){
   const pSpread = getPct(curTicker,'obstats','spread_bbo');
   const spreadZ = pSpread?.n>=5 ? (normScore(spread,pSpread,1.0)||0) : 0;
   const confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
-  return {score, confidence, detail:`imb:${imb.toFixed(3)} sprd:${spread.toFixed(4)}`};
+  return {score, confidence, detail:`дисбаланс заявок в стакане: ${imb>=0?'больше на покупку':'больше на продажу'} (${(Math.abs(imb)*100).toFixed(0)}%), спред ${spread.toFixed(4)}`};
 }
 
 // --- Method 7: Cancel Signal (адаптивный) ---
 function m_CANCEL_SIGNAL(os){
-  if(!os.length) return {score:0, confidence:0, detail:'нет данных'};
+  if(!os.length) return {score:0, confidence:0, detail:'нет данных по сделкам — рынок закрыт или тикер не торгуется'};
   const recent = os.slice(-5);
   const canB = avg(recent.map(r=>toNum(r.cancel_orders_b||0)));
   const canS = avg(recent.map(r=>toNum(r.cancel_orders_s||0)));
@@ -1428,14 +1430,14 @@ function m_CANCEL_SIGNAL(os){
     score = Math.tanh(((canS-canB)/total)*3);
   }
   const confidence = total>10 ? 0.6 : 0.25;
-  return {score, confidence, detail:`canB:${snum(canB)} canS:${snum(canS)}`};
+  return {score, confidence, detail:`отмены заявок: на покупку ${snum(canB)}, на продажу ${snum(canS)} — больше отмен на ${canS>=canB?'продажу (бычий сигнал)':'покупку (медвежий сигнал)'}`};
 }
 
 // --- Method 8: Institutional OI (адаптивный) ---
 function m_INST_OI(futoi){
-  if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  if(!futoi.length) return {score:0, confidence:0, detail:'метод применим только к фьючерсам'};
   const jur = futoi.filter(r=>(r.clgroup||'').toUpperCase()==='YUR');
-  if(!jur.length) return {score:0, confidence:0.1, detail:'нет данных YUR'};
+  if(!jur.length) return {score:0, confidence:0.1, detail:'нет данных по позициям юрлиц'};
   let longNet=0, shortNet=0;
   jur.forEach(r=>{ longNet+=toNum(r.pos_long||0); shortNet+=Math.abs(toNum(r.pos_short||0)); });
   const netPos = jur.reduce((s,r)=>s+toNum(r.pos||0),0);
@@ -1447,14 +1449,14 @@ function m_INST_OI(futoi){
     score = Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*3);
   }
   const confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
-  return {score, confidence, detail:`YUR L:${snum(longNet)} S:${snum(shortNet)} net:${snum(netPos)}`};
+  return {score, confidence, detail:`крупные игроки (юрлица): лонгов ${snum(longNet)}, шортов ${snum(shortNet)}, нетто ${netPos>=0?'+':''}${snum(netPos)} — ${netPos>=0?'наращивают лонги':'наращивают шорты'}`};
 }
 
 // --- Method 9: Retail Contrarian (адаптивный) ---
 function m_RETAIL_CONTRA(futoi){
-  if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  if(!futoi.length) return {score:0, confidence:0, detail:'метод применим только к фьючерсам'};
   const phiz = futoi.filter(r=>(r.clgroup||'').toUpperCase()==='FIZ');
-  if(!phiz.length) return {score:0, confidence:0.1, detail:'нет данных FIZ'};
+  if(!phiz.length) return {score:0, confidence:0.1, detail:'нет данных по позициям физлиц'};
   let longNet=0, shortNet=0;
   phiz.forEach(r=>{ longNet+=toNum(r.pos_long||0); shortNet+=Math.abs(toNum(r.pos_short||0)); });
   const netPos = phiz.reduce((s,r)=>s+toNum(r.pos||0),0);
@@ -1466,15 +1468,15 @@ function m_RETAIL_CONTRA(futoi){
     score = -Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*2.5);
   }
   const confidence = (longNet+shortNet)>0 ? 0.55 : 0.1;
-  return {score, confidence, detail:`FIZ L:${snum(longNet)} S:${snum(shortNet)}`};
+  return {score, confidence, detail:`физлица: лонгов ${snum(longNet)}, шортов ${snum(shortNet)} — толпа ${longNet>=shortNet?'в лонгах (контр-сигнал на падение)':'в шортах (контр-сигнал на рост)'}`};
 }
 
 // --- Method 10: Price Trend (адаптивный через ATR) ---
 function m_PRICE_TREND(candles){
   const arr = candles[curTF]||candles['1min']||[];
-  if(arr.length<10) return {score:0, confidence:0, detail:'мало свечей'};
+  if(arr.length<10) return {score:0, confidence:0, detail:'недостаточно свечей для расчёта тренда'};
   const closes = arr.map(c=>toP(c.close)).filter(Boolean);
-  if(closes.length<10) return {score:0, confidence:0, detail:'нет цены'};
+  if(closes.length<10) return {score:0, confidence:0, detail:'нет данных по цене'};
   const cur  = closes[closes.length-1];
   const p3   = closes[closes.length-4];
   const p10c = closes[closes.length-11]||closes[0];
@@ -1483,16 +1485,16 @@ function m_PRICE_TREND(candles){
   const roc10 = (cur-p10c)/(p10c||1)/(atrPct*10||0.05);
   const score = Math.tanh(roc3*0.6+roc10*0.4);
   const confidence = atrPct>0 ? 0.55 : 0.2;
-  return {score, confidence, detail:`roc3:${(roc3*100).toFixed(1)}% roc10:${(roc10*100).toFixed(1)}% atr%:${(atrPct*100).toFixed(2)}`};
+  return {score, confidence, detail:`цена движется ${roc3>=0?'вверх':'вниз'}: за 3 бара на ${Math.abs(roc3*atrPct*300).toFixed(2)}%, за 10 баров на ${Math.abs(roc10*atrPct*1000).toFixed(2)}% (ATR ${(atrPct*100).toFixed(2)}%)`};
 }
 
 // --- Method 11: Связанные тикеры — переносим сигнал коррелированных инструментов ---
 // Берём последний рассчитанный composite по каждому связанному тикеру (из signalLog,
 // заполняется при их собственных обновлениях), взвешиваем по знаку/силе корреляции.
 function m_CORR_PEERS(){
-  if(!corrEnabled) return {score:0, confidence:0, detail:'связи отключены'};
+  if(!corrEnabled) return {score:0, confidence:0, detail:'учёт связанных тикеров выключен (тумблер «Связи»)'};
   const peers = CORR_GROUPS[curTicker];
-  if(!peers || !peers.length) return {score:0, confidence:0, detail:'нет заданных связей'};
+  if(!peers || !peers.length) return {score:0, confidence:0, detail:'для этого тикера связи не заданы'};
   let wSum=0, wTotal=0, used=[];
   const maxAge = 2*3600*1000; // 2 часа — свежесть пирового сигнала
   peers.forEach(p=>{
@@ -1504,10 +1506,10 @@ function m_CORR_PEERS(){
     wTotal += w * w;
     used.push(`${p.t}:${p.corr>=0?'+':''}${p.corr}`);
   });
-  if(!used.length) return {score:0, confidence:0, detail:`нет свежих сигналов по: ${peers.map(p=>p.t).join(',')}`};
+  if(!used.length) return {score:0, confidence:0, detail:`нет свежих сигналов по связанным тикерам: ${peers.map(p=>p.t).join(', ')}`};
   const score = Math.tanh(wSum/wTotal);
   const confidence = Math.min(0.5, 0.15*used.length);
-  return {score, confidence, detail:used.join(' ')};
+  return {score, confidence, detail:`сигнал по связанным тикерам: ${used.join(', ')}`};
 }
 
 // ============================================================
@@ -1957,13 +1959,16 @@ function renderMethodsTable(methodResults){
     const barPct = Math.abs(sc) * 100;
     const barColor = sc > 0 ? '#52F2C9' : sc < 0 ? '#FF4D7A' : '#6F648F';
     const confDot = r.confidence < 0.2 ? '○' : r.confidence < 0.5 ? '◑' : '●';
-    return `<div class="meth-row" title="${r.detail||''}">
-      <span style="font-size:9px;color:var(--txt3);width:12px;">${confDot}</span>
-      <span class="meth-name" title="${r.detail||''}">${m.label}</span>
-      <div class="meth-bar-wrap"><div class="meth-bar" style="width:${barPct}%;background:${barColor};margin-left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
-      <span class="meth-score" style="color:${barColor}">${sc>=0?'+':''}${(sc).toFixed(2)}</span>
-      <span class="meth-w" title="вес метода">${(wVal).toFixed(2)}</span>
-      <span class="meth-acc" style="color:${acc==='—'?'var(--txt3)':parseInt(acc)>=60?'var(--pos)':'var(--neg)'}">${acc}</span>
+    return `<div class="meth-row">
+      <div class="meth-row-main">
+        <span style="font-size:9px;color:var(--txt3);width:12px;" title="уверенность метода: ${(r.confidence*100).toFixed(0)}%">${confDot}</span>
+        <span class="meth-name">${m.label}</span>
+        <div class="meth-bar-wrap"><div class="meth-bar" style="width:${barPct}%;background:${barColor};margin-left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
+        <span class="meth-score" style="color:${barColor}">${sc>=0?'+':''}${(sc).toFixed(2)}</span>
+        <span class="meth-w" title="вес метода в композите">${(wVal).toFixed(2)}</span>
+        <span class="meth-acc" title="точность метода по истории" style="color:${acc==='—'?'var(--txt3)':parseInt(acc)>=60?'var(--pos)':'var(--neg)'}">${acc}</span>
+      </div>
+      <div class="meth-detail">${r.detail||''}</div>
     </div>`;
   }).join('');
   document.getElementById('methodsTable').innerHTML = html;
