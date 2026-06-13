@@ -1,0 +1,3589 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OI · INTEL v10 — Real-Time Market Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0B0613;--panel:#140A24;--card:#1A1030;
+  --accent:#FF006E;--accent2:#FF2A8A;
+  --pos:#52F2C9;--neg:#FF4D7A;--mem:#A78BFA;--warn:#FF9F40;
+  --txt:#F2F0FF;--txt2:#A79BC9;--txt3:#6F648F;
+  --border:rgba(255,0,128,0.12);--border2:rgba(170,90,255,0.10);
+}
+body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min-height:100vh;font-family:'JetBrains Mono',monospace;color:var(--txt);padding:14px 16px;}
+a{color:var(--accent);text-decoration:none;}
+/* ---- Header ---- */
+.hdr{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border2);flex-wrap:wrap;}
+.logo{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;color:var(--accent);text-shadow:0 0 20px rgba(255,0,110,0.35);white-space:nowrap;}
+.logo-sub{font-size:9px;color:var(--txt3);letter-spacing:.08em;margin-top:2px;}
+.hdr-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+/* ---- Buttons ---- */
+.btn-pill{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.12));border:1px solid rgba(255,0,128,.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:6px 16px;cursor:pointer;transition:all .15s;}
+.btn-pill:hover{box-shadow:0 0 14px rgba(255,0,128,.25);}
+.btn-pill.pos{background:linear-gradient(180deg,rgba(82,242,201,.22),rgba(82,242,201,.1));border-color:rgba(82,242,201,.5);color:var(--pos);}
+.btn-pill.neg{background:linear-gradient(180deg,rgba(255,77,122,.22),rgba(255,77,122,.1));border-color:rgba(255,77,122,.5);color:var(--neg);}
+.btn-ghost{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 12px;cursor:pointer;transition:all .15s;}
+.btn-ghost:hover{border-color:rgba(255,0,128,.25);color:var(--txt);}
+.btn-ghost.active{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}
+.btn-sm{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;cursor:pointer;}
+.btn-sm:hover{color:var(--txt2);border-color:rgba(255,255,255,.15);}
+.btn-danger{border-color:rgba(255,77,122,.3);color:var(--neg);}
+/* ---- Inputs ---- */
+.inp{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:6px 14px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;}
+.inp:focus{border-color:rgba(255,0,110,.4);}
+.inp.wide{width:260px;}
+.inp.mid{width:180px;}
+/* ---- Panel / Card ---- */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:14px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;}
+.sec{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px;}
+/* ---- Status dots ---- */
+.sdot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
+.sdot.ok{background:var(--pos);box-shadow:0 0 7px rgba(82,242,201,.5);}
+.sdot.err{background:var(--neg);box-shadow:0 0 7px rgba(255,77,122,.5);}
+.sdot.warn{background:var(--warn);box-shadow:0 0 7px rgba(255,159,64,.5);}
+.sdot.off{background:var(--txt3);}
+.spinner{width:12px;height:12px;border:2px solid rgba(255,0,128,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+/* ---- Ticker chips ---- */
+.chips{display:flex;gap:4px;flex-wrap:wrap;}
+.chip{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;}
+.chip:hover{border-color:rgba(255,0,128,.25);}
+.chip.active{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);}
+.chip-code{font-size:11px;font-weight:600;color:var(--txt);}
+.chip.active .chip-code{color:var(--accent);}
+.chip-name{font-size:8px;color:var(--txt3);white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis;}
+/* ---- Layout ---- */
+.main-grid{display:grid;grid-template-columns:220px 1fr 260px;gap:12px;margin-bottom:12px;}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
+/* ---- Signal gauge ---- */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0;}
+.gauge-svg{width:140px;height:76px;}
+.gauge-val{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:700;text-align:center;margin-top:2px;}
+.gauge-dir{font-size:10px;letter-spacing:.1em;text-align:center;margin-top:2px;}
+.gauge-conf{font-size:9px;color:var(--txt3);text-align:center;margin-top:1px;}
+/* ---- Methods table ---- */
+.meth-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.meth-name{font-size:10px;color:var(--txt2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meth-bar-wrap{width:60px;height:4px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
+.meth-bar{height:100%;border-radius:999px;transition:width .4s;}
+.meth-score{font-size:10px;font-weight:600;width:32px;text-align:right;flex-shrink:0;}
+.meth-w{font-size:9px;color:var(--txt3);width:26px;text-align:right;flex-shrink:0;}
+.meth-src{font-size:8px;color:var(--txt3);width:20px;text-align:right;flex-shrink:0;}
+.meth-acc{font-size:9px;width:28px;text-align:right;flex-shrink:0;}
+/* ---- Candle area ---- */
+#candleArea{width:100%;height:200px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.01);border:1px solid rgba(255,255,255,.04);border-radius:10px;color:var(--txt3);font-size:11px;}
+/* ---- Data panels ---- */
+.dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.dp-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;}
+.dp-label{font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.dp-val{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;}
+.dp-sub{font-size:9px;color:var(--txt3);margin-top:1px;}
+/* ---- FutOI block ---- */
+.futoi-row{display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:4px;font-size:10px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.futoi-hdr{color:var(--txt3);font-size:9px;letter-spacing:.06em;text-transform:uppercase;}
+/* ---- History ---- */
+.hist-row{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:10px;}
+.hist-date{color:var(--txt3);width:90px;flex-shrink:0;}
+.hist-ticker{width:50px;flex-shrink:0;font-weight:600;}
+.hist-dir{width:48px;flex-shrink:0;}
+.hist-score{width:36px;text-align:right;flex-shrink:0;font-weight:600;}
+.hist-outcome{flex:1;}
+.hist-acc{font-size:9px;color:var(--txt3);}
+/* ---- Outcome row ---- */
+.outcome-row{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;}
+.outcome-lbl{font-size:10px;color:var(--txt3);flex:1;}
+.outcome-sel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
+/* ---- Refresh bar ---- */
+.refresh-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.refresh-bar span{font-size:10px;color:var(--txt3);}
+.age-badge{font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.08);color:var(--txt3);}
+.age-badge.fresh{border-color:rgba(82,242,201,.3);color:var(--pos);}
+.age-badge.stale{border-color:rgba(255,159,64,.3);color:var(--warn);}
+.age-badge.old{border-color:rgba(255,77,122,.3);color:var(--neg);}
+/* ---- Collapsible ---- */
+.collapsible-hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;padding:8px 0;}
+.collapsible-hdr:hover .sec{color:var(--txt2);}
+.collapsible-body{display:none;}
+.collapsible-body.open{display:block;}
+/* ---- Misc ---- */
+.tag{font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.06);color:var(--txt3);}
+.dp{color:var(--pos);font-weight:600;}.dn{color:var(--neg);font-weight:600;}.dm{color:var(--txt2);}
+.save-bar{display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:10px;flex-wrap:wrap;}
+.save-bar span{font-size:10px;color:var(--txt3);}
+.save-ind{font-size:10px;color:var(--pos);opacity:0;transition:opacity .3s;}
+.save-ind.show{opacity:1;}
+.proxy-help-box{display:none;margin:6px 0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;font-size:10px;color:var(--txt2);line-height:1.7;max-width:720px;}
+pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow-x:auto;font-size:9px;color:#c9d1d9;line-height:1.5;white-space:pre;}
+.select-inp{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
+.select-inp:focus{border-color:rgba(255,0,128,.4);}
+.ticker-panel{background:var(--panel);border:1px solid var(--border2);border-radius:14px;margin-bottom:10px;overflow:hidden;}
+.ticker-panel-hdr{display:flex;align-items:center;padding:8px 14px;cursor:pointer;user-select:none;min-height:38px;}
+.ticker-panel-hdr:hover{background:rgba(255,255,255,.02);}
+.ticker-panel-body{padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,.05);}
+.cat-item{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;cursor:pointer;transition:all .15s;}
+.cat-item:hover{border-color:rgba(255,0,128,.25);background:rgba(255,0,128,.04);}
+.cat-item.active-ticker{border-color:rgba(255,0,128,.5);background:rgba(255,0,128,.1);}
+.cat-item.pinned .pin-btn{color:var(--accent);}
+.cat-item-code{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}
+.cat-item-name{font-size:9px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.cat-item-sector{font-size:8px;color:var(--txt3);opacity:.6;white-space:nowrap;}
+.pin-btn{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;flex-shrink:0;}
+.pin-btn:hover{color:var(--accent);}
+/* ---- Adaptive calibration panel ---- */
+.calib-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;padding:6px 10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:10px;}
+.calib-bar span{font-size:10px;color:var(--txt3);}
+.calib-stat{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.04);color:var(--txt2);}
+.calib-stat.ready{background:rgba(82,242,201,.1);color:var(--pos);}
+.calib-stat.partial{background:rgba(255,159,64,.1);color:var(--warn);}
+.pct-bar{height:3px;border-radius:999px;background:rgba(255,255,255,.06);margin-top:3px;overflow:hidden;}
+.pct-fill{height:100%;border-radius:999px;background:var(--mem);}
+.pchip{display:flex;align-items:center;gap:3px;padding:3px 8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;font-size:11px;font-weight:600;color:var(--txt2);white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.pchip:hover{border-color:rgba(255,0,128,.3);color:var(--txt);}
+.pchip.active{background:rgba(255,0,128,.15);border-color:rgba(255,0,128,.5);color:var(--accent);}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ HEADER -->
+<div class="hdr">
+  <div>
+    <div class="logo">OI · INTEL</div>
+    <div class="logo-sub">v10 · AlgoPack + T-Invest · 10 методов</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+    <div class="hdr-row">
+      <input class="inp mid" id="moexKeyInp" placeholder="MOEX AlgoPack API ключ..." type="password">
+      <input class="inp mid" id="tinvestInp" placeholder="T-Invest токен..." type="password">
+      <input class="inp wide" id="proxyInp" placeholder="https://your-worker.workers.dev  (прокси)">
+      <button class="btn-sm" onclick="toggleProxyHelp()">⚙ Прокси?</button>
+    </div>
+    <div class="hdr-row">
+      <button class="btn-pill" id="btnRefresh" onclick="refreshAll()">↺ Обновить</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;">
+        <input type="checkbox" id="autoChk" onchange="toggleAuto()" style="cursor:pointer;"> Авто
+      </label>
+      <select class="select-inp" id="intervalSel" onchange="setInterval_()">
+        <option value="30">30с</option>
+        <option value="60" selected>1 мин</option>
+        <option value="120">2 мин</option>
+        <option value="300">5 мин</option>
+      </select>
+      <span class="age-badge" id="moexAge">MOEX —</span>
+      <span class="age-badge" id="candleAge">Свечи —</span>
+      <span style="font-size:10px;color:var(--txt3);">Окно:</span>
+      <select class="select-inp" id="windowSel" onchange="onWindowChange()" title="Глубина скользящего окна для нормализации">
+        <option value="7">7д</option>
+        <option value="14">14д</option>
+        <option value="30" selected>30д</option>
+        <option value="60">60д</option>
+      </select>
+      <span class="calib-stat" id="calibBadge">калибровка —</span>
+      <span style="font-size:10px;color:var(--txt3);" id="statusTxt">Ожидание</span>
+      <div id="spinnerEl" style="display:none;"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Proxy help -->
+<div class="proxy-help-box" id="proxyHelpBox">
+  <b style="color:var(--txt);font-size:11px;">Единый прокси для T-Invest + MOEX AlgoPack</b><br>
+  Один Cloudflare Worker проксирует оба API. Настройка — 3 минуты.<br><br>
+  <b style="color:var(--accent);">1.</b> <a href="https://workers.cloudflare.com" target="_blank">workers.cloudflare.com</a> → Start for free → Create Worker → Edit code<br>
+  <b style="color:var(--accent);">2.</b> Замени весь код на:
+  <pre class="code-block" id="workerCodeEl">export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const path = url.pathname + url.search;
+    const auth = request.headers.get('Authorization') || '';
+    const ch = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type' };
+
+    if (request.method === 'OPTIONS') return new Response(null, { status:204, headers: ch });
+
+    let target, hdrs, body;
+    if (path.startsWith('/iss/')) {
+      // MOEX AlgoPack (SuperCandles, FUTOI и др.) — требует Bearer-ключ подписки
+      // Пути: /iss/datashop/algopack/... и /iss/analyticalproducts/futoi/...
+      target = 'https://apim.moex.com' + path;
+      hdrs = { 'Authorization': auth, 'Accept': 'application/json' };
+    } else {
+      // T-Invest REST API — path начинается с /tinkoff...
+      target = 'https://invest-public-api.tinkoff.ru/rest' + path;
+      hdrs = { 'Authorization': auth, 'Content-Type': request.headers.get('Content-Type') || 'application/json' };
+      if (request.method === 'POST') body = await request.arrayBuffer();
+    }
+
+    const resp = await fetch(target, { method: request.method, headers: hdrs, body });
+    return new Response(resp.body, {
+      status: resp.status,
+      headers: { ...ch, 'Content-Type': resp.headers.get('Content-Type') || 'application/json' }
+    });
+  }
+};</pre>
+  <b style="color:var(--accent);">3.</b> Save &amp; Deploy → скопируй URL (вида <code style="color:var(--pos)">https://xxx.workers.dev</code>)<br>
+  <b style="color:var(--accent);">4.</b> Вставь URL в поле "прокси" выше → Enter<br><br>
+  <div style="display:flex;gap:6px;">
+    <button class="btn-sm" onclick="copyWorkerCode()">📋 Скопировать код</button>
+    <button class="btn-sm" onclick="toggleProxyHelp()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Ticker panel -->
+<div class="ticker-panel" id="tickerPanel">
+  <div class="ticker-panel-hdr" onclick="toggleTickerPanel()">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;" id="pinnedChips">
+      <!-- pinned chips rendered here -->
+    </div>
+    <span style="font-size:10px;color:var(--txt3);white-space:nowrap;margin-left:6px;" id="tickerPanelChev">▼ тикеры</span>
+  </div>
+  <div class="ticker-panel-body" id="tickerPanelBody" style="display:none;">
+    <!-- Search + tabs -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <input class="inp" id="tickerSearch" placeholder="🔍 Поиск тикера или названия..." style="flex:1;min-width:200px;" oninput="renderCatalog()">
+      <div style="display:flex;gap:3px;" id="catTabs">
+        <button class="btn-ghost active" data-cat="" onclick="selectCatTab(this,'')">Все</button>
+        <button class="btn-ghost" data-cat="stocks" onclick="selectCatTab(this,'stocks')">Акции</button>
+        <button class="btn-ghost" data-cat="futures" onclick="selectCatTab(this,'futures')">Фьючерсы</button>
+        <button class="btn-ghost" data-cat="currency" onclick="selectCatTab(this,'currency')">Валюта</button>
+        <button class="btn-ghost" data-cat="index" onclick="selectCatTab(this,'index')">Индексы</button>
+      </div>
+    </div>
+    <div id="catalogGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px;max-height:260px;overflow-y:auto;"></div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:10px;color:var(--txt3);">Добавить свой:</span>
+      <input id="custT" class="inp" placeholder="ТИКЕР" style="width:80px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <select class="select-inp" id="custType">
+        <option value="stocks">Акции</option>
+        <option value="futures">Фьючерсы</option>
+        <option value="currency">Валюта</option>
+        <option value="index">Индекс</option>
+      </select>
+      <input id="custName" class="inp" placeholder="Название" style="width:130px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <input id="custFigi" class="inp" placeholder="FIGI/UID (или 🔍)" style="width:160px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <button class="btn-sm" onclick="addCustomTicker()">+ Добавить</button>
+      <button class="btn-sm" onclick="lookupAllFIGI()" title="Найти FIGI для всех закреплённых тикеров без FIGI через T-Invest API">🔍 Авто-FIGI</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save bar -->
+<div class="save-bar">
+  <button class="btn-sm" onclick="saveAll()">💾 Сохранить</button>
+  <button class="btn-sm" onclick="exportData()">↑ Экспорт</button>
+  <button class="btn-sm" onclick="document.getElementById('importFile').click()">↓ Импорт</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+  <span class="save-ind" id="saveInd">✓ сохранено</span>
+  <div style="flex:1;"></div>
+  <button class="btn-sm btn-danger" onclick="clearAll()">✕ Очистить</button>
+</div>
+
+<!-- ============================================================ MAIN GRID -->
+<div class="main-grid">
+
+  <!-- LEFT: Signal card + Methods -->
+  <div>
+    <div class="panel" style="margin-bottom:10px;">
+      <div class="sec">Сигнал</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 76">
+          <defs>
+            <linearGradient id="gNeg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#FF4D7A"/>
+              <stop offset="100%" stop-color="#FF9F40"/>
+            </linearGradient>
+            <linearGradient id="gPos" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#52F2C9"/>
+              <stop offset="100%" stop-color="#A78BFA"/>
+            </linearGradient>
+          </defs>
+          <!-- Track -->
+          <path d="M10,70 A60,60 0 0,1 130,70" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10" stroke-linecap="round"/>
+          <!-- Neg arc -->
+          <path id="gaugeNeg" d="M10,70 A60,60 0 0,1 70,10" fill="none" stroke="url(#gNeg)" stroke-width="10" stroke-linecap="round" opacity="0"/>
+          <!-- Pos arc -->
+          <path id="gaugePos" d="M70,10 A60,60 0 0,1 130,70" fill="none" stroke="url(#gPos)" stroke-width="10" stroke-linecap="round" opacity="0"/>
+          <!-- Needle -->
+          <line id="gaugeNeedle" x1="70" y1="70" x2="70" y2="14" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round" transform="rotate(0,70,70)"/>
+          <circle cx="70" cy="70" r="4" fill="rgba(255,255,255,0.6)"/>
+        </svg>
+        <div class="gauge-val" id="gaugeVal">—</div>
+        <div class="gauge-dir" id="gaugeDir" style="color:var(--txt3);">Нет данных</div>
+        <div class="gauge-conf" id="gaugeConf"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:10px;padding:8px 12px;">
+      <div class="sec" style="margin-bottom:6px;">Режим рынка</div>
+      <div id="regimeBadge" style="display:flex;"></div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="sec" style="margin-bottom:0;">Методы</div>
+        <span style="font-size:9px;color:var(--txt3);">вес · точность</span>
+      </div>
+      <div id="methodsTable"></div>
+      <div class="outcome-row" id="outcomeRow" style="display:none;opacity:0.4;" title="Авто-запись включена — исходы фиксируются через 3 бара по свечам">
+        <span class="outcome-lbl">Записать исход:</span>
+        <select class="outcome-sel" id="outcomeSel">
+          <option value="">— выбрать —</option>
+          <option value="long">↑ Рост</option>
+          <option value="short">↓ Падение</option>
+          <option value="neutral">→ Боковик</option>
+        </select>
+        <button class="btn-sm" onclick="recordOutcome()">✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Candle chart + TF selector -->
+  <div>
+    <div class="panel" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <div class="sec" style="margin-bottom:0;flex:1;">График (T-Invest)</div>
+        <div style="display:flex;gap:3px;">
+          <button class="btn-ghost active" id="tf1m" onclick="selTF(this,'1min')">1m</button>
+          <button class="btn-ghost" id="tf5m" onclick="selTF(this,'5min')">5m</button>
+          <button class="btn-ghost" id="tf1h" onclick="selTF(this,'1h')">1h</button>
+          <button class="btn-ghost" id="tf1d" onclick="selTF(this,'1d')">1D</button>
+        </div>
+      </div>
+      <div id="candleArea"><span>Нажмите ↺ Обновить для загрузки свечей</span></div>
+      <div id="candleTip" style="display:none;position:fixed;background:#1A1030;border:1px solid rgba(255,0,128,.3);border-radius:4px;padding:4px 8px;font-size:10px;color:#F2F0FF;pointer-events:none;z-index:99;white-space:nowrap;"></div>
+    </div>
+
+    <!-- TradeStats mini panel -->
+    <div class="panel">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('tsBody')">
+        <div class="sec" style="margin-bottom:0;">TradeStats (последние бары)</div>
+        <span style="font-size:10px;color:var(--txt3);" id="tsChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="tsBody">
+        <div id="tsPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: OI data panels -->
+  <div>
+    <!-- FutOI -->
+    <div class="panel" style="margin-bottom:10px;">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('futoiBody')">
+        <div class="sec" style="margin-bottom:0;">FutOI — открытые позиции</div>
+        <span style="font-size:10px;color:var(--txt3);" id="futoiChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="futoiBody">
+        <div id="futoiPanel"><div style="font-size:10px;color:var(--txt3);">Доступно только для фьючерсов</div></div>
+      </div>
+    </div>
+
+    <!-- OBStats + OrderStats -->
+    <div class="panel">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('obBody')">
+        <div class="sec" style="margin-bottom:0;">OBStats / OrderStats</div>
+        <span style="font-size:10px;color:var(--txt3);" id="obChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="obBody">
+        <div id="obPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ HISTORY -->
+<div class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div class="sec" style="margin-bottom:0;">История сигналов</div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn-sm" onclick="renderHistory()">↺</button>
+      <button class="btn-sm btn-danger" onclick="clearHistory()">✕</button>
+    </div>
+  </div>
+  <div id="historyArea"><div style="font-size:10px;color:var(--txt3);">История пуста</div></div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const LS = 'oisignal_v10';
+
+const MOEX_MARKETS = {
+  stocks:   {engine:'stock',   market:'shares', board:'TQBR'},
+  futures:  {engine:'futures', market:'forts',  board:'RFUD'},
+  currency: {engine:'currency',market:'selt',   board:'CETS'},
+};
+
+const TF_INTERVALS = {'1min':1,'5min':2,'1h':4,'1d':5};
+
+const METHODS = [
+  {id:'BS_PRESSURE',    label:'Buy/Sell давление',    src:'ts',     color:'#52F2C9'},
+  {id:'AGGRESSOR_FLOW', label:'Поток агрессора',      src:'ts',     color:'#52F2C9'},
+  {id:'LARGE_IMPACT',   label:'Крупные сделки',       src:'ts',     color:'#52F2C9'},
+  {id:'VWAP_SIGNAL',    label:'VWAP отклонение',      src:'ts',     color:'#A78BFA'},
+  {id:'VOL_MOMENTUM',   label:'Объём × цена',         src:'ts',     color:'#A78BFA'},
+  {id:'OB_IMBALANCE',   label:'Дисбаланс стакана',    src:'ob',     color:'#FF9F40'},
+  {id:'CANCEL_SIGNAL',  label:'Отмены заявок',        src:'os',     color:'#FF9F40'},
+  {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#FF006E'},
+  {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
+  {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
+];
+
+const CATALOG = [
+  // Акции TQBR — f: FIGI для T-Invest свечей
+  {t:'SBER',  cat:'stocks',  name:'Сбербанк',      sector:'Банки',         f:'BBG004730N88'},
+  {t:'GAZP',  cat:'stocks',  name:'Газпром',        sector:'Нефтегаз',      f:'BBG004730RP0'},
+  {t:'LKOH',  cat:'stocks',  name:'Лукойл',         sector:'Нефтегаз',      f:'BBG004731032'},
+  {t:'ROSN',  cat:'stocks',  name:'Роснефть',       sector:'Нефтегаз',      f:'BBG004731354'},
+  {t:'NVTK',  cat:'stocks',  name:'Новатэк',        sector:'Нефтегаз',      f:'BBG00475KKY8'},
+  {t:'VTBR',  cat:'stocks',  name:'ВТБ',            sector:'Банки',         f:'BBG004730ZJ9'},
+  {t:'TCSG',  cat:'stocks',  name:'Т-Банк',         sector:'Банки',         f:'BBG00QPYJ5H0'},
+  {t:'BSPB',  cat:'stocks',  name:'Банк СПБ',       sector:'Банки',         f:'BBG000QJW156'},
+  {t:'GMKN',  cat:'stocks',  name:'Норникель',      sector:'Металлы',       f:'BBG004731489'},
+  {t:'CHMF',  cat:'stocks',  name:'Северсталь',     sector:'Металлы',       f:'BBG00475K6C3'},
+  {t:'NLMK',  cat:'stocks',  name:'НЛМК',           sector:'Металлы',       f:'BBG004S681B4'},
+  {t:'RUAL',  cat:'stocks',  name:'РУСАЛ',          sector:'Металлы',       f:'BBG008F2T3T2'},
+  {t:'PLZL',  cat:'stocks',  name:'Полюс',          sector:'Металлы',       f:'BBG000R607Y3'},
+  {t:'ALRS',  cat:'stocks',  name:'АЛРОСА',         sector:'Металлы',       f:'BBG004S68473'},
+  {t:'YNDX',  cat:'stocks',  name:'Яндекс',         sector:'Технологии',    f:'BBG006L8G4H1'},
+  {t:'VKCO',  cat:'stocks',  name:'ВКонтакте',      sector:'Технологии',    f:'BBG00Y6XVMF5'},
+  {t:'POSI',  cat:'stocks',  name:'Позитив',        sector:'Технологии',    f:'BBG013LGHHZ5'},
+  {t:'OZON',  cat:'stocks',  name:'Ozon',           sector:'Технологии',    f:'BBG00JN4FXG8'},
+  {t:'TATN',  cat:'stocks',  name:'Татнефть',       sector:'Нефтегаз',      f:'BBG004RVFFC0'},
+  {t:'SNGS',  cat:'stocks',  name:'Сургутнефтегаз', sector:'Нефтегаз',      f:'BBG004S681M2'},
+  {t:'MGNT',  cat:'stocks',  name:'Магнит',         sector:'Ритейл',        f:'BBG004RVFCY3'},
+  {t:'FIVE',  cat:'stocks',  name:'X5 Retail',      sector:'Ритейл',        f:'BBG00JXPFBN0'},
+  {t:'MTSS',  cat:'stocks',  name:'МТС',            sector:'Телеком',       f:'BBG004S681W1'},
+  {t:'RTKM',  cat:'stocks',  name:'Ростелеком',     sector:'Телеком',       f:'BBG004S682Z6'},
+  {t:'AFLT',  cat:'stocks',  name:'Аэрофлот',       sector:'Транспорт',     f:'BBG004S683W7'},
+  {t:'FLOT',  cat:'stocks',  name:'Совкомфлот',     sector:'Транспорт',     f:'BBG000R70SP1'},
+  {t:'PIKK',  cat:'stocks',  name:'ПИК',            sector:'Строительство', f:'BBG002GHV6L9'},
+  {t:'SMLT',  cat:'stocks',  name:'Самолёт',        sector:'Строительство', f:'BBG001M2SC01'},
+  {t:'AFKS',  cat:'stocks',  name:'АФК Система',    sector:'Холдинги',      f:'BBG004S68758'},
+  {t:'IRAO',  cat:'stocks',  name:'Интер РАО',      sector:'Энергетика',    f:'BBG004S68829'},
+  {t:'FEES',  cat:'stocks',  name:'ФСК ЕЭС',        sector:'Энергетика',    f:'BBG004S686W0'},
+  {t:'HYDR',  cat:'stocks',  name:'РусГидро',       sector:'Энергетика',    f:'BBG004S68614'},
+  {t:'CBOM',  cat:'stocks',  name:'Совкомбанк',     sector:'Банки',         f:'BBG013HJD9B6'},
+  // Индексы (FIGI нет — только MOEX данные)
+  {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс',        f:''},
+  {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс',        f:''},
+  {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс',        f:''},
+  // Фьючерсы FORTS — актуальные контракты (U6=сент2026, Z6=дек2026)
+  {t:'SiU6',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:''},
+  {t:'SiZ6',  cat:'futures', name:'USD/RUB дек',     sector:'Валюта',        f:''},
+  {t:'EuU6',  cat:'futures', name:'EUR/RUB сент',    sector:'Валюта',        f:''},
+  {t:'RIU6',  cat:'futures', name:'RTS сент',        sector:'Индекс',        f:''},
+  {t:'MXU6',  cat:'futures', name:'МосБиржа сент',   sector:'Индекс',        f:''},
+  {t:'GDU6',  cat:'futures', name:'Золото сент',     sector:'Сырьё',         f:''},
+  {t:'BRU6',  cat:'futures', name:'Brent сент',      sector:'Сырьё',         f:''},
+  {t:'NGU6',  cat:'futures', name:'Газ сент',        sector:'Сырьё',         f:''},
+  {t:'GZU6',  cat:'futures', name:'Газпром сент',    sector:'Акции',         f:''},
+  {t:'SRU6',  cat:'futures', name:'Сбербанк сент',   sector:'Акции',         f:''},
+  // Валюта CETS
+  {t:'USD000UTSTOM', cat:'currency', name:'Доллар США',  sector:'Валюта'},
+  {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
+  {t:'CNY000000TOM', cat:'currency', name:'Юань',        sector:'Валюта'},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let curTicker = '';
+let curType = 'stocks';
+let curTF = '1min';
+let autoInterval = 60;
+let autoTimer = null;
+let curWindow = 30; // дней — глубина скользящего окна нормализации
+
+let tickers = [];
+let pinnedTickers = ['SBER','GAZP','LKOH','BRU6'];
+
+// Текущие бары (последние 100)
+let tsHistory = [];
+let obHistory = [];
+let osHistory = [];
+let futoiData = [];
+let candleData = {};
+
+// Глубокая история для перцентилей — из D1 (до curWindow дней)
+// {ticker: {tradestats:[...], obstats:[...], orderstats:[...], futoi:[...]}}
+let deepHistory = {};
+
+// Кэш перцентилей — пересчитывается после загрузки deepHistory
+// {ticker__type__field__window: {p10,p25,p50,p75,p90,n}}
+let pctCache = {};
+
+// ATR по тикеру/tf — адаптивный порог значимого движения
+// {ticker__tf: {atr, atr_pct, n}}
+let atrCache = {};
+
+// Signal snapshots
+let lastSnapshot = null;
+let methodWeights = {};
+let signalLog = [];
+
+let candleChart = null;
+let moexLastUpdate = null;
+let candleLastUpdate = null;
+let calibLastTicker = null; // для которого считали перцентили
+
+// ============================================================
+// D1 КЛИЕНТ — все запросы идут через CF Worker /db/* роуты
+// ============================================================
+function dbBase(){
+  // Берём прокси из поля ввода, убираем ?u= суффикс если есть
+  const raw = (document.getElementById('proxyInp')?.value||'').trim();
+  return raw.replace(/\/\?u=$/, '').replace(/\?u=$/, '').replace(/\/$/, '');
+}
+
+async function dbFetch(path, opts={}){
+  const base = dbBase();
+  if(!base) throw new Error('Укажи URL прокси в настройках');
+  const resp = await fetch(base + path, {
+    ...opts,
+    headers: {'Content-Type':'application/json', ...(opts.headers||{})},
+  });
+  if(!resp.ok){
+    const t = await resp.text().catch(()=>'');
+    throw new Error(`DB ${path} → HTTP ${resp.status}: ${t.slice(0,120)}`);
+  }
+  return resp.json();
+}
+
+async function dbOpen(){
+  // Инициализируем схему на старте (идемпотентно)
+  return dbFetch('/db/init').catch(e=>console.warn('D1 init:', e.message));
+}
+
+async function dbSaveCandles(ticker, tf, candles){
+  if(!candles.length) return;
+  const rows = candles.map(c=>({
+    key: `${ticker}__${tf}__${new Date(c.time).getTime()}`,
+    ticker, tf,
+    time: new Date(c.time).getTime(),
+    o: toP(c.open), h: toP(c.high), l: toP(c.low), cl: toP(c.close),
+    vol: c.volume?.units ? parseInt(c.volume.units)||0 : 0,
+  }));
+  return dbFetch('/db/candles', {method:'POST', body: JSON.stringify(rows)});
+}
+
+async function dbGetCandlesAfter(ticker, tf, fromTs){
+  return dbFetch(`/db/candles?ticker=${encodeURIComponent(ticker)}&tf=${encodeURIComponent(tf)}&from=${fromTs}`);
+}
+
+async function dbSaveSignal(sig){
+  const r = await dbFetch('/db/signal', {method:'POST', body: JSON.stringify({
+    ts: sig.ts, ticker: sig.ticker, tf: sig.tf,
+    entry_price: sig.entryPrice||0, entry_ts: sig.entryTs||0,
+    composite: sig.composite||0, dir: sig.dir||'neutral',
+    methods: sig.methods||{},
+  })});
+  return r.id;
+}
+
+async function dbUpdateSignal(id, patch){
+  return dbFetch(`/db/signal/${id}`, {method:'PATCH', body: JSON.stringify(patch)});
+}
+
+async function dbGetOpenSignals(ticker){
+  return dbFetch(`/db/signals?ticker=${encodeURIComponent(ticker)}&resolved=0`);
+}
+
+async function dbSaveWeight(ticker, methodId, data){
+  return dbFetch('/db/weight', {method:'POST', body: JSON.stringify({ticker, method_id: methodId, ...data})});
+}
+
+async function dbLoadWeights(ticker){
+  const rows = await dbFetch(`/db/weights?ticker=${encodeURIComponent(ticker)}`);
+  const out = {};
+  rows.forEach(w=>{ out[w.method_id] = {weight:w.weight, total:w.total, sum_quality:w.sum_quality}; });
+  return out;
+}
+
+// ── AlgoPack history ──
+async function dbSaveAlgopack(ticker, type, rows){
+  if(!rows.length) return;
+  return dbFetch('/db/algopack', {method:'POST', body: JSON.stringify({ticker, type, rows})});
+}
+async function dbLoadAlgopack(ticker, type, days){
+  return dbFetch(`/db/algopack?ticker=${encodeURIComponent(ticker)}&type=${encodeURIComponent(type)}&days=${days}`);
+}
+
+// ── Percentiles cache ──
+async function dbSavePercentiles(rows){
+  if(!rows.length) return;
+  return dbFetch('/db/percentiles', {method:'POST', body: JSON.stringify(rows)});
+}
+async function dbLoadPercentiles(ticker, windowDays){
+  return dbFetch(`/db/percentiles?ticker=${encodeURIComponent(ticker)}&window=${windowDays}`);
+}
+
+// ── ATR ──
+async function dbSaveAtr(ticker, tf, atr, atr_pct, n){
+  return dbFetch('/db/atr', {method:'POST', body: JSON.stringify({ticker, tf, atr, atr_pct, n})});
+}
+async function dbLoadAtr(ticker){
+  return dbFetch(`/db/atr?ticker=${encodeURIComponent(ticker)}`);
+}
+
+// ============================================================
+// STORAGE (localStorage — только UI-настройки и пины)
+// ============================================================
+function saveAll(){
+  const d = {
+    tickers, pinnedTickers, methodWeights, signalLog,
+    moexKey: document.getElementById('moexKeyInp').value,
+    tinvest: document.getElementById('tinvestInp').value,
+    proxy: document.getElementById('proxyInp').value,
+    curTicker, autoInterval, curWindow,
+    autoOn: document.getElementById('autoChk').checked,
+  };
+  localStorage.setItem(LS, JSON.stringify(d));
+  const el = document.getElementById('saveInd');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1500);
+}
+
+function loadAll(){
+  try{
+    const d = JSON.parse(localStorage.getItem(LS)||'{}');
+    if(d.tickers?.length) tickers = d.tickers;
+    if(d.pinnedTickers?.length) pinnedTickers = d.pinnedTickers;
+    // Миграция: заменить истёкшие фьючерсы 2025 на 2026
+    const FUT_MIGRATE = {SiH5:'SiU6',SiM5:'SiU6',SiU5:'SiU6',SiZ5:'SiZ6',EuH5:'EuU6',EuM5:'EuU6',EuU5:'EuU6',
+      RIH5:'RIU6',RIM5:'RIU6',RIU5:'RIU6',MXH5:'MXU6',MXM5:'MXU6',MXU5:'MXU6',
+      GDH5:'GDU6',GDM5:'GDU6',GDU5:'GDU6',BRH5:'BRU6',BRM5:'BRU6',BRU5:'BRU6',
+      NGH5:'NGU6',NGM5:'NGU6',NGU5:'NGU6',GZH5:'GZU6',GZM5:'GZU6',GZU5:'GZU6',
+      SRH5:'SRU6',SRM5:'SRU6',SRU5:'SRU6'};
+    pinnedTickers = [...new Set(pinnedTickers.map(t=>FUT_MIGRATE[t]||t))];
+    // Очистить фиктивные FUT* FIGIs из сохранённых tickers (не BBG-формат)
+    tickers.forEach(tk=>{ if(tk.f && tk.f.startsWith('FUT')) tk.f = ''; });
+    if(d.curTicker && FUT_MIGRATE[d.curTicker]) d.curTicker = FUT_MIGRATE[d.curTicker];
+    if(d.methodWeights) methodWeights = d.methodWeights;
+    if(d.signalLog) signalLog = d.signalLog;
+    if(d.moexKey) document.getElementById('moexKeyInp').value = d.moexKey;
+    if(d.tinvest) document.getElementById('tinvestInp').value = d.tinvest;
+    if(d.proxy) document.getElementById('proxyInp').value = d.proxy;
+    if(d.curTicker) curTicker = d.curTicker;
+    if(d.autoInterval) {
+      autoInterval = d.autoInterval;
+      document.getElementById('intervalSel').value = String(autoInterval);
+    }
+    if(d.autoOn) {
+      document.getElementById('autoChk').checked = true;
+      startAuto();
+    }
+    if(d.curWindow) {
+      curWindow = d.curWindow;
+      document.getElementById('windowSel').value = String(curWindow);
+    }
+  } catch(e){}
+}
+
+function onWindowChange(){
+  curWindow = parseInt(document.getElementById('windowSel').value);
+  saveAll();
+  // Пересчитываем перцентили с новым окном если история уже загружена
+  if(deepHistory[curTicker]) {
+    computeAndCachePercentiles(curTicker);
+    const mr = computeAllMethods();
+    renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
+    renderMethodsTable(mr);
+  }
+}
+
+function exportData(){
+  const d = {tickers, methodWeights, signalLog};
+  const a = document.createElement('a');
+  a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(d, null, 2));
+  a.download = 'oisignal_v10_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+function importData(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try{
+      const d = JSON.parse(e.target.result);
+      if(d.tickers) tickers = d.tickers;
+      if(d.methodWeights) methodWeights = d.methodWeights;
+      if(d.signalLog) signalLog = d.signalLog;
+      renderPinnedChips(); renderHistory(); saveAll();
+    } catch(ex){ alert('Ошибка импорта: ' + ex.message); }
+  };
+  r.readAsText(f);
+}
+function clearAll(){
+  if(!confirm('Очистить все данные?')) return;
+  localStorage.removeItem(LS);
+  methodWeights = {}; signalLog = []; tickers = [];
+  renderPinnedChips(); renderHistory(); renderMethodsTable([]);
+}
+function clearHistory(){
+  if(!confirm('Очистить историю сигналов?')) return;
+  signalLog = []; saveAll(); renderHistory();
+}
+
+// ============================================================
+// MOEX ALGOPACK FETCHER
+// ============================================================
+function getProxy(){ return (document.getElementById('proxyInp').value||'').trim().replace(/\/$/,''); }
+function getMoexKey(){ return (document.getElementById('moexKeyInp').value||'').trim(); }
+function getTinvestToken(){ return (document.getElementById('tinvestInp').value||'').trim(); }
+
+// Реальный путь MOEX AlgoPack DataShop: /iss/datashop/algopack/{segment}/{metric}.json?secid=...
+const MOEX_SEGMENTS = {stocks:'eq', futures:'fo', currency:'currency', index:'eq'};
+
+function moexUrl(secid, metric, type, params={}){
+  const seg = MOEX_SEGMENTS[type] || 'eq';
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const path = `/datashop/algopack/${seg}/${metric}.json`;
+  const q = new URLSearchParams({secid, ...params, 'iss.meta':'off'}).toString();
+  return prefix + path + '?' + q;
+}
+
+function issToObjects(json, blockName){
+  const block = json[blockName] || json[Object.keys(json)[0]];
+  if(!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c,i) => obj[c] = row[i]);
+    return obj;
+  });
+}
+
+async function fetchWithTimeout(url, opts={}, ms=15000){
+  const ctrl = new AbortController();
+  const tid = setTimeout(()=>ctrl.abort(), ms);
+  try{
+    const r = await fetch(url, {...opts, signal: ctrl.signal});
+    return r;
+  } catch(e){
+    if(e.name==='AbortError') throw new Error('Таймаут запроса (15с)');
+    throw e;
+  } finally{ clearTimeout(tid); }
+}
+
+async function fetchMoex(secid, metric, type, params={}){
+  const url = moexUrl(secid, metric, type, params);
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX ${metric} HTTP ${resp.status} (${url.slice(0,80)})`);
+  const json = await resp.json();
+  return issToObjects(json, metric);
+}
+
+// FUTOI использует отдельный endpoint: /iss/analyticalproducts/futoi/securities
+// Тикер — двухсимвольный код контракта: BR, Si, RI, GD, MX, GZ, SR, NG, EU
+function futoi2sym(ticker){
+  // Из кода контракта вида BRU6, SiU6, RIU6 и т.д. → двухсимвольный базовый тикер
+  const m = ticker.match(/^([A-Za-z]{2,3})/);
+  if(!m) return ticker;
+  const base = m[1].toUpperCase();
+  // Известные маппинги
+  const MAP = {BR:'BR',SI:'Si',RI:'RI',GD:'GD',MX:'MX',GZ:'GZ',SR:'SR',NG:'NG',EU:'ED',NG:'NG'};
+  return MAP[base] || base;
+}
+
+async function fetchFutoi(ticker){
+  const sym = futoi2sym(ticker);
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const url = prefix + `/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=20`;
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX futoi HTTP ${resp.status}`);
+  const json = await resp.json();
+  // Блок называется 'futoi' или первый ключ
+  const block = json['futoi'] || json[Object.keys(json).find(k=>k!=='metadata'&&k!=='history')];
+  if(!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c,i) => obj[c] = row[i]);
+    return obj;
+  });
+}
+
+async function fetchAllMoex(ticker, type){
+  const lim = {limit: 100};
+  const prom = {
+    ts:    fetchMoex(ticker, 'tradestats', type, lim).catch(()=>[]),
+    ob:    fetchMoex(ticker, 'obstats',    type, lim).catch(()=>[]),
+    os:    fetchMoex(ticker, 'orderstats', type, lim).catch(()=>[]),
+    futoi: type==='futures' ? fetchFutoi(ticker).catch(()=>[]) : Promise.resolve([]),
+  };
+  return {
+    ts:    await prom.ts,
+    ob:    await prom.ob,
+    os:    await prom.os,
+    futoi: await prom.futoi,
+  };
+}
+
+// ============================================================
+// ADAPTIVE CALIBRATION ENGINE
+// ============================================================
+
+// Считает перцентиль значения v в массиве arr
+function percentileRank(arr, v){
+  if(!arr.length) return 0.5;
+  const sorted = [...arr].sort((a,b)=>a-b);
+  let lo=0, hi=sorted.length-1;
+  while(lo < hi){ const mid=(lo+hi)>>1; if(sorted[mid]<v) lo=mid+1; else hi=mid; }
+  return lo / (sorted.length - 1 || 1);
+}
+
+// Вычисляет p10/p25/p50/p75/p90 из массива
+function calcPercentiles(arr){
+  if(!arr.length) return {p10:0,p25:0,p50:0,p75:0,p90:0,n:0};
+  const s = [...arr].sort((a,b)=>a-b);
+  const p = q => s[Math.min(s.length-1, Math.floor(q*(s.length-1)))];
+  return {p10:p(0.1), p25:p(0.25), p50:p(0.5), p75:p(0.75), p90:p(0.9), n:s.length};
+}
+
+// Нормализует значение относительно исторического распределения → [-1, +1]
+// Используем: score = tanh( (v - p50) / (p90 - p10 + ε) * scale )
+function normScore(v, pcts, scale=2.5){
+  if(!pcts || pcts.n < 5) return null; // недостаточно истории
+  const range = (pcts.p90 - pcts.p10) || (pcts.p90 * 0.1) || 0.001;
+  return Math.tanh((v - pcts.p50) / range * scale);
+}
+
+// Ключ для кэша перцентилей
+function pKey(ticker, type, field, window){ return `${ticker}__${type}__${field}__${window}`; }
+
+// Получить перцентили из кэша
+function getPct(ticker, type, field){ return pctCache[pKey(ticker, type, field, curWindow)] || null; }
+
+// Пересчитать перцентили для тикера из deepHistory и сохранить в кэш + D1
+function computeAndCachePercentiles(ticker){
+  const dh = deepHistory[ticker];
+  if(!dh) return;
+  const rows = [];
+  const now = Date.now();
+  const cutoff = now - curWindow * 86400000;
+
+  // Поля tradestats для нормализации
+  const tsFields = ['vol_b','vol_s','val_b','val_s','trades_b','trades_s','vol','disb','im'];
+  const tsData = (dh.tradestats||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  tsFields.forEach(field=>{
+    const vals = tsData.map(r=>toNum(r[field]||0)).filter(v=>v!==0);
+    const p = calcPercentiles(vals);
+    const k = pKey(ticker,'tradestats',field,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'tradestats', field, window_days:curWindow, ...p});
+  });
+
+  // obstats
+  const obFields = ['imbalance_vol_bbo','spread_bbo'];
+  const obData = (dh.obstats||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  obFields.forEach(field=>{
+    const vals = obData.map(r=>toNum(r[field]||0)).filter(v=>v!==0);
+    const p = calcPercentiles(vals);
+    const k = pKey(ticker,'obstats',field,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'obstats', field, window_days:curWindow, ...p});
+  });
+
+  // orderstats
+  const osFields = ['put_orders_b','put_orders_s','cancel_orders_b','cancel_orders_s'];
+  const osData = (dh.orderstats||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  osFields.forEach(field=>{
+    const vals = osData.map(r=>toNum(r[field]||0)).filter(v=>v!==0);
+    const p = calcPercentiles(vals);
+    const k = pKey(ticker,'orderstats',field,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'orderstats', field, window_days:curWindow, ...p});
+  });
+
+  // futoi — нормализуем по net-позиции
+  const foData = (dh.futoi||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  ['YUR','FIZ'].forEach(group=>{
+    const grpData = foData.filter(r=>(r.clgroup||'').toUpperCase()===group);
+    const netVals = grpData.map(r=>toNum(r.pos||0)).filter(v=>v!==0);
+    const p = calcPercentiles(netVals);
+    const k = pKey(ticker,'futoi','pos_'+group,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'futoi', field:'pos_'+group, window_days:curWindow, ...p});
+  });
+
+  calibLastTicker = ticker;
+  updateCalibBadge(ticker);
+
+  // Сохраняем в D1 асинхронно (не блокируем)
+  if(rows.length) dbSavePercentiles(rows).catch(e=>console.warn('pct save:', e.message));
+}
+
+// ATR из свечей — адаптивный порог "значимого движения"
+function computeAtr(ticker, tf, candles){
+  if(!candles || candles.length < 5) return;
+  const slice = candles.slice(-Math.min(candles.length, curWindow * 7)); // ~неделя баров
+  const trs = slice.map((c,i)=>{
+    if(i===0) return toP(c.high) - toP(c.low);
+    const prevClose = toP(slice[i-1].close);
+    return Math.max(toP(c.high)-toP(c.low), Math.abs(toP(c.high)-prevClose), Math.abs(toP(c.low)-prevClose));
+  });
+  const atr = avg(trs);
+  const midPrice = avg(slice.map(c=>toP(c.close)).filter(Boolean)) || 1;
+  const atr_pct = atr / midPrice;
+  const key = `${ticker}__${tf}`;
+  atrCache[key] = {atr, atr_pct, n: trs.length};
+  dbSaveAtr(ticker, tf, atr, atr_pct, trs.length).catch(()=>{});
+}
+
+function getAtrPct(ticker, tf){
+  return atrCache[`${ticker}__${tf}`]?.atr_pct || 0.005; // дефолт 0.5%
+}
+
+// Загрузить глубокую историю из D1 для тикера
+async function loadDeepHistory(ticker){
+  if(!dbBase()) return;
+  setStatus('Загрузка истории AlgoPack...', true);
+  try{
+    const [ts, ob, os, fo] = await Promise.all([
+      dbLoadAlgopack(ticker, 'tradestats', curWindow).catch(()=>[]),
+      dbLoadAlgopack(ticker, 'obstats',    curWindow).catch(()=>[]),
+      dbLoadAlgopack(ticker, 'orderstats', curWindow).catch(()=>[]),
+      dbLoadAlgopack(ticker, 'futoi',      curWindow).catch(()=>[]),
+    ]);
+    deepHistory[ticker] = {tradestats: ts, obstats: ob, orderstats: os, futoi: fo};
+
+    // Загружаем кэш перцентилей из D1 (быстрый старт)
+    const savedPct = await dbLoadPercentiles(ticker, curWindow).catch(()=>[]);
+    savedPct.forEach(r=>{
+      pctCache[pKey(r.ticker, r.type, r.field, r.window_days)] = {
+        p10:r.p10, p25:r.p25, p50:r.p50, p75:r.p75, p90:r.p90, n:r.n
+      };
+    });
+
+    // Загружаем ATR из D1
+    const savedAtr = await dbLoadAtr(ticker).catch(()=>[]);
+    savedAtr.forEach(r=>{ atrCache[`${r.ticker}__${r.tf}`] = {atr:r.atr, atr_pct:r.atr_pct, n:r.n}; });
+
+    // Пересчитываем перцентили свежо из данных
+    computeAndCachePercentiles(ticker);
+    setStatus('История загружена');
+  } catch(e){
+    setStatus('История: ' + e.message);
+  }
+}
+
+// Сохранить текущие бары в D1 после каждого обновления
+async function persistAlgopackBars(ticker, data){
+  if(!dbBase()) return;
+  const saves = [];
+  if(data.ts?.length)    saves.push(dbSaveAlgopack(ticker, 'tradestats', data.ts));
+  if(data.ob?.length)    saves.push(dbSaveAlgopack(ticker, 'obstats',    data.ob));
+  if(data.os?.length)    saves.push(dbSaveAlgopack(ticker, 'orderstats', data.os));
+  if(data.futoi?.length) saves.push(dbSaveAlgopack(ticker, 'futoi',      data.futoi));
+  await Promise.allSettled(saves);
+
+  // Добавляем в deepHistory в памяти (чтобы не ждать следующую загрузку)
+  if(!deepHistory[ticker]) deepHistory[ticker] = {tradestats:[],obstats:[],orderstats:[],futoi:[]};
+  const dh = deepHistory[ticker];
+  const cutoff = Date.now() - curWindow * 86400000;
+  const merge = (arr, newRows) => {
+    const seen = new Set(arr.map(r=>r.tradedate+'_'+r.tradetime));
+    newRows.forEach(r=>{ if(!seen.has(r.tradedate+'_'+r.tradetime)) arr.push(r); });
+    return arr.filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  };
+  if(data.ts?.length)    dh.tradestats = merge(dh.tradestats, data.ts);
+  if(data.ob?.length)    dh.obstats    = merge(dh.obstats,    data.ob);
+  if(data.os?.length)    dh.orderstats = merge(dh.orderstats, data.os);
+  if(data.futoi?.length) dh.futoi      = merge(dh.futoi,      data.futoi);
+
+  // Пересчитываем перцентили с новыми данными
+  computeAndCachePercentiles(ticker);
+}
+
+function updateCalibBadge(ticker){
+  const el = document.getElementById('calibBadge');
+  if(!el) return;
+  const dh = deepHistory[ticker];
+  if(!dh){ el.textContent = 'калибровка —'; el.className = 'calib-stat'; return; }
+  const n = (dh.tradestats||[]).length;
+  if(n >= 50){ el.textContent = `✓ калибр. ${n} баров`; el.className = 'calib-stat ready'; }
+  else if(n > 0){ el.textContent = `⚠ калибр. ${n}/50`; el.className = 'calib-stat partial'; }
+  else { el.textContent = 'нет истории'; el.className = 'calib-stat'; }
+}
+
+// ============================================================
+// T-INVEST CANDLE FETCHER
+// ============================================================
+function tinvestUrl(path){
+  const proxy = getProxy();
+  // path = /tinkoff..., воркер prepend'ит https://invest-public-api.tinkoff.ru/rest
+  if(proxy) return proxy + path;
+  return 'https://invest-public-api.tinkoff.ru/rest' + path;
+}
+
+async function fetchCandles(ticker, tf){
+  const meta = tickers.find(x=>x.t===ticker) || CATALOG.find(x=>x.t===ticker);
+  const figi = meta?.f || CATALOG.find(x=>x.t===ticker)?.f;
+  if(!figi) throw new Error(`FIGI не задан для ${ticker}. Нажмите 🔍 рядом с тикером.`);
+  const token = getTinvestToken();
+  if(!token) throw new Error('Введите T-Invest токен (поле сверху)');
+
+  const now = new Date();
+  const dayMs = 86400000;
+  let fromDate;
+  if(tf==='1min') fromDate = new Date(now - dayMs);
+  else if(tf==='5min') fromDate = new Date(now - 3*dayMs);
+  else if(tf==='1h') fromDate = new Date(now - 14*dayMs);
+  else fromDate = new Date(now - 30*dayMs);
+
+  const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles');
+  // instrument_id принимает BBG FIGI, UID или ticker_CLASS — используем его
+  const body = {
+    instrument_id: figi,
+    from: fromDate.toISOString(),
+    to: now.toISOString(),
+    interval: TF_INTERVALS[tf],
+  };
+  const resp = await fetchWithTimeout(url, {
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  });
+  if(!resp.ok){
+    const txt = await resp.text().catch(()=>'');
+    throw new Error(`T-Invest HTTP ${resp.status} → ${url.slice(0,80)}: ${txt.slice(0,100)}`);
+  }
+  const d = await resp.json();
+  return d.candles || [];
+}
+
+// ============================================================
+// SIGNAL ANALYSIS METHODS
+// ============================================================
+function tanh(x){ return Math.tanh(x); }
+function avg(arr){ return arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0; }
+function std(arr){
+  const m=avg(arr); const v=avg(arr.map(x=>(x-m)**2)); return Math.sqrt(v);
+}
+function last(arr, n=1){ return n===1 ? arr[arr.length-1] : arr.slice(-n); }
+function toNum(v){ return parseFloat(v)||0; }
+
+// Parse price from T-Invest format (units + nano)
+function toP(p){ if(!p) return 0; return (toNum(p.units)||0) + (toNum(p.nano)||0)/1e9; }
+
+// --- Method 1: Buy/Sell Pressure (адаптивный) ---
+function m_BS_PRESSURE(ts){
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ts.slice(-5);
+  const vb = avg(recent.map(r=>toNum(r.vol_b||0)));
+  const vs = avg(recent.map(r=>toNum(r.vol_s||0)));
+  const total = vb + vs || 1;
+  const ratio = (vb - vs) / total;
+  const pVb = getPct(curTicker,'tradestats','vol_b');
+  const pVs = getPct(curTicker,'tradestats','vol_s');
+  let score;
+  if(pVb?.n>=5 && pVs?.n>=5){
+    const zb = normScore(vb, pVb, 2.0)||0;
+    const zs = normScore(vs, pVs, 2.0)||0;
+    score = Math.tanh(zb - zs);
+  } else {
+    score = Math.tanh(ratio * 4);
+  }
+  const confidence = Math.min(0.9, total > 0 ? 0.7 : 0.1);
+  return {score, confidence, detail:`vB:${snum(vb)} vS:${snum(vs)} r:${ratio.toFixed(2)}`};
+}
+
+// --- Method 2: Aggressor Flow (адаптивный) ---
+function m_AGGRESSOR_FLOW(ts){
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ts.slice(-5);
+  const valB = avg(recent.map(r=>toNum(r.val_b||0)));
+  const valS = avg(recent.map(r=>toNum(r.val_s||0)));
+  const trdB = avg(recent.map(r=>toNum(r.trades_b||r.buy_trades||0)));
+  const trdS = avg(recent.map(r=>toNum(r.trades_s||r.sell_trades||0)));
+  const pValB = getPct(curTicker,'tradestats','val_b');
+  const pValS = getPct(curTicker,'tradestats','val_s');
+  const pTrdB = getPct(curTicker,'tradestats','trades_b');
+  const pTrdS = getPct(curTicker,'tradestats','trades_s');
+  let score;
+  if(pValB?.n>=5 && pValS?.n>=5){
+    const zVal = (normScore(valB,pValB,1.5)||0) - (normScore(valS,pValS,1.5)||0);
+    const zTrd = pTrdB?.n>=5 ? ((normScore(trdB,pTrdB,1.0)||0)-(normScore(trdS,pTrdS,1.0)||0)) : 0;
+    score = Math.tanh(zVal*0.7 + zTrd*0.3);
+  } else {
+    const vr = (valB-valS)/(valB+valS||1);
+    const tr = (trdB-trdS)/(trdB+trdS||1);
+    score = Math.tanh(vr*3 + tr*2);
+  }
+  const confidence = (valB+valS)>0 ? 0.7 : 0.1;
+  return {score, confidence, detail:`valB:${snum(valB)} valS:${snum(valS)}`};
+}
+
+// --- Method 3: Large Trade Impact (адаптивный) ---
+function m_LARGE_IMPACT(ts){
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ts.slice(-5);
+  const pVol = getPct(curTicker,'tradestats','vol');
+  const threshold = pVol?.p75 || 0;
+  const largeB = avg(recent.map(r=>{ const v=toNum(r.vol_b||0); return v>threshold?v:0; }));
+  const largeS = avg(recent.map(r=>{ const v=toNum(r.vol_s||0); return v>threshold?v:0; }));
+  const total = largeB+largeS||1;
+  if(total < 1) return {score:0, confidence:0.1, detail:'нет крупных сделок'};
+  const ratio = (largeB-largeS)/total;
+  const totalVol = avg(recent.map(r=>toNum(r.vol||0)))||1;
+  const largeFrac = (largeB+largeS)/(totalVol*2);
+  const score = Math.tanh(ratio*3.5);
+  const confidence = Math.min(0.8, largeFrac*2);
+  return {score, confidence, detail:`lgB:${snum(largeB)} lgS:${snum(largeS)} thr>${snum(threshold)}`};
+}
+
+// --- Method 4: VWAP Signal (адаптивный) ---
+function m_VWAP_SIGNAL(ts){
+  if(ts.length<3) return {score:0, confidence:0, detail:'мало данных'};
+  const prices = ts.map(r=>toNum(r.pr_close||r.pr_cl||0)).filter(Boolean);
+  const vols   = ts.map(r=>toNum(r.vol||0));
+  if(!prices.length) return {score:0, confidence:0.1, detail:'нет цены'};
+  const vwap = prices.reduce((s,p,i)=>s+p*(vols[i]||1),0)/prices.reduce((s,_,i)=>s+(vols[i]||1),0);
+  const curPrice = prices[prices.length-1];
+  const atrPct = getAtrPct(curTicker, curTF);
+  const scale  = vwap*atrPct||vwap*0.005;
+  const z = (curPrice-vwap)/(scale||1);
+  const score = Math.tanh(z*1.5);
+  const confidence = scale>0 ? 0.6 : 0.2;
+  return {score, confidence, detail:`price:${curPrice.toFixed(2)} vwap:${vwap.toFixed(2)} z:${z.toFixed(2)}`};
+}
+
+// --- Method 5: Volume Momentum (адаптивный) ---
+function m_VOL_MOMENTUM(ts){
+  if(ts.length<5) return {score:0, confidence:0, detail:'мало данных'};
+  const pVol = getPct(curTicker,'tradestats','vol');
+  const vols  = ts.map(r=>toNum(r.vol||0));
+  const curVol = avg(vols.slice(-3));
+  let zVol;
+  if(pVol?.n>=5){
+    zVol = normScore(curVol, pVol, 2.0)||0;
+  } else {
+    const mu=avg(vols); const sd=std(vols)||mu*0.1||1;
+    zVol=(curVol-mu)/sd;
+  }
+  const prices = ts.map(r=>toNum(r.pr_close||r.pr_cl||0)).filter(Boolean);
+  const dir = prices.length>=2 ? Math.sign(prices[prices.length-1]-prices[prices.length-2]) : 0;
+  const score = Math.tanh(zVol*dir*1.5);
+  const confidence = Math.abs(zVol)>0.3 ? 0.65 : 0.3;
+  return {score, confidence, detail:`vol:${snum(curVol)} z:${zVol.toFixed(2)} dir:${dir>0?'↑':dir<0?'↓':'→'}`};
+}
+
+// --- Method 6: Order Book Imbalance (адаптивный) ---
+function m_OB_IMBALANCE(ob){
+  if(!ob.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ob.slice(-5);
+  const imb    = avg(recent.map(r=>toNum(r.imbalance_vol_bbo||r.imbalance_val_bbo||0)));
+  const spread = avg(recent.map(r=>toNum(r.spread_bbo||0)));
+  const pImb = getPct(curTicker,'obstats','imbalance_vol_bbo');
+  let score;
+  if(pImb?.n>=5){
+    score = normScore(imb, pImb, 2.5)||Math.tanh(imb*3);
+  } else {
+    score = Math.tanh(imb*3);
+  }
+  const pSpread = getPct(curTicker,'obstats','spread_bbo');
+  const spreadZ = pSpread?.n>=5 ? (normScore(spread,pSpread,1.0)||0) : 0;
+  const confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
+  return {score, confidence, detail:`imb:${imb.toFixed(3)} sprd:${spread.toFixed(4)}`};
+}
+
+// --- Method 7: Cancel Signal (адаптивный) ---
+function m_CANCEL_SIGNAL(os){
+  if(!os.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = os.slice(-5);
+  const canB = avg(recent.map(r=>toNum(r.cancel_orders_b||0)));
+  const canS = avg(recent.map(r=>toNum(r.cancel_orders_s||0)));
+  const total = canB+canS||1;
+  const pCB = getPct(curTicker,'orderstats','cancel_orders_b');
+  const pCS = getPct(curTicker,'orderstats','cancel_orders_s');
+  let score;
+  if(pCB?.n>=5 && pCS?.n>=5){
+    const zB = normScore(canB,pCB,1.5)||0;
+    const zS = normScore(canS,pCS,1.5)||0;
+    score = Math.tanh(zS-zB);
+  } else {
+    score = Math.tanh(((canS-canB)/total)*3);
+  }
+  const confidence = total>10 ? 0.6 : 0.25;
+  return {score, confidence, detail:`canB:${snum(canB)} canS:${snum(canS)}`};
+}
+
+// --- Method 8: Institutional OI (адаптивный) ---
+function m_INST_OI(futoi){
+  if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  const jur = futoi.filter(r=>(r.clgroup||'').toUpperCase()==='YUR');
+  if(!jur.length) return {score:0, confidence:0.1, detail:'нет данных YUR'};
+  let longNet=0, shortNet=0;
+  jur.forEach(r=>{ longNet+=toNum(r.pos_long||0); shortNet+=Math.abs(toNum(r.pos_short||0)); });
+  const netPos = jur.reduce((s,r)=>s+toNum(r.pos||0),0);
+  const pNet = getPct(curTicker,'futoi','pos_YUR');
+  let score;
+  if(pNet?.n>=5){
+    score = normScore(netPos,pNet,2.5)||Math.tanh(netPos/(longNet+shortNet||1)*3);
+  } else {
+    score = Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*3);
+  }
+  const confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
+  return {score, confidence, detail:`YUR L:${snum(longNet)} S:${snum(shortNet)} net:${snum(netPos)}`};
+}
+
+// --- Method 9: Retail Contrarian (адаптивный) ---
+function m_RETAIL_CONTRA(futoi){
+  if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  const phiz = futoi.filter(r=>(r.clgroup||'').toUpperCase()==='FIZ');
+  if(!phiz.length) return {score:0, confidence:0.1, detail:'нет данных FIZ'};
+  let longNet=0, shortNet=0;
+  phiz.forEach(r=>{ longNet+=toNum(r.pos_long||0); shortNet+=Math.abs(toNum(r.pos_short||0)); });
+  const netPos = phiz.reduce((s,r)=>s+toNum(r.pos||0),0);
+  const pNet = getPct(curTicker,'futoi','pos_FIZ');
+  let score;
+  if(pNet?.n>=5){
+    score = -(normScore(netPos,pNet,2.0)||Math.tanh(netPos/(longNet+shortNet||1)*2));
+  } else {
+    score = -Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*2.5);
+  }
+  const confidence = (longNet+shortNet)>0 ? 0.55 : 0.1;
+  return {score, confidence, detail:`FIZ L:${snum(longNet)} S:${snum(shortNet)}`};
+}
+
+// --- Method 10: Price Trend (адаптивный через ATR) ---
+function m_PRICE_TREND(candles){
+  const arr = candles[curTF]||candles['1min']||[];
+  if(arr.length<10) return {score:0, confidence:0, detail:'мало свечей'};
+  const closes = arr.map(c=>toP(c.close)).filter(Boolean);
+  if(closes.length<10) return {score:0, confidence:0, detail:'нет цены'};
+  const cur  = closes[closes.length-1];
+  const p3   = closes[closes.length-4];
+  const p10c = closes[closes.length-11]||closes[0];
+  const atrPct = getAtrPct(curTicker, curTF);
+  const roc3  = (cur-p3) /(p3 ||1)/(atrPct*3 ||0.015);
+  const roc10 = (cur-p10c)/(p10c||1)/(atrPct*10||0.05);
+  const score = Math.tanh(roc3*0.6+roc10*0.4);
+  const confidence = atrPct>0 ? 0.55 : 0.2;
+  return {score, confidence, detail:`roc3:${(roc3*100).toFixed(1)}% roc10:${(roc10*100).toFixed(1)}% atr%:${(atrPct*100).toFixed(2)}`};
+}
+
+// ============================================================
+// COMPOSITE SIGNAL ENGINE
+// ============================================================
+function computeAllMethods(){
+  const results = {};
+  results.BS_PRESSURE    = m_BS_PRESSURE(tsHistory);
+  results.AGGRESSOR_FLOW = m_AGGRESSOR_FLOW(tsHistory);
+  results.LARGE_IMPACT   = m_LARGE_IMPACT(tsHistory);
+  results.VWAP_SIGNAL    = m_VWAP_SIGNAL(tsHistory);
+  results.VOL_MOMENTUM   = m_VOL_MOMENTUM(tsHistory);
+  results.OB_IMBALANCE   = m_OB_IMBALANCE(obHistory);
+  results.CANCEL_SIGNAL  = m_CANCEL_SIGNAL(osHistory);
+  results.INST_OI        = m_INST_OI(futoiData);
+  results.RETAIL_CONTRA  = m_RETAIL_CONTRA(futoiData);
+  results.PRICE_TREND    = m_PRICE_TREND(candleData);
+  return results;
+}
+
+function getWeights(ticker){
+  return methodWeights[ticker] || {};
+}
+
+function computeComposite(methodResults, ticker){
+  const weights = getWeights(ticker);
+  let wSum = 0, wTotal = 0;
+  METHODS.forEach(m=>{
+    const r = methodResults[m.id];
+    if(!r || r.confidence < 0.05) return;
+    const mw = weights[m.id];
+    // Используем адаптивный вес только если накоплено >= 30 наблюдений
+    const w = (mw && mw.total >= 30) ? mw.weight : 0.5;
+    wSum   += r.score * w * r.confidence;
+    wTotal += w * r.confidence;
+  });
+  return wTotal > 0 ? wSum / wTotal : 0;
+}
+
+// ============================================================
+// LEARNING ENGINE — адаптивный MFE/MAE + адаптивный стоп через ATR
+// ============================================================
+// quality = MFE / (MFE + MAE + ε) ∈ [0,1]
+// Стоп-лосс = 1.5 × ATR% тикера (адаптивный), минимум 0.3%
+// Веса обновляются только при total >= 30 наблюдений
+const MIN_OBS_FOR_WEIGHT = 30;
+const MAX_BARS = 20;
+
+function getStopPct(ticker, tf){
+  const atrPct = getAtrPct(ticker, tf);
+  return Math.max(0.003, atrPct * 1.5); // 1.5 × ATR, минимум 0.3%
+}
+
+async function autoRecordOutcomes(){
+  if(!dbBase()) return;
+  const openSigs = await dbGetOpenSignals(curTicker).catch(()=>[]);
+  if(!openSigs.length) return;
+
+  const now = Date.now();
+  let weightsUpdated = false;
+
+  for(const sig of openSigs){
+    const afterCandles = await dbGetCandlesAfter(sig.ticker, sig.tf, sig.entryTs).catch(()=>[]);
+    if(afterCandles.length < 2) continue;
+
+    const ep = sig.entryPrice;
+    if(!ep) continue;
+
+    const stopPct = getStopPct(sig.ticker, sig.tf);
+
+    let mfe=0, mae=0;
+    for(const c of afterCandles){
+      const upside   = (toP(c.high)  - ep) / ep;
+      const downside = (ep - toP(c.low)) / ep;
+      if(sig.dir === 'short'){
+        mfe = Math.max(mfe, downside);
+        mae = Math.max(mae, upside);
+      } else {
+        mfe = Math.max(mfe, upside);
+        mae = Math.max(mae, downside);
+      }
+    }
+
+    const barsElapsed = afterCandles.length;
+    const stopped = mae >= stopPct;
+    const expired = barsElapsed >= MAX_BARS;
+    if(!stopped && !expired) continue;
+
+    const quality = mfe / (mfe + mae + 1e-8);
+
+    // Обновляем веса — только при накоплении >= MIN_OBS_FOR_WEIGHT
+    const weights = await dbLoadWeights(sig.ticker).catch(()=>({}));
+    for(const m of METHODS){
+      const score = sig.methods?.[m.id] ?? 0;
+      if(Math.abs(score) < 0.05) continue;
+      const methodAligned = (score > 0.1 && sig.dir !== 'short') ||
+                            (score < -0.1 && sig.dir === 'short');
+      const targetAcc = methodAligned ? quality : (1 - quality);
+      const prev = weights[m.id] || {weight:0.5, correct:0, total:0, sumQ:0};
+      prev.total++;
+      prev.sumQ = (prev.sumQ||0) + targetAcc;
+      // Обновляем вес только после MIN_OBS_FOR_WEIGHT наблюдений
+      if(prev.total >= MIN_OBS_FOR_WEIGHT){
+        const rollingAcc = prev.sumQ / prev.total;
+        prev.weight = 0.95 * prev.weight + 0.05 * rollingAcc; // медленный EWA
+        prev.weight = Math.max(0.05, Math.min(1, prev.weight));
+      }
+      await dbSaveWeight(sig.ticker, m.id, prev);
+      if(!methodWeights[sig.ticker]) methodWeights[sig.ticker] = {};
+      methodWeights[sig.ticker][m.id] = prev;
+    }
+
+    await dbUpdateSignal(sig.id, {
+      resolved:1, mfe, mae, quality,
+      barsElapsed, stoppedOut: stopped ? 1 : 0,
+      resolvedAt: now,
+    });
+    const li = signalLog.findIndex(x=>x.dbId === sig.id);
+    if(li>=0){
+      signalLog[li].outcome = quality > 0.55 ? sig.dir : (sig.dir==='long'?'short':'long');
+      signalLog[li].quality = quality;
+    }
+    weightsUpdated = true;
+  }
+  if(weightsUpdated){ saveAll(); renderHistory(); renderMethodsTable(computeAllMethods()); }
+}
+
+function recordOutcome(){
+  const sel = document.getElementById('outcomeSel');
+  const outcome = sel.value;
+  if(!outcome || !lastSnapshot){ alert('Нет сигнала для записи исхода'); return; }
+  const ticker = lastSnapshot.ticker;
+  if(!methodWeights[ticker]) methodWeights[ticker] = {};
+
+  METHODS.forEach(m=>{
+    const r = lastSnapshot.methodResults[m.id];
+    if(!r || r.confidence < 0.05) return;
+    const correct = (r.score >  0.1 && outcome === 'long')  ||
+                    (r.score < -0.1 && outcome === 'short') ||
+                    (Math.abs(r.score) <= 0.1 && outcome === 'neutral');
+    if(!methodWeights[ticker][m.id])
+      methodWeights[ticker][m.id] = {weight:0.5, correct:0, total:0, sumQ:0};
+    const mw = methodWeights[ticker][m.id];
+    mw.total++;
+    mw.sumQ = (mw.sumQ||0) + (correct ? 1 : 0);
+    if(mw.total >= MIN_OBS_FOR_WEIGHT){
+      const accuracy = mw.sumQ / mw.total;
+      mw.weight = 0.95 * mw.weight + 0.05 * accuracy;
+      mw.weight = Math.max(0.05, Math.min(1, mw.weight));
+    }
+  });
+
+  const logIdx = signalLog.findIndex(x=>x.snapshotTs === lastSnapshot.ts);
+  if(logIdx >= 0) signalLog[logIdx].outcome = outcome;
+  else signalLog.unshift({
+    snapshotTs: lastSnapshot.ts,
+    ts: new Date().toISOString(),
+    ticker,
+    composite: lastSnapshot.composite,
+    dir: scoreToDir(lastSnapshot.composite).dir,
+    outcome,
+    methods: Object.fromEntries(METHODS.map(m=>[m.id, lastSnapshot.methodResults[m.id]?.score??0])),
+  });
+
+  sel.value = '';
+  document.getElementById('outcomeRow').style.display = 'none';
+  saveAll(); renderHistory(); renderMethodsTable(computeAllMethods());
+  setStatus('✓ Исход записан, веса обновлены');
+}
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OI · INTEL v10 — Real-Time Market Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0B0613;--panel:#140A24;--card:#1A1030;
+  --accent:#FF006E;--accent2:#FF2A8A;
+  --pos:#52F2C9;--neg:#FF4D7A;--mem:#A78BFA;--warn:#FF9F40;
+  --txt:#F2F0FF;--txt2:#A79BC9;--txt3:#6F648F;
+  --border:rgba(255,0,128,0.12);--border2:rgba(170,90,255,0.10);
+}
+body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min-height:100vh;font-family:'JetBrains Mono',monospace;color:var(--txt);padding:14px 16px;}
+a{color:var(--accent);text-decoration:none;}
+/* ---- Header ---- */
+.hdr{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border2);flex-wrap:wrap;}
+.logo{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;color:var(--accent);text-shadow:0 0 20px rgba(255,0,110,0.35);white-space:nowrap;}
+.logo-sub{font-size:9px;color:var(--txt3);letter-spacing:.08em;margin-top:2px;}
+.hdr-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+/* ---- Buttons ---- */
+.btn-pill{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.12));border:1px solid rgba(255,0,128,.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:6px 16px;cursor:pointer;transition:all .15s;}
+.btn-pill:hover{box-shadow:0 0 14px rgba(255,0,128,.25);}
+.btn-pill.pos{background:linear-gradient(180deg,rgba(82,242,201,.22),rgba(82,242,201,.1));border-color:rgba(82,242,201,.5);color:var(--pos);}
+.btn-pill.neg{background:linear-gradient(180deg,rgba(255,77,122,.22),rgba(255,77,122,.1));border-color:rgba(255,77,122,.5);color:var(--neg);}
+.btn-ghost{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 12px;cursor:pointer;transition:all .15s;}
+.btn-ghost:hover{border-color:rgba(255,0,128,.25);color:var(--txt);}
+.btn-ghost.active{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}
+.btn-sm{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;cursor:pointer;}
+.btn-sm:hover{color:var(--txt2);border-color:rgba(255,255,255,.15);}
+.btn-danger{border-color:rgba(255,77,122,.3);color:var(--neg);}
+/* ---- Inputs ---- */
+.inp{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:6px 14px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;}
+.inp:focus{border-color:rgba(255,0,110,.4);}
+.inp.wide{width:260px;}
+.inp.mid{width:180px;}
+/* ---- Panel / Card ---- */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:14px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;}
+.sec{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px;}
+/* ---- Status dots ---- */
+.sdot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}
+.sdot.ok{background:var(--pos);box-shadow:0 0 7px rgba(82,242,201,.5);}
+.sdot.err{background:var(--neg);box-shadow:0 0 7px rgba(255,77,122,.5);}
+.sdot.warn{background:var(--warn);box-shadow:0 0 7px rgba(255,159,64,.5);}
+.sdot.off{background:var(--txt3);}
+.spinner{width:12px;height:12px;border:2px solid rgba(255,0,128,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg);}}
+/* ---- Ticker chips ---- */
+.chips{display:flex;gap:4px;flex-wrap:wrap;}
+.chip{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;}
+.chip:hover{border-color:rgba(255,0,128,.25);}
+.chip.active{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);}
+.chip-code{font-size:11px;font-weight:600;color:var(--txt);}
+.chip.active .chip-code{color:var(--accent);}
+.chip-name{font-size:8px;color:var(--txt3);white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis;}
+/* ---- Layout ---- */
+.main-grid{display:grid;grid-template-columns:220px 1fr 260px;gap:12px;margin-bottom:12px;}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
+/* ---- Signal gauge ---- */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0;}
+.gauge-svg{width:140px;height:76px;}
+.gauge-val{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:700;text-align:center;margin-top:2px;}
+.gauge-dir{font-size:10px;letter-spacing:.1em;text-align:center;margin-top:2px;}
+.gauge-conf{font-size:9px;color:var(--txt3);text-align:center;margin-top:1px;}
+/* ---- Methods table ---- */
+.meth-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.meth-name{font-size:10px;color:var(--txt2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meth-bar-wrap{width:60px;height:4px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
+.meth-bar{height:100%;border-radius:999px;transition:width .4s;}
+.meth-score{font-size:10px;font-weight:600;width:32px;text-align:right;flex-shrink:0;}
+.meth-w{font-size:9px;color:var(--txt3);width:26px;text-align:right;flex-shrink:0;}
+.meth-src{font-size:8px;color:var(--txt3);width:20px;text-align:right;flex-shrink:0;}
+.meth-acc{font-size:9px;width:28px;text-align:right;flex-shrink:0;}
+/* ---- Candle area ---- */
+#candleArea{width:100%;height:200px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.01);border:1px solid rgba(255,255,255,.04);border-radius:10px;color:var(--txt3);font-size:11px;}
+/* ---- Data panels ---- */
+.dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.dp-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;}
+.dp-label{font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.dp-val{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;}
+.dp-sub{font-size:9px;color:var(--txt3);margin-top:1px;}
+/* ---- FutOI block ---- */
+.futoi-row{display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:4px;font-size:10px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.futoi-hdr{color:var(--txt3);font-size:9px;letter-spacing:.06em;text-transform:uppercase;}
+/* ---- History ---- */
+.hist-row{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:10px;}
+.hist-date{color:var(--txt3);width:90px;flex-shrink:0;}
+.hist-ticker{width:50px;flex-shrink:0;font-weight:600;}
+.hist-dir{width:48px;flex-shrink:0;}
+.hist-score{width:36px;text-align:right;flex-shrink:0;font-weight:600;}
+.hist-outcome{flex:1;}
+.hist-acc{font-size:9px;color:var(--txt3);}
+/* ---- Outcome row ---- */
+.outcome-row{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;}
+.outcome-lbl{font-size:10px;color:var(--txt3);flex:1;}
+.outcome-sel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
+/* ---- Refresh bar ---- */
+.refresh-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.refresh-bar span{font-size:10px;color:var(--txt3);}
+.age-badge{font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.08);color:var(--txt3);}
+.age-badge.fresh{border-color:rgba(82,242,201,.3);color:var(--pos);}
+.age-badge.stale{border-color:rgba(255,159,64,.3);color:var(--warn);}
+.age-badge.old{border-color:rgba(255,77,122,.3);color:var(--neg);}
+/* ---- Collapsible ---- */
+.collapsible-hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;padding:8px 0;}
+.collapsible-hdr:hover .sec{color:var(--txt2);}
+.collapsible-body{display:none;}
+.collapsible-body.open{display:block;}
+/* ---- Misc ---- */
+.tag{font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.06);color:var(--txt3);}
+.dp{color:var(--pos);font-weight:600;}.dn{color:var(--neg);font-weight:600;}.dm{color:var(--txt2);}
+.save-bar{display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid rgba(255,255,255,.04);margin-top:10px;flex-wrap:wrap;}
+.save-bar span{font-size:10px;color:var(--txt3);}
+.save-ind{font-size:10px;color:var(--pos);opacity:0;transition:opacity .3s;}
+.save-ind.show{opacity:1;}
+.proxy-help-box{display:none;margin:6px 0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px;font-size:10px;color:var(--txt2);line-height:1.7;max-width:720px;}
+pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow-x:auto;font-size:9px;color:#c9d1d9;line-height:1.5;white-space:pre;}
+.select-inp{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
+.select-inp:focus{border-color:rgba(255,0,128,.4);}
+.ticker-panel{background:var(--panel);border:1px solid var(--border2);border-radius:14px;margin-bottom:10px;overflow:hidden;}
+.ticker-panel-hdr{display:flex;align-items:center;padding:8px 14px;cursor:pointer;user-select:none;min-height:38px;}
+.ticker-panel-hdr:hover{background:rgba(255,255,255,.02);}
+.ticker-panel-body{padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,.05);}
+.cat-item{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:6px 8px;cursor:pointer;transition:all .15s;}
+.cat-item:hover{border-color:rgba(255,0,128,.25);background:rgba(255,0,128,.04);}
+.cat-item.active-ticker{border-color:rgba(255,0,128,.5);background:rgba(255,0,128,.1);}
+.cat-item.pinned .pin-btn{color:var(--accent);}
+.cat-item-code{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}
+.cat-item-name{font-size:9px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.cat-item-sector{font-size:8px;color:var(--txt3);opacity:.6;white-space:nowrap;}
+.pin-btn{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;flex-shrink:0;}
+.pin-btn:hover{color:var(--accent);}
+/* ---- Adaptive calibration panel ---- */
+.calib-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;padding:6px 10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:10px;}
+.calib-bar span{font-size:10px;color:var(--txt3);}
+.calib-stat{font-size:9px;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.04);color:var(--txt2);}
+.calib-stat.ready{background:rgba(82,242,201,.1);color:var(--pos);}
+.calib-stat.partial{background:rgba(255,159,64,.1);color:var(--warn);}
+.pct-bar{height:3px;border-radius:999px;background:rgba(255,255,255,.06);margin-top:3px;overflow:hidden;}
+.pct-fill{height:100%;border-radius:999px;background:var(--mem);}
+.pchip{display:flex;align-items:center;gap:3px;padding:3px 8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;font-size:11px;font-weight:600;color:var(--txt2);white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.pchip:hover{border-color:rgba(255,0,128,.3);color:var(--txt);}
+.pchip.active{background:rgba(255,0,128,.15);border-color:rgba(255,0,128,.5);color:var(--accent);}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ HEADER -->
+<div class="hdr">
+  <div>
+    <div class="logo">OI · INTEL</div>
+    <div class="logo-sub">v10 · AlgoPack + T-Invest · 10 методов</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+    <div class="hdr-row">
+      <input class="inp mid" id="moexKeyInp" placeholder="MOEX AlgoPack API ключ..." type="password">
+      <input class="inp mid" id="tinvestInp" placeholder="T-Invest токен..." type="password">
+      <input class="inp wide" id="proxyInp" placeholder="https://your-worker.workers.dev  (прокси)">
+      <button class="btn-sm" onclick="toggleProxyHelp()">⚙ Прокси?</button>
+    </div>
+    <div class="hdr-row">
+      <button class="btn-pill" id="btnRefresh" onclick="refreshAll()">↺ Обновить</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;">
+        <input type="checkbox" id="autoChk" onchange="toggleAuto()" style="cursor:pointer;"> Авто
+      </label>
+      <select class="select-inp" id="intervalSel" onchange="setInterval_()">
+        <option value="30">30с</option>
+        <option value="60" selected>1 мин</option>
+        <option value="120">2 мин</option>
+        <option value="300">5 мин</option>
+      </select>
+      <span class="age-badge" id="moexAge">MOEX —</span>
+      <span class="age-badge" id="candleAge">Свечи —</span>
+      <span style="font-size:10px;color:var(--txt3);">Окно:</span>
+      <select class="select-inp" id="windowSel" onchange="onWindowChange()" title="Глубина скользящего окна для нормализации">
+        <option value="7">7д</option>
+        <option value="14">14д</option>
+        <option value="30" selected>30д</option>
+        <option value="60">60д</option>
+      </select>
+      <span class="calib-stat" id="calibBadge">калибровка —</span>
+      <span style="font-size:10px;color:var(--txt3);" id="statusTxt">Ожидание</span>
+      <div id="spinnerEl" style="display:none;"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Proxy help -->
+<div class="proxy-help-box" id="proxyHelpBox">
+  <b style="color:var(--txt);font-size:11px;">Единый прокси для T-Invest + MOEX AlgoPack</b><br>
+  Один Cloudflare Worker проксирует оба API. Настройка — 3 минуты.<br><br>
+  <b style="color:var(--accent);">1.</b> <a href="https://workers.cloudflare.com" target="_blank">workers.cloudflare.com</a> → Start for free → Create Worker → Edit code<br>
+  <b style="color:var(--accent);">2.</b> Замени весь код на:
+  <pre class="code-block" id="workerCodeEl">export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const path = url.pathname + url.search;
+    const auth = request.headers.get('Authorization') || '';
+    const ch = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type' };
+
+    if (request.method === 'OPTIONS') return new Response(null, { status:204, headers: ch });
+
+    let target, hdrs, body;
+    if (path.startsWith('/iss/')) {
+      // MOEX AlgoPack (SuperCandles, FUTOI и др.) — требует Bearer-ключ подписки
+      // Пути: /iss/datashop/algopack/... и /iss/analyticalproducts/futoi/...
+      target = 'https://apim.moex.com' + path;
+      hdrs = { 'Authorization': auth, 'Accept': 'application/json' };
+    } else {
+      // T-Invest REST API — path начинается с /tinkoff...
+      target = 'https://invest-public-api.tinkoff.ru/rest' + path;
+      hdrs = { 'Authorization': auth, 'Content-Type': request.headers.get('Content-Type') || 'application/json' };
+      if (request.method === 'POST') body = await request.arrayBuffer();
+    }
+
+    const resp = await fetch(target, { method: request.method, headers: hdrs, body });
+    return new Response(resp.body, {
+      status: resp.status,
+      headers: { ...ch, 'Content-Type': resp.headers.get('Content-Type') || 'application/json' }
+    });
+  }
+};</pre>
+  <b style="color:var(--accent);">3.</b> Save &amp; Deploy → скопируй URL (вида <code style="color:var(--pos)">https://xxx.workers.dev</code>)<br>
+  <b style="color:var(--accent);">4.</b> Вставь URL в поле "прокси" выше → Enter<br><br>
+  <div style="display:flex;gap:6px;">
+    <button class="btn-sm" onclick="copyWorkerCode()">📋 Скопировать код</button>
+    <button class="btn-sm" onclick="toggleProxyHelp()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Ticker panel -->
+<div class="ticker-panel" id="tickerPanel">
+  <div class="ticker-panel-hdr" onclick="toggleTickerPanel()">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;" id="pinnedChips">
+      <!-- pinned chips rendered here -->
+    </div>
+    <span style="font-size:10px;color:var(--txt3);white-space:nowrap;margin-left:6px;" id="tickerPanelChev">▼ тикеры</span>
+  </div>
+  <div class="ticker-panel-body" id="tickerPanelBody" style="display:none;">
+    <!-- Search + tabs -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <input class="inp" id="tickerSearch" placeholder="🔍 Поиск тикера или названия..." style="flex:1;min-width:200px;" oninput="renderCatalog()">
+      <div style="display:flex;gap:3px;" id="catTabs">
+        <button class="btn-ghost active" data-cat="" onclick="selectCatTab(this,'')">Все</button>
+        <button class="btn-ghost" data-cat="stocks" onclick="selectCatTab(this,'stocks')">Акции</button>
+        <button class="btn-ghost" data-cat="futures" onclick="selectCatTab(this,'futures')">Фьючерсы</button>
+        <button class="btn-ghost" data-cat="currency" onclick="selectCatTab(this,'currency')">Валюта</button>
+        <button class="btn-ghost" data-cat="index" onclick="selectCatTab(this,'index')">Индексы</button>
+      </div>
+    </div>
+    <div id="catalogGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px;max-height:260px;overflow-y:auto;"></div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:10px;color:var(--txt3);">Добавить свой:</span>
+      <input id="custT" class="inp" placeholder="ТИКЕР" style="width:80px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <select class="select-inp" id="custType">
+        <option value="stocks">Акции</option>
+        <option value="futures">Фьючерсы</option>
+        <option value="currency">Валюта</option>
+        <option value="index">Индекс</option>
+      </select>
+      <input id="custName" class="inp" placeholder="Название" style="width:130px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <input id="custFigi" class="inp" placeholder="FIGI/UID (или 🔍)" style="width:160px;" onkeydown="if(event.key==='Enter')addCustomTicker()">
+      <button class="btn-sm" onclick="addCustomTicker()">+ Добавить</button>
+      <button class="btn-sm" onclick="lookupAllFIGI()" title="Найти FIGI для всех закреплённых тикеров без FIGI через T-Invest API">🔍 Авто-FIGI</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save bar -->
+<div class="save-bar">
+  <button class="btn-sm" onclick="saveAll()">💾 Сохранить</button>
+  <button class="btn-sm" onclick="exportData()">↑ Экспорт</button>
+  <button class="btn-sm" onclick="document.getElementById('importFile').click()">↓ Импорт</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+  <span class="save-ind" id="saveInd">✓ сохранено</span>
+  <div style="flex:1;"></div>
+  <button class="btn-sm btn-danger" onclick="clearAll()">✕ Очистить</button>
+</div>
+
+<!-- ============================================================ MAIN GRID -->
+<div class="main-grid">
+
+  <!-- LEFT: Signal card + Methods -->
+  <div>
+    <div class="panel" style="margin-bottom:10px;">
+      <div class="sec">Сигнал</div>
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 76">
+          <defs>
+            <linearGradient id="gNeg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#FF4D7A"/>
+              <stop offset="100%" stop-color="#FF9F40"/>
+            </linearGradient>
+            <linearGradient id="gPos" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#52F2C9"/>
+              <stop offset="100%" stop-color="#A78BFA"/>
+            </linearGradient>
+          </defs>
+          <!-- Track -->
+          <path d="M10,70 A60,60 0 0,1 130,70" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10" stroke-linecap="round"/>
+          <!-- Neg arc -->
+          <path id="gaugeNeg" d="M10,70 A60,60 0 0,1 70,10" fill="none" stroke="url(#gNeg)" stroke-width="10" stroke-linecap="round" opacity="0"/>
+          <!-- Pos arc -->
+          <path id="gaugePos" d="M70,10 A60,60 0 0,1 130,70" fill="none" stroke="url(#gPos)" stroke-width="10" stroke-linecap="round" opacity="0"/>
+          <!-- Needle -->
+          <line id="gaugeNeedle" x1="70" y1="70" x2="70" y2="14" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round" transform="rotate(0,70,70)"/>
+          <circle cx="70" cy="70" r="4" fill="rgba(255,255,255,0.6)"/>
+        </svg>
+        <div class="gauge-val" id="gaugeVal">—</div>
+        <div class="gauge-dir" id="gaugeDir" style="color:var(--txt3);">Нет данных</div>
+        <div class="gauge-conf" id="gaugeConf"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="sec" style="margin-bottom:0;">Методы</div>
+        <span style="font-size:9px;color:var(--txt3);">вес · точность</span>
+      </div>
+      <div id="methodsTable"></div>
+      <div class="outcome-row" id="outcomeRow" style="display:none;opacity:0.4;" title="Авто-запись включена — исходы фиксируются через 3 бара по свечам">
+        <span class="outcome-lbl">Записать исход:</span>
+        <select class="outcome-sel" id="outcomeSel">
+          <option value="">— выбрать —</option>
+          <option value="long">↑ Рост</option>
+          <option value="short">↓ Падение</option>
+          <option value="neutral">→ Боковик</option>
+        </select>
+        <button class="btn-sm" onclick="recordOutcome()">✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Candle chart + TF selector -->
+  <div>
+    <div class="panel" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+        <div class="sec" style="margin-bottom:0;flex:1;">График (T-Invest)</div>
+        <div style="display:flex;gap:3px;">
+          <button class="btn-ghost active" id="tf1m" onclick="selTF(this,'1min')">1m</button>
+          <button class="btn-ghost" id="tf5m" onclick="selTF(this,'5min')">5m</button>
+          <button class="btn-ghost" id="tf1h" onclick="selTF(this,'1h')">1h</button>
+          <button class="btn-ghost" id="tf1d" onclick="selTF(this,'1d')">1D</button>
+        </div>
+      </div>
+      <div id="candleArea"><span>Нажмите ↺ Обновить для загрузки свечей</span></div>
+      <div id="candleTip" style="display:none;position:fixed;background:#1A1030;border:1px solid rgba(255,0,128,.3);border-radius:4px;padding:4px 8px;font-size:10px;color:#F2F0FF;pointer-events:none;z-index:99;white-space:nowrap;"></div>
+    </div>
+
+    <!-- TradeStats mini panel -->
+    <div class="panel">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('tsBody')">
+        <div class="sec" style="margin-bottom:0;">TradeStats (последние бары)</div>
+        <span style="font-size:10px;color:var(--txt3);" id="tsChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="tsBody">
+        <div id="tsPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: OI data panels -->
+  <div>
+    <!-- FutOI -->
+    <div class="panel" style="margin-bottom:10px;">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('futoiBody')">
+        <div class="sec" style="margin-bottom:0;">FutOI — открытые позиции</div>
+        <span style="font-size:10px;color:var(--txt3);" id="futoiChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="futoiBody">
+        <div id="futoiPanel"><div style="font-size:10px;color:var(--txt3);">Доступно только для фьючерсов</div></div>
+      </div>
+    </div>
+
+    <!-- OBStats + OrderStats -->
+    <div class="panel">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('obBody')">
+        <div class="sec" style="margin-bottom:0;">OBStats / OrderStats</div>
+        <span style="font-size:10px;color:var(--txt3);" id="obChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="obBody">
+        <div id="obPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ HISTORY -->
+<div class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div class="sec" style="margin-bottom:0;">История сигналов</div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn-sm" onclick="renderHistory()">↺</button>
+      <button class="btn-sm btn-danger" onclick="clearHistory()">✕</button>
+    </div>
+  </div>
+  <div id="historyArea"><div style="font-size:10px;color:var(--txt3);">История пуста</div></div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const LS = 'oisignal_v10';
+
+const MOEX_MARKETS = {
+  stocks:   {engine:'stock',   market:'shares', board:'TQBR'},
+  futures:  {engine:'futures', market:'forts',  board:'RFUD'},
+  currency: {engine:'currency',market:'selt',   board:'CETS'},
+};
+
+const TF_INTERVALS = {'1min':1,'5min':2,'1h':4,'1d':5};
+
+const METHODS = [
+  {id:'BS_PRESSURE',    label:'Buy/Sell давление',    src:'ts',     color:'#52F2C9'},
+  {id:'AGGRESSOR_FLOW', label:'Поток агрессора',      src:'ts',     color:'#52F2C9'},
+  {id:'LARGE_IMPACT',   label:'Крупные сделки',       src:'ts',     color:'#52F2C9'},
+  {id:'VWAP_SIGNAL',    label:'VWAP отклонение',      src:'ts',     color:'#A78BFA'},
+  {id:'VOL_MOMENTUM',   label:'Объём × цена',         src:'ts',     color:'#A78BFA'},
+  {id:'OB_IMBALANCE',   label:'Дисбаланс стакана',    src:'ob',     color:'#FF9F40'},
+  {id:'CANCEL_SIGNAL',  label:'Отмены заявок',        src:'os',     color:'#FF9F40'},
+  {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#FF006E'},
+  {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
+  {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
+];
+
+const CATALOG = [
+  // Акции TQBR — f: FIGI для T-Invest свечей
+  {t:'SBER',  cat:'stocks',  name:'Сбербанк',      sector:'Банки',         f:'BBG004730N88'},
+  {t:'GAZP',  cat:'stocks',  name:'Газпром',        sector:'Нефтегаз',      f:'BBG004730RP0'},
+  {t:'LKOH',  cat:'stocks',  name:'Лукойл',         sector:'Нефтегаз',      f:'BBG004731032'},
+  {t:'ROSN',  cat:'stocks',  name:'Роснефть',       sector:'Нефтегаз',      f:'BBG004731354'},
+  {t:'NVTK',  cat:'stocks',  name:'Новатэк',        sector:'Нефтегаз',      f:'BBG00475KKY8'},
+  {t:'VTBR',  cat:'stocks',  name:'ВТБ',            sector:'Банки',         f:'BBG004730ZJ9'},
+  {t:'TCSG',  cat:'stocks',  name:'Т-Банк',         sector:'Банки',         f:'BBG00QPYJ5H0'},
+  {t:'BSPB',  cat:'stocks',  name:'Банк СПБ',       sector:'Банки',         f:'BBG000QJW156'},
+  {t:'GMKN',  cat:'stocks',  name:'Норникель',      sector:'Металлы',       f:'BBG004731489'},
+  {t:'CHMF',  cat:'stocks',  name:'Северсталь',     sector:'Металлы',       f:'BBG00475K6C3'},
+  {t:'NLMK',  cat:'stocks',  name:'НЛМК',           sector:'Металлы',       f:'BBG004S681B4'},
+  {t:'RUAL',  cat:'stocks',  name:'РУСАЛ',          sector:'Металлы',       f:'BBG008F2T3T2'},
+  {t:'PLZL',  cat:'stocks',  name:'Полюс',          sector:'Металлы',       f:'BBG000R607Y3'},
+  {t:'ALRS',  cat:'stocks',  name:'АЛРОСА',         sector:'Металлы',       f:'BBG004S68473'},
+  {t:'YNDX',  cat:'stocks',  name:'Яндекс',         sector:'Технологии',    f:'BBG006L8G4H1'},
+  {t:'VKCO',  cat:'stocks',  name:'ВКонтакте',      sector:'Технологии',    f:'BBG00Y6XVMF5'},
+  {t:'POSI',  cat:'stocks',  name:'Позитив',        sector:'Технологии',    f:'BBG013LGHHZ5'},
+  {t:'OZON',  cat:'stocks',  name:'Ozon',           sector:'Технологии',    f:'BBG00JN4FXG8'},
+  {t:'TATN',  cat:'stocks',  name:'Татнефть',       sector:'Нефтегаз',      f:'BBG004RVFFC0'},
+  {t:'SNGS',  cat:'stocks',  name:'Сургутнефтегаз', sector:'Нефтегаз',      f:'BBG004S681M2'},
+  {t:'MGNT',  cat:'stocks',  name:'Магнит',         sector:'Ритейл',        f:'BBG004RVFCY3'},
+  {t:'FIVE',  cat:'stocks',  name:'X5 Retail',      sector:'Ритейл',        f:'BBG00JXPFBN0'},
+  {t:'MTSS',  cat:'stocks',  name:'МТС',            sector:'Телеком',       f:'BBG004S681W1'},
+  {t:'RTKM',  cat:'stocks',  name:'Ростелеком',     sector:'Телеком',       f:'BBG004S682Z6'},
+  {t:'AFLT',  cat:'stocks',  name:'Аэрофлот',       sector:'Транспорт',     f:'BBG004S683W7'},
+  {t:'FLOT',  cat:'stocks',  name:'Совкомфлот',     sector:'Транспорт',     f:'BBG000R70SP1'},
+  {t:'PIKK',  cat:'stocks',  name:'ПИК',            sector:'Строительство', f:'BBG002GHV6L9'},
+  {t:'SMLT',  cat:'stocks',  name:'Самолёт',        sector:'Строительство', f:'BBG001M2SC01'},
+  {t:'AFKS',  cat:'stocks',  name:'АФК Система',    sector:'Холдинги',      f:'BBG004S68758'},
+  {t:'IRAO',  cat:'stocks',  name:'Интер РАО',      sector:'Энергетика',    f:'BBG004S68829'},
+  {t:'FEES',  cat:'stocks',  name:'ФСК ЕЭС',        sector:'Энергетика',    f:'BBG004S686W0'},
+  {t:'HYDR',  cat:'stocks',  name:'РусГидро',       sector:'Энергетика',    f:'BBG004S68614'},
+  {t:'CBOM',  cat:'stocks',  name:'Совкомбанк',     sector:'Банки',         f:'BBG013HJD9B6'},
+  // Индексы (FIGI нет — только MOEX данные)
+  {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс',        f:''},
+  {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс',        f:''},
+  {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс',        f:''},
+  // Фьючерсы FORTS — актуальные контракты (U6=сент2026, Z6=дек2026)
+  {t:'SiU6',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:''},
+  {t:'SiZ6',  cat:'futures', name:'USD/RUB дек',     sector:'Валюта',        f:''},
+  {t:'EuU6',  cat:'futures', name:'EUR/RUB сент',    sector:'Валюта',        f:''},
+  {t:'RIU6',  cat:'futures', name:'RTS сент',        sector:'Индекс',        f:''},
+  {t:'MXU6',  cat:'futures', name:'МосБиржа сент',   sector:'Индекс',        f:''},
+  {t:'GDU6',  cat:'futures', name:'Золото сент',     sector:'Сырьё',         f:''},
+  {t:'BRU6',  cat:'futures', name:'Brent сент',      sector:'Сырьё',         f:''},
+  {t:'NGU6',  cat:'futures', name:'Газ сент',        sector:'Сырьё',         f:''},
+  {t:'GZU6',  cat:'futures', name:'Газпром сент',    sector:'Акции',         f:''},
+  {t:'SRU6',  cat:'futures', name:'Сбербанк сент',   sector:'Акции',         f:''},
+  // Валюта CETS
+  {t:'USD000UTSTOM', cat:'currency', name:'Доллар США',  sector:'Валюта'},
+  {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
+  {t:'CNY000000TOM', cat:'currency', name:'Юань',        sector:'Валюта'},
+];
+
+// STORAGE (localStorage — только UI-настройки и пины)
+// ============================================================
+function saveAll(){
+  const d = {
+    tickers, pinnedTickers, methodWeights, signalLog,
+    moexKey: document.getElementById('moexKeyInp').value,
+    tinvest: document.getElementById('tinvestInp').value,
+    proxy: document.getElementById('proxyInp').value,
+    curTicker, autoInterval, curWindow,
+    autoOn: document.getElementById('autoChk').checked,
+  };
+  localStorage.setItem(LS, JSON.stringify(d));
+  const el = document.getElementById('saveInd');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1500);
+}
+
+function loadAll(){
+  try{
+    const d = JSON.parse(localStorage.getItem(LS)||'{}');
+    if(d.tickers?.length) tickers = d.tickers;
+    if(d.pinnedTickers?.length) pinnedTickers = d.pinnedTickers;
+    // Миграция: заменить истёкшие фьючерсы 2025 на 2026
+    const FUT_MIGRATE = {SiH5:'SiU6',SiM5:'SiU6',SiU5:'SiU6',SiZ5:'SiZ6',EuH5:'EuU6',EuM5:'EuU6',EuU5:'EuU6',
+      RIH5:'RIU6',RIM5:'RIU6',RIU5:'RIU6',MXH5:'MXU6',MXM5:'MXU6',MXU5:'MXU6',
+      GDH5:'GDU6',GDM5:'GDU6',GDU5:'GDU6',BRH5:'BRU6',BRM5:'BRU6',BRU5:'BRU6',
+      NGH5:'NGU6',NGM5:'NGU6',NGU5:'NGU6',GZH5:'GZU6',GZM5:'GZU6',GZU5:'GZU6',
+      SRH5:'SRU6',SRM5:'SRU6',SRU5:'SRU6'};
+    pinnedTickers = [...new Set(pinnedTickers.map(t=>FUT_MIGRATE[t]||t))];
+    // Очистить фиктивные FUT* FIGIs из сохранённых tickers (не BBG-формат)
+    tickers.forEach(tk=>{ if(tk.f && tk.f.startsWith('FUT')) tk.f = ''; });
+    if(d.curTicker && FUT_MIGRATE[d.curTicker]) d.curTicker = FUT_MIGRATE[d.curTicker];
+    if(d.methodWeights) methodWeights = d.methodWeights;
+    if(d.signalLog) signalLog = d.signalLog;
+    if(d.moexKey) document.getElementById('moexKeyInp').value = d.moexKey;
+    if(d.tinvest) document.getElementById('tinvestInp').value = d.tinvest;
+    if(d.proxy) document.getElementById('proxyInp').value = d.proxy;
+    if(d.curTicker) curTicker = d.curTicker;
+    if(d.autoInterval) {
+      autoInterval = d.autoInterval;
+      document.getElementById('intervalSel').value = String(autoInterval);
+    }
+    if(d.autoOn) {
+      document.getElementById('autoChk').checked = true;
+      startAuto();
+    }
+    if(d.curWindow) {
+      curWindow = d.curWindow;
+      document.getElementById('windowSel').value = String(curWindow);
+    }
+  } catch(e){}
+}
+
+function onWindowChange(){
+  curWindow = parseInt(document.getElementById('windowSel').value);
+  saveAll();
+  // Пересчитываем перцентили с новым окном если история уже загружена
+  if(deepHistory[curTicker]) {
+    computeAndCachePercentiles(curTicker);
+    const mr = computeAllMethods();
+    renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
+    renderMethodsTable(mr);
+  }
+}
+
+function exportData(){
+  const d = {tickers, methodWeights, signalLog};
+  const a = document.createElement('a');
+  a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(d, null, 2));
+  a.download = 'oisignal_v10_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+function importData(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try{
+      const d = JSON.parse(e.target.result);
+      if(d.tickers) tickers = d.tickers;
+      if(d.methodWeights) methodWeights = d.methodWeights;
+      if(d.signalLog) signalLog = d.signalLog;
+      renderPinnedChips(); renderHistory(); saveAll();
+    } catch(ex){ alert('Ошибка импорта: ' + ex.message); }
+  };
+  r.readAsText(f);
+}
+function clearAll(){
+  if(!confirm('Очистить все данные?')) return;
+  localStorage.removeItem(LS);
+  methodWeights = {}; signalLog = []; tickers = [];
+  renderPinnedChips(); renderHistory(); renderMethodsTable([]);
+}
+function clearHistory(){
+  if(!confirm('Очистить историю сигналов?')) return;
+  signalLog = []; saveAll(); renderHistory();
+}
+
+// ============================================================
+// MOEX ALGOPACK FETCHER
+// ============================================================
+function getProxy(){ return (document.getElementById('proxyInp').value||'').trim().replace(/\/$/,''); }
+function getMoexKey(){ return (document.getElementById('moexKeyInp').value||'').trim(); }
+function getTinvestToken(){ return (document.getElementById('tinvestInp').value||'').trim(); }
+
+// Реальный путь MOEX AlgoPack DataShop: /iss/datashop/algopack/{segment}/{metric}.json?secid=...
+const MOEX_SEGMENTS = {stocks:'eq', futures:'fo', currency:'currency', index:'eq'};
+
+function moexUrl(secid, metric, type, params={}){
+  const seg = MOEX_SEGMENTS[type] || 'eq';
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const path = `/datashop/algopack/${seg}/${metric}.json`;
+  const q = new URLSearchParams({secid, ...params, 'iss.meta':'off'}).toString();
+  return prefix + path + '?' + q;
+}
+
+function issToObjects(json, blockName){
+  const block = json[blockName] || json[Object.keys(json)[0]];
+  if(!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c,i) => obj[c] = row[i]);
+    return obj;
+  });
+}
+
+async function fetchWithTimeout(url, opts={}, ms=15000){
+  const ctrl = new AbortController();
+  const tid = setTimeout(()=>ctrl.abort(), ms);
+  try{
+    const r = await fetch(url, {...opts, signal: ctrl.signal});
+    return r;
+  } catch(e){
+    if(e.name==='AbortError') throw new Error('Таймаут запроса (15с)');
+    throw e;
+  } finally{ clearTimeout(tid); }
+}
+
+async function fetchMoex(secid, metric, type, params={}){
+  const url = moexUrl(secid, metric, type, params);
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX ${metric} HTTP ${resp.status} (${url.slice(0,80)})`);
+  const json = await resp.json();
+  return issToObjects(json, metric);
+}
+
+// FUTOI использует отдельный endpoint: /iss/analyticalproducts/futoi/securities
+// Тикер — двухсимвольный код контракта: BR, Si, RI, GD, MX, GZ, SR, NG, EU
+function futoi2sym(ticker){
+  // Из кода контракта вида BRU6, SiU6, RIU6 и т.д. → двухсимвольный базовый тикер
+  const m = ticker.match(/^([A-Za-z]{2,3})/);
+  if(!m) return ticker;
+  const base = m[1].toUpperCase();
+  // Известные маппинги
+  const MAP = {BR:'BR',SI:'Si',RI:'RI',GD:'GD',MX:'MX',GZ:'GZ',SR:'SR',NG:'NG',EU:'ED',NG:'NG'};
+  return MAP[base] || base;
+}
+
+async function fetchFutoi(ticker){
+  const sym = futoi2sym(ticker);
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const url = prefix + `/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=20`;
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX futoi HTTP ${resp.status}`);
+  const json = await resp.json();
+  // Блок называется 'futoi' или первый ключ
+  const block = json['futoi'] || json[Object.keys(json).find(k=>k!=='metadata'&&k!=='history')];
+  if(!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c,i) => obj[c] = row[i]);
+    return obj;
+  });
+}
+
+async function fetchAllMoex(ticker, type){
+  const lim = {limit: 100};
+  const prom = {
+    ts:    fetchMoex(ticker, 'tradestats', type, lim).catch(()=>[]),
+    ob:    fetchMoex(ticker, 'obstats',    type, lim).catch(()=>[]),
+    os:    fetchMoex(ticker, 'orderstats', type, lim).catch(()=>[]),
+    futoi: type==='futures' ? fetchFutoi(ticker).catch(()=>[]) : Promise.resolve([]),
+  };
+  return {
+    ts:    await prom.ts,
+    ob:    await prom.ob,
+    os:    await prom.os,
+    futoi: await prom.futoi,
+  };
+}
+
+// ============================================================
+// ADAPTIVE CALIBRATION ENGINE
+// ============================================================
+
+// Считает перцентиль значения v в массиве arr
+function percentileRank(arr, v){
+  if(!arr.length) return 0.5;
+  const sorted = [...arr].sort((a,b)=>a-b);
+  let lo=0, hi=sorted.length-1;
+  while(lo < hi){ const mid=(lo+hi)>>1; if(sorted[mid]<v) lo=mid+1; else hi=mid; }
+  return lo / (sorted.length - 1 || 1);
+}
+
+// Вычисляет p10/p25/p50/p75/p90 из массива
+function calcPercentiles(arr){
+  if(!arr.length) return {p10:0,p25:0,p50:0,p75:0,p90:0,n:0};
+  const s = [...arr].sort((a,b)=>a-b);
+  const p = q => s[Math.min(s.length-1, Math.floor(q*(s.length-1)))];
+  return {p10:p(0.1), p25:p(0.25), p50:p(0.5), p75:p(0.75), p90:p(0.9), n:s.length};
+}
+
+// Нормализует значение относительно исторического распределения → [-1, +1]
+// Используем: score = tanh( (v - p50) / (p90 - p10 + ε) * scale )
+function normScore(v, pcts, scale=2.5){
+  if(!pcts || pcts.n < 5) return null; // недостаточно истории
+  const range = (pcts.p90 - pcts.p10) || (pcts.p90 * 0.1) || 0.001;
+  return Math.tanh((v - pcts.p50) / range * scale);
+}
+
+// Ключ для кэша перцентилей
+function pKey(ticker, type, field, window){ return `${ticker}__${type}__${field}__${window}`; }
+
+// Получить перцентили из кэша
+function getPct(ticker, type, field){ return pctCache[pKey(ticker, type, field, curWindow)] || null; }
+
+// Пересчитать перцентили для тикера из deepHistory и сохранить в кэш + D1
+function computeAndCachePercentiles(ticker){
+  const dh = deepHistory[ticker];
+  if(!dh) return;
+  const rows = [];
+  const now = Date.now();
+  const cutoff = now - curWindow * 86400000;
+
+  // Поля tradestats для нормализации
+  const tsFields = ['vol_b','vol_s','val_b','val_s','trades_b','trades_s','vol','disb','im'];
+  const tsData = (dh.tradestats||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  tsFields.forEach(field=>{
+    const vals = tsData.map(r=>toNum(r[field]||0)).filter(v=>v!==0);
+    const p = calcPercentiles(vals);
+    const k = pKey(ticker,'tradestats',field,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'tradestats', field, window_days:curWindow, ...p});
+  });
+
+  // obstats
+  const obFields = ['imbalance_vol_bbo','spread_bbo'];
+  const obData = (dh.obstats||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  obFields.forEach(field=>{
+    const vals = obData.map(r=>toNum(r[field]||0)).filter(v=>v!==0);
+    const p = calcPercentiles(vals);
+    const k = pKey(ticker,'obstats',field,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'obstats', field, window_days:curWindow, ...p});
+  });
+
+  // orderstats
+  const osFields = ['put_orders_b','put_orders_s','cancel_orders_b','cancel_orders_s'];
+  const osData = (dh.orderstats||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  osFields.forEach(field=>{
+    const vals = osData.map(r=>toNum(r[field]||0)).filter(v=>v!==0);
+    const p = calcPercentiles(vals);
+    const k = pKey(ticker,'orderstats',field,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'orderstats', field, window_days:curWindow, ...p});
+  });
+
+  // futoi — нормализуем по net-позиции
+  const foData = (dh.futoi||[]).filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  ['YUR','FIZ'].forEach(group=>{
+    const grpData = foData.filter(r=>(r.clgroup||'').toUpperCase()===group);
+    const netVals = grpData.map(r=>toNum(r.pos||0)).filter(v=>v!==0);
+    const p = calcPercentiles(netVals);
+    const k = pKey(ticker,'futoi','pos_'+group,curWindow);
+    pctCache[k] = p;
+    rows.push({ticker, type:'futoi', field:'pos_'+group, window_days:curWindow, ...p});
+  });
+
+  calibLastTicker = ticker;
+  updateCalibBadge(ticker);
+
+  // Сохраняем в D1 асинхронно (не блокируем)
+  if(rows.length) dbSavePercentiles(rows).catch(e=>console.warn('pct save:', e.message));
+}
+
+// ATR из свечей — адаптивный порог "значимого движения"
+function computeAtr(ticker, tf, candles){
+  if(!candles || candles.length < 5) return;
+  const slice = candles.slice(-Math.min(candles.length, curWindow * 7)); // ~неделя баров
+  const trs = slice.map((c,i)=>{
+    if(i===0) return toP(c.high) - toP(c.low);
+    const prevClose = toP(slice[i-1].close);
+    return Math.max(toP(c.high)-toP(c.low), Math.abs(toP(c.high)-prevClose), Math.abs(toP(c.low)-prevClose));
+  });
+  const atr = avg(trs);
+  const midPrice = avg(slice.map(c=>toP(c.close)).filter(Boolean)) || 1;
+  const atr_pct = atr / midPrice;
+  const key = `${ticker}__${tf}`;
+  atrCache[key] = {atr, atr_pct, n: trs.length};
+  dbSaveAtr(ticker, tf, atr, atr_pct, trs.length).catch(()=>{});
+}
+
+function getAtrPct(ticker, tf){
+  return atrCache[`${ticker}__${tf}`]?.atr_pct || 0.005; // дефолт 0.5%
+}
+
+// Загрузить глубокую историю из D1 для тикера
+async function loadDeepHistory(ticker){
+  if(!dbBase()) return;
+  setStatus('Загрузка истории AlgoPack...', true);
+  try{
+    const [ts, ob, os, fo] = await Promise.all([
+      dbLoadAlgopack(ticker, 'tradestats', curWindow).catch(()=>[]),
+      dbLoadAlgopack(ticker, 'obstats',    curWindow).catch(()=>[]),
+      dbLoadAlgopack(ticker, 'orderstats', curWindow).catch(()=>[]),
+      dbLoadAlgopack(ticker, 'futoi',      curWindow).catch(()=>[]),
+    ]);
+    deepHistory[ticker] = {tradestats: ts, obstats: ob, orderstats: os, futoi: fo};
+
+    // Загружаем кэш перцентилей из D1 (быстрый старт)
+    const savedPct = await dbLoadPercentiles(ticker, curWindow).catch(()=>[]);
+    savedPct.forEach(r=>{
+      pctCache[pKey(r.ticker, r.type, r.field, r.window_days)] = {
+        p10:r.p10, p25:r.p25, p50:r.p50, p75:r.p75, p90:r.p90, n:r.n
+      };
+    });
+
+    // Загружаем ATR из D1
+    const savedAtr = await dbLoadAtr(ticker).catch(()=>[]);
+    savedAtr.forEach(r=>{ atrCache[`${r.ticker}__${r.tf}`] = {atr:r.atr, atr_pct:r.atr_pct, n:r.n}; });
+
+    // Пересчитываем перцентили свежо из данных
+    computeAndCachePercentiles(ticker);
+    setStatus('История загружена');
+  } catch(e){
+    setStatus('История: ' + e.message);
+  }
+}
+
+// Сохранить текущие бары в D1 после каждого обновления
+async function persistAlgopackBars(ticker, data){
+  if(!dbBase()) return;
+  const saves = [];
+  if(data.ts?.length)    saves.push(dbSaveAlgopack(ticker, 'tradestats', data.ts));
+  if(data.ob?.length)    saves.push(dbSaveAlgopack(ticker, 'obstats',    data.ob));
+  if(data.os?.length)    saves.push(dbSaveAlgopack(ticker, 'orderstats', data.os));
+  if(data.futoi?.length) saves.push(dbSaveAlgopack(ticker, 'futoi',      data.futoi));
+  await Promise.allSettled(saves);
+
+  // Добавляем в deepHistory в памяти (чтобы не ждать следующую загрузку)
+  if(!deepHistory[ticker]) deepHistory[ticker] = {tradestats:[],obstats:[],orderstats:[],futoi:[]};
+  const dh = deepHistory[ticker];
+  const cutoff = Date.now() - curWindow * 86400000;
+  const merge = (arr, newRows) => {
+    const seen = new Set(arr.map(r=>r.tradedate+'_'+r.tradetime));
+    newRows.forEach(r=>{ if(!seen.has(r.tradedate+'_'+r.tradetime)) arr.push(r); });
+    return arr.filter(r=> new Date(r.tradedate+'T'+(r.tradetime||'00:00:00')+'Z').getTime() >= cutoff);
+  };
+  if(data.ts?.length)    dh.tradestats = merge(dh.tradestats, data.ts);
+  if(data.ob?.length)    dh.obstats    = merge(dh.obstats,    data.ob);
+  if(data.os?.length)    dh.orderstats = merge(dh.orderstats, data.os);
+  if(data.futoi?.length) dh.futoi      = merge(dh.futoi,      data.futoi);
+
+  // Пересчитываем перцентили с новыми данными
+  computeAndCachePercentiles(ticker);
+}
+
+function updateCalibBadge(ticker){
+  const el = document.getElementById('calibBadge');
+  if(!el) return;
+  const dh = deepHistory[ticker];
+  if(!dh){ el.textContent = 'калибровка —'; el.className = 'calib-stat'; return; }
+  const n = (dh.tradestats||[]).length;
+  if(n >= 50){ el.textContent = `✓ калибр. ${n} баров`; el.className = 'calib-stat ready'; }
+  else if(n > 0){ el.textContent = `⚠ калибр. ${n}/50`; el.className = 'calib-stat partial'; }
+  else { el.textContent = 'нет истории'; el.className = 'calib-stat'; }
+}
+
+// ============================================================
+// T-INVEST CANDLE FETCHER
+// ============================================================
+function tinvestUrl(path){
+  const proxy = getProxy();
+  // path = /tinkoff..., воркер prepend'ит https://invest-public-api.tinkoff.ru/rest
+  if(proxy) return proxy + path;
+  return 'https://invest-public-api.tinkoff.ru/rest' + path;
+}
+
+async function fetchCandles(ticker, tf){
+  const meta = tickers.find(x=>x.t===ticker) || CATALOG.find(x=>x.t===ticker);
+  const figi = meta?.f || CATALOG.find(x=>x.t===ticker)?.f;
+  if(!figi) throw new Error(`FIGI не задан для ${ticker}. Нажмите 🔍 рядом с тикером.`);
+  const token = getTinvestToken();
+  if(!token) throw new Error('Введите T-Invest токен (поле сверху)');
+
+  const now = new Date();
+  const dayMs = 86400000;
+  let fromDate;
+  if(tf==='1min') fromDate = new Date(now - dayMs);
+  else if(tf==='5min') fromDate = new Date(now - 3*dayMs);
+  else if(tf==='1h') fromDate = new Date(now - 14*dayMs);
+  else fromDate = new Date(now - 30*dayMs);
+
+  const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles');
+  // instrument_id принимает BBG FIGI, UID или ticker_CLASS — используем его
+  const body = {
+    instrument_id: figi,
+    from: fromDate.toISOString(),
+    to: now.toISOString(),
+    interval: TF_INTERVALS[tf],
+  };
+  const resp = await fetchWithTimeout(url, {
+    method:'POST',
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  });
+  if(!resp.ok){
+    const txt = await resp.text().catch(()=>'');
+    throw new Error(`T-Invest HTTP ${resp.status} → ${url.slice(0,80)}: ${txt.slice(0,100)}`);
+  }
+  const d = await resp.json();
+  return d.candles || [];
+}
+
+// ============================================================
+// SIGNAL ANALYSIS METHODS
+// ============================================================
+function tanh(x){ return Math.tanh(x); }
+function avg(arr){ return arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0; }
+function std(arr){
+  const m=avg(arr); const v=avg(arr.map(x=>(x-m)**2)); return Math.sqrt(v);
+}
+function last(arr, n=1){ return n===1 ? arr[arr.length-1] : arr.slice(-n); }
+function toNum(v){ return parseFloat(v)||0; }
+
+// Parse price from T-Invest format (units + nano)
+function toP(p){ if(!p) return 0; return (toNum(p.units)||0) + (toNum(p.nano)||0)/1e9; }
+
+// --- Method 1: Buy/Sell Pressure (адаптивный) ---
+function m_BS_PRESSURE(ts){
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ts.slice(-5);
+  const vb = avg(recent.map(r=>toNum(r.vol_b||0)));
+  const vs = avg(recent.map(r=>toNum(r.vol_s||0)));
+  const total = vb + vs || 1;
+  const ratio = (vb - vs) / total;
+  const pVb = getPct(curTicker,'tradestats','vol_b');
+  const pVs = getPct(curTicker,'tradestats','vol_s');
+  let score;
+  if(pVb?.n>=5 && pVs?.n>=5){
+    const zb = normScore(vb, pVb, 2.0)||0;
+    const zs = normScore(vs, pVs, 2.0)||0;
+    score = Math.tanh(zb - zs);
+  } else {
+    score = Math.tanh(ratio * 4);
+  }
+  const confidence = Math.min(0.9, total > 0 ? 0.7 : 0.1);
+  return {score, confidence, detail:`vB:${snum(vb)} vS:${snum(vs)} r:${ratio.toFixed(2)}`};
+}
+
+// --- Method 2: Aggressor Flow (адаптивный) ---
+function m_AGGRESSOR_FLOW(ts){
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ts.slice(-5);
+  const valB = avg(recent.map(r=>toNum(r.val_b||0)));
+  const valS = avg(recent.map(r=>toNum(r.val_s||0)));
+  const trdB = avg(recent.map(r=>toNum(r.trades_b||r.buy_trades||0)));
+  const trdS = avg(recent.map(r=>toNum(r.trades_s||r.sell_trades||0)));
+  const pValB = getPct(curTicker,'tradestats','val_b');
+  const pValS = getPct(curTicker,'tradestats','val_s');
+  const pTrdB = getPct(curTicker,'tradestats','trades_b');
+  const pTrdS = getPct(curTicker,'tradestats','trades_s');
+  let score;
+  if(pValB?.n>=5 && pValS?.n>=5){
+    const zVal = (normScore(valB,pValB,1.5)||0) - (normScore(valS,pValS,1.5)||0);
+    const zTrd = pTrdB?.n>=5 ? ((normScore(trdB,pTrdB,1.0)||0)-(normScore(trdS,pTrdS,1.0)||0)) : 0;
+    score = Math.tanh(zVal*0.7 + zTrd*0.3);
+  } else {
+    const vr = (valB-valS)/(valB+valS||1);
+    const tr = (trdB-trdS)/(trdB+trdS||1);
+    score = Math.tanh(vr*3 + tr*2);
+  }
+  const confidence = (valB+valS)>0 ? 0.7 : 0.1;
+  return {score, confidence, detail:`valB:${snum(valB)} valS:${snum(valS)}`};
+}
+
+// --- Method 3: Large Trade Impact (адаптивный) ---
+function m_LARGE_IMPACT(ts){
+  if(!ts.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ts.slice(-5);
+  const pVol = getPct(curTicker,'tradestats','vol');
+  const threshold = pVol?.p75 || 0;
+  const largeB = avg(recent.map(r=>{ const v=toNum(r.vol_b||0); return v>threshold?v:0; }));
+  const largeS = avg(recent.map(r=>{ const v=toNum(r.vol_s||0); return v>threshold?v:0; }));
+  const total = largeB+largeS||1;
+  if(total < 1) return {score:0, confidence:0.1, detail:'нет крупных сделок'};
+  const ratio = (largeB-largeS)/total;
+  const totalVol = avg(recent.map(r=>toNum(r.vol||0)))||1;
+  const largeFrac = (largeB+largeS)/(totalVol*2);
+  const score = Math.tanh(ratio*3.5);
+  const confidence = Math.min(0.8, largeFrac*2);
+  return {score, confidence, detail:`lgB:${snum(largeB)} lgS:${snum(largeS)} thr>${snum(threshold)}`};
+}
+
+// --- Method 4: VWAP Signal (адаптивный) ---
+function m_VWAP_SIGNAL(ts){
+  if(ts.length<3) return {score:0, confidence:0, detail:'мало данных'};
+  const prices = ts.map(r=>toNum(r.pr_close||r.pr_cl||0)).filter(Boolean);
+  const vols   = ts.map(r=>toNum(r.vol||0));
+  if(!prices.length) return {score:0, confidence:0.1, detail:'нет цены'};
+  const vwap = prices.reduce((s,p,i)=>s+p*(vols[i]||1),0)/prices.reduce((s,_,i)=>s+(vols[i]||1),0);
+  const curPrice = prices[prices.length-1];
+  const atrPct = getAtrPct(curTicker, curTF);
+  const scale  = vwap*atrPct||vwap*0.005;
+  const z = (curPrice-vwap)/(scale||1);
+  const score = Math.tanh(z*1.5);
+  const confidence = scale>0 ? 0.6 : 0.2;
+  return {score, confidence, detail:`price:${curPrice.toFixed(2)} vwap:${vwap.toFixed(2)} z:${z.toFixed(2)}`};
+}
+
+// --- Method 5: Volume Momentum (адаптивный) ---
+function m_VOL_MOMENTUM(ts){
+  if(ts.length<5) return {score:0, confidence:0, detail:'мало данных'};
+  const pVol = getPct(curTicker,'tradestats','vol');
+  const vols  = ts.map(r=>toNum(r.vol||0));
+  const curVol = avg(vols.slice(-3));
+  let zVol;
+  if(pVol?.n>=5){
+    zVol = normScore(curVol, pVol, 2.0)||0;
+  } else {
+    const mu=avg(vols); const sd=std(vols)||mu*0.1||1;
+    zVol=(curVol-mu)/sd;
+  }
+  const prices = ts.map(r=>toNum(r.pr_close||r.pr_cl||0)).filter(Boolean);
+  const dir = prices.length>=2 ? Math.sign(prices[prices.length-1]-prices[prices.length-2]) : 0;
+  const score = Math.tanh(zVol*dir*1.5);
+  const confidence = Math.abs(zVol)>0.3 ? 0.65 : 0.3;
+  return {score, confidence, detail:`vol:${snum(curVol)} z:${zVol.toFixed(2)} dir:${dir>0?'↑':dir<0?'↓':'→'}`};
+}
+
+// --- Method 6: Order Book Imbalance (адаптивный) ---
+function m_OB_IMBALANCE(ob){
+  if(!ob.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = ob.slice(-5);
+  const imb    = avg(recent.map(r=>toNum(r.imbalance_vol_bbo||r.imbalance_val_bbo||0)));
+  const spread = avg(recent.map(r=>toNum(r.spread_bbo||0)));
+  const pImb = getPct(curTicker,'obstats','imbalance_vol_bbo');
+  let score;
+  if(pImb?.n>=5){
+    score = normScore(imb, pImb, 2.5)||Math.tanh(imb*3);
+  } else {
+    score = Math.tanh(imb*3);
+  }
+  const pSpread = getPct(curTicker,'obstats','spread_bbo');
+  const spreadZ = pSpread?.n>=5 ? (normScore(spread,pSpread,1.0)||0) : 0;
+  const confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
+  return {score, confidence, detail:`imb:${imb.toFixed(3)} sprd:${spread.toFixed(4)}`};
+}
+
+// --- Method 7: Cancel Signal (адаптивный) ---
+function m_CANCEL_SIGNAL(os){
+  if(!os.length) return {score:0, confidence:0, detail:'нет данных'};
+  const recent = os.slice(-5);
+  const canB = avg(recent.map(r=>toNum(r.cancel_orders_b||0)));
+  const canS = avg(recent.map(r=>toNum(r.cancel_orders_s||0)));
+  const total = canB+canS||1;
+  const pCB = getPct(curTicker,'orderstats','cancel_orders_b');
+  const pCS = getPct(curTicker,'orderstats','cancel_orders_s');
+  let score;
+  if(pCB?.n>=5 && pCS?.n>=5){
+    const zB = normScore(canB,pCB,1.5)||0;
+    const zS = normScore(canS,pCS,1.5)||0;
+    score = Math.tanh(zS-zB);
+  } else {
+    score = Math.tanh(((canS-canB)/total)*3);
+  }
+  const confidence = total>10 ? 0.6 : 0.25;
+  return {score, confidence, detail:`canB:${snum(canB)} canS:${snum(canS)}`};
+}
+
+// --- Method 8: Institutional OI (адаптивный) ---
+function m_INST_OI(futoi){
+  if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  const jur = futoi.filter(r=>(r.clgroup||'').toUpperCase()==='YUR');
+  if(!jur.length) return {score:0, confidence:0.1, detail:'нет данных YUR'};
+  let longNet=0, shortNet=0;
+  jur.forEach(r=>{ longNet+=toNum(r.pos_long||0); shortNet+=Math.abs(toNum(r.pos_short||0)); });
+  const netPos = jur.reduce((s,r)=>s+toNum(r.pos||0),0);
+  const pNet = getPct(curTicker,'futoi','pos_YUR');
+  let score;
+  if(pNet?.n>=5){
+    score = normScore(netPos,pNet,2.5)||Math.tanh(netPos/(longNet+shortNet||1)*3);
+  } else {
+    score = Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*3);
+  }
+  const confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
+  return {score, confidence, detail:`YUR L:${snum(longNet)} S:${snum(shortNet)} net:${snum(netPos)}`};
+}
+
+// --- Method 9: Retail Contrarian (адаптивный) ---
+function m_RETAIL_CONTRA(futoi){
+  if(!futoi.length) return {score:0, confidence:0, detail:'только для фьючерсов'};
+  const phiz = futoi.filter(r=>(r.clgroup||'').toUpperCase()==='FIZ');
+  if(!phiz.length) return {score:0, confidence:0.1, detail:'нет данных FIZ'};
+  let longNet=0, shortNet=0;
+  phiz.forEach(r=>{ longNet+=toNum(r.pos_long||0); shortNet+=Math.abs(toNum(r.pos_short||0)); });
+  const netPos = phiz.reduce((s,r)=>s+toNum(r.pos||0),0);
+  const pNet = getPct(curTicker,'futoi','pos_FIZ');
+  let score;
+  if(pNet?.n>=5){
+    score = -(normScore(netPos,pNet,2.0)||Math.tanh(netPos/(longNet+shortNet||1)*2));
+  } else {
+    score = -Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*2.5);
+  }
+  const confidence = (longNet+shortNet)>0 ? 0.55 : 0.1;
+  return {score, confidence, detail:`FIZ L:${snum(longNet)} S:${snum(shortNet)}`};
+}
+
+// --- Method 10: Price Trend (адаптивный через ATR) ---
+function m_PRICE_TREND(candles){
+  const arr = candles[curTF]||candles['1min']||[];
+  if(arr.length<10) return {score:0, confidence:0, detail:'мало свечей'};
+  const closes = arr.map(c=>toP(c.close)).filter(Boolean);
+  if(closes.length<10) return {score:0, confidence:0, detail:'нет цены'};
+  const cur  = closes[closes.length-1];
+  const p3   = closes[closes.length-4];
+  const p10c = closes[closes.length-11]||closes[0];
+  const atrPct = getAtrPct(curTicker, curTF);
+  const roc3  = (cur-p3) /(p3 ||1)/(atrPct*3 ||0.015);
+  const roc10 = (cur-p10c)/(p10c||1)/(atrPct*10||0.05);
+  const score = Math.tanh(roc3*0.6+roc10*0.4);
+  const confidence = atrPct>0 ? 0.55 : 0.2;
+  return {score, confidence, detail:`roc3:${(roc3*100).toFixed(1)}% roc10:${(roc10*100).toFixed(1)}% atr%:${(atrPct*100).toFixed(2)}`};
+}
+
+// ============================================================
+// REGIME CLASSIFIER MODULE v1.0
+// ============================================================
+const REGIME_LS_KEY = 'oi_regime_cache_v1';
+
+function regimeSave(ticker, state) {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGIME_LS_KEY) || '{}');
+    all[ticker] = { ...state, savedAt: Date.now() };
+    localStorage.setItem(REGIME_LS_KEY, JSON.stringify(all));
+  } catch(e) {}
+}
+
+function regimeLoad(ticker) {
+  try {
+    const all = JSON.parse(localStorage.getItem(REGIME_LS_KEY) || '{}');
+    return all[ticker] || null;
+  } catch(e) { return null; }
+}
+
+function rc_avg(arr) { return arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0; }
+function rc_toNum(v) { return parseFloat(v)||0; }
+function rc_toPrice(p) { if(!p) return 0; return (rc_toNum(p.units)||0)+(rc_toNum(p.nano)||0)/1e9; }
+function rc_trueRange(candle, prevClose) {
+  const h=rc_toPrice(candle.high), l=rc_toPrice(candle.low), c=prevClose||rc_toPrice(candle.open);
+  return Math.max(h-l, Math.abs(h-c), Math.abs(l-c));
+}
+function rc_atr(candles, period=14) {
+  if(candles.length<2) return 0;
+  const trs=[];
+  for(let i=1;i<candles.length;i++) trs.push(rc_trueRange(candles[i], rc_toPrice(candles[i-1].close)));
+  return rc_avg(trs.slice(-period));
+}
+function rc_percentileRank(x, history) {
+  if(!history.length) return 0.5;
+  return history.filter(v=>v<x).length/history.length;
+}
+function rc_slope(arr) {
+  const n=arr.length; if(n<2) return 0;
+  const xs=arr.map((_,i)=>i), mx=rc_avg(xs), my=rc_avg(arr);
+  const num=xs.reduce((s,x,i)=>s+(x-mx)*(arr[i]-my),0);
+  const den=xs.reduce((s,x)=>s+(x-mx)**2,0);
+  return den?num/den:0;
+}
+
+function rc_trendStrength(candles) {
+  if(candles.length<10) return {trend:0,dir:0};
+  const closes=candles.slice(-20).map(c=>rc_toPrice(c.close)).filter(Boolean);
+  if(closes.length<5) return {trend:0,dir:0};
+  const xs=closes.map((_,i)=>i), mx=rc_avg(xs), my=rc_avg(closes);
+  const sl=rc_slope(closes);
+  const ssRes=closes.reduce((s,y,i)=>s+(y-(my+sl*(i-mx)))**2,0);
+  const ssTot=closes.reduce((s,y)=>s+(y-my)**2,0);
+  const r2=ssTot>0?1-ssRes/ssTot:0;
+  return {trend:Math.max(0,r2), dir:Math.sign(sl)};
+}
+
+function rc_volRegime(candles, atrHistory=[]) {
+  if(candles.length<5) return {raw:0,pct:0.5,level:'normal'};
+  const atr=rc_atr(candles,14);
+  const lastClose=rc_toPrice(candles[candles.length-1].close);
+  const atrPct=lastClose>0?atr/lastClose:0;
+  const pct=rc_percentileRank(atrPct, atrHistory.length>10?atrHistory:[atrPct]);
+  let level='normal';
+  if(pct>=0.80) level='high_vol';
+  else if(pct>=0.60) level='elevated';
+  else if(pct<=0.20) level='low_vol';
+  return {raw:atrPct, pct, level};
+}
+
+function rc_microStress(obHistory, osHistory) {
+  if(!obHistory.length&&!osHistory.length) return 0;
+  let spreadScore=0;
+  if(obHistory.length>=3){
+    const spreads=obHistory.slice(-10).map(r=>rc_toNum(r.spread_bbo||r.spreadBbo||0)).filter(Boolean);
+    if(spreads.length>=3){
+      spreadScore=rc_percentileRank(spreads[spreads.length-1], spreads.slice(0,-1));
+    }
+  }
+  let cancelScore=0;
+  if(osHistory.length>=3){
+    const recent=osHistory.slice(-5);
+    let totalCancel=0, totalPut=0;
+    recent.forEach(r=>{
+      totalCancel+=rc_toNum(r.cancel_orders_b||0)+rc_toNum(r.cancel_orders_s||0);
+      totalPut   +=rc_toNum(r.put_orders_b   ||0)+rc_toNum(r.put_orders_s   ||0);
+    });
+    cancelScore=totalPut>0?Math.min(1,totalCancel/totalPut):0;
+  }
+  return Math.min(1,(spreadScore*0.5+cancelScore*0.5));
+}
+
+function rc_oiPressure(tsHistory) {
+  if(tsHistory.length<5) return 0;
+  const oi=tsHistory.map(r=>rc_toNum(r.oi||r.open_interest||0)).filter(Boolean);
+  if(oi.length<5) return 0;
+  const diffs=oi.slice(1).map((v,i)=>Math.abs(v-oi[i])/(oi[i]||1));
+  const curDiff=diffs[diffs.length-1]||0;
+  return rc_percentileRank(curDiff, diffs.slice(0,-1).length>3?diffs.slice(0,-1):diffs);
+}
+
+function rc_volumeSpike(tsHistory) {
+  if(tsHistory.length<5) return 0;
+  const vols=tsHistory.map(r=>rc_toNum(r.vol||r.volume||0));
+  return rc_percentileRank(vols[vols.length-1], vols.slice(0,-1));
+}
+
+const REGIME_WEIGHT_MODS = {
+  trending_up:   {BS_PRESSURE:1.3,AGGRESSOR_FLOW:1.3,LARGE_IMPACT:1.2,VWAP_SIGNAL:1.1,VOL_MOMENTUM:1.4,OB_IMBALANCE:1.0,CANCEL_SIGNAL:0.8,INST_OI:1.2,RETAIL_CONTRA:1.1,PRICE_TREND:1.4},
+  trending_down: {BS_PRESSURE:1.3,AGGRESSOR_FLOW:1.3,LARGE_IMPACT:1.2,VWAP_SIGNAL:1.1,VOL_MOMENTUM:1.4,OB_IMBALANCE:1.0,CANCEL_SIGNAL:0.8,INST_OI:1.2,RETAIL_CONTRA:1.1,PRICE_TREND:1.4},
+  ranging:       {BS_PRESSURE:0.9,AGGRESSOR_FLOW:0.9,LARGE_IMPACT:0.8,VWAP_SIGNAL:1.4,VOL_MOMENTUM:0.7,OB_IMBALANCE:1.3,CANCEL_SIGNAL:1.2,INST_OI:1.0,RETAIL_CONTRA:0.9,PRICE_TREND:0.5},
+  high_vol:      {BS_PRESSURE:0.8,AGGRESSOR_FLOW:0.8,LARGE_IMPACT:1.2,VWAP_SIGNAL:0.6,VOL_MOMENTUM:0.7,OB_IMBALANCE:0.7,CANCEL_SIGNAL:1.3,INST_OI:1.1,RETAIL_CONTRA:1.4,PRICE_TREND:0.5},
+  low_vol:       {BS_PRESSURE:0.7,AGGRESSOR_FLOW:0.7,LARGE_IMPACT:1.3,VWAP_SIGNAL:1.2,VOL_MOMENTUM:0.6,OB_IMBALANCE:1.4,CANCEL_SIGNAL:1.1,INST_OI:1.0,RETAIL_CONTRA:0.8,PRICE_TREND:0.7},
+  stress:        {BS_PRESSURE:0.5,AGGRESSOR_FLOW:0.5,LARGE_IMPACT:0.9,VWAP_SIGNAL:0.4,VOL_MOMENTUM:0.5,OB_IMBALANCE:0.5,CANCEL_SIGNAL:0.9,INST_OI:1.5,RETAIL_CONTRA:1.5,PRICE_TREND:0.3},
+};
+
+let currentRegimeState = null;
+
+function classifyRegime(tsHistory, candleData, obHistory, osHistory, ticker, options={}) {
+  const {atrWindow=14, minCandles=10} = options;
+  const dailyCandles=(candleData['1d']||[]).slice(-60);
+  const curCandles=(candleData['1h']||candleData['5min']||candleData['1d']||[]).slice(-30);
+  const cached=regimeLoad(ticker)||{};
+  const atrHistory=cached.atrHistory||[];
+
+  const {trend, dir:trendDir}=rc_trendStrength(dailyCandles.length>=minCandles?dailyCandles:curCandles);
+  const volInfo=rc_volRegime(curCandles, atrHistory);
+  const microSt=rc_microStress(obHistory, osHistory);
+  const oiPress=rc_oiPressure(tsHistory);
+  const volSpike=rc_volumeSpike(tsHistory);
+  const newAtrHistory=[...atrHistory, volInfo.raw].slice(-90);
+
+  const p_stress=Math.min(1, volInfo.pct*0.35 + microSt*0.30 + oiPress*0.20 + volSpike*0.15);
+
+  let regime, confidence, label, color;
+  if(p_stress>=0.75){
+    regime='stress'; confidence=Math.min(1,(p_stress-0.75)/0.25+0.6); label='⚡ Стресс'; color='#FF4D7A';
+  } else if(volInfo.level==='high_vol'&&trend<0.3){
+    regime='high_vol'; confidence=volInfo.pct; label='🌪 Высокая волат.'; color='#FF9F40';
+  } else if(volInfo.level==='low_vol'&&trend<0.3){
+    regime='low_vol'; confidence=1-volInfo.pct; label='😴 Низкая волат.'; color='#A78BFA';
+  } else if(trend>=0.45&&trendDir>0){
+    regime='trending_up'; confidence=trend; label='📈 Тренд вверх'; color='#52F2C9';
+  } else if(trend>=0.45&&trendDir<0){
+    regime='trending_down'; confidence=trend; label='📉 Тренд вниз'; color='#FF4D7A';
+  } else {
+    regime='ranging'; confidence=Math.max(0.3,1-trend-volInfo.pct*0.5); label='↔ Боковик'; color='#A79BC9';
+  }
+
+  const weightMod=REGIME_WEIGHT_MODS[regime]||REGIME_WEIGHT_MODS['ranging'];
+  const state={
+    regime, confidence, label, color, p_stress,
+    scores:{trend, trendDir, vol:volInfo.pct, microStress:microSt, oiPressure:oiPress, volumeSpike:volSpike},
+    atr:rc_atr(curCandles,atrWindow), atrPct:volInfo.raw, weightMod,
+    updatedAt:Date.now(), atrHistory:newAtrHistory,
+  };
+  regimeSave(ticker, state);
+  return state;
+}
+
+function adaptiveThresholds(regimeState, baseThresh=0.25) {
+  if(!regimeState) return {longThresh:baseThresh, shortThresh:-baseThresh};
+  const mods={trending_up:0.85, trending_down:0.85, ranging:1.00, high_vol:1.25, low_vol:0.90, stress:1.40};
+  const t=baseThresh*(mods[regimeState.regime]||1.0);
+  return {longThresh:t, shortThresh:-t};
+}
+
+function renderRegimeBadge(regimeState) {
+  if(!regimeState) return '<span style="color:#6F648F;font-size:10px;">Режим: —</span>';
+  const {label, color, confidence, p_stress, scores, atrPct}=regimeState;
+  const confPct=Math.round(confidence*100);
+  const stressPct=Math.round(p_stress*100);
+  const atrStr=atrPct>0?(atrPct*100).toFixed(2)+'%':'—';
+  return `<div style="display:inline-flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.03);border:1px solid ${color}44;border-radius:10px;padding:8px 12px;min-width:160px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:11px;font-weight:600;color:${color};letter-spacing:.05em;">${label}</span>
+      <span style="font-size:9px;color:#6F648F;margin-left:auto;">уверен. ${confPct}%</span>
+    </div>
+    <div style="display:flex;gap:8px;font-size:9px;color:#A79BC9;flex-wrap:wrap;">
+      <span>стресс ${stressPct}%</span><span>ATR ${atrStr}</span><span>тренд ${Math.round(scores.trend*100)}%</span>
+    </div>
+    <div style="height:2px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;">
+      <div style="height:100%;width:${stressPct}%;background:${color};border-radius:999px;transition:width .4s;"></div>
+    </div>
+  </div>`;
+}
+
+
+
+// ============================================================
+// COMPOSITE SIGNAL ENGINE
+// ============================================================
+function computeAllMethods(){
+  const results = {};
+  results.BS_PRESSURE    = m_BS_PRESSURE(tsHistory);
+  results.AGGRESSOR_FLOW = m_AGGRESSOR_FLOW(tsHistory);
+  results.LARGE_IMPACT   = m_LARGE_IMPACT(tsHistory);
+  results.VWAP_SIGNAL    = m_VWAP_SIGNAL(tsHistory);
+  results.VOL_MOMENTUM   = m_VOL_MOMENTUM(tsHistory);
+  results.OB_IMBALANCE   = m_OB_IMBALANCE(obHistory);
+  results.CANCEL_SIGNAL  = m_CANCEL_SIGNAL(osHistory);
+  results.INST_OI        = m_INST_OI(futoiData);
+  results.RETAIL_CONTRA  = m_RETAIL_CONTRA(futoiData);
+  results.PRICE_TREND    = m_PRICE_TREND(candleData);
+  return results;
+}
+
+function getWeights(ticker){
+  return methodWeights[ticker] || {};
+}
+
+function computeComposite(methodResults, ticker){
+  const weights = getWeights(ticker);
+  // Берём режимные модификаторы весов если классификатор уже отработал
+  const regimeMod = (currentRegimeState && currentRegimeState.weightMod) || {};
+  let wSum = 0, wTotal = 0;
+  METHODS.forEach(m=>{
+    const r = methodResults[m.id];
+    if(!r || r.confidence < 0.05) return;
+    const mw = weights[m.id];
+    // Базовый обученный вес (или 0.5 если данных мало)
+    const baseW = (mw && mw.total >= 30) ? mw.weight : 0.5;
+    // Умножаем на режимный коэффициент (по умолчанию 1.0)
+    const regW = regimeMod[m.id] != null ? regimeMod[m.id] : 1.0;
+    const w = baseW * regW;
+    wSum   += r.score * w * r.confidence;
+    wTotal += w * r.confidence;
+  });
+  return wTotal > 0 ? wSum / wTotal : 0;
+}
+
+// LEARNING ENGINE — MFE/MAE через IndexedDB
+// ============================================================
+// Сигнал закрывается когда:
+//   - MAE > STOP_PCT (стоп выбит) — outcome = противоположный направлению
+//   - Прошло MAX_BARS баров — outcome по соотношению MFE/MAE
+// quality = MFE / (MFE + MAE + ε) ∈ [0,1] — непрерывная метрика точности
+const STOP_PCT  = 0.005;  // 0.5% — стоп-лосс для закрытия сигнала
+const MAX_BARS  = 20;     // максимум баров до принудительного закрытия
+
+async function autoRecordOutcomes(){
+  if(!db) return;
+  const openSigs = await dbGetOpenSignals(curTicker).catch(()=>[]);
+  if(!openSigs.length) return;
+
+  const now = Date.now();
+  let weightsUpdated = false;
+
+  for(const sig of openSigs){
+    const afterCandles = await dbGetCandlesAfter(sig.ticker, sig.tf, sig.entryTs).catch(()=>[]);
+    if(afterCandles.length < 2) continue; // ждём больше данных
+
+    const ep = sig.entryPrice;
+    if(!ep) continue;
+
+    // Считаем MFE и MAE по всей траектории после сигнала
+    let mfe = 0, mae = 0;
+    for(const c of afterCandles){
+      // Для long-сигнала: MFE = max upside, MAE = max downside
+      const upside   = (c.h - ep) / ep;
+      const downside = (ep - c.l) / ep;
+      if(sig.dir === 'short'){
+        // Для short: инвертируем
+        mfe = Math.max(mfe, downside);
+        mae = Math.max(mae, upside);
+      } else {
+        mfe = Math.max(mfe, upside);
+        mae = Math.max(mae, downside);
+      }
+    }
+
+    const barsElapsed = afterCandles.length;
+    const stopped = mae >= STOP_PCT;
+    const expired = barsElapsed >= MAX_BARS;
+    if(!stopped && !expired) continue; // ещё не закрыт
+
+    // Непрерывная метрика качества [0..1]
+    const quality = mfe / (mfe + mae + 1e-8);
+
+    // Обновляем веса методов в IndexedDB
+    const weights = await dbLoadWeights(sig.ticker).catch(()=>({}));
+    for(const m of METHODS){
+      const score = sig.methods?.[m.id] ?? 0;
+      if(Math.abs(score) < 0.05) continue;
+      // Ожидаемая точность метода: 1 если score совпадает с исходом, иначе 0
+      // quality > 0.5 → сигнал сработал, quality < 0.5 → не сработал
+      const methodAligned = (score > 0.1 && sig.dir !== 'short') ||
+                            (score < -0.1 && sig.dir === 'short');
+      // target_accuracy = quality если aligned, (1-quality) если против
+      const targetAcc = methodAligned ? quality : (1 - quality);
+
+      const prev = weights[m.id] || {weight:0.5, correct:0, total:0, sumQ:0};
+      prev.total++;
+      prev.sumQ = (prev.sumQ||0) + targetAcc;
+      const rollingAcc = prev.sumQ / prev.total;
+      // EWA update: медленный α=0.1 чтобы не болтало
+      prev.weight = 0.9 * prev.weight + 0.1 * rollingAcc;
+      prev.weight = Math.max(0.05, Math.min(1, prev.weight));
+      await dbSaveWeight(sig.ticker, m.id, prev);
+      // Синхронизируем в памяти тоже
+      if(!methodWeights[sig.ticker]) methodWeights[sig.ticker] = {};
+      methodWeights[sig.ticker][m.id] = prev;
+    }
+
+    // Закрываем сигнал
+    await dbUpdateSignal(sig.id, {
+      resolved: 1, mfe, mae, quality,
+      barsElapsed, stoppedOut: stopped,
+      resolvedAt: now,
+    });
+    // Обновляем в signalLog для отображения
+    const li = signalLog.findIndex(x=>x.dbId === sig.id);
+    if(li>=0){ signalLog[li].outcome = quality > 0.55 ? sig.dir : (sig.dir==='long'?'short':'long');
+               signalLog[li].quality = quality; }
+    weightsUpdated = true;
+  }
+  if(weightsUpdated){ saveAll(); renderHistory(); renderMethodsTable(computeAllMethods()); }
+}
+
+function recordOutcome(){
+  const sel = document.getElementById('outcomeSel');
+  const outcome = sel.value;
+  if(!outcome || !lastSnapshot) { alert('Нет сигнала для записи исхода'); return; }
+  const ticker = lastSnapshot.ticker;
+  if(!methodWeights[ticker]) methodWeights[ticker] = {};
+
+  METHODS.forEach(m=>{
+    const r = lastSnapshot.methodResults[m.id];
+    if(!r || r.confidence < 0.05) return;
+    const correct =
+      (r.score >  0.1 && outcome === 'long')  ||
+      (r.score < -0.1 && outcome === 'short') ||
+      (Math.abs(r.score) <= 0.1 && outcome === 'neutral');
+    if(!methodWeights[ticker][m.id])
+      methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0};
+    const mw = methodWeights[ticker][m.id];
+    mw.total++;
+    if(correct) mw.correct++;
+    const accuracy = mw.correct / mw.total;
+    mw.weight = 0.85 * mw.weight + 0.15 * accuracy;
+  });
+
+  // Update log entry
+  const logIdx = signalLog.findIndex(x=>x.snapshotTs === lastSnapshot.ts);
+  if(logIdx >= 0) signalLog[logIdx].outcome = outcome;
+  else signalLog.unshift({
+    snapshotTs: lastSnapshot.ts,
+    ts: new Date().toISOString(),
+    ticker,
+    composite: lastSnapshot.composite,
+    dir: scoreToDir(lastSnapshot.composite).dir,
+    outcome,
+    methods: Object.fromEntries(METHODS.map(m=>[m.id, lastSnapshot.methodResults[m.id]?.score??0])),
+  });
+
+  sel.value = '';
+  document.getElementById('outcomeRow').style.display = 'none';
+  saveAll(); renderHistory(); renderMethodsTable(computeAllMethods());
+  setStatus('✓ Исход записан, веса обновлены');
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function pct(v){ return (v*100).toFixed(0)+'%'; }
+function snum(v){
+  v = parseFloat(v)||0;
+  if(Math.abs(v)>=1e6) return (v/1e6).toFixed(1)+'M';
+  if(Math.abs(v)>=1e3) return (v/1e3).toFixed(1)+'K';
+  return v.toFixed(0);
+}
+
+function scoreToDir(score){
+  if(score > 0.25) return {dir:'LONG ↑', cls:'dp', arrow:'↑'};
+  if(score < -0.25) return {dir:'SHORT ↓', cls:'dn', arrow:'↓'};
+  return {dir:'НЕЙТРАЛЬНО →', cls:'dm', arrow:'→'};
+}
+
+function scoreColor(score){
+  if(score > 0.1) return '#52F2C9';
+  if(score < -0.1) return '#FF4D7A';
+  return '#A79BC9';
+}
+
+function setStatus(msg, loading=false){
+  document.getElementById('statusTxt').textContent = msg;
+  document.getElementById('spinnerEl').style.display = loading ? '' : 'none';
+}
+
+function setAgeBadge(id, lastUpdate){
+  const el = document.getElementById(id);
+  if(!lastUpdate){ el.textContent = id==='moexAge'?'MOEX —':'Свечи —'; el.className='age-badge'; return; }
+  const secs = (Date.now() - lastUpdate) / 1000;
+  const txt = secs < 90 ? Math.round(secs)+'с' : Math.round(secs/60)+'мин';
+  el.textContent = (id==='moexAge'?'MOEX ':'Свечи ') + txt + ' назад';
+  el.className = 'age-badge ' + (secs<120?'fresh':secs<300?'stale':'old');
+}
+
+function updateAges(){
+  setAgeBadge('moexAge', moexLastUpdate);
+  setAgeBadge('candleAge', candleLastUpdate);
+}
+
+// ============================================================
+// RENDER: GAUGE
+// ============================================================
+function renderGauge(score, confidence){
+  const needle = document.getElementById('gaugeNeedle');
+  const gaugeVal = document.getElementById('gaugeVal');
+  const gaugeDir = document.getElementById('gaugeDir');
+  const gaugeConf = document.getElementById('gaugeConf');
+  const gaugePos = document.getElementById('gaugePos');
+  const gaugeNeg = document.getElementById('gaugeNeg');
+  // Rotate needle: -90° = full neg, 0° = neutral, +90° = full pos
+  const angle = score * 90;
+  needle.setAttribute('transform', `rotate(${angle},70,70)`);
+  const d = scoreToDir(score);
+  gaugeVal.textContent = (score >= 0 ? '+' : '') + (score*100).toFixed(0);
+  gaugeVal.style.color = scoreColor(score);
+  gaugeDir.textContent = d.dir;
+  gaugeDir.className = 'gauge-dir ' + d.cls;
+  gaugeConf.textContent = `уверенность: ${(confidence*100).toFixed(0)}%`;
+  // Fill arcs
+  if(score > 0){
+    gaugePos.setAttribute('opacity', Math.min(1, score * 1.5));
+    gaugeNeg.setAttribute('opacity', '0');
+  } else {
+    gaugeNeg.setAttribute('opacity', Math.min(1, -score * 1.5));
+    gaugePos.setAttribute('opacity', '0');
+  }
+}
+
+// ============================================================
+// RENDER: METHODS TABLE
+// ============================================================
+function renderMethodsTable(methodResults){
+  const weights = getWeights(curTicker);
+  const html = METHODS.map(m=>{
+    const r = methodResults[m.id] || {score:0, confidence:0, detail:''};
+    const w = weights[m.id];
+    const wVal = (w?.weight ?? 0.5);
+    const acc = w && w.total > 0 ? (w.correct/w.total*100).toFixed(0)+'%' : '—';
+    const sc = r.score;
+    const barPct = Math.abs(sc) * 100;
+    const barColor = sc > 0 ? '#52F2C9' : sc < 0 ? '#FF4D7A' : '#6F648F';
+    const confDot = r.confidence < 0.2 ? '○' : r.confidence < 0.5 ? '◑' : '●';
+    return `<div class="meth-row" title="${r.detail||''}">
+      <span style="font-size:9px;color:var(--txt3);width:12px;">${confDot}</span>
+      <span class="meth-name" title="${r.detail||''}">${m.label}</span>
+      <div class="meth-bar-wrap"><div class="meth-bar" style="width:${barPct}%;background:${barColor};margin-left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
+      <span class="meth-score" style="color:${barColor}">${sc>=0?'+':''}${(sc).toFixed(2)}</span>
+      <span class="meth-w" title="вес метода">${(wVal).toFixed(2)}</span>
+      <span class="meth-acc" style="color:${acc==='—'?'var(--txt3)':parseInt(acc)>=60?'var(--pos)':'var(--neg)'}">${acc}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('methodsTable').innerHTML = html;
+  // Show outcome recording if we have a snapshot
+  document.getElementById('outcomeRow').style.display = lastSnapshot ? '' : 'none';
+}
+
+// ============================================================
+// RENDER: CANDLE CHART
+// ============================================================
+function renderCandleChart(candles){
+  const area = document.getElementById('candleArea');
+  if(candleChart){ candleChart.destroy(); candleChart=null; }
+  if(!candles || !candles.length){
+    area.style.height='220px'; area.innerHTML='<span style="color:var(--txt3);font-size:11px;">Нет свечей</span>'; return;
+  }
+  area.innerHTML=''; area.style.height='220px';
+  const dpr = window.devicePixelRatio||1;
+  const W = area.clientWidth||600, H2 = 220;
+  const canvas = document.createElement('canvas');
+  canvas.width = W*dpr; canvas.height = H2*dpr;
+  canvas.style.cssText=`width:${W}px;height:${H2}px;`;
+  area.appendChild(canvas);
+  const ctx2 = canvas.getContext('2d');
+  ctx2.scale(dpr,dpr);
+
+  const slice = candles.slice(-80);
+  const O=slice.map(c=>toP(c.open)), H=slice.map(c=>toP(c.high)),
+        L=slice.map(c=>toP(c.low)),  C=slice.map(c=>toP(c.close));
+
+  const pad={l:44,r:8,t:8,b:28};
+  const chartW=W-pad.l-pad.r, chartH=H2-pad.t-pad.b;
+  const allH2=H.filter(v=>v>0), allL2=L.filter(v=>v>0);
+  const yMax=allH2.length?Math.max(...allH2):1, yMin2=allL2.length?Math.min(...allL2):0;
+  const yRange=yMax-yMin2||1;
+  const toY=v=>pad.t+chartH*(1-(v-yMin2)/yRange);
+  const n=slice.length;
+  const slotW=chartW/n;
+  const bodyW=Math.max(1,slotW*0.6);
+
+  // Grid lines
+  ctx2.strokeStyle='rgba(255,255,255,0.04)'; ctx2.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+chartH*i/4;
+    ctx2.beginPath(); ctx2.moveTo(pad.l,y); ctx2.lineTo(pad.l+chartW,y); ctx2.stroke();
+  }
+  // Y labels
+  ctx2.fillStyle='#6F648F'; ctx2.font='9px sans-serif'; ctx2.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const v=yMin2+yRange*(1-i/4);
+    ctx2.fillText(v.toFixed(2),pad.l-3,pad.t+chartH*i/4+3);
+  }
+
+  // Candles
+  slice.forEach((c,i)=>{
+    const cx=pad.l+slotW*i+slotW/2;
+    const o=toY(O[i]),h=toY(H[i]),l=toY(L[i]),cl=toY(C[i]);
+    const bull=C[i]>=O[i];
+    const col=bull?'#52F2C9':'#FF4D7A';
+    // Wick
+    ctx2.strokeStyle=col; ctx2.lineWidth=1;
+    ctx2.beginPath(); ctx2.moveTo(cx,h); ctx2.lineTo(cx,l); ctx2.stroke();
+    // Body
+    const by=Math.min(o,cl), bh=Math.max(1,Math.abs(o-cl));
+    ctx2.fillStyle=bull?'rgba(82,242,201,0.9)':'rgba(255,77,122,0.9)';
+    ctx2.fillRect(cx-bodyW/2, by, bodyW, bh);
+  });
+
+  // X labels (every ~10 candles)
+  ctx2.fillStyle='#6F648F'; ctx2.font='9px sans-serif'; ctx2.textAlign='center';
+  const step=Math.max(1,Math.floor(n/8));
+  slice.forEach((c,i)=>{
+    if(i%step!==0) return;
+    const d=new Date(c.time);
+    const lbl=curTF==='1d'?d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    ctx2.fillText(lbl,pad.l+slotW*i+slotW/2,H2-8);
+  });
+
+  // Hover tooltip
+  canvas.onmousemove=e=>{
+    const rect=canvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left);
+    const idx=Math.floor((mx-pad.l)/slotW);
+    if(idx<0||idx>=n) return;
+    const c=slice[idx];
+    const tt=document.getElementById('candleTip');
+    if(tt){ tt.style.left=(e.clientX+10)+'px'; tt.style.top=(e.clientY-10)+'px';
+      tt.innerHTML=`O:${toP(c.open).toFixed(2)} H:${toP(c.high).toFixed(2)} L:${toP(c.low).toFixed(2)} C:${toP(c.close).toFixed(2)}`; tt.style.display='block'; }
+  };
+  canvas.onmouseleave=()=>{ const tt=document.getElementById('candleTip'); if(tt) tt.style.display='none'; };
+}
+
+// ============================================================
+// RENDER: TRADESTATS PANEL
+// ============================================================
+function renderTsPanel(){
+  if(!tsHistory.length){ document.getElementById('tsPanel').innerHTML='<div style="font-size:10px;color:var(--txt3)">Нет данных</div>'; return; }
+  const r = last(tsHistory);
+  const vol    = toNum(r.vol||0);
+  const bv     = toNum(r.vol_b||0);   // buy volume
+  const sv     = toNum(r.vol_s||0);   // sell volume
+  const bval   = toNum(r.val_b||0);   // buy value (₽)
+  const sval   = toNum(r.val_s||0);   // sell value
+  const btrades= toNum(r.trades_b||0);
+  const strades= toNum(r.trades_s||0);
+  const pr     = toNum(r.pr_close||r.sec_pr_close||0);
+  const vwap   = toNum(r.pr_vwap||0);
+  const disb   = toNum(r.disb||0);    // дисбаланс (signed)
+  const trades = toNum(r.trades||0);
+  const bvPct  = vol ? bv/vol : 0;
+  const svPct = vol ? sv/vol : 0;
+  const html = `
+  <div class="dp-grid">
+    <div class="dp-card"><div class="dp-label">Объём (лоты)</div><div class="dp-val">${snum(vol)}</div><div class="dp-sub">${trades} сделок (B:${btrades} S:${strades})</div></div>
+    <div class="dp-card"><div class="dp-label">Цена / VWAP</div><div class="dp-val">${pr.toFixed(2)}</div><div class="dp-sub">vwap: ${vwap.toFixed(2)} | disb: ${disb.toFixed(3)}</div></div>
+    <div class="dp-card" style="grid-column:span 2">
+      <div class="dp-label">Buy / Sell (объём)</div>
+      <div style="display:flex;height:6px;border-radius:999px;overflow:hidden;margin:4px 0;">
+        <div style="width:${bvPct*100}%;background:#52F2C9;"></div>
+        <div style="width:${(1-bvPct)*100}%;background:#FF4D7A;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;">
+        <span class="dp">B: ${snum(bv)} (${pct(bvPct)}) · ${snum(bval)}₽</span>
+        <span class="dn">S: ${snum(sv)} (${pct(1-bvPct)}) · ${snum(sval)}₽</span>
+      </div>
+    </div>
+    <div class="dp-card"><div class="dp-label">im (агр. дисбаланс)</div><div class="dp-val" style="color:${toNum(r.im||0)>0?'#52F2C9':'#FF4D7A'}">${(toNum(r.im||0)).toFixed(3)}</div><div class="dp-sub">im field</div></div>
+    <div class="dp-card"><div class="dp-label">Баров истории</div><div class="dp-val">${tsHistory.length}</div><div class="dp-sub">tradestats</div></div>
+  </div>`;
+  document.getElementById('tsPanel').innerHTML = html;
+}
+
+// ============================================================
+// RENDER: FUTOI PANEL
+// ============================================================
+function renderFutoiPanel(){
+  const el = document.getElementById('futoiPanel');
+  if(!futoiData.length){
+    el.innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных (только для фьючерсов)</div>';
+    return;
+  }
+  // Группируем по clgroup, берём последнюю запись для каждой группы
+  const byGroup = {};
+  futoiData.forEach(r=>{
+    const g = (r.clgroup||r.group||'—').toUpperCase();
+    if(!byGroup[g] || (r.tradetime||r.systime||'') > (byGroup[g].tradetime||byGroup[g].systime||''))
+      byGroup[g] = r;
+  });
+  // Определяем время данных
+  const sample = futoiData[futoiData.length-1] || {};
+  const dataTime = sample.tradetime || sample.systime || '';
+  const dataDate = sample.tradedate || '';
+
+  const rows = Object.entries(byGroup).map(([group, r])=>{
+    const lg  = toNum(r.pos_long  || 0);
+    // pos_short в FUTOI API — отрицательное число
+    const sh  = Math.abs(toNum(r.pos_short || 0));
+    const net = toNum(r.pos || 0); // нетто = pos_long + pos_short (pos_short < 0)
+    const groupLabel = group === 'YUR' ? 'ЮЛ (YUR)' : group === 'FIZ' ? 'ФЛ (FIZ)' : group;
+    return `<div class="futoi-row">
+      <span style="color:var(--txt);font-weight:500;">${groupLabel}</span>
+      <span class="dp">${snum(lg)}</span>
+      <span class="dn">${snum(sh)}</span>
+      <span style="color:${net>=0?'var(--pos)':'var(--neg)'};font-weight:600;">${net>=0?'+':''}${snum(net)}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="font-size:9px;color:var(--txt3);margin-bottom:6px;">
+      ${dataDate} ${dataTime ? dataTime.slice(0,5) : ''} · ticker: ${futoi2sym(curTicker)}
+    </div>
+    <div class="futoi-row futoi-hdr"><span>Группа</span><span>Лонг</span><span>Шорт</span><span>Нетто</span></div>
+    ${rows}`;
+}
+
+// ============================================================
+// RENDER: OB + OS PANEL
+// ============================================================
+function renderObPanel(){
+  const el = document.getElementById('obPanel');
+  if(!obHistory.length && !osHistory.length){
+    el.innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+    return;
+  }
+  let html = '';
+  if(obHistory.length){
+    const r = last(obHistory);
+    const imb = toNum(r.imbalance_vol_bbo||r.imbalanceVolBbo||r.imbalance_vol||r.imbalanceVol||0);
+    const spr = toNum(r.spread_bbo||r.spreadBbo||0);
+    const lb = toNum(r.levels_b||r.levelsB||0);
+    const ls = toNum(r.levels_s||r.levelsS||0);
+    html += `<div class="dp-grid" style="margin-bottom:8px;">
+      <div class="dp-card"><div class="dp-label">OB Imbalance</div><div class="dp-val" style="color:${imb>=0?'var(--pos)':'var(--neg)'}">${imb>=0?'+':''}${imb.toFixed(3)}</div><div class="dp-sub">bid vs ask</div></div>
+      <div class="dp-card"><div class="dp-label">Спред BBO</div><div class="dp-val">${spr.toFixed(4)}</div><div class="dp-sub">уровни B:${lb} S:${ls}</div></div>
+    </div>`;
+  }
+  if(osHistory.length){
+    const r = last(osHistory);
+    const pb = toNum(r.put_orders_b||r.putOrdersB||r.put_buy_vol||0);
+    const ps = toNum(r.put_orders_s||r.putOrdersS||r.put_sell_vol||0);
+    const cb = toNum(r.cancel_orders_b||r.cancelOrdersB||r.cancel_buy_vol||0);
+    const cs = toNum(r.cancel_orders_s||r.cancelOrdersS||r.cancel_sell_vol||0);
+    html += `<div class="dp-grid">
+      <div class="dp-card"><div class="dp-label">Поданы B/S</div><div class="dp-val">${snum(pb)}/${snum(ps)}</div><div class="dp-sub">заявки</div></div>
+      <div class="dp-card"><div class="dp-label">Отмены B/S</div><div class="dp-val">${snum(cb)}/${snum(cs)}</div><div class="dp-sub">${pct(pb?cb/pb:0)} / ${pct(ps?cs/ps:0)}</div></div>
+    </div>`;
+  }
+  el.innerHTML = html || '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+}
+
+// ============================================================
+// RENDER: HISTORY
+// ============================================================
+function renderHistory(){
+  const el = document.getElementById('historyArea');
+  if(!signalLog.length){ el.innerHTML='<div style="font-size:10px;color:var(--txt3)">История пуста</div>'; return; }
+  el.innerHTML = signalLog.slice(0,30).map(e=>{
+    const d = scoreToDir(e.composite || 0);
+    const out = e.outcome ? (e.outcome==='long'?'<span class="dp">↑ Рост</span>':e.outcome==='short'?'<span class="dn">↓ Падение</span>':'<span class="dm">→ Боковик</span>') : '<span style="color:var(--txt3)">—</span>';
+    const t = e.ts ? new Date(e.ts).toLocaleString('ru-RU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    return `<div class="hist-row">
+      <span class="hist-date">${t}</span>
+      <span class="hist-ticker">${e.ticker||'—'}</span>
+      <span class="hist-dir" style="color:${scoreColor(e.composite||0)}">${d.arrow} ${e.composite>=0?'+':''}${((e.composite||0)*100).toFixed(0)}</span>
+      <span class="hist-outcome">${out}</span>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// TICKER PANEL
+// ============================================================
+let activeCatFilter = '';
+
+function toggleTickerPanel(){
+  const body = document.getElementById('tickerPanelBody');
+  const chev = document.getElementById('tickerPanelChev');
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  chev.textContent = open ? '▲ тикеры' : '▼ тикеры';
+  if(open) renderCatalog();
+}
+
+function selectCatTab(btn, cat){
+  document.querySelectorAll('#catTabs .btn-ghost').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeCatFilter = cat;
+  renderCatalog();
+}
+
+function renderCatalog(){
+  const search = (document.getElementById('tickerSearch')?.value||'').toLowerCase();
+  const items = [...CATALOG, ...tickers.filter(t=>!CATALOG.find(c=>c.t===t.t))]
+    .filter(item=>{
+      if(activeCatFilter && item.cat !== activeCatFilter) return false;
+      if(search && !item.t.toLowerCase().includes(search) && !item.name.toLowerCase().includes(search)) return false;
+      return true;
+    });
+  const el = document.getElementById('catalogGrid');
+  if(!el) return;
+  el.innerHTML = items.map(item=>{
+    const isPin = pinnedTickers.includes(item.t);
+    const isActive = item.t === curTicker;
+    const hasFigi = !!(item.f);
+    return `<div class="cat-item${isActive?' active-ticker':''}${isPin?' pinned':''}" onclick="selectTicker('${item.t}','${item.cat||'stocks'}')">
+      <div style="flex:1;min-width:0;">
+        <div class="cat-item-code">${item.t} <span style="font-size:8px;color:${hasFigi?'var(--pos)':'var(--txt3)'}">${hasFigi?'●':'○'}</span></div>
+        <div class="cat-item-name">${item.name}</div>
+        <div class="cat-item-sector">${item.sector||item.cat||''}</div>
+      </div>
+      ${!hasFigi?`<button class="pin-btn" onclick="event.stopPropagation();lookupFIGI('${item.t}')" title="Найти FIGI через T-Invest API" style="font-size:10px;">🔍</button>`:''}
+      <button class="pin-btn" onclick="event.stopPropagation();togglePin('${item.t}')" title="${isPin?'Открепить':'Закрепить'}">${isPin?'★':'☆'}</button>
+    </div>`;
+  }).join('');
+}
+
+function renderPinnedChips(){
+  const el = document.getElementById('pinnedChips');
+  if(!el) return;
+  const items = pinnedTickers.map(t=>CATALOG.find(c=>c.t===t)||tickers.find(c=>c.t===t)||{t,cat:'stocks',name:t});
+  el.innerHTML = items.map(item=>`<div class="pchip${item.t===curTicker?' active':''}" onclick="selectTicker('${item.t}','${item.cat||'stocks'}')">${item.t}</div>`).join('');
+}
+
+function togglePin(t){
+  const idx = pinnedTickers.indexOf(t);
+  if(idx>=0) pinnedTickers.splice(idx,1);
+  else pinnedTickers.push(t);
+  renderPinnedChips();
+  renderCatalog();
+  saveAll();
+}
+
+// Авто-поиск FIGI через T-Invest FindInstrument
+async function lookupFIGI(ticker){
+  const token = getTinvestToken();
+  if(!token){ alert('Введи T-Invest токен'); return; }
+  const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument');
+  try{
+    const resp = await fetch(url, {
+      method:'POST',
+      headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body: JSON.stringify({query: ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false}),
+    });
+    const d = await resp.json();
+    const instr = (d.instruments||[]);
+    // Prefer exact ticker match on MOEX (classCode TQBR/SPBFUT etc)
+    const match = instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
+                 || instr.find(x=>x.ticker===ticker)
+                 || instr[0];
+    if(!match){ alert(`FIGI для ${ticker} не найден (результатов: ${instr.length})`); return; }
+    const figi = match.figi || match.uid || match.instrumentUid || '';
+    if(!figi){ alert('У инструмента нет FIGI/UID'); return; }
+    // Обновить в CATALOG и tickers
+    const catItem = CATALOG.find(x=>x.t===ticker);
+    if(catItem) catItem.f = figi;
+    const tkItem = tickers.find(x=>x.t===ticker);
+    if(tkItem) tkItem.f = figi; else tickers.push({t:ticker, f:figi, cat:'stocks', type:'stocks', name:ticker});
+    saveAll(); renderCatalog();
+    setStatus(`✓ FIGI для ${ticker}: ${figi}`);
+    return figi;
+  } catch(e){ alert('Ошибка поиска: '+e.message); }
+}
+
+async function lookupAllFIGI(){
+  const noFigi = [...CATALOG, ...tickers].filter(x=>!x.f && pinnedTickers.includes(x.t));
+  if(!noFigi.length){ setStatus('У всех закреплённых тикеров уже есть FIGI'); return; }
+  setStatus(`Поиск FIGI для ${noFigi.length} тикеров…`, true);
+  for(const item of noFigi){ await lookupFIGI(item.t); }
+  setStatus('✓ Поиск FIGI завершён');
+}
+
+function addCustomTicker(){
+  const t = (document.getElementById('custT').value||'').trim().toUpperCase();
+  const type = document.getElementById('custType').value;
+  const name = (document.getElementById('custName').value||'').trim() || t;
+  const f = (document.getElementById('custFigi').value||'').trim();
+  if(!t) return;
+  if(!tickers.find(x=>x.t===t)) tickers.push({t, cat:type, type, name, f, sector:type, custom:true});
+  if(!pinnedTickers.includes(t)) pinnedTickers.push(t);
+  document.getElementById('custT').value='';
+  document.getElementById('custName').value='';
+  document.getElementById('custFigi').value='';
+  renderPinnedChips(); renderCatalog(); saveAll();
+}
+
+function selectTicker(t, type){
+  curTicker = t;
+  const meta = CATALOG.find(x=>x.t===t) || tickers.find(x=>x.t===t);
+  curType = type || meta?.cat || meta?.type || 'stocks';
+  // Загружаем веса из IndexedDB
+  dbLoadWeights(t).then(w=>{ if(Object.keys(w).length) methodWeights[t]=w; }).catch(()=>{});
+  loadDeepHistory(t).catch(()=>{});
+  updateCalibBadge(t);
+  // sync tickers array (for FIGI lookup)
+  if(!tickers.find(x=>x.t===t)){
+    const cat = CATALOG.find(x=>x.t===t);
+    if(cat) tickers.push({...cat, type:cat.cat}); // f берётся из CATALOG
+  }
+  tsHistory=[]; obHistory=[]; osHistory=[]; futoiData=[];
+  renderPinnedChips();
+  renderCatalog();
+  renderMethodsTable({});
+  renderGauge(0, 0);
+  document.getElementById('candleArea').innerHTML = '<span>Нажмите ↺ Обновить</span>';
+  document.getElementById('tsPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+  document.getElementById('futoiPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+  document.getElementById('obPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+}
+
+// ============================================================
+// TF SELECTOR
+// ============================================================
+function selTF(btn, tf){
+  document.querySelectorAll('.tf-bar .btn-ghost, #tf1m, #tf5m, #tf1h, #tf1d').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  curTF = tf;
+  if(candleData[tf]) renderCandleChart(candleData[tf]);
+  else refreshAll(); // нет кэша для этого ТФ — грузим
+}
+
+// ============================================================
+// AUTO-REFRESH
+// ============================================================
+function startAuto(){
+  stopAuto();
+  autoTimer = setInterval(()=>refreshAll(), autoInterval * 1000);
+}
+function stopAuto(){
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+}
+function toggleAuto(){
+  if(document.getElementById('autoChk').checked) startAuto();
+  else stopAuto();
+}
+function setInterval_(){
+  autoInterval = parseInt(document.getElementById('intervalSel').value)||60;
+  if(document.getElementById('autoChk').checked){ startAuto(); }
+}
+
+// ============================================================
+// MAIN REFRESH
+// ============================================================
+async function refreshAll(){
+  if(!curTicker){ setStatus('Выберите тикер'); return; }
+  setStatus('Загрузка…', true);
+
+  const errs = [];
+
+  // 1. MOEX AlgoPack
+  try{
+    const data = await fetchAllMoex(curTicker, curType);
+    if(data.ts?.length)    tsHistory    = data.ts;
+    if(data.ob?.length)    obHistory    = data.ob;
+    if(data.os?.length)    osHistory    = data.os;
+    if(data.futoi?.length) futoiData    = data.futoi;
+    moexLastUpdate = Date.now();
+    persistAlgopackBars(curTicker, data).catch(()=>{});
+  } catch(e){ errs.push('MOEX: '+e.message); }
+
+  // 2. T-Invest candles for active TF
+  const tfsToLoad = [curTF];
+  if(curTF !== '1d') tfsToLoad.push('1d'); // always keep 1D for PRICE_TREND
+  let candleErr = null;
+  for(const tf of tfsToLoad){
+    try{
+      const c = await fetchCandles(curTicker, tf);
+      if(c) {
+        candleData[tf] = c;
+        if(tf===curTF) computeAtr(curTicker, tf, c);
+        if(tf===curTF) candleLastUpdate = Date.now();
+        dbSaveCandles(curTicker, tf, c).catch(()=>{}); // персистим в IndexedDB
+      }
+    } catch(e){
+      if(tf === curTF) candleErr = e.message;
+      errs.push(`T-Invest(${tf}): `+e.message.slice(0,80));
+    }
+  }
+  if(candleErr){
+    document.getElementById('candleArea').innerHTML =
+      `<div style="color:#e57373;padding:16px;font-size:12px;border:1px solid #e5737355;border-radius:6px;">⚠ Свечи: ${candleErr}</div>`;
+  }
+
+  // 3. Classify market regime (uses candles + MOEX data gathered above)
+  try {
+    currentRegimeState = classifyRegime(
+      tsHistory, candleData,
+      obHistory, osHistory,
+      curTicker
+    );
+  } catch(e) { console.warn('Regime classifier error:', e); currentRegimeState = null; }
+
+  // 3. Compute signals
+  const methodResults = computeAllMethods();
+  const composite = computeComposite(methodResults, curTicker);
+  const avgConf = METHODS.reduce((s,m)=>s+(methodResults[m.id]?.confidence||0),0)/METHODS.length;
+
+  // Save snapshot
+  lastSnapshot = {ts: Date.now(), ticker: curTicker, methodResults, composite};
+
+  // Цена входа — последняя свеча
+  const lastCandle = (candleData[curTF]||[]).slice(-1)[0];
+  const entryPrice = lastCandle ? toP(lastCandle.close) : 0;
+  const entryTs    = lastCandle ? new Date(lastCandle.time).getTime() : Date.now();
+  const dir = scoreToDir(composite).dir;
+  const sigObj = {
+    snapshotTs: lastSnapshot.ts,
+    ts: new Date().toISOString(),
+    ticker: curTicker,
+    tf: curTF,
+    entryPrice, entryTs,
+    composite, dir,
+    outcome: null, quality: null,
+    resolved: 0, mfe: 0, mae: 0,
+    methods: Object.fromEntries(METHODS.map(m=>[m.id, methodResults[m.id]?.score??0])),
+  };
+  // Сохраняем в IndexedDB и получаем id
+  dbSaveSignal(sigObj).then(id=>{ sigObj.dbId = id; }).catch(()=>{});
+  signalLog.unshift(sigObj);
+  if(signalLog.length > 500) signalLog.splice(500);
+
+  // 4. Render
+  renderGauge(composite, avgConf);
+  // Render regime badge
+  const regBadgeEl = document.getElementById('regimeBadge');
+  if(regBadgeEl) regBadgeEl.innerHTML = renderRegimeBadge(currentRegimeState);
+  renderMethodsTable(methodResults);
+  if(candleData[curTF]) renderCandleChart(candleData[curTF]);
+  renderTsPanel();
+  renderFutoiPanel();
+  renderObPanel();
+  renderHistory();
+  updateAges();
+
+  autoRecordOutcomes(); // авто-запись исходов по свечам через 3 бара
+
+  const msg = errs.length ? `Готово (ошибки: ${errs.join('; ')})` : `Обновлено ${new Date().toLocaleTimeString('ru-RU')}`;
+  setStatus(msg, false);
+  saveAll();
+}
+
+// ============================================================
+// COLLAPSIBLE
+// ============================================================
+function toggleCollapsible(id){
+  const el = document.getElementById(id);
+  const isOpen = el.classList.toggle('open');
+  const chevId = id.replace('Body','Chev');
+  const chev = document.getElementById(chevId);
+  if(chev) chev.textContent = isOpen ? '▼' : '▶';
+}
+
+// ============================================================
+// PROXY HELP / WORKER CODE
+// ============================================================
+function toggleProxyHelp(){
+  const el = document.getElementById('proxyHelpBox');
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+function copyWorkerCode(){
+  const code = document.getElementById('workerCodeEl').textContent;
+  navigator.clipboard.writeText(code).then(()=>setStatus('✓ Код скопирован'));
+}
+
+// ============================================================
+// AGE TIMER
+// ============================================================
+setInterval(updateAges, 10000);
+
+// ============================================================
+// INIT
+// ============================================================
+(async function init(){
+  dbOpen(); // инит схемы D1, не блокируем запуск
+  loadAll();
+  renderPinnedChips();
+  renderHistory();
+  renderMethodsTable({});
+  renderGauge(0, 0);
+
+  // Input persistence
+  ['moexKeyInp','tinvestInp','proxyInp'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', saveAll);
+  });
+  document.getElementById('proxyInp').addEventListener('keydown', e=>{
+    if(e.key==='Enter') refreshAll();
+  });
+
+  if(curTicker){
+    const meta = CATALOG.find(x=>x.t===curTicker) || tickers.find(x=>x.t===curTicker);
+    curType = meta?.cat || meta?.type || 'stocks';
+  } else if(pinnedTickers.length){
+    const first = pinnedTickers[0];
+    const meta = CATALOG.find(x=>x.t===first) || tickers.find(x=>x.t===first);
+    selectTicker(first, meta?.cat||'stocks');
+  }
+
+  setStatus('Готово · выберите тикер и нажмите ↺ Обновить');
+})();
+</script>
+</body>
+</html>
