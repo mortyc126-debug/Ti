@@ -1,29 +1,30 @@
-// Cloudflare Worker — CORS-прокси + D1 база данных для OI·INTEL
+// Cloudflare Worker — CORS-прокси + D1 для OI·INTEL
 //
-// НАСТРОЙКА D1 (один раз, 5 минут):
-//   1. dash.cloudflare.com → Workers & Pages → твой воркер (oi.marginacall.workers.dev)
-//   2. Settings → Bindings → Add → D1 Database
-//      Variable name: DB
-//      D1 database: нажми "Create new" → название: oisignal → Create
-//   3. Edit code → вставь этот файл → Deploy
-//   4. Один раз открой: https://oi.marginacall.workers.dev/db/init
-//      Должно вернуть {"ok":true,"msg":"schema ready"}
+// Binding: интерес → D1 database oi_signal1
 //
-// Маршруты:
-//   /db/init              GET  — создать таблицы (первый запуск)
-//   /db/candles           POST — upsert свечи [{key,ticker,tf,time,o,h,l,cl,vol}]
-//   /db/candles?ticker=&tf=&from=  GET — свечи после timestamp
-//   /db/signal            POST — новый сигнал → {id}
-//   /db/signal/:id        PATCH — обновить сигнал (mfe, mae, quality, resolved)
-//   /db/signals?ticker=&resolved=  GET — список сигналов
-//   /db/weight            POST — upsert вес метода
-//   /db/weights?ticker=   GET  — все веса тикера
+// Маршруты /db/:
+//   /db/init                          GET  — создать/обновить схему
+//   /db/candles                       POST — upsert свечи
+//   /db/candles?ticker=&tf=&from=     GET  — свечи после timestamp
+//   /db/signal                        POST — новый сигнал
+//   /db/signal/:id                    PATCH— обновить сигнал
+//   /db/signals?ticker=&resolved=     GET  — список сигналов
+//   /db/weight                        POST — upsert вес метода
+//   /db/weights?ticker=               GET  — веса тикера
+//   /db/algopack                      POST — upsert сырые бары AlgoPack
+//   /db/algopack?ticker=&type=&from=  GET  — история баров
+//   /db/percentiles                   POST — сохранить кэш перцентилей
+//   /db/percentiles?ticker=&window=   GET  — загрузить кэш перцентилей
+//   /db/atr                           POST — upsert ATR по тикеру
+//   /db/atr?ticker=                   GET  — ATR тикера
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
 };
+
+const DB = env => env.интерес;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -32,72 +33,116 @@ function json(data, status = 200) {
   });
 }
 
-// ── D1 Schema ──────────────────────────────────────────────────────────────
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS candles (
-  key    TEXT PRIMARY KEY,
-  ticker TEXT NOT NULL,
-  tf     TEXT NOT NULL,
-  time   INTEGER NOT NULL,
-  o REAL, h REAL, l REAL, cl REAL, vol INTEGER DEFAULT 0
-);
-CREATE INDEX IF NOT EXISTS idx_candles_ttf ON candles(ticker, tf, time);
+// ── Schema ─────────────────────────────────────────────────────────────────
+const SCHEMA_STMTS = [
+  // Свечи T-Invest
+  `CREATE TABLE IF NOT EXISTS candles (
+    key    TEXT PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    tf     TEXT NOT NULL,
+    time   INTEGER NOT NULL,
+    o REAL, h REAL, l REAL, cl REAL, vol INTEGER DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_candles_ttf ON candles(ticker, tf, time)`,
 
-CREATE TABLE IF NOT EXISTS signals (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts          TEXT NOT NULL,
-  ticker      TEXT NOT NULL,
-  tf          TEXT NOT NULL,
-  entry_price REAL DEFAULT 0,
-  entry_ts    INTEGER DEFAULT 0,
-  composite   REAL DEFAULT 0,
-  dir         TEXT DEFAULT 'neutral',
-  methods     TEXT DEFAULT '{}',
-  mfe         REAL DEFAULT 0,
-  mae         REAL DEFAULT 0,
-  quality     REAL,
-  resolved    INTEGER DEFAULT 0,
-  resolved_at INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_signals_ticker ON signals(ticker, resolved);
+  // Сигналы
+  `CREATE TABLE IF NOT EXISTS signals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    ticker      TEXT NOT NULL,
+    tf          TEXT NOT NULL,
+    entry_price REAL DEFAULT 0,
+    entry_ts    INTEGER DEFAULT 0,
+    composite   REAL DEFAULT 0,
+    dir         TEXT DEFAULT 'neutral',
+    methods     TEXT DEFAULT '{}',
+    mfe         REAL DEFAULT 0,
+    mae         REAL DEFAULT 0,
+    quality     REAL,
+    resolved    INTEGER DEFAULT 0,
+    resolved_at INTEGER
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_signals_ticker ON signals(ticker, resolved)`,
 
-CREATE TABLE IF NOT EXISTS weights (
-  key        TEXT PRIMARY KEY,
-  ticker     TEXT NOT NULL,
-  method_id  TEXT NOT NULL,
-  weight     REAL DEFAULT 0.5,
-  total      INTEGER DEFAULT 0,
-  sum_quality REAL DEFAULT 0,
-  updated_at INTEGER DEFAULT 0
-);
-`;
+  // Адаптивные веса методов
+  `CREATE TABLE IF NOT EXISTS weights (
+    key         TEXT PRIMARY KEY,
+    ticker      TEXT NOT NULL,
+    method_id   TEXT NOT NULL,
+    weight      REAL DEFAULT 0.5,
+    total       INTEGER DEFAULT 0,
+    sum_quality REAL DEFAULT 0,
+    updated_at  INTEGER DEFAULT 0
+  )`,
+
+  // Сырые бары AlgoPack (tradestats / obstats / orderstats / futoi)
+  // Храним всё поле values как JSON — гибко, не нужно менять схему при добавлении полей
+  `CREATE TABLE IF NOT EXISTS algopack (
+    key        TEXT PRIMARY KEY,
+    ticker     TEXT NOT NULL,
+    type       TEXT NOT NULL,
+    ts         INTEGER NOT NULL,
+    tradedate  TEXT,
+    tradetime  TEXT,
+    values     TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_algopack_ttt ON algopack(ticker, type, ts)`,
+
+  // Кэш перцентилей — пересчитываем в браузере, кладём сюда как бэкап
+  // window_days — глубина окна в днях (7/14/30/60)
+  `CREATE TABLE IF NOT EXISTS percentiles (
+    key        TEXT PRIMARY KEY,
+    ticker     TEXT NOT NULL,
+    type       TEXT NOT NULL,
+    field      TEXT NOT NULL,
+    window_days INTEGER NOT NULL,
+    p10        REAL,
+    p25        REAL,
+    p50        REAL,
+    p75        REAL,
+    p90        REAL,
+    n          INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_pct_ticker ON percentiles(ticker, type, window_days)`,
+
+  // ATR по тикеру и таймфрейму — адаптивный порог "значимого движения"
+  `CREATE TABLE IF NOT EXISTS atr (
+    key        TEXT PRIMARY KEY,
+    ticker     TEXT NOT NULL,
+    tf         TEXT NOT NULL,
+    atr        REAL NOT NULL,
+    atr_pct    REAL NOT NULL,
+    n          INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT 0
+  )`,
+];
 
 // ── D1 Route Handler ───────────────────────────────────────────────────────
 async function handleDb(path, req, env) {
-  if (!env.DB) return json({ error: 'D1 binding DB not configured. See worker setup instructions.' }, 503);
+  const db = DB(env);
+  if (!db) return json({ error: 'D1 binding "интерес" не настроен' }, 503);
 
   const p = path.replace(/^\/db/, '');
 
-  // Init schema
+  // ── Init ──
   if (p === '/init') {
-    await env.DB.exec(SCHEMA);
-    return json({ ok: true, msg: 'schema ready' });
+    for (const stmt of SCHEMA_STMTS) {
+      await db.prepare(stmt).run();
+    }
+    return json({ ok: true, msg: 'schema ready (v2 — adaptive)' });
   }
 
   // ── Candles ──
   if (p === '/candles' && req.method === 'POST') {
     const rows = await req.json();
     if (!Array.isArray(rows) || !rows.length) return json({ ok: true, inserted: 0 });
-    // Batch upsert, по 100 строк за раз
-    const chunks = [];
-    for (let i = 0; i < rows.length; i += 100) chunks.push(rows.slice(i, i + 100));
-    for (const chunk of chunks) {
-      const stmts = chunk.map(r =>
-        env.DB.prepare(
-          'INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)'
-        ).bind(r.key, r.ticker, r.tf, r.time, r.o, r.h, r.l, r.cl, r.vol ?? 0)
-      );
-      await env.DB.batch(stmts);
+    for (let i = 0; i < rows.length; i += 100) {
+      const chunk = rows.slice(i, i + 100);
+      await db.batch(chunk.map(r =>
+        db.prepare('INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)')
+          .bind(r.key, r.ticker, r.tf, r.time, r.o, r.h, r.l, r.cl, r.vol ?? 0)
+      ));
     }
     return json({ ok: true, inserted: rows.length });
   }
@@ -108,7 +153,7 @@ async function handleDb(path, req, env) {
     const tf     = u.searchParams.get('tf');
     const from   = parseInt(u.searchParams.get('from') || '0');
     if (!ticker || !tf) return json({ error: 'ticker and tf required' }, 400);
-    const { results } = await env.DB.prepare(
+    const { results } = await db.prepare(
       'SELECT * FROM candles WHERE ticker=? AND tf=? AND time>=? ORDER BY time ASC LIMIT 2000'
     ).bind(ticker, tf, from).all();
     return json(results);
@@ -117,7 +162,7 @@ async function handleDb(path, req, env) {
   // ── Signals ──
   if (p === '/signal' && req.method === 'POST') {
     const s = await req.json();
-    const r = await env.DB.prepare(
+    const r = await db.prepare(
       `INSERT INTO signals(ts,ticker,tf,entry_price,entry_ts,composite,dir,methods)
        VALUES(?,?,?,?,?,?,?,?)`
     ).bind(s.ts, s.ticker, s.tf, s.entry_price ?? 0, s.entry_ts ?? 0,
@@ -130,21 +175,21 @@ async function handleDb(path, req, env) {
     const id = parseInt(sigPatch[1]);
     const patch = await req.json();
     const fields = Object.keys(patch).map(k => `${k}=?`).join(',');
-    const vals   = Object.values(patch);
-    await env.DB.prepare(`UPDATE signals SET ${fields} WHERE id=?`).bind(...vals, id).run();
+    await db.prepare(`UPDATE signals SET ${fields} WHERE id=?`)
+      .bind(...Object.values(patch), id).run();
     return json({ ok: true });
   }
 
   if (p.startsWith('/signals') && req.method === 'GET') {
     const u = new URL(req.url);
     const ticker   = u.searchParams.get('ticker');
-    const resolved = u.searchParams.get('resolved'); // '0' или '1' или null
+    const resolved = u.searchParams.get('resolved');
     let q = 'SELECT * FROM signals WHERE 1=1';
     const binds = [];
-    if (ticker)   { q += ' AND ticker=?';   binds.push(ticker); }
+    if (ticker)            { q += ' AND ticker=?';   binds.push(ticker); }
     if (resolved !== null) { q += ' AND resolved=?'; binds.push(parseInt(resolved)); }
     q += ' ORDER BY id DESC LIMIT 500';
-    const { results } = await env.DB.prepare(q).bind(...binds).all();
+    const { results } = await db.prepare(q).bind(...binds).all();
     results.forEach(r => { try { r.methods = JSON.parse(r.methods); } catch(_){} });
     return json(results);
   }
@@ -152,7 +197,7 @@ async function handleDb(path, req, env) {
   // ── Weights ──
   if (p === '/weight' && req.method === 'POST') {
     const w = await req.json();
-    await env.DB.prepare(
+    await db.prepare(
       `INSERT OR REPLACE INTO weights(key,ticker,method_id,weight,total,sum_quality,updated_at)
        VALUES(?,?,?,?,?,?,?)`
     ).bind(`${w.ticker}__${w.method_id}`, w.ticker, w.method_id,
@@ -163,7 +208,111 @@ async function handleDb(path, req, env) {
   if (p.startsWith('/weights') && req.method === 'GET') {
     const ticker = new URL(req.url).searchParams.get('ticker');
     if (!ticker) return json({ error: 'ticker required' }, 400);
-    const { results } = await env.DB.prepare('SELECT * FROM weights WHERE ticker=?').bind(ticker).all();
+    const { results } = await db.prepare('SELECT * FROM weights WHERE ticker=?').bind(ticker).all();
+    return json(results);
+  }
+
+  // ── AlgoPack history ──
+  // POST body: { ticker, type, rows: [{tradedate, tradetime, ...fields}] }
+  // key = ticker__type__tradedate__tradetime
+  if (p === '/algopack' && req.method === 'POST') {
+    const body = await req.json();
+    const { ticker, type, rows } = body;
+    if (!ticker || !type || !Array.isArray(rows) || !rows.length)
+      return json({ error: 'ticker, type, rows required' }, 400);
+
+    // Чистим старые данные старше 90 дней чтобы база не росла бесконечно
+    const cutoff = Date.now() - 90 * 86400 * 1000;
+    await db.prepare('DELETE FROM algopack WHERE ticker=? AND type=? AND ts<?')
+      .bind(ticker, type, cutoff).run();
+
+    for (let i = 0; i < rows.length; i += 100) {
+      const chunk = rows.slice(i, i + 100);
+      await db.batch(chunk.map(r => {
+        const date = r.tradedate || '';
+        const time = r.tradetime || r.systime?.slice(11,19) || '00:00:00';
+        const tsMs = date ? new Date(`${date}T${time}Z`).getTime() : Date.now();
+        const key  = `${ticker}__${type}__${date}__${time}`;
+        return db.prepare(
+          `INSERT OR REPLACE INTO algopack(key,ticker,type,ts,tradedate,tradetime,values)
+           VALUES(?,?,?,?,?,?,?)`
+        ).bind(key, ticker, type, tsMs, date, time, JSON.stringify(r));
+      }));
+    }
+    return json({ ok: true, inserted: rows.length });
+  }
+
+  if (p.startsWith('/algopack') && req.method === 'GET') {
+    const u      = new URL(req.url);
+    const ticker = u.searchParams.get('ticker');
+    const type   = u.searchParams.get('type');
+    const days   = parseInt(u.searchParams.get('days') || '30');
+    const limit  = parseInt(u.searchParams.get('limit') || '2000');
+    if (!ticker || !type) return json({ error: 'ticker and type required' }, 400);
+    const from = Date.now() - days * 86400 * 1000;
+    const { results } = await db.prepare(
+      `SELECT tradedate, tradetime, values FROM algopack
+       WHERE ticker=? AND type=? AND ts>=?
+       ORDER BY ts ASC LIMIT ?`
+    ).bind(ticker, type, from, limit).all();
+    // Разворачиваем JSON-поле values обратно в объекты
+    const parsed = results.map(r => {
+      try { return JSON.parse(r.values); } catch(_) { return {}; }
+    });
+    return json(parsed);
+  }
+
+  // ── Percentiles cache ──
+  // POST body: { ticker, type, field, window_days, p10, p25, p50, p75, p90, n }
+  if (p === '/percentiles' && req.method === 'POST') {
+    const rows = await req.json();
+    const arr = Array.isArray(rows) ? rows : [rows];
+    for (let i = 0; i < arr.length; i += 100) {
+      const chunk = arr.slice(i, i + 100);
+      await db.batch(chunk.map(r =>
+        db.prepare(
+          `INSERT OR REPLACE INTO percentiles
+           (key,ticker,type,field,window_days,p10,p25,p50,p75,p90,n,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+        ).bind(
+          `${r.ticker}__${r.type}__${r.field}__${r.window_days}`,
+          r.ticker, r.type, r.field, r.window_days,
+          r.p10 ?? null, r.p25 ?? null, r.p50 ?? null, r.p75 ?? null, r.p90 ?? null,
+          r.n ?? 0, Date.now()
+        )
+      ));
+    }
+    return json({ ok: true, saved: arr.length });
+  }
+
+  if (p.startsWith('/percentiles') && req.method === 'GET') {
+    const u      = new URL(req.url);
+    const ticker = u.searchParams.get('ticker');
+    const window_days = u.searchParams.get('window');
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    let q = 'SELECT * FROM percentiles WHERE ticker=?';
+    const binds = [ticker];
+    if (window_days) { q += ' AND window_days=?'; binds.push(parseInt(window_days)); }
+    const { results } = await db.prepare(q).bind(...binds).all();
+    return json(results);
+  }
+
+  // ── ATR ──
+  // POST body: { ticker, tf, atr, atr_pct, n }
+  if (p === '/atr' && req.method === 'POST') {
+    const r = await req.json();
+    await db.prepare(
+      `INSERT OR REPLACE INTO atr(key,ticker,tf,atr,atr_pct,n,updated_at)
+       VALUES(?,?,?,?,?,?,?)`
+    ).bind(`${r.ticker}__${r.tf}`, r.ticker, r.tf,
+           r.atr ?? 0, r.atr_pct ?? 0, r.n ?? 0, Date.now()).run();
+    return json({ ok: true });
+  }
+
+  if (p.startsWith('/atr') && req.method === 'GET') {
+    const ticker = new URL(req.url).searchParams.get('ticker');
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    const { results } = await db.prepare('SELECT * FROM atr WHERE ticker=?').bind(ticker).all();
     return json(results);
   }
 
@@ -176,19 +325,15 @@ export default {
     const url  = new URL(req.url);
     const path = url.pathname;
 
-    // CORS preflight для всех /db/ маршрутов
-    if (req.method === 'OPTIONS') {
+    if (req.method === 'OPTIONS')
       return new Response(null, { status: 204, headers: CORS });
-    }
 
-    // D1 роуты
-    if (path.startsWith('/db/') || path === '/db') {
+    if (path.startsWith('/db/') || path === '/db')
       return handleDb(path, req, env).catch(e => json({ error: e.message }, 500));
-    }
 
     const fullPath = path + url.search;
 
-    // OI·INTEL — MOEX AlgoPack
+    // MOEX AlgoPack: /iss/datashop/algopack/... и /iss/analyticalproducts/futoi/...
     if (path.startsWith('/iss/')) {
       const auth = req.headers.get('Authorization') || '';
       const resp = await fetch('https://apim.moex.com' + fullPath, {
@@ -200,7 +345,7 @@ export default {
       });
     }
 
-    // OI·INTEL — T-Invest
+    // T-Invest
     if (path.startsWith('/tinkoff')) {
       const auth = req.headers.get('Authorization') || '';
       const body = req.method === 'POST' ? await req.arrayBuffer() : undefined;
@@ -215,7 +360,7 @@ export default {
       });
     }
 
-    // БондАналитик — CORS-прокси для ГИР БО / ЦБ / ФНС
+    // БондАналитик — CORS-прокси
     let target = url.searchParams.get('u');
 
     const ALLOWED = [
@@ -247,13 +392,11 @@ export default {
         target = 'https://buxbalans.ru' + fullPath;
     }
 
-    if (!target || !ALLOWED.some(re => re.test(target))) {
+    if (!target || !ALLOWED.some(re => re.test(target)))
       return new Response('Bad request', { status: 400, headers: CORS });
-    }
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
+    if (req.method !== 'GET' && req.method !== 'HEAD')
       return new Response('Method not allowed', { status: 405, headers: CORS });
-    }
 
     try {
       let upstream = null;
