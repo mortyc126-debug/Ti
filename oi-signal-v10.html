@@ -98,6 +98,10 @@ a{color:var(--accent);text-decoration:none;}
 .hist-score{width:36px;text-align:right;flex-shrink:0;font-weight:600;}
 .hist-outcome{flex:1;}
 .hist-acc{font-size:9px;color:var(--txt3);}
+.scen-table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;}
+.scen-table th{text-align:left;color:var(--txt3);font-weight:400;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.08);}
+.scen-table td{padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--txt2);}
+.scen-table tr:hover td{background:rgba(255,255,255,.02);}
 /* ---- Outcome row ---- */
 .outcome-row{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;}
 .outcome-lbl{font-size:10px;color:var(--txt3);flex:1;}
@@ -412,6 +416,14 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
   </div>
   <div id="historyStats"></div>
   <div id="historyArea"><div style="font-size:10px;color:var(--txt3);">История пуста</div></div>
+</div>
+
+<div class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div class="sec" style="margin-bottom:0;">Статистика по завершённым сценариям</div>
+    <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
+  </div>
+  <div id="scenarioStats" style="font-size:10px;color:var(--txt3);">Нажмите «Обновить» — статистика собирается по всем завершённым сценариям из базы (не только по текущему тикеру)</div>
 </div>
 
 <script>
@@ -2237,6 +2249,58 @@ function renderHistory(){
       <span class="hist-outcome">${out} ${matchTag}</span>
     </div>`;
   }).join('');
+}
+
+// Статистика по завершённым сценариям из общей базы (все тикеры).
+// "Сыграл" = итог в пользу прогноза (quality = MFE/(MFE+MAE) > 0.5).
+async function loadScenarioStats(){
+  const el = document.getElementById('scenarioStats');
+  el.textContent = 'Загрузка...';
+  let rows;
+  try{ rows = await dbFetch('/db/signals?resolved=1'); }
+  catch(e){ el.textContent = 'Ошибка загрузки: ' + e.message; return; }
+  if(!rows || !rows.length){ el.textContent = 'Завершённых сценариев пока нет — подождите, пока сигналы пройдут через MAX_BARS или STOP'; return; }
+
+  // 1. По силе сигнала
+  const buckets = [
+    {lo:-1,    hi:-0.5,  label:'Сильный сигнал на падение'},
+    {lo:-0.5,  hi:-0.15, label:'Слабый сигнал на падение'},
+    {lo:-0.15, hi:0.15,  label:'Нейтрально'},
+    {lo:0.15,  hi:0.5,   label:'Слабый сигнал на рост'},
+    {lo:0.5,   hi:1.01,  label:'Сильный сигнал на рост'},
+  ].map(b=>({...b, n:0, win:0, mfeSum:0, maeSum:0}));
+  rows.forEach(r=>{
+    const c = r.composite||0;
+    const b = buckets.find(b=>c>=b.lo && c<b.hi) || buckets[buckets.length-1];
+    b.n++; b.mfeSum += r.mfe||0; b.maeSum += r.mae||0;
+    if((r.quality??0) > 0.5) b.win++;
+  });
+  let html = `<div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Всего завершённых сценариев: ${rows.length}</div>`;
+  html += `<table class="scen-table"><tr><th>Сила сигнала на момент входа</th><th>Кол-во</th><th>Сыграл в пользу прогноза</th><th>Сред. движение «за»</th><th>Сред. движение «против»</th></tr>`;
+  buckets.forEach(b=>{
+    if(!b.n){ html += `<tr><td>${b.label}</td><td>0</td><td>—</td><td>—</td><td>—</td></tr>`; return; }
+    const winPct = (b.win/b.n*100).toFixed(0);
+    const color = winPct>=55?'var(--pos)':winPct>=45?'var(--warn)':'var(--neg)';
+    html += `<tr><td>${b.label}</td><td>${b.n}</td><td style="color:${color}">${b.win}/${b.n} (${winPct}%)</td><td>${(b.mfeSum/b.n*100).toFixed(2)}%</td><td>${(b.maeSum/b.n*100).toFixed(2)}%</td></tr>`;
+  });
+  html += `</table>`;
+
+  // 2. По методам — что было дальше, когда конкретный метод сигналил рост/падение
+  html += `<table class="scen-table"><tr><th>Метод</th><th>Когда сигналил «рост» — сыграло</th><th>Когда сигналил «падение» — сыграло</th></tr>`;
+  METHODS.forEach(m=>{
+    let posN=0,posWin=0,negN=0,negWin=0;
+    rows.forEach(r=>{
+      const sc = r.methods?.[m.id] ?? 0;
+      if(Math.abs(sc) < 0.1) return;
+      const win = (r.quality??0) > 0.5 ? 1 : 0;
+      if(sc>0){ posN++; posWin+=win; } else { negN++; negWin+=win; }
+    });
+    const fmt = (n,w)=> n ? `${w}/${n} (${(w/n*100).toFixed(0)}%)` : '—';
+    html += `<tr><td>${m.label}</td><td>${fmt(posN,posWin)}</td><td>${fmt(negN,negWin)}</td></tr>`;
+  });
+  html += `</table>`;
+  html += `<div style="font-size:9px;color:var(--txt3);">«Сыграло» — после сигнала цена прошла дальше в предсказанную сторону, чем против неё.</div>`;
+  el.innerHTML = html;
 }
 
 // Сводная статистика по signalLog: всего/закрыто/нейтральных/точность по направлению
