@@ -419,15 +419,20 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
 </div>
 
 <div class="panel">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
     <div class="sec" style="margin-bottom:0;">Статистика по завершённым сценариям</div>
-    <div style="display:flex;gap:6px;">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <select class="select-inp" id="scenTickerSel" onchange="loadScenarioStats()" title="Фильтр по тикеру — показать эффективность методов именно для него">
+        <option value="">Все тикеры</option>
+      </select>
       <button class="btn-sm" onclick="runHistoricalBacktest()" title="Построить сценарии по дневным свечам текущего тикера за всю сохранённую историю (только ценовой тренд)">📜 По дням (тренд)</button>
-      <button class="btn-sm" onclick="runIntradayBacktest()" title="Прогнать все методы по сохранённым внутридневным данным AlgoPack (до 90 дней)">📊 По AlgoPack (все методы)</button>
+      <button class="btn-sm" onclick="runIntradayBacktest()" title="Прогнать все методы по сохранённым внутридневным данным AlgoPack (до 90 дней) для текущего тикера">📊 По AlgoPack: тикер</button>
+      <button class="btn-sm" id="btnBfBacktest" onclick="toggleBacktestQueue()" title="Прогнать «По AlgoPack» по очереди для всех тикеров из списка бэкфилла">🚀 По AlgoPack: все тикеры</button>
       <button class="btn-sm" onclick="loadScenarioStats()">↺ Обновить</button>
     </div>
   </div>
   <div id="scenarioStats" style="font-size:10px;color:var(--txt3);">Нажмите «Обновить» — статистика собирается по всем завершённым сценариям из базы (не только по текущему тикеру)</div>
+
 </div>
 
 <script>
@@ -1071,6 +1076,29 @@ async function toggleBfQueue(){
   bfRunning = false;
   btn.textContent = '▶ Очередь';
   setStatus(bfStop ? 'Очередь остановлена' : '✓ Очередь завершена');
+}
+
+// ── Очередь бэктеста по AlgoPack для всех тикеров из списка бэкфилла ──
+let btRunning = false, btStop = false;
+async function toggleBacktestQueue(){
+  if(btRunning){ btStop = true; setStatus('Останавливаю бэктест...'); return; }
+  const list = (bfQueue.length ? bfQueue : bfAllTickers()).map(x=>x.t);
+  if(!list.length){ setStatus('Нет тикеров — добавь кнопкой 📥 в каталоге или «Все»'); return; }
+  btRunning = true; btStop = false;
+  const btn = document.getElementById('btnBfBacktest');
+  btn.textContent = '⏸ Стоп бэктеста';
+  const prevTicker = curTicker;
+  for(const t of list){
+    if(btStop) break;
+    curTicker = t;
+    setStatus(`Бэктест по AlgoPack (осталось ${list.indexOf(t)+1}/${list.length}): ${t}…`, true);
+    try{ await runIntradayBacktest(); } catch(e){}
+  }
+  curTicker = prevTicker;
+  btRunning = false;
+  btn.textContent = '🚀 По AlgoPack: все тикеры';
+  setStatus(btStop ? 'Бэктест остановлен' : '✓ Бэктест по всем тикерам завершён');
+  loadScenarioStats();
 }
 
 async function fetchAllMoex(ticker, type){
@@ -2395,10 +2423,22 @@ async function runIntradayBacktest(){
 async function loadScenarioStats(){
   const el = document.getElementById('scenarioStats');
   el.textContent = 'Загрузка...';
+  const sel = document.getElementById('scenTickerSel');
+  const tickerFilter = sel?.value || '';
   let rows;
-  try{ rows = await dbFetch('/db/signals?resolved=1'); }
+  try{ rows = await dbFetch('/db/signals?resolved=1' + (tickerFilter ? `&ticker=${encodeURIComponent(tickerFilter)}` : '')); }
   catch(e){ el.textContent = 'Ошибка загрузки: ' + e.message; return; }
   if(!rows || !rows.length){ el.textContent = 'Завершённых сценариев пока нет — подождите, пока сигналы пройдут через MAX_BARS или STOP'; return; }
+
+  // Наполняем список тикеров (один раз — из всех сценариев без фильтра)
+  if(sel && sel.options.length <= 1){
+    try{
+      const all = await dbFetch('/db/signals?resolved=1');
+      const uniq = [...new Set(all.map(r=>r.ticker))].sort();
+      uniq.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+      if(tickerFilter) sel.value = tickerFilter;
+    } catch(e){}
+  }
 
   // 1. По силе сигнала
   const buckets = [
