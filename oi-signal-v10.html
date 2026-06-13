@@ -198,6 +198,8 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;" title="Учитывать сигналы коррелированных тикеров (BR/Si, акция/индекс и т.п.)">
         <input type="checkbox" id="corrChk" checked onchange="toggleCorr()" style="cursor:pointer;"> Связи
       </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;" title="Учитывать вердикт модуля индикаторов (RSI/MACD/Stoch и др. из indlab за 90 дней)">
+        <input type="checkbox" id="extIndChk" checked onchange="toggleExtInd()" style="cursor:pointer;"> Индикаторы</label>
       <span style="font-size:10px;color:var(--txt3);" id="statusTxt">Ожидание</span>
       <div id="spinnerEl" style="display:none;"><div class="spinner"></div></div>
     </div>
@@ -500,6 +502,7 @@ const CORR_GROUPS = {
 };
 
 let corrEnabled = true;
+let extIndEnabled = true;
 
 const CATALOG = [
   // Акции TQBR — f: FIGI для T-Invest свечей
@@ -709,6 +712,7 @@ function saveAll(){
     curTicker, autoInterval, curWindow,
     autoOn: document.getElementById('autoChk').checked,
     corrEnabled,
+    extIndEnabled,
   };
   localStorage.setItem(LS, JSON.stringify(d));
   const el = document.getElementById('saveInd');
@@ -750,11 +754,23 @@ function loadAll(){
       corrEnabled = false;
       document.getElementById('corrChk').checked = false;
     }
+    if(d.extIndEnabled === false){
+      extIndEnabled = false;
+      document.getElementById('extIndChk').checked = false;
+    }
     if(d.curWindow) {
       curWindow = d.curWindow;
       document.getElementById('windowSel').value = String(curWindow);
     }
   } catch(e){}
+}
+
+function toggleExtInd(){
+  extIndEnabled = document.getElementById('extIndChk').checked;
+  saveAll();
+  const mr = computeAllMethods();
+  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
+  renderMethodsTable(mr);
 }
 
 function toggleCorr(){
@@ -1606,6 +1622,7 @@ function _ilRequestVerdict(ticker){
     .finally(()=>{ delete extIndicatorsPending[ticker]; });
 }
 function m_EXT_INDICATORS(){
+  if(!extIndEnabled) return {score:0, confidence:0, detail:'учёт модуля индикаторов выключен (тумблер «Индикаторы»)'};
   const cached = extIndicatorsCache[curTicker];
   const maxAge = 10*60*1000;
   if(!cached || Date.now()-cached.ts > maxAge){
