@@ -189,6 +189,9 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <option value="60">60д</option>
       </select>
       <span class="calib-stat" id="calibBadge">калибровка —</span>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;" title="Учитывать сигналы коррелированных тикеров (BR/Si, акция/индекс и т.п.)">
+        <input type="checkbox" id="corrChk" checked onchange="toggleCorr()" style="cursor:pointer;"> Связи
+      </label>
       <span style="font-size:10px;color:var(--txt3);" id="statusTxt">Ожидание</span>
       <div id="spinnerEl" style="display:none;"><div class="spinner"></div></div>
     </div>
@@ -433,7 +436,45 @@ const METHODS = [
   {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#FF006E'},
   {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
+  {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FF9F40'},
 ];
+
+// ============================================================
+// КОРРЕЛЯЦИИ МЕЖДУ ТИКЕРАМИ
+// corr ∈ [-1,1]: знак — однонаправленно/противофазно, |corr| — сила связи.
+// Используется в m_CORR_PEERS как доп. источник сигнала.
+// Можно править / отключать через corrEnabled (тумблер в шапке).
+// ============================================================
+const CORR_GROUPS = {
+  // Нефть / валюта / газ — фьючерсы FORTS
+  SiU6: [{t:'BRU6',corr:-0.5},{t:'EuU6',corr:0.6}],
+  SiZ6: [{t:'BRU6',corr:-0.5},{t:'EuU6',corr:0.6}],
+  EuU6: [{t:'SiU6',corr:0.6}],
+  BRU6: [{t:'SiU6',corr:-0.5},{t:'GZU6',corr:0.3},{t:'LKOH',corr:0.4},{t:'ROSN',corr:0.4},{t:'TATN',corr:0.4}],
+  NGU6: [{t:'NVTK',corr:0.3}],
+  // Индексные фьючерсы и кэш-индексы
+  RIU6: [{t:'MXU6',corr:0.85},{t:'SBER',corr:0.5}],
+  MXU6: [{t:'RIU6',corr:0.85},{t:'IMOEX',corr:0.95}],
+  IMOEX:[{t:'MXU6',corr:0.95},{t:'SBER',corr:0.6},{t:'GAZP',corr:0.4},{t:'LKOH',corr:0.4}],
+  RTSI: [{t:'RIU6',corr:0.85}],
+  // Акции ↔ их фьючерсы / индекс
+  SBER: [{t:'SRU6',corr:0.85},{t:'IMOEX',corr:0.6},{t:'CBOM',corr:0.5},{t:'VTBR',corr:0.5}],
+  SRU6: [{t:'SBER',corr:0.85}],
+  GAZP: [{t:'GZU6',corr:0.85},{t:'BRU6',corr:0.2},{t:'IMOEX',corr:0.4}],
+  GZU6: [{t:'GAZP',corr:0.85}],
+  LKOH: [{t:'BRU6',corr:0.4},{t:'TATN',corr:0.5},{t:'ROSN',corr:0.5}],
+  ROSN: [{t:'BRU6',corr:0.4},{t:'LKOH',corr:0.5},{t:'TATN',corr:0.5}],
+  TATN: [{t:'BRU6',corr:0.4},{t:'LKOH',corr:0.5},{t:'ROSN',corr:0.5}],
+  NVTK: [{t:'NGU6',corr:0.3},{t:'BRU6',corr:0.3}],
+  // Банки / металлурги — внутригруппные
+  VTBR: [{t:'SBER',corr:0.5},{t:'CBOM',corr:0.5}],
+  CBOM: [{t:'SBER',corr:0.5},{t:'VTBR',corr:0.5}],
+  GMKN: [{t:'PLZL',corr:0.3},{t:'RUAL',corr:0.3}],
+  CHMF: [{t:'NLMK',corr:0.6}],
+  NLMK: [{t:'CHMF',corr:0.6}],
+};
+
+let corrEnabled = true;
 
 const CATALOG = [
   // Акции TQBR — f: FIGI для T-Invest свечей
@@ -642,6 +683,7 @@ function saveAll(){
     proxy: document.getElementById('proxyInp').value,
     curTicker, autoInterval, curWindow,
     autoOn: document.getElementById('autoChk').checked,
+    corrEnabled,
   };
   localStorage.setItem(LS, JSON.stringify(d));
   const el = document.getElementById('saveInd');
@@ -679,11 +721,23 @@ function loadAll(){
       document.getElementById('autoChk').checked = true;
       startAuto();
     }
+    if(d.corrEnabled === false){
+      corrEnabled = false;
+      document.getElementById('corrChk').checked = false;
+    }
     if(d.curWindow) {
       curWindow = d.curWindow;
       document.getElementById('windowSel').value = String(curWindow);
     }
   } catch(e){}
+}
+
+function toggleCorr(){
+  corrEnabled = document.getElementById('corrChk').checked;
+  saveAll();
+  const mr = computeAllMethods();
+  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
+  renderMethodsTable(mr);
 }
 
 function onWindowChange(){
@@ -1431,6 +1485,30 @@ function m_PRICE_TREND(candles){
   return {score, confidence, detail:`roc3:${(roc3*100).toFixed(1)}% roc10:${(roc10*100).toFixed(1)}% atr%:${(atrPct*100).toFixed(2)}`};
 }
 
+// --- Method 11: Связанные тикеры — переносим сигнал коррелированных инструментов ---
+// Берём последний рассчитанный composite по каждому связанному тикеру (из signalLog,
+// заполняется при их собственных обновлениях), взвешиваем по знаку/силе корреляции.
+function m_CORR_PEERS(){
+  if(!corrEnabled) return {score:0, confidence:0, detail:'связи отключены'};
+  const peers = CORR_GROUPS[curTicker];
+  if(!peers || !peers.length) return {score:0, confidence:0, detail:'нет заданных связей'};
+  let wSum=0, wTotal=0, used=[];
+  const maxAge = 2*3600*1000; // 2 часа — свежесть пирового сигнала
+  peers.forEach(p=>{
+    const entry = signalLog.find(e=>e.ticker===p.t);
+    if(!entry || entry.composite==null || !entry.ts) return;
+    if(Date.now() - entry.ts > maxAge) return;
+    const w = Math.abs(p.corr);
+    wSum   += entry.composite * p.corr * w;
+    wTotal += w * w;
+    used.push(`${p.t}:${p.corr>=0?'+':''}${p.corr}`);
+  });
+  if(!used.length) return {score:0, confidence:0, detail:`нет свежих сигналов по: ${peers.map(p=>p.t).join(',')}`};
+  const score = Math.tanh(wSum/wTotal);
+  const confidence = Math.min(0.5, 0.15*used.length);
+  return {score, confidence, detail:used.join(' ')};
+}
+
 // ============================================================
 // REGIME CLASSIFIER MODULE v1.0
 // ============================================================
@@ -1635,6 +1713,7 @@ function computeAllMethods(){
   results.INST_OI        = m_INST_OI(futoiData);
   results.RETAIL_CONTRA  = m_RETAIL_CONTRA(futoiData);
   results.PRICE_TREND    = m_PRICE_TREND(candleData);
+  results.CORR_PEERS     = m_CORR_PEERS();
   return results;
 }
 
