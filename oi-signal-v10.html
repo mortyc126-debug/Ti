@@ -1614,10 +1614,16 @@ function m_EXT_INDICATORS(){
   if(!cached) return {score:0, confidence:0, detail:'запрос к модулю индикаторов отправлен, ответа пока нет'};
   if(cached.error) return {score:0, confidence:0, detail:`модуль индикаторов: ошибка — ${cached.error}`};
   const ageMin = Math.round((Date.now()-cached.ts)/60000);
-  const parts = (cached.details||[]).map(d=>`${d.name}: ${d.text}`);
+  const details = cached.details||[];
+  const used = details.filter(d=>d.included);
+  const parts = details.map(d=>{
+    const eff = d.n>=10 ? `, эффективность за 90д ${Math.round(d.winRate*100)}% (n=${d.n})` : ', недостаточно истории';
+    const mark = d.included ? '✓ учтён' : '— не учтён';
+    return `${d.name} (${mark}${eff}): ${d.text}`;
+  });
   const score = Math.max(-1, Math.min(1, cached.score/2));
-  const confidence = 0.4;
-  return {score, confidence, detail:`модуль индикаторов (${ageMin} мин назад) — ${cached.label}. ${parts.join(' ')}`};
+  const confidence = used.length ? Math.min(0.5, 0.15*used.length) : 0.05;
+  return {score, confidence, detail:`модуль индикаторов (${ageMin} мин назад) — ${cached.label}. Учтено ${used.length} из ${details.length}. ${parts.join(' ')}`};
 }
 
 // ============================================================

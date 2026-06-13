@@ -7373,8 +7373,101 @@ async function ilFindFigi(ticker, token) {
   return list.find(i=>i.ticker===ticker) || list[0];
 }
 
-// Вердикт по индикаторам (RSI/MACD) на дневках за ~90 дней.
-// Возвращает {score: -2..2, label, details:[{name,text,score}]}
+// ── Доп. расчёты индикаторов по OHLCV (для тех, кого нет в _chartCalc*) ──
+function ilCalcStoch(c, period, smoothK) {
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let hh=-Infinity, ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){ if(c[j].high>hh)hh=c[j].high; if(c[j].low<ll)ll=c[j].low; }
+    res.push(hh===ll?50:(c[i].close-ll)/(hh-ll)*100);
+  }
+  const k=[];
+  for(let i=0;i<res.length;i++){
+    if(res[i]==null||i<smoothK-1){k.push(null);continue;}
+    let s=0,n=0; for(let j=i-smoothK+1;j<=i;j++){ if(res[j]!=null){s+=res[j];n++;} }
+    k.push(n?s/n:null);
+  }
+  const d=[];
+  for(let i=0;i<k.length;i++){
+    if(k[i]==null||i<2||k[i-1]==null||k[i-2]==null){d.push(null);continue;}
+    d.push((k[i]+k[i-1]+k[i-2])/3);
+  }
+  return k.map((kv,i)=>({k:kv,d:d[i]}));
+}
+function ilCalcCCI(c, period) {
+  const tp=c.map(x=>(x.high+x.low+x.close)/3);
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    const slice=tp.slice(i-period+1,i+1);
+    const sma=slice.reduce((a,v)=>a+v,0)/period;
+    const md=slice.reduce((a,v)=>a+Math.abs(v-sma),0)/period;
+    res.push(md===0?0:(tp[i]-sma)/(0.015*md));
+  }
+  return res;
+}
+function ilCalcWR(c, period) {
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let hh=-Infinity, ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){ if(c[j].high>hh)hh=c[j].high; if(c[j].low<ll)ll=c[j].low; }
+    res.push(hh===ll?-50:(hh-c[i].close)/(hh-ll)*-100);
+  }
+  return res;
+}
+function ilCalcMFI(c, period) {
+  const tp=c.map(x=>(x.high+x.low+x.close)/3);
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period){res.push(null);continue;}
+    let pos=0,neg=0;
+    for(let j=i-period+1;j<=i;j++){
+      const mf=tp[j]*c[j].volume;
+      if(tp[j]>tp[j-1]) pos+=mf; else if(tp[j]<tp[j-1]) neg+=mf;
+    }
+    res.push(neg===0?100:100-100/(1+pos/neg));
+  }
+  return res;
+}
+
+// ── Оценка score (-2..2) текущего значения по той же шкале, что и UI «Гид» ──
+const ilScore = {
+  rsi:  x => x<=30?2 : x<=40?1 : x<=60?0 : x<=70?-1 : -2,
+  wr:   x => x>=-20?-2 : x>=-30?-1 : x>=-70?0 : x>=-80?1 : 2,
+  cci:  x => x>200?-2 : x>100?-1 : x<-200?2 : x<-100?1 : 0,
+  mfi:  x => x>=80?-2 : x>=70?-1 : x<=20?2 : x<=30?1 : 0,
+  bb:   x => x<=0?2 : x<20?1 : x>=100?-2 : x>80?-1 : 0, // x = позиция цены в полосе, %
+};
+function ilScoreStoch(k,d){
+  const up=k>d, dn=k<d, near=Math.abs(k-d)<5;
+  if(k<=20&&up) return 2; if(k>=80&&dn) return -2;
+  if(k<=30&&up) return 1; if(k>=70&&dn) return -1;
+  if(near) return 0;
+  return up?1:(dn?-1:0);
+}
+function ilScoreMACD(macdArr,sigArr,histArr,i){
+  const f=macdArr[i], s=sigArr[i];
+  if(f==null||s==null) return 0;
+  const ab=f>s, abZ=f>0;
+  const h=histArr[i], ph=histArr[i-1];
+  let trend = (h!=null&&ph!=null) ? (h>ph ? (h>0?'up':'down') : 'fade') : 'fade';
+  if(ab&&abZ&&trend==='up') return 2;
+  if(!ab&&!abZ&&trend==='down') return -2;
+  if(ab&&trend==='up') return 1;
+  if(!ab&&trend==='down') return -1;
+  return 0;
+}
+
+const IL_INDICATORS = ['rsi','wr','cci','mfi','stoch','macd','bb'];
+const IL_NAMES = {rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B'};
+
+// Вердикт по набору индикаторов на дневках за ~90 дней.
+// Для каждого индикатора считается историческая серия score'ов и бэктест:
+// эффективность = доля совпадений знака score с направлением цены через N дней.
+// В итоговый score попадают только индикаторы с устойчивым перевесом (winRate>0.55, N>=10).
+// Возвращает {score: -2..2, label, details:[{name,text,score,winRate,n,included}]}
 async function ilGetVerdict({ticker, token}) {
   token = token || _ilShellToken;
   if (!token) throw new Error('Нет API-токена');
@@ -7388,35 +7481,87 @@ async function ilGetVerdict({ticker, token}) {
   });
   if (!cr.ok) throw new Error('GetCandles '+cr.status);
   const cd = await cr.json();
-  const closes = (cd.candles||[]).map(c=>chartQuotation(c.close)).filter(c=>c>0);
-  if (closes.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+closes.length+' свечей)');
+  const candles = (cd.candles||[]).map(c=>({
+    open:chartQuotation(c.open), high:chartQuotation(c.high), low:chartQuotation(c.low),
+    close:chartQuotation(c.close), volume:Number(c.volume)||0,
+  })).filter(c=>c.close>0);
+  if (candles.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+candles.length+' свечей)');
+  const closes = candles.map(c=>c.close);
 
-  const rsiArr = _chartCalcRSI(closes, 14);
-  const macdR = _chartCalcMACD(closes, 12, 26, 9);
-  const rsi = Math.round(rsiArr[rsiArr.length-1]*10)/10;
+  // Серии score по каждому индикатору (индекс совпадает с candles)
+  const rsiArr = _chartCalcRSI(closes,14);
+  const wrArr = ilCalcWR(candles,14);
+  const cciArr = ilCalcCCI(candles,20);
+  const mfiArr = ilCalcMFI(candles,14);
+  const stochArr = ilCalcStoch(candles,14,3);
+  const macdR = _chartCalcMACD(closes,12,26,9);
+  const bbArr = _chartCalcBB(closes,20,2);
 
-  const hist = macdR.hist;
-  let histTrend = 'иссякает';
-  const lastH = hist[hist.length-1], prevH = hist[hist.length-2];
-  if (lastH!==null && prevH!==null) {
-    if (lastH > prevH) histTrend = lastH>0 ? 'растёт' : 'падает';
-    else histTrend = 'иссякает';
+  const seriesScore = {};
+  seriesScore.rsi = rsiArr.map(v=>v==null?null:ilScore.rsi(v));
+  seriesScore.wr  = wrArr.map(v=>v==null?null:ilScore.wr(v));
+  seriesScore.cci = cciArr.map(v=>v==null?null:ilScore.cci(v));
+  seriesScore.mfi = mfiArr.map(v=>v==null?null:ilScore.mfi(v));
+  seriesScore.stoch = stochArr.map(v=>(v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d));
+  seriesScore.macd = closes.map((_,i)=>ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i)===0&&macdR.macd[i]==null?null:ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i));
+  seriesScore.bb = bbArr.map((b,i)=> b==null ? null : ilScore.bb((closes[i]-b.lower)/((b.upper-b.lower)||1)*100));
+
+  // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
+  const horizon = 5;
+  const evalRes = {};
+  IL_INDICATORS.forEach(id=>{
+    const s = seriesScore[id];
+    let win=0, n=0;
+    for(let i=0;i<closes.length-horizon;i++){
+      const sc = s[i];
+      if(sc==null || sc===0) continue;
+      const fut = closes[i+horizon]-closes[i];
+      if(fut===0) continue;
+      n++;
+      if((sc>0&&fut>0)||(sc<0&&fut<0)) win++;
+    }
+    evalRes[id] = {winRate: n>0?win/n:0, n};
+  });
+
+  // Текущие значения и тексты
+  const last = closes.length-1;
+  const curText = {
+    rsi: `RSI(14) = ${rsiArr[last]?.toFixed(1) ?? '—'}`,
+    wr:  `Williams %R(14) = ${wrArr[last]?.toFixed(1) ?? '—'}`,
+    cci: `CCI(20) = ${cciArr[last]?.toFixed(0) ?? '—'}`,
+    mfi: `MFI(14) = ${mfiArr[last]?.toFixed(1) ?? '—'}`,
+    stoch: `Stochastic %K/%D = ${stochArr[last]?.k?.toFixed(1) ?? '—'} / ${stochArr[last]?.d?.toFixed(1) ?? '—'}`,
+    macd: `MACD ${macdR.macd[last]?.toFixed(2) ?? '—'} / сигнальная ${macdR.signal[last]?.toFixed(2) ?? '—'}`,
+    bb: bbArr[last] ? `позиция цены в полосах Боллинджера = ${((closes[last]-bbArr[last].lower)/((bbArr[last].upper-bbArr[last].lower)||1)*100).toFixed(0)}%` : 'недостаточно данных',
+  };
+
+  const details = IL_INDICATORS.map(id=>{
+    const cur = seriesScore[id][last];
+    const ev = evalRes[id];
+    const included = ev.n>=10 && ev.winRate>0.55;
+    return {
+      name: IL_NAMES[id],
+      text: curText[id],
+      score: cur ?? 0,
+      winRate: ev.winRate,
+      n: ev.n,
+      included,
+    };
+  });
+
+  const used = details.filter(d=>d.included && d.score!==0);
+  let score = 0;
+  if(used.length){
+    let wSum=0, wTot=0;
+    used.forEach(d=>{ const w=(d.winRate-0.5)*2; wSum += d.score*w; wTot += w; });
+    score = wTot>0 ? wSum/wTot * Math.min(1, used.length/3) : 0;
   }
-  const macdF = macdR.macd[macdR.macd.length-1], macdS = macdR.signal[macdR.signal.length-1];
-
-  const rsiR = interpRSI(rsi);
-  const macdRes = (macdF!==null && macdS!==null) ? interpMACD(macdF, macdS, histTrend) : {s:'neutral', t:'MACD недоступен'};
-
-  const details = [
-    {name:'RSI', text: rsiR.t, score: SC[rsiR.s]},
-    {name:'MACD', text: macdRes.t, score: SC[macdRes.s]},
-  ];
-  const score = details.reduce((a,b)=>a+b.score,0) / details.length;
   let label;
-  if (score >= 1.5) label = 'сильный сигнал на рост';
-  else if (score >= 0.5) label = 'сигнал на рост';
-  else if (score <= -1.5) label = 'сильный сигнал на падение';
-  else if (score <= -0.5) label = 'сигнал на падение';
+  if (!used.length) label = 'за 90 дней ни один индикатор не показал устойчивого перевеса — сигнала нет';
+  else if (score >= 1) label = 'сильный сигнал на рост';
+  else if (score >= 0.4) label = 'сигнал на рост';
+  else if (score <= -1) label = 'сильный сигнал на падение';
+  else if (score <= -0.4) label = 'сигнал на падение';
   else label = 'нейтрально';
 
   return {score, label, details};
