@@ -485,6 +485,147 @@ const CATALOG = [
   {t:'EUR_RUB__TOM', cat:'currency', name:'Евро',        sector:'Валюта'},
   {t:'CNY000000TOM', cat:'currency', name:'Юань',        sector:'Валюта'},
 ];
+// ============================================================
+// STATE
+// ============================================================
+let curTicker = '';
+let curType = 'stocks';
+let curTF = '1min';
+let autoInterval = 60;
+let autoTimer = null;
+let curWindow = 30; // дней — глубина скользящего окна нормализации
+
+let tickers = [];
+let pinnedTickers = ['SBER','GAZP','LKOH','BRU6'];
+
+// Текущие бары (последние 100)
+let tsHistory = [];
+let obHistory = [];
+let osHistory = [];
+let futoiData = [];
+let candleData = {};
+
+// Глубокая история для перцентилей — из D1 (до curWindow дней)
+// {ticker: {tradestats:[...], obstats:[...], orderstats:[...], futoi:[...]}}
+let deepHistory = {};
+
+// Кэш перцентилей — пересчитывается после загрузки deepHistory
+// {ticker__type__field__window: {p10,p25,p50,p75,p90,n}}
+let pctCache = {};
+
+// ATR по тикеру/tf — адаптивный порог значимого движения
+// {ticker__tf: {atr, atr_pct, n}}
+let atrCache = {};
+
+// Signal snapshots
+let lastSnapshot = null;
+let methodWeights = {};
+let signalLog = [];
+
+let candleChart = null;
+let moexLastUpdate = null;
+let candleLastUpdate = null;
+let calibLastTicker = null; // для которого считали перцентили
+
+// ============================================================
+// D1 КЛИЕНТ — все запросы идут через CF Worker /db/* роуты
+// ============================================================
+function dbBase(){
+  // Берём прокси из поля ввода, убираем ?u= суффикс если есть
+  const raw = (document.getElementById('proxyInp')?.value||'').trim();
+  return raw.replace(/\/\?u=$/, '').replace(/\?u=$/, '').replace(/\/$/, '');
+}
+
+async function dbFetch(path, opts={}){
+  const base = dbBase();
+  if(!base) throw new Error('Укажи URL прокси в настройках');
+  const resp = await fetch(base + path, {
+    ...opts,
+    headers: {'Content-Type':'application/json', ...(opts.headers||{})},
+  });
+  if(!resp.ok){
+    const t = await resp.text().catch(()=>'');
+    throw new Error(`DB ${path} → HTTP ${resp.status}: ${t.slice(0,120)}`);
+  }
+  return resp.json();
+}
+
+async function dbOpen(){
+  // Инициализируем схему на старте (идемпотентно)
+  return dbFetch('/db/init').catch(e=>console.warn('D1 init:', e.message));
+}
+
+async function dbSaveCandles(ticker, tf, candles){
+  if(!candles.length) return;
+  const rows = candles.map(c=>({
+    key: `${ticker}__${tf}__${new Date(c.time).getTime()}`,
+    ticker, tf,
+    time: new Date(c.time).getTime(),
+    o: toP(c.open), h: toP(c.high), l: toP(c.low), cl: toP(c.close),
+    vol: c.volume?.units ? parseInt(c.volume.units)||0 : 0,
+  }));
+  return dbFetch('/db/candles', {method:'POST', body: JSON.stringify(rows)});
+}
+
+async function dbGetCandlesAfter(ticker, tf, fromTs){
+  return dbFetch(`/db/candles?ticker=${encodeURIComponent(ticker)}&tf=${encodeURIComponent(tf)}&from=${fromTs}`);
+}
+
+async function dbSaveSignal(sig){
+  const r = await dbFetch('/db/signal', {method:'POST', body: JSON.stringify({
+    ts: sig.ts, ticker: sig.ticker, tf: sig.tf,
+    entry_price: sig.entryPrice||0, entry_ts: sig.entryTs||0,
+    composite: sig.composite||0, dir: sig.dir||'neutral',
+    methods: sig.methods||{},
+  })});
+  return r.id;
+}
+
+async function dbUpdateSignal(id, patch){
+  return dbFetch(`/db/signal/${id}`, {method:'PATCH', body: JSON.stringify(patch)});
+}
+
+async function dbGetOpenSignals(ticker){
+  return dbFetch(`/db/signals?ticker=${encodeURIComponent(ticker)}&resolved=0`);
+}
+
+async function dbSaveWeight(ticker, methodId, data){
+  return dbFetch('/db/weight', {method:'POST', body: JSON.stringify({ticker, method_id: methodId, ...data})});
+}
+
+async function dbLoadWeights(ticker){
+  const rows = await dbFetch(`/db/weights?ticker=${encodeURIComponent(ticker)}`);
+  const out = {};
+  rows.forEach(w=>{ out[w.method_id] = {weight:w.weight, total:w.total, sum_quality:w.sum_quality}; });
+  return out;
+}
+
+// ── AlgoPack history ──
+async function dbSaveAlgopack(ticker, type, rows){
+  if(!rows.length) return;
+  return dbFetch('/db/algopack', {method:'POST', body: JSON.stringify({ticker, type, rows})});
+}
+async function dbLoadAlgopack(ticker, type, days){
+  return dbFetch(`/db/algopack?ticker=${encodeURIComponent(ticker)}&type=${encodeURIComponent(type)}&days=${days}`);
+}
+
+// ── Percentiles cache ──
+async function dbSavePercentiles(rows){
+  if(!rows.length) return;
+  return dbFetch('/db/percentiles', {method:'POST', body: JSON.stringify(rows)});
+}
+async function dbLoadPercentiles(ticker, windowDays){
+  return dbFetch(`/db/percentiles?ticker=${encodeURIComponent(ticker)}&window=${windowDays}`);
+}
+
+// ── ATR ──
+async function dbSaveAtr(ticker, tf, atr, atr_pct, n){
+  return dbFetch('/db/atr', {method:'POST', body: JSON.stringify({ticker, tf, atr, atr_pct, n})});
+}
+async function dbLoadAtr(ticker){
+  return dbFetch(`/db/atr?ticker=${encodeURIComponent(ticker)}`);
+}
+
 
 // STORAGE (localStorage — только UI-настройки и пины)
 // ============================================================
