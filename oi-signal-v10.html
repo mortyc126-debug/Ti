@@ -2405,8 +2405,19 @@ function selTF(btn, tf){
   document.querySelectorAll('.tf-bar .btn-ghost, #tf1m, #tf5m, #tf1h, #tf1d').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   curTF = tf;
-  if(candleData[tf]) renderCandleChart(candleData[tf]);
-  else refreshAll(); // нет кэша для этого ТФ — грузим
+  // Всегда переcчитываем график и сигналы под новый ТФ (ATR/VWAP/PRICE_TREND
+  // зависят от curTF, поэтому рендера одного графика из кэша недостаточно)
+  if(candleData[tf] && candleData[tf].length){
+    renderCandleChart(candleData[tf]);
+    computeAtr(curTicker, tf, candleData[tf]);
+    const methodResults = computeAllMethods();
+    const composite = computeComposite(methodResults, curTicker);
+    const avgConf = METHODS.reduce((s,m)=>s+(methodResults[m.id]?.confidence||0),0)/METHODS.length;
+    renderGauge(composite, avgConf);
+    renderMethodsTable(methodResults);
+  } else {
+    refreshAll(); // нет кэша для этого ТФ — грузим
+  }
 }
 
 // ============================================================
