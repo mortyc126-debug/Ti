@@ -202,6 +202,10 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       </label>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;" title="Учитывать вердикт модуля индикаторов (RSI/MACD/Stoch и др. из indlab за 90 дней)">
         <input type="checkbox" id="extIndChk" checked onchange="toggleExtInd()" style="cursor:pointer;"> Индикаторы</label>
+      <select id="extIndBasisSel" onchange="toggleExtIndBasis()" style="font-size:10px;background:var(--panel);color:var(--txt3);border:1px solid var(--border2);border-radius:6px;cursor:pointer;" title="Для фьючерсов: считать индикаторы по базовому активу (больше истории) или по самому фьючерсу">
+        <option value="basis" selected>по базису</option>
+        <option value="future">по фьючерсу</option>
+      </select>
       <span style="font-size:10px;color:var(--txt3);" id="statusTxt">Ожидание</span>
       <div id="spinnerEl" style="display:none;"><div class="spinner"></div></div>
     </div>
@@ -507,6 +511,7 @@ const CORR_GROUPS = {
 
 let corrEnabled = true;
 let extIndEnabled = true;
+let extIndBasis = 'basis'; // 'basis' = считать индикаторы по базовому активу фьючерса, 'future' = по самому фьючерсу
 
 const CATALOG = [
   // Акции TQBR — f: FIGI для T-Invest свечей
@@ -725,6 +730,7 @@ function saveAll(){
     autoOn: document.getElementById('autoChk').checked,
     corrEnabled,
     extIndEnabled,
+    extIndBasis,
   };
   localStorage.setItem(LS, JSON.stringify(d));
   const el = document.getElementById('saveInd');
@@ -770,6 +776,10 @@ function loadAll(){
       extIndEnabled = false;
       document.getElementById('extIndChk').checked = false;
     }
+    if(d.extIndBasis === 'future' || d.extIndBasis === 'basis'){
+      extIndBasis = d.extIndBasis;
+      document.getElementById('extIndBasisSel').value = extIndBasis;
+    }
     if(d.curWindow) {
       curWindow = d.curWindow;
       document.getElementById('windowSel').value = String(curWindow);
@@ -780,6 +790,18 @@ function loadAll(){
 function toggleExtInd(){
   extIndEnabled = document.getElementById('extIndChk').checked;
   saveAll();
+  const mr = computeAllMethods();
+  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
+  renderMethodsTable(mr);
+}
+
+// Переключение базис/фьючерс сбрасывает кэш разрешения тикера и заставляет
+// пересчитать вердикт индикаторов для текущего тикера с новым выбором.
+function toggleExtIndBasis(){
+  extIndBasis = document.getElementById('extIndBasisSel').value;
+  saveAll();
+  _ilResolveCache = {};
+  delete extIndicatorsCache[curTicker];
   const mr = computeAllMethods();
   renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
   renderMethodsTable(mr);
@@ -1647,7 +1669,33 @@ function _ilRpcCall(api, args){
 
 let extIndicatorsCache = {}; // ticker -> {score, label, details, ts}
 let extIndicatorsPending = {};
+let _ilResolveCache = {}; // ticker -> {resolved, note}
 const EXT_IND_MAX_AGE = 6*3600*1000; // 6 часов — индикаторы за 90 дней не меняются быстро
+
+// Для фьючерса с режимом «по базису» подменяет тикер на базовый актив
+// (basicAsset, обычно совпадает с тикером акции — у него больше истории).
+// В режиме «по фьючерсу» или для не-фьючерсов тикер не меняется.
+async function _ilResolveTicker(ticker){
+  if(_ilResolveCache[ticker]) return _ilResolveCache[ticker];
+  let result = {resolved:ticker, note:''};
+  if(extIndBasis === 'basis'){
+    try{
+      const token = getTinvestToken();
+      const resp = await fetch(tinvestUrl('/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'), {
+        method:'POST',
+        headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+        body: JSON.stringify({query:ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false}),
+      });
+      const d = await resp.json();
+      const found = (d.instruments||[]).find(x=>x.ticker===ticker);
+      if(found && found.instrumentType==='future' && found.basicAsset && found.basicAsset!==ticker){
+        result = {resolved:found.basicAsset, note:`по базису ${found.basicAsset} (фьюч ${ticker})`};
+      }
+    }catch(_){ /* не удалось определить базис — считаем по исходному тикеру */ }
+  }
+  _ilResolveCache[ticker] = result;
+  return result;
+}
 
 // Загружает свежий вердикт: сперва пробует кэш в D1 (быстро, бесплатно),
 // если там пусто/устарело — считает в indlab и сохраняет результат в D1.
@@ -1655,10 +1703,11 @@ async function _ilRequestVerdict(ticker){
   if(extIndicatorsPending[ticker]) return;
   extIndicatorsPending[ticker] = true;
   try{
+    const {resolved, note} = await _ilResolveTicker(ticker);
     try{
-      const cached = await dbLoadIndVerdict(ticker);
+      const cached = await dbLoadIndVerdict(resolved);
       if(cached && cached.updated_at && Date.now()-cached.updated_at < EXT_IND_MAX_AGE){
-        extIndicatorsCache[ticker] = {...cached, ts:cached.updated_at};
+        extIndicatorsCache[ticker] = {...cached, ts:cached.updated_at, note};
         return;
       }
     }catch(e){ /* нет прокси/таблицы — просто считаем заново */ }
@@ -1666,9 +1715,9 @@ async function _ilRequestVerdict(ticker){
       extIndicatorsCache[ticker] = {error:'модуль открыт не внутри shell — нет window.parent', ts:Date.now()};
       return;
     }
-    const res = await _ilRpcCall('getVerdict', {ticker, token: getTinvestToken()});
-    extIndicatorsCache[ticker] = {...res, ts:Date.now()};
-    dbSaveIndVerdict(ticker, res).catch(()=>{});
+    const res = await _ilRpcCall('getVerdict', {ticker:resolved, token: getTinvestToken()});
+    extIndicatorsCache[ticker] = {...res, ts:Date.now(), note};
+    dbSaveIndVerdict(resolved, res).catch(()=>{});
   }catch(err){
     extIndicatorsCache[ticker] = {error:String(err&&err.message||err), ts:Date.now()};
   }finally{
@@ -1693,7 +1742,8 @@ function m_EXT_INDICATORS(){
   });
   const score = Math.max(-1, Math.min(1, cached.score/2));
   const confidence = used.length ? Math.min(0.5, 0.15*used.length) : 0.05;
-  const header = `модуль индикаторов (${ageMin} мин назад) — ${cached.label}. Учтено ${used.length} из ${details.length}:`;
+  const basisNote = cached.note ? ` [${cached.note}]` : '';
+  const header = `модуль индикаторов (${ageMin} мин назад)${basisNote} — ${cached.label}. Учтено ${used.length} из ${details.length}:`;
   return {score, confidence, detail:`${header}<br>${parts.join('<br>')}`};
 }
 
