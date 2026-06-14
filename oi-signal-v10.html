@@ -2711,7 +2711,7 @@ function renderCatalog(){
         <div class="cat-item-name">${item.name}</div>
         <div class="cat-item-sector">${item.sector||item.cat||''}</div>
       </div>
-      ${!hasFigi?`<button class="pin-btn" onclick="event.stopPropagation();lookupFIGI('${item.t}')" title="Найти FIGI через T-Invest API" style="font-size:10px;">🔍</button>`:''}
+      <button class="pin-btn" onclick="event.stopPropagation();lookupFIGI('${item.t}')" title="${hasFigi?'Обновить FIGI через T-Invest API (если текущий не находится)':'Найти FIGI через T-Invest API'}" style="font-size:10px;">🔍</button>
       <button class="pin-btn" onclick="event.stopPropagation();bfToggle('${item.t}','${item.cat||'stocks'}')" title="${bfQueue.find(x=>x.t===item.t)?'Убрать из очереди бэкфилла':'В очередь бэкфилла (90д)'}" style="${bfQueue.find(x=>x.t===item.t)?'color:var(--mem);':''}">📥</button>
       <button class="pin-btn" onclick="event.stopPropagation();togglePin('${item.t}')" title="${isPin?'Открепить':'Закрепить'}">${isPin?'★':'☆'}</button>
     </div>`;
