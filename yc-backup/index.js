@@ -89,7 +89,7 @@ const SCHEMA_STMTS = [
 async function dbInit() {
   await withSession(async session => {
     for (const stmt of SCHEMA_STMTS) {
-      await session.executeQuery(stmt);
+      await session.executeSchemeQuery(stmt);
     }
   });
   return { ok: true, msg: 'schema ready (YDB backup)' };
