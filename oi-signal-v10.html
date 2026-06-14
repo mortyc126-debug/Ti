@@ -2769,9 +2769,22 @@ async function lookupFIGI(ticker){
     // Никогда не берём instr[0] как fallback — T-Invest часто возвращает по запросу
     // совершенно несвязанные инструменты (нечёткий поиск), и без проверки тикера
     // можно записать в FIGI значение от другого инструмента (молча, без ошибки)
-    const match = instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
+    let match = instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
                  || instr.find(x=>x.ticker===ticker);
-    if(!match){ alert(`FIGI для ${ticker} не найден: T-Invest не вернул инструмент с точным тикером "${ticker}" (получено ${instr.length} нерелевантных результатов)`); return; }
+    // FindInstrument — нечёткий полнотекстовый поиск, для коротких тикеров фьючерсов
+    // часто не находит точное совпадение. Fallback: полный список Futures и точный
+    // фильтр по ticker — надёжнее, чем гадать по relevance.
+    if(!match){
+      const futResp = await fetch(tinvestUrl('/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures'), {
+        method:'POST',
+        headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+        body: JSON.stringify({instrumentStatus:'INSTRUMENT_STATUS_ALL'}),
+      });
+      const futD = await futResp.json();
+      const futs = (futD.instruments||[]).filter(x=>x.ticker===ticker);
+      match = futs.find(x=>x.apiTradeAvailableFlag) || futs[0];
+    }
+    if(!match){ alert(`FIGI для ${ticker} не найден: точного совпадения по тикеру "${ticker}" нет ни в FindInstrument, ни в списке Futures`); return; }
     const figi = match.figi || match.uid || match.instrumentUid || '';
     if(!figi){ alert('У инструмента нет FIGI/UID'); return; }
     // Обновить в CATALOG и tickers
