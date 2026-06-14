@@ -3047,8 +3047,8 @@ setInterval(updateAges, 10000);
 // INIT
 // ============================================================
 (async function init(){
-  dbOpen(); // инит схемы D1, не блокируем запуск
   loadAll();
+  dbOpen(); // инит схемы D1, не блокируем запуск (после loadAll — нужен прокси из настроек)
   updateBfBadge();
   renderPinnedChips();
   renderHistory();
