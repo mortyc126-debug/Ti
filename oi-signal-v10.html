@@ -2514,6 +2514,16 @@ async function runHistoricalBacktest(){
 // статистики этого достаточно, дальше она будет уточняться в реальном времени.
 async function runIntradayBacktest(){
   if(!curTicker){ setStatus('Выберите тикер'); return; }
+  // EXT_INDICATORS считает вердикт indlab «на сейчас» (кэш по тикеру), а не
+  // по историческому бару — поэтому без прогрева кэша он даёт 0/0 на каждом
+  // баре и в статистике метода всегда «—». Прогреваем кэш перед прогоном:
+  // в каждый исторический бар попадёт текущий вердикт как константа —
+  // грубее, чем полноценный исторический пересчёт, но статистика хотя бы
+  // появится и будет уточняться по мере накопления реальных сигналов.
+  if(extIndEnabled && (!extIndicatorsCache[curTicker] || Date.now()-extIndicatorsCache[curTicker].ts > EXT_IND_MAX_AGE)){
+    setStatus(`Загружаю вердикт модуля индикаторов для ${curTicker}…`, true);
+    await _ilRequestVerdict(curTicker);
+  }
   setStatus(`Загрузка внутридневной истории AlgoPack для ${curTicker}…`, true);
   let ts, ob, os, fo;
   try{
