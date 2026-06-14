@@ -7411,7 +7411,9 @@ try {
 // него — воркер сам prepend'ит https://invest-public-api.tinkoff.ru/rest.
 // Иначе — прямой запрос (standalone-режим indlab).
 function ilTinvestUrl(proxy, path){
-  if (proxy) return proxy.replace(/\/$/,'') + '/rest' + path;
+  // Конвенция cf-worker.js (oi.marginacall.workers.dev): путь начинается с
+  // /tinkoff..., воркер сам добавляет /rest при проксировании на T-Invest.
+  if (proxy) return proxy.replace(/\/$/,'') + path;
   return 'https://invest-public-api.tinkoff.ru/rest' + path;
 }
 
