@@ -7411,7 +7411,7 @@ try {
 // него — воркер сам prepend'ит https://invest-public-api.tinkoff.ru/rest.
 // Иначе — прямой запрос (standalone-режим indlab).
 function ilTinvestUrl(proxy, path){
-  if (proxy) return proxy.replace(/\/$/,'') + path;
+  if (proxy) return proxy.replace(/\/$/,'') + '/rest' + path;
   return 'https://invest-public-api.tinkoff.ru/rest' + path;
 }
 
