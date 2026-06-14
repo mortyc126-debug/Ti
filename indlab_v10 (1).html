@@ -4833,21 +4833,39 @@ async function chartLoad() {
       if (!searchResp.ok) throw new Error(`Ошибка поиска: ${searchResp.status}`);
       const searchData = await searchResp.json();
       let instruments = searchData.instruments || [];
-      // Prefer exact ticker match, then starts-with match
-      let found = instruments.find(i => i.ticker === raw)
-                || instruments.find(i => i.ticker?.startsWith(raw))
-                || instruments[0];
-      // If still not found, try futures-specific search
-      if (!found) {
+      let found;
+      // Тикеры фьючерсов (в т.ч. акционных, типа SBRF6/GAZR6) FindInstrument
+      // часто путает с похожими акциями/облигациями — ищем сразу среди фьючерсов
+      const futLikeTicker = /^[A-Z]{2,5}\d{1,2}$/.test(raw);
+      let futList = null;
+      if (futLikeTicker) {
         const futResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
           method:'POST',
           headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
           body: JSON.stringify({ instrumentStatus:'INSTRUMENT_STATUS_ALL' })
         });
         if (futResp.ok) {
-          const futData = await futResp.json();
-          found = (futData.instruments || []).find(i => i.ticker === raw || i.basicAsset === raw);
+          futList = (await futResp.json()).instruments || [];
+          found = futList.find(i => i.ticker === raw);
         }
+      }
+      // Prefer exact ticker match, then starts-with match
+      if (!found) {
+        found = instruments.find(i => i.ticker === raw)
+              || instruments.find(i => i.ticker?.startsWith(raw))
+              || instruments[0];
+      }
+      // If still not found, try futures-specific search
+      if (!found) {
+        if (!futList) {
+          const futResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+            method:'POST',
+            headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
+            body: JSON.stringify({ instrumentStatus:'INSTRUMENT_STATUS_ALL' })
+          });
+          if (futResp.ok) futList = (await futResp.json()).instruments || [];
+        }
+        found = (futList || []).find(i => i.ticker === raw || i.basicAsset === raw);
       }
       if (!found) throw new Error(`«${raw}» не найден. Проверь тикер — для фьючерсов нужен точный тикер (SSM6, SIM5 и т.д.)`);
       figi = found.figi;
@@ -7371,6 +7389,20 @@ try {
 } catch(e) {}
 
 async function ilFindFigi(ticker, token) {
+  // Тикеры фьючерсов (в т.ч. акционных, SBRF6/GAZR6 и т.п.) ищем сразу среди
+  // фьючерсов — FindInstrument часто подменяет их похожими акциями/облигациями
+  const futLikeTicker = /^[A-Z]{2,5}\d{1,2}$/.test(ticker);
+  if (futLikeTicker) {
+    const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+      method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
+      body: JSON.stringify({instrumentStatus:'INSTRUMENT_STATUS_ALL'})
+    });
+    if (fr.ok) {
+      const fl = (await fr.json()).instruments||[];
+      const found = fl.find(i=>i.ticker===ticker);
+      if (found) { found._futuresList = fl; return found; }
+    }
+  }
   const r = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
     method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
     body: JSON.stringify({query:ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false})
@@ -7379,6 +7411,46 @@ async function ilFindFigi(ticker, token) {
   const d = await r.json();
   const list = d.instruments||[];
   return list.find(i=>i.ticker===ticker) || list[0];
+}
+
+// Непрерывный ряд свечей для фьючерса: если у текущего контракта мало истории
+// (свежий контракт только начал торговаться), достраиваем хвост из предыдущего
+// контракта той же цепочки (общий basicAsset) — для бэктеста индикаторов.
+async function ilGetCandlesChain(found, token, from, now) {
+  const fetchCandles = async (figi, f, t) => {
+    const cr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+      method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
+      body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval:'CANDLE_INTERVAL_DAY'})
+    });
+    if (!cr.ok) throw new Error('GetCandles '+cr.status);
+    const cd = await cr.json();
+    return (cd.candles||[]).map(c=>({
+      time: new Date(c.time),
+      open:chartQuotation(c.open), high:chartQuotation(c.high), low:chartQuotation(c.low),
+      close:chartQuotation(c.close), volume:Number(c.volume)||0,
+    })).filter(c=>c.close>0);
+  };
+
+  let candles = await fetchCandles(found.figi, from, now);
+  let chained = false;
+
+  if (candles.length < 60 && found.basicAsset && found._futuresList) {
+    const myExp = found.expirationDate ? new Date(found.expirationDate)
+                 : (candles[0]?.time || now);
+    const prev = found._futuresList
+      .filter(i=>i.basicAsset===found.basicAsset && i.figi!==found.figi && i.expirationDate)
+      .map(i=>({...i, _exp:new Date(i.expirationDate)}))
+      .filter(i=>i._exp < myExp)
+      .sort((a,b)=>b._exp-a._exp)[0];
+    if (prev) {
+      const cutoff = candles.length ? candles[0].time.getTime() : myExp.getTime();
+      const prevTo = new Date(Math.min(prev._exp.getTime(), cutoff));
+      const prevCandles = await fetchCandles(prev.figi, from, prevTo);
+      candles = prevCandles.filter(c=>c.time.getTime() < cutoff).concat(candles);
+      chained = candles.length > 0;
+    }
+  }
+  return {candles, chained};
 }
 
 // ── Доп. расчёты индикаторов по OHLCV (для тех, кого нет в _chartCalc*) ──
@@ -7600,16 +7672,7 @@ async function ilGetVerdict({ticker, token}) {
   if (!found) throw new Error('Тикер не найден: '+ticker);
   const now = new Date(), from = new Date(now);
   from.setDate(from.getDate()-90);
-  const cr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
-    method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
-    body: JSON.stringify({figi:found.figi, from:from.toISOString(), to:now.toISOString(), interval:'CANDLE_INTERVAL_DAY'})
-  });
-  if (!cr.ok) throw new Error('GetCandles '+cr.status);
-  const cd = await cr.json();
-  const candles = (cd.candles||[]).map(c=>({
-    open:chartQuotation(c.open), high:chartQuotation(c.high), low:chartQuotation(c.low),
-    close:chartQuotation(c.close), volume:Number(c.volume)||0,
-  })).filter(c=>c.close>0);
+  const {candles, chained} = await ilGetCandlesChain(found, token, from, now);
   if (candles.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+candles.length+' свечей)');
   const closes = candles.map(c=>c.close);
 
@@ -7713,7 +7776,9 @@ async function ilGetVerdict({ticker, token}) {
   else if (score <= -0.4) label = 'сигнал на падение';
   else label = 'нейтрально';
 
-  return {score, label, details};
+  if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
+
+  return {score, label, details, chained};
 }
 
 // Отвечаем на запросы вердикта от других модулей (через релей MODULE_RPC_* в shell).
