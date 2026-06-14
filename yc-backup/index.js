@@ -428,7 +428,7 @@ module.exports.handler = async function (event) {
   const method = event.httpMethod || 'GET';
   if (method === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
 
-  const path = event.path || '/';
+  const path = '/' + ((event.pathParams && event.pathParams.path) || (event.path || '/').replace(/^\/+/, ''));
   const qs = event.queryStringParameters || {};
   const headers = event.headers || {};
   let body = null;
