@@ -7351,9 +7351,10 @@ async function cpLoadMoex() {
   try{
     const sr=await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'),{
       method:'POST',headers:{'Authorization':`Bearer ${tok}`,'Content-Type':'application/json','accept':'application/json'},
-      body:JSON.stringify({query:'IMOEX',instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED',apiTradeAvailableFlag:false})});
+      body:JSON.stringify({query:'TMOS',instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED',apiTradeAvailableFlag:false})});
     if(!sr.ok)throw new Error(sr.status);
-    const sd=await sr.json(), found=(sd.instruments||[]).find(i=>i.ticker==='IMOEX')||(sd.instruments||[])[0];
+    // У индекса IMOEX нет FIGI в T-Invest — берём ETF TMOS (следует за индексом) как проксу
+    const sd=await sr.json(), found=(sd.instruments||[]).find(i=>i.ticker==='TMOS'&&i.apiTradeAvailableFlag);
     if(!found)throw new Error('not found');
     const now=new Date(),from=new Date(now);from.setDate(from.getDate()-30);
     const cr=await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'),{
@@ -7374,7 +7375,7 @@ async function cpLoadMoex() {
     if(pe)pe.textContent=last.close.toFixed(2);
     if(ce){ce.textContent=`${chgD>=0?'+':''}${chgD.toFixed(2)}%`;ce.style.color=chgD>=0?'#52F2C9':'#FF4D7A';}
     if(xe)xe.textContent=`7д: ${chg7>=0?'+':''}${chg7.toFixed(1)}%  30д: ${chg30>=0?'+':''}${chg30.toFixed(1)}%  ·  ${ctx}`;
-  }catch(e){if(pe)pe.textContent='—';if(xe)xe.textContent='Ошибка MOEX';console.error(e);}
+  }catch(e){if(pe)pe.textContent='—';if(xe)xe.textContent='';}
 }
 
 
