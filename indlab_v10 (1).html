@@ -7698,10 +7698,13 @@ const IL_NAMES = {
 // эффективность = доля совпадений знака score с направлением цены через N дней.
 // В итоговый score попадают только индикаторы с устойчивым перевесом (winRate>0.55, N>=10).
 // Возвращает {score: -2..2, label, details:[{name,text,score,winRate,n,included}]}
-async function ilGetVerdict({ticker, token, proxy}) {
+async function ilGetVerdict({ticker, token, proxy, figi}) {
   token = token || _ilShellToken;
   if (!token) throw new Error('Нет API-токена');
-  const found = await ilFindFigi(ticker, token, proxy);
+  // Если вызывающий модуль уже знает FIGI (свой каталог инструментов) — берём
+  // его напрямую, минуя поиск по тикеру (тикеры акций в FindInstrument иногда
+  // не совпадают с тикерами в каталоге другого модуля).
+  const found = figi ? {figi, ticker} : await ilFindFigi(ticker, token, proxy);
   if (!found) throw new Error('Тикер не найден: '+ticker);
   const now = new Date(), from = new Date(now);
   from.setDate(from.getDate()-90);
@@ -7821,7 +7824,7 @@ window.addEventListener('message', (ev) => {
   if (!d || d.type !== 'MODULE_RPC_REQUEST') return;
   const payload = d.payload || {};
   if (payload.api !== 'getVerdict') return;
-  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy()})
+  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy(), figi: payload.figi})
     .then(result => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*'))
     .catch(err => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*'));
 });

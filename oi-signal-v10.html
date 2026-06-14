@@ -1675,6 +1675,12 @@ const EXT_IND_MAX_AGE = 6*3600*1000; // 6 часов — индикаторы з
 // Для фьючерса с режимом «по базису» подменяет тикер на базовый актив
 // (basicAsset, обычно совпадает с тикером акции — у него больше истории).
 // В режиме «по фьючерсу» или для не-фьючерсов тикер не меняется.
+// FIGI из каталога OI — надёжнее, чем поиск по тикеру в T-Invest (тикеры
+// акций/фьючерсов в OI и в ответе FindInstrument иногда не совпадают).
+function _ilFigiForTicker(t){
+  return (tickers.find(x=>x.t===t) || CATALOG.find(x=>x.t===t))?.f || '';
+}
+
 async function _ilResolveTicker(ticker){
   if(_ilResolveCache[ticker]) return _ilResolveCache[ticker];
   let result = {resolved:ticker, note:''};
@@ -1693,6 +1699,9 @@ async function _ilResolveTicker(ticker){
       }
     }catch(_){ /* не удалось определить базис — считаем по исходному тикеру */ }
   }
+  // Если для итогового тикера в каталоге OI есть FIGI — передадим его в indlab
+  // напрямую, минуя поиск по тикеру (там тикеры акций иногда не совпадают).
+  result.figi = _ilFigiForTicker(result.resolved);
   _ilResolveCache[ticker] = result;
   return result;
 }
@@ -1703,7 +1712,7 @@ async function _ilRequestVerdict(ticker){
   if(extIndicatorsPending[ticker]) return;
   extIndicatorsPending[ticker] = true;
   try{
-    const {resolved, note} = await _ilResolveTicker(ticker);
+    const {resolved, note, figi} = await _ilResolveTicker(ticker);
     try{
       const cached = await dbLoadIndVerdict(resolved);
       if(cached && cached.updated_at && Date.now()-cached.updated_at < EXT_IND_MAX_AGE){
@@ -1715,7 +1724,7 @@ async function _ilRequestVerdict(ticker){
       extIndicatorsCache[ticker] = {error:'модуль открыт не внутри shell — нет window.parent', ts:Date.now()};
       return;
     }
-    const res = await _ilRpcCall('getVerdict', {ticker:resolved, token: getTinvestToken(), proxy: getProxy()});
+    const res = await _ilRpcCall('getVerdict', {ticker:resolved, figi, token: getTinvestToken(), proxy: getProxy()});
     extIndicatorsCache[ticker] = {...res, ts:Date.now(), note};
     dbSaveIndVerdict(resolved, res).catch(()=>{});
   }catch(err){
