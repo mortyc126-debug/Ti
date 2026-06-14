@@ -1715,7 +1715,7 @@ async function _ilRequestVerdict(ticker){
       extIndicatorsCache[ticker] = {error:'модуль открыт не внутри shell — нет window.parent', ts:Date.now()};
       return;
     }
-    const res = await _ilRpcCall('getVerdict', {ticker:resolved, token: getTinvestToken()});
+    const res = await _ilRpcCall('getVerdict', {ticker:resolved, token: getTinvestToken(), proxy: getProxy()});
     extIndicatorsCache[ticker] = {...res, ts:Date.now(), note};
     dbSaveIndVerdict(resolved, res).catch(()=>{});
   }catch(err){

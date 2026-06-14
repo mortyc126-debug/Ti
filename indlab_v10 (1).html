@@ -7388,12 +7388,20 @@ try {
   _ilShellToken = localStorage.getItem('t_api_token') || _ilShellToken;
 } catch(e) {}
 
-async function ilFindFigi(ticker, token) {
+// Базовый URL T-Invest API: если передан proxy (воркер из shell), бьём через
+// него — воркер сам prepend'ит https://invest-public-api.tinkoff.ru/rest.
+// Иначе — прямой запрос (standalone-режим indlab).
+function ilTinvestUrl(proxy, path){
+  if (proxy) return proxy.replace(/\/$/,'') + path;
+  return 'https://invest-public-api.tinkoff.ru/rest' + path;
+}
+
+async function ilFindFigi(ticker, token, proxy) {
   // Тикеры фьючерсов (в т.ч. акционных, SBRF6/GAZR6 и т.п.) ищем сразу среди
   // фьючерсов — FindInstrument часто подменяет их похожими акциями/облигациями
   const futLikeTicker = /^[A-Z]{2,5}\d{1,2}$/.test(ticker);
   if (futLikeTicker) {
-    const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+    const fr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures'), {
       method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
       body: JSON.stringify({instrumentStatus:'INSTRUMENT_STATUS_ALL'})
     });
@@ -7403,7 +7411,7 @@ async function ilFindFigi(ticker, token) {
       if (found) { found._futuresList = fl; return found; }
     }
   }
-  const r = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+  const r = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'), {
     method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
     body: JSON.stringify({query:ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false})
   });
@@ -7416,9 +7424,9 @@ async function ilFindFigi(ticker, token) {
 // Непрерывный ряд свечей для фьючерса: если у текущего контракта мало истории
 // (свежий контракт только начал торговаться), достраиваем хвост из предыдущего
 // контракта той же цепочки (общий basicAsset) — для бэктеста индикаторов.
-async function ilGetCandlesChain(found, token, from, now) {
+async function ilGetCandlesChain(found, token, from, now, proxy) {
   const fetchCandles = async (figi, f, t) => {
-    const cr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+    const cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
       method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
       body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval:'CANDLE_INTERVAL_DAY'})
     });
@@ -7665,14 +7673,14 @@ const IL_NAMES = {
 // эффективность = доля совпадений знака score с направлением цены через N дней.
 // В итоговый score попадают только индикаторы с устойчивым перевесом (winRate>0.55, N>=10).
 // Возвращает {score: -2..2, label, details:[{name,text,score,winRate,n,included}]}
-async function ilGetVerdict({ticker, token}) {
+async function ilGetVerdict({ticker, token, proxy}) {
   token = token || _ilShellToken;
   if (!token) throw new Error('Нет API-токена');
-  const found = await ilFindFigi(ticker, token);
+  const found = await ilFindFigi(ticker, token, proxy);
   if (!found) throw new Error('Тикер не найден: '+ticker);
   const now = new Date(), from = new Date(now);
   from.setDate(from.getDate()-90);
-  const {candles, chained} = await ilGetCandlesChain(found, token, from, now);
+  const {candles, chained} = await ilGetCandlesChain(found, token, from, now, proxy);
   if (candles.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+candles.length+' свечей)');
   const closes = candles.map(c=>c.close);
 
