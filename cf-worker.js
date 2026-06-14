@@ -24,6 +24,9 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  // Chrome Private Network Access: страницы с "public" адресов (raw.githack.com)
+  // блокируют запросы к workers.dev (адресное пространство "unknown") без этого заголовка
+  'Access-Control-Allow-Private-Network': 'true',
 };
 
 const DB = env => env.интерес;
