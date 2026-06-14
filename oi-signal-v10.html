@@ -622,15 +622,27 @@ function dbBase(){
 async function dbFetch(path, opts={}){
   const base = dbBase();
   if(!base) throw new Error('Укажи URL прокси в настройках');
-  const resp = await fetch(base + path, {
-    ...opts,
-    headers: {'Content-Type':'application/json', ...(opts.headers||{})},
-  });
-  if(!resp.ok){
-    const t = await resp.text().catch(()=>'');
-    throw new Error(`DB ${path} → HTTP ${resp.status}: ${t.slice(0,120)}`);
+  // Воркер иногда рвёт соединение (ERR_CONNECTION_RESET) под нагрузкой —
+  // один повтор через секунду спасает большинство таких разовых сбоев.
+  for(let attempt=0; attempt<2; attempt++){
+    try{
+      const resp = await fetch(base + path, {
+        ...opts,
+        headers: {'Content-Type':'application/json', ...(opts.headers||{})},
+      });
+      if(!resp.ok){
+        const t = await resp.text().catch(()=>'');
+        throw new Error(`DB ${path} → HTTP ${resp.status}: ${t.slice(0,120)}`);
+      }
+      return resp.json();
+    } catch(e){
+      if(attempt===0 && /Failed to fetch|ERR_CONNECTION|NetworkError/i.test(e.message)){
+        await new Promise(r=>setTimeout(r,1000));
+        continue;
+      }
+      throw e;
+    }
   }
-  return resp.json();
 }
 
 async function dbOpen(){
