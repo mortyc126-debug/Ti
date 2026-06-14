@@ -713,6 +713,14 @@ input[type=range] { touch-action: none; }
       </button>
     </div>
 
+    <!-- Row 1.5: proxy (CF Worker), для прямых запросов к T-Invest API, заблокированных без него -->
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input id="chart-proxy" type="text" placeholder="https://your-worker.workers.dev (прокси T-Invest, опционально)"
+        autocomplete="off" oninput="chartSaveProxy()"
+        style="width:100%;background:#1A1030;border:1px solid rgba(255,0,110,0.15);border-radius:10px;
+          padding:7px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
+    </div>
+
     <!-- Row 2: timeframe pills -->
     <div style="display:flex;gap:5px;flex-wrap:wrap;">
       <button class="cp-tf active" data-tf="CANDLE_INTERVAL_1_MIN"   onclick="cpSetTF(this)">1м</button>
@@ -4760,6 +4768,14 @@ function chartSaveToken() {
   try { localStorage.setItem('tinkoff_token', v); } catch(e){}
 }
 
+function chartSaveProxy() {
+  const v = (document.getElementById('chart-proxy')?.value || '').trim();
+  try { localStorage.setItem('tinkoff_proxy', v); } catch(e){}
+}
+function chartGetProxy() {
+  return (document.getElementById('chart-proxy')?.value || '').trim().replace(/\/$/,'');
+}
+
 function chartToggleTokenVis() {
   const inp = document.getElementById('chart-token');
   const btn = document.getElementById('chart-token-eye');
@@ -4778,6 +4794,9 @@ function chartPageInit() {
     const saved = localStorage.getItem('tinkoff_token');
     const inp = document.getElementById('chart-token');
     if (saved && inp && !inp.value) inp.value = saved;
+    const savedProxy = localStorage.getItem('tinkoff_proxy');
+    const pInp = document.getElementById('chart-proxy');
+    if (savedProxy && pInp && !pInp.value) pInp.value = savedProxy;
   } catch(e){}
   // draw empty state
   if (!chartCandles.length) chartDrawEmpty();
@@ -4825,7 +4844,7 @@ async function chartLoad() {
     let figi = raw;
     if (!raw.startsWith('BBG') && !raw.startsWith('TCS')) {
       // Search instrument (UNSPECIFIED = shares + futures + ETFs + bonds)
-      const searchResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+      const searchResp = await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'), {
         method:'POST',
         headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
         body: JSON.stringify({ query: raw, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false })
@@ -4839,7 +4858,7 @@ async function chartLoad() {
       const futLikeTicker = /^[A-Z]{2,5}\d{1,2}$/.test(raw);
       let futList = null;
       if (futLikeTicker) {
-        const futResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+        const futResp = await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures'), {
           method:'POST',
           headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
           body: JSON.stringify({ instrumentStatus:'INSTRUMENT_STATUS_ALL' })
@@ -4858,7 +4877,7 @@ async function chartLoad() {
       // If still not found, try futures-specific search
       if (!found) {
         if (!futList) {
-          const futResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+          const futResp = await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures'), {
             method:'POST',
             headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
             body: JSON.stringify({ instrumentStatus:'INSTRUMENT_STATUS_ALL' })
@@ -4891,7 +4910,7 @@ async function chartLoad() {
     from.setDate(from.getDate() - (tfDays[tf] || 365));
 
     // Fetch candles
-    const candleResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+    const candleResp = await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'accept': 'application/json' },
       body: JSON.stringify({
@@ -7330,14 +7349,14 @@ async function cpLoadMoex() {
   if(!tok){if(xe)xe.textContent='Введи токен для контекста рынка';return;}
   if(pe)pe.textContent='…';
   try{
-    const sr=await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument',{
+    const sr=await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'),{
       method:'POST',headers:{'Authorization':`Bearer ${tok}`,'Content-Type':'application/json','accept':'application/json'},
       body:JSON.stringify({query:'IMOEX',instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED',apiTradeAvailableFlag:false})});
     if(!sr.ok)throw new Error(sr.status);
     const sd=await sr.json(), found=(sd.instruments||[]).find(i=>i.ticker==='IMOEX')||(sd.instruments||[])[0];
     if(!found)throw new Error('not found');
     const now=new Date(),from=new Date(now);from.setDate(from.getDate()-30);
-    const cr=await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles',{
+    const cr=await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'),{
       method:'POST',headers:{'Authorization':`Bearer ${tok}`,'Content-Type':'application/json','accept':'application/json'},
       body:JSON.stringify({figi:found.figi,from:from.toISOString(),to:now.toISOString(),interval:'CANDLE_INTERVAL_DAY'})});
     const cd=await cr.json();
@@ -7796,7 +7815,7 @@ window.addEventListener('message', (ev) => {
   if (!d || d.type !== 'MODULE_RPC_REQUEST') return;
   const payload = d.payload || {};
   if (payload.api !== 'getVerdict') return;
-  ilGetVerdict({ticker: payload.ticker, token: payload.token})
+  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy()})
     .then(result => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*'))
     .catch(err => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*'));
 });
