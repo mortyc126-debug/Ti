@@ -2007,7 +2007,8 @@ async function autoRecordOutcomes(){
   let weightsUpdated = false;
 
   for(const sig of openSigs){
-    const afterCandles = await dbGetCandlesAfter(sig.ticker, sig.tf, sig.entryTs).catch(()=>[]);
+    const entryTs = Number(sig.entryTs) || 0;
+    const afterCandles = await dbGetCandlesAfter(sig.ticker, sig.tf, entryTs).catch(()=>[]);
     if(afterCandles.length < 2) continue; // ждём больше данных
 
     const ep = sig.entryPrice;
