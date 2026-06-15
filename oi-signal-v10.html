@@ -970,12 +970,16 @@ async function fetchFutoiHist(ticker, fromStr, tillStr, start){
   if(!resp.ok) throw new Error(`MOEX futoi HTTP ${resp.status}`);
   const json = await resp.json();
   const block = json['futoi'] || json[Object.keys(json).find(k=>k!=='metadata'&&k!=='history')];
-  if(!block || !block.columns || !block.data) return [];
-  return block.data.map(row => {
+  if(!block || !block.columns || !block.data) return {rows:[], rawCount:0};
+  const rows = block.data.map(row => {
     const obj = {};
     block.columns.forEach((c,i) => obj[c] = row[i]);
     return obj;
   }).filter(obj => obj.ticker === sym);
+  // MOEX отдаёт страницу по ВСЕМ инструментам — после фильтра по sym
+  // строк может быть мало, поэтому конец пагинации определяем по
+  // исходному (нефильтрованному) размеру страницы, а не по rows.length
+  return {rows, rawCount: block.data.length};
 }
 
 // ============================================================
@@ -1081,15 +1085,15 @@ async function backfillOne(ticker, type){
       } catch(e){}
       let start = 0;
       for(let page=0; page<60 && futoiFromStr; page++){
-        let rows;
-        try{ rows = await fetchFutoiHist(ticker, futoiFromStr, tillStr, start); }
+        let res;
+        try{ res = await fetchFutoiHist(ticker, futoiFromStr, tillStr, start); }
         catch(e){ break; }
-        if(!rows.length) break;
-        await dbSaveAlgopack(ticker, 'futoi', rows).catch(()=>{});
+        const {rows, rawCount} = res;
+        if(rows.length) await dbSaveAlgopack(ticker, 'futoi', rows).catch(()=>{});
         total += rows.length;
-        setStatus(`Бэкфилл ${ticker}: futoi — ${start+rows.length} запис.`, true);
-        start += rows.length;
-        if(rows.length < 100) break;
+        setStatus(`Бэкфилл ${ticker}: futoi — ${start+rawCount} запис. (найдено ${total})`, true);
+        if(!rawCount || rawCount < 100) break; // конец данных — определяем по нефильтрованной странице
+        start += rawCount;
         await new Promise(r=>setTimeout(r, 250));
       }
     }
