@@ -624,6 +624,7 @@ async function dbFetch(path, opts={}){
   if(!base) throw new Error('Укажи URL прокси в настройках');
   const resp = await fetch(base + path, {
     ...opts,
+    signal: opts.signal || AbortSignal.timeout(15000),
     headers: {'Content-Type':'application/json', ...(opts.headers||{})},
   });
   if(!resp.ok){
@@ -1733,6 +1734,7 @@ async function _ilResolveTicker(ticker){
         method:'POST',
         headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
         body: JSON.stringify({query:ticker, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false}),
+        signal: AbortSignal.timeout(10000),
       });
       const d = await resp.json();
       const found = (d.instruments||[]).find(x=>x.ticker===ticker);
