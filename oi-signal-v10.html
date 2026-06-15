@@ -2758,7 +2758,7 @@ function togglePin(t){
 }
 
 // Авто-поиск FIGI через T-Invest FindInstrument
-async function lookupFIGI(ticker){
+async function lookupFIGI(ticker, silent=false){
   const token = getTinvestToken();
   if(!token){ alert('Введи T-Invest токен'); return; }
   const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument');
@@ -2794,9 +2794,9 @@ async function lookupFIGI(ticker){
       const futs = (futD.instruments||[]).filter(x=>x.ticker===ticker);
       match = futs.find(x=>x.apiTradeAvailableFlag) || futs[0];
     }
-    if(!match){ alert(`FIGI для ${ticker} не найден: точного совпадения по тикеру "${ticker}" нет ни в FindInstrument, ни в списке Futures`); return; }
+    if(!match){ if(!silent) alert(`FIGI для ${ticker} не найден: точного совпадения по тикеру "${ticker}" нет ни в FindInstrument, ни в списке Futures`); return; }
     const figi = match.figi || match.uid || match.instrumentUid || '';
-    if(!figi){ alert('У инструмента нет FIGI/UID'); return; }
+    if(!figi){ if(!silent) alert('У инструмента нет FIGI/UID'); return; }
     // Обновить в CATALOG и tickers
     const catItem = CATALOG.find(x=>x.t===ticker);
     if(catItem) catItem.f = figi;
@@ -2805,15 +2805,15 @@ async function lookupFIGI(ticker){
     saveAll(); renderCatalog();
     setStatus(`✓ FIGI для ${ticker}: ${figi}`);
     return figi;
-  } catch(e){ alert('Ошибка поиска: '+e.message); }
+  } catch(e){ if(!silent) alert('Ошибка поиска: '+e.message); }
 }
 
 async function lookupAllFIGI(){
-  const noFigi = [...CATALOG, ...tickers].filter(x=>!x.f && pinnedTickers.includes(x.t));
-  if(!noFigi.length){ setStatus('У всех закреплённых тикеров уже есть FIGI'); return; }
-  setStatus(`Поиск FIGI для ${noFigi.length} тикеров…`, true);
-  for(const item of noFigi){ await lookupFIGI(item.t); }
-  setStatus('✓ Поиск FIGI завершён');
+  const all = [...new Map([...CATALOG, ...tickers].map(x=>[x.t,x])).values()];
+  if(!all.length){ setStatus('Каталог пуст'); return; }
+  setStatus(`Обновление FIGI для ${all.length} тикеров…`, true);
+  for(const item of all){ await lookupFIGI(item.t, true); }
+  setStatus('✓ Обновление FIGI завершено');
 }
 
 function addCustomTicker(){
