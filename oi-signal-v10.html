@@ -973,6 +973,19 @@ async function fetchFutoiHist(ticker, fromStr, tillStr, start){
 // переименования лежит под старым SECID. Подтягиваем её под новым тикером.
 const TICKER_PREDECESSOR = {YDEX:'YNDX'};
 
+// Для фьючерсов предшественник — предыдущий квартальный контракт того же
+// актива (SiU6 → SiM6 → SiH6 → SiZ5...), чтобы при перекате (за ~3 дня до
+// экспирации трейдер переходит на следующий контракт) не терять историю.
+const FUT_MONTH_CODES = ['H','M','U','Z']; // март/июнь/сентябрь/декабрь
+function futPredecessor(ticker){
+  const m = ticker.match(/^([A-Za-z]{2,3})([HMUZ])(\d)$/);
+  if(!m) return null;
+  const [, root, code, year] = m;
+  const idx = FUT_MONTH_CODES.indexOf(code);
+  if(idx === 0) return `${root}${FUT_MONTH_CODES[3]}${(parseInt(year,10)+9)%10}`; // -1 год по модулю
+  return `${root}${FUT_MONTH_CODES[idx-1]}${year}`;
+}
+
 async function backfillOne(ticker, type){
   const till = new Date();
   const from = new Date(till.getTime() - 90*86400000);
@@ -983,7 +996,7 @@ async function backfillOne(ticker, type){
   {
     // Если у тикера есть предшественник (переименование) — докачиваем его
     // AlgoPack-историю под текущим именем, чтобы не терять глубину
-    const predecessor = TICKER_PREDECESSOR[ticker];
+    const predecessor = TICKER_PREDECESSOR[ticker] || (type==='futures' ? futPredecessor(ticker) : null);
     if(predecessor){
       for(const metric of ['tradestats','obstats','orderstats']){
         try{
