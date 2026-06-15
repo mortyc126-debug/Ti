@@ -801,9 +801,7 @@ function loadAll(){
 function toggleExtInd(){
   extIndEnabled = document.getElementById('extIndChk').checked;
   saveAll();
-  const mr = computeAllMethods();
-  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-  renderMethodsTable(mr);
+  recalculateAndRender();
 }
 
 // Переключение базис/фьючерс сбрасывает кэш разрешения тикера и заставляет
@@ -813,17 +811,13 @@ function toggleExtIndBasis(){
   saveAll();
   _ilResolveCache = {};
   delete extIndicatorsCache[curTicker];
-  const mr = computeAllMethods();
-  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-  renderMethodsTable(mr);
+  recalculateAndRender();
 }
 
 function toggleCorr(){
   corrEnabled = document.getElementById('corrChk').checked;
   saveAll();
-  const mr = computeAllMethods();
-  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-  renderMethodsTable(mr);
+  recalculateAndRender();
 }
 
 function onWindowChange(){
@@ -832,9 +826,7 @@ function onWindowChange(){
   // Пересчитываем перцентили с новым окном если история уже загружена
   if(deepHistory[curTicker]) {
     computeAndCachePercentiles(curTicker);
-    const mr = computeAllMethods();
-    renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-    renderMethodsTable(mr);
+    recalculateAndRender();
   }
 }
 
@@ -2033,6 +2025,16 @@ function computeAllMethods(){
   return results;
 }
 
+// Пересчитывает методы/композит и обновляет gauge+таблицу методов —
+// общий хвост для мест, где меняются настройки/тикер без полного refreshAll
+function recalculateAndRender(){
+  const mr = computeAllMethods();
+  const avgConf = METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length;
+  renderGauge(computeComposite(mr, curTicker), avgConf);
+  renderMethodsTable(mr);
+  return mr;
+}
+
 function getWeights(ticker){
   return methodWeights[ticker] || {};
 }
@@ -2939,11 +2941,7 @@ function selTF(btn, tf){
   if(candleData[tf] && candleData[tf].length){
     renderCandleChart(candleData[tf]);
     computeAtr(curTicker, tf, candleData[tf]);
-    const methodResults = computeAllMethods();
-    const composite = computeComposite(methodResults, curTicker);
-    const avgConf = METHODS.reduce((s,m)=>s+(methodResults[m.id]?.confidence||0),0)/METHODS.length;
-    renderGauge(composite, avgConf);
-    renderMethodsTable(methodResults);
+    recalculateAndRender();
   } else {
     refreshAll(); // нет кэша для этого ТФ — грузим
   }
