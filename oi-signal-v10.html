@@ -1575,8 +1575,31 @@ function m_OB_IMBALANCE(ob){
   }
   const pSpread = getPct(curTicker,'obstats','spread_bbo');
   const spreadZ = pSpread?.n>=5 ? (normScore(spread,pSpread,1.0)||0) : 0;
-  const confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
-  return {score, confidence, detail:`дисбаланс заявок в стакане: ${imb>=0?'больше на покупку':'больше на продажу'} (${(Math.abs(imb)*100).toFixed(0)}%), спред ${spread.toFixed(4)}`};
+  let confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
+  let detail = `дисбаланс заявок в стакане: ${imb>=0?'больше на покупку':'больше на продажу'} (${(Math.abs(imb)*100).toFixed(0)}%), спред ${spread.toFixed(4)}`;
+
+  // Liquidity Sweep / Absorption: сильный дисбаланс + цена реально прошла в
+  // ту же сторону — sweep (снос ликвидности, сигнал усиливается). Сильный
+  // дисбаланс, но цена стоит на месте — absorption (поглощение, давление
+  // может развернуться, сигнал ослабляем).
+  const dailyC = candleData[curTF]||candleData['1min']||[];
+  if(dailyC.length>=2 && Math.abs(imb)>0.15){
+    const c1 = toP(dailyC[dailyC.length-1].close);
+    const c0 = toP(dailyC[dailyC.length-2].close);
+    const atrPct = getAtrPct(curTicker, curTF);
+    const moveRel = atrPct>0 ? (c1-c0)/(c0||1)/atrPct : 0;
+    const sameDir = Math.sign(moveRel)===Math.sign(imb);
+    if(Math.abs(moveRel)>0.3 && sameDir){
+      score = Math.tanh(score*1.25);
+      confidence = Math.min(0.85, confidence+0.1);
+      detail += `; sweep — дисбаланс подтверждён движением цены, ликвидность снесена`;
+    } else if(Math.abs(moveRel)<0.15){
+      score *= 0.5;
+      confidence = Math.max(0.1, confidence-0.1);
+      detail += `; absorption — крупный дисбаланс, но цена стоит (поглощение, возможен разворот)`;
+    }
+  }
+  return {score, confidence, detail};
 }
 
 // --- Method 7: Cancel Signal (адаптивный) ---
@@ -1596,8 +1619,26 @@ function m_CANCEL_SIGNAL(os){
   } else {
     score = Math.tanh(((canS-canB)/total)*3);
   }
-  const confidence = total>10 ? 0.6 : 0.25;
-  return {score, confidence, detail:`отмены заявок: на покупку ${snum(canB)}, на продажу ${snum(canS)} — больше отмен на ${canS>=canB?'продажу (бычий сигнал)':'покупку (медвежий сигнал)'}`};
+  let confidence = total>10 ? 0.6 : 0.25;
+  let detail = `отмены заявок: на покупку ${snum(canB)}, на продажу ${snum(canS)} — больше отмен на ${canS>=canB?'продажу (бычий сигнал)':'покупку (медвежий сигнал)'}`;
+
+  // Absorption через отмены: всплеск отмен на одной стороне без движения
+  // цены в сторону снятой ликвидности — крупный игрок поглощает поток,
+  // не давая цене уйти (часто разворотный сигнал, сигнал ослабляем).
+  const dailyC = candleData[curTF]||candleData['1min']||[];
+  if(dailyC.length>=2 && total>10){
+    const c1 = toP(dailyC[dailyC.length-1].close);
+    const c0 = toP(dailyC[dailyC.length-2].close);
+    const atrPct = getAtrPct(curTicker, curTF);
+    const moveRel = atrPct>0 ? (c1-c0)/(c0||1)/atrPct : 0;
+    const cancelSkew = Math.sign(canS-canB); // >0: больше отмен на продажу → бычий по score
+    if(Math.abs(moveRel)<0.15 && cancelSkew!==0 && Math.sign(score)===cancelSkew){
+      score *= 0.5;
+      confidence = Math.max(0.1, confidence-0.1);
+      detail += `; absorption — отмены перекошены, но цена стоит (поглощение, сигнал ослаблен)`;
+    }
+  }
+  return {score, confidence, detail};
 }
 
 // --- Method 8: Institutional OI (адаптивный) ---
@@ -1615,8 +1656,45 @@ function m_INST_OI(futoi){
   } else {
     score = Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*3);
   }
-  const confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
-  return {score, confidence, detail:`крупные игроки (юрлица): лонгов ${snum(longNet)}, шортов ${snum(shortNet)}, нетто ${netPos>=0?'+':''}${snum(netPos)} — ${netPos>=0?'наращивают лонги':'наращивают шорты'}`};
+  let confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
+  let detail = `крупные игроки (юрлица): лонгов ${snum(longNet)}, шортов ${snum(shortNet)}, нетто ${netPos>=0?'+':''}${snum(netPos)} — ${netPos>=0?'наращивают лонги':'наращивают шорты'}`;
+
+  // Дивергенция ΔOI × ΔPrice: рост ОИ при росте цены — новые лонги (бычий
+  // сигнал подтверждён), рост ОИ при падении цены — новые шорты (медвежий
+  // подтверждён); ОИ падает при движении цены — закрытие позиций (дивергенция,
+  // сигнал слабее, корректируем score к нулю и снижаем confidence).
+  const histFo = (deepHistory[curTicker]?.futoi||[]).filter(r=>(r.clgroup||'').toUpperCase()==='YUR');
+  const dailyCloses = (candleData['1d']||[]);
+  if(histFo.length>=2 && dailyCloses.length>=2){
+    const byDate = {};
+    histFo.forEach(r=>{ byDate[r.tradedate] = (byDate[r.tradedate]||0) + toNum(r.pos||0); });
+    const dates = Object.keys(byDate).sort();
+    if(dates.length>=2){
+      const oiPrev = byDate[dates[dates.length-2]];
+      const oiCur  = byDate[dates[dates.length-1]];
+      const dOI = oiCur - oiPrev;
+      const c1 = toP(dailyCloses[dailyCloses.length-1].close);
+      const c0 = toP(dailyCloses[dailyCloses.length-2].close);
+      const dPrice = c1 - c0;
+      if(dOI!==0 && dPrice!==0){
+        const sameSign = Math.sign(dOI)===Math.sign(dPrice);
+        if(sameSign){
+          // ОИ растёт вместе с ценой — подтверждение тренда, усиливаем сигнал
+          score = Math.tanh(score*1.3 + Math.sign(dPrice)*0.2);
+          confidence = Math.min(0.9, confidence+0.1);
+          detail += `; ОИ ${dOI>=0?'растёт':'падает'} вместе с ценой (${dPrice>=0?'+':''}${dPrice.toFixed(2)}) — тренд подтверждён новыми позициями`;
+        } else {
+          // ОИ падает/растёт против цены — закрытие позиций, дивергенция,
+          // ослабляем сигнал
+          score *= 0.4;
+          confidence = Math.max(0.1, confidence-0.15);
+          detail += `; дивергенция ОИ/цены (ΔOI ${dOI>=0?'+':''}${snum(dOI)}, цена ${dPrice>=0?'+':''}${dPrice.toFixed(2)}) — вероятно закрытие позиций, сигнал ослаблен`;
+        }
+      }
+    }
+  }
+
+  return {score, confidence, detail};
 }
 
 // --- Method 9: Retail Contrarian (адаптивный) ---
