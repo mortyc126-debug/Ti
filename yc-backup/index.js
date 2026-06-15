@@ -87,10 +87,13 @@ const SCHEMA_STMTS = [
 ];
 
 async function dbInit() {
-  await withSession(async session => {
-    for (const stmt of SCHEMA_STMTS) {
-      await session.executeSchemeQuery(stmt);
-    }
+  const driver = await getDriver();
+  await driver.queryClient.do({
+    fn: async session => {
+      for (const stmt of SCHEMA_STMTS) {
+        await session.execute({ text: stmt });
+      }
+    },
   });
   return { ok: true, msg: 'schema ready (YDB backup)' };
 }
