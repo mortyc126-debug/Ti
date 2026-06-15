@@ -2705,6 +2705,10 @@ function selectCatTab(btn, cat){
 function renderCatalog(){
   const search = (document.getElementById('tickerSearch')?.value||'').toLowerCase();
   const items = [...CATALOG, ...tickers.filter(t=>!CATALOG.find(c=>c.t===t.t))]
+    .map(item=>{
+      const tk = tickers.find(t=>t.t===item.t);
+      return tk?.f ? {...item, f: tk.f} : item;
+    })
     .filter(item=>{
       if(activeCatFilter && item.cat !== activeCatFilter) return false;
       if(search && !item.t.toLowerCase().includes(search) && !item.name.toLowerCase().includes(search)) return false;
