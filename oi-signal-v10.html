@@ -899,14 +899,14 @@ function issToObjects(json, blockName){
   });
 }
 
-async function fetchWithTimeout(url, opts={}, ms=15000){
+async function fetchWithTimeout(url, opts={}, ms=30000){
   const ctrl = new AbortController();
   const tid = setTimeout(()=>ctrl.abort(), ms);
   try{
     const r = await fetch(url, {...opts, signal: ctrl.signal});
     return r;
   } catch(e){
-    if(e.name==='AbortError') throw new Error('Таймаут запроса (15с)');
+    if(e.name==='AbortError') throw new Error(`Таймаут запроса (${ms/1000}с)`);
     throw e;
   } finally{ clearTimeout(tid); }
 }
