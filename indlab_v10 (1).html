@@ -7441,7 +7441,10 @@ async function ilFindFigi(ticker, token, proxy) {
   const d = await r.json();
   const list = d.instruments||[];
   const exact = list.filter(i=>i.ticker===ticker);
-  if (!exact.length) return list[0];
+  // Если точного совпадения по тикеру нет — НЕ берём первый попавшийся
+  // результат поиска (FindInstrument может вернуть вообще другой эмитент,
+  // напр. для "GZU6" — облигацию Яндекса), это даст бессмысленный вердикт
+  if (!exact.length) return null;
   // Среди точных совпадений по тикеру предпочитаем основную торговую площадку
   // (акции/фонды MOEX, фьючерсы, валюта, ОФЗ) — иначе может попасться, например,
   // внебиржевой дубль без свечей.
