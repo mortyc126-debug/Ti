@@ -1727,6 +1727,7 @@ function _ilRpcCall(api, args){
 
 let extIndicatorsCache = {}; // ticker -> {score, label, details, ts}
 let extIndicatorsPending = {};
+let extIndRequestStarted = {}; // ticker -> Date.now() когда отправлен запрос (для прогресс-бара)
 let _ilResolveCache = {}; // ticker -> {resolved, note}
 const EXT_IND_MAX_AGE = 6*3600*1000; // 6 часов — индикаторы за 90 дней не меняются быстро
 
@@ -1802,9 +1803,20 @@ function m_EXT_INDICATORS(){
   if(!extIndEnabled) return {score:0, confidence:0, detail:'учёт модуля индикаторов выключен (тумблер «Индикаторы»)'};
   const cached = extIndicatorsCache[curTicker];
   if(!cached || Date.now()-cached.ts > EXT_IND_MAX_AGE){
+    if(!extIndicatorsPending[curTicker]) extIndRequestStarted[curTicker] = Date.now();
     _ilRequestVerdict(curTicker);
   }
-  if(!cached) return {score:0, confidence:0, detail:'запрос к модулю индикаторов отправлен, ответа пока нет'};
+  if(!cached){
+    if(extIndicatorsPending[curTicker]){
+      const elapsed = Math.round((Date.now()-(extIndRequestStarted[curTicker]||Date.now()))/1000);
+      // RPC обычно отвечает за 5-20с (90 дней свечей + бэктест 15 индикаторов);
+      // полоска — условный прогресс по этому диапазону, чтобы видно было, что не зависло
+      const pct = Math.min(95, Math.round(elapsed/20*100));
+      return {score:0, confidence:0, detail:`запрос к модулю индикаторов отправлен, считает... ${elapsed}с
+        <div style="height:4px;background:var(--border2);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:#52F2C9;transition:width .3s;"></div></div>`};
+    }
+    return {score:0, confidence:0, detail:'запрос к модулю индикаторов отправлен, ответа пока нет'};
+  }
   if(cached.error) return {score:0, confidence:0, detail:`модуль индикаторов: ошибка — ${cached.error}`};
   const ageMin = Math.round((Date.now()-cached.ts)/60000);
   const details = cached.details||[];
@@ -2225,6 +2237,8 @@ function setAgeBadge(id, lastUpdate){
 function updateAges(){
   setAgeBadge('moexAge', moexLastUpdate);
   setAgeBadge('candleAge', candleLastUpdate);
+  // Пока идёт запрос к indlab — обновляем счётчик/полоску в строке индикаторов
+  if(extIndicatorsPending[curTicker]) renderMethodsTable(computeAllMethods());
 }
 
 // ============================================================
