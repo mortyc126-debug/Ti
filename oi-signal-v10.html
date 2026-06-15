@@ -1230,15 +1230,6 @@ async function fetchAllMoex(ticker, type){
 // ADAPTIVE CALIBRATION ENGINE
 // ============================================================
 
-// Считает перцентиль значения v в массиве arr
-function percentileRank(arr, v){
-  if(!arr.length) return 0.5;
-  const sorted = [...arr].sort((a,b)=>a-b);
-  let lo=0, hi=sorted.length-1;
-  while(lo < hi){ const mid=(lo+hi)>>1; if(sorted[mid]<v) lo=mid+1; else hi=mid; }
-  return lo / (sorted.length - 1 || 1);
-}
-
 // Вычисляет p10/p25/p50/p75/p90 из массива
 function calcPercentiles(arr){
   if(!arr.length) return {p10:0,p25:0,p50:0,p75:0,p90:0,n:0};
@@ -2170,10 +2161,13 @@ function recordOutcome(){
       (r.score < -0.1 && outcome === 'short') ||
       (Math.abs(r.score) <= 0.1 && outcome === 'neutral');
     if(!methodWeights[ticker][m.id])
-      methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0};
+      methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0, sumQ: 0};
     const mw = methodWeights[ticker][m.id];
     mw.total++;
     if(correct) mw.correct++;
+    // sumQ держим в той же шкале, что и автообновление (autoRecordOutcomes),
+    // чтобы ручная и авто-запись не давали разные веса при смешивании
+    mw.sumQ = (mw.sumQ||0) + (correct ? 1 : 0);
     const accuracy = mw.correct / mw.total;
     mw.weight = 0.85 * mw.weight + 0.15 * accuracy;
   });
