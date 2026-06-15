@@ -938,11 +938,12 @@ async function fetchFutoi(ticker){
   // Блок называется 'futoi' или первый ключ
   const block = json['futoi'] || json[Object.keys(json).find(k=>k!=='metadata'&&k!=='history')];
   if(!block || !block.columns || !block.data) return [];
+  // MOEX игнорирует ticker= в запросе и отдаёт все инструменты — фильтруем сами
   return block.data.map(row => {
     const obj = {};
     block.columns.forEach((c,i) => obj[c] = row[i]);
     return obj;
-  });
+  }).filter(obj => obj.ticker === sym);
 }
 
 // Историческая выгрузка FUTOI с пагинацией (from/till/start)
@@ -964,7 +965,7 @@ async function fetchFutoiHist(ticker, fromStr, tillStr, start){
     const obj = {};
     block.columns.forEach((c,i) => obj[c] = row[i]);
     return obj;
-  });
+  }).filter(obj => obj.ticker === sym);
 }
 
 // ============================================================
