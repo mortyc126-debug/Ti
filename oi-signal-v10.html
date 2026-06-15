@@ -1753,7 +1753,13 @@ async function _ilResolveTicker(ticker){
       });
       const d = await resp.json();
       const found = (d.instruments||[]).find(x=>x.ticker===ticker);
-      if(found && found.instrumentType==='future' && found.basicAsset && found.basicAsset!==ticker){
+      // basicAsset у индексных/валютных/товарных фьючерсов (RTS, USD000UTSTOM,
+      // Gold, Brent...) — не тикер, а описание; в каталоге OI его не найти,
+      // и indlab не сможет резолвить такую "строку" как инструмент.
+      // Переключаемся на базис только если для него есть FIGI в каталоге —
+      // иначе считаем индикаторы по самому фьючерсу (indlab умеет искать
+      // фьючерсные тикеры напрямую через Futures-список).
+      if(found && found.instrumentType==='future' && found.basicAsset && found.basicAsset!==ticker && _ilFigiForTicker(found.basicAsset)){
         result = {resolved:found.basicAsset, note:`по базису ${found.basicAsset} (фьюч ${ticker})`};
       }
     }catch(_){ /* не удалось определить базис — считаем по исходному тикеру */ }
