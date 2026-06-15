@@ -766,7 +766,7 @@ function loadAll(){
     }
     if(d.methodWeights) methodWeights = d.methodWeights;
     if(d.signalLog) signalLog = d.signalLog;
-    if(d.bfQueue?.length) bfQueue = d.bfQueue;
+    if(d.bfQueue?.length) bfQueue = d.bfQueue.map(x=>x.t==='YNDX'?{...x,t:'YDEX'}:x);
     if(d.moexKey) document.getElementById('moexKeyInp').value = d.moexKey;
     if(d.tinvest) document.getElementById('tinvestInp').value = d.tinvest;
     if(d.proxy) document.getElementById('proxyInp').value = d.proxy;
