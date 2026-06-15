@@ -2770,7 +2770,12 @@ async function lookupFIGI(ticker){
     // Никогда не берём instr[0] как fallback — T-Invest часто возвращает по запросу
     // совершенно несвязанные инструменты (нечёткий поиск), и без проверки тикера
     // можно записать в FIGI значение от другого инструмента (молча, без ошибки)
-    let match = instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
+    // Сначала ищем среди реально торгуемых (apiTradeAvailableFlag) — биржевой класс
+    // не гарантирует, что инструмент жив (напр. BBG006L8G4H1/TQBR для YNDX давно не торгуется,
+    // а актуальный — TCS609805522/SPBEQRU)
+    let match = instr.find(x=>x.ticker===ticker && x.apiTradeAvailableFlag && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
+                 || instr.find(x=>x.ticker===ticker && x.apiTradeAvailableFlag)
+                 || instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
                  || instr.find(x=>x.ticker===ticker);
     // FindInstrument — нечёткий полнотекстовый поиск, для коротких тикеров фьючерсов
     // часто не находит точное совпадение. Fallback: полный список Futures и точный
