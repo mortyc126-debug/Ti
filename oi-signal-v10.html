@@ -754,6 +754,16 @@ function loadAll(){
     // Очистить фиктивные FUT* FIGIs из сохранённых tickers (не BBG-формат)
     tickers.forEach(tk=>{ if(tk.f && tk.f.startsWith('FUT')) tk.f = ''; });
     if(d.curTicker && FUT_MIGRATE[d.curTicker]) d.curTicker = FUT_MIGRATE[d.curTicker];
+    // Миграция: YNDX переименован Мосбиржей в YDEX
+    pinnedTickers = [...new Set(pinnedTickers.map(t=>t==='YNDX'?'YDEX':t))];
+    if(d.curTicker === 'YNDX') d.curTicker = 'YDEX';
+    {
+      const yndx = tickers.find(tk=>tk.t==='YNDX');
+      if(yndx){
+        if(!tickers.find(tk=>tk.t==='YDEX')) tickers.push({...yndx, t:'YDEX', f:''});
+        tickers = tickers.filter(tk=>tk.t!=='YNDX');
+      }
+    }
     if(d.methodWeights) methodWeights = d.methodWeights;
     if(d.signalLog) signalLog = d.signalLog;
     if(d.bfQueue?.length) bfQueue = d.bfQueue;
