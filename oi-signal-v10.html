@@ -969,6 +969,10 @@ async function fetchFutoiHist(ticker, fromStr, tillStr, start){
 // ============================================================
 // BACKFILL — загрузка глубокой истории (по умолчанию 90 дней)
 // ============================================================
+// Тикеры, переименованные на MOEX — история AlgoPack за период до
+// переименования лежит под старым SECID. Подтягиваем её под новым тикером.
+const TICKER_PREDECESSOR = {YDEX:'YNDX'};
+
 async function backfillOne(ticker, type){
   const till = new Date();
   const from = new Date(till.getTime() - 90*86400000);
@@ -977,6 +981,31 @@ async function backfillOne(ticker, type){
   let total = 0;
 
   {
+    // Если у тикера есть предшественник (переименование) — докачиваем его
+    // AlgoPack-историю под текущим именем, чтобы не терять глубину
+    const predecessor = TICKER_PREDECESSOR[ticker];
+    if(predecessor){
+      for(const metric of ['tradestats','obstats','orderstats']){
+        try{
+          const existing = await dbLoadAlgopack(ticker, metric, 90);
+          if(existing.length >= 30) continue; // своих данных достаточно
+          let start = 0;
+          for(let page=0; page<60; page++){
+            let rows;
+            try{ rows = await fetchMoex(predecessor, metric, type, {from:fromStr, till:tillStr, start, limit:100}); }
+            catch(e){ break; }
+            if(!rows.length) break;
+            await dbSaveAlgopack(ticker, metric, rows).catch(()=>{});
+            total += rows.length;
+            setStatus(`Бэкфилл ${ticker}: ${metric} (история ${predecessor}) — ${start+rows.length} запис.`, true);
+            start += rows.length;
+            if(rows.length < 100) break;
+            await new Promise(r=>setTimeout(r, 250));
+          }
+        } catch(e){}
+      }
+    }
+
     // AlgoPack: tradestats / obstats / orderstats — постранично через start
     for(const metric of ['tradestats','obstats','orderstats']){
       // Проверяем, что уже есть в базе — если данные за вчера/сегодня уже
