@@ -8874,26 +8874,41 @@ function ilRenderAnalysis() {
       <td style="text-align:center;color:${bc}">${s5.bias!=null?(s5.bias*100).toFixed(0)+'%':'—'}</td></tr>`;
   });
   html+=`</table></div>`;
-  // Конструктор комбо
+  // ── Лучшие комбинации (авто-поиск) ──
   html+=`<div style="margin-top:16px;border-top:1px solid #2a1f3d;padding-top:12px;">
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;font-family:var(--mono);">Конструктор комбинации (H30 acc в скобках)</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);">Лучшие комбинации (жадный поиск, межкластерные, H30)</div>
+      <button onclick="ilShowBestCombos()" style="padding:3px 10px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:6px;color:#52F2C9;font-family:var(--mono);font-size:9px;cursor:pointer;">▷ Найти</button>
+    </div>
+    <div id="an-best-combos" style="font-size:10px;font-family:var(--mono);color:var(--text2);"></div>
+  </div>`;
+  // ── Конструктор: выбор по категориям ──
+  html+=`<div style="margin-top:14px;border-top:1px solid #2a1f3d;padding-top:12px;">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px;font-family:var(--mono);">Конструктор: выбери индикаторы из любых категорий и рассчитай комбинацию</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">`;
-  r.clusters.forEach((cl,ci)=>{
+  _IL_CATS.forEach((cat,ci)=>{
+    const catIds=cat.ids.filter(id=>IL_INDICATORS.includes(id));
+    if(!catIds.length) return;
     const clr=CC[ci%CC.length];
     html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}33;border-radius:8px;padding:8px 12px;min-width:140px;">
-      <div style="font-size:9px;color:${clr};margin-bottom:5px;">Кластер ${ci+1}</div>`;
-    cl.forEach(id=>{
+      <div style="font-size:9px;color:${clr};margin-bottom:5px;">${cat.label}</div>`;
+    catIds.sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0)).forEach(id=>{
       const s=r.stats[id].h30;
-      const q=s.acc!=null&&s.n>=5?` <span style="font-size:8px;color:${s.acc>=0.55?'#52F2C9':'var(--text3)'}">${(s.acc*100).toFixed(0)}%</span>`:'';
+      const acc=s?.acc!=null&&s.n>=5?(s.acc*100).toFixed(0):null;
+      const ac=acc?(acc>=55?'#52F2C9':acc>=50?'#A78BFA':'#FF4D7A'):'var(--text3)';
+      const q=acc?` <span style="font-size:8px;color:${ac}">${acc}%</span>`:'';
       html+=`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;padding:2px 0;">
         <input type="checkbox" class="an-cb" data-id="${id}" style="accent-color:${clr};">${IL_NAMES[id]}${q}</label>`;
     });
     html+=`</div>`;
   });
-  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-    <button onclick="ilSelectBestCombo()" style="padding:5px 12px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">✦ Лучшая из кластеров</button>
-    <button onclick="ilCalcSelectedCombo()" style="padding:5px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать</button>
-  </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:40px;"></div></div>`;
+  html+=`</div>
+  <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <button onclick="ilSelectBestCombo()" style="padding:5px 12px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">✦ Авто-выбор (лучшая)</button>
+    <button onclick="ilCalcSelectedCombo()" style="padding:5px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать выбранные</button>
+    <button onclick="document.querySelectorAll('.an-cb').forEach(c=>c.checked=false)" style="padding:5px 8px;background:rgba(255,77,122,0.07);border:1px solid rgba(255,77,122,0.2);border-radius:8px;color:#FF4D7A;font-family:var(--mono);font-size:10px;cursor:pointer;">✕ Сбросить</button>
+  </div>
+  <div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:20px;"></div></div>`;
   // Матрица корреляций (свёрнута) — только цвет, числа в tooltip
   html+=`<details style="margin-top:14px;"><summary style="font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono);">Матрица корреляций (${IL_INDICATORS.length}×${IL_INDICATORS.length}) — наведи на ячейку для значения</summary><div style="overflow-x:auto;margin-top:8px;">
     <table style="border-collapse:collapse;font-size:8px;font-family:var(--mono);table-layout:fixed;"><tr><th style="min-width:60px;"></th>`;
@@ -8912,11 +8927,124 @@ function ilRenderAnalysis() {
   el.innerHTML=html;
 }
 
+// Категории для группировки в конструкторе
+const _IL_CATS = [
+  {label:'Осцилляторы',  ids:['rsi','wr','cci','mfi','stoch','cmo','rsi_w']},
+  {label:'Тренд/MA',     ids:['macd','ema','adx','supertrend','tsi','dpo','mcginley','stock_trend']},
+  {label:'Каналы',       ids:['bb','donchian','keltner','envelopes','ichimoku','alligator','parabolic','bb_width']},
+  {label:'Объём',        ids:['obv','cmf','mfi','acc_dist','chaikin_osc','chaikin_vol','eom','nvi','pvi','pvt','vo','vwma','force_idx']},
+  {label:'Моментум',     ids:['ao','ult_osc','accel_osc','elder_ray','elder_impulse','fisher','chop','vortex']},
+  {label:'Волатильность',ids:['hist_vol','vix_like','std_dev','ohlc_vol']},
+  {label:'Паттерны',     ids:['zigzag','fractals']},
+  {label:'Режим',        ids:['crash','recovery','flat','high_vol','low_vol']},
+];
+
+// Жадный поиск лучших комбинаций (межкластерные, H30)
+function ilFindBestCombos() {
+  const r=_ilBtResults; if(!r) return [];
+  const closes=r.closes;
+  const evalCombo=(ids)=>{
+    const arr=closes.map((_,i)=>{
+      const vals=ids.map(id=>r.ss[id]?.[i]).filter(v=>v!=null&&v!==0);
+      return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
+    });
+    return _ilBtStats(arr,closes,30,null);
+  };
+  // Индикаторы с достаточным числом наблюдений, сортируем по H30 acc
+  const ranked=IL_INDICATORS
+    .filter(id=>r.stats[id].h30?.n>=5&&r.stats[id].h30?.acc!=null)
+    .sort((a,b)=>(r.stats[b].h30.acc||0)-(r.stats[a].h30.acc||0));
+  if(!ranked.length) return [];
+
+  // Жадное наращивание: добавляем следующий из другого кластера если улучшает
+  const results=[];
+  const usedClusters=new Set();
+  let cur=[ranked[0]];
+  usedClusters.add(r.clusterOf[ranked[0]]);
+
+  for(let step=0;step<6;step++){
+    const stat=evalCombo(cur);
+    results.push({ids:[...cur],stat});
+    let bestId=null,bestAcc=-1;
+    for(const id of ranked){
+      const cl=r.clusterOf[id]??-1;
+      if(usedClusters.has(cl)||cur.includes(id)) continue;
+      const t=evalCombo([...cur,id]);
+      if(t.acc!=null&&t.n>=5&&t.acc>bestAcc){bestAcc=t.acc;bestId=id;}
+    }
+    if(!bestId||bestAcc<=(stat.acc??0)) break;
+    cur.push(bestId);
+    usedClusters.add(r.clusterOf[bestId]??-1);
+  }
+  // Дополнительно: топ-5 пар из разных кластеров (не жадные)
+  const pairs=[];
+  for(let i=0;i<Math.min(15,ranked.length);i++){
+    for(let j=i+1;j<Math.min(15,ranked.length);j++){
+      const a=ranked[i],b=ranked[j];
+      if((r.clusterOf[a]??0)===(r.clusterOf[b]??0)) continue;
+      const t=evalCombo([a,b]);
+      if(t.acc!=null&&t.n>=5) pairs.push({ids:[a,b],stat:t});
+    }
+  }
+  pairs.sort((a,b)=>(b.stat.acc||0)-(a.stat.acc||0));
+  // Мёрдж: добавляем пары которых нет в жадном результате
+  const seen=new Set(results.map(r=>r.ids.join(',')));
+  pairs.slice(0,5).forEach(p=>{if(!seen.has(p.ids.join(',')))results.push(p);});
+  return results;
+}
+
 function ilSelectBestCombo() {
   const r=_ilBtResults; if(!r)return;
   const best=r.clusters.map(cl=>cl.slice().sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0))[0]);
   document.querySelectorAll('.an-cb').forEach(cb=>{ cb.checked=best.includes(cb.dataset.id); });
   ilCalcSelectedCombo();
+}
+
+function ilShowBestCombos() {
+  const el=document.getElementById('an-best-combos');
+  if(!el) return;
+  el.textContent='Ищу…';
+  setTimeout(()=>{
+    const combos=ilFindBestCombos();
+    if(!combos.length){el.textContent='Нет данных'; return;}
+    let h=`<table style="border-collapse:collapse;width:100%;font-size:9px;font-family:var(--mono);">
+      <tr style="color:var(--text3);border-bottom:1px solid #2a1f3d;">
+        <th style="text-align:left;padding:3px 5px;">#</th>
+        <th style="text-align:left;padding:3px 5px;">Индикаторы</th>
+        <th style="padding:3px 5px;">H30 acc</th>
+        <th style="padding:3px 5px;">IG</th>
+        <th style="padding:3px 5px;">n</th>
+        <th style="padding:3px 5px;">Применить</th></tr>`;
+    combos.forEach((c,i)=>{
+      const s=c.stat;
+      const ac=s.acc!=null?(s.acc*100).toFixed(0)+'%':'—';
+      const ig=s.ig!=null?(s.ig>0?'+':'')+(s.ig*100).toFixed(1)+'%':'—';
+      const cc=s.acc>=0.55?'#52F2C9':s.acc>=0.50?'#A78BFA':'#FF4D7A';
+      const ic=s.ig>0.05?'#52F2C9':s.ig>0?'#A78BFA':'#FF4D7A';
+      const ids=JSON.stringify(c.ids);
+      h+=`<tr style="border-bottom:1px solid #1a1028;">
+        <td style="padding:3px 5px;color:var(--text3);">${i+1}</td>
+        <td style="padding:3px 5px;color:var(--text2);">${c.ids.map(id=>IL_NAMES[id]).join(' + ')}</td>
+        <td style="text-align:center;color:${cc};">${ac}</td>
+        <td style="text-align:center;color:${ic};">${ig}</td>
+        <td style="text-align:center;color:var(--text3);">${s.n}</td>
+        <td style="text-align:center;"><button onclick='ilApplyCombo(${ids})' style="padding:2px 7px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:4px;color:#52F2C9;font-family:var(--mono);font-size:8px;cursor:pointer;">✓</button></td></tr>`;
+    });
+    h+=`</table>`;
+    el.innerHTML=h;
+  },0);
+}
+
+function ilApplyCombo(ids) {
+  // Сбрасываем все чекбоксы и выбираем нужные
+  document.querySelectorAll('.an-cb').forEach(c=>c.checked=false);
+  ids.forEach(id=>{
+    const cb=document.querySelector(`.an-cb[data-id="${id}"]`);
+    if(cb) cb.checked=true;
+  });
+  ilCalcSelectedCombo();
+  // Прокрутить к результату
+  document.getElementById('an-combo-result')?.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 
 function ilCalcSelectedCombo() {
