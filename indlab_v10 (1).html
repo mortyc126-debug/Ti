@@ -425,6 +425,7 @@ input[type=range] { touch-action: none; }
   <button class="nav-btn" onclick="goPage('combos',this)">Комбинации</button>
   <button class="nav-btn" onclick="goPage('compare',this)">Сравнение</button>
   <button class="nav-btn" onclick="goPage('guide',this)">Справочник</button>
+  <button class="nav-btn" onclick="goPage('analysis',this)">Анализ</button>
 </div>
 
 <!-- ══ GUIDE PAGE ══ -->
@@ -655,6 +656,16 @@ input[type=range] { touch-action: none; }
     Выбери стратегию — индикаторы настроятся автоматически. Потом скорректируй значения под свою ситуацию.
   </div>
   <div id="combos-list"></div>
+</div>
+
+<!-- ══ ANALYSIS PAGE ══ -->
+<div id="page-analysis" class="page">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+    <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;">
+    <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить анализ</button>
+    <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
+  </div>
+  <div id="an-results"></div>
 </div>
 
 <!-- ══ COMPARE PAGE ══ -->
@@ -7201,8 +7212,9 @@ goPage = function(name, btn) {
     if (chartBtn) chartBtn.classList.add('active');
   }
   _origGP(name, btn);
-  if (name === 'guide')   setTimeout(() => renderGuide(), 50);
-  if (name === 'compare') setTimeout(() => renderCmpTable(), 30);
+  if (name === 'guide')    setTimeout(() => renderGuide(), 50);
+  if (name === 'compare')  setTimeout(() => renderCmpTable(), 30);
+  if (name === 'analysis') setTimeout(() => initAnalysis(), 50);
 };
 
 // chartAddToCompare
@@ -7821,6 +7833,241 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
 
   return {score, label, details, chained};
+}
+
+// ═══ СТРАНИЦА АНАЛИЗА: мульти-горизонтный бэктест, кластеры, конструктор комбо ═══
+
+function _ilCalcAllSeries(candles, closes) {
+  const rsiArr = _chartCalcRSI(closes,14);
+  const wrArr  = ilCalcWR(candles,14);
+  const cciArr = ilCalcCCI(candles,20);
+  const mfiArr = ilCalcMFI(candles,14);
+  const stochArr = ilCalcStoch(candles,14,3);
+  const macdR  = _chartCalcMACD(closes,12,26,9);
+  const bbArr  = _chartCalcBB(closes,20,2);
+  const aoArr  = ilCalcAO(candles);
+  const emaF   = _chartCalcEMA(closes,12), emaS = _chartCalcEMA(closes,26);
+  const adxArr = ilCalcADX(candles,14);
+  const donArr = ilCalcDonchian(candles,20);
+  const keltArr= ilCalcKeltner(closes,candles,20,2);
+  const envArr = ilCalcEnvelopes(closes,20,0.025);
+  const ichiArr= ilCalcIchimoku(candles);
+  const allArr = ilCalcAlligator(candles);
+  const ss = {};
+  ss.rsi       = rsiArr.map(v=>v==null?null:ilScore.rsi(v));
+  ss.wr        = wrArr.map(v=>v==null?null:ilScore.wr(v));
+  ss.cci       = cciArr.map(v=>v==null?null:ilScore.cci(v));
+  ss.mfi       = mfiArr.map(v=>v==null?null:ilScore.mfi(v));
+  ss.stoch     = stochArr.map(v=>(v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d));
+  ss.macd      = closes.map((_,i)=>macdR.macd[i]==null?null:ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i));
+  ss.bb        = bbArr.map((b,i)=>b==null?null:ilScore.bb((closes[i]-b.lower)/((b.upper-b.lower)||1)*100));
+  ss.ao        = aoArr.map((_,i)=>ilScoreAO(aoArr,i));
+  ss.ema       = closes.map((_,i)=>ilScoreCross(emaF,emaS,i));
+  ss.adx       = adxArr.map((_,i)=>ilScoreADX(adxArr,i));
+  ss.donchian  = donArr.map((d,i)=>d?ilScoreChannel(closes[i],d.lower,d.upper):null);
+  ss.keltner   = keltArr.map((k,i)=>k?ilScoreChannel(closes[i],k.lower,k.upper):null);
+  ss.envelopes = envArr.map((e,i)=>e?ilScoreChannel(closes[i],e.lower,e.upper):null);
+  ss.ichimoku  = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
+  ss.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
+  return ss;
+}
+
+function _ilBtStats(scoreArr, closes, horizon, mask) {
+  let win=0, n=0, longN=0, totalUp=0, totalN=0;
+  for (let i=0; i<closes.length-horizon; i++) {
+    const inMask = !mask || mask[i];
+    const sc = scoreArr[i];
+    if (inMask && sc!=null && sc!==0) {
+      const fut = closes[i+horizon] - closes[i];
+      if (fut!==0) {
+        n++;
+        if (sc>0) { longN++; if (fut>0) win++; }
+        else { if (fut<0) win++; }
+      }
+    }
+    if (inMask && i+horizon < closes.length) {
+      totalN++;
+      if (closes[i+horizon] > closes[i]) totalUp++;
+    }
+  }
+  const acc = n>0 ? win/n : null;
+  const baseRate = totalN>0 ? totalUp/totalN : 0.5;
+  return { acc, ig: acc!=null ? acc-baseRate : null, n, bias: n>0?longN/n:null, baseRate };
+}
+
+function _ilPearson(a, b) {
+  const pairs = [];
+  for (let i=0;i<a.length;i++) if(a[i]!=null&&b[i]!=null) pairs.push([a[i],b[i]]);
+  if (pairs.length<5) return 0;
+  const n=pairs.length, ma=pairs.reduce((s,p)=>s+p[0],0)/n, mb=pairs.reduce((s,p)=>s+p[1],0)/n;
+  let num=0,da=0,db=0;
+  pairs.forEach(([x,y])=>{const A=x-ma,B=y-mb;num+=A*B;da+=A*A;db+=B*B;});
+  return (da&&db)?num/Math.sqrt(da*db):0;
+}
+
+let _ilBtResults = null;
+
+async function ilRunAnalysis() {
+  const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
+  const statusEl = document.getElementById('an-status');
+  const token = _ilShellToken;
+  if (!ticker||!token) { if(statusEl) statusEl.textContent='Введите тикер; токен берётся со страницы График'; return; }
+  if (statusEl) statusEl.textContent = `Загружаю ${ticker}…`;
+  try {
+    const found = await ilFindFigi(ticker, token, chartGetProxy?.());
+    if (!found) throw new Error('Тикер не найден: '+ticker);
+    const now=new Date(), from=new Date(now);
+    from.setDate(from.getDate()-90);
+    const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
+    if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
+    const closes = candles.map(c=>c.close);
+    if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
+    const ss = _ilCalcAllSeries(candles, closes);
+    // Режимная маска: trending = |5-bar return| ≥ медианы
+    const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
+    const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
+    const trendMask = returns5.map(r=>r>=med5);
+    const rangeMask = returns5.map(r=>r<med5);
+    const HORIZONS = [5,15,30];
+    const stats = {};
+    IL_INDICATORS.forEach(id=>{
+      stats[id]={};
+      HORIZONS.forEach(h=>{
+        stats[id][`h${h}`]  = _ilBtStats(ss[id],closes,h,null);
+        stats[id][`h${h}T`] = _ilBtStats(ss[id],closes,h,trendMask);
+        stats[id][`h${h}R`] = _ilBtStats(ss[id],closes,h,rangeMask);
+      });
+    });
+    // Корреляционная матрица и кластеры
+    const corrMatrix={};
+    IL_INDICATORS.forEach(a=>{corrMatrix[a]={};IL_INDICATORS.forEach(b=>{corrMatrix[a][b]=_ilPearson(ss[a],ss[b]);});});
+    const assigned=new Set(), clusters=[];
+    IL_INDICATORS.forEach(id=>{
+      if(assigned.has(id))return;
+      const cl=[id];assigned.add(id);
+      IL_INDICATORS.forEach(id2=>{if(!assigned.has(id2)&&Math.abs(_ilPearson(ss[id],ss[id2]))>=0.5){cl.push(id2);assigned.add(id2);}});
+      clusters.push(cl);
+    });
+    const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,ss};
+    if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
+    ilRenderAnalysis();
+  } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
+}
+
+function ilRenderAnalysis() {
+  const r=_ilBtResults, el=document.getElementById('an-results');
+  if(!el||!r) return;
+  const CC=['#52F2C9','#A78BFA','#FF9F40','#FF006E','#6366F1','#60A4A1','#FFD700'];
+  const fA=(s)=>{
+    if(!s||s.acc==null||s.n<5) return '<span style="color:#333">—</span>';
+    const p=(s.acc*100).toFixed(0), c=s.acc>=0.60?'#52F2C9':s.acc>=0.52?'var(--text2)':'#FF4D7A';
+    return `<span style="color:${c}">${p}%</span>`;
+  };
+  const fI=(s)=>{
+    if(!s||s.ig==null||s.n<5) return '<span style="color:#333">—</span>';
+    const p=(s.ig*100).toFixed(1), c=s.ig>0.05?'#52F2C9':s.ig>0?'#A78BFA':'#FF4D7A';
+    return `<span style="color:${c}">${p>0?'+':''}${p}%</span>`;
+  };
+  let html='';
+  // Кластеры
+  html+=`<div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--mono);">Кластеры по корреляции score-серий (порог 0.5)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">`;
+  r.clusters.forEach((cl,ci)=>{
+    const clr=CC[ci%CC.length];
+    html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}55;border-radius:8px;padding:6px 10px;"><div style="font-size:9px;color:${clr};margin-bottom:3px;">Кластер ${ci+1}</div>`;
+    cl.forEach(id=>html+=`<div style="font-size:10px;color:var(--text2);">• ${IL_NAMES[id]}</div>`);
+    html+=`</div>`;
+  });
+  html+=`</div>`;
+  // Таблица
+  html+=`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);"><tr style="color:var(--text3);border-bottom:1px solid #2a1f3d;">
+    <th style="text-align:left;padding:4px 6px;">Индикатор</th><th>Кл.</th>
+    <th colspan="2" style="padding:4px;">5 баров<br><span style="font-size:8px">acc/IG</span></th>
+    <th colspan="2" style="padding:4px;">15 баров<br><span style="font-size:8px">acc/IG</span></th>
+    <th colspan="2" style="padding:4px;">30 баров<br><span style="font-size:8px">acc/IG</span></th>
+    <th style="padding:4px;">Тренд<br><span style="font-size:8px">H5</span></th>
+    <th style="padding:4px;">Боков.<br><span style="font-size:8px">H5</span></th>
+    <th style="padding:4px;">Bias%</th></tr>`;
+  [...IL_INDICATORS].sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0)).forEach(id=>{
+    const ci=r.clusterOf[id]??0, clr=CC[ci%CC.length];
+    const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30, s5T=r.stats[id].h5T, s5R=r.stats[id].h5R;
+    const bc=s5.bias!=null?(s5.bias>0.75||s5.bias<0.25?'#FF9F40':'var(--text2)'):'var(--text3)';
+    html+=`<tr style="border-bottom:1px solid #1a1028;">
+      <td style="padding:5px 6px;color:var(--text2);">${IL_NAMES[id]}</td>
+      <td style="text-align:center;"><span style="color:${clr};font-size:9px;">●${ci+1}</span></td>
+      <td style="text-align:center;">${fA(s5)}</td><td style="text-align:center;">${fI(s5)}</td>
+      <td style="text-align:center;">${fA(s15)}</td><td style="text-align:center;">${fI(s15)}</td>
+      <td style="text-align:center;">${fA(s30)}</td><td style="text-align:center;">${fI(s30)}</td>
+      <td style="text-align:center;">${fA(s5T)}</td><td style="text-align:center;">${fA(s5R)}</td>
+      <td style="text-align:center;color:${bc}">${s5.bias!=null?(s5.bias*100).toFixed(0)+'%':'—'}</td></tr>`;
+  });
+  html+=`</table></div>`;
+  // Конструктор комбо
+  html+=`<div style="margin-top:16px;border-top:1px solid #2a1f3d;padding-top:12px;">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;font-family:var(--mono);">Конструктор комбинации (H30 acc в скобках)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">`;
+  r.clusters.forEach((cl,ci)=>{
+    const clr=CC[ci%CC.length];
+    html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}33;border-radius:8px;padding:8px 12px;min-width:140px;">
+      <div style="font-size:9px;color:${clr};margin-bottom:5px;">Кластер ${ci+1}</div>`;
+    cl.forEach(id=>{
+      const s=r.stats[id].h30;
+      const q=s.acc!=null&&s.n>=5?` <span style="font-size:8px;color:${s.acc>=0.55?'#52F2C9':'var(--text3)'}">${(s.acc*100).toFixed(0)}%</span>`:'';
+      html+=`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;padding:2px 0;">
+        <input type="checkbox" class="an-cb" data-id="${id}" style="accent-color:${clr};">${IL_NAMES[id]}${q}</label>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <button onclick="ilSelectBestCombo()" style="padding:5px 12px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">✦ Лучшая из кластеров</button>
+    <button onclick="ilCalcSelectedCombo()" style="padding:5px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать</button>
+  </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:40px;"></div></div>`;
+  // Матрица корреляций (свёрнута)
+  html+=`<details style="margin-top:14px;"><summary style="font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono);">Матрица корреляций</summary><div style="overflow-x:auto;margin-top:8px;">
+    <table style="border-collapse:collapse;font-size:8px;font-family:var(--mono);"><tr><th></th>`;
+  IL_INDICATORS.forEach(id=>html+=`<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px;min-width:16px;color:var(--text3);">${IL_NAMES[id].split(' ')[0]}</th>`);
+  html+=`</tr>`;
+  IL_INDICATORS.forEach(a=>{
+    html+=`<tr><td style="padding:2px 4px;color:var(--text3);white-space:nowrap;">${IL_NAMES[a].split(' ')[0]}</td>`;
+    IL_INDICATORS.forEach(b=>{
+      const v=r.corrMatrix[a][b], abs=Math.abs(v);
+      const bg=abs>0.7?`rgba(199,27,82,${abs*0.7})`:abs>0.4?`rgba(255,159,64,${abs*0.5})`:'transparent';
+      html+=`<td style="background:${bg};text-align:center;padding:2px;color:var(--text2);">${v.toFixed(2)}</td>`;
+    });
+    html+=`</tr>`;
+  });
+  html+=`</table></div></details>`;
+  el.innerHTML=html;
+}
+
+function ilSelectBestCombo() {
+  const r=_ilBtResults; if(!r)return;
+  const best=r.clusters.map(cl=>cl.slice().sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0))[0]);
+  document.querySelectorAll('.an-cb').forEach(cb=>{ cb.checked=best.includes(cb.dataset.id); });
+  ilCalcSelectedCombo();
+}
+
+function ilCalcSelectedCombo() {
+  const r=_ilBtResults; if(!r)return;
+  const sel=[...document.querySelectorAll('.an-cb:checked')].map(cb=>cb.dataset.id);
+  const el=document.getElementById('an-combo-result');
+  if(!sel.length){el.textContent='Выберите хотя бы один индикатор';return;}
+  const closes=r.closes;
+  const compArr=closes.map((_,i)=>{const vals=sel.map(id=>r.ss[id][i]).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;});
+  const btRow=(h)=>{
+    const s=_ilBtStats(compArr,closes,h,null);
+    if(!s.acc||s.n<5)return `H${h}: —`;
+    const c=s.acc>=0.55?'#52F2C9':s.acc>=0.50?'var(--text2)':'#FF4D7A';
+    return `H${h}: <span style="color:${c}">${(s.acc*100).toFixed(0)}%</span> acc, IG <span style="color:${s.ig>0?'#52F2C9':'#FF4D7A'}">${s.ig>0?'+':''}${(s.ig*100).toFixed(1)}%</span> (n=${s.n})`;
+  };
+  el.innerHTML=`<div style="margin-bottom:4px;color:var(--text3);">Выбрано: <span style="color:var(--text2)">${sel.map(id=>IL_NAMES[id]).join(', ')}</span></div><div>${btRow(5)}</div><div>${btRow(15)}</div><div>${btRow(30)}</div>`;
+}
+
+function initAnalysis() {
+  const el=document.getElementById('an-ticker');
+  if(el && typeof _cpTicker!=='undefined' && _cpTicker) el.value=_cpTicker;
+  else if(el && typeof _chartTicker!=='undefined' && _chartTicker) el.value=_chartTicker;
+  if(_ilBtResults) ilRenderAnalysis();
 }
 
 // Отвечаем на запросы вердикта от других модулей (через релей MODULE_RPC_* в shell).
