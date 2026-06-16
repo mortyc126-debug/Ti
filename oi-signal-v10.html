@@ -68,17 +68,35 @@ a{color:var(--accent);text-decoration:none;}
 .gauge-val{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:700;text-align:center;margin-top:2px;}
 .gauge-dir{font-size:10px;letter-spacing:.1em;text-align:center;margin-top:2px;}
 .gauge-conf{font-size:9px;color:var(--txt3);text-align:center;margin-top:1px;}
+/* ---- Cluster grid (indlab + methods) ---- */
+.cluster-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+.cluster-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;}
+.cluster-card-hdr{display:flex;align-items:center;gap:8px;padding:9px 10px 6px;cursor:pointer;user-select:none;}
+.cluster-card-stripe{width:4px;height:22px;border-radius:2px;flex-shrink:0;}
+.cluster-card-label{font-size:13px;font-weight:700;color:var(--txt);flex:1;line-height:1.2;}
+.cluster-card-score{font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.cluster-card-bar-wrap{height:5px;background:rgba(255,255,255,.06);margin:0 10px 7px;border-radius:3px;position:relative;overflow:hidden;}
+.cluster-card-bar{position:absolute;top:0;height:100%;border-radius:3px;transition:width .4s;}
+.cluster-card-leader{font-size:11px;padding:0 10px 7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cluster-card-bt{font-size:11px;color:var(--txt3);padding:4px 0 2px;}
+.cluster-card-body{padding:6px 10px 8px;border-top:1px solid rgba(255,255,255,.05);}
+.cl-col-hdr{display:grid;font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;padding:2px 0 5px;border-bottom:1px solid rgba(255,255,255,.06);}
+.cl-ind-row{display:grid;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.025);align-items:center;}
+.cl-ind-name{color:var(--txt2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cl-ind-name.leader{font-weight:700;}
+.cl-ind-val{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;}
+.cl-ind-sub{text-align:right;color:var(--txt3);}
 /* ---- Methods table ---- */
 .meth-row{display:flex;flex-direction:column;gap:2px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03);}
 .meth-row-main{display:flex;align-items:center;gap:6px;}
-.meth-name{font-size:10px;color:var(--txt2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.meth-detail{font-size:9px;color:var(--txt3);line-height:1.3;padding-left:18px;}
-.meth-bar-wrap{width:60px;height:4px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
+.meth-name{font-size:12px;color:var(--txt2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.meth-detail{font-size:10px;color:var(--txt3);line-height:1.3;padding-left:4px;}
+.meth-bar-wrap{width:60px;height:5px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
 .meth-bar{height:100%;border-radius:999px;transition:width .4s;}
-.meth-score{font-size:10px;font-weight:600;width:32px;text-align:right;flex-shrink:0;}
-.meth-w{font-size:9px;color:var(--txt3);width:26px;text-align:right;flex-shrink:0;}
-.meth-src{font-size:8px;color:var(--txt3);width:20px;text-align:right;flex-shrink:0;}
-.meth-acc{font-size:9px;width:28px;text-align:right;flex-shrink:0;}
+.meth-score{font-size:12px;font-weight:700;width:38px;text-align:right;flex-shrink:0;font-family:'JetBrains Mono',monospace;}
+.meth-w{font-size:11px;color:var(--txt3);width:30px;text-align:right;flex-shrink:0;}
+.meth-src{font-size:9px;color:var(--txt3);width:20px;text-align:right;flex-shrink:0;}
+.meth-acc{font-size:11px;width:32px;text-align:right;flex-shrink:0;}
 /* ---- Candle area ---- */
 #candleArea{width:100%;height:200px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.01);border:1px solid rgba(255,255,255,.04);border-radius:10px;color:var(--txt3);font-size:11px;}
 /* ---- Data panels ---- */
@@ -2983,39 +3001,48 @@ function renderIndlabClusters(){
   if(sec) sec.textContent = `Кластеры · ${meta.label}`;
 
   const entries = Object.entries(m.clusters).sort((a,b)=>Math.abs(b[1].score||0)-Math.abs(a[1].score||0));
-  el.innerHTML = entries.map(([label, cl])=>{
+  const cards = entries.map(([label, cl])=>{
     const sc = cl.score ?? 0;
     const pct = Math.round(sc * 100);
-    const color = sc > 0.1 ? '#52F2C9' : sc < -0.1 ? '#FF4D7A' : '#9090A0';
-    const bar = Math.abs(pct);
     const catColor = _IL_CLUSTER_COLORS[label] || '#94A3B8';
-    const barColor = sc > 0.05 ? catColor : sc < -0.05 ? '#FF4D7A' : '#555';
+    const barColor = sc > 0.05 ? '#52F2C9' : sc < -0.05 ? '#FF4D7A' : '#6F648F';
+    const bar = Math.abs(pct);
     const safeId = '_ilcl_'+label.replace(/[^a-zа-яёА-ЯЁ0-9]/gi,'_');
     const leaderName = cl.leader ? (_IL_ID_NAMES[cl.leader] || cl.leader) : '';
-    const leaderLine = leaderName ? `<div style="color:${catColor};margin-bottom:2px;">Лидер: ${leaderName}</div>` : '';
-    const btLine = cl.bt?.h30?.acc != null ? `<div style="color:var(--txt3);">бэктест H30: ${(cl.bt.h30.acc*100).toFixed(0)}% (${cl.bt.h30.n} сигн.)</div>` : '';
+    const btAcc = cl.bt?.h30?.acc != null ? `${(cl.bt.h30.acc*100).toFixed(0)}% (${cl.bt.h30.n} сигн.)` : null;
+
+    // Колонки: название | вес%
+    const cols = '1fr 40px';
     const idsHtml = (cl.ids||[]).map(id=>{
       const name = _IL_ID_NAMES[id] || id;
       const w = cl.weights?.[id];
-      return `<div style="padding:1px 0;color:var(--txt2);">• ${name}${w!=null?` <span style="color:var(--txt3);">${(parseFloat(w)*100).toFixed(0)}%</span>`:''}</div>`;
+      const isLeader = id === cl.leader;
+      return `<div class="cl-ind-row" style="grid-template-columns:${cols};">
+        <span class="cl-ind-name${isLeader?' leader':''}" title="${name}">${isLeader?'★ ':''}${name}</span>
+        <span class="cl-ind-sub">${w!=null?(parseFloat(w)*100).toFixed(0)+'%':''}</span>
+      </div>`;
     }).join('');
-    return `<div style="border-bottom:1px solid rgba(255,255,255,0.05);">
-      <div onclick="_toggleClusterDetail('${safeId}')" style="display:flex;align-items:center;gap:6px;padding:5px 0;cursor:pointer;">
-        <div style="width:3px;height:20px;background:${catColor};border-radius:2px;flex-shrink:0;"></div>
-        <span style="font-size:10px;color:var(--txt2);min-width:115px;font-weight:600;">${label}</span>
-        <div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;position:relative;">
-          <div style="position:absolute;height:100%;width:${bar}%;background:${barColor};border-radius:2px;
-            left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'};"></div>
-        </div>
-        <span style="font-size:11px;color:${barColor};min-width:32px;text-align:right;font-weight:700;">${pct>=0?'+':''}${pct}</span>
-        <span style="font-size:8px;color:var(--txt3);margin-left:2px;">▾</span>
+
+    return `<div class="cluster-card">
+      <div class="cluster-card-hdr" onclick="_toggleClusterDetail('${safeId}')">
+        <div class="cluster-card-stripe" style="background:${catColor}"></div>
+        <span class="cluster-card-label">${label}</span>
+        <span class="cluster-card-score" style="color:${barColor}">${pct>=0?'+':''}${pct}</span>
       </div>
-      <div id="${safeId}" style="display:none;padding:4px 0 8px 18px;font-size:9px;line-height:1.6;border-left:2px solid ${catColor}33;margin-left:5px;">
-        ${leaderLine}${btLine}
+      <div class="cluster-card-bar-wrap">
+        <div class="cluster-card-bar" style="width:${bar}%;background:${barColor};left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div>
+      </div>
+      ${leaderName?`<div class="cluster-card-leader" style="color:${catColor}">▶ ${leaderName}</div>`:''}
+      <div id="${safeId}" class="cluster-card-body" style="display:none;">
+        <div class="cl-col-hdr" style="grid-template-columns:${cols};">
+          <span>Индикатор</span><span style="text-align:right;">Вес</span>
+        </div>
         ${idsHtml}
+        ${btAcc?`<div class="cluster-card-bt">Бэктест H30: ${btAcc}</div>`:''}
       </div>
     </div>`;
   }).join('');
+  el.innerHTML = `<div class="cluster-grid">${cards}</div>`;
 }
 
 function _toggleClusterDetail(id){
@@ -3067,16 +3094,15 @@ function _methRow(m, r, wVal, acc){
   const barPct = Math.abs(sc) * 100;
   const barColor = sc > 0 ? '#52F2C9' : sc < 0 ? '#FF4D7A' : '#6F648F';
   const confDot = r.confidence < 0.2 ? '○' : r.confidence < 0.5 ? '◑' : '●';
-  return `<div class="meth-row">
-    <div class="meth-row-main">
-      <span style="font-size:9px;color:var(--txt3);width:12px;" title="уверенность: ${(r.confidence*100).toFixed(0)}%">${confDot}</span>
-      <span class="meth-name">${m.label}</span>
+  const accColor = acc==='—'?'var(--txt3)':parseInt(acc)>=60?'var(--pos)':'var(--neg)';
+  return `<div class="cl-ind-row" style="grid-template-columns:1fr 50px 36px 34px 34px;" title="${r.detail||''}">
+    <span class="cl-ind-name" title="${m.label}">${m.label}</span>
+    <div style="display:flex;align-items:center;gap:0;">
       <div class="meth-bar-wrap"><div class="meth-bar" style="width:${barPct}%;background:${barColor};margin-left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
-      <span class="meth-score" style="color:${barColor}">${sc>=0?'+':''}${(sc).toFixed(2)}</span>
-      <span class="meth-w" title="вес">${(wVal).toFixed(2)}</span>
-      <span class="meth-acc" title="точность" style="color:${acc==='—'?'var(--txt3)':parseInt(acc)>=60?'var(--pos)':'var(--neg)'}">${acc}</span>
     </div>
-    <div class="meth-detail">${r.detail||''}</div>
+    <span class="cl-ind-val" style="color:${barColor}">${sc>=0?'+':''}${sc.toFixed(2)}</span>
+    <span class="cl-ind-sub" title="вес">${wVal.toFixed(2)}</span>
+    <span class="cl-ind-sub" style="color:${accColor}" title="точность">${acc}</span>
   </div>`;
 }
 
@@ -3085,43 +3111,56 @@ function renderMethodsTable(methodResults){
   const signalMethods = METHODS.filter(m=>!MODEL_METHOD_IDS.includes(m.id));
   const modelMethods  = METHODS.filter(m=>MODEL_METHOD_IDS.includes(m.id));
 
-  // Группировка по METHODS_CLUSTERS
-  let html = '';
-  METHODS_CLUSTERS.forEach(cat=>{
+  const colHdr = `<div class="cl-col-hdr" style="grid-template-columns:1fr 50px 36px 34px 34px;">
+    <span>Метод</span><span></span>
+    <span style="text-align:right;">Оценка</span>
+    <span style="text-align:right;">Вес</span>
+    <span style="text-align:right;">Точн.</span>
+  </div>`;
+
+  // Карточки по кластерам
+  const cards = METHODS_CLUSTERS.map(cat=>{
     const catMethods = cat.ids.map(id=>signalMethods.find(m=>m.id===id)).filter(Boolean);
-    if(!catMethods.length) return;
-    // Сортировка по |score| убыванием
+    if(!catMethods.length) return '';
     catMethods.sort((a,b)=>Math.abs(methodResults[b.id]?.score||0)-Math.abs(methodResults[a.id]?.score||0));
     const catScore = catMethods.reduce((s,m)=>s+(methodResults[m.id]?.score||0),0)/catMethods.length;
-    const catColor = catScore>0.05?'#52F2C9':catScore<-0.05?'#FF4D7A':'#6F648F';
+    const barColor = catScore>0.05?'#52F2C9':catScore<-0.05?'#FF4D7A':'#6F648F';
+    const bar = Math.abs(Math.round(catScore*100));
     const safeId = '_mcat_'+cat.label.replace(/[^a-zа-яёА-ЯЁ0-9]/gi,'_');
-    html += `<div style="border-bottom:1px solid rgba(255,255,255,0.05);margin-bottom:2px;">
-      <div onclick="_toggleClusterDetail('${safeId}')" style="display:flex;align-items:center;gap:6px;padding:5px 0;cursor:pointer;">
-        <span style="font-size:10px;font-weight:600;color:${cat.color};min-width:120px;">${cat.label}</span>
-        <span style="font-size:11px;color:${catColor};font-weight:700;">${catScore>=0?'+':''}${(catScore*100).toFixed(0)}</span>
-        <span style="font-size:8px;color:var(--txt3);">▾</span>
-      </div>
-      <div id="${safeId}" style="display:none;">`;
-    catMethods.forEach(m=>{
-      const r = methodResults[m.id] || {score:0, confidence:0, detail:''};
+    const rowsHtml = catMethods.map(m=>{
+      const r = methodResults[m.id] || {score:0,confidence:0,detail:''};
       const w = weights[m.id];
-      html += _methRow(m, r, w?.weight??0.5, w&&w.total>0?(w.correct/w.total*100).toFixed(0)+'%':'—');
-    });
-    html += `</div></div>`;
-  });
+      return _methRow(m, r, w?.weight??0.5, w&&w.total>0?(w.correct/w.total*100).toFixed(0)+'%':'—');
+    }).join('');
+    return `<div class="cluster-card">
+      <div class="cluster-card-hdr" onclick="_toggleClusterDetail('${safeId}')">
+        <div class="cluster-card-stripe" style="background:${cat.color}"></div>
+        <span class="cluster-card-label">${cat.label}</span>
+        <span class="cluster-card-score" style="color:${barColor}">${catScore>=0?'+':''}${Math.round(catScore*100)}</span>
+      </div>
+      <div class="cluster-card-bar-wrap">
+        <div class="cluster-card-bar" style="width:${bar}%;background:${barColor};left:${catScore<0?0:50}%;transform:${catScore<0?'translateX(-100%)':'none'}"></div>
+      </div>
+      <div id="${safeId}" class="cluster-card-body" style="display:none;">
+        ${colHdr}${rowsHtml}
+      </div>
+    </div>`;
+  }).filter(Boolean).join('');
 
-  // Модели — отдельная секция
-  html += `<div style="margin-top:6px;">
-    <div style="font-size:9px;color:#C084FC;font-weight:600;padding:4px 0;">Агрегационные модели (indlab)</div>`;
-  modelMethods.forEach(m=>{
+  // Модели — отдельная секция (список, не карточки)
+  const modelRows = modelMethods.map(m=>{
     const r = methodResults[m.id] || {score:0, confidence:0, detail:''};
     const w = weights[m.id];
-    html += _methRow(m, r, w?.weight??0.5, w&&w.total>0?(w.correct/w.total*100).toFixed(0)+'%':'—');
-  });
-  html += `</div>`;
+    return _methRow(m, r, w?.weight??0.5, w&&w.total>0?(w.correct/w.total*100).toFixed(0)+'%':'—');
+  }).join('');
+
+  let html = `<div class="cluster-grid">${cards}</div>`;
+  html += `<div style="margin-top:10px;background:rgba(129,140,248,.06);border:1px solid rgba(129,140,248,.15);border-radius:10px;padding:8px 10px;">
+    <div style="font-size:11px;color:#C084FC;font-weight:700;margin-bottom:6px;letter-spacing:.06em;">АГРЕГАЦИОННЫЕ МОДЕЛИ (indlab)</div>
+    ${colHdr}${modelRows}
+  </div>`;
 
   document.getElementById('methodsTable').innerHTML = html;
-  // Show outcome recording if we have a snapshot
   document.getElementById('outcomeRow').style.display = lastSnapshot ? '' : 'none';
 }
 
