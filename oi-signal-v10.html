@@ -60,7 +60,7 @@ a{color:var(--accent);text-decoration:none;}
 .chip.active .chip-code{color:var(--accent);}
 .chip-name{font-size:8px;color:var(--txt3);white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis;}
 /* ---- Layout ---- */
-.main-grid{display:grid;grid-template-columns:220px 1fr 260px;gap:12px;margin-bottom:12px;}
+.main-grid{display:grid;grid-template-columns:240px 1fr 260px;gap:12px;margin-bottom:12px;}
 @media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
 /* ---- Signal gauge ---- */
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0;}
@@ -69,28 +69,34 @@ a{color:var(--accent);text-decoration:none;}
 .gauge-dir{font-size:10px;letter-spacing:.1em;text-align:center;margin-top:2px;}
 .gauge-conf{font-size:9px;color:var(--txt3);text-align:center;margin-top:1px;}
 /* ---- Cluster blocks ---- */
-.cluster-block{border-left:3px solid #555;background:rgba(255,255,255,.02);border-radius:0 8px 8px 0;margin-bottom:6px;overflow:hidden;}
-.cluster-block-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none;}
-.cluster-block-name{font-size:13px;font-weight:600;color:var(--txt);flex:1;min-width:0;}
-.cluster-block-bar-wrap{flex-shrink:0;width:48px;height:5px;background:rgba(255,255,255,.07);border-radius:3px;position:relative;overflow:hidden;}
-.cluster-block-bar{position:absolute;top:0;height:100%;border-radius:3px;}
-.cluster-block-score{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0;min-width:32px;text-align:right;}
-.cluster-block-sub{font-size:11px;color:var(--txt3);padding:0 12px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cluster-block-body{padding:5px 12px 8px;border-top:1px solid rgba(255,255,255,.05);}
-/* Row grid: conf | name | bar | score | weight | acc */
-.ind-col-hdr{display:grid;grid-template-columns:14px 1fr 48px 38px 28px 32px;gap:4px;font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.04em;padding:3px 0 5px;border-bottom:1px solid rgba(255,255,255,.07);}
-.ind-row{display:grid;grid-template-columns:14px 1fr 48px 38px 28px 32px;gap:4px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.025);align-items:center;}
-.ind-row-nobar{display:grid;grid-template-columns:14px 1fr 60px;gap:4px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.025);align-items:center;}
-.ind-row-conf{color:var(--txt3);font-size:11px;}
-.ind-row-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt2);font-size:12px;}
+.cluster-block{border-left:3px solid #555;background:rgba(255,255,255,.02);border-radius:0 8px 8px 0;margin-bottom:5px;overflow:hidden;}
+.cluster-block-hdr{display:flex;flex-direction:column;gap:5px;padding:8px 10px 6px;cursor:pointer;user-select:none;}
+.cbh-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.cbh-bot{display:flex;align-items:center;gap:6px;}
+.cluster-block-name{font-size:12px;font-weight:600;color:var(--txt);line-height:1.2;}
+.cluster-block-score{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.cluster-block-bar-wrap{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;position:relative;overflow:hidden;min-width:30px;}
+.cluster-block-bar{position:absolute;top:0;height:100%;border-radius:2px;}
+.cluster-block-sub{font-size:11px;color:var(--txt3);padding:0 10px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cluster-block-body{padding:5px 10px 8px;border-top:1px solid rgba(255,255,255,.05);}
+/* Rows inside blocks — 2-line layout */
+.ind-col-hdr{display:flex;gap:6px;font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.04em;padding:3px 0 5px;border-bottom:1px solid rgba(255,255,255,.07);align-items:center;}
+.ind-col-hdr span:first-child{flex:1;}
+.ind-row{display:flex;flex-direction:column;gap:2px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.025);}
+.ind-row-top{display:flex;align-items:center;gap:6px;}
+.ind-row-bot{display:flex;align-items:center;gap:6px;padding-left:18px;}
+.ind-row-conf{color:var(--txt3);font-size:11px;flex-shrink:0;width:12px;}
+.ind-row-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt2);font-size:12px;flex:1;}
 .ind-row-name.bold{font-weight:700;color:var(--txt);}
-.ind-row-bar-wrap{height:4px;background:rgba(255,255,255,.07);border-radius:2px;position:relative;overflow:hidden;}
+.ind-row-bar-wrap{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;position:relative;overflow:hidden;}
 .ind-row-bar{position:absolute;top:0;height:100%;border-radius:2px;}
-.ind-row-val{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;}
-.ind-row-sub{text-align:right;color:var(--txt3);font-size:11px;}
-.ind-row-detail{font-size:11px;color:var(--txt3);line-height:1.4;padding:2px 0 3px 18px;grid-column:1/-1;}
-/* ---- Methods table (legacy cleanup) ---- */
-.meth-bar-wrap{width:48px;height:4px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
+.ind-row-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;flex-shrink:0;}
+.ind-row-sub{color:var(--txt3);font-size:11px;flex-shrink:0;}
+.ind-row-detail{font-size:11px;color:var(--txt3);line-height:1.4;padding:1px 0 2px 18px;}
+/* indlab-indicator rows (no bar, just name+weight) */
+.ind-row-nobar{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.025);}
+/* ---- Legacy ---- */
+.meth-bar-wrap{width:40px;height:4px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden;flex-shrink:0;}
 .meth-bar{height:100%;border-radius:999px;}
 /* ---- Candle area ---- */
 #candleArea{width:100%;height:200px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.01);border:1px solid rgba(255,255,255,.04);border-radius:10px;color:var(--txt3);font-size:11px;}
@@ -215,7 +221,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       </label>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;" title="Учитывать вердикт модуля индикаторов (RSI/MACD/Stoch и др. из indlab за 90 дней)">
         <input type="checkbox" id="extIndChk" checked onchange="toggleExtInd()" style="cursor:pointer;"> Индикаторы</label>
-      <span id="_ilProgressMsg" style="font-size:9px;color:var(--txt3);font-style:italic;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <span id="_ilProgressMsg" style="font-size:11px;color:var(--txt3);font-style:italic;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
       <select id="extIndBasisSel" onchange="toggleExtIndBasis()" style="font-size:10px;background:var(--panel);color:var(--txt3);border:1px solid var(--border2);border-radius:6px;cursor:pointer;" title="Для фьючерсов: считать индикаторы по базовому активу (больше истории) или по самому фьючерсу">
         <option value="basis" selected>по базису</option>
         <option value="future">по фьючерсу</option>
@@ -2997,9 +3003,7 @@ function renderIndlabClusters(){
   if(sec) sec.textContent = `Кластеры · ${meta.label}`;
 
   const entries = Object.entries(m.clusters).sort((a,b)=>Math.abs(b[1].score||0)-Math.abs(a[1].score||0));
-  const ilColHdr = `<div class="ind-col-hdr" style="grid-template-columns:14px 1fr 60px;">
-    <span></span><span>Индикатор</span><span style="text-align:right;">Вес</span>
-  </div>`;
+  const ilColHdr = `<div class="ind-col-hdr"><span>Индикатор</span><span>Вес</span></div>`;
   el.innerHTML = entries.map(([label, cl])=>{
     const sc = cl.score ?? 0;
     const pct = Math.round(sc * 100);
@@ -3014,16 +3018,20 @@ function renderIndlabClusters(){
       const w = cl.weights?.[id];
       const isLeader = id === cl.leader;
       return `<div class="ind-row-nobar">
-        <span class="ind-row-conf">${isLeader?'★':''}</span>
-        <span class="ind-row-name${isLeader?' bold':''}" title="${name}">${name}</span>
-        <span class="ind-row-sub">${w!=null?(parseFloat(w)*100).toFixed(0)+'%':''}</span>
+        <span class="ind-row-conf" style="width:14px;flex-shrink:0;">${isLeader?'★':''}</span>
+        <span class="ind-row-name${isLeader?' bold':''}" title="${name}" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${name}</span>
+        <span class="ind-row-sub" style="flex-shrink:0;">${w!=null?(parseFloat(w)*100).toFixed(0)+'%':''}</span>
       </div>`;
     }).join('');
     return `<div class="cluster-block" style="border-left-color:${catColor};">
       <div class="cluster-block-hdr" onclick="_toggleClusterDetail('${safeId}')">
-        <span class="cluster-block-name">${label}</span>
-        <div class="cluster-block-bar-wrap"><div class="cluster-block-bar" style="width:${bar}%;background:${barColor};left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
-        <span class="cluster-block-score" style="color:${barColor}">${pct>=0?'+':''}${pct}</span>
+        <div class="cbh-top">
+          <span class="cluster-block-name">${label}</span>
+          <span class="cluster-block-score" style="color:${barColor}">${pct>=0?'+':''}${pct}</span>
+        </div>
+        <div class="cbh-bot">
+          <div class="cluster-block-bar-wrap"><div class="cluster-block-bar" style="width:${bar}%;background:${barColor};left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
+        </div>
       </div>
       ${leaderName?`<div class="cluster-block-sub" style="color:${catColor};">▶ ${leaderName}</div>`:''}
       <div id="${safeId}" class="cluster-block-body" style="display:none;">
@@ -3084,24 +3092,23 @@ function _methRow(m, r, wVal, acc){
   const barColor = sc > 0 ? '#52F2C9' : sc < 0 ? '#FF4D7A' : '#6F648F';
   const confDot = r.confidence < 0.2 ? '○' : r.confidence < 0.5 ? '◑' : '●';
   const accColor = acc==='—'?'var(--txt3)':parseInt(acc)>=60?'var(--pos)':'var(--neg)';
+  const scStr = (sc!=null&&!isNaN(sc)) ? (sc>=0?'+':'')+sc.toFixed(2) : '—';
   const detailHtml = r.detail ? `<div class="ind-row-detail">${r.detail}</div>` : '';
   return `<div class="ind-row">
-    <span class="ind-row-conf" title="уверенность ${(r.confidence*100).toFixed(0)}%">${confDot}</span>
-    <span class="ind-row-name" title="${m.label}">${m.label}</span>
-    <div class="ind-row-bar-wrap"><div class="ind-row-bar" style="width:${barPct}%;background:${barColor};left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
-    <span class="ind-row-val" style="color:${barColor}">${sc>=0?'+':''}${sc.toFixed(2)}</span>
-    <span class="ind-row-sub" title="вес">${wVal.toFixed(2)}</span>
-    <span class="ind-row-sub" style="color:${accColor}" title="точность">${acc}</span>
-  </div>${detailHtml}`;
+    <div class="ind-row-top">
+      <span class="ind-row-conf" title="уверенность ${(r.confidence*100).toFixed(0)}%">${confDot}</span>
+      <span class="ind-row-name" title="${m.label}">${m.label}</span>
+      <span class="ind-row-val" style="color:${barColor}">${scStr}</span>
+    </div>
+    <div class="ind-row-bot">
+      <div class="ind-row-bar-wrap"><div class="ind-row-bar" style="width:${barPct}%;background:${barColor};left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'}"></div></div>
+      <span class="ind-row-sub">вес ${wVal.toFixed(2)} · <span style="color:${accColor}">${acc}</span></span>
+    </div>
+    ${detailHtml}
+  </div>`;
 }
 
-const _IND_COL_HDR = `<div class="ind-col-hdr">
-  <span></span><span>Метод / индикатор</span>
-  <span style="text-align:center;">━━━</span>
-  <span style="text-align:right;">Оценка</span>
-  <span style="text-align:right;">Вес</span>
-  <span style="text-align:right;">Точн.</span>
-</div>`;
+const _IND_COL_HDR = `<div class="ind-col-hdr"><span>Метод / индикатор</span><span style="font-size:11px;">Оценка</span></div>`;
 
 function renderMethodsTable(methodResults){
   const weights = getWeights(curTicker);
@@ -3127,9 +3134,13 @@ function renderMethodsTable(methodResults){
     }).join('');
     html += `<div class="cluster-block" style="border-left-color:${cat.color};">
       <div class="cluster-block-hdr" onclick="_toggleClusterDetail('${safeId}')">
-        <span class="cluster-block-name">${cat.label}</span>
-        <div class="cluster-block-bar-wrap"><div class="cluster-block-bar" style="width:${barPct}%;background:${barColor};left:${catScore<0?0:50}%;transform:${catScore<0?'translateX(-100%)':'none'}"></div></div>
-        <span class="cluster-block-score" style="color:${barColor}">${catScore>=0?'+':''}${Math.round(catScore*100)}</span>
+        <div class="cbh-top">
+          <span class="cluster-block-name">${cat.label}</span>
+          <span class="cluster-block-score" style="color:${barColor}">${catScore>=0?'+':''}${Math.round(catScore*100)}</span>
+        </div>
+        <div class="cbh-bot">
+          <div class="cluster-block-bar-wrap"><div class="cluster-block-bar" style="width:${barPct}%;background:${barColor};left:${catScore<0?0:50}%;transform:${catScore<0?'translateX(-100%)':'none'}"></div></div>
+        </div>
       </div>
       ${topName?`<div class="cluster-block-sub">▶ ${topName}</div>`:''}
       <div id="${safeId}" class="cluster-block-body" style="display:none;">
@@ -3146,7 +3157,7 @@ function renderMethodsTable(methodResults){
   }).join('');
   html += `<div class="cluster-block" style="border-left-color:#818CF8;margin-top:4px;">
     <div class="cluster-block-hdr" onclick="_toggleClusterDetail('_mcat_models')">
-      <span class="cluster-block-name" style="color:#C084FC;">Агрегационные модели</span>
+      <div class="cbh-top"><span class="cluster-block-name" style="color:#C084FC;">Агрегационные модели</span></div>
     </div>
     <div id="_mcat_models" class="cluster-block-body" style="display:none;">
       ${_IND_COL_HDR}${modelRows}
