@@ -1792,7 +1792,16 @@ function _ilRpcCall(api, args){
       delete _ilRpcPending[reqId];
       reject(new Error('таймаут 60с — модуль indlab не ответил'));
     }, 60000)};
-    window.parent.postMessage({type:'MODULE_RPC_REQUEST', reqId, payload:{api, ...args}}, '*');
+    const msg = {type:'MODULE_RPC_REQUEST', reqId, payload:{api, ...args}};
+    // Шлём родителю (на случай если shell сам релеит)
+    try{ window.parent.postMessage(msg, '*'); } catch(e){}
+    // И напрямую всем соседним фреймам — indlab может быть соседним iframe без relay в shell
+    try{
+      const frames = window.parent.frames;
+      for(let i=0;i<frames.length;i++){
+        try{ if(frames[i]!==window) frames[i].postMessage(msg,'*'); }catch(e){}
+      }
+    }catch(e){}
   });
 }
 
