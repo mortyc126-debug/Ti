@@ -8442,7 +8442,7 @@ async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null}) {
   seriesScore.aroon    = _arA.map(v=>ilScoreAroon(v));
   seriesScore.roc      = _rocA.map((v,i)=>ilScoreROC(v,closes,i));
   seriesScore.momentum = _momA.map((_,i)=>ilScoreMomentum(_momA,i));
-  seriesScore.vhf      = _vhfA.map((v,i)=>ilScoreVHF(v,_vhfA,i));
+  seriesScore.vhf      = _vhfA.map((_,i)=>ilScoreVHF(_vhfA,_rocA,i));
   seriesScore.vwap_ind = _vwapA.map((v,i)=>ilScoreVWAP(closes[i],v,_atrScalar));
 
   _prog('📊 пакет 6/13: адаптивные МА (KAMA/FRAMA/T3)...');
