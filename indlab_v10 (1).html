@@ -7959,7 +7959,10 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   const details = IL_INDICATORS.map(id=>{
     const cur = seriesScore[id][last];
     const ev = evalRes[id];
-    const included = ev.n>=10 && ev.winRate>0.55;
+    // Участвует в итоговом score если есть хоть 5 наблюдений;
+    // вес = max(0.01, winRate-0.45)*4 — слабые индикаторы вносят малый вклад,
+    // сильные (winRate≥0.65) — большой. Порог «не включать ниже 0.55» убран.
+    const included = ev.n >= 5;
     return {
       name: IL_NAMES[id],
       text: curText[id],
@@ -7974,8 +7977,11 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   let score = 0;
   if(used.length){
     let wSum=0, wTot=0;
-    used.forEach(d=>{ const w=(d.winRate-0.5)*2; wSum += d.score*w; wTot += w; });
-    score = wTot>0 ? wSum/wTot * Math.min(1, used.length/3) : 0;
+    used.forEach(d=>{
+      const w = Math.max(0.01, (d.winRate - 0.45) * 4);
+      wSum += d.score * w; wTot += w;
+    });
+    score = wTot>0 ? wSum/wTot * Math.min(1, used.length/5) : 0;
   }
   let label;
   if (!used.length) label = 'за 90 дней ни один индикатор не показал устойчивого перевеса — сигнала нет';
