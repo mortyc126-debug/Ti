@@ -336,7 +336,9 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <div class="gauge-val" id="gaugeVal">—</div>
         <div class="gauge-dir" id="gaugeDir" style="color:var(--txt3);">Нет данных</div>
         <div class="gauge-conf" id="gaugeConf"></div>
+        <div id="expectedMoveBar" style="font-size:9px;color:var(--txt3);text-align:center;margin-top:3px;min-height:14px;font-family:'JetBrains Mono',monospace;"></div>
       </div>
+      <div id="scenario-panel" style="margin-top:6px;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--txt2);line-height:1.6;"></div>
     </div>
 
     <div class="panel">
@@ -2105,11 +2107,141 @@ function computeAllMethods(){
 
 // Пересчитывает методы/композит и обновляет gauge+таблицу методов —
 // общий хвост для мест, где меняются настройки/тикер без полного refreshAll
+
+// ============================================================
+// EXPECTED MOVE: ATR + исторический vol + режимный коэффициент
+// ============================================================
+function computeExpectedMove(ticker) {
+  const tf = curTF;
+  const candles = candleData[tf] || candleData['1d'] || [];
+  if (candles.length < 5) return null;
+  const closes = candles.slice(-21).map(c => toP(c.close)).filter(Boolean);
+  if (closes.length < 5) return null;
+  const curPrice = closes[closes.length - 1];
+  if (!curPrice) return null;
+
+  // ATR как % цены
+  const atrPct = getAtrPct(ticker, tf);
+
+  // Историческая волатильность: стандартное отклонение лог-доходностей × sqrt(N)
+  const logRets = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0) logRets.push(Math.log(closes[i] / closes[i - 1]));
+  }
+  const n = logRets.length;
+  let hvPct = atrPct; // fallback
+  if (n >= 4) {
+    const mean = logRets.reduce((a, b) => a + b, 0) / n;
+    const variance = logRets.reduce((s, r) => s + (r - mean) ** 2, 0) / (n - 1);
+    hvPct = Math.sqrt(variance * n); // N-баровая σ
+  }
+
+  // Базовое движение = среднее ATR% и HV%
+  let basePct = (atrPct + hvPct) / 2;
+
+  // Модификатор режима
+  const regime = currentRegimeState;
+  const regName = regime ? regime.regime : 'unknown';
+  const regMods = { stress: 2.0, high_vol: 1.5, trending: 1.1, low_vol: 0.6, ranging: 0.8 };
+  const mod = regMods[regName] || 1.0;
+  basePct *= mod;
+
+  return { pct: basePct * 100, abs: curPrice * basePct, regime: regName };
+}
+
+// ============================================================
+// СЦЕНАРНЫЕ ЦЕНОВЫЕ ЦЕЛИ: Fibonacci + swing high/low
+// ============================================================
+function computeScenarios(compositeScore, ticker) {
+  if (Math.abs(compositeScore) < 0.15) return null;
+  const candles = candleData[curTF] || candleData['1d'] || [];
+  if (candles.length < 5) return null;
+  const slice = candles.slice(-30);
+  const highs = slice.map(c => toP(c.high)).filter(Boolean);
+  const lows  = slice.map(c => toP(c.low)).filter(Boolean);
+  if (!highs.length || !lows.length) return null;
+  const swHigh = Math.max(...highs);
+  const swLow  = Math.min(...lows);
+  const closes = slice.map(c => toP(c.close)).filter(Boolean);
+  const curPrice = closes[closes.length - 1];
+  if (!curPrice || swHigh <= swLow) return null;
+
+  // Fibo уровни
+  const fiboRatios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618];
+  const fiboLevels = fiboRatios.map(r => swLow + (swHigh - swLow) * r);
+
+  const above = fiboLevels.filter(l => l > curPrice).sort((a, b) => a - b);
+  const below = fiboLevels.filter(l => l < curPrice).sort((a, b) => b - a);
+
+  let base, optimistic, negative, invalidation;
+  if (compositeScore > 0) {
+    base        = above[0] ?? (curPrice * 1.02);
+    optimistic  = above[1] ?? (curPrice * 1.04);
+    negative    = below[0] ?? (curPrice * 0.98);
+    invalidation = swLow;
+  } else {
+    base        = below[0] ?? (curPrice * 0.98);
+    optimistic  = below[1] ?? (curPrice * 0.96);
+    negative    = above[0] ?? (curPrice * 1.02);
+    invalidation = swHigh;
+  }
+
+  const sc = Math.abs(compositeScore);
+  const baseProb  = Math.min(65, Math.max(35, 40 + compositeScore * 30));
+  const optProb   = Math.round((100 - baseProb) / 2 * sc);
+  const negProb   = 100 - Math.round(baseProb) - optProb;
+
+  return {
+    base: { lo: Math.min(curPrice, base), hi: Math.max(curPrice, base), prob: Math.round(baseProb) },
+    optimistic: { lo: Math.min(base, optimistic), hi: Math.max(base, optimistic), prob: optProb },
+    negative: { lo: Math.min(curPrice, negative), hi: Math.max(curPrice, negative), prob: negProb < 0 ? 0 : negProb },
+    invalidation,
+    bullish: compositeScore > 0,
+  };
+}
+
+// ============================================================
+// RENDER: Expected move + scenario panel
+// ============================================================
+function renderExpectedMoveAndScenarios(compositeScore, ticker) {
+  const emEl = document.getElementById('expectedMoveBar');
+  const scEl = document.getElementById('scenario-panel');
+  if (!emEl || !scEl) return;
+
+  const em = computeExpectedMove(ticker);
+  if (em) {
+    const sign = compositeScore >= 0 ? '+' : '−';
+    const regLabel = { stress:'Стресс', high_vol:'Выс. вол.', trending:'Тренд', low_vol:'Низ. вол.', ranging:'Флэт', unknown:'?' }[em.regime] || em.regime;
+    emEl.textContent = `ожид. движение ${sign}${em.pct.toFixed(1)}% ± ${(em.pct/2).toFixed(1)}% [${regLabel}]`;
+    emEl.style.color = compositeScore >= 0 ? 'var(--pos)' : 'var(--neg)';
+  } else {
+    emEl.textContent = '';
+  }
+
+  const sc = computeScenarios(compositeScore, ticker);
+  if (sc) {
+    const fmt = v => v != null ? v.toFixed(1) : '?';
+    const arrowB = sc.bullish ? '↑' : '↓';
+    const arrowO = sc.bullish ? '↑↑' : '↓↓';
+    const arrowN = sc.bullish ? '↓' : '↑';
+    scEl.innerHTML = [
+      `<div style="color:var(--pos)">${arrowB} Базовый (${sc.base.prob}%) → ${fmt(sc.base.lo)} – ${fmt(sc.base.hi)}</div>`,
+      `<div style="color:var(--mem)">${arrowO} Оптимист. (${sc.optimistic.prob}%) → ${fmt(sc.optimistic.lo)} – ${fmt(sc.optimistic.hi)}</div>`,
+      `<div style="color:var(--neg)">${arrowN} Негативный (${sc.negative.prob}%) → ${fmt(sc.negative.lo)} – ${fmt(sc.negative.hi)}</div>`,
+      `<div style="color:var(--txt3)">Инвалидация → ${sc.bullish ? 'ниже' : 'выше'} ${fmt(sc.invalidation)}</div>`,
+    ].join('');
+  } else {
+    scEl.innerHTML = '';
+  }
+}
+
 function recalculateAndRender(){
   const mr = computeAllMethods();
   const avgConf = METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length;
-  renderGauge(computeComposite(mr, curTicker), avgConf);
+  const composite = computeComposite(mr, curTicker);
+  renderGauge(composite, avgConf);
   renderMethodsTable(mr);
+  renderExpectedMoveAndScenarios(composite, curTicker);
   return mr;
 }
 
