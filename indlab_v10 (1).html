@@ -7971,6 +7971,163 @@ function ilCalcOHLCVol(c){
   });
 }
 
+// ── Пакет 4: оставшиеся индикаторы + режимные классификаторы ────────────────
+
+// ZigZag: направление последнего завершённого свинга (смотрим назад, без lookahead)
+function ilCalcZigzagSignal(c, minPct=0.015) {
+  const res=[];
+  // Подтверждённый пивот-хай в точке j: high[j] > high[j±1] и high[j±2]
+  // Доступен начиная с j+2, т.е. при i>=j+2
+  const pivHi=[],pivLo=[];
+  for(let j=2;j<c.length-2;j++){
+    if(c[j].high>=c[j-1].high&&c[j].high>=c[j-2].high&&c[j].high>=c[j+1].high&&c[j].high>=c[j+2].high) pivHi.push(j);
+    if(c[j].low<=c[j-1].low&&c[j].low<=c[j-2].low&&c[j].low<=c[j+1].low&&c[j].low<=c[j+2].low) pivLo.push(j);
+  }
+  for(let i=0;i<c.length;i++){
+    // последний подтверждённый хай/лоу доступный к бару i (нужно j+2<=i)
+    const lastHi=pivHi.filter(j=>j+2<=i).slice(-1)[0];
+    const lastLo=pivLo.filter(j=>j+2<=i).slice(-1)[0];
+    if(lastHi==null||lastLo==null){res.push(null);continue;}
+    if(lastHi>lastLo){
+      // последний пивот — хай: тренд вниз или разворот от хая
+      const swing=(c[lastHi].high-c[lastLo].low)/c[lastLo].low;
+      res.push(swing>=minPct?-1:0);
+    } else {
+      const swing=(c[lastLo].high-c[lastLo].low)/c[lastHi].low;
+      res.push((c[lastLo].low<c[lastHi].low&&swing>=minPct)?1:0);
+    }
+  }
+  return res;
+}
+
+// Fractals: цена выше последнего лоу-фрактала и ниже хай-фрактала
+function ilCalcFractalsSignal(c) {
+  const res=[];
+  const fHi=[],fLo=[];
+  for(let j=2;j<c.length-2;j++){
+    if(c[j].high>c[j-1].high&&c[j].high>c[j-2].high&&c[j].high>c[j+1].high&&c[j].high>c[j+2].high) fHi.push({j,v:c[j].high});
+    if(c[j].low<c[j-1].low&&c[j].low<c[j-2].low&&c[j].low<c[j+1].low&&c[j].low<c[j+2].low) fLo.push({j,v:c[j].low});
+  }
+  for(let i=0;i<c.length;i++){
+    const hi=fHi.filter(f=>f.j+2<=i).slice(-1)[0];
+    const lo=fLo.filter(f=>f.j+2<=i).slice(-1)[0];
+    if(!hi&&!lo){res.push(null);continue;}
+    const price=c[i].close;
+    if(hi&&lo){
+      // между фракталами: нейтрально; за пределами — сигнал
+      if(price>hi.v) res.push(2);     // пробой хай-фрактала вверх
+      else if(price<lo.v) res.push(-2); // пробой лоу-фрактала вниз
+      else res.push(price>(hi.v+lo.v)/2?1:-1); // ближе к верхнему или нижнему
+    } else res.push(null);
+  }
+  return res;
+}
+
+// Crash: падение>2σ за 3 бара + объём выше среднего
+function ilCalcCrash(c,closes,period=20){
+  const std=ilCalcStdDev(closes,period);
+  return closes.map((v,i)=>{
+    if(i<period+3||std[i]==null)return null;
+    const ret3=(v-closes[i-3])/closes[i-3];
+    const avgVol=c.slice(i-period,i).reduce((s,x)=>s+(x.volume||0),0)/period;
+    const volSpike=(c[i].volume||0)>avgVol*1.5;
+    if(ret3<-2*std[i]/closes[i]&&volSpike)return -2; // крэш
+    if(ret3<-std[i]/closes[i])return -1; // слабый крэш
+    return null; // не крэш-бар
+  });
+}
+
+// Recovery: цена X% выше N-барного минимума и растёт
+function ilCalcRecovery(closes,period=20){
+  return closes.map((v,i)=>{
+    if(i<period)return null;
+    const lo=Math.min(...closes.slice(i-period,i));
+    const pct=(v-lo)/lo;
+    if(pct>=0.08&&v>closes[i-5])return 2;
+    if(pct>=0.04&&v>closes[i-3])return 1;
+    return null;
+  });
+}
+
+// Flat/no_dir: диапазон / ATR < порог
+function ilCalcFlat(c,closes,period=20){
+  const atr=ilCalcATR(c,period);
+  return closes.map((v,i)=>{
+    if(i<period||atr[i]==null||!atr[i])return null;
+    const hi=Math.max(...c.slice(i-period,i+1).map(x=>x.high));
+    const lo=Math.min(...c.slice(i-period,i+1).map(x=>x.low));
+    const ratio=(hi-lo)/(atr[i]*period);
+    return ratio<1.5?0:null; // 0 = боковик подтверждён, null = тренд
+  });
+}
+
+// HighVol/LowVol: перцентиль HV
+function ilCalcVolRegime(hvArr,period=60){
+  return hvArr.map((v,i)=>{
+    if(v==null||i<period)return null;
+    const window=hvArr.slice(i-period,i).filter(x=>x!=null).sort((a,b)=>a-b);
+    if(!window.length)return null;
+    const rank=window.filter(x=>x<=v).length/window.length;
+    return rank; // 0..1, >0.75=высокая, <0.25=низкая волат.
+  });
+}
+
+// StockUp/StockDown: цена vs SMA200 + моментум
+function ilCalcStockTrend(closes,smaPeriod=200,momPeriod=20){
+  const sma=ilSMA(closes,smaPeriod);
+  return closes.map((v,i)=>{
+    if(sma[i]==null||i<momPeriod)return null;
+    const aboveSMA=v>sma[i];
+    const mom=(v-closes[i-momPeriod])/closes[i-momPeriod];
+    if(aboveSMA&&mom>0.05)return 2;
+    if(aboveSMA&&mom>0)return 1;
+    if(!aboveSMA&&mom<-0.05)return -2;
+    if(!aboveSMA&&mom<0)return -1;
+    return 0;
+  });
+}
+
+// Scoring для пакета 4
+function ilScoreZigzag(v){ return v; } // уже -1/0/1 из calcZigzagSignal
+function ilScoreFractals(v){ return v; }
+function ilScoreCrash(v){ return v; }
+function ilScoreRecovery(v){ return v; }
+function ilScoreFlat(v){ return 0; } // боковик не дирекциональный
+function ilScoreStockTrend(v){ return v; }
+// VolRegime — режимный, не дирекциональный (возвращает null)
+function ilScoreVolRegime(v){ return null; }
+
+// ── HELPER: вычислить режим рынка из имеющихся серий ──────────────────────
+// Возвращает {regime, labels, color} для отображения на странице Анализ
+function ilDetectRegime(closes, c, i) {
+  if(i<30)return null;
+  const hvArr=ilCalcHistVol(closes,20);
+  const volReg=ilCalcVolRegime(hvArr,60);
+  const sma200=ilSMA(closes,Math.min(200,closes.length-1));
+  const flatArr=ilCalcFlat(c,closes,20);
+  const atr=ilCalcATR(c,14);
+
+  const hv=volReg[i], flat=flatArr[i], price=closes[i], sma=sma200[i];
+  const ret5=i>=5?(price-closes[i-5])/closes[i-5]:0;
+  const ret20=i>=20?(price-closes[i-20])/closes[i-20]:0;
+
+  const labels=[], regime=[];
+  // Тренд
+  if(sma&&price>sma*1.03&&ret20>0.03){regime.push('trend_up');labels.push('📈 Тренд вверх');}
+  else if(sma&&price<sma*0.97&&ret20<-0.03){regime.push('trend_dn');labels.push('📉 Тренд вниз');}
+  else if(flat===0){regime.push('range');labels.push('↔ Боковик');}
+  // Волатильность
+  if(hv!=null){
+    if(hv>0.75)labels.push('🌪 Высокая волат.');
+    else if(hv<0.25)labels.push('😴 Низкая волат.');
+  }
+  // Стресс
+  if(i>=3){const d3=(price-closes[i-3])/closes[i-3]; if(d3<-0.06)labels.push('⚡ Распродажа');}
+  if(!labels.length)labels.push('— Нейтрально');
+  const color=regime.includes('trend_up')?'#52F2C9':regime.includes('trend_dn')?'#FF4D7A':regime.includes('range')?'#A78BFA':'var(--text3)';
+  return {labels,color};
+}
+
 // Scoring для пакета 2
 function ilScoreAccDist(arr,i,period=20){
   if(i<period||arr[i]==null)return null;
@@ -8059,6 +8216,8 @@ const IL_INDICATORS = [
   'acc_dist','chaikin_osc','chaikin_vol','accel_osc','elder_ray','elder_impulse',
   'eom','nvi','pvi','pvt','vo','vwma','parabolic','hist_vol','vix_like',
   'std_dev','fisher','mcginley','dpo','bb_width','rsi_w','ohlc_vol',
+  // Пакет 4: ценовые паттерны + режимные классификаторы
+  'zigzag','fractals','crash','recovery','flat','high_vol','low_vol','stock_trend',
 ];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
@@ -8073,6 +8232,9 @@ const IL_NAMES = {
   hist_vol:'Историч. волатильность', vix_like:'VIX-like (страх)', std_dev:'StdDev',
   fisher:'Fisher Transform', mcginley:'McGinley Dynamic', dpo:'DPO',
   bb_width:'BB Width', rsi_w:'RSI(7) краткоср.', ohlc_vol:'OHLC Volatility',
+  zigzag:'ZigZag сигнал', fractals:'Фракталы (пробой)', crash:'Режим: крах',
+  recovery:'Режим: отскок', flat:'Режим: боковик', high_vol:'Режим: высокая вол.',
+  low_vol:'Режим: низкая вол.', stock_trend:'Режим: тренд (SMA200)',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -8170,6 +8332,22 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.bb_width=_bwA.map((_,i)=>ilScoreBBWidth(_bwA,i,20));
   seriesScore.rsi_w=_r7A.map(v=>ilScoreRSIW(v));
   seriesScore.ohlc_vol=_ovA.map((_,i)=>ilScoreOHLCVol(_ovA,i,20));
+  // Пакет 4: паттерны и режимные классификаторы
+  const _zzA=ilCalcZigzagSignal(candles,0.015);
+  const _frA=ilCalcFractalsSignal(candles);
+  const _crA=ilCalcCrash(candles,closes,20);
+  const _rcA=ilCalcRecovery(closes,20);
+  const _flA=ilCalcFlat(candles,closes,20);
+  const _vrA=ilCalcVolRegime(_hvA,60);
+  const _strendA=ilCalcStockTrend(closes,Math.min(200,closes.length-1),20);
+  seriesScore.zigzag     = _zzA.map(v=>ilScoreZigzag(v));
+  seriesScore.fractals   = _frA.map(v=>ilScoreFractals(v));
+  seriesScore.crash      = _crA.map(v=>ilScoreCrash(v));
+  seriesScore.recovery   = _rcA.map(v=>ilScoreRecovery(v));
+  seriesScore.flat       = _flA.map(v=>ilScoreFlat(v));
+  seriesScore.high_vol   = _vrA.map(v=>v!=null?(v>=0.7?-0.5:null):null);
+  seriesScore.low_vol    = _vrA.map(v=>v!=null?(v<=0.3?0.5:null):null);
+  seriesScore.stock_trend= _strendA.map(v=>ilScoreStockTrend(v));
 
   // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
   const horizon = 5;
@@ -8237,6 +8415,14 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     bb_width: `BB Width = ${_bwA[last]?.toFixed(2)??'—'}%`,
     rsi_w: `RSI(7) = ${_r7A[last]?.toFixed(1)??'—'}`,
     ohlc_vol: `OHLC Vol = ${_ovA[last]?.toFixed(1)??'—'}%`,
+    zigzag: `ZigZag = ${_zzA[last]===1?'↑ подтверждён рост':_zzA[last]===-1?'↓ подтверждён спуск':'нет сигнала'}`,
+    fractals: `Fractals = ${_frA[last]===1?'↑ пробой вверх':_frA[last]===-1?'↓ пробой вниз':'нет пробоя'}`,
+    crash: `Режим краха: ${_crA[last]===1?'🔴 да':'нет'}`,
+    recovery: `Режим отскока: ${_rcA[last]===1?'🟢 да':'нет'}`,
+    flat: `Боковик: ${_flA[last]===1?'да':'нет'}`,
+    high_vol: `HV-перцентиль = ${_vrA[last]!=null?(_vrA[last]*100).toFixed(0)+'%':'—'} (${_vrA[last]!=null&&_vrA[last]>=0.7?'🌪 высокая вол.':''})`,
+    low_vol: `HV-перцентиль = ${_vrA[last]!=null?(_vrA[last]*100).toFixed(0)+'%':'—'} (${_vrA[last]!=null&&_vrA[last]<=0.3?'😴 низкая вол.':''})`,
+    stock_trend: `SMA(${Math.min(200,closes.length-1)}): цена ${_strendA[last]===1?'выше ↑ тренд':_strendA[last]===-1?'ниже ↓ нет тренда':'—'}`,
   };
 
   const details = IL_INDICATORS.map(id=>{
@@ -8376,6 +8562,22 @@ function _ilCalcAllSeries(candles, closes) {
   ss.bb_width     = bwArr.map((_,i)=>ilScoreBBWidth(bwArr,i,20));
   ss.rsi_w        = r7Arr.map(v=>ilScoreRSIW(v));
   ss.ohlc_vol     = ovArr.map((_,i)=>ilScoreOHLCVol(ovArr,i,20));
+  // Пакет 4
+  const zzArr   = ilCalcZigzagSignal(candles,0.015);
+  const frArr   = ilCalcFractalsSignal(candles);
+  const crArr   = ilCalcCrash(candles,closes,20);
+  const rcArr   = ilCalcRecovery(closes,20);
+  const flArr   = ilCalcFlat(candles,closes,20);
+  const vrArr   = ilCalcVolRegime(hvArr,60);
+  const strendArr = ilCalcStockTrend(closes,Math.min(200,closes.length-1),20);
+  ss.zigzag      = zzArr.map(v=>ilScoreZigzag(v));
+  ss.fractals    = frArr.map(v=>ilScoreFractals(v));
+  ss.crash       = crArr.map(v=>ilScoreCrash(v));
+  ss.recovery    = rcArr.map(v=>ilScoreRecovery(v));
+  ss.flat        = flArr.map(v=>ilScoreFlat(v));
+  ss.high_vol    = vrArr.map(v=>v!=null?(v>=0.7?-0.5:null):null);
+  ss.low_vol     = vrArr.map(v=>v!=null?(v<=0.3?0.5:null):null);
+  ss.stock_trend = strendArr.map(v=>ilScoreStockTrend(v));
   return ss;
 }
 
@@ -8456,7 +8658,7 @@ async function ilRunAnalysis() {
       clusters.push(cl);
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,ss};
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
@@ -8477,6 +8679,21 @@ function ilRenderAnalysis() {
     return `<span style="color:${c}">${p>0?'+':''}${p}%</span>`;
   };
   let html='';
+  // Блок текущего рыночного режима
+  try {
+    const closes_=r.closes, last_=closes_.length-1;
+    const regime=ilDetectRegime(closes_,r.candles||null,last_);
+    if(regime&&regime.labels&&regime.labels.length){
+      html+=`<div style="margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid #2a1f3d;">`;
+      html+=`<div style="font-size:9px;color:var(--text3);margin-bottom:6px;">ТЕКУЩИЙ РЕЖИМ РЫНКА</div>`;
+      html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+      regime.labels.forEach(l=>{
+        const col=regime.color||'#A78BFA';
+        html+=`<span style="padding:3px 8px;border-radius:12px;background:${col}22;border:1px solid ${col}66;color:${col};font-size:10px;font-family:var(--mono);">${l}</span>`;
+      });
+      html+=`</div></div>`;
+    }
+  } catch(e) {}
   // Кластеры
   html+=`<div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--mono);">Кластеры по корреляции score-серий (порог 0.5)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">`;
   r.clusters.forEach((cl,ci)=>{
