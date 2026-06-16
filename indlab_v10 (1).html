@@ -8250,6 +8250,8 @@ const IL_INDICATORS = [
   'std_dev','fisher','mcginley','dpo','bb_width','rsi_w','ohlc_vol',
   // Пакет 4: ценовые паттерны + режимные классификаторы
   'zigzag','fractals','crash','recovery','flat','high_vol','low_vol','stock_trend',
+  // Пакет 5: SMA-кросс, Aroon, ROC, Momentum, VHF, VWAP-индикатор
+  'sma','aroon','roc','momentum','vhf','vwap_ind',
 ];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
@@ -8267,6 +8269,8 @@ const IL_NAMES = {
   zigzag:'ZigZag сигнал', fractals:'Фракталы (пробой)', crash:'Режим: крах',
   recovery:'Режим: отскок', flat:'Режим: боковик', high_vol:'Режим: высокая вол.',
   low_vol:'Режим: низкая вол.', stock_trend:'Режим: тренд (SMA200)',
+  sma:'SMA 10/30 кросс', aroon:'Aroon Oscillator', roc:'ROC (скорость изм.)',
+  momentum:'Momentum', vhf:'VHF (режим рынка)', vwap_ind:'VWAP-индикатор',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -8380,6 +8384,17 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.high_vol   = _vrA.map(v=>v!=null?(v>=0.7?-0.5:null):null);
   seriesScore.low_vol    = _vrA.map(v=>v!=null?(v<=0.3?0.5:null):null);
   seriesScore.stock_trend= _strendA.map(v=>ilScoreStockTrend(v));
+  // Пакет 5
+  const _smaR=ilCalcSMACross(closes,10,30),_arA=ilCalcAroon(candles,25);
+  const _rocA=ilCalcROC(closes,10),_momA=ilCalcMomentum(closes,10);
+  const _vhfA=ilCalcVHF(closes,28),_vwapA=ilCalcVWAP(candles,20);
+  const _atrScalar=ilCalcATR(candles,14)||1;
+  seriesScore.sma      = closes.map((_,i)=>ilScoreSMA(_smaR.fast,_smaR.slow,i));
+  seriesScore.aroon    = _arA.map(v=>ilScoreAroon(v));
+  seriesScore.roc      = _rocA.map((v,i)=>ilScoreROC(v,closes,i));
+  seriesScore.momentum = _momA.map((_,i)=>ilScoreMomentum(_momA,i));
+  seriesScore.vhf      = _vhfA.map((v,i)=>ilScoreVHF(v,_vhfA,i));
+  seriesScore.vwap_ind = _vwapA.map((v,i)=>ilScoreVWAP(closes[i],v,_atrScalar));
 
   // Бэктест по 3 горизонтам для каждого индикатора
   const evalRes = {};
@@ -8491,6 +8506,12 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     high_vol: `HV-перцентиль = ${_vrA[last]!=null?(_vrA[last]*100).toFixed(0)+'%':'—'} (${_vrA[last]!=null&&_vrA[last]>=0.7?'🌪 высокая вол.':''})`,
     low_vol: `HV-перцентиль = ${_vrA[last]!=null?(_vrA[last]*100).toFixed(0)+'%':'—'} (${_vrA[last]!=null&&_vrA[last]<=0.3?'😴 низкая вол.':''})`,
     stock_trend: `SMA(${Math.min(200,closes.length-1)}): цена ${_strendA[last]===1?'выше ↑ тренд':_strendA[last]===-1?'ниже ↓ нет тренда':'—'}`,
+    sma: `SMA10 ${_smaR.fast[last]?.toFixed(2)??'—'} / SMA30 ${_smaR.slow[last]?.toFixed(2)??'—'}`,
+    aroon: `Aroon Osc(25) = ${_arA[last]?.toFixed(0)??'—'}`,
+    roc: `ROC(10) = ${_rocA[last]?.toFixed(2)??'—'}%`,
+    momentum: `Momentum(10) = ${_momA[last]?.toFixed(2)??'—'}`,
+    vhf: `VHF(28) = ${_vhfA[last]?.toFixed(3)??'—'}`,
+    vwap_ind: `VWAP(20) = ${_vwapA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
   };
 
   const details = IL_INDICATORS.map(id=>{
@@ -8532,6 +8553,87 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
 
   return {score, label, details, chained, bestCombos};
+}
+
+// ═══ Пакет 5: новые индикаторы ═══
+
+// SMA crossover (10/30)
+function ilCalcSMACross(closes, fast=10, slow=30){
+  return { fast: ilSMA(closes,fast), slow: ilSMA(closes,slow) };
+}
+// Aroon (25): AroonUp/Down → осциллятор
+function ilCalcAroon(candles, period=25){
+  const res=[];
+  for(let i=0;i<candles.length;i++){
+    if(i<period){res.push(null);continue;}
+    const slice=candles.slice(i-period,i+1);
+    let hiIdx=0, loIdx=0;
+    for(let j=1;j<=period;j++){
+      if(slice[j].h>=slice[hiIdx].h) hiIdx=j;
+      if(slice[j].l<=slice[loIdx].l) loIdx=j;
+    }
+    const up=100*(period-(period-hiIdx))/period;
+    const dn=100*(period-(period-loIdx))/period;
+    res.push(up-dn); // осциллятор -100..+100
+  }
+  return res;
+}
+// ROC: (close - close[n]) / close[n] * 100
+function ilCalcROC(closes, period=10){
+  return closes.map((c,i)=>i<period?null:(c-closes[i-period])/(closes[i-period]||1)*100);
+}
+// Momentum: close - close[n]
+function ilCalcMomentum(closes, period=10){
+  return closes.map((c,i)=>i<period?null:c-closes[i-period]);
+}
+// VHF (Vertical Horizontal Filter): (max-min) / sum(|diff|)
+function ilCalcVHF(closes, period=28){
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period){res.push(null);continue;}
+    const sl=closes.slice(i-period,i+1);
+    const hi=Math.max(...sl), lo=Math.min(...sl);
+    let s=0; for(let j=1;j<=period;j++) s+=Math.abs(sl[j]-sl[j-1]);
+    res.push(s>0?(hi-lo)/s:null);
+  }
+  return res;
+}
+// VWAP (кумулятивный за период): cumsum(TP*vol)/cumsum(vol)
+function ilCalcVWAP(candles, period=20){
+  const res=[];
+  for(let i=0;i<candles.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let numSum=0,denSum=0;
+    for(let j=i-period+1;j<=i;j++){
+      const tp=(candles[j].h+candles[j].l+candles[j].c)/3;
+      const v=candles[j].v||1;
+      numSum+=tp*v; denSum+=v;
+    }
+    res.push(denSum>0?numSum/denSum:null);
+  }
+  return res;
+}
+
+// Скоринг
+function ilScoreSMA(fast,slow,i){ return ilScoreCross(fast,slow,i); }
+function ilScoreAroon(v){ if(v==null)return null; return Math.tanh(v/50); }
+function ilScoreROC(v,closes,i){ if(v==null)return null; const atr=closes[i]*0.01||1; return Math.tanh(v/atr/10); }
+function ilScoreMomentum(arr,i,period=10){
+  if(arr[i]==null)return null;
+  const ref=Math.abs(arr[i-period]||arr.slice(0,i+1).reduce((mx,v)=>Math.max(mx,Math.abs(v||0)),0.001));
+  return Math.tanh(arr[i]/(ref||0.001)*2);
+}
+function ilScoreVHF(vhf,arr,i){
+  // VHF ≥ 0.4 → тренд (усиливаем сигнал направления по ROC), < 0.2 → флэт
+  if(vhf[i]==null||arr==null)return null;
+  const dir=arr[i]>=0?1:-1;
+  const str=Math.min(1,(vhf[i]-0.2)/0.4);
+  return str>0?str*dir:0;
+}
+function ilScoreVWAP(close,vwap,atr){
+  if(vwap==null)return null;
+  const scale=atr||vwap*0.005;
+  return Math.tanh((close-vwap)/(scale||1)*1.5);
 }
 
 // ═══ СТРАНИЦА АНАЛИЗА: мульти-горизонтный бэктест, кластеры, конструктор комбо ═══
@@ -8997,10 +9099,10 @@ function ilRenderAnalysis() {
 
 // Категории для группировки в конструкторе
 const _IL_CATS = [
-  {label:'Тренд',          ids:['ichimoku','alligator','supertrend','ema','vwma','mcginley','donchian','vortex','parabolic','stock_trend','macd']},
-  {label:'Импульс',        ids:['rsi','stoch','wr','cci','tsi','ult_osc','ao','dpo','fisher','cmo','rsi_w','accel_osc']},
+  {label:'Тренд',          ids:['ichimoku','alligator','supertrend','ema','vwma','mcginley','donchian','vortex','parabolic','stock_trend','macd','sma','aroon','vwap_ind']},
+  {label:'Импульс',        ids:['rsi','stoch','wr','cci','tsi','ult_osc','ao','dpo','fisher','cmo','rsi_w','accel_osc','roc','momentum']},
   {label:'Волатильность',  ids:['bb','bb_width','keltner','envelopes','std_dev','hist_vol','vix_like','ohlc_vol']},
-  {label:'Режим рынка',    ids:['adx','chop','flat','high_vol','low_vol','crash','recovery']},
+  {label:'Режим рынка',    ids:['adx','chop','flat','high_vol','low_vol','crash','recovery','vhf']},
   {label:'Объём',          ids:['obv','cmf','chaikin_osc','chaikin_vol','force_idx','mfi','pvt','nvi','pvi','eom','vo','acc_dist']},
   {label:'Elder',          ids:['elder_ray','elder_impulse']},
   {label:'Структура цены', ids:['fractals','zigzag']},
