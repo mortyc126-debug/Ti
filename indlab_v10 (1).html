@@ -7501,10 +7501,16 @@ async function ilFindFigi(ticker, token, proxy) {
 // контракта той же цепочки (общий basicAsset) — для бэктеста индикаторов.
 async function ilGetCandlesChain(found, token, from, now, proxy) {
   const fetchCandles = async (figi, f, t) => {
-    const cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
-      method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
-      body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval:'CANDLE_INTERVAL_DAY'})
-    });
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 20000);
+    let cr;
+    try {
+      cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
+        method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
+        body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval:'CANDLE_INTERVAL_DAY'}),
+        signal: ctrl.signal,
+      });
+    } finally { clearTimeout(tid); }
     if (!cr.ok) throw new Error('GetCandles '+cr.status);
     const cd = await cr.json();
     return (cd.candles||[]).map(c=>({
