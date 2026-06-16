@@ -1537,11 +1537,16 @@ function m_LARGE_IMPACT(ts){
 // --- Method 4: VWAP Signal (адаптивный) ---
 function m_VWAP_SIGNAL(ts){
   if(ts.length<3) return {score:0, confidence:0, detail:'недостаточно истории для расчёта'};
-  const prices = ts.map(r=>toNum(r.pr_close||r.pr_cl||0)).filter(Boolean);
-  const vols   = ts.map(r=>toNum(r.vol||0));
-  if(!prices.length) return {score:0, confidence:0.1, detail:'нет данных по цене'};
-  const vwap = prices.reduce((s,p,i)=>s+p*(vols[i]||1),0)/prices.reduce((s,_,i)=>s+(vols[i]||1),0);
-  const curPrice = prices[prices.length-1];
+  const bars = ts.filter(r=>toNum(r.pr_close||r.pr_cl||0)>0);
+  if(!bars.length) return {score:0, confidence:0.1, detail:'нет данных по цене'};
+  const curPrice = toNum(bars[bars.length-1].pr_close||bars[bars.length-1].pr_cl||0);
+  // MOEX отдаёт pr_vwap за каждый бар — берём напрямую, не пересчитываем вручную
+  const vwapDirect = toNum(bars[bars.length-1].pr_vwap||0);
+  const vwap = vwapDirect > 0 ? vwapDirect : (() => {
+    const num = bars.reduce((s,r)=>s+toNum(r.pr_close||r.pr_cl||0)*(toNum(r.vol||0)||1),0);
+    const den = bars.reduce((s,r)=>s+(toNum(r.vol||0)||1),0);
+    return num/den;
+  })();
   const atrPct = getAtrPct(curTicker, curTF);
   const scale  = vwap*atrPct||vwap*0.005;
   const z = (curPrice-vwap)/(scale||1);
