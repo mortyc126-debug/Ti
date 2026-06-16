@@ -906,14 +906,21 @@ async function fetchWithTimeout(url, opts={}, ms=30000){
 }
 
 async function fetchMoex(secid, metric, type, params={}){
-  const url = moexUrl(secid, metric, type, params);
+  // limit по умолчанию 1000 — MOEX AlgoPack игнорирует secid= и отдаёт все инструменты,
+  // поэтому нужно забрать достаточно строк а потом отфильтровать по secid клиентски
+  const p = {limit: 1000, ...params};
+  const url = moexUrl(secid, metric, type, p);
   const key = getMoexKey();
   const hdrs = {'Accept':'application/json'};
   if(key) hdrs['Authorization'] = `Bearer ${key}`;
   const resp = await fetchWithTimeout(url, {headers: hdrs});
   if(!resp.ok) throw new Error(`MOEX ${metric} HTTP ${resp.status} (${url.slice(0,80)})`);
   const json = await resp.json();
-  return issToObjects(json, metric);
+  const all = issToObjects(json, metric);
+  // Фильтруем по secid — API возвращает все инструменты вперемешку
+  const sid = secid.toUpperCase();
+  const filtered = all.filter(r => (r.secid||r.SECID||'').toUpperCase() === sid);
+  return filtered.length ? filtered : all; // fallback если поле secid отсутствует
 }
 
 // FUTOI использует отдельный endpoint: /iss/analyticalproducts/futoi/securities
