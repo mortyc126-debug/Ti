@@ -459,7 +459,7 @@ const MOEX_MARKETS = {
   currency: {engine:'currency',market:'selt',   board:'CETS'},
 };
 
-const TF_INTERVALS = {'1min':1,'5min':2,'1h':4,'1d':5};
+const TF_INTERVALS = {'1min':'CANDLE_INTERVAL_1_MIN','5min':'CANDLE_INTERVAL_5_MIN','1h':'CANDLE_INTERVAL_HOUR','1d':'CANDLE_INTERVAL_DAY'};
 
 const METHODS = [
   {id:'BS_PRESSURE',    label:'Buy/Sell давление',    src:'ts',     color:'#52F2C9'},
@@ -1121,7 +1121,7 @@ async function backfillOne(ticker, type){
         const resp = await fetchWithTimeout(url, {
           method:'POST',
           headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
-          body: JSON.stringify({instrument_id:figi, from:from.toISOString(), to:till.toISOString(), interval:TF_INTERVALS['1d']}),
+          body: JSON.stringify({figi:figi, from:from.toISOString(), to:till.toISOString(), interval:TF_INTERVALS['1d']}),
         });
         if(resp.ok){
           const d = await resp.json();
@@ -1448,9 +1448,8 @@ async function fetchCandles(ticker, tf){
   else fromDate = new Date(now - 30*dayMs);                   // 1d — лимит до года
 
   const url = tinvestUrl('/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles');
-  // instrument_id принимает BBG FIGI, UID или ticker_CLASS — используем его
   const body = {
-    instrument_id: figi,
+    figi: figi,
     from: fromDate.toISOString(),
     to: now.toISOString(),
     interval: TF_INTERVALS[tf],
