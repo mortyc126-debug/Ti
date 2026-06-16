@@ -425,6 +425,7 @@ input[type=range] { touch-action: none; }
   <button class="nav-btn" onclick="goPage('combos',this)">Комбинации</button>
   <button class="nav-btn" onclick="goPage('compare',this)">Сравнение</button>
   <button class="nav-btn" onclick="goPage('guide',this)">Справочник</button>
+  <button class="nav-btn" onclick="goPage('analysis',this)">Анализ</button>
 </div>
 
 <!-- ══ GUIDE PAGE ══ -->
@@ -655,6 +656,16 @@ input[type=range] { touch-action: none; }
     Выбери стратегию — индикаторы настроятся автоматически. Потом скорректируй значения под свою ситуацию.
   </div>
   <div id="combos-list"></div>
+</div>
+
+<!-- ══ ANALYSIS PAGE ══ -->
+<div id="page-analysis" class="page">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+    <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;">
+    <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить анализ</button>
+    <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
+  </div>
+  <div id="an-results"></div>
 </div>
 
 <!-- ══ COMPARE PAGE ══ -->
@@ -7201,8 +7212,9 @@ goPage = function(name, btn) {
     if (chartBtn) chartBtn.classList.add('active');
   }
   _origGP(name, btn);
-  if (name === 'guide')   setTimeout(() => renderGuide(), 50);
-  if (name === 'compare') setTimeout(() => renderCmpTable(), 30);
+  if (name === 'guide')    setTimeout(() => renderGuide(), 50);
+  if (name === 'compare')  setTimeout(() => renderCmpTable(), 30);
+  if (name === 'analysis') setTimeout(() => initAnalysis(), 50);
 };
 
 // chartAddToCompare
@@ -7692,11 +7704,537 @@ function ilScoreAlligator(arr,i){
   return 0; // линии сплетены — флэт
 }
 
-const IL_INDICATORS = ['rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator'];
+// ── Все вычислимые индикаторы библиотеки indlab ──────────────────────────────
+
+function ilCalcOBV(c) {
+  const res=[]; let obv=0;
+  for(let i=0;i<c.length;i++){
+    if(i>0) obv += c[i].close>c[i-1].close?(c[i].volume||0) : c[i].close<c[i-1].close?-(c[i].volume||0):0;
+    res.push(obv);
+  }
+  return res;
+}
+
+function ilCalcCMF(c, period=20) {
+  const mf=c.map(x=>{ const hl=x.high-x.low; return hl>0?((x.close-x.low)-(x.high-x.close))/hl*(x.volume||0):0; });
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let sv=0,sv2=0;
+    for(let j=i-period+1;j<=i;j++){sv+=mf[j];sv2+=(c[j].volume||0);}
+    res.push(sv2?sv/sv2:null);
+  }
+  return res;
+}
+
+function ilCalcChop(c, period=14) {
+  const tr=c.map((x,i)=>i===0?x.high-x.low:Math.max(x.high-x.low,Math.abs(x.high-c[i-1].close),Math.abs(x.low-c[i-1].close)));
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let trSum=0,hh=-Infinity,ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){trSum+=tr[j];if(c[j].high>hh)hh=c[j].high;if(c[j].low<ll)ll=c[j].low;}
+    const hl=hh-ll; res.push(hl>0?100*Math.log10(trSum/hl)/Math.log10(period):null);
+  }
+  return res;
+}
+
+function ilCalcSuperTrend(c, period=10, mult=3) {
+  const atr=ilCalcATR(c,period);
+  const res=[];
+  let dir=1, sup=0, sdn=0;
+  for(let i=0;i<c.length;i++){
+    if(atr[i]==null){res.push(null);continue;}
+    const hl2=(c[i].high+c[i].low)/2;
+    const newSup=hl2-mult*atr[i], newSdn=hl2+mult*atr[i];
+    if(i===0){sup=newSup;sdn=newSdn;res.push(null);continue;}
+    sup=newSup>(res[i-1]?.sup??0)&&c[i-1].close>(res[i-1]?.sup??0)?newSup:Math.max(newSup,res[i-1]?.sup??0);
+    sdn=newSdn<(res[i-1]?.sdn??Infinity)&&c[i-1].close<(res[i-1]?.sdn??Infinity)?newSdn:Math.min(newSdn,res[i-1]?.sdn??Infinity);
+    if(dir===1&&c[i].close<sup) dir=-1;
+    else if(dir===-1&&c[i].close>sdn) dir=1;
+    res.push({dir,sup,sdn});
+  }
+  return res;
+}
+
+function ilCalcCMO(closes, period=14) {
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period){res.push(null);continue;}
+    let up=0,dn=0;
+    for(let j=i-period+1;j<=i;j++){const d=closes[j]-closes[j-1];if(d>0)up+=d;else dn-=d;}
+    res.push((up+dn)===0?0:(up-dn)/(up+dn)*100);
+  }
+  return res;
+}
+
+function ilCalcVortex(c, period=14) {
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period){res.push(null);continue;}
+    let viP=0,viM=0,trSum=0;
+    for(let j=i-period+1;j<=i;j++){
+      viP+=Math.abs(c[j].high-c[j-1].low);
+      viM+=Math.abs(c[j].low-c[j-1].high);
+      trSum+=Math.max(c[j].high-c[j].low,Math.abs(c[j].high-c[j-1].close),Math.abs(c[j].low-c[j-1].close));
+    }
+    res.push(trSum?{vip:viP/trSum,vim:viM/trSum}:null);
+  }
+  return res;
+}
+
+function ilCalcTSI(closes, r=25, s=13) {
+  // double-smoothed momentum
+  const d=closes.map((v,i)=>i?v-closes[i-1]:0);
+  const ilEMA=(arr,p)=>{
+    const k=2/(p+1); const out=[];
+    arr.forEach((v,i)=>out.push(i?out[i-1]+(v-out[i-1])*k:v));
+    return out;
+  };
+  const pc=ilEMA(ilEMA(d,r),s);
+  const apc=ilEMA(ilEMA(d.map(Math.abs),r),s);
+  return closes.map((_,i)=>apc[i]?pc[i]/apc[i]*100:null);
+}
+
+function ilCalcForceIdx(c, period=13) {
+  const raw=c.map((x,i)=>i?((x.close-c[i-1].close)*(x.volume||0)):0);
+  const sma=ilSMA(raw,period);
+  return sma;
+}
+
+function ilCalcUltOsc(c, p1=7, p2=14, p3=28) {
+  const bp=c.map((x,i)=>i?x.close-Math.min(x.low,c[i-1].close):null);
+  const tr=c.map((x,i)=>i?Math.max(x.high,c[i-1].close)-Math.min(x.low,c[i-1].close):null);
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<p3){res.push(null);continue;}
+    const avg=(p)=>{let sb=0,st=0;for(let j=i-p+1;j<=i;j++){sb+=bp[j]??0;st+=tr[j]??0;}return st?sb/st:0;};
+    res.push(100*(4*avg(p1)+2*avg(p2)+avg(p3))/7);
+  }
+  return res;
+}
+
+// Scoring для новых индикаторов
+// ── Пакет 2: ещё ~22 вычислимых индикатора библиотеки ────────────────────────
+
+function ilCalcAccDist(c){
+  const res=[]; let ad=0;
+  c.forEach(x=>{ const hl=x.high-x.low; ad+=hl?(((x.close-x.low)-(x.high-x.close))/hl)*(x.volume||0):0; res.push(ad); });
+  return res;
+}
+function ilCalcChaikinOsc(c,fast=3,slow=10){
+  const ad=ilCalcAccDist(c);
+  const ef=_chartCalcEMA(ad,fast), es=_chartCalcEMA(ad,slow);
+  return ad.map((_,i)=>(ef[i]!=null&&es[i]!=null)?ef[i]-es[i]:null);
+}
+function ilCalcChaikinVol(c,period=10){
+  const hl=c.map(x=>x.high-x.low);
+  const ema1=_chartCalcEMA(hl,period);
+  return ema1.map((v,i)=>{
+    if(v==null||i<period)return null;
+    const prev=ema1[i-period];
+    return prev&&prev!==0?(v-prev)/prev*100:null;
+  });
+}
+function ilCalcAccelOsc(c){
+  const ao=ilCalcAO(c);
+  const sma5=ilSMA(ao.map(v=>v??0),5);
+  return ao.map((v,i)=>(v==null||sma5[i]==null)?null:v-sma5[i]);
+}
+function ilCalcElderRay(closes,c,period=13){
+  const ema=_chartCalcEMA(closes,period);
+  return c.map((_,i)=>ema[i]==null?null:{bull:c[i].high-ema[i],bear:c[i].low-ema[i]});
+}
+function ilCalcElderImpulse(closes,c,period=13){
+  const ema=_chartCalcEMA(closes,period);
+  const macdR=_chartCalcMACD(closes,12,26,9);
+  return closes.map((_,i)=>{
+    if(i<1||ema[i]==null||macdR.hist[i]==null||macdR.hist[i-1]==null)return null;
+    return {emaDir:ema[i]>ema[i-1]?1:-1, macdDir:macdR.hist[i]>macdR.hist[i-1]?1:-1};
+  });
+}
+function ilCalcEOM(c,period=14){
+  const raw=c.map((x,i)=>{
+    if(!i)return null;
+    const mp=(x.high+x.low)/2, pm=(c[i-1].high+c[i-1].low)/2;
+    const box=(x.high-x.low)/(x.volume||1)*10000;
+    return box?(mp-pm)/box:null;
+  });
+  return ilSMA(raw.map(v=>v??0),period).map((v,i)=>raw[i]==null?null:v);
+}
+function ilCalcNVI(c){
+  const res=[]; let nvi=1000;
+  c.forEach((x,i)=>{
+    if(i&&(x.volume||0)<(c[i-1].volume||0)&&c[i-1].close) nvi+=nvi*(x.close-c[i-1].close)/c[i-1].close;
+    res.push(nvi);
+  });
+  return res;
+}
+function ilCalcPVI(c){
+  const res=[]; let pvi=1000;
+  c.forEach((x,i)=>{
+    if(i&&(x.volume||0)>(c[i-1].volume||0)&&c[i-1].close) pvi+=pvi*(x.close-c[i-1].close)/c[i-1].close;
+    res.push(pvi);
+  });
+  return res;
+}
+function ilCalcPVT(c){
+  const res=[]; let pvt=0;
+  c.forEach((x,i)=>{
+    if(i&&c[i-1].close) pvt+=(x.volume||0)*(x.close-c[i-1].close)/c[i-1].close;
+    res.push(pvt);
+  });
+  return res;
+}
+function ilCalcVO(c,fast=5,slow=10){
+  const vols=c.map(x=>x.volume||0);
+  const ef=_chartCalcEMA(vols,fast), es=_chartCalcEMA(vols,slow);
+  return vols.map((_,i)=>(ef[i]!=null&&es[i]!=null&&es[i]!==0)?(ef[i]-es[i])/es[i]*100:null);
+}
+function ilCalcVWMA(c,period=20){
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let sv=0,v=0; for(let j=i-period+1;j<=i;j++){sv+=c[j].close*(c[j].volume||0);v+=(c[j].volume||0);}
+    res.push(v?sv/v:null);
+  }
+  return res;
+}
+function ilCalcParabolicSAR(c,step=0.02,max=0.2){
+  const res=[]; let bull=true,sar=c[0]?.low??0,ep=c[0]?.high??0,af=step;
+  c.forEach((x,i)=>{
+    if(!i){res.push(null);return;}
+    sar=sar+af*(ep-sar);
+    if(bull){ if(x.low<sar){bull=false;sar=ep;ep=x.low;af=step;} else {if(x.high>ep){ep=x.high;af=Math.min(af+step,max);} sar=Math.min(sar,c[i-1].low,i>1?c[i-2].low:c[i-1].low);} }
+    else { if(x.high>sar){bull=true;sar=ep;ep=x.high;af=step;} else {if(x.low<ep){ep=x.low;af=Math.min(af+step,max);} sar=Math.max(sar,c[i-1].high,i>1?c[i-2].high:c[i-1].high);} }
+    res.push({sar,bull});
+  });
+  return res;
+}
+function ilCalcHistVol(closes,period=20){
+  const lr=closes.map((v,i)=>i&&closes[i-1]?Math.log(v/closes[i-1]):null);
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period){res.push(null);continue;}
+    const sl=lr.slice(i-period+1,i+1).filter(v=>v!=null);
+    const mean=sl.reduce((s,v)=>s+v,0)/sl.length;
+    const variance=sl.reduce((s,v)=>s+(v-mean)**2,0)/sl.length;
+    res.push(Math.sqrt(variance)*Math.sqrt(252)*100);
+  }
+  return res;
+}
+function ilCalcStdDev(closes,period=20){
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    const sl=closes.slice(i-period+1,i+1);
+    const mean=sl.reduce((s,v)=>s+v,0)/period;
+    res.push(Math.sqrt(sl.reduce((s,v)=>s+(v-mean)**2,0)/period));
+  }
+  return res;
+}
+function ilCalcFisher(c,period=10){
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let hh=-Infinity,ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){if(c[j].high>hh)hh=c[j].high;if(c[j].low<ll)ll=c[j].low;}
+    const r=hh===ll?0:2*(c[i].close-ll)/(hh-ll)-1;
+    const v=Math.min(0.999,Math.max(-0.999,r));
+    res.push(0.5*Math.log((1+v)/(1-v)));
+  }
+  return res;
+}
+function ilCalcMcGinley(closes,period=14){
+  const res=[closes[0]??0];
+  closes.slice(1).forEach((v,i)=>{
+    const prev=res[i]; const denom=period*Math.pow(v/prev,4)||1;
+    res.push(prev+(v-prev)/denom);
+  });
+  return res;
+}
+function ilCalcDPO(closes,period=20){
+  const ma=ilSMA(closes,period);
+  const shift=Math.floor(period/2)+1;
+  return closes.map((_,i)=>(ma[i-shift]!=null)?closes[i]-ma[i-shift]:null);
+}
+function ilCalcBBWidth(closes,period=20,mult=2){
+  const bb=_chartCalcBB(closes,period,mult);
+  return bb.map(b=>b&&b.mid?((b.upper-b.lower)/b.mid*100):null);
+}
+function ilCalcRSIW(closes,period=7){ return _chartCalcRSI(closes,period); }
+function ilCalcOHLCVol(c){
+  return c.map(x=>{
+    const hl=x.high>0?Math.log(x.high/x.low)**2/2:0;
+    const co=x.open>0&&x.close>0?Math.log(x.close/x.open)**2*(2*Math.log(2)-1):0;
+    return Math.sqrt((hl-co)*252)*100;
+  });
+}
+
+// ── Пакет 4: оставшиеся индикаторы + режимные классификаторы ────────────────
+
+// ZigZag: направление последнего завершённого свинга (смотрим назад, без lookahead)
+function ilCalcZigzagSignal(c, minPct=0.015) {
+  const res=[];
+  // Подтверждённый пивот-хай в точке j: high[j] > high[j±1] и high[j±2]
+  // Доступен начиная с j+2, т.е. при i>=j+2
+  const pivHi=[],pivLo=[];
+  for(let j=2;j<c.length-2;j++){
+    if(c[j].high>=c[j-1].high&&c[j].high>=c[j-2].high&&c[j].high>=c[j+1].high&&c[j].high>=c[j+2].high) pivHi.push(j);
+    if(c[j].low<=c[j-1].low&&c[j].low<=c[j-2].low&&c[j].low<=c[j+1].low&&c[j].low<=c[j+2].low) pivLo.push(j);
+  }
+  for(let i=0;i<c.length;i++){
+    // последний подтверждённый хай/лоу доступный к бару i (нужно j+2<=i)
+    const lastHi=pivHi.filter(j=>j+2<=i).slice(-1)[0];
+    const lastLo=pivLo.filter(j=>j+2<=i).slice(-1)[0];
+    if(lastHi==null||lastLo==null){res.push(null);continue;}
+    if(lastHi>lastLo){
+      // последний пивот — хай: тренд вниз или разворот от хая
+      const swing=(c[lastHi].high-c[lastLo].low)/c[lastLo].low;
+      res.push(swing>=minPct?-1:0);
+    } else {
+      const swing=(c[lastLo].high-c[lastLo].low)/c[lastHi].low;
+      res.push((c[lastLo].low<c[lastHi].low&&swing>=minPct)?1:0);
+    }
+  }
+  return res;
+}
+
+// Fractals: цена выше последнего лоу-фрактала и ниже хай-фрактала
+function ilCalcFractalsSignal(c) {
+  const res=[];
+  const fHi=[],fLo=[];
+  for(let j=2;j<c.length-2;j++){
+    if(c[j].high>c[j-1].high&&c[j].high>c[j-2].high&&c[j].high>c[j+1].high&&c[j].high>c[j+2].high) fHi.push({j,v:c[j].high});
+    if(c[j].low<c[j-1].low&&c[j].low<c[j-2].low&&c[j].low<c[j+1].low&&c[j].low<c[j+2].low) fLo.push({j,v:c[j].low});
+  }
+  for(let i=0;i<c.length;i++){
+    const hi=fHi.filter(f=>f.j+2<=i).slice(-1)[0];
+    const lo=fLo.filter(f=>f.j+2<=i).slice(-1)[0];
+    if(!hi&&!lo){res.push(null);continue;}
+    const price=c[i].close;
+    if(hi&&lo){
+      // между фракталами: нейтрально; за пределами — сигнал
+      if(price>hi.v) res.push(2);     // пробой хай-фрактала вверх
+      else if(price<lo.v) res.push(-2); // пробой лоу-фрактала вниз
+      else res.push(price>(hi.v+lo.v)/2?1:-1); // ближе к верхнему или нижнему
+    } else res.push(null);
+  }
+  return res;
+}
+
+// Crash: падение>2σ за 3 бара + объём выше среднего
+function ilCalcCrash(c,closes,period=20){
+  const std=ilCalcStdDev(closes,period);
+  return closes.map((v,i)=>{
+    if(i<period+3||std[i]==null)return null;
+    const ret3=(v-closes[i-3])/closes[i-3];
+    const avgVol=c.slice(i-period,i).reduce((s,x)=>s+(x.volume||0),0)/period;
+    const volSpike=(c[i].volume||0)>avgVol*1.5;
+    if(ret3<-2*std[i]/closes[i]&&volSpike)return -2; // крэш
+    if(ret3<-std[i]/closes[i])return -1; // слабый крэш
+    return null; // не крэш-бар
+  });
+}
+
+// Recovery: цена X% выше N-барного минимума и растёт
+function ilCalcRecovery(closes,period=20){
+  return closes.map((v,i)=>{
+    if(i<period)return null;
+    const lo=Math.min(...closes.slice(i-period,i));
+    const pct=(v-lo)/lo;
+    if(pct>=0.08&&v>closes[i-5])return 2;
+    if(pct>=0.04&&v>closes[i-3])return 1;
+    return null;
+  });
+}
+
+// Flat/no_dir: диапазон / ATR < порог
+function ilCalcFlat(c,closes,period=20){
+  const atr=ilCalcATR(c,period);
+  return closes.map((v,i)=>{
+    if(i<period||atr[i]==null||!atr[i])return null;
+    const hi=Math.max(...c.slice(i-period,i+1).map(x=>x.high));
+    const lo=Math.min(...c.slice(i-period,i+1).map(x=>x.low));
+    const ratio=(hi-lo)/(atr[i]*period);
+    return ratio<1.5?0:null; // 0 = боковик подтверждён, null = тренд
+  });
+}
+
+// HighVol/LowVol: перцентиль HV
+function ilCalcVolRegime(hvArr,period=60){
+  return hvArr.map((v,i)=>{
+    if(v==null||i<period)return null;
+    const window=hvArr.slice(i-period,i).filter(x=>x!=null).sort((a,b)=>a-b);
+    if(!window.length)return null;
+    const rank=window.filter(x=>x<=v).length/window.length;
+    return rank; // 0..1, >0.75=высокая, <0.25=низкая волат.
+  });
+}
+
+// StockUp/StockDown: цена vs SMA200 + моментум
+function ilCalcStockTrend(closes,smaPeriod=200,momPeriod=20){
+  const sma=ilSMA(closes,smaPeriod);
+  return closes.map((v,i)=>{
+    if(sma[i]==null||i<momPeriod)return null;
+    const aboveSMA=v>sma[i];
+    const mom=(v-closes[i-momPeriod])/closes[i-momPeriod];
+    if(aboveSMA&&mom>0.05)return 2;
+    if(aboveSMA&&mom>0)return 1;
+    if(!aboveSMA&&mom<-0.05)return -2;
+    if(!aboveSMA&&mom<0)return -1;
+    return 0;
+  });
+}
+
+// Scoring для пакета 4
+function ilScoreZigzag(v){ return v; } // уже -1/0/1 из calcZigzagSignal
+function ilScoreFractals(v){ return v; }
+function ilScoreCrash(v){ return v; }
+function ilScoreRecovery(v){ return v; }
+function ilScoreFlat(v){ return 0; } // боковик не дирекциональный
+function ilScoreStockTrend(v){ return v; }
+// VolRegime — режимный, не дирекциональный (возвращает null)
+function ilScoreVolRegime(v){ return null; }
+
+// ── HELPER: вычислить режим рынка из имеющихся серий ──────────────────────
+// Возвращает {regime, labels, color} для отображения на странице Анализ
+function ilDetectRegime(closes, c, i) {
+  if(i<30)return null;
+  const hvArr=ilCalcHistVol(closes,20);
+  const volReg=ilCalcVolRegime(hvArr,60);
+  const sma200=ilSMA(closes,Math.min(200,closes.length-1));
+  const flatArr=ilCalcFlat(c,closes,20);
+  const atr=ilCalcATR(c,14);
+
+  const hv=volReg[i], flat=flatArr[i], price=closes[i], sma=sma200[i];
+  const ret5=i>=5?(price-closes[i-5])/closes[i-5]:0;
+  const ret20=i>=20?(price-closes[i-20])/closes[i-20]:0;
+
+  const labels=[], regime=[];
+  // Тренд
+  if(sma&&price>sma*1.03&&ret20>0.03){regime.push('trend_up');labels.push('📈 Тренд вверх');}
+  else if(sma&&price<sma*0.97&&ret20<-0.03){regime.push('trend_dn');labels.push('📉 Тренд вниз');}
+  else if(flat===0){regime.push('range');labels.push('↔ Боковик');}
+  // Волатильность
+  if(hv!=null){
+    if(hv>0.75)labels.push('🌪 Высокая волат.');
+    else if(hv<0.25)labels.push('😴 Низкая волат.');
+  }
+  // Стресс
+  if(i>=3){const d3=(price-closes[i-3])/closes[i-3]; if(d3<-0.06)labels.push('⚡ Распродажа');}
+  if(!labels.length)labels.push('— Нейтрально');
+  const color=regime.includes('trend_up')?'#52F2C9':regime.includes('trend_dn')?'#FF4D7A':regime.includes('range')?'#A78BFA':'var(--text3)';
+  return {labels,color};
+}
+
+// Scoring для пакета 2
+function ilScoreAccDist(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).reduce((s,v)=>s+v,0)/period;
+  const d=(arr[i]-avg)/(Math.abs(avg)||1);
+  // также смотрим на тренд (восходящий/нисходящий)
+  const trend=arr[i]>arr[i-5]?1:-1;
+  return Math.max(-2,Math.min(2,(d*2+trend)*0.7));
+}
+function ilScoreChaikinOsc(v,prev){ if(v==null)return null; const rising=prev!=null&&v>prev; return v>0?(rising?2:1):(v<0?(rising?-1:-2):0); }
+function ilScoreChaikinVol(v){ return null; } // волатильность — не дирекциональная
+function ilScoreAccelOsc(arr,i){ return ilScoreAO(arr,i); }
+function ilScoreElderRay(v){
+  if(!v)return null;
+  if(v.bull>0&&v.bear>0)return 2; if(v.bull>0&&v.bear<=0)return 1;
+  if(v.bull<=0&&v.bear<0)return -2; return -1;
+}
+function ilScoreElderImpulse(v){
+  if(!v)return null;
+  const s=v.emaDir+v.macdDir;
+  return s===2?2:s===-2?-2:s===1?1:s===-1?-1:0;
+}
+function ilScoreEOM(v){ if(v==null)return null; return v>0.5?2:v>0?1:v<-0.5?-2:v<0?-1:0; }
+function ilScoreNVI(arr,i,period=255){
+  if(i<period||arr[i]==null)return null;
+  const sma=arr.slice(Math.max(0,i-period+1),i+1).reduce((s,v)=>s+v,0)/Math.min(i+1,period);
+  return arr[i]>sma?1:-1;
+}
+function ilScorePVI(arr,i,period=255){ return ilScoreNVI(arr,i,period); }
+function ilScorePVT(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const trend=arr[i]-arr[i-period];
+  const abs=Math.abs(trend)/(Math.abs(arr[i])||1);
+  return trend>0?(abs>0.02?2:1):(abs>0.02?-2:-1);
+}
+function ilScoreVO(v){ if(v==null)return null; return v>10?2:v>2?1:v<-10?-2:v<-2?-1:0; }
+function ilScoreVWMA(close,vwma){ return vwma==null?null:(close>vwma?1:(close<vwma?-1:0)); }
+function ilScoreParabolic(v,close){ return (!v||close==null)?null:(v.bull?1:-1); }
+function ilScoreHistVol(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0)/period;
+  // высокая волатильность = риск = не дирекциональная, но spike часто медвежий
+  return null; // нейтральный — используется в Анализе для режима
+}
+function ilScoreVixLike(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0)/period;
+  const spike=(arr[i]-avg)/(avg||1);
+  return spike>0.5?-2:spike>0.2?-1:spike<-0.2?1:0; // spike страха → контр-сигнал
+}
+function ilScoreStdDev(arr,i,period=20){ return null; } // нейтральный режимный
+function ilScoreFisher(v){ if(v==null)return null; return v>1.5?2:v>0.5?1:v<-1.5?-2:v<-0.5?-1:0; }
+function ilScoreMcGinley(close,mg){ return (close==null||mg==null)?null:(close>mg?1:(close<mg?-1:0)); }
+function ilScoreDPO(v,close){ if(v==null||close==null||!close)return null; const r=v/close*100; return r>1?2:r>0?1:r<-1?-2:r<0?-1:0; }
+function ilScoreBBWidth(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0)/period;
+  return null; // ширина не дает направление, только указывает на сжатие
+}
+function ilScoreRSIW(v){ return v==null?null:ilScore.rsi(v); }
+function ilScoreOHLCVol(arr,i,period=20){ return null; } // режимный
+
+// Scoring для OBV (был ниже, теперь здесь)
+function ilScoreOBV(arr,i,period=20){
+  if(arr[i]==null||i<period) return null;
+  const avg=arr.slice(i-period+1,i+1).reduce((s,v)=>s+v,0)/period;
+  const v=arr[i]; const diff=(v-avg)/(Math.abs(avg)||1);
+  return Math.max(-2,Math.min(2,diff*3));
+}
+function ilScoreCMF(v){ return v==null?null:Math.max(-2,Math.min(2,v*10)); }
+// CHOP: <38.2 = тренд (усиливает другие сигналы), >61.8 = боковик; как самостоятельный сигнал — не даёт направление, только силу
+function ilScoreChop(v){ return v==null?null:0; } // нейтрален по направлению, используется как модификатор
+function ilScoreSuperTrend(arr,i){ const a=arr[i]; return a==null?null:(a.dir===1?1:-1); }
+function ilScoreCMO(v){ return v==null?null:(v>=50?2:v>=20?1:v<=-50?-2:v<=-20?-1:0); }
+function ilScoreVortex(v){ if(!v)return null; const d=v.vip-v.vim; return d>0.2?2:d>0.05?1:d<-0.2?-2:d<-0.05?-1:0; }
+function ilScoreTSI(v){ return v==null?null:(v>=25?2:v>=5?1:v<=-25?-2:v<=-5?-1:0); }
+function ilScoreForceIdx(arr,i){ if(arr[i]==null)return null; const v=arr[i]; const abs=Math.abs(v); return v>0?(abs>arr.filter(x=>x!=null).reduce((a,b)=>a>Math.abs(b)?a:Math.abs(b),0)*0.3?2:1):(abs>arr.filter(x=>x!=null).reduce((a,b)=>a>Math.abs(b)?a:Math.abs(b),0)*0.3?-2:-1); }
+function ilScoreUltOsc(v){ return v==null?null:(v>=70?-2:v>=60?-1:v<=30?2:v<=40?1:0); }
+
+const IL_INDICATORS = [
+  // Пакет 1 (15 оригинальных)
+  'rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator',
+  // Пакет 2 (9 новых объём/тренд)
+  'obv','cmf','chop','supertrend','cmo','vortex','tsi','force_idx','ult_osc',
+  // Пакет 3 (остальные вычислимые из библиотеки)
+  'acc_dist','chaikin_osc','chaikin_vol','accel_osc','elder_ray','elder_impulse',
+  'eom','nvi','pvi','pvt','vo','vwma','parabolic','hist_vol','vix_like',
+  'std_dev','fisher','mcginley','dpo','bb_width','rsi_w','ohlc_vol',
+  // Пакет 4: ценовые паттерны + режимные классификаторы
+  'zigzag','fractals','crash','recovery','flat','high_vol','low_vol','stock_trend',
+];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
-  ao:'Awesome Oscillator', ema:'EMA 12/26 (тренд)', adx:'ADX/DI', donchian:'Канал Дончиана',
-  keltner:'Канал Кельтнера', envelopes:'Конверты', ichimoku:'Ишимоку (Tenkan/Kijun)', alligator:'Аллигатор Вильямса',
+  ao:'Awesome Oscillator', ema:'EMA 12/26', adx:'ADX/DI', donchian:'Канал Дончиана',
+  keltner:'Канал Кельтнера', envelopes:'Конверты', ichimoku:'Ишимоку Tenkan/Kijun', alligator:'Аллигатор',
+  obv:'OBV', cmf:'CMF', chop:'CHOP', supertrend:'SuperTrend', cmo:'CMO (моментум)',
+  vortex:'Vortex VI+/VI−', tsi:'TSI', force_idx:'Force Index', ult_osc:'Ultimate Oscillator',
+  acc_dist:'A/D Line', chaikin_osc:'Chaikin Osc', chaikin_vol:'Chaikin Vol',
+  accel_osc:'Acceleration Osc (AC)', elder_ray:'Elder Ray', elder_impulse:'Elder Impulse',
+  eom:'EOM (лёгкость движения)', nvi:'NVI', pvi:'PVI', pvt:'PVT',
+  vo:'Volume Oscillator', vwma:'VWMA', parabolic:'Parabolic SAR',
+  hist_vol:'Историч. волатильность', vix_like:'VIX-like (страх)', std_dev:'StdDev',
+  fisher:'Fisher Transform', mcginley:'McGinley Dynamic', dpo:'DPO',
+  bb_width:'BB Width', rsi_w:'RSI(7) краткоср.', ohlc_vol:'OHLC Volatility',
+  zigzag:'ZigZag сигнал', fractals:'Фракталы (пробой)', crash:'Режим: крах',
+  recovery:'Режим: отскок', flat:'Режим: боковик', high_vol:'Режим: высокая вол.',
+  low_vol:'Режим: низкая вол.', stock_trend:'Режим: тренд (SMA200)',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -7751,6 +8289,65 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.envelopes = envArr.map((e,i)=> e?ilScoreChannel(closes[i],e.lower,e.upper):null);
   seriesScore.ichimoku = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
   seriesScore.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
+  // Новые индикаторы
+  const _obvA=ilCalcOBV(candles),_cmfA=ilCalcCMF(candles,20),_chopA=ilCalcChop(candles,14);
+  const _stA=ilCalcSuperTrend(candles,10,3),_cmoA=ilCalcCMO(closes,14),_vxA=ilCalcVortex(candles,14);
+  const _tsiA=ilCalcTSI(closes,25,13),_fiA=ilCalcForceIdx(candles,13),_uoA=ilCalcUltOsc(candles,7,14,28);
+  seriesScore.obv=_obvA.map((_,i)=>ilScoreOBV(_obvA,i,20));
+  seriesScore.cmf=_cmfA.map(v=>ilScoreCMF(v));
+  seriesScore.chop=_chopA.map(v=>ilScoreChop(v));
+  seriesScore.supertrend=_stA.map((_,i)=>ilScoreSuperTrend(_stA,i));
+  seriesScore.cmo=_cmoA.map(v=>ilScoreCMO(v));
+  seriesScore.vortex=_vxA.map(v=>ilScoreVortex(v));
+  seriesScore.tsi=_tsiA.map(v=>ilScoreTSI(v));
+  seriesScore.force_idx=_fiA.map((_,i)=>ilScoreForceIdx(_fiA,i));
+  seriesScore.ult_osc=_uoA.map(v=>ilScoreUltOsc(v));
+  // Пакет 3
+  const _adA=ilCalcAccDist(candles),_coA=ilCalcChaikinOsc(candles,3,10),_cvA=ilCalcChaikinVol(candles,10);
+  const _acA=ilCalcAccelOsc(candles),_erA=ilCalcElderRay(closes,candles,13),_eiA=ilCalcElderImpulse(closes,candles,13);
+  const _eomA=ilCalcEOM(candles,14),_nviA=ilCalcNVI(candles),_pviA=ilCalcPVI(candles),_pvtA=ilCalcPVT(candles);
+  const _voA=ilCalcVO(candles,5,10),_vwA=ilCalcVWMA(candles,20),_psA=ilCalcParabolicSAR(candles,0.02,0.2);
+  const _hvA=ilCalcHistVol(closes,20),_sdA=ilCalcStdDev(closes,20),_fi2A=ilCalcFisher(candles,10);
+  const _mgA=ilCalcMcGinley(closes,14),_dpA=ilCalcDPO(closes,20),_bwA=ilCalcBBWidth(closes,20,2);
+  const _r7A=ilCalcRSIW(closes,7),_ovA=ilCalcOHLCVol(candles);
+  seriesScore.acc_dist=_adA.map((_,i)=>ilScoreAccDist(_adA,i,20));
+  seriesScore.chaikin_osc=_coA.map((v,i)=>ilScoreChaikinOsc(v,i>0?_coA[i-1]:null));
+  seriesScore.chaikin_vol=_cvA.map(v=>ilScoreChaikinVol(v));
+  seriesScore.accel_osc=_acA.map((_,i)=>ilScoreAccelOsc(_acA,i));
+  seriesScore.elder_ray=_erA.map(v=>ilScoreElderRay(v));
+  seriesScore.elder_impulse=_eiA.map(v=>ilScoreElderImpulse(v));
+  seriesScore.eom=_eomA.map(v=>ilScoreEOM(v));
+  seriesScore.nvi=_nviA.map((_,i)=>ilScoreNVI(_nviA,i,Math.min(255,_nviA.length-1)));
+  seriesScore.pvi=_pviA.map((_,i)=>ilScorePVI(_pviA,i,Math.min(255,_pviA.length-1)));
+  seriesScore.pvt=_pvtA.map((_,i)=>ilScorePVT(_pvtA,i,20));
+  seriesScore.vo=_voA.map(v=>ilScoreVO(v));
+  seriesScore.vwma=_vwA.map((v,i)=>ilScoreVWMA(closes[i],v));
+  seriesScore.parabolic=_psA.map((v,i)=>ilScoreParabolic(v,closes[i]));
+  seriesScore.hist_vol=_hvA.map((_,i)=>ilScoreHistVol(_hvA,i,20));
+  seriesScore.vix_like=_hvA.map((_,i)=>ilScoreVixLike(_hvA,i,20));
+  seriesScore.std_dev=_sdA.map((_,i)=>ilScoreStdDev(_sdA,i,20));
+  seriesScore.fisher=_fi2A.map(v=>ilScoreFisher(v));
+  seriesScore.mcginley=_mgA.map((v,i)=>ilScoreMcGinley(closes[i],v));
+  seriesScore.dpo=_dpA.map((v,i)=>ilScoreDPO(v,closes[i]));
+  seriesScore.bb_width=_bwA.map((_,i)=>ilScoreBBWidth(_bwA,i,20));
+  seriesScore.rsi_w=_r7A.map(v=>ilScoreRSIW(v));
+  seriesScore.ohlc_vol=_ovA.map((_,i)=>ilScoreOHLCVol(_ovA,i,20));
+  // Пакет 4: паттерны и режимные классификаторы
+  const _zzA=ilCalcZigzagSignal(candles,0.015);
+  const _frA=ilCalcFractalsSignal(candles);
+  const _crA=ilCalcCrash(candles,closes,20);
+  const _rcA=ilCalcRecovery(closes,20);
+  const _flA=ilCalcFlat(candles,closes,20);
+  const _vrA=ilCalcVolRegime(_hvA,60);
+  const _strendA=ilCalcStockTrend(closes,Math.min(200,closes.length-1),20);
+  seriesScore.zigzag     = _zzA.map(v=>ilScoreZigzag(v));
+  seriesScore.fractals   = _frA.map(v=>ilScoreFractals(v));
+  seriesScore.crash      = _crA.map(v=>ilScoreCrash(v));
+  seriesScore.recovery   = _rcA.map(v=>ilScoreRecovery(v));
+  seriesScore.flat       = _flA.map(v=>ilScoreFlat(v));
+  seriesScore.high_vol   = _vrA.map(v=>v!=null?(v>=0.7?-0.5:null):null);
+  seriesScore.low_vol    = _vrA.map(v=>v!=null?(v<=0.3?0.5:null):null);
+  seriesScore.stock_trend= _strendA.map(v=>ilScoreStockTrend(v));
 
   // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
   const horizon = 5;
@@ -7787,12 +8384,54 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     envelopes: envArr[last] ? `конверт ${envArr[last].lower.toFixed(2)}–${envArr[last].upper.toFixed(2)}, цена ${closes[last].toFixed(2)}` : 'недостаточно данных',
     ichimoku: `Tenkan ${ichiArr[last]?.tenkan?.toFixed(2) ?? '—'} / Kijun ${ichiArr[last]?.kijun?.toFixed(2) ?? '—'}`,
     alligator: allArr[last] ? `губы ${allArr[last].lips?.toFixed(2) ?? '—'} / зубы ${allArr[last].teeth?.toFixed(2) ?? '—'} / пасть ${allArr[last].jaw?.toFixed(2) ?? '—'}` : 'недостаточно данных',
+    obv: `OBV = ${_obvA[last]?.toFixed(0)??'—'}`,
+    cmf: `CMF(20) = ${_cmfA[last]?.toFixed(3)??'—'}`,
+    chop: `CHOP(14) = ${_chopA[last]?.toFixed(1)??'—'} (${_chopA[last]!=null?(_chopA[last]<38.2?'тренд':_chopA[last]>61.8?'боковик':'переход'):'—'})`,
+    supertrend: `SuperTrend = ${_stA[last]?(_stA[last].dir===1?'↑ бычий':'↓ медвежий'):'—'}`,
+    cmo: `CMO(14) = ${_cmoA[last]?.toFixed(1)??'—'}`,
+    vortex: `VI+ ${_vxA[last]?.vip?.toFixed(3)??'—'} / VI− ${_vxA[last]?.vim?.toFixed(3)??'—'}`,
+    tsi: `TSI = ${_tsiA[last]?.toFixed(1)??'—'}`,
+    force_idx: `Force Index(13) = ${_fiA[last]?.toFixed(0)??'—'}`,
+    ult_osc: `Ultimate Oscillator = ${_uoA[last]?.toFixed(1)??'—'}`,
+    acc_dist: `A/D = ${_adA[last]?.toFixed(0)??'—'}`,
+    chaikin_osc: `Chaikin Osc = ${_coA[last]?.toFixed(0)??'—'}`,
+    chaikin_vol: `Chaikin Vol = ${_cvA[last]?.toFixed(1)??'—'}%`,
+    accel_osc: `AC = ${_acA[last]?.toFixed(2)??'—'}`,
+    elder_ray: `Bull ${_erA[last]?.bull?.toFixed(2)??'—'} / Bear ${_erA[last]?.bear?.toFixed(2)??'—'}`,
+    elder_impulse: _eiA[last]?`EMA ${_eiA[last].emaDir>0?'↑':'↓'} MACD ${_eiA[last].macdDir>0?'↑':'↓'}`:'недостаточно данных',
+    eom: `EOM = ${_eomA[last]?.toFixed(3)??'—'}`,
+    nvi: `NVI = ${_nviA[last]?.toFixed(0)??'—'}`,
+    pvi: `PVI = ${_pviA[last]?.toFixed(0)??'—'}`,
+    pvt: `PVT = ${_pvtA[last]?.toFixed(0)??'—'}`,
+    vo: `VO = ${_voA[last]?.toFixed(1)??'—'}%`,
+    vwma: `VWMA(20) = ${_vwA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    parabolic: _psA[last]?`SAR = ${_psA[last].sar?.toFixed(2)}, ${_psA[last].bull?'↑ бычий':'↓ медвежий'}`:'недостаточно данных',
+    hist_vol: `HV(20) = ${_hvA[last]?.toFixed(1)??'—'}%`,
+    vix_like: `VIX-like HV = ${_hvA[last]?.toFixed(1)??'—'}%`,
+    std_dev: `σ(20) = ${_sdA[last]?.toFixed(2)??'—'}`,
+    fisher: `Fisher(10) = ${_fi2A[last]?.toFixed(3)??'—'}`,
+    mcginley: `McGinley(14) = ${_mgA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    dpo: `DPO(20) = ${_dpA[last]?.toFixed(2)??'—'}`,
+    bb_width: `BB Width = ${_bwA[last]?.toFixed(2)??'—'}%`,
+    rsi_w: `RSI(7) = ${_r7A[last]?.toFixed(1)??'—'}`,
+    ohlc_vol: `OHLC Vol = ${_ovA[last]?.toFixed(1)??'—'}%`,
+    zigzag: `ZigZag = ${_zzA[last]===1?'↑ подтверждён рост':_zzA[last]===-1?'↓ подтверждён спуск':'нет сигнала'}`,
+    fractals: `Fractals = ${_frA[last]===1?'↑ пробой вверх':_frA[last]===-1?'↓ пробой вниз':'нет пробоя'}`,
+    crash: `Режим краха: ${_crA[last]===1?'🔴 да':'нет'}`,
+    recovery: `Режим отскока: ${_rcA[last]===1?'🟢 да':'нет'}`,
+    flat: `Боковик: ${_flA[last]===1?'да':'нет'}`,
+    high_vol: `HV-перцентиль = ${_vrA[last]!=null?(_vrA[last]*100).toFixed(0)+'%':'—'} (${_vrA[last]!=null&&_vrA[last]>=0.7?'🌪 высокая вол.':''})`,
+    low_vol: `HV-перцентиль = ${_vrA[last]!=null?(_vrA[last]*100).toFixed(0)+'%':'—'} (${_vrA[last]!=null&&_vrA[last]<=0.3?'😴 низкая вол.':''})`,
+    stock_trend: `SMA(${Math.min(200,closes.length-1)}): цена ${_strendA[last]===1?'выше ↑ тренд':_strendA[last]===-1?'ниже ↓ нет тренда':'—'}`,
   };
 
   const details = IL_INDICATORS.map(id=>{
     const cur = seriesScore[id][last];
     const ev = evalRes[id];
-    const included = ev.n>=10 && ev.winRate>0.55;
+    // Участвует в итоговом score если есть хоть 5 наблюдений;
+    // вес = max(0.01, winRate-0.45)*4 — слабые индикаторы вносят малый вклад,
+    // сильные (winRate≥0.65) — большой. Порог «не включать ниже 0.55» убран.
+    const included = ev.n >= 5;
     return {
       name: IL_NAMES[id],
       text: curText[id],
@@ -7807,8 +8446,11 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   let score = 0;
   if(used.length){
     let wSum=0, wTot=0;
-    used.forEach(d=>{ const w=(d.winRate-0.5)*2; wSum += d.score*w; wTot += w; });
-    score = wTot>0 ? wSum/wTot * Math.min(1, used.length/3) : 0;
+    used.forEach(d=>{
+      const w = Math.max(0.01, (d.winRate - 0.45) * 4);
+      wSum += d.score * w; wTot += w;
+    });
+    score = wTot>0 ? wSum/wTot * Math.min(1, used.length/5) : 0;
   }
   let label;
   if (!used.length) label = 'за 90 дней ни один индикатор не показал устойчивого перевеса — сигнала нет';
@@ -7821,6 +8463,335 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
 
   return {score, label, details, chained};
+}
+
+// ═══ СТРАНИЦА АНАЛИЗА: мульти-горизонтный бэктест, кластеры, конструктор комбо ═══
+
+function _ilCalcAllSeries(candles, closes) {
+  const rsiArr = _chartCalcRSI(closes,14);
+  const wrArr  = ilCalcWR(candles,14);
+  const cciArr = ilCalcCCI(candles,20);
+  const mfiArr = ilCalcMFI(candles,14);
+  const stochArr = ilCalcStoch(candles,14,3);
+  const macdR  = _chartCalcMACD(closes,12,26,9);
+  const bbArr  = _chartCalcBB(closes,20,2);
+  const aoArr  = ilCalcAO(candles);
+  const emaF   = _chartCalcEMA(closes,12), emaS = _chartCalcEMA(closes,26);
+  const adxArr = ilCalcADX(candles,14);
+  const donArr = ilCalcDonchian(candles,20);
+  const keltArr= ilCalcKeltner(closes,candles,20,2);
+  const envArr = ilCalcEnvelopes(closes,20,0.025);
+  const ichiArr= ilCalcIchimoku(candles);
+  const allArr = ilCalcAlligator(candles);
+  const ss = {};
+  ss.rsi       = rsiArr.map(v=>v==null?null:ilScore.rsi(v));
+  ss.wr        = wrArr.map(v=>v==null?null:ilScore.wr(v));
+  ss.cci       = cciArr.map(v=>v==null?null:ilScore.cci(v));
+  ss.mfi       = mfiArr.map(v=>v==null?null:ilScore.mfi(v));
+  ss.stoch     = stochArr.map(v=>(v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d));
+  ss.macd      = closes.map((_,i)=>macdR.macd[i]==null?null:ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i));
+  ss.bb        = bbArr.map((b,i)=>b==null?null:ilScore.bb((closes[i]-b.lower)/((b.upper-b.lower)||1)*100));
+  ss.ao        = aoArr.map((_,i)=>ilScoreAO(aoArr,i));
+  ss.ema       = closes.map((_,i)=>ilScoreCross(emaF,emaS,i));
+  ss.adx       = adxArr.map((_,i)=>ilScoreADX(adxArr,i));
+  ss.donchian  = donArr.map((d,i)=>d?ilScoreChannel(closes[i],d.lower,d.upper):null);
+  ss.keltner   = keltArr.map((k,i)=>k?ilScoreChannel(closes[i],k.lower,k.upper):null);
+  ss.envelopes = envArr.map((e,i)=>e?ilScoreChannel(closes[i],e.lower,e.upper):null);
+  ss.ichimoku  = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
+  ss.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
+  // Новые индикаторы
+  const obvArr  = ilCalcOBV(candles);
+  const cmfArr  = ilCalcCMF(candles,20);
+  const chopArr = ilCalcChop(candles,14);
+  const stArr   = ilCalcSuperTrend(candles,10,3);
+  const cmoArr  = ilCalcCMO(closes,14);
+  const vxArr   = ilCalcVortex(candles,14);
+  const tsiArr  = ilCalcTSI(closes,25,13);
+  const fiArr   = ilCalcForceIdx(candles,13);
+  const uoArr   = ilCalcUltOsc(candles,7,14,28);
+  ss.obv        = obvArr.map((_,i)=>ilScoreOBV(obvArr,i,20));
+  ss.cmf        = cmfArr.map(v=>ilScoreCMF(v));
+  ss.chop       = chopArr.map(v=>ilScoreChop(v));
+  ss.supertrend = stArr.map((_,i)=>ilScoreSuperTrend(stArr,i));
+  ss.cmo        = cmoArr.map(v=>ilScoreCMO(v));
+  ss.vortex     = vxArr.map(v=>ilScoreVortex(v));
+  ss.tsi        = tsiArr.map(v=>ilScoreTSI(v));
+  ss.force_idx  = fiArr.map((_,i)=>ilScoreForceIdx(fiArr,i));
+  ss.ult_osc    = uoArr.map(v=>ilScoreUltOsc(v));
+  // Пакет 3
+  const adArr  = ilCalcAccDist(candles);
+  const coArr  = ilCalcChaikinOsc(candles,3,10);
+  const cvArr  = ilCalcChaikinVol(candles,10);
+  const acArr  = ilCalcAccelOsc(candles);
+  const erArr  = ilCalcElderRay(closes,candles,13);
+  const eiArr  = ilCalcElderImpulse(closes,candles,13);
+  const eomArr = ilCalcEOM(candles,14);
+  const nviArr = ilCalcNVI(candles);
+  const pviArr = ilCalcPVI(candles);
+  const pvtArr = ilCalcPVT(candles);
+  const voArr  = ilCalcVO(candles,5,10);
+  const vwArr  = ilCalcVWMA(candles,20);
+  const psArr  = ilCalcParabolicSAR(candles,0.02,0.2);
+  const hvArr  = ilCalcHistVol(closes,20);
+  const sdArr  = ilCalcStdDev(closes,20);
+  const fiArr2 = ilCalcFisher(candles,10);
+  const mgArr  = ilCalcMcGinley(closes,14);
+  const dpArr  = ilCalcDPO(closes,20);
+  const bwArr  = ilCalcBBWidth(closes,20,2);
+  const r7Arr  = ilCalcRSIW(closes,7);
+  const ovArr  = ilCalcOHLCVol(candles);
+  ss.acc_dist     = adArr.map((_,i)=>ilScoreAccDist(adArr,i,20));
+  ss.chaikin_osc  = coArr.map((v,i)=>ilScoreChaikinOsc(v,i>0?coArr[i-1]:null));
+  ss.chaikin_vol  = cvArr.map(v=>ilScoreChaikinVol(v));
+  ss.accel_osc    = acArr.map((_,i)=>ilScoreAccelOsc(acArr,i));
+  ss.elder_ray    = erArr.map(v=>ilScoreElderRay(v));
+  ss.elder_impulse= eiArr.map(v=>ilScoreElderImpulse(v));
+  ss.eom          = eomArr.map(v=>ilScoreEOM(v));
+  ss.nvi          = nviArr.map((_,i)=>ilScoreNVI(nviArr,i,Math.min(255,nviArr.length-1)));
+  ss.pvi          = pviArr.map((_,i)=>ilScorePVI(pviArr,i,Math.min(255,pviArr.length-1)));
+  ss.pvt          = pvtArr.map((_,i)=>ilScorePVT(pvtArr,i,20));
+  ss.vo           = voArr.map(v=>ilScoreVO(v));
+  ss.vwma         = vwArr.map((v,i)=>ilScoreVWMA(closes[i],v));
+  ss.parabolic    = psArr.map((v,i)=>ilScoreParabolic(v,closes[i]));
+  ss.hist_vol     = hvArr.map((_,i)=>ilScoreHistVol(hvArr,i,20));
+  ss.vix_like     = hvArr.map((_,i)=>ilScoreVixLike(hvArr,i,20));
+  ss.std_dev      = sdArr.map((_,i)=>ilScoreStdDev(sdArr,i,20));
+  ss.fisher       = fiArr2.map(v=>ilScoreFisher(v));
+  ss.mcginley     = mgArr.map((v,i)=>ilScoreMcGinley(closes[i],v));
+  ss.dpo          = dpArr.map((v,i)=>ilScoreDPO(v,closes[i]));
+  ss.bb_width     = bwArr.map((_,i)=>ilScoreBBWidth(bwArr,i,20));
+  ss.rsi_w        = r7Arr.map(v=>ilScoreRSIW(v));
+  ss.ohlc_vol     = ovArr.map((_,i)=>ilScoreOHLCVol(ovArr,i,20));
+  // Пакет 4
+  const zzArr   = ilCalcZigzagSignal(candles,0.015);
+  const frArr   = ilCalcFractalsSignal(candles);
+  const crArr   = ilCalcCrash(candles,closes,20);
+  const rcArr   = ilCalcRecovery(closes,20);
+  const flArr   = ilCalcFlat(candles,closes,20);
+  const vrArr   = ilCalcVolRegime(hvArr,60);
+  const strendArr = ilCalcStockTrend(closes,Math.min(200,closes.length-1),20);
+  ss.zigzag      = zzArr.map(v=>ilScoreZigzag(v));
+  ss.fractals    = frArr.map(v=>ilScoreFractals(v));
+  ss.crash       = crArr.map(v=>ilScoreCrash(v));
+  ss.recovery    = rcArr.map(v=>ilScoreRecovery(v));
+  ss.flat        = flArr.map(v=>ilScoreFlat(v));
+  ss.high_vol    = vrArr.map(v=>v!=null?(v>=0.7?-0.5:null):null);
+  ss.low_vol     = vrArr.map(v=>v!=null?(v<=0.3?0.5:null):null);
+  ss.stock_trend = strendArr.map(v=>ilScoreStockTrend(v));
+  return ss;
+}
+
+function _ilBtStats(scoreArr, closes, horizon, mask) {
+  let win=0, n=0, longN=0, totalUp=0, totalN=0;
+  for (let i=0; i<closes.length-horizon; i++) {
+    const inMask = !mask || mask[i];
+    const sc = scoreArr[i];
+    if (inMask && sc!=null && sc!==0) {
+      const fut = closes[i+horizon] - closes[i];
+      if (fut!==0) {
+        n++;
+        if (sc>0) { longN++; if (fut>0) win++; }
+        else { if (fut<0) win++; }
+      }
+    }
+    if (inMask && i+horizon < closes.length) {
+      totalN++;
+      if (closes[i+horizon] > closes[i]) totalUp++;
+    }
+  }
+  const acc = n>0 ? win/n : null;
+  const baseRate = totalN>0 ? totalUp/totalN : 0.5;
+  return { acc, ig: acc!=null ? acc-baseRate : null, n, bias: n>0?longN/n:null, baseRate };
+}
+
+function _ilPearson(a, b) {
+  const pairs = [];
+  for (let i=0;i<a.length;i++) if(a[i]!=null&&b[i]!=null) pairs.push([a[i],b[i]]);
+  if (pairs.length<5) return 0;
+  const n=pairs.length, ma=pairs.reduce((s,p)=>s+p[0],0)/n, mb=pairs.reduce((s,p)=>s+p[1],0)/n;
+  let num=0,da=0,db=0;
+  pairs.forEach(([x,y])=>{const A=x-ma,B=y-mb;num+=A*B;da+=A*A;db+=B*B;});
+  return (da&&db)?num/Math.sqrt(da*db):0;
+}
+
+let _ilBtResults = null;
+
+async function ilRunAnalysis() {
+  const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
+  const statusEl = document.getElementById('an-status');
+  const token = _ilShellToken;
+  if (!ticker||!token) { if(statusEl) statusEl.textContent='Введите тикер; токен берётся со страницы График'; return; }
+  if (statusEl) statusEl.textContent = `Загружаю ${ticker}…`;
+  try {
+    const found = await ilFindFigi(ticker, token, chartGetProxy?.());
+    if (!found) throw new Error('Тикер не найден: '+ticker);
+    const now=new Date(), from=new Date(now);
+    from.setDate(from.getDate()-90);
+    const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
+    if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
+    const closes = candles.map(c=>c.close);
+    if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
+    const ss = _ilCalcAllSeries(candles, closes);
+    // Режимная маска: trending = |5-bar return| ≥ медианы
+    const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
+    const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
+    const trendMask = returns5.map(r=>r>=med5);
+    const rangeMask = returns5.map(r=>r<med5);
+    const HORIZONS = [5,15,30];
+    const stats = {};
+    IL_INDICATORS.forEach(id=>{
+      stats[id]={};
+      HORIZONS.forEach(h=>{
+        stats[id][`h${h}`]  = _ilBtStats(ss[id],closes,h,null);
+        stats[id][`h${h}T`] = _ilBtStats(ss[id],closes,h,trendMask);
+        stats[id][`h${h}R`] = _ilBtStats(ss[id],closes,h,rangeMask);
+      });
+    });
+    // Корреляционная матрица и кластеры
+    const corrMatrix={};
+    IL_INDICATORS.forEach(a=>{corrMatrix[a]={};IL_INDICATORS.forEach(b=>{corrMatrix[a][b]=_ilPearson(ss[a],ss[b]);});});
+    const assigned=new Set(), clusters=[];
+    IL_INDICATORS.forEach(id=>{
+      if(assigned.has(id))return;
+      const cl=[id];assigned.add(id);
+      IL_INDICATORS.forEach(id2=>{if(!assigned.has(id2)&&Math.abs(_ilPearson(ss[id],ss[id2]))>=0.5){cl.push(id2);assigned.add(id2);}});
+      clusters.push(cl);
+    });
+    const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss};
+    if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
+    ilRenderAnalysis();
+  } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
+}
+
+function ilRenderAnalysis() {
+  const r=_ilBtResults, el=document.getElementById('an-results');
+  if(!el||!r) return;
+  const CC=['#52F2C9','#A78BFA','#FF9F40','#FF006E','#6366F1','#60A4A1','#FFD700'];
+  const fA=(s)=>{
+    if(!s||s.acc==null||s.n<5) return '<span style="color:#333">—</span>';
+    const p=(s.acc*100).toFixed(0), c=s.acc>=0.60?'#52F2C9':s.acc>=0.52?'var(--text2)':'#FF4D7A';
+    return `<span style="color:${c}">${p}%</span>`;
+  };
+  const fI=(s)=>{
+    if(!s||s.ig==null||s.n<5) return '<span style="color:#333">—</span>';
+    const p=(s.ig*100).toFixed(1), c=s.ig>0.05?'#52F2C9':s.ig>0?'#A78BFA':'#FF4D7A';
+    return `<span style="color:${c}">${p>0?'+':''}${p}%</span>`;
+  };
+  let html='';
+  // Блок текущего рыночного режима
+  try {
+    const closes_=r.closes, last_=closes_.length-1;
+    const regime=ilDetectRegime(closes_,r.candles||null,last_);
+    if(regime&&regime.labels&&regime.labels.length){
+      html+=`<div style="margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid #2a1f3d;">`;
+      html+=`<div style="font-size:9px;color:var(--text3);margin-bottom:6px;">ТЕКУЩИЙ РЕЖИМ РЫНКА</div>`;
+      html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+      regime.labels.forEach(l=>{
+        const col=regime.color||'#A78BFA';
+        html+=`<span style="padding:3px 8px;border-radius:12px;background:${col}22;border:1px solid ${col}66;color:${col};font-size:10px;font-family:var(--mono);">${l}</span>`;
+      });
+      html+=`</div></div>`;
+    }
+  } catch(e) {}
+  // Кластеры
+  html+=`<div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--mono);">Кластеры по корреляции score-серий (порог 0.5)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">`;
+  r.clusters.forEach((cl,ci)=>{
+    const clr=CC[ci%CC.length];
+    html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}55;border-radius:8px;padding:6px 10px;"><div style="font-size:9px;color:${clr};margin-bottom:3px;">Кластер ${ci+1}</div>`;
+    cl.forEach(id=>html+=`<div style="font-size:10px;color:var(--text2);">• ${IL_NAMES[id]}</div>`);
+    html+=`</div>`;
+  });
+  html+=`</div>`;
+  // Таблица
+  html+=`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);"><tr style="color:var(--text3);border-bottom:1px solid #2a1f3d;">
+    <th style="text-align:left;padding:4px 6px;">Индикатор</th><th>Кл.</th>
+    <th colspan="2" style="padding:4px;">5 баров<br><span style="font-size:8px">acc/IG</span></th>
+    <th colspan="2" style="padding:4px;">15 баров<br><span style="font-size:8px">acc/IG</span></th>
+    <th colspan="2" style="padding:4px;">30 баров<br><span style="font-size:8px">acc/IG</span></th>
+    <th style="padding:4px;">Тренд<br><span style="font-size:8px">H5</span></th>
+    <th style="padding:4px;">Боков.<br><span style="font-size:8px">H5</span></th>
+    <th style="padding:4px;">Bias%</th></tr>`;
+  [...IL_INDICATORS].sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0)).forEach(id=>{
+    const ci=r.clusterOf[id]??0, clr=CC[ci%CC.length];
+    const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30, s5T=r.stats[id].h5T, s5R=r.stats[id].h5R;
+    const bc=s5.bias!=null?(s5.bias>0.75||s5.bias<0.25?'#FF9F40':'var(--text2)'):'var(--text3)';
+    html+=`<tr style="border-bottom:1px solid #1a1028;">
+      <td style="padding:5px 6px;color:var(--text2);">${IL_NAMES[id]}</td>
+      <td style="text-align:center;"><span style="color:${clr};font-size:9px;">●${ci+1}</span></td>
+      <td style="text-align:center;">${fA(s5)}</td><td style="text-align:center;">${fI(s5)}</td>
+      <td style="text-align:center;">${fA(s15)}</td><td style="text-align:center;">${fI(s15)}</td>
+      <td style="text-align:center;">${fA(s30)}</td><td style="text-align:center;">${fI(s30)}</td>
+      <td style="text-align:center;">${fA(s5T)}</td><td style="text-align:center;">${fA(s5R)}</td>
+      <td style="text-align:center;color:${bc}">${s5.bias!=null?(s5.bias*100).toFixed(0)+'%':'—'}</td></tr>`;
+  });
+  html+=`</table></div>`;
+  // Конструктор комбо
+  html+=`<div style="margin-top:16px;border-top:1px solid #2a1f3d;padding-top:12px;">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;font-family:var(--mono);">Конструктор комбинации (H30 acc в скобках)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">`;
+  r.clusters.forEach((cl,ci)=>{
+    const clr=CC[ci%CC.length];
+    html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}33;border-radius:8px;padding:8px 12px;min-width:140px;">
+      <div style="font-size:9px;color:${clr};margin-bottom:5px;">Кластер ${ci+1}</div>`;
+    cl.forEach(id=>{
+      const s=r.stats[id].h30;
+      const q=s.acc!=null&&s.n>=5?` <span style="font-size:8px;color:${s.acc>=0.55?'#52F2C9':'var(--text3)'}">${(s.acc*100).toFixed(0)}%</span>`:'';
+      html+=`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;padding:2px 0;">
+        <input type="checkbox" class="an-cb" data-id="${id}" style="accent-color:${clr};">${IL_NAMES[id]}${q}</label>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <button onclick="ilSelectBestCombo()" style="padding:5px 12px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">✦ Лучшая из кластеров</button>
+    <button onclick="ilCalcSelectedCombo()" style="padding:5px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать</button>
+  </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:40px;"></div></div>`;
+  // Матрица корреляций (свёрнута)
+  html+=`<details style="margin-top:14px;"><summary style="font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono);">Матрица корреляций</summary><div style="overflow-x:auto;margin-top:8px;">
+    <table style="border-collapse:collapse;font-size:8px;font-family:var(--mono);"><tr><th></th>`;
+  IL_INDICATORS.forEach(id=>html+=`<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px;min-width:16px;color:var(--text3);">${IL_NAMES[id].split(' ')[0]}</th>`);
+  html+=`</tr>`;
+  IL_INDICATORS.forEach(a=>{
+    html+=`<tr><td style="padding:2px 4px;color:var(--text3);white-space:nowrap;">${IL_NAMES[a].split(' ')[0]}</td>`;
+    IL_INDICATORS.forEach(b=>{
+      const v=r.corrMatrix[a][b], abs=Math.abs(v);
+      const bg=abs>0.7?`rgba(199,27,82,${abs*0.7})`:abs>0.4?`rgba(255,159,64,${abs*0.5})`:'transparent';
+      html+=`<td style="background:${bg};text-align:center;padding:2px;color:var(--text2);">${v.toFixed(2)}</td>`;
+    });
+    html+=`</tr>`;
+  });
+  html+=`</table></div></details>`;
+  el.innerHTML=html;
+}
+
+function ilSelectBestCombo() {
+  const r=_ilBtResults; if(!r)return;
+  const best=r.clusters.map(cl=>cl.slice().sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0))[0]);
+  document.querySelectorAll('.an-cb').forEach(cb=>{ cb.checked=best.includes(cb.dataset.id); });
+  ilCalcSelectedCombo();
+}
+
+function ilCalcSelectedCombo() {
+  const r=_ilBtResults; if(!r)return;
+  const sel=[...document.querySelectorAll('.an-cb:checked')].map(cb=>cb.dataset.id);
+  const el=document.getElementById('an-combo-result');
+  if(!sel.length){el.textContent='Выберите хотя бы один индикатор';return;}
+  const closes=r.closes;
+  const compArr=closes.map((_,i)=>{const vals=sel.map(id=>r.ss[id][i]).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;});
+  const btRow=(h)=>{
+    const s=_ilBtStats(compArr,closes,h,null);
+    if(!s.acc||s.n<5)return `H${h}: —`;
+    const c=s.acc>=0.55?'#52F2C9':s.acc>=0.50?'var(--text2)':'#FF4D7A';
+    return `H${h}: <span style="color:${c}">${(s.acc*100).toFixed(0)}%</span> acc, IG <span style="color:${s.ig>0?'#52F2C9':'#FF4D7A'}">${s.ig>0?'+':''}${(s.ig*100).toFixed(1)}%</span> (n=${s.n})`;
+  };
+  el.innerHTML=`<div style="margin-bottom:4px;color:var(--text3);">Выбрано: <span style="color:var(--text2)">${sel.map(id=>IL_NAMES[id]).join(', ')}</span></div><div>${btRow(5)}</div><div>${btRow(15)}</div><div>${btRow(30)}</div>`;
+}
+
+function initAnalysis() {
+  const el=document.getElementById('an-ticker');
+  if(el && typeof _cpTicker!=='undefined' && _cpTicker) el.value=_cpTicker;
+  else if(el && typeof _chartTicker!=='undefined' && _chartTicker) el.value=_chartTicker;
+  if(_ilBtResults) ilRenderAnalysis();
 }
 
 // Отвечаем на запросы вердикта от других модулей (через релей MODULE_RPC_* в shell).

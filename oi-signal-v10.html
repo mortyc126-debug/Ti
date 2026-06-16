@@ -336,7 +336,9 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <div class="gauge-val" id="gaugeVal">—</div>
         <div class="gauge-dir" id="gaugeDir" style="color:var(--txt3);">Нет данных</div>
         <div class="gauge-conf" id="gaugeConf"></div>
+        <div id="expectedMoveBar" style="font-size:9px;color:var(--txt3);text-align:center;margin-top:3px;min-height:14px;font-family:'JetBrains Mono',monospace;"></div>
       </div>
+      <div id="scenario-panel" style="margin-top:6px;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--txt2);line-height:1.6;"></div>
     </div>
 
     <div class="panel">
@@ -801,9 +803,7 @@ function loadAll(){
 function toggleExtInd(){
   extIndEnabled = document.getElementById('extIndChk').checked;
   saveAll();
-  const mr = computeAllMethods();
-  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-  renderMethodsTable(mr);
+  recalculateAndRender();
 }
 
 // Переключение базис/фьючерс сбрасывает кэш разрешения тикера и заставляет
@@ -813,17 +813,13 @@ function toggleExtIndBasis(){
   saveAll();
   _ilResolveCache = {};
   delete extIndicatorsCache[curTicker];
-  const mr = computeAllMethods();
-  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-  renderMethodsTable(mr);
+  recalculateAndRender();
 }
 
 function toggleCorr(){
   corrEnabled = document.getElementById('corrChk').checked;
   saveAll();
-  const mr = computeAllMethods();
-  renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-  renderMethodsTable(mr);
+  recalculateAndRender();
 }
 
 function onWindowChange(){
@@ -832,9 +828,7 @@ function onWindowChange(){
   // Пересчитываем перцентили с новым окном если история уже загружена
   if(deepHistory[curTicker]) {
     computeAndCachePercentiles(curTicker);
-    const mr = computeAllMethods();
-    renderGauge(computeComposite(mr, curTicker), METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length);
-    renderMethodsTable(mr);
+    recalculateAndRender();
   }
 }
 
@@ -1230,15 +1224,6 @@ async function fetchAllMoex(ticker, type){
 // ADAPTIVE CALIBRATION ENGINE
 // ============================================================
 
-// Считает перцентиль значения v в массиве arr
-function percentileRank(arr, v){
-  if(!arr.length) return 0.5;
-  const sorted = [...arr].sort((a,b)=>a-b);
-  let lo=0, hi=sorted.length-1;
-  while(lo < hi){ const mid=(lo+hi)>>1; if(sorted[mid]<v) lo=mid+1; else hi=mid; }
-  return lo / (sorted.length - 1 || 1);
-}
-
 // Вычисляет p10/p25/p50/p75/p90 из массива
 function calcPercentiles(arr){
   if(!arr.length) return {p10:0,p25:0,p50:0,p75:0,p90:0,n:0};
@@ -1592,8 +1577,31 @@ function m_OB_IMBALANCE(ob){
   }
   const pSpread = getPct(curTicker,'obstats','spread_bbo');
   const spreadZ = pSpread?.n>=5 ? (normScore(spread,pSpread,1.0)||0) : 0;
-  const confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
-  return {score, confidence, detail:`дисбаланс заявок в стакане: ${imb>=0?'больше на покупку':'больше на продажу'} (${(Math.abs(imb)*100).toFixed(0)}%), спред ${spread.toFixed(4)}`};
+  let confidence = Math.max(0.1, 0.75-Math.max(0,spreadZ)*0.15);
+  let detail = `дисбаланс заявок в стакане: ${imb>=0?'больше на покупку':'больше на продажу'} (${(Math.abs(imb)*100).toFixed(0)}%), спред ${spread.toFixed(4)}`;
+
+  // Liquidity Sweep / Absorption: сильный дисбаланс + цена реально прошла в
+  // ту же сторону — sweep (снос ликвидности, сигнал усиливается). Сильный
+  // дисбаланс, но цена стоит на месте — absorption (поглощение, давление
+  // может развернуться, сигнал ослабляем).
+  const dailyC = candleData[curTF]||candleData['1min']||[];
+  if(dailyC.length>=2 && Math.abs(imb)>0.15){
+    const c1 = toP(dailyC[dailyC.length-1].close);
+    const c0 = toP(dailyC[dailyC.length-2].close);
+    const atrPct = getAtrPct(curTicker, curTF);
+    const moveRel = atrPct>0 ? (c1-c0)/(c0||1)/atrPct : 0;
+    const sameDir = Math.sign(moveRel)===Math.sign(imb);
+    if(Math.abs(moveRel)>0.3 && sameDir){
+      score = Math.tanh(score*1.25);
+      confidence = Math.min(0.85, confidence+0.1);
+      detail += `; sweep — дисбаланс подтверждён движением цены, ликвидность снесена`;
+    } else if(Math.abs(moveRel)<0.15){
+      score *= 0.5;
+      confidence = Math.max(0.1, confidence-0.1);
+      detail += `; absorption — крупный дисбаланс, но цена стоит (поглощение, возможен разворот)`;
+    }
+  }
+  return {score, confidence, detail};
 }
 
 // --- Method 7: Cancel Signal (адаптивный) ---
@@ -1613,8 +1621,26 @@ function m_CANCEL_SIGNAL(os){
   } else {
     score = Math.tanh(((canS-canB)/total)*3);
   }
-  const confidence = total>10 ? 0.6 : 0.25;
-  return {score, confidence, detail:`отмены заявок: на покупку ${snum(canB)}, на продажу ${snum(canS)} — больше отмен на ${canS>=canB?'продажу (бычий сигнал)':'покупку (медвежий сигнал)'}`};
+  let confidence = total>10 ? 0.6 : 0.25;
+  let detail = `отмены заявок: на покупку ${snum(canB)}, на продажу ${snum(canS)} — больше отмен на ${canS>=canB?'продажу (бычий сигнал)':'покупку (медвежий сигнал)'}`;
+
+  // Absorption через отмены: всплеск отмен на одной стороне без движения
+  // цены в сторону снятой ликвидности — крупный игрок поглощает поток,
+  // не давая цене уйти (часто разворотный сигнал, сигнал ослабляем).
+  const dailyC = candleData[curTF]||candleData['1min']||[];
+  if(dailyC.length>=2 && total>10){
+    const c1 = toP(dailyC[dailyC.length-1].close);
+    const c0 = toP(dailyC[dailyC.length-2].close);
+    const atrPct = getAtrPct(curTicker, curTF);
+    const moveRel = atrPct>0 ? (c1-c0)/(c0||1)/atrPct : 0;
+    const cancelSkew = Math.sign(canS-canB); // >0: больше отмен на продажу → бычий по score
+    if(Math.abs(moveRel)<0.15 && cancelSkew!==0 && Math.sign(score)===cancelSkew){
+      score *= 0.5;
+      confidence = Math.max(0.1, confidence-0.1);
+      detail += `; absorption — отмены перекошены, но цена стоит (поглощение, сигнал ослаблен)`;
+    }
+  }
+  return {score, confidence, detail};
 }
 
 // --- Method 8: Institutional OI (адаптивный) ---
@@ -1632,8 +1658,45 @@ function m_INST_OI(futoi){
   } else {
     score = Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*3);
   }
-  const confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
-  return {score, confidence, detail:`крупные игроки (юрлица): лонгов ${snum(longNet)}, шортов ${snum(shortNet)}, нетто ${netPos>=0?'+':''}${snum(netPos)} — ${netPos>=0?'наращивают лонги':'наращивают шорты'}`};
+  let confidence = (longNet+shortNet)>0 ? 0.75 : 0.1;
+  let detail = `крупные игроки (юрлица): лонгов ${snum(longNet)}, шортов ${snum(shortNet)}, нетто ${netPos>=0?'+':''}${snum(netPos)} — ${netPos>=0?'наращивают лонги':'наращивают шорты'}`;
+
+  // Дивергенция ΔOI × ΔPrice: рост ОИ при росте цены — новые лонги (бычий
+  // сигнал подтверждён), рост ОИ при падении цены — новые шорты (медвежий
+  // подтверждён); ОИ падает при движении цены — закрытие позиций (дивергенция,
+  // сигнал слабее, корректируем score к нулю и снижаем confidence).
+  const histFo = (deepHistory[curTicker]?.futoi||[]).filter(r=>(r.clgroup||'').toUpperCase()==='YUR');
+  const dailyCloses = (candleData['1d']||[]);
+  if(histFo.length>=2 && dailyCloses.length>=2){
+    const byDate = {};
+    histFo.forEach(r=>{ byDate[r.tradedate] = (byDate[r.tradedate]||0) + toNum(r.pos||0); });
+    const dates = Object.keys(byDate).sort();
+    if(dates.length>=2){
+      const oiPrev = byDate[dates[dates.length-2]];
+      const oiCur  = byDate[dates[dates.length-1]];
+      const dOI = oiCur - oiPrev;
+      const c1 = toP(dailyCloses[dailyCloses.length-1].close);
+      const c0 = toP(dailyCloses[dailyCloses.length-2].close);
+      const dPrice = c1 - c0;
+      if(dOI!==0 && dPrice!==0){
+        const sameSign = Math.sign(dOI)===Math.sign(dPrice);
+        if(sameSign){
+          // ОИ растёт вместе с ценой — подтверждение тренда, усиливаем сигнал
+          score = Math.tanh(score*1.3 + Math.sign(dPrice)*0.2);
+          confidence = Math.min(0.9, confidence+0.1);
+          detail += `; ОИ ${dOI>=0?'растёт':'падает'} вместе с ценой (${dPrice>=0?'+':''}${dPrice.toFixed(2)}) — тренд подтверждён новыми позициями`;
+        } else {
+          // ОИ падает/растёт против цены — закрытие позиций, дивергенция,
+          // ослабляем сигнал
+          score *= 0.4;
+          confidence = Math.max(0.1, confidence-0.15);
+          detail += `; дивергенция ОИ/цены (ΔOI ${dOI>=0?'+':''}${snum(dOI)}, цена ${dPrice>=0?'+':''}${dPrice.toFixed(2)}) — вероятно закрытие позиций, сигнал ослаблен`;
+        }
+      }
+    }
+  }
+
+  return {score, confidence, detail};
 }
 
 // --- Method 9: Retail Contrarian (адаптивный) ---
@@ -2042,6 +2105,146 @@ function computeAllMethods(){
   return results;
 }
 
+// Пересчитывает методы/композит и обновляет gauge+таблицу методов —
+// общий хвост для мест, где меняются настройки/тикер без полного refreshAll
+
+// ============================================================
+// EXPECTED MOVE: ATR + исторический vol + режимный коэффициент
+// ============================================================
+function computeExpectedMove(ticker) {
+  const tf = curTF;
+  const candles = candleData[tf] || candleData['1d'] || [];
+  if (candles.length < 5) return null;
+  const closes = candles.slice(-21).map(c => toP(c.close)).filter(Boolean);
+  if (closes.length < 5) return null;
+  const curPrice = closes[closes.length - 1];
+  if (!curPrice) return null;
+
+  // ATR как % цены
+  const atrPct = getAtrPct(ticker, tf);
+
+  // Историческая волатильность: стандартное отклонение лог-доходностей × sqrt(N)
+  const logRets = [];
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i - 1] > 0) logRets.push(Math.log(closes[i] / closes[i - 1]));
+  }
+  const n = logRets.length;
+  let hvPct = atrPct; // fallback
+  if (n >= 4) {
+    const mean = logRets.reduce((a, b) => a + b, 0) / n;
+    const variance = logRets.reduce((s, r) => s + (r - mean) ** 2, 0) / (n - 1);
+    hvPct = Math.sqrt(variance * n); // N-баровая σ
+  }
+
+  // Базовое движение = среднее ATR% и HV%
+  let basePct = (atrPct + hvPct) / 2;
+
+  // Модификатор режима
+  const regime = currentRegimeState;
+  const regName = regime ? regime.regime : 'unknown';
+  const regMods = { stress: 2.0, high_vol: 1.5, trending: 1.1, low_vol: 0.6, ranging: 0.8 };
+  const mod = regMods[regName] || 1.0;
+  basePct *= mod;
+
+  return { pct: basePct * 100, abs: curPrice * basePct, regime: regName };
+}
+
+// ============================================================
+// СЦЕНАРНЫЕ ЦЕНОВЫЕ ЦЕЛИ: Fibonacci + swing high/low
+// ============================================================
+function computeScenarios(compositeScore, ticker) {
+  if (Math.abs(compositeScore) < 0.15) return null;
+  const candles = candleData[curTF] || candleData['1d'] || [];
+  if (candles.length < 5) return null;
+  const slice = candles.slice(-30);
+  const highs = slice.map(c => toP(c.high)).filter(Boolean);
+  const lows  = slice.map(c => toP(c.low)).filter(Boolean);
+  if (!highs.length || !lows.length) return null;
+  const swHigh = Math.max(...highs);
+  const swLow  = Math.min(...lows);
+  const closes = slice.map(c => toP(c.close)).filter(Boolean);
+  const curPrice = closes[closes.length - 1];
+  if (!curPrice || swHigh <= swLow) return null;
+
+  // Fibo уровни
+  const fiboRatios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618];
+  const fiboLevels = fiboRatios.map(r => swLow + (swHigh - swLow) * r);
+
+  const above = fiboLevels.filter(l => l > curPrice).sort((a, b) => a - b);
+  const below = fiboLevels.filter(l => l < curPrice).sort((a, b) => b - a);
+
+  let base, optimistic, negative, invalidation;
+  if (compositeScore > 0) {
+    base        = above[0] ?? (curPrice * 1.02);
+    optimistic  = above[1] ?? (curPrice * 1.04);
+    negative    = below[0] ?? (curPrice * 0.98);
+    invalidation = swLow;
+  } else {
+    base        = below[0] ?? (curPrice * 0.98);
+    optimistic  = below[1] ?? (curPrice * 0.96);
+    negative    = above[0] ?? (curPrice * 1.02);
+    invalidation = swHigh;
+  }
+
+  const sc = Math.abs(compositeScore);
+  const baseProb  = Math.min(65, Math.max(35, 40 + compositeScore * 30));
+  const optProb   = Math.round((100 - baseProb) / 2 * sc);
+  const negProb   = 100 - Math.round(baseProb) - optProb;
+
+  return {
+    base: { lo: Math.min(curPrice, base), hi: Math.max(curPrice, base), prob: Math.round(baseProb) },
+    optimistic: { lo: Math.min(base, optimistic), hi: Math.max(base, optimistic), prob: optProb },
+    negative: { lo: Math.min(curPrice, negative), hi: Math.max(curPrice, negative), prob: negProb < 0 ? 0 : negProb },
+    invalidation,
+    bullish: compositeScore > 0,
+  };
+}
+
+// ============================================================
+// RENDER: Expected move + scenario panel
+// ============================================================
+function renderExpectedMoveAndScenarios(compositeScore, ticker) {
+  const emEl = document.getElementById('expectedMoveBar');
+  const scEl = document.getElementById('scenario-panel');
+  if (!emEl || !scEl) return;
+
+  const em = computeExpectedMove(ticker);
+  if (em) {
+    const sign = compositeScore >= 0 ? '+' : '−';
+    const regLabel = { stress:'Стресс', high_vol:'Выс. вол.', trending:'Тренд', low_vol:'Низ. вол.', ranging:'Флэт', unknown:'?' }[em.regime] || em.regime;
+    emEl.textContent = `ожид. движение ${sign}${em.pct.toFixed(1)}% ± ${(em.pct/2).toFixed(1)}% [${regLabel}]`;
+    emEl.style.color = compositeScore >= 0 ? 'var(--pos)' : 'var(--neg)';
+  } else {
+    emEl.textContent = '';
+  }
+
+  const sc = computeScenarios(compositeScore, ticker);
+  if (sc) {
+    const fmt = v => v != null ? v.toFixed(1) : '?';
+    const arrowB = sc.bullish ? '↑' : '↓';
+    const arrowO = sc.bullish ? '↑↑' : '↓↓';
+    const arrowN = sc.bullish ? '↓' : '↑';
+    scEl.innerHTML = [
+      `<div style="color:var(--pos)">${arrowB} Базовый (${sc.base.prob}%) → ${fmt(sc.base.lo)} – ${fmt(sc.base.hi)}</div>`,
+      `<div style="color:var(--mem)">${arrowO} Оптимист. (${sc.optimistic.prob}%) → ${fmt(sc.optimistic.lo)} – ${fmt(sc.optimistic.hi)}</div>`,
+      `<div style="color:var(--neg)">${arrowN} Негативный (${sc.negative.prob}%) → ${fmt(sc.negative.lo)} – ${fmt(sc.negative.hi)}</div>`,
+      `<div style="color:var(--txt3)">Инвалидация → ${sc.bullish ? 'ниже' : 'выше'} ${fmt(sc.invalidation)}</div>`,
+    ].join('');
+  } else {
+    scEl.innerHTML = '';
+  }
+}
+
+function recalculateAndRender(){
+  const mr = computeAllMethods();
+  const avgConf = METHODS.reduce((s,m)=>s+(mr[m.id]?.confidence||0),0)/METHODS.length;
+  const composite = computeComposite(mr, curTicker);
+  renderGauge(composite, avgConf);
+  renderMethodsTable(mr);
+  renderExpectedMoveAndScenarios(composite, curTicker);
+  return mr;
+}
+
 function getWeights(ticker){
   return methodWeights[ticker] || {};
 }
@@ -2170,10 +2373,13 @@ function recordOutcome(){
       (r.score < -0.1 && outcome === 'short') ||
       (Math.abs(r.score) <= 0.1 && outcome === 'neutral');
     if(!methodWeights[ticker][m.id])
-      methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0};
+      methodWeights[ticker][m.id] = {weight: 0.5, correct: 0, total: 0, sumQ: 0};
     const mw = methodWeights[ticker][m.id];
     mw.total++;
     if(correct) mw.correct++;
+    // sumQ держим в той же шкале, что и автообновление (autoRecordOutcomes),
+    // чтобы ручная и авто-запись не давали разные веса при смешивании
+    mw.sumQ = (mw.sumQ||0) + (correct ? 1 : 0);
     const accuracy = mw.correct / mw.total;
     mw.weight = 0.85 * mw.weight + 0.15 * accuracy;
   });
@@ -2657,11 +2863,20 @@ async function runIntradayBacktest(){
         else { mfe=Math.max(mfe,upside); mae=Math.max(mae,downside); }
       });
       const quality = mfe/(mfe+mae+1e-8);
+      // Горизонты: направление цены через +5/+15/+30/+60 баров (1=вверх,-1=вниз,0=нет данных)
+      const hDir = (offset) => {
+        const r = ts[i + offset]; const p = r ? toNum(r.pr_close || r.pr_cl || 0) : 0;
+        return p ? (p > ep ? 1 : p < ep ? -1 : 0) : 0;
+      };
+      const horizons = { __h5: hDir(5), __h15: hDir(15), __h30: hDir(30), __h60: hDir(60) };
       const id = await dbSaveSignal({
         ts: new Date(curTs).toISOString(), ticker: curTicker, tf:'1min',
         entryPrice: ep, entryTs: curTs,
         composite, dir,
-        methods: Object.fromEntries(METHODS.map(m=>[m.id, methodResults[m.id]?.score ?? 0])),
+        methods: Object.fromEntries([
+          ...METHODS.map(m=>[m.id, methodResults[m.id]?.score ?? 0]),
+          ...Object.entries(horizons),
+        ]),
       }).catch(()=>null);
       if(id == null) continue;
       await dbUpdateSignal(id, {mfe, mae, quality, resolved:1, resolved_at: Date.now()}).catch(()=>{});
@@ -2725,6 +2940,118 @@ async function loadScenarioStats(){
   html += `</table>`;
 
   // 2. По методам — что было дальше, когда конкретный метод сигналил рост/падение
+  // Базовая ставка по горизонтам (% баров где цена выросла) — нужна для info gain
+  const HORIZONS = [
+    {key:'__h5', label:'5 баров'}, {key:'__h15', label:'15 баров'},
+    {key:'__h30', label:'30 баров'}, {key:'__h60', label:'60 баров'},
+  ];
+  const baseRate = {};
+  HORIZONS.forEach(h=>{
+    const valid = rows.filter(r=> r.methods?.[h.key] !== 0 && r.methods?.[h.key] != null);
+    baseRate[h.key] = valid.length ? valid.filter(r=>r.methods[h.key]===1).length / valid.length : null;
+  });
+
+  // ── Таблица: метод × горизонт (точность + information gain)
+  html += `<div style="font-size:10px;color:var(--txt3);margin:10px 0 4px;">Точность и Information Gain по горизонтам</div>`;
+  const hasHorizon = rows.some(r=>r.methods?.__h5 !== undefined);
+  if(!hasHorizon){
+    html += `<div style="font-size:9px;color:var(--txt3);margin-bottom:8px;">Данные по горизонтам появятся после нового прогона «По AlgoPack» (старые сигналы не содержат горизонтов).</div>`;
+  } else {
+    // Шапка
+    html += `<table class="scen-table"><tr><th>Метод</th>`;
+    HORIZONS.forEach(h=> html += `<th>${h.label}<br><span style="font-size:8px;color:var(--txt3)">acc / IG</span></th>`);
+    html += `<th>Bias %<br><span style="font-size:8px;color:var(--txt3)">доля LONG</span></th></tr>`;
+    METHODS.forEach(m=>{
+      html += `<tr><td>${m.label}</td>`;
+      let longN=0;
+      const scoredRows = rows.filter(r=> Math.abs(r.methods?.[m.id]??0) >= 0.1);
+      if(scoredRows.length) longN = scoredRows.filter(r=>(r.methods[m.id]??0)>0).length;
+      const biasColor = scoredRows.length ? ((longN/scoredRows.length)>0.75 || (longN/scoredRows.length)<0.25 ? '#FF9F40':'var(--txt2)') : 'var(--txt3)';
+      HORIZONS.forEach(h=>{
+        const valid = scoredRows.filter(r=> r.methods?.[h.key] !== 0 && r.methods?.[h.key] != null);
+        if(!valid.length){ html += `<td>—</td>`; return; }
+        // Точность: когда метод LONG — цена выросла? когда SHORT — цена упала?
+        let correct=0;
+        valid.forEach(r=>{
+          const s=r.methods[m.id], hv=r.methods[h.key];
+          if((s>0&&hv===1)||(s<0&&hv===-1)) correct++;
+        });
+        const acc = correct/valid.length;
+        const br = baseRate[h.key];
+        const ig = br!=null ? acc - (scoredRows.filter(r=>(r.methods[m.id]??0)>0).length/scoredRows.length * br + scoredRows.filter(r=>(r.methods[m.id]??0)<0).length/scoredRows.length * (1-br)) : null;
+        const accPct = (acc*100).toFixed(0);
+        const accColor = acc>=0.60?'var(--green)':acc>=0.50?'var(--txt2)':'var(--red)';
+        const igStr = ig!=null ? (ig>=0?'+':'')+( ig*100).toFixed(1)+'%' : '';
+        const igColor = ig!=null ? (ig>0.05?'var(--green)':ig>0?'var(--txt3)':'var(--red)') : '';
+        html += `<td><span style="color:${accColor}">${accPct}%</span> <span style="font-size:9px;color:${igColor}">${igStr}</span></td>`;
+      });
+      const biasPct = scoredRows.length ? (longN/scoredRows.length*100).toFixed(0)+'%' : '—';
+      html += `<td style="color:${biasColor}">${biasPct} (${scoredRows.length})</td></tr>`;
+    });
+    // Строка базовой ставки
+    html += `<tr><td style="color:var(--txt3)">База (рынок)</td>`;
+    HORIZONS.forEach(h=> html += `<td style="color:var(--txt3)">${baseRate[h.key]!=null?(baseRate[h.key]*100).toFixed(0)+'%':'—'}</td>`);
+    html += `<td>—</td></tr></table>`;
+    html += `<div style="font-size:9px;color:var(--txt3);margin-bottom:6px;">IG (information gain) = точность метода − базовая ставка рынка. Положительный IG = метод реально что-то знает.</div>`;
+  }
+
+  // ── Матрица корреляций методов (из scores по всем сигналам)
+  if(rows.length >= 30){
+    const mIds = METHODS.map(m=>m.id);
+    // Корреляция Пирсона между двумя векторами score
+    const pearson = (a,b) => {
+      const n=a.length; if(!n) return 0;
+      const ma=a.reduce((s,v)=>s+v,0)/n, mb=b.reduce((s,v)=>s+v,0)/n;
+      let num=0,da=0,db=0;
+      for(let i=0;i<n;i++){ const A=a[i]-ma,B=b[i]-mb; num+=A*B; da+=A*A; db+=B*B; }
+      return (da&&db) ? num/Math.sqrt(da*db) : 0;
+    };
+    const vecs = {};
+    mIds.forEach(id=>{ vecs[id]=rows.map(r=>r.methods?.[id]??0); });
+    // Простая кластеризация: жадная — берём первый нераспределённый, добавляем всех с |corr|>0.5
+    const assigned = new Set();
+    const clusters = [];
+    mIds.forEach(id=>{
+      if(assigned.has(id)) return;
+      const cl = [id]; assigned.add(id);
+      mIds.forEach(id2=>{ if(!assigned.has(id2) && Math.abs(pearson(vecs[id],vecs[id2]))>=0.5){ cl.push(id2); assigned.add(id2); } });
+      clusters.push(cl);
+    });
+    html += `<div style="font-size:10px;color:var(--txt3);margin:10px 0 4px;">Кластеры методов (|корреляция| ≥ 0.5)</div>`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
+    const CLUSTER_COLORS = ['#52F2C9','#A78BFA','#FF9F40','#FF006E','#6366F1','#60A4A1'];
+    clusters.forEach((cl,ci)=>{
+      const clr = CLUSTER_COLORS[ci%CLUSTER_COLORS.length];
+      html += `<div style="background:rgba(255,255,255,0.03);border:1px solid ${clr}44;border-radius:6px;padding:6px 10px;min-width:140px;">`;
+      html += `<div style="font-size:9px;color:${clr};margin-bottom:3px;">Кластер ${ci+1}</div>`;
+      cl.forEach(id=>{
+        const m=METHODS.find(x=>x.id===id);
+        html += `<div style="font-size:10px;color:var(--txt2);padding:1px 0;">• ${m?.label||id}</div>`;
+      });
+      html += `</div>`;
+    });
+    html += `</div>`;
+
+    // Матрица попарных корреляций
+    html += `<div style="font-size:10px;color:var(--txt3);margin-bottom:4px;">Матрица корреляций</div>`;
+    html += `<div style="overflow-x:auto;"><table class="scen-table" style="font-size:9px;"><tr><th></th>`;
+    mIds.forEach(id=>{ const m=METHODS.find(x=>x.id===id); html += `<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px 3px;max-width:18px;">${m?.label||id}</th>`; });
+    html += `</tr>`;
+    mIds.forEach(id=>{
+      const m=METHODS.find(x=>x.id===id);
+      html += `<tr><td style="white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${m?.label||id}</td>`;
+      mIds.forEach(id2=>{
+        const r=pearson(vecs[id],vecs[id2]);
+        const abs=Math.abs(r), bg=abs>0.7?`rgba(199,27,82,${abs*0.6})`:abs>0.4?`rgba(255,159,64,${abs*0.4})`:'transparent';
+        html += `<td style="background:${bg};color:var(--txt2);text-align:center;">${r.toFixed(2)}</td>`;
+      });
+      html += `</tr>`;
+    });
+    html += `</table></div>`;
+  }
+
+  // Исходная таблица по MFE/MAE (старые сигналы без горизонтов)
+  html += `<div style="font-size:10px;color:var(--txt3);margin:10px 0 4px;">Старая метрика (MFE/MAE)</div>`;
   html += `<table class="scen-table"><tr><th>Метод</th><th>Когда сигналил «рост» — сыграло</th><th>Когда сигналил «падение» — сыграло</th></tr>`;
   METHODS.forEach(m=>{
     let posN=0,posWin=0,negN=0,negWin=0;
@@ -2945,11 +3272,7 @@ function selTF(btn, tf){
   if(candleData[tf] && candleData[tf].length){
     renderCandleChart(candleData[tf]);
     computeAtr(curTicker, tf, candleData[tf]);
-    const methodResults = computeAllMethods();
-    const composite = computeComposite(methodResults, curTicker);
-    const avgConf = METHODS.reduce((s,m)=>s+(methodResults[m.id]?.confidence||0),0)/METHODS.length;
-    renderGauge(composite, avgConf);
-    renderMethodsTable(methodResults);
+    recalculateAndRender();
   } else {
     refreshAll(); // нет кэша для этого ТФ — грузим
   }
