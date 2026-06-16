@@ -474,6 +474,10 @@ const METHODS = [
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
   {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FF9F40'},
   {id:'EXT_INDICATORS', label:'Индикаторы (модуль indlab)', src:'indlab', color:'#52F2C9'},
+  // Три модели агрегации из indlab (90 дней, бэктест)
+  {id:'IL_MODEL_M1',   label:'M1: WR×(1−corr) кластер', src:'indlab', color:'#52F2C9'},
+  {id:'IL_MODEL_M2',   label:'M2: Лидеры кластеров',     src:'indlab', color:'#A78BFA'},
+  {id:'IL_MODEL_M3',   label:'M3: Лидер→направление',    src:'indlab', color:'#FF9F40'},
 ];
 
 // ============================================================
@@ -1880,7 +1884,8 @@ async function _ilRequestVerdict(ticker){
       const cacheOk = cached && cached.updated_at
         && Date.now()-cached.updated_at < EXT_IND_MAX_AGE
         && Array.isArray(cached.bestCombos)
-        && cached.details?.[0]?.h30 != null;
+        && cached.details?.[0]?.h30 != null
+        && cached.models != null;
       if(cacheOk){
         extIndicatorsCache[ticker] = {...cached, ts:cached.updated_at, note};
         return;
@@ -1899,6 +1904,42 @@ async function _ilRequestVerdict(ticker){
     delete extIndicatorsPending[ticker];
   }
 }
+// Извлекает сигнал из модели M1/M2/M3, рассчитанной indlab за 90 дней
+function _m_modelSignal(modelKey){
+  if(!extIndEnabled) return {score:0, confidence:0, detail:`учёт indlab выключен`};
+  const cached = extIndicatorsCache[curTicker];
+  if(!cached){
+    if(!extIndicatorsPending[curTicker]) _ilRequestVerdict(curTicker);
+    return {score:0, confidence:0, detail:'ожидаем indlab…'};
+  }
+  if(cached.error) return {score:0, confidence:0, detail:`indlab ошибка: ${cached.error}`};
+  const models = cached.models;
+  if(!models) return {score:0, confidence:0, detail:'indlab: данные моделей отсутствуют (обновите)'};
+
+  const m = models[modelKey];
+  if(!m) return {score:0, confidence:0, detail:`модель ${modelKey} не найдена`};
+
+  const score = Math.max(-1, Math.min(1, m.score ?? 0));
+  const regime = models.regime || 'neutral';
+
+  // Уверенность = качество бэктеста H30 модели (если есть)
+  const bt30 = m.bt?.h30;
+  const btConf = (bt30?.acc != null && bt30.n >= 5) ? Math.min(0.9, (bt30.acc - 0.45) * 4) : 0.3;
+  const confidence = Math.max(0.1, btConf);
+
+  const ageMin = Math.round((Date.now() - cached.ts) / 60000);
+  const btStr = bt30?.acc != null ? ` H30=${(bt30.acc*100).toFixed(0)}% n=${bt30.n}` : '';
+  const labels = {m1:'M1 WR×(1−corr)',m2:'M2 лидеры',m3:'M3 согласованность'};
+  return {
+    score, confidence,
+    detail:`${labels[modelKey]||modelKey} · режим:${regime} · ${ageMin}м назад${btStr}`,
+  };
+}
+
+function m_IL_MODEL_M1(){ return _m_modelSignal('m1'); }
+function m_IL_MODEL_M2(){ return _m_modelSignal('m2'); }
+function m_IL_MODEL_M3(){ return _m_modelSignal('m3'); }
+
 function m_EXT_INDICATORS(){
   if(!extIndEnabled) return {score:0, confidence:0, detail:'учёт модуля индикаторов выключен (тумблер «Индикаторы»)'};
   const cached = extIndicatorsCache[curTicker];
@@ -2370,6 +2411,10 @@ function computeAllMethods(){
   results.ZSCORE_SIGNAL  = m_ZSCORE_SIGNAL();
   results.VR_SIGNAL      = m_VR_SIGNAL();
   results.PFE_SIGNAL     = m_PFE_SIGNAL();
+  // Три модели из indlab
+  results.IL_MODEL_M1    = m_IL_MODEL_M1();
+  results.IL_MODEL_M2    = m_IL_MODEL_M2();
+  results.IL_MODEL_M3    = m_IL_MODEL_M3();
   return results;
 }
 
@@ -2560,18 +2605,39 @@ function getWeights(ticker){
 
 function computeComposite(methodResults, ticker){
   const weights = getWeights(ticker);
-  // Берём режимные модификаторы весов если классификатор уже отработал
   const regimeMod = (currentRegimeState && currentRegimeState.weightMod) || {};
+
+  // Если есть хотя бы одна модель с данными — выбираем лучшую по H30 бэктесту
+  const modelIds = ['IL_MODEL_M1','IL_MODEL_M2','IL_MODEL_M3'];
+  const activeModels = modelIds.map(id=>({id, r:methodResults[id]})).filter(x=>x.r&&x.r.confidence>0.15);
+  const cached = extIndicatorsCache[curTicker];
+  const hasBt = cached && cached.models && !cached.error;
+
   let wSum = 0, wTotal = 0;
   METHODS.forEach(m=>{
     const r = methodResults[m.id];
     if(!r || r.confidence < 0.05) return;
     const mw = weights[m.id];
-    // Базовый обученный вес (или 0.5 если данных мало)
     const baseW = (mw && mw.total >= 30) ? mw.weight : 0.5;
-    // Умножаем на режимный коэффициент (по умолчанию 1.0)
     const regW = regimeMod[m.id] != null ? regimeMod[m.id] : 1.0;
-    const w = baseW * regW;
+
+    // Модели M1/M2/M3: если есть бэктест — вес пропорционален H30 acc − 0.45
+    // иначе базовый вес 0.8 (выше других, т.к. 90-дневный бэктест сильнее)
+    let w;
+    if(modelIds.includes(m.id)){
+      if(hasBt){
+        const mk = {IL_MODEL_M1:'m1',IL_MODEL_M2:'m2',IL_MODEL_M3:'m3'}[m.id];
+        const bt30 = cached.models[mk]?.bt?.h30;
+        w = (bt30?.acc != null && bt30.n >= 5)
+          ? Math.max(0.1, (bt30.acc - 0.45) * 5) * regW
+          : 0.6 * regW;
+      } else {
+        w = 0.6 * regW;
+      }
+    } else {
+      w = baseW * regW;
+    }
+
     wSum   += r.score * w * r.confidence;
     wTotal += w * r.confidence;
   });
