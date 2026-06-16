@@ -8997,14 +8997,13 @@ function ilRenderAnalysis() {
 
 // Категории для группировки в конструкторе
 const _IL_CATS = [
-  {label:'Осцилляторы',  ids:['rsi','wr','cci','mfi','stoch','cmo','rsi_w']},
-  {label:'Тренд/MA',     ids:['macd','ema','adx','supertrend','tsi','dpo','mcginley','stock_trend']},
-  {label:'Каналы',       ids:['bb','donchian','keltner','envelopes','ichimoku','alligator','parabolic','bb_width']},
-  {label:'Объём',        ids:['obv','cmf','mfi','acc_dist','chaikin_osc','chaikin_vol','eom','nvi','pvi','pvt','vo','vwma','force_idx']},
-  {label:'Моментум',     ids:['ao','ult_osc','accel_osc','elder_ray','elder_impulse','fisher','chop','vortex']},
-  {label:'Волатильность',ids:['hist_vol','vix_like','std_dev','ohlc_vol']},
-  {label:'Паттерны',     ids:['zigzag','fractals']},
-  {label:'Режим',        ids:['crash','recovery','flat','high_vol','low_vol']},
+  {label:'Тренд',          ids:['ichimoku','alligator','supertrend','ema','vwma','mcginley','donchian','vortex','parabolic','stock_trend','macd']},
+  {label:'Импульс',        ids:['rsi','stoch','wr','cci','tsi','ult_osc','ao','dpo','fisher','cmo','rsi_w','accel_osc']},
+  {label:'Волатильность',  ids:['bb','bb_width','keltner','envelopes','std_dev','hist_vol','vix_like','ohlc_vol']},
+  {label:'Режим рынка',    ids:['adx','chop','flat','high_vol','low_vol','crash','recovery']},
+  {label:'Объём',          ids:['obv','cmf','chaikin_osc','chaikin_vol','force_idx','mfi','pvt','nvi','pvi','eom','vo','acc_dist']},
+  {label:'Elder',          ids:['elder_ray','elder_impulse']},
+  {label:'Структура цены', ids:['fractals','zigzag']},
 ];
 
 // Жадный поиск лучших комбинаций (межкластерные, H30)
