@@ -463,23 +463,57 @@ const MOEX_MARKETS = {
 const TF_INTERVALS = {'1min':'CANDLE_INTERVAL_1_MIN','5min':'CANDLE_INTERVAL_5_MIN','1h':'CANDLE_INTERVAL_HOUR','1d':'CANDLE_INTERVAL_DAY'};
 
 const METHODS = [
+  // ── Поток ордеров ──
   {id:'BS_PRESSURE',    label:'Buy/Sell давление',    src:'ts',     color:'#52F2C9'},
   {id:'AGGRESSOR_FLOW', label:'Поток агрессора',      src:'ts',     color:'#52F2C9'},
   {id:'LARGE_IMPACT',   label:'Крупные сделки',       src:'ts',     color:'#52F2C9'},
+  // ── Цена и объём ──
   {id:'VWAP_SIGNAL',    label:'VWAP отклонение',      src:'ts',     color:'#A78BFA'},
   {id:'VOL_MOMENTUM',   label:'Объём × цена',         src:'ts',     color:'#A78BFA'},
+  {id:'VZO_SIGNAL',     label:'VZO (объём-осцилл.)',  src:'candles',color:'#A78BFA'},
+  {id:'YZ_VOL',         label:'Волатильность YZ',     src:'candles',color:'#A78BFA'},
+  {id:'ZSCORE_SIGNAL',  label:'Z-Score откл.',        src:'candles',color:'#A78BFA'},
+  // ── Стакан & заявки ──
   {id:'OB_IMBALANCE',   label:'Дисбаланс стакана',    src:'ob',     color:'#FF9F40'},
   {id:'CANCEL_SIGNAL',  label:'Отмены заявок',        src:'os',     color:'#FF9F40'},
+  // ── Открытый интерес ──
   {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#FF006E'},
   {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
+  // ── Тренд и МА ──
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
-  {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FF9F40'},
-  {id:'EXT_INDICATORS', label:'Индикаторы (модуль indlab)', src:'indlab', color:'#52F2C9'},
-  // Три модели агрегации из indlab (90 дней, бэктест)
-  {id:'IL_MODEL_M1',   label:'M1: WR×(1−corr) кластер', src:'indlab', color:'#52F2C9'},
-  {id:'IL_MODEL_M2',   label:'M2: Лидеры кластеров',     src:'indlab', color:'#A78BFA'},
-  {id:'IL_MODEL_M3',   label:'M3: Лидер→направление',    src:'indlab', color:'#FF9F40'},
+  {id:'KAMA_SIGNAL',    label:'KAMA (адапт. МА)',     src:'candles',color:'#6366F1'},
+  {id:'ZLEMA_SIGNAL',   label:'ZLEMA (нулев. лаг)',   src:'candles',color:'#6366F1'},
+  {id:'T3_SIGNAL',      label:'T3 (МА Тильсон)',      src:'candles',color:'#6366F1'},
+  {id:'PFE_SIGNAL',     label:'PFE (эфф. тренда)',    src:'candles',color:'#6366F1'},
+  // ── Цикл и режим ──
+  {id:'SINEWAVE',       label:'Синусоида (Элерс)',    src:'candles',color:'#60A4A1'},
+  {id:'DECYCLER',       label:'Децикл (Элерс)',       src:'candles',color:'#60A4A1'},
+  {id:'MMI_SIGNAL',     label:'MMI (режим рынка)',    src:'candles',color:'#60A4A1'},
+  {id:'TQI_SIGNAL',     label:'TQI (кач. тренда)',   src:'candles',color:'#60A4A1'},
+  {id:'VR_SIGNAL',      label:'Variance Ratio',       src:'candles',color:'#60A4A1'},
+  // ── Межрыночный ──
+  {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FFD700'},
+  // ── Технические индикаторы (indlab) ──
+  {id:'EXT_INDICATORS', label:'Индикаторы (indlab)',  src:'indlab', color:'#52F2C9'},
+  // ── Модели (отдельно от сигналов) ──
+  {id:'IL_MODEL_M1',    label:'M1: WR×(1−corr)',      src:'indlab', color:'#C084FC'},
+  {id:'IL_MODEL_M2',    label:'M2: Лидеры кластеров', src:'indlab', color:'#C084FC'},
+  {id:'IL_MODEL_M3',    label:'M3: Лидер→направление',src:'indlab', color:'#C084FC'},
 ];
+
+// Статичные семантические кластеры (не меняются от данных)
+const METHODS_CLUSTERS = [
+  {label:'Поток ордеров',          color:'#52F2C9', ids:['BS_PRESSURE','AGGRESSOR_FLOW','LARGE_IMPACT']},
+  {label:'Цена и объём',           color:'#A78BFA', ids:['VWAP_SIGNAL','VOL_MOMENTUM','VZO_SIGNAL','YZ_VOL','ZSCORE_SIGNAL']},
+  {label:'Стакан & заявки',        color:'#FF9F40', ids:['OB_IMBALANCE','CANCEL_SIGNAL']},
+  {label:'Открытый интерес',       color:'#FF006E', ids:['INST_OI','RETAIL_CONTRA']},
+  {label:'Тренд и МА',             color:'#6366F1', ids:['PRICE_TREND','KAMA_SIGNAL','ZLEMA_SIGNAL','T3_SIGNAL','PFE_SIGNAL']},
+  {label:'Цикл и режим рынка',     color:'#60A4A1', ids:['SINEWAVE','DECYCLER','MMI_SIGNAL','TQI_SIGNAL','VR_SIGNAL']},
+  {label:'Межрыночный',            color:'#FFD700', ids:['CORR_PEERS']},
+  {label:'Техн. индикаторы (indlab)', color:'#34D399', ids:['EXT_INDICATORS']},
+];
+// Модели отображаются отдельно
+const MODEL_METHOD_IDS = ['IL_MODEL_M1','IL_MODEL_M2','IL_MODEL_M3'];
 
 // ============================================================
 // КОРРЕЛЯЦИИ МЕЖДУ ТИКЕРАМИ
@@ -3378,10 +3412,10 @@ async function loadScenarioStats(){
     html += `<div style="font-size:9px;color:var(--txt3);margin-bottom:6px;">IG (information gain) = точность метода − базовая ставка рынка. Положительный IG = метод реально что-то знает.</div>`;
   }
 
-  // ── Матрица корреляций методов (из scores по всем сигналам)
+  // ── Семантические кластеры методов (статичные) + Модели отдельно ──
   if(rows.length >= 30){
-    const mIds = METHODS.map(m=>m.id);
-    // Корреляция Пирсона между двумя векторами score
+    const signalIds = METHODS.filter(m=>!MODEL_METHOD_IDS.includes(m.id)).map(m=>m.id);
+    // Корреляция Пирсона
     const pearson = (a,b) => {
       const n=a.length; if(!n) return 0;
       const ma=a.reduce((s,v)=>s+v,0)/n, mb=b.reduce((s,v)=>s+v,0)/n;
@@ -3390,40 +3424,50 @@ async function loadScenarioStats(){
       return (da&&db) ? num/Math.sqrt(da*db) : 0;
     };
     const vecs = {};
-    mIds.forEach(id=>{ vecs[id]=rows.map(r=>r.methods?.[id]??0); });
-    // Простая кластеризация: жадная — берём первый нераспределённый, добавляем всех с |corr|>0.5
-    const assigned = new Set();
-    const clusters = [];
-    mIds.forEach(id=>{
-      if(assigned.has(id)) return;
-      const cl = [id]; assigned.add(id);
-      mIds.forEach(id2=>{ if(!assigned.has(id2) && Math.abs(pearson(vecs[id],vecs[id2]))>=0.5){ cl.push(id2); assigned.add(id2); } });
-      clusters.push(cl);
-    });
-    html += `<div style="font-size:10px;color:var(--txt3);margin:10px 0 4px;">Кластеры методов (|корреляция| ≥ 0.5)</div>`;
-    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">`;
-    const CLUSTER_COLORS = ['#52F2C9','#A78BFA','#FF9F40','#FF006E','#6366F1','#60A4A1'];
-    clusters.forEach((cl,ci)=>{
-      const clr = CLUSTER_COLORS[ci%CLUSTER_COLORS.length];
-      html += `<div style="background:rgba(255,255,255,0.03);border:1px solid ${clr}44;border-radius:6px;padding:6px 10px;min-width:140px;">`;
-      html += `<div style="font-size:9px;color:${clr};margin-bottom:3px;">Кластер ${ci+1}</div>`;
-      cl.forEach(id=>{
+    METHODS.forEach(m=>{ vecs[m.id]=rows.map(r=>r.methods?.[m.id]??0); });
+
+    // Сигнальные кластеры
+    html += `<div style="font-size:10px;color:var(--txt3);margin:10px 0 4px;font-weight:600;">Кластеры сигналов</div>`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">`;
+    METHODS_CLUSTERS.forEach(cat=>{
+      const activeIds = cat.ids.filter(id=>signalIds.includes(id));
+      if(!activeIds.length) return;
+      html += `<div style="background:rgba(255,255,255,0.03);border:1px solid ${cat.color}44;border-radius:6px;padding:6px 10px;min-width:140px;">`;
+      html += `<div style="font-size:9px;color:${cat.color};font-weight:600;margin-bottom:3px;">${cat.label}</div>`;
+      activeIds.forEach(id=>{
         const m=METHODS.find(x=>x.id===id);
-        html += `<div style="font-size:10px;color:var(--txt2);padding:1px 0;">• ${m?.label||id}</div>`;
+        const corrs = activeIds.filter(id2=>id2!==id).map(id2=>pearson(vecs[id],vecs[id2]));
+        const avgCorr = corrs.length ? (corrs.reduce((s,v)=>s+v,0)/corrs.length).toFixed(2) : '—';
+        html += `<div style="font-size:10px;color:var(--txt2);padding:1px 0;" title="средн. корр. внутри кластера: ${avgCorr}">• ${m?.label||id}</div>`;
       });
       html += `</div>`;
     });
     html += `</div>`;
 
-    // Матрица попарных корреляций
-    html += `<div style="font-size:10px;color:var(--txt3);margin-bottom:4px;">Матрица корреляций</div>`;
+    // Модели — отдельно
+    html += `<div style="font-size:10px;color:var(--txt3);margin:4px 0 4px;font-weight:600;">Агрегационные модели (indlab)</div>`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">`;
+    MODEL_METHOD_IDS.forEach(id=>{
+      const m=METHODS.find(x=>x.id===id);
+      if(!m) return;
+      html += `<div style="background:rgba(192,132,252,0.08);border:1px solid #C084FC44;border-radius:6px;padding:6px 10px;min-width:140px;">`;
+      html += `<div style="font-size:9px;color:#C084FC;font-weight:600;margin-bottom:3px;">${m.label}</div>`;
+      const stats = rows.map(r=>r.methods?.[id]??0);
+      const acc = stats.filter(v=>v!==0).length;
+      html += `<div style="font-size:9px;color:var(--txt3);">сигналов: ${acc} из ${rows.length}</div>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+
+    // Матрица попарных корреляций (только сигналы, без моделей)
+    html += `<div style="font-size:10px;color:var(--txt3);margin-bottom:4px;">Матрица корреляций сигналов</div>`;
     html += `<div style="overflow-x:auto;"><table class="scen-table" style="font-size:9px;"><tr><th></th>`;
-    mIds.forEach(id=>{ const m=METHODS.find(x=>x.id===id); html += `<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px 3px;max-width:18px;">${m?.label||id}</th>`; });
+    signalIds.forEach(id=>{ const m=METHODS.find(x=>x.id===id); html += `<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px 3px;max-width:18px;">${m?.label||id}</th>`; });
     html += `</tr>`;
-    mIds.forEach(id=>{
+    signalIds.forEach(id=>{
       const m=METHODS.find(x=>x.id===id);
       html += `<tr><td style="white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">${m?.label||id}</td>`;
-      mIds.forEach(id2=>{
+      signalIds.forEach(id2=>{
         const r=pearson(vecs[id],vecs[id2]);
         const abs=Math.abs(r), bg=abs>0.7?`rgba(199,27,82,${abs*0.6})`:abs>0.4?`rgba(255,159,64,${abs*0.4})`:'transparent';
         html += `<td style="background:${bg};color:var(--txt2);text-align:center;">${r.toFixed(2)}</td>`;
