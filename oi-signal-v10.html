@@ -932,7 +932,7 @@ async function fetchFutoi(ticker){
   const sym = futoi2sym(ticker);
   const base = getProxy();
   const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
-  const url = prefix + `/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=20`;
+  const url = prefix + `/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=1000`;
   const key = getMoexKey();
   const hdrs = {'Accept':'application/json'};
   if(key) hdrs['Authorization'] = `Bearer ${key}`;
