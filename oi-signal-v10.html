@@ -2153,7 +2153,6 @@ function computeExpectedMove(ticker) {
 // СЦЕНАРНЫЕ ЦЕНОВЫЕ ЦЕЛИ: Fibonacci + swing high/low
 // ============================================================
 function computeScenarios(compositeScore, ticker) {
-  if (Math.abs(compositeScore) < 0.15) return null;
   const candles = candleData[curTF] || candleData['1d'] || [];
   if (candles.length < 5) return null;
   const slice = candles.slice(-30);
@@ -2197,6 +2196,7 @@ function computeScenarios(compositeScore, ticker) {
     negative: { lo: Math.min(curPrice, negative), hi: Math.max(curPrice, negative), prob: negProb < 0 ? 0 : negProb },
     invalidation,
     bullish: compositeScore > 0,
+    curPrice,
   };
 }
 
@@ -2208,6 +2208,8 @@ function renderExpectedMoveAndScenarios(compositeScore, ticker) {
   const scEl = document.getElementById('scenario-panel');
   if (!emEl || !scEl) return;
 
+  const hasCandles = (candleData[curTF]||candleData['1d']||[]).length >= 5;
+
   const em = computeExpectedMove(ticker);
   if (em) {
     const sign = compositeScore >= 0 ? '+' : '−';
@@ -2215,23 +2217,59 @@ function renderExpectedMoveAndScenarios(compositeScore, ticker) {
     emEl.textContent = `ожид. движение ${sign}${em.pct.toFixed(1)}% ± ${(em.pct/2).toFixed(1)}% [${regLabel}]`;
     emEl.style.color = compositeScore >= 0 ? 'var(--pos)' : 'var(--neg)';
   } else {
-    emEl.textContent = '';
+    emEl.textContent = hasCandles ? '' : 'загрузите свечи для расчёта ценовых целей';
+    emEl.style.color = 'var(--txt3)';
   }
 
   const sc = computeScenarios(compositeScore, ticker);
   if (sc) {
-    const fmt = v => v != null ? v.toFixed(1) : '?';
-    const arrowB = sc.bullish ? '↑' : '↓';
-    const arrowO = sc.bullish ? '↑↑' : '↓↓';
-    const arrowN = sc.bullish ? '↓' : '↑';
-    scEl.innerHTML = [
-      `<div style="color:var(--pos)">${arrowB} Базовый (${sc.base.prob}%) → ${fmt(sc.base.lo)} – ${fmt(sc.base.hi)}</div>`,
-      `<div style="color:var(--mem)">${arrowO} Оптимист. (${sc.optimistic.prob}%) → ${fmt(sc.optimistic.lo)} – ${fmt(sc.optimistic.hi)}</div>`,
-      `<div style="color:var(--neg)">${arrowN} Негативный (${sc.negative.prob}%) → ${fmt(sc.negative.lo)} – ${fmt(sc.negative.hi)}</div>`,
-      `<div style="color:var(--txt3)">Инвалидация → ${sc.bullish ? 'ниже' : 'выше'} ${fmt(sc.invalidation)}</div>`,
-    ].join('');
+    const p = v => v != null ? v.toFixed(2) : '?';
+    const dir = sc.bullish ? 'LONG' : 'SHORT';
+    const invDir = sc.bullish ? 'ниже' : 'выше';
+    // Визуальная шкала: от invalidation до optimistic.hi
+    const rangeMin = Math.min(sc.invalidation, sc.negative.lo, sc.base.lo, sc.optimistic.lo);
+    const rangeMax = Math.max(sc.invalidation, sc.negative.hi, sc.base.hi, sc.optimistic.hi);
+    const pBar = (v, total) => Math.round((v-rangeMin)/(rangeMax-rangeMin||1)*total);
+    const W = 120; // ширина шкалы в px
+    const curPx  = pBar(sc.curPrice, W);
+    const invPx  = pBar(sc.invalidation, W);
+    const b1 = pBar(sc.base.lo, W), b2 = pBar(sc.base.hi, W);
+    const o1 = pBar(sc.optimistic.lo, W), o2 = pBar(sc.optimistic.hi, W);
+    const n1 = pBar(sc.negative.lo, W), n2 = pBar(sc.negative.hi, W);
+
+    scEl.innerHTML = `
+<div style="margin-bottom:4px;font-size:9px;color:var(--txt3);">── Ценовые сценарии (Fibonacci, 30 баров) ──</div>
+<div style="display:grid;grid-template-columns:72px 1fr auto;gap:2px 6px;align-items:center;font-size:9px;">
+  <span style="color:${sc.bullish?'#52F2C9':'#FF4D7A'};">▣ Базовый ${sc.base.prob}%</span>
+  <div style="position:relative;height:8px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;">
+    <div style="position:absolute;left:${b1}px;width:${Math.max(2,b2-b1)}px;height:100%;background:${sc.bullish?'rgba(82,242,201,0.6)':'rgba(255,77,122,0.6)'};border-radius:2px;"></div>
+    <div style="position:absolute;left:${curPx}px;width:2px;height:100%;background:#fff;"></div>
+  </div>
+  <span style="color:var(--txt2);white-space:nowrap;">${p(sc.base.lo)} – ${p(sc.base.hi)}</span>
+
+  <span style="color:#A78BFA;">▣ Оптимист. ${sc.optimistic.prob}%</span>
+  <div style="position:relative;height:8px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;">
+    <div style="position:absolute;left:${o1}px;width:${Math.max(2,o2-o1)}px;height:100%;background:rgba(167,139,250,0.6);border-radius:2px;"></div>
+    <div style="position:absolute;left:${curPx}px;width:2px;height:100%;background:#fff;"></div>
+  </div>
+  <span style="color:var(--txt2);white-space:nowrap;">${p(sc.optimistic.lo)} – ${p(sc.optimistic.hi)}</span>
+
+  <span style="color:#FF9F40;">▣ Негативный ${sc.negative.prob}%</span>
+  <div style="position:relative;height:8px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;">
+    <div style="position:absolute;left:${n1}px;width:${Math.max(2,n2-n1)}px;height:100%;background:rgba(255,159,64,0.6);border-radius:2px;"></div>
+    <div style="position:absolute;left:${curPx}px;width:2px;height:100%;background:#fff;"></div>
+  </div>
+  <span style="color:var(--txt2);white-space:nowrap;">${p(sc.negative.lo)} – ${p(sc.negative.hi)}</span>
+
+  <span style="color:#FF4D7A;">✕ Инвалидация</span>
+  <div style="position:relative;height:8px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;">
+    <div style="position:absolute;left:${invPx}px;width:2px;height:100%;background:#FF4D7A;"></div>
+    <div style="position:absolute;left:${curPx}px;width:2px;height:100%;background:#fff;"></div>
+  </div>
+  <span style="color:#FF4D7A;white-space:nowrap;">${invDir} ${p(sc.invalidation)}</span>
+</div>`;
   } else {
-    scEl.innerHTML = '';
+    scEl.innerHTML = hasCandles ? '' : '';
   }
 }
 
