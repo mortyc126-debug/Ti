@@ -3536,6 +3536,7 @@ async function refreshAll(){
 
   // 4. Render
   renderGauge(composite, avgConf);
+  renderExpectedMoveAndScenarios(composite, curTicker);
   // Render regime badge
   const regBadgeEl = document.getElementById('regimeBadge');
   if(regBadgeEl) regBadgeEl.innerHTML = renderRegimeBadge(currentRegimeState);
