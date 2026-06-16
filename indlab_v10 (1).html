@@ -7704,7 +7704,7 @@ function ilScoreAlligator(arr,i){
   return 0; // линии сплетены — флэт
 }
 
-// ── Дополнительные индикаторы (OBV, CMF, CHOP, SuperTrend, CMO, Vortex, TSI, Force, UltOsc) ──
+// ── Все вычислимые индикаторы библиотеки indlab ──────────────────────────────
 
 function ilCalcOBV(c) {
   const res=[]; let obv=0;
@@ -7815,6 +7815,225 @@ function ilCalcUltOsc(c, p1=7, p2=14, p3=28) {
 }
 
 // Scoring для новых индикаторов
+// ── Пакет 2: ещё ~22 вычислимых индикатора библиотеки ────────────────────────
+
+function ilCalcAccDist(c){
+  const res=[]; let ad=0;
+  c.forEach(x=>{ const hl=x.high-x.low; ad+=hl?(((x.close-x.low)-(x.high-x.close))/hl)*(x.volume||0):0; res.push(ad); });
+  return res;
+}
+function ilCalcChaikinOsc(c,fast=3,slow=10){
+  const ad=ilCalcAccDist(c);
+  const ef=_chartCalcEMA(ad,fast), es=_chartCalcEMA(ad,slow);
+  return ad.map((_,i)=>(ef[i]!=null&&es[i]!=null)?ef[i]-es[i]:null);
+}
+function ilCalcChaikinVol(c,period=10){
+  const hl=c.map(x=>x.high-x.low);
+  const ema1=_chartCalcEMA(hl,period);
+  return ema1.map((v,i)=>{
+    if(v==null||i<period)return null;
+    const prev=ema1[i-period];
+    return prev&&prev!==0?(v-prev)/prev*100:null;
+  });
+}
+function ilCalcAccelOsc(c){
+  const ao=ilCalcAO(c);
+  const sma5=ilSMA(ao.map(v=>v??0),5);
+  return ao.map((v,i)=>(v==null||sma5[i]==null)?null:v-sma5[i]);
+}
+function ilCalcElderRay(closes,c,period=13){
+  const ema=_chartCalcEMA(closes,period);
+  return c.map((_,i)=>ema[i]==null?null:{bull:c[i].high-ema[i],bear:c[i].low-ema[i]});
+}
+function ilCalcElderImpulse(closes,c,period=13){
+  const ema=_chartCalcEMA(closes,period);
+  const macdR=_chartCalcMACD(closes,12,26,9);
+  return closes.map((_,i)=>{
+    if(i<1||ema[i]==null||macdR.hist[i]==null||macdR.hist[i-1]==null)return null;
+    return {emaDir:ema[i]>ema[i-1]?1:-1, macdDir:macdR.hist[i]>macdR.hist[i-1]?1:-1};
+  });
+}
+function ilCalcEOM(c,period=14){
+  const raw=c.map((x,i)=>{
+    if(!i)return null;
+    const mp=(x.high+x.low)/2, pm=(c[i-1].high+c[i-1].low)/2;
+    const box=(x.high-x.low)/(x.volume||1)*10000;
+    return box?(mp-pm)/box:null;
+  });
+  return ilSMA(raw.map(v=>v??0),period).map((v,i)=>raw[i]==null?null:v);
+}
+function ilCalcNVI(c){
+  const res=[]; let nvi=1000;
+  c.forEach((x,i)=>{
+    if(i&&(x.volume||0)<(c[i-1].volume||0)&&c[i-1].close) nvi+=nvi*(x.close-c[i-1].close)/c[i-1].close;
+    res.push(nvi);
+  });
+  return res;
+}
+function ilCalcPVI(c){
+  const res=[]; let pvi=1000;
+  c.forEach((x,i)=>{
+    if(i&&(x.volume||0)>(c[i-1].volume||0)&&c[i-1].close) pvi+=pvi*(x.close-c[i-1].close)/c[i-1].close;
+    res.push(pvi);
+  });
+  return res;
+}
+function ilCalcPVT(c){
+  const res=[]; let pvt=0;
+  c.forEach((x,i)=>{
+    if(i&&c[i-1].close) pvt+=(x.volume||0)*(x.close-c[i-1].close)/c[i-1].close;
+    res.push(pvt);
+  });
+  return res;
+}
+function ilCalcVO(c,fast=5,slow=10){
+  const vols=c.map(x=>x.volume||0);
+  const ef=_chartCalcEMA(vols,fast), es=_chartCalcEMA(vols,slow);
+  return vols.map((_,i)=>(ef[i]!=null&&es[i]!=null&&es[i]!==0)?(ef[i]-es[i])/es[i]*100:null);
+}
+function ilCalcVWMA(c,period=20){
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let sv=0,v=0; for(let j=i-period+1;j<=i;j++){sv+=c[j].close*(c[j].volume||0);v+=(c[j].volume||0);}
+    res.push(v?sv/v:null);
+  }
+  return res;
+}
+function ilCalcParabolicSAR(c,step=0.02,max=0.2){
+  const res=[]; let bull=true,sar=c[0]?.low??0,ep=c[0]?.high??0,af=step;
+  c.forEach((x,i)=>{
+    if(!i){res.push(null);return;}
+    sar=sar+af*(ep-sar);
+    if(bull){ if(x.low<sar){bull=false;sar=ep;ep=x.low;af=step;} else {if(x.high>ep){ep=x.high;af=Math.min(af+step,max);} sar=Math.min(sar,c[i-1].low,i>1?c[i-2].low:c[i-1].low);} }
+    else { if(x.high>sar){bull=true;sar=ep;ep=x.high;af=step;} else {if(x.low<ep){ep=x.low;af=Math.min(af+step,max);} sar=Math.max(sar,c[i-1].high,i>1?c[i-2].high:c[i-1].high);} }
+    res.push({sar,bull});
+  });
+  return res;
+}
+function ilCalcHistVol(closes,period=20){
+  const lr=closes.map((v,i)=>i&&closes[i-1]?Math.log(v/closes[i-1]):null);
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period){res.push(null);continue;}
+    const sl=lr.slice(i-period+1,i+1).filter(v=>v!=null);
+    const mean=sl.reduce((s,v)=>s+v,0)/sl.length;
+    const variance=sl.reduce((s,v)=>s+(v-mean)**2,0)/sl.length;
+    res.push(Math.sqrt(variance)*Math.sqrt(252)*100);
+  }
+  return res;
+}
+function ilCalcStdDev(closes,period=20){
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    const sl=closes.slice(i-period+1,i+1);
+    const mean=sl.reduce((s,v)=>s+v,0)/period;
+    res.push(Math.sqrt(sl.reduce((s,v)=>s+(v-mean)**2,0)/period));
+  }
+  return res;
+}
+function ilCalcFisher(c,period=10){
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let hh=-Infinity,ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){if(c[j].high>hh)hh=c[j].high;if(c[j].low<ll)ll=c[j].low;}
+    const r=hh===ll?0:2*(c[i].close-ll)/(hh-ll)-1;
+    const v=Math.min(0.999,Math.max(-0.999,r));
+    res.push(0.5*Math.log((1+v)/(1-v)));
+  }
+  return res;
+}
+function ilCalcMcGinley(closes,period=14){
+  const res=[closes[0]??0];
+  closes.slice(1).forEach((v,i)=>{
+    const prev=res[i]; const denom=period*Math.pow(v/prev,4)||1;
+    res.push(prev+(v-prev)/denom);
+  });
+  return res;
+}
+function ilCalcDPO(closes,period=20){
+  const ma=ilSMA(closes,period);
+  const shift=Math.floor(period/2)+1;
+  return closes.map((_,i)=>(ma[i-shift]!=null)?closes[i]-ma[i-shift]:null);
+}
+function ilCalcBBWidth(closes,period=20,mult=2){
+  const bb=_chartCalcBB(closes,period,mult);
+  return bb.map(b=>b&&b.mid?((b.upper-b.lower)/b.mid*100):null);
+}
+function ilCalcRSIW(closes,period=7){ return _chartCalcRSI(closes,period); }
+function ilCalcOHLCVol(c){
+  return c.map(x=>{
+    const hl=x.high>0?Math.log(x.high/x.low)**2/2:0;
+    const co=x.open>0&&x.close>0?Math.log(x.close/x.open)**2*(2*Math.log(2)-1):0;
+    return Math.sqrt((hl-co)*252)*100;
+  });
+}
+
+// Scoring для пакета 2
+function ilScoreAccDist(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).reduce((s,v)=>s+v,0)/period;
+  const d=(arr[i]-avg)/(Math.abs(avg)||1);
+  // также смотрим на тренд (восходящий/нисходящий)
+  const trend=arr[i]>arr[i-5]?1:-1;
+  return Math.max(-2,Math.min(2,(d*2+trend)*0.7));
+}
+function ilScoreChaikinOsc(v,prev){ if(v==null)return null; const rising=prev!=null&&v>prev; return v>0?(rising?2:1):(v<0?(rising?-1:-2):0); }
+function ilScoreChaikinVol(v){ return null; } // волатильность — не дирекциональная
+function ilScoreAccelOsc(arr,i){ return ilScoreAO(arr,i); }
+function ilScoreElderRay(v){
+  if(!v)return null;
+  if(v.bull>0&&v.bear>0)return 2; if(v.bull>0&&v.bear<=0)return 1;
+  if(v.bull<=0&&v.bear<0)return -2; return -1;
+}
+function ilScoreElderImpulse(v){
+  if(!v)return null;
+  const s=v.emaDir+v.macdDir;
+  return s===2?2:s===-2?-2:s===1?1:s===-1?-1:0;
+}
+function ilScoreEOM(v){ if(v==null)return null; return v>0.5?2:v>0?1:v<-0.5?-2:v<0?-1:0; }
+function ilScoreNVI(arr,i,period=255){
+  if(i<period||arr[i]==null)return null;
+  const sma=arr.slice(Math.max(0,i-period+1),i+1).reduce((s,v)=>s+v,0)/Math.min(i+1,period);
+  return arr[i]>sma?1:-1;
+}
+function ilScorePVI(arr,i,period=255){ return ilScoreNVI(arr,i,period); }
+function ilScorePVT(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const trend=arr[i]-arr[i-period];
+  const abs=Math.abs(trend)/(Math.abs(arr[i])||1);
+  return trend>0?(abs>0.02?2:1):(abs>0.02?-2:-1);
+}
+function ilScoreVO(v){ if(v==null)return null; return v>10?2:v>2?1:v<-10?-2:v<-2?-1:0; }
+function ilScoreVWMA(close,vwma){ return vwma==null?null:(close>vwma?1:(close<vwma?-1:0)); }
+function ilScoreParabolic(v,close){ return (!v||close==null)?null:(v.bull?1:-1); }
+function ilScoreHistVol(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0)/period;
+  // высокая волатильность = риск = не дирекциональная, но spike часто медвежий
+  return null; // нейтральный — используется в Анализе для режима
+}
+function ilScoreVixLike(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0)/period;
+  const spike=(arr[i]-avg)/(avg||1);
+  return spike>0.5?-2:spike>0.2?-1:spike<-0.2?1:0; // spike страха → контр-сигнал
+}
+function ilScoreStdDev(arr,i,period=20){ return null; } // нейтральный режимный
+function ilScoreFisher(v){ if(v==null)return null; return v>1.5?2:v>0.5?1:v<-1.5?-2:v<-0.5?-1:0; }
+function ilScoreMcGinley(close,mg){ return (close==null||mg==null)?null:(close>mg?1:(close<mg?-1:0)); }
+function ilScoreDPO(v,close){ if(v==null||close==null||!close)return null; const r=v/close*100; return r>1?2:r>0?1:r<-1?-2:r<0?-1:0; }
+function ilScoreBBWidth(arr,i,period=20){
+  if(i<period||arr[i]==null)return null;
+  const avg=arr.slice(i-period+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0)/period;
+  return null; // ширина не дает направление, только указывает на сжатие
+}
+function ilScoreRSIW(v){ return v==null?null:ilScore.rsi(v); }
+function ilScoreOHLCVol(arr,i,period=20){ return null; } // режимный
+
+// Scoring для OBV (был ниже, теперь здесь)
 function ilScoreOBV(arr,i,period=20){
   if(arr[i]==null||i<period) return null;
   const avg=arr.slice(i-period+1,i+1).reduce((s,v)=>s+v,0)/period;
@@ -7832,16 +8051,28 @@ function ilScoreForceIdx(arr,i){ if(arr[i]==null)return null; const v=arr[i]; co
 function ilScoreUltOsc(v){ return v==null?null:(v>=70?-2:v>=60?-1:v<=30?2:v<=40?1:0); }
 
 const IL_INDICATORS = [
+  // Пакет 1 (15 оригинальных)
   'rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator',
+  // Пакет 2 (9 новых объём/тренд)
   'obv','cmf','chop','supertrend','cmo','vortex','tsi','force_idx','ult_osc',
+  // Пакет 3 (остальные вычислимые из библиотеки)
+  'acc_dist','chaikin_osc','chaikin_vol','accel_osc','elder_ray','elder_impulse',
+  'eom','nvi','pvi','pvt','vo','vwma','parabolic','hist_vol','vix_like',
+  'std_dev','fisher','mcginley','dpo','bb_width','rsi_w','ohlc_vol',
 ];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
-  ao:'Awesome Oscillator', ema:'EMA 12/26 (тренд)', adx:'ADX/DI', donchian:'Канал Дончиана',
-  keltner:'Канал Кельтнера', envelopes:'Конверты', ichimoku:'Ишимоку (Tenkan/Kijun)', alligator:'Аллигатор Вильямса',
-  obv:'OBV (баланс объёма)', cmf:'CMF (денежный поток)', chop:'CHOP (боковик/тренд)',
-  supertrend:'SuperTrend (ATR-тренд)', cmo:'CMO (моментум Чанде)', vortex:'Vortex (VI+/VI−)',
-  tsi:'TSI (индекс силы тренда)', force_idx:'Force Index (объём×цена)', ult_osc:'Ultimate Oscillator',
+  ao:'Awesome Oscillator', ema:'EMA 12/26', adx:'ADX/DI', donchian:'Канал Дончиана',
+  keltner:'Канал Кельтнера', envelopes:'Конверты', ichimoku:'Ишимоку Tenkan/Kijun', alligator:'Аллигатор',
+  obv:'OBV', cmf:'CMF', chop:'CHOP', supertrend:'SuperTrend', cmo:'CMO (моментум)',
+  vortex:'Vortex VI+/VI−', tsi:'TSI', force_idx:'Force Index', ult_osc:'Ultimate Oscillator',
+  acc_dist:'A/D Line', chaikin_osc:'Chaikin Osc', chaikin_vol:'Chaikin Vol',
+  accel_osc:'Acceleration Osc (AC)', elder_ray:'Elder Ray', elder_impulse:'Elder Impulse',
+  eom:'EOM (лёгкость движения)', nvi:'NVI', pvi:'PVI', pvt:'PVT',
+  vo:'Volume Oscillator', vwma:'VWMA', parabolic:'Parabolic SAR',
+  hist_vol:'Историч. волатильность', vix_like:'VIX-like (страх)', std_dev:'StdDev',
+  fisher:'Fisher Transform', mcginley:'McGinley Dynamic', dpo:'DPO',
+  bb_width:'BB Width', rsi_w:'RSI(7) краткоср.', ohlc_vol:'OHLC Volatility',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -7909,6 +8140,36 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.tsi=_tsiA.map(v=>ilScoreTSI(v));
   seriesScore.force_idx=_fiA.map((_,i)=>ilScoreForceIdx(_fiA,i));
   seriesScore.ult_osc=_uoA.map(v=>ilScoreUltOsc(v));
+  // Пакет 3
+  const _adA=ilCalcAccDist(candles),_coA=ilCalcChaikinOsc(candles,3,10),_cvA=ilCalcChaikinVol(candles,10);
+  const _acA=ilCalcAccelOsc(candles),_erA=ilCalcElderRay(closes,candles,13),_eiA=ilCalcElderImpulse(closes,candles,13);
+  const _eomA=ilCalcEOM(candles,14),_nviA=ilCalcNVI(candles),_pviA=ilCalcPVI(candles),_pvtA=ilCalcPVT(candles);
+  const _voA=ilCalcVO(candles,5,10),_vwA=ilCalcVWMA(candles,20),_psA=ilCalcParabolicSAR(candles,0.02,0.2);
+  const _hvA=ilCalcHistVol(closes,20),_sdA=ilCalcStdDev(closes,20),_fi2A=ilCalcFisher(candles,10);
+  const _mgA=ilCalcMcGinley(closes,14),_dpA=ilCalcDPO(closes,20),_bwA=ilCalcBBWidth(closes,20,2);
+  const _r7A=ilCalcRSIW(closes,7),_ovA=ilCalcOHLCVol(candles);
+  seriesScore.acc_dist=_adA.map((_,i)=>ilScoreAccDist(_adA,i,20));
+  seriesScore.chaikin_osc=_coA.map((v,i)=>ilScoreChaikinOsc(v,i>0?_coA[i-1]:null));
+  seriesScore.chaikin_vol=_cvA.map(v=>ilScoreChaikinVol(v));
+  seriesScore.accel_osc=_acA.map((_,i)=>ilScoreAccelOsc(_acA,i));
+  seriesScore.elder_ray=_erA.map(v=>ilScoreElderRay(v));
+  seriesScore.elder_impulse=_eiA.map(v=>ilScoreElderImpulse(v));
+  seriesScore.eom=_eomA.map(v=>ilScoreEOM(v));
+  seriesScore.nvi=_nviA.map((_,i)=>ilScoreNVI(_nviA,i,Math.min(255,_nviA.length-1)));
+  seriesScore.pvi=_pviA.map((_,i)=>ilScorePVI(_pviA,i,Math.min(255,_pviA.length-1)));
+  seriesScore.pvt=_pvtA.map((_,i)=>ilScorePVT(_pvtA,i,20));
+  seriesScore.vo=_voA.map(v=>ilScoreVO(v));
+  seriesScore.vwma=_vwA.map((v,i)=>ilScoreVWMA(closes[i],v));
+  seriesScore.parabolic=_psA.map((v,i)=>ilScoreParabolic(v,closes[i]));
+  seriesScore.hist_vol=_hvA.map((_,i)=>ilScoreHistVol(_hvA,i,20));
+  seriesScore.vix_like=_hvA.map((_,i)=>ilScoreVixLike(_hvA,i,20));
+  seriesScore.std_dev=_sdA.map((_,i)=>ilScoreStdDev(_sdA,i,20));
+  seriesScore.fisher=_fi2A.map(v=>ilScoreFisher(v));
+  seriesScore.mcginley=_mgA.map((v,i)=>ilScoreMcGinley(closes[i],v));
+  seriesScore.dpo=_dpA.map((v,i)=>ilScoreDPO(v,closes[i]));
+  seriesScore.bb_width=_bwA.map((_,i)=>ilScoreBBWidth(_bwA,i,20));
+  seriesScore.rsi_w=_r7A.map(v=>ilScoreRSIW(v));
+  seriesScore.ohlc_vol=_ovA.map((_,i)=>ilScoreOHLCVol(_ovA,i,20));
 
   // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
   const horizon = 5;
@@ -7954,6 +8215,28 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     tsi: `TSI = ${_tsiA[last]?.toFixed(1)??'—'}`,
     force_idx: `Force Index(13) = ${_fiA[last]?.toFixed(0)??'—'}`,
     ult_osc: `Ultimate Oscillator = ${_uoA[last]?.toFixed(1)??'—'}`,
+    acc_dist: `A/D = ${_adA[last]?.toFixed(0)??'—'}`,
+    chaikin_osc: `Chaikin Osc = ${_coA[last]?.toFixed(0)??'—'}`,
+    chaikin_vol: `Chaikin Vol = ${_cvA[last]?.toFixed(1)??'—'}%`,
+    accel_osc: `AC = ${_acA[last]?.toFixed(2)??'—'}`,
+    elder_ray: `Bull ${_erA[last]?.bull?.toFixed(2)??'—'} / Bear ${_erA[last]?.bear?.toFixed(2)??'—'}`,
+    elder_impulse: _eiA[last]?`EMA ${_eiA[last].emaDir>0?'↑':'↓'} MACD ${_eiA[last].macdDir>0?'↑':'↓'}`:'недостаточно данных',
+    eom: `EOM = ${_eomA[last]?.toFixed(3)??'—'}`,
+    nvi: `NVI = ${_nviA[last]?.toFixed(0)??'—'}`,
+    pvi: `PVI = ${_pviA[last]?.toFixed(0)??'—'}`,
+    pvt: `PVT = ${_pvtA[last]?.toFixed(0)??'—'}`,
+    vo: `VO = ${_voA[last]?.toFixed(1)??'—'}%`,
+    vwma: `VWMA(20) = ${_vwA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    parabolic: _psA[last]?`SAR = ${_psA[last].sar?.toFixed(2)}, ${_psA[last].bull?'↑ бычий':'↓ медвежий'}`:'недостаточно данных',
+    hist_vol: `HV(20) = ${_hvA[last]?.toFixed(1)??'—'}%`,
+    vix_like: `VIX-like HV = ${_hvA[last]?.toFixed(1)??'—'}%`,
+    std_dev: `σ(20) = ${_sdA[last]?.toFixed(2)??'—'}`,
+    fisher: `Fisher(10) = ${_fi2A[last]?.toFixed(3)??'—'}`,
+    mcginley: `McGinley(14) = ${_mgA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    dpo: `DPO(20) = ${_dpA[last]?.toFixed(2)??'—'}`,
+    bb_width: `BB Width = ${_bwA[last]?.toFixed(2)??'—'}%`,
+    rsi_w: `RSI(7) = ${_r7A[last]?.toFixed(1)??'—'}`,
+    ohlc_vol: `OHLC Vol = ${_ovA[last]?.toFixed(1)??'—'}%`,
   };
 
   const details = IL_INDICATORS.map(id=>{
@@ -8049,6 +8332,50 @@ function _ilCalcAllSeries(candles, closes) {
   ss.tsi        = tsiArr.map(v=>ilScoreTSI(v));
   ss.force_idx  = fiArr.map((_,i)=>ilScoreForceIdx(fiArr,i));
   ss.ult_osc    = uoArr.map(v=>ilScoreUltOsc(v));
+  // Пакет 3
+  const adArr  = ilCalcAccDist(candles);
+  const coArr  = ilCalcChaikinOsc(candles,3,10);
+  const cvArr  = ilCalcChaikinVol(candles,10);
+  const acArr  = ilCalcAccelOsc(candles);
+  const erArr  = ilCalcElderRay(closes,candles,13);
+  const eiArr  = ilCalcElderImpulse(closes,candles,13);
+  const eomArr = ilCalcEOM(candles,14);
+  const nviArr = ilCalcNVI(candles);
+  const pviArr = ilCalcPVI(candles);
+  const pvtArr = ilCalcPVT(candles);
+  const voArr  = ilCalcVO(candles,5,10);
+  const vwArr  = ilCalcVWMA(candles,20);
+  const psArr  = ilCalcParabolicSAR(candles,0.02,0.2);
+  const hvArr  = ilCalcHistVol(closes,20);
+  const sdArr  = ilCalcStdDev(closes,20);
+  const fiArr2 = ilCalcFisher(candles,10);
+  const mgArr  = ilCalcMcGinley(closes,14);
+  const dpArr  = ilCalcDPO(closes,20);
+  const bwArr  = ilCalcBBWidth(closes,20,2);
+  const r7Arr  = ilCalcRSIW(closes,7);
+  const ovArr  = ilCalcOHLCVol(candles);
+  ss.acc_dist     = adArr.map((_,i)=>ilScoreAccDist(adArr,i,20));
+  ss.chaikin_osc  = coArr.map((v,i)=>ilScoreChaikinOsc(v,i>0?coArr[i-1]:null));
+  ss.chaikin_vol  = cvArr.map(v=>ilScoreChaikinVol(v));
+  ss.accel_osc    = acArr.map((_,i)=>ilScoreAccelOsc(acArr,i));
+  ss.elder_ray    = erArr.map(v=>ilScoreElderRay(v));
+  ss.elder_impulse= eiArr.map(v=>ilScoreElderImpulse(v));
+  ss.eom          = eomArr.map(v=>ilScoreEOM(v));
+  ss.nvi          = nviArr.map((_,i)=>ilScoreNVI(nviArr,i,Math.min(255,nviArr.length-1)));
+  ss.pvi          = pviArr.map((_,i)=>ilScorePVI(pviArr,i,Math.min(255,pviArr.length-1)));
+  ss.pvt          = pvtArr.map((_,i)=>ilScorePVT(pvtArr,i,20));
+  ss.vo           = voArr.map(v=>ilScoreVO(v));
+  ss.vwma         = vwArr.map((v,i)=>ilScoreVWMA(closes[i],v));
+  ss.parabolic    = psArr.map((v,i)=>ilScoreParabolic(v,closes[i]));
+  ss.hist_vol     = hvArr.map((_,i)=>ilScoreHistVol(hvArr,i,20));
+  ss.vix_like     = hvArr.map((_,i)=>ilScoreVixLike(hvArr,i,20));
+  ss.std_dev      = sdArr.map((_,i)=>ilScoreStdDev(sdArr,i,20));
+  ss.fisher       = fiArr2.map(v=>ilScoreFisher(v));
+  ss.mcginley     = mgArr.map((v,i)=>ilScoreMcGinley(closes[i],v));
+  ss.dpo          = dpArr.map((v,i)=>ilScoreDPO(v,closes[i]));
+  ss.bb_width     = bwArr.map((_,i)=>ilScoreBBWidth(bwArr,i,20));
+  ss.rsi_w        = r7Arr.map(v=>ilScoreRSIW(v));
+  ss.ohlc_vol     = ovArr.map((_,i)=>ilScoreOHLCVol(ovArr,i,20));
   return ss;
 }
 
