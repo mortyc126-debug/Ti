@@ -1324,13 +1324,16 @@ function computeAndCachePercentiles(ticker){
 function computeAtr(ticker, tf, candles){
   if(!candles || candles.length < 5) return;
   const slice = candles.slice(-Math.min(candles.length, curWindow * 7)); // ~неделя баров
+  const ph = c => c.h ?? toP(c.high);
+  const pl = c => c.l ?? toP(c.low);
+  const pc = c => c.cl ?? toP(c.close);
   const trs = slice.map((c,i)=>{
-    if(i===0) return toP(c.high) - toP(c.low);
-    const prevClose = toP(slice[i-1].close);
-    return Math.max(toP(c.high)-toP(c.low), Math.abs(toP(c.high)-prevClose), Math.abs(toP(c.low)-prevClose));
+    if(i===0) return ph(c) - pl(c);
+    const prevClose = pc(slice[i-1]);
+    return Math.max(ph(c)-pl(c), Math.abs(ph(c)-prevClose), Math.abs(pl(c)-prevClose));
   });
   const atr = avg(trs);
-  const midPrice = avg(slice.map(c=>toP(c.close)).filter(Boolean)) || 1;
+  const midPrice = avg(slice.map(pc).filter(Boolean)) || 1;
   const atr_pct = atr / midPrice;
   const key = `${ticker}__${tf}`;
   atrCache[key] = {atr, atr_pct, n: trs.length};
@@ -1742,7 +1745,7 @@ function m_RETAIL_CONTRA(futoi){
 function m_PRICE_TREND(candles){
   const arr = candles[curTF]||candles['1min']||[];
   if(arr.length<10) return {score:0, confidence:0, detail:'недостаточно свечей для расчёта тренда'};
-  const closes = arr.map(c=>toP(c.close)).filter(Boolean);
+  const closes = arr.map(c=>c.cl??toP(c.close)).filter(Boolean);
   if(closes.length<10) return {score:0, confidence:0, detail:'нет данных по цене'};
   const cur  = closes[closes.length-1];
   const p3   = closes[closes.length-4];
@@ -2667,8 +2670,8 @@ function renderCandleChart(candles){
   ctx2.scale(dpr,dpr);
 
   const slice = candles.slice(-80);
-  const O=slice.map(c=>toP(c.open)), H=slice.map(c=>toP(c.high)),
-        L=slice.map(c=>toP(c.low)),  C=slice.map(c=>toP(c.close));
+  const O=slice.map(c=>c.o??toP(c.open)), H=slice.map(c=>c.h??toP(c.high)),
+        L=slice.map(c=>c.l??toP(c.low)),  C=slice.map(c=>c.cl??toP(c.close));
 
   const pad={l:44,r:8,t:8,b:28};
   const chartW=W-pad.l-pad.r, chartH=H2-pad.t-pad.b;
@@ -2727,7 +2730,7 @@ function renderCandleChart(candles){
     const c=slice[idx];
     const tt=document.getElementById('candleTip');
     if(tt){ tt.style.left=(e.clientX+10)+'px'; tt.style.top=(e.clientY-10)+'px';
-      tt.innerHTML=`O:${toP(c.open).toFixed(2)} H:${toP(c.high).toFixed(2)} L:${toP(c.low).toFixed(2)} C:${toP(c.close).toFixed(2)}`; tt.style.display='block'; }
+      tt.innerHTML=`O:${(c.o??toP(c.open)).toFixed(2)} H:${(c.h??toP(c.high)).toFixed(2)} L:${(c.l??toP(c.low)).toFixed(2)} C:${(c.cl??toP(c.close)).toFixed(2)}`; tt.style.display='block'; }
   };
   canvas.onmouseleave=()=>{ const tt=document.getElementById('candleTip'); if(tt) tt.style.display='none'; };
 }
