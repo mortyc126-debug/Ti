@@ -919,13 +919,21 @@ async function fetchMoex(secid, metric, type, params={}){
 // FUTOI использует отдельный endpoint: /iss/analyticalproducts/futoi/securities
 // Тикер — двухсимвольный код контракта: BR, Si, RI, GD, MX, GZ, SR, NG, EU
 function futoi2sym(ticker){
-  // Из кода контракта вида BRU6, SiU6, RIU6 и т.д. → двухсимвольный базовый тикер
-  const m = ticker.match(/^([A-Za-z]{2,3})/);
-  if(!m) return ticker;
-  const base = m[1].toUpperCase();
-  // Известные маппинги
-  const MAP = {BR:'BR',SI:'Si',RI:'RI',GD:'GD',MX:'MX',GZ:'GZ',SR:'SR',NG:'NG',EU:'ED',NG:'NG'};
-  return MAP[base] || base;
+  // FUTOI API хранит короткий код: Si, BR, RI, GZ, MX, GD и т.д. (2 буквы)
+  // Для акционных фьючерсов (SBERF, GAZPF, IMOEXF...) — полный код без даты экспирации
+  // Примеры: SiU6→Si, BRH6→BR, GZM6→GZ, SBERM5→SBERF, GAZPM5→GAZPF
+  const FULL_MAP = {
+    SBER:'SBERF', GAZP:'GAZPF', LKOH:'LKOHF', GMKN:'GMKNF', NVTK:'NVTKF',
+    ROSN:'ROSNF', TATN:'TATNF', MGNT:'MGNTF', YNDX:'YDEX',  YDEX:'YD',
+    IMOEX:'IMOEXF', GLDR:'GLDRUBF', EURR:'EURRUBF', CNYR:'CNYRUBF', USDR:'USDRUBF',
+  };
+  // Проверяем длинные маппинги сначала
+  for(const [k,v] of Object.entries(FULL_MAP)){
+    if(ticker.toUpperCase().startsWith(k)) return v;
+  }
+  // Стандартные фьючерсы: ровно 2 буквы в начале (Si, BR, RI и т.д.)
+  const m = ticker.match(/^([A-Za-z]{2})/);
+  return m ? m[1] : ticker;
 }
 
 async function fetchFutoi(ticker){
