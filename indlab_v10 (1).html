@@ -8679,7 +8679,185 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
 
   if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
 
-  return {score, label, details, chained, bestCombos};
+  // ══════════════════════════════════════════════════════════════
+  // РЕЖИМ РЫНКА + ТРИ МОДЕЛИ АГРЕГАЦИИ
+  // ══════════════════════════════════════════════════════════════
+
+  // Режим на каждом баре: trend / chop / high_vol / low_vol / neutral
+  const regimes = closes.map((_, i) => {
+    const vp = _vrA[i]; // 0..1 перцентиль волатильности
+    if (vp != null && vp >= 0.7) return 'high_vol';
+    if (vp != null && vp <= 0.3) return 'low_vol';
+    const chop = _chopA[i];
+    if (chop != null && chop > 61.8) return 'chop';
+    const adxV = adxArr[i]?.adx;
+    if (adxV != null && adxV > 25) return 'trend';
+    return 'neutral';
+  });
+  const curRegime = regimes[last] || 'neutral';
+
+  // Винрейт по режимам (H15) для каждого индикатора
+  const REGIME_LIST = ['trend','chop','high_vol','low_vol','neutral'];
+  const regimeWR = {};
+  IL_INDICATORS.forEach(id => {
+    regimeWR[id] = {};
+    const s = seriesScore[id];
+    REGIME_LIST.forEach(rg => {
+      let win=0, n=0;
+      for(let i=0;i<closes.length-15;i++){
+        if(regimes[i]!==rg) continue;
+        const sc=s?.[i]; const fut=closes[i+15]-closes[i];
+        if(sc==null||sc===0||fut===0) continue;
+        n++; if((sc>0&&fut>0)||(sc<0&&fut<0)) win++;
+      }
+      regimeWR[id][rg] = n>=5 ? win/n : null;
+    });
+  });
+
+  // Эффективный WR = режимный (если есть) или h30
+  const effWR = id => regimeWR[id]?.[curRegime] ?? evalRes[id]?.h30?.winRate ?? 0.5;
+
+  // Корреляция Пирсона двух score-рядов
+  function _sc_pearson(a, b) {
+    const pairs=[];
+    for(let i=0;i<Math.min(a.length,b.length);i++){
+      if(a[i]!=null&&b[i]!=null&&a[i]!==0&&b[i]!==0) pairs.push([a[i],b[i]]);
+    }
+    if(pairs.length<10) return 0;
+    const ma=pairs.reduce((s,p)=>s+p[0],0)/pairs.length;
+    const mb=pairs.reduce((s,p)=>s+p[1],0)/pairs.length;
+    let num=0,da=0,db=0;
+    for(const[x,y]of pairs){num+=(x-ma)*(y-mb);da+=(x-ma)**2;db+=(y-mb)**2;}
+    return(da===0||db===0)?0:num/Math.sqrt(da*db);
+  }
+
+  // Бэктест серии aggregate-скоров
+  function _btSeries(arr, h) {
+    let win=0,n=0;
+    for(let i=0;i<closes.length-h;i++){
+      const sc=arr[i]; const fut=closes[i+h]-closes[i];
+      if(sc==null||sc===0||fut===0) continue;
+      n++; if((sc>0&&fut>0)||(sc<0&&fut<0)) win++;
+    }
+    return {winRate: n>=5?win/n:null, n};
+  }
+
+  // ── M1: weight = winRate × (1 − |corr|) внутри кластера ──────
+  const m1Clusters = {};
+  _IL_CATS.forEach(cat => {
+    const ids = cat.ids.filter(id => seriesScore[id]!=null && evalRes[id]?.h30?.n>=5);
+    if(!ids.length){m1Clusters[cat.label]={score:0,confidence:0,ids:[]};return;}
+    const leader = ids.reduce((b,id)=>effWR(id)>effWR(b)?id:b, ids[0]);
+    const lS = seriesScore[leader];
+    const W = {};
+    ids.forEach(id=>{
+      const corr = id===leader ? 1 : _sc_pearson(lS, seriesScore[id]);
+      W[id] = id===leader ? effWR(id) : effWR(id)*(1-Math.abs(corr));
+    });
+    const totW = Object.values(W).reduce((s,w)=>s+w,0)||1;
+    let score=0;
+    ids.forEach(id=>{const sc=seriesScore[id]?.[last];if(sc!=null)score+=W[id]/totW*sc;});
+    // Бэктест агрегатной серии
+    const aggSeries = closes.map((_,i)=>{
+      let s=0; ids.forEach(id=>{const v=seriesScore[id]?.[i];if(v!=null)s+=W[id]/totW*v;});
+      return Math.abs(s)>0.05?s:0;
+    });
+    m1Clusters[cat.label]={
+      score:Math.max(-1,Math.min(1,score)),
+      confidence:Math.min(0.75, totW/ids.length*0.6),
+      leader, ids,
+      bt:{h5:_btSeries(aggSeries,5),h15:_btSeries(aggSeries,15),h30:_btSeries(aggSeries,30)},
+      weights:Object.fromEntries(ids.map(id=>[id,(W[id]/totW).toFixed(3)])),
+    };
+  });
+  // M1 итог
+  const m1Total = (() => {
+    const cats = Object.values(m1Clusters).filter(c=>c.confidence>0);
+    const tw = cats.reduce((s,c)=>s+c.confidence,0)||1;
+    const sc = cats.reduce((s,c)=>s+c.score*c.confidence/tw,0);
+    const aggFull = closes.map((_,i)=>{
+      const parts=cats.map(c=>{
+        const ids=c.ids.filter(id=>seriesScore[id]!=null);
+        const tw2=ids.reduce((s,id)=>s+(parseFloat(c.weights[id])||0),0)||1;
+        return cats.indexOf(c)>=0?c.score:0; // упрощённо
+      });
+      return parts.reduce((s,v)=>s+v,0)/parts.length;
+    });
+    return {score:sc, bt:{h5:_btSeries(aggFull,5),h15:_btSeries(aggFull,15),h30:_btSeries(aggFull,30)}, clusters:m1Clusters};
+  })();
+
+  // ── M2: только лидеры кластеров, вес = winRate ───────────────
+  const m2Clusters = {};
+  _IL_CATS.forEach(cat => {
+    const ids = cat.ids.filter(id=>seriesScore[id]!=null&&evalRes[id]?.h30?.n>=5);
+    if(!ids.length){m2Clusters[cat.label]={score:0,confidence:0,leader:null};return;}
+    const leader = ids.reduce((b,id)=>effWR(id)>effWR(b)?id:b, ids[0]);
+    const leaderSeries = seriesScore[leader];
+    m2Clusters[cat.label]={
+      score: leaderSeries?.[last]??0,
+      confidence: effWR(leader)*0.85,
+      leader, wr: effWR(leader),
+      bt:{h5:_btSeries(leaderSeries,5),h15:_btSeries(leaderSeries,15),h30:_btSeries(leaderSeries,30)},
+    };
+  });
+  const m2AggSeries = closes.map((_,i)=>{
+    const cats=Object.values(m2Clusters).filter(c=>c.confidence>0&&c.leader);
+    const tw=cats.reduce((s,c)=>s+c.confidence,0)||1;
+    return cats.reduce((s,c)=>{const v=seriesScore[c.leader]?.[i]??0;return s+v*c.confidence/tw;},0);
+  });
+  const m2Total = {
+    score: (() => {const cats=Object.values(m2Clusters).filter(c=>c.confidence>0);const tw=cats.reduce((s,c)=>s+c.confidence,0)||1;return cats.reduce((s,c)=>s+c.score*c.confidence/tw,0);})(),
+    bt:{h5:_btSeries(m2AggSeries,5),h15:_btSeries(m2AggSeries,15),h30:_btSeries(m2AggSeries,30)},
+    clusters:m2Clusters,
+  };
+
+  // ── M3: лидер даёт направление, кластер даёт уверенность ─────
+  const m3Clusters = {};
+  _IL_CATS.forEach(cat => {
+    const ids = cat.ids.filter(id=>seriesScore[id]!=null&&evalRes[id]?.h30?.n>=5);
+    if(!ids.length){m3Clusters[cat.label]={score:0,confidence:0,leader:null,agreement:0};return;}
+    const leader = ids.reduce((b,id)=>effWR(id)>effWR(b)?id:b, ids[0]);
+    const leaderSc = seriesScore[leader]?.[last]??0;
+    const leaderDir = Math.sign(leaderSc);
+    let agree=0;
+    ids.forEach(id=>{const sc=seriesScore[id]?.[last];if(sc!=null&&Math.sign(sc)===leaderDir)agree++;});
+    const agreement = ids.length>1 ? agree/ids.length : 1;
+    // серия: score лидера × мгновенное согласие на каждом баре
+    const m3series = closes.map((_,i)=>{
+      const lsc=seriesScore[leader]?.[i]??0;
+      const ldir=Math.sign(lsc);
+      let ag=0;
+      ids.forEach(id=>{const sc=seriesScore[id]?.[i];if(sc!=null&&Math.sign(sc)===ldir)ag++;});
+      const agr=ids.length>1?ag/ids.length:1;
+      return lsc*agr;
+    });
+    m3Clusters[cat.label]={
+      score:leaderSc*agreement,
+      confidence:effWR(leader)*agreement,
+      leader, agreement, ids,
+      bt:{h5:_btSeries(m3series,5),h15:_btSeries(m3series,15),h30:_btSeries(m3series,30)},
+    };
+  });
+  const m3AggSeries = closes.map((_,i)=>{
+    const cats=Object.values(m3Clusters).filter(c=>c.confidence>0&&c.leader);
+    const tw=cats.reduce((s,c)=>s+c.confidence,0)||1;
+    return cats.reduce((s,c)=>{
+      const lsc=seriesScore[c.leader]?.[i]??0;
+      const ldir=Math.sign(lsc);
+      let ag=0;c.ids.forEach(id=>{const sc=seriesScore[id]?.[i];if(sc!=null&&Math.sign(sc)===ldir)ag++;});
+      const agr=c.ids.length>1?ag/c.ids.length:1;
+      return s+(lsc*agr)*c.confidence/tw;
+    },0);
+  });
+  const m3Total = {
+    score:(() => {const cats=Object.values(m3Clusters).filter(c=>c.confidence>0);const tw=cats.reduce((s,c)=>s+c.confidence,0)||1;return cats.reduce((s,c)=>s+c.score*c.confidence/tw,0);})(),
+    bt:{h5:_btSeries(m3AggSeries,5),h15:_btSeries(m3AggSeries,15),h30:_btSeries(m3AggSeries,30)},
+    clusters:m3Clusters,
+  };
+
+  const models = {regime:curRegime, regimeWR, m1:m1Total, m2:m2Total, m3:m3Total};
+
+  return {score, label, details, chained, bestCombos, models};
 }
 
 // ═══ Пакет 5: новые индикаторы ═══
@@ -9078,6 +9256,8 @@ async function _ilComputeAggregates(barMap, statusEl) {
       stats[id][`h${h}T`] = _ilBtStats(ss[id],closes,h,trendMask);
       stats[id][`h${h}R`] = _ilBtStats(ss[id],closes,h,rangeMask);
     });
+    // текущий балл (последний бар)
+    const ser=ss[id]; stats[id].curScore = ser?.[ser.length-1]??0;
   });
   if (statusEl) statusEl.textContent = `Матрица корреляций (${IL_INDICATORS.length}²)…`;
   await new Promise(r=>setTimeout(r,0));
@@ -9211,6 +9391,155 @@ function ilRenderAnalysis() {
     return `<span style="color:${c}">${p>0?'+':''}${p}%</span>`;
   };
   let html='';
+  // ── Три модели агрегации сигналов ────────────────────────────
+  try {
+    const closes_ = r.closes, last_ = closes_.length-1;
+    const stats_ = r.stats;
+    // Режим последнего бара из _ilBtResults (если есть)
+    const regime_ = (() => {
+      if(!r.candles||!r.candles.length) return 'neutral';
+      // используем imbalance из stats как прокси: adx h5T vs h5R
+      const chop = stats_['chop']?.curScore ?? 0;
+      const adxS = stats_['adx']?.curScore ?? 0;
+      const hvS  = stats_['high_vol']?.curScore ?? 0;
+      const lvS  = stats_['low_vol']?.curScore ?? 0;
+      if(hvS > 0) return 'high_vol';
+      if(lvS > 0) return 'low_vol';
+      if(chop < -0.3) return 'chop';
+      if(adxS > 0.3) return 'trend';
+      return 'neutral';
+    })();
+    const REGIME_LABELS = {trend:'📈 Тренд',chop:'↔ Боковик',high_vol:'🌪 Высокая вол.',low_vol:'😴 Низкая вол.',neutral:'— Нейтральный'};
+    const REGIME_COLORS = {trend:'#52F2C9',chop:'#FFD700',high_vol:'#FF4D7A',low_vol:'#A78BFA',neutral:'#60A4A1'};
+
+    // Эффективный WR индикатора (h30 из stats)
+    const effWR_ = id => stats_[id]?.h30?.acc ?? 0.5;
+
+    // Корреляция score-рядов из r.scoreSeries (если есть) или stats
+    const getSeries_ = id => r.ss?.[id] ?? [];
+    function pearson_(a,b){
+      const pairs=[];
+      for(let i=0;i<Math.min(a.length,b.length);i++){if(a[i]!=null&&b[i]!=null&&a[i]!==0&&b[i]!==0)pairs.push([a[i],b[i]]);}
+      if(pairs.length<10)return 0;
+      const ma=pairs.reduce((s,p)=>s+p[0],0)/pairs.length,mb=pairs.reduce((s,p)=>s+p[1],0)/pairs.length;
+      let num=0,da=0,db=0;for(const[x,y]of pairs){num+=(x-ma)*(y-mb);da+=(x-ma)**2;db+=(y-mb)**2;}
+      return(da===0||db===0)?0:num/Math.sqrt(da*db);
+    }
+    function btArr_(arr,h){
+      let win=0,n=0;
+      for(let i=0;i<closes_.length-h;i++){const sc=arr[i];const fut=closes_[i+h]-closes_[i];if(sc==null||sc===0||fut===0)continue;n++;if((sc>0&&fut>0)||(sc<0&&fut<0))win++;}
+      return{acc:n>=5?win/n:null,n};
+    }
+    // Текущий балл из stats
+    const curSc_ = id => stats_[id]?.curScore ?? 0;
+
+    // ── M1 ──
+    const m1cats=[], m1agg=new Array(closes_.length).fill(0), m1cnt=new Array(closes_.length).fill(0);
+    _IL_CATS.forEach(cat=>{
+      const ids=cat.ids.filter(id=>stats_[id]?.h30?.n>=5);
+      if(!ids.length)return;
+      const leader=ids.reduce((b,id)=>effWR_(id)>effWR_(b)?id:b,ids[0]);
+      const lSer=getSeries_(leader);
+      const W={};
+      ids.forEach(id=>{const c=id===leader?1:pearson_(lSer,getSeries_(id));W[id]=id===leader?effWR_(id):effWR_(id)*(1-Math.abs(c));});
+      const totW=Object.values(W).reduce((s,v)=>s+v,0)||1;
+      let score=0;ids.forEach(id=>score+=W[id]/totW*curSc_(id));
+      const aggSer=closes_.map((_,i)=>{let s=0;ids.forEach(id=>{const v=getSeries_(id)?.[i];if(v!=null)s+=W[id]/totW*v;});return Math.abs(s)>0.05?s:0;});
+      aggSer.forEach((v,i)=>{m1agg[i]+=v;m1cnt[i]++;});
+      m1cats.push({label:cat.label,score:Math.max(-1,Math.min(1,score)),wr:effWR_(leader),leader,bt:{h5:btArr_(aggSer,5),h15:btArr_(aggSer,15),h30:btArr_(aggSer,30)},ids,W,totW});
+    });
+    const m1FullSer=m1agg.map((v,i)=>m1cnt[i]?v/m1cnt[i]:0);
+    const m1Bt={h5:btArr_(m1FullSer,5),h15:btArr_(m1FullSer,15),h30:btArr_(m1FullSer,30)};
+    const m1Score=m1cats.reduce((s,c)=>s+c.score,0)/(m1cats.length||1);
+
+    // ── M2 ──
+    const m2cats=[], m2agg=new Array(closes_.length).fill(0), m2w=new Array(closes_.length).fill(0);
+    _IL_CATS.forEach(cat=>{
+      const ids=cat.ids.filter(id=>stats_[id]?.h30?.n>=5);
+      if(!ids.length)return;
+      const leader=ids.reduce((b,id)=>effWR_(id)>effWR_(b)?id:b,ids[0]);
+      const wr=effWR_(leader), sc=curSc_(leader);
+      const lSer=getSeries_(leader);
+      lSer.forEach((v,i)=>{if(v!=null){m2agg[i]+=v*wr;m2w[i]+=wr;}});
+      m2cats.push({label:cat.label,score:sc,wr,leader,bt:{h5:btArr_(lSer,5),h15:btArr_(lSer,15),h30:btArr_(lSer,30)}});
+    });
+    const m2FullSer=m2agg.map((v,i)=>m2w[i]?v/m2w[i]:0);
+    const m2Bt={h5:btArr_(m2FullSer,5),h15:btArr_(m2FullSer,15),h30:btArr_(m2FullSer,30)};
+    const m2TotW=m2cats.reduce((s,c)=>s+c.wr,0)||1;
+    const m2Score=m2cats.reduce((s,c)=>s+c.score*c.wr/m2TotW,0);
+
+    // ── M3 ──
+    const m3cats=[], m3agg=new Array(closes_.length).fill(0), m3w=new Array(closes_.length).fill(0);
+    _IL_CATS.forEach(cat=>{
+      const ids=cat.ids.filter(id=>stats_[id]?.h30?.n>=5);
+      if(!ids.length)return;
+      const leader=ids.reduce((b,id)=>effWR_(id)>effWR_(b)?id:b,ids[0]);
+      const leaderSc=curSc_(leader), leaderDir=Math.sign(leaderSc);
+      let agree=0; ids.forEach(id=>{if(Math.sign(curSc_(id))===leaderDir)agree++;});
+      const agreement=ids.length>1?agree/ids.length:1;
+      const wr=effWR_(leader), conf=wr*agreement;
+      const lSer=getSeries_(leader);
+      const m3ser=closes_.map((_,i)=>{
+        const lv=lSer[i]??0, ld=Math.sign(lv); let ag=0;
+        ids.forEach(id=>{const v=getSeries_(id)?.[i];if(v!=null&&Math.sign(v)===ld)ag++;});
+        return lv*(ids.length>1?ag/ids.length:1);
+      });
+      m3ser.forEach((v,i)=>{m3agg[i]+=v*conf;m3w[i]+=conf;});
+      m3cats.push({label:cat.label,score:leaderSc*agreement,wr,leader,agreement,bt:{h5:btArr_(m3ser,5),h15:btArr_(m3ser,15),h30:btArr_(m3ser,30)},ids});
+    });
+    const m3FullSer=m3agg.map((v,i)=>m3w[i]?v/m3w[i]:0);
+    const m3Bt={h5:btArr_(m3FullSer,5),h15:btArr_(m3FullSer,15),h30:btArr_(m3FullSer,30)};
+    const m3TotW=m3cats.reduce((s,c)=>s+c.wr*c.agreement,0)||1;
+    const m3Score=m3cats.reduce((s,c)=>s+c.score*c.wr*c.agreement/m3TotW,0);
+
+    // Рендер блока
+    const fBt=s=>{if(!s||s.acc==null||s.n<5)return'<span style="color:#444">—</span>';const p=(s.acc*100).toFixed(0),c=s.acc>=0.60?'#52F2C9':s.acc>=0.52?'#A78BFA':'#FF4D7A';return`<span style="color:${c};font-weight:bold">${p}%</span><span style="color:#444;font-size:8px"> n=${s.n}</span>`;};
+    const fSc=v=>{const c=v>0.3?'#52F2C9':v<-0.3?'#FF4D7A':'#A78BFA';const s=v>0?'▲':'▼';return`<span style="color:${c}">${v>=0?'+':''}${v.toFixed(2)} ${v!==0?s:''}</span>`;};
+    const rc=REGIME_COLORS[regime_]||'#A78BFA';
+    html+=`<div style="margin-bottom:14px;padding:10px 14px;background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid #2a1f3d;">`;
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">`;
+    html+=`<div style="font-size:9px;color:var(--text3);font-family:var(--mono);">ТРИ МОДЕЛИ АГРЕГАЦИИ · РЕЖИМ: <span style="color:${rc}">${REGIME_LABELS[regime_]||regime_}</span></div>`;
+    html+=`</div>`;
+    // Сводная таблица моделей
+    html+=`<table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">`;
+    html+=`<tr style="color:var(--text3);border-bottom:1px solid #2a1f3d;"><th style="text-align:left;padding:3px 6px;">Модель</th><th>Описание</th><th style="padding:3px 8px;">Сигнал</th><th>H5</th><th>H15</th><th>H30</th></tr>`;
+    html+=`<tr style="border-bottom:1px solid #1a1028;">
+      <td style="padding:5px 6px;color:#52F2C9;">M1</td>
+      <td style="color:var(--text3);font-size:9px;">winRate×(1−corr), полный кластер</td>
+      <td style="text-align:center;">${fSc(m1Score)}</td>
+      <td style="text-align:center;">${fBt(m1Bt.h5)}</td><td style="text-align:center;">${fBt(m1Bt.h15)}</td><td style="text-align:center;">${fBt(m1Bt.h30)}</td></tr>`;
+    html+=`<tr style="border-bottom:1px solid #1a1028;">
+      <td style="padding:5px 6px;color:#A78BFA;">M2</td>
+      <td style="color:var(--text3);font-size:9px;">Только лидеры кластеров</td>
+      <td style="text-align:center;">${fSc(m2Score)}</td>
+      <td style="text-align:center;">${fBt(m2Bt.h5)}</td><td style="text-align:center;">${fBt(m2Bt.h15)}</td><td style="text-align:center;">${fBt(m2Bt.h30)}</td></tr>`;
+    html+=`<tr style="border-bottom:1px solid #1a1028;">
+      <td style="padding:5px 6px;color:#FF9F40;">M3</td>
+      <td style="color:var(--text3);font-size:9px;">Лидер → направление, кластер → уверенность</td>
+      <td style="text-align:center;">${fSc(m3Score)}</td>
+      <td style="text-align:center;">${fBt(m3Bt.h5)}</td><td style="text-align:center;">${fBt(m3Bt.h15)}</td><td style="text-align:center;">${fBt(m3Bt.h30)}</td></tr>`;
+    html+=`</table>`;
+    // Детали по кластерам (свёрнуто)
+    html+=`<details style="margin-top:10px;"><summary style="font-size:9px;color:var(--text3);cursor:pointer;">▸ Детали по кластерам (M1/M2/M3)</summary>`;
+    html+=`<div style="overflow-x:auto;margin-top:8px;"><table style="width:100%;border-collapse:collapse;font-size:9px;font-family:var(--mono);">`;
+    html+=`<tr style="color:var(--text3);border-bottom:1px solid #2a1f3d;"><th style="text-align:left;padding:2px 6px;">Кластер</th><th>Лидер</th><th>WR%</th><th colspan="2">M1 H5/H30</th><th colspan="2">M2 H5/H30</th><th colspan="2">M3 H5/H30</th><th>M3 согл.</th></tr>`;
+    _IL_CATS.forEach((cat,ci)=>{
+      const c1=m1cats.find(c=>c.label===cat.label), c2=m2cats.find(c=>c.label===cat.label), c3=m3cats.find(c=>c.label===cat.label);
+      if(!c1&&!c2&&!c3) return;
+      const leader=(c2||c3)?.leader, wr=((c2||c3)?.wr??0)*100;
+      const clr=CC[ci%CC.length];
+      html+=`<tr style="border-bottom:1px solid #1a1028;">
+        <td style="padding:3px 6px;color:${clr};">${cat.label}</td>
+        <td style="color:var(--text2);font-size:8px;">${IL_NAMES[leader]||'—'}</td>
+        <td style="text-align:center;">${wr.toFixed(0)}%</td>
+        <td style="text-align:center;">${fBt(c1?.bt?.h5)}</td><td style="text-align:center;">${fBt(c1?.bt?.h30)}</td>
+        <td style="text-align:center;">${fBt(c2?.bt?.h5)}</td><td style="text-align:center;">${fBt(c2?.bt?.h30)}</td>
+        <td style="text-align:center;">${fBt(c3?.bt?.h5)}</td><td style="text-align:center;">${fBt(c3?.bt?.h30)}</td>
+        <td style="text-align:center;color:${(c3?.agreement??0)>0.7?'#52F2C9':'#A78BFA'}">${c3?.agreement!=null?(c3.agreement*100).toFixed(0)+'%':'—'}</td></tr>`;
+    });
+    html+=`</table></div></details>`;
+    html+=`</div>`;
+  } catch(eModel) { console.warn('Model render error:', eModel); }
   // Блок текущего рыночного режима
   try {
     const closes_=r.closes, last_=closes_.length-1;
