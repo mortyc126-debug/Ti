@@ -8350,22 +8350,58 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.low_vol    = _vrA.map(v=>v!=null?(v<=0.3?0.5:null):null);
   seriesScore.stock_trend= _strendA.map(v=>ilScoreStockTrend(v));
 
-  // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
-  const horizon = 5;
+  // Бэктест по 3 горизонтам для каждого индикатора
   const evalRes = {};
   IL_INDICATORS.forEach(id=>{
     const s = seriesScore[id];
-    let win=0, n=0;
-    for(let i=0;i<closes.length-horizon;i++){
-      const sc = s[i];
-      if(sc==null || sc===0) continue;
-      const fut = closes[i+horizon]-closes[i];
-      if(fut===0) continue;
-      n++;
-      if((sc>0&&fut>0)||(sc<0&&fut<0)) win++;
-    }
-    evalRes[id] = {winRate: n>0?win/n:0, n};
+    const bt=(h)=>{
+      let win=0,n=0,longN=0,totalUp=0,totalN=0;
+      for(let i=0;i<closes.length-h;i++){
+        const sc=s[i];
+        const fut=closes[i+h]-closes[i];
+        totalN++; if(fut>0)totalUp++;
+        if(sc==null||sc===0||fut===0) continue;
+        n++; if(sc>0)longN++;
+        if((sc>0&&fut>0)||(sc<0&&fut<0)) win++;
+      }
+      const acc=n>0?win/n:0;
+      const base=totalN>0?totalUp/totalN:0.5;
+      return {winRate:acc, acc, ig:acc-base, n, bias:n>0?longN/n:null};
+    };
+    evalRes[id] = {h5:bt(5), h15:bt(15), h30:bt(30)};
   });
+
+  // Жадный поиск лучших комбо (межкластерные, H30) — лёгкий вариант без кластеров
+  const _btCombo=(ids,h)=>{
+    const arr=closes.map((_,i)=>{
+      const vals=ids.map(id=>seriesScore[id]?.[i]).filter(v=>v!=null&&v!==0);
+      return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
+    });
+    return _ilBtStats(arr,closes,h,null);
+  };
+  const ranked30=IL_INDICATORS
+    .filter(id=>evalRes[id].h30.n>=5&&evalRes[id].h30.acc!=null)
+    .sort((a,b)=>evalRes[b].h30.acc-evalRes[a].h30.acc);
+  const bestCombos=[];
+  if(ranked30.length){
+    // Отслеживаем использованные «группы» по простому хешу (каждые 5 = группа)
+    const grpOf=id=>Math.floor(ranked30.indexOf(id)/3);
+    const usedGrp=new Set();
+    let cur=[ranked30[0]]; usedGrp.add(grpOf(ranked30[0]));
+    for(let step=0;step<6;step++){
+      const st=_btCombo(cur,30);
+      bestCombos.push({ids:[...cur],h30:st});
+      let bestAdd=null,bestAcc=-1;
+      for(const id of ranked30){
+        const g=grpOf(id);
+        if(usedGrp.has(g)||cur.includes(id)) continue;
+        const t=_btCombo([...cur,id],30);
+        if(t.acc!=null&&t.n>=5&&t.acc>bestAcc){bestAcc=t.acc;bestAdd=id;}
+      }
+      if(!bestAdd||bestAcc<=(st.acc??0)) break;
+      cur.push(bestAdd); usedGrp.add(grpOf(bestAdd));
+    }
+  }
 
   // Текущие значения и тексты
   const last = closes.length-1;
@@ -8429,16 +8465,17 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   const details = IL_INDICATORS.map(id=>{
     const cur = seriesScore[id][last];
     const ev = evalRes[id];
-    // Участвует в итоговом score если есть хоть 5 наблюдений;
-    // вес = max(0.01, winRate-0.45)*4 — слабые индикаторы вносят малый вклад,
-    // сильные (winRate≥0.65) — большой. Порог «не включать ниже 0.55» убран.
-    const included = ev.n >= 5;
+    const included = ev.h5.n >= 5;
     return {
+      id,
       name: IL_NAMES[id],
       text: curText[id],
       score: cur ?? 0,
-      winRate: ev.winRate,
-      n: ev.n,
+      winRate: ev.h5.winRate,
+      n: ev.h5.n,
+      h5: ev.h5,
+      h15: ev.h15,
+      h30: ev.h30,
       included,
     };
   });
@@ -8463,7 +8500,7 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
 
   if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
 
-  return {score, label, details, chained};
+  return {score, label, details, chained, bestCombos};
 }
 
 // ═══ СТРАНИЦА АНАЛИЗА: мульти-горизонтный бэктест, кластеры, конструктор комбо ═══

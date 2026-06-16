@@ -1884,16 +1884,68 @@ function m_EXT_INDICATORS(){
   const ageMin = Math.round((Date.now()-cached.ts)/60000);
   const details = cached.details||[];
   const used = details.filter(d=>d.included);
-  const parts = details.map(d=>{
-    const eff = d.n>=10 ? `, эффективность за 90д ${Math.round(d.winRate*100)}% (n=${d.n})` : ', недостаточно истории';
-    const mark = d.included ? '✓ учтён' : '— не учтён';
-    return `${d.name} (${mark}${eff}): ${d.text}`;
-  });
   const score = Math.max(-1, Math.min(1, cached.score/2));
   const confidence = used.length ? Math.min(0.5, 0.15*used.length) : 0.05;
   const basisNote = cached.note ? ` [${cached.note}]` : '';
-  const header = `модуль индикаторов (${ageMin} мин назад)${basisNote} — ${cached.label}. Учтено ${used.length} из ${details.length}:`;
-  return {score, confidence, detail:`${header}<br>${parts.join('<br>')}`};
+
+  // Таблица индикаторов по H30 acc
+  const sorted = [...details].filter(d=>d.h30?.n>=5).sort((a,b)=>(b.h30?.acc||0)-(a.h30?.acc||0));
+  const fA = (s)=>{ if(!s||s.acc==null||s.n<5) return '—';
+    const p=(s.acc*100).toFixed(0), c=s.acc>=0.60?'#52F2C9':s.acc>=0.52?'#A78BFA':'#FF4D7A';
+    return `<span style="color:${c}">${p}%</span>`; };
+  const fI = (s)=>{ if(!s||s.ig==null||s.n<5) return '—';
+    const p=(s.ig*100).toFixed(1), c=s.ig>0.05?'#52F2C9':s.ig>0?'#A78BFA':'#FF4D7A';
+    return `<span style="color:${c}">${s.ig>0?'+':''}${p}%</span>`; };
+
+  let tbl = `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:9px;color:var(--txt3);font-family:'JetBrains Mono',monospace;">▸ Рейтинг индикаторов (${sorted.length}) · Лучшие комбо</summary>
+<div style="margin-top:6px;overflow-x:auto;">
+<table style="border-collapse:collapse;width:100%;font-size:9px;font-family:'JetBrains Mono',monospace;">
+<tr style="color:var(--txt3);border-bottom:1px solid #2a1f3d;">
+  <th style="text-align:left;padding:2px 4px;">#</th>
+  <th style="text-align:left;padding:2px 4px;">Индикатор</th>
+  <th style="padding:2px 4px;">H5</th><th style="padding:2px 4px;">H15</th><th style="padding:2px 4px;">H30</th>
+  <th style="padding:2px 4px;">IG H30</th><th style="padding:2px 4px;">Сейчас</th></tr>`;
+  sorted.forEach((d,i)=>{
+    const sc=d.score, sc_c=sc>0.3?'#52F2C9':sc<-0.3?'#FF4D7A':'var(--txt3)';
+    tbl+=`<tr style="border-bottom:1px solid #1a1028;">
+      <td style="padding:2px 4px;color:var(--txt3);">${i+1}</td>
+      <td style="padding:2px 4px;color:var(--txt2);">${d.name}</td>
+      <td style="text-align:center;">${fA(d.h5)}</td>
+      <td style="text-align:center;">${fA(d.h15)}</td>
+      <td style="text-align:center;">${fA(d.h30)}</td>
+      <td style="text-align:center;">${fI(d.h30)}</td>
+      <td style="text-align:center;color:${sc_c};">${sc>0?'+':''}${sc.toFixed(2)}</td></tr>`;
+  });
+  tbl += `</table>`;
+
+  // Лучшие комбо
+  const combos = cached.bestCombos||[];
+  if(combos.length){
+    tbl += `<div style="margin-top:8px;font-size:9px;color:var(--txt3);font-family:'JetBrains Mono',monospace;">Лучшие комбинации (H30):</div>
+<table style="border-collapse:collapse;width:100%;font-size:9px;font-family:'JetBrains Mono',monospace;margin-top:4px;">
+<tr style="color:var(--txt3);border-bottom:1px solid #2a1f3d;">
+  <th style="padding:2px 4px;">#</th><th style="text-align:left;padding:2px 4px;">Состав</th>
+  <th style="padding:2px 4px;">H30 acc</th><th style="padding:2px 4px;">IG</th><th style="padding:2px 4px;">n</th></tr>`;
+    combos.forEach((c,i)=>{
+      const s=c.h30;
+      const ac=s?.acc!=null?(s.acc*100).toFixed(0)+'%':'—';
+      const ig=s?.ig!=null?(s.ig>0?'+':'')+(s.ig*100).toFixed(1)+'%':'—';
+      const cc=s?.acc>=0.55?'#52F2C9':s?.acc>=0.50?'#A78BFA':'#FF4D7A';
+      const ic=s?.ig>0.05?'#52F2C9':s?.ig>0?'#A78BFA':'#FF4D7A';
+      const names=(c.ids||[]).map(id=>details.find(d=>d.id===id)?.name||id).join(' + ');
+      tbl+=`<tr style="border-bottom:1px solid #1a1028;">
+        <td style="padding:2px 4px;color:var(--txt3);">${i+1}</td>
+        <td style="padding:2px 4px;color:var(--txt2);">${names}</td>
+        <td style="text-align:center;color:${cc};">${ac}</td>
+        <td style="text-align:center;color:${ic};">${ig}</td>
+        <td style="text-align:center;color:var(--txt3);">${s?.n??'—'}</td></tr>`;
+    });
+    tbl += `</table>`;
+  }
+  tbl += `</div></details>`;
+
+  const header = `модуль индикаторов (${ageMin} мин назад)${basisNote} — ${cached.label}. Учтено ${used.length} из ${details.length}`;
+  return {score, confidence, detail:`${header}${tbl}`};
 }
 
 // ============================================================
