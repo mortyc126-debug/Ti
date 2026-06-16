@@ -7704,11 +7704,144 @@ function ilScoreAlligator(arr,i){
   return 0; // линии сплетены — флэт
 }
 
-const IL_INDICATORS = ['rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator'];
+// ── Дополнительные индикаторы (OBV, CMF, CHOP, SuperTrend, CMO, Vortex, TSI, Force, UltOsc) ──
+
+function ilCalcOBV(c) {
+  const res=[]; let obv=0;
+  for(let i=0;i<c.length;i++){
+    if(i>0) obv += c[i].close>c[i-1].close?(c[i].volume||0) : c[i].close<c[i-1].close?-(c[i].volume||0):0;
+    res.push(obv);
+  }
+  return res;
+}
+
+function ilCalcCMF(c, period=20) {
+  const mf=c.map(x=>{ const hl=x.high-x.low; return hl>0?((x.close-x.low)-(x.high-x.close))/hl*(x.volume||0):0; });
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let sv=0,sv2=0;
+    for(let j=i-period+1;j<=i;j++){sv+=mf[j];sv2+=(c[j].volume||0);}
+    res.push(sv2?sv/sv2:null);
+  }
+  return res;
+}
+
+function ilCalcChop(c, period=14) {
+  const tr=c.map((x,i)=>i===0?x.high-x.low:Math.max(x.high-x.low,Math.abs(x.high-c[i-1].close),Math.abs(x.low-c[i-1].close)));
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period-1){res.push(null);continue;}
+    let trSum=0,hh=-Infinity,ll=Infinity;
+    for(let j=i-period+1;j<=i;j++){trSum+=tr[j];if(c[j].high>hh)hh=c[j].high;if(c[j].low<ll)ll=c[j].low;}
+    const hl=hh-ll; res.push(hl>0?100*Math.log10(trSum/hl)/Math.log10(period):null);
+  }
+  return res;
+}
+
+function ilCalcSuperTrend(c, period=10, mult=3) {
+  const atr=ilCalcATR(c,period);
+  const res=[];
+  let dir=1, sup=0, sdn=0;
+  for(let i=0;i<c.length;i++){
+    if(atr[i]==null){res.push(null);continue;}
+    const hl2=(c[i].high+c[i].low)/2;
+    const newSup=hl2-mult*atr[i], newSdn=hl2+mult*atr[i];
+    if(i===0){sup=newSup;sdn=newSdn;res.push(null);continue;}
+    sup=newSup>(res[i-1]?.sup??0)&&c[i-1].close>(res[i-1]?.sup??0)?newSup:Math.max(newSup,res[i-1]?.sup??0);
+    sdn=newSdn<(res[i-1]?.sdn??Infinity)&&c[i-1].close<(res[i-1]?.sdn??Infinity)?newSdn:Math.min(newSdn,res[i-1]?.sdn??Infinity);
+    if(dir===1&&c[i].close<sup) dir=-1;
+    else if(dir===-1&&c[i].close>sdn) dir=1;
+    res.push({dir,sup,sdn});
+  }
+  return res;
+}
+
+function ilCalcCMO(closes, period=14) {
+  const res=[];
+  for(let i=0;i<closes.length;i++){
+    if(i<period){res.push(null);continue;}
+    let up=0,dn=0;
+    for(let j=i-period+1;j<=i;j++){const d=closes[j]-closes[j-1];if(d>0)up+=d;else dn-=d;}
+    res.push((up+dn)===0?0:(up-dn)/(up+dn)*100);
+  }
+  return res;
+}
+
+function ilCalcVortex(c, period=14) {
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<period){res.push(null);continue;}
+    let viP=0,viM=0,trSum=0;
+    for(let j=i-period+1;j<=i;j++){
+      viP+=Math.abs(c[j].high-c[j-1].low);
+      viM+=Math.abs(c[j].low-c[j-1].high);
+      trSum+=Math.max(c[j].high-c[j].low,Math.abs(c[j].high-c[j-1].close),Math.abs(c[j].low-c[j-1].close));
+    }
+    res.push(trSum?{vip:viP/trSum,vim:viM/trSum}:null);
+  }
+  return res;
+}
+
+function ilCalcTSI(closes, r=25, s=13) {
+  // double-smoothed momentum
+  const d=closes.map((v,i)=>i?v-closes[i-1]:0);
+  const ilEMA=(arr,p)=>{
+    const k=2/(p+1); const out=[];
+    arr.forEach((v,i)=>out.push(i?out[i-1]+(v-out[i-1])*k:v));
+    return out;
+  };
+  const pc=ilEMA(ilEMA(d,r),s);
+  const apc=ilEMA(ilEMA(d.map(Math.abs),r),s);
+  return closes.map((_,i)=>apc[i]?pc[i]/apc[i]*100:null);
+}
+
+function ilCalcForceIdx(c, period=13) {
+  const raw=c.map((x,i)=>i?((x.close-c[i-1].close)*(x.volume||0)):0);
+  const sma=ilSMA(raw,period);
+  return sma;
+}
+
+function ilCalcUltOsc(c, p1=7, p2=14, p3=28) {
+  const bp=c.map((x,i)=>i?x.close-Math.min(x.low,c[i-1].close):null);
+  const tr=c.map((x,i)=>i?Math.max(x.high,c[i-1].close)-Math.min(x.low,c[i-1].close):null);
+  const res=[];
+  for(let i=0;i<c.length;i++){
+    if(i<p3){res.push(null);continue;}
+    const avg=(p)=>{let sb=0,st=0;for(let j=i-p+1;j<=i;j++){sb+=bp[j]??0;st+=tr[j]??0;}return st?sb/st:0;};
+    res.push(100*(4*avg(p1)+2*avg(p2)+avg(p3))/7);
+  }
+  return res;
+}
+
+// Scoring для новых индикаторов
+function ilScoreOBV(arr,i,period=20){
+  if(arr[i]==null||i<period) return null;
+  const avg=arr.slice(i-period+1,i+1).reduce((s,v)=>s+v,0)/period;
+  const v=arr[i]; const diff=(v-avg)/(Math.abs(avg)||1);
+  return Math.max(-2,Math.min(2,diff*3));
+}
+function ilScoreCMF(v){ return v==null?null:Math.max(-2,Math.min(2,v*10)); }
+// CHOP: <38.2 = тренд (усиливает другие сигналы), >61.8 = боковик; как самостоятельный сигнал — не даёт направление, только силу
+function ilScoreChop(v){ return v==null?null:0; } // нейтрален по направлению, используется как модификатор
+function ilScoreSuperTrend(arr,i){ const a=arr[i]; return a==null?null:(a.dir===1?1:-1); }
+function ilScoreCMO(v){ return v==null?null:(v>=50?2:v>=20?1:v<=-50?-2:v<=-20?-1:0); }
+function ilScoreVortex(v){ if(!v)return null; const d=v.vip-v.vim; return d>0.2?2:d>0.05?1:d<-0.2?-2:d<-0.05?-1:0; }
+function ilScoreTSI(v){ return v==null?null:(v>=25?2:v>=5?1:v<=-25?-2:v<=-5?-1:0); }
+function ilScoreForceIdx(arr,i){ if(arr[i]==null)return null; const v=arr[i]; const abs=Math.abs(v); return v>0?(abs>arr.filter(x=>x!=null).reduce((a,b)=>a>Math.abs(b)?a:Math.abs(b),0)*0.3?2:1):(abs>arr.filter(x=>x!=null).reduce((a,b)=>a>Math.abs(b)?a:Math.abs(b),0)*0.3?-2:-1); }
+function ilScoreUltOsc(v){ return v==null?null:(v>=70?-2:v>=60?-1:v<=30?2:v<=40?1:0); }
+
+const IL_INDICATORS = [
+  'rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator',
+  'obv','cmf','chop','supertrend','cmo','vortex','tsi','force_idx','ult_osc',
+];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
   ao:'Awesome Oscillator', ema:'EMA 12/26 (тренд)', adx:'ADX/DI', donchian:'Канал Дончиана',
   keltner:'Канал Кельтнера', envelopes:'Конверты', ichimoku:'Ишимоку (Tenkan/Kijun)', alligator:'Аллигатор Вильямса',
+  obv:'OBV (баланс объёма)', cmf:'CMF (денежный поток)', chop:'CHOP (боковик/тренд)',
+  supertrend:'SuperTrend (ATR-тренд)', cmo:'CMO (моментум Чанде)', vortex:'Vortex (VI+/VI−)',
+  tsi:'TSI (индекс силы тренда)', force_idx:'Force Index (объём×цена)', ult_osc:'Ultimate Oscillator',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -7763,6 +7896,19 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.envelopes = envArr.map((e,i)=> e?ilScoreChannel(closes[i],e.lower,e.upper):null);
   seriesScore.ichimoku = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
   seriesScore.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
+  // Новые индикаторы
+  const _obvA=ilCalcOBV(candles),_cmfA=ilCalcCMF(candles,20),_chopA=ilCalcChop(candles,14);
+  const _stA=ilCalcSuperTrend(candles,10,3),_cmoA=ilCalcCMO(closes,14),_vxA=ilCalcVortex(candles,14);
+  const _tsiA=ilCalcTSI(closes,25,13),_fiA=ilCalcForceIdx(candles,13),_uoA=ilCalcUltOsc(candles,7,14,28);
+  seriesScore.obv=_obvA.map((_,i)=>ilScoreOBV(_obvA,i,20));
+  seriesScore.cmf=_cmfA.map(v=>ilScoreCMF(v));
+  seriesScore.chop=_chopA.map(v=>ilScoreChop(v));
+  seriesScore.supertrend=_stA.map((_,i)=>ilScoreSuperTrend(_stA,i));
+  seriesScore.cmo=_cmoA.map(v=>ilScoreCMO(v));
+  seriesScore.vortex=_vxA.map(v=>ilScoreVortex(v));
+  seriesScore.tsi=_tsiA.map(v=>ilScoreTSI(v));
+  seriesScore.force_idx=_fiA.map((_,i)=>ilScoreForceIdx(_fiA,i));
+  seriesScore.ult_osc=_uoA.map(v=>ilScoreUltOsc(v));
 
   // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
   const horizon = 5;
@@ -7799,6 +7945,15 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     envelopes: envArr[last] ? `конверт ${envArr[last].lower.toFixed(2)}–${envArr[last].upper.toFixed(2)}, цена ${closes[last].toFixed(2)}` : 'недостаточно данных',
     ichimoku: `Tenkan ${ichiArr[last]?.tenkan?.toFixed(2) ?? '—'} / Kijun ${ichiArr[last]?.kijun?.toFixed(2) ?? '—'}`,
     alligator: allArr[last] ? `губы ${allArr[last].lips?.toFixed(2) ?? '—'} / зубы ${allArr[last].teeth?.toFixed(2) ?? '—'} / пасть ${allArr[last].jaw?.toFixed(2) ?? '—'}` : 'недостаточно данных',
+    obv: `OBV = ${_obvA[last]?.toFixed(0)??'—'}`,
+    cmf: `CMF(20) = ${_cmfA[last]?.toFixed(3)??'—'}`,
+    chop: `CHOP(14) = ${_chopA[last]?.toFixed(1)??'—'} (${_chopA[last]!=null?(_chopA[last]<38.2?'тренд':_chopA[last]>61.8?'боковик':'переход'):'—'})`,
+    supertrend: `SuperTrend = ${_stA[last]?(_stA[last].dir===1?'↑ бычий':'↓ медвежий'):'—'}`,
+    cmo: `CMO(14) = ${_cmoA[last]?.toFixed(1)??'—'}`,
+    vortex: `VI+ ${_vxA[last]?.vip?.toFixed(3)??'—'} / VI− ${_vxA[last]?.vim?.toFixed(3)??'—'}`,
+    tsi: `TSI = ${_tsiA[last]?.toFixed(1)??'—'}`,
+    force_idx: `Force Index(13) = ${_fiA[last]?.toFixed(0)??'—'}`,
+    ult_osc: `Ultimate Oscillator = ${_uoA[last]?.toFixed(1)??'—'}`,
   };
 
   const details = IL_INDICATORS.map(id=>{
@@ -7869,6 +8024,25 @@ function _ilCalcAllSeries(candles, closes) {
   ss.envelopes = envArr.map((e,i)=>e?ilScoreChannel(closes[i],e.lower,e.upper):null);
   ss.ichimoku  = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
   ss.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
+  // Новые индикаторы
+  const obvArr  = ilCalcOBV(candles);
+  const cmfArr  = ilCalcCMF(candles,20);
+  const chopArr = ilCalcChop(candles,14);
+  const stArr   = ilCalcSuperTrend(candles,10,3);
+  const cmoArr  = ilCalcCMO(closes,14);
+  const vxArr   = ilCalcVortex(candles,14);
+  const tsiArr  = ilCalcTSI(closes,25,13);
+  const fiArr   = ilCalcForceIdx(candles,13);
+  const uoArr   = ilCalcUltOsc(candles,7,14,28);
+  ss.obv        = obvArr.map((_,i)=>ilScoreOBV(obvArr,i,20));
+  ss.cmf        = cmfArr.map(v=>ilScoreCMF(v));
+  ss.chop       = chopArr.map(v=>ilScoreChop(v));
+  ss.supertrend = stArr.map((_,i)=>ilScoreSuperTrend(stArr,i));
+  ss.cmo        = cmoArr.map(v=>ilScoreCMO(v));
+  ss.vortex     = vxArr.map(v=>ilScoreVortex(v));
+  ss.tsi        = tsiArr.map(v=>ilScoreTSI(v));
+  ss.force_idx  = fiArr.map((_,i)=>ilScoreForceIdx(fiArr,i));
+  ss.ult_osc    = uoArr.map(v=>ilScoreUltOsc(v));
   return ss;
 }
 
