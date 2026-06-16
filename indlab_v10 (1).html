@@ -6635,10 +6635,17 @@ function cpUpdateInd(id) {
   });
 
   // For chart-able indicators, also update from real candles if available
-  const CHART_INDS_SET = new Set(['ma','ema','bb','vol','rsi','macd']);
+  const CHART_INDS_SET = new Set(['ma','ema','bb','vol','rsi','macd',
+    'chop','vortex','fisher','mcginley','tsi','ult_osc','dpo','supertrend']);
   if (CHART_INDS_SET.has(id) && chartCandles.length && ind.params?.length) {
     const closes = chartCandles.map(c=>c.close);
     const last = closes[closes.length-1];
+    const setVal = (key, val) => {
+      vals[key] = val;
+      const nEl = document.getElementById(`cpval-${id}-${key}`);
+      const sEl = document.getElementById(`cpslider-${id}-${key}`);
+      if(nEl) nEl.value = val; if(sEl) sEl.value = val;
+    };
     // Auto-fill interpret values from real data
     if (id === 'rsi') {
       const rsiArr = _chartCalcRSI(closes, vals.period||14);
@@ -6672,6 +6679,30 @@ function cpUpdateInd(id) {
         const sEl = document.getElementById('cpslider-macd-'+k);
         if(nEl) nEl.value = vals[k]; if(sEl) sEl.value = vals[k];
       });
+    }
+    if (id === 'chop') {
+      try { const v=ilCalcChop(chartCandles,14); const lv=v.filter(x=>x!=null).pop(); if(lv!=null) setVal('val',parseFloat(lv.toFixed(1))); } catch(e){}
+    }
+    if (id === 'vortex') {
+      try { const v=ilCalcVortex(chartCandles,14); const lv=v.filter(x=>x!=null).pop(); if(lv) { setVal('viplus',parseFloat((lv.vip||1).toFixed(3))); setVal('viminus',parseFloat((lv.vim||1).toFixed(3))); } } catch(e){}
+    }
+    if (id === 'fisher') {
+      try { const v=ilCalcFisher(chartCandles,10); const lv=v.filter(x=>x!=null).pop(); if(lv!=null) setVal('val',parseFloat(lv.toFixed(3))); } catch(e){}
+    }
+    if (id === 'mcginley') {
+      try { const v=ilCalcMcGinley(closes,14); const lv=v.filter(x=>x!=null).pop(); if(lv!=null) { setVal('price',parseFloat(last.toFixed(2))); setVal('md',parseFloat(lv.toFixed(2))); } } catch(e){}
+    }
+    if (id === 'tsi') {
+      try { const v=ilCalcTSI(closes,25,13); const lv=v.filter(x=>x!=null).pop(); if(lv!=null) setVal('val',Math.round(lv)); } catch(e){}
+    }
+    if (id === 'ult_osc') {
+      try { const v=ilCalcUltOsc(chartCandles,7,14,28); const lv=v.filter(x=>x!=null).pop(); if(lv!=null) setVal('val',Math.round(lv)); } catch(e){}
+    }
+    if (id === 'dpo') {
+      try { const v=ilCalcDPO(closes,20); const lv=v.filter(x=>x!=null).pop(); if(lv!=null) setVal('val',parseFloat(lv.toFixed(2))); } catch(e){}
+    }
+    if (id === 'supertrend') {
+      try { const v=ilCalcSuperTrend(chartCandles,10,3); const lv=v.filter(x=>x!=null).pop(); if(lv) { setVal('price',parseFloat(last.toFixed(2))); setVal('st_line',parseFloat((lv.line||last).toFixed(2))); setVal('bull',lv.dir===1?1:-1); } } catch(e){}
     }
   }
 
