@@ -9800,9 +9800,16 @@ window.addEventListener('message', (ev) => {
   if (!d || d.type !== 'MODULE_RPC_REQUEST') return;
   const payload = d.payload || {};
   if (payload.api !== 'getVerdict') return;
+  console.log('[indlab RPC] getVerdict →', payload.ticker, 'figi:', payload.figi);
   ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy(), figi: payload.figi})
-    .then(result => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*'))
-    .catch(err => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*'));
+    .then(result => {
+      console.log('[indlab RPC] готово →', payload.ticker, 'score:', result?.score);
+      ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*');
+    })
+    .catch(err => {
+      console.warn('[indlab RPC] ошибка →', payload.ticker, err);
+      ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*');
+    });
 });
 </script>
 </body>
