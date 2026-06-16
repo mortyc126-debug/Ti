@@ -1982,7 +1982,7 @@ function _m_modelSignal(modelKey){
   const m = models[modelKey];
   if(!m) return {score:0, confidence:0, detail:`модель ${modelKey} не найдена`};
 
-  const score = Math.max(-1, Math.min(1, m.score ?? 0));
+  const rawMs = m.score; const score = Math.max(-1, Math.min(1, (rawMs == null || isNaN(rawMs)) ? 0 : rawMs));
   const regime = models.regime || 'neutral';
 
   // Уверенность = качество бэктеста H30 модели (если есть)
@@ -2025,7 +2025,7 @@ function m_EXT_INDICATORS(){
   const ageMin = Math.round((Date.now()-cached.ts)/60000);
   const details = cached.details||[];
   const used = details.filter(d=>d.included);
-  const score = Math.max(-1, Math.min(1, cached.score/2));
+  const rawCs = cached.score; const score = Math.max(-1, Math.min(1, (rawCs == null || isNaN(rawCs)) ? 0 : rawCs / 2));
   const confidence = used.length ? Math.min(0.5, 0.15*used.length) : 0.05;
   const basisNote = cached.note ? ` [${cached.note}]` : '';
 
@@ -2064,7 +2064,7 @@ function m_EXT_INDICATORS(){
         <td style="text-align:center;">${fA(d.h15)}</td>
         <td style="text-align:center;">${fA(d.h30)}</td>
         <td style="text-align:center;">${fI(d.h30)}</td>
-        <td style="text-align:center;color:${sc_c};">${sc>0?'+':''}${sc.toFixed(2)}</td></tr>`;
+        <td style="text-align:center;color:${sc_c};">${sc!=null&&!isNaN(sc)?(sc>0?'+':'')+sc.toFixed(2):'—'}</td></tr>`;
     });
     tbl += `</table>`;
   } else {
@@ -2703,7 +2703,8 @@ function computeComposite(methodResults, ticker){
       w = baseW * regW;
     }
 
-    wSum   += r.score * w * r.confidence;
+    const rs = (r.score == null || isNaN(r.score)) ? 0 : r.score;
+    wSum   += rs * w * r.confidence;
     wTotal += w * r.confidence;
   });
   return wTotal > 0 ? wSum / wTotal : 0;
@@ -3056,7 +3057,7 @@ function renderGauge(score, confidence){
   const gaugePos = document.getElementById('gaugePos');
   const gaugeNeg = document.getElementById('gaugeNeg');
   // Rotate needle: -90° = full neg, 0° = neutral, +90° = full pos
-  const angle = score * 90;
+  const angle = (score == null || isNaN(score)) ? 0 : score * 90;
   needle.setAttribute('transform', `rotate(${angle},70,70)`);
   const d = scoreToDir(score);
   gaugeVal.textContent = (score >= 0 ? '+' : '') + (score*100).toFixed(0);

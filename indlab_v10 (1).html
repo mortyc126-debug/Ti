@@ -8897,9 +8897,14 @@ async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null}) {
     clusters:m3Clusters,
   };
 
-  const models = {regime:curRegime, regimeWR, m1:m1Total, m2:m2Total, m3:m3Total};
-
-  return {score, label, details, chained, bestCombos, models};
+  // Защита от NaN: если какой-то пакет дал NaN — обнуляем чтобы не ломать UI
+  const safeScore = (score == null || isNaN(score)) ? 0 : score;
+  const safeModels = {regime:curRegime, regimeWR,
+    m1:{...m1Total, score:(m1Total.score==null||isNaN(m1Total.score))?0:m1Total.score},
+    m2:{...m2Total, score:(m2Total.score==null||isNaN(m2Total.score))?0:m2Total.score},
+    m3:{...m3Total, score:(m3Total.score==null||isNaN(m3Total.score))?0:m3Total.score},
+  };
+  return {score:safeScore, label, details, chained, bestCombos, models:safeModels};
 }
 
 // ═══ Пакет 5: новые индикаторы ═══
