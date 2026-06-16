@@ -476,53 +476,47 @@ const TF_INTERVALS = {'1min':'CANDLE_INTERVAL_1_MIN','5min':'CANDLE_INTERVAL_5_M
 
 const METHODS = [
   // ── Поток ордеров ──
-  {id:'BS_PRESSURE',    label:'Buy/Sell давление',    src:'ts',     color:'#52F2C9'},
-  {id:'AGGRESSOR_FLOW', label:'Поток агрессора',      src:'ts',     color:'#52F2C9'},
-  {id:'LARGE_IMPACT',   label:'Крупные сделки',       src:'ts',     color:'#52F2C9'},
-  // ── Цена и объём ──
-  {id:'VWAP_SIGNAL',    label:'VWAP отклонение',      src:'ts',     color:'#A78BFA'},
-  {id:'VOL_MOMENTUM',   label:'Объём × цена',         src:'ts',     color:'#A78BFA'},
+  {id:'BS_PRESSURE',    label:'Buy/Sell давление',    src:'ts',     color:'#00C9A7'},
+  {id:'AGGRESSOR_FLOW', label:'Поток агрессора',      src:'ts',     color:'#00C9A7'},
+  {id:'LARGE_IMPACT',   label:'Крупные сделки',       src:'ts',     color:'#00C9A7'},
+  {id:'VWAP_SIGNAL',    label:'VWAP отклонение',      src:'ts',     color:'#00C9A7'},
+  {id:'VOL_MOMENTUM',   label:'Объём × цена',         src:'ts',     color:'#00C9A7'},
+  // ── Микроструктура рынка ──
+  {id:'OB_IMBALANCE',   label:'Дисбаланс стакана',    src:'ob',     color:'#7B8CDE'},
+  {id:'CANCEL_SIGNAL',  label:'Отмены заявок',        src:'os',     color:'#7B8CDE'},
+  // ── Позиционирование участников ──
+  {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#F59E0B'},
+  {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#F59E0B'},
+  {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#F59E0B'},
+  // ── Собственные модели цены ──
+  {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#A78BFA'},
+  {id:'KAMA_SIGNAL',    label:'KAMA (адапт. МА)',     src:'candles',color:'#A78BFA'},
+  {id:'ZLEMA_SIGNAL',   label:'ZLEMA (нулев. лаг)',   src:'candles',color:'#A78BFA'},
+  {id:'T3_SIGNAL',      label:'T3 (МА Тильсон)',      src:'candles',color:'#A78BFA'},
+  {id:'PFE_SIGNAL',     label:'PFE (эфф. тренда)',    src:'candles',color:'#A78BFA'},
+  {id:'SINEWAVE',       label:'Синусоида (Элерс)',    src:'candles',color:'#A78BFA'},
+  {id:'DECYCLER',       label:'Децикл (Элерс)',       src:'candles',color:'#A78BFA'},
+  {id:'MMI_SIGNAL',     label:'MMI (режим рынка)',    src:'candles',color:'#A78BFA'},
+  {id:'TQI_SIGNAL',     label:'TQI (кач. тренда)',   src:'candles',color:'#A78BFA'},
   {id:'VZO_SIGNAL',     label:'VZO (объём-осцилл.)',  src:'candles',color:'#A78BFA'},
   {id:'YZ_VOL',         label:'Волатильность YZ',     src:'candles',color:'#A78BFA'},
   {id:'ZSCORE_SIGNAL',  label:'Z-Score откл.',        src:'candles',color:'#A78BFA'},
-  // ── Стакан & заявки ──
-  {id:'OB_IMBALANCE',   label:'Дисбаланс стакана',    src:'ob',     color:'#FF9F40'},
-  {id:'CANCEL_SIGNAL',  label:'Отмены заявок',        src:'os',     color:'#FF9F40'},
-  // ── Открытый интерес ──
-  {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#FF006E'},
-  {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
-  // ── Тренд и МА ──
-  {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
-  {id:'KAMA_SIGNAL',    label:'KAMA (адапт. МА)',     src:'candles',color:'#6366F1'},
-  {id:'ZLEMA_SIGNAL',   label:'ZLEMA (нулев. лаг)',   src:'candles',color:'#6366F1'},
-  {id:'T3_SIGNAL',      label:'T3 (МА Тильсон)',      src:'candles',color:'#6366F1'},
-  {id:'PFE_SIGNAL',     label:'PFE (эфф. тренда)',    src:'candles',color:'#6366F1'},
-  // ── Цикл и режим ──
-  {id:'SINEWAVE',       label:'Синусоида (Элерс)',    src:'candles',color:'#60A4A1'},
-  {id:'DECYCLER',       label:'Децикл (Элерс)',       src:'candles',color:'#60A4A1'},
-  {id:'MMI_SIGNAL',     label:'MMI (режим рынка)',    src:'candles',color:'#60A4A1'},
-  {id:'TQI_SIGNAL',     label:'TQI (кач. тренда)',   src:'candles',color:'#60A4A1'},
-  {id:'VR_SIGNAL',      label:'Variance Ratio',       src:'candles',color:'#60A4A1'},
-  // ── Межрыночный ──
-  {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FFD700'},
+  {id:'VR_SIGNAL',      label:'Variance Ratio',       src:'candles',color:'#A78BFA'},
   // ── Технические индикаторы (indlab) ──
-  {id:'EXT_INDICATORS', label:'Индикаторы (indlab)',  src:'indlab', color:'#52F2C9'},
+  {id:'EXT_INDICATORS', label:'Индикаторы (indlab)',  src:'indlab', color:'#34D399'},
   // ── Модели (отдельно от сигналов) ──
-  {id:'IL_MODEL_M1',    label:'M1: WR×(1−corr)',      src:'indlab', color:'#C084FC'},
-  {id:'IL_MODEL_M2',    label:'M2: Лидеры кластеров', src:'indlab', color:'#C084FC'},
-  {id:'IL_MODEL_M3',    label:'M3: Лидер→направление',src:'indlab', color:'#C084FC'},
+  {id:'IL_MODEL_M1',    label:'M1: Весовая агрегация',     src:'indlab', color:'#818CF8'},
+  {id:'IL_MODEL_M2',    label:'M2: Представители кластеров',src:'indlab', color:'#818CF8'},
+  {id:'IL_MODEL_M3',    label:'M3: Кластерное подтверждение',src:'indlab',color:'#818CF8'},
 ];
 
-// Статичные семантические кластеры (не меняются от данных)
+// Статичные семантические кластеры сигналов oi-signal
 const METHODS_CLUSTERS = [
-  {label:'Поток ордеров',          color:'#52F2C9', ids:['BS_PRESSURE','AGGRESSOR_FLOW','LARGE_IMPACT']},
-  {label:'Цена и объём',           color:'#A78BFA', ids:['VWAP_SIGNAL','VOL_MOMENTUM','VZO_SIGNAL','YZ_VOL','ZSCORE_SIGNAL']},
-  {label:'Стакан & заявки',        color:'#FF9F40', ids:['OB_IMBALANCE','CANCEL_SIGNAL']},
-  {label:'Открытый интерес',       color:'#FF006E', ids:['INST_OI','RETAIL_CONTRA']},
-  {label:'Тренд и МА',             color:'#6366F1', ids:['PRICE_TREND','KAMA_SIGNAL','ZLEMA_SIGNAL','T3_SIGNAL','PFE_SIGNAL']},
-  {label:'Цикл и режим рынка',     color:'#60A4A1', ids:['SINEWAVE','DECYCLER','MMI_SIGNAL','TQI_SIGNAL','VR_SIGNAL']},
-  {label:'Межрыночный',            color:'#FFD700', ids:['CORR_PEERS']},
-  {label:'Техн. индикаторы (indlab)', color:'#34D399', ids:['EXT_INDICATORS']},
+  {label:'Поток ордеров',           color:'#00C9A7', ids:['BS_PRESSURE','AGGRESSOR_FLOW','LARGE_IMPACT','VWAP_SIGNAL','VOL_MOMENTUM']},
+  {label:'Микроструктура рынка',    color:'#7B8CDE', ids:['OB_IMBALANCE','CANCEL_SIGNAL']},
+  {label:'Позиционирование',        color:'#F59E0B', ids:['INST_OI','RETAIL_CONTRA','CORR_PEERS']},
+  {label:'Собственные модели цены', color:'#A78BFA', ids:['PRICE_TREND','KAMA_SIGNAL','ZLEMA_SIGNAL','T3_SIGNAL','PFE_SIGNAL','SINEWAVE','DECYCLER','MMI_SIGNAL','TQI_SIGNAL','VZO_SIGNAL','YZ_VOL','ZSCORE_SIGNAL','VR_SIGNAL']},
+  {label:'Техн. индикаторы (indlab)',color:'#34D399', ids:['EXT_INDICATORS']},
 ];
 // Модели отображаются отдельно
 const MODEL_METHOD_IDS = ['IL_MODEL_M1','IL_MODEL_M2','IL_MODEL_M3'];
@@ -2878,6 +2872,39 @@ function setAgeBadge(id, lastUpdate){
 // ============================================================
 let activeIndlabModel = 'm1';
 
+// Цвета кластеров indlab (совпадают с _IL_CATS в indlab)
+const _IL_CLUSTER_COLORS = {
+  'Тренд':'#3B82F6','Импульс':'#8B5CF6','Объём':'#10B981','Волатильность':'#F59E0B',
+  'Адаптивные МА':'#06B6D4','Фрактальность':'#6366F1','Энтропия':'#EC4899',
+  'Циклы Элерса':'#14B8A6','Режим рынка':'#F97316','Статистика':'#94A3B8',
+};
+// Читаемые имена индикаторов для expand-списка кластеров
+const _IL_ID_NAMES = {
+  rsi:'RSI(14)',rsi_w:'RSI(7)',stoch:'Stochastic',wr:'Williams %R',cci:'CCI',roc:'ROC',
+  momentum:'Momentum',cmo:'CMO',tsi:'TSI',ult_osc:'Ultimate Osc',ao:'AO',dpo:'DPO',
+  fisher:'Fisher',macd:'MACD',accel_osc:'AC Osc',elder_ray:'Elder Ray',elder_impulse:'Elder Impulse',
+  ichimoku:'Ichimoku',alligator:'Alligator',supertrend:'SuperTrend',adx:'ADX',aroon:'Aroon',
+  donchian:'Donchian',keltner:'Keltner',envelopes:'Envelopes',ema:'EMA Cross 12/26',
+  sma:'SMA Cross 10/30',vwap_ind:'VWAP',mcginley:'McGinley',parabolic:'Parabolic SAR',
+  vortex:'Vortex',stock_trend:'Stock Trend',
+  obv:'OBV',cmf:'CMF',vfi_ind:'VFI',force_idx:'Force Index',pvt:'PVT',vo:'VO',
+  vwma:'VWMA',klinger_ind:'Klinger Osc',twiggs_ind:'Twiggs MF',vzo_ind:'VZO',
+  chaikin_osc:'Chaikin Osc',acc_dist:'Acc/Dist',eom:'EOM',nvi:'NVI',pvi:'PVI',mfi:'MFI',
+  bb:'Bollinger Bands',bb_width:'BB Width',hist_vol:'Hist.Vol',vix_like:'VIX-like',
+  std_dev:'StdDev',ohlc_vol:'OHLC Vol',chaikin_vol:'Chaikin Vol',
+  parkinson_ind:'Parkinson Vol',gk_ind:'Garman-Klass Vol',rs_vol_ind:'Rogers-Satchell Vol',
+  yz_vol_ind:'Yang-Zhang Vol',ulcer_ind:'Ulcer Index',
+  kama_ind:'KAMA',frama_ind:'FRAMA',vidya_ind:'VIDYA',jma_ind:'JMA',zlema_ind:'ZLEMA',t3_ind:'T3',
+  fdi_ind:'FDI',hurst_ind:'Hurst',pfe_ind:'PFE',fractals:'Fractals',zigzag:'ZigZag',
+  shannon_ent:'Shannon Entropy',perm_ent:'Perm. Entropy',spec_ent:'Spectral Entropy',
+  cyber_cycle:'Cyber Cycle',roofing_ind:'Roofing Filter',sinewave_ind:'Sinewave',
+  ebs_ind:'Even Better Sinewave',decycler_ind:'Decycler Osc',
+  mmi_ind:'MMI',chop:'CHOP',vhf:'VHF',er_ind:'Eff. Ratio',tpi_ind:'TPI',
+  tqi_ind:'TQI',tii_ind:'TII',crash:'Crash Mode',recovery:'Recovery Mode',
+  flat:'Flat',high_vol:'High Vol',low_vol:'Low Vol',
+  zscore_roll:'Z-Score',skew_ind:'Skewness',kurt_ind:'Kurtosis',vr_ind:'Variance Ratio',acf_ind:'ACF(1)',
+};
+
 const _MODEL_META = {
   m1: {label:'Весовая агрегация',         short:'M1'},
   m2: {label:'Представители кластеров',   short:'M2'},
@@ -2961,25 +2988,30 @@ function renderIndlabClusters(){
     const pct = Math.round(sc * 100);
     const color = sc > 0.1 ? '#52F2C9' : sc < -0.1 ? '#FF4D7A' : '#9090A0';
     const bar = Math.abs(pct);
+    const catColor = _IL_CLUSTER_COLORS[label] || '#94A3B8';
+    const barColor = sc > 0.05 ? catColor : sc < -0.05 ? '#FF4D7A' : '#555';
     const safeId = '_ilcl_'+label.replace(/[^a-zа-яёА-ЯЁ0-9]/gi,'_');
-    const leaderLine = cl.leader ? `<span style="color:#A78BFA;">лидер: ${cl.leader}</span> ` : '';
-    const btLine = cl.bt?.h30?.acc != null ? `acc ${(cl.bt.h30.acc*100).toFixed(0)}%` : '';
+    const leaderName = cl.leader ? (_IL_ID_NAMES[cl.leader] || cl.leader) : '';
+    const leaderLine = leaderName ? `<div style="color:${catColor};margin-bottom:2px;">Лидер: ${leaderName}</div>` : '';
+    const btLine = cl.bt?.h30?.acc != null ? `<div style="color:var(--txt3);">бэктест H30: ${(cl.bt.h30.acc*100).toFixed(0)}% (${cl.bt.h30.n} сигн.)</div>` : '';
     const idsHtml = (cl.ids||[]).map(id=>{
+      const name = _IL_ID_NAMES[id] || id;
       const w = cl.weights?.[id];
-      return `<div style="padding:1px 0;color:var(--txt2);">• ${id}${w!=null?' <span style="color:var(--txt3);">('+w+')</span>':''}</div>`;
+      return `<div style="padding:1px 0;color:var(--txt2);">• ${name}${w!=null?` <span style="color:var(--txt3);">${(parseFloat(w)*100).toFixed(0)}%</span>`:''}</div>`;
     }).join('');
     return `<div style="border-bottom:1px solid rgba(255,255,255,0.05);">
       <div onclick="_toggleClusterDetail('${safeId}')" style="display:flex;align-items:center;gap:6px;padding:5px 0;cursor:pointer;">
-        <span style="font-size:10px;color:var(--txt2);min-width:110px;font-weight:600;">${label}</span>
+        <div style="width:3px;height:20px;background:${catColor};border-radius:2px;flex-shrink:0;"></div>
+        <span style="font-size:10px;color:var(--txt2);min-width:115px;font-weight:600;">${label}</span>
         <div style="flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;position:relative;">
-          <div style="position:absolute;height:100%;width:${bar}%;background:${color};border-radius:2px;
+          <div style="position:absolute;height:100%;width:${bar}%;background:${barColor};border-radius:2px;
             left:${sc<0?0:50}%;transform:${sc<0?'translateX(-100%)':'none'};"></div>
         </div>
-        <span style="font-size:11px;color:${color};min-width:32px;text-align:right;font-weight:700;">${pct>=0?'+':''}${pct}</span>
-        <span style="font-size:8px;color:var(--txt3);">▾</span>
+        <span style="font-size:11px;color:${barColor};min-width:32px;text-align:right;font-weight:700;">${pct>=0?'+':''}${pct}</span>
+        <span style="font-size:8px;color:var(--txt3);margin-left:2px;">▾</span>
       </div>
-      <div id="${safeId}" style="display:none;padding:4px 0 6px 8px;font-size:9px;line-height:1.5;">
-        <div>${leaderLine}${btLine}</div>
+      <div id="${safeId}" style="display:none;padding:4px 0 8px 18px;font-size:9px;line-height:1.6;border-left:2px solid ${catColor}33;margin-left:5px;">
+        ${leaderLine}${btLine}
         ${idsHtml}
       </div>
     </div>`;

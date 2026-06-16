@@ -9684,18 +9684,16 @@ function ilRenderAnalysis() {
 
 // Категории для группировки в конструкторе
 const _IL_CATS = [
-  {label:'Тренд',          ids:['ichimoku','alligator','supertrend','ema','vwma','mcginley','donchian','vortex','parabolic','stock_trend','macd','sma','aroon','vwap_ind']},
-  {label:'Импульс',        ids:['rsi','stoch','wr','cci','tsi','ult_osc','ao','dpo','fisher','cmo','rsi_w','accel_osc','roc','momentum']},
-  {label:'Волатильность',  ids:['bb','bb_width','keltner','envelopes','std_dev','hist_vol','vix_like','ohlc_vol','parkinson_ind','gk_ind','rs_vol_ind','yz_vol_ind','ulcer_ind']},
-  {label:'Режим рынка',    ids:['adx','chop','flat','high_vol','low_vol','crash','recovery','vhf','mmi_ind','tii_ind','er_ind','tpi_ind','tqi_ind']},
-  {label:'Объём',          ids:['obv','cmf','chaikin_osc','chaikin_vol','force_idx','mfi','pvt','nvi','pvi','eom','vo','acc_dist','klinger_ind','vzo_ind','twiggs_ind','vfi_ind']},
-  {label:'Elder',          ids:['elder_ray','elder_impulse']},
-  {label:'Структура цены', ids:['fractals','zigzag']},
-  {label:'Адаптивные МА',  ids:['kama_ind','frama_ind','vidya_ind','jma_ind','zlema_ind','t3_ind']},
-  {label:'Фрактал. анализ',ids:['fdi_ind','hurst_ind','pfe_ind']},
-  {label:'Энтропия',       ids:['shannon_ent','perm_ent','spec_ent']},
-  {label:'Элерс',          ids:['cyber_cycle','roofing_ind','sinewave_ind','decycler_ind','ebs_ind']},
-  {label:'Статистика',     ids:['zscore_roll','skew_ind','kurt_ind','acf_ind','vr_ind']},
+  {label:'Тренд',            color:'#3B82F6', ids:['ichimoku','alligator','supertrend','adx','aroon','donchian','keltner','envelopes','ema','sma','vwap_ind','mcginley','parabolic','vortex','stock_trend']},
+  {label:'Импульс',          color:'#8B5CF6', ids:['rsi','rsi_w','stoch','wr','cci','roc','momentum','cmo','tsi','ult_osc','ao','dpo','fisher','macd','accel_osc','elder_ray','elder_impulse']},
+  {label:'Объём',            color:'#10B981', ids:['obv','cmf','vfi_ind','force_idx','pvt','vo','vwma','klinger_ind','twiggs_ind','vzo_ind','chaikin_osc','acc_dist','eom','nvi','pvi','mfi']},
+  {label:'Волатильность',    color:'#F59E0B', ids:['bb','bb_width','hist_vol','vix_like','std_dev','ohlc_vol','chaikin_vol','parkinson_ind','gk_ind','rs_vol_ind','yz_vol_ind','ulcer_ind']},
+  {label:'Адаптивные МА',   color:'#06B6D4', ids:['kama_ind','frama_ind','vidya_ind','jma_ind','zlema_ind','t3_ind']},
+  {label:'Фрактальность',   color:'#6366F1', ids:['fdi_ind','hurst_ind','pfe_ind','fractals','zigzag']},
+  {label:'Энтропия',         color:'#EC4899', ids:['shannon_ent','perm_ent','spec_ent']},
+  {label:'Циклы Элерса',    color:'#14B8A6', ids:['cyber_cycle','roofing_ind','sinewave_ind','ebs_ind','decycler_ind']},
+  {label:'Режим рынка',      color:'#F97316', ids:['mmi_ind','chop','vhf','er_ind','tpi_ind','tqi_ind','tii_ind','crash','recovery','flat','high_vol','low_vol']},
+  {label:'Статистика',       color:'#94A3B8', ids:['zscore_roll','skew_ind','kurt_ind','vr_ind','acf_ind']},
 ];
 
 // Жадный поиск лучших комбинаций (межкластерные, H30)
