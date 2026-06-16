@@ -3133,13 +3133,14 @@ function renderObPanel(){
 function renderHistory(){
   const el = document.getElementById('historyArea');
   const statsEl = document.getElementById('historyStats');
-  if(!signalLog.length){
+  const log = curTicker ? signalLog.filter(e=>e.ticker===curTicker) : signalLog;
+  if(!log.length){
     el.innerHTML='<div style="font-size:10px;color:var(--txt3)">История пуста</div>';
     if(statsEl) statsEl.innerHTML = '';
     return;
   }
-  if(statsEl) statsEl.innerHTML = renderHistoryStats();
-  el.innerHTML = signalLog.slice(0,30).map(e=>{
+  if(statsEl) statsEl.innerHTML = renderHistoryStats(log);
+  el.innerHTML = log.slice(0,30).map(e=>{
     const d = scoreToDir(e.composite || 0);
     const out = e.outcome ? (e.outcome==='long'?'<span class="dp">↑ Рост</span>':e.outcome==='short'?'<span class="dn">↓ Падение</span>':'<span class="dm">→ Боковик</span>') : '<span style="color:var(--txt3)">—</span>';
     const t = e.ts ? new Date(e.ts).toLocaleString('ru-RU',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
@@ -3497,10 +3498,11 @@ async function loadScenarioStats(){
 }
 
 // Сводная статистика по signalLog: всего/закрыто/нейтральных/точность по направлению
-function renderHistoryStats(){
-  const total = signalLog.length;
-  const resolved = signalLog.filter(e=>e.outcome);
-  const neutralSig = signalLog.filter(e=>Math.abs(e.composite||0) <= 0.25).length;
+function renderHistoryStats(log){
+  log = log || (curTicker ? signalLog.filter(e=>e.ticker===curTicker) : signalLog);
+  const total = log.length;
+  const resolved = log.filter(e=>e.outcome);
+  const neutralSig = log.filter(e=>Math.abs(e.composite||0) <= 0.25).length;
   if(!resolved.length){
     return `<div class="hist-acc" style="margin-bottom:6px;">Всего сигналов: ${total} · нейтральных: ${neutralSig} (${(neutralSig/total*100).toFixed(0)}%) · исходов записано: 0 — статистика точности появится после первых исходов</div>`;
   }
