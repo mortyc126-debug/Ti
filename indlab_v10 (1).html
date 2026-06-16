@@ -662,7 +662,8 @@ input[type=range] { touch-action: none; }
 <div id="page-analysis" class="page">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
     <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;">
-    <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить анализ</button>
+    <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить / обновить</button>
+    <button onclick="ilRunAnalysis(true)" title="Удалить сохранённые бары и скачать заново (нужно если сменился инструмент или появились новые индикаторы)" style="padding:6px 10px;background:rgba(255,77,122,0.07);border:1px solid rgba(255,77,122,0.25);border-radius:8px;color:#FF4D7A;font-family:var(--mono);font-size:10px;cursor:pointer;">⟳ Перестроить БД</button>
     <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
   </div>
   <div id="an-results"></div>
@@ -8616,56 +8617,197 @@ function _ilPearson(a, b) {
 
 let _ilBtResults = null;
 
-async function ilRunAnalysis() {
+// ═══ База данных бэктеста (постоянная, в localStorage) ═══
+// Структура: { [ticker]: { indSig, bars: { 'YYYY-MM-DD': {o,h,l,c,v, scores:{id:val}} }, lastFetch } }
+// Агрегаты (stats/corrMatrix/clusters) не хранятся — пересчитываются из bars за секунды.
+const _IL_DB_KEY = 'il_bt_db_v2';
+// Сигнатура текущего набора индикаторов; при изменении старые бары нужно переоценить
+const _IL_IND_SIG = ()=>IL_INDICATORS.join(',');
+
+function ilBtDbGet() {
+  try { return JSON.parse(localStorage.getItem(_IL_DB_KEY)||'{}'); } catch(e) { return {}; }
+}
+function ilBtDbSet(db) {
+  try { localStorage.setItem(_IL_DB_KEY, JSON.stringify(db)); } catch(e) {}
+}
+
+// Извлекает ISO-дату из объекта свечи (может быть Date или строка)
+function _ilCandleDate(c) {
+  const t = c.time;
+  if (t instanceof Date) return t.toISOString().slice(0,10);
+  return String(t).slice(0,10);
+}
+
+// По массиву candles вычисляет scores каждого бара и возвращает {dateKey: {o,h,l,c,v,scores}}
+function _ilComputeBarScores(candles) {
+  const closes = candles.map(c=>c.close);
+  const ss = _ilCalcAllSeries(candles, closes);
+  const result = {};
+  candles.forEach((c,i)=>{
+    const d = _ilCandleDate(c);
+    const scores = {};
+    IL_INDICATORS.forEach(id=>{ scores[id] = ss[id]?.[i]??null; });
+    result[d] = {o:c.open,h:c.high,l:c.low,c:c.close,v:c.volume, scores};
+  });
+  return result;
+}
+
+// Пересчитывает scores только для баров с пропущенными индикаторами (после добавления новых)
+// candles — полный массив (warmup + пересчитываемые бары)
+function _ilRescoreMissingIndicators(barMap, candles) {
+  const missingIds = IL_INDICATORS.filter(id => {
+    const dates = Object.keys(barMap);
+    return dates.length > 0 && barMap[dates[0]].scores[id] === undefined;
+  });
+  if (!missingIds.length) return;
+  const closes = candles.map(c=>c.close);
+  const ss = _ilCalcAllSeries(candles, closes);
+  candles.forEach((c,i)=>{
+    const d = _ilCandleDate(c);
+    if (barMap[d]) missingIds.forEach(id=>{ barMap[d].scores[id] = ss[id]?.[i]??null; });
+  });
+}
+
+// Из barMap строит массивы closes и ss для агрегатных вычислений
+function _ilBarMapToArrays(barMap) {
+  const dates = Object.keys(barMap).sort();
+  const closes = dates.map(d=>barMap[d].c);
+  const ss = {};
+  IL_INDICATORS.forEach(id=>{ ss[id] = dates.map(d=>barMap[d].scores?.[id]??null); });
+  return {dates, closes, ss};
+}
+
+// Вычисляет агрегатные stats/corrMatrix/clusters из barMap
+async function _ilComputeAggregates(barMap, statusEl) {
+  const {dates, closes, ss} = _ilBarMapToArrays(barMap);
+  if (statusEl) statusEl.textContent = `Бэктест (${IL_INDICATORS.length} инд. × 3 горизонта, ${dates.length} баров)…`;
+  await new Promise(r=>setTimeout(r,0));
+  const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
+  const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
+  const trendMask = returns5.map(r=>r>=med5);
+  const rangeMask = returns5.map(r=>r<med5);
+  const stats = {};
+  IL_INDICATORS.forEach(id=>{
+    stats[id]={};
+    [5,15,30].forEach(h=>{
+      stats[id][`h${h}`]  = _ilBtStats(ss[id],closes,h,null);
+      stats[id][`h${h}T`] = _ilBtStats(ss[id],closes,h,trendMask);
+      stats[id][`h${h}R`] = _ilBtStats(ss[id],closes,h,rangeMask);
+    });
+  });
+  if (statusEl) statusEl.textContent = `Матрица корреляций (${IL_INDICATORS.length}²)…`;
+  await new Promise(r=>setTimeout(r,0));
+  const corrMatrix={};
+  IL_INDICATORS.forEach(a=>{corrMatrix[a]={};IL_INDICATORS.forEach(b=>{corrMatrix[a][b]=_ilPearson(ss[a],ss[b]);});});
+  const assigned=new Set(), clusters=[];
+  IL_INDICATORS.forEach(id=>{
+    if(assigned.has(id))return;
+    const cl=[id];assigned.add(id);
+    IL_INDICATORS.forEach(id2=>{if(!assigned.has(id2)&&Math.abs(corrMatrix[id][id2])>=0.5){cl.push(id2);assigned.add(id2);}});
+    clusters.push(cl);
+  });
+  const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
+  return {stats, corrMatrix, clusters, clusterOf, closes, ss, dates};
+}
+
+// Основная функция анализа.
+// forceRebuild=true — удаляет сохранённые бары и качает заново (для полной перезаписи).
+// addNewIndicators=true — оставляет бары, но досчитывает новые индикаторы.
+async function ilRunAnalysis(forceRebuild=false) {
   const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
   const statusEl = document.getElementById('an-status');
   const token = _ilShellToken;
   if (!ticker||!token) { if(statusEl) statusEl.textContent='Введите тикер; токен берётся со страницы График'; return; }
-  if (statusEl) statusEl.textContent = `Загружаю ${ticker}…`;
+
+  const db = ilBtDbGet();
+  let tickerDb = db[ticker] || null;
+  const curSig = _IL_IND_SIG();
+
+  // Если добавились новые индикаторы — досчитаем их на старых барах без перекачки
+  const needsRescoring = tickerDb && tickerDb.indSig !== curSig;
+  if (forceRebuild) { tickerDb = null; delete db[ticker]; }
+
   try {
-    const found = await ilFindFigi(ticker, token, chartGetProxy?.());
-    if (!found) throw new Error('Тикер не найден: '+ticker);
-    const now=new Date(), from=new Date(now);
-    from.setDate(from.getDate()-90);
-    const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
-    if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
-    const closes = candles.map(c=>c.close);
-    if (statusEl) statusEl.textContent = `Считаю ${IL_INDICATORS.length} индикаторов (${closes.length} баров)…`;
-    // Отдаём браузеру тик перед тяжёлыми вычислениями, чтобы статус отобразился
-    await new Promise(r=>setTimeout(r,0));
-    const ss = _ilCalcAllSeries(candles, closes);
-    if (statusEl) statusEl.textContent = `Бэктест (${IL_INDICATORS.length} × 3 горизонта)…`;
-    await new Promise(r=>setTimeout(r,0));
-    // Режимная маска: trending = |5-bar return| ≥ медианы
-    const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
-    const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
-    const trendMask = returns5.map(r=>r>=med5);
-    const rangeMask = returns5.map(r=>r<med5);
-    const HORIZONS = [5,15,30];
-    const stats = {};
-    IL_INDICATORS.forEach(id=>{
-      stats[id]={};
-      HORIZONS.forEach(h=>{
-        stats[id][`h${h}`]  = _ilBtStats(ss[id],closes,h,null);
-        stats[id][`h${h}T`] = _ilBtStats(ss[id],closes,h,trendMask);
-        stats[id][`h${h}R`] = _ilBtStats(ss[id],closes,h,rangeMask);
-      });
+    let newCandlesFetched = 0;
+
+    if (!tickerDb || needsRescoring || Object.keys(tickerDb.bars||{}).length < 20) {
+      // Первый запуск или перестройка: качаем 90 дней
+      if (statusEl) statusEl.textContent = `Загружаю ${ticker} (90 дней)…`;
+      const found = await ilFindFigi(ticker, token, chartGetProxy?.());
+      if (!found) throw new Error('Тикер не найден: '+ticker);
+      const now=new Date(), from=new Date(now);
+      from.setDate(from.getDate()-90);
+      const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
+      if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
+
+      if (statusEl) statusEl.textContent = `Считаю ${IL_INDICATORS.length} индикаторов (${candles.length} баров)…`;
+      await new Promise(r=>setTimeout(r,0));
+
+      const existingBars = (tickerDb && !forceRebuild) ? (tickerDb.bars||{}) : {};
+      const newBarScores = _ilComputeBarScores(candles);
+
+      // Мёрджим: новые бары перезаписывают старые (свежие данные точнее)
+      const mergedBars = {...existingBars, ...newBarScores};
+      // Если были старые бары с другим набором инд. — досчитываем только новые поля
+      if (needsRescoring && Object.keys(existingBars).length) {
+        _ilRescoreMissingIndicators(mergedBars, candles);
+      }
+
+      tickerDb = {indSig: curSig, bars: mergedBars, lastFetch: Date.now()};
+      newCandlesFetched = candles.length;
+
+    } else {
+      // Инкрементальное обновление: качаем только пропущенные дни
+      const storedDates = Object.keys(tickerDb.bars).sort();
+      const lastDate = storedDates[storedDates.length-1];
+      const lastDateObj = new Date(lastDate+'T12:00:00Z');
+      const now = new Date();
+      const daysSinceLast = Math.round((now-lastDateObj)/(86400000));
+
+      if (daysSinceLast < 1) {
+        // Данные уже сегодняшние — просто показываем
+        if (statusEl) statusEl.textContent = `${ticker} · данные актуальны (${storedDates.length} баров в БД) · пересчитываю агрегаты…`;
+      } else {
+        if (statusEl) statusEl.textContent = `${ticker} · загружаю +${daysSinceLast} дн. (с ${lastDate})…`;
+        const found = await ilFindFigi(ticker, token, chartGetProxy?.());
+        if (!found) throw new Error('Тикер не найден: '+ticker);
+        // Берём последние 250 хранимых баров как warmup + новые бары
+        const warmupDates = storedDates.slice(-250);
+        const warmupCandles = warmupDates.map(d=>{
+          const b=tickerDb.bars[d]; return {time:new Date(d+'T00:00:00Z'),open:b.o,high:b.h,low:b.l,close:b.c,volume:b.v};
+        });
+        const fetchFrom = new Date(lastDate+'T12:00:00Z');
+        fetchFrom.setDate(fetchFrom.getDate()+1);
+        const {candles:newC} = await ilGetCandlesChain(found, token, fetchFrom, now, chartGetProxy?.());
+        if (newC.length > 0) {
+          const fullC = [...warmupCandles, ...newC];
+          if (statusEl) statusEl.textContent = `Считаю ${IL_INDICATORS.length} инд. для ${newC.length} новых баров…`;
+          await new Promise(r=>setTimeout(r,0));
+          const allScored = _ilComputeBarScores(fullC);
+          // Берём только новые бары (не warmup)
+          newC.forEach(c=>{ const d=_ilCandleDate(c); tickerDb.bars[d]=allScored[d]; });
+          newCandlesFetched = newC.length;
+          tickerDb.lastFetch = Date.now();
+        }
+      }
+    }
+
+    // Сохраняем обновлённую БД
+    db[ticker] = tickerDb;
+    ilBtDbSet(db);
+
+    // Вычисляем агрегаты из всех хранимых баров
+    const barCount = Object.keys(tickerDb.bars).length;
+    const agg = await _ilComputeAggregates(tickerDb.bars, statusEl);
+    // Для последних свечей нужны candles с временем — реконструируем из barMap для ilDetectRegime
+    const sortedDates = agg.dates;
+    const reconCandles = sortedDates.map(d=>{
+      const b=tickerDb.bars[d]; return {time:new Date(d+'T00:00:00Z'),open:b.o,high:b.h,low:b.l,close:b.c,volume:b.v};
     });
-    if (statusEl) statusEl.textContent = `Матрица корреляций (${IL_INDICATORS.length}²)…`;
-    await new Promise(r=>setTimeout(r,0));
-    // Корреляционная матрица и кластеры
-    const corrMatrix={};
-    IL_INDICATORS.forEach(a=>{corrMatrix[a]={};IL_INDICATORS.forEach(b=>{corrMatrix[a][b]=_ilPearson(ss[a],ss[b]);});});
-    const assigned=new Set(), clusters=[];
-    IL_INDICATORS.forEach(id=>{
-      if(assigned.has(id))return;
-      const cl=[id];assigned.add(id);
-      IL_INDICATORS.forEach(id2=>{if(!assigned.has(id2)&&Math.abs(corrMatrix[id][id2])>=0.5){cl.push(id2);assigned.add(id2);}});
-      clusters.push(cl);
-    });
-    const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss};
-    if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${IL_INDICATORS.length} индикаторов · ${clusters.length} кластеров`;
+
+    _ilBtResults = {ticker, ...agg, candles: reconCandles};
+    const newLabel = newCandlesFetched ? ` · +${newCandlesFetched} новых` : '';
+    if(statusEl) statusEl.textContent=`✓ ${ticker} · ${barCount} баров в БД${newLabel} · ${IL_INDICATORS.length} инд. · ${agg.clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
 }
