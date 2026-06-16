@@ -2202,7 +2202,7 @@ function computeExpectedMove(ticker) {
   const tf = curTF;
   const candles = candleData[tf] || candleData['1d'] || [];
   if (candles.length < 5) return null;
-  const closes = candles.slice(-21).map(c => toP(c.close)).filter(Boolean);
+  const closes = candles.slice(-21).map(c => c.cl ?? toP(c.close)).filter(Boolean);
   if (closes.length < 5) return null;
   const curPrice = closes[closes.length - 1];
   if (!curPrice) return null;
@@ -2243,12 +2243,15 @@ function computeScenarios(compositeScore, ticker) {
   const candles = candleData[curTF] || candleData['1d'] || [];
   if (candles.length < 5) return null;
   const slice = candles.slice(-30);
-  const highs = slice.map(c => toP(c.high)).filter(Boolean);
-  const lows  = slice.map(c => toP(c.low)).filter(Boolean);
+  const ph = c => c.h ?? toP(c.high);
+  const pl = c => c.l ?? toP(c.low);
+  const pc = c => c.cl ?? toP(c.close);
+  const highs = slice.map(ph).filter(Boolean);
+  const lows  = slice.map(pl).filter(Boolean);
   if (!highs.length || !lows.length) return null;
   const swHigh = Math.max(...highs);
   const swLow  = Math.min(...lows);
-  const closes = slice.map(c => toP(c.close)).filter(Boolean);
+  const closes = slice.map(pc).filter(Boolean);
   const curPrice = closes[closes.length - 1];
   if (!curPrice || swHigh <= swLow) return null;
 
