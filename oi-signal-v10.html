@@ -67,7 +67,7 @@ a{color:var(--accent);text-decoration:none;}
 .gauge-svg{width:140px;height:76px;}
 .gauge-val{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:700;text-align:center;margin-top:2px;}
 .gauge-dir{font-size:10px;letter-spacing:.1em;text-align:center;margin-top:2px;}
-.gauge-conf{font-size:9px;color:var(--txt3);text-align:center;margin-top:1px;}
+.gauge-conf{font-size:11px;color:var(--txt3);text-align:center;margin-top:1px;}
 /* ---- Cluster blocks ---- */
 .cluster-block{border-left:3px solid #555;background:rgba(255,255,255,.02);border-radius:0 8px 8px 0;margin-bottom:5px;overflow:hidden;}
 .cluster-block-hdr{display:flex;flex-direction:column;gap:5px;padding:8px 10px 6px;cursor:pointer;user-select:none;}
@@ -103,12 +103,12 @@ a{color:var(--accent);text-decoration:none;}
 /* ---- Data panels ---- */
 .dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
 .dp-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;}
-.dp-label{font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.dp-label{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
 .dp-val{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;}
-.dp-sub{font-size:9px;color:var(--txt3);margin-top:1px;}
+.dp-sub{font-size:11px;color:var(--txt3);margin-top:1px;}
 /* ---- FutOI block ---- */
 .futoi-row{display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:4px;font-size:10px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);}
-.futoi-hdr{color:var(--txt3);font-size:9px;letter-spacing:.06em;text-transform:uppercase;}
+.futoi-hdr{color:var(--txt3);font-size:11px;letter-spacing:.04em;text-transform:uppercase;}
 /* ---- History ---- */
 .hist-row{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:10px;}
 .hist-date{color:var(--txt3);width:90px;flex-shrink:0;}
@@ -116,7 +116,7 @@ a{color:var(--accent);text-decoration:none;}
 .hist-dir{width:48px;flex-shrink:0;}
 .hist-score{width:36px;text-align:right;flex-shrink:0;font-weight:600;}
 .hist-outcome{flex:1;}
-.hist-acc{font-size:9px;color:var(--txt3);}
+.hist-acc{font-size:11px;color:var(--txt3);}
 .scen-table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:10px;}
 .scen-table th{text-align:left;color:var(--txt3);font-weight:400;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.08);}
 .scen-table td{padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--txt2);}
@@ -159,7 +159,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
 .cat-item-code{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}
 .copy-ticker{cursor:pointer;font-size:9px;opacity:.5;transition:opacity .15s;}
 .copy-ticker:hover{opacity:1;}
-.cat-item-name{font-size:9px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.cat-item-name{font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
 .cat-item-sector{font-size:8px;color:var(--txt3);opacity:.6;white-space:nowrap;}
 .pin-btn{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;flex-shrink:0;}
 .pin-btn:hover{color:var(--accent);}
@@ -356,7 +356,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
         <div class="gauge-val" id="gaugeVal">—</div>
         <div class="gauge-dir" id="gaugeDir" style="color:var(--txt3);">Нет данных</div>
         <div class="gauge-conf" id="gaugeConf"></div>
-        <div id="gaugeModelLine" style="font-size:9px;color:var(--txt3);text-align:center;margin-top:2px;min-height:13px;"></div>
+        <div id="gaugeModelLine" style="font-size:11px;color:var(--txt3);text-align:center;margin-top:2px;min-height:14px;"></div>
         <div id="expectedMoveBar" style="font-size:9px;color:var(--txt3);text-align:center;margin-top:3px;min-height:14px;font-family:'JetBrains Mono',monospace;"></div>
       </div>
       <div id="scenario-panel" style="margin-top:6px;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--txt2);line-height:1.6;"></div>
@@ -3125,7 +3125,6 @@ function renderMethodsTable(methodResults){
     const barPct = Math.abs(Math.round(catScore*100));
     const safeId = '_mcat_'+cat.label.replace(/[^a-zа-яёА-ЯЁ0-9]/gi,'_');
     const topMethod = catMethods[0];
-    const topR = methodResults[topMethod?.id] || {score:0};
     const topName = topMethod ? topMethod.label : '';
     const rowsHtml = catMethods.map(m=>{
       const r = methodResults[m.id] || {score:0,confidence:0,detail:''};
