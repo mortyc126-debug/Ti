@@ -2188,6 +2188,159 @@ function renderRegimeBadge(regimeState) {
 
 
 // ============================================================
+// IND LIB — встроенные функции (candles:{h,l,cl,o,vol})
+// ============================================================
+function _oiSMA(arr,p){const out=new Array(arr.length).fill(NaN);let s=0;for(let i=0;i<arr.length;i++){s+=isNaN(arr[i])?0:arr[i];if(i>=p)s-=isNaN(arr[i-p])?0:arr[i-p];if(i>=p-1)out[i]=s/p;}return out;}
+function _oiEMA(arr,p){const out=new Array(arr.length).fill(NaN);const k=2/(p+1);let prev;for(let i=0;i<arr.length;i++){if(isNaN(arr[i])){out[i]=prev??NaN;continue;}prev=prev===undefined?arr[i]:arr[i]*k+prev*(1-k);out[i]=prev;}return out;}
+function _oiMean(a){return a.reduce((s,v)=>s+v,0)/a.length;}
+function _oiLR(cl){const out=new Array(cl.length).fill(0);for(let i=1;i<cl.length;i++)out[i]=Math.log(cl[i]/cl[i-1]);return out;}
+function _oiAdapt(cs){return cs.map(c=>({o:c.o??toP(c.open),h:c.h??toP(c.high),l:c.l??toP(c.low),c:c.cl??toP(c.close),v:c.vol??c.volume??0}));}
+
+function _oiKAMA(cl,p=10){const out=new Array(cl.length).fill(NaN);const fk=2/3,sk=2/31;let prev;for(let i=p;i<cl.length;i++){const ch=Math.abs(cl[i]-cl[i-p]);let vol=0;for(let j=i-p+1;j<=i;j++)vol+=Math.abs(cl[j]-cl[j-1]);const er=vol?ch/vol:0;const sc=(er*(fk-sk)+sk)**2;prev=prev===undefined?cl[i]:prev+sc*(cl[i]-prev);out[i]=prev;}return out;}
+function _oiZLEMA(cl,p=14){const lag=Math.floor((p-1)/2);return _oiEMA(cl.map((c,i)=>i>=lag?c+(c-cl[i-lag]):c),p);}
+function _oiT3(cl,p=5,v=0.7){const e1=_oiEMA(cl,p),e2=_oiEMA(e1,p),e3=_oiEMA(e2,p),e4=_oiEMA(e3,p),e5=_oiEMA(e4,p),e6=_oiEMA(e5,p);const c1=-(v**3),c2=3*v**2+3*v**3,c3=-6*v**2-3*v-3*v**3,c4=1+3*v+v**3+3*v**2;return cl.map((_,i)=>isNaN(e3[i])?NaN:c1*e6[i]+c2*e5[i]+c3*e4[i]+c4*e3[i]);}
+function _oiCyberCycle(cl,alpha=0.07){const n=cl.length,sm=new Array(n).fill(0),cy=new Array(n).fill(0);for(let i=3;i<n;i++){sm[i]=(cl[i]+2*cl[i-1]+2*cl[i-2]+cl[i-3])/6;cy[i]=(1-0.5*alpha)**2*(sm[i]-2*sm[i-1]+sm[i-2])+2*(1-alpha)*(cy[i-1]||0)-(1-alpha)**2*(cy[i-2]||0);}return cy;}
+function _oiSinewave(cl){const cy=_oiCyberCycle(cl),n=cl.length,sine=new Array(n).fill(0),lead=new Array(n).fill(0);for(let i=6;i<n;i++){const ip=cy[i]-(cy[i-6]||0),qp=cy[i-3]||0,ph=Math.atan2(qp,ip)*180/Math.PI;sine[i]=Math.sin(ph*Math.PI/180);lead[i]=Math.sin((ph+45)*Math.PI/180);}return{sine,lead};}
+function _oiDecycler(cl,hp=125){const n=cl.length,a1=(Math.cos(2*Math.PI/hp)+Math.sin(2*Math.PI/hp)-1)/Math.cos(2*Math.PI/hp),dec=new Array(n).fill(cl[0]||0);for(let i=1;i<n;i++)dec[i]=(a1/2)*(cl[i]+cl[i-1])+(1-a1)*dec[i-1];return cl.map((c,i)=>c-dec[i]);}
+function _oiPFE(cl,p=10,sm=5){const raw=new Array(cl.length).fill(NaN);for(let i=p;i<cl.length;i++){const pc=cl[i]-cl[i-p];let path=0;for(let j=i-p+1;j<=j&&j<=i;j++)path+=Math.sqrt((cl[j]-cl[j-1])**2+1);const dist=Math.sqrt(pc**2+p**2);raw[i]=path?Math.sign(pc)*100*dist/path:0;}return _oiEMA(raw,sm);}
+function _oiMMI(cl,p=200){const out=new Array(cl.length).fill(NaN);for(let i=p-1;i<cl.length;i++){const ch=cl.slice(i-p+1,i+1),m=_oiMean(ch);let cr=0,prev=ch[0]>m;for(let j=0;j<ch.length;j++){const ia=ch[j]>m;if(j>0&&ia!==prev)cr++;prev=ia;}out[i]=100*(1-cr/p);}return out;}
+function _oiTQI(cl,p=20){const er=cl.map((_,i)=>{if(i<p)return NaN;const ch=Math.abs(cl[i]-cl[i-p]);let vol=0;for(let j=i-p+1;j<=i;j++)vol+=Math.abs(cl[j]-cl[j-1]);return vol?ch/vol:0;});const out=new Array(cl.length).fill(NaN);for(let i=p-1;i<cl.length;i++){const ch=cl.slice(i-p+1,i+1),xs=ch.map((_,k)=>k),mx=_oiMean(xs),my=_oiMean(ch);let num=0,den=0;for(let j=0;j<ch.length;j++){num+=(xs[j]-mx)*(ch[j]-my);den+=(xs[j]-mx)**2;}const slope=den?num/den:0;out[i]=(er[i]||0)*Math.sign(slope)*Math.min(1,Math.abs(slope)/(my||1)*p);}return out;}
+function _oiYZ(cc,p=20,ann=252){const out=new Array(cc.length).fill(NaN),k=0.34/(1.34+(p+1)/(p-1));for(let i=p;i<cc.length;i++){let sO=0,sC=0,sRS=0;for(let j=i-p+1;j<=i;j++){const c=cc[j],pr=cc[j-1],ov=Math.log(c.c/pr.c);sO+=ov*ov;const cv=Math.log(c.c/c.o);sC+=cv*cv;sRS+=Math.log(c.h/c.c)*Math.log(c.h/c.o)+Math.log(c.l/c.c)*Math.log(c.l/c.o);}out[i]=Math.sqrt(Math.max(0,sO/(p-1)+k*(sC/(p-1))+(1-k)*(sRS/p))*ann)*100;}return out;}
+function _oiVZO(cc,p=14){const vp=new Array(cc.length).fill(0);for(let i=1;i<cc.length;i++)vp[i]=cc[i].c>cc[i-1].c?(cc[i].v||0):-(cc[i].v||0);const vols=cc.map(c=>c.v||0),ev=_oiEMA(vp,p),evol=_oiEMA(vols,p);return ev.map((v,i)=>evol[i]?100*v/evol[i]:NaN);}
+function _oiZScore(cl,p=20){const m=_oiSMA(cl,p);const out=new Array(cl.length).fill(NaN);for(let i=p-1;i<cl.length;i++){const ch=cl.slice(i-p+1,i+1),mn=_oiMean(ch),sd=Math.sqrt(_oiMean(ch.map(v=>(v-mn)**2)));out[i]=sd?(cl[i]-mn)/sd:NaN;}return out;}
+function _oiVR(cl,q=5,win=60){const out=new Array(cl.length).fill(NaN),lr=_oiLR(cl);for(let i=win+q;i<cl.length;i++){const chunk=lr.slice(i-win+1,i+1),mu=_oiMean(chunk),v1=_oiMean(chunk.map(r=>(r-mu)**2));let sQ=0;for(let j=q-1;j<chunk.length;j++){let s=0;for(let k=j-q+1;k<=j;k++)s+=chunk[k];sQ+=(s-q*mu)**2;}const vQ=sQ/(chunk.length-q+1)/q;out[i]=v1?vQ/v1:NaN;}return out;}
+
+// Сигнальные методы на базе IND lib
+function _oiCandleScore(key){
+  const tf=curTF;
+  const cs=candleData[tf]||candleData['1d']||[];
+  if(cs.length<30) return {score:0,confidence:0,detail:'мало свечей'};
+  const cc=_oiAdapt(cs);
+  const cl=cc.map(c=>c.c);
+  return {cc,cl};
+}
+
+function m_KAMA_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const kama=_oiKAMA(cl,10);
+  const last=cl.length-1;
+  const v=kama[last]; if(isNaN(v)) return {score:0,confidence:0,detail:'KAMA: нет данных'};
+  const d=(cl[last]-v)/v;
+  const score=d>0.015?1:d>0.005?0.5:d<-0.015?-1:d<-0.005?-0.5:0;
+  return {score,confidence:0.4,detail:`KAMA(10)=${v.toFixed(2)}, цена=${cl[last].toFixed(2)}, откл.=${(d*100).toFixed(2)}%`};
+}
+function m_ZLEMA_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const z=_oiZLEMA(cl,14);
+  const last=cl.length-1;
+  const v=z[last]; if(isNaN(v)) return {score:0,confidence:0,detail:'ZLEMA: нет данных'};
+  const d=(cl[last]-v)/v;
+  const score=d>0.01?1:d>0.003?0.5:d<-0.01?-1:d<-0.003?-0.5:0;
+  return {score,confidence:0.35,detail:`ZLEMA(14)=${v.toFixed(2)}, цена=${cl[last].toFixed(2)}`};
+}
+function m_T3_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const t=_oiT3(cl,5);
+  const last=cl.length-1;
+  const v=t[last]; if(isNaN(v)) return {score:0,confidence:0,detail:'T3: нет данных'};
+  const d=(cl[last]-v)/v;
+  const score=d>0.01?1:d>0.003?0.5:d<-0.01?-1:d<-0.003?-0.5:0;
+  return {score,confidence:0.35,detail:`T3(5)=${v.toFixed(2)}, цена=${cl[last].toFixed(2)}`};
+}
+function m_SINEWAVE_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const sw=_oiSinewave(cl);
+  const last=cl.length-1;
+  const s=sw.sine[last],l=sw.lead[last];
+  if(isNaN(s)||isNaN(l)) return {score:0,confidence:0,detail:'Sinewave: нет данных'};
+  const score=l>s&&l>0?1:l<s&&l<0?-1:l>s?0.5:-0.5;
+  return {score,confidence:0.4,detail:`Ehlers Sinewave: Sine=${s.toFixed(3)}, Lead=${l.toFixed(3)} → ${score>0?'↑бычий':'↓медвежий'}`};
+}
+function m_DECYCLER_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const dec=_oiDecycler(cl,125);
+  const last=cl.length-1;
+  const v=dec[last],prev=dec[last-1]??0;
+  const score=v>0&&prev<=0?1:v<0&&prev>=0?-1:v>0?0.5:-0.5;
+  return {score,confidence:0.35,detail:`Decycler Osc=${v.toFixed(4)} → ${score>0?'↑':'↓'}`};
+}
+function m_MMI_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const mmi=_oiMMI(cl,Math.min(200,cl.length-1));
+  const v=mmi[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'MMI: нет данных'};
+  // MMI > 75 = боковик (плохо для тренда), < 50 = тренд
+  const regime=v>75?'боковик':v<50?'тренд':'нейтр.';
+  const score=v>75?-0.5:v<50?0.5:0;
+  return {score,confidence:0.3,detail:`MMI(${Math.min(200,cl.length-1)})=${v.toFixed(1)}% — режим: ${regime}`};
+}
+function m_TQI_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const tqi=_oiTQI(cl,20);
+  const v=tqi[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'TQI: нет данных'};
+  const score=v>0.3?1:v>0?0.5:v<-0.3?-1:v<0?-0.5:0;
+  return {score,confidence:0.4,detail:`Trend Quality Index(20)=${v.toFixed(3)}`};
+}
+function m_YZ_VOL_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cc,cl}=r;
+  const yz=_oiYZ(cc,20);
+  const v=yz[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'YZ Vol: нет данных'};
+  // Высокая YZ-волатильность = риск, низкая = спокойствие
+  const hist=yz.slice(-60).filter(x=>!isNaN(x));
+  const pct=hist.length?hist.filter(x=>x<v).length/hist.length:0.5;
+  const score=pct>0.8?-0.5:pct<0.2?0.5:0;
+  return {score,confidence:0.3,detail:`Yang-Zhang Vol(20)=${v.toFixed(1)}% (перцентиль 60д: ${(pct*100).toFixed(0)}%)`};
+}
+function m_VZO_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cc,cl}=r;
+  const vzo=_oiVZO(cc,14);
+  const v=vzo[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'VZO: нет данных'};
+  const score=v>5?1:v>0?0.5:v<-5?-1:-0.5;
+  return {score,confidence:0.4,detail:`Volume Zone Osc(14)=${v.toFixed(1)}`};
+}
+function m_ZSCORE_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const zs=_oiZScore(cl,20);
+  const v=zs[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'Z-Score: нет данных'};
+  // Низкий z-score = перепродан (покупка), высокий = перекуплен
+  const score=v<-2?1:v<-1?0.5:v>2?-1:v>1?-0.5:0;
+  return {score,confidence:0.35,detail:`Rolling Z-Score(20)=${v.toFixed(2)} → ${score>0?'перепродан':score<0?'перекуплен':'норма'}`};
+}
+function m_VR_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const vr=_oiVR(cl,5);
+  const v=vr[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'VR: нет данных'};
+  const score=v>1.3?0.5:v<0.7?-0.5:0;
+  const label=v>1.3?'трендовый':v<0.7?'mean-reverting':'случайный';
+  return {score,confidence:0.3,detail:`Variance Ratio(q=5)=${v.toFixed(3)} — рынок: ${label}`};
+}
+function m_PFE_SIGNAL(){
+  const r=_oiCandleScore(); if(r.detail) return r;
+  const {cl}=r;
+  const pfe=_oiPFE(cl,10,5);
+  const v=pfe[cl.length-1];
+  if(isNaN(v)) return {score:0,confidence:0,detail:'PFE: нет данных'};
+  const score=v>50?1:v>20?0.5:v<-50?-1:v<-20?-0.5:0;
+  return {score,confidence:0.4,detail:`PFE(10)=${v.toFixed(1)} → ${score>0?'↑тренд вверх':score<0?'↓тренд вниз':'нейтр.'}`};
+}
+
+// ============================================================
 // COMPOSITE SIGNAL ENGINE
 // ============================================================
 function computeAllMethods(){
@@ -2204,6 +2357,19 @@ function computeAllMethods(){
   results.PRICE_TREND    = m_PRICE_TREND(candleData);
   results.CORR_PEERS     = m_CORR_PEERS();
   results.EXT_INDICATORS = m_EXT_INDICATORS();
+  // IND lib методы
+  results.KAMA_SIGNAL    = m_KAMA_SIGNAL();
+  results.ZLEMA_SIGNAL   = m_ZLEMA_SIGNAL();
+  results.T3_SIGNAL      = m_T3_SIGNAL();
+  results.SINEWAVE       = m_SINEWAVE_SIGNAL();
+  results.DECYCLER       = m_DECYCLER_SIGNAL();
+  results.MMI_SIGNAL     = m_MMI_SIGNAL();
+  results.TQI_SIGNAL     = m_TQI_SIGNAL();
+  results.YZ_VOL         = m_YZ_VOL_SIGNAL();
+  results.VZO_SIGNAL     = m_VZO_SIGNAL();
+  results.ZSCORE_SIGNAL  = m_ZSCORE_SIGNAL();
+  results.VR_SIGNAL      = m_VR_SIGNAL();
+  results.PFE_SIGNAL     = m_PFE_SIGNAL();
   return results;
 }
 

@@ -8252,6 +8252,22 @@ const IL_INDICATORS = [
   'zigzag','fractals','crash','recovery','flat','high_vol','low_vol','stock_trend',
   // Пакет 5: SMA-кросс, Aroon, ROC, Momentum, VHF, VWAP-индикатор
   'sma','aroon','roc','momentum','vhf','vwap_ind',
+  // Пакет 6: адаптивные средние (IND lib)
+  'kama_ind','frama_ind','vidya_ind','jma_ind','zlema_ind','t3_ind',
+  // Пакет 7: фрактальный анализ
+  'fdi_ind','hurst_ind','pfe_ind',
+  // Пакет 8: энтропия
+  'shannon_ent','perm_ent','spec_ent',
+  // Пакет 9: Элерс
+  'cyber_cycle','roofing_ind','sinewave_ind','decycler_ind','ebs_ind',
+  // Пакет 10: режим рынка (доп.)
+  'mmi_ind','tii_ind','er_ind','tpi_ind','tqi_ind',
+  // Пакет 11: волатильность (доп.)
+  'parkinson_ind','gk_ind','rs_vol_ind','yz_vol_ind','ulcer_ind',
+  // Пакет 12: объём (доп.)
+  'klinger_ind','vzo_ind','twiggs_ind','vfi_ind',
+  // Пакет 13: статистика
+  'zscore_roll','skew_ind','kurt_ind','acf_ind','vr_ind',
 ];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
@@ -8271,6 +8287,19 @@ const IL_NAMES = {
   low_vol:'Режим: низкая вол.', stock_trend:'Режим: тренд (SMA200)',
   sma:'SMA 10/30 кросс', aroon:'Aroon Oscillator', roc:'ROC (скорость изм.)',
   momentum:'Momentum', vhf:'VHF (режим рынка)', vwap_ind:'VWAP-индикатор',
+  kama_ind:'KAMA (Kaufman AMA)', frama_ind:'FRAMA (Fractal AMA)', vidya_ind:'VIDYA',
+  jma_ind:'JMA (Jurik MA)', zlema_ind:'ZLEMA (Zero-Lag EMA)', t3_ind:'T3 (Tilson)',
+  fdi_ind:'FDI (Fractal Dimension)', hurst_ind:'Hurst Exponent', pfe_ind:'PFE (Polar. Fractal Eff.)',
+  shannon_ent:'Shannon Entropy', perm_ent:'Permutation Entropy', spec_ent:'Spectral Entropy',
+  cyber_cycle:'Cyber Cycle (Ehlers)', roofing_ind:'Roofing Filter', sinewave_ind:'Sinewave (Ehlers)',
+  decycler_ind:'Decycler Osc', ebs_ind:'Even Better Sinewave',
+  mmi_ind:'MMI (Market Meanness)', tii_ind:'Trend Intensity Index', er_ind:'Efficiency Ratio',
+  tpi_ind:'Trend Persistence', tqi_ind:'Trend Quality',
+  parkinson_ind:'Parkinson Vol', gk_ind:'Garman-Klass Vol', rs_vol_ind:'Rogers-Satchell Vol',
+  yz_vol_ind:'Yang-Zhang Vol', ulcer_ind:'Ulcer Index',
+  klinger_ind:'Klinger Oscillator', vzo_ind:'Volume Zone Osc', twiggs_ind:'Twiggs Money Flow', vfi_ind:'VFI',
+  zscore_roll:'Rolling Z-Score', skew_ind:'Skewness', kurt_ind:'Kurtosis',
+  acf_ind:'Autocorrelation(1)', vr_ind:'Variance Ratio',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -8396,6 +8425,68 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.vhf      = _vhfA.map((v,i)=>ilScoreVHF(v,_vhfA,i));
   seriesScore.vwap_ind = _vwapA.map((v,i)=>ilScoreVWAP(closes[i],v,_atrScalar));
 
+  // Пакеты 6-13: IND lib
+  const _indC = _indAdapt(candles);
+  // Адаптивные средние
+  const _kamaA=indKAMA(closes,10),_framaA=indFRAMA(_indC,16),_vidyaA=indVIDYA(closes,9);
+  const _jmaA=indJMA(closes,7),_zlemaA=indZLEMA(closes,14),_t3A=indT3(closes,5);
+  seriesScore.kama_ind  =_kamaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  seriesScore.frama_ind =_framaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  seriesScore.vidya_ind =_vidyaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  seriesScore.jma_ind   =_jmaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  seriesScore.zlema_ind =_zlemaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  seriesScore.t3_ind    =_t3A.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  // Фрактальный анализ
+  const _fdiA=indFDI(closes,30),_pfeA=indPFE(closes,10,5);
+  const _hurstVal=indHurst(closes.slice(-60));
+  seriesScore.fdi_ind  =_fdiA.map(v=>ilScoreFDI(v));
+  seriesScore.hurst_ind=closes.map((_,i)=>i===closes.length-1?ilScoreHurst(_hurstVal):null);
+  seriesScore.pfe_ind  =_pfeA.map(v=>ilScorePFE(v));
+  // Энтропия
+  const _shannA=indShannonEnt(closes,30),_permA=indPermEnt(closes,30,3),_specA=indSpecEnt(closes,32);
+  seriesScore.shannon_ent=_shannA.map((v,i)=>ilScoreEntropyInd(v,_shannA,i));
+  seriesScore.perm_ent   =_permA.map((v,i)=>ilScoreEntropyInd(v,_permA,i));
+  seriesScore.spec_ent   =_specA.map((v,i)=>ilScoreEntropyInd(v,_specA,i));
+  // Элерс
+  const _ccA=indCyberCycle(closes),_roofA=indRoofing(closes),_swR=indSinewave(closes);
+  const _decA=indDecycler(closes),_ebsA=indEBS(closes);
+  seriesScore.cyber_cycle  =_ccA.map((_,i)=>ilScoreCyberCycleInd(_ccA,i));
+  seriesScore.roofing_ind  =_roofA.map((_,i)=>ilScoreCyberCycleInd(_roofA,i));
+  seriesScore.sinewave_ind =_swR.sine.map((v,i)=>ilScoreSinewaveInd(v,_swR.lead[i]));
+  seriesScore.decycler_ind =_decA.map((_,i)=>ilScoreDecyclerInd(_decA,i));
+  seriesScore.ebs_ind      =_ebsA.map((_,i)=>ilScoreCyberCycleInd(_ebsA,i));
+  // Режим рынка (доп.)
+  const _mmiA=indMMI(closes,200),_tiiA=indTII(closes,30),_erA2=indER(closes,10);
+  const _tpiA=indTPI(closes,20),_tqiA=indTQI(closes,20);
+  seriesScore.mmi_ind=_mmiA.map(v=>ilScoreMMI(v));
+  seriesScore.tii_ind=_tiiA.map(v=>ilScoreTII(v));
+  seriesScore.er_ind =_erA2.map(v=>ilScoreER(v));
+  seriesScore.tpi_ind=_tpiA.map(v=>ilScoreTPI(v));
+  seriesScore.tqi_ind=_tqiA.map(v=>ilScoreTQI(v));
+  // Волатильность (доп.)
+  const _parkA=indParkinson(_indC,20),_gkA=indGK(_indC,20),_rsVA=indRS(_indC,20);
+  const _yzA=indYZ(_indC,20),_ulcA=indUlcer(closes,14);
+  seriesScore.parkinson_ind=_parkA.map((_,i)=>ilScoreVolInd(_parkA[i],_parkA,i));
+  seriesScore.gk_ind       =_gkA.map((_,i)=>ilScoreVolInd(_gkA[i],_gkA,i));
+  seriesScore.rs_vol_ind   =_rsVA.map((_,i)=>ilScoreVolInd(_rsVA[i],_rsVA,i));
+  seriesScore.yz_vol_ind   =_yzA.map((_,i)=>ilScoreVolInd(_yzA[i],_yzA,i));
+  seriesScore.ulcer_ind    =_ulcA.map((_,i)=>ilScoreVolInd(_ulcA[i],_ulcA,i));
+  // Объём (доп.)
+  const _klgA=indKlinger(_indC,34,55),_vzoA=indVZO(_indC,14);
+  const _twgA=indTwiggs(_indC,21),_vfiA=indVFI(_indC,130);
+  seriesScore.klinger_ind=_klgA.map((_,i)=>ilScoreKlingerInd(_klgA,i));
+  seriesScore.vzo_ind    =_vzoA.map(v=>ilScoreVZO(v));
+  seriesScore.twiggs_ind =_twgA.map(v=>ilScoreTwiggs(v));
+  seriesScore.vfi_ind    =_vfiA.map((_,i)=>ilScoreKlingerInd(_vfiA,i));
+  // Статистика
+  const _zsA=indZScore(closes,20),_skwA=indSkew(closes,20),_krtA=indKurt(closes,20);
+  const _acfA=indAcf(closes,1,30),_vrA2=indVR(closes,5);
+  seriesScore.zscore_roll=_zsA.map(v=>ilScoreZScoreRoll(v));
+  seriesScore.skew_ind   =_skwA.map(v=>ilScoreSkewInd(v));
+  seriesScore.kurt_ind   =_krtA.map(v=>ilScoreKurtInd(v));
+  seriesScore.acf_ind    =_acfA.map(v=>ilScoreAcfInd(v));
+  seriesScore.vr_ind     =_vrA2.map(v=>ilScoreVR(v));
+
   // Бэктест по 3 горизонтам для каждого индикатора
   const evalRes = {};
   IL_INDICATORS.forEach(id=>{
@@ -8512,6 +8603,42 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     momentum: `Momentum(10) = ${_momA[last]?.toFixed(2)??'—'}`,
     vhf: `VHF(28) = ${_vhfA[last]?.toFixed(3)??'—'}`,
     vwap_ind: `VWAP(20) = ${_vwapA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    kama_ind: `KAMA(10) = ${_kamaA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    frama_ind:`FRAMA(16) = ${_framaA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    vidya_ind:`VIDYA(9) = ${_vidyaA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    jma_ind:  `JMA(7) = ${_jmaA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    zlema_ind:`ZLEMA(14) = ${_zlemaA[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    t3_ind:   `T3(5) = ${_t3A[last]?.toFixed(2)??'—'}, цена ${closes[last]?.toFixed(2)??'—'}`,
+    fdi_ind:  `FDI(30) = ${_fdiA[last]?.toFixed(3)??'—'} (${_fdiA[last]!=null?(_fdiA[last]<1.35?'тренд':_fdiA[last]>1.65?'случайность':'переход'):'—'})`,
+    hurst_ind:`Hurst(60б) = ${typeof _hurstVal==='number'&&!isNaN(_hurstVal)?_hurstVal.toFixed(3):'—'} (${typeof _hurstVal==='number'?(_hurstVal>0.6?'трендовый':_hurstVal<0.4?'mean-rev.':'случайный'):'—'})`,
+    pfe_ind:  `PFE(10) = ${_pfeA[last]?.toFixed(1)??'—'}`,
+    shannon_ent:`Shannon Ent(30) = ${_shannA[last]?.toFixed(3)??'—'}`,
+    perm_ent: `Perm. Ent(30) = ${_permA[last]?.toFixed(3)??'—'}`,
+    spec_ent: `Spectral Ent(32) = ${_specA[last]?.toFixed(3)??'—'}`,
+    cyber_cycle:`Cyber Cycle = ${_ccA[last]?.toFixed(4)??'—'}`,
+    roofing_ind:`Roofing Filter = ${_roofA[last]?.toFixed(4)??'—'}`,
+    sinewave_ind:`Sine = ${_swR.sine[last]?.toFixed(3)??'—'} / Lead = ${_swR.lead[last]?.toFixed(3)??'—'}`,
+    decycler_ind:`Decycler Osc = ${_decA[last]?.toFixed(4)??'—'}`,
+    ebs_ind:  `Even Better Sinewave = ${_ebsA[last]?.toFixed(3)??'—'}`,
+    mmi_ind:  `MMI(200) = ${_mmiA[last]?.toFixed(1)??'—'}% (${_mmiA[last]!=null?(_mmiA[last]>75?'боковик':_mmiA[last]<50?'тренд':'нейтр.'):'—'})`,
+    tii_ind:  `TII(30) = ${_tiiA[last]?.toFixed(1)??'—'}`,
+    er_ind:   `Eff. Ratio(10) = ${_erA2[last]?.toFixed(3)??'—'}`,
+    tpi_ind:  `Trend Persistence(20) = ${_tpiA[last]?.toFixed(3)??'—'}`,
+    tqi_ind:  `Trend Quality(20) = ${_tqiA[last]?.toFixed(3)??'—'}`,
+    parkinson_ind:`Parkinson Vol(20) = ${_parkA[last]?.toFixed(1)??'—'}%`,
+    gk_ind:   `Garman-Klass Vol(20) = ${_gkA[last]?.toFixed(1)??'—'}%`,
+    rs_vol_ind:`Rogers-Satchell Vol(20) = ${_rsVA[last]?.toFixed(1)??'—'}%`,
+    yz_vol_ind:`Yang-Zhang Vol(20) = ${_yzA[last]?.toFixed(1)??'—'}%`,
+    ulcer_ind:`Ulcer Index(14) = ${_ulcA[last]?.toFixed(2)??'—'}`,
+    klinger_ind:`Klinger Osc = ${_klgA[last]?.toFixed(0)??'—'}`,
+    vzo_ind:  `VZO(14) = ${_vzoA[last]?.toFixed(1)??'—'}`,
+    twiggs_ind:`Twiggs MF(21) = ${_twgA[last]?.toFixed(3)??'—'}`,
+    vfi_ind:  `VFI(130) = ${_vfiA[last]?.toFixed(1)??'—'}`,
+    zscore_roll:`Z-Score(20) = ${_zsA[last]?.toFixed(2)??'—'}`,
+    skew_ind: `Skewness(20) = ${_skwA[last]?.toFixed(3)??'—'}`,
+    kurt_ind: `Kurtosis(20) = ${_krtA[last]?.toFixed(3)??'—'}`,
+    acf_ind:  `ACF(lag=1,30) = ${_acfA[last]?.toFixed(3)??'—'}`,
+    vr_ind:   `Variance Ratio(q=5) = ${_vrA2[last]?.toFixed(3)??'—'}`,
   };
 
   const details = IL_INDICATORS.map(id=>{
@@ -8635,6 +8762,93 @@ function ilScoreVWAP(close,vwap,atr){
   const scale=atr||vwap*0.005;
   return Math.tanh((close-vwap)/(scale||1)*1.5);
 }
+
+// ═══ IND LIB — адаптированные функции для indlab (candles:{open,high,low,close,volume}) ═══
+
+function _indSMA(arr,period){const out=new Array(arr.length).fill(NaN);let sum=0;for(let i=0;i<arr.length;i++){sum+=isNaN(arr[i])?0:arr[i];if(i>=period)sum-=isNaN(arr[i-period])?0:arr[i-period];if(i>=period-1)out[i]=sum/period;}return out;}
+function _indEMA(arr,period){const out=new Array(arr.length).fill(NaN);const k=2/(period+1);let prev;for(let i=0;i<arr.length;i++){if(isNaN(arr[i])){out[i]=prev??NaN;continue;}prev=prev===undefined?arr[i]:arr[i]*k+prev*(1-k);out[i]=prev;}return out;}
+function _indStdev(arr,period){const out=new Array(arr.length).fill(NaN);for(let i=period-1;i<arr.length;i++){const s=arr.slice(i-period+1,i+1).filter(v=>!isNaN(v));if(!s.length)continue;const m=s.reduce((a,b)=>a+b,0)/s.length;out[i]=Math.sqrt(s.reduce((a,b)=>a+(b-m)*(b-m),0)/s.length);}return out;}
+function _indMean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length;}
+function _indLR(closes){const out=new Array(closes.length).fill(0);for(let i=1;i<closes.length;i++)out[i]=Math.log(closes[i]/closes[i-1]);return out;}
+function _indHistProbs(arr,bins=10){const mn=Math.min(...arr),mx=Math.max(...arr);if(mx===mn)return[1];const c=new Array(bins).fill(0);arr.forEach(v=>{const idx=Math.min(bins-1,Math.floor((v-mn)/(mx-mn)*bins));c[idx]++;});return c.filter(x=>x>0).map(x=>x/arr.length);}
+// адаптер {open,high,low,close,volume} → {o,h,l,c,v}
+function _indAdapt(candles){return candles.map(c=>({o:c.open,h:c.high,l:c.low,c:c.close,v:c.volume||0}));}
+
+// 1. Адаптивные средние
+function indKAMA(closes,period=10,fast=2,slow=30){const out=new Array(closes.length).fill(NaN);const fSC=2/(fast+1),sSC=2/(slow+1);let prev;for(let i=period;i<closes.length;i++){const ch=Math.abs(closes[i]-closes[i-period]);let vol=0;for(let j=i-period+1;j<=i;j++)vol+=Math.abs(closes[j]-closes[j-1]);const er=vol===0?0:ch/vol;const sc=Math.pow(er*(fSC-sSC)+sSC,2);prev=prev===undefined?closes[i]:prev+sc*(closes[i]-prev);out[i]=prev;}return out;}
+function indFRAMA(cc,period=16){const out=new Array(cc.length).fill(NaN);const half=Math.floor(period/2);let prev;for(let i=period-1;i<cc.length;i++){const s1=cc.slice(i-period+1,i-half+1),s2=cc.slice(i-half+1,i+1),s=cc.slice(i-period+1,i+1);const h1=Math.max(...s1.map(c=>c.h)),l1=Math.min(...s1.map(c=>c.l));const h2=Math.max(...s2.map(c=>c.h)),l2=Math.min(...s2.map(c=>c.l));const h3=Math.max(...s.map(c=>c.h)),l3=Math.min(...s.map(c=>c.l));const n1=(h1-l1)/half,n2=(h2-l2)/half,n3=(h3-l3)/period;let d=1;if(n1>0&&n2>0&&n3>0)d=(Math.log(n1+n2)-Math.log(n3))/Math.log(2);const alpha=Math.max(0.01,Math.min(1,Math.exp(-4.6*(d-1))));prev=prev===undefined?cc[i].c:alpha*cc[i].c+(1-alpha)*prev;out[i]=prev;}return out;}
+function indVIDYA(closes,period=9,cmo=9){const out=new Array(closes.length).fill(NaN);let prev;for(let i=cmo;i<closes.length;i++){let up=0,dn=0;for(let j=i-cmo+1;j<=i;j++){const d=closes[j]-closes[j-1];if(d>0)up+=d;else dn-=d;}const c=(up+dn)===0?0:Math.abs((up-dn)/(up+dn));const a=2/(period+1)*c;prev=prev===undefined?closes[i]:a*closes[i]+(1-a)*prev;out[i]=prev;}return out;}
+function indJMA(closes,period=7,phase=0){const pr=Math.max(-1,Math.min(1,phase/100))*0.5+0.5;const beta=0.45*(period-1)/(0.45*(period-1)+2);const out=new Array(closes.length).fill(NaN);let e0,e1,e2,jv;for(let i=0;i<closes.length;i++){e0=e0===undefined?closes[i]:(1-beta)*closes[i]+beta*e0;e1=e1===undefined?(closes[i]-(e0??closes[i])):(closes[i]-e0)*(1-pr)+beta*e1;e2=e2===undefined?e1:(e0+pr*e1-(jv??e0))*Math.pow(1-beta,2)+Math.pow(beta,2)*e2;jv=(jv??e0)+e2;out[i]=jv;}return out;}
+function indZLEMA(closes,period=14){const lag=Math.floor((period-1)/2);const adj=closes.map((c,i)=>i>=lag?c+(c-closes[i-lag]):c);return _indEMA(adj,period);}
+function indT3(closes,period=5,v=0.7){const e1=_indEMA(closes,period),e2=_indEMA(e1,period),e3=_indEMA(e2,period),e4=_indEMA(e3,period),e5=_indEMA(e4,period),e6=_indEMA(e5,period);const c1=-(v**3),c2=3*v**2+3*v**3,c3=-6*v**2-3*v-3*v**3,c4=1+3*v+v**3+3*v**2;return closes.map((_,i)=>isNaN(e3[i])?NaN:c1*e6[i]+c2*e5[i]+c3*e4[i]+c4*e3[i]);}
+
+// 2. Фрактальный анализ
+function indFDI(closes,period=30){const out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){const s=closes.slice(i-period+1,i+1);const mx=Math.max(...s),mn=Math.min(...s);let len=0;for(let j=1;j<s.length;j++)len+=Math.abs(s[j]-s[j-1])/(mx-mn||1);out[i]=1+(Math.log(len)+Math.log(2))/Math.log(2*(period-1));}return out;}
+function indHurst(closes,minW=8){const rets=_indLR(closes).filter(x=>!isNaN(x));const n=rets.length;if(n<minW*2)return NaN;const sizes=[];for(let s=minW;s<=Math.floor(n/2);s=Math.floor(s*1.5))sizes.push(s);const ls=[],lr=[];for(const size of sizes){const chunks=Math.floor(n/size);if(!chunks)continue;let rs=0;for(let c=0;c<chunks;c++){const ch=rets.slice(c*size,(c+1)*size);const m=_indMean(ch),dev=ch.map(x=>x-m);let cum=0;const cs=dev.map(x=>(cum+=x));const range=Math.max(...cs)-Math.min(...cs);const sd=Math.sqrt(_indMean(dev.map(x=>x*x)));rs+=sd===0?0:range/sd;}const avg=rs/chunks;if(avg>0){ls.push(Math.log(size));lr.push(Math.log(avg));}}if(ls.length<2)return NaN;const mx=_indMean(ls),my=_indMean(lr);let num=0,den=0;for(let i=0;i<ls.length;i++){num+=(ls[i]-mx)*(lr[i]-my);den+=(ls[i]-mx)**2;}return den===0?NaN:num/den;}
+function indPFE(closes,period=10,smooth=5){const raw=new Array(closes.length).fill(NaN);for(let i=period;i<closes.length;i++){const pc=closes[i]-closes[i-period];let path=0;for(let j=i-period+1;j<=i;j++)path+=Math.sqrt((closes[j]-closes[j-1])**2+1);const dist=Math.sqrt(pc**2+period**2);raw[i]=path===0?0:Math.sign(pc)*100*dist/path;}return _indEMA(raw,smooth);}
+
+// 3. Энтропия
+function indShannonEnt(closes,window=30,bins=10){const rets=_indLR(closes);const out=new Array(closes.length).fill(NaN);for(let i=window;i<closes.length;i++){const ch=rets.slice(i-window+1,i+1).filter(x=>!isNaN(x));const pr=_indHistProbs(ch,bins);out[i]=-pr.reduce((s,p)=>s+p*Math.log2(p),0);}return out;}
+function indPermEnt(closes,window=30,m=3){const out=new Array(closes.length).fill(NaN);const fact=n=>{let r=1;for(let i=2;i<=n;i++)r*=i;return r;};for(let i=window;i<closes.length;i++){const ch=closes.slice(i-window+1,i+1);const pc=new Map();for(let j=0;j<=ch.length-m;j++){const sub=ch.slice(j,j+m);const ord=sub.map((_,k)=>k).sort((a,b)=>sub[a]-sub[b]).join(',');pc.set(ord,(pc.get(ord)||0)+1);}const total=ch.length-m+1;let h=0;pc.forEach(c=>{const p=c/total;h-=p*Math.log2(p);});out[i]=h/Math.log2(fact(m));}return out;}
+function indSpecEnt(closes,window=32){const out=new Array(closes.length).fill(NaN);for(let i=window;i<closes.length;i++){const ch=closes.slice(i-window+1,i+1),n=ch.length;const power=[];for(let k=0;k<n/2;k++){let re=0,im=0;for(let t=0;t<n;t++){const a=2*Math.PI*k*t/n;re+=ch[t]*Math.cos(a);im-=ch[t]*Math.sin(a);}power.push(re*re+im*im);}const tot=power.reduce((a,b)=>a+b,0)||1;const pr=power.map(p=>p/tot).filter(p=>p>0);out[i]=-pr.reduce((s,p)=>s+p*Math.log2(p),0)/Math.log2(pr.length||2);}return out;}
+
+// 4. Элерс
+function indCyberCycle(closes,alpha=0.07){const n=closes.length,sm=new Array(n).fill(0),cy=new Array(n).fill(0);for(let i=3;i<n;i++){sm[i]=(closes[i]+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6;cy[i]=(1-0.5*alpha)**2*(sm[i]-2*sm[i-1]+sm[i-2])+2*(1-alpha)*(cy[i-1]||0)-(1-alpha)**2*(cy[i-2]||0);}return cy;}
+function indRoofing(closes,hp=48,lp=10){const n=closes.length,a1=(Math.cos(2*Math.PI/hp)+Math.sin(2*Math.PI/hp)-1)/Math.cos(2*Math.PI/hp),hpA=new Array(n).fill(0);for(let i=2;i<n;i++)hpA[i]=(1-a1/2)**2*(closes[i]-2*closes[i-1]+closes[i-2])+2*(1-a1)*hpA[i-1]-(1-a1)**2*hpA[i-2];const a=Math.exp(-1.414*Math.PI/lp),b=2*a*Math.cos(1.414*Math.PI/lp),c2=b,c3=-a*a,c1=1-c2-c3,out=new Array(n).fill(0);for(let i=2;i<n;i++)out[i]=c1*(hpA[i]+hpA[i-1])/2+c2*out[i-1]+c3*out[i-2];return out;}
+function indSinewave(closes){const cy=indCyberCycle(closes),n=closes.length,sine=new Array(n).fill(NaN),lead=new Array(n).fill(NaN);for(let i=6;i<n;i++){const ip=cy[i]-(cy[i-6]||0),qp=(cy[i-3]||0);const ph=Math.atan2(qp,ip)*180/Math.PI;sine[i]=Math.sin(ph*Math.PI/180);lead[i]=Math.sin((ph+45)*Math.PI/180);}return{sine,lead};}
+function indDecycler(closes,hp=125){const n=closes.length,a1=(Math.cos(2*Math.PI/hp)+Math.sin(2*Math.PI/hp)-1)/Math.cos(2*Math.PI/hp),dec=new Array(n).fill(closes[0]||0);for(let i=1;i<n;i++)dec[i]=(a1/2)*(closes[i]+closes[i-1])+(1-a1)*dec[i-1];return closes.map((c,i)=>c-dec[i]);}
+function indEBS(closes,hp=40,lp=10){const hpA=indRoofing(closes,hp,lp),n=hpA.length,out=new Array(n).fill(0);for(let i=lp;i<n;i++){const w=hpA.slice(i-lp+1,i+1);const rms=Math.sqrt(_indMean(w.map(v=>v*v)))||1;out[i]=hpA[i]/rms;}return out;}
+
+// 5. Режим рынка (доп.)
+function indMMI(closes,period=200){const out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){const ch=closes.slice(i-period+1,i+1),m=_indMean(ch);let crosses=0,prev=ch[0]>m;for(let j=0;j<ch.length;j++){const ia=ch[j]>m;if(j>0&&ia!==prev)crosses++;prev=ia;}out[i]=100*(1-crosses/period);}return out;}
+function indTII(closes,period=30){const s30=_indSMA(closes,period),out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){let pos=0,neg=0;for(let j=i-period+1;j<=i;j++){const d=closes[j]-s30[j];if(d>0)pos+=d;else neg-=d;}out[i]=100*pos/(pos+neg||1);}return out;}
+function indER(closes,period=10){const out=new Array(closes.length).fill(NaN);for(let i=period;i<closes.length;i++){const ch=Math.abs(closes[i]-closes[i-period]);let vol=0;for(let j=i-period+1;j<=i;j++)vol+=Math.abs(closes[j]-closes[j-1]);out[i]=vol===0?0:ch/vol;}return out;}
+function indTPI(closes,period=20){const out=new Array(closes.length).fill(NaN);for(let i=period;i<closes.length;i++){let same=0,total=0,prev=Math.sign(closes[i-period+1]-closes[i-period]);for(let j=i-period+2;j<=i;j++){const dir=Math.sign(closes[j]-closes[j-1]);if(dir!==0&&prev!==0){total++;if(dir===prev)same++;}if(dir!==0)prev=dir;}out[i]=total===0?NaN:same/total;}return out;}
+function indTQI(closes,period=20){const er=indER(closes,period),out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){const ch=closes.slice(i-period+1,i+1);const xs=ch.map((_,k)=>k),mx=_indMean(xs),my=_indMean(ch);let num=0,den=0;for(let j=0;j<ch.length;j++){num+=(xs[j]-mx)*(ch[j]-my);den+=(xs[j]-mx)**2;}const slope=den===0?0:num/den;out[i]=(er[i]||0)*Math.sign(slope)*Math.min(1,Math.abs(slope)/(my||1)*period);}return out;}
+
+// 6. Волатильность (доп.)
+function indParkinson(cc,period=20,ann=252){const out=new Array(cc.length).fill(NaN),f=1/(4*Math.log(2));for(let i=period-1;i<cc.length;i++){let sum=0;for(let j=i-period+1;j<=i;j++)sum+=Math.pow(Math.log(cc[j].h/cc[j].l),2);out[i]=Math.sqrt(f*sum/period*ann)*100;}return out;}
+function indGK(cc,period=20,ann=252){const out=new Array(cc.length).fill(NaN);for(let i=period-1;i<cc.length;i++){let sum=0;for(let j=i-period+1;j<=i;j++){const c=cc[j];sum+=0.5*Math.pow(Math.log(c.h/c.l),2)-(2*Math.log(2)-1)*Math.pow(Math.log(c.c/c.o),2);}out[i]=Math.sqrt(Math.max(0,sum/period)*ann)*100;}return out;}
+function indRS(cc,period=20,ann=252){const out=new Array(cc.length).fill(NaN);for(let i=period-1;i<cc.length;i++){let sum=0;for(let j=i-period+1;j<=i;j++){const c=cc[j];sum+=Math.log(c.h/c.c)*Math.log(c.h/c.o)+Math.log(c.l/c.c)*Math.log(c.l/c.o);}out[i]=Math.sqrt(Math.max(0,sum/period)*ann)*100;}return out;}
+function indYZ(cc,period=20,ann=252){const out=new Array(cc.length).fill(NaN),k=0.34/(1.34+(period+1)/(period-1));for(let i=period;i<cc.length;i++){let sigO=0,sigC=0,sigRS=0;for(let j=i-period+1;j<=i;j++){const c=cc[j],p=cc[j-1];const ov=Math.log(c.o/p.c);sigO+=ov*ov;const cv=Math.log(c.c/c.o);sigC+=cv*cv;sigRS+=Math.log(c.h/c.c)*Math.log(c.h/c.o)+Math.log(c.l/c.c)*Math.log(c.l/c.o);}out[i]=Math.sqrt(Math.max(0,sigO/(period-1)+k*(sigC/(period-1))+(1-k)*(sigRS/period))*ann)*100;}return out;}
+function indUlcer(closes,period=14){const out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){const ch=closes.slice(i-period+1,i+1);let mx=-Infinity,sumSq=0;for(const c of ch){mx=Math.max(mx,c);const dd=100*(c-mx)/mx;sumSq+=dd*dd;}out[i]=Math.sqrt(sumSq/period);}return out;}
+
+// 7. Объём (доп.)
+function indKlinger(cc,fast=34,slow=55){const n=cc.length,vf=new Array(n).fill(0);let pT=1,pHLC=(cc[0]?(cc[0].h+cc[0].l+cc[0].c):0),cumDM=0;for(let i=1;i<n;i++){const hlc=cc[i].h+cc[i].l+cc[i].c,trend=hlc>pHLC?1:-1,dm=cc[i].h-cc[i].l;cumDM=trend===pT?cumDM+dm:dm;vf[i]=(cc[i].v||0)*Math.abs(2*(dm/(cumDM||1)-1))*trend*100;pT=trend;pHLC=hlc;}const fe=_indEMA(vf,fast),se=_indEMA(vf,slow);return fe.map((v,i)=>v-se[i]);}
+function indVZO(cc,period=14){const n=cc.length,vp=new Array(n).fill(0);for(let i=1;i<n;i++)vp[i]=cc[i].c>cc[i-1].c?(cc[i].v||0):-(cc[i].v||0);const vols=cc.map(c=>c.v||0),ev=_indEMA(vp,period),evol=_indEMA(vols,period);return ev.map((v,i)=>evol[i]?100*v/evol[i]:NaN);}
+function indTwiggs(cc,period=21){const n=cc.length,adv=new Array(n).fill(0);for(let i=1;i<n;i++){const c=cc[i],p=cc[i-1],trh=Math.max(c.h,p.c),trl=Math.min(c.l,p.c),range=trh-trl;adv[i]=range===0?0:(c.v||0)*(2*c.c-trh-trl)/range;}const vols=cc.map(c=>c.v||0),ea=_indEMA(adv,period),ev=_indEMA(vols,period);return ea.map((v,i)=>ev[i]?v/ev[i]:NaN);}
+function indVFI(cc,period=130,coef=0.2){const n=cc.length,typ=cc.map(c=>(c.h+c.l+c.c)/3),logVF=new Array(n).fill(0);for(let i=1;i<n;i++)logVF[i]=Math.log(typ[i]/typ[i-1]);const sd=_indStdev(logVF,period),vols=cc.map(c=>c.v||0),avgV=_indSMA(vols,period);const out=new Array(n).fill(NaN);let cum=0;for(let i=period;i<n;i++){const cut=coef*(sd[i]||0)*typ[i],dir=typ[i]-typ[i-1]>cut?1:typ[i]-typ[i-1]<-cut?-1:0;cum+=dir*(vols[i]||0);out[i]=avgV[i]?cum/avgV[i]:NaN;}return out;}
+
+// 8. Статистика
+function indZScore(closes,period=20){const m=_indSMA(closes,period),sd=_indStdev(closes,period);return closes.map((c,i)=>sd[i]?(c-m[i])/sd[i]:NaN);}
+function indSkew(closes,period=20){const out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){const ch=closes.slice(i-period+1,i+1),m=_indMean(ch);const sd=Math.sqrt(_indMean(ch.map(v=>(v-m)**2)));out[i]=sd===0?0:_indMean(ch.map(v=>((v-m)/sd)**3));}return out;}
+function indKurt(closes,period=20){const out=new Array(closes.length).fill(NaN);for(let i=period-1;i<closes.length;i++){const ch=closes.slice(i-period+1,i+1),m=_indMean(ch);const sd=Math.sqrt(_indMean(ch.map(v=>(v-m)**2)));out[i]=sd===0?0:_indMean(ch.map(v=>((v-m)/sd)**4))-3;}return out;}
+function indAcf(closes,lag=1,period=30){const out=new Array(closes.length).fill(NaN);for(let i=period+lag-1;i<closes.length;i++){const ch=closes.slice(i-period+1,i+1),a=ch.slice(0,ch.length-lag),b=ch.slice(lag);const ma=_indMean(a),mb=_indMean(b);let num=0,da=0,db=0;for(let j=0;j<a.length;j++){num+=(a[j]-ma)*(b[j]-mb);da+=(a[j]-ma)**2;db+=(b[j]-mb)**2;}out[i]=(da===0||db===0)?0:num/Math.sqrt(da*db);}return out;}
+function indVR(closes,q=5,win=60){const out=new Array(closes.length).fill(NaN),lr=_indLR(closes);for(let i=win+q;i<closes.length;i++){const chunk=lr.slice(i-win+1,i+1).filter(x=>!isNaN(x)),n=chunk.length;if(n<q*2)continue;const mu=_indMean(chunk),v1=_indMean(chunk.map(r=>(r-mu)**2));let sumQ=0;for(let j=q-1;j<n;j++){let s=0;for(let k=j-q+1;k<=j;k++)s+=chunk[k];sumQ+=(s-q*mu)**2;}const vQ=sumQ/(n-q+1)/q;out[i]=v1===0?NaN:vQ/v1;}return out;}
+
+// Score-функции IND lib
+function ilScoreAdaptiveMA(close,ma){if(ma==null||isNaN(ma))return null;const d=(close-ma)/ma;return d>0.01?1:d<-0.01?-1:d>0?0.5:-0.5;}
+function ilScoreFDI(v){if(v==null||isNaN(v))return null;return v<1.35?1:v>1.65?-0.5:null;}
+function ilScoreHurst(v){if(v==null||isNaN(v))return null;return v>0.6?1:v<0.4?-1:0;}
+function ilScorePFE(v){if(v==null||isNaN(v))return null;return v>50?1:v>20?0.5:v<-50?-1:v<-20?-0.5:0;}
+function ilScoreEntropyInd(v,arr,i){if(v==null||isNaN(v))return null;const cl=arr.slice(Math.max(0,i-60),i+1).filter(x=>x!=null&&!isNaN(x));if(cl.length<5)return null;const sorted=[...cl].sort((a,b)=>a-b);const p=sorted.indexOf(v)/sorted.length;return p<0.3?0.5:p>0.7?-0.5:null;}
+function ilScoreCyberCycleInd(arr,i){const v=arr[i];if(v==null||isNaN(v))return null;const prev=i>0?arr[i-1]:null;if(prev==null)return null;return v>0&&prev<0?1:v<0&&prev>0?-1:v>0?0.5:-0.5;}
+function ilScoreSinewaveInd(sine,lead){if(sine==null||lead==null||isNaN(sine)||isNaN(lead))return null;return lead>sine&&lead>0?1:lead<sine&&lead<0?-1:lead>sine?0.5:-0.5;}
+function ilScoreDecyclerInd(arr,i){const v=arr[i];if(v==null||isNaN(v))return null;return v>0?0.5:-0.5;}
+function ilScoreMMI(v){if(v==null||isNaN(v))return null;return v>75?-0.5:v<50?0.5:null;}
+function ilScoreTII(v){if(v==null||isNaN(v))return null;return v>60?1:v>50?0.5:v<40?-1:v<50?-0.5:0;}
+function ilScoreER(v){if(v==null||isNaN(v))return null;return v>0.6?0.5:null;}
+function ilScoreTPI(v){if(v==null||isNaN(v))return null;return v>0.65?0.5:v<0.4?-0.5:null;}
+function ilScoreTQI(v){if(v==null||isNaN(v))return null;return v>0.3?1:v>0?0.5:v<-0.3?-1:v<0?-0.5:0;}
+function ilScoreVolInd(v,arr,i){if(v==null||isNaN(v))return null;const cl=arr.slice(Math.max(0,i-60),i+1).filter(x=>x!=null&&!isNaN(x));if(cl.length<5)return null;const sorted=[...cl].sort((a,b)=>a-b);const p=sorted.indexOf(v)/sorted.length;return p>0.8?-0.5:p<0.2?0.5:null;}
+function ilScoreKlingerInd(arr,i){const v=arr[i];if(v==null||isNaN(v))return null;const prev=i>0?arr[i-1]:null;if(prev==null)return null;return v>0&&prev<0?1:v<0&&prev>0?-1:v>0?0.5:-0.5;}
+function ilScoreVZO(v){if(v==null||isNaN(v))return null;return v>5?1:v>0?0.5:v<-5?-1:-0.5;}
+function ilScoreTwiggs(v){if(v==null||isNaN(v))return null;return v>0.05?1:v>0?0.5:v<-0.05?-1:-0.5;}
+function ilScoreZScoreRoll(v){if(v==null||isNaN(v))return null;return v<-2?1:v<-1?0.5:v>2?-1:v>1?-0.5:0;}
+function ilScoreSkewInd(v){if(v==null||isNaN(v))return null;return v>1?0.5:v<-1?-0.5:null;}
+function ilScoreKurtInd(v){if(v==null||isNaN(v))return null;return v>3?-0.5:null;}
+function ilScoreAcfInd(v){if(v==null||isNaN(v))return null;return v>0.3?0.5:v<-0.3?-0.5:null;}
+function ilScoreVR(v){if(v==null||isNaN(v))return null;return v>1.3?0.5:v<0.7?-0.5:null;}
 
 // ═══ СТРАНИЦА АНАЛИЗА: мульти-горизонтный бэктест, кластеры, конструктор комбо ═══
 
@@ -9101,11 +9315,16 @@ function ilRenderAnalysis() {
 const _IL_CATS = [
   {label:'Тренд',          ids:['ichimoku','alligator','supertrend','ema','vwma','mcginley','donchian','vortex','parabolic','stock_trend','macd','sma','aroon','vwap_ind']},
   {label:'Импульс',        ids:['rsi','stoch','wr','cci','tsi','ult_osc','ao','dpo','fisher','cmo','rsi_w','accel_osc','roc','momentum']},
-  {label:'Волатильность',  ids:['bb','bb_width','keltner','envelopes','std_dev','hist_vol','vix_like','ohlc_vol']},
-  {label:'Режим рынка',    ids:['adx','chop','flat','high_vol','low_vol','crash','recovery','vhf']},
-  {label:'Объём',          ids:['obv','cmf','chaikin_osc','chaikin_vol','force_idx','mfi','pvt','nvi','pvi','eom','vo','acc_dist']},
+  {label:'Волатильность',  ids:['bb','bb_width','keltner','envelopes','std_dev','hist_vol','vix_like','ohlc_vol','parkinson_ind','gk_ind','rs_vol_ind','yz_vol_ind','ulcer_ind']},
+  {label:'Режим рынка',    ids:['adx','chop','flat','high_vol','low_vol','crash','recovery','vhf','mmi_ind','tii_ind','er_ind','tpi_ind','tqi_ind']},
+  {label:'Объём',          ids:['obv','cmf','chaikin_osc','chaikin_vol','force_idx','mfi','pvt','nvi','pvi','eom','vo','acc_dist','klinger_ind','vzo_ind','twiggs_ind','vfi_ind']},
   {label:'Elder',          ids:['elder_ray','elder_impulse']},
   {label:'Структура цены', ids:['fractals','zigzag']},
+  {label:'Адаптивные МА',  ids:['kama_ind','frama_ind','vidya_ind','jma_ind','zlema_ind','t3_ind']},
+  {label:'Фрактал. анализ',ids:['fdi_ind','hurst_ind','pfe_ind']},
+  {label:'Энтропия',       ids:['shannon_ent','perm_ent','spec_ent']},
+  {label:'Элерс',          ids:['cyber_cycle','roofing_ind','sinewave_ind','decycler_ind','ebs_ind']},
+  {label:'Статистика',     ids:['zscore_roll','skew_ind','kurt_ind','acf_ind','vr_ind']},
 ];
 
 // Жадный поиск лучших комбинаций (межкластерные, H30)
