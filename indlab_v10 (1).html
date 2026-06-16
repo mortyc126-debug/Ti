@@ -8313,20 +8313,26 @@ const IL_NAMES = {
 // эффективность = доля совпадений знака score с направлением цены через N дней.
 // В итоговый score попадают только индикаторы с устойчивым перевесом (winRate>0.55, N>=10).
 // Возвращает {score: -2..2, label, details:[{name,text,score,winRate,n,included}]}
-async function ilGetVerdict({ticker, token, proxy, figi}) {
+const _ilYield = () => new Promise(r => setTimeout(r, 0));
+async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null}) {
+  const _prog = msg => { try{ if(onProgress) onProgress(msg); }catch(_){} };
   token = token || _ilShellToken;
   if (!token) throw new Error('Нет API-токена');
   // Если вызывающий модуль уже знает FIGI (свой каталог инструментов) — берём
   // его напрямую, минуя поиск по тикеру (тикеры акций в FindInstrument иногда
   // не совпадают с тикерами в каталоге другого модуля).
+  _prog('🔍 поиск инструмента...');
   const found = figi ? {figi, ticker} : await ilFindFigi(ticker, token, proxy);
   if (!found) throw new Error('Тикер не найден: '+ticker);
   const now = new Date(), from = new Date(now);
   from.setDate(from.getDate()-90);
+  _prog('📥 загрузка свечей (90 дней)...');
   const {candles, chained} = await ilGetCandlesChain(found, token, from, now, proxy);
   if (candles.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+candles.length+' свечей)');
   const closes = candles.map(c=>c.close);
 
+  _prog('📊 пакет 1/13: тренд, импульс...');
+  await _ilYield();
   // Серии score по каждому индикатору (индекс совпадает с candles)
   const rsiArr = _chartCalcRSI(closes,14);
   const wrArr = ilCalcWR(candles,14);
@@ -8360,6 +8366,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.envelopes = envArr.map((e,i)=> e?ilScoreChannel(closes[i],e.lower,e.upper):null);
   seriesScore.ichimoku = ichiArr.map((_,i)=>ilScoreCross(ichiArr.map(x=>x.tenkan),ichiArr.map(x=>x.kijun),i));
   seriesScore.alligator = allArr.map((_,i)=>ilScoreAlligator(allArr,i));
+  _prog('📊 пакет 2/13: волатильность, объём...');
+  await _ilYield();
   // Новые индикаторы
   const _obvA=ilCalcOBV(candles),_cmfA=ilCalcCMF(candles,20),_chopA=ilCalcChop(candles,14);
   const _stA=ilCalcSuperTrend(candles,10,3),_cmoA=ilCalcCMO(closes,14),_vxA=ilCalcVortex(candles,14);
@@ -8373,6 +8381,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.tsi=_tsiA.map(v=>ilScoreTSI(v));
   seriesScore.force_idx=_fiA.map((_,i)=>ilScoreForceIdx(_fiA,i));
   seriesScore.ult_osc=_uoA.map(v=>ilScoreUltOsc(v));
+  _prog('📊 пакет 3/13: Elder, Acc/Dist, SAR...');
+  await _ilYield();
   // Пакет 3
   const _adA=ilCalcAccDist(candles),_coA=ilCalcChaikinOsc(candles,3,10),_cvA=ilCalcChaikinVol(candles,10);
   const _acA=ilCalcAccelOsc(candles),_erA=ilCalcElderRay(closes,candles,13),_eiA=ilCalcElderImpulse(closes,candles,13);
@@ -8403,6 +8413,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.bb_width=_bwA.map((_,i)=>ilScoreBBWidth(_bwA,i,20));
   seriesScore.rsi_w=_r7A.map(v=>ilScoreRSIW(v));
   seriesScore.ohlc_vol=_ovA.map((_,i)=>ilScoreOHLCVol(_ovA,i,20));
+  _prog('📊 пакет 4/13: паттерны, режим рынка...');
+  await _ilYield();
   // Пакет 4: паттерны и режимные классификаторы
   const _zzA=ilCalcZigzagSignal(candles,0.015);
   const _frA=ilCalcFractalsSignal(candles);
@@ -8419,6 +8431,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.high_vol   = _vrA.map(v=>v!=null?(v>=0.7?-0.5:null):null);
   seriesScore.low_vol    = _vrA.map(v=>v!=null?(v<=0.3?0.5:null):null);
   seriesScore.stock_trend= _strendA.map(v=>ilScoreStockTrend(v));
+  _prog('📊 пакет 5/13: SMA, Aroon, ROC, VWAP...');
+  await _ilYield();
   // Пакет 5
   const _smaR=ilCalcSMACross(closes,10,30),_arA=ilCalcAroon(candles,25);
   const _rocA=ilCalcROC(closes,10),_momA=ilCalcMomentum(closes,10);
@@ -8431,6 +8445,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.vhf      = _vhfA.map((v,i)=>ilScoreVHF(v,_vhfA,i));
   seriesScore.vwap_ind = _vwapA.map((v,i)=>ilScoreVWAP(closes[i],v,_atrScalar));
 
+  _prog('📊 пакет 6/13: адаптивные МА (KAMA/FRAMA/T3)...');
+  await _ilYield();
   // Пакеты 6-13: IND lib
   const _indC = _indAdapt(candles);
   // Адаптивные средние
@@ -8442,17 +8458,23 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.jma_ind   =_jmaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
   seriesScore.zlema_ind =_zlemaA.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
   seriesScore.t3_ind    =_t3A.map((v,i)=>ilScoreAdaptiveMA(closes[i],v));
+  _prog('📊 пакет 7/13: фрактальный анализ (FDI/Hurst/PFE)...');
+  await _ilYield();
   // Фрактальный анализ
   const _fdiA=indFDI(closes,30),_pfeA=indPFE(closes,10,5);
   const _hurstVal=indHurst(closes.slice(-60));
   seriesScore.fdi_ind  =_fdiA.map(v=>ilScoreFDI(v));
   seriesScore.hurst_ind=closes.map((_,i)=>i===closes.length-1?ilScoreHurst(_hurstVal):null);
   seriesScore.pfe_ind  =_pfeA.map(v=>ilScorePFE(v));
+  _prog('📊 пакет 8/13: энтропия (Shannon/Perm/Spectral)...');
+  await _ilYield();
   // Энтропия
   const _shannA=indShannonEnt(closes,30),_permA=indPermEnt(closes,30,3),_specA=indSpecEnt(closes,32);
   seriesScore.shannon_ent=_shannA.map((v,i)=>ilScoreEntropyInd(v,_shannA,i));
   seriesScore.perm_ent   =_permA.map((v,i)=>ilScoreEntropyInd(v,_permA,i));
   seriesScore.spec_ent   =_specA.map((v,i)=>ilScoreEntropyInd(v,_specA,i));
+  _prog('📊 пакет 9/13: Элерс (CyberCycle/Sinewave/EBS)...');
+  await _ilYield();
   // Элерс
   const _ccA=indCyberCycle(closes),_roofA=indRoofing(closes),_swR=indSinewave(closes);
   const _decA=indDecycler(closes),_ebsA=indEBS(closes);
@@ -8461,6 +8483,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.sinewave_ind =_swR.sine.map((v,i)=>ilScoreSinewaveInd(v,_swR.lead[i]));
   seriesScore.decycler_ind =_decA.map((_,i)=>ilScoreDecyclerInd(_decA,i));
   seriesScore.ebs_ind      =_ebsA.map((_,i)=>ilScoreCyberCycleInd(_ebsA,i));
+  _prog('📊 пакет 10/13: режим рынка (MMI/TII/TQI)...');
+  await _ilYield();
   // Режим рынка (доп.)
   const _mmiA=indMMI(closes,200),_tiiA=indTII(closes,30),_erA2=indER(closes,10);
   const _tpiA=indTPI(closes,20),_tqiA=indTQI(closes,20);
@@ -8469,6 +8493,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.er_ind =_erA2.map(v=>ilScoreER(v));
   seriesScore.tpi_ind=_tpiA.map(v=>ilScoreTPI(v));
   seriesScore.tqi_ind=_tqiA.map(v=>ilScoreTQI(v));
+  _prog('📊 пакет 11/13: волатильность (Parkinson/YZ/Ulcer)...');
+  await _ilYield();
   // Волатильность (доп.)
   const _parkA=indParkinson(_indC,20),_gkA=indGK(_indC,20),_rsVA=indRS(_indC,20);
   const _yzA=indYZ(_indC,20),_ulcA=indUlcer(closes,14);
@@ -8477,6 +8503,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.rs_vol_ind   =_rsVA.map((_,i)=>ilScoreVolInd(_rsVA[i],_rsVA,i));
   seriesScore.yz_vol_ind   =_yzA.map((_,i)=>ilScoreVolInd(_yzA[i],_yzA,i));
   seriesScore.ulcer_ind    =_ulcA.map((_,i)=>ilScoreVolInd(_ulcA[i],_ulcA,i));
+  _prog('📊 пакет 12/13: объём (Klinger/VZO/VFI)...');
+  await _ilYield();
   // Объём (доп.)
   const _klgA=indKlinger(_indC,34,55),_vzoA=indVZO(_indC,14);
   const _twgA=indTwiggs(_indC,21),_vfiA=indVFI(_indC,130);
@@ -8484,6 +8512,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.vzo_ind    =_vzoA.map(v=>ilScoreVZO(v));
   seriesScore.twiggs_ind =_twgA.map(v=>ilScoreTwiggs(v));
   seriesScore.vfi_ind    =_vfiA.map((_,i)=>ilScoreKlingerInd(_vfiA,i));
+  _prog('📊 пакет 13/13: статистика (ZScore/ACF/VR)...');
+  await _ilYield();
   // Статистика
   const _zsA=indZScore(closes,20),_skwA=indSkew(closes,20),_krtA=indKurt(closes,20);
   const _acfA=indAcf(closes,1,30),_vrA2=indVR(closes,5);
@@ -8493,6 +8523,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.acf_ind    =_acfA.map(v=>ilScoreAcfInd(v));
   seriesScore.vr_ind     =_vrA2.map(v=>ilScoreVR(v));
 
+  _prog('🔬 бэктест (90 индикаторов × 3 горизонта)...');
+  await _ilYield();
   // Бэктест по 3 горизонтам для каждого индикатора
   const evalRes = {};
   IL_INDICATORS.forEach(id=>{
@@ -8514,6 +8546,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
     evalRes[id] = {h5:bt(5), h15:bt(15), h30:bt(30)};
   });
 
+  _prog('🧩 поиск лучших комбинаций...');
+  await _ilYield();
   // Жадный поиск лучших комбо (межкластерные, H30) — лёгкий вариант без кластеров
   const _btCombo=(ids,h)=>{
     const arr=closes.map((_,i)=>{
@@ -8685,6 +8719,8 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
 
   if (chained) label += ' (история достроена предыдущим контрактом цепочки)';
 
+  _prog('🤖 модели M1/M2/M3 и режим рынка...');
+  await _ilYield();
   // ══════════════════════════════════════════════════════════════
   // РЕЖИМ РЫНКА + ТРИ МОДЕЛИ АГРЕГАЦИИ
   // ══════════════════════════════════════════════════════════════
@@ -9801,14 +9837,18 @@ window.addEventListener('message', (ev) => {
   const payload = d.payload || {};
   if (payload.api !== 'getVerdict') return;
   console.log('[indlab RPC] getVerdict →', payload.ticker, 'figi:', payload.figi);
-  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy(), figi: payload.figi})
+  const _rpcSrc = ev.source;
+  const _onProg = msg => {
+    try{ _rpcSrc.postMessage({type:'MODULE_RPC_PROGRESS', reqId:d.reqId, msg}, '*'); }catch(_){}
+  };
+  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy(), figi: payload.figi, onProgress: _onProg})
     .then(result => {
       console.log('[indlab RPC] готово →', payload.ticker, 'score:', result?.score);
-      ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*');
+      _rpcSrc.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*');
     })
     .catch(err => {
       console.warn('[indlab RPC] ошибка →', payload.ticker, err);
-      ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*');
+      _rpcSrc.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*');
     });
 });
 </script>

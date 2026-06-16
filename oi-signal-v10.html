@@ -202,6 +202,7 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       </label>
       <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--txt3);cursor:pointer;" title="Учитывать вердикт модуля индикаторов (RSI/MACD/Stoch и др. из indlab за 90 дней)">
         <input type="checkbox" id="extIndChk" checked onchange="toggleExtInd()" style="cursor:pointer;"> Индикаторы</label>
+      <span id="_ilProgressMsg" style="font-size:9px;color:var(--txt3);font-style:italic;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
       <select id="extIndBasisSel" onchange="toggleExtIndBasis()" style="font-size:10px;background:var(--panel);color:var(--txt3);border:1px solid var(--border2);border-radius:6px;cursor:pointer;" title="Для фьючерсов: считать индикаторы по базовому активу (больше истории) или по самому фьючерсу">
         <option value="basis" selected>по базису</option>
         <option value="future">по фьючерсу</option>
@@ -1796,11 +1797,19 @@ let _ilRpcSeq = 0;
 const _ilRpcPending = {};
 window.addEventListener('message', (ev)=>{
   const d = ev.data;
-  if(!d || d.type !== 'MODULE_RPC_RESPONSE') return;
+  if(!d) return;
+  if(d.type === 'MODULE_RPC_PROGRESS'){
+    const el = document.getElementById('_ilProgressMsg');
+    if(el) el.textContent = d.msg;
+    return;
+  }
+  if(d.type !== 'MODULE_RPC_RESPONSE') return;
   const p = _ilRpcPending[d.reqId];
   if(!p) return;
   delete _ilRpcPending[d.reqId];
   clearTimeout(p.timer);
+  const el = document.getElementById('_ilProgressMsg');
+  if(el) el.textContent = '';
   if(d.error) p.reject(new Error(d.error)); else p.resolve(d.result);
 });
 function _ilRpcCall(api, args){
