@@ -473,7 +473,7 @@ const METHODS = [
   {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#FF006E'},
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#6366F1'},
   {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#FF9F40'},
-  {id:'EXT_INDICATORS', label:'Индикаторы (15 шт., модуль indlab)',src:'indlab', color:'#52F2C9'},
+  {id:'EXT_INDICATORS', label:'Индикаторы (модуль indlab)', src:'indlab', color:'#52F2C9'},
 ];
 
 // ============================================================
@@ -1844,7 +1844,12 @@ async function _ilRequestVerdict(ticker){
     const {resolved, note, figi} = await _ilResolveTicker(ticker);
     try{
       const cached = await dbLoadIndVerdict(resolved);
-      if(cached && cached.updated_at && Date.now()-cached.updated_at < EXT_IND_MAX_AGE){
+      // Кеш считается актуальным только если содержит новый формат (details с h30 + bestCombos)
+      const cacheOk = cached && cached.updated_at
+        && Date.now()-cached.updated_at < EXT_IND_MAX_AGE
+        && Array.isArray(cached.bestCombos)
+        && cached.details?.[0]?.h30 != null;
+      if(cacheOk){
         extIndicatorsCache[ticker] = {...cached, ts:cached.updated_at, note};
         return;
       }
