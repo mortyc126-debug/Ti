@@ -8630,8 +8630,12 @@ async function ilRunAnalysis() {
     const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
     if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
     const closes = candles.map(c=>c.close);
-    if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
+    if (statusEl) statusEl.textContent = `Считаю ${IL_INDICATORS.length} индикаторов (${closes.length} баров)…`;
+    // Отдаём браузеру тик перед тяжёлыми вычислениями, чтобы статус отобразился
+    await new Promise(r=>setTimeout(r,0));
     const ss = _ilCalcAllSeries(candles, closes);
+    if (statusEl) statusEl.textContent = `Бэктест (${IL_INDICATORS.length} × 3 горизонта)…`;
+    await new Promise(r=>setTimeout(r,0));
     // Режимная маска: trending = |5-bar return| ≥ медианы
     const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
     const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
@@ -8647,6 +8651,8 @@ async function ilRunAnalysis() {
         stats[id][`h${h}R`] = _ilBtStats(ss[id],closes,h,rangeMask);
       });
     });
+    if (statusEl) statusEl.textContent = `Матрица корреляций (${IL_INDICATORS.length}²)…`;
+    await new Promise(r=>setTimeout(r,0));
     // Корреляционная матрица и кластеры
     const corrMatrix={};
     IL_INDICATORS.forEach(a=>{corrMatrix[a]={};IL_INDICATORS.forEach(b=>{corrMatrix[a][b]=_ilPearson(ss[a],ss[b]);});});
@@ -8654,12 +8660,12 @@ async function ilRunAnalysis() {
     IL_INDICATORS.forEach(id=>{
       if(assigned.has(id))return;
       const cl=[id];assigned.add(id);
-      IL_INDICATORS.forEach(id2=>{if(!assigned.has(id2)&&Math.abs(_ilPearson(ss[id],ss[id2]))>=0.5){cl.push(id2);assigned.add(id2);}});
+      IL_INDICATORS.forEach(id2=>{if(!assigned.has(id2)&&Math.abs(corrMatrix[id][id2])>=0.5){cl.push(id2);assigned.add(id2);}});
       clusters.push(cl);
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
     _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss};
-    if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
+    if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${IL_INDICATORS.length} индикаторов · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
 }
@@ -8746,17 +8752,17 @@ function ilRenderAnalysis() {
     <button onclick="ilSelectBestCombo()" style="padding:5px 12px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">✦ Лучшая из кластеров</button>
     <button onclick="ilCalcSelectedCombo()" style="padding:5px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать</button>
   </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:40px;"></div></div>`;
-  // Матрица корреляций (свёрнута)
-  html+=`<details style="margin-top:14px;"><summary style="font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono);">Матрица корреляций</summary><div style="overflow-x:auto;margin-top:8px;">
-    <table style="border-collapse:collapse;font-size:8px;font-family:var(--mono);"><tr><th></th>`;
-  IL_INDICATORS.forEach(id=>html+=`<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px;min-width:16px;color:var(--text3);">${IL_NAMES[id].split(' ')[0]}</th>`);
+  // Матрица корреляций (свёрнута) — только цвет, числа в tooltip
+  html+=`<details style="margin-top:14px;"><summary style="font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono);">Матрица корреляций (${IL_INDICATORS.length}×${IL_INDICATORS.length}) — наведи на ячейку для значения</summary><div style="overflow-x:auto;margin-top:8px;">
+    <table style="border-collapse:collapse;font-size:8px;font-family:var(--mono);table-layout:fixed;"><tr><th style="min-width:60px;"></th>`;
+  IL_INDICATORS.forEach(id=>html+=`<th title="${IL_NAMES[id]}" style="writing-mode:vertical-rl;transform:rotate(180deg);padding:1px 0;width:14px;min-width:14px;max-width:14px;color:var(--text3);font-size:7px;overflow:hidden;text-overflow:ellipsis;">${IL_NAMES[id].split(' ')[0].substring(0,6)}</th>`);
   html+=`</tr>`;
   IL_INDICATORS.forEach(a=>{
-    html+=`<tr><td style="padding:2px 4px;color:var(--text3);white-space:nowrap;">${IL_NAMES[a].split(' ')[0]}</td>`;
+    html+=`<tr><td style="padding:1px 4px;color:var(--text3);white-space:nowrap;font-size:8px;">${IL_NAMES[a].split(' ')[0].substring(0,8)}</td>`;
     IL_INDICATORS.forEach(b=>{
-      const v=r.corrMatrix[a][b], abs=Math.abs(v);
-      const bg=abs>0.7?`rgba(199,27,82,${abs*0.7})`:abs>0.4?`rgba(255,159,64,${abs*0.5})`:'transparent';
-      html+=`<td style="background:${bg};text-align:center;padding:2px;color:var(--text2);">${v.toFixed(2)}</td>`;
+      const v=r.corrMatrix[a][b]??0, abs=Math.abs(v), s=v>=0?'+':'';
+      const bg=a===b?'rgba(82,242,201,0.3)':abs>0.7?`rgba(199,27,82,${abs*0.8})`:abs>0.4?`rgba(255,159,64,${abs*0.7})`:abs>0.2?`rgba(100,100,200,${abs*0.5})`:'rgba(30,20,50,0.3)';
+      html+=`<td title="${IL_NAMES[a]} / ${IL_NAMES[b]}: ${s}${v.toFixed(2)}" style="background:${bg};width:14px;min-width:14px;max-width:14px;height:12px;padding:0;cursor:default;"></td>`;
     });
     html+=`</tr>`;
   });

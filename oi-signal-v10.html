@@ -1872,9 +1872,9 @@ function m_EXT_INDICATORS(){
   if(!cached){
     if(extIndicatorsPending[curTicker]){
       const elapsed = Math.round((Date.now()-(extIndRequestStarted[curTicker]||Date.now()))/1000);
-      // RPC обычно отвечает за 5-20с (90 дней свечей + бэктест 15 индикаторов);
+      // RPC обычно отвечает за 10-60с (90 дней свечей + бэктест 54 индикаторов);
       // полоска — условный прогресс по этому диапазону, чтобы видно было, что не зависло
-      const pct = Math.min(95, Math.round(elapsed/20*100));
+      const pct = Math.min(95, Math.round(elapsed/60*100));
       return {score:0, confidence:0, detail:`запрос к модулю индикаторов отправлен, считает... ${elapsed}с
         <div style="height:4px;background:var(--border2);border-radius:2px;margin-top:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:#52F2C9;transition:width .3s;"></div></div>`};
     }
