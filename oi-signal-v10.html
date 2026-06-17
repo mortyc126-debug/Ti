@@ -313,6 +313,28 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
   </div>
 </div>
 
+<!-- Scanner: MOEX alerts + compare pinned -->
+<div class="panel" style="margin-bottom:10px;">
+  <div class="collapsible-hdr" onclick="toggleCollapsible('scannerBody')">
+    <div class="sec" style="margin-bottom:0;">🔎 Сканер: аномалии MOEX + сравнение избранных</div>
+    <span style="font-size:10px;color:var(--txt3);" id="scannerChev">▼</span>
+  </div>
+  <div class="collapsible-body open" id="scannerBody">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      <select class="select-inp" id="alertsMarketSel">
+        <option value="eq">Акции</option>
+        <option value="fo">Фьючерсы</option>
+      </select>
+      <input class="inp" id="alertsDateInp" type="date" style="width:130px;">
+      <button class="btn-sm" onclick="loadMegaAlerts()">↺ Загрузить аномалии</button>
+      <div style="flex:1;"></div>
+      <button class="btn-sm" onclick="compareTickersScan()" title="Прогнать все закреплённые тикеры по текущим методам и сравнить силу сигнала">📊 Сравнить избранные</button>
+    </div>
+    <div id="alertsList" style="font-size:10px;color:var(--txt3);margin-bottom:8px;">Аномалии не загружены</div>
+    <div id="compareResult" style="font-size:10px;color:var(--txt3);"></div>
+  </div>
+</div>
+
 <!-- Save bar -->
 <div class="save-bar">
   <button class="btn-sm" onclick="saveAll()">💾 Сохранить</button>
@@ -986,6 +1008,101 @@ async function fetchWithTimeout(url, opts={}, ms=30000){
     if(e.name==='AbortError') throw new Error(`Таймаут запроса (${ms/1000}с)`);
     throw e;
   } finally{ clearTimeout(tid); }
+}
+
+// ============================================================
+// MOEX MEGA-ALERTS: торговые аномалии по всем инструментам за день
+// /iss/datashop/algopack/{market}/alerts.json?date=YYYY-MM-DD, market: eq|fo
+// ============================================================
+async function fetchMegaAlerts(market, date){
+  const base = getProxy();
+  const prefix = base ? (base + '/iss') : 'https://apim.moex.com/iss';
+  const url = `${prefix}/datashop/algopack/${market}/alerts.json?date=${encodeURIComponent(date)}&iss.meta=off`;
+  const key = getMoexKey();
+  const hdrs = {'Accept':'application/json'};
+  if(key) hdrs['Authorization'] = `Bearer ${key}`;
+  const resp = await fetchWithTimeout(url, {headers: hdrs});
+  if(!resp.ok) throw new Error(`MOEX alerts HTTP ${resp.status}`);
+  const json = await resp.json();
+  return issToObjects(json, 'alerts');
+}
+
+async function loadMegaAlerts(){
+  const market = document.getElementById('alertsMarketSel').value;
+  let date = document.getElementById('alertsDateInp').value;
+  if(!date){
+    date = new Date().toISOString().slice(0,10);
+    document.getElementById('alertsDateInp').value = date;
+  }
+  const el = document.getElementById('alertsList');
+  el.innerHTML = 'Загрузка…';
+  try{
+    const rows = await fetchMegaAlerts(market, date);
+    if(!rows.length){ el.innerHTML = 'Нет аномалий за эту дату (или нет подписки на alerts.json)'; return; }
+    el.innerHTML = `<div style="max-height:220px;overflow-y:auto;">${rows.map(r=>{
+      const sid = r.secid || r.SECID || '—';
+      const known = CATALOG.find(x=>x.t===sid);
+      const fields = Object.entries(r).filter(([k])=>k!=='secid'&&k!=='SECID').map(([k,v])=>`${k}=${v}`).join(' · ');
+      return `<div style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:${known?'pointer':'default'};" ${known?`onclick="selectTicker('${sid}','${market==='fo'?'futures':'stocks'}');refreshAll();"`:''}>
+        <span style="color:${known?'var(--accent)':'var(--txt)'};font-weight:600;">${sid}</span>${known?'':' <span style="color:var(--txt3)">(не в каталоге)</span>'}
+        <span style="color:var(--txt3);"> — ${fields}</span>
+      </div>`;
+    }).join('')}</div>`;
+  } catch(e){ el.innerHTML = `<span style="color:var(--neg)">Ошибка: ${e.message}</span>`; }
+}
+
+// ============================================================
+// COMPARE PINNED TICKERS: прогоняет методы по каждому закреплённому
+// тикеру (используя уже сохранённые AlgoPack/свечи в БД, без живых
+// запросов к MOEX/T-Invest), сравнивает силу композитного сигнала
+// ============================================================
+async function compareTickersScan(){
+  const el = document.getElementById('compareResult');
+  if(!pinnedTickers.length){ el.innerHTML = 'Список избранных пуст'; return; }
+  el.innerHTML = 'Сканирую избранные тикеры…';
+
+  const saved = {
+    curTicker, curType, tsHistory, obHistory, osHistory, futoiData, candleData
+  };
+  const out = [];
+  try{
+    for(const t of pinnedTickers){
+      const meta = CATALOG.find(x=>x.t===t);
+      curTicker = t;
+      curType = meta?.cat || 'stocks';
+      try{
+        const [ts, ob, os, fo] = await Promise.all([
+          dbLoadAlgopack(t,'tradestats',2).catch(()=>[]),
+          dbLoadAlgopack(t,'obstats',2).catch(()=>[]),
+          dbLoadAlgopack(t,'orderstats',2).catch(()=>[]),
+          dbLoadAlgopack(t,'futoi',2).catch(()=>[]),
+        ]);
+        tsHistory = ts.slice(-5); obHistory = ob.slice(-5); osHistory = os.slice(-5); futoiData = fo;
+        const c1d = await dbFetch(`/db/candles?ticker=${encodeURIComponent(t)}&tf=1d&from=0`).catch(()=>[]);
+        candleData = {'1d': (c1d||[]).slice(-30).map(b=>({time:b.time, cl:b.cl, close:{units:Math.trunc(b.cl), nano:0}}))};
+        const methodResults = computeAllMethods();
+        const composite = computeComposite(methodResults, t);
+        const avgConf = METHODS.reduce((s,m)=>s+(methodResults[m.id]?.confidence||0),0)/METHODS.length;
+        out.push({t, composite, avgConf});
+      } catch(e){ out.push({t, composite:0, avgConf:0, err:e.message}); }
+    }
+  } finally {
+    curTicker = saved.curTicker; curType = saved.curType;
+    tsHistory = saved.tsHistory; obHistory = saved.obHistory; osHistory = saved.osHistory;
+    futoiData = saved.futoiData; candleData = saved.candleData;
+  }
+
+  out.sort((a,b)=> Math.abs(b.composite)*b.avgConf - Math.abs(a.composite)*a.avgConf);
+  el.innerHTML = `<div style="font-size:9px;color:var(--txt3);margin-bottom:4px;">по сохранённым данным (без живых запросов) · клик — выбрать тикер</div>` +
+    out.map(r=>{
+      const dir = scoreToDir(r.composite);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;" onclick="selectTicker('${r.t}','${(CATALOG.find(x=>x.t===r.t)?.cat)||'stocks'}');refreshAll();">
+        <span style="width:60px;font-weight:600;">${r.t}</span>
+        <span style="color:${scoreColor(r.composite)};width:60px;">${dir.arrow} ${(r.composite*100).toFixed(0)}</span>
+        <span style="color:var(--txt3);">conf ${(r.avgConf*100).toFixed(0)}%</span>
+        ${r.err?`<span style="color:var(--neg);">${r.err}</span>`:''}
+      </div>`;
+    }).join('');
 }
 
 async function fetchMoex(secid, metric, type, params={}){
