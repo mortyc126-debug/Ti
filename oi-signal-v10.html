@@ -2779,6 +2779,7 @@ async function autoRecordOutcomes(){
 
       const prev = weights[m.id] || {weight:0.5, correct:0, total:0, sumQ:0};
       prev.total++;
+      if(targetAcc > 0.5) prev.correct = (prev.correct||0) + 1;
       prev.sumQ = (prev.sumQ||0) + targetAcc;
       const rollingAcc = prev.sumQ / prev.total;
       // EWA update: медленный α=0.1 чтобы не болтало
@@ -3148,11 +3149,18 @@ function renderMethodsTable(methodResults){
     </div>`;
   });
 
-  // Модели — отдельный блок
+  // Модели — отдельный блок. Точность берём из 90-дневного бэктеста indlab (bt.h30),
+  // он считается сразу и не требует накопления собственной истории по тикеру.
+  const cachedM = extIndicatorsCache[curTicker];
   const modelRows = modelMethods.map(m=>{
     const r = methodResults[m.id] || {score:0, confidence:0, detail:''};
     const w = weights[m.id];
-    return _methRow(m, r, w?.weight??0.5, w&&w.total>0?(w.correct/w.total*100).toFixed(0)+'%':'—');
+    const mk = {IL_MODEL_M1:'m1',IL_MODEL_M2:'m2',IL_MODEL_M3:'m3'}[m.id];
+    const bt30 = cachedM?.models?.[mk]?.bt?.h30;
+    const acc = (bt30?.acc != null && bt30.n >= 5)
+      ? (bt30.acc*100).toFixed(0)+'%'
+      : (w&&w.total>0?(w.correct/w.total*100).toFixed(0)+'%':'—');
+    return _methRow(m, r, w?.weight??0.5, acc);
   }).join('');
   html += `<div class="cluster-block" style="border-left-color:#818CF8;margin-top:4px;">
     <div class="cluster-block-hdr" onclick="_toggleClusterDetail('_mcat_models')">
