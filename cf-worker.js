@@ -29,8 +29,9 @@
 // FORTS — без участия браузера. Настройка:
 //   1. Cloudflare Dashboard → Workers → этот воркер → Settings → Variables →
 //      добавить secret MOEX_KEY (тот же ключ, что в поле "MOEX API key" в приложении).
-//   2. Settings → Triggers → Cron Triggers → добавить, например "30 7 * * *"
-//      (07:30 UTC = после закрытия вечерней сессии FORTS).
+//   2. Settings → Triggers → Cron Triggers → добавить "0 22 * * *"
+//      (22:00 UTC = 01:00 МСК — данные FutOI публикуются к 00:10-00:50 МСК,
+//      этот час даёт запас).
 // Список тикеров cron определяет сам: тянет /iss/engines/futures/markets/forts/
 // securities.json (объём+ОИ+цена), ранжирует по объёму с гистерезисом
 // (входит в отбор при топ-50% объёма, выпадает только ниже топ-80% —
