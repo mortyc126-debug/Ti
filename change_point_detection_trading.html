@@ -1,0 +1,321 @@
+
+<h2 class="sr-only">Change Point Detection — интерактивный инструмент для анализа трейдинговых данных</h2>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.panel { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.metric { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 12px 14px; }
+.metric-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.metric-value { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+.metric-value.up { color: #1D9E75; }
+.metric-value.down { color: #D85A30; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; padding: 12px 14px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
+.ctrl-group { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
+.ctrl-group input[type=range] { width: 100px; }
+.ctrl-group span { min-width: 28px; font-weight: 500; font-size: 13px; color: var(--color-text-primary); }
+select { font-size: 13px; padding: 4px 8px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); color: var(--color-text-primary); }
+.chart-wrap { position: relative; width: 100%; height: 320px; margin-bottom: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 14px; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.cp-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+.cp-table th { text-align: left; color: var(--color-text-secondary); font-weight: 400; padding: 6px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.cp-table td { padding: 6px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-primary); }
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+.badge-up { background: #EAF3DE; color: #3B6D11; }
+.badge-down { background: #FAECE7; color: #993C1D; }
+button.gen { font-size: 13px; padding: 5px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
+button.gen:hover { background: var(--color-background-secondary); }
+</style>
+
+<div class="panel">
+  <div class="metric"><div class="metric-label">Точек разворота</div><div class="metric-value" id="m-count">—</div></div>
+  <div class="metric"><div class="metric-label">Текущий тренд</div><div class="metric-value" id="m-trend">—</div></div>
+  <div class="metric"><div class="metric-label">Макс. изменение</div><div class="metric-value" id="m-maxchg">—</div></div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <label>Метод:</label>
+    <select id="method">
+      <option value="cusum">CUSUM</option>
+      <option value="pelt">PELT (BOCPD)</option>
+      <option value="zscore">Z-Score</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Чувствительность:</label>
+    <input type="range" id="thresh" min="1" max="10" value="4" step="1">
+    <span id="thresh-val">4</span>
+  </div>
+  <div class="ctrl-group">
+    <label>Окно:</label>
+    <input type="range" id="window" min="5" max="30" value="15" step="1">
+    <span id="window-val">15</span>
+  </div>
+  <button class="gen" onclick="generateData()">↻ Новые данные</button>
+</div>
+
+<div class="chart-wrap">
+  <canvas id="chart" role="img" aria-label="Ценовой график с отмеченными точками смены тренда"></canvas>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#378ADD"></div> Цена</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div> Сигнал роста (Change Point ↑)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#D85A30"></div> Сигнал падения (Change Point ↓)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#BA7517; border-radius:2px; width:20px; height:3px; margin-top:4px;"></div> Скользящее среднее</div>
+</div>
+
+<table class="cp-table">
+  <thead>
+    <tr><th>#</th><th>Бар</th><th>Цена</th><th>Изменение %</th><th>Направление</th><th>Метод</th></tr>
+  </thead>
+  <tbody id="cp-body"></tbody>
+</table>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let chartInst = null;
+let priceData = [];
+let labels = [];
+
+function generateData() {
+  priceData = [];
+  labels = [];
+  let price = 100 + Math.random() * 50;
+  const n = 120;
+  const segments = 5 + Math.floor(Math.random() * 4);
+  const segLen = Math.floor(n / segments);
+
+  for (let s = 0; s < segments; s++) {
+    const trend = (Math.random() - 0.45) * 0.6;
+    const vol = 0.5 + Math.random() * 1.5;
+    const len = s === segments - 1 ? n - s * segLen : segLen;
+    for (let i = 0; i < len; i++) {
+      price += trend + (Math.random() - 0.5) * vol;
+      priceData.push(+price.toFixed(2));
+      labels.push(`Bar ${s * segLen + i + 1}`);
+    }
+  }
+  detect();
+}
+
+function movingAvg(data, w) {
+  return data.map((_, i) => {
+    if (i < w - 1) return null;
+    const slice = data.slice(i - w + 1, i + 1);
+    return +(slice.reduce((a, b) => a + b, 0) / w).toFixed(2);
+  });
+}
+
+function detectCUSUM(data, thresh) {
+  const mu = data.reduce((a, b) => a + b, 0) / data.length;
+  const std = Math.sqrt(data.reduce((a, b) => a + (b - mu) ** 2, 0) / data.length);
+  const k = thresh * 0.15;
+  let Sp = 0, Sm = 0;
+  const cps = [];
+  for (let i = 1; i < data.length; i++) {
+    const x = (data[i] - mu) / (std || 1);
+    Sp = Math.max(0, Sp + x - k);
+    Sm = Math.max(0, Sm - x - k);
+    const h = thresh * 0.8;
+    if (Sp > h) { cps.push({ idx: i, dir: 'up' }); Sp = 0; Sm = 0; }
+    else if (Sm > h) { cps.push({ idx: i, dir: 'down' }); Sp = 0; Sm = 0; }
+  }
+  return cps;
+}
+
+function detectPELT(data, thresh, w) {
+  const cps = [];
+  const minDist = Math.max(w, 10);
+  let lastIdx = -minDist;
+  for (let i = w; i < data.length - w; i++) {
+    if (i - lastIdx < minDist) continue;
+    const before = data.slice(Math.max(0, i - w), i);
+    const after = data.slice(i, Math.min(data.length, i + w));
+    const mB = before.reduce((a, b) => a + b, 0) / before.length;
+    const mA = after.reduce((a, b) => a + b, 0) / after.length;
+    const varB = before.reduce((a, b) => a + (b - mB) ** 2, 0) / before.length;
+    const varA = after.reduce((a, b) => a + (b - mA) ** 2, 0) / after.length;
+    const diff = Math.abs(mA - mB);
+    const noise = Math.sqrt((varB + varA) / 2) || 1;
+    const score = diff / noise;
+    if (score > thresh * 0.35) {
+      cps.push({ idx: i, dir: mA > mB ? 'up' : 'down' });
+      lastIdx = i;
+    }
+  }
+  return cps;
+}
+
+function detectZScore(data, thresh, w) {
+  const cps = [];
+  let lastIdx = -w;
+  for (let i = w; i < data.length; i++) {
+    if (i - lastIdx < w) continue;
+    const window = data.slice(i - w, i);
+    const mu = window.reduce((a, b) => a + b, 0) / window.length;
+    const std = Math.sqrt(window.reduce((a, b) => a + (b - mu) ** 2, 0) / window.length) || 1;
+    const z = (data[i] - mu) / std;
+    if (Math.abs(z) > thresh * 0.4) {
+      cps.push({ idx: i, dir: z > 0 ? 'up' : 'down' });
+      lastIdx = i;
+    }
+  }
+  return cps;
+}
+
+function detect() {
+  const method = document.getElementById('method').value;
+  const thresh = +document.getElementById('thresh').value;
+  const w = +document.getElementById('window').value;
+
+  let cps = [];
+  if (method === 'cusum') cps = detectCUSUM(priceData, thresh);
+  else if (method === 'pelt') cps = detectPELT(priceData, thresh, w);
+  else cps = detectZScore(priceData, thresh, w);
+
+  const ma = movingAvg(priceData, w);
+  renderChart(cps, ma, method);
+  renderTable(cps, method);
+  updateMetrics(cps);
+}
+
+function renderChart(cps, ma, method) {
+  const cpSet = new Set(cps.map(c => c.idx));
+  const cpDir = {};
+  cps.forEach(c => cpDir[c.idx] = c.dir);
+
+  const pointBg = priceData.map((_, i) => {
+    if (!cpSet.has(i)) return 'rgba(0,0,0,0)';
+    return cpDir[i] === 'up' ? '#1D9E75' : '#D85A30';
+  });
+  const pointR = priceData.map((_, i) => cpSet.has(i) ? 7 : 0);
+
+  if (chartInst) chartInst.destroy();
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+  const textColor = isDark ? '#aaa' : '#888';
+
+  chartInst = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Цена',
+          data: priceData,
+          borderColor: '#378ADD',
+          borderWidth: 1.5,
+          pointBackgroundColor: pointBg,
+          pointRadius: pointR,
+          pointHoverRadius: pointR.map(r => r > 0 ? r + 2 : 3),
+          tension: 0.3,
+          fill: false,
+        },
+        {
+          label: 'MA',
+          data: ma,
+          borderColor: '#BA7517',
+          borderWidth: 1.2,
+          borderDash: [5, 3],
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const i = ctx.dataIndex;
+              const cp = cps.find(c => c.idx === i);
+              if (cp && ctx.datasetIndex === 0) return `Цена: ${ctx.parsed.y} ⚡ Change Point ${cp.dir === 'up' ? '↑' : '↓'}`;
+              return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: textColor, maxTicksLimit: 12, font: { size: 11 }, autoSkip: true },
+          grid: { color: gridColor }
+        },
+        y: {
+          ticks: { color: textColor, font: { size: 11 } },
+          grid: { color: gridColor }
+        }
+      }
+    }
+  });
+}
+
+function renderTable(cps, method) {
+  const tbody = document.getElementById('cp-body');
+  if (cps.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:12px 8px; color:var(--color-text-secondary)">Точки разворота не найдены — уменьшите чувствительность</td></tr>';
+    return;
+  }
+  tbody.innerHTML = cps.slice(0, 15).map((cp, n) => {
+    const price = priceData[cp.idx];
+    const prev = priceData[Math.max(0, cp.idx - 1)];
+    const chg = prev ? (((price - prev) / prev) * 100).toFixed(2) : '0.00';
+    const dir = cp.dir === 'up';
+    return `<tr>
+      <td>${n + 1}</td>
+      <td>${labels[cp.idx]}</td>
+      <td><strong>${price}</strong></td>
+      <td style="color:${dir ? '#1D9E75' : '#D85A30'}">${dir ? '+' : ''}${chg}%</td>
+      <td><span class="badge ${dir ? 'badge-up' : 'badge-down'}">${dir ? '↑ Рост' : '↓ Падение'}</span></td>
+      <td style="color:var(--color-text-secondary)">${method.toUpperCase()}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateMetrics(cps) {
+  document.getElementById('m-count').textContent = cps.length;
+
+  const last = cps[cps.length - 1];
+  const trendEl = document.getElementById('m-trend');
+  if (last) {
+    trendEl.textContent = last.dir === 'up' ? '↑ Бычий' : '↓ Медвежий';
+    trendEl.className = 'metric-value ' + (last.dir === 'up' ? 'up' : 'down');
+  } else {
+    trendEl.textContent = '—';
+    trendEl.className = 'metric-value';
+  }
+
+  if (cps.length > 0) {
+    let maxChg = 0;
+    cps.forEach(cp => {
+      const price = priceData[cp.idx];
+      const prev = priceData[Math.max(0, cp.idx - 1)];
+      const chg = Math.abs(prev ? (price - prev) / prev * 100 : 0);
+      if (chg > maxChg) maxChg = chg;
+    });
+    document.getElementById('m-maxchg').textContent = maxChg.toFixed(2) + '%';
+  } else {
+    document.getElementById('m-maxchg').textContent = '—';
+  }
+}
+
+document.getElementById('thresh').addEventListener('input', e => {
+  document.getElementById('thresh-val').textContent = e.target.value;
+  detect();
+});
+document.getElementById('window').addEventListener('input', e => {
+  document.getElementById('window-val').textContent = e.target.value;
+  detect();
+});
+document.getElementById('method').addEventListener('change', detect);
+
+generateData();
+</script>
