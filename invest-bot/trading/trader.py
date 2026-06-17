@@ -80,6 +80,10 @@ class Trader:
         tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
 
+        for strategy in today_trade_strategies.values():
+            if hasattr(strategy, "set_squeeze_provider"):
+                strategy.set_squeeze_provider(self.__oi_layers.squeeze_score)
+
         rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
         logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
         if rub_before_trade_day < min_rub:
