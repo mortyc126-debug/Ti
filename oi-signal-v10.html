@@ -3798,9 +3798,14 @@ function renderCatalog(){
     const isPin = pinnedTickers.includes(item.t);
     const isActive = item.t === curTicker;
     const hasFigi = !!(item.f);
+    const dc = extIndicatorsCache[item.t];
+    const hasDeep = !!(dc && !dc.error && dc.score != null && !isNaN(dc.score));
+    const deepStale = hasDeep && dc.ts && (Date.now() - dc.ts > EXT_IND_MAX_AGE);
+    const deepTitle = hasDeep ? (deepStale?'Глубокие данные (90д) есть, но устарели':'Глубокие данные (90д) есть') : 'Глубоких данных (90д) нет';
+    const deepBadge = `<span title="${deepTitle}" style="font-size:11px;line-height:1;color:${hasDeep?(deepStale?'var(--warn,#E8A33D)':'var(--mem)'):'var(--txt3)'};opacity:${hasDeep?1:.35};">${hasDeep?'◆':'◇'}</span>`;
     return `<div class="cat-item${isActive?' active-ticker':''}${isPin?' pinned':''}" onclick="selectTicker('${item.t}','${item.cat||'stocks'}')">
       <div style="flex:1;min-width:0;">
-        <div class="cat-item-code">${item.t} <span style="font-size:8px;color:${hasFigi?'var(--pos)':'var(--txt3)'}">${hasFigi?'●':'○'}</span> <span class="copy-ticker" onclick="event.stopPropagation();copyTicker('${item.t}')" title="Скопировать тикер">📋</span></div>
+        <div class="cat-item-code">${item.t} <span style="font-size:11px;color:${hasFigi?'var(--pos)':'var(--txt3)'}">${hasFigi?'●':'○'}</span> ${deepBadge} <span class="copy-ticker" onclick="event.stopPropagation();copyTicker('${item.t}')" title="Скопировать тикер">📋</span></div>
         <div class="cat-item-name">${item.name}</div>
         <div class="cat-item-sector">${item.sector||item.cat||''}</div>
       </div>
