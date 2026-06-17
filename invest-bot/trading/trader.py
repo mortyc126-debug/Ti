@@ -1,5 +1,7 @@
+import asyncio
 import datetime
 import logging
+import os
 from decimal import Decimal
 
 from tinkoff.invest import Candle, OrderExecutionReportStatus
@@ -18,10 +20,16 @@ from trade_system.strategies.base_strategy import IStrategy
 from trading.trade_results import TradeResults
 from configuration.settings import TradingSettings
 from risk import RiskManager
+from oi_layers import OiLayersService
 
 __all__ = ("Trader")
 
 logger = logging.getLogger(__name__)
+
+# Адаптивный выход (risk.check_exit: трейлинг Chandelier + squeeze-протекция)
+# — один из РЕЖИМОВ работы, не замена фиксированного стоп/тейк сигнала
+# стратегии. По умолчанию выключен, чтобы не менять текущее поведение.
+ADAPTIVE_EXIT_ENABLED = os.getenv("ADAPTIVE_EXIT", "0") == "1"
 
 
 class Trader:
@@ -48,6 +56,9 @@ class Trader:
         self.__market_data_service = market_data_service
         self.__blogger = blogger
         self.__risk = RiskManager()
+        self.__last_prices: dict[str, float] = {}
+        self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
+        self.__oi_task: asyncio.Task | None = None
 
     async def trade_day(
             self,
@@ -65,6 +76,9 @@ class Trader:
 
         self.__clear_all_positions(account_id, today_trade_strategies)
         self.__risk.equity_getter = lambda: float(self.__operation_service.available_rub_on_account(account_id) or 0)
+
+        tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
+        self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
 
         rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
         logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
@@ -86,6 +100,14 @@ class Trader:
             logger.debug(f"Old: {self.__today_trade_results.get_closed_orders()}")
         except Exception as ex:
             logger.error(f"Trading error: {repr(ex)}")
+        finally:
+            if self.__oi_task:
+                self.__oi_task.cancel()
+                try:
+                    await self.__oi_task
+                except asyncio.CancelledError:
+                    pass
+                self.__oi_task = None
 
         logger.info("Finishing trading today")
         self.__blogger.finish_trading_message()
@@ -136,6 +158,8 @@ class Trader:
                 logger.debug("Skip candle from past.")
                 continue
 
+            self.__last_prices[strategies[candle.figi].settings.ticker] = float(quotation_to_decimal(candle.close))
+
             # check price from candle for take or stop price levels
             current_trade_order = self.__today_trade_results.get_current_trade_order(candle.figi)
             if current_trade_order:
@@ -153,6 +177,9 @@ class Trader:
                         logger.info(f"TAKE PROFIT: {current_trade_order}")
                         self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.take_profit_level), "take_profit")
                         self.__close_position_and_send_message(account_id, candle.figi, strategies)
+
+                    elif ADAPTIVE_EXIT_ENABLED:
+                        self.__check_adaptive_exit(account_id, candle, strategies)
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
 
@@ -341,6 +368,33 @@ class Trader:
         risk_ticker = strategy.settings.ticker
         if risk_ticker in self.__risk.positions:
             self.__risk.close_position(risk_ticker, price, point_value=1.0, reason=reason)
+
+    def __check_adaptive_exit(
+            self,
+            account_id: str,
+            candle: Candle,
+            strategies: dict[str, IStrategy]
+    ) -> None:
+        """
+        Режим ADAPTIVE_EXIT=1: вместо фиксированного take_profit_level —
+        risk.check_exit (трейлинг Chandelier + безубыток + giveback), плюс
+        squeeze-протекция шорта по реальному squeeze_score из oi_layers.py
+        (не статичный порог, а недавнее крупное наращивание стороны, которое
+        сейчас в минусе по цене).
+        """
+        strategy = strategies[candle.figi]
+        risk_ticker = strategy.settings.ticker
+        pos = self.__risk.positions.get(risk_ticker)
+        if not pos:
+            return
+
+        price = float(quotation_to_decimal(candle.close))
+        squeeze = self.__oi_layers.is_squeeze_risk(risk_ticker, pos.direction)
+        should_close, reason = self.__risk.check_exit(risk_ticker, price, squeeze=squeeze)
+        if should_close:
+            logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")
+            self.__risk_close(strategy, price, reason)
+            self.__close_position_and_send_message(account_id, candle.figi, strategies)
 
     def __close_position_and_send_message(
             self,
