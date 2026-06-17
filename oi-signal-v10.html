@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="lib-infotheory-opt.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -399,6 +400,9 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <div class="sec" style="margin-bottom:0;">Методы</div>
         <span style="font-size:9px;color:var(--txt3);" title="Каждый метод даёт оценку от −1 (сигнал на падение) до +1 (сигнал на рост). Полоса слева от центра = медвежий сигнал, справа = бычий. ○◑● — уверенность метода (мало данных → меньше влияния на итог). «вес» — насколько композит доверяет методу по истории, «точность» — % совпадений прогноза с фактом.">ⓘ +/− значит рост/падение · вес · точность</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
+        <button class="btn" id="jointCalibrateBtn" style="font-size:10px;padding:3px 8px;" title="Совместно пересчитывает веса методов через QUBO/Ising + simulated annealing — штрафует одновременное включение сильно коррелированных методов (в отличие от независимой EWA-калибровки по умолчанию)" onclick="jointCalibrateWeights(curTicker); renderMethodsTable(computeAllMethods());">🧮 Совместная калибровка (SA)</button>
       </div>
       <div id="dataFreshWarn" style="display:none;font-size:10px;color:var(--warn);background:rgba(255,180,0,.08);border:1px solid rgba(255,180,0,.2);border-radius:6px;padding:6px 8px;margin-bottom:6px;"></div>
       <div id="methodsTable"></div>
@@ -2477,6 +2481,67 @@ function regimeLoad(ticker) {
   } catch(e) { return null; }
 }
 
+// ============================================================
+// СОВМЕСТНАЯ КАЛИБРОВКА ВЕСОВ МЕТОДОВ (QUBO/Ising + simulated annealing,
+// формулы из lib-infotheory-opt.js). В отличие от EWA-калибровки ниже
+// (методы калибруются независимо), здесь штрафуется одновременное
+// включение сильно коррелированных методов — избегаем задваивания сигнала.
+// ============================================================
+const JOINT_MASK_LS_KEY = 'oi_joint_mask_v1';
+let jointMethodMask = {};
+
+function jointMaskSave(ticker, mask) {
+  try {
+    const all = JSON.parse(localStorage.getItem(JOINT_MASK_LS_KEY) || '{}');
+    all[ticker] = { mask, savedAt: Date.now() };
+    localStorage.setItem(JOINT_MASK_LS_KEY, JSON.stringify(all));
+    jointMethodMask[ticker] = mask;
+  } catch(e) {}
+}
+
+function jointMaskLoad(ticker) {
+  try {
+    const all = JSON.parse(localStorage.getItem(JOINT_MASK_LS_KEY) || '{}');
+    const entry = all[ticker];
+    jointMethodMask[ticker] = entry ? entry.mask : null;
+    return jointMethodMask[ticker];
+  } catch(e) { return null; }
+}
+
+// Строит per-метод score-серии из signalLog (по тикеру), считает попарную
+// корреляцию Пирсона и совместно оптимизирует бинарную маску включения
+// методов через itJointOptimizeMethodMask (QUBO -> Ising -> SA).
+function jointCalibrateWeights(ticker) {
+  try {
+    const logs = (signalLog || []).filter(e => e.ticker === ticker && e.methods);
+    if (logs.length < 15) return null;
+    const methodIds = Array.from(new Set(logs.flatMap(e => Object.keys(e.methods))));
+    if (methodIds.length < 2) return null;
+
+    const seriesById = {};
+    methodIds.forEach(id => {
+      seriesById[id] = logs.map(e => (e.methods[id] && e.methods[id].score != null) ? e.methods[id].score : NaN);
+    });
+
+    const n = methodIds.length;
+    const corrMatrix = Array.from({length:n}, () => new Array(n).fill(0));
+    for (let i=0;i<n;i++){
+      for (let j=i+1;j<n;j++){
+        const c = itPearsonCorr(seriesById[methodIds[i]], seriesById[methodIds[j]]);
+        corrMatrix[i][j] = c; corrMatrix[j][i] = c;
+      }
+    }
+
+    const mw = (methodWeights && methodWeights[ticker]) || {};
+    const accById = {};
+    methodIds.forEach(id => { accById[id] = (mw[id] && mw[id].total >= 30) ? mw[id].weight : 0.5; });
+
+    const mask = itJointOptimizeMethodMask(methodIds, accById, corrMatrix, { redundancyPenalty: 1.0 });
+    jointMaskSave(ticker, mask);
+    return mask;
+  } catch(e) { console.error('jointCalibrateWeights', e); return null; }
+}
+
 function rc_avg(arr) { return arr.length ? arr.reduce((s,v)=>s+v,0)/arr.length : 0; }
 function rc_toNum(v) { return parseFloat(v)||0; }
 function rc_toPrice(p) { if(!p) return 0; return (rc_toNum(p.units)||0)+(rc_toNum(p.nano)||0)/1e9; }
@@ -2589,7 +2654,15 @@ function classifyRegime(tsHistory, candleData, obHistory, osHistory, ticker, opt
   const volSpike=rc_volumeSpike(tsHistory);
   const newAtrHistory=[...atrHistory, volInfo.raw].slice(-90);
 
-  const p_stress=Math.min(1, volInfo.pct*0.35 + microSt*0.30 + oiPress*0.20 + volSpike*0.15);
+  // Дрейф распределения returns (KL-дивергенция короткого окна к базовому,
+  // lib-infotheory-opt.js) — режим, который "выбивается" из привычного
+  // поведения ряда, не всегда виден через волатильность/микростресс отдельно.
+  const closesAll=curCandles.map(c=>rc_toPrice(c.close)).filter(v=>v>0);
+  const retsAll=closesAll.slice(1).map((c,i)=>c/closesAll[i]-1);
+  const driftRaw=itDistributionDrift(retsAll.slice(-10), retsAll, 8);
+  const driftPct=Math.min(1, driftRaw/3); // KL обычно в диапазоне 0..~3 бит для этих окон
+
+  const p_stress=Math.min(1, volInfo.pct*0.30 + microSt*0.25 + oiPress*0.20 + volSpike*0.15 + driftPct*0.10);
 
   let regime, confidence, label, color;
   if(p_stress>=0.75){
@@ -3056,7 +3129,9 @@ function computeComposite(methodResults, ticker){
         w = 0.6 * regW;
       }
     } else {
-      w = baseW * regW;
+      const mask = jointMethodMask[ticker];
+      const maskW = (mask && mask[m.id] === 0) ? 0.5 : 1.0; // мягкий даунвес коррелированных дублей, не жёсткое отключение
+      w = baseW * regW * maskW;
     }
 
     const rs = (r.score == null || isNaN(r.score)) ? 0 : r.score;
@@ -4559,6 +4634,7 @@ async function refreshAll(){
       curTicker
     );
   } catch(e) { console.warn('Regime classifier error:', e); currentRegimeState = null; }
+  jointMaskLoad(curTicker);
 
   // 3. Compute signals
   const methodResults = computeAllMethods();
