@@ -21,6 +21,9 @@
 //   /db/indverdict?ticker=            GET  — последний сохранённый вердикт
 //   /db/oidaily                       POST — upsert дневной снэпшок ОИ (юр/физ, лонг/шорт, цена)
 //   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
+//   /db/oibackfill?tickers=&days=     GET  — разовый backfill истории FutOI юр/физ за прошлые
+//                                            даты (date= в futoi API); без tickers — берёт
+//                                            текущий отслеживаемый список из oi_tracked_state
 //
 // Cron (scheduled): ежедневный автосбор oi_daily по всем ликвидным фьючерсам
 // FORTS — без участия браузера. Настройка:
@@ -342,6 +345,53 @@ async function scheduledCollectOi(env) {
   }
 }
 
+// ── Backfill: разовая подтяжка истории FutOI (юр/физ) за прошлые даты ──
+// futoi/securities.json принимает date= и отдаёт срез на конкретный день,
+// поэтому глубину истории тянем циклом по датам (а не диапазоном за раз).
+// Глубина ограничена тарифом подписки на стороне MOEX — сколько дней реально
+// отдаст API, узнаём только по факту (где данных не будет, просто пропустим).
+async function backfillOiHistory(db, env, tickers, days) {
+  const moexKey = env.MOEX_KEY;
+  if (!moexKey) return { error: 'secret MOEX_KEY не задан' };
+  const dates = [];
+  const d = new Date();
+  for (let i = 0; i < days; i++) {
+    dates.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() - 1);
+  }
+  let saved = 0, empty = 0, failed = 0;
+  for (const ticker of tickers) {
+    const sym = futoi2sym(ticker);
+    for (const date of dates) {
+      try {
+        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${date}&iss.meta=off&limit=1000`;
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+        if (!resp.ok) { failed++; continue; }
+        const json2 = await resp.json();
+        const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
+        const rows = issBlockToObjects(block).filter(o => o.ticker === sym);
+        if (!rows.length) { empty++; continue; }
+        const byGroup = {};
+        rows.forEach(o => {
+          const g = (o.clgroup || '').toUpperCase();
+          if (g !== 'YUR' && g !== 'FIZ') return;
+          if (!byGroup[g] || (o.tradetime || '') > (byGroup[g].tradetime || '')) byGroup[g] = o;
+        });
+        const tradedate = (byGroup.YUR || byGroup.FIZ || {}).tradedate || date;
+        await upsertOiDaily(db, {
+          ticker, tradedate, price: 0,
+          yur_long: Number(byGroup.YUR?.pos_long || 0),
+          yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
+          fiz_long: Number(byGroup.FIZ?.pos_long || 0),
+          fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+        });
+        saved++;
+      } catch (e) { failed++; }
+    }
+  }
+  return { tickers: tickers.length, days, saved, empty, failed };
+}
+
 async function handleDb(path, req, env) {
   const db = DB(env);
   if (!db) return json({ error: 'D1 binding "интерес" не настроен' }, 503);
@@ -599,6 +649,21 @@ async function handleDb(path, req, env) {
       'SELECT * FROM oi_daily WHERE ticker=? ORDER BY tradedate ASC'
     ).bind(ticker).all();
     return json(results);
+  }
+
+  // ── Разовый backfill истории FutOI: /db/oibackfill?tickers=BRN6,SiU6&days=90 ──
+  // Без tickers — берёт текущий отслеживаемый список из oi_tracked_state.
+  if (p === '/oibackfill' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const days = Math.min(Number(u.searchParams.get('days')) || 90, 365);
+    let tickers = (u.searchParams.get('tickers') || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!tickers.length) {
+      const { results } = await db.prepare('SELECT ticker FROM oi_tracked_state WHERE tracked=1').all();
+      tickers = results.map(r => r.ticker);
+    }
+    if (!tickers.length) return json({ error: 'нет тикеров: пусто и в параметре, и в oi_tracked_state (запусти cron хотя бы раз)' }, 400);
+    const result = await backfillOiHistory(db, env, tickers, days);
+    return json(result);
   }
 
   return json({ error: 'unknown db route: ' + p }, 404);
