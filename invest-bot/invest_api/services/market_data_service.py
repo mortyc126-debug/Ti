@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from tinkoff.invest import Client, GetTradingStatusResponse, SecurityTradingStatus, Quotation
+from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
 
@@ -21,7 +22,7 @@ class MarketDataService:
     @invest_api_retry()
     @invest_error_logging
     def __get_trading_status(self, figi: str) -> GetTradingStatusResponse:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             status = client.market_data.get_trading_status(figi=figi)
 
             logger.debug(f"Trading Status {figi}: {status}")
@@ -50,7 +51,7 @@ class MarketDataService:
         Request last price for instrument by figi.
         Main reason is for order purposes (more close to current price).
         """
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             prices = client.market_data.get_last_prices(figi=[figi])
 
             logger.debug(f"Last prices for {figi}: {prices}")

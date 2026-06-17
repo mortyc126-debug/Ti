@@ -2,6 +2,7 @@ import datetime
 import logging
 
 from tinkoff.invest import Client, TradingSchedule, InstrumentIdType, InstrumentStatus
+from invest_api.invest_target import INVEST_TARGET
 
 from configuration.settings import ShareSettings
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
@@ -47,7 +48,7 @@ class InstrumentService:
     ) -> list[TradingSchedule]:
         result = []
 
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             logger.debug(f"Trading Schedules for exchange: {exchange}, from: {_from}, to: {_to}")
 
             for schedule in client.instruments.trading_schedules(
@@ -66,7 +67,7 @@ class InstrumentService:
         """
         :return: Information about share settings by it figi
         """
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             logger.debug(f"ShareBy figi: {figi}:")
 
             share = client.instruments.share_by(
@@ -88,7 +89,7 @@ class InstrumentService:
     @invest_api_retry()
     @invest_error_logging
     def __currencies(self) -> None:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             for cur in client.instruments.currencies(
                     instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
             ).instruments:
@@ -97,7 +98,7 @@ class InstrumentService:
     @invest_api_retry()
     @invest_error_logging
     def __instrument_by_figi(self, figi: str) -> None:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             logger.debug(f"InstrumentBy figi: {figi}:")
 
             instrument = client.instruments.get_instrument_by(id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI,

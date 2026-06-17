@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from tinkoff.invest import CandleInterval, Client, HistoricCandle
 from tinkoff.invest.utils import now
+from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
 
@@ -33,7 +34,7 @@ class ClientService:
         from_ = now() - timedelta(days=from_days)
         logger.info(f"Start download recent candles. Figi: {figi}, from days: {from_}, interval: {interval.name}")
 
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             for candle in client.get_all_candles(
                     figi=figi,
                     from_=from_,
@@ -53,7 +54,7 @@ class ClientService:
         """ Cancel all open orders. """
         logger.info(f"Cancel all orders for account id: {account_id}")
 
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             client.cancel_all_orders(account_id=account_id)
 
         logger.info(f"Cancellation all orders complete.")

@@ -8,6 +8,7 @@ from tinkoff.invest import Client, CandleInstrument, SubscriptionInterval, InfoI
 from tinkoff.invest.market_data_stream.async_market_data_stream_manager import AsyncMarketDataStreamManager
 from tinkoff.invest.market_data_stream.market_data_stream_interface import IMarketDataStreamManager
 from tinkoff.invest.market_data_stream.market_data_stream_manager import MarketDataStreamManager
+from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.utils import invest_api_retry_status_codes
 
@@ -34,7 +35,7 @@ class MarketDataStreamService:
         """
         logger.debug(f"Starting candles stream")
 
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             market_data_candles_stream: MarketDataStreamManager = client.create_market_data_stream()
 
             logger.info(f"Subscribe candles: {figies}")
@@ -76,7 +77,7 @@ class MarketDataStreamService:
             try:
                 logger.debug(f"Starting async candles stream")
 
-                async with AsyncClient(self.__token, app_name=self.__app_name) as client:
+                async with AsyncClient(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
                     async_market_data_candles_stream: AsyncMarketDataStreamManager = client.create_market_data_stream()
 
                     logger.info(f"Subscribe candles: {figies}")

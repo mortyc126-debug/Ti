@@ -53,8 +53,24 @@ python main.py
 ```
 
 Заполни в `settings.ini`:
-- `TOKEN` — токен T-Invest (readonly для SIGNAL_ONLY, полный для торговли)
+- `TOKEN` — токен T-Invest (readonly для SIGNAL_ONLY, полный для торговли;
+  для sandbox — отдельный sandbox-токен, см. ниже)
 - `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` — для уведомлений
+
+## Sandbox (виртуальный счёт, без реальных денег)
+
+```bash
+TINKOFF_SANDBOX=1 python sandbox_setup.py 100000   # разово: создать sandbox-счёт + пополнить
+TINKOFF_SANDBOX=1 python main.py                   # запуск бота в песочнице
+```
+
+`TINKOFF_SANDBOX=1` переключает gRPC-таргет всех сервисов
+(`invest_api/invest_target.py`) на `sandbox-invest-public-api`. Без этой
+переменной бот всегда идёт на боевой эндпоинт — даже с sandbox-токеном
+запрос будет отклонён, так что переменная и токен должны соответствовать
+друг другу. `sandbox_setup.py` — разовый скрипт (не часть торгового цикла):
+создаёт виртуальный счёт через `sandbox_open_account` (если уже есть —
+переиспользует) и зачисляет виртуальные рубли через `sandbox_pay_in`.
 
 ## Структура файлов
 
