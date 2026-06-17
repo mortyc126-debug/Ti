@@ -451,6 +451,17 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       </div>
     </div>
 
+    <!-- OI zones (профиль накопления ОИ по цене) -->
+    <div class="panel" style="margin-bottom:10px;">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('oiZonesBody')">
+        <div class="sec" style="margin-bottom:0;">Зоны интереса (ОИ × цена)</div>
+        <span style="font-size:10px;color:var(--txt3);" id="oiZonesChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="oiZonesBody">
+        <div id="oiZonesPanel"><div style="font-size:10px;color:var(--txt3);">Нет данных (нужна история FutOI + дневные свечи)</div></div>
+      </div>
+    </div>
+
     <!-- OBStats + OrderStats -->
     <div class="panel" style="margin-bottom:10px;">
       <div class="collapsible-hdr" onclick="toggleCollapsible('obBody')">
@@ -1813,8 +1824,45 @@ function m_RETAIL_CONTRA(futoi){
   } else {
     score = -Math.tanh(((longNet-shortNet)/(longNet+shortNet||1))*2.5);
   }
-  const confidence = (longNet+shortNet)>0 ? 0.55 : 0.1;
-  return {score, confidence, detail:`физлица: лонгов ${snum(longNet)}, шортов ${snum(shortNet)} — толпа ${longNet>=shortNet?'в лонгах (контр-сигнал на падение)':'в шортах (контр-сигнал на рост)'}`};
+  let confidence = (longNet+shortNet)>0 ? 0.55 : 0.1;
+  let detail = `физлица: лонгов ${snum(longNet)}, шортов ${snum(shortNet)} — толпа ${longNet>=shortNet?'в лонгах (контр-сигнал на падение)':'в шортах (контр-сигнал на рост)'}`;
+
+  // Та же логика дивергенции ΔOI×ΔPrice, что и у юрлиц, но интерпретация
+  // обратная: толпа доливает позиции вместе с ценой (FOMO) — это её типичное
+  // поведение на пиках/днищах, контр-сигнал усиливаем; толпа закрывает
+  // позиции (ОИ падает) — её влияние на цену ослабевает, сигнал слабее.
+  const histFo = (deepHistory[curTicker]?.futoi||[]).filter(r=>(r.clgroup||'').toUpperCase()==='FIZ');
+  const dailyCloses = (candleData['1d']||[]);
+  if(histFo.length>=2 && dailyCloses.length>=2){
+    const byDate = {};
+    histFo.forEach(r=>{ byDate[r.tradedate] = (byDate[r.tradedate]||0) + toNum(r.pos||0); });
+    const dates = Object.keys(byDate).sort();
+    if(dates.length>=2){
+      const oiPrev = byDate[dates[dates.length-2]];
+      const oiCur  = byDate[dates[dates.length-1]];
+      const dOI = oiCur - oiPrev;
+      const c1 = toP(dailyCloses[dailyCloses.length-1].close);
+      const c0 = toP(dailyCloses[dailyCloses.length-2].close);
+      const dPrice = c1 - c0;
+      if(dOI!==0 && dPrice!==0){
+        const sameSign = Math.sign(dOI)===Math.sign(dPrice);
+        if(sameSign){
+          // толпа доливает в направлении цены — типичное FOMO-поведение,
+          // усиливаем контр-сигнал (на разворот)
+          score = Math.tanh(score*1.3 - Math.sign(dPrice)*0.2);
+          confidence = Math.min(0.8, confidence+0.1);
+          detail += `; физлица доливают позиции вместе с ценой (${dPrice>=0?'+':''}${dPrice.toFixed(2)}) — FOMO, контр-сигнал усилен`;
+        } else {
+          // толпа закрывает позиции при движении цены — её влияние слабеет
+          score *= 0.4;
+          confidence = Math.max(0.1, confidence-0.15);
+          detail += `; физлица закрывают позиции при движении цены — контр-сигнал ослаблен`;
+        }
+      }
+    }
+  }
+
+  return {score, confidence, detail};
 }
 
 // --- Method 10: Price Trend (адаптивный через ATR) ---
@@ -3411,6 +3459,86 @@ function renderFutoiPanel(){
 }
 
 // ============================================================
+// RENDER: OI ZONES (профиль накопления ОИ по цене, по аналогии с MOEX OI-tool)
+// ============================================================
+// Идея: по дням считаем |ΔOI| отдельно для юрлиц и физлиц и "кладём" эту
+// величину в ценовой бакет дня (цена закрытия). Бакеты с наибольшим
+// суммарным приростом ОИ — зоны, где массово открывались новые позиции;
+// потенциальные уровни реакции цены при повторном подходе.
+function _oiZonesCompute(){
+  const dh = deepHistory[curTicker];
+  const dailyCloses = candleData['1d']||[];
+  if(!dh || !dh.futoi || !dh.futoi.length || dailyCloses.length<2) return null;
+
+  const byDateClose = {};
+  dailyCloses.forEach(c=>{
+    const d = new Date(c.time).toISOString().slice(0,10);
+    byDateClose[d] = c.cl ?? toP(c.close);
+  });
+
+  const byDateGroup = {}; // date -> {YUR:net, FIZ:net}
+  dh.futoi.forEach(r=>{
+    const g = (r.clgroup||'').toUpperCase();
+    if(g!=='YUR' && g!=='FIZ') return;
+    const d = r.tradedate;
+    if(!byDateGroup[d]) byDateGroup[d] = {YUR:0, FIZ:0};
+    byDateGroup[d][g] += toNum(r.pos||0);
+  });
+  const dates = Object.keys(byDateGroup).sort();
+  if(dates.length<2) return null;
+
+  const prices = dates.map(d=>byDateClose[d]).filter(Boolean);
+  if(prices.length<2) return null;
+  const pMin = Math.min(...prices), pMax = Math.max(...prices);
+  if(pMax<=pMin) return null;
+  const bucketCount = 12;
+  const bucketSize = (pMax-pMin)/bucketCount;
+
+  const buckets = Array.from({length:bucketCount}, (_,i)=>({
+    lo: pMin+i*bucketSize, hi: pMin+(i+1)*bucketSize, yur:0, fiz:0
+  }));
+  for(let i=1;i<dates.length;i++){
+    const d0=dates[i-1], d1=dates[i];
+    const price = byDateClose[d1];
+    if(!price) continue;
+    const dYur = Math.abs((byDateGroup[d1].YUR||0)-(byDateGroup[d0].YUR||0));
+    const dFiz = Math.abs((byDateGroup[d1].FIZ||0)-(byDateGroup[d0].FIZ||0));
+    let bi = Math.floor((price-pMin)/bucketSize);
+    bi = Math.max(0, Math.min(bucketCount-1, bi));
+    buckets[bi].yur += dYur;
+    buckets[bi].fiz += dFiz;
+  }
+  const curPrice = byDateClose[dates[dates.length-1]];
+  return {buckets, curPrice, from: dates[0], to: dates[dates.length-1]};
+}
+
+function renderOiZonesPanel(){
+  const el = document.getElementById('oiZonesPanel');
+  const res = _oiZonesCompute();
+  if(!res){
+    el.innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных (нужна история FutOI + дневные свечи)</div>';
+    return;
+  }
+  const { buckets, curPrice, from, to } = res;
+  const maxTotal = Math.max(...buckets.map(b=>b.yur+b.fiz), 1);
+  const rows = buckets.slice().reverse().map(b=>{
+    const total = b.yur+b.fiz;
+    const wPct = (total/maxTotal*100).toFixed(0);
+    const isCur = curPrice>=b.lo && curPrice<b.hi;
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:9px;margin:1px 0;${isCur?'background:rgba(245,158,11,0.12);border-radius:3px;':''}">
+      <span style="width:78px;color:var(--txt3);text-align:right;">${b.lo.toFixed(1)}–${b.hi.toFixed(1)}${isCur?' ◄':''}</span>
+      <span style="flex:1;background:var(--bg2);border-radius:2px;height:10px;position:relative;overflow:hidden;">
+        <span style="display:block;height:100%;width:${wPct}%;background:linear-gradient(90deg,#F59E0B,#EF4444);"></span>
+      </span>
+      <span style="width:64px;color:var(--txt3);">ЮЛ ${snum(b.yur)} / ФЛ ${snum(b.fiz)}</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div style="font-size:9px;color:var(--txt3);margin-bottom:6px;">период ${from}…${to} · ширина бакета ${snum((buckets[0].hi-buckets[0].lo))} · ◄ текущая цена ${curPrice.toFixed(2)}</div>
+    ${rows}`;
+}
+
+// ============================================================
 // RENDER: OB + OS PANEL
 // ============================================================
 function renderObPanel(){
@@ -4043,6 +4171,7 @@ function selectTicker(t, type){
   document.getElementById('candleArea').innerHTML = '<span>Нажмите ↺ Обновить</span>';
   document.getElementById('tsPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('futoiPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+  document.getElementById('oiZonesPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('obPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
 }
 
@@ -4202,6 +4331,7 @@ async function refreshAll(){
   if(candleData[curTF]) renderCandleChart(candleData[curTF]);
   renderTsPanel();
   renderFutoiPanel();
+  renderOiZonesPanel();
   renderObPanel();
   renderHistory();
   updateAges();
