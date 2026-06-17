@@ -548,10 +548,10 @@ const MODEL_METHOD_IDS = ['IL_MODEL_M1','IL_MODEL_M2','IL_MODEL_M3'];
 // ============================================================
 const CORR_GROUPS = {
   // Нефть / валюта / газ — фьючерсы FORTS
-  SiU6: [{t:'BRU6',corr:-0.5},{t:'EuU6',corr:0.6}],
-  SiZ6: [{t:'BRU6',corr:-0.5},{t:'EuU6',corr:0.6}],
+  SiU6: [{t:'BRN6',corr:-0.5},{t:'EuU6',corr:0.6}],
+  SiZ6: [{t:'BRN6',corr:-0.5},{t:'EuU6',corr:0.6}],
   EuU6: [{t:'SiU6',corr:0.6}],
-  BRU6: [{t:'SiU6',corr:-0.5},{t:'GZU6',corr:0.3},{t:'LKOH',corr:0.4},{t:'ROSN',corr:0.4},{t:'TATN',corr:0.4}],
+  BRN6: [{t:'SiU6',corr:-0.5},{t:'GZU6',corr:0.3},{t:'LKOH',corr:0.4},{t:'ROSN',corr:0.4},{t:'TATN',corr:0.4}],
   NGU6: [{t:'NVTK',corr:0.3}],
   // Индексные фьючерсы и кэш-индексы
   RIU6: [{t:'MXU6',corr:0.85},{t:'SBER',corr:0.5}],
@@ -561,12 +561,12 @@ const CORR_GROUPS = {
   // Акции ↔ их фьючерсы / индекс
   SBER: [{t:'SRU6',corr:0.85},{t:'IMOEX',corr:0.6},{t:'CBOM',corr:0.5},{t:'VTBR',corr:0.5}],
   SRU6: [{t:'SBER',corr:0.85}],
-  GAZP: [{t:'GZU6',corr:0.85},{t:'BRU6',corr:0.2},{t:'IMOEX',corr:0.4}],
+  GAZP: [{t:'GZU6',corr:0.85},{t:'BRN6',corr:0.2},{t:'IMOEX',corr:0.4}],
   GZU6: [{t:'GAZP',corr:0.85}],
-  LKOH: [{t:'BRU6',corr:0.4},{t:'TATN',corr:0.5},{t:'ROSN',corr:0.5}],
-  ROSN: [{t:'BRU6',corr:0.4},{t:'LKOH',corr:0.5},{t:'TATN',corr:0.5}],
-  TATN: [{t:'BRU6',corr:0.4},{t:'LKOH',corr:0.5},{t:'ROSN',corr:0.5}],
-  NVTK: [{t:'NGU6',corr:0.3},{t:'BRU6',corr:0.3}],
+  LKOH: [{t:'BRN6',corr:0.4},{t:'TATN',corr:0.5},{t:'ROSN',corr:0.5}],
+  ROSN: [{t:'BRN6',corr:0.4},{t:'LKOH',corr:0.5},{t:'TATN',corr:0.5}],
+  TATN: [{t:'BRN6',corr:0.4},{t:'LKOH',corr:0.5},{t:'ROSN',corr:0.5}],
+  NVTK: [{t:'NGU6',corr:0.3},{t:'BRN6',corr:0.3}],
   // Банки / металлурги — внутригруппные
   VTBR: [{t:'SBER',corr:0.5},{t:'CBOM',corr:0.5}],
   CBOM: [{t:'SBER',corr:0.5},{t:'VTBR',corr:0.5}],
@@ -618,14 +618,14 @@ const CATALOG = [
   {t:'IMOEX', cat:'index',   name:'Индекс МосБиржи',sector:'Индекс',        f:''},
   {t:'RTSI',  cat:'index',   name:'Индекс РТС',     sector:'Индекс',        f:''},
   {t:'MOEXBC',cat:'index',   name:'МосБиржа бонды', sector:'Индекс',        f:''},
-  // Фьючерсы FORTS — актуальные контракты (U6=сент2026, Z6=дек2026)
+  // Фьючерсы FORTS — актуальные контракты (U6=сент2026, Z6=дек2026, N6=июль2026 для Brent)
   {t:'SiU6',  cat:'futures', name:'USD/RUB сент',    sector:'Валюта',        f:''},
   {t:'SiZ6',  cat:'futures', name:'USD/RUB дек',     sector:'Валюта',        f:''},
   {t:'EuU6',  cat:'futures', name:'EUR/RUB сент',    sector:'Валюта',        f:''},
   {t:'RIU6',  cat:'futures', name:'RTS сент',        sector:'Индекс',        f:''},
   {t:'MXU6',  cat:'futures', name:'МосБиржа сент',   sector:'Индекс',        f:''},
   {t:'GDU6',  cat:'futures', name:'Золото сент',     sector:'Сырьё',         f:''},
-  {t:'BRU6',  cat:'futures', name:'Brent сент',      sector:'Сырьё',         f:''},
+  {t:'BRN6',  cat:'futures', name:'Brent июль',      sector:'Сырьё',         f:''},
   {t:'NGU6',  cat:'futures', name:'Газ сент',        sector:'Сырьё',         f:''},
   {t:'GZU6',  cat:'futures', name:'Газпром сент',    sector:'Акции',         f:''},
   {t:'SRU6',  cat:'futures', name:'Сбербанк сент',   sector:'Акции',         f:''},
@@ -645,7 +645,7 @@ let autoTimer = null;
 let curWindow = 30; // дней — глубина скользящего окна нормализации
 
 let tickers = [];
-let pinnedTickers = ['SBER','GAZP','LKOH','BRU6'];
+let pinnedTickers = ['SBER','GAZP','LKOH','BRN6'];
 
 // Текущие бары (последние 100)
 let tsHistory = [];
@@ -821,7 +821,7 @@ function loadAll(){
     // Миграция: заменить истёкшие фьючерсы 2025 на 2026
     const FUT_MIGRATE = {SiH5:'SiU6',SiM5:'SiU6',SiU5:'SiU6',SiZ5:'SiZ6',EuH5:'EuU6',EuM5:'EuU6',EuU5:'EuU6',
       RIH5:'RIU6',RIM5:'RIU6',RIU5:'RIU6',MXH5:'MXU6',MXM5:'MXU6',MXU5:'MXU6',
-      GDH5:'GDU6',GDM5:'GDU6',GDU5:'GDU6',BRH5:'BRU6',BRM5:'BRU6',BRU5:'BRU6',
+      GDH5:'GDU6',GDM5:'GDU6',GDU5:'GDU6',BRH5:'BRN6',BRM5:'BRN6',BRU5:'BRN6',
       NGH5:'NGU6',NGM5:'NGU6',NGU5:'NGU6',GZH5:'GZU6',GZM5:'GZU6',GZU5:'GZU6',
       SRH5:'SRU6',SRM5:'SRU6',SRU5:'SRU6'};
     pinnedTickers = [...new Set(pinnedTickers.map(t=>FUT_MIGRATE[t]||t))];
@@ -3913,6 +3913,26 @@ function togglePin(t){
   saveAll();
 }
 
+// Выбор инструмента среди нескольких совпадений по тикеру фьючерса (RFUD).
+// «Большой» и «мини» контракт у T-Invest могут отдаваться под одинаковым
+// ticker-кодом — отличаются по lot (мини почти всегда lot=1, у большого
+// контракта лот часто больше 1) и по name (там часто явно "Mini"/"мини").
+// Предпочитаем контракт БЕЗ "mini" в имени и с бóльшим лотом — это обычно
+// основной (полноразмерный) контракт. Если после этого остаётся несколько
+// кандидатов — не гадаем дальше, а явно показываем список, чтобы ticker
+// был выбран осознанно, а не случайно через instr[0].
+function _pickFutureCandidate(candidates, ticker, silent){
+  const notMini = candidates.filter(x=>!/мини|mini/i.test(x.name||''));
+  const pool = notMini.length ? notMini : candidates;
+  const sorted = [...pool].sort((a,b)=>(b.lot||0)-(a.lot||0));
+  const picked = sorted[0];
+  if(pool.length > 1 && !silent){
+    const list = pool.map(x=>`${x.name||x.ticker} (лот ${x.lot}, figi ${x.figi||x.uid})`).join('\n');
+    alert(`Для тикера ${ticker} нашлось ${pool.length} инструмента(ов) — выбран «${picked.name}» (лот ${picked.lot}).\nЕсли это не тот контракт, добавьте нужный вручную через FIGI:\n${list}`);
+  }
+  return picked;
+}
+
 // Авто-поиск FIGI через T-Invest FindInstrument
 async function lookupFIGI(ticker, silent=false){
   const token = getTinvestToken();
@@ -3933,10 +3953,21 @@ async function lookupFIGI(ticker, silent=false){
     // Сначала ищем среди реально торгуемых (apiTradeAvailableFlag) — биржевой класс
     // не гарантирует, что инструмент жив (напр. BBG006L8G4H1/TQBR для YNDX давно не торгуется,
     // а актуальный — TCS609805522/SPBEQRU)
-    let match = instr.find(x=>x.ticker===ticker && x.apiTradeAvailableFlag && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
+    //
+    // Для фьючерсов (RFUD) тикер не уникален: у T-Invest «большой» и «мини»
+    // контракт могут отдаваться под одним и тем же ticker-кодом, но это разные
+    // инструменты (разный FIGI/лот). Слепо брать instr.find() здесь означало
+    // молча получать то один, то другой контракт без предупреждения.
+    const futCandidates = instr.filter(x=>x.ticker===ticker && x.classCode==='RFUD');
+    let match;
+    if(futCandidates.length > 1){
+      match = _pickFutureCandidate(futCandidates, ticker, silent);
+    } else {
+      match = instr.find(x=>x.ticker===ticker && x.apiTradeAvailableFlag && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
                  || instr.find(x=>x.ticker===ticker && x.apiTradeAvailableFlag)
                  || instr.find(x=>x.ticker===ticker && (x.classCode==='TQBR'||x.classCode==='SPBFUT'||x.classCode==='RFUD'||x.classCode==='CETS'))
                  || instr.find(x=>x.ticker===ticker);
+    }
     // FindInstrument — нечёткий полнотекстовый поиск, для коротких тикеров фьючерсов
     // часто не находит точное совпадение. Fallback: полный список Futures и точный
     // фильтр по ticker — надёжнее, чем гадать по relevance.
@@ -3948,7 +3979,7 @@ async function lookupFIGI(ticker, silent=false){
       });
       const futD = await futResp.json();
       const futs = (futD.instruments||[]).filter(x=>x.ticker===ticker);
-      match = futs.find(x=>x.apiTradeAvailableFlag) || futs[0];
+      match = futs.length > 1 ? _pickFutureCandidate(futs, ticker, silent) : (futs.find(x=>x.apiTradeAvailableFlag) || futs[0]);
     }
     if(!match){ if(!silent) alert(`FIGI для ${ticker} не найден: точного совпадения по тикеру "${ticker}" нет ни в FindInstrument, ни в списке Futures`); return; }
     const figi = match.figi || match.uid || match.instrumentUid || '';
