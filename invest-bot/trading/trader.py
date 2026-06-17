@@ -17,6 +17,7 @@ from trade_system.signal import SignalType
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trade_results import TradeResults
 from configuration.settings import TradingSettings
+from risk import RiskManager
 
 __all__ = ("Trader")
 
@@ -46,6 +47,7 @@ class Trader:
         self.__stream_service = stream_service
         self.__market_data_service = market_data_service
         self.__blogger = blogger
+        self.__risk = RiskManager()
 
     async def trade_day(
             self,
@@ -62,6 +64,7 @@ class Trader:
             return None
 
         self.__clear_all_positions(account_id, today_trade_strategies)
+        self.__risk.equity_getter = lambda: float(self.__operation_service.available_rub_on_account(account_id) or 0)
 
         rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
         logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
@@ -143,10 +146,12 @@ class Trader:
                 try:
                     if low <= current_trade_order.signal.stop_loss_level <= high:
                         logger.info(f"STOP LOSS: {current_trade_order}")
+                        self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.stop_loss_level), "stop_loss")
                         self.__close_position_and_send_message(account_id, candle.figi, strategies)
 
                     elif low <= current_trade_order.signal.take_profit_level <= high:
                         logger.info(f"TAKE PROFIT: {current_trade_order}")
+                        self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.take_profit_level), "take_profit")
                         self.__close_position_and_send_message(account_id, candle.figi, strategies)
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
@@ -164,6 +169,7 @@ class Trader:
                         if signal_new.signal_type == SignalType.CLOSE:
                             if current_trade_order:
                                 logger.info(f"Close position by close signal: {current_trade_order}")
+                                self.__risk_close(strategies[candle.figi], float(quotation_to_decimal(candle.close)), "close_signal")
                                 self.__close_position_and_send_message(account_id, candle.figi, strategies)
                             else:
                                 logger.info(f"New signal has been skipped. No open position to close.")
@@ -187,14 +193,33 @@ class Trader:
                                     )
                                 )
                             else:
-                                available_lots = self.__open_position_lots_count(
+                                risk_ticker = strategy.settings.ticker
+                                direction = "long" if signal_new.signal_type == SignalType.LONG else "short"
+                                confidence = getattr(strategy, 'confidence', 0.7)
+
+                                risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
+                                if not risk_ok:
+                                    logger.info(f"New signal has been skipped. Risk gate: {risk_why}")
+                                    current_candles[candle.figi] = candle
+                                    continue
+
+                                entry_price = float(quotation_to_decimal(candle.close))
+                                stop_price = float(signal_new.stop_loss_level)
+                                risk_qty, risk_size_why = self.__risk.position_size(
+                                    entry_price, stop_price, point_value=1.0,
+                                    lot=strategy.settings.lot_size, confidence=confidence
+                                )
+                                logger.debug(f"Risk position_size: {risk_size_why}")
+
+                                cash_lots = self.__open_position_lots_count(
                                     account_id,
                                     strategy.settings.max_lots_per_order,
                                     quotation_to_decimal(candle.close),
                                     strategy.settings.lot_size
                                 )
+                                available_lots = min(cash_lots, risk_qty) if risk_qty > 0 else 0
 
-                                logger.debug(f"Available lots: {available_lots}")
+                                logger.debug(f"Available lots: {available_lots} (cash={cash_lots}, risk={risk_qty})")
                                 if available_lots > 0:
                                     open_order = self.__order_service.post_market_order(
                                         account_id=account_id,
@@ -209,12 +234,17 @@ class Trader:
                                             open_order.order_id,
                                             signal_new
                                         )
+                                        self.__risk.open_position(
+                                            risk_ticker, direction, available_lots,
+                                            entry_price, stop_price, point_value=1.0,
+                                            confidence=confidence
+                                        )
                                         self.__blogger.open_position_message(open_position)
                                         logger.info(f"Open position: {open_position}")
                                     else:
                                         logger.info(f"Open order status failed: {open_order}")
                                 else:
-                                    logger.info(f"New signal has been skipped. No available money")
+                                    logger.info(f"New signal has been skipped. No available money or risk budget")
                     except Exception as ex:
                         logger.error(f"Error open new position by new signal: {repr(ex)}")
 
@@ -294,7 +324,23 @@ class Trader:
         self.__client_service.cancel_all_orders(account_id)
 
         logger.debug("Close all positions.")
+        # Снимаем с учёта risk.py то, что осталось открытым к концу дня. Точная
+        # цена выхода здесь неизвестна (как и в остальном коде — closing order
+        # тоже не хранит цену исполнения), поэтому approx = entry_price
+        # (нейтральный pnl, не искажает день вверх/вниз).
+        for strategy in strategies.values():
+            risk_ticker = strategy.settings.ticker
+            pos = self.__risk.positions.get(risk_ticker)
+            if pos:
+                self.__risk.close_position(risk_ticker, pos.entry_price, point_value=1.0, reason="eod_clear")
+
         return self.__close_position_by_figi(account_id, strategies.keys(), strategies)
+
+    def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> None:
+        """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу."""
+        risk_ticker = strategy.settings.ticker
+        if risk_ticker in self.__risk.positions:
+            self.__risk.close_position(risk_ticker, price, point_value=1.0, reason=reason)
 
     def __close_position_and_send_message(
             self,

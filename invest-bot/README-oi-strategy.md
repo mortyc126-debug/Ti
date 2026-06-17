@@ -61,14 +61,37 @@ python main.py
 ```
 invest-bot/
   trade_system/strategies/
-    oi_composite_strategy.py   ← наша стратегия
+    oi_composite_strategy.py   ← наша стратегия, экспонирует .confidence
     change_and_volume_strategy.py  ← оригинал (пример)
     strategy_factory.py        ← регистрация стратегий
   trading/
-    trader.py                  ← добавлен signal_only режим
+    trader.py                  ← signal_only режим + risk-gate перед открытием
+  risk.py                      ← риск-менеджер (корреляционный риск,
+                                  risk% от confidence, портфельный лимит,
+                                  дневной стоп, безубыток, трейлинг)
+  risk_config.py                ← константы риск-менеджмента (CORR_GROUPS и т.д.)
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
+  data/risk_state.json,
+  data/open_positions.json     ← состояние risk.py, переживает рестарт
 ```
+
+## Риск-менеджмент (risk.py)
+
+Перед каждым реальным открытием позиции (`SIGNAL_ONLY=0`) `trader.py` спрашивает
+`risk.can_open(ticker, direction, confidence)`:
+- блокирует, если уже открыт противоположный лонг/шорт в той же корреляционной
+  группе (`risk_config.CORR_GROUPS`) — все акции РФ по умолчанию одна группа;
+- блокирует, если `confidence` (производная от composite-сигнала стратегии)
+  ниже 55%;
+- сжимает размер новой позиции, если суммарный риск портфеля близок к лимиту
+  (`PORTFOLIO_RISK_MAX_PCT`).
+
+Размер лота — `min(доступные деньги, риск-бюджет от confidence)`. Дневной
+защитный стоп (`DAILY_MAX_LOSS_PCT`) блокирует новые входы до конца дня.
+
+`confidence` стратегии = `0.5 + 0.5*|composite|` — приближение, так как
+у composite-сигнала нет нативной вероятностной интерпретации.
 
 ## Что планируется добавить
 

@@ -132,3 +132,7 @@ dmypy.json
 .idea/*
 TODO.txt
 *.pyc
+
+# risk.py / oi_composite_strategy.py persisted state
+/data/
+oi_weights.json

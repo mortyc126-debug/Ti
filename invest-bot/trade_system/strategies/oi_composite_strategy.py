@@ -242,6 +242,7 @@ class OICompositeStrategy(IStrategy):
         self.__candles: list[HistoricCandle] = []
         self.__open_trade: Optional[OpenTrade] = None
         self.__weights: dict[str, MethodWeight] = self.__load_weights()
+        self.__confidence: float = 0.7
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -256,6 +257,16 @@ class OICompositeStrategy(IStrategy):
     def signal_only(self) -> bool:
         """Если True — ордера не выставляем, только Telegram-уведомления."""
         return self.__signal_only
+
+    @property
+    def confidence(self) -> float:
+        """
+        Уверенность последнего сигнала (0-1) для risk.py.
+        composite ограничен ~[-1, 1] (см. __compute_composite), поэтому
+        confidence = 0.5 + 0.5*|composite|: порог сигнала (composite=threshold,
+        обычно 0.25) даёт ~0.6, насыщение (composite=1.0) даёт 1.0.
+        """
+        return self.__confidence
 
     def update_lot_count(self, lot: int) -> None:
         self.__settings.lot_size = lot
@@ -327,6 +338,9 @@ class OICompositeStrategy(IStrategy):
         entry = quotation_to_decimal(last.close)
 
         method_scores = {name: scores[i] for i, (name, _) in enumerate(METHODS)}
+        composite = sum(scores[i] * self.__weights[name].weight for i, (name, _) in enumerate(METHODS))
+        weight_sum = sum(self.__weights[name].weight for name, _ in METHODS) or 1.0
+        self.__confidence = max(0.0, min(1.0, 0.5 + 0.5 * abs(composite / weight_sum)))
 
         self.__open_trade = OpenTrade(
             signal_type=signal_type,
