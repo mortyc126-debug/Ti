@@ -19,6 +19,8 @@
 //   /db/atr?ticker=                   GET  — ATR тикера
 //   /db/indverdict                    POST — сохранить вердикт модуля indlab
 //   /db/indverdict?ticker=            GET  — последний сохранённый вердикт
+//   /db/oidaily                       POST — upsert дневной снэпшок ОИ (юр/физ, лонг/шорт, цена)
+//   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -139,6 +141,23 @@ const SCHEMA_STMTS = [
     last_ts    INTEGER NOT NULL,
     updated_at INTEGER DEFAULT 0
   )`,
+
+  // Дневные снэпшоты ОИ (юр/физ, лонг/шорт) + цена закрытия — копится с момента
+  // включения фичи (FutOI не отдаёт историю позиций глубже окна AlgoPack),
+  // на основе этой истории клиент строит слои позиций по дате/цене открытия
+  // для анализа сквизов. Не чистим по времени — это и есть вся ценность таблицы.
+  `CREATE TABLE IF NOT EXISTS oi_daily (
+    key        TEXT PRIMARY KEY,
+    ticker     TEXT NOT NULL,
+    tradedate  TEXT NOT NULL,
+    price      REAL DEFAULT 0,
+    yur_long   REAL DEFAULT 0,
+    yur_short  REAL DEFAULT 0,
+    fiz_long   REAL DEFAULT 0,
+    fiz_short  REAL DEFAULT 0,
+    updated_at INTEGER DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_oidaily_ticker ON oi_daily(ticker, tradedate)`,
 ];
 
 // ── D1 Route Handler ───────────────────────────────────────────────────────
@@ -381,6 +400,30 @@ async function handleDb(path, req, env) {
     if (!row) return json(null);
     let candles; try { candles = JSON.parse(row.candles); } catch(_) { candles = []; }
     return json({ candles, last_ts: row.last_ts, updated_at: row.updated_at });
+  }
+
+  // ── Дневные снэпшоты ОИ (для построения слоёв позиций / риска сквиза) ──
+  // POST body: { ticker, tradedate, price, yur_long, yur_short, fiz_long, fiz_short }
+  if (p === '/oidaily' && req.method === 'POST') {
+    const r = await req.json();
+    if (!r.ticker || !r.tradedate) return json({ error: 'ticker and tradedate required' }, 400);
+    await db.prepare(
+      `INSERT OR REPLACE INTO oi_daily(key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,updated_at)
+       VALUES(?,?,?,?,?,?,?,?,?)`
+    ).bind(
+      `${r.ticker}__${r.tradedate}`, r.ticker, r.tradedate, r.price ?? 0,
+      r.yur_long ?? 0, r.yur_short ?? 0, r.fiz_long ?? 0, r.fiz_short ?? 0, Date.now()
+    ).run();
+    return json({ ok: true });
+  }
+
+  if (p.startsWith('/oidaily') && req.method === 'GET') {
+    const ticker = new URL(req.url).searchParams.get('ticker');
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    const { results } = await db.prepare(
+      'SELECT * FROM oi_daily WHERE ticker=? ORDER BY tradedate ASC'
+    ).bind(ticker).all();
+    return json(results);
   }
 
   return json({ error: 'unknown db route: ' + p }, 404);

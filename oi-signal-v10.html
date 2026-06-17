@@ -484,6 +484,17 @@ pre.code-block{background:rgba(0,0,0,.5);border-radius:6px;padding:10px;overflow
       </div>
     </div>
 
+    <!-- Слои позиций / риск сквиза -->
+    <div class="panel" style="margin-bottom:10px;">
+      <div class="collapsible-hdr" onclick="toggleCollapsible('squeezeBody')">
+        <div class="sec" style="margin-bottom:0;">Слои позиций (риск сквиза)</div>
+        <span style="font-size:10px;color:var(--txt3);" id="squeezeChev">▼</span>
+      </div>
+      <div class="collapsible-body open" id="squeezeBody">
+        <div id="squeezePanel"><div style="font-size:10px;color:var(--txt3);">Копится со старта фичи — нужно несколько дней снэпшотов ОИ</div></div>
+      </div>
+    </div>
+
     <!-- OBStats + OrderStats -->
     <div class="panel" style="margin-bottom:10px;">
       <div class="collapsible-hdr" onclick="toggleCollapsible('obBody')">
@@ -539,6 +550,7 @@ const METHODS = [
   // ── Позиционирование участников ──
   {id:'INST_OI',        label:'ОИ юрлиц (фьюч)',      src:'futoi',  color:'#F59E0B'},
   {id:'RETAIL_CONTRA',  label:'Контр. физлиц (фьюч)', src:'futoi',  color:'#F59E0B'},
+  {id:'SQUEEZE_RISK',   label:'Риск сквиза (слои ОИ)',src:'futoi',  color:'#EF4444'},
   {id:'CORR_PEERS',     label:'Связанные тикеры',     src:'corr',   color:'#F59E0B'},
   // ── Собственные модели цены ──
   {id:'PRICE_TREND',    label:'Ценовой тренд',        src:'candles',color:'#A78BFA'},
@@ -691,6 +703,10 @@ let candleData = {};
 // {ticker: {tradestats:[...], obstats:[...], orderstats:[...], futoi:[...]}}
 let deepHistory = {};
 
+// Дневные снэпшоты ОИ для слоёв позиций / риска сквиза (см. m_SQUEEZE_RISK) —
+// {ticker: [{tradedate, price, yur_long, yur_short, fiz_long, fiz_short}]}
+let oiDailyCache = {};
+
 // Кэш перцентилей — пересчитывается после загрузки deepHistory
 // {ticker__type__field__window: {p10,p25,p50,p75,p90,n}}
 let pctCache = {};
@@ -790,6 +806,14 @@ async function dbSaveAlgopack(ticker, type, rows){
 }
 async function dbLoadAlgopack(ticker, type, days){
   return dbFetch(`/db/algopack?ticker=${encodeURIComponent(ticker)}&type=${encodeURIComponent(type)}&days=${days}`);
+}
+
+// ── Дневные снэпшоты ОИ (для слоёв позиций / риска сквиза) ──
+async function dbSaveOiDaily(snap){
+  return dbFetch('/db/oidaily', {method:'POST', body: JSON.stringify(snap)});
+}
+async function dbLoadOiDaily(ticker){
+  return dbFetch(`/db/oidaily?ticker=${encodeURIComponent(ticker)}`);
 }
 
 // ── Percentiles cache ──
@@ -1549,6 +1573,42 @@ function getAtrPct(ticker, tf){
   return atrCache[`${ticker}__${tf}`]?.atr_pct || 0.005; // дефолт 0.5%
 }
 
+// Загрузить историю дневных снэпшотов ОИ для слоёв позиций (см. m_SQUEEZE_RISK)
+async function loadOiDailyHistory(ticker){
+  if(!dbBase()) return;
+  try{ oiDailyCache[ticker] = await dbLoadOiDaily(ticker); }
+  catch(e){ oiDailyCache[ticker] = oiDailyCache[ticker] || []; }
+}
+
+// Захватить сегодняшний снэпшок ОИ (юр/физ, лонг/шорт, цена) для текущего
+// тикера — копим начиная с этого момента, старые дни недоступны через FutOI.
+// Вызывается из refreshAll после загрузки futoiData и дневной свечи.
+function captureOiDailySnapshot(){
+  if(!futoiData.length) return;
+  const byGroup = {};
+  futoiData.forEach(r=>{
+    const g = (r.clgroup||'').toUpperCase();
+    if(g!=='YUR' && g!=='FIZ') return;
+    if(!byGroup[g] || (r.tradetime||'') > (byGroup[g].tradetime||'')) byGroup[g] = r;
+  });
+  const date = (byGroup.YUR||byGroup.FIZ||{}).tradedate;
+  if(!date) return;
+  const lastCandle = (candleData['1d']||candleData[curTF]||[]).slice(-1)[0];
+  const price = lastCandle ? toP(lastCandle.close) : 0;
+  if(!price) return; // без цены слой бессмысленен — пропускаем день
+  const snap = {
+    ticker: curTicker, tradedate: date, price,
+    yur_long:  toNum(byGroup.YUR?.pos_long||0),
+    yur_short: Math.abs(toNum(byGroup.YUR?.pos_short||0)),
+    fiz_long:  toNum(byGroup.FIZ?.pos_long||0),
+    fiz_short: Math.abs(toNum(byGroup.FIZ?.pos_short||0)),
+  };
+  const cache = oiDailyCache[curTicker] || (oiDailyCache[curTicker] = []);
+  const idx = cache.findIndex(r=>r.tradedate===date);
+  if(idx>=0) cache[idx] = snap; else cache.push(snap);
+  dbSaveOiDaily(snap).catch(()=>{});
+}
+
 // Загрузить глубокую историю из D1 для тикера
 async function loadDeepHistory(ticker){
   if(!dbBase()) return;
@@ -1979,6 +2039,83 @@ function m_RETAIL_CONTRA(futoi){
     }
   }
 
+  return {score, confidence, detail};
+}
+
+// --- Method 9b: Squeeze Risk (слои позиций по дате/цене открытия) ---
+// FutOI отдаёт только суммарный net по дню — без слоёв нельзя отличить
+// "старый прибыльный шорт месяц назад" от "свежего убыточного шорта 4 дня
+// назад", а именно их столкновение даёт сквиз. День за днём раскладываем
+// ΔOI на слои (дата+цена входа+размер): рост qty — новый слой, падение —
+// закрытие, списываем пропорционально по всем текущим слоям этой стороны
+// (FIFO/LIFO неизвестны без позиционных данных, pro-rata — нейтральное
+// допущение). Свежий крупный убыточный слой = риск его капитуляции и
+// сквиза в сторону его закрытия.
+function _buildOiLayerSeries(dates, qtys, prices){
+  let layers = [], prevQty = 0;
+  for(let i=0;i<dates.length;i++){
+    const delta = qtys[i] - prevQty;
+    if(delta > 1e-6){
+      layers.push({date: dates[i], price: prices[i], size: delta});
+    } else if(delta < -1e-6){
+      const total = layers.reduce((s,l)=>s+l.size, 0);
+      if(total > 1e-6){
+        const ratio = Math.min(1, -delta/total);
+        layers.forEach(l=>{ l.size *= (1-ratio); });
+        layers = layers.filter(l=>l.size > 1e-6);
+      }
+    }
+    prevQty = qtys[i];
+  }
+  return layers;
+}
+
+function _buildOiLayers(rows){
+  if(!rows || rows.length < 2) return null;
+  const sorted = [...rows].sort((a,b)=> a.tradedate < b.tradedate ? -1 : 1);
+  const dates  = sorted.map(r=>r.tradedate);
+  const prices = sorted.map(r=>r.price||0);
+  const curPrice = prices[prices.length-1];
+  const lastDate = dates[dates.length-1];
+  if(!curPrice) return null;
+  const longLayers = [
+    ..._buildOiLayerSeries(dates, sorted.map(r=>toNum(r.yur_long)), prices).map(l=>({...l, group:'YUR'})),
+    ..._buildOiLayerSeries(dates, sorted.map(r=>toNum(r.fiz_long)), prices).map(l=>({...l, group:'FIZ'})),
+  ];
+  const shortLayers = [
+    ..._buildOiLayerSeries(dates, sorted.map(r=>toNum(r.yur_short)), prices).map(l=>({...l, group:'YUR'})),
+    ..._buildOiLayerSeries(dates, sorted.map(r=>toNum(r.fiz_short)), prices).map(l=>({...l, group:'FIZ'})),
+  ];
+  const withAgePnl = (layers, side) => layers.map(l=>({
+    ...l,
+    age: Math.round((new Date(lastDate) - new Date(l.date)) / 86400000),
+    pnl: side==='long' ? (curPrice-l.price)/l.price : (l.price-curPrice)/l.price,
+  })).sort((a,b)=>a.age-b.age);
+  const longL = withAgePnl(longLayers, 'long');
+  const shortL = withAgePnl(shortLayers, 'short');
+  return {
+    longLayers: longL, shortLayers: shortL, curPrice, lastDate,
+    totalLong: longL.reduce((s,l)=>s+l.size,0), totalShort: shortL.reduce((s,l)=>s+l.size,0),
+  };
+}
+
+function m_SQUEEZE_RISK(rows){
+  const built = _buildOiLayers(rows);
+  if(!built) return {score:0, confidence:0, detail:'недостаточно дневных снэпшотов ОИ — копятся со старта фичи, нужно несколько дней'};
+  const FRESH_DAYS = 5, SIZABLE = 0.15;
+  const freshUnderwater = (layers, total) => layers
+    .filter(l=>l.age<=FRESH_DAYS && l.pnl<0 && (l.size/(total||1))>=SIZABLE)
+    .reduce((s,l)=>s+l.size, 0);
+  const freshShortUW = freshUnderwater(built.shortLayers, built.totalShort);
+  const freshLongUW  = freshUnderwater(built.longLayers,  built.totalLong);
+  const squeezeUp   = freshShortUW / (built.totalShort||1); // свежие шорты в просадке → риск сквиза вверх
+  const squeezeDown = freshLongUW  / (built.totalLong||1);  // свежие лонги в просадке → риск сквиза вниз
+  const score = Math.tanh((squeezeUp - squeezeDown) * 2.5);
+  const confidence = (built.totalLong+built.totalShort>0) ? Math.min(0.7, 0.15 + rows.length*0.02) : 0.1;
+  let detail = `слоёв: лонг ${built.longLayers.length}, шорт ${built.shortLayers.length} (история ${rows.length} дн.)`;
+  if(squeezeUp>0.01) detail += `; свежие шорты (≤${FRESH_DAYS}д) в просадке ${(squeezeUp*100).toFixed(0)}% от шорт-ОИ — риск сквиза вверх`;
+  if(squeezeDown>0.01) detail += `; свежие лонги (≤${FRESH_DAYS}д) в просадке ${(squeezeDown*100).toFixed(0)}% от лонг-ОИ — риск сквиза вниз`;
+  if(squeezeUp<=0.01 && squeezeDown<=0.01) detail += '; явных свежих убыточных когорт не видно';
   return {score, confidence, detail};
 }
 
@@ -2676,6 +2813,7 @@ function computeAllMethods(){
   results.CANCEL_SIGNAL  = m_CANCEL_SIGNAL(osHistory);
   results.INST_OI        = m_INST_OI(futoiData);
   results.RETAIL_CONTRA  = m_RETAIL_CONTRA(futoiData);
+  results.SQUEEZE_RISK   = m_SQUEEZE_RISK(oiDailyCache[curTicker]||[]);
   results.PRICE_TREND    = m_PRICE_TREND(candleData);
   results.CORR_PEERS     = m_CORR_PEERS();
   results.EXT_INDICATORS = m_EXT_INDICATORS();
@@ -3656,6 +3794,41 @@ function renderOiZonesPanel(){
 }
 
 // ============================================================
+// RENDER: SQUEEZE LAYERS (слои позиций по дате/цене открытия)
+// ============================================================
+function renderSqueezeLayersPanel(){
+  const el = document.getElementById('squeezePanel');
+  const built = _buildOiLayers(oiDailyCache[curTicker]||[]);
+  if(!built){
+    el.innerHTML = '<div style="font-size:10px;color:var(--txt3)">Копится со старта фичи — нужно несколько дней снэпшотов ОИ</div>';
+    return;
+  }
+  const layerRow = (l, side) => {
+    const pnlColor = l.pnl>=0 ? 'var(--pos)' : 'var(--neg)';
+    const freshTag = l.age<=5 ? ' 🔥' : '';
+    return `<div style="display:flex;gap:6px;font-size:9px;padding:1px 0;">
+      <span style="width:34px;color:var(--txt3);">${l.group}</span>
+      <span style="width:46px;">${l.age}д${freshTag}</span>
+      <span style="width:58px;color:var(--txt3);">@${l.price.toFixed(2)}</span>
+      <span style="width:54px;">${snum(l.size)}</span>
+      <span style="color:${pnlColor};">${l.pnl>=0?'+':''}${(l.pnl*100).toFixed(1)}%</span>
+    </div>`;
+  };
+  el.innerHTML = `
+    <div style="font-size:9px;color:var(--txt3);margin-bottom:4px;">на ${built.lastDate} · цена ${built.curPrice.toFixed(2)} · 🔥 = свежий слой (≤5д)</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:180px;">
+        <div style="font-size:9px;color:var(--pos);font-weight:600;margin-bottom:2px;">Лонг-слои (${snum(built.totalLong)})</div>
+        ${built.longLayers.length ? built.longLayers.map(l=>layerRow(l,'long')).join('') : '<span style="color:var(--txt3);font-size:9px;">нет</span>'}
+      </div>
+      <div style="flex:1;min-width:180px;">
+        <div style="font-size:9px;color:var(--neg);font-weight:600;margin-bottom:2px;">Шорт-слои (${snum(built.totalShort)})</div>
+        ${built.shortLayers.length ? built.shortLayers.map(l=>layerRow(l,'short')).join('') : '<span style="color:var(--txt3);font-size:9px;">нет</span>'}
+      </div>
+    </div>`;
+}
+
+// ============================================================
 // RENDER: OB + OS PANEL
 // ============================================================
 function renderObPanel(){
@@ -4274,6 +4447,7 @@ function selectTicker(t, type){
   // Загружаем веса из IndexedDB
   dbLoadWeights(t).then(w=>{ if(Object.keys(w).length) methodWeights[t]=w; }).catch(()=>{});
   loadDeepHistory(t).catch(()=>{});
+  loadOiDailyHistory(t).catch(()=>{});
   updateCalibBadge(t);
   // sync tickers array (for FIGI lookup)
   if(!tickers.find(x=>x.t===t)){
@@ -4289,6 +4463,7 @@ function selectTicker(t, type){
   document.getElementById('tsPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('futoiPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('oiZonesPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
+  document.getElementById('squeezePanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
   document.getElementById('obPanel').innerHTML = '<div style="font-size:10px;color:var(--txt3)">Нет данных</div>';
 }
 
@@ -4374,6 +4549,7 @@ async function refreshAll(){
       `<div style="color:#e57373;padding:16px;font-size:12px;border:1px solid #e5737355;border-radius:6px;">⚠ Свечи: ${candleErr}</div>`;
   }
 
+  captureOiDailySnapshot();
   setStatus('3/3 Расчёт сигналов и режима рынка…', true);
   // 3. Classify market regime (uses candles + MOEX data gathered above)
   try {
@@ -4449,6 +4625,7 @@ async function refreshAll(){
   renderTsPanel();
   renderFutoiPanel();
   renderOiZonesPanel();
+  renderSqueezeLayersPanel();
   renderObPanel();
   renderHistory();
   updateAges();
