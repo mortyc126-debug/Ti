@@ -784,6 +784,14 @@ async function dbLoadIndVerdict(ticker){
   return dbFetch(`/db/indverdict?ticker=${encodeURIComponent(ticker)}`);
 }
 
+// ── Кэш сырых свечей для инкрементального пересчёта indlab (по тикеру+интервалу) ──
+async function dbSaveIndCandles(ticker, interval, candles, lastTs){
+  return dbFetch('/db/indcandles', {method:'POST', body: JSON.stringify({ticker, interval, candles, last_ts: lastTs})});
+}
+async function dbLoadIndCandles(ticker, interval){
+  return dbFetch(`/db/indcandles?ticker=${encodeURIComponent(ticker)}&interval=${encodeURIComponent(interval)}`);
+}
+
 
 // STORAGE (localStorage — только UI-настройки и пины)
 // ============================================================
@@ -1962,9 +1970,20 @@ async function _ilRequestVerdict(ticker){
       extIndicatorsCache[ticker] = {error:'модуль открыт не внутри shell — нет window.parent', ts:Date.now()};
       return;
     }
-    const res = await _ilRpcCall('getVerdict', {ticker:resolved, figi, token: getTinvestToken(), proxy: getProxy()});
-    extIndicatorsCache[ticker] = {...res, ts:Date.now(), note};
-    dbSaveIndVerdict(resolved, res).catch(()=>{});
+    // Подтягиваем кэш свечей (дневной 90д + недельный 15м), чтобы indlab докачал
+    // только новые бары, а не весь период заново.
+    const [candleCacheDaily, candleCacheWeek] = await Promise.all([
+      dbLoadIndCandles(resolved, 'CANDLE_INTERVAL_DAY').catch(()=>null),
+      dbLoadIndCandles(resolved, 'CANDLE_INTERVAL_15_MIN').catch(()=>null),
+    ]);
+    const res = await _ilRpcCall('getVerdict', {ticker:resolved, figi, token: getTinvestToken(), proxy: getProxy(), candleCacheDaily, candleCacheWeek});
+    // Кэши свечей не нужны клиенту и не должны раздувать ind_verdicts — сохраняем
+    // их отдельно в свою таблицу и вырезаем из вердикта перед кэшированием.
+    const {candleCacheDaily: outDaily, candleCacheWeek: outWeek, ...verdict} = res;
+    if(outDaily?.candles?.length) dbSaveIndCandles(resolved, 'CANDLE_INTERVAL_DAY', outDaily.candles, outDaily.last_ts).catch(()=>{});
+    if(outWeek?.candles?.length) dbSaveIndCandles(resolved, 'CANDLE_INTERVAL_15_MIN', outWeek.candles, outWeek.last_ts).catch(()=>{});
+    extIndicatorsCache[ticker] = {...verdict, ts:Date.now(), note};
+    dbSaveIndVerdict(resolved, verdict).catch(()=>{});
   }catch(err){
     extIndicatorsCache[ticker] = {error:String(err&&err.message||err), ts:Date.now()};
   }finally{
@@ -2034,6 +2053,14 @@ function m_EXT_INDICATORS(){
   const rawCs = cached.score; const score = Math.max(-1, Math.min(1, (rawCs == null || isNaN(rawCs)) ? 0 : rawCs / 2));
   const confidence = used.length ? Math.min(0.5, 0.15*used.length) : 0.05;
   const basisNote = cached.note ? ` [${cached.note}]` : '';
+
+  // Краткая строка по недельному 15-минутному слою (если посчитан)
+  const ia15 = cached.intraday15;
+  const ia15Line = ia15 && !ia15.error
+    ? (()=>{ const sc15=ia15.score, c15=sc15>0.3?'#52F2C9':sc15<-0.3?'#FF4D7A':'var(--txt3)';
+        const acc15 = ia15.models?.m1?.bt?.h30?.acc; const accStr = acc15!=null?` · H30=${(acc15*100).toFixed(0)}%`:'';
+        return `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">15м/неделя: <span style="color:${c15}">${sc15>0?'+':''}${sc15.toFixed(2)}</span>${accStr}</div>`; })()
+    : (ia15?.error ? `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">15м/неделя: ошибка — ${ia15.error}</div>` : '');
 
   // Таблица индикаторов по H30 acc
   const sorted = [...details].filter(d=>d.h30?.n>=5).sort((a,b)=>(b.h30?.acc||0)-(a.h30?.acc||0));
@@ -2105,7 +2132,7 @@ function m_EXT_INDICATORS(){
   tbl += `</div></details>`;
 
   const header = `модуль индикаторов (${ageMin} мин назад)${basisNote} — ${cached.label}. Учтено ${used.length} из ${details.length}`;
-  return {score, confidence, detail:`${header}${tbl}`};
+  return {score, confidence, detail:`${header}${ia15Line}${tbl}`};
 }
 
 // ============================================================

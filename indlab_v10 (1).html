@@ -7499,7 +7499,8 @@ async function ilFindFigi(ticker, token, proxy) {
 // Непрерывный ряд свечей для фьючерса: если у текущего контракта мало истории
 // (свежий контракт только начал торговаться), достраиваем хвост из предыдущего
 // контракта той же цепочки (общий basicAsset) — для бэктеста индикаторов.
-async function ilGetCandlesChain(found, token, from, now, proxy) {
+async function ilGetCandlesChain(found, token, from, now, proxy, interval) {
+  interval = interval || 'CANDLE_INTERVAL_DAY';
   const fetchCandles = async (figi, f, t) => {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 20000);
@@ -7507,7 +7508,7 @@ async function ilGetCandlesChain(found, token, from, now, proxy) {
     try {
       cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
         method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
-        body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval:'CANDLE_INTERVAL_DAY'}),
+        body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval}),
         signal: ctrl.signal,
       });
     } finally { clearTimeout(tid); }
@@ -7540,6 +7541,28 @@ async function ilGetCandlesChain(found, token, from, now, proxy) {
     }
   }
   return {candles, chained};
+}
+
+// Инкрементальная докачка свечей: если есть кэш (candles+lastTs от прошлого
+// расчёта), запрашиваем у API только хвост (с небольшим перекрытием на случай
+// коррекций), склеиваем с кэшем и обрезаем до нужного окна — вместо того,
+// чтобы каждый раз скачивать весь период заново.
+async function ilGetCandlesIncremental(found, token, proxy, interval, days, cache) {
+  const now = new Date();
+  const winFrom = new Date(now); winFrom.setDate(winFrom.getDate() - days);
+  if (cache && Array.isArray(cache.candles) && cache.candles.length && cache.last_ts) {
+    const overlapFrom = new Date(Math.max(winFrom.getTime(), cache.last_ts - 2*86400000));
+    const { candles: fresh, chained } = await ilGetCandlesChain(found, token, overlapFrom, now, proxy, interval);
+    const byTs = new Map();
+    cache.candles.forEach(c => byTs.set(new Date(c.time).getTime(), c));
+    fresh.forEach(c => byTs.set(c.time.getTime(), c));
+    const merged = [...byTs.values()]
+      .sort((a,b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+      .filter(c => new Date(c.time).getTime() >= winFrom.getTime());
+    return { candles: merged, chained, fromCache: true };
+  }
+  const { candles, chained } = await ilGetCandlesChain(found, token, winFrom, now, proxy, interval);
+  return { candles, chained, fromCache: false };
 }
 
 // ── Доп. расчёты индикаторов по OHLCV (для тех, кого нет в _chartCalc*) ──
@@ -8314,7 +8337,7 @@ const IL_NAMES = {
 // В итоговый score попадают только индикаторы с устойчивым перевесом (winRate>0.55, N>=10).
 // Возвращает {score: -2..2, label, details:[{name,text,score,winRate,n,included}]}
 const _ilYield = () => new Promise(r => setTimeout(r, 0));
-async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null}) {
+async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null, candleCacheDaily=null, candleCacheWeek=null}) {
   const _prog = msg => { try{ if(onProgress) onProgress(msg); }catch(_){} };
   token = token || _ilShellToken;
   if (!token) throw new Error('Нет API-токена');
@@ -8324,14 +8347,15 @@ async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null}) {
   _prog('🔍 поиск инструмента...');
   const found = figi ? {figi, ticker} : await ilFindFigi(ticker, token, proxy);
   if (!found) throw new Error('Тикер не найден: '+ticker);
-  const now = new Date(), from = new Date(now);
-  from.setDate(from.getDate()-90);
-  _prog('📥 загрузка свечей (90 дней)...');
-  const {candles, chained} = await ilGetCandlesChain(found, token, from, now, proxy);
-  if (candles.length < 30) throw new Error('Недостаточно данных по '+ticker+' ('+candles.length+' свечей)');
-  const closes = candles.map(c=>c.close);
 
-  _prog('📊 пакет 1/13: тренд, импульс...');
+  // Ядро расчёта (~90 индикаторов + бэктест + комбо-поиск + M1/M2/M3) — чистая
+  // функция от массива свечей, без обращений к ticker/figi. Вызывается отдельно
+  // для дневного 90-дневного окна и для 15-минутного недельного.
+  async function _ilComputeTier(candles, chained, tierLabel) {
+    if (candles.length < 30) throw new Error(`Недостаточно данных (${tierLabel}): `+candles.length+' свечей');
+    const closes = candles.map(c=>c.close);
+
+    _prog(`📊 [${tierLabel}] пакет 1/13: тренд, импульс...`);
   await _ilYield();
   // Серии score по каждому индикатору (индекс совпадает с candles)
   const rsiArr = _chartCalcRSI(closes,14);
@@ -8904,7 +8928,34 @@ async function ilGetVerdict({ticker, token, proxy, figi, onProgress=null}) {
     m2:{...m2Total, score:(m2Total.score==null||isNaN(m2Total.score))?0:m2Total.score},
     m3:{...m3Total, score:(m3Total.score==null||isNaN(m3Total.score))?0:m3Total.score},
   };
-  return {score:safeScore, label, details, chained, bestCombos, models:safeModels};
+    return {score:safeScore, label, details, chained, bestCombos, models:safeModels};
+  } // _ilComputeTier
+
+  // ── Дневной слой: 90 дней, инкрементальная докачка хвоста ──
+  _prog('📥 загрузка свечей (90 дней)...');
+  const dailyFetch = await ilGetCandlesIncremental(found, token, proxy, 'CANDLE_INTERVAL_DAY', 90, candleCacheDaily);
+  const dailyResult = await _ilComputeTier(dailyFetch.candles, dailyFetch.chained, '90д');
+
+  // ── Недельный слой: 15-минутные бары за последнюю неделю, для более точной
+  //    реакции на «интересные» ситуации без полного дорогого пересчёта ──
+  let weekResult = null, weekCacheOut = candleCacheWeek || null;
+  try {
+    _prog('📥 загрузка свечей (15м, неделя)...');
+    const weekFetch = await ilGetCandlesIncremental(found, token, proxy, 'CANDLE_INTERVAL_15_MIN', 7, candleCacheWeek);
+    weekResult = await _ilComputeTier(weekFetch.candles, weekFetch.chained, '15м/неделя');
+    weekCacheOut = {candles: weekFetch.candles, last_ts: weekFetch.candles.length ? new Date(weekFetch.candles[weekFetch.candles.length-1].time).getTime() : 0};
+  } catch(e) {
+    weekResult = {error: String(e && e.message || e)};
+  }
+
+  return {
+    ...dailyResult,
+    intraday15: weekResult,
+    // Обновлённые кэши свечей — вызывающий модуль сохраняет их в D1, чтобы
+    // следующий запрос докачивал только новые дни/бары, а не весь период.
+    candleCacheDaily: {candles: dailyFetch.candles, last_ts: dailyFetch.candles.length ? new Date(dailyFetch.candles[dailyFetch.candles.length-1].time).getTime() : 0},
+    candleCacheWeek: weekCacheOut,
+  };
 }
 
 // ═══ Пакет 5: новые индикаторы ═══

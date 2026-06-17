@@ -128,6 +128,17 @@ const SCHEMA_STMTS = [
     payload    TEXT NOT NULL,
     updated_at INTEGER DEFAULT 0
   )`,
+
+  // Кэш сырых свечей по тикеру+интервалу для инкрементального пересчёта indlab —
+  // при следующем запросе докачиваем только дни после last_ts, а не весь период.
+  `CREATE TABLE IF NOT EXISTS ind_candles (
+    key        TEXT PRIMARY KEY,
+    ticker     TEXT NOT NULL,
+    interval   TEXT NOT NULL,
+    candles    TEXT NOT NULL,
+    last_ts    INTEGER NOT NULL,
+    updated_at INTEGER DEFAULT 0
+  )`,
 ];
 
 // ── D1 Route Handler ───────────────────────────────────────────────────────
@@ -347,6 +358,29 @@ async function handleDb(path, req, env) {
     if (!row) return json(null);
     let verdict; try { verdict = JSON.parse(row.payload); } catch(_) { verdict = {}; }
     return json({ ...verdict, updated_at: row.updated_at });
+  }
+
+  // ── Кэш свечей для инкрементального пересчёта indlab ──
+  // POST body: { ticker, interval, candles, last_ts }
+  if (p === '/indcandles' && req.method === 'POST') {
+    const r = await req.json();
+    const { ticker, interval, candles, last_ts } = r;
+    if (!ticker || !interval || !Array.isArray(candles)) return json({ error: 'ticker, interval, candles required' }, 400);
+    await db.prepare(
+      `INSERT OR REPLACE INTO ind_candles(key,ticker,interval,candles,last_ts,updated_at) VALUES(?,?,?,?,?,?)`
+    ).bind(`${ticker}__${interval}`, ticker, interval, JSON.stringify(candles), last_ts || 0, Date.now()).run();
+    return json({ ok: true });
+  }
+
+  if (p.startsWith('/indcandles') && req.method === 'GET') {
+    const u = new URL(req.url);
+    const ticker = u.searchParams.get('ticker');
+    const interval = u.searchParams.get('interval');
+    if (!ticker || !interval) return json({ error: 'ticker and interval required' }, 400);
+    const row = await db.prepare('SELECT candles, last_ts, updated_at FROM ind_candles WHERE key=?').bind(`${ticker}__${interval}`).first();
+    if (!row) return json(null);
+    let candles; try { candles = JSON.parse(row.candles); } catch(_) { candles = []; }
+    return json({ candles, last_ts: row.last_ts, updated_at: row.updated_at });
   }
 
   return json({ error: 'unknown db route: ' + p }, 404);
