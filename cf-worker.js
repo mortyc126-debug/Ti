@@ -21,6 +21,20 @@
 //   /db/indverdict?ticker=            GET  — последний сохранённый вердикт
 //   /db/oidaily                       POST — upsert дневной снэпшок ОИ (юр/физ, лонг/шорт, цена)
 //   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
+//
+// Cron (scheduled): ежедневный автосбор oi_daily по всем ликвидным фьючерсам
+// FORTS — без участия браузера. Настройка:
+//   1. Cloudflare Dashboard → Workers → этот воркер → Settings → Variables →
+//      добавить secret MOEX_KEY (тот же ключ, что в поле "MOEX API key" в приложении).
+//   2. Settings → Triggers → Cron Triggers → добавить, например "30 7 * * *"
+//      (07:30 UTC = после закрытия вечерней сессии FORTS).
+// Список тикеров cron определяет сам: тянет /iss/engines/futures/markets/forts/
+// securities.json (объём+ОИ+цена), ранжирует по объёму с гистерезисом
+// (входит в отбор при топ-50% объёма, выпадает только ниже топ-80% —
+// без гистерезиса контракты на границе порога дёргались бы то туда то сюда
+// день ото дня) и ГАРАНТИРОВАННО включает текущий фронт-месяц по каждому
+// базовому активу (BR, Si, RI, GZ...) независимо от объёма — иначе в момент
+// роста объёма нового фронт-месяца при ролле он мог бы выпасть на пару дней.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -158,9 +172,176 @@ const SCHEMA_STMTS = [
     updated_at INTEGER DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS idx_oidaily_ticker ON oi_daily(ticker, tradedate)`,
+
+  // Гистерезис-состояние автообхода фьючерсов в cron: тикер остаётся
+  // в отборе, пока не упадёт ниже нижнего порога объёма (см. scheduledCollectOi)
+  `CREATE TABLE IF NOT EXISTS oi_tracked_state (
+    ticker     TEXT PRIMARY KEY,
+    tracked    INTEGER DEFAULT 0,
+    root       TEXT,
+    updated_at INTEGER DEFAULT 0
+  )`,
 ];
 
 // ── D1 Route Handler ───────────────────────────────────────────────────────
+// ── Upsert одного снэпшока в oi_daily (общий код для /db/oidaily и cron) ──
+async function upsertOiDaily(db, r) {
+  await db.prepare(
+    `INSERT OR REPLACE INTO oi_daily(key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,updated_at)
+     VALUES(?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    `${r.ticker}__${r.tradedate}`, r.ticker, r.tradedate, r.price ?? 0,
+    r.yur_long ?? 0, r.yur_short ?? 0, r.fiz_long ?? 0, r.fiz_short ?? 0, Date.now()
+  ).run();
+}
+
+// ── FutOI короткий код тикера — те же правила, что в oi-signal-v10.html::futoi2sym ──
+const FUTOI_FULL_MAP = {
+  SBER:'SBERF', GAZP:'GAZPF', LKOH:'LKOHF', GMKN:'GMKNF', NVTK:'NVTKF',
+  ROSN:'ROSNF', TATN:'TATNF', MGNT:'MGNTF', YNDX:'YDEX',  YDEX:'YD',
+  IMOEX:'IMOEXF', GLDR:'GLDRUBF', EURR:'EURRUBF', CNYR:'CNYRUBF', USDR:'USDRUBF',
+};
+function futoi2sym(ticker) {
+  for (const [k, v] of Object.entries(FUTOI_FULL_MAP)) {
+    if (ticker.toUpperCase().startsWith(k)) return v;
+  }
+  const m = ticker.match(/^([A-Za-z]{2})/);
+  return m ? m[1] : ticker;
+}
+
+// Базовый актив контракта (для группировки по фронт-месяцу): BRN6→BR, SiU6→Si, SBERM5→SBER
+function contractRoot(ticker) {
+  const m = ticker.match(/^([A-Za-z]+)[FGHJKMNQUVXZ]\d$/);
+  return m ? m[1] : ticker;
+}
+
+// ── ISS helper: разворачивает любой блок {columns,data} в массив объектов ──
+function issBlockToObjects(block) {
+  if (!block || !block.columns || !block.data) return [];
+  return block.data.map(row => {
+    const obj = {};
+    block.columns.forEach((c, i) => { obj[c] = row[i]; });
+    return obj;
+  });
+}
+
+// ── Cron: ежедневный автосбор oi_daily по ликвидным фьючерсам FORTS ──
+async function scheduledCollectOi(env) {
+  const db = DB(env);
+  if (!db) { console.warn('oi cron: D1 binding не настроен'); return; }
+  const moexKey = env.MOEX_KEY;
+  if (!moexKey) { console.warn('oi cron: secret MOEX_KEY не задан — пропуск'); return; }
+
+  // 1. Список всех фьючерсов FORTS с объёмом/ОИ/ценой/датой экспирации —
+  // публичный ISS, без авторизации.
+  const secResp = await fetch(
+    'https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.meta=off'
+  );
+  if (!secResp.ok) { console.warn('oi cron: securities.json HTTP', secResp.status); return; }
+  const secJson = await secResp.json();
+  const merged = {}; // SECID -> объединённая строка из всех блоков ответа
+  for (const key of Object.keys(secJson)) {
+    const rows = issBlockToObjects(secJson[key]);
+    rows.forEach(row => {
+      const sid = row.SECID;
+      if (!sid) return;
+      merged[sid] = { ...(merged[sid] || {}), ...row };
+    });
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const all = Object.values(merged)
+    .map(r => ({
+      ticker: r.SECID,
+      vol: Number(r.VOLTODAY ?? r.VALTODAY ?? 0) || 0,
+      price: Number(r.LAST ?? r.MARKETPRICE ?? r.PREVSETTLEPRICE ?? r.SETTLEPRICE ?? 0) || 0,
+      expiry: r.LASTTRADEDATE || r.LASTDELDATE || null,
+    }))
+    .filter(r => r.ticker && r.price > 0);
+  if (!all.length) { console.warn('oi cron: пустой список фьючерсов'); return; }
+
+  // 2. Гарантированный фронт-месяц по каждому базовому активу — независимо
+  // от объёма, чтобы не терять только что начавший роллироваться контракт.
+  const byRoot = {};
+  all.forEach(r => {
+    const root = contractRoot(r.ticker);
+    if (!byRoot[root]) byRoot[root] = [];
+    byRoot[root].push(r);
+  });
+  const frontByRoot = new Set();
+  Object.values(byRoot).forEach(list => {
+    const future = list.filter(r => r.expiry && r.expiry >= today);
+    const pool = future.length ? future : list;
+    pool.sort((a, b) => (a.expiry || '9999').localeCompare(b.expiry || '9999'));
+    frontByRoot.add(pool[0].ticker);
+  });
+
+  // 3. Ранжирование по объёму + гистерезис (вход — топ-50%, выход — ниже топ-80%)
+  const ranked = [...all].sort((a, b) => b.vol - a.vol);
+  const n = ranked.length;
+  const rankOf = {};
+  ranked.forEach((r, i) => { rankOf[r.ticker] = n > 1 ? i / (n - 1) : 0; });
+  const ENTER = 0.5, EXIT = 0.8;
+
+  const { results: stateRows } = await db.prepare('SELECT ticker, tracked FROM oi_tracked_state').all();
+  const prevTracked = {};
+  stateRows.forEach(r => { prevTracked[r.ticker] = !!r.tracked; });
+
+  const finalTickers = [];
+  const stateUpdates = [];
+  all.forEach(r => {
+    const isFront = frontByRoot.has(r.ticker);
+    const rank = rankOf[r.ticker] ?? 1;
+    const was = !!prevTracked[r.ticker];
+    const tracked = isFront || (was ? rank <= EXIT : rank <= ENTER);
+    if (tracked) finalTickers.push(r);
+    stateUpdates.push({ ticker: r.ticker, tracked: tracked ? 1 : 0, root: contractRoot(r.ticker) });
+  });
+
+  for (let i = 0; i < stateUpdates.length; i += 50) {
+    const chunk = stateUpdates.slice(i, i + 50);
+    await db.batch(chunk.map(s =>
+      db.prepare('INSERT OR REPLACE INTO oi_tracked_state(ticker,tracked,root,updated_at) VALUES(?,?,?,?)')
+        .bind(s.ticker, s.tracked, s.root, Date.now())
+    ));
+  }
+
+  console.log(`oi cron: отобрано ${finalTickers.length} из ${all.length} фьючерсов`);
+
+  // 4. По каждому отобранному тикеру — FutOI (apim, нужен ключ) + цена из
+  // securities.json — и сохраняем дневной снэпшок. Чанками, чтобы не упереться
+  // в лимиты конкурентных запросов воркера.
+  const CHUNK = 6;
+  for (let i = 0; i < finalTickers.length; i += CHUNK) {
+    const chunk = finalTickers.slice(i, i + CHUNK);
+    await Promise.all(chunk.map(async r => {
+      try {
+        const sym = futoi2sym(r.ticker);
+        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=1000`;
+        const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+        if (!resp.ok) return;
+        const json2 = await resp.json();
+        const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
+        const rows = issBlockToObjects(block).filter(o => o.ticker === sym);
+        if (!rows.length) return;
+        const byGroup = {};
+        rows.forEach(o => {
+          const g = (o.clgroup || '').toUpperCase();
+          if (g !== 'YUR' && g !== 'FIZ') return;
+          if (!byGroup[g] || (o.tradetime || '') > (byGroup[g].tradetime || '')) byGroup[g] = o;
+        });
+        const date = (byGroup.YUR || byGroup.FIZ || {}).tradedate || today;
+        await upsertOiDaily(db, {
+          ticker: r.ticker, tradedate: date, price: r.price,
+          yur_long: Number(byGroup.YUR?.pos_long || 0),
+          yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
+          fiz_long: Number(byGroup.FIZ?.pos_long || 0),
+          fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+        });
+      } catch (e) { console.warn('oi cron:', r.ticker, e.message); }
+    }));
+  }
+}
+
 async function handleDb(path, req, env) {
   const db = DB(env);
   if (!db) return json({ error: 'D1 binding "интерес" не настроен' }, 503);
@@ -407,13 +588,7 @@ async function handleDb(path, req, env) {
   if (p === '/oidaily' && req.method === 'POST') {
     const r = await req.json();
     if (!r.ticker || !r.tradedate) return json({ error: 'ticker and tradedate required' }, 400);
-    await db.prepare(
-      `INSERT OR REPLACE INTO oi_daily(key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,updated_at)
-       VALUES(?,?,?,?,?,?,?,?,?)`
-    ).bind(
-      `${r.ticker}__${r.tradedate}`, r.ticker, r.tradedate, r.price ?? 0,
-      r.yur_long ?? 0, r.yur_short ?? 0, r.fiz_long ?? 0, r.fiz_short ?? 0, Date.now()
-    ).run();
+    await upsertOiDaily(db, r);
     return json({ ok: true });
   }
 
@@ -431,6 +606,10 @@ async function handleDb(path, req, env) {
 
 // ── Main Handler ───────────────────────────────────────────────────────────
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(scheduledCollectOi(env).catch(e => console.error('oi cron failed:', e.message)));
+  },
+
   async fetch(req, env) {
     const url  = new URL(req.url);
     const path = url.pathname;
