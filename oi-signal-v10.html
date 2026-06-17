@@ -1118,20 +1118,24 @@ async function backfillOne(ticker, type){
 
     // AlgoPack: tradestats / obstats / orderstats — постранично через start
     for(const metric of ['tradestats','obstats','orderstats']){
-      // Проверяем, что уже есть в базе — если данные за вчера/сегодня уже
-      // загружены, повторно качать все 90 дней не нужно
+      // Проверяем, что данных не просто «есть свежая запись», а реально набрано
+      // прилично за весь период — иначе один случайный бар за сегодня (напр.
+      // от оборвавшегося прошлого запроса) даёт ложное "уже актуально" и весь
+      // 90-дневный бэкфилл молча скипается, оставляя дыру в истории.
       let metricFromStr = fromStr;
       try{
-        const existing = await dbLoadAlgopack(ticker, metric, 2);
-        if(existing.length){
+        const existing = await dbLoadAlgopack(ticker, metric, 90);
+        if(existing.length >= 30){
           const lastDate = existing.map(r=>r.tradedate).sort().pop();
           const yesterday = new Date(till.getTime()-86400000).toISOString().slice(0,10);
           if(lastDate >= yesterday){
-            setStatus(`Бэкфилл ${ticker}: ${metric} — уже актуально (по ${lastDate})`, true);
+            setStatus(`Бэкфилл ${ticker}: ${metric} — уже актуально (по ${lastDate}, ${existing.length} запис.)`, true);
             continue;
           }
           metricFromStr = lastDate; // докачиваем только недостающий хвост
         }
+        // existing.length < 30 — данных слишком мало (или дыра в истории),
+        // докачиваем весь период с fromStr, даже если есть свежая запись
       } catch(e){}
       let start = 0;
       for(let page=0; page<60; page++){
@@ -1152,17 +1156,18 @@ async function backfillOne(ticker, type){
     if(type === 'futures'){
       let futoiFromStr = fromStr;
       try{
-        const existing = await dbLoadAlgopack(ticker, 'futoi', 2);
-        if(existing.length){
+        const existing = await dbLoadAlgopack(ticker, 'futoi', 90);
+        if(existing.length >= 30){
           const lastDate = existing.map(r=>r.tradedate).sort().pop();
           const yesterday = new Date(till.getTime()-86400000).toISOString().slice(0,10);
           if(lastDate >= yesterday){
-            setStatus(`Бэкфилл ${ticker}: futoi — уже актуально (по ${lastDate})`, true);
+            setStatus(`Бэкфилл ${ticker}: futoi — уже актуально (по ${lastDate}, ${existing.length} запис.)`, true);
             futoiFromStr = null;
           } else {
             futoiFromStr = lastDate;
           }
         }
+        // existing.length < 30 — оставляем futoiFromStr = fromStr (полный докач)
       } catch(e){}
       let start = 0;
       for(let page=0; page<60 && futoiFromStr; page++){
