@@ -60,7 +60,7 @@ a{color:var(--accent);text-decoration:none;}
 .chip.active .chip-code{color:var(--accent);}
 .chip-name{font-size:8px;color:var(--txt3);white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis;}
 /* ---- Layout ---- */
-.main-grid{display:grid;grid-template-columns:240px 1fr 260px;gap:12px;margin-bottom:12px;}
+.main-grid{display:grid;grid-template-columns:240px 1fr 260px;gap:12px;margin-bottom:12px;align-items:start;}
 @media(max-width:900px){.main-grid{grid-template-columns:1fr;}}
 /* ---- Signal gauge ---- */
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0;}
@@ -2083,22 +2083,36 @@ function m_EXT_INDICATORS(){
   tbl += `<details open style="margin-top:6px;"><summary style="cursor:pointer;font-size:9px;color:var(--txt3);font-family:'JetBrains Mono',monospace;">Рейтинг ${sorted.length||details.length} инд. по H30 · Лучшие комбо</summary>
 <div style="margin-top:6px;overflow-x:auto;">`;
   if(sorted.length){
+    // Группируем по кластерам indlab (вместо одного плоского списка) — кластеры
+    // сортируем по средней H30-точности входящих в них индикаторов
+    const byCluster = {};
+    sorted.forEach(d=>{ const cl=_IL_ID_TO_CLUSTER[d.id]||'Прочее'; (byCluster[cl]=byCluster[cl]||[]).push(d); });
+    const clusterOrder = Object.entries(byCluster).map(([label,arr])=>{
+      const avg = arr.reduce((s,d)=>s+(d.h30?.acc||0),0)/arr.length;
+      return {label, arr, avg};
+    }).sort((a,b)=>b.avg-a.avg);
     tbl += `<table style="border-collapse:collapse;width:100%;font-size:9px;font-family:'JetBrains Mono',monospace;">
 <tr style="color:var(--txt3);border-bottom:1px solid #2a1f3d;">
   <th style="text-align:left;padding:2px 4px;">#</th>
   <th style="text-align:left;padding:2px 4px;">Индикатор</th>
   <th style="padding:2px 4px;">H5</th><th style="padding:2px 4px;">H15</th><th style="padding:2px 4px;">H30</th>
   <th style="padding:2px 4px;">IG H30</th><th style="padding:2px 4px;">Сейчас</th></tr>`;
-    sorted.forEach((d,i)=>{
-      const sc=d.score, sc_c=sc>0.3?'#52F2C9':sc<-0.3?'#FF4D7A':'var(--txt3)';
-      tbl+=`<tr style="border-bottom:1px solid #1a1028;">
-        <td style="padding:2px 4px;color:var(--txt3);">${i+1}</td>
-        <td style="padding:2px 4px;color:var(--txt2);">${d.name}</td>
-        <td style="text-align:center;">${fA(d.h5)}</td>
-        <td style="text-align:center;">${fA(d.h15)}</td>
-        <td style="text-align:center;">${fA(d.h30)}</td>
-        <td style="text-align:center;">${fI(d.h30)}</td>
-        <td style="text-align:center;color:${sc_c};">${sc!=null&&!isNaN(sc)?(sc>0?'+':'')+sc.toFixed(2):'—'}</td></tr>`;
+    let i=0;
+    clusterOrder.forEach(({label,arr})=>{
+      const clColor = _IL_CLUSTER_COLORS[label]||'#94A3B8';
+      tbl += `<tr><td colspan="7" style="padding:5px 4px 2px;color:${clColor};font-weight:600;border-top:1px solid #2a1f3d;">${label}</td></tr>`;
+      arr.forEach(d=>{
+        i++;
+        const sc=d.score, sc_c=sc>0.3?'#52F2C9':sc<-0.3?'#FF4D7A':'var(--txt3)';
+        tbl+=`<tr style="border-bottom:1px solid #1a1028;">
+          <td style="padding:2px 4px;color:var(--txt3);">${i}</td>
+          <td style="padding:2px 4px;color:var(--txt2);">${d.name}</td>
+          <td style="text-align:center;">${fA(d.h5)}</td>
+          <td style="text-align:center;">${fA(d.h15)}</td>
+          <td style="text-align:center;">${fA(d.h30)}</td>
+          <td style="text-align:center;">${fI(d.h30)}</td>
+          <td style="text-align:center;color:${sc_c};">${sc!=null&&!isNaN(sc)?(sc>0?'+':'')+sc.toFixed(2):'—'}</td></tr>`;
+      });
     });
     tbl += `</table>`;
   } else {
@@ -2920,6 +2934,8 @@ function setAgeBadge(id, lastUpdate){
 // МОДЕЛИ INDLAB: карточки + кластеры
 // ============================================================
 let activeIndlabModel = 'm1';
+// Точность M1/M2/M3 по реальной истории сигналов (заполняется loadScenarioStats)
+const _modelHistAccCache = {m1:null, m2:null, m3:null};
 
 // Цвета кластеров indlab (совпадают с _IL_CATS в indlab)
 const _IL_CLUSTER_COLORS = {
@@ -2927,6 +2943,21 @@ const _IL_CLUSTER_COLORS = {
   'Адаптивные МА':'#06B6D4','Фрактальность':'#6366F1','Энтропия':'#EC4899',
   'Циклы Элерса':'#14B8A6','Режим рынка':'#F97316','Статистика':'#94A3B8',
 };
+// Копия _IL_CATS из indlab — нужна тут, чтобы группировать рейтинг индикаторов по кластерам
+const _IL_CATS = [
+  {label:'Тренд',         ids:['ichimoku','alligator','supertrend','adx','aroon','donchian','keltner','envelopes','ema','sma','vwap_ind','mcginley','parabolic','vortex','stock_trend']},
+  {label:'Импульс',       ids:['rsi','rsi_w','stoch','wr','cci','roc','momentum','cmo','tsi','ult_osc','ao','dpo','fisher','macd','accel_osc','elder_ray','elder_impulse']},
+  {label:'Объём',         ids:['obv','cmf','vfi_ind','force_idx','pvt','vo','vwma','klinger_ind','twiggs_ind','vzo_ind','chaikin_osc','acc_dist','eom','nvi','pvi','mfi']},
+  {label:'Волатильность', ids:['bb','bb_width','hist_vol','vix_like','std_dev','ohlc_vol','chaikin_vol','parkinson_ind','gk_ind','rs_vol_ind','yz_vol_ind','ulcer_ind']},
+  {label:'Адаптивные МА', ids:['kama_ind','frama_ind','vidya_ind','jma_ind','zlema_ind','t3_ind']},
+  {label:'Фрактальность', ids:['fdi_ind','hurst_ind','pfe_ind','fractals','zigzag']},
+  {label:'Энтропия',      ids:['shannon_ent','perm_ent','spec_ent']},
+  {label:'Циклы Элерса',  ids:['cyber_cycle','roofing_ind','sinewave_ind','ebs_ind','decycler_ind']},
+  {label:'Режим рынка',   ids:['mmi_ind','chop','vhf','er_ind','tpi_ind','tqi_ind','tii_ind','crash','recovery','flat','high_vol','low_vol']},
+  {label:'Статистика',    ids:['zscore_roll','skew_ind','kurt_ind','vr_ind','acf_ind']},
+];
+const _IL_ID_TO_CLUSTER = {};
+_IL_CATS.forEach(cat=>cat.ids.forEach(id=>{ _IL_ID_TO_CLUSTER[id]=cat.label; }));
 // Читаемые имена индикаторов для expand-списка кластеров
 const _IL_ID_NAMES = {
   rsi:'RSI(14)',rsi_w:'RSI(7)',stoch:'Stochastic',wr:'Williams %R',cci:'CCI',roc:'ROC',
@@ -2999,6 +3030,8 @@ function renderModelCards(){
     const color = sc > 0.15 ? '#52F2C9' : sc < -0.15 ? '#FF4D7A' : '#9090A0';
     const isActive = activeIndlabModel === mk;
     const meta = _MODEL_META[mk];
+    const hist = _modelHistAccCache[mk];
+    const histStr = hist ? `${(hist.acc*100).toFixed(0)}% (${hist.n} сигн.)` : 'нет данных пока';
     return `<div onclick="setActiveModel('${mk}')" style="flex:1;min-width:0;cursor:pointer;
       background:${isActive?'rgba(255,255,255,0.09)':'rgba(255,255,255,0.03)'};
       border:1px solid ${isActive?color+'99':'rgba(255,255,255,0.1)'};
@@ -3006,7 +3039,8 @@ function renderModelCards(){
       ">
       <div style="font-size:8px;color:${isActive?color:'var(--txt3)'};font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${meta.label}">${meta.short}: ${meta.label}</div>
       <div style="font-size:15px;font-weight:700;color:${color};line-height:1.1;">${dir}</div>
-      <div style="font-size:9px;color:var(--txt3);margin-top:1px;">бэктест: ${acc}</div>
+      <div style="font-size:9px;color:var(--txt3);margin-top:1px;">бэктест indlab: ${acc}</div>
+      <div style="font-size:9px;color:var(--txt3);margin-top:1px;" title="Точность по реальной истории сигналов oi-signal (нужно «Статистика по сценариям → Обновить»)">история: ${histStr}</div>
     </div>`;
   }).join('');
   el.innerHTML = `<div style="display:flex;gap:5px;">${html}</div>`;
@@ -3724,20 +3758,23 @@ async function loadScenarioStats(){
     });
     html += `</div>`;
 
-    // Модели — отдельно
-    html += `<div style="font-size:10px;color:var(--txt3);margin:4px 0 4px;font-weight:600;">Агрегационные модели (indlab)</div>`;
-    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">`;
+    // Точность моделей M1/M2/M3 по реальной истории сигналов — НЕ рисуем
+    // здесь карточками (это дублировало бы переключатель моделей в левой
+    // колонке), а просто кладём в кэш, который читает renderModelCards()
+    // рядом с самим переключателем
     MODEL_METHOD_IDS.forEach(id=>{
-      const m=METHODS.find(x=>x.id===id);
-      if(!m) return;
-      html += `<div style="background:rgba(192,132,252,0.08);border:1px solid #C084FC44;border-radius:6px;padding:6px 10px;min-width:140px;">`;
-      html += `<div style="font-size:9px;color:#C084FC;font-weight:600;margin-bottom:3px;">${m.label}</div>`;
-      const stats = rows.map(r=>r.methods?.[id]??0);
-      const acc = stats.filter(v=>v!==0).length;
-      html += `<div style="font-size:9px;color:var(--txt3);">сигналов: ${acc} из ${rows.length}</div>`;
-      html += `</div>`;
+      const mk = {IL_MODEL_M1:'m1',IL_MODEL_M2:'m2',IL_MODEL_M3:'m3'}[id];
+      let posN=0,posWin=0,negN=0,negWin=0;
+      rows.forEach(r=>{
+        const sc = r.methods?.[id] ?? 0;
+        if(Math.abs(sc) < 0.1) return;
+        const win = (r.quality??0) > 0.5 ? 1 : 0;
+        if(sc>0){ posN++; posWin+=win; } else { negN++; negWin+=win; }
+      });
+      const n = posN+negN, w = posWin+negWin;
+      _modelHistAccCache[mk] = n>=5 ? {n, acc:w/n} : null;
     });
-    html += `</div>`;
+    renderModelCards();
 
     // Матрица попарных корреляций (только сигналы, без моделей)
     html += `<div style="font-size:10px;color:var(--txt3);margin-bottom:4px;">Матрица корреляций сигналов</div>`;
@@ -3760,7 +3797,7 @@ async function loadScenarioStats(){
   // Исходная таблица по MFE/MAE (старые сигналы без горизонтов)
   html += `<div style="font-size:10px;color:var(--txt3);margin:10px 0 4px;">Старая метрика (MFE/MAE)</div>`;
   html += `<table class="scen-table"><tr><th>Метод</th><th>Когда сигналил «рост» — сыграло</th><th>Когда сигналил «падение» — сыграло</th></tr>`;
-  METHODS.forEach(m=>{
+  METHODS.filter(m=>!MODEL_METHOD_IDS.includes(m.id)).forEach(m=>{
     let posN=0,posWin=0,negN=0,negWin=0;
     rows.forEach(r=>{
       const sc = r.methods?.[m.id] ?? 0;
