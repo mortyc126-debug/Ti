@@ -2057,7 +2057,8 @@ function m_EXT_INDICATORS(){
   // Краткая строка по недельному 15-минутному слою (если посчитан)
   const ia15 = cached.intraday15;
   const ia15Line = ia15 && !ia15.error
-    ? (()=>{ const sc15=ia15.score, c15=sc15>0.3?'#52F2C9':sc15<-0.3?'#FF4D7A':'var(--txt3)';
+    ? (()=>{ const raw15=ia15.score; const sc15=(raw15==null||isNaN(raw15))?0:raw15;
+        const c15=sc15>0.3?'#52F2C9':sc15<-0.3?'#FF4D7A':'var(--txt3)';
         const acc15 = ia15.models?.m1?.bt?.h30?.acc; const accStr = acc15!=null?` · H30=${(acc15*100).toFixed(0)}%`:'';
         return `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">15м/неделя: <span style="color:${c15}">${sc15>0?'+':''}${sc15.toFixed(2)}</span>${accStr}</div>`; })()
     : (ia15?.error ? `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">15м/неделя: ошибка — ${ia15.error}</div>` : '');

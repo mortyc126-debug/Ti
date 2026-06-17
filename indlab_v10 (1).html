@@ -9895,7 +9895,7 @@ window.addEventListener('message', (ev) => {
   const _onProg = msg => {
     try{ _rpcSrc.postMessage({type:'MODULE_RPC_PROGRESS', reqId:d.reqId, msg}, '*'); }catch(_){}
   };
-  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy(), figi: payload.figi, onProgress: _onProg})
+  ilGetVerdict({ticker: payload.ticker, token: payload.token, proxy: payload.proxy || chartGetProxy(), figi: payload.figi, onProgress: _onProg, candleCacheDaily: payload.candleCacheDaily, candleCacheWeek: payload.candleCacheWeek})
     .then(result => {
       console.log('[indlab RPC] готово →', payload.ticker, 'score:', result?.score);
       _rpcSrc.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*');
