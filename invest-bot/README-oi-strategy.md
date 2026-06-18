@@ -19,6 +19,11 @@
 | DECYCLER | Ehlers Decycler: цена минус долгосрочный low-pass тренд | Свечи |
 | FISHER_RSI | Преобразование Фишера от RSI (резкие развороты) | Свечи |
 | EBSW | Ehlers Even Better Sinewave: RMS-нормированный roofing filter | Свечи |
+| KLINGER | Klinger Volume Oscillator: пересечение нуля | Свечи |
+| VZO | Volume Zone Oscillator | Свечи |
+| TWIGGS | Twiggs Money Flow | Свечи |
+| RMI | Relative Momentum Index (вариант RSI на разностях) | Свечи |
+| ZSCORE | Rolling z-score — контр-сигнал на возврат к среднему | Свечи |
 | OI_SQUEEZE | squeeze-score из `oi_layers.py` (реальный сквиз по FutOI юр/физ) | MOEX AlgoPack |
 | INST_OI | m_INST_OI: нетто-позиция юрлиц (FutOI) — "умные деньги" срочного рынка | MOEX AlgoPack |
 | RETAIL_CONTRA | m_RETAIL_CONTRA: расхождение юр/физ по направлению (контр-сигнал) | MOEX AlgoPack |
@@ -151,6 +156,8 @@ invest-bot/
                                   + энтропия (Shannon/Permutation)
   indicators_ehlers.py           ← Фаза 3 (часть 3): Ehlers DSP (Cyber Cycle,
                                   Decycler, Fisherized RSI, Even Better Sinewave)
+  indicators_volume.py           ← Фаза 3 (часть 4, финал): объём (Klinger/
+                                  VZO/Twiggs), относит. сила (RMI), z-score
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
   data/risk_state.json,
@@ -237,7 +244,11 @@ take_profit по умолчанию.
 
 ## Что планируется добавить
 
-- Фаза 3, продолжение: волатильность (Parkinson/Garman-Klass/Yang-Zhang),
-  объём (Klinger/VZO/Twiggs/VFI), относительная сила (Mansfield/RMI),
-  статистика (z-score/skew/autocorr)
+- Фаза 3 (опционально, низкий приоритет): Mansfield RS / Beta-adjusted RS
+  не портированы — требуют отдельного ряда бенчмарка (индекса), которого
+  у стратегии нет (один тикер). Расширенная волатильность (Parkinson/
+  Garman-Klass/Yang-Zhang/Ulcer) не даёт направления само по себе — не
+  портирована как отдельный метод композита.
 - Сохранение истории сигналов в Cloudflare D1 (как в oi-signal-v10)
+- Информационная теория + Ising/QUBO-оптимизатор весов (`lib-infotheory-opt.js`)
+  как альтернатива текущей простой EWA-калибровке весов
