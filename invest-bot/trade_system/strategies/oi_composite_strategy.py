@@ -42,6 +42,47 @@ SIGNAL_THRESHOLD = 0.25            # порог composite для сигнала
 WEIGHT_ALPHA = 0.1                 # скорость обучения EWA (0.1 = медленно, стабильно)
 MFE_MAE_BARS = 15                  # максимум баров для записи MFE/MAE
 
+# ── Комиссии Т-Инвестиции, тариф «Трейдер» ──────────────────────────────────
+# Источник: tbank.ru/invest/tariffs/ (актуально на 2025–2026)
+#
+# Акции / облигации / ETF (биржевые торги, не айсберг):  0.05% за сделку
+# Фьючерсы (оборот до 5 млн ₽/день):                    0.040% от стоимости контракта
+# Фьючерсы (оборот 5–10 млн ₽/день):                    0.030%
+# Фьючерсы (оборот свыше 10 млн ₽/день):                0.025%
+# Фьючерсы из доп. списка (нестандартные):               0.080%
+# Биржевая комиссия MOEX: включена в тариф (БЕСПЛАТНО — брокер берёт на себя)
+#
+# Для расчёта безубытка берём ROUND-TRIP = открытие + закрытие:
+#   Акции:       0.05% × 2 = 0.10%
+#   Фьючерсы:   0.04% × 2 = 0.08%  (типовой, при обороте до 5 млн/день)
+
+class CommissionRate:
+    """Ставки комиссии тарифа «Трейдер» (Т-Инвестиции)."""
+    STOCKS      = Decimal("0.0005")   # 0.05% — акции/облигации/ETF
+    FUT_TIER1   = Decimal("0.0004")   # 0.040% — фьючерсы, оборот до 5 млн ₽/день
+    FUT_TIER2   = Decimal("0.0003")   # 0.030% — фьючерсы, оборот 5–10 млн ₽/день
+    FUT_TIER3   = Decimal("0.00025")  # 0.025% — фьючерсы, оборот > 10 млн ₽/день
+    FUT_EXTRA   = Decimal("0.0008")   # 0.080% — фьючерсы из доп. списка
+
+    @classmethod
+    def round_trip(cls, instrument_type: str = "stocks") -> Decimal:
+        """Полная комиссия за сделку туда-обратно (открытие + закрытие)."""
+        if instrument_type == "futures_extra":
+            return cls.FUT_EXTRA * 2
+        if instrument_type == "futures":
+            return cls.FUT_TIER1 * 2   # консервативно: tier1 (до 5 млн/день)
+        return cls.STOCKS * 2           # акции: 0.10%
+
+    @classmethod
+    def min_take_multiplier(cls, instrument_type: str = "stocks",
+                            profit_margin: Decimal = Decimal("1.5")) -> Decimal:
+        """
+        Минимальный множитель take-profit чтобы покрыть комиссию + желаемый profit_margin.
+        profit_margin=1.5 → take должен быть в 1.5× больше комиссии round-trip.
+        Пример для акций: 1 + 0.10% × 1.5 = 1.0015
+        """
+        return Decimal("1") + cls.round_trip(instrument_type) * profit_margin
+
 
 @dataclass
 class MethodWeight:
@@ -221,10 +262,14 @@ class OICompositeStrategy(IStrategy):
     Многометодная стратегия. Комбинирует 5 методов анализа свечей с обучаемыми весами.
     Параметры (settings.ini):
       SIGNAL_THRESHOLD  — порог composite для сигнала (0.0–1.0, default 0.25)
-      LONG_TAKE         — множитель take-profit для LONG
+      INSTRUMENT_TYPE   — тип инструмента для расчёта комиссии:
+                          "stocks" (default) | "futures" | "futures_extra"
+      LONG_TAKE         — множитель take-profit для LONG (если не задан — авто от комиссии)
       LONG_STOP         — множитель stop-loss для LONG
       SHORT_TAKE        — множитель take-profit для SHORT
       SHORT_STOP        — множитель stop-loss для SHORT
+      PROFIT_MARGIN     — во сколько раз take должен превышать round-trip комиссию
+                          (default 1.5; при 1.0 take = ровно безубыток по комиссии)
       SIGNAL_ONLY       — 0/1: если 1, ордера не исполняются (только Telegram)
     """
 
@@ -233,11 +278,23 @@ class OICompositeStrategy(IStrategy):
         s = settings.settings
 
         self.__threshold = float(s.get("SIGNAL_THRESHOLD", SIGNAL_THRESHOLD))
-        self.__long_take = Decimal(s.get("LONG_TAKE", "1.015"))
-        self.__long_stop = Decimal(s.get("LONG_STOP", "0.985"))
-        self.__short_take = Decimal(s.get("SHORT_TAKE", "0.985"))
-        self.__short_stop = Decimal(s.get("SHORT_STOP", "1.015"))
         self.__signal_only = s.get("SIGNAL_ONLY", "0") == "1"
+
+        # тип инструмента → правильная ставка комиссии
+        self.__instrument_type = s.get("INSTRUMENT_TYPE", "stocks")
+        profit_margin = Decimal(s.get("PROFIT_MARGIN", "1.5"))
+        commission_rt = CommissionRate.round_trip(self.__instrument_type)
+
+        # take-profit: если явно задан — берём из конфига, иначе считаем от комиссии
+        default_take = Decimal("1") + commission_rt * profit_margin
+        default_stop = Decimal("1") - commission_rt  # stop = точка безубытка по комиссии
+
+        self.__long_take  = Decimal(s.get("LONG_TAKE",  str(default_take)))
+        self.__long_stop  = Decimal(s.get("LONG_STOP",  str(default_stop)))
+        self.__short_take = Decimal(s.get("SHORT_TAKE", str(Decimal("2") - default_take)))
+        self.__short_stop = Decimal(s.get("SHORT_STOP", str(Decimal("2") - default_stop)))
+
+        self.__commission_rt = commission_rt  # храним для логирования
 
         self.__candles: list[HistoricCandle] = []
         self.__open_trade: Optional[OpenTrade] = None
@@ -245,7 +302,10 @@ class OICompositeStrategy(IStrategy):
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
-            f"threshold={self.__threshold} signal_only={self.__signal_only}"
+            f"instrument={self.__instrument_type} "
+            f"commission_round_trip={float(commission_rt)*100:.3f}% "
+            f"long take={self.__long_take} stop={self.__long_stop} "
+            f"signal_only={self.__signal_only}"
         )
 
     @property
