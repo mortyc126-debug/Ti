@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import os
+from collections import deque
 from decimal import Decimal
 
 from tinkoff.invest import Candle, OrderExecutionReportStatus
@@ -71,6 +72,10 @@ class Trader:
         self.__mega_alerts = MegaAlertsService()
         self.__mega_alerts_task: asyncio.Task | None = None
         self.__archive = ArchiveStore()
+        self.__trading_settings: TradingSettings = TradingSettings()
+        # Объёмы последних закрытых свечей по тикеру — основа для оценки
+        # размера позиции по ликвидности (см. __liquidity_lots_cap).
+        self.__candle_volumes: dict[str, deque] = {}
 
     async def trade_day(
             self,
@@ -81,6 +86,7 @@ class Trader:
             min_rub: int
     ) -> None:
         logger.info("Start preparations for trading today")
+        self.__trading_settings = trading_settings
         today_trade_strategies = self.__get_today_strategies(strategies)
         if not today_trade_strategies:
             logger.info("No shares to trade today.")
@@ -232,6 +238,9 @@ class Trader:
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
 
+            if candle.time > current_figi_candle.time:
+                self.__candle_volumes.setdefault(candle.figi, deque(maxlen=20)).append(current_figi_candle.volume)
+
             if candle.time > current_figi_candle.time and \
                     datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) <= signals_before_time:
                 signal_new = strategies[candle.figi].analyze_candles(
@@ -293,9 +302,13 @@ class Trader:
                                     quotation_to_decimal(candle.close),
                                     strategy.settings.lot_size
                                 )
-                                available_lots = min(cash_lots, risk_qty) if risk_qty > 0 else 0
+                                liquidity_lots = self.__liquidity_lots_cap(candle.figi, strategy.settings.lot_size)
+                                available_lots = min(cash_lots, risk_qty, liquidity_lots) if risk_qty > 0 else 0
 
-                                logger.debug(f"Available lots: {available_lots} (cash={cash_lots}, risk={risk_qty})")
+                                logger.debug(
+                                    f"Available lots: {available_lots} "
+                                    f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
+                                )
                                 if available_lots > 0:
                                     open_order = self.__order_service.post_market_order(
                                         account_id=account_id,
@@ -388,6 +401,22 @@ class Trader:
         available_lots = int(current_rub_on_depo / (share_lot_size * price))
 
         return available_lots if max_lots_per_order > available_lots else max_lots_per_order
+
+    def __liquidity_lots_cap(self, figi: str, share_lot_size: int) -> int:
+        """
+        Ограничивает размер ордера долей среднего объёма последних закрытых
+        свечей по тикеру (MAX_VOLUME_PARTICIPATION), чтобы не выставлять
+        ордер, который рынок не может спокойно поглотить (неликвид —
+        проскальзывание, частичное исполнение). Пока истории свечей по
+        тикеру нет (старт дня) — не ограничивает.
+        """
+        volumes = self.__candle_volumes.get(figi)
+        if not volumes:
+            return 10 ** 9
+
+        avg_volume = sum(volumes) / len(volumes)
+        cap_in_shares = avg_volume * self.__trading_settings.max_volume_participation
+        return max(1, int(cap_in_shares / share_lot_size))
 
     def __clear_all_positions(
             self,

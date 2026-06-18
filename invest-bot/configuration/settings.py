@@ -39,6 +39,9 @@ class TradingSettings:
     delay_start_after_open: int = 10
     stop_trade_before_close: int = 300
     stop_signals_before_close: int = 60
+    # Доля от среднего объёма последних свечей по тикеру, которую разрешено
+    # выставить в одном ордере (защита от проскальзывания на неликвиде).
+    max_volume_participation: float = 0.1
 
 
 @dataclass(eq=False, repr=True)

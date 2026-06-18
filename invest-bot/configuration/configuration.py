@@ -32,7 +32,8 @@ class ProgramConfiguration:
         self.__trading_settings = TradingSettings(
             delay_start_after_open=int(config["TRADING_SETTINGS"]["DELAY_START_AFTER_EXCHANGE_OPEN_SECONDS"]),
             stop_trade_before_close=int(config["TRADING_SETTINGS"]["STOP_TRADE_BEFORE_EXCHANGE_CLOSE_SECONDS"]),
-            stop_signals_before_close=int(config["TRADING_SETTINGS"]["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"])
+            stop_signals_before_close=int(config["TRADING_SETTINGS"]["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"]),
+            max_volume_participation=float(config["TRADING_SETTINGS"].get("MAX_VOLUME_PARTICIPATION", "0.1"))
         )
 
         if "MEGA_ALERTS" in config:
