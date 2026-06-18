@@ -149,9 +149,52 @@ def _fetch_futoi_snapshot(sym: str) -> dict | None:
     tradedate = (by_group.get("YUR") or by_group.get("FIZ") or {}).get("tradedate")
     if not tradedate:
         return None
-    long_qty = float(by_group.get("YUR", {}).get("pos_long") or 0) + float(by_group.get("FIZ", {}).get("pos_long") or 0)
-    short_qty = abs(float(by_group.get("YUR", {}).get("pos_short") or 0)) + abs(float(by_group.get("FIZ", {}).get("pos_short") or 0))
-    return {"tradedate": tradedate, "long": long_qty, "short": short_qty}
+    yur_long = float(by_group.get("YUR", {}).get("pos_long") or 0)
+    yur_short = abs(float(by_group.get("YUR", {}).get("pos_short") or 0))
+    fiz_long = float(by_group.get("FIZ", {}).get("pos_long") or 0)
+    fiz_short = abs(float(by_group.get("FIZ", {}).get("pos_short") or 0))
+    return {
+        "tradedate": tradedate,
+        "long": yur_long + fiz_long, "short": yur_short + fiz_short,
+        "yur_long": yur_long, "yur_short": yur_short,
+        "fiz_long": fiz_long, "fiz_short": fiz_short,
+    }
+
+
+def _inst_oi_score(rows: list[dict]) -> float:
+    """
+    Порт m_INST_OI: позиция юрлиц (YUR) — "умные деньги" срочного рынка.
+    net = pos_long - pos_short, нормировано на размер позиции стороны.
+    > 0 — юрлица в нетто-лонге (бычий сигнал), < 0 — в нетто-шорте.
+    """
+    if not rows:
+        return 0.0
+    last = rows[-1]
+    long_, short_ = float(last.get("yur_long") or 0), float(last.get("yur_short") or 0)
+    total = long_ + short_
+    if total <= 0:
+        return 0.0
+    net = (long_ - short_) / total
+    return max(-1.0, min(1.0, net * 3))
+
+
+def _retail_contra_score(rows: list[dict]) -> float:
+    """
+    Порт m_RETAIL_CONTRA: физлица (FIZ) и юрлица (YUR) разошлись по направлению —
+    типичная картина перед разворотом (retail обычно догоняет движение последним).
+    score = (net_yur - net_fiz) / 2 — положительный, когда юрлица в лонге, а
+    физлица в шорте (или наоборот для отрицательного); если обе группы согласны —
+    сигнал около нуля (нет противоречия, нечего эксплуатировать).
+    """
+    if not rows:
+        return 0.0
+    last = rows[-1]
+    yur_l, yur_s = float(last.get("yur_long") or 0), float(last.get("yur_short") or 0)
+    fiz_l, fiz_s = float(last.get("fiz_long") or 0), float(last.get("fiz_short") or 0)
+    yur_total, fiz_total = yur_l + yur_s, fiz_l + fiz_s
+    net_yur = (yur_l - yur_s) / yur_total if yur_total > 0 else 0.0
+    net_fiz = (fiz_l - fiz_s) / fiz_total if fiz_total > 0 else 0.0
+    return max(-1.0, min(1.0, (net_yur - net_fiz) / 2))
 
 
 class OiLayersService:
@@ -219,7 +262,12 @@ class OiLayersService:
             price = self.price_getter(ticker)
             if price:
                 layers = _build_layers(hist)
-                self._scores[ticker] = _squeeze_from_layers(layers, snap["tradedate"], price)
+                scores = _squeeze_from_layers(layers, snap["tradedate"], price)
+            else:
+                scores = self._scores.get(ticker, {"squeeze_up": 0.0, "squeeze_down": 0.0})
+            scores["inst_oi"] = _inst_oi_score(hist)
+            scores["retail_contra"] = _retail_contra_score(hist)
+            self._scores[ticker] = scores
         self._save()
 
     @staticmethod
@@ -245,3 +293,11 @@ class OiLayersService:
 
     def is_squeeze_risk(self, ticker: str, direction: str, threshold: float = 0.5) -> bool:
         return self.squeeze_score(ticker, direction) >= threshold
+
+    def inst_oi_score(self, ticker: str) -> float:
+        """m_INST_OI: нетто-позиция юрлиц (>0 — лонг, <0 — шорт). 0.0 если данных нет."""
+        return self._scores.get(ticker, {}).get("inst_oi", 0.0)
+
+    def retail_contra_score(self, ticker: str) -> float:
+        """m_RETAIL_CONTRA: расхождение юр/физ по направлению. 0.0 если данных нет."""
+        return self._scores.get(ticker, {}).get("retail_contra", 0.0)
