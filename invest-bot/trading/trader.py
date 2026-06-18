@@ -213,7 +213,13 @@ class Trader:
                 # Logic is:
                 # if stop or take price level is between high and low, then stop or take will be executed
                 try:
-                    if low <= current_trade_order.signal.stop_loss_level <= high:
+                    if ADAPTIVE_EXIT_ENABLED:
+                        # Адаптивный выход — единственная логика закрытия позиции:
+                        # фиксированные stop/take из сигнала игнорируются, чтобы
+                        # трейлинг-стоп мог двигаться и забирать большее движение,
+                        # а не закрываться по первому касанию исходного take_profit.
+                        self.__check_adaptive_exit(account_id, candle, strategies)
+                    elif low <= current_trade_order.signal.stop_loss_level <= high:
                         logger.info(f"STOP LOSS: {current_trade_order}")
                         self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.stop_loss_level), "stop_loss")
                         self.__close_position_and_send_message(account_id, candle.figi, strategies)
@@ -222,9 +228,6 @@ class Trader:
                         logger.info(f"TAKE PROFIT: {current_trade_order}")
                         self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.take_profit_level), "take_profit")
                         self.__close_position_and_send_message(account_id, candle.figi, strategies)
-
-                    elif ADAPTIVE_EXIT_ENABLED:
-                        self.__check_adaptive_exit(account_id, candle, strategies)
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
 
@@ -421,11 +424,12 @@ class Trader:
             strategies: dict[str, IStrategy]
     ) -> None:
         """
-        Режим ADAPTIVE_EXIT=1: вместо фиксированного take_profit_level —
-        risk.check_exit (трейлинг Chandelier + безубыток + giveback), плюс
-        squeeze-протекция шорта по реальному squeeze_score из oi_layers.py
-        (не статичный порог, а недавнее крупное наращивание стороны, которое
-        сейчас в минусе по цене).
+        Режим ADAPTIVE_EXIT=1: для ВСЕХ открытых позиций вместо фиксированных
+        stop_loss_level/take_profit_level из сигнала — risk.check_exit
+        (трейлинг Chandelier + безубыток после 1R + giveback-защита пика),
+        плюс для шортов — доп. squeeze-протекция по реальному squeeze_score
+        из oi_layers.py (не статичный порог, а недавнее крупное наращивание
+        стороны, которое сейчас в минусе по цене).
         """
         strategy = strategies[candle.figi]
         risk_ticker = strategy.settings.ticker
