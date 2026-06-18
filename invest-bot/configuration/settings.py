@@ -66,6 +66,12 @@ class TradingSettings:
     # Доля от среднего объёма последних свечей по тикеру, которую разрешено
     # выставить в одном ордере (защита от проскальзывания на неликвиде).
     max_volume_participation: float = 0.1
+    # Лимитные ордера: интервал между попытками re-price (секунды)
+    limit_reprice_interval_sec: int = 15
+    # Максимум re-price попыток перед переходом на маркет
+    limit_reprice_max_attempts: int = 3
+    # Порог ухода цены против нас (доля от цены) для немедленного перехода на маркет
+    limit_adverse_move_pct: float = 0.0006  # 0.06%
 
 
 @dataclass(eq=False, repr=True)
