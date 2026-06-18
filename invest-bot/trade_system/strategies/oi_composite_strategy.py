@@ -70,6 +70,7 @@ from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
 from regime import classify_regime, REGIME_WEIGHT_MODS, change_point_score
+from cluster_models import ClusterModels
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
 from indicators_ehlers import (
@@ -730,15 +731,19 @@ TRADESTATS_METHOD_NAMES = [
     "VWAP_SIGNAL_TS", "VOL_MOMENTUM_TS", "OB_IMBALANCE", "CANCEL_SIGNAL",
 ]
 CHANGE_POINT_NAME = "CHANGE_POINT"
-# Межинструментальный метод (transfer entropy / wavelet coherence / RMT), см.
-# indicators_multi.py. Требует ряда цен второго инструмента — подключается
-# извне через провайдера; без него молчит (score=0).
 MULTI_TICKER_NAME = "MULTI_TICKER"
+# Три кластерных модели — конкурируют наравне с остальными методами.
+# Вычисляются в ClusterModels (cluster_models.py) поверх истории сделок.
+M1_NAME = "M1_CLUSTER"
+M2_NAME = "M2_CLUSTER"
+M3_NAME = "M3_CLUSTER"
+
 ALL_METHOD_NAMES = (
     [name for name, _ in METHODS]
     + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
     + TRADESTATS_METHOD_NAMES
     + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
+    + [M1_NAME, M2_NAME, M3_NAME]
 )
 
 # (ticker, direction) -> squeeze_score; подключается извне (Trader), т.к.
@@ -804,6 +809,8 @@ class OICompositeStrategy(IStrategy):
         self.__dynamic_regime_mods: dict[str, dict[str, float]] = {}
         # tf-регимы от MultiTfBuffer (обновляются трейдером на каждой свече)
         self.__tf_regimes: dict[str, str] = {}
+        # Кластерные модели M1/M2/M3 — инициализируются при set_history
+        self.__cluster_models: Optional[ClusterModels] = None
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -885,6 +892,8 @@ class OICompositeStrategy(IStrategy):
             calibrator.warm_up(ticker, {k: v for k, v in method_scores.items() if v})
         # Загрузка динамических режимных модификаторов из истории сделок
         self._reload_dynamic_regime_mods()
+        # Инициализация кластерных моделей M1/M2/M3
+        self.__cluster_models = ClusterModels(history, self.__settings.ticker)
 
     def _reload_dynamic_regime_mods(self) -> None:
         """Пересчитывает per-regime accuracy из истории и сохраняет в __dynamic_regime_mods."""
@@ -1055,7 +1064,7 @@ class OICompositeStrategy(IStrategy):
         closes = [_to_f(c.close) for c in window]
         volumes = [float(c.volume) for c in window]
 
-        scores = [fn(window) for _, fn in METHODS] + [
+        base_scores = [fn(window) for _, fn in METHODS] + [
             self.__score_oi_squeeze(),
             self.__score_provider(self.__inst_oi_provider),
             self.__score_provider(self.__retail_contra_provider),
@@ -1064,6 +1073,23 @@ class OICompositeStrategy(IStrategy):
 
         # classify_regime возвращает (режим, уверенность-в-режиме).
         regime, regime_conf = classify_regime(closes, volumes)
+
+        # Кластерные модели M1/M2/M3: обновляем при смене режима,
+        # вычисляем на текущих скорах. До накопления истории — 0.
+        base_score_dict = dict(zip(
+            [name for name, _ in METHODS]
+            + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
+            + TRADESTATS_METHOD_NAMES
+            + [CHANGE_POINT_NAME, MULTI_TICKER_NAME],
+            base_scores
+        ))
+        m1_sc = m2_sc = m3_sc = 0.0
+        if self.__cluster_models is not None:
+            if self.__cluster_models.needs_refresh(regime):
+                self.__cluster_models.refresh(regime)
+            m1_sc, m2_sc, m3_sc = self.__cluster_models.compute(base_score_dict)
+
+        scores = base_scores + [m1_sc, m2_sc, m3_sc]
 
         # Перцентильная нормализация: если калибратор прогрет — приводим каждый
         # скор к шкале [-1, 1] относительно его исторического распределения.
