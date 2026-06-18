@@ -67,11 +67,55 @@ from tinkoff.invest.utils import quotation_to_decimal
 from configuration.settings import StrategySettings
 from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
+# regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
+# sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
 from regime import classify_regime, REGIME_WEIGHT_MODS, change_point_score
-from indicators import score_adaptive_ma, score_trend_quality
+from cluster_models import ClusterModels
+from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
-from indicators_ehlers import score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw
+from indicators_ehlers import (
+    score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
+)
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
+
+# ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
+# Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
+# базовых методах, а "научные" методы молча отдают нейтральный 0.0.
+try:
+    from kalman_filter import KalmanFilter
+    _HAS_KALMAN = True
+except Exception:
+    _HAS_KALMAN = False
+
+try:
+    from hawkes_processes import hawkes_processes
+    _HAS_HAWKES = True
+except Exception:
+    _HAS_HAWKES = False
+
+try:
+    from recurrence_quantification_analysis import rqa_signal
+    _HAS_RQA = True
+except Exception:
+    _HAS_RQA = False
+
+try:
+    from wavelet_transform import wavelet_transform
+    _HAS_WAVELET = True
+except Exception:
+    _HAS_WAVELET = False
+
+try:
+    from singular_spectrum_analysis import analyze as ssa_analyze
+    _HAS_SSA = True
+except Exception:
+    _HAS_SSA = False
+
+try:
+    import numpy as _np
+    _HAS_NUMPY = True
+except Exception:
+    _HAS_NUMPY = False
 
 __all__ = ("OICompositeStrategy",)
 
@@ -94,6 +138,11 @@ WARMUP_THRESHOLD_MULT = 1.5        # во сколько раз ужесточа
 LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "плохая полоса"
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
 QUALITY_ALPHA = 0.15               # скорость EWA для rolling quality
+
+# ── ATR-фильтр шума ──────────────────────────────────────────────────────────
+ATR_PERIOD = 14                    # период ATR
+COMMISSION_RT = 0.001              # round-trip комиссия (вход+выход), доля цены
+MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комиссия × этот фактор
 
 
 @dataclass
@@ -162,19 +211,99 @@ def _linreg_slope(values: list[float]) -> float:
     return max(-1.0, min(1.0, slope * n / price_range))
 
 
+def _adaptive_threshold(base: float, regime: str) -> float:
+    """
+    Порог входа под режим рынка: в тренде вход дешевле (легче ловить движение),
+    в стрессе/высокой волатильности дороже (меньше ложных входов на шуме).
+    """
+    mods = {"trending_up": 0.85, "trending_down": 0.85, "ranging": 1.0,
+            "high_vol": 1.25, "low_vol": 0.90, "stress": 1.40}
+    return base * mods.get(regime, 1.0)
+
+
+def _compute_atr(candles: list[HistoricCandle], period: int = ATR_PERIOD) -> float:
+    """
+    ATR (Average True Range) как доля цены: средний True Range за period баров,
+    делённый на последнюю цену. Фильтр против "мёртвых" инструментов, где
+    движение меньше комиссии (торговать бессмысленно).
+    """
+    if len(candles) < 2:
+        return 0.0
+    trs: list[float] = []
+    for i in range(1, len(candles)):
+        h = _to_f(candles[i].high)
+        lo = _to_f(candles[i].low)
+        prev_c = _to_f(candles[i - 1].close)
+        tr = max(h - lo, abs(h - prev_c), abs(lo - prev_c))
+        trs.append(tr)
+    if not trs:
+        return 0.0
+    window = trs[-period:]
+    atr = sum(window) / len(window)
+    last_price = _to_f(candles[-1].close) or 1e-9
+    return atr / last_price
+
+
 def score_price_trend(candles: list[HistoricCandle]) -> float:
+    """
+    PRICE_TREND: вместо наклона линрегрессии — скорость скрытого тренда по
+    Kalman-фильтру (Local Level Model). Фильтр сглаживает шум наблюдений и
+    отдаёт чистую оценку тренда; velocity = приращение тренда за последний бар,
+    нормированное на цену, прогнанное через tanh. Без numpy/Kalman — fallback
+    на исходный _linreg_slope (полная обратная совместимость).
+    """
     closes = [_to_f(c.close) for c in candles]
-    return _linreg_slope(closes)
+    if not _HAS_KALMAN or len(closes) < 3:
+        return _linreg_slope(closes)
+    try:
+        mid_price = sum(closes) / len(closes) or 1e-9
+        # R ~ дисперсия шума цены, Q << R для гладкого тренда. Берём от масштаба цены.
+        scale = (mid_price * 0.005) ** 2 or 1e-9
+        kf = KalmanFilter(R=scale, Q=scale * 0.01)
+        filtered = [r.trend for r in kf.batch(closes)]
+        if len(filtered) < 2:
+            return _linreg_slope(closes)
+        velocity = (filtered[-1] - filtered[-2]) / mid_price
+        return max(-1.0, min(1.0, math.tanh(velocity * 50)))
+    except Exception:
+        return _linreg_slope(closes)
 
 
 def score_vol_momentum(candles: list[HistoricCandle]) -> float:
-    """Объём × направление за последние N свечей, нормировано."""
+    """
+    Объём × направление за последние N свечей, нормировано. Поверх базовой
+    формулы — множитель Хокса: если всплески объёма образуют самовозбуждающийся
+    каскад (branching_ratio n = alpha/decay >= 1.0), движение по объёму усиливаем
+    ×1.5; затухающий поток (n < 0.5) ослабляем ×0.5. Без scipy/Hawkes или при
+    сбое оптимизации — исходная формула (множитель ×1.0).
+    """
     if len(candles) < 2:
         return 0.0
     bull_vol = sum(c.volume for c in candles if _to_f(c.close) >= _to_f(c.open))
     bear_vol = sum(c.volume for c in candles if _to_f(c.close) < _to_f(c.open))
     total = bull_vol + bear_vol or 1
-    return (bull_vol - bear_vol) / total
+    base = (bull_vol - bear_vol) / total
+
+    if not _HAS_HAWKES:
+        return base
+    try:
+        volumes = [float(c.volume) for c in candles]
+        med = statistics.median(volumes) if volumes else 0.0
+        # крупные бары = объём > median*1.5; их индексы — времена событий потока
+        event_times = [float(i) for i, v in enumerate(volumes) if v > med * 1.5]
+        if len(event_times) < 5:
+            return base
+        res = hawkes_processes(event_times)
+        n = res["branching_ratio"]
+        if n >= 1.0:
+            mult = 1.5
+        elif n < 0.5:
+            mult = 0.5
+        else:
+            mult = 1.0
+        return max(-1.0, min(1.0, base * mult))
+    except Exception:
+        return base
 
 
 def score_vwap_signal(candles: list[HistoricCandle]) -> float:
@@ -334,6 +463,231 @@ def score_volatility_regime(candles: list[HistoricCandle]) -> float:
     return min(1.0, vhf / 0.3)
 
 
+# ── Новые методы (Wave 2): адаптивные MA, циклы, волатильность, статистика ───
+
+def _dev_score(price: float, ref: float) -> float:
+    """Скоринг относительного отклонения цены от опорной линии (ZLEMA/T3)."""
+    if ref is None or ref <= 0:
+        return 0.0
+    dev = (price - ref) / ref
+    if dev > 0.01:
+        return 1.0
+    if dev > 0.003:
+        return 0.5
+    if dev < -0.01:
+        return -1.0
+    if dev < -0.003:
+        return -0.5
+    return 0.0
+
+
+def score_zlema_signal(candles: list[HistoricCandle]) -> float:
+    """ZLEMA_SIGNAL: отклонение цены от Zero-Lag EMA (indicators.py)."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 15:
+        return 0.0
+    line = zlema(closes, period=min(14, len(closes) - 1))
+    ref = line[-1] if line else None
+    return _dev_score(closes[-1], ref)
+
+
+def score_t3_signal(candles: list[HistoricCandle]) -> float:
+    """T3_SIGNAL: отклонение цены от сглаживающей T3 (indicators.py)."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 10:
+        return 0.0
+    line = t3(closes, period=min(5, max(2, len(closes) // 3)))
+    ref = line[-1] if line else None
+    return _dev_score(closes[-1], ref)
+
+
+def score_sinewave_signal(candles: list[HistoricCandle]) -> float:
+    """
+    SINEWAVE_SIGNAL: Ehlers Even Better Sinewave (indicators_ehlers.py).
+    Знак последнего значения → направление; пересечение нуля усиливает сигнал.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 15:
+        return 0.0
+    period = min(10, max(3, len(closes) // 3))
+    series = even_better_sinewave(closes, hp_period=min(40, len(closes)), period=period)
+    if len(series) < 2:
+        return 0.0
+    v, prev = series[-1], series[-2]
+    if v > 0 and prev < 0:
+        return 1.0
+    if v < 0 and prev > 0:
+        return -1.0
+    return max(-1.0, min(1.0, v))
+
+
+def score_mmi_signal(candles: list[HistoricCandle]) -> float:
+    """
+    MMI_SIGNAL: Market Meanness Index (indicators.py). Высокий MMI → рынок
+    "вязкий", тренд-следящие методы рискованны (лёгкий контр-голос). Низкий →
+    благоприятен для следования за движением.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 5:
+        return 0.0
+    m = mmi(closes, period=min(200, len(closes)))
+    if m > 75:
+        return -0.5
+    if m < 50:
+        return 0.5
+    return 0.0
+
+
+def _log_returns(values: list[float]) -> list[float]:
+    out = []
+    for i in range(1, len(values)):
+        if values[i - 1] > 0 and values[i] > 0:
+            out.append(math.log(values[i] / values[i - 1]))
+    return out
+
+
+def score_yz_vol_signal(candles: list[HistoricCandle]) -> float:
+    """
+    YZ_VOL_SIGNAL: Yang-Zhang волатильность (учитывает гэпы overnight + тело
+    бара) и её перцентиль в скользящем окне. Высокая волатильность (>80-й
+    перцентиль) — risk-off (−0.5); низкая (<20-й) — спокойный фон (+0.5).
+    """
+    if len(candles) < 12:
+        return 0.0
+    # покомпонентная YZ: overnight (close[-1]->open) + open->close (rogers-satchell-ish)
+    vols: list[float] = []
+    for i in range(1, len(candles)):
+        prev_c = _to_f(candles[i - 1].close)
+        o = _to_f(candles[i].open)
+        h = _to_f(candles[i].high)
+        lo = _to_f(candles[i].low)
+        cl = _to_f(candles[i].close)
+        if prev_c <= 0 or o <= 0 or h <= 0 or lo <= 0 or cl <= 0:
+            continue
+        overnight = math.log(o / prev_c) ** 2
+        rs = 0.0
+        if h > 0 and cl > 0 and o > 0 and lo > 0:
+            rs = (math.log(h / cl) * math.log(h / o) +
+                  math.log(lo / cl) * math.log(lo / o))
+        vols.append(math.sqrt(max(0.0, overnight + rs)))
+    if len(vols) < 6:
+        return 0.0
+    cur = vols[-1]
+    hist = sorted(vols)
+    # перцентиль текущего значения среди исторических
+    rank = sum(1 for v in hist if v <= cur) / len(hist)
+    if rank > 0.8:
+        return -0.5
+    if rank < 0.2:
+        return 0.5
+    return 0.0
+
+
+def score_vr_signal(candles: list[HistoricCandle]) -> float:
+    """
+    VR_SIGNAL: Variance Ratio VR(q=4) — отношение дисперсии q-периодных
+    доходностей к q×дисперсии однопериодных. VR > 1 — тренд/персистентность
+    (момент), VR < 1 — возврат к среднему. VR>1.3 → +0.5, VR<0.7 → −0.5.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    rets = _log_returns(closes)
+    q = 4
+    if len(rets) < q * 3:
+        return 0.0
+    var1 = statistics.pvariance(rets)
+    if var1 <= 0:
+        return 0.0
+    # q-периодные перекрывающиеся суммы доходностей
+    q_sums = [sum(rets[i:i + q]) for i in range(len(rets) - q + 1)]
+    if len(q_sums) < 2:
+        return 0.0
+    varq = statistics.pvariance(q_sums)
+    vr = varq / (q * var1)
+    if vr > 1.3:
+        return 0.5
+    if vr < 0.7:
+        return -0.5
+    return 0.0
+
+
+def score_ssa_signal(candles: list[HistoricCandle]) -> float:
+    """
+    SSA_SIGNAL: тренд-компонента Singular Spectrum Analysis. Цена выше
+    SSA-тренда → бычий голос пропорционально отклонению, ниже → медвежий.
+    Без numpy/SSA — нейтрально 0.0.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    if not _HAS_SSA or len(closes) < 12:
+        return 0.0
+    try:
+        res = ssa_analyze(_np.asarray(closes, dtype=float),
+                          L=min(len(closes) // 2, 15), n_components=6)
+        trend = res["trend"]
+        ssa_trend = float(trend[-1])
+        if ssa_trend <= 0:
+            return 0.0
+        dev = (closes[-1] - ssa_trend) / ssa_trend
+        return max(-1.0, min(1.0, math.tanh(dev * 30)))
+    except Exception:
+        return 0.0
+
+
+def score_hawkes_signal(candles: list[HistoricCandle]) -> float:
+    """
+    HAWKES_SIGNAL: branching ratio потока крупных баров как направленный
+    сигнал. Каскад (n>=1.0) — усиливаем недавнее направление цены ×0.8;
+    переходная зона (0.5<n<1.0) — нейтрально 0; затухание (n<0.5) — лёгкий
+    контр-сигнал −0.3 (всплеск выдохся → откат вероятнее). Без scipy — 0.0.
+    """
+    if not _HAS_HAWKES or len(candles) < 6:
+        return 0.0
+    try:
+        volumes = [float(c.volume) for c in candles]
+        med = statistics.median(volumes) if volumes else 0.0
+        event_times = [float(i) for i, v in enumerate(volumes) if v > med * 1.5]
+        if len(event_times) < 5:
+            return 0.0
+        res = hawkes_processes(event_times)
+        n = res["branching_ratio"]
+        # направление недавнего движения цены
+        closes = [_to_f(c.close) for c in candles]
+        ref = closes[-min(5, len(closes))]
+        price_dir = 1.0 if closes[-1] >= ref else -1.0
+        if n >= 1.0:
+            return max(-1.0, min(1.0, price_dir * 0.8))
+        if n < 0.5:
+            return -0.3 * price_dir
+        return 0.0
+    except Exception:
+        return 0.0
+
+
+def wavelet_confidence_mult(closes: list[float]) -> float:
+    """
+    WAVELET_SIGNAL (множитель уверенности, не направление): доминантный масштаб
+    CWT. Короткий (2-8) — шум/скальпинг → 0.7; средний (8-32) — внутридневной
+    тренд → 1.0; длинный (32+) — устойчивый цикл → 1.2. Без numpy/wavelet — 1.0.
+    """
+    if not _HAS_WAVELET or len(closes) < 32:
+        return 1.0
+    try:
+        res = wavelet_transform(closes)
+        scale = res["dominant_scale"]
+        if scale <= 8:
+            return 0.7
+        if scale <= 32:
+            return 1.0
+        return 1.2
+    except Exception:
+        return 1.0
+
+
+def score_wavelet_signal(candles: list[HistoricCandle]) -> float:
+    """WAVELET_SIGNAL: как метод композита — нейтральный score 0.0; реальный
+    эффект через wavelet_confidence_mult (множитель уверенности в composite)."""
+    return 0.0
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -355,6 +709,16 @@ METHODS = [
     ("TWIGGS",         score_twiggs_candle),
     ("RMI",            score_rmi_candle),
     ("ZSCORE",         score_zscore_candle),
+    # Wave 2: новые методы
+    ("ZLEMA_SIGNAL",   score_zlema_signal),
+    ("T3_SIGNAL",      score_t3_signal),
+    ("SINEWAVE_SIGNAL", score_sinewave_signal),
+    ("MMI_SIGNAL",     score_mmi_signal),
+    ("YZ_VOL_SIGNAL",  score_yz_vol_signal),
+    ("VR_SIGNAL",      score_vr_signal),
+    ("WAVELET_SIGNAL", score_wavelet_signal),
+    ("SSA_SIGNAL",     score_ssa_signal),
+    ("HAWKES_SIGNAL",  score_hawkes_signal),
 ]
 
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
@@ -367,11 +731,19 @@ TRADESTATS_METHOD_NAMES = [
     "VWAP_SIGNAL_TS", "VOL_MOMENTUM_TS", "OB_IMBALANCE", "CANCEL_SIGNAL",
 ]
 CHANGE_POINT_NAME = "CHANGE_POINT"
+MULTI_TICKER_NAME = "MULTI_TICKER"
+# Три кластерных модели — конкурируют наравне с остальными методами.
+# Вычисляются в ClusterModels (cluster_models.py) поверх истории сделок.
+M1_NAME = "M1_CLUSTER"
+M2_NAME = "M2_CLUSTER"
+M3_NAME = "M3_CLUSTER"
+
 ALL_METHOD_NAMES = (
     [name for name, _ in METHODS]
     + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
     + TRADESTATS_METHOD_NAMES
-    + [CHANGE_POINT_NAME]
+    + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
+    + [M1_NAME, M2_NAME, M3_NAME]
 )
 
 # (ticker, direction) -> squeeze_score; подключается извне (Trader), т.к.
@@ -383,6 +755,8 @@ SqueezeProvider = Callable[[str, str], float]
 ScoreProvider = Callable[[str], float]
 # (ticker, method_name) -> score [-1, 1]; методы микроструктуры из tradestats.py.
 TradeStatsProvider = Callable[[str, str], float]
+# (ticker) -> score [-1, 1]; межинструментальный сигнал (indicators_multi.py).
+MultiTickerProvider = Callable[[str], float]
 
 
 class OICompositeStrategy(IStrategy):
@@ -408,6 +782,12 @@ class OICompositeStrategy(IStrategy):
         self.__short_stop = Decimal(s.get("SHORT_STOP", "1.015"))
         self.__signal_only = s.get("SIGNAL_ONLY", "0") == "1"
 
+        # ATR-based take/stop: если в settings.ini заданы оба коэффициента —
+        # уровни считаются от ATR (динамически, под текущую волатильность);
+        # иначе остаются фиксированные множители LONG_TAKE/STOP (обратная совместимость).
+        self.__atr_take_k = float(s["ATR_TAKE_K"]) if "ATR_TAKE_K" in s else None
+        self.__atr_stop_k = float(s["ATR_STOP_K"]) if "ATR_STOP_K" in s else None
+
         self.__candles: list[HistoricCandle] = []
         self.__open_trade: Optional[OpenTrade] = None
         self.__weights: dict[str, MethodWeight] = self.__load_weights()
@@ -417,9 +797,20 @@ class OICompositeStrategy(IStrategy):
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
         self.__tradestats_provider: Optional[TradeStatsProvider] = None
+        self.__multi_ticker_provider: Optional[MultiTickerProvider] = None
+        self.__regime_confidence: float = 1.0
         self.__last_regime: str = "ranging"
         self.__last_scores: dict[str, float] = {}
         self.__last_composite: float = 0.0
+        # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
+        self.__history = None
+        self.__calibrator = None
+        # Динамические REGIME_WEIGHT_MODS из истории (обновляются при set_history)
+        self.__dynamic_regime_mods: dict[str, dict[str, float]] = {}
+        # tf-регимы от MultiTfBuffer (обновляются трейдером на каждой свече)
+        self.__tf_regimes: dict[str, str] = {}
+        # Кластерные модели M1/M2/M3 — инициализируются при set_history
+        self.__cluster_models: Optional[ClusterModels] = None
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -477,6 +868,63 @@ class OICompositeStrategy(IStrategy):
         """provider(ticker, method_name) -> score, см. tradestats.py.TradeStatsService.score."""
         self.__tradestats_provider = provider
 
+    def set_multi_ticker_provider(self, provider: Optional[MultiTickerProvider]) -> None:
+        """provider(ticker) -> score [-1,1], межинструментальный сигнал (indicators_multi.py)."""
+        self.__multi_ticker_provider = provider
+
+    def set_history(self, history, calibrator) -> None:
+        """
+        Инжектирует HistoryStore и PercentileCalibrator.
+        После этого:
+        - composite строится на перцентильно-нормализованных скорах
+        - REGIME_WEIGHT_MODS заменяются динамическими (из истории сделок)
+        - notify_position_closed получает реальные MFE/MAE и пишет в историю
+        """
+        self.__history = history
+        self.__calibrator = calibrator
+        ticker = self.__settings.ticker
+        # Прогрев калибратора из истории дневных скоров
+        if calibrator is not None and history is not None:
+            method_scores = {
+                name: history.daily_scores(ticker, name, window_days=90)
+                for name in ALL_METHOD_NAMES
+            }
+            calibrator.warm_up(ticker, {k: v for k, v in method_scores.items() if v})
+        # Загрузка динамических режимных модификаторов из истории сделок
+        self._reload_dynamic_regime_mods()
+        # Инициализация кластерных моделей M1/M2/M3
+        self.__cluster_models = ClusterModels(history, self.__settings.ticker)
+
+    def _reload_dynamic_regime_mods(self) -> None:
+        """Пересчитывает per-regime accuracy из истории и сохраняет в __dynamic_regime_mods."""
+        if self.__history is None:
+            return
+        ticker = self.__settings.ticker
+        regime_perf = self.__history.regime_method_performance(ticker, window_days=90)
+        if not regime_perf:
+            return
+        # Преобразуем avg_quality → мультипликатор веса: 0.5 = нейтраль → 1.0,
+        # 0.8 = хороший → 1.6, 0.2 = плохой → 0.4. Диапазон [0.2, 2.0].
+        mods: dict[str, dict[str, float]] = {}
+        for regime, methods in regime_perf.items():
+            mods[regime] = {
+                method: max(0.2, min(2.0, quality * 2.0))
+                for method, quality in methods.items()
+            }
+        self.__dynamic_regime_mods = mods
+        logger.info(
+            f"{self.__settings.ticker}: загружены динамические режимные моды "
+            f"для {len(mods)} режимов из истории"
+        )
+
+    def set_tf_regimes(self, tf_regimes: dict[str, str]) -> None:
+        """
+        Обновляет текущие режимы по таймфреймам от MultiTfBuffer.
+        tf_regimes = {"1min": "trending_up", "5min": "ranging", "1h": "trending_up"}
+        Используется для записи tf-контекста в историю сделок.
+        """
+        self.__tf_regimes = tf_regimes
+
     # ── Публичный метод — вызывается на каждой свече ─────────────────────────
 
     def analyze_candles(self, candles: list[HistoricCandle]) -> Optional[Signal]:
@@ -495,6 +943,13 @@ class OICompositeStrategy(IStrategy):
         if len(self.__candles) < MIN_CANDLES:
             return None
 
+        # ATR-фильтр: если средний ход меньше комиссии×фактор — движение не
+        # окупает торговлю, сигнал не выдаём (защита от "мёртвых" инструментов).
+        atr_pct = _compute_atr(self.__candles)
+        if atr_pct < COMMISSION_RT * MIN_ATR_FACTOR:
+            logger.debug(f"{self.__settings.figi}: пропуск — ATR {atr_pct:.4f} ниже комиссии×{MIN_ATR_FACTOR}")
+            return None
+
         # вычисляем composite
         composite, scores = self.__compute_composite()
         logger.debug(
@@ -502,7 +957,9 @@ class OICompositeStrategy(IStrategy):
             f"scores={dict(zip(ALL_METHOD_NAMES, [round(s, 3) for s in scores]))}"
         )
 
-        effective_threshold = self.__effective_threshold()
+        # порог адаптируется под режим рынка, поверх — прогрев/плохая полоса
+        adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
+        effective_threshold = self.__effective_threshold(adaptive)
 
         direction: Optional[SignalType] = None
         if composite >= effective_threshold:
@@ -521,14 +978,23 @@ class OICompositeStrategy(IStrategy):
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — тонкая свеча (низкий объём)")
             return None
 
-        if direction == SignalType.LONG:
-            return self.__make_signal(SignalType.LONG, self.__long_take, self.__long_stop, scores)
-        return self.__make_signal(SignalType.SHORT, self.__short_take, self.__short_stop, scores)
+        # take/stop: ATR-based если заданы коэффициенты, иначе фиксированные множители
+        take_mult, stop_mult = self.__take_stop_mults(direction, atr_pct)
+        return self.__make_signal(direction, take_mult, stop_mult, scores)
 
-    def notify_position_closed(self) -> None:
-        """Вызвать извне при закрытии позиции — записываем исход."""
+    def notify_position_closed(
+            self,
+            exit_price: float = 0.0,
+            mfe: float = 0.0,
+            mae: float = 0.0,
+    ) -> None:
+        """
+        Вызвать извне при закрытии позиции.
+        exit_price, mfe, mae — реальные значения от трейдера (доли от entry).
+        Если переданы — используются вместо после-свечного расчёта OpenTrade.
+        """
         if self.__open_trade:
-            self.__record_outcome()
+            self.__record_outcome(exit_price=exit_price, mfe=mfe, mae=mae)
 
     def warmup(self, candles: list[HistoricCandle]) -> None:
         """
@@ -598,25 +1064,96 @@ class OICompositeStrategy(IStrategy):
         closes = [_to_f(c.close) for c in window]
         volumes = [float(c.volume) for c in window]
 
-        scores = [fn(window) for _, fn in METHODS] + [
+        base_scores = [fn(window) for _, fn in METHODS] + [
             self.__score_oi_squeeze(),
             self.__score_provider(self.__inst_oi_provider),
             self.__score_provider(self.__retail_contra_provider),
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
-          + [change_point_score(closes)]
+          + [change_point_score(closes), self.__score_multi_ticker()]
 
-        regime = classify_regime(closes, volumes)
-        regime_mods = REGIME_WEIGHT_MODS.get(regime, {})
+        # classify_regime возвращает (режим, уверенность-в-режиме).
+        regime, regime_conf = classify_regime(closes, volumes)
+
+        # Кластерные модели M1/M2/M3: обновляем при смене режима,
+        # вычисляем на текущих скорах. До накопления истории — 0.
+        base_score_dict = dict(zip(
+            [name for name, _ in METHODS]
+            + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
+            + TRADESTATS_METHOD_NAMES
+            + [CHANGE_POINT_NAME, MULTI_TICKER_NAME],
+            base_scores
+        ))
+        m1_sc = m2_sc = m3_sc = 0.0
+        if self.__cluster_models is not None:
+            if self.__cluster_models.needs_refresh(regime):
+                self.__cluster_models.refresh(regime)
+            m1_sc, m2_sc, m3_sc = self.__cluster_models.compute(base_score_dict)
+
+        scores = base_scores + [m1_sc, m2_sc, m3_sc]
+
+        # Перцентильная нормализация: если калибратор прогрет — приводим каждый
+        # скор к шкале [-1, 1] относительно его исторического распределения.
+        # Без нормализации "громкие" методы (большой масштаб) доминируют случайно.
+        ticker = self.__settings.ticker
+        if self.__calibrator is not None:
+            norm_scores = []
+            for name, s in zip(ALL_METHOD_NAMES, scores):
+                self.__calibrator.update(ticker, name, s)
+                if self.__calibrator.ready(ticker, name):
+                    norm_scores.append(self.__calibrator.normalize(ticker, name, s))
+                else:
+                    norm_scores.append(s)
+            scores_for_composite = norm_scores
+        else:
+            scores_for_composite = scores
+
+        # Режимные мультипликаторы: динамические (из истории) в приоритете
+        # над захардкоженными REGIME_WEIGHT_MODS. Если динамических нет —
+        # откат на статику (обратная совместимость).
+        if self.__dynamic_regime_mods.get(regime):
+            dyn = self.__dynamic_regime_mods[regime]
+            # Берём динамику для методов с историей, для остальных — статику
+            static = REGIME_WEIGHT_MODS.get(regime, {})
+            regime_mods = {name: dyn.get(name, static.get(name, 1.0)) for name in ALL_METHOD_NAMES}
+        else:
+            regime_mods = REGIME_WEIGHT_MODS.get(regime, {})
+
         weights = [self.__weights[name].weight * regime_mods.get(name, 1.0) for name in ALL_METHOD_NAMES]
 
-        # взвешенная сумма; VOL_MOMENTUM усиливается режимом тренда
-        weighted = sum(s * w for s, w in zip(scores, weights))
+        weighted = sum(s * w for s, w in zip(scores_for_composite, weights))
         weight_sum = sum(weights) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
+
+        confidence_mult = self.__rqa_confidence_mult(closes)
+        confidence_mult *= wavelet_confidence_mult(closes)
+        confidence_mult *= regime_conf
+        composite *= confidence_mult
+
         self.__last_regime = regime
+        self.__regime_confidence = regime_conf
+        # __last_scores хранит сырые скоры — для архива и диагностики
         self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
         self.__last_composite = composite
         return composite, scores
+
+    def __rqa_confidence_mult(self, closes: list[float]) -> float:
+        """
+        RQA DET на последних 30 closes → множитель уверенности composite.
+        DET>0.7 (детерминированный ряд) усиливаем до 1.0+(DET-0.7)*0.5;
+        DET<0.3 (хаос) ослабляем до max(0.5, DET/0.3*0.7). Без numpy/RQA — 1.0.
+        """
+        if not _HAS_RQA or len(closes) < 12:
+            return 1.0
+        try:
+            res = rqa_signal(_np.asarray(closes[-30:], dtype=float), dim=3, tau=1)
+            det = float(res["DET"])
+            if det > 0.7:
+                return 1.0 + (det - 0.7) * 0.5
+            if det < 0.3:
+                return max(0.5, det / 0.3 * 0.7)
+            return 1.0
+        except Exception:
+            return 1.0
 
     def last_snapshot(self) -> dict:
         """Последний расчёт composite/scores/режима — для архива (archive.py), не торговая логика."""
@@ -624,6 +1161,7 @@ class OICompositeStrategy(IStrategy):
             "composite": self.__last_composite,
             "scores": dict(self.__last_scores),
             "regime": self.__last_regime,
+            "regime_confidence": self.__regime_confidence,
             "rolling_quality": self.__rolling_quality,
         }
 
@@ -655,6 +1193,19 @@ class OICompositeStrategy(IStrategy):
             return 0.0
         return self.__tradestats_provider(self.__settings.ticker, method_name)
 
+    def __score_multi_ticker(self) -> float:
+        """
+        MULTI_TICKER: межинструментальный сигнал (transfer entropy / wavelet
+        coherence / RMT-вес, см. indicators_multi.py). Требует ряда второго
+        инструмента — поэтому считается извне в провайдере. Без него молчит.
+        """
+        if not self.__multi_ticker_provider:
+            return 0.0
+        try:
+            return max(-1.0, min(1.0, float(self.__multi_ticker_provider(self.__settings.ticker))))
+        except Exception:
+            return 0.0
+
     def __methods_agree(self, scores: list[float], direction: SignalType) -> bool:
         """Хотя бы MIN_AGREE_METHODS методов высказались (|score|>=AGREE_SCORE_MIN) за это направление."""
         sign = 1 if direction == SignalType.LONG else -1
@@ -671,15 +1222,36 @@ class OICompositeStrategy(IStrategy):
             return True
         return volumes[-1] >= LIQUIDITY_MIN_RATIO * median_vol
 
-    def __effective_threshold(self) -> float:
-        """Базовый порог, ужесточённый во время прогрева весов и в полосе слабых сделок."""
+    def __effective_threshold(self, base: Optional[float] = None) -> float:
+        """
+        Базовый порог (по умолчанию self.__threshold; analyze_candles передаёт
+        уже адаптированный под режим), ужесточённый во время прогрева весов и
+        в полосе слабых сделок.
+        """
+        base = self.__threshold if base is None else base
         mult = 1.0
         avg_total = sum(w.total for w in self.__weights.values()) / max(1, len(self.__weights))
         if avg_total < WARMUP_TRADES:
             mult *= WARMUP_THRESHOLD_MULT
         if self.__rolling_quality < LOW_QUALITY_THRESHOLD:
             mult *= LOW_QUALITY_MULT
-        return self.__threshold * mult
+        return base * mult
+
+    def __take_stop_mults(self, direction: SignalType, atr_pct: float) -> tuple[Decimal, Decimal]:
+        """
+        Множители take/stop. Если в settings заданы ATR_TAKE_K и ATR_STOP_K —
+        уровни считаются от ATR (динамически под волатильность): take = 1 ± k*ATR%.
+        Иначе — фиксированные LONG_*/SHORT_* (полная обратная совместимость).
+        """
+        if self.__atr_take_k is not None and self.__atr_stop_k is not None and atr_pct > 0:
+            take_off = Decimal(str(self.__atr_take_k * atr_pct))
+            stop_off = Decimal(str(self.__atr_stop_k * atr_pct))
+            if direction == SignalType.LONG:
+                return Decimal("1") + take_off, Decimal("1") - stop_off
+            return Decimal("1") - take_off, Decimal("1") + stop_off
+        if direction == SignalType.LONG:
+            return self.__long_take, self.__long_stop
+        return self.__short_take, self.__short_stop
 
     def __make_signal(
             self,
@@ -711,14 +1283,43 @@ class OICompositeStrategy(IStrategy):
         logger.info(f"OICompositeStrategy signal: {signal} scores={method_scores}")
         return signal
 
-    def __record_outcome(self) -> None:
-        """Записать MFE/MAE, обновить веса EWA."""
+    def __record_outcome(
+            self,
+            exit_price: float = 0.0,
+            mfe: float = 0.0,
+            mae: float = 0.0,
+    ) -> None:
+        """
+        Записать MFE/MAE, обновить веса EWA, сохранить сделку в историю.
+        Если exit_price/mfe/mae переданы трейдером — используем их (реальные);
+        иначе считаем из after_candles (предположительные, как раньше).
+        """
         if not self.__open_trade:
             return
 
-        quality = self.__open_trade.calc_quality()
+        # Приоритет: реальные значения от трейдера
+        if mfe > 0 or mae > 0:
+            quality = mfe / (mfe + mae + 1e-8)
+            real_exit = exit_price
+        else:
+            quality = self.__open_trade.calc_quality()
+            real_exit = 0.0
+            # Восстановить mfe/mae из after_candles для записи в историю
+            ep = float(self.__open_trade.entry_price)
+            mfe = mae = 0.0
+            for c in self.__open_trade.after_candles:
+                h = float(quotation_to_decimal(c.high))
+                lo = float(quotation_to_decimal(c.low))
+                if self.__open_trade.signal_type == SignalType.LONG:
+                    mfe = max(mfe, (h - ep) / ep)
+                    mae = max(mae, (ep - lo) / ep)
+                else:
+                    mfe = max(mfe, (ep - lo) / ep)
+                    mae = max(mae, (h - ep) / ep)
+
         logger.info(
             f"{self.__settings.figi} trade closed: quality={quality:.3f} "
+            f"mfe={mfe:.4f} mae={mae:.4f} "
             f"bars={len(self.__open_trade.after_candles)}"
         )
 
@@ -732,6 +1333,23 @@ class OICompositeStrategy(IStrategy):
                       (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
             self.__weights[name].update(target)
+
+        # Сохранить сделку в историю с attribution по методам
+        if self.__history is not None:
+            ep = float(self.__open_trade.entry_price)
+            self.__history.record_trade(
+                self.__settings.ticker,
+                direction="LONG" if self.__open_trade.signal_type == SignalType.LONG else "SHORT",
+                entry_price=ep,
+                exit_price=real_exit if real_exit > 0 else ep,
+                mfe=mfe,
+                mae=mae,
+                method_scores=dict(self.__open_trade.method_scores),
+                regime=self.__last_regime,
+                tf_regimes=dict(self.__tf_regimes) if self.__tf_regimes else None,
+            )
+            # Обновляем динамические режимные моды после каждой сделки
+            self._reload_dynamic_regime_mods()
 
         self.__open_trade = None
         self.__save_weights()

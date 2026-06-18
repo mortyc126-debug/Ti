@@ -21,6 +21,9 @@ class StrategySettings:
     # ГО за один лот в рублях, на момент построения стратегии (Decimal как
     # float здесь — берётся напрямую из API, см. InstrumentService.future_by_ticker).
     margin_per_lot: float = 0.0
+    # для фьючерсов — стоимость одного пункта изменения цены в рублях
+    # (для акций остаётся 1.0 — 1 пункт цены = 1 рубль)
+    point_value: float = 1.0
 
 
 @dataclass(eq=False, repr=True)
@@ -49,6 +52,8 @@ class FutureSettings:
     basic_asset: str = ""
     expiration_date: object = None
     margin_per_lot: float = 0.0
+    # стоимость одного пункта цены в рублях (min_price_increment_amount / min_price_increment)
+    point_value: float = 1.0
 
 
 @dataclass(eq=False, repr=True)
@@ -66,6 +71,12 @@ class TradingSettings:
     # Доля от среднего объёма последних свечей по тикеру, которую разрешено
     # выставить в одном ордере (защита от проскальзывания на неликвиде).
     max_volume_participation: float = 0.1
+    # Лимитные ордера: интервал между попытками re-price (секунды)
+    limit_reprice_interval_sec: int = 15
+    # Максимум re-price попыток перед переходом на маркет
+    limit_reprice_max_attempts: int = 3
+    # Порог ухода цены против нас (доля от цены) для немедленного перехода на маркет
+    limit_adverse_move_pct: float = 0.0006  # 0.06%
 
 
 @dataclass(eq=False, repr=True)

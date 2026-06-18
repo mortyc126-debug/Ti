@@ -180,13 +180,19 @@ class InstrumentService:
             moneyvalue_to_decimal(best.initial_margin_on_sell)
         )
 
+        # стоимость одного пункта цены: сколько рублей даёт движение цены на 1 шаг
+        min_step = moneyvalue_to_decimal(best.min_price_increment)
+        min_step_amount = moneyvalue_to_decimal(best.min_price_increment_amount)
+        point_value = float(min_step_amount / min_step) if min_step and min_step != 0 else 1.0
+
         return FutureSettings(
             ticker=best.ticker,
             lot=best.lot,
             short_enabled_flag=best.short_enabled_flag,
             basic_asset=best.basic_asset,
             expiration_date=best.expiration_date,
-            margin_per_lot=float(margin_per_lot)
+            margin_per_lot=float(margin_per_lot),
+            point_value=point_value
         ), best_figi
 
     @invest_api_retry()

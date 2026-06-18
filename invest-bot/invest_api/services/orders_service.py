@@ -1,6 +1,8 @@
 import logging
+from decimal import Decimal
 
 from tinkoff.invest import Client, OrderDirection, Quotation, OrderType, PostOrderResponse, OrderState
+from tinkoff.invest.utils import decimal_to_quotation
 from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.utils import generate_order_id
@@ -64,6 +66,34 @@ class OrderService:
             price=None,
             direction=OrderDirection.ORDER_DIRECTION_BUY if is_buy else OrderDirection.ORDER_DIRECTION_SELL,
             order_type=OrderType.ORDER_TYPE_MARKET,
+            order_id=generate_order_id()
+        )
+
+        logger.debug(f"{order}")
+
+        return order
+
+    def post_limit_order(
+            self,
+            account_id: str,
+            figi: str,
+            count_lots: int,
+            is_buy: bool,
+            price: Decimal
+    ) -> PostOrderResponse:
+        """Post limit order at the given price."""
+        logger.info(
+            f"Post limit order account_id: {account_id}, "
+            f"figi: {figi}, count_lots: {count_lots}, is_buy: {is_buy}, price: {price}"
+        )
+
+        order = self.__post_order(
+            account_id=account_id,
+            figi=figi,
+            count_lots=count_lots,
+            price=decimal_to_quotation(price),
+            direction=OrderDirection.ORDER_DIRECTION_BUY if is_buy else OrderDirection.ORDER_DIRECTION_SELL,
+            order_type=OrderType.ORDER_TYPE_LIMIT,
             order_id=generate_order_id()
         )
 

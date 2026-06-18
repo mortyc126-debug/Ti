@@ -22,7 +22,17 @@ CONF_HIGH_THR = 0.85  # 70-85% -> RISK_MID_PCT; 85%+ -> RISK_MAX_PCT
 # Ключ группы -> список человеческих тикеров (strategy.settings.ticker),
 # не FIGI. Заполни своими тикерами из settings.ini по мере добавления стратегий.
 CORR_GROUPS: dict[str, list[str]] = {
-    "RU_EQUITY": ["SBER", "GAZP", "VTBR", "SMLT", "LKOH", "ROSN", "NVTK", "GMKN"],
+    # Акции и их фьючерсы в одной группе — нельзя одновременно держать SBER и SBRF
+    "RU_EQUITY": [
+        "SBER", "SBRF",   # Сбербанк
+        "GAZP", "GAZRF",  # Газпром
+        "VTBR",
+        "SMLT",
+        "LKOH", "LKOHF",  # Лукойл
+        "ROSN", "ROSNF",  # Роснефть
+        "NVTK",
+        "GMKN", "GMKNF",  # Норникель
+    ],
 }
 
 # ── Портфельный риск-лимит ───────────────────────────────────────────────
