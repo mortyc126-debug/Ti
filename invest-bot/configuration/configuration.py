@@ -46,7 +46,10 @@ class ProgramConfiguration:
                 short_take=ma.get("SHORT_TAKE", "0.985"),
                 short_stop=ma.get("SHORT_STOP", "1.015"),
                 signal_only=ma.get("SIGNAL_ONLY", "1"),
-                max_lots_per_order=int(ma.get("MAX_LOTS_PER_ORDER", "1"))
+                max_lots_per_order=int(ma.get("MAX_LOTS_PER_ORDER", "1")),
+                history_days=int(ma.get("HISTORY_DAYS", "5")),
+                backtest_quality_min=float(ma.get("BACKTEST_QUALITY_MIN", "0.55")),
+                backtest_min_trades=int(ma.get("BACKTEST_MIN_TRADES", "3"))
             )
         else:
             self.__mega_alerts_settings = MegaAlertsSettings()

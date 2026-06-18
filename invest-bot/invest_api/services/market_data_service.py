@@ -1,7 +1,9 @@
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from tinkoff.invest import Client, GetTradingStatusResponse, SecurityTradingStatus, Quotation
+from tinkoff.invest import Client, GetTradingStatusResponse, SecurityTradingStatus, Quotation, \
+    CandleInterval, HistoricCandle
 from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
@@ -61,3 +63,35 @@ class MarketDataService:
                     return price.price
             else:
                 return None
+
+    @invest_api_retry()
+    @invest_error_logging
+    def get_candles_history(
+            self,
+            figi: str,
+            days: int = 5,
+            interval: CandleInterval = CandleInterval.CANDLE_INTERVAL_5_MIN
+    ) -> list[HistoricCandle]:
+        """
+        Историческая выгрузка свечей за последние `days` дней — для прогрева
+        стратегии (warmup/backtest_quality) на тикерах, у которых ещё нет
+        накопленной внутри процесса истории (например, найденных через
+        MEGA-ALERTS). 5-минутный интервал лимитирован API одним днём за
+        запрос — тянем по дням и склеиваем.
+        """
+        result: list[HistoricCandle] = []
+        now = datetime.now(timezone.utc)
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            for day in range(days, 0, -1):
+                day_to = now - timedelta(days=day - 1)
+                day_from = now - timedelta(days=day)
+                response = client.market_data.get_candles(
+                    figi=figi,
+                    from_=day_from,
+                    to=day_to,
+                    interval=interval
+                )
+                result.extend(c for c in response.candles if c.is_complete)
+
+        logger.debug(f"Candles history for {figi}: {len(result)} баров за {days} дней")
+        return result

@@ -53,6 +53,9 @@ class MegaAlertsSettings:
     short_stop: str = "1.015"
     signal_only: str = "1"
     max_lots_per_order: int = 1
+    history_days: int = 5
+    backtest_quality_min: float = 0.55
+    backtest_min_trades: int = 3
 
 
 @dataclass(eq=False, repr=True)

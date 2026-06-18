@@ -24,6 +24,7 @@ from risk import RiskManager
 from oi_layers import OiLayersService
 from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
+from archive import ArchiveStore
 
 __all__ = ("Trader")
 
@@ -68,6 +69,7 @@ class Trader:
         self.__tradestats_task: asyncio.Task | None = None
         self.__mega_alerts = MegaAlertsService()
         self.__mega_alerts_task: asyncio.Task | None = None
+        self.__archive = ArchiveStore()
 
     async def trade_day(
             self,
@@ -149,6 +151,8 @@ class Trader:
             self.__oi_task = None
             await self.__cancel_task(self.__tradestats_task)
             self.__tradestats_task = None
+
+        self.__archive_today(today_trade_strategies)
 
         logger.info("Finishing trading today")
         self.__blogger.finish_trading_message()
@@ -476,13 +480,45 @@ class Trader:
                             logger.info(f"Close order status failed: {close_order}")
         return result
 
+    def __archive_today(self, today_trade_strategies: dict[str, IStrategy]) -> None:
+        """
+        Конец торгового дня — кладём в data/archive.json (archive.py) итоговый
+        снэпшок композита по каждому тикеру, который сегодня считался, не
+        только по тем, что реально торговались. Это и есть "база данных" с
+        расчётами, а не только живая память процесса.
+        """
+        for strategy in today_trade_strategies.values():
+            if not hasattr(strategy, "last_snapshot"):
+                continue
+            snapshot = strategy.last_snapshot()
+            if not snapshot.get("scores"):
+                continue
+            if hasattr(strategy, "is_signal_only"):
+                signal_only = strategy.is_signal_only()
+            else:
+                signal_only = str(getattr(strategy.settings, "settings", {}).get("SIGNAL_ONLY", "1")) == "1"
+            self.__archive.record(
+                strategy.settings.ticker,
+                composite=snapshot["composite"],
+                scores=snapshot["scores"],
+                regime=snapshot["regime"],
+                rolling_quality=snapshot["rolling_quality"],
+                live=not signal_only
+            )
+
     def __build_dynamic_strategies(self, tickers: list[str]) -> list[IStrategy]:
         """
         Создаёт OICompositeStrategy на лету для тикеров, которые сегодня
         отметил MOEX MEGA-ALERTS, но которых нет в settings.ini. Параметры —
         дефолтные из [MEGA_ALERTS] (тот же шаблон, что у сконфигурированных
-        тикеров). Никак не сохраняется на диск — список пересобирается
-        каждый торговый день из текущего срез аномалий.
+        тикеров). Список не сохраняется на диск — пересобирается каждый
+        торговый день из текущего срез аномалий (расчёты — в data/archive.json).
+
+        Перед включением реальной торговли: запрашиваем историю свечей
+        (HISTORY_DAYS дней), прогреваем стратегию ей же (warmup) и считаем
+        backtest_quality — если модели на истории дали >= BACKTEST_MIN_TRADES
+        виртуальных сделок с quality >= BACKTEST_QUALITY_MIN, разрешаем
+        реальные ордера (SIGNAL_ONLY=0), иначе тикер только шлёт сигналы.
         """
         cfg = self.__mega_alerts_settings
         result: list[IStrategy] = []
@@ -509,8 +545,29 @@ class Trader:
                 short_enabled_flag=share_settings.short_enabled_flag
             )
             strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
-            if strategy:
-                result.append(strategy)
+            if not strategy:
+                continue
+
+            try:
+                candles = self.__market_data_service.get_candles_history(figi, days=cfg.history_days)
+            except Exception as ex:
+                logger.warning(f"MEGA-ALERTS: история свечей {ticker} не получена: {repr(ex)}")
+                candles = []
+
+            quality, n_trades = 0.5, 0
+            if candles and hasattr(strategy, "warmup"):
+                strategy.warmup(candles)
+            if candles and hasattr(strategy, "backtest_quality"):
+                quality, n_trades = strategy.backtest_quality(candles)
+
+            live = n_trades >= cfg.backtest_min_trades and quality >= cfg.backtest_quality_min
+            if live and hasattr(strategy, "set_signal_only"):
+                strategy.set_signal_only(False)
+            logger.info(
+                f"MEGA-ALERTS: {ticker} backtest quality={quality:.2f} на {n_trades} вирт. сделках "
+                f"({'реальная торговля' if live else 'только сигналы'})"
+            )
+            result.append(strategy)
         return result
 
     def __get_today_strategies(self, strategies: list[IStrategy]) -> dict[str, IStrategy]:

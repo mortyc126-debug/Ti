@@ -417,6 +417,9 @@ class OICompositeStrategy(IStrategy):
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
         self.__tradestats_provider: Optional[TradeStatsProvider] = None
+        self.__last_regime: str = "ranging"
+        self.__last_scores: dict[str, float] = {}
+        self.__last_composite: float = 0.0
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -447,6 +450,13 @@ class OICompositeStrategy(IStrategy):
 
     def update_short_status(self, status: bool) -> None:
         self.__settings.short_enabled_flag = status
+
+    def set_signal_only(self, flag: bool) -> None:
+        """Переключение sandbox-режима после создания — для тикеров, добавленных динамически по MEGA-ALERTS."""
+        self.__signal_only = flag
+
+    def is_signal_only(self) -> bool:
+        return self.__signal_only
 
     def set_squeeze_provider(self, provider: Optional[SqueezeProvider]) -> None:
         """
@@ -520,6 +530,66 @@ class OICompositeStrategy(IStrategy):
         if self.__open_trade:
             self.__record_outcome()
 
+    def warmup(self, candles: list[HistoricCandle]) -> None:
+        """
+        Прогрев окна свечей исторической выгрузкой — чтобы новый (например,
+        найденный через MEGA-ALERTS) тикер не ждал MIN_CANDLES живых свечей
+        перед первым сигналом. Открытых сделок не затрагивает.
+        """
+        self.__candles = candles[-CANDLE_WINDOW:]
+
+    def backtest_quality(self, candles: list[HistoricCandle], lookahead: int = MFE_MAE_BARS) -> tuple[float, int]:
+        """
+        Прогон композита по исторической свечной выгрузке без реальных
+        сделок — оценка, "дают ли модели хороший %" на этом тикере ДО того,
+        как пускать его в реальную торговлю. quality того же вида, что и в
+        EWA (MFE/(MFE+MAE)), считается по виртуальным сделкам на пересечении
+        порога; виртуальные сделки не пересекаются по времени (после входа
+        пропускаем `lookahead` баров). Реальное состояние стратегии
+        (свечи/открытая сделка) не трогает — окно подменяется только на
+        время вызова.
+        Возвращает (средний quality, число виртуальных сделок).
+        """
+        if len(candles) < CANDLE_WINDOW + lookahead + 1:
+            return 0.5, 0
+
+        saved_candles = self.__candles
+        qualities: list[float] = []
+        try:
+            i = CANDLE_WINDOW
+            while i < len(candles) - lookahead:
+                self.__candles = candles[i - CANDLE_WINDOW:i]
+                composite, _ = self.__compute_composite()
+
+                direction: Optional[SignalType] = None
+                if composite >= self.__threshold:
+                    direction = SignalType.LONG
+                elif self.__settings.short_enabled_flag and composite <= -self.__threshold:
+                    direction = SignalType.SHORT
+
+                if direction is None:
+                    i += 1
+                    continue
+
+                entry = _to_f(candles[i].close)
+                future = candles[i + 1:i + 1 + lookahead]
+                highs = [_to_f(c.high) for c in future]
+                lows = [_to_f(c.low) for c in future]
+                if direction == SignalType.LONG:
+                    mfe = max(0.0, (max(highs) - entry) / entry) if highs else 0.0
+                    mae = max(0.0, (entry - min(lows)) / entry) if lows else 0.0
+                else:
+                    mfe = max(0.0, (entry - min(lows)) / entry) if lows else 0.0
+                    mae = max(0.0, (max(highs) - entry) / entry) if highs else 0.0
+                qualities.append(mfe / (mfe + mae) if (mfe + mae) > 0 else 0.5)
+                i += lookahead  # не пересекать виртуальные сделки
+        finally:
+            self.__candles = saved_candles
+
+        if not qualities:
+            return 0.5, 0
+        return sum(qualities) / len(qualities), len(qualities)
+
     # ── Внутренние методы ─────────────────────────────────────────────────────
 
     def __compute_composite(self) -> tuple[float, list[float]]:
@@ -543,7 +613,19 @@ class OICompositeStrategy(IStrategy):
         weighted = sum(s * w for s, w in zip(scores, weights))
         weight_sum = sum(weights) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
+        self.__last_regime = regime
+        self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
+        self.__last_composite = composite
         return composite, scores
+
+    def last_snapshot(self) -> dict:
+        """Последний расчёт composite/scores/режима — для архива (archive.py), не торговая логика."""
+        return {
+            "composite": self.__last_composite,
+            "scores": dict(self.__last_scores),
+            "regime": self.__last_regime,
+            "rolling_quality": self.__rolling_quality,
+        }
 
     def __score_oi_squeeze(self) -> float:
         """
