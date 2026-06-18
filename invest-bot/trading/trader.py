@@ -305,7 +305,8 @@ class Trader:
                                 entry_price = float(quotation_to_decimal(candle.close))
                                 stop_price = float(signal_new.stop_loss_level)
                                 risk_qty, risk_size_why = self.__risk.position_size(
-                                    entry_price, stop_price, point_value=1.0,
+                                    entry_price, stop_price,
+                                    point_value=strategy.settings.point_value,
                                     lot=strategy.settings.lot_size, confidence=confidence
                                 )
                                 logger.debug(f"Risk position_size: {risk_size_why}")
@@ -334,20 +335,34 @@ class Trader:
                                     )
                                     if open_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL or \
                                             open_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
+                                        # Фактически исполненные лоты из order_state —
+                                        # при PARTIALLYFILL available_lots != реальность.
+                                        try:
+                                            order_state = self.__order_service.get_order_state(
+                                                account_id, open_order.order_id)
+                                            actual_lots = order_state.lots_executed or available_lots
+                                        except Exception:
+                                            actual_lots = available_lots
+                                        if actual_lots < available_lots:
+                                            logger.warning(
+                                                f"PARTIAL FILL {risk_ticker}: "
+                                                f"запрошено {available_lots}, исполнено {actual_lots}"
+                                            )
                                         open_position = self.__today_trade_results.open_position(
                                             candle.figi,
                                             open_order.order_id,
                                             signal_new
                                         )
                                         self.__risk.open_position(
-                                            risk_ticker, direction, available_lots,
-                                            entry_price, stop_price, point_value=1.0,
+                                            risk_ticker, direction, actual_lots,
+                                            entry_price, stop_price,
+                                            point_value=strategy.settings.point_value,
                                             confidence=confidence
                                         )
                                         self.__blogger.open_position_message(open_position)
                                         logger.info(f"Open position: {open_position}")
                                     else:
-                                        logger.info(f"Open order status failed: {open_order}")
+                                        logger.warning(f"Open order REJECTED/FAILED: {open_order}")
                                 else:
                                     logger.info(f"New signal has been skipped. No available money or risk budget")
                     except Exception as ex:
@@ -460,15 +475,35 @@ class Trader:
             risk_ticker = strategy.settings.ticker
             pos = self.__risk.positions.get(risk_ticker)
             if pos:
-                self.__risk.close_position(risk_ticker, pos.entry_price, point_value=1.0, reason="eod_clear")
+                self.__risk.close_position(
+                    risk_ticker, pos.entry_price,
+                    point_value=strategy.settings.point_value, reason="eod_clear")
 
-        return self.__close_position_by_figi(account_id, strategies.keys(), strategies)
+        result = self.__close_position_by_figi(account_id, strategies.keys(), strategies)
+
+        # Если какая-то позиция не закрылась (halt, rejected) — уведомляем
+        by_figi = {s.settings.figi: s for s in strategies.values()}
+        for figi, strategy in by_figi.items():
+            if figi not in result:
+                # Проверяем, есть ли реально позиция на бирже
+                all_pos = list(self.__operation_service.positions_securities(account_id) or []) + \
+                          list(self.__operation_service.positions_futures(account_id) or [])
+                still_open = [p for p in all_pos if p.figi == figi and p.balance != 0]
+                if still_open:
+                    logger.error(
+                        f"EOD ALERT: позиция {strategy.settings.ticker} ({figi}) "
+                        f"НЕ ЗАКРЫТА (halt/rejected). Баланс={still_open[0].balance}. "
+                        f"Требуется ручное закрытие!"
+                    )
+                    self.__blogger.fail_message()
+        return result
 
     def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> None:
         """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу."""
         risk_ticker = strategy.settings.ticker
         if risk_ticker in self.__risk.positions:
-            self.__risk.close_position(risk_ticker, price, point_value=1.0, reason=reason)
+            self.__risk.close_position(
+                risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
 
     def __check_adaptive_exit(
             self,
@@ -536,8 +571,15 @@ class Trader:
                         if close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL or \
                                 close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
                             result[position.figi] = close_order.order_id
+                            # Уведомляем стратегию о закрытии — обновляет EWA-веса по факту
+                            strategy = strategies.get(position.figi)
+                            if strategy and hasattr(strategy, "notify_position_closed"):
+                                close_price = float(quotation_to_decimal(candle.close)) \
+                                    if hasattr(self, "_last_close_price") else 0.0
+                                last_price = self.__last_prices.get(strategy.settings.ticker, 0.0)
+                                strategy.notify_position_closed(last_price or close_price)
                         else:
-                            logger.info(f"Close order status failed: {close_order}")
+                            logger.warning(f"Close order REJECTED/FAILED: {close_order}")
         return result
 
     def __archive_today(self, today_trade_strategies: dict[str, IStrategy]) -> None:
