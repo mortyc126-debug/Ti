@@ -57,3 +57,10 @@ class DbApiClient:
     def history(self, ticker: str, days: int = 90) -> list[dict]:
         result = self.__request("GET", f"history/{ticker}?days={days}")
         return result.get("history", []) if result else []
+
+    def push_trade(self, ticker: str, **fields) -> None:
+        self.__request("POST", "trade", {"ticker": ticker, **fields})
+
+    def get_trades(self, ticker: str, days: int = 60) -> list[dict]:
+        result = self.__request("GET", f"trades/{ticker}?days={days}")
+        return result.get("trades", []) if result else []

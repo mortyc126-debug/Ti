@@ -4,9 +4,9 @@ import logging
 from tinkoff.invest import Client, TradingSchedule, InstrumentIdType, InstrumentStatus
 from invest_api.invest_target import INVEST_TARGET
 
-from configuration.settings import ShareSettings
+from configuration.settings import ShareSettings, FutureSettings
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
-from invest_api.utils import moex_exchange_name
+from invest_api.utils import moex_exchange_name, moneyvalue_to_decimal
 
 __all__ = ("InstrumentService")
 
@@ -145,6 +145,55 @@ class InstrumentService:
                 ))
         logger.info(f"all_moex_shares: {len(result)} акций {class_code}")
         return result
+
+    @invest_api_retry()
+    @invest_error_logging
+    def future_by_base_ticker(self, base_ticker: str) -> tuple[FutureSettings, str] | None:
+        """
+        Находит ближайший по дате экспирации непросроченный фьючерс на
+        базовый актив (например base_ticker="SBER" -> фьючерс SBRF с
+        ближайшей датой исполнения). ГО берётся из API на момент вызова —
+        контракты заменяются раз в квартал, ГО может меняться день в день.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        best = None
+        best_figi = None
+        best_expiration = None
+
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            for future in client.instruments.futures(
+                    instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
+            ).instruments:
+                if future.basic_asset != base_ticker or not future.api_trade_available_flag:
+                    continue
+                if future.expiration_date <= now:
+                    continue
+                if best_expiration is None or future.expiration_date < best_expiration:
+                    best, best_figi, best_expiration = future, future.figi, future.expiration_date
+
+        if best is None:
+            logger.warning(f"future_by_base_ticker: контракт на {base_ticker} не найден")
+            return None
+
+        margin_per_lot = max(
+            moneyvalue_to_decimal(best.initial_margin_on_buy),
+            moneyvalue_to_decimal(best.initial_margin_on_sell)
+        )
+
+        # стоимость одного пункта цены: сколько рублей даёт движение цены на 1 шаг
+        min_step = moneyvalue_to_decimal(best.min_price_increment)
+        min_step_amount = moneyvalue_to_decimal(best.min_price_increment_amount)
+        point_value = float(min_step_amount / min_step) if min_step and min_step != 0 else 1.0
+
+        return FutureSettings(
+            ticker=best.ticker,
+            lot=best.lot,
+            short_enabled_flag=best.short_enabled_flag,
+            basic_asset=best.basic_asset,
+            expiration_date=best.expiration_date,
+            margin_per_lot=float(margin_per_lot),
+            point_value=point_value
+        ), best_figi
 
     @invest_api_retry()
     @invest_error_logging

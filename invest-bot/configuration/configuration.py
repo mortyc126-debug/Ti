@@ -1,7 +1,7 @@
 from configparser import ConfigParser
 
 from configuration.settings import StrategySettings, AccountSettings, TradingSettings, BlogSettings, \
-    MegaAlertsSettings
+    MegaAlertsSettings, FuturesTradingSettings
 
 __all__ = ("ProgramConfiguration")
 
@@ -57,6 +57,16 @@ class ProgramConfiguration:
         else:
             self.__mega_alerts_settings = MegaAlertsSettings()
 
+        if "FUTURES_TRADING" in config:
+            ft = config["FUTURES_TRADING"]
+            base_tickers = [t.strip() for t in ft.get("BASE_TICKERS", "").split(",") if t.strip()]
+            self.__futures_trading_settings = FuturesTradingSettings(
+                enabled=ft.get("ENABLED", "0") == "1",
+                base_tickers=base_tickers
+            )
+        else:
+            self.__futures_trading_settings = FuturesTradingSettings()
+
         self.__trade_strategy_settings = []
         for strategy_section in config.sections():
             if strategy_section.startswith("STRATEGY_") and not strategy_section.endswith("_SETTINGS"):
@@ -97,3 +107,7 @@ class ProgramConfiguration:
     @property
     def mega_alerts_settings(self) -> MegaAlertsSettings:
         return self.__mega_alerts_settings
+
+    @property
+    def futures_trading_settings(self) -> FuturesTradingSettings:
+        return self.__futures_trading_settings

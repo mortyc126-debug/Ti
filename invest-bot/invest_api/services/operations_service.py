@@ -54,6 +54,16 @@ class OperationService:
 
         return positions.securities if positions else None
 
+    def positions_futures(self, account_id: str) -> list:
+        """
+        :return: All open futures positions for account. Tinkoff API держит
+        фьючерсы в отдельном поле PositionsResponse.futures, НЕ в .securities
+        (даже если позиция открыта тем же post_market_order по тому же figi).
+        """
+        positions = self.__get_positions(account_id)
+
+        return positions.futures if positions else None
+
     @invest_api_retry()
     @invest_error_logging
     def __get_positions(self, account_id: str) -> PositionsResponse:

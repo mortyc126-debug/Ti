@@ -17,6 +17,7 @@ from invest_api.services.market_data_stream_service import MarketDataStreamServi
 from trade_system.strategies.strategy_factory import StrategyFactory
 from trading.trade_service import TradeService
 from news import NewsCollector
+from tg_api.tg_control import run_control_listener
 
 # the configuration file name
 CONFIG_FILE = "settings.ini"
@@ -53,6 +54,7 @@ async def start_asyncio_trading(
     blog_worker_loop: BlogWorker,
     trade_service_loop: TradeService,
     news_collector: NewsCollector | None = None,
+    control_listener_creds: tuple[str, str] | None = None,
 ) -> None:
     # Some asyncio MAGIC for Windows OS
     if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith('win'):
@@ -63,11 +65,17 @@ async def start_asyncio_trading(
     blog_task = asyncio.create_task(blog_worker_loop.worker())
     trade_task = asyncio.create_task(trade_service_loop.worker())
     news_task = asyncio.create_task(news_collector.run_forever()) if news_collector else None
+    control_task = None
+    if control_listener_creds:
+        token, chat_id = control_listener_creds
+        control_task = asyncio.create_task(run_control_listener(token, chat_id))
 
     await blog_task
     await trade_task
     if news_task:
         await news_task
+    if control_task:
+        await control_task
 
 
 def prepare_logs() -> None:
@@ -123,14 +131,19 @@ if __name__ == "__main__":
                 account_settings=config.account_settings,
                 trading_settings=config.trading_settings,
                 strategies=trade_strategies,
-                mega_alerts_settings=config.mega_alerts_settings
+                mega_alerts_settings=config.mega_alerts_settings,
+                futures_trading_settings=config.futures_trading_settings
             )
 
             news_collector = NewsCollector(
                 price_getter=_make_news_price_getter(instrument_service, market_data_service)
             )
 
-            asyncio.run(start_asyncio_trading(blog_worker, trade_service, news_collector))
+            control_creds = (
+                (config.blog_settings.bot_token, config.blog_settings.chat_id)
+                if config.blog_settings.blog_status else None
+            )
+            asyncio.run(start_asyncio_trading(blog_worker, trade_service, news_collector, control_creds))
 
         else:
             logger.critical("Client verification has been failed")

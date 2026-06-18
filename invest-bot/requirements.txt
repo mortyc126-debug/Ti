@@ -1,3 +1,5 @@
 tinkoff-investments
 aiogram
 cerebras_cloud_sdk
+numpy
+scipy

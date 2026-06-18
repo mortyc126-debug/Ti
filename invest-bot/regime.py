@@ -12,9 +12,25 @@ REGIME_WEIGHT_MODS). change_point_score — отдельный лёгкий ме
 голосует за направление, только если на коротком окне найден свежий излом
 тренда (а не просто "цена куда-то едет").
 """
+import os
+import sys
 import statistics
 
 __all__ = ("classify_regime", "REGIME_WEIGHT_MODS", "change_point_score")
+
+# formulas/ лежит рядом с invest-bot/ (на уровень выше cwd). Добавляем в путь
+# один раз, чтобы тяжёлые научные модули (BOCD, Hawkes, RQA, Kalman ...) были
+# импортируемы как из regime.py, так и из oi_composite_strategy.py.
+_FORMULAS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "formulas"))
+if os.path.isdir(_FORMULAS_DIR) and _FORMULAS_DIR not in sys.path:
+    sys.path.insert(0, _FORMULAS_DIR)
+
+# BOCD опционален: если numpy/модуль недоступны — деградируем без падения.
+try:
+    from BOCD import BOCD, NIGParams  # noqa: E402
+    _HAS_BOCD = True
+except Exception:  # ImportError, отсутствие numpy и т.п.
+    _HAS_BOCD = False
 
 REGIMES = ("trending_up", "trending_down", "ranging", "high_vol", "low_vol", "stress")
 
@@ -83,14 +99,49 @@ def _vol_regime(closes: list[float]) -> str:
     return "high_vol" if sd > median_abs * 2.5 else "low_vol"
 
 
-def classify_regime(closes: list[float], volumes: list[float] | None = None) -> str:
+def _bocd_change_prob(closes: list[float]) -> float:
+    """
+    Вероятность того, что режим только что сменился, по последним 50 closes
+    через Bayesian Online Change Point Detection. Возвращает hazard-массу
+    P(r=0) последнего шага ∈ [0,1]; если BOCD недоступен — 0.0 (нейтрально).
+    Чем выше — тем меньше доверия к классифицированному режиму (рынок ломается).
+    """
+    if not _HAS_BOCD or len(closes) < 12:
+        return 0.0
+    try:
+        window = closes[-50:]
+        # beta задаёт ожидаемую дисперсию лог-доходностей режима (внутридневной масштаб).
+        det = BOCD(hazard_rate=1.0 / 100.0,
+                   prior=NIGParams(mu=0.0, kappa=1.0, alpha=2.0, beta=1e-4),
+                   change_threshold=0.15)
+        last = None
+        for i in range(1, len(window)):
+            prev, cur = window[i - 1], window[i]
+            if prev <= 0 or cur <= 0:
+                continue
+            import math as _m
+            last = det.update(_m.log(cur / prev))
+        if last is None:
+            return 0.0
+        # hazard_mass = P(r=0); при свежей смене режима стремится вверх.
+        return float(max(0.0, min(1.0, last.hazard_mass)))
+    except Exception:
+        return 0.0
+
+
+def classify_regime(closes: list[float], volumes: list[float] | None = None) -> tuple[str, float]:
     """
     Порт classifyRegime: упрощённая версия без orderbook/OI-стресс-истории
     (которой нет в самой стратегии) — здесь регим определяется по силе тренда,
     направлению и волатильности самого ценового ряда.
+
+    Возвращает (regime, regime_confidence): confidence ∈ [0,1] — насколько
+    можно доверять классификации. BOCD понижает её на 30%, если на последнем
+    шаге обнаружена свежая смена режима (change_prob > 0.5) — режим, который
+    только что сломался, ещё не устаканился.
     """
     if len(closes) < 10:
-        return "ranging"
+        return "ranging", 1.0
     trend, direction = _trend_strength(closes)
     vol_level = _vol_regime(closes)
 
@@ -101,16 +152,22 @@ def classify_regime(closes: list[float], volumes: list[float] | None = None) -> 
 
     p_stress = min(1.0, (1.0 if vol_level == "high_vol" else 0.0) * 0.5 + vol_spike * 0.5)
     if p_stress >= 0.75:
-        return "stress"
-    if vol_level == "high_vol" and trend < 0.3:
-        return "high_vol"
-    if vol_level == "low_vol" and trend < 0.3:
-        return "low_vol"
-    if trend >= 0.45 and direction > 0:
-        return "trending_up"
-    if trend >= 0.45 and direction < 0:
-        return "trending_down"
-    return "ranging"
+        regime = "stress"
+    elif vol_level == "high_vol" and trend < 0.3:
+        regime = "high_vol"
+    elif vol_level == "low_vol" and trend < 0.3:
+        regime = "low_vol"
+    elif trend >= 0.45 and direction > 0:
+        regime = "trending_up"
+    elif trend >= 0.45 and direction < 0:
+        regime = "trending_down"
+    else:
+        regime = "ranging"
+
+    confidence = 1.0
+    if _bocd_change_prob(closes) > 0.5:
+        confidence *= 0.7  # свежий излом — на 30% меньше доверия к режиму
+    return regime, confidence
 
 
 # ── Детекция точек излома ────────────────────────────────────────────────
