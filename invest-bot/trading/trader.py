@@ -18,6 +18,9 @@ from invest_api.services.market_data_stream_service import MarketDataStreamServi
 from invest_api.utils import candle_to_historiccandle
 from trade_system.signal import SignalType
 from trade_system.strategies.base_strategy import IStrategy
+from history import HistoryStore
+from calibration import PercentileCalibrator
+from timeframe import MultiTfBuffer
 from trading.trade_results import TradeResults
 from configuration.settings import TradingSettings, MegaAlertsSettings, StrategySettings, FuturesTradingSettings
 from trade_system.strategies.strategy_factory import StrategyFactory
@@ -75,9 +78,13 @@ class Trader:
         self.__mega_alerts_task: asyncio.Task | None = None
         self.__archive = ArchiveStore()
         self.__trading_settings: TradingSettings = TradingSettings()
-        # Объёмы последних закрытых свечей по тикеру — основа для оценки
-        # размера позиции по ликвидности (см. __liquidity_lots_cap).
         self.__candle_volumes: dict[str, deque] = {}
+        # Аналитическая история: per-trade attribution, перцентильная калибровка
+        self.__history = HistoryStore()
+        self.__calibrator = PercentileCalibrator()
+        self.__tf_buffer = MultiTfBuffer()
+        # Трекинг MFE/MAE для открытых позиций: {figi: {entry, direction, max_fav, max_adv}}
+        self.__pos_tracking: dict[str, dict] = {}
 
     async def trade_day(
             self,
@@ -146,6 +153,10 @@ class Trader:
                 strategy.set_retail_contra_provider(self.__oi_layers.retail_contra_score)
             if hasattr(strategy, "set_tradestats_provider"):
                 strategy.set_tradestats_provider(self.__tradestats.score)
+            # Инжекция аналитической истории и калибратора — прогревает
+            # перцентильные буферы и загружает динамические режимные моды.
+            if hasattr(strategy, "set_history"):
+                strategy.set_history(self.__history, self.__calibrator)
 
         rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
         logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
@@ -224,7 +235,38 @@ class Trader:
                 logger.debug("Skip candle from past.")
                 continue
 
-            self.__last_prices[strategies[candle.figi].settings.ticker] = float(quotation_to_decimal(candle.close))
+            ticker = strategies[candle.figi].settings.ticker
+            cur_price = float(quotation_to_decimal(candle.close))
+            self.__last_prices[ticker] = cur_price
+
+            # Обновляем MFE/MAE трекинг для открытой позиции
+            pt = self.__pos_tracking.get(candle.figi)
+            if pt:
+                high_p = float(quotation_to_decimal(candle.high))
+                low_p = float(quotation_to_decimal(candle.low))
+                if pt["direction"] == "LONG":
+                    pt["max_fav"] = max(pt["max_fav"], high_p)
+                    pt["max_adv"] = min(pt["max_adv"], low_p)
+                else:
+                    pt["max_fav"] = min(pt["max_fav"], low_p)
+                    pt["max_adv"] = max(pt["max_adv"], high_p)
+
+            # Обновляем tf-буфер и передаём режимы по тф в стратегию
+            _new5, _new1h = self.__tf_buffer.push(candle)
+            if hasattr(strategies[candle.figi], "set_tf_regimes"):
+                tf_regimes = {"1min": strategies[candle.figi].last_snapshot().get("regime", "")}
+                if self.__tf_buffer.has_5min(candle.figi):
+                    from regime import classify_regime as _cr
+                    c5 = self.__tf_buffer.closes_5min(candle.figi)
+                    if len(c5) >= 5:
+                        r5, _ = _cr(c5, [])
+                        tf_regimes["5min"] = r5
+                if self.__tf_buffer.has_1h(candle.figi):
+                    c1h = self.__tf_buffer.closes_1h(candle.figi)
+                    if len(c1h) >= 3:
+                        r1h, _ = _cr(c1h, [])
+                        tf_regimes["1h"] = r1h
+                strategies[candle.figi].set_tf_regimes(tf_regimes)
 
             # check price from candle for take or stop price levels
             current_trade_order = self.__today_trade_results.get_current_trade_order(candle.figi)
@@ -354,6 +396,13 @@ class Trader:
                                         )
                                         self.__blogger.open_position_message(open_position)
                                         logger.info(f"Open position: {open_position}")
+                                        # Запускаем MFE/MAE трекинг для этой позиции
+                                        self.__pos_tracking[candle.figi] = {
+                                            "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
+                                            "entry": entry_price,
+                                            "max_fav": entry_price,
+                                            "max_adv": entry_price,
+                                        }
                                     else:
                                         logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
                                 else:
@@ -674,6 +723,34 @@ class Trader:
         if close_order_id:
             trade_order = self.__today_trade_results.close_position(figi, close_order_id)
             self.__blogger.close_position_message(trade_order)
+            # Передаём реальные MFE/MAE в стратегию при закрытии
+            self.__notify_closed_with_tracking(figi, strategies)
+
+    def __notify_closed_with_tracking(
+            self,
+            figi: str,
+            strategies: dict[str, IStrategy]
+    ) -> None:
+        """
+        При закрытии позиции вычисляет реальные MFE/MAE из трекинга цен и
+        передаёт их в стратегию вместо приближённого расчёта по after_candles.
+        """
+        strategy = strategies.get(figi)
+        if strategy is None or not hasattr(strategy, "notify_position_closed"):
+            return
+        pt = self.__pos_tracking.pop(figi, None)
+        exit_price = self.__last_prices.get(strategy.settings.ticker, 0.0)
+        if pt and pt["entry"] > 0 and exit_price > 0:
+            ep = pt["entry"]
+            if pt["direction"] == "LONG":
+                mfe = max(0.0, (pt["max_fav"] - ep) / ep)
+                mae = max(0.0, (ep - pt["max_adv"]) / ep)
+            else:
+                mfe = max(0.0, (ep - pt["max_fav"]) / ep)
+                mae = max(0.0, (pt["max_adv"] - ep) / ep)
+            strategy.notify_position_closed(exit_price=exit_price, mfe=mfe, mae=mae)
+        else:
+            strategy.notify_position_closed()
 
     def __close_position_by_figi(
             self,
@@ -705,10 +782,7 @@ class Trader:
                             # Уведомляем стратегию о закрытии — обновляет EWA-веса по факту
                             strategy = strategies.get(position.figi)
                             if strategy and hasattr(strategy, "notify_position_closed"):
-                                close_price = float(quotation_to_decimal(candle.close)) \
-                                    if hasattr(self, "_last_close_price") else 0.0
-                                last_price = self.__last_prices.get(strategy.settings.ticker, 0.0)
-                                strategy.notify_position_closed(last_price or close_price)
+                                self.__notify_closed_with_tracking(position.figi, strategies)
                         else:
                             logger.warning(f"Close order REJECTED/FAILED: {close_order}")
         return result
@@ -741,6 +815,16 @@ class Trader:
                 regime=snapshot["regime"],
                 rolling_quality=snapshot["rolling_quality"],
                 live=not signal_only
+            )
+            # Дублируем в HistoryStore — там хранятся ещё и сделки с attribution
+            self.__history.record_daily(
+                strategy.settings.ticker,
+                composite=snapshot["composite"],
+                scores=snapshot["scores"],
+                regime=snapshot["regime"],
+                regime_confidence=snapshot.get("regime_confidence", 1.0),
+                rolling_quality=snapshot["rolling_quality"],
+                live=not signal_only,
             )
             if db.configured:
                 db.push_snapshot(

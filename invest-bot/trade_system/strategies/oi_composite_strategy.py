@@ -797,6 +797,13 @@ class OICompositeStrategy(IStrategy):
         self.__last_regime: str = "ranging"
         self.__last_scores: dict[str, float] = {}
         self.__last_composite: float = 0.0
+        # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
+        self.__history = None
+        self.__calibrator = None
+        # Динамические REGIME_WEIGHT_MODS из истории (обновляются при set_history)
+        self.__dynamic_regime_mods: dict[str, dict[str, float]] = {}
+        # tf-регимы от MultiTfBuffer (обновляются трейдером на каждой свече)
+        self.__tf_regimes: dict[str, str] = {}
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -858,6 +865,57 @@ class OICompositeStrategy(IStrategy):
         """provider(ticker) -> score [-1,1], межинструментальный сигнал (indicators_multi.py)."""
         self.__multi_ticker_provider = provider
 
+    def set_history(self, history, calibrator) -> None:
+        """
+        Инжектирует HistoryStore и PercentileCalibrator.
+        После этого:
+        - composite строится на перцентильно-нормализованных скорах
+        - REGIME_WEIGHT_MODS заменяются динамическими (из истории сделок)
+        - notify_position_closed получает реальные MFE/MAE и пишет в историю
+        """
+        self.__history = history
+        self.__calibrator = calibrator
+        ticker = self.__settings.ticker
+        # Прогрев калибратора из истории дневных скоров
+        if calibrator is not None and history is not None:
+            method_scores = {
+                name: history.daily_scores(ticker, name, window_days=90)
+                for name in ALL_METHOD_NAMES
+            }
+            calibrator.warm_up(ticker, {k: v for k, v in method_scores.items() if v})
+        # Загрузка динамических режимных модификаторов из истории сделок
+        self._reload_dynamic_regime_mods()
+
+    def _reload_dynamic_regime_mods(self) -> None:
+        """Пересчитывает per-regime accuracy из истории и сохраняет в __dynamic_regime_mods."""
+        if self.__history is None:
+            return
+        ticker = self.__settings.ticker
+        regime_perf = self.__history.regime_method_performance(ticker, window_days=90)
+        if not regime_perf:
+            return
+        # Преобразуем avg_quality → мультипликатор веса: 0.5 = нейтраль → 1.0,
+        # 0.8 = хороший → 1.6, 0.2 = плохой → 0.4. Диапазон [0.2, 2.0].
+        mods: dict[str, dict[str, float]] = {}
+        for regime, methods in regime_perf.items():
+            mods[regime] = {
+                method: max(0.2, min(2.0, quality * 2.0))
+                for method, quality in methods.items()
+            }
+        self.__dynamic_regime_mods = mods
+        logger.info(
+            f"{self.__settings.ticker}: загружены динамические режимные моды "
+            f"для {len(mods)} режимов из истории"
+        )
+
+    def set_tf_regimes(self, tf_regimes: dict[str, str]) -> None:
+        """
+        Обновляет текущие режимы по таймфреймам от MultiTfBuffer.
+        tf_regimes = {"1min": "trending_up", "5min": "ranging", "1h": "trending_up"}
+        Используется для записи tf-контекста в историю сделок.
+        """
+        self.__tf_regimes = tf_regimes
+
     # ── Публичный метод — вызывается на каждой свече ─────────────────────────
 
     def analyze_candles(self, candles: list[HistoricCandle]) -> Optional[Signal]:
@@ -915,10 +973,19 @@ class OICompositeStrategy(IStrategy):
         take_mult, stop_mult = self.__take_stop_mults(direction, atr_pct)
         return self.__make_signal(direction, take_mult, stop_mult, scores)
 
-    def notify_position_closed(self) -> None:
-        """Вызвать извне при закрытии позиции — записываем исход."""
+    def notify_position_closed(
+            self,
+            exit_price: float = 0.0,
+            mfe: float = 0.0,
+            mae: float = 0.0,
+    ) -> None:
+        """
+        Вызвать извне при закрытии позиции.
+        exit_price, mfe, mae — реальные значения от трейдера (доли от entry).
+        Если переданы — используются вместо после-свечного расчёта OpenTrade.
+        """
         if self.__open_trade:
-            self.__record_outcome()
+            self.__record_outcome(exit_price=exit_price, mfe=mfe, mae=mae)
 
     def warmup(self, candles: list[HistoricCandle]) -> None:
         """
@@ -995,28 +1062,50 @@ class OICompositeStrategy(IStrategy):
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [change_point_score(closes), self.__score_multi_ticker()]
 
-        # classify_regime теперь возвращает (режим, уверенность-в-режиме):
-        # BOCD понижает уверенность при свежем изломе.
+        # classify_regime возвращает (режим, уверенность-в-режиме).
         regime, regime_conf = classify_regime(closes, volumes)
-        regime_mods = REGIME_WEIGHT_MODS.get(regime, {})
+
+        # Перцентильная нормализация: если калибратор прогрет — приводим каждый
+        # скор к шкале [-1, 1] относительно его исторического распределения.
+        # Без нормализации "громкие" методы (большой масштаб) доминируют случайно.
+        ticker = self.__settings.ticker
+        if self.__calibrator is not None:
+            norm_scores = []
+            for name, s in zip(ALL_METHOD_NAMES, scores):
+                self.__calibrator.update(ticker, name, s)
+                if self.__calibrator.ready(ticker, name):
+                    norm_scores.append(self.__calibrator.normalize(ticker, name, s))
+                else:
+                    norm_scores.append(s)
+            scores_for_composite = norm_scores
+        else:
+            scores_for_composite = scores
+
+        # Режимные мультипликаторы: динамические (из истории) в приоритете
+        # над захардкоженными REGIME_WEIGHT_MODS. Если динамических нет —
+        # откат на статику (обратная совместимость).
+        if self.__dynamic_regime_mods.get(regime):
+            dyn = self.__dynamic_regime_mods[regime]
+            # Берём динамику для методов с историей, для остальных — статику
+            static = REGIME_WEIGHT_MODS.get(regime, {})
+            regime_mods = {name: dyn.get(name, static.get(name, 1.0)) for name in ALL_METHOD_NAMES}
+        else:
+            regime_mods = REGIME_WEIGHT_MODS.get(regime, {})
+
         weights = [self.__weights[name].weight * regime_mods.get(name, 1.0) for name in ALL_METHOD_NAMES]
 
-        # взвешенная сумма; VOL_MOMENTUM усиливается режимом тренда
-        weighted = sum(s * w for s, w in zip(scores, weights))
+        weighted = sum(s * w for s, w in zip(scores_for_composite, weights))
         weight_sum = sum(weights) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
 
-        # RQA: детерминированность ряда (DET) масштабирует уверенность —
-        # высокая предсказуемость усиливает сигнал, хаос ослабляет.
         confidence_mult = self.__rqa_confidence_mult(closes)
-        # WAVELET: доминантный масштаб CWT (короткий шум ослабляем, длинный цикл усиливаем).
         confidence_mult *= wavelet_confidence_mult(closes)
-        # регим-уверенность от BOCD (свежий излом → меньше доверия)
         confidence_mult *= regime_conf
         composite *= confidence_mult
 
         self.__last_regime = regime
         self.__regime_confidence = regime_conf
+        # __last_scores хранит сырые скоры — для архива и диагностики
         self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
         self.__last_composite = composite
         return composite, scores
@@ -1168,14 +1257,43 @@ class OICompositeStrategy(IStrategy):
         logger.info(f"OICompositeStrategy signal: {signal} scores={method_scores}")
         return signal
 
-    def __record_outcome(self) -> None:
-        """Записать MFE/MAE, обновить веса EWA."""
+    def __record_outcome(
+            self,
+            exit_price: float = 0.0,
+            mfe: float = 0.0,
+            mae: float = 0.0,
+    ) -> None:
+        """
+        Записать MFE/MAE, обновить веса EWA, сохранить сделку в историю.
+        Если exit_price/mfe/mae переданы трейдером — используем их (реальные);
+        иначе считаем из after_candles (предположительные, как раньше).
+        """
         if not self.__open_trade:
             return
 
-        quality = self.__open_trade.calc_quality()
+        # Приоритет: реальные значения от трейдера
+        if mfe > 0 or mae > 0:
+            quality = mfe / (mfe + mae + 1e-8)
+            real_exit = exit_price
+        else:
+            quality = self.__open_trade.calc_quality()
+            real_exit = 0.0
+            # Восстановить mfe/mae из after_candles для записи в историю
+            ep = float(self.__open_trade.entry_price)
+            mfe = mae = 0.0
+            for c in self.__open_trade.after_candles:
+                h = float(quotation_to_decimal(c.high))
+                lo = float(quotation_to_decimal(c.low))
+                if self.__open_trade.signal_type == SignalType.LONG:
+                    mfe = max(mfe, (h - ep) / ep)
+                    mae = max(mae, (ep - lo) / ep)
+                else:
+                    mfe = max(mfe, (ep - lo) / ep)
+                    mae = max(mae, (h - ep) / ep)
+
         logger.info(
             f"{self.__settings.figi} trade closed: quality={quality:.3f} "
+            f"mfe={mfe:.4f} mae={mae:.4f} "
             f"bars={len(self.__open_trade.after_candles)}"
         )
 
@@ -1189,6 +1307,23 @@ class OICompositeStrategy(IStrategy):
                       (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
             self.__weights[name].update(target)
+
+        # Сохранить сделку в историю с attribution по методам
+        if self.__history is not None:
+            ep = float(self.__open_trade.entry_price)
+            self.__history.record_trade(
+                self.__settings.ticker,
+                direction="LONG" if self.__open_trade.signal_type == SignalType.LONG else "SHORT",
+                entry_price=ep,
+                exit_price=real_exit if real_exit > 0 else ep,
+                mfe=mfe,
+                mae=mae,
+                method_scores=dict(self.__open_trade.method_scores),
+                regime=self.__last_regime,
+                tf_regimes=dict(self.__tf_regimes) if self.__tf_regimes else None,
+            )
+            # Обновляем динамические режимные моды после каждой сделки
+            self._reload_dynamic_regime_mods()
 
         self.__open_trade = None
         self.__save_weights()
