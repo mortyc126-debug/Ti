@@ -49,7 +49,9 @@ class ProgramConfiguration:
                 max_lots_per_order=int(ma.get("MAX_LOTS_PER_ORDER", "1")),
                 history_days=int(ma.get("HISTORY_DAYS", "5")),
                 backtest_quality_min=float(ma.get("BACKTEST_QUALITY_MIN", "0.55")),
-                backtest_min_trades=int(ma.get("BACKTEST_MIN_TRADES", "3"))
+                backtest_min_trades=int(ma.get("BACKTEST_MIN_TRADES", "3")),
+                db_api_url=config["DB_API"].get("URL", "") if "DB_API" in config else "",
+                db_api_key=config["DB_API"].get("API_KEY", "") if "DB_API" in config else ""
             )
         else:
             self.__mega_alerts_settings = MegaAlertsSettings()

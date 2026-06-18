@@ -162,6 +162,13 @@ invest-bot/
                                   рынку (MOEX AlgoPack alerts.json)
   archive.py                      ← персистентный архив суточных снэпшотов
                                   композита по тикерам (data/archive.json)
+  collector_worker.py             ← отдельный суточный сбор+расчёт по ВСЕМ
+                                  акциям MOEX, шлёт в общую базу (cf-collector/)
+  db_api_client.py                ← HTTP-клиент к общей базе (cf-collector/)
+  cf-collector/
+    worker.js, wrangler.toml,
+    schema.sql                    ← Cloudflare Worker + D1 — общая база
+                                  расчётов, читает/пишет и бот, и collector_worker.py
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
   data/risk_state.json,
@@ -314,6 +321,55 @@ MOEX AlgoPack `datashop/algopack/{eq,fo}/alerts.json` отдаёт срез ан
 история хранится `DAYS_KEPT=90` дней на тикер. `ArchiveStore.history(ticker)`
 отдаёт всю накопленную историю по тикеру, `ArchiveStore.tickers()` — список
 тикеров в архиве.
+
+`archive.py` — локальный архив только по тикерам, которые этот конкретный
+бот сегодня считал (3-8 штук). Для расчёта по **всему рынку** есть отдельный
+слой ниже.
+
+## Общая база по всему рынку (`collector_worker.py` + `cf-collector/`)
+
+Идея: не нагружать торговый бот ежедневным расчётом по всем акциям MOEX —
+для этого есть отдельный процесс, который считает всё заранее и кладёт в
+общую базу, а торговый бот просто спрашивает у неё готовый результат и
+досчитывает только то, чего там не хватает (например, сегодняшние минуты).
+
+**`collector_worker.py`** — отдельный скрипт, НЕ часть `main.py`, запускается
+своим cron/systemd timer'ом раз в день (вне торговых часов):
+1. `InstrumentService.all_moex_shares()` — список всех торгуемых через API
+   акций TQBR (не только тикеры из `settings.ini` или сегодняшних
+   MEGA-ALERTS — весь рынок);
+2. для каждой акции: `MarketDataService.get_candles_history` (история за
+   `[DB_API] HISTORY_DAYS`), `OICompositeStrategy.warmup` + расчёт композита
+   + `backtest_quality` — тот же код, что использует сам бот;
+3. результат (`composite`, разбор по 29 методам, режим, `backtest_quality`,
+   число виртуальных сделок) шлёт `POST /snapshot` в Cloudflare Worker
+   (`cf-collector/worker.js`), который пишет в D1 (`cf-collector/schema.sql`).
+
+**`cf-collector/`** — Cloudflare Worker + D1, общая база, без бандлера
+(один `worker.js`), деплоится `wrangler deploy` из этой папки:
+- `POST /snapshot` — upsert снэпшота по тикеру+дате;
+- `GET /latest/:ticker` — последний снэпшот по тикеру;
+- `GET /history/:ticker?days=N` — история по тикеру;
+- `GET /tickers` — все тикеры, по которым есть данные.
+Авторизация — заголовок `X-API-Key`, секрет задаётся `wrangler secret put API_KEY`
+(не хранится в репозитории).
+
+**`db_api_client.py`** — общий тонкий HTTP-клиент к этому Worker'у,
+использует и `collector_worker.py` (пишет), и `trading/trader.py` (читает).
+
+**Как бот использует это** (`Trader.__build_dynamic_strategies`): при
+появлении нового тикера из MEGA-ALERTS бот сначала спрашивает
+`db.latest(ticker)` — если там уже есть снэпшот за сегодня с посчитанным
+`backtest_quality`, использует его как есть и пропускает локальный
+`backtest_quality` (только `warmup` коротким окном для живых сигналов).
+Если в базе ничего свежего нет — считает сам, как раньше (полная история
++ локальный бэктест). После каждого торгового дня бот также пишет свои
+собственные снэпшоты обратно в эту же базу (`__archive_today`) — общая
+база растёт и от collector_worker.py, и от самого бота.
+
+Настройка — секция `[DB_API]` в `settings.ini` (`URL`, `API_KEY`); если
+`URL` пустой — вся эта база не используется, бот считает всё сам локально,
+поведение как до появления этого слоя.
 
 ## Адаптивный выход (ADAPTIVE_EXIT=1)
 

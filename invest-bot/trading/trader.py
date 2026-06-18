@@ -25,6 +25,7 @@ from oi_layers import OiLayersService
 from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
+from db_api_client import DbApiClient
 
 __all__ = ("Trader")
 
@@ -489,8 +490,12 @@ class Trader:
         Конец торгового дня — кладём в data/archive.json (archive.py) итоговый
         снэпшок композита по каждому тикеру, который сегодня считался, не
         только по тем, что реально торговались. Это и есть "база данных" с
-        расчётами, а не только живая память процесса.
+        расчётами, а не только живая память процесса. Дополнительно, если
+        настроена общая база (DB_API), отправляем тот же снэпшок туда —
+        чтобы collector_worker.py и этот бот писали в одно общее хранилище.
         """
+        db = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         for strategy in today_trade_strategies.values():
             if not hasattr(strategy, "last_snapshot"):
                 continue
@@ -509,6 +514,16 @@ class Trader:
                 rolling_quality=snapshot["rolling_quality"],
                 live=not signal_only
             )
+            if db.configured:
+                db.push_snapshot(
+                    strategy.settings.ticker,
+                    date=today,
+                    composite=snapshot["composite"],
+                    scores=snapshot["scores"],
+                    regime=snapshot["regime"],
+                    rolling_quality=snapshot["rolling_quality"],
+                    live=not signal_only
+                )
 
     def __build_dynamic_strategies(self, tickers: list[str]) -> list[IStrategy]:
         """
@@ -518,13 +533,20 @@ class Trader:
         тикеров). Список не сохраняется на диск — пересобирается каждый
         торговый день из текущего срез аномалий (расчёты — в data/archive.json).
 
-        Перед включением реальной торговли: запрашиваем историю свечей
+        Перед включением реальной торговли: сначала спрашиваем общую базу
+        расчётов (DB_API, Cloudflare D1) — если там уже есть свежий (за
+        сегодня) бэктест по тикеру от collector_worker.py, используем его
+        качество напрямую, не считая всё заново. Если в базе нет свежих
+        данных — достраиваем недостающее сами: запрашиваем историю свечей
         (HISTORY_DAYS дней), прогреваем стратегию ей же (warmup) и считаем
-        backtest_quality — если модели на истории дали >= BACKTEST_MIN_TRADES
-        виртуальных сделок с quality >= BACKTEST_QUALITY_MIN, разрешаем
-        реальные ордера (SIGNAL_ONLY=0), иначе тикер только шлёт сигналы.
+        backtest_quality локально. В обоих случаях: если на истории
+        >= BACKTEST_MIN_TRADES виртуальных сделок с quality >=
+        BACKTEST_QUALITY_MIN, разрешаем реальные ордера (SIGNAL_ONLY=0),
+        иначе тикер только шлёт сигналы.
         """
         cfg = self.__mega_alerts_settings
+        db = DbApiClient(cfg.db_api_url, cfg.db_api_key)
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         result: list[IStrategy] = []
         for ticker in tickers[:cfg.max_tickers]:
             resolved = self.__instrument_service.share_by_ticker(ticker)
@@ -558,11 +580,21 @@ class Trader:
                 logger.warning(f"MEGA-ALERTS: история свечей {ticker} не получена: {repr(ex)}")
                 candles = []
 
-            quality, n_trades = 0.5, 0
             if candles and hasattr(strategy, "warmup"):
                 strategy.warmup(candles)
-            if candles and hasattr(strategy, "backtest_quality"):
+
+            db_snapshot = db.latest(ticker) if db.configured else None
+            from_db = bool(db_snapshot and db_snapshot.get("date") == today
+                            and db_snapshot.get("backtest_trades") is not None)
+
+            if from_db:
+                quality = db_snapshot.get("backtest_quality") or 0.5
+                n_trades = db_snapshot.get("backtest_trades") or 0
+                logger.info(f"MEGA-ALERTS: {ticker} — беру расчёт из общей базы, локальный бэктест не считаю")
+            elif candles and hasattr(strategy, "backtest_quality"):
                 quality, n_trades = strategy.backtest_quality(candles)
+            else:
+                quality, n_trades = 0.5, 0
 
             live = n_trades >= cfg.backtest_min_trades and quality >= cfg.backtest_quality_min
             if live and hasattr(strategy, "set_signal_only"):

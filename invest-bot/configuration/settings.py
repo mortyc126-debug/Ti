@@ -56,6 +56,8 @@ class MegaAlertsSettings:
     history_days: int = 5
     backtest_quality_min: float = 0.55
     backtest_min_trades: int = 3
+    db_api_url: str = ""
+    db_api_key: str = ""
 
 
 @dataclass(eq=False, repr=True)

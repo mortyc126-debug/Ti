@@ -119,6 +119,35 @@ class InstrumentService:
 
     @invest_api_retry()
     @invest_error_logging
+    def all_moex_shares(self, class_code: str = "TQBR") -> list[tuple[ShareSettings, str]]:
+        """
+        :return: Все торгуемые через API акции основного режима MOEX (TQBR) —
+        для воркера полного сбора по рынку (collector_worker.py).
+        """
+        result: list[tuple[ShareSettings, str]] = []
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            for share in client.instruments.shares(
+                    instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
+            ).instruments:
+                if share.class_code != class_code or not share.api_trade_available_flag:
+                    continue
+                result.append((
+                    ShareSettings(
+                        ticker=share.ticker,
+                        lot=share.lot,
+                        short_enabled_flag=share.short_enabled_flag,
+                        otc_flag=share.otc_flag,
+                        buy_available_flag=share.buy_available_flag,
+                        sell_available_flag=share.sell_available_flag,
+                        api_trade_available_flag=share.api_trade_available_flag
+                    ),
+                    share.figi
+                ))
+        logger.info(f"all_moex_shares: {len(result)} акций {class_code}")
+        return result
+
+    @invest_api_retry()
+    @invest_error_logging
     def __currencies(self) -> None:
         with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             for cur in client.instruments.currencies(
