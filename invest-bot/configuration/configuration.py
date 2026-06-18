@@ -1,6 +1,7 @@
 from configparser import ConfigParser
 
-from configuration.settings import StrategySettings, AccountSettings, TradingSettings, BlogSettings
+from configuration.settings import StrategySettings, AccountSettings, TradingSettings, BlogSettings, \
+    MegaAlertsSettings
 
 __all__ = ("ProgramConfiguration")
 
@@ -33,6 +34,22 @@ class ProgramConfiguration:
             stop_trade_before_close=int(config["TRADING_SETTINGS"]["STOP_TRADE_BEFORE_EXCHANGE_CLOSE_SECONDS"]),
             stop_signals_before_close=int(config["TRADING_SETTINGS"]["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"])
         )
+
+        if "MEGA_ALERTS" in config:
+            ma = config["MEGA_ALERTS"]
+            self.__mega_alerts_settings = MegaAlertsSettings(
+                auto_trade=ma.get("AUTO_TRADE", "0") == "1",
+                max_tickers=int(ma.get("MAX_TICKERS", "5")),
+                signal_threshold=ma.get("SIGNAL_THRESHOLD", "0.25"),
+                long_take=ma.get("LONG_TAKE", "1.015"),
+                long_stop=ma.get("LONG_STOP", "0.985"),
+                short_take=ma.get("SHORT_TAKE", "0.985"),
+                short_stop=ma.get("SHORT_STOP", "1.015"),
+                signal_only=ma.get("SIGNAL_ONLY", "1"),
+                max_lots_per_order=int(ma.get("MAX_LOTS_PER_ORDER", "1"))
+            )
+        else:
+            self.__mega_alerts_settings = MegaAlertsSettings()
 
         self.__trade_strategy_settings = []
         for strategy_section in config.sections():
@@ -70,3 +87,7 @@ class ProgramConfiguration:
     @property
     def trading_settings(self) -> TradingSettings:
         return self.__trading_settings
+
+    @property
+    def mega_alerts_settings(self) -> MegaAlertsSettings:
+        return self.__mega_alerts_settings

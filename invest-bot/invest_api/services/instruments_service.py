@@ -88,6 +88,37 @@ class InstrumentService:
 
     @invest_api_retry()
     @invest_error_logging
+    def share_by_ticker(self, ticker: str, class_code: str = "TQBR") -> tuple[ShareSettings, str] | None:
+        """
+        :return: Share settings by MOEX ticker (e.g. для тикеров, найденных
+        вне settings.ini — через MEGA-ALERTS), None если не нашли/не акция.
+        """
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            logger.debug(f"ShareBy ticker: {ticker}:")
+
+            try:
+                share = client.instruments.share_by(
+                    id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_TICKER,
+                    class_code=class_code,
+                    id=ticker
+                ).instrument
+            except Exception as ex:
+                logger.warning(f"share_by_ticker {ticker} failed: {repr(ex)}")
+                return None
+            logger.debug(f"{share}")
+
+            return ShareSettings(
+                ticker=share.ticker,
+                lot=share.lot,
+                short_enabled_flag=share.short_enabled_flag,
+                otc_flag=share.otc_flag,
+                buy_available_flag=share.buy_available_flag,
+                sell_available_flag=share.sell_available_flag,
+                api_trade_available_flag=share.api_trade_available_flag
+            ), share.figi
+
+    @invest_api_retry()
+    @invest_error_logging
     def __currencies(self) -> None:
         with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             for cur in client.instruments.currencies(

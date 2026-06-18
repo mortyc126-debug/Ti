@@ -18,7 +18,8 @@ from invest_api.utils import candle_to_historiccandle
 from trade_system.signal import SignalType
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trade_results import TradeResults
-from configuration.settings import TradingSettings
+from configuration.settings import TradingSettings, MegaAlertsSettings, StrategySettings
+from trade_system.strategies.strategy_factory import StrategyFactory
 from risk import RiskManager
 from oi_layers import OiLayersService
 from tradestats import TradeStatsService
@@ -47,7 +48,8 @@ class Trader:
             order_service: OrderService,
             stream_service: MarketDataStreamService,
             market_data_service: MarketDataService,
-            blogger: Blogger
+            blogger: Blogger,
+            mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings()
     ) -> None:
         self.__today_trade_results: TradeResults = None
         self.__client_service = client_service
@@ -57,6 +59,7 @@ class Trader:
         self.__stream_service = stream_service
         self.__market_data_service = market_data_service
         self.__blogger = blogger
+        self.__mega_alerts_settings = mega_alerts_settings
         self.__risk = RiskManager()
         self.__last_prices: dict[str, float] = {}
         self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
@@ -80,20 +83,36 @@ class Trader:
             logger.info("No shares to trade today.")
             return None
 
-        self.__clear_all_positions(account_id, today_trade_strategies)
         self.__risk.equity_getter = lambda: float(self.__operation_service.available_rub_on_account(account_id) or 0)
 
-        tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
-        self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
-        self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
+        configured_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         if self.__mega_alerts_task is None:
             # MEGA-ALERTS живёт дольше одного торгового дня — обновляется
             # раз в сутки по ВСЕМУ рынку, не только по сегодняшним тикерам.
             self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
         await self.__mega_alerts.refresh_once()
-        tracked_hits = [t for t in tracked_tickers if self.__mega_alerts.alerts_for(t)]
-        extra_tickers = [t for t in self.__mega_alerts.tickers_today() if t not in tracked_tickers]
-        self.__blogger.mega_alerts_message(tracked_hits, extra_tickers)
+        tracked_hits = [t for t in configured_tickers if self.__mega_alerts.alerts_for(t)]
+        candidate_tickers = [t for t in self.__mega_alerts.tickers_today("eq") if t not in configured_tickers]
+
+        added_strategies: dict[str, IStrategy] = {}
+        if self.__mega_alerts_settings.auto_trade and candidate_tickers:
+            dynamic_strategies = self.__build_dynamic_strategies(candidate_tickers)
+            if dynamic_strategies:
+                added_strategies = self.__get_today_strategies(dynamic_strategies)
+                today_trade_strategies.update(added_strategies)
+                logger.info(
+                    f"MEGA-ALERTS: добавлены в торговлю на сегодня "
+                    f"{[s.settings.ticker for s in added_strategies.values()]}"
+                )
+        self.__blogger.mega_alerts_message(
+            tracked_hits, [t for t in candidate_tickers if t not in [s.settings.ticker for s in added_strategies.values()]]
+        )
+
+        self.__clear_all_positions(account_id, today_trade_strategies)
+
+        tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
+        self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
+        self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
 
         for strategy in today_trade_strategies.values():
             if hasattr(strategy, "set_squeeze_provider"):
@@ -455,6 +474,43 @@ class Trader:
                             result[position.figi] = close_order.order_id
                         else:
                             logger.info(f"Close order status failed: {close_order}")
+        return result
+
+    def __build_dynamic_strategies(self, tickers: list[str]) -> list[IStrategy]:
+        """
+        Создаёт OICompositeStrategy на лету для тикеров, которые сегодня
+        отметил MOEX MEGA-ALERTS, но которых нет в settings.ini. Параметры —
+        дефолтные из [MEGA_ALERTS] (тот же шаблон, что у сконфигурированных
+        тикеров). Никак не сохраняется на диск — список пересобирается
+        каждый торговый день из текущего срез аномалий.
+        """
+        cfg = self.__mega_alerts_settings
+        result: list[IStrategy] = []
+        for ticker in tickers[:cfg.max_tickers]:
+            resolved = self.__instrument_service.share_by_ticker(ticker)
+            if not resolved:
+                logger.debug(f"MEGA-ALERTS: не удалось определить figi для {ticker}, пропуск")
+                continue
+            share_settings, figi = resolved
+            settings = StrategySettings(
+                name="OICompositeStrategy",
+                figi=figi,
+                ticker=ticker,
+                max_lots_per_order=cfg.max_lots_per_order,
+                settings={
+                    "SIGNAL_THRESHOLD": cfg.signal_threshold,
+                    "LONG_TAKE": cfg.long_take,
+                    "LONG_STOP": cfg.long_stop,
+                    "SHORT_TAKE": cfg.short_take,
+                    "SHORT_STOP": cfg.short_stop,
+                    "SIGNAL_ONLY": cfg.signal_only,
+                },
+                lot_size=share_settings.lot,
+                short_enabled_flag=share_settings.short_enabled_flag
+            )
+            strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
+            if strategy:
+                result.append(strategy)
         return result
 
     def __get_today_strategies(self, strategies: list[IStrategy]) -> dict[str, IStrategy]:
