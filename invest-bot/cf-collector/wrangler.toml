@@ -1,0 +1,11 @@
+name = "invest-bot-collector"
+main = "worker.js"
+compatibility_date = "2024-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "invest-bot-archive"
+database_id = "72d98a11-8203-4671-857f-c554027365d2"
+
+# Секрет задаётся командой, не хранится в репозитории:
+#   wrangler secret put API_KEY

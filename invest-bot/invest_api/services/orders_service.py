@@ -1,6 +1,7 @@
 import logging
 
 from tinkoff.invest import Client, OrderDirection, Quotation, OrderType, PostOrderResponse, OrderState
+from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.utils import generate_order_id
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
@@ -30,7 +31,7 @@ class OrderService:
             order_type: OrderType,
             order_id: str
     ) -> PostOrderResponse:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             return client.orders.post_order(
                 figi=figi,
                 quantity=count_lots,
@@ -73,17 +74,17 @@ class OrderService:
     @invest_api_retry()
     @invest_error_logging
     def cancel_order(self, account_id: str, order_id: str) -> None:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             client.orders.cancel_order(account_id=account_id, order_id=order_id)
 
     @invest_api_retry()
     @invest_error_logging
     def get_order_state(self, account_id: str, order_id: str) -> OrderState:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             return client.orders.get_order_state(account_id=account_id, order_id=order_id)
 
     @invest_api_retry()
     @invest_error_logging
     def get_orders(self, account_id: str) -> list[OrderState]:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             return client.orders.get_orders(account_id=account_id).orders

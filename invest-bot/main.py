@@ -16,6 +16,7 @@ from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from trade_system.strategies.strategy_factory import StrategyFactory
 from trading.trade_service import TradeService
+from news import NewsCollector
 
 # the configuration file name
 CONFIG_FILE = "settings.ini"
@@ -23,7 +24,36 @@ CONFIG_FILE = "settings.ini"
 logger = logging.getLogger(__name__)
 
 
-async def start_asyncio_trading(blog_worker_loop: BlogWorker, trade_service_loop: TradeService) -> None:
+def _make_news_price_getter(instrument_service: InstrumentService, market_data_service: MarketDataService):
+    """
+    price_getter для NewsCollector: тикер -> текущая цена.
+    FIGI резолвится через share_by_ticker и кэшируется (не дёргать API
+    на каждую новость по уже известному тикеру).
+    """
+    from tinkoff.invest.utils import quotation_to_decimal
+
+    figi_cache: dict[str, str] = {}
+
+    def price_getter(ticker: str) -> float | None:
+        figi = figi_cache.get(ticker)
+        if figi is None:
+            found = instrument_service.share_by_ticker(ticker)
+            if found is None:
+                return None
+            _, figi = found
+            figi_cache[ticker] = figi
+
+        price = market_data_service.get_last_price(figi)
+        return float(quotation_to_decimal(price)) if price is not None else None
+
+    return price_getter
+
+
+async def start_asyncio_trading(
+    blog_worker_loop: BlogWorker,
+    trade_service_loop: TradeService,
+    news_collector: NewsCollector | None = None,
+) -> None:
     # Some asyncio MAGIC for Windows OS
     if sys.version_info[0] == 3 and sys.version_info[1] >= 8 and sys.platform.startswith('win'):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -32,9 +62,12 @@ async def start_asyncio_trading(blog_worker_loop: BlogWorker, trade_service_loop
 
     blog_task = asyncio.create_task(blog_worker_loop.worker())
     trade_task = asyncio.create_task(trade_service_loop.worker())
+    news_task = asyncio.create_task(news_collector.run_forever()) if news_collector else None
 
     await blog_task
     await trade_task
+    if news_task:
+        await news_task
 
 
 def prepare_logs() -> None:
@@ -89,10 +122,16 @@ if __name__ == "__main__":
                 blogger=Blogger(config.blog_settings, config.trade_strategy_settings, messages_queue),
                 account_settings=config.account_settings,
                 trading_settings=config.trading_settings,
-                strategies=trade_strategies
+                strategies=trade_strategies,
+                mega_alerts_settings=config.mega_alerts_settings,
+                futures_trading_settings=config.futures_trading_settings
             )
 
-            asyncio.run(start_asyncio_trading(blog_worker, trade_service))
+            news_collector = NewsCollector(
+                price_getter=_make_news_price_getter(instrument_service, market_data_service)
+            )
+
+            asyncio.run(start_asyncio_trading(blog_worker, trade_service, news_collector))
 
         else:
             logger.critical("Client verification has been failed")

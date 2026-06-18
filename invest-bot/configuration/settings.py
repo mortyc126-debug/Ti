@@ -21,8 +21,6 @@ class StrategySettings:
     # ГО за один лот в рублях, на момент построения стратегии (Decimal как
     # float здесь — берётся напрямую из API, см. InstrumentService.future_by_ticker).
     margin_per_lot: float = 0.0
-    # для фьючерсов — стоимость одного пункта изменения цены в рублях
-    point_value: float = 1.0
 
 
 @dataclass(eq=False, repr=True)
@@ -51,8 +49,6 @@ class FutureSettings:
     basic_asset: str = ""
     expiration_date: object = None
     margin_per_lot: float = 0.0
-    # стоимость одного пункта цены в рублях (min_price_increment_amount / min_price_increment)
-    point_value: float = 1.0
 
 
 @dataclass(eq=False, repr=True)

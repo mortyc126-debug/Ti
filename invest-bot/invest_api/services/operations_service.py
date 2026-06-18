@@ -5,6 +5,7 @@ from typing import Optional
 
 from tinkoff.invest import Client, PositionsResponse, PositionsSecurities, OperationState, Operation, PortfolioResponse
 from tinkoff.invest.utils import quotation_to_decimal
+from invest_api.invest_target import INVEST_TARGET
 
 from invest_api.invest_error_decorators import invest_error_logging, invest_api_retry
 from invest_api.services.market_data_service import MarketDataService
@@ -53,10 +54,20 @@ class OperationService:
 
         return positions.securities if positions else None
 
+    def positions_futures(self, account_id: str) -> list:
+        """
+        :return: All open futures positions for account. Tinkoff API держит
+        фьючерсы в отдельном поле PositionsResponse.futures, НЕ в .securities
+        (даже если позиция открыта тем же post_market_order по тому же figi).
+        """
+        positions = self.__get_positions(account_id)
+
+        return positions.futures if positions else None
+
     @invest_api_retry()
     @invest_error_logging
     def __get_positions(self, account_id: str) -> PositionsResponse:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             logger.debug(f"Get Positions for: {account_id}:")
 
             positions = client.operations.get_positions(account_id=account_id)
@@ -75,7 +86,7 @@ class OperationService:
             state: OperationState,
             figi: str = ""
     ) -> list[Operation]:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             logger.debug(f"Get operations for: {account_id}, from: {from_}, to: {to_}, state: {state}, figi: {figi}")
 
             operations = client.operations.get_operations(
@@ -93,7 +104,7 @@ class OperationService:
     @invest_api_retry()
     @invest_error_logging
     def __get_portfolio(self, account_id: str) -> PortfolioResponse:
-        with Client(self.__token, app_name=self.__app_name) as client:
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             logger.debug(f"Get portfolio for: {account_id}")
 
             portfolio = client.operations.get_portfolio(account_id=account_id)

@@ -305,7 +305,7 @@ class Trader:
                                 entry_price = float(quotation_to_decimal(candle.close))
                                 stop_price = float(signal_new.stop_loss_level)
                                 risk_qty, risk_size_why = self.__risk.position_size(
-                                    entry_price, stop_price, point_value=strategy.settings.point_value,
+                                    entry_price, stop_price, point_value=1.0,
                                     lot=strategy.settings.lot_size, confidence=confidence
                                 )
                                 logger.debug(f"Risk position_size: {risk_size_why}")
@@ -341,7 +341,7 @@ class Trader:
                                         )
                                         self.__risk.open_position(
                                             risk_ticker, direction, available_lots,
-                                            entry_price, stop_price, point_value=strategy.settings.point_value,
+                                            entry_price, stop_price, point_value=1.0,
                                             confidence=confidence
                                         )
                                         self.__blogger.open_position_message(open_position)
@@ -460,7 +460,7 @@ class Trader:
             risk_ticker = strategy.settings.ticker
             pos = self.__risk.positions.get(risk_ticker)
             if pos:
-                self.__risk.close_position(risk_ticker, pos.entry_price, point_value=strategy.settings.point_value, reason="eod_clear")
+                self.__risk.close_position(risk_ticker, pos.entry_price, point_value=1.0, reason="eod_clear")
 
         return self.__close_position_by_figi(account_id, strategies.keys(), strategies)
 
@@ -468,7 +468,7 @@ class Trader:
         """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу."""
         risk_ticker = strategy.settings.ticker
         if risk_ticker in self.__risk.positions:
-            self.__risk.close_position(risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
+            self.__risk.close_position(risk_ticker, price, point_value=1.0, reason=reason)
 
     def __check_adaptive_exit(
             self,
@@ -711,17 +711,14 @@ class Trader:
                 lot_size=future_settings.lot,
                 short_enabled_flag=future_settings.short_enabled_flag,
                 is_future=True,
-                margin_per_lot=future_settings.margin_per_lot,
-                point_value=future_settings.point_value
+                margin_per_lot=future_settings.margin_per_lot
             )
             strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
             if not strategy:
                 continue
             logger.info(
                 f"FUTURES: {base_ticker} -> {future_settings.ticker} (figi={figi}), "
-                f"ГО за лот={future_settings.margin_per_lot:.2f} ₽, "
-                f"point_value={future_settings.point_value:.4f} ₽/пункт, "
-                f"экспирация={future_settings.expiration_date}"
+                f"ГО за лот={future_settings.margin_per_lot:.2f} ₽, экспирация={future_settings.expiration_date}"
             )
             result.append(strategy)
 

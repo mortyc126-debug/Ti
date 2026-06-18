@@ -1,6 +1,7 @@
 from configparser import ConfigParser
 
-from configuration.settings import StrategySettings, AccountSettings, TradingSettings, BlogSettings
+from configuration.settings import StrategySettings, AccountSettings, TradingSettings, BlogSettings, \
+    MegaAlertsSettings, FuturesTradingSettings
 
 __all__ = ("ProgramConfiguration")
 
@@ -31,8 +32,40 @@ class ProgramConfiguration:
         self.__trading_settings = TradingSettings(
             delay_start_after_open=int(config["TRADING_SETTINGS"]["DELAY_START_AFTER_EXCHANGE_OPEN_SECONDS"]),
             stop_trade_before_close=int(config["TRADING_SETTINGS"]["STOP_TRADE_BEFORE_EXCHANGE_CLOSE_SECONDS"]),
-            stop_signals_before_close=int(config["TRADING_SETTINGS"]["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"])
+            stop_signals_before_close=int(config["TRADING_SETTINGS"]["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"]),
+            max_volume_participation=float(config["TRADING_SETTINGS"].get("MAX_VOLUME_PARTICIPATION", "0.1"))
         )
+
+        if "MEGA_ALERTS" in config:
+            ma = config["MEGA_ALERTS"]
+            self.__mega_alerts_settings = MegaAlertsSettings(
+                auto_trade=ma.get("AUTO_TRADE", "0") == "1",
+                max_tickers=int(ma.get("MAX_TICKERS", "5")),
+                signal_threshold=ma.get("SIGNAL_THRESHOLD", "0.25"),
+                long_take=ma.get("LONG_TAKE", "1.015"),
+                long_stop=ma.get("LONG_STOP", "0.985"),
+                short_take=ma.get("SHORT_TAKE", "0.985"),
+                short_stop=ma.get("SHORT_STOP", "1.015"),
+                signal_only=ma.get("SIGNAL_ONLY", "1"),
+                max_lots_per_order=int(ma.get("MAX_LOTS_PER_ORDER", "1")),
+                history_days=int(ma.get("HISTORY_DAYS", "5")),
+                backtest_quality_min=float(ma.get("BACKTEST_QUALITY_MIN", "0.55")),
+                backtest_min_trades=int(ma.get("BACKTEST_MIN_TRADES", "3")),
+                db_api_url=config["DB_API"].get("URL", "") if "DB_API" in config else "",
+                db_api_key=config["DB_API"].get("API_KEY", "") if "DB_API" in config else ""
+            )
+        else:
+            self.__mega_alerts_settings = MegaAlertsSettings()
+
+        if "FUTURES_TRADING" in config:
+            ft = config["FUTURES_TRADING"]
+            base_tickers = [t.strip() for t in ft.get("BASE_TICKERS", "").split(",") if t.strip()]
+            self.__futures_trading_settings = FuturesTradingSettings(
+                enabled=ft.get("ENABLED", "0") == "1",
+                base_tickers=base_tickers
+            )
+        else:
+            self.__futures_trading_settings = FuturesTradingSettings()
 
         self.__trade_strategy_settings = []
         for strategy_section in config.sections():
@@ -70,3 +103,11 @@ class ProgramConfiguration:
     @property
     def trading_settings(self) -> TradingSettings:
         return self.__trading_settings
+
+    @property
+    def mega_alerts_settings(self) -> MegaAlertsSettings:
+        return self.__mega_alerts_settings
+
+    @property
+    def futures_trading_settings(self) -> FuturesTradingSettings:
+        return self.__futures_trading_settings
