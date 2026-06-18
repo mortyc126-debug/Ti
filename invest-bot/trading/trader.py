@@ -144,6 +144,7 @@ class Trader:
         self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
         self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
 
+        db_for_history = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
         for strategy in today_trade_strategies.values():
             if hasattr(strategy, "set_squeeze_provider"):
                 strategy.set_squeeze_provider(self.__oi_layers.squeeze_score)
@@ -155,8 +156,9 @@ class Trader:
                 strategy.set_tradestats_provider(self.__tradestats.score)
             # Инжекция аналитической истории и калибратора — прогревает
             # перцентильные буферы и загружает динамические режимные моды.
+            # db (если настроен) — дублирует закрытые сделки в общую базу.
             if hasattr(strategy, "set_history"):
-                strategy.set_history(self.__history, self.__calibrator)
+                strategy.set_history(self.__history, self.__calibrator, db=db_for_history)
 
         rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
         logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
@@ -827,12 +829,15 @@ class Trader:
                 live=not signal_only,
             )
             if db.configured:
+                method_perf = self.__history.method_performance(strategy.settings.ticker)
                 db.push_snapshot(
                     strategy.settings.ticker,
                     date=today,
                     composite=snapshot["composite"],
                     scores=snapshot["scores"],
                     regime=snapshot["regime"],
+                    regime_confidence=snapshot.get("regime_confidence", 1.0),
+                    method_weights={m: v["ewa_weight"] for m, v in method_perf.items()} or None,
                     rolling_quality=snapshot["rolling_quality"],
                     live=not signal_only
                 )

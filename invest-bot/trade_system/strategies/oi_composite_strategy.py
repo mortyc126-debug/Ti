@@ -52,6 +52,7 @@ high_vol/low_vol/stress) применяется как множитель вес
 Веса EWA обновляются после закрытия каждой сделки (quality = MFE / (MFE + MAE)).
 Сохраняются в JSON-файл рядом с bot'ом.
 """
+import datetime
 import json
 import logging
 import math
@@ -805,6 +806,7 @@ class OICompositeStrategy(IStrategy):
         # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
         self.__history = None
         self.__calibrator = None
+        self.__db = None
         # Динамические REGIME_WEIGHT_MODS из истории (обновляются при set_history)
         self.__dynamic_regime_mods: dict[str, dict[str, float]] = {}
         # tf-регимы от MultiTfBuffer (обновляются трейдером на каждой свече)
@@ -872,16 +874,19 @@ class OICompositeStrategy(IStrategy):
         """provider(ticker) -> score [-1,1], межинструментальный сигнал (indicators_multi.py)."""
         self.__multi_ticker_provider = provider
 
-    def set_history(self, history, calibrator) -> None:
+    def set_history(self, history, calibrator, db=None) -> None:
         """
         Инжектирует HistoryStore и PercentileCalibrator.
         После этого:
         - composite строится на перцентильно-нормализованных скорах
         - REGIME_WEIGHT_MODS заменяются динамическими (из истории сделок)
         - notify_position_closed получает реальные MFE/MAE и пишет в историю
+        - если передан db (DbApiClient, configured) — сделка дублируется в
+          общую базу (cf-collector), чтобы другие инстансы видели attribution
         """
         self.__history = history
         self.__calibrator = calibrator
+        self.__db = db
         ticker = self.__settings.ticker
         # Прогрев калибратора из истории дневных скоров
         if calibrator is not None and history is not None:
@@ -1337,17 +1342,37 @@ class OICompositeStrategy(IStrategy):
         # Сохранить сделку в историю с attribution по методам
         if self.__history is not None:
             ep = float(self.__open_trade.entry_price)
+            direction = "LONG" if self.__open_trade.signal_type == SignalType.LONG else "SHORT"
+            exit_price = real_exit if real_exit > 0 else ep
+            method_scores = dict(self.__open_trade.method_scores)
+            tf_regimes = dict(self.__tf_regimes) if self.__tf_regimes else None
             self.__history.record_trade(
                 self.__settings.ticker,
-                direction="LONG" if self.__open_trade.signal_type == SignalType.LONG else "SHORT",
+                direction=direction,
                 entry_price=ep,
-                exit_price=real_exit if real_exit > 0 else ep,
+                exit_price=exit_price,
                 mfe=mfe,
                 mae=mae,
-                method_scores=dict(self.__open_trade.method_scores),
+                method_scores=method_scores,
                 regime=self.__last_regime,
-                tf_regimes=dict(self.__tf_regimes) if self.__tf_regimes else None,
+                tf_regimes=tf_regimes,
             )
+            # Дублируем в общую базу (cf-collector) — другие инстансы видят
+            # attribution не только по своим сделкам, но и по чужим.
+            if self.__db is not None and self.__db.configured:
+                self.__db.push_trade(
+                    self.__settings.ticker,
+                    date=datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+                    dir=direction,
+                    entry=ep,
+                    exit=exit_price,
+                    mfe=mfe,
+                    mae=mae,
+                    quality=quality,
+                    method_scores=method_scores,
+                    regime=self.__last_regime,
+                    tf_regimes=tf_regimes,
+                )
             # Обновляем динамические режимные моды после каждой сделки
             self._reload_dynamic_regime_mods()
 

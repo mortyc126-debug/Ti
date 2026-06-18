@@ -15,6 +15,8 @@
  *   GET  /history/:ticker?days= — последние N дней по тикеру (по умолч. 90)
  *   GET  /latest/:ticker        — последняя запись по тикеру
  *   GET  /tickers               — список тикеров, для которых есть данные
+ *   POST /trade                 — записать одну закрытую сделку с attribution
+ *   GET  /trades/:ticker?days=  — сделки по тикеру за последние N дней (по умолч. 60)
  */
 
 function jsonResponse(data, status = 200) {
@@ -38,8 +40,9 @@ async function handleSnapshot(request, env) {
   }
   await env.DB.prepare(
     `INSERT INTO snapshots
-       (ticker, date, composite, scores, regime, rolling_quality, backtest_quality, backtest_trades, live, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (ticker, date, composite, scores, regime, rolling_quality, backtest_quality, backtest_trades, live,
+        regime_confidence, method_weights, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(ticker, date) DO UPDATE SET
        composite=excluded.composite,
        scores=excluded.scores,
@@ -48,6 +51,8 @@ async function handleSnapshot(request, env) {
        backtest_quality=excluded.backtest_quality,
        backtest_trades=excluded.backtest_trades,
        live=excluded.live,
+       regime_confidence=excluded.regime_confidence,
+       method_weights=excluded.method_weights,
        updated_at=excluded.updated_at`
   ).bind(
     body.ticker,
@@ -59,6 +64,8 @@ async function handleSnapshot(request, env) {
     body.backtest_quality ?? null,
     body.backtest_trades ?? null,
     body.live ? 1 : 0,
+    body.regime_confidence ?? 1.0,
+    body.method_weights ? JSON.stringify(body.method_weights) : null,
     new Date().toISOString()
   ).run();
   return jsonResponse({ ok: true });
@@ -67,22 +74,35 @@ async function handleSnapshot(request, env) {
 async function handleHistory(ticker, request, env) {
   const days = parseInt(new URL(request.url).searchParams.get("days") || "90", 10);
   const rows = await env.DB.prepare(
-    `SELECT date, composite, scores, regime, rolling_quality, backtest_quality, backtest_trades, live, updated_at
+    `SELECT date, composite, scores, regime, rolling_quality, backtest_quality, backtest_trades, live,
+            regime_confidence, method_weights, updated_at
      FROM snapshots WHERE ticker = ? ORDER BY date DESC LIMIT ?`
   ).bind(ticker, days).all();
   return jsonResponse({
     ticker,
-    history: rows.results.map((r) => ({ ...r, scores: JSON.parse(r.scores) })),
+    history: rows.results.map((r) => ({
+      ...r,
+      scores: JSON.parse(r.scores),
+      method_weights: r.method_weights ? JSON.parse(r.method_weights) : null,
+    })),
   });
 }
 
 async function handleLatest(ticker, env) {
   const row = await env.DB.prepare(
-    `SELECT date, composite, scores, regime, rolling_quality, backtest_quality, backtest_trades, live, updated_at
+    `SELECT date, composite, scores, regime, rolling_quality, backtest_quality, backtest_trades, live,
+            regime_confidence, method_weights, updated_at
      FROM snapshots WHERE ticker = ? ORDER BY date DESC LIMIT 1`
   ).bind(ticker).first();
   if (!row) return jsonResponse({ ticker, latest: null });
-  return jsonResponse({ ticker, latest: { ...row, scores: JSON.parse(row.scores) } });
+  return jsonResponse({
+    ticker,
+    latest: {
+      ...row,
+      scores: JSON.parse(row.scores),
+      method_weights: row.method_weights ? JSON.parse(row.method_weights) : null,
+    },
+  });
 }
 
 async function handleTickers(env) {
@@ -90,6 +110,52 @@ async function handleTickers(env) {
     `SELECT DISTINCT ticker FROM snapshots ORDER BY ticker`
   ).all();
   return jsonResponse({ tickers: rows.results.map((r) => r.ticker) });
+}
+
+async function handleTradeWrite(request, env) {
+  const body = await request.json();
+  const required = ["ticker", "date", "dir", "entry", "exit", "mfe", "mae", "quality", "method_scores"];
+  for (const field of required) {
+    if (body[field] === undefined || body[field] === null) {
+      return jsonResponse({ error: `missing field: ${field}` }, 400);
+    }
+  }
+  await env.DB.prepare(
+    `INSERT INTO trades
+       (ticker, date, dir, entry, exit, mfe, mae, quality, method_scores, regime, tf_regimes, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    body.ticker,
+    body.date,
+    body.dir,
+    body.entry,
+    body.exit,
+    body.mfe,
+    body.mae,
+    body.quality,
+    JSON.stringify(body.method_scores),
+    body.regime ?? null,
+    body.tf_regimes ? JSON.stringify(body.tf_regimes) : null,
+    new Date().toISOString()
+  ).run();
+  return jsonResponse({ ok: true });
+}
+
+async function handleTradesRead(ticker, request, env) {
+  const days = parseInt(new URL(request.url).searchParams.get("days") || "60", 10);
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const rows = await env.DB.prepare(
+    `SELECT date, dir, entry, exit, mfe, mae, quality, method_scores, regime, tf_regimes, created_at
+     FROM trades WHERE ticker = ? AND date >= ? ORDER BY date DESC`
+  ).bind(ticker, cutoff).all();
+  return jsonResponse({
+    ticker,
+    trades: rows.results.map((r) => ({
+      ...r,
+      method_scores: JSON.parse(r.method_scores),
+      tf_regimes: r.tf_regimes ? JSON.parse(r.tf_regimes) : null,
+    })),
+  });
 }
 
 export default {
@@ -113,6 +179,12 @@ export default {
       }
       if (request.method === "GET" && parts[0] === "tickers") {
         return await handleTickers(env);
+      }
+      if (request.method === "POST" && parts[0] === "trade") {
+        return await handleTradeWrite(request, env);
+      }
+      if (request.method === "GET" && parts[0] === "trades" && parts[1]) {
+        return await handleTradesRead(parts[1], request, env);
       }
       return jsonResponse({ error: "not found" }, 404);
     } catch (ex) {

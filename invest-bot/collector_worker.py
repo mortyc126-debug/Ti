@@ -83,6 +83,7 @@ def collect_one(
         composite=snapshot["composite"],
         scores=snapshot["scores"],
         regime=snapshot["regime"],
+        regime_confidence=snapshot.get("regime_confidence", 1.0),
         rolling_quality=snapshot["rolling_quality"],
         backtest_quality=quality,
         backtest_trades=n_trades,
