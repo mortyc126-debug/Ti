@@ -172,7 +172,8 @@ class OpenTrade:
         self.after_candles.append(candle)
 
     def calc_quality(self) -> float:
-        """MFE/MAE → quality ∈ [0, 1]."""
+        """MFE/MAE → quality ∈ [0, 1]. MFE уменьшается на COMMISSION_RT —
+        движение цены меньше комиссии за круг не даёт реальной прибыли."""
         ep = float(self.entry_price)
         mfe = mae = 0.0
         for c in self.after_candles:
@@ -184,7 +185,8 @@ class OpenTrade:
             else:
                 mfe = max(mfe, (ep - lo) / ep)
                 mae = max(mae, (h - ep) / ep)
-        return mfe / (mfe + mae + 1e-8)
+        mfe_net = max(0.0, mfe - COMMISSION_RT)
+        return mfe_net / (mfe_net + mae + 1e-8)
 
 
 # ── Методы анализа (чистые функции) ──────────────────────────────────────────
@@ -1052,7 +1054,10 @@ class OICompositeStrategy(IStrategy):
                 else:
                     mfe = max(0.0, (entry - min(lows)) / entry) if lows else 0.0
                     mae = max(0.0, (max(highs) - entry) / entry) if highs else 0.0
-                qualities.append(mfe / (mfe + mae) if (mfe + mae) > 0 else 0.5)
+                # MFE за вычетом комиссии за круг — движение цены меньше
+                # COMMISSION_RT не даёт реальной прибыли на реальном счёте.
+                mfe_net = max(0.0, mfe - COMMISSION_RT)
+                qualities.append(mfe_net / (mfe_net + mae) if (mfe_net + mae) > 0 else 0.5)
                 i += lookahead  # не пересекать виртуальные сделки
         finally:
             self.__candles = saved_candles

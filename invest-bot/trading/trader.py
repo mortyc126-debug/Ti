@@ -148,6 +148,9 @@ class Trader:
 
         self.__risk.equity_getter = lambda: float(self.__operation_service.available_rub_on_account(account_id) or 0)
 
+        for strategy in today_trade_strategies.values():
+            self.__validate_strategy_backtest(strategy)
+
         configured_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         if self.__mega_alerts_task is None:
             # MEGA-ALERTS живёт дольше одного торгового дня — обновляется
@@ -918,6 +921,40 @@ class Trader:
                     rolling_quality=snapshot["rolling_quality"],
                     live=not signal_only
                 )
+
+    def __validate_strategy_backtest(self, strategy: IStrategy) -> None:
+        """
+        До сих пор backtest_quality прогонялся только для тикеров, найденных
+        MEGA-ALERTS — сконфигурированные в settings.ini STRATEGY_<TICKER>
+        с SIGNAL_ONLY=0 шли в реальную торговлю без какой-либо проверки на
+        истории. Теперь перед стартом дня каждый такой тикер тоже прогоняется
+        через backtest_quality (история — [MEGA_ALERTS] HISTORY_DAYS, пороги —
+        BACKTEST_QUALITY_MIN/BACKTEST_MIN_TRADES). Если на истории недостаточно
+        качественных вирт. сделок — стратегия на сегодня переводится в
+        SIGNAL_ONLY (только Telegram), settings.ini не трогается.
+        """
+        if not hasattr(strategy, "is_signal_only") or not hasattr(strategy, "backtest_quality"):
+            return
+        if strategy.is_signal_only():
+            return
+        cfg = self.__mega_alerts_settings
+        try:
+            candles = self.__market_data_service.get_candles_history(strategy.settings.figi, days=cfg.history_days)
+        except Exception as ex:
+            logger.warning(f"BACKTEST: история свечей {strategy.settings.ticker} не получена: {repr(ex)}")
+            return
+        if not candles:
+            return
+        if hasattr(strategy, "warmup"):
+            strategy.warmup(candles)
+        quality, n_trades = strategy.backtest_quality(candles)
+        live = n_trades >= cfg.backtest_min_trades and quality >= cfg.backtest_quality_min
+        logger.info(
+            f"BACKTEST: {strategy.settings.ticker} quality={quality:.2f} на {n_trades} вирт. сделках "
+            f"({'ок, торгуем' if live else 'НЕДОСТАТОЧНО — переводим в signal-only на сегодня'})"
+        )
+        if not live and hasattr(strategy, "set_signal_only"):
+            strategy.set_signal_only(True)
 
     def __build_dynamic_strategies(self, tickers: list[str]) -> list[IStrategy]:
         """
