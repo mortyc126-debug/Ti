@@ -15,6 +15,10 @@
 | TREND_QUALITY | TQI: знак×сила тренда (Efficiency Ratio × наклон) | Свечи |
 | FRACTAL | Среднее скоров FDI/Hurst/PFE (фрактальная структура движения) | Свечи |
 | ENTROPY | Перестановочная энтропия как множитель уверенности к направлению | Свечи |
+| CYBER_CYCLE | Ehlers Cyber Cycle: пересечение нуля сглаженного цикла | Свечи |
+| DECYCLER | Ehlers Decycler: цена минус долгосрочный low-pass тренд | Свечи |
+| FISHER_RSI | Преобразование Фишера от RSI (резкие развороты) | Свечи |
+| EBSW | Ehlers Even Better Sinewave: RMS-нормированный roofing filter | Свечи |
 | OI_SQUEEZE | squeeze-score из `oi_layers.py` (реальный сквиз по FutOI юр/физ) | MOEX AlgoPack |
 | INST_OI | m_INST_OI: нетто-позиция юрлиц (FutOI) — "умные деньги" срочного рынка | MOEX AlgoPack |
 | RETAIL_CONTRA | m_RETAIL_CONTRA: расхождение юр/физ по направлению (контр-сигнал) | MOEX AlgoPack |
@@ -145,6 +149,8 @@ invest-bot/
                                   MMI/TII/ER/VHF/TPI/TQI)
   indicators_fractal.py          ← Фаза 3 (часть 2): фракталы (FDI/Hurst/PFE)
                                   + энтропия (Shannon/Permutation)
+  indicators_ehlers.py           ← Фаза 3 (часть 3): Ehlers DSP (Cyber Cycle,
+                                  Decycler, Fisherized RSI, Even Better Sinewave)
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
   data/risk_state.json,
@@ -231,8 +237,7 @@ take_profit по умолчанию.
 
 ## Что планируется добавить
 
-- Фаза 3, продолжение: Ehlers DSP (Cyber Cycle, Roofing Filter, Sinewave),
-  волатильность (Parkinson/Garman-Klass/Yang-Zhang), объём (Klinger/VZO/
-  Twiggs/VFI), относительная сила (Mansfield/RMI), статистика (z-score/
-  skew/autocorr)
+- Фаза 3, продолжение: волатильность (Parkinson/Garman-Klass/Yang-Zhang),
+  объём (Klinger/VZO/Twiggs/VFI), относительная сила (Mansfield/RMI),
+  статистика (z-score/skew/autocorr)
 - Сохранение истории сигналов в Cloudflare D1 (как в oi-signal-v10)
