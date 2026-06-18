@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
-__all__ = ("StrategySettings", "AccountSettings", "ShareSettings", "TradingSettings", "BlogSettings",
-           "MegaAlertsSettings")
+__all__ = ("StrategySettings", "AccountSettings", "ShareSettings", "FutureSettings", "TradingSettings",
+           "BlogSettings", "MegaAlertsSettings", "FuturesTradingSettings")
 
 
 @dataclass(eq=False, repr=True)
@@ -15,6 +15,12 @@ class StrategySettings:
     settings: dict = field(default_factory=dict)
     lot_size: int = 1
     short_enabled_flag: bool = True
+    # Фьючерс вместо акции: размер позиции считается не от цены*лот, а от
+    # реального гарантийного обеспечения (ГО) контракта на бирже.
+    is_future: bool = False
+    # ГО за один лот в рублях, на момент построения стратегии (Decimal как
+    # float здесь — берётся напрямую из API, см. InstrumentService.future_by_ticker).
+    margin_per_lot: float = 0.0
 
 
 @dataclass(eq=False, repr=True)
@@ -32,6 +38,24 @@ class ShareSettings:
     buy_available_flag: bool = False
     sell_available_flag: bool = False
     api_trade_available_flag: bool = False
+
+
+@dataclass(eq=False, repr=True)
+class FutureSettings:
+    """Информация по фьючерсному контракту (для расчёта позиции по ГО, см. trader.py)."""
+    ticker: str = ""
+    lot: int = 1
+    short_enabled_flag: bool = True
+    basic_asset: str = ""
+    expiration_date: object = None
+    margin_per_lot: float = 0.0
+
+
+@dataclass(eq=False, repr=True)
+class FuturesTradingSettings:
+    """Автоторговля фьючерсами на базовые активы из STRATEGY_* (вместо акций)."""
+    enabled: bool = False
+    base_tickers: list = field(default_factory=list)
 
 
 @dataclass(eq=False, repr=True)

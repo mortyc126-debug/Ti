@@ -123,7 +123,8 @@ if __name__ == "__main__":
                 account_settings=config.account_settings,
                 trading_settings=config.trading_settings,
                 strategies=trade_strategies,
-                mega_alerts_settings=config.mega_alerts_settings
+                mega_alerts_settings=config.mega_alerts_settings,
+                futures_trading_settings=config.futures_trading_settings
             )
 
             news_collector = NewsCollector(

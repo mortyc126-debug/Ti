@@ -19,7 +19,7 @@ from invest_api.utils import candle_to_historiccandle
 from trade_system.signal import SignalType
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trade_results import TradeResults
-from configuration.settings import TradingSettings, MegaAlertsSettings, StrategySettings
+from configuration.settings import TradingSettings, MegaAlertsSettings, StrategySettings, FuturesTradingSettings
 from trade_system.strategies.strategy_factory import StrategyFactory
 from risk import RiskManager
 from oi_layers import OiLayersService
@@ -52,7 +52,8 @@ class Trader:
             stream_service: MarketDataStreamService,
             market_data_service: MarketDataService,
             blogger: Blogger,
-            mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings()
+            mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings(),
+            futures_trading_settings: FuturesTradingSettings = FuturesTradingSettings()
     ) -> None:
         self.__today_trade_results: TradeResults = None
         self.__client_service = client_service
@@ -63,6 +64,7 @@ class Trader:
         self.__market_data_service = market_data_service
         self.__blogger = blogger
         self.__mega_alerts_settings = mega_alerts_settings
+        self.__futures_trading_settings = futures_trading_settings
         self.__risk = RiskManager()
         self.__last_prices: dict[str, float] = {}
         self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
@@ -113,6 +115,18 @@ class Trader:
                     f"MEGA-ALERTS: добавлены в торговлю на сегодня "
                     f"{[s.settings.ticker for s in added_strategies.values()]}"
                 )
+        if self.__futures_trading_settings.enabled and self.__futures_trading_settings.base_tickers:
+            futures_strategies = self.__build_futures_strategies(
+                today_trade_strategies, self.__futures_trading_settings.base_tickers
+            )
+            if futures_strategies:
+                added_futures = self.__get_today_strategies(futures_strategies)
+                today_trade_strategies.update(added_futures)
+                logger.info(
+                    f"FUTURES: добавлены в торговлю на сегодня "
+                    f"{[s.settings.ticker for s in added_futures.values()]}"
+                )
+
         self.__blogger.mega_alerts_message(
             tracked_hits, [t for t in candidate_tickers if t not in [s.settings.ticker for s in added_strategies.values()]]
         )
@@ -300,7 +314,9 @@ class Trader:
                                     account_id,
                                     strategy.settings.max_lots_per_order,
                                     quotation_to_decimal(candle.close),
-                                    strategy.settings.lot_size
+                                    strategy.settings.lot_size,
+                                    margin_per_lot=Decimal(str(strategy.settings.margin_per_lot))
+                                    if strategy.settings.is_future else None
                                 )
                                 liquidity_lots = self.__liquidity_lots_cap(candle.figi, strategy.settings.lot_size)
                                 available_lots = min(cash_lots, risk_qty, liquidity_lots) if risk_qty > 0 else 0
@@ -391,14 +407,21 @@ class Trader:
             account_id: str,
             max_lots_per_order: int,
             price: Decimal,
-            share_lot_size: int
+            share_lot_size: int,
+            margin_per_lot: Decimal | None = None
     ) -> int:
         """
-        Calculate counts of lots for order
+        Calculate counts of lots for order.
+
+        Для акций стоимость лота — price*lot_size (полная оплата). Для
+        фьючерсов (margin_per_lot задан) — это в разы меньше: реальная
+        стоимость владения одним лотом — ГО (гарантийное обеспечение),
+        а не полная номинальная стоимость контракта.
         """
         current_rub_on_depo = self.__operation_service.available_rub_on_account(account_id)
 
-        available_lots = int(current_rub_on_depo / (share_lot_size * price))
+        cost_per_lot = margin_per_lot if margin_per_lot and margin_per_lot > 0 else (share_lot_size * price)
+        available_lots = int(current_rub_on_depo / cost_per_lot)
 
         return available_lots if max_lots_per_order > available_lots else max_lots_per_order
 
@@ -493,7 +516,10 @@ class Trader:
             strategies: dict[str, IStrategy]
     ) -> dict[str, str]:
         result: dict[str, str] = dict()
-        current_positions = self.__operation_service.positions_securities(account_id)
+        # Tinkoff API держит фьючерсные позиции отдельно от securities — без
+        # этого объединения открытые фьючерсы никогда бы не закрылись в конце дня.
+        current_positions = list(self.__operation_service.positions_securities(account_id) or []) + \
+            list(self.__operation_service.positions_futures(account_id) or [])
 
         if current_positions:
             logger.info(f"Current positions: {current_positions}")
@@ -635,6 +661,69 @@ class Trader:
             result.append(strategy)
         return result
 
+    def __build_futures_strategies(
+            self,
+            base_strategies: dict[str, IStrategy],
+            base_tickers: list[str]
+    ) -> list[IStrategy]:
+        """
+        Для каждого базового тикера из [FUTURES_TRADING] BASE_TICKERS находит
+        ближайший по экспирации фьючерс (FORTS) и торгует ИМ вместо акции —
+        сигнальные настройки (threshold/take/stop) переиспользуются из
+        STRATEGY_<TICKER>_SETTINGS той же акции в settings.ini, если она
+        сконфигурирована, иначе берутся дефолты из [MEGA_ALERTS]. Размер
+        позиции считается отдельно, по ГО (см. __liquidity-аналог в
+        __open_position_lots_count и место вызова в __trading).
+        """
+        cfg = self.__mega_alerts_settings
+        result: list[IStrategy] = []
+
+        by_ticker = {s.settings.ticker: s for s in base_strategies.values()}
+
+        for base_ticker in base_tickers:
+            resolved = self.__instrument_service.future_by_base_ticker(base_ticker)
+            if not resolved:
+                logger.warning(f"FUTURES: контракт на {base_ticker} не найден, пропуск")
+                continue
+            future_settings, figi = resolved
+
+            base_strategy = by_ticker.get(base_ticker)
+            if base_strategy:
+                settings_dict = dict(base_strategy.settings.settings)
+                max_lots_per_order = base_strategy.settings.max_lots_per_order
+            else:
+                settings_dict = {
+                    "SIGNAL_THRESHOLD": cfg.signal_threshold,
+                    "LONG_TAKE": cfg.long_take,
+                    "LONG_STOP": cfg.long_stop,
+                    "SHORT_TAKE": cfg.short_take,
+                    "SHORT_STOP": cfg.short_stop,
+                    "SIGNAL_ONLY": cfg.signal_only,
+                }
+                max_lots_per_order = cfg.max_lots_per_order
+
+            settings = StrategySettings(
+                name="OICompositeStrategy",
+                figi=figi,
+                ticker=future_settings.ticker,
+                max_lots_per_order=max_lots_per_order,
+                settings=settings_dict,
+                lot_size=future_settings.lot,
+                short_enabled_flag=future_settings.short_enabled_flag,
+                is_future=True,
+                margin_per_lot=future_settings.margin_per_lot
+            )
+            strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
+            if not strategy:
+                continue
+            logger.info(
+                f"FUTURES: {base_ticker} -> {future_settings.ticker} (figi={figi}), "
+                f"ГО за лот={future_settings.margin_per_lot:.2f} ₽, экспирация={future_settings.expiration_date}"
+            )
+            result.append(strategy)
+
+        return result
+
     def __get_today_strategies(self, strategies: list[IStrategy]) -> dict[str, IStrategy]:
         """
         Check and Select stocks for trading today.
@@ -643,6 +732,12 @@ class Trader:
         today_trade_strategy: dict[str, IStrategy] = dict()
 
         for strategy in strategies:
+            if strategy.settings.is_future:
+                # фьючерс уже проверен на торгуемость в future_by_base_ticker
+                # (api_trade_available_flag) — share-специфичных полей у него нет.
+                today_trade_strategy[strategy.settings.figi] = strategy
+                continue
+
             share_settings = self.__instrument_service.share_by_figi(strategy.settings.figi)
             logger.debug(f"Check share settings for figi {strategy.settings.figi}: {share_settings}")
 
