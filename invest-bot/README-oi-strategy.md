@@ -11,6 +11,8 @@
 | VWAP_SIGNAL | Отклонение от скользящего VWAP | Свечи |
 | BS_PRESSURE | Давление тела свечи (bull/bear по размеру тела vs фитиль) | Свечи |
 | CANDLE_PATTERN | Engulfing, Pin-bar, Doji | Свечи |
+| ADAPTIVE_MA | Отклонение цены от KAMA (Kaufman Adaptive MA) | Свечи |
+| TREND_QUALITY | TQI: знак×сила тренда (Efficiency Ratio × наклон) | Свечи |
 | OI_SQUEEZE | squeeze-score из `oi_layers.py` (реальный сквиз по FutOI юр/физ) | MOEX AlgoPack |
 | INST_OI | m_INST_OI: нетто-позиция юрлиц (FutOI) — "умные деньги" срочного рынка | MOEX AlgoPack |
 | RETAIL_CONTRA | m_RETAIL_CONTRA: расхождение юр/физ по направлению (контр-сигнал) | MOEX AlgoPack |
@@ -136,6 +138,9 @@ invest-bot/
                                   obstats/orderstats), 7 методов
   regime.py                     ← классификация режима рынка + детекция
                                   точек излома (CUSUM/PELT/Z-Score)
+  indicators.py                  ← Фаза 3 (часть 1): адаптивные MA + режимные
+                                  индикаторы (KAMA/FRAMA/VIDYA/ZLEMA/T3,
+                                  MMI/TII/ER/VHF/TPI/TQI)
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
   data/risk_state.json,
@@ -222,6 +227,8 @@ take_profit по умолчанию.
 
 ## Что планируется добавить
 
-- Интеграция с `indicators-lib.js`/`indlab_v10.html` методами (~70+ индикаторов,
-  портирование на Python)
+- Фаза 3, продолжение `indicators.py`: фракталы/энтропия (FDI, Hurst, ApEn/
+  SampEn), Ehlers DSP (Cyber Cycle, Roofing Filter, Sinewave), волатильность
+  (Parkinson/Garman-Klass/Yang-Zhang), объём (Klinger/VZO/Twiggs/VFI),
+  относительная сила (Mansfield/RMI), статистика (z-score/skew/autocorr)
 - Сохранение истории сигналов в Cloudflare D1 (как в oi-signal-v10)
