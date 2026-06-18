@@ -42,6 +42,11 @@ FUTOI_MAP = {
     "SBER": "SBERF", "GAZP": "GAZPF", "LKOH": "LKOHF", "GMKN": "GMKNF",
     "NVTK": "NVTKF", "ROSN": "ROSNF", "TATN": "TATNF", "MGNT": "MGNTF",
 }
+# YDEX, VKCO, RUAL, SMLT сюда не добавлены — на FORTS для них либо нет
+# ликвидного отдельного фьючерса, либо тикер не сверен (риск молчаливо
+# дёргать API не тем символом). Без записи в FUTOI_MAP squeeze/INST_OI/
+# RETAIL_CONTRA просто не считаются для тикера — это не ошибка, остальные
+# методы OICompositeStrategy продолжают работать.
 
 MOEX_TOKEN = os.getenv("MOEX_TOKEN")
 FUTOI_URL = "https://apim.moex.com/iss/analyticalproducts/futoi/securities.json"

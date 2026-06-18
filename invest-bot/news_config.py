@@ -23,6 +23,10 @@ TICKER_KEYWORDS = {
     "LKOH": ["лукойл", "lukoil"],
     "VTBR": ["втб", "vtb"],
     "SMLT": ["самолёт", "самолет", "smlt"],
+    "YDEX": ["яндекс", "yandex", "ydex", "yndx"],
+    "VKCO": ["вконтакте", "vkco", "вк групп", "vk group"],
+    "RUAL": ["русал", "rusal", "rual"],
+    "MGNT": ["магнит", "magnit", "mgnt"],
 }
 
 # Корпоративные раскрытия (e-disclosure.ru).
