@@ -30,6 +30,7 @@ from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
 from db_api_client import DbApiClient
+import bot_control
 
 __all__ = ("Trader")
 
@@ -85,6 +86,50 @@ class Trader:
         self.__tf_buffer = MultiTfBuffer()
         # Трекинг MFE/MAE для открытых позиций: {figi: {entry, direction, max_fav, max_adv}}
         self.__pos_tracking: dict[str, dict] = {}
+        # Текущие стратегии торгового дня — для TG /status и /close
+        self.__current_strategies: dict[str, IStrategy] = {}
+
+    def pause(self) -> None:
+        bot_control.control.paused = True
+
+    def resume(self) -> None:
+        bot_control.control.paused = False
+
+    def request_close(self, ticker: str) -> None:
+        bot_control.control.close_requests.add(ticker.upper())
+
+    def status_text(self) -> str:
+        """
+        Текстовый статус для TG /status: режим (пауза/торговля) + по
+        каждой открытой позиции текущий PnL и пик MFE/MAE с момента входа.
+        """
+        lines = ["⏸ Пауза (новые позиции не открываются)" if bot_control.control.paused else "▶ Торговля активна"]
+        has_position = False
+        for figi, strategy in self.__current_strategies.items():
+            order = self.__today_trade_results.get_current_trade_order(figi) if self.__today_trade_results else None
+            if not order:
+                continue
+            has_position = True
+            ticker = strategy.settings.ticker
+            direction = "LONG" if order.signal.signal_type == SignalType.LONG else "SHORT"
+            pt = self.__pos_tracking.get(figi)
+            cur_price = self.__last_prices.get(ticker)
+            line = f"{ticker} {direction}"
+            if pt and pt["entry"] > 0 and cur_price:
+                ep = pt["entry"]
+                if direction == "LONG":
+                    cur_pnl = (cur_price - ep) / ep
+                    mfe = (pt["max_fav"] - ep) / ep
+                    mae = (ep - pt["max_adv"]) / ep
+                else:
+                    cur_pnl = (ep - cur_price) / ep
+                    mfe = (ep - pt["max_fav"]) / ep
+                    mae = (pt["max_adv"] - ep) / ep
+                line += f": сейчас {cur_pnl * 100:+.2f}%, пик +{mfe * 100:.2f}% / просадка -{mae * 100:.2f}%"
+            lines.append(line)
+        if not has_position:
+            lines.append("Открытых позиций нет.")
+        return "\n".join(lines)
 
     async def trade_day(
             self,
@@ -226,6 +271,8 @@ class Trader:
 
         current_candles: dict[str, Candle] = dict()
         self.__today_trade_results = TradeResults()
+        self.__current_strategies = strategies
+        bot_control.control.current_trader = self
 
         async for candle in self.__stream_service.start_async_candles_stream(
                 list(strategies.keys()),
@@ -240,6 +287,10 @@ class Trader:
             ticker = strategies[candle.figi].settings.ticker
             cur_price = float(quotation_to_decimal(candle.close))
             self.__last_prices[ticker] = cur_price
+
+            # Срочное закрытие по команде из Telegram (/close TICKER|all)
+            if bot_control.control.close_requests:
+                self.__process_close_requests(account_id, strategies)
 
             # Обновляем MFE/MAE трекинг для открытой позиции
             pt = self.__pos_tracking.get(candle.figi)
@@ -322,6 +373,9 @@ class Trader:
 
                         elif not self.__market_data_service.is_stock_ready_for_trading(candle.figi):
                             logger.info(f"New signal has been skipped. Stock isn't ready for trading")
+
+                        elif bot_control.control.paused:
+                            logger.info(f"New signal has been skipped. Бот на паузе (TG /pause)")
 
                         else:
                             strategy = strategies[candle.figi]
@@ -714,6 +768,29 @@ class Trader:
             logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")
             self.__risk_close(strategy, price, reason)
             self.__close_position_and_send_message(account_id, candle.figi, strategies)
+
+    def __process_close_requests(
+            self,
+            account_id: str,
+            strategies: dict[str, IStrategy]
+    ) -> None:
+        """
+        Срочное закрытие по команде из Telegram: тикер или "ALL".
+        Запрос снимается сразу после исполнения (или если позиции по нему
+        нет — чтобы не висел вечно, если тикер указали с опечаткой).
+        """
+        reqs = bot_control.control.close_requests
+        close_all = "ALL" in reqs
+        for figi, strategy in list(strategies.items()):
+            ticker = strategy.settings.ticker.upper()
+            if not (close_all or ticker in reqs):
+                continue
+            if self.__today_trade_results and self.__today_trade_results.get_current_trade_order(figi):
+                logger.info(f"TG /close: срочное закрытие {strategy.settings.ticker}")
+                self.__risk_close(strategy, self.__last_prices.get(strategy.settings.ticker, 0.0), "tg_close_request")
+                self.__close_position_and_send_message(account_id, figi, strategies)
+            reqs.discard(ticker)
+        reqs.discard("ALL")
 
     def __close_position_and_send_message(
             self,
