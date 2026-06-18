@@ -89,7 +89,8 @@ if __name__ == "__main__":
                 blogger=Blogger(config.blog_settings, config.trade_strategy_settings, messages_queue),
                 account_settings=config.account_settings,
                 trading_settings=config.trading_settings,
-                strategies=trade_strategies
+                strategies=trade_strategies,
+                mega_alerts_settings=config.mega_alerts_settings
             )
 
             asyncio.run(start_asyncio_trading(blog_worker, trade_service))

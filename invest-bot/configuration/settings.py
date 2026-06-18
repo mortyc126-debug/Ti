@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
-__all__ = ("StrategySettings", "AccountSettings", "ShareSettings", "TradingSettings", "BlogSettings")
+__all__ = ("StrategySettings", "AccountSettings", "ShareSettings", "TradingSettings", "BlogSettings",
+           "MegaAlertsSettings")
 
 
 @dataclass(eq=False, repr=True)
@@ -38,6 +39,25 @@ class TradingSettings:
     delay_start_after_open: int = 10
     stop_trade_before_close: int = 300
     stop_signals_before_close: int = 60
+
+
+@dataclass(eq=False, repr=True)
+class MegaAlertsSettings:
+    """Динамическая торговля тикерами, которые MOEX MEGA-ALERTS отметил аномальными сегодня."""
+    auto_trade: bool = False
+    max_tickers: int = 5
+    signal_threshold: str = "0.25"
+    long_take: str = "1.015"
+    long_stop: str = "0.985"
+    short_take: str = "0.985"
+    short_stop: str = "1.015"
+    signal_only: str = "1"
+    max_lots_per_order: int = 1
+    history_days: int = 5
+    backtest_quality_min: float = 0.55
+    backtest_min_trades: int = 3
+    db_api_url: str = ""
+    db_api_key: str = ""
 
 
 @dataclass(eq=False, repr=True)

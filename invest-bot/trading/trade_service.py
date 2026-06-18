@@ -3,7 +3,8 @@ import datetime
 import logging
 
 from blog.blogger import Blogger
-from configuration.settings import AccountSettings, TradingSettings, BlogSettings, StrategySettings
+from configuration.settings import AccountSettings, TradingSettings, BlogSettings, StrategySettings, \
+    MegaAlertsSettings
 from invest_api.services.accounts_service import AccountService
 from invest_api.services.client_service import ClientService
 from invest_api.services.instruments_service import InstrumentService
@@ -35,7 +36,8 @@ class TradeService:
             blogger: Blogger,
             account_settings: AccountSettings,
             trading_settings: TradingSettings,
-            strategies: list[IStrategy]
+            strategies: list[IStrategy],
+            mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings()
     ) -> None:
         self.__account_service = account_service
         self.__client_service = client_service
@@ -48,6 +50,7 @@ class TradeService:
         self.__account_settings = account_settings
         self.__trading_settings = trading_settings
         self.__strategies = strategies
+        self.__mega_alerts_settings = mega_alerts_settings
 
     async def worker(self) -> None:
         try:
@@ -97,7 +100,8 @@ class TradeService:
                         order_service=self.__order_service,
                         stream_service=self.__stream_service,
                         market_data_service=self.__market_data_service,
-                        blogger=self.__blogger
+                        blogger=self.__blogger,
+                        mega_alerts_settings=self.__mega_alerts_settings
                     ).trade_day(
                         account_id,
                         self.__trading_settings,
