@@ -31,10 +31,18 @@ class DbApiClient:
         req = urllib.request.Request(url, data=data, method=method, headers={
             "X-API-Key": self.__api_key,
             "Content-Type": "application/json",
+            # Без явного User-Agent urllib шлёт "Python-urllib/x.y", который
+            # Cloudflare иногда блокирует на уровне edge (403 раньше, чем
+            # запрос дойдёт до кода воркера) — подделываем под браузер.
+            "User-Agent": "Mozilla/5.0 (compatible; invest-bot-collector/1.0)",
         })
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 return json.load(resp)
+        except urllib.error.HTTPError as ex:
+            body = ex.read().decode("utf-8", errors="replace")
+            logger.warning(f"DB API {method} {path} упал: HTTP {ex.code} — {body[:300]}")
+            return None
         except urllib.error.URLError as ex:
             logger.warning(f"DB API {method} {path} упал: {ex}")
             return None
