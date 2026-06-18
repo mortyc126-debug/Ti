@@ -21,8 +21,13 @@
 | VOL_MOMENTUM_TS | Аномальный объём (по перцентилям) × направление (tradestats) | MOEX AlgoPack tradestats |
 | OB_IMBALANCE | m_OB_IMBALANCE: перекос объёма в стакане у лучшей цены | MOEX AlgoPack obstats |
 | CANCEL_SIGNAL | m_CANCEL_SIGNAL: перекос отмен заявок по стороне | MOEX AlgoPack orderstats |
+| CHANGE_POINT | Голос направления, если ≥2 из 3 алгоритмов (CUSUM/PELT/Z-Score) нашли свежий излом | Свечи |
 
 Режим рынка (VHF) используется как множитель надёжности, не как отдельный сигнал.
+Отдельно `regime.py.classify_regime` (trending_up/trending_down/ranging/high_vol/
+low_vol/stress) множит вес КАЖДОГО метода по `REGIME_WEIGHT_MODS` — например
+VOL_MOMENTUM надёжнее в тренде, VWAP_SIGNAL — в боковике (порт REGIME_WEIGHT_MODS
+из oi-signal-v10.html).
 
 Все скоры ∈ [-1, 1]. Итоговый composite = взвешенная сумма × режим рынка.
 
@@ -129,6 +134,8 @@ invest-bot/
   oi_layers.py                  ← фоновый поллер ОИ (юр/физ), squeeze-score
   tradestats.py                  ← фоновый поллер микроструктуры (tradestats/
                                   obstats/orderstats), 7 методов
+  regime.py                     ← классификация режима рынка + детекция
+                                  точек излома (CUSUM/PELT/Z-Score)
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
   data/risk_state.json,
@@ -215,8 +222,6 @@ take_profit по умолчанию.
 
 ## Что планируется добавить
 
-- Смена режима (classifyRegime/REGIME_WEIGHTS + детекция точек излома —
-  CUSUM/PELT/Z-Score)
 - Интеграция с `indicators-lib.js`/`indlab_v10.html` методами (~70+ индикаторов,
   портирование на Python)
 - Сохранение истории сигналов в Cloudflare D1 (как в oi-signal-v10)
