@@ -19,6 +19,7 @@ _buildOiLayers/_buildOiLayerSeries из oi-signal-v10.html. squeeze_score —
 import asyncio
 import json
 import logging
+import math
 import os
 import urllib.parse
 import urllib.request
@@ -161,10 +162,38 @@ def _fetch_futoi_snapshot(sym: str) -> dict | None:
     }
 
 
+def _divergence_correction(score: float, rows: list[dict], long_key: str, short_key: str, sign: float) -> float:
+    """
+    Порт дивергенции ΔOI×ΔPrice из m_INST_OI/m_RETAIL_CONTRA (oi-signal-v10.html):
+    ОИ и цена двигаются в одну сторону — новые позиции, тренд подтверждён,
+    усиливаем сигнал; ОИ и цена расходятся — закрытие позиций, сигнал слабее.
+    sign=+1 для INST_OI (тренд усиливает score в сторону движения цены),
+    sign=-1 для RETAIL_CONTRA (зеркально — толпа доливает за ценой, FOMO).
+    Нужны минимум 2 дня снэпшотов с записанной ценой (см. _poll_once).
+    """
+    if len(rows) < 2:
+        return score
+    r1, r0 = rows[-1], rows[-2]
+    price1, price0 = float(r1.get("price") or 0), float(r0.get("price") or 0)
+    if price1 <= 0 or price0 <= 0:
+        return score
+    d_price = price1 - price0
+    net1 = float(r1.get(long_key) or 0) - float(r1.get(short_key) or 0)
+    net0 = float(r0.get(long_key) or 0) - float(r0.get(short_key) or 0)
+    d_oi = net1 - net0
+    if d_oi == 0 or d_price == 0:
+        return score
+    same_sign = (d_oi > 0) == (d_price > 0)
+    if same_sign:
+        return math.tanh(score * 1.3 + sign * math.copysign(0.2, d_price))
+    return score * 0.4
+
+
 def _inst_oi_score(rows: list[dict]) -> float:
     """
     Порт m_INST_OI: позиция юрлиц (YUR) — "умные деньги" срочного рынка.
-    net = pos_long - pos_short, нормировано на размер позиции стороны.
+    tanh-нелинейность (не линейный клип) + дивергенция ОИ/цены, как в
+    oi-signal-v10.html (нет перцентильной истории — берём ветку normScore-фоллбэка).
     > 0 — юрлица в нетто-лонге (бычий сигнал), < 0 — в нетто-шорте.
     """
     if not rows:
@@ -174,27 +203,27 @@ def _inst_oi_score(rows: list[dict]) -> float:
     total = long_ + short_
     if total <= 0:
         return 0.0
-    net = (long_ - short_) / total
-    return max(-1.0, min(1.0, net * 3))
+    score = math.tanh(((long_ - short_) / total) * 3)
+    return _divergence_correction(score, rows, "yur_long", "yur_short", sign=1.0)
 
 
 def _retail_contra_score(rows: list[dict]) -> float:
     """
-    Порт m_RETAIL_CONTRA: физлица (FIZ) и юрлица (YUR) разошлись по направлению —
-    типичная картина перед разворотом (retail обычно догоняет движение последним).
-    score = (net_yur - net_fiz) / 2 — положительный, когда юрлица в лонге, а
-    физлица в шорте (или наоборот для отрицательного); если обе группы согласны —
-    сигнал около нуля (нет противоречия, нечего эксплуатировать).
+    Порт m_RETAIL_CONTRA: позиция физлиц (FIZ) — контр-индикатор толпы.
+    score = -tanh(net_fiz * 2.5): физлица в нетто-лонге → контр-сигнал на падение
+    (отрицательный score), в нетто-шорте → контр-сигнал на рост. Дивергенция
+    зеркальная INST_OI (sign=-1): толпа доливает вместе с ценой — FOMO,
+    усиливаем контр-сигнал; закрывает позиции — сигнал слабее.
     """
     if not rows:
         return 0.0
     last = rows[-1]
-    yur_l, yur_s = float(last.get("yur_long") or 0), float(last.get("yur_short") or 0)
     fiz_l, fiz_s = float(last.get("fiz_long") or 0), float(last.get("fiz_short") or 0)
-    yur_total, fiz_total = yur_l + yur_s, fiz_l + fiz_s
-    net_yur = (yur_l - yur_s) / yur_total if yur_total > 0 else 0.0
-    net_fiz = (fiz_l - fiz_s) / fiz_total if fiz_total > 0 else 0.0
-    return max(-1.0, min(1.0, (net_yur - net_fiz) / 2))
+    total = fiz_l + fiz_s
+    if total <= 0:
+        return 0.0
+    score = -math.tanh(((fiz_l - fiz_s) / total) * 2.5)
+    return _divergence_correction(score, rows, "fiz_long", "fiz_short", sign=-1.0)
 
 
 class OiLayersService:
@@ -252,6 +281,12 @@ class OiLayersService:
             snap = await asyncio.to_thread(_fetch_futoi_snapshot, sym)
             if not snap:
                 continue
+            price = self.price_getter(ticker)
+            # Цена нужна слоям (entry price для pnl%) и дивергенции ОИ/цены —
+            # без неё слои всегда были бы "куплены по нулю" и squeeze не считался.
+            if price:
+                snap["price"] = price
+
             hist = self._history.setdefault(ticker, [])
             if hist and hist[-1]["tradedate"] == snap["tradedate"]:
                 hist[-1] = snap
@@ -259,7 +294,6 @@ class OiLayersService:
                 hist.append(snap)
             hist[:] = hist[-120:]  # храним ~120 последних дней, достаточно для слоёв
 
-            price = self.price_getter(ticker)
             if price:
                 layers = _build_layers(hist)
                 scores = _squeeze_from_layers(layers, snap["tradedate"], price)

@@ -639,7 +639,9 @@ class OICompositeStrategy(IStrategy):
         ticker = self.__settings.ticker
         squeeze_up = self.__squeeze_provider(ticker, "short")
         squeeze_down = self.__squeeze_provider(ticker, "long")
-        return max(-1.0, min(1.0, squeeze_up - squeeze_down))
+        # m_SQUEEZE_RISK (oi-signal-v10.html): tanh-нелинейность, не линейный клип —
+        # риск растёт резко после ~0.2-0.3 разницы, а не равномерно до 1.0.
+        return math.tanh((squeeze_up - squeeze_down) * 2.5)
 
     def __score_provider(self, provider: Optional[ScoreProvider]) -> float:
         """m_INST_OI / m_RETAIL_CONTRA: без подключённого провайдера метод молчит (score=0)."""
