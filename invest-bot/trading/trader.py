@@ -327,22 +327,15 @@ class Trader:
                                     f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
                                 )
                                 if available_lots > 0:
-                                    open_order = self.__order_service.post_market_order(
+                                    open_order_id, actual_lots = await self.__smart_order(
                                         account_id=account_id,
                                         figi=candle.figi,
                                         count_lots=available_lots,
-                                        is_buy=(signal_new.signal_type == SignalType.LONG)
+                                        is_buy=(signal_new.signal_type == SignalType.LONG),
+                                        last_price=float(quotation_to_decimal(candle.close)),
+                                        strategy=strategy
                                     )
-                                    if open_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL or \
-                                            open_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
-                                        # Фактически исполненные лоты из order_state —
-                                        # при PARTIALLYFILL available_lots != реальность.
-                                        try:
-                                            order_state = self.__order_service.get_order_state(
-                                                account_id, open_order.order_id)
-                                            actual_lots = order_state.lots_executed or available_lots
-                                        except Exception:
-                                            actual_lots = available_lots
+                                    if open_order_id and actual_lots > 0:
                                         if actual_lots < available_lots:
                                             logger.warning(
                                                 f"PARTIAL FILL {risk_ticker}: "
@@ -350,7 +343,7 @@ class Trader:
                                             )
                                         open_position = self.__today_trade_results.open_position(
                                             candle.figi,
-                                            open_order.order_id,
+                                            open_order_id,
                                             signal_new
                                         )
                                         self.__risk.open_position(
@@ -362,7 +355,7 @@ class Trader:
                                         self.__blogger.open_position_message(open_position)
                                         logger.info(f"Open position: {open_position}")
                                     else:
-                                        logger.warning(f"Open order REJECTED/FAILED: {open_order}")
+                                        logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
                                 else:
                                     logger.info(f"New signal has been skipped. No available money or risk budget")
                     except Exception as ex:
@@ -455,6 +448,144 @@ class Trader:
         avg_volume = sum(volumes) / len(volumes)
         cap_in_shares = avg_volume * self.__trading_settings.max_volume_participation
         return max(1, int(cap_in_shares / share_lot_size))
+
+    async def __smart_order(
+            self,
+            account_id: str,
+            figi: str,
+            count_lots: int,
+            is_buy: bool,
+            last_price: float,
+            strategy: IStrategy
+    ) -> tuple[str | None, int]:
+        """
+        Лимитная заявка с авто-репрайсингом и переходом на рыночную.
+        Возвращает (order_id, actual_lots) при успешном исполнении или (None, 0).
+
+        Логика:
+        1. Выставить лимит на уровне last_price.
+        2. Каждые 5 сек проверять статус заявки.
+        3. Если цена ушла против нас более чем на adverse_pct — немедленно
+           переходим на рынок (хуже будет ещё больше).
+        4. Если прошёл reprice_interval и заявка не исполнена — отменяем,
+           переставляем на текущую цену (до max_attempts раз).
+        5. После всех попыток — рыночная заявка.
+        """
+        ts = self.__trading_settings
+        ticker = strategy.settings.ticker
+        poll_interval = 5  # секунды между опросами состояния
+
+        def _adverse(current: float) -> bool:
+            if last_price == 0:
+                return False
+            move = (current - last_price) / last_price
+            # Для покупки плохо когда цена выросла (платим дороже),
+            # для продажи — когда упала.
+            return (is_buy and move > ts.limit_adverse_move_pct) or \
+                   (not is_buy and move < -ts.limit_adverse_move_pct)
+
+        def _place_limit(price: float) -> tuple[str | None, object]:
+            try:
+                p = Decimal(str(price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy, price=p
+                )
+                return resp.order_id, resp
+            except Exception as ex:
+                logger.warning(f"__smart_order place limit failed: {repr(ex)}")
+                return None, None
+
+        def _to_market() -> tuple[str | None, int]:
+            try:
+                resp = self.__order_service.post_market_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy
+                )
+                if resp.execution_report_status in (
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+                ):
+                    try:
+                        state = self.__order_service.get_order_state(account_id, resp.order_id)
+                        return resp.order_id, state.lots_executed or count_lots
+                    except Exception:
+                        return resp.order_id, count_lots
+                logger.warning(f"__smart_order market fallback REJECTED: {resp}")
+                return None, 0
+            except Exception as ex:
+                logger.warning(f"__smart_order market fallback error: {repr(ex)}")
+                return None, 0
+
+        def _cancel(order_id: str) -> None:
+            try:
+                self.__order_service.cancel_order(account_id, order_id)
+            except Exception:
+                pass
+
+        entry_price = last_price
+        order_id, _ = _place_limit(entry_price)
+        if order_id is None:
+            logger.warning(f"__smart_order: limit place failed, falling back to market")
+            return _to_market()
+
+        elapsed_since_reprice = 0
+        attempt = 0
+
+        while True:
+            await asyncio.sleep(poll_interval)
+            elapsed_since_reprice += poll_interval
+
+            # Проверяем статус
+            try:
+                state = self.__order_service.get_order_state(account_id, order_id)
+            except Exception as ex:
+                logger.warning(f"__smart_order get_order_state error: {repr(ex)}")
+                break
+
+            if state.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL:
+                return order_id, state.lots_executed or count_lots
+
+            if state.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
+                # Частичное — продолжаем ждать, но не бесконечно
+                pass
+
+            if state.execution_report_status in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_REJECTED,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_CANCELLED,
+            ):
+                logger.warning(f"__smart_order: заявка {order_id} отклонена/отменена, рынок")
+                return _to_market()
+
+            # Проверяем неблагоприятное движение цены
+            current_price = self.__last_prices.get(ticker, entry_price)
+            if _adverse(current_price):
+                logger.info(
+                    f"__smart_order {ticker}: неблагоприятное движение "
+                    f"{entry_price:.4f}->{current_price:.4f}, переход на рынок"
+                )
+                _cancel(order_id)
+                return _to_market()
+
+            # Репрайс по таймеру
+            if elapsed_since_reprice >= ts.limit_reprice_interval_sec:
+                elapsed_since_reprice = 0
+                attempt += 1
+                if attempt > ts.limit_reprice_max_attempts:
+                    logger.info(f"__smart_order {ticker}: исчерпаны попытки репрайса, рынок")
+                    _cancel(order_id)
+                    return _to_market()
+
+                _cancel(order_id)
+                entry_price = current_price
+                order_id, _ = _place_limit(entry_price)
+                if order_id is None:
+                    return _to_market()
+                logger.info(f"__smart_order {ticker}: репрайс #{attempt} на {entry_price:.4f}")
+
+        # Нештатный выход из цикла — рынок
+        _cancel(order_id)
+        return _to_market()
 
     def __clear_all_positions(
             self,
