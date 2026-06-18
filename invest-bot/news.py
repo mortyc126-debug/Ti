@@ -153,7 +153,7 @@ def analyze_news(title: str, summary: str, ticker: str) -> dict:
         from cerebras.cloud.sdk import Cerebras
         from news_config import CEREBRAS_API_KEY
 
-        api_key = CEREBRAS_API_KEY or os.getenv("CEREBRAS_API_KEY", "")
+        api_key = CEREBRAS_API_KEY
         if not api_key:
             logger.warning("CEREBRAS_API_KEY не задан")
             return fallback
