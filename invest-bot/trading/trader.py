@@ -22,6 +22,7 @@ from configuration.settings import TradingSettings
 from risk import RiskManager
 from oi_layers import OiLayersService
 from tradestats import TradeStatsService
+from mega_alerts import MegaAlertsService
 
 __all__ = ("Trader")
 
@@ -62,6 +63,8 @@ class Trader:
         self.__oi_task: asyncio.Task | None = None
         self.__tradestats = TradeStatsService()
         self.__tradestats_task: asyncio.Task | None = None
+        self.__mega_alerts = MegaAlertsService()
+        self.__mega_alerts_task: asyncio.Task | None = None
 
     async def trade_day(
             self,
@@ -83,6 +86,14 @@ class Trader:
         tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
         self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
+        if self.__mega_alerts_task is None:
+            # MEGA-ALERTS живёт дольше одного торгового дня — обновляется
+            # раз в сутки по ВСЕМУ рынку, не только по сегодняшним тикерам.
+            self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
+        await self.__mega_alerts.refresh_once()
+        tracked_hits = [t for t in tracked_tickers if self.__mega_alerts.alerts_for(t)]
+        extra_tickers = [t for t in self.__mega_alerts.tickers_today() if t not in tracked_tickers]
+        self.__blogger.mega_alerts_message(tracked_hits, extra_tickers)
 
         for strategy in today_trade_strategies.values():
             if hasattr(strategy, "set_squeeze_provider"):

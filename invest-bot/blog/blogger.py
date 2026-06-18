@@ -55,6 +55,22 @@ class Blogger:
                     f"Short trade status: {strategy_value.settings.short_enabled_flag}"
                 )
 
+    def mega_alerts_message(self, tracked_hits: list[str], extra_tickers: list[str]) -> None:
+        """
+        Сообщение по итогам ежедневной выгрузки MOEX MEGA-ALERTS: какие из
+        сегодня сконфигурированных тикеров попали в аномалии рынка, и сколько
+        других (несконфигурированных) тикеров тоже отметились — как наводка
+        на расширение списка отслеживаемых тикеров.
+        """
+        if not self.__blog_status:
+            return
+        if tracked_hits:
+            self.__send_text_message(f"MEGA-ALERTS: аномалии сегодня по нашим тикерам: {', '.join(tracked_hits)}")
+        if extra_tickers:
+            preview = ', '.join(extra_tickers[:20])
+            more = f" и ещё {len(extra_tickers) - 20}" if len(extra_tickers) > 20 else ""
+            self.__send_text_message(f"MEGA-ALERTS: ещё {len(extra_tickers)} тикеров с аномалиями вне списка: {preview}{more}")
+
     def finish_trading_message(self) -> None:
         """
         The method sends information that trading is stopping.
