@@ -14,6 +14,13 @@
 | OI_SQUEEZE | squeeze-score из `oi_layers.py` (реальный сквиз по FutOI юр/физ) | MOEX AlgoPack |
 | INST_OI | m_INST_OI: нетто-позиция юрлиц (FutOI) — "умные деньги" срочного рынка | MOEX AlgoPack |
 | RETAIL_CONTRA | m_RETAIL_CONTRA: расхождение юр/физ по направлению (контр-сигнал) | MOEX AlgoPack |
+| BS_PRESSURE_TS | m_BS_PRESSURE: давление покупателей/продавцов по объёму сделок | MOEX AlgoPack tradestats |
+| AGGRESSOR_FLOW | m_AGGRESSOR_FLOW: объём+число сделок инициатора покупки/продажи | MOEX AlgoPack tradestats |
+| LARGE_IMPACT | m_LARGE_IMPACT: перекос крупных (≥p75) сделок по стороне | MOEX AlgoPack tradestats |
+| VWAP_SIGNAL_TS | Отклонение цены от внутридневного VWAP (tradestats), не свечного | MOEX AlgoPack tradestats |
+| VOL_MOMENTUM_TS | Аномальный объём (по перцентилям) × направление (tradestats) | MOEX AlgoPack tradestats |
+| OB_IMBALANCE | m_OB_IMBALANCE: перекос объёма в стакане у лучшей цены | MOEX AlgoPack obstats |
+| CANCEL_SIGNAL | m_CANCEL_SIGNAL: перекос отмен заявок по стороне | MOEX AlgoPack orderstats |
 
 Режим рынка (VHF) используется как множитель надёжности, не как отдельный сигнал.
 
@@ -25,6 +32,10 @@ OI_SQUEEZE, INST_OI и RETAIL_CONTRA подключаются `Trader`'ом че
 читают один и тот же FutOI-снэпшот из `oi_layers.py`, новый запрос к MOEX не
 нужен. Без подключения метод просто молчит (score=0, не участвует в обучении
 весов).
+
+Семь микроструктурных методов (BS_PRESSURE_TS … CANCEL_SIGNAL) подключаются
+через `strategy.set_tradestats_provider(...)` — данные идут из нового
+`tradestats.py` (см. ниже), отдельного от `oi_layers.py` поллера.
 
 ## Обучение весов
 
@@ -116,6 +127,8 @@ invest-bot/
                                   дневной стоп, безубыток, трейлинг)
   risk_config.py                ← константы риск-менеджмента (CORR_GROUPS и т.д.)
   oi_layers.py                  ← фоновый поллер ОИ (юр/физ), squeeze-score
+  tradestats.py                  ← фоновый поллер микроструктуры (tradestats/
+                                  obstats/orderstats), 7 методов
   settings.ini                 ← пример конфига с OICompositeStrategy
   oi_weights.json              ← создаётся автоматически при первом запуске
   data/risk_state.json,
@@ -163,6 +176,34 @@ squeeze_score — долю свежих (≤5 дней) и крупных (≥15
 squeeze_score (в отличие от inst_oi/retail_contra) используется только в
 адаптивном выходе (см. ниже), не как отдельный сигнал на вход.
 
+## Микроструктура (tradestats.py)
+
+Отдельный фоновый поллер (не путать с `oi_layers.py` — другие данные, другая
+частота). Внутридневные данные MOEX AlgoPack `datashop/algopack/eq/{tradestats,
+obstats,orderstats}` обновляются гораздо чаще FutOI, без фиксированной границы
+:00/:05 — поллим раз в `POLL_SECONDS` (60 сек), храним скользящее окно
+`ROLLING_WINDOW` (30) баров на тикер по каждому из трёх эндпоинтов.
+
+Методы (порт из oi-signal-v10.html):
+- `m_BS_PRESSURE` (tradestats: vol_b/vol_s) — давление покупателей/продавцов
+  по объёму инициированных сделок.
+- `m_AGGRESSOR_FLOW` (tradestats: val_b/val_s, trades_b/trades_s) — объём +
+  число сделок по инициатору, взвешенная комбинация.
+- `m_LARGE_IMPACT` (tradestats: vol_b/vol_s/vol) — перекос крупных
+  (объём ≥ p75 окна) сделок по стороне.
+- `m_VWAP_SIGNAL` ts-вариант (tradestats: pr_close/pr_vwap) — отклонение
+  цены от внутридневного VWAP, масштаб по волатильности последних баров
+  (вместо ATR — pstdev(pr_close)/mean, минимум 0.5%).
+- `m_VOL_MOMENTUM` ts-вариант (tradestats: vol, pr_close) — аномальный
+  объём (по перцентилям p10/p50/p90 окна) × направление цены.
+- `m_OB_IMBALANCE` (obstats: imbalance_vol_bbo) — перекос объёма в стакане
+  у лучшей цены.
+- `m_CANCEL_SIGNAL` (orderstats: cancel_orders_b/cancel_orders_s) — перекос
+  отмен заявок по стороне.
+
+Без `MOEX_TOKEN` (или без подписки AlgoPack на эти эндпоинты) `poll_loop`
+выходит сразу, методы молчат (score=0) — так же, как OI_SQUEEZE без токена.
+
 ## Адаптивный выход (ADAPTIVE_EXIT=1)
 
 По умолчанию выход — фиксированный stop/take уровень сигнала стратегии.
@@ -174,6 +215,8 @@ take_profit по умолчанию.
 
 ## Что планируется добавить
 
-- Подтяжка MOEX AlgoPack данных (OI, tradestats, obstats) как дополнительные методы
-- Интеграция с `indicators-lib.js` методами (портирование на Python)
+- Смена режима (classifyRegime/REGIME_WEIGHTS + детекция точек излома —
+  CUSUM/PELT/Z-Score)
+- Интеграция с `indicators-lib.js`/`indlab_v10.html` методами (~70+ индикаторов,
+  портирование на Python)
 - Сохранение истории сигналов в Cloudflare D1 (как в oi-signal-v10)

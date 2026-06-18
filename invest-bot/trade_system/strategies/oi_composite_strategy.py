@@ -11,6 +11,9 @@ OICompositeStrategy — многометодная стратегия на ос�
                    не статичный порог), если провайдер подключён извне
   INST_OI        — m_INST_OI: нетто-позиция юрлиц (FutOI), если провайдер подключён
   RETAIL_CONTRA  — m_RETAIL_CONTRA: расхождение юр/физ по направлению (FutOI)
+  BS_PRESSURE_TS, AGGRESSOR_FLOW, LARGE_IMPACT, VWAP_SIGNAL_TS, VOL_MOMENTUM_TS,
+  OB_IMBALANCE, CANCEL_SIGNAL — микроструктура из tradestats.py (tradestats/
+  obstats/orderstats, AlgoPack), если провайдер подключён извне
   VOLATILITY_REG — режим волатильности (тренд vs. боковик)
 
 Каждый метод возвращает score ∈ [-1, 1].
@@ -248,7 +251,17 @@ METHODS = [
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
 INST_OI_NAME = "INST_OI"
 RETAIL_CONTRA_NAME = "RETAIL_CONTRA"
-ALL_METHOD_NAMES = [name for name, _ in METHODS] + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
+# Методы микроструктуры (tradestats/obstats/orderstats, см. tradestats.py).
+# Имена соответствуют ключам TradeStatsService.SCORE_FUNCS.
+TRADESTATS_METHOD_NAMES = [
+    "BS_PRESSURE_TS", "AGGRESSOR_FLOW", "LARGE_IMPACT",
+    "VWAP_SIGNAL_TS", "VOL_MOMENTUM_TS", "OB_IMBALANCE", "CANCEL_SIGNAL",
+]
+ALL_METHOD_NAMES = (
+    [name for name, _ in METHODS]
+    + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
+    + TRADESTATS_METHOD_NAMES
+)
 
 # (ticker, direction) -> squeeze_score; подключается извне (Trader), т.к.
 # у самой стратегии нет доступа к сети/oi_layers.py. Без подключённого
@@ -257,6 +270,8 @@ ALL_METHOD_NAMES = [name for name, _ in METHODS] + [OI_SQUEEZE_NAME, INST_OI_NAM
 SqueezeProvider = Callable[[str, str], float]
 # (ticker) -> score [-1, 1]; m_INST_OI / m_RETAIL_CONTRA из oi_layers.py.
 ScoreProvider = Callable[[str], float]
+# (ticker, method_name) -> score [-1, 1]; методы микроструктуры из tradestats.py.
+TradeStatsProvider = Callable[[str, str], float]
 
 
 class OICompositeStrategy(IStrategy):
@@ -290,6 +305,7 @@ class OICompositeStrategy(IStrategy):
         self.__squeeze_provider: Optional[SqueezeProvider] = None
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
+        self.__tradestats_provider: Optional[TradeStatsProvider] = None
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -335,6 +351,10 @@ class OICompositeStrategy(IStrategy):
     def set_retail_contra_provider(self, provider: Optional[ScoreProvider]) -> None:
         """provider(ticker) -> m_RETAIL_CONTRA score, см. oi_layers.py.OiLayersService.retail_contra_score."""
         self.__retail_contra_provider = provider
+
+    def set_tradestats_provider(self, provider: Optional[TradeStatsProvider]) -> None:
+        """provider(ticker, method_name) -> score, см. tradestats.py.TradeStatsService.score."""
+        self.__tradestats_provider = provider
 
     # ── Публичный метод — вызывается на каждой свече ─────────────────────────
 
@@ -399,7 +419,7 @@ class OICompositeStrategy(IStrategy):
             self.__score_oi_squeeze(),
             self.__score_provider(self.__inst_oi_provider),
             self.__score_provider(self.__retail_contra_provider),
-        ]
+        ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES]
         weights = [self.__weights[name].weight for name in ALL_METHOD_NAMES]
 
         # взвешенная сумма; VOL_MOMENTUM усиливается режимом тренда
@@ -427,6 +447,12 @@ class OICompositeStrategy(IStrategy):
         if not provider:
             return 0.0
         return provider(self.__settings.ticker)
+
+    def __score_tradestats(self, method_name: str) -> float:
+        """Без подключённого провайдера (нет MOEX_TOKEN / tradestats.py не подключён) — молчит."""
+        if not self.__tradestats_provider:
+            return 0.0
+        return self.__tradestats_provider(self.__settings.ticker, method_name)
 
     def __methods_agree(self, scores: list[float], direction: SignalType) -> bool:
         """Хотя бы MIN_AGREE_METHODS методов высказались (|score|>=AGREE_SCORE_MIN) за это направление."""

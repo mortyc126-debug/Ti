@@ -21,6 +21,7 @@ from trading.trade_results import TradeResults
 from configuration.settings import TradingSettings
 from risk import RiskManager
 from oi_layers import OiLayersService
+from tradestats import TradeStatsService
 
 __all__ = ("Trader")
 
@@ -59,6 +60,8 @@ class Trader:
         self.__last_prices: dict[str, float] = {}
         self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
         self.__oi_task: asyncio.Task | None = None
+        self.__tradestats = TradeStatsService()
+        self.__tradestats_task: asyncio.Task | None = None
 
     async def trade_day(
             self,
@@ -79,6 +82,7 @@ class Trader:
 
         tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
+        self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
 
         for strategy in today_trade_strategies.values():
             if hasattr(strategy, "set_squeeze_provider"):
@@ -87,6 +91,8 @@ class Trader:
                 strategy.set_inst_oi_provider(self.__oi_layers.inst_oi_score)
             if hasattr(strategy, "set_retail_contra_provider"):
                 strategy.set_retail_contra_provider(self.__oi_layers.retail_contra_score)
+            if hasattr(strategy, "set_tradestats_provider"):
+                strategy.set_tradestats_provider(self.__tradestats.score)
 
         rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
         logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
@@ -109,13 +115,10 @@ class Trader:
         except Exception as ex:
             logger.error(f"Trading error: {repr(ex)}")
         finally:
-            if self.__oi_task:
-                self.__oi_task.cancel()
-                try:
-                    await self.__oi_task
-                except asyncio.CancelledError:
-                    pass
-                self.__oi_task = None
+            await self.__cancel_task(self.__oi_task)
+            self.__oi_task = None
+            await self.__cancel_task(self.__tradestats_task)
+            self.__tradestats_task = None
 
         logger.info("Finishing trading today")
         self.__blogger.finish_trading_message()
