@@ -44,6 +44,14 @@ logger = logging.getLogger(__name__)
 # стратегии. По умолчанию выключен, чтобы не менять текущее поведение.
 ADAPTIVE_EXIT_ENABLED = os.getenv("ADAPTIVE_EXIT", "0") == "1"
 
+# Частичная фиксация на первом тейке (risk.check_partial_take/reduce_position):
+# половина закрывается на тейке, остаток держится с фиксированным уровнем
+# защиты (треть пройденного расстояния вход->тейк). Управляется с дашборда
+# (RuntimeOverrides.partial_tp_enabled) — здесь только дефолт, если в
+# data/bot_overrides.json явно не выставлено. Несовместимо с ADAPTIVE_EXIT
+# (там стоп/тейк сигнала вообще не используются).
+PARTIAL_TP_DEFAULT_ENABLED = os.getenv("PARTIAL_TP", "0") == "1"
+
 # Глубина истории для авто-подбора ATR_TAKE_K/ATR_STOP_K (OICompositeStrategy.
 # set_atr_history_provider) — столько дней свечей берётся для sweep раз в день.
 # 20 дней давало 3-24 сделки на тикер — недостаточно для надёжного выбора
@@ -364,6 +372,8 @@ class Trader:
 
                 # Logic is:
                 # if stop or take price level is between high and low, then stop or take will be executed
+                risk_ticker_cur = strategies[candle.figi].settings.ticker
+                risk_pos_cur = self.__risk.positions.get(risk_ticker_cur)
                 try:
                     if ADAPTIVE_EXIT_ENABLED:
                         # Адаптивный выход — единственная логика закрытия позиции:
@@ -371,6 +381,17 @@ class Trader:
                         # трейлинг-стоп мог двигаться и забирать большее движение,
                         # а не закрываться по первому касанию исходного take_profit.
                         self.__check_adaptive_exit(account_id, candle, strategies)
+                    elif risk_pos_cur and risk_pos_cur.half_closed:
+                        # Остаток после частичной фиксации — стоп/тейк сигнала больше не
+                        # действуют, его судьбу решает remainder_stop (risk.check_exit).
+                        should_close, reason = self.__risk.check_exit(risk_ticker_cur, float(quotation_to_decimal(candle.close)))
+                        if should_close:
+                            logger.info(f"PARTIAL TP REMAINDER CLOSE {risk_ticker_cur}: {reason}")
+                            self.__risk_close(strategies[candle.figi], float(quotation_to_decimal(candle.close)), reason)
+                            self.__close_position_and_send_message(account_id, candle.figi, strategies)
+                    elif self.__overrides.partial_tp_enabled(PARTIAL_TP_DEFAULT_ENABLED) and \
+                            self.__try_partial_take(account_id, candle, strategies):
+                        pass  # частичная фиксация сработала — остаток остаётся открытым
                     elif low <= current_trade_order.signal.stop_loss_level <= high:
                         logger.info(f"STOP LOSS: {current_trade_order}")
                         self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.stop_loss_level), "stop_loss")
@@ -490,7 +511,8 @@ class Trader:
                                             risk_ticker, direction, actual_lots,
                                             entry_price, stop_price,
                                             point_value=strategy.settings.point_value,
-                                            confidence=confidence
+                                            confidence=confidence,
+                                            take_target=float(signal_new.take_profit_level),
                                         )
                                         self.__blogger.open_position_message(open_position)
                                         logger.info(f"Open position: {open_position}")
@@ -791,6 +813,59 @@ class Trader:
             if overrides:
                 strategy.set_take_stop_overrides(**overrides)
                 logger.info(f"OVERRIDES: {strategy.settings.ticker} take/stop -> {overrides}")
+
+    def __try_partial_take(
+            self,
+            account_id: str,
+            candle: Candle,
+            strategies: dict[str, IStrategy]
+    ) -> bool:
+        """
+        Частичная фиксация: половина позиции закрывается реальным маркет-
+        ордером при достижении take_target (см. risk.check_partial_take),
+        остаток дальше защищён remainder_stop (risk.check_exit). Для
+        signal_only позиций risk.positions пуст — функция просто вернёт
+        False, обычные stop/take-проверки сигнала сработают как раньше.
+        """
+        strategy = strategies[candle.figi]
+        ticker = strategy.settings.ticker
+        pos = self.__risk.positions.get(ticker)
+        if not pos or pos.half_closed or pos.take_target <= 0:
+            return False
+        high, low = float(quotation_to_decimal(candle.high)), float(quotation_to_decimal(candle.low))
+        if not (low <= pos.take_target <= high):
+            return False
+        should, qty, remainder_stop = self.__risk.check_partial_take(ticker, pos.take_target)
+        if not should:
+            return False
+        is_buy = (pos.direction == "short")  # закрыть часть шорта -> купить
+        order_id = self.__partial_close_order(account_id, candle.figi, qty, is_buy)
+        if not order_id:
+            return False
+        self.__risk.reduce_position(
+            ticker, qty, pos.take_target,
+            point_value=strategy.settings.point_value,
+            reason="partial_take_profit", remainder_stop=remainder_stop,
+        )
+        logger.info(
+            f"PARTIAL TAKE PROFIT {ticker}: -{qty} лотов @ {pos.take_target}, "
+            f"остаток защищён уровнем {remainder_stop:.4f}"
+        )
+        return True
+
+    def __partial_close_order(self, account_id: str, figi: str, lots: int, is_buy: bool) -> str | None:
+        if not self.__market_data_service.is_stock_ready_for_trading(figi):
+            return None
+        order = self.__order_service.post_market_order(
+            account_id=account_id, figi=figi, count_lots=lots, is_buy=is_buy
+        )
+        if order.execution_report_status in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+        ):
+            return order.order_id
+        logger.warning(f"Partial-TP close order REJECTED/FAILED: {order}")
+        return None
 
     def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> None:
         """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу."""

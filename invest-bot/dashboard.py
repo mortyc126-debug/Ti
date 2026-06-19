@@ -547,6 +547,11 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <input type="password" class="inp mid" id="ov_password" placeholder="код из settings.ini">
   </label>
   <br><br>
+  <label><input type="checkbox" id="ov_partial_tp"> Частичная фиксация на первом тейке
+    (половина закрывается на тейке, остаток держится с защитой 1/3 пройденного
+    расстояния вход→тейк; не работает вместе с ADAPTIVE_EXIT)
+  </label>
+  <br><br>
   <table class="scen-table">
     <thead><tr>
       <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
@@ -762,6 +767,7 @@ async function loadOverrides() {{
   const data = await resp.json();
   document.getElementById('ov_global_mode').value =
     data.global_signal_only === true ? 'sandbox' : (data.global_signal_only === false ? 'live' : 'auto');
+  document.getElementById('ov_partial_tp').checked = data.partial_tp_enabled === true;
   const tbody = document.getElementById('ov_table');
   tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t])).join('');
   document.getElementById('ov_status').textContent = 'загружено';
@@ -770,6 +776,7 @@ async function loadOverrides() {{
 async function saveOverrides() {{
   const globalMode = document.getElementById('ov_global_mode').value;
   const global_signal_only = globalMode === 'sandbox' ? true : (globalMode === 'live' ? false : null);
+  const partial_tp_enabled = document.getElementById('ov_partial_tp').checked;
   const tickers = {{}};
   document.querySelectorAll('#ov_table tr').forEach(tr => {{
     const ticker = tr.dataset.ticker;
@@ -789,7 +796,7 @@ async function saveOverrides() {{
     method: 'POST',
     headers: {{'Content-Type': 'application/json'}},
     body: JSON.stringify({{
-      global_signal_only, tickers,
+      global_signal_only, partial_tp_enabled, tickers,
       password: document.getElementById('ov_password').value,
     }}),
   }});
@@ -837,6 +844,7 @@ def get_overrides_payload() -> dict:
     tickers_all = sorted(set(_strategy_settings_by_ticker().keys()) | set(load_oi_tickers().keys()))
     return {
         "global_signal_only": data.get("global_signal_only"),
+        "partial_tp_enabled": data.get("partial_tp_enabled"),
         "tickers": data.get("tickers", {}),
         "tickers_all": tickers_all,
     }
@@ -849,6 +857,7 @@ def save_overrides_payload(payload: dict) -> dict | None:
     из settings.ini [DASHBOARD_CONTROL] PASSWORD.
     """
     global_signal_only = payload.get("global_signal_only")
+    partial_tp_enabled = payload.get("partial_tp_enabled")
     tickers_in = payload.get("tickers", {})
 
     wants_live = global_signal_only is False or any(
@@ -871,7 +880,11 @@ def save_overrides_payload(payload: dict) -> dict | None:
             entry[field] = str(v) if v not in (None, "") else None
         tickers_out[ticker.upper()] = entry
 
-    save_overrides({"global_signal_only": global_signal_only, "tickers": tickers_out})
+    save_overrides({
+        "global_signal_only": global_signal_only,
+        "partial_tp_enabled": partial_tp_enabled,
+        "tickers": tickers_out,
+    })
     return None
 
 

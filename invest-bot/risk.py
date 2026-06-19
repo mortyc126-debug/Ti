@@ -37,6 +37,7 @@ from risk_config import (
     RISK_MIN_PCT, RISK_MID_PCT, RISK_MAX_PCT,
     CONF_LOW_THR, CONF_MID_THR, CONF_HIGH_THR,
     CORR_GROUPS, PORTFOLIO_RISK_MAX_PCT, PORTFOLIO_STOP_SQUEEZE,
+    PARTIAL_TP_CLOSE_FRACTION, PARTIAL_TP_RETRACE_FRACTION,
 )
 
 __all__ = ("Position", "RiskManager")
@@ -64,6 +65,9 @@ class Position:
     adds_count: int = 0
     scaled_out: bool = False
     reasons: list = field(default_factory=list)
+    take_target: float = 0.0       # уровень первого тейка из сигнала — для частичной фиксации
+    half_closed: bool = False      # половина уже зафиксирована на тейке
+    remainder_stop: float = 0.0    # после half_closed: фиксированный уровень защиты остатка
 
     def pnl_rub(self, price: float, point_value: float = 1.0) -> float:
         diff = (price - self.entry_price) if self.direction == "long" \
@@ -330,7 +334,8 @@ class RiskManager:
                        entry: float, stop: float, point_value: float = 1.0,
                        reasons: list | None = None,
                        trail_dist: float = 0.0,
-                       confidence: float = 0.7) -> Position:
+                       confidence: float = 0.7,
+                       take_target: float = 0.0) -> Position:
         pos = Position(
             ticker=ticker, direction=direction, qty=qty,
             entry_price=entry, stop_price=stop,
@@ -340,6 +345,7 @@ class RiskManager:
             peak_price=entry,
             confidence=confidence,
             reasons=reasons or [],
+            take_target=take_target,
         )
         self.positions[ticker] = pos
         log.info(f"OPEN {direction} {ticker} qty={qty} entry={entry} stop={stop} "
@@ -368,6 +374,15 @@ class RiskManager:
             if pos.trail_dist > 0:
                 pos.stop_price = min(pos.stop_price, pos.peak_price + pos.trail_dist)
 
+        # Остаток после частичной фиксации на тейке: фиксированный уровень
+        # защиты (треть пройденного расстояния вход->тейк), независимо от
+        # обычного трейлинга/стопа — проверяем отдельно, до них.
+        if pos.half_closed and pos.remainder_stop:
+            if pos.direction == "long" and price <= pos.remainder_stop:
+                return True, f"остаток после частичной фиксации: откат к {pos.remainder_stop:.4f}"
+            if pos.direction == "short" and price >= pos.remainder_stop:
+                return True, f"остаток после частичной фиксации: откат к {pos.remainder_stop:.4f}"
+
         if pos.direction == "long" and price <= pos.stop_price:
             return True, f"стоп-лосс {pos.stop_price}"
         if pos.direction == "short" and price >= pos.stop_price:
@@ -392,8 +407,31 @@ class RiskManager:
                                f"отдали {giveback:.0f}₽ — фиксируем")
         return False, ""
 
+    def check_partial_take(self, ticker: str, price: float) -> tuple[bool, int, float]:
+        """
+        Возвращает (зафиксировать половину, qty к закрытию, уровень защиты
+        остатка). Срабатывает один раз — при первом достижении take_target
+        после открытия (half_closed=False). qtyـto_close = PARTIAL_TP_CLOSE_FRACTION
+        от текущего объёма (минимум 1 лот) — округление вниз, остаток не
+        обязан делиться на 2 без остатка.
+        """
+        pos = self.positions.get(ticker)
+        if not pos or pos.half_closed or pos.take_target <= 0 or pos.qty < 2:
+            return False, 0, 0.0
+        reached = (pos.direction == "long" and price >= pos.take_target) or \
+                  (pos.direction == "short" and price <= pos.take_target)
+        if not reached:
+            return False, 0, 0.0
+        dist = abs(pos.take_target - pos.entry_price)
+        retrace = dist * PARTIAL_TP_RETRACE_FRACTION
+        remainder_stop = pos.take_target - retrace if pos.direction == "long" else pos.take_target + retrace
+        qty_to_close = max(1, int(pos.qty * PARTIAL_TP_CLOSE_FRACTION))
+        qty_to_close = min(qty_to_close, pos.qty - 1)  # хотя бы 1 лот остаётся
+        return True, qty_to_close, remainder_stop
+
     def reduce_position(self, ticker: str, qty: int, price: float,
-                         point_value: float = 1.0, reason: str = "") -> dict | None:
+                         point_value: float = 1.0, reason: str = "",
+                         remainder_stop: float = 0.0) -> dict | None:
         pos = self.positions.get(ticker)
         if not pos or qty <= 0:
             return None
@@ -403,6 +441,9 @@ class RiskManager:
         pnl = diff * qty * point_value
         pos.qty -= qty
         pos.risk_rub = max(0.0, pos.risk_rub * (pos.qty / (pos.qty + qty)))
+        if remainder_stop:
+            pos.half_closed = True
+            pos.remainder_stop = remainder_stop
         self._register_closed_pnl(pnl)
         result = {"ticker": ticker, "direction": pos.direction, "qty": qty,
                   "entry": round(pos.entry_price, 2), "exit": price,
