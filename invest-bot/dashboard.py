@@ -523,7 +523,13 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <input type="password" class="inp mid" id="ov_password" placeholder="код из settings.ini">
   </label>
   <br><br>
-  <table class="scen-table" id="ov_table"></table>
+  <table class="scen-table">
+    <thead><tr>
+      <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
+      <th>LONG Take</th><th>LONG Stop</th><th>SHORT Take</th><th>SHORT Stop</th>
+    </tr></thead>
+    <tbody id="ov_table"></tbody>
+  </table>
   <br>
   <button class="btn-pill" onclick="loadOverrides()">⟳ ЗАГРУЗИТЬ ТЕКУЩИЕ</button>
   <button class="btn-pill" onclick="saveOverrides()">💾 СОХРАНИТЬ</button>
@@ -705,10 +711,10 @@ function ovRowHtml(ticker, t) {{
       <option value="sandbox" ${{so === 'sandbox' ? 'selected' : ''}}>песочница</option>
       <option value="live" ${{so === 'live' ? 'selected' : ''}}>боевой</option>
     </select></td>
-    <td>L.take <input type="text" class="inp ov_long_take" style="width:70px" value="${{t.long_take ?? ''}}" placeholder="—"></td>
-    <td>L.stop <input type="text" class="inp ov_long_stop" style="width:70px" value="${{t.long_stop ?? ''}}" placeholder="—"></td>
-    <td>S.take <input type="text" class="inp ov_short_take" style="width:70px" value="${{t.short_take ?? ''}}" placeholder="—"></td>
-    <td>S.stop <input type="text" class="inp ov_short_stop" style="width:70px" value="${{t.short_stop ?? ''}}" placeholder="—"></td>
+    <td><input type="text" class="inp ov_long_take" style="width:70px" value="${{t.long_take ?? ''}}" placeholder="—"></td>
+    <td><input type="text" class="inp ov_long_stop" style="width:70px" value="${{t.long_stop ?? ''}}" placeholder="—"></td>
+    <td><input type="text" class="inp ov_short_take" style="width:70px" value="${{t.short_take ?? ''}}" placeholder="—"></td>
+    <td><input type="text" class="inp ov_short_stop" style="width:70px" value="${{t.short_stop ?? ''}}" placeholder="—"></td>
   </tr>`;
 }}
 
