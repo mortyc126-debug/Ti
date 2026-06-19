@@ -58,6 +58,7 @@ import logging
 import math
 import os
 import statistics
+from configparser import ConfigParser
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable, Optional
@@ -142,8 +143,33 @@ QUALITY_ALPHA = 0.15               # скорость EWA для rolling quality
 
 # ── ATR-фильтр шума ──────────────────────────────────────────────────────────
 ATR_PERIOD = 14                    # период ATR
-COMMISSION_RT = 0.001              # round-trip комиссия (вход+выход), доля цены
 MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комиссия × этот фактор
+
+# ── Комиссия Т-Инвестиций по тарифам (round-trip = вход+выход) ──────────────
+# Акции/облигации/ETF/расписки — фикс. % от суммы сделки. Фьючерсы — % от
+# стоимости контракта, тариф растёт по мере падения дневного оборота —
+# берём ставку первой (самой высокой) ступени, чтобы не переоценить качество.
+# settings.ini [COMMISSION] TARIFF=TRADER|PREMIUM переключает обе ставки сразу.
+COMMISSION_TABLE = {
+    "TRADER": {"stock": 0.0005 * 2, "future": 0.0004 * 2},   # 0.1% / 0.08%
+    "PREMIUM": {"stock": 0.0004 * 2, "future": 0.00025 * 2},  # 0.08% / 0.05%
+}
+
+
+def _ini_tariff() -> str:
+    _ini = ConfigParser()
+    _ini.read("settings.ini")
+    tariff = _ini.get("COMMISSION", "TARIFF", fallback="TRADER").upper()
+    return tariff if tariff in COMMISSION_TABLE else "TRADER"
+
+
+def commission_rt(is_future: bool, tariff: Optional[str] = None) -> float:
+    """Round-trip комиссия для типа инструмента на заданном (или ini-) тарифе."""
+    rates = COMMISSION_TABLE[tariff if tariff in COMMISSION_TABLE else _ini_tariff()]
+    return rates["future"] if is_future else rates["stock"]
+
+
+COMMISSION_RT = commission_rt(is_future=False)  # дефолт для мест без доступа к settings (ATR-фильтр)
 
 
 @dataclass
@@ -167,12 +193,13 @@ class OpenTrade:
     entry_price: Decimal
     method_scores: dict
     after_candles: list = field(default_factory=list)
+    commission_rt: float = COMMISSION_RT  # ставка по типу инструмента (акция/фьючерс)
 
     def add_candle(self, candle: HistoricCandle) -> None:
         self.after_candles.append(candle)
 
     def calc_quality(self) -> float:
-        """MFE/MAE → quality ∈ [0, 1]. MFE уменьшается на COMMISSION_RT —
+        """MFE/MAE → quality ∈ [0, 1]. MFE уменьшается на commission_rt —
         движение цены меньше комиссии за круг не даёт реальной прибыли."""
         ep = float(self.entry_price)
         mfe = mae = 0.0
@@ -185,7 +212,7 @@ class OpenTrade:
             else:
                 mfe = max(mfe, (ep - lo) / ep)
                 mae = max(mae, (h - ep) / ep)
-        mfe_net = max(0.0, mfe - COMMISSION_RT)
+        mfe_net = max(0.0, mfe - self.commission_rt)
         return mfe_net / (mfe_net + mae + 1e-8)
 
 
@@ -953,7 +980,7 @@ class OICompositeStrategy(IStrategy):
         # ATR-фильтр: если средний ход меньше комиссии×фактор — движение не
         # окупает торговлю, сигнал не выдаём (защита от "мёртвых" инструментов).
         atr_pct = _compute_atr(self.__candles)
-        if atr_pct < COMMISSION_RT * MIN_ATR_FACTOR:
+        if atr_pct < commission_rt(self.__settings.is_future) * MIN_ATR_FACTOR:
             logger.debug(f"{self.__settings.figi}: пропуск — ATR {atr_pct:.4f} ниже комиссии×{MIN_ATR_FACTOR}")
             return None
 
@@ -1054,9 +1081,10 @@ class OICompositeStrategy(IStrategy):
                 else:
                     mfe = max(0.0, (entry - min(lows)) / entry) if lows else 0.0
                     mae = max(0.0, (max(highs) - entry) / entry) if highs else 0.0
-                # MFE за вычетом комиссии за круг — движение цены меньше
-                # COMMISSION_RT не даёт реальной прибыли на реальном счёте.
-                mfe_net = max(0.0, mfe - COMMISSION_RT)
+                # MFE за вычетом комиссии за круг (своя ставка для акции/фьючерса
+                # и текущего тарифа из settings.ini) — движение цены меньше
+                # комиссии не даёт реальной прибыли на реальном счёте.
+                mfe_net = max(0.0, mfe - commission_rt(self.__settings.is_future))
                 qualities.append(mfe_net / (mfe_net + mae) if (mfe_net + mae) > 0 else 0.5)
                 i += lookahead  # не пересекать виртуальные сделки
         finally:
@@ -1282,6 +1310,7 @@ class OICompositeStrategy(IStrategy):
             signal_type=signal_type,
             entry_price=entry,
             method_scores=method_scores,
+            commission_rt=commission_rt(self.__settings.is_future),
         )
 
         signal = Signal(
