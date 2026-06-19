@@ -37,6 +37,7 @@ from db_api_client import DbApiClient
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
+from runtime_overrides import load_overrides, save_overrides
 from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.strategies.strategy_factory import StrategyFactory
 
@@ -494,6 +495,30 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="council_answer"></div>
 </div>
 
+<div class="panel">
+  <div class="sec">Управление ботом (live)</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Бот перечитывает эти настройки сам, без перезапуска (раз в свечу).
+    Take/Stop-оверрайды действуют только на НОВЫЕ сигналы — открытые позиции не трогаются.
+  </div>
+  <label>Глобальный режим
+    <select class="inp" id="ov_global_mode">
+      <option value="auto">как в settings.ini у каждого тикера</option>
+      <option value="sandbox">форс-песочница для всех (паника)</option>
+      <option value="live">форс-боевой для всех (где не запрещено по тикеру)</option>
+    </select>
+  </label>
+  <label>Код подтверждения (нужен только чтобы включить «боевой»)
+    <input type="password" class="inp mid" id="ov_password" placeholder="код из settings.ini">
+  </label>
+  <br><br>
+  <table class="scen-table" id="ov_table"></table>
+  <br>
+  <button class="btn-pill" onclick="loadOverrides()">⟳ ЗАГРУЗИТЬ ТЕКУЩИЕ</button>
+  <button class="btn-pill" onclick="saveOverrides()">💾 СОХРАНИТЬ</button>
+  <span id="ov_status"></span>
+</div>
+
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
@@ -655,6 +680,67 @@ async function runPortfolioSim() {{
   document.getElementById('pf_trades').innerHTML = trh;
 }}
 
+function ovRowHtml(ticker, t) {{
+  t = t || {{}};
+  const en = t.enabled !== false;
+  const so = t.signal_only === true ? 'sandbox' : (t.signal_only === false ? 'live' : 'auto');
+  return `<tr data-ticker="${{ticker}}">
+    <td>${{ticker}}</td>
+    <td><input type="checkbox" class="ov_enabled" ${{en ? 'checked' : ''}}> торгуется</td>
+    <td><select class="inp ov_signal_only">
+      <option value="auto" ${{so === 'auto' ? 'selected' : ''}}>как в settings.ini</option>
+      <option value="sandbox" ${{so === 'sandbox' ? 'selected' : ''}}>песочница</option>
+      <option value="live" ${{so === 'live' ? 'selected' : ''}}>боевой</option>
+    </select></td>
+    <td>L.take <input type="text" class="inp ov_long_take" style="width:70px" value="${{t.long_take ?? ''}}" placeholder="—"></td>
+    <td>L.stop <input type="text" class="inp ov_long_stop" style="width:70px" value="${{t.long_stop ?? ''}}" placeholder="—"></td>
+    <td>S.take <input type="text" class="inp ov_short_take" style="width:70px" value="${{t.short_take ?? ''}}" placeholder="—"></td>
+    <td>S.stop <input type="text" class="inp ov_short_stop" style="width:70px" value="${{t.short_stop ?? ''}}" placeholder="—"></td>
+  </tr>`;
+}}
+
+async function loadOverrides() {{
+  const resp = await fetch('/api/overrides');
+  const data = await resp.json();
+  document.getElementById('ov_global_mode').value =
+    data.global_signal_only === true ? 'sandbox' : (data.global_signal_only === false ? 'live' : 'auto');
+  const tbody = document.getElementById('ov_table');
+  tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t])).join('');
+  document.getElementById('ov_status').textContent = 'загружено';
+}}
+
+async function saveOverrides() {{
+  const globalMode = document.getElementById('ov_global_mode').value;
+  const global_signal_only = globalMode === 'sandbox' ? true : (globalMode === 'live' ? false : null);
+  const tickers = {{}};
+  document.querySelectorAll('#ov_table tr').forEach(tr => {{
+    const ticker = tr.dataset.ticker;
+    const soVal = tr.querySelector('.ov_signal_only').value;
+    const num = (sel) => {{
+      const v = tr.querySelector(sel).value.trim();
+      return v === '' ? null : v;
+    }};
+    tickers[ticker] = {{
+      enabled: tr.querySelector('.ov_enabled').checked,
+      signal_only: soVal === 'sandbox' ? true : (soVal === 'live' ? false : null),
+      long_take: num('.ov_long_take'), long_stop: num('.ov_long_stop'),
+      short_take: num('.ov_short_take'), short_stop: num('.ov_short_stop'),
+    }};
+  }});
+  const resp = await fetch('/api/overrides', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{
+      global_signal_only, tickers,
+      password: document.getElementById('ov_password').value,
+    }}),
+  }});
+  const result = await resp.json();
+  document.getElementById('ov_status').textContent = result.error ? ('ОШИБКА: ' + result.error) : 'сохранено';
+}}
+
+loadOverrides();
+
 async function askCouncil() {{
   const text = document.getElementById('bugtext').value;
   if (!text.trim()) return;
@@ -672,6 +758,50 @@ async function askCouncil() {{
 </body>
 </html>
 """
+
+
+def get_overrides_payload() -> dict:
+    """Текущий data/bot_overrides.json + полный список тикеров (settings.ini + OI) для таблицы."""
+    data = load_overrides()
+    tickers_all = sorted(set(_strategy_settings_by_ticker().keys()) | set(load_oi_tickers().keys()))
+    return {
+        "global_signal_only": data.get("global_signal_only"),
+        "tickers": data.get("tickers", {}),
+        "tickers_all": tickers_all,
+    }
+
+
+def save_overrides_payload(payload: dict) -> dict | None:
+    """
+    Возвращает None при успехе, {"error": ...} если запрошен переход в боевой
+    режим (глобально или для конкретного тикера) без верного пароля
+    из settings.ini [DASHBOARD_CONTROL] PASSWORD.
+    """
+    global_signal_only = payload.get("global_signal_only")
+    tickers_in = payload.get("tickers", {})
+
+    wants_live = global_signal_only is False or any(
+        t.get("signal_only") is False for t in tickers_in.values()
+    )
+    if wants_live:
+        expected = _config.dashboard_password
+        if not expected or payload.get("password") != expected:
+            return {"error": "неверный или не настроен код подтверждения (settings.ini [DASHBOARD_CONTROL] PASSWORD)"}
+
+    tickers_out = {}
+    for ticker, t in tickers_in.items():
+        entry = {"enabled": bool(t.get("enabled", True))}
+        if t.get("signal_only") is not None:
+            entry["signal_only"] = bool(t["signal_only"])
+        else:
+            entry["signal_only"] = None
+        for field in ("long_take", "long_stop", "short_take", "short_stop"):
+            v = t.get(field)
+            entry[field] = str(v) if v not in (None, "") else None
+        tickers_out[ticker.upper()] = entry
+
+    save_overrides({"global_signal_only": global_signal_only, "tickers": tickers_out})
+    return None
 
 
 def _render_page() -> bytes:
@@ -701,6 +831,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif self.path == "/api/overrides":
+            self._send_json(get_overrides_payload())
         else:
             self.send_error(404)
 
@@ -750,6 +882,9 @@ class Handler(BaseHTTPRequestHandler):
             text = payload.get("text", "")
             advice = bug_council.analyze_bug(text, context="ручной запрос через дашборд")
             self._send_json(advice)
+        elif self.path == "/api/overrides":
+            error = save_overrides_payload(payload)
+            self._send_json(error if error else {"ok": True})
         else:
             self.send_error(404)
 

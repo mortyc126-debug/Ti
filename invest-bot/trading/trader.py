@@ -31,6 +31,7 @@ from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
 from db_api_client import DbApiClient
+from runtime_overrides import RuntimeOverrides
 import bot_control
 
 __all__ = ("Trader")
@@ -92,6 +93,9 @@ class Trader:
         self.__pos_tracking: dict[str, dict] = {}
         # Текущие стратегии торгового дня — для TG /status и /close
         self.__current_strategies: dict[str, IStrategy] = {}
+        # Настройки с дашборда (live/sandbox, take/stop, allow/deny по тикерам) —
+        # см. runtime_overrides.py. Перечитывается на каждой свече по mtime.
+        self.__overrides = RuntimeOverrides()
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -282,6 +286,8 @@ class Trader:
         self.__today_trade_results = TradeResults()
         self.__current_strategies = strategies
         bot_control.control.current_trader = self
+        self.__overrides.maybe_reload()
+        self.__apply_overrides(strategies)
 
         async for candle in self.__stream_service.start_async_candles_stream(
                 list(strategies.keys()),
@@ -300,6 +306,11 @@ class Trader:
             # Срочное закрытие по команде из Telegram (/close TICKER|all)
             if bot_control.control.close_requests:
                 self.__process_close_requests(account_id, strategies)
+
+            # Настройки с дашборда (live/sandbox, take/stop) — перечитываем
+            # дёшево (stat()), применяем к стратегиям только если файл менялся.
+            if self.__overrides.maybe_reload():
+                self.__apply_overrides(strategies)
 
             # Обновляем MFE/MAE трекинг для открытой позиции
             pt = self.__pos_tracking.get(candle.figi)
@@ -386,10 +397,16 @@ class Trader:
                         elif bot_control.control.paused:
                             logger.info(f"New signal has been skipped. Бот на паузе (TG /pause)")
 
+                        elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
+                            logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")
+
                         else:
                             strategy = strategies[candle.figi]
-                            # signal_only = только Telegram, без реального ордера
-                            is_signal_only = getattr(strategy, 'signal_only', False)
+                            # signal_only = только Telegram, без реального ордера;
+                            # дашборд может форсировать sandbox глобально или для тикера
+                            is_signal_only = self.__overrides.signal_only_for(
+                                strategy.settings.ticker, getattr(strategy, 'signal_only', False)
+                            )
 
                             if is_signal_only:
                                 logger.info(f"SIGNAL ONLY mode: {signal_new} (no order placed)")
@@ -742,6 +759,22 @@ class Trader:
                     )
                     self.__blogger.fail_message()
         return result
+
+    def __apply_overrides(self, strategies: dict[str, IStrategy]) -> None:
+        """
+        Применяет take/stop оверрайды с дашборда к уже сконструированным
+        стратегиям (set_take_stop_overrides переписывает закэшированные в
+        __init__ Decimal). signal_only и enabled/disabled читаются на
+        каждый новый сигнал напрямую из RuntimeOverrides (см. __trading) —
+        здесь они не кэшируются.
+        """
+        for strategy in strategies.values():
+            if not hasattr(strategy, "set_take_stop_overrides"):
+                continue
+            overrides = self.__overrides.take_stop_for(strategy.settings.ticker)
+            if overrides:
+                strategy.set_take_stop_overrides(**overrides)
+                logger.info(f"OVERRIDES: {strategy.settings.ticker} take/stop -> {overrides}")
 
     def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> None:
         """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу."""

@@ -67,6 +67,12 @@ class ProgramConfiguration:
         else:
             self.__futures_trading_settings = FuturesTradingSettings()
 
+        # Пароль для подтверждения переключения бота в боевой режим с дашборда
+        # (runtime_overrides.py) — отдельно от TOKEN, чтобы не плодить риск
+        # компрометации основного API-токена при случайной утечке.
+        self.__dashboard_password = config["DASHBOARD_CONTROL"].get("PASSWORD", "") \
+            if "DASHBOARD_CONTROL" in config else ""
+
         self.__trade_strategy_settings = []
         for strategy_section in config.sections():
             if strategy_section.startswith("STRATEGY_") and not strategy_section.endswith("_SETTINGS"):
@@ -111,3 +117,7 @@ class ProgramConfiguration:
     @property
     def futures_trading_settings(self) -> FuturesTradingSettings:
         return self.__futures_trading_settings
+
+    @property
+    def dashboard_password(self) -> str:
+        return self.__dashboard_password

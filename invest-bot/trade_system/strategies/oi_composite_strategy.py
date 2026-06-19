@@ -881,6 +881,31 @@ class OICompositeStrategy(IStrategy):
     def is_signal_only(self) -> bool:
         return self.__signal_only
 
+    def set_take_stop_overrides(
+            self,
+            long_take: Decimal | None = None,
+            long_stop: Decimal | None = None,
+            short_take: Decimal | None = None,
+            short_stop: Decimal | None = None,
+    ) -> None:
+        """
+        Хот-релоад LONG_TAKE/LONG_STOP/SHORT_TAKE/SHORT_STOP из дашборда
+        (runtime_overrides.py) без пересоздания стратегии. Множители
+        закэшированы в __init__ как Decimal и иначе не перечитываются —
+        этот сеттер единственный способ применить новые значения. Влияет
+        только на сигналы, которые будут сгенерированы ПОСЛЕ вызова (уже
+        открытая позиция использует stop_loss_level/take_profit_level,
+        зафиксированные в сигнале на момент открытия).
+        """
+        if long_take is not None:
+            self.__long_take = long_take
+        if long_stop is not None:
+            self.__long_stop = long_stop
+        if short_take is not None:
+            self.__short_take = short_take
+        if short_stop is not None:
+            self.__short_stop = short_stop
+
     def set_squeeze_provider(self, provider: Optional[SqueezeProvider]) -> None:
         """
         provider(ticker, direction) -> squeeze_score [0..1], см. oi_layers.py.
