@@ -98,7 +98,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = ConfigParser()
-    config.read(args.settings)
+    config.read(args.settings, encoding="utf-8")
 
     token = config["INVEST_API"]["TOKEN"]
     app_name = config["INVEST_API"]["APP_NAME"]

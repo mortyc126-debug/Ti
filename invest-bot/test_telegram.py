@@ -11,7 +11,7 @@ from aiogram import Bot
 
 async def main():
     config = ConfigParser()
-    config.read("settings.ini")
+    config.read("settings.ini", encoding="utf-8")
     token = config["BLOG"]["TELEGRAM_BOT_TOKEN"]
     chat_id = config["BLOG"]["TELEGRAM_CHAT_ID"]
     print(f"token={token[:10]}... chat_id={chat_id}")

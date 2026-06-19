@@ -13,7 +13,7 @@ class ProgramConfiguration:
     def __init__(self, file_name: str) -> None:
         # classic ini file
         config = ConfigParser()
-        config.read(file_name)
+        config.read(file_name, encoding="utf-8")
 
         self.__tinkoff_token = config["INVEST_API"]["TOKEN"]
         self.__tinkoff_app_name = config["INVEST_API"]["APP_NAME"]

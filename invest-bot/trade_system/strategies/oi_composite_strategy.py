@@ -158,7 +158,7 @@ COMMISSION_TABLE = {
 
 def _ini_tariff() -> str:
     _ini = ConfigParser()
-    _ini.read("settings.ini")
+    _ini.read("settings.ini", encoding="utf-8")
     tariff = _ini.get("COMMISSION", "TARIFF", fallback="TRADER").upper()
     return tariff if tariff in COMMISSION_TABLE else "TRADER"
 

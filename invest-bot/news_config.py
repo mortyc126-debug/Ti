@@ -5,7 +5,7 @@ from configparser import ConfigParser
 # https://cloud.cerebras.ai → API Keys), а не в отдельной переменной
 # окружения — все остальные секреты бота тоже лежат в settings.ini.
 _ini = ConfigParser()
-_ini.read("settings.ini")
+_ini.read("settings.ini", encoding="utf-8")
 CEREBRAS_API_KEY = _ini.get("NEWS", "CEREBRAS_API_KEY", fallback="")
 if CEREBRAS_API_KEY == "YOUR_CEREBRAS_KEY":
     CEREBRAS_API_KEY = ""
