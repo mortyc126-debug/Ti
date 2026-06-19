@@ -307,11 +307,21 @@ def run_backtest(
     return rows
 
 
-def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: float, tariff: str | None = None) -> dict:
+def run_portfolio_sim(
+        tickers: list[str], days: int, account: float, risk_pct: float, tariff: str | None = None,
+        mode: str = "fixed", atr_take_ks: list[float] | None = None, atr_stop_ks: list[float] | None = None,
+) -> dict:
     """
-    Виртуальный счёт: сделки со ВСЕХ выбранных тикеров (fixed take/stop из
-    их настроек) сводятся в одну хронологию и проигрываются по очереди на
-    одном балансе — как если бы счёт был один, а сигналы приходили вперемешку.
+    Виртуальный счёт: сделки со ВСЕХ выбранных тикеров сводятся в одну
+    хронологию и проигрываются по очереди на одном балансе — как если бы
+    счёт был один, а сигналы приходили вперемешку.
+
+    mode="fixed" — take/stop из настроек тикера (как раньше). mode="atr" —
+    на каждом тикере для тех же сигналов подбирается лучшая по expectancy_pct
+    комбинация ATR_TAKE_K/ATR_STOP_K из сетки (как в run_backtest_one) и
+    именно её сделки идут в портфель. Нужно, чтобы сравнить плавающий
+    take/stop с фиксированным не только по отдельному тикеру (как в таблице
+    бэктеста), но и на одном виртуальном счёте.
 
     Размер сделки — risk_pct% от ТЕКУЩЕГО баланса (растёт/падает вместе со
     счётом), а не от стартового — иначе просадка/рост считались бы нечестно.
@@ -341,16 +351,35 @@ def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: f
             if not candles:
                 continue
 
-            s = strategy_settings.settings
-            long_take = Decimal(s.get("LONG_TAKE", "1.015"))
-            long_stop = Decimal(s.get("LONG_STOP", "0.985"))
-
             signals = strategy.backtest_scan_signals(candles)
-            res = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
-                                              return_trades=True, tariff=tariff)
-            for t in res.get("trades", []):
-                t["ticker"] = ticker
-                all_trades.append(t)
+
+            if mode == "atr":
+                best = None
+                for tk in (atr_take_ks or []):
+                    for sk in (atr_stop_ks or []):
+                        r = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk, tariff=tariff)
+                        if r["n_trades"] == 0:
+                            continue
+                        if best is None or r["expectancy_pct"] > best[1]["expectancy_pct"]:
+                            best = ((tk, sk), r)
+                if best is None:
+                    continue
+                (tk, sk), _ = best
+                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk,
+                                                  return_trades=True, tariff=tariff)
+                for t in res.get("trades", []):
+                    t["ticker"] = ticker
+                    t["atr_k"] = f"{tk}/{sk}"
+                    all_trades.append(t)
+            else:
+                s = strategy_settings.settings
+                long_take = Decimal(s.get("LONG_TAKE", "1.015"))
+                long_stop = Decimal(s.get("LONG_STOP", "0.985"))
+                res = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
+                                                  return_trades=True, tariff=tariff)
+                for t in res.get("trades", []):
+                    t["ticker"] = ticker
+                    all_trades.append(t)
 
         except Exception:
             tb = traceback.format_exc()
@@ -502,11 +531,19 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div class="sec">Портфель (виртуальный счёт)</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     Сделки выбранных выше тикеров (галочки) сводятся в одну хронологию и
-    проигрываются по очереди на одном балансе — fixed take/stop из настроек
-    тикера, размер сделки = риск% от текущего баланса.
+    проигрываются по очереди на одном балансе, размер сделки = риск% от
+    текущего баланса. Режим "fixed" — take/stop из настроек тикера. Режим
+    "ATR" — на каждом тикере для тех же сигналов берётся лучшая по
+    expectancy комбинация ATR_TAKE_K/ATR_STOP_K (сетка как в бэктесте выше).
   </div>
   <label>Счёт, ₽ <input type="number" class="inp mid" id="pf_account" value="100000" min="1000"></label>
   <label>Риск на сделку, % <input type="number" class="inp mid" id="pf_risk" value="1" min="0.1" step="0.1"></label>
+  <label>Режим
+    <select class="inp mid" id="pf_mode">
+      <option value="fixed">fixed</option>
+      <option value="atr">ATR-адаптивный</option>
+    </select>
+  </label>
   <br><br>
   <button class="btn-pill" onclick="runPortfolioSim()">▶ ПРОГНАТЬ ПОРТФЕЛЬ</button>
   <span id="pf_status"></span>
@@ -691,7 +728,7 @@ async function fetchMegaAlerts() {{
 function pfRowsToHtml(trades) {{
   let html = '';
   for (const t of trades) {{
-    html += `<tr><td>${{t.entry_time}}</td><td>${{t.ticker}}</td><td>${{t.direction}}</td><td>${{(t.net_pct*100).toFixed(2)}}%</td><td>${{t.r_multiple}}</td><td>${{t.pnl_rub}}</td><td>${{t.equity_after}}</td></tr>`;
+    html += `<tr><td>${{t.entry_time}}</td><td>${{t.ticker}}${{t.atr_k ? ' (' + t.atr_k + ')' : ''}}</td><td>${{t.direction}}</td><td>${{(t.net_pct*100).toFixed(2)}}%</td><td>${{t.r_multiple}}</td><td>${{t.pnl_rub}}</td><td>${{t.equity_after}}</td></tr>`;
   }}
   return html;
 }}
@@ -708,6 +745,9 @@ async function runPortfolioSim() {{
     account: parseFloat(document.getElementById('pf_account').value),
     risk_pct: parseFloat(document.getElementById('pf_risk').value),
     tariff: document.getElementById('tariff').value,
+    mode: document.getElementById('pf_mode').value,
+    atr_take: document.getElementById('atr_take').value,
+    atr_stop: document.getElementById('atr_stop').value,
   }};
   const resp = await fetch('/api/portfolio_sim', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(body)}});
   const data = await resp.json();
@@ -953,7 +993,11 @@ class Handler(BaseHTTPRequestHandler):
             account = float(payload.get("account", 100000))
             risk_pct = float(payload.get("risk_pct", 1))
             tariff = payload.get("tariff") or None
-            result = run_portfolio_sim(tickers, days, account, risk_pct, tariff=tariff)
+            mode = payload.get("mode") or "fixed"
+            atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
+            atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
+            result = run_portfolio_sim(tickers, days, account, risk_pct, tariff=tariff,
+                                        mode=mode, atr_take_ks=atr_take_ks, atr_stop_ks=atr_stop_ks)
             self._send_json(result)
         elif self.path == "/api/import_oi":
             oi_tickers = payload.get("tickers", [])
