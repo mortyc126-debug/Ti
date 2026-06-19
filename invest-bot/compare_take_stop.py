@@ -20,6 +20,8 @@ import argparse
 import logging
 from decimal import Decimal
 
+from tinkoff.invest.exceptions import RequestError
+
 from configuration.configuration import ProgramConfiguration
 from invest_api.services.market_data_service import MarketDataService
 from trade_system.strategies.strategy_factory import StrategyFactory
@@ -48,7 +50,11 @@ def main() -> None:
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             continue
 
-        candles = market_data.get_candles_history(strategy_settings.figi, days=args.days)
+        try:
+            candles = market_data.get_candles_history(strategy_settings.figi, days=args.days)
+        except RequestError as ex:
+            print(f"{strategy_settings.ticker:<8} — ошибка API ({ex.details}), пропуск")
+            continue
         if not candles:
             print(f"{strategy_settings.ticker:<8} — нет истории, пропуск")
             continue
