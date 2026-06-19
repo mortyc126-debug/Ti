@@ -84,6 +84,9 @@ class Trader:
         self.__history = HistoryStore()
         self.__calibrator = PercentileCalibrator()
         self.__tf_buffer = MultiTfBuffer()
+        # Прогноз утреннего backtest-гейта (ticker -> {quality, n_trades, live})
+        # для сверки с фактическим rolling_quality конца дня — см. __archive_today.
+        self.__backtest_predictions: dict[str, dict] = {}
         # Трекинг MFE/MAE для открытых позиций: {figi: {entry, direction, max_fav, max_adv}}
         self.__pos_tracking: dict[str, dict] = {}
         # Текущие стратегии торгового дня — для TG /status и /close
@@ -923,6 +926,38 @@ class Trader:
                     rolling_quality=snapshot["rolling_quality"],
                     live=not signal_only
                 )
+            self.__record_backtest_calibration(strategy.settings.ticker, today, snapshot["rolling_quality"])
+        self.__backtest_predictions.clear()
+
+    def __record_backtest_calibration(self, ticker: str, date: str, actual_quality: float) -> None:
+        """
+        Сверяет утренний прогноз backtest-гейта (__validate_strategy_backtest)
+        с фактическим rolling_quality конца дня — без этого нет способа узнать,
+        насколько BACKTEST_QUALITY_MIN/историческая выборка вообще предсказывают
+        реальный результат, а не просто шум на 5 днях истории.
+        """
+        prediction = self.__backtest_predictions.get(ticker)
+        if prediction is None:
+            return
+        record = {"date": date, "ticker": ticker, "actual_quality": round(actual_quality, 4), **prediction}
+        logger.info(
+            f"BACKTEST-СВЕРКА: {ticker} прогноз={prediction['predicted_quality']:.2f} "
+            f"факт={actual_quality:.2f} ({'торговали' if prediction['gated_live'] else 'signal-only'})"
+        )
+        path = "data/backtest_calibration.json"
+        try:
+            os.makedirs("data", exist_ok=True)
+            records = []
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    records = json.load(f)
+            records.append(record)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(records[-500:], f, ensure_ascii=False)
+            os.replace(tmp, path)
+        except (OSError, json.JSONDecodeError) as ex:
+            logger.warning(f"BACKTEST-СВЕРКА: не удалось сохранить {path}: {repr(ex)}")
 
     def __validate_strategy_backtest(self, strategy: IStrategy) -> None:
         """
@@ -955,6 +990,9 @@ class Trader:
             f"BACKTEST: {strategy.settings.ticker} quality={quality:.2f} на {n_trades} вирт. сделках "
             f"({'ок, торгуем' if live else 'НЕДОСТАТОЧНО — переводим в signal-only на сегодня'})"
         )
+        self.__backtest_predictions[strategy.settings.ticker] = {
+            "predicted_quality": round(quality, 4), "n_trades": n_trades, "gated_live": live,
+        }
         if not live and hasattr(strategy, "set_signal_only"):
             strategy.set_signal_only(True)
 
