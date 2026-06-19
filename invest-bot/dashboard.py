@@ -21,6 +21,19 @@ import asyncio
 import json
 import logging
 import os
+
+# Гонка процессов в ProcessPoolExecutor: каждый воркер тянет numpy/scipy,
+# а BLAS (OpenBLAS/MKL) по умолчанию сам расхватывает все ядра под потоки.
+# 4 процесса × N BLAS-тредов на N-ядерной машине = жёсткая оверсаб­скрипция,
+# планировщик ОС реально докручивает только 2 из 4 — отсюда "параллелим
+# 4, а бежит 2". Ограничиваем BLAS одним тредом на процесс; ставить ДО
+# импорта numpy/scipy (в т.ч. транзитивного, через trade_system.*).
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+
 import time
 import traceback
 from collections import defaultdict
