@@ -95,3 +95,32 @@ class MarketDataService:
 
         logger.debug(f"Candles history for {figi}: {len(result)} баров за {days} дней")
         return result
+
+    @invest_api_retry()
+    @invest_error_logging
+    def get_candles_for_dates(
+            self,
+            figi: str,
+            dates: list,
+            interval: CandleInterval = CandleInterval.CANDLE_INTERVAL_5_MIN
+    ) -> list[HistoricCandle]:
+        """
+        Свечи только за конкретные календарные даты (`date` объекты) — для
+        докачки недостающих дней архива (candle_archive.py), без повторного
+        запроса уже закэшированных дней.
+        """
+        result: list[HistoricCandle] = []
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            for day in dates:
+                day_from = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+                day_to = day_from + timedelta(days=1)
+                response = client.market_data.get_candles(
+                    figi=figi,
+                    from_=day_from,
+                    to=day_to,
+                    interval=interval
+                )
+                result.extend(c for c in response.candles if c.is_complete)
+
+        logger.debug(f"Candles for dates {figi}: {len(result)} баров за {len(dates)} дней")
+        return result
