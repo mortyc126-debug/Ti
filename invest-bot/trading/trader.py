@@ -403,20 +403,17 @@ class Trader:
                         should_close, reason = self.__risk.check_exit(risk_ticker_cur, float(quotation_to_decimal(candle.close)))
                         if should_close:
                             logger.info(f"PARTIAL TP REMAINDER CLOSE {risk_ticker_cur}: {reason}")
-                            self.__risk_close(strategies[candle.figi], float(quotation_to_decimal(candle.close)), reason)
-                            self.__close_position_and_send_message(account_id, candle.figi, strategies)
+                            self.__exit_position(account_id, strategies[candle.figi], strategies, float(quotation_to_decimal(candle.close)), reason)
                     elif self.__overrides.partial_tp_enabled(PARTIAL_TP_DEFAULT_ENABLED) and \
                             self.__try_partial_take(account_id, candle, strategies):
                         pass  # частичная фиксация сработала — остаток остаётся открытым
                     elif low <= current_trade_order.signal.stop_loss_level <= high:
                         logger.info(f"STOP LOSS: {current_trade_order}")
-                        self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.stop_loss_level), "stop_loss")
-                        self.__close_position_and_send_message(account_id, candle.figi, strategies)
+                        self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.stop_loss_level), "stop_loss")
 
                     elif low <= current_trade_order.signal.take_profit_level <= high:
                         logger.info(f"TAKE PROFIT: {current_trade_order}")
-                        self.__risk_close(strategies[candle.figi], float(current_trade_order.signal.take_profit_level), "take_profit")
-                        self.__close_position_and_send_message(account_id, candle.figi, strategies)
+                        self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.take_profit_level), "take_profit")
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
 
@@ -436,8 +433,7 @@ class Trader:
                         if signal_new.signal_type == SignalType.CLOSE:
                             if current_trade_order:
                                 logger.info(f"Close position by close signal: {current_trade_order}")
-                                self.__risk_close(strategies[candle.figi], float(quotation_to_decimal(candle.close)), "close_signal")
-                                self.__close_position_and_send_message(account_id, candle.figi, strategies)
+                                self.__exit_position(account_id, strategies[candle.figi], strategies, float(quotation_to_decimal(candle.close)), "close_signal")
                             else:
                                 logger.info(f"New signal has been skipped. No open position to close.")
 
@@ -1017,8 +1013,7 @@ class Trader:
         should_close, reason = self.__risk.check_exit(risk_ticker, price, squeeze=squeeze)
         if should_close:
             logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")
-            self.__risk_close(strategy, price, reason)
-            self.__close_position_and_send_message(account_id, candle.figi, strategies)
+            self.__exit_position(account_id, strategy, strategies, price, reason)
 
     def __process_close_requests(
             self,
@@ -1038,23 +1033,102 @@ class Trader:
                 continue
             if self.__today_trade_results and self.__today_trade_results.get_current_trade_order(figi):
                 logger.info(f"TG /close: срочное закрытие {strategy.settings.ticker}")
-                self.__risk_close(strategy, self.__last_prices.get(strategy.settings.ticker, 0.0), "tg_close_request")
-                self.__close_position_and_send_message(account_id, figi, strategies)
+                self.__exit_position(account_id, strategy, strategies, self.__last_prices.get(strategy.settings.ticker, 0.0), "tg_close_request")
             reqs.discard(ticker)
         reqs.discard("ALL")
 
-    def __close_position_and_send_message(
+    def __close_figi_with_fill_info(
             self,
             account_id: str,
             figi: str,
             strategies: dict[str, IStrategy]
+    ) -> tuple[str | None, int, int]:
+        """
+        Закрывает одну позицию по figi market-ордером, возвращает
+        (order_id, исполнено_лотов, запрошено_лотов) — в отличие от
+        __close_position_by_figi не прячет PARTIALLYFILL, чтобы вызывающий
+        код (__exit_position) мог не терять видимость непогашенного
+        остатка реальной позиции в risk.py.
+        """
+        current_positions = list(self.__operation_service.positions_securities(account_id) or []) + \
+            list(self.__operation_service.positions_futures(account_id) or [])
+        for position in current_positions:
+            if position.figi != figi or position.balance == 0:
+                continue
+            if not self.__market_data_service.is_stock_ready_for_trading(position.figi):
+                return None, 0, 0
+            lot_size = strategies[position.figi].settings.lot_size
+            requested_lots = abs(int(position.balance / lot_size))
+            if requested_lots <= 0:
+                return None, 0, 0
+            close_order = self.__order_service.post_market_order(
+                account_id=account_id, figi=position.figi,
+                count_lots=requested_lots, is_buy=(position.balance < 0)
+            )
+            if close_order.execution_report_status not in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+            ):
+                logger.warning(f"Close order REJECTED/FAILED: {close_order}")
+                return None, 0, requested_lots
+            try:
+                state = self.__order_service.get_order_state(account_id, close_order.order_id)
+                filled_lots = state.lots_executed or requested_lots
+            except Exception as ex:
+                logger.warning(f"__close_figi_with_fill_info get_order_state error: {repr(ex)}")
+                filled_lots = requested_lots \
+                    if close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL \
+                    else 0
+            return close_order.order_id, filled_lots, requested_lots
+        return None, 0, 0
+
+    def __exit_position(
+            self,
+            account_id: str,
+            strategy: IStrategy,
+            strategies: dict[str, IStrategy],
+            price: float,
+            reason: str,
     ) -> None:
-        close_order_id = self.__close_position_by_figi(account_id, [figi], strategies).get(figi, None)
-        if close_order_id:
-            trade_order = self.__today_trade_results.close_position(figi, close_order_id)
-            self.__blogger.close_position_message(trade_order)
-            # Передаём реальные MFE/MAE в стратегию при закрытии
-            self.__notify_closed_with_tracking(figi, strategies)
+        """
+        Единая точка выхода из позиции по стопу/тейку/сигналу/Telegram.
+        Раньше risk_close (снятие позиции из risk.py) вызывался ДО
+        закрывающего ордера на бирже — при PARTIALLYFILL бот считал
+        позицию закрытой целиком, хотя на бирже остаётся непогашенный
+        остаток, который risk.py больше не трейлит и не видит для
+        корреляционного/портфельного риск-лимита. Теперь risk.py
+        обновляется только по факту исполнения закрывающего ордера.
+        """
+        figi = strategy.settings.figi
+        risk_ticker = strategy.settings.ticker
+        if risk_ticker not in self.__risk.positions:
+            return
+
+        order_id, filled_lots, requested_lots = self.__close_figi_with_fill_info(account_id, figi, strategies)
+        if not order_id or filled_lots <= 0:
+            logger.warning(
+                f"{risk_ticker}: закрывающий ордер не исполнился ({reason}), "
+                f"позиция остаётся под трекингом risk.py — повтор на следующей свече"
+            )
+            return
+
+        if filled_lots < requested_lots:
+            logger.warning(
+                f"PARTIAL CLOSE {risk_ticker}: запрошено {requested_lots}, исполнено {filled_lots} "
+                f"лотов ({reason}) — остаток {requested_lots - filled_lots} лотов остаётся в risk.positions"
+            )
+            self.__risk.reduce_position(
+                risk_ticker, filled_lots, price,
+                point_value=strategy.settings.point_value, reason=reason,
+            )
+            # today_trade_results НЕ закрываем — current_trade_order остаётся
+            # активным, следующая свеча повторит попытку закрыть остаток.
+            return
+
+        self.__risk_close(strategy, price, reason)
+        trade_order = self.__today_trade_results.close_position(figi, order_id)
+        self.__blogger.close_position_message(trade_order)
+        self.__notify_closed_with_tracking(figi, strategies)
 
     def __notify_closed_with_tracking(
             self,
