@@ -17,7 +17,7 @@ from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from invest_api.utils import candle_to_historiccandle
 from trade_system.issuer_filter import issuer_key, select_top_tickers
-from trade_system.signal import SignalType
+from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 from history import HistoryStore
 from calibration import PercentileCalibrator
@@ -121,6 +121,11 @@ class Trader:
         self.__overrides = RuntimeOverrides()
         # Кулдаун повторного входа после убыточного закрытия — см. __risk_close.
         self.__loss_cooldown_until: dict[str, datetime.datetime] = {}
+        # figi, для которых размещение ордера (__smart_order, до 45с репрайса)
+        # сейчас идёт фоновой asyncio.Task — см. __trading/__place_order_task.
+        # Не даёт открыть вторую заявку по тому же тикеру, пока первая летит,
+        # и не блокирует чтение стрима свечей по ОСТАЛЬНЫМ тикерам на это время.
+        self.__pending_orders: set[str] = set()
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -439,6 +444,9 @@ class Trader:
                         elif current_trade_order:
                             logger.info(f"New signal has been skipped. Previous signal is still alive.")
 
+                        elif candle.figi in self.__pending_orders:
+                            logger.info(f"New signal has been skipped. Ордер по тикеру уже в процессе размещения.")
+
                         elif not self.__market_data_service.is_stock_ready_for_trading(candle.figi):
                             logger.info(f"New signal has been skipped. Stock isn't ready for trading")
 
@@ -506,48 +514,17 @@ class Trader:
                                     f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
                                 )
                                 if available_lots > 0:
-                                    open_order_id, actual_lots = await self.__smart_order(
-                                        account_id=account_id,
-                                        figi=candle.figi,
-                                        count_lots=available_lots,
-                                        is_buy=(signal_new.signal_type == SignalType.LONG),
-                                        last_price=float(quotation_to_decimal(candle.close)),
-                                        strategy=strategy
-                                    )
-                                    if open_order_id and actual_lots > 0:
-                                        if actual_lots < available_lots:
-                                            logger.warning(
-                                                f"PARTIAL FILL {risk_ticker}: "
-                                                f"запрошено {available_lots}, исполнено {actual_lots}"
-                                            )
-                                        open_position = self.__today_trade_results.open_position(
-                                            candle.figi,
-                                            open_order_id,
-                                            signal_new
-                                        )
-                                        entry_composite = 0.0
-                                        if hasattr(strategy, "last_snapshot"):
-                                            _comp = strategy.last_snapshot().get("composite", 0.0)
-                                            entry_composite = _comp if direction == "long" else -_comp
-                                        self.__risk.open_position(
-                                            risk_ticker, direction, actual_lots,
-                                            entry_price, stop_price,
-                                            point_value=strategy.settings.point_value,
-                                            confidence=confidence,
-                                            take_target=float(signal_new.take_profit_level),
-                                            entry_composite=entry_composite,
-                                        )
-                                        self.__blogger.open_position_message(open_position)
-                                        logger.info(f"Open position: {open_position}")
-                                        # Запускаем MFE/MAE трекинг для этой позиции
-                                        self.__pos_tracking[candle.figi] = {
-                                            "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
-                                            "entry": entry_price,
-                                            "max_fav": entry_price,
-                                            "max_adv": entry_price,
-                                        }
-                                    else:
-                                        logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
+                                    # Размещение/репрайс ордера (__smart_order) может ждать
+                                    # до limit_reprice_interval_sec * limit_reprice_max_attempts
+                                    # (десятки секунд). await прямо тут блокировал бы чтение
+                                    # стрима свечей по ВСЕМ остальным тикерам — стопы/тейки по
+                                    # уже открытым позициям не проверялись бы это время. Гоним
+                                    # фоновой таской, помечаем figi как "ордер в процессе".
+                                    self.__pending_orders.add(candle.figi)
+                                    asyncio.create_task(self.__place_order_task(
+                                        account_id, candle.figi, available_lots, signal_new,
+                                        strategy, direction, confidence, entry_price, stop_price,
+                                    ))
                                 else:
                                     logger.info(f"New signal has been skipped. No available money or risk budget")
                     except Exception as ex:
@@ -640,6 +617,73 @@ class Trader:
         avg_volume = sum(volumes) / len(volumes)
         cap_in_shares = avg_volume * self.__trading_settings.max_volume_participation
         return max(1, int(cap_in_shares / share_lot_size))
+
+    async def __place_order_task(
+            self,
+            account_id: str,
+            figi: str,
+            available_lots: int,
+            signal_new: Signal,
+            strategy: IStrategy,
+            direction: str,
+            confidence: float,
+            entry_price: float,
+            stop_price: float,
+    ) -> None:
+        """
+        Фоновая таска размещения ордера (см. вызов в __trading) — выполняет
+        __smart_order и последующую регистрацию позиции (today_trade_results,
+        risk.open_position, MFE/MAE трекинг) без блокировки чтения стрима
+        свечей по остальным тикерам на время репрайса.
+        """
+        risk_ticker = strategy.settings.ticker
+        try:
+            open_order_id, actual_lots = await self.__smart_order(
+                account_id=account_id,
+                figi=figi,
+                count_lots=available_lots,
+                is_buy=(signal_new.signal_type == SignalType.LONG),
+                last_price=entry_price,
+                strategy=strategy
+            )
+            if open_order_id and actual_lots > 0:
+                if actual_lots < available_lots:
+                    logger.warning(
+                        f"PARTIAL FILL {risk_ticker}: "
+                        f"запрошено {available_lots}, исполнено {actual_lots}"
+                    )
+                open_position = self.__today_trade_results.open_position(
+                    figi,
+                    open_order_id,
+                    signal_new
+                )
+                entry_composite = 0.0
+                if hasattr(strategy, "last_snapshot"):
+                    _comp = strategy.last_snapshot().get("composite", 0.0)
+                    entry_composite = _comp if direction == "long" else -_comp
+                self.__risk.open_position(
+                    risk_ticker, direction, actual_lots,
+                    entry_price, stop_price,
+                    point_value=strategy.settings.point_value,
+                    confidence=confidence,
+                    take_target=float(signal_new.take_profit_level),
+                    entry_composite=entry_composite,
+                )
+                self.__blogger.open_position_message(open_position)
+                logger.info(f"Open position: {open_position}")
+                # Запускаем MFE/MAE трекинг для этой позиции
+                self.__pos_tracking[figi] = {
+                    "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
+                    "entry": entry_price,
+                    "max_fav": entry_price,
+                    "max_adv": entry_price,
+                }
+            else:
+                logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
+        except Exception as ex:
+            logger.error(f"Error open new position by new signal: {repr(ex)}")
+        finally:
+            self.__pending_orders.discard(figi)
 
     async def __smart_order(
             self,
