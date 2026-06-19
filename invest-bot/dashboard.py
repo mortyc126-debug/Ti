@@ -32,6 +32,7 @@ import bug_council
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from invest_api.services.market_data_service import MarketDataService
+from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.strategies.strategy_factory import StrategyFactory
 
 CONFIG_FILE = "settings.ini"
@@ -68,20 +69,33 @@ def load_oi_tickers() -> dict:
         return json.load(f)
 
 
-def merge_oi_tickers(oi_tickers: list[dict]) -> int:
+def merge_oi_tickers(oi_tickers: list[dict], signal_log: list[dict] | None = None) -> int:
     """
     Принимает массив `tickers` из JSON-экспорта OI ({t, f, name, ...} —
     см. exportData() в oi-signal-v10.html), сохраняет тикер+FIGI на диск.
+    `signal_log` (тоже из экспорта OI) — считаем по нему demand =
+    частоту сигналов по тикеру, нужна для дедупликации по эмитенту
+    (см. trade_system/issuer_filter.py) — самый востребованный из пары
+    "обычка/префы" остаётся, второй — нет.
     Возвращает число добавленных/обновлённых тикеров.
     """
     current = load_oi_tickers()
+    demand_counts: dict[str, int] = defaultdict(int)
+    for entry in signal_log or []:
+        t = entry.get("ticker")
+        if t:
+            demand_counts[t] += 1
+
     n = 0
     for item in oi_tickers:
         ticker = item.get("t")
         figi = item.get("f")
         if not ticker or not figi:
             continue
-        current[ticker] = {"figi": figi, "name": item.get("name", ticker)}
+        current[ticker] = {
+            "figi": figi, "name": item.get("name", ticker),
+            "demand": demand_counts.get(ticker, current.get(ticker, {}).get("demand", 0)),
+        }
         n += 1
     with open(OI_TICKERS_FILE, "w", encoding="utf-8") as f:
         json.dump(current, f, ensure_ascii=False, indent=2)
@@ -99,6 +113,39 @@ def _strategy_settings_by_ticker() -> dict:
             settings=dict(_OI_DEFAULT_SETTINGS),
         )
     return by_ticker
+
+
+def filter_active_tickers(tickers: list[str], dedup_by_issuer: bool, top_pct: float) -> dict:
+    """
+    Применяет дедуп по эмитенту + отсев по востребованности (см.
+    issuer_filter.select_top_tickers) к выбранному в UI списку тикеров.
+
+    Тикеры из settings.ini (вручную отобранные, без дублей) всегда
+    остаются — demand у них приравнивается к "бесконечности", чтобы они
+    не вытеснялись и не отсекались top_pct, но всё равно участвовали в
+    дедупе как "сильный" вариант, если у эмитента есть OI-дубль.
+    """
+    if not dedup_by_issuer:
+        return {"kept": tickers, "dropped": []}
+
+    settings_tickers = {s.ticker for s in _config.trade_strategy_settings}
+    oi_tickers = load_oi_tickers()
+
+    infos = []
+    for ticker in tickers:
+        if ticker in settings_tickers:
+            infos.append({"ticker": ticker, "issuer_key": issuer_key(ticker), "demand": float("inf")})
+        else:
+            info = oi_tickers.get(ticker, {})
+            infos.append({
+                "ticker": ticker,
+                "issuer_key": issuer_key(ticker, info.get("name", "")),
+                "demand": info.get("demand", 0),
+            })
+
+    kept, dropped = select_top_tickers(infos, top_pct)
+    kept_set = set(tickers) & set(kept)
+    return {"kept": [t for t in tickers if t in kept_set], "dropped": dropped}
 
 
 def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float]) -> list[dict]:
@@ -356,6 +403,9 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <label>Дней истории <input type="number" class="inp mid" id="days" value="30" min="1" max="90"></label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
+  <br>
+  <label><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту (обычка/префы, фьючерс/базис) —
+    топ <input type="number" class="inp" style="width:50px;padding:6px 8px;" id="top_pct" value="70" min="1" max="100">% по востребованности</label>
   <br><br>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <span id="status"></span>
@@ -420,14 +470,36 @@ function rowsToHtml(rows) {{
   return html;
 }}
 
+async function applyDedup(tickersIn) {{
+  const dedup = document.getElementById('dedup_issuer').checked;
+  const topPct = parseFloat(document.getElementById('top_pct').value);
+  const resp = await fetch('/api/filter_tickers', {{
+    method: 'POST', headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{tickers: tickersIn, dedup: dedup, top_pct: topPct}})
+  }});
+  return await resp.json();
+}}
+
+function droppedToHtml(dropped) {{
+  let html = '';
+  for (const d of dropped) {{
+    html += `<tr><td>${{d.ticker}}</td><td colspan="5" style="color:var(--txt3);">пропущен — ${{d.reason}}</td></tr>`;
+  }}
+  return html;
+}}
+
 async function runBacktest() {{
-  const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
-  if (tickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
+  const allTickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
+  if (allTickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
   const table = document.getElementById('results');
   table.innerHTML = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th></tr>';
   const days = parseInt(document.getElementById('days').value, 10);
   const atrTake = document.getElementById('atr_take').value;
   const atrStop = document.getElementById('atr_stop').value;
+
+  const filtered = await applyDedup(allTickers);
+  const tickers = filtered.kept;
+  table.innerHTML += droppedToHtml(filtered.dropped);
 
   for (let i = 0; i < tickers.length; i++) {{
     const ticker = tickers[i];
@@ -459,7 +531,7 @@ async function importOiFile(ev) {{
     const tickers = data.tickers || [];
     const resp = await fetch('/api/import_oi', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{tickers: tickers}})
+      body: JSON.stringify({{tickers: tickers, signalLog: data.signalLog || []}})
     }});
     const result = await resp.json();
     document.getElementById('oi_status').textContent = `✓ импортировано ${{result.imported}} тикеров — перезагрузи страницу`;
@@ -476,9 +548,11 @@ function pfRowsToHtml(trades) {{
 }}
 
 async function runPortfolioSim() {{
-  const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
-  if (tickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
+  const allTickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
+  if (allTickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
   document.getElementById('pf_status').textContent = 'Считаю...';
+  const filtered = await applyDedup(allTickers);
+  const tickers = filtered.kept;
   const body = {{
     tickers: tickers,
     days: parseInt(document.getElementById('days').value, 10),
@@ -491,10 +565,13 @@ async function runPortfolioSim() {{
 
   const s = data.summary;
   const sign = s.pnl_rub >= 0 ? 'var(--pos)' : 'var(--neg)';
+  const dedupNote = filtered.dropped.length
+    ? `<div style="color:var(--txt3);font-size:10px;margin-top:4px;">Без дублей по эмитенту: пропущено ${{filtered.dropped.length}} (${{filtered.dropped.map(d => d.ticker).join(', ')}})</div>`
+    : '';
   document.getElementById('pf_summary').innerHTML =
     `<div class="advice">Старт: ${{s.account_start}} ₽ &nbsp;→&nbsp; Итог: ${{s.equity_end}} ₽ &nbsp;
      (<span style="color:${{sign}}">${{s.pnl_rub >= 0 ? '+' : ''}}${{s.pnl_rub}} ₽</span>) &nbsp;|&nbsp;
-     Сделок: ${{s.n_trades}} &nbsp;|&nbsp; Макс. просадка: ${{s.max_drawdown_rub}} ₽</div>`;
+     Сделок: ${{s.n_trades}} &nbsp;|&nbsp; Макс. просадка: ${{s.max_drawdown_rub}} ₽</div>${{dedupNote}}`;
 
   let mh = '<tr><th>Месяц</th><th>Сделок</th><th>Прибыль ₽</th><th>Счёт на конец</th></tr>';
   for (const m of data.monthly) {{
@@ -597,8 +674,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(result)
         elif self.path == "/api/import_oi":
             oi_tickers = payload.get("tickers", [])
-            n = merge_oi_tickers(oi_tickers)
+            signal_log = payload.get("signalLog", [])
+            n = merge_oi_tickers(oi_tickers, signal_log)
             self._send_json({"imported": n, "tickers": sorted(_strategy_settings_by_ticker().keys())})
+        elif self.path == "/api/filter_tickers":
+            tickers = payload.get("tickers", [])
+            dedup = bool(payload.get("dedup", False))
+            top_pct = float(payload.get("top_pct", 70)) / 100.0
+            self._send_json(filter_active_tickers(tickers, dedup, top_pct))
         elif self.path == "/api/council":
             text = payload.get("text", "")
             advice = bug_council.analyze_bug(text, context="ручной запрос через дашборд")
