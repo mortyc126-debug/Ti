@@ -31,8 +31,13 @@ from invest_api.services.market_data_service import MarketDataService
 from trade_system.strategies.strategy_factory import StrategyFactory
 
 CONFIG_FILE = "settings.ini"
+LOG_FILE = "dashboard.log"
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, encoding="utf-8")],
+)
 logger = logging.getLogger(__name__)
 
 _config = ProgramConfiguration(CONFIG_FILE)
@@ -43,69 +48,76 @@ def _strategy_settings_by_ticker() -> dict:
     return {s.ticker: s for s in _config.trade_strategy_settings}
 
 
-def run_backtest(tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float]) -> list[dict]:
+def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float]) -> list[dict]:
     """
-    Прогоняет бэктест по выбранным тикерам. Возвращает список строк-результатов
-    (как в compare_take_stop.py: fixed + лучшая ATR-комбинация на тикер),
+    Прогоняет бэктест по одному тикеру. Возвращает список строк-результатов
+    (как в compare_take_stop.py: fixed + лучшая ATR-комбинация),
     либо строку с ошибкой и советом, если тикер упал.
     """
     by_ticker = _strategy_settings_by_ticker()
     rows: list[dict] = []
 
-    for ticker in tickers:
-        strategy_settings = by_ticker.get(ticker)
-        if strategy_settings is None:
-            rows.append({"ticker": ticker, "mode": "ошибка", "error": "нет в settings.ini"})
-            continue
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        rows.append({"ticker": ticker, "mode": "ошибка", "error": "нет в settings.ini"})
+        return rows
+
+    try:
+        strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+        if strategy is None or not hasattr(strategy, "backtest_barriers"):
+            rows.append({"ticker": ticker, "mode": "пропуск",
+                         "error": "стратегия не поддерживает backtest_barriers"})
+            return rows
 
         try:
-            strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
-            if strategy is None or not hasattr(strategy, "backtest_barriers"):
-                rows.append({"ticker": ticker, "mode": "пропуск",
-                             "error": "стратегия не поддерживает backtest_barriers"})
-                continue
+            candles = _market_data.get_candles_history(strategy_settings.figi, days=days)
+        except RequestError as ex:
+            rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
+            return rows
 
-            try:
-                candles = _market_data.get_candles_history(strategy_settings.figi, days=days)
-            except RequestError as ex:
-                rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
-                continue
+        if not candles:
+            rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
+            return rows
 
-            if not candles:
-                rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
-                continue
+        s = strategy_settings.settings
+        long_take = Decimal(s.get("LONG_TAKE", "1.015"))
+        long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
-            s = strategy_settings.settings
-            long_take = Decimal(s.get("LONG_TAKE", "1.015"))
-            long_stop = Decimal(s.get("LONG_STOP", "0.985"))
+        signals = strategy.backtest_scan_signals(candles)
 
-            signals = strategy.backtest_scan_signals(candles)
+        fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop)
+        rows.append({"ticker": ticker, "mode": "fixed", **fixed})
 
-            fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop)
-            rows.append({"ticker": ticker, "mode": "fixed", **fixed})
+        best = None
+        for tk in atr_take_ks:
+            for sk in atr_stop_ks:
+                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk)
+                if res["n_trades"] == 0:
+                    continue
+                if best is None or res["expectancy_pct"] > best[1]["expectancy_pct"]:
+                    best = ((tk, sk), res)
 
-            best = None
-            for tk in atr_take_ks:
-                for sk in atr_stop_ks:
-                    res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk)
-                    if res["n_trades"] == 0:
-                        continue
-                    if best is None or res["expectancy_pct"] > best[1]["expectancy_pct"]:
-                        best = ((tk, sk), res)
+        if best:
+            (tk, sk), res = best
+            rows.append({"ticker": ticker, "mode": f"ATR k={tk}/{sk}", **res})
 
-            if best:
-                (tk, sk), res = best
-                rows.append({"ticker": ticker, "mode": f"ATR k={tk}/{sk}", **res})
+    except Exception:
+        tb = traceback.format_exc()
+        context = (f"dashboard run_backtest: ticker={ticker}, days={days}, "
+                   f"atr_take={atr_take_ks}, atr_stop={atr_stop_ks}")
+        advice = bug_council.analyze_bug(tb, context)
+        logger.error(f"run_backtest {ticker}:\n{tb}")
+        rows.append({"ticker": ticker, "mode": "ошибка", "error": tb.strip().splitlines()[-1],
+                     "traceback": tb, "advice": advice})
 
-        except Exception:
-            tb = traceback.format_exc()
-            context = (f"dashboard run_backtest: ticker={ticker}, days={days}, "
-                       f"atr_take={atr_take_ks}, atr_stop={atr_stop_ks}")
-            advice = bug_council.analyze_bug(tb, context)
-            logger.error(f"run_backtest {ticker}:\n{tb}")
-            rows.append({"ticker": ticker, "mode": "ошибка", "error": tb.strip().splitlines()[-1],
-                         "traceback": tb, "advice": advice})
+    return rows
 
+
+def run_backtest(tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float]) -> list[dict]:
+    """Прогоняет бэктест по всем тикерам сразу (используется как fallback API)."""
+    rows: list[dict] = []
+    for ticker in tickers:
+        rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks))
     return rows
 
 
@@ -178,6 +190,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <div class="panel">
   <div class="sec">Совет по багам</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Лог пишется в файл <b style="color:var(--txt2)">dashboard.log</b> (рядом с dashboard.py) —
+    открой его текстовым редактором и скопируй нужный кусок сюда.
+  </div>
   <textarea id="bugtext" placeholder="Вставь traceback или лог..."></textarea><br><br>
   <button class="btn-pill" onclick="askCouncil()">СПРОСИТЬ СОВЕТ</button>
   <div id="council_answer"></div>
@@ -186,9 +202,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
-function renderRows(rows) {{
-  const table = document.getElementById('results');
-  let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th></tr>';
+function rowsToHtml(rows) {{
+  let html = '';
   for (const r of rows) {{
     if (r.error !== undefined && r.n_trades === undefined) {{
       html += `<tr><td><span class="sdot err"></span>${{r.ticker}}</td><td colspan="5" class="err">${{r.mode}}: ${{r.error || ''}}</td></tr>`;
@@ -207,23 +222,33 @@ function renderRows(rows) {{
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
     html += `<tr><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td></tr>`;
   }}
-  table.innerHTML = html;
+  return html;
 }}
 
 async function runBacktest() {{
   const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
   if (tickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
-  document.getElementById('status').textContent = 'Считаю...';
-  const body = {{
-    tickers: tickers,
-    days: parseInt(document.getElementById('days').value, 10),
-    atr_take: document.getElementById('atr_take').value,
-    atr_stop: document.getElementById('atr_stop').value,
-  }};
-  const resp = await fetch('/api/backtest', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(body)}});
-  const data = await resp.json();
-  document.getElementById('status').textContent = '';
-  renderRows(data.rows);
+  const table = document.getElementById('results');
+  table.innerHTML = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th></tr>';
+  const days = parseInt(document.getElementById('days').value, 10);
+  const atrTake = document.getElementById('atr_take').value;
+  const atrStop = document.getElementById('atr_stop').value;
+
+  for (let i = 0; i < tickers.length; i++) {{
+    const ticker = tickers[i];
+    document.getElementById('status').textContent = `Считаю ${{ticker}}... (${{i + 1}}/${{tickers.length}})`;
+    try {{
+      const resp = await fetch('/api/backtest_one', {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{ticker: ticker, days: days, atr_take: atrTake, atr_stop: atrStop}})
+      }});
+      const data = await resp.json();
+      table.innerHTML += rowsToHtml(data.rows);
+    }} catch (e) {{
+      table.innerHTML += `<tr><td><span class="sdot err"></span>${{ticker}}</td><td colspan="5" class="err">сетевая ошибка: ${{e}}</td></tr>`;
+    }}
+  }}
+  document.getElementById('status').textContent = `Готово: ${{tickers.length}} тикер(ов)`;
 }}
 
 async function askCouncil() {{
@@ -283,7 +308,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": "bad json"}, 400)
             return
 
-        if self.path == "/api/backtest":
+        if self.path == "/api/backtest_one":
+            ticker = payload.get("ticker", "")
+            days = int(payload.get("days", 30))
+            atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
+            atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
+            rows = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks)
+            self._send_json({"rows": rows})
+        elif self.path == "/api/backtest":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 30))
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
