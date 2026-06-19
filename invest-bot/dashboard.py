@@ -198,7 +198,10 @@ def fetch_mega_alert_tickers() -> dict:
     return {"added": [a["t"] for a in added], "dropped": dropped, "unresolved": unresolved, "n": n}
 
 
-def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float]) -> list[dict]:
+def run_backtest_one(
+        ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
+        tariff: str | None = None,
+) -> list[dict]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает список строк-результатов
     (как в compare_take_stop.py: fixed + лучшая ATR-комбинация),
@@ -241,13 +244,13 @@ def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_
         signals = strategy.backtest_scan_signals(candles)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с")
 
-        fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop)
+        fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop, tariff=tariff)
         rows.append({"ticker": ticker, "mode": "fixed", **fixed})
 
         best = None
         for tk in atr_take_ks:
             for sk in atr_stop_ks:
-                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk)
+                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk, tariff=tariff)
                 if res["n_trades"] == 0:
                     continue
                 if best is None or res["expectancy_pct"] > best[1]["expectancy_pct"]:
@@ -269,15 +272,18 @@ def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_
     return rows
 
 
-def run_backtest(tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float]) -> list[dict]:
+def run_backtest(
+        tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
+        tariff: str | None = None,
+) -> list[dict]:
     """Прогоняет бэктест по всем тикерам сразу (используется как fallback API)."""
     rows: list[dict] = []
     for ticker in tickers:
-        rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks))
+        rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff))
     return rows
 
 
-def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: float) -> dict:
+def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: float, tariff: str | None = None) -> dict:
     """
     Виртуальный счёт: сделки со ВСЕХ выбранных тикеров (fixed take/stop из
     их настроек) сводятся в одну хронологию и проигрываются по очереди на
@@ -317,7 +323,7 @@ def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: f
 
             signals = strategy.backtest_scan_signals(candles)
             res = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
-                                              return_trades=True)
+                                              return_trades=True, tariff=tariff)
             for t in res.get("trades", []):
                 t["ticker"] = ticker
                 all_trades.append(t)
@@ -454,6 +460,11 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <label>Дней истории <input type="number" class="inp mid" id="days" value="30" min="1" max="90"></label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
+  <label>Тариф комиссии <select class="inp" id="tariff">
+    <option value="">как в settings.ini</option>
+    <option value="TRADER">Трейдер (0.05%/0.04% за сторону)</option>
+    <option value="PREMIUM">Премиум (0.04%/0.025% за сторону)</option>
+  </select></label>
   <br>
   <label><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту (обычка/префы, фьючерс/базис) —
     топ <input type="number" class="inp" style="width:50px;padding:6px 8px;" id="top_pct" value="70" min="1" max="100">% по востребованности</label>
@@ -582,7 +593,8 @@ async function runBacktest() {{
     try {{
       const resp = await fetch('/api/backtest_one', {{
         method: 'POST', headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{ticker: ticker, days: days, atr_take: atrTake, atr_stop: atrStop}})
+        body: JSON.stringify({{ticker: ticker, days: days, atr_take: atrTake, atr_stop: atrStop,
+                                tariff: document.getElementById('tariff').value}})
       }});
       const data = await resp.json();
       table.innerHTML += rowsToHtml(data.rows);
@@ -645,6 +657,7 @@ async function runPortfolioSim() {{
     days: parseInt(document.getElementById('days').value, 10),
     account: parseFloat(document.getElementById('pf_account').value),
     risk_pct: parseFloat(document.getElementById('pf_risk').value),
+    tariff: document.getElementById('tariff').value,
   }};
   const resp = await fetch('/api/portfolio_sim', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(body)}});
   const data = await resp.json();
@@ -850,21 +863,24 @@ class Handler(BaseHTTPRequestHandler):
             days = int(payload.get("days", 30))
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
-            rows = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks)
+            tariff = payload.get("tariff") or None
+            rows = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff)
             self._send_json({"rows": rows})
         elif self.path == "/api/backtest":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 30))
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
-            rows = run_backtest(tickers, days, atr_take_ks, atr_stop_ks)
+            tariff = payload.get("tariff") or None
+            rows = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff)
             self._send_json({"rows": rows})
         elif self.path == "/api/portfolio_sim":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 30))
             account = float(payload.get("account", 100000))
             risk_pct = float(payload.get("risk_pct", 1))
-            result = run_portfolio_sim(tickers, days, account, risk_pct)
+            tariff = payload.get("tariff") or None
+            result = run_portfolio_sim(tickers, days, account, risk_pct, tariff=tariff)
             self._send_json(result)
         elif self.path == "/api/import_oi":
             oi_tickers = payload.get("tickers", [])

@@ -1200,6 +1200,7 @@ class OICompositeStrategy(IStrategy):
             max_bars: int = 60,
             signals: Optional[list[dict]] = None,
             return_trades: bool = False,
+            tariff: Optional[str] = None,
     ) -> dict:
         """
         В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
@@ -1223,6 +1224,10 @@ class OICompositeStrategy(IStrategy):
 
         Возвращает {"n_trades", "win_rate", "avg_r", "expectancy_pct"} —
         expectancy_pct уже за вычетом commission_rt за круг.
+
+        tariff — "TRADER"/"PREMIUM", переопределяет settings.ini [COMMISSION]
+        TARIFF на время этого расчёта (дашборд — сравнить тарифы без правки
+        settings.ini). None — берётся ini-тариф, как раньше.
         """
         if signals is None:
             signals = self.backtest_scan_signals(candles, max_bars=max_bars)
@@ -1233,7 +1238,7 @@ class OICompositeStrategy(IStrategy):
         if not signals:
             return empty
 
-        comm = commission_rt(self.__settings.is_future)
+        comm = commission_rt(self.__settings.is_future, tariff=tariff)
         results: list[tuple[bool, float, float]] = []  # (win, r_multiple, net_pct)
         trades: list[dict] = []
         for sig in signals:
