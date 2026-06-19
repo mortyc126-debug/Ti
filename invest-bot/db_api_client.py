@@ -80,11 +80,11 @@ class DbApiClient:
     def push_candles(self, ticker: str, candles: list[dict]) -> None:
         """
         candles: [{time (ISO), open, high, low, close, volume}]. Бьём на чанки —
-        2000 строк в одном batch-insert D1 не укладываются в 15с (один день
-        5-минутных свечей по ликвидному тикеру — это уже ~100 строк, чанк
-        в 300 покрывает несколько дней истории за раз и не таймаутит).
+        большой batch-insert (300+ строк в одной D1-транзакции) иногда упирается
+        в лимит CPU-времени Workers на бесплатном плане, и edge рвёт соединение
+        без ответа (RemoteDisconnected) — поэтому чанк маленький.
         """
-        chunk = 300
+        chunk = 100
         for i in range(0, len(candles), chunk):
             self.__request("POST", "candles", {"ticker": ticker, "candles": candles[i:i + chunk]}, timeout=30)
 
