@@ -20,6 +20,7 @@ import argparse
 import json
 import logging
 import os
+import time
 import traceback
 from collections import defaultdict
 from decimal import Decimal
@@ -38,7 +39,7 @@ LOG_FILE = "dashboard.log"
 OI_TICKERS_FILE = "oi_tickers.json"
 
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, encoding="utf-8")],
 )
@@ -114,6 +115,8 @@ def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_
         rows.append({"ticker": ticker, "mode": "ошибка", "error": "нет в settings.ini"})
         return rows
 
+    t0 = time.monotonic()
+    logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
@@ -131,11 +134,15 @@ def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_
             rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
             return rows
 
+        logger.info(f"{ticker}: {len(candles)} свечей за {time.monotonic() - t0:.1f}с, считаю сигналы "
+                    f"(может занять минуту-две — внутри Hawkes-MLE на каждый бар)...")
         s = strategy_settings.settings
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
+        t1 = time.monotonic()
         signals = strategy.backtest_scan_signals(candles)
+        logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с")
 
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop)
         rows.append({"ticker": ticker, "mode": "fixed", **fixed})
@@ -188,11 +195,12 @@ def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: f
     all_trades: list[dict] = []
     errors: list[dict] = []
 
-    for ticker in tickers:
+    for i, ticker in enumerate(tickers, 1):
         strategy_settings = by_ticker.get(ticker)
         if strategy_settings is None:
             errors.append({"ticker": ticker, "error": "нет в settings.ini и не импортирован из OI"})
             continue
+        logger.info(f"portfolio_sim: {ticker} ({i}/{len(tickers)})...")
         try:
             strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
             if strategy is None or not hasattr(strategy, "backtest_barriers"):
