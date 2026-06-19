@@ -11,6 +11,7 @@ set_take_stop_overrides). Изменения take/stop влияют только
 {
   "global_signal_only": null | true | false,   // null — нет глобального оверрайда
   "partial_tp_enabled": null | true | false,    // null — берём дефолт из PARTIAL_TP_DEFAULT_ENABLED (trader.py)
+  "adaptive_exit_enabled": null | true | false, // null — берём дефолт из ADAPTIVE_EXIT_ENABLED (trader.py)
   "tickers": {
     "SBER": {
       "enabled": true,                          // false — новые сигналы не открываются (ни реально, ни signal-only)
@@ -45,6 +46,7 @@ def load_overrides(path: str = OVERRIDES_FILE) -> dict:
         return {"global_signal_only": None, "tickers": {}}
     data.setdefault("global_signal_only", None)
     data.setdefault("partial_tp_enabled", None)
+    data.setdefault("adaptive_exit_enabled", None)
     data.setdefault("tickers", {})
     return data
 
@@ -97,6 +99,10 @@ class RuntimeOverrides:
 
     def partial_tp_enabled(self, default: bool) -> bool:
         v = self.__data.get("partial_tp_enabled")
+        return default if v is None else bool(v)
+
+    def adaptive_exit_enabled(self, default: bool) -> bool:
+        v = self.__data.get("adaptive_exit_enabled")
         return default if v is None else bool(v)
 
     def take_stop_for(self, ticker: str) -> dict[str, Decimal]:

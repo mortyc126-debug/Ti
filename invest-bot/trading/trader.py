@@ -390,7 +390,7 @@ class Trader:
                 risk_ticker_cur = strategies[candle.figi].settings.ticker
                 risk_pos_cur = self.__risk.positions.get(risk_ticker_cur)
                 try:
-                    if ADAPTIVE_EXIT_ENABLED:
+                    if self.__overrides.adaptive_exit_enabled(ADAPTIVE_EXIT_ENABLED):
                         # Адаптивный выход — единственная логика закрытия позиции:
                         # фиксированные stop/take из сигнала игнорируются, чтобы
                         # трейлинг-стоп мог двигаться и забирать большее движение,

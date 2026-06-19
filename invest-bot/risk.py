@@ -57,7 +57,8 @@ class Position:
     entry_price: float
     stop_price: float
     opened_ts: str
-    risk_rub: float            # рублей на кону при стопе
+    risk_rub: float            # рублей на кону ПРИ ТЕКУЩЕМ стопе (пересчитывается в check_exit при трейлинге/безубытке)
+    point_value: float = 1.0   # цена пункта — нужна, чтобы пересчитывать risk_rub при сдвиге stop_price
     confidence: float = 0.7    # уверенность сигнала на момент открытия (0-1)
     trail_dist: float = 0.0
     peak_profit_rub: float = 0.0
@@ -347,6 +348,7 @@ class RiskManager:
             entry_price=entry, stop_price=stop,
             opened_ts=datetime.now().isoformat(),
             risk_rub=abs(entry - stop) * qty * point_value,
+            point_value=point_value,
             trail_dist=trail_dist or abs(entry - stop) / 2 * CHANDELIER_MULT,
             peak_price=entry,
             confidence=confidence,
@@ -360,6 +362,21 @@ class RiskManager:
                  f"портфель_риск={self.portfolio_risk_pct():.1f}%")
         self.save_positions()
         return pos
+
+    def _recalc_risk_rub(self, pos: "Position") -> None:
+        """
+        risk_rub считался один раз при открытии и не уменьшался при подтяжке
+        стопа (трейлинг/безубыток) — portfolio_risk_pct()/stop_squeeze_factor()
+        видели риск как если бы стоп всегда был на первоначальном расстоянии,
+        даже когда реальный риск уже ниже (или нулевой после безубытка). Раз
+        stop_price сдвинулся — пересчитываем от текущей дистанции entry->stop,
+        с полом в 0 (если стоп ушёл за вход — риска убытка уже нет).
+        """
+        if pos.direction == "long":
+            dist = pos.entry_price - pos.stop_price
+        else:
+            dist = pos.stop_price - pos.entry_price
+        pos.risk_rub = max(0.0, dist) * pos.qty * pos.point_value
 
     def check_exit(self, ticker: str, price: float,
                     point_value: float = 1.0,
@@ -380,6 +397,7 @@ class RiskManager:
             pos.peak_price = min(pos.peak_price, price)
             if pos.trail_dist > 0:
                 pos.stop_price = min(pos.stop_price, pos.peak_price + pos.trail_dist)
+        self._recalc_risk_rub(pos)
 
         # Остаток после частичной фиксации на тейке: фиксированный уровень
         # защиты (треть пройденного расстояния вход->тейк), независимо от
@@ -405,6 +423,7 @@ class RiskManager:
             else:
                 pos.stop_price = min(pos.stop_price, pos.entry_price)
             pos.breakeven_set = True
+            self._recalc_risk_rub(pos)
             log.info(f"{ticker}: прибыль >= {BREAKEVEN_AT_R}R — стоп в безубыток")
 
         if pos.peak_profit_rub > pos.risk_rub:
