@@ -38,6 +38,7 @@ from risk_config import (
     CONF_LOW_THR, CONF_MID_THR, CONF_HIGH_THR,
     CORR_GROUPS, PORTFOLIO_RISK_MAX_PCT, PORTFOLIO_STOP_SQUEEZE,
     PARTIAL_TP_CLOSE_FRACTION, PARTIAL_TP_RETRACE_FRACTION,
+    SCALE_OUT_EDGE_DECAY, SCALE_OUT_CLOSE_FRACTION,
 )
 
 __all__ = ("Position", "RiskManager")
@@ -68,6 +69,10 @@ class Position:
     take_target: float = 0.0       # уровень первого тейка из сигнала — для частичной фиксации
     half_closed: bool = False      # половина уже зафиксирована на тейке
     remainder_stop: float = 0.0    # после half_closed: фиксированный уровень защиты остатка
+    fix_step: float = 0.0          # шаг для следующих фиксаций = дистанция первого плеча вход->тейк
+    next_fix_level: float = 0.0    # следующий уровень цены для оценки доп. фиксации
+    fix_count: int = 0             # сколько раз уже фиксировали после первого тейка
+    entry_composite: float = 0.0   # сигнальный edge на момент входа (знаковый, по направлению позиции)
 
     def pnl_rub(self, price: float, point_value: float = 1.0) -> float:
         diff = (price - self.entry_price) if self.direction == "long" \
@@ -335,7 +340,8 @@ class RiskManager:
                        reasons: list | None = None,
                        trail_dist: float = 0.0,
                        confidence: float = 0.7,
-                       take_target: float = 0.0) -> Position:
+                       take_target: float = 0.0,
+                       entry_composite: float = 0.0) -> Position:
         pos = Position(
             ticker=ticker, direction=direction, qty=qty,
             entry_price=entry, stop_price=stop,
@@ -346,6 +352,7 @@ class RiskManager:
             confidence=confidence,
             reasons=reasons or [],
             take_target=take_target,
+            entry_composite=entry_composite,
         )
         self.positions[ticker] = pos
         log.info(f"OPEN {direction} {ticker} qty={qty} entry={entry} stop={stop} "
@@ -429,6 +436,51 @@ class RiskManager:
         qty_to_close = min(qty_to_close, pos.qty - 1)  # хотя бы 1 лот остаётся
         return True, qty_to_close, remainder_stop
 
+    def check_scale_out(self, ticker: str, price: float, current_edge: float) -> tuple[bool, int, float]:
+        """
+        Вызывается после half_closed=True, на каждом обновлении цены —
+        оценивает, не пора ли зафиксировать ещё часть остатка. Срабатывает
+        только при достижении очередного шага next_fix_level (тот же шаг,
+        что и первое плечо вход->тейк). current_edge — знаковый edge сигнала
+        (composite по направлению позиции: +composite для long, -composite
+        для short) на текущий момент.
+
+        Если edge просел ниже entry_composite * SCALE_OUT_EDGE_DECAY —
+        преимущество исчезает, фиксируем ещё SCALE_OUT_CLOSE_FRACTION остатка.
+        Иначе сигнал всё ещё в силе — просто подтягиваем remainder_stop
+        вперёд (никогда не отпускаем назад) и сдвигаем следующий шаг.
+
+        Возвращает (зафиксировать ли доп.часть, qty к закрытию, новый
+        remainder_stop). remainder_stop в результате актуален всегда —
+        даже если зафиксировать не пришлось (для информирования вызывающей
+        стороны), но при price-движении мутирует pos.remainder_stop в любом
+        случае как побочный эффект.
+        """
+        pos = self.positions.get(ticker)
+        if not pos or not pos.half_closed or pos.fix_step <= 0 or pos.qty < 2:
+            return False, 0, 0.0
+        reached = (pos.direction == "long" and price >= pos.next_fix_level) or \
+                  (pos.direction == "short" and price <= pos.next_fix_level)
+        if not reached:
+            return False, 0, 0.0
+
+        retrace = pos.fix_step * PARTIAL_TP_RETRACE_FRACTION
+        candidate_stop = price - retrace if pos.direction == "long" else price + retrace
+        if pos.direction == "long":
+            pos.remainder_stop = max(pos.remainder_stop, candidate_stop)
+        else:
+            pos.remainder_stop = min(pos.remainder_stop, candidate_stop)
+        pos.next_fix_level += pos.fix_step if pos.direction == "long" else -pos.fix_step
+
+        decayed = current_edge < pos.entry_composite * SCALE_OUT_EDGE_DECAY
+        if not decayed:
+            return False, 0, pos.remainder_stop
+
+        qty_to_close = max(1, int(pos.qty * SCALE_OUT_CLOSE_FRACTION))
+        qty_to_close = min(qty_to_close, pos.qty - 1)  # хотя бы 1 лот остаётся
+        pos.fix_count += 1
+        return True, qty_to_close, pos.remainder_stop
+
     def reduce_position(self, ticker: str, qty: int, price: float,
                          point_value: float = 1.0, reason: str = "",
                          remainder_stop: float = 0.0) -> dict | None:
@@ -442,6 +494,14 @@ class RiskManager:
         pos.qty -= qty
         pos.risk_rub = max(0.0, pos.risk_rub * (pos.qty / (pos.qty + qty)))
         if remainder_stop:
+            if not pos.half_closed:
+                # первая частичная фиксация на тейке — задаём шаг для
+                # последующих фиксаций (та же дистанция вход->тейк) и
+                # уровень, на котором будем оценивать следующий шаг.
+                pos.fix_step = abs(pos.take_target - pos.entry_price)
+                pos.next_fix_level = (pos.take_target + pos.fix_step) if pos.direction == "long" \
+                    else (pos.take_target - pos.fix_step)
+                pos.fix_count += 1
             pos.half_closed = True
             pos.remainder_stop = remainder_stop
         self._register_closed_pnl(pnl)

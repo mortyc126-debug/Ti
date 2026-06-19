@@ -52,6 +52,12 @@ ADAPTIVE_EXIT_ENABLED = os.getenv("ADAPTIVE_EXIT", "0") == "1"
 # (там стоп/тейк сигнала вообще не используются).
 PARTIAL_TP_DEFAULT_ENABLED = os.getenv("PARTIAL_TP", "0") == "1"
 
+# После убыточного закрытия (стоп/remainder_stop в минус) — повод для входа
+# мог быть ошибочным, новый вход в тот же тикер блокируется на это время.
+# Прибыльное закрытие НЕ блокирует — повторный заход на той же идее это
+# нормально (см. __risk_close).
+LOSS_REENTRY_COOLDOWN_MINUTES = int(os.getenv("LOSS_COOLDOWN_MIN", "30"))
+
 # Глубина истории для авто-подбора ATR_TAKE_K/ATR_STOP_K (OICompositeStrategy.
 # set_atr_history_provider) — столько дней свечей берётся для sweep раз в день.
 # 20 дней давало 3-24 сделки на тикер — недостаточно для надёжного выбора
@@ -113,6 +119,8 @@ class Trader:
         # Настройки с дашборда (live/sandbox, take/stop, allow/deny по тикерам) —
         # см. runtime_overrides.py. Перечитывается на каждой свече по mtime.
         self.__overrides = RuntimeOverrides()
+        # Кулдаун повторного входа после убыточного закрытия — см. __risk_close.
+        self.__loss_cooldown_until: dict[str, datetime.datetime] = {}
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -384,6 +392,9 @@ class Trader:
                     elif risk_pos_cur and risk_pos_cur.half_closed:
                         # Остаток после частичной фиксации — стоп/тейк сигнала больше не
                         # действуют, его судьбу решает remainder_stop (risk.check_exit).
+                        # Если цена идёт ещё дальше в плюс — оцениваем, не пора ли
+                        # зафиксировать ещё часть (размазывание по check_scale_out).
+                        self.__try_scale_out(account_id, candle, strategies, risk_ticker_cur, risk_pos_cur)
                         should_close, reason = self.__risk.check_exit(risk_ticker_cur, float(quotation_to_decimal(candle.close)))
                         if should_close:
                             logger.info(f"PARTIAL TP REMAINDER CLOSE {risk_ticker_cur}: {reason}")
@@ -436,6 +447,13 @@ class Trader:
 
                         elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
                             logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")
+
+                        elif self.__loss_cooldown_until.get(strategies[candle.figi].settings.ticker, datetime.datetime.min) \
+                                > datetime.datetime.utcnow():
+                            logger.info(
+                                f"New signal has been skipped. Кулдаун после убыточного закрытия до "
+                                f"{self.__loss_cooldown_until[strategies[candle.figi].settings.ticker].isoformat()}"
+                            )
 
                         else:
                             strategy = strategies[candle.figi]
@@ -507,12 +525,17 @@ class Trader:
                                             open_order_id,
                                             signal_new
                                         )
+                                        entry_composite = 0.0
+                                        if hasattr(strategy, "last_snapshot"):
+                                            _comp = strategy.last_snapshot().get("composite", 0.0)
+                                            entry_composite = _comp if direction == "long" else -_comp
                                         self.__risk.open_position(
                                             risk_ticker, direction, actual_lots,
                                             entry_price, stop_price,
                                             point_value=strategy.settings.point_value,
                                             confidence=confidence,
                                             take_target=float(signal_new.take_profit_level),
+                                            entry_composite=entry_composite,
                                         )
                                         self.__blogger.open_position_message(open_position)
                                         logger.info(f"Open position: {open_position}")
@@ -867,12 +890,63 @@ class Trader:
         logger.warning(f"Partial-TP close order REJECTED/FAILED: {order}")
         return None
 
-    def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> None:
-        """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу."""
+    def __try_scale_out(
+            self,
+            account_id: str,
+            candle: Candle,
+            strategies: dict[str, IStrategy],
+            ticker: str,
+            pos,
+    ) -> None:
+        """
+        Размазывание фиксации после первого тейка: пока остаток открыт,
+        на каждый следующий шаг (та же дистанция вход->тейк) сверяем
+        текущий знаковый edge сигнала (composite) с тем, что был на входе
+        (risk.check_scale_out). Если преимущество исчезает — фиксируем ещё
+        часть остатка реальным ордером; иначе risk.py сам подтянет
+        remainder_stop вперёд без закрытия.
+        """
+        if pos.fix_step <= 0 or pos.qty < 2:
+            return
+        strategy = strategies[candle.figi]
+        if not hasattr(strategy, "last_snapshot"):
+            return
+        composite = strategy.last_snapshot().get("composite", 0.0)
+        current_edge = composite if pos.direction == "long" else -composite
+        price = float(quotation_to_decimal(candle.close))
+        should, qty, remainder_stop = self.__risk.check_scale_out(ticker, price, current_edge)
+        if not should:
+            return
+        is_buy = (pos.direction == "short")  # закрыть часть шорта -> купить
+        order_id = self.__partial_close_order(account_id, candle.figi, qty, is_buy)
+        if not order_id:
+            return
+        self.__risk.reduce_position(
+            ticker, qty, price,
+            point_value=strategy.settings.point_value,
+            reason="scale_out_decay", remainder_stop=remainder_stop,
+        )
+        logger.info(
+            f"SCALE-OUT FIX {ticker}: -{qty} лотов @ {price} (edge просел), "
+            f"остаток защищён уровнем {remainder_stop:.4f}"
+        )
+
+    def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> dict | None:
+        """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу.
+        Возвращает результат close_position (нужен pnl_rub для loss-cooldown)."""
         risk_ticker = strategy.settings.ticker
-        if risk_ticker in self.__risk.positions:
-            self.__risk.close_position(
-                risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
+        if risk_ticker not in self.__risk.positions:
+            return None
+        result = self.__risk.close_position(
+            risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
+        if result and result.get("pnl_rub", 0) < 0:
+            self.__loss_cooldown_until[risk_ticker] = datetime.datetime.utcnow() + \
+                datetime.timedelta(minutes=LOSS_REENTRY_COOLDOWN_MINUTES)
+            logger.info(
+                f"LOSS COOLDOWN {risk_ticker}: pnl={result['pnl_rub']:+.0f}₽ — "
+                f"новые входы заблокированы на {LOSS_REENTRY_COOLDOWN_MINUTES} мин"
+            )
+        return result
 
     def __check_adaptive_exit(
             self,
