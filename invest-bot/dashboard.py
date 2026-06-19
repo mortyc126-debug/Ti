@@ -24,6 +24,7 @@ import os
 import time
 import traceback
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -59,6 +60,11 @@ _instrument_service = InstrumentService(_config.tinkoff_token, _config.tinkoff_a
 _mega_alerts = MegaAlertsService()
 _db = DbApiClient(_config.mega_alerts_settings.db_api_url, _config.mega_alerts_settings.db_api_key)
 _archive = ArchiveStore()
+
+# Скан __compute_composite() на каждом баре (Hawkes-MLE через scipy.optimize)
+# — CPU-bound, кэш свечей тут не помогает. Гоняем тикеры параллельно по
+# процессам (не по тредам — GIL не отпускается на каждой scipy-итерации).
+BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", "4"))
 
 # Дефолтные настройки сигнала для тикеров, импортированных из OI (у них
 # нет [STRATEGY_<TICKER>] в settings.ini — только тикер+FIGI) — берём те же
@@ -300,11 +306,94 @@ def run_backtest(
         tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None,
 ) -> list[dict]:
-    """Прогоняет бэктест по всем тикерам сразу (используется как fallback API)."""
-    rows: list[dict] = []
+    """
+    Прогоняет бэктест по всем тикерам сразу (используется как fallback API).
+    Каждый тикер — это независимый дорогой CPU-bound скан (Hawkes-MLE на
+    каждый бар), поэтому гоняем по процессам параллельно, а не по очереди.
+    """
+    if len(tickers) <= 1:
+        rows: list[dict] = []
+        for ticker in tickers:
+            rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff))
+        return rows
+
+    by_ticker_rows: dict[str, list[dict]] = {}
+    with ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers))) as pool:
+        futures = {
+            pool.submit(run_backtest_one, ticker, days, atr_take_ks, atr_stop_ks, tariff): ticker
+            for ticker in tickers
+        }
+        for fut in as_completed(futures):
+            ticker = futures[fut]
+            by_ticker_rows[ticker] = fut.result()
+
+    rows = []
     for ticker in tickers:
-        rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff))
+        rows.extend(by_ticker_rows.get(ticker, []))
     return rows
+
+
+def _portfolio_sim_one_ticker(
+        ticker: str, days: int, tariff: str | None,
+        mode: str, atr_take_ks: list[float] | None, atr_stop_ks: list[float] | None,
+) -> tuple[list[dict], dict | None]:
+    """Считает сделки одного тикера для портфельной симуляции. Выделено в
+    отдельную функцию, чтобы гонять тикеры параллельно по процессам
+    (см. run_portfolio_sim) — каждый скан CPU-bound сам по себе."""
+    by_ticker = _strategy_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return [], {"ticker": ticker, "error": "нет в settings.ini и не импортирован из OI"}
+    try:
+        strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+        if strategy is None or not hasattr(strategy, "backtest_barriers"):
+            return [], None
+
+        try:
+            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+        except RequestError as ex:
+            return [], {"ticker": ticker, "error": str(ex.details)}
+        if not candles:
+            return [], None
+
+        signals = strategy.backtest_scan_signals(candles)
+        trades: list[dict] = []
+
+        if mode == "atr":
+            best = None
+            for tk in (atr_take_ks or []):
+                for sk in (atr_stop_ks or []):
+                    r = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk, tariff=tariff)
+                    if r["n_trades"] == 0:
+                        continue
+                    if best is None or r["expectancy_pct"] > best[1]["expectancy_pct"]:
+                        best = ((tk, sk), r)
+            if best is None:
+                return [], None
+            (tk, sk), _ = best
+            res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk,
+                                              return_trades=True, tariff=tariff)
+            for t in res.get("trades", []):
+                t["ticker"] = ticker
+                t["atr_k"] = f"{tk}/{sk}"
+                trades.append(t)
+        else:
+            s = strategy_settings.settings
+            long_take = Decimal(s.get("LONG_TAKE", "1.015"))
+            long_stop = Decimal(s.get("LONG_STOP", "0.985"))
+            res = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
+                                              return_trades=True, tariff=tariff)
+            for t in res.get("trades", []):
+                t["ticker"] = ticker
+                trades.append(t)
+
+        return trades, None
+
+    except Exception:
+        tb = traceback.format_exc()
+        advice = bug_council.analyze_bug(tb, f"dashboard run_portfolio_sim: ticker={ticker}, days={days}")
+        logger.error(f"run_portfolio_sim {ticker}:\n{tb}")
+        return [], {"ticker": ticker, "error": tb.strip().splitlines()[-1], "traceback": tb, "advice": advice}
 
 
 def run_portfolio_sim(
@@ -327,66 +416,30 @@ def run_portfolio_sim(
     счётом), а не от стартового — иначе просадка/рост считались бы нечестно.
     pnl сделки = риск_в_рублях × r_multiple (R-мультипликатор уже учитывает
     комиссию, см. backtest_barriers).
+
+    Каждый тикер сканится независимо (дорогой Hawkes-MLE per-bar) — гоняем
+    параллельно по процессам, а не по очереди (см. run_backtest).
     """
-    by_ticker = _strategy_settings_by_ticker()
     all_trades: list[dict] = []
     errors: list[dict] = []
 
-    for i, ticker in enumerate(tickers, 1):
-        strategy_settings = by_ticker.get(ticker)
-        if strategy_settings is None:
-            errors.append({"ticker": ticker, "error": "нет в settings.ini и не импортирован из OI"})
-            continue
-        logger.info(f"portfolio_sim: {ticker} ({i}/{len(tickers)})...")
-        try:
-            strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
-            if strategy is None or not hasattr(strategy, "backtest_barriers"):
-                continue
+    if len(tickers) <= 1:
+        results = [(t, _portfolio_sim_one_ticker(t, days, tariff, mode, atr_take_ks, atr_stop_ks))
+                   for t in tickers]
+    else:
+        results = []
+        with ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers))) as pool:
+            futures = {
+                pool.submit(_portfolio_sim_one_ticker, ticker, days, tariff, mode, atr_take_ks, atr_stop_ks): ticker
+                for ticker in tickers
+            }
+            for fut in as_completed(futures):
+                results.append((futures[fut], fut.result()))
 
-            try:
-                candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
-            except RequestError as ex:
-                errors.append({"ticker": ticker, "error": str(ex.details)})
-                continue
-            if not candles:
-                continue
-
-            signals = strategy.backtest_scan_signals(candles)
-
-            if mode == "atr":
-                best = None
-                for tk in (atr_take_ks or []):
-                    for sk in (atr_stop_ks or []):
-                        r = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk, tariff=tariff)
-                        if r["n_trades"] == 0:
-                            continue
-                        if best is None or r["expectancy_pct"] > best[1]["expectancy_pct"]:
-                            best = ((tk, sk), r)
-                if best is None:
-                    continue
-                (tk, sk), _ = best
-                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk,
-                                                  return_trades=True, tariff=tariff)
-                for t in res.get("trades", []):
-                    t["ticker"] = ticker
-                    t["atr_k"] = f"{tk}/{sk}"
-                    all_trades.append(t)
-            else:
-                s = strategy_settings.settings
-                long_take = Decimal(s.get("LONG_TAKE", "1.015"))
-                long_stop = Decimal(s.get("LONG_STOP", "0.985"))
-                res = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
-                                                  return_trades=True, tariff=tariff)
-                for t in res.get("trades", []):
-                    t["ticker"] = ticker
-                    all_trades.append(t)
-
-        except Exception:
-            tb = traceback.format_exc()
-            advice = bug_council.analyze_bug(tb, f"dashboard run_portfolio_sim: ticker={ticker}, days={days}")
-            logger.error(f"run_portfolio_sim {ticker}:\n{tb}")
-            errors.append({"ticker": ticker, "error": tb.strip().splitlines()[-1],
-                            "traceback": tb, "advice": advice})
+    for ticker, (trades, error) in results:
+        all_trades.extend(trades)
+        if error:
+            errors.append(error)
 
     all_trades.sort(key=lambda t: t["entry_time"])
 
