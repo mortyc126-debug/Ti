@@ -32,7 +32,12 @@ class InstrumentService:
                 _to=datetime.datetime.utcnow() + datetime.timedelta(days=1)
         ):
             for day in schedule.days:
-                if day.date.date() == datetime.date.today():
+                # day.date приходит от API в UTC — сравнивать нужно с
+                # UTC-датой, а не datetime.date.today() (локальная дата
+                # сервера). На сервере не в UTC (например, Europe/Moscow,
+                # UTC+3) в окне 21:00-00:00 UTC локальная дата уже "завтра",
+                # сравнение не находило бы сегодняшний (по UTC) день.
+                if day.date.date() == datetime.datetime.now(datetime.timezone.utc).date():
                     logger.info(f"MOEX today schedule: {day}")
                     return day.is_trading_day, day.start_time, day.end_time
 

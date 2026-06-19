@@ -29,7 +29,7 @@ import logging
 import os
 import json
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, date
+from datetime import datetime, timezone
 
 from risk_config import (
     MAX_OPEN_POSITIONS, DAILY_MAX_LOSS_PCT,
@@ -97,7 +97,7 @@ class RiskManager:
                 self._ticker_group[t] = group
 
     def _load_state(self):
-        today = str(date.today())
+        today = str(datetime.now(timezone.utc).date())
         self.state = {"date": today, "day_pnl_rub": 0.0,
                       "killed": False, "trades_today": 0}
         if os.path.exists(STATE_FILE):
@@ -115,7 +115,7 @@ class RiskManager:
             json.dump(self.state, f, ensure_ascii=False)
 
     def _rollover_if_new_day(self):
-        today = str(date.today())
+        today = str(datetime.now(timezone.utc).date())
         if self.state.get("date") == today:
             return
         self.state = {"date": today, "day_pnl_rub": 0.0,
