@@ -17,6 +17,8 @@
  *   GET  /tickers               — список тикеров, для которых есть данные
  *   POST /trade                 — записать одну закрытую сделку с attribution
  *   GET  /trades/:ticker?days=  — сделки по тикеру за последние N дней (по умолч. 60)
+ *   POST /candles               — bulk upsert свечей { ticker, candles: [{time,open,high,low,close,volume}] }
+ *   GET  /candles/:ticker?from=&to= — архивные свечи по тикеру за период (ISO-даты), по времени по возрастанию
  */
 
 function jsonResponse(data, status = 200) {
@@ -158,6 +160,36 @@ async function handleTradesRead(ticker, request, env) {
   });
 }
 
+async function handleCandlesWrite(request, env) {
+  const body = await request.json();
+  if (!body.ticker || !Array.isArray(body.candles)) {
+    return jsonResponse({ error: "missing ticker or candles[]" }, 400);
+  }
+  const stmt = env.DB.prepare(
+    `INSERT INTO candles (ticker, time, open, high, low, close, volume)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(ticker, time) DO NOTHING`
+  );
+  const batch = body.candles.map((c) =>
+    stmt.bind(body.ticker, c.time, c.open, c.high, c.low, c.close, c.volume)
+  );
+  if (batch.length) {
+    await env.DB.batch(batch);
+  }
+  return jsonResponse({ ok: true, n: batch.length });
+}
+
+async function handleCandlesRead(ticker, request, env) {
+  const url = new URL(request.url);
+  const from = url.searchParams.get("from") || "0000-00-00";
+  const to = url.searchParams.get("to") || "9999-99-99";
+  const rows = await env.DB.prepare(
+    `SELECT time, open, high, low, close, volume FROM candles
+     WHERE ticker = ? AND time >= ? AND time <= ? ORDER BY time ASC`
+  ).bind(ticker, from, to).all();
+  return jsonResponse({ ticker, candles: rows.results });
+}
+
 export default {
   async fetch(request, env) {
     if (!checkAuth(request, env)) {
@@ -185,6 +217,12 @@ export default {
       }
       if (request.method === "GET" && parts[0] === "trades" && parts[1]) {
         return await handleTradesRead(parts[1], request, env);
+      }
+      if (request.method === "POST" && parts[0] === "candles") {
+        return await handleCandlesWrite(request, env);
+      }
+      if (request.method === "GET" && parts[0] === "candles" && parts[1]) {
+        return await handleCandlesRead(parts[1], request, env);
       }
       return jsonResponse({ error: "not found" }, 404);
     } catch (ex) {

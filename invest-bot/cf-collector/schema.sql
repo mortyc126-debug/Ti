@@ -40,3 +40,21 @@ CREATE TABLE IF NOT EXISTS trades (
 );
 
 CREATE INDEX IF NOT EXISTS idx_trades_ticker_date ON trades(ticker, date);
+
+-- Архив исторических 5-минутных свечей по тикеру — чтобы дашборд при
+-- бэктесте не тянул одни и те же дни у Tinkoff API повторно при каждом
+-- прогоне с другими параметрами take/stop, и чтобы можно было накопить
+-- архив глубже, чем держит сам Tinkoff (свечи копятся day-by-day из тех
+-- запросов, что уже были сделаны хоть раз).
+CREATE TABLE IF NOT EXISTS candles (
+    ticker  TEXT NOT NULL,
+    time    TEXT NOT NULL,             -- ISO timestamp свечи (UTC)
+    open    REAL NOT NULL,
+    high    REAL NOT NULL,
+    low     REAL NOT NULL,
+    close   REAL NOT NULL,
+    volume  INTEGER NOT NULL,
+    PRIMARY KEY (ticker, time)
+);
+
+CREATE INDEX IF NOT EXISTS idx_candles_ticker_time ON candles(ticker, time);

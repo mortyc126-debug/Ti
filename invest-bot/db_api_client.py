@@ -64,3 +64,14 @@ class DbApiClient:
     def get_trades(self, ticker: str, days: int = 60) -> list[dict]:
         result = self.__request("GET", f"trades/{ticker}?days={days}")
         return result.get("trades", []) if result else []
+
+    def push_candles(self, ticker: str, candles: list[dict]) -> None:
+        """candles: [{time (ISO), open, high, low, close, volume}]. Бьём на чанки,
+        чтобы не упереться в лимит размера запроса воркера на годах истории."""
+        chunk = 2000
+        for i in range(0, len(candles), chunk):
+            self.__request("POST", "candles", {"ticker": ticker, "candles": candles[i:i + chunk]})
+
+    def get_candles(self, ticker: str, date_from: str, date_to: str) -> list[dict]:
+        result = self.__request("GET", f"candles/{ticker}?from={date_from}&to={date_to}")
+        return result.get("candles", []) if result else []

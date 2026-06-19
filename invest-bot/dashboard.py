@@ -30,8 +30,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from tinkoff.invest.exceptions import RequestError
 
 import bug_council
+from candle_archive import get_candles_cached
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
+from db_api_client import DbApiClient
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
@@ -53,6 +55,7 @@ _config = ProgramConfiguration(CONFIG_FILE)
 _market_data = MarketDataService(_config.tinkoff_token, _config.tinkoff_app_name)
 _instrument_service = InstrumentService(_config.tinkoff_token, _config.tinkoff_app_name)
 _mega_alerts = MegaAlertsService()
+_db = DbApiClient(_config.mega_alerts_settings.db_api_url, _config.mega_alerts_settings.db_api_key)
 
 # Дефолтные настройки сигнала для тикеров, импортированных из OI (у них
 # нет [STRATEGY_<TICKER>] в settings.ini — только тикер+FIGI) — берём те же
@@ -218,7 +221,7 @@ def run_backtest_one(ticker: str, days: int, atr_take_ks: list[float], atr_stop_
             return rows
 
         try:
-            candles = _market_data.get_candles_history(strategy_settings.figi, days=days)
+            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             return rows
@@ -300,7 +303,7 @@ def run_portfolio_sim(tickers: list[str], days: int, account: float, risk_pct: f
                 continue
 
             try:
-                candles = _market_data.get_candles_history(strategy_settings.figi, days=days)
+                candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
             except RequestError as ex:
                 errors.append({"ticker": ticker, "error": str(ex.details)})
                 continue
