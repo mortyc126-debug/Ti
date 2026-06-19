@@ -1106,6 +1106,116 @@ class OICompositeStrategy(IStrategy):
             return 0.5, 0
         return sum(qualities) / len(qualities), len(qualities)
 
+    def backtest_barriers(
+            self,
+            candles: list[HistoricCandle],
+            take_mult: Optional[Decimal] = None,
+            stop_mult: Optional[Decimal] = None,
+            atr_take_k: Optional[float] = None,
+            atr_stop_k: Optional[float] = None,
+            max_bars: int = 60,
+    ) -> dict:
+        """
+        В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
+        окне и не знает про take/stop вообще), здесь честно симулируется
+        исполнение: для каждой виртуальной сделки бар-за-баром ищем, какой
+        барьер (take или stop) пробивается первым, до max_bars. Если ни один —
+        сделка закрывается по последней цене окна (timeout).
+
+        Передайте либо (take_mult, stop_mult) — фиксированные множители,
+        либо (atr_take_k, atr_stop_k) — ATR-based (как в __take_stop_mults) —
+        чтобы сравнить два режима на одной и той же истории.
+
+        Возвращает {"n_trades", "win_rate", "avg_r", "expectancy_pct"} —
+        expectancy_pct уже за вычетом commission_rt за круг.
+        """
+        if len(candles) < CANDLE_WINDOW + 2:
+            return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+
+        comm = commission_rt(self.__settings.is_future)
+        saved_candles = self.__candles
+        results: list[tuple[bool, float, float]] = []  # (win, r_multiple, net_pct)
+        try:
+            i = CANDLE_WINDOW
+            while i < len(candles) - 1:
+                self.__candles = candles[i - CANDLE_WINDOW:i]
+                composite, _ = self.__compute_composite()
+
+                direction: Optional[SignalType] = None
+                if composite >= self.__threshold:
+                    direction = SignalType.LONG
+                elif self.__settings.short_enabled_flag and composite <= -self.__threshold:
+                    direction = SignalType.SHORT
+
+                if direction is None:
+                    i += 1
+                    continue
+
+                entry = _to_f(candles[i].close)
+                if atr_take_k is not None and atr_stop_k is not None:
+                    atr_pct = _compute_atr(self.__candles)
+                    if atr_pct <= 0:
+                        i += 1
+                        continue
+                    take_dist = atr_take_k * atr_pct
+                    stop_dist = atr_stop_k * atr_pct
+                else:
+                    take_dist = abs(float(take_mult) - 1.0)
+                    stop_dist = abs(float(stop_mult) - 1.0)
+
+                if direction == SignalType.LONG:
+                    take_price = entry * (1 + take_dist)
+                    stop_price = entry * (1 - stop_dist)
+                else:
+                    take_price = entry * (1 - take_dist)
+                    stop_price = entry * (1 + stop_dist)
+
+                window = candles[i + 1:i + 1 + max_bars]
+                exit_pct: Optional[float] = None
+                win = False
+                for c in window:
+                    h = _to_f(c.high)
+                    lo = _to_f(c.low)
+                    if direction == SignalType.LONG:
+                        hit_take = h >= take_price
+                        hit_stop = lo <= stop_price
+                    else:
+                        hit_take = lo <= take_price
+                        hit_stop = h >= stop_price
+                    if hit_take and hit_stop:
+                        # обе цены задело в одной свече — консервативно считаем стоп первым
+                        exit_pct = -stop_dist
+                        break
+                    if hit_take:
+                        exit_pct = take_dist
+                        break
+                    if hit_stop:
+                        exit_pct = -stop_dist
+                        break
+                if exit_pct is None:
+                    last_close = _to_f(window[-1].close) if window else entry
+                    exit_pct = (last_close - entry) / entry if direction == SignalType.LONG \
+                        else (entry - last_close) / entry
+
+                net_pct = exit_pct - comm
+                r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
+                results.append((net_pct > 0, r_multiple, net_pct))
+                i += max(1, len(window))  # не пересекать виртуальные сделки
+        finally:
+            self.__candles = saved_candles
+
+        if not results:
+            return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+
+        n = len(results)
+        wins = sum(1 for w, _, _ in results if w)
+        return {
+            "n_trades": n,
+            "win_rate": wins / n,
+            "avg_r": sum(r for _, r, _ in results) / n,
+            "expectancy_pct": sum(p for _, _, p in results) / n,
+        }
+
     # ── Внутренние методы ─────────────────────────────────────────────────────
 
     def __compute_composite(self) -> tuple[float, list[float]]:
