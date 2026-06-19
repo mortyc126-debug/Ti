@@ -648,32 +648,53 @@ class Trader:
                         f"PARTIAL FILL {risk_ticker}: "
                         f"запрошено {available_lots}, исполнено {actual_lots}"
                     )
-                open_position = self.__today_trade_results.open_position(
-                    figi,
-                    open_order_id,
-                    signal_new
-                )
-                entry_composite = 0.0
-                if hasattr(strategy, "last_snapshot"):
-                    _comp = strategy.last_snapshot().get("composite", 0.0)
-                    entry_composite = _comp if direction == "long" else -_comp
-                self.__risk.open_position(
-                    risk_ticker, direction, actual_lots,
-                    entry_price, stop_price,
-                    point_value=strategy.settings.point_value,
-                    confidence=confidence,
-                    take_target=float(signal_new.take_profit_level),
-                    entry_composite=entry_composite,
-                )
-                self.__blogger.open_position_message(open_position)
-                logger.info(f"Open position: {open_position}")
-                # Запускаем MFE/MAE трекинг для этой позиции
-                self.__pos_tracking[figi] = {
-                    "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
-                    "entry": entry_price,
-                    "max_fav": entry_price,
-                    "max_adv": entry_price,
-                }
+                # Ордер уже реально исполнен на бирже — отсюда и до конца
+                # блока нельзя просто залогировать исключение и пойти дальше:
+                # риск.py должен зарегистрировать позицию ПЕРВЫМ (на нём
+                # держится корреляционный/портфельный лимит и трейлинг), а
+                # если что-то всё равно упадёт ниже — компенсируем закрытием
+                # "осиротевшего" реального ордера, а не просто логом.
+                try:
+                    entry_composite = 0.0
+                    if hasattr(strategy, "last_snapshot"):
+                        try:
+                            _comp = strategy.last_snapshot().get("composite", 0.0)
+                            entry_composite = _comp if direction == "long" else -_comp
+                        except Exception as ex:
+                            logger.warning(f"{risk_ticker}: last_snapshot() упал, entry_composite=0.0: {repr(ex)}")
+
+                    self.__risk.open_position(
+                        risk_ticker, direction, actual_lots,
+                        entry_price, stop_price,
+                        point_value=strategy.settings.point_value,
+                        confidence=confidence,
+                        take_target=float(signal_new.take_profit_level),
+                        entry_composite=entry_composite,
+                    )
+                    open_position = self.__today_trade_results.open_position(
+                        figi,
+                        open_order_id,
+                        signal_new
+                    )
+                    self.__blogger.open_position_message(open_position)
+                    logger.info(f"Open position: {open_position}")
+                    # Запускаем MFE/MAE трекинг для этой позиции
+                    self.__pos_tracking[figi] = {
+                        "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
+                        "entry": entry_price,
+                        "max_fav": entry_price,
+                        "max_adv": entry_price,
+                    }
+                except Exception as ex:
+                    logger.error(
+                        f"{risk_ticker}: ошибка регистрации позиции после реального исполнения "
+                        f"ордера {open_order_id} — закрываю осиротевшую позицию на бирже: {repr(ex)}"
+                    )
+                    self.__risk.positions.pop(risk_ticker, None)
+                    try:
+                        self.__close_figi_with_fill_info(account_id, figi, {figi: strategy})
+                    except Exception as close_ex:
+                        logger.error(f"{risk_ticker}: не удалось закрыть осиротевшую позицию: {repr(close_ex)}")
             else:
                 logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
         except Exception as ex:
