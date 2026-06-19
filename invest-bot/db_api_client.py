@@ -52,6 +52,12 @@ class DbApiClient:
             # push_candles на большом чанке) валит весь вызывающий код.
             logger.warning(f"DB API {method} {path} упал: таймаут ({timeout}с)")
             return None
+        except ConnectionError as ex:
+            # Cloudflare иногда рвёт соединение без ответа (RemoteDisconnected
+            # и т.п.) — это ConnectionError/OSError, тоже не URLError/HTTPError,
+            # тоже валило вызывающий код без этого except.
+            logger.warning(f"DB API {method} {path} упал: соединение разорвано — {ex}")
+            return None
 
     def push_snapshot(self, ticker: str, **fields) -> None:
         self.__request("POST", "snapshot", {"ticker": ticker, **fields})
