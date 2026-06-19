@@ -1142,6 +1142,7 @@ class OICompositeStrategy(IStrategy):
                 window = candles[i + 1:i + 1 + max_bars]
                 signals.append({
                     "direction": direction, "entry": entry, "atr_pct": atr_pct, "window": window,
+                    "entry_time": candles[i].time,
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
@@ -1158,6 +1159,7 @@ class OICompositeStrategy(IStrategy):
             atr_stop_k: Optional[float] = None,
             max_bars: int = 60,
             signals: Optional[list[dict]] = None,
+            return_trades: bool = False,
     ) -> dict:
         """
         В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
@@ -1174,17 +1176,26 @@ class OICompositeStrategy(IStrategy):
         — второе избегает повторного дорогого пересчёта composite, если
         нужно сравнить несколько комбинаций take/stop на одной истории.
 
+        return_trades=True добавляет в ответ "trades" — список отдельных
+        сделок ({entry_time, exit_time, direction, net_pct, r_multiple, win}),
+        нужен дашборду для портфельной симуляции (сделки разных тикеров по
+        хронологии на одном виртуальном счёте).
+
         Возвращает {"n_trades", "win_rate", "avg_r", "expectancy_pct"} —
         expectancy_pct уже за вычетом commission_rt за круг.
         """
         if signals is None:
             signals = self.backtest_scan_signals(candles, max_bars=max_bars)
 
+        empty = {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+        if return_trades:
+            empty["trades"] = []
         if not signals:
-            return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+            return empty
 
         comm = commission_rt(self.__settings.is_future)
         results: list[tuple[bool, float, float]] = []  # (win, r_multiple, net_pct)
+        trades: list[dict] = []
         for sig in signals:
             direction, entry, atr_pct, window = sig["direction"], sig["entry"], sig["atr_pct"], sig["window"]
 
@@ -1205,6 +1216,7 @@ class OICompositeStrategy(IStrategy):
                 stop_price = entry * (1 + stop_dist)
 
             exit_pct: Optional[float] = None
+            exit_time = window[-1].time if window else sig.get("entry_time")
             for c in window:
                 h = _to_f(c.high)
                 lo = _to_f(c.low)
@@ -1217,12 +1229,15 @@ class OICompositeStrategy(IStrategy):
                 if hit_take and hit_stop:
                     # обе цены задело в одной свече — консервативно считаем стоп первым
                     exit_pct = -stop_dist
+                    exit_time = c.time
                     break
                 if hit_take:
                     exit_pct = take_dist
+                    exit_time = c.time
                     break
                 if hit_stop:
                     exit_pct = -stop_dist
+                    exit_time = c.time
                     break
             if exit_pct is None:
                 last_close = _to_f(window[-1].close) if window else entry
@@ -1232,18 +1247,27 @@ class OICompositeStrategy(IStrategy):
             net_pct = exit_pct - comm
             r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
             results.append((net_pct > 0, r_multiple, net_pct))
+            if return_trades:
+                trades.append({
+                    "entry_time": sig.get("entry_time"), "exit_time": exit_time,
+                    "direction": direction.name, "net_pct": net_pct,
+                    "r_multiple": r_multiple, "win": net_pct > 0,
+                })
 
         if not results:
-            return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+            return empty
 
         n = len(results)
         wins = sum(1 for w, _, _ in results if w)
-        return {
+        out = {
             "n_trades": n,
             "win_rate": wins / n,
             "avg_r": sum(r for _, r, _ in results) / n,
             "expectancy_pct": sum(p for _, _, p in results) / n,
         }
+        if return_trades:
+            out["trades"] = trades
+        return out
 
     # ── Внутренние методы ─────────────────────────────────────────────────────
 
