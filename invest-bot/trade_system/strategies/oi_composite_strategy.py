@@ -1585,9 +1585,12 @@ class OICompositeStrategy(IStrategy):
         entry = quotation_to_decimal(last.close)
 
         method_scores = {name: scores[i] for i, name in enumerate(ALL_METHOD_NAMES)}
-        composite = sum(scores[i] * self.__weights[name].weight for i, name in enumerate(ALL_METHOD_NAMES))
-        weight_sum = sum(self.__weights[name].weight for name in ALL_METHOD_NAMES) or 1.0
-        self.__confidence = max(0.0, min(1.0, 0.5 + 0.5 * abs(composite / weight_sum)))
+        # confidence должен опираться на тот же composite, что реально
+        # пересёк порог в analyze_candles (с regime/RQA/wavelet-множителями
+        # из __compute_composite), а не на пересчёт по сырым scores —
+        # иначе risk.position_size()/can_open() получают эдж, не совпадающий
+        # с фактическим сигналом.
+        self.__confidence = max(0.0, min(1.0, 0.5 + 0.5 * abs(self.__last_composite)))
 
         self.__open_trade = OpenTrade(
             signal_type=signal_type,
