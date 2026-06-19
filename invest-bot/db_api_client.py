@@ -23,7 +23,7 @@ class DbApiClient:
     def configured(self) -> bool:
         return bool(self.__base_url)
 
-    def __request(self, method: str, path: str, body: dict | None = None) -> dict | None:
+    def __request(self, method: str, path: str, body: dict | None = None, timeout: int = 15) -> dict | None:
         if not self.__base_url:
             return None
         url = f"{self.__base_url}/{path}"
@@ -37,7 +37,7 @@ class DbApiClient:
             "User-Agent": "Mozilla/5.0 (compatible; invest-bot-collector/1.0)",
         })
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return json.load(resp)
         except urllib.error.HTTPError as ex:
             body = ex.read().decode("utf-8", errors="replace")
@@ -45,6 +45,12 @@ class DbApiClient:
             return None
         except urllib.error.URLError as ex:
             logger.warning(f"DB API {method} {path} упал: {ex}")
+            return None
+        except TimeoutError:
+            # urlopen на таймауте чтения ответа кидает голый TimeoutError, не
+            # URLError — без этого except один медленный батч (например,
+            # push_candles на большом чанке) валит весь вызывающий код.
+            logger.warning(f"DB API {method} {path} упал: таймаут ({timeout}с)")
             return None
 
     def push_snapshot(self, ticker: str, **fields) -> None:
@@ -66,11 +72,15 @@ class DbApiClient:
         return result.get("trades", []) if result else []
 
     def push_candles(self, ticker: str, candles: list[dict]) -> None:
-        """candles: [{time (ISO), open, high, low, close, volume}]. Бьём на чанки,
-        чтобы не упереться в лимит размера запроса воркера на годах истории."""
-        chunk = 2000
+        """
+        candles: [{time (ISO), open, high, low, close, volume}]. Бьём на чанки —
+        2000 строк в одном batch-insert D1 не укладываются в 15с (один день
+        5-минутных свечей по ликвидному тикеру — это уже ~100 строк, чанк
+        в 300 покрывает несколько дней истории за раз и не таймаутит).
+        """
+        chunk = 300
         for i in range(0, len(candles), chunk):
-            self.__request("POST", "candles", {"ticker": ticker, "candles": candles[i:i + chunk]})
+            self.__request("POST", "candles", {"ticker": ticker, "candles": candles[i:i + chunk]}, timeout=30)
 
     def get_candles(self, ticker: str, date_from: str, date_to: str) -> list[dict]:
         result = self.__request("GET", f"candles/{ticker}?from={date_from}&to={date_to}")
