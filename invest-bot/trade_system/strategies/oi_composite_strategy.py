@@ -58,6 +58,7 @@ import logging
 import math
 import os
 import statistics
+import time
 from configparser import ConfigParser
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -1121,9 +1122,23 @@ class OICompositeStrategy(IStrategy):
 
         saved_candles = self.__candles
         signals: list[dict] = []
+        total_bars = len(candles) - 1 - CANDLE_WINDOW
+        t_start = time.monotonic()
+        t_last_log = t_start
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
+                done = i - CANDLE_WINDOW
+                now = time.monotonic()
+                if now - t_last_log >= 5 and done > 0:  # не реже раза в 5с, независимо от скорости бара
+                    t_last_log = now
+                    elapsed = now - t_start
+                    rate = done / elapsed if elapsed > 0 else 0
+                    eta = (total_bars - done) / rate if rate > 0 else 0
+                    logger.info(
+                        f"{self.__settings.ticker}: скан {done}/{total_bars} баров "
+                        f"({100 * done / total_bars:.0f}%), {elapsed:.0f}с прошло, ~{eta:.0f}с осталось"
+                    )
                 self.__candles = candles[i - CANDLE_WINDOW:i]
                 composite, _ = self.__compute_composite()
 
