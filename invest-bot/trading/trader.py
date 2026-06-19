@@ -176,6 +176,8 @@ class Trader:
             )
             if futures_strategies:
                 added_futures = self.__get_today_strategies(futures_strategies)
+                for strategy in added_futures.values():
+                    self.__validate_strategy_backtest(strategy)
                 today_trade_strategies.update(added_futures)
                 logger.info(
                     f"FUTURES: добавлены в торговлю на сегодня "
