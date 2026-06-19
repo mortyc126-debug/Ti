@@ -16,6 +16,7 @@ from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from invest_api.utils import candle_to_historiccandle
+from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.signal import SignalType
 from trade_system.strategies.base_strategy import IStrategy
 from history import HistoryStore
@@ -161,7 +162,7 @@ class Trader:
             self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
         await self.__mega_alerts.refresh_once()
         tracked_hits = [t for t in configured_tickers if self.__mega_alerts.alerts_for(t)]
-        candidate_tickers = [t for t in self.__mega_alerts.tickers_today("eq") if t not in configured_tickers]
+        candidate_tickers = self.__dedup_mega_alerts_candidates(configured_tickers)
 
         added_strategies: dict[str, IStrategy] = {}
         if self.__mega_alerts_settings.auto_trade and candidate_tickers:
@@ -995,6 +996,30 @@ class Trader:
         }
         if not live and hasattr(strategy, "set_signal_only"):
             strategy.set_signal_only(True)
+
+    def __dedup_mega_alerts_candidates(self, configured_tickers: list[str]) -> list[str]:
+        """
+        MOEX MEGA-ALERTS отдаёт сырой список тикеров с сегодняшними
+        аномалиями — без учёта того, что обычка+префы одного эмитента
+        (SBER/SBERP и т.п.) это один и тот же риск. Без дедупа бот мог бы
+        потратить MAX_TICKERS слотов на дубли вместо разных эмитентов,
+        а лучшую из пары мог бы и вовсе пропустить, если хуже отсортирована
+        в alerts.json. Дедуп — тот же trade_system/issuer_filter.py, что
+        и в dashboard.py, чтобы бэктест и реальная торговля видели
+        одинаковый список тикеров.
+
+        Порядок MEGA-ALERTS (по убыванию значимости аномалии) используем
+        как demand — раньше в списке значит более востребован сегодня.
+        """
+        raw = [t for t in self.__mega_alerts.tickers_today("eq") if t not in configured_tickers]
+        configured_keys = {issuer_key(t) for t in configured_tickers}
+        infos = [
+            {"ticker": t, "issuer_key": issuer_key(t), "demand": len(raw) - i}
+            for i, t in enumerate(raw)
+            if issuer_key(t) not in configured_keys
+        ]
+        kept, _ = select_top_tickers(infos, top_pct=1.0)
+        return kept
 
     def __build_dynamic_strategies(self, tickers: list[str]) -> list[IStrategy]:
         """
