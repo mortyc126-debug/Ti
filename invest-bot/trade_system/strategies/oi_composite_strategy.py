@@ -1100,12 +1100,25 @@ class OICompositeStrategy(IStrategy):
         """
         Прогон композита по исторической свечной выгрузке без реальных
         сделок — оценка, "дают ли модели хороший %" на этом тикере ДО того,
-        как пускать его в реальную торговлю. quality того же вида, что и в
-        EWA (MFE/(MFE+MAE)), считается по виртуальным сделкам на пересечении
-        порога; виртуальные сделки не пересекаются по времени (после входа
-        пропускаем `lookahead` баров). Реальное состояние стратегии
-        (свечи/открытая сделка) не трогает — окно подменяется только на
-        время вызова.
+        как пускать его в реальную торговлю (гейт BACKTEST_QUALITY_MIN на
+        реальные ордера). Реальное состояние стратегии (свечи/открытая
+        сделка) не трогает — окно подменяется только на время вызова.
+
+        Раньше отбор виртуальных сделок (composite>=self.__threshold) и
+        MFE/MAE-расчёт (максимум/минимум по всему lookahead-окну без учёта
+        стопа) отличались от того, что реально доходит до реальных денег
+        в analyze_candles — гейт мог одобрить тикер по сигналам, которые
+        стратегия в проде вообще не выдала бы (другой порог, нет
+        __methods_agree/__liquidity_ok/ATR-фильтров), и завышенно оценить
+        качество (избегая случаев, когда стоп пробивается раньше, чем
+        достигается пик избыточного движения). Теперь:
+        - отбор сигналов идёт той же цепочкой фильтров, что в
+          analyze_candles (effective_threshold с учётом режима,
+          __methods_agree, __liquidity_ok, ATR/комиссия);
+        - MFE/MAE считаются честно бар-за-баром по реальным take/stop
+          уровням (__take_stop_mults), как в backtest_barriers — если стоп
+          пробивается раньше пика, MFE не растёт дальше точки пробития.
+
         Возвращает (средний quality, число виртуальных сделок).
         """
         if len(candles) < CANDLE_WINDOW + lookahead + 1:
@@ -1113,36 +1126,84 @@ class OICompositeStrategy(IStrategy):
 
         saved_candles = self.__candles
         qualities: list[float] = []
+        comm = commission_rt(self.__settings.is_future)
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - lookahead:
                 self.__candles = candles[i - CANDLE_WINDOW:i]
-                composite, _ = self.__compute_composite()
+
+                atr_pct = _compute_atr(self.__candles)
+                if atr_pct < comm * MIN_ATR_FACTOR:
+                    i += 1
+                    continue
+
+                composite, scores = self.__compute_composite()
+                adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
+                effective_threshold = self.__effective_threshold(adaptive)
 
                 direction: Optional[SignalType] = None
-                if composite >= self.__threshold:
+                if composite >= effective_threshold:
                     direction = SignalType.LONG
-                elif self.__settings.short_enabled_flag and composite <= -self.__threshold:
+                elif self.__settings.short_enabled_flag and composite <= -effective_threshold:
                     direction = SignalType.SHORT
 
                 if direction is None:
                     i += 1
                     continue
+                if not self.__methods_agree(scores, direction):
+                    i += 1
+                    continue
+                if not self.__liquidity_ok():
+                    i += 1
+                    continue
+
+                take_mult, stop_mult = self.__take_stop_mults(direction, atr_pct)
+                take_dist = abs(float(take_mult) - 1.0)
+                stop_dist = abs(float(stop_mult) - 1.0)
+                if take_dist < comm * MIN_ATR_FACTOR:
+                    i += 1
+                    continue
 
                 entry = _to_f(candles[i].close)
-                future = candles[i + 1:i + 1 + lookahead]
-                highs = [_to_f(c.high) for c in future]
-                lows = [_to_f(c.low) for c in future]
                 if direction == SignalType.LONG:
-                    mfe = max(0.0, (max(highs) - entry) / entry) if highs else 0.0
-                    mae = max(0.0, (entry - min(lows)) / entry) if lows else 0.0
+                    take_price, stop_price = entry * (1 + take_dist), entry * (1 - stop_dist)
                 else:
-                    mfe = max(0.0, (entry - min(lows)) / entry) if lows else 0.0
-                    mae = max(0.0, (max(highs) - entry) / entry) if highs else 0.0
+                    take_price, stop_price = entry * (1 - take_dist), entry * (1 + stop_dist)
+
+                # Бар-за-баром, как в backtest_barriers: считаем mfe/mae только
+                # до момента, когда впервые пробивается take или stop —
+                # дальше движение цены уже не относится к этой сделке.
+                mfe, mae = 0.0, 0.0
+                future = candles[i + 1:i + 1 + lookahead]
+                for c in future:
+                    h, lo = _to_f(c.high), _to_f(c.low)
+                    if direction == SignalType.LONG:
+                        hit_take, hit_stop = h >= take_price, lo <= stop_price
+                    else:
+                        hit_take, hit_stop = lo <= take_price, h >= stop_price
+                    if hit_take and hit_stop:
+                        # обе цены задело в одной свече — консервативно считаем
+                        # стоп первым (как в backtest_barriers): mfe этой свечи
+                        # не засчитываем, mae фиксируем на уровне стопа.
+                        mae = max(mae, stop_dist)
+                        break
+                    if hit_stop:
+                        mae = max(mae, stop_dist)
+                        break
+                    if hit_take:
+                        mfe = max(mfe, take_dist)
+                        break
+                    if direction == SignalType.LONG:
+                        mfe = max(mfe, (h - entry) / entry)
+                        mae = max(mae, (entry - lo) / entry)
+                    else:
+                        mfe = max(mfe, (entry - lo) / entry)
+                        mae = max(mae, (h - entry) / entry)
+
                 # MFE за вычетом комиссии за круг (своя ставка для акции/фьючерса
                 # и текущего тарифа из settings.ini) — движение цены меньше
                 # комиссии не даёт реальной прибыли на реальном счёте.
-                mfe_net = max(0.0, mfe - commission_rt(self.__settings.is_future))
+                mfe_net = max(0.0, mfe - comm)
                 qualities.append(mfe_net / (mfe_net + mae) if (mfe_net + mae) > 0 else 0.5)
                 i += lookahead  # не пересекать виртуальные сделки
         finally:
@@ -1185,20 +1246,34 @@ class OICompositeStrategy(IStrategy):
                         f"({100 * done / total_bars:.0f}%), {elapsed:.0f}с прошло, ~{eta:.0f}с осталось"
                     )
                 self.__candles = candles[i - CANDLE_WINDOW:i]
-                composite, _ = self.__compute_composite()
+
+                atr_pct = _compute_atr(self.__candles)
+                comm = commission_rt(self.__settings.is_future)
+                if atr_pct < comm * MIN_ATR_FACTOR:
+                    i += 1
+                    continue
+
+                composite, scores = self.__compute_composite()
+                adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
+                effective_threshold = self.__effective_threshold(adaptive)
 
                 direction: Optional[SignalType] = None
-                if composite >= self.__threshold:
+                if composite >= effective_threshold:
                     direction = SignalType.LONG
-                elif self.__settings.short_enabled_flag and composite <= -self.__threshold:
+                elif self.__settings.short_enabled_flag and composite <= -effective_threshold:
                     direction = SignalType.SHORT
 
                 if direction is None:
                     i += 1
                     continue
+                if not self.__methods_agree(scores, direction):
+                    i += 1
+                    continue
+                if not self.__liquidity_ok():
+                    i += 1
+                    continue
 
                 entry = _to_f(candles[i].close)
-                atr_pct = _compute_atr(self.__candles)
                 window = candles[i + 1:i + 1 + max_bars]
                 signals.append({
                     "direction": direction, "entry": entry, "atr_pct": atr_pct, "window": window,
