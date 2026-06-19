@@ -1014,6 +1014,18 @@ class OICompositeStrategy(IStrategy):
 
         # take/stop: ATR-based если заданы коэффициенты, иначе фиксированные множители
         take_mult, stop_mult = self.__take_stop_mults(direction, atr_pct)
+
+        # целесообразность сделки: если тейк-профит даже без проскальзывания
+        # не покрывает комиссию за круг с запасом MIN_ATR_FACTOR — сделка
+        # на бумаге не отрицательная, но и невыгодная, не входим.
+        take_dist = abs(float(take_mult) - 1.0)
+        if take_dist < commission_rt(self.__settings.is_future) * MIN_ATR_FACTOR:
+            logger.debug(
+                f"{self.__settings.figi}: сигнал {direction} отфильтрован — "
+                f"тейк {take_dist:.4f} не покрывает комиссию с запасом"
+            )
+            return None
+
         return self.__make_signal(direction, take_mult, stop_mult, scores)
 
     def notify_position_closed(
