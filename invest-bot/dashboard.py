@@ -113,53 +113,85 @@ PAGE_HTML = """<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>invest-bot — виртуальные сделки</title>
+<title>invest-bot · DASHBOARD — виртуальные сделки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-body {{ font-family: system-ui, sans-serif; margin: 24px; background: #0f1117; color: #e6e6e6; }}
-h1 {{ font-size: 20px; }}
-.box {{ background: #1a1d27; border-radius: 8px; padding: 16px; margin-bottom: 20px; }}
-label {{ display: inline-block; margin: 4px 12px 4px 0; }}
-input[type=text], input[type=number] {{ background: #0f1117; color: #e6e6e6; border: 1px solid #333; border-radius: 4px; padding: 4px 8px; }}
-button {{ background: #3b6fd4; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 14px; }}
-button:hover {{ background: #4a7de0; }}
-table {{ border-collapse: collapse; width: 100%; margin-top: 12px; }}
-th, td {{ border-bottom: 1px solid #2a2d3a; padding: 6px 10px; text-align: right; font-size: 13px; }}
-th:first-child, td:first-child {{ text-align: left; }}
-.err {{ color: #ff6b6b; }}
-.advice {{ background: #0f1117; border: 1px solid #333; border-radius: 4px; padding: 8px; margin-top: 4px; font-size: 12px; white-space: pre-wrap; }}
-textarea {{ width: 100%; height: 140px; background: #0f1117; color: #e6e6e6; border: 1px solid #333; border-radius: 4px; }}
-#status {{ font-size: 13px; color: #999; }}
+*{{box-sizing:border-box;margin:0;padding:0;}}
+:root{{
+  --bg:#0B0613;--panel:#140A24;--card:#1A1030;
+  --accent:#FF006E;--accent2:#FF2A8A;
+  --pos:#52F2C9;--neg:#FF4D7A;--mem:#A78BFA;--warn:#FF9F40;
+  --txt:#F2F0FF;--txt2:#A79BC9;--txt3:#6F648F;
+  --border:rgba(255,0,128,0.12);--border2:rgba(170,90,255,0.10);
+}}
+body{{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min-height:100vh;font-family:'JetBrains Mono',monospace;color:var(--txt);padding:14px 16px;}}
+.hdr{{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border2);flex-wrap:wrap;}}
+.logo{{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;color:var(--accent);text-shadow:0 0 20px rgba(255,0,110,0.35);white-space:nowrap;}}
+.logo-sub{{font-size:9px;color:var(--txt3);letter-spacing:.08em;margin-top:2px;}}
+.panel{{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:14px;margin-bottom:16px;}}
+.sec{{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px;}}
+label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt2);}}
+.inp{{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:6px 14px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;}}
+.inp:focus{{border-color:rgba(255,0,110,.4);}}
+.inp.mid{{width:100px;}}
+.btn-pill{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.12));border:1px solid rgba(255,0,128,.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:8px 18px;cursor:pointer;transition:all .15s;}}
+.btn-pill:hover{{box-shadow:0 0 14px rgba(255,0,128,.25);}}
+.chips{{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}}
+.chip{{display:flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);}}
+.chip:hover{{border-color:rgba(255,0,128,.25);}}
+.chip.active{{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}}
+.scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
+.scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
+.scen-table th:first-child, .scen-table td:first-child{{text-align:left;}}
+.scen-table td{{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--txt2);text-align:right;}}
+.scen-table tr:hover td{{background:rgba(255,255,255,.02);}}
+.sdot{{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}}
+.sdot.ok{{background:var(--pos);box-shadow:0 0 7px rgba(82,242,201,.5);}}
+.sdot.err{{background:var(--neg);box-shadow:0 0 7px rgba(255,77,122,.5);}}
+.err{{color:var(--neg);}}
+.advice{{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-top:4px;font-size:11px;white-space:pre-wrap;color:var(--txt2);}}
+.advice b{{color:var(--mem);}}
+textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);border:1px solid var(--border);border-radius:14px;font-family:'JetBrains Mono',monospace;font-size:11px;padding:10px;}}
+#status{{font-size:11px;color:var(--txt3);margin-left:10px;}}
 </style>
 </head>
 <body>
-<h1>invest-bot — прогон виртуальных сделок</h1>
-
-<div class="box">
-  <h3>Бэктест</h3>
-  <div id="tickers">{ticker_checkboxes}</div>
-  <label>Дней истории: <input type="number" id="days" value="30" min="1" max="90"></label>
-  <label>ATR_TAKE_K: <input type="text" id="atr_take" value="2,3,4"></label>
-  <label>ATR_STOP_K: <input type="text" id="atr_stop" value="1,1.5,2"></label>
-  <br><br>
-  <button onclick="runBacktest()">Запустить бэктест</button>
-  <span id="status"></span>
-  <table id="results"></table>
+<div class="hdr">
+  <div>
+    <div class="logo">INVEST-BOT · DASHBOARD</div>
+    <div class="logo-sub">VIRTUAL TRADES BACKTEST &amp; BUG COUNCIL</div>
+  </div>
 </div>
 
-<div class="box">
-  <h3>Спросить совет по багу</h3>
+<div class="panel">
+  <div class="sec">Бэктест</div>
+  <div class="chips" id="tickers">{ticker_checkboxes}</div>
+  <label>Дней истории <input type="number" class="inp mid" id="days" value="30" min="1" max="90"></label>
+  <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
+  <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
+  <br><br>
+  <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
+  <span id="status"></span>
+  <table class="scen-table" id="results"></table>
+</div>
+
+<div class="panel">
+  <div class="sec">Совет по багам</div>
   <textarea id="bugtext" placeholder="Вставь traceback или лог..."></textarea><br><br>
-  <button onclick="askCouncil()">Спросить совет</button>
+  <button class="btn-pill" onclick="askCouncil()">СПРОСИТЬ СОВЕТ</button>
   <div id="council_answer"></div>
 </div>
 
 <script>
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
+
 function renderRows(rows) {{
   const table = document.getElementById('results');
   let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th></tr>';
   for (const r of rows) {{
     if (r.error !== undefined && r.n_trades === undefined) {{
-      html += `<tr><td>${{r.ticker}}</td><td colspan="5" class="err">${{r.mode}}: ${{r.error || ''}}</td></tr>`;
+      html += `<tr><td><span class="sdot err"></span>${{r.ticker}}</td><td colspan="5" class="err">${{r.mode}}: ${{r.error || ''}}</td></tr>`;
       if (r.advice && r.advice.used_ai) {{
         html += `<tr><td></td><td colspan="5"><div class="advice">
           <b>Диагноз:</b> ${{r.advice.diagnosis}}<br>
@@ -173,13 +205,13 @@ function renderRows(rows) {{
     const winPct = r.win_rate !== undefined ? (r.win_rate * 100).toFixed(1) + '%' : '';
     const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct * 100).toFixed(2) + '%' : '';
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
-    html += `<tr><td>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td></tr>`;
+    html += `<tr><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td></tr>`;
   }}
   table.innerHTML = html;
 }}
 
 async function runBacktest() {{
-  const tickers = Array.from(document.querySelectorAll('.tk:checked')).map(c => c.value);
+  const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
   if (tickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
   document.getElementById('status').textContent = 'Считаю...';
   const body = {{
@@ -216,7 +248,7 @@ async function askCouncil() {{
 def _render_page() -> bytes:
     tickers = sorted(_strategy_settings_by_ticker().keys())
     checkboxes = "".join(
-        f'<label><input type="checkbox" class="tk" value="{t}" checked> {t}</label>'
+        f'<div class="chip active" data-ticker="{t}">{t}</div>'
         for t in tickers
     )
     return PAGE_HTML.format(ticker_checkboxes=checkboxes).encode("utf-8")
