@@ -791,7 +791,8 @@ AtrHistoryProvider = Callable[[str], list[HistoricCandle]]
 
 AUTO_ATR_TAKE_KS = (2.0, 3.0, 4.0)
 AUTO_ATR_STOP_KS = (1.0, 1.5, 2.0)
-AUTO_ATR_MIN_TRADES = 3            # меньше сделок на истории — авто-подбору не доверяем
+AUTO_ATR_MIN_TRADES = 20           # меньше сделок на истории — авто-подбору не доверяем
+                                    # (sweep по 3-9 исходам — это подбор по шуму, не сигнал)
 
 
 class OICompositeStrategy(IStrategy):

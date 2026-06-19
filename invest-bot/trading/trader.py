@@ -46,7 +46,11 @@ ADAPTIVE_EXIT_ENABLED = os.getenv("ADAPTIVE_EXIT", "0") == "1"
 
 # Глубина истории для авто-подбора ATR_TAKE_K/ATR_STOP_K (OICompositeStrategy.
 # set_atr_history_provider) — столько дней свечей берётся для sweep раз в день.
-AUTO_ATR_HISTORY_DAYS = 20
+# 20 дней давало 3-24 сделки на тикер — недостаточно для надёжного выбора
+# параметра по шумной метрике (expectancy на горстке исходов). D1-архив свечей
+# растёт инкрементально не только за последние 90 дней, поэтому можно брать
+# окно шире без доп. нагрузки на Tinkoff API.
+AUTO_ATR_HISTORY_DAYS = 90
 
 
 class Trader:
