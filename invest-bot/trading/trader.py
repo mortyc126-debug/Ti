@@ -30,6 +30,7 @@ from oi_layers import OiLayersService
 from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
+from candle_archive import get_candles_cached
 from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
 import bot_control
@@ -42,6 +43,10 @@ logger = logging.getLogger(__name__)
 # — один из РЕЖИМОВ работы, не замена фиксированного стоп/тейк сигнала
 # стратегии. По умолчанию выключен, чтобы не менять текущее поведение.
 ADAPTIVE_EXIT_ENABLED = os.getenv("ADAPTIVE_EXIT", "0") == "1"
+
+# Глубина истории для авто-подбора ATR_TAKE_K/ATR_STOP_K (OICompositeStrategy.
+# set_atr_history_provider) — столько дней свечей берётся для sweep раз в день.
+AUTO_ATR_HISTORY_DAYS = 20
 
 
 class Trader:
@@ -212,6 +217,13 @@ class Trader:
                 strategy.set_retail_contra_provider(self.__oi_layers.retail_contra_score)
             if hasattr(strategy, "set_tradestats_provider"):
                 strategy.set_tradestats_provider(self.__tradestats.score)
+            if hasattr(strategy, "set_atr_history_provider"):
+                figi = strategy.settings.figi
+                strategy.set_atr_history_provider(
+                    lambda ticker, figi=figi: get_candles_cached(
+                        ticker, figi, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+                    )
+                )
             # Инжекция аналитической истории и калибратора — прогревает
             # перцентильные буферы и загружает динамические режимные моды.
             # db (если настроен) — дублирует закрытые сделки в общую базу.
@@ -935,7 +947,9 @@ class Trader:
                 scores=snapshot["scores"],
                 regime=snapshot["regime"],
                 rolling_quality=snapshot["rolling_quality"],
-                live=not signal_only
+                live=not signal_only,
+                auto_atr_take_k=snapshot.get("auto_atr_take_k"),
+                auto_atr_stop_k=snapshot.get("auto_atr_stop_k"),
             )
             # Дублируем в HistoryStore — там хранятся ещё и сделки с attribution
             self.__history.record_daily(

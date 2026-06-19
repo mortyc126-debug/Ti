@@ -57,6 +57,8 @@ class ArchiveStore:
             live: bool,
             backtest_quality: float | None = None,
             backtest_trades: int | None = None,
+            auto_atr_take_k: float | None = None,
+            auto_atr_stop_k: float | None = None,
     ) -> None:
         """
         Снэпшок на конец дня по одному тикеру (вызывается раз в trade_day).
@@ -73,6 +75,8 @@ class ArchiveStore:
             "live": live,
             "backtest_quality": round(backtest_quality, 4) if backtest_quality is not None else None,
             "backtest_trades": backtest_trades,
+            "auto_atr_take_k": auto_atr_take_k,
+            "auto_atr_stop_k": auto_atr_stop_k,
         }
         cutoff = (datetime.now(timezone.utc).date() - timedelta(days=DAYS_KEPT)).isoformat()
         per_ticker_trimmed = {d: v for d, v in per_ticker.items() if d >= cutoff}

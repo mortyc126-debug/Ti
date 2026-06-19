@@ -30,6 +30,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from tinkoff.invest.exceptions import RequestError
 
 import bug_council
+from archive import ArchiveStore
 from candle_archive import get_candles_cached
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
@@ -57,6 +58,7 @@ _market_data = MarketDataService(_config.tinkoff_token, _config.tinkoff_app_name
 _instrument_service = InstrumentService(_config.tinkoff_token, _config.tinkoff_app_name)
 _mega_alerts = MegaAlertsService()
 _db = DbApiClient(_config.mega_alerts_settings.db_api_url, _config.mega_alerts_settings.db_api_key)
+_archive = ArchiveStore()
 
 # Дефолтные настройки сигнала для тикеров, импортированных из OI (у них
 # нет [STRATEGY_<TICKER>] в settings.ini — только тикер+FIGI) — берём те же
@@ -68,6 +70,28 @@ _OI_DEFAULT_SETTINGS = {
     "SHORT_TAKE": _config.mega_alerts_settings.short_take,
     "SHORT_STOP": _config.mega_alerts_settings.short_stop,
 }
+
+
+def get_auto_atr_snapshot() -> list[dict]:
+    """
+    Последние авто-подобранные ATR_TAKE_K/ATR_STOP_K по тикерам (из
+    data/archive.json, пишет Trader.__archive_today — см. oi_composite_strategy.py
+    __recalc_auto_atr). Только тикеры, где живой бот уже считал авто-ATR
+    (явные ATR_TAKE_K/ATR_STOP_K в settings.ini подбор не запускают).
+    """
+    rows = []
+    for ticker in _archive.tickers():
+        history = _archive.history(ticker)
+        if not history:
+            continue
+        last_date = max(history.keys())
+        snap = history[last_date]
+        tk, sk = snap.get("auto_atr_take_k"), snap.get("auto_atr_stop_k")
+        if tk is None or sk is None:
+            continue
+        rows.append({"ticker": ticker, "date": last_date, "auto_atr_take_k": tk, "auto_atr_stop_k": sk})
+    rows.sort(key=lambda r: r["ticker"])
+    return rows
 
 
 def load_oi_tickers() -> dict:
@@ -536,6 +560,21 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <span id="ov_status"></span>
 </div>
 
+<div class="panel">
+  <h3>Авто-подобранные ATR_TAKE_K/ATR_STOP_K</h3>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Считает сам бот раз в день (OICompositeStrategy.__recalc_auto_atr) для тикеров
+    без явных ATR_TAKE_K/ATR_STOP_K в settings.ini — sweep по истории, лучшая пара
+    по expectancy_pct. Здесь только последний посчитанный снэпшок из data/archive.json.
+  </div>
+  <table class="scen-table">
+    <thead><tr><th>Тикер</th><th>Дата расчёта</th><th>ATR_TAKE_K</th><th>ATR_STOP_K</th></tr></thead>
+    <tbody id="auto_atr_table"></tbody>
+  </table>
+  <br>
+  <button class="btn-pill" onclick="loadAutoAtr()">⟳ ОБНОВИТЬ</button>
+</div>
+
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
@@ -760,6 +799,19 @@ async function saveOverrides() {{
 
 loadOverrides();
 
+async function loadAutoAtr() {{
+  const resp = await fetch('/api/auto_atr');
+  const data = await resp.json();
+  const tbody = document.getElementById('auto_atr_table');
+  tbody.innerHTML = data.rows.map(r => `<tr>
+    <td>${{r.ticker}}</td>
+    <td>${{r.date}}</td>
+    <td>${{r.auto_atr_take_k}}</td>
+    <td>${{r.auto_atr_stop_k}}</td>
+  </tr>`).join('') || '<tr><td colspan="4">нет данных</td></tr>';
+}}
+loadAutoAtr();
+
 async function askCouncil() {{
   const text = document.getElementById('bugtext').value;
   if (!text.trim()) return;
@@ -852,6 +904,8 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/api/overrides":
             self._send_json(get_overrides_payload())
+        elif self.path == "/api/auto_atr":
+            self._send_json({"rows": get_auto_atr_snapshot()})
         else:
             self.send_error(404)
 

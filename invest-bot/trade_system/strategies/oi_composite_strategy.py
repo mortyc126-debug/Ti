@@ -784,6 +784,14 @@ ScoreProvider = Callable[[str], float]
 TradeStatsProvider = Callable[[str, str], float]
 # (ticker) -> score [-1, 1]; межинструментальный сигнал (indicators_multi.py).
 MultiTickerProvider = Callable[[str], float]
+# (ticker) -> исторические свечи (для авто-подбора ATR_TAKE_K/ATR_STOP_K, см.
+# __recalc_auto_atr) — Trader подключает get_candles_cached. Без провайдера
+# (или если в settings.ini заданы явные ATR_TAKE_K/ATR_STOP_K) авто-подбор не запускается.
+AtrHistoryProvider = Callable[[str], list[HistoricCandle]]
+
+AUTO_ATR_TAKE_KS = (2.0, 3.0, 4.0)
+AUTO_ATR_STOP_KS = (1.0, 1.5, 2.0)
+AUTO_ATR_MIN_TRADES = 3            # меньше сделок на истории — авто-подбору не доверяем
 
 
 class OICompositeStrategy(IStrategy):
@@ -839,6 +847,12 @@ class OICompositeStrategy(IStrategy):
         self.__tf_regimes: dict[str, str] = {}
         # Кластерные модели M1/M2/M3 — инициализируются при set_history
         self.__cluster_models: Optional[ClusterModels] = None
+        # Авто-подбор ATR_TAKE_K/ATR_STOP_K (если в settings.ini не зафиксированы
+        # явные значения) — см. __recalc_auto_atr.
+        self.__atr_history_provider: Optional[AtrHistoryProvider] = None
+        self.__auto_atr_take_k: Optional[float] = None
+        self.__auto_atr_stop_k: Optional[float] = None
+        self.__auto_atr_recalc_date: Optional[object] = None
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -925,6 +939,14 @@ class OICompositeStrategy(IStrategy):
         """provider(ticker) -> score [-1,1], межинструментальный сигнал (indicators_multi.py)."""
         self.__multi_ticker_provider = provider
 
+    def set_atr_history_provider(self, provider: Optional[AtrHistoryProvider]) -> None:
+        """
+        provider(ticker) -> исторические свечи для авто-подбора ATR_TAKE_K/
+        ATR_STOP_K (Trader подключает get_candles_cached). Игнорируется, если
+        в settings.ini для этого тикера явно зафиксированы ATR_TAKE_K/ATR_STOP_K.
+        """
+        self.__atr_history_provider = provider
+
     def set_history(self, history, calibrator, db=None) -> None:
         """
         Инжектирует HistoryStore и PercentileCalibrator.
@@ -984,6 +1006,7 @@ class OICompositeStrategy(IStrategy):
     # ── Публичный метод — вызывается на каждой свече ─────────────────────────
 
     def analyze_candles(self, candles: list[HistoricCandle]) -> Optional[Signal]:
+        self.__recalc_auto_atr()
         self.__candles.extend(candles)
         # окно: последние CANDLE_WINDOW свечей
         if len(self.__candles) > CANDLE_WINDOW:
@@ -1417,6 +1440,8 @@ class OICompositeStrategy(IStrategy):
             "regime": self.__last_regime,
             "regime_confidence": self.__regime_confidence,
             "rolling_quality": self.__rolling_quality,
+            "auto_atr_take_k": self.__auto_atr_take_k,
+            "auto_atr_stop_k": self.__auto_atr_stop_k,
         }
 
     def __score_oi_squeeze(self) -> float:
@@ -1491,15 +1516,56 @@ class OICompositeStrategy(IStrategy):
             mult *= LOW_QUALITY_MULT
         return base * mult
 
+    def __recalc_auto_atr(self) -> None:
+        """
+        Авто-подбор ATR_TAKE_K/ATR_STOP_K по исторической выгрузке — раз в
+        день, тот же sweep, что в дашборде (run_backtest_one): перебираем
+        AUTO_ATR_TAKE_KS x AUTO_ATR_STOP_KS, берём пару с лучшим expectancy_pct.
+        Не запускается, если ATR_TAKE_K/ATR_STOP_K зафиксированы в settings.ini
+        (явная настройка приоритетнее) или провайдер истории не подключён.
+        """
+        if self.__atr_take_k is not None and self.__atr_stop_k is not None:
+            return
+        if self.__atr_history_provider is None:
+            return
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        if self.__auto_atr_recalc_date == today:
+            return
+        self.__auto_atr_recalc_date = today
+
+        try:
+            history = self.__atr_history_provider(self.__settings.ticker)
+            if not history:
+                return
+            signals = self.backtest_scan_signals(history)
+            best = None
+            for tk in AUTO_ATR_TAKE_KS:
+                for sk in AUTO_ATR_STOP_KS:
+                    res = self.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk)
+                    if res["n_trades"] < AUTO_ATR_MIN_TRADES:
+                        continue
+                    if best is None or res["expectancy_pct"] > best[1]:
+                        best = ((tk, sk), res["expectancy_pct"])
+            if best:
+                (tk, sk), exp = best
+                self.__auto_atr_take_k, self.__auto_atr_stop_k = tk, sk
+                logger.info(f"{self.__settings.ticker}: авто-ATR k={tk}/{sk} (expectancy={exp:.4f}%)")
+        except Exception:
+            logger.exception(f"{self.__settings.ticker}: авто-подбор ATR_TAKE_K/ATR_STOP_K упал")
+
     def __take_stop_mults(self, direction: SignalType, atr_pct: float) -> tuple[Decimal, Decimal]:
         """
         Множители take/stop. Если в settings заданы ATR_TAKE_K и ATR_STOP_K —
         уровни считаются от ATR (динамически под волатильность): take = 1 ± k*ATR%.
-        Иначе — фиксированные LONG_*/SHORT_* (полная обратная совместимость).
+        Если не заданы, но подключён __atr_history_provider — используется
+        авто-подобранная пара (__recalc_auto_atr). Иначе — фиксированные
+        LONG_*/SHORT_* (полная обратная совместимость).
         """
-        if self.__atr_take_k is not None and self.__atr_stop_k is not None and atr_pct > 0:
-            take_off = Decimal(str(self.__atr_take_k * atr_pct))
-            stop_off = Decimal(str(self.__atr_stop_k * atr_pct))
+        take_k = self.__atr_take_k if self.__atr_take_k is not None else self.__auto_atr_take_k
+        stop_k = self.__atr_stop_k if self.__atr_stop_k is not None else self.__auto_atr_stop_k
+        if take_k is not None and stop_k is not None and atr_pct > 0:
+            take_off = Decimal(str(take_k * atr_pct))
+            stop_off = Decimal(str(stop_k * atr_pct))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
