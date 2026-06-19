@@ -39,8 +39,14 @@ CORR_GROUPS: dict[str, list[str]] = {
         "GMKN", "GMKNF",  # Норникель
         "RUAL",
     ],
-    "RU_OTHER": [
-        "SMLT", "YDEX", "VKCO", "MGNT",
+    "RU_DEV": [
+        "SMLT",  # Самолёт
+    ],
+    "RU_TECH": [
+        "YDEX", "VKCO",  # Яндекс, VK — рекламный рынок РФ, двигаются синхронно
+    ],
+    "RU_RETAIL": [
+        "MGNT",  # Магнит
     ],
 }
 
