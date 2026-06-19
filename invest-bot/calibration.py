@@ -46,7 +46,7 @@ class PercentileCalibrator:
         Вызывается один раз при старте.
         """
         for method, scores in method_scores.items():
-            buf = sorted(scores[-self._window:])
+            buf = sorted(abs(s) for s in scores[-self._window:])
             self._bufs[ticker][method] = buf
         if method_scores:
             n = sum(len(v) for v in method_scores.values())
@@ -55,7 +55,10 @@ class PercentileCalibrator:
     def update(self, ticker: str, method: str, score: float) -> None:
         """Добавляет новое значение; вытесняет старейшее при переполнении."""
         buf = self._bufs[ticker][method]
-        bisect.insort(buf, score)
+        # Буфер хранит |score| — rank() ищет позицию abs(score) в нём, и
+        # должен сравнивать амплитуды, а не знаковые величины (иначе все
+        # отрицательные элементы буфера всегда оказывались бы "меньше").
+        bisect.insort(buf, abs(score))
         if len(buf) > self._window:
             buf.pop(0)
 
