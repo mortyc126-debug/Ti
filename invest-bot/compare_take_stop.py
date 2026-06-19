@@ -57,13 +57,17 @@ def main() -> None:
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
-        fixed = strategy.backtest_barriers(candles, take_mult=long_take, stop_mult=long_stop)
+        # Дорогой проход (Hawkes-MLE и т.п.) делаем один раз на тикер,
+        # а не на каждую из 10 комбинаций take/stop.
+        signals = strategy.backtest_scan_signals(candles)
+
+        fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop)
         _print_row(strategy_settings.ticker, "fixed", fixed)
 
         best = None
         for tk in take_ks:
             for sk in stop_ks:
-                res = strategy.backtest_barriers(candles, atr_take_k=tk, atr_stop_k=sk)
+                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk)
                 if res["n_trades"] == 0:
                     continue
                 if best is None or res["expectancy_pct"] > best[1]["expectancy_pct"]:

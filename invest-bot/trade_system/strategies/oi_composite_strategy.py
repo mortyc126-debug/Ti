@@ -1106,35 +1106,21 @@ class OICompositeStrategy(IStrategy):
             return 0.5, 0
         return sum(qualities) / len(qualities), len(qualities)
 
-    def backtest_barriers(
-            self,
-            candles: list[HistoricCandle],
-            take_mult: Optional[Decimal] = None,
-            stop_mult: Optional[Decimal] = None,
-            atr_take_k: Optional[float] = None,
-            atr_stop_k: Optional[float] = None,
-            max_bars: int = 60,
-    ) -> dict:
+    def backtest_scan_signals(self, candles: list[HistoricCandle], max_bars: int = 60) -> list[dict]:
         """
-        В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
-        окне и не знает про take/stop вообще), здесь честно симулируется
-        исполнение: для каждой виртуальной сделки бар-за-баром ищем, какой
-        барьер (take или stop) пробивается первым, до max_bars. Если ни один —
-        сделка закрывается по последней цене окна (timeout).
-
-        Передайте либо (take_mult, stop_mult) — фиксированные множители,
-        либо (atr_take_k, atr_stop_k) — ATR-based (как в __take_stop_mults) —
-        чтобы сравнить два режима на одной и той же истории.
-
-        Возвращает {"n_trades", "win_rate", "avg_r", "expectancy_pct"} —
-        expectancy_pct уже за вычетом commission_rt за круг.
+        Один проход по свечам с дорогим __compute_composite() (внутри —
+        Hawkes-MLE через scipy.optimize и другие методы) — собирает все бары,
+        где стратегия дала бы сигнал, вместе с ATR на момент входа и окном
+        свечей для поиска барьера. Позволяет прогнать backtest_barriers() с
+        разными take/stop без повторного пересчёта composite на каждой
+        комбинации — см. compare_take_stop.py, где иначе один и тот же
+        дорогой проход повторялся бы 10 раз на тикер.
         """
         if len(candles) < CANDLE_WINDOW + 2:
-            return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+            return []
 
-        comm = commission_rt(self.__settings.is_future)
         saved_candles = self.__candles
-        results: list[tuple[bool, float, float]] = []  # (win, r_multiple, net_pct)
+        signals: list[dict] = []
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
@@ -1152,57 +1138,100 @@ class OICompositeStrategy(IStrategy):
                     continue
 
                 entry = _to_f(candles[i].close)
-                if atr_take_k is not None and atr_stop_k is not None:
-                    atr_pct = _compute_atr(self.__candles)
-                    if atr_pct <= 0:
-                        i += 1
-                        continue
-                    take_dist = atr_take_k * atr_pct
-                    stop_dist = atr_stop_k * atr_pct
-                else:
-                    take_dist = abs(float(take_mult) - 1.0)
-                    stop_dist = abs(float(stop_mult) - 1.0)
-
-                if direction == SignalType.LONG:
-                    take_price = entry * (1 + take_dist)
-                    stop_price = entry * (1 - stop_dist)
-                else:
-                    take_price = entry * (1 - take_dist)
-                    stop_price = entry * (1 + stop_dist)
-
+                atr_pct = _compute_atr(self.__candles)
                 window = candles[i + 1:i + 1 + max_bars]
-                exit_pct: Optional[float] = None
-                win = False
-                for c in window:
-                    h = _to_f(c.high)
-                    lo = _to_f(c.low)
-                    if direction == SignalType.LONG:
-                        hit_take = h >= take_price
-                        hit_stop = lo <= stop_price
-                    else:
-                        hit_take = lo <= take_price
-                        hit_stop = h >= stop_price
-                    if hit_take and hit_stop:
-                        # обе цены задело в одной свече — консервативно считаем стоп первым
-                        exit_pct = -stop_dist
-                        break
-                    if hit_take:
-                        exit_pct = take_dist
-                        break
-                    if hit_stop:
-                        exit_pct = -stop_dist
-                        break
-                if exit_pct is None:
-                    last_close = _to_f(window[-1].close) if window else entry
-                    exit_pct = (last_close - entry) / entry if direction == SignalType.LONG \
-                        else (entry - last_close) / entry
-
-                net_pct = exit_pct - comm
-                r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
-                results.append((net_pct > 0, r_multiple, net_pct))
+                signals.append({
+                    "direction": direction, "entry": entry, "atr_pct": atr_pct, "window": window,
+                })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
             self.__candles = saved_candles
+
+        return signals
+
+    def backtest_barriers(
+            self,
+            candles: Optional[list[HistoricCandle]] = None,
+            take_mult: Optional[Decimal] = None,
+            stop_mult: Optional[Decimal] = None,
+            atr_take_k: Optional[float] = None,
+            atr_stop_k: Optional[float] = None,
+            max_bars: int = 60,
+            signals: Optional[list[dict]] = None,
+    ) -> dict:
+        """
+        В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
+        окне и не знает про take/stop вообще), здесь честно симулируется
+        исполнение: для каждой виртуальной сделки бар-за-баром ищем, какой
+        барьер (take или stop) пробивается первым, до max_bars. Если ни один —
+        сделка закрывается по последней цене окна (timeout).
+
+        Передайте либо (take_mult, stop_mult) — фиксированные множители,
+        либо (atr_take_k, atr_stop_k) — ATR-based (как в __take_stop_mults) —
+        чтобы сравнить два режима на одной и той же истории.
+
+        Передайте `candles`, либо готовый `signals` (из backtest_scan_signals)
+        — второе избегает повторного дорогого пересчёта composite, если
+        нужно сравнить несколько комбинаций take/stop на одной истории.
+
+        Возвращает {"n_trades", "win_rate", "avg_r", "expectancy_pct"} —
+        expectancy_pct уже за вычетом commission_rt за круг.
+        """
+        if signals is None:
+            signals = self.backtest_scan_signals(candles, max_bars=max_bars)
+
+        if not signals:
+            return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+
+        comm = commission_rt(self.__settings.is_future)
+        results: list[tuple[bool, float, float]] = []  # (win, r_multiple, net_pct)
+        for sig in signals:
+            direction, entry, atr_pct, window = sig["direction"], sig["entry"], sig["atr_pct"], sig["window"]
+
+            if atr_take_k is not None and atr_stop_k is not None:
+                if atr_pct <= 0:
+                    continue
+                take_dist = atr_take_k * atr_pct
+                stop_dist = atr_stop_k * atr_pct
+            else:
+                take_dist = abs(float(take_mult) - 1.0)
+                stop_dist = abs(float(stop_mult) - 1.0)
+
+            if direction == SignalType.LONG:
+                take_price = entry * (1 + take_dist)
+                stop_price = entry * (1 - stop_dist)
+            else:
+                take_price = entry * (1 - take_dist)
+                stop_price = entry * (1 + stop_dist)
+
+            exit_pct: Optional[float] = None
+            for c in window:
+                h = _to_f(c.high)
+                lo = _to_f(c.low)
+                if direction == SignalType.LONG:
+                    hit_take = h >= take_price
+                    hit_stop = lo <= stop_price
+                else:
+                    hit_take = lo <= take_price
+                    hit_stop = h >= stop_price
+                if hit_take and hit_stop:
+                    # обе цены задело в одной свече — консервативно считаем стоп первым
+                    exit_pct = -stop_dist
+                    break
+                if hit_take:
+                    exit_pct = take_dist
+                    break
+                if hit_stop:
+                    exit_pct = -stop_dist
+                    break
+            if exit_pct is None:
+                last_close = _to_f(window[-1].close) if window else entry
+                exit_pct = (last_close - entry) / entry if direction == SignalType.LONG \
+                    else (entry - last_close) / entry
+
+            net_pct = exit_pct - comm
+            r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
+            results.append((net_pct > 0, r_multiple, net_pct))
 
         if not results:
             return {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
