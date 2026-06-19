@@ -727,20 +727,18 @@ async function runBacktest() {{
   const tickers = filtered.kept;
   table.innerHTML += droppedToHtml(filtered.dropped);
 
-  for (let i = 0; i < tickers.length; i++) {{
-    const ticker = tickers[i];
-    document.getElementById('status').textContent = `Считаю ${{ticker}}... (${{i + 1}}/${{tickers.length}})`;
-    try {{
-      const resp = await fetch('/api/backtest_one', {{
-        method: 'POST', headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{ticker: ticker, days: days, atr_take: atrTake, atr_stop: atrStop,
-                                tariff: document.getElementById('tariff').value}})
-      }});
-      const data = await resp.json();
-      table.innerHTML += rowsToHtml(data.rows);
-    }} catch (e) {{
-      table.innerHTML += `<tr><td><span class="sdot err"></span>${{ticker}}</td><td colspan="5" class="err">сетевая ошибка: ${{e}}</td></tr>`;
-    }}
+  document.getElementById('status').textContent =
+    `Считаю ${{tickers.length}} тикер(ов) параллельно (до {backtest_workers} одновременно)...`;
+  try {{
+    const resp = await fetch('/api/backtest', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{tickers: tickers, days: days, atr_take: atrTake, atr_stop: atrStop,
+                              tariff: document.getElementById('tariff').value}})
+    }});
+    const data = await resp.json();
+    table.innerHTML += rowsToHtml(data.rows);
+  }} catch (e) {{
+    table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
   }}
   document.getElementById('status').textContent = `Готово: ${{tickers.length}} тикер(ов)`;
 }}
@@ -988,7 +986,7 @@ def _render_page() -> bytes:
         f'<div class="chip active" data-ticker="{t}" title="{"импортирован из OI" if t in oi_tickers else "settings.ini"}">{t}{" •" if t in oi_tickers else ""}</div>'
         for t in tickers
     )
-    return PAGE_HTML.format(ticker_checkboxes=checkboxes).encode("utf-8")
+    return PAGE_HTML.format(ticker_checkboxes=checkboxes, backtest_workers=BACKTEST_WORKERS).encode("utf-8")
 
 
 class Handler(BaseHTTPRequestHandler):
