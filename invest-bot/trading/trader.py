@@ -83,6 +83,7 @@ class Trader:
             stream_service: MarketDataStreamService,
             market_data_service: MarketDataService,
             blogger: Blogger,
+            mega_alerts: MegaAlertsService,
             mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings(),
             futures_trading_settings: FuturesTradingSettings = FuturesTradingSettings()
     ) -> None:
@@ -102,8 +103,15 @@ class Trader:
         self.__oi_task: asyncio.Task | None = None
         self.__tradestats = TradeStatsService()
         self.__tradestats_task: asyncio.Task | None = None
-        self.__mega_alerts = MegaAlertsService()
-        self.__mega_alerts_task: asyncio.Task | None = None
+        # MegaAlertsService и его daily_loop живут на уровне TradeService —
+        # один процесс-долгоживущий инстанс на весь срок работы бота, а не
+        # пересоздаётся вместе с новым Trader каждый торговый день. Иначе
+        # вчерашняя daily_loop-задача от вчерашнего Trader продолжала бы
+        # жить вечно в фоне (ссылку на неё уже никто не держит, отменить
+        # нельзя) — за N дней работы накопилось бы N независимых циклов,
+        # каждый раз в сутки бьющих MOEX API и конкурирующих за запись в
+        # один и тот же data/mega_alerts.json.
+        self.__mega_alerts = mega_alerts
         self.__archive = ArchiveStore()
         self.__trading_settings: TradingSettings = TradingSettings()
         self.__candle_volumes: dict[str, deque] = {}
@@ -192,10 +200,8 @@ class Trader:
             self.__validate_strategy_backtest(strategy)
 
         configured_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
-        if self.__mega_alerts_task is None:
-            # MEGA-ALERTS живёт дольше одного торгового дня — обновляется
-            # раз в сутки по ВСЕМУ рынку, не только по сегодняшним тикерам.
-            self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
+        # daily_loop() самой MegaAlertsService уже крутится фоном на уровне
+        # TradeService — здесь только форсируем свежий срез на старт дня.
         await self.__mega_alerts.refresh_once()
         tracked_hits = [t for t in configured_tickers if self.__mega_alerts.alerts_for(t)]
         candidate_tickers = self.__dedup_mega_alerts_candidates(configured_tickers)

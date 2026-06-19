@@ -12,6 +12,7 @@ from invest_api.services.market_data_service import MarketDataService
 from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
+from mega_alerts import MegaAlertsService
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trader import Trader
 
@@ -53,23 +54,36 @@ class TradeService:
         self.__strategies = strategies
         self.__mega_alerts_settings = mega_alerts_settings
         self.__futures_trading_settings = futures_trading_settings
+        # Один инстанс и одна фоновая daily_loop-задача на весь процесс — раньше
+        # MegaAlertsService создавался внутри Trader.__init__ и пересоздавался
+        # каждый торговый день вместе с новым Trader; старая задача никогда не
+        # отменялась (только oi_task/tradestats_task отменялись в trade_day's
+        # finally) — за N дней работы накапливалось N "осиротевших" daily_loop,
+        # каждый раз в сутки бьющих MOEX API и независимо пишущих в один и тот
+        # же data/mega_alerts.json.
+        self.__mega_alerts = MegaAlertsService()
+        self.__mega_alerts_task: asyncio.Task | None = None
 
     async def worker(self) -> None:
+        self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
         try:
-            logger.info("Finding account for trading")
-            account_id = self.__account_service.trading_account_id(self.__account_settings)
+            try:
+                logger.info("Finding account for trading")
+                account_id = self.__account_service.trading_account_id(self.__account_settings)
 
-            if not account_id:
-                logger.error("Account for trading hasn't been found")
+                if not account_id:
+                    logger.error("Account for trading hasn't been found")
+                    return None
+
+                logger.info(f"Account id: {account_id}")
+
+            except Exception as ex:
+                logger.error(f"Start trading error: {repr(ex)}")
                 return None
 
-            logger.info(f"Account id: {account_id}")
-
-        except Exception as ex:
-            logger.error(f"Start trading error: {repr(ex)}")
-            return None
-
-        await self.__working_loop(account_id)
+            await self.__working_loop(account_id)
+        finally:
+            self.__mega_alerts_task.cancel()
 
     async def __working_loop(self, account_id: str) -> None:
         logger.info("Start every day trading")
@@ -103,6 +117,7 @@ class TradeService:
                         stream_service=self.__stream_service,
                         market_data_service=self.__market_data_service,
                         blogger=self.__blogger,
+                        mega_alerts=self.__mega_alerts,
                         mega_alerts_settings=self.__mega_alerts_settings,
                         futures_trading_settings=self.__futures_trading_settings
                     ).trade_day(
