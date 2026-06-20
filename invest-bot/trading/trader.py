@@ -136,6 +136,11 @@ class Trader:
         # Не даёт открыть вторую заявку по тому же тикеру, пока первая летит,
         # и не блокирует чтение стрима свечей по ОСТАЛЬНЫМ тикерам на это время.
         self.__pending_orders: set[str] = set()
+        # Кэш MULTI_TICKER-скора (ticker -> (date, score)) — пересчитывается
+        # раз в день в __multi_ticker_signal, а не на каждой свече: расчёт
+        # требует скачивания истории по двум тикерам и тяжёлых numpy-вычислений
+        # (transfer entropy / wavelet coherence), см. set_multi_ticker_provider.
+        self.__multi_ticker_cache: dict[str, tuple] = {}
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -255,6 +260,12 @@ class Trader:
                 strategy.set_atr_history_provider(
                     lambda ticker, figi=figi: get_candles_cached(
                         ticker, figi, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+                    )
+                )
+            if hasattr(strategy, "set_multi_ticker_provider"):
+                strategy.set_multi_ticker_provider(
+                    lambda ticker: self.__multi_ticker_signal(
+                        ticker, today_trade_strategies, db_for_history
                     )
                 )
             # Инжекция аналитической истории и калибратора — прогревает
@@ -612,6 +623,63 @@ class Trader:
         available_lots = int(current_rub_on_depo / cost_per_lot)
 
         return available_lots if max_lots_per_order > available_lots else max_lots_per_order
+
+    def __multi_ticker_signal(
+            self,
+            ticker: str,
+            today_trade_strategies: dict[str, IStrategy],
+            db_for_history: DbApiClient
+    ) -> float:
+        """
+        MULTI_TICKER провайдер: межинструментальный сигнал между ticker и
+        вторым тикером из сегодняшней корзины (детерминированно — следующий
+        по сортированному списку тикеров, по кругу). Направление — знак
+        transfer_entropy_score (информационный поток между рядами, см.
+        indicators_multi.py), отвзвешенный wavelet_coherence_score как
+        уверенностью в синхронности пары на средних горизонтах.
+
+        Тяжёлые вычисления (скачивание истории, numpy) — раз в день на
+        тикер, кэшируется в self.__multi_ticker_cache; между пересчётами
+        отдаётся кэшированное значение.
+        """
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        cached = self.__multi_ticker_cache.get(ticker)
+        if cached and cached[0] == today:
+            return cached[1]
+
+        tickers = sorted(today_trade_strategies.keys())
+        if len(tickers) < 2:
+            self.__multi_ticker_cache[ticker] = (today, 0.0)
+            return 0.0
+
+        figi_self = next((f for f in tickers if today_trade_strategies[f].settings.ticker == ticker), None)
+        if figi_self is None:
+            return 0.0
+        peer_figi = tickers[(tickers.index(figi_self) + 1) % len(tickers)]
+
+        try:
+            from indicators_multi import transfer_entropy_score, wavelet_coherence_score
+
+            candles_self = get_candles_cached(
+                ticker, figi_self, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+            )
+            peer_ticker = today_trade_strategies[peer_figi].settings.ticker
+            candles_peer = get_candles_cached(
+                peer_ticker, peer_figi, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+            )
+            n = min(len(candles_self), len(candles_peer))
+            closes_self = [float(quotation_to_decimal(c.close)) for c in candles_self[-n:]]
+            closes_peer = [float(quotation_to_decimal(c.close)) for c in candles_peer[-n:]]
+
+            direction = transfer_entropy_score(closes_self, closes_peer)
+            confidence = wavelet_coherence_score(closes_self, closes_peer)
+            score = max(-1.0, min(1.0, direction * confidence))
+        except Exception as ex:
+            logger.warning(f"multi_ticker_signal {ticker} failed: {repr(ex)}")
+            score = 0.0
+
+        self.__multi_ticker_cache[ticker] = (today, score)
+        return score
 
     def __liquidity_lots_cap(self, figi: str, share_lot_size: int) -> int:
         """
