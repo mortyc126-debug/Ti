@@ -1,0 +1,9 @@
+{
+  "name": "oi-intel-yc-backup",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "ydb-sdk": "^5.9.0",
+    "@yandex-cloud/nodejs-sdk": "^2.7.0"
+  }
+}

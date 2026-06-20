@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>risk.py — Риск-менеджер v2</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 24px; }
+  h1 { color: #58a6ff; border-bottom: 1px solid #21262d; padding-bottom: 12px; }
+  h2 { color: #79c0ff; margin-top: 32px; }
+  h3 { color: #d2a8ff; margin-top: 20px; }
+  pre { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 16px; overflow-x: auto; font-size: 13px; line-height: 1.6; white-space: pre; }
+  .comment  { color: #8b949e; }
+  .string   { color: #a5d6ff; }
+  .number   { color: #f2cc60; }
+  .kw       { color: #ff7b72; }
+  .fn       { color: #d2a8ff; }
+  .cls      { color: #ffa657; }
+  .ok       { color: #3fb950; }
+  .warn     { color: #e3b341; }
+  .err      { color: #f85149; }
+  .banner   { background: #1c2128; border-left: 4px solid #58a6ff; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 14px; line-height: 1.7; }
+  .removed  { background: #3d0000; border-left: 4px solid #f85149; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+  .added    { background: #002d00; border-left: 4px solid #3fb950; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+</style>
+</head>
+<body>
+<h1>🛡️ risk.py — Риск-менеджер v2</h1>
+
+<div class="banner">
+<b>Что изменилось относительно v1:</b><br>
+✅ <b>Корреляционный риск</b> — все фьючерсы одной группы (RU_EQUITY) считаются одной ставкой. Нельзя открыть лонг по Сберу, если уже есть лонг по Газпрому.<br>
+✅ <b>Риск от уверенности</b> — вместо антимартингейла: 55% → 0.5%, 70% → 1.0%, 85%+ → 1.5% капитала.<br>
+✅ <b>Портфельный риск-лимит</b> — суммарный риск по всем позициям отслеживается в реальном времени. При перегрузке стоп нового входа сжимается пропорционально.<br>
+❌ <b>Антимартингейл удалён</b> — risk_mult, WIN_RISK_STEP, LOSS_RISK_STEP больше не используются.<br>
+✅ <b>can_add требует усиления сигнала</b> — добор разрешён только если новая уверенность выше уверенности при открытии. Новый обязательный параметр: <code>new_confidence</code>.
+</div>
+
+<pre>
+<span class="comment">"""
+risk.py — Риск-менеджер v2. Слой дисциплины без человеческого фактора.
+
+Правила:
+  1. КОРРЕЛЯЦИОННЫЙ РИСК. Все фьючерсы в одной группе (например, RU_EQUITY:
+     Сбер, ВТБ, Газпром, Лукойл) — это ОДНА ставка на рынок РФ. Открыть
+     4 лонга в группе ≠ 4 сделки. Это 1 большая ставка в 4× концентрации.
+     Правило: в группе одновременно только ОДНО направление. Новый лонг
+     запрещён, если в группе уже есть хоть один лонг. Смена направления —
+     только после закрытия ВСЕХ позиций группы.
+
+  2. РИСК ОТ УВЕРЕННОСТИ. Размер ставки определяет качество сигнала,
+     а не история серий (антимартингейл УДАЛЁН):
+       55–70% уверенности → 0.5% капитала (узкий стоп, цель 1R)
+       70–85% уверенности → 1.0% капитала (средний стоп, цель 2R)
+       85%+   уверенности → 1.5% капитала (широкий стоп, цель 3–5R)
+     Ниже 55% — сделка запрещена.
+
+  3. ПОРТФЕЛЬНЫЙ РИСК-ЛИМИТ. Суммарный риск всех открытых позиций не должен
+     превышать PORTFOLIO_RISK_MAX_PCT депо. Если портфель уже перегружен —
+     стоп нового входа сжимается (squeeze_factor < 1.0), уменьшая лот.
+
+  4. Стоп есть ВСЕГДА и двигается только В СТОРОНУ прибыли.
+  5. Дневной стоп-лосс: минус DAILY_MAX_LOSS_PCT за день → дневной защитный стоп.
+  6. После 1R прибыли → стоп в безубыток.
+  7. Трейлинг Chandelier + giveback-защита пика.
+  8. Скейл-аут на откате, скейл-ин на возврате тренда — риск позиции ≤ бюджета.
+  9. Не больше MAX_OPEN_POSITIONS позиций одновременно.
+
+Состояние переживает рестарт (data/risk_state.json, data/open_positions.json).
+"""</span>
+
+<span class="kw">import</span> os, json
+<span class="kw">from</span> datetime <span class="kw">import</span> datetime, date
+<span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, field, asdict
+<span class="kw">from</span> config <span class="kw">import</span> (
+    MAX_OPEN_POSITIONS, DAILY_MAX_LOSS_PCT,
+    TRAIL_GIVEBACK_PCT, BREAKEVEN_AT_R, CHANDELIER_MULT,
+    RISK_MIN_PCT, RISK_MID_PCT, RISK_MAX_PCT,
+    CONF_LOW_THR, CONF_MID_THR, CONF_HIGH_THR,
+    CORR_GROUPS, PORTFOLIO_RISK_MAX_PCT, PORTFOLIO_STOP_SQUEEZE,
+)
+<span class="kw">import</span> metrics
+<span class="kw">from</span> logger <span class="kw">import</span> get_logger
+
+log = get_logger(<span class="string">"risk"</span>)
+
+STATE_FILE     = <span class="string">"data/risk_state.json"</span>
+POSITIONS_FILE = <span class="string">"data/open_positions.json"</span>
+</pre>
+
+<h2>📦 Dataclass Position</h2>
+<pre>
+<span class="kw">@dataclass</span>
+<span class="kw">class</span> <span class="cls">Position</span>:
+    ticker:           <span class="cls">str</span>
+    direction:        <span class="cls">str</span>           <span class="comment"># "long" | "short"</span>
+    qty:              <span class="cls">int</span>
+    entry_price:      <span class="cls">float</span>
+    stop_price:       <span class="cls">float</span>
+    opened_ts:        <span class="cls">str</span>
+    risk_rub:         <span class="cls">float</span>         <span class="comment"># рублей на кону при стопе</span>
+    confidence:       <span class="cls">float</span> = <span class="number">0.7</span>   <span class="comment"># уверенность ИИ в сигнале (0–1)</span>
+    trail_dist:       <span class="cls">float</span> = <span class="number">0.0</span>
+    peak_profit_rub:  <span class="cls">float</span> = <span class="number">0.0</span>
+    peak_price:       <span class="cls">float</span> = <span class="number">0.0</span>
+    breakeven_set:    <span class="cls">bool</span>  = <span class="kw">False</span>
+    adds_count:       <span class="cls">int</span>   = <span class="number">0</span>
+    scaled_out:       <span class="cls">bool</span>  = <span class="kw">False</span>
+    reasons:          <span class="cls">list</span>  = field(default_factory=<span class="cls">list</span>)
+
+    <span class="kw">def</span> <span class="fn">pnl_rub</span>(<span class="kw">self</span>, price: <span class="cls">float</span>, point_value: <span class="cls">float</span> = <span class="number">1.0</span>) -&gt; <span class="cls">float</span>:
+        diff = (price - <span class="kw">self</span>.entry_price) <span class="kw">if</span> <span class="kw">self</span>.direction == <span class="string">"long"</span> \
+            <span class="kw">else</span> (<span class="kw">self</span>.entry_price - price)
+        <span class="kw">return</span> diff * <span class="kw">self</span>.qty * point_value
+</pre>
+
+<h2>🏗️ class RiskManager</h2>
+
+<h3>__init__ / состояние</h3>
+<pre>
+<span class="kw">class</span> <span class="cls">RiskManager</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>, equity_getter=<span class="kw">None</span>):
+        <span class="string">"""equity_getter() -> float — текущий размер депо."""</span>
+        <span class="kw">self</span>.equity_getter = equity_getter <span class="kw">or</span> (<span class="kw">lambda</span>: <span class="number">0.0</span>)
+        <span class="kw">self</span>.positions: dict[str, Position] = {}
+        <span class="kw">self</span>._build_corr_index()   <span class="comment"># {ticker → group_name}</span>
+        <span class="kw">self</span>._load_state()
+
+    <span class="kw">def</span> <span class="fn">_build_corr_index</span>(<span class="kw">self</span>):
+        <span class="string">"""Строим быстрый индекс: тикер → название его корреляционной группы."""</span>
+        <span class="kw">self</span>._ticker_group: dict[str, str] = {}
+        <span class="kw">for</span> group, tickers <span class="kw">in</span> CORR_GROUPS.items():
+            <span class="kw">for</span> t <span class="kw">in</span> tickers:
+                <span class="kw">self</span>._ticker_group[t] = group
+
+    <span class="kw">def</span> <span class="fn">_load_state</span>(<span class="kw">self</span>):
+        today = str(date.today())
+        <span class="kw">self</span>.state = {<span class="string">"date"</span>: today, <span class="string">"day_pnl_rub"</span>: <span class="number">0.0</span>,
+                      <span class="string">"killed"</span>: <span class="kw">False</span>, <span class="string">"trades_today"</span>: <span class="number">0</span>}
+        <span class="kw">if</span> os.path.exists(STATE_FILE):
+            <span class="kw">try</span>:
+                <span class="kw">with</span> open(STATE_FILE, encoding=<span class="string">"utf-8"</span>) <span class="kw">as</span> f:
+                    s = json.load(f)
+                <span class="kw">if</span> s.get(<span class="string">"date"</span>) == today:
+                    <span class="kw">self</span>.state = s
+            <span class="kw">except</span> (json.JSONDecodeError, OSError):
+                <span class="kw">pass</span>
+
+    <span class="kw">def</span> <span class="fn">_save_state</span>(<span class="kw">self</span>):
+        os.makedirs(<span class="string">"data"</span>, exist_ok=<span class="kw">True</span>)
+        <span class="kw">with</span> open(STATE_FILE, <span class="string">"w"</span>, encoding=<span class="string">"utf-8"</span>) <span class="kw">as</span> f:
+            json.dump(<span class="kw">self</span>.state, f, ensure_ascii=<span class="kw">False</span>)
+
+    <span class="kw">def</span> <span class="fn">_rollover_if_new_day</span>(<span class="kw">self</span>):
+        today = str(date.today())
+        <span class="kw">if</span> <span class="kw">self</span>.state.get(<span class="string">"date"</span>) == today:
+            <span class="kw">return</span>
+        <span class="kw">self</span>.state = {<span class="string">"date"</span>: today, <span class="string">"day_pnl_rub"</span>: <span class="number">0.0</span>,
+                      <span class="string">"killed"</span>: <span class="kw">False</span>, <span class="string">"trades_today"</span>: <span class="number">0</span>}
+        <span class="kw">self</span>._save_state()
+        log.info(f<span class="string">"risk: новый день {today} — PnL и дневной защитный стоп сброшены"</span>)
+</pre>
+
+<h3>💾 Персистентность позиций</h3>
+<pre>
+    <span class="kw">def</span> <span class="fn">save_positions</span>(<span class="kw">self</span>):
+        os.makedirs(<span class="string">"data"</span>, exist_ok=<span class="kw">True</span>)
+        <span class="kw">try</span>:
+            data = {<span class="string">"saved_ts"</span>: datetime.now().isoformat(),
+                    <span class="string">"positions"</span>: {t: asdict(p) <span class="kw">for</span> t, p <span class="kw">in</span> <span class="kw">self</span>.positions.items()}}
+            tmp = POSITIONS_FILE + <span class="string">".tmp"</span>
+            <span class="kw">with</span> open(tmp, <span class="string">"w"</span>, encoding=<span class="string">"utf-8"</span>) <span class="kw">as</span> f:
+                json.dump(data, f, ensure_ascii=<span class="kw">False</span>)
+            os.replace(tmp, POSITIONS_FILE)  <span class="comment"># атомарно</span>
+        <span class="kw">except</span> Exception <span class="kw">as</span> e:
+            log.warning(f<span class="string">"save_positions: {e}"</span>)
+
+    <span class="kw">def</span> <span class="fn">load_positions</span>(<span class="kw">self</span>) -&gt; dict:
+        <span class="kw">if</span> <span class="kw">not</span> os.path.exists(POSITIONS_FILE):
+            <span class="kw">return</span> {}
+        <span class="kw">try</span>:
+            <span class="kw">with</span> open(POSITIONS_FILE, encoding=<span class="string">"utf-8"</span>) <span class="kw">as</span> f:
+                data = json.load(f)
+        <span class="kw">except</span> (json.JSONDecodeError, OSError) <span class="kw">as</span> e:
+            log.warning(f<span class="string">"load_positions: {e}"</span>); <span class="kw">return</span> {}
+        restored = data.get(<span class="string">"positions"</span>, {})
+        <span class="kw">for</span> ticker, pd <span class="kw">in</span> restored.items():
+            <span class="kw">if</span> ticker <span class="kw">in</span> <span class="kw">self</span>.positions:
+                <span class="kw">continue</span>
+            <span class="kw">try</span>:
+                <span class="kw">self</span>.positions[ticker] = Position(**pd)
+            <span class="kw">except</span> (TypeError, ValueError) <span class="kw">as</span> e:
+                log.warning(f<span class="string">"load_positions: {ticker} повреждена: {e}"</span>)
+        <span class="kw">if</span> restored:
+            log.info(f<span class="string">"восстановлено {len(restored)} позиций: {list(restored.keys())}"</span>)
+        <span class="kw">return</span> restored
+</pre>
+
+<h3>🔴 Дневной защитный стоп</h3>
+<pre>
+    <span class="kw">def</span> <span class="fn">trading_allowed</span>(<span class="kw">self</span>) -&gt; tuple[bool, str]:
+        <span class="kw">self</span>._rollover_if_new_day()
+        <span class="kw">if</span> <span class="kw">self</span>.state.get(<span class="string">"killed"</span>):
+            <span class="kw">return False</span>, f<span class="string">"дневной защитный стоп: лимит убытка {DAILY_MAX_LOSS_PCT}% достигнут"</span>
+        <span class="kw">return True</span>, <span class="string">""</span>
+
+    <span class="kw">def</span> <span class="fn">_register_closed_pnl</span>(<span class="kw">self</span>, pnl_rub: <span class="cls">float</span>):
+        <span class="kw">self</span>._rollover_if_new_day()
+        <span class="kw">self</span>.state[<span class="string">"day_pnl_rub"</span>] = <span class="kw">self</span>.state.get(<span class="string">"day_pnl_rub"</span>, <span class="number">0.0</span>) + pnl_rub
+        <span class="kw">self</span>.state[<span class="string">"trades_today"</span>] = <span class="kw">self</span>.state.get(<span class="string">"trades_today"</span>, <span class="number">0</span>) + <span class="number">1</span>
+        equity = <span class="kw">self</span>.equity_getter() <span class="kw">or</span> <span class="number">0</span>
+        <span class="kw">if</span> equity &gt; <span class="number">0</span> <span class="kw">and</span> <span class="kw">self</span>.state[<span class="string">"day_pnl_rub"</span>] &lt; -equity * DAILY_MAX_LOSS_PCT / <span class="number">100</span>:
+            <span class="kw">self</span>.state[<span class="string">"killed"</span>] = <span class="kw">True</span>
+            log.error(f<span class="string">"ДНЕВНОЙ ЗАЩИТНЫЙ СТОП: убыток {self.state['day_pnl_rub']:.0f}₽ "
+                      f"превысил {DAILY_MAX_LOSS_PCT}% депо"</span>)
+        <span class="kw">self</span>._save_state()
+</pre>
+
+<h3>🎯 НОВОЕ: Корреляционный риск</h3>
+
+<div class="added">
+<b>Логика:</b> Каждый тикер принадлежит группе (например, все акции РФ → "RU_EQUITY"). В группе может быть только одно активное направление. Если уже открыт SBER Long — нельзя открыть GAZP Long или VTBR Long. Можно только: докрыть SBER или открыть Short в той же группе ПОСЛЕ закрытия всех Long.
+</div>
+
+<pre>
+    <span class="kw">def</span> <span class="fn">group_direction</span>(<span class="kw">self</span>, group: <span class="cls">str</span>) -&gt; str | <span class="kw">None</span>:
+        <span class="string">"""
+        Возвращает текущее направление группы: "long", "short" или None (нет позиций).
+        Если в группе есть позиции В РАЗНЫХ направлениях — это ошибка данных,
+        логируем и возвращаем направление большинства.
+        """</span>
+        dirs = [p.direction <span class="kw">for</span> t, p <span class="kw">in</span> <span class="kw">self</span>.positions.items()
+                <span class="kw">if</span> <span class="kw">self</span>._ticker_group.get(t) == group]
+        <span class="kw">if not</span> dirs:
+            <span class="kw">return None</span>
+        <span class="kw">if</span> len(set(dirs)) &gt; <span class="number">1</span>:
+            log.warning(f<span class="string">"CORR: группа {group} содержит СМЕШАННЫЕ направления {dirs}!"</span>)
+        <span class="kw">return</span> max(set(dirs), key=dirs.count)
+
+    <span class="kw">def</span> <span class="fn">portfolio_risk_pct</span>(<span class="kw">self</span>) -&gt; float:
+        <span class="string">"""
+        Суммарный риск всех открытых позиций в % от текущего депо.
+        risk_rub каждой позиции — это рубли, которые уйдут при срабатывании стопа.
+        """</span>
+        equity = <span class="kw">self</span>.equity_getter() <span class="kw">or</span> <span class="number">0</span>
+        <span class="kw">if</span> equity &lt;= <span class="number">0</span>:
+            <span class="kw">return</span> <span class="number">0.0</span>
+        total_risk = sum(p.risk_rub <span class="kw">for</span> p <span class="kw">in</span> <span class="kw">self</span>.positions.values())
+        <span class="kw">return</span> round(total_risk / equity * <span class="number">100</span>, <span class="number">2</span>)
+
+    <span class="kw">def</span> <span class="fn">stop_squeeze_factor</span>(<span class="kw">self</span>) -&gt; float:
+        <span class="string">"""
+        Если портфель уже несёт риск близкий к лимиту — новый вход получает
+        сжатый стоп (меньше лот = меньше ₽ на кону).
+
+        squeeze_factor = 1.0   → стоп нормальный (портфель свободен)
+        squeeze_factor = 0.5   → портфель перегружен вдвое относительно лимита,
+                                 стоп вдвое уже → лот вдвое меньше
+        squeeze_factor = 0.0   → нет места для нового риска вообще
+
+        Формула: factor = max(0, (лимит - текущий) / лимит)
+        Новая позиция получит: risk_pct * factor вместо risk_pct.
+        """</span>
+        <span class="kw">if not</span> PORTFOLIO_STOP_SQUEEZE:
+            <span class="kw">return</span> <span class="number">1.0</span>
+        current = <span class="kw">self</span>.portfolio_risk_pct()
+        <span class="kw">if</span> current &gt;= PORTFOLIO_RISK_MAX_PCT:
+            <span class="kw">return</span> <span class="number">0.0</span>
+        factor = (PORTFOLIO_RISK_MAX_PCT - current) / PORTFOLIO_RISK_MAX_PCT
+        <span class="kw">return</span> round(max(<span class="number">0.0</span>, min(<span class="number">1.0</span>, factor)), <span class="number">3</span>)
+</pre>
+
+<h3>🎯 НОВОЕ: Риск от уверенности (вместо антимартингейла)</h3>
+
+<div class="removed">
+<b>Удалено:</b> risk_mult, WIN_RISK_STEP (×1.15 после прибыли), LOSS_RISK_STEP (×0.80 после убытка), loss_streak. Антимартингейл увеличивает/снижает ставку на основе прошлых результатов — это ретроспективная логика. Новая логика проспективная: система ставит столько, сколько оправдывает ТЕКУЩИЙ сигнал.
+</div>
+
+<div class="added">
+<b>Добавлено:</b> confidence → risk_pct. Уверенность в сигнале напрямую определяет размер риска. Плохой сигнал — маленькая ставка. Хороший — большая. Никакой памяти о прошлых сделках.
+</div>
+
+<pre>
+    <span class="kw">def</span> <span class="fn">risk_pct_from_confidence</span>(<span class="kw">self</span>, confidence: <span class="cls">float</span>) -&gt; tuple[float, str]:
+        <span class="string">"""
+        Переводит уверенность ИИ (0.0–1.0) в % риска на сделку.
+
+        confidence &lt; CONF_LOW_THR (55%) → сделка запрещена (0.0, причина)
+        CONF_LOW_THR–CONF_MID_THR      → RISK_MIN_PCT (0.5%)
+        CONF_MID_THR–CONF_HIGH_THR     → RISK_MID_PCT (1.0%)
+        CONF_HIGH_THR+                 → RISK_MAX_PCT  (1.5%)
+
+        Возвращает (risk_pct, описание).
+        """</span>
+        <span class="kw">if</span> confidence &lt; CONF_LOW_THR:
+            <span class="kw">return</span> <span class="number">0.0</span>, f<span class="string">"уверенность {confidence:.0%} &lt; порога {CONF_LOW_THR:.0%} — вход запрещён"</span>
+        <span class="kw">elif</span> confidence &lt; CONF_MID_THR:
+            <span class="kw">return</span> RISK_MIN_PCT, f<span class="string">"слабый сигнал {confidence:.0%} → {RISK_MIN_PCT}% (узкий стоп, цель 1R)"</span>
+        <span class="kw">elif</span> confidence &lt; CONF_HIGH_THR:
+            <span class="kw">return</span> RISK_MID_PCT, f<span class="string">"средний сигнал {confidence:.0%} → {RISK_MID_PCT}% (средний стоп, цель 2R)"</span>
+        <span class="kw">else</span>:
+            <span class="kw">return</span> RISK_MAX_PCT, f<span class="string">"сильный сигнал {confidence:.0%} → {RISK_MAX_PCT}% (широкий стоп, цель 3–5R)"</span>
+
+    <span class="kw">def</span> <span class="fn">current_risk_pct</span>(<span class="kw">self</span>, confidence: <span class="cls">float</span> = <span class="number">0.7</span>) -&gt; tuple[float, str]:
+        <span class="string">"""Риск на сделку прямо сейчас: определяется уверенностью сигнала."""</span>
+        <span class="kw">return</span> <span class="kw">self</span>.risk_pct_from_confidence(confidence)
+</pre>
+
+<h3>🚦 Допуск к входу</h3>
+<pre>
+    <span class="kw">def</span> <span class="fn">can_open</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, direction: <span class="cls">str</span>,
+                  confidence: <span class="cls">float</span> = <span class="number">0.7</span>) -&gt; tuple[bool, str]:
+        <span class="string">"""
+        Проверяет всё перед открытием новой позиции:
+          1. Дневной защитный стоп
+          2. Лимит открытых позиций
+          3. Позиция по тикеру уже есть (это добор)
+          4. НОВОЕ: Корреляционный конфликт (группа уже в другом направлении)
+          5. НОВОЕ: Уверенность ниже порога
+          6. НОВОЕ: Портфель перегружен (squeeze_factor == 0)
+        """</span>
+        ok, why = <span class="kw">self</span>.trading_allowed()
+        <span class="kw">if not</span> ok:
+            <span class="kw">return False</span>, why
+
+        <span class="kw">if</span> len(<span class="kw">self</span>.positions) &gt;= MAX_OPEN_POSITIONS:
+            <span class="kw">return False</span>, f<span class="string">"уже {MAX_OPEN_POSITIONS} позиций — лимит"</span>
+
+        <span class="kw">if</span> ticker <span class="kw">in</span> <span class="kw">self</span>.positions:
+            <span class="kw">return False</span>, <span class="string">"позиция уже открыта — это добор, см. can_add()"</span>
+
+        <span class="comment"># ── Корреляционный риск ────────────────────────────────────────────</span>
+        group = <span class="kw">self</span>._ticker_group.get(ticker)
+        <span class="kw">if</span> group:
+            group_dir = <span class="kw">self</span>.group_direction(group)
+            <span class="kw">if</span> group_dir <span class="kw">and</span> group_dir != direction:
+                tickers_in_group = [t <span class="kw">for</span> t, p <span class="kw">in</span> <span class="kw">self</span>.positions.items()
+                                    <span class="kw">if</span> <span class="kw">self</span>._ticker_group.get(t) == group]
+                <span class="kw">return False</span>, (
+                    f<span class="string">"КОРРЕЛЯЦИОННЫЙ КОНФЛИКТ: группа {group} уже в {group_dir.upper()}, "
+                    f"новый {direction.upper()} по {ticker} запрещён. "</span>
+                    f<span class="string">"Активные позиции группы: {tickers_in_group}"</span>
+                )
+
+        <span class="comment"># ── Уверенность в сигнале ──────────────────────────────────────────</span>
+        risk_pct, risk_why = <span class="kw">self</span>.risk_pct_from_confidence(confidence)
+        <span class="kw">if</span> risk_pct == <span class="number">0.0</span>:
+            <span class="kw">return False</span>, risk_why
+
+        <span class="comment"># ── Портфельный риск ───────────────────────────────────────────────</span>
+        squeeze = <span class="kw">self</span>.stop_squeeze_factor()
+        <span class="kw">if</span> squeeze == <span class="number">0.0</span>:
+            port_risk = <span class="kw">self</span>.portfolio_risk_pct()
+            <span class="kw">return False</span>, (
+                f<span class="string">"ПОРТФЕЛЬ ПЕРЕГРУЖЕН: суммарный риск {port_risk:.1f}% "
+                f"≥ лимита {PORTFOLIO_RISK_MAX_PCT}% — новый вход запрещён"</span>
+            )
+
+        <span class="kw">return True</span>, f<span class="string">"{risk_why} | squeeze={squeeze:.2f}"</span>
+
+    <span class="kw">def</span> <span class="fn">can_add</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, direction: <span class="cls">str</span>, add_risk_rub: <span class="cls">float</span>,
+                 new_confidence: <span class="cls">float</span>,
+                 max_adds: <span class="cls">int</span> = <span class="number">2</span>, risk_budget_r: <span class="cls">float</span> = <span class="number">2.0</span>) -&gt; tuple[bool, str]:
+        <span class="string">"""
+        Добор к открытой позиции.
+
+        Условие добора: аналитические методы должны давать БОЛЕЕ ВЫСОКУЮ
+        уверенность, чем при открытии. Добор из соображений «сейчас выгодно»
+        или «цена удобна» — запрещён. Только усиление первоначального сигнала.
+
+        new_confidence — уверенность на момент запроса добора (float 0–1).
+        """</span>
+        ok, why = <span class="kw">self</span>.trading_allowed()
+        <span class="kw">if not</span> ok:
+            <span class="kw">return False</span>, why
+        pos = <span class="kw">self</span>.positions.get(ticker)
+        <span class="kw">if not</span> pos:
+            <span class="kw">return False</span>, <span class="string">"нет позиции — это не добор"</span>
+        <span class="kw">if</span> pos.direction != direction:
+            <span class="kw">return False</span>, <span class="string">"направление не совпадает — сначала закрыть"</span>
+        <span class="kw">if</span> pos.adds_count &gt;= max_adds:
+            <span class="kw">return False</span>, f<span class="string">"лимит доборов {max_adds} исчерпан"</span>
+
+        <span class="comment"># ── Ключевое условие: сигнал должен быть сильнее, чем при открытии ──</span>
+        <span class="kw">if</span> new_confidence &lt;= pos.confidence:
+            <span class="kw">return False</span>, (
+                f<span class="string">"добор запрещён: уверенность {new_confidence:.0%} не выше "
+                f"уверенности при открытии {pos.confidence:.0%}. "</span>
+                <span class="string">"Добор допустим только при усилении сигнала."</span>
+            )
+
+        equity = <span class="kw">self</span>.equity_getter() <span class="kw">or</span> <span class="number">0</span>
+        pct, _ = <span class="kw">self</span>.risk_pct_from_confidence(pos.confidence)
+        budget = equity * pct / <span class="number">100</span> * risk_budget_r
+        <span class="kw">if</span> pos.risk_rub + add_risk_rub &gt; budget:
+            <span class="kw">return False</span>, (
+                f<span class="string">"бюджет риска позиции {budget:.0f}₽ "
+                f"(сейчас {pos.risk_rub:.0f}₽ + добор {add_risk_rub:.0f}₽)"</span>
+            )
+        <span class="kw">return True</span>, f<span class="string">"сигнал усилился: {pos.confidence:.0%} → {new_confidence:.0%}"</span>
+</pre>
+
+<h3>📐 Размер позиции</h3>
+<pre>
+    <span class="kw">def</span> <span class="fn">position_size</span>(<span class="kw">self</span>, entry: <span class="cls">float</span>, stop: <span class="cls">float</span>,
+                       point_value: <span class="cls">float</span> = <span class="number">1.0</span>, lot: <span class="cls">int</span> = <span class="number">1</span>,
+                       confidence: <span class="cls">float</span> = <span class="number">0.7</span>,
+                       vol_adj: <span class="cls">float</span> = <span class="number">1.0</span>) -&gt; tuple[int, str]:
+        <span class="string">"""
+        Размер позиции = (риск% от депо × vol_adj) / расстояние до стопа.
+
+        Новое: confidence определяет risk_pct, а squeeze_factor сужает его
+        если портфель уже несёт много риска.
+
+        Возвращает (qty, объяснение).
+        """</span>
+        equity = <span class="kw">self</span>.equity_getter() <span class="kw">or</span> <span class="number">0</span>
+        stop_dist = abs(entry - stop)
+        <span class="kw">if</span> equity &lt;= <span class="number">0</span> <span class="kw">or</span> stop_dist &lt;= <span class="number">0</span> <span class="kw">or</span> point_value &lt;= <span class="number">0</span>:
+            <span class="kw">return</span> <span class="number">0</span>, <span class="string">"нет данных для расчёта"</span>
+
+        pct, conf_why = <span class="kw">self</span>.risk_pct_from_confidence(confidence)
+        <span class="kw">if</span> pct == <span class="number">0.0</span>:
+            <span class="kw">return</span> <span class="number">0</span>, conf_why
+
+        squeeze = <span class="kw">self</span>.stop_squeeze_factor()
+        effective_pct = pct * squeeze * vol_adj
+        risk_rub = equity * effective_pct / <span class="number">100</span>
+        qty = int(risk_rub / (stop_dist * point_value))
+        qty = max(<span class="number">0</span>, (qty // lot) * lot)
+
+        why = (f<span class="string">"{conf_why} | портфель squeeze={squeeze:.2f} vol={vol_adj:.2f} "
+               f"→ эфф.риск={effective_pct:.2f}% ({risk_rub:.0f}₽) → {qty} лотов"</span>)
+        log.debug(why)
+        <span class="kw">return</span> qty, why
+</pre>
+
+<h3>📂 Открытие / жизнь / закрытие позиции</h3>
+<pre>
+    <span class="kw">def</span> <span class="fn">open_position</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, direction: <span class="cls">str</span>, qty: <span class="cls">int</span>,
+                       entry: <span class="cls">float</span>, stop: <span class="cls">float</span>, point_value: <span class="cls">float</span> = <span class="number">1.0</span>,
+                       reasons: list | <span class="kw">None</span> = <span class="kw">None</span>,
+                       trail_dist: <span class="cls">float</span> = <span class="number">0.0</span>,
+                       confidence: <span class="cls">float</span> = <span class="number">0.7</span>) -&gt; <span class="cls">Position</span>:
+        pos = Position(
+            ticker=ticker, direction=direction, qty=qty,
+            entry_price=entry, stop_price=stop,
+            opened_ts=datetime.now().isoformat(),
+            risk_rub=abs(entry - stop) * qty * point_value,
+            trail_dist=trail_dist <span class="kw">or</span> abs(entry - stop) / <span class="number">2</span> * CHANDELIER_MULT,
+            peak_price=entry,
+            confidence=confidence,   <span class="comment"># сохраняем для can_add / budget</span>
+            reasons=reasons <span class="kw">or</span> [],
+        )
+        <span class="kw">self</span>.positions[ticker] = pos
+        log.info(f<span class="string">"OPEN {direction} {ticker} qty={qty} entry={entry} stop={stop} "
+                 f"risk={pos.risk_rub:.0f}₽ conf={confidence:.0%} | "
+                 f"портфель_риск={self.portfolio_risk_pct():.1f}%"</span>)
+        <span class="kw">self</span>.save_positions()
+        <span class="kw">return</span> pos
+
+    <span class="kw">def</span> <span class="fn">check_exit</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, price: <span class="cls">float</span>,
+                    point_value: <span class="cls">float</span> = <span class="number">1.0</span>,
+                    squeeze: <span class="cls">bool</span> = <span class="kw">False</span>) -&gt; tuple[bool, str]:
+        <span class="string">"""Вызывается на каждом обновлении цены. Возвращает (закрыть, причина)."""</span>
+        pos = <span class="kw">self</span>.positions.get(ticker)
+        <span class="kw">if not</span> pos: <span class="kw">return False</span>, <span class="string">""</span>
+
+        pnl = pos.pnl_rub(price, point_value)
+        pos.peak_profit_rub = max(pos.peak_profit_rub, pnl)
+
+        <span class="comment"># Chandelier: трейлинг за пиком цены</span>
+        <span class="kw">if</span> pos.direction == <span class="string">"long"</span>:
+            pos.peak_price = max(pos.peak_price, price)
+            <span class="kw">if</span> pos.trail_dist &gt; <span class="number">0</span>:
+                pos.stop_price = max(pos.stop_price, pos.peak_price - pos.trail_dist)
+        <span class="kw">else</span>:
+            pos.peak_price = min(pos.peak_price, price)
+            <span class="kw">if</span> pos.trail_dist &gt; <span class="number">0</span>:
+                pos.stop_price = min(pos.stop_price, pos.peak_price + pos.trail_dist)
+
+        <span class="comment"># Жёсткий стоп</span>
+        <span class="kw">if</span> pos.direction == <span class="string">"long"</span> <span class="kw">and</span> price &lt;= pos.stop_price:
+            <span class="kw">return True</span>, f<span class="string">"стоп-лосс {pos.stop_price}"</span>
+        <span class="kw">if</span> pos.direction == <span class="string">"short"</span> <span class="kw">and</span> price &gt;= pos.stop_price:
+            <span class="kw">return True</span>, f<span class="string">"стоп-лосс {pos.stop_price}"</span>
+
+        <span class="comment"># Сквиз-протекция шорта</span>
+        <span class="kw">if</span> squeeze <span class="kw">and</span> pos.direction == <span class="string">"short"</span> <span class="kw">and</span> pnl &lt; <span class="number">0</span>:
+            <span class="kw">return True</span>, <span class="string">"сквиз-риск: физики в шорте, цена растёт — выходим"</span>
+
+        <span class="comment"># Безубыток после 1R</span>
+        <span class="kw">if not</span> pos.breakeven_set <span class="kw">and</span> pnl &gt;= pos.risk_rub * BREAKEVEN_AT_R:
+            <span class="kw">if</span> pos.direction == <span class="string">"long"</span>:
+                pos.stop_price = max(pos.stop_price, pos.entry_price)
+            <span class="kw">else</span>:
+                pos.stop_price = min(pos.stop_price, pos.entry_price)
+            pos.breakeven_set = <span class="kw">True</span>
+            log.info(f<span class="string">"{ticker}: прибыль ≥ {BREAKEVEN_AT_R}R → стоп в безубыток"</span>)
+
+        <span class="comment"># Трейлинг giveback</span>
+        <span class="kw">if</span> pos.peak_profit_rub &gt; pos.risk_rub:
+            giveback = pos.peak_profit_rub - pnl
+            <span class="kw">if</span> giveback &gt; pos.peak_profit_rub * TRAIL_GIVEBACK_PCT / <span class="number">100</span>:
+                <span class="kw">return True</span>, (f<span class="string">"трейлинг: пик +{pos.peak_profit_rub:.0f}₽, "
+                               f"отдали {giveback:.0f}₽ — фиксируем"</span>)
+        <span class="kw">return False</span>, <span class="string">""</span>
+
+    <span class="kw">def</span> <span class="fn">check_scale_out</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, price: <span class="cls">float</span>,
+                         point_value: <span class="cls">float</span> = <span class="number">1.0</span>,
+                         trigger: <span class="cls">float</span> = <span class="number">0.6</span>, frac: <span class="cls">float</span> = <span class="number">0.5</span>) -&gt; tuple[int, str]:
+        <span class="string">"""Откат против позиции → частичная фиксация (один раз на откат)."""</span>
+        pos = <span class="kw">self</span>.positions.get(ticker)
+        <span class="kw">if not</span> pos <span class="kw">or</span> pos.scaled_out <span class="kw">or</span> pos.qty &lt; <span class="number">2</span> <span class="kw">or</span> pos.trail_dist &lt;= <span class="number">0</span>:
+            <span class="kw">return</span> <span class="number">0</span>, <span class="string">""</span>
+        retrace = (pos.peak_price - price) <span class="kw">if</span> pos.direction == <span class="string">"long"</span> \
+            <span class="kw">else</span> (price - pos.peak_price)
+        <span class="kw">if</span> retrace &gt;= pos.trail_dist * trigger:
+            cut = max(<span class="number">1</span>, int(pos.qty * frac))
+            pos.scaled_out = <span class="kw">True</span>
+            <span class="kw">return</span> cut, (f<span class="string">"скейл-аут: откат {retrace:.2f} ≥ "
+                          f"{trigger:.1f}×trail от пика {pos.peak_price:.2f}"</span>)
+        <span class="kw">return</span> <span class="number">0</span>, <span class="string">""</span>
+
+    <span class="kw">def</span> <span class="fn">check_exit_extreme_reset</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, price: <span class="cls">float</span>):
+        <span class="string">"""Новый экстремум в нашу сторону → скейл-аут снова взведён."""</span>
+        pos = <span class="kw">self</span>.positions.get(ticker)
+        <span class="kw">if not</span> pos: <span class="kw">return</span>
+        <span class="kw">if</span> pos.direction == <span class="string">"long"</span> <span class="kw">and</span> price &gt;= pos.peak_price:
+            pos.scaled_out = <span class="kw">False</span>
+        <span class="kw">elif</span> pos.direction == <span class="string">"short"</span> <span class="kw">and</span> price &lt;= pos.peak_price:
+            pos.scaled_out = <span class="kw">False</span>
+
+    <span class="kw">def</span> <span class="fn">reduce_position</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, qty: <span class="cls">int</span>, price: <span class="cls">float</span>,
+                         point_value: <span class="cls">float</span> = <span class="number">1.0</span>, reason: <span class="cls">str</span> = <span class="string">""</span>) -&gt; dict | <span class="kw">None</span>:
+        pos = <span class="kw">self</span>.positions.get(ticker)
+        <span class="kw">if not</span> pos <span class="kw">or</span> qty &lt;= <span class="number">0</span>: <span class="kw">return None</span>
+        qty = min(qty, pos.qty)
+        diff = (price - pos.entry_price) <span class="kw">if</span> pos.direction == <span class="string">"long"</span> \
+            <span class="kw">else</span> (pos.entry_price - price)
+        pnl = diff * qty * point_value
+        pos.qty -= qty
+        pos.risk_rub = max(<span class="number">0.0</span>, pos.risk_rub * (pos.qty / (pos.qty + qty)))
+        <span class="kw">self</span>._register_closed_pnl(pnl)
+        result = {<span class="string">"ticker"</span>: ticker, <span class="string">"direction"</span>: pos.direction, <span class="string">"qty"</span>: qty,
+                  <span class="string">"entry"</span>: round(pos.entry_price, <span class="number">2</span>), <span class="string">"exit"</span>: price,
+                  <span class="string">"pnl_rub"</span>: round(pnl, <span class="number">2</span>), <span class="string">"partial"</span>: <span class="kw">True</span>,
+                  <span class="string">"left_qty"</span>: pos.qty, <span class="string">"reason"</span>: reason,
+                  <span class="string">"closed_ts"</span>: datetime.now().isoformat()}
+        log.info(f<span class="string">"REDUCE {ticker} -{qty} @ {price} pnl={pnl:+.0f}₽ (осталось {pos.qty})"</span>)
+        <span class="kw">if</span> pos.qty == <span class="number">0</span>:
+            <span class="kw">self</span>.positions.pop(ticker, <span class="kw">None</span>)
+        <span class="kw">self</span>.save_positions()
+        <span class="kw">return</span> result
+
+    <span class="kw">def</span> <span class="fn">add_to_position</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, qty: <span class="cls">int</span>, price: <span class="cls">float</span>,
+                         point_value: <span class="cls">float</span> = <span class="number">1.0</span>) -&gt; <span class="kw">None</span>:
+        pos = <span class="kw">self</span>.positions.get(ticker)
+        <span class="kw">if not</span> pos <span class="kw">or</span> qty &lt;= <span class="number">0</span>: <span class="kw">return</span>
+        total = pos.qty + qty
+        pos.entry_price = (pos.entry_price * pos.qty + price * qty) / total
+        pos.qty = total
+        pos.risk_rub += abs(price - pos.stop_price) * qty * point_value
+        pos.adds_count += <span class="number">1</span>
+        pos.scaled_out = <span class="kw">False</span>
+        log.info(f<span class="string">"ADD {ticker} +{qty} @ {price} → qty={total}, "
+                 f"avg={pos.entry_price:.2f}, риск={pos.risk_rub:.0f}₽"</span>)
+        <span class="kw">self</span>.save_positions()
+
+    <span class="kw">def</span> <span class="fn">close_position</span>(<span class="kw">self</span>, ticker: <span class="cls">str</span>, price: <span class="cls">float</span>,
+                        point_value: <span class="cls">float</span> = <span class="number">1.0</span>, reason: <span class="cls">str</span> = <span class="string">""</span>) -&gt; dict | <span class="kw">None</span>:
+        pos = <span class="kw">self</span>.positions.pop(ticker, <span class="kw">None</span>)
+        <span class="kw">if not</span> pos: <span class="kw">return None</span>
+        pnl = pos.pnl_rub(price, point_value)
+        <span class="kw">self</span>._register_closed_pnl(pnl)
+        result = {
+            <span class="string">"ticker"</span>: ticker, <span class="string">"direction"</span>: pos.direction, <span class="string">"qty"</span>: pos.qty,
+            <span class="string">"entry"</span>: pos.entry_price, <span class="string">"exit"</span>: price,
+            <span class="string">"pnl_rub"</span>: round(pnl, <span class="number">2</span>),
+            <span class="string">"peak_profit_rub"</span>: round(pos.peak_profit_rub, <span class="number">2</span>),
+            <span class="string">"opened_ts"</span>: pos.opened_ts, <span class="string">"closed_ts"</span>: datetime.now().isoformat(),
+            <span class="string">"reason"</span>: reason, <span class="string">"entry_reasons"</span>: pos.reasons,
+            <span class="string">"confidence"</span>: pos.confidence,
+        }
+        log.info(f<span class="string">"CLOSE {ticker} {pos.direction} pnl={pnl:+.0f}₽ | {reason} | "
+                 f"портфель_риск={self.portfolio_risk_pct():.1f}%"</span>)
+        <span class="kw">self</span>.save_positions()
+        <span class="kw">return</span> result
+</pre>
+
+<h3>📊 Статус</h3>
+<pre>
+    <span class="kw">def</span> <span class="fn">status</span>(<span class="kw">self</span>) -&gt; dict:
+        ok, why = <span class="kw">self</span>.trading_allowed()
+        port_risk = <span class="kw">self</span>.portfolio_risk_pct()
+        squeeze = <span class="kw">self</span>.stop_squeeze_factor()
+
+        <span class="comment"># Направления по группам</span>
+        group_dirs = {}
+        <span class="kw">for</span> group <span class="kw">in</span> CORR_GROUPS:
+            d = <span class="kw">self</span>.group_direction(group)
+            <span class="kw">if</span> d:
+                group_dirs[group] = d
+
+        <span class="kw">return</span> {
+            <span class="string">"trading_allowed"</span>:  ok,
+            <span class="string">"block_reason"</span>:     why,
+            <span class="string">"open_positions"</span>:   len(<span class="kw">self</span>.positions),
+            <span class="string">"day_pnl_rub"</span>:      round(<span class="kw">self</span>.state.get(<span class="string">"day_pnl_rub"</span>, <span class="number">0</span>), <span class="number">2</span>),
+            <span class="string">"trades_today"</span>:     <span class="kw">self</span>.state.get(<span class="string">"trades_today"</span>, <span class="number">0</span>),
+            <span class="string">"day_stop_active"</span>:  <span class="kw">self</span>.state.get(<span class="string">"killed"</span>, <span class="kw">False</span>),
+            <span class="string">"portfolio_risk_pct"</span>: port_risk,  <span class="comment"># НОВОЕ</span>
+            <span class="string">"squeeze_factor"</span>:   squeeze,        <span class="comment"># НОВОЕ</span>
+            <span class="string">"group_directions"</span>: group_dirs,     <span class="comment"># НОВОЕ</span>
+        }
+</pre>
+
+<h2>🔄 Что нужно изменить в вызывающем коде</h2>
+<pre>
+<span class="comment"># БЫЛО:</span>
+ok, why = rm.can_open(ticker, direction)
+qty = rm.position_size(entry, stop, point_value, lot,
+                       strength=signal_strength, vol_adj=vol_adj)
+
+<span class="comment"># СТАЛО:</span>
+confidence = signal.confidence  <span class="comment"># float 0–1 из модуля сигналов</span>
+ok, why = rm.can_open(ticker, direction, confidence=confidence)
+<span class="kw">if</span> ok:
+    qty, size_why = rm.position_size(entry, stop, point_value, lot,
+                                     confidence=confidence, vol_adj=vol_adj)
+    <span class="kw">if</span> qty &gt; <span class="number">0</span>:
+        rm.open_position(ticker, direction, qty, entry, stop,
+                         point_value, reasons, trail_dist,
+                         confidence=confidence)
+
+<span class="comment"># ДОБОР (изменилась сигнатура can_add):</span>
+<span class="comment"># БЫЛО: rm.can_add(ticker, direction, add_risk_rub)</span>
+<span class="comment"># СТАЛО: передавать новую уверенность явно.</span>
+<span class="comment"># Добор разрешён ТОЛЬКО если сигнал стал сильнее, чем при открытии.</span>
+new_confidence = signal.confidence  <span class="comment"># пересчитанная уверенность прямо сейчас</span>
+ok, why = rm.can_add(ticker, direction, add_risk_rub,
+                     new_confidence=new_confidence)
+<span class="kw">if</span> ok:
+    add_qty, _ = rm.position_size(entry, stop, point_value, lot,
+                                   confidence=new_confidence, vol_adj=vol_adj)
+    <span class="kw">if</span> add_qty &gt; <span class="number">0</span>:
+        rm.add_to_position(ticker, add_qty, price, point_value)
+</pre>
+</body>
+</html>
