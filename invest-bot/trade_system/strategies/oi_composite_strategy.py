@@ -826,6 +826,12 @@ class OICompositeStrategy(IStrategy):
         self.__long_stop = Decimal(s.get("LONG_STOP", "0.985"))
         self.__short_take = Decimal(s.get("SHORT_TAKE", "0.985"))
         self.__short_stop = Decimal(s.get("SHORT_STOP", "1.015"))
+        # Дефолты из settings.ini — нужны, чтобы set_take_stop_overrides могла
+        # сбросить значение обратно, когда оверрайд с дашборда убрали (null).
+        self.__default_long_take = self.__long_take
+        self.__default_long_stop = self.__long_stop
+        self.__default_short_take = self.__short_take
+        self.__default_short_stop = self.__short_stop
         self.__signal_only = s.get("SIGNAL_ONLY", "0") == "1"
 
         # ATR-based take/stop: если в settings.ini заданы оба коэффициента —
@@ -917,15 +923,14 @@ class OICompositeStrategy(IStrategy):
         только на сигналы, которые будут сгенерированы ПОСЛЕ вызова (уже
         открытая позиция использует stop_loss_level/take_profit_level,
         зафиксированные в сигнале на момент открытия).
+        None означает "оверрайда нет" — сбрасывает множитель обратно на
+        значение из settings.ini, а не оставляет прежний (иначе снятие
+        оверрайда с дашборда молча игнорировалось бы навсегда).
         """
-        if long_take is not None:
-            self.__long_take = long_take
-        if long_stop is not None:
-            self.__long_stop = long_stop
-        if short_take is not None:
-            self.__short_take = short_take
-        if short_stop is not None:
-            self.__short_stop = short_stop
+        self.__long_take = long_take if long_take is not None else self.__default_long_take
+        self.__long_stop = long_stop if long_stop is not None else self.__default_long_stop
+        self.__short_take = short_take if short_take is not None else self.__default_short_take
+        self.__short_stop = short_stop if short_stop is not None else self.__default_short_stop
 
     def set_squeeze_provider(self, provider: Optional[SqueezeProvider]) -> None:
         """

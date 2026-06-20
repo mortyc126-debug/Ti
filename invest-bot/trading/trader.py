@@ -972,14 +972,20 @@ class Trader:
         __init__ Decimal). signal_only и enabled/disabled читаются на
         каждый новый сигнал напрямую из RuntimeOverrides (см. __trading) —
         здесь они не кэшируются.
+
+        Вызывается на каждый реальный реload оверрайдов (не только когда
+        для тикера заданы take/stop) — set_take_stop_overrides сама умеет
+        сбрасывать множитель на дефолт settings.ini для полей, которых нет
+        в overrides. Раньше вызов пропускался при пустом overrides, из-за
+        чего снятие оверрайда с дашборда (поле очищено -> null) не
+        применялось: стратегия молча торговала со старым значением.
         """
         for strategy in strategies.values():
             if not hasattr(strategy, "set_take_stop_overrides"):
                 continue
             overrides = self.__overrides.take_stop_for(strategy.settings.ticker)
-            if overrides:
-                strategy.set_take_stop_overrides(**overrides)
-                logger.info(f"OVERRIDES: {strategy.settings.ticker} take/stop -> {overrides}")
+            strategy.set_take_stop_overrides(**overrides)
+            logger.info(f"OVERRIDES: {strategy.settings.ticker} take/stop -> {overrides or 'default (settings.ini)'}")
 
     def __try_partial_take(
             self,
