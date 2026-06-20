@@ -46,10 +46,12 @@ from tinkoff.invest.exceptions import RequestError
 
 import bug_council
 from archive import ArchiveStore
+from calibration import PercentileCalibrator
 from candle_archive import get_candles_cached
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from db_api_client import DbApiClient
+from history import HistoryStore
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
@@ -68,6 +70,17 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(), logging.FileHandler(LOG_FILE, encoding="utf-8")],
 )
 logger = logging.getLogger(__name__)
+
+
+def _wire_history(strategy) -> None:
+    """Подключает HistoryStore/калибратор к стратегии — без этого
+    __cluster_models остаётся None и M1/M2/M3 всегда считают 0 (модели
+    молчат во всех бэктестах/портфельных симуляциях дашборда). В живой
+    торговле это делает trader.py (set_history), здесь — то же самое,
+    но без db (бэктест не пишет закрытые сделки в общую базу)."""
+    if hasattr(strategy, "set_history"):
+        strategy.set_history(HistoryStore(), PercentileCalibrator())
+
 
 _config = ProgramConfiguration(CONFIG_FILE)
 _market_data = MarketDataService(_config.tinkoff_token, _config.tinkoff_app_name)
@@ -264,6 +277,7 @@ def run_backtest_one(
     logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+        _wire_history(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
                          "error": "стратегия не поддерживает backtest_barriers"})
@@ -361,6 +375,7 @@ def _portfolio_sim_one_ticker(
         return [], {"ticker": ticker, "error": "нет в settings.ini и не импортирован из OI"}
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+        _wire_history(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             return [], None
 
