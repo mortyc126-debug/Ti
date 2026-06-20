@@ -44,7 +44,14 @@ def select_top_tickers(infos: list[dict], top_pct: float = 0.7) -> tuple[list[st
 
     1) Внутри каждой группы issuer_key оставляет только тикер с максимальным
        demand (остальные — "тот же базис, слабее").
-    2) Из выживших оставляет top_pct по demand (минимум 1 тикер).
+    2) Из выживших с конечным demand оставляет top_pct по demand (минимум 1).
+       Тикеры с demand=inf (явно отмеченные в дашборде, из settings.ini)
+       top_pct-отсев не затрагивает — иначе явный выбор пользователя мог
+       молча "ни на что не влиять": при нескольких выбранных тикерах из
+       settings.ini и top_pct=70% часть из них отсекалась бы тем же
+       срезом, что и слабые OI-кандидаты, хотя оба места документации
+       (issuer_filter.py, dashboard.py) обещают, что demand=inf тикеры
+       "не отсекаются top_pct".
 
     Возвращает (kept_tickers, dropped) — dropped с причиной для UI.
     """
@@ -64,10 +71,16 @@ def select_top_tickers(infos: list[dict], top_pct: float = 0.7) -> tuple[list[st
         else:
             dropped.append({"ticker": info["ticker"], "reason": f"тот же эмитент, что {cur['ticker']} (слабее)"})
 
-    survivors = sorted(best_by_issuer.values(), key=lambda i: i["demand"], reverse=True)
-    keep_n = max(1, round(len(survivors) * top_pct))
-    kept, rest = survivors[:keep_n], survivors[keep_n:]
+    survivors = list(best_by_issuer.values())
+    always_kept = [i for i in survivors if i["demand"] == float("inf")]
+    finite = sorted(
+        (i for i in survivors if i["demand"] != float("inf")),
+        key=lambda i: i["demand"], reverse=True,
+    )
+    keep_n = max(1, round(len(finite) * top_pct)) if finite else 0
+    kept_finite, rest = finite[:keep_n], finite[keep_n:]
     dropped.extend({"ticker": i["ticker"], "reason": f"не входит в топ-{round(top_pct * 100)}% по востребованности"}
                    for i in rest)
 
+    kept = always_kept + kept_finite
     return [i["ticker"] for i in kept], dropped

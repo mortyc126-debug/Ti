@@ -412,7 +412,7 @@ def _portfolio_sim_one_ticker(
 
 def run_portfolio_sim(
         tickers: list[str], days: int, account: float, risk_pct: float, tariff: str | None = None,
-        mode: str = "fixed", atr_take_ks: list[float] | None = None, atr_stop_ks: list[float] | None = None,
+        mode: str = "atr", atr_take_ks: list[float] | None = None, atr_stop_ks: list[float] | None = None,
 ) -> dict:
     """
     Виртуальный счёт: сделки со ВСЕХ выбранных тикеров сводятся в одну
@@ -463,8 +463,24 @@ def run_portfolio_sim(
     by_ticker_stats: dict = defaultdict(lambda: {"n": 0, "wins": 0, "pnl_rub": 0.0})
     monthly: dict = defaultdict(lambda: {"n": 0, "pnl_rub": 0.0, "equity_end": account})
     trade_rows: list[dict] = []
+    # Та же логика agree/disagree, что в backtest_barriers.model_stats, но
+    # по сводным сделкам портфеля (все тикеры вместе) — отдельный прогон
+    # по тикеру может не показать характер модели на малой выборке.
+    model_tally = {m: {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0} for m in ("m1", "m2", "m3")}
 
     for t in all_trades:
+        dir_sign = 1 if t["direction"] == "LONG" else -1
+        for m in ("m1", "m2", "m3"):
+            m_sc = t.get(m, 0.0)
+            if m_sc == 0:
+                continue
+            tally = model_tally[m]
+            if (m_sc > 0) == (dir_sign > 0):
+                tally["agree_n"] += 1
+                tally["agree_win"] += int(t["win"])
+            else:
+                tally["disagree_n"] += 1
+                tally["disagree_win"] += int(t["win"])
         risk_rub = equity * risk_pct / 100.0
         pnl_rub = risk_rub * t["r_multiple"]
         equity += pnl_rub
@@ -487,6 +503,7 @@ def run_portfolio_sim(
             "ticker": t["ticker"], "entry_time": str(t["entry_time"]), "direction": t["direction"],
             "net_pct": round(t["net_pct"], 4), "r_multiple": round(t["r_multiple"], 2),
             "pnl_rub": round(pnl_rub, 2), "equity_after": round(equity, 2),
+            "m1": round(t.get("m1", 0.0), 3), "m2": round(t.get("m2", 0.0), 3), "m3": round(t.get("m3", 0.0), 3),
         })
 
     per_ticker = [
@@ -499,6 +516,16 @@ def run_portfolio_sim(
         for mk, v in sorted(monthly.items())
     ]
 
+    model_stats = {
+        m.upper() + "_CLUSTER": {
+            "agree_n": t["agree_n"],
+            "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
+            "disagree_n": t["disagree_n"],
+            "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+        }
+        for m, t in model_tally.items()
+    }
+
     return {
         "summary": {
             "account_start": account, "equity_end": round(equity, 2),
@@ -508,6 +535,7 @@ def run_portfolio_sim(
         "monthly": monthly_rows,
         "per_ticker": per_ticker,
         "trades": trade_rows,
+        "model_stats": model_stats,
         "errors": errors,
     }
 
@@ -607,8 +635,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <label>Риск на сделку, % <input type="number" class="inp mid" id="pf_risk" value="1" min="0.1" step="0.1"></label>
   <label>Режим
     <select class="inp mid" id="pf_mode">
-      <option value="fixed">fixed</option>
-      <option value="atr">ATR-адаптивный</option>
+      <option value="atr" selected>ATR-адаптивный (авто, диапазон ATR_TAKE_K/ATR_STOP_K выше)</option>
+      <option value="fixed">fixed (take/stop тикера из settings.ini)</option>
     </select>
   </label>
   <br><br>
@@ -691,25 +719,39 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
+function modelStatsToHtml(modelStats) {{
+  if (!modelStats) return '';
+  const parts = [];
+  for (const name of ['M1_CLUSTER', 'M2_CLUSTER', 'M3_CLUSTER']) {{
+    const s = modelStats[name];
+    if (!s) continue;
+    const agreePct = s.agree_win_rate !== null && s.agree_win_rate !== undefined
+      ? (s.agree_win_rate * 100).toFixed(0) + '%' : '—';
+    parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}})`);
+  }}
+  return parts.join(' / ');
+}}
+
 function rowsToHtml(rows) {{
   let html = '';
   for (const r of rows) {{
     if (r.error !== undefined && r.n_trades === undefined) {{
-      html += `<tr><td><span class="sdot err"></span>${{r.ticker}}</td><td colspan="5" class="err">${{r.mode}}: ${{r.error || ''}}</td></tr>`;
+      html += `<tr><td><span class="sdot err"></span>${{r.ticker}}</td><td colspan="6" class="err">${{r.mode}}: ${{r.error || ''}}</td></tr>`;
       if (r.advice && r.advice.used_ai) {{
-        html += `<tr><td></td><td colspan="5"><div class="advice">
+        html += `<tr><td></td><td colspan="6"><div class="advice">
           <b>Диагноз:</b> ${{r.advice.diagnosis}}<br>
           <b>Вероятная причина:</b> ${{r.advice.likely_cause}}<br>
           <b>Предлагаемая правка:</b> ${{r.advice.suggested_fix}}</div></td></tr>`;
       }} else if (r.traceback) {{
-        html += `<tr><td></td><td colspan="5"><div class="advice">${{r.traceback}}</div></td></tr>`;
+        html += `<tr><td></td><td colspan="6"><div class="advice">${{r.traceback}}</div></td></tr>`;
       }}
       continue;
     }}
     const winPct = r.win_rate !== undefined ? (r.win_rate * 100).toFixed(1) + '%' : '';
     const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct * 100).toFixed(2) + '%' : '';
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
-    html += `<tr><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td></tr>`;
+    const models = modelStatsToHtml(r.model_stats);
+    html += `<tr><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
   }}
   return html;
 }}
@@ -736,7 +778,7 @@ async function runBacktest() {{
   const allTickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
   if (allTickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
   const table = document.getElementById('results');
-  table.innerHTML = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th></tr>';
+  table.innerHTML = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
   const days = parseInt(document.getElementById('days').value, 10);
   const atrTake = document.getElementById('atr_take').value;
   const atrStop = document.getElementById('atr_stop').value;
@@ -797,7 +839,7 @@ async function fetchMegaAlerts() {{
 function pfRowsToHtml(trades) {{
   let html = '';
   for (const t of trades) {{
-    html += `<tr><td>${{t.entry_time}}</td><td>${{t.ticker}}${{t.atr_k ? ' (' + t.atr_k + ')' : ''}}</td><td>${{t.direction}}</td><td>${{(t.net_pct*100).toFixed(2)}}%</td><td>${{t.r_multiple}}</td><td>${{t.pnl_rub}}</td><td>${{t.equity_after}}</td></tr>`;
+    html += `<tr><td>${{t.entry_time}}</td><td>${{t.ticker}}${{t.atr_k ? ' (' + t.atr_k + ')' : ''}}</td><td>${{t.direction}}</td><td>${{(t.net_pct*100).toFixed(2)}}%</td><td>${{t.r_multiple}}</td><td>${{t.pnl_rub}}</td><td>${{t.equity_after}}</td><td style="font-size:10px;color:var(--txt3);">M1:${{t.m1}} M2:${{t.m2}} M3:${{t.m3}}</td></tr>`;
   }}
   return html;
 }}
@@ -830,7 +872,8 @@ async function runPortfolioSim() {{
   document.getElementById('pf_summary').innerHTML =
     `<div class="advice">Старт: ${{s.account_start}} ₽ &nbsp;→&nbsp; Итог: ${{s.equity_end}} ₽ &nbsp;
      (<span style="color:${{sign}}">${{s.pnl_rub >= 0 ? '+' : ''}}${{s.pnl_rub}} ₽</span>) &nbsp;|&nbsp;
-     Сделок: ${{s.n_trades}} &nbsp;|&nbsp; Макс. просадка: ${{s.max_drawdown_rub}} ₽</div>${{dedupNote}}`;
+     Сделок: ${{s.n_trades}} &nbsp;|&nbsp; Макс. просадка: ${{s.max_drawdown_rub}} ₽</div>${{dedupNote}}
+     <div class="advice" style="margin-top:6px;">М1/М2/М3 — win% сделок, где модель была согласна с направлением: ${{modelStatsToHtml(data.model_stats)}}</div>`;
 
   let mh = '<tr><th>Месяц</th><th>Сделок</th><th>Прибыль ₽</th><th>Счёт на конец</th></tr>';
   for (const m of data.monthly) {{
@@ -844,10 +887,10 @@ async function runPortfolioSim() {{
   }}
   document.getElementById('pf_ticker').innerHTML = th;
 
-  let trh = '<tr><th>Время входа</th><th>Тикер</th><th>Напр.</th><th>Net%</th><th>R</th><th>P&L ₽</th><th>Счёт после</th></tr>';
+  let trh = '<tr><th>Время входа</th><th>Тикер</th><th>Напр.</th><th>Net%</th><th>R</th><th>P&L ₽</th><th>Счёт после</th><th>M1/M2/M3</th></tr>';
   trh += pfRowsToHtml(data.trades);
   for (const e of (data.errors || [])) {{
-    trh += `<tr><td colspan="7" class="err">${{e.ticker}}: ${{e.error}}</td></tr>`;
+    trh += `<tr><td colspan="8" class="err">${{e.ticker}}: ${{e.error}}</td></tr>`;
   }}
   document.getElementById('pf_trades').innerHTML = trh;
 }}
@@ -1067,7 +1110,7 @@ class Handler(BaseHTTPRequestHandler):
             account = float(payload.get("account", 100000))
             risk_pct = float(payload.get("risk_pct", 1))
             tariff = payload.get("tariff") or None
-            mode = payload.get("mode") or "fixed"
+            mode = payload.get("mode") or "atr"
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             result = run_portfolio_sim(tickers, days, account, risk_pct, tariff=tariff,

@@ -1290,9 +1290,13 @@ class OICompositeStrategy(IStrategy):
 
                 entry = _to_f(candles[i].close)
                 window = candles[i + 1:i + 1 + max_bars]
+                # Последние 3 элемента scores — M1/M2/M3 (см. ALL_METHOD_NAMES) —
+                # сохраняем сырыми скорами для attribution в дашборде/бэктесте.
+                m1_sc, m2_sc, m3_sc = scores[-3], scores[-2], scores[-1]
                 signals.append({
                     "direction": direction, "entry": entry, "atr_pct": atr_pct, "window": window,
                     "entry_time": candles[i].time,
+                    "m1": m1_sc, "m2": m2_sc, "m3": m3_sc,
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
@@ -1342,7 +1346,7 @@ class OICompositeStrategy(IStrategy):
         if signals is None:
             signals = self.backtest_scan_signals(candles, max_bars=max_bars)
 
-        empty = {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0}
+        empty = {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0, "model_stats": {}}
         if return_trades:
             empty["trades"] = []
         if not signals:
@@ -1351,6 +1355,11 @@ class OICompositeStrategy(IStrategy):
         comm = commission_rt(self.__settings.is_future, tariff=tariff)
         results: list[tuple[bool, float, float]] = []  # (win, r_multiple, net_pct)
         trades: list[dict] = []
+        # Attribution M1/M2/M3: для каждой модели считаем win_rate среди
+        # сделок, где её скор согласен с направлением сделки (agree), и
+        # отдельно среди тех, где она была против (disagree) — нулевой
+        # скор (модель промолчала) не считается ни тем, ни другим.
+        model_tally = {m: {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0} for m in ("m1", "m2", "m3")}
         for sig in signals:
             direction, entry, atr_pct, window = sig["direction"], sig["entry"], sig["atr_pct"], sig["window"]
 
@@ -1401,12 +1410,30 @@ class OICompositeStrategy(IStrategy):
 
             net_pct = exit_pct - comm
             r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
-            results.append((net_pct > 0, r_multiple, net_pct))
+            win = net_pct > 0
+            results.append((win, r_multiple, net_pct))
+
+            dir_sign = 1 if direction == SignalType.LONG else -1
+            trade_models = {}
+            for m in ("m1", "m2", "m3"):
+                m_sc = sig.get(m, 0.0)
+                trade_models[m] = m_sc
+                if m_sc == 0:
+                    continue
+                tally = model_tally[m]
+                if (m_sc > 0) == (dir_sign > 0):
+                    tally["agree_n"] += 1
+                    tally["agree_win"] += int(win)
+                else:
+                    tally["disagree_n"] += 1
+                    tally["disagree_win"] += int(win)
+
             if return_trades:
                 trades.append({
                     "entry_time": sig.get("entry_time"), "exit_time": exit_time,
                     "direction": direction.name, "net_pct": net_pct,
-                    "r_multiple": r_multiple, "win": net_pct > 0,
+                    "r_multiple": r_multiple, "win": win,
+                    "m1": trade_models["m1"], "m2": trade_models["m2"], "m3": trade_models["m3"],
                 })
 
         if not results:
@@ -1419,6 +1446,15 @@ class OICompositeStrategy(IStrategy):
             "win_rate": wins / n,
             "avg_r": sum(r for _, r, _ in results) / n,
             "expectancy_pct": sum(p for _, _, p in results) / n,
+        }
+        out["model_stats"] = {
+            m.upper() + "_CLUSTER": {
+                "agree_n": t["agree_n"],
+                "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
+                "disagree_n": t["disagree_n"],
+                "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+            }
+            for m, t in model_tally.items()
         }
         if return_trades:
             out["trades"] = trades
