@@ -1372,6 +1372,7 @@ class OICompositeStrategy(IStrategy):
             signals: Optional[list[dict]] = None,
             return_trades: bool = False,
             tariff: Optional[str] = None,
+            record_history: bool = True,
     ) -> dict:
         """
         В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
@@ -1399,6 +1400,12 @@ class OICompositeStrategy(IStrategy):
         tariff — "TRADER"/"PREMIUM", переопределяет settings.ini [COMMISSION]
         TARIFF на время этого расчёта (дашборд — сравнить тарифы без правки
         settings.ini). None — берётся ini-тариф, как раньше.
+
+        record_history=False — не писать сделки в BacktestHistoryStore.
+        Нужно для sweep-вызовов (подбор atr_take_k/atr_stop_k по сетке):
+        иначе один и тот же сигнал переписывается в историю по разу на
+        каждую проверяемую пару (tk, sk) и на каждый день walk-forward —
+        раздувает историю задвоениями и портит effWR в ClusterModels.
         """
         if signals is None:
             signals = self.backtest_scan_signals(candles, max_bars=max_bars)
@@ -1508,7 +1515,7 @@ class OICompositeStrategy(IStrategy):
             # mfe/mae здесь — грубая аппроксимация по факту take/stop (а не
             # реальный максимум хода), но того же знака/масштаба, что и quality
             # формула в live __record_outcome.
-            if self.__history is not None and hasattr(self.__history, "set_sim_date") \
+            if record_history and self.__history is not None and hasattr(self.__history, "set_sim_date") \
                     and entry_time is not None:
                 approx_mfe = take_dist if win else 0.0
                 approx_mae = 0.0 if win else stop_dist
@@ -1808,7 +1815,8 @@ class OICompositeStrategy(IStrategy):
             best = None
             for tk in AUTO_ATR_TAKE_KS:
                 for sk in AUTO_ATR_STOP_KS:
-                    res = self.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk)
+                    res = self.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                  record_history=False)
                     if res["n_trades"] < AUTO_ATR_MIN_TRADES:
                         continue
                     if best is None or res["expectancy_pct"] > best[1]:
