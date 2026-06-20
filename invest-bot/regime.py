@@ -16,7 +16,7 @@ import os
 import sys
 import statistics
 
-__all__ = ("classify_regime", "REGIME_WEIGHT_MODS", "change_point_score")
+__all__ = ("classify_regime", "classify_regime_probs", "REGIME_WEIGHT_MODS", "change_point_score")
 
 # formulas/ лежит рядом с invest-bot/ (на уровень выше cwd). Добавляем в путь
 # один раз, чтобы тяжёлые научные модули (BOCD, Hawkes, RQA, Kalman ...) были
@@ -129,43 +129,85 @@ def _bocd_change_prob(closes: list[float]) -> float:
         return 0.0
 
 
-def classify_regime(closes: list[float], volumes: list[float] | None = None) -> tuple[str, float]:
-    """
-    Порт classifyRegime: упрощённая версия без orderbook/OI-стресс-истории
-    (которой нет в самой стратегии) — здесь регим определяется по силе тренда,
-    направлению и волатильности самого ценового ряда.
+def _smoothstep(x: float, lo: float, hi: float) -> float:
+    """0 при x<=lo, 1 при x>=hi, кубическая гладкая интерполяция между — заменяет
+    жёсткие cliff-границы (`trend >= 0.45`) на непрерывный переход без скачков."""
+    if hi <= lo:
+        return 1.0 if x >= hi else 0.0
+    t = min(1.0, max(0.0, (x - lo) / (hi - lo)))
+    return t * t * (3 - 2 * t)
 
-    Возвращает (regime, regime_confidence): confidence ∈ [0,1] — насколько
-    можно доверять классификации. BOCD понижает её на 30%, если на последнем
-    шаге обнаружена свежая смена режима (change_prob > 0.5) — режим, который
-    только что сломался, ещё не устаканился.
+
+def classify_regime_probs(closes: list[float], volumes: list[float] | None = None) -> dict[str, float]:
+    """
+    Layer 0: непрерывное распределение вероятностей по всем REGIMES вместо
+    жёсткого if/elif (oldclassify_regime имел разрывные границы вида
+    `trend >= 0.45` — на самой границе режим мог скакать туда-обратно от шума
+    в один тик). Здесь те же признаки (trend, direction, vol_ratio, vol_spike),
+    но переходы между режимами — гладкие (_smoothstep), а результат —
+    нормированное распределение (сумма = 1), а не одна точка.
     """
     if len(closes) < 10:
-        return "ranging", 1.0
+        return {r: (1.0 if r == "ranging" else 0.0) for r in REGIMES}
+
     trend, direction = _trend_strength(closes)
-    vol_level = _vol_regime(closes)
+    rets = _returns(closes)
+    if len(rets) >= 5:
+        sd = statistics.pstdev(rets)
+        median_abs = statistics.median(abs(r) for r in rets) or 1e-9
+        vol_ratio = sd / median_abs
+    else:
+        vol_ratio = 1.0
 
     vol_spike = 0.0
     if volumes and len(volumes) >= 5:
         med = statistics.median(volumes[:-1]) or 1e-9
         vol_spike = min(1.0, max(0.0, (volumes[-1] / med - 1.0)))
 
-    p_stress = min(1.0, (1.0 if vol_level == "high_vol" else 0.0) * 0.5 + vol_spike * 0.5)
-    if p_stress >= 0.75:
-        regime = "stress"
-    elif vol_level == "high_vol" and trend < 0.3:
-        regime = "high_vol"
-    elif vol_level == "low_vol" and trend < 0.3:
-        regime = "low_vol"
-    elif trend >= 0.45 and direction > 0:
-        regime = "trending_up"
-    elif trend >= 0.45 and direction < 0:
-        regime = "trending_down"
-    else:
-        regime = "ranging"
+    p_stress_raw = min(1.0, (vol_ratio > 2.5) * 0.5 + vol_spike * 0.5)
+    # тот же признак, но непрерывный: доля "режим=high_vol" растёт с vol_ratio гладко
+    vol_high_prob = _smoothstep(vol_ratio, 1.5, 3.5)
 
-    confidence = 1.0
-    if _bocd_change_prob(closes) > 0.5:
+    s1 = _smoothstep(trend, 0.3, 0.45)   # 0..1: выход из vol-режимов (high/low_vol) в ranging
+    s2 = _smoothstep(trend, 0.45, 0.6)   # 0..1: выход из ranging в trending
+
+    p_low_trend = 1 - s1
+    p_ranging = s1 * (1 - s2)
+    p_trend = s2
+
+    direction_up = 1.0 if direction > 0 else 0.0
+    direction_down = 1.0 if direction < 0 else 0.0
+    trend_leftover = p_trend * (1 - direction_up - direction_down)
+
+    pre_stress = {
+        "high_vol": p_low_trend * vol_high_prob,
+        "low_vol": p_low_trend * (1 - vol_high_prob),
+        "ranging": p_ranging + trend_leftover,
+        "trending_up": p_trend * direction_up,
+        "trending_down": p_trend * direction_down,
+        "stress": 0.0,
+    }
+
+    stress_prob = _smoothstep(p_stress_raw, 0.6, 0.9)
+    probs = {r: v * (1 - stress_prob) for r, v in pre_stress.items()}
+    probs["stress"] = stress_prob
+
+    total = sum(probs.values()) or 1.0
+    return {r: probs.get(r, 0.0) / total for r in REGIMES}
+
+
+def classify_regime(closes: list[float], volumes: list[float] | None = None) -> tuple[str, float]:
+    """
+    Совместимость со старым контрактом (regime_str, confidence): argmax
+    classify_regime_probs(). confidence — вероятность argmax-режима, плюс
+    тот же BOCD-дисконт за свежий излом (см. classify_regime_probs для
+    непрерывного распределения по всем режимам сразу).
+    """
+    probs = classify_regime_probs(closes, volumes)
+    regime = max(probs, key=probs.get)
+    confidence = probs[regime]
+
+    if len(closes) >= 10 and _bocd_change_prob(closes) > 0.5:
         confidence *= 0.7  # свежий излом — на 30% меньше доверия к режиму
     return regime, confidence
 

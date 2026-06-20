@@ -73,7 +73,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import classify_regime, REGIME_WEIGHT_MODS, change_point_score
+from regime import classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score
 from cluster_models import ClusterModels
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
@@ -1616,8 +1616,11 @@ class OICompositeStrategy(IStrategy):
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [change_point_score(closes), self.__score_multi_ticker()]
 
-        # classify_regime возвращает (режим, уверенность-в-режиме).
-        regime, regime_conf = classify_regime(closes, volumes)
+        # Layer 0: непрерывное распределение по всем режимам вместо одной
+        # точки — снимает дребезг весов на границе hard-классификации.
+        regime_probs = classify_regime_probs(closes, volumes)
+        regime = max(regime_probs, key=regime_probs.get)
+        regime_conf = regime_probs[regime]
 
         # Кластерные модели M1/M2/M3: обновляем при смене режима,
         # вычисляем на текущих скорах. До накопления истории — 0.
@@ -1652,16 +1655,21 @@ class OICompositeStrategy(IStrategy):
         else:
             scores_for_composite = scores
 
-        # Режимные мультипликаторы: динамические (из истории) в приоритете
-        # над захардкоженными REGIME_WEIGHT_MODS. Если динамических нет —
-        # откат на статику (обратная совместимость).
-        if self.__dynamic_regime_mods.get(regime):
-            dyn = self.__dynamic_regime_mods[regime]
-            # Берём динамику для методов с историей, для остальных — статику
-            static = REGIME_WEIGHT_MODS.get(regime, {})
-            regime_mods = {name: dyn.get(name, static.get(name, 1.0)) for name in ALL_METHOD_NAMES}
-        else:
-            regime_mods = REGIME_WEIGHT_MODS.get(regime, {})
+        # Layer 2: режимные мультипликаторы — взвешенная смесь по ВСЕМ режимам
+        # (regime_probs), а не жёсткий выбор одного. Динамические (из истории)
+        # в приоритете над захардкоженными REGIME_WEIGHT_MODS на уровне каждого
+        # режима в смеси; для методов без истории в данном режиме — откат на
+        # статику этого же режима (обратная совместимость).
+        regime_mods: dict[str, float] = {}
+        for name in ALL_METHOD_NAMES:
+            mult = 0.0
+            for r, p in regime_probs.items():
+                if p <= 0.0:
+                    continue
+                dyn = self.__dynamic_regime_mods.get(r)
+                static = REGIME_WEIGHT_MODS.get(r, {})
+                mult += p * (dyn.get(name, static.get(name, 1.0)) if dyn else static.get(name, 1.0))
+            regime_mods[name] = mult
 
         # RMT-очищенная корреляция (та же матрица, что и в M1/M2/M3) — штраф
         # за избыточность веса коррелирующих методов. Без этого сильно
