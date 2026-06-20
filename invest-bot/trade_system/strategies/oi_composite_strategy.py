@@ -137,6 +137,19 @@ MFE_MAE_BARS = 15                  # максимум баров для запи
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
 AGREE_STRENGTH_MIN = 0.5           # минимальная взвешенная сила согласных методов
 AGREE_SHARE_MIN = 0.55             # доля силы согласных от силы всех высказавшихся
+
+# Микроструктурные методы (TRADESTATS + HAWKES_SIGNAL) смотрят на действие
+# участников рынка (поток ордеров/агрессии) ДО того как оно проявится в цене —
+# структурно ведущие, в отличие от технических индикаторов цены (PRICE_TREND,
+# VOL_MOMENTUM, ZSCORE и т.п.), которые по построению смотрят на уже
+# прошедшее движение через скользящее окно. Это грубая, категориальная
+# классификация (TRADESTATS-методы микроструктурны по определению, не по
+# измерению) — точная калибровка по фактическому лагу каждого метода ждёт
+# данных lag_analysis.py. До тех пор явный бустинг компенсирует то, что
+# чисто EWA-вес (effWR) недооценивает шумный-но-ведущий сигнал по сравнению
+# с техническим, который "дозревает" синхронно с уже состоявшимся движением.
+MICROSTRUCTURE_WEIGHT_BOOST = 1.25  # множитель веса в композите
+MICROSTRUCTURE_AGREE_BOOST = 1.3    # множитель силы в гейте __methods_agree
 LIQUIDITY_MIN_RATIO = 0.3          # объём последней свечи >= 0.3 * медианы окна
 LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "плохая полоса"
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
@@ -790,6 +803,8 @@ TRADESTATS_METHOD_NAMES = [
     "BS_PRESSURE_TS", "AGGRESSOR_FLOW", "LARGE_IMPACT",
     "VWAP_SIGNAL_TS", "VOL_MOMENTUM_TS", "OB_IMBALANCE", "CANCEL_SIGNAL",
 ]
+# Категориально ведущие методы (см. MICROSTRUCTURE_WEIGHT_BOOST/_AGREE_BOOST выше).
+MICROSTRUCTURE_METHOD_NAMES = frozenset(TRADESTATS_METHOD_NAMES + ["HAWKES_SIGNAL"])
 CHANGE_POINT_NAME = "CHANGE_POINT"
 MULTI_TICKER_NAME = "MULTI_TICKER"
 # Три кластерных модели — конкурируют наравне с остальными методами.
@@ -1725,6 +1740,7 @@ class OICompositeStrategy(IStrategy):
 
         weights = [
             self.__weights[name].weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+            * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             for name in ALL_METHOD_NAMES
         ]
 
@@ -1855,6 +1871,10 @@ class OICompositeStrategy(IStrategy):
         Берём только BASE_METHOD_NAMES — M1/M2/M3 в scores идут последними
         и не входят в композит (см. __compute_composite), не должны
         входить и в гейт по той же причине (двойной счёт).
+        Микроструктурные методы (MICROSTRUCTURE_METHOD_NAMES) получают
+        MICROSTRUCTURE_AGREE_BOOST к strength — они ведущие и могут "созреть"
+        раньше технических индикаторов; без буста гейт требовал бы от них
+        ждать того же уровня |score|, что обнуляет их преимущество в скорости.
         """
         sign = 1 if direction == SignalType.LONG else -1
         n_base = len(BASE_METHOD_NAMES)
@@ -1864,6 +1884,8 @@ class OICompositeStrategy(IStrategy):
             if abs(s) < AGREE_SCORE_MIN:
                 continue
             strength = self.__weights[name].weight * abs(s)
+            if name in MICROSTRUCTURE_METHOD_NAMES:
+                strength *= MICROSTRUCTURE_AGREE_BOOST
             total_strength += strength
             if (s > 0) == (sign > 0):
                 agree_strength += strength
