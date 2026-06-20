@@ -109,13 +109,30 @@ BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", max(4, (os.cpu_count() or 4
 # ВСЕ тикеры (run_backtest/run_portfolio_sim возвращали результат только
 # после as_completed по всем futures). ProcessPoolExecutor — отдельные
 # процессы, обычный dict между ними не шарится, нужен Manager().dict().
-_progress_manager = multiprocessing.Manager()
-_progress: dict = _progress_manager.dict()
+#
+# Manager() создаём ЛЕНИВО (не на уровне модуля!) — на Windows (spawn, а не
+# fork) eager-вызов здесь крашит сам запуск `python dashboard.py`: spawn
+# пересобирает __main__ через runpy ещё для старта менеджерского
+# подпроцесса, и без `if __name__ == "__main__":` это нарушает
+# multiprocessing's "не стартовать новый процесс до конца bootstrap"
+# (RuntimeError "before bootstrapping phase"). Прокси-dict передаём явным
+# аргументом в воркеры пула — на spawn глобал в дочернем процессе — это
+# отдельный объект, обычная ссылка на модульный _progress не шарится.
+_progress_manager = None
+_progress: dict = {}
 
 
-def _set_progress(ticker: str, status: str) -> None:
+def _get_progress_proxy() -> dict:
+    global _progress_manager, _progress
+    if _progress_manager is None:
+        _progress_manager = multiprocessing.Manager()
+        _progress = _progress_manager.dict()
+    return _progress
+
+
+def _set_progress(progress: dict, ticker: str, status: str) -> None:
     try:
-        _progress[ticker] = {"status": status, "ts": time.time()}
+        progress[ticker] = {"status": status, "ts": time.time()}
     except Exception:
         # Manager-процесс может быть недоступен на shutdown — прогресс это
         # необязательный UI-сахар, не должен валить сам прогон.
@@ -353,48 +370,51 @@ def _what_if_from_trades(trades: list[dict]) -> dict:
 def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
+        progress: dict | None = None,
 ) -> list[dict]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает список строк-результатов
     (как в compare_take_stop.py: fixed + лучшая ATR-комбинация),
     либо строку с ошибкой и советом, если тикер упал.
     """
+    if progress is None:
+        progress = _get_progress_proxy()
     by_ticker = _strategy_settings_by_ticker()
     rows: list[dict] = []
 
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         rows.append({"ticker": ticker, "mode": "ошибка", "error": "нет в settings.ini"})
-        _set_progress(ticker, "ошибка")
+        _set_progress(progress, ticker, "ошибка")
         return rows
 
     t0 = time.monotonic()
     logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
-    _set_progress(ticker, "загрузка свечей")
+    _set_progress(progress, ticker, "загрузка свечей")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
         _wire_history(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
                          "error": "стратегия не поддерживает backtest_barriers"})
-            _set_progress(ticker, "пропуск")
+            _set_progress(progress, ticker, "пропуск")
             return rows
 
         try:
             candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
-            _set_progress(ticker, "ошибка API")
+            _set_progress(progress, ticker, "ошибка API")
             return rows
 
         if not candles:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
-            _set_progress(ticker, "нет истории")
+            _set_progress(progress, ticker, "нет истории")
             return rows
 
         logger.info(f"{ticker}: {len(candles)} свечей за {time.monotonic() - t0:.1f}с, считаю сигналы "
                     f"(может занять минуту-две — внутри Hawkes-MLE на каждый бар)...")
-        _set_progress(ticker, f"скан сигналов ({len(candles)} свечей)")
+        _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
         s = strategy_settings.settings
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
@@ -476,10 +496,10 @@ def run_backtest_one(
         logger.error(f"run_backtest {ticker}:\n{tb}")
         rows.append({"ticker": ticker, "mode": "ошибка", "error": tb.strip().splitlines()[-1],
                      "traceback": tb, "advice": advice})
-        _set_progress(ticker, "ошибка")
+        _set_progress(progress, ticker, "ошибка")
         return rows
 
-    _set_progress(ticker, "готово")
+    _set_progress(progress, ticker, "готово")
     return rows
 
 
@@ -492,19 +512,20 @@ def run_backtest(
     Каждый тикер — это независимый дорогой CPU-bound скан (Hawkes-MLE на
     каждый бар), поэтому гоняем по процессам параллельно, а не по очереди.
     """
+    progress = _get_progress_proxy()
     for ticker in tickers:
-        _set_progress(ticker, "в очереди")
+        _set_progress(progress, ticker, "в очереди")
 
     if len(tickers) <= 1:
         rows: list[dict] = []
         for ticker in tickers:
-            rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff))
+            rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress))
         return rows
 
     by_ticker_rows: dict[str, list[dict]] = {}
     with ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers))) as pool:
         futures = {
-            pool.submit(run_backtest_one, ticker, days, atr_take_ks, atr_stop_ks, tariff): ticker
+            pool.submit(run_backtest_one, ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress): ticker
             for ticker in tickers
         }
         for fut in as_completed(futures):
@@ -520,40 +541,42 @@ def run_backtest(
 def _portfolio_sim_one_ticker(
         ticker: str, days: int, tariff: str | None,
         mode: str, atr_take_ks: list[float] | None, atr_stop_ks: list[float] | None,
-        atr_scale_exps: list[float] | None = None,
+        atr_scale_exps: list[float] | None = None, progress: dict | None = None,
 ) -> tuple[list[dict], dict | None]:
     """Считает сделки одного тикера для портфельной симуляции. Выделено в
     отдельную функцию, чтобы гонять тикеры параллельно по процессам
     (см. run_portfolio_sim) — каждый скан CPU-bound сам по себе."""
+    if progress is None:
+        progress = _get_progress_proxy()
     by_ticker = _strategy_settings_by_ticker()
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
-        _set_progress(ticker, "ошибка")
+        _set_progress(progress, ticker, "ошибка")
         return [], {"ticker": ticker, "error": "нет в settings.ini и не импортирован из OI"}
-    _set_progress(ticker, "загрузка свечей")
+    _set_progress(progress, ticker, "загрузка свечей")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
         _wire_history(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
-            _set_progress(ticker, "пропуск")
+            _set_progress(progress, ticker, "пропуск")
             return [], None
 
         try:
             candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
         except RequestError as ex:
-            _set_progress(ticker, "ошибка API")
+            _set_progress(progress, ticker, "ошибка API")
             return [], {"ticker": ticker, "error": str(ex.details)}
         if not candles:
-            _set_progress(ticker, "нет истории")
+            _set_progress(progress, ticker, "нет истории")
             return [], None
 
-        _set_progress(ticker, f"скан сигналов ({len(candles)} свечей)")
+        _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
         signals = strategy.backtest_scan_signals(candles)
         trades: list[dict] = []
 
         if mode == "atr":
             if not signals:
-                _set_progress(ticker, "готово")
+                _set_progress(progress, ticker, "готово")
                 return [], None
             # Раньше тут был один sweep по ВСЕЙ истории тикера — лучшая по
             # expectancy_pct пара (tk, sk) подбиралась по тем же сделкам,
@@ -605,14 +628,14 @@ def _portfolio_sim_one_ticker(
                 t["ticker"] = ticker
                 trades.append(t)
 
-        _set_progress(ticker, "готово")
+        _set_progress(progress, ticker, "готово")
         return trades, None
 
     except Exception:
         tb = traceback.format_exc()
         advice = bug_council.analyze_bug(tb, f"dashboard run_portfolio_sim: ticker={ticker}, days={days}")
         logger.error(f"run_portfolio_sim {ticker}:\n{tb}")
-        _set_progress(ticker, "ошибка")
+        _set_progress(progress, ticker, "ошибка")
         return [], {"ticker": ticker, "error": tb.strip().splitlines()[-1], "traceback": tb, "advice": advice}
 
 
@@ -643,17 +666,19 @@ def run_portfolio_sim(
     all_trades: list[dict] = []
     errors: list[dict] = []
 
+    progress = _get_progress_proxy()
     for ticker in tickers:
-        _set_progress(ticker, "в очереди")
+        _set_progress(progress, ticker, "в очереди")
 
     if len(tickers) <= 1:
-        results = [(t, _portfolio_sim_one_ticker(t, days, tariff, mode, atr_take_ks, atr_stop_ks))
+        results = [(t, _portfolio_sim_one_ticker(t, days, tariff, mode, atr_take_ks, atr_stop_ks, progress=progress))
                    for t in tickers]
     else:
         results = []
         with ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers))) as pool:
             futures = {
-                pool.submit(_portfolio_sim_one_ticker, ticker, days, tariff, mode, atr_take_ks, atr_stop_ks): ticker
+                pool.submit(_portfolio_sim_one_ticker, ticker, days, tariff, mode, atr_take_ks, atr_stop_ks,
+                            progress=progress): ticker
                 for ticker in tickers
             }
             for fut in as_completed(futures):
@@ -1411,7 +1436,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/auto_atr":
             self._send_json({"rows": get_auto_atr_snapshot()})
         elif self.path == "/api/progress":
-            self._send_json({"progress": dict(_progress)})
+            self._send_json({"progress": dict(_get_progress_proxy())})
         else:
             self.send_error(404)
 
