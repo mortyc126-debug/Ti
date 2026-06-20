@@ -259,6 +259,37 @@ def fetch_mega_alert_tickers() -> dict:
     return {"added": [a["t"] for a in added], "dropped": dropped, "unresolved": unresolved, "n": n}
 
 
+def _what_if_from_trades(trades: list[dict]) -> dict:
+    """Та же идея, что what_if в run_portfolio_sim, но без эквити-симуляции
+    (на одном тикере счёт не строим) — просто n_trades/win_rate/avg_r/
+    expectancy_pct на подмножестве сделок, где модель(и) согласны с
+    направлением. Закрывает жалобу «нет разделения по одной модели/2 из 3»
+    для таблицы одного тикера (раньше там был только общий model_stats)."""
+    def _agrees(t: dict, m: str) -> bool:
+        sc = t.get(m, 0.0)
+        return sc != 0 and (sc > 0) == (t["direction"] == "LONG")
+
+    def _stats(subset: list[dict]) -> dict:
+        n = len(subset)
+        if n == 0:
+            return {"n_trades": 0, "win_rate": None, "avg_r": None, "expectancy_pct": None}
+        return {
+            "n_trades": n,
+            "win_rate": sum(1 for t in subset if t["win"]) / n,
+            "avg_r": sum(t["r_multiple"] for t in subset) / n,
+            "expectancy_pct": sum(t["net_pct"] for t in subset) / n,
+        }
+
+    what_if = {}
+    for m in ("m1", "m2", "m3"):
+        what_if[m.upper() + "_CLUSTER_ONLY"] = _stats([t for t in trades if _agrees(t, m)])
+    what_if["ALL_THREE_AGREE"] = _stats(
+        [t for t in trades if all(_agrees(t, m) for m in ("m1", "m2", "m3"))])
+    what_if["TWO_OF_THREE_AGREE"] = _stats(
+        [t for t in trades if sum(_agrees(t, m) for m in ("m1", "m2", "m3")) >= 2])
+    return what_if
+
+
 def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None,
@@ -306,13 +337,16 @@ def run_backtest_one(
         signals = strategy.backtest_scan_signals(candles)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с")
 
-        fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop, tariff=tariff)
-        rows.append({"ticker": ticker, "mode": "fixed", **fixed})
+        fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
+                                            return_trades=True, tariff=tariff)
+        fixed_trades = fixed.pop("trades", [])
+        rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades), **fixed})
 
         best = None
         for tk in atr_take_ks:
             for sk in atr_stop_ks:
-                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk, tariff=tariff)
+                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk,
+                                                  return_trades=True, tariff=tariff)
                 if res["n_trades"] == 0:
                     continue
                 if best is None or res["expectancy_pct"] > best[1]["expectancy_pct"]:
@@ -320,7 +354,9 @@ def run_backtest_one(
 
         if best:
             (tk, sk), res = best
-            rows.append({"ticker": ticker, "mode": f"ATR k={tk}/{sk}", **res})
+            best_trades = res.pop("trades", [])
+            rows.append({"ticker": ticker, "mode": f"ATR k={tk}/{sk}",
+                         "what_if": _what_if_from_trades(best_trades), **res})
 
     except Exception:
         tb = traceback.format_exc()
@@ -824,8 +860,15 @@ function whatIfToHtml(whatIf) {{
   const parts = [];
   for (const key of ['M1_CLUSTER_ONLY', 'M2_CLUSTER_ONLY', 'M3_CLUSTER_ONLY', 'ALL_THREE_AGREE', 'TWO_OF_THREE_AGREE']) {{
     const s = whatIf[key];
-    if (!s || s.n_trades === 0) continue;
-    parts.push(`${{labels[key.toLowerCase()]}}: ${{s.pnl_rub.toFixed(0)}}₽ (n=${{s.n_trades}})`);
+    if (!s || !s.n_trades) continue;
+    if (s.pnl_rub !== undefined) {{
+      parts.push(`${{labels[key.toLowerCase()]}}: ${{s.pnl_rub.toFixed(0)}}₽ (n=${{s.n_trades}})`);
+    }} else {{
+      const wr = s.win_rate !== null && s.win_rate !== undefined ? (s.win_rate * 100).toFixed(0) + '%' : '—';
+      const exp = s.expectancy_pct !== null && s.expectancy_pct !== undefined
+        ? `, эксп ${{(s.expectancy_pct * 100).toFixed(2)}}%` : '';
+      parts.push(`${{labels[key.toLowerCase()]}}: ${{wr}} (n=${{s.n_trades}}${{exp}})`);
+    }}
   }}
   return parts.join(' / ');
 }}
@@ -850,6 +893,12 @@ function rowsToHtml(rows) {{
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
     const models = modelStatsToHtml(r.model_stats);
     html += `<tr><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
+    if (r.what_if) {{
+      const wi = whatIfToHtml(r.what_if);
+      if (wi) {{
+        html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3);">Если бы слушали только модель: ${{wi}}</td></tr>`;
+      }}
+    }}
   }}
   return html;
 }}
