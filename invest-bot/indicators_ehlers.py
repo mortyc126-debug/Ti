@@ -89,6 +89,8 @@ def rsi(closes: list[float], period: int = 14) -> list[float]:
     gains = [max(0.0, closes[i] - closes[i - 1]) for i in range(1, period + 1)]
     losses = [max(0.0, closes[i - 1] - closes[i]) for i in range(1, period + 1)]
     avg_gain, avg_loss = sum(gains) / period, sum(losses) / period
+    rs0 = avg_gain / avg_loss if avg_loss > 0 else 100.0
+    out[period] = 100 - 100 / (1 + rs0) if avg_loss > 0 else 100.0
     for i in range(period + 1, n):
         change = closes[i] - closes[i - 1]
         gain, loss = max(0.0, change), max(0.0, -change)

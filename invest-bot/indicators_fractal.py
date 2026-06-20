@@ -163,13 +163,22 @@ def permutation_entropy(closes: list[float], window: int = 30, m: int = 3) -> fl
 
 
 def score_fractal(closes: list[float]) -> float:
-    """Комбинированный фрактальный score: среднее FDI/Hurst/PFE-скоров."""
+    """
+    Направление берётся только из PFE (единственный из трёх, у кого знак
+    привязан к направлению цены — FDI и Hurst измеряют лишь "качество"
+    тренда и одинаково положительны на любом сильном движении, что вверх,
+    что вниз). FDI/Hurst участвуют только как множитель уверенности к
+    знаку PFE, а не как равноправные направленные голоса — иначе на
+    чистом сильном даунтренде FDI=+1, Hurst=+1 утягивали бы итог в LONG
+    несмотря на отрицательный PFE.
+    """
     if len(closes) < 15:
         return 0.0
     s_fdi = _score_fdi(fdi(closes, period=min(30, len(closes) - 1)))
     s_hurst = _score_hurst(hurst_exponent(closes, min_window=min(8, len(closes) // 4) or 1))
     s_pfe = _score_pfe(pfe(closes, period=min(10, len(closes) - 1)))
-    return max(-1.0, min(1.0, (s_fdi + s_hurst + s_pfe) / 3))
+    trend_confidence = max(0.0, (s_fdi + s_hurst) / 2)
+    return max(-1.0, min(1.0, s_pfe * (0.5 + 0.5 * trend_confidence)))
 
 
 def score_entropy_regime(closes: list[float]) -> float:
