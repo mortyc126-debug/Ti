@@ -308,3 +308,24 @@ class ClusterModels:
             return sum(s * c / tw for s, c in parts)
 
         return _agg(m1_parts), _agg(m2_parts), _agg(m3_parts)
+
+    def redundancy_dampen(self, method_names: list[str]) -> dict[str, float]:
+        """
+        Множитель [0.3, 1.0] на вес метода — штраф за среднюю RMT-очищенную
+        корреляцию с остальными методами из переданного списка. Применяется
+        в __compute_composite к base_scores ПЕРЕД сложением с M1/M2/M3, чтобы
+        кластер сильно скоррелированных методов не учитывался многократно.
+        Методы без истории в self._corr (включая M1_CLUSTER/M2_CLUSTER/
+        M3_CLUSTER — они не входят в self._series) получают множитель 1.0.
+        """
+        if not self._ready or not self._corr:
+            return {name: 1.0 for name in method_names}
+        result = {}
+        for mid in method_names:
+            others = [n for n in method_names if n != mid and (mid, n) in self._corr]
+            if not others:
+                result[mid] = 1.0
+                continue
+            avg_abs_corr = sum(abs(self._corr[(mid, n)]) for n in others) / len(others)
+            result[mid] = max(0.3, 1.0 - avg_abs_corr)
+        return result

@@ -1471,7 +1471,19 @@ class OICompositeStrategy(IStrategy):
         else:
             regime_mods = REGIME_WEIGHT_MODS.get(regime, {})
 
-        weights = [self.__weights[name].weight * regime_mods.get(name, 1.0) for name in ALL_METHOD_NAMES]
+        # RMT-очищенная корреляция (та же матрица, что и в M1/M2/M3) — штраф
+        # за избыточность веса коррелирующих методов. Без этого сильно
+        # скоррелированный кластер методов перетягивает композит, как
+        # отдельный голос от каждого, хотя по сути это один сигнал.
+        if self.__cluster_models is not None:
+            redundancy_mult = self.__cluster_models.redundancy_dampen(ALL_METHOD_NAMES)
+        else:
+            redundancy_mult = {}
+
+        weights = [
+            self.__weights[name].weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+            for name in ALL_METHOD_NAMES
+        ]
 
         weighted = sum(s * w for s, w in zip(scores_for_composite, weights))
         weight_sum = sum(weights) or 1.0
