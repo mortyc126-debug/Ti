@@ -409,7 +409,7 @@ def run_backtest_one(
                     for tk in atr_take_ks:
                         for sk in atr_stop_ks:
                             r = strategy.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                            tariff=tariff)
+                                                            tariff=tariff, record_history=False)
                             if r["n_trades"] < AUTO_ATR_MIN_TRADES:
                                 continue
                             if best is None or r["expectancy_pct"] > best[1]:
