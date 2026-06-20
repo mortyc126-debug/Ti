@@ -129,9 +129,6 @@ class Trader:
         self.__history = HistoryStore()
         self.__calibrator = PercentileCalibrator()
         self.__tf_buffer = MultiTfBuffer()
-        # Сигнал, дождавшийся подтверждения на 1min-свече после решения на 5min-баре
-        # (см. _new5 в __trading_loop): {figi: {"signal": Signal, "ttl": int}}
-        self.__pending_signal: dict[str, dict] = {}
         # Прогноз утреннего backtest-гейта (ticker -> {quality, n_trades, live})
         # для сверки с фактическим rolling_quality конца дня — см. __archive_today.
         self.__backtest_predictions: dict[str, dict] = {}
@@ -479,29 +476,13 @@ class Trader:
                         [aggcandle_to_historiccandle(_new5, current_figi_candle.time)]
                     )
 
-                if signal_new and signal_new.signal_type != SignalType.CLOSE:
-                    # Не входим сразу по цене закрытия 5min-бара — ждём до 5 минутных
-                    # свечей подтверждения движения в сторону сигнала (момент входа
-                    # выбирается на 1min-данных), иначе входим по дедлайну как раньше.
-                    logger.info(f"New signal (pending 1min confirmation): {signal_new}")
-                    self.__pending_signal[candle.figi] = {"signal": signal_new, "ttl": 5}
-                elif signal_new:
+                if signal_new:
+                    # Раньше здесь была отложенная проверка "подтверждения" сигнала
+                    # на 1min-барах (до 5 минут ожидания) — на практике задержка
+                    # входа относительно момента сигнала только теряла часть
+                    # движения, а не повышала качество входа. Убрано — входим
+                    # сразу по сигналу.
                     self.__handle_new_signal(account_id, candle, strategies, current_trade_order, signal_new)
-
-                pending = self.__pending_signal.get(candle.figi)
-                if pending:
-                    if current_trade_order:
-                        del self.__pending_signal[candle.figi]
-                    else:
-                        sig = pending["signal"]
-                        want_long = sig.signal_type == SignalType.LONG
-                        c_open = float(quotation_to_decimal(current_figi_candle.open))
-                        c_close = float(quotation_to_decimal(current_figi_candle.close))
-                        confirmed = (c_close >= c_open) if want_long else (c_close <= c_open)
-                        pending["ttl"] -= 1
-                        if confirmed or pending["ttl"] <= 0:
-                            del self.__pending_signal[candle.figi]
-                            self.__handle_new_signal(account_id, candle, strategies, current_trade_order, sig)
 
             current_candles[candle.figi] = candle
 
