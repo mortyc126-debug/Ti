@@ -27,6 +27,7 @@ from configuration.settings import TradingSettings, MegaAlertsSettings, Strategy
 from trade_system.strategies.strategy_factory import StrategyFactory
 from risk import RiskManager
 from oi_layers import OiLayersService
+from orderbook import OrderBookService
 from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
@@ -68,6 +69,13 @@ LOSS_REENTRY_COOLDOWN_MINUTES = int(os.getenv("LOSS_COOLDOWN_MIN", "30"))
 # окно шире без доп. нагрузки на Tinkoff API.
 AUTO_ATR_HISTORY_DAYS = 90
 
+# Стрим стакана (OrderBookService): отдельная gRPC-подписка сверх свечной,
+# глубина ORDERBOOK_DEPTH уровней. Выключен по умолчанию (новая живая
+# подписка с доп. нагрузкой на лимиты API) — включается с дашборда
+# (RuntimeOverrides.orderbook_enabled) или ORDERBOOK=1.
+ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "0") == "1"
+ORDERBOOK_DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "10"))
+
 
 class Trader:
     """
@@ -101,6 +109,8 @@ class Trader:
         self.__last_prices: dict[str, float] = {}
         self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
         self.__oi_task: asyncio.Task | None = None
+        self.__orderbook = OrderBookService()
+        self.__orderbook_task: asyncio.Task | None = None
         self.__tradestats = TradeStatsService()
         self.__tradestats_task: asyncio.Task | None = None
         # MegaAlertsService и его daily_loop живут на уровне TradeService —
@@ -247,6 +257,11 @@ class Trader:
         tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
         self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
         self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
+        if self.__overrides.orderbook_enabled(ORDERBOOK_DEFAULT_ENABLED):
+            figi_to_ticker = {s.settings.figi: s.settings.ticker for s in today_trade_strategies.values()}
+            self.__orderbook_task = asyncio.create_task(
+                self.__orderbook_loop(figi_to_ticker, trade_day_end_time)
+            )
 
         db_for_history = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
         for strategy in today_trade_strategies.values():
@@ -302,6 +317,8 @@ class Trader:
             self.__oi_task = None
             await self.__cancel_task(self.__tradestats_task)
             self.__tradestats_task = None
+            await self.__cancel_task(self.__orderbook_task)
+            self.__orderbook_task = None
 
         self.__archive_today(today_trade_strategies)
 
@@ -1131,6 +1148,23 @@ class Trader:
             )
         return result
 
+    async def __orderbook_loop(
+            self,
+            figi_to_ticker: dict[str, str],
+            trade_day_end_time: datetime.datetime
+    ) -> None:
+        """Фоновая задача: читает стрим стакана и кормит OrderBookService.on_orderbook."""
+        figies = list(figi_to_ticker.keys())
+        async for ob in self.__stream_service.start_async_orderbook_stream(
+                figies, trade_day_end_time, depth=ORDERBOOK_DEPTH
+        ):
+            ticker = figi_to_ticker.get(ob.figi)
+            if not ticker:
+                continue
+            bids = [(float(quotation_to_decimal(o.price)), float(o.quantity)) for o in ob.bids]
+            asks = [(float(quotation_to_decimal(o.price)), float(o.quantity)) for o in ob.asks]
+            self.__orderbook.on_orderbook(ticker, bids, asks)
+
     def __check_adaptive_exit(
             self,
             account_id: str,
@@ -1155,10 +1189,14 @@ class Trader:
         squeeze = self.__oi_layers.is_squeeze_risk(risk_ticker, pos.direction)
         drift_per_bar, vol_per_bar = strategy.path_estimate()
         regime_confidence = strategy.last_snapshot().get("regime_confidence", 1.0)
+        order_flow = 0.0
+        if self.__orderbook.has_data(risk_ticker):
+            imbalance = self.__orderbook.imbalance_score(risk_ticker)
+            order_flow = imbalance if pos.direction == "long" else -imbalance
         should_close, reason = self.__risk.check_exit(
             risk_ticker, price, squeeze=squeeze,
             drift_per_bar=drift_per_bar, vol_per_bar=vol_per_bar,
-            regime_confidence=regime_confidence,
+            regime_confidence=regime_confidence, order_flow=order_flow,
         )
         if should_close:
             logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")

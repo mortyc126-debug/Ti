@@ -43,6 +43,7 @@ from risk_config import (
     SCALE_OUT_EDGE_DECAY, SCALE_OUT_CLOSE_FRACTION,
     PROB_EXIT_ENABLED, PROB_EXIT_MIN_PTAKE, PROB_EXIT_GRACE_R,
     BOCD_EXIT_CONFIDENCE,
+    ORDERBOOK_EXIT_ENABLED, ORDERBOOK_EXIT_THR,
 )
 
 __all__ = ("Position", "RiskManager")
@@ -411,7 +412,8 @@ class RiskManager:
                     squeeze: bool = False,
                     drift_per_bar: float = 0.0,
                     vol_per_bar: float = 0.0,
-                    regime_confidence: float = 1.0) -> tuple[bool, str]:
+                    regime_confidence: float = 1.0,
+                    order_flow: float = 0.0) -> tuple[bool, str]:
         """Вызывается на каждом обновлении цены. Возвращает (закрыть, причина)."""
         pos = self.positions.get(ticker)
         if not pos:
@@ -429,6 +431,13 @@ class RiskManager:
             if pos.trail_dist > 0:
                 pos.stop_price = min(pos.stop_price, pos.peak_price + pos.trail_dist)
         self._recalc_risk_rub(pos)
+
+        # Срочный выход по слому потока заявок в стакане — приоритетнее
+        # стопа/тейка и не ждёт grace-окна (может закрыть и прибыльную
+        # позицию). order_flow уже знаковый по направлению позиции.
+        if ORDERBOOK_EXIT_ENABLED and order_flow <= ORDERBOOK_EXIT_THR:
+            return True, (f"стакан: дисбаланс заявок против позиции "
+                           f"({order_flow:.2f}) — выходим немедленно")
 
         # Остаток после частичной фиксации на тейке: фиксированный уровень
         # защиты (треть пройденного расстояния вход->тейк), независимо от
