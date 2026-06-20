@@ -1247,6 +1247,10 @@ def main():
     args = parser.parse_args()
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    # daemon_threads=True — без этого Ctrl+C обрывает только accept-loop,
+    # а поток с долгим расчётом (бэктест/портфель) продолжает жить и держит
+    # процесс/терминал, не давая ввести новую команду.
+    server.daemon_threads = True
     print(f"Дашборд: http://127.0.0.1:{args.port}")
     try:
         server.serve_forever()
