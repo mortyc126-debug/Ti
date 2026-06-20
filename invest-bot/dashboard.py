@@ -876,6 +876,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     расстояния вход→тейк; не работает вместе с адаптивным выходом)
   </label>
   <br><br>
+  <label><input type="checkbox" id="ov_orderbook"> Стакан (10 уровней): срочный выход по дисбалансу заявок
+    (доп. живая подписка к API, выключено по умолчанию; работает только вместе с адаптивным выходом)
+  </label>
+  <br><br>
   <table class="scen-table">
     <thead><tr>
       <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
@@ -1138,6 +1142,7 @@ async function loadOverrides() {{
     data.global_signal_only === true ? 'sandbox' : (data.global_signal_only === false ? 'live' : 'auto');
   document.getElementById('ov_partial_tp').checked = data.partial_tp_enabled === true;
   document.getElementById('ov_adaptive_exit').checked = data.adaptive_exit_enabled === true;
+  document.getElementById('ov_orderbook').checked = data.orderbook_enabled === true;
   const tbody = document.getElementById('ov_table');
   tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t])).join('');
   document.getElementById('ov_status').textContent = 'загружено';
@@ -1148,6 +1153,7 @@ async function saveOverrides() {{
   const global_signal_only = globalMode === 'sandbox' ? true : (globalMode === 'live' ? false : null);
   const partial_tp_enabled = document.getElementById('ov_partial_tp').checked;
   const adaptive_exit_enabled = document.getElementById('ov_adaptive_exit').checked;
+  const orderbook_enabled = document.getElementById('ov_orderbook').checked;
   const tickers = {{}};
   document.querySelectorAll('#ov_table tr').forEach(tr => {{
     const ticker = tr.dataset.ticker;
@@ -1167,7 +1173,7 @@ async function saveOverrides() {{
     method: 'POST',
     headers: {{'Content-Type': 'application/json'}},
     body: JSON.stringify({{
-      global_signal_only, partial_tp_enabled, adaptive_exit_enabled, tickers,
+      global_signal_only, partial_tp_enabled, adaptive_exit_enabled, orderbook_enabled, tickers,
       password: document.getElementById('ov_password').value,
     }}),
   }});
@@ -1217,6 +1223,7 @@ def get_overrides_payload() -> dict:
         "global_signal_only": data.get("global_signal_only"),
         "partial_tp_enabled": data.get("partial_tp_enabled"),
         "adaptive_exit_enabled": data.get("adaptive_exit_enabled"),
+        "orderbook_enabled": data.get("orderbook_enabled"),
         "tickers": data.get("tickers", {}),
         "tickers_all": tickers_all,
     }
@@ -1231,6 +1238,7 @@ def save_overrides_payload(payload: dict) -> dict | None:
     global_signal_only = payload.get("global_signal_only")
     partial_tp_enabled = payload.get("partial_tp_enabled")
     adaptive_exit_enabled = payload.get("adaptive_exit_enabled")
+    orderbook_enabled = payload.get("orderbook_enabled")
     tickers_in = payload.get("tickers", {})
 
     wants_live = global_signal_only is False or any(
@@ -1257,6 +1265,7 @@ def save_overrides_payload(payload: dict) -> dict | None:
         "global_signal_only": global_signal_only,
         "partial_tp_enabled": partial_tp_enabled,
         "adaptive_exit_enabled": adaptive_exit_enabled,
+        "orderbook_enabled": orderbook_enabled,
         "tickers": tickers_out,
     })
     return None

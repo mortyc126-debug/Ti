@@ -4,7 +4,7 @@ import logging
 from typing import Generator
 
 from tinkoff.invest import Client, CandleInstrument, SubscriptionInterval, InfoInstrument, TradeInstrument, \
-    MarketDataResponse, Candle, AsyncClient, AioRequestError
+    MarketDataResponse, Candle, AsyncClient, AioRequestError, OrderBookInstrument, OrderBook
 from tinkoff.invest.market_data_stream.async_market_data_stream_manager import AsyncMarketDataStreamManager
 from tinkoff.invest.market_data_stream.market_data_stream_interface import IMarketDataStreamManager
 from tinkoff.invest.market_data_stream.market_data_stream_manager import MarketDataStreamManager
@@ -114,6 +114,56 @@ class MarketDataStreamService:
 
             finally:
                 self.__stop_candles_stream(async_market_data_candles_stream)
+
+    async def start_async_orderbook_stream(
+            self,
+            figies: list[str],
+            trade_before_time: datetime,
+            depth: int = 10
+    ) -> Generator[OrderBook, None, None]:
+        """
+        Тот же механизм, что start_async_candles_stream — тот же
+        MarketDataStreamManager, другая подписка (.order_book вместо .candles).
+        """
+        logger.debug(f"Starting async orderbook stream loop")
+
+        while datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) < trade_before_time:
+            try:
+                logger.debug(f"Starting async orderbook stream")
+
+                async with AsyncClient(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+                    async_market_data_orderbook_stream: AsyncMarketDataStreamManager = client.create_market_data_stream()
+
+                    logger.info(f"Subscribe orderbook: {figies} depth={depth}")
+                    async_market_data_orderbook_stream.order_book.subscribe(
+                        [
+                            OrderBookInstrument(figi=figi, depth=depth)
+                            for figi in figies
+                        ]
+                    )
+
+                    async for market_data in async_market_data_orderbook_stream:
+                        logger.debug(f"market_data: {market_data}")
+
+                        if datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) >= trade_before_time:
+                            logger.debug(f"Time to stop orderbook stream")
+                            self.__stop_candles_stream(async_market_data_orderbook_stream)
+                            break
+
+                        if market_data.orderbook:
+                            yield market_data.orderbook
+
+            except AioRequestError as ex:
+                logger.error("AioRequestError code=%s repr=%s details=%s", str(ex.code), repr(ex), ex.details)
+
+                if ex.code in invest_api_retry_status_codes():
+                    logger.debug(f"Status code available for reconnect")
+                    await asyncio.sleep(1)
+                else:
+                    raise
+
+            finally:
+                self.__stop_candles_stream(async_market_data_orderbook_stream)
 
     @staticmethod
     def __stop_candles_stream(stream: IMarketDataStreamManager) -> None:
