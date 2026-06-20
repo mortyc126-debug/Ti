@@ -397,10 +397,18 @@ def run_backtest_one(
             for day in sorted(by_day.keys()):
                 day_signals = by_day[day]
                 if len(past_signals) >= AUTO_ATR_MIN_TRADES:
+                    # Fit/eval split той же болезни, что в __recalc_auto_atr:
+                    # sweep и его же оценка по одному и тому же past_signals
+                    # тянет к узким стопам, которые в этом конкретном прошлом
+                    # окне просто случайно не выбило шумом. Оцениваем sweep на
+                    # более позднем хвосте past_signals, не участвовавшем в
+                    # отборе кандидатов.
+                    split = int(len(past_signals) * 0.6)
+                    eval_signals = past_signals[split:] if len(past_signals) - split >= AUTO_ATR_MIN_TRADES else past_signals
                     best = None
                     for tk in atr_take_ks:
                         for sk in atr_stop_ks:
-                            r = strategy.backtest_barriers(signals=past_signals, atr_take_k=tk, atr_stop_k=sk,
+                            r = strategy.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
                                                             tariff=tariff)
                             if r["n_trades"] < AUTO_ATR_MIN_TRADES:
                                 continue
