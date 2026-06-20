@@ -1391,6 +1391,35 @@ class OICompositeStrategy(IStrategy):
 
         return signals
 
+    def scan_method_scores(self, candles: list[HistoricCandle]) -> list[dict]:
+        """
+        В отличие от backtest_scan_signals (который пишет бар только когда
+        composite пересёк threshold) — здесь пишется КАЖДЫЙ бар, безусловно,
+        с сырыми скорами всех методов и close-ценой. Нужно для измерения лага
+        метода относительно будущей цены (кросс-корреляция score/forward
+        return со сдвигом, см. lag_analysis.py) — для этого нужен непрерывный
+        ряд score(t), а не только моменты сигналов (которые сами по себе уже
+        отфильтрованы по "score созрел", т.е. смещены к месту, где лаг скрыт).
+        """
+        if len(candles) < CANDLE_WINDOW + 2:
+            return []
+
+        saved_candles = self.__candles
+        rows: list[dict] = []
+        try:
+            for i in range(CANDLE_WINDOW, len(candles)):
+                self.__candles = candles[i - CANDLE_WINDOW:i]
+                _, scores = self.__compute_composite()
+                rows.append({
+                    "time": candles[i].time,
+                    "close": _to_f(candles[i].close),
+                    "scores": dict(zip(ALL_METHOD_NAMES, scores)),
+                })
+        finally:
+            self.__candles = saved_candles
+
+        return rows
+
     def backtest_barriers(
             self,
             candles: Optional[list[HistoricCandle]] = None,
