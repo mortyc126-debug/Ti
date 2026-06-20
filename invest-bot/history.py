@@ -39,7 +39,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-__all__ = ("HistoryStore",)
+__all__ = ("HistoryStore", "BacktestHistoryStore")
 
 logger = logging.getLogger(__name__)
 
@@ -297,3 +297,67 @@ class HistoryStore:
 
     def tickers(self) -> list[str]:
         return list(self._data.keys())
+
+
+class BacktestHistoryStore(HistoryStore):
+    """
+    In-memory HistoryStore для бэктеста: не читает/не пишет data/history.json
+    и не привязана к реальной дате "сегодня". Без неё ClusterModels (M1/M2/M3)
+    молчат в каждом бэктесте — daily_scores() приходит из реальной живой
+    истории, которой пока нет (бот не торговал живьём). Здесь история
+    строится прямо из прогона по свечам: record_daily/record_trade пишут
+    под симулируемую дату (set_sim_date), а не под datetime.now().
+    """
+
+    def __init__(self):
+        self._data: dict[str, dict[str, dict]] = {}
+        self._sim_date: str = ""
+
+    def set_sim_date(self, date_iso: str) -> None:
+        self._sim_date = date_iso
+
+    def _save(self) -> None:
+        pass  # бэктест не пишет на диск
+
+    def _cutoff(self, days: int = DAYS_KEPT) -> str:
+        if not self._sim_date:
+            return super()._cutoff(days)
+        d = datetime.strptime(self._sim_date, "%Y-%m-%d").date() - timedelta(days=days)
+        return d.isoformat()
+
+    def record_daily(self, ticker: str, *, composite: float, scores: dict[str, float], regime: str,
+                      regime_confidence: float = 1.0, rolling_quality: float, live: bool) -> None:
+        date = self._sim_date or datetime.now(timezone.utc).date().isoformat()
+        day = self._data.setdefault(ticker, {}).setdefault(date, {})
+        day.update({
+            "composite": round(composite, 4),
+            "scores": {k: round(v, 4) for k, v in scores.items()},
+            "regime": regime,
+            "regime_confidence": round(regime_confidence, 4),
+            "rolling_quality": round(rolling_quality, 4),
+            "live": live,
+        })
+        self._trim(ticker)
+
+    def record_trade(self, ticker: str, *, direction: str, entry_price: float, exit_price: float,
+                      mfe: float, mae: float, method_scores: dict[str, float], regime: str = "",
+                      tf_regimes: Optional[dict[str, str]] = None) -> None:
+        quality = mfe / (mfe + mae + 1e-8)
+        date = self._sim_date or datetime.now(timezone.utc).date().isoformat()
+        day = self._data.setdefault(ticker, {}).setdefault(date, {})
+        trades = day.setdefault("trades", [])
+        record = {
+            "dir": direction,
+            "entry": round(entry_price, 4),
+            "exit": round(exit_price, 4),
+            "mfe": round(mfe, 6),
+            "mae": round(mae, 6),
+            "quality": round(quality, 4),
+            "method_scores": {k: round(v, 4) for k, v in method_scores.items()},
+        }
+        if regime:
+            record["regime"] = regime
+        if tf_regimes:
+            record["tf_regimes"] = tf_regimes
+        trades.append(record)
+        self._trim(ticker)

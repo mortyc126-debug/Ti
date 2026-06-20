@@ -1246,6 +1246,11 @@ class OICompositeStrategy(IStrategy):
         total_bars = len(candles) - 1 - CANDLE_WINDOW
         t_start = time.monotonic()
         t_last_log = t_start
+        # Бэктестовая история (см. history.BacktestHistoryStore) умеет писать
+        # дневные снэпшоты скоров под симулируемую дату — без этого
+        # ClusterModels (M1/M2/M3) никогда не набирают _MIN_OBS и молчат
+        # весь бэктест (история живой торговли пуста, бот ещё не торговал).
+        last_sim_day: Optional[str] = None
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
@@ -1269,6 +1274,21 @@ class OICompositeStrategy(IStrategy):
                     continue
 
                 composite, scores = self.__compute_composite()
+
+                if self.__history is not None and hasattr(self.__history, "set_sim_date"):
+                    sim_day = candles[i].time.date().isoformat()
+                    if sim_day != last_sim_day:
+                        last_sim_day = sim_day
+                        self.__history.set_sim_date(sim_day)
+                        self.__history.record_daily(
+                            self.__settings.ticker,
+                            composite=composite,
+                            scores=self.__last_scores,
+                            regime=self.__last_regime,
+                            regime_confidence=self.__regime_confidence,
+                            rolling_quality=self.__rolling_quality,
+                            live=False,
+                        )
                 adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
                 effective_threshold = self.__effective_threshold(adaptive)
 
@@ -1297,6 +1317,10 @@ class OICompositeStrategy(IStrategy):
                     "direction": direction, "entry": entry, "atr_pct": atr_pct, "window": window,
                     "entry_time": candles[i].time,
                     "m1": m1_sc, "m2": m2_sc, "m3": m3_sc,
+                    # Скоры всех методов на момент входа — для record_trade
+                    # (attribution effWR в ClusterModels), как в живой торговле.
+                    "method_scores": dict(self.__last_scores),
+                    "regime": self.__last_regime,
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
@@ -1440,6 +1464,30 @@ class OICompositeStrategy(IStrategy):
                     tally["disagree_n"] += 1
                     tally["disagree_win"] += int(win)
                     tally["disagree_dur"] += duration_min
+
+            # Пишем сделку в бэктестовую историю (см. backtest_scan_signals) —
+            # без этого effWR в ClusterModels остаётся дефолтным 0.5 для всех
+            # методов, как и в самом начале живой торговли без сделок.
+            # mfe/mae здесь — грубая аппроксимация по факту take/stop (а не
+            # реальный максимум хода), но того же знака/масштаба, что и quality
+            # формула в live __record_outcome.
+            if self.__history is not None and hasattr(self.__history, "set_sim_date") \
+                    and entry_time is not None:
+                approx_mfe = take_dist if win else 0.0
+                approx_mae = 0.0 if win else stop_dist
+                exit_price = entry * (1 + exit_pct) if direction == SignalType.LONG \
+                    else entry * (1 - exit_pct)
+                self.__history.set_sim_date(entry_time.date().isoformat())
+                self.__history.record_trade(
+                    self.__settings.ticker,
+                    direction="LONG" if direction == SignalType.LONG else "SHORT",
+                    entry_price=entry,
+                    exit_price=exit_price,
+                    mfe=approx_mfe,
+                    mae=approx_mae,
+                    method_scores=sig.get("method_scores", {}),
+                    regime=sig.get("regime", ""),
+                )
 
             if return_trades:
                 trades.append({

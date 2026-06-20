@@ -51,7 +51,7 @@ from candle_archive import get_candles_cached
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from db_api_client import DbApiClient
-from history import HistoryStore
+from history import BacktestHistoryStore
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
@@ -73,13 +73,16 @@ logger = logging.getLogger(__name__)
 
 
 def _wire_history(strategy) -> None:
-    """Подключает HistoryStore/калибратор к стратегии — без этого
-    __cluster_models остаётся None и M1/M2/M3 всегда считают 0 (модели
-    молчат во всех бэктестах/портфельных симуляциях дашборда). В живой
-    торговле это делает trader.py (set_history), здесь — то же самое,
-    но без db (бэктест не пишет закрытые сделки в общую базу)."""
+    """Подключает History/калибратор к стратегии — без этого __cluster_models
+    остаётся None и M1/M2/M3 всегда считают 0 (модели молчат во всех
+    бэктестах/портфельных симуляциях дашборда). Используем
+    BacktestHistoryStore (не реальный data/history.json — он пуст, бот ещё
+    не торговал живьём): стратегия сама строит дневные скоры и attribution
+    сделок по ходу сканирования свечей (см. backtest_scan_signals/
+    backtest_barriers), так что M1/M2/M3 включаются прямо внутри прогона,
+    как только набирается история (≥10 дней)."""
     if hasattr(strategy, "set_history"):
-        strategy.set_history(HistoryStore(), PercentileCalibrator())
+        strategy.set_history(BacktestHistoryStore(), PercentileCalibrator())
 
 
 _config = ProgramConfiguration(CONFIG_FILE)
