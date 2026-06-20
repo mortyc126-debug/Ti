@@ -1797,11 +1797,18 @@ class OICompositeStrategy(IStrategy):
             history = self.__atr_history_provider(self.__settings.ticker)
             if not history:
                 return
-            signals = self.backtest_scan_signals(history)
+            signals = sorted(self.backtest_scan_signals(history), key=lambda s: s["entry_time"])
+            # Fit/eval split: раньше (tk, sk) выбирался по expectancy_pct на том
+            # же signals, на котором же и считался — best-of-N по шумной выборке
+            # систематически переоценивает узкие стопы, которые в этом окне
+            # случайно не выбило. Считаем sweep на отложенном "будущем" хвосте
+            # истории, не участвовавшем в выборе кандидатов.
+            split = int(len(signals) * 0.6)
+            eval_signals = signals[split:] if len(signals) - split >= AUTO_ATR_MIN_TRADES else signals
             best = None
             for tk in AUTO_ATR_TAKE_KS:
                 for sk in AUTO_ATR_STOP_KS:
-                    res = self.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk)
+                    res = self.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk)
                     if res["n_trades"] < AUTO_ATR_MIN_TRADES:
                         continue
                     if best is None or res["expectancy_pct"] > best[1]:
