@@ -136,7 +136,6 @@ TINKOFF_SANDBOX=1 python main.py                   # запуск бота в п
 invest-bot/
   trade_system/strategies/
     oi_composite_strategy.py   ← наша стратегия, экспонирует .confidence
-    change_and_volume_strategy.py  ← оригинал (пример)
     strategy_factory.py        ← регистрация стратегий
   trading/
     trader.py                  ← signal_only режим + risk-gate перед открытием

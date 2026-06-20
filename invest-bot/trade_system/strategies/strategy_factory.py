@@ -1,6 +1,5 @@
 from typing import Optional
 
-from trade_system.strategies.change_and_volume_strategy import ChangeAndVolumeStrategy
 from trade_system.strategies.oi_composite_strategy import OICompositeStrategy
 from trade_system.strategies.base_strategy import IStrategy
 
@@ -14,8 +13,6 @@ class StrategyFactory:
     @staticmethod
     def new_factory(strategy_name: str, *args, **kwargs) -> Optional[IStrategy]:
         match strategy_name:
-            case "ChangeAndVolumeStrategy":
-                return ChangeAndVolumeStrategy(*args, **kwargs)
             case "OICompositeStrategy":
                 return OICompositeStrategy(*args, **kwargs)
             case _:
