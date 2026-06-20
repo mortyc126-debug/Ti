@@ -33,7 +33,7 @@ import statistics
 from collections import defaultdict
 
 from configuration.configuration import ProgramConfiguration
-from invest_api.services.instruments_service import InstrumentsService
+from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from tinkoff.invest import CandleInterval
 from tinkoff.invest.utils import quotation_to_decimal
@@ -132,7 +132,7 @@ def main() -> None:
 
     config = ProgramConfiguration(CONFIG_FILE)
     market_data = MarketDataService(config.tinkoff_token, config.tinkoff_app_name)
-    instruments = InstrumentsService(config.tinkoff_token, config.tinkoff_app_name)
+    instruments = InstrumentService(config.tinkoff_token, config.tinkoff_app_name)
 
     base_tickers = (
         [t.strip() for t in args.base_tickers.split(",") if t.strip()]
