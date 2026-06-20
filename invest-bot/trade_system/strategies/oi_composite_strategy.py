@@ -833,6 +833,23 @@ AUTO_ATR_STOP_KS = (1.5, 2.0, 3.0)
 AUTO_ATR_MIN_TRADES = 20           # меньше сделок на истории — авто-подбору не доверяем
                                     # (sweep по 3-9 исходам — это подбор по шуму, не сигнал)
 
+# _compute_atr меряет волатильность ОДНОГО бара (TR-квантиль), а сделка
+# держится десятки баров до take/stop/timeout (max_bars) — без масштабирования
+# take_k/stop_k калибруются под однобарное движение, а не под фактическую
+# экспозицию за время удержания. Кумулятивный разброс растёт с числом баров N
+# примерно как N**scale_exp (0.5 — чистое случайное блуждание; меньше — если
+# внутри дня есть mean-reversion, больше — если momentum). ATR_SCALE_HOLDING_BARS
+# — оценка типичного N для масштабирования; берём существующий max_bars
+# (одно и то же число уже используется и в backtest_barriers, и неявно
+# ограничивает живую сделку через __recalc_auto_atr/backtest_scan_signals) —
+# не лог реальных медианных длительностей, чтобы не тащить отдельный сбор
+# статистики на первом шаге; можно уточнить позже, если экспонента приживётся.
+ATR_SCALE_HOLDING_BARS = 60
+# 0.0 — старое поведение (без масштабирования), оставлено в сетке, чтобы
+# walk-forward мог сам решить, что лучше, а не считать масштабирование
+# обязательным.
+AUTO_ATR_SCALE_EXPS = (0.0, 0.3, 0.4, 0.5, 0.6)
+
 
 class OICompositeStrategy(IStrategy):
     """
@@ -868,6 +885,7 @@ class OICompositeStrategy(IStrategy):
         # иначе остаются фиксированные множители LONG_TAKE/STOP (обратная совместимость).
         self.__atr_take_k = float(s["ATR_TAKE_K"]) if "ATR_TAKE_K" in s else None
         self.__atr_stop_k = float(s["ATR_STOP_K"]) if "ATR_STOP_K" in s else None
+        self.__atr_scale_exp = float(s["ATR_SCALE_EXP"]) if "ATR_SCALE_EXP" in s else None
 
         self.__candles: list[HistoricCandle] = []
         self.__open_trade: Optional[OpenTrade] = None
@@ -898,6 +916,7 @@ class OICompositeStrategy(IStrategy):
         self.__atr_history_provider: Optional[AtrHistoryProvider] = None
         self.__auto_atr_take_k: Optional[float] = None
         self.__auto_atr_stop_k: Optional[float] = None
+        self.__auto_atr_scale_exp: Optional[float] = None
         self.__auto_atr_recalc_date: Optional[object] = None
 
         logger.info(
@@ -1368,6 +1387,7 @@ class OICompositeStrategy(IStrategy):
             stop_mult: Optional[Decimal] = None,
             atr_take_k: Optional[float] = None,
             atr_stop_k: Optional[float] = None,
+            atr_scale_exp: Optional[float] = None,
             max_bars: int = 60,
             signals: Optional[list[dict]] = None,
             return_trades: bool = False,
@@ -1433,15 +1453,25 @@ class OICompositeStrategy(IStrategy):
             if atr_take_k is not None and atr_stop_k is not None:
                 if atr_pct <= 0:
                     continue
-                take_dist = atr_take_k * atr_pct
-                stop_dist = atr_stop_k * atr_pct
+                # atr_pct — волатильность ОДНОГО бара (TR-квантиль), а сделка
+                # держится десятки баров до take/stop/timeout — без этого
+                # take_k/stop_k калибруются под однобарное движение, не под
+                # фактическую экспозицию. holding**exp — грубая оценка
+                # накопленного разброса (см. ATR_SCALE_HOLDING_BARS).
+                hold_scale = ATR_SCALE_HOLDING_BARS ** atr_scale_exp if atr_scale_exp else 1.0
+                take_dist = atr_take_k * atr_pct * hold_scale
+                stop_dist = atr_stop_k * atr_pct * hold_scale
             else:
                 take_dist = abs(float(take_mult) - 1.0)
                 stop_dist = abs(float(stop_mult) - 1.0)
-            # Та же шумовая адаптация стопа, что и в live (__noise_stop_scale,
-            # записан в сигнал на момент входа в backtest_scan_signals) —
-            # иначе backtest не отражает реальное поведение стратегии.
-            stop_dist *= sig.get("noise_scale", 1.0)
+            # Шумовая адаптация (__noise_stop_scale, записана в сигнал на
+            # момент входа в backtest_scan_signals) применяется к ОБОИМ
+            # барьерам, не только к стопу — раньше она ужимала только стоп,
+            # из-за чего в шумном режиме (noise_scale<1) требуемое R:R для
+            # выхода в плюс росло именно тогда, когда edge и так слабее.
+            noise_scale = sig.get("noise_scale", 1.0)
+            take_dist *= noise_scale
+            stop_dist *= noise_scale
 
             if direction == SignalType.LONG:
                 take_price = entry * (1 + take_dist)
@@ -1692,6 +1722,7 @@ class OICompositeStrategy(IStrategy):
             "rolling_quality": self.__rolling_quality,
             "auto_atr_take_k": self.__auto_atr_take_k,
             "auto_atr_stop_k": self.__auto_atr_stop_k,
+            "auto_atr_scale_exp": self.__auto_atr_scale_exp,
         }
 
     def path_estimate(self, lookback: int = 20) -> tuple[float, float]:
@@ -1785,9 +1816,10 @@ class OICompositeStrategy(IStrategy):
 
     def __recalc_auto_atr(self) -> None:
         """
-        Авто-подбор ATR_TAKE_K/ATR_STOP_K по исторической выгрузке — раз в
-        день, тот же sweep, что в дашборде (run_backtest_one): перебираем
-        AUTO_ATR_TAKE_KS x AUTO_ATR_STOP_KS, берём пару с лучшим expectancy_pct.
+        Авто-подбор ATR_TAKE_K/ATR_STOP_K/ATR_SCALE_EXP по исторической
+        выгрузке — раз в день, тот же sweep, что в дашборде (run_backtest_one):
+        перебираем AUTO_ATR_TAKE_KS x AUTO_ATR_STOP_KS x AUTO_ATR_SCALE_EXPS,
+        берём тройку с лучшим expectancy_pct.
         Не запускается, если ATR_TAKE_K/ATR_STOP_K зафиксированы в settings.ini
         (явная настройка приоритетнее) или провайдер истории не подключён.
         """
@@ -1815,16 +1847,17 @@ class OICompositeStrategy(IStrategy):
             best = None
             for tk in AUTO_ATR_TAKE_KS:
                 for sk in AUTO_ATR_STOP_KS:
-                    res = self.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                  record_history=False)
-                    if res["n_trades"] < AUTO_ATR_MIN_TRADES:
-                        continue
-                    if best is None or res["expectancy_pct"] > best[1]:
-                        best = ((tk, sk), res["expectancy_pct"])
+                    for ex in AUTO_ATR_SCALE_EXPS:
+                        res = self.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                      atr_scale_exp=ex, record_history=False)
+                        if res["n_trades"] < AUTO_ATR_MIN_TRADES:
+                            continue
+                        if best is None or res["expectancy_pct"] > best[1]:
+                            best = ((tk, sk, ex), res["expectancy_pct"])
             if best:
-                (tk, sk), exp = best
-                self.__auto_atr_take_k, self.__auto_atr_stop_k = tk, sk
-                logger.info(f"{self.__settings.ticker}: авто-ATR k={tk}/{sk} (expectancy={exp:.4f}%)")
+                (tk, sk, ex), exp = best
+                self.__auto_atr_take_k, self.__auto_atr_stop_k, self.__auto_atr_scale_exp = tk, sk, ex
+                logger.info(f"{self.__settings.ticker}: авто-ATR k={tk}/{sk} exp={ex} (expectancy={exp:.4f}%)")
         except Exception:
             logger.exception(f"{self.__settings.ticker}: авто-подбор ATR_TAKE_K/ATR_STOP_K упал")
 
@@ -1857,25 +1890,35 @@ class OICompositeStrategy(IStrategy):
         авто-подобранная пара (__recalc_auto_atr). Иначе — фиксированные
         LONG_*/SHORT_* (полная обратная совместимость).
 
-        Ширина стопа (но не тейка) дополнительно масштабируется
-        __noise_stop_scale() — адаптация не только к волатильности (ATR%),
-        но и к тому, шумовое сейчас движение или трендовое.
+        Оба барьера дополнительно масштабируются __noise_stop_scale() —
+        адаптация не только к волатильности (ATR%), но и к тому, шумовое
+        сейчас движение или трендовое (раньше масштабировался только стоп,
+        из-за чего требуемое R:R росло именно в шумных условиях — см.
+        backtest_barriers).
+
+        ATR-ширина дополнительно умножается на ATR_SCALE_HOLDING_BARS**exp —
+        компенсация того, что atr_pct меряет волатильность одного бара, а
+        сделка держится десятки баров (см. ATR_SCALE_HOLDING_BARS).
         """
         noise_scale = self.__noise_stop_scale()
         take_k = self.__atr_take_k if self.__atr_take_k is not None else self.__auto_atr_take_k
         stop_k = self.__atr_stop_k if self.__atr_stop_k is not None else self.__auto_atr_stop_k
         if take_k is not None and stop_k is not None and atr_pct > 0:
-            take_off = Decimal(str(take_k * atr_pct))
-            stop_off = Decimal(str(stop_k * atr_pct * noise_scale))
+            scale_exp = self.__atr_scale_exp if self.__atr_scale_exp is not None else self.__auto_atr_scale_exp
+            hold_scale = ATR_SCALE_HOLDING_BARS ** scale_exp if scale_exp else 1.0
+            take_off = Decimal(str(take_k * atr_pct * hold_scale * noise_scale))
+            stop_off = Decimal(str(stop_k * atr_pct * hold_scale * noise_scale))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
         scale = Decimal(str(noise_scale))
         if direction == SignalType.LONG:
+            take_off = (self.__long_take - Decimal("1")) * scale
             stop_off = (Decimal("1") - self.__long_stop) * scale
-            return self.__long_take, Decimal("1") - stop_off
+            return Decimal("1") + take_off, Decimal("1") - stop_off
+        take_off = (Decimal("1") - self.__short_take) * scale
         stop_off = (self.__short_stop - Decimal("1")) * scale
-        return self.__short_take, Decimal("1") + stop_off
+        return Decimal("1") - take_off, Decimal("1") + stop_off
 
     def __make_signal(
             self,
