@@ -1359,7 +1359,10 @@ class OICompositeStrategy(IStrategy):
         # сделок, где её скор согласен с направлением сделки (agree), и
         # отдельно среди тех, где она была против (disagree) — нулевой
         # скор (модель промолчала) не считается ни тем, ни другим.
-        model_tally = {m: {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0} for m in ("m1", "m2", "m3")}
+        model_tally = {
+            m: {"agree_n": 0, "agree_win": 0, "agree_dur": 0.0, "disagree_n": 0, "disagree_win": 0, "disagree_dur": 0.0}
+            for m in ("m1", "m2", "m3")
+        }
         for sig in signals:
             direction, entry, atr_pct, window = sig["direction"], sig["entry"], sig["atr_pct"], sig["window"]
 
@@ -1413,6 +1416,14 @@ class OICompositeStrategy(IStrategy):
             win = net_pct > 0
             results.append((win, r_multiple, net_pct))
 
+            entry_time = sig.get("entry_time")
+            duration_min = 0.0
+            if entry_time is not None and exit_time is not None and hasattr(exit_time, "__sub__"):
+                try:
+                    duration_min = (exit_time - entry_time).total_seconds() / 60.0
+                except TypeError:
+                    duration_min = 0.0
+
             dir_sign = 1 if direction == SignalType.LONG else -1
             trade_models = {}
             for m in ("m1", "m2", "m3"):
@@ -1424,15 +1435,17 @@ class OICompositeStrategy(IStrategy):
                 if (m_sc > 0) == (dir_sign > 0):
                     tally["agree_n"] += 1
                     tally["agree_win"] += int(win)
+                    tally["agree_dur"] += duration_min
                 else:
                     tally["disagree_n"] += 1
                     tally["disagree_win"] += int(win)
+                    tally["disagree_dur"] += duration_min
 
             if return_trades:
                 trades.append({
-                    "entry_time": sig.get("entry_time"), "exit_time": exit_time,
+                    "entry_time": entry_time, "exit_time": exit_time,
                     "direction": direction.name, "net_pct": net_pct,
-                    "r_multiple": r_multiple, "win": win,
+                    "r_multiple": r_multiple, "win": win, "duration_min": round(duration_min, 1),
                     "m1": trade_models["m1"], "m2": trade_models["m2"], "m3": trade_models["m3"],
                 })
 
@@ -1451,8 +1464,10 @@ class OICompositeStrategy(IStrategy):
             m.upper() + "_CLUSTER": {
                 "agree_n": t["agree_n"],
                 "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
+                "agree_avg_duration_min": t["agree_dur"] / t["agree_n"] if t["agree_n"] else None,
                 "disagree_n": t["disagree_n"],
                 "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+                "disagree_avg_duration_min": t["disagree_dur"] / t["disagree_n"] if t["disagree_n"] else None,
             }
             for m, t in model_tally.items()
         }

@@ -55,6 +55,7 @@ from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
 from runtime_overrides import load_overrides, save_overrides
 from trade_system.issuer_filter import issuer_key, select_top_tickers
+from trade_system.strategies.oi_composite_strategy import AUTO_ATR_MIN_TRADES, AUTO_ATR_STOP_KS, AUTO_ATR_TAKE_KS
 from trade_system.strategies.strategy_factory import StrategyFactory
 
 CONFIG_FILE = "settings.ini"
@@ -374,23 +375,46 @@ def _portfolio_sim_one_ticker(
         trades: list[dict] = []
 
         if mode == "atr":
-            best = None
-            for tk in (atr_take_ks or []):
-                for sk in (atr_stop_ks or []):
-                    r = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk, tariff=tariff)
-                    if r["n_trades"] == 0:
-                        continue
-                    if best is None or r["expectancy_pct"] > best[1]["expectancy_pct"]:
-                        best = ((tk, sk), r)
-            if best is None:
+            if not signals:
                 return [], None
-            (tk, sk), _ = best
-            res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk,
-                                              return_trades=True, tariff=tariff)
-            for t in res.get("trades", []):
-                t["ticker"] = ticker
-                t["atr_k"] = f"{tk}/{sk}"
-                trades.append(t)
+            # Раньше тут был один sweep по ВСЕЙ истории тикера — лучшая по
+            # expectancy_pct пара (tk, sk) подбиралась по тем же сделкам,
+            # что потом шли в отчёт (look-ahead/переподгонка). Здесь —
+            # пересчёт раз в день только по сигналам ДО этого дня, как в
+            # проде (см. __recalc_auto_atr): честная имитация того, что
+            # увидел бы живой бот, без подглядывания в свои будущие сделки.
+            grid_take = list(atr_take_ks or AUTO_ATR_TAKE_KS)
+            grid_stop = list(atr_stop_ks or AUTO_ATR_STOP_KS)
+            by_day: dict = defaultdict(list)
+            for sig in signals:
+                et = sig["entry_time"]
+                day = et.date() if hasattr(et, "date") else str(et)[:10]
+                by_day[day].append(sig)
+
+            chosen_k = (grid_take[len(grid_take) // 2], grid_stop[len(grid_stop) // 2])
+            past_signals: list[dict] = []
+            for day in sorted(by_day.keys()):
+                day_signals = by_day[day]
+                if len(past_signals) >= AUTO_ATR_MIN_TRADES:
+                    best = None
+                    for tk in grid_take:
+                        for sk in grid_stop:
+                            r = strategy.backtest_barriers(signals=past_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                            tariff=tariff)
+                            if r["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                continue
+                            if best is None or r["expectancy_pct"] > best[1]:
+                                best = ((tk, sk), r["expectancy_pct"])
+                    if best is not None:
+                        chosen_k = best[0]
+                tk, sk = chosen_k
+                res = strategy.backtest_barriers(signals=day_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                  return_trades=True, tariff=tariff)
+                for t in res.get("trades", []):
+                    t["ticker"] = ticker
+                    t["atr_k"] = f"{tk}/{sk}"
+                    trades.append(t)
+                past_signals.extend(day_signals)
         else:
             s = strategy_settings.settings
             long_take = Decimal(s.get("LONG_TAKE", "1.015"))
@@ -466,10 +490,14 @@ def run_portfolio_sim(
     # Та же логика agree/disagree, что в backtest_barriers.model_stats, но
     # по сводным сделкам портфеля (все тикеры вместе) — отдельный прогон
     # по тикеру может не показать характер модели на малой выборке.
-    model_tally = {m: {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0} for m in ("m1", "m2", "m3")}
+    model_tally = {
+        m: {"agree_n": 0, "agree_win": 0, "agree_dur": 0.0, "disagree_n": 0, "disagree_win": 0, "disagree_dur": 0.0}
+        for m in ("m1", "m2", "m3")
+    }
 
     for t in all_trades:
         dir_sign = 1 if t["direction"] == "LONG" else -1
+        dur = t.get("duration_min", 0.0)
         for m in ("m1", "m2", "m3"):
             m_sc = t.get(m, 0.0)
             if m_sc == 0:
@@ -478,9 +506,11 @@ def run_portfolio_sim(
             if (m_sc > 0) == (dir_sign > 0):
                 tally["agree_n"] += 1
                 tally["agree_win"] += int(t["win"])
+                tally["agree_dur"] += dur
             else:
                 tally["disagree_n"] += 1
                 tally["disagree_win"] += int(t["win"])
+                tally["disagree_dur"] += dur
         risk_rub = equity * risk_pct / 100.0
         pnl_rub = risk_rub * t["r_multiple"]
         equity += pnl_rub
@@ -520,11 +550,39 @@ def run_portfolio_sim(
         m.upper() + "_CLUSTER": {
             "agree_n": t["agree_n"],
             "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
+            "agree_avg_duration_min": round(t["agree_dur"] / t["agree_n"], 1) if t["agree_n"] else None,
             "disagree_n": t["disagree_n"],
             "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+            "disagree_avg_duration_min": round(t["disagree_dur"] / t["disagree_n"], 1) if t["disagree_n"] else None,
         }
         for m, t in model_tally.items()
     }
+
+    # "Что если бы" сценарии: тот же портфель сделок (хронология/риск как
+    # выше), но из них отбираются только те, где соответствующая модель
+    # согласна с направлением сделки — показывает, ухудшил бы реальный
+    # композит результат, если бы M1/M2/M3 решали сами (или все втроём).
+    def _simulate(subset: list[dict]) -> dict:
+        eq, pk, dd = account, account, 0.0
+        for tt in subset:
+            risk = eq * risk_pct / 100.0
+            eq += risk * tt["r_multiple"]
+            pk = max(pk, eq)
+            dd = max(dd, pk - eq)
+        return {"n_trades": len(subset), "equity_end": round(eq, 2), "pnl_rub": round(eq - account, 2),
+                "max_drawdown_rub": round(dd, 2)}
+
+    what_if = {}
+    for m in ("m1", "m2", "m3"):
+        subset = [tt for tt in all_trades if tt.get(m, 0.0) != 0
+                  and (tt.get(m, 0.0) > 0) == (tt["direction"] == "LONG")]
+        what_if[m.upper() + "_CLUSTER_ONLY"] = _simulate(subset)
+    all_agree = [
+        tt for tt in all_trades
+        if all(tt.get(m, 0.0) != 0 and (tt.get(m, 0.0) > 0) == (tt["direction"] == "LONG")
+               for m in ("m1", "m2", "m3"))
+    ]
+    what_if["ALL_THREE_AGREE"] = _simulate(all_agree)
 
     return {
         "summary": {
@@ -536,6 +594,7 @@ def run_portfolio_sim(
         "per_ticker": per_ticker,
         "trades": trade_rows,
         "model_stats": model_stats,
+        "what_if": what_if,
         "errors": errors,
     }
 
@@ -727,7 +786,22 @@ function modelStatsToHtml(modelStats) {{
     if (!s) continue;
     const agreePct = s.agree_win_rate !== null && s.agree_win_rate !== undefined
       ? (s.agree_win_rate * 100).toFixed(0) + '%' : '—';
-    parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}})`);
+    const dur = s.agree_avg_duration_min !== null && s.agree_avg_duration_min !== undefined
+      ? `, ${{s.agree_avg_duration_min.toFixed(0)}}мин` : '';
+    parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}}${{dur}})`);
+  }}
+  return parts.join(' / ');
+}}
+
+function whatIfToHtml(whatIf) {{
+  if (!whatIf) return '';
+  const labels = {{m1_cluster_only: 'M1 один', m2_cluster_only: 'M2 один', m3_cluster_only: 'M3 один',
+                  all_three_agree: 'все 3 согласны'}};
+  const parts = [];
+  for (const key of ['M1_CLUSTER_ONLY', 'M2_CLUSTER_ONLY', 'M3_CLUSTER_ONLY', 'ALL_THREE_AGREE']) {{
+    const s = whatIf[key];
+    if (!s || s.n_trades === 0) continue;
+    parts.push(`${{labels[key.toLowerCase()]}}: ${{s.pnl_rub.toFixed(0)}}₽ (n=${{s.n_trades}})`);
   }}
   return parts.join(' / ');
 }}
@@ -873,7 +947,8 @@ async function runPortfolioSim() {{
     `<div class="advice">Старт: ${{s.account_start}} ₽ &nbsp;→&nbsp; Итог: ${{s.equity_end}} ₽ &nbsp;
      (<span style="color:${{sign}}">${{s.pnl_rub >= 0 ? '+' : ''}}${{s.pnl_rub}} ₽</span>) &nbsp;|&nbsp;
      Сделок: ${{s.n_trades}} &nbsp;|&nbsp; Макс. просадка: ${{s.max_drawdown_rub}} ₽</div>${{dedupNote}}
-     <div class="advice" style="margin-top:6px;">М1/М2/М3 — win% сделок, где модель была согласна с направлением: ${{modelStatsToHtml(data.model_stats)}}</div>`;
+     <div class="advice" style="margin-top:6px;">М1/М2/М3 — win% сделок, где модель была согласна с направлением: ${{modelStatsToHtml(data.model_stats)}}</div>
+     <div class="advice" style="margin-top:6px;">Если бы торговали только по модели (без композита): ${{whatIfToHtml(data.what_if)}}</div>`;
 
   let mh = '<tr><th>Месяц</th><th>Сделок</th><th>Прибыль ₽</th><th>Счёт на конец</th></tr>';
   for (const m of data.monthly) {{
