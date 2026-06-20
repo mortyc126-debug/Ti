@@ -142,6 +142,12 @@ LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "п
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
 QUALITY_ALPHA = 0.15               # скорость EWA для rolling quality
 
+# Layer-lag-penalty: после смены режима первые LAG_PENALTY_BARS баров доверять
+# режимным мультипликаторам меньше — effWR/REGIME_WEIGHT_MODS откалиброваны на
+# уже устоявшемся режиме, а сразу после переключения это ещё переходный шум.
+LAG_PENALTY_BARS = 5
+LAG_PENALTY_MIN = 0.6              # confidence-множитель сразу после смены режима
+
 # ── ATR-фильтр шума ──────────────────────────────────────────────────────────
 ATR_PERIOD = 14                    # период ATR
 MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комиссия × этот фактор
@@ -903,6 +909,7 @@ class OICompositeStrategy(IStrategy):
         self.__multi_ticker_provider: Optional[MultiTickerProvider] = None
         self.__regime_confidence: float = 1.0
         self.__last_regime: str = "ranging"
+        self.__regime_stable_bars: int = 0
         self.__last_scores: dict[str, float] = {}
         self.__last_composite: float = 0.0
         # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
@@ -1622,6 +1629,13 @@ class OICompositeStrategy(IStrategy):
         regime = max(regime_probs, key=regime_probs.get)
         regime_conf = regime_probs[regime]
 
+        # Lag-penalty: считаем бары подряд в одном (argmax) режиме до его смены.
+        if regime == self.__last_regime:
+            self.__regime_stable_bars = min(self.__regime_stable_bars + 1, LAG_PENALTY_BARS)
+        else:
+            self.__regime_stable_bars = 0
+        lag_mult = LAG_PENALTY_MIN + (1.0 - LAG_PENALTY_MIN) * (self.__regime_stable_bars / LAG_PENALTY_BARS)
+
         # Кластерные модели M1/M2/M3: обновляем при смене режима,
         # вычисляем на текущих скорах. До накопления истории — 0.
         base_score_dict = dict(zip(
@@ -1696,6 +1710,7 @@ class OICompositeStrategy(IStrategy):
         confidence_mult = self.__rqa_confidence_mult(closes)
         confidence_mult *= wavelet_confidence_mult(closes)
         confidence_mult *= regime_conf
+        confidence_mult *= lag_mult
         composite *= confidence_mult
 
         self.__last_regime = regime
