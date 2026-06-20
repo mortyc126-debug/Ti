@@ -1089,8 +1089,16 @@ function droppedToHtml(dropped) {{
 
 let _progressTimer = null;
 
+function _fmtEta(sec) {{
+  if (!isFinite(sec) || sec < 0) return '';
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return m > 0 ? `${{m}}м ${{s}}с` : `${{s}}с`;
+}}
+
 function startProgressPolling(tickers, statusElId) {{
   const el = document.getElementById(statusElId);
+  const startedAt = Date.now();
+  const DONE_STATUSES = new Set(['готово', 'ошибка', 'ошибка API', 'нет истории', 'пропуск']);
   const statusRu = {{
     'в очереди': 'в очереди', 'загрузка свечей': 'грузит свечи', 'готово': '✓ готово',
     'ошибка': '✗ ошибка', 'ошибка API': '✗ ошибка API', 'нет истории': '— нет истории', 'пропуск': '— пропуск',
@@ -1102,7 +1110,21 @@ function startProgressPolling(tickers, statusElId) {{
       const cls = p && p.status === 'готово' ? 'color:var(--pos);' : (p && p.status.startsWith('ошибка') ? 'color:var(--neg);' : '');
       return `<span style="${{cls}}">${{t}}: ${{status}}</span>`;
     }});
-    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+
+    // Общий ETA: средн. время на завершённый тикер (от старта прогона) ×
+    // сколько тикеров ещё не done — грубо, но по мере прогресса точнее
+    // (первые тикеры обычно дороже из-за прогрева кэша/расчёта индикаторов).
+    const total = tickers.length;
+    const doneCount = tickers.filter(t => progress[t] && DONE_STATUSES.has(progress[t].status)).length;
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    let overall = `Готово ${{doneCount}}/${{total}}`;
+    if (doneCount > 0 && doneCount < total) {{
+      const etaSec = (elapsedSec / doneCount) * (total - doneCount);
+      overall += ` · осталось ~${{_fmtEta(etaSec)}}`;
+    }} else if (doneCount === 0 && total > 1) {{
+      overall += ` · считаю время...`;
+    }}
+    el.innerHTML = `<div style="margin-bottom:4px;font-weight:600;">${{overall}}</div>` + parts.join(' &nbsp;·&nbsp; ');
   }};
   render({{}});
   _progressTimer = setInterval(async () => {{
