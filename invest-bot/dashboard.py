@@ -601,6 +601,12 @@ def run_portfolio_sim(
                for m in ("m1", "m2", "m3"))
     ]
     what_if["ALL_THREE_AGREE"] = _simulate(all_agree)
+    two_of_three = [
+        tt for tt in all_trades
+        if sum(tt.get(m, 0.0) != 0 and (tt.get(m, 0.0) > 0) == (tt["direction"] == "LONG")
+               for m in ("m1", "m2", "m3")) >= 2
+    ]
+    what_if["TWO_OF_THREE_AGREE"] = _simulate(two_of_three)
 
     return {
         "summary": {
@@ -814,9 +820,9 @@ function modelStatsToHtml(modelStats) {{
 function whatIfToHtml(whatIf) {{
   if (!whatIf) return '';
   const labels = {{m1_cluster_only: 'M1 один', m2_cluster_only: 'M2 один', m3_cluster_only: 'M3 один',
-                  all_three_agree: 'все 3 согласны'}};
+                  all_three_agree: 'все 3 согласны', two_of_three_agree: '2 из 3 согласны'}};
   const parts = [];
-  for (const key of ['M1_CLUSTER_ONLY', 'M2_CLUSTER_ONLY', 'M3_CLUSTER_ONLY', 'ALL_THREE_AGREE']) {{
+  for (const key of ['M1_CLUSTER_ONLY', 'M2_CLUSTER_ONLY', 'M3_CLUSTER_ONLY', 'ALL_THREE_AGREE', 'TWO_OF_THREE_AGREE']) {{
     const s = whatIf[key];
     if (!s || s.n_trades === 0) continue;
     parts.push(`${{labels[key.toLowerCase()]}}: ${{s.pnl_rub.toFixed(0)}}₽ (n=${{s.n_trades}})`);
