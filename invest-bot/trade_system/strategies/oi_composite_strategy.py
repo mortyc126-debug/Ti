@@ -765,13 +765,23 @@ M1_NAME = "M1_CLUSTER"
 M2_NAME = "M2_CLUSTER"
 M3_NAME = "M3_CLUSTER"
 
-ALL_METHOD_NAMES = (
+BASE_METHOD_NAMES = (
     [name for name, _ in METHODS]
     + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
     + TRADESTATS_METHOD_NAMES
     + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
-    + [M1_NAME, M2_NAME, M3_NAME]
 )
+CLUSTER_MODEL_NAMES = [M1_NAME, M2_NAME, M3_NAME]
+
+# M1/M2/M3 считаются и трекаются (вес/история/attribution) наравне с базовыми
+# методами — чтобы их качество было сравнимо с остальными в архиве и при
+# обучении весов. Но в живой композит (то, что реально открывает сделки) они
+# НЕ входят: они строятся из тех же base_scores, что и остальные методы, и их
+# сложение с этими же методами в одной взвешенной сумме означало бы повторный
+# счёт уже учтённого сигнала. См. __compute_composite — composite считается
+# только по BASE_METHOD_NAMES, M1/M2/M3 копятся отдельно для будущего
+# самостоятельного бэктеста/решающего слоя.
+ALL_METHOD_NAMES = BASE_METHOD_NAMES + CLUSTER_MODEL_NAMES
 
 # (ticker, direction) -> squeeze_score; подключается извне (Trader), т.к.
 # у самой стратегии нет доступа к сети/oi_layers.py. Без подключённого
@@ -1485,8 +1495,12 @@ class OICompositeStrategy(IStrategy):
             for name in ALL_METHOD_NAMES
         ]
 
-        weighted = sum(s * w for s, w in zip(scores_for_composite, weights))
-        weight_sum = sum(weights) or 1.0
+        # M1/M2/M3 — последние 3 элемента (см. ALL_METHOD_NAMES) — не входят в
+        # живой композит: они построены из тех же base_scores, что уже здесь
+        # просуммированы, повторное сложение было бы двойным счётом.
+        n_base = len(BASE_METHOD_NAMES)
+        weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
+        weight_sum = sum(weights[:n_base]) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
 
         confidence_mult = self.__rqa_confidence_mult(closes)
