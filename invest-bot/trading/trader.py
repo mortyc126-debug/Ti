@@ -15,7 +15,7 @@ from invest_api.services.market_data_service import MarketDataService
 from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
-from invest_api.utils import candle_to_historiccandle
+from invest_api.utils import aggcandle_to_historiccandle
 from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
@@ -119,6 +119,9 @@ class Trader:
         self.__history = HistoryStore()
         self.__calibrator = PercentileCalibrator()
         self.__tf_buffer = MultiTfBuffer()
+        # Сигнал, дождавшийся подтверждения на 1min-свече после решения на 5min-баре
+        # (см. _new5 в __trading_loop): {figi: {"signal": Signal, "ttl": int}}
+        self.__pending_signal: dict[str, dict] = {}
         # Прогноз утреннего backtest-гейта (ticker -> {quality, n_trades, live})
         # для сверки с фактическим rolling_quality конца дня — см. __archive_today.
         self.__backtest_predictions: dict[str, dict] = {}
@@ -448,113 +451,143 @@ class Trader:
 
             if candle.time > current_figi_candle.time and \
                     datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) <= signals_before_time:
-                signal_new = strategies[candle.figi].analyze_candles(
-                    [candle_to_historiccandle(current_figi_candle)]
-                )
+                signal_new = None
+                if _new5 is not None:
+                    # Решение о входе считается на агрегированном 5min-баре — так же,
+                    # как в бэктесте (там CANDLE_WINDOW=30 строится из 5min-свечей).
+                    # Раньше здесь отдавался каждый 1min-бар, и стратегия фактически
+                    # считала сигнал по последним 30 минутам, а бэктест — по последним
+                    # ~2.5 часам на тех же CANDLE_WINDOW=30: разные окна для одной цифры.
+                    signal_new = strategies[candle.figi].analyze_candles(
+                        [aggcandle_to_historiccandle(_new5, current_figi_candle.time)]
+                    )
 
-                if signal_new:
-                    logger.info(f"New signal: {signal_new}")
+                if signal_new and signal_new.signal_type != SignalType.CLOSE:
+                    # Не входим сразу по цене закрытия 5min-бара — ждём до 5 минутных
+                    # свечей подтверждения движения в сторону сигнала (момент входа
+                    # выбирается на 1min-данных), иначе входим по дедлайну как раньше.
+                    logger.info(f"New signal (pending 1min confirmation): {signal_new}")
+                    self.__pending_signal[candle.figi] = {"signal": signal_new, "ttl": 5}
+                elif signal_new:
+                    self.__handle_new_signal(account_id, candle, strategies, current_trade_order, signal_new)
 
-                    try:
-                        if signal_new.signal_type == SignalType.CLOSE:
-                            if current_trade_order:
-                                logger.info(f"Close position by close signal: {current_trade_order}")
-                                self.__exit_position(account_id, strategies[candle.figi], strategies, float(quotation_to_decimal(candle.close)), "close_signal")
-                            else:
-                                logger.info(f"New signal has been skipped. No open position to close.")
-
-                        elif current_trade_order:
-                            logger.info(f"New signal has been skipped. Previous signal is still alive.")
-
-                        elif candle.figi in self.__pending_orders:
-                            logger.info(f"New signal has been skipped. Ордер по тикеру уже в процессе размещения.")
-
-                        elif not self.__market_data_service.is_stock_ready_for_trading(candle.figi):
-                            logger.info(f"New signal has been skipped. Stock isn't ready for trading")
-
-                        elif bot_control.control.paused:
-                            logger.info(f"New signal has been skipped. Бот на паузе (TG /pause)")
-
-                        elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
-                            logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")
-
-                        elif self.__loss_cooldown_until.get(strategies[candle.figi].settings.ticker, datetime.datetime.min) \
-                                > datetime.datetime.utcnow():
-                            logger.info(
-                                f"New signal has been skipped. Кулдаун после убыточного закрытия до "
-                                f"{self.__loss_cooldown_until[strategies[candle.figi].settings.ticker].isoformat()}"
-                            )
-
-                        else:
-                            strategy = strategies[candle.figi]
-                            # signal_only = только Telegram, без реального ордера;
-                            # дашборд может форсировать sandbox глобально или для тикера
-                            is_signal_only = self.__overrides.signal_only_for(
-                                strategy.settings.ticker, getattr(strategy, 'signal_only', False)
-                            )
-
-                            if is_signal_only:
-                                logger.info(f"SIGNAL ONLY mode: {signal_new} (no order placed)")
-                                self.__blogger.open_position_message(
-                                    self.__today_trade_results.open_position(
-                                        candle.figi, "signal_only", signal_new
-                                    )
-                                )
-                            else:
-                                risk_ticker = strategy.settings.ticker
-                                direction = "long" if signal_new.signal_type == SignalType.LONG else "short"
-                                confidence = getattr(strategy, 'confidence', 0.7)
-
-                                risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
-                                if not risk_ok:
-                                    logger.info(f"New signal has been skipped. Risk gate: {risk_why}")
-                                    current_candles[candle.figi] = candle
-                                    continue
-
-                                entry_price = float(quotation_to_decimal(candle.close))
-                                stop_price = float(signal_new.stop_loss_level)
-                                risk_qty, risk_size_why = self.__risk.position_size(
-                                    entry_price, stop_price,
-                                    point_value=strategy.settings.point_value,
-                                    lot=strategy.settings.lot_size, confidence=confidence
-                                )
-                                logger.debug(f"Risk position_size: {risk_size_why}")
-
-                                cash_lots = self.__open_position_lots_count(
-                                    account_id,
-                                    strategy.settings.max_lots_per_order,
-                                    quotation_to_decimal(candle.close),
-                                    strategy.settings.lot_size,
-                                    margin_per_lot=Decimal(str(strategy.settings.margin_per_lot))
-                                    if strategy.settings.is_future else None
-                                )
-                                liquidity_lots = self.__liquidity_lots_cap(candle.figi, strategy.settings.lot_size)
-                                available_lots = min(cash_lots, risk_qty, liquidity_lots) if risk_qty > 0 else 0
-
-                                logger.debug(
-                                    f"Available lots: {available_lots} "
-                                    f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
-                                )
-                                if available_lots > 0:
-                                    # Размещение/репрайс ордера (__smart_order) может ждать
-                                    # до limit_reprice_interval_sec * limit_reprice_max_attempts
-                                    # (десятки секунд). await прямо тут блокировал бы чтение
-                                    # стрима свечей по ВСЕМ остальным тикерам — стопы/тейки по
-                                    # уже открытым позициям не проверялись бы это время. Гоним
-                                    # фоновой таской, помечаем figi как "ордер в процессе".
-                                    self.__pending_orders.add(candle.figi)
-                                    asyncio.create_task(self.__place_order_task(
-                                        account_id, candle.figi, available_lots, signal_new,
-                                        strategy, direction, confidence, entry_price, stop_price,
-                                    ))
-                                else:
-                                    logger.info(f"New signal has been skipped. No available money or risk budget")
-                    except Exception as ex:
-                        logger.error(f"Error open new position by new signal: {repr(ex)}")
+                pending = self.__pending_signal.get(candle.figi)
+                if pending:
+                    if current_trade_order:
+                        del self.__pending_signal[candle.figi]
+                    else:
+                        sig = pending["signal"]
+                        want_long = sig.signal_type == SignalType.LONG
+                        c_open = float(quotation_to_decimal(current_figi_candle.open))
+                        c_close = float(quotation_to_decimal(current_figi_candle.close))
+                        confirmed = (c_close >= c_open) if want_long else (c_close <= c_open)
+                        pending["ttl"] -= 1
+                        if confirmed or pending["ttl"] <= 0:
+                            del self.__pending_signal[candle.figi]
+                            self.__handle_new_signal(account_id, candle, strategies, current_trade_order, sig)
 
             current_candles[candle.figi] = candle
 
         logger.info("Today trading has been completed")
+
+    def __handle_new_signal(self, account_id, candle, strategies, current_trade_order, signal_new) -> None:
+        logger.info(f"New signal: {signal_new}")
+
+        try:
+            if signal_new.signal_type == SignalType.CLOSE:
+                if current_trade_order:
+                    logger.info(f"Close position by close signal: {current_trade_order}")
+                    self.__exit_position(account_id, strategies[candle.figi], strategies, float(quotation_to_decimal(candle.close)), "close_signal")
+                else:
+                    logger.info(f"New signal has been skipped. No open position to close.")
+
+            elif current_trade_order:
+                logger.info(f"New signal has been skipped. Previous signal is still alive.")
+
+            elif candle.figi in self.__pending_orders:
+                logger.info(f"New signal has been skipped. Ордер по тикеру уже в процессе размещения.")
+
+            elif not self.__market_data_service.is_stock_ready_for_trading(candle.figi):
+                logger.info(f"New signal has been skipped. Stock isn't ready for trading")
+
+            elif bot_control.control.paused:
+                logger.info(f"New signal has been skipped. Бот на паузе (TG /pause)")
+
+            elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
+                logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")
+
+            elif self.__loss_cooldown_until.get(strategies[candle.figi].settings.ticker, datetime.datetime.min) \
+                    > datetime.datetime.utcnow():
+                logger.info(
+                    f"New signal has been skipped. Кулдаун после убыточного закрытия до "
+                    f"{self.__loss_cooldown_until[strategies[candle.figi].settings.ticker].isoformat()}"
+                )
+
+            else:
+                strategy = strategies[candle.figi]
+                # signal_only = только Telegram, без реального ордера;
+                # дашборд может форсировать sandbox глобально или для тикера
+                is_signal_only = self.__overrides.signal_only_for(
+                    strategy.settings.ticker, getattr(strategy, 'signal_only', False)
+                )
+
+                if is_signal_only:
+                    logger.info(f"SIGNAL ONLY mode: {signal_new} (no order placed)")
+                    self.__blogger.open_position_message(
+                        self.__today_trade_results.open_position(
+                            candle.figi, "signal_only", signal_new
+                        )
+                    )
+                else:
+                    risk_ticker = strategy.settings.ticker
+                    direction = "long" if signal_new.signal_type == SignalType.LONG else "short"
+                    confidence = getattr(strategy, 'confidence', 0.7)
+
+                    risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
+                    if not risk_ok:
+                        logger.info(f"New signal has been skipped. Risk gate: {risk_why}")
+                        return
+
+                    entry_price = float(quotation_to_decimal(candle.close))
+                    stop_price = float(signal_new.stop_loss_level)
+                    risk_qty, risk_size_why = self.__risk.position_size(
+                        entry_price, stop_price,
+                        point_value=strategy.settings.point_value,
+                        lot=strategy.settings.lot_size, confidence=confidence
+                    )
+                    logger.debug(f"Risk position_size: {risk_size_why}")
+
+                    cash_lots = self.__open_position_lots_count(
+                        account_id,
+                        strategy.settings.max_lots_per_order,
+                        quotation_to_decimal(candle.close),
+                        strategy.settings.lot_size,
+                        margin_per_lot=Decimal(str(strategy.settings.margin_per_lot))
+                        if strategy.settings.is_future else None
+                    )
+                    liquidity_lots = self.__liquidity_lots_cap(candle.figi, strategy.settings.lot_size)
+                    available_lots = min(cash_lots, risk_qty, liquidity_lots) if risk_qty > 0 else 0
+
+                    logger.debug(
+                        f"Available lots: {available_lots} "
+                        f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
+                    )
+                    if available_lots > 0:
+                        # Размещение/репрайс ордера (__smart_order) может ждать
+                        # до limit_reprice_interval_sec * limit_reprice_max_attempts
+                        # (десятки секунд). await прямо тут блокировал бы чтение
+                        # стрима свечей по ВСЕМ остальным тикерам — стопы/тейки по
+                        # уже открытым позициям не проверялись бы это время. Гоним
+                        # фоновой таской, помечаем figi как "ордер в процессе".
+                        self.__pending_orders.add(candle.figi)
+                        asyncio.create_task(self.__place_order_task(
+                            account_id, candle.figi, available_lots, signal_new,
+                            strategy, direction, confidence, entry_price, stop_price,
+                        ))
+                    else:
+                        logger.info(f"New signal has been skipped. No available money or risk budget")
+        except Exception as ex:
+            logger.error(f"Error open new position by new signal: {repr(ex)}")
 
     def __summary_today_trade_results(
             self,

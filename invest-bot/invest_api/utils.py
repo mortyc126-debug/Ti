@@ -50,6 +50,21 @@ def candle_to_historiccandle(candle: Candle) -> HistoricCandle:
     )
 
 
+def aggcandle_to_historiccandle(agg, time) -> HistoricCandle:
+    """Конвертирует AggCandle (timeframe.py, float OHLCV из нескольких 1min-баров)
+    в HistoricCandle — чтобы стратегия считала сигнал на агрегированном 5min-баре
+    так же, как в бэктесте (там CANDLE_WINDOW=30 строится из 5min-свечей)."""
+    return HistoricCandle(
+        open=decimal_to_quotation(Decimal(str(agg.open))),
+        high=decimal_to_quotation(Decimal(str(agg.high))),
+        low=decimal_to_quotation(Decimal(str(agg.low))),
+        close=decimal_to_quotation(Decimal(str(agg.close))),
+        volume=agg.volume,
+        time=time,
+        is_complete=True
+    )
+
+
 def invest_api_retry_status_codes() -> set[StatusCode]:
     return {StatusCode.CANCELLED, StatusCode.DEADLINE_EXCEEDED, StatusCode.RESOURCE_EXHAUSTED,
             StatusCode.FAILED_PRECONDITION, StatusCode.ABORTED, StatusCode.INTERNAL,
