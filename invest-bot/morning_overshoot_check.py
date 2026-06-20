@@ -16,31 +16,42 @@ morning_overshoot_check.py — разовая проверка гипотезы 
 Не запускался в этой среде — нет сетевого доступа к invest-public-api
 (см. egress allowlist). Логика проверена только синтаксически (ast.parse).
 
+У этой версии tinkoff-investments SDK нет секундных интервалов (только от
+CANDLE_INTERVAL_1_MIN) — гипотезу про "доли секунды" этим способом не
+проверить напрямую, но overshoot ВНУТРИ первой минуты всё равно виден через
+high/low этой свечи: если толпа на открытии прыгнула выше/ниже итоговой
+цены минуты, это уйдёт в хвост (high или low), а не в close.
+
 Запуск:
     python morning_overshoot_check.py --days 20 [--base-tickers SBER,GAZP,LKOH]
-    [--settle-after-sec 300]
+    [--settle-after-min 5]
 
 Для каждого фьюча по [FUTURES_TRADING] BASE_TICKERS (или --base-tickers):
-  1. Тянем 5-секундные свечи фьюча за --days дней (CANDLE_INTERVAL_5_SEC,
-     лимит API на сек-интервалы — данные за сутки на запрос, поэтому только
-     по дням, не больше --days).
-  2. "Выброс" = ПЕРВАЯ свеча торгов дня. Намеренно не ищем "самую экстремальную
-     свечу за первую минуту" — это было бы forward-looking: в реальной
-     торговле момент пика неизвестен заранее, пока он не позади.
-  3. "Равновесная" цена — close фьюча через --settle-after-sec секунд после
-     выброса (где цена устоялась после открытия).
-  4. overshoot_pct = (цена выброса - равновесная цена) / равновесная цена —
-     насколько далеко был выброс от уровня, на котором цена устоялась.
+  1. Тянем 1-минутные свечи фьюча за --days дней (CANDLE_INTERVAL_1_MIN).
+  2. "Выброс" = high/low ПЕРВОЙ минутной свечи торгов дня (не close —
+     именно хвост свечи ловит внутриминутный скачок, даже если цена к
+     закрытию минуты уже откатилась).
+  3. "Равновесная" цена — close фьюча через --settle-after-min минут после
+     открытия (где цена устоялась после открытия).
+  4. overshoot_pct = max(
+         (high_первой_свечи - равновесная) / равновесная,
+         (равновесная - low_первой_свечи) / равновесная
+     ) — берём то направление хвоста, что дальше от итоговой цены; это и
+     есть мера "насколько далеко был выброс от уровня, на котором цена
+     устоялась" с точностью до 1 минуты (без секундной детализации не
+     различить ушёл ли хвост вверх и вниз ОДНОВРЕМЕННО или по очереди).
   5. Печатаем: число дней, среднюю |overshoot_pct|, долю дней, где
      |overshoot_pct| превышает комиссию круга по фьючу (0.08%) — то есть
      теоретически окупила бы fade-сделку (без учёта реального
      проскальзывания/задержки исполнения на открытии, которая в первые
-     секунды торгов может быть больше, чем на спокойном рынке).
+     секунды торгов может быть больше, чем на спокойном рынке, и без
+     учёта того, что внутри минуты вход по хвосту физически недостижим
+     лимит-ордером без удачи — это верхняя граница потенциала, не гарантия).
 
 Если |overshoot_pct| в среднем меньше комиссии или сопоставим с обычным
-шумом 5-сек бара — выброса, который можно было бы выгодно зафейдить, либо
-нет, либо его съедает комиссия/проскальзывание, и идею лучше не встраивать
-в живую торговлю.
+размахом любой минутной свечи фьюча (не только первой) — выброса, который
+можно было бы выгодно зафейдить, либо нет, либо его съедает комиссия/
+проскальзывание, и идею лучше не встраивать в живую торговлю.
 """
 import argparse
 import statistics
@@ -60,6 +71,14 @@ def _close(c) -> float:
     return float(quotation_to_decimal(c.close))
 
 
+def _high(c) -> float:
+    return float(quotation_to_decimal(c.high))
+
+
+def _low(c) -> float:
+    return float(quotation_to_decimal(c.low))
+
+
 def _by_day(candles) -> dict:
     days: dict[str, list] = defaultdict(list)
     for c in candles:
@@ -69,29 +88,31 @@ def _by_day(candles) -> dict:
     return days
 
 
-def _settle_price(day_candles: list, settle_after_sec: int) -> float | None:
-    """close первой свечи через >= settle_after_sec секунд после открытия дня."""
+def _settle_price(day_candles: list, settle_after_min: int) -> float | None:
+    """close первой свечи через >= settle_after_min минут после открытия дня."""
     day_start = day_candles[0].time
     for c in day_candles[1:]:
-        if (c.time - day_start).total_seconds() >= settle_after_sec:
+        if (c.time - day_start).total_seconds() >= settle_after_min * 60:
             return _close(c)
     return None
 
 
 def analyze_future(ticker: str, figi_future: str, market_data: MarketDataService,
-                    days: int, settle_after_sec: int) -> None:
-    candles = market_data.get_candles_history(figi_future, days=days, interval=CandleInterval.CANDLE_INTERVAL_5_SEC)
+                    days: int, settle_after_min: int) -> None:
+    candles = market_data.get_candles_history(figi_future, days=days, interval=CandleInterval.CANDLE_INTERVAL_1_MIN)
     by_day = _by_day(candles)
 
     overshoots = []
     for day, day_candles in by_day.items():
         if not day_candles:
             continue
-        spike_price = _close(day_candles[0])
-        settle = _settle_price(day_candles, settle_after_sec)
+        first = day_candles[0]
+        settle = _settle_price(day_candles, settle_after_min)
         if settle is None or settle == 0:
             continue
-        overshoots.append((spike_price - settle) / settle)
+        overshoot_up = (_high(first) - settle) / settle
+        overshoot_down = (settle - _low(first)) / settle
+        overshoots.append(overshoot_up if overshoot_up >= overshoot_down else -overshoot_down)
 
     n = len(overshoots)
     if n < 5:
@@ -113,7 +134,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=20)
     parser.add_argument("--base-tickers", type=str, default="")
-    parser.add_argument("--settle-after-sec", type=int, default=300)
+    parser.add_argument("--settle-after-min", type=int, default=5)
     args = parser.parse_args()
 
     config = ProgramConfiguration(CONFIG_FILE)
@@ -136,7 +157,7 @@ def main() -> None:
             continue
         future_settings, figi_future = future
 
-        analyze_future(future_settings.ticker, figi_future, market_data, args.days, args.settle_after_sec)
+        analyze_future(future_settings.ticker, figi_future, market_data, args.days, args.settle_after_min)
 
 
 if __name__ == "__main__":
