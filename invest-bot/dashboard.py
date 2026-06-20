@@ -35,6 +35,7 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
+import multiprocessing
 import time
 import traceback
 from collections import defaultdict
@@ -97,7 +98,28 @@ _archive = ArchiveStore()
 # Скан __compute_composite() на каждом баре (Hawkes-MLE через scipy.optimize)
 # — CPU-bound, кэш свечей тут не помогает. Гоняем тикеры параллельно по
 # процессам (не по тредам — GIL не отпускается на каждой scipy-итерации).
-BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", "4"))
+# Раньше дефолт был 4 "на глаз" — теперь берём число ядер минус один (не
+# забирать всю машину под бэктест), но не меньше 4: на машинах с < 6 ядрами
+# BLAS уже ограничен одним тредом на процесс (см. выше), так что 1 ядро на
+# процесс — это нижняя граница, ниже которой просто меньше параллелизма.
+BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", max(4, (os.cpu_count() or 4) - 1)))
+
+# Прогресс по тикерам во время прогона (грузим ли свечи, считаем ли сигналы,
+# готово/ошибка) — раньше дашборд не показывал НИЧЕГО, пока не закончатся
+# ВСЕ тикеры (run_backtest/run_portfolio_sim возвращали результат только
+# после as_completed по всем futures). ProcessPoolExecutor — отдельные
+# процессы, обычный dict между ними не шарится, нужен Manager().dict().
+_progress_manager = multiprocessing.Manager()
+_progress: dict = _progress_manager.dict()
+
+
+def _set_progress(ticker: str, status: str) -> None:
+    try:
+        _progress[ticker] = {"status": status, "ts": time.time()}
+    except Exception:
+        # Manager-процесс может быть недоступен на shutdown — прогресс это
+        # необязательный UI-сахар, не должен валить сам прогон.
+        pass
 
 # Дефолтные настройки сигнала для тикеров, импортированных из OI (у них
 # нет [STRATEGY_<TICKER>] в settings.ini — только тикер+FIGI) — берём те же
@@ -343,30 +365,36 @@ def run_backtest_one(
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         rows.append({"ticker": ticker, "mode": "ошибка", "error": "нет в settings.ini"})
+        _set_progress(ticker, "ошибка")
         return rows
 
     t0 = time.monotonic()
     logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
+    _set_progress(ticker, "загрузка свечей")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
         _wire_history(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
                          "error": "стратегия не поддерживает backtest_barriers"})
+            _set_progress(ticker, "пропуск")
             return rows
 
         try:
             candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
+            _set_progress(ticker, "ошибка API")
             return rows
 
         if not candles:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
+            _set_progress(ticker, "нет истории")
             return rows
 
         logger.info(f"{ticker}: {len(candles)} свечей за {time.monotonic() - t0:.1f}с, считаю сигналы "
                     f"(может занять минуту-две — внутри Hawkes-MLE на каждый бар)...")
+        _set_progress(ticker, f"скан сигналов ({len(candles)} свечей)")
         s = strategy_settings.settings
         long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
@@ -448,7 +476,10 @@ def run_backtest_one(
         logger.error(f"run_backtest {ticker}:\n{tb}")
         rows.append({"ticker": ticker, "mode": "ошибка", "error": tb.strip().splitlines()[-1],
                      "traceback": tb, "advice": advice})
+        _set_progress(ticker, "ошибка")
+        return rows
 
+    _set_progress(ticker, "готово")
     return rows
 
 
@@ -461,6 +492,9 @@ def run_backtest(
     Каждый тикер — это независимый дорогой CPU-bound скан (Hawkes-MLE на
     каждый бар), поэтому гоняем по процессам параллельно, а не по очереди.
     """
+    for ticker in tickers:
+        _set_progress(ticker, "в очереди")
+
     if len(tickers) <= 1:
         rows: list[dict] = []
         for ticker in tickers:
@@ -494,25 +528,32 @@ def _portfolio_sim_one_ticker(
     by_ticker = _strategy_settings_by_ticker()
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
+        _set_progress(ticker, "ошибка")
         return [], {"ticker": ticker, "error": "нет в settings.ini и не импортирован из OI"}
+    _set_progress(ticker, "загрузка свечей")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
         _wire_history(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
+            _set_progress(ticker, "пропуск")
             return [], None
 
         try:
             candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
         except RequestError as ex:
+            _set_progress(ticker, "ошибка API")
             return [], {"ticker": ticker, "error": str(ex.details)}
         if not candles:
+            _set_progress(ticker, "нет истории")
             return [], None
 
+        _set_progress(ticker, f"скан сигналов ({len(candles)} свечей)")
         signals = strategy.backtest_scan_signals(candles)
         trades: list[dict] = []
 
         if mode == "atr":
             if not signals:
+                _set_progress(ticker, "готово")
                 return [], None
             # Раньше тут был один sweep по ВСЕЙ истории тикера — лучшая по
             # expectancy_pct пара (tk, sk) подбиралась по тем же сделкам,
@@ -564,12 +605,14 @@ def _portfolio_sim_one_ticker(
                 t["ticker"] = ticker
                 trades.append(t)
 
+        _set_progress(ticker, "готово")
         return trades, None
 
     except Exception:
         tb = traceback.format_exc()
         advice = bug_council.analyze_bug(tb, f"dashboard run_portfolio_sim: ticker={ticker}, days={days}")
         logger.error(f"run_portfolio_sim {ticker}:\n{tb}")
+        _set_progress(ticker, "ошибка")
         return [], {"ticker": ticker, "error": tb.strip().splitlines()[-1], "traceback": tb, "advice": advice}
 
 
@@ -599,6 +642,9 @@ def run_portfolio_sim(
     """
     all_trades: list[dict] = []
     errors: list[dict] = []
+
+    for ticker in tickers:
+        _set_progress(ticker, "в очереди")
 
     if len(tickers) <= 1:
         results = [(t, _portfolio_sim_one_ticker(t, days, tariff, mode, atr_take_ks, atr_stop_ks))
@@ -827,6 +873,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <br><br>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <span id="status"></span>
+  <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
 </div>
 
@@ -850,6 +897,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <br><br>
   <button class="btn-pill" onclick="runPortfolioSim()">▶ ПРОГНАТЬ ПОРТФЕЛЬ</button>
   <span id="pf_status"></span>
+  <div id="pf_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="pf_summary"></div>
   <div class="sec" style="margin-top:14px;">По месяцам</div>
   <table class="scen-table" id="pf_monthly"></table>
@@ -1014,6 +1062,37 @@ function droppedToHtml(dropped) {{
   return html;
 }}
 
+let _progressTimer = null;
+
+function startProgressPolling(tickers, statusElId) {{
+  const el = document.getElementById(statusElId);
+  const statusRu = {{
+    'в очереди': 'в очереди', 'загрузка свечей': 'грузит свечи', 'готово': '✓ готово',
+    'ошибка': '✗ ошибка', 'ошибка API': '✗ ошибка API', 'нет истории': '— нет истории', 'пропуск': '— пропуск',
+  }};
+  const render = (progress) => {{
+    const parts = tickers.map(t => {{
+      const p = progress[t];
+      const status = p ? (statusRu[p.status] || p.status) : 'в очереди';
+      const cls = p && p.status === 'готово' ? 'color:var(--pos);' : (p && p.status.startsWith('ошибка') ? 'color:var(--neg);' : '');
+      return `<span style="${{cls}}">${{t}}: ${{status}}</span>`;
+    }});
+    el.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+  }};
+  render({{}});
+  _progressTimer = setInterval(async () => {{
+    try {{
+      const resp = await fetch('/api/progress');
+      const data = await resp.json();
+      render(data.progress || {{}});
+    }} catch (e) {{ /* сетевая ошибка опроса — не критично, просто не обновили */ }}
+  }}, 800);
+}}
+
+function stopProgressPolling() {{
+  if (_progressTimer) {{ clearInterval(_progressTimer); _progressTimer = null; }}
+}}
+
 async function runBacktest() {{
   const allTickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
   if (allTickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
@@ -1029,6 +1108,7 @@ async function runBacktest() {{
 
   document.getElementById('status').textContent =
     `Считаю ${{tickers.length}} тикер(ов) параллельно (до {backtest_workers} одновременно)...`;
+  startProgressPolling(tickers, 'status_detail');
   try {{
     const resp = await fetch('/api/backtest', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -1039,6 +1119,8 @@ async function runBacktest() {{
     table.innerHTML += rowsToHtml(data.rows);
   }} catch (e) {{
     table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
+  }} finally {{
+    stopProgressPolling();
   }}
   document.getElementById('status').textContent = `Готово: ${{tickers.length}} тикер(ов)`;
 }}
@@ -1100,8 +1182,14 @@ async function runPortfolioSim() {{
     atr_take: document.getElementById('atr_take').value,
     atr_stop: document.getElementById('atr_stop').value,
   }};
-  const resp = await fetch('/api/portfolio_sim', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(body)}});
-  const data = await resp.json();
+  startProgressPolling(tickers, 'pf_status_detail');
+  let data;
+  try {{
+    const resp = await fetch('/api/portfolio_sim', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(body)}});
+    data = await resp.json();
+  }} finally {{
+    stopProgressPolling();
+  }}
   document.getElementById('pf_status').textContent = '';
 
   const s = data.summary;
@@ -1322,6 +1410,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_overrides_payload())
         elif self.path == "/api/auto_atr":
             self._send_json({"rows": get_auto_atr_snapshot()})
+        elif self.path == "/api/progress":
+            self._send_json({"progress": dict(_progress)})
         else:
             self.send_error(404)
 
