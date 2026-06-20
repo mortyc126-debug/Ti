@@ -47,6 +47,7 @@ HISTORY_FILE = "data/history.json"
 DAYS_KEPT = 90
 EWA_ALPHA = 0.1
 MIN_OBS = 30  # минимум сделок до того как вес начинает отклоняться от 0.5
+REGIME_SHRINKAGE_K = 10  # Layer 6: псевдо-наблюдения к нейтральному 0.5 в regime_method_performance
 
 
 class HistoryStore:
@@ -214,8 +215,12 @@ class HistoryStore:
             self, ticker: str, window_days: int = 90
     ) -> dict[str, dict[str, float]]:
         """
-        Средняя точность каждого метода В КАЖДОМ режиме.
-        Возвращает {regime: {method: avg_quality}}.
+        Средняя точность каждого метода В КАЖДОМ режиме, со сжатием (Layer 6)
+        к нейтральному 0.5 по числу наблюдений: shrunk = (n*raw + k*0.5)/(n+k),
+        k=REGIME_SHRINKAGE_K. На малой выборке (типично для редких режимов типа
+        stress) raw avg_quality — шумная оценка; без сжатия она напрямую
+        превращалась в множитель веса (см. _reload_dynamic_regime_mods) и могла
+        дать множитель 2.0 по 1-2 сделкам. Возвращает {regime: {method: avg_quality}}.
         Используется для динамической замены захардкоженных REGIME_WEIGHT_MODS.
         """
         cutoff = self._cutoff(window_days)
@@ -236,8 +241,12 @@ class HistoryStore:
                               (score < 0 and direction == "SHORT")
                     acc[regime][method].append(q if aligned else 1.0 - q)
 
+        k = REGIME_SHRINKAGE_K
         return {
-            regime: {m: sum(v) / len(v) for m, v in methods.items() if v}
+            regime: {
+                m: (sum(v) + k * 0.5) / (len(v) + k)
+                for m, v in methods.items() if v
+            }
             for regime, methods in acc.items()
         }
 
