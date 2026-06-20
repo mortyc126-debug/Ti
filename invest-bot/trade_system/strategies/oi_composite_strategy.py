@@ -248,11 +248,19 @@ def _adaptive_threshold(base: float, regime: str) -> float:
     return base * mods.get(regime, 1.0)
 
 
-def _compute_atr(candles: list[HistoricCandle], period: int = ATR_PERIOD) -> float:
+def _compute_atr(candles: list[HistoricCandle], period: int = ATR_PERIOD, tail_q: float = 0.8) -> float:
     """
-    ATR (Average True Range) как доля цены: средний True Range за period баров,
-    делённый на последнюю цену. Фильтр против "мёртвых" инструментов, где
-    движение меньше комиссии (торговать бессмысленно).
+    Ширина волатильности как доля цены — не среднее True Range (как в
+    классическом ATR), а tail_q-квантиль True Range за окно из 3×period
+    баров (EVT-lite: "Block Maxima" в миниатюре — берём не среднее, а
+    хвостовое значение распределения движений).
+
+    Среднее по 14 барам сильно сглаживает резкие всплески: после спайка
+    волатильности оно ещё долго "помнит" спокойный период до него и
+    отстаёт от факта. Квантиль по более длинному окну реагирует быстрее
+    на смену режима и не недооценивает риск редких крупных движений —
+    отсюда и нереалистично узкие/широкие стопы, на которые жаловались
+    (ATR_TAKE_K/ATR_STOP_K умножали лагающую и заниженную оценку).
     """
     if len(candles) < 2:
         return 0.0
@@ -265,10 +273,13 @@ def _compute_atr(candles: list[HistoricCandle], period: int = ATR_PERIOD) -> flo
         trs.append(tr)
     if not trs:
         return 0.0
-    window = trs[-period:]
-    atr = sum(window) / len(window)
+    window = trs[-period * 3:]
     last_price = _to_f(candles[-1].close) or 1e-9
-    return atr / last_price
+    if len(window) < 5:
+        return (sum(window) / len(window)) / last_price
+    sorted_w = sorted(window)
+    idx = min(len(sorted_w) - 1, max(0, round(tail_q * (len(sorted_w) - 1))))
+    return sorted_w[idx] / last_price
 
 
 def score_price_trend(candles: list[HistoricCandle]) -> float:

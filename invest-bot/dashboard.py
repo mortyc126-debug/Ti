@@ -259,6 +259,42 @@ def fetch_mega_alert_tickers() -> dict:
     return {"added": [a["t"] for a in added], "dropped": dropped, "unresolved": unresolved, "n": n}
 
 
+def _model_stats_from_trades(trades: list[dict]) -> dict:
+    """Та же agree/disagree-агрегация, что в backtest_barriers.model_stats
+    (oi_composite_strategy.py) и run_portfolio_sim — нужна здесь отдельно,
+    т.к. walk-forward режим считает сделки по дням, а model_stats из
+    backtest_barriers по одному дню статистически бесполезен."""
+    tally = {m: {"agree_n": 0, "agree_win": 0, "agree_dur": 0.0, "disagree_n": 0, "disagree_win": 0, "disagree_dur": 0.0}
+             for m in ("m1", "m2", "m3")}
+    for t in trades:
+        dir_sign = 1 if t["direction"] == "LONG" else -1
+        dur = t.get("duration_min", 0.0)
+        for m in ("m1", "m2", "m3"):
+            m_sc = t.get(m, 0.0)
+            if m_sc == 0:
+                continue
+            tl = tally[m]
+            if (m_sc > 0) == (dir_sign > 0):
+                tl["agree_n"] += 1
+                tl["agree_win"] += int(t["win"])
+                tl["agree_dur"] += dur
+            else:
+                tl["disagree_n"] += 1
+                tl["disagree_win"] += int(t["win"])
+                tl["disagree_dur"] += dur
+    return {
+        m.upper() + "_CLUSTER": {
+            "agree_n": tl["agree_n"],
+            "agree_win_rate": tl["agree_win"] / tl["agree_n"] if tl["agree_n"] else None,
+            "agree_avg_duration_min": tl["agree_dur"] / tl["agree_n"] if tl["agree_n"] else None,
+            "disagree_n": tl["disagree_n"],
+            "disagree_win_rate": tl["disagree_win"] / tl["disagree_n"] if tl["disagree_n"] else None,
+            "disagree_avg_duration_min": tl["disagree_dur"] / tl["disagree_n"] if tl["disagree_n"] else None,
+        }
+        for m, tl in tally.items()
+    }
+
+
 def _what_if_from_trades(trades: list[dict]) -> dict:
     """Та же идея, что what_if в run_portfolio_sim, но без эквити-симуляции
     (на одном тикере счёт не строим) — просто n_trades/win_rate/avg_r/
@@ -342,21 +378,54 @@ def run_backtest_one(
         fixed_trades = fixed.pop("trades", [])
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades), **fixed})
 
-        best = None
-        for tk in atr_take_ks:
-            for sk in atr_stop_ks:
-                res = strategy.backtest_barriers(signals=signals, atr_take_k=tk, atr_stop_k=sk,
-                                                  return_trades=True, tariff=tariff)
-                if res["n_trades"] == 0:
-                    continue
-                if best is None or res["expectancy_pct"] > best[1]["expectancy_pct"]:
-                    best = ((tk, sk), res)
+        # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
+        # ДО текущего дня, торговля день — той же парой, что увидел бы живой
+        # бот (см. _portfolio_sim_one_ticker mode="atr"). Раньше пара выбиралась
+        # одним sweep'ом по всей истории сразу — подгонка под прошлое, отсюда
+        # нереалистичные комбинации и заметно худший винрейт вживую.
+        if signals:
+            by_day: dict = defaultdict(list)
+            for sig in signals:
+                et = sig["entry_time"]
+                day = et.date() if hasattr(et, "date") else str(et)[:10]
+                by_day[day].append(sig)
 
-        if best:
-            (tk, sk), res = best
-            best_trades = res.pop("trades", [])
-            rows.append({"ticker": ticker, "mode": f"ATR k={tk}/{sk}",
-                         "what_if": _what_if_from_trades(best_trades), **res})
+            chosen_k = (atr_take_ks[len(atr_take_ks) // 2], atr_stop_ks[len(atr_stop_ks) // 2])
+            past_signals: list[dict] = []
+            wf_trades: list[dict] = []
+            wf_results: list[dict] = []
+            for day in sorted(by_day.keys()):
+                day_signals = by_day[day]
+                if len(past_signals) >= AUTO_ATR_MIN_TRADES:
+                    best = None
+                    for tk in atr_take_ks:
+                        for sk in atr_stop_ks:
+                            r = strategy.backtest_barriers(signals=past_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                            tariff=tariff)
+                            if r["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                continue
+                            if best is None or r["expectancy_pct"] > best[1]:
+                                best = ((tk, sk), r["expectancy_pct"])
+                    if best is not None:
+                        chosen_k = best[0]
+                tk, sk = chosen_k
+                res = strategy.backtest_barriers(signals=day_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                  return_trades=True, tariff=tariff)
+                wf_results.append(res)
+                wf_trades.extend(res.get("trades", []))
+                past_signals.extend(day_signals)
+
+            n_total = sum(r["n_trades"] for r in wf_results)
+            if n_total:
+                wf_row = {
+                    "n_trades": n_total,
+                    "win_rate": sum(1 for t in wf_trades if t["win"]) / n_total,
+                    "avg_r": sum(t["r_multiple"] for t in wf_trades) / n_total,
+                    "expectancy_pct": sum(t["net_pct"] for t in wf_trades) / n_total,
+                    "model_stats": _model_stats_from_trades(wf_trades),
+                }
+                rows.append({"ticker": ticker, "mode": "ATR walk-forward",
+                             "what_if": _what_if_from_trades(wf_trades), **wf_row})
 
     except Exception:
         tb = traceback.format_exc()
