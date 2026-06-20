@@ -176,19 +176,22 @@ class InstrumentService:
                 if best_expiration is None or future.expiration_date < best_expiration:
                     best, best_figi, best_expiration = future, future.figi, future.expiration_date
 
-        if best is None:
-            logger.warning(f"future_by_base_ticker: контракт на {base_ticker} не найден")
-            return None
+            if best is None:
+                logger.warning(f"future_by_base_ticker: контракт на {base_ticker} не найден")
+                return None
 
-        margin_per_lot = max(
-            moneyvalue_to_decimal(best.initial_margin_on_buy),
-            moneyvalue_to_decimal(best.initial_margin_on_sell)
-        )
+            # ГО не приходит в самом Future из futures()-листинга — нужен
+            # отдельный вызов get_futures_margin(figi=...).
+            margin = client.instruments.get_futures_margin(figi=best_figi)
+            margin_per_lot = max(
+                moneyvalue_to_decimal(margin.initial_margin_on_buy),
+                moneyvalue_to_decimal(margin.initial_margin_on_sell)
+            )
 
-        # стоимость одного пункта цены: сколько рублей даёт движение цены на 1 шаг
-        min_step = moneyvalue_to_decimal(best.min_price_increment)
-        min_step_amount = moneyvalue_to_decimal(best.min_price_increment_amount)
-        point_value = float(min_step_amount / min_step) if min_step and min_step != 0 else 1.0
+            # стоимость одного пункта цены: сколько рублей даёт движение цены на 1 шаг
+            min_step = moneyvalue_to_decimal(margin.min_price_increment)
+            min_step_amount = moneyvalue_to_decimal(margin.min_price_increment_amount)
+            point_value = float(min_step_amount / min_step) if min_step and min_step != 0 else 1.0
 
         return FutureSettings(
             ticker=best.ticker,
