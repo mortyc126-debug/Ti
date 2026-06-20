@@ -151,6 +151,11 @@ class Trader:
         # требует скачивания истории по двум тикерам и тяжёлых numpy-вычислений
         # (transfer entropy / wavelet coherence), см. set_multi_ticker_provider.
         self.__multi_ticker_cache: dict[str, tuple] = {}
+        # future_ticker -> base_ticker (его акция), заполняется в
+        # __build_futures_strategies — используется __multi_ticker_signal,
+        # чтобы фьюч ставился в пару именно со своей акцией, а не с
+        # циркулярным соседом по алфавиту.
+        self.__future_base_ticker: dict[str, str] = {}
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -663,11 +668,25 @@ class Trader:
     ) -> float:
         """
         MULTI_TICKER провайдер: межинструментальный сигнал между ticker и
-        вторым тикером из сегодняшней корзины (детерминированно — следующий
-        по сортированному списку тикеров, по кругу). Направление — знак
-        transfer_entropy_score (информационный поток между рядами, см.
-        indicators_multi.py), отвзвешенный wavelet_coherence_score как
-        уверенностью в синхронности пары на средних горизонтах.
+        вторым тикером.
+
+        Если ticker — фьюч, открытый через [FUTURES_TRADING] (см.
+        __future_base_ticker, заполняется в __build_futures_strategies),
+        пара — его СОБСТВЕННАЯ акция-базис: цена фьюча на FORTS реально
+        подстраивается под цену акции с лагом (тонкий стакан single-stock
+        фьючерса), это не случайное соседство, а конкретная экономическая
+        связь. Раньше пара выбиралась детерминированно, но произвольно —
+        "следующий тикер по сортированному списку, по кругу" — то есть
+        фьюч на одну акцию мог попасть в пару с совершенно несвязанным
+        тикером, и сигнал не отражал реальный лид-лаг.
+        Для остальных тикеров (просто акции без привязанного фьюча в
+        сегодняшней корзине) пары не считается без явной связи — circular
+        fallback убран как источник шума без экономического смысла.
+
+        Направление — знак transfer_entropy_score (информационный поток
+        между рядами, см. indicators_multi.py), отвзвешенный
+        wavelet_coherence_score как уверенностью в синхронности пары на
+        средних горизонтах.
 
         Тяжёлые вычисления (скачивание истории, numpy) — раз в день на
         тикер, кэшируется в self.__multi_ticker_cache; между пересчётами
@@ -678,15 +697,26 @@ class Trader:
         if cached and cached[0] == today:
             return cached[1]
 
-        tickers = sorted(today_trade_strategies.keys())
-        if len(tickers) < 2:
+        figis = list(today_trade_strategies.keys())
+        figi_self = next((f for f in figis if today_trade_strategies[f].settings.ticker == ticker), None)
+        if figi_self is None:
             self.__multi_ticker_cache[ticker] = (today, 0.0)
             return 0.0
 
-        figi_self = next((f for f in tickers if today_trade_strategies[f].settings.ticker == ticker), None)
-        if figi_self is None:
+        peer_ticker_target = self.__future_base_ticker.get(ticker)
+        if peer_ticker_target is None:
+            # Без привязанного фьюч/акция-пары считать нечего — циркулярный
+            # сосед по алфавиту не имеет экономического смысла.
+            self.__multi_ticker_cache[ticker] = (today, 0.0)
             return 0.0
-        peer_figi = tickers[(tickers.index(figi_self) + 1) % len(tickers)]
+        peer_figi = next(
+            (f for f in figis if today_trade_strategies[f].settings.ticker == peer_ticker_target), None
+        )
+        if peer_figi is None:
+            # Базовая акция сегодня не торгуется ботом (нет в STRATEGY_*/
+            # MEGA-ALERTS) — нет свечей для пары, сигнал недоступен.
+            self.__multi_ticker_cache[ticker] = (today, 0.0)
+            return 0.0
 
         try:
             from indicators_multi import transfer_entropy_score, wavelet_coherence_score
@@ -1643,6 +1673,7 @@ class Trader:
             strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
             if not strategy:
                 continue
+            self.__future_base_ticker[future_settings.ticker] = base_ticker
             logger.info(
                 f"FUTURES: {base_ticker} -> {future_settings.ticker} (figi={figi}), "
                 f"ГО за лот={future_settings.margin_per_lot:.2f} ₽, экспирация={future_settings.expiration_date}"
