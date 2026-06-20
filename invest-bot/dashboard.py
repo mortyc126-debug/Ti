@@ -57,7 +57,9 @@ from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
 from runtime_overrides import load_overrides, save_overrides
 from trade_system.issuer_filter import issuer_key, select_top_tickers
-from trade_system.strategies.oi_composite_strategy import AUTO_ATR_MIN_TRADES, AUTO_ATR_STOP_KS, AUTO_ATR_TAKE_KS
+from trade_system.strategies.oi_composite_strategy import (
+    AUTO_ATR_MIN_TRADES, AUTO_ATR_SCALE_EXPS, AUTO_ATR_STOP_KS, AUTO_ATR_TAKE_KS,
+)
 from trade_system.strategies.strategy_factory import StrategyFactory
 
 CONFIG_FILE = "settings.ini"
@@ -328,7 +330,7 @@ def _what_if_from_trades(trades: list[dict]) -> dict:
 
 def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
-        tariff: str | None = None,
+        tariff: str | None = None, atr_scale_exps: list[float] | None = None,
 ) -> list[dict]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает список строк-результатов
@@ -390,7 +392,9 @@ def run_backtest_one(
                 day = et.date() if hasattr(et, "date") else str(et)[:10]
                 by_day[day].append(sig)
 
-            chosen_k = (atr_take_ks[len(atr_take_ks) // 2], atr_stop_ks[len(atr_stop_ks) // 2])
+            scale_exps = atr_scale_exps if atr_scale_exps else list(AUTO_ATR_SCALE_EXPS)
+            chosen_k = (atr_take_ks[len(atr_take_ks) // 2], atr_stop_ks[len(atr_stop_ks) // 2],
+                        scale_exps[len(scale_exps) // 2])
             past_signals: list[dict] = []
             wf_trades: list[dict] = []
             wf_results: list[dict] = []
@@ -408,17 +412,18 @@ def run_backtest_one(
                     best = None
                     for tk in atr_take_ks:
                         for sk in atr_stop_ks:
-                            r = strategy.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                            tariff=tariff, record_history=False)
-                            if r["n_trades"] < AUTO_ATR_MIN_TRADES:
-                                continue
-                            if best is None or r["expectancy_pct"] > best[1]:
-                                best = ((tk, sk), r["expectancy_pct"])
+                            for ex in scale_exps:
+                                r = strategy.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                                atr_scale_exp=ex, tariff=tariff, record_history=False)
+                                if r["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                    continue
+                                if best is None or r["expectancy_pct"] > best[1]:
+                                    best = ((tk, sk, ex), r["expectancy_pct"])
                     if best is not None:
                         chosen_k = best[0]
-                tk, sk = chosen_k
+                tk, sk, ex = chosen_k
                 res = strategy.backtest_barriers(signals=day_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                  return_trades=True, tariff=tariff)
+                                                  atr_scale_exp=ex, return_trades=True, tariff=tariff)
                 wf_results.append(res)
                 wf_trades.extend(res.get("trades", []))
                 past_signals.extend(day_signals)
@@ -481,6 +486,7 @@ def run_backtest(
 def _portfolio_sim_one_ticker(
         ticker: str, days: int, tariff: str | None,
         mode: str, atr_take_ks: list[float] | None, atr_stop_ks: list[float] | None,
+        atr_scale_exps: list[float] | None = None,
 ) -> tuple[list[dict], dict | None]:
     """Считает сделки одного тикера для портфельной симуляции. Выделено в
     отдельную функцию, чтобы гонять тикеры параллельно по процессам
@@ -516,13 +522,14 @@ def _portfolio_sim_one_ticker(
             # увидел бы живой бот, без подглядывания в свои будущие сделки.
             grid_take = list(atr_take_ks or AUTO_ATR_TAKE_KS)
             grid_stop = list(atr_stop_ks or AUTO_ATR_STOP_KS)
+            grid_exp = list(atr_scale_exps or AUTO_ATR_SCALE_EXPS)
             by_day: dict = defaultdict(list)
             for sig in signals:
                 et = sig["entry_time"]
                 day = et.date() if hasattr(et, "date") else str(et)[:10]
                 by_day[day].append(sig)
 
-            chosen_k = (grid_take[len(grid_take) // 2], grid_stop[len(grid_stop) // 2])
+            chosen_k = (grid_take[len(grid_take) // 2], grid_stop[len(grid_stop) // 2], grid_exp[len(grid_exp) // 2])
             past_signals: list[dict] = []
             for day in sorted(by_day.keys()):
                 day_signals = by_day[day]
@@ -530,20 +537,21 @@ def _portfolio_sim_one_ticker(
                     best = None
                     for tk in grid_take:
                         for sk in grid_stop:
-                            r = strategy.backtest_barriers(signals=past_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                            tariff=tariff)
-                            if r["n_trades"] < AUTO_ATR_MIN_TRADES:
-                                continue
-                            if best is None or r["expectancy_pct"] > best[1]:
-                                best = ((tk, sk), r["expectancy_pct"])
+                            for ex in grid_exp:
+                                r = strategy.backtest_barriers(signals=past_signals, atr_take_k=tk, atr_stop_k=sk,
+                                                                atr_scale_exp=ex, tariff=tariff)
+                                if r["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                    continue
+                                if best is None or r["expectancy_pct"] > best[1]:
+                                    best = ((tk, sk, ex), r["expectancy_pct"])
                     if best is not None:
                         chosen_k = best[0]
-                tk, sk = chosen_k
+                tk, sk, ex = chosen_k
                 res = strategy.backtest_barriers(signals=day_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                  return_trades=True, tariff=tariff)
+                                                  atr_scale_exp=ex, return_trades=True, tariff=tariff)
                 for t in res.get("trades", []):
                     t["ticker"] = ticker
-                    t["atr_k"] = f"{tk}/{sk}"
+                    t["atr_k"] = f"{tk}/{sk}/{ex}"
                     trades.append(t)
                 past_signals.extend(day_signals)
         else:
