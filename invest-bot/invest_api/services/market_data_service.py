@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -11,6 +12,13 @@ from invest_api.invest_error_decorators import invest_error_logging, invest_api_
 __all__ = ("MarketDataService")
 
 logger = logging.getLogger(__name__)
+
+# Tinkoff лимитирует get_candles ~600 запросов/60с суммарно на все процессы
+# (см. RESOURCE_EXHAUSTED в логах при параллельном бэктесте BACKTEST_WORKERS
+# тикеров с холодным D1-кэшем). Пауза между дневными запросами внутри одного
+# тикера держит суммарную нагрузку нескольких параллельных воркеров safely
+# под лимитом (4 воркера * ~2 запроса/с ≈ 480/60с).
+CANDLE_REQUEST_DELAY = 0.5
 
 
 class MarketDataService:
@@ -66,6 +74,9 @@ class MarketDataService:
 
     @invest_api_retry()
     @invest_error_logging
+    def __get_candles_one_day(self, client, figi, day_from, day_to, interval):
+        return client.market_data.get_candles(figi=figi, from_=day_from, to=day_to, interval=interval)
+
     def get_candles_history(
             self,
             figi: str,
@@ -78,26 +89,27 @@ class MarketDataService:
         накопленной внутри процесса истории (например, найденных через
         MEGA-ALERTS). 5-минутный интервал лимитирован API одним днём за
         запрос — тянем по дням и склеиваем.
+
+        Ретраи теперь на уровне одного дня (__get_candles_one_day), а не всего
+        метода: иначе RESOURCE_EXHAUSTED на дне 100 из 150 заново перекачивал
+        бы все 99 уже успешных дней. CANDLE_REQUEST_DELAY между запросами —
+        чтобы при нескольких параллельных тикерах (BACKTEST_WORKERS) не
+        выбивать общий rate-limit Tinkoff (600 запросов/60с на все процессы).
         """
         result: list[HistoricCandle] = []
         now = datetime.now(timezone.utc)
         with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             for day in range(days, 0, -1):
+                if day != days:
+                    time.sleep(CANDLE_REQUEST_DELAY)
                 day_to = now - timedelta(days=day - 1)
                 day_from = now - timedelta(days=day)
-                response = client.market_data.get_candles(
-                    figi=figi,
-                    from_=day_from,
-                    to=day_to,
-                    interval=interval
-                )
+                response = self.__get_candles_one_day(client, figi, day_from, day_to, interval)
                 result.extend(c for c in response.candles if c.is_complete)
 
         logger.debug(f"Candles history for {figi}: {len(result)} баров за {days} дней")
         return result
 
-    @invest_api_retry()
-    @invest_error_logging
     def get_candles_for_dates(
             self,
             figi: str,
@@ -107,19 +119,16 @@ class MarketDataService:
         """
         Свечи только за конкретные календарные даты (`date` объекты) — для
         докачки недостающих дней архива (candle_archive.py), без повторного
-        запроса уже закэшированных дней.
+        запроса уже закэшированных дней. Ретраи/пауза — см. get_candles_history.
         """
         result: list[HistoricCandle] = []
         with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
-            for day in dates:
+            for i, day in enumerate(dates):
+                if i:
+                    time.sleep(CANDLE_REQUEST_DELAY)
                 day_from = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
                 day_to = day_from + timedelta(days=1)
-                response = client.market_data.get_candles(
-                    figi=figi,
-                    from_=day_from,
-                    to=day_to,
-                    interval=interval
-                )
+                response = self.__get_candles_one_day(client, figi, day_from, day_to, interval)
                 result.extend(c for c in response.candles if c.is_complete)
 
         logger.debug(f"Candles for dates {figi}: {len(result)} баров за {len(dates)} дней")
