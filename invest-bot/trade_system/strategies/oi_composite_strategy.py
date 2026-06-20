@@ -610,26 +610,38 @@ def score_yz_vol_signal(candles: list[HistoricCandle]) -> float:
     return 0.0
 
 
-def score_vr_signal(candles: list[HistoricCandle]) -> float:
+def _variance_ratio(candles: list[HistoricCandle], q: int = 4) -> Optional[float]:
     """
-    VR_SIGNAL: Variance Ratio VR(q=4) — отношение дисперсии q-периодных
-    доходностей к q×дисперсии однопериодных. VR > 1 — тренд/персистентность
-    (момент), VR < 1 — возврат к среднему. VR>1.3 → +0.5, VR<0.7 → −0.5.
+    Variance Ratio VR(q) — отношение дисперсии q-периодных доходностей к
+    q×дисперсии однопериодных. VR > 1 — тренд/персистентность (момент),
+    VR < 1 — возврат к среднему (шум). None — недостаточно данных.
+    Вынесено из score_vr_signal, чтобы то же сырое число использовать для
+    адаптации ширины стопа (см. __noise_stop_scale), не только для голоса
+    в композите.
     """
     closes = [_to_f(c.close) for c in candles]
     rets = _log_returns(closes)
-    q = 4
     if len(rets) < q * 3:
-        return 0.0
+        return None
     var1 = statistics.pvariance(rets)
     if var1 <= 0:
-        return 0.0
+        return None
     # q-периодные перекрывающиеся суммы доходностей
     q_sums = [sum(rets[i:i + q]) for i in range(len(rets) - q + 1)]
     if len(q_sums) < 2:
-        return 0.0
+        return None
     varq = statistics.pvariance(q_sums)
-    vr = varq / (q * var1)
+    return varq / (q * var1)
+
+
+def score_vr_signal(candles: list[HistoricCandle]) -> float:
+    """
+    VR_SIGNAL: VR>1.3 → +0.5 (тренд), VR<0.7 → −0.5 (возврат к среднему),
+    иначе нейтрально. См. _variance_ratio.
+    """
+    vr = _variance_ratio(candles)
+    if vr is None:
+        return 0.0
     if vr > 1.3:
         return 0.5
     if vr < 0.7:
@@ -1321,6 +1333,10 @@ class OICompositeStrategy(IStrategy):
                     # (attribution effWR в ClusterModels), как в живой торговле.
                     "method_scores": dict(self.__last_scores),
                     "regime": self.__last_regime,
+                    # Шумовой множитель стопа на момент входа (см.
+                    # __noise_stop_scale) — чтобы backtest_barriers мог
+                    # повторить ту же адаптацию, что и в живой торговле.
+                    "noise_scale": self.__noise_stop_scale(),
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
@@ -1398,6 +1414,10 @@ class OICompositeStrategy(IStrategy):
             else:
                 take_dist = abs(float(take_mult) - 1.0)
                 stop_dist = abs(float(stop_mult) - 1.0)
+            # Та же шумовая адаптация стопа, что и в live (__noise_stop_scale,
+            # записан в сигнал на момент входа в backtest_scan_signals) —
+            # иначе backtest не отражает реальное поведение стратегии.
+            stop_dist *= sig.get("noise_scale", 1.0)
 
             if direction == SignalType.LONG:
                 take_price = entry * (1 + take_dist)
@@ -1759,6 +1779,27 @@ class OICompositeStrategy(IStrategy):
         except Exception:
             logger.exception(f"{self.__settings.ticker}: авто-подбор ATR_TAKE_K/ATR_STOP_K упал")
 
+    def __noise_stop_scale(self) -> float:
+        """
+        Адаптивный множитель ширины стопа по Variance Ratio (_variance_ratio,
+        тот же расчёт что в VR_SIGNAL) — "в моменте", на текущем окне свечей.
+        VR<0.7 — движение шумовое/возвратное: узкий стоп оправдан, шанс на
+        устойчивое продолжение низкий, держать широкий стоп — просто отдавать
+        больше при развороте. VR>1.3 — персистентный тренд: стопу нужен запас,
+        чтобы не выбивало обычным шумом внутри движения. Гладкая интерполяция
+        между порогами VR_SIGNAL (0.7/1.3), без скачков на границах.
+        """
+        vr = _variance_ratio(self.__candles)
+        if vr is None:
+            return 1.0
+        if vr <= 0.7:
+            return 0.7
+        if vr >= 1.3:
+            return 1.15
+        if vr <= 1.0:
+            return 0.7 + (vr - 0.7) / 0.3 * 0.3
+        return 1.0 + (vr - 1.0) / 0.3 * 0.15
+
     def __take_stop_mults(self, direction: SignalType, atr_pct: float) -> tuple[Decimal, Decimal]:
         """
         Множители take/stop. Если в settings заданы ATR_TAKE_K и ATR_STOP_K —
@@ -1766,18 +1807,26 @@ class OICompositeStrategy(IStrategy):
         Если не заданы, но подключён __atr_history_provider — используется
         авто-подобранная пара (__recalc_auto_atr). Иначе — фиксированные
         LONG_*/SHORT_* (полная обратная совместимость).
+
+        Ширина стопа (но не тейка) дополнительно масштабируется
+        __noise_stop_scale() — адаптация не только к волатильности (ATR%),
+        но и к тому, шумовое сейчас движение или трендовое.
         """
+        noise_scale = self.__noise_stop_scale()
         take_k = self.__atr_take_k if self.__atr_take_k is not None else self.__auto_atr_take_k
         stop_k = self.__atr_stop_k if self.__atr_stop_k is not None else self.__auto_atr_stop_k
         if take_k is not None and stop_k is not None and atr_pct > 0:
             take_off = Decimal(str(take_k * atr_pct))
-            stop_off = Decimal(str(stop_k * atr_pct))
+            stop_off = Decimal(str(stop_k * atr_pct * noise_scale))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
+        scale = Decimal(str(noise_scale))
         if direction == SignalType.LONG:
-            return self.__long_take, self.__long_stop
-        return self.__short_take, self.__short_stop
+            stop_off = (Decimal("1") - self.__long_stop) * scale
+            return self.__long_take, Decimal("1") - stop_off
+        stop_off = (self.__short_stop - Decimal("1")) * scale
+        return self.__short_take, Decimal("1") + stop_off
 
     def __make_signal(
             self,
