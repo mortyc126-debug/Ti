@@ -135,6 +135,16 @@ _progress_manager = None
 _progress: dict = {}
 _progress_lock = threading.Lock()
 
+# Кэш последнего готового результата /api/backtest и /api/portfolio_sim.
+# Без него: если HTTP-соединение оборвётся ПОСЛЕ того как сервер досчитал
+# результат, но ДО того как успел его отправить (на Windows такое бывает
+# из-за антивируса/файрвола/браузера, рвущих долгий синхронный POST —
+# прогресс по тикерам в /api/progress при этом уже дошёл до "готово", а
+# таблица результатов так и не появляется) — посчитанные данные просто
+# теряются и нужен полный повторный прогон. Фронтенд при сетевой ошибке
+# забирает их отсюда вместо повторного счёта.
+_last_result: dict[str, dict] = {}
+
 
 def _get_progress_proxy() -> dict:
     # ThreadingHTTPServer: GET /api/progress (опрос) и POST /api/backtest*
@@ -1187,7 +1197,21 @@ async function runBacktest() {{
     const data = await resp.json();
     table.innerHTML += rowsToHtml(data.rows);
   }} catch (e) {{
-    table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
+    // Соединение могло оборваться уже ПОСЛЕ того как сервер досчитал
+    // результат (видно по прогрессу — он дошёл до "готово"), но не успел
+    // отправить ответ. Пробуем забрать его из кэша вместо повторного счёта.
+    try {{
+      const r2 = await fetch('/api/last_result?kind=backtest');
+      const d2 = await r2.json();
+      if (d2 && d2.rows) {{
+        table.innerHTML += rowsToHtml(d2.rows);
+        table.innerHTML += `<tr><td colspan="6" style="color:var(--txt3);">⚠ соединение оборвалось, результат восстановлен из кэша</td></tr>`;
+      }} else {{
+        table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
+      }}
+    }} catch (e2) {{
+      table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
+    }}
   }} finally {{
     stopProgressPolling();
   }}
@@ -1253,13 +1277,31 @@ async function runPortfolioSim() {{
   }};
   startProgressPolling(tickers, 'pf_status_detail');
   let data;
+  let recovered = false;
   try {{
     const resp = await fetch('/api/portfolio_sim', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(body)}});
     data = await resp.json();
+  }} catch (e) {{
+    // Соединение могло оборваться уже ПОСЛЕ того как сервер досчитал
+    // результат (прогресс по тикерам дошёл до "готово"), но не успел
+    // отправить ответ — забираем его из кэша вместо тихого падения.
+    try {{
+      const r2 = await fetch('/api/last_result?kind=portfolio_sim');
+      data = await r2.json();
+      recovered = !!(data && data.summary);
+    }} catch (e2) {{
+      data = null;
+    }}
+    if (!recovered) {{
+      stopProgressPolling();
+      document.getElementById('pf_status').textContent = `сетевая ошибка: ${{e}}`;
+      return;
+    }}
   }} finally {{
     stopProgressPolling();
   }}
-  document.getElementById('pf_status').textContent = '';
+  document.getElementById('pf_status').textContent = recovered
+    ? '⚠ соединение оборвалось, результат восстановлен из кэша' : '';
 
   const s = data.summary;
   const sign = s.pnl_rub >= 0 ? 'var(--pos)' : 'var(--neg)';
@@ -1481,6 +1523,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"rows": get_auto_atr_snapshot()})
         elif self.path == "/api/progress":
             self._send_json({"progress": dict(_get_progress_proxy())})
+        elif self.path.startswith("/api/last_result"):
+            from urllib.parse import urlparse, parse_qs
+            kind = parse_qs(urlparse(self.path).query).get("kind", [""])[0]
+            cached = _last_result.get(kind)
+            self._send_json(cached if cached else {"missing": True})
         else:
             self.send_error(404)
 
@@ -1508,6 +1555,7 @@ class Handler(BaseHTTPRequestHandler):
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
             rows = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            _last_result["backtest"] = {"rows": rows}
             self._send_json({"rows": rows})
         elif self.path == "/api/portfolio_sim":
             tickers = payload.get("tickers", [])
@@ -1520,6 +1568,7 @@ class Handler(BaseHTTPRequestHandler):
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             result = run_portfolio_sim(tickers, days, account, risk_pct, tariff=tariff,
                                         mode=mode, atr_take_ks=atr_take_ks, atr_stop_ks=atr_stop_ks)
+            _last_result["portfolio_sim"] = result
             self._send_json(result)
         elif self.path == "/api/import_oi":
             oi_tickers = payload.get("tickers", [])
