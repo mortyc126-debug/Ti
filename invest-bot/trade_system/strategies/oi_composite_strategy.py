@@ -38,9 +38,12 @@ high_vol/low_vol/stress) применяется как множитель вес
 на "мусорных" сигналах, пока веса не накопят историю.
 
 Фильтры качества перед выдачей сигнала:
-  1. СОГЛАСИЕ МЕТОДОВ — хотя бы MIN_AGREE_METHODS методов высказались
-     (|score| >= AGREE_SCORE_MIN) в направлении composite. Иначе один
-     сильный метод может протащить сигнал, пока остальные молчат/против.
+  1. СОГЛАСИЕ МЕТОДОВ — взвешенная (EWA-весом метода) сила согласных
+     методов (|score| >= AGREE_SCORE_MIN) должна быть достаточной и
+     абсолютно (AGREE_STRENGTH_MIN), и относительно силы несогласных
+     (AGREE_SHARE_MIN). Раньше считался только сырой счёт методов — три
+     слабых согласных метода проходили гейт, даже если один сильный
+     (высоковесный) метод был против.
   2. ЛИКВИДНОСТЬ — последняя свеча не аномально тонкая относительно медианы
      объёма по окну (защита от шума на пустом стакане).
   3. СКОЛЬЗЯЩЕЕ КАЧЕСТВО — если последние сделки стратегии в среднем
@@ -131,8 +134,9 @@ WEIGHT_ALPHA = 0.1                 # скорость обучения EWA (0.1 
 MFE_MAE_BARS = 15                  # максимум баров для записи MFE/MAE
 
 # ── Фильтры качества сигнала ────────────────────────────────────────────────
-MIN_AGREE_METHODS = 3              # минимум методов согласны по направлению
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
+AGREE_STRENGTH_MIN = 0.5           # минимальная взвешенная сила согласных методов
+AGREE_SHARE_MIN = 0.55             # доля силы согласных от силы всех высказавшихся
 LIQUIDITY_MIN_RATIO = 0.3          # объём последней свечи >= 0.3 * медианы окна
 LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "плохая полоса"
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
@@ -1784,10 +1788,36 @@ class OICompositeStrategy(IStrategy):
             return 0.0
 
     def __methods_agree(self, scores: list[float], direction: SignalType) -> bool:
-        """Хотя бы MIN_AGREE_METHODS методов высказались (|score|>=AGREE_SCORE_MIN) за это направление."""
+        """
+        Гейт по взвешенной силе согласия, а не по сырому счёту методов:
+        раньше "3 любых метода с |score|>=0.15" пропускало сигналы, где
+        согласны три слабых/ненадёжных метода, а несогласен один сильный
+        (с высоким EWA-весом) — гейт это не видел. Теперь:
+          agree_strength = sum(weight[m] * |score[m]| for m согласных)
+          total_strength = sum(weight[m] * |score[m]| for m высказавшихся)
+        Пропускаем, если согласных силы достаточно АБСОЛЮТНО
+        (AGREE_STRENGTH_MIN) И они составляют достаточную ДОЛЮ от всей
+        высказавшейся силы (AGREE_SHARE_MIN) — это отсекает и "тихое"
+        согласие (мало кто высказался вообще), и "перетянутое" (сильное
+        несогласное меньшинство).
+        Берём только BASE_METHOD_NAMES — M1/M2/M3 в scores идут последними
+        и не входят в композит (см. __compute_composite), не должны
+        входить и в гейт по той же причине (двойной счёт).
+        """
         sign = 1 if direction == SignalType.LONG else -1
-        agree = sum(1 for s in scores if abs(s) >= AGREE_SCORE_MIN and (s > 0) == (sign > 0))
-        return agree >= MIN_AGREE_METHODS
+        n_base = len(BASE_METHOD_NAMES)
+        agree_strength = 0.0
+        total_strength = 0.0
+        for name, s in zip(BASE_METHOD_NAMES, scores[:n_base]):
+            if abs(s) < AGREE_SCORE_MIN:
+                continue
+            strength = self.__weights[name].weight * abs(s)
+            total_strength += strength
+            if (s > 0) == (sign > 0):
+                agree_strength += strength
+        if total_strength <= 0:
+            return False
+        return agree_strength >= AGREE_STRENGTH_MIN and agree_strength / total_strength >= AGREE_SHARE_MIN
 
     def __liquidity_ok(self) -> bool:
         """Объём последней свечи не аномально мал относительно медианы окна."""
