@@ -89,5 +89,15 @@ class DbApiClient:
             self.__request("POST", "candles", {"ticker": ticker, "candles": candles[i:i + chunk]}, timeout=30)
 
     def get_candles(self, ticker: str, date_from: str, date_to: str) -> list[dict]:
-        result = self.__request("GET", f"candles/{ticker}?from={date_from}&to={date_to}")
-        return result.get("candles", []) if result else []
+        """
+        15с таймаута не хватает на выборку ~150 дней 5-минутных свечей из D1
+        (тысячи строк) — запрос падал по таймауту, архив читался как пустой,
+        и весь период перекачивался у Tinkoff заново, хотя был в кэше. Таймаут
+        выше (как у push_candles) + один повтор на случай разовой медленной
+        выборки/холодного старта D1.
+        """
+        for attempt in range(2):
+            result = self.__request("GET", f"candles/{ticker}?from={date_from}&to={date_to}", timeout=45)
+            if result is not None:
+                return result.get("candles", [])
+        return []
