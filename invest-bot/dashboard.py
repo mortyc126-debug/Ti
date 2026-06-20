@@ -36,6 +36,7 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
 import multiprocessing
+import threading
 import time
 import traceback
 from collections import defaultdict
@@ -132,13 +133,22 @@ _market_data_service_module.CANDLE_REQUEST_DELAY = max(
 # отдельный объект, обычная ссылка на модульный _progress не шарится.
 _progress_manager = None
 _progress: dict = {}
+_progress_lock = threading.Lock()
 
 
 def _get_progress_proxy() -> dict:
+    # ThreadingHTTPServer: GET /api/progress (опрос) и POST /api/backtest*
+    # выполняются в разных потоках и оба зовут эту функцию — без блокировки
+    # check-then-act на "_progress_manager is None" не атомарен, оба потока
+    # могут одновременно создать свой Manager(); тогда воркеры пишут в один
+    # dict, а /api/progress читает другой (тот, что выставился последним) —
+    # прогресс молча "теряется". Lock делает инициализацию однократной.
     global _progress_manager, _progress
     if _progress_manager is None:
-        _progress_manager = multiprocessing.Manager()
-        _progress = _progress_manager.dict()
+        with _progress_lock:
+            if _progress_manager is None:
+                _progress_manager = multiprocessing.Manager()
+                _progress = _progress_manager.dict()
     return _progress
 
 
