@@ -1,5 +1,7 @@
 import logging
+import time
 
+from grpc import StatusCode
 from tinkoff.invest import InvestError, RequestError, AioRequestError
 
 __all__ = ()
@@ -41,11 +43,30 @@ def invest_api_retry(retry_count: int = 5, exceptions: tuple = ( RequestError ))
 
                 try:
                     return func(*args, **kwargs)
-                except exceptions:
+                except exceptions as ex:
                     logger.error(f"Retry exception attempt: {attempts}")
+                    # Без паузы повторный запрос летит в тот же исчерпанный
+                    # rate-limit-окно и гарантированно падает ещё раз — особенно
+                    # на RESOURCE_EXHAUSTED (ratelimit_reset в metadata говорит,
+                    # сколько секунд ждать до сброса окна). Бэкофф: берём
+                    # ratelimit_reset, если он есть, иначе экспоненциально
+                    # растущую паузу.
+                    time.sleep(_retry_delay_seconds(ex, attempts))
 
             return func(*args, **kwargs)
 
         return errors_wrapper
 
     return errors_retry
+
+
+def _retry_delay_seconds(ex, attempt: int) -> float:
+    code = getattr(ex, "code", None)
+    metadata = getattr(ex, "metadata", None)
+    reset = getattr(metadata, "ratelimit_reset", None) if metadata else None
+    if code == StatusCode.RESOURCE_EXHAUSTED and reset:
+        try:
+            return float(reset) + 0.5
+        except (TypeError, ValueError):
+            pass
+    return min(2.0 ** attempt, 30.0)
