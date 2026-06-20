@@ -793,7 +793,11 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <span id="oi_status"></span>
   </div>
   <div class="chips" id="tickers">{ticker_checkboxes}</div>
-  <label>Дней истории <input type="number" class="inp mid" id="days" value="30" min="1" max="90"></label>
+  <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
+       (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
+       _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
+       короче 90 дней молчит почти весь прогон. -->
+  <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
   <label>Тариф комиссии <select class="inp" id="tariff">
