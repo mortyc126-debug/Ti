@@ -1153,7 +1153,13 @@ class Trader:
 
         price = float(quotation_to_decimal(candle.close))
         squeeze = self.__oi_layers.is_squeeze_risk(risk_ticker, pos.direction)
-        should_close, reason = self.__risk.check_exit(risk_ticker, price, squeeze=squeeze)
+        drift_per_bar, vol_per_bar = strategy.path_estimate()
+        regime_confidence = strategy.last_snapshot().get("regime_confidence", 1.0)
+        should_close, reason = self.__risk.check_exit(
+            risk_ticker, price, squeeze=squeeze,
+            drift_per_bar=drift_per_bar, vol_per_bar=vol_per_bar,
+            regime_confidence=regime_confidence,
+        )
         if should_close:
             logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")
             self.__exit_position(account_id, strategy, strategies, price, reason)

@@ -1681,6 +1681,23 @@ class OICompositeStrategy(IStrategy):
             "auto_atr_stop_k": self.__auto_atr_stop_k,
         }
 
+    def path_estimate(self, lookback: int = 20) -> tuple[float, float]:
+        """(дрифт за бар, волатильность за бар) в единицах цены по последним
+        `lookback` свечам — для оценки вероятности дойти до тейка/стопа
+        (risk.check_exit). Дрифт — это просто средний шаг цены за бар, а не
+        предсказание; намеренно простая оценка, без новых источников данных."""
+        candles = self.__candles[-lookback:]
+        if len(candles) < 3:
+            return 0.0, 0.0
+        closes = [_to_f(c.close) for c in candles]
+        diffs = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+        drift = sum(diffs) / len(diffs)
+        if len(diffs) > 1:
+            vol = statistics.pstdev(diffs)
+        else:
+            vol = abs(diffs[0])
+        return drift, vol
+
     def __score_oi_squeeze(self) -> float:
         """
         squeeze_up (риск для шорта — физики/юр.лица недавно крупно нарастили

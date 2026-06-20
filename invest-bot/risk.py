@@ -31,6 +31,8 @@ import json
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 
+import math
+
 from risk_config import (
     MAX_OPEN_POSITIONS, DAILY_MAX_LOSS_PCT,
     TRAIL_GIVEBACK_PCT, BREAKEVEN_AT_R, CHANDELIER_MULT,
@@ -39,9 +41,35 @@ from risk_config import (
     CORR_GROUPS, PORTFOLIO_RISK_MAX_PCT, PORTFOLIO_STOP_SQUEEZE,
     PARTIAL_TP_CLOSE_FRACTION, PARTIAL_TP_RETRACE_FRACTION,
     SCALE_OUT_EDGE_DECAY, SCALE_OUT_CLOSE_FRACTION,
+    PROB_EXIT_ENABLED, PROB_EXIT_MIN_PTAKE, PROB_EXIT_GRACE_R,
+    BOCD_EXIT_CONFIDENCE,
 )
 
 __all__ = ("Position", "RiskManager")
+
+
+def _first_passage_prob(dist_to_stop: float, dist_to_take: float,
+                          mu: float, sigma: float) -> float:
+    """P(дойти до тейка раньше стопа) для дрейфующего броуновского
+    движения с дрифтом mu (за бар, в пользу позиции) и волатильностью
+    sigma (за бар, в тех же единицах цены). Формула гамблера-банкрота."""
+    dist_to_stop = max(0.0, dist_to_stop)
+    dist_to_take = max(0.0, dist_to_take)
+    if dist_to_stop + dist_to_take <= 0:
+        return 1.0
+    if sigma <= 0:
+        return 1.0 if mu >= 0 else 0.0
+    if abs(mu) < 1e-12:
+        return dist_to_stop / (dist_to_stop + dist_to_take)
+    k = 2 * mu / (sigma * sigma)
+    try:
+        num = 1 - math.exp(-k * dist_to_stop)
+        den = 1 - math.exp(-k * (dist_to_stop + dist_to_take))
+    except OverflowError:
+        return 1.0 if mu > 0 else 0.0
+    if den == 0:
+        return dist_to_stop / (dist_to_stop + dist_to_take)
+    return max(0.0, min(1.0, num / den))
 
 log = logging.getLogger(__name__)
 
@@ -380,7 +408,10 @@ class RiskManager:
 
     def check_exit(self, ticker: str, price: float,
                     point_value: float = 1.0,
-                    squeeze: bool = False) -> tuple[bool, str]:
+                    squeeze: bool = False,
+                    drift_per_bar: float = 0.0,
+                    vol_per_bar: float = 0.0,
+                    regime_confidence: float = 1.0) -> tuple[bool, str]:
         """Вызывается на каждом обновлении цены. Возвращает (закрыть, причина)."""
         pos = self.positions.get(ticker)
         if not pos:
@@ -431,6 +462,26 @@ class RiskManager:
             if giveback > pos.peak_profit_rub * TRAIL_GIVEBACK_PCT / 100:
                 return True, (f"трейлинг: пик +{pos.peak_profit_rub:.0f}₽, "
                                f"отдали {giveback:.0f}₽ — фиксируем")
+
+        # Инвалидация гипотезы входа: стоп — аварийный выключатель, а не
+        # основной выход. Эти две проверки не трогают уже отработавшие
+        # сделки (pnl >= grace_r * risk_rub) — там рулит Chandelier/giveback.
+        grace = pos.risk_rub * PROB_EXIT_GRACE_R
+        if pnl < grace:
+            if (PROB_EXIT_ENABLED and pos.take_target
+                    and vol_per_bar > 0):
+                dist_stop = abs(price - pos.stop_price)
+                dist_take = abs(pos.take_target - price)
+                mu = drift_per_bar if pos.direction == "long" else -drift_per_bar
+                p_take = _first_passage_prob(dist_stop, dist_take, mu, vol_per_bar)
+                if p_take < PROB_EXIT_MIN_PTAKE:
+                    return True, (f"вероятность дойти до тейка упала до {p_take:.0%} "
+                                   f"(дрифт против движения) — закрываем")
+
+            if regime_confidence < BOCD_EXIT_CONFIDENCE:
+                return True, (f"смена режима рынка (BOCD): confidence={regime_confidence:.0%} "
+                               f"— гипотеза входа сломана")
+
         return False, ""
 
     def check_partial_take(self, ticker: str, price: float) -> tuple[bool, int, float]:
