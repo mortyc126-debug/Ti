@@ -369,8 +369,15 @@ class Trader:
                     pt["max_fav"] = min(pt["max_fav"], low_p)
                     pt["max_adv"] = max(pt["max_adv"], high_p)
 
-            # Обновляем tf-буфер и передаём режимы по тф в стратегию
-            _new5, _new1h = self.__tf_buffer.push(candle)
+            # Обновляем tf-буфер ТОЛЬКО закрытой минутной свечой — push(candle)
+            # с текущим (ещё формирующимся) candle здесь раньше вызывался на
+            # каждое промежуточное обновление потока (стрим шлёт обновления
+            # текущей минуты на каждую сделку внутри неё, а не только финальное
+            # закрытое значение), из-за чего "5-минутный"/"часовой" бар в
+            # MultiTfBuffer закрывался за случайное число тиков, а не за
+            # реальные 5/60 минут, и volume суммировался многократно.
+            if candle.time > current_figi_candle.time:
+                _new5, _new1h = self.__tf_buffer.push(current_figi_candle)
             if hasattr(strategies[candle.figi], "set_tf_regimes"):
                 tf_regimes = {"1min": strategies[candle.figi].last_snapshot().get("regime", "")}
                 if self.__tf_buffer.has_5min(candle.figi):
