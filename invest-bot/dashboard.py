@@ -104,6 +104,18 @@ _archive = ArchiveStore()
 # процесс — это нижняя граница, ниже которой просто меньше параллелизма.
 BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", max(4, (os.cpu_count() or 4) - 1)))
 
+# CANDLE_REQUEST_DELAY в market_data_service.py был откалиброван на 4
+# параллельных воркера (0.5с * 4 ≈ 480 запросов/60с, под лимитом Tinkoff
+# 600/60с). С тех пор как дефолт BACKTEST_WORKERS стал cpu_count()-1 (часто
+# больше 4), та же задержка на бОльшем числе процессов суммарно превышала
+# лимит → RESOURCE_EXHAUSTED при холодном кэше. Масштабируем задержку
+# пропорционально реальному числу воркеров, чтобы суммарный темп запросов
+# остался ~под тем же потолком независимо от BACKTEST_WORKERS.
+import invest_api.services.market_data_service as _market_data_service_module  # noqa: E402
+_market_data_service_module.CANDLE_REQUEST_DELAY = max(
+    _market_data_service_module.CANDLE_REQUEST_DELAY, 0.5 * BACKTEST_WORKERS / 4
+)
+
 # Прогресс по тикерам во время прогона (грузим ли свечи, считаем ли сигналы,
 # готово/ошибка) — раньше дашборд не показывал НИЧЕГО, пока не закончатся
 # ВСЕ тикеры (run_backtest/run_portfolio_sim возвращали результат только
