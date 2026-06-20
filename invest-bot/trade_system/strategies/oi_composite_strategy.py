@@ -1435,20 +1435,6 @@ class OICompositeStrategy(IStrategy):
                     continue
                 take_dist = atr_take_k * atr_pct
                 stop_dist = atr_stop_k * atr_pct
-                # Пол не уже проверенного fixed-уровня: ATR walk-forward
-                # систематически торгует теснее (в 3-4 раза короче держит
-                # позицию), потому что tail-quantile atr_pct на 5-мин барах
-                # обычно мельче, чем 1.5% fixed — независимо от выбранной
-                # (tk, sk) из сетки. Без пола сравнение fixed vs ATR нечестное:
-                # ATR не "адаптируется", а просто всегда уже.
-                if direction == SignalType.LONG:
-                    floor_take = abs(float(self.__long_take) - 1.0)
-                    floor_stop = abs(float(self.__long_stop) - 1.0)
-                else:
-                    floor_take = abs(float(self.__short_take) - 1.0)
-                    floor_stop = abs(float(self.__short_stop) - 1.0)
-                take_dist = max(take_dist, floor_take)
-                stop_dist = max(stop_dist, floor_stop)
             else:
                 take_dist = abs(float(take_mult) - 1.0)
                 stop_dist = abs(float(stop_mult) - 1.0)
@@ -1881,16 +1867,6 @@ class OICompositeStrategy(IStrategy):
         if take_k is not None and stop_k is not None and atr_pct > 0:
             take_off = Decimal(str(take_k * atr_pct))
             stop_off = Decimal(str(stop_k * atr_pct * noise_scale))
-            if self.__atr_take_k is None:
-                # Авто-подбор (__recalc_auto_atr), не явная настройка из
-                # settings.ini — пол не уже fixed LONG_*/SHORT_* (см. тот же
-                # пол в backtest_barriers, поставлен по тем же замерам).
-                if direction == SignalType.LONG:
-                    take_off = max(take_off, abs(self.__long_take - 1))
-                    stop_off = max(stop_off, abs(Decimal("1") - self.__long_stop))
-                else:
-                    take_off = max(take_off, abs(self.__short_take - 1))
-                    stop_off = max(stop_off, abs(self.__short_stop - 1))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
