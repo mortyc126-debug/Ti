@@ -102,6 +102,9 @@ class MarketDataService:
             for day in range(days, 0, -1):
                 if day != days:
                     time.sleep(CANDLE_REQUEST_DELAY)
+                done = days - day
+                if done and done % 20 == 0:
+                    logger.info(f"{figi}: получено {done}/{days} дней...")
                 day_to = now - timedelta(days=day - 1)
                 day_from = now - timedelta(days=day)
                 response = self.__get_candles_one_day(client, figi, day_from, day_to, interval)
@@ -126,6 +129,12 @@ class MarketDataService:
             for i, day in enumerate(dates):
                 if i:
                     time.sleep(CANDLE_REQUEST_DELAY)
+                # При докачке 100+ дней без этого лога долгий прогон выглядит
+                # как "зависло" — retry-бэкоффы на RESOURCE_EXHAUSTED молчат
+                # (logger.debug), и между стартовым и финальным INFO может
+                # пройти несколько минут без единой строчки в консоли.
+                if i and i % 20 == 0:
+                    logger.info(f"{figi}: докачано {i}/{len(dates)} дней...")
                 day_from = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
                 day_to = day_from + timedelta(days=1)
                 response = self.__get_candles_one_day(client, figi, day_from, day_to, interval)
