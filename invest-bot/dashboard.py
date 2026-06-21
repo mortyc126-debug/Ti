@@ -2107,24 +2107,69 @@ async function askCouncil() {{
     _draw();
   }};
 
+  // Кэш: cacheKey → {candles, trades} — не перезапрашиваем одно и то же
+  const _tcCache = {{}};
+
+  function _cacheKey(ticker, days, take, stop) {{
+    return `${{ticker}}::${{days}}::${{take}}::${{stop}}`;
+  }}
+
+  function _indexTrades(candles, trades) {{
+    const timeIdx = {{}};
+    candles.forEach((c, i) => {{ timeIdx[c.time] = i; }});
+    return trades.map(t => {{
+      const _findIdx = (iso) => {{
+        if (!iso) return null;
+        let idx = timeIdx[iso];
+        if (idx !== undefined) return idx;
+        const ms = new Date(iso).getTime();
+        let best = null, bestD = Infinity;
+        candles.forEach((c, i) => {{
+          const d = Math.abs(new Date(c.time).getTime() - ms);
+          if (d < bestD) {{ bestD = d; best = i; }}
+        }});
+        return best;
+      }};
+      return {{...t, _entry_i: _findIdx(t.entry_time), _exit_i: _findIdx(t.exit_time)}};
+    }});
+  }}
+
+  function _applyData(data) {{
+    _candles = data.candles;
+    _ticker = data.ticker;
+    _trades = _indexTrades(data.candles, data.trades || []);
+    _v0 = 0; _v1 = _candles.length - 1;
+    _resize();
+    document.getElementById('tc_status').textContent =
+      `${{_candles.length}} свечей, ${{_trades.length}} сделок (из кэша)`;
+  }}
+
   // Заполнить select тикерами из бэктеста; вызывается из runBacktest
   window.tcPopulateTickers = function(tickers, days, atrTake, atrStop) {{
     const sel = document.getElementById('tc_ticker');
     sel.innerHTML = tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('');
     document.getElementById('tc_take').value = atrTake;
     document.getElementById('tc_stop').value = atrStop;
-    window._tcDays = days;  // запомнить дни бэктеста
-    // Автозагрузка первого тикера
+    window._tcDays = days;
     if (tickers.length > 0) loadTradeChart();
   }};
 
-  // ── Загрузка данных ──────────────────────────────────────────────────────
+  // ── Загрузка данных (с кэшем) ────────────────────────────────────────────
   window.loadTradeChart = async function() {{
     const ticker = document.getElementById('tc_ticker').value;
     const days = window._tcDays || document.getElementById('days')?.value || 90;
     const take = document.getElementById('tc_take').value;
     const stop = document.getElementById('tc_stop').value;
     if (!ticker) {{ alert('Сначала запусти бэктест'); return; }}
+
+    const key = _cacheKey(ticker, days, take, stop);
+    if (_tcCache[key]) {{
+      _applyData(_tcCache[key]);
+      document.getElementById('tc_trade_detail').innerHTML = '';
+      document.getElementById('tc_tooltip').style.display = 'none';
+      return;
+    }}
+
     document.getElementById('tc_status').textContent = 'загрузка...';
     document.getElementById('tc_trade_detail').innerHTML = '';
     document.getElementById('tc_tooltip').style.display = 'none';
@@ -2135,40 +2180,10 @@ async function askCouncil() {{
         document.getElementById('tc_status').textContent = '❌ ' + data.error;
         return;
       }}
+      _tcCache[key] = data;
       _candles = data.candles;
       _ticker = data.ticker;
-      // Проиндексировать сделки: найти индексы свечей по времени
-      const timeIdx = {{}};
-      _candles.forEach((c, i) => {{ timeIdx[c.time] = i; }});
-      _trades = (data.trades || []).map(t => {{
-        // entry_time может совпадать точно или не совпадать — ищем ближайшее
-        let ei = null;
-        if (t.entry_time) {{
-          ei = timeIdx[t.entry_time];
-          if (ei === undefined) {{
-            // ближайшая свеча
-            const et = new Date(t.entry_time).getTime();
-            let bestD = Infinity;
-            _candles.forEach((c, i) => {{
-              const d = Math.abs(new Date(c.time).getTime() - et);
-              if (d < bestD) {{ bestD = d; ei = i; }}
-            }});
-          }}
-        }}
-        let xi = null;
-        if (t.exit_time) {{
-          xi = timeIdx[t.exit_time];
-          if (xi === undefined) {{
-            const xt = new Date(t.exit_time).getTime();
-            let bestD = Infinity;
-            _candles.forEach((c, i) => {{
-              const d = Math.abs(new Date(c.time).getTime() - xt);
-              if (d < bestD) {{ bestD = d; xi = i; }}
-            }});
-          }}
-        }}
-        return {{...t, _entry_i: ei, _exit_i: xi}};
-      }});
+      _trades = _indexTrades(data.candles, data.trades || []);
       _v0 = 0; _v1 = _candles.length - 1;
       _resize();
       document.getElementById('tc_status').textContent =
