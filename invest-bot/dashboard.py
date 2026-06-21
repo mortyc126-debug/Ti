@@ -2675,6 +2675,7 @@ def _render_page() -> bytes:
     return (PAGE_HTML
             .replace("__TICKER_CHECKBOXES__", checkboxes)
             .replace("__BACKTEST_WORKERS__", str(BACKTEST_WORKERS))
+            .replace("{{", "{").replace("}}", "}")
             ).encode("utf-8")
 
 
