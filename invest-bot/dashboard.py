@@ -1151,7 +1151,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
-  <div class="chips" id="tickers">{ticker_checkboxes}</div>
+  <div class="chips" id="tickers">__TICKER_CHECKBOXES__</div>
   <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
        (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
        _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
@@ -1576,7 +1576,7 @@ async function runBacktest() {{
   table.innerHTML += droppedToHtml(filtered.dropped);
 
   document.getElementById('status').textContent =
-    `Считаю ${{tickers.length}} тикер(ов) параллельно (до {backtest_workers} одновременно)...`;
+    `Считаю ${{tickers.length}} тикер(ов) параллельно (до __BACKTEST_WORKERS__ одновременно)...`;
   startProgressPolling(tickers, 'status_detail');
   try {{
     const resp = await fetch('/api/backtest', {{
@@ -2672,7 +2672,10 @@ def _render_page() -> bytes:
         f'<div class="chip active" data-ticker="{t}" title="{"импортирован из OI" if t in oi_tickers else "settings.ini"}">{t}{" •" if t in oi_tickers else ""}</div>'
         for t in tickers
     )
-    return PAGE_HTML.format(ticker_checkboxes=checkboxes, backtest_workers=BACKTEST_WORKERS).encode("utf-8")
+    return (PAGE_HTML
+            .replace("__TICKER_CHECKBOXES__", checkboxes)
+            .replace("__BACKTEST_WORKERS__", str(BACKTEST_WORKERS))
+            ).encode("utf-8")
 
 
 class Handler(BaseHTTPRequestHandler):
