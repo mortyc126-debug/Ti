@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import logging
 import os
 from collections import deque
@@ -199,6 +200,43 @@ class Trader:
             lines.append("Открытых позиций нет.")
         return "\n".join(lines)
 
+    def write_status_file(self, path: str = "data/bot_status.json") -> None:
+        """Снимок состояния для дашборда: пауза + открытые позиции с PnL/MFE/MAE."""
+        paused = bot_control.control.paused or self.__overrides.is_paused()
+        positions = []
+        for figi, strategy in self.__current_strategies.items():
+            order = self.__today_trade_results.get_current_trade_order(figi) if self.__today_trade_results else None
+            if not order:
+                continue
+            ticker = strategy.settings.ticker
+            direction = "LONG" if order.signal.signal_type == SignalType.LONG else "SHORT"
+            pt = self.__pos_tracking.get(figi)
+            cur_price = self.__last_prices.get(ticker)
+            pos: dict = {"ticker": ticker, "direction": direction}
+            if pt and pt["entry"] > 0 and cur_price:
+                ep = pt["entry"]
+                if direction == "LONG":
+                    pos["cur_pnl_pct"] = round((cur_price - ep) / ep * 100, 3)
+                    pos["mfe_pct"] = round((pt["max_fav"] - ep) / ep * 100, 3)
+                    pos["mae_pct"] = round((ep - pt["max_adv"]) / ep * 100, 3)
+                else:
+                    pos["cur_pnl_pct"] = round((ep - cur_price) / ep * 100, 3)
+                    pos["mfe_pct"] = round((ep - pt["max_fav"]) / ep * 100, 3)
+                    pos["mae_pct"] = round((pt["max_adv"] - ep) / ep * 100, 3)
+                pos["entry_price"] = round(ep, 4)
+                pos["cur_price"] = round(cur_price, 4)
+            positions.append(pos)
+        import datetime as _dt
+        data = {"paused": paused, "positions": positions, "updated_at": _dt.datetime.utcnow().isoformat()}
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            os.replace(tmp, path)
+        except OSError:
+            pass
+
     async def trade_day(
             self,
             account_id: str,
@@ -381,14 +419,20 @@ class Trader:
             cur_price = float(quotation_to_decimal(candle.close))
             self.__last_prices[ticker] = cur_price
 
-            # Срочное закрытие по команде из Telegram (/close TICKER|all)
+            # Срочное закрытие по команде из Telegram (/close) или с дашборда.
             if bot_control.control.close_requests:
                 self.__process_close_requests(account_id, strategies)
 
-            # Настройки с дашборда (live/sandbox, take/stop) — перечитываем
+            # Настройки с дашборда (live/sandbox, take/stop, пауза) — перечитываем
             # дёшево (stat()), применяем к стратегиям только если файл менялся.
             if self.__overrides.maybe_reload():
                 self.__apply_overrides(strategies)
+                # close_requests из файла — добавляем к in-memory и сразу обрабатываем
+                file_reqs = self.__overrides.pop_close_requests()
+                if file_reqs:
+                    bot_control.control.close_requests.update(file_reqs)
+                    self.__process_close_requests(account_id, strategies)
+            self.write_status_file()
 
             # Обновляем MFE/MAE трекинг для открытой позиции
             pt = self.__pos_tracking.get(candle.figi)
@@ -513,8 +557,8 @@ class Trader:
             elif not self.__market_data_service.is_stock_ready_for_trading(candle.figi):
                 logger.info(f"New signal has been skipped. Stock isn't ready for trading")
 
-            elif bot_control.control.paused:
-                logger.info(f"New signal has been skipped. Бот на паузе (TG /pause)")
+            elif bot_control.control.paused or self.__overrides.is_paused():
+                logger.info(f"New signal has been skipped. Бот на паузе")
 
             elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
                 logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")

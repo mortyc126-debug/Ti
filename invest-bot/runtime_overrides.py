@@ -13,6 +13,8 @@ set_take_stop_overrides). Изменения take/stop влияют только
   "partial_tp_enabled": null | true | false,    // null — берём дефолт из PARTIAL_TP_DEFAULT_ENABLED (trader.py)
   "adaptive_exit_enabled": null | true | false, // null — берём дефолт из ADAPTIVE_EXIT_ENABLED (trader.py)
   "orderbook_enabled": null | true | false,     // null — берём дефолт из ORDERBOOK_DEFAULT_ENABLED (trader.py)
+  "paused": false,                              // true — пауза: новые позиции не открываются (как /pause в ТГ)
+  "close_requests": [],                         // тикеры или "ALL" — срочное закрытие, бот очищает после исполнения
   "tickers": {
     "SBER": {
       "enabled": true,                          // false — новые сигналы не открываются (ни реально, ни signal-only)
@@ -49,6 +51,8 @@ def load_overrides(path: str = OVERRIDES_FILE) -> dict:
     data.setdefault("partial_tp_enabled", None)
     data.setdefault("adaptive_exit_enabled", None)
     data.setdefault("orderbook_enabled", None)
+    data.setdefault("paused", False)
+    data.setdefault("close_requests", [])
     data.setdefault("tickers", {})
     return data
 
@@ -110,6 +114,19 @@ class RuntimeOverrides:
     def orderbook_enabled(self, default: bool) -> bool:
         v = self.__data.get("orderbook_enabled")
         return default if v is None else bool(v)
+
+    def is_paused(self) -> bool:
+        return bool(self.__data.get("paused", False))
+
+    def pop_close_requests(self) -> set[str]:
+        """Возвращает набор тикеров/ALL и очищает список в файле."""
+        reqs = self.__data.get("close_requests", [])
+        if not reqs:
+            return set()
+        result = {r.upper() for r in reqs}
+        self.__data["close_requests"] = []
+        save_overrides(self.__data, self.__path)
+        return result
 
     def take_stop_for(self, ticker: str) -> dict[str, Decimal]:
         """Только заданные (не null) поля — для set_take_stop_overrides(**kwargs)."""

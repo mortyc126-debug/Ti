@@ -1291,6 +1291,28 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <div class="tab-pane" id="tab-live">
 
 <div class="panel">
+  <div class="sec-lg">Статус и управление</div>
+  <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+    <span id="bot_state_dot" class="sdot"></span>
+    <span id="bot_state_label" style="font-size:12px;font-weight:600;color:var(--txt2);">загружаем...</span>
+    <button class="btn-pill" id="btn_pause" onclick="botPause()" style="padding:5px 16px;font-size:11px;">⏸ Пауза</button>
+    <button class="btn-pill" id="btn_resume" onclick="botResume()" style="padding:5px 16px;font-size:11px;display:none;">▶ Возобновить</button>
+    <button class="btn-pill btn-sm" onclick="loadBotStatus()">⟳</button>
+  </div>
+  <div class="sec" style="margin-bottom:6px;">Открытые позиции</div>
+  <div id="bot_positions" style="font-size:11px;color:var(--txt3);">нет данных</div>
+  <div style="margin-top:12px;">
+    <div class="sec" style="margin-bottom:6px;">Срочное закрытие позиции</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select class="inp mid" id="close_ticker_sel" style="min-width:120px;"></select>
+      <button class="btn-pill" style="background:rgba(255,60,60,.25);border-color:rgba(255,60,60,.5);color:#ff6060;padding:5px 14px;font-size:11px;" onclick="botClose()">✕ Закрыть</button>
+      <button class="btn-pill" style="background:rgba(255,60,60,.15);border-color:rgba(255,60,60,.4);color:#ff8080;padding:5px 14px;font-size:11px;" onclick="botCloseAll()">✕ Закрыть все</button>
+      <span id="close_status" style="font-size:11px;color:var(--txt3);"></span>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
   <div class="sec-lg">Глобальные настройки бота</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     Бот перечитывает эти настройки сам, без перезапуска (раз в свечу).
@@ -1346,6 +1368,7 @@ function showTab(name) {{
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
+  if (name === 'live') {{ loadBotStatus(); loadOverrides(); loadAutoAtr(); }}
 }}
 
 function modelStatsToHtml(modelStats) {{
@@ -1685,6 +1708,71 @@ function ovRowHtml(ticker, t) {{
     <td><input type="text" class="inp ov_short_take" style="width:70px" value="${{t.short_take ?? ''}}" placeholder="—"></td>
     <td><input type="text" class="inp ov_short_stop" style="width:70px" value="${{t.short_stop ?? ''}}" placeholder="—"></td>
   </tr>`;
+}}
+
+async function loadBotStatus() {{
+  const data = await fetch('/api/bot_status').then(r => r.json()).catch(() => ({{running: false}}));
+  const dot = document.getElementById('bot_state_dot');
+  const lbl = document.getElementById('bot_state_label');
+  const btnP = document.getElementById('btn_pause');
+  const btnR = document.getElementById('btn_resume');
+  if (!data.running) {{
+    dot.className = 'sdot err'; lbl.textContent = 'Бот не запущен / нет данных';
+    btnP.style.display = 'none'; btnR.style.display = 'none';
+  }} else if (data.paused) {{
+    dot.className = 'sdot err'; lbl.textContent = '⏸ Пауза — новые позиции не открываются';
+    btnP.style.display = 'none'; btnR.style.display = '';
+  }} else {{
+    dot.className = 'sdot ok'; lbl.textContent = '▶ Торговля активна';
+    btnP.style.display = ''; btnR.style.display = 'none';
+  }}
+  const posDiv = document.getElementById('bot_positions');
+  const sel = document.getElementById('close_ticker_sel');
+  if (!data.positions || data.positions.length === 0) {{
+    posDiv.textContent = 'Открытых позиций нет.';
+    sel.innerHTML = '<option value="ALL">ALL (все)</option>';
+  }} else {{
+    posDiv.innerHTML = data.positions.map(p => {{
+      const pnl = p.cur_pnl_pct !== undefined ? ` <span style="color:${{p.cur_pnl_pct >= 0 ? 'var(--pos)' : 'var(--neg)'}}">${{p.cur_pnl_pct >= 0 ? '+' : ''}}${{p.cur_pnl_pct?.toFixed(2)}}%</span>` : '';
+      const mfe = p.mfe_pct !== undefined ? ` пик +${{p.mfe_pct.toFixed(2)}}%` : '';
+      const mae = p.mae_pct !== undefined ? ` просадка -${{p.mae_pct.toFixed(2)}}%` : '';
+      return `<div style="margin:3px 0;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);">
+        <b style="color:var(--txt)">${{p.ticker}}</b> ${{p.direction}}${{pnl}}${{mfe}}${{mae}}
+        ${{p.entry_price ? `<span style="color:var(--txt3)">  вход ${{p.entry_price}} → сейчас ${{p.cur_price}}</span>` : ''}}
+      </div>`;
+    }}).join('');
+    const tickers = ['ALL', ...data.positions.map(p => p.ticker)];
+    sel.innerHTML = tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('');
+  }}
+  if (data.updated_at) lbl.title = 'обновлено: ' + data.updated_at;
+}}
+
+async function botPause() {{
+  await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'pause'}})}});
+  await loadBotStatus();
+}}
+
+async function botResume() {{
+  await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'resume'}})}});
+  await loadBotStatus();
+}}
+
+async function botClose() {{
+  const ticker = document.getElementById('close_ticker_sel').value;
+  if (!ticker) return;
+  const st = document.getElementById('close_status');
+  st.textContent = 'Отправляем...';
+  const r = await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'close',ticker}})}}).then(r=>r.json());
+  st.textContent = r.ok ? `✓ Запрос закрытия ${{ticker}} отправлен` : (r.error || 'ошибка');
+  await loadBotStatus();
+}}
+
+async function botCloseAll() {{
+  const st = document.getElementById('close_status');
+  st.textContent = 'Отправляем...';
+  const r = await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'close',ticker:'ALL'}})}}).then(r=>r.json());
+  st.textContent = r.ok ? '✓ Запрос закрытия ALL отправлен' : (r.error || 'ошибка');
+  await loadBotStatus();
 }}
 
 async function loadOverrides() {{
@@ -2304,9 +2392,43 @@ def get_overrides_payload() -> dict:
         "partial_tp_enabled": data.get("partial_tp_enabled"),
         "adaptive_exit_enabled": data.get("adaptive_exit_enabled"),
         "orderbook_enabled": data.get("orderbook_enabled"),
+        "paused": data.get("paused", False),
         "tickers": data.get("tickers", {}),
         "tickers_all": tickers_all,
     }
+
+
+def get_bot_status() -> dict:
+    """data/bot_status.json — живой снимок, который бот обновляет на каждой свече."""
+    path = "data/bot_status.json"
+    if not os.path.exists(path):
+        return {"running": False}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        data["running"] = True
+        return data
+    except (OSError, json.JSONDecodeError):
+        return {"running": False}
+
+
+def bot_control_action(action: str, ticker: str = "") -> dict:
+    """pause / resume / close (ticker или 'ALL') — пишем в bot_overrides.json."""
+    data = load_overrides()
+    if action == "pause":
+        data["paused"] = True
+    elif action == "resume":
+        data["paused"] = False
+    elif action == "close":
+        t = ticker.strip().upper() or "ALL"
+        reqs = list(data.get("close_requests", []))
+        if t not in reqs:
+            reqs.append(t)
+        data["close_requests"] = reqs
+    else:
+        return {"error": f"неизвестное действие: {action}"}
+    save_overrides(data)
+    return {"ok": True, "paused": data.get("paused", False)}
 
 
 def save_overrides_payload(payload: dict) -> dict | None:
@@ -2341,11 +2463,14 @@ def save_overrides_payload(payload: dict) -> dict | None:
             entry[field] = str(v) if v not in (None, "") else None
         tickers_out[ticker.upper()] = entry
 
+    existing = load_overrides()
     save_overrides({
         "global_signal_only": global_signal_only,
         "partial_tp_enabled": partial_tp_enabled,
         "adaptive_exit_enabled": adaptive_exit_enabled,
         "orderbook_enabled": orderbook_enabled,
+        "paused": existing.get("paused", False),
+        "close_requests": existing.get("close_requests", []),
         "tickers": tickers_out,
     })
     return None
@@ -2409,6 +2534,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(get_trade_chart(ticker, days, atr_take, atr_stop))
             except Exception as e:
                 self._send_json({"error": str(e)})
+        elif self.path == "/api/bot_status":
+            self._send_json(get_bot_status())
         else:
             self.send_error(404)
 
@@ -2473,6 +2600,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/cancel":
             was_running = request_cancel()
             self._send_json({"cancelled": was_running})
+        elif self.path == "/api/bot_control":
+            action = payload.get("action", "")
+            ticker = payload.get("ticker", "")
+            self._send_json(bot_control_action(action, ticker))
         else:
             self.send_error(404)
 
