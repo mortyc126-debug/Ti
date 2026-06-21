@@ -36,6 +36,7 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
 import multiprocessing
+import statistics
 import threading
 import time
 import traceback
@@ -496,6 +497,32 @@ def _what_if_from_trades(trades: list[dict]) -> dict:
     return what_if
 
 
+ATR_REOPT_MIN_NEW_TRADES = 15   # переоптимизировать не каждый день, а раз в N новых сделок —
+                                # меньше "точек выбора" -> меньше шансов у шума выиграть argmax
+ATR_SHRINK_K = 8                # псевдо-наблюдения к fixed-бейзлайну (как REGIME_SHRINKAGE_K в history.py)
+ATR_MIN_EDGE_SEM = 1.0          # ATR-кандидат должен превосходить fixed минимум на N своих SEM,
+                                # иначе остаёмся на текущих параметрах (не дёргаем из-за шума)
+
+
+def _shrunk_score(trades: list[dict], fixed_pct: float, k: int = ATR_SHRINK_K) -> tuple[float, float]:
+    """Shrinkage-оценка expectancy ATR-кандидата на маленькой/шумной выборке:
+    тянет к fixed-бейзлайну (а не к голому средству), сила тяги — k псевдо-
+    наблюдений, по аналогии с REGIME_SHRINKAGE_K в history.py. Без этого
+    argmax по сетке (3 take × 3 stop × 5 scale_exp = 45 кандидатов) почти
+    всегда выбирает комбинацию, выигравшую за счёт пары случайных сделок в
+    eval-окне ("optimizer's curse") — отсюда систематический проигрыш ATR
+    walk-forward fixed-режиму, который ничего не подгоняет. Возвращает
+    (shrunk_score, sem) — sem нужен дальше для проверки значимости edge."""
+    n = len(trades)
+    if n == 0:
+        return fixed_pct, 0.0
+    vals = [t["net_pct"] for t in trades]
+    raw = sum(vals) / n
+    sem = statistics.pstdev(vals) / (n ** 0.5) if n > 1 else abs(raw)
+    shrunk = (n * raw + k * fixed_pct) / (n + k)
+    return shrunk, sem
+
+
 def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
@@ -555,6 +582,7 @@ def run_backtest_one(
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff)
         fixed_trades = fixed.pop("trades", [])
+        fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades), **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
@@ -575,9 +603,12 @@ def run_backtest_one(
             past_signals: list[dict] = []
             wf_trades: list[dict] = []
             wf_results: list[dict] = []
+            new_since_reopt = 0
             for day in sorted(by_day.keys()):
                 day_signals = by_day[day]
-                if len(past_signals) >= AUTO_ATR_MIN_TRADES:
+                new_since_reopt += len(day_signals)
+                if len(past_signals) >= AUTO_ATR_MIN_TRADES and new_since_reopt >= ATR_REOPT_MIN_NEW_TRADES:
+                    new_since_reopt = 0
                     # Fit/eval split той же болезни, что в __recalc_auto_atr:
                     # sweep и его же оценка по одному и тому же past_signals
                     # тянет к узким стопам, которые в этом конкретном прошлом
@@ -591,12 +622,19 @@ def run_backtest_one(
                         for sk in atr_stop_ks:
                             for ex in scale_exps:
                                 r = strategy.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                                atr_scale_exp=ex, tariff=tariff, record_history=False)
-                                if r["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                                                atr_scale_exp=ex, tariff=tariff, record_history=False,
+                                                                return_trades=True)
+                                cand_trades = r.get("trades", [])
+                                if len(cand_trades) < AUTO_ATR_MIN_TRADES:
                                     continue
-                                if best is None or r["expectancy_pct"] > best[1]:
-                                    best = ((tk, sk, ex), r["expectancy_pct"])
-                    if best is not None:
+                                score, sem = _shrunk_score(cand_trades, fixed_pct)
+                                if best is None or score > best[1]:
+                                    best = ((tk, sk, ex), score, sem)
+                    # Менять параметры только если ATR-кандидат превосходит
+                    # fixed-бейзлайн больше чем на свой SEM — иначе "победа"
+                    # на eval-окне неотличима от шума (optimizer's curse),
+                    # и переключение лишь добавляет нестабильности без edge.
+                    if best is not None and best[1] - ATR_MIN_EDGE_SEM * best[2] > fixed_pct:
                         chosen_k = best[0]
                 tk, sk, ex = chosen_k
                 res = strategy.backtest_barriers(signals=day_signals, atr_take_k=tk, atr_stop_k=sk,
