@@ -1945,6 +1945,8 @@ class OICompositeStrategy(IStrategy):
                     "regime": sig.get("regime", ""),
                     "entry_mode": entry_mode,
                     "pattern": _lp.pattern if entry_mode == "level" and _lp is not None else None,
+                    "level_kind": _lp.level_kind if entry_mode == "level" and _lp is not None else None,
+                    "level_tier": _lp.level_tier if entry_mode == "level" and _lp is not None else None,
                     "agree_count": len([v for v in ms.values() if v * dir_sign > 0.05]),
                     "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
                     "top_agree": top_agree,

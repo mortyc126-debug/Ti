@@ -1,22 +1,23 @@
 """
-level_pattern.py — детекция трёх разворотных паттернов на ключевых уровнях.
+level_pattern.py — детекция разворотных паттернов на иерархических уровнях.
 
-Паттерн 1 — LEVEL_REVERSAL («разворот у уровня»):
-  Цена подходит к prev-day H/L → объёмный climax → компрессия → импульс обратно.
-  Стоп: за уровень + буфер. Тейк: 1.75× stop-dist.
+Уровни (tier = приоритет, 1 = сильнейший):
+  tier 1 — недельные H/L, месячные H/L
+  tier 2 — дневные H/L/Open/Close (предыдущий день, сегодня до текущего бара)
+  tier 3 — Fibonacci (0.236 / 0.382 / 0.5 / 0.618 / 0.786) по свингу последних N баров
+  tier 4 — круглые числа (психологические уровни)
+  tier 5 — фракталы Уильямса (локальные экстремумы ≥ 2 бара в каждую сторону)
 
-Паттерн 2 — FALSE_BREAKOUT («ложный пробой / пружина»):
-  Цена пробивает уровень на высоком объёме, возвращается обратно,
-  затем появляется «ступенька» — новый экстремум лучше предыдущего
-  (для LONG: лой выше лоя пробоя). Стоп: за ступеньку. Тейк: 2× stop-dist.
+Паттерн 1 — LEVEL_REVERSAL: подход к уровню → climax → компрессия → импульс.
+Паттерн 2 — FALSE_BREAKOUT: пробой уровня на объёме → возврат → ступенька.
+Паттерн 3 — THREAD: узкий диапазон с объёмом → разворотная свеча.
 
-Паттерн 3 — THREAD («нитка / накопление»):
-  Цена идёт в узком диапазоне с нарастающим объёмом (крупный участник
-  стоит лимитами). Входим ПРОТИВ объёма при появлении разворотной свечи.
-  Стоп: за диапазон нитки. Тейк: 1.75× stop-dist.
+При нахождении паттерна стоп/тейк ставятся ОТНОСИТЕЛЬНО ближайшего уровня,
+а не фиксированных %, т.е. размер стопа определяется структурой рынка.
 """
 from __future__ import annotations
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from typing import Optional
 
 from tinkoff.invest import HistoricCandle
@@ -26,11 +27,35 @@ def _f(q) -> float:
     return q.units + q.nano / 1e9
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Структуры данных
+# ─────────────────────────────────────────────────────────────────────────────
+
 @dataclass
-class DayLevels:
-    date: object
-    high: float
-    low: float
+class PriceLevel:
+    price: float
+    kind: str    # week_high, week_low, day_high, day_low, day_open, day_close,
+                 # today_high, today_low, fib_236/382/500/618/786,
+                 # round, fractal_high, fractal_low
+    tier: int    # 1..5, меньше = сильнее
+
+
+@dataclass
+class LevelSet:
+    levels: list[PriceLevel] = field(default_factory=list)
+
+    def nearest(self, price: float, max_dist: float) -> Optional[PriceLevel]:
+        """Ближайший уровень в пределах max_dist, с приоритетом по tier."""
+        candidates = [lv for lv in self.levels if abs(lv.price - price) <= max_dist]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda lv: (lv.tier, abs(lv.price - price)))
+
+    def within(self, price: float, max_dist: float) -> list[PriceLevel]:
+        return sorted(
+            [lv for lv in self.levels if abs(lv.price - price) <= max_dist],
+            key=lambda lv: (lv.tier, abs(lv.price - price))
+        )
 
 
 @dataclass
@@ -39,56 +64,172 @@ class LevelEntry:
     stop: float
     take: float
     level: float
-    level_side: str
+    level_kind: str
+    level_tier: int
     stop_dist_pct: float
     take_dist_pct: float
-    pattern: str            # "level_reversal" | "false_breakout" | "thread"
+    pattern: str   # "level_reversal" | "false_breakout" | "thread"
 
 
-def prev_day_levels(candles: list[HistoricCandle]) -> Optional[DayLevels]:
-    if not candles:
-        return None
-    today = candles[-1].time.date()
-    by_day: dict = {}
-    for c in candles:
-        d = c.time.date()
-        if d >= today:
-            continue
-        h, lo = _f(c.high), _f(c.low)
-        if d not in by_day:
-            by_day[d] = [h, lo]
-        else:
-            if h > by_day[d][0]:
-                by_day[d][0] = h
-            if lo < by_day[d][1]:
-                by_day[d][1] = lo
-    if not by_day:
-        return None
-    prev = max(by_day.keys())
-    return DayLevels(date=prev, high=by_day[prev][0], low=by_day[prev][1])
+# ─────────────────────────────────────────────────────────────────────────────
+# Построение иерархических уровней
+# ─────────────────────────────────────────────────────────────────────────────
 
-
-def _atr(candles: list[HistoricCandle], period: int = 14) -> float:
+def _atr(candles: list, period: int = 14) -> float:
     trs = []
     for i in range(1, len(candles)):
-        h = _f(candles[i].high)
-        lo = _f(candles[i].low)
-        pc = _f(candles[i - 1].close)
+        h, lo, pc = _f(candles[i].high), _f(candles[i].low), _f(candles[i - 1].close)
         trs.append(max(h - lo, abs(h - pc), abs(lo - pc)))
     if not trs:
         return 0.0
-    tail = trs[-period:]
-    return sum(tail) / len(tail)
+    return sum(trs[-period:]) / min(len(trs), period)
 
 
-def _avg_volume(candles: list[HistoricCandle], period: int = 20) -> float:
+def _avg_volume(candles: list, period: int = 20) -> float:
     vols = [c.volume for c in candles[-period:]]
     return sum(vols) / len(vols) if vols else 0.0
 
 
+def _round_step(price: float) -> float:
+    """Шаг круглых чисел: 0.01% от цены, округлённый до красивого числа."""
+    mag = 10 ** math.floor(math.log10(price))
+    raw = price * 0.005  # примерно 0.5% — типичный диапазон психологического уровня
+    # округляем шаг до ближайшего из [1, 2, 5, 10, 20, 50, 100, 200, 500] × mag
+    for mult in [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100]:
+        step = mult * mag
+        if step >= raw:
+            return step
+    return mag
+
+
+def _fibonacci_levels(swing_high: float, swing_low: float) -> list[tuple[float, str]]:
+    """Fib retracements от swing_low до swing_high и наоборот."""
+    diff = swing_high - swing_low
+    ratios = [("fib_236", 0.236), ("fib_382", 0.382), ("fib_500", 0.500),
+              ("fib_618", 0.618), ("fib_786", 0.786)]
+    result = []
+    for name, r in ratios:
+        result.append((swing_high - diff * r, name))   # pullback от high
+        result.append((swing_low  + diff * r, name))   # rally от low
+    return result
+
+
+def _williams_fractals(candles: list, n: int = 2) -> tuple[list[float], list[float]]:
+    """Фракталы Уильямса: локальный max/min с n барами в каждую сторону."""
+    highs_f, lows_f = [], []
+    for i in range(n, len(candles) - n):
+        h = _f(candles[i].high)
+        lo = _f(candles[i].low)
+        if all(_f(candles[i - j].high) < h and _f(candles[i + j].high) < h for j in range(1, n + 1)):
+            highs_f.append(h)
+        if all(_f(candles[i - j].low) > lo and _f(candles[i + j].low) > lo for j in range(1, n + 1)):
+            lows_f.append(lo)
+    return highs_f, lows_f
+
+
+def build_levels(candles: list) -> LevelSet:
+    """
+    Строит иерархический набор уровней из свечей.
+    Ожидает минутные свечи (но работает с любым TF).
+    Для расчёта недельных/дневных уровней группирует по дате.
+    """
+    if not candles:
+        return LevelSet()
+
+    levels: list[PriceLevel] = []
+    today = candles[-1].time.date()
+
+    # Группируем свечи по торговым дням
+    by_day: dict = {}
+    for c in candles:
+        d = c.time.date()
+        h, lo, cl, op = _f(c.high), _f(c.low), _f(c.close), _f(c.open)
+        if d not in by_day:
+            by_day[d] = {"h": h, "l": lo, "o": op, "c": cl}
+        else:
+            if h > by_day[d]["h"]: by_day[d]["h"] = h
+            if lo < by_day[d]["l"]: by_day[d]["l"] = lo
+            by_day[d]["c"] = cl  # close = последнее закрытие дня
+
+    sorted_days = sorted(by_day.keys())
+    past_days = [d for d in sorted_days if d < today]
+
+    # ── tier 1: недельные и месячные H/L ──
+    week_days  = past_days[-5:]  if len(past_days) >= 5  else past_days
+    month_days = past_days[-22:] if len(past_days) >= 22 else past_days
+
+    if week_days:
+        wh = max(by_day[d]["h"] for d in week_days)
+        wl = min(by_day[d]["l"] for d in week_days)
+        levels.append(PriceLevel(wh, "week_high", 1))
+        levels.append(PriceLevel(wl, "week_low",  1))
+
+    if month_days and len(month_days) > len(week_days):
+        mh = max(by_day[d]["h"] for d in month_days)
+        ml = min(by_day[d]["l"] for d in month_days)
+        levels.append(PriceLevel(mh, "month_high", 1))
+        levels.append(PriceLevel(ml, "month_low",  1))
+
+    # ── tier 2: вчерашние H/L/O/C + сегодняшние H/L до текущего бара ──
+    if past_days:
+        prev = past_days[-1]
+        pd = by_day[prev]
+        levels.append(PriceLevel(pd["h"], "day_high",  2))
+        levels.append(PriceLevel(pd["l"], "day_low",   2))
+        levels.append(PriceLevel(pd["o"], "day_open",  2))
+        levels.append(PriceLevel(pd["c"], "day_close", 2))
+
+    # Сегодняшние экстремумы (до текущего бара) — важны внутри дня
+    today_candles = [c for c in candles if c.time.date() == today]
+    if len(today_candles) > 1:
+        th = max(_f(c.high) for c in today_candles[:-1])
+        tl = min(_f(c.low)  for c in today_candles[:-1])
+        levels.append(PriceLevel(th, "today_high", 2))
+        levels.append(PriceLevel(tl, "today_low",  2))
+
+    # ── tier 3: Fibonacci по свингу последних ~60 баров ──
+    swing_window = candles[-60:] if len(candles) >= 60 else candles
+    if len(swing_window) >= 10:
+        sh = max(_f(c.high) for c in swing_window)
+        sl = min(_f(c.low)  for c in swing_window)
+        if sh > sl:
+            for price, name in _fibonacci_levels(sh, sl):
+                if sl <= price <= sh:
+                    levels.append(PriceLevel(round(price, 6), name, 3))
+
+    # ── tier 4: круглые числа ──
+    if candles:
+        mid = _f(candles[-1].close)
+        step = _round_step(mid)
+        # ±10 ступеней вокруг текущей цены
+        base = round(mid / step) * step
+        for i in range(-10, 11):
+            levels.append(PriceLevel(round(base + i * step, 8), "round", 4))
+
+    # ── tier 5: фракталы Уильямса (последние 80 баров) ──
+    frac_window = candles[-80:] if len(candles) >= 80 else candles
+    frac_highs, frac_lows = _williams_fractals(frac_window, n=2)
+    for h in frac_highs[-5:]:  # только 5 последних фракталов
+        levels.append(PriceLevel(h, "fractal_high", 5))
+    for l in frac_lows[-5:]:
+        levels.append(PriceLevel(l, "fractal_low", 5))
+
+    # Убираем дубли (уровни ближе 0.01% друг к другу — оставляем с меньшим tier)
+    deduped: list[PriceLevel] = []
+    for lv in sorted(levels, key=lambda x: (x.tier, x.price)):
+        if not any(abs(lv.price - ex.price) / (ex.price or 1) < 0.0001 for ex in deduped):
+            deduped.append(lv)
+
+    return LevelSet(deduped)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Вспомогательные функции
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _make_entry(
     entry: float, stop: float, take_ratio: float, pattern: str,
-    level: float, level_side: str,
+    level: PriceLevel,
 ) -> Optional[LevelEntry]:
     if entry <= 0 or stop <= 0:
         return None
@@ -103,7 +244,7 @@ def _make_entry(
         return None
     return LevelEntry(
         entry=round(entry, 6), stop=round(stop, 6), take=round(take, 6),
-        level=round(level, 6), level_side=level_side,
+        level=round(level.price, 6), level_kind=level.kind, level_tier=level.tier,
         stop_dist_pct=round(stop_pct, 6), take_dist_pct=round(take_pct, 6),
         pattern=pattern,
     )
@@ -114,10 +255,11 @@ def _make_entry(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def detect_level_reversal(
-    candles: list[HistoricCandle],
+    candles: list,
     direction: str,
     atr_value: float = 0.0,
-    proximity_atr: float = 2.5,
+    level_set: Optional[LevelSet] = None,
+    proximity_atr: float = 2.0,
     climax_vol_mult: float = 1.8,
     compress_bars: int = 3,
     compress_atr_frac: float = 0.5,
@@ -126,11 +268,8 @@ def detect_level_reversal(
     take_ratio: float = 1.75,
     min_candles: int = 30,
 ) -> Optional[LevelEntry]:
-    """Подход к уровню → объёмный climax → компрессия → импульс."""
+    """Подход к уровню → объёмный climax → компрессия → импульс обратно."""
     if len(candles) < min_candles:
-        return None
-    levels = prev_day_levels(candles)
-    if levels is None:
         return None
     atr = atr_value if atr_value > 0 else _atr(candles)
     if atr <= 0:
@@ -139,18 +278,32 @@ def detect_level_reversal(
     if avg_vol <= 0:
         return None
 
-    level = levels.low if direction == "LONG" else levels.high
-    level_side = "low" if direction == "LONG" else "high"
+    ls = level_set or build_levels(candles)
     proximity = proximity_atr * atr
+
+    last = candles[-1]
+    entry = _f(last.close)
+
+    # Ищем ближайший уровень с правильной стороны
+    # LONG: ищем уровень поддержки (ниже или у текущей цены)
+    # SHORT: ищем уровень сопротивления (выше или у текущей цены)
+    candidates = ls.within(entry, proximity)
+    if direction == "LONG":
+        candidates = [lv for lv in candidates if lv.price <= entry + atr]
+    else:
+        candidates = [lv for lv in candidates if lv.price >= entry - atr]
+
+    if not candidates:
+        return None
+    level = candidates[0]
+
     window = candles[-40:]
     n = len(window)
 
     climax_i = None
     for i in range(n - 1, max(0, n - 20), -1):
         c = window[i]
-        near = (abs(_f(c.close) - level) <= proximity or
-                abs(_f(c.low) - level) <= proximity or
-                abs(_f(c.high) - level) <= proximity)
+        near = abs(_f(c.close) - level.price) <= proximity
         if near and c.volume >= climax_vol_mult * avg_vol:
             climax_i = i
             break
@@ -165,46 +318,38 @@ def detect_level_reversal(
     if avg_range >= compress_atr_frac * atr:
         return None
 
-    last = candles[-1]
     if (_f(last.high) - _f(last.low)) < impulse_atr_frac * atr:
         return None
 
-    entry = _f(last.close)
     if direction == "LONG":
         if _f(last.close) <= _f(last.open):
             return None
-        stop = level - stop_buffer_atr * atr
+        stop = level.price - stop_buffer_atr * atr
     else:
         if _f(last.close) >= _f(last.open):
             return None
-        stop = level + stop_buffer_atr * atr
+        stop = level.price + stop_buffer_atr * atr
 
-    return _make_entry(entry, stop, take_ratio, "level_reversal", level, level_side)
+    return _make_entry(entry, stop, take_ratio, "level_reversal", level)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Паттерн 2: FALSE_BREAKOUT («пружина»)
+# Паттерн 2: FALSE_BREAKOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
 def detect_false_breakout(
-    candles: list[HistoricCandle],
+    candles: list,
     direction: str,
     atr_value: float = 0.0,
+    level_set: Optional[LevelSet] = None,
     breakout_vol_mult: float = 1.6,
     stop_buffer_atr: float = 0.35,
     take_ratio: float = 2.0,
     min_candles: int = 30,
     lookback: int = 30,
 ) -> Optional[LevelEntry]:
-    """
-    Ложный пробой уровня: пробой на объёме → возврат → ступенька (лучший экстремум).
-    LONG: пробой prev-day-low вниз → возврат выше → новый лой выше пробойного.
-    SHORT: пробой prev-day-high вверх → возврат ниже → новый хай ниже пробойного.
-    """
+    """Ложный пробой: пробой уровня на объёме → возврат → ступенька."""
     if len(candles) < min_candles:
-        return None
-    levels = prev_day_levels(candles)
-    if levels is None:
         return None
     atr = atr_value if atr_value > 0 else _atr(candles)
     if atr <= 0:
@@ -213,52 +358,60 @@ def detect_false_breakout(
     if avg_vol <= 0:
         return None
 
-    level = levels.low if direction == "LONG" else levels.high
-    level_side = "low" if direction == "LONG" else "high"
+    ls = level_set or build_levels(candles)
     window = candles[-lookback:]
     n = len(window)
 
-    # Ищем свечу-пробой
+    # Ищем пробой любого уровня на высоком объёме
     breakout_i = None
-    breakout_extreme = None  # лой пробоя (LONG) или хай пробоя (SHORT)
+    breakout_extreme = None
+    hit_level: Optional[PriceLevel] = None
+
     for i in range(n - 1, max(0, n - 20), -1):
         c = window[i]
-        vol_ok = c.volume >= breakout_vol_mult * avg_vol
+        if c.volume < breakout_vol_mult * avg_vol:
+            continue
         if direction == "LONG":
-            if _f(c.low) < level and vol_ok:
+            # Пробой вниз: low пробил какой-то уровень
+            lv = ls.nearest(_f(c.low), atr * 1.5)
+            if lv and _f(c.low) < lv.price:
                 breakout_i = i
                 breakout_extreme = _f(c.low)
+                hit_level = lv
                 break
         else:
-            if _f(c.high) > level and vol_ok:
+            lv = ls.nearest(_f(c.high), atr * 1.5)
+            if lv and _f(c.high) > lv.price:
                 breakout_i = i
                 breakout_extreme = _f(c.high)
+                hit_level = lv
                 break
-    if breakout_i is None:
+
+    if breakout_i is None or hit_level is None:
         return None
 
-    # После пробоя цена должна вернуться за уровень
+    # Цена вернулась за уровень
     returned = False
     for i in range(breakout_i + 1, n):
         c = window[i]
-        if direction == "LONG" and _f(c.close) > level:
+        if direction == "LONG" and _f(c.close) > hit_level.price:
             returned = True
             break
-        if direction == "SHORT" and _f(c.close) < level:
+        if direction == "SHORT" and _f(c.close) < hit_level.price:
             returned = True
             break
     if not returned:
         return None
 
-    # Ступенька: новый экстремум лучше предыдущего (лой выше / хай ниже)
     last = candles[-1]
     entry = _f(last.close)
+
     if direction == "LONG":
         step_low = min(_f(c.low) for c in window[breakout_i + 1:])
         if step_low <= breakout_extreme:
-            return None  # нет ступеньки — просто ещё один лой
+            return None
         if _f(last.close) <= _f(last.open):
-            return None  # ждём бычью свечу
+            return None
         stop = step_low - stop_buffer_atr * atr
     else:
         step_high = max(_f(c.high) for c in window[breakout_i + 1:])
@@ -268,28 +421,26 @@ def detect_false_breakout(
             return None
         stop = step_high + stop_buffer_atr * atr
 
-    return _make_entry(entry, stop, take_ratio, "false_breakout", level, level_side)
+    return _make_entry(entry, stop, take_ratio, "false_breakout", hit_level)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Паттерн 3: THREAD («нитка» — узкий диапазон + объём)
+# Паттерн 3: THREAD
 # ─────────────────────────────────────────────────────────────────────────────
 
 def detect_thread(
-    candles: list[HistoricCandle],
+    candles: list,
     direction: str,
     atr_value: float = 0.0,
+    level_set: Optional[LevelSet] = None,
     thread_bars: int = 5,
-    thread_range_frac: float = 0.35,   # диапазон нитки < frac * ATR
-    thread_vol_mult: float = 1.5,      # объём в нитке выше среднего
+    thread_range_frac: float = 0.35,
+    thread_vol_mult: float = 1.5,
     stop_buffer_atr: float = 0.4,
     take_ratio: float = 1.75,
     min_candles: int = 30,
 ) -> Optional[LevelEntry]:
-    """
-    Нитка: цена в узком диапазоне с повышенным объёмом → крупный участник
-    стоит лимитами. Входим против объёма при разворотной свече.
-    """
+    """Нитка: узкий диапазон с объёмом → разворотная свеча."""
     if len(candles) < min_candles:
         return None
     atr = atr_value if atr_value > 0 else _atr(candles)
@@ -298,65 +449,63 @@ def detect_thread(
     avg_vol = _avg_volume(candles, 20)
     if avg_vol <= 0:
         return None
-
-    # Нитка: последние thread_bars свечей (не считая последней — она разворотная)
     if len(candles) < thread_bars + 2:
         return None
-    thread = candles[-(thread_bars + 1):-1]
 
+    thread = candles[-(thread_bars + 1):-1]
     thread_high = max(_f(c.high) for c in thread)
-    thread_low = min(_f(c.low) for c in thread)
+    thread_low  = min(_f(c.low)  for c in thread)
     thread_range = thread_high - thread_low
     if thread_range >= thread_range_frac * atr:
-        return None  # не нитка — слишком широкий диапазон
+        return None
 
     avg_thread_vol = sum(c.volume for c in thread) / len(thread)
     if avg_thread_vol < thread_vol_mult * avg_vol:
-        return None  # мало объёма
+        return None
 
-    # Разворотная свеча (последняя) — выходит из диапазона нитки
     last = candles[-1]
     entry = _f(last.close)
-    if direction == "LONG":
-        # Цена выходила вниз (продавали), теперь разворот вверх
-        if _f(last.close) <= _f(last.open):
-            return None
-        if _f(last.close) <= thread_low:
-            return None
-        stop = thread_low - stop_buffer_atr * atr
-        # Уровень — низ нитки (там стоял крупный продавец / покупатель)
-        level = thread_low
-        level_side = "thread_low"
-    else:
-        if _f(last.close) >= _f(last.open):
-            return None
-        if _f(last.close) >= thread_high:
-            return None
-        stop = thread_high + stop_buffer_atr * atr
-        level = thread_high
-        level_side = "thread_high"
 
-    return _make_entry(entry, stop, take_ratio, "thread", level, level_side)
+    ls = level_set or build_levels(candles)
+    # Стоп за диапазон нитки; если рядом есть более сильный уровень — берём его
+    if direction == "LONG":
+        if _f(last.close) <= _f(last.open) or _f(last.close) <= thread_low:
+            return None
+        natural_stop = thread_low - stop_buffer_atr * atr
+        lv_near = ls.nearest(thread_low, atr)
+        level = lv_near if (lv_near and lv_near.tier <= 3) else PriceLevel(thread_low, "thread_low", 5)
+        stop = min(natural_stop, level.price - stop_buffer_atr * atr)
+    else:
+        if _f(last.close) >= _f(last.open) or _f(last.close) >= thread_high:
+            return None
+        natural_stop = thread_high + stop_buffer_atr * atr
+        lv_near = ls.nearest(thread_high, atr)
+        level = lv_near if (lv_near and lv_near.tier <= 3) else PriceLevel(thread_high, "thread_high", 5)
+        stop = max(natural_stop, level.price + stop_buffer_atr * atr)
+
+    return _make_entry(entry, stop, take_ratio, "thread", level)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Публичный API — пробуем все три паттерна по приоритету
+# Публичный API
 # ─────────────────────────────────────────────────────────────────────────────
 
 def detect_level_pattern(
-    candles: list[HistoricCandle],
+    candles: list,
     direction: str,
     atr_value: float = 0.0,
     **kwargs,
 ) -> Optional[LevelEntry]:
     """
-    Пробует FALSE_BREAKOUT → LEVEL_REVERSAL → THREAD (в порядке убывания надёжности).
-    Возвращает первый найденный паттерн или None.
+    Строит иерархические уровни один раз, пробует три паттерна:
+    FALSE_BREAKOUT → LEVEL_REVERSAL → THREAD.
+    Возвращает первый найденный или None.
     """
-    result = detect_false_breakout(candles, direction, atr_value=atr_value)
+    ls = build_levels(candles)
+    result = detect_false_breakout(candles, direction, atr_value=atr_value, level_set=ls)
     if result:
         return result
-    result = detect_level_reversal(candles, direction, atr_value=atr_value)
+    result = detect_level_reversal(candles, direction, atr_value=atr_value, level_set=ls)
     if result:
         return result
-    return detect_thread(candles, direction, atr_value=atr_value)
+    return detect_thread(candles, direction, atr_value=atr_value, level_set=ls)
