@@ -1748,7 +1748,7 @@ class OICompositeStrategy(IStrategy):
         # скоррелированный кластер методов перетягивает композит, как
         # отдельный голос от каждого, хотя по сути это один сигнал.
         if self.__cluster_models is not None:
-            redundancy_mult = self.__cluster_models.redundancy_dampen(ALL_METHOD_NAMES)
+            redundancy_mult = self.__cluster_models.redundancy_dampen(ALL_METHOD_NAMES, regime_probs)
         else:
             redundancy_mult = {}
 
