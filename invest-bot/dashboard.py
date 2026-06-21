@@ -1678,15 +1678,24 @@ async function cancelRun() {{
 }}
 
 async function runBacktest() {{
-  const allTickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
-  if (allTickers.length === 0) {{ alert('Выбери хотя бы один тикер'); return; }}
+  const allChips = Array.from(document.querySelectorAll('.chip.active'));
+  console.log('[runBacktest] active chips:', allChips.length, allChips.map(c=>c.dataset.ticker));
+  const allTickers = allChips.map(c => c.dataset.ticker).filter(Boolean);
+  if (allTickers.length === 0) {{ alert('Нет активных чипов тикеров. Выбери хотя бы один.'); return; }}
   const table = document.getElementById('results');
   table.innerHTML = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
   const days = parseInt(document.getElementById('days').value, 10);
   const atrTake = document.getElementById('atr_take').value;
   const atrStop = document.getElementById('atr_stop').value;
 
-  const filtered = await applyDedup(allTickers);
+  let filtered;
+  try {{
+    filtered = await applyDedup(allTickers);
+  }} catch(e) {{
+    console.error('[runBacktest] applyDedup failed:', e);
+    alert('Ошибка фильтрации тикеров: ' + e);
+    return;
+  }}
   const tickers = filtered.kept;
   table.innerHTML += droppedToHtml(filtered.dropped);
 
