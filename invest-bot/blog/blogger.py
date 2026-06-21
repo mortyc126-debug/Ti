@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class Blogger:
     """
-    Class formats and sends messages to telegram chat.
+    Форматирует и отправляет сообщения в Telegram-чат.
     """
     def __init__(
             self,
@@ -31,73 +31,57 @@ class Blogger:
 
     def __send_text_message(self, text: str) -> None:
         try:
-            logger.debug(f"Put message to telegram messages queue: {text}")
-
+            logger.debug(f"Добавляем сообщение в очередь TG: {text}")
             self.__messages_queue.put_nowait(text)
         except Exception as ex:
-            logger.error(f"Error put message to telegram messages queue: {repr(ex)}")
+            logger.error(f"Ошибка добавления сообщения в очередь TG: {repr(ex)}")
 
     def start_trading_message(
             self,
             today_trade_strategy: dict[str, IStrategy],
             rub_before_trade_day: Decimal
     ) -> None:
-        """
-        The method sends message about depo size, list of stocks for today trading and greetings also.
-        """
         if self.__blog_status:
-            self.__send_text_message("Greetings! We are starting.")
-            self.__send_text_message(f"Depo size: {rub_before_trade_day:.2f} rub")
-            self.__send_text_message("Stocks list:")
+            self.__send_text_message("🟢 Бот запускается. Начинаем торговый день.")
+            self.__send_text_message(f"💰 Депозит на старте: {rub_before_trade_day:.2f} ₽")
+            self.__send_text_message("📋 Торгуемые тикеры сегодня:")
             for figi_key, strategy_value in today_trade_strategy.items():
+                short_status = "разрешён" if strategy_value.settings.short_enabled_flag else "запрещён"
                 self.__send_text_message(
-                    f"Ticker: {strategy_value.settings.ticker}. "
-                    f"Short trade status: {strategy_value.settings.short_enabled_flag}"
+                    f"  • {strategy_value.settings.ticker} (шорт: {short_status})"
                 )
 
     def mega_alerts_message(self, tracked_hits: list[str], extra_tickers: list[str]) -> None:
         """
-        Сообщение по итогам ежедневной выгрузки MOEX MEGA-ALERTS: какие из
-        сегодня сконфигурированных тикеров попали в аномалии рынка, и сколько
-        других (несконфигурированных) тикеров тоже отметились — как наводка
-        на расширение списка отслеживаемых тикеров.
+        Сообщение по итогам ежедневной выгрузки MOEX MEGA-ALERTS.
         """
         if not self.__blog_status:
             return
         if tracked_hits:
-            self.__send_text_message(f"MEGA-ALERTS: аномалии сегодня по нашим тикерам: {', '.join(tracked_hits)}")
+            self.__send_text_message(f"⚡ MEGA-ALERTS: аномалии сегодня по нашим тикерам: {', '.join(tracked_hits)}")
         if extra_tickers:
             preview = ', '.join(extra_tickers[:20])
             more = f" и ещё {len(extra_tickers) - 20}" if len(extra_tickers) > 20 else ""
-            self.__send_text_message(f"MEGA-ALERTS: ещё {len(extra_tickers)} тикеров с аномалиями вне списка: {preview}{more}")
+            self.__send_text_message(f"⚡ MEGA-ALERTS: {len(extra_tickers)} сторонних тикеров с аномалиями: {preview}{more}")
 
     def finish_trading_message(self) -> None:
-        """
-        The method sends information that trading is stopping.
-        """
         if self.__blog_status:
-            self.__send_text_message("We are closing trading day.")
+            self.__send_text_message("🔔 Закрываем торговый день, выходим из позиций.")
 
     def close_position_message(self, trade_order: TradeOrder) -> None:
-        """
-        The method sends information about closed position.
-        """
         if self.__blog_status and trade_order:
-            signal_type = Blogger.__signal_type_to_message_test(trade_order.signal.signal_type)
-            self.__send_text_message(
-                f"{self.__trade_strategies[trade_order.signal.figi].ticker} position {signal_type} has been closed."
-            )
+            direction = "ЛОНГ" if trade_order.signal.signal_type == SignalType.LONG else "ШОРТ"
+            ticker = self.__trade_strategies[trade_order.signal.figi].ticker
+            self.__send_text_message(f"🔴 {ticker}: позиция {direction} закрыта.")
 
     def open_position_message(self, trade_order: TradeOrder) -> None:
-        """
-        The method sends information about opened position.
-        """
         if self.__blog_status and trade_order:
-            signal_type = Blogger.__signal_type_to_message_test(trade_order.signal.signal_type)
+            direction = "ЛОНГ" if trade_order.signal.signal_type == SignalType.LONG else "ШОРТ"
+            ticker = self.__trade_strategies[trade_order.signal.figi].ticker
             self.__send_text_message(
-                f"{self.__trade_strategies[trade_order.signal.figi].ticker} position {signal_type} has been opened. "
-                f"Take profit level: {trade_order.signal.take_profit_level:.2f}. "
-                f"Stop loss level: {trade_order.signal.stop_loss_level:.2f}."
+                f"🟢 {ticker}: открыта позиция {direction}. "
+                f"Тейк-профит: {trade_order.signal.take_profit_level:.2f}. "
+                f"Стоп-лосс: {trade_order.signal.stop_loss_level:.2f}."
             )
 
     def trading_depo_summary_message(
@@ -105,17 +89,16 @@ class Blogger:
             rub_before_trade_day: Decimal,
             current_rub_on_depo: Decimal
     ) -> None:
-        """
-        The method sends information about trading day summary.
-        """
         if self.__blog_status:
             self.__send_text_message(
-                f"Start depo: {rub_before_trade_day:.2f} close depo:{current_rub_on_depo:.2f}."
+                f"💼 Депозит: начало дня {rub_before_trade_day:.2f} ₽ → конец дня {current_rub_on_depo:.2f} ₽"
             )
-
             today_profit = current_rub_on_depo - rub_before_trade_day
-            today_percent_profit = (today_profit / rub_before_trade_day) * 100
-            self.__send_text_message(f"Today leverage: {today_profit:.2f} rub ({today_percent_profit:.2f} %)")
+            today_percent_profit = (today_profit / rub_before_trade_day * 100) if rub_before_trade_day else 0
+            sign = "+" if today_profit >= 0 else ""
+            self.__send_text_message(
+                f"📊 Результат дня: {sign}{today_profit:.2f} ₽ ({sign}{today_percent_profit:.2f}%)"
+            )
 
     def notify_message(self, text: str) -> None:
         """Прямая отправка произвольного текста — для NotificationService."""
@@ -123,47 +106,34 @@ class Blogger:
             self.__send_text_message(text)
 
     def fail_message(self):
-        """
-        The method sends information about emergency situation in bot.
-        """
         if self.__blog_status:
             self.__send_text_message(
-                f"Something went wrong. We are trying to close all positions. "
-                f"If we fail, please try to do it himself."
+                "🚨 ВНИМАНИЕ: произошла критическая ошибка. "
+                "Пытаемся закрыть все позиции. "
+                "Если не получится — закройте вручную!"
             )
 
     def summary_message(self):
-        """
-        The method sends just summary title.
-        """
         if self.__blog_status:
-            self.__send_text_message(f"Trading day summary:")
+            self.__send_text_message("📋 Итоги торгового дня:")
 
     def final_message(self):
-        """
-        The method sends just goodbye title.
-        """
         if self.__blog_status:
-            self.__send_text_message(f"Trading has been completed. See you on next trade day!")
+            self.__send_text_message("✅ Торговля завершена. До встречи на следующем торговом дне!")
 
     def summary_open_signal_message(self, trade_order: TradeOrder, open_order_state: OrderState):
-        """
-        The method sends summary information about only open positions (not closed)
-        """
         if self.__blog_status:
-            signal_type = Blogger.__signal_type_to_message_test(trade_order.signal.signal_type)
+            direction = "ЛОНГ" if trade_order.signal.signal_type == SignalType.LONG else "ШОРТ"
+            ticker = self.__trade_strategies[trade_order.signal.figi].ticker
             summary_commission = moneyvalue_to_decimal(open_order_state.executed_commission) + \
                                  moneyvalue_to_decimal(open_order_state.service_commission)
             self.__send_text_message(
-                f"Open {signal_type} position for {self.__trade_strategies[trade_order.signal.figi].ticker}. "
-                f"Lots executed: {open_order_state.lots_executed}. "
-                f"Average price: "
-                f"{moneyvalue_to_decimal(open_order_state.average_position_price):.2f}. "
-                f"Total order price: "
-                f"{moneyvalue_to_decimal(open_order_state.total_order_amount):.2f}. "
-                f"Total commissions: "
-                f"{summary_commission:.2f}. "
-                f"You have to close position manually."
+                f"⚠️ {ticker}: позиция {direction} осталась открытой.\n"
+                f"  Лотов исполнено: {open_order_state.lots_executed}\n"
+                f"  Средняя цена: {moneyvalue_to_decimal(open_order_state.average_position_price):.2f} ₽\n"
+                f"  Сумма ордера: {moneyvalue_to_decimal(open_order_state.total_order_amount):.2f} ₽\n"
+                f"  Комиссия: {summary_commission:.2f} ₽\n"
+                f"  ⚡ Требуется ручное закрытие!"
             )
 
     def summary_closed_signal_message(self,
@@ -171,28 +141,21 @@ class Blogger:
                                       open_order_state: OrderState,
                                       close_order_state: OrderState
                                       ) -> None:
-        """
-        The method sends summary information about closed positions
-        """
         if self.__blog_status:
-            signal_type = Blogger.__signal_type_to_message_test(trade_order.signal.signal_type)
+            direction = "ЛОНГ" if trade_order.signal.signal_type == SignalType.LONG else "ШОРТ"
+            ticker = self.__trade_strategies[trade_order.signal.figi].ticker
             summary_commission = moneyvalue_to_decimal(open_order_state.executed_commission) + \
                                  moneyvalue_to_decimal(open_order_state.service_commission) + \
                                  moneyvalue_to_decimal(close_order_state.executed_commission) + \
                                  moneyvalue_to_decimal(close_order_state.service_commission)
+            pnl = moneyvalue_to_decimal(close_order_state.total_order_amount) - \
+                  moneyvalue_to_decimal(open_order_state.total_order_amount)
+            sign = "+" if pnl >= 0 else ""
             self.__send_text_message(
-                f"Close {signal_type} position for {self.__trade_strategies[trade_order.signal.figi].ticker}. "
-                f"Lots executed: {close_order_state.lots_executed}. "
-                f"Average open price: "
-                f"{moneyvalue_to_decimal(open_order_state.average_position_price):.2f}. "
-                f"Average close price: "
-                f"{moneyvalue_to_decimal(close_order_state.average_position_price):.2f}. "
-                f"Summary: "
-                f"{moneyvalue_to_decimal(close_order_state.total_order_amount) - moneyvalue_to_decimal(open_order_state.total_order_amount):.2f}. "
-                f"Total commissions: "
-                f"{summary_commission:.2f}."
+                f"📌 {ticker}: сделка {direction} закрыта.\n"
+                f"  Цена входа: {moneyvalue_to_decimal(open_order_state.average_position_price):.2f} ₽\n"
+                f"  Цена выхода: {moneyvalue_to_decimal(close_order_state.average_position_price):.2f} ₽\n"
+                f"  Лотов: {close_order_state.lots_executed}\n"
+                f"  Результат: {sign}{pnl:.2f} ₽\n"
+                f"  Комиссии: {summary_commission:.2f} ₽"
             )
-
-    @staticmethod
-    def __signal_type_to_message_test(signal_type: SignalType) -> str:
-        return "long" if signal_type == SignalType.LONG else "short"
