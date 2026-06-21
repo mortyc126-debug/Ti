@@ -164,7 +164,8 @@ def classify_regime_probs(closes: list[float], volumes: list[float] | None = Non
         med = statistics.median(volumes[:-1]) or 1e-9
         vol_spike = min(1.0, max(0.0, (volumes[-1] / med - 1.0)))
 
-    p_stress_raw = min(1.0, (vol_ratio > 2.5) * 0.5 + vol_spike * 0.5)
+    # Непрерывный стресс-сигнал: плавный рост с vol_ratio вместо жёсткого порога
+    p_stress_raw = min(1.0, _smoothstep(vol_ratio, 1.8, 3.0) * 0.5 + vol_spike * 0.5)
     # тот же признак, но непрерывный: доля "режим=high_vol" растёт с vol_ratio гладко
     vol_high_prob = _smoothstep(vol_ratio, 1.5, 3.5)
 

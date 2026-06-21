@@ -87,13 +87,14 @@ STRATEGY_CLUSTERS = [
     },
     {
         "label": "Циклы",
-        "ids": ["CYBER_CYCLE", "DECYCLER", "EBSW", "SINEWAVE_SIGNAL", "WAVELET_SIGNAL"],
-        # WAVELET_SIGNAL: доминантный масштаб CWT — та же группа что Элерс
+        "ids": ["CYBER_CYCLE", "DECYCLER", "EBSW", "SINEWAVE_SIGNAL"],
+        # WAVELET_SIGNAL убран из методов: работает только как множитель уверенности
     },
     {
         "label": "Режим рынка",
-        "ids": ["MMI_SIGNAL", "ZSCORE", "CHANGE_POINT", "VOLATILITY_REG"],
+        "ids": ["MMI_SIGNAL", "ZSCORE", "CHANGE_POINT"],
         # CHANGE_POINT: CUSUM/PELT/BOCD — смена режима
+        # VOLATILITY_REG убран: используется как vhf_mult множитель, не голос
     },
     {
         "label": "Микроструктура",

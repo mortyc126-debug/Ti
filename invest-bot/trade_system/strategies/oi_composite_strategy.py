@@ -1030,7 +1030,6 @@ METHODS = [
     ("MMI_SIGNAL",     score_mmi_signal),
     ("YZ_VOL_SIGNAL",  score_yz_vol_signal),
     ("VR_SIGNAL",      score_vr_signal),
-    ("WAVELET_SIGNAL", score_wavelet_signal),
     ("SSA_SIGNAL",     score_ssa_signal),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
 ]
@@ -1772,14 +1771,12 @@ class OICompositeStrategy(IStrategy):
             cluster_ready = False
             corr_regimes = []
 
-        _1min_mods = _1MIN_WEIGHT_MODS if self.__candle_window > CANDLE_WINDOW else {}
         methods = []
         for name in ALL_METHOD_NAMES:
             hedge = self.__weights[name]
             blended_weight = self.__blended_hedge_weight(name, regime_probs)
             eff_weight = (
                 blended_weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
-                * _1min_mods.get(name, 1.0)
                 * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             )
             methods.append({
@@ -2180,10 +2177,8 @@ class OICompositeStrategy(IStrategy):
         else:
             redundancy_mult = {}
 
-        _1min_mods = _1MIN_WEIGHT_MODS if self.__candle_window > CANDLE_WINDOW else {}
         weights = [
             self.__blended_hedge_weight(name, regime_probs) * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
-            * _1min_mods.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             for name in ALL_METHOD_NAMES
         ]
@@ -2193,29 +2188,7 @@ class OICompositeStrategy(IStrategy):
         # просуммированы, повторное сложение было бы двойным счётом.
         n_base = len(BASE_METHOD_NAMES)
 
-        # Lag-коррекция: для методов с измеренным стабильным лагом читаем
-        # задержанный скор из буфера истории, взвешивая по вероятностям режима.
-        # Читаем ДО того, как пушим текущий бар, чтобы history[-k] = scores[t-k].
-        lag_corrected = list(scores_for_composite)
-        if self.__score_history:
-            for i, name in enumerate(BASE_METHOD_NAMES):
-                delayed_sum = 0.0
-                for r, p in regime_probs.items():
-                    if p <= 0.0:
-                        continue
-                    lag_k = _LAG_TABLE.get(r, {}).get(name, 0)
-                    if lag_k > 0 and len(self.__score_history) >= lag_k:
-                        delayed_sum += p * self.__score_history[-lag_k][i]
-                    else:
-                        delayed_sum += p * scores_for_composite[i]
-                lag_corrected[i] = delayed_sum
-        # Пишем в историю текущий (не скорректированный) скор — чтобы
-        # будущие бары читали реальный исторический скор, а не коррекцию от коррекции.
-        self.__score_history.append(list(scores_for_composite))
-        if len(self.__score_history) > _LAG_HISTORY_LEN:
-            self.__score_history.pop(0)
-
-        weighted = sum(s * w for s, w in zip(lag_corrected[:n_base], weights[:n_base]))
+        weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
         weight_sum = sum(weights[:n_base]) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
 
