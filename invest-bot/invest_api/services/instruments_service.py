@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 
 from tinkoff.invest import Client, TradingSchedule, InstrumentIdType, InstrumentStatus
 from invest_api.invest_target import INVEST_TARGET
@@ -152,6 +153,71 @@ class InstrumentService:
         return result
 
     @invest_api_retry()
+    def futures_by_base_tickers_bulk(
+        self,
+        base_tickers: list[str],
+        margin_delay: float = 0.5,
+    ) -> dict[str, tuple[FutureSettings, str]]:
+        """
+        Батч-загрузка ближайших контрактов для списка базовых активов.
+        Один вызов futures() на весь список, потом get_futures_margin()
+        только для найденных контрактов с паузой margin_delay между вызовами
+        (защита от RESOURCE_EXHAUSTED: лимит ~15 req/60s).
+        Возвращает {base_ticker: (FutureSettings, figi)}.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        base_set = set(base_tickers)
+
+        # Шаг 1: один запрос — весь листинг фьючерсов
+        best: dict[str, tuple] = {}   # base -> (future_obj, figi, expiration)
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            for fut in client.instruments.futures(
+                    instrument_status=InstrumentStatus.INSTRUMENT_STATUS_BASE
+            ).instruments:
+                if fut.basic_asset not in base_set:
+                    continue
+                if not fut.api_trade_available_flag:
+                    continue
+                if fut.expiration_date <= now:
+                    continue
+                base = fut.basic_asset
+                if base not in best or fut.expiration_date < best[base][2]:
+                    best[base] = (fut, fut.figi, fut.expiration_date)
+
+        # Шаг 2: get_futures_margin для каждого найденного контракта
+        result: dict[str, tuple[FutureSettings, str]] = {}
+        items = list(best.items())
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            for i, (base, (fut, figi, _)) in enumerate(items):
+                try:
+                    margin = client.instruments.get_futures_margin(figi=figi)
+                    margin_per_lot = max(
+                        moneyvalue_to_decimal(margin.initial_margin_on_buy),
+                        moneyvalue_to_decimal(margin.initial_margin_on_sell)
+                    )
+                    min_step = moneyvalue_to_decimal(margin.min_price_increment)
+                    min_step_amount = moneyvalue_to_decimal(margin.min_price_increment_amount)
+                    point_value = float(min_step_amount / min_step) if min_step else 1.0
+
+                    result[base] = (FutureSettings(
+                        ticker=fut.ticker,
+                        lot=fut.lot,
+                        short_enabled_flag=fut.short_enabled_flag,
+                        basic_asset=fut.basic_asset,
+                        expiration_date=fut.expiration_date,
+                        margin_per_lot=float(margin_per_lot),
+                        point_value=point_value,
+                    ), figi)
+                except Exception as e:
+                    logger.warning(f"futures_bulk: {base} ({fut.ticker}): {e}")
+
+                # пауза чтобы не бить в лимит (14 req/60s = 4.3s/req, берём с запасом)
+                if i < len(items) - 1:
+                    time.sleep(margin_delay)
+
+        logger.info(f"futures_bulk: найдено {len(result)}/{len(base_tickers)} контрактов")
+        return result
+
     @invest_error_logging
     def future_by_base_ticker(self, base_ticker: str) -> tuple[FutureSettings, str] | None:
         """

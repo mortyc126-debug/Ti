@@ -354,20 +354,18 @@ def _load_futures_settings_bg() -> None:
             _futures_settings_cache = {}
             return
 
-        print(f"[futures] Начинаю загрузку {len(ft.base_tickers)} контрактов…", flush=True)
+        print(f"[futures] Батч-загрузка {len(ft.base_tickers)} базовых активов…", flush=True)
         stock_settings = {s.ticker: s for s in _config.trade_strategy_settings}
         ma = _config.mega_alerts_settings
 
+        # Один вызов futures() + get_futures_margin с паузами (без rate-limit flood)
+        bulk = _instrument_service.futures_by_base_tickers_bulk(
+            ft.base_tickers, margin_delay=4.5
+        )
+        print(f"[futures] API вернул {len(bulk)} контрактов, строю StrategySettings…", flush=True)
+
         result: dict[str, StrategySettings] = {}
-        for i, base in enumerate(ft.base_tickers, 1):
-            try:
-                resolved = _instrument_service.future_by_base_ticker(base)
-            except Exception as e:
-                logger.warning(f"futures dashboard: {base}: {e}")
-                continue
-            if resolved is None:
-                continue
-            future_info, figi = resolved
+        for base, (future_info, figi) in bulk.items():
             base_st = stock_settings.get(base)
             if base_st:
                 sig_settings = dict(base_st.settings)
@@ -394,11 +392,9 @@ def _load_futures_settings_bg() -> None:
                 candle_interval_min=1,
             )
             result[future_info.ticker] = st
-            if i % 10 == 0:
-                print(f"[futures] {i}/{len(ft.base_tickers)} — найдено {len(result)}", flush=True)
 
         _futures_settings_cache = result
-        print(f"[futures] Готово: загружено {len(result)} контрактов", flush=True)
+        print(f"[futures] Готово: {len(result)} контрактов", flush=True)
         logger.info(f"futures dashboard: загружено {len(result)} контрактов")
     except Exception as e:
         logger.error(f"futures dashboard: ошибка загрузки: {e}")
