@@ -868,6 +868,13 @@ AUTO_ATR_TAKE_KS = (2.0, 3.0, 4.0)
 AUTO_ATR_STOP_KS = (1.5, 2.0, 3.0)
 AUTO_ATR_MIN_TRADES = 20           # меньше сделок на истории — авто-подбору не доверяем
                                     # (sweep по 3-9 исходам — это подбор по шуму, не сигнал)
+ATR_SHRINK_K = 8                   # псевдо-наблюдения к fixed-бейзлайну (как REGIME_SHRINKAGE_K в history.py) —
+                                    # тянет оценку ATR-кандидата на маленькой выборке к консервативному fixed,
+                                    # без этого argmax по 45 кандидатам (3×3×5) почти всегда выбирает
+                                    # комбинацию, выигравшую за счёт пары случайных сделок в eval-окне
+                                    # ("optimizer's curse") — отсюда систематический проигрыш ATR живому fixed-режиму.
+ATR_MIN_EDGE_SEM = 1.0              # переключаться на ATR-кандидата только если он бьёт fixed больше чем на
+                                     # свой SEM — иначе "победа" неотличима от шума
 
 # _compute_atr меряет волатильность ОДНОГО бара (TR-квантиль), а сделка
 # держится десятки баров до take/stop/timeout (max_bars) — без масштабирования
@@ -885,6 +892,21 @@ ATR_SCALE_HOLDING_BARS = 60
 # walk-forward мог сам решить, что лучше, а не считать масштабирование
 # обязательным.
 AUTO_ATR_SCALE_EXPS = (0.0, 0.3, 0.4, 0.5, 0.6)
+
+
+def _shrunk_atr_score(trades: list[dict], fixed_pct: float, k: int = ATR_SHRINK_K) -> tuple[float, float]:
+    """Shrinkage-оценка expectancy ATR-кандидата (см. ATR_SHRINK_K) — тянет
+    к fixed_pct силой k псевдо-наблюдений, чтобы argmax по сетке не выбирал
+    комбинацию, выигравшую за счёт пары случайных сделок на маленьком
+    eval-окне. Возвращает (shrunk_score, sem)."""
+    n = len(trades)
+    if n == 0:
+        return fixed_pct, 0.0
+    vals = [t["net_pct"] for t in trades]
+    raw = sum(vals) / n
+    sem = statistics.pstdev(vals) / (n ** 0.5) if n > 1 else abs(raw)
+    shrunk = (n * raw + k * fixed_pct) / (n + k)
+    return shrunk, sem
 
 
 class OICompositeStrategy(IStrategy):
@@ -2035,20 +2057,32 @@ class OICompositeStrategy(IStrategy):
             # истории, не участвовавшем в выборе кандидатов.
             split = int(len(signals) * 0.6)
             eval_signals = signals[split:] if len(signals) - split >= AUTO_ATR_MIN_TRADES else signals
+            # fixed-режим на том же eval-окне — бейзлайн для shrinkage и для
+            # проверки значимости edge (см. _shrunk_atr_score, ATR_MIN_EDGE_SEM):
+            # без него argmax по 45 кандидатам почти всегда находит "победителя"
+            # по шуму, который потом хуже живого fixed-режима ("optimizer's curse").
+            fixed_res = self.backtest_barriers(signals=eval_signals, take_mult=self.__long_take,
+                                                stop_mult=self.__long_stop, record_history=False)
+            fixed_pct = fixed_res.get("expectancy_pct", 0.0)
             best = None
             for tk in AUTO_ATR_TAKE_KS:
                 for sk in AUTO_ATR_STOP_KS:
                     for ex in AUTO_ATR_SCALE_EXPS:
                         res = self.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                      atr_scale_exp=ex, record_history=False)
-                        if res["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                                      atr_scale_exp=ex, record_history=False, return_trades=True)
+                        cand_trades = res.get("trades", [])
+                        if len(cand_trades) < AUTO_ATR_MIN_TRADES:
                             continue
-                        if best is None or res["expectancy_pct"] > best[1]:
-                            best = ((tk, sk, ex), res["expectancy_pct"])
-            if best:
-                (tk, sk, ex), exp = best
+                        score, sem = _shrunk_atr_score(cand_trades, fixed_pct)
+                        if best is None or score > best[1]:
+                            best = ((tk, sk, ex), score, sem)
+            if best is not None and best[1] - ATR_MIN_EDGE_SEM * best[2] > fixed_pct:
+                (tk, sk, ex), score, sem = best
                 self.__auto_atr_take_k, self.__auto_atr_stop_k, self.__auto_atr_scale_exp = tk, sk, ex
-                logger.info(f"{self.__settings.ticker}: авто-ATR k={tk}/{sk} exp={ex} (expectancy={exp:.4f}%)")
+                logger.info(f"{self.__settings.ticker}: авто-ATR k={tk}/{sk} exp={ex} (shrunk_score={score:.4f}%, fixed={fixed_pct:.4f}%)")
+            else:
+                logger.info(f"{self.__settings.ticker}: авто-ATR — нет значимого edge над fixed "
+                            f"(fixed={fixed_pct:.4f}%), параметры не меняем")
         except Exception:
             logger.exception(f"{self.__settings.ticker}: авто-подбор ATR_TAKE_K/ATR_STOP_K упал")
 
