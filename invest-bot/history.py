@@ -388,3 +388,26 @@ class BacktestHistoryStore(HistoryStore):
             record["tf_regimes"] = tf_regimes
         trades.append(record)
         self._trim(ticker)
+
+    def merge_into(self, store: "HistoryStore") -> int:
+        """Копирует накопленные данные бэктеста в реальный HistoryStore.
+        Живые дни не перезаписываются — только дописываются недостающие даты.
+        Возвращает количество скопированных дней."""
+        merged = 0
+        for ticker, days in self._data.items():
+            for date, day_data in days.items():
+                existing = store._data.setdefault(ticker, {})
+                if date not in existing:
+                    existing[date] = day_data
+                    merged += 1
+                else:
+                    # Живой день уже есть — добавляем только новые сделки
+                    if "trades" in day_data:
+                        existing[date].setdefault("trades", [])
+                        live_trades = existing[date]["trades"]
+                        for t in day_data["trades"]:
+                            if t not in live_trades:
+                                live_trades.append(t)
+        if merged:
+            store._save()
+        return merged

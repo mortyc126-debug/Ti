@@ -92,6 +92,54 @@ def _wire_history(strategy) -> None:
         strategy.set_history(BacktestHistoryStore(), PercentileCalibrator())
 
 
+def _wire_history_returning(strategy) -> BacktestHistoryStore:
+    """Как _wire_history, но возвращает store чтобы после прогона можно было
+    забрать накопленные сделки и сохранить их в реальный HistoryStore."""
+    store = BacktestHistoryStore()
+    if hasattr(strategy, "set_history"):
+        strategy.set_history(store, PercentileCalibrator())
+    return store
+
+
+def save_backtest_history(tickers: list[str], days: int) -> dict:
+    """Прогоняет бэктест по тикерам и сохраняет накопленные сделки/скоры
+    в data/history.json. Используется для начальной калибровки lasso без
+    ожидания живых сделок."""
+    real_store = HistoryStore()
+    total_days = 0
+    total_trades = 0
+    errors = []
+
+    by_ticker = _all_settings_by_ticker()
+    for ticker in tickers:
+        settings = by_ticker.get(ticker)
+        if settings is None:
+            errors.append(f"{ticker}: нет в settings")
+            continue
+        try:
+            strategy = StrategyFactory.new_factory(settings.name, settings)
+            bt_store = _wire_history_returning(strategy)
+            candles = get_candles_cached(ticker, settings.figi, days, _market_data, _db,
+                                         candle_interval_min=settings.candle_interval_min)
+            if not candles:
+                errors.append(f"{ticker}: нет свечей")
+                continue
+            strategy.backtest_barriers(candles)
+            merged = bt_store.merge_into(real_store)
+            # подсчитаем сделки
+            n_trades = sum(
+                len(v.get("trades", []))
+                for days_data in bt_store._data.get(ticker, {}).values()
+                for v in [days_data]
+            )
+            total_days += merged
+            total_trades += n_trades
+        except Exception as ex:
+            errors.append(f"{ticker}: {ex}")
+
+    return {"saved_days": total_days, "trades": total_trades, "errors": errors}
+
+
 _config = ProgramConfiguration(CONFIG_FILE)
 _market_data = MarketDataService(_config.tinkoff_token, _config.tinkoff_app_name)
 _instrument_service = InstrumentService(_config.tinkoff_token, _config.tinkoff_app_name)
@@ -1363,6 +1411,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div class="sec-lg">Бэктест по тикерам</div>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
+  <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <span id="status"></span>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
@@ -1874,6 +1923,31 @@ async function importOiFile(ev) {{
     document.getElementById('oi_status').textContent = `✓ импортировано ${{result.imported}} тикеров — перезагрузи страницу`;
   }};
   reader.readAsText(file);
+}}
+
+async function saveBacktestHistory() {{
+  const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
+  if (!tickers.length) {{ alert('Выбери тикеры (активные чипы)'); return; }}
+  const days = parseInt(document.getElementById('days').value) || 90;
+  if (!confirm(`Прогнать бэктест по ${{tickers.length}} тикерам (${{days}} дн.) и сохранить сделки в history.json?`)) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳ сохраняю...';
+  try {{
+    const r = await fetch('/api/save_backtest_history', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{tickers, days}})
+    }});
+    const d = await r.json();
+    if (d.error) {{ alert('Ошибка: ' + d.error); }}
+    else {{
+      const errs = d.errors && d.errors.length ? '\\nОшибки: ' + d.errors.join(', ') : '';
+      alert(`Сохранено: ${{d.saved_days}} дн., ${{d.trades}} сделок.${{errs}}`);
+    }}
+  }} catch(e) {{
+    alert('Ошибка: ' + e);
+  }} finally {{
+    btn.disabled = false; btn.textContent = '💾 сохранить историю';
+  }}
 }}
 
 async function reloadFutures() {{
@@ -3211,6 +3285,14 @@ class Handler(BaseHTTPRequestHandler):
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
             self._send_json({"started": started, "running": running})
+        elif self.path == "/api/save_backtest_history":
+            tickers = payload.get("tickers", [])
+            days = int(payload.get("days", 90))
+            if not tickers:
+                self._send_json({"error": "нет тикеров"}, status=400)
+            else:
+                result = save_backtest_history(tickers, days)
+                self._send_json(result)
         elif self.path == "/api/cancel":
             was_running = request_cancel()
             self._send_json({"cancelled": was_running})
