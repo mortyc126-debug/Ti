@@ -608,7 +608,8 @@ def run_backtest_one(
             return rows
 
         try:
-            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db,
+                                         candle_interval_min=strategy_settings.candle_interval_min)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             _set_progress(progress, ticker, "ошибка API")
@@ -798,7 +799,8 @@ def _portfolio_sim_one_ticker(
             return [], None
 
         try:
-            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db,
+                                         candle_interval_min=strategy_settings.candle_interval_min)
         except RequestError as ex:
             _set_progress(progress, ticker, "ошибка API")
             return [], {"ticker": ticker, "error": str(ex.details)}

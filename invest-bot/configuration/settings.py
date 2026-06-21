@@ -24,6 +24,9 @@ class StrategySettings:
     # для фьючерсов — стоимость одного пункта изменения цены в рублях
     # (для акций остаётся 1.0 — 1 пункт цены = 1 рубль)
     point_value: float = 1.0
+    # интервал свечей в минутах: 1 или 5 (дефолт). Влияет на загрузку истории
+    # и на окна индикаторов внутри OICompositeStrategy.
+    candle_interval_min: int = 5
 
 
 @dataclass(eq=False, repr=True)

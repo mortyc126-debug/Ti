@@ -82,7 +82,9 @@ class ProgramConfiguration:
                         figi=config[strategy_section]["FIGI"],
                         ticker=config[strategy_section]["TICKER"],
                         max_lots_per_order=int(config[strategy_section]["MAX_LOTS_PER_ORDER"]),
-                        settings=config[strategy_section + "_SETTINGS"]
+                        settings=config[strategy_section + "_SETTINGS"],
+                        is_future=config[strategy_section].get("IS_FUTURE", "0") == "1",
+                        candle_interval_min=int(config[strategy_section].get("CANDLE_INTERVAL", "5")),
                     )
                 )
 

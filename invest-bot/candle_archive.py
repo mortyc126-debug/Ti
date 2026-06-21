@@ -28,7 +28,12 @@ import os
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 
-from tinkoff.invest import HistoricCandle, Quotation
+from tinkoff.invest import CandleInterval, HistoricCandle, Quotation
+
+_INTERVAL_MAP = {
+    1: CandleInterval.CANDLE_INTERVAL_1_MIN,
+    5: CandleInterval.CANDLE_INTERVAL_5_MIN,
+}
 from tinkoff.invest.utils import quotation_to_decimal, decimal_to_quotation
 
 from db_api_client import DbApiClient
@@ -65,12 +70,13 @@ def _row_to_candle(row: dict) -> HistoricCandle:
     )
 
 
-def _local_cache_path(ticker: str) -> str:
-    return os.path.join(LOCAL_CACHE_DIR, f"{ticker}.json")
+def _local_cache_path(ticker: str, interval_min: int = 5) -> str:
+    suffix = "" if interval_min == 5 else f"_{interval_min}m"
+    return os.path.join(LOCAL_CACHE_DIR, f"{ticker}{suffix}.json")
 
 
-def _load_local(ticker: str) -> list[dict]:
-    path = _local_cache_path(ticker)
+def _load_local(ticker: str, interval_min: int = 5) -> list[dict]:
+    path = _local_cache_path(ticker, interval_min)
     if not os.path.exists(path):
         return []
     try:
@@ -81,10 +87,10 @@ def _load_local(ticker: str) -> list[dict]:
         return []
 
 
-def _save_local(ticker: str, rows: list[dict]) -> None:
+def _save_local(ticker: str, rows: list[dict], interval_min: int = 5) -> None:
     os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
     rows = sorted(rows, key=lambda r: r["time"])
-    path = _local_cache_path(ticker)
+    path = _local_cache_path(ticker, interval_min)
     tmp_path = path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(rows, f)
@@ -95,14 +101,16 @@ def _save_local(ticker: str, rows: list[dict]) -> None:
 
 def get_candles_cached(
         ticker: str, figi: str, days: int,
-        market_data: MarketDataService, db: DbApiClient
+        market_data: MarketDataService, db: DbApiClient,
+        candle_interval_min: int = 5,
 ) -> list[HistoricCandle]:
     now = datetime.now(timezone.utc)
     date_from = (now - timedelta(days=days)).date()
     date_to = now.date()
     all_days = [date_from + timedelta(days=i) for i in range((date_to - date_from).days + 1)]
 
-    local_rows = _load_local(ticker)
+    interval = _INTERVAL_MAP.get(candle_interval_min, CandleInterval.CANDLE_INTERVAL_5_MIN)
+    local_rows = _load_local(ticker, candle_interval_min)
     local_by_day: dict[str, list[dict]] = {}
     for row in local_rows:
         local_by_day.setdefault(row["time"][:10], []).append(row)
@@ -113,8 +121,9 @@ def get_candles_cached(
         rows = [r for d in all_days for r in local_by_day.get(d.isoformat(), [])]
         return [_row_to_candle(r) for r in rows]
 
-    if not db.configured:
-        fresh = market_data.get_candles_for_dates(figi, missing_locally) if missing_locally else []
+    # D1 хранит только 5-мин свечи — для 1-мин всегда идём напрямую в Tinkoff
+    if not db.configured or candle_interval_min != 5:
+        fresh = market_data.get_candles_for_dates(figi, missing_locally, interval=interval) if missing_locally else []
     else:
         archived = db.get_candles(
             ticker, missing_locally[0].isoformat(), missing_locally[-1].isoformat()
@@ -136,7 +145,7 @@ def get_candles_cached(
         local_by_day.setdefault(c.time.date().isoformat(), []).append(_candle_to_row(c))
 
     all_rows = [r for d in all_days for r in local_by_day.get(d.isoformat(), [])]
-    _save_local(ticker, [r for rows in local_by_day.values() for r in rows])
+    _save_local(ticker, [r for rows in local_by_day.values() for r in rows], candle_interval_min)
 
     merged = [_row_to_candle(r) for r in all_rows]
     merged.sort(key=lambda c: c.time)

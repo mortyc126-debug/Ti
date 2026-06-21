@@ -1812,7 +1812,11 @@ class Trader:
             return
         cfg = self.__mega_alerts_settings
         try:
-            candles = self.__market_data_service.get_candles_history(strategy.settings.figi, days=cfg.history_days)
+            from tinkoff.invest import CandleInterval as _CI
+            _imap = {1: _CI.CANDLE_INTERVAL_1_MIN, 5: _CI.CANDLE_INTERVAL_5_MIN}
+            candles = self.__market_data_service.get_candles_history(
+                strategy.settings.figi, days=cfg.history_days,
+                interval=_imap.get(strategy.settings.candle_interval_min, _CI.CANDLE_INTERVAL_5_MIN))
         except Exception as ex:
             logger.warning(f"BACKTEST: история свечей {strategy.settings.ticker} не получена: {repr(ex)}")
             return
@@ -1906,7 +1910,11 @@ class Trader:
                 continue
 
             try:
-                candles = self.__market_data_service.get_candles_history(figi, days=cfg.history_days)
+                from tinkoff.invest import CandleInterval as _CI
+                _imap = {1: _CI.CANDLE_INTERVAL_1_MIN, 5: _CI.CANDLE_INTERVAL_5_MIN}
+                candles = self.__market_data_service.get_candles_history(
+                    figi, days=cfg.history_days,
+                    interval=_imap.get(strategy.settings.candle_interval_min, _CI.CANDLE_INTERVAL_5_MIN))
             except Exception as ex:
                 logger.warning(f"MEGA-ALERTS: история свечей {ticker} не получена: {repr(ex)}")
                 candles = []

@@ -981,6 +981,12 @@ class OICompositeStrategy(IStrategy):
         self.__atr_stop_k = float(s["ATR_STOP_K"]) if "ATR_STOP_K" in s else None
         self.__atr_scale_exp = float(s["ATR_SCALE_EXP"]) if "ATR_SCALE_EXP" in s else None
 
+        # На 1-мин свечах используем увеличенное окно чтобы покрыть то же
+        # календарное время что и CANDLE_WINDOW баров на 5-мин (30×5 = 150 мин).
+        interval_min = getattr(settings, "candle_interval_min", 5)
+        self.__candle_window = CANDLE_WINDOW if interval_min >= 5 else CANDLE_WINDOW * 5
+        self.__min_candles = MIN_CANDLES if interval_min >= 5 else MIN_CANDLES * 3
+
         self.__candles: list[HistoricCandle] = []
         self.__open_trade: Optional[OpenTrade] = None
         self.__weights: dict[str, MethodWeight] = self.__load_weights()
@@ -1176,8 +1182,8 @@ class OICompositeStrategy(IStrategy):
         self.__recalc_auto_atr()
         self.__candles.extend(candles)
         # окно: последние CANDLE_WINDOW свечей
-        if len(self.__candles) > CANDLE_WINDOW:
-            self.__candles = self.__candles[-CANDLE_WINDOW:]
+        if len(self.__candles) > self.__candle_window:
+            self.__candles = self.__candles[-self.__candle_window:]
 
         # накапливаем историю открытой сделки для MFE/MAE
         if self.__open_trade:
@@ -1186,7 +1192,7 @@ class OICompositeStrategy(IStrategy):
             if len(self.__open_trade.after_candles) >= MFE_MAE_BARS:
                 self.__record_outcome()
 
-        if len(self.__candles) < MIN_CANDLES:
+        if len(self.__candles) < self.__min_candles:
             return None
 
         # ATR-фильтр: если средний ход меньше комиссии×фактор — движение не
@@ -1260,7 +1266,7 @@ class OICompositeStrategy(IStrategy):
         найденный через MEGA-ALERTS) тикер не ждал MIN_CANDLES живых свечей
         перед первым сигналом. Открытых сделок не затрагивает.
         """
-        self.__candles = candles[-CANDLE_WINDOW:]
+        self.__candles = candles[-self.__candle_window:]
 
     def backtest_quality(self, candles: list[HistoricCandle], lookahead: int = MFE_MAE_BARS) -> tuple[float, int]:
         """
@@ -1287,7 +1293,7 @@ class OICompositeStrategy(IStrategy):
 
         Возвращает (средний quality, число виртуальных сделок).
         """
-        if len(candles) < CANDLE_WINDOW + lookahead + 1:
+        if len(candles) < self.__candle_window + lookahead + 1:
             return 0.5, 0
 
         saved_candles = self.__candles
@@ -1297,7 +1303,7 @@ class OICompositeStrategy(IStrategy):
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - lookahead:
-                self.__candles = candles[i - CANDLE_WINDOW:i]
+                self.__candles = candles[i - self.__candle_window:i]
 
                 atr_pct = _compute_atr(self.__candles)
                 if atr_pct < comm * MIN_ATR_FACTOR:
@@ -1391,13 +1397,13 @@ class OICompositeStrategy(IStrategy):
         комбинации — см. compare_take_stop.py, где иначе один и тот же
         дорогой проход повторялся бы 10 раз на тикер.
         """
-        if len(candles) < CANDLE_WINDOW + 2:
+        if len(candles) < self.__candle_window + 2:
             return []
 
         saved_candles = self.__candles
         saved_score_history = list(self.__score_history)
         signals: list[dict] = []
-        total_bars = len(candles) - 1 - CANDLE_WINDOW
+        total_bars = len(candles) - 1 - self.__candle_window
         t_start = time.monotonic()
         t_last_log = t_start
         # Бэктестовая история (см. history.BacktestHistoryStore) умеет писать
@@ -1408,7 +1414,7 @@ class OICompositeStrategy(IStrategy):
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
-                done = i - CANDLE_WINDOW
+                done = i - self.__candle_window
                 now = time.monotonic()
                 if now - t_last_log >= 5 and done > 0:  # не реже раза в 5с, независимо от скорости бара
                     t_last_log = now
@@ -1419,7 +1425,7 @@ class OICompositeStrategy(IStrategy):
                         f"{self.__settings.ticker}: скан {done}/{total_bars} баров "
                         f"({100 * done / total_bars:.0f}%), {elapsed:.0f}с прошло, ~{eta:.0f}с осталось"
                     )
-                self.__candles = candles[i - CANDLE_WINDOW:i]
+                self.__candles = candles[i - self.__candle_window:i]
 
                 atr_pct = _compute_atr(self.__candles)
                 comm = commission_rt(self.__settings.is_future)
@@ -1497,15 +1503,15 @@ class OICompositeStrategy(IStrategy):
         ряд score(t), а не только моменты сигналов (которые сами по себе уже
         отфильтрованы по "score созрел", т.е. смещены к месту, где лаг скрыт).
         """
-        if len(candles) < CANDLE_WINDOW + 2:
+        if len(candles) < self.__candle_window + 2:
             return []
 
         saved_candles = self.__candles
         saved_score_history = list(self.__score_history)
         rows: list[dict] = []
         try:
-            for i in range(CANDLE_WINDOW, len(candles)):
-                self.__candles = candles[i - CANDLE_WINDOW:i]
+            for i in range(self.__candle_window, len(candles)):
+                self.__candles = candles[i - self.__candle_window:i]
                 _, scores = self.__compute_composite()
                 closes_w = [_to_f(c.close) for c in self.__candles]
                 volumes_w = [float(c.volume) for c in self.__candles]
@@ -1532,10 +1538,10 @@ class OICompositeStrategy(IStrategy):
         __cluster_models/__last_regime, считает регим/смеси заново на этом
         окне, не вмешиваясь в состояние, которое использует analyze_candles.
         """
-        if len(candles) < CANDLE_WINDOW:
+        if len(candles) < self.__candle_window:
             return {"ready": False}
 
-        window = candles[-CANDLE_WINDOW:]
+        window = candles[-self.__candle_window:]
         closes = [_to_f(c.close) for c in window]
         volumes = [float(c.volume) for c in window]
         regime_probs = classify_regime_probs(closes, volumes)
