@@ -132,7 +132,43 @@ MIN_CANDLES = 10                   # минимум свечей для перв
 SIGNAL_THRESHOLD = 0.25            # порог composite для сигнала
 HEDGE_ETA = 0.6                    # темп Hedge-обучения весов методов (multiplicative weights)
 HEDGE_WARMUP_TRADES = 15           # на первых N сделках eta линейно растёт от 0 до HEDGE_ETA
-HEDGE_REGIME_MIN_OBS = 15          # ниже этого числа сделок в режиме режимный Hedge-вес не доверяем, используем глобальный
+# Байесовский shrinkage: per-regime вес → global.
+# alpha = n / (n + SHRINK_N): при n=0 полностью global, при n=SHRINK_N — 50/50.
+# Вместо бинарного порога (было: HEDGE_REGIME_MIN_OBS = 15) — плавный переход.
+HEDGE_REGIME_SHRINK_N = 20
+# Lasso prior shrinkage: global Hedge-вес → lasso-prior (при малом числе сделок
+# сначала доверяем data-driven prior, затем Hedge берёт управление).
+LASSO_SHRINK_N = 30
+
+# ── Lag-коррекция по результатам lag_analysis.py ─────────────────────────────
+# Таблица составлена по 60-дневному прогону (медиана лага по 35 тикерам).
+# Корректируем только методы с лагом < 10 баров И стабильным лагом в режиме
+# (σ_lag < 2 баров — не измерена здесь, взяты топ по |corr| как прокси
+# стабильности). Методы с нестабильным/длинным лагом корректировать не стоит:
+# взятие производной добавляет шум, а не убирает запаздывание.
+_LAG_TABLE: dict[str, dict[str, int]] = {
+    "high_vol": {
+        "T3_SIGNAL": 4, "TREND_QUALITY": 5, "ZLEMA_SIGNAL": 6,
+        "VWAP_SIGNAL": 7, "VR_SIGNAL": 7, "FISHER_RSI": 7, "YZ_VOL_SIGNAL": 6,
+    },
+    "trending_up": {
+        "ZLEMA_SIGNAL": 5, "BS_PRESSURE": 7,
+    },
+    "trending_down": {
+        "ZSCORE": 6, "KLINGER": 6, "FISHER_RSI": 7,
+    },
+    "ranging": {
+        "SINEWAVE_SIGNAL": 4, "MMI_SIGNAL": 5, "VWAP_SIGNAL": 7,
+        "ZLEMA_SIGNAL": 7, "TREND_QUALITY": 7, "FISHER_RSI": 7,
+    },
+    "stress": {
+        "EBSW": 6, "VOL_MOMENTUM": 6, "YZ_VOL_SIGNAL": 7,
+    },
+    "low_vol": {
+        "RMI": 7, "T3_SIGNAL": 7, "FISHER_RSI": 6,
+    },
+}
+_LAG_HISTORY_LEN = 14  # max lag в таблице + 2 буфера
 MFE_MAE_BARS = 15                  # максимум баров для записи MFE/MAE
 
 # ── Фильтры качества сигнала ────────────────────────────────────────────────
@@ -951,6 +987,13 @@ class OICompositeStrategy(IStrategy):
         self.__regime_weights: dict[str, dict[str, MethodWeight]] = self.__load_regime_weights()
         self.__rolling_quality: float = self.__load_rolling_quality()
         self.__confidence: float = 0.7
+        # Буфер скоров за последние _LAG_HISTORY_LEN баров — для lag-коррекции.
+        # Хранит scores_for_composite (после нормализации, до взвешивания),
+        # чтобы для метода с лагом k читать правильный исторический скор.
+        self.__score_history: list[list[float]] = []
+        # Lasso prior — data/lasso_weights.json, keyed by figi.
+        # Загружается один раз на старте; обновить можно reload_lasso_priors().
+        self.__lasso_priors: dict[str, float] = self.__load_lasso_priors()
         self.__squeeze_provider: Optional[SqueezeProvider] = None
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
@@ -1866,7 +1909,30 @@ class OICompositeStrategy(IStrategy):
         # живой композит: они построены из тех же base_scores, что уже здесь
         # просуммированы, повторное сложение было бы двойным счётом.
         n_base = len(BASE_METHOD_NAMES)
-        weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
+
+        # Lag-коррекция: для методов с измеренным стабильным лагом читаем
+        # задержанный скор из буфера истории, взвешивая по вероятностям режима.
+        # Читаем ДО того, как пушим текущий бар, чтобы history[-k] = scores[t-k].
+        lag_corrected = list(scores_for_composite)
+        if self.__score_history:
+            for i, name in enumerate(BASE_METHOD_NAMES):
+                delayed_sum = 0.0
+                for r, p in regime_probs.items():
+                    if p <= 0.0:
+                        continue
+                    lag_k = _LAG_TABLE.get(r, {}).get(name, 0)
+                    if lag_k > 0 and len(self.__score_history) >= lag_k:
+                        delayed_sum += p * self.__score_history[-lag_k][i]
+                    else:
+                        delayed_sum += p * scores_for_composite[i]
+                lag_corrected[i] = delayed_sum
+        # Пишем в историю текущий (не скорректированный) скор — чтобы
+        # будущие бары читали реальный исторический скор, а не коррекцию от коррекции.
+        self.__score_history.append(list(scores_for_composite))
+        if len(self.__score_history) > _LAG_HISTORY_LEN:
+            self.__score_history.pop(0)
+
+        weighted = sum(s * w for s, w in zip(lag_corrected[:n_base], weights[:n_base]))
         weight_sum = sum(weights[:n_base]) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
 
@@ -2283,6 +2349,51 @@ class OICompositeStrategy(IStrategy):
         self.__save_weights()
         self.__save_rolling_quality()
 
+    # ── Lasso prior ───────────────────────────────────────────────────────────
+
+    def __load_lasso_priors(self) -> dict[str, float]:
+        """Читает data/lasso_weights.json → prior-вес [0.05, 1.0] для каждого метода.
+
+        Lasso-коэффициенты — результат регрессии outcome ~ method_scores.
+        Нулевой или отрицательный коэффициент → prior=0.05 (минимальный вес);
+        положительный → линейно в [0.05, 1.0] относительно максимума.
+
+        Это не заменяет Hedge, а задаёт стартовую точку и гравитационный центр
+        до накопления достаточного числа живых сделок (LASSO_SHRINK_N).
+        """
+        path = "data/lasso_weights.json"
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            entry = data.get(self.__settings.figi, {})
+            coefs = entry.get("coefficients", {})
+            if not coefs:
+                return {}
+            max_pos = max((v for v in coefs.values() if v > 0), default=0.0)
+            if max_pos <= 0:
+                return {}
+            priors: dict[str, float] = {}
+            for name, coef in coefs.items():
+                if coef <= 0:
+                    priors[name] = 0.05
+                else:
+                    priors[name] = max(0.05, min(1.0, 0.05 + 0.95 * coef / max_pos))
+            logger.info(
+                f"{self.__settings.ticker}: lasso prior загружен для "
+                f"{sum(1 for v in priors.values() if v > 0.05)}/{len(priors)} методов"
+            )
+            return priors
+        except Exception as e:
+            logger.warning(f"Could not load lasso priors: {e}")
+            return {}
+
+    def reload_lasso_priors(self) -> None:
+        """Перечитать lasso prior без пересоздания стратегии.
+        Вызывать после еженедельного прогона lasso_calibration.py."""
+        self.__lasso_priors = self.__load_lasso_priors()
+
     # ── Персистентность весов ─────────────────────────────────────────────────
 
     def __weights_key(self) -> str:
@@ -2363,17 +2474,41 @@ class OICompositeStrategy(IStrategy):
         return rw
 
     def __blended_hedge_weight(self, name: str, regime_probs: dict[str, float]) -> float:
-        """Hedge-вес метода, смешанный по вероятностям режима (как в Layer 2/4):
-        для каждого режима с достаточным числом наблюдений (HEDGE_REGIME_MIN_OBS)
-        используем режимный вес, иначе — глобальный self.__weights как fallback."""
-        global_weight = self.__weights[name].weight
+        """Hedge-вес метода — иерархический, два уровня shrinkage:
+
+        Level 1 (Lasso → Global): если есть lasso_prior для метода,
+          глобальный Hedge-вес притягивается к нему пропорционально числу
+          сделок: alpha = total / (total + LASSO_SHRINK_N). При малом total
+          lasso prior доминирует; с накоплением истории Hedge берёт управление.
+          Это гарантирует, что методы без edge (lasso_prior ≈ 0.05) не растут
+          в весе на первых сделках.
+
+        Level 2 (Global → Per-regime): вместо бинарного порога (n >= 15)
+          плавный α = n / (n + HEDGE_REGIME_SHRINK_N). При n=0 полностью
+          global, при n=HEDGE_REGIME_SHRINK_N — 50/50.
+          Это решает проблему редких режимов (stress, low_vol): их per-regime
+          вес остаётся значимым только при достаточной статистике.
+        """
+        hedge_w = self.__weights[name]
+
+        # Level 1: lasso prior → global
+        lasso_prior = self.__lasso_priors.get(name)
+        if lasso_prior is not None and hedge_w.total < LASSO_SHRINK_N * 4:
+            lasso_alpha = hedge_w.total / (hedge_w.total + LASSO_SHRINK_N)
+            global_weight = lasso_alpha * hedge_w.weight + (1.0 - lasso_alpha) * lasso_prior
+        else:
+            global_weight = hedge_w.weight
+
+        # Level 2: global → per-regime, взвешенный по regime_probs
         blended = 0.0
         for regime, p in regime_probs.items():
             if p <= 0.0:
                 continue
             rw = self.__regime_weights.get(regime, {}).get(name)
-            w = rw.weight if (rw is not None and rw.total >= HEDGE_REGIME_MIN_OBS) else global_weight
-            blended += p * w
+            n = rw.total if rw is not None else 0
+            alpha = n / (n + HEDGE_REGIME_SHRINK_N)
+            w_local = rw.weight if rw is not None else global_weight
+            blended += p * (alpha * w_local + (1.0 - alpha) * global_weight)
         return blended if blended > 0.0 else global_weight
 
     def __load_rolling_quality(self) -> float:
