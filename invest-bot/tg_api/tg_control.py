@@ -20,7 +20,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import BotCommand, Message
 
 import bot_control
 from notification_service import _append_event
@@ -102,6 +102,16 @@ def _build_dispatcher(allowed_chat_id: str) -> Dispatcher:
         return str(message.chat.id) == str(allowed_chat_id)
 
     # ── существующие команды ──────────────────────────────────────────────
+
+    @dp.message(Command("start"))
+    async def cmd_start(message: Message) -> None:
+        if not _allowed(message):
+            return
+        await message.answer(
+            "👋 Привет! Торговый бот подключён.\n\n"
+            "Нажми / в поле ввода — увидишь список команд.\n"
+            "Или напиши /help для полного описания.",
+        )
 
     @dp.message(Command("status"))
     async def cmd_status(message: Message) -> None:
@@ -277,11 +287,30 @@ def _build_dispatcher(allowed_chat_id: str) -> Dispatcher:
     return dp
 
 
+_BOT_COMMANDS = [
+    BotCommand(command="status",   description="Состояние бота, открытые позиции, PnL"),
+    BotCommand(command="pause",    description="Приостановить открытие новых позиций"),
+    BotCommand(command="resume",   description="Возобновить торговлю"),
+    BotCommand(command="close",    description="Срочно закрыть позицию: /close SBER или /close all"),
+    BotCommand(command="accounts", description="Список счетов и их статус"),
+    BotCommand(command="account",  description="Вкл/выкл счёт: /account enable ID"),
+    BotCommand(command="config",   description="Текущие переопределения настроек"),
+    BotCommand(command="enable",   description="Включить тикер: /enable SBER"),
+    BotCommand(command="disable",  description="Отключить тикер: /disable SBER"),
+    BotCommand(command="signal",   description="Signal-only режим: /signal SBER on|off"),
+    BotCommand(command="take",     description="Установить тейк: /take SBER 1.02"),
+    BotCommand(command="stop",     description="Установить стоп: /stop SBER 0.98"),
+    BotCommand(command="help",     description="Список всех команд"),
+]
+
+
 async def run_control_listener(token: str, allowed_chat_id: str) -> None:
     bot = Bot(token=token)
     dp = _build_dispatcher(allowed_chat_id)
     logger.info("TG control listener: старт polling команд")
     try:
+        await bot.set_my_commands(_BOT_COMMANDS)
+        logger.info("TG control listener: команды зарегистрированы в меню Telegram")
         await dp.start_polling(bot)
     except Exception:
         logger.exception("TG control listener: polling упал, перезапуск невозможен — проверьте токен/сеть")
