@@ -699,6 +699,10 @@ def run_backtest_one(
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             _set_progress(progress, ticker, "ошибка API")
             return rows
+        except Exception as ex:
+            rows.append({"ticker": ticker, "mode": "нет истории", "error": str(ex)})
+            _set_progress(progress, ticker, "нет истории")
+            return rows
 
         if not candles:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
