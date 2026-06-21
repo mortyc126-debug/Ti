@@ -1727,11 +1727,21 @@ class OICompositeStrategy(IStrategy):
                 )
 
             if return_trades:
+                exit_price_val = entry * (1 + exit_pct) if direction == SignalType.LONG \
+                    else entry * (1 - exit_pct)
+                approx_mfe = take_dist if win else 0.0
+                approx_mae = 0.0 if win else stop_dist
                 trades.append({
                     "entry_time": entry_time, "exit_time": exit_time,
                     "direction": direction.name, "net_pct": net_pct,
                     "r_multiple": r_multiple, "win": win, "duration_min": round(duration_min, 1),
                     "m1": trade_models["m1"], "m2": trade_models["m2"], "m3": trade_models["m3"],
+                    "entry_price": round(entry, 4),
+                    "exit_price": round(exit_price_val, 4),
+                    "take_price": round(take_price, 4),
+                    "stop_price": round(stop_price, 4),
+                    "mfe": round(approx_mfe, 6),
+                    "mae": round(approx_mae, 6),
                 })
 
         if not results:

@@ -325,6 +325,57 @@ def _strategy_settings_by_ticker() -> dict:
     return by_ticker
 
 
+def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) -> dict:
+    """Свечи + бэктестовые сделки для графика: {candles, trades, ticker}."""
+    from candle_archive import _candle_to_row  # уже импортирован через get_candles_cached
+    by_ticker = _strategy_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"error": f"{ticker}: нет в settings.ini/oi_tickers.json"}
+
+    try:
+        candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    except RequestError as e:
+        return {"error": f"Tinkoff API: {e}"}
+    if not candles:
+        return {"error": f"{ticker}: нет свечей"}
+
+    strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+    if strategy is None:
+        return {"error": f"{ticker}: стратегия не создана"}
+    _wire_history(strategy)
+
+    signals = strategy.backtest_scan_signals(candles)
+    result = strategy.backtest_barriers(
+        candles, signals=signals,
+        atr_take_k=atr_take, atr_stop_k=atr_stop,
+        return_trades=True,
+    )
+    trades_raw = result.get("trades", [])
+
+    candle_rows = [_candle_to_row(c) for c in candles]
+
+    trades_out = []
+    for t in trades_raw:
+        trades_out.append({
+            "entry_time": t["entry_time"].isoformat() if t["entry_time"] else None,
+            "exit_time": t["exit_time"].isoformat() if t["exit_time"] else None,
+            "direction": t["direction"],
+            "entry_price": t.get("entry_price"),
+            "exit_price": t.get("exit_price"),
+            "take_price": t.get("take_price"),
+            "stop_price": t.get("stop_price"),
+            "mfe": t.get("mfe"),
+            "mae": t.get("mae"),
+            "net_pct": round(t["net_pct"] * 100, 3),
+            "r_multiple": round(t["r_multiple"], 2),
+            "win": t["win"],
+            "duration_min": t["duration_min"],
+        })
+
+    return {"ticker": ticker, "candles": candle_rows, "trades": trades_out}
+
+
 def get_diagnostics(ticker: str, days: int = 30) -> dict:
     """
     Снимок того, КАК сейчас реально считается композит для тикера — на
@@ -1221,6 +1272,33 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <table class="scen-table" id="diag_table"></table>
 </div>
 
+<div class="panel">
+  <div class="sec">График сделок</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Японские свечи + сделки из бэктеста: вход/выход, уровни тейк/стоп, направление.
+    Нажми на маркер сделки — увидишь детали ниже. Полоса MFE/MAE показывает,
+    какую часть хода бот взял и где был максимальный ход против позиции.
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+    <label>Тикер <input type="text" class="inp mid" id="tc_ticker" placeholder="SBER"></label>
+    <label>Дней <input type="number" class="inp mid" id="tc_days" value="90" min="10" max="240"></label>
+    <label>ATR_TAKE_K <input type="number" class="inp mid" id="tc_take" value="2.0" min="0.5" step="0.5"></label>
+    <label>ATR_STOP_K <input type="number" class="inp mid" id="tc_stop" value="1.0" min="0.3" step="0.5"></label>
+    <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
+    <span id="tc_status" style="font-size:11px;color:var(--txt3);"></span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:11px;color:var(--txt3);">
+    <span>🔍 прокрутка/пинч — масштаб &nbsp;|&nbsp; перетащи — панорама</span>
+    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomAll()">Всё</button>
+    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(30)">30д</button>
+    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(14)">14д</button>
+    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(7)">7д</button>
+  </div>
+  <canvas id="tc_canvas" style="width:100%;height:480px;display:block;cursor:crosshair;background:var(--panel);border-radius:10px;border:1px solid var(--border);"></canvas>
+  <div id="tc_tooltip" style="font-size:11px;color:var(--txt2);margin-top:6px;min-height:32px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
+  <div id="tc_trade_detail" style="font-size:11px;color:var(--txt2);margin-top:6px;min-height:24px;"></div>
+</div>
+
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
@@ -1662,6 +1740,430 @@ async function askCouncil() {{
     div.innerHTML = '<div class="advice">AI недоступен (нет CEREBRAS_API_KEY или ошибка вызова) — добавь ключ в settings.ini [NEWS].</div>';
   }}
 }}
+
+// ── График сделок ────────────────────────────────────────────────────────────
+(function() {{
+  let _candles = [], _trades = [], _ticker = '';
+  const PAD = {{l:52, r:12, t:24, b:36}};
+  // Viewport: индекс первой и последней видимой свечи
+  let _v0 = 0, _v1 = 0;
+  let _drag = null;
+  const canvas = document.getElementById('tc_canvas');
+  const ctx = canvas.getContext('2d');
+
+  function _dpr() {{ return window.devicePixelRatio || 1; }}
+
+  function _resize() {{
+    const dpr = _dpr();
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    _draw();
+  }}
+
+  function _cw() {{ return canvas.clientWidth; }}
+  function _ch() {{ return canvas.clientHeight; }}
+  function _innerW() {{ return _cw() - PAD.l - PAD.r; }}
+  function _innerH() {{ return _ch() - PAD.t - PAD.b; }}
+
+  // Масштаб: px на свечу
+  function _barW() {{ return Math.max(1, _innerW() / Math.max(1, _v1 - _v0 + 1)); }}
+
+  function _xOfBar(i) {{
+    return PAD.l + (i - _v0 + 0.5) * _barW();
+  }}
+
+  function _priceRange() {{
+    const slice = _candles.slice(_v0, _v1 + 1);
+    if (!slice.length) return {{lo: 0, hi: 1}};
+    let lo = Infinity, hi = -Infinity;
+    for (const c of slice) {{
+      if (c.low < lo) lo = c.low;
+      if (c.high > hi) hi = c.high;
+    }}
+    // расширить на take/stop сделок в видимом диапазоне
+    for (const t of _trades) {{
+      if (t._entry_i >= _v0 && t._entry_i <= _v1) {{
+        if (t.take_price && t.take_price < lo) lo = t.take_price;
+        if (t.take_price && t.take_price > hi) hi = t.take_price;
+        if (t.stop_price && t.stop_price < lo) lo = t.stop_price;
+        if (t.stop_price && t.stop_price > hi) hi = t.stop_price;
+      }}
+    }}
+    const margin = (hi - lo) * 0.08 || hi * 0.01;
+    return {{lo: lo - margin, hi: hi + margin}};
+  }}
+
+  function _yOf(price, lo, hi) {{
+    const h = _innerH();
+    return PAD.t + h - (price - lo) / (hi - lo) * h;
+  }}
+
+  function _fmtTime(iso) {{
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU', {{day:'2-digit', month:'2-digit'}}) + ' ' +
+           d.toLocaleTimeString('ru-RU', {{hour:'2-digit', minute:'2-digit'}});
+  }}
+
+  function _draw() {{
+    if (!_candles.length) return;
+    const W = _cw(), H = _ch();
+    const iW = _innerW(), iH = _innerH();
+    ctx.clearRect(0, 0, W, H);
+
+    // фон
+    ctx.fillStyle = getComputedStyle(canvas).getPropertyValue('--panel').trim() || '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+
+    const {{lo, hi}} = _priceRange();
+    const bw = _barW();
+    const bodyW = Math.max(1, bw * 0.6);
+    const halfBody = bodyW / 2;
+
+    // сетка
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    const nGridY = 5;
+    for (let g = 0; g <= nGridY; g++) {{
+      const price = lo + (hi - lo) * (g / nGridY);
+      const y = _yOf(price, lo, hi);
+      ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + iW, y); ctx.stroke();
+      // ценовая метка
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font = '10px JetBrains Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(price.toFixed(2), PAD.l - 3, y + 3);
+    }}
+
+    // ── уровни сделок (take/stop линии) в видимой области ───────────────
+    for (const t of _trades) {{
+      if (t._entry_i < _v0 || t._entry_i > _v1) continue;
+      const ei = t._entry_i, xi = t._exit_i !== null ? Math.min(t._exit_i, _v1) : _v1;
+      const x0 = _xOfBar(ei);
+      const x1 = _xOfBar(xi);
+      if (t.take_price) {{
+        ctx.strokeStyle = 'rgba(72,199,142,0.3)';
+        ctx.setLineDash([3,4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x0, _yOf(t.take_price, lo, hi));
+        ctx.lineTo(x1, _yOf(t.take_price, lo, hi));
+        ctx.stroke();
+      }}
+      if (t.stop_price) {{
+        ctx.strokeStyle = 'rgba(255,99,99,0.3)';
+        ctx.setLineDash([3,4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x0, _yOf(t.stop_price, lo, hi));
+        ctx.lineTo(x1, _yOf(t.stop_price, lo, hi));
+        ctx.stroke();
+      }}
+      ctx.setLineDash([]);
+    }}
+
+    // ── свечи ────────────────────────────────────────────────────────────
+    for (let i = _v0; i <= _v1 && i < _candles.length; i++) {{
+      const c = _candles[i];
+      const x = _xOfBar(i);
+      const yO = _yOf(c.open, lo, hi);
+      const yC = _yOf(c.close, lo, hi);
+      const yH = _yOf(c.high, lo, hi);
+      const yL = _yOf(c.low, lo, hi);
+      const bull = c.close >= c.open;
+      const col = bull ? '#48c78e' : '#f14668';
+
+      // фитиль
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+
+      // тело
+      const bodyTop = Math.min(yO, yC);
+      const bodyH = Math.max(1, Math.abs(yC - yO));
+      ctx.fillStyle = bull ? 'rgba(72,199,142,0.85)' : 'rgba(241,70,104,0.85)';
+      ctx.fillRect(x - halfBody, bodyTop, bodyW, bodyH);
+    }}
+
+    // ── маркеры сделок ───────────────────────────────────────────────────
+    for (let ti = 0; ti < _trades.length; ti++) {{
+      const t = _trades[ti];
+      if (t._entry_i < _v0 || t._entry_i > _v1) continue;
+      const xe = _xOfBar(t._entry_i);
+      const ye = _yOf(t.entry_price, lo, hi);
+      const isLong = t.direction === 'LONG';
+      const winCol = t.win ? '#48c78e' : '#f14668';
+
+      // вертикальная линия вход→выход
+      if (t._exit_i !== null && t._exit_i >= _v0) {{
+        const xx = _xOfBar(Math.min(t._exit_i, _v1));
+        const yx = _yOf(t.exit_price, lo, hi);
+        ctx.strokeStyle = winCol + '66';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([2,3]);
+        ctx.beginPath(); ctx.moveTo(xe, ye); ctx.lineTo(xx, yx); ctx.stroke();
+        ctx.setLineDash([]);
+        // маркер выхода
+        ctx.beginPath();
+        ctx.arc(xx, yx, 4, 0, Math.PI * 2);
+        ctx.fillStyle = winCol;
+        ctx.fill();
+      }}
+
+      // треугольник входа
+      ctx.fillStyle = isLong ? '#48c78e' : '#f14668';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      if (isLong) {{
+        ctx.moveTo(xe, ye - 10);
+        ctx.lineTo(xe - 6, ye);
+        ctx.lineTo(xe + 6, ye);
+      }} else {{
+        ctx.moveTo(xe, ye + 10);
+        ctx.lineTo(xe - 6, ye);
+        ctx.lineTo(xe + 6, ye);
+      }}
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // номер сделки
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 8px JetBrains Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(ti + 1, xe, isLong ? ye - 12 : ye + 20);
+    }}
+
+    // временнáя ось
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    const nLabels = Math.min(8, _v1 - _v0 + 1);
+    const step = Math.max(1, Math.floor((_v1 - _v0 + 1) / nLabels));
+    for (let i = _v0; i <= _v1; i += step) {{
+      const x = _xOfBar(i);
+      const iso = _candles[i]?.time;
+      if (!iso) continue;
+      const d = new Date(iso);
+      const label = d.toLocaleDateString('ru-RU', {{day:'2-digit',month:'2-digit'}});
+      ctx.fillText(label, x, _ch() - 6);
+    }}
+
+    // заголовок
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = 'bold 12px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(_ticker, PAD.l + 4, PAD.t - 6);
+  }}
+
+  // ── Поиск ближайшей сделки по пиксельной биссектрисе ────────────────────
+  function _hitTrade(px, py) {{
+    const {{lo, hi}} = _priceRange();
+    let best = null, bestD = 20;
+    for (let ti = 0; ti < _trades.length; ti++) {{
+      const t = _trades[ti];
+      if (t._entry_i < _v0 || t._entry_i > _v1 || !t.entry_price) continue;
+      const x = _xOfBar(t._entry_i);
+      const y = _yOf(t.entry_price, lo, hi);
+      const d = Math.hypot(px - x, py - y);
+      if (d < bestD) {{ bestD = d; best = ti; }}
+    }}
+    return best;
+  }}
+
+  // ── Тултип при движении мыши ─────────────────────────────────────────────
+  canvas.addEventListener('mousemove', function(e) {{
+    if (_drag) {{
+      const dx = e.clientX - _drag.startX;
+      const barsShift = -Math.round(dx / _barW());
+      let v0 = _drag.v0 + barsShift, v1 = _drag.v1 + barsShift;
+      const span = v1 - v0;
+      if (v0 < 0) {{ v0 = 0; v1 = span; }}
+      if (v1 >= _candles.length) {{ v1 = _candles.length - 1; v0 = v1 - span; }}
+      _v0 = Math.max(0, v0); _v1 = Math.min(_candles.length - 1, v1);
+      _draw();
+      return;
+    }}
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const ti = _hitTrade(px, py);
+    const tip = document.getElementById('tc_tooltip');
+    if (ti !== null) {{
+      const t = _trades[ti];
+      tip.style.display = 'block';
+      const dir = t.direction === 'LONG' ? '📈 LONG' : '📉 SHORT';
+      const res = t.win ? '✅ профит' : '❌ убыток';
+      tip.innerHTML = `<b>#${{ti+1}} ${{dir}}</b> &nbsp; ${{res}} &nbsp; net: ${{t.net_pct >= 0 ? '+' : ''}}${{t.net_pct}}% &nbsp; R=${{t.r_multiple}} &nbsp; ${{Math.round(t.duration_min)}}мин`;
+    }} else {{
+      tip.style.display = 'none';
+    }}
+  }});
+
+  canvas.addEventListener('mousedown', function(e) {{
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const ti = _hitTrade(px, py);
+    if (ti !== null) {{
+      _showTradeDetail(ti);
+      return;
+    }}
+    _drag = {{startX: e.clientX, v0: _v0, v1: _v1}};
+  }});
+  canvas.addEventListener('mouseup', () => {{ _drag = null; }});
+  canvas.addEventListener('mouseleave', () => {{ _drag = null; }});
+
+  canvas.addEventListener('wheel', function(e) {{
+    e.preventDefault();
+    const ratio = e.deltaY < 0 ? 0.85 : 1.18;
+    const span = _v1 - _v0 + 1;
+    const newSpan = Math.max(10, Math.min(_candles.length, Math.round(span * ratio)));
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const center = _v0 + (px - PAD.l) / _innerW() * span;
+    let v0 = Math.round(center - newSpan * (px - PAD.l) / _innerW());
+    let v1 = v0 + newSpan - 1;
+    if (v0 < 0) {{ v0 = 0; v1 = newSpan - 1; }}
+    if (v1 >= _candles.length) {{ v1 = _candles.length - 1; v0 = v1 - newSpan + 1; }}
+    _v0 = Math.max(0, v0); _v1 = Math.min(_candles.length - 1, v1);
+    _draw();
+  }}, {{passive: false}});
+
+  // Тач (пинч + панорама на мобиле)
+  let _touch = null;
+  canvas.addEventListener('touchstart', e => {{
+    if (e.touches.length === 1) _touch = {{x: e.touches[0].clientX, v0: _v0, v1: _v1, pinch: null}};
+    if (e.touches.length === 2) {{
+      const d = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      _touch = {{x: 0, v0: _v0, v1: _v1, pinch: d}};
+    }}
+  }}, {{passive: true}});
+  canvas.addEventListener('touchmove', e => {{
+    e.preventDefault();
+    if (!_touch) return;
+    if (e.touches.length === 1 && _touch.pinch === null) {{
+      const dx = e.touches[0].clientX - _touch.x;
+      const barsShift = -Math.round(dx / _barW());
+      let v0 = _touch.v0 + barsShift, v1 = _touch.v1 + barsShift;
+      const span = v1 - v0;
+      if (v0 < 0) {{ v0 = 0; v1 = span; }}
+      if (v1 >= _candles.length) {{ v1 = _candles.length - 1; v0 = v1 - span; }}
+      _v0 = Math.max(0, v0); _v1 = Math.min(_candles.length - 1, v1);
+      _draw();
+    }}
+    if (e.touches.length === 2 && _touch.pinch !== null) {{
+      const d = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      const ratio = _touch.pinch / Math.max(1, d);
+      const span = _touch.v1 - _touch.v0 + 1;
+      const newSpan = Math.max(10, Math.min(_candles.length, Math.round(span * ratio)));
+      let v0 = _touch.v0, v1 = v0 + newSpan - 1;
+      if (v1 >= _candles.length) {{ v1 = _candles.length - 1; v0 = v1 - newSpan + 1; }}
+      _v0 = Math.max(0, v0); _v1 = Math.min(_candles.length - 1, v1);
+      _draw();
+    }}
+  }}, {{passive: false}});
+  canvas.addEventListener('touchend', () => _touch = null);
+
+  function _showTradeDetail(ti) {{
+    const t = _trades[ti];
+    const dir = t.direction === 'LONG' ? '📈 LONG' : '📉 SHORT';
+    const res = t.win ? '✅' : '❌';
+    const mfeP = t.mfe !== null ? (t.mfe * 100).toFixed(2) : '—';
+    const maeP = t.mae !== null ? (t.mae * 100).toFixed(2) : '—';
+    document.getElementById('tc_trade_detail').innerHTML =
+      `<b>#${{ti+1}} ${{dir}} ${{res}}</b> &nbsp;&nbsp;`+
+      `Вход: ${{t.entry_price}} (${{_fmtTime(t.entry_time)}}) &rarr; `+
+      `Выход: ${{t.exit_price}} (${{_fmtTime(t.exit_time)}}) &nbsp;&nbsp;`+
+      `net: <b style="color:${{t.win?'#48c78e':'#f14668'}}">${{t.net_pct >= 0?'+':''}}${{t.net_pct}}%</b> &nbsp;&nbsp;`+
+      `R=${{t.r_multiple}} &nbsp;&nbsp;`+
+      `Тейк: ${{t.take_price || '—'}} &nbsp;`+
+      `Стоп: ${{t.stop_price || '—'}} &nbsp;&nbsp;`+
+      `MFE: +${{mfeP}}% &nbsp; MAE: -${{maeP}}% &nbsp;&nbsp;`+
+      `${{Math.round(t.duration_min)}} мин`;
+  }}
+
+  // ── Зум ─────────────────────────────────────────────────────────────────
+  window.tcZoomAll = function() {{
+    if (!_candles.length) return;
+    _v0 = 0; _v1 = _candles.length - 1; _draw();
+  }};
+  window.tcZoomLast = function(days) {{
+    if (!_candles.length) return;
+    // Примерно 10 свечей в день (1-минутные), подбираем по дате
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+    let i = 0;
+    for (; i < _candles.length; i++) {{
+      if (_candles[i].time >= cutoff) break;
+    }}
+    _v0 = Math.max(0, i); _v1 = _candles.length - 1;
+    _draw();
+  }};
+
+  // ── Загрузка данных ──────────────────────────────────────────────────────
+  window.loadTradeChart = async function() {{
+    const ticker = document.getElementById('tc_ticker').value.trim().toUpperCase();
+    const days = document.getElementById('tc_days').value;
+    const take = document.getElementById('tc_take').value;
+    const stop = document.getElementById('tc_stop').value;
+    if (!ticker) {{ alert('Укажи тикер'); return; }}
+    document.getElementById('tc_status').textContent = 'загрузка...';
+    document.getElementById('tc_trade_detail').innerHTML = '';
+    document.getElementById('tc_tooltip').style.display = 'none';
+    try {{
+      const resp = await fetch(`/api/trade_chart?ticker=${{encodeURIComponent(ticker)}}&days=${{days}}&atr_take=${{take}}&atr_stop=${{stop}}`);
+      const data = await resp.json();
+      if (data.error) {{
+        document.getElementById('tc_status').textContent = '❌ ' + data.error;
+        return;
+      }}
+      _candles = data.candles;
+      _ticker = data.ticker;
+      // Проиндексировать сделки: найти индексы свечей по времени
+      const timeIdx = {{}};
+      _candles.forEach((c, i) => {{ timeIdx[c.time] = i; }});
+      _trades = (data.trades || []).map(t => {{
+        // entry_time может совпадать точно или не совпадать — ищем ближайшее
+        let ei = null;
+        if (t.entry_time) {{
+          ei = timeIdx[t.entry_time];
+          if (ei === undefined) {{
+            // ближайшая свеча
+            const et = new Date(t.entry_time).getTime();
+            let bestD = Infinity;
+            _candles.forEach((c, i) => {{
+              const d = Math.abs(new Date(c.time).getTime() - et);
+              if (d < bestD) {{ bestD = d; ei = i; }}
+            }});
+          }}
+        }}
+        let xi = null;
+        if (t.exit_time) {{
+          xi = timeIdx[t.exit_time];
+          if (xi === undefined) {{
+            const xt = new Date(t.exit_time).getTime();
+            let bestD = Infinity;
+            _candles.forEach((c, i) => {{
+              const d = Math.abs(new Date(c.time).getTime() - xt);
+              if (d < bestD) {{ bestD = d; xi = i; }}
+            }});
+          }}
+        }}
+        return {{...t, _entry_i: ei, _exit_i: xi}};
+      }});
+      _v0 = 0; _v1 = _candles.length - 1;
+      _resize();
+      document.getElementById('tc_status').textContent =
+        `${{_candles.length}} свечей, ${{_trades.length}} сделок`;
+    }} catch(e) {{
+      document.getElementById('tc_status').textContent = '❌ ' + e;
+    }}
+  }};
+
+  window.addEventListener('resize', _resize);
+  _resize();
+}})();
 </script>
 </body>
 </html>
@@ -1771,6 +2273,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(get_diagnostics(ticker, days))
             except Exception as e:
                 self._send_json({"ready": False, "error": str(e)})
+        elif self.path.startswith("/api/trade_chart"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0]
+            days = int(qs.get("days", ["90"])[0])
+            atr_take = float(qs.get("atr_take", ["2.0"])[0])
+            atr_stop = float(qs.get("atr_stop", ["1.0"])[0])
+            try:
+                self._send_json(get_trade_chart(ticker, days, atr_take, atr_stop))
+            except Exception as e:
+                self._send_json({"error": str(e)})
         else:
             self.send_error(404)
 
