@@ -7,13 +7,16 @@ tg_api/tg_control.py — приём команд управления ботом
 других чатов игнорируются.
 
 Команды:
-  /status        — режим (пауза/торговля) + открытые позиции, PnL, пик MFE/MAE
-  /pause         — не открывать новые позиции (открытые управляются как обычно)
-  /resume        — снять паузу
-  /close TICKER  — срочно закрыть позицию по тикеру на следующей свече
-  /close all     — срочно закрыть все открытые позиции
+  /status                          — режим (пауза/торговля) + открытые позиции, PnL, пик MFE/MAE
+  /pause                           — не открывать новые позиции (открытые управляются как обычно)
+  /resume                          — снять паузу
+  /close TICKER                    — срочно закрыть позицию по тикеру на следующей свече
+  /close all                       — срочно закрыть все открытые позиции
+  /adopt TICKER LONG take=X stop=Y — передать ручную позицию боту под управление
+  /adopt TICKER SHORT take=X stop=Y entry=Z — то же, с явной ценой входа
 """
 import logging
+from decimal import Decimal, InvalidOperation
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
@@ -65,6 +68,45 @@ def _build_dispatcher(allowed_chat_id: str) -> Dispatcher:
         target = parts[1].strip().upper()
         bot_control.control.close_requests.add(target)
         await message.answer(f"Принято: срочное закрытие {target}. Исполнится на следующей свече.")
+
+    @dp.message(Command("adopt"))
+    async def cmd_adopt(message: Message) -> None:
+        if not _allowed(message):
+            return
+        # /adopt SBER LONG take=250.50 stop=240.00 entry=245.00
+        text = (message.text or "").split(maxsplit=1)[1].strip() if len((message.text or "").split(maxsplit=1)) > 1 else ""
+        parts = text.split()
+        if len(parts) < 4:
+            await message.answer(
+                "Формат: /adopt TICKER LONG|SHORT take=X stop=Y [entry=Z]\n"
+                "Пример: /adopt SBER LONG take=250.50 stop=240.00"
+            )
+            return
+        ticker = parts[0].upper()
+        direction = parts[1].upper()
+        if direction not in ("LONG", "SHORT"):
+            await message.answer("Направление должно быть LONG или SHORT")
+            return
+        kwargs: dict[str, str] = {}
+        for p in parts[2:]:
+            if "=" in p:
+                k, v = p.split("=", 1)
+                kwargs[k.lower()] = v
+        try:
+            take = Decimal(kwargs["take"])
+            stop = Decimal(kwargs["stop"])
+            entry = Decimal(kwargs["entry"]) if "entry" in kwargs else None
+        except (KeyError, InvalidOperation):
+            await message.answer("Не хватает take= или stop=, или некорректное число")
+            return
+        bot_control.control.adopt_requests.append(
+            bot_control.AdoptRequest(ticker=ticker, direction=direction, take=take, stop=stop, entry=entry)
+        )
+        await message.answer(
+            f"📥 Принято: передаю {ticker} {direction} боту под управление.\n"
+            f"Тейк: {take}, Стоп: {stop}" + (f", Вход: {entry}" if entry else " (вход = текущая цена)") +
+            "\nИсполнится на следующей свече."
+        )
 
     return dp
 

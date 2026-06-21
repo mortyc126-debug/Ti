@@ -1310,6 +1310,27 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <span id="close_status" style="font-size:11px;color:var(--txt3);"></span>
     </div>
   </div>
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border2);">
+    <div class="sec" style="margin-bottom:8px;">Передать ручную позицию боту</div>
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+      Открыл позицию в терминале — бот возьмёт её под управление: трейлинг-стоп,
+      безубыток после 1R, закрытие на тейке. Сработает на следующей свече.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <label>Тикер <input type="text" class="inp mid" id="adopt_ticker" placeholder="SBER" style="width:80px;"></label>
+      <label>Направление
+        <select class="inp" id="adopt_dir" style="width:90px;">
+          <option value="LONG">LONG</option>
+          <option value="SHORT">SHORT</option>
+        </select>
+      </label>
+      <label>Тейк <input type="number" class="inp mid" id="adopt_take" placeholder="250.00" step="0.01" style="width:90px;"></label>
+      <label>Стоп <input type="number" class="inp mid" id="adopt_stop" placeholder="240.00" step="0.01" style="width:90px;"></label>
+      <label>Вход <input type="number" class="inp mid" id="adopt_entry" placeholder="(текущая)" step="0.01" style="width:90px;"></label>
+      <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botAdopt()">📥 Передать боту</button>
+    </div>
+    <div id="adopt_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
+  </div>
 </div>
 
 <div class="panel">
@@ -1773,6 +1794,26 @@ async function botCloseAll() {{
   const r = await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'close',ticker:'ALL'}})}}).then(r=>r.json());
   st.textContent = r.ok ? '✓ Запрос закрытия ALL отправлен' : (r.error || 'ошибка');
   await loadBotStatus();
+}}
+
+async function botAdopt() {{
+  const ticker = document.getElementById('adopt_ticker').value.trim().toUpperCase();
+  const direction = document.getElementById('adopt_dir').value;
+  const take = document.getElementById('adopt_take').value.trim();
+  const stop = document.getElementById('adopt_stop').value.trim();
+  const entry = document.getElementById('adopt_entry').value.trim();
+  const st = document.getElementById('adopt_status');
+  if (!ticker || !take || !stop) {{
+    st.textContent = '⚠ Укажи тикер, тейк и стоп';
+    return;
+  }}
+  st.textContent = 'Отправляем...';
+  const body = {{ticker, direction, take: parseFloat(take), stop: parseFloat(stop)}};
+  if (entry) body.entry = parseFloat(entry);
+  const r = await fetch('/api/bot_adopt', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}}).then(r=>r.json());
+  st.textContent = r.ok
+    ? `✓ ${{ticker}} ${{direction}} — передано боту. Тейк ${{take}}, Стоп ${{stop}}. Сработает на следующей свече.`
+    : (r.error || 'ошибка');
 }}
 
 async function loadOverrides() {{
@@ -2412,6 +2453,22 @@ def get_bot_status() -> dict:
         return {"running": False}
 
 
+def bot_adopt_position(ticker: str, direction: str, take: float, stop: float, entry: float | None) -> dict:
+    """Пишет AdoptRequest в bot_overrides.json — бот подхватит на следующей свече."""
+    data = load_overrides()
+    reqs = data.get("adopt_requests", [])
+    reqs.append({
+        "ticker": ticker.upper(),
+        "direction": direction.upper(),
+        "take": str(take),
+        "stop": str(stop),
+        "entry": str(entry) if entry is not None else None,
+    })
+    data["adopt_requests"] = reqs
+    save_overrides(data)
+    return {"ok": True}
+
+
 def bot_control_action(action: str, ticker: str = "") -> dict:
     """pause / resume / close (ticker или 'ALL') — пишем в bot_overrides.json."""
     data = load_overrides()
@@ -2604,6 +2661,19 @@ class Handler(BaseHTTPRequestHandler):
             action = payload.get("action", "")
             ticker = payload.get("ticker", "")
             self._send_json(bot_control_action(action, ticker))
+        elif self.path == "/api/bot_adopt":
+            try:
+                ticker = payload.get("ticker", "").strip()
+                direction = payload.get("direction", "LONG").strip().upper()
+                take = float(payload["take"])
+                stop = float(payload["stop"])
+                entry = float(payload["entry"]) if payload.get("entry") not in (None, "") else None
+                if not ticker or direction not in ("LONG", "SHORT"):
+                    self._send_json({"error": "нужны ticker и direction (LONG/SHORT)"}, 400)
+                else:
+                    self._send_json(bot_adopt_position(ticker, direction, take, stop, entry))
+            except (KeyError, ValueError) as e:
+                self._send_json({"error": f"нужны take и stop: {e}"}, 400)
         else:
             self.send_error(404)
 

@@ -128,6 +128,15 @@ class RuntimeOverrides:
         save_overrides(self.__data, self.__path)
         return result
 
+    def pop_adopt_requests(self) -> list:
+        """Возвращает список AdoptRequest-словарей и очищает из файла."""
+        reqs = self.__data.get("adopt_requests", [])
+        if not reqs:
+            return []
+        self.__data["adopt_requests"] = []
+        save_overrides(self.__data, self.__path)
+        return reqs
+
     def take_stop_for(self, ticker: str) -> dict[str, Decimal]:
         """Только заданные (не null) поля — для set_take_stop_overrides(**kwargs)."""
         t = self.__data["tickers"].get(ticker.upper(), {})

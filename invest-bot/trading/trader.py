@@ -381,11 +381,93 @@ class Trader:
         except Exception as ex:
             logger.error(f"Summary trading day error: {repr(ex)}")
 
+    def adopt_position(
+            self,
+            account_id: str,
+            strategies: dict[str, "IStrategy"],
+            req: "bot_control.AdoptRequest",
+    ) -> str:
+        """
+        Принимает ручную позицию под управление бота.
+        Ищет реальную позицию на счёте по тикеру, регистрирует её в
+        TradeResults и RiskManager — после этого бот ведёт трейлинг/стоп/тейк
+        как будто сам открыл эту позицию.
+        Возвращает строку с результатом для ответа в ТГ/дашборд.
+        """
+        ticker = req.ticker.upper()
+        figi = next((s.settings.figi for s in strategies.values()
+                     if s.settings.ticker.upper() == ticker), None)
+        if figi is None:
+            return f"❌ {ticker}: тикер не найден в активных стратегиях бота"
+
+        strategy = next(s for s in strategies.values() if s.settings.ticker.upper() == ticker)
+
+        if self.__today_trade_results and self.__today_trade_results.get_current_trade_order(figi):
+            return f"❌ {ticker}: бот уже ведёт позицию по этому тикеру"
+
+        # Проверяем реальную позицию на счёте
+        all_pos = list(self.__operation_service.positions_securities(account_id) or []) + \
+                  list(self.__operation_service.positions_futures(account_id) or [])
+        broker_pos = next((p for p in all_pos if p.figi == figi and p.balance != 0), None)
+        if broker_pos is None:
+            return f"❌ {ticker}: на счёте нет открытой позиции"
+
+        qty = abs(int(broker_pos.balance))
+        direction = req.direction.upper()
+
+        # Цена входа: из запроса или текущая рыночная
+        if req.entry is not None:
+            entry_price = float(req.entry)
+        else:
+            last_q = self.__market_data_service.get_last_price(figi)
+            if last_q is None:
+                return f"❌ {ticker}: не удалось получить текущую цену"
+            from invest_api.utils import quotation_to_decimal as _qtd
+            entry_price = float(_qtd(last_q))
+
+        take = float(req.take)
+        stop = float(req.stop)
+
+        signal = Signal(
+            figi=figi,
+            signal_type=SignalType.LONG if direction == "LONG" else SignalType.SHORT,
+            take_profit_level=Decimal(str(take)),
+            stop_loss_level=Decimal(str(stop)),
+        )
+
+        self.__risk.open_position(
+            ticker, direction.lower(), qty,
+            entry_price, stop,
+            point_value=strategy.settings.point_value,
+            confidence=0.7,
+            take_target=take,
+        )
+
+        if self.__today_trade_results is None:
+            self.__today_trade_results = TradeResults()
+        self.__today_trade_results.open_position(figi, "manual_adopt", signal)
+
+        self.__pos_tracking[figi] = {
+            "direction": direction,
+            "entry": entry_price,
+            "max_fav": entry_price,
+            "max_adv": entry_price,
+        }
+
+        logger.info(f"ADOPT: принята позиция {ticker} {direction} qty={qty} "
+                    f"entry={entry_price} take={take} stop={stop}")
+        self.__blogger.send_message(
+            f"📥 Принята ручная позиция: {ticker} {direction}\n"
+            f"Вход: {entry_price:.4f}  Тейк: {take:.4f}  Стоп: {stop:.4f}\n"
+            f"Бот ведёт трейлинг/стоп/тейк."
+        )
+        return f"✅ {ticker} {direction}: позиция принята. Вход {entry_price:.4f}, тейк {take:.4f}, стоп {stop:.4f}"
+
     async def __trading(
             self,
             account_id: str,
             trading_settings: TradingSettings,
-            strategies: dict[str, IStrategy],
+            strategies: dict[str, "IStrategy"],
             trade_day_end_time: datetime
     ) -> None:
         logger.info(f"Subscribe and read Candles for {strategies.keys()}")
@@ -423,6 +505,13 @@ class Trader:
             if bot_control.control.close_requests:
                 self.__process_close_requests(account_id, strategies)
 
+            # Принятие ручных позиций под управление (/adopt или дашборд).
+            if bot_control.control.adopt_requests:
+                for req in list(bot_control.control.adopt_requests):
+                    result = self.adopt_position(account_id, strategies, req)
+                    logger.info(f"adopt_position result: {result}")
+                bot_control.control.adopt_requests.clear()
+
             # Настройки с дашборда (live/sandbox, take/stop, пауза) — перечитываем
             # дёшево (stat()), применяем к стратегиям только если файл менялся.
             if self.__overrides.maybe_reload():
@@ -432,6 +521,19 @@ class Trader:
                 if file_reqs:
                     bot_control.control.close_requests.update(file_reqs)
                     self.__process_close_requests(account_id, strategies)
+                for adopt_dict in self.__overrides.pop_adopt_requests():
+                    try:
+                        req = bot_control.AdoptRequest(
+                            ticker=adopt_dict["ticker"],
+                            direction=adopt_dict["direction"],
+                            take=Decimal(adopt_dict["take"]),
+                            stop=Decimal(adopt_dict["stop"]),
+                            entry=Decimal(adopt_dict["entry"]) if adopt_dict.get("entry") else None,
+                        )
+                        result = self.adopt_position(account_id, strategies, req)
+                        logger.info(f"adopt_position (dashboard): {result}")
+                    except Exception as e:
+                        logger.error(f"adopt_position (dashboard) ошибка: {repr(e)}")
             self.write_status_file()
 
             # Обновляем MFE/MAE трекинг для открытой позиции
