@@ -54,7 +54,7 @@ from candle_archive import get_candles_cached
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from db_api_client import DbApiClient
-from history import BacktestHistoryStore
+from history import BacktestHistoryStore, HistoryStore
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
@@ -322,6 +322,37 @@ def _strategy_settings_by_ticker() -> dict:
             settings=dict(_OI_DEFAULT_SETTINGS),
         )
     return by_ticker
+
+
+def get_diagnostics(ticker: str, days: int = 30) -> dict:
+    """
+    Снимок того, КАК сейчас реально считается композит для тикера — на
+    живой истории (data/history.json через HistoryStore, не пустой
+    BacktestHistoryStore): Hedge-вес метода (persist в oi_weights.json),
+    regime_probs текущего окна, RMT-redundancy по режиму (Layer 4),
+    в каких режимах накоплена своя корреляционная матрица. Кнопка
+    "Диагностика стратегии" в дашборде — иначе всё это видно только
+    логами/чтением кода.
+    """
+    by_ticker = _strategy_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"ready": False, "error": f"{ticker}: нет в settings.ini/oi_tickers.json"}
+
+    candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    if not candles:
+        return {"ready": False, "error": f"{ticker}: нет истории свечей"}
+
+    strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+    if strategy is None or not hasattr(strategy, "diagnostics_snapshot"):
+        return {"ready": False, "error": f"{ticker}: стратегия не поддерживает diagnostics_snapshot"}
+
+    if hasattr(strategy, "set_history"):
+        strategy.set_history(HistoryStore(), PercentileCalibrator())
+
+    snapshot = strategy.diagnostics_snapshot(candles)
+    snapshot["ticker"] = ticker
+    return snapshot
 
 
 def filter_active_tickers(tickers: list[str], dedup_by_issuer: bool, top_pct: float) -> dict:
@@ -1136,6 +1167,22 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill" onclick="loadAutoAtr()">⟳ ОБНОВИТЬ</button>
 </div>
 
+<div class="panel">
+  <h3>Диагностика стратегии (как сейчас считается композит)</h3>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Снимок текущего состояния на живой истории (data/history.json) для
+    одного тикера: Hedge-вес метода (oi_weights.json), смесь
+    regime_mods по вероятностям режима, RMT-redundancy по режиму
+    (Layer 4) и итоговый эффективный вес каждого метода в композите.
+    Не запускает сделки, ничего не меняет.
+  </div>
+  <label>Тикер <input type="text" class="inp mid" id="diag_ticker" placeholder="SBER"></label>
+  <label>Дней истории <input type="number" class="inp mid" id="diag_days" value="30" min="5" max="240"></label>
+  <button class="btn-pill" onclick="loadDiagnostics()">▶ ПОСМОТРЕТЬ</button>
+  <div id="diag_summary" style="font-size:11px;color:var(--txt3);margin-top:8px;"></div>
+  <table class="scen-table" id="diag_table"></table>
+</div>
+
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
@@ -1532,6 +1579,38 @@ async function loadAutoAtr() {{
 }}
 loadAutoAtr();
 
+async function loadDiagnostics() {{
+  const ticker = document.getElementById('diag_ticker').value.trim().toUpperCase();
+  const days = document.getElementById('diag_days').value;
+  const summary = document.getElementById('diag_summary');
+  const table = document.getElementById('diag_table');
+  if (!ticker) {{ summary.textContent = 'Укажи тикер.'; return; }}
+  summary.textContent = 'Считаю...';
+  table.innerHTML = '';
+  const resp = await fetch(`/api/diagnostics?ticker=${{ticker}}&days=${{days}}`);
+  const data = await resp.json();
+  if (!data.ready) {{
+    summary.textContent = data.error || 'Недостаточно данных.';
+    return;
+  }}
+  const regimeProbs = Object.entries(data.regime_probs || {{}})
+    .sort((a, b) => b[1] - a[1])
+    .map(([r, p]) => `${{r}}: ${{(p * 100).toFixed(0)}}%`).join(', ');
+  summary.innerHTML = `Текущий режим (argmax): <b>${{data.regime}}</b> · смесь: ${{regimeProbs}}<br>` +
+    `rolling_quality: ${{data.rolling_quality}} · M1/M2/M3 готовы: ${{data.cluster_models_ready ? 'да' : 'нет (мало истории)'}}` +
+    (data.cluster_corr_regimes && data.cluster_corr_regimes.length
+      ? ` · RMT-корреляция накоплена для режимов: ${{data.cluster_corr_regimes.join(', ')}}`
+      : ' · RMT-корреляция по режимам пока нигде не накоплена (fallback на общую матрицу)');
+  table.innerHTML = `<thead><tr>
+      <th>Метод</th><th>Hedge-вес</th><th>сделок</th><th>regime_mult</th>
+      <th>redundancy_mult</th><th>эфф. вес</th><th>микростр.</th>
+    </tr></thead>` + (data.methods || []).map(m => `<tr>
+      <td>${{m.name}}</td><td>${{m.hedge_weight}}</td><td>${{m.hedge_trades}}</td>
+      <td>${{m.regime_mult}}</td><td>${{m.redundancy_mult}}</td>
+      <td><b>${{m.effective_weight}}</b></td><td>${{m.is_microstructure ? '✓' : ''}}</td>
+    </tr>`).join('');
+}}
+
 async function askCouncil() {{
   const text = document.getElementById('bugtext').value;
   if (!text.trim()) return;
@@ -1645,6 +1724,15 @@ class Handler(BaseHTTPRequestHandler):
             kind = parse_qs(urlparse(self.path).query).get("kind", [""])[0]
             cached = _last_result.get(kind)
             self._send_json(cached if cached else {"missing": True})
+        elif self.path.startswith("/api/diagnostics"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0]
+            days = int(qs.get("days", ["30"])[0])
+            try:
+                self._send_json(get_diagnostics(ticker, days))
+            except Exception as e:
+                self._send_json({"ready": False, "error": str(e)})
         else:
             self.send_error(404)
 

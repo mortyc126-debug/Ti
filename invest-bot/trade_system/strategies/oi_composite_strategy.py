@@ -1449,6 +1449,75 @@ class OICompositeStrategy(IStrategy):
 
         return rows
 
+    def diagnostics_snapshot(self, candles: list[HistoricCandle]) -> dict:
+        """
+        Снимок текущего внутреннего состояния композита на последнем окне —
+        для дашборда (страница "Диагностика стратегии"): что сейчас весит
+        Hedge на метод, как смешиваются regime_mods/redundancy по
+        regime_probs, готовы ли M1/M2/M3 и в каких режимах накоплена
+        RMT-корреляция (см. cluster_models.py). Read-only: не трогает
+        __cluster_models/__last_regime, считает регим/смеси заново на этом
+        окне, не вмешиваясь в состояние, которое использует analyze_candles.
+        """
+        if len(candles) < CANDLE_WINDOW:
+            return {"ready": False}
+
+        window = candles[-CANDLE_WINDOW:]
+        closes = [_to_f(c.close) for c in window]
+        volumes = [float(c.volume) for c in window]
+        regime_probs = classify_regime_probs(closes, volumes)
+        regime = max(regime_probs, key=regime_probs.get)
+
+        regime_mods: dict[str, float] = {}
+        for name in ALL_METHOD_NAMES:
+            mult = 0.0
+            for r, p in regime_probs.items():
+                if p <= 0.0:
+                    continue
+                dyn = self.__dynamic_regime_mods.get(r)
+                static = REGIME_WEIGHT_MODS.get(r, {})
+                mult += p * (dyn.get(name, static.get(name, 1.0)) if dyn else static.get(name, 1.0))
+            regime_mods[name] = mult
+
+        if self.__cluster_models is not None:
+            if self.__cluster_models.needs_refresh(regime):
+                self.__cluster_models.refresh(regime)
+            redundancy_mult = self.__cluster_models.redundancy_dampen(ALL_METHOD_NAMES, regime_probs)
+            cluster_ready = self.__cluster_models._ready
+            corr_regimes = sorted(self.__cluster_models._corr_by_regime.keys())
+        else:
+            redundancy_mult = {}
+            cluster_ready = False
+            corr_regimes = []
+
+        methods = []
+        for name in ALL_METHOD_NAMES:
+            hedge = self.__weights[name]
+            eff_weight = (
+                hedge.weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+                * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
+            )
+            methods.append({
+                "name": name,
+                "hedge_weight": round(hedge.weight, 4),
+                "hedge_trades": hedge.total,
+                "regime_mult": round(regime_mods.get(name, 1.0), 4),
+                "redundancy_mult": round(redundancy_mult.get(name, 1.0), 4),
+                "effective_weight": round(eff_weight, 4),
+                "is_microstructure": name in MICROSTRUCTURE_METHOD_NAMES,
+            })
+        methods.sort(key=lambda m: m["effective_weight"], reverse=True)
+
+        return {
+            "ready": True,
+            "regime": regime,
+            "regime_probs": {r: round(p, 3) for r, p in regime_probs.items()},
+            "rolling_quality": round(self.__rolling_quality, 4),
+            "cluster_models_ready": cluster_ready,
+            "cluster_corr_regimes": corr_regimes,
+            "methods": methods,
+        }
+
     def backtest_barriers(
             self,
             candles: Optional[list[HistoricCandle]] = None,
