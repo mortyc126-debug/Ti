@@ -28,6 +28,8 @@ regime.classify_regime_probs), а не только в момент сигнал
 import argparse
 import statistics
 
+from tinkoff.invest.exceptions import RequestError
+
 from candle_archive import get_candles_cached
 from dashboard import _config, _db, _market_data, _strategy_settings_by_ticker, _wire_history
 from regime import REGIMES
@@ -96,7 +98,11 @@ def _analyze_one(ticker: str, days: int, horizon: int, max_lag: int) -> TickerRe
         print(f"{ticker}: нет в settings.ini/oi_tickers.json — пропуск")
         return None
 
-    candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    try:
+        candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    except RequestError as e:
+        print(f"{ticker}: ошибка Tinkoff API ({e.code if hasattr(e, 'code') else e}) — пропуск")
+        return None
     if not candles:
         print(f"{ticker}: нет истории свечей — пропуск")
         return None
@@ -206,7 +212,11 @@ def main() -> None:
     per_ticker = {}
     for i, ticker in enumerate(tickers, 1):
         print(f"[{i}/{len(tickers)}]", end=" ")
-        result = _analyze_one(ticker, args.days, args.horizon, args.max_lag)
+        try:
+            result = _analyze_one(ticker, args.days, args.horizon, args.max_lag)
+        except Exception as e:
+            print(f"{ticker}: непредвиденная ошибка ({e}) — пропуск")
+            continue
         if result:
             per_ticker[ticker] = result
     if per_ticker:
