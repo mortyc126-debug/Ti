@@ -1121,6 +1121,16 @@ class OICompositeStrategy(IStrategy):
         self.__auto_atr_stop_k: Optional[float] = None
         self.__auto_atr_scale_exp: Optional[float] = None
         self.__auto_atr_recalc_date: Optional[object] = None
+        # Кэш тяжёлых операций: пересчитываем раз в N баров, между ними — старое значение.
+        # RQA O(n²), wavelet O(n log n), regime (CUSUM+PELT+Z-score) — всё CPU-bound.
+        # На 1м-свечах N=5 (обновление каждые 5 минут), на 5м — N=3.
+        self.__heavy_cache_n: int = 5 if interval_min == 1 else 3
+        self.__heavy_bar_counter: int = 0
+        self.__cached_rqa_mult: float = 1.0
+        self.__cached_wavelet_mult: float = 1.0
+        self.__cached_regime_probs: dict = {"ranging": 1.0}
+        self.__cached_change_point: float = 0.0
+        self.__cached_mtf_trend: float = 0.0
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -1975,16 +1985,30 @@ class OICompositeStrategy(IStrategy):
         closes = [_to_f(c.close) for c in window]
         volumes = [float(c.volume) for c in window]
 
+        # Тяжёлые операции пересчитываем раз в __heavy_cache_n баров:
+        # regime_probs (CUSUM+PELT), change_point_score, RQA, wavelet, MTF.
+        # Режим рынка меняется медленно — 5-бар кэш не теряет точности.
+        self.__heavy_bar_counter += 1
+        do_heavy = (self.__heavy_bar_counter % self.__heavy_cache_n == 1)
+
+        if do_heavy:
+            self.__cached_regime_probs = classify_regime_probs(closes, volumes)
+            self.__cached_change_point = change_point_score(closes)
+            self.__cached_rqa_mult    = self.__rqa_confidence_mult(closes)
+            self.__cached_wavelet_mult = wavelet_confidence_mult(closes)
+            if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
+                self.__cached_mtf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
+
+        regime_probs = self.__cached_regime_probs
+
         base_scores = [fn(window) for _, fn in METHODS] + [
             self.__score_oi_squeeze(),
             self.__score_provider(self.__inst_oi_provider),
             self.__score_provider(self.__retail_contra_provider),
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
-          + [change_point_score(closes), self.__score_multi_ticker()]
+          + [self.__cached_change_point, self.__score_multi_ticker()]
 
-        # Layer 0: непрерывное распределение по всем режимам вместо одной
-        # точки — снимает дребезг весов на границе hard-классификации.
-        regime_probs = classify_regime_probs(closes, volumes)
+        # Layer 0: непрерывное распределение по всем режимам.
         regime = max(regime_probs, key=regime_probs.get)
         regime_conf = regime_probs[regime]
 
@@ -2092,23 +2116,19 @@ class OICompositeStrategy(IStrategy):
         weight_sum = sum(weights[:n_base]) or 1.0
         composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
 
-        confidence_mult = self.__rqa_confidence_mult(closes)
-        confidence_mult *= wavelet_confidence_mult(closes)
+        confidence_mult = self.__cached_rqa_mult
+        confidence_mult *= self.__cached_wavelet_mult
         confidence_mult *= regime_conf
         confidence_mult *= lag_mult
         composite *= confidence_mult
 
-        # MTF-гейт: на 1м-свечах проверяем тренд виртуального старшего ТФ (5м).
-        # Сигнал против тренда старшего ТФ получает штраф × 0.25 — не блокируется
-        # полностью (вдруг разворот), но требует значительно большего composite
-        # чтобы пробить SIGNAL_THRESHOLD. Сигнал по тренду — буст × 1.15.
-        if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
-            htf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
-            if htf_trend != 0.0:
-                if (composite > 0 and htf_trend < 0) or (composite < 0 and htf_trend > 0):
-                    composite *= _MTF_COUNTER_MULT
-                else:
-                    composite *= _MTF_TREND_MULT
+        # MTF-гейт: используем кэшированный тренд старшего ТФ.
+        htf_trend = self.__cached_mtf_trend
+        if htf_trend != 0.0:
+            if (composite > 0 and htf_trend < 0) or (composite < 0 and htf_trend > 0):
+                composite *= _MTF_COUNTER_MULT
+            else:
+                composite *= _MTF_TREND_MULT
 
         self.__last_regime = regime
         self.__regime_confidence = regime_conf
