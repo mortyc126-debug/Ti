@@ -1812,7 +1812,7 @@ async function runBacktest() {{
       if (done) break;
       buf += dec.decode(value, {{stream: true}});
       // SSE: каждое событие отделено \n\n
-      const parts = buf.split('\n\n');
+      const parts = buf.split('\\n\\n');
       buf = parts.pop();
       for (const part of parts) {{
         const line = part.startsWith('data: ') ? part.slice(6) : part;
