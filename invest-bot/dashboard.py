@@ -325,68 +325,81 @@ def _strategy_settings_by_ticker() -> dict:
     return by_ticker
 
 
-# Кэш фьючерсных стратегий — заполняется при первом обращении
+# Кэш фьючерсных стратегий — заполняется фоновым потоком при старте
 _futures_settings_cache: dict[str, StrategySettings] | None = None
+_futures_cache_lock = threading.Lock()
+_futures_cache_ready = threading.Event()  # сигнализирует что кэш готов (или пуст)
 
 
 def _futures_settings_by_ticker() -> dict[str, StrategySettings]:
     """
-    Загружает ближайшие контракты для BASE_TICKERS из [FUTURES_TRADING],
-    возвращает {contract_ticker: StrategySettings}. Кэшируется на процесс.
+    Возвращает кэш фьючерсных стратегий. Если фоновый поток ещё грузит —
+    ждёт не более 5 секунд, потом возвращает что успело загрузиться (или {}).
     """
     global _futures_settings_cache
     if _futures_settings_cache is not None:
         return _futures_settings_cache
+    # Ждём пока фоновая загрузка завершится (или таймаут 5 с при первом GET /)
+    _futures_cache_ready.wait(timeout=5)
+    return _futures_settings_cache or {}
 
-    ft = _config.futures_trading_settings
-    if not ft.enabled or not ft.base_tickers:
+
+def _load_futures_settings_bg() -> None:
+    """Фоновая загрузка фьючерсных контрактов из [FUTURES_TRADING]. Запускается в потоке при старте."""
+    global _futures_settings_cache
+    try:
+        ft = _config.futures_trading_settings
+        if not ft.enabled or not ft.base_tickers:
+            _futures_settings_cache = {}
+            return
+
+        stock_settings = {s.ticker: s for s in _config.trade_strategy_settings}
+        ma = _config.mega_alerts_settings
+
+        result: dict[str, StrategySettings] = {}
+        for base in ft.base_tickers:
+            try:
+                resolved = _instrument_service.future_by_base_ticker(base)
+            except Exception as e:
+                logger.warning(f"futures dashboard: {base}: {e}")
+                continue
+            if resolved is None:
+                continue
+            future_info, figi = resolved
+            base_st = stock_settings.get(base)
+            if base_st:
+                sig_settings = dict(base_st.settings)
+                max_lots = base_st.max_lots_per_order
+            else:
+                sig_settings = {
+                    "SIGNAL_THRESHOLD": ma.signal_threshold,
+                    "LONG_TAKE": ma.long_take, "LONG_STOP": ma.long_stop,
+                    "SHORT_TAKE": ma.short_take, "SHORT_STOP": ma.short_stop,
+                    "SIGNAL_ONLY": "1",
+                }
+                max_lots = ma.max_lots_per_order
+            st = StrategySettings(
+                name="OICompositeStrategy",
+                figi=figi,
+                ticker=future_info.ticker,
+                max_lots_per_order=max_lots,
+                settings=sig_settings,
+                lot_size=future_info.lot,
+                short_enabled_flag=future_info.short_enabled_flag,
+                is_future=True,
+                margin_per_lot=future_info.margin_per_lot,
+                point_value=future_info.point_value,
+                candle_interval_min=1,
+            )
+            result[future_info.ticker] = st
+
+        _futures_settings_cache = result
+        logger.info(f"futures dashboard: загружено {len(result)} контрактов")
+    except Exception as e:
+        logger.error(f"futures dashboard: ошибка загрузки: {e}")
         _futures_settings_cache = {}
-        return _futures_settings_cache
-
-    # Шаблоны сигнала берём из STRATEGY_<BASE>_SETTINGS если есть, иначе дефолты
-    stock_settings = {s.ticker: s for s in _config.trade_strategy_settings}
-    ma = _config.mega_alerts_settings
-
-    result: dict[str, StrategySettings] = {}
-    for base in ft.base_tickers:
-        try:
-            resolved = _instrument_service.future_by_base_ticker(base)
-        except Exception as e:
-            logger.warning(f"futures dashboard: {base}: {e}")
-            continue
-        if resolved is None:
-            continue
-        future_info, figi = resolved
-        base_st = stock_settings.get(base)
-        if base_st:
-            sig_settings = dict(base_st.settings)
-            max_lots = base_st.max_lots_per_order
-        else:
-            sig_settings = {
-                "SIGNAL_THRESHOLD": ma.signal_threshold,
-                "LONG_TAKE": ma.long_take, "LONG_STOP": ma.long_stop,
-                "SHORT_TAKE": ma.short_take, "SHORT_STOP": ma.short_stop,
-                "SIGNAL_ONLY": "1",
-            }
-            max_lots = ma.max_lots_per_order
-        st = StrategySettings(
-            name="OICompositeStrategy",
-            figi=figi,
-            ticker=future_info.ticker,
-            max_lots_per_order=max_lots,
-            settings=sig_settings,
-            lot_size=future_info.lot,
-            short_enabled_flag=future_info.short_enabled_flag,
-            is_future=True,
-            margin_per_lot=future_info.margin_per_lot,
-            point_value=future_info.point_value,
-            candle_interval_min=1,  # фьючерсы — минутки
-        )
-        result[future_info.ticker] = st
-
-    _futures_settings_cache = result
-    logger.info(f"futures dashboard: загружено {len(result)} контрактов")
-    return result
+    finally:
+        _futures_cache_ready.set()
 
 
 def _all_settings_by_ticker() -> dict[str, StrategySettings]:
@@ -2840,7 +2853,8 @@ def save_overrides_payload(payload: dict) -> dict | None:
 def _render_page() -> bytes:
     oi_tickers = load_oi_tickers()
     stocks = _strategy_settings_by_ticker()
-    futures = _futures_settings_by_ticker()
+    futures_ready = _futures_cache_ready.is_set()
+    futures = _futures_settings_by_ticker() if futures_ready else {}
 
     stock_chips = "".join(
         f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
@@ -2852,6 +2866,12 @@ def _render_page() -> bytes:
         f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
         for t in sorted(futures)
     )
+    loading_notice = (
+        '<div id="fut-loading" style="color:#7eb8f7;font-size:12px;padding:4px 0">'
+        '⏳ Загружаю контракты… <a href="/" style="color:#7eb8f7">обновить</a></div>'
+        '<script>setTimeout(()=>location.reload(),15000)</script>'
+        if not futures_ready else ""
+    )
     checkboxes = (
         f'<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'
         f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\')">Все</button>'
@@ -2860,7 +2880,7 @@ def _render_page() -> bytes:
         f'<button class="btn-pill btn-sm" onclick="setAllChips(true)">✓ все</button>'
         f'<button class="btn-pill btn-sm" onclick="setAllChips(false)">✗ снять</button>'
         f'</div>'
-        f'{stock_chips}{futures_chips}'
+        f'{loading_notice}{stock_chips}{futures_chips}'
     )
     return (PAGE_HTML
             .replace("__TICKER_CHECKBOXES__", checkboxes)
@@ -3022,6 +3042,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
+
+    # Загружаем фьючерсы в фоне, чтобы первый GET / не висел минуту
+    t = threading.Thread(target=_load_futures_settings_bg, daemon=True, name="futures-loader")
+    t.start()
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     # daemon_threads=True — без этого Ctrl+C обрывает только accept-loop,
