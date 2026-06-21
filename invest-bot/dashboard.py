@@ -1205,7 +1205,7 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .btn-pill:hover{{box-shadow:0 0 14px rgba(255,0,128,.25);}}
 .btn-sm{{padding:4px 12px;font-size:10px;}}
 .chips{{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}}
-.chip{{display:flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);}}
+.chip{{display:inline-flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}}
 .chip:hover{{border-color:rgba(255,0,128,.25);}}
 .chip.active{{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}}
 .chip-fut{{border-color:rgba(80,140,255,.25);}}
@@ -1252,7 +1252,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
-  <div id="tickers">__TICKER_CHECKBOXES__</div>
+  <div id="tickers" style="display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;">__TICKER_CHECKBOXES__</div>
   <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
        (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
        _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
