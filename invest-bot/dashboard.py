@@ -562,15 +562,27 @@ def filter_active_tickers(tickers: list[str], dedup_by_issuer: bool, top_pct: fl
     не вытеснялись и не отсекались top_pct, но всё равно участвовали в
     дедупе как "сильный" вариант, если у эмитента есть OI-дубль.
     """
+    # Дедуп не нужен если выключен
     if not dedup_by_issuer:
-        return {"kept": tickers, "dropped": []}
+        # Убираем дубли (один тикер может быть и в акциях, и в фьючерсах)
+        seen: set[str] = set()
+        unique = [t for t in tickers if not (t in seen or seen.add(t))]
+        return {"kept": unique, "dropped": []}
 
     settings_tickers = {s.ticker for s in _config.trade_strategy_settings}
+    futures_tickers = set(_futures_settings_by_ticker().keys())
     oi_tickers = load_oi_tickers()
+
+    # Убираем дубли перед дедупом
+    seen_set: set[str] = set()
+    tickers = [t for t in tickers if not (t in seen_set or seen_set.add(t))]
 
     infos = []
     for ticker in tickers:
-        if ticker in settings_tickers:
+        if ticker in settings_tickers or ticker in futures_tickers:
+            # Акции из settings.ini и фьючерсы — всегда оставляем, demand=inf
+            # чтобы top_pct их не отрезал. У каждого фьючерса уникальный
+            # тикер (SiU6, BRU6 и т.д.) — дедуп по эмитенту не нужен.
             infos.append({"ticker": ticker, "issuer_key": issuer_key(ticker), "demand": float("inf")})
         else:
             info = oi_tickers.get(ticker, {})
