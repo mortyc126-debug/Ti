@@ -1002,7 +1002,8 @@ def run_portfolio_sim(
             "entry_price": t.get("entry_price"), "exit_price": t.get("exit_price"),
             "take_price": t.get("take_price"), "stop_price": t.get("stop_price"),
             "duration_min": t.get("duration_min"),
-            "exit_reason": t.get("exit_reason"), "entry_mode": t.get("entry_mode", "fixed"), "regime": t.get("regime"),
+            "exit_reason": t.get("exit_reason"), "entry_mode": t.get("entry_mode", "fixed"),
+            "pattern": t.get("pattern"), "regime": t.get("regime"),
             "agree_count": t.get("agree_count"), "against_count": t.get("against_count"),
             "top_agree": t.get("top_agree", []), "top_against": t.get("top_against", []),
         })
@@ -1662,6 +1663,16 @@ function pfRowsToHtml(trades) {{
     ranging: '↔ боковик', high_vol: '⚡ волат.', low_vol: '😴 тихо', stress: '🔴 стресс'
   }};
   const EXIT_LABELS = {{take: '✅ тейк', stop: '🛑 стоп', timeout: '⏱ тайм'}};
+  const PATTERN_LABELS = {{
+    level_reversal:  '📍уровень',
+    false_breakout:  '🪤пробой',
+    thread:          '🧵нитка',
+  }};
+  const PATTERN_BG = {{
+    level_reversal: 'rgba(100,200,100,.07)',
+    false_breakout: 'rgba(255,190,50,.07)',
+    thread:         'rgba(100,180,255,.07)',
+  }};
   let html = '';
   trades.forEach((t, i) => {{
     const winColor = t.win ? 'var(--pos)' : 'var(--neg)';
@@ -1669,8 +1680,10 @@ function pfRowsToHtml(trades) {{
     const regime = REGIME_LABELS[t.regime] || t.regime || '—';
     const exitLbl = EXIT_LABELS[t.exit_reason] || t.exit_reason || '—';
     const agreeStr = t.agree_count !== undefined ? `${{t.agree_count}}↑ ${{t.against_count}}↓` : '';
+    const patternLbl = PATTERN_LABELS[t.pattern] || '';
+    const rowBg = PATTERN_BG[t.pattern] || '';
     const detailId = `td_${{i}}`;
-    html += `<tr style="cursor:pointer" onclick="toggleTd('${{detailId}}')">
+    html += `<tr style="cursor:pointer;${{rowBg ? 'background:'+rowBg : ''}}" onclick="toggleTd('${{detailId}}')">
       <td>${{t.entry_time ? t.entry_time.toString().slice(0,16) : ''}}</td>
       <td>${{t.ticker}}${{t.atr_k ? ' <span style="color:var(--txt3)">'+t.atr_k+'</span>' : ''}}</td>
       <td>${{t.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'}}</td>
@@ -1679,10 +1692,11 @@ function pfRowsToHtml(trades) {{
       <td>${{exitLbl}}</td>
       <td style="color:var(--txt3)">${{regime}}</td>
       <td style="color:var(--txt3)">${{agreeStr}}</td>
+      <td>${{patternLbl}}</td>
       <td>${{t.pnl_rub ?? ''}}</td>
     </tr>
     <tr id="${{detailId}}" style="display:none">
-      <td colspan="9" style="background:rgba(255,255,255,.03);padding:8px 14px;font-size:11px;">
+      <td colspan="10" style="background:rgba(255,255,255,.03);padding:8px 14px;font-size:11px;">
         ${{tradeDetailHtml(t)}}
       </td>
     </tr>`;
@@ -1697,9 +1711,16 @@ function toggleTd(id) {{
 
 function tradeDetailHtml(t) {{
   const fmtScore = v => v >= 0 ? `<span style="color:var(--pos)">+${{v.toFixed(2)}}</span>` : `<span style="color:var(--neg)">${{v.toFixed(2)}}</span>`;
+  const PATTERN_FULL = {{
+    level_reversal: '📍 Разворот у уровня',
+    false_breakout: '🪤 Ложный пробой',
+    thread:         '🧵 Нитка',
+  }};
   let html = `<div style="display:flex;gap:24px;flex-wrap:wrap">`;
-  const modeTag = t.entry_mode === 'level' ? ' <span style="color:var(--pos);font-size:11px">📍уровень</span>' : '';
-  html += `<div><b>Цены:</b> вход ${{t.entry_price}} → выход ${{t.exit_price}} &nbsp; тейк ${{t.take_price}} стоп ${{t.stop_price}}${{modeTag}}</div>`;
+  if (t.pattern && PATTERN_FULL[t.pattern]) {{
+    html += `<div style="font-weight:700">${{PATTERN_FULL[t.pattern]}}</div>`;
+  }}
+  html += `<div><b>Цены:</b> вход ${{t.entry_price}} → выход ${{t.exit_price}} &nbsp; тейк ${{t.take_price}} стоп ${{t.stop_price}}</div>`;
   html += `<div><b>Экспозиция:</b> ${{Math.round(t.duration_min)}} мин</div>`;
   if (t.top_agree && t.top_agree.length) {{
     html += `<div><b>За (${{t.agree_count}}):</b> `;

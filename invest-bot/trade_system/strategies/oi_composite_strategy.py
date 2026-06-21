@@ -1724,6 +1724,7 @@ class OICompositeStrategy(IStrategy):
             # после входа — для форвард-тест). Берём последние 60 свечей из
             # полного candle-окна стратегии как исторический контекст.
             entry_mode = "fixed"
+            _lp: Optional[object] = None
             _lp_candles = sig.get("history_window")
             if _lp_candles is not None and len(_lp_candles) >= 30:
                 _lp = detect_level_pattern(
@@ -1860,6 +1861,7 @@ class OICompositeStrategy(IStrategy):
                     "exit_reason": exit_reason,
                     "regime": sig.get("regime", ""),
                     "entry_mode": entry_mode,
+                    "pattern": _lp.pattern if entry_mode == "level" and _lp is not None else None,
                     "agree_count": len([v for v in ms.values() if v * dir_sign > 0.05]),
                     "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
                     "top_agree": top_agree,
