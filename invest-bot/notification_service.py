@@ -49,10 +49,12 @@ class NotificationService:
     """
     Оборачивает Blogger и bot_events.json. Используется из asyncio-контекста.
     blogger может быть None — тогда шлём только в файл.
+    prefix — строка-префикс для имени счёта, напр. "[Брокерский [ИИС]] ".
     """
 
-    def __init__(self, blogger=None) -> None:
+    def __init__(self, blogger=None, prefix: str = "") -> None:
         self._blogger = blogger
+        self._prefix = prefix
 
     def _tg(self, text: str) -> None:
         if self._blogger:
@@ -63,7 +65,7 @@ class NotificationService:
 
     def error(self, context: str, exc: Exception | None = None, tb: str | None = None) -> None:
         """Ошибка — красный уровень. Всегда шлём в оба канала."""
-        parts = [f"🔴 ОШИБКА [{context}]"]
+        parts = [f"🔴 ОШИБКА {self._prefix}[{context}]"]
         if exc is not None:
             parts.append(repr(exc))
         if tb:
@@ -75,12 +77,12 @@ class NotificationService:
         self._tg(text)
 
     def warning(self, context: str, text: str) -> None:
-        msg = f"🟡 ПРЕДУПРЕЖДЕНИЕ [{context}]\n{text}"
+        msg = f"🟡 ПРЕДУПРЕЖДЕНИЕ {self._prefix}[{context}]\n{text}"
         _append_event("warning", msg)
         self._tg(msg)
 
     def info(self, text: str) -> None:
-        msg = f"ℹ️ {text}"
+        msg = f"ℹ️ {self._prefix}{text}"
         _append_event("info", msg)
         self._tg(msg)
 

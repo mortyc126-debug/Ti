@@ -9,15 +9,19 @@ set_take_stop_overrides). Изменения take/stop влияют только
 
 Формат файла:
 {
-  "global_signal_only": null | true | false,   // null — нет глобального оверрайда
-  "partial_tp_enabled": null | true | false,    // null — берём дефолт из PARTIAL_TP_DEFAULT_ENABLED (trader.py)
-  "adaptive_exit_enabled": null | true | false, // null — берём дефолт из ADAPTIVE_EXIT_ENABLED (trader.py)
-  "orderbook_enabled": null | true | false,     // null — берём дефолт из ORDERBOOK_DEFAULT_ENABLED (trader.py)
+  "global_signal_only": null | true | false,
+  "partial_tp_enabled": null | true | false,
+  "adaptive_exit_enabled": null | true | false,
+  "orderbook_enabled": null | true | false,
+  "accounts": {                                // null/отсутствует → торгуем на всех подходящих
+    "2050123456": {"enabled": true},
+    "2050789012": {"enabled": false}
+  },
   "tickers": {
     "SBER": {
-      "enabled": true,                          // false — новые сигналы не открываются (ни реально, ни signal-only)
-      "signal_only": null | true | false,       // null — берём из settings.ini
-      "long_take": null | "1.02", ...           // null — берём из settings.ini
+      "enabled": true,
+      "signal_only": null | true | false,
+      "long_take": null | "1.02", ...
     }
   }
 }
@@ -49,6 +53,7 @@ def load_overrides(path: str = OVERRIDES_FILE) -> dict:
     data.setdefault("partial_tp_enabled", None)
     data.setdefault("adaptive_exit_enabled", None)
     data.setdefault("orderbook_enabled", None)
+    data.setdefault("accounts", None)   # None → все подходящие
     data.setdefault("tickers", {})
     return data
 
@@ -110,6 +115,16 @@ class RuntimeOverrides:
     def orderbook_enabled(self, default: bool) -> bool:
         v = self.__data.get("orderbook_enabled")
         return default if v is None else bool(v)
+
+    def enabled_account_ids(self) -> list[str] | None:
+        """
+        None → торгуем на всех подходящих (accounts не задан или пуст).
+        list → только счета из списка с enabled=True.
+        """
+        accounts = self.__data.get("accounts")
+        if not accounts:
+            return None
+        return [aid for aid, cfg in accounts.items() if cfg.get("enabled", True)]
 
     def take_stop_for(self, ticker: str) -> dict[str, Decimal]:
         """Только заданные (не null) поля — для set_take_stop_overrides(**kwargs)."""

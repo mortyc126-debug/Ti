@@ -95,7 +95,8 @@ class Trader:
             blogger: Blogger,
             mega_alerts: MegaAlertsService,
             mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings(),
-            futures_trading_settings: FuturesTradingSettings = FuturesTradingSettings()
+            futures_trading_settings: FuturesTradingSettings = FuturesTradingSettings(),
+            account_label: str = "",
     ) -> None:
         self.__today_trade_results: TradeResults = None
         self.__client_service = client_service
@@ -141,7 +142,9 @@ class Trader:
         # Настройки с дашборда (live/sandbox, take/stop, allow/deny по тикерам) —
         # см. runtime_overrides.py. Перечитывается на каждой свече по mtime.
         self.__overrides = RuntimeOverrides()
-        self.__notifier = NotificationService(blogger)
+        # Префикс для TG-сообщений при работе с несколькими счетами
+        self.__label = f"[{account_label}] " if account_label else ""
+        self.__notifier = NotificationService(blogger, prefix=self.__label)
         # Кулдаун повторного входа после убыточного закрытия — см. __risk_close.
         self.__loss_cooldown_until: dict[str, datetime.datetime] = {}
         # figi, для которых размещение ордера (__smart_order, до 45с репрайса)

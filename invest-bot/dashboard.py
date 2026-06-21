@@ -1148,6 +1148,26 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div class="panel">
+  <div class="sec">Счета для торговли</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Включите счета, на которых бот будет торговать. Бот воспринимает их как одну систему:
+    один и тот же сигнал открывает сделку на каждом включённом счёте пропорционально его балансу.
+    Изменения применяются со следующего торгового дня (бот перечитывает список счетов при старте дня).
+  </div>
+  <div id="acc_loading" style="font-size:11px;color:var(--txt3)">Загрузка счетов...</div>
+  <table class="scen-table" id="acc_table" style="display:none">
+    <thead><tr>
+      <th>Включён</th><th>Название</th><th>Тип</th><th>ID счёта</th><th>Баланс, ₽</th><th>Маржа</th>
+    </tr></thead>
+    <tbody id="acc_tbody"></tbody>
+  </table>
+  <br>
+  <button class="btn-pill" onclick="loadAccounts()">⟳ ОБНОВИТЬ</button>
+  <button class="btn-pill" onclick="saveAccounts()">💾 СОХРАНИТЬ</button>
+  <span id="acc_status"></span>
+</div>
+
+<div class="panel">
   <div class="sec">Управление ботом (live)</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     Бот перечитывает эти настройки сам, без перезапуска (раз в свечу).
@@ -1672,6 +1692,48 @@ async function loadDiagnostics() {{
     </tr>`).join('');
 }}
 
+// ── Счета ───────────────────────────────────────────────────────────────────
+let _accData = [];
+
+async function loadAccounts() {{
+  document.getElementById('acc_loading').textContent = 'Загрузка...';
+  document.getElementById('acc_table').style.display = 'none';
+  try {{
+    const resp = await fetch('/api/accounts');
+    const data = await resp.json();
+    if (data.error) {{ document.getElementById('acc_loading').textContent = 'Ошибка: ' + data.error; return; }}
+    _accData = data.accounts || [];
+    const tbody = document.getElementById('acc_tbody');
+    tbody.innerHTML = _accData.map(a => `<tr>
+      <td style="text-align:center"><input type="checkbox" data-id="${{a.id}}" ${{a.enabled ? 'checked' : ''}}></td>
+      <td>${{a.name}}</td>
+      <td>${{a.type}}</td>
+      <td style="font-family:monospace;font-size:10px">${{a.id}}</td>
+      <td>${{a.liquid.toLocaleString('ru-RU')}} ₽</td>
+      <td style="color:${{a.margin_ok ? 'var(--grn)' : 'var(--red)'}}">${{a.margin_ok ? '✓ ОК' : '✗ Не ОК'}}</td>
+    </tr>`).join('');
+    document.getElementById('acc_loading').style.display = 'none';
+    document.getElementById('acc_table').style.display = '';
+    document.getElementById('acc_status').textContent = '';
+  }} catch(e) {{
+    document.getElementById('acc_loading').textContent = 'Ошибка загрузки: ' + e;
+  }}
+}}
+
+async function saveAccounts() {{
+  const accounts = {{}};
+  document.querySelectorAll('#acc_tbody input[data-id]').forEach(cb => {{
+    accounts[cb.dataset.id] = {{enabled: cb.checked}};
+  }});
+  const resp = await fetch('/api/accounts', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{accounts}})}});
+  const data = await resp.json();
+  const st = document.getElementById('acc_status');
+  st.textContent = data.ok ? '✓ Сохранено' : ('Ошибка: ' + (data.error || '?'));
+  st.style.color = data.ok ? 'var(--grn)' : 'var(--red)';
+}}
+
+loadAccounts();
+
 // ── Лог бота ────────────────────────────────────────────────────────────────
 let _evAll = [];
 let _evTimer = null;
@@ -1840,6 +1902,24 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(get_diagnostics(ticker, days))
             except Exception as e:
                 self._send_json({"ready": False, "error": str(e)})
+        elif self.path == "/api/accounts":
+            from invest_api.services.accounts_service import AccountService
+            svc = AccountService(_config.tinkoff_token, _config.tinkoff_app_name)
+            overrides = load_overrides()
+            acc_overrides = overrides.get("accounts") or {}
+            try:
+                accounts = svc.list_all_accounts()
+                rows = []
+                for a in accounts:
+                    enabled = acc_overrides.get(a.id, {}).get("enabled", True) if acc_overrides else True
+                    rows.append({
+                        "id": a.id, "name": a.name, "type": a.account_type,
+                        "liquid": a.liquid_portfolio, "margin_ok": a.margin_ok,
+                        "enabled": enabled,
+                    })
+                self._send_json({"accounts": rows})
+            except Exception as ex:
+                self._send_json({"error": repr(ex)}, 500)
         elif self.path.startswith("/api/bot_events"):
             from urllib.parse import urlparse, parse_qs
             since = int(parse_qs(urlparse(self.path).query).get("since", ["0"])[0])
@@ -1913,6 +1993,18 @@ class Handler(BaseHTTPRequestHandler):
                 from notification_service import _append_event
                 _append_event("control", "Dashboard: настройки сохранены (bot_overrides.json обновлён)")
             self._send_json(error if error else {"ok": True})
+        elif self.path == "/api/accounts":
+            # {"accounts": {"2050123": {"enabled": true}, ...}}
+            acc_in = payload.get("accounts", {})
+            data = load_overrides()
+            data["accounts"] = {aid: {"enabled": bool(cfg.get("enabled", True))}
+                                 for aid, cfg in acc_in.items()}
+            save_overrides(data)
+            from notification_service import _append_event
+            enabled = [aid for aid, cfg in data["accounts"].items() if cfg.get("enabled")]
+            disabled = [aid for aid, cfg in data["accounts"].items() if not cfg.get("enabled")]
+            _append_event("control", f"Dashboard: счета включены={enabled} отключены={disabled}")
+            self._send_json({"ok": True})
         elif self.path == "/api/cancel":
             was_running = request_cancel()
             self._send_json({"cancelled": was_running})

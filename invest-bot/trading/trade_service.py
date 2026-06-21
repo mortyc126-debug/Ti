@@ -3,9 +3,9 @@ import datetime
 import logging
 
 from blog.blogger import Blogger
-from configuration.settings import AccountSettings, TradingSettings, BlogSettings, StrategySettings, \
+from configuration.settings import AccountSettings, TradingSettings, StrategySettings, \
     MegaAlertsSettings, FuturesTradingSettings
-from invest_api.services.accounts_service import AccountService
+from invest_api.services.accounts_service import AccountService, AccountInfo
 from invest_api.services.client_service import ClientService
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
@@ -14,6 +14,7 @@ from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from mega_alerts import MegaAlertsService
 from notification_service import NotificationService, capture_tb
+from runtime_overrides import RuntimeOverrides
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trader import Trader
 
@@ -23,9 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class TradeService:
-    """
-    Represent logic keep trading going
-    """
     def __init__(
             self,
             account_service: AccountService,
@@ -55,64 +53,69 @@ class TradeService:
         self.__strategies = strategies
         self.__mega_alerts_settings = mega_alerts_settings
         self.__futures_trading_settings = futures_trading_settings
-        # Один инстанс и одна фоновая daily_loop-задача на весь процесс — раньше
-        # MegaAlertsService создавался внутри Trader.__init__ и пересоздавался
-        # каждый торговый день вместе с новым Trader; старая задача никогда не
-        # отменялась (только oi_task/tradestats_task отменялись в trade_day's
-        # finally) — за N дней работы накапливалось N "осиротевших" daily_loop,
-        # каждый раз в сутки бьющих MOEX API и независимо пишущих в один и тот
-        # же data/mega_alerts.json.
         self.__mega_alerts = MegaAlertsService()
         self.__mega_alerts_task: asyncio.Task | None = None
         self.__notifier = NotificationService(blogger)
+        # Отдельный RuntimeOverrides для trade_service — отслеживает список включённых счетов.
+        # Trader внутри читает свой экземпляр для тикерных оверрайдов.
+        self.__overrides = RuntimeOverrides()
 
     async def worker(self) -> None:
         self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
         try:
             try:
-                logger.info("Finding account for trading")
-                account_id = self.__account_service.trading_account_id(self.__account_settings)
-
-                if not account_id:
-                    msg = "Account for trading hasn't been found"
-                    logger.error(msg)
-                    self.__notifier.error("trade_service: поиск счёта", ValueError(msg))
-                    return None
-
-                logger.info(f"Account id: {account_id}")
-
+                accounts = self.__get_active_accounts()
             except Exception as ex:
                 logger.error(f"Start trading error: {repr(ex)}")
                 self.__notifier.error("trade_service: старт", ex, capture_tb())
-                return None
+                return
 
-            await self.__working_loop(account_id)
+            if not accounts:
+                msg = "Не найдено ни одного подходящего счёта для торговли"
+                logger.error(msg)
+                self.__notifier.error("trade_service: поиск счетов", ValueError(msg))
+                return
+
+            # Запускаем рабочий цикл параллельно для каждого счёта
+            await asyncio.gather(*[self.__working_loop(acc) for acc in accounts])
         finally:
             self.__mega_alerts_task.cancel()
 
-    async def __working_loop(self, account_id: str) -> None:
-        logger.info("Start every day trading")
+    def __get_active_accounts(self) -> list[AccountInfo]:
+        """Возвращает список счетов с учётом оверрайдов."""
+        self.__overrides.maybe_reload()
+        enabled_ids = self.__overrides.enabled_account_ids()  # None = все
+        accounts = self.__account_service.trading_account_ids(self.__account_settings, enabled_ids)
+        logger.info(f"Счета для торговли: {[(a.id, a.name, a.account_type, a.liquid_portfolio) for a in accounts]}")
+        return accounts
+
+    async def __working_loop(self, account: AccountInfo) -> None:
+        label = f"{account.name} [{account.account_type}]"
+        logger.info(f"Запуск рабочего цикла для счёта: {label} ({account.id})")
 
         while True:
-            logger.info("Check trading schedule on today")
+            logger.info(f"[{label}] Проверяем расписание торгов")
 
             try:
                 is_trading_day, start_time, end_time = \
                     self.__instrument_service.moex_today_trading_schedule()
-                # for tests purposes
-                #is_trading_day, start_time, end_time = \
-                #    True, \
-                #    datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) + datetime.timedelta(seconds=10), \
-                #    datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) + datetime.timedelta(minutes=12)
 
                 if is_trading_day and datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) <= end_time:
-                    logger.info(f"Today is trading day. Trading will start after {start_time}")
+                    logger.info(f"[{label}] Торговый день, старт после {start_time}")
 
                     await TradeService.__sleep_to(
                         start_time + datetime.timedelta(seconds=self.__trading_settings.delay_start_after_open)
                     )
 
-                    logger.info(f"Trading day has been started")
+                    # Проверяем, не отключили ли счёт пока ждали
+                    self.__overrides.maybe_reload()
+                    enabled_ids = self.__overrides.enabled_account_ids()
+                    if enabled_ids is not None and account.id not in enabled_ids:
+                        logger.info(f"[{label}] Счёт отключён в оверрайдах, пропускаем торговый день")
+                        await TradeService.__sleep_to_next_morning()
+                        continue
+
+                    logger.info(f"[{label}] Начинаем торговый день")
 
                     await Trader(
                         client_service=self.__client_service,
@@ -121,26 +124,26 @@ class TradeService:
                         order_service=self.__order_service,
                         stream_service=self.__stream_service,
                         market_data_service=self.__market_data_service,
-                        blogger=self.__blogger,
+                        blogger=self.__blogger.with_label(label),
                         mega_alerts=self.__mega_alerts,
                         mega_alerts_settings=self.__mega_alerts_settings,
-                        futures_trading_settings=self.__futures_trading_settings
+                        futures_trading_settings=self.__futures_trading_settings,
+                        account_label=label,
                     ).trade_day(
-                        account_id,
+                        account.id,
                         self.__trading_settings,
                         self.__strategies,
                         end_time,
                         self.__account_settings.min_rub_on_account
                     )
 
-                    logger.info("Trading day has been completed")
+                    logger.info(f"[{label}] Торговый день завершён")
                 else:
-                    logger.info("Today is not trading day. Sleep on next morning")
+                    logger.info(f"[{label}] Не торговый день, ждём до утра")
             except Exception as ex:
-                logger.error(f"Start trading today error: {repr(ex)}")
-                self.__notifier.error("trade_service: рабочий цикл", ex, capture_tb())
+                logger.error(f"[{label}] Ошибка в рабочем цикле: {repr(ex)}")
+                self.__notifier.error(f"trade_service [{label}]", ex, capture_tb())
 
-            logger.info("Sleep to next morning")
             await TradeService.__sleep_to_next_morning()
 
     @staticmethod
@@ -148,15 +151,12 @@ class TradeService:
         future = datetime.datetime.utcnow() + datetime.timedelta(days=1)
         next_time = datetime.datetime(year=future.year, month=future.month, day=future.day,
                                       hour=6, minute=0, tzinfo=datetime.timezone.utc)
-
         await TradeService.__sleep_to(next_time)
 
     @staticmethod
     async def __sleep_to(next_time: datetime) -> None:
         now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-
-        logger.debug(f"Sleep from {now} to {next_time}")
+        logger.debug(f"Ожидание с {now} до {next_time}")
         total_seconds = (next_time - now).total_seconds()
-
         if total_seconds > 0:
             await asyncio.sleep(total_seconds)

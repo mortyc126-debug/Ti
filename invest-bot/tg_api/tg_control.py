@@ -12,6 +12,8 @@ tg_api/tg_control.py — приём команд управления ботом
   /signal  TICKER on|off      — переключить signal_only для тикера
   /take    TICKER VALUE       — установить long_take (напр. /take SBER 1.02)
   /stop    TICKER VALUE       — установить long_stop (напр. /stop SBER 0.98)
+  /accounts                   — список счетов и их статус
+  /account enable|disable ID  — включить/отключить счёт
   /help                       — список команд
 """
 import logging
@@ -41,6 +43,31 @@ def _patch_overrides(ticker: str, **fields) -> None:
     entry.update(fields)
     save_overrides(data)
     _append_event("control", f"TG override: {ticker.upper()} {fields}")
+
+
+def _patch_accounts(account_id: str, enabled: bool) -> None:
+    """Атомарно меняет статус счёта в bot_overrides.json."""
+    data = load_overrides()
+    accounts = data.setdefault("accounts", {}) or {}
+    accounts[account_id] = {"enabled": enabled}
+    data["accounts"] = accounts
+    save_overrides(data)
+    state = "включён" if enabled else "отключён"
+    _append_event("control", f"TG: счёт {account_id} {state}")
+
+
+def _accounts_text() -> str:
+    data = load_overrides()
+    accounts = data.get("accounts") or {}
+    if not accounts:
+        return "⚙️ Все счета включены (переопределений нет).\n\nЧтобы отключить счёт:\n/account disable ID"
+    lines = ["⚙️ <b>Счета (bot_overrides.json):</b>"]
+    for acc_id, cfg in sorted(accounts.items()):
+        icon = "✅" if cfg.get("enabled", True) else "❌"
+        lines.append(f"  {icon} <code>{acc_id}</code>")
+    lines.append("")
+    lines.append("Команды:\n/account enable ID\n/account disable ID")
+    return "\n".join(lines)
 
 
 def _config_text() -> str:
@@ -193,6 +220,36 @@ def _build_dispatcher(allowed_chat_id: str) -> Dispatcher:
         _patch_overrides(ticker, long_stop=str(val))
         await message.answer(f"⚙️ {ticker}: long_stop → {val}. Применится на следующей свече.")
 
+    @dp.message(Command("accounts"))
+    async def cmd_accounts(message: Message) -> None:
+        if not _allowed(message):
+            return
+        await message.answer(_accounts_text(), parse_mode="HTML")
+
+    @dp.message(Command("account"))
+    async def cmd_account(message: Message) -> None:
+        if not _allowed(message):
+            return
+        parts = (message.text or "").split(maxsplit=2)
+        if len(parts) < 3 or parts[1].lower() not in ("enable", "disable"):
+            await message.answer(
+                "Использование:\n"
+                "/account enable ID — включить счёт\n"
+                "/account disable ID — отключить счёт\n\n"
+                "ID счёта смотри в /accounts"
+            )
+            return
+        action = parts[1].lower()
+        account_id = parts[2].strip()
+        enabled = action == "enable"
+        _patch_accounts(account_id, enabled)
+        state = "включён ✅" if enabled else "отключён ❌"
+        await message.answer(
+            f"Счёт <code>{account_id}</code>: {state}.\n"
+            "Применится при следующей проверке расписания.",
+            parse_mode="HTML"
+        )
+
     @dp.message(Command("help"))
     async def cmd_help(message: Message) -> None:
         if not _allowed(message):
@@ -209,7 +266,11 @@ def _build_dispatcher(allowed_chat_id: str) -> Dispatcher:
             "/disable TICKER — отключить тикер\n"
             "/signal TICKER on|off — signal-only режим\n"
             "/take TICKER VALUE — установить long_take (напр. 1.02)\n"
-            "/stop TICKER VALUE — установить long_stop (напр. 0.98)\n"
+            "/stop TICKER VALUE — установить long_stop (напр. 0.98)\n\n"
+            "<b>Счета:</b>\n"
+            "/accounts — список счетов и статусы\n"
+            "/account enable ID — включить счёт\n"
+            "/account disable ID — отключить счёт\n"
         )
         await message.answer(text, parse_mode="HTML")
 

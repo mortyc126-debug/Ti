@@ -23,11 +23,14 @@ class Blogger:
             self,
             blog_settings: BlogSettings,
             trade_strategies: list[StrategySettings],
-            messages_queue: asyncio.Queue
+            messages_queue: asyncio.Queue,
+            account_label: str = "",
     ) -> None:
         self.__blog_status = blog_settings.blog_status
         self.__trade_strategies: dict[str, StrategySettings] = {x.figi: x for x in trade_strategies}
         self.__messages_queue = messages_queue
+        # Префикс для всех сообщений при работе с несколькими счетами
+        self.__pfx = f"[{account_label}] " if account_label else ""
 
     def __send_text_message(self, text: str) -> None:
         try:
@@ -42,8 +45,8 @@ class Blogger:
             rub_before_trade_day: Decimal
     ) -> None:
         if self.__blog_status:
-            self.__send_text_message("🟢 Бот запускается. Начинаем торговый день.")
-            self.__send_text_message(f"💰 Депозит на старте: {rub_before_trade_day:.2f} ₽")
+            self.__send_text_message(f"🟢 {self.__pfx}Бот запускается. Начинаем торговый день.")
+            self.__send_text_message(f"💰 {self.__pfx}Депозит на старте: {rub_before_trade_day:.2f} ₽")
             self.__send_text_message("📋 Торгуемые тикеры сегодня:")
             for figi_key, strategy_value in today_trade_strategy.items():
                 short_status = "разрешён" if strategy_value.settings.short_enabled_flag else "запрещён"
@@ -72,14 +75,14 @@ class Blogger:
         if self.__blog_status and trade_order:
             direction = "ЛОНГ" if trade_order.signal.signal_type == SignalType.LONG else "ШОРТ"
             ticker = self.__trade_strategies[trade_order.signal.figi].ticker
-            self.__send_text_message(f"🔴 {ticker}: позиция {direction} закрыта.")
+            self.__send_text_message(f"🔴 {self.__pfx}{ticker}: позиция {direction} закрыта.")
 
     def open_position_message(self, trade_order: TradeOrder) -> None:
         if self.__blog_status and trade_order:
             direction = "ЛОНГ" if trade_order.signal.signal_type == SignalType.LONG else "ШОРТ"
             ticker = self.__trade_strategies[trade_order.signal.figi].ticker
             self.__send_text_message(
-                f"🟢 {ticker}: открыта позиция {direction}. "
+                f"🟢 {self.__pfx}{ticker}: открыта позиция {direction}. "
                 f"Тейк-профит: {trade_order.signal.take_profit_level:.2f}. "
                 f"Стоп-лосс: {trade_order.signal.stop_loss_level:.2f}."
             )
@@ -91,14 +94,26 @@ class Blogger:
     ) -> None:
         if self.__blog_status:
             self.__send_text_message(
-                f"💼 Депозит: начало дня {rub_before_trade_day:.2f} ₽ → конец дня {current_rub_on_depo:.2f} ₽"
+                f"💼 {self.__pfx}Депозит: начало дня {rub_before_trade_day:.2f} ₽ → конец дня {current_rub_on_depo:.2f} ₽"
             )
             today_profit = current_rub_on_depo - rub_before_trade_day
             today_percent_profit = (today_profit / rub_before_trade_day * 100) if rub_before_trade_day else 0
             sign = "+" if today_profit >= 0 else ""
             self.__send_text_message(
-                f"📊 Результат дня: {sign}{today_profit:.2f} ₽ ({sign}{today_percent_profit:.2f}%)"
+                f"📊 {self.__pfx}Результат дня: {sign}{today_profit:.2f} ₽ ({sign}{today_percent_profit:.2f}%)"
             )
+
+    def with_label(self, account_label: str) -> "Blogger":
+        """Возвращает копию Blogger с префиксом счёта для сообщений."""
+        b = Blogger.__new__(Blogger)
+        b.__dict__.update(self.__dict__)
+        # Blogger — не dataclass, поэтому копируем вручную с новым префиксом.
+        # Используем name-mangled атрибуты через их полные имена.
+        b._Blogger__blog_status = self._Blogger__blog_status
+        b._Blogger__trade_strategies = self._Blogger__trade_strategies
+        b._Blogger__messages_queue = self._Blogger__messages_queue
+        b._Blogger__pfx = f"[{account_label}] " if account_label else ""
+        return b
 
     def notify_message(self, text: str) -> None:
         """Прямая отправка произвольного текста — для NotificationService."""
