@@ -1085,24 +1085,34 @@ PAGE_HTML = """<!doctype html>
   --border:rgba(255,0,128,0.12);--border2:rgba(170,90,255,0.10);
 }}
 body{{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min-height:100vh;font-family:'JetBrains Mono',monospace;color:var(--txt);padding:14px 16px;}}
-.hdr{{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border2);flex-wrap:wrap;}}
+.hdr{{display:flex;align-items:center;gap:16px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border2);flex-wrap:wrap;}}
 .logo{{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:700;color:var(--accent);text-shadow:0 0 20px rgba(255,0,110,0.35);white-space:nowrap;}}
 .logo-sub{{font-size:9px;color:var(--txt3);letter-spacing:.08em;margin-top:2px;}}
-.panel{{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:14px;margin-bottom:16px;}}
+/* ── Вкладки ── */
+.tab-nav{{display:flex;gap:6px;flex-wrap:wrap;}}
+.tab-btn{{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:999px;color:var(--txt3);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:7px 18px;cursor:pointer;transition:all .18s;}}
+.tab-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt2);}}
+.tab-btn.active{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.10));border-color:rgba(255,0,128,.55);color:var(--accent);box-shadow:0 0 12px rgba(255,0,128,.15);}}
+.tab-pane{{display:none;}}.tab-pane.active{{display:block;}}
+/* ── Панели ── */
+.panel{{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:16px;margin-bottom:14px;}}
+.panel-inner{{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:10px;}}
 .sec{{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--txt3);margin-bottom:10px;}}
+.sec-lg{{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;border-bottom:1px solid var(--border2);padding-bottom:8px;}}
 label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt2);}}
 .inp{{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:6px 14px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;}}
 .inp:focus{{border-color:rgba(255,0,110,.4);}}
 .inp.mid{{width:100px;}}
 .btn-pill{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.12));border:1px solid rgba(255,0,128,.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:8px 18px;cursor:pointer;transition:all .15s;}}
 .btn-pill:hover{{box-shadow:0 0 14px rgba(255,0,128,.25);}}
+.btn-sm{{padding:4px 12px;font-size:10px;}}
 .chips{{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}}
 .chip{{display:flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);}}
 .chip:hover{{border-color:rgba(255,0,128,.25);}}
 .chip.active{{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
-.scen-table th:first-child, .scen-table td:first-child{{text-align:left;}}
+.scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
 .scen-table td{{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--txt2);text-align:right;}}
 .scen-table tr:hover td{{background:rgba(255,255,255,.02);}}
 .sdot{{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle;}}
@@ -1123,13 +1133,22 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </div>
 </div>
 
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="showTab('sim')">СИМУЛЯЦИЯ</button>
+  <button class="tab-btn" onclick="showTab('diag')">ДИАГНОСТИКА</button>
+  <button class="tab-btn" onclick="showTab('live')">БОТ (LIVE)</button>
+</nav>
+
+<!-- ══════════════════════ TAB: СИМУЛЯЦИЯ ══════════════════════ -->
+<div class="tab-pane active" id="tab-sim">
+
 <div class="panel">
-  <div class="sec">Бэктест</div>
+  <div class="sec-lg">Настройки симуляции</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     Список тикеров — из settings.ini + импортированные из OI.
     <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
-    <button class="btn-pill" style="padding:4px 12px;font-size:10px;" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
-    <button class="btn-pill" style="padding:4px 12px;font-size:10px;" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
+    <button class="btn-pill btn-sm" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
+    <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
   <div class="chips" id="tickers">{ticker_checkboxes}</div>
@@ -1148,7 +1167,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <br>
   <label><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту (обычка/префы, фьючерс/базис) —
     топ <input type="number" class="inp" style="width:50px;padding:6px 8px;" id="top_pct" value="70" min="1" max="100">% по востребованности</label>
-  <br><br>
+</div>
+
+<div class="panel">
+  <div class="sec-lg">Бэктест по тикерам</div>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
   <span id="status"></span>
@@ -1157,13 +1179,12 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div class="panel">
-  <div class="sec">Портфель (виртуальный счёт)</div>
+  <div class="sec-lg">Портфель — виртуальный счёт</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    Сделки выбранных выше тикеров (галочки) сводятся в одну хронологию и
-    проигрываются по очереди на одном балансе, размер сделки = риск% от
-    текущего баланса. Режим "fixed" — take/stop из настроек тикера. Режим
-    "ATR" — на каждом тикере для тех же сигналов берётся лучшая по
-    expectancy комбинация ATR_TAKE_K/ATR_STOP_K (сетка как в бэктесте выше).
+    Сделки выбранных тикеров (галочки выше) сводятся в одну хронологию и
+    проигрываются на одном балансе, размер сделки = риск% от текущего баланса.
+    Режим «ATR» — на каждом тикере берётся лучшая пара ATR_TAKE_K/ATR_STOP_K
+    по expectancy из сетки выше.
   </div>
   <label>Счёт, ₽ <input type="number" class="inp mid" id="pf_account" value="100000" min="1000"></label>
   <label>Риск на сделку, % <input type="number" class="inp mid" id="pf_risk" value="1" min="0.1" step="0.1"></label>
@@ -1188,92 +1209,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div class="panel">
-  <div class="sec">Совет по багам</div>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    Лог пишется в файл <b style="color:var(--txt2)">dashboard.log</b> (рядом с dashboard.py) —
-    открой его текстовым редактором и скопируй нужный кусок сюда.
-  </div>
-  <textarea id="bugtext" placeholder="Вставь traceback или лог..."></textarea><br><br>
-  <button class="btn-pill" onclick="askCouncil()">СПРОСИТЬ СОВЕТ</button>
-  <div id="council_answer"></div>
-</div>
-
-<div class="panel">
-  <div class="sec">Управление ботом (live)</div>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    Бот перечитывает эти настройки сам, без перезапуска (раз в свечу).
-    Take/Stop-оверрайды действуют только на НОВЫЕ сигналы — открытые позиции не трогаются.
-  </div>
-  <label>Глобальный режим
-    <select class="inp" id="ov_global_mode">
-      <option value="auto">как в settings.ini у каждого тикера</option>
-      <option value="sandbox">форс-песочница для всех (паника)</option>
-      <option value="live">форс-боевой для всех (где не запрещено по тикеру)</option>
-    </select>
-  </label>
-  <label>Код подтверждения (нужен только чтобы включить «боевой»)
-    <input type="password" class="inp mid" id="ov_password" placeholder="код из settings.ini">
-  </label>
-  <br><br>
-  <label><input type="checkbox" id="ov_adaptive_exit"> Адаптивный выход (трейлинг-стоп + безубыток после 1R + giveback-защита пика)
-    (статичный take_profit сигнала игнорируется, выходим по risk.check_exit; приоритетнее частичной фиксации ниже)
-  </label>
-  <br><br>
-  <label><input type="checkbox" id="ov_partial_tp"> Частичная фиксация на первом тейке
-    (половина закрывается на тейке, остаток держится с защитой 1/3 пройденного
-    расстояния вход→тейк; не работает вместе с адаптивным выходом)
-  </label>
-  <br><br>
-  <label><input type="checkbox" id="ov_orderbook"> Стакан (10 уровней): срочный выход по дисбалансу заявок
-    (доп. живая подписка к API, выключено по умолчанию; работает только вместе с адаптивным выходом)
-  </label>
-  <br><br>
-  <table class="scen-table">
-    <thead><tr>
-      <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
-      <th>LONG Take</th><th>LONG Stop</th><th>SHORT Take</th><th>SHORT Stop</th>
-    </tr></thead>
-    <tbody id="ov_table"></tbody>
-  </table>
-  <br>
-  <button class="btn-pill" onclick="loadOverrides()">⟳ ЗАГРУЗИТЬ ТЕКУЩИЕ</button>
-  <button class="btn-pill" onclick="saveOverrides()">💾 СОХРАНИТЬ</button>
-  <span id="ov_status"></span>
-</div>
-
-<div class="panel">
-  <h3>Авто-подобранные ATR_TAKE_K/ATR_STOP_K</h3>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    Считает сам бот раз в день (OICompositeStrategy.__recalc_auto_atr) для тикеров
-    без явных ATR_TAKE_K/ATR_STOP_K в settings.ini — sweep по истории, лучшая пара
-    по expectancy_pct. Здесь только последний посчитанный снэпшок из data/archive.json.
-  </div>
-  <table class="scen-table">
-    <thead><tr><th>Тикер</th><th>Дата расчёта</th><th>ATR_TAKE_K</th><th>ATR_STOP_K</th></tr></thead>
-    <tbody id="auto_atr_table"></tbody>
-  </table>
-  <br>
-  <button class="btn-pill" onclick="loadAutoAtr()">⟳ ОБНОВИТЬ</button>
-</div>
-
-<div class="panel">
-  <h3>Диагностика стратегии (как сейчас считается композит)</h3>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    Снимок текущего состояния на живой истории (data/history.json) для
-    одного тикера: Hedge-вес метода (oi_weights.json), смесь
-    regime_mods по вероятностям режима, RMT-redundancy по режиму
-    (Layer 4) и итоговый эффективный вес каждого метода в композите.
-    Не запускает сделки, ничего не меняет.
-  </div>
-  <label>Тикер <input type="text" class="inp mid" id="diag_ticker" placeholder="SBER"></label>
-  <label>Дней истории <input type="number" class="inp mid" id="diag_days" value="30" min="5" max="240"></label>
-  <button class="btn-pill" onclick="loadDiagnostics()">▶ ПОСМОТРЕТЬ</button>
-  <div id="diag_summary" style="font-size:11px;color:var(--txt3);margin-top:8px;"></div>
-  <table class="scen-table" id="diag_table"></table>
-</div>
-
-<div class="panel">
-  <div class="sec">График сделок</div>
+  <div class="sec-lg">График сделок</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     Японские свечи + сделки из бэктеста: вход/выход, уровни тейк/стоп, направление.
     Нажми на маркер сделки — увидишь детали ниже. Полоса MFE/MAE показывает,
@@ -1302,8 +1238,115 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="tc_trade_detail" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:24px;"></div>
 </div>
 
+</div><!-- /tab-sim -->
+
+<!-- ══════════════════════ TAB: ДИАГНОСТИКА ══════════════════════ -->
+<div class="tab-pane" id="tab-diag">
+
+<div class="panel">
+  <div class="sec-lg">Веса методов / Диагностика стратегии</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Снимок текущего состояния на живой истории (data/history.json) для
+    одного тикера: Hedge-вес метода (oi_weights.json), смесь
+    regime_mods по вероятностям режима, RMT-redundancy по режиму
+    (Layer 4) и итоговый эффективный вес каждого метода в композите.
+    Не запускает сделки, ничего не меняет.
+  </div>
+  <label>Тикер <input type="text" class="inp mid" id="diag_ticker" placeholder="SBER"></label>
+  <label>Дней истории <input type="number" class="inp mid" id="diag_days" value="30" min="5" max="240"></label>
+  <button class="btn-pill" onclick="loadDiagnostics()">▶ ПОСМОТРЕТЬ</button>
+  <div id="diag_summary" style="font-size:11px;color:var(--txt3);margin-top:8px;"></div>
+  <table class="scen-table" id="diag_table"></table>
+</div>
+
+<div class="panel">
+  <div class="sec-lg">Авто-подобранные ATR_TAKE_K / ATR_STOP_K</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Считает сам бот раз в день (OICompositeStrategy.__recalc_auto_atr) для тикеров
+    без явных ATR_TAKE_K/ATR_STOP_K в settings.ini — sweep по истории, лучшая пара
+    по expectancy_pct. Здесь только последний посчитанный снэпшок из data/archive.json.
+  </div>
+  <table class="scen-table">
+    <thead><tr><th>Тикер</th><th>Дата расчёта</th><th>ATR_TAKE_K</th><th>ATR_STOP_K</th></tr></thead>
+    <tbody id="auto_atr_table"></tbody>
+  </table>
+  <br>
+  <button class="btn-pill" onclick="loadAutoAtr()">⟳ ОБНОВИТЬ</button>
+</div>
+
+<div class="panel">
+  <div class="sec-lg">Совет по багам</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Лог пишется в файл <b style="color:var(--txt2)">dashboard.log</b> (рядом с dashboard.py) —
+    открой его текстовым редактором и скопируй нужный кусок сюда.
+  </div>
+  <textarea id="bugtext" placeholder="Вставь traceback или лог..."></textarea><br><br>
+  <button class="btn-pill" onclick="askCouncil()">СПРОСИТЬ СОВЕТ</button>
+  <div id="council_answer"></div>
+</div>
+
+</div><!-- /tab-diag -->
+
+<!-- ══════════════════════ TAB: БОТ (LIVE) ══════════════════════ -->
+<div class="tab-pane" id="tab-live">
+
+<div class="panel">
+  <div class="sec-lg">Глобальные настройки бота</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Бот перечитывает эти настройки сам, без перезапуска (раз в свечу).
+    Take/Stop-оверрайды действуют только на НОВЫЕ сигналы — открытые позиции не трогаются.
+  </div>
+  <label>Глобальный режим
+    <select class="inp" id="ov_global_mode">
+      <option value="auto">как в settings.ini у каждого тикера</option>
+      <option value="sandbox">форс-песочница для всех (паника)</option>
+      <option value="live">форс-боевой для всех (где не запрещено по тикеру)</option>
+    </select>
+  </label>
+  <label>Код подтверждения (нужен только чтобы включить «боевой»)
+    <input type="password" class="inp mid" id="ov_password" placeholder="код из settings.ini">
+  </label>
+  <br><br>
+  <label><input type="checkbox" id="ov_adaptive_exit"> Адаптивный выход (трейлинг-стоп + безубыток после 1R + giveback-защита пика)
+    (статичный take_profit сигнала игнорируется, выходим по risk.check_exit; приоритетнее частичной фиксации ниже)
+  </label>
+  <br><br>
+  <label><input type="checkbox" id="ov_partial_tp"> Частичная фиксация на первом тейке
+    (половина закрывается на тейке, остаток держится с защитой 1/3 пройденного
+    расстояния вход→тейк; не работает вместе с адаптивным выходом)
+  </label>
+  <br><br>
+  <label><input type="checkbox" id="ov_orderbook"> Стакан (10 уровней): срочный выход по дисбалансу заявок
+    (доп. живая подписка к API, выключено по умолчанию; работает только вместе с адаптивным выходом)
+  </label>
+  <br><br>
+  <button class="btn-pill" onclick="loadOverrides()">⟳ ЗАГРУЗИТЬ ТЕКУЩИЕ</button>
+  <button class="btn-pill" onclick="saveOverrides()">💾 СОХРАНИТЬ</button>
+  <span id="ov_status"></span>
+</div>
+
+<div class="panel">
+  <div class="sec-lg">Настройки по тикерам</div>
+  <table class="scen-table">
+    <thead><tr>
+      <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
+      <th>LONG Take</th><th>LONG Stop</th><th>SHORT Take</th><th>SHORT Stop</th>
+    </tr></thead>
+    <tbody id="ov_table"></tbody>
+  </table>
+</div>
+
+</div><!-- /tab-live -->
+
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
+
+function showTab(name) {{
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}}
 
 function modelStatsToHtml(modelStats) {{
   if (!modelStats) return '';
