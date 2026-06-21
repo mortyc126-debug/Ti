@@ -1706,24 +1706,46 @@ async function runBacktest() {{
   document.getElementById('status').textContent =
     `Считаю ${{tickers.length}} тикер(ов) параллельно (до __BACKTEST_WORKERS__ одновременно)...`;
   startProgressPolling(tickers, 'status_detail');
+  let doneCount = 0;
   try {{
-    const resp = await fetch('/api/backtest', {{
+    const resp = await fetch('/api/backtest_stream', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
       body: JSON.stringify({{tickers: tickers, days: days, atr_take: atrTake, atr_stop: atrStop,
                               tariff: document.getElementById('tariff').value}})
     }});
-    const data = await resp.json();
-    table.innerHTML += rowsToHtml(data.rows);
+    if (!resp.ok || !resp.body) throw new Error('stream недоступен');
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {{
+      const {{done, value}} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {{stream: true}});
+      // SSE: каждое событие отделено \n\n
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {{
+        const line = part.startsWith('data: ') ? part.slice(6) : part;
+        if (!line.trim()) continue;
+        let evt;
+        try {{ evt = JSON.parse(line); }} catch(ex) {{ continue; }}
+        if (evt.done) {{ break; }}
+        if (evt.rows) {{
+          table.innerHTML += rowsToHtml(evt.rows);
+          doneCount++;
+          document.getElementById('status').textContent =
+            `Готово ${{doneCount}}/${{tickers.length}} тикер(ов)...`;
+        }}
+      }}
+    }}
   }} catch (e) {{
-    // Соединение могло оборваться уже ПОСЛЕ того как сервер досчитал
-    // результат (видно по прогрессу — он дошёл до "готово"), но не успел
-    // отправить ответ. Пробуем забрать его из кэша вместо повторного счёта.
+    // Fallback: пробуем забрать кэш если стрим оборвался
     try {{
       const r2 = await fetch('/api/last_result?kind=backtest');
       const d2 = await r2.json();
       if (d2 && d2.rows) {{
         table.innerHTML += rowsToHtml(d2.rows);
-        table.innerHTML += `<tr><td colspan="6" style="color:var(--txt3);">⚠ соединение оборвалось, результат восстановлен из кэша</td></tr>`;
+        table.innerHTML += `<tr><td colspan="6" style="color:var(--txt3);">⚠ соединение оборвалось, результат из кэша</td></tr>`;
       }} else {{
         table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
       }}
@@ -2982,6 +3004,73 @@ class Handler(BaseHTTPRequestHandler):
             rows = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff)
             _last_result["backtest"] = {"rows": rows}
             self._send_json({"rows": rows})
+        elif self.path == "/api/backtest_stream":
+            # Стриминг бэктеста: каждый готовый тикер сразу отправляется клиенту
+            # без ожидания остальных. Формат — Server-Sent Events (text/event-stream).
+            tickers = payload.get("tickers", [])
+            days = int(payload.get("days", 30))
+            atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
+            atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
+            tariff = payload.get("tariff") or None
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+
+            def _sse(obj: dict) -> None:
+                line = "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
+                self.wfile.write(line.encode("utf-8"))
+                self.wfile.flush()
+
+            _cancel_event.clear()
+            progress = _get_progress_proxy()
+            for t in tickers:
+                _set_progress(progress, t, "в очереди")
+
+            all_rows: list[dict] = []
+            if not tickers:
+                try:
+                    _sse({"done": True})
+                except Exception:
+                    pass
+                return
+
+            pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
+            _register_pool(pool)
+            try:
+                fs = {
+                    pool.submit(run_backtest_one, t, days, atr_take_ks, atr_stop_ks,
+                                tariff=tariff, progress=progress): t
+                    for t in tickers
+                }
+                for fut in as_completed(fs):
+                    if _cancel_event.is_set():
+                        break
+                    t = fs[fut]
+                    try:
+                        rows = fut.result()
+                    except Exception as ex:
+                        rows = [{"ticker": t, "mode": "ошибка", "error": str(ex)}]
+                        _set_progress(progress, t, "ошибка")
+                    all_rows.extend(rows)
+                    try:
+                        _sse({"ticker": t, "rows": rows})
+                    except Exception:
+                        break  # клиент отвалился
+            finally:
+                _unregister_pool(pool)
+                pool.shutdown(wait=False, cancel_futures=True)
+
+            if _cancel_event.is_set():
+                _mark_unfinished_cancelled(progress, tickers)
+
+            _last_result["backtest"] = {"rows": all_rows}
+            try:
+                _sse({"done": True})
+            except Exception:
+                pass
         elif self.path == "/api/portfolio_sim":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 30))
