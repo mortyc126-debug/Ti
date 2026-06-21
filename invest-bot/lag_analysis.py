@@ -4,10 +4,15 @@ lag_analysis.py — измеряет лаг каждого метода из oi_
 return(t+lag) при разных lag, см. обсуждение "технические индикаторы
 структурно запаздывают, микроструктурные (TRADESTATS) — ведущие".
 
-Идея: если максимум |corr| достигается на lag > 0 (forward_return[t+lag] —
-то есть нужно сдвинуть score НАЗАД во времени, чтобы он совпал с движением,
-которое уже произошло raньше) — метод запаздывает на lag баров. lag <= 0 —
-метод ведущий или синхронный.
+Идея: для каждого lag >= 0 меряется corr(score[t], forward_return[t+lag]).
+Если пик |corr| достигается близко к lag=0 — метод реагирует одновременно с
+движением или раньше его завершения (ведущий/синхронный); если пик далеко
+(близко к --max-lag) — метод "созревает" только после того, как движение
+уже состоялось (запаздывающий). Отрицательные lag намеренно не тестируются:
+при малом --horizon (по умолчанию 3) окно forward_return для lag < 0 целиком
+уходит в прошлое относительно t, и тест измеряет не опережение будущего, а
+тривиальную корреляцию score(t) с движением, на котором сам индикатор
+посчитан (для трендовых/momentum методов она всегда высокая — это не лаг).
 
 Использует strategy.scan_method_scores() (см. oi_composite_strategy.py) —
 непрерывный ряд score по каждому бару (плюс режим bar-by-bar из
@@ -35,7 +40,7 @@ from dashboard import _config, _db, _market_data, _strategy_settings_by_ticker, 
 from regime import REGIMES
 from trade_system.strategies.strategy_factory import StrategyFactory
 
-MAX_LAG = 10
+MAX_LAG = 20  # с убранными отрицательными lag реальный лаг трендовых методов может быть больше 10
 MIN_REGIME_BARS = 80  # ниже этого regime-специфичный профиль слишком шумный, пропускаем
 
 
@@ -61,21 +66,26 @@ def _corrcoef(a: list[float], b: list[float]) -> float:
 
 def _lag_profile(scores: list[float], fwd_ret: list[float], max_lag: int,
                   regime_mask: list[bool] | None = None) -> dict[int, float]:
-    """{lag: corr(score[t], fwd_ret[t+lag])} для lag в [-max_lag, max_lag], только
+    """{lag: corr(score[t], fwd_ret[t+lag])} для lag в [0, max_lag], только
     по барам где regime_mask[t] истинен (если передан). Маска фильтрует по
     исходному индексу t ДО сдвига на lag — лаг остаётся в "настоящих" барах,
-    а не в позициях урезанного списка."""
+    а не в позициях урезанного списка.
+
+    ВАЖНО: lag только >= 0 (т.е. fwd_ret[t+lag], не fwd_ret[t-lag]). При
+    отрицательном lag окно forward_return [t+lag, t+lag+horizon] при малом
+    horizon (по умолчанию 3) целиком уходит в ПРОШЛОЕ относительно t — тест
+    тогда меряет не опережение будущей цены, а тривиальную корреляцию score(t)
+    с движением, на котором сам индикатор посчитан (для трендовых/momentum
+    методов она всегда высокая и не говорит про лаг). Поэтому "опережение"
+    теперь определяется иначе: чем БЛИЖЕ пик |corr| к lag=0, тем более
+    ведущий/синхронный метод; чем дальше (ближе к max_lag) — тем больше
+    он запаздывает, см. _print_group/_print_aggregate."""
     n = len(scores)
     profile = {}
-    for lag in range(-max_lag, max_lag + 1):
-        if lag >= 0:
-            s = scores[:n - lag] if lag else scores
-            r = fwd_ret[lag:]
-            m = regime_mask[:n - lag] if regime_mask is not None else None
-        else:
-            s = scores[-lag:]
-            r = fwd_ret[:n + lag]
-            m = regime_mask[-lag:] if regime_mask is not None else None
+    for lag in range(0, max_lag + 1):
+        s = scores[:n - lag] if lag else scores
+        r = fwd_ret[lag:]
+        m = regime_mask[:n - lag] if regime_mask is not None else None
         if m is not None:
             pairs = [(x, y) for x, y, keep in zip(s, r, m) if y is not None and keep]
         else:
@@ -150,7 +160,7 @@ def _print_group(title: str, per_method: dict[str, tuple[int, float]]) -> None:
     print(f"{'метод':<16} {'лаг (бар)':>10} {'corr':>8}   интерпретация")
     print("-" * 60)
     for method, (lag, corr) in rows:
-        tag = f"запаздывает на {lag} бар." if lag > 1 else (f"ведущий, опережает на {-lag} бар." if lag < -1 else "синхронный")
+        tag = f"запаздывает на {lag} бар." if lag > 1 else "ведущий/синхронный"
         print(f"{method:<16} {lag:>10} {corr:>8.3f}   {tag}")
 
 
@@ -178,7 +188,7 @@ def _print_aggregate(per_ticker: dict[str, TickerResult]) -> None:
         print(f"{'метод':<16} {'медиана лага':>13} {'|corr| сред.':>13} {'n тикеров':>10}   интерпретация")
         print("-" * 80)
         for method, med_lag, mean_corr, n in rows:
-            tag = f"запаздывает на {med_lag} бар." if med_lag > 1 else (f"ведущий, опережает на {-med_lag} бар." if med_lag < -1 else "синхронный")
+            tag = f"запаздывает на {med_lag} бар." if med_lag > 1 else "ведущий/синхронный"
             print(f"{method:<16} {med_lag:>13} {mean_corr:>13.3f} {n:>10}   {tag}")
 
 
