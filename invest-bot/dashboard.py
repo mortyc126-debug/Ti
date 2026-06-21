@@ -35,6 +35,7 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
+import datetime
 import multiprocessing
 import statistics
 import threading
@@ -399,14 +400,32 @@ def _futures_settings_by_ticker() -> dict[str, StrategySettings]:
     with _futures_cache_lock:
         if _futures_settings_cache is not None:
             return _futures_settings_cache
-        # Первый запрос — грузим с диска
+        # Первый запрос — грузим с диска, фильтруем истекшие контракты
         contracts, age_days = _futures_cache_from_disk()
         if contracts is not None:
-            _futures_settings_cache = _build_strategy_settings(contracts)
-            logger.info(f"futures: загружено {len(_futures_settings_cache)} контрактов из кэша (возраст {age_days:.1f} дн.)")
-            # Если кэш протух — обновляем в фоне, не блокируя запрос
-            if age_days > FUTURES_CACHE_MAX_AGE_DAYS:
-                logger.info("futures: кэш старше 7 дней, запускаю фоновое обновление")
+            now = datetime.datetime.now(datetime.timezone.utc)
+            valid, expired = {}, []
+            for base, info in contracts.items():
+                exp_str = info.get("expiration_date")
+                if exp_str:
+                    try:
+                        exp = datetime.datetime.fromisoformat(exp_str)
+                        if exp.tzinfo is None:
+                            exp = exp.replace(tzinfo=datetime.timezone.utc)
+                        if exp > now:
+                            valid[base] = info
+                        else:
+                            expired.append(info["ticker"])
+                    except Exception:
+                        valid[base] = info  # не разобрали дату — оставляем
+                else:
+                    valid[base] = info  # старый кэш без даты — оставляем
+            if expired:
+                logger.info(f"futures: истекло {len(expired)} контрактов: {expired[:5]}{'...' if len(expired)>5 else ''}, запускаю обновление")
+                _start_futures_reload_bg()
+            _futures_settings_cache = _build_strategy_settings(valid)
+            logger.info(f"futures: загружено {len(_futures_settings_cache)} актуальных контрактов из кэша (возраст {age_days:.1f} дн.)")
+            if age_days > FUTURES_CACHE_MAX_AGE_DAYS and not expired:
                 _start_futures_reload_bg()
         else:
             _futures_settings_cache = {}
@@ -432,6 +451,7 @@ def _load_futures_from_api() -> dict[str, dict]:
             "short_enabled_flag": future_info.short_enabled_flag,
             "margin_per_lot": future_info.margin_per_lot,
             "point_value": future_info.point_value,
+            "expiration_date": future_info.expiration_date.isoformat(),
         }
     return contracts
 
