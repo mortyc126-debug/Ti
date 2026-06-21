@@ -81,6 +81,7 @@ from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
 )
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
+from level_pattern import detect_level_pattern
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
@@ -1497,14 +1498,12 @@ class OICompositeStrategy(IStrategy):
                     "direction": direction, "entry": entry, "atr_pct": atr_pct, "window": window,
                     "entry_time": candles[i].time,
                     "m1": m1_sc, "m2": m2_sc, "m3": m3_sc,
-                    # Скоры всех методов на момент входа — для record_trade
-                    # (attribution effWR в ClusterModels), как в живой торговле.
                     "method_scores": dict(self.__last_scores),
                     "regime": self.__last_regime,
-                    # Шумовой множитель стопа на момент входа (см.
-                    # __noise_stop_scale) — чтобы backtest_barriers мог
-                    # повторить ту же адаптацию, что и в живой торговле.
                     "noise_scale": self.__noise_stop_scale(),
+                    # Исторические свечи до точки входа — для detect_level_pattern
+                    # (prev day H/L, volume climax, compression).
+                    "history_window": candles[max(0, i - 60):i + 1],
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
@@ -1720,6 +1719,25 @@ class OICompositeStrategy(IStrategy):
                 take_price = entry * (1 - take_dist)
                 stop_price = entry * (1 + stop_dist)
 
+            # Попытка заменить фиксированные барьеры уровневыми.
+            # Используем свечи до момента входа (sig["window"] содержит свечи
+            # после входа — для форвард-тест). Берём последние 60 свечей из
+            # полного candle-окна стратегии как исторический контекст.
+            entry_mode = "fixed"
+            _lp_candles = sig.get("history_window")
+            if _lp_candles is not None and len(_lp_candles) >= 30:
+                _lp = detect_level_pattern(
+                    _lp_candles,
+                    direction=direction.name,
+                    atr_value=atr_pct * entry if atr_pct > 0 else 0.0,
+                )
+                if _lp is not None:
+                    stop_price = _lp.stop
+                    take_price = _lp.take
+                    take_dist = _lp.take_dist_pct
+                    stop_dist = _lp.stop_dist_pct
+                    entry_mode = "level"
+
             exit_pct: Optional[float] = None
             exit_time = window[-1].time if window else sig.get("entry_time")
             for c in window:
@@ -1841,6 +1859,7 @@ class OICompositeStrategy(IStrategy):
                     "mae": round(approx_mae, 6),
                     "exit_reason": exit_reason,
                     "regime": sig.get("regime", ""),
+                    "entry_mode": entry_mode,
                     "agree_count": len([v for v in ms.values() if v * dir_sign > 0.05]),
                     "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
                     "top_agree": top_agree,

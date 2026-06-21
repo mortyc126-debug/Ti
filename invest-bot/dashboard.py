@@ -1002,7 +1002,7 @@ def run_portfolio_sim(
             "entry_price": t.get("entry_price"), "exit_price": t.get("exit_price"),
             "take_price": t.get("take_price"), "stop_price": t.get("stop_price"),
             "duration_min": t.get("duration_min"),
-            "exit_reason": t.get("exit_reason"), "regime": t.get("regime"),
+            "exit_reason": t.get("exit_reason"), "entry_mode": t.get("entry_mode", "fixed"), "regime": t.get("regime"),
             "agree_count": t.get("agree_count"), "against_count": t.get("against_count"),
             "top_agree": t.get("top_agree", []), "top_against": t.get("top_against", []),
         })
@@ -1698,7 +1698,8 @@ function toggleTd(id) {{
 function tradeDetailHtml(t) {{
   const fmtScore = v => v >= 0 ? `<span style="color:var(--pos)">+${{v.toFixed(2)}}</span>` : `<span style="color:var(--neg)">${{v.toFixed(2)}}</span>`;
   let html = `<div style="display:flex;gap:24px;flex-wrap:wrap">`;
-  html += `<div><b>Цены:</b> вход ${{t.entry_price}} → выход ${{t.exit_price}} &nbsp; тейк ${{t.take_price}} стоп ${{t.stop_price}}</div>`;
+  const modeTag = t.entry_mode === 'level' ? ' <span style="color:var(--pos);font-size:11px">📍уровень</span>' : '';
+  html += `<div><b>Цены:</b> вход ${{t.entry_price}} → выход ${{t.exit_price}} &nbsp; тейк ${{t.take_price}} стоп ${{t.stop_price}}${{modeTag}}</div>`;
   html += `<div><b>Экспозиция:</b> ${{Math.round(t.duration_min)}} мин</div>`;
   if (t.top_agree && t.top_agree.length) {{
     html += `<div><b>За (${{t.agree_count}}):</b> `;
