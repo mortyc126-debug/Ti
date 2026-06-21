@@ -117,6 +117,11 @@ class Blogger:
             today_percent_profit = (today_profit / rub_before_trade_day) * 100
             self.__send_text_message(f"Today leverage: {today_profit:.2f} rub ({today_percent_profit:.2f} %)")
 
+    def notify_message(self, text: str) -> None:
+        """Прямая отправка произвольного текста — для NotificationService."""
+        if self.__blog_status:
+            self.__send_text_message(text)
+
     def fail_message(self):
         """
         The method sends information about emergency situation in bot.

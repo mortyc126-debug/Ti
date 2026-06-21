@@ -13,6 +13,7 @@ from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from mega_alerts import MegaAlertsService
+from notification_service import NotificationService, capture_tb
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trader import Trader
 
@@ -63,6 +64,7 @@ class TradeService:
         # же data/mega_alerts.json.
         self.__mega_alerts = MegaAlertsService()
         self.__mega_alerts_task: asyncio.Task | None = None
+        self.__notifier = NotificationService(blogger)
 
     async def worker(self) -> None:
         self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
@@ -72,13 +74,16 @@ class TradeService:
                 account_id = self.__account_service.trading_account_id(self.__account_settings)
 
                 if not account_id:
-                    logger.error("Account for trading hasn't been found")
+                    msg = "Account for trading hasn't been found"
+                    logger.error(msg)
+                    self.__notifier.error("trade_service: поиск счёта", ValueError(msg))
                     return None
 
                 logger.info(f"Account id: {account_id}")
 
             except Exception as ex:
                 logger.error(f"Start trading error: {repr(ex)}")
+                self.__notifier.error("trade_service: старт", ex, capture_tb())
                 return None
 
             await self.__working_loop(account_id)
@@ -133,6 +138,7 @@ class TradeService:
                     logger.info("Today is not trading day. Sleep on next morning")
             except Exception as ex:
                 logger.error(f"Start trading today error: {repr(ex)}")
+                self.__notifier.error("trade_service: рабочий цикл", ex, capture_tb())
 
             logger.info("Sleep to next morning")
             await TradeService.__sleep_to_next_morning()

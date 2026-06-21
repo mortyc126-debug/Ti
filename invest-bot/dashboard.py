@@ -1191,6 +1191,29 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div class="panel">
+  <h3>📡 Лог бота (bot_events.json)</h3>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Ошибки, предупреждения и управляющие события из live-бота. Обновляется раз в 3 сек автоматически.
+    Та же информация дублируется в Telegram.
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+    <button class="btn-pill" onclick="loadBotEvents(true)">⟳ ОБНОВИТЬ</button>
+    <label style="font-size:11px;display:flex;align-items:center;gap:4px;">
+      <input type="checkbox" id="ev_auto" checked onchange="evAutoToggle()"> авто-обновление
+    </label>
+    <select class="inp" id="ev_filter" style="font-size:11px;padding:3px 6px;width:auto" onchange="renderEvents()">
+      <option value="">все</option>
+      <option value="error">🔴 ошибки</option>
+      <option value="warning">🟡 предупреждения</option>
+      <option value="info">ℹ️ инфо</option>
+      <option value="control">⚙️ управление</option>
+    </select>
+  </div>
+  <div id="ev_list" style="font-family:monospace;font-size:11px;max-height:320px;overflow-y:auto;
+    background:var(--bg);border:1px solid var(--brd);padding:8px;border-radius:4px;"></div>
+</div>
+
+<div class="panel">
   <h3>Авто-подобранные ATR_TAKE_K/ATR_STOP_K</h3>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     Считает сам бот раз в день (OICompositeStrategy.__recalc_auto_atr) для тикеров
@@ -1649,6 +1672,52 @@ async function loadDiagnostics() {{
     </tr>`).join('');
 }}
 
+// ── Лог бота ────────────────────────────────────────────────────────────────
+let _evAll = [];
+let _evTimer = null;
+
+const EV_COLORS = {{
+  error:   '#ff5555',
+  warning: '#f0a040',
+  info:    '#8888cc',
+  control: '#44bb88',
+}};
+
+function renderEvents() {{
+  const filter = document.getElementById('ev_filter').value;
+  const list = document.getElementById('ev_list');
+  const items = filter ? _evAll.filter(e => e.level === filter) : _evAll;
+  if (!items.length) {{ list.innerHTML = '<span style="color:var(--txt3)">событий нет</span>'; return; }}
+  list.innerHTML = [...items].reverse().map(e => {{
+    const col = EV_COLORS[e.level] || '#aaa';
+    const txt = e.text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
+    return `<div style="margin-bottom:6px;border-left:3px solid ${{col}};padding-left:6px">
+      <span style="color:var(--txt3)">${{e.ts}}</span>
+      <span style="color:${{col}};font-weight:bold;margin:0 4px">${{e.level.toUpperCase()}}</span>
+      ${{txt}}
+    </div>`;
+  }}).join('');
+}}
+
+async function loadBotEvents(force) {{
+  try {{
+    const resp = await fetch('/api/bot_events');
+    const data = await resp.json();
+    const prev = _evAll.length;
+    _evAll = data.events || [];
+    if (force || _evAll.length !== prev) renderEvents();
+  }} catch (e) {{ /* дашборд мог перезапуститься */ }}
+}}
+
+function evAutoToggle() {{
+  const on = document.getElementById('ev_auto').checked;
+  if (on) {{ _evTimer = setInterval(() => loadBotEvents(false), 3000); }}
+  else if (_evTimer) {{ clearInterval(_evTimer); _evTimer = null; }}
+}}
+
+loadBotEvents(true);
+_evTimer = setInterval(() => loadBotEvents(false), 3000);
+
 async function askCouncil() {{
   const text = document.getElementById('bugtext').value;
   if (!text.trim()) return;
@@ -1771,6 +1840,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(get_diagnostics(ticker, days))
             except Exception as e:
                 self._send_json({"ready": False, "error": str(e)})
+        elif self.path.startswith("/api/bot_events"):
+            from urllib.parse import urlparse, parse_qs
+            since = int(parse_qs(urlparse(self.path).query).get("since", ["0"])[0])
+            try:
+                with open("data/bot_events.json", encoding="utf-8") as f:
+                    events = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                events = []
+            self._send_json({"events": events[since:]})
         else:
             self.send_error(404)
 
@@ -1831,6 +1909,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(advice)
         elif self.path == "/api/overrides":
             error = save_overrides_payload(payload)
+            if not error:
+                from notification_service import _append_event
+                _append_event("control", "Dashboard: настройки сохранены (bot_overrides.json обновлён)")
             self._send_json(error if error else {"ok": True})
         elif self.path == "/api/cancel":
             was_running = request_cancel()

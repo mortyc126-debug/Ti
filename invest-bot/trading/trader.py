@@ -35,6 +35,7 @@ from archive import ArchiveStore
 from candle_archive import get_candles_cached
 from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
+from notification_service import NotificationService, capture_tb
 import bot_control
 
 __all__ = ("Trader")
@@ -140,6 +141,7 @@ class Trader:
         # Настройки с дашборда (live/sandbox, take/stop, allow/deny по тикерам) —
         # см. runtime_overrides.py. Перечитывается на каждой свече по mtime.
         self.__overrides = RuntimeOverrides()
+        self.__notifier = NotificationService(blogger)
         # Кулдаун повторного входа после убыточного закрытия — см. __risk_close.
         self.__loss_cooldown_until: dict[str, datetime.datetime] = {}
         # figi, для которых размещение ордера (__smart_order, до 45с репрайса)
@@ -315,6 +317,7 @@ class Trader:
             logger.debug(f"Old: {self.__today_trade_results.get_closed_orders()}")
         except Exception as ex:
             logger.error(f"Trading error: {repr(ex)}")
+            self.__notifier.error("trade_day: торговый цикл", ex, capture_tb())
         finally:
             await self.__cancel_task(self.__oi_task)
             self.__oi_task = None
@@ -337,12 +340,14 @@ class Trader:
                 self.__clear_all_positions(account_id, today_trade_strategies)
         except Exception as ex:
             logger.error(f"Finishing trading error: {repr(ex)}")
+            self.__notifier.error("trade_day: закрытие позиций", ex, capture_tb())
 
         logger.info("Show trade results today")
         try:
             self.__summary_today_trade_results(account_id, rub_before_trade_day)
         except Exception as ex:
             logger.error(f"Summary trading day error: {repr(ex)}")
+            self.__notifier.error("trade_day: итоги дня", ex, capture_tb())
 
     async def __trading(
             self,
@@ -390,6 +395,7 @@ class Trader:
             # дёшево (stat()), применяем к стратегиям только если файл менялся.
             if self.__overrides.maybe_reload():
                 self.__apply_overrides(strategies)
+                self.__notifier.info("Настройки обновлены с дашборда (bot_overrides.json)")
 
             # Обновляем MFE/MAE трекинг для открытой позиции
             pt = self.__pos_tracking.get(candle.figi)
@@ -465,6 +471,7 @@ class Trader:
                         self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.take_profit_level), "take_profit")
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
+                    self.__notifier.error(f"stop/take check {candle.figi}", ex, capture_tb())
 
             if candle.time > current_figi_candle.time:
                 self.__candle_volumes.setdefault(candle.figi, deque(maxlen=20)).append(current_figi_candle.volume)
@@ -592,6 +599,7 @@ class Trader:
                         logger.info(f"New signal has been skipped. No available money or risk budget")
         except Exception as ex:
             logger.error(f"Error open new position by new signal: {repr(ex)}")
+            self.__notifier.error(f"handle_new_signal {candle.figi}", ex, capture_tb())
 
     def __summary_today_trade_results(
             self,
@@ -835,15 +843,18 @@ class Trader:
                         f"{risk_ticker}: ошибка регистрации позиции после реального исполнения "
                         f"ордера {open_order_id} — закрываю осиротевшую позицию на бирже: {repr(ex)}"
                     )
+                    self.__notifier.error(f"place_order: регистрация позиции {risk_ticker}", ex, capture_tb())
                     self.__risk.positions.pop(risk_ticker, None)
                     try:
                         self.__close_figi_with_fill_info(account_id, figi, {figi: strategy})
                     except Exception as close_ex:
                         logger.error(f"{risk_ticker}: не удалось закрыть осиротевшую позицию: {repr(close_ex)}")
+                        self.__notifier.error(f"place_order: закрытие осиротевшей позиции {risk_ticker}", close_ex, capture_tb())
             else:
                 logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
         except Exception as ex:
             logger.error(f"Error open new position by new signal: {repr(ex)}")
+            self.__notifier.error(f"place_order_task {figi}", ex, capture_tb())
         finally:
             self.__pending_orders.discard(figi)
 
@@ -1019,12 +1030,14 @@ class Trader:
                           list(self.__operation_service.positions_futures(account_id) or [])
                 still_open = [p for p in all_pos if p.figi == figi and p.balance != 0]
                 if still_open:
-                    logger.error(
+                    msg = (
                         f"EOD ALERT: позиция {strategy.settings.ticker} ({figi}) "
                         f"НЕ ЗАКРЫТА (halt/rejected). Баланс={still_open[0].balance}. "
                         f"Требуется ручное закрытие!"
                     )
-                    self.__blogger.fail_message()
+                    logger.error(msg)
+                    self.__notifier.error("clear_all_positions: EOD", None)
+                    self.__notifier.warning("EOD", msg)
         return result
 
     def __apply_overrides(self, strategies: dict[str, IStrategy]) -> None:
