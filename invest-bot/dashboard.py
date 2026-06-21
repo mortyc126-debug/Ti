@@ -1280,8 +1280,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     какую часть хода бот взял и где был максимальный ход против позиции.
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
-    <label>Тикер <input type="text" class="inp mid" id="tc_ticker" placeholder="SBER"></label>
-    <label>Дней <input type="number" class="inp mid" id="tc_days" value="90" min="10" max="240"></label>
+    <label>Тикер <select class="inp mid" id="tc_ticker"><option value="">— запусти бэктест —</option></select></label>
     <label>ATR_TAKE_K <input type="number" class="inp mid" id="tc_take" value="2.0" min="0.5" step="0.5"></label>
     <label>ATR_STOP_K <input type="number" class="inp mid" id="tc_stop" value="1.0" min="0.3" step="0.5"></label>
     <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
@@ -1496,6 +1495,13 @@ async function runBacktest() {{
     stopProgressPolling();
   }}
   document.getElementById('status').textContent = `Готово: ${{tickers.length}} тикер(ов)`;
+  // Заполнить панель графика тикерами из только что завершённого бэктеста
+  if (tickers.length > 0) {{
+    // Первый ATR из сетки — берём первые числа из строк вида "2,3,4"
+    const firstTake = parseFloat(atrTake.split(',')[0]) || 2.0;
+    const firstStop = parseFloat(atrStop.split(',')[0]) || 1.0;
+    tcPopulateTickers(tickers, days, firstTake, firstStop);
+  }}
 }}
 
 async function importOiFile(ev) {{
@@ -2101,13 +2107,24 @@ async function askCouncil() {{
     _draw();
   }};
 
+  // Заполнить select тикерами из бэктеста; вызывается из runBacktest
+  window.tcPopulateTickers = function(tickers, days, atrTake, atrStop) {{
+    const sel = document.getElementById('tc_ticker');
+    sel.innerHTML = tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('');
+    document.getElementById('tc_take').value = atrTake;
+    document.getElementById('tc_stop').value = atrStop;
+    window._tcDays = days;  // запомнить дни бэктеста
+    // Автозагрузка первого тикера
+    if (tickers.length > 0) loadTradeChart();
+  }};
+
   // ── Загрузка данных ──────────────────────────────────────────────────────
   window.loadTradeChart = async function() {{
-    const ticker = document.getElementById('tc_ticker').value.trim().toUpperCase();
-    const days = document.getElementById('tc_days').value;
+    const ticker = document.getElementById('tc_ticker').value;
+    const days = window._tcDays || document.getElementById('days')?.value || 90;
     const take = document.getElementById('tc_take').value;
     const stop = document.getElementById('tc_stop').value;
-    if (!ticker) {{ alert('Укажи тикер'); return; }}
+    if (!ticker) {{ alert('Сначала запусти бэктест'); return; }}
     document.getElementById('tc_status').textContent = 'загрузка...';
     document.getElementById('tc_trade_detail').innerHTML = '';
     document.getElementById('tc_tooltip').style.display = 'none';
