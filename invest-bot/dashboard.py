@@ -325,10 +325,81 @@ def _strategy_settings_by_ticker() -> dict:
     return by_ticker
 
 
+# Кэш фьючерсных стратегий — заполняется при первом обращении
+_futures_settings_cache: dict[str, StrategySettings] | None = None
+
+
+def _futures_settings_by_ticker() -> dict[str, StrategySettings]:
+    """
+    Загружает ближайшие контракты для BASE_TICKERS из [FUTURES_TRADING],
+    возвращает {contract_ticker: StrategySettings}. Кэшируется на процесс.
+    """
+    global _futures_settings_cache
+    if _futures_settings_cache is not None:
+        return _futures_settings_cache
+
+    ft = _config.futures_trading_settings
+    if not ft.enabled or not ft.base_tickers:
+        _futures_settings_cache = {}
+        return _futures_settings_cache
+
+    # Шаблоны сигнала берём из STRATEGY_<BASE>_SETTINGS если есть, иначе дефолты
+    stock_settings = {s.ticker: s for s in _config.trade_strategy_settings}
+    ma = _config.mega_alerts_settings
+
+    result: dict[str, StrategySettings] = {}
+    for base in ft.base_tickers:
+        try:
+            resolved = _instrument_service.future_by_base_ticker(base)
+        except Exception as e:
+            logger.warning(f"futures dashboard: {base}: {e}")
+            continue
+        if resolved is None:
+            continue
+        future_info, figi = resolved
+        base_st = stock_settings.get(base)
+        if base_st:
+            sig_settings = dict(base_st.settings)
+            max_lots = base_st.max_lots_per_order
+        else:
+            sig_settings = {
+                "SIGNAL_THRESHOLD": ma.signal_threshold,
+                "LONG_TAKE": ma.long_take, "LONG_STOP": ma.long_stop,
+                "SHORT_TAKE": ma.short_take, "SHORT_STOP": ma.short_stop,
+                "SIGNAL_ONLY": "1",
+            }
+            max_lots = ma.max_lots_per_order
+        st = StrategySettings(
+            name="OICompositeStrategy",
+            figi=figi,
+            ticker=future_info.ticker,
+            max_lots_per_order=max_lots,
+            settings=sig_settings,
+            lot_size=future_info.lot,
+            short_enabled_flag=future_info.short_enabled_flag,
+            is_future=True,
+            margin_per_lot=future_info.margin_per_lot,
+            point_value=future_info.point_value,
+            candle_interval_min=1,  # фьючерсы — минутки
+        )
+        result[future_info.ticker] = st
+
+    _futures_settings_cache = result
+    logger.info(f"futures dashboard: загружено {len(result)} контрактов")
+    return result
+
+
+def _all_settings_by_ticker() -> dict[str, StrategySettings]:
+    """Акции + фьючерсы (фьючерсы приоритетнее при совпадении тикера)."""
+    merged = dict(_strategy_settings_by_ticker())
+    merged.update(_futures_settings_by_ticker())
+    return merged
+
+
 def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) -> dict:
     """Свечи + бэктестовые сделки для графика: {candles, trades, ticker}."""
     from candle_archive import _candle_to_row  # уже импортирован через get_candles_cached
-    by_ticker = _strategy_settings_by_ticker()
+    by_ticker = _all_settings_by_ticker()
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         return {"error": f"{ticker}: нет в settings.ini/oi_tickers.json"}
@@ -386,7 +457,7 @@ def get_diagnostics(ticker: str, days: int = 30) -> dict:
     "Диагностика стратегии" в дашборде — иначе всё это видно только
     логами/чтением кода.
     """
-    by_ticker = _strategy_settings_by_ticker()
+    by_ticker = _all_settings_by_ticker()
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         return {"ready": False, "error": f"{ticker}: нет в settings.ini/oi_tickers.json"}
@@ -458,7 +529,7 @@ def fetch_mega_alert_tickers() -> dict:
     except Exception as ex:
         logger.warning(f"mega_alerts: обновление не удалось: {ex}")
 
-    configured = set(_strategy_settings_by_ticker().keys())
+    configured = set(_all_settings_by_ticker().keys())
     raw = [t for t in _mega_alerts.tickers_today("eq") if t not in configured]
     configured_keys = {issuer_key(t) for t in configured}
     infos = [
@@ -586,7 +657,7 @@ def run_backtest_one(
     """
     if progress is None:
         progress = _get_progress_proxy()
-    by_ticker = _strategy_settings_by_ticker()
+    by_ticker = _all_settings_by_ticker()
     rows: list[dict] = []
 
     strategy_settings = by_ticker.get(ticker)
@@ -785,7 +856,7 @@ def _portfolio_sim_one_ticker(
     (см. run_portfolio_sim) — каждый скан CPU-bound сам по себе."""
     if progress is None:
         progress = _get_progress_proxy()
-    by_ticker = _strategy_settings_by_ticker()
+    by_ticker = _all_settings_by_ticker()
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         _set_progress(progress, ticker, "ошибка")
@@ -1119,6 +1190,9 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip{{display:flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);}}
 .chip:hover{{border-color:rgba(255,0,128,.25);}}
 .chip.active{{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}}
+.chip-fut{{border-color:rgba(80,140,255,.25);}}
+.chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
+.chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -1154,13 +1228,13 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <div class="panel">
   <div class="sec-lg">Настройки симуляции</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    Список тикеров — из settings.ini + импортированные из OI.
+    🔷 Фьючерсы — из [FUTURES_TRADING] (авто). 📈 Акции — settings.ini + OI.
     <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
     <button class="btn-pill btn-sm" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
     <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
-  <div class="chips" id="tickers">__TICKER_CHECKBOXES__</div>
+  <div id="tickers">__TICKER_CHECKBOXES__</div>
   <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
        (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
        _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
@@ -1405,6 +1479,24 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
+
+function filterInstrKind(kind) {{
+  document.querySelectorAll('.chip').forEach(c => {{
+    if (kind === 'all') {{
+      c.style.display = '';
+    }} else {{
+      c.style.display = (c.dataset.kind === kind) ? '' : 'none';
+    }}
+  }});
+}}
+
+function setAllChips(active) {{
+  document.querySelectorAll('.chip').forEach(c => {{
+    if (c.style.display !== 'none') {{
+      active ? c.classList.add('active') : c.classList.remove('active');
+    }}
+  }});
+}}
 
 let _statusPollTimer = null;
 
@@ -2626,7 +2718,7 @@ async function askCouncil() {{
 def get_overrides_payload() -> dict:
     """Текущий data/bot_overrides.json + полный список тикеров (settings.ini + OI) для таблицы."""
     data = load_overrides()
-    tickers_all = sorted(set(_strategy_settings_by_ticker().keys()) | set(load_oi_tickers().keys()))
+    tickers_all = sorted(set(_all_settings_by_ticker().keys()) | set(load_oi_tickers().keys()))
     return {
         "global_signal_only": data.get("global_signal_only"),
         "partial_tp_enabled": data.get("partial_tp_enabled"),
@@ -2747,10 +2839,28 @@ def save_overrides_payload(payload: dict) -> dict | None:
 
 def _render_page() -> bytes:
     oi_tickers = load_oi_tickers()
-    tickers = sorted(_strategy_settings_by_ticker().keys())
-    checkboxes = "".join(
-        f'<div class="chip active" data-ticker="{t}" title="{"импортирован из OI" if t in oi_tickers else "settings.ini"}">{t}{" •" if t in oi_tickers else ""}</div>'
-        for t in tickers
+    stocks = _strategy_settings_by_ticker()
+    futures = _futures_settings_by_ticker()
+
+    stock_chips = "".join(
+        f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
+        f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
+        for t in sorted(stocks)
+    )
+    futures_chips = "".join(
+        f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
+        f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+        for t in sorted(futures)
+    )
+    checkboxes = (
+        f'<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">'
+        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\')">Все</button>'
+        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'futures\')" style="color:#7eb8f7">🔷 Фьючерсы ({len(futures)})</button>'
+        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'stock\')" style="color:#a0d4a0">📈 Акции ({len(stocks)})</button>'
+        f'<button class="btn-pill btn-sm" onclick="setAllChips(true)">✓ все</button>'
+        f'<button class="btn-pill btn-sm" onclick="setAllChips(false)">✗ снять</button>'
+        f'</div>'
+        f'{stock_chips}{futures_chips}'
     )
     return (PAGE_HTML
             .replace("__TICKER_CHECKBOXES__", checkboxes)
@@ -2855,7 +2965,7 @@ class Handler(BaseHTTPRequestHandler):
             oi_tickers = payload.get("tickers", [])
             signal_log = payload.get("signalLog", [])
             n = merge_oi_tickers(oi_tickers, signal_log)
-            self._send_json({"imported": n, "tickers": sorted(_strategy_settings_by_ticker().keys())})
+            self._send_json({"imported": n, "tickers": sorted(_all_settings_by_ticker().keys())})
         elif self.path == "/api/mega_alerts":
             self._send_json(fetch_mega_alert_tickers())
         elif self.path == "/api/filter_tickers":
