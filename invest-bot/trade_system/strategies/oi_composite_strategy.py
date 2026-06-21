@@ -1425,10 +1425,14 @@ class OICompositeStrategy(IStrategy):
             for i in range(CANDLE_WINDOW, len(candles)):
                 self.__candles = candles[i - CANDLE_WINDOW:i]
                 _, scores = self.__compute_composite()
+                closes_w = [_to_f(c.close) for c in self.__candles]
+                volumes_w = [float(c.volume) for c in self.__candles]
+                regime_probs = classify_regime_probs(closes_w, volumes_w)
                 rows.append({
                     "time": candles[i].time,
                     "close": _to_f(candles[i].close),
                     "scores": dict(zip(ALL_METHOD_NAMES, scores)),
+                    "regime": max(regime_probs, key=regime_probs.get),
                 })
         finally:
             self.__candles = saved_candles
