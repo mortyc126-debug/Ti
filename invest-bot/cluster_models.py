@@ -181,12 +181,18 @@ class ClusterModels:
         self._history = history
         self._ticker = ticker
         self._regime: str = ""
-        # {method: [daily scores ordered by date]}
+        # {method: [daily scores ordered by date]} — пул по всем режимам,
+        # используется для M1/M2/M3 (там сглаживание по режимам не нужно,
+        # effWR уже режимный).
         self._series: dict[str, list[float]] = {}
         # {method: effWR float}
         self._eff_wr: dict[str, float] = {}
-        # RMT-cleaned correlation matrix: {(id_i, id_j): corr}
+        # RMT-cleaned correlation matrix по всем режимам вместе (fallback,
+        # когда конкретного режима в _corr_by_regime недостаточно данных)
         self._corr: dict[tuple, float] = {}
+        # {regime: {(id_i, id_j): corr}} — RMT-корреляция ОТДЕЛЬНО по
+        # каждому режиму (Layer 4), см. redundancy_dampen.
+        self._corr_by_regime: dict[str, dict[tuple, float]] = {}
         self._ready = False
 
     def refresh(self, regime: str) -> None:
@@ -218,14 +224,31 @@ class ClusterModels:
                 general_acc if general_acc is not None else 0.5
             )
 
-        # RMT-очищенная матрица корреляций
+        # RMT-очищенная матрица корреляций — общая (fallback)
         if len(self._series) >= 2:
             self._corr = _rmt_clean_corr(self._series)
+
+        # Layer 4: те же ряды, но разбитые по day["regime"] — корреляция
+        # между методами не одинакова во всех режимах (напр. микроструктурные
+        # методы синхронны в stress, но независимы в ranging), общая матрица
+        # это усредняет и теряет. Считаем отдельно на каждый режим с
+        # достаточным числом наблюдений, fallback на self._corr иначе.
+        per_regime_series: dict[str, dict[str, list[float]]] = {}
+        for mid in all_ids:
+            by_regime = self._history.daily_scores_by_regime(ticker, mid, window_days=90)
+            for r, vals in by_regime.items():
+                per_regime_series.setdefault(r, {})[mid] = vals
+        self._corr_by_regime = {}
+        for r, series in per_regime_series.items():
+            series = {k: v for k, v in series.items() if len(v) >= _MIN_OBS}
+            if len(series) >= 2:
+                self._corr_by_regime[r] = _rmt_clean_corr(series)
 
         self._ready = bool(self._series)
         logger.info(
             f"ClusterModels {ticker} refresh: режим={regime}, "
-            f"методов с историей={len(self._series)}/{len(all_ids)}"
+            f"методов с историей={len(self._series)}/{len(all_ids)}, "
+            f"режимов с RMT-корреляцией={len(self._corr_by_regime)}"
         )
 
     def needs_refresh(self, regime: str) -> bool:
@@ -309,23 +332,60 @@ class ClusterModels:
 
         return _agg(m1_parts), _agg(m2_parts), _agg(m3_parts)
 
-    def redundancy_dampen(self, method_names: list[str]) -> dict[str, float]:
+    def redundancy_dampen(
+            self, method_names: list[str], regime_probs: Optional[dict[str, float]] = None
+    ) -> dict[str, float]:
         """
         Множитель [0.3, 1.0] на вес метода — штраф за среднюю RMT-очищенную
         корреляцию с остальными методами из переданного списка. Применяется
         в __compute_composite к base_scores ПЕРЕД сложением с M1/M2/M3, чтобы
         кластер сильно скоррелированных методов не учитывался многократно.
-        Методы без истории в self._corr (включая M1_CLUSTER/M2_CLUSTER/
-        M3_CLUSTER — они не входят в self._series) получают множитель 1.0.
+
+        Layer 4: если передан regime_probs (распределение вероятностей по
+        режимам, как в Layer 2 regime_mods) — корреляция берётся как смесь
+        per-regime матриц self._corr_by_regime, взвешенная по p(regime), а не
+        одна общая матрица self._corr. Для режима без своей матрицы (мало
+        наблюдений) откат на self._corr этого же расчёта — как и в Layer 2
+        откат на статику при отсутствии динамики.
+        Методы без истории получают множитель 1.0.
         """
-        if not self._ready or not self._corr:
+        if not self._ready:
             return {name: 1.0 for name in method_names}
+
+        def _avg_abs_corr(corr: dict[tuple, float], mid: str) -> Optional[float]:
+            others = [n for n in method_names if n != mid and (mid, n) in corr]
+            if not others:
+                return None
+            return sum(abs(corr[(mid, n)]) for n in others) / len(others)
+
         result = {}
         for mid in method_names:
-            others = [n for n in method_names if n != mid and (mid, n) in self._corr]
-            if not others:
-                result[mid] = 1.0
-                continue
-            avg_abs_corr = sum(abs(self._corr[(mid, n)]) for n in others) / len(others)
+            if regime_probs:
+                blended = 0.0
+                total_p = 0.0
+                for r, p in regime_probs.items():
+                    if p <= 0.0:
+                        continue
+                    corr = self._corr_by_regime.get(r) or self._corr
+                    if not corr:
+                        continue
+                    avg = _avg_abs_corr(corr, mid)
+                    if avg is None:
+                        continue
+                    blended += p * avg
+                    total_p += p
+                if total_p <= 0.0:
+                    result[mid] = 1.0
+                    continue
+                avg_abs_corr = blended / total_p
+            else:
+                if not self._corr:
+                    result[mid] = 1.0
+                    continue
+                avg = _avg_abs_corr(self._corr, mid)
+                if avg is None:
+                    result[mid] = 1.0
+                    continue
+                avg_abs_corr = avg
             result[mid] = max(0.3, 1.0 - avg_abs_corr)
         return result

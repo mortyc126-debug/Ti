@@ -169,6 +169,24 @@ class HistoryStore:
             if date >= cutoff and method in day.get("scores", {})
         ]
 
+    def daily_scores_by_regime(
+            self, ticker: str, method: str, window_days: int = 90
+    ) -> dict[str, list[float]]:
+        """
+        То же, что daily_scores, но разбито по day["regime"] — нужно для
+        RMT-корреляции, посчитанной ОТДЕЛЬНО в каждом режиме (корреляция между
+        методами в trending отличается от corr в stress, общая матрица их
+        смешивает и теряет это различие).
+        """
+        cutoff = self._cutoff(window_days)
+        out: dict[str, list[float]] = {}
+        for date, day in sorted(self._data.get(ticker, {}).items()):
+            if date < cutoff or method not in day.get("scores", {}):
+                continue
+            regime = day.get("regime", "")
+            out.setdefault(regime, []).append(day["scores"][method])
+        return out
+
     # ── Аналитика: точность методов ──────────────────────────────────────────
 
     def method_performance(
