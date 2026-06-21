@@ -1780,6 +1780,26 @@ class OICompositeStrategy(IStrategy):
                     else entry * (1 - exit_pct)
                 approx_mfe = take_dist if win else 0.0
                 approx_mae = 0.0 if win else stop_dist
+                # Определяем причину выхода по ценам
+                if exit_pct > 0 and abs(exit_pct - take_dist) < 1e-9:
+                    exit_reason = "take"
+                elif exit_pct < 0 and abs(exit_pct + stop_dist) < 1e-9:
+                    exit_reason = "stop"
+                else:
+                    exit_reason = "timeout"
+
+                # Топ-5 методов согласных с направлением (по силе скора)
+                dir_sign = 1 if direction == SignalType.LONG else -1
+                ms = sig.get("method_scores", {})
+                top_agree = sorted(
+                    [(n, v) for n, v in ms.items() if v * dir_sign > 0.05],
+                    key=lambda x: abs(x[1]), reverse=True
+                )[:5]
+                top_against = sorted(
+                    [(n, v) for n, v in ms.items() if v * dir_sign < -0.05],
+                    key=lambda x: abs(x[1]), reverse=True
+                )[:3]
+
                 trades.append({
                     "entry_time": entry_time, "exit_time": exit_time,
                     "direction": direction.name, "net_pct": net_pct,
@@ -1791,6 +1811,12 @@ class OICompositeStrategy(IStrategy):
                     "stop_price": round(stop_price, 4),
                     "mfe": round(approx_mfe, 6),
                     "mae": round(approx_mae, 6),
+                    "exit_reason": exit_reason,
+                    "regime": sig.get("regime", ""),
+                    "agree_count": len([v for v in ms.values() if v * dir_sign > 0.05]),
+                    "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
+                    "top_agree": top_agree,
+                    "top_against": top_against,
                 })
 
         if not results:

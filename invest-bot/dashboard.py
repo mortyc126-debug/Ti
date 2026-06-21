@@ -1649,10 +1649,60 @@ async function fetchMegaAlerts() {{
 }}
 
 function pfRowsToHtml(trades) {{
+  const REGIME_LABELS = {{
+    trending_up: '↑ тренд', trending_down: '↓ тренд',
+    ranging: '↔ боковик', high_vol: '⚡ волат.', low_vol: '😴 тихо', stress: '🔴 стресс'
+  }};
+  const EXIT_LABELS = {{take: '✅ тейк', stop: '🛑 стоп', timeout: '⏱ тайм'}};
   let html = '';
-  for (const t of trades) {{
-    html += `<tr><td>${{t.entry_time}}</td><td>${{t.ticker}}${{t.atr_k ? ' (' + t.atr_k + ')' : ''}}</td><td>${{t.direction}}</td><td>${{(t.net_pct*100).toFixed(2)}}%</td><td>${{t.r_multiple}}</td><td>${{t.pnl_rub}}</td><td>${{t.equity_after}}</td><td style="font-size:10px;color:var(--txt3);">M1:${{t.m1}} M2:${{t.m2}} M3:${{t.m3}}</td></tr>`;
+  trades.forEach((t, i) => {{
+    const winColor = t.win ? 'var(--pos)' : 'var(--neg)';
+    const netStr = (t.net_pct * 100).toFixed(2) + '%';
+    const regime = REGIME_LABELS[t.regime] || t.regime || '—';
+    const exitLbl = EXIT_LABELS[t.exit_reason] || t.exit_reason || '—';
+    const agreeStr = t.agree_count !== undefined ? `${{t.agree_count}}↑ ${{t.against_count}}↓` : '';
+    const detailId = `td_${{i}}`;
+    html += `<tr style="cursor:pointer" onclick="toggleTd('${{detailId}}')">
+      <td>${{t.entry_time ? t.entry_time.toString().slice(0,16) : ''}}</td>
+      <td>${{t.ticker}}${{t.atr_k ? ' <span style="color:var(--txt3)">'+t.atr_k+'</span>' : ''}}</td>
+      <td>${{t.direction === 'LONG' ? '▲ LONG' : '▼ SHORT'}}</td>
+      <td style="color:${{winColor}};font-weight:700">${{t.win ? '+' : ''}}${{netStr}}</td>
+      <td style="color:${{winColor}}">${{(+t.r_multiple).toFixed(2)}}R</td>
+      <td>${{exitLbl}}</td>
+      <td style="color:var(--txt3)">${{regime}}</td>
+      <td style="color:var(--txt3)">${{agreeStr}}</td>
+      <td>${{t.pnl_rub ?? ''}}</td>
+    </tr>
+    <tr id="${{detailId}}" style="display:none">
+      <td colspan="9" style="background:rgba(255,255,255,.03);padding:8px 14px;font-size:11px;">
+        ${{tradeDetailHtml(t)}}
+      </td>
+    </tr>`;
+  }});
+  return html;
+}}
+
+function toggleTd(id) {{
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}}
+
+function tradeDetailHtml(t) {{
+  const fmtScore = v => v >= 0 ? `<span style="color:var(--pos)">+${{v.toFixed(2)}}</span>` : `<span style="color:var(--neg)">${{v.toFixed(2)}}</span>`;
+  let html = `<div style="display:flex;gap:24px;flex-wrap:wrap">`;
+  html += `<div><b>Цены:</b> вход ${{t.entry_price}} → выход ${{t.exit_price}} &nbsp; тейк ${{t.take_price}} стоп ${{t.stop_price}}</div>`;
+  html += `<div><b>Экспозиция:</b> ${{Math.round(t.duration_min)}} мин</div>`;
+  if (t.top_agree && t.top_agree.length) {{
+    html += `<div><b>За (${{t.agree_count}}):</b> `;
+    html += t.top_agree.map(([n, v]) => `${{n}} ${{fmtScore(v)}}`).join(' · ');
+    html += `</div>`;
   }}
+  if (t.top_against && t.top_against.length) {{
+    html += `<div><b>Против (${{t.against_count}}):</b> `;
+    html += t.top_against.map(([n, v]) => `${{n}} ${{fmtScore(v)}}`).join(' · ');
+    html += `</div>`;
+  }}
+  html += `</div>`;
   return html;
 }}
 
@@ -1724,7 +1774,7 @@ async function runPortfolioSim() {{
   }}
   document.getElementById('pf_ticker').innerHTML = th;
 
-  let trh = '<tr><th>Время входа</th><th>Тикер</th><th>Напр.</th><th>Net%</th><th>R</th><th>P&L ₽</th><th>Счёт после</th><th>M1/M2/M3</th></tr>';
+  let trh = '<tr><th>Время входа</th><th>Тикер</th><th>Напр.</th><th>Net%</th><th>R</th><th>Выход</th><th>Режим</th><th>За/Против</th><th>P&L ₽</th></tr>';
   trh += pfRowsToHtml(data.trades);
   for (const e of (data.errors || [])) {{
     trh += `<tr><td colspan="8" class="err">${{e.ticker}}: ${{e.error}}</td></tr>`;
