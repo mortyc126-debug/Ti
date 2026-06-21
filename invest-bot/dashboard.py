@@ -43,6 +43,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Optional
 
 from tinkoff.invest.exceptions import RequestError
 
@@ -103,7 +104,12 @@ _archive = ArchiveStore()
 # забирать всю машину под бэктест), но не меньше 4: на машинах с < 6 ядрами
 # BLAS уже ограничен одним тредом на процесс (см. выше), так что 1 ядро на
 # процесс — это нижняя граница, ниже которой просто меньше параллелизма.
-BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", max(4, (os.cpu_count() or 4) - 1)))
+# -1 (а не -2) оставлял системе всего ОДНО свободное ядро на ОС+браузер+сам
+# процесс дашборда (главный поток, который отвечает на GET / при обновлении
+# страницы) — под нагрузкой это ядро забивается, ответ на простой GET
+# запаздывает, и браузер рвёт соединение по таймауту ("обновил страницу —
+# ошибка", хотя сам прогон продолжается). -2 оставляет больше запаса.
+BACKTEST_WORKERS = int(os.getenv("BACKTEST_WORKERS", max(2, (os.cpu_count() or 4) - 2)))
 
 # CANDLE_REQUEST_DELAY в market_data_service.py был откалиброван на 4
 # параллельных воркера (0.5с * 4 ≈ 480 запросов/60с, под лимитом Tinkoff
@@ -169,6 +175,66 @@ def _set_progress(progress: dict, ticker: str, status: str) -> None:
         # Manager-процесс может быть недоступен на shutdown — прогресс это
         # необязательный UI-сахар, не должен валить сам прогон.
         pass
+
+
+# Терминальные статусы тикера — дальше с ним уже ничего не происходит.
+_DONE_STATUSES = {"готово", "ошибка", "ошибка API", "нет истории", "пропуск", "отменено"}
+
+
+def _mark_unfinished_cancelled(progress: dict, tickers: list[str]) -> None:
+    """После отмены прогона — тикеры, которые так и не дошли до терминального
+    статуса (ещё в очереди / считались, пока процесс не убили), помечаем
+    явно, иначе их статус навечно зависает на "скан сигналов..."/"в очереди"
+    в /api/progress, и непонятно — прогон стоит или просто долго думает."""
+    for t in tickers:
+        cur = progress.get(t)
+        status = cur.get("status") if cur else None
+        if status not in _DONE_STATUSES:
+            _set_progress(progress, t, "отменено")
+
+
+# Кнопка "Стоп": ProcessPoolExecutor.shutdown(cancel_futures=True) снимает
+# только ещё НЕ запущенные задачи — уже работающие воркер-процессы будут
+# молотить до конца, если их не убить явно. _active_pool — текущий
+# пул, чтобы /api/cancel мог достать его процессы и terminate() их (доступ
+# к приватному _processes — единственный способ остановить уже запущенный
+# CPU-bound скан без поддержки отмены внутри самого скана).
+_cancel_event = threading.Event()
+_active_pool_lock = threading.Lock()
+_active_pool: Optional[ProcessPoolExecutor] = None
+
+
+def _register_pool(pool: ProcessPoolExecutor) -> None:
+    global _active_pool
+    with _active_pool_lock:
+        _active_pool = pool
+
+
+def _unregister_pool(pool: ProcessPoolExecutor) -> None:
+    global _active_pool
+    with _active_pool_lock:
+        if _active_pool is pool:
+            _active_pool = None
+
+
+def request_cancel() -> bool:
+    """Вызывается из /api/cancel. Возвращает True, если был активный прогон."""
+    _cancel_event.set()
+    with _active_pool_lock:
+        pool = _active_pool
+    if pool is None:
+        return False
+    try:
+        pool.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        pass
+    for p in list(getattr(pool, "_processes", {}).values()):
+        try:
+            if p.is_alive():
+                p.terminate()
+        except Exception:
+            pass
+    return True
 
 # Дефолтные настройки сигнала для тикеров, импортированных из OI (у них
 # нет [STRATEGY_<TICKER>] в settings.ini — только тикер+FIGI) — берём те же
@@ -544,6 +610,7 @@ def run_backtest(
     Каждый тикер — это независимый дорогой CPU-bound скан (Hawkes-MLE на
     каждый бар), поэтому гоняем по процессам параллельно, а не по очереди.
     """
+    _cancel_event.clear()
     progress = _get_progress_proxy()
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
@@ -551,18 +618,35 @@ def run_backtest(
     if len(tickers) <= 1:
         rows: list[dict] = []
         for ticker in tickers:
+            if _cancel_event.is_set():
+                break
             rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress))
+        if _cancel_event.is_set():
+            _mark_unfinished_cancelled(progress, tickers)
         return rows
 
     by_ticker_rows: dict[str, list[dict]] = {}
-    with ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers))) as pool:
+    pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
+    _register_pool(pool)
+    try:
         futures = {
             pool.submit(run_backtest_one, ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress): ticker
             for ticker in tickers
         }
         for fut in as_completed(futures):
+            if _cancel_event.is_set():
+                break
             ticker = futures[fut]
-            by_ticker_rows[ticker] = fut.result()
+            try:
+                by_ticker_rows[ticker] = fut.result()
+            except Exception:
+                pass  # воркер мог быть убит через /api/cancel — это ожидаемо
+    finally:
+        _unregister_pool(pool)
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    if _cancel_event.is_set():
+        _mark_unfinished_cancelled(progress, tickers)
 
     rows = []
     for ticker in tickers:
@@ -698,23 +782,40 @@ def run_portfolio_sim(
     all_trades: list[dict] = []
     errors: list[dict] = []
 
+    _cancel_event.clear()
     progress = _get_progress_proxy()
     for ticker in tickers:
         _set_progress(progress, ticker, "в очереди")
 
     if len(tickers) <= 1:
-        results = [(t, _portfolio_sim_one_ticker(t, days, tariff, mode, atr_take_ks, atr_stop_ks, progress=progress))
-                   for t in tickers]
+        results = []
+        for t in tickers:
+            if _cancel_event.is_set():
+                break
+            results.append((t, _portfolio_sim_one_ticker(t, days, tariff, mode, atr_take_ks, atr_stop_ks, progress=progress)))
     else:
         results = []
-        with ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers))) as pool:
+        pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
+        _register_pool(pool)
+        try:
             futures = {
                 pool.submit(_portfolio_sim_one_ticker, ticker, days, tariff, mode, atr_take_ks, atr_stop_ks,
                             progress=progress): ticker
                 for ticker in tickers
             }
             for fut in as_completed(futures):
-                results.append((futures[fut], fut.result()))
+                if _cancel_event.is_set():
+                    break
+                try:
+                    results.append((futures[fut], fut.result()))
+                except Exception:
+                    pass  # воркер мог быть убит через /api/cancel — это ожидаемо
+        finally:
+            _unregister_pool(pool)
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    if _cancel_event.is_set():
+        _mark_unfinished_cancelled(progress, tickers)
 
     for ticker, (trades, error) in results:
         all_trades.extend(trades)
@@ -929,6 +1030,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     топ <input type="number" class="inp" style="width:50px;padding:6px 8px;" id="top_pct" value="70" min="1" max="100">% по востребованности</label>
   <br><br>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
+  <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
   <span id="status"></span>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
@@ -953,6 +1055,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </label>
   <br><br>
   <button class="btn-pill" onclick="runPortfolioSim()">▶ ПРОГНАТЬ ПОРТФЕЛЬ</button>
+  <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
   <span id="pf_status"></span>
   <div id="pf_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="pf_summary"></div>
@@ -1170,6 +1273,20 @@ function startProgressPolling(tickers, statusElId) {{
 
 function stopProgressPolling() {{
   if (_progressTimer) {{ clearInterval(_progressTimer); _progressTimer = null; }}
+}}
+
+async function cancelRun() {{
+  // Останавливает текущий прогон бэктеста/портфельной симуляции (если
+  // он есть): сервер убивает уже запущенные воркер-процессы, исходный
+  // fetch() в runBacktest/runPortfolioSim вернётся раньше с частичным
+  // результатом — отдельно обрабатывать ответ этой кнопки не нужно.
+  try {{
+    const resp = await fetch('/api/cancel', {{method: 'POST'}});
+    const data = await resp.json();
+    if (!data.cancelled) {{ alert('Нет активного прогона для остановки'); }}
+  }} catch (e) {{
+    alert('Не удалось отправить сигнал остановки: ' + e);
+  }}
 }}
 
 async function runBacktest() {{
@@ -1589,6 +1706,9 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/overrides":
             error = save_overrides_payload(payload)
             self._send_json(error if error else {"ok": True})
+        elif self.path == "/api/cancel":
+            was_running = request_cancel()
+            self._send_json({"cancelled": was_running})
         else:
             self.send_error(404)
 
