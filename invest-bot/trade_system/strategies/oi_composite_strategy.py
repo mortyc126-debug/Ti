@@ -209,6 +209,78 @@ _1MIN_WEIGHT_MODS: dict[str, float] = {
     "VZO":              1.1,
     "VWAP_SIGNAL":      1.2,
 }
+
+# MTF: при торговле на 1м-свечах агрегируем виртуальные 5м-свечи и используем
+# направление ZLEMA на них как фильтр тренда старшего ТФ.
+# Сигналы ПРОТИВ 5м-тренда получают штраф MTF_COUNTER_MULT (подавление).
+# Сигналы ПО 5м-тренду — небольшой буст MTF_TREND_MULT.
+_MTF_FACTOR = 5           # сколько 1м-свечей = 1 свеча старшего ТФ
+_MTF_COUNTER_MULT = 0.25  # composite × 0.25 если против тренда старшего ТФ
+_MTF_TREND_MULT   = 1.15  # composite × 1.15 если по тренду старшего ТФ
+_MTF_MIN_BARS = 15        # минимум виртуальных свечей для расчёта тренда
+
+
+def _aggregate_candles(candles: list, factor: int) -> list:
+    """Агрегирует список 1м-свечей в виртуальные свечи старшего ТФ.
+    O=open[0], H=max(high), L=min(low), C=close[-1], V=sum(volume) по каждому блоку."""
+    from tinkoff.invest import HistoricCandle
+    from decimal import Decimal
+
+    result = []
+    for start in range(0, len(candles) - factor + 1, factor):
+        block = candles[start:start + factor]
+        opens  = [_to_f(c.open)   for c in block]
+        highs  = [_to_f(c.high)   for c in block]
+        lows   = [_to_f(c.low)    for c in block]
+        closes = [_to_f(c.close)  for c in block]
+        vols   = [float(c.volume) for c in block]
+
+        # Создаём объект с нужными атрибутами (duck-typing: все score_* читают .close/.high/.low/.volume)
+        class _VCandle:
+            pass
+        vc = _VCandle()
+        vc.open   = block[0].open
+        vc.high   = block[0].high   # переиспользуем объект для хранения — значение ниже
+        vc.low    = block[0].low
+        vc.close  = block[-1].close
+        vc.volume = int(sum(vols))
+        vc.time   = block[-1].time
+        # перезаписываем H/L через атрибуты простого объекта
+        vc._h = max(highs)
+        vc._l = min(lows)
+
+        # score_* функции читают c.high / c.low через _to_f → нужны совместимые типы
+        # Простейший workaround: заменим high/low на объект с нужным полем units
+        class _MV:
+            def __init__(self, val):
+                # _to_f ожидает MoneyValue (units+nano) или Quotation — имитируем
+                self.units = int(val)
+                self.nano  = int(round((val - int(val)) * 1_000_000_000))
+        vc.high = _MV(max(highs))
+        vc.low  = _MV(min(lows))
+
+        result.append(vc)
+    return result
+
+
+def _mtf_trend_score(candles_1m: list, factor: int = _MTF_FACTOR) -> float:
+    """ZLEMA-тренд на виртуальных свечах старшего ТФ. Возвращает +1 (бычий) / -1 (медвежий) / 0 (нейтрально)."""
+    agg = _aggregate_candles(candles_1m, factor)
+    if len(agg) < _MTF_MIN_BARS:
+        return 0.0
+    closes = [_to_f(c.close) for c in agg]
+    period = min(14, len(closes) - 1)
+    line = zlema(closes, period=period)
+    if line is None or len(line) < 2:
+        return 0.0
+    slope = line[-1] - line[-2]
+    # Нормируем по последней цене чтобы сравнивать по всем инструментам
+    rel = slope / (closes[-1] or 1.0)
+    if rel > 0.0001:
+        return 1.0
+    if rel < -0.0001:
+        return -1.0
+    return 0.0
 LIQUIDITY_MIN_RATIO = 0.3          # объём последней свечи >= 0.3 * медианы окна
 LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "плохая полоса"
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
@@ -1005,6 +1077,7 @@ class OICompositeStrategy(IStrategy):
         # На 1-мин свечах используем увеличенное окно чтобы покрыть то же
         # календарное время что и CANDLE_WINDOW баров на 5-мин (30×5 = 150 мин).
         interval_min = getattr(settings, "candle_interval_min", 5)
+        self.__interval_min = interval_min
         self.__candle_window = CANDLE_WINDOW if interval_min >= 5 else CANDLE_WINDOW * 5
         self.__min_candles = MIN_CANDLES if interval_min >= 5 else MIN_CANDLES * 3
 
@@ -2024,6 +2097,18 @@ class OICompositeStrategy(IStrategy):
         confidence_mult *= regime_conf
         confidence_mult *= lag_mult
         composite *= confidence_mult
+
+        # MTF-гейт: на 1м-свечах проверяем тренд виртуального старшего ТФ (5м).
+        # Сигнал против тренда старшего ТФ получает штраф × 0.25 — не блокируется
+        # полностью (вдруг разворот), но требует значительно большего composite
+        # чтобы пробить SIGNAL_THRESHOLD. Сигнал по тренду — буст × 1.15.
+        if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
+            htf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
+            if htf_trend != 0.0:
+                if (composite > 0 and htf_trend < 0) or (composite < 0 and htf_trend > 0):
+                    composite *= _MTF_COUNTER_MULT
+                else:
+                    composite *= _MTF_TREND_MULT
 
         self.__last_regime = regime
         self.__regime_confidence = regime_conf
