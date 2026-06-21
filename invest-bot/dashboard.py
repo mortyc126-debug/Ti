@@ -421,12 +421,9 @@ def _futures_settings_by_ticker() -> dict[str, StrategySettings]:
                 else:
                     valid[base] = info  # старый кэш без даты — оставляем
             if expired:
-                logger.info(f"futures: истекло {len(expired)} контрактов: {expired[:5]}{'...' if len(expired)>5 else ''}, запускаю обновление")
-                _start_futures_reload_bg()
+                logger.info(f"futures: истекло {len(expired)} контрактов: {expired[:5]}{'...' if len(expired)>5 else ''}, обновите вручную кнопкой 🔄")
             _futures_settings_cache = _build_strategy_settings(valid)
             logger.info(f"futures: загружено {len(_futures_settings_cache)} актуальных контрактов из кэша (возраст {age_days:.1f} дн.)")
-            if age_days > FUTURES_CACHE_MAX_AGE_DAYS and not expired:
-                _start_futures_reload_bg()
         else:
             _futures_settings_cache = {}
     return _futures_settings_cache
