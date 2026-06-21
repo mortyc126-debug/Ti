@@ -535,40 +535,141 @@ def score_bs_pressure(candles: list[HistoricCandle]) -> float:
 
 
 def score_candle_pattern(candles: list[HistoricCandle]) -> float:
-    """Engulfing / Pin-bar / Doji на последних 2–3 свечах."""
-    if len(candles) < 2:
+    """
+    Контекстные свечные паттерны: форма × объём × предшествующий тренд × близость к уровню.
+    Каждый паттерн имеет базовый скор, который умножается на контекстные множители.
+    Итог ∈ [-1, 1].
+    """
+    if len(candles) < 5:
         return 0.0
-    prev, last = candles[-2], candles[-1]
-    ph, pl = _to_f(prev.high), _to_f(prev.low)
-    po, pc = _to_f(prev.open), _to_f(prev.close)
-    lh, ll = _to_f(last.high), _to_f(last.low)
-    lo_, lc = _to_f(last.open), _to_f(last.close)
+
+    def f(c, attr): return _to_f(getattr(c, attr))
+
+    # Последние свечи
+    last = candles[-1]
+    lh, ll, lo_, lc = f(last, "high"), f(last, "low"), f(last, "open"), f(last, "close")
     lrng = lh - ll or 1e-9
+    lbody = abs(lc - lo_)
+    lbody_frac = lbody / lrng
 
-    # Bullish Engulfing
-    if pc < po and lc > lo_ and lc > po and lo_ < pc:
-        return 0.8
+    prev = candles[-2]
+    ph, pl, po, pc = f(prev, "high"), f(prev, "low"), f(prev, "open"), f(prev, "close")
+    prng = ph - pl or 1e-9
 
-    # Bearish Engulfing
-    if pc > po and lc < lo_ and lc < po and lo_ > pc:
-        return -0.8
+    # Предшествующий тренд: последние N свечей (не считая текущую)
+    trend_w = candles[-6:-1]
+    trend_closes = [f(c, "close") for c in trend_w]
+    trend_slope = (trend_closes[-1] - trend_closes[0]) / (abs(trend_closes[0]) or 1.0)
+    prior_bullish = trend_slope > 0.001
+    prior_bearish = trend_slope < -0.001
 
-    # Bullish Pin Bar (молот)
+    # Объём: последняя свеча vs медиана окна
+    vols = [c.volume for c in candles[-20:]]
+    med_vol = sorted(vols)[len(vols) // 2] or 1
+    vol_ratio = last.volume / med_vol  # 1.0 = средний объём
+
+    # Объём хвоста: насколько объём «принадлежит» отвергнутой зоне
     lower_wick = (min(lo_, lc) - ll) / lrng
-    body = abs(lc - lo_) / lrng
-    if lower_wick > 0.6 and body < 0.3:
-        return 0.7
-
-    # Bearish Pin Bar (перевёрнутый молот)
     upper_wick = (lh - max(lo_, lc)) / lrng
-    if upper_wick > 0.6 and body < 0.3:
-        return -0.7
 
-    # Doji
-    if body < 0.05:
-        return 0.0  # нейтральный
+    # Множитель объёма: от 0.5 (мёртвый) до 1.5 (высокий)
+    vol_mult = min(1.5, max(0.5, 0.5 + vol_ratio * 0.5))
 
-    return 0.0
+    # Контекст истощения: 3+ свечи подряд в одну сторону перед текущей
+    last3 = candles[-4:-1]
+    consec_down = all(f(c, "close") < f(c, "open") for c in last3)
+    consec_up   = all(f(c, "close") > f(c, "open") for c in last3)
+    # Объём последних свечей убывает → истощение движения
+    last3_vols = [c.volume for c in last3]
+    vol_fading = last3_vols[-1] < last3_vols[0] * 0.8 if last3_vols[0] > 0 else False
+
+    scores = []
+
+    # ── Молот (Hammer) ──────────────────────────────────────────────────────
+    # Длинный нижний хвост + маленькое тело: покупатели поглотили продажи.
+    # Контекст: после медвежьего движения, лучше на уровне поддержки.
+    if lower_wick > 0.55 and lbody_frac < 0.35 and upper_wick < 0.2:
+        base = 0.65
+        ctx = (1.3 if consec_down else 0.6) * (1.2 if prior_bearish else 0.8)
+        scores.append(base * ctx * vol_mult)
+
+    # ── Перевёрнутый молот / Shooting Star ──────────────────────────────────
+    # Длинный верхний хвост: продавцы поглотили покупателей.
+    if upper_wick > 0.55 and lbody_frac < 0.35 and lower_wick < 0.2:
+        base = -0.65
+        ctx = (1.3 if consec_up else 0.6) * (1.2 if prior_bullish else 0.8)
+        scores.append(base * ctx * vol_mult)
+
+    # ── Бычье поглощение (Bullish Engulfing) ────────────────────────────────
+    # Тело последней свечи полностью поглощает тело предыдущей медвежьей.
+    # Контекст: после серии падения, объём нарастает.
+    if pc < po and lc > lo_ and lc >= po and lo_ <= pc:
+        engulf_strength = lbody / (abs(pc - po) or 1e-9)  # насколько больше тела
+        base = min(0.9, 0.55 + engulf_strength * 0.15)
+        ctx = (1.3 if consec_down else 0.7) * (1.2 if prior_bearish else 0.9)
+        vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))  # объём важнее для engulfing
+        scores.append(base * ctx * vol_eng)
+
+    # ── Медвежье поглощение (Bearish Engulfing) ─────────────────────────────
+    if pc > po and lc < lo_ and lc <= po and lo_ >= pc:
+        engulf_strength = lbody / (abs(pc - po) or 1e-9)
+        base = -min(0.9, 0.55 + engulf_strength * 0.15)
+        ctx = (1.3 if consec_up else 0.7) * (1.2 if prior_bullish else 0.9)
+        vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))
+        scores.append(base * ctx * vol_eng)
+
+    # ── Doji (неопределённость после движения) ──────────────────────────────
+    # Сам по себе нейтрален, но после сильного движения = истощение.
+    if lbody_frac < 0.08:
+        if consec_down and vol_fading:
+            scores.append(0.35 * vol_mult)   # возможный разворот вверх
+        elif consec_up and vol_fading:
+            scores.append(-0.35 * vol_mult)  # возможный разворот вниз
+        # Doji без контекста — 0, не добавляем шум
+
+    # ── Inside Bar (компрессия) ──────────────────────────────────────────────
+    # Диапазон последней свечи внутри предыдущей — сжатие энергии.
+    # Направление даёт предшествующий тренд: продолжение или разворот.
+    if lh <= ph and ll >= pl:
+        compression = (lrng / prng) if prng > 0 else 1.0  # 0=полная компрессия
+        base_strength = (1.0 - compression) * 0.4  # чем теснее — тем сильнее
+        if prior_bullish:
+            scores.append(base_strength * vol_mult)
+        elif prior_bearish:
+            scores.append(-base_strength * vol_mult)
+
+    # ── Три солдата / три вороны ─────────────────────────────────────────────
+    # 3 последовательные направленные свечи с нарастающим объёмом — не разворот,
+    # а ПРОДОЛЖЕНИЕ тренда (не против него!).
+    if len(candles) >= 4:
+        last3c = candles[-3:]
+        c1, c2, c3 = last3c
+        three_up = (f(c1,"close")>f(c1,"open") and f(c2,"close")>f(c2,"open") and f(c3,"close")>f(c3,"open")
+                    and f(c2,"close")>f(c1,"close") and f(c3,"close")>f(c2,"close"))
+        three_dn = (f(c1,"close")<f(c1,"open") and f(c2,"close")<f(c2,"open") and f(c3,"close")<f(c3,"open")
+                    and f(c2,"close")<f(c1,"close") and f(c3,"close")<f(c2,"close"))
+        vol3 = [c.volume for c in last3c]
+        vol_growing = vol3[2] >= vol3[0] * 0.9  # объём не падает
+
+        if three_up and vol_growing and prior_bullish:
+            scores.append(0.5 * vol_mult)   # тренд продолжается
+        if three_dn and vol_growing and prior_bearish:
+            scores.append(-0.5 * vol_mult)
+
+    # ── Tweezer (пинцет) — двойная вершина/основание ─────────────────────────
+    # Два бара с одинаковым хаем (шорт) или лоем (лонг) ± 0.1% → отвержение уровня.
+    tolerance = lrng * 0.15
+    if abs(lh - ph) < tolerance and upper_wick > 0.3 and prior_bullish:
+        scores.append(-0.5 * vol_mult)   # двойная вершина
+    if abs(ll - pl) < tolerance and lower_wick > 0.3 and prior_bearish:
+        scores.append(0.5 * vol_mult)    # двойное основание
+
+    if not scores:
+        return 0.0
+
+    # Берём сигнал с максимальным abs (самый сильный паттерн на баре)
+    best = max(scores, key=abs)
+    return max(-1.0, min(1.0, best))
 
 
 def score_adaptive_ma_candle(candles: list[HistoricCandle]) -> float:
