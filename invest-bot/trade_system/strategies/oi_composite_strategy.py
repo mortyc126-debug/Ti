@@ -73,7 +73,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score
+from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score
 from cluster_models import ClusterModels
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
@@ -132,6 +132,7 @@ MIN_CANDLES = 10                   # минимум свечей для перв
 SIGNAL_THRESHOLD = 0.25            # порог composite для сигнала
 HEDGE_ETA = 0.6                    # темп Hedge-обучения весов методов (multiplicative weights)
 HEDGE_WARMUP_TRADES = 15           # на первых N сделках eta линейно растёт от 0 до HEDGE_ETA
+HEDGE_REGIME_MIN_OBS = 15          # ниже этого числа сделок в режиме режимный Hedge-вес не доверяем, используем глобальный
 MFE_MAE_BARS = 15                  # максимум баров для записи MFE/MAE
 
 # ── Фильтры качества сигнала ────────────────────────────────────────────────
@@ -925,6 +926,7 @@ class OICompositeStrategy(IStrategy):
         self.__candles: list[HistoricCandle] = []
         self.__open_trade: Optional[OpenTrade] = None
         self.__weights: dict[str, MethodWeight] = self.__load_weights()
+        self.__regime_weights: dict[str, dict[str, MethodWeight]] = self.__load_regime_weights()
         self.__rolling_quality: float = self.__load_rolling_quality()
         self.__confidence: float = 0.7
         self.__squeeze_provider: Optional[SqueezeProvider] = None
@@ -1493,13 +1495,14 @@ class OICompositeStrategy(IStrategy):
         methods = []
         for name in ALL_METHOD_NAMES:
             hedge = self.__weights[name]
+            blended_weight = self.__blended_hedge_weight(name, regime_probs)
             eff_weight = (
-                hedge.weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+                blended_weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
                 * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             )
             methods.append({
                 "name": name,
-                "hedge_weight": round(hedge.weight, 4),
+                "hedge_weight": round(blended_weight, 4),
                 "hedge_trades": hedge.total,
                 "regime_mult": round(regime_mods.get(name, 1.0), 4),
                 "redundancy_mult": round(redundancy_mult.get(name, 1.0), 4),
@@ -1822,7 +1825,7 @@ class OICompositeStrategy(IStrategy):
             redundancy_mult = {}
 
         weights = [
-            self.__weights[name].weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+            self.__blended_hedge_weight(name, regime_probs) * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             for name in ALL_METHOD_NAMES
         ]
@@ -2192,6 +2195,8 @@ class OICompositeStrategy(IStrategy):
                       (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
             self.__weights[name].update(target)
+            if self.__last_regime in self.__regime_weights:
+                self.__regime_weights[self.__last_regime][name].update(target)
 
         # Сохранить сделку в историю с attribution по методам
         if self.__history is not None:
@@ -2272,10 +2277,60 @@ class OICompositeStrategy(IStrategy):
                 name: {"weight": w.weight, "total": w.total, "sum_quality": w.sum_quality}
                 for name, w in self.__weights.items()
             })
+            data[key]["__regimes__"] = {
+                regime: {
+                    name: {"weight": w.weight, "total": w.total, "sum_quality": w.sum_quality}
+                    for name, w in methods.items()
+                }
+                for regime, methods in self.__regime_weights.items()
+            }
             with open(WEIGHTS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.warning(f"Could not save weights: {e}")
+
+    def __load_regime_weights(self) -> dict[str, dict[str, MethodWeight]]:
+        """Per-regime Hedge-веса (см. HEDGE_REGIME_MIN_OBS) — отдельные от
+        глобальных self.__weights, хранятся в WEIGHTS_FILE под ключом
+        "__regimes__", не ломая обратную совместимость со старым плоским форматом."""
+        rw: dict[str, dict[str, MethodWeight]] = {
+            regime: {name: MethodWeight() for name in ALL_METHOD_NAMES} for regime in REGIMES
+        }
+        if not os.path.exists(WEIGHTS_FILE):
+            return rw
+        try:
+            with open(WEIGHTS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            key = self.__settings.figi
+            regimes_data = data.get(key, {}).get("__regimes__", {})
+            for regime in REGIMES:
+                if regime not in regimes_data:
+                    continue
+                for name in rw[regime]:
+                    if name in regimes_data[regime]:
+                        d = regimes_data[regime][name]
+                        rw[regime][name] = MethodWeight(
+                            weight=d.get("weight", 0.5),
+                            total=d.get("total", 0),
+                            sum_quality=d.get("sum_quality", 0.0),
+                        )
+        except Exception as e:
+            logger.warning(f"Could not load regime weights: {e}")
+        return rw
+
+    def __blended_hedge_weight(self, name: str, regime_probs: dict[str, float]) -> float:
+        """Hedge-вес метода, смешанный по вероятностям режима (как в Layer 2/4):
+        для каждого режима с достаточным числом наблюдений (HEDGE_REGIME_MIN_OBS)
+        используем режимный вес, иначе — глобальный self.__weights как fallback."""
+        global_weight = self.__weights[name].weight
+        blended = 0.0
+        for regime, p in regime_probs.items():
+            if p <= 0.0:
+                continue
+            rw = self.__regime_weights.get(regime, {}).get(name)
+            w = rw.weight if (rw is not None and rw.total >= HEDGE_REGIME_MIN_OBS) else global_weight
+            blended += p * w
+        return blended if blended > 0.0 else global_weight
 
     def __load_rolling_quality(self) -> float:
         if not os.path.exists(WEIGHTS_FILE):
