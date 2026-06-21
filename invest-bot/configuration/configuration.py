@@ -59,7 +59,8 @@ class ProgramConfiguration:
 
         if "FUTURES_TRADING" in config:
             ft = config["FUTURES_TRADING"]
-            base_tickers = [t.strip() for t in ft.get("BASE_TICKERS", "").split(",") if t.strip()]
+            raw = ft.get("BASE_TICKERS", "").replace("\n", ",").replace("\r", "")
+            base_tickers = [t.strip() for t in raw.split(",") if t.strip()]
             self.__futures_trading_settings = FuturesTradingSettings(
                 enabled=ft.get("ENABLED", "0") == "1",
                 base_tickers=base_tickers
