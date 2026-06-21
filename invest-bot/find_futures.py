@@ -26,13 +26,13 @@ TOKEN_FILE = "settings.ini"
 
 def _token() -> str:
     cfg = configparser.ConfigParser()
-    cfg.read(TOKEN_FILE)
+    cfg.read(TOKEN_FILE, encoding="utf-8")
     return cfg["INVEST_API"]["TOKEN"]
 
 
 def _app_name() -> str:
     cfg = configparser.ConfigParser()
-    cfg.read(TOKEN_FILE)
+    cfg.read(TOKEN_FILE, encoding="utf-8")
     return cfg["INVEST_API"].get("APP_NAME", "invest-bot")
 
 
@@ -139,7 +139,7 @@ def write_to_settings(basic_assets: list[str], results: list[dict]) -> None:
         added.append(r["ticker"])
 
     if added:
-        with open(TOKEN_FILE, "w", encoding="utf-8") as f:
+        with open(TOKEN_FILE, "w", encoding="utf-8", newline="\n") as f:
             cfg.write(f)
         print(f"\n  ✓ Добавлено в settings.ini: {', '.join(added)}")
         print("  Контракты устаревают при экспирации — перезапускай find_futures.py раз в квартал")
