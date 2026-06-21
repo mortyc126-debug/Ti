@@ -1588,13 +1588,14 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
 function filterInstrKind(kind) {{
-  document.querySelectorAll('.chip').forEach(c => {{
-    if (kind === 'all') {{
-      c.style.display = '';
-    }} else {{
-      c.style.display = (c.dataset.kind === kind) ? '' : 'none';
-    }}
-  }});
+  if (kind === 'all') {{
+    document.querySelectorAll('.chip').forEach(c => c.style.display = '');
+    return;
+  }}
+  // toggle: если все чипы этого типа активны — снять все, иначе — включить все
+  const ofKind = Array.from(document.querySelectorAll('.chip[data-kind="' + kind + '"]'));
+  const allActive = ofKind.every(c => c.classList.contains('active'));
+  ofKind.forEach(c => allActive ? c.classList.remove('active') : c.classList.add('active'));
 }}
 
 function setAllChips(active) {{
@@ -3012,7 +3013,7 @@ def _render_page() -> bytes:
     )
     checkboxes = (
         f'<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center">'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\')">Все</button>'
+        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\');setAllChips(true)">Все</button>'
         f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'futures\')" style="color:#7eb8f7">🔷 Фьючерсы ({len(futures)})</button>'
         f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'stock\')" style="color:#a0d4a0">📈 Акции ({len(stocks)})</button>'
         f'<button class="btn-pill btn-sm" onclick="setAllChips(true)">✓ все</button>'
