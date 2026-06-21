@@ -350,14 +350,16 @@ def _load_futures_settings_bg() -> None:
     try:
         ft = _config.futures_trading_settings
         if not ft.enabled or not ft.base_tickers:
+            print("[futures] FUTURES_TRADING disabled или BASE_TICKERS пуст", flush=True)
             _futures_settings_cache = {}
             return
 
+        print(f"[futures] Начинаю загрузку {len(ft.base_tickers)} контрактов…", flush=True)
         stock_settings = {s.ticker: s for s in _config.trade_strategy_settings}
         ma = _config.mega_alerts_settings
 
         result: dict[str, StrategySettings] = {}
-        for base in ft.base_tickers:
+        for i, base in enumerate(ft.base_tickers, 1):
             try:
                 resolved = _instrument_service.future_by_base_ticker(base)
             except Exception as e:
@@ -392,8 +394,11 @@ def _load_futures_settings_bg() -> None:
                 candle_interval_min=1,
             )
             result[future_info.ticker] = st
+            if i % 10 == 0:
+                print(f"[futures] {i}/{len(ft.base_tickers)} — найдено {len(result)}", flush=True)
 
         _futures_settings_cache = result
+        print(f"[futures] Готово: загружено {len(result)} контрактов", flush=True)
         logger.info(f"futures dashboard: загружено {len(result)} контрактов")
     except Exception as e:
         logger.error(f"futures dashboard: ошибка загрузки: {e}")
