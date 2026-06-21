@@ -91,11 +91,22 @@ def _analyze_one(ticker: str, days: int) -> TickerResult | None:
     corr = _rmt_clean_corr(series)
 
     try:
-        strategy.backtest_barriers(candles, record_history=True)
+        bt = strategy.backtest_barriers(candles, record_history=True)
     except Exception as e:
         print(f"{ticker}: backtest_barriers упал ({e}) — avg_quality будет недоступен")
+        bt = {"n_trades": 0}
 
     perf = store.method_performance(ticker, window_days=days)
+    if bt.get("n_trades", 0) == 0:
+        print(f"{ticker}: backtest_barriers не дал ни одной сделки — avg_quality будет недоступен")
+    elif not perf:
+        print(f"{ticker}: backtest_barriers дал {bt['n_trades']} сделок, но store.method_performance() пуст "
+              f"— проблема в записи/чтении BacktestHistoryStore, не в отсутствии сигналов")
+    else:
+        any_total = next(iter(perf.values()))["total"]
+        if any_total < MIN_TRADES_FOR_QUALITY:
+            print(f"{ticker}: всего {any_total} сделок за {days} дн. — ниже порога "
+                  f"MIN_TRADES_FOR_QUALITY={MIN_TRADES_FOR_QUALITY}, avg_quality не показывается (не баг, мало данных)")
 
     out: TickerResult = {}
     for mid in series:
