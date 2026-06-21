@@ -73,4 +73,10 @@ async def run_control_listener(token: str, allowed_chat_id: str) -> None:
     bot = Bot(token=token)
     dp = _build_dispatcher(allowed_chat_id)
     logger.info("TG control listener: старт polling команд")
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    except Exception:
+        logger.exception("TG control listener: polling упал, перезапуск невозможен — проверьте токен/сеть")
+        raise
+    finally:
+        await bot.session.close()

@@ -70,12 +70,12 @@ async def start_asyncio_trading(
         token, chat_id = control_listener_creds
         control_task = asyncio.create_task(run_control_listener(token, chat_id))
 
-    await blog_task
-    await trade_task
+    tasks = [blog_task, trade_task]
     if news_task:
-        await news_task
+        tasks.append(news_task)
     if control_task:
-        await control_task
+        tasks.append(control_task)
+    await asyncio.gather(*tasks)
 
 
 def prepare_logs() -> None:

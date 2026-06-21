@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import logging
 import os
 from collections import deque
@@ -604,7 +605,7 @@ class Trader:
         logger.info(f"RUBs on account before:{rub_before_trade_day}, after:{current_rub_on_depo}")
 
         today_profit = current_rub_on_depo - rub_before_trade_day
-        today_percent_profit = (today_profit / rub_before_trade_day) * 100
+        today_percent_profit = (today_profit / rub_before_trade_day * 100) if rub_before_trade_day else 0
         logger.info(f"Today Profit:{today_profit} rub ({today_percent_profit} %)")
         self.__blogger.trading_depo_summary_message(rub_before_trade_day, current_rub_on_depo)
 
@@ -1372,10 +1373,14 @@ class Trader:
                 if position.figi in figies:
                     # Check a stock
                     if self.__market_data_service.is_stock_ready_for_trading(position.figi):
+                        lot_size = strategies[position.figi].settings.lot_size
+                        if not lot_size:
+                            logger.error(f"lot_size=0 для {position.figi}, пропускаем принудительное закрытие")
+                            continue
                         close_order = self.__order_service.post_market_order(
                             account_id=account_id,
                             figi=position.figi,
-                            count_lots=abs(int(position.balance / strategies[position.figi].settings.lot_size)),
+                            count_lots=abs(int(position.balance / lot_size)),
                             is_buy=(position.balance < 0)
                         )
                         if close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL or \

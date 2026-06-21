@@ -15,6 +15,9 @@ class TelegramService:
         self.__bot = Bot(token=token)
         self.__chat_id = chat_id
 
+    async def close(self) -> None:
+        await self.__bot.session.close()
+
     async def send_text_message(self, text: str) -> None:
         """
         Sends text message to telegram chat
