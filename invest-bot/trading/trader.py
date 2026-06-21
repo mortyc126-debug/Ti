@@ -142,6 +142,8 @@ class Trader:
         self.__overrides = RuntimeOverrides()
         # Кулдаун повторного входа после убыточного закрытия — см. __risk_close.
         self.__loss_cooldown_until: dict[str, datetime.datetime] = {}
+        # Последние пропущенные сигналы — для статус-файла дашборда.
+        self.__skipped_signals: list[dict] = []
         # figi, для которых размещение ордера (__smart_order, до 45с репрайса)
         # сейчас идёт фоновой asyncio.Task — см. __trading/__place_order_task.
         # Не даёт открыть вторую заявку по тому же тикеру, пока первая летит,
@@ -201,8 +203,10 @@ class Trader:
         return "\n".join(lines)
 
     def write_status_file(self, path: str = "data/bot_status.json") -> None:
-        """Снимок состояния для дашборда: пауза + открытые позиции с PnL/MFE/MAE."""
+        """Снимок состояния для дашборда: пауза, позиции, риск, кулдауны, сделки дня."""
         paused = bot_control.control.paused or self.__overrides.is_paused()
+
+        # Открытые позиции
         positions = []
         for figi, strategy in self.__current_strategies.items():
             order = self.__today_trade_results.get_current_trade_order(figi) if self.__today_trade_results else None
@@ -212,7 +216,11 @@ class Trader:
             direction = "LONG" if order.signal.signal_type == SignalType.LONG else "SHORT"
             pt = self.__pos_tracking.get(figi)
             cur_price = self.__last_prices.get(ticker)
-            pos: dict = {"ticker": ticker, "direction": direction}
+            pos: dict = {
+                "ticker": ticker, "direction": direction,
+                "take": round(float(order.signal.take_profit_level), 4),
+                "stop": round(float(order.signal.stop_loss_level), 4),
+            }
             if pt and pt["entry"] > 0 and cur_price:
                 ep = pt["entry"]
                 if direction == "LONG":
@@ -226,8 +234,49 @@ class Trader:
                 pos["entry_price"] = round(ep, 4)
                 pos["cur_price"] = round(cur_price, 4)
             positions.append(pos)
-        import datetime as _dt
-        data = {"paused": paused, "positions": positions, "updated_at": _dt.datetime.utcnow().isoformat()}
+
+        # Риск-метрики
+        trading_ok, trading_why = self.__risk.trading_allowed()
+        risk = {
+            "portfolio_risk_pct": self.__risk.portfolio_risk_pct(),
+            "day_pnl_rub": round(self.__risk.state.get("day_pnl_rub", 0.0), 0),
+            "trades_today": self.__risk.state.get("trades_today", 0),
+            "daily_stop_hit": not trading_ok,
+            "daily_stop_reason": trading_why if not trading_ok else "",
+            "open_count": len(positions),
+        }
+
+        # Кулдауны после убыточного закрытия
+        now = datetime.datetime.utcnow()
+        cooldowns = {
+            ticker: until.isoformat()
+            for ticker, until in self.__loss_cooldown_until.items()
+            if until > now
+        }
+
+        # Закрытые сделки сегодня
+        closed_today = []
+        if self.__today_trade_results:
+            for figi, orders in self.__today_trade_results.get_closed_orders().items():
+                strategy = self.__current_strategies.get(figi)
+                ticker = strategy.settings.ticker if strategy else figi
+                for o in orders:
+                    direction = "LONG" if o.signal.signal_type == SignalType.LONG else "SHORT"
+                    closed_today.append({
+                        "ticker": ticker, "direction": direction,
+                        "take": round(float(o.signal.take_profit_level), 4),
+                        "stop": round(float(o.signal.stop_loss_level), 4),
+                    })
+
+        data = {
+            "paused": paused,
+            "positions": positions,
+            "risk": risk,
+            "cooldowns": cooldowns,
+            "closed_today": closed_today,
+            "skipped_signals": list(self.__skipped_signals[-20:]),
+            "updated_at": datetime.datetime.utcnow().isoformat(),
+        }
         try:
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
             tmp = path + ".tmp"
@@ -236,6 +285,18 @@ class Trader:
             os.replace(tmp, path)
         except OSError:
             pass
+
+    def __record_skip(self, ticker: str, signal, reason: str) -> None:
+        direction = "LONG" if signal.signal_type == SignalType.LONG else "SHORT"
+        self.__skipped_signals.append({
+            "ticker": ticker,
+            "direction": direction,
+            "reason": reason,
+            "at": datetime.datetime.utcnow().strftime("%H:%M"),
+        })
+        # Держим не более 50 последних — старые отбрасываем
+        if len(self.__skipped_signals) > 50:
+            self.__skipped_signals = self.__skipped_signals[-50:]
 
     async def trade_day(
             self,
@@ -463,6 +524,51 @@ class Trader:
         )
         return f"✅ {ticker} {direction}: позиция принята. Вход {entry_price:.4f}, тейк {take:.4f}, стоп {stop:.4f}"
 
+    def move_stop(self, strategies: dict[str, "IStrategy"], req: "bot_control.MoveStopRequest") -> str:
+        """
+        Двигает стоп (и опционально тейк) уже открытой позиции.
+        Обновляет Signal внутри TradeResults и стоп в RiskManager.
+        Только в сторону прибыли — защита от случайного расширения стопа не встроена,
+        решение остаётся за пользователем.
+        """
+        ticker = req.ticker.upper()
+        figi = next((s.settings.figi for s in strategies.values()
+                     if s.settings.ticker.upper() == ticker), None)
+        if figi is None:
+            return f"❌ {ticker}: тикер не найден"
+
+        if not self.__today_trade_results:
+            return f"❌ {ticker}: нет активных сделок сегодня"
+        order = self.__today_trade_results.get_current_trade_order(figi)
+        if order is None:
+            return f"❌ {ticker}: нет открытой позиции под управлением бота"
+
+        new_stop = float(req.new_stop)
+        new_take = float(req.new_take) if req.new_take is not None else float(order.signal.take_profit_level)
+
+        # Обновляем Signal (frozen=True, пересоздаём)
+        old_signal = order.signal
+        new_signal = Signal(
+            figi=old_signal.figi,
+            signal_type=old_signal.signal_type,
+            take_profit_level=Decimal(str(new_take)),
+            stop_loss_level=Decimal(str(new_stop)),
+        )
+        order.signal = new_signal
+
+        # Обновляем стоп в RiskManager (трейлинг отталкивается от него)
+        pos = self.__risk.positions.get(ticker)
+        if pos:
+            pos.stop_price = new_stop
+            self.__risk.save_positions()
+
+        msg = f"📐 {ticker}: стоп → {new_stop:.4f}"
+        if req.new_take is not None:
+            msg += f", тейк → {new_take:.4f}"
+        logger.info(f"MOVE_STOP: {msg}")
+        self.__blogger.send_message(msg)
+        return f"✅ {msg}"
+
     async def __trading(
             self,
             account_id: str,
@@ -512,6 +618,13 @@ class Trader:
                     logger.info(f"adopt_position result: {result}")
                 bot_control.control.adopt_requests.clear()
 
+            # Перемещение стопа/тейка (/move_stop или дашборд).
+            if bot_control.control.move_stop_requests:
+                for req in list(bot_control.control.move_stop_requests):
+                    result = self.move_stop(strategies, req)
+                    logger.info(f"move_stop result: {result}")
+                bot_control.control.move_stop_requests.clear()
+
             # Настройки с дашборда (live/sandbox, take/stop, пауза) — перечитываем
             # дёшево (stat()), применяем к стратегиям только если файл менялся.
             if self.__overrides.maybe_reload():
@@ -534,6 +647,17 @@ class Trader:
                         logger.info(f"adopt_position (dashboard): {result}")
                     except Exception as e:
                         logger.error(f"adopt_position (dashboard) ошибка: {repr(e)}")
+                for ms_dict in self.__overrides.pop_move_stop_requests():
+                    try:
+                        req = bot_control.MoveStopRequest(
+                            ticker=ms_dict["ticker"],
+                            new_stop=Decimal(ms_dict["new_stop"]),
+                            new_take=Decimal(ms_dict["new_take"]) if ms_dict.get("new_take") else None,
+                        )
+                        result = self.move_stop(strategies, req)
+                        logger.info(f"move_stop (dashboard): {result}")
+                    except Exception as e:
+                        logger.error(f"move_stop (dashboard) ошибка: {repr(e)}")
             self.write_status_file()
 
             # Обновляем MFE/MAE трекинг для открытой позиции
@@ -661,16 +785,21 @@ class Trader:
 
             elif bot_control.control.paused or self.__overrides.is_paused():
                 logger.info(f"New signal has been skipped. Бот на паузе")
+                self.__record_skip(strategies[candle.figi].settings.ticker, signal_new, "пауза")
 
             elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
                 logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")
+                self.__record_skip(strategies[candle.figi].settings.ticker, signal_new, "тикер отключён")
 
             elif self.__loss_cooldown_until.get(strategies[candle.figi].settings.ticker, datetime.datetime.min) \
                     > datetime.datetime.utcnow():
+                until = self.__loss_cooldown_until[strategies[candle.figi].settings.ticker]
                 logger.info(
                     f"New signal has been skipped. Кулдаун после убыточного закрытия до "
-                    f"{self.__loss_cooldown_until[strategies[candle.figi].settings.ticker].isoformat()}"
+                    f"{until.isoformat()}"
                 )
+                self.__record_skip(strategies[candle.figi].settings.ticker, signal_new,
+                                   f"кулдаун до {until.strftime('%H:%M')}")
 
             else:
                 strategy = strategies[candle.figi]
@@ -695,6 +824,7 @@ class Trader:
                     risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
                     if not risk_ok:
                         logger.info(f"New signal has been skipped. Risk gate: {risk_why}")
+                        self.__record_skip(risk_ticker, signal_new, f"риск: {risk_why}")
                         return
 
                     entry_price = float(quotation_to_decimal(candle.close))
@@ -735,6 +865,7 @@ class Trader:
                         ))
                     else:
                         logger.info(f"New signal has been skipped. No available money or risk budget")
+                        self.__record_skip(risk_ticker, signal_new, "нет денег / риск-бюджет")
         except Exception as ex:
             logger.error(f"Error open new position by new signal: {repr(ex)}")
 

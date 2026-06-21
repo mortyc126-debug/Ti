@@ -137,6 +137,15 @@ class RuntimeOverrides:
         save_overrides(self.__data, self.__path)
         return reqs
 
+    def pop_move_stop_requests(self) -> list:
+        """Возвращает список MoveStopRequest-словарей и очищает из файла."""
+        reqs = self.__data.get("move_stop_requests", [])
+        if not reqs:
+            return []
+        self.__data["move_stop_requests"] = []
+        save_overrides(self.__data, self.__path)
+        return reqs
+
     def take_stop_for(self, ticker: str) -> dict[str, Decimal]:
         """Только заданные (не null) поля — для set_take_stop_overrides(**kwargs)."""
         t = self.__data["tickers"].get(ticker.upper(), {})

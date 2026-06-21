@@ -1292,15 +1292,18 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <div class="panel">
   <div class="sec-lg">Статус и управление</div>
-  <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+  <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
     <span id="bot_state_dot" class="sdot"></span>
     <span id="bot_state_label" style="font-size:12px;font-weight:600;color:var(--txt2);">загружаем...</span>
     <button class="btn-pill" id="btn_pause" onclick="botPause()" style="padding:5px 16px;font-size:11px;">⏸ Пауза</button>
     <button class="btn-pill" id="btn_resume" onclick="botResume()" style="padding:5px 16px;font-size:11px;display:none;">▶ Возобновить</button>
     <button class="btn-pill btn-sm" onclick="loadBotStatus()">⟳</button>
+    <span style="font-size:10px;color:var(--txt3);">авто-обновление каждые 30с</span>
   </div>
+  <div id="bot_risk" style="font-size:11px;color:var(--txt2);padding:6px 10px;background:var(--card);border-radius:8px;border:1px solid var(--border2);margin-bottom:10px;display:none;"></div>
   <div class="sec" style="margin-bottom:6px;">Открытые позиции</div>
   <div id="bot_positions" style="font-size:11px;color:var(--txt3);">нет данных</div>
+  <div id="bot_closed_today" style="display:none;"></div>
   <div style="margin-top:12px;">
     <div class="sec" style="margin-bottom:6px;">Срочное закрытие позиции</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -1330,6 +1333,16 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botAdopt()">📥 Передать боту</button>
     </div>
     <div id="adopt_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
+  </div>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border2);">
+    <div class="sec" style="margin-bottom:8px;">Переставить стоп/тейк открытой позиции</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <label>Тикер <input type="text" class="inp mid" id="ms_ticker" placeholder="SBER" style="width:80px;"></label>
+      <label>Новый стоп <input type="number" class="inp mid" id="ms_stop" placeholder="242.00" step="0.01" style="width:90px;"></label>
+      <label>Новый тейк <input type="number" class="inp mid" id="ms_take" placeholder="(не менять)" step="0.01" style="width:100px;"></label>
+      <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botMoveStop()">📐 Переставить</button>
+    </div>
+    <div id="ms_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   </div>
 </div>
 
@@ -1384,12 +1397,19 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
+let _statusPollTimer = null;
+
 function showTab(name) {{
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
-  if (name === 'live') {{ loadBotStatus(); loadOverrides(); loadAutoAtr(); }}
+  if (name === 'live') {{
+    loadBotStatus(); loadOverrides(); loadAutoAtr();
+    if (!_statusPollTimer) _statusPollTimer = setInterval(loadBotStatus, 30000);
+  }} else {{
+    if (_statusPollTimer) {{ clearInterval(_statusPollTimer); _statusPollTimer = null; }}
+  }}
 }}
 
 function modelStatsToHtml(modelStats) {{
@@ -1747,6 +1767,30 @@ async function loadBotStatus() {{
     dot.className = 'sdot ok'; lbl.textContent = '▶ Торговля активна';
     btnP.style.display = ''; btnR.style.display = 'none';
   }}
+  if (data.updated_at) lbl.title = 'обновлено: ' + data.updated_at;
+
+  // Риск-панель
+  const riskDiv = document.getElementById('bot_risk');
+  if (data.risk) {{
+    const r = data.risk;
+    const dailyStop = r.daily_stop_hit
+      ? `<span style="color:var(--neg);font-weight:700">🛑 ДНЕВНОЙ СТОП</span>`
+      : `<span style="color:var(--pos)">✓ в норме</span>`;
+    const pnlColor = r.day_pnl_rub >= 0 ? 'var(--pos)' : 'var(--neg)';
+    const cooldownTickers = Object.keys(data.cooldowns || {{}});
+    const cooldownStr = cooldownTickers.length
+      ? `<span style="color:var(--neg)"> · кулдаун: ${{cooldownTickers.join(', ')}}</span>` : '';
+    riskDiv.innerHTML =
+      `<span>Портфельный риск: <b>${{r.portfolio_risk_pct}}%</b></span> &nbsp;·&nbsp; ` +
+      `<span>P&amp;L за день: <b style="color:${{pnlColor}}">${{r.day_pnl_rub >= 0 ? '+' : ''}}${{r.day_pnl_rub.toFixed(0)}}₽</b></span> &nbsp;·&nbsp; ` +
+      `<span>Сделок сегодня: <b>${{r.trades_today}}</b></span> &nbsp;·&nbsp; ` +
+      `<span>Дневной стоп: ${{dailyStop}}</span>${{cooldownStr}}`;
+    riskDiv.style.display = '';
+  }} else {{
+    riskDiv.style.display = 'none';
+  }}
+
+  // Открытые позиции
   const posDiv = document.getElementById('bot_positions');
   const sel = document.getElementById('close_ticker_sel');
   if (!data.positions || data.positions.length === 0) {{
@@ -1755,17 +1799,59 @@ async function loadBotStatus() {{
   }} else {{
     posDiv.innerHTML = data.positions.map(p => {{
       const pnl = p.cur_pnl_pct !== undefined ? ` <span style="color:${{p.cur_pnl_pct >= 0 ? 'var(--pos)' : 'var(--neg)'}}">${{p.cur_pnl_pct >= 0 ? '+' : ''}}${{p.cur_pnl_pct?.toFixed(2)}}%</span>` : '';
-      const mfe = p.mfe_pct !== undefined ? ` пик +${{p.mfe_pct.toFixed(2)}}%` : '';
-      const mae = p.mae_pct !== undefined ? ` просадка -${{p.mae_pct.toFixed(2)}}%` : '';
-      return `<div style="margin:3px 0;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);">
-        <b style="color:var(--txt)">${{p.ticker}}</b> ${{p.direction}}${{pnl}}${{mfe}}${{mae}}
-        ${{p.entry_price ? `<span style="color:var(--txt3)">  вход ${{p.entry_price}} → сейчас ${{p.cur_price}}</span>` : ''}}
+      const mfe = p.mfe_pct !== undefined ? ` &nbsp;пик <span style="color:var(--pos)">+${{p.mfe_pct.toFixed(2)}}%</span>` : '';
+      const mae = p.mae_pct !== undefined ? ` просадка <span style="color:var(--neg)">-${{p.mae_pct.toFixed(2)}}%</span>` : '';
+      const levels = p.take ? ` <span style="color:var(--txt3)">тейк ${{p.take}} · стоп ${{p.stop}}</span>` : '';
+      return `<div style="margin:3px 0;padding:5px 10px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <b style="color:var(--txt)">${{p.ticker}}</b>
+        <span style="color:var(--txt3)">${{p.direction}}</span>
+        ${{pnl}}${{mfe}}${{mae}}
+        ${{p.entry_price ? `<span style="color:var(--txt3)">вход ${{p.entry_price}} → ${{p.cur_price}}</span>` : ''}}
+        ${{levels}}
       </div>`;
     }}).join('');
     const tickers = ['ALL', ...data.positions.map(p => p.ticker)];
     sel.innerHTML = tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('');
   }}
-  if (data.updated_at) lbl.title = 'обновлено: ' + data.updated_at;
+
+  // Сделки дня
+  const closedDiv = document.getElementById('bot_closed_today');
+  if (data.closed_today && data.closed_today.length > 0) {{
+    closedDiv.innerHTML = `<div class="sec" style="margin:14px 0 6px;">Закрытые сделки сегодня (${{data.closed_today.length}})</div>` +
+      data.closed_today.map(t => {{
+        const dir = t.direction === 'LONG'
+          ? `<span style="color:var(--pos)">LONG</span>`
+          : `<span style="color:var(--neg)">SHORT</span>`;
+        return `<div style="margin:2px 0;padding:3px 10px;background:var(--card);border-radius:6px;border:1px solid var(--border);font-size:11px;">
+          <b>${{t.ticker}}</b> ${{dir}} · тейк ${{t.take}} · стоп ${{t.stop}}
+        </div>`;
+      }}).join('');
+    closedDiv.style.display = '';
+  }} else {{
+    closedDiv.style.display = 'none';
+  }}
+
+  // Пропущенные сигналы
+  let skipDiv = document.getElementById('bot_skipped_signals');
+  if (!skipDiv) {{
+    skipDiv = document.createElement('div');
+    skipDiv.id = 'bot_skipped_signals';
+    closedDiv.insertAdjacentElement('afterend', skipDiv);
+  }}
+  if (data.skipped_signals && data.skipped_signals.length > 0) {{
+    skipDiv.innerHTML = `<div class="sec" style="margin:14px 0 6px;">Пропущенные сигналы (${{data.skipped_signals.length}})</div>` +
+      data.skipped_signals.slice().reverse().map(s => {{
+        const dir = s.direction === 'LONG'
+          ? `<span style="color:var(--pos)">LONG</span>`
+          : `<span style="color:var(--neg)">SHORT</span>`;
+        return `<div style="margin:2px 0;padding:3px 10px;background:var(--card);border-radius:6px;border:1px solid var(--border);font-size:11px;">
+          <b>${{s.ticker}}</b> ${{dir}} · ${{s.reason}} · ${{s.at}}
+        </div>`;
+      }}).join('');
+    skipDiv.style.display = '';
+  }} else {{
+    skipDiv.style.display = 'none';
+  }}
 }}
 
 async function botPause() {{
@@ -1789,6 +1875,7 @@ async function botClose() {{
 }}
 
 async function botCloseAll() {{
+  if (!confirm('Закрыть ВСЕ открытые позиции? Это действие нельзя отменить.')) return;
   const st = document.getElementById('close_status');
   st.textContent = 'Отправляем...';
   const r = await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'close',ticker:'ALL'}})}}).then(r=>r.json());
@@ -1799,20 +1886,52 @@ async function botCloseAll() {{
 async function botAdopt() {{
   const ticker = document.getElementById('adopt_ticker').value.trim().toUpperCase();
   const direction = document.getElementById('adopt_dir').value;
-  const take = document.getElementById('adopt_take').value.trim();
-  const stop = document.getElementById('adopt_stop').value.trim();
-  const entry = document.getElementById('adopt_entry').value.trim();
+  const take = parseFloat(document.getElementById('adopt_take').value);
+  const stop = parseFloat(document.getElementById('adopt_stop').value);
+  const entryRaw = document.getElementById('adopt_entry').value.trim();
+  const entry = entryRaw ? parseFloat(entryRaw) : null;
   const st = document.getElementById('adopt_status');
-  if (!ticker || !take || !stop) {{
-    st.textContent = '⚠ Укажи тикер, тейк и стоп';
-    return;
+  if (!ticker || isNaN(take) || isNaN(stop)) {{
+    st.textContent = '⚠ Укажи тикер, тейк и стоп'; return;
+  }}
+  if (direction === 'LONG' && take <= stop) {{
+    st.textContent = '⚠ LONG: тейк должен быть выше стопа'; return;
+  }}
+  if (direction === 'SHORT' && take >= stop) {{
+    st.textContent = '⚠ SHORT: тейк должен быть ниже стопа'; return;
+  }}
+  if (entry !== null) {{
+    if (direction === 'LONG' && (entry <= stop || entry >= take)) {{
+      st.textContent = '⚠ LONG: вход должен быть между стопом и тейком'; return;
+    }}
+    if (direction === 'SHORT' && (entry >= stop || entry <= take)) {{
+      st.textContent = '⚠ SHORT: вход должен быть между тейком и стопом'; return;
+    }}
   }}
   st.textContent = 'Отправляем...';
-  const body = {{ticker, direction, take: parseFloat(take), stop: parseFloat(stop)}};
-  if (entry) body.entry = parseFloat(entry);
+  const body = {{ticker, direction, take, stop}};
+  if (entry !== null) body.entry = entry;
   const r = await fetch('/api/bot_adopt', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}}).then(r=>r.json());
   st.textContent = r.ok
     ? `✓ ${{ticker}} ${{direction}} — передано боту. Тейк ${{take}}, Стоп ${{stop}}. Сработает на следующей свече.`
+    : (r.error || 'ошибка');
+}}
+
+async function botMoveStop() {{
+  const ticker = document.getElementById('ms_ticker').value.trim().toUpperCase();
+  const newStop = parseFloat(document.getElementById('ms_stop').value);
+  const newTakeRaw = document.getElementById('ms_take').value.trim();
+  const newTake = newTakeRaw ? parseFloat(newTakeRaw) : null;
+  const st = document.getElementById('ms_status');
+  if (!ticker || isNaN(newStop)) {{
+    st.textContent = '⚠ Укажи тикер и новый стоп'; return;
+  }}
+  st.textContent = 'Отправляем...';
+  const body = {{ticker, new_stop: newStop}};
+  if (newTake !== null) body.new_take = newTake;
+  const r = await fetch('/api/bot_move_stop', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}}).then(r=>r.json());
+  st.textContent = r.ok
+    ? `✓ ${{ticker}}: стоп → ${{newStop}}${{newTake !== null ? ', тейк → ' + newTake : ''}}. Сработает на следующей свече.`
     : (r.error || 'ошибка');
 }}
 
@@ -2453,6 +2572,19 @@ def get_bot_status() -> dict:
         return {"running": False}
 
 
+def bot_move_stop(ticker: str, new_stop: float, new_take: float | None) -> dict:
+    """Пишет MoveStopRequest в bot_overrides.json."""
+    data = load_overrides()
+    reqs = data.get("move_stop_requests", [])
+    req: dict = {"ticker": ticker.upper(), "new_stop": str(new_stop)}
+    if new_take is not None:
+        req["new_take"] = str(new_take)
+    reqs.append(req)
+    data["move_stop_requests"] = reqs
+    save_overrides(data)
+    return {"ok": True}
+
+
 def bot_adopt_position(ticker: str, direction: str, take: float, stop: float, entry: float | None) -> dict:
     """Пишет AdoptRequest в bot_overrides.json — бот подхватит на следующей свече."""
     data = load_overrides()
@@ -2674,6 +2806,17 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json(bot_adopt_position(ticker, direction, take, stop, entry))
             except (KeyError, ValueError) as e:
                 self._send_json({"error": f"нужны take и stop: {e}"}, 400)
+        elif self.path == "/api/bot_move_stop":
+            try:
+                ticker = payload.get("ticker", "").strip()
+                new_stop = float(payload["new_stop"])
+                new_take = float(payload["new_take"]) if payload.get("new_take") not in (None, "") else None
+                if not ticker:
+                    self._send_json({"error": "нужен ticker"}, 400)
+                else:
+                    self._send_json(bot_move_stop(ticker, new_stop, new_take))
+            except (KeyError, ValueError) as e:
+                self._send_json({"error": f"нужен new_stop: {e}"}, 400)
         else:
             self.send_error(404)
 

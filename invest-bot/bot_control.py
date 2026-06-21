@@ -23,11 +23,19 @@ class AdoptRequest:
     entry: Decimal | None = None  # если None — возьмём текущую цену с биржи
 
 
+@dataclass
+class MoveStopRequest:
+    ticker: str
+    new_stop: Decimal
+    new_take: Decimal | None = None  # None — тейк не трогать
+
+
 class BotControl:
     def __init__(self) -> None:
         self.paused: bool = False
         self.close_requests: set[str] = set()  # тикеры или "ALL"
         self.adopt_requests: list[AdoptRequest] = []
+        self.move_stop_requests: list[MoveStopRequest] = []
         self.current_trader = None  # type: ignore
 
 

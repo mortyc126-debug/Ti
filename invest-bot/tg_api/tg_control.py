@@ -108,6 +108,36 @@ def _build_dispatcher(allowed_chat_id: str) -> Dispatcher:
             "\nИсполнится на следующей свече."
         )
 
+    @dp.message(Command("move_stop"))
+    async def cmd_move_stop(message: Message) -> None:
+        if not _allowed(message):
+            return
+        # /move_stop SBER 242.00 [take=255.00]
+        parts = ((message.text or "").split(maxsplit=1)[1].strip()
+                 if len((message.text or "").split(maxsplit=1)) > 1 else "").split()
+        if len(parts) < 2:
+            await message.answer("Формат: /move_stop TICKER НОВЫЙ_СТОП [take=НОВЫЙ_ТЕЙК]\nПример: /move_stop SBER 242.00")
+            return
+        ticker = parts[0].upper()
+        try:
+            new_stop = Decimal(parts[1])
+            kw: dict[str, str] = {}
+            for p in parts[2:]:
+                if "=" in p:
+                    k, v = p.split("=", 1)
+                    kw[k.lower()] = v
+            new_take = Decimal(kw["take"]) if "take" in kw else None
+        except InvalidOperation:
+            await message.answer("Некорректное число")
+            return
+        bot_control.control.move_stop_requests.append(
+            bot_control.MoveStopRequest(ticker=ticker, new_stop=new_stop, new_take=new_take)
+        )
+        reply = f"📐 Принято: двигаю стоп {ticker} → {new_stop}"
+        if new_take:
+            reply += f", тейк → {new_take}"
+        await message.answer(reply + "\nИсполнится на следующей свече.")
+
     return dp
 
 
