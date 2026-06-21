@@ -36,6 +36,7 @@ from candle_archive import get_candles_cached
 from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
 import bot_control
+import lasso_calibration
 
 __all__ = ("Trader")
 
@@ -149,6 +150,8 @@ class Trader:
         # Не даёт открыть вторую заявку по тому же тикеру, пока первая летит,
         # и не блокирует чтение стрима свечей по ОСТАЛЬНЫМ тикерам на это время.
         self.__pending_orders: set[str] = set()
+        # Дата последнего запуска lasso-калибровки (еженедельно, по понедельникам).
+        self.__lasso_last_run: datetime.date | None = None
         # Кэш MULTI_TICKER-скора (ticker -> (date, score)) — пересчитывается
         # раз в день в __multi_ticker_signal, а не на каждой свече: расчёт
         # требует скачивания истории по двум тикерам и тяжёлых numpy-вычислений
@@ -441,6 +444,45 @@ class Trader:
             self.__summary_today_trade_results(account_id, rub_before_trade_day)
         except Exception as ex:
             logger.error(f"Summary trading day error: {repr(ex)}")
+
+        self.__maybe_run_lasso(list(today_trade_strategies.values()))
+
+    def __maybe_run_lasso(self, strategies: list) -> None:
+        """Еженедельная lasso-калибровка по понедельникам (первый торговый день недели).
+        Запускается в конце торгового дня — когда Tinkoff API уже не занят стримом.
+        После успешного прогона вызывает reload_lasso_priors() на каждой стратегии."""
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        if today.weekday() != 0:  # 0 = понедельник
+            return
+        if self.__lasso_last_run == today:
+            return
+        self.__lasso_last_run = today
+        logger.info("Lasso-калибровка: старт (понедельник)")
+        try:
+            existing = lasso_calibration._load_existing()
+            by_ticker = lasso_calibration._strategy_settings_by_ticker()
+            for strategy in strategies:
+                ticker = strategy.settings.ticker
+                if ticker not in by_ticker:
+                    continue
+                try:
+                    result = lasso_calibration._calibrate_one(
+                        ticker, days=90,
+                        alpha=0.01, l1_ratio=0.8, use_group_lasso=False,
+                    )
+                except Exception as e:
+                    logger.warning(f"Lasso {ticker}: {repr(e)}")
+                    continue
+                if result:
+                    existing[strategy.settings.figi] = result
+            lasso_calibration._save(existing)
+            logger.info(f"Lasso-калибровка: сохранено {len(existing)} тикеров")
+            # Применяем новые prior к живым стратегиям без перезапуска
+            for strategy in strategies:
+                if hasattr(strategy, "reload_lasso_priors"):
+                    strategy.reload_lasso_priors()
+        except Exception as ex:
+            logger.error(f"Lasso-калибровка упала: {repr(ex)}")
 
     def adopt_position(
             self,
