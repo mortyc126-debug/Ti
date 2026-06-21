@@ -81,7 +81,7 @@ from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
 )
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
-from level_pattern import detect_level_pattern
+from trade_system.strategies.level_pattern import detect_level_pattern
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
