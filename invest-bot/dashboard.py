@@ -999,6 +999,12 @@ def run_portfolio_sim(
             "net_pct": round(t["net_pct"], 4), "r_multiple": round(t["r_multiple"], 2),
             "pnl_rub": round(pnl_rub, 2), "equity_after": round(equity, 2),
             "m1": round(t.get("m1", 0.0), 3), "m2": round(t.get("m2", 0.0), 3), "m3": round(t.get("m3", 0.0), 3),
+            "entry_price": t.get("entry_price"), "exit_price": t.get("exit_price"),
+            "take_price": t.get("take_price"), "stop_price": t.get("stop_price"),
+            "duration_min": t.get("duration_min"),
+            "exit_reason": t.get("exit_reason"), "regime": t.get("regime"),
+            "agree_count": t.get("agree_count"), "against_count": t.get("against_count"),
+            "top_agree": t.get("top_agree", []), "top_against": t.get("top_against", []),
         })
 
     per_ticker = [
