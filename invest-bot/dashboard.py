@@ -1303,6 +1303,112 @@ def run_portfolio_sim(
     }
 
 
+def compute_equity_analytics(trade_rows: list[dict], account: float) -> dict:
+    """
+    Дополнительная аналитика поверх trade_rows из run_portfolio_sim:
+    - daily_equity: [{date, equity}] — капитал на конец каждого дня
+    - weekly_stats: [{week, n, wins, pnl_rub, win_rate}]
+    - rolling_winrate: [{trade_n, win_rate}] — скользящий WR по окну 20 сделок
+    - learning_curve: [{trade_n, date, cum_wr, equity}] — растёт ли WR со временем
+    - model_disagree: [[дата, win, m1>0, m2>0, m3>0]] — сделки где модель НЕ согласилась
+    """
+    from datetime import datetime as _dt, timedelta as _td
+
+    if not trade_rows:
+        return {"daily_equity": [], "weekly_stats": [], "rolling_winrate": [],
+                "learning_curve": [], "model_disagree_rate": {}}
+
+    # daily equity
+    daily: dict[str, float] = {}
+    for t in trade_rows:
+        day = str(t["entry_time"])[:10]
+        daily[day] = t["equity_after"]
+    # заполняем пропущенные дни (выходные/нет сделок) предыдущим значением
+    filled_equity = []
+    prev_eq = account
+    all_days = sorted(daily.keys())
+    if all_days:
+        d = _dt.fromisoformat(all_days[0])
+        end = _dt.fromisoformat(all_days[-1])
+        while d <= end:
+            dk = d.strftime("%Y-%m-%d")
+            if dk in daily:
+                prev_eq = daily[dk]
+            filled_equity.append({"date": dk, "equity": prev_eq})
+            d += _td(days=1)
+    daily_equity = filled_equity
+
+    # weekly stats
+    weekly: dict = defaultdict(lambda: {"n": 0, "wins": 0, "pnl_rub": 0.0})
+    for t in trade_rows:
+        dt_str = str(t["entry_time"])[:19]
+        try:
+            dt = _dt.fromisoformat(dt_str)
+        except Exception:
+            continue
+        iso = dt.isocalendar()
+        week_key = f"{iso[0]}-W{iso[1]:02d}"
+        w = weekly[week_key]
+        w["n"] += 1
+        w["wins"] += 1 if t["r_multiple"] > 0 else 0
+        w["pnl_rub"] += t["pnl_rub"]
+    weekly_stats = [
+        {"week": k, "n": v["n"], "wins": v["wins"],
+         "win_rate": round(v["wins"] / v["n"], 3) if v["n"] else 0,
+         "pnl_rub": round(v["pnl_rub"], 2)}
+        for k, v in sorted(weekly.items())
+    ]
+
+    # rolling winrate (окно 20 сделок)
+    WINDOW = 20
+    results_bin = [1 if t["r_multiple"] > 0 else 0 for t in trade_rows]
+    rolling_winrate = []
+    for i, t in enumerate(trade_rows):
+        start = max(0, i - WINDOW + 1)
+        n_w = i - start + 1
+        wr = sum(results_bin[start:i + 1]) / n_w
+        rolling_winrate.append({"trade_n": i + 1, "date": str(t["entry_time"])[:10],
+                                 "win_rate": round(wr, 3), "equity": t["equity_after"]})
+
+    # learning curve — то же, что rolling, но и накопленный WR (растёт ли модель)
+    cum_w = 0
+    learning_curve = []
+    for i, t in enumerate(trade_rows):
+        cum_w += results_bin[i]
+        learning_curve.append({
+            "trade_n": i + 1,
+            "date": str(t["entry_time"])[:10],
+            "cum_wr": round(cum_w / (i + 1), 3),
+            "rolling_wr": rolling_winrate[i]["win_rate"],
+            "equity": t["equity_after"],
+        })
+
+    # M1/M2/M3 disagree rate — доля сделок где модель не согласилась с направлением
+    model_disagree_rate = {}
+    for m in ("m1", "m2", "m3"):
+        total, disagree = 0, 0
+        for t in trade_rows:
+            sc = t.get(m, 0.0)
+            if sc == 0:
+                continue
+            total += 1
+            if (sc > 0) != (t["r_multiple"] > 0 or t.get("direction") == "LONG"):
+                disagree += 1
+        if total:
+            model_disagree_rate[m.upper() + "_CLUSTER"] = {
+                "total": total, "disagree": disagree,
+                "rate": round(disagree / total, 3),
+            }
+
+    return {
+        "daily_equity": daily_equity,
+        "weekly_stats": weekly_stats,
+        "rolling_winrate": rolling_winrate,
+        "learning_curve": learning_curve,
+        "model_disagree_rate": model_disagree_rate,
+    }
+
+
 PAGE_HTML = """<!doctype html>
 <html lang="ru">
 <head>
@@ -1373,6 +1479,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="showTab('sim')">СИМУЛЯЦИЯ</button>
+  <button class="tab-btn" onclick="showTab('analytics')">📈 АНАЛИТИКА</button>
   <button class="tab-btn" onclick="showTab('diag')">ДИАГНОСТИКА</button>
   <button class="tab-btn" onclick="showTab('live')">БОТ (LIVE)</button>
 </nav>
@@ -1478,6 +1585,64 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 </div><!-- /tab-sim -->
+
+<!-- ══════════════════════ TAB: АНАЛИТИКА ══════════════════════ -->
+<div class="tab-pane" id="tab-analytics">
+
+<div class="panel">
+  <div class="sec-lg">📈 Анализ капитала и обучения модели</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Прогон бэктеста по всем выбранным тикерам → equity-кривая, rolling winrate,
+    кривая обучения (растёт ли WR по мере накопления истории). Запускай на ночь.
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+    <label>Дней <input type="number" class="inp mid" id="an_days" value="60" min="10" max="365"></label>
+    <label>Счёт ₽ <input type="number" class="inp mid" id="an_account" value="100000" min="1000"></label>
+    <label>Риск% <input type="number" class="inp mid" id="an_risk" value="1" min="0.1" max="5" step="0.1"></label>
+    <button class="btn-pill" onclick="runEquityAnalysis()">▶ ЗАПУСТИТЬ АНАЛИТИКУ</button>
+    <span id="an_status" style="font-size:11px;color:var(--txt3);"></span>
+  </div>
+  <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Тикеры берутся из выбранных в «Симуляция».</div>
+</div>
+
+<div class="panel" id="an_summary_panel" style="display:none;">
+  <div class="sec-lg">Сводка</div>
+  <div id="an_summary" style="font-size:12px;color:var(--txt2);"></div>
+</div>
+
+<div class="panel" id="an_charts_panel" style="display:none;">
+  <div class="sec-lg">Equity-кривая (виртуальный счёт)</div>
+  <canvas id="an_eq_canvas" style="width:100%;height:260px;display:block;background:var(--card);border-radius:10px;border:1px solid var(--border);margin-bottom:16px;"></canvas>
+
+  <div class="sec-lg">Rolling winrate (окно 20 сделок)</div>
+  <canvas id="an_wr_canvas" style="width:100%;height:180px;display:block;background:var(--card);border-radius:10px;border:1px solid var(--border);margin-bottom:16px;"></canvas>
+
+  <div class="sec-lg">Кривая обучения (накопленный winrate vs число сделок)</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:6px;">
+    Если модель учится — линия должна расти. Плоская = случайное угадывание.
+  </div>
+  <canvas id="an_lc_canvas" style="width:100%;height:180px;display:block;background:var(--card);border-radius:10px;border:1px solid var(--border);margin-bottom:16px;"></canvas>
+
+  <div class="sec-lg">По неделям</div>
+  <table class="scen-table" id="an_weekly_table">
+    <thead><tr><th>Неделя</th><th>Сделок</th><th>Win%</th><th>P&L ₽</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="panel" id="an_model_panel" style="display:none;">
+  <div class="sec-lg">M1/M2/M3 — статистика согласия/несогласия</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    «Несогласие» = модель дала противоположный сигнал, но сделка всё равно прошла через композит.
+    Высокий % несогласия при низком WR = модель сигнализировала опасность, которую проигнорировали.
+  </div>
+  <table class="scen-table" id="an_model_table">
+    <thead><tr><th>Модель</th><th>Согласна</th><th>Win% (согл)</th><th>Не согласна</th><th>Win% (не согл)</th></tr></thead>
+    <tbody id="an_model_tbody"></tbody>
+  </table>
+</div>
+
+</div><!-- /tab-analytics -->
 
 <!-- ══════════════════════ TAB: ДИАГНОСТИКА ══════════════════════ -->
 <div class="tab-pane" id="tab-diag">
@@ -1680,7 +1845,12 @@ function modelStatsToHtml(modelStats) {{
       ? (s.agree_win_rate * 100).toFixed(0) + '%' : '—';
     const dur = s.agree_avg_duration_min !== null && s.agree_avg_duration_min !== undefined
       ? `, ${{s.agree_avg_duration_min.toFixed(0)}}мин` : '';
-    parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}}${{dur}})`);
+    let dis = '';
+    if (s.disagree_n > 0) {{
+      const disPct = s.disagree_win_rate !== null ? (s.disagree_win_rate * 100).toFixed(0) + '%' : '—';
+      dis = ` <span style="color:var(--neg)">✗${{s.disagree_n}} ${{disPct}}</span>`;
+    }}
+    parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}}${{dur}})${{dis}}`);
   }}
   return parts.join(' / ');
 }}
@@ -2937,6 +3107,258 @@ async function askCouncil() {{
   window.addEventListener('resize', _resize);
   _resize();
 }})();
+
+// ══════════════════════ АНАЛИТИКА ══════════════════════
+
+let _anData = null;
+
+async function runEquityAnalysis() {{
+  const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker).filter(Boolean);
+  if (!tickers.length) {{ alert('Выбери хотя бы один тикер в «Симуляция»'); return; }}
+  const days = parseInt(document.getElementById('an_days').value) || 60;
+  const account = parseFloat(document.getElementById('an_account').value) || 100000;
+  const risk_pct = parseFloat(document.getElementById('an_risk').value) || 1;
+  const status = document.getElementById('an_status');
+  status.textContent = '⏳ считаем...';
+  document.getElementById('an_summary_panel').style.display = 'none';
+  document.getElementById('an_charts_panel').style.display = 'none';
+  document.getElementById('an_model_panel').style.display = 'none';
+  try {{
+    const resp = await fetch('/api/equity_analysis', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{tickers, days, account, risk_pct}}),
+    }});
+    const data = await resp.json();
+    if (data.error) {{ status.textContent = '❌ ' + data.error; return; }}
+    _anData = data;
+    status.textContent = `✓ ${{data.summary?.n_trades ?? 0}} сделок`;
+    _renderAnalytics(data, account);
+  }} catch(e) {{
+    status.textContent = '❌ ' + e;
+  }}
+}}
+
+function _renderAnalytics(data, account) {{
+  const an = data.analytics || {{}};
+  const summary = data.summary || {{}};
+
+  // Сводка
+  document.getElementById('an_summary_panel').style.display = '';
+  const pnl = summary.pnl_rub || 0;
+  const pnlPct = account ? ((pnl / account) * 100).toFixed(1) : '—';
+  const nTrades = summary.n_trades || 0;
+  const winRate = nTrades ? (((data.trades || []).filter(t => t.r_multiple > 0).length / nTrades) * 100).toFixed(1) : '—';
+  const dd = summary.max_drawdown_rub || 0;
+  document.getElementById('an_summary').innerHTML =
+    `<b style="color:${{pnl >= 0 ? 'var(--pos)' : 'var(--neg)'}}">${{pnl >= 0 ? '+' : ''}}${{pnl.toFixed(0)}} ₽ (${{pnlPct}}%)</b> &nbsp;·&nbsp; ` +
+    `${{nTrades}} сделок &nbsp;·&nbsp; WR ${{winRate}}% &nbsp;·&nbsp; ` +
+    `MaxDD ${{dd.toFixed(0)}} ₽ &nbsp;·&nbsp; Счёт → <b>${{(summary.equity_end || account).toFixed(0)}} ₽</b>`;
+
+  // Charts
+  document.getElementById('an_charts_panel').style.display = '';
+  _drawLineChart('an_eq_canvas', an.daily_equity || [], 'date', 'equity', account,
+    '#A78BFA', true, 'Equity ₽');
+  _drawLineChart('an_wr_canvas', an.rolling_winrate || [], 'trade_n', 'win_rate', 0.5,
+    '#52F2C9', false, 'Rolling WR (20 сд)', [0, 1], 0.5);
+  _drawLearningCurve('an_lc_canvas', an.learning_curve || []);
+
+  // Weekly table
+  const tbody = document.querySelector('#an_weekly_table tbody');
+  tbody.innerHTML = '';
+  for (const w of (an.weekly_stats || [])) {{
+    const pnlColor = w.pnl_rub >= 0 ? 'var(--pos)' : 'var(--neg)';
+    tbody.innerHTML += `<tr><td>${{w.week}}</td><td>${{w.n}}</td>` +
+      `<td>${{(w.win_rate * 100).toFixed(0)}}%</td>` +
+      `<td style="color:${{pnlColor}}">${{w.pnl_rub >= 0 ? '+' : ''}}${{w.pnl_rub.toFixed(0)}}</td></tr>`;
+  }}
+
+  // Model table
+  const ms = data.model_stats || {{}};
+  const tbody2 = document.getElementById('an_model_tbody');
+  tbody2.innerHTML = '';
+  let hasModel = false;
+  for (const name of ['M1_CLUSTER', 'M2_CLUSTER', 'M3_CLUSTER']) {{
+    const s = ms[name];
+    if (!s) continue;
+    hasModel = true;
+    const agreeWR = s.agree_win_rate !== null ? (s.agree_win_rate * 100).toFixed(0) + '%' : '—';
+    const disWR = s.disagree_win_rate !== null ? (s.disagree_win_rate * 100).toFixed(0) + '%' : '—';
+    const disColor = s.disagree_n > 0 && s.disagree_win_rate !== null && s.disagree_win_rate < (s.agree_win_rate || 0.5)
+      ? 'color:var(--pos)' : 'color:var(--neg)';
+    tbody2.innerHTML += `<tr><td>${{name.replace('_CLUSTER', '')}}</td>` +
+      `<td>${{s.agree_n}}</td><td>${{agreeWR}}</td>` +
+      `<td style="${{disColor}}">${{s.disagree_n}}</td><td style="${{disColor}}">${{disWR}}</td></tr>`;
+  }}
+  document.getElementById('an_model_panel').style.display = hasModel ? '' : 'none';
+}}
+
+function _drawLineChart(canvasId, data, xKey, yKey, baseline, color, fillArea, label, yRange, refLine) {{
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const PAD = {{top: 18, right: 16, bottom: 28, left: 62}};
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top - PAD.bottom;
+
+  const vals = data.map(d => d[yKey]);
+  let yMin = yRange ? yRange[0] : Math.min(...vals);
+  let yMax = yRange ? yRange[1] : Math.max(...vals);
+  if (baseline !== undefined && !yRange) {{
+    yMin = Math.min(yMin, baseline);
+    yMax = Math.max(yMax, baseline);
+  }}
+  const ySpan = yMax - yMin || 1;
+
+  const toX = i => PAD.left + (i / (data.length - 1 || 1)) * cw;
+  const toY = v => PAD.top + ch - ((v - yMin) / ySpan) * ch;
+
+  // background
+  ctx.fillStyle = '#1A1030';
+  ctx.fillRect(0, 0, W, H);
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {{
+    const y = PAD.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cw, y); ctx.stroke();
+  }}
+
+  // baseline / refLine
+  if (refLine !== undefined) {{
+    const ry = toY(refLine);
+    ctx.strokeStyle = 'rgba(255,255,255,.2)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD.left, ry); ctx.lineTo(PAD.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }}
+
+  // fill area
+  if (fillArea) {{
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(vals[0]));
+    for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(vals[i]));
+    ctx.lineTo(toX(data.length - 1), PAD.top + ch);
+    ctx.lineTo(toX(0), PAD.top + ch);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + ch);
+    grad.addColorStop(0, color + '44');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }}
+
+  // line
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.8;
+  ctx.moveTo(toX(0), toY(vals[0]));
+  for (let i = 1; i < data.length; i++) ctx.lineTo(toX(i), toY(vals[i]));
+  ctx.stroke();
+
+  // Y axis labels
+  ctx.fillStyle = 'rgba(160,140,200,.7)';
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {{
+    const v = yMin + (ySpan / 4) * (4 - i);
+    const y = PAD.top + (ch / 4) * i;
+    const txt = yRange ? (v * 100).toFixed(0) + '%' : v.toFixed(0);
+    ctx.fillText(txt, PAD.left - 4, y + 3);
+  }}
+
+  // X labels (first, mid, last)
+  ctx.textAlign = 'center';
+  const xLabels = [0, Math.floor(data.length / 2), data.length - 1];
+  for (const idx of xLabels) {{
+    if (data[idx]) {{
+      const lbl = data[idx][xKey] !== undefined
+        ? (typeof data[idx][xKey] === 'number' ? '#' + data[idx][xKey] : String(data[idx][xKey]).slice(0, 10))
+        : '';
+      ctx.fillText(lbl, toX(idx), H - 6);
+    }}
+  }}
+
+  // label
+  ctx.fillStyle = color;
+  ctx.textAlign = 'left';
+  ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillText(label, PAD.left + 4, PAD.top + 12);
+}}
+
+function _drawLearningCurve(canvasId, data) {{
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !data.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const PAD = {{top: 18, right: 16, bottom: 28, left: 62}};
+  const cw = W - PAD.left - PAD.right;
+  const ch = H - PAD.top - PAD.bottom;
+
+  ctx.fillStyle = '#1A1030';
+  ctx.fillRect(0, 0, W, H);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {{
+    const y = PAD.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cw, y); ctx.stroke();
+  }}
+
+  // 50% reference
+  ctx.strokeStyle = 'rgba(255,255,255,.2)';
+  ctx.setLineDash([4, 4]);
+  const r50 = PAD.top + ch * 0.5;
+  ctx.beginPath(); ctx.moveTo(PAD.left, r50); ctx.lineTo(PAD.left + cw, r50); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const n = data.length;
+  const toX = i => PAD.left + (i / (n - 1 || 1)) * cw;
+  const toY = v => PAD.top + ch - v * ch;  // v ∈ [0,1]
+
+  // rolling WR
+  ctx.beginPath(); ctx.strokeStyle = '#52F2C9'; ctx.lineWidth = 1.5;
+  ctx.moveTo(toX(0), toY(data[0].rolling_wr));
+  for (let i = 1; i < n; i++) ctx.lineTo(toX(i), toY(data[i].rolling_wr));
+  ctx.stroke();
+
+  // cumulative WR (более гладкая)
+  ctx.beginPath(); ctx.strokeStyle = '#FF9F40'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 3]);
+  ctx.moveTo(toX(0), toY(data[0].cum_wr));
+  for (let i = 1; i < n; i++) ctx.lineTo(toX(i), toY(data[i].cum_wr));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Y labels
+  ctx.fillStyle = 'rgba(160,140,200,.7)'; ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {{
+    const v = 1 - i / 4;
+    ctx.fillText((v * 100).toFixed(0) + '%', PAD.left - 4, PAD.top + (ch / 4) * i + 3);
+  }}
+
+  // X labels
+  ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(160,140,200,.7)';
+  const idx3 = [0, Math.floor(n / 2), n - 1];
+  for (const idx of idx3) if (data[idx]) ctx.fillText('#' + data[idx].trade_n, toX(idx), H - 6);
+
+  // legend
+  ctx.textAlign = 'left'; ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillStyle = '#52F2C9'; ctx.fillText('Rolling WR (20)', PAD.left + 4, PAD.top + 12);
+  ctx.fillStyle = '#FF9F40'; ctx.fillText('Cum WR', PAD.left + 130, PAD.top + 12);
+}}
+
 </script>
 </body>
 </html>
@@ -3285,6 +3707,18 @@ class Handler(BaseHTTPRequestHandler):
             started = _start_futures_reload_bg()
             running = _futures_reload_running.is_set()
             self._send_json({"started": started, "running": running})
+        elif self.path == "/api/equity_analysis":
+            tickers = payload.get("tickers", [])
+            days = int(payload.get("days", 60))
+            account = float(payload.get("account", 100000))
+            risk_pct = float(payload.get("risk_pct", 1))
+            if not tickers:
+                self._send_json({"error": "нет тикеров"}, status=400)
+            else:
+                sim = run_portfolio_sim(tickers, days, account, risk_pct, mode="atr")
+                analytics = compute_equity_analytics(sim.get("trades", []), account)
+                sim["analytics"] = analytics
+                self._send_json(sim)
         elif self.path == "/api/save_backtest_history":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 90))
