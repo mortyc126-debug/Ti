@@ -36,6 +36,7 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
 import multiprocessing
+import statistics
 import threading
 import time
 import traceback
@@ -54,7 +55,7 @@ from candle_archive import get_candles_cached
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from db_api_client import DbApiClient
-from history import BacktestHistoryStore
+from history import BacktestHistoryStore, HistoryStore
 from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from mega_alerts import MegaAlertsService
@@ -324,6 +325,37 @@ def _strategy_settings_by_ticker() -> dict:
     return by_ticker
 
 
+def get_diagnostics(ticker: str, days: int = 30) -> dict:
+    """
+    Снимок того, КАК сейчас реально считается композит для тикера — на
+    живой истории (data/history.json через HistoryStore, не пустой
+    BacktestHistoryStore): Hedge-вес метода (persist в oi_weights.json),
+    regime_probs текущего окна, RMT-redundancy по режиму (Layer 4),
+    в каких режимах накоплена своя корреляционная матрица. Кнопка
+    "Диагностика стратегии" в дашборде — иначе всё это видно только
+    логами/чтением кода.
+    """
+    by_ticker = _strategy_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"ready": False, "error": f"{ticker}: нет в settings.ini/oi_tickers.json"}
+
+    candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    if not candles:
+        return {"ready": False, "error": f"{ticker}: нет истории свечей"}
+
+    strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+    if strategy is None or not hasattr(strategy, "diagnostics_snapshot"):
+        return {"ready": False, "error": f"{ticker}: стратегия не поддерживает diagnostics_snapshot"}
+
+    if hasattr(strategy, "set_history"):
+        strategy.set_history(HistoryStore(), PercentileCalibrator())
+
+    snapshot = strategy.diagnostics_snapshot(candles)
+    snapshot["ticker"] = ticker
+    return snapshot
+
+
 def filter_active_tickers(tickers: list[str], dedup_by_issuer: bool, top_pct: float) -> dict:
     """
     Применяет дедуп по эмитенту + отсев по востребованности (см.
@@ -465,6 +497,32 @@ def _what_if_from_trades(trades: list[dict]) -> dict:
     return what_if
 
 
+ATR_REOPT_MIN_NEW_TRADES = 15   # переоптимизировать не каждый день, а раз в N новых сделок —
+                                # меньше "точек выбора" -> меньше шансов у шума выиграть argmax
+ATR_SHRINK_K = 8                # псевдо-наблюдения к fixed-бейзлайну (как REGIME_SHRINKAGE_K в history.py)
+ATR_MIN_EDGE_SEM = 1.0          # ATR-кандидат должен превосходить fixed минимум на N своих SEM,
+                                # иначе остаёмся на текущих параметрах (не дёргаем из-за шума)
+
+
+def _shrunk_score(trades: list[dict], fixed_pct: float, k: int = ATR_SHRINK_K) -> tuple[float, float]:
+    """Shrinkage-оценка expectancy ATR-кандидата на маленькой/шумной выборке:
+    тянет к fixed-бейзлайну (а не к голому средству), сила тяги — k псевдо-
+    наблюдений, по аналогии с REGIME_SHRINKAGE_K в history.py. Без этого
+    argmax по сетке (3 take × 3 stop × 5 scale_exp = 45 кандидатов) почти
+    всегда выбирает комбинацию, выигравшую за счёт пары случайных сделок в
+    eval-окне ("optimizer's curse") — отсюда систематический проигрыш ATR
+    walk-forward fixed-режиму, который ничего не подгоняет. Возвращает
+    (shrunk_score, sem) — sem нужен дальше для проверки значимости edge."""
+    n = len(trades)
+    if n == 0:
+        return fixed_pct, 0.0
+    vals = [t["net_pct"] for t in trades]
+    raw = sum(vals) / n
+    sem = statistics.pstdev(vals) / (n ** 0.5) if n > 1 else abs(raw)
+    shrunk = (n * raw + k * fixed_pct) / (n + k)
+    return shrunk, sem
+
+
 def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
@@ -524,6 +582,7 @@ def run_backtest_one(
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff)
         fixed_trades = fixed.pop("trades", [])
+        fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades), **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
@@ -544,9 +603,12 @@ def run_backtest_one(
             past_signals: list[dict] = []
             wf_trades: list[dict] = []
             wf_results: list[dict] = []
+            new_since_reopt = 0
             for day in sorted(by_day.keys()):
                 day_signals = by_day[day]
-                if len(past_signals) >= AUTO_ATR_MIN_TRADES:
+                new_since_reopt += len(day_signals)
+                if len(past_signals) >= AUTO_ATR_MIN_TRADES and new_since_reopt >= ATR_REOPT_MIN_NEW_TRADES:
+                    new_since_reopt = 0
                     # Fit/eval split той же болезни, что в __recalc_auto_atr:
                     # sweep и его же оценка по одному и тому же past_signals
                     # тянет к узким стопам, которые в этом конкретном прошлом
@@ -560,12 +622,19 @@ def run_backtest_one(
                         for sk in atr_stop_ks:
                             for ex in scale_exps:
                                 r = strategy.backtest_barriers(signals=eval_signals, atr_take_k=tk, atr_stop_k=sk,
-                                                                atr_scale_exp=ex, tariff=tariff, record_history=False)
-                                if r["n_trades"] < AUTO_ATR_MIN_TRADES:
+                                                                atr_scale_exp=ex, tariff=tariff, record_history=False,
+                                                                return_trades=True)
+                                cand_trades = r.get("trades", [])
+                                if len(cand_trades) < AUTO_ATR_MIN_TRADES:
                                     continue
-                                if best is None or r["expectancy_pct"] > best[1]:
-                                    best = ((tk, sk, ex), r["expectancy_pct"])
-                    if best is not None:
+                                score, sem = _shrunk_score(cand_trades, fixed_pct)
+                                if best is None or score > best[1]:
+                                    best = ((tk, sk, ex), score, sem)
+                    # Менять параметры только если ATR-кандидат превосходит
+                    # fixed-бейзлайн больше чем на свой SEM — иначе "победа"
+                    # на eval-окне неотличима от шума (optimizer's curse),
+                    # и переключение лишь добавляет нестабильности без edge.
+                    if best is not None and best[1] - ATR_MIN_EDGE_SEM * best[2] > fixed_pct:
                         chosen_k = best[0]
                 tk, sk, ex = chosen_k
                 res = strategy.backtest_barriers(signals=day_signals, atr_take_k=tk, atr_stop_k=sk,
@@ -1136,6 +1205,22 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill" onclick="loadAutoAtr()">⟳ ОБНОВИТЬ</button>
 </div>
 
+<div class="panel">
+  <h3>Диагностика стратегии (как сейчас считается композит)</h3>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Снимок текущего состояния на живой истории (data/history.json) для
+    одного тикера: Hedge-вес метода (oi_weights.json), смесь
+    regime_mods по вероятностям режима, RMT-redundancy по режиму
+    (Layer 4) и итоговый эффективный вес каждого метода в композите.
+    Не запускает сделки, ничего не меняет.
+  </div>
+  <label>Тикер <input type="text" class="inp mid" id="diag_ticker" placeholder="SBER"></label>
+  <label>Дней истории <input type="number" class="inp mid" id="diag_days" value="30" min="5" max="240"></label>
+  <button class="btn-pill" onclick="loadDiagnostics()">▶ ПОСМОТРЕТЬ</button>
+  <div id="diag_summary" style="font-size:11px;color:var(--txt3);margin-top:8px;"></div>
+  <table class="scen-table" id="diag_table"></table>
+</div>
+
 <script>
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
@@ -1532,6 +1617,38 @@ async function loadAutoAtr() {{
 }}
 loadAutoAtr();
 
+async function loadDiagnostics() {{
+  const ticker = document.getElementById('diag_ticker').value.trim().toUpperCase();
+  const days = document.getElementById('diag_days').value;
+  const summary = document.getElementById('diag_summary');
+  const table = document.getElementById('diag_table');
+  if (!ticker) {{ summary.textContent = 'Укажи тикер.'; return; }}
+  summary.textContent = 'Считаю...';
+  table.innerHTML = '';
+  const resp = await fetch(`/api/diagnostics?ticker=${{ticker}}&days=${{days}}`);
+  const data = await resp.json();
+  if (!data.ready) {{
+    summary.textContent = data.error || 'Недостаточно данных.';
+    return;
+  }}
+  const regimeProbs = Object.entries(data.regime_probs || {{}})
+    .sort((a, b) => b[1] - a[1])
+    .map(([r, p]) => `${{r}}: ${{(p * 100).toFixed(0)}}%`).join(', ');
+  summary.innerHTML = `Текущий режим (argmax): <b>${{data.regime}}</b> · смесь: ${{regimeProbs}}<br>` +
+    `rolling_quality: ${{data.rolling_quality}} · M1/M2/M3 готовы: ${{data.cluster_models_ready ? 'да' : 'нет (мало истории)'}}` +
+    (data.cluster_corr_regimes && data.cluster_corr_regimes.length
+      ? ` · RMT-корреляция накоплена для режимов: ${{data.cluster_corr_regimes.join(', ')}}`
+      : ' · RMT-корреляция по режимам пока нигде не накоплена (fallback на общую матрицу)');
+  table.innerHTML = `<thead><tr>
+      <th>Метод</th><th>Hedge-вес</th><th>сделок</th><th>regime_mult</th>
+      <th>redundancy_mult</th><th>эфф. вес</th><th>микростр.</th>
+    </tr></thead>` + (data.methods || []).map(m => `<tr>
+      <td>${{m.name}}</td><td>${{m.hedge_weight}}</td><td>${{m.hedge_trades}}</td>
+      <td>${{m.regime_mult}}</td><td>${{m.redundancy_mult}}</td>
+      <td><b>${{m.effective_weight}}</b></td><td>${{m.is_microstructure ? '✓' : ''}}</td>
+    </tr>`).join('');
+}}
+
 async function askCouncil() {{
   const text = document.getElementById('bugtext').value;
   if (!text.trim()) return;
@@ -1645,6 +1762,15 @@ class Handler(BaseHTTPRequestHandler):
             kind = parse_qs(urlparse(self.path).query).get("kind", [""])[0]
             cached = _last_result.get(kind)
             self._send_json(cached if cached else {"missing": True})
+        elif self.path.startswith("/api/diagnostics"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0]
+            days = int(qs.get("days", ["30"])[0])
+            try:
+                self._send_json(get_diagnostics(ticker, days))
+            except Exception as e:
+                self._send_json({"ready": False, "error": str(e)})
         else:
             self.send_error(404)
 
