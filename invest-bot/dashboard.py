@@ -1286,16 +1286,20 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
     <span id="tc_status" style="font-size:11px;color:var(--txt3);"></span>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:11px;color:var(--txt3);">
-    <span>🔍 прокрутка/пинч — масштаб &nbsp;|&nbsp; перетащи — панорама</span>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--txt3);">
+    <span>🔍 колесо/пинч — масштаб &nbsp;|&nbsp; перетащи — панорама &nbsp;|&nbsp; Shift+drag — выделить область</span>
     <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomAll()">Всё</button>
     <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(30)">30д</button>
     <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(14)">14д</button>
     <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(7)">7д</button>
+    <span style="margin-left:8px;">Вид:</span>
+    <button class="btn-pill" id="tc_mode_candle" style="padding:3px 10px;font-size:10px;background:var(--mem);" onclick="tcSetMode('candle')">Свечи</button>
+    <button class="btn-pill" id="tc_mode_line"   style="padding:3px 10px;font-size:10px;" onclick="tcSetMode('line')">Линия</button>
   </div>
   <canvas id="tc_canvas" style="width:100%;height:480px;display:block;cursor:crosshair;background:var(--panel);border-radius:10px;border:1px solid var(--border);"></canvas>
-  <div id="tc_tooltip" style="font-size:11px;color:var(--txt2);margin-top:6px;min-height:32px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
-  <div id="tc_trade_detail" style="font-size:11px;color:var(--txt2);margin-top:6px;min-height:24px;"></div>
+  <div id="tc_sel_info" style="font-size:12px;color:var(--txt2);margin-top:6px;min-height:24px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
+  <div id="tc_tooltip" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:28px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
+  <div id="tc_trade_detail" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:24px;"></div>
 </div>
 
 <script>
@@ -1751,9 +1755,12 @@ async function askCouncil() {{
 (function() {{
   let _candles = [], _trades = [], _ticker = '';
   const PAD = {{l:52, r:12, t:24, b:36}};
-  // Viewport: индекс первой и последней видимой свечи
   let _v0 = 0, _v1 = 0;
   let _drag = null;
+  let _chartMode = 'candle';  // 'candle' | 'line'
+  // Выделение области: {i0, i1} — индексы баров, null если нет
+  let _sel = null;
+  let _selDrag = null;  // {startI, startX} во время Shift+drag
   const canvas = document.getElementById('tc_canvas');
   const ctx = canvas.getContext('2d');
 
@@ -1819,16 +1826,13 @@ async function askCouncil() {{
     const iW = _innerW(), iH = _innerH();
     ctx.clearRect(0, 0, W, H);
 
-    // фон
     ctx.fillStyle = getComputedStyle(canvas).getPropertyValue('--panel').trim() || '#1a1a2e';
     ctx.fillRect(0, 0, W, H);
 
     const {{lo, hi}} = _priceRange();
     const bw = _barW();
-    const bodyW = Math.max(1, bw * 0.6);
-    const halfBody = bodyW / 2;
 
-    // сетка
+    // ── сетка ────────────────────────────────────────────────────────────
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.lineWidth = 1;
     const nGridY = 5;
@@ -1836,132 +1840,116 @@ async function askCouncil() {{
       const price = lo + (hi - lo) * (g / nGridY);
       const y = _yOf(price, lo, hi);
       ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + iW, y); ctx.stroke();
-      // ценовая метка
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.font = '10px JetBrains Mono, monospace';
       ctx.textAlign = 'right';
       ctx.fillText(price.toFixed(2), PAD.l - 3, y + 3);
     }}
 
-    // ── уровни сделок (take/stop линии) в видимой области ───────────────
+    // ── подсветка выделенной области ─────────────────────────────────────
+    if (_sel) {{
+      const si0 = Math.max(_v0, _sel.i0), si1 = Math.min(_v1, _sel.i1);
+      if (si0 <= si1) {{
+        const sx0 = _xOfBar(si0) - bw / 2, sx1 = _xOfBar(si1) + bw / 2;
+        ctx.fillStyle = 'rgba(120,180,255,0.10)';
+        ctx.fillRect(sx0, PAD.t, sx1 - sx0, iH);
+        // вертикальные границы
+        ctx.strokeStyle = 'rgba(120,180,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(sx0, PAD.t); ctx.lineTo(sx0, PAD.t + iH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx1, PAD.t); ctx.lineTo(sx1, PAD.t + iH); ctx.stroke();
+        ctx.setLineDash([]);
+      }}
+    }}
+
+    // ── уровни сделок (take/stop) ─────────────────────────────────────────
     for (const t of _trades) {{
       if (t._entry_i < _v0 || t._entry_i > _v1) continue;
-      const ei = t._entry_i, xi = t._exit_i !== null ? Math.min(t._exit_i, _v1) : _v1;
-      const x0 = _xOfBar(ei);
-      const x1 = _xOfBar(xi);
+      const xi = t._exit_i !== null ? Math.min(t._exit_i, _v1) : _v1;
+      const x0 = _xOfBar(t._entry_i), x1 = _xOfBar(xi);
+      ctx.lineWidth = 1;
       if (t.take_price) {{
-        ctx.strokeStyle = 'rgba(72,199,142,0.3)';
-        ctx.setLineDash([3,4]);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x0, _yOf(t.take_price, lo, hi));
-        ctx.lineTo(x1, _yOf(t.take_price, lo, hi));
-        ctx.stroke();
+        ctx.strokeStyle = 'rgba(72,199,142,0.3)'; ctx.setLineDash([3,4]);
+        ctx.beginPath(); ctx.moveTo(x0, _yOf(t.take_price, lo, hi)); ctx.lineTo(x1, _yOf(t.take_price, lo, hi)); ctx.stroke();
       }}
       if (t.stop_price) {{
-        ctx.strokeStyle = 'rgba(255,99,99,0.3)';
-        ctx.setLineDash([3,4]);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x0, _yOf(t.stop_price, lo, hi));
-        ctx.lineTo(x1, _yOf(t.stop_price, lo, hi));
-        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,99,99,0.3)'; ctx.setLineDash([3,4]);
+        ctx.beginPath(); ctx.moveTo(x0, _yOf(t.stop_price, lo, hi)); ctx.lineTo(x1, _yOf(t.stop_price, lo, hi)); ctx.stroke();
       }}
       ctx.setLineDash([]);
     }}
 
-    // ── свечи ────────────────────────────────────────────────────────────
-    for (let i = _v0; i <= _v1 && i < _candles.length; i++) {{
-      const c = _candles[i];
-      const x = _xOfBar(i);
-      const yO = _yOf(c.open, lo, hi);
-      const yC = _yOf(c.close, lo, hi);
-      const yH = _yOf(c.high, lo, hi);
-      const yL = _yOf(c.low, lo, hi);
-      const bull = c.close >= c.open;
-      const col = bull ? '#48c78e' : '#f14668';
-
-      // фитиль
-      ctx.strokeStyle = col;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
-
-      // тело
-      const bodyTop = Math.min(yO, yC);
-      const bodyH = Math.max(1, Math.abs(yC - yO));
-      ctx.fillStyle = bull ? 'rgba(72,199,142,0.85)' : 'rgba(241,70,104,0.85)';
-      ctx.fillRect(x - halfBody, bodyTop, bodyW, bodyH);
+    // ── свечи или линия ───────────────────────────────────────────────────
+    if (_chartMode === 'line') {{
+      // заливка под линией
+      ctx.beginPath();
+      let first = true;
+      for (let i = _v0; i <= _v1 && i < _candles.length; i++) {{
+        const x = _xOfBar(i), y = _yOf(_candles[i].close, lo, hi);
+        if (first) {{ ctx.moveTo(x, y); first = false; }} else ctx.lineTo(x, y);
+      }}
+      const lastX = _xOfBar(Math.min(_v1, _candles.length - 1));
+      ctx.lineTo(lastX, PAD.t + iH); ctx.lineTo(_xOfBar(_v0), PAD.t + iH); ctx.closePath();
+      const grad = ctx.createLinearGradient(0, PAD.t, 0, PAD.t + iH);
+      grad.addColorStop(0, 'rgba(100,160,255,0.25)'); grad.addColorStop(1, 'rgba(100,160,255,0.0)');
+      ctx.fillStyle = grad; ctx.fill();
+      // сама линия
+      ctx.beginPath(); first = true;
+      for (let i = _v0; i <= _v1 && i < _candles.length; i++) {{
+        const x = _xOfBar(i), y = _yOf(_candles[i].close, lo, hi);
+        if (first) {{ ctx.moveTo(x, y); first = false; }} else ctx.lineTo(x, y);
+      }}
+      ctx.strokeStyle = '#6ba3ff'; ctx.lineWidth = 1.5; ctx.stroke();
+    }} else {{
+      const bodyW = Math.max(1, bw * 0.6), halfBody = bodyW / 2;
+      for (let i = _v0; i <= _v1 && i < _candles.length; i++) {{
+        const c = _candles[i], x = _xOfBar(i);
+        const yO = _yOf(c.open, lo, hi), yC = _yOf(c.close, lo, hi);
+        const yH = _yOf(c.high, lo, hi), yL = _yOf(c.low, lo, hi);
+        const bull = c.close >= c.open;
+        ctx.strokeStyle = bull ? '#48c78e' : '#f14668'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+        ctx.fillStyle = bull ? 'rgba(72,199,142,0.85)' : 'rgba(241,70,104,0.85)';
+        ctx.fillRect(x - halfBody, Math.min(yO, yC), bodyW, Math.max(1, Math.abs(yC - yO)));
+      }}
     }}
 
     // ── маркеры сделок ───────────────────────────────────────────────────
     for (let ti = 0; ti < _trades.length; ti++) {{
       const t = _trades[ti];
       if (t._entry_i < _v0 || t._entry_i > _v1) continue;
-      const xe = _xOfBar(t._entry_i);
-      const ye = _yOf(t.entry_price, lo, hi);
-      const isLong = t.direction === 'LONG';
-      const winCol = t.win ? '#48c78e' : '#f14668';
-
-      // вертикальная линия вход→выход
+      const xe = _xOfBar(t._entry_i), ye = _yOf(t.entry_price, lo, hi);
+      const isLong = t.direction === 'LONG', winCol = t.win ? '#48c78e' : '#f14668';
       if (t._exit_i !== null && t._exit_i >= _v0) {{
-        const xx = _xOfBar(Math.min(t._exit_i, _v1));
-        const yx = _yOf(t.exit_price, lo, hi);
-        ctx.strokeStyle = winCol + '66';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([2,3]);
-        ctx.beginPath(); ctx.moveTo(xe, ye); ctx.lineTo(xx, yx); ctx.stroke();
-        ctx.setLineDash([]);
-        // маркер выхода
-        ctx.beginPath();
-        ctx.arc(xx, yx, 4, 0, Math.PI * 2);
-        ctx.fillStyle = winCol;
-        ctx.fill();
+        const xx = _xOfBar(Math.min(t._exit_i, _v1)), yx = _yOf(t.exit_price, lo, hi);
+        ctx.strokeStyle = winCol + '66'; ctx.lineWidth = 1.5; ctx.setLineDash([2,3]);
+        ctx.beginPath(); ctx.moveTo(xe, ye); ctx.lineTo(xx, yx); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(xx, yx, 4, 0, Math.PI * 2); ctx.fillStyle = winCol; ctx.fill();
       }}
-
-      // треугольник входа
       ctx.fillStyle = isLong ? '#48c78e' : '#f14668';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8;
       ctx.beginPath();
-      if (isLong) {{
-        ctx.moveTo(xe, ye - 10);
-        ctx.lineTo(xe - 6, ye);
-        ctx.lineTo(xe + 6, ye);
-      }} else {{
-        ctx.moveTo(xe, ye + 10);
-        ctx.lineTo(xe - 6, ye);
-        ctx.lineTo(xe + 6, ye);
-      }}
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // номер сделки
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 8px JetBrains Mono, monospace';
-      ctx.textAlign = 'center';
+      if (isLong) {{ ctx.moveTo(xe, ye-10); ctx.lineTo(xe-6, ye); ctx.lineTo(xe+6, ye); }}
+      else        {{ ctx.moveTo(xe, ye+10); ctx.lineTo(xe-6, ye); ctx.lineTo(xe+6, ye); }}
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px JetBrains Mono,monospace'; ctx.textAlign = 'center';
       ctx.fillText(ti + 1, xe, isLong ? ye - 12 : ye + 20);
     }}
 
-    // временнáя ось
+    // ── временна́я ось ────────────────────────────────────────────────────
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.textAlign = 'center';
+    ctx.font = '10px JetBrains Mono, monospace'; ctx.textAlign = 'center';
     const nLabels = Math.min(8, _v1 - _v0 + 1);
     const step = Math.max(1, Math.floor((_v1 - _v0 + 1) / nLabels));
     for (let i = _v0; i <= _v1; i += step) {{
-      const x = _xOfBar(i);
-      const iso = _candles[i]?.time;
-      if (!iso) continue;
+      const iso = _candles[i]?.time; if (!iso) continue;
       const d = new Date(iso);
-      const label = d.toLocaleDateString('ru-RU', {{day:'2-digit',month:'2-digit'}});
-      ctx.fillText(label, x, _ch() - 6);
+      ctx.fillText(d.toLocaleDateString('ru-RU', {{day:'2-digit',month:'2-digit'}}), _xOfBar(i), _ch() - 6);
     }}
 
-    // заголовок
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = 'bold 12px JetBrains Mono, monospace';
-    ctx.textAlign = 'left';
+    // ── заголовок ────────────────────────────────────────────────────────
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 12px JetBrains Mono,monospace'; ctx.textAlign = 'left';
     ctx.fillText(_ticker, PAD.l + 4, PAD.t - 6);
   }}
 
@@ -1980,8 +1968,53 @@ async function askCouncil() {{
     return best;
   }}
 
+  // Преобразовать пиксель X → индекс бара
+  function _barAtX(px) {{
+    return Math.round(_v0 + (px - PAD.l) / _barW() - 0.5);
+  }}
+
+  // Обновить инфо-блок выделения
+  function _updateSelInfo() {{
+    const el = document.getElementById('tc_sel_info');
+    if (!_sel || !_candles.length) {{ el.style.display = 'none'; return; }}
+    const i0 = Math.max(0, Math.min(_sel.i0, _sel.i1));
+    const i1 = Math.min(_candles.length - 1, Math.max(_sel.i0, _sel.i1));
+    if (i0 >= i1) {{ el.style.display = 'none'; return; }}
+    const p0 = _candles[i0].close, p1 = _candles[i1].close;
+    const diff = p1 - p0, pct = (diff / p0 * 100);
+    const hi = Math.max(..._candles.slice(i0, i1+1).map(c => c.high));
+    const lo = Math.min(..._candles.slice(i0, i1+1).map(c => c.low));
+    const swing = (hi - lo) / p0 * 100;
+    const nBars = i1 - i0 + 1;
+    const col = diff >= 0 ? '#48c78e' : '#f14668';
+    const sign = diff >= 0 ? '+' : '';
+    // Сделки внутри выделения
+    const tradesIn = _trades.filter(t => t._entry_i >= i0 && t._entry_i <= i1);
+    const wins = tradesIn.filter(t => t.win).length;
+    const tradeStr = tradesIn.length ? ` &nbsp;|&nbsp; Сделок в области: ${{tradesIn.length}} (W=${{wins}}/L=${{tradesIn.length - wins}})` : '';
+    el.style.display = 'block';
+    el.innerHTML =
+      `📐 Выделено ${{nBars}} баров &nbsp;|&nbsp; `+
+      `Начало: ${{p0.toFixed(2)}} → Конец: ${{p1.toFixed(2)}} &nbsp;|&nbsp; `+
+      `Изменение: <b style="color:${{col}}">${{sign}}${{diff.toFixed(2)}} (${{sign}}${{pct.toFixed(2)}}%)</b> &nbsp;|&nbsp; `+
+      `Амплитуда Hi–Lo: ${{swing.toFixed(2)}}%`+
+      tradeStr+
+      ` &nbsp;<span style="color:var(--txt3);cursor:pointer;" onclick="tcClearSel()">✕ сброс</span>`;
+  }}
+
+  window.tcClearSel = function() {{ _sel = null; _updateSelInfo(); _draw(); }};
+
   // ── Тултип при движении мыши ─────────────────────────────────────────────
   canvas.addEventListener('mousemove', function(e) {{
+    // Shift+drag: обновляем правую границу выделения
+    if (_selDrag) {{
+      const rect = canvas.getBoundingClientRect();
+      const bi = Math.max(0, Math.min(_candles.length-1, _barAtX(e.clientX - rect.left)));
+      _sel = {{i0: Math.min(_selDrag.startI, bi), i1: Math.max(_selDrag.startI, bi)}};
+      _updateSelInfo();
+      _draw();
+      return;
+    }}
     if (_drag) {{
       const dx = e.clientX - _drag.startX;
       const barsShift = -Math.round(dx / _barW());
@@ -2011,15 +2044,25 @@ async function askCouncil() {{
   canvas.addEventListener('mousedown', function(e) {{
     const rect = canvas.getBoundingClientRect();
     const px = e.clientX - rect.left, py = e.clientY - rect.top;
-    const ti = _hitTrade(px, py);
-    if (ti !== null) {{
-      _showTradeDetail(ti);
+
+    // Shift+drag → выделение области
+    if (e.shiftKey) {{
+      const bi = Math.max(0, Math.min(_candles.length-1, _barAtX(px)));
+      _selDrag = {{startI: bi}};
+      _sel = {{i0: bi, i1: bi}};
+      _draw();
       return;
     }}
+
+    const ti = _hitTrade(px, py);
+    if (ti !== null) {{ _showTradeDetail(ti); return; }}
     _drag = {{startX: e.clientX, v0: _v0, v1: _v1}};
   }});
-  canvas.addEventListener('mouseup', () => {{ _drag = null; }});
-  canvas.addEventListener('mouseleave', () => {{ _drag = null; }});
+  canvas.addEventListener('mouseup', function(e) {{
+    if (_selDrag) {{ _selDrag = null; _updateSelInfo(); return; }}
+    _drag = null;
+  }});
+  canvas.addEventListener('mouseleave', () => {{ _drag = null; _selDrag = null; }});
 
   canvas.addEventListener('wheel', function(e) {{
     e.preventDefault();
@@ -2091,6 +2134,13 @@ async function askCouncil() {{
   }}
 
   // ── Зум ─────────────────────────────────────────────────────────────────
+  window.tcSetMode = function(mode) {{
+    _chartMode = mode;
+    document.getElementById('tc_mode_candle').style.background = mode === 'candle' ? 'var(--mem)' : '';
+    document.getElementById('tc_mode_line').style.background   = mode === 'line'   ? 'var(--mem)' : '';
+    _draw();
+  }};
+
   window.tcZoomAll = function() {{
     if (!_candles.length) return;
     _v0 = 0; _v1 = _candles.length - 1; _draw();
