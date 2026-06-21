@@ -1291,6 +1291,7 @@ class OICompositeStrategy(IStrategy):
             return 0.5, 0
 
         saved_candles = self.__candles
+        saved_score_history = list(self.__score_history)
         qualities: list[float] = []
         comm = commission_rt(self.__settings.is_future)
         try:
@@ -1374,6 +1375,7 @@ class OICompositeStrategy(IStrategy):
                 i += lookahead  # не пересекать виртуальные сделки
         finally:
             self.__candles = saved_candles
+            self.__score_history = saved_score_history
 
         if not qualities:
             return 0.5, 0
@@ -1393,6 +1395,7 @@ class OICompositeStrategy(IStrategy):
             return []
 
         saved_candles = self.__candles
+        saved_score_history = list(self.__score_history)
         signals: list[dict] = []
         total_bars = len(candles) - 1 - CANDLE_WINDOW
         t_start = time.monotonic()
@@ -1480,6 +1483,7 @@ class OICompositeStrategy(IStrategy):
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
             self.__candles = saved_candles
+            self.__score_history = saved_score_history
 
         return signals
 
@@ -1497,6 +1501,7 @@ class OICompositeStrategy(IStrategy):
             return []
 
         saved_candles = self.__candles
+        saved_score_history = list(self.__score_history)
         rows: list[dict] = []
         try:
             for i in range(CANDLE_WINDOW, len(candles)):
@@ -1513,6 +1518,7 @@ class OICompositeStrategy(IStrategy):
                 })
         finally:
             self.__candles = saved_candles
+            self.__score_history = saved_score_history
 
         return rows
 
