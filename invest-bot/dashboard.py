@@ -146,6 +146,40 @@ def save_backtest_history(tickers: list[str], days: int) -> dict:
     return {"saved_days": total_days, "trades": total_trades, "errors": errors}
 
 
+def save_cached_backtest_history(tickers: list[str], days: int) -> dict:
+    """То же самое, что save_backtest_history(), но без повторного прогона:
+    использует данные, уже посчитанные последним runBacktest() в дашборде
+    (_last_backtest_history_data) — то, что видно в таблице результатов.
+    Тикеры без кэша (бэктест по ним ещё не запускали в этой сессии сервера)
+    прогоняются по старой схеме как fallback."""
+    real_store = HistoryStore()
+    total_days = 0
+    total_trades = 0
+    errors: list[str] = []
+    missing: list[str] = []
+
+    for ticker in tickers:
+        hist = _last_backtest_history_data.get(ticker)
+        if not hist:
+            missing.append(ticker)
+            continue
+        tmp = BacktestHistoryStore()
+        tmp._data[ticker] = hist
+        merged = tmp.merge_into(real_store)
+        n_trades = sum(len(day.get("trades", [])) for day in hist.values())
+        total_days += merged
+        total_trades += n_trades
+
+    if missing:
+        fallback = save_backtest_history(missing, days)
+        total_days += fallback["saved_days"]
+        total_trades += fallback["trades"]
+        errors.extend(fallback["errors"])
+
+    return {"saved_days": total_days, "trades": total_trades, "errors": errors,
+            "from_cache": len(tickers) - len(missing), "recomputed": missing}
+
+
 def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
     """Шаги 2-4 run_pipeline.py (narrative-пороги + lasso + rule_miner) на
     уже сохранённой data/history.json — без бэктеста (см. save_backtest_history
@@ -263,6 +297,13 @@ _progress_lock = threading.Lock()
 # теряются и нужен полный повторный прогон. Фронтенд при сетевой ошибке
 # забирает их отсюда вместо повторного счёта.
 _last_result: dict[str, dict] = {}
+
+# Дневные скоры/сделки бэктеста с последнего прогона runBacktest(), по тикеру
+# (см. run_backtest_one). Без этого "сохранить историю" гоняла отдельный,
+# более простой бэктест с нуля заново — те же тикеры считались дважды по
+# разной логике, и сохранённые сделки не совпадали с тем, что видно в
+# таблице. Теперь сохранение берёт уже посчитанное отсюда.
+_last_backtest_history_data: dict[str, dict] = {}
 
 
 def _get_progress_proxy() -> dict:
@@ -972,11 +1013,17 @@ def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
         progress: dict | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], dict | None]:
     """
-    Прогоняет бэктест по одному тикеру. Возвращает список строк-результатов
-    (как в compare_take_stop.py: fixed + лучшая ATR-комбинация),
-    либо строку с ошибкой и советом, если тикер упал.
+    Прогоняет бэктест по одному тикеру. Возвращает (rows, history_data):
+    rows — список строк-результатов (как в compare_take_stop.py: fixed +
+    лучшая ATR-комбинация), либо строка с ошибкой и советом, если тикер упал;
+    history_data — накопленные за этот прогон дневные скоры/сделки
+    (BacktestHistoryStore._data[ticker]) или None при ошибке/нет данных.
+    Раньше эта история собиралась (_wire_history) и сразу выбрасывалась —
+    "сохранить историю" потом гоняла отдельный, более простой бэктест с нуля
+    заново. Теперь оставляем её доступной вызывающему, чтобы сохранение могло
+    взять уже посчитанное вместо повторного прогона (см. save_backtest_history).
     """
     if progress is None:
         progress = _get_progress_proxy()
@@ -994,12 +1041,12 @@ def run_backtest_one(
     _set_progress(progress, ticker, "загрузка свечей")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
-        _wire_history(strategy)
+        bt_store = _wire_history_returning(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
                          "error": "стратегия не поддерживает backtest_barriers"})
             _set_progress(progress, ticker, "пропуск")
-            return rows
+            return rows, None
 
         try:
             candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db,
@@ -1007,16 +1054,16 @@ def run_backtest_one(
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             _set_progress(progress, ticker, "ошибка API")
-            return rows
+            return rows, None
         except Exception as ex:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": str(ex)})
             _set_progress(progress, ticker, "нет истории")
-            return rows
+            return rows, None
 
         if not candles:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
             _set_progress(progress, ticker, "нет истории")
-            return rows
+            return rows, None
 
         logger.info(f"{ticker}: {len(candles)} свечей за {time.monotonic() - t0:.1f}с, считаю сигналы "
                     f"(может занять минуту-две — внутри Hawkes-MLE на каждый бар)...")
@@ -1115,20 +1162,22 @@ def run_backtest_one(
         rows.append({"ticker": ticker, "mode": "ошибка", "error": tb.strip().splitlines()[-1],
                      "traceback": tb, "advice": advice})
         _set_progress(progress, ticker, "ошибка")
-        return rows
+        return rows, None
 
     _set_progress(progress, ticker, "готово")
-    return rows
+    return rows, bt_store._data.get(ticker)
 
 
 def run_backtest(
         tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], dict[str, dict]]:
     """
     Прогоняет бэктест по всем тикерам сразу (используется как fallback API).
     Каждый тикер — это независимый дорогой CPU-bound скан (Hawkes-MLE на
     каждый бар), поэтому гоняем по процессам параллельно, а не по очереди.
+    Возвращает (rows, hist_by_ticker) — hist_by_ticker нужен, чтобы "сохранить
+    историю" могла использовать уже посчитанные данные без повторного прогона.
     """
     _cancel_event.clear()
     progress = _get_progress_proxy()
@@ -1137,15 +1186,20 @@ def run_backtest(
 
     if len(tickers) <= 1:
         rows: list[dict] = []
+        hist_by_ticker: dict[str, dict] = {}
         for ticker in tickers:
             if _cancel_event.is_set():
                 break
-            rows.extend(run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress))
+            r_rows, r_hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress)
+            rows.extend(r_rows)
+            if r_hist:
+                hist_by_ticker[ticker] = r_hist
         if _cancel_event.is_set():
             _mark_unfinished_cancelled(progress, tickers)
-        return rows
+        return rows, hist_by_ticker
 
     by_ticker_rows: dict[str, list[dict]] = {}
+    hist_by_ticker: dict[str, dict] = {}
     pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
     _register_pool(pool)
     try:
@@ -1158,7 +1212,10 @@ def run_backtest(
                 break
             ticker = futures[fut]
             try:
-                by_ticker_rows[ticker] = fut.result()
+                r_rows, r_hist = fut.result()
+                by_ticker_rows[ticker] = r_rows
+                if r_hist:
+                    hist_by_ticker[ticker] = r_hist
             except Exception:
                 pass  # воркер мог быть убит через /api/cancel — это ожидаемо
     finally:
@@ -1171,7 +1228,7 @@ def run_backtest(
     rows = []
     for ticker in tickers:
         rows.extend(by_ticker_rows.get(ticker, []))
-    return rows
+    return rows, hist_by_ticker
 
 
 def _portfolio_sim_one_ticker(
@@ -2425,7 +2482,10 @@ async function saveBacktestHistory() {{
   const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
   if (!tickers.length) {{ alert('Выбери тикеры (активные чипы)'); return; }}
   const days = parseInt(document.getElementById('days').value) || 90;
-  if (!confirm(`Прогнать бэктест по ${{tickers.length}} тикерам (${{days}} дн.) и сохранить сделки в history.json?`)) return;
+  // Сохраняем то, что уже посчитано последним "ЗАПУСТИТЬ БЭКТЕСТ" (сервер
+  // держит его в _last_backtest_history_data) — без повторного прогона.
+  // Тикеры, для которых кэша нет (бэктест по ним ещё не гоняли в этой
+  // сессии сервера), сервер досчитает сам и сообщит об этом в ответе.
   const btn = event.target;
   btn.disabled = true; btn.textContent = '⏳ сохраняю...';
   try {{
@@ -2437,7 +2497,9 @@ async function saveBacktestHistory() {{
     if (d.error) {{ alert('Ошибка: ' + d.error); }}
     else {{
       const errs = d.errors && d.errors.length ? '\\nОшибки: ' + d.errors.join(', ') : '';
-      alert(`Сохранено: ${{d.saved_days}} дн., ${{d.trades}} сделок.${{errs}}`);
+      const recomp = d.recomputed && d.recomputed.length
+        ? `\\nДосчитано с нуля (не было в кэше): ${{d.recomputed.join(', ')}}` : '';
+      alert(`Сохранено: ${{d.saved_days}} дн., ${{d.trades}} сделок (из кэша: ${{d.from_cache}} тикер(ов)).${{recomp}}${{errs}}`);
     }}
   }} catch(e) {{
     alert('Ошибка: ' + e);
@@ -4074,7 +4136,9 @@ class Handler(BaseHTTPRequestHandler):
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
-            rows = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            rows, hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            if hist:
+                _last_backtest_history_data[ticker] = hist
             self._send_json({"rows": rows})
         elif self.path == "/api/backtest":
             tickers = payload.get("tickers", [])
@@ -4082,7 +4146,8 @@ class Handler(BaseHTTPRequestHandler):
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
-            rows = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            rows, hist_by_ticker = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            _last_backtest_history_data.update(hist_by_ticker)
             _last_result["backtest"] = {"rows": rows}
             self._send_json({"rows": rows})
         elif self.path == "/api/backtest_stream":
@@ -4131,7 +4196,9 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     t = fs[fut]
                     try:
-                        rows = fut.result()
+                        rows, hist = fut.result()
+                        if hist:
+                            _last_backtest_history_data[t] = hist
                     except Exception as ex:
                         rows = [{"ticker": t, "mode": "ошибка", "error": str(ex)}]
                         _set_progress(progress, t, "ошибка")
@@ -4206,7 +4273,7 @@ class Handler(BaseHTTPRequestHandler):
             if not tickers:
                 self._send_json({"error": "нет тикеров"}, status=400)
             else:
-                result = save_backtest_history(tickers, days)
+                result = save_cached_backtest_history(tickers, days)
                 self._send_json(result)
         elif self.path == "/api/run_calibration":
             tickers = payload.get("tickers", [])
