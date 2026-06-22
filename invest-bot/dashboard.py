@@ -1838,6 +1838,21 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     (доп. живая подписка к API, выключено по умолчанию; работает только вместе с адаптивным выходом)
   </label>
   <br><br>
+  <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+      Дневной лимит убытка, %
+      <input type="number" step="0.1" min="0.1" max="100" class="inp mid" id="ov_daily_loss" placeholder="2">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+      Недельный лимит убытка, %
+      <input type="number" step="0.1" min="0.1" max="100" class="inp mid" id="ov_weekly_loss" placeholder="5">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+      Месячный лимит убытка, %
+      <input type="number" step="0.1" min="0.1" max="100" class="inp mid" id="ov_monthly_loss" placeholder="10">
+    </label>
+  </div>
+  <br>
   <button class="btn-pill" onclick="loadOverrides()">⟳ ЗАГРУЗИТЬ ТЕКУЩИЕ</button>
   <button class="btn-pill" onclick="saveOverrides()">💾 СОХРАНИТЬ</button>
   <span id="ov_status"></span>
@@ -2582,6 +2597,9 @@ async function loadOverrides() {{
   document.getElementById('ov_partial_tp').checked = data.partial_tp_enabled === true;
   document.getElementById('ov_adaptive_exit').checked = data.adaptive_exit_enabled === true;
   document.getElementById('ov_orderbook').checked = data.orderbook_enabled === true;
+  document.getElementById('ov_daily_loss').value = data.daily_max_loss_pct ?? '';
+  document.getElementById('ov_weekly_loss').value = data.weekly_max_loss_pct ?? '';
+  document.getElementById('ov_monthly_loss').value = data.monthly_max_loss_pct ?? '';
   const tbody = document.getElementById('ov_table');
   tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t])).join('');
   document.getElementById('ov_status').textContent = 'загружено';
@@ -2613,6 +2631,9 @@ async function saveOverrides() {{
     headers: {{'Content-Type': 'application/json'}},
     body: JSON.stringify({{
       global_signal_only, partial_tp_enabled, adaptive_exit_enabled, orderbook_enabled, tickers,
+      daily_max_loss_pct: document.getElementById('ov_daily_loss').value || null,
+      weekly_max_loss_pct: document.getElementById('ov_weekly_loss').value || null,
+      monthly_max_loss_pct: document.getElementById('ov_monthly_loss').value || null,
       password: document.getElementById('ov_password').value,
     }}),
   }});
@@ -3486,6 +3507,9 @@ def get_overrides_payload() -> dict:
         "adaptive_exit_enabled": data.get("adaptive_exit_enabled"),
         "orderbook_enabled": data.get("orderbook_enabled"),
         "paused": data.get("paused", False),
+        "daily_max_loss_pct": data.get("daily_max_loss_pct"),
+        "weekly_max_loss_pct": data.get("weekly_max_loss_pct"),
+        "monthly_max_loss_pct": data.get("monthly_max_loss_pct"),
         "tickers": data.get("tickers", {}),
         "tickers_all": tickers_all,
     }
@@ -3563,6 +3587,18 @@ def save_overrides_payload(payload: dict) -> dict | None:
     partial_tp_enabled = payload.get("partial_tp_enabled")
     adaptive_exit_enabled = payload.get("adaptive_exit_enabled")
     orderbook_enabled = payload.get("orderbook_enabled")
+    def _pct_or_none(key):
+        v = payload.get(key)
+        if v in (None, ""):
+            return None
+        try:
+            f = float(v)
+            return f if f > 0 else None
+        except (TypeError, ValueError):
+            return None
+    daily_max_loss_pct = _pct_or_none("daily_max_loss_pct")
+    weekly_max_loss_pct = _pct_or_none("weekly_max_loss_pct")
+    monthly_max_loss_pct = _pct_or_none("monthly_max_loss_pct")
     tickers_in = payload.get("tickers", {})
 
     wants_live = global_signal_only is False or any(
@@ -3591,6 +3627,9 @@ def save_overrides_payload(payload: dict) -> dict | None:
         "partial_tp_enabled": partial_tp_enabled,
         "adaptive_exit_enabled": adaptive_exit_enabled,
         "orderbook_enabled": orderbook_enabled,
+        "daily_max_loss_pct": daily_max_loss_pct,
+        "weekly_max_loss_pct": weekly_max_loss_pct,
+        "monthly_max_loss_pct": monthly_max_loss_pct,
         "paused": existing.get("paused", False),
         "close_requests": existing.get("close_requests", []),
         "tickers": tickers_out,

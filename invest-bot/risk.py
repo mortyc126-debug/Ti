@@ -29,12 +29,12 @@ import logging
 import os
 import json
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import math
 
 from risk_config import (
-    MAX_OPEN_POSITIONS, DAILY_MAX_LOSS_PCT,
+    MAX_OPEN_POSITIONS, DAILY_MAX_LOSS_PCT, WEEKLY_MAX_LOSS_PCT, MONTHLY_MAX_LOSS_PCT,
     TRAIL_GIVEBACK_PCT, BREAKEVEN_AT_R, CHANDELIER_MULT,
     RISK_MIN_PCT, RISK_MID_PCT, RISK_MAX_PCT,
     CONF_LOW_THR, CONF_MID_THR, CONF_HIGH_THR,
@@ -115,9 +115,21 @@ class RiskManager:
         """equity_getter() -> float — текущий размер депо."""
         self.equity_getter = equity_getter or (lambda: 0.0)
         self.positions: dict[str, Position] = {}
+        self._daily_limit: float = DAILY_MAX_LOSS_PCT
+        self._weekly_limit: float = WEEKLY_MAX_LOSS_PCT
+        self._monthly_limit: float = MONTHLY_MAX_LOSS_PCT
         self._build_corr_index()
         self._load_state()
         self.load_positions()
+
+    def update_loss_limits(self, daily: float | None, weekly: float | None, monthly: float | None) -> None:
+        """Вызывается из Trader после перечитки runtime_overrides."""
+        if daily is not None:
+            self._daily_limit = daily
+        if weekly is not None:
+            self._weekly_limit = weekly
+        if monthly is not None:
+            self._monthly_limit = monthly
 
     def _build_corr_index(self):
         self._ticker_group: dict[str, str] = {}
@@ -125,16 +137,35 @@ class RiskManager:
             for t in tickers:
                 self._ticker_group[t] = group
 
+    @staticmethod
+    def _week_start(d) -> str:
+        return str(d - timedelta(days=d.weekday()))
+
     def _load_state(self):
-        today = str(datetime.now(timezone.utc).date())
-        self.state = {"date": today, "day_pnl_rub": 0.0,
-                      "killed": False, "trades_today": 0}
+        now = datetime.now(timezone.utc)
+        today = str(now.date())
+        week_start = self._week_start(now.date())
+        month_ym = now.strftime("%Y-%m")
+        self.state = {
+            "date": today, "day_pnl_rub": 0.0, "killed": False, "trades_today": 0,
+            "week_start": week_start, "week_pnl_rub": 0.0, "week_killed": False,
+            "month_ym": month_ym, "month_pnl_rub": 0.0, "month_killed": False,
+        }
         if os.path.exists(STATE_FILE):
             try:
                 with open(STATE_FILE, encoding="utf-8") as f:
                     s = json.load(f)
+                # восстанавливаем недельный/месячный аккумулятор из файла
+                if s.get("week_start") == week_start:
+                    self.state["week_pnl_rub"] = s.get("week_pnl_rub", 0.0)
+                    self.state["week_killed"] = s.get("week_killed", False)
+                if s.get("month_ym") == month_ym:
+                    self.state["month_pnl_rub"] = s.get("month_pnl_rub", 0.0)
+                    self.state["month_killed"] = s.get("month_killed", False)
                 if s.get("date") == today:
-                    self.state = s
+                    self.state["day_pnl_rub"] = s.get("day_pnl_rub", 0.0)
+                    self.state["killed"] = s.get("killed", False)
+                    self.state["trades_today"] = s.get("trades_today", 0)
             except (json.JSONDecodeError, OSError):
                 pass
 
@@ -144,13 +175,30 @@ class RiskManager:
             json.dump(self.state, f, ensure_ascii=False)
 
     def _rollover_if_new_day(self):
-        today = str(datetime.now(timezone.utc).date())
+        now = datetime.now(timezone.utc)
+        today = str(now.date())
         if self.state.get("date") == today:
             return
-        self.state = {"date": today, "day_pnl_rub": 0.0,
-                      "killed": False, "trades_today": 0}
+        week_start = self._week_start(now.date())
+        month_ym = now.strftime("%Y-%m")
+        new_week = week_start != self.state.get("week_start")
+        new_month = month_ym != self.state.get("month_ym")
+        self.state["date"] = today
+        self.state["day_pnl_rub"] = 0.0
+        self.state["killed"] = False
+        self.state["trades_today"] = 0
+        if new_week:
+            self.state["week_start"] = week_start
+            self.state["week_pnl_rub"] = 0.0
+            self.state["week_killed"] = False
+        if new_month:
+            self.state["month_ym"] = month_ym
+            self.state["month_pnl_rub"] = 0.0
+            self.state["month_killed"] = False
         self._save_state()
-        log.info(f"risk: новый день {today} — PnL и дневной защитный стоп сброшены")
+        log.info(f"risk: новый день {today} — дневной PnL сброшен"
+                 + (f", новая неделя {week_start}" if new_week else "")
+                 + (f", новый месяц {month_ym}" if new_month else ""))
 
     # ── Персистентность позиций ─────────────────────────────────────────────
 
@@ -192,18 +240,33 @@ class RiskManager:
     def trading_allowed(self) -> tuple[bool, str]:
         self._rollover_if_new_day()
         if self.state.get("killed"):
-            return False, f"дневной защитный стоп: лимит убытка {DAILY_MAX_LOSS_PCT}% достигнут"
+            return False, f"дневной защитный стоп: лимит убытка {self._daily_limit}% достигнут"
+        if self.state.get("week_killed"):
+            return False, f"недельный защитный стоп: лимит убытка {self._weekly_limit}% достигнут"
+        if self.state.get("month_killed"):
+            return False, f"месячный защитный стоп: лимит убытка {self._monthly_limit}% достигнут"
         return True, ""
 
     def _register_closed_pnl(self, pnl_rub: float):
         self._rollover_if_new_day()
         self.state["day_pnl_rub"] = self.state.get("day_pnl_rub", 0.0) + pnl_rub
+        self.state["week_pnl_rub"] = self.state.get("week_pnl_rub", 0.0) + pnl_rub
+        self.state["month_pnl_rub"] = self.state.get("month_pnl_rub", 0.0) + pnl_rub
         self.state["trades_today"] = self.state.get("trades_today", 0) + 1
         equity = self.equity_getter() or 0
-        if equity > 0 and self.state["day_pnl_rub"] < -equity * DAILY_MAX_LOSS_PCT / 100:
-            self.state["killed"] = True
-            log.error(f"ДНЕВНОЙ ЗАЩИТНЫЙ СТОП: убыток {self.state['day_pnl_rub']:.0f}₽ "
-                      f"превысил {DAILY_MAX_LOSS_PCT}% депо")
+        if equity > 0:
+            if not self.state.get("killed") and self.state["day_pnl_rub"] < -equity * self._daily_limit / 100:
+                self.state["killed"] = True
+                log.error(f"ДНЕВНОЙ ЗАЩИТНЫЙ СТОП: убыток {self.state['day_pnl_rub']:.0f}₽ "
+                          f"превысил {self._daily_limit}% депо")
+            if not self.state.get("week_killed") and self.state["week_pnl_rub"] < -equity * self._weekly_limit / 100:
+                self.state["week_killed"] = True
+                log.error(f"НЕДЕЛЬНЫЙ ЗАЩИТНЫЙ СТОП: убыток {self.state['week_pnl_rub']:.0f}₽ "
+                          f"превысил {self._weekly_limit}% депо")
+            if not self.state.get("month_killed") and self.state["month_pnl_rub"] < -equity * self._monthly_limit / 100:
+                self.state["month_killed"] = True
+                log.error(f"МЕСЯЧНЫЙ ЗАЩИТНЫЙ СТОП: убыток {self.state['month_pnl_rub']:.0f}₽ "
+                          f"превысил {self._monthly_limit}% депо")
         self._save_state()
 
     # ── Корреляционный риск ──────────────────────────────────────────────────
@@ -649,8 +712,15 @@ class RiskManager:
             "block_reason": why,
             "open_positions": len(self.positions),
             "day_pnl_rub": round(self.state.get("day_pnl_rub", 0), 2),
+            "week_pnl_rub": round(self.state.get("week_pnl_rub", 0), 2),
+            "month_pnl_rub": round(self.state.get("month_pnl_rub", 0), 2),
             "trades_today": self.state.get("trades_today", 0),
             "day_stop_active": self.state.get("killed", False),
+            "week_stop_active": self.state.get("week_killed", False),
+            "month_stop_active": self.state.get("month_killed", False),
+            "daily_limit_pct": self._daily_limit,
+            "weekly_limit_pct": self._weekly_limit,
+            "monthly_limit_pct": self._monthly_limit,
             "portfolio_risk_pct": port_risk,
             "squeeze_factor": squeeze,
             "group_directions": group_dirs,
