@@ -570,11 +570,69 @@ def _futures_cache_from_disk() -> tuple[dict[str, dict] | None, float]:
         return None, float("inf")
 
 
+# Группы basic_asset из FUTURES_TRADING.BASE_TICKERS (settings.ini) — для
+# дашборда, чтобы не валить десятки разнородных фьючерсов в одну кучу
+# чипов. Списком, а не одним правилом, т.к. часть имён неоднозначна
+# (BABA/BIDU выглядят как обычные тикеры, но это иностр. акции, не РФ).
+_FUTURES_CATEGORIES: list[tuple[str, frozenset[str]]] = [
+    ("🛢 Энергоносители", frozenset({
+        "Brent", "Газ (США)", "Газ (Европа)", "Газ микро (США)",
+        "Бензин АИ-92", "Бензин АИ-95", "Дизельное топливо летнее",
+    })),
+    ("⚙️ Металлы", frozenset({
+        "Золото", "Золото в долларах", "Золото в рублях", "Серебро",
+        "Палладий", "Платина", "Алюминий", "Медь", "Никель", "Цинк",
+    })),
+    ("🌾 Агро", frozenset({
+        "Пшеница", "Сахар мировой", "Сахар российский",
+        "Апельсиновый сок", "Какао", "Кофе",
+    })),
+    ("📊 Индексы РФ", frozenset({"IMOEX", "RTSI", "RTSI мини"})),
+    ("🌐 Иностр. акции/крипто", frozenset({"BABA", "BIDU", "Bitcoin-фонд IBIT", "ETHA"})),
+]
+
+_RU_STOCK_BASE_TICKERS = frozenset({
+    "ABIO", "AFKS", "AFLT", "ALRS", "ASTR", "BANE", "BELU", "BSPB", "CBOM", "CHMF",
+    "DOMRF", "ENPG", "FEES", "FESH", "FLOT", "GAZP", "GMKN", "HEAD", "HYDR", "IRAO",
+    "IVAT", "KMAZ", "LEAS", "LENT", "LKOH", "MAGN", "MDMG", "MGNT", "MIPO", "MOEX",
+    "MREDC", "MTLR", "MTSS", "MVID", "NLMK", "NVTK", "OZON", "PHOR", "PIKK", "PLZL",
+    "POSI", "RASP", "RENI", "RNFT", "ROSN", "RTKM", "RTKMP", "RUAL", "SBER", "SBERP",
+    "SFIN", "SGZH", "SIBN", "SMLT", "SNGS", "SNGSP", "SOFL", "SVCB", "T", "TATN",
+    "TATNP", "TRNFP", "UPRO", "VKCO", "VTBR", "WUSH", "X5", "YDEX",
+})
+
+
+def _futures_category(base: str) -> str:
+    """Категория фьючерса для группировки чипов в дашборде — по basic_asset
+    (не по тикеру контракта, он меняется при экспирации)."""
+    for label, names in _FUTURES_CATEGORIES:
+        if base in names:
+            return label
+    if base in _RU_STOCK_BASE_TICKERS:
+        return "📈 Акции РФ"
+    if "/" in base:
+        return "💱 Валюта"
+    if base.startswith("Индекс"):
+        return "📊 Индексы (отрасл.)"
+    if base.startswith("АДР"):
+        return "🌐 АДР"
+    if any(k in base for k in ("ETF", "iShares", "SPDR", "Nasdaq", "Tracker Fund", "MSCI")):
+        return "🌐 Иностр. ETF/индексы"
+    return "🌐 Прочее"
+
+
+# ticker → категория (для группировки чипов), пересчитывается вместе с
+# _futures_settings_cache в _build_strategy_settings.
+_futures_category_by_ticker: dict[str, str] = {}
+
+
 def _build_strategy_settings(contracts: dict[str, dict]) -> dict[str, StrategySettings]:
     """Строит dict[ticker → StrategySettings] из сохранённых данных контрактов."""
+    global _futures_category_by_ticker
     stock_settings = {s.ticker: s for s in _config.trade_strategy_settings}
     ma = _config.mega_alerts_settings
     result: dict[str, StrategySettings] = {}
+    categories: dict[str, str] = {}
     for base, info in contracts.items():
         base_st = stock_settings.get(base)
         if base_st:
@@ -601,6 +659,8 @@ def _build_strategy_settings(contracts: dict[str, dict]) -> dict[str, StrategySe
             point_value=info["point_value"],
             candle_interval_min=1,
         )
+        categories[info["ticker"]] = _futures_category(base)
+    _futures_category_by_ticker = categories
     return result
 
 
@@ -1779,6 +1839,7 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-fut{{border-color:rgba(80,140,255,.25);}}
 .chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
 .chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
+.chip-cat-label{{flex-basis:100%;font-size:10px;color:var(--txt3);margin:4px 0 -2px 2px;font-weight:600;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -4088,10 +4149,17 @@ def _render_page() -> bytes:
         f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
         for t in sorted(stocks)
     )
+    futures_by_cat: dict[str, list[str]] = {}
+    for t in sorted(futures):
+        cat = _futures_category_by_ticker.get(t, "🌐 Прочее")
+        futures_by_cat.setdefault(cat, []).append(t)
     futures_chips = "".join(
-        f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-        f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
-        for t in sorted(futures)
+        f'<div class="chip-cat-label">{cat} ({len(ts)})</div>' + "".join(
+            f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
+            f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+            for t in ts
+        )
+        for cat, ts in sorted(futures_by_cat.items())
     )
     reload_hint = (
         ' <span style="color:#7eb8f7;font-size:11px">⏳ обновляется…</span>'
