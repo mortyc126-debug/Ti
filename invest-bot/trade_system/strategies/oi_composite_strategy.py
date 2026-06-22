@@ -219,6 +219,18 @@ _MTF_COUNTER_MULT = 0.25  # composite × 0.25 если против тренда
 _MTF_TREND_MULT   = 1.15  # composite × 1.15 если по тренду старшего ТФ
 _MTF_MIN_BARS = 15        # минимум виртуальных свечей для расчёта тренда
 
+# ── L1: Структурный контекст (дневной уровень) ────────────────────────────────
+# Иерархия сигналов: L1 (структура, дни/недели) → L2 (режим, часы) → L3 (вход, минуты).
+# L1 — ворота: лонг в верхней трети N-дневного диапазона в боковике блокируется,
+# тренд смягчает штраф. Данных нет (<L1_MA_DAYS торговых дней) → нейтраль 1.0.
+_L1_COUNTER_MULT  = 0.10   # composite × 0.10 при жёстком структурном противоречии
+_L1_SOFT_MULT     = 0.35   # composite × 0.35 при мягком структурном противоречии
+_L1_TREND_MULT    = 1.15   # composite × 1.15 если структура подтверждает направление
+_L1_HARD_ZONE     = 0.15   # верхние/нижние 15% N-дневного диапазона — жёсткий блок
+_L1_SOFT_ZONE     = 0.30   # верхние/нижние 30% — мягкий штраф
+_L1_RANGE_DAYS    = 30     # период дней для расчёта ценового диапазона (percentile)
+_L1_MA_DAYS       = 50     # период дней для расчёта MA и проверки наличия истории
+
 
 def _aggregate_candles(candles: list, factor: int) -> list:
     """Агрегирует список 1м-свечей в виртуальные свечи старшего ТФ.
@@ -281,6 +293,60 @@ def _mtf_trend_score(candles_1m: list, factor: int = _MTF_FACTOR) -> float:
     if rel < -0.0001:
         return -1.0
     return 0.0
+def _l1_mult_from_context(
+    composite: float,
+    pct: float,
+    above_ma50: bool,
+    trending_up: bool,
+    trending_down: bool,
+) -> float:
+    """
+    Применяет структурный множитель L1 к composite.
+    Параметры кэшируются стратегией и обновляются раз в N баров.
+    Логика: лонг в верхней трети N-дневного диапазона в боковике → блок;
+    тренд (MA5>MA20) снимает блок — возможен пробой, не мешаем.
+    """
+    if abs(composite) < 1e-6:
+        return 1.0
+    if composite > 0:  # попытка лонга
+        if pct > (1.0 - _L1_HARD_ZONE):
+            return 1.0 if trending_up else _L1_COUNTER_MULT
+        if pct > (1.0 - _L1_SOFT_ZONE):
+            if trending_up:
+                return 1.0  # трендовый пробой вверх — не блокируем
+            return _L1_SOFT_MULT if above_ma50 else _L1_SOFT_MULT * 0.7
+        if pct < _L1_SOFT_ZONE and not above_ma50 and not trending_down:
+            return _L1_TREND_MULT  # структурно выгодно: у низа диапазона, ниже MA50
+        return 1.0
+    else:  # попытка шорта
+        if pct < _L1_HARD_ZONE:
+            return 1.0 if trending_down else _L1_COUNTER_MULT
+        if pct < _L1_SOFT_ZONE:
+            if trending_down:
+                return 1.0  # трендовый пробой вниз — не блокируем
+            return _L1_SOFT_MULT if not above_ma50 else _L1_SOFT_MULT * 0.7
+        if pct > (1.0 - _L1_SOFT_ZONE) and above_ma50 and not trending_up:
+            return _L1_TREND_MULT  # структурно выгодно: у верха диапазона, выше MA50
+        return 1.0
+
+
+def _atr_exhaustion_mult(composite: float, day_move_pct: float, atr_pct: float) -> float:
+    """Демпфирует composite если цена уже прошла значительную часть дневного ATR
+    в направлении сигнала. day_move_pct = (close - daily_open) / daily_open * 100, знаковый."""
+    if abs(composite) < 1e-6 or atr_pct <= 0:
+        return 1.0
+    direction_move = day_move_pct if composite > 0 else -day_move_pct
+    if direction_move <= 0:
+        return 1.0  # цена ещё не двигалась в сторону сигнала — исчерпания нет
+    ratio = direction_move / atr_pct
+    if ratio >= _ATR_EX_HARD:
+        return _ATR_EX_HARD_MULT
+    if ratio >= _ATR_EX_SOFT:
+        t = (ratio - _ATR_EX_SOFT) / (_ATR_EX_HARD - _ATR_EX_SOFT)
+        return 1.0 - t * (1.0 - _ATR_EX_HARD_MULT)
+    return 1.0
+
+
 LIQUIDITY_MIN_RATIO = 0.3          # объём последней свечи >= 0.3 * медианы окна
 LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "плохая полоса"
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
@@ -291,6 +357,11 @@ QUALITY_ALPHA = 0.15               # скорость EWA для rolling quality
 # уже устоявшемся режиме, а сразу после переключения это ещё переходный шум.
 LAG_PENALTY_BARS = 5
 LAG_PENALTY_MIN = 0.6              # confidence-множитель сразу после смены режима
+
+# ── ATR-exhaustion: подавление входов когда дневной ATR почти исчерпан ───────
+_ATR_EX_SOFT      = 0.60   # 60% дневного ATR в направлении сигнала → начало демпфирования
+_ATR_EX_HARD      = 0.85   # 85% → жёсткое демпфирование
+_ATR_EX_HARD_MULT = 0.15   # множитель при полном исчерпании
 
 # ── ATR-фильтр шума ──────────────────────────────────────────────────────────
 ATR_PERIOD = 14                    # период ATR
@@ -1232,6 +1303,23 @@ class OICompositeStrategy(IStrategy):
         self.__auto_atr_stop_k: Optional[float] = None
         self.__auto_atr_scale_exp: Optional[float] = None
         self.__auto_atr_recalc_date: Optional[object] = None
+        # L1: расширенный буфер для структурного контекста (дни/недели).
+        # Хранит _L1_MA_DAYS+5 торговых дней свечей; обновляется каждый бар в
+        # analyze_candles и устанавливается явно в backtest_scan_signals.
+        bars_per_day = int(6.5 * 60 / interval_min)
+        self.__l1_buffer_size: int = (_L1_MA_DAYS + 5) * bars_per_day
+        self.__l1_buffer: list = []
+        # Кэш L1-контекста (пересчитывается вместе с тяжёлыми операциями):
+        self.__l1_pct: float = 0.5           # percentile цены в N-дневном диапазоне
+        self.__l1_above_ma50: bool = True
+        self.__l1_trending_up: bool = False
+        self.__l1_trending_down: bool = False
+        self.__l1_data_ready: bool = False   # False пока нет _L1_MA_DAYS дней истории
+        # ATR-exhaustion: дневной ход в % от цены (знаковый, +вверх/-вниз).
+        self.__daily_open_price: float = 0.0
+        self.__daily_open_date: Optional[object] = None
+        self.__day_move_pct: float = 0.0
+        self.__last_atr_pct: float = 0.0
         # Кэш тяжёлых операций: пересчитываем раз в N баров, между ними — старое значение.
         # RQA O(n²), wavelet O(n log n), regime (CUSUM+PELT+Z-score) — всё CPU-bound.
         # На 1м-свечах N=5 (обновление каждые 5 минут), на 5м — N=3.
@@ -1396,9 +1484,12 @@ class OICompositeStrategy(IStrategy):
     def analyze_candles(self, candles: list[HistoricCandle]) -> Optional[Signal]:
         self.__recalc_auto_atr()
         self.__candles.extend(candles)
-        # окно: последние CANDLE_WINDOW свечей
         if len(self.__candles) > self.__candle_window:
             self.__candles = self.__candles[-self.__candle_window:]
+        # L1-буфер: накапливаем длинную историю для структурного контекста
+        self.__l1_buffer.extend(candles)
+        if len(self.__l1_buffer) > self.__l1_buffer_size:
+            self.__l1_buffer = self.__l1_buffer[-self.__l1_buffer_size:]
 
         # накапливаем историю открытой сделки для MFE/MAE
         if self.__open_trade:
@@ -1413,9 +1504,21 @@ class OICompositeStrategy(IStrategy):
         # ATR-фильтр: если средний ход меньше комиссии×фактор — движение не
         # окупает торговлю, сигнал не выдаём (защита от "мёртвых" инструментов).
         atr_pct = _compute_atr(self.__candles)
+        self.__last_atr_pct = atr_pct
         if atr_pct < commission_rt(self.__settings.is_future) * MIN_ATR_FACTOR:
             logger.debug(f"{self.__settings.figi}: пропуск — ATR {atr_pct:.4f} ниже комиссии×{MIN_ATR_FACTOR}")
             return None
+
+        # ATR-exhaustion: обновляем дневной open и дневной ход
+        if self.__candles:
+            last_c = self.__candles[-1]
+            cur_day = last_c.time.date()
+            if cur_day != self.__daily_open_date:
+                self.__daily_open_date = cur_day
+                self.__daily_open_price = _to_f(last_c.open)
+            close_px = _to_f(last_c.close)
+            if self.__daily_open_price > 0:
+                self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
         # вычисляем composite
         composite, scores = self.__compute_composite()
@@ -1513,17 +1616,39 @@ class OICompositeStrategy(IStrategy):
 
         saved_candles = self.__candles
         saved_score_history = list(self.__score_history)
+        saved_l1_state = (
+            list(self.__l1_buffer), self.__l1_pct, self.__l1_above_ma50,
+            self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready,
+        )
+        saved_atr_ex_state = (
+            self.__daily_open_price, self.__daily_open_date,
+            self.__day_move_pct, self.__last_atr_pct,
+        )
         qualities: list[float] = []
         comm = commission_rt(self.__settings.is_future)
+        last_l1_day = None
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - lookahead:
                 self.__candles = candles[i - self.__candle_window:i]
+                # L1-буфер обновляем раз в день — агрегация дорогая (O(N) баров)
+                cur_day = candles[i].time.date()
+                if cur_day != last_l1_day:
+                    last_l1_day = cur_day
+                    self.__l1_buffer = candles[max(0, i - self.__l1_buffer_size):i]
+                    self.__recalc_l1_context()
+                    self.__daily_open_date = cur_day
+                    self.__daily_open_price = _to_f(candles[i].open)
 
                 atr_pct = _compute_atr(self.__candles)
+                self.__last_atr_pct = atr_pct
                 if atr_pct < comm * MIN_ATR_FACTOR:
                     i += 1
                     continue
+
+                close_px = _to_f(candles[i].close)
+                if self.__daily_open_price > 0:
+                    self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
                 composite, scores = self.__compute_composite()
                 adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
@@ -1600,6 +1725,10 @@ class OICompositeStrategy(IStrategy):
         finally:
             self.__candles = saved_candles
             self.__score_history = saved_score_history
+            (self.__l1_buffer, self.__l1_pct, self.__l1_above_ma50,
+             self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready) = saved_l1_state
+            (self.__daily_open_price, self.__daily_open_date,
+             self.__day_move_pct, self.__last_atr_pct) = saved_atr_ex_state
 
         if not qualities:
             return 0.5, 0
@@ -1620,21 +1749,26 @@ class OICompositeStrategy(IStrategy):
 
         saved_candles = self.__candles
         saved_score_history = list(self.__score_history)
+        saved_l1_state = (
+            list(self.__l1_buffer), self.__l1_pct, self.__l1_above_ma50,
+            self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready,
+        )
+        saved_atr_ex_state = (
+            self.__daily_open_price, self.__daily_open_date,
+            self.__day_move_pct, self.__last_atr_pct,
+        )
         signals: list[dict] = []
         total_bars = len(candles) - 1 - self.__candle_window
         t_start = time.monotonic()
         t_last_log = t_start
-        # Бэктестовая история (см. history.BacktestHistoryStore) умеет писать
-        # дневные снэпшоты скоров под симулируемую дату — без этого
-        # ClusterModels (M1/M2/M3) никогда не набирают _MIN_OBS и молчат
-        # весь бэктест (история живой торговли пуста, бот ещё не торговал).
         last_sim_day: Optional[str] = None
+        last_l1_day = None
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
                 done = i - self.__candle_window
                 now = time.monotonic()
-                if now - t_last_log >= 5 and done > 0:  # не реже раза в 5с, независимо от скорости бара
+                if now - t_last_log >= 5 and done > 0:
                     t_last_log = now
                     elapsed = now - t_start
                     rate = done / elapsed if elapsed > 0 else 0
@@ -1644,12 +1778,27 @@ class OICompositeStrategy(IStrategy):
                         f"({100 * done / total_bars:.0f}%), {elapsed:.0f}с прошло, ~{eta:.0f}с осталось"
                     )
                 self.__candles = candles[i - self.__candle_window:i]
+                # L1-буфер: обновляем раз в день (агрегация — O(N) баров)
+                cur_day = candles[i].time.date()
+                if cur_day != last_l1_day:
+                    last_l1_day = cur_day
+                    self.__l1_buffer = candles[max(0, i - self.__l1_buffer_size):i]
+                    self.__recalc_l1_context()
+                    # ATR-exhaustion: дневной open = open первой свечи нового дня
+                    self.__daily_open_date = cur_day
+                    self.__daily_open_price = _to_f(candles[i].open)
 
                 atr_pct = _compute_atr(self.__candles)
+                self.__last_atr_pct = atr_pct
                 comm = commission_rt(self.__settings.is_future)
                 if atr_pct < comm * MIN_ATR_FACTOR:
                     i += 1
                     continue
+
+                # ATR-exhaustion: обновляем дневной ход на каждой свече
+                close_px = _to_f(candles[i].close)
+                if self.__daily_open_price > 0:
+                    self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
                 composite, scores = self.__compute_composite()
 
@@ -1701,14 +1850,24 @@ class OICompositeStrategy(IStrategy):
                     "method_scores": dict(self.__last_scores),
                     "regime": self.__last_regime,
                     "noise_scale": self.__noise_stop_scale(),
+                    # L1-контекст на момент входа
+                    "l1_pct": round(self.__l1_pct, 3) if self.__l1_data_ready else None,
+                    "l1_above_ma50": self.__l1_above_ma50 if self.__l1_data_ready else None,
+                    "l1_trending_up": self.__l1_trending_up if self.__l1_data_ready else None,
+                    "l1_trending_down": self.__l1_trending_down if self.__l1_data_ready else None,
+                    "atr_ex_ratio": round(self.__day_move_pct / self.__last_atr_pct, 2)
+                                    if self.__last_atr_pct > 0 else None,
                     # Исторические свечи до точки входа — для detect_level_pattern
-                    # (prev day H/L, volume climax, compression).
                     "history_window": candles[max(0, i - 60):i + 1],
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
         finally:
             self.__candles = saved_candles
             self.__score_history = saved_score_history
+            (self.__l1_buffer, self.__l1_pct, self.__l1_above_ma50,
+             self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready) = saved_l1_state
+            (self.__daily_open_price, self.__daily_open_date,
+             self.__day_move_pct, self.__last_atr_pct) = saved_atr_ex_state
 
         return signals
 
@@ -1884,7 +2043,26 @@ class OICompositeStrategy(IStrategy):
             m: {"agree_n": 0, "agree_win": 0, "agree_dur": 0.0, "disagree_n": 0, "disagree_win": 0, "disagree_dur": 0.0}
             for m in ("m1", "m2", "m3")
         }
+        # Attribution по отдельным методам (BASE_METHOD_NAMES): та же логика agree/disagree.
+        # Ключ — имя метода (PRICE_TREND, VOL_MOMENTUM, …).
+        method_tally: dict[str, dict] = {}
         for sig in signals:
+            # Адаптивный пересчёт M1/M2/M3: кластерные модели накапливают историю
+            # из предыдущих записанных сделок (record_history=True), поэтому каждый
+            # следующий сигнал получает актуальные effWR вместо дефолтных 0.5.
+            # Без этого backtest_scan_signals генерирует 0,0,0 (история пуста),
+            # и attribution бессмысленен. Shallow-copy sig, чтобы не мутировать оригинал.
+            if self.__cluster_models is not None and sig.get("method_scores"):
+                base_sc = {k: v for k, v in sig["method_scores"].items()
+                           if k not in {M1_NAME, M2_NAME, M3_NAME}}
+                sig_regime = sig.get("regime", "")
+                if self.__cluster_models.needs_refresh(sig_regime):
+                    self.__cluster_models.refresh(sig_regime)
+                if self.__cluster_models._ready:
+                    rm1, rm2, rm3 = self.__cluster_models.compute(base_sc)
+                    sig = dict(sig)
+                    sig["m1"], sig["m2"], sig["m3"] = rm1, rm2, rm3
+
             direction, entry, atr_pct, window = sig["direction"], sig["entry"], sig["atr_pct"], sig["window"]
 
             if atr_take_k is not None and atr_stop_k is not None:
@@ -1996,6 +2174,21 @@ class OICompositeStrategy(IStrategy):
                     tally["disagree_win"] += int(win)
                     tally["disagree_dur"] += duration_min
 
+            # Per-method attribution: скоры из method_scores сигнала,
+            # исключая M1/M2/M3 (они агрегаты, а не самостоятельные методы).
+            for mname, m_sc in sig.get("method_scores", {}).items():
+                if mname in {M1_NAME, M2_NAME, M3_NAME}:
+                    continue
+                if abs(m_sc) < 0.02:  # метод промолчал — не считаем
+                    continue
+                t = method_tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
+                if (m_sc > 0) == (dir_sign > 0):
+                    t["agree_n"] += 1
+                    t["agree_win"] += int(win)
+                else:
+                    t["disagree_n"] += 1
+                    t["disagree_win"] += int(win)
+
             # Пишем сделку в бэктестовую историю (см. backtest_scan_signals) —
             # без этого effWR в ClusterModels остаётся дефолтным 0.5 для всех
             # методов, как и в самом начале живой торговли без сделок.
@@ -2066,6 +2259,12 @@ class OICompositeStrategy(IStrategy):
                     "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
                     "top_agree": top_agree,
                     "top_against": top_against,
+                    # L1-контекст на момент входа (None если данных не было)
+                    "l1_pct": sig.get("l1_pct"),
+                    "l1_above_ma50": sig.get("l1_above_ma50"),
+                    "l1_trending_up": sig.get("l1_trending_up"),
+                    "l1_trending_down": sig.get("l1_trending_down"),
+                    "atr_ex_ratio": sig.get("atr_ex_ratio"),
                 })
 
         if not results:
@@ -2090,9 +2289,63 @@ class OICompositeStrategy(IStrategy):
             }
             for m, t in model_tally.items()
         }
+        out["method_stats"] = {
+            mname: {
+                "agree_n": t["agree_n"],
+                "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
+                "disagree_n": t["disagree_n"],
+                "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+            }
+            for mname, t in method_tally.items()
+        }
         if return_trades:
             out["trades"] = trades
         return out
+
+    def __recalc_l1_context(self) -> None:
+        """
+        Пересчитывает L1-контекст из расширенного буфера свечей:
+        - percentile текущей цены в _L1_RANGE_DAYS-дневном диапазоне (0..1)
+        - положение относительно 50d MA
+        - тренд по MA5/MA20 (есть ли направленное движение)
+        Вызывается в блоке тяжёлых операций (каждые __heavy_cache_n баров)
+        и при инициализации позиции буфера в бэктесте.
+        """
+        if not self.__l1_buffer:
+            return
+        by_day: dict = {}
+        for c in self.__l1_buffer:
+            d = c.time.date()
+            h, lo, cl = _to_f(c.high), _to_f(c.low), _to_f(c.close)
+            if d not in by_day:
+                by_day[d] = {"h": h, "l": lo, "c": cl}
+            else:
+                if h > by_day[d]["h"]: by_day[d]["h"] = h
+                if lo < by_day[d]["l"]: by_day[d]["l"] = lo
+                by_day[d]["c"] = cl
+        sorted_days = sorted(by_day.keys())
+        n = len(sorted_days)
+        if n < _L1_MA_DAYS:
+            return  # недостаточно истории — не меняем __l1_data_ready
+        current_price = _to_f(self.__l1_buffer[-1].close)
+        # 30-дневный ценовой диапазон
+        range_days = sorted_days[-_L1_RANGE_DAYS:]
+        rng_high = max(by_day[d]["h"] for d in range_days)
+        rng_low  = min(by_day[d]["l"] for d in range_days)
+        rng = rng_high - rng_low
+        if rng <= 0:
+            return
+        self.__l1_pct = max(0.0, min(1.0, (current_price - rng_low) / rng))
+        # 50d MA
+        ma50 = sum(by_day[d]["c"] for d in sorted_days[-_L1_MA_DAYS:]) / _L1_MA_DAYS
+        self.__l1_above_ma50 = current_price > ma50
+        # MA5/MA20 — детектор тренда: снимает блок при пробойном движении
+        n5 = min(5, n); n20 = min(20, n)
+        ma5  = sum(by_day[d]["c"] for d in sorted_days[-n5:])  / n5
+        ma20 = sum(by_day[d]["c"] for d in sorted_days[-n20:]) / n20
+        self.__l1_trending_up   = ma5 > ma20 * 1.002
+        self.__l1_trending_down = ma5 < ma20 * 0.998
+        self.__l1_data_ready = True
 
     # ── Внутренние методы ─────────────────────────────────────────────────────
 
@@ -2115,6 +2368,7 @@ class OICompositeStrategy(IStrategy):
             self.__cached_wavelet_mult = wavelet_confidence_mult(closes)
             if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
                 self.__cached_mtf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
+            self.__recalc_l1_context()
 
         regime_probs = self.__cached_regime_probs
 
@@ -2215,13 +2469,41 @@ class OICompositeStrategy(IStrategy):
         confidence_mult *= lag_mult
         composite *= confidence_mult
 
-        # MTF-гейт: используем кэшированный тренд старшего ТФ.
+        # MTF-гейт: тренд на 5м-свечах против текущего направления → штраф.
         htf_trend = self.__cached_mtf_trend
         if htf_trend != 0.0:
             if (composite > 0 and htf_trend < 0) or (composite < 0 and htf_trend > 0):
                 composite *= _MTF_COUNTER_MULT
             else:
                 composite *= _MTF_TREND_MULT
+
+        # L1-гейт: структурный контекст (30d диапазон + 50d MA).
+        # Старший ворот иерархии: лонг в верхних 15% диапазона в боковике → ×0.10.
+        # Тренд (MA5>MA20) снимает блок — пробойное движение не подавляем.
+        if self.__l1_data_ready:
+            l1_mult = _l1_mult_from_context(
+                composite, self.__l1_pct, self.__l1_above_ma50,
+                self.__l1_trending_up, self.__l1_trending_down,
+            )
+            if l1_mult != 1.0:
+                logger.debug(
+                    f"{self.__settings.figi}: L1 pct={self.__l1_pct:.2f} "
+                    f"above_ma50={self.__l1_above_ma50} trend↑={self.__l1_trending_up} "
+                    f"trend↓={self.__l1_trending_down} → ×{l1_mult:.2f}"
+                )
+            composite *= l1_mult
+
+        # ATR-exhaustion: если цена уже прошла 60-85%+ дневного ATR в направлении
+        # сигнала — потенциал движения исчерпывается, демпфируем composite.
+        if self.__last_atr_pct > 0 and self.__daily_open_price > 0:
+            atr_ex_mult = _atr_exhaustion_mult(composite, self.__day_move_pct, self.__last_atr_pct)
+            if atr_ex_mult != 1.0:
+                logger.debug(
+                    f"{self.__settings.figi}: ATR-ex ratio="
+                    f"{self.__day_move_pct / self.__last_atr_pct:.2f} "
+                    f"move={self.__day_move_pct:.3f}% atr={self.__last_atr_pct:.3f}% → ×{atr_ex_mult:.2f}"
+                )
+            composite *= atr_ex_mult
 
         self.__last_regime = regime
         self.__regime_confidence = regime_conf

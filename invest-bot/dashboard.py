@@ -41,6 +41,8 @@ import statistics
 import threading
 import time
 import traceback
+import csv
+import io
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from decimal import Decimal
@@ -586,6 +588,88 @@ def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) ->
     return {"ticker": ticker, "candles": candle_rows, "trades": trades_out}
 
 
+def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
+    """
+    Экспорт CSV для AI-анализа: каждый M5-бар тикера со всеми method_scores,
+    режимом, OHLCV и forward-return (+1/+5/+20 баров).
+    Возвращает {"csv": "<строка>", "rows": N, "ticker": ticker} или {"error": ...}.
+    """
+    by_ticker = _all_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"error": f"{ticker}: нет в settings.ini"}
+
+    try:
+        candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    except RequestError as e:
+        return {"error": f"Tinkoff API: {e}"}
+    if not candles:
+        return {"error": f"{ticker}: нет свечей"}
+
+    # используем OICompositeStrategy.scan_method_scores — даёт каждый бар
+    from trade_system.strategies.oi_composite_strategy import OICompositeStrategy
+    oi_settings = strategy_settings
+    # если текущая стратегия не OI — временно создаём OI для скоринга
+    oi_strat = OICompositeStrategy(oi_settings)
+    _wire_history(oi_strat)
+
+    rows = oi_strat.scan_method_scores(candles)
+    if not rows:
+        return {"error": f"{ticker}: scan_method_scores вернул пустой результат"}
+
+    # добавляем OHLV и forward return
+    from tinkoff.invest.utils import quotation_to_decimal
+    def _f(q): return float(quotation_to_decimal(q))
+
+    close_arr = [_f(c.close) for c in candles]
+    high_arr  = [_f(c.high)  for c in candles]
+    low_arr   = [_f(c.low)   for c in candles]
+    open_arr  = [_f(c.open)  for c in candles]
+    vol_arr   = [float(c.volume) for c in candles]
+
+    # rows[i] соответствует candles[window + i]
+    window = len(candles) - len(rows)
+
+    score_names = sorted(rows[0]["scores"].keys()) if rows else []
+    fieldnames = (
+        ["time", "open", "high", "low", "close", "volume", "regime"]
+        + score_names
+        + ["fwd_ret_3", "fwd_ret_6", "fwd_ret_12"]
+    )
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for i, row in enumerate(rows):
+        ci = window + i  # индекс в candles
+        close = close_arr[ci]
+
+        def fwd(n):
+            j = ci + n
+            if j >= len(close_arr) or close == 0:
+                return ""
+            return round((close_arr[j] - close) / close * 100, 4)
+
+        record = {
+            "time": row["time"].isoformat() if hasattr(row["time"], "isoformat") else str(row["time"]),
+            "open":   round(open_arr[ci], 4),
+            "high":   round(high_arr[ci], 4),
+            "low":    round(low_arr[ci], 4),
+            "close":  round(close, 4),
+            "volume": int(vol_arr[ci]),
+            "regime": row["regime"],
+            "fwd_ret_3":  fwd(3),
+            "fwd_ret_6":  fwd(6),
+            "fwd_ret_12": fwd(12),
+        }
+        for sn in score_names:
+            record[sn] = round(row["scores"].get(sn, 0.0), 4)
+        writer.writerow(record)
+
+    return {"csv": buf.getvalue(), "rows": len(rows), "ticker": ticker}
+
+
 def get_diagnostics(ticker: str, days: int = 30) -> dict:
     """
     Снимок того, КАК сейчас реально считается композит для тикера — на
@@ -736,6 +820,33 @@ def _model_stats_from_trades(trades: list[dict]) -> dict:
             "disagree_avg_duration_min": tl["disagree_dur"] / tl["disagree_n"] if tl["disagree_n"] else None,
         }
         for m, tl in tally.items()
+    }
+
+
+def _method_stats_from_trades(trades: list[dict]) -> dict:
+    """Per-method agree/disagree attribution из списка сделок.
+    Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win."""
+    tally: dict[str, dict] = {}
+    for t in trades:
+        dir_sign = 1 if t["direction"] == "LONG" else -1
+        for mname, m_sc in t.get("method_scores", {}).items():
+            if abs(m_sc) < 0.02:
+                continue
+            e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
+            if (m_sc > 0) == (dir_sign > 0):
+                e["agree_n"] += 1
+                e["agree_win"] += int(t["win"])
+            else:
+                e["disagree_n"] += 1
+                e["disagree_win"] += int(t["win"])
+    return {
+        mname: {
+            "agree_n": e["agree_n"],
+            "agree_win_rate": e["agree_win"] / e["agree_n"] if e["agree_n"] else None,
+            "disagree_n": e["disagree_n"],
+            "disagree_win_rate": e["disagree_win"] / e["disagree_n"] if e["disagree_n"] else None,
+        }
+        for mname, e in tally.items()
     }
 
 
@@ -929,6 +1040,7 @@ def run_backtest_one(
                     "avg_r": sum(t["r_multiple"] for t in wf_trades) / n_total,
                     "expectancy_pct": sum(t["net_pct"] for t in wf_trades) / n_total,
                     "model_stats": _model_stats_from_trades(wf_trades),
+                    "method_stats": _method_stats_from_trades(wf_trades),
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
                              "what_if": _what_if_from_trades(wf_trades), **wf_row})
@@ -1598,6 +1710,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <label>ATR_TAKE_K <input type="number" class="inp mid" id="tc_take" value="2.0" min="0.5" step="0.5"></label>
     <label>ATR_STOP_K <input type="number" class="inp mid" id="tc_stop" value="1.0" min="0.3" step="0.5"></label>
     <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
+    <button class="btn-pill" style="background:var(--accent2,#2a4a2a);" onclick="exportBarScores()" title="Скачать CSV со всеми method_scores по каждому бару — для AI-анализа">📥 CSV для AI</button>
     <span id="tc_status" style="font-size:11px;color:var(--txt3);"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--txt3);">
@@ -1838,6 +1951,21 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     (доп. живая подписка к API, выключено по умолчанию; работает только вместе с адаптивным выходом)
   </label>
   <br><br>
+  <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+      Дневной лимит убытка, %
+      <input type="number" step="0.1" min="0.1" max="100" class="inp mid" id="ov_daily_loss" placeholder="2">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+      Недельный лимит убытка, %
+      <input type="number" step="0.1" min="0.1" max="100" class="inp mid" id="ov_weekly_loss" placeholder="5">
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+      Месячный лимит убытка, %
+      <input type="number" step="0.1" min="0.1" max="100" class="inp mid" id="ov_monthly_loss" placeholder="10">
+    </label>
+  </div>
+  <br>
   <button class="btn-pill" onclick="loadOverrides()">⟳ ЗАГРУЗИТЬ ТЕКУЩИЕ</button>
   <button class="btn-pill" onclick="saveOverrides()">💾 СОХРАНИТЬ</button>
   <span id="ov_status"></span>
@@ -1906,7 +2034,7 @@ function modelStatsToHtml(modelStats) {{
     let dis = '';
     if (s.disagree_n > 0) {{
       const disPct = s.disagree_win_rate !== null ? (s.disagree_win_rate * 100).toFixed(0) + '%' : '—';
-      dis = ` <span style="color:var(--neg)">✗${{s.disagree_n}} ${{disPct}}</span>`;
+      dis = ` <span style="color:var(--neg)" title="сделок где модель была против направления">(против: ${{s.disagree_n}}, ${{disPct}})</span>`;
     }}
     parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}}${{dur}})${{dis}}`);
   }}
@@ -1933,6 +2061,32 @@ function whatIfToHtml(whatIf) {{
   return parts.join(' / ');
 }}
 
+function methodStatsToHtml(ms) {{
+  if (!ms || !Object.keys(ms).length) return '';
+  // Сортируем по agree_n desc, оставляем методы где есть хоть одна сделка
+  const rows = Object.entries(ms)
+    .filter(([, s]) => s.agree_n > 0 || s.disagree_n > 0)
+    .sort((a, b) => (b[1].agree_n + b[1].disagree_n) - (a[1].agree_n + a[1].disagree_n));
+  if (!rows.length) return '';
+  let html = '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:4px">';
+  html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:1px 6px">метод</th>'
+        + '<th style="padding:1px 6px">за n</th><th style="padding:1px 6px">за win%</th>'
+        + '<th style="padding:1px 6px">против n</th><th style="padding:1px 6px">против win%</th></tr>';
+  for (const [name, s] of rows) {{
+    const agWr = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate*100).toFixed(0)+'%' : '—';
+    const disWr = s.disagree_win_rate !== null && s.disagree_win_rate !== undefined ? (s.disagree_win_rate*100).toFixed(0)+'%' : '—';
+    const agStyle = s.agree_win_rate !== null && s.agree_win_rate > 0.6 ? 'color:var(--pos)' : (s.agree_win_rate !== null && s.agree_win_rate < 0.4 ? 'color:var(--neg)' : '');
+    const disStyle = s.disagree_win_rate !== null && s.disagree_win_rate > 0.6 ? 'color:var(--neg)' : (s.disagree_win_rate !== null && s.disagree_win_rate < 0.4 ? 'color:var(--pos)' : '');
+    html += `<tr><td style="padding:1px 6px">${{name}}</td>`
+          + `<td style="text-align:right;padding:1px 6px">${{s.agree_n}}</td>`
+          + `<td style="text-align:right;padding:1px 6px;${{agStyle}}">${{agWr}}</td>`
+          + `<td style="text-align:right;padding:1px 6px">${{s.disagree_n}}</td>`
+          + `<td style="text-align:right;padding:1px 6px;${{disStyle}}">${{disWr}}</td></tr>`;
+  }}
+  html += '</table>';
+  return html;
+}}
+
 function rowsToHtml(rows) {{
   let html = '';
   for (const r of rows) {{
@@ -1957,6 +2111,12 @@ function rowsToHtml(rows) {{
       const wi = whatIfToHtml(r.what_if);
       if (wi) {{
         html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3);">Если бы слушали только модель: ${{wi}}</td></tr>`;
+      }}
+    }}
+    if (r.method_stats) {{
+      const mt = methodStatsToHtml(r.method_stats);
+      if (mt) {{
+        html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам</summary>${{mt}}</details></td></tr>`;
       }}
     }}
   }}
@@ -2280,6 +2440,20 @@ function tradeDetailHtml(t) {{
     html += t.top_against.map(([n, v]) => `${{n}} ${{fmtScore(v)}}`).join(' · ');
     html += `</div>`;
   }}
+  if (t.l1_pct != null) {{
+    const pct = Math.round(t.l1_pct * 100);
+    const pctColor = t.direction === 'LONG'
+      ? (pct > 70 ? 'var(--neg)' : pct < 30 ? 'var(--pos)' : 'var(--txt3)')
+      : (pct < 30 ? 'var(--neg)' : pct > 70 ? 'var(--pos)' : 'var(--txt3)');
+    const maStr = t.l1_above_ma50 ? '▲MA50' : '▼MA50';
+    const trendStr = t.l1_trending_up ? ' тренд↑' : t.l1_trending_down ? ' тренд↓' : '';
+    const exStr = t.atr_ex_ratio != null
+      ? ` ATR-ex <b style="color:${{t.atr_ex_ratio > 0.6 ? 'var(--neg)' : 'var(--txt3)}}">${{t.atr_ex_ratio.toFixed(2)}}</b>`
+      : '';
+    html += `<div style="font-size:10px;color:var(--txt3)"><b>L1:</b> `
+      + `перцентиль <b style="color:${{pctColor}}">${{pct}}%</b> `
+      + `${{maStr}}${{trendStr}}${{exStr}}</div>`;
+  }}
   html += `</div>`;
   return html;
 }}
@@ -2571,6 +2745,9 @@ async function loadOverrides() {{
   document.getElementById('ov_partial_tp').checked = data.partial_tp_enabled === true;
   document.getElementById('ov_adaptive_exit').checked = data.adaptive_exit_enabled === true;
   document.getElementById('ov_orderbook').checked = data.orderbook_enabled === true;
+  document.getElementById('ov_daily_loss').value = data.daily_max_loss_pct ?? '';
+  document.getElementById('ov_weekly_loss').value = data.weekly_max_loss_pct ?? '';
+  document.getElementById('ov_monthly_loss').value = data.monthly_max_loss_pct ?? '';
   const tbody = document.getElementById('ov_table');
   tbody.innerHTML = data.tickers_all.map(t => ovRowHtml(t, data.tickers[t])).join('');
   document.getElementById('ov_status').textContent = 'загружено';
@@ -2602,6 +2779,9 @@ async function saveOverrides() {{
     headers: {{'Content-Type': 'application/json'}},
     body: JSON.stringify({{
       global_signal_only, partial_tp_enabled, adaptive_exit_enabled, orderbook_enabled, tickers,
+      daily_max_loss_pct: document.getElementById('ov_daily_loss').value || null,
+      weekly_max_loss_pct: document.getElementById('ov_weekly_loss').value || null,
+      monthly_max_loss_pct: document.getElementById('ov_monthly_loss').value || null,
       password: document.getElementById('ov_password').value,
     }}),
   }});
@@ -3166,6 +3346,32 @@ async function askCouncil() {{
   _resize();
 }})();
 
+async function exportBarScores() {{
+  const ticker = document.getElementById('tc_ticker').value;
+  if (!ticker) {{ alert('Сначала выбери тикер'); return; }}
+  const days = 90;
+  const status = document.getElementById('tc_status');
+  status.textContent = 'подготовка CSV...';
+  try {{
+    const resp = await fetch(`/api/export_bar_scores?ticker=${{encodeURIComponent(ticker)}}&days=${{days}}`);
+    if (!resp.ok) {{
+      const j = await resp.json().catch(() => ({{}}));
+      status.textContent = '❌ ' + (j.error || resp.statusText);
+      return;
+    }}
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${{ticker}}_bar_scores_${{days}}d.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    status.textContent = 'CSV скачан ✓';
+  }} catch(e) {{
+    status.textContent = '❌ ' + e;
+  }}
+}}
+
 // ══════════════════════ АНАЛИТИКА ══════════════════════
 
 let _anData = null;
@@ -3475,6 +3681,9 @@ def get_overrides_payload() -> dict:
         "adaptive_exit_enabled": data.get("adaptive_exit_enabled"),
         "orderbook_enabled": data.get("orderbook_enabled"),
         "paused": data.get("paused", False),
+        "daily_max_loss_pct": data.get("daily_max_loss_pct"),
+        "weekly_max_loss_pct": data.get("weekly_max_loss_pct"),
+        "monthly_max_loss_pct": data.get("monthly_max_loss_pct"),
         "tickers": data.get("tickers", {}),
         "tickers_all": tickers_all,
     }
@@ -3552,6 +3761,18 @@ def save_overrides_payload(payload: dict) -> dict | None:
     partial_tp_enabled = payload.get("partial_tp_enabled")
     adaptive_exit_enabled = payload.get("adaptive_exit_enabled")
     orderbook_enabled = payload.get("orderbook_enabled")
+    def _pct_or_none(key):
+        v = payload.get(key)
+        if v in (None, ""):
+            return None
+        try:
+            f = float(v)
+            return f if f > 0 else None
+        except (TypeError, ValueError):
+            return None
+    daily_max_loss_pct = _pct_or_none("daily_max_loss_pct")
+    weekly_max_loss_pct = _pct_or_none("weekly_max_loss_pct")
+    monthly_max_loss_pct = _pct_or_none("monthly_max_loss_pct")
     tickers_in = payload.get("tickers", {})
 
     wants_live = global_signal_only is False or any(
@@ -3580,6 +3801,9 @@ def save_overrides_payload(payload: dict) -> dict | None:
         "partial_tp_enabled": partial_tp_enabled,
         "adaptive_exit_enabled": adaptive_exit_enabled,
         "orderbook_enabled": orderbook_enabled,
+        "daily_max_loss_pct": daily_max_loss_pct,
+        "weekly_max_loss_pct": weekly_max_loss_pct,
+        "monthly_max_loss_pct": monthly_max_loss_pct,
         "paused": existing.get("paused", False),
         "close_requests": existing.get("close_requests", []),
         "tickers": tickers_out,
@@ -3671,6 +3895,26 @@ class Handler(BaseHTTPRequestHandler):
             atr_stop = float(qs.get("atr_stop", ["1.0"])[0])
             try:
                 self._send_json(get_trade_chart(ticker, days, atr_take, atr_stop))
+            except Exception as e:
+                self._send_json({"error": str(e)})
+        elif self.path.startswith("/api/export_bar_scores"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0]
+            days = int(qs.get("days", ["90"])[0])
+            try:
+                result = export_bar_scores_csv(ticker, days)
+                if "error" in result:
+                    self._send_json(result)
+                else:
+                    fname = f"{ticker}_bar_scores_{days}d.csv"
+                    csv_bytes = result["csv"].encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/csv; charset=utf-8")
+                    self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+                    self.send_header("Content-Length", str(len(csv_bytes)))
+                    self.end_headers()
+                    self.wfile.write(csv_bytes)
             except Exception as e:
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":

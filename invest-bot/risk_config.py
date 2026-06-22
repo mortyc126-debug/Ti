@@ -56,7 +56,9 @@ PORTFOLIO_STOP_SQUEEZE = True  # сжимать стоп нового входа
 
 # ── Прочие параметры ─────────────────────────────────────────────────────
 MAX_OPEN_POSITIONS = 2
-DAILY_MAX_LOSS_PCT = 6.0
+DAILY_MAX_LOSS_PCT   = 2.0   # макс. дневной убыток, % депо (дефолт; перебивается с дашборда)
+WEEKLY_MAX_LOSS_PCT  = 5.0   # макс. недельный убыток, % депо
+MONTHLY_MAX_LOSS_PCT = 10.0  # макс. месячный убыток, % депо
 BREAKEVEN_AT_R = 1.0
 TRAIL_GIVEBACK_PCT = 30
 CHANDELIER_MULT = 3.0

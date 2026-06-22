@@ -54,6 +54,9 @@ def load_overrides(path: str = OVERRIDES_FILE) -> dict:
     data.setdefault("paused", False)
     data.setdefault("close_requests", [])
     data.setdefault("tickers", {})
+    data.setdefault("daily_max_loss_pct", None)
+    data.setdefault("weekly_max_loss_pct", None)
+    data.setdefault("monthly_max_loss_pct", None)
     return data
 
 
@@ -145,6 +148,16 @@ class RuntimeOverrides:
         self.__data["move_stop_requests"] = []
         save_overrides(self.__data, self.__path)
         return reqs
+
+    def loss_limits(self) -> tuple[float | None, float | None, float | None]:
+        """Возвращает (daily_pct, weekly_pct, monthly_pct); None = брать дефолт из risk_config."""
+        def _pct(key):
+            v = self.__data.get(key)
+            try:
+                return float(v) if v is not None else None
+            except (TypeError, ValueError):
+                return None
+        return _pct("daily_max_loss_pct"), _pct("weekly_max_loss_pct"), _pct("monthly_max_loss_pct")
 
     def take_stop_for(self, ticker: str) -> dict[str, Decimal]:
         """Только заданные (не null) поля — для set_take_stop_overrides(**kwargs)."""
