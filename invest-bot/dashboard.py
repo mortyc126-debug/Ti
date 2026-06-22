@@ -1849,12 +1849,12 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-section>.chip-row{{padding:8px 12px 10px;}}
 .chip-stock-section>summary{{color:#a0d4a0;}}
 .chip-fut-section>summary{{color:#7eb8f7;}}
-.cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;max-height:220px;}}
-.cat-toc{{flex:0 0 200px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);}}
+.cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:220px;}}
+.cat-toc{{flex:0 0 200px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);height:100%;}}
 .cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:pointer;border-bottom:1px solid var(--border2);white-space:nowrap;}}
 .cat-toc-item:hover{{background:rgba(255,255,255,.05);color:var(--txt);}}
 .cat-toc-item.active{{background:rgba(126,184,247,.12);color:var(--accent);font-weight:600;}}
-.cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;}}
+.cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;height:100%;box-sizing:border-box;}}
 .cat-panel .chip-row{{padding:0;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
