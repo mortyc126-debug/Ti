@@ -739,6 +739,33 @@ def _model_stats_from_trades(trades: list[dict]) -> dict:
     }
 
 
+def _method_stats_from_trades(trades: list[dict]) -> dict:
+    """Per-method agree/disagree attribution из списка сделок.
+    Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win."""
+    tally: dict[str, dict] = {}
+    for t in trades:
+        dir_sign = 1 if t["direction"] == "LONG" else -1
+        for mname, m_sc in t.get("method_scores", {}).items():
+            if abs(m_sc) < 0.02:
+                continue
+            e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
+            if (m_sc > 0) == (dir_sign > 0):
+                e["agree_n"] += 1
+                e["agree_win"] += int(t["win"])
+            else:
+                e["disagree_n"] += 1
+                e["disagree_win"] += int(t["win"])
+    return {
+        mname: {
+            "agree_n": e["agree_n"],
+            "agree_win_rate": e["agree_win"] / e["agree_n"] if e["agree_n"] else None,
+            "disagree_n": e["disagree_n"],
+            "disagree_win_rate": e["disagree_win"] / e["disagree_n"] if e["disagree_n"] else None,
+        }
+        for mname, e in tally.items()
+    }
+
+
 def _what_if_from_trades(trades: list[dict]) -> dict:
     """Та же идея, что what_if в run_portfolio_sim, но без эквити-симуляции
     (на одном тикере счёт не строим) — просто n_trades/win_rate/avg_r/
@@ -929,6 +956,7 @@ def run_backtest_one(
                     "avg_r": sum(t["r_multiple"] for t in wf_trades) / n_total,
                     "expectancy_pct": sum(t["net_pct"] for t in wf_trades) / n_total,
                     "model_stats": _model_stats_from_trades(wf_trades),
+                    "method_stats": _method_stats_from_trades(wf_trades),
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
                              "what_if": _what_if_from_trades(wf_trades), **wf_row})
@@ -1948,6 +1976,32 @@ function whatIfToHtml(whatIf) {{
   return parts.join(' / ');
 }}
 
+function methodStatsToHtml(ms) {{
+  if (!ms || !Object.keys(ms).length) return '';
+  // Сортируем по agree_n desc, оставляем методы где есть хоть одна сделка
+  const rows = Object.entries(ms)
+    .filter(([, s]) => s.agree_n > 0 || s.disagree_n > 0)
+    .sort((a, b) => (b[1].agree_n + b[1].disagree_n) - (a[1].agree_n + a[1].disagree_n));
+  if (!rows.length) return '';
+  let html = '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:4px">';
+  html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:1px 6px">метод</th>'
+        + '<th style="padding:1px 6px">за n</th><th style="padding:1px 6px">за win%</th>'
+        + '<th style="padding:1px 6px">против n</th><th style="padding:1px 6px">против win%</th></tr>';
+  for (const [name, s] of rows) {{
+    const agWr = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate*100).toFixed(0)+'%' : '—';
+    const disWr = s.disagree_win_rate !== null && s.disagree_win_rate !== undefined ? (s.disagree_win_rate*100).toFixed(0)+'%' : '—';
+    const agStyle = s.agree_win_rate !== null && s.agree_win_rate > 0.6 ? 'color:var(--pos)' : (s.agree_win_rate !== null && s.agree_win_rate < 0.4 ? 'color:var(--neg)' : '');
+    const disStyle = s.disagree_win_rate !== null && s.disagree_win_rate > 0.6 ? 'color:var(--neg)' : (s.disagree_win_rate !== null && s.disagree_win_rate < 0.4 ? 'color:var(--pos)' : '');
+    html += `<tr><td style="padding:1px 6px">${{name}}</td>`
+          + `<td style="text-align:right;padding:1px 6px">${{s.agree_n}}</td>`
+          + `<td style="text-align:right;padding:1px 6px;${{agStyle}}">${{agWr}}</td>`
+          + `<td style="text-align:right;padding:1px 6px">${{s.disagree_n}}</td>`
+          + `<td style="text-align:right;padding:1px 6px;${{disStyle}}">${{disWr}}</td></tr>`;
+  }}
+  html += '</table>';
+  return html;
+}}
+
 function rowsToHtml(rows) {{
   let html = '';
   for (const r of rows) {{
@@ -1972,6 +2026,12 @@ function rowsToHtml(rows) {{
       const wi = whatIfToHtml(r.what_if);
       if (wi) {{
         html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3);">Если бы слушали только модель: ${{wi}}</td></tr>`;
+      }}
+    }}
+    if (r.method_stats) {{
+      const mt = methodStatsToHtml(r.method_stats);
+      if (mt) {{
+        html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам</summary>${{mt}}</details></td></tr>`;
       }}
     }}
   }}

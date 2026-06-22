@@ -2043,6 +2043,9 @@ class OICompositeStrategy(IStrategy):
             m: {"agree_n": 0, "agree_win": 0, "agree_dur": 0.0, "disagree_n": 0, "disagree_win": 0, "disagree_dur": 0.0}
             for m in ("m1", "m2", "m3")
         }
+        # Attribution по отдельным методам (BASE_METHOD_NAMES): та же логика agree/disagree.
+        # Ключ — имя метода (PRICE_TREND, VOL_MOMENTUM, …).
+        method_tally: dict[str, dict] = {}
         for sig in signals:
             # Адаптивный пересчёт M1/M2/M3: кластерные модели накапливают историю
             # из предыдущих записанных сделок (record_history=True), поэтому каждый
@@ -2171,6 +2174,21 @@ class OICompositeStrategy(IStrategy):
                     tally["disagree_win"] += int(win)
                     tally["disagree_dur"] += duration_min
 
+            # Per-method attribution: скоры из method_scores сигнала,
+            # исключая M1/M2/M3 (они агрегаты, а не самостоятельные методы).
+            for mname, m_sc in sig.get("method_scores", {}).items():
+                if mname in {M1_NAME, M2_NAME, M3_NAME}:
+                    continue
+                if abs(m_sc) < 0.02:  # метод промолчал — не считаем
+                    continue
+                t = method_tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
+                if (m_sc > 0) == (dir_sign > 0):
+                    t["agree_n"] += 1
+                    t["agree_win"] += int(win)
+                else:
+                    t["disagree_n"] += 1
+                    t["disagree_win"] += int(win)
+
             # Пишем сделку в бэктестовую историю (см. backtest_scan_signals) —
             # без этого effWR в ClusterModels остаётся дефолтным 0.5 для всех
             # методов, как и в самом начале живой торговли без сделок.
@@ -2270,6 +2288,15 @@ class OICompositeStrategy(IStrategy):
                 "disagree_avg_duration_min": t["disagree_dur"] / t["disagree_n"] if t["disagree_n"] else None,
             }
             for m, t in model_tally.items()
+        }
+        out["method_stats"] = {
+            mname: {
+                "agree_n": t["agree_n"],
+                "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
+                "disagree_n": t["disagree_n"],
+                "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+            }
+            for mname, t in method_tally.items()
         }
         if return_trades:
             out["trades"] = trades
