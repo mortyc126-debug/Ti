@@ -84,10 +84,24 @@ ORDERBOOK_DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "10"))
 MAX_ENTRY_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT", "0.003"))  # 0.3%
 
 # Дробный вход: первый транш TRANCHE1_RATIO*lots сразу, остаток через
-# TRANCHE2_BARS свечей если позиция ещё не в убытке. Выключен по умолчанию.
+# TRANCHE2_BARS свечей если откат от входа не превысил TRANCHE2_MAX_ADVERSE_ATR*ATR.
+# Знак P&L — плохой фильтр: любой тик против нас (0.01%) отменит транш.
+# ATR-порог лучше: нормальный шум ≤0.5 ATR — добавляем, движение ≥1 ATR против — отменяем.
 FRACTIONAL_ENTRY_ENABLED = os.getenv("FRACTIONAL_ENTRY", "0") == "1"
 TRANCHE1_RATIO = float(os.getenv("TRANCHE1_RATIO", "0.5"))  # доля первого транша
 TRANCHE2_BARS = int(os.getenv("TRANCHE2_BARS", "3"))  # свечей ожидания до 2-го
+TRANCHE2_MAX_ADVERSE_ATR = float(os.getenv("TRANCHE2_MAX_ADV_ATR", "0.5"))  # макс откат в ATR
+
+# Фильтр режима при входе: сигналы в этих режимах игнорируются.
+# "ranging" — боковик без тренда, momentum-стратегия там статистически убыточна.
+# "stress" — аномальная волатильность, паттерны ломаются, соотношение сигнал/шум падает.
+# Отключить: ENTRY_BLOCKED_REGIMES=
+_ENTRY_BLOCKED_REGIMES_DEFAULT = {"ranging", "stress"}
+_ebr_env = os.getenv("ENTRY_BLOCKED_REGIMES", None)
+ENTRY_BLOCKED_REGIMES: set[str] = (
+    set(r.strip() for r in _ebr_env.split(",") if r.strip())
+    if _ebr_env is not None else _ENTRY_BLOCKED_REGIMES_DEFAULT
+)
 
 # Пирамидинг: при движении ≥ PYRAMID_R * R добавляем PYRAMID_ADD_RATIO*лотов.
 # Стоп нового транша = текущий (не ниже безубытка). Выключен по умолчанию.
@@ -818,21 +832,25 @@ class Trader:
             if candle.time > current_figi_candle.time and candle.figi in self.__pending_tranche2:
                 t2 = self.__pending_tranche2[candle.figi]
                 t2["bars_left"] -= 1
-                # Добавляем только если позиция ещё открыта и не в убытке
                 pos_t2 = self.__risk.positions.get(t2["strategy"].settings.ticker)
                 current_close = float(quotation_to_decimal(candle.close))
-                in_profit = (
-                    (t2["direction"] == "long" and current_close > t2["entry_price"]) or
-                    (t2["direction"] == "short" and current_close < t2["entry_price"])
-                )
                 if pos_t2 is None:
                     # Позиция уже закрыта — отменяем второй транш
                     del self.__pending_tranche2[candle.figi]
                 elif t2["bars_left"] <= 0:
-                    if in_profit:
+                    # Фильтр: откат от входа не превышает TRANCHE2_MAX_ADVERSE_ATR * ATR.
+                    # Знак P&L плохой критерий — отменял бы транш при любом тике против.
+                    # ATR-порог: нормальный шум (≤0.5 ATR) — добавляем, сильное движение
+                    # против (≥0.5 ATR) — вход был ошибочным, второй транш не нужен.
+                    atr_abs = t2["entry_price"] * t2["atr_pct"] if t2["atr_pct"] > 0 else 0.0
+                    adverse_move = (t2["entry_price"] - current_close) if t2["direction"] == "long" \
+                        else (current_close - t2["entry_price"])
+                    adverse_ok = atr_abs <= 0 or adverse_move <= TRANCHE2_MAX_ADVERSE_ATR * atr_abs
+                    if adverse_ok:
                         logger.info(
                             f"TRANCHE2 {t2['strategy'].settings.ticker}: "
-                            f"добавляем {t2['remaining_lots']} лотов"
+                            f"добавляем {t2['remaining_lots']} лотов "
+                            f"(откат {adverse_move:.4f} ≤ {TRANCHE2_MAX_ADVERSE_ATR}×ATR {atr_abs:.4f})"
                         )
                         asyncio.create_task(self.__add_lots_task(
                             account_id=account_id,
@@ -846,7 +864,7 @@ class Trader:
                     else:
                         logger.info(
                             f"TRANCHE2 {t2['strategy'].settings.ticker}: "
-                            f"отменён — позиция в минусе"
+                            f"отменён — откат {adverse_move:.4f} > {TRANCHE2_MAX_ADVERSE_ATR}×ATR {atr_abs:.4f}"
                         )
                     del self.__pending_tranche2[candle.figi]
 
@@ -974,6 +992,21 @@ class Trader:
                     direction = "long" if signal_new.signal_type == SignalType.LONG else "short"
                     confidence = getattr(strategy, 'confidence', 0.7)
 
+                    # Фильтр режима: в боковике и стрессе momentum-сигналы
+                    # статистически убыточны — входа нет.
+                    if ENTRY_BLOCKED_REGIMES and hasattr(strategy, "last_snapshot"):
+                        try:
+                            current_regime = strategy.last_snapshot().get("regime", "")
+                            if current_regime in ENTRY_BLOCKED_REGIMES:
+                                logger.info(
+                                    f"New signal has been skipped. "
+                                    f"Режим {current_regime!r} заблокирован для входа"
+                                )
+                                self.__record_skip(risk_ticker, signal_new, f"режим: {current_regime}")
+                                return
+                        except Exception:
+                            pass
+
                     risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
                     if not risk_ok:
                         logger.info(f"New signal has been skipped. Risk gate: {risk_why}")
@@ -997,7 +1030,11 @@ class Trader:
                         margin_per_lot=Decimal(str(strategy.settings.margin_per_lot))
                         if strategy.settings.is_future else None
                     )
-                    liquidity_lots = self.__liquidity_lots_cap(candle.figi, strategy.settings.lot_size)
+                    liquidity_lots = self.__liquidity_lots_cap(
+                        candle.figi, strategy.settings.lot_size,
+                        ticker=risk_ticker,
+                        is_buy=(signal_new.signal_type == SignalType.LONG),
+                    )
                     available_lots = min(cash_lots, risk_qty, liquidity_lots) if risk_qty > 0 else 0
 
                     logger.debug(
@@ -1172,21 +1209,38 @@ class Trader:
         self.__multi_ticker_cache[ticker] = (today, score)
         return score
 
-    def __liquidity_lots_cap(self, figi: str, share_lot_size: int) -> int:
+    def __liquidity_lots_cap(self, figi: str, share_lot_size: int, ticker: str = "",
+                             is_buy: bool = True) -> int:
         """
-        Ограничивает размер ордера долей среднего объёма последних закрытых
-        свечей по тикеру (MAX_VOLUME_PARTICIPATION), чтобы не выставлять
-        ордер, который рынок не может спокойно поглотить (неликвид —
-        проскальзывание, частичное исполнение). Пока истории свечей по
-        тикеру нет (старт дня) — не ограничивает.
-        """
-        volumes = self.__candle_volumes.get(figi)
-        if not volumes:
-            return 10 ** 9
+        Ограничивает размер ордера двумя независимыми метриками:
 
-        avg_volume = sum(volumes) / len(volumes)
-        cap_in_shares = avg_volume * self.__trading_settings.max_volume_participation
-        return max(1, int(cap_in_shares / share_lot_size))
+        1. Средний объём свечей × MAX_VOLUME_PARTICIPATION (0.1) — защита от
+           выставления ордера больше, чем рынок переваривает за минуту.
+
+        2. Лучший bid/ask size из стакана (если OrderBookService активен) —
+           защита от входа когда в стакане стоит единственная заявка на 1 лот:
+           объём свечи может быть высоким (прошла крупная сделка), но прямо
+           сейчас встречной ликвидности нет. Берём min(cap_candles, cap_book).
+
+        Пока истории свечей нет (старт дня) — не ограничиваем по свечам.
+        """
+        cap_candles = 10 ** 9
+        volumes = self.__candle_volumes.get(figi)
+        if volumes:
+            avg_volume = sum(volumes) / len(volumes)
+            cap_candles = max(1, int(avg_volume * self.__trading_settings.max_volume_participation
+                                     / share_lot_size))
+
+        cap_book = 10 ** 9
+        if ticker and self.__orderbook.has_data(ticker):
+            # Берём объём на нашей стороне (bid если покупаем, ask если продаём)
+            # в единицах базового актива, делим на размер лота.
+            book_size_shares = (self.__orderbook.best_bid_size(ticker) if is_buy
+                                else self.__orderbook.best_ask_size(ticker))
+            if book_size_shares > 0:
+                cap_book = max(1, int(book_size_shares / share_lot_size))
+
+        return min(cap_candles, cap_book)
 
     async def __place_order_task(
             self,
