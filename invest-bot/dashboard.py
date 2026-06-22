@@ -1921,7 +1921,7 @@ function modelStatsToHtml(modelStats) {{
     let dis = '';
     if (s.disagree_n > 0) {{
       const disPct = s.disagree_win_rate !== null ? (s.disagree_win_rate * 100).toFixed(0) + '%' : '—';
-      dis = ` <span style="color:var(--neg)">✗${{s.disagree_n}} ${{disPct}}</span>`;
+      dis = ` <span style="color:var(--neg)" title="сделок где модель была против направления">(против: ${{s.disagree_n}}, ${{disPct}})</span>`;
     }}
     parts.push(`${{name.replace('_CLUSTER', '')}}: ${{agreePct}} (n=${{s.agree_n}}${{dur}})${{dis}}`);
   }}
