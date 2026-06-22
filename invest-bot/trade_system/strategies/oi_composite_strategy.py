@@ -2044,6 +2044,22 @@ class OICompositeStrategy(IStrategy):
             for m in ("m1", "m2", "m3")
         }
         for sig in signals:
+            # Адаптивный пересчёт M1/M2/M3: кластерные модели накапливают историю
+            # из предыдущих записанных сделок (record_history=True), поэтому каждый
+            # следующий сигнал получает актуальные effWR вместо дефолтных 0.5.
+            # Без этого backtest_scan_signals генерирует 0,0,0 (история пуста),
+            # и attribution бессмысленен. Shallow-copy sig, чтобы не мутировать оригинал.
+            if self.__cluster_models is not None and sig.get("method_scores"):
+                base_sc = {k: v for k, v in sig["method_scores"].items()
+                           if k not in {M1_NAME, M2_NAME, M3_NAME}}
+                sig_regime = sig.get("regime", "")
+                if self.__cluster_models.needs_refresh(sig_regime):
+                    self.__cluster_models.refresh(sig_regime)
+                if self.__cluster_models._ready:
+                    rm1, rm2, rm3 = self.__cluster_models.compute(base_sc)
+                    sig = dict(sig)
+                    sig["m1"], sig["m2"], sig["m3"] = rm1, rm2, rm3
+
             direction, entry, atr_pct, window = sig["direction"], sig["entry"], sig["atr_pct"], sig["window"]
 
             if atr_take_k is not None and atr_stop_k is not None:
