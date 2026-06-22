@@ -75,6 +75,10 @@ from trade_system.strategies.base_strategy import IStrategy
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
 from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score
 from cluster_models import ClusterModels
+from narrative import (
+    NarrativeState, NarrativeWeights, classify_directional, classify_volume,
+    classify_price_reaction, update_narrative,
+)
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
 from indicators_ehlers import (
@@ -475,6 +479,7 @@ class OpenTrade:
     method_scores: dict
     after_candles: list = field(default_factory=list)
     commission_rt: float = COMMISSION_RT  # ставка по типу инструмента (акция/фьючерс)
+    narrative_name: str = "NEUTRAL"  # имя состояния NarrativeState на момент входа
 
     def add_candle(self, candle: HistoricCandle) -> None:
         self.after_candles.append(candle)
@@ -1476,6 +1481,12 @@ class OICompositeStrategy(IStrategy):
         self.__cached_regime_probs: dict = {"ranging": 1.0}
         self.__cached_change_point: float = 0.0
         self.__cached_mtf_trend: float = 0.0
+        # Narrative-гейт (narrative.py): FSM с памятью между барами + EWA-доверие
+        # по (narrative, regime). Локальный, без внешних провайдеров — в отличие
+        # от history/calibrator, не нуждается в set_*-инъекции.
+        self.__narrative_state = NarrativeState()
+        self.__narrative_weights = NarrativeWeights()
+        self.__last_narrative_tags: dict = {}
 
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
@@ -1702,6 +1713,10 @@ class OICompositeStrategy(IStrategy):
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — мало методов согласны")
             return None
 
+        if not self.__narrative_allows(direction):
+            logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — сюжет не сложился ({self.__narrative_state.name})")
+            return None
+
         if not self.__liquidity_ok():
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — тонкая свеча (низкий объём)")
             return None
@@ -1839,6 +1854,9 @@ class OICompositeStrategy(IStrategy):
                     i += 1
                     continue
                 if not self.__methods_agree(scores, direction):
+                    i += 1
+                    continue
+                if not self.__narrative_allows(direction):
                     i += 1
                     continue
                 if not self.__liquidity_ok():
@@ -2016,6 +2034,9 @@ class OICompositeStrategy(IStrategy):
                     i += 1
                     continue
                 if not self.__methods_agree(scores, direction):
+                    i += 1
+                    continue
+                if not self.__narrative_allows(direction):
                     i += 1
                     continue
                 if not self.__liquidity_ok():
@@ -2684,8 +2705,10 @@ class OICompositeStrategy(IStrategy):
 
         # ATR-exhaustion: если цена уже прошла 60-85%+ дневного ATR в направлении
         # сигнала — потенциал движения исчерпывается, демпфируем composite.
+        exhaustion = False
         if self.__last_atr_pct > 0 and self.__daily_open_price > 0:
             atr_ex_mult = _atr_exhaustion_mult(composite, self.__candles, self.__last_atr_pct, self.__daily_atr)
+            exhaustion = atr_ex_mult < 0.99
             if atr_ex_mult != 1.0:
                 logger.debug(
                     f"{self.__settings.figi}: ATR-ex ratio="
@@ -2699,6 +2722,7 @@ class OICompositeStrategy(IStrategy):
         # __last_scores хранит сырые скоры — для архива и диагностики
         self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
         self.__last_composite = composite
+        self.__advance_narrative(base_score_dict, closes, regime, exhaustion)
         return composite, scores
 
     def __rqa_confidence_mult(self, closes: list[float]) -> float:
@@ -2830,6 +2854,51 @@ class OICompositeStrategy(IStrategy):
         if total_strength <= 0:
             return False
         return agree_strength >= AGREE_STRENGTH_MIN and agree_strength / total_strength >= AGREE_SHARE_MIN
+
+    def __advance_narrative(
+            self, base_score_dict: dict, closes: list[float], regime: str, exhaustion: bool,
+    ) -> None:
+        """
+        Один шаг FSM сюжета (narrative.py) — вызывается из __compute_composite
+        на каждом баре, ДО гейта в analyze_candles/backtest-циклах, чтобы
+        __narrative_allows видел уже обновлённое состояние текущего бара.
+        Теги считаются по сырым (ненормализованным/невзвешенным) base_score_dict
+        — нарратив описывает, что "сказали" методы, а не то, как они уже
+        свёрнуты в composite весами/режимными множителями.
+        """
+        trend = classify_directional(base_score_dict, "Тренд")
+        volume = classify_volume(base_score_dict, "Объём")
+        # % изменение цены за окно — тот же горизонт, что у группы "Тренд".
+        lookback = min(20, len(closes) - 1)
+        if lookback > 0 and closes[-1 - lookback] != 0:
+            price_move_pct = (closes[-1] - closes[-1 - lookback]) / closes[-1 - lookback] * 100
+        else:
+            price_move_pct = 0.0
+        price_reaction = classify_price_reaction(price_move_pct, trend)
+
+        self.__narrative_state = update_narrative(
+            self.__narrative_state, trend=trend, volume=volume,
+            price_reaction=price_reaction, regime=regime, exhaustion=exhaustion,
+        )
+        self.__last_narrative_tags = {
+            "trend": trend.value, "volume": volume.value,
+            "price_reaction": price_reaction.value,
+        }
+
+    def __narrative_allows(self, direction: SignalType) -> bool:
+        """
+        Бинарный гейт (не множитель — см. narrative.py docstring): сигнал
+        проходит только если сюжет уже СЛОЖИЛСЯ (is_actionable), совпадает по
+        направлению с composite, и этому (narrative, regime) сейчас доверяют
+        по истории сделок (NarrativeWeights, EWA quality).
+        """
+        state = self.__narrative_state
+        if not state.is_actionable:
+            return False
+        sign = 1 if direction == SignalType.LONG else -1
+        if state.direction != sign:
+            return False
+        return self.__narrative_weights.is_trusted(state.name, self.__last_regime)
 
     def __liquidity_ok(self) -> bool:
         """Объём последней свечи не аномально мал относительно медианы окна."""
@@ -2998,6 +3067,7 @@ class OICompositeStrategy(IStrategy):
             entry_price=entry,
             method_scores=method_scores,
             commission_rt=commission_rt(self.__settings.is_future),
+            narrative_name=self.__narrative_state.name,
         )
 
         signal = Signal(
@@ -3050,6 +3120,10 @@ class OICompositeStrategy(IStrategy):
         )
 
         self.__rolling_quality = (1 - QUALITY_ALPHA) * self.__rolling_quality + QUALITY_ALPHA * quality
+
+        self.__narrative_weights.record_outcome(
+            self.__open_trade.narrative_name, self.__last_regime, quality,
+        )
 
         for name in ALL_METHOD_NAMES:
             score = self.__open_trade.method_scores.get(name, 0.0)

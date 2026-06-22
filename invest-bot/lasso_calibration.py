@@ -10,6 +10,14 @@ per-regime, онлайн, не пересекается).
 M1/M2/M3 исключены из фичей: они метамодели над теми же сигналами,
 включение создаст двойной счёт как rank-1 фичи.
 
+Фичи дополнены кластерными средними и их парными произведениями
+(см. _build_features) — это позволяет лассо находить конъюнкции вида
+"Объём высокий И Тренд бычий", которые не видны в сумме отдельных
+скоров. Лаговые (по барам до входа) фичи НЕ добавлены: history.py
+хранит только один снимок method_scores на момент входа в сделку,
+последовательность баров до входа не логируется — для лагов нужна
+отдельная инфраструктура per-bar логирования, которой сейчас нет.
+
 Кросс-валидация по времени: train на первой половине окна, eval на второй —
 тот же walk-forward принцип, что ATR-калибровка, избегает optimizer's curse.
 
@@ -211,6 +219,45 @@ def _mse(y: list[float], yhat: list[float]) -> float:
     return sum((a - b) ** 2 for a, b in zip(y, yhat)) / len(y)
 
 
+# ── Кластерные средние и взаимодействия ──────────────────────────────────────
+
+def _build_features(
+    trades: list[dict], methods: list[str],
+) -> tuple[list[str], list[list[float]]]:
+    """Расширяет матрицу фичей: raw method scores + кластерные средние +
+    их парные произведения (взаимодействия между кластерами-"органами
+    чувств" — напр. Объём×Тренд для различения импульса от поглощения).
+    Произведения берутся только между кластерными СРЕДНИМИ, а не всеми
+    парами методов — иначе p растёт квадратично от числа методов и
+    регрессия становится недоопределённой даже для elastic net."""
+    clusters_present = sorted({_METHOD_TO_CLUSTER[m] for m in methods if m in _METHOD_TO_CLUSTER})
+    cluster_methods = {
+        cl: [m for m in methods if _METHOD_TO_CLUSTER.get(m) == cl] for cl in clusters_present
+    }
+
+    feature_names = list(methods) + [f"CL_{cl}" for cl in clusters_present]
+    interaction_pairs = [
+        (clusters_present[i], clusters_present[j])
+        for i in range(len(clusters_present))
+        for j in range(i + 1, len(clusters_present))
+    ]
+    feature_names += [f"CLxCL_{a}_{b}" for a, b in interaction_pairs]
+
+    rows: list[list[float]] = []
+    for t in trades:
+        scores = t.get("method_scores", {})
+        raw = [scores.get(m, 0.0) for m in methods]
+        cluster_avg = {}
+        for cl in clusters_present:
+            vals = [scores.get(m, 0.0) for m in cluster_methods[cl]]
+            cluster_avg[cl] = sum(vals) / len(vals) if vals else 0.0
+        cl_feats = [cluster_avg[cl] for cl in clusters_present]
+        inter_feats = [cluster_avg[a] * cluster_avg[b] for a, b in interaction_pairs]
+        rows.append(raw + cl_feats + inter_feats)
+
+    return feature_names, rows
+
+
 # ── Знакочувствительный таргет ────────────────────────────────────────────────
 
 def _signed_outcome(trade: dict) -> float | None:
@@ -252,70 +299,70 @@ def _calibrate_one(
         print(f"{ticker}: нет методов после исключения метамоделей — пропуск")
         return None
 
-    # Построить X, y
-    rows_X: list[list[float]] = []
-    rows_y: list[float] = []
-    for t in trades:
-        y_val = _signed_outcome(t)
-        if y_val is None:
-            continue
-        scores = t.get("method_scores", {})
-        x_row = [scores.get(m, 0.0) for m in methods]
-        rows_X.append(x_row)
-        rows_y.append(y_val)
+    # Построить y и отфильтровать сделки без валидного исхода ДО построения
+    # фичей — _build_features должен видеть тот же набор строк, что и rows_y.
+    valid_trades = [t for t in trades if _signed_outcome(t) is not None]
+    rows_y = [_signed_outcome(t) for t in valid_trades]
 
     n = len(rows_y)
     if n < MIN_TRADES:
         print(f"{ticker}: слишком мало сделок ({n} < {MIN_TRADES}) — пропуск")
         return None
 
+    feature_names, rows_X = _build_features(valid_trades, methods)
+
     # Кросс-валидация по времени: train=первая половина, eval=вторая
     split = n // 2
     X_train, y_train = rows_X[:split], rows_y[:split]
     X_eval, y_eval = rows_X[split:], rows_y[split:]
 
+    n_feat = len(feature_names)
     X_train_std, means, stds = _standardize(X_train)
-    X_eval_std = [[(X_eval[i][j] - means[j]) / stds[j] for j in range(len(methods))]
+    X_eval_std = [[(X_eval[i][j] - means[j]) / stds[j] for j in range(n_feat)]
                   for i in range(len(X_eval))]
 
     if use_group_lasso:
-        # Построить индексные группы по кластерам
-        method_idx = {m: j for j, m in enumerate(methods)}
+        # Группы: raw-методы — по кластерам (как раньше); кластерные средние
+        # и парные взаимодействия — каждая в своей одноэлементной группе
+        # (для них group lasso вырождается в обычный L1, что и нужно — это
+        # уже агрегаты, дальше дробить их незачем).
+        feat_idx = {f: j for j, f in enumerate(feature_names)}
         groups: list[list[int]] = []
         for cl in STRATEGY_CLUSTERS:
-            g = [method_idx[mid] for mid in cl["ids"] if mid in method_idx]
+            g = [feat_idx[mid] for mid in cl["ids"] if mid in feat_idx]
             if g:
                 groups.append(g)
-        # Методы вне известных кластеров — в одну fallback-группу
         known = {j for g in groups for j in g}
-        leftover = [j for j in range(len(methods)) if j not in known]
-        if leftover:
-            groups.append(leftover)
+        leftover = [j for j in range(n_feat) if j not in known]
+        groups.extend([j] for j in leftover)
 
         w_std = _group_lasso_fista(X_train_std, y_train, groups, alpha, l1_ratio)
     else:
         w_std = _elastic_net_fista(X_train_std, y_train, alpha, l1_ratio)
 
     # Денормализация: w_orig[j] = w_std[j] / stds[j]
-    w_orig = [w_std[j] / stds[j] if stds[j] else 0.0 for j in range(len(methods))]
+    w_orig = [w_std[j] / stds[j] if stds[j] else 0.0 for j in range(n_feat)]
 
     # Eval MSE для контроля
     y_hat_eval = _mat_vec(X_eval_std, w_std)
     eval_mse = _mse(y_eval, y_hat_eval)
 
-    coefficients = {m: round(w_orig[j], 6) for j, m in enumerate(methods)}
+    coefficients = {f: round(w_orig[j], 6) for j, f in enumerate(feature_names)}
 
-    # Кластеры с нулевым суммарным весом → dropped
+    # Кластеры с нулевым суммарным весом → dropped (учитываются только
+    # raw-методы — кластерные агрегаты/взаимодействия не входят в исходную
+    # кластеризацию методов, их обнуление считается отдельно не нужно).
     cluster_weights: dict[str, float] = {}
-    for m, coef in coefficients.items():
+    for m in methods:
+        coef = coefficients.get(m, 0.0)
         cl = _METHOD_TO_CLUSTER.get(m, "?")
         cluster_weights[cl] = cluster_weights.get(cl, 0.0) + abs(coef)
     dropped_clusters = [cl for cl, w in cluster_weights.items() if w < 1e-8]
 
     figi = strategy_settings.figi
     print(
-        f"{ticker} ({figi}): {n} сделок, ненулевых методов: "
-        f"{sum(1 for v in coefficients.values() if abs(v) > 1e-8)}/{len(methods)}, "
+        f"{ticker} ({figi}): {n} сделок, ненулевых фичей: "
+        f"{sum(1 for v in coefficients.values() if abs(v) > 1e-8)}/{n_feat}, "
         f"eval MSE: {eval_mse:.4f}"
     )
 
@@ -426,7 +473,7 @@ def _print_result(ticker: str, result: dict) -> None:
     print(f"{'метод':<20} {'кластер':<16} {'коэф.':>10}   статус")
     print("-" * 70)
     for m, c in rows:
-        cl = _METHOD_TO_CLUSTER.get(m, "?")
+        cl = _METHOD_TO_CLUSTER.get(m, "агрегат/взаимод.")
         tag = "  ← обнулён" if abs(c) < 1e-8 else ""
         print(f"{m:<20} {cl:<16} {c:>10.4f}{tag}")
     if dropped_cl:
