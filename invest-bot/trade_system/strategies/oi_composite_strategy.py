@@ -1117,6 +1117,107 @@ def score_wavelet_signal(candles: list[HistoricCandle]) -> float:
     return 0.0
 
 
+def score_vsa(candles: list[HistoricCandle]) -> float:
+    """
+    Volume Spread Analysis — паттерны VSA/Wyckoff на последних барах.
+
+    Паттерны (каждый даёт скор от -1 до +1, итог — взвешенное среднее):
+
+    Бычьи:
+      No Supply    — узкий спред + низкий объём + закрытие в нижней половине
+                     на нисходящем баре после даунтренда → нет давления продаж
+      Stopping Vol — очень высокий объём + широкий спред вниз + закрытие
+                     в верхней трети → поглощение продаж
+      Test         — низкий объём + узкий спред вниз + закрытие выше середины
+                     после высокообъёмного даунбара → успешный тест предложения
+      Effort Up    — широкий спред вверх + высокий объём + закрытие в верхней
+                     трети → усилие совпадает с результатом
+
+    Медвежьи:
+      No Demand    — узкий спред + низкий объём + закрытие в верхней половине
+                     на восходящем баре после аптренда → нет спроса
+      Up-thrust    — широкий спред вверх + высокий объём + закрытие в нижней
+                     трети (ложный пробой, отвержение)
+      SOW          — широкий спред вниз + высокий объём + закрытие в нижней
+                     трети → знак слабости
+    """
+    if len(candles) < 10:
+        return 0.0
+
+    vols = [float(c.volume) for c in candles]
+    vol_ma = statistics.mean(vols[-20:]) if len(vols) >= 20 else statistics.mean(vols)
+    if vol_ma <= 0:
+        return 0.0
+
+    def bar(c):
+        h, lo, op, cl = _to_f(c.high), _to_f(c.low), _to_f(c.open), _to_f(c.close)
+        rng = h - lo or 1e-9
+        return h, lo, op, cl, rng
+
+    last = candles[-1]
+    h, lo, op, cl, rng = bar(last)
+    vol = float(last.volume)
+    vol_ratio = vol / vol_ma          # >1.5 высокий, <0.6 низкий
+    close_pos = (cl - lo) / rng       # 0=низ, 1=верх
+    is_up = cl >= op
+    spread_ratio = rng / (statistics.mean(
+        [_to_f(c.high) - _to_f(c.low) for c in candles[-10:-1]]) or 1e-9)
+
+    # предшествующий тренд последних 5 баров
+    closes_5 = [_to_f(c.close) for c in candles[-6:-1]]
+    trend = closes_5[-1] - closes_5[0]  # >0 аптренд, <0 даунтренд
+
+    # предыдущий бар
+    prev = candles[-2]
+    ph, plo, pop, pcl, prng = bar(prev)
+    prev_vol = float(prev.volume)
+    prev_vol_ratio = prev_vol / vol_ma
+
+    signals: list[float] = []
+
+    # ── No Supply (бычий) ───────────────────────────────────────────────────
+    if (not is_up and spread_ratio < 0.8 and vol_ratio < 0.7
+            and close_pos < 0.5 and trend < 0):
+        signals.append(0.7)
+
+    # ── No Demand (медвежий) ────────────────────────────────────────────────
+    if (is_up and spread_ratio < 0.8 and vol_ratio < 0.7
+            and close_pos > 0.5 and trend > 0):
+        signals.append(-0.7)
+
+    # ── Stopping Volume / Climax (бычий) ───────────────────────────────────
+    if (not is_up and vol_ratio > 1.8 and spread_ratio > 1.2
+            and close_pos > 0.6 and trend < 0):
+        signals.append(0.9)
+
+    # ── Sign of Weakness (медвежий) ─────────────────────────────────────────
+    if (not is_up and vol_ratio > 1.8 and spread_ratio > 1.2
+            and close_pos < 0.35 and trend > 0):
+        signals.append(-0.9)
+
+    # ── Up-thrust (медвежий) ────────────────────────────────────────────────
+    if (is_up and vol_ratio > 1.4 and spread_ratio > 1.2 and close_pos < 0.35):
+        signals.append(-0.85)
+
+    # ── Test (бычий) — низкий объём после высокообъёмного даунбара ──────────
+    if (not is_up and vol_ratio < 0.6 and spread_ratio < 0.9
+            and close_pos > 0.5 and prev_vol_ratio > 1.4 and pcl < pop):
+        signals.append(0.75)
+
+    # ── Effort Up (бычий) ───────────────────────────────────────────────────
+    if (is_up and vol_ratio > 1.5 and spread_ratio > 1.1 and close_pos > 0.65):
+        signals.append(0.8)
+
+    # ── Effort Down (медвежий) ──────────────────────────────────────────────
+    if (not is_up and vol_ratio > 1.5 and spread_ratio > 1.1 and close_pos < 0.35):
+        signals.append(-0.8)
+
+    if not signals:
+        return 0.0
+    # берём максимальный по модулю сигнал (не усредняем — паттерны не складываются)
+    return max(signals, key=abs)
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -1147,6 +1248,7 @@ METHODS = [
     ("VR_SIGNAL",      score_vr_signal),
     ("SSA_SIGNAL",     score_ssa_signal),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
+    ("VSA",            score_vsa),
 ]
 
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
