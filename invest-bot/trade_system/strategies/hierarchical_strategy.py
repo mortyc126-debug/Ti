@@ -2,28 +2,26 @@
 HierarchicalStrategy — 4-слойная иерархическая стратегия.
 
 Архитектура:
-  D1  (контекст/bias)  — EMA20, структура цены (HH/HL vs LH/LL), ATR(14)
+  D1  (контекст/bias)    — EMA20, структура цены (HH/HL vs LH/LL), ATR(14)
   H1  (уровень/гипотеза) — откат к уровню свинга H1, глубина 25–70% свинга, R:R ≥1.5
-  M5  (триггер)        — вход на старте ATR-волны (<60% дневного ATR от экстремума),
-                          разворотная свеча (тело ≥30%), объём ≥80% среднего
-  Exit                 — структурный стоп (свинг M5 ± 0.08%), цель D1-структурная
+  M5  (триггер)          — вход на старте ATR-волны (<60% дневного ATR),
+                            разворотная свеча (тело ≥30%), объём ≥80% среднего
+  Exit                   — структурный стоп (свинг M5 ± 0.08%), цель D1-структурная
 
-Ресэмплинг делается один раз в `backtest_scan_signals`, затем при обходе
-M5-баров индексы D1/H1 двигаются вперёд без повторного перебора.
+API совместим с OICompositeStrategy: backtest_scan_signals + backtest_barriers
+возвращают те же форматы dict'ов что ожидает dashboard.py.
 """
 from __future__ import annotations
 
 import logging
 import math
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
 from tinkoff.invest import HistoricCandle
-
-from trade_system.signal import Signal, SignalType
 
 __all__ = ("HierarchicalStrategy",)
 
@@ -37,18 +35,17 @@ _M5_MIN = 5
 # ── параметры стратегии ───────────────────────────────────────────────────────
 _EMA_PERIOD = 20
 _ATR_PERIOD = 14
-_SWING_LOOKBACK = 5        # полуокно для поиска свинга (слева и справа)
-_PULLBACK_MIN = 0.25       # минимальная глубина отката от свинга (доля)
-_PULLBACK_MAX = 0.70       # максимальная глубина (дальше — слом структуры)
-_WAVE_MAX_PCT = 0.60       # вход только если прошли <60% дневного ATR
-_BODY_MIN_RATIO = 0.30     # тело разворотной свечи ≥ 30% от high-low
-_VOL_MIN_RATIO = 0.80      # объём ≥ 80% скользящего среднего объёма
+_SWING_LOOKBACK = 5
+_PULLBACK_MIN = 0.25
+_PULLBACK_MAX = 0.70
+_WAVE_MAX_PCT = 0.60       # вход если прошли <60% дневного ATR от экстремума
+_BODY_MIN_RATIO = 0.30
+_VOL_MIN_RATIO = 0.80
 _VOL_MA_PERIOD = 20
-_MIN_RR = 1.5              # минимальное R:R (цель / стоп)
+_MIN_RR = 1.5
 _STRUCT_BUF = 0.0008       # буфер структурного стопа (0.08%)
+_MAX_HOLD_BARS = 200       # максимум баров в сделке
 
-
-# ── примитивные типы данных ───────────────────────────────────────────────────
 
 @dataclass
 class Bar:
@@ -62,19 +59,19 @@ class Bar:
 
 @dataclass
 class D1Context:
-    bias: int          # +1 LONG, -1 SHORT, 0 нейтрально
+    bias: int
     atr: float
     ema: float
-    swing_high: float  # ближайший структурный максимум
-    swing_low: float   # ближайший структурный минимум
+    swing_high: float
+    swing_low: float
 
 
 @dataclass
 class H1Setup:
-    direction: int     # +1 / -1
-    level: float       # уровень входа (граница зоны отката)
-    target: float      # структурная цель D1
-    stop_ref: float    # ориентировочный стоп (уточняется на M5)
+    direction: int
+    level: float
+    target: float
+    stop_ref: float
     rr: float
 
 
@@ -82,12 +79,12 @@ class H1Setup:
 class M5Trigger:
     direction: int
     entry: float
-    stop: float        # структурный стоп (свинг M5 ± buffer)
+    stop: float
     target: float
-    bar_idx: int       # индекс в M5-массиве
+    bar_idx: int
 
 
-# ── вспомогательные функции ───────────────────────────────────────────────────
+# ── конвертация HistoricCandle ────────────────────────────────────────────────
 
 def _candle_to_bar(c: HistoricCandle) -> Bar:
     def _f(q) -> float:
@@ -107,12 +104,11 @@ def _candle_to_bar(c: HistoricCandle) -> Bar:
     )
 
 
+# ── ресэмплинг ────────────────────────────────────────────────────────────────
+
 def _resample(bars: list[Bar], tf_minutes: int) -> list[Bar]:
-    """Схлопывает M5-бары в бары нужного таймфрейма."""
     if not bars:
         return []
-    result: list[Bar] = []
-    bucket: list[Bar] = []
 
     def _flush(b: list[Bar]) -> Bar:
         return Bar(
@@ -124,13 +120,12 @@ def _resample(bars: list[Bar], tf_minutes: int) -> list[Bar]:
             volume=sum(x.volume for x in b),
         )
 
-    # выравниваем по границе TF
+    result: list[Bar] = []
+    bucket: list[Bar] = []
     for bar in bars:
-        minutes_since_midnight = bar.time.hour * 60 + bar.time.minute
-        slot = (minutes_since_midnight // tf_minutes) * tf_minutes
+        slot = (bar.time.hour * 60 + bar.time.minute) // tf_minutes
         if bucket:
-            prev_slot = (bucket[0].time.hour * 60 + bucket[0].time.minute) // tf_minutes * tf_minutes
-            # новый день или новый слот → сбрасываем
+            prev_slot = (bucket[0].time.hour * 60 + bucket[0].time.minute) // tf_minutes
             if bar.time.date() != bucket[0].time.date() or slot != prev_slot:
                 result.append(_flush(bucket))
                 bucket = []
@@ -139,6 +134,8 @@ def _resample(bars: list[Bar], tf_minutes: int) -> list[Bar]:
         result.append(_flush(bucket))
     return result
 
+
+# ── индикаторы ────────────────────────────────────────────────────────────────
 
 def _ema(values: list[float], period: int) -> list[float]:
     if not values:
@@ -151,7 +148,6 @@ def _ema(values: list[float], period: int) -> list[float]:
 
 
 def _atr(bars: list[Bar], period: int) -> list[float]:
-    """Возвращает список ATR той же длины что и bars (первые period-1 = NaN)."""
     if len(bars) < 2:
         return [float("nan")] * len(bars)
     trs = [float("nan")]
@@ -162,21 +158,15 @@ def _atr(bars: list[Bar], period: int) -> list[float]:
             abs(bars[i].low - bars[i - 1].close),
         )
         trs.append(tr)
-    # RMA (Wilder MA)
     out: list[float] = [float("nan")] * len(bars)
-    # первое значение — простое среднее за period
     if len(trs) >= period + 1:
-        first = sum(trs[1: period + 1]) / period
-        out[period] = first
+        out[period] = sum(trs[1: period + 1]) / period
         for i in range(period + 1, len(trs)):
             out[i] = (out[i - 1] * (period - 1) + trs[i]) / period
     return out
 
 
 def _swings(bars: list[Bar], lookback: int = _SWING_LOOKBACK) -> tuple[list[float], list[float]]:
-    """Возвращает (swing_highs, swing_lows) — списки той же длины.
-    В позиции i стоит nan, если i не является свингом, иначе — значение экстремума.
-    """
     n = len(bars)
     sh = [float("nan")] * n
     sl = [float("nan")] * n
@@ -191,44 +181,46 @@ def _swings(bars: list[Bar], lookback: int = _SWING_LOOKBACK) -> tuple[list[floa
 
 
 def _last_valid(values: list[float], up_to: int) -> float:
-    """Последнее не-nan значение в values[:up_to+1]."""
     for i in range(up_to, -1, -1):
         if not math.isnan(values[i]):
             return values[i]
     return float("nan")
 
 
+def _tf_idx(m5_bars: list[Bar], tf_bars: list[Bar], m5_i: int) -> int:
+    """Индекс последнего завершённого tf-бара относительно m5_bars[m5_i]."""
+    t = m5_bars[m5_i].time
+    result = -1
+    for j, b in enumerate(tf_bars):
+        if b.time <= t:
+            result = j
+        else:
+            break
+    return result
+
+
 # ── слои анализа ──────────────────────────────────────────────────────────────
 
 def _d1_context(d1_bars: list[Bar], idx: int) -> Optional[D1Context]:
-    """Вычисляет D1-контекст по барам до idx включительно."""
     if idx < _EMA_PERIOD + _ATR_PERIOD:
         return None
-
     closes = [b.close for b in d1_bars[: idx + 1]]
     ema_series = _ema(closes, _EMA_PERIOD)
     atr_series = _atr(d1_bars[: idx + 1], _ATR_PERIOD)
-
     ema = ema_series[-1]
     atr = atr_series[-1]
     if math.isnan(atr) or atr <= 0:
         return None
-
     sh, sl = _swings(d1_bars[: idx + 1])
     last_sh = _last_valid(sh, idx)
     last_sl = _last_valid(sl, idx)
-
     close = d1_bars[idx].close
-
-    # bias: цена выше EMA → потенциально LONG; структура HH/HL
     if close > ema and not math.isnan(last_sh) and not math.isnan(last_sl):
-        # ищем предыдущий swing high перед last_sh
         prev_sh = float("nan")
         for i in range(idx - 1, -1, -1):
-            if not math.isnan(sh[i]) and d1_bars[i].high < d1_bars[sh.index(last_sh) if last_sh in sh else idx].high:
+            if not math.isnan(sh[i]) and sh[i] < last_sh:
                 prev_sh = sh[i]
                 break
-        # HH = последний свинг-хай выше предыдущего
         bias = 1 if (math.isnan(prev_sh) or last_sh > prev_sh) else 0
     elif close < ema and not math.isnan(last_sh) and not math.isnan(last_sl):
         prev_sl = float("nan")
@@ -239,26 +231,19 @@ def _d1_context(d1_bars: list[Bar], idx: int) -> Optional[D1Context]:
         bias = -1 if (math.isnan(prev_sl) or last_sl < prev_sl) else 0
     else:
         bias = 0
-
     return D1Context(
-        bias=bias,
-        atr=atr,
-        ema=ema,
+        bias=bias, atr=atr, ema=ema,
         swing_high=last_sh if not math.isnan(last_sh) else close,
         swing_low=last_sl if not math.isnan(last_sl) else close,
     )
 
 
 def _h1_setup(h1_bars: list[Bar], idx: int, d1: D1Context) -> Optional[H1Setup]:
-    """Ищет откат к уровню H1-свинга в направлении D1-bias."""
     if d1.bias == 0 or idx < _SWING_LOOKBACK * 2:
         return None
-
     sh, sl = _swings(h1_bars[: idx + 1])
     close = h1_bars[idx].close
-
     if d1.bias == 1:
-        # LONG: ищем откат к ближайшему H1 swing low
         level = _last_valid(sl, idx)
         if math.isnan(level):
             return None
@@ -273,7 +258,6 @@ def _h1_setup(h1_bars: list[Bar], idx: int, d1: D1Context) -> Optional[H1Setup]:
         risk = close - stop_ref
         reward = target - close
     else:
-        # SHORT: откат к ближайшему H1 swing high
         level = _last_valid(sh, idx)
         if math.isnan(level):
             return None
@@ -287,49 +271,31 @@ def _h1_setup(h1_bars: list[Bar], idx: int, d1: D1Context) -> Optional[H1Setup]:
         stop_ref = level + d1.atr * 0.3
         risk = stop_ref - close
         reward = close - target
-
     if risk <= 0 or reward <= 0:
         return None
     rr = reward / risk
     if rr < _MIN_RR:
         return None
-
-    return H1Setup(
-        direction=d1.bias,
-        level=level,
-        target=target,
-        stop_ref=stop_ref,
-        rr=rr,
-    )
+    return H1Setup(direction=d1.bias, level=level, target=target, stop_ref=stop_ref, rr=rr)
 
 
 def _m5_trigger(m5_bars: list[Bar], idx: int, h1: H1Setup, d1_atr: float) -> Optional[M5Trigger]:
-    """Проверяет триггер на M5: волна ATR, разворотная свеча, объём."""
     if idx < _VOL_MA_PERIOD + _SWING_LOOKBACK:
         return None
-
     bar = m5_bars[idx]
-
-    # объём ≥ 80% среднего
     vol_avg = statistics.mean(b.volume for b in m5_bars[max(0, idx - _VOL_MA_PERIOD): idx])
     if vol_avg > 0 and bar.volume < _VOL_MIN_RATIO * vol_avg:
         return None
-
-    # тело разворотной свечи ≥ 30% диапазона
     bar_range = bar.high - bar.low
     if bar_range <= 0:
         return None
     body = abs(bar.close - bar.open)
     if body / bar_range < _BODY_MIN_RATIO:
         return None
-
-    # направление тела должно совпадать с h1.direction
     if h1.direction == 1 and bar.close <= bar.open:
         return None
     if h1.direction == -1 and bar.close >= bar.open:
         return None
-
-    # поиск ближайшего экстремума M5 для оценки позиции в ATR-волне
     sh, sl = _swings(m5_bars[: idx + 1], lookback=3)
     if h1.direction == 1:
         wave_start = _last_valid(sl, idx)
@@ -341,36 +307,17 @@ def _m5_trigger(m5_bars: list[Bar], idx: int, h1: H1Setup, d1_atr: float) -> Opt
         if math.isnan(wave_start):
             return None
         wave_traveled = wave_start - bar.close
-
-    if wave_traveled < 0:
+    if wave_traveled < 0 or wave_traveled > _WAVE_MAX_PCT * d1_atr:
         return None
-    # волна не должна быть > _WAVE_MAX_PCT дневного ATR
-    if wave_traveled > _WAVE_MAX_PCT * d1_atr:
-        return None
-
-    # структурный стоп: M5 свинг ± буфер
-    if h1.direction == 1:
-        stop = wave_start * (1 - _STRUCT_BUF)
-    else:
-        stop = wave_start * (1 + _STRUCT_BUF)
-
+    stop = wave_start * (1 - _STRUCT_BUF) if h1.direction == 1 else wave_start * (1 + _STRUCT_BUF)
     entry = bar.close
     risk = abs(entry - stop)
     if risk <= 0:
         return None
-
-    # цель из H1
     reward = abs(h1.target - entry)
     if reward / risk < _MIN_RR:
         return None
-
-    return M5Trigger(
-        direction=h1.direction,
-        entry=entry,
-        stop=stop,
-        target=h1.target,
-        bar_idx=idx,
-    )
+    return M5Trigger(direction=h1.direction, entry=entry, stop=stop, target=h1.target, bar_idx=idx)
 
 
 # ── основной класс ────────────────────────────────────────────────────────────
@@ -379,18 +326,32 @@ class HierarchicalStrategy:
     """
     Иерархическая стратегия D1→H1→M5.
 
-    Не наследует IStrategy (не используется в live-боте напрямую),
-    но предоставляет тот же API бэктеста что и OICompositeStrategy:
-      backtest_scan_signals(candles) → list[dict]
-      backtest_barriers(signals, candles, ...) → dict
+    Принимает опциональный settings-аргумент (совместимость с StrategyFactory),
+    но не использует ATR-множители из settings — стоп и цель структурные.
     """
 
-    def backtest_scan_signals(
-        self,
-        candles: list[HistoricCandle],
-        figi: str = "",
-    ) -> list[dict]:
-        """Возвращает список сигналов-dict (те же поля что у OICompositeStrategy)."""
+    def __init__(self, settings=None):
+        self._settings = settings
+
+    # совместимость с IStrategy-интерфейсом (для _wire_history и прочего)
+    def set_history(self, *args, **kwargs):
+        pass
+
+    def update_lot_count(self, lot: int) -> None:
+        pass
+
+    def update_short_status(self, status: bool) -> None:
+        pass
+
+    @property
+    def settings(self):
+        return self._settings
+
+    def backtest_scan_signals(self, candles: list[HistoricCandle]) -> list[dict]:
+        """
+        Сканирует M5-свечи и возвращает список сигналов в формате
+        совместимом с OICompositeStrategy (entry_time, direction, ...).
+        """
         if len(candles) < (_D1_MIN // _M5_MIN) * (_EMA_PERIOD + _ATR_PERIOD + 10):
             return []
 
@@ -398,26 +359,13 @@ class HierarchicalStrategy:
         h1 = _resample(m5, _H1_MIN)
         d1 = _resample(m5, _D1_MIN)
 
-        # индексы: для каждого M5-бара — индекс последнего завершённого D1/H1-бара
-        def _tf_idx(m5_bars: list[Bar], tf_bars: list[Bar], m5_i: int) -> int:
-            t = m5_bars[m5_i].time
-            result = -1
-            for j, b in enumerate(tf_bars):
-                if b.time <= t:
-                    result = j
-                else:
-                    break
-            return result
-
+        # кешируем свинги для D1 и H1 — пересчитываем инкрементально
         signals: list[dict] = []
 
         for i in range(_SWING_LOOKBACK + _VOL_MA_PERIOD + 1, len(m5)):
-            d1_i = _tf_idx(m5, d1, i - 1)  # только завершённые бары
+            d1_i = _tf_idx(m5, d1, i - 1)
             h1_i = _tf_idx(m5, h1, i - 1)
-
-            if d1_i < _EMA_PERIOD + _ATR_PERIOD:
-                continue
-            if h1_i < _SWING_LOOKBACK * 2:
+            if d1_i < _EMA_PERIOD + _ATR_PERIOD or h1_i < _SWING_LOOKBACK * 2:
                 continue
 
             ctx = _d1_context(d1, d1_i)
@@ -433,133 +381,173 @@ class HierarchicalStrategy:
                 continue
 
             direction = "LONG" if trig.direction == 1 else "SHORT"
+            atr_close = ctx.atr
             signals.append({
-                "figi": figi,
-                "time": m5[i].time,
+                "entry_time": m5[i].time,
                 "direction": direction,
-                "entry": trig.entry,
-                "stop": trig.stop,
-                "target": trig.target,
+                "entry_price": trig.entry,
+                "take_price": trig.target,
+                "stop_price": trig.stop,
+                "atr": atr_close,
                 "rr": abs(trig.target - trig.entry) / abs(trig.entry - trig.stop),
                 "d1_bias": ctx.bias,
                 "d1_atr": ctx.atr,
                 "h1_level": setup.level,
-                "wave_pct": (abs(trig.entry - (m5[i].low if trig.direction == 1 else m5[i].high))) / ctx.atr
-                            if ctx.atr > 0 else 0,
                 "bar_idx": i,
+                # кластерные скоры — в иерархической стратегии не используются
+                "m1": 0.0, "m2": 0.0, "m3": 0.0,
+                "method_scores": {},
             })
 
         return signals
 
     def backtest_barriers(
         self,
-        signals: list[dict],
-        candles: list[HistoricCandle],
-        atr_mult_tp: float = 3.0,
-        atr_mult_sl: float = 1.0,
-        max_hold_bars: int = 200,
+        candles: Optional[list[HistoricCandle]] = None,
+        *,
+        signals: Optional[list[dict]] = None,
+        take_mult: Optional[Decimal] = None,
+        stop_mult: Optional[Decimal] = None,
+        atr_take_k: Optional[float] = None,
+        atr_stop_k: Optional[float] = None,
+        atr_scale_exp: Optional[float] = None,
+        return_trades: bool = False,
+        tariff: Optional[str] = None,
+        **kwargs,
     ) -> dict:
         """
-        Симуляция сделок по структурным стопу и цели из сигналов.
-        Возвращает dict совместимый с OICompositeStrategy.backtest_barriers.
+        Симулирует сделки по структурным стопу и цели из сигналов.
+        ATR-множители (take_mult, atr_take_k и т.д.) игнорируются —
+        стоп и цель берутся напрямую из сигнала (структурные уровни).
+        Возвращает dict с теми же ключами что OICompositeStrategy.
         """
         if not signals or not candles:
-            return {"trades": [], "stats": {}}
+            return self._empty_result()
 
         m5 = [_candle_to_bar(c) for c in candles]
-
         trades: list[dict] = []
-        in_trade = False
         next_entry_bar = 0
 
         for sig in signals:
-            bar_idx = sig["bar_idx"]
-            if bar_idx < next_entry_bar or in_trade:
+            bar_idx = sig.get("bar_idx", 0)
+            if bar_idx < next_entry_bar:
                 continue
 
-            entry = sig["entry"]
-            stop = sig["stop"]
-            target = sig["target"]
+            entry = sig["entry_price"]
+            stop = sig["stop_price"]
+            target = sig["take_price"]
             direction = sig["direction"]
             dir_sign = 1 if direction == "LONG" else -1
+            entry_time = sig["entry_time"]
 
-            # ищем выход в последующих M5-барах
             win = False
             exit_price = entry
             exit_bar = bar_idx
-            exit_reason = "timeout"
+            exit_time = entry_time
+            mfe = 0.0
+            mae = 0.0
 
-            for j in range(bar_idx + 1, min(bar_idx + max_hold_bars + 1, len(m5))):
+            for j in range(bar_idx + 1, min(bar_idx + _MAX_HOLD_BARS + 1, len(m5))):
                 bar = m5[j]
+                # MFE / MAE
+                if dir_sign == 1:
+                    mfe = max(mfe, bar.high - entry)
+                    mae = max(mae, entry - bar.low)
+                else:
+                    mfe = max(mfe, entry - bar.low)
+                    mae = max(mae, bar.high - entry)
+
                 if dir_sign == 1:
                     if bar.low <= stop:
-                        exit_price = stop
-                        exit_reason = "stop"
-                        exit_bar = j
-                        break
+                        exit_price = stop; exit_bar = j; exit_time = bar.time; break
                     if bar.high >= target:
-                        exit_price = target
-                        win = True
-                        exit_reason = "target"
-                        exit_bar = j
-                        break
+                        exit_price = target; win = True; exit_bar = j; exit_time = bar.time; break
                 else:
                     if bar.high >= stop:
-                        exit_price = stop
-                        exit_reason = "stop"
-                        exit_bar = j
-                        break
+                        exit_price = stop; exit_bar = j; exit_time = bar.time; break
                     if bar.low <= target:
-                        exit_price = target
-                        win = True
-                        exit_reason = "target"
-                        exit_bar = j
-                        break
+                        exit_price = target; win = True; exit_bar = j; exit_time = bar.time; break
             else:
-                exit_price = m5[min(bar_idx + max_hold_bars, len(m5) - 1)].close
-                exit_reason = "timeout"
+                last_idx = min(bar_idx + _MAX_HOLD_BARS, len(m5) - 1)
+                exit_price = m5[last_idx].close
+                exit_bar = last_idx
+                exit_time = m5[last_idx].time
                 win = (exit_price - entry) * dir_sign > 0
 
-            pnl_pct = (exit_price - entry) / entry * dir_sign * 100
+            risk = abs(entry - stop)
+            net_pct = (exit_price - entry) / entry * dir_sign  # доля (не %)
+            r_multiple = (exit_price - entry) * dir_sign / risk if risk > 0 else 0.0
+
+            # duration_min: разница в минутах между entry и exit
+            try:
+                delta = exit_time - entry_time
+                duration_min = delta.total_seconds() / 60.0
+            except Exception:
+                duration_min = (exit_bar - bar_idx) * _M5_MIN
 
             trades.append({
-                "time": sig["time"],
+                "entry_time": entry_time,
+                "exit_time": exit_time,
                 "direction": direction,
-                "entry": entry,
-                "exit": exit_price,
-                "stop": stop,
-                "target": target,
+                "entry_price": entry,
+                "exit_price": exit_price,
+                "take_price": target,
+                "stop_price": stop,
+                "mfe": mfe,
+                "mae": mae,
+                "net_pct": net_pct,
+                "r_multiple": r_multiple,
                 "win": win,
-                "pnl_pct": pnl_pct,
-                "exit_reason": exit_reason,
-                "rr": sig.get("rr", 0),
+                "duration_min": duration_min,
+                # кластерные скоры (для _what_if_from_trades)
+                "m1": sig.get("m1", 0.0),
+                "m2": sig.get("m2", 0.0),
+                "m3": sig.get("m3", 0.0),
+                "method_scores": sig.get("method_scores", {}),
+                # дополнительные поля иерархической стратегии
                 "d1_bias": sig.get("d1_bias", 0),
-                "h1_level": sig.get("h1_level", 0),
-                "wave_pct": sig.get("wave_pct", 0),
+                "h1_level": sig.get("h1_level", 0.0),
             })
 
             next_entry_bar = exit_bar + 1
 
+        return self._calc_stats(trades, return_trades)
+
+    @staticmethod
+    def _empty_result() -> dict:
+        return {
+            "total": 0, "wins": 0, "losses": 0,
+            "win_rate": 0.0, "expectancy_pct": 0.0,
+            "avg_win_pct": 0.0, "avg_loss_pct": 0.0,
+            "profit_factor": 0.0, "trades": [],
+        }
+
+    @staticmethod
+    def _calc_stats(trades: list[dict], return_trades: bool) -> dict:
         if not trades:
-            return {"trades": [], "stats": {}}
+            return HierarchicalStrategy._empty_result()
 
         wins = [t for t in trades if t["win"]]
         losses = [t for t in trades if not t["win"]]
         total = len(trades)
-        win_rate = len(wins) / total if total else 0
-        avg_win = statistics.mean(t["pnl_pct"] for t in wins) if wins else 0
-        avg_loss = statistics.mean(t["pnl_pct"] for t in losses) if losses else 0
-        pf = abs(avg_win * len(wins) / (avg_loss * len(losses))) if losses and avg_loss != 0 else float("inf")
+        win_rate = len(wins) / total
+        avg_win = statistics.mean(t["net_pct"] for t in wins) if wins else 0.0
+        avg_loss = statistics.mean(t["net_pct"] for t in losses) if losses else 0.0
+        gross_win = sum(t["net_pct"] for t in wins)
+        gross_loss = abs(sum(t["net_pct"] for t in losses))
+        pf = gross_win / gross_loss if gross_loss > 0 else float("inf")
+        expectancy = sum(t["net_pct"] for t in trades) / total
 
-        stats = {
+        out = {
             "total": total,
             "wins": len(wins),
             "losses": len(losses),
             "win_rate": win_rate,
+            "expectancy_pct": expectancy,
             "avg_win_pct": avg_win,
             "avg_loss_pct": avg_loss,
             "profit_factor": pf,
-            "expectancy": win_rate * avg_win + (1 - win_rate) * avg_loss,
         }
-
-        return {"trades": trades, "stats": stats}
+        if return_trades:
+            out["trades"] = trades
+        return out
