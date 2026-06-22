@@ -41,6 +41,8 @@ import statistics
 import threading
 import time
 import traceback
+import csv
+import io
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from decimal import Decimal
@@ -584,6 +586,88 @@ def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) ->
         })
 
     return {"ticker": ticker, "candles": candle_rows, "trades": trades_out}
+
+
+def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
+    """
+    Экспорт CSV для AI-анализа: каждый M5-бар тикера со всеми method_scores,
+    режимом, OHLCV и forward-return (+1/+5/+20 баров).
+    Возвращает {"csv": "<строка>", "rows": N, "ticker": ticker} или {"error": ...}.
+    """
+    by_ticker = _all_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"error": f"{ticker}: нет в settings.ini"}
+
+    try:
+        candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    except RequestError as e:
+        return {"error": f"Tinkoff API: {e}"}
+    if not candles:
+        return {"error": f"{ticker}: нет свечей"}
+
+    # используем OICompositeStrategy.scan_method_scores — даёт каждый бар
+    from trade_system.strategies.oi_composite_strategy import OICompositeStrategy
+    oi_settings = strategy_settings
+    # если текущая стратегия не OI — временно создаём OI для скоринга
+    oi_strat = OICompositeStrategy(oi_settings)
+    _wire_history(oi_strat)
+
+    rows = oi_strat.scan_method_scores(candles)
+    if not rows:
+        return {"error": f"{ticker}: scan_method_scores вернул пустой результат"}
+
+    # добавляем OHLV и forward return
+    from tinkoff.invest.utils import quotation_to_decimal
+    def _f(q): return float(quotation_to_decimal(q))
+
+    close_arr = [_f(c.close) for c in candles]
+    high_arr  = [_f(c.high)  for c in candles]
+    low_arr   = [_f(c.low)   for c in candles]
+    open_arr  = [_f(c.open)  for c in candles]
+    vol_arr   = [float(c.volume) for c in candles]
+
+    # rows[i] соответствует candles[window + i]
+    window = len(candles) - len(rows)
+
+    score_names = sorted(rows[0]["scores"].keys()) if rows else []
+    fieldnames = (
+        ["time", "open", "high", "low", "close", "volume", "regime"]
+        + score_names
+        + ["fwd_ret_1", "fwd_ret_5", "fwd_ret_20"]
+    )
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for i, row in enumerate(rows):
+        ci = window + i  # индекс в candles
+        close = close_arr[ci]
+
+        def fwd(n):
+            j = ci + n
+            if j >= len(close_arr) or close == 0:
+                return ""
+            return round((close_arr[j] - close) / close * 100, 4)
+
+        record = {
+            "time": row["time"].isoformat() if hasattr(row["time"], "isoformat") else str(row["time"]),
+            "open":   round(open_arr[ci], 4),
+            "high":   round(high_arr[ci], 4),
+            "low":    round(low_arr[ci], 4),
+            "close":  round(close, 4),
+            "volume": int(vol_arr[ci]),
+            "regime": row["regime"],
+            "fwd_ret_1":  fwd(1),
+            "fwd_ret_5":  fwd(5),
+            "fwd_ret_20": fwd(20),
+        }
+        for sn in score_names:
+            record[sn] = round(row["scores"].get(sn, 0.0), 4)
+        writer.writerow(record)
+
+    return {"csv": buf.getvalue(), "rows": len(rows), "ticker": ticker}
 
 
 def get_diagnostics(ticker: str, days: int = 30) -> dict:
@@ -1626,6 +1710,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <label>ATR_TAKE_K <input type="number" class="inp mid" id="tc_take" value="2.0" min="0.5" step="0.5"></label>
     <label>ATR_STOP_K <input type="number" class="inp mid" id="tc_stop" value="1.0" min="0.3" step="0.5"></label>
     <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
+    <button class="btn-pill" style="background:var(--accent2,#2a4a2a);" onclick="exportBarScores()" title="Скачать CSV со всеми method_scores по каждому бару — для AI-анализа">📥 CSV для AI</button>
     <span id="tc_status" style="font-size:11px;color:var(--txt3);"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--txt3);">
@@ -3261,6 +3346,32 @@ async function askCouncil() {{
   _resize();
 }})();
 
+async function exportBarScores() {{
+  const ticker = document.getElementById('tc_ticker').value;
+  if (!ticker) {{ alert('Сначала выбери тикер'); return; }}
+  const days = 90;
+  const status = document.getElementById('tc_status');
+  status.textContent = 'подготовка CSV...';
+  try {{
+    const resp = await fetch(`/api/export_bar_scores?ticker=${{encodeURIComponent(ticker)}}&days=${{days}}`);
+    if (!resp.ok) {{
+      const j = await resp.json().catch(() => ({{}}));
+      status.textContent = '❌ ' + (j.error || resp.statusText);
+      return;
+    }}
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${{ticker}}_bar_scores_${{days}}d.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    status.textContent = 'CSV скачан ✓';
+  }} catch(e) {{
+    status.textContent = '❌ ' + e;
+  }}
+}}
+
 // ══════════════════════ АНАЛИТИКА ══════════════════════
 
 let _anData = null;
@@ -3784,6 +3895,26 @@ class Handler(BaseHTTPRequestHandler):
             atr_stop = float(qs.get("atr_stop", ["1.0"])[0])
             try:
                 self._send_json(get_trade_chart(ticker, days, atr_take, atr_stop))
+            except Exception as e:
+                self._send_json({"error": str(e)})
+        elif self.path.startswith("/api/export_bar_scores"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0]
+            days = int(qs.get("days", ["90"])[0])
+            try:
+                result = export_bar_scores_csv(ticker, days)
+                if "error" in result:
+                    self._send_json(result)
+                else:
+                    fname = f"{ticker}_bar_scores_{days}d.csv"
+                    csv_bytes = result["csv"].encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/csv; charset=utf-8")
+                    self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+                    self.send_header("Content-Length", str(len(csv_bytes)))
+                    self.end_headers()
+                    self.wfile.write(csv_bytes)
             except Exception as e:
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":
