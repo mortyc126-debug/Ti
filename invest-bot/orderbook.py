@@ -44,6 +44,8 @@ class _TickerState:
     imbalance: float = 0.0
     stale_ratio: float = 0.0
     updated_ts: float = 0.0
+    last_bids: list[tuple[float, float]] = field(default_factory=list)
+    last_asks: list[tuple[float, float]] = field(default_factory=list)
 
 
 def _update_tracks(tracks: dict[float, _LevelTrack], levels: list[tuple[float, float]]) -> None:
@@ -110,6 +112,8 @@ class OrderBookService:
         total_vol = bid_live + ask_live + bid_dead + ask_dead
         st.stale_ratio = (bid_dead + ask_dead) / total_vol if total_vol > 0 else 0.0
         st.updated_ts = time.time()
+        st.last_bids = bids
+        st.last_asks = asks
 
     def imbalance_score(self, ticker: str) -> float:
         st = self._state.get(ticker)
@@ -118,6 +122,24 @@ class OrderBookService:
     def stale_ratio(self, ticker: str) -> float:
         st = self._state.get(ticker)
         return st.stale_ratio if st else 0.0
+
+    def best_bid(self, ticker: str) -> float | None:
+        """Лучший бид (цена покупки) из последнего снэпшота стакана."""
+        st = self._state.get(ticker)
+        return st.last_bids[0][0] if st and st.last_bids else None
+
+    def best_ask(self, ticker: str) -> float | None:
+        """Лучший аск (цена продажи) из последнего снэпшота стакана."""
+        st = self._state.get(ticker)
+        return st.last_asks[0][0] if st and st.last_asks else None
+
+    def best_bid_size(self, ticker: str) -> float:
+        st = self._state.get(ticker)
+        return st.last_bids[0][1] if st and st.last_bids else 0.0
+
+    def best_ask_size(self, ticker: str) -> float:
+        st = self._state.get(ticker)
+        return st.last_asks[0][1] if st and st.last_asks else 0.0
 
     def has_data(self, ticker: str, max_age_s: float = 30.0) -> bool:
         st = self._state.get(ticker)

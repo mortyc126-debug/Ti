@@ -15,6 +15,7 @@ from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
+from invest_api.services.stop_orders_service import StopOrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from invest_api.utils import aggcandle_to_historiccandle
 from trade_system.issuer_filter import issuer_key, select_top_tickers
@@ -90,6 +91,7 @@ class Trader:
             instrument_service: InstrumentService,
             operation_service: OperationService,
             order_service: OrderService,
+            stop_order_service: StopOrderService,
             stream_service: MarketDataStreamService,
             market_data_service: MarketDataService,
             blogger: Blogger,
@@ -102,6 +104,7 @@ class Trader:
         self.__instrument_service = instrument_service
         self.__operation_service = operation_service
         self.__order_service = order_service
+        self.__stop_order_service = stop_order_service
         self.__stream_service = stream_service
         self.__market_data_service = market_data_service
         self.__blogger = blogger
@@ -136,6 +139,10 @@ class Trader:
         self.__backtest_predictions: dict[str, dict] = {}
         # Трекинг MFE/MAE для открытых позиций: {figi: {entry, direction, max_fav, max_adv}}
         self.__pos_tracking: dict[str, dict] = {}
+        # Биржевые стоп/тейк ордера, выставленные после открытия позиции.
+        # figi -> {take_id, stop_id, lots, is_long, ticker, min_price_step}
+        # Живут на бирже независимо от бота — защита при падении процесса.
+        self.__active_exit_orders: dict[str, dict] = {}
         # Текущие стратегии торгового дня — для TG /status и /close
         self.__current_strategies: dict[str, IStrategy] = {}
         # Настройки с дашборда (live/sandbox, take/stop, allow/deny по тикерам) —
@@ -768,11 +775,17 @@ class Trader:
                             self.__try_partial_take(account_id, candle, strategies):
                         pass  # частичная фиксация сработала — остаток остаётся открытым
                     elif low <= current_trade_order.signal.stop_loss_level <= high:
-                        logger.info(f"STOP LOSS: {current_trade_order}")
+                        logger.info(f"STOP LOSS уровень достигнут: {current_trade_order}")
+                        # Биржевой стоп-лимит должен уже исполниться/исполняться —
+                        # отменяем тейк-ордер и обновляем внутреннее состояние.
+                        self.__cancel_exit_orders(account_id, candle.figi, which="take")
                         self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.stop_loss_level), "stop_loss")
 
                     elif low <= current_trade_order.signal.take_profit_level <= high:
-                        logger.info(f"TAKE PROFIT: {current_trade_order}")
+                        logger.info(f"TAKE PROFIT уровень достигнут: {current_trade_order}")
+                        # Биржевой тейк-лимит должен уже исполниться/исполняться —
+                        # отменяем стоп-ордер и обновляем внутреннее состояние.
+                        self.__cancel_exit_orders(account_id, candle.figi, which="stop")
                         self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.take_profit_level), "take_profit")
                 except Exception as ex:
                     logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
@@ -1097,7 +1110,7 @@ class Trader:
         """
         risk_ticker = strategy.settings.ticker
         try:
-            open_order_id, actual_lots = await self.__smart_order(
+            open_order_id, actual_lots = await self.__limit_entry_order(
                 account_id=account_id,
                 figi=figi,
                 count_lots=available_lots,
@@ -1148,6 +1161,22 @@ class Trader:
                         "max_fav": entry_price,
                         "max_adv": entry_price,
                     }
+                    # Выставляем биржевые стоп-лимит + тейк-лимит немедленно.
+                    # Они живут на бирже независимо от процесса бота — защита
+                    # от падения / потери связи. __place_exit_orders не бросает
+                    # исключений наружу (ловит внутри), так что позиция в любом
+                    # случае остаётся под трекингом risk.py.
+                    is_long = (signal_new.signal_type == SignalType.LONG)
+                    self.__place_exit_orders(
+                        account_id=account_id,
+                        figi=figi,
+                        is_long=is_long,
+                        lots=actual_lots,
+                        take_price=float(signal_new.take_profit_level),
+                        stop_price=stop_price,
+                        ticker=risk_ticker,
+                        min_price_step=strategy.settings.min_price_increment,
+                    )
                 except Exception as ex:
                     logger.error(
                         f"{risk_ticker}: ошибка регистрации позиции после реального исполнения "
@@ -1303,12 +1332,305 @@ class Trader:
         _cancel(order_id)
         return _to_market()
 
+    # ── Биржевые стоп/тейк ордера ────────────────────────────────────────────
+
+    def __place_exit_orders(
+            self,
+            account_id: str,
+            figi: str,
+            is_long: bool,
+            lots: int,
+            take_price: float,
+            stop_price: float,
+            ticker: str,
+            min_price_step: float = 0.01,
+    ) -> None:
+        """
+        После исполнения входа немедленно ставим на бирже:
+        - Тейк: обычная лимитная заявка на уровне take_price (противоположная сторона)
+        - Стоп: стоп-лимит на stop_price, лимит чуть хуже (3 шага цены) чтобы
+          исполнился в очереди, а не превратился в висячую заявку.
+
+        Оба ордера живут на бирже независимо от состояния процесса бота.
+        При срабатывании одного нужно отменить другой (см. __cancel_exit_orders).
+        """
+        take_id: str | None = None
+        stop_id: str | None = None
+
+        # Лимит тейка: продаём если лонг (закрываем), покупаем если шорт
+        try:
+            p = Decimal(str(take_price))
+            resp = self.__order_service.post_limit_order(
+                account_id=account_id, figi=figi,
+                count_lots=lots, is_buy=(not is_long), price=p
+            )
+            take_id = resp.order_id
+            logger.info(f"EXIT_ORDERS {ticker}: тейк-лимит {take_price:.4f} → {take_id}")
+        except Exception as ex:
+            logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить тейк-лимит: {repr(ex)}")
+
+        # Стоп-лимит: триггер на stop_price, исполнение на stop_price ± 3 шага
+        step = max(min_price_step, 1e-9)
+        # Для лонга стоп = продажа: лимит чуть ниже триггера (даём 3 шага проскальзывания)
+        # Для шорта стоп = покупка: лимит чуть выше триггера
+        limit_offset = 3 * step
+        stop_limit_price = (stop_price - limit_offset) if is_long else (stop_price + limit_offset)
+        stop_limit_price = max(step, stop_limit_price)
+        try:
+            stop_id = self.__stop_order_service.post_stop_limit(
+                account_id=account_id, figi=figi, lots=lots,
+                is_buy=(not is_long),
+                stop_price=stop_price,
+                limit_price=stop_limit_price,
+            )
+            logger.info(f"EXIT_ORDERS {ticker}: стоп-лимит {stop_price:.4f} (лимит {stop_limit_price:.4f}) → {stop_id}")
+        except Exception as ex:
+            logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить стоп-лимит: {repr(ex)}")
+
+        self.__active_exit_orders[figi] = {
+            "take_id": take_id,
+            "stop_id": stop_id,
+            "lots": lots,
+            "is_long": is_long,
+            "ticker": ticker,
+            "min_price_step": step,
+        }
+
+    def __cancel_exit_orders(self, account_id: str, figi: str, which: str = "both") -> None:
+        """
+        Отменяет биржевые выходные ордера.
+        which: "both" | "take" | "stop"
+        Вызывается при: адаптация уровней, срабатывание одного из ордеров,
+        принудительное закрытие (Telegram/EOD).
+        """
+        ex_info = self.__active_exit_orders.get(figi)
+        if not ex_info:
+            return
+        ticker = ex_info.get("ticker", figi)
+
+        if which in ("both", "take") and ex_info.get("take_id"):
+            try:
+                self.__order_service.cancel_order(account_id, ex_info["take_id"])
+                logger.info(f"EXIT_ORDERS {ticker}: отменён тейк {ex_info['take_id']}")
+            except Exception as ex:
+                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены тейка: {repr(ex)}")
+            ex_info["take_id"] = None
+
+        if which in ("both", "stop") and ex_info.get("stop_id"):
+            try:
+                self.__stop_order_service.cancel_stop_order(account_id, ex_info["stop_id"])
+                logger.info(f"EXIT_ORDERS {ticker}: отменён стоп {ex_info['stop_id']}")
+            except Exception as ex:
+                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены стопа: {repr(ex)}")
+            ex_info["stop_id"] = None
+
+        if which == "both":
+            self.__active_exit_orders.pop(figi, None)
+
+    def __update_stop_order(
+            self,
+            account_id: str,
+            figi: str,
+            new_stop_price: float,
+            new_take_price: float | None = None,
+    ) -> None:
+        """
+        Переставить биржевой стоп (и опционально тейк) на новые уровни.
+        Вызывается из адаптивного выхода при трейлинге Chandelier.
+        """
+        ex_info = self.__active_exit_orders.get(figi)
+        if not ex_info:
+            return
+        ticker = ex_info.get("ticker", figi)
+        lots = ex_info["lots"]
+        is_long = ex_info["is_long"]
+        step = ex_info["min_price_step"]
+
+        # Отменяем старый стоп и ставим новый
+        if ex_info.get("stop_id"):
+            try:
+                self.__stop_order_service.cancel_stop_order(account_id, ex_info["stop_id"])
+            except Exception as ex:
+                logger.warning(f"UPDATE_STOP {ticker}: отмена старого стопа: {repr(ex)}")
+            ex_info["stop_id"] = None
+
+        limit_offset = 3 * step
+        stop_limit_price = (new_stop_price - limit_offset) if is_long else (new_stop_price + limit_offset)
+        stop_limit_price = max(step, stop_limit_price)
+        try:
+            new_id = self.__stop_order_service.post_stop_limit(
+                account_id=account_id, figi=figi, lots=lots,
+                is_buy=(not is_long),
+                stop_price=new_stop_price,
+                limit_price=stop_limit_price,
+            )
+            ex_info["stop_id"] = new_id
+            logger.info(f"UPDATE_STOP {ticker}: новый стоп {new_stop_price:.4f} → {new_id}")
+        except Exception as ex:
+            logger.warning(f"UPDATE_STOP {ticker}: ошибка постановки нового стопа: {repr(ex)}")
+
+        # Если тейк тоже изменился (частичный TP / scale-out)
+        if new_take_price is not None and ex_info.get("take_id"):
+            try:
+                self.__order_service.cancel_order(account_id, ex_info["take_id"])
+            except Exception:
+                pass
+            ex_info["take_id"] = None
+            try:
+                p = Decimal(str(new_take_price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=lots, is_buy=(not is_long), price=p
+                )
+                ex_info["take_id"] = resp.order_id
+                logger.info(f"UPDATE_TAKE {ticker}: новый тейк {new_take_price:.4f} → {resp.order_id}")
+            except Exception as ex:
+                logger.warning(f"UPDATE_TAKE {ticker}: ошибка постановки нового тейка: {repr(ex)}")
+
+    # ── Book-following вход ───────────────────────────────────────────────────
+
+    async def __limit_entry_order(
+            self,
+            account_id: str,
+            figi: str,
+            count_lots: int,
+            is_buy: bool,
+            last_price: float,
+            strategy: IStrategy,
+    ) -> tuple[str | None, int]:
+        """
+        Лимитный вход с book-following: встаём в очередь по лучшей цене
+        из стакана (bid при покупке, ask при продаже), двигаемся за книгой
+        если лучшая цена уходит. Рыночная заявка только в аварийном случае.
+
+        Алгоритм:
+        1. Берём best_bid (покупка) / best_ask (продажа) из OrderBookService.
+           Если стакан недоступен — last_price как fallback.
+        2. Ставим лимит туда.
+        3. Каждые 2 сек: если лучшая цена сдвинулась на ≥1 шаг в любую сторону
+           (кто-то выставил лучше нас или очередь сместилась) — переставляемся.
+        4. Если за MAX_WAIT_SEC так и не исполнились — рыночная заявка (аварий).
+        """
+        ticker = strategy.settings.ticker
+        step = max(strategy.settings.min_price_increment, 1e-9)
+        ts = self.__trading_settings
+        MAX_WAIT_SEC = ts.limit_reprice_interval_sec * ts.limit_reprice_max_attempts
+        POLL_SEC = 2
+
+        def _book_price() -> float:
+            """Лучшая цена из стакана на нашей стороне."""
+            if is_buy:
+                p = self.__orderbook.best_bid(ticker)
+            else:
+                p = self.__orderbook.best_ask(ticker)
+            return p if p else last_price
+
+        def _place_limit(price: float) -> tuple[str | None, object]:
+            try:
+                p = Decimal(str(price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy, price=p
+                )
+                return resp.order_id, resp
+            except Exception as ex:
+                logger.warning(f"__limit_entry_order {ticker}: limit place failed: {repr(ex)}")
+                return None, None
+
+        def _cancel(oid: str) -> None:
+            try:
+                self.__order_service.cancel_order(account_id, oid)
+            except Exception:
+                pass
+
+        def _to_market() -> tuple[str | None, int]:
+            # Аварийный fallback — используем только если рынок закрывается
+            # или критическое время (не нашли контрагента за MAX_WAIT_SEC)
+            try:
+                resp = self.__order_service.post_market_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy
+                )
+                if resp.execution_report_status in (
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+                ):
+                    try:
+                        state = self.__order_service.get_order_state(account_id, resp.order_id)
+                        return resp.order_id, state.lots_executed or count_lots
+                    except Exception:
+                        return resp.order_id, count_lots
+                return None, 0
+            except Exception as ex:
+                logger.warning(f"__limit_entry_order {ticker}: market fallback error: {repr(ex)}")
+                return None, 0
+
+        entry_price = _book_price()
+        order_id, _ = _place_limit(entry_price)
+        if order_id is None:
+            logger.warning(f"__limit_entry_order {ticker}: первичная заявка не прошла, пробуем рынок")
+            return _to_market()
+
+        logger.info(f"__limit_entry_order {ticker}: лимит {entry_price:.4f} {'BUY' if is_buy else 'SELL'}")
+        elapsed = 0.0
+
+        while elapsed < MAX_WAIT_SEC:
+            await asyncio.sleep(POLL_SEC)
+            elapsed += POLL_SEC
+
+            try:
+                state = self.__order_service.get_order_state(account_id, order_id)
+            except Exception as ex:
+                logger.warning(f"__limit_entry_order {ticker}: get_order_state: {repr(ex)}")
+                break
+
+            status = state.execution_report_status
+            if status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL:
+                return order_id, state.lots_executed or count_lots
+
+            if status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
+                pass  # ждём полного исполнения, но не вечно
+
+            if status in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_REJECTED,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_CANCELLED,
+            ):
+                logger.warning(f"__limit_entry_order {ticker}: заявка отклонена, повтор")
+                entry_price = _book_price()
+                order_id, _ = _place_limit(entry_price)
+                if order_id is None:
+                    return _to_market()
+                continue
+
+            # Book-following: лучшая цена сместилась — переставляем
+            current_best = _book_price()
+            if abs(current_best - entry_price) >= step:
+                logger.info(
+                    f"__limit_entry_order {ticker}: книга сместилась "
+                    f"{entry_price:.4f} → {current_best:.4f}, переставляемся"
+                )
+                _cancel(order_id)
+                entry_price = current_best
+                order_id, _ = _place_limit(entry_price)
+                if order_id is None:
+                    return _to_market()
+
+        # Таймаут — аварийная рыночная заявка
+        logger.warning(f"__limit_entry_order {ticker}: таймаут {MAX_WAIT_SEC}с, переход на рынок")
+        _cancel(order_id)
+        return _to_market()
+
     def __clear_all_positions(
             self,
             account_id: str,
             strategies: dict[str, IStrategy]
     ) -> dict[str, str]:
         logger.info("Clear all orders and close all open positions")
+
+        # Сначала отменяем все биржевые стоп/тейк ордера, чтобы после
+        # рыночного закрытия не осталось висячих заявок на чистом счёте.
+        for figi in list(self.__active_exit_orders.keys()):
+            self.__cancel_exit_orders(account_id, figi, which="both")
 
         logger.debug("Cancel all order.")
         self.__client_service.cancel_all_orders(account_id)
@@ -1523,6 +1845,10 @@ class Trader:
         if self.__orderbook.has_data(risk_ticker):
             imbalance = self.__orderbook.imbalance_score(risk_ticker)
             order_flow = imbalance if pos.direction == "long" else -imbalance
+
+        # Запоминаем стоп ДО вызова check_exit — чтобы обнаружить трейлинг
+        stop_before = pos.stop_price
+
         should_close, reason = self.__risk.check_exit(
             risk_ticker, price, squeeze=squeeze,
             drift_per_bar=drift_per_bar, vol_per_bar=vol_per_bar,
@@ -1531,6 +1857,17 @@ class Trader:
         if should_close:
             logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")
             self.__exit_position(account_id, strategy, strategies, price, reason)
+        elif pos.stop_price != stop_before:
+            # Chandelier подтянул стоп — переставляем биржевой стоп-лимит
+            logger.info(
+                f"TRAIL_STOP {risk_ticker}: стоп {stop_before:.4f} → {pos.stop_price:.4f}, "
+                f"переставляем биржевой ордер"
+            )
+            self.__update_stop_order(
+                account_id=account_id,
+                figi=candle.figi,
+                new_stop_price=pos.stop_price,
+            )
 
     def __process_close_requests(
             self,
@@ -1621,13 +1958,32 @@ class Trader:
         if risk_ticker not in self.__risk.positions:
             return
 
+        # Перед закрытием отменяем оставшиеся биржевые стоп/тейк ордера,
+        # чтобы не осталось "висячих" заявок после закрытия позиции.
+        self.__cancel_exit_orders(account_id, figi, which="both")
+
         order_id, filled_lots, requested_lots = self.__close_figi_with_fill_info(account_id, figi, strategies)
         if not order_id or filled_lots <= 0:
-            logger.warning(
-                f"{risk_ticker}: закрывающий ордер не исполнился ({reason}), "
-                f"позиция остаётся под трекингом risk.py — повтор на следующей свече"
-            )
-            return
+            # Позиция не найдена на бирже — вероятно, уже закрыта биржевым
+            # стоп/тейк ордером. Проверяем реальный баланс.
+            all_pos = (list(self.__operation_service.positions_securities(account_id) or []) +
+                       list(self.__operation_service.positions_futures(account_id) or []))
+            real_balance = next((p.balance for p in all_pos if p.figi == figi), 0)
+            if real_balance == 0 and risk_ticker in self.__risk.positions:
+                # Биржевой ордер уже исполнился — обновляем только внутреннее состояние
+                logger.info(
+                    f"{risk_ticker}: позиция уже закрыта биржевым ордером ({reason}) @ {price:.4f}, "
+                    f"обновляем внутреннее состояние"
+                )
+                filled_lots = self.__risk.positions[risk_ticker].qty
+                # Используем синтетический order_id чтобы пройти дальше
+                order_id = f"exchange_{reason}"
+            else:
+                logger.warning(
+                    f"{risk_ticker}: закрывающий ордер не исполнился ({reason}), "
+                    f"позиция остаётся под трекингом risk.py — повтор на следующей свече"
+                )
+                return
 
         if filled_lots < requested_lots:
             logger.warning(

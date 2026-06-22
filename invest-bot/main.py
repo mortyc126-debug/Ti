@@ -13,6 +13,7 @@ from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
+from invest_api.services.stop_orders_service import StopOrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from trade_system.strategies.strategy_factory import StrategyFactory
 from trading.trade_service import TradeService
@@ -106,6 +107,7 @@ if __name__ == "__main__":
         instrument_service = InstrumentService(config.tinkoff_token, config.tinkoff_app_name)
         operation_service = OperationService(config.tinkoff_token, config.tinkoff_app_name)
         order_service = OrderService(config.tinkoff_token, config.tinkoff_app_name)
+        stop_order_service = StopOrderService(config.tinkoff_token, config.tinkoff_app_name)
         stream_service = MarketDataStreamService(config.tinkoff_token, config.tinkoff_app_name)
         market_data_service = MarketDataService(config.tinkoff_token, config.tinkoff_app_name)
 
@@ -125,6 +127,7 @@ if __name__ == "__main__":
                 instrument_service=instrument_service,
                 operation_service=operation_service,
                 order_service=order_service,
+                stop_order_service=stop_order_service,
                 stream_service=stream_service,
                 market_data_service=market_data_service,
                 blogger=Blogger(config.blog_settings, config.trade_strategy_settings, messages_queue),

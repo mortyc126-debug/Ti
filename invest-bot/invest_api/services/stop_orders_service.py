@@ -48,6 +48,43 @@ class StopOrderService:
                 expire_date=expire_date
             ).stop_order_id
 
+    def post_stop_limit(
+            self,
+            account_id: str,
+            figi: str,
+            lots: int,
+            is_buy: bool,
+            stop_price: float,
+            limit_price: float,
+    ) -> str:
+        """
+        Стоп-лимит: когда цена достигает stop_price — выставляет лимит по limit_price.
+        Живёт на бирже независимо от бота (GTC). Возвращает stop_order_id.
+        is_buy=True → покупка (закрытие шорта), False → продажа (закрытие лонга).
+        limit_price должен быть чуть хуже stop_price, чтобы заявка исполнилась:
+          для стопа лонга: limit_price = stop_price - N*min_step (разрешаем небольшое
+          проскальзывание, но всё равно лучше рынка).
+        """
+        direction = (StopOrderDirection.STOP_ORDER_DIRECTION_BUY if is_buy
+                     else StopOrderDirection.STOP_ORDER_DIRECTION_SELL)
+
+        def _to_q(price: float) -> Quotation:
+            units = int(price)
+            nano = round((price - units) * 1_000_000_000)
+            return Quotation(units=units, nano=nano)
+
+        return self.__post_stop_order(
+            account_id=account_id,
+            figi=figi,
+            count_lots=lots,
+            price=_to_q(limit_price),
+            stop_price=_to_q(stop_price),
+            direction=direction,
+            expiration_type=StopOrderExpirationType.STOP_ORDER_EXPIRATION_TYPE_GOOD_TILL_CANCEL,
+            stop_order_type=StopOrderType.STOP_ORDER_TYPE_STOP_LIMIT,
+            expire_date=datetime.datetime(2099, 12, 31, tzinfo=datetime.timezone.utc),
+        )
+
     @invest_api_retry()
     @invest_error_logging
     def get_stop_orders(self, account_id: str) -> list[StopOrder]:

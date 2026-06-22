@@ -11,6 +11,7 @@ from invest_api.services.instruments_service import InstrumentService
 from invest_api.services.market_data_service import MarketDataService
 from invest_api.services.operations_service import OperationService
 from invest_api.services.orders_service import OrderService
+from invest_api.services.stop_orders_service import StopOrderService
 from invest_api.services.market_data_stream_service import MarketDataStreamService
 from mega_alerts import MegaAlertsService
 from trade_system.strategies.base_strategy import IStrategy
@@ -32,6 +33,7 @@ class TradeService:
             instrument_service: InstrumentService,
             operation_service: OperationService,
             order_service: OrderService,
+            stop_order_service: StopOrderService,
             stream_service: MarketDataStreamService,
             market_data_service: MarketDataService,
             blogger: Blogger,
@@ -46,6 +48,7 @@ class TradeService:
         self.__instrument_service = instrument_service
         self.__operation_service = operation_service
         self.__order_service = order_service
+        self.__stop_order_service = stop_order_service
         self.__stream_service = stream_service
         self.__market_data_service = market_data_service
         self.__blogger = blogger
@@ -114,6 +117,7 @@ class TradeService:
                         instrument_service=self.__instrument_service,
                         operation_service=self.__operation_service,
                         order_service=self.__order_service,
+                        stop_order_service=self.__stop_order_service,
                         stream_service=self.__stream_service,
                         market_data_service=self.__market_data_service,
                         blogger=self.__blogger,

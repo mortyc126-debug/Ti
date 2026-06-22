@@ -27,6 +27,10 @@ class StrategySettings:
     # интервал свечей в минутах: 1 или 5 (дефолт). Влияет на загрузку истории
     # и на окна индикаторов внутри OICompositeStrategy.
     candle_interval_min: int = 5
+    # минимальный шаг цены (тик) в рублях — используется при расчёте лимит-цены
+    # для биржевых стоп-лимит ордеров (слиппаж = 3 * min_price_increment).
+    # Дефолт 0.01 (1 копейка) подходит большинству акций MOEX.
+    min_price_increment: float = 0.01
 
 
 @dataclass(eq=False, repr=True)
