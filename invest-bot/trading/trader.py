@@ -103,6 +103,14 @@ ENTRY_BLOCKED_REGIMES: set[str] = (
     if _ebr_env is not None else _ENTRY_BLOCKED_REGIMES_DEFAULT
 )
 
+# Фильтр imbalance стакана: imbalance_score должен совпадать с направлением
+# сигнала. Только когда стакан активен (ORDERBOOK=1) и не "мёртвый" (stale).
+# 0.0 = любой ненулевой имбаланс в нашу сторону, 0.1 = уверенный перевес.
+# -1.0 = выключено (фильтр не применяется).
+ENTRY_IMBALANCE_MIN = float(os.getenv("ENTRY_IMBALANCE_MIN", "0.0"))
+# Порог "мёртвости" стакана: если доля stale-объёма выше этого — не доверяем
+ENTRY_IMBALANCE_MAX_STALE = float(os.getenv("ENTRY_IMBALANCE_MAX_STALE", "0.6"))
+
 # Пирамидинг: при движении ≥ PYRAMID_R * R добавляем PYRAMID_ADD_RATIO*лотов.
 # Стоп нового транша = текущий (не ниже безубытка). Выключен по умолчанию.
 PYRAMID_ENABLED = os.getenv("PYRAMID", "0") == "1"
@@ -1006,6 +1014,28 @@ class Trader:
                                 return
                         except Exception:
                             pass
+
+                    # Фильтр imbalance: живой стакан должен подтверждать направление.
+                    # stale_ratio проверяем первым — если большинство объёма "мёртвое"
+                    # (заявки не двигаются, хотя цена идёт сквозь них), imbalance
+                    # искажён и не несёт информации.
+                    if ENTRY_IMBALANCE_MIN >= 0 and self.__orderbook.has_data(risk_ticker):
+                        stale = self.__orderbook.stale_ratio(risk_ticker)
+                        if stale <= ENTRY_IMBALANCE_MAX_STALE:
+                            imbalance = self.__orderbook.imbalance_score(risk_ticker)
+                            required_sign = 1 if direction == "long" else -1
+                            if imbalance * required_sign < ENTRY_IMBALANCE_MIN:
+                                logger.info(
+                                    f"New signal has been skipped. "
+                                    f"Стакан против: imbalance={imbalance:.2f} "
+                                    f"(нужно ≥{ENTRY_IMBALANCE_MIN} для {direction}), "
+                                    f"stale={stale:.2f}"
+                                )
+                                self.__record_skip(
+                                    risk_ticker, signal_new,
+                                    f"стакан против: {imbalance:.2f}"
+                                )
+                                return
 
                     risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
                     if not risk_ok:

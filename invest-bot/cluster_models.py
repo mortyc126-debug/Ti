@@ -112,6 +112,25 @@ STRATEGY_CLUSTERS = [
 
 MODEL_NAMES = ["M1_CLUSTER", "M2_CLUSTER", "M3_CLUSTER"]
 
+# ── Три независимых суб-композита ─────────────────────────────────────────────
+# Раньше M1/M2/M3 были тремя способами агрегации ВСЕХ 11 кластеров (weighted /
+# representative / consensus). Это делало их структурно скоррелированными:
+# composite > threshold → все три всегда давали тот же знак → agree/disagree
+# анализ в бэктесте был бессмысленным (n agree == n total).
+#
+# Теперь M1/M2/M3 — суб-композиты над РАЗНЫМИ подмножествами кластеров:
+#   M1 = "Цена/Тренд": Тренд, Адаптивные МА, Циклы, Фрактальность
+#   M2 = "Объём/Поток": Объём, Импульс, Волатильность, Микроструктура
+#   M3 = "Позиционирование/Режим": Позиционирование, Режим рынка, Энтропия
+#
+# Так они могут реально расходиться: цена говорит UP, объём DOWN → противоречие;
+# позиционирование и режим добавляют третий независимый голос.
+CLUSTER_GROUPS: dict[str, set[str]] = {
+    "M1": {"Тренд", "Адаптивные МА", "Циклы", "Фрактальность"},
+    "M2": {"Объём", "Импульс", "Волатильность", "Микроструктура"},
+    "M3": {"Позиционирование", "Режим рынка", "Энтропия"},
+}
+
 # Минимум наблюдений на метод для того, чтобы его effWR учитывался
 _MIN_OBS = 10
 
@@ -258,18 +277,30 @@ class ClusterModels:
     def compute(self, current_scores: dict[str, float]) -> tuple[float, float, float]:
         """
         Вычисляет (m1_score, m2_score, m3_score) для текущего бара.
-        current_scores — словарь {method_name: score} из __compute_composite.
-        Если истории недостаточно — возвращает (0, 0, 0).
+
+        Каждый из M1/M2/M3 — независимый суб-композит над своей группой кластеров
+        (см. CLUSTER_GROUPS). Агрегация внутри каждого кластера — WR × (1−|corr|),
+        как в классическом M1. Итог группы = среднее по кластерам, взвешенное
+        по confidence (средний effWR методов кластера).
+
+        Так M1, M2, M3 могут реально расходиться: разные группы методов отвечают
+        на разные вопросы (цена / объём+поток / позиционирование+режим), и их
+        согласие/несогласие теперь несёт информацию.
         """
         if not self._ready:
             return 0.0, 0.0, 0.0
 
-        m1_parts: list[tuple[float, float]] = []  # (score, confidence)
-        m2_parts: list[tuple[float, float]] = []
-        m3_parts: list[tuple[float, float]] = []
+        group_parts: dict[str, list[tuple[float, float]]] = {"M1": [], "M2": [], "M3": []}
 
         for cluster in STRATEGY_CLUSTERS:
-            # Только методы с историей И с ненулевым текущим скором
+            # К какой группе относится этот кластер?
+            group_key = next(
+                (k for k, labels in CLUSTER_GROUPS.items() if cluster["label"] in labels),
+                None
+            )
+            if group_key is None:
+                continue  # кластер без группы — игнорируем
+
             ids = [
                 mid for mid in cluster["ids"]
                 if mid in self._series and mid in current_scores
@@ -277,61 +308,36 @@ class ClusterModels:
             if not ids:
                 continue
 
-            # Лидер = метод с наибольшим effWR в текущем режиме
             leader = max(ids, key=lambda mid: self._eff_wr.get(mid, 0.5))
 
-            # ── M1: весовая агрегация WR × (1 − |corr с лидером|) ─────────
-            weights_m1 = {}
+            # WR × (1 − |corr с лидером|) — те же веса что в оригинальном M1
+            weights: dict[str, float] = {}
             for mid in ids:
                 wr = self._eff_wr.get(mid, 0.5)
                 if mid == leader:
-                    corr = 1.0
+                    weights[mid] = wr
                 else:
                     corr = self._corr.get((leader, mid), _pearson(
                         self._series.get(leader, []),
                         self._series.get(mid, [])
                     ))
-                weights_m1[mid] = wr * (1.0 - abs(corr)) if mid != leader else wr
+                    weights[mid] = wr * (1.0 - abs(corr))
 
-            tot_w = sum(weights_m1.values()) or 1.0
-            m1_score = sum(
-                weights_m1[mid] / tot_w * current_scores[mid]
-                for mid in ids
-            )
-            m1_score = max(-1.0, min(1.0, m1_score))
-            m1_conf = min(0.75, (tot_w / len(ids)) * 0.6)
-            if m1_conf > 0:
-                m1_parts.append((m1_score, m1_conf))
+            tot_w = sum(weights.values()) or 1.0
+            cl_score = sum(weights[mid] / tot_w * current_scores[mid] for mid in ids)
+            cl_score = max(-1.0, min(1.0, cl_score))
+            cl_conf = min(0.75, (tot_w / len(ids)) * 0.6)
 
-            # ── M2: только лидер кластера ──────────────────────────────────
-            leader_wr = self._eff_wr.get(leader, 0.5)
-            m2_score = current_scores.get(leader, 0.0)
-            m2_conf = leader_wr * 0.85
-            if m2_conf > 0:
-                m2_parts.append((m2_score, m2_conf))
-
-            # ── M3: лидер × agreement (доля методов согласных с лидером) ──
-            leader_sc = current_scores.get(leader, 0.0)
-            leader_dir = 1 if leader_sc > 0 else (-1 if leader_sc < 0 else 0)
-            if leader_dir == 0:
-                continue
-            agree = sum(
-                1 for mid in ids
-                if (current_scores.get(mid, 0) > 0) == (leader_dir > 0)
-            )
-            agreement = agree / len(ids) if len(ids) > 1 else 1.0
-            m3_score = leader_sc * agreement
-            m3_conf = leader_wr * agreement
-            if m3_conf > 0:
-                m3_parts.append((m3_score, m3_conf))
+            if cl_conf > 0:
+                group_parts[group_key].append((cl_score, cl_conf))
 
         def _agg(parts: list[tuple[float, float]]) -> float:
             if not parts:
                 return 0.0
             tw = sum(c for _, c in parts) or 1.0
-            return sum(s * c / tw for s, c in parts)
+            return max(-1.0, min(1.0, sum(s * c / tw for s, c in parts)))
 
-        return _agg(m1_parts), _agg(m2_parts), _agg(m3_parts)
+        return _agg(group_parts["M1"]), _agg(group_parts["M2"]), _agg(group_parts["M3"])
 
     def redundancy_dampen(
             self, method_names: list[str], regime_probs: Optional[dict[str, float]] = None
