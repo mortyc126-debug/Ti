@@ -156,8 +156,14 @@ def save_cached_backtest_history(tickers: list[str], days: int) -> dict:
 
     for ticker in tickers:
         hist = _last_backtest_history_data.get(ticker)
-        if not hist:
+        # hist is None -> бэктест по тикеру не запускали (нет кэша вообще);
+        # hist == {} -> запускали, но не записалось ни дня (слишком мало
+        # свечей для скана) — оба случая разные: только первый требует
+        # пересчёта, иначе тикеры без сделок гонялись бы заново каждый раз.
+        if hist is None:
             missing.append(ticker)
+            continue
+        if not hist:
             continue
         tmp = BacktestHistoryStore()
         tmp._data[ticker] = hist
@@ -1169,7 +1175,12 @@ def run_backtest_one(
         return rows, None
 
     _set_progress(progress, ticker, "готово")
-    return rows, bt_store._data.get(ticker)
+    # .get(ticker, {}) а не None: если у тикера слишком мало свечей для скана
+    # (ничего не записалось в bt_store), это всё равно ЗАВЕРШЁННЫЙ прогон без
+    # данных — а не "не пытались". {} != None дальше отличает это от реально
+    # отсутствующего кэша (см. save_cached_backtest_history) — иначе такие
+    # тикеры заново и заново уходили в пересчёт при каждом "сохранить историю".
+    return rows, bt_store._data.get(ticker, {})
 
 
 def run_backtest(
@@ -1196,7 +1207,7 @@ def run_backtest(
                 break
             r_rows, r_hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress)
             rows.extend(r_rows)
-            if r_hist:
+            if r_hist is not None:
                 hist_by_ticker[ticker] = r_hist
         if _cancel_event.is_set():
             _mark_unfinished_cancelled(progress, tickers)
@@ -1218,7 +1229,7 @@ def run_backtest(
             try:
                 r_rows, r_hist = fut.result()
                 by_ticker_rows[ticker] = r_rows
-                if r_hist:
+                if r_hist is not None:
                     hist_by_ticker[ticker] = r_hist
             except Exception:
                 pass  # воркер мог быть убит через /api/cancel — это ожидаемо
@@ -4141,7 +4152,7 @@ class Handler(BaseHTTPRequestHandler):
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
             rows, hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff)
-            if hist:
+            if hist is not None:
                 _last_backtest_history_data[ticker] = hist
             self._send_json({"rows": rows})
         elif self.path == "/api/backtest":
@@ -4201,7 +4212,7 @@ class Handler(BaseHTTPRequestHandler):
                     t = fs[fut]
                     try:
                         rows, hist = fut.result()
-                        if hist:
+                        if hist is not None:
                             _last_backtest_history_data[t] = hist
                     except Exception as ex:
                         rows = [{"ticker": t, "mode": "ошибка", "error": str(ex)}]
