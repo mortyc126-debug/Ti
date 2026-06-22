@@ -330,6 +330,23 @@ def _l1_mult_from_context(
         return 1.0
 
 
+def _atr_exhaustion_mult(composite: float, day_move_pct: float, atr_pct: float) -> float:
+    """Демпфирует composite если цена уже прошла значительную часть дневного ATR
+    в направлении сигнала. day_move_pct = (close - daily_open) / daily_open * 100, знаковый."""
+    if abs(composite) < 1e-6 or atr_pct <= 0:
+        return 1.0
+    direction_move = day_move_pct if composite > 0 else -day_move_pct
+    if direction_move <= 0:
+        return 1.0  # цена ещё не двигалась в сторону сигнала — исчерпания нет
+    ratio = direction_move / atr_pct
+    if ratio >= _ATR_EX_HARD:
+        return _ATR_EX_HARD_MULT
+    if ratio >= _ATR_EX_SOFT:
+        t = (ratio - _ATR_EX_SOFT) / (_ATR_EX_HARD - _ATR_EX_SOFT)
+        return 1.0 - t * (1.0 - _ATR_EX_HARD_MULT)
+    return 1.0
+
+
 LIQUIDITY_MIN_RATIO = 0.3          # объём последней свечи >= 0.3 * медианы окна
 LOW_QUALITY_THRESHOLD = 0.4        # rolling quality ниже этого — "плохая полоса"
 LOW_QUALITY_MULT = 1.3             # ужесточение порога в плохой полосе
@@ -340,6 +357,11 @@ QUALITY_ALPHA = 0.15               # скорость EWA для rolling quality
 # уже устоявшемся режиме, а сразу после переключения это ещё переходный шум.
 LAG_PENALTY_BARS = 5
 LAG_PENALTY_MIN = 0.6              # confidence-множитель сразу после смены режима
+
+# ── ATR-exhaustion: подавление входов когда дневной ATR почти исчерпан ───────
+_ATR_EX_SOFT      = 0.60   # 60% дневного ATR в направлении сигнала → начало демпфирования
+_ATR_EX_HARD      = 0.85   # 85% → жёсткое демпфирование
+_ATR_EX_HARD_MULT = 0.15   # множитель при полном исчерпании
 
 # ── ATR-фильтр шума ──────────────────────────────────────────────────────────
 ATR_PERIOD = 14                    # период ATR
@@ -1293,6 +1315,11 @@ class OICompositeStrategy(IStrategy):
         self.__l1_trending_up: bool = False
         self.__l1_trending_down: bool = False
         self.__l1_data_ready: bool = False   # False пока нет _L1_MA_DAYS дней истории
+        # ATR-exhaustion: дневной ход в % от цены (знаковый, +вверх/-вниз).
+        self.__daily_open_price: float = 0.0
+        self.__daily_open_date: Optional[object] = None
+        self.__day_move_pct: float = 0.0
+        self.__last_atr_pct: float = 0.0
         # Кэш тяжёлых операций: пересчитываем раз в N баров, между ними — старое значение.
         # RQA O(n²), wavelet O(n log n), regime (CUSUM+PELT+Z-score) — всё CPU-bound.
         # На 1м-свечах N=5 (обновление каждые 5 минут), на 5м — N=3.
@@ -1477,9 +1504,21 @@ class OICompositeStrategy(IStrategy):
         # ATR-фильтр: если средний ход меньше комиссии×фактор — движение не
         # окупает торговлю, сигнал не выдаём (защита от "мёртвых" инструментов).
         atr_pct = _compute_atr(self.__candles)
+        self.__last_atr_pct = atr_pct
         if atr_pct < commission_rt(self.__settings.is_future) * MIN_ATR_FACTOR:
             logger.debug(f"{self.__settings.figi}: пропуск — ATR {atr_pct:.4f} ниже комиссии×{MIN_ATR_FACTOR}")
             return None
+
+        # ATR-exhaustion: обновляем дневной open и дневной ход
+        if self.__candles:
+            last_c = self.__candles[-1]
+            cur_day = last_c.time.date()
+            if cur_day != self.__daily_open_date:
+                self.__daily_open_date = cur_day
+                self.__daily_open_price = _to_f(last_c.open)
+            close_px = _to_f(last_c.close)
+            if self.__daily_open_price > 0:
+                self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
         # вычисляем composite
         composite, scores = self.__compute_composite()
@@ -1581,6 +1620,10 @@ class OICompositeStrategy(IStrategy):
             list(self.__l1_buffer), self.__l1_pct, self.__l1_above_ma50,
             self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready,
         )
+        saved_atr_ex_state = (
+            self.__daily_open_price, self.__daily_open_date,
+            self.__day_move_pct, self.__last_atr_pct,
+        )
         qualities: list[float] = []
         comm = commission_rt(self.__settings.is_future)
         last_l1_day = None
@@ -1594,11 +1637,18 @@ class OICompositeStrategy(IStrategy):
                     last_l1_day = cur_day
                     self.__l1_buffer = candles[max(0, i - self.__l1_buffer_size):i]
                     self.__recalc_l1_context()
+                    self.__daily_open_date = cur_day
+                    self.__daily_open_price = _to_f(candles[i].open)
 
                 atr_pct = _compute_atr(self.__candles)
+                self.__last_atr_pct = atr_pct
                 if atr_pct < comm * MIN_ATR_FACTOR:
                     i += 1
                     continue
+
+                close_px = _to_f(candles[i].close)
+                if self.__daily_open_price > 0:
+                    self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
                 composite, scores = self.__compute_composite()
                 adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
@@ -1677,6 +1727,8 @@ class OICompositeStrategy(IStrategy):
             self.__score_history = saved_score_history
             (self.__l1_buffer, self.__l1_pct, self.__l1_above_ma50,
              self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready) = saved_l1_state
+            (self.__daily_open_price, self.__daily_open_date,
+             self.__day_move_pct, self.__last_atr_pct) = saved_atr_ex_state
 
         if not qualities:
             return 0.5, 0
@@ -1700,6 +1752,10 @@ class OICompositeStrategy(IStrategy):
         saved_l1_state = (
             list(self.__l1_buffer), self.__l1_pct, self.__l1_above_ma50,
             self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready,
+        )
+        saved_atr_ex_state = (
+            self.__daily_open_price, self.__daily_open_date,
+            self.__day_move_pct, self.__last_atr_pct,
         )
         signals: list[dict] = []
         total_bars = len(candles) - 1 - self.__candle_window
@@ -1728,12 +1784,21 @@ class OICompositeStrategy(IStrategy):
                     last_l1_day = cur_day
                     self.__l1_buffer = candles[max(0, i - self.__l1_buffer_size):i]
                     self.__recalc_l1_context()
+                    # ATR-exhaustion: дневной open = open первой свечи нового дня
+                    self.__daily_open_date = cur_day
+                    self.__daily_open_price = _to_f(candles[i].open)
 
                 atr_pct = _compute_atr(self.__candles)
+                self.__last_atr_pct = atr_pct
                 comm = commission_rt(self.__settings.is_future)
                 if atr_pct < comm * MIN_ATR_FACTOR:
                     i += 1
                     continue
+
+                # ATR-exhaustion: обновляем дневной ход на каждой свече
+                close_px = _to_f(candles[i].close)
+                if self.__daily_open_price > 0:
+                    self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
                 composite, scores = self.__compute_composite()
 
@@ -1790,6 +1855,8 @@ class OICompositeStrategy(IStrategy):
                     "l1_above_ma50": self.__l1_above_ma50 if self.__l1_data_ready else None,
                     "l1_trending_up": self.__l1_trending_up if self.__l1_data_ready else None,
                     "l1_trending_down": self.__l1_trending_down if self.__l1_data_ready else None,
+                    "atr_ex_ratio": round(self.__day_move_pct / self.__last_atr_pct, 2)
+                                    if self.__last_atr_pct > 0 else None,
                     # Исторические свечи до точки входа — для detect_level_pattern
                     "history_window": candles[max(0, i - 60):i + 1],
                 })
@@ -1799,6 +1866,8 @@ class OICompositeStrategy(IStrategy):
             self.__score_history = saved_score_history
             (self.__l1_buffer, self.__l1_pct, self.__l1_above_ma50,
              self.__l1_trending_up, self.__l1_trending_down, self.__l1_data_ready) = saved_l1_state
+            (self.__daily_open_price, self.__daily_open_date,
+             self.__day_move_pct, self.__last_atr_pct) = saved_atr_ex_state
 
         return signals
 
@@ -2161,6 +2230,7 @@ class OICompositeStrategy(IStrategy):
                     "l1_above_ma50": sig.get("l1_above_ma50"),
                     "l1_trending_up": sig.get("l1_trending_up"),
                     "l1_trending_down": sig.get("l1_trending_down"),
+                    "atr_ex_ratio": sig.get("atr_ex_ratio"),
                 })
 
         if not results:
@@ -2379,6 +2449,18 @@ class OICompositeStrategy(IStrategy):
                     f"trend↓={self.__l1_trending_down} → ×{l1_mult:.2f}"
                 )
             composite *= l1_mult
+
+        # ATR-exhaustion: если цена уже прошла 60-85%+ дневного ATR в направлении
+        # сигнала — потенциал движения исчерпывается, демпфируем composite.
+        if self.__last_atr_pct > 0 and self.__daily_open_price > 0:
+            atr_ex_mult = _atr_exhaustion_mult(composite, self.__day_move_pct, self.__last_atr_pct)
+            if atr_ex_mult != 1.0:
+                logger.debug(
+                    f"{self.__settings.figi}: ATR-ex ratio="
+                    f"{self.__day_move_pct / self.__last_atr_pct:.2f} "
+                    f"move={self.__day_move_pct:.3f}% atr={self.__last_atr_pct:.3f}% → ×{atr_ex_mult:.2f}"
+                )
+            composite *= atr_ex_mult
 
         self.__last_regime = regime
         self.__regime_confidence = regime_conf
