@@ -32,7 +32,7 @@ __all__ = (
     "Tag",
     "classify_directional", "classify_volume", "classify_price_reaction",
     "NarrativeState", "update_narrative",
-    "NarrativeWeights",
+    "NarrativeWeights", "NarrativeThresholds",
 )
 
 logger = logging.getLogger(__name__)
@@ -61,10 +61,17 @@ def _voted(scores: dict, names: list) -> list:
 
 
 def classify_directional(scores: dict, cluster_label: str,
-                          bullish_thresh: float = 0.2) -> Tag:
+                          bullish_thresh: float = 0.2,
+                          thresholds: "NarrativeThresholds | None" = None,
+                          regime: str = "") -> Tag:
     """BULLISH/BEARISH/NEUTRAL/NO_OPINION — среднее score кластера.
     Применимо к кластерам с направленным смыслом: Тренд, Импульс,
-    Адаптивные МА, Циклы, Микроструктура, Позиционирование."""
+    Адаптивные МА, Циклы, Микроструктура, Позиционирование.
+    bullish_thresh — дефолт на холодном старте; если передан thresholds
+    (калиброванный по перцентилям истории, см. calibrate_narrative.py) и для
+    (cluster_label, regime) есть калибровка — она замещает дефолт."""
+    if thresholds is not None:
+        bullish_thresh = thresholds.get(cluster_label, regime, "bullish", bullish_thresh)
     names = _CLUSTERS_BY_LABEL.get(cluster_label, [])
     voted = _voted(scores, names)
     if not names or len(voted) < max(1, int(len(names) * _MIN_QUORUM_SHARE)):
@@ -79,11 +86,18 @@ def classify_directional(scores: dict, cluster_label: str,
 
 
 def classify_volume(scores: dict, cluster_label: str = "Объём",
-                     accum_thresh: float = 0.2, climax_spread: float = 1.0) -> Tag:
+                     accum_thresh: float = 0.2, climax_spread: float = 1.0,
+                     thresholds: "NarrativeThresholds | None" = None,
+                     regime: str = "") -> Tag:
     """ACCUMULATION/DISTRIBUTION/CLIMAX/NEUTRAL/NO_OPINION.
     CLIMAX определяется РАЗБРОСОМ методов группы, не средним: резкий объёмный
     скачок без согласия по знаку внутри группы типичен для климакса/выброса
-    объёма (паника/кульминация), а не для направленного накопления/распределения."""
+    объёма (паника/кульминация), а не для направленного накопления/распределения.
+    accum_thresh/climax_spread — дефолты на холодном старте, замещаются
+    калиброванными значениями из thresholds, если они есть для regime."""
+    if thresholds is not None:
+        accum_thresh = thresholds.get(cluster_label, regime, "accum", accum_thresh)
+        climax_spread = thresholds.get(cluster_label, regime, "climax_spread", climax_spread)
     names = _CLUSTERS_BY_LABEL.get(cluster_label, [])
     voted = _voted(scores, names)
     if not names or len(voted) < max(1, int(len(names) * _MIN_QUORUM_SHARE)):
@@ -324,3 +338,41 @@ class NarrativeWeights:
         if n < _MIN_TRADES_TRUSTED:
             return True
         return ewa >= min_quality
+
+
+# ── Слой 1.5: калиброванные пороги тегов (перцентили по истории) ────────────
+#
+# bullish_thresh/accum_thresh/climax_spread в classify_directional/
+# classify_volume по умолчанию — захардкоженные числа для холодного старта
+# (когда истории ещё нет). calibrate_narrative.py считает реальные перцентили
+# распределения кластерных скоров ПО РЕЖИМАМ (то, что бычье в trending_up,
+# может быть медианой в ranging) и пишет их сюда — тогда пороги берутся из
+# данных конкретного тикера, а не угадываются.
+
+NARRATIVE_THRESHOLDS_FILE = "data/narrative_thresholds.json"
+
+
+class NarrativeThresholds:
+    """Калиброванные пороги по (cluster_label, regime). JSON вида
+    {cluster_label: {regime: {"bullish": .., "accum": .., "climax_spread": ..}}},
+    пишется calibrate_narrative.py. Без калибровки get() возвращает default,
+    переданный вызывающей стороной (см. classify_directional/classify_volume)."""
+
+    def __init__(self, path: str = NARRATIVE_THRESHOLDS_FILE):
+        self._path = path
+        self._data: dict[str, dict[str, dict[str, float]]] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if os.path.exists(self._path):
+            try:
+                with open(self._path, encoding="utf-8") as f:
+                    self._data = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning(f"narrative_thresholds: не удалось загрузить: {e}")
+
+    def get(self, cluster_label: str, regime: str, key: str, default: float) -> float:
+        bucket = self._data.get(cluster_label, {}).get(regime)
+        if not bucket or key not in bucket:
+            return default
+        return bucket[key]

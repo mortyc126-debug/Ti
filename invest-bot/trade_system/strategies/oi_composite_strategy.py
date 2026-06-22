@@ -76,8 +76,8 @@ from trade_system.strategies.base_strategy import IStrategy
 from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score
 from cluster_models import ClusterModels
 from narrative import (
-    NarrativeState, NarrativeWeights, classify_directional, classify_volume,
-    classify_price_reaction, update_narrative,
+    NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
+    classify_volume, classify_price_reaction, update_narrative,
 )
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
@@ -1486,6 +1486,7 @@ class OICompositeStrategy(IStrategy):
         # от history/calibrator, не нуждается в set_*-инъекции.
         self.__narrative_state = NarrativeState()
         self.__narrative_weights = NarrativeWeights()
+        self.__narrative_thresholds = NarrativeThresholds()
         self.__last_narrative_tags: dict = {}
 
         logger.info(
@@ -2866,8 +2867,12 @@ class OICompositeStrategy(IStrategy):
         — нарратив описывает, что "сказали" методы, а не то, как они уже
         свёрнуты в composite весами/режимными множителями.
         """
-        trend = classify_directional(base_score_dict, "Тренд")
-        volume = classify_volume(base_score_dict, "Объём")
+        trend = classify_directional(
+            base_score_dict, "Тренд", thresholds=self.__narrative_thresholds, regime=regime,
+        )
+        volume = classify_volume(
+            base_score_dict, "Объём", thresholds=self.__narrative_thresholds, regime=regime,
+        )
         # % изменение цены за окно — тот же горизонт, что у группы "Тренд".
         lookback = min(20, len(closes) - 1)
         if lookback > 0 and closes[-1 - lookback] != 0:

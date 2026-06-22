@@ -187,6 +187,23 @@ class HistoryStore:
             out.setdefault(regime, []).append(day["scores"][method])
         return out
 
+    def daily_method_scores_by_regime(
+            self, ticker: str, window_days: int = 90
+    ) -> dict[str, list[dict[str, float]]]:
+        """Как daily_scores_by_regime, но сразу все методы за день (не один) —
+        нужно narrative.py для калибровки кластерных порогов: кластерное
+        среднее/разброс за день считается по ВСЕМ методам кластера сразу,
+        а не по одному методу за раз."""
+        cutoff = self._cutoff(window_days)
+        out: dict[str, list[dict[str, float]]] = {}
+        for date, day in sorted(self._data.get(ticker, {}).items()):
+            scores = day.get("scores", {})
+            if date < cutoff or not scores:
+                continue
+            regime = day.get("regime", "")
+            out.setdefault(regime, []).append(scores)
+        return out
+
     # ── Аналитика: точность методов ──────────────────────────────────────────
 
     def method_performance(
