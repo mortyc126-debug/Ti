@@ -1849,6 +1849,13 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-section>.chip-row{{padding:8px 12px 10px;}}
 .chip-stock-section>summary{{color:#a0d4a0;}}
 .chip-fut-section>summary{{color:#7eb8f7;}}
+.cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;max-height:220px;}}
+.cat-toc{{flex:0 0 200px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);}}
+.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:pointer;border-bottom:1px solid var(--border2);white-space:nowrap;}}
+.cat-toc-item:hover{{background:rgba(255,255,255,.05);color:var(--txt);}}
+.cat-toc-item.active{{background:rgba(126,184,247,.12);color:var(--accent);font-weight:600;}}
+.cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;}}
+.cat-panel .chip-row{{padding:0;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -2252,6 +2259,11 @@ function filterInstrKind(kind) {{
   const ofKind = Array.from(document.querySelectorAll('.chip[data-kind="' + kind + '"]'));
   const allActive = ofKind.every(c => c.classList.contains('active'));
   ofKind.forEach(c => allActive ? c.classList.remove('active') : c.classList.add('active'));
+}}
+
+function showCatPanel(panelId) {{
+  document.querySelectorAll('.cat-toc-item').forEach(el => el.classList.toggle('active', el.dataset.panel === panelId));
+  document.querySelectorAll('.cat-panel').forEach(el => el.style.display = el.dataset.panel === panelId ? 'block' : 'none');
 }}
 
 function setAllChips(active) {{
@@ -4153,32 +4165,40 @@ def _render_page() -> bytes:
     futures = _futures_settings_by_ticker()
     reload_running = _futures_reload_running.is_set()
 
-    stock_chips = (
-        f'<details class="chip-section chip-stock-section" open><summary>Акции ({len(stocks)})</summary>'
-        f'<div class="chip-row">' + "".join(
-            f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
-            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
-            for t in sorted(stocks)
-        ) + '</div></details>'
-    )
     futures_by_cat: dict[str, list[str]] = {}
     for t in sorted(futures):
         cat = _futures_category_by_ticker.get(t, "Прочее")
         futures_by_cat.setdefault(cat, []).append(t)
-    futures_subsections = "".join(
-        f'<details class="chip-section" style="margin:6px 8px 6px 18px;" open><summary>{cat} ({len(ts)})</summary>'
-        f'<div class="chip-row">' + "".join(
-            f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-            f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
-            for t in ts
-        ) + '</div></details>'
-        for cat, ts in sorted(futures_by_cat.items())
+
+    # panels: список (panel_id, заголовок_toc, html_содержимого_панели)
+    panels: list[tuple[str, str, str]] = [(
+        "stock", f"Акции ({len(stocks)})",
+        '<div class="chip-row">' + "".join(
+            f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
+            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
+            for t in sorted(stocks)
+        ) + '</div>'
+    )]
+    for cat, ts in sorted(futures_by_cat.items()):
+        panels.append((
+            f"fut-{cat}", f"{cat} ({len(ts)})",
+            '<div class="chip-row">' + "".join(
+                f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
+                f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+                for t in ts
+            ) + '</div>'
+        ))
+
+    toc_items = "".join(
+        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}" '
+        f'onclick="showCatPanel(\'{pid}\')">{label}</div>'
+        for i, (pid, label, _) in enumerate(panels)
     )
-    futures_chips = (
-        f'<details class="chip-section chip-fut-section" open><summary>Фьючерсы ({len(futures)})</summary>'
-        f'{futures_subsections}</details>'
-        if futures else ""
+    cat_panels = "".join(
+        f'<div class="cat-panel" data-panel="{pid}" style="display:{"block" if i == 0 else "none"}">{html}</div>'
+        for i, (pid, _, html) in enumerate(panels)
     )
+
     reload_hint = (
         ' <span style="color:#7eb8f7;font-size:11px">⏳ обновляется…</span>'
         if reload_running else ""
@@ -4192,7 +4212,10 @@ def _render_page() -> bytes:
         f'<button class="btn-pill btn-sm" onclick="setAllChips(false)">✗ снять</button>'
         f'<button class="btn-pill btn-sm" onclick="reloadFutures()" style="color:#aaa" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты{reload_hint}</button>'
         f'</div>'
-        f'{stock_chips}{futures_chips}'
+        f'<div class="cat-toc-wrap">'
+        f'<div class="cat-toc">{toc_items}</div>'
+        f'<div class="cat-panels">{cat_panels}</div>'
+        f'</div>'
     )
     return (PAGE_HTML
             .replace("__TICKER_CHECKBOXES__", checkboxes)
