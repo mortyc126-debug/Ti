@@ -2280,6 +2280,17 @@ function tradeDetailHtml(t) {{
     html += t.top_against.map(([n, v]) => `${{n}} ${{fmtScore(v)}}`).join(' · ');
     html += `</div>`;
   }}
+  if (t.l1_pct != null) {{
+    const pct = Math.round(t.l1_pct * 100);
+    const pctColor = t.direction === 'LONG'
+      ? (pct > 70 ? 'var(--neg)' : pct < 30 ? 'var(--pos)' : 'var(--txt3)')
+      : (pct < 30 ? 'var(--neg)' : pct > 70 ? 'var(--pos)' : 'var(--txt3)');
+    const maStr = t.l1_above_ma50 ? '▲MA50' : '▼MA50';
+    const trendStr = t.l1_trending_up ? ' тренд↑' : t.l1_trending_down ? ' тренд↓' : '';
+    html += `<div style="font-size:10px;color:var(--txt3)"><b>L1:</b> `
+      + `перцентиль <b style="color:${{pctColor}}">${{pct}}%</b> `
+      + `${{maStr}}${{trendStr}}</div>`;
+  }}
   html += `</div>`;
   return html;
 }}

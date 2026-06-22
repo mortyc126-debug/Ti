@@ -1785,8 +1785,12 @@ class OICompositeStrategy(IStrategy):
                     "method_scores": dict(self.__last_scores),
                     "regime": self.__last_regime,
                     "noise_scale": self.__noise_stop_scale(),
+                    # L1-контекст на момент входа
+                    "l1_pct": round(self.__l1_pct, 3) if self.__l1_data_ready else None,
+                    "l1_above_ma50": self.__l1_above_ma50 if self.__l1_data_ready else None,
+                    "l1_trending_up": self.__l1_trending_up if self.__l1_data_ready else None,
+                    "l1_trending_down": self.__l1_trending_down if self.__l1_data_ready else None,
                     # Исторические свечи до точки входа — для detect_level_pattern
-                    # (prev day H/L, volume climax, compression).
                     "history_window": candles[max(0, i - 60):i + 1],
                 })
                 i += max(1, len(window))  # не пересекать виртуальные сделки
@@ -2152,6 +2156,11 @@ class OICompositeStrategy(IStrategy):
                     "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
                     "top_agree": top_agree,
                     "top_against": top_against,
+                    # L1-контекст на момент входа (None если данных не было)
+                    "l1_pct": sig.get("l1_pct"),
+                    "l1_above_ma50": sig.get("l1_above_ma50"),
+                    "l1_trending_up": sig.get("l1_trending_up"),
+                    "l1_trending_down": sig.get("l1_trending_down"),
                 })
 
         if not results:
