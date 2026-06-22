@@ -117,6 +117,15 @@ PYRAMID_ENABLED = os.getenv("PYRAMID", "0") == "1"
 PYRAMID_R_THRESHOLD = float(os.getenv("PYRAMID_R", "0.5"))  # сколько R пройти
 PYRAMID_ADD_RATIO = float(os.getenv("PYRAMID_ADD_RATIO", "0.5"))  # доля добавки
 
+# Drift-алерт: разъезд утреннего backtest-прогноза и фактического конца дня
+# (см. __record_backtest_calibration). DRIFT_ALERT_THRESHOLD — разовый скачок,
+# DRIFT_ROLLING_WINDOW/DRIFT_ROLLING_THRESHOLD — устойчивое смещение за
+# последние N дней по тикеру (сигнал "пора пересчитать narrative/lasso", а
+# не просто шум одного дня).
+DRIFT_ALERT_THRESHOLD = float(os.getenv("DRIFT_ALERT_THRESHOLD", "0.25"))
+DRIFT_ROLLING_WINDOW = int(os.getenv("DRIFT_ROLLING_WINDOW", "5"))
+DRIFT_ROLLING_THRESHOLD = float(os.getenv("DRIFT_ROLLING_THRESHOLD", "0.15"))
+
 
 class Trader:
     """
@@ -497,17 +506,50 @@ class Trader:
 
         self.__maybe_run_lasso(list(today_trade_strategies.values()))
 
+    def __drifted_tickers(self) -> list[str]:
+        """Тикеры, у которых rolling-разъезд прогноза/факта (см.
+        __check_drift_alert) держится DRIFT_ROLLING_WINDOW дней подряд —
+        повод пересчитать lasso раньше штатного понедельника, а не ждать,
+        пока устаревшая модель неделю торгует по сигналам сменившегося
+        режима рынка."""
+        path = "data/backtest_calibration.json"
+        if not os.path.exists(path):
+            return []
+        try:
+            with open(path, encoding="utf-8") as f:
+                records = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return []
+        by_ticker: dict[str, list[dict]] = {}
+        for r in records:
+            by_ticker.setdefault(r.get("ticker"), []).append(r)
+        drifted = []
+        for ticker, recs in by_ticker.items():
+            rolling = recs[-DRIFT_ROLLING_WINDOW:]
+            if len(rolling) < DRIFT_ROLLING_WINDOW:
+                continue
+            mean_drift = sum(abs(r["actual_quality"] - r["predicted_quality"]) for r in rolling) / len(rolling)
+            if mean_drift >= DRIFT_ROLLING_THRESHOLD:
+                drifted.append(ticker)
+        return drifted
+
     def __maybe_run_lasso(self, strategies: list) -> None:
-        """Еженедельная lasso-калибровка по понедельникам (первый торговый день недели).
-        Запускается в конце торгового дня — когда Tinkoff API уже не занят стримом.
+        """Lasso-калибровка по понедельникам (первый торговый день недели) —
+        ИЛИ раньше срока, если у части тикеров устойчиво разъехался
+        утренний прогноз и факт (см. __drifted_tickers): смена режима
+        рынка, ждать неделю до штатного понедельника не нужно. Запускается
+        в конце торгового дня — когда Tinkoff API уже не занят стримом.
         После успешного прогона вызывает reload_lasso_priors() на каждой стратегии."""
         today = datetime.datetime.now(datetime.timezone.utc).date()
-        if today.weekday() != 0:  # 0 = понедельник
-            return
         if self.__lasso_last_run == today:
             return
+        is_monday = today.weekday() == 0
+        drifted = [] if is_monday else self.__drifted_tickers()
+        if not is_monday and not drifted:
+            return
         self.__lasso_last_run = today
-        logger.info("Lasso-калибровка: старт (понедельник)")
+        reason = "понедельник" if is_monday else f"drift по тикерам: {', '.join(drifted)}"
+        logger.info(f"Lasso-калибровка: старт ({reason})")
         try:
             existing = lasso_calibration._load_existing()
             by_ticker = lasso_calibration._strategy_settings_by_ticker()
@@ -2458,6 +2500,26 @@ class Trader:
             os.replace(tmp, path)
         except (OSError, json.JSONDecodeError) as ex:
             logger.warning(f"BACKTEST-СВЕРКА: не удалось сохранить {path}: {repr(ex)}")
+            return
+        self.__check_drift_alert(ticker, records, prediction["predicted_quality"], actual_quality)
+
+    def __check_drift_alert(
+            self, ticker: str, records: list[dict], predicted_quality: float, actual_quality: float,
+    ) -> None:
+        """Шлёт в Telegram (через self.__blogger), если прогноз и факт
+        разъехались сильно — разово или устойчиво за последние дни.
+        См. DRIFT_ALERT_THRESHOLD/DRIFT_ROLLING_*."""
+        same_ticker = [r for r in records if r.get("ticker") == ticker]
+        rolling = same_ticker[-DRIFT_ROLLING_WINDOW:]
+        rolling_mean_drift = None
+        if len(rolling) >= DRIFT_ROLLING_WINDOW:
+            rolling_mean_drift = sum(
+                abs(r["actual_quality"] - r["predicted_quality"]) for r in rolling
+            ) / len(rolling)
+        single_drift = abs(actual_quality - predicted_quality)
+        if single_drift >= DRIFT_ALERT_THRESHOLD or (
+                rolling_mean_drift is not None and rolling_mean_drift >= DRIFT_ROLLING_THRESHOLD):
+            self.__blogger.drift_alert(ticker, predicted_quality, actual_quality, rolling_mean_drift)
 
     def __validate_strategy_backtest(self, strategy: IStrategy) -> None:
         """

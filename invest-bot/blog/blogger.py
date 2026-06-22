@@ -71,6 +71,23 @@ class Blogger:
             more = f" и ещё {len(extra_tickers) - 20}" if len(extra_tickers) > 20 else ""
             self.__send_text_message(f"MEGA-ALERTS: ещё {len(extra_tickers)} тикеров с аномалиями вне списка: {preview}{more}")
 
+    def drift_alert(self, ticker: str, predicted_quality: float, actual_quality: float, rolling_mean_drift: float | None = None) -> None:
+        """
+        Утренний backtest-гейт (__validate_strategy_backtest) предсказывает
+        качество, факт сверяется в конце дня (__record_backtest_calibration).
+        Если разъехались сильно — модель устарела (смена режима рынка), стоит
+        пересчитать narrative/lasso/rule_miner раньше штатного понедельника.
+        """
+        if not self.__blog_status:
+            return
+        text = (
+            f"⚠️ DRIFT {ticker}: прогноз={predicted_quality:.2f} факт={actual_quality:.2f} "
+            f"(расхождение {abs(actual_quality - predicted_quality):.2f})"
+        )
+        if rolling_mean_drift is not None:
+            text += f"\nСреднее расхождение за последние дни: {rolling_mean_drift:.2f} — модель, похоже, устарела."
+        self.__send_text_message(text)
+
     def finish_trading_message(self) -> None:
         """
         The method sends information that trading is stopping.
