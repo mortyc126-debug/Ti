@@ -103,41 +103,68 @@ def _wire_history_returning(strategy) -> BacktestHistoryStore:
     return store
 
 
+def _save_backtest_history_one(ticker: str, days: int) -> tuple[str, dict | None, int, str | None]:
+    """Считает накопленную историю одного тикера (для save_backtest_history).
+    Выделено в отдельную функцию, чтобы гонять тикеры параллельно по
+    процессам — тот же CPU-bound скан, что и в run_backtest_one."""
+    by_ticker = _all_settings_by_ticker()
+    settings = by_ticker.get(ticker)
+    if settings is None:
+        return ticker, None, 0, f"{ticker}: нет в settings"
+    try:
+        strategy = StrategyFactory.new_factory(settings.name, settings)
+        bt_store = _wire_history_returning(strategy)
+        candles = get_candles_cached(ticker, settings.figi, days, _market_data, _db,
+                                     candle_interval_min=settings.candle_interval_min)
+        if not candles:
+            return ticker, None, 0, f"{ticker}: нет свечей"
+        strategy.backtest_barriers(candles)
+        hist = bt_store._data.get(ticker, {})
+        n_trades = sum(len(day.get("trades", [])) for day in hist.values())
+        return ticker, hist, n_trades, None
+    except Exception as ex:
+        return ticker, None, 0, f"{ticker}: {ex}"
+
+
 def save_backtest_history(tickers: list[str], days: int) -> dict:
     """Прогоняет бэктест по тикерам и сохраняет накопленные сделки/скоры
     в data/history.json. Используется для начальной калибровки lasso без
-    ожидания живых сделок."""
+    ожидания живых сделок. Тикеры — независимые CPU-bound сканы, поэтому
+    при >1 тикере гоняем параллельно по процессам (как run_backtest)."""
     real_store = HistoryStore()
     total_days = 0
     total_trades = 0
-    errors = []
+    errors: list[str] = []
 
-    by_ticker = _all_settings_by_ticker()
-    for ticker in tickers:
-        settings = by_ticker.get(ticker)
-        if settings is None:
-            errors.append(f"{ticker}: нет в settings")
-            continue
+    if len(tickers) <= 1:
+        results = [_save_backtest_history_one(t, days) for t in tickers]
+    else:
+        results = []
+        pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
+        _register_pool(pool)
         try:
-            strategy = StrategyFactory.new_factory(settings.name, settings)
-            bt_store = _wire_history_returning(strategy)
-            candles = get_candles_cached(ticker, settings.figi, days, _market_data, _db,
-                                         candle_interval_min=settings.candle_interval_min)
-            if not candles:
-                errors.append(f"{ticker}: нет свечей")
-                continue
-            strategy.backtest_barriers(candles)
-            merged = bt_store.merge_into(real_store)
-            # подсчитаем сделки
-            n_trades = sum(
-                len(v.get("trades", []))
-                for days_data in bt_store._data.get(ticker, {}).values()
-                for v in [days_data]
-            )
-            total_days += merged
-            total_trades += n_trades
-        except Exception as ex:
-            errors.append(f"{ticker}: {ex}")
+            futures = {pool.submit(_save_backtest_history_one, t, days): t for t in tickers}
+            for fut in as_completed(futures):
+                ticker = futures[fut]
+                try:
+                    results.append(fut.result())
+                except Exception as ex:
+                    results.append((ticker, None, 0, f"{ticker}: {ex}"))
+        finally:
+            _unregister_pool(pool)
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    for ticker, hist, n_trades, err in results:
+        if err:
+            errors.append(err)
+            continue
+        if hist is None:
+            continue
+        tmp = BacktestHistoryStore()
+        tmp._data[ticker] = hist
+        merged = tmp.merge_into(real_store)
+        total_days += merged
+        total_trades += n_trades
 
     return {"saved_days": total_days, "trades": total_trades, "errors": errors}
 
