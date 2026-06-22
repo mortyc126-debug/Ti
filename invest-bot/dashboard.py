@@ -634,7 +634,7 @@ def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
     fieldnames = (
         ["time", "open", "high", "low", "close", "volume", "regime"]
         + score_names
-        + ["fwd_ret_1", "fwd_ret_5", "fwd_ret_20"]
+        + ["fwd_ret_3", "fwd_ret_6", "fwd_ret_12"]
     )
 
     buf = io.StringIO()
@@ -659,9 +659,9 @@ def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
             "close":  round(close, 4),
             "volume": int(vol_arr[ci]),
             "regime": row["regime"],
-            "fwd_ret_1":  fwd(1),
-            "fwd_ret_5":  fwd(5),
-            "fwd_ret_20": fwd(20),
+            "fwd_ret_3":  fwd(3),
+            "fwd_ret_6":  fwd(6),
+            "fwd_ret_12": fwd(12),
         }
         for sn in score_names:
             record[sn] = round(row["scores"].get(sn, 0.0), 4)
