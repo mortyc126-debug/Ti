@@ -1726,6 +1726,9 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <span id="status"></span>
+  <label style="margin-left:8px;font-size:11px;color:var(--txt3);">
+    <input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть тикеры без сделок
+  </label>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
 </div>
@@ -2203,6 +2206,44 @@ function droppedToHtml(dropped) {{
   return html;
 }}
 
+// Накопленные строки текущего прогона — храним как данные, не HTML, чтобы
+// можно было перерисовывать таблицу (фильтр "скрыть нулевые", итоговая
+// строка) без повторного запроса к серверу.
+let _backtestRows = [];
+let _droppedRows = [];
+
+function _isZeroResult(r) {{
+  // "нулевой результат" — тикер досчитан, но сделок не нашлось (n_trades===0),
+  // а не ошибка/пропуск (у тех n_trades вообще не определён).
+  return r.n_trades !== undefined && r.n_trades === 0;
+}}
+
+function summaryRowToHtml(rows) {{
+  const valid = rows.filter(r => r.win_rate !== undefined && r.n_trades > 0);
+  if (!valid.length) return '';
+  const totalTrades = valid.reduce((s, r) => s + r.n_trades, 0);
+  // Средневзвешенно по числу сделок — тикер с 2 сделками не должен иметь
+  // тот же вес в среднем, что тикер с 80.
+  const avgWin = valid.reduce((s, r) => s + r.win_rate * r.n_trades, 0) / totalTrades;
+  const avgExp = valid.reduce((s, r) => s + (r.expectancy_pct || 0) * r.n_trades, 0) / totalTrades;
+  const avgR = valid.reduce((s, r) => s + (r.avg_r || 0) * r.n_trades, 0) / totalTrades;
+  return `<tr style="font-weight:bold;border-top:2px solid var(--txt3);">` +
+    `<td>ИТОГО (${{valid.length}} тикер(ов))</td><td></td><td>${{totalTrades}}</td>` +
+    `<td>${{(avgWin * 100).toFixed(1)}}%</td><td>${{avgR.toFixed(2)}}</td>` +
+    `<td>${{(avgExp * 100).toFixed(2)}}%</td><td></td></tr>`;
+}}
+
+function renderResultsTable() {{
+  const table = document.getElementById('results');
+  const hideZero = document.getElementById('hide_zero').checked;
+  const shown = hideZero ? _backtestRows.filter(r => !_isZeroResult(r)) : _backtestRows;
+  let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
+  html += droppedToHtml(_droppedRows);
+  html += rowsToHtml(shown);
+  html += summaryRowToHtml(shown);
+  table.innerHTML = html;
+}}
+
 let _progressTimer = null;
 
 function _fmtEta(sec) {{
@@ -2276,7 +2317,9 @@ async function runBacktest() {{
   const allTickers = allChips.map(c => c.dataset.ticker).filter(Boolean);
   if (allTickers.length === 0) {{ alert('Нет активных чипов тикеров. Выбери хотя бы один.'); return; }}
   const table = document.getElementById('results');
-  table.innerHTML = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
+  _backtestRows = [];
+  _droppedRows = [];
+  renderResultsTable();
   const days = parseInt(document.getElementById('days').value, 10);
   const atrTake = document.getElementById('atr_take').value;
   const atrStop = document.getElementById('atr_stop').value;
@@ -2290,7 +2333,8 @@ async function runBacktest() {{
     return;
   }}
   const tickers = filtered.kept;
-  table.innerHTML += droppedToHtml(filtered.dropped);
+  _droppedRows = filtered.dropped;
+  renderResultsTable();
 
   document.getElementById('status').textContent =
     `Считаю ${{tickers.length}} тикер(ов) параллельно (до __BACKTEST_WORKERS__ одновременно)...`;
@@ -2320,7 +2364,8 @@ async function runBacktest() {{
         try {{ evt = JSON.parse(line); }} catch(ex) {{ continue; }}
         if (evt.done) {{ break; }}
         if (evt.rows) {{
-          table.innerHTML += rowsToHtml(evt.rows);
+          _backtestRows.push(...evt.rows);
+          renderResultsTable();
           doneCount++;
           document.getElementById('status').textContent =
             `Готово ${{doneCount}}/${{tickers.length}} тикер(ов)...`;
@@ -2333,7 +2378,8 @@ async function runBacktest() {{
       const r2 = await fetch('/api/last_result?kind=backtest');
       const d2 = await r2.json();
       if (d2 && d2.rows) {{
-        table.innerHTML += rowsToHtml(d2.rows);
+        _backtestRows.push(...d2.rows);
+        renderResultsTable();
         table.innerHTML += `<tr><td colspan="6" style="color:var(--txt3);">⚠ соединение оборвалось, результат из кэша</td></tr>`;
       }} else {{
         table.innerHTML += `<tr><td colspan="6" class="err">сетевая ошибка: ${{e}}</td></tr>`;
