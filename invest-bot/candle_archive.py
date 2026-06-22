@@ -103,8 +103,13 @@ def get_candles_cached(
         ticker: str, figi: str, days: int,
         market_data: MarketDataService, db: DbApiClient,
         candle_interval_min: int = 5,
+        offset_days: int = 0,
 ) -> list[HistoricCandle]:
-    now = datetime.now(timezone.utc)
+    """offset_days сдвигает ОБА конца периода в прошлое (период всё равно
+    `days` дней длиной) — чтобы можно было прогнать более старый кусок
+    истории (например, days=150 offset_days=150 — это дни 150..300 назад
+    от сегодня), не пересчитывая то, что уже посчитано для offset_days=0."""
+    now = datetime.now(timezone.utc) - timedelta(days=offset_days)
     date_from = (now - timedelta(days=days)).date()
     date_to = now.date()
     all_days = [date_from + timedelta(days=i) for i in range((date_to - date_from).days + 1)]

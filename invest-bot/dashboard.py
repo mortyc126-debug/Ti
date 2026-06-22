@@ -103,7 +103,7 @@ def _wire_history_returning(strategy) -> BacktestHistoryStore:
     return store
 
 
-def _save_backtest_history_one(ticker: str, days: int) -> tuple[str, dict | None, int, str | None]:
+def _save_backtest_history_one(ticker: str, days: int, offset_days: int = 0) -> tuple[str, dict | None, int, str | None]:
     """Считает накопленную историю одного тикера (для save_backtest_history).
     Выделено в отдельную функцию, чтобы гонять тикеры параллельно по
     процессам — тот же CPU-bound скан, что и в run_backtest_one."""
@@ -115,7 +115,8 @@ def _save_backtest_history_one(ticker: str, days: int) -> tuple[str, dict | None
         strategy = StrategyFactory.new_factory(settings.name, settings)
         bt_store = _wire_history_returning(strategy)
         candles = get_candles_cached(ticker, settings.figi, days, _market_data, _db,
-                                     candle_interval_min=settings.candle_interval_min)
+                                     candle_interval_min=settings.candle_interval_min,
+                                     offset_days=offset_days)
         if not candles:
             return ticker, None, 0, f"{ticker}: нет свечей"
         strategy.backtest_barriers(candles)
@@ -126,24 +127,26 @@ def _save_backtest_history_one(ticker: str, days: int) -> tuple[str, dict | None
         return ticker, None, 0, f"{ticker}: {ex}"
 
 
-def save_backtest_history(tickers: list[str], days: int) -> dict:
+def save_backtest_history(tickers: list[str], days: int, offset_days: int = 0) -> dict:
     """Прогоняет бэктест по тикерам и сохраняет накопленные сделки/скоры
     в data/history.json. Используется для начальной калибровки lasso без
     ожидания живых сделок. Тикеры — независимые CPU-bound сканы, поэтому
-    при >1 тикере гоняем параллельно по процессам (как run_backtest)."""
+    при >1 тикере гоняем параллельно по процессам (как run_backtest).
+    offset_days — см. get_candles_cached: сдвигает период в прошлое, чтобы
+    добрать более старый кусок истории без пересчёта уже посчитанного."""
     real_store = HistoryStore()
     total_days = 0
     total_trades = 0
     errors: list[str] = []
 
     if len(tickers) <= 1:
-        results = [_save_backtest_history_one(t, days) for t in tickers]
+        results = [_save_backtest_history_one(t, days, offset_days) for t in tickers]
     else:
         results = []
         pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
         _register_pool(pool)
         try:
-            futures = {pool.submit(_save_backtest_history_one, t, days): t for t in tickers}
+            futures = {pool.submit(_save_backtest_history_one, t, days, offset_days): t for t in tickers}
             for fut in as_completed(futures):
                 ticker = futures[fut]
                 try:
@@ -169,12 +172,16 @@ def save_backtest_history(tickers: list[str], days: int) -> dict:
     return {"saved_days": total_days, "trades": total_trades, "errors": errors}
 
 
-def save_cached_backtest_history(tickers: list[str], days: int) -> dict:
+def save_cached_backtest_history(tickers: list[str], days: int, offset_days: int = 0) -> dict:
     """То же самое, что save_backtest_history(), но без повторного прогона:
     использует данные, уже посчитанные последним runBacktest() в дашборде
     (_last_backtest_history_data) — то, что видно в таблице результатов.
     Тикеры без кэша (бэктест по ним ещё не запускали в этой сессии сервера)
-    прогоняются по старой схеме как fallback."""
+    прогоняются по старой схеме как fallback, за тот же период (days/offset_days).
+    Кэш в _last_backtest_history_data ключуется только по тикеру, без периода —
+    если между прогонами поменять offset_days для того же тикера, в кэше
+    останутся данные ИЗ ПОСЛЕДНЕГО прогона; сохранять нужно сразу после
+    каждого прогона, не накапливая периоды вперемешку."""
     real_store = HistoryStore()
     total_days = 0
     total_trades = 0
@@ -200,7 +207,7 @@ def save_cached_backtest_history(tickers: list[str], days: int) -> dict:
         total_trades += n_trades
 
     if missing:
-        fallback = save_backtest_history(missing, days)
+        fallback = save_backtest_history(missing, days, offset_days)
         total_days += fallback["saved_days"]
         total_trades += fallback["trades"]
         errors.extend(fallback["errors"])
@@ -1049,7 +1056,7 @@ def _shrunk_score(trades: list[dict], fixed_pct: float, k: int = ATR_SHRINK_K) -
 def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
-        progress: dict | None = None,
+        progress: dict | None = None, offset_days: int = 0,
 ) -> tuple[list[dict], dict | None]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает (rows, history_data):
@@ -1087,7 +1094,8 @@ def run_backtest_one(
 
         try:
             candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db,
-                                         candle_interval_min=strategy_settings.candle_interval_min)
+                                         candle_interval_min=strategy_settings.candle_interval_min,
+                                         offset_days=offset_days)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             _set_progress(progress, ticker, "ошибка API")
@@ -1212,7 +1220,7 @@ def run_backtest_one(
 
 def run_backtest(
         tickers: list[str], days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
-        tariff: str | None = None,
+        tariff: str | None = None, offset_days: int = 0,
 ) -> tuple[list[dict], dict[str, dict]]:
     """
     Прогоняет бэктест по всем тикерам сразу (используется как fallback API).
@@ -1232,7 +1240,7 @@ def run_backtest(
         for ticker in tickers:
             if _cancel_event.is_set():
                 break
-            r_rows, r_hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress)
+            r_rows, r_hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress, offset_days=offset_days)
             rows.extend(r_rows)
             if r_hist is not None:
                 hist_by_ticker[ticker] = r_hist
@@ -1246,7 +1254,7 @@ def run_backtest(
     _register_pool(pool)
     try:
         futures = {
-            pool.submit(run_backtest_one, ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress): ticker
+            pool.submit(run_backtest_one, ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress, offset_days=offset_days): ticker
             for ticker in tickers
         }
         for fut in as_completed(futures):
@@ -1806,6 +1814,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
        _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
        короче 90 дней молчит почти весь прогон. -->
   <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
+  <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
   <label>Тариф комиссии <select class="inp" id="tariff">
@@ -2420,6 +2429,7 @@ async function runBacktest() {{
   _droppedRows = [];
   renderResultsTable();
   const days = parseInt(document.getElementById('days').value, 10);
+  const offsetDays = parseInt(document.getElementById('offset_days').value, 10) || 0;
   const atrTake = document.getElementById('atr_take').value;
   const atrStop = document.getElementById('atr_stop').value;
 
@@ -2442,7 +2452,7 @@ async function runBacktest() {{
   try {{
     const resp = await fetch('/api/backtest_stream', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{tickers: tickers, days: days, atr_take: atrTake, atr_stop: atrStop,
+      body: JSON.stringify({{tickers: tickers, days: days, offset_days: offsetDays, atr_take: atrTake, atr_stop: atrStop,
                               tariff: document.getElementById('tariff').value}})
     }});
     if (!resp.ok || !resp.body) throw new Error('stream недоступен');
@@ -2524,16 +2534,18 @@ async function saveBacktestHistory() {{
   const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
   if (!tickers.length) {{ alert('Выбери тикеры (активные чипы)'); return; }}
   const days = parseInt(document.getElementById('days').value) || 90;
+  const offsetDays = parseInt(document.getElementById('offset_days').value, 10) || 0;
   // Сохраняем то, что уже посчитано последним "ЗАПУСТИТЬ БЭКТЕСТ" (сервер
   // держит его в _last_backtest_history_data) — без повторного прогона.
   // Тикеры, для которых кэша нет (бэктест по ним ещё не гоняли в этой
-  // сессии сервера), сервер досчитает сам и сообщит об этом в ответе.
+  // сессии сервера), сервер досчитает сам — за тот же период (days/offset_days,
+  // как сейчас стоят в форме) — и сообщит об этом в ответе.
   const btn = event.target;
   btn.disabled = true; btn.textContent = '⏳ сохраняю...';
   try {{
     const r = await fetch('/api/save_backtest_history', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{tickers, days}})
+      body: JSON.stringify({{tickers, days, offset_days: offsetDays}})
     }});
     const d = await r.json();
     if (d.error) {{ alert('Ошибка: ' + d.error); }}
@@ -4175,20 +4187,22 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/backtest_one":
             ticker = payload.get("ticker", "")
             days = int(payload.get("days", 30))
+            offset_days = int(payload.get("offset_days", 0))
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
-            rows, hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            rows, hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, offset_days=offset_days)
             if hist is not None:
                 _last_backtest_history_data[ticker] = hist
             self._send_json({"rows": rows})
         elif self.path == "/api/backtest":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 30))
+            offset_days = int(payload.get("offset_days", 0))
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
-            rows, hist_by_ticker = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff)
+            rows, hist_by_ticker = run_backtest(tickers, days, atr_take_ks, atr_stop_ks, tariff=tariff, offset_days=offset_days)
             _last_backtest_history_data.update(hist_by_ticker)
             _last_result["backtest"] = {"rows": rows}
             self._send_json({"rows": rows})
@@ -4197,6 +4211,7 @@ class Handler(BaseHTTPRequestHandler):
             # без ожидания остальных. Формат — Server-Sent Events (text/event-stream).
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 30))
+            offset_days = int(payload.get("offset_days", 0))
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
@@ -4230,7 +4245,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 fs = {
                     pool.submit(run_backtest_one, t, days, atr_take_ks, atr_stop_ks,
-                                tariff=tariff, progress=progress): t
+                                tariff=tariff, progress=progress, offset_days=offset_days): t
                     for t in tickers
                 }
                 for fut in as_completed(fs):
@@ -4312,10 +4327,11 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/save_backtest_history":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 90))
+            offset_days = int(payload.get("offset_days", 0))
             if not tickers:
                 self._send_json({"error": "нет тикеров"}, status=400)
             else:
-                result = save_cached_backtest_history(tickers, days)
+                result = save_cached_backtest_history(tickers, days, offset_days)
                 self._send_json(result)
         elif self.path == "/api/run_calibration":
             tickers = payload.get("tickers", [])
