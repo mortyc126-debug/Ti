@@ -2234,6 +2234,7 @@ class OICompositeStrategy(IStrategy):
 
     def last_snapshot(self) -> dict:
         """Последний расчёт composite/scores/режима — для архива (archive.py), не торговая логика."""
+        atr_pct = _compute_atr(self.__candles) if self.__candles else 0.0
         return {
             "composite": self.__last_composite,
             "scores": dict(self.__last_scores),
@@ -2243,6 +2244,7 @@ class OICompositeStrategy(IStrategy):
             "auto_atr_take_k": self.__auto_atr_take_k,
             "auto_atr_stop_k": self.__auto_atr_stop_k,
             "auto_atr_scale_exp": self.__auto_atr_scale_exp,
+            "atr_pct": atr_pct,
         }
 
     def path_estimate(self, lookback: int = 20) -> tuple[float, float]:

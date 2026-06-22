@@ -79,6 +79,22 @@ AUTO_ATR_HISTORY_DAYS = 90
 ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "0") == "1"
 ORDERBOOK_DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "10"))
 
+# Спред-фильтр: пропускаем вход если bid-ask спред шире этой доли от цены.
+# 0 = выключено. Типовой ликвидный MOEX-инструмент — спред 0.02-0.1%.
+MAX_ENTRY_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT", "0.003"))  # 0.3%
+
+# Дробный вход: первый транш TRANCHE1_RATIO*lots сразу, остаток через
+# TRANCHE2_BARS свечей если позиция ещё не в убытке. Выключен по умолчанию.
+FRACTIONAL_ENTRY_ENABLED = os.getenv("FRACTIONAL_ENTRY", "0") == "1"
+TRANCHE1_RATIO = float(os.getenv("TRANCHE1_RATIO", "0.5"))  # доля первого транша
+TRANCHE2_BARS = int(os.getenv("TRANCHE2_BARS", "3"))  # свечей ожидания до 2-го
+
+# Пирамидинг: при движении ≥ PYRAMID_R * R добавляем PYRAMID_ADD_RATIO*лотов.
+# Стоп нового транша = текущий (не ниже безубытка). Выключен по умолчанию.
+PYRAMID_ENABLED = os.getenv("PYRAMID", "0") == "1"
+PYRAMID_R_THRESHOLD = float(os.getenv("PYRAMID_R", "0.5"))  # сколько R пройти
+PYRAMID_ADD_RATIO = float(os.getenv("PYRAMID_ADD_RATIO", "0.5"))  # доля добавки
+
 
 class Trader:
     """
@@ -169,6 +185,11 @@ class Trader:
         # чтобы фьюч ставился в пару именно со своей акцией, а не с
         # циркулярным соседом по алфавиту.
         self.__future_base_ticker: dict[str, str] = {}
+        # Дробный вход: {figi: {remaining_lots, bars_left, signal, strategy,
+        #   direction, confidence, entry_price, stop_price}}
+        self.__pending_tranche2: dict[str, dict] = {}
+        # Пирамидинг: figi -> True если доп. транш уже добавлен к текущей позиции
+        self.__pyramided: set[str] = set()
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -793,6 +814,83 @@ class Trader:
             if candle.time > current_figi_candle.time:
                 self.__candle_volumes.setdefault(candle.figi, deque(maxlen=20)).append(current_figi_candle.volume)
 
+            # ── Дробный вход: второй транш ─────────────────────────────────────
+            if candle.time > current_figi_candle.time and candle.figi in self.__pending_tranche2:
+                t2 = self.__pending_tranche2[candle.figi]
+                t2["bars_left"] -= 1
+                # Добавляем только если позиция ещё открыта и не в убытке
+                pos_t2 = self.__risk.positions.get(t2["strategy"].settings.ticker)
+                current_close = float(quotation_to_decimal(candle.close))
+                in_profit = (
+                    (t2["direction"] == "long" and current_close > t2["entry_price"]) or
+                    (t2["direction"] == "short" and current_close < t2["entry_price"])
+                )
+                if pos_t2 is None:
+                    # Позиция уже закрыта — отменяем второй транш
+                    del self.__pending_tranche2[candle.figi]
+                elif t2["bars_left"] <= 0:
+                    if in_profit:
+                        logger.info(
+                            f"TRANCHE2 {t2['strategy'].settings.ticker}: "
+                            f"добавляем {t2['remaining_lots']} лотов"
+                        )
+                        asyncio.create_task(self.__add_lots_task(
+                            account_id=account_id,
+                            figi=candle.figi,
+                            lots=t2["remaining_lots"],
+                            is_long=(t2["direction"] == "long"),
+                            entry_price=current_close,
+                            strategy=t2["strategy"],
+                            atr_pct=t2["atr_pct"],
+                        ))
+                    else:
+                        logger.info(
+                            f"TRANCHE2 {t2['strategy'].settings.ticker}: "
+                            f"отменён — позиция в минусе"
+                        )
+                    del self.__pending_tranche2[candle.figi]
+
+            # ── Пирамидинг ────────────────────────────────────────────────────
+            if PYRAMID_ENABLED and candle.time > current_figi_candle.time \
+                    and candle.figi not in self.__pyramided \
+                    and candle.figi not in self.__pending_orders:
+                figi_strat = strategies.get(candle.figi)
+                if figi_strat:
+                    pos_pyr = self.__risk.positions.get(figi_strat.settings.ticker)
+                    if pos_pyr and not pos_pyr.half_closed:
+                        entry_p = pos_pyr.entry_price
+                        stop_p = pos_pyr.stop_price
+                        current_p = float(quotation_to_decimal(candle.close))
+                        risk_dist = abs(entry_p - stop_p)
+                        if risk_dist > 0:
+                            moved = (current_p - entry_p) if pos_pyr.direction == "long" \
+                                else (entry_p - current_p)
+                            if moved >= PYRAMID_R_THRESHOLD * risk_dist:
+                                add_lots = max(1, round(pos_pyr.lots * PYRAMID_ADD_RATIO))
+                                logger.info(
+                                    f"PYRAMID {figi_strat.settings.ticker}: "
+                                    f"+{add_lots} лотов при {moved/risk_dist:.1f}R прибыли"
+                                )
+                                self.__pyramided.add(candle.figi)
+                                atr_pct_pyr = 0.0
+                                if hasattr(figi_strat, "last_snapshot"):
+                                    try:
+                                        atr_pct_pyr = figi_strat.last_snapshot().get("atr_pct", 0.0) or 0.0
+                                    except Exception:
+                                        pass
+                                asyncio.create_task(self.__add_lots_task(
+                                    account_id=account_id,
+                                    figi=candle.figi,
+                                    lots=add_lots,
+                                    is_long=(pos_pyr.direction == "long"),
+                                    entry_price=current_p,
+                                    strategy=figi_strat,
+                                    atr_pct=atr_pct_pyr,
+                                    new_stop=max(entry_p, stop_p)  # стоп не ниже безубытка
+                                    if pos_pyr.direction == "long"
+                                    else min(entry_p, stop_p),
+                                ))
+
             if candle.time > current_figi_candle.time and \
                     datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) <= signals_before_time:
                 signal_new = None
@@ -1109,20 +1207,35 @@ class Trader:
         свечей по остальным тикерам на время репрайса.
         """
         risk_ticker = strategy.settings.ticker
+        # ATR в долях цены — для адаптивного буфера стоп-лимита
+        atr_pct = 0.0
+        if hasattr(strategy, "last_snapshot"):
+            try:
+                atr_pct = strategy.last_snapshot().get("atr_pct", 0.0) or 0.0
+            except Exception:
+                pass
+
+        # Дробный вход: первый транш = TRANCHE1_RATIO*lots, остаток — позже
+        first_lots = available_lots
+        remaining_lots = 0
+        if FRACTIONAL_ENTRY_ENABLED and available_lots >= 2:
+            first_lots = max(1, round(available_lots * TRANCHE1_RATIO))
+            remaining_lots = available_lots - first_lots
+
         try:
             open_order_id, actual_lots = await self.__limit_entry_order(
                 account_id=account_id,
                 figi=figi,
-                count_lots=available_lots,
+                count_lots=first_lots,
                 is_buy=(signal_new.signal_type == SignalType.LONG),
                 last_price=entry_price,
                 strategy=strategy
             )
             if open_order_id and actual_lots > 0:
-                if actual_lots < available_lots:
+                if actual_lots < first_lots:
                     logger.warning(
                         f"PARTIAL FILL {risk_ticker}: "
-                        f"запрошено {available_lots}, исполнено {actual_lots}"
+                        f"запрошено {first_lots}, исполнено {actual_lots}"
                     )
                 # Ордер уже реально исполнен на бирже — отсюда и до конца
                 # блока нельзя просто залогировать исключение и пойти дальше:
@@ -1161,6 +1274,23 @@ class Trader:
                         "max_fav": entry_price,
                         "max_adv": entry_price,
                     }
+                    # Второй транш: запомнить для добавления через TRANCHE2_BARS свечей
+                    if remaining_lots > 0:
+                        self.__pending_tranche2[figi] = {
+                            "remaining_lots": remaining_lots,
+                            "bars_left": TRANCHE2_BARS,
+                            "signal": signal_new,
+                            "strategy": strategy,
+                            "direction": direction,
+                            "confidence": confidence,
+                            "entry_price": entry_price,
+                            "stop_price": stop_price,
+                            "atr_pct": atr_pct,
+                        }
+                        logger.info(
+                            f"TRANCHE2 {risk_ticker}: запланировано +{remaining_lots} лотов "
+                            f"через {TRANCHE2_BARS} свечей"
+                        )
                     # Выставляем биржевые стоп-лимит + тейк-лимит немедленно.
                     # Они живут на бирже независимо от процесса бота — защита
                     # от падения / потери связи. __place_exit_orders не бросает
@@ -1176,6 +1306,7 @@ class Trader:
                         stop_price=stop_price,
                         ticker=risk_ticker,
                         min_price_step=strategy.settings.min_price_increment,
+                        atr_pct=atr_pct,
                     )
                 except Exception as ex:
                     logger.error(
@@ -1332,6 +1463,75 @@ class Trader:
         _cancel(order_id)
         return _to_market()
 
+    # ── Добавление лотов (дробный вход / пирамидинг) ─────────────────────────
+
+    async def __add_lots_task(
+            self,
+            account_id: str,
+            figi: str,
+            lots: int,
+            is_long: bool,
+            entry_price: float,
+            strategy: IStrategy,
+            atr_pct: float = 0.0,
+            new_stop: float | None = None,
+    ) -> None:
+        """
+        Добавляет лоты к существующей позиции (дробный вход или пирамидинг).
+        После исполнения обновляет биржевые стоп/тейк ордера (отменяет старые,
+        выставляет новые с увеличенным объёмом). Если new_stop задан — сдвигает
+        стоп (для пирамидинга: стоп не хуже безубытка).
+        """
+        ticker = strategy.settings.ticker
+        self.__pending_orders.add(figi)
+        try:
+            order_id, filled_lots = await self.__limit_entry_order(
+                account_id=account_id, figi=figi,
+                count_lots=lots, is_buy=is_long,
+                last_price=entry_price, strategy=strategy,
+            )
+            if not order_id or filled_lots <= 0:
+                logger.warning(f"ADD_LOTS {ticker}: ордер не исполнился, лоты не добавлены")
+                return
+
+            logger.info(f"ADD_LOTS {ticker}: +{filled_lots} лотов по ~{entry_price:.4f}")
+
+            pos = self.__risk.positions.get(ticker)
+            if pos is None:
+                logger.warning(f"ADD_LOTS {ticker}: позиция уже закрыта, лоты остаются на бирже — закрываем")
+                try:
+                    self.__close_figi_with_fill_info(account_id, figi, {figi: strategy})
+                except Exception as ex:
+                    logger.error(f"ADD_LOTS {ticker}: не удалось закрыть осиротевший лот: {repr(ex)}")
+                return
+
+            # Обновляем лоты в позиции risk.py (средневзвешенный вход)
+            old_lots = pos.lots
+            total_lots = old_lots + filled_lots
+            avg_entry = (pos.entry_price * old_lots + entry_price * filled_lots) / total_lots
+            pos.lots = total_lots
+            pos.entry_price = avg_entry
+
+            if new_stop is not None and new_stop != pos.stop_price:
+                pos.stop_price = new_stop
+
+            # Переставляем биржевые ордера на новый суммарный объём
+            take_target = pos.take_target if hasattr(pos, "take_target") and pos.take_target else None
+            self.__cancel_exit_orders(account_id, figi, which="both")
+            if take_target:
+                self.__place_exit_orders(
+                    account_id=account_id, figi=figi,
+                    is_long=is_long, lots=total_lots,
+                    take_price=take_target, stop_price=pos.stop_price,
+                    ticker=ticker,
+                    min_price_step=strategy.settings.min_price_increment,
+                    atr_pct=atr_pct,
+                )
+        except Exception as ex:
+            logger.error(f"ADD_LOTS {ticker}: ошибка: {repr(ex)}")
+        finally:
+            self.__pending_orders.discard(figi)
+
     # ── Биржевые стоп/тейк ордера ────────────────────────────────────────────
 
     def __place_exit_orders(
@@ -1344,12 +1544,14 @@ class Trader:
             stop_price: float,
             ticker: str,
             min_price_step: float = 0.01,
+            atr_pct: float = 0.0,
     ) -> None:
         """
         После исполнения входа немедленно ставим на бирже:
         - Тейк: обычная лимитная заявка на уровне take_price (противоположная сторона)
-        - Стоп: стоп-лимит на stop_price, лимит чуть хуже (3 шага цены) чтобы
-          исполнился в очереди, а не превратился в висячую заявку.
+        - Стоп: стоп-лимит на stop_price, лимит = stop_price ± буфер, где
+          буфер = max(3*шаг, ATR*0.1) — адаптивный, чтобы при высокой
+          волатильности стоп не превращался в мёртвую лимитку при гэпе.
 
         Оба ордера живут на бирже независимо от состояния процесса бота.
         При срабатывании одного нужно отменить другой (см. __cancel_exit_orders).
@@ -1369,11 +1571,13 @@ class Trader:
         except Exception as ex:
             logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить тейк-лимит: {repr(ex)}")
 
-        # Стоп-лимит: триггер на stop_price, исполнение на stop_price ± 3 шага
+        # Адаптивный буфер стоп-лимита: 3 тика или 10% ATR — что больше.
+        # На ликвидных акциях с малым ATR работает как раньше (3 тика).
+        # На волатильных фьючерсах или в момент новостей ATR-буфер шире и
+        # защищает от ситуации когда цена гэпнула через лимит и заявка повисла.
         step = max(min_price_step, 1e-9)
-        # Для лонга стоп = продажа: лимит чуть ниже триггера (даём 3 шага проскальзывания)
-        # Для шорта стоп = покупка: лимит чуть выше триггера
-        limit_offset = 3 * step
+        atr_buffer = stop_price * atr_pct * 0.1 if atr_pct > 0 and stop_price > 0 else 0.0
+        limit_offset = max(3 * step, atr_buffer)
         stop_limit_price = (stop_price - limit_offset) if is_long else (stop_price + limit_offset)
         stop_limit_price = max(step, stop_limit_price)
         try:
@@ -1565,6 +1769,21 @@ class Trader:
                 logger.warning(f"__limit_entry_order {ticker}: market fallback error: {repr(ex)}")
                 return None, 0
 
+        # ── Спред-фильтр ──────────────────────────────────────────────────────
+        # Если стакан доступен и спред шире порога — вход невыгоден: мы сразу
+        # теряем полспреда при открытии. Рынок в этот момент неликвиден.
+        if MAX_ENTRY_SPREAD_PCT > 0 and self.__orderbook.has_data(ticker):
+            bid = self.__orderbook.best_bid(ticker)
+            ask = self.__orderbook.best_ask(ticker)
+            if bid and ask and bid > 0:
+                spread_pct = (ask - bid) / bid
+                if spread_pct > MAX_ENTRY_SPREAD_PCT:
+                    logger.info(
+                        f"__limit_entry_order {ticker}: вход пропущен — "
+                        f"спред {spread_pct*100:.3f}% > {MAX_ENTRY_SPREAD_PCT*100:.3f}%"
+                    )
+                    return None, 0
+
         entry_price = _book_price()
         order_id, _ = _place_limit(entry_price)
         if order_id is None:
@@ -1631,6 +1850,8 @@ class Trader:
         # рыночного закрытия не осталось висячих заявок на чистом счёте.
         for figi in list(self.__active_exit_orders.keys()):
             self.__cancel_exit_orders(account_id, figi, which="both")
+        self.__pending_tranche2.clear()
+        self.__pyramided.clear()
 
         logger.debug("Cancel all order.")
         self.__client_service.cancel_all_orders(account_id)
@@ -2002,6 +2223,9 @@ class Trader:
         trade_order = self.__today_trade_results.close_position(figi, order_id)
         self.__blogger.close_position_message(trade_order)
         self.__notify_closed_with_tracking(figi, strategies)
+        # Сбрасываем состояние дробного входа и пирамидинга для этого инструмента
+        self.__pending_tranche2.pop(figi, None)
+        self.__pyramided.discard(figi)
 
     def __notify_closed_with_tracking(
             self,
