@@ -296,6 +296,17 @@ LAG_PENALTY_MIN = 0.6              # confidence-множитель сразу п
 ATR_PERIOD = 14                    # период ATR
 MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комиссия × этот фактор
 
+# ── Блокировка режимов рынка в бэктесте ──────────────────────────────────────
+# Те же режимы что в trader.py (ENTRY_BLOCKED_REGIMES) — бэктест должен
+# пропускать сделки в тех же условиях, в которых бот их пропустит живьём.
+# Так оценка backtest_quality становится честной: не нужно ждать прогона
+# чтобы увидеть что ranging-сделки убыточны — они не попадут ни в WR ни в
+# качество бэктеста, как и не попадут в реальную торговлю.
+_ebr_bt = os.getenv("ENTRY_BLOCKED_REGIMES", None)
+BACKTEST_BLOCKED_REGIMES: frozenset[str] = frozenset(
+    r.strip() for r in _ebr_bt.split(",") if r.strip()
+) if _ebr_bt is not None else frozenset({"ranging", "stress"})
+
 # ── Комиссия Т-Инвестиций по тарифам (round-trip = вход+выход) ──────────────
 # Акции/облигации/ETF/расписки — фикс. % от суммы сделки. Фьючерсы — % от
 # стоимости контракта, тариф растёт по мере падения дневного оборота —
@@ -1527,6 +1538,9 @@ class OICompositeStrategy(IStrategy):
                 if direction is None:
                     i += 1
                     continue
+                if self.__last_regime in BACKTEST_BLOCKED_REGIMES:
+                    i += 1
+                    continue
                 if not self.__methods_agree(scores, direction):
                     i += 1
                     continue
@@ -1669,6 +1683,9 @@ class OICompositeStrategy(IStrategy):
                     i += 1
                     continue
                 if not self.__liquidity_ok():
+                    i += 1
+                    continue
+                if self.__last_regime in BACKTEST_BLOCKED_REGIMES:
                     i += 1
                     continue
 
