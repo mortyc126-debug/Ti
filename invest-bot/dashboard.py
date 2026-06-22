@@ -1400,12 +1400,44 @@ def compute_equity_analytics(trade_rows: list[dict], account: float) -> dict:
                 "rate": round(disagree / total, 3),
             }
 
+    # Агрегация по отдельным методам стратегии: для каждого метода —
+    # agree_n/agree_wr/disagree_n/disagree_wr — видно какой метод реально полезен
+    method_stats: dict[str, dict] = {}
+    SCORE_THRESH = 0.05  # метод считается активным если |score| > порога
+    for t in trade_rows:
+        ms = t.get("method_scores") or {}
+        dir_sign = 1 if t.get("direction") == "LONG" else -1
+        win = 1 if t["r_multiple"] > 0 else 0
+        for method, sc in ms.items():
+            if abs(sc) < SCORE_THRESH:
+                continue
+            if method not in method_stats:
+                method_stats[method] = {"agree_n": 0, "agree_win": 0,
+                                        "disagree_n": 0, "disagree_win": 0}
+            s = method_stats[method]
+            if (sc > 0) == (dir_sign > 0):
+                s["agree_n"] += 1
+                s["agree_win"] += win
+            else:
+                s["disagree_n"] += 1
+                s["disagree_win"] += win
+
+    method_stats_out = {}
+    for name, s in method_stats.items():
+        method_stats_out[name] = {
+            "agree_n": s["agree_n"],
+            "agree_wr": round(s["agree_win"] / s["agree_n"], 3) if s["agree_n"] else None,
+            "disagree_n": s["disagree_n"],
+            "disagree_wr": round(s["disagree_win"] / s["disagree_n"], 3) if s["disagree_n"] else None,
+        }
+
     return {
         "daily_equity": daily_equity,
         "weekly_stats": weekly_stats,
         "rolling_winrate": rolling_winrate,
         "learning_curve": learning_curve,
         "model_disagree_rate": model_disagree_rate,
+        "method_stats": method_stats_out,
     }
 
 
@@ -1636,9 +1668,35 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     «Несогласие» = модель дала противоположный сигнал, но сделка всё равно прошла через композит.
     Высокий % несогласия при низком WR = модель сигнализировала опасность, которую проигнорировали.
   </div>
-  <table class="scen-table" id="an_model_table">
+  <table class="scen-table">
     <thead><tr><th>Модель</th><th>Согласна</th><th>Win% (согл)</th><th>Не согласна</th><th>Win% (не согл)</th></tr></thead>
     <tbody id="an_model_tbody"></tbody>
+  </table>
+</div>
+
+<div class="panel" id="an_methods_panel" style="display:none;">
+  <div class="sec-lg">Методы стратегии — agree/disagree</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+    Для каждого метода: сколько раз он голосовал <b style="color:var(--pos)">за</b> направление сделки (и win%),
+    сколько раз <b style="color:var(--neg)">против</b>. Методы с высоким disagree_n + низким disagree_wr — ценные фильтры,
+    которые стоит усилить. |score| &gt; 0.05 считается активным голосом.
+  </div>
+  <div style="margin-bottom:8px;">
+    <button class="btn-pill btn-sm" onclick="_anSortMethods('agree_n')">▼ по n</button>
+    <button class="btn-pill btn-sm" onclick="_anSortMethods('agree_wr')">▼ по WR (согл)</button>
+    <button class="btn-pill btn-sm" onclick="_anSortMethods('disagree_n')">▼ по против</button>
+    <button class="btn-pill btn-sm" onclick="_anSortMethods('delta_wr')">▼ по Δ WR</button>
+  </div>
+  <table class="scen-table" id="an_methods_table">
+    <thead><tr>
+      <th>Метод</th>
+      <th title="сколько раз метод голосовал за направление сделки">За (n)</th>
+      <th>WR за</th>
+      <th title="сколько раз метод голосовал против направления сделки">Против (n)</th>
+      <th>WR против</th>
+      <th title="WR(за) - WR(против): чем выше — тем метод полезнее">Δ WR</th>
+    </tr></thead>
+    <tbody id="an_methods_tbody"></tbody>
   </table>
 </div>
 
@@ -3191,7 +3249,49 @@ function _renderAnalytics(data, account) {{
       `<td style="${{disColor}}">${{s.disagree_n}}</td><td style="${{disColor}}">${{disWR}}</td></tr>`;
   }}
   document.getElementById('an_model_panel').style.display = hasModel ? '' : 'none';
+
+  // Methods table
+  const mst = an.method_stats || {{}};
+  const methodKeys = Object.keys(mst);
+  document.getElementById('an_methods_panel').style.display = methodKeys.length ? '' : 'none';
+  if (methodKeys.length) _renderMethodsTable(mst, 'agree_n');
 }}
+
+let _anMethodStats = {{}};
+function _renderMethodsTable(mst, sortKey) {{
+  _anMethodStats = mst;
+  const tbody = document.getElementById('an_methods_tbody');
+  const rows = Object.entries(mst).map(([name, s]) => {{
+    const delta = (s.agree_wr !== null && s.disagree_wr !== null)
+      ? s.agree_wr - s.disagree_wr : null;
+    return {{name, ...s, delta_wr: delta}};
+  }});
+  rows.sort((a, b) => (b[sortKey] ?? -99) - (a[sortKey] ?? -99));
+  tbody.innerHTML = '';
+  const overallWR = (() => {{
+    let w = 0, n = 0;
+    for (const s of Object.values(mst)) {{ w += (s.agree_wr || 0) * (s.agree_n || 0); n += s.agree_n || 0; }}
+    return n ? w / n : null;
+  }})();
+  for (const r of rows) {{
+    const awr = r.agree_wr !== null ? (r.agree_wr * 100).toFixed(0) + '%' : '—';
+    const dwr = r.disagree_wr !== null ? (r.disagree_wr * 100).toFixed(0) + '%' : '—';
+    const delta = r.delta_wr !== null ? (r.delta_wr >= 0 ? '+' : '') + (r.delta_wr * 100).toFixed(0) + '%' : '—';
+    const dColor = r.delta_wr !== null && r.delta_wr > 0.05 ? 'color:var(--pos)' :
+                   r.delta_wr !== null && r.delta_wr < -0.05 ? 'color:var(--neg)' : '';
+    const awrColor = overallWR && r.agree_wr !== null ?
+      (r.agree_wr > overallWR + 0.05 ? 'color:var(--pos)' : r.agree_wr < overallWR - 0.05 ? 'color:var(--neg)' : '') : '';
+    tbody.innerHTML += `<tr>
+      <td style="color:var(--txt)">${{r.name}}</td>
+      <td>${{r.agree_n}}</td>
+      <td style="${{awrColor}}">${{awr}}</td>
+      <td style="color:${{r.disagree_n > 3 ? 'var(--warn)' : 'var(--txt3)'}}">${{r.disagree_n}}</td>
+      <td>${{dwr}}</td>
+      <td style="${{dColor}}"><b>${{delta}}</b></td>
+    </tr>`;
+  }}
+}}
+function _anSortMethods(key) {{ if (_anMethodStats) _renderMethodsTable(_anMethodStats, key); }}
 
 function _drawLineChart(canvasId, data, xKey, yKey, baseline, color, fillArea, label, yRange, refLine) {{
   const canvas = document.getElementById(canvasId);
