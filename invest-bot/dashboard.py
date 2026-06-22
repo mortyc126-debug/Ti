@@ -69,6 +69,10 @@ from trade_system.strategies.oi_composite_strategy import (
 )
 from trade_system.strategies.strategy_factory import StrategyFactory
 
+import calibrate_narrative
+import lasso_calibration
+import rule_miner
+
 CONFIG_FILE = "settings.ini"
 LOG_FILE = "dashboard.log"
 OI_TICKERS_FILE = "oi_tickers.json"
@@ -140,6 +144,63 @@ def save_backtest_history(tickers: list[str], days: int) -> dict:
             errors.append(f"{ticker}: {ex}")
 
     return {"saved_days": total_days, "trades": total_trades, "errors": errors}
+
+
+def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
+    """Шаги 2-4 run_pipeline.py (narrative-пороги + lasso + rule_miner) на
+    уже сохранённой data/history.json — без бэктеста (см. save_backtest_history
+    для шага 1). Дёргается из дашборда кнопкой "🎯 калибровать", чтобы не лезть
+    в консоль каждый раз после "💾 сохранить историю"."""
+    errors: list[str] = []
+    by_ticker = _strategy_settings_by_ticker()
+
+    existing_thresh = calibrate_narrative._load_existing()
+    n_pairs_before = sum(len(v) for v in existing_thresh.values())
+    for ticker in tickers:
+        try:
+            result = calibrate_narrative._calibrate_one(ticker, days)
+        except Exception as ex:
+            errors.append(f"narrative/{ticker}: {ex}")
+            continue
+        if result:
+            existing_thresh = calibrate_narrative._merge(existing_thresh, result)
+    calibrate_narrative._save(existing_thresh)
+    narrative_pairs = sum(len(v) for v in existing_thresh.values()) - n_pairs_before
+
+    existing_lasso = lasso_calibration._load_existing()
+    lasso_tickers = 0
+    for ticker in tickers:
+        try:
+            result = lasso_calibration._calibrate_one(ticker, days, 0.01, 0.8, False)
+        except Exception as ex:
+            errors.append(f"lasso/{ticker}: {ex}")
+            continue
+        if result:
+            st = by_ticker.get(ticker)
+            key = st.figi if st else ticker
+            existing_lasso[key] = result
+            lasso_tickers += 1
+    lasso_calibration._save(existing_lasso)
+
+    existing_rules = rule_miner._load_existing()
+    rule_tickers = 0
+    for ticker in tickers:
+        try:
+            result = rule_miner._mine_one(ticker, days, rule_miner._DEFAULT_MAX_DEPTH)
+        except Exception as ex:
+            errors.append(f"rule_miner/{ticker}: {ex}")
+            continue
+        if result:
+            existing_rules[ticker] = result
+            rule_tickers += 1
+    rule_miner._save(existing_rules)
+
+    return {
+        "narrative_pairs": narrative_pairs,
+        "lasso_tickers": lasso_tickers,
+        "rule_tickers": rule_tickers,
+        "errors": errors,
+    }
 
 
 _config = ProgramConfiguration(CONFIG_FILE)
@@ -1663,6 +1724,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
   <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
+  <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <span id="status"></span>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
@@ -2335,6 +2397,35 @@ async function saveBacktestHistory() {{
     alert('Ошибка: ' + e);
   }} finally {{
     btn.disabled = false; btn.textContent = '💾 сохранить историю';
+  }}
+}}
+
+async function runCalibration() {{
+  const tickers = Array.from(document.querySelectorAll('.chip.active')).map(c => c.dataset.ticker);
+  if (!tickers.length) {{ alert('Выбери тикеры (активные чипы)'); return; }}
+  const days = parseInt(document.getElementById('days').value) || 90;
+  if (!confirm(`Калибровать narrative/lasso/rule_miner по ${{tickers.length}} тикерам (${{days}} дн.) на уже сохранённой history.json?`)) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳ калибрую...';
+  try {{
+    const r = await fetch('/api/run_calibration', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{tickers, days}})
+    }});
+    const d = await r.json();
+    if (d.error) {{ alert('Ошибка: ' + d.error); }}
+    else {{
+      alert(
+        `narrative: ${{d.narrative_pairs}} пар (кластер, режим)\\n` +
+        `lasso: ${{d.lasso_tickers}} тикеров\\n` +
+        `rule_miner: ${{d.rule_tickers}} тикеров\\n` +
+        (d.errors && d.errors.length ? '\\nОшибки: ' + d.errors.join('; ') : '')
+      );
+    }}
+  }} catch(e) {{
+    alert('Ошибка: ' + e);
+  }} finally {{
+    btn.disabled = false; btn.textContent = '🎯 калибровать (narrative+lasso+rules)';
   }}
 }}
 
@@ -4070,6 +4161,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "нет тикеров"}, status=400)
             else:
                 result = save_backtest_history(tickers, days)
+                self._send_json(result)
+        elif self.path == "/api/run_calibration":
+            tickers = payload.get("tickers", [])
+            days = int(payload.get("days", 90))
+            if not tickers:
+                self._send_json({"error": "нет тикеров"}, status=400)
+            else:
+                result = run_calibration_pipeline(tickers, days)
                 self._send_json(result)
         elif self.path == "/api/cancel":
             was_running = request_cancel()
