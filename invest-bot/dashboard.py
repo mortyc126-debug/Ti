@@ -69,10 +69,6 @@ from trade_system.strategies.oi_composite_strategy import (
 )
 from trade_system.strategies.strategy_factory import StrategyFactory
 
-import calibrate_narrative
-import lasso_calibration
-import rule_miner
-
 CONFIG_FILE = "settings.ini"
 LOG_FILE = "dashboard.log"
 OI_TICKERS_FILE = "oi_tickers.json"
@@ -185,6 +181,14 @@ def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
     уже сохранённой data/history.json — без бэктеста (см. save_backtest_history
     для шага 1). Дёргается из дашборда кнопкой "🎯 калибровать", чтобы не лезть
     в консоль каждый раз после "💾 сохранить историю"."""
+    # Импорт внутри функции, не на уровне модуля: calibrate_narrative/
+    # lasso_calibration/rule_miner сами импортируют из dashboard
+    # (_strategy_settings_by_ticker, _db, _market_data, _wire_history) —
+    # импорт на верхнем уровне даёт циклический импорт при старте dashboard.py.
+    import calibrate_narrative
+    import lasso_calibration
+    import rule_miner
+
     errors: list[str] = []
     by_ticker = _strategy_settings_by_ticker()
 
