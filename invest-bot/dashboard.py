@@ -1840,9 +1840,15 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
 .chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
 .chip-row{{display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;}}
-.chip-group{{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border2);}}
-.chip-group:last-child{{border-bottom:none;margin-bottom:0;padding-bottom:0;}}
-.chip-cat-label{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin:0 0 6px 2px;}}
+.chip-section{{margin-bottom:4px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;}}
+.chip-section>summary{{list-style:none;cursor:pointer;padding:7px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:6px;}}
+.chip-section>summary::-webkit-details-marker{{display:none;}}
+.chip-section>summary::before{{content:'▸';display:inline-block;color:var(--txt3);transition:transform .15s;}}
+.chip-section[open]>summary::before{{transform:rotate(90deg);}}
+.chip-section>summary:hover{{background:rgba(255,255,255,.05);}}
+.chip-section>.chip-row{{padding:8px 12px 10px;}}
+.chip-stock-section>summary{{color:#a0d4a0;}}
+.chip-fut-section>summary{{color:#7eb8f7;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -4148,24 +4154,30 @@ def _render_page() -> bytes:
     reload_running = _futures_reload_running.is_set()
 
     stock_chips = (
-        f'<div class="chip-group"><div class="chip-row">' + "".join(
+        f'<details class="chip-section chip-stock-section" open><summary>Акции ({len(stocks)})</summary>'
+        f'<div class="chip-row">' + "".join(
             f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
             f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
             for t in sorted(stocks)
-        ) + '</div></div>'
+        ) + '</div></details>'
     )
     futures_by_cat: dict[str, list[str]] = {}
     for t in sorted(futures):
         cat = _futures_category_by_ticker.get(t, "Прочее")
         futures_by_cat.setdefault(cat, []).append(t)
-    futures_chips = "".join(
-        f'<div class="chip-group"><div class="chip-cat-label">{cat} ({len(ts)})</div>'
+    futures_subsections = "".join(
+        f'<details class="chip-section" style="margin:6px 8px 6px 18px;" open><summary>{cat} ({len(ts)})</summary>'
         f'<div class="chip-row">' + "".join(
             f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
             f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
             for t in ts
-        ) + '</div></div>'
+        ) + '</div></details>'
         for cat, ts in sorted(futures_by_cat.items())
+    )
+    futures_chips = (
+        f'<details class="chip-section chip-fut-section" open><summary>Фьючерсы ({len(futures)})</summary>'
+        f'{futures_subsections}</details>'
+        if futures else ""
     )
     reload_hint = (
         ' <span style="color:#7eb8f7;font-size:11px">⏳ обновляется…</span>'
