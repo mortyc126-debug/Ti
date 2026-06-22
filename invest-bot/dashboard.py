@@ -1839,7 +1839,10 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-fut{{border-color:rgba(80,140,255,.25);}}
 .chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
 .chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
-.chip-cat-label{{flex-basis:100%;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin:6px 0 -1px 2px;}}
+.chip-row{{display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;}}
+.chip-group{{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border2);}}
+.chip-group:last-child{{border-bottom:none;margin-bottom:0;padding-bottom:0;}}
+.chip-cat-label{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin:0 0 6px 2px;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -1882,7 +1885,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
-  <div id="tickers" style="display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;">__TICKER_CHECKBOXES__</div>
+  <div id="tickers">__TICKER_CHECKBOXES__</div>
   <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
        (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
        _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
@@ -4144,21 +4147,24 @@ def _render_page() -> bytes:
     futures = _futures_settings_by_ticker()
     reload_running = _futures_reload_running.is_set()
 
-    stock_chips = "".join(
-        f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
-        f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
-        for t in sorted(stocks)
+    stock_chips = (
+        f'<div class="chip-group"><div class="chip-row">' + "".join(
+            f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
+            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
+            for t in sorted(stocks)
+        ) + '</div></div>'
     )
     futures_by_cat: dict[str, list[str]] = {}
     for t in sorted(futures):
         cat = _futures_category_by_ticker.get(t, "Прочее")
         futures_by_cat.setdefault(cat, []).append(t)
     futures_chips = "".join(
-        f'<div class="chip-cat-label">{cat} ({len(ts)})</div>' + "".join(
+        f'<div class="chip-group"><div class="chip-cat-label">{cat} ({len(ts)})</div>'
+        f'<div class="chip-row">' + "".join(
             f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
             f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
             for t in ts
-        )
+        ) + '</div></div>'
         for cat, ts in sorted(futures_by_cat.items())
     )
     reload_hint = (
