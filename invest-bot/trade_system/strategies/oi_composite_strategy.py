@@ -358,12 +358,18 @@ def _last_swing_price(candles: list[HistoricCandle], direction: int, lookback: i
     return best_val
 
 
-def _atr_exhaustion_mult(composite: float, candles: list[HistoricCandle], atr_pct: float) -> float:
+def _atr_exhaustion_mult(composite: float, candles: list[HistoricCandle],
+                         atr_pct: float, daily_atr: float) -> float:
     """Демпфирует composite если текущий импульс (от последнего свинга) уже
-    прошёл значительную долю ATR. Мерим от последнего свинга, не от открытия дня:
-    открытие дня даёт неверную точку отсчёта когда день развернулся.
-    0–50% ATR → без ограничений; 50–80% → плавное демпфирование; >80% → 0.15×."""
-    if abs(composite) < 1e-6 or atr_pct <= 0 or not candles:
+    прошёл значительную долю дневного ATR.
+    Числитель: расстояние от последнего свинга до текущей цены.
+    Знаменатель: скользящее среднее дневного диапазона (10 дней).
+    0–50% дневного ATR → без ограничений; 50–80% → плавное демпфирование; >80% → 0.15×."""
+    if abs(composite) < 1e-6 or not candles:
+        return 1.0
+    # знаменатель: дневной ATR; fallback на M5 ATR × 5 если дневной ещё не накоплен
+    denom = daily_atr if daily_atr > 0 else atr_pct * 5
+    if denom <= 0:
         return 1.0
     close_px = _to_f(candles[-1].close)
     direction = 1 if composite > 0 else -1
@@ -371,7 +377,7 @@ def _atr_exhaustion_mult(composite: float, candles: list[HistoricCandle], atr_pc
     if swing <= 0 or close_px <= 0:
         return 1.0
     impulse_pct = abs(close_px - swing) / swing * 100
-    ratio = impulse_pct / atr_pct
+    ratio = impulse_pct / denom
     if ratio >= _ATR_EX_HARD:
         return _ATR_EX_HARD_MULT
     if ratio >= _ATR_EX_SOFT:
@@ -2679,7 +2685,7 @@ class OICompositeStrategy(IStrategy):
         # ATR-exhaustion: если цена уже прошла 60-85%+ дневного ATR в направлении
         # сигнала — потенциал движения исчерпывается, демпфируем composite.
         if self.__last_atr_pct > 0 and self.__daily_open_price > 0:
-            atr_ex_mult = _atr_exhaustion_mult(composite, self.__candles, self.__last_atr_pct)
+            atr_ex_mult = _atr_exhaustion_mult(composite, self.__candles, self.__last_atr_pct, self.__daily_atr)
             if atr_ex_mult != 1.0:
                 logger.debug(
                     f"{self.__settings.figi}: ATR-ex ratio="
