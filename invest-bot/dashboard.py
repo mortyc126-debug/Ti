@@ -575,20 +575,20 @@ def _futures_cache_from_disk() -> tuple[dict[str, dict] | None, float]:
 # чипов. Списком, а не одним правилом, т.к. часть имён неоднозначна
 # (BABA/BIDU выглядят как обычные тикеры, но это иностр. акции, не РФ).
 _FUTURES_CATEGORIES: list[tuple[str, frozenset[str]]] = [
-    ("🛢 Энергоносители", frozenset({
+    ("Энергоносители", frozenset({
         "Brent", "Газ (США)", "Газ (Европа)", "Газ микро (США)",
         "Бензин АИ-92", "Бензин АИ-95", "Дизельное топливо летнее",
     })),
-    ("⚙️ Металлы", frozenset({
+    ("Металлы", frozenset({
         "Золото", "Золото в долларах", "Золото в рублях", "Серебро",
         "Палладий", "Платина", "Алюминий", "Медь", "Никель", "Цинк",
     })),
-    ("🌾 Агро", frozenset({
+    ("Агро", frozenset({
         "Пшеница", "Сахар мировой", "Сахар российский",
         "Апельсиновый сок", "Какао", "Кофе",
     })),
-    ("📊 Индексы РФ", frozenset({"IMOEX", "RTSI", "RTSI мини"})),
-    ("🌐 Иностр. акции/крипто", frozenset({"BABA", "BIDU", "Bitcoin-фонд IBIT", "ETHA"})),
+    ("Индексы РФ", frozenset({"IMOEX", "RTSI", "RTSI мини"})),
+    ("Иностр. акции/крипто", frozenset({"BABA", "BIDU", "Bitcoin-фонд IBIT", "ETHA"})),
 ]
 
 _RU_STOCK_BASE_TICKERS = frozenset({
@@ -609,16 +609,16 @@ def _futures_category(base: str) -> str:
         if base in names:
             return label
     if base in _RU_STOCK_BASE_TICKERS:
-        return "📈 Акции РФ"
+        return "Акции РФ"
     if "/" in base:
-        return "💱 Валюта"
+        return "Валюта"
     if base.startswith("Индекс"):
-        return "📊 Индексы (отрасл.)"
+        return "Индексы (отрасл.)"
     if base.startswith("АДР"):
-        return "🌐 АДР"
+        return "АДР"
     if any(k in base for k in ("ETF", "iShares", "SPDR", "Nasdaq", "Tracker Fund", "MSCI")):
-        return "🌐 Иностр. ETF/индексы"
-    return "🌐 Прочее"
+        return "Иностр. ETF/индексы"
+    return "Прочее"
 
 
 # ticker → категория (для группировки чипов), пересчитывается вместе с
@@ -1839,7 +1839,7 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-fut{{border-color:rgba(80,140,255,.25);}}
 .chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
 .chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
-.chip-cat-label{{flex-basis:100%;font-size:10px;color:var(--txt3);margin:4px 0 -2px 2px;font-weight:600;}}
+.chip-cat-label{{flex-basis:100%;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin:6px 0 -1px 2px;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -4151,7 +4151,7 @@ def _render_page() -> bytes:
     )
     futures_by_cat: dict[str, list[str]] = {}
     for t in sorted(futures):
-        cat = _futures_category_by_ticker.get(t, "🌐 Прочее")
+        cat = _futures_category_by_ticker.get(t, "Прочее")
         futures_by_cat.setdefault(cat, []).append(t)
     futures_chips = "".join(
         f'<div class="chip-cat-label">{cat} ({len(ts)})</div>' + "".join(
