@@ -54,7 +54,7 @@ from tinkoff.invest.exceptions import RequestError
 import bug_council
 from archive import ArchiveStore
 from calibration import PercentileCalibrator
-from candle_archive import get_candles_cached
+from candle_archive import get_candles_cached, get_candles_cached_futures_chain
 from configuration.configuration import ProgramConfiguration
 from configuration.settings import StrategySettings
 from db_api_client import DbApiClient
@@ -103,6 +103,23 @@ def _wire_history_returning(strategy) -> BacktestHistoryStore:
     return store
 
 
+def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0):
+    """Свечи для бэктеста: для фьючерсов на период старше даты листинга
+    текущего контракта докачивает и сшивает предыдущие контракты того же
+    basic_asset (см. candle_archive.get_candles_cached_futures_chain) —
+    иначе при достаточно большом days/offset_days получили бы пустую
+    историю там, где текущий контракт ещё не существовал."""
+    if getattr(settings, "is_future", False):
+        return get_candles_cached_futures_chain(
+            ticker, settings.figi, days, _market_data, _db, _instrument_service,
+            candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
+        )
+    return get_candles_cached(
+        ticker, settings.figi, days, _market_data, _db,
+        candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
+    )
+
+
 def _save_backtest_history_one(ticker: str, days: int, offset_days: int = 0) -> tuple[str, dict | None, int, str | None]:
     """Считает накопленную историю одного тикера (для save_backtest_history).
     Выделено в отдельную функцию, чтобы гонять тикеры параллельно по
@@ -114,9 +131,7 @@ def _save_backtest_history_one(ticker: str, days: int, offset_days: int = 0) -> 
     try:
         strategy = StrategyFactory.new_factory(settings.name, settings)
         bt_store = _wire_history_returning(strategy)
-        candles = get_candles_cached(ticker, settings.figi, days, _market_data, _db,
-                                     candle_interval_min=settings.candle_interval_min,
-                                     offset_days=offset_days)
+        candles = _get_backtest_candles(ticker, settings, days, offset_days)
         if not candles:
             return ticker, None, 0, f"{ticker}: нет свечей"
         strategy.backtest_barriers(candles)
@@ -1093,9 +1108,7 @@ def run_backtest_one(
             return rows, None
 
         try:
-            candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db,
-                                         candle_interval_min=strategy_settings.candle_interval_min,
-                                         offset_days=offset_days)
+            candles = _get_backtest_candles(ticker, strategy_settings, days, offset_days)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             _set_progress(progress, ticker, "ошибка API")

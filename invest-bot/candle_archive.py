@@ -39,7 +39,7 @@ from tinkoff.invest.utils import quotation_to_decimal, decimal_to_quotation
 from db_api_client import DbApiClient
 from invest_api.services.market_data_service import MarketDataService
 
-__all__ = ("get_candles_cached",)
+__all__ = ("get_candles_cached", "get_candles_cached_futures_chain")
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +152,91 @@ def get_candles_cached(
     all_rows = [r for d in all_days for r in local_by_day.get(d.isoformat(), [])]
     _save_local(ticker, [r for rows in local_by_day.values() for r in rows], candle_interval_min)
 
+    merged = [_row_to_candle(r) for r in all_rows]
+    merged.sort(key=lambda c: c.time)
+    return merged
+
+
+def get_candles_cached_futures_chain(
+        ticker: str, figi: str, days: int,
+        market_data: MarketDataService, db: DbApiClient,
+        instrument_service,
+        candle_interval_min: int = 5,
+        offset_days: int = 0,
+) -> list[HistoricCandle]:
+    """Как get_candles_cached, но если запрошенный период (days/offset_days)
+    уходит раньше даты листинга ТЕКУЩЕГО фьючерсного контракта (figi —
+    обычно ближайший непросроченный, из settings.ini), докачивает свечи
+    предыдущих контрактов того же basic_asset (InstrumentService.
+    futures_chain_by_figi) и склеивает их в одну непрерывную серию.
+
+    Склейка — back-adjustment: на дату ролла старый контракт сдвигается по
+    цене (open/high/low/close) на разницу между его последней ценой и
+    первой ценой следующего (уже известного) контракта, чтобы не было
+    скачка цены на стыке — иначе ATR/take-profit вокруг даты ролла считались
+    бы по фантомному движению. Каскадно — для каждого следующего, более
+    старого контракта в цепочке."""
+    candles = get_candles_cached(ticker, figi, days, market_data, db, candle_interval_min, offset_days)
+
+    now = datetime.now(timezone.utc) - timedelta(days=offset_days)
+    date_from = (now - timedelta(days=days)).date()
+    earliest_have = min((c.time.date() for c in candles), default=None)
+    if earliest_have is None or earliest_have <= date_from:
+        return candles
+
+    chain = instrument_service.futures_chain_by_figi(figi)
+    if not chain:
+        return candles
+
+    idx = next((i for i, (_, f, _) in enumerate(chain) if f == figi), None)
+    if idx is None or idx == 0:
+        return candles  # самый старый контракт в цепочке — дальше некуда
+
+    rows_by_day: dict[str, list[dict]] = {}
+    for c in candles:
+        rows_by_day.setdefault(c.time.date().isoformat(), []).append(_candle_to_row(c))
+
+    cur_earliest = earliest_have
+    cur_first_row = min(rows_by_day[cur_earliest.isoformat()], key=lambda r: r["time"])
+
+    for prev_ticker, prev_figi, _prev_expiration in reversed(chain[:idx]):
+        target_date_to = cur_earliest - timedelta(days=1)
+        if target_date_to < date_from:
+            break
+        offset_old = (now.date() - target_date_to).days
+        days_old = (target_date_to - date_from).days + 1
+        prev_candles = get_candles_cached(
+            prev_ticker, prev_figi, days_old, market_data, db,
+            candle_interval_min, offset_days=offset_old,
+        )
+        prev_candles = [c for c in prev_candles if c.time.date() <= target_date_to]
+        if not prev_candles:
+            logger.info(f"{ticker}: предыдущий контракт {prev_ticker} ({prev_figi}) — свечей нет, цепочка обрывается")
+            break
+
+        prev_last_row = max((_candle_to_row(c) for c in prev_candles), key=lambda r: r["time"])
+        diff = cur_first_row["close"] - prev_last_row["close"]
+
+        for c in prev_candles:
+            row = _candle_to_row(c)
+            row["open"] += diff
+            row["high"] += diff
+            row["low"] += diff
+            row["close"] += diff
+            rows_by_day.setdefault(c.time.date().isoformat(), []).append(row)
+
+        prev_earliest = min(c.time.date() for c in prev_candles)
+        logger.info(
+            f"{ticker}: сшит предыдущий контракт {prev_ticker} ({prev_earliest}..{target_date_to}), "
+            f"сдвиг цены {diff:+.4f}"
+        )
+
+        cur_earliest = prev_earliest
+        cur_first_row = min(rows_by_day[cur_earliest.isoformat()], key=lambda r: r["time"])
+        if cur_earliest <= date_from:
+            break
+
+    all_rows = [r for rows in rows_by_day.values() for r in rows]
     merged = [_row_to_candle(r) for r in all_rows]
     merged.sort(key=lambda c: c.time)
     return merged

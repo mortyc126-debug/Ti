@@ -271,6 +271,32 @@ class InstrumentService:
 
     @invest_api_retry()
     @invest_error_logging
+    def futures_chain_by_figi(self, figi: str) -> list[tuple[str, str, datetime.datetime]] | None:
+        """
+        Все контракты (включая уже экспирировавшие) того же basic_asset, что
+        и figi — для склейки истории старых контрактов с текущим при бэктесте
+        на период длиннее жизни одного фьючерса (см. candle_archive.
+        get_candles_cached_futures_chain). Возвращает [(ticker, figi,
+        expiration_date), ...] по возрастанию экспирации, или None если
+        basic_asset не нашёлся.
+        """
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            all_futures = client.instruments.futures(
+                instrument_status=InstrumentStatus.INSTRUMENT_STATUS_ALL
+            ).instruments
+
+            basic_asset = next((f.basic_asset for f in all_futures if f.figi == figi), None)
+            if not basic_asset:
+                return None
+
+            chain = sorted(
+                ((f.ticker, f.figi, f.expiration_date) for f in all_futures if f.basic_asset == basic_asset),
+                key=lambda x: x[2],
+            )
+        return chain
+
+    @invest_api_retry()
+    @invest_error_logging
     def __currencies(self) -> None:
         with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
             for cur in client.instruments.currencies(
