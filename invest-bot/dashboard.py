@@ -2448,7 +2448,7 @@ function tradeDetailHtml(t) {{
     const maStr = t.l1_above_ma50 ? '▲MA50' : '▼MA50';
     const trendStr = t.l1_trending_up ? ' тренд↑' : t.l1_trending_down ? ' тренд↓' : '';
     const exStr = t.atr_ex_ratio != null
-      ? ` ATR-ex <b style="color:${{t.atr_ex_ratio > 0.6 ? 'var(--neg)' : 'var(--txt3)}}">${{t.atr_ex_ratio.toFixed(2)}}</b>`
+      ? ` ATR-ex <b style="color:${{t.atr_ex_ratio > 0.6 ? 'var(--neg)' : 'var(--txt3)'}}">${{t.atr_ex_ratio.toFixed(2)}}</b>`
       : '';
     html += `<div style="font-size:10px;color:var(--txt3)"><b>L1:</b> `
       + `перцентиль <b style="color:${{pctColor}}">${{pct}}%</b> `
