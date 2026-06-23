@@ -509,3 +509,99 @@ def detect_level_pattern(
     if result:
         return result
     return detect_thread(candles, direction, atr_value=atr_value, level_set=ls)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Многогоризонтный кеш уровней (per-ticker)
+# ─────────────────────────────────────────────────────────────────────────────
+
+from datetime import datetime, timedelta, timezone
+
+
+# Горизонты: (название, целевой охват в торговых днях, ttl обновления в часах)
+_MTF_HORIZONS: list[tuple[str, int, float]] = [
+    ("week",    5,   4.0),   # 1 неделя, обновляем каждые 4 ч
+    ("month",  22,  24.0),   # 1 месяц,  обновляем раз в сутки
+    ("half",  126, 168.0),   # ~полгода, обновляем раз в неделю
+]
+
+
+@dataclass
+class _HorizonLevels:
+    level_set: LevelSet
+    built_at: datetime
+    ttl_hours: float
+
+    def is_stale(self, now: datetime) -> bool:
+        age = (now - self.built_at).total_seconds() / 3600.0
+        return age >= self.ttl_hours
+
+
+class MultiTFLevelCache:
+    """
+    Хранит LevelSet для трёх горизонтов (неделя / месяц / полгода) per-ticker.
+    Вызывается с полным буфером свечей; пересчитывает каждый горизонт только
+    когда истёк TTL — не на каждом баре.
+
+    Уровни горизонта строятся по последним target_days торговым дням буфера.
+    Если буфера не хватает — берём что есть.
+    """
+
+    def __init__(self) -> None:
+        self._horizons: dict[str, _HorizonLevels] = {}
+
+    def update(self, candles: list, now: Optional[datetime] = None) -> None:
+        """Перестроить горизонты у которых истёк TTL."""
+        if not candles:
+            return
+        if now is None:
+            raw = candles[-1].time
+            now = raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+
+        # группируем свечи по торговым дням
+        by_day: dict = {}
+        for c in candles:
+            d = c.time.date()
+            if d not in by_day:
+                by_day[d] = []
+            by_day[d].append(c)
+        sorted_days = sorted(by_day.keys())
+
+        for name, target_days, ttl_h in _MTF_HORIZONS:
+            hl = self._horizons.get(name)
+            if hl is not None and not hl.is_stale(now):
+                continue  # ещё свежий
+
+            # берём последние target_days дней (или меньше если нет истории)
+            use_days = sorted_days[-target_days:] if len(sorted_days) >= target_days else sorted_days
+            horizon_candles = [c for d in use_days for c in by_day[d]]
+            if not horizon_candles:
+                continue
+
+            ls = build_levels(horizon_candles)
+            self._horizons[name] = _HorizonLevels(
+                level_set=ls, built_at=now, ttl_hours=ttl_h
+            )
+
+    def all_levels(self) -> list[tuple[str, LevelSet]]:
+        """Список (horizon_name, LevelSet) для всех построенных горизонтов."""
+        return [(name, hl.level_set) for name, hl in self._horizons.items()]
+
+    def nearest_across_horizons(
+        self, price: float, max_dist: float
+    ) -> list[tuple[str, PriceLevel]]:
+        """
+        Уровни из всех горизонтов в пределах max_dist.
+        Возвращает [(horizon_name, PriceLevel)] отсортированные по (tier, dist).
+        """
+        result: list[tuple[str, PriceLevel]] = []
+        seen_prices: list[float] = []
+        for name, ls in self.all_levels():
+            for lv in ls.within(price, max_dist):
+                # дедупликация: уровни из разных горизонтов ближе 0.05% — оставляем tier-лучший
+                dup = any(abs(lv.price - p) / (p or 1) < 0.0005 for p in seen_prices)
+                if not dup:
+                    result.append((name, lv))
+                    seen_prices.append(lv.price)
+        result.sort(key=lambda x: (x[1].tier, abs(x[1].price - price)))
+        return result

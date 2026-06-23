@@ -86,14 +86,14 @@ from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
 )
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
-from trade_system.strategies.level_pattern import detect_level_pattern, build_levels
+from trade_system.strategies.level_pattern import detect_level_pattern, build_levels, MultiTFLevelCache
 
 # Ревизия логики стратегии — пишется в каждую сделку (history.py record_trade),
 # чтобы калибровка (lasso_calibration.py, rule_miner.py) могла отличить сделки,
 # насчитанные текущей механикой, от устаревших (до фикса ATR-барьеров SBER/
 # LKOH/YDEX, до появления LEVEL_CONTEXT и т.п.) и не смешивать их без разбора.
 # Поднимать при значимых изменениях входа/выхода/набора методов.
-STRATEGY_VERSION = "2026-06-23-adaptive-tf-windows"
+STRATEGY_VERSION = "2026-06-23-mtf-level-cache"
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
@@ -1270,7 +1270,81 @@ def score_vsa(candles: list[HistoricCandle]) -> float:
     return max(signals, key=abs)
 
 
-def score_level_context(candles: list[HistoricCandle]) -> float:
+def _score_one_level(
+    candles, window_size: int, atr_abs: float, cl_now: float, level,
+    touch_frac: float, reject_frac: float, confirm_bars: int,
+    vol_strong: float, vol_breakout: float, vols_ref: list,
+) -> float:
+    """
+    Скор поведения цены у одного уровня за window_size баров.
+    level — объект с атрибутами .price и .tier (PriceLevel).
+    Возвращает значение до применения tier_w (caller применяет сам).
+    """
+    lp = level.price
+    touch_zone = touch_frac * atr_abs
+    tier_w = {1: 1.3, 2: 1.2, 3: 1.0, 4: 0.8, 5: 0.7}.get(level.tier, 1.0)
+
+    window = candles[-window_size:]
+    avg_vol = statistics.mean(vols_ref) if vols_ref else 1.0
+
+    reject_res: list[float] = []
+    reject_sup: list[float] = []
+    breakout_above_idx: list[int] = []
+    breakout_above_vols: list[float] = []
+    breakout_below_idx: list[int] = []
+    breakout_below_vols: list[float] = []
+
+    for i, c in enumerate(window):
+        h = _to_f(c.high); lo = _to_f(c.low); cl = _to_f(c.close)
+        vol_ratio = float(c.volume) / avg_vol if avg_vol > 0 else 1.0
+        if lo < lp and h >= lp - touch_zone and cl < lp - reject_frac * atr_abs:
+            reject_res.append(vol_ratio)
+        if h > lp and lo <= lp + touch_zone and cl > lp + reject_frac * atr_abs:
+            reject_sup.append(vol_ratio)
+        if cl > lp + touch_zone * 0.5:
+            breakout_above_idx.append(i); breakout_above_vols.append(vol_ratio)
+        elif cl < lp - touch_zone * 0.5:
+            breakout_below_idx.append(i); breakout_below_vols.append(vol_ratio)
+
+    score = 0.0
+    first_half = window_size // 2
+
+    if len(reject_res) >= 2:
+        strength = min(1.0, len(reject_res) / 3.0)
+        vol_boost = min(1.3, statistics.mean(reject_res) / vol_strong)
+        score = -strength * 0.85 * min(1.3, vol_boost)
+    elif len(reject_sup) >= 2:
+        strength = min(1.0, len(reject_sup) / 3.0)
+        vol_boost = min(1.3, statistics.mean(reject_sup) / vol_strong)
+        score = +strength * 0.85 * min(1.3, vol_boost)
+
+    had_above = any(i < first_half for i in breakout_above_idx)
+    had_below = any(i < first_half for i in breakout_below_idx)
+    now_below = cl_now < lp - touch_zone * 0.3
+    now_above = cl_now > lp + touch_zone * 0.3
+
+    if had_above and now_below:
+        bv = max((v for i, v in zip(breakout_above_idx, breakout_above_vols) if i < first_half), default=1.0)
+        vm = min(1.2, bv / vol_breakout) if bv >= vol_breakout else 0.85
+        score = -0.75 * vm
+    elif had_below and now_above:
+        bv = max((v for i, v in zip(breakout_below_idx, breakout_below_vols) if i < first_half), default=1.0)
+        vm = min(1.2, bv / vol_breakout) if bv >= vol_breakout else 0.85
+        score = +0.75 * vm
+
+    tail = window[-confirm_bars:]
+    tail_avg_vol = statistics.mean(float(c.volume) / avg_vol for c in tail) if tail else 1.0
+    if all(_to_f(c.close) > lp + touch_zone * 0.3 for c in tail):
+        vol_conf = min(1.2, tail_avg_vol / vol_strong) if tail_avg_vol >= 1.0 else 0.7
+        score = +0.65 * vol_conf
+    elif all(_to_f(c.close) < lp - touch_zone * 0.3 for c in tail):
+        vol_conf = min(1.2, tail_avg_vol / vol_strong) if tail_avg_vol >= 1.0 else 0.7
+        score = -0.65 * vol_conf
+
+    return max(-1.0, min(1.0, score * tier_w))
+
+
+def score_level_context(candles: list[HistoricCandle], external_nearest=None) -> float:
     """
     Поведение цены у ближайшего уровня за последние WINDOW баров.
 
@@ -1310,99 +1384,42 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
     if atr_abs <= 0:
         return 0.0
 
-    # Уровни строятся по истории до начала окна — без look-ahead
+    # Уровни: либо из многогоризонтного кеша (MTF), либо строятся локально
+    if external_nearest is not None:
+        # external_nearest(price, max_dist) → [(horizon, PriceLevel)]
+        candidates = external_nearest(cl_now, 2.5 * atr_abs)
+        if not candidates:
+            return 0.0
+        # Агрегируем скоры по каждому уровню и берём взвешенное среднее
+        # (горизонт: неделя×1.0, месяц×1.4, полгода×1.8)
+        _HORIZON_W = {"week": 1.0, "month": 1.4, "half": 1.8}
+        horizon_scores: list[tuple[float, float]] = []  # (score, weight)
+        for horizon, lv in candidates[:6]:  # не больше 6 уровней
+            s = _score_one_level(candles, _WINDOW, atr_abs, cl_now, lv,
+                                  _TOUCH_FRAC, _REJECT_FRAC, _CONFIRM_BARS,
+                                  _VOL_STRONG, _VOL_BREAKOUT,
+                                  vols_ref=[float(c.volume) for c in candles[-(_WINDOW + 20): -_WINDOW]])
+            if s != 0.0:
+                hw = _HORIZON_W.get(horizon, 1.0)
+                horizon_scores.append((s, hw))
+        if not horizon_scores:
+            return 0.0
+        total_w = sum(w for _, w in horizon_scores)
+        agg = sum(s * w for s, w in horizon_scores) / total_w
+        return max(-1.0, min(1.0, agg))
+
+    # Fallback: строим уровни по истории до начала окна (без look-ahead)
     ls = build_levels(candles[:-_WINDOW])
     nearest = ls.nearest(cl_now, max_dist=2.5 * atr_abs)
     if nearest is None:
         return 0.0
 
-    lp = nearest.price
-    touch_zone = _TOUCH_FRAC * atr_abs
-    tier_w = {1: 1.3, 2: 1.2, 3: 1.0, 4: 0.8, 5: 0.7}.get(nearest.tier, 1.0)
-
-    window = candles[-_WINDOW:]
     vols_ref = [float(c.volume) for c in candles[-(_WINDOW + 20): -_WINDOW]]
-    avg_vol = statistics.mean(vols_ref) if vols_ref else 1.0
-
-    # Для каждого бара определяем: касание уровня, направление отказа/пробоя
-    # touch_res[i] = True если бар касался уровня как сопротивления (подход снизу)
-    # touch_sup[i] = True если бар касался уровня как поддержки (подход сверху)
-    reject_res: list[float] = []   # объёмы баров, отказавших от сопротивления
-    reject_sup: list[float] = []   # объёмы баров, отказавших от поддержки
-    breakout_above_idx: list[int] = []  # (idx, vol_ratio) — закрытие выше уровня
-    breakout_above_vols: list[float] = []
-    breakout_below_idx: list[int] = []
-    breakout_below_vols: list[float] = []
-
-    for i, c in enumerate(window):
-        h = _to_f(c.high)
-        lo = _to_f(c.low)
-        cl = _to_f(c.close)
-        vol_ratio = float(c.volume) / avg_vol if avg_vol > 0 else 1.0
-
-        approached_from_below = lo < lp and h >= lp - touch_zone
-        approached_from_above = h > lp and lo <= lp + touch_zone
-
-        if approached_from_below and cl < lp - _REJECT_FRAC * atr_abs:
-            reject_res.append(vol_ratio)
-        if approached_from_above and cl > lp + _REJECT_FRAC * atr_abs:
-            reject_sup.append(vol_ratio)
-
-        if cl > lp + touch_zone * 0.5:
-            breakout_above_idx.append(i)
-            breakout_above_vols.append(vol_ratio)
-        elif cl < lp - touch_zone * 0.5:
-            breakout_below_idx.append(i)
-            breakout_below_vols.append(vol_ratio)
-
-    score = 0.0
-
-    # ── 1. Серия отказов (объём усиливает) ──────────────────────────────────
-    if len(reject_res) >= 2:
-        strength = min(1.0, len(reject_res) / 3.0)
-        vol_boost = min(1.3, statistics.mean(reject_res) / _VOL_STRONG) if reject_res else 1.0
-        score = -strength * 0.85 * min(1.3, vol_boost)
-    elif len(reject_sup) >= 2:
-        strength = min(1.0, len(reject_sup) / 3.0)
-        vol_boost = min(1.3, statistics.mean(reject_sup) / _VOL_STRONG) if reject_sup else 1.0
-        score = +strength * 0.85 * min(1.3, vol_boost)
-
-    # ── 2. Ложный пробой ────────────────────────────────────────────────────
-    # Объём на пробойном баре: аномальный = захват ликвидности (стопы сбили)
-    # → сигнал разворота сильнее. Без объёма = слабый ложный пробой.
-    first_half = _WINDOW // 2
-    had_close_above = any(i < first_half for i in breakout_above_idx)
-    had_close_below = any(i < first_half for i in breakout_below_idx)
-    now_below = cl_now < lp - touch_zone * 0.3
-    now_above = cl_now > lp + touch_zone * 0.3
-
-    if had_close_above and now_below:
-        # пробивало вверх, сейчас уже ниже → ложный пробой, медвежий
-        bvols = [v for i, v in zip(breakout_above_idx, breakout_above_vols) if i < first_half]
-        breakout_vol = max(bvols) if bvols else 1.0
-        # Аномальный объём на пробое = явный захват ликвидности → до ±0.9
-        vol_mult = min(1.2, breakout_vol / _VOL_BREAKOUT) if breakout_vol >= _VOL_BREAKOUT else 0.85
-        score = -0.75 * vol_mult
-    elif had_close_below and now_above:
-        bvols = [v for i, v in zip(breakout_below_idx, breakout_below_vols) if i < first_half]
-        breakout_vol = max(bvols) if bvols else 1.0
-        vol_mult = min(1.2, breakout_vol / _VOL_BREAKOUT) if breakout_vol >= _VOL_BREAKOUT else 0.85
-        score = +0.75 * vol_mult
-
-    # ── 3. Подтверждённый пробой (объём обязателен) ─────────────────────────
-    tail = window[-_CONFIRM_BARS:]
-    tail_vols = [float(c.volume) / avg_vol for c in tail]
-    tail_avg_vol = statistics.mean(tail_vols) if tail_vols else 1.0
-
-    if all(_to_f(c.close) > lp + touch_zone * 0.3 for c in tail):
-        # пробой вверх подтверждён; без объёма — слабее
-        vol_conf = min(1.2, tail_avg_vol / _VOL_STRONG) if tail_avg_vol >= 1.0 else 0.7
-        score = +0.65 * vol_conf
-    elif all(_to_f(c.close) < lp - touch_zone * 0.3 for c in tail):
-        vol_conf = min(1.2, tail_avg_vol / _VOL_STRONG) if tail_avg_vol >= 1.0 else 0.7
-        score = -0.65 * vol_conf
-
-    return max(-1.0, min(1.0, score * tier_w))
+    return _score_one_level(
+        candles, _WINDOW, atr_abs, cl_now, nearest,
+        _TOUCH_FRAC, _REJECT_FRAC, _CONFIRM_BARS, _VOL_STRONG, _VOL_BREAKOUT,
+        vols_ref,
+    )
 
 
 def score_market_structure(candles: list[HistoricCandle]) -> float:
@@ -1637,10 +1654,14 @@ METHODS = [
     ("SSA_SIGNAL",     score_ssa_signal),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
     ("VSA",            score_vsa),
-    ("LEVEL_CONTEXT",  score_level_context),
-    ("MKT_STRUCTURE",  score_market_structure),
-    ("SPRING",         score_spring),
 ]
+
+# Структурные методы — используют MultiTFLevelCache инстанса стратегии,
+# поэтому вынесены из METHODS и вызываются отдельно в __compute_scores.
+LEVEL_CONTEXT_NAME  = "LEVEL_CONTEXT"
+MKT_STRUCTURE_NAME  = "MKT_STRUCTURE"
+SPRING_NAME         = "SPRING"
+STRUCTURAL_METHOD_NAMES = [LEVEL_CONTEXT_NAME, MKT_STRUCTURE_NAME, SPRING_NAME]
 
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
 INST_OI_NAME = "INST_OI"
@@ -1663,6 +1684,7 @@ M3_NAME = "M3_CLUSTER"
 
 BASE_METHOD_NAMES = (
     [name for name, _ in METHODS]
+    + STRUCTURAL_METHOD_NAMES
     + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
     + TRADESTATS_METHOD_NAMES
     + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
@@ -1841,6 +1863,8 @@ class OICompositeStrategy(IStrategy):
         self.__l1_trending_up: bool = False
         self.__l1_trending_down: bool = False
         self.__l1_data_ready: bool = False   # False пока нет _L1_MA_DAYS дней истории
+        # Многогоризонтный кеш уровней (неделя/месяц/полгода)
+        self.__level_cache: MultiTFLevelCache = MultiTFLevelCache()
         # ATR-exhaustion: дневной ход в % от цены (знаковый, +вверх/-вниз).
         self.__daily_open_price: float = 0.0
         self.__daily_open_date: Optional[object] = None
@@ -2028,6 +2052,8 @@ class OICompositeStrategy(IStrategy):
         self.__l1_buffer.extend(candles)
         if len(self.__l1_buffer) > self.__l1_buffer_size:
             self.__l1_buffer = self.__l1_buffer[-self.__l1_buffer_size:]
+        # Многогоризонтный кеш уровней — обновляем по TTL (не каждый бар)
+        self.__level_cache.update(self.__l1_buffer)
 
         # накапливаем историю открытой сделки для MFE/MAE
         if self.__open_trade:
@@ -3021,6 +3047,9 @@ class OICompositeStrategy(IStrategy):
         regime_probs = self.__cached_regime_probs
 
         base_scores = [fn(window) for _, fn in METHODS] + [
+            self.__score_level_context_mtf(),
+            self.__score_market_structure_mtf(),
+            self.__score_spring_mtf(),
             self.__score_oi_squeeze(),
             self.__score_provider(self.__inst_oi_provider),
             self.__score_provider(self.__retail_contra_provider),
@@ -3229,6 +3258,35 @@ class OICompositeStrategy(IStrategy):
         else:
             vol = abs(diffs[0])
         return drift, vol
+
+    # ── Структурные методы (используют MultiTFLevelCache) ────────────────────
+
+    def __score_level_context_mtf(self) -> float:
+        """
+        Поведение цены у уровней со всех трёх горизонтов (неделя/месяц/полгода).
+
+        Для каждого горизонта строится независимый скор (логика та же что в
+        score_level_context), затем берётся взвешенное среднее: более долгосрочные
+        уровни весят больше (полгода > месяц > неделя), т.к. на них сосредоточено
+        больше ликвидности и памяти участников.
+
+        Окно поведенческого анализа (~3 ч) остаётся адаптивным по таймфрейму,
+        но сами уровни берутся из кеша (пересчитываются по TTL, не на каждом баре).
+        """
+        candles = self.__candles
+        if len(candles) < 20:
+            return 0.0
+        horizon_levels = self.__level_cache.nearest_across_horizons
+        return score_level_context(candles, external_nearest=horizon_levels)
+
+    def __score_market_structure_mtf(self) -> float:
+        """Слом структуры — вызывает score_market_structure на l1_buffer для большего охвата."""
+        buf = self.__l1_buffer if len(self.__l1_buffer) >= 30 else self.__candles
+        return score_market_structure(buf)
+
+    def __score_spring_mtf(self) -> float:
+        """Сжатие пружины — вызывает score_spring на текущем окне свечей."""
+        return score_spring(self.__candles)
 
     def __score_oi_squeeze(self) -> float:
         """
