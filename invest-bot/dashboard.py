@@ -778,9 +778,9 @@ def _futures_category(base: str) -> str:
     return "Прочее"
 
 
-# ticker → категория (для группировки чипов), пересчитывается вместе с
-# _futures_settings_cache в _build_strategy_settings.
+# ticker → категория / basic_asset, пересчитываются вместе в _build_strategy_settings.
 _futures_category_by_ticker: dict[str, str] = {}
+_futures_base_by_ticker: dict[str, str] = {}
 
 
 def _build_strategy_settings(contracts: dict[str, dict]) -> dict[str, StrategySettings]:
@@ -818,6 +818,8 @@ def _build_strategy_settings(contracts: dict[str, dict]) -> dict[str, StrategySe
         )
         categories[info["ticker"]] = _futures_category(base)
     _futures_category_by_ticker = categories
+    global _futures_base_by_ticker
+    _futures_base_by_ticker = {info["ticker"]: base for base, info in contracts.items()}
     return result
 
 
@@ -4484,7 +4486,7 @@ def _render_page() -> bytes:
             f"fut-{cat}", f"{cat} ({len(ts)})",
             '<div class="chip-row">' + "".join(
                 f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-                f'title="{_BASE_ASSET_LABEL.get(futures[t].basic_asset, futures[t].basic_asset or t)}'
+                f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
                 f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
                 for t in ts
             ) + '</div>'
