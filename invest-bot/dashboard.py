@@ -2110,9 +2110,25 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <button class="btn-pill btn-sm" style="color:#7eb8f7" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
   <span id="status"></span>
-  <label style="margin-left:8px;font-size:11px;color:var(--txt3);">
-    <input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть тикеры без сделок
-  </label>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
+    <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
+    <label>мин сделок: <input type="number" id="min_trades" value="0" min="0" style="width:44px;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
+    <label>сортировка:
+      <select id="sort_by" onchange="renderResultsTable()" style="background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;font-size:11px;">
+        <option value="">по умолчанию</option>
+        <option value="win_desc">win% ↓</option>
+        <option value="win_asc">win% ↑</option>
+        <option value="exp_desc">exp% ↓</option>
+        <option value="exp_asc">exp% ↑</option>
+        <option value="avgr_desc">avg R ↓</option>
+        <option value="avgr_asc">avg R ↑</option>
+        <option value="n_desc">сделок ↓</option>
+        <option value="n_asc">сделок ↑</option>
+      </select>
+    </label>
+    <label>топ N: <input type="number" id="top_n" value="" min="1" placeholder="все" style="width:44px;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
+    <label><input type="checkbox" id="top_n_worst" onchange="renderResultsTable()"> худшие</label>
+  </div>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="calib_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
@@ -2652,10 +2668,30 @@ function summaryRowToHtml(rows) {{
 function renderResultsTable() {{
   const table = document.getElementById('results');
   const hideZero = document.getElementById('hide_zero').checked;
-  const shown = hideZero ? _backtestRows.filter(r => !_isZeroResult(r)) : _backtestRows;
+  const minTrades = parseInt(document.getElementById('min_trades').value) || 0;
+  const sortBy = document.getElementById('sort_by').value;
+  const topN = parseInt(document.getElementById('top_n').value) || 0;
+  const topNWorst = document.getElementById('top_n_worst').checked;
+
+  let shown = _backtestRows.filter(r => r.error === undefined || r.n_trades !== undefined);
+  if (hideZero) shown = shown.filter(r => !_isZeroResult(r));
+  if (minTrades > 0) shown = shown.filter(r => (r.n_trades || 0) >= minTrades);
+
+  if (sortBy) {{
+    const [field, dir] = sortBy.split('_');
+    const key = field === 'win' ? 'win_rate' : field === 'exp' ? 'expectancy_pct' : field === 'avgr' ? 'avg_r' : 'n_trades';
+    shown = [...shown].sort((a, b) => {{
+      const av = a[key] ?? (dir === 'desc' ? -Infinity : Infinity);
+      const bv = b[key] ?? (dir === 'desc' ? -Infinity : Infinity);
+      return dir === 'desc' ? bv - av : av - bv;
+    }});
+  }}
+  if (topN > 0) shown = topNWorst ? shown.slice(-topN) : shown.slice(0, topN);
+
+  const errors = _backtestRows.filter(r => r.error !== undefined && r.n_trades === undefined);
   let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
   html += droppedToHtml(_droppedRows);
-  html += rowsToHtml(shown);
+  html += rowsToHtml(errors.concat(shown));
   html += summaryRowToHtml(shown);
   table.innerHTML = html;
 }}
