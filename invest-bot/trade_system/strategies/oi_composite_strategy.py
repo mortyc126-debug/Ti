@@ -93,7 +93,7 @@ from trade_system.strategies.level_pattern import detect_level_pattern, build_le
 # насчитанные текущей механикой, от устаревших (до фикса ATR-барьеров SBER/
 # LKOH/YDEX, до появления LEVEL_CONTEXT и т.п.) и не смешивать их без разбора.
 # Поднимать при значимых изменениях входа/выхода/набора методов.
-STRATEGY_VERSION = "2026-06-23-bos-spring-level-vol"
+STRATEGY_VERSION = "2026-06-23-adaptive-tf-windows"
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
@@ -523,6 +523,27 @@ class OpenTrade:
 
 
 # ── Методы анализа (чистые функции) ──────────────────────────────────────────
+
+def _candle_tf_minutes(candles) -> float:
+    """Средний интервал между свечами в минутах (по последним 10 парам)."""
+    sample = candles[-11:] if len(candles) >= 11 else candles
+    deltas = []
+    for i in range(1, len(sample)):
+        try:
+            d = (sample[i].time - sample[i - 1].time).total_seconds() / 60.0
+            if 0 < d < 1500:  # отсекаем ночные/выходные разрывы
+                deltas.append(d)
+        except Exception:
+            pass
+    return statistics.median(deltas) if deltas else 5.0
+
+
+def _adaptive_window(candles, target_hours: float, min_bars: int = 10, max_bars: int = 120) -> int:
+    """Количество баров, соответствующее target_hours часам на данном таймфрейме."""
+    tf = _candle_tf_minutes(candles)
+    bars = int(round(target_hours * 60 / tf))
+    return max(min_bars, min(max_bars, bars))
+
 
 def _to_f(q) -> float:
     """Quotation или уже float → float."""
@@ -1271,10 +1292,11 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
     Объём везде обязателен: паттерн без объёма = шум рынка, не торгуем.
     Tier 1-2 (неделя/день) весят сильнее, чем фракталы/круглые числа.
     """
-    _WINDOW = 15
+    # ~3 торговых часа: на M5 ≈ 36 баров, на M1 ≈ 180, на H1 ≈ 3 → min 10
+    _WINDOW = _adaptive_window(candles, target_hours=3.0, min_bars=12, max_bars=100)
     _TOUCH_FRAC = 0.35      # бар "касается" уровня если H или L в пределах TOUCH_FRAC*ATR
     _REJECT_FRAC = 0.4      # закрытие считается "отказом" если ушло на REJECT_FRAC*ATR от уровня
-    _CONFIRM_BARS = 3       # закрытий подряд за уровнем для подтверждённого пробоя
+    _CONFIRM_BARS = max(3, _WINDOW // 8)   # ~12% окна подряд за уровнем
     _VOL_STRONG = 1.2       # объём "усиленный"
     _VOL_BREAKOUT = 1.5     # объём на пробое — "аномальный" (захват ликвидности)
 
@@ -1402,7 +1424,8 @@ def score_market_structure(candles: list[HistoricCandle]) -> float:
                 < 0 (медвежий BOS — структура разворачивается вниз),
                 0   (структура не сломана или данных недостаточно).
     """
-    _SWING_W = 80       # окно для поиска свингов
+    # ~8 торговых часов: на M5 ≈ 96 баров, на H1 ≈ 8, на M1 ≈ 480
+    _SWING_W = _adaptive_window(candles, target_hours=8.0, min_bars=30, max_bars=300)
     _LOOKBACK = 3       # баров с каждой стороны для подтверждения свинга
     _MIN_SWINGS = 2     # минимум свингов для определения структуры
 
@@ -1510,10 +1533,13 @@ def score_spring(candles: list[HistoricCandle]) -> float:
 
     Объём — обязательный фактор: компрессия без накопленного объёма = не пружина.
     """
-    _COMP_BARS = 6      # баров компрессии для паттерна A
+    # компрессия ~1 час: M5→12 баров, H1→1 (min 4), M1→60
+    _COMP_BARS = _adaptive_window(candles, target_hours=1.0, min_bars=4, max_bars=60)
     _VOL_THRESH = 1.4   # объём на импульсном баре
     _VOL_COMP = 0.9     # средний объём во время компрессии (≥ базового × это)
     _IMPULSE_FRAC = 0.9 # импульсный бар ≥ IMPULSE_FRAC * ATR
+    # база объёма: ~2.5 часа до компрессии
+    _BASE_VOL_BARS = _adaptive_window(candles, target_hours=2.5, min_bars=10, max_bars=150)
 
     if len(candles) < _COMP_BARS + 15:
         return 0.0
@@ -1523,7 +1549,7 @@ def score_spring(candles: list[HistoricCandle]) -> float:
     last_price = _to_f(candles[-1].close)
     atr_abs = atr_pct * last_price
 
-    vols_base = [float(c.volume) for c in candles[-30:-_COMP_BARS - 1]]
+    vols_base = [float(c.volume) for c in candles[-_BASE_VOL_BARS:-_COMP_BARS - 1]]
     avg_vol = statistics.mean(vols_base) if vols_base else 1.0
     if avg_vol <= 0:
         return 0.0
