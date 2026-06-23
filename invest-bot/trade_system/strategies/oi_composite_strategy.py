@@ -93,7 +93,7 @@ from trade_system.strategies.level_pattern import detect_level_pattern, build_le
 # насчитанные текущей механикой, от устаревших (до фикса ATR-барьеров SBER/
 # LKOH/YDEX, до появления LEVEL_CONTEXT и т.п.) и не смешивать их без разбора.
 # Поднимать при значимых изменениях входа/выхода/набора методов.
-STRATEGY_VERSION = "2026-06-23-level-context-multibar"
+STRATEGY_VERSION = "2026-06-23-bos-spring-level-vol"
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
@@ -1261,10 +1261,14 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
        Сила пропорциональна количеству отказов и объёму.
     2. ЛОЖНЫЙ ПРОБОЙ: был закрытый пробой уровня → затем возврат обратно
        → текущая цена на противоположной стороне → сигнал разворота.
+       Объём на пробойном баре усиливает сигнал: аномальный объём = захват
+       ликвидности (стопы сбили), вероятность разворота выше.
     3. ПОДТВЕРЖДЁННЫЙ ПРОБОЙ: 3+ закрытий подряд за уровнем (в хвосте окна)
-       → сигнал продолжения.
+       + объём на пробойном баре выше среднего → сигнал продолжения.
+       Без объёма пробой слабее (множитель 0.7).
     4. Далеко от уровня или нет паттерна → 0.
 
+    Объём везде обязателен: паттерн без объёма = шум рынка, не торгуем.
     Tier 1-2 (неделя/день) весят сильнее, чем фракталы/круглые числа.
     """
     _WINDOW = 15
@@ -1272,6 +1276,7 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
     _REJECT_FRAC = 0.4      # закрытие считается "отказом" если ушло на REJECT_FRAC*ATR от уровня
     _CONFIRM_BARS = 3       # закрытий подряд за уровнем для подтверждённого пробоя
     _VOL_STRONG = 1.2       # объём "усиленный"
+    _VOL_BREAKOUT = 1.5     # объём на пробое — "аномальный" (захват ликвидности)
 
     if len(candles) < 40:
         return 0.0
@@ -1302,8 +1307,10 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
     # touch_sup[i] = True если бар касался уровня как поддержки (подход сверху)
     reject_res: list[float] = []   # объёмы баров, отказавших от сопротивления
     reject_sup: list[float] = []   # объёмы баров, отказавших от поддержки
-    breakout_above_idx: list[int] = []  # индексы баров с закрытием выше уровня
-    breakout_below_idx: list[int] = []  # индексы баров с закрытием ниже уровня
+    breakout_above_idx: list[int] = []  # (idx, vol_ratio) — закрытие выше уровня
+    breakout_above_vols: list[float] = []
+    breakout_below_idx: list[int] = []
+    breakout_below_vols: list[float] = []
 
     for i, c in enumerate(window):
         h = _to_f(c.high)
@@ -1315,33 +1322,32 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
         approached_from_above = h > lp and lo <= lp + touch_zone
 
         if approached_from_below and cl < lp - _REJECT_FRAC * atr_abs:
-            # подошёл снизу к уровню, закрылся обратно ниже → отказ от сопротивления
             reject_res.append(vol_ratio)
         if approached_from_above and cl > lp + _REJECT_FRAC * atr_abs:
-            # подошёл сверху, закрылся обратно выше → отказ от поддержки
             reject_sup.append(vol_ratio)
 
         if cl > lp + touch_zone * 0.5:
             breakout_above_idx.append(i)
+            breakout_above_vols.append(vol_ratio)
         elif cl < lp - touch_zone * 0.5:
             breakout_below_idx.append(i)
+            breakout_below_vols.append(vol_ratio)
 
     score = 0.0
 
-    # ── 1. Серия отказов ────────────────────────────────────────────────────
+    # ── 1. Серия отказов (объём усиливает) ──────────────────────────────────
     if len(reject_res) >= 2:
-        # сопротивление держит → медвежий
         strength = min(1.0, len(reject_res) / 3.0)
-        vol_boost = min(1.2, statistics.mean(reject_res) / _VOL_STRONG) if reject_res else 1.0
-        score = -strength * 0.85 * min(1.2, vol_boost)
+        vol_boost = min(1.3, statistics.mean(reject_res) / _VOL_STRONG) if reject_res else 1.0
+        score = -strength * 0.85 * min(1.3, vol_boost)
     elif len(reject_sup) >= 2:
-        # поддержка держит → бычий
         strength = min(1.0, len(reject_sup) / 3.0)
-        vol_boost = min(1.2, statistics.mean(reject_sup) / _VOL_STRONG) if reject_sup else 1.0
-        score = +strength * 0.85 * min(1.2, vol_boost)
+        vol_boost = min(1.3, statistics.mean(reject_sup) / _VOL_STRONG) if reject_sup else 1.0
+        score = +strength * 0.85 * min(1.3, vol_boost)
 
-    # ── 2. Ложный пробой (выше приоритет чем одиночный отказ) ──────────────
-    # Был закрытый пробой вверх в первой половине окна → потом возврат вниз
+    # ── 2. Ложный пробой ────────────────────────────────────────────────────
+    # Объём на пробойном баре: аномальный = захват ликвидности (стопы сбили)
+    # → сигнал разворота сильнее. Без объёма = слабый ложный пробой.
     first_half = _WINDOW // 2
     had_close_above = any(i < first_half for i in breakout_above_idx)
     had_close_below = any(i < first_half for i in breakout_below_idx)
@@ -1349,21 +1355,229 @@ def score_level_context(candles: list[HistoricCandle]) -> float:
     now_above = cl_now > lp + touch_zone * 0.3
 
     if had_close_above and now_below:
-        # пробивало вверх, сейчас уже ниже → ложный пробой вверх, медвежий
-        score = -0.75
+        # пробивало вверх, сейчас уже ниже → ложный пробой, медвежий
+        bvols = [v for i, v in zip(breakout_above_idx, breakout_above_vols) if i < first_half]
+        breakout_vol = max(bvols) if bvols else 1.0
+        # Аномальный объём на пробое = явный захват ликвидности → до ±0.9
+        vol_mult = min(1.2, breakout_vol / _VOL_BREAKOUT) if breakout_vol >= _VOL_BREAKOUT else 0.85
+        score = -0.75 * vol_mult
     elif had_close_below and now_above:
-        # пробивало вниз, сейчас уже выше → ложный пробой вниз, бычий
-        score = +0.75
+        bvols = [v for i, v in zip(breakout_below_idx, breakout_below_vols) if i < first_half]
+        breakout_vol = max(bvols) if bvols else 1.0
+        vol_mult = min(1.2, breakout_vol / _VOL_BREAKOUT) if breakout_vol >= _VOL_BREAKOUT else 0.85
+        score = +0.75 * vol_mult
 
-    # ── 3. Подтверждённый пробой (перевешивает остальные паттерны) ──────────
+    # ── 3. Подтверждённый пробой (объём обязателен) ─────────────────────────
     tail = window[-_CONFIRM_BARS:]
+    tail_vols = [float(c.volume) / avg_vol for c in tail]
+    tail_avg_vol = statistics.mean(tail_vols) if tail_vols else 1.0
+
     if all(_to_f(c.close) > lp + touch_zone * 0.3 for c in tail):
-        # три последних закрытия выше уровня — пробой подтверждён
-        score = +0.65
+        # пробой вверх подтверждён; без объёма — слабее
+        vol_conf = min(1.2, tail_avg_vol / _VOL_STRONG) if tail_avg_vol >= 1.0 else 0.7
+        score = +0.65 * vol_conf
     elif all(_to_f(c.close) < lp - touch_zone * 0.3 for c in tail):
-        score = -0.65
+        vol_conf = min(1.2, tail_avg_vol / _VOL_STRONG) if tail_avg_vol >= 1.0 else 0.7
+        score = -0.65 * vol_conf
 
     return max(-1.0, min(1.0, score * tier_w))
+
+
+def score_market_structure(candles: list[HistoricCandle]) -> float:
+    """
+    Слом рыночной структуры (BOS — Break of Structure).
+
+    Алгоритм:
+    1. Находим свинг-хаи и свинг-лои за окно SWING_W (фракталы ±LOOKBACK баров).
+    2. Проверяем последнюю последовательность: восходящая структура = HH + HL
+       (каждый новый хай/лой выше предыдущего), нисходящая = LH + LL.
+    3. Слом восходящей: появился LH (хай ниже предыдущего) ИЛИ LL (лой ниже предыдущего).
+       Слом нисходящей: появился HH или HL.
+    4. Сила сигнала зависит от:
+       - насколько "сломан" хай/лой в % (глубина нарушения);
+       - объёма на баре, сформировавшем слом (аномальный объём = сильный сигнал);
+       - количества свингов в последовательности до слома (3+ = устоявшийся тренд).
+
+    Возвращает: > 0 (бычий BOS — структура разворачивается вверх),
+                < 0 (медвежий BOS — структура разворачивается вниз),
+                0   (структура не сломана или данных недостаточно).
+    """
+    _SWING_W = 80       # окно для поиска свингов
+    _LOOKBACK = 3       # баров с каждой стороны для подтверждения свинга
+    _MIN_SWINGS = 2     # минимум свингов для определения структуры
+
+    if len(candles) < _SWING_W:
+        return 0.0
+    atr_pct = _compute_atr(candles)
+    if atr_pct <= 0:
+        return 0.0
+
+    window = candles[-_SWING_W:]
+    vols = [float(c.volume) for c in window]
+    avg_vol = statistics.mean(vols) or 1.0
+
+    # Находим свинг-хаи и свинг-лои
+    swing_highs: list[tuple[int, float, float]] = []  # (idx, price, vol_ratio)
+    swing_lows:  list[tuple[int, float, float]] = []
+    n = len(window)
+    for i in range(_LOOKBACK, n - _LOOKBACK):
+        h = _to_f(window[i].high)
+        lo = _to_f(window[i].low)
+        vol_r = float(window[i].volume) / avg_vol
+        if all(_to_f(window[i - j].high) < h and _to_f(window[i + j].high) < h
+               for j in range(1, _LOOKBACK + 1)):
+            swing_highs.append((i, h, vol_r))
+        if all(_to_f(window[i - j].low) > lo and _to_f(window[i + j].low) > lo
+               for j in range(1, _LOOKBACK + 1)):
+            swing_lows.append((i, lo, vol_r))
+
+    if len(swing_highs) < _MIN_SWINGS or len(swing_lows) < _MIN_SWINGS:
+        return 0.0
+
+    # Последние N свингов
+    sh = swing_highs[-4:]
+    sl = swing_lows[-4:]
+
+    # Определяем доминирующую структуру по последним 3 свингам
+    # Восходящая: последовательность sh[i+1] > sh[i] и sl[i+1] > sl[i]
+    def is_ascending(pts: list) -> bool:
+        return all(pts[i + 1][1] > pts[i][1] for i in range(len(pts) - 1))
+
+    def is_descending(pts: list) -> bool:
+        return all(pts[i + 1][1] < pts[i][1] for i in range(len(pts) - 1))
+
+    was_bullish = is_ascending(sh[-3:]) and is_ascending(sl[-3:])
+    was_bearish = is_descending(sh[-3:]) and is_descending(sl[-3:])
+
+    if not was_bullish and not was_bearish:
+        return 0.0  # нет чёткой структуры — нечего ломать
+
+    score = 0.0
+
+    if was_bullish:
+        # Слом восходящей: последний свинг-хай ниже предыдущего (LH)
+        # ИЛИ последний свинг-лой ниже предыдущего (LL)
+        lh_broken = sh[-1][1] < sh[-2][1] if len(sh) >= 2 else False
+        ll_broken = sl[-1][1] < sl[-2][1] if len(sl) >= 2 else False
+        if lh_broken or ll_broken:
+            # Глубина нарушения
+            depth_h = (sh[-2][1] - sh[-1][1]) / (sh[-2][1] or 1) if lh_broken else 0.0
+            depth_l = (sl[-2][1] - sl[-1][1]) / (sl[-2][1] or 1) if ll_broken else 0.0
+            depth = max(depth_h, depth_l)
+            # Объём на сломе (берём бар с большим объёмом из последнего свинга)
+            vol_boost = min(1.5, (sh[-1][2] if lh_broken else sl[-1][2]) / 1.0)
+            strength = min(1.0, depth / atr_pct) * vol_boost
+            n_swings_bonus = min(1.3, 1.0 + 0.1 * len(sh))  # чем дольше тренд — тем значимее слом
+            score = -min(1.0, strength * 0.8 * n_swings_bonus)
+
+    elif was_bearish:
+        # Слом нисходящей: последний хай выше предыдущего (HH) или лой выше (HL)
+        hh_broken = sh[-1][1] > sh[-2][1] if len(sh) >= 2 else False
+        hl_broken = sl[-1][1] > sl[-2][1] if len(sl) >= 2 else False
+        if hh_broken or hl_broken:
+            depth_h = (sh[-1][1] - sh[-2][1]) / (sh[-2][1] or 1) if hh_broken else 0.0
+            depth_l = (sl[-1][1] - sl[-2][1]) / (sl[-2][1] or 1) if hl_broken else 0.0
+            depth = max(depth_h, depth_l)
+            vol_boost = min(1.5, (sh[-1][2] if hh_broken else sl[-1][2]) / 1.0)
+            strength = min(1.0, depth / atr_pct) * vol_boost
+            n_swings_bonus = min(1.3, 1.0 + 0.1 * len(sl))
+            score = +min(1.0, strength * 0.8 * n_swings_bonus)
+
+    return max(-1.0, min(1.0, score))
+
+
+def score_spring(candles: list[HistoricCandle]) -> float:
+    """
+    Сжатие пружины (Spring/Compression → Impulse).
+
+    Два суб-паттерна:
+
+    A. КОМПРЕССИЯ + ИМПУЛЬС (после отката в тренде или у уровня):
+       - последние COMP_BARS баров показывают убывающий диапазон (ATR убывает);
+       - объём в компрессии выше среднего (накопление/распределение);
+       - текущий бар — резкий выход: диапазон > IMPULSE_FRAC * ATR, закрытие
+         в верхней/нижней трети, объём > VOL_THRESH * среднего.
+
+    B. NR7 с объёмом (Narrow Range 7):
+       - текущий бар имеет наименьший диапазон за последние 7 баров (NR7);
+       - объём накапливался в компрессии (средний объём компрессии > базового);
+       - следующий (текущий) бар — расширение с объёмом.
+       Возвращает слабый сигнал (±0.4) о готовности к выходу.
+
+    Направление определяется:
+    - предшествующим трендом (slope closes);
+    - закрытием импульсного бара (верх/низ диапазона).
+
+    Объём — обязательный фактор: компрессия без накопленного объёма = не пружина.
+    """
+    _COMP_BARS = 6      # баров компрессии для паттерна A
+    _VOL_THRESH = 1.4   # объём на импульсном баре
+    _VOL_COMP = 0.9     # средний объём во время компрессии (≥ базового × это)
+    _IMPULSE_FRAC = 0.9 # импульсный бар ≥ IMPULSE_FRAC * ATR
+
+    if len(candles) < _COMP_BARS + 15:
+        return 0.0
+    atr_pct = _compute_atr(candles)
+    if atr_pct <= 0:
+        return 0.0
+    last_price = _to_f(candles[-1].close)
+    atr_abs = atr_pct * last_price
+
+    vols_base = [float(c.volume) for c in candles[-30:-_COMP_BARS - 1]]
+    avg_vol = statistics.mean(vols_base) if vols_base else 1.0
+    if avg_vol <= 0:
+        return 0.0
+
+    last = candles[-1]
+    lh = _to_f(last.high); ll = _to_f(last.low)
+    lc = _to_f(last.close); lo_ = _to_f(last.open)
+    lrng = lh - ll or 1e-9
+    last_vol_r = float(last.volume) / avg_vol
+
+    comp_candles = candles[-_COMP_BARS - 1:-1]  # предшествующие COMP_BARS баров
+    comp_ranges = [_to_f(c.high) - _to_f(c.low) for c in comp_candles]
+    comp_vol_r = statistics.mean(float(c.volume) / avg_vol for c in comp_candles)
+
+    # Убывающий диапазон: каждый следующий меньше предыдущего (не строго — допускаем 1 выброс)
+    violations = sum(1 for i in range(1, len(comp_ranges)) if comp_ranges[i] > comp_ranges[i - 1])
+    is_compressing = violations <= 1 and comp_ranges[-1] < comp_ranges[0] * 0.7
+
+    score = 0.0
+
+    # ── Паттерн A: компрессия + импульсный выход ──────────────────────────
+    if (is_compressing
+            and comp_vol_r >= _VOL_COMP
+            and lrng >= _IMPULSE_FRAC * atr_abs
+            and last_vol_r >= _VOL_THRESH):
+
+        # Направление по закрытию импульсного бара
+        close_pos = (lc - ll) / lrng
+        trend_closes = [_to_f(c.close) for c in candles[-15:-1]]
+        trend_slope = (trend_closes[-1] - trend_closes[0]) / (abs(trend_closes[0]) or 1)
+
+        if close_pos >= 0.65:
+            # Закрытие в верхней трети — бычий выход
+            strength = min(1.0, (lrng / atr_abs) * last_vol_r * 0.4)
+            score = +strength
+        elif close_pos <= 0.35:
+            # Закрытие в нижней трети — медвежий выход
+            strength = min(1.0, (lrng / atr_abs) * last_vol_r * 0.4)
+            score = -strength
+
+        # Если импульс против недавнего тренда — это не продолжение, а разворот;
+        # сигнал всё равно даём (пружина отталкивается), но без дополнительного буста.
+
+    # ── Паттерн B: NR7 с накопленным объёмом (готовность к выходу) ─────────
+    if score == 0.0:
+        ranges_7 = [_to_f(c.high) - _to_f(c.low) for c in candles[-7:]]
+        if lrng == min(ranges_7) and comp_vol_r >= _VOL_COMP:
+            # Самый узкий бар за 7 — пружина сжата, направление пока неизвестно
+            # Слабый сигнал в сторону предшествующего тренда
+            trend_closes = [_to_f(c.close) for c in candles[-10:-1]]
+            slope = (trend_closes[-1] - trend_closes[0]) / (abs(trend_closes[0]) or 1)
+            score = 0.35 * (1.0 if slope > 0 else -1.0)
+
+    return max(-1.0, min(1.0, score))
 
 
 # ── Стратегия ─────────────────────────────────────────────────────────────────
@@ -1398,6 +1612,8 @@ METHODS = [
     ("HAWKES_SIGNAL",  score_hawkes_signal),
     ("VSA",            score_vsa),
     ("LEVEL_CONTEXT",  score_level_context),
+    ("MKT_STRUCTURE",  score_market_structure),
+    ("SPRING",         score_spring),
 ]
 
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
