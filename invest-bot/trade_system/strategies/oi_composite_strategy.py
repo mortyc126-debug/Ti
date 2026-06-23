@@ -1698,17 +1698,19 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     - Восходящий: хаи горизонтальны + лои растут → бычий bias.
     - Нисходящий: хаи падают + лои горизонтальны → медвежий bias.
 
-    КОНТЕКСТНАЯ ПЕРЕИНТЕРПРЕТАЦИЯ (ключевое):
-    Восходящий треугольник часто появляется как откат против нисходящего
-    тренда. Классик скажет "накопление = лонг", но в реальности это флаг
-    распределения — серия откатов внутри более крупного даунтренда, пружина
-    сжимается в сторону медведей. Пробой пойдёт вниз, и амплитуда этого
-    пробоя кратно превысит высоту самого треугольника.
-    Аналогично нисходящий треугольник в аптренде — ловушка для медведей.
+    КОНТЕКСТНАЯ ПЕРЕИНТЕРПРЕТАЦИЯ:
+    Восходящий треугольник в нисходящем тренде — флаг распределения,
+    пробой вниз с амплитудой кратно больше высоты треугольника.
+    Аналогично нисходящий в аптренде — ловушка для медведей.
 
-    Детектируем пре-трендовый контекст: смотрим на наклон closes
-    ЗА тот же период до треугольника. Если он противоположен классическому
-    направлению паттерна — флипаем интерпретацию и усиливаем сигнал.
+    ТРИ ДОПОЛНИТЕЛЬНЫХ ИЗМЕРЕНИЯ:
+    1. Касания горизонтальной линии: каждый тест сопротивления/поддержки
+       накапливает стопы. 4+ касания = взрывной мув при пробое.
+    2. Объём на касаниях ("усилие без результата"): если на волнах к
+       сопротивлению объём растёт, но цена не проходит — это VSA-признак
+       дистрибуции (покупателей поглощают). Для поддержки — наоборот.
+    3. Размер фигуры / дневной ATR: маленький треугольник относительно ATR =
+       высокая степень сжатия = потенциал выхода кратно выше высоты паттерна.
     """
     _WINDOW = _adaptive_window(candles, target_hours=6.0, min_bars=12, max_bars=120)
     _SWING_STEP = max(2, _WINDOW // 8)
@@ -1718,6 +1720,7 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     window = candles[-_WINDOW:]
     highs = [_to_f(c.high) for c in window]
     lows  = [_to_f(c.low)  for c in window]
+    vols  = [float(c.volume) for c in window]
     n = len(window)
 
     def _linreg(vals: list[float]) -> tuple[float, float]:
@@ -1741,7 +1744,7 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
         pts = []
         for i in range(step, len(vals) - step):
             if vals[i] == min(vals[max(0, i - step):i + step + 1]):
-                pts.append((i, vals[i]))
+                pts.append((i, vals[i])  )
         return pts
 
     sh = _swing_highs(highs, _SWING_STEP)
@@ -1770,30 +1773,90 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     l_rising  = slope_l_n >  _FLAT_THRESH
     l_flat    = abs(slope_l_n) <= _FLAT_THRESH
 
-    # Пре-трендовый контекст: наклон closes в период ПЕРЕД треугольником.
-    # Положительный → аптренд до треугольника, отрицательный → даунтренд.
+    # ── Пре-трендовый контекст ────────────────────────────────────────────────
     pre_window = candles[-(2 * _WINDOW):-_WINDOW]
     pre_closes = [_to_f(c.close) for c in pre_window]
     pre_slope_n = 0.0
     if len(pre_closes) >= 4:
         pre_s, _ = _linreg(pre_closes)
         pre_slope_n = pre_s / (atr_abs * len(pre_closes)) * len(pre_closes)
-    # Пре-тренд вниз если slope_n < -0.1, вверх если > 0.1
     pre_downtrend = pre_slope_n < -0.10
     pre_uptrend   = pre_slope_n >  0.10
 
-    # Степень схождения: диапазон конца vs начала
+    # ── 1. Касания горизонтальной линии ──────────────────────────────────────
+    # Считаем свинговые точки, которые пришли близко к проецируемой
+    # горизонтали (в пределах 0.3 ATR). Больше касаний = больше стопов накоплено.
+    touch_tol = atr_abs * 0.3
+    # Линия сопротивления: проецируем из sh[-1] по slope_h
+    def _proj_resist(i: int) -> float:
+        return sh[-1][1] + slope_h * (i - sh[-1][0])
+    def _proj_support(i: int) -> float:
+        return sl[-1][1] + slope_l * (i - sl[-1][0])
+
+    resist_touches = sum(
+        1 for idx, val in sh if abs(val - _proj_resist(idx)) < touch_tol
+    )
+    support_touches = sum(
+        1 for idx, val in sl if abs(val - _proj_support(idx)) < touch_tol
+    )
+    # Мультипликатор: 2 касания → 1.0, 3 → 1.2, 4 → 1.4, 5+ → 1.6
+    def _touch_mult(touches: int) -> float:
+        return min(1.6, 1.0 + max(0, touches - 2) * 0.2)
+
+    # ── 2. Объём на касаниях ("усилие без результата") ───────────────────────
+    # Для каждой волны к горизонтальной линии считаем средний объём
+    # на барах вблизи свинговой точки (±_SWING_STEP).
+    # Если объём на поздних волнах выше, чем на ранних — поглощение.
+    def _vol_near_touches(touches: list[tuple[int, float]]) -> list[float]:
+        result = []
+        for idx, _ in touches:
+            lo = max(0, idx - _SWING_STEP)
+            hi = min(n, idx + _SWING_STEP + 1)
+            result.append(statistics.mean(vols[lo:hi]) if lo < hi else 0.0)
+        return result
+
+    resist_vols = _vol_near_touches(sh)
+    support_vols = _vol_near_touches(sl)
+
+    def _effort_without_result(touch_vols: list[float]) -> float:
+        """Растёт ли объём на последовательных касаниях (поглощение)?
+        +1 = объём явно растёт (дистрибуция/аккумуляция); -1 = снижается (истощение)."""
+        if len(touch_vols) < 2:
+            return 0.0
+        early = statistics.mean(touch_vols[:len(touch_vols) // 2]) or 1.0
+        late  = statistics.mean(touch_vols[len(touch_vols) // 2:]) or 1.0
+        ratio = late / early
+        if ratio > 1.25:
+            return +1.0   # объём растёт на касаниях — поглощение
+        if ratio < 0.8:
+            return -1.0   # объём сухой — истощение продавцов/покупателей
+        return 0.0
+
+    resist_effort = _effort_without_result(resist_vols)   # +1 = поглощение покупателей
+    support_effort = _effort_without_result(support_vols)  # +1 = поглощение продавцов
+
+    # ── 3. Размер фигуры относительно дневного ATR ───────────────────────────
+    # triangle_height / atr_abs: < 0.3 → очень сжатая пружина (коэф. 1.5),
+    # 0.3–0.8 → нормальный (1.0), > 0.8 → крупный паттерн (0.8).
+    triangle_height = (highs[0] - lows[0]) * (1.0 - convergence * 0.5)  # средняя высота
+    size_ratio = triangle_height / (atr_abs or 1.0)
+    if size_ratio < 0.3:
+        compression_mult = 1.5   # маленький треугольник = высокое сжатие
+    elif size_ratio < 0.8:
+        compression_mult = 1.0
+    else:
+        compression_mult = 0.8   # слишком большой — менее предсказуем
+
+    # ── Степень схождения и базовое качество ─────────────────────────────────
     range_start = highs[0] - lows[0] or 1e-9
     range_end   = highs[-1] - lows[-1]
     convergence = max(0.0, 1.0 - range_end / range_start)
 
-    # Объём: убывает ли (накопление энергии)
-    vols = [float(c.volume) for c in window]
     vol_half1 = statistics.mean(vols[:n // 2]) or 1.0
     vol_half2 = statistics.mean(vols[n // 2:]) or 1.0
     vol_declining = vol_half2 < vol_half1 * 0.85
 
-    # Пробой: последний бар закрылся за проекцией линий
+    # ── Пробой ────────────────────────────────────────────────────────────────
     last_h = _to_f(candles[-1].high); last_l = _to_f(candles[-1].low)
     last_c = _to_f(candles[-1].close)
     proj_high = sh[-1][1] + slope_h * (n - 1 - sh[-1][0])
@@ -1806,61 +1869,74 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
 
     quality = (r2_h + r2_l) / 2
 
+    # Итоговая база: сжатие × качество × объём-фактор × сжатие-по-размеру
+    def _base(declining_vol: bool) -> float:
+        return convergence * quality * (1.2 if declining_vol else 0.8) * compression_mult
+
     score = 0.0
 
     if h_falling and l_rising:
-        # Симметричный: нейтрален до пробоя; пре-тренд усиливает вероятный вектор
+        # Симметричный: нейтрален до пробоя
+        touch_avg = _touch_mult((resist_touches + support_touches) // 2)
         if breakout_up and breakout_vol_ok:
-            mult = 1.3 if pre_uptrend else (0.6 if pre_downtrend else 1.0)
-            score = +convergence * quality * mult
+            context = 1.3 if pre_uptrend else (0.6 if pre_downtrend else 1.0)
+            score = +convergence * quality * context * touch_avg * compression_mult
         elif breakout_down and breakout_vol_ok:
-            mult = 1.3 if pre_downtrend else (0.6 if pre_uptrend else 1.0)
-            score = -convergence * quality * mult
+            context = 1.3 if pre_downtrend else (0.6 if pre_uptrend else 1.0)
+            score = -convergence * quality * context * touch_avg * compression_mult
 
     elif h_flat and l_rising:
         # Восходящий треугольник.
-        # В даунтренде — это НЕ накопление, а флаг распределения:
-        # лои подпирают вверх на слабеющем импульсе, хаи не могут пробить
-        # сопротивление, медведи продавливают ниже. Пробой вниз сильнее,
-        # чем предполагает высота треугольника — ребейланс позиций массовый.
-        base = convergence * quality * (1.2 if vol_declining else 0.8)
+        # resist_effort > 0: объём растёт на касаниях сопротивления = покупателей поглощают.
+        # В даунтренде это дистрибуция; в аптренде — борьба у уровня.
+        base = _base(vol_declining)
+        resist_tm = _touch_mult(resist_touches)
+        absorption = resist_effort > 0  # объём растёт на касаниях верха
+
         if pre_downtrend:
-            # Контр-трендовый восходящий треугольник: флаг медведей
+            # Флаг распределения: пробой вниз взрывной
+            # Если ещё и объём на касаниях растёт — поглощение подтверждает
+            absorption_boost = 1.3 if absorption else 1.0
             if breakout_down and breakout_vol_ok:
-                score = -min(1.0, base * 2.0)   # сильнее классики — мув крупнее треугольника
+                score = -min(1.0, base * 2.0 * resist_tm * absorption_boost)
             elif breakout_up and breakout_vol_ok:
-                score = +min(1.0, base * 0.3)   # ложный пробой вверх, доверяем слабо
+                score = +min(1.0, base * 0.3)   # ложный пробой
             else:
-                score = -base * 0.5             # ещё внутри, но уже медвежий bias
+                score = -base * 0.5 * (1.2 if absorption else 1.0)
         else:
-            # Стандартная трактовка: накопление / аптренд
+            # Стандартное накопление
+            # Если объём на касаниях снижается — истощение продавцов, пробой вверх надёжнее
+            exhaustion_boost = 1.2 if resist_effort < 0 else 1.0
             if breakout_up and breakout_vol_ok:
-                score = +min(1.0, base * 1.5)
+                score = +min(1.0, base * 1.5 * resist_tm * exhaustion_boost)
             elif breakout_down and breakout_vol_ok:
                 score = -min(1.0, base * 0.7)
             else:
-                score = +base * 0.4
+                score = +base * 0.4 * exhaustion_boost
 
     elif h_falling and l_flat:
         # Нисходящий треугольник.
-        # В аптренде — ловушка для медведей: распределение затухает,
-        # покупатели удерживают поддержку, вынос вверх кратно мощнее.
-        base = convergence * quality * (1.2 if vol_declining else 0.8)
+        base = _base(vol_declining)
+        support_tm = _touch_mult(support_touches)
+        absorption = support_effort > 0  # объём растёт на касаниях поддержки = продавцов поглощают
+
         if pre_uptrend:
-            # Контр-трендовый нисходящий треугольник: флаг быков
+            # Ловушка для медведей: пробой вверх взрывной
+            absorption_boost = 1.3 if absorption else 1.0
             if breakout_up and breakout_vol_ok:
-                score = +min(1.0, base * 2.0)
+                score = +min(1.0, base * 2.0 * support_tm * absorption_boost)
             elif breakout_down and breakout_vol_ok:
                 score = -min(1.0, base * 0.3)
             else:
-                score = +base * 0.5
+                score = +base * 0.5 * (1.2 if absorption else 1.0)
         else:
+            exhaustion_boost = 1.2 if support_effort < 0 else 1.0
             if breakout_down and breakout_vol_ok:
-                score = -min(1.0, base * 1.5)
+                score = -min(1.0, base * 1.5 * support_tm * exhaustion_boost)
             elif breakout_up and breakout_vol_ok:
                 score = +min(1.0, base * 0.7)
             else:
-                score = -base * 0.4
+                score = -base * 0.4 * exhaustion_boost
 
     return max(-1.0, min(1.0, score))
 
