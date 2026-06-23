@@ -3785,7 +3785,7 @@ function _renderAnalytics(data, account) {{
   const pnl = summary.pnl_rub || 0;
   const pnlPct = account ? ((pnl / account) * 100).toFixed(1) : '—';
   const nTrades = summary.n_trades || 0;
-  const winRate = nTrades ? (((data.trades || []).filter(t => t.r_multiple > 0).length / nTrades) * 100).toFixed(1) : '—';
+  const winRate = nTrades ? (((data.trades || []).filter(t => t.net_pct > 0).length / nTrades) * 100).toFixed(1) : '—';
   const dd = summary.max_drawdown_rub || 0;
   document.getElementById('an_summary').innerHTML =
     `<b style="color:${{pnl >= 0 ? 'var(--pos)' : 'var(--neg)'}}">${{pnl >= 0 ? '+' : ''}}${{pnl.toFixed(0)}} ₽ (${{pnlPct}}%)</b> &nbsp;·&nbsp; ` +
