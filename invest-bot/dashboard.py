@@ -2108,6 +2108,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
+  <button class="btn-pill btn-sm" style="color:#7eb8f7" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
   <span id="status"></span>
   <label style="margin-left:8px;font-size:11px;color:var(--txt3);">
     <input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть тикеры без сделок
@@ -2657,6 +2658,68 @@ function renderResultsTable() {{
   html += rowsToHtml(shown);
   html += summaryRowToHtml(shown);
   table.innerHTML = html;
+}}
+
+function _rowToText(r) {{
+  const lines = [];
+  if (r.error !== undefined && r.n_trades === undefined) {{
+    lines.push(`${{r.ticker}}\t${{r.mode}}\tERROR: ${{r.error || ''}}`);
+    if (r.traceback) lines.push(r.traceback);
+    return lines.join('\n');
+  }}
+  const winPct = r.win_rate !== undefined ? (r.win_rate * 100).toFixed(1) + '%' : '';
+  const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct * 100).toFixed(2) + '%' : '';
+  const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
+  const models = r.model_stats ? Object.entries(r.model_stats).map(([k, s]) => {{
+    const wr = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate * 100).toFixed(0) + '%' : '—';
+    return `${{k.replace('_CLUSTER','')}}:${{wr}}(n=${{s.agree_n}})`;
+  }}).join(' / ') : '';
+  lines.push(`${{r.ticker}}\t${{r.mode}}\t${{r.n_trades ?? 0}}\t${{winPct}}\t${{avgR}}\t${{exp}}\t${{models}}`);
+  if (r.what_if) {{
+    const wi = Object.entries(r.what_if).filter(([,s])=>s&&s.n_trades).map(([k,s])=>{{
+      const wr = s.win_rate !== null && s.win_rate !== undefined ? (s.win_rate*100).toFixed(0)+'%' : '—';
+      const ep = s.expectancy_pct !== null && s.expectancy_pct !== undefined ? (s.expectancy_pct*100).toFixed(2)+'%' : '';
+      return `${{k}}: ${{wr}} n=${{s.n_trades}}${{ep?' эксп '+ep:''}}`;
+    }}).join(' / ');
+    if (wi) lines.push(`  Если бы слушали только модель: ${{wi}}`);
+  }}
+  if (r.method_stats) {{
+    lines.push('  Attribution по методам:');
+    lines.push('  метод\tза n\tза win%\tпротив n\tпротив win%');
+    for (const [m, s] of Object.entries(r.method_stats)) {{
+      const fw = s.for_win_rate !== null && s.for_win_rate !== undefined ? (s.for_win_rate*100).toFixed(0)+'%' : '—';
+      const aw = s.against_win_rate !== null && s.against_win_rate !== undefined ? (s.against_win_rate*100).toFixed(0)+'%' : '—';
+      lines.push(`  ${{m}}\t${{s.for_n}}\t${{fw}}\t${{s.against_n}}\t${{aw}}`);
+    }}
+  }}
+  if (r.method_stats_by_regime) {{
+    for (const [regime, ms] of Object.entries(r.method_stats_by_regime)) {{
+      lines.push(`  Attribution по методам (режим ${{regime}}):`);
+      for (const [m, s] of Object.entries(ms)) {{
+        const fw = s.for_win_rate !== null && s.for_win_rate !== undefined ? (s.for_win_rate*100).toFixed(0)+'%' : '—';
+        const aw = s.against_win_rate !== null && s.against_win_rate !== undefined ? (s.against_win_rate*100).toFixed(0)+'%' : '—';
+        lines.push(`  ${{m}}\t${{s.for_n}}\t${{fw}}\t${{s.against_n}}\t${{aw}}`);
+      }}
+    }}
+  }}
+  return lines.join('\n');
+}}
+
+async function copyAllResults(btn) {{
+  if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
+  const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
+  const text = header + '\n' + _backtestRows.map(_rowToText).join('\n') + '\n';
+  try {{
+    await navigator.clipboard.writeText(text);
+    const orig = btn.textContent;
+    btn.textContent = '✓ скопировано';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }} catch(e) {{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋 копировать всё', 1500);
+  }}
 }}
 
 let _progressTimer = null;
