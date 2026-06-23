@@ -1122,6 +1122,17 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
     }
 
 
+def _method_stats_by_regime_from_trades(trades: list[dict]) -> dict:
+    """Та же attribution, что _method_stats_from_trades, но раздельно по
+    regime сделки (поле "regime" уже пишется в каждую trade-запись, см.
+    backtest_barriers/record_trade) — чтобы сравнивать win% метода в
+    разных рыночных условиях, а не смешивать их в одну цифру."""
+    by_regime: dict[str, list[dict]] = defaultdict(list)
+    for t in trades:
+        by_regime[t.get("regime") or "unknown"].append(t)
+    return {regime: _method_stats_from_trades(rt) for regime, rt in by_regime.items()}
+
+
 def _what_if_from_trades(trades: list[dict]) -> dict:
     """Та же идея, что what_if в run_portfolio_sim, но без эквити-симуляции
     (на одном тикере счёт не строим) — просто n_trades/win_rate/avg_r/
@@ -1249,7 +1260,8 @@ def run_backtest_one(
                                             return_trades=True, tariff=tariff)
         fixed_trades = fixed.pop("trades", [])
         fixed_pct = fixed.get("expectancy_pct", 0.0)
-        rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades), **fixed})
+        rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
+                     "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades), **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
         # ДО текущего дня, торговля день — той же парой, что увидел бы живой
@@ -1318,6 +1330,7 @@ def run_backtest_one(
                     "expectancy_pct": sum(t["net_pct"] for t in wf_trades) / n_total,
                     "model_stats": _model_stats_from_trades(wf_trades),
                     "method_stats": _method_stats_from_trades(wf_trades),
+                    "method_stats_by_regime": _method_stats_by_regime_from_trades(wf_trades),
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
                              "what_if": _what_if_from_trades(wf_trades), **wf_row})
@@ -2412,6 +2425,17 @@ function methodStatsToHtml(ms) {{
   return html;
 }}
 
+function methodStatsByRegimeToHtml(msr) {{
+  if (!msr || !Object.keys(msr).length) return '';
+  let html = '';
+  for (const [regime, ms] of Object.entries(msr)) {{
+    const t = methodStatsToHtml(ms);
+    if (!t) continue;
+    html += `<div style="margin-top:4px"><b style="color:var(--txt3)">режим: ${{regime}}</b>${{t}}</div>`;
+  }}
+  return html;
+}}
+
 function rowsToHtml(rows) {{
   let html = '';
   for (const r of rows) {{
@@ -2442,6 +2466,12 @@ function rowsToHtml(rows) {{
       const mt = methodStatsToHtml(r.method_stats);
       if (mt) {{
         html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам</summary>${{mt}}</details></td></tr>`;
+      }}
+    }}
+    if (r.method_stats_by_regime) {{
+      const mtr = methodStatsByRegimeToHtml(r.method_stats_by_regime);
+      if (mtr) {{
+        html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам — по режимам</summary>${{mtr}}</details></td></tr>`;
       }}
     }}
   }}
