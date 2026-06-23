@@ -37,6 +37,7 @@ os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
 import datetime
 import multiprocessing
+import dataclasses
 import statistics
 import threading
 import time
@@ -104,20 +105,42 @@ def _wire_history_returning(strategy) -> BacktestHistoryStore:
 
 
 def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0):
-    """Свечи для бэктеста: для фьючерсов на период старше даты листинга
-    текущего контракта докачивает и сшивает предыдущие контракты того же
-    basic_asset (см. candle_archive.get_candles_cached_futures_chain) —
-    иначе при достаточно большом days/offset_days получили бы пустую
-    историю там, где текущий контракт ещё не существовал."""
+    """Свечи для бэктеста. Для фьючерсов пробуем два интервала:
+    1) 5-мин — D1 хранит их глубоко, нужны для исторических периодов.
+    2) 1-мин fallback — для экзотики, у которой нет 5-мин в D1/Tinkoff,
+       но есть свежие 1-мин данные (работает только для недавних периодов).
+    Возвращаем то, что длиннее."""
     if getattr(settings, "is_future", False):
-        return get_candles_cached_futures_chain(
+        candles_5m = get_candles_cached_futures_chain(
             ticker, settings.figi, days, _market_data, _db, _instrument_service,
-            candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
+            candle_interval_min=5, offset_days=offset_days,
         )
+        if candles_5m:
+            return candles_5m
+        # fallback: пробуем нативный интервал (обычно 1-мин) — только для текущих периодов
+        if settings.candle_interval_min != 5:
+            candles_native = get_candles_cached_futures_chain(
+                ticker, settings.figi, days, _market_data, _db, _instrument_service,
+                candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
+            )
+            if candles_native:
+                return candles_native
+        return candles_5m  # пустой список
     return get_candles_cached(
         ticker, settings.figi, days, _market_data, _db,
         candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
     )
+
+
+def _backtest_strategy_settings(settings) -> "StrategySettings":
+    """Для фьючерсов в историческом бэктесте мы всегда грузим 5-мин свечи
+    (Tinkoff отдаёт 1-мин только за последние ~7 дней, D1 хранит только 5-мин).
+    Если оставить candle_interval_min=1, стратегия строит окно 150 баров вместо 30
+    и включает MTF-агрегацию 5→25-мин (бессмысленную на реальных 5-мин данных),
+    что обрушивает composite ниже порога на все 150 дней."""
+    if getattr(settings, "is_future", False) and getattr(settings, "candle_interval_min", 5) != 5:
+        return dataclasses.replace(settings, candle_interval_min=5)
+    return settings
 
 
 def _save_backtest_history_one(
@@ -134,7 +157,7 @@ def _save_backtest_history_one(
         _set_progress(progress, ticker, "ошибка")
         return ticker, None, 0, f"{ticker}: нет в settings"
     try:
-        strategy = StrategyFactory.new_factory(settings.name, settings)
+        strategy = StrategyFactory.new_factory(settings.name, _backtest_strategy_settings(settings))
         bt_store = _wire_history_returning(strategy)
         _set_progress(progress, ticker, "загрузка свечей")
         candles = _get_backtest_candles(ticker, settings, days, offset_days)
@@ -668,26 +691,65 @@ def _futures_cache_from_disk() -> tuple[dict[str, dict] | None, float]:
         return None, float("inf")
 
 
-# Группы basic_asset из FUTURES_TRADING.BASE_TICKERS (settings.ini) — для
-# дашборда, чтобы не валить десятки разнородных фьючерсов в одну кучу
-# чипов. Списком, а не одним правилом, т.к. часть имён неоднозначна
-# (BABA/BIDU выглядят как обычные тикеры, но это иностр. акции, не РФ).
-_FUTURES_CATEGORIES: list[tuple[str, frozenset[str]]] = [
-    ("Энергоносители", frozenset({
-        "Brent", "Газ (США)", "Газ (Европа)", "Газ микро (США)",
-        "Бензин АИ-92", "Бензин АИ-95", "Дизельное топливо летнее",
-    })),
-    ("Металлы", frozenset({
-        "Золото", "Золото в долларах", "Золото в рублях", "Серебро",
-        "Палладий", "Платина", "Алюминий", "Медь", "Никель", "Цинк",
-    })),
-    ("Агро", frozenset({
-        "Пшеница", "Сахар мировой", "Сахар российский",
-        "Апельсиновый сок", "Какао", "Кофе",
-    })),
-    ("Индексы РФ", frozenset({"IMOEX", "RTSI", "RTSI мини"})),
-    ("Иностр. акции/крипто", frozenset({"BABA", "BIDU", "Bitcoin-фонд IBIT", "ETHA"})),
-]
+# basic_asset коды из Tinkoff API → человекочитаемое название базиса.
+# Используется в двух местах: как подпись категории в TOC и как тултип чипа.
+_BASE_ASSET_LABEL: dict[str, str] = {
+    # Нефть и нефтепродукты
+    "BR": "Нефть Brent",
+    "CL": "Нефть WTI",
+    "NG": "Газ природный (США)",
+    "TTF": "Газ TTF (Европа)",
+    "NGM": "Газ микро (США)",
+    "AI92": "Бензин АИ-92",
+    "AI95": "Бензин АИ-95",
+    "DT": "Дизельное топливо",
+    # Металлы
+    "GD": "Золото",
+    "GOLD": "Золото",
+    "GLD": "Золото $",
+    "GLDRUB_TOM": "Золото ₽",
+    "SLVR": "Серебро",
+    "PD": "Палладий",
+    "PT": "Платина",
+    "AL": "Алюминий",
+    "CU": "Медь",
+    "NI": "Никель",
+    "ZN": "Цинк",
+    # Агро
+    "W": "Пшеница",
+    "SRW": "Пшеница (SRW)",
+    "SUGAR": "Сахар мировой",
+    "SUGR": "Сахар российский",
+    "OJ": "Апельсиновый сок",
+    "CC": "Какао",
+    "KC": "Кофе",
+    # Валюта
+    "Si": "USD/RUB",
+    "Eu": "EUR/RUB",
+    "CNYRUB_TOM": "CNY/RUB",
+    "GBPRUB_TOM": "GBP/RUB",
+    "HKDRUB_TOM": "HKD/RUB",
+    "TRYRUB_TOM": "TRY/RUB",
+    "AMDRUB_TOM": "AMD/RUB",
+    "KZTRUB_TOM": "KZT/RUB",
+    "EUR_USD000UTSTOM": "EUR/USD",
+    # Индексы РФ
+    "MX": "Индекс МосБиржи",
+    "RI": "Индекс РТС",
+    "MM": "Индекс МосБиржи мини",
+    # Иностр. акции / крипто
+    "BABA": "Alibaba (BABA)",
+    "BIDU": "Baidu (BIDU)",
+    "IBIT": "Bitcoin ETF IBIT",
+    "ETHA": "Ethereum ETF ETHA",
+}
+
+# Коды, которые относятся к товарным/индексным базисам — их показываем
+# каждый своей категорией; остальное (акции РФ, валюта) — в группу.
+_COMMODITY_BASES = frozenset(_BASE_ASSET_LABEL) - frozenset({
+    "Si", "Eu", "CNYRUB_TOM", "GBPRUB_TOM", "HKDRUB_TOM",
+    "TRYRUB_TOM", "AMDRUB_TOM", "KZTRUB_TOM", "EUR_USD000UTSTOM",
+})
 
 _RU_STOCK_BASE_TICKERS = frozenset({
     "ABIO", "AFKS", "AFLT", "ALRS", "ASTR", "BANE", "BELU", "BSPB", "CBOM", "CHMF",
@@ -701,27 +763,24 @@ _RU_STOCK_BASE_TICKERS = frozenset({
 
 
 def _futures_category(base: str) -> str:
-    """Категория фьючерса для группировки чипов в дашборде — по basic_asset
-    (не по тикеру контракта, он меняется при экспирации)."""
-    for label, names in _FUTURES_CATEGORIES:
-        if base in names:
-            return label
+    """Категория для группировки чипов дашборда.
+    Товарные/индексные базисы из _BASE_ASSET_LABEL — каждый своей
+    категорией с человекочитаемым именем. Акции РФ и валюты — в широкую
+    группу, иначе TOC становится бесконечным."""
+    if not base:
+        return "Прочее"
+    if base in _COMMODITY_BASES:
+        return "Сырьё"
     if base in _RU_STOCK_BASE_TICKERS:
         return "Акции РФ"
-    if "/" in base:
+    if base in _BASE_ASSET_LABEL:
         return "Валюта"
-    if base.startswith("Индекс"):
-        return "Индексы (отрасл.)"
-    if base.startswith("АДР"):
-        return "АДР"
-    if any(k in base for k in ("ETF", "iShares", "SPDR", "Nasdaq", "Tracker Fund", "MSCI")):
-        return "Иностр. ETF/индексы"
     return "Прочее"
 
 
-# ticker → категория (для группировки чипов), пересчитывается вместе с
-# _futures_settings_cache в _build_strategy_settings.
+# ticker → категория / basic_asset, пересчитываются вместе в _build_strategy_settings.
 _futures_category_by_ticker: dict[str, str] = {}
+_futures_base_by_ticker: dict[str, str] = {}
 
 
 def _build_strategy_settings(contracts: dict[str, dict]) -> dict[str, StrategySettings]:
@@ -759,6 +818,8 @@ def _build_strategy_settings(contracts: dict[str, dict]) -> dict[str, StrategySe
         )
         categories[info["ticker"]] = _futures_category(base)
     _futures_category_by_ticker = categories
+    global _futures_base_by_ticker
+    _futures_base_by_ticker = {info["ticker"]: base for base, info in contracts.items()}
     return result
 
 
@@ -1142,6 +1203,30 @@ def _model_stats_from_trades(trades: list[dict]) -> dict:
     }
 
 
+def _trades_list_compact(trades: list[dict]) -> list[dict]:
+    """Компактный список сделок для drill-down на дашборде.
+    Из method_scores берём только топ-3 за и топ-3 против (по abs score),
+    чтобы не гонять по сети все ~40 методов на каждую сделку."""
+    out = []
+    for t in trades:
+        ms = t.get("method_scores", {})
+        dir_sign = 1 if t.get("direction") == "LONG" else -1
+        # согласные (score * dir_sign > 0) и несогласные
+        for_m = sorted([(n, s) for n, s in ms.items() if s * dir_sign > 0.05],
+                        key=lambda x: -abs(x[1]))[:3]
+        against_m = sorted([(n, s) for n, s in ms.items() if s * dir_sign < -0.05],
+                            key=lambda x: -abs(x[1]))[:3]
+        out.append({
+            "t": str(t.get("entry_time", ""))[:16],  # YYYY-MM-DD HH:MM
+            "d": t.get("direction", "?")[0],  # L / S
+            "w": int(t.get("win", False)),
+            "r": round(t.get("r_multiple", 0.0), 2),
+            "fa": [[n, round(s, 2)] for n, s in for_m],
+            "ag": [[n, round(s, 2)] for n, s in against_m],
+        })
+    return out
+
+
 def _method_stats_from_trades(trades: list[dict]) -> dict:
     """Per-method agree/disagree attribution из списка сделок.
     Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win."""
@@ -1269,7 +1354,7 @@ def run_backtest_one(
     logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
     _set_progress(progress, ticker, "загрузка свечей")
     try:
-        strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+        strategy = StrategyFactory.new_factory(strategy_settings.name, _backtest_strategy_settings(strategy_settings))
         bt_store = _wire_history_returning(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
@@ -1310,7 +1395,8 @@ def run_backtest_one(
         fixed_trades = fixed.pop("trades", [])
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
-                     "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades), **fixed})
+                     "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
+                     "trades_list": _trades_list_compact(fixed_trades), **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
         # ДО текущего дня, торговля день — той же парой, что увидел бы живой
@@ -1382,7 +1468,8 @@ def run_backtest_one(
                     "method_stats_by_regime": _method_stats_by_regime_from_trades(wf_trades),
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
-                             "what_if": _what_if_from_trades(wf_trades), **wf_row})
+                             "what_if": _what_if_from_trades(wf_trades),
+                             "trades_list": _trades_list_compact(wf_trades), **wf_row})
 
     except Exception:
         tb = traceback.format_exc()
@@ -1964,7 +2051,9 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-fut-section>summary{{color:#7eb8f7;}}
 .cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:220px;}}
 .cat-toc{{flex:0 0 260px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);height:100%;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
-.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:pointer;border-bottom:1px solid var(--border2);}}
+.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:default;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:4px;}}
+.cat-toc-toggle{{flex:0 0 auto;font-size:14px;color:var(--txt3);cursor:pointer;line-height:1;padding:0 2px;border-radius:3px;}}
+.cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
 .cat-toc-item:hover{{background:rgba(255,255,255,.05);color:var(--txt);}}
 .cat-toc-item.active{{background:rgba(126,184,247,.12);color:var(--accent);font-weight:600;}}
 .cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;height:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
@@ -2045,10 +2134,28 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
+  <button class="btn-pill btn-sm" style="color:#7eb8f7" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
+  <button class="btn-pill btn-sm" style="color:#b8e6b8" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <span id="status"></span>
-  <label style="margin-left:8px;font-size:11px;color:var(--txt3);">
-    <input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть тикеры без сделок
-  </label>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
+    <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
+    <label>мин сделок: <input type="number" id="min_trades" value="0" min="0" style="width:44px;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
+    <label>сортировка:
+      <select id="sort_by" onchange="renderResultsTable()" style="background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;font-size:11px;">
+        <option value="">по умолчанию</option>
+        <option value="win_desc">win% ↓</option>
+        <option value="win_asc">win% ↑</option>
+        <option value="exp_desc">exp% ↓</option>
+        <option value="exp_asc">exp% ↑</option>
+        <option value="avgr_desc">avg R ↓</option>
+        <option value="avgr_asc">avg R ↑</option>
+        <option value="n_desc">сделок ↓</option>
+        <option value="n_asc">сделок ↑</option>
+      </select>
+    </label>
+    <label>топ N: <input type="number" id="top_n" value="" min="1" placeholder="все" style="width:44px;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
+    <label><input type="checkbox" id="top_n_worst" onchange="renderResultsTable()"> худшие</label>
+  </div>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="calib_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
@@ -2397,6 +2504,15 @@ function setAllChips(active) {{
   }});
 }}
 
+function toggleCatPanel(panelId, btn) {{
+  const panel = document.querySelector(`.cat-panel[data-panel="${{panelId}}"]`);
+  if (!panel) return;
+  const chips = panel.querySelectorAll('.chip');
+  const anyActive = Array.from(chips).some(c => c.classList.contains('active'));
+  chips.forEach(c => anyActive ? c.classList.remove('active') : c.classList.add('active'));
+  btn.style.color = anyActive ? 'var(--txt3)' : 'var(--accent)';
+}}
+
 let _statusPollTimer = null;
 
 function showTab(name) {{
@@ -2527,7 +2643,40 @@ function rowsToHtml(rows) {{
         html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам — по режимам</summary>${{mtr}}</details></td></tr>`;
       }}
     }}
+    if (r.trades_list && r.trades_list.length) {{
+      html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 сделки по времени (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate)}}</details></td></tr>`;
+    }}
   }}
+  return html;
+}}
+
+function tradesListToHtml(trades, overallWr) {{
+  // Rolling win% по окну 10 сделок
+  const W = 10;
+  let cumR = 0;
+  let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;width:100%">';
+  html += '<tr style="color:var(--txt3)"><th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th><th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
+  const rollWin = [];
+  for (let i = 0; i < trades.length; i++) {{
+    const t = trades[i];
+    cumR += t.r;
+    rollWin.push(t.w);
+    if (rollWin.length > W) rollWin.shift();
+    const rwr = rollWin.reduce((a, b) => a + b, 0) / rollWin.length;
+    const rwrPct = (rwr * 100).toFixed(0) + '%';
+    // цвет rolling WR: зеленее если выше общего, краснее если ниже
+    const rwrColor = overallWr !== undefined
+      ? (rwr > overallWr ? '#7dcc7d' : rwr < overallWr - 0.1 ? '#e07070' : 'var(--txt3)')
+      : 'var(--txt3)';
+    const winMark = t.w ? '<span style="color:#7dcc7d">✓</span>' : '<span style="color:#e07070">✗</span>';
+    const rColor = t.r > 0 ? '#7dcc7d' : '#e07070';
+    const cumRColor = cumR >= 0 ? '#7dcc7d' : '#e07070';
+    const forStr = t.fa.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const againstStr = t.ag.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
+    html += `<tr style="${{bg}}"><td style="color:var(--txt3)">${{i+1}}</td><td style="white-space:nowrap">${{t.t}}</td><td>${{t.d}}</td><td>${{winMark}}</td><td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td><td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td><td style="color:${{rwrColor}}">${{rwrPct}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{forStr}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{againstStr}}</td></tr>`;
+  }}
+  html += '</table></div>';
   return html;
 }}
 
@@ -2579,12 +2728,149 @@ function summaryRowToHtml(rows) {{
 function renderResultsTable() {{
   const table = document.getElementById('results');
   const hideZero = document.getElementById('hide_zero').checked;
-  const shown = hideZero ? _backtestRows.filter(r => !_isZeroResult(r)) : _backtestRows;
+  const minTrades = parseInt(document.getElementById('min_trades').value) || 0;
+  const sortBy = document.getElementById('sort_by').value;
+  const topN = parseInt(document.getElementById('top_n').value) || 0;
+  const topNWorst = document.getElementById('top_n_worst').checked;
+
+  let shown = _backtestRows.filter(r => r.error === undefined || r.n_trades !== undefined);
+  if (hideZero) shown = shown.filter(r => !_isZeroResult(r));
+  if (minTrades > 0) shown = shown.filter(r => (r.n_trades || 0) >= minTrades);
+
+  if (sortBy) {{
+    const [field, dir] = sortBy.split('_');
+    const key = field === 'win' ? 'win_rate' : field === 'exp' ? 'expectancy_pct' : field === 'avgr' ? 'avg_r' : 'n_trades';
+    shown = [...shown].sort((a, b) => {{
+      const av = a[key] ?? (dir === 'desc' ? -Infinity : Infinity);
+      const bv = b[key] ?? (dir === 'desc' ? -Infinity : Infinity);
+      return dir === 'desc' ? bv - av : av - bv;
+    }});
+  }}
+  if (topN > 0) shown = topNWorst ? shown.slice(-topN) : shown.slice(0, topN);
+
+  const errors = _backtestRows.filter(r => r.error !== undefined && r.n_trades === undefined);
   let html = '<tr><th>Тикер</th><th>Режим</th><th>Сделок</th><th>Win%</th><th>avg R</th><th>Exp%</th><th>M1/M2/M3 win% (когда согласны)</th></tr>';
   html += droppedToHtml(_droppedRows);
-  html += rowsToHtml(shown);
+  html += rowsToHtml(errors.concat(shown));
   html += summaryRowToHtml(shown);
   table.innerHTML = html;
+}}
+
+function _rowToText(r) {{
+  const lines = [];
+  if (r.error !== undefined && r.n_trades === undefined) {{
+    lines.push(`${{r.ticker}}\t${{r.mode}}\tERROR: ${{r.error || ''}}`);
+    if (r.traceback) lines.push(r.traceback);
+    return lines.join('\\n');
+  }}
+  const winPct = r.win_rate !== undefined ? (r.win_rate * 100).toFixed(1) + '%' : '';
+  const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct * 100).toFixed(2) + '%' : '';
+  const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
+  const models = r.model_stats ? Object.entries(r.model_stats).map(([k, s]) => {{
+    const wr = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate * 100).toFixed(0) + '%' : '—';
+    return `${{k.replace('_CLUSTER','')}}:${{wr}}(n=${{s.agree_n}})`;
+  }}).join(' / ') : '';
+  lines.push(`${{r.ticker}}\t${{r.mode}}\t${{r.n_trades ?? 0}}\t${{winPct}}\t${{avgR}}\t${{exp}}\t${{models}}`);
+  if (r.what_if) {{
+    const wi = Object.entries(r.what_if).filter(([,s])=>s&&s.n_trades).map(([k,s])=>{{
+      const wr = s.win_rate !== null && s.win_rate !== undefined ? (s.win_rate*100).toFixed(0)+'%' : '—';
+      const ep = s.expectancy_pct !== null && s.expectancy_pct !== undefined ? (s.expectancy_pct*100).toFixed(2)+'%' : '';
+      return `${{k}}: ${{wr}} n=${{s.n_trades}}${{ep?' эксп '+ep:''}}`;
+    }}).join(' / ');
+    if (wi) lines.push(`  Если бы слушали только модель: ${{wi}}`);
+  }}
+  if (r.method_stats) {{
+    lines.push('  Attribution по методам:');
+    lines.push('  метод\tза n\tза win%\tпротив n\tпротив win%');
+    for (const [m, s] of Object.entries(r.method_stats)) {{
+      const fw = s.for_win_rate !== null && s.for_win_rate !== undefined ? (s.for_win_rate*100).toFixed(0)+'%' : '—';
+      const aw = s.against_win_rate !== null && s.against_win_rate !== undefined ? (s.against_win_rate*100).toFixed(0)+'%' : '—';
+      lines.push(`  ${{m}}\t${{s.for_n}}\t${{fw}}\t${{s.against_n}}\t${{aw}}`);
+    }}
+  }}
+  if (r.method_stats_by_regime) {{
+    for (const [regime, ms] of Object.entries(r.method_stats_by_regime)) {{
+      lines.push(`  Attribution по методам (режим ${{regime}}):`);
+      for (const [m, s] of Object.entries(ms)) {{
+        const fw = s.for_win_rate !== null && s.for_win_rate !== undefined ? (s.for_win_rate*100).toFixed(0)+'%' : '—';
+        const aw = s.against_win_rate !== null && s.against_win_rate !== undefined ? (s.against_win_rate*100).toFixed(0)+'%' : '—';
+        lines.push(`  ${{m}}\t${{s.for_n}}\t${{fw}}\t${{s.against_n}}\t${{aw}}`);
+      }}
+    }}
+  }}
+  if (r.trades_list && r.trades_list.length) {{
+    lines.push('  Сделки по времени:');
+    lines.push('  #\tДата\tDir\tWin\tR\tcumR\tТоп ЗА\tТоп ПРОТИВ');
+    let cumR = 0;
+    r.trades_list.forEach((t, i) => {{
+      cumR += t.r;
+      const forStr = t.fa.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
+      const agStr = t.ag.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
+      lines.push(`  ${{i+1}}\t${{t.t}}\t${{t.d}}\t${{t.w ? 'W' : 'L'}}\t${{t.r.toFixed(2)}}\t${{cumR.toFixed(2)}}\t${{forStr}}\t${{agStr}}`);
+    }});
+  }}
+  return lines.join('\\n');
+}}
+
+async function copyAllResults(btn) {{
+  if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
+  const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
+  const text = header + '\n' + _backtestRows.map(_rowToText).join('\n') + '\n';
+  try {{
+    await navigator.clipboard.writeText(text);
+    const orig = btn.textContent;
+    btn.textContent = '✓ скопировано';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }} catch(e) {{
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋 копировать всё', 1500);
+  }}
+}}
+
+async function calibrateMethodWeights(btn) {{
+  if (!_backtestRows.length) {{ alert('Нет результатов бэктеста'); return; }}
+  // Для каждого тикера и каждого метода вычисляем мультипликатор из атрибуции.
+  // overall win rate по тикеру = r.win_rate; для метода: for_win_rate vs against_win_rate.
+  // Если метод против (against_win_rate - for_win_rate > 0.2, against_n >= 3) → mult=0.1.
+  // Если for_n >= 5 → mult = clamp(for_win_rate / overallWr, 0.2, 2.0).
+  // Иначе → 1.0 (нейтральный).
+  const MIN_FOR_N = 5, MIN_AGAINST_N = 3, ANTI_DELTA = 0.2;
+  const weights = {{}};
+  for (const r of _backtestRows) {{
+    if (!r.ticker || !r.method_stats || typeof r.win_rate !== 'number') continue;
+    const wr = r.win_rate / 100;
+    if (wr <= 0) continue;
+    const tickerMults = {{}};
+    for (const [method, ms] of Object.entries(r.method_stats)) {{
+      const fn = ms.for_n || 0;
+      const an = ms.against_n || 0;
+      const fwr = ms.for_win_rate != null ? ms.for_win_rate / 100 : null;
+      const awr = ms.against_win_rate != null ? ms.against_win_rate / 100 : null;
+      let mult = 1.0;
+      if (fwr !== null && awr !== null && an >= MIN_AGAINST_N && (awr - fwr) > ANTI_DELTA) {{
+        mult = 0.1; // антисигнал — подавить
+      }} else if (fwr !== null && fn >= MIN_FOR_N) {{
+        mult = Math.max(0.2, Math.min(2.0, fwr / wr));
+      }}
+      if (Math.abs(mult - 1.0) > 0.01) tickerMults[method] = +mult.toFixed(3);
+    }}
+    if (Object.keys(tickerMults).length) weights[r.ticker] = tickerMults;
+  }}
+  if (!Object.keys(weights).length) {{ alert('Недостаточно данных атрибуции (нужно for_n≥5)'); return; }}
+  btn.disabled = true; btn.textContent = '⏳ сохранение…';
+  try {{
+    const resp = await fetch('/api/save_method_weights', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(weights),
+    }});
+    const j = await resp.json();
+    btn.textContent = j.ok ? `✓ сохранено ${{j.tickers}}т` : `Ошибка: ${{j.error}}`;
+    setTimeout(() => {{ btn.textContent = '💾 веса методов'; btn.disabled = false; }}, 2500);
+  }} catch(e) {{
+    btn.textContent = 'Ошибка сети'; btn.disabled = false;
+  }}
 }}
 
 let _progressTimer = null;
@@ -4414,19 +4700,24 @@ def _render_page() -> bytes:
             f"fut-{cat}", f"{cat} ({len(ts)})",
             '<div class="chip-row">' + "".join(
                 f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-                f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+                f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
+                f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
                 for t in ts
             ) + '</div>'
         ))
 
     toc_items = "".join(
-        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}" '
-        f'onclick="showCatPanel(\'{pid}\')">{label}</div>'
+        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}">'
+        f'<span onclick="showCatPanel(\'{pid}\')" style="flex:1;cursor:pointer">{label}</span>'
+        f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
+        f'onclick="event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span>'
+        f'</div>'
         for i, (pid, label, _) in enumerate(panels)
     )
     cat_panels = "".join(
-        f'<div class="cat-panel" data-panel="{pid}" style="display:{"block" if i == 0 else "none"}">{html}</div>'
-        for i, (pid, _, html) in enumerate(panels)
+        '<div class="cat-panel" data-panel="{}" style="display:{}">{}</div>'.format(
+            pid, "block" if i == 0 else "none", panel_html)
+        for i, (pid, _, panel_html) in enumerate(panels)
     )
 
     reload_hint = (
@@ -4700,6 +4991,24 @@ class Handler(BaseHTTPRequestHandler):
                 analytics = compute_equity_analytics(sim.get("trades", []), account)
                 sim["analytics"] = analytics
                 self._send_json(sim)
+        elif self.path == "/api/save_method_weights":
+            # payload: {ticker: {method: multiplier}}
+            path = os.path.join("data", "ticker_method_weights.json")
+            os.makedirs("data", exist_ok=True)
+            # мёрджим с существующим файлом (не затираем тикеры, которых нет в payload)
+            existing = {}
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                except Exception:
+                    pass
+            existing.update(payload)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(existing, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
+            self._send_json({"ok": True, "tickers": len(payload)})
         elif self.path == "/api/save_backtest_history":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 90))
