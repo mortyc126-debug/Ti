@@ -1974,6 +1974,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
   <button type="button" class="btn-pill btn-sm" style="color:#aaa" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
   <span id="history_coverage_out" style="display:block;width:100%;font-size:12px;color:var(--muted);white-space:pre-wrap;"></span>
+  <label title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
   <label>Тариф комиссии <select class="inp" id="tariff">
@@ -2640,6 +2641,9 @@ async function runBacktest() {{
     return;
   }}
   const tickers = filtered.kept;
+  if (document.getElementById('reverse_order').checked) {{
+    tickers.reverse();
+  }}
   _droppedRows = filtered.dropped;
   renderResultsTable();
 
