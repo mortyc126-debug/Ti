@@ -2302,6 +2302,8 @@ class OICompositeStrategy(IStrategy):
             return_trades: bool = False,
             tariff: Optional[str] = None,
             record_history: bool = True,
+            adaptive_lasso: bool = False,
+            lasso_recalib_every_trades: int = 30,
     ) -> dict:
         """
         В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
@@ -2335,6 +2337,19 @@ class OICompositeStrategy(IStrategy):
         иначе один и тот же сигнал переписывается в историю по разу на
         каждую проверяемую пару (tk, sk) и на каждый день walk-forward —
         раздувает историю задвоениями и портит effWR в ClusterModels.
+
+        adaptive_lasso=True — настоящая адаптивность lasso-приоров внутри
+        одного прогона. Сигналы уже идут в хронологическом порядке (как и
+        для адаптивных M1/M2/M3 cluster-models выше в этом же цикле), и
+        исход каждой сделки (mfe/mae/take/stop) известен сразу после её
+        обработки — без отдельного прохода. Это и есть "интерливинг скана и
+        барьеров день за днём": вместо одного fit_lasso_coefficients ПОСЛЕ
+        всего прогона (lasso_calibration._calibrate_one, пост-фактум) —
+        каждые lasso_recalib_every_trades сделок фитим lasso на всех
+        сделках, накопленных К ЭТОМУ МОМЕНТУ, и обновляем self.__lasso_priors
+        — приоры влияют на __global_weight только следующих сделок,
+        причинно корректно (в отличие от narrative-порогов, тут нужны были
+        именно исходы, поэтому раньше это не делалось вообще).
         """
         if signals is None:
             signals = self.backtest_scan_signals(candles, max_bars=max_bars)
@@ -2359,6 +2374,8 @@ class OICompositeStrategy(IStrategy):
         # Attribution по отдельным методам (BASE_METHOD_NAMES): та же логика agree/disagree.
         # Ключ — имя метода (PRICE_TREND, VOL_MOMENTUM, …).
         method_tally: dict[str, dict] = {}
+        lasso_trades: list[dict] = []
+        trades_since_lasso_recalib = 0
         for sig in signals:
             # Адаптивный пересчёт M1/M2/M3: кластерные модели накапливают историю
             # из предыдущих записанных сделок (record_history=True), поэтому каждый
@@ -2461,6 +2478,23 @@ class OICompositeStrategy(IStrategy):
             r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
             win = net_pct > 0
             results.append((win, r_multiple, net_pct))
+
+            if adaptive_lasso and sig.get("method_scores"):
+                lasso_trades.append({
+                    "method_scores": sig["method_scores"],
+                    "mfe": take_dist if win else 0.0,
+                    "mae": 0.0 if win else stop_dist,
+                    "dir": "LONG" if direction == SignalType.LONG else "SHORT",
+                })
+                trades_since_lasso_recalib += 1
+                if trades_since_lasso_recalib >= lasso_recalib_every_trades:
+                    trades_since_lasso_recalib = 0
+                    import lasso_calibration
+                    fitted = lasso_calibration.fit_lasso_coefficients(
+                        lasso_trades, alpha=0.01, l1_ratio=0.8, use_group_lasso=False,
+                    )
+                    if fitted:
+                        self.set_lasso_priors(self.priors_from_lasso_coefficients(fitted["coefficients"]))
 
             entry_time = sig.get("entry_time")
             duration_min = 0.0
