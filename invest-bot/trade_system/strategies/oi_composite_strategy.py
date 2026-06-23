@@ -93,7 +93,7 @@ from trade_system.strategies.level_pattern import detect_level_pattern, build_le
 # насчитанные текущей механикой, от устаревших (до фикса ATR-барьеров SBER/
 # LKOH/YDEX, до появления LEVEL_CONTEXT и т.п.) и не смешивать их без разбора.
 # Поднимать при значимых изменениях входа/выхода/набора методов.
-STRATEGY_VERSION = "2026-06-23-level-context"
+STRATEGY_VERSION = "2026-06-23-level-context-multibar"
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
@@ -1251,71 +1251,117 @@ def score_vsa(candles: list[HistoricCandle]) -> float:
 
 def score_level_context(candles: list[HistoricCandle]) -> float:
     """
-    Реакция последнего бара на ближайший ключевой уровень (build_levels —
-    недельные/дневные H/L, фибо, круглые числа, фракталы Уильямса; см.
-    level_pattern.py) — на входе, а не только на выходе (там уже есть
-    detect_level_pattern для барьеров).
+    Поведение цены у ближайшего уровня за последние WINDOW баров.
 
-    Идея: голый momentum-сигнал других методов не знает, что цена сейчас
-    тычется в сопротивление или поддержку — отсюда склонность покупать
-    на хае у сопротивления и продавать на лое у поддержки. Здесь:
+    Один бар — шум. Метод смотрит на паттерн взаимодействия за окно:
 
-    - пробой уровня с объёмом и закрытием ЗА ним → подтверждение
-      продолжения (истинный пробой) — скор в сторону пробоя;
-    - прокол уровня без закрытия за ним + длинная тень от уровня
-      (отказ) → сигнал РАЗВОРОТА от уровня (ложный пробой/реакция) —
-      скор ПРОТИВ направления прокола, именно чтобы не покупать хай
-      у сопротивления и не продавать лой у поддержки;
-    - до уровня далеко (или объём слабый) → 0, метод молчит.
+    Паттерны (в порядке убывания приоритета):
+    1. СЕРИЯ ОТКАЗОВ от сопротивления/поддержки (≥2 баров касались уровня,
+       большинство закрылись обратно) → медвежий/бычий сигнал.
+       Сила пропорциональна количеству отказов и объёму.
+    2. ЛОЖНЫЙ ПРОБОЙ: был закрытый пробой уровня → затем возврат обратно
+       → текущая цена на противоположной стороне → сигнал разворота.
+    3. ПОДТВЕРЖДЁННЫЙ ПРОБОЙ: 3+ закрытий подряд за уровнем (в хвосте окна)
+       → сигнал продолжения.
+    4. Далеко от уровня или нет паттерна → 0.
 
-    Близкие/сильные уровни (tier 1-2: неделя/день) весят больше,
-    чем фрактал/круглое число (tier 4-5).
+    Tier 1-2 (неделя/день) весят сильнее, чем фракталы/круглые числа.
     """
-    if len(candles) < 30:
+    _WINDOW = 15
+    _TOUCH_FRAC = 0.35      # бар "касается" уровня если H или L в пределах TOUCH_FRAC*ATR
+    _REJECT_FRAC = 0.4      # закрытие считается "отказом" если ушло на REJECT_FRAC*ATR от уровня
+    _CONFIRM_BARS = 3       # закрытий подряд за уровнем для подтверждённого пробоя
+    _VOL_STRONG = 1.2       # объём "усиленный"
+
+    if len(candles) < 40:
         return 0.0
     atr_pct = _compute_atr(candles)
     if atr_pct <= 0:
         return 0.0
-    last = candles[-1]
-    cl = _to_f(last.close)
-    atr_abs = atr_pct * cl
+    cl_now = _to_f(candles[-1].close)
+    atr_abs = atr_pct * cl_now
     if atr_abs <= 0:
         return 0.0
 
-    ls = build_levels(candles[:-1])
-    nearest = ls.nearest(cl, max_dist=1.5 * atr_abs)
+    # Уровни строятся по истории до начала окна — без look-ahead
+    ls = build_levels(candles[:-_WINDOW])
+    nearest = ls.nearest(cl_now, max_dist=2.5 * atr_abs)
     if nearest is None:
         return 0.0
 
-    h, lo, op = _to_f(last.high), _to_f(last.low), _to_f(last.open)
-    rng = h - lo or 1e-9
-    vols = [float(c.volume) for c in candles[-21:-1]]
-    avg_vol = statistics.mean(vols) if vols else 0.0
-    vol_ratio = float(last.volume) / avg_vol if avg_vol > 0 else 1.0
+    lp = nearest.price
+    touch_zone = _TOUCH_FRAC * atr_abs
+    tier_w = {1: 1.3, 2: 1.2, 3: 1.0, 4: 0.8, 5: 0.7}.get(nearest.tier, 1.0)
 
-    tier_w = {1: 1.2, 2: 1.2, 3: 1.0, 4: 0.8, 5: 0.8}.get(nearest.tier, 1.0)
+    window = candles[-_WINDOW:]
+    vols_ref = [float(c.volume) for c in candles[-(_WINDOW + 20): -_WINDOW]]
+    avg_vol = statistics.mean(vols_ref) if vols_ref else 1.0
+
+    # Для каждого бара определяем: касание уровня, направление отказа/пробоя
+    # touch_res[i] = True если бар касался уровня как сопротивления (подход снизу)
+    # touch_sup[i] = True если бар касался уровня как поддержки (подход сверху)
+    reject_res: list[float] = []   # объёмы баров, отказавших от сопротивления
+    reject_sup: list[float] = []   # объёмы баров, отказавших от поддержки
+    breakout_above_idx: list[int] = []  # индексы баров с закрытием выше уровня
+    breakout_below_idx: list[int] = []  # индексы баров с закрытием ниже уровня
+
+    for i, c in enumerate(window):
+        h = _to_f(c.high)
+        lo = _to_f(c.low)
+        cl = _to_f(c.close)
+        vol_ratio = float(c.volume) / avg_vol if avg_vol > 0 else 1.0
+
+        approached_from_below = lo < lp and h >= lp - touch_zone
+        approached_from_above = h > lp and lo <= lp + touch_zone
+
+        if approached_from_below and cl < lp - _REJECT_FRAC * atr_abs:
+            # подошёл снизу к уровню, закрылся обратно ниже → отказ от сопротивления
+            reject_res.append(vol_ratio)
+        if approached_from_above and cl > lp + _REJECT_FRAC * atr_abs:
+            # подошёл сверху, закрылся обратно выше → отказ от поддержки
+            reject_sup.append(vol_ratio)
+
+        if cl > lp + touch_zone * 0.5:
+            breakout_above_idx.append(i)
+        elif cl < lp - touch_zone * 0.5:
+            breakout_below_idx.append(i)
+
     score = 0.0
 
-    if nearest.price >= cl - 0.3 * atr_abs and h >= nearest.price - 0.3 * atr_abs:
-        # уровень над/у цены — тычется в "сопротивление" снизу
-        pierced = h >= nearest.price
-        closed_above = cl >= nearest.price
-        if pierced and closed_above and vol_ratio >= 1.3:
-            score = 0.6   # истинный пробой вверх — продолжение
-        elif pierced and not closed_above:
-            upper_wick = h - max(op, cl)
-            if upper_wick >= 0.4 * rng and vol_ratio >= 1.1:
-                score = -0.6  # отказ у сопротивления — не покупать хай
-    elif nearest.price <= cl + 0.3 * atr_abs and lo <= nearest.price + 0.3 * atr_abs:
-        # уровень под/у цены — тычется в "поддержку" сверху
-        pierced = lo <= nearest.price
-        closed_below = cl <= nearest.price
-        if pierced and closed_below and vol_ratio >= 1.3:
-            score = -0.6  # истинный пробой вниз — продолжение
-        elif pierced and not closed_below:
-            lower_wick = min(op, cl) - lo
-            if lower_wick >= 0.4 * rng and vol_ratio >= 1.1:
-                score = 0.6   # отказ у поддержки — не продавать лой
+    # ── 1. Серия отказов ────────────────────────────────────────────────────
+    if len(reject_res) >= 2:
+        # сопротивление держит → медвежий
+        strength = min(1.0, len(reject_res) / 3.0)
+        vol_boost = min(1.2, statistics.mean(reject_res) / _VOL_STRONG) if reject_res else 1.0
+        score = -strength * 0.85 * min(1.2, vol_boost)
+    elif len(reject_sup) >= 2:
+        # поддержка держит → бычий
+        strength = min(1.0, len(reject_sup) / 3.0)
+        vol_boost = min(1.2, statistics.mean(reject_sup) / _VOL_STRONG) if reject_sup else 1.0
+        score = +strength * 0.85 * min(1.2, vol_boost)
+
+    # ── 2. Ложный пробой (выше приоритет чем одиночный отказ) ──────────────
+    # Был закрытый пробой вверх в первой половине окна → потом возврат вниз
+    first_half = _WINDOW // 2
+    had_close_above = any(i < first_half for i in breakout_above_idx)
+    had_close_below = any(i < first_half for i in breakout_below_idx)
+    now_below = cl_now < lp - touch_zone * 0.3
+    now_above = cl_now > lp + touch_zone * 0.3
+
+    if had_close_above and now_below:
+        # пробивало вверх, сейчас уже ниже → ложный пробой вверх, медвежий
+        score = -0.75
+    elif had_close_below and now_above:
+        # пробивало вниз, сейчас уже выше → ложный пробой вниз, бычий
+        score = +0.75
+
+    # ── 3. Подтверждённый пробой (перевешивает остальные паттерны) ──────────
+    tail = window[-_CONFIRM_BARS:]
+    if all(_to_f(c.close) > lp + touch_zone * 0.3 for c in tail):
+        # три последних закрытия выше уровня — пробой подтверждён
+        score = +0.65
+    elif all(_to_f(c.close) < lp - touch_zone * 0.3 for c in tail):
+        score = -0.65
 
     return max(-1.0, min(1.0, score * tier_w))
 
