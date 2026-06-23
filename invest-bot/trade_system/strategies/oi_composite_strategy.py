@@ -142,7 +142,7 @@ logger = logging.getLogger(__name__)
 WEIGHTS_FILE = "oi_weights.json"   # файл весов (рядом с main.py)
 CANDLE_WINDOW = 30                 # свечей в окне для расчётов
 MIN_CANDLES = 10                   # минимум свечей для первого сигнала
-SIGNAL_THRESHOLD = 0.25            # порог composite для сигнала
+SIGNAL_THRESHOLD = 0.15            # порог composite для сигнала
 HEDGE_ETA = 0.6                    # темп Hedge-обучения весов методов (multiplicative weights)
 HEDGE_WARMUP_TRADES = 15           # на первых N сделках eta линейно растёт от 0 до HEDGE_ETA
 # Байесовский shrinkage: per-regime вес → global.
@@ -186,7 +186,7 @@ MFE_MAE_BARS = 15                  # максимум баров для запи
 
 # ── Фильтры качества сигнала ────────────────────────────────────────────────
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
-AGREE_STRENGTH_MIN = 0.5           # минимальная взвешенная сила согласных методов
+AGREE_STRENGTH_MIN = 0.25          # минимальная взвешенная сила согласных методов
 AGREE_SHARE_MIN = 0.55             # доля силы согласных от силы всех высказавшихся
 
 # Микроструктурные методы (TRADESTATS + HAWKES_SIGNAL) смотрят на действие
@@ -441,7 +441,7 @@ MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комисси
 _ebr_bt = os.getenv("ENTRY_BLOCKED_REGIMES", None)
 BACKTEST_BLOCKED_REGIMES: frozenset[str] = frozenset(
     r.strip() for r in _ebr_bt.split(",") if r.strip()
-) if _ebr_bt is not None else frozenset({"ranging", "stress"})
+) if _ebr_bt is not None else frozenset({"stress"})
 
 # ── Комиссия Т-Инвестиций по тарифам (round-trip = вход+выход) ──────────────
 # Акции/облигации/ETF/расписки — фикс. % от суммы сделки. Фьючерсы — % от
