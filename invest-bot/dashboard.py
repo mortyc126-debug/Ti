@@ -1221,8 +1221,8 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
             "d": t.get("direction", "?")[0],  # L / S
             "w": int(t.get("win", False)),
             "r": round(t.get("r_multiple", 0.0), 2),
-            "for": [[n, round(s, 2)] for n, s in for_m],
-            "against": [[n, round(s, 2)] for n, s in against_m],
+            "fa": [[n, round(s, 2)] for n, s in for_m],
+            "ag": [[n, round(s, 2)] for n, s in against_m],
         })
     return out
 
@@ -2671,8 +2671,8 @@ function tradesListToHtml(trades, overallWr) {{
     const winMark = t.w ? '<span style="color:#7dcc7d">✓</span>' : '<span style="color:#e07070">✗</span>';
     const rColor = t.r > 0 ? '#7dcc7d' : '#e07070';
     const cumRColor = cumR >= 0 ? '#7dcc7d' : '#e07070';
-    const forStr = t.for.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
-    const againstStr = t.against.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const forStr = t.fa.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const againstStr = t.ag.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
     html += `<tr style="${{bg}}"><td style="color:var(--txt3)">${{i+1}}</td><td style="white-space:nowrap">${{t.t}}</td><td>${{t.d}}</td><td>${{winMark}}</td><td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td><td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td><td style="color:${{rwrColor}}">${{rwrPct}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{forStr}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{againstStr}}</td></tr>`;
   }}
@@ -2804,8 +2804,8 @@ function _rowToText(r) {{
     let cumR = 0;
     r.trades_list.forEach((t, i) => {{
       cumR += t.r;
-      const forStr = t.for.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
-      const agStr = t.against.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
+      const forStr = t.fa.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
+      const agStr = t.ag.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
       lines.push(`  ${{i+1}}\t${{t.t}}\t${{t.d}}\t${{t.w ? 'W' : 'L'}}\t${{t.r.toFixed(2)}}\t${{cumR.toFixed(2)}}\t${{forStr}}\t${{agStr}}`);
     }});
   }}
