@@ -529,7 +529,15 @@ class RiskManager:
             self._recalc_risk_rub(pos)
             log.info(f"{ticker}: прибыль >= {BREAKEVEN_AT_R}R — стоп в безубыток")
 
-        if pos.peak_profit_rub > pos.risk_rub:
+        # Раньше гейт был "пик >= 1R" (BREAKEVEN_AT_R) — позиции, которые
+        # доходили, например, до 0.5R и откатывались назад в минус, не
+        # защищались ничем: ждали обычного стоп-лосса, т.е. фактически
+        # "ждали минус, чтобы зафиксировать его" вместо фиксации уже
+        # упущенной прибыли на откате от пика. Гейт снижен до
+        # PROB_EXIT_GRACE_R (0.3R) — той же планки, что у инвалидации
+        # гипотезы входа ниже, чтобы между 0 и grace не было дыры без
+        # защиты пика вообще ни от одной из проверок.
+        if pos.peak_profit_rub > pos.risk_rub * PROB_EXIT_GRACE_R:
             giveback = pos.peak_profit_rub - pnl
             if giveback > pos.peak_profit_rub * TRAIL_GIVEBACK_PCT / 100:
                 return True, (f"трейлинг: пик +{pos.peak_profit_rub:.0f}₽, "
