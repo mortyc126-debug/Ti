@@ -2144,11 +2144,10 @@ class OICompositeStrategy(IStrategy):
         # Lasso prior — data/lasso_weights.json, keyed by figi.
         # Загружается один раз на старте; обновить можно reload_lasso_priors().
         self.__lasso_priors: dict[str, float] = self.__load_lasso_priors()
-        # Пер-тикерные мультипликаторы весов методов из dashboard (data/ticker_method_weights.json).
-        # Формат: {ticker: {method_name: multiplier}}; multiplier∈[0.1, 2.0].
-        self.__ticker_method_weights: dict[str, float] = self.__load_ticker_method_weights()
-        self.__ticker_weights_mtime: float = self.__ticker_weights_file_mtime()
-        self.__ticker_weights_check_bar: int = 0  # счётчик баров для периодической проверки
+        # Пер-тикерные Hedge-веса методов — второй слой адаптации поверх глобального.
+        # Обновляются в close_trade так же как __weights, но отдельно для каждой
+        # стратегии (тикера): один метод может быть хорош на BR и плох на Si.
+        self.__ticker_weights: dict[str, MethodWeight] = {name: MethodWeight() for name in ALL_METHOD_NAMES}
         self.__squeeze_provider: Optional[SqueezeProvider] = None
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
@@ -3412,7 +3411,6 @@ class OICompositeStrategy(IStrategy):
         # скор к шкале [-1, 1] относительно его исторического распределения.
         # Без нормализации "громкие" методы (большой масштаб) доминируют случайно.
         ticker = self.__settings.ticker
-        self.__maybe_reload_ticker_weights()
         if self.__calibrator is not None:
             norm_scores = []
             for name, s in zip(ALL_METHOD_NAMES, scores):
@@ -3453,7 +3451,7 @@ class OICompositeStrategy(IStrategy):
         weights = [
             self.__blended_hedge_weight(name, regime_probs) * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
-            * self.__ticker_method_weights.get(name, 1.0)
+            * self.__ticker_weights[name].weight
             for name in ALL_METHOD_NAMES
         ]
 
@@ -3975,6 +3973,7 @@ class OICompositeStrategy(IStrategy):
                       (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
             self.__weights[name].update(target)
+            self.__ticker_weights[name].update(target)
             if self.__last_regime in self.__regime_weights:
                 self.__regime_weights[self.__last_regime][name].update(target)
 
@@ -4065,46 +4064,6 @@ class OICompositeStrategy(IStrategy):
         Вызывать после еженедельного прогона lasso_calibration.py."""
         self.__lasso_priors = self.__load_lasso_priors()
 
-    _TICKER_WEIGHTS_PATH = "data/ticker_method_weights.json"
-    _TICKER_WEIGHTS_CHECK_INTERVAL = 100  # баров между проверками mtime
-
-    def __ticker_weights_file_mtime(self) -> float:
-        try:
-            return os.path.getmtime(self._TICKER_WEIGHTS_PATH)
-        except OSError:
-            return 0.0
-
-    def __load_ticker_method_weights(self) -> dict[str, float]:
-        """Читает data/ticker_method_weights.json → мультипликатор [0.1, 2.0]
-        для каждого метода этого тикера. Генерируется дашбордом из атрибуции бэктеста."""
-        if not os.path.exists(self._TICKER_WEIGHTS_PATH):
-            return {}
-        try:
-            with open(self._TICKER_WEIGHTS_PATH, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            mults = data.get(self.__settings.ticker, {})
-            if mults:
-                logger.info(f"{self.__settings.ticker}: пер-тикерные веса методов: {mults}")
-            return {k: float(v) for k, v in mults.items()}
-        except Exception as e:
-            logger.warning(f"ticker_method_weights load error: {e}")
-            return {}
-
-    def __maybe_reload_ticker_weights(self) -> None:
-        """Проверяем mtime файла каждые N баров; перечитываем если изменился."""
-        self.__ticker_weights_check_bar += 1
-        if self.__ticker_weights_check_bar < self._TICKER_WEIGHTS_CHECK_INTERVAL:
-            return
-        self.__ticker_weights_check_bar = 0
-        mtime = self.__ticker_weights_file_mtime()
-        if mtime != self.__ticker_weights_mtime:
-            self.__ticker_method_weights = self.__load_ticker_method_weights()
-            self.__ticker_weights_mtime = mtime
-
-    def reload_ticker_method_weights(self) -> None:
-        """Принудительно перечитать пер-тикерные веса без пересоздания стратегии."""
-        self.__ticker_method_weights = self.__load_ticker_method_weights()
-        self.__ticker_weights_mtime = self.__ticker_weights_file_mtime()
 
     @staticmethod
     def priors_from_lasso_coefficients(coefficients: dict[str, float]) -> dict[str, float]:
