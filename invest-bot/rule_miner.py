@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from cluster_models import STRATEGY_CLUSTERS, MODEL_NAMES
 from dashboard import _strategy_settings_by_ticker
 from history import HistoryStore
+from trade_system.strategies.oi_composite_strategy import STRATEGY_VERSION
 from lasso_calibration import _build_features, _signed_outcome, _EXCLUDE_FROM_FEATURES
 
 RULES_FILE = "data/mined_rules.json"
@@ -146,6 +147,11 @@ def _mine_one(ticker: str, days: int, max_depth: int) -> dict | None:
     if not trades:
         print(f"{ticker}: нет сделок в истории — пропуск")
         return None
+
+    # См. lasso_calibration.py — то же снижение веса устаревших (до текущей
+    # ревизии стратегии) сделок, чтобы майнинг правил не путал старую и новую
+    # механику входа/выхода.
+    trades = HistoryStore.reweight_trades_by_version(trades, STRATEGY_VERSION)
 
     all_methods: set[str] = set()
     for t in trades:

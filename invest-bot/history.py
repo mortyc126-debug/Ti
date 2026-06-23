@@ -122,11 +122,16 @@ class HistoryStore:
             method_scores: dict[str, float],
             regime: str = "",
             tf_regimes: Optional[dict[str, str]] = None,
+            code_version: str = "",
     ) -> None:
         """
         Запись сделки с attribution по методам.
         quality = mfe / (mfe + mae + 1e-8) — непрерывная метрика [0,1],
         аналогично oi-signal-v10.html строки 1364.
+        code_version — ревизия стратегии, что насчитала эту сделку (см.
+        STRATEGY_VERSION в oi_composite_strategy.py). Не указана у старых
+        записей — это и есть признак "устаревшая", по нему калибровка
+        фильтрует/занижает вес прошлых сделок (см. reweight_trades_by_version).
         """
         quality = mfe / (mfe + mae + 1e-8)
         date = datetime.now(timezone.utc).date().isoformat()
@@ -145,6 +150,8 @@ class HistoryStore:
             record["regime"] = regime
         if tf_regimes:
             record["tf_regimes"] = tf_regimes
+        if code_version:
+            record["code_version"] = code_version
         trades.append(record)
         self._trim(ticker)
         self._save()
@@ -159,6 +166,34 @@ class HistoryStore:
             if date >= cutoff:
                 result.extend(day.get("trades", []))
         return result
+
+    @staticmethod
+    def reweight_trades_by_version(
+            trades: list[dict],
+            current_version: str,
+            min_fresh: int = 20,
+            stale_weight: int = 1,
+            fresh_weight: int = 4,
+    ) -> list[dict]:
+        """
+        Фильтрация/занижение веса устаревших сделок (записанных без code_version
+        или с другой версией) для калибровки (lasso_calibration.py, rule_miner.py).
+
+        Если свежих (code_version == current_version) сделок хватает
+        (>= min_fresh) — отдаём только их, устаревшие просто выкидываем.
+        Если не хватает — отдаём все, но свежие дублируем fresh_weight раз
+        (устаревшие — stale_weight раз), чтобы регрессия/майнинг правил
+        ориентировались на текущую механику стратегии, а не растворялись
+        в старых данных, насчитанных другой логикой (фикс ATR-барьеров,
+        появление LEVEL_CONTEXT и т.п.).
+        """
+        if not current_version:
+            return list(trades)
+        fresh = [t for t in trades if t.get("code_version") == current_version]
+        if len(fresh) >= min_fresh:
+            return fresh
+        stale = [t for t in trades if t.get("code_version") != current_version]
+        return stale * stale_weight + fresh * fresh_weight
 
     def daily_scores(self, ticker: str, method: str, window_days: int = 30) -> list[float]:
         """Исторические значения скора метода по дням — для перцентильной калибровки."""
@@ -385,7 +420,7 @@ class BacktestHistoryStore(HistoryStore):
 
     def record_trade(self, ticker: str, *, direction: str, entry_price: float, exit_price: float,
                       mfe: float, mae: float, method_scores: dict[str, float], regime: str = "",
-                      tf_regimes: Optional[dict[str, str]] = None) -> None:
+                      tf_regimes: Optional[dict[str, str]] = None, code_version: str = "") -> None:
         quality = mfe / (mfe + mae + 1e-8)
         date = self._sim_date or datetime.now(timezone.utc).date().isoformat()
         day = self._data.setdefault(ticker, {}).setdefault(date, {})
@@ -403,6 +438,8 @@ class BacktestHistoryStore(HistoryStore):
             record["regime"] = regime
         if tf_regimes:
             record["tf_regimes"] = tf_regimes
+        if code_version:
+            record["code_version"] = code_version
         trades.append(record)
         self._trim(ticker)
 

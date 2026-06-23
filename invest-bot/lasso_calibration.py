@@ -36,6 +36,7 @@ from tinkoff.invest.exceptions import RequestError
 from cluster_models import STRATEGY_CLUSTERS, MODEL_NAMES
 from dashboard import _db, _market_data, _strategy_settings_by_ticker, _wire_history
 from history import HistoryStore
+from trade_system.strategies.oi_composite_strategy import STRATEGY_VERSION
 
 LASSO_WEIGHTS_FILE = "data/lasso_weights.json"
 
@@ -289,6 +290,11 @@ def _calibrate_one(
     if not trades:
         print(f"{ticker}: нет сделок в истории — пропуск")
         return None
+
+    # Понижаем вес/отфильтровываем сделки, насчитанные старой версией
+    # стратегии (до фикса ATR-барьеров, до LEVEL_CONTEXT и т.п.) — иначе
+    # регрессия смешивает две разные механики входа/выхода в одном окне.
+    trades = HistoryStore.reweight_trades_by_version(trades, STRATEGY_VERSION)
 
     # Собрать метод-имена из сделок, исключить метамодели
     all_methods: set[str] = set()

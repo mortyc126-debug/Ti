@@ -87,6 +87,13 @@ from indicators_ehlers import (
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
 from trade_system.strategies.level_pattern import detect_level_pattern, build_levels
 
+# Ревизия логики стратегии — пишется в каждую сделку (history.py record_trade),
+# чтобы калибровка (lasso_calibration.py, rule_miner.py) могла отличить сделки,
+# насчитанные текущей механикой, от устаревших (до фикса ATR-барьеров SBER/
+# LKOH/YDEX, до появления LEVEL_CONTEXT и т.п.) и не смешивать их без разбора.
+# Поднимать при значимых изменениях входа/выхода/набора методов.
+STRATEGY_VERSION = "2026-06-23-level-context"
+
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
 # базовых методах, а "научные" методы молча отдают нейтральный 0.0.
@@ -2494,6 +2501,7 @@ class OICompositeStrategy(IStrategy):
                     mae=approx_mae,
                     method_scores=sig.get("method_scores", {}),
                     regime=sig.get("regime", ""),
+                    code_version=STRATEGY_VERSION,
                 )
 
             if return_trades:
@@ -3230,6 +3238,7 @@ class OICompositeStrategy(IStrategy):
                 method_scores=method_scores,
                 regime=self.__last_regime,
                 tf_regimes=tf_regimes,
+                code_version=STRATEGY_VERSION,
             )
             # Дублируем в общую базу (cf-collector) — другие инстансы видят
             # attribution не только по своим сделкам, но и по чужим.
