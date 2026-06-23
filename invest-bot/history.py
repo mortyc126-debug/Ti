@@ -172,8 +172,7 @@ class HistoryStore:
             trades: list[dict],
             current_version: str,
             min_fresh: int = 20,
-            stale_weight: int = 1,
-            fresh_weight: int = 4,
+            max_fresh_weight: int = 4,
     ) -> list[dict]:
         """
         Фильтрация/занижение веса устаревших сделок (записанных без code_version
@@ -181,11 +180,12 @@ class HistoryStore:
 
         Если свежих (code_version == current_version) сделок хватает
         (>= min_fresh) — отдаём только их, устаревшие просто выкидываем.
-        Если не хватает — отдаём все, но свежие дублируем fresh_weight раз
-        (устаревшие — stale_weight раз), чтобы регрессия/майнинг правил
-        ориентировались на текущую механику стратегии, а не растворялись
-        в старых данных, насчитанных другой логикой (фикс ATR-барьеров,
-        появление LEVEL_CONTEXT и т.п.).
+        Если не хватает — отдаём все, но свежие дублируем с весом, который
+        растёт линейно от 1x (когда свежих почти нет) до max_fresh_weight
+        (когда их количество приближается к min_fresh). Без этого плавного
+        роста 2-3 свежие сделки при фиксированном 4x дублировании просто
+        повторялись бы 8-12 раз — регрессия подстраивалась бы под шум
+        конкретных нескольких сделок, а не под реальный сигнал.
         """
         if not current_version:
             return list(trades)
@@ -193,7 +193,9 @@ class HistoryStore:
         if len(fresh) >= min_fresh:
             return fresh
         stale = [t for t in trades if t.get("code_version") != current_version]
-        return stale * stale_weight + fresh * fresh_weight
+        weight = 1 + (max_fresh_weight - 1) * (len(fresh) / min_fresh)
+        n_dup = max(1, round(weight))
+        return stale + fresh * n_dup
 
     def daily_scores(self, ticker: str, method: str, window_days: int = 30) -> list[float]:
         """Исторические значения скора метода по дням — для перцентильной калибровки."""
