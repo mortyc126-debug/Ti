@@ -691,26 +691,65 @@ def _futures_cache_from_disk() -> tuple[dict[str, dict] | None, float]:
         return None, float("inf")
 
 
-# Группы basic_asset из FUTURES_TRADING.BASE_TICKERS (settings.ini) — для
-# дашборда, чтобы не валить десятки разнородных фьючерсов в одну кучу
-# чипов. Списком, а не одним правилом, т.к. часть имён неоднозначна
-# (BABA/BIDU выглядят как обычные тикеры, но это иностр. акции, не РФ).
-_FUTURES_CATEGORIES: list[tuple[str, frozenset[str]]] = [
-    ("Энергоносители", frozenset({
-        "Brent", "Газ (США)", "Газ (Европа)", "Газ микро (США)",
-        "Бензин АИ-92", "Бензин АИ-95", "Дизельное топливо летнее",
-    })),
-    ("Металлы", frozenset({
-        "Золото", "Золото в долларах", "Золото в рублях", "Серебро",
-        "Палладий", "Платина", "Алюминий", "Медь", "Никель", "Цинк",
-    })),
-    ("Агро", frozenset({
-        "Пшеница", "Сахар мировой", "Сахар российский",
-        "Апельсиновый сок", "Какао", "Кофе",
-    })),
-    ("Индексы РФ", frozenset({"IMOEX", "RTSI", "RTSI мини"})),
-    ("Иностр. акции/крипто", frozenset({"BABA", "BIDU", "Bitcoin-фонд IBIT", "ETHA"})),
-]
+# basic_asset коды из Tinkoff API → человекочитаемое название базиса.
+# Используется в двух местах: как подпись категории в TOC и как тултип чипа.
+_BASE_ASSET_LABEL: dict[str, str] = {
+    # Нефть и нефтепродукты
+    "BR": "Нефть Brent",
+    "CL": "Нефть WTI",
+    "NG": "Газ природный (США)",
+    "TTF": "Газ TTF (Европа)",
+    "NGM": "Газ микро (США)",
+    "AI92": "Бензин АИ-92",
+    "AI95": "Бензин АИ-95",
+    "DT": "Дизельное топливо",
+    # Металлы
+    "GD": "Золото",
+    "GOLD": "Золото",
+    "GLD": "Золото $",
+    "GLDRUB_TOM": "Золото ₽",
+    "SLVR": "Серебро",
+    "PD": "Палладий",
+    "PT": "Платина",
+    "AL": "Алюминий",
+    "CU": "Медь",
+    "NI": "Никель",
+    "ZN": "Цинк",
+    # Агро
+    "W": "Пшеница",
+    "SRW": "Пшеница (SRW)",
+    "SUGAR": "Сахар мировой",
+    "SUGR": "Сахар российский",
+    "OJ": "Апельсиновый сок",
+    "CC": "Какао",
+    "KC": "Кофе",
+    # Валюта
+    "Si": "USD/RUB",
+    "Eu": "EUR/RUB",
+    "CNYRUB_TOM": "CNY/RUB",
+    "GBPRUB_TOM": "GBP/RUB",
+    "HKDRUB_TOM": "HKD/RUB",
+    "TRYRUB_TOM": "TRY/RUB",
+    "AMDRUB_TOM": "AMD/RUB",
+    "KZTRUB_TOM": "KZT/RUB",
+    "EUR_USD000UTSTOM": "EUR/USD",
+    # Индексы РФ
+    "MX": "Индекс МосБиржи",
+    "RI": "Индекс РТС",
+    "MM": "Индекс МосБиржи мини",
+    # Иностр. акции / крипто
+    "BABA": "Alibaba (BABA)",
+    "BIDU": "Baidu (BIDU)",
+    "IBIT": "Bitcoin ETF IBIT",
+    "ETHA": "Ethereum ETF ETHA",
+}
+
+# Коды, которые относятся к товарным/индексным базисам — их показываем
+# каждый своей категорией; остальное (акции РФ, валюта) — в группу.
+_COMMODITY_BASES = frozenset(_BASE_ASSET_LABEL) - frozenset({
+    "Si", "Eu", "CNYRUB_TOM", "GBPRUB_TOM", "HKDRUB_TOM",
+    "TRYRUB_TOM", "AMDRUB_TOM", "KZTRUB_TOM", "EUR_USD000UTSTOM",
+})
 
 _RU_STOCK_BASE_TICKERS = frozenset({
     "ABIO", "AFKS", "AFLT", "ALRS", "ASTR", "BANE", "BELU", "BSPB", "CBOM", "CHMF",
@@ -725,26 +764,18 @@ _RU_STOCK_BASE_TICKERS = frozenset({
 
 def _futures_category(base: str) -> str:
     """Категория для группировки чипов дашборда.
-    Товарные фьючерсы (нефть, металлы, зерно, индексы) — показываем
-    сам базовый актив как категорию; акционные и валютные — в широкую
-    группу, иначе список TOC становится бесконечным."""
+    Товарные/индексные базисы из _BASE_ASSET_LABEL — каждый своей
+    категорией с человекочитаемым именем. Акции РФ и валюты — в широкую
+    группу, иначе TOC становится бесконечным."""
     if not base:
         return "Прочее"
-    # Для каждого товарного актива из _FUTURES_CATEGORIES возвращаем его имя
-    for _label, names in _FUTURES_CATEGORIES:
-        if base in names:
-            return base  # «Brent», «Золото», «Пшеница» — отдельные категории
+    if base in _COMMODITY_BASES:
+        return _BASE_ASSET_LABEL.get(base, base)  # «Нефть Brent», «Золото» и т.д.
     if base in _RU_STOCK_BASE_TICKERS:
         return "Акции РФ"
-    if "/" in base:
-        return "Валюта"
-    if base.startswith("Индекс"):
-        return "Индексы (отрасл.)"
-    if base.startswith("АДР"):
-        return "АДР"
-    if any(k in base for k in ("ETF", "iShares", "SPDR", "Nasdaq", "Tracker Fund", "MSCI")):
-        return "Иностр. ETF/индексы"
-    return base  # что не распознано — само себе категория
+    if base in _BASE_ASSET_LABEL:
+        return "Валюта"  # остаток _BASE_ASSET_LABEL — валюты
+    return "Прочее"
 
 
 # ticker → категория (для группировки чипов), пересчитывается вместе с
@@ -4453,7 +4484,8 @@ def _render_page() -> bytes:
             f"fut-{cat}", f"{cat} ({len(ts)})",
             '<div class="chip-row">' + "".join(
                 f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-                f'title="фьючерс GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+                f'title="{_BASE_ASSET_LABEL.get(futures[t].basic_asset, futures[t].basic_asset or t)}'
+                f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
                 for t in ts
             ) + '</div>'
         ))
