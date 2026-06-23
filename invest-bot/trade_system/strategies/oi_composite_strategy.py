@@ -1633,6 +1633,199 @@ def score_spring(candles: list[HistoricCandle]) -> float:
     return max(-1.0, min(1.0, score))
 
 
+def score_wick_rejection(candles: list[HistoricCandle]) -> float:
+    """
+    Хвостовое отвержение: покупатели/продавцы систематически отвергают экстремумы.
+
+    Логика:
+    - Верхний хвост = high - max(open, close): зона, куда цена зашла но не устояла.
+    - Нижний хвост = min(open, close) - low: аналогично снизу.
+    - Сравниваем накопленное давление хвостов за окно:
+      доминируют нижние → покупатели отталкивают цену вверх (бычий сигнал),
+      доминируют верхние → продавцы давят (медвежий).
+    - Усиление: тело свечи мало относительно ATR (хвост, а не тело несёт движение).
+    - Объём на хвостовых барах выше среднего → отвержение значимо.
+    """
+    _WINDOW = _adaptive_window(candles, target_hours=2.0, min_bars=8, max_bars=80)
+    if len(candles) < _WINDOW + 5:
+        return 0.0
+    atr_pct = _compute_atr(candles)
+    if atr_pct <= 0:
+        return 0.0
+    last_price = _to_f(candles[-1].close)
+    atr_abs = atr_pct * last_price or 1e-9
+
+    window = candles[-_WINDOW:]
+    vols = [float(c.volume) for c in window]
+    avg_vol = statistics.mean(vols) or 1.0
+
+    upper_total = 0.0
+    lower_total = 0.0
+    for c in window:
+        h = _to_f(c.high); l = _to_f(c.low)
+        o = _to_f(c.open); cl = _to_f(c.close)
+        rng = h - l or 1e-9
+        upper_wick = h - max(o, cl)
+        lower_wick = min(o, cl) - l
+        body = abs(cl - o)
+        # Взвешиваем: чем меньше тело, тем значимее хвост
+        body_factor = max(0.3, 1.0 - body / rng)
+        # Взвешиваем на объём
+        vol_w = (float(c.volume) / avg_vol) * body_factor
+        upper_total += upper_wick / rng * vol_w
+        lower_total += lower_wick / rng * vol_w
+
+    total = upper_total + lower_total or 1e-9
+    # Дисбаланс [-1, +1]: +1 = нижние хвосты доминируют (бычье отвержение)
+    imbalance = (lower_total - upper_total) / total
+
+    # Усиление если дисбаланс последних 3 баров совпадает с общим
+    last3 = candles[-3:]
+    last3_upper = sum((_to_f(c.high) - max(_to_f(c.open), _to_f(c.close))) for c in last3)
+    last3_lower = sum((min(_to_f(c.open), _to_f(c.close)) - _to_f(c.low)) for c in last3)
+    recent_confirm = 1.2 if (imbalance > 0 and last3_lower > last3_upper) or \
+                             (imbalance < 0 and last3_upper > last3_lower) else 0.8
+
+    return max(-1.0, min(1.0, imbalance * recent_confirm))
+
+
+def score_triangle(candles: list[HistoricCandle]) -> float:
+    """
+    Графические треугольники: сходящиеся максимумы и минимумы.
+
+    Три типа:
+    - Симметричный: хаи падают + лои растут → нейтральный (ждём пробоя);
+      сигнал = 0, но если последний бар пробил верх диапазона → бычий,
+      если низ → медвежий.
+    - Восходящий: хаи горизонтальны + лои растут → накопление, бычий сигнал.
+    - Нисходящий: хаи падают + лои горизонтальны → распределение, медвежий.
+
+    Сила зависит от:
+    - чистоты схождения (R² линейной регрессии по хаям/лоям);
+    - степени схождения (насколько % сузился диапазон);
+    - объёма: в накоплении объём должен снижаться → пружина заряжается.
+    """
+    _WINDOW = _adaptive_window(candles, target_hours=6.0, min_bars=12, max_bars=120)
+    _SWING_STEP = max(2, _WINDOW // 8)  # шаг поиска свинговых точек
+    if len(candles) < _WINDOW + 5:
+        return 0.0
+
+    window = candles[-_WINDOW:]
+    highs = [_to_f(c.high) for c in window]
+    lows  = [_to_f(c.low)  for c in window]
+    n = len(window)
+
+    # Линейная регрессия по вектору значений → slope, r²
+    def _linreg(vals: list[float]) -> tuple[float, float]:
+        xs = list(range(len(vals)))
+        mx = statistics.mean(xs); my = statistics.mean(vals)
+        ssxx = sum((x - mx) ** 2 for x in xs) or 1e-9
+        ssyy = sum((y - my) ** 2 for y in vals) or 1e-9
+        ssxy = sum((xs[i] - mx) * (vals[i] - my) for i in range(len(vals)))
+        slope = ssxy / ssxx
+        r2 = (ssxy ** 2) / (ssxx * ssyy)
+        return slope, r2
+
+    # Используем только локальные хаи/лои (свинговые точки) для чистоты
+    def _swing_highs(vals: list[float], step: int) -> list[tuple[int, float]]:
+        pts = []
+        for i in range(step, len(vals) - step):
+            if vals[i] == max(vals[max(0,i-step):i+step+1]):
+                pts.append((i, vals[i]))
+        return pts
+
+    def _swing_lows(vals: list[float], step: int) -> list[tuple[int, float]]:
+        pts = []
+        for i in range(step, len(vals) - step):
+            if vals[i] == min(vals[max(0,i-step):i+step+1]):
+                pts.append((i, vals[i]))
+        return pts
+
+    sh = _swing_highs(highs, _SWING_STEP)
+    sl = _swing_lows(lows, _SWING_STEP)
+
+    if len(sh) < 2 or len(sl) < 2:
+        return 0.0
+
+    slope_h, r2_h = _linreg([p[1] for p in sh])
+    slope_l, r2_l = _linreg([p[1] for p in sl])
+
+    # Нормируем slope на ATR чтобы не зависеть от масштаба цены
+    atr_pct = _compute_atr(candles)
+    if atr_pct <= 0:
+        return 0.0
+    last_price = _to_f(candles[-1].close) or 1.0
+    atr_abs = atr_pct * last_price
+    norm = atr_abs * n  # нормировочный знаменатель
+
+    slope_h_n = slope_h / norm * n  # относительный наклон
+    slope_l_n = slope_l / norm * n
+
+    _FLAT_THRESH = 0.15  # считаем линию "горизонтальной" если |slope_n| < этого
+
+    h_falling = slope_h_n < -_FLAT_THRESH
+    h_flat    = abs(slope_h_n) <= _FLAT_THRESH
+    l_rising  = slope_l_n >  _FLAT_THRESH
+    l_flat    = abs(slope_l_n) <= _FLAT_THRESH
+
+    # Степень схождения: диапазон конца vs начала
+    range_start = highs[0] - lows[0] or 1e-9
+    range_end   = highs[-1] - lows[-1]
+    convergence = max(0.0, 1.0 - range_end / range_start)  # 0..1
+
+    # Объём: убывает ли в треугольнике (накопление энергии)
+    vols = [float(c.volume) for c in window]
+    vol_half1 = statistics.mean(vols[:n//2]) or 1.0
+    vol_half2 = statistics.mean(vols[n//2:]) or 1.0
+    vol_declining = vol_half2 < vol_half1 * 0.85  # объём снизился >15%
+
+    # Пробой: последний бар вышел за диапазон свинговых точек
+    last_h = _to_f(candles[-1].high); last_l = _to_f(candles[-1].low)
+    last_c = _to_f(candles[-1].close)
+    # Проецируем линию хаёв/лоёв на последний бар
+    proj_high = sh[-1][1] + slope_h * (n - 1 - sh[-1][0])
+    proj_low  = sl[-1][1] + slope_l * (n - 1 - sl[-1][0])
+    breakout_up   = last_c > proj_high and last_h > proj_high
+    breakout_down = last_c < proj_low  and last_l < proj_low
+
+    vol_last = float(candles[-1].volume) / (statistics.mean(vols) or 1.0)
+    breakout_vol_ok = vol_last >= 1.3  # пробой с объёмом
+
+    quality = (r2_h + r2_l) / 2  # средняя чистота паттерна (R²)
+
+    score = 0.0
+
+    if h_falling and l_rising:
+        # Симметричный треугольник: нейтрален до пробоя
+        if breakout_up and breakout_vol_ok:
+            score = +convergence * quality
+        elif breakout_down and breakout_vol_ok:
+            score = -convergence * quality
+        # без пробоя — 0
+
+    elif h_flat and l_rising:
+        # Восходящий треугольник — накопление, бычий bias
+        base = convergence * quality * (1.2 if vol_declining else 0.8)
+        if breakout_up and breakout_vol_ok:
+            score = +min(1.0, base * 1.5)
+        elif breakout_down and breakout_vol_ok:
+            score = -min(1.0, base * 0.7)  # ложный сигнал вниз — слабее
+        else:
+            score = +base * 0.4  # ещё внутри — слабый бычий bias
+
+    elif h_falling and l_flat:
+        # Нисходящий треугольник — распределение, медвежий bias
+        base = convergence * quality * (1.2 if vol_declining else 0.8)
+        if breakout_down and breakout_vol_ok:
+            score = -min(1.0, base * 1.5)
+        elif breakout_up and breakout_vol_ok:
+            score = +min(1.0, base * 0.7)
+        else:
+            score = -base * 0.4
+
+    return max(-1.0, min(1.0, score))
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -1664,6 +1857,8 @@ METHODS = [
     ("SSA_SIGNAL",     score_ssa_signal),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
     ("VSA",            score_vsa),
+    ("WICK_REJECTION", score_wick_rejection),
+    ("TRIANGLE",       score_triangle),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
