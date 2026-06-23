@@ -724,22 +724,10 @@ _RU_STOCK_BASE_TICKERS = frozenset({
 
 
 def _futures_category(base: str) -> str:
-    """Категория фьючерса для группировки чипов в дашборде — по basic_asset
-    (не по тикеру контракта, он меняется при экспирации)."""
-    for label, names in _FUTURES_CATEGORIES:
-        if base in names:
-            return label
-    if base in _RU_STOCK_BASE_TICKERS:
-        return "Акции РФ"
-    if "/" in base:
-        return "Валюта"
-    if base.startswith("Индекс"):
-        return "Индексы (отрасл.)"
-    if base.startswith("АДР"):
-        return "АДР"
-    if any(k in base for k in ("ETF", "iShares", "SPDR", "Nasdaq", "Tracker Fund", "MSCI")):
-        return "Иностр. ETF/индексы"
-    return "Прочее"
+    """Категория фьючерса = сам базовый актив (basic_asset).
+    Каждый уникальный базис образует свою группу — пользователь видит
+    что именно торгуется, а не абстрактный сектор."""
+    return base if base else "Прочее"
 
 
 # ticker → категория (для группировки чипов), пересчитывается вместе с
@@ -1987,7 +1975,9 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-fut-section>summary{{color:#7eb8f7;}}
 .cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:220px;}}
 .cat-toc{{flex:0 0 260px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);height:100%;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
-.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:pointer;border-bottom:1px solid var(--border2);}}
+.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:default;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:4px;}}
+.cat-toc-toggle{{flex:0 0 auto;font-size:14px;color:var(--txt3);cursor:pointer;line-height:1;padding:0 2px;border-radius:3px;}}
+.cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
 .cat-toc-item:hover{{background:rgba(255,255,255,.05);color:var(--txt);}}
 .cat-toc-item.active{{background:rgba(126,184,247,.12);color:var(--accent);font-weight:600;}}
 .cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;height:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
@@ -2418,6 +2408,15 @@ function setAllChips(active) {{
       active ? c.classList.add('active') : c.classList.remove('active');
     }}
   }});
+}}
+
+function toggleCatPanel(panelId, btn) {{
+  const panel = document.querySelector(`.cat-panel[data-panel="${{panelId}}"]`);
+  if (!panel) return;
+  const chips = panel.querySelectorAll('.chip');
+  const anyActive = Array.from(chips).some(c => c.classList.contains('active'));
+  chips.forEach(c => anyActive ? c.classList.remove('active') : c.classList.add('active'));
+  btn.style.color = anyActive ? 'var(--txt3)' : 'var(--accent)';
 }}
 
 let _statusPollTimer = null;
@@ -4443,8 +4442,11 @@ def _render_page() -> bytes:
         ))
 
     toc_items = "".join(
-        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}" '
-        f'onclick="showCatPanel(\'{pid}\')">{label}</div>'
+        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}">'
+        f'<span onclick="showCatPanel(\'{pid}\')" style="flex:1;cursor:pointer">{label}</span>'
+        f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
+        f'onclick="event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span>'
+        f'</div>'
         for i, (pid, label, _) in enumerate(panels)
     )
     cat_panels = "".join(
