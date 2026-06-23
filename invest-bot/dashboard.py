@@ -104,20 +104,27 @@ def _wire_history_returning(strategy) -> BacktestHistoryStore:
 
 
 def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0):
-    """Свечи для бэктеста: для фьючерсов на период старше даты листинга
-    текущего контракта докачивает и сшивает предыдущие контракты того же
-    basic_asset (см. candle_archive.get_candles_cached_futures_chain) —
-    иначе при достаточно большом days/offset_days получили бы пустую
-    историю там, где текущий контракт ещё не существовал.
-
-    Для фьючерсов принудительно используем 5-мин свечи: Tinkoff отдаёт
-    1-мин данные только за последние ~7 дней, а D1 хранит только 5-мин.
-    Для исторических периодов 1-мин недоступны в любом случае."""
+    """Свечи для бэктеста. Для фьючерсов пробуем два интервала:
+    1) 5-мин — D1 хранит их глубоко, нужны для исторических периодов.
+    2) 1-мин fallback — для экзотики, у которой нет 5-мин в D1/Tinkoff,
+       но есть свежие 1-мин данные (работает только для недавних периодов).
+    Возвращаем то, что длиннее."""
     if getattr(settings, "is_future", False):
-        return get_candles_cached_futures_chain(
+        candles_5m = get_candles_cached_futures_chain(
             ticker, settings.figi, days, _market_data, _db, _instrument_service,
             candle_interval_min=5, offset_days=offset_days,
         )
+        if candles_5m:
+            return candles_5m
+        # fallback: пробуем нативный интервал (обычно 1-мин) — только для текущих периодов
+        if settings.candle_interval_min != 5:
+            candles_native = get_candles_cached_futures_chain(
+                ticker, settings.figi, days, _market_data, _db, _instrument_service,
+                candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
+            )
+            if candles_native:
+                return candles_native
+        return candles_5m  # пустой список
     return get_candles_cached(
         ticker, settings.figi, days, _market_data, _db,
         candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
