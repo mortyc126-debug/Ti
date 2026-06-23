@@ -1693,21 +1693,26 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     """
     Графические треугольники: сходящиеся максимумы и минимумы.
 
-    Три типа:
-    - Симметричный: хаи падают + лои растут → нейтральный (ждём пробоя);
-      сигнал = 0, но если последний бар пробил верх диапазона → бычий,
-      если низ → медвежий.
-    - Восходящий: хаи горизонтальны + лои растут → накопление, бычий сигнал.
-    - Нисходящий: хаи падают + лои горизонтальны → распределение, медвежий.
+    Три типа (классическая интерпретация):
+    - Симметричный: хаи падают + лои растут → нейтральный до пробоя.
+    - Восходящий: хаи горизонтальны + лои растут → бычий bias.
+    - Нисходящий: хаи падают + лои горизонтальны → медвежий bias.
 
-    Сила зависит от:
-    - чистоты схождения (R² линейной регрессии по хаям/лоям);
-    - степени схождения (насколько % сузился диапазон);
-    - объёма: в накоплении объём должен снижаться → пружина заряжается.
+    КОНТЕКСТНАЯ ПЕРЕИНТЕРПРЕТАЦИЯ (ключевое):
+    Восходящий треугольник часто появляется как откат против нисходящего
+    тренда. Классик скажет "накопление = лонг", но в реальности это флаг
+    распределения — серия откатов внутри более крупного даунтренда, пружина
+    сжимается в сторону медведей. Пробой пойдёт вниз, и амплитуда этого
+    пробоя кратно превысит высоту самого треугольника.
+    Аналогично нисходящий треугольник в аптренде — ловушка для медведей.
+
+    Детектируем пре-трендовый контекст: смотрим на наклон closes
+    ЗА тот же период до треугольника. Если он противоположен классическому
+    направлению паттерна — флипаем интерпретацию и усиливаем сигнал.
     """
     _WINDOW = _adaptive_window(candles, target_hours=6.0, min_bars=12, max_bars=120)
-    _SWING_STEP = max(2, _WINDOW // 8)  # шаг поиска свинговых точек
-    if len(candles) < _WINDOW + 5:
+    _SWING_STEP = max(2, _WINDOW // 8)
+    if len(candles) < _WINDOW * 2 + 5:
         return 0.0
 
     window = candles[-_WINDOW:]
@@ -1715,7 +1720,6 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     lows  = [_to_f(c.low)  for c in window]
     n = len(window)
 
-    # Линейная регрессия по вектору значений → slope, r²
     def _linreg(vals: list[float]) -> tuple[float, float]:
         xs = list(range(len(vals)))
         mx = statistics.mean(xs); my = statistics.mean(vals)
@@ -1726,18 +1730,17 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
         r2 = (ssxy ** 2) / (ssxx * ssyy)
         return slope, r2
 
-    # Используем только локальные хаи/лои (свинговые точки) для чистоты
     def _swing_highs(vals: list[float], step: int) -> list[tuple[int, float]]:
         pts = []
         for i in range(step, len(vals) - step):
-            if vals[i] == max(vals[max(0,i-step):i+step+1]):
+            if vals[i] == max(vals[max(0, i - step):i + step + 1]):
                 pts.append((i, vals[i]))
         return pts
 
     def _swing_lows(vals: list[float], step: int) -> list[tuple[int, float]]:
         pts = []
         for i in range(step, len(vals) - step):
-            if vals[i] == min(vals[max(0,i-step):i+step+1]):
+            if vals[i] == min(vals[max(0, i - step):i + step + 1]):
                 pts.append((i, vals[i]))
         return pts
 
@@ -1750,78 +1753,114 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     slope_h, r2_h = _linreg([p[1] for p in sh])
     slope_l, r2_l = _linreg([p[1] for p in sl])
 
-    # Нормируем slope на ATR чтобы не зависеть от масштаба цены
     atr_pct = _compute_atr(candles)
     if atr_pct <= 0:
         return 0.0
     last_price = _to_f(candles[-1].close) or 1.0
     atr_abs = atr_pct * last_price
-    norm = atr_abs * n  # нормировочный знаменатель
+    norm = atr_abs * n
 
-    slope_h_n = slope_h / norm * n  # относительный наклон
+    slope_h_n = slope_h / norm * n
     slope_l_n = slope_l / norm * n
 
-    _FLAT_THRESH = 0.15  # считаем линию "горизонтальной" если |slope_n| < этого
+    _FLAT_THRESH = 0.15
 
     h_falling = slope_h_n < -_FLAT_THRESH
     h_flat    = abs(slope_h_n) <= _FLAT_THRESH
     l_rising  = slope_l_n >  _FLAT_THRESH
     l_flat    = abs(slope_l_n) <= _FLAT_THRESH
 
+    # Пре-трендовый контекст: наклон closes в период ПЕРЕД треугольником.
+    # Положительный → аптренд до треугольника, отрицательный → даунтренд.
+    pre_window = candles[-(2 * _WINDOW):-_WINDOW]
+    pre_closes = [_to_f(c.close) for c in pre_window]
+    pre_slope_n = 0.0
+    if len(pre_closes) >= 4:
+        pre_s, _ = _linreg(pre_closes)
+        pre_slope_n = pre_s / (atr_abs * len(pre_closes)) * len(pre_closes)
+    # Пре-тренд вниз если slope_n < -0.1, вверх если > 0.1
+    pre_downtrend = pre_slope_n < -0.10
+    pre_uptrend   = pre_slope_n >  0.10
+
     # Степень схождения: диапазон конца vs начала
     range_start = highs[0] - lows[0] or 1e-9
     range_end   = highs[-1] - lows[-1]
-    convergence = max(0.0, 1.0 - range_end / range_start)  # 0..1
+    convergence = max(0.0, 1.0 - range_end / range_start)
 
-    # Объём: убывает ли в треугольнике (накопление энергии)
+    # Объём: убывает ли (накопление энергии)
     vols = [float(c.volume) for c in window]
-    vol_half1 = statistics.mean(vols[:n//2]) or 1.0
-    vol_half2 = statistics.mean(vols[n//2:]) or 1.0
-    vol_declining = vol_half2 < vol_half1 * 0.85  # объём снизился >15%
+    vol_half1 = statistics.mean(vols[:n // 2]) or 1.0
+    vol_half2 = statistics.mean(vols[n // 2:]) or 1.0
+    vol_declining = vol_half2 < vol_half1 * 0.85
 
-    # Пробой: последний бар вышел за диапазон свинговых точек
+    # Пробой: последний бар закрылся за проекцией линий
     last_h = _to_f(candles[-1].high); last_l = _to_f(candles[-1].low)
     last_c = _to_f(candles[-1].close)
-    # Проецируем линию хаёв/лоёв на последний бар
     proj_high = sh[-1][1] + slope_h * (n - 1 - sh[-1][0])
     proj_low  = sl[-1][1] + slope_l * (n - 1 - sl[-1][0])
     breakout_up   = last_c > proj_high and last_h > proj_high
     breakout_down = last_c < proj_low  and last_l < proj_low
 
     vol_last = float(candles[-1].volume) / (statistics.mean(vols) or 1.0)
-    breakout_vol_ok = vol_last >= 1.3  # пробой с объёмом
+    breakout_vol_ok = vol_last >= 1.3
 
-    quality = (r2_h + r2_l) / 2  # средняя чистота паттерна (R²)
+    quality = (r2_h + r2_l) / 2
 
     score = 0.0
 
     if h_falling and l_rising:
-        # Симметричный треугольник: нейтрален до пробоя
+        # Симметричный: нейтрален до пробоя; пре-тренд усиливает вероятный вектор
         if breakout_up and breakout_vol_ok:
-            score = +convergence * quality
+            mult = 1.3 if pre_uptrend else (0.6 if pre_downtrend else 1.0)
+            score = +convergence * quality * mult
         elif breakout_down and breakout_vol_ok:
-            score = -convergence * quality
-        # без пробоя — 0
+            mult = 1.3 if pre_downtrend else (0.6 if pre_uptrend else 1.0)
+            score = -convergence * quality * mult
 
     elif h_flat and l_rising:
-        # Восходящий треугольник — накопление, бычий bias
+        # Восходящий треугольник.
+        # В даунтренде — это НЕ накопление, а флаг распределения:
+        # лои подпирают вверх на слабеющем импульсе, хаи не могут пробить
+        # сопротивление, медведи продавливают ниже. Пробой вниз сильнее,
+        # чем предполагает высота треугольника — ребейланс позиций массовый.
         base = convergence * quality * (1.2 if vol_declining else 0.8)
-        if breakout_up and breakout_vol_ok:
-            score = +min(1.0, base * 1.5)
-        elif breakout_down and breakout_vol_ok:
-            score = -min(1.0, base * 0.7)  # ложный сигнал вниз — слабее
+        if pre_downtrend:
+            # Контр-трендовый восходящий треугольник: флаг медведей
+            if breakout_down and breakout_vol_ok:
+                score = -min(1.0, base * 2.0)   # сильнее классики — мув крупнее треугольника
+            elif breakout_up and breakout_vol_ok:
+                score = +min(1.0, base * 0.3)   # ложный пробой вверх, доверяем слабо
+            else:
+                score = -base * 0.5             # ещё внутри, но уже медвежий bias
         else:
-            score = +base * 0.4  # ещё внутри — слабый бычий bias
+            # Стандартная трактовка: накопление / аптренд
+            if breakout_up and breakout_vol_ok:
+                score = +min(1.0, base * 1.5)
+            elif breakout_down and breakout_vol_ok:
+                score = -min(1.0, base * 0.7)
+            else:
+                score = +base * 0.4
 
     elif h_falling and l_flat:
-        # Нисходящий треугольник — распределение, медвежий bias
+        # Нисходящий треугольник.
+        # В аптренде — ловушка для медведей: распределение затухает,
+        # покупатели удерживают поддержку, вынос вверх кратно мощнее.
         base = convergence * quality * (1.2 if vol_declining else 0.8)
-        if breakout_down and breakout_vol_ok:
-            score = -min(1.0, base * 1.5)
-        elif breakout_up and breakout_vol_ok:
-            score = +min(1.0, base * 0.7)
+        if pre_uptrend:
+            # Контр-трендовый нисходящий треугольник: флаг быков
+            if breakout_up and breakout_vol_ok:
+                score = +min(1.0, base * 2.0)
+            elif breakout_down and breakout_vol_ok:
+                score = -min(1.0, base * 0.3)
+            else:
+                score = +base * 0.5
         else:
-            score = -base * 0.4
+            if breakout_down and breakout_vol_ok:
+                score = -min(1.0, base * 1.5)
+            elif breakout_up and breakout_vol_ok:
+                score = +min(1.0, base * 0.7)
+            else:
+                score = -base * 0.4
 
     return max(-1.0, min(1.0, score))
 
