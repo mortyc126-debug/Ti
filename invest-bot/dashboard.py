@@ -456,11 +456,17 @@ def request_cancel() -> bool:
         pool = _active_pool
     if pool is None:
         return False
+    # _processes снимаем ДО shutdown: shutdown(wait=False) запускает
+    # process-management-thread, который сам обнуляет pool._processes
+    # примерно в то же время — getattr после shutdown иногда ловит None
+    # вместо словаря и роняет необработанным AttributeError весь обработчик
+    # запроса (кнопка "Стоп" не отрабатывает с первого клика).
+    procs = list((getattr(pool, "_processes", None) or {}).values())
     try:
         pool.shutdown(wait=False, cancel_futures=True)
     except Exception:
         pass
-    for p in list(getattr(pool, "_processes", {}).values()):
+    for p in procs:
         try:
             if p.is_alive():
                 p.terminate()
