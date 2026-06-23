@@ -724,10 +724,27 @@ _RU_STOCK_BASE_TICKERS = frozenset({
 
 
 def _futures_category(base: str) -> str:
-    """Категория фьючерса = сам базовый актив (basic_asset).
-    Каждый уникальный базис образует свою группу — пользователь видит
-    что именно торгуется, а не абстрактный сектор."""
-    return base if base else "Прочее"
+    """Категория для группировки чипов дашборда.
+    Товарные фьючерсы (нефть, металлы, зерно, индексы) — показываем
+    сам базовый актив как категорию; акционные и валютные — в широкую
+    группу, иначе список TOC становится бесконечным."""
+    if not base:
+        return "Прочее"
+    # Для каждого товарного актива из _FUTURES_CATEGORIES возвращаем его имя
+    for _label, names in _FUTURES_CATEGORIES:
+        if base in names:
+            return base  # «Brent», «Золото», «Пшеница» — отдельные категории
+    if base in _RU_STOCK_BASE_TICKERS:
+        return "Акции РФ"
+    if "/" in base:
+        return "Валюта"
+    if base.startswith("Индекс"):
+        return "Индексы (отрасл.)"
+    if base.startswith("АДР"):
+        return "АДР"
+    if any(k in base for k in ("ETF", "iShares", "SPDR", "Nasdaq", "Tracker Fund", "MSCI")):
+        return "Иностр. ETF/индексы"
+    return base  # что не распознано — само себе категория
 
 
 # ticker → категория (для группировки чипов), пересчитывается вместе с
