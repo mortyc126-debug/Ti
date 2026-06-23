@@ -2761,7 +2761,7 @@ function _rowToText(r) {{
   if (r.error !== undefined && r.n_trades === undefined) {{
     lines.push(`${{r.ticker}}\t${{r.mode}}\tERROR: ${{r.error || ''}}`);
     if (r.traceback) lines.push(r.traceback);
-    return lines.join('\n');
+    return lines.join('\\n');
   }}
   const winPct = r.win_rate !== undefined ? (r.win_rate * 100).toFixed(1) + '%' : '';
   const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct * 100).toFixed(2) + '%' : '';
@@ -2809,7 +2809,7 @@ function _rowToText(r) {{
       lines.push(`  ${{i+1}}\t${{t.t}}\t${{t.d}}\t${{t.w ? 'W' : 'L'}}\t${{t.r.toFixed(2)}}\t${{cumR.toFixed(2)}}\t${{forStr}}\t${{agStr}}`);
     }});
   }}
-  return lines.join('\n');
+  return lines.join('\\n');
 }}
 
 async function copyAllResults(btn) {{
