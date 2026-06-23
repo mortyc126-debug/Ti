@@ -41,31 +41,42 @@ REGIME_WEIGHT_MODS = {
         "BS_PRESSURE": 1.3, "BS_PRESSURE_TS": 1.3, "AGGRESSOR_FLOW": 1.3, "LARGE_IMPACT": 1.2,
         "VWAP_SIGNAL": 1.1, "VWAP_SIGNAL_TS": 1.1, "VOL_MOMENTUM": 1.4, "VOL_MOMENTUM_TS": 1.4,
         "OB_IMBALANCE": 1.0, "CANCEL_SIGNAL": 0.8, "INST_OI": 1.2, "RETAIL_CONTRA": 1.1, "PRICE_TREND": 1.4,
+        # Структурные: в тренде BOS важен (подтверждает слом), уровни важны, пружина умеренно
+        "MKT_STRUCTURE": 1.4, "LEVEL_CONTEXT": 1.2, "SPRING": 1.1,
     },
     "trending_down": {
         "BS_PRESSURE": 1.3, "BS_PRESSURE_TS": 1.3, "AGGRESSOR_FLOW": 1.3, "LARGE_IMPACT": 1.2,
         "VWAP_SIGNAL": 1.1, "VWAP_SIGNAL_TS": 1.1, "VOL_MOMENTUM": 1.4, "VOL_MOMENTUM_TS": 1.4,
         "OB_IMBALANCE": 1.0, "CANCEL_SIGNAL": 0.8, "INST_OI": 1.2, "RETAIL_CONTRA": 1.1, "PRICE_TREND": 1.4,
+        "MKT_STRUCTURE": 1.4, "LEVEL_CONTEXT": 1.2, "SPRING": 1.1,
     },
     "ranging": {
         "BS_PRESSURE": 0.9, "BS_PRESSURE_TS": 0.9, "AGGRESSOR_FLOW": 0.9, "LARGE_IMPACT": 0.8,
         "VWAP_SIGNAL": 1.4, "VWAP_SIGNAL_TS": 1.4, "VOL_MOMENTUM": 0.7, "VOL_MOMENTUM_TS": 0.7,
         "OB_IMBALANCE": 1.3, "CANCEL_SIGNAL": 1.2, "INST_OI": 1.0, "RETAIL_CONTRA": 0.9, "PRICE_TREND": 0.5,
+        # Боковик: уровни — главный инструмент, пружина часто срабатывает у границ
+        "MKT_STRUCTURE": 0.7, "LEVEL_CONTEXT": 1.5, "SPRING": 1.3,
     },
     "high_vol": {
         "BS_PRESSURE": 0.8, "BS_PRESSURE_TS": 0.8, "AGGRESSOR_FLOW": 0.8, "LARGE_IMPACT": 1.2,
         "VWAP_SIGNAL": 0.6, "VWAP_SIGNAL_TS": 0.6, "VOL_MOMENTUM": 0.7, "VOL_MOMENTUM_TS": 0.7,
         "OB_IMBALANCE": 0.7, "CANCEL_SIGNAL": 1.3, "INST_OI": 1.1, "RETAIL_CONTRA": 1.4, "PRICE_TREND": 0.5,
+        # Высокая волатильность: уровни и BOS важны (ложные пробои часты), пружина ненадёжна
+        "MKT_STRUCTURE": 1.2, "LEVEL_CONTEXT": 1.3, "SPRING": 0.7,
     },
     "low_vol": {
         "BS_PRESSURE": 0.7, "BS_PRESSURE_TS": 0.7, "AGGRESSOR_FLOW": 0.7, "LARGE_IMPACT": 1.3,
         "VWAP_SIGNAL": 1.2, "VWAP_SIGNAL_TS": 1.2, "VOL_MOMENTUM": 0.6, "VOL_MOMENTUM_TS": 0.6,
         "OB_IMBALANCE": 1.4, "CANCEL_SIGNAL": 1.1, "INST_OI": 1.0, "RETAIL_CONTRA": 0.8, "PRICE_TREND": 0.7,
+        # Низкая волатильность: пружина сжата и готовится — повышаем, BOS тихий — снижаем
+        "MKT_STRUCTURE": 0.8, "LEVEL_CONTEXT": 1.1, "SPRING": 1.4,
     },
     "stress": {
         "BS_PRESSURE": 0.5, "BS_PRESSURE_TS": 0.5, "AGGRESSOR_FLOW": 0.5, "LARGE_IMPACT": 0.9,
         "VWAP_SIGNAL": 0.4, "VWAP_SIGNAL_TS": 0.4, "VOL_MOMENTUM": 0.5, "VOL_MOMENTUM_TS": 0.5,
         "OB_IMBALANCE": 0.5, "CANCEL_SIGNAL": 0.9, "INST_OI": 1.5, "RETAIL_CONTRA": 1.5, "PRICE_TREND": 0.3,
+        # Стресс: структура ломается хаотично — всё структурное снижаем сильно
+        "MKT_STRUCTURE": 0.3, "LEVEL_CONTEXT": 0.5, "SPRING": 0.3,
     },
 }
 
