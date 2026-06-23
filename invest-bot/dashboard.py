@@ -170,7 +170,7 @@ def save_backtest_history(tickers: list[str], days: int, offset_days: int = 0) -
                     results.append((ticker, None, 0, f"{ticker}: {ex}"))
         finally:
             _unregister_pool(pool)
-            pool.shutdown(wait=False, cancel_futures=True)
+            pool.shutdown(wait=True, cancel_futures=True)
 
     for ticker, hist, n_trades, err in results:
         if err:
@@ -1343,7 +1343,7 @@ def run_backtest(
                 pass  # воркер мог быть убит через /api/cancel — это ожидаемо
     finally:
         _unregister_pool(pool)
-        pool.shutdown(wait=False, cancel_futures=True)
+        pool.shutdown(wait=True, cancel_futures=True)
 
     if _cancel_event.is_set():
         _mark_unfinished_cancelled(progress, tickers)
@@ -1513,7 +1513,7 @@ def run_portfolio_sim(
                     pass  # воркер мог быть убит через /api/cancel — это ожидаемо
         finally:
             _unregister_pool(pool)
-            pool.shutdown(wait=False, cancel_futures=True)
+            pool.shutdown(wait=True, cancel_futures=True)
 
     if _cancel_event.is_set():
         _mark_unfinished_cancelled(progress, tickers)
@@ -4391,7 +4391,14 @@ class Handler(BaseHTTPRequestHandler):
                         break  # клиент отвалился
             finally:
                 _unregister_pool(pool)
-                pool.shutdown(wait=False, cancel_futures=True)
+                # wait=True: дожидаемся, чтобы воркер-процессы реально
+                # завершились (отдали CPU/память) ДО конца ответа — иначе
+                # они продолжают доедать ресурсы ещё несколько секунд после
+                # большого прогона, и следующий запрос (например "сохранить
+                # историю", если что-то не закэшировано и придётся
+                # пересчитывать) ловит ERR_CONNECTION_RESET/REFUSED, потому
+                # что accept-потоку сервера не хватает CPU.
+                pool.shutdown(wait=True, cancel_futures=True)
 
             if _cancel_event.is_set():
                 _mark_unfinished_cancelled(progress, tickers)
