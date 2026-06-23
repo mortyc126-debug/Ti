@@ -1979,6 +1979,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
+  <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <span id="status"></span>
   <label style="margin-left:8px;font-size:11px;color:var(--txt3);">
     <input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть тикеры без сделок
@@ -2758,6 +2759,33 @@ async function runCalibration() {{
     alert('Ошибка: ' + e);
   }} finally {{
     btn.disabled = false; btn.textContent = '🎯 калибровать (narrative+lasso+rules)';
+  }}
+}}
+
+async function calibrateAllHistory() {{
+  if (!confirm('Калибровать narrative/lasso/rule_miner по ВСЕМ тикерам, уже сохранённым в data/history.json (не только активные чипы)?')) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳ калибрую...';
+  try {{
+    const r = await fetch('/api/run_calibration', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{use_all_history: true}})
+    }});
+    const d = await r.json();
+    if (d.error) {{ alert('Ошибка: ' + d.error); }}
+    else {{
+      alert(
+        `Тикеров: ${{(d.tickers_used || []).length}}, окно: ${{d.days_used}} дн.\\n` +
+        `narrative: ${{d.narrative_pairs}} пар (кластер, режим)\\n` +
+        `lasso: ${{d.lasso_tickers}} тикеров\\n` +
+        `rule_miner: ${{d.rule_tickers}} тикеров\\n` +
+        (d.errors && d.errors.length ? '\\nОшибки: ' + d.errors.join('; ') : '')
+      );
+    }}
+  }} catch(e) {{
+    alert('Ошибка: ' + e);
+  }} finally {{
+    btn.disabled = false; btn.textContent = '🎯 калибровать по всей history.json';
   }}
 }}
 
@@ -4552,12 +4580,29 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_cached_backtest_history(tickers, days, offset_days)
                 self._send_json(result)
         elif self.path == "/api/run_calibration":
-            tickers = payload.get("tickers", [])
-            days = int(payload.get("days", 90))
+            if payload.get("use_all_history"):
+                # Калибровка по ВСЕМУ, что уже лежит в data/history.json, а не
+                # только по тикерам активных чипов на странице (если прогон
+                # сохранялся раньше — выбор чипов мог не совпасть, и калибровка
+                # просто не находила сделки). days берём по самому старому
+                # покрытому тикеру, чтобы окно гарантированно захватило все
+                # сохранённые сделки у всех тикеров.
+                coverage = get_history_coverage()
+                tickers = [row["ticker"] for row in coverage]
+                today = datetime.datetime.now(datetime.timezone.utc).date()
+                days = 90
+                for row in coverage:
+                    span = (today - datetime.datetime.strptime(row["from"], "%Y-%m-%d").date()).days + 1
+                    days = max(days, span)
+            else:
+                tickers = payload.get("tickers", [])
+                days = int(payload.get("days", 90))
             if not tickers:
                 self._send_json({"error": "нет тикеров"}, status=400)
             else:
                 result = run_calibration_pipeline(tickers, days)
+                result["tickers_used"] = tickers
+                result["days_used"] = days
                 self._send_json(result)
         elif self.path == "/api/cancel":
             was_running = request_cancel()
