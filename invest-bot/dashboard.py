@@ -120,25 +120,35 @@ def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0
     )
 
 
-def _save_backtest_history_one(ticker: str, days: int, offset_days: int = 0) -> tuple[str, dict | None, int, str | None]:
+def _save_backtest_history_one(
+        ticker: str, days: int, offset_days: int = 0, progress: dict | None = None,
+) -> tuple[str, dict | None, int, str | None]:
     """Считает накопленную историю одного тикера (для save_backtest_history).
     Выделено в отдельную функцию, чтобы гонять тикеры параллельно по
     процессам — тот же CPU-bound скан, что и в run_backtest_one."""
+    if progress is None:
+        progress = _get_progress_proxy()
     by_ticker = _all_settings_by_ticker()
     settings = by_ticker.get(ticker)
     if settings is None:
+        _set_progress(progress, ticker, "ошибка")
         return ticker, None, 0, f"{ticker}: нет в settings"
     try:
         strategy = StrategyFactory.new_factory(settings.name, settings)
         bt_store = _wire_history_returning(strategy)
+        _set_progress(progress, ticker, "загрузка свечей")
         candles = _get_backtest_candles(ticker, settings, days, offset_days)
         if not candles:
+            _set_progress(progress, ticker, "нет истории")
             return ticker, None, 0, f"{ticker}: нет свечей"
+        _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
         strategy.backtest_barriers(candles)
         hist = bt_store._data.get(ticker, {})
         n_trades = sum(len(day.get("trades", [])) for day in hist.values())
+        _set_progress(progress, ticker, "готово")
         return ticker, hist, n_trades, None
     except Exception as ex:
+        _set_progress(progress, ticker, "ошибка")
         return ticker, None, 0, f"{ticker}: {ex}"
 
 
@@ -173,14 +183,21 @@ def save_backtest_history(tickers: list[str], days: int, offset_days: int = 0) -
     total_trades = 0
     errors: list[str] = []
 
+    progress = _get_progress_proxy()
+    for ticker in tickers:
+        _set_progress(progress, ticker, "в очереди")
+
     if len(tickers) <= 1:
-        results = [_save_backtest_history_one(t, days, offset_days) for t in tickers]
+        results = [_save_backtest_history_one(t, days, offset_days, progress=progress) for t in tickers]
     else:
         results = []
         pool = ProcessPoolExecutor(max_workers=min(BACKTEST_WORKERS, len(tickers)))
         _register_pool(pool)
         try:
-            futures = {pool.submit(_save_backtest_history_one, t, days, offset_days): t for t in tickers}
+            futures = {
+                pool.submit(_save_backtest_history_one, t, days, offset_days, progress): t
+                for t in tickers
+            }
             for fut in as_completed(futures):
                 ticker = futures[fut]
                 try:
@@ -250,11 +267,16 @@ def save_cached_backtest_history(tickers: list[str], days: int, offset_days: int
             "from_cache": len(tickers) - len(missing), "recomputed": missing}
 
 
-def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
+def run_calibration_pipeline(tickers: list[str], days: int, progress: dict | None = None) -> dict:
     """Шаги 2-4 run_pipeline.py (narrative-пороги + lasso + rule_miner) на
     уже сохранённой data/history.json — без бэктеста (см. save_backtest_history
     для шага 1). Дёргается из дашборда кнопкой "🎯 калибровать", чтобы не лезть
-    в консоль каждый раз после "💾 сохранить историю"."""
+    в консоль каждый раз после "💾 сохранить историю".
+
+    progress — отдельный ключ "_calibration" в общем progress-proxy (не
+    per-ticker, как у бэктеста): единица работы тут — (стадия, тикер), а
+    тикер проходит ВСЕ 3 стадии последовательно, так что per-ticker
+    терминальный статус не передал бы общий ETA по конвейеру."""
     # Импорт внутри функции, не на уровне модуля: calibrate_narrative/
     # lasso_calibration/rule_miner сами импортируют из dashboard
     # (_strategy_settings_by_ticker, _db, _market_data, _wire_history) —
@@ -263,12 +285,28 @@ def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
     import lasso_calibration
     import rule_miner
 
+    if progress is None:
+        progress = _get_progress_proxy()
+    total_steps = 3 * len(tickers)
+    step = 0
+
+    def _tick(stage: str, ticker: str) -> None:
+        nonlocal step
+        step += 1
+        try:
+            progress["_calibration"] = {
+                "step": step, "total": total_steps, "stage": stage, "ticker": ticker, "ts": time.time(),
+            }
+        except Exception:
+            pass
+
     errors: list[str] = []
     by_ticker = _strategy_settings_by_ticker()
 
     existing_thresh = calibrate_narrative._load_existing()
     n_pairs_before = sum(len(v) for v in existing_thresh.values())
     for ticker in tickers:
+        _tick("narrative", ticker)
         try:
             result = calibrate_narrative._calibrate_one(ticker, days)
         except Exception as ex:
@@ -282,6 +320,7 @@ def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
     existing_lasso = lasso_calibration._load_existing()
     lasso_tickers = 0
     for ticker in tickers:
+        _tick("lasso", ticker)
         try:
             result = lasso_calibration._calibrate_one(ticker, days, 0.01, 0.8, False)
         except Exception as ex:
@@ -297,6 +336,7 @@ def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
     existing_rules = rule_miner._load_existing()
     rule_tickers = 0
     for ticker in tickers:
+        _tick("rules", ticker)
         try:
             result = rule_miner._mine_one(ticker, days, rule_miner._DEFAULT_MAX_DEPTH)
         except Exception as ex:
@@ -306,6 +346,13 @@ def run_calibration_pipeline(tickers: list[str], days: int) -> dict:
             existing_rules[ticker] = result
             rule_tickers += 1
     rule_miner._save(existing_rules)
+
+    try:
+        progress["_calibration"] = {
+            "step": total_steps, "total": total_steps, "stage": "готово", "ticker": "", "ts": time.time(),
+        }
+    except Exception:
+        pass
 
     return {
         "narrative_pairs": narrative_pairs,
@@ -2002,6 +2049,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть тикеры без сделок
   </label>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
+  <div id="calib_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
 </div>
 
@@ -2591,6 +2639,36 @@ function stopProgressPolling() {{
   if (_progressTimer) {{ clearInterval(_progressTimer); _progressTimer = null; }}
 }}
 
+const _stageRu = {{narrative: 'narrative', lasso: 'lasso', rules: 'rule_miner', 'готово': 'готово'}};
+
+function startCalibrationPolling(statusElId) {{
+  // Калибровка — конвейер из 3 стадий (narrative/lasso/rules) по всем
+  // тикерам подряд, а не параллельные независимые тикеры как в бэктесте —
+  // поэтому ETA считаем по общему счётчику шагов "_calibration" из
+  // /api/progress, а не по per-ticker статусам (см. run_calibration_pipeline).
+  const el = document.getElementById(statusElId);
+  const startedAt = Date.now();
+  const render = (c) => {{
+    if (!c) {{ el.textContent = 'запускаю...'; return; }}
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    let line = `этап: ${{_stageRu[c.stage] || c.stage}} · шаг ${{c.step}}/${{c.total}}`;
+    if (c.ticker) line += ` (${{c.ticker}})`;
+    if (c.step > 0 && c.step < c.total) {{
+      const etaSec = (elapsedSec / c.step) * (c.total - c.step);
+      line += ` · осталось ~${{_fmtEta(etaSec)}}`;
+    }}
+    el.textContent = line;
+  }};
+  render(null);
+  _progressTimer = setInterval(async () => {{
+    try {{
+      const resp = await fetch('/api/progress');
+      const data = await resp.json();
+      render((data.progress || {{}})._calibration);
+    }} catch (e) {{ /* сетевая ошибка опроса — не критично */ }}
+  }}, 800);
+}}
+
 async function cancelRun() {{
   // Останавливает текущий прогон бэктеста/портфельной симуляции (если
   // он есть): сервер убивает уже запущенные воркер-процессы, исходный
@@ -2751,6 +2829,7 @@ async function saveBacktestHistory() {{
   // как сейчас стоят в форме) — и сообщит об этом в ответе.
   const btn = event.target;
   btn.disabled = true; btn.textContent = '⏳ сохраняю...';
+  startProgressPolling(tickers, 'status_detail');
   try {{
     const r = await fetch('/api/save_backtest_history', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -2767,6 +2846,8 @@ async function saveBacktestHistory() {{
   }} catch(e) {{
     alert('Ошибка: ' + e);
   }} finally {{
+    stopProgressPolling();
+    document.getElementById('status_detail').textContent = '';
     btn.disabled = false; btn.textContent = '💾 сохранить историю';
   }}
 }}
@@ -2778,6 +2859,7 @@ async function runCalibration() {{
   if (!confirm(`Калибровать narrative/lasso/rule_miner по ${{tickers.length}} тикерам (${{days}} дн.) на уже сохранённой history.json?`)) return;
   const btn = event.target;
   btn.disabled = true; btn.textContent = '⏳ калибрую...';
+  startCalibrationPolling('calib_status_detail');
   try {{
     const r = await fetch('/api/run_calibration', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -2796,6 +2878,8 @@ async function runCalibration() {{
   }} catch(e) {{
     alert('Ошибка: ' + e);
   }} finally {{
+    stopProgressPolling();
+    document.getElementById('calib_status_detail').textContent = '';
     btn.disabled = false; btn.textContent = '🎯 калибровать (narrative+lasso+rules)';
   }}
 }}
@@ -2804,6 +2888,7 @@ async function calibrateAllHistory() {{
   if (!confirm('Калибровать narrative/lasso/rule_miner по ВСЕМ тикерам, уже сохранённым в data/history.json (не только активные чипы)?')) return;
   const btn = event.target;
   btn.disabled = true; btn.textContent = '⏳ калибрую...';
+  startCalibrationPolling('calib_status_detail');
   try {{
     const r = await fetch('/api/run_calibration', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -2823,6 +2908,8 @@ async function calibrateAllHistory() {{
   }} catch(e) {{
     alert('Ошибка: ' + e);
   }} finally {{
+    stopProgressPolling();
+    document.getElementById('calib_status_detail').textContent = '';
     btn.disabled = false; btn.textContent = '🎯 калибровать по всей history.json';
   }}
 }}
@@ -4640,7 +4727,11 @@ class Handler(BaseHTTPRequestHandler):
             if not tickers:
                 self._send_json({"error": "нет тикеров"}, status=400)
             else:
-                result = run_calibration_pipeline(tickers, days)
+                progress = _get_progress_proxy()
+                progress["_calibration"] = {
+                    "step": 0, "total": 3 * len(tickers), "stage": "narrative", "ticker": "", "ts": time.time(),
+                }
+                result = run_calibration_pipeline(tickers, days, progress=progress)
                 result["tickers_used"] = tickers
                 result["days_used"] = days
                 self._send_json(result)
