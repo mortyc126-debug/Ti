@@ -1835,6 +1835,11 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     resist_effort = _effort_without_result(resist_vols)   # +1 = поглощение покупателей
     support_effort = _effort_without_result(support_vols)  # +1 = поглощение продавцов
 
+    # ── Степень схождения ─────────────────────────────────────────────────────
+    range_start = highs[0] - lows[0] or 1e-9
+    range_end   = highs[-1] - lows[-1]
+    convergence = max(0.0, 1.0 - range_end / range_start)
+
     # ── 3. Размер фигуры относительно дневного ATR ───────────────────────────
     # triangle_height / atr_abs: < 0.3 → очень сжатая пружина (коэф. 1.5),
     # 0.3–0.8 → нормальный (1.0), > 0.8 → крупный паттерн (0.8).
@@ -1846,11 +1851,6 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
         compression_mult = 1.0
     else:
         compression_mult = 0.8   # слишком большой — менее предсказуем
-
-    # ── Степень схождения и базовое качество ─────────────────────────────────
-    range_start = highs[0] - lows[0] or 1e-9
-    range_end   = highs[-1] - lows[-1]
-    convergence = max(0.0, 1.0 - range_end / range_start)
 
     vol_half1 = statistics.mean(vols[:n // 2]) or 1.0
     vol_half2 = statistics.mean(vols[n // 2:]) or 1.0
