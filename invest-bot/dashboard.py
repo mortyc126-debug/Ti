@@ -2798,6 +2798,17 @@ function _rowToText(r) {{
       }}
     }}
   }}
+  if (r.trades_list && r.trades_list.length) {{
+    lines.push('  Сделки по времени:');
+    lines.push('  #\tДата\tDir\tWin\tR\tcumR\tТоп ЗА\tТоп ПРОТИВ');
+    let cumR = 0;
+    r.trades_list.forEach((t, i) => {{
+      cumR += t.r;
+      const forStr = t.for.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
+      const agStr = t.against.map(([n, s]) => `${{n}}(${{s.toFixed(2)}})` ).join(', ');
+      lines.push(`  ${{i+1}}\t${{t.t}}\t${{t.d}}\t${{t.w ? 'W' : 'L'}}\t${{t.r.toFixed(2)}}\t${{cumR.toFixed(2)}}\t${{forStr}}\t${{agStr}}`);
+    }});
+  }}
   return lines.join('\n');
 }}
 
