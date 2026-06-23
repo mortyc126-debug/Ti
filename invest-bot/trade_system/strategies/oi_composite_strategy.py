@@ -243,6 +243,18 @@ _L1_SOFT_ZONE     = 0.30   # верхние/нижние 30% — мягкий ш
 _L1_RANGE_DAYS    = 30     # период дней для расчёта ценового диапазона (percentile)
 _L1_MA_DAYS       = 50     # период дней для расчёта MA и проверки наличия истории
 
+# ── Вето отказа от уровня (LEVEL_CONTEXT) ─────────────────────────────────────
+# L1-гейт смотрит на структуру 30д/MA50 и пропускает шорт/лонг у края диапазона,
+# если есть тренд (MA5 vs MA20) — то есть трактует резкое движение к локальному
+# лою/хаю как пробой, а не как "тот самый уровень, от которого уже был полный
+# разворот". Сам LEVEL_CONTEXT это видит (отказ с длинной тенью у уровня), но
+# в композите это всего один голос среди ~30 методов — вес размывается, и
+# сильный сигнал отказа практически не влияет на итог. Здесь даём ему вето:
+# если LEVEL_CONTEXT даёт сильный сигнал ПРОТИВ направления композита, давим
+# композит независимо от того, что говорят остальные методы и L1.
+_LEVEL_VETO_THRESH = 0.45  # |score_level_context| выше — считается "сильным" отказом
+_LEVEL_VETO_MULT   = 0.15  # composite × это при вето
+
 
 def _aggregate_candles(candles: list, factor: int) -> list:
     """Агрегирует список 1м-свечей в виртуальные свечи старшего ТФ.
@@ -2840,6 +2852,22 @@ class OICompositeStrategy(IStrategy):
                     f"trend↓={self.__l1_trending_down} → ×{l1_mult:.2f}"
                 )
             composite *= l1_mult
+
+        # Вето отказа от уровня: LEVEL_CONTEXT сильно против направления
+        # композита (отказ с длинной тенью у того же уровня, от которого уже
+        # был разворот) — давим композит вне зависимости от L1/тренда и
+        # остальных методов, иначе сигнал тонет среди ~30 голосов.
+        try:
+            level_idx = BASE_METHOD_NAMES.index("LEVEL_CONTEXT")
+            level_score = scores[level_idx]
+        except (ValueError, IndexError):
+            level_score = 0.0
+        if abs(level_score) >= _LEVEL_VETO_THRESH and composite * level_score < 0:
+            logger.debug(
+                f"{self.__settings.figi}: LEVEL_CONTEXT={level_score:+.2f} против "
+                f"composite={composite:+.3f} → вето ×{_LEVEL_VETO_MULT}"
+            )
+            composite *= _LEVEL_VETO_MULT
 
         # ATR-exhaustion: если цена уже прошла 60-85%+ дневного ATR в направлении
         # сигнала — потенциал движения исчерпывается, демпфируем composite.
