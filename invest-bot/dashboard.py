@@ -108,11 +108,15 @@ def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0
     текущего контракта докачивает и сшивает предыдущие контракты того же
     basic_asset (см. candle_archive.get_candles_cached_futures_chain) —
     иначе при достаточно большом days/offset_days получили бы пустую
-    историю там, где текущий контракт ещё не существовал."""
+    историю там, где текущий контракт ещё не существовал.
+
+    Для фьючерсов принудительно используем 5-мин свечи: Tinkoff отдаёт
+    1-мин данные только за последние ~7 дней, а D1 хранит только 5-мин.
+    Для исторических периодов 1-мин недоступны в любом случае."""
     if getattr(settings, "is_future", False):
         return get_candles_cached_futures_chain(
             ticker, settings.figi, days, _market_data, _db, _instrument_service,
-            candle_interval_min=settings.candle_interval_min, offset_days=offset_days,
+            candle_interval_min=5, offset_days=offset_days,
         )
     return get_candles_cached(
         ticker, settings.figi, days, _market_data, _db,
