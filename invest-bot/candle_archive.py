@@ -94,9 +94,17 @@ def _save_local(ticker: str, rows: list[dict], interval_min: int = 5) -> None:
     tmp_path = path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(rows, f)
-    # atomic replace — несколько параллельных процессов дашборда не должны
-    # увидеть частично записанный файл.
-    os.replace(tmp_path, path)
+    # На Windows os.replace падает с WinError 32 если файл в этот момент
+    # открыт другим потоком/антивирусом — делаем несколько попыток.
+    for _attempt in range(5):
+        try:
+            os.replace(tmp_path, path)
+            break
+        except OSError:
+            if _attempt == 4:
+                raise
+            import time as _time
+            _time.sleep(0.1 * (_attempt + 1))
 
 
 def get_candles_cached(
