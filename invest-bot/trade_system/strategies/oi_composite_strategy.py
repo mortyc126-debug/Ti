@@ -2455,7 +2455,7 @@ class OICompositeStrategy(IStrategy):
                             if days_since_recalib >= narrative_recalib_every_days:
                                 days_since_recalib = 0
                                 by_regime = self.__history.daily_method_scores_by_regime(
-                                    self.__settings.ticker, window_days=10**6,
+                                    self.__settings.ticker, window_days=36500,
                                 )
                                 fitted = fit_narrative_thresholds(by_regime)
                                 if fitted:

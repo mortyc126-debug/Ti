@@ -403,7 +403,11 @@ class BacktestHistoryStore(HistoryStore):
     def _cutoff(self, days: int = DAYS_KEPT) -> str:
         if not self._sim_date:
             return super()._cutoff(days)
-        d = datetime.strptime(self._sim_date, "%Y-%m-%d").date() - timedelta(days=days)
+        from datetime import date as _date
+        try:
+            d = datetime.strptime(self._sim_date, "%Y-%m-%d").date() - timedelta(days=days)
+        except OverflowError:
+            d = _date.min
         return d.isoformat()
 
     def record_daily(self, ticker: str, *, composite: float, scores: dict[str, float], regime: str,
