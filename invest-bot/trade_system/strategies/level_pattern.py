@@ -214,10 +214,14 @@ def build_levels(candles: list) -> LevelSet:
     for l in frac_lows[-5:]:
         levels.append(PriceLevel(l, "fractal_low", 5))
 
-    # Убираем дубли (уровни ближе 0.01% друг к другу — оставляем с меньшим tier)
+    # Убираем дубли: уровни ближе 0.2 ATR — оставляем с меньшим tier.
+    # ATR-based вместо фиксированного %: корректно работает на любой цене инструмента.
+    atr_tol = _atr(candles) * 0.2 if candles else 0.0
+    min_tol = (_f(candles[-1].close) if candles else 1.0) * 0.0001
+    tol = max(atr_tol, min_tol)
     deduped: list[PriceLevel] = []
     for lv in sorted(levels, key=lambda x: (x.tier, x.price)):
-        if not any(abs(lv.price - ex.price) / (ex.price or 1) < 0.0001 for ex in deduped):
+        if not any(abs(lv.price - ex.price) < tol for ex in deduped):
             deduped.append(lv)
 
     return LevelSet(deduped)
