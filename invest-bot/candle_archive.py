@@ -181,7 +181,12 @@ def get_candles_cached_futures_chain(
     now = datetime.now(timezone.utc) - timedelta(days=offset_days)
     date_from = (now - timedelta(days=days)).date()
     earliest_have = min((c.time.date() for c in candles), default=None)
-    if earliest_have is None or earliest_have <= date_from:
+    # Раньше earliest_have is None (у ТЕКУЩЕГО контракта вообще нет свечей в
+    # запрошенном окне — типичный случай для глубокого offset_days, когда окно
+    # целиком уходит до даты листинга контракта) сразу возвращал [] и цепочку
+    # предыдущих контрактов даже не пытался смотреть — хотя именно для этого
+    # случая она и нужна больше всего.
+    if earliest_have is not None and earliest_have <= date_from:
         return candles
 
     chain = instrument_service.futures_chain_by_figi(figi)
@@ -204,8 +209,16 @@ def get_candles_cached_futures_chain(
     for c in candles:
         rows_by_day.setdefault(c.time.date().isoformat(), []).append(_candle_to_row(c))
 
-    cur_earliest = earliest_have
-    cur_first_row = min(rows_by_day[cur_earliest.isoformat()], key=lambda r: r["time"])
+    if earliest_have is not None:
+        cur_earliest = earliest_have
+        cur_first_row = min(rows_by_day[cur_earliest.isoformat()], key=lambda r: r["time"])
+    else:
+        # Нет своих свечей вообще — нет и якоря для back-adjustment к текущему
+        # контракту. Начинаем поиск от верхней границы окна (now), без сдвига
+        # цены на первой сшивке (diff=0); если предыдущих контрактов в цепочке
+        # несколько, между НИМИ диффы считаются нормально (см. ниже).
+        cur_earliest = now.date() + timedelta(days=1)
+        cur_first_row = None
 
     for prev_ticker, prev_figi, _prev_expiration in reversed(chain[:idx]):
         target_date_to = cur_earliest - timedelta(days=1)
@@ -222,8 +235,11 @@ def get_candles_cached_futures_chain(
             logger.info(f"{ticker}: предыдущий контракт {prev_ticker} ({prev_figi}) — свечей нет, цепочка обрывается")
             break
 
-        prev_last_row = max((_candle_to_row(c) for c in prev_candles), key=lambda r: r["time"])
-        diff = cur_first_row["close"] - prev_last_row["close"]
+        if cur_first_row is not None:
+            prev_last_row = max((_candle_to_row(c) for c in prev_candles), key=lambda r: r["time"])
+            diff = cur_first_row["close"] - prev_last_row["close"]
+        else:
+            diff = 0.0
 
         for c in prev_candles:
             row = _candle_to_row(c)
