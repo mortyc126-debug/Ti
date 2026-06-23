@@ -2583,9 +2583,10 @@ class OICompositeStrategy(IStrategy):
                 if not self.__methods_agree(scores, direction):
                     i += 1
                     continue
-                if not self.__narrative_allows(direction):
-                    i += 1
-                    continue
+                # Narrative-гейт убран из backtest_scan_signals: FSM требует разогрева
+                # между барами (NEUTRAL → WATCHING → CONFIRMED), которого нет на холодном
+                # старте бэктеста — в итоге блокирует почти все сигналы. В живой торговле
+                # (analyze_candles) гейт остаётся и продолжает фильтровать.
                 if not self.__liquidity_ok():
                     i += 1
                     continue
@@ -2783,9 +2784,6 @@ class OICompositeStrategy(IStrategy):
                     i += 1
                     continue
                 if not self.__methods_agree(scores, direction):
-                    i += 1
-                    continue
-                if not self.__narrative_allows(direction):
                     i += 1
                     continue
                 if not self.__liquidity_ok():
