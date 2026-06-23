@@ -508,6 +508,32 @@ def get_auto_atr_snapshot() -> list[dict]:
     return rows
 
 
+def get_history_coverage() -> list[dict]:
+    """
+    Какой период уже покрыт в data/history.json по каждому тикеру —
+    чтобы не гадать, на сколько дней двигать offset_days в форме бэктеста.
+    Дни сделок/бэктеста пишутся под реальную (для backtest — симулируемую)
+    дату как ключ (см. history.py HistoryStore._data), поэтому min/max ключ
+    по тикеру = крайние даты, уже посчитанные и сохранённые.
+    """
+    store = HistoryStore()
+    rows = []
+    for ticker in store.tickers():
+        dates = sorted(store._data.get(ticker, {}).keys())
+        if not dates:
+            continue
+        n_trades = sum(len(store._data[ticker][d].get("trades", [])) for d in dates)
+        rows.append({
+            "ticker": ticker,
+            "from": dates[0],
+            "to": dates[-1],
+            "days": len(dates),
+            "trades": n_trades,
+        })
+    rows.sort(key=lambda r: r["ticker"])
+    return rows
+
+
 def load_oi_tickers() -> dict:
     """{ticker: {figi, name}} — тикеры, импортированные из экспорта oi-signal-v10.html."""
     if not os.path.exists(OI_TICKERS_FILE):
@@ -1933,6 +1959,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
        короче 90 дней молчит почти весь прогон. -->
   <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
   <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
+  <button type="button" class="btn-pill btn-sm" style="color:#aaa" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
+  <span id="history_coverage_out" style="display:block;width:100%;font-size:12px;color:var(--muted);white-space:pre-wrap;"></span>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
   <label>Тариф комиссии <select class="inp" id="tariff">
@@ -2539,6 +2567,22 @@ async function cancelRun() {{
     if (!data.cancelled) {{ alert('Нет активного прогона для остановки'); }}
   }} catch (e) {{
     alert('Не удалось отправить сигнал остановки: ' + e);
+  }}
+}}
+
+async function checkHistoryCoverage() {{
+  const out = document.getElementById('history_coverage_out');
+  out.textContent = 'Загрузка...';
+  try {{
+    const r = await fetch('/api/history_coverage');
+    const data = await r.json();
+    const rows = data.rows || [];
+    if (rows.length === 0) {{ out.textContent = 'history.json пуст — ничего ещё не посчитано.'; return; }}
+    out.textContent = rows.map(row =>
+      `${{row.ticker}}: ${{row.from}} … ${{row.to}} (${{row.days}} дн., ${{row.trades}} сделок)`
+    ).join('\\n');
+  }} catch (e) {{
+    out.textContent = 'Ошибка: ' + e;
   }}
 }}
 
@@ -4276,6 +4320,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_overrides_payload())
         elif self.path == "/api/auto_atr":
             self._send_json({"rows": get_auto_atr_snapshot()})
+        elif self.path == "/api/history_coverage":
+            self._send_json({"rows": get_history_coverage()})
         elif self.path == "/api/progress":
             self._send_json({"progress": dict(_get_progress_proxy())})
         elif self.path.startswith("/api/last_result"):
