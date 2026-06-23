@@ -142,6 +142,25 @@ def _save_backtest_history_one(ticker: str, days: int, offset_days: int = 0) -> 
         return ticker, None, 0, f"{ticker}: {ex}"
 
 
+def _persist_history_dicts(hist_by_ticker: dict[str, dict]) -> tuple[int, int]:
+    """Сливает уже посчитанные {ticker: hist} в реальный data/history.json.
+    Общий код для save_backtest_history и автосохранения по итогам
+    /api/backtest_stream — пишет на диск то, что уже есть в памяти, без
+    отдельного HTTP-запроса (который может упереться в перегруженный сразу
+    после прогона сервер, см. save_backtest_history)."""
+    real_store = HistoryStore()
+    total_days = 0
+    total_trades = 0
+    for ticker, hist in hist_by_ticker.items():
+        if not hist:
+            continue
+        tmp = BacktestHistoryStore()
+        tmp._data[ticker] = hist
+        total_days += tmp.merge_into(real_store)
+        total_trades += sum(len(day.get("trades", [])) for day in hist.values())
+    return total_days, total_trades
+
+
 def save_backtest_history(tickers: list[str], days: int, offset_days: int = 0) -> dict:
     """Прогоняет бэктест по тикерам и сохраняет накопленные сделки/скоры
     в data/history.json. Используется для начальной калибровки lasso без
@@ -2547,6 +2566,7 @@ async function runBacktest() {{
     `Считаю ${{tickers.length}} тикер(ов) параллельно (до __BACKTEST_WORKERS__ одновременно)...`;
   startProgressPolling(tickers, 'status_detail');
   let doneCount = 0;
+  let autoSaved = null;
   try {{
     const resp = await fetch('/api/backtest_stream', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
@@ -2569,7 +2589,7 @@ async function runBacktest() {{
         if (!line.trim()) continue;
         let evt;
         try {{ evt = JSON.parse(line); }} catch(ex) {{ continue; }}
-        if (evt.done) {{ break; }}
+        if (evt.done) {{ autoSaved = {{days: evt.auto_saved_days || 0, trades: evt.auto_saved_trades || 0}}; break; }}
         if (evt.rows) {{
           _backtestRows.push(...evt.rows);
           renderResultsTable();
@@ -2597,7 +2617,9 @@ async function runBacktest() {{
   }} finally {{
     stopProgressPolling();
   }}
-  document.getElementById('status').textContent = `Готово: ${{tickers.length}} тикер(ов)`;
+  document.getElementById('status').textContent = autoSaved
+    ? `Готово: ${{tickers.length}} тикер(ов). Автосохранено в history.json: ${{autoSaved.days}} дн., ${{autoSaved.trades}} сделок.`
+    : `Готово: ${{tickers.length}} тикер(ов)`;
   // Заполнить панель графика тикерами из только что завершённого бэктеста
   if (tickers.length > 0) {{
     // Первый ATR из сетки — берём первые числа из строк вида "2,3,4"
@@ -4404,8 +4426,20 @@ class Handler(BaseHTTPRequestHandler):
                 _mark_unfinished_cancelled(progress, tickers)
 
             _last_result["backtest"] = {"rows": all_rows}
+            # Автосохранение в data/history.json сразу здесь, в этом же
+            # запросе — без отдельного клика "сохранить историю", который
+            # уязвим к перегрузке сервера сразу после большого прогона
+            # (ERR_CONNECTION_RESET/REFUSED). Пул уже остановлен (wait=True
+            # выше), CPU свободен — пишем прямо сейчас, пока процесс жив.
+            saved_days, saved_trades = 0, 0
             try:
-                _sse({"done": True})
+                saved_days, saved_trades = _persist_history_dicts(
+                    {t: _last_backtest_history_data[t] for t in tickers if t in _last_backtest_history_data}
+                )
+            except Exception as ex:
+                logger.warning(f"backtest_stream: автосохранение истории не удалось: {ex}")
+            try:
+                _sse({"done": True, "auto_saved_days": saved_days, "auto_saved_trades": saved_trades})
             except Exception:
                 pass
         elif self.path == "/api/portfolio_sim":
