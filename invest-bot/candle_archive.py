@@ -178,7 +178,8 @@ def get_candles_cached_futures_chain(
     старого контракта в цепочке."""
     candles = get_candles_cached(ticker, figi, days, market_data, db, candle_interval_min, offset_days)
 
-    now = datetime.now(timezone.utc) - timedelta(days=offset_days)
+    real_now = datetime.now(timezone.utc)
+    now = real_now - timedelta(days=offset_days)
     date_from = (now - timedelta(days=days)).date()
     earliest_have = min((c.time.date() for c in candles), default=None)
     # Раньше earliest_have is None (у ТЕКУЩЕГО контракта вообще нет свечей в
@@ -224,7 +225,9 @@ def get_candles_cached_futures_chain(
         target_date_to = cur_earliest - timedelta(days=1)
         if target_date_to < date_from:
             break
-        offset_old = (now.date() - target_date_to).days
+        # offset для get_candles_cached считаем от РЕАЛЬНОГО now — внутри та функция
+        # сама вычисляет datetime.now(), поэтому сдвинутый now здесь неприменим.
+        offset_old = (real_now.date() - target_date_to).days
         days_old = (target_date_to - date_from).days + 1
         prev_candles = get_candles_cached(
             prev_ticker, prev_figi, days_old, market_data, db,
