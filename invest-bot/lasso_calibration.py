@@ -276,6 +276,82 @@ def _signed_outcome(trade: dict) -> float | None:
 
 # ── Основной анализ по тикеру ─────────────────────────────────────────────────
 
+def fit_lasso_coefficients(
+    trades: list[dict], alpha: float, l1_ratio: float, use_group_lasso: bool,
+    min_trades: int = MIN_TRADES,
+) -> dict | None:
+    """Чистая версия фита — принимает уже готовый список сделок (без
+    обращения к HistoryStore/диску), нужна и для офлайн-калибровки
+    (_calibrate_one читает из data/history.json), и для адаптивной
+    пере-калибровки внутри бэктеста (run_backtest_one — там сделки уже
+    в памяти, в process'е walk-forward, без промежуточного файла)."""
+    all_methods: set[str] = set()
+    for t in trades:
+        all_methods.update(t.get("method_scores", {}).keys())
+    methods = sorted(all_methods - _EXCLUDE_FROM_FEATURES)
+    if not methods:
+        return None
+
+    valid_trades = [t for t in trades if _signed_outcome(t) is not None]
+    rows_y = [_signed_outcome(t) for t in valid_trades]
+
+    n = len(rows_y)
+    if n < min_trades:
+        return None
+
+    feature_names, rows_X = _build_features(valid_trades, methods)
+
+    split = n // 2
+    X_train, y_train = rows_X[:split], rows_y[:split]
+    X_eval, y_eval = rows_X[split:], rows_y[split:]
+
+    n_feat = len(feature_names)
+    X_train_std, means, stds = _standardize(X_train)
+    X_eval_std = [[(X_eval[i][j] - means[j]) / stds[j] for j in range(n_feat)]
+                  for i in range(len(X_eval))]
+
+    if use_group_lasso:
+        feat_idx = {f: j for j, f in enumerate(feature_names)}
+        groups: list[list[int]] = []
+        for cl in STRATEGY_CLUSTERS:
+            g = [feat_idx[mid] for mid in cl["ids"] if mid in feat_idx]
+            if g:
+                groups.append(g)
+        known = {j for g in groups for j in g}
+        leftover = [j for j in range(n_feat) if j not in known]
+        groups.extend([j] for j in leftover)
+
+        w_std = _group_lasso_fista(X_train_std, y_train, groups, alpha, l1_ratio)
+    else:
+        w_std = _elastic_net_fista(X_train_std, y_train, alpha, l1_ratio)
+
+    w_orig = [w_std[j] / stds[j] if stds[j] else 0.0 for j in range(n_feat)]
+
+    y_hat_eval = _mat_vec(X_eval_std, w_std)
+    eval_mse = _mse(y_eval, y_hat_eval)
+
+    coefficients = {f: round(w_orig[j], 6) for j, f in enumerate(feature_names)}
+
+    cluster_weights: dict[str, float] = {}
+    for m in methods:
+        coef = coefficients.get(m, 0.0)
+        cl = _METHOD_TO_CLUSTER.get(m, "?")
+        cluster_weights[cl] = cluster_weights.get(cl, 0.0) + abs(coef)
+    dropped_clusters = [cl for cl, w in cluster_weights.items() if w < 1e-8]
+
+    return {
+        "computed_at": datetime.now(timezone.utc).date().isoformat(),
+        "window_days": None,
+        "n_trades": n,
+        "alpha": alpha,
+        "l1_ratio": l1_ratio,
+        "use_group_lasso": use_group_lasso,
+        "eval_mse": round(eval_mse, 6),
+        "coefficients": coefficients,
+        "dropped_clusters": dropped_clusters,
+    }
+
+
 def _calibrate_one(
     ticker: str, days: int, alpha: float, l1_ratio: float, use_group_lasso: bool,
 ) -> dict | None:
@@ -296,93 +372,20 @@ def _calibrate_one(
     # регрессия смешивает две разные механики входа/выхода в одном окне.
     trades = HistoryStore.reweight_trades_by_version(trades, STRATEGY_VERSION)
 
-    # Собрать метод-имена из сделок, исключить метамодели
-    all_methods: set[str] = set()
-    for t in trades:
-        all_methods.update(t.get("method_scores", {}).keys())
-    methods = sorted(all_methods - _EXCLUDE_FROM_FEATURES)
-    if not methods:
-        print(f"{ticker}: нет методов после исключения метамоделей — пропуск")
+    result = fit_lasso_coefficients(trades, alpha, l1_ratio, use_group_lasso)
+    if result is None:
+        print(f"{ticker}: нет методов/слишком мало сделок ({len(trades)} < {MIN_TRADES}) — пропуск")
         return None
-
-    # Построить y и отфильтровать сделки без валидного исхода ДО построения
-    # фичей — _build_features должен видеть тот же набор строк, что и rows_y.
-    valid_trades = [t for t in trades if _signed_outcome(t) is not None]
-    rows_y = [_signed_outcome(t) for t in valid_trades]
-
-    n = len(rows_y)
-    if n < MIN_TRADES:
-        print(f"{ticker}: слишком мало сделок ({n} < {MIN_TRADES}) — пропуск")
-        return None
-
-    feature_names, rows_X = _build_features(valid_trades, methods)
-
-    # Кросс-валидация по времени: train=первая половина, eval=вторая
-    split = n // 2
-    X_train, y_train = rows_X[:split], rows_y[:split]
-    X_eval, y_eval = rows_X[split:], rows_y[split:]
-
-    n_feat = len(feature_names)
-    X_train_std, means, stds = _standardize(X_train)
-    X_eval_std = [[(X_eval[i][j] - means[j]) / stds[j] for j in range(n_feat)]
-                  for i in range(len(X_eval))]
-
-    if use_group_lasso:
-        # Группы: raw-методы — по кластерам (как раньше); кластерные средние
-        # и парные взаимодействия — каждая в своей одноэлементной группе
-        # (для них group lasso вырождается в обычный L1, что и нужно — это
-        # уже агрегаты, дальше дробить их незачем).
-        feat_idx = {f: j for j, f in enumerate(feature_names)}
-        groups: list[list[int]] = []
-        for cl in STRATEGY_CLUSTERS:
-            g = [feat_idx[mid] for mid in cl["ids"] if mid in feat_idx]
-            if g:
-                groups.append(g)
-        known = {j for g in groups for j in g}
-        leftover = [j for j in range(n_feat) if j not in known]
-        groups.extend([j] for j in leftover)
-
-        w_std = _group_lasso_fista(X_train_std, y_train, groups, alpha, l1_ratio)
-    else:
-        w_std = _elastic_net_fista(X_train_std, y_train, alpha, l1_ratio)
-
-    # Денормализация: w_orig[j] = w_std[j] / stds[j]
-    w_orig = [w_std[j] / stds[j] if stds[j] else 0.0 for j in range(n_feat)]
-
-    # Eval MSE для контроля
-    y_hat_eval = _mat_vec(X_eval_std, w_std)
-    eval_mse = _mse(y_eval, y_hat_eval)
-
-    coefficients = {f: round(w_orig[j], 6) for j, f in enumerate(feature_names)}
-
-    # Кластеры с нулевым суммарным весом → dropped (учитываются только
-    # raw-методы — кластерные агрегаты/взаимодействия не входят в исходную
-    # кластеризацию методов, их обнуление считается отдельно не нужно).
-    cluster_weights: dict[str, float] = {}
-    for m in methods:
-        coef = coefficients.get(m, 0.0)
-        cl = _METHOD_TO_CLUSTER.get(m, "?")
-        cluster_weights[cl] = cluster_weights.get(cl, 0.0) + abs(coef)
-    dropped_clusters = [cl for cl, w in cluster_weights.items() if w < 1e-8]
+    result["window_days"] = days
 
     figi = strategy_settings.figi
+    n_feat = len(result["coefficients"])
     print(
-        f"{ticker} ({figi}): {n} сделок, ненулевых фичей: "
-        f"{sum(1 for v in coefficients.values() if abs(v) > 1e-8)}/{n_feat}, "
-        f"eval MSE: {eval_mse:.4f}"
+        f"{ticker} ({figi}): {result['n_trades']} сделок, ненулевых фичей: "
+        f"{sum(1 for v in result['coefficients'].values() if abs(v) > 1e-8)}/{n_feat}, "
+        f"eval MSE: {result['eval_mse']:.4f}"
     )
-
-    return {
-        "computed_at": datetime.now(timezone.utc).date().isoformat(),
-        "window_days": days,
-        "n_trades": n,
-        "alpha": alpha,
-        "l1_ratio": l1_ratio,
-        "use_group_lasso": use_group_lasso,
-        "eval_mse": round(eval_mse, 6),
-        "coefficients": coefficients,
-        "dropped_clusters": dropped_clusters,
-    }
+    return result
 
 
 # ── Запись результата ─────────────────────────────────────────────────────────

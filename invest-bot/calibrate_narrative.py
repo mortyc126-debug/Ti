@@ -22,29 +22,13 @@ import argparse
 import json
 import os
 
-from cluster_models import STRATEGY_CLUSTERS
 from dashboard import _strategy_settings_by_ticker
 from history import HistoryStore
-from narrative import NARRATIVE_THRESHOLDS_FILE
-
-# Перцентили, определяющие "явно выраженный" сигнал — выше них направление
-# считается не шумом, а реальным согласием кластера. 65/35 — не середина
-# (50/50 ловила бы шум), но и не крайность (90/10 почти никогда не сработает).
-_DIRECTIONAL_PCT = 0.65
-_VOLUME_PCT = 0.65
-# Перцентиль РАЗБРОСА (не среднего) для CLIMAX — верхний хвост распределения
-# спреда внутри группы "Объём" за день.
-_CLIMAX_SPREAD_PCT = 0.85
-
-MIN_DAYS_PER_REGIME = 20
-
-
-def _percentile(values: list[float], pct: float) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    idx = min(len(s) - 1, max(0, int(len(s) * pct)))
-    return s[idx]
+from narrative import (
+    MIN_DAYS_PER_REGIME,
+    NARRATIVE_THRESHOLDS_FILE,
+    fit_narrative_thresholds as fit_thresholds,
+)
 
 
 def _calibrate_one(ticker: str, days: int) -> dict | None:
@@ -54,33 +38,7 @@ def _calibrate_one(ticker: str, days: int) -> dict | None:
         print(f"{ticker}: нет дневной истории scores — пропуск")
         return None
 
-    result: dict[str, dict[str, dict[str, float]]] = {}
-    for cl in STRATEGY_CLUSTERS:
-        label = cl["label"]
-        ids = cl["ids"]
-        for regime, day_scores_list in by_regime.items():
-            if len(day_scores_list) < MIN_DAYS_PER_REGIME:
-                continue
-            avgs: list[float] = []
-            spreads: list[float] = []
-            for day_scores in day_scores_list:
-                vals = [day_scores[m] for m in ids if m in day_scores]
-                if not vals:
-                    continue
-                avgs.append(sum(vals) / len(vals))
-                spreads.append(max(vals) - min(vals))
-            if not avgs:
-                continue
-            bullish = _percentile([abs(a) for a in avgs], _DIRECTIONAL_PCT)
-            accum = _percentile([abs(a) for a in avgs], _VOLUME_PCT)
-            climax_spread = _percentile(spreads, _CLIMAX_SPREAD_PCT)
-            result.setdefault(label, {})[regime] = {
-                "bullish": round(bullish, 4),
-                "accum": round(accum, 4),
-                "climax_spread": round(climax_spread, 4),
-                "n_days": len(avgs),
-            }
-
+    result = fit_thresholds(by_regime)
     if not result:
         print(f"{ticker}: ни одного (кластер, режим) с >= {MIN_DAYS_PER_REGIME} дней — пропуск")
         return None

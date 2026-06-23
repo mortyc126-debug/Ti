@@ -78,6 +78,7 @@ from cluster_models import ClusterModels
 from narrative import (
     NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
     classify_volume, classify_price_reaction, update_narrative,
+    fit_narrative_thresholds,
 )
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
@@ -2006,7 +2007,9 @@ class OICompositeStrategy(IStrategy):
             return 0.5, 0
         return sum(qualities) / len(qualities), len(qualities)
 
-    def backtest_scan_signals(self, candles: list[HistoricCandle], max_bars: int = 60) -> list[dict]:
+    def backtest_scan_signals(self, candles: list[HistoricCandle], max_bars: int = 60,
+                               adaptive_narrative: bool = False,
+                               narrative_recalib_every_days: int = 20) -> list[dict]:
         """
         Один проход по свечам с дорогим __compute_composite() (внутри —
         Hawkes-MLE через scipy.optimize и другие методы) — собирает все бары,
@@ -2037,6 +2040,7 @@ class OICompositeStrategy(IStrategy):
         t_last_log = t_start
         last_sim_day: Optional[str] = None
         last_l1_day = None
+        days_since_recalib = 0
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
@@ -2101,6 +2105,25 @@ class OICompositeStrategy(IStrategy):
                             rolling_quality=self.__rolling_quality,
                             live=False,
                         )
+                        # Адаптивная пере-калибровка narrative-порогов В ПРОЦЕССЕ
+                        # скана: в отличие от lasso-приоров (которым нужны исходы
+                        # сделок, доступные только после backtest_barriers — пост-
+                        # фактум обновление было бы причинно бессмысленным), пороги
+                        # narrative читаются классификаторами на каждом баре заново
+                        # (classify_directional/classify_volume, см. ниже), а нужные
+                        # для фита дневные method_scores уже накоплены record_daily
+                        # выше в этом же проходе — обновление здесь меняет реальное
+                        # поведение всех последующих баров той же симуляции.
+                        if adaptive_narrative:
+                            days_since_recalib += 1
+                            if days_since_recalib >= narrative_recalib_every_days:
+                                days_since_recalib = 0
+                                by_regime = self.__history.daily_method_scores_by_regime(
+                                    self.__settings.ticker, window_days=10**6,
+                                )
+                                fitted = fit_narrative_thresholds(by_regime)
+                                if fitted:
+                                    self.__narrative_thresholds.set_data(fitted)
                 adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
                 effective_threshold = self.__effective_threshold(adaptive)
 
@@ -3307,6 +3330,33 @@ class OICompositeStrategy(IStrategy):
         """Перечитать lasso prior без пересоздания стратегии.
         Вызывать после еженедельного прогона lasso_calibration.py."""
         self.__lasso_priors = self.__load_lasso_priors()
+
+    @staticmethod
+    def priors_from_lasso_coefficients(coefficients: dict[str, float]) -> dict[str, float]:
+        """Та же конвертация коэффициент → prior [0.05, 1.0], что в
+        __load_lasso_priors, вынесена наружу — используется адаптивной
+        пере-калибровкой внутри бэктеста (run_backtest_one), где
+        коэффициенты приходят из fit_lasso_coefficients() в памяти,
+        а не из data/lasso_weights.json."""
+        max_pos = max((v for v in coefficients.values() if v > 0), default=0.0)
+        if max_pos <= 0:
+            return {}
+        return {
+            name: (0.05 if coef <= 0 else max(0.05, min(1.0, 0.05 + 0.95 * coef / max_pos)))
+            for name, coef in coefficients.items()
+        }
+
+    def set_lasso_priors(self, priors: dict[str, float]) -> None:
+        """Подставить lasso-приоры напрямую (in-memory), минуя файл —
+        для адаптивной пере-калибровки в процессе бэктеста."""
+        if priors:
+            self.__lasso_priors = priors
+
+    def set_narrative_thresholds(self, data: dict) -> None:
+        """Подставить пороги narrative напрямую (in-memory), минуя файл —
+        для адаптивной пере-калибровки в процессе бэктеста."""
+        if data:
+            self.__narrative_thresholds.set_data(data)
 
     # ── Персистентность весов ─────────────────────────────────────────────────
 

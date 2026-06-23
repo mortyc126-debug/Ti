@@ -33,6 +33,7 @@ __all__ = (
     "classify_directional", "classify_volume", "classify_price_reaction",
     "NarrativeState", "update_narrative",
     "NarrativeWeights", "NarrativeThresholds",
+    "fit_narrative_thresholds", "MIN_DAYS_PER_REGIME",
 )
 
 logger = logging.getLogger(__name__)
@@ -376,3 +377,65 @@ class NarrativeThresholds:
         if not bucket or key not in bucket:
             return default
         return bucket[key]
+
+    def set_data(self, data: dict[str, dict[str, dict[str, float]]]) -> None:
+        """Подставить пороги напрямую (in-memory), минуя файл — для
+        адаптивной пере-калибровки в процессе бэктеста (run_backtest_one)."""
+        self._data = data
+
+
+# Перцентили, определяющие "явно выраженный" сигнал — выше них направление
+# считается не шумом, а реальным согласием кластера. 65/35 — не середина
+# (50/50 ловила бы шум), но и не крайность (90/10 почти никогда не сработает).
+_DIRECTIONAL_PCT = 0.65
+_VOLUME_PCT = 0.65
+# Перцентиль РАЗБРОСА (не среднего) для CLIMAX — верхний хвост распределения
+# спреда внутри группы "Объём" за день.
+_CLIMAX_SPREAD_PCT = 0.85
+
+MIN_DAYS_PER_REGIME = 20
+
+
+def _percentile(values: list[float], pct: float) -> float:
+    if not values:
+        return 0.0
+    s = sorted(values)
+    idx = min(len(s) - 1, max(0, int(len(s) * pct)))
+    return s[idx]
+
+
+def fit_narrative_thresholds(by_regime: dict[str, list[dict[str, float]]]) -> dict | None:
+    """Чистая версия расчёта порогов — принимает уже собранные дневные
+    method_scores по режимам (см. HistoryStore.daily_method_scores_by_regime
+    / BacktestHistoryStore — структура та же), без обращения к диску.
+    Используется и для офлайн-калибровки (calibrate_narrative.py), и для
+    адаптивной пере-калибровки внутри бэктеста (run_backtest_one)."""
+    if not by_regime:
+        return None
+    result: dict[str, dict[str, dict[str, float]]] = {}
+    for cl in STRATEGY_CLUSTERS:
+        label = cl["label"]
+        ids = cl["ids"]
+        for regime, day_scores_list in by_regime.items():
+            if len(day_scores_list) < MIN_DAYS_PER_REGIME:
+                continue
+            avgs: list[float] = []
+            spreads: list[float] = []
+            for day_scores in day_scores_list:
+                vals = [day_scores[m] for m in ids if m in day_scores]
+                if not vals:
+                    continue
+                avgs.append(sum(vals) / len(vals))
+                spreads.append(max(vals) - min(vals))
+            if not avgs:
+                continue
+            bullish = _percentile([abs(a) for a in avgs], _DIRECTIONAL_PCT)
+            accum = _percentile([abs(a) for a in avgs], _VOLUME_PCT)
+            climax_spread = _percentile(spreads, _CLIMAX_SPREAD_PCT)
+            result.setdefault(label, {})[regime] = {
+                "bullish": round(bullish, 4),
+                "accum": round(accum, 4),
+                "climax_spread": round(climax_spread, 4),
+                "n_days": len(avgs),
+            }
+    return result or None

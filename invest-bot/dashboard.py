@@ -1194,6 +1194,7 @@ def run_backtest_one(
         ticker: str, days: int, atr_take_ks: list[float], atr_stop_ks: list[float],
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
         progress: dict | None = None, offset_days: int = 0,
+        adaptive_narrative: bool = False,
 ) -> tuple[list[dict], dict | None]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает (rows, history_data):
@@ -1253,8 +1254,9 @@ def run_backtest_one(
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
         t1 = time.monotonic()
-        signals = strategy.backtest_scan_signals(candles)
-        logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с")
+        signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative)
+        logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с"
+                    + (" (адаптивная калибровка narrative)" if adaptive_narrative else ""))
 
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff)
@@ -1975,6 +1977,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button type="button" class="btn-pill btn-sm" style="color:#aaa" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
   <span id="history_coverage_out" style="display:block;width:100%;font-size:12px;color:var(--muted);white-space:pre-wrap;"></span>
   <label title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
+  <label title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json. ВАЖНО: lasso-приоры методов так пере-калибровать нельзя — им нужны исходы сделок, которые появляются только ПОСЛЕ скана сигналов (на уже зафиксированных входах), поэтому эта опция влияет только на narrative-гейт, не на веса методов."><input type="checkbox" id="adaptive_narrative"> Адаптивная калибровка narrative</label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
   <label>Тариф комиссии <select class="inp" id="tariff">
@@ -2656,7 +2659,8 @@ async function runBacktest() {{
     const resp = await fetch('/api/backtest_stream', {{
       method: 'POST', headers: {{'Content-Type': 'application/json'}},
       body: JSON.stringify({{tickers: tickers, days: days, offset_days: offsetDays, atr_take: atrTake, atr_stop: atrStop,
-                              tariff: document.getElementById('tariff').value}})
+                              tariff: document.getElementById('tariff').value,
+                              adaptive_narrative: document.getElementById('adaptive_narrative').checked}})
     }});
     if (!resp.ok || !resp.body) throw new Error('stream недоступен');
     const reader = resp.body.getReader();
@@ -4476,6 +4480,7 @@ class Handler(BaseHTTPRequestHandler):
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
+            adaptive_narrative = bool(payload.get("adaptive_narrative", False))
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -4506,7 +4511,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 fs = {
                     pool.submit(run_backtest_one, t, days, atr_take_ks, atr_stop_ks,
-                                tariff=tariff, progress=progress, offset_days=offset_days): t
+                                tariff=tariff, progress=progress, offset_days=offset_days,
+                                adaptive_narrative=adaptive_narrative): t
                     for t in tickers
                 }
                 for fut in as_completed(fs):
