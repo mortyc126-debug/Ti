@@ -85,7 +85,7 @@ from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
 )
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
-from trade_system.strategies.level_pattern import detect_level_pattern
+from trade_system.strategies.level_pattern import detect_level_pattern, build_levels
 
 # ── Научные модули из formulas/ (numpy/scipy) — опциональны ──────────────────
 # Каждый завёрнут в try/except: без numpy/scipy бот продолжает работать на
@@ -1229,6 +1229,77 @@ def score_vsa(candles: list[HistoricCandle]) -> float:
     return max(signals, key=abs)
 
 
+def score_level_context(candles: list[HistoricCandle]) -> float:
+    """
+    Реакция последнего бара на ближайший ключевой уровень (build_levels —
+    недельные/дневные H/L, фибо, круглые числа, фракталы Уильямса; см.
+    level_pattern.py) — на входе, а не только на выходе (там уже есть
+    detect_level_pattern для барьеров).
+
+    Идея: голый momentum-сигнал других методов не знает, что цена сейчас
+    тычется в сопротивление или поддержку — отсюда склонность покупать
+    на хае у сопротивления и продавать на лое у поддержки. Здесь:
+
+    - пробой уровня с объёмом и закрытием ЗА ним → подтверждение
+      продолжения (истинный пробой) — скор в сторону пробоя;
+    - прокол уровня без закрытия за ним + длинная тень от уровня
+      (отказ) → сигнал РАЗВОРОТА от уровня (ложный пробой/реакция) —
+      скор ПРОТИВ направления прокола, именно чтобы не покупать хай
+      у сопротивления и не продавать лой у поддержки;
+    - до уровня далеко (или объём слабый) → 0, метод молчит.
+
+    Близкие/сильные уровни (tier 1-2: неделя/день) весят больше,
+    чем фрактал/круглое число (tier 4-5).
+    """
+    if len(candles) < 30:
+        return 0.0
+    atr_pct = _compute_atr(candles)
+    if atr_pct <= 0:
+        return 0.0
+    last = candles[-1]
+    cl = _to_f(last.close)
+    atr_abs = atr_pct * cl
+    if atr_abs <= 0:
+        return 0.0
+
+    ls = build_levels(candles[:-1])
+    nearest = ls.nearest(cl, max_dist=1.5 * atr_abs)
+    if nearest is None:
+        return 0.0
+
+    h, lo, op = _to_f(last.high), _to_f(last.low), _to_f(last.open)
+    rng = h - lo or 1e-9
+    vols = [float(c.volume) for c in candles[-21:-1]]
+    avg_vol = statistics.mean(vols) if vols else 0.0
+    vol_ratio = float(last.volume) / avg_vol if avg_vol > 0 else 1.0
+
+    tier_w = {1: 1.2, 2: 1.2, 3: 1.0, 4: 0.8, 5: 0.8}.get(nearest.tier, 1.0)
+    score = 0.0
+
+    if nearest.price >= cl - 0.3 * atr_abs and h >= nearest.price - 0.3 * atr_abs:
+        # уровень над/у цены — тычется в "сопротивление" снизу
+        pierced = h >= nearest.price
+        closed_above = cl >= nearest.price
+        if pierced and closed_above and vol_ratio >= 1.3:
+            score = 0.6   # истинный пробой вверх — продолжение
+        elif pierced and not closed_above:
+            upper_wick = h - max(op, cl)
+            if upper_wick >= 0.4 * rng and vol_ratio >= 1.1:
+                score = -0.6  # отказ у сопротивления — не покупать хай
+    elif nearest.price <= cl + 0.3 * atr_abs and lo <= nearest.price + 0.3 * atr_abs:
+        # уровень под/у цены — тычется в "поддержку" сверху
+        pierced = lo <= nearest.price
+        closed_below = cl <= nearest.price
+        if pierced and closed_below and vol_ratio >= 1.3:
+            score = -0.6  # истинный пробой вниз — продолжение
+        elif pierced and not closed_below:
+            lower_wick = min(op, cl) - lo
+            if lower_wick >= 0.4 * rng and vol_ratio >= 1.1:
+                score = 0.6   # отказ у поддержки — не продавать лой
+
+    return max(-1.0, min(1.0, score * tier_w))
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -1260,6 +1331,7 @@ METHODS = [
     ("SSA_SIGNAL",     score_ssa_signal),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
     ("VSA",            score_vsa),
+    ("LEVEL_CONTEXT",  score_level_context),
 ]
 
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
