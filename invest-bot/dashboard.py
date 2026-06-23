@@ -4715,8 +4715,9 @@ def _render_page() -> bytes:
         for i, (pid, label, _) in enumerate(panels)
     )
     cat_panels = "".join(
-        f'<div class="cat-panel" data-panel="{pid}" style="display:{"block" if i == 0 else "none"}">{html}</div>'
-        for i, (pid, _, html) in enumerate(panels)
+        '<div class="cat-panel" data-panel="{}" style="display:{}">{}</div>'.format(
+            pid, "block" if i == 0 else "none", panel_html)
+        for i, (pid, _, panel_html) in enumerate(panels)
     )
 
     reload_hint = (
