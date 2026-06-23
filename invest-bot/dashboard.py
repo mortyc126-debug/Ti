@@ -770,11 +770,11 @@ def _futures_category(base: str) -> str:
     if not base:
         return "Прочее"
     if base in _COMMODITY_BASES:
-        return _BASE_ASSET_LABEL.get(base, base)  # «Нефть Brent», «Золото» и т.д.
+        return "Сырьё"
     if base in _RU_STOCK_BASE_TICKERS:
         return "Акции РФ"
     if base in _BASE_ASSET_LABEL:
-        return "Валюта"  # остаток _BASE_ASSET_LABEL — валюты
+        return "Валюта"
     return "Прочее"
 
 
