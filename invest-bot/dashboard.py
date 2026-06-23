@@ -2109,6 +2109,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <button class="btn-pill btn-sm" style="color:#7eb8f7" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
+  <button class="btn-pill btn-sm" style="color:#b8e6b8" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -2755,6 +2756,50 @@ async function copyAllResults(btn) {{
     ta.value = text; document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
     btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋 копировать всё', 1500);
+  }}
+}}
+
+async function calibrateMethodWeights(btn) {{
+  if (!_backtestRows.length) {{ alert('Нет результатов бэктеста'); return; }}
+  // Для каждого тикера и каждого метода вычисляем мультипликатор из атрибуции.
+  // overall win rate по тикеру = r.win_rate; для метода: for_win_rate vs against_win_rate.
+  // Если метод против (against_win_rate - for_win_rate > 0.2, against_n >= 3) → mult=0.1.
+  // Если for_n >= 5 → mult = clamp(for_win_rate / overallWr, 0.2, 2.0).
+  // Иначе → 1.0 (нейтральный).
+  const MIN_FOR_N = 5, MIN_AGAINST_N = 3, ANTI_DELTA = 0.2;
+  const weights = {{}};
+  for (const r of _backtestRows) {{
+    if (!r.ticker || !r.method_stats || typeof r.win_rate !== 'number') continue;
+    const wr = r.win_rate / 100;
+    if (wr <= 0) continue;
+    const tickerMults = {{}};
+    for (const [method, ms] of Object.entries(r.method_stats)) {{
+      const fn = ms.for_n || 0;
+      const an = ms.against_n || 0;
+      const fwr = ms.for_win_rate != null ? ms.for_win_rate / 100 : null;
+      const awr = ms.against_win_rate != null ? ms.against_win_rate / 100 : null;
+      let mult = 1.0;
+      if (fwr !== null && awr !== null && an >= MIN_AGAINST_N && (awr - fwr) > ANTI_DELTA) {{
+        mult = 0.1; // антисигнал — подавить
+      }} else if (fwr !== null && fn >= MIN_FOR_N) {{
+        mult = Math.max(0.2, Math.min(2.0, fwr / wr));
+      }}
+      if (Math.abs(mult - 1.0) > 0.01) tickerMults[method] = +mult.toFixed(3);
+    }}
+    if (Object.keys(tickerMults).length) weights[r.ticker] = tickerMults;
+  }}
+  if (!Object.keys(weights).length) {{ alert('Недостаточно данных атрибуции (нужно for_n≥5)'); return; }}
+  btn.disabled = true; btn.textContent = '⏳ сохранение…';
+  try {{
+    const resp = await fetch('/api/save_method_weights', {{
+      method: 'POST', headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(weights),
+    }});
+    const j = await resp.json();
+    btn.textContent = j.ok ? `✓ сохранено ${{j.tickers}}т` : `Ошибка: ${{j.error}}`;
+    setTimeout(() => {{ btn.textContent = '💾 веса методов'; btn.disabled = false; }}, 2500);
+  }} catch(e) {{
+    btn.textContent = 'Ошибка сети'; btn.disabled = false;
   }}
 }}
 
@@ -4875,6 +4920,24 @@ class Handler(BaseHTTPRequestHandler):
                 analytics = compute_equity_analytics(sim.get("trades", []), account)
                 sim["analytics"] = analytics
                 self._send_json(sim)
+        elif self.path == "/api/save_method_weights":
+            # payload: {ticker: {method: multiplier}}
+            path = os.path.join("data", "ticker_method_weights.json")
+            os.makedirs("data", exist_ok=True)
+            # мёрджим с существующим файлом (не затираем тикеры, которых нет в payload)
+            existing = {}
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                except Exception:
+                    pass
+            existing.update(payload)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(existing, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
+            self._send_json({"ok": True, "tickers": len(payload)})
         elif self.path == "/api/save_backtest_history":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 90))

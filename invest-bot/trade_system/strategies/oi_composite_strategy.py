@@ -142,7 +142,7 @@ logger = logging.getLogger(__name__)
 WEIGHTS_FILE = "oi_weights.json"   # файл весов (рядом с main.py)
 CANDLE_WINDOW = 30                 # свечей в окне для расчётов
 MIN_CANDLES = 10                   # минимум свечей для первого сигнала
-SIGNAL_THRESHOLD = 0.15            # порог composite для сигнала
+SIGNAL_THRESHOLD = 0.08            # порог composite для сигнала
 HEDGE_ETA = 0.6                    # темп Hedge-обучения весов методов (multiplicative weights)
 HEDGE_WARMUP_TRADES = 15           # на первых N сделках eta линейно растёт от 0 до HEDGE_ETA
 # Байесовский shrinkage: per-regime вес → global.
@@ -186,7 +186,7 @@ MFE_MAE_BARS = 15                  # максимум баров для запи
 
 # ── Фильтры качества сигнала ────────────────────────────────────────────────
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
-AGREE_STRENGTH_MIN = 0.25          # минимальная взвешенная сила согласных методов
+AGREE_STRENGTH_MIN = 0.12          # минимальная взвешенная сила согласных методов
 AGREE_SHARE_MIN = 0.55             # доля силы согласных от силы всех высказавшихся
 
 # Микроструктурные методы (TRADESTATS + HAWKES_SIGNAL) смотрят на действие
@@ -2144,6 +2144,9 @@ class OICompositeStrategy(IStrategy):
         # Lasso prior — data/lasso_weights.json, keyed by figi.
         # Загружается один раз на старте; обновить можно reload_lasso_priors().
         self.__lasso_priors: dict[str, float] = self.__load_lasso_priors()
+        # Пер-тикерные мультипликаторы весов методов из dashboard (data/ticker_method_weights.json).
+        # Формат: {ticker: {method_name: multiplier}}; multiplier∈[0.1, 2.0].
+        self.__ticker_method_weights: dict[str, float] = self.__load_ticker_method_weights()
         self.__squeeze_provider: Optional[SqueezeProvider] = None
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
@@ -3447,6 +3450,7 @@ class OICompositeStrategy(IStrategy):
         weights = [
             self.__blended_hedge_weight(name, regime_probs) * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
+            * self.__ticker_method_weights.get(name, 1.0)
             for name in ALL_METHOD_NAMES
         ]
 
@@ -4057,6 +4061,26 @@ class OICompositeStrategy(IStrategy):
         """Перечитать lasso prior без пересоздания стратегии.
         Вызывать после еженедельного прогона lasso_calibration.py."""
         self.__lasso_priors = self.__load_lasso_priors()
+
+    def __load_ticker_method_weights(self) -> dict[str, float]:
+        """Читает data/ticker_method_weights.json → мультипликатор [0.1, 2.0]
+        для каждого метода этого тикера. Генерируется дашбордом из атрибуции бэктеста."""
+        path = "data/ticker_method_weights.json"
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            mults = data.get(self.__settings.ticker, {})
+            logger.info(f"{self.__settings.ticker}: загружены пер-тикерные веса методов: {mults}")
+            return {k: float(v) for k, v in mults.items()}
+        except Exception as e:
+            logger.warning(f"ticker_method_weights load error: {e}")
+            return {}
+
+    def reload_ticker_method_weights(self) -> None:
+        """Перечитать пер-тикерные веса без пересоздания стратегии."""
+        self.__ticker_method_weights = self.__load_ticker_method_weights()
 
     @staticmethod
     def priors_from_lasso_coefficients(coefficients: dict[str, float]) -> dict[str, float]:
