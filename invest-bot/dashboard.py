@@ -2815,7 +2815,7 @@ function _rowToText(r) {{
 async function copyAllResults(btn) {{
   if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
   const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
-  const text = header + '\n' + _backtestRows.map(_rowToText).join('\n') + '\n';
+  const text = header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
   try {{
     await navigator.clipboard.writeText(text);
     const orig = btn.textContent;
