@@ -1203,6 +1203,30 @@ def _model_stats_from_trades(trades: list[dict]) -> dict:
     }
 
 
+def _trades_list_compact(trades: list[dict]) -> list[dict]:
+    """Компактный список сделок для drill-down на дашборде.
+    Из method_scores берём только топ-3 за и топ-3 против (по abs score),
+    чтобы не гонять по сети все ~40 методов на каждую сделку."""
+    out = []
+    for t in trades:
+        ms = t.get("method_scores", {})
+        dir_sign = 1 if t.get("direction") == "LONG" else -1
+        # согласные (score * dir_sign > 0) и несогласные
+        for_m = sorted([(n, s) for n, s in ms.items() if s * dir_sign > 0.05],
+                        key=lambda x: -abs(x[1]))[:3]
+        against_m = sorted([(n, s) for n, s in ms.items() if s * dir_sign < -0.05],
+                            key=lambda x: -abs(x[1]))[:3]
+        out.append({
+            "t": str(t.get("entry_time", ""))[:16],  # YYYY-MM-DD HH:MM
+            "d": t.get("direction", "?")[0],  # L / S
+            "w": int(t.get("win", False)),
+            "r": round(t.get("r_multiple", 0.0), 2),
+            "for": [[n, round(s, 2)] for n, s in for_m],
+            "against": [[n, round(s, 2)] for n, s in against_m],
+        })
+    return out
+
+
 def _method_stats_from_trades(trades: list[dict]) -> dict:
     """Per-method agree/disagree attribution из списка сделок.
     Каждая сделка должна иметь method_scores (dict метод→скор) и direction/win."""
@@ -1371,7 +1395,8 @@ def run_backtest_one(
         fixed_trades = fixed.pop("trades", [])
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
-                     "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades), **fixed})
+                     "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
+                     "trades_list": _trades_list_compact(fixed_trades), **fixed})
 
         # Walk-forward, не full-history sweep: подбор лучшей (tk, sk) по сигналам
         # ДО текущего дня, торговля день — той же парой, что увидел бы живой
@@ -1443,7 +1468,8 @@ def run_backtest_one(
                     "method_stats_by_regime": _method_stats_by_regime_from_trades(wf_trades),
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
-                             "what_if": _what_if_from_trades(wf_trades), **wf_row})
+                             "what_if": _what_if_from_trades(wf_trades),
+                             "trades_list": _trades_list_compact(wf_trades), **wf_row})
 
     except Exception:
         tb = traceback.format_exc()
@@ -2617,7 +2643,40 @@ function rowsToHtml(rows) {{
         html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам — по режимам</summary>${{mtr}}</details></td></tr>`;
       }}
     }}
+    if (r.trades_list && r.trades_list.length) {{
+      html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 сделки по времени (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate)}}</details></td></tr>`;
+    }}
   }}
+  return html;
+}}
+
+function tradesListToHtml(trades, overallWr) {{
+  // Rolling win% по окну 10 сделок
+  const W = 10;
+  let cumR = 0;
+  let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;width:100%">';
+  html += '<tr style="color:var(--txt3)"><th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th><th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
+  const rollWin = [];
+  for (let i = 0; i < trades.length; i++) {{
+    const t = trades[i];
+    cumR += t.r;
+    rollWin.push(t.w);
+    if (rollWin.length > W) rollWin.shift();
+    const rwr = rollWin.reduce((a, b) => a + b, 0) / rollWin.length;
+    const rwrPct = (rwr * 100).toFixed(0) + '%';
+    // цвет rolling WR: зеленее если выше общего, краснее если ниже
+    const rwrColor = overallWr !== undefined
+      ? (rwr > overallWr ? '#7dcc7d' : rwr < overallWr - 0.1 ? '#e07070' : 'var(--txt3)')
+      : 'var(--txt3)';
+    const winMark = t.w ? '<span style="color:#7dcc7d">✓</span>' : '<span style="color:#e07070">✗</span>';
+    const rColor = t.r > 0 ? '#7dcc7d' : '#e07070';
+    const cumRColor = cumR >= 0 ? '#7dcc7d' : '#e07070';
+    const forStr = t.for.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const againstStr = t.against.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
+    const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
+    html += `<tr style="${{bg}}"><td style="color:var(--txt3)">${{i+1}}</td><td style="white-space:nowrap">${{t.t}}</td><td>${{t.d}}</td><td>${{winMark}}</td><td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td><td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td><td style="color:${{rwrColor}}">${{rwrPct}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{forStr}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{againstStr}}</td></tr>`;
+  }}
+  html += '</table></div>';
   return html;
 }}
 
