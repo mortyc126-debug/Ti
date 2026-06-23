@@ -186,11 +186,19 @@ def get_candles_cached_futures_chain(
 
     chain = instrument_service.futures_chain_by_figi(figi)
     if not chain:
+        logger.info(f"{ticker}: цепочка предыдущих контрактов не найдена (basic_asset не "
+                     f"определился) — глубже {earliest_have} не уйти, история обрывается на этом")
         return candles
 
     idx = next((i for i, (_, f, _) in enumerate(chain) if f == figi), None)
-    if idx is None or idx == 0:
-        return candles  # самый старый контракт в цепочке — дальше некуда
+    if idx is None:
+        logger.info(f"{ticker}: figi={figi} не найден в собственной цепочке basic_asset — "
+                     f"глубже {earliest_have} не уйти")
+        return candles
+    if idx == 0:
+        logger.info(f"{ticker}: это самый старый контракт в цепочке basic_asset (предыдущих "
+                     f"нет) — глубже {earliest_have} физически нет истории")
+        return candles
 
     rows_by_day: dict[str, list[dict]] = {}
     for c in candles:

@@ -18,9 +18,19 @@ class InstrumentService:
     """
     The class encapsulate tinkoff instruments api
     """
+    # TTL кэша полного списка фьючерсов (instruments.futures ALL) — без него
+    # futures_chain_by_figi гонял этот тяжёлый запрос (тысячи инструментов)
+    # ПО КАЖДОМУ тикеру в бэктесте: на сотне фьючерсов в чипах это и медленно,
+    # и упирается в rate-limit Tinkoff API, из-за чего часть тикеров ловила
+    # RequestError/пустой ответ и репортилась как "нет истории" хотя цепочка
+    # предыдущих контрактов у них реально есть.
+    _ALL_FUTURES_CACHE_TTL_SEC = 600
+
     def __init__(self, token: str, app_name: str) -> None:
         self.__token = token
         self.__app_name = app_name
+        self.__all_futures_cache: list | None = None
+        self.__all_futures_cache_ts: float = 0.0
 
     def moex_today_trading_schedule(self) -> (bool, datetime, datetime):
         """
@@ -271,6 +281,21 @@ class InstrumentService:
 
     @invest_api_retry()
     @invest_error_logging
+    def __all_futures(self) -> list:
+        """Полный список фьючерсов (включая экспирировавшие), кэшированный
+        на _ALL_FUTURES_CACHE_TTL_SEC — см. комментарий у __init__."""
+        now = time.monotonic()
+        if self.__all_futures_cache is not None \
+                and now - self.__all_futures_cache_ts < self._ALL_FUTURES_CACHE_TTL_SEC:
+            return self.__all_futures_cache
+        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
+            all_futures = client.instruments.futures(
+                instrument_status=InstrumentStatus.INSTRUMENT_STATUS_ALL
+            ).instruments
+        self.__all_futures_cache = all_futures
+        self.__all_futures_cache_ts = now
+        return all_futures
+
     def futures_chain_by_figi(self, figi: str) -> list[tuple[str, str, datetime.datetime]] | None:
         """
         Все контракты (включая уже экспирировавшие) того же basic_asset, что
@@ -280,19 +305,18 @@ class InstrumentService:
         expiration_date), ...] по возрастанию экспирации, или None если
         basic_asset не нашёлся.
         """
-        with Client(self.__token, app_name=self.__app_name, target=INVEST_TARGET) as client:
-            all_futures = client.instruments.futures(
-                instrument_status=InstrumentStatus.INSTRUMENT_STATUS_ALL
-            ).instruments
+        all_futures = self.__all_futures()
 
-            basic_asset = next((f.basic_asset for f in all_futures if f.figi == figi), None)
-            if not basic_asset:
-                return None
+        basic_asset = next((f.basic_asset for f in all_futures if f.figi == figi), None)
+        if not basic_asset:
+            logger.info(f"futures_chain_by_figi: figi={figi} не найден в списке фьючерсов "
+                        f"(или у него нет basic_asset) — цепочка недоступна")
+            return None
 
-            chain = sorted(
-                ((f.ticker, f.figi, f.expiration_date) for f in all_futures if f.basic_asset == basic_asset),
-                key=lambda x: x[2],
-            )
+        chain = sorted(
+            ((f.ticker, f.figi, f.expiration_date) for f in all_futures if f.basic_asset == basic_asset),
+            key=lambda x: x[2],
+        )
         return chain
 
     @invest_api_retry()
