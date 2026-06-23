@@ -379,9 +379,20 @@ class NarrativeThresholds:
         return bucket[key]
 
     def set_data(self, data: dict[str, dict[str, dict[str, float]]]) -> None:
-        """Подставить пороги напрямую (in-memory), минуя файл — для
-        адаптивной пере-калибровки в процессе бэктеста (run_backtest_one)."""
+        """Подставить пороги и сохранить на диск — для адаптивной
+        пере-калибровки в бэктесте и переноса результатов в живую торговлю."""
         self._data = data
+        self._save()
+
+    def _save(self) -> None:
+        os.makedirs(os.path.dirname(self._path) or ".", exist_ok=True)
+        tmp = self._path + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self._data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, self._path)
+        except OSError as e:
+            logger.warning(f"narrative_thresholds: не удалось сохранить: {e}")
 
 
 # Перцентили, определяющие "явно выраженный" сигнал — выше них направление
