@@ -4738,11 +4738,18 @@ def _render_page() -> bytes:
         f'<div class="cat-panels">{cat_panels}</div>'
         f'</div>'
     )
-    return (PAGE_HTML
-            .replace("__TICKER_CHECKBOXES__", checkboxes)
-            .replace("__BACKTEST_WORKERS__", str(BACKTEST_WORKERS))
-            .replace("{{", "{").replace("}}", "}")
-            ).encode("utf-8")
+    rendered = (PAGE_HTML
+                .replace("__TICKER_CHECKBOXES__", checkboxes)
+                .replace("__BACKTEST_WORKERS__", str(BACKTEST_WORKERS))
+                .replace("{{", "{").replace("}}", "}"))
+    try:
+        import tempfile, os as _os
+        _debug = _os.path.join(_os.path.dirname(__file__), "data", "_debug_rendered.html")
+        with open(_debug, "w", encoding="utf-8") as _f:
+            _f.write(rendered)
+    except Exception:
+        pass
+    return rendered.encode("utf-8")
 
 
 class Handler(BaseHTTPRequestHandler):
