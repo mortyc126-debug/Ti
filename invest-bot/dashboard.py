@@ -37,6 +37,7 @@ os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 
 import datetime
 import multiprocessing
+import dataclasses
 import statistics
 import threading
 import time
@@ -131,6 +132,17 @@ def _get_backtest_candles(ticker: str, settings, days: int, offset_days: int = 0
     )
 
 
+def _backtest_strategy_settings(settings) -> "StrategySettings":
+    """Для фьючерсов в историческом бэктесте мы всегда грузим 5-мин свечи
+    (Tinkoff отдаёт 1-мин только за последние ~7 дней, D1 хранит только 5-мин).
+    Если оставить candle_interval_min=1, стратегия строит окно 150 баров вместо 30
+    и включает MTF-агрегацию 5→25-мин (бессмысленную на реальных 5-мин данных),
+    что обрушивает composite ниже порога на все 150 дней."""
+    if getattr(settings, "is_future", False) and getattr(settings, "candle_interval_min", 5) != 5:
+        return dataclasses.replace(settings, candle_interval_min=5)
+    return settings
+
+
 def _save_backtest_history_one(
         ticker: str, days: int, offset_days: int = 0, progress: dict | None = None,
 ) -> tuple[str, dict | None, int, str | None]:
@@ -145,7 +157,7 @@ def _save_backtest_history_one(
         _set_progress(progress, ticker, "ошибка")
         return ticker, None, 0, f"{ticker}: нет в settings"
     try:
-        strategy = StrategyFactory.new_factory(settings.name, settings)
+        strategy = StrategyFactory.new_factory(settings.name, _backtest_strategy_settings(settings))
         bt_store = _wire_history_returning(strategy)
         _set_progress(progress, ticker, "загрузка свечей")
         candles = _get_backtest_candles(ticker, settings, days, offset_days)
@@ -1280,7 +1292,7 @@ def run_backtest_one(
     logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
     _set_progress(progress, ticker, "загрузка свечей")
     try:
-        strategy = StrategyFactory.new_factory(strategy_settings.name, strategy_settings)
+        strategy = StrategyFactory.new_factory(strategy_settings.name, _backtest_strategy_settings(strategy_settings))
         bt_store = _wire_history_returning(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
