@@ -3272,6 +3272,7 @@ class OICompositeStrategy(IStrategy):
                     "against_count": len([v for v in ms.values() if v * dir_sign < -0.05]),
                     "top_agree": top_agree,
                     "top_against": top_against,
+                    "method_scores": ms,
                     # L1-контекст на момент входа (None если данных не было)
                     "l1_pct": sig.get("l1_pct"),
                     "l1_above_ma50": sig.get("l1_above_ma50"),
