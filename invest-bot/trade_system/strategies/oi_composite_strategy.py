@@ -3751,17 +3751,17 @@ class OICompositeStrategy(IStrategy):
             self.__cached_change_point = change_point_score(closes)
             self.__cached_rqa_mult    = self.__rqa_confidence_mult(closes)
             self.__cached_wavelet_mult = wavelet_confidence_mult(closes)
-            if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
+            if len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
                 self.__cached_mtf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
-            # L2: composite из методов на виртуальных 5м-барах.
-            if self.__interval_min == 1:
-                src = (self.__l1_buffer or self.__candles)[-_MTF5_BUFFER_1M:]
-                if len(src) >= _MTF5_MIN_5M_BARS * _MTF_FACTOR:
-                    self.__cached_mtf5_composite, self.__cached_mtf5_scores = _compute_l2_composite(src)
-                    # Signal Momentum: буфер последних L2-значений для детекции разворота
-                    self.__mtf5_momentum_buf.append(self.__cached_mtf5_composite)
-                    if len(self.__mtf5_momentum_buf) > _MTF5_MOMENTUM_LEN + 2:
-                        self.__mtf5_momentum_buf = self.__mtf5_momentum_buf[-(_MTF5_MOMENTUM_LEN + 2):]
+            # L2: composite на виртуальных барах ТФ×MTF_FACTOR (5м на 1м-данных,
+            # 25м на 5м-данных и т.д.). Работает на любом рабочем интервале.
+            src = (self.__l1_buffer or self.__candles)[-_MTF5_BUFFER_1M:]
+            if len(src) >= _MTF5_MIN_5M_BARS * _MTF_FACTOR:
+                self.__cached_mtf5_composite, self.__cached_mtf5_scores = _compute_l2_composite(src)
+                # Signal Momentum: буфер последних L2-значений для детекции разворота
+                self.__mtf5_momentum_buf.append(self.__cached_mtf5_composite)
+                if len(self.__mtf5_momentum_buf) > _MTF5_MOMENTUM_LEN + 2:
+                    self.__mtf5_momentum_buf = self.__mtf5_momentum_buf[-(_MTF5_MOMENTUM_LEN + 2):]
             self.__recalc_l1_context()
 
         regime_probs = self.__cached_regime_probs
@@ -3887,10 +3887,10 @@ class OICompositeStrategy(IStrategy):
         confidence_mult *= lag_mult
         composite *= confidence_mult
 
-        # L2-блендинг: L2 (5м) аналитик, даёт 30% итогового composite.
+        # L2-блендинг: даёт 30% итогового composite. Работает на любом ТФ.
         l2_comp = self.__cached_mtf5_composite
         l2_scores = self.__cached_mtf5_scores
-        if abs(l2_comp) > 0.01 and self.__interval_min == 1:
+        if abs(l2_comp) > 0.01:
             composite = (1.0 - _MTF5_BLEND_W) * composite + _MTF5_BLEND_W * l2_comp
 
             # Signal Momentum L2: если импульс на 5м разворачивается — штрафуем.
