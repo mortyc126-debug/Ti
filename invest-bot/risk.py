@@ -109,6 +109,9 @@ class Position:
     fix_count: int = 0             # сколько раз уже фиксировали после первого тейка
     entry_composite: float = 0.0   # сигнальный edge на момент входа (знаковый, по направлению позиции)
     initial_risk_rub: float = 0.0  # риск при открытии — не меняется при сдвиге стопа, используется для R-расчётов
+    initial_trail_dist: float = 0.0  # trail_dist при открытии; нужен для восстановления после tighten
+    trail_tightened: bool = False    # True после ужесточения по 1/3 поведенческих сигналов
+    activation_levels: dict = field(default_factory=dict)  # per-playbook пороги: breakeven/partial/trailing (доли R)
 
     def pnl_rub(self, price: float, point_value: float = 1.0) -> float:
         diff = (price - self.entry_price) if self.direction == "long" \
@@ -440,8 +443,10 @@ class RiskManager:
                        trail_dist: float = 0.0,
                        confidence: float = 0.7,
                        take_target: float = 0.0,
-                       entry_composite: float = 0.0) -> Position:
+                       entry_composite: float = 0.0,
+                       activation_levels: dict | None = None) -> Position:
         initial_risk = abs(entry - stop) * qty * point_value
+        td = trail_dist or abs(entry - stop) / 2 * CHANDELIER_MULT
         pos = Position(
             ticker=ticker, direction=direction, qty=qty,
             entry_price=entry, stop_price=stop,
@@ -449,7 +454,9 @@ class RiskManager:
             risk_rub=initial_risk,
             initial_risk_rub=initial_risk,
             point_value=point_value,
-            trail_dist=trail_dist or abs(entry - stop) / 2 * CHANDELIER_MULT,
+            trail_dist=td,
+            initial_trail_dist=td,
+            activation_levels=activation_levels or {},
             peak_price=entry,
             confidence=confidence,
             reasons=reasons or [],
@@ -510,21 +517,18 @@ class RiskManager:
 
         # Поведенческий выход: 2 из 3 (стакан + структура + нитки).
         # Без grace-окна — нитки+тонкий стакан предшествуют гэпу.
-        # Если данные свечей не переданы — fallback на одиночный экстремальный
-        # порог стакана (обратная совместимость).
+        # При 1 из 3 условий: ужесточить chandelier (trail_dist × 0.7, один раз).
+        # Если данные свечей не переданы — fallback на одиночный порог стакана.
         if recent_highs is not None and recent_lows is not None \
                 and recent_opens is not None and recent_closes is not None:
             votes: dict[str, bool] = {}
-            # 1. Стакан против позиции (мягкий порог, т.к. это один голос)
             votes['order_flow'] = order_flow < BEHAVIORAL_EXIT_ORDER_FLOW_THR
-            # 2. Структура: последние N баров не обновили HH (для лонга) / LL (для шорта)
             n = BEHAVIORAL_EXIT_HH_BARS
             if len(recent_highs) >= 2 * n and len(recent_lows) >= 2 * n:
                 if pos.direction == "long":
                     votes['structure'] = max(recent_highs[-n:]) <= max(recent_highs[-2 * n:-n])
                 else:
                     votes['structure'] = min(recent_lows[-n:]) >= min(recent_lows[-2 * n:-n])
-            # 3. Нитки: среднее тело / средний диапазон < порога → импульс иссяк
             m = BEHAVIORAL_EXIT_MOMENTUM_BARS
             if (len(recent_opens) >= m and len(recent_closes) >= m
                     and len(recent_highs) >= m and len(recent_lows) >= m):
@@ -532,12 +536,19 @@ class RiskManager:
                 avg_range = sum(recent_highs[-(m - i)] - recent_lows[-(m - i)] for i in range(m)) / m
                 if avg_range > 0:
                     votes['momentum_dead'] = avg_body / avg_range < BEHAVIORAL_EXIT_MOMENTUM_THR
-            if sum(votes.values()) >= BEHAVIORAL_EXIT_VOTES_NEEDED:
-                reasons = '+'.join(k for k, v in votes.items() if v)
-                return True, (f"поведенческий выход ({reasons}): "
-                               f"{sum(votes.values())}/{len(votes)} условий")
+            n_votes = sum(votes.values())
+            if n_votes >= BEHAVIORAL_EXIT_VOTES_NEEDED:
+                reasons_str = '+'.join(k for k, v in votes.items() if v)
+                return True, (f"поведенческий выход ({reasons_str}): "
+                               f"{n_votes}/{len(votes)} условий")
+            # 1 из 3: предупреждение — ужесточить chandelier один раз чтобы
+            # выйти быстрее если картина продолжит ухудшаться.
+            if n_votes == 1 and not pos.trail_tightened and pos.initial_trail_dist > 0:
+                pos.trail_dist = pos.initial_trail_dist * 0.7
+                pos.trail_tightened = True
+                log.debug(f"{ticker}: поведенческое предупреждение (1/3) — "
+                           f"chandelier ужесточён: trail_dist × 0.7")
         elif ORDERBOOK_EXIT_ENABLED and order_flow <= ORDERBOOK_EXIT_THR:
-            # fallback: данные свечей не переданы — экстремальный дисбаланс стакана
             return True, (f"стакан: дисбаланс заявок против позиции "
                            f"({order_flow:.2f}) — выходим немедленно")
 
@@ -559,25 +570,28 @@ class RiskManager:
         if squeeze and pos.direction == "short" and pnl < 0:
             return True, "сквиз-риск: физики в шорте, цена растёт — выходим"
 
-        # Скользящий безубыток: три ступени.
-        # До 0.5R — только фиксированный стоп, принимаем полный риск.
-        # 0.5R → стоп в entry; 0.75R → entry+0.25R; 1.0R → breakeven_set
-        # (Chandelier+giveback берут управление). Giveback никогда не
-        # закрывает в убыток — он активен только после breakeven_set.
-        # Все сравнения через initial_risk_rub: risk_rub сжимается при
-        # сдвиге стопа и непригоден как мера "1R от входа".
+        # Скользящий безубыток: три ступени с per-playbook уровнями.
+        # Уровни берутся из pos.activation_levels (рассчитанных стратегией
+        # из percentiles MFE для данного плейбука/режима); если не заданы —
+        # используются глобальные дефолты из risk_config.
+        # Chandelier работает параллельно и всегда берётся max(chandelier, ступень),
+        # т.к. Chandelier пишет через max() выше, а ступени тоже через max().
+        # Итого: стоп = max(chandelier_stop, breakeven_ступень) — проблема 2 закрыта.
         ir = pos.initial_risk_rub if pos.initial_risk_rub > 0 else pos.risk_rub
+        lvl = pos.activation_levels
+        _be_start = lvl.get('breakeven', BREAKEVEN_SLIDE_START_R)   # дефолт 0.5R
+        _be_step2 = lvl.get('partial', BREAKEVEN_SLIDE_STEP2_R)     # дефолт 0.75R
+        _be_trail = lvl.get('trailing', BREAKEVEN_AT_R)             # дефолт 1.0R
         if not pos.breakeven_set and ir > 0:
-            if pnl >= ir * BREAKEVEN_AT_R:
+            if pnl >= ir * _be_trail:
                 if pos.direction == "long":
                     pos.stop_price = max(pos.stop_price, pos.entry_price)
                 else:
                     pos.stop_price = min(pos.stop_price, pos.entry_price)
                 pos.breakeven_set = True
                 self._recalc_risk_rub(pos)
-                log.info(f"{ticker}: прибыль >= {BREAKEVEN_AT_R}R — безубыток, Chandelier+giveback активны")
-            elif pnl >= ir * BREAKEVEN_SLIDE_STEP2_R:
-                # entry + 0.25R: фиксируем часть прибыли на второй ступени
+                log.info(f"{ticker}: прибыль >= {_be_trail:.2f}R — безубыток, Chandelier+giveback активны")
+            elif pnl >= ir * _be_step2:
                 lock_dist = BREAKEVEN_SLIDE_LOCK2_R * ir / (pos.qty * pos.point_value) \
                     if pos.qty and pos.point_value else 0.0
                 if pos.direction == "long":
@@ -585,9 +599,7 @@ class RiskManager:
                 else:
                     pos.stop_price = min(pos.stop_price, pos.entry_price - lock_dist)
                 self._recalc_risk_rub(pos)
-            elif pnl >= ir * BREAKEVEN_SLIDE_START_R:
-                # entry: стоп в безубыток на первой ступени (не ставим breakeven_set —
-                # giveback и Chandelier ещё не активны, позиция управляется этим стопом)
+            elif pnl >= ir * _be_start:
                 if pos.direction == "long":
                     pos.stop_price = max(pos.stop_price, pos.entry_price)
                 else:
