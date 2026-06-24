@@ -1209,13 +1209,9 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
     чтобы не гонять по сети все ~40 методов на каждую сделку."""
     out = []
     for t in trades:
-        ms = t.get("method_scores", {})
-        dir_sign = 1 if t.get("direction") == "LONG" else -1
-        # согласные (score * dir_sign > 0) и несогласные
-        for_m = sorted([(n, s) for n, s in ms.items() if s * dir_sign > 0.05],
-                        key=lambda x: -abs(x[1]))[:3]
-        against_m = sorted([(n, s) for n, s in ms.items() if s * dir_sign < -0.05],
-                            key=lambda x: -abs(x[1]))[:3]
+        # top_agree/top_against уже вычислены в backtest_barriers как [(name, score), ...]
+        for_m = [(n, s) for n, s in (t.get("top_agree") or [])[:3]]
+        against_m = [(n, s) for n, s in (t.get("top_against") or [])[:3]]
         out.append({
             "t": str(t.get("entry_time", ""))[:16],  # YYYY-MM-DD HH:MM
             "d": t.get("direction", "?")[0],  # L / S
@@ -1236,19 +1232,19 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
         for mname, m_sc in t.get("method_scores", {}).items():
             if abs(m_sc) < 0.02:
                 continue
-            e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
+            e = tally.setdefault(mname, {"for_n": 0, "for_win": 0, "against_n": 0, "against_win": 0})
             if (m_sc > 0) == (dir_sign > 0):
-                e["agree_n"] += 1
-                e["agree_win"] += int(t["win"])
+                e["for_n"] += 1
+                e["for_win"] += int(t["win"])
             else:
-                e["disagree_n"] += 1
-                e["disagree_win"] += int(t["win"])
+                e["against_n"] += 1
+                e["against_win"] += int(t["win"])
     return {
         mname: {
-            "agree_n": e["agree_n"],
-            "agree_win_rate": e["agree_win"] / e["agree_n"] if e["agree_n"] else None,
-            "disagree_n": e["disagree_n"],
-            "disagree_win_rate": e["disagree_win"] / e["disagree_n"] if e["disagree_n"] else None,
+            "for_n": e["for_n"],
+            "for_win_rate": e["for_win"] / e["for_n"] if e["for_n"] else None,
+            "against_n": e["against_n"],
+            "against_win_rate": e["against_win"] / e["against_n"] if e["against_n"] else None,
         }
         for mname, e in tally.items()
     }
@@ -1472,6 +1468,7 @@ def run_backtest_one(
                 }
                 rows.append({"ticker": ticker, "mode": "ATR walk-forward",
                              "what_if": _what_if_from_trades(wf_trades),
+                             "rejection_stats": rej,
                              "trades_list": _trades_list_compact(wf_trades), **wf_row})
 
     except Exception:
