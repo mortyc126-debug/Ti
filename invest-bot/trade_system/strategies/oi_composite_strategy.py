@@ -2197,76 +2197,136 @@ BASE_METHOD_NAMES = (
 )
 CLUSTER_MODEL_NAMES = [M1_NAME, M2_NAME, M3_NAME]
 
-# ── L2 (5м): методы-аналитики старшего ТФ ────────────────────────────────────
-# Подмножество методов, которые имеют смысл на 5м-барах.
-# Tick-данные (BS_PRESSURE_TS, AGGRESSOR_FLOW и др.) работают только на 1м —
-# они завязаны на поток реальных тиков, агрегация их убьёт.
-# Осцилляторы RSI-типа (FISHER_RSI, RMI) перевозбуждаются на 1м; на 5м лучше
-# себя ведут, но SINEWAVE/CYBER_CYCLE тоже нестабильнее — оставляем только
-# трендовые, объёмные и паттерновые.
-_MTF5_BUFFER_1M  = 500   # сколько 1м-баров используем для 5м-агрегации (= 100 5м-баров)
-_MTF5_MIN_5M_BARS = 12   # минимум 5м-баров для расчёта L2 composite
-_MTF5_BLEND_W    = 0.30  # доля L2 в финальном composite (L3 получает 1 - 0.30 = 0.70)
+# ── L2 (5м): полная конфигурация методов ─────────────────────────────────────
+# METHOD_TF_CONFIG: для каждого метода — на каких ТФ считается, минимум баров
+# для стабильного результата (иначе 0.0 без мусора), вес на данном ТФ.
+# Tick-методы (AGGRESSOR_FLOW, BS_PRESSURE_TS и пр.) — только TF=1, т.к.
+# смысл в потоке реальных тиков; агрегация в 5м-бар убьёт сигнал.
+_MTF5_BUFFER_1M   = 500   # 1м-баров для 5м-агрегации  → 100 5м-баров
+_MTF5_MIN_5M_BARS = 12    # минимум 5м-баров для расчёта L2 composite
+_MTF5_BLEND_W     = 0.30  # доля L2 в финальном composite (L3 = 0.70)
+_MTF5_MOMENTUM_LEN = 4    # длина окна Signal Momentum для L2 composite
 
-# (name, score_fn) — только те, что устойчивы на 5м и являются чистыми функциями.
-_MTF5_METHODS_NAMES = frozenset({
-    "PRICE_TREND", "VOL_MOMENTUM", "VWAP_SIGNAL", "TREND_QUALITY",
-    "ADAPTIVE_MA", "FRACTAL", "KLINGER", "VZO", "TWIGGS",
-    "HAWKES_SIGNAL", "CANDLE_PATTERN", "WICK_REJECTION",
-    "SINEWAVE_SIGNAL", "VSA",
-})
-_MTF5_FUNCS: list[tuple[str, object]] = [
-    (name, fn) for name, fn in METHODS if name in _MTF5_METHODS_NAMES
-]
-# На 5м некоторые методы ценнее — буст, применяется внутри _compute_l2_composite.
-_MTF5_WEIGHT_MODS: dict[str, float] = {
-    "HAWKES_SIGNAL":  1.25,   # самоусиление реального потока весомее на 5м
-    "TREND_QUALITY":  1.15,   # TQI стабильнее на 5м (меньше шума HH/HL)
-    "FRACTAL":        1.20,   # Hurst надёжнее на более длинных рядах
-    "CANDLE_PATTERN": 1.10,   # 5м-паттерн значимее 1м
-    "WICK_REJECTION": 1.10,
-    "VWAP_SIGNAL":    0.85,   # 1м-VWAP ближе к реальному; на 5м чуть слабее
-    "SINEWAVE_SIGNAL": 0.80,  # цикл менее чёткий на 5м при коротком окне
+# {name: {min_bars, weight_5m}}
+# min_bars — минимум 5м-баров, при меньшем — метод молчит (0.0)
+# weight_5m — относительный вес на 5м (1.0 = нейтральный)
+METHOD_TF_CONFIG: dict[str, dict] = {
+    # Трендовые — стабильны на 5м, вес выше
+    "PRICE_TREND":    {"min_bars": 10, "weight_5m": 1.10},
+    "TREND_QUALITY":  {"min_bars": 15, "weight_5m": 1.20},  # HH/HL меньше шума на 5м
+    "ADAPTIVE_MA":    {"min_bars": 12, "weight_5m": 1.10},
+    "ZLEMA_SIGNAL":   {"min_bars": 10, "weight_5m": 1.05},
+    "T3_SIGNAL":      {"min_bars": 10, "weight_5m": 1.05},
+    # Объёмные — на 5м ловят реальный поток, не 1м-шум
+    "VOL_MOMENTUM":   {"min_bars": 10, "weight_5m": 1.10},
+    "KLINGER":        {"min_bars": 15, "weight_5m": 1.10},
+    "VZO":            {"min_bars": 15, "weight_5m": 1.05},
+    "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
+    "HAWKES_SIGNAL":  {"min_bars": 25, "weight_5m": 1.30},  # самоусиление потока
+    "VSA":            {"min_bars": 12, "weight_5m": 1.05},
+    # Паттерновые — на 5м значимее чем на 1м
+    "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
+    "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
+    # Фрактальные — нужно много баров для стабильного Hurst/FDI
+    "FRACTAL":        {"min_bars": 40, "weight_5m": 1.25},
+    "ENTROPY":        {"min_bars": 20, "weight_5m": 1.10},
+    # VWAP — на 1м точнее отражает реальный VWAP сессии
+    "VWAP_SIGNAL":    {"min_bars": 10, "weight_5m": 0.85},
+    # Цикловые — на 5м менее стабильны при коротком окне
+    "SINEWAVE_SIGNAL": {"min_bars": 20, "weight_5m": 0.80},
+    "CYBER_CYCLE":    {"min_bars": 30, "weight_5m": 0.80},
+    "EBSW":           {"min_bars": 25, "weight_5m": 0.85},
+    # ZSCORE — mean-reversion; работает и на 5м
+    "ZSCORE":         {"min_bars": 15, "weight_5m": 0.95},
+    # RMI/FISHER — на 5м лучше чем на 1м (меньше перевозбуждения)
+    "RMI":            {"min_bars": 15, "weight_5m": 1.05},
+    "FISHER_RSI":     {"min_bars": 15, "weight_5m": 1.05},
 }
+
+# Методы с конфигом на 5м + доступные как чистые функции в METHODS
+_MTF5_FUNCS: list[tuple[str, object, int, float]] = [
+    (name, fn, METHOD_TF_CONFIG[name]["min_bars"], METHOD_TF_CONFIG[name]["weight_5m"])
+    for name, fn in METHODS
+    if name in METHOD_TF_CONFIG
+]
 
 
 def _compute_l2_composite(candles_1m: list, factor: int = _MTF_FACTOR) -> tuple[float, dict[str, float]]:
     """
-    Вычисляет L2-composite и индивидуальные скоры методов на виртуальных 5м-барах.
-    Входные candles_1m — последние _MTF5_BUFFER_1M 1м-свечей.
+    L2-composite и индивидуальные скоры на виртуальных 5м-барах.
+    min_bars соблюдается: метод молчит (0.0) пока не накоплено достаточно 5м-баров.
     Возвращает (composite ∈[-1,1], {method_name: score}).
-    Возвращает (0.0, {}) если данных недостаточно или произошла ошибка.
     """
     try:
         bars_5m = _aggregate_candles(candles_1m, factor)
     except Exception:
         return 0.0, {}
-    if len(bars_5m) < _MTF5_MIN_5M_BARS:
+    n5 = len(bars_5m)
+    if n5 < _MTF5_MIN_5M_BARS:
         return 0.0, {}
 
     scores: dict[str, float] = {}
-    for name, fn in _MTF5_FUNCS:
-        try:
-            scores[name] = fn(bars_5m)
-        except Exception:
-            scores[name] = 0.0
-
-    # CHANGE_POINT на 5м — детектирует излом режима раньше чем на 1м
-    try:
-        closes_5m = [_to_f(c.close) for c in bars_5m]
-        scores["CHANGE_POINT_L2"] = change_point_score(closes_5m)
-    except Exception:
-        scores["CHANGE_POINT_L2"] = 0.0
-
-    # Взвешенная сумма с per-method модификаторами ТФ
     total_w = 0.0
     total_wv = 0.0
-    for name, sc in scores.items():
-        w = _MTF5_WEIGHT_MODS.get(name, 1.0)
-        total_wv += sc * w
-        total_w  += w
+
+    for name, fn, min_b, w5 in _MTF5_FUNCS:
+        if n5 < min_b:
+            # Метод молчит — недостаточно данных, не подаём мусор.
+            scores[name] = 0.0
+            continue
+        try:
+            sc = fn(bars_5m)
+        except Exception:
+            sc = 0.0
+        scores[name] = sc
+        if sc != 0.0:
+            total_wv += sc * w5
+            total_w  += w5
+
+    # CHANGE_POINT на 5м — отдельный сигнал, не в METHODS
+    try:
+        closes_5m = [_to_f(c.close) for c in bars_5m]
+        cp_l2 = change_point_score(closes_5m) if n5 >= 15 else 0.0
+    except Exception:
+        cp_l2 = 0.0
+    scores["CHANGE_POINT_L2"] = cp_l2
+    if cp_l2 != 0.0:
+        total_wv += cp_l2 * 1.15  # детектор слома режима ценнее на 5м
+        total_w  += 1.15
+
+    # YZ_VOL на 5м — волатильность без 1м-шума; сохраняется отдельно для порогов
+    try:
+        yz_l2 = score_yz_vol_signal(bars_5m) if n5 >= 12 else 0.0
+    except Exception:
+        yz_l2 = 0.0
+    scores["YZ_VOL_L2"] = yz_l2
+    # YZ_VOL не голосует в composite (risk-off не направленный), но хранится для порога
+
     composite = (total_wv / total_w) if total_w > 0 else 0.0
     return max(-1.0, min(1.0, composite)), scores
+
+def _l2_momentum_mult(buf: list[float], l2_composite: float) -> float:
+    """
+    Signal Momentum для L2: если 5м-composite последовательно рос/падал N баров
+    и теперь разворачивается — штрафуем. Это сигнал ослабления импульса на старшем
+    ТФ, который L3 ещё не видит (у него короткое окно).
+    Возвращает мультипликатор [0.5, 1.0]: 1.0 = нет штрафа, 0.5 = разворот импульса.
+    """
+    n = len(buf)
+    if n < _MTF5_MOMENTUM_LEN or abs(l2_composite) < 0.05:
+        return 1.0
+    # Проверяем: все предыдущие N значений росли (или падали), а последнее — наоборот
+    prev = buf[-_MTF5_MOMENTUM_LEN - 1:-1]
+    if len(prev) < _MTF5_MOMENTUM_LEN:
+        return 1.0
+    all_up   = all(prev[i] < prev[i + 1] for i in range(len(prev) - 1))
+    all_down = all(prev[i] > prev[i + 1] for i in range(len(prev) - 1))
+    if all_up and l2_composite < prev[-1]:
+        return 0.65   # импульс рос, теперь падает → ослабляем
+    if all_down and l2_composite > prev[-1]:
+        return 0.65   # импульс падал, теперь растёт → ослабляем контртрендовый сигнал
+    return 1.0
+
 
 # M1/M2/M3 считаются и трекаются (вес/история/attribution) наравне с базовыми
 # методами — чтобы их качество было сравнимо с остальными в архиве и при
@@ -2417,6 +2477,7 @@ class OICompositeStrategy(IStrategy):
         self.__last_composite: float = 0.0
         self.__last_playbooks: list[str] = []
         self.__last_entropy_score: float = 0.0
+        self.__last_yz_vol_l2: float = 0.0
         # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
         self.__history = None
         self.__calibrator = None
@@ -2470,6 +2531,8 @@ class OICompositeStrategy(IStrategy):
         self.__cached_mtf_trend: float = 0.0
         self.__cached_mtf5_composite: float = 0.0
         self.__cached_mtf5_scores: dict[str, float] = {}
+        # Signal Momentum L2: история composite на 5м для детекции ослабления
+        self.__mtf5_momentum_buf: list[float] = []
         # Narrative-гейт (narrative.py): FSM с памятью между барами + EWA-доверие
         # по (narrative, regime). Локальный, без внешних провайдеров — в отличие
         # от history/calibrator, не нуждается в set_*-инъекции.
@@ -2699,19 +2762,38 @@ class OICompositeStrategy(IStrategy):
         # порог адаптируется под режим рынка, поверх — прогрев/плохая полоса
         adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
         effective_threshold = self.__effective_threshold(adaptive)
-        # Энтропийная коррекция: низкая энтропия (упорядоченный рынок) → порог
-        # снижается до ×0.85; высокая (хаос) → поднимается до ×1.25.
-        # __last_entropy_score > 0 = упорядоченно, < 0 = хаотично.
+
+        # Энтропийная коррекция: низкая энтропия → порог снижается до ×0.85;
+        # высокая (хаос) → ×1.25.
         ent = self.__last_entropy_score
         if ent > 0.2:
             effective_threshold *= max(0.85, 1.0 - ent * 0.3)
         elif ent < -0.2:
             effective_threshold *= min(1.25, 1.0 + abs(ent) * 0.5)
 
+        # YZ_VOL на L2 (5м): высокая волатильность → повышаем порог (шум выше).
+        yz_l2 = self.__last_yz_vol_l2
+        if yz_l2 < -0.3:   # vol высокая (score_yz_vol_signal < 0 при >80-м перцентиле)
+            effective_threshold *= min(1.30, 1.0 + abs(yz_l2) * 0.4)
+
+        # Асимметричный порог: L2 бычий → шорты требуют больше подтверждений,
+        # и наоборот. Шаг от 0 до ×1.20 в зависимости от силы L2.
+        l2_comp = self.__cached_mtf5_composite
+        threshold_long  = effective_threshold
+        threshold_short = effective_threshold
+        if abs(l2_comp) > 0.1:
+            asym = min(0.20, abs(l2_comp) * 0.25)
+            if l2_comp > 0:      # L2 бычий: лонги легче, шорты труднее
+                threshold_long  *= max(0.85, 1.0 - asym)
+                threshold_short *= min(1.20, 1.0 + asym)
+            else:                # L2 медвежий: шорты легче, лонги труднее
+                threshold_short *= max(0.85, 1.0 - asym)
+                threshold_long  *= min(1.20, 1.0 + asym)
+
         direction: Optional[SignalType] = None
-        if composite >= effective_threshold:
+        if composite >= threshold_long:
             direction = SignalType.LONG
-        elif self.__settings.short_enabled_flag and composite <= -effective_threshold:
+        elif self.__settings.short_enabled_flag and composite <= -threshold_short:
             direction = SignalType.SHORT
 
         if direction is None:
@@ -3068,11 +3150,26 @@ class OICompositeStrategy(IStrategy):
                     effective_threshold *= max(0.85, 1.0 - ent * 0.3)
                 elif ent < -0.2:
                     effective_threshold *= min(1.25, 1.0 + abs(ent) * 0.5)
+                # YZ_VOL_L2 + асимметричный порог (те же правила что и в analyze_candles)
+                yz_l2 = self.__last_yz_vol_l2
+                if yz_l2 < -0.3:
+                    effective_threshold *= min(1.30, 1.0 + abs(yz_l2) * 0.4)
+                l2c = self.__cached_mtf5_composite
+                thr_long = effective_threshold
+                thr_short = effective_threshold
+                if abs(l2c) > 0.1:
+                    asym = min(0.20, abs(l2c) * 0.25)
+                    if l2c > 0:
+                        thr_long  *= max(0.85, 1.0 - asym)
+                        thr_short *= min(1.20, 1.0 + asym)
+                    else:
+                        thr_short *= max(0.85, 1.0 - asym)
+                        thr_long  *= min(1.20, 1.0 + asym)
 
                 direction: Optional[SignalType] = None
-                if composite >= effective_threshold:
+                if composite >= thr_long:
                     direction = SignalType.LONG
-                elif self.__settings.short_enabled_flag and composite <= -effective_threshold:
+                elif self.__settings.short_enabled_flag and composite <= -thr_short:
                     direction = SignalType.SHORT
 
                 if direction is None:
@@ -3656,12 +3753,15 @@ class OICompositeStrategy(IStrategy):
             self.__cached_wavelet_mult = wavelet_confidence_mult(closes)
             if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
                 self.__cached_mtf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
-            # L2: compute composite из 14 методов на виртуальных 5м-барах.
-            # Используем l1_buffer (полная история), а не короткое окно self.__candles.
+            # L2: composite из методов на виртуальных 5м-барах.
             if self.__interval_min == 1:
                 src = (self.__l1_buffer or self.__candles)[-_MTF5_BUFFER_1M:]
                 if len(src) >= _MTF5_MIN_5M_BARS * _MTF_FACTOR:
                     self.__cached_mtf5_composite, self.__cached_mtf5_scores = _compute_l2_composite(src)
+                    # Signal Momentum: буфер последних L2-значений для детекции разворота
+                    self.__mtf5_momentum_buf.append(self.__cached_mtf5_composite)
+                    if len(self.__mtf5_momentum_buf) > _MTF5_MOMENTUM_LEN + 2:
+                        self.__mtf5_momentum_buf = self.__mtf5_momentum_buf[-(_MTF5_MOMENTUM_LEN + 2):]
             self.__recalc_l1_context()
 
         regime_probs = self.__cached_regime_probs
@@ -3787,13 +3887,22 @@ class OICompositeStrategy(IStrategy):
         confidence_mult *= lag_mult
         composite *= confidence_mult
 
-        # L2-блендинг: заменяет старый бинарный MTF-гейт (×0.25/×1.15).
-        # L2 (5м) теперь аналитик: добавляет 30% своего composite к L3.
-        # Если данных нет или ТФ ≠ 1м — поведение прежнее через htf_trend.
+        # L2-блендинг: L2 (5м) аналитик, даёт 30% итогового composite.
         l2_comp = self.__cached_mtf5_composite
+        l2_scores = self.__cached_mtf5_scores
         if abs(l2_comp) > 0.01 and self.__interval_min == 1:
             composite = (1.0 - _MTF5_BLEND_W) * composite + _MTF5_BLEND_W * l2_comp
+
+            # Signal Momentum L2: если импульс на 5м разворачивается — штрафуем.
+            mom_mult = _l2_momentum_mult(self.__mtf5_momentum_buf, l2_comp)
+            if mom_mult < 1.0:
+                composite *= mom_mult
+                logger.debug(f"{self.__settings.figi}: L2 momentum разворот → ×{mom_mult:.2f}")
+
+            # YZ_VOL на 5м → адаптивный порог (сохраняем для использования ниже)
+            self.__last_yz_vol_l2 = l2_scores.get("YZ_VOL_L2", 0.0)
         else:
+            self.__last_yz_vol_l2 = 0.0
             # Fallback: старый ZLEMA-фильтр (для не-1м ТФ или пока нет 5м-истории)
             htf_trend = self.__cached_mtf_trend
             if htf_trend != 0.0:
