@@ -19,8 +19,8 @@ risk.py — риск-менеджер. Слой дисциплины перед 
      PORTFOLIO_RISK_MAX_PCT; при перегрузке новый стоп сжимается.
   4. Стоп есть всегда и двигается только в сторону прибыли (трейлинг).
   5. Дневной стоп-лосс: минус DAILY_MAX_LOSS_PCT за день -> блокировка входов.
-  6. После 1R прибыли -> стоп в безубыток.
-  7. Трейлинг Chandelier + giveback-защита пика.
+  6. Скользящий безубыток: 0.5R→entry, 0.75R→entry+0.25R, 1.0R→breakeven_set.
+  7. Chandelier trailing + giveback-защита пика (только после breakeven_set).
   8. Не больше MAX_OPEN_POSITIONS позиций одновременно.
 
 Состояние переживает рестарт (data/risk_state.json, data/open_positions.json).
@@ -36,6 +36,7 @@ import math
 from risk_config import (
     MAX_OPEN_POSITIONS, DAILY_MAX_LOSS_PCT, WEEKLY_MAX_LOSS_PCT, MONTHLY_MAX_LOSS_PCT,
     TRAIL_GIVEBACK_PCT, BREAKEVEN_AT_R, CHANDELIER_MULT,
+    BREAKEVEN_SLIDE_START_R, BREAKEVEN_SLIDE_STEP2_R, BREAKEVEN_SLIDE_LOCK2_R,
     RISK_MIN_PCT, RISK_MID_PCT, RISK_MAX_PCT,
     CONF_LOW_THR, CONF_MID_THR, CONF_HIGH_THR,
     CORR_GROUPS, PORTFOLIO_RISK_MAX_PCT, PORTFOLIO_STOP_SQUEEZE,
@@ -103,6 +104,7 @@ class Position:
     next_fix_level: float = 0.0    # следующий уровень цены для оценки доп. фиксации
     fix_count: int = 0             # сколько раз уже фиксировали после первого тейка
     entry_composite: float = 0.0   # сигнальный edge на момент входа (знаковый, по направлению позиции)
+    initial_risk_rub: float = 0.0  # риск при открытии — не меняется при сдвиге стопа, используется для R-расчётов
 
     def pnl_rub(self, price: float, point_value: float = 1.0) -> float:
         diff = (price - self.entry_price) if self.direction == "long" \
@@ -435,11 +437,13 @@ class RiskManager:
                        confidence: float = 0.7,
                        take_target: float = 0.0,
                        entry_composite: float = 0.0) -> Position:
+        initial_risk = abs(entry - stop) * qty * point_value
         pos = Position(
             ticker=ticker, direction=direction, qty=qty,
             entry_price=entry, stop_price=stop,
             opened_ts=datetime.now().isoformat(),
-            risk_rub=abs(entry - stop) * qty * point_value,
+            risk_rub=initial_risk,
+            initial_risk_rub=initial_risk,
             point_value=point_value,
             trail_dist=trail_dist or abs(entry - stop) / 2 * CHANDELIER_MULT,
             peak_price=entry,
@@ -520,24 +524,44 @@ class RiskManager:
         if squeeze and pos.direction == "short" and pnl < 0:
             return True, "сквиз-риск: физики в шорте, цена растёт — выходим"
 
-        if not pos.breakeven_set and pnl >= pos.risk_rub * BREAKEVEN_AT_R:
-            if pos.direction == "long":
-                pos.stop_price = max(pos.stop_price, pos.entry_price)
-            else:
-                pos.stop_price = min(pos.stop_price, pos.entry_price)
-            pos.breakeven_set = True
-            self._recalc_risk_rub(pos)
-            log.info(f"{ticker}: прибыль >= {BREAKEVEN_AT_R}R — стоп в безубыток")
+        # Скользящий безубыток: три ступени.
+        # До 0.5R — только фиксированный стоп, принимаем полный риск.
+        # 0.5R → стоп в entry; 0.75R → entry+0.25R; 1.0R → breakeven_set
+        # (Chandelier+giveback берут управление). Giveback никогда не
+        # закрывает в убыток — он активен только после breakeven_set.
+        # Все сравнения через initial_risk_rub: risk_rub сжимается при
+        # сдвиге стопа и непригоден как мера "1R от входа".
+        ir = pos.initial_risk_rub if pos.initial_risk_rub > 0 else pos.risk_rub
+        if not pos.breakeven_set and ir > 0:
+            if pnl >= ir * BREAKEVEN_AT_R:
+                if pos.direction == "long":
+                    pos.stop_price = max(pos.stop_price, pos.entry_price)
+                else:
+                    pos.stop_price = min(pos.stop_price, pos.entry_price)
+                pos.breakeven_set = True
+                self._recalc_risk_rub(pos)
+                log.info(f"{ticker}: прибыль >= {BREAKEVEN_AT_R}R — безубыток, Chandelier+giveback активны")
+            elif pnl >= ir * BREAKEVEN_SLIDE_STEP2_R:
+                # entry + 0.25R: фиксируем часть прибыли на второй ступени
+                lock_dist = BREAKEVEN_SLIDE_LOCK2_R * ir / (pos.qty * pos.point_value) \
+                    if pos.qty and pos.point_value else 0.0
+                if pos.direction == "long":
+                    pos.stop_price = max(pos.stop_price, pos.entry_price + lock_dist)
+                else:
+                    pos.stop_price = min(pos.stop_price, pos.entry_price - lock_dist)
+                self._recalc_risk_rub(pos)
+            elif pnl >= ir * BREAKEVEN_SLIDE_START_R:
+                # entry: стоп в безубыток на первой ступени (не ставим breakeven_set —
+                # giveback и Chandelier ещё не активны, позиция управляется этим стопом)
+                if pos.direction == "long":
+                    pos.stop_price = max(pos.stop_price, pos.entry_price)
+                else:
+                    pos.stop_price = min(pos.stop_price, pos.entry_price)
+                self._recalc_risk_rub(pos)
 
-        # Раньше гейт был "пик >= 1R" (BREAKEVEN_AT_R) — позиции, которые
-        # доходили, например, до 0.5R и откатывались назад в минус, не
-        # защищались ничем: ждали обычного стоп-лосса, т.е. фактически
-        # "ждали минус, чтобы зафиксировать его" вместо фиксации уже
-        # упущенной прибыли на откате от пика. Гейт снижен до
-        # PROB_EXIT_GRACE_R (0.3R) — той же планки, что у инвалидации
-        # гипотезы входа ниже, чтобы между 0 и grace не было дыры без
-        # защиты пика вообще ни от одной из проверок.
-        if pos.peak_profit_rub > pos.risk_rub * PROB_EXIT_GRACE_R:
+        # Giveback защищает прибыль, а не фиксирует убыток — активен только
+        # после того как стоп перенесён в безубыток (breakeven_set).
+        if pos.breakeven_set:
             giveback = pos.peak_profit_rub - pnl
             if giveback > pos.peak_profit_rub * TRAIL_GIVEBACK_PCT / 100:
                 return True, (f"трейлинг: пик +{pos.peak_profit_rub:.0f}₽, "

@@ -60,6 +60,11 @@ DAILY_MAX_LOSS_PCT   = 2.0   # макс. дневной убыток, % депо
 WEEKLY_MAX_LOSS_PCT  = 5.0   # макс. недельный убыток, % депо
 MONTHLY_MAX_LOSS_PCT = 10.0  # макс. месячный убыток, % депо
 BREAKEVEN_AT_R = 1.0
+# Скользящий безубыток: стоп подтягивается в три ступени ДО передачи
+# управления Chandelier+giveback. До 0.5R — только фиксированный стоп.
+BREAKEVEN_SLIDE_START_R = 0.5    # стоп → entry при 0.5R
+BREAKEVEN_SLIDE_STEP2_R = 0.75   # стоп → entry + BREAKEVEN_SLIDE_LOCK2_R при 0.75R
+BREAKEVEN_SLIDE_LOCK2_R = 0.25   # сколько R защищаем на второй ступени
 TRAIL_GIVEBACK_PCT = 30
 CHANDELIER_MULT = 3.0
 
