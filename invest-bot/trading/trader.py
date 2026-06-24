@@ -630,12 +630,19 @@ class Trader:
             stop_loss_level=Decimal(str(stop)),
         )
 
+        _act_levels = {}
+        if hasattr(strategy, "get_activation_levels"):
+            try:
+                _act_levels = strategy.get_activation_levels()
+            except Exception:
+                pass
         self.__risk.open_position(
             ticker, direction.lower(), qty,
             entry_price, stop,
             point_value=strategy.settings.point_value,
             confidence=0.7,
             take_target=take,
+            activation_levels=_act_levels,
         )
 
         if self.__today_trade_results is None:
@@ -1378,6 +1385,12 @@ class Trader:
                         except Exception as ex:
                             logger.warning(f"{risk_ticker}: last_snapshot() упал, entry_composite=0.0: {repr(ex)}")
 
+                    _act_levels = {}
+                    if hasattr(strategy, "get_activation_levels"):
+                        try:
+                            _act_levels = strategy.get_activation_levels()
+                        except Exception as ex:
+                            logger.warning(f"{risk_ticker}: get_activation_levels() упал: {repr(ex)}")
                     self.__risk.open_position(
                         risk_ticker, direction, actual_lots,
                         entry_price, stop_price,
@@ -1385,6 +1398,7 @@ class Trader:
                         confidence=confidence,
                         take_target=float(signal_new.take_profit_level),
                         entry_composite=entry_composite,
+                        activation_levels=_act_levels,
                     )
                     open_position = self.__today_trade_results.open_position(
                         figi,

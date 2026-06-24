@@ -4992,6 +4992,31 @@ class OICompositeStrategy(IStrategy):
                     best = p50
         return best
 
+    def get_activation_levels(self) -> dict:
+        """Публичный метод: вернуть activation_levels для open_position.
+        Использует текущие __last_playbooks и __last_regime + накопленные MFE.
+        Если данных недостаточно — вернуть пустой dict (risk.py возьмёт дефолты)."""
+        from joint_calibration import calibrate_playbook_activation_levels
+        rg_mfe = self.__mfe_distribution.get(self.__last_regime, {})
+        if not rg_mfe or not self.__last_playbooks:
+            return {}
+        # Собираем MFE только по активным плейбукам текущего сигнала
+        filtered = {pb: rg_mfe[pb] for pb in self.__last_playbooks if pb in rg_mfe}
+        if not filtered:
+            return {}
+        # calibrate_playbook_activation_levels возвращает {playbook: {breakeven, partial, trailing}}
+        per_pb = calibrate_playbook_activation_levels(filtered)
+        # Берём наименьшие уровни (самый осторожный плейбук из активных) как единый dict
+        if not per_pb:
+            return {}
+        keys = ("breakeven", "partial", "trailing")
+        merged = {}
+        for k in keys:
+            vals = [per_pb[pb][k] for pb in per_pb if k in per_pb[pb]]
+            if vals:
+                merged[k] = min(vals)
+        return merged
+
     def __system_uncertainty(self) -> float:
         """Агрегатор неопределённости системы ∈ [0,1] по нескольким источникам:
         noise_mode (все IC незначимы), статистический слом, degraded-нарратив.
