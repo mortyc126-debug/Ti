@@ -2202,8 +2202,9 @@ CLUSTER_MODEL_NAMES = [M1_NAME, M2_NAME, M3_NAME]
 # для стабильного результата (иначе 0.0 без мусора), вес на данном ТФ.
 # Tick-методы (AGGRESSOR_FLOW, BS_PRESSURE_TS и пр.) — только TF=1, т.к.
 # смысл в потоке реальных тиков; агрегация в 5м-бар убьёт сигнал.
-_MTF5_BUFFER_1M   = 500   # 1м-баров для 5м-агрегации  → 100 5м-баров
-_MTF5_MIN_5M_BARS = 12    # минимум 5м-баров для расчёта L2 composite
+_MTF5_BUFFER_MINUTES = 500  # временной горизонт L2-буфера в минутах рабочего ТФ
+                             # на 1м → 500 баров (100 L2-баров), на 5м → 100 баров (20 L2-баров)
+_MTF5_MIN_5M_BARS = 12    # минимум L2-баров для расчёта composite
 _MTF5_BLEND_W     = 0.30  # доля L2 в финальном composite (L3 = 0.70)
 _MTF5_MOMENTUM_LEN = 4    # длина окна Signal Momentum для L2 composite
 
@@ -2533,6 +2534,12 @@ class OICompositeStrategy(IStrategy):
         self.__cached_mtf5_scores: dict[str, float] = {}
         # Signal Momentum L2: история composite на 5м для детекции ослабления
         self.__mtf5_momentum_buf: list[float] = []
+        # Размер буфера для L2 в барах рабочего ТФ: одинаковый временной
+        # горизонт независимо от interval_min.
+        self.__mtf5_buffer_bars: int = max(
+            _MTF5_MIN_5M_BARS * _MTF_FACTOR,
+            _MTF5_BUFFER_MINUTES // max(1, interval_min),
+        )
         # Narrative-гейт (narrative.py): FSM с памятью между барами + EWA-доверие
         # по (narrative, regime). Локальный, без внешних провайдеров — в отличие
         # от history/calibrator, не нуждается в set_*-инъекции.
@@ -2893,6 +2900,11 @@ class OICompositeStrategy(IStrategy):
             self.__daily_high, self.__daily_low,
             list(self.__daily_atr_buf), self.__daily_atr,
         )
+        saved_l2_state_q = (
+            self.__cached_mtf5_composite,
+            dict(self.__cached_mtf5_scores),
+            list(self.__mtf5_momentum_buf),
+        )
         qualities: list[float] = []
         comm = commission_rt(self.__settings.is_future)
         last_l1_day = None
@@ -3020,6 +3032,9 @@ class OICompositeStrategy(IStrategy):
              self.__day_move_pct, self.__last_atr_pct,
              self.__daily_high, self.__daily_low,
              self.__daily_atr_buf, self.__daily_atr) = saved_atr_ex_state
+            (self.__cached_mtf5_composite,
+             self.__cached_mtf5_scores,
+             self.__mtf5_momentum_buf) = saved_l2_state_q
 
         if not qualities:
             return 0.5, 0
@@ -3053,6 +3068,27 @@ class OICompositeStrategy(IStrategy):
             self.__daily_high, self.__daily_low,
             list(self.__daily_atr_buf), self.__daily_atr,
         )
+        # L2-состояние нужно восстанавливать так же как L1 — иначе состояние
+        # «протекает» из lookahead-окна симуляции обратно в основной скан.
+        saved_l2_state = (
+            self.__cached_mtf5_composite,
+            dict(self.__cached_mtf5_scores),
+            list(self.__mtf5_momentum_buf),
+        )
+        # Сброс EWA-весов до равномерных: бэктест должен стартовать «холодным»,
+        # без знания исходов сделок, которые ещё не произошли. Использование
+        # весов из oi_weights.json (обученных на полной истории, включая будущее
+        # относительно начала окна) — форма look-ahead bias.
+        saved_weights = {n: MethodWeight(w.weight, w.total, w.sum_quality)
+                         for n, w in self.__weights.items()}
+        saved_regime_weights = {
+            regime: {n: MethodWeight(w.weight, w.total, w.sum_quality)
+                     for n, w in methods.items()}
+            for regime, methods in self.__regime_weights.items()
+        }
+        self.__weights = {name: MethodWeight() for name in ALL_METHOD_NAMES}
+        self.__regime_weights = {regime: {name: MethodWeight() for name in ALL_METHOD_NAMES}
+                                  for regime in REGIMES}
         signals: list[dict] = []
         total_bars = len(candles) - 1 - self.__candle_window
         t_start = time.monotonic()
@@ -3204,6 +3240,8 @@ class OICompositeStrategy(IStrategy):
                     "l1_trending_down": self.__l1_trending_down if self.__l1_data_ready else None,
                     "atr_ex_ratio": round(self.__day_move_pct / self.__last_atr_pct, 2)
                                     if self.__last_atr_pct > 0 else None,
+                    # Активные плейбуки на момент входа — для attribution в дашборде
+                    "active_playbooks": list(self.__last_playbooks),
                     # Исторические свечи до точки входа — для detect_level_pattern
                     "history_window": candles[max(0, i - 60):i + 1],
                 })
@@ -3217,6 +3255,11 @@ class OICompositeStrategy(IStrategy):
              self.__day_move_pct, self.__last_atr_pct,
              self.__daily_high, self.__daily_low,
              self.__daily_atr_buf, self.__daily_atr) = saved_atr_ex_state
+            (self.__cached_mtf5_composite,
+             self.__cached_mtf5_scores,
+             self.__mtf5_momentum_buf) = saved_l2_state
+            self.__weights = saved_weights
+            self.__regime_weights = saved_regime_weights
 
         return signals
 
@@ -3650,6 +3693,7 @@ class OICompositeStrategy(IStrategy):
                     "l1_trending_up": sig.get("l1_trending_up"),
                     "l1_trending_down": sig.get("l1_trending_down"),
                     "atr_ex_ratio": sig.get("atr_ex_ratio"),
+                    "active_playbooks": sig.get("active_playbooks", []),
                 })
 
         if not results:
@@ -3682,6 +3726,28 @@ class OICompositeStrategy(IStrategy):
                 "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
             }
             for mname, t in method_tally.items()
+        }
+        # Attribution по плейбукам: для каждого — сколько сделок, сколько побед,
+        # и отдельно — когда был активен vs. когда не было ни одного плейбука.
+        playbook_tally: dict[str, dict] = {}
+        no_playbook_n = no_playbook_win = 0
+        for tr in (trades if return_trades else []):
+            pbs = tr.get("active_playbooks") or []
+            win_tr = tr.get("win", False)
+            if not pbs:
+                no_playbook_n += 1
+                no_playbook_win += int(win_tr)
+            for pb in pbs:
+                t = playbook_tally.setdefault(pb, {"n": 0, "wins": 0})
+                t["n"] += 1
+                t["wins"] += int(win_tr)
+        out["playbook_stats"] = {
+            pb: {"n": t["n"], "win_rate": t["wins"] / t["n"] if t["n"] else None}
+            for pb, t in playbook_tally.items()
+        }
+        out["playbook_stats"]["__no_playbook__"] = {
+            "n": no_playbook_n,
+            "win_rate": no_playbook_win / no_playbook_n if no_playbook_n else None,
         }
         if return_trades:
             out["trades"] = trades
@@ -3755,7 +3821,7 @@ class OICompositeStrategy(IStrategy):
                 self.__cached_mtf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
             # L2: composite на виртуальных барах ТФ×MTF_FACTOR (5м на 1м-данных,
             # 25м на 5м-данных и т.д.). Работает на любом рабочем интервале.
-            src = (self.__l1_buffer or self.__candles)[-_MTF5_BUFFER_1M:]
+            src = (self.__l1_buffer or self.__candles)[-self.__mtf5_buffer_bars:]
             if len(src) >= _MTF5_MIN_5M_BARS * _MTF_FACTOR:
                 self.__cached_mtf5_composite, self.__cached_mtf5_scores = _compute_l2_composite(src)
                 # Signal Momentum: буфер последних L2-значений для детекции разворота
