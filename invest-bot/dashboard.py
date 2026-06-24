@@ -2022,6 +2022,18 @@ body{{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min
 .tab-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt2);}}
 .tab-btn.active{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.10));border-color:rgba(255,0,128,.55);color:var(--accent);box-shadow:0 0 12px rgba(255,0,128,.15);}}
 .tab-pane{{display:none;}}.tab-pane.active{{display:block;}}
+/* ── Раскладка: сайдбар тикеров + основная колонка ── */
+.app-layout{{display:flex;gap:14px;align-items:flex-start;}}
+.sidebar{{flex:0 0 300px;width:300px;position:sticky;top:14px;max-height:calc(100vh - 28px);overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:14px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;transition:flex-basis .18s,width .18s,opacity .12s,padding .18s;}}
+.sidebar::-webkit-scrollbar{{width:6px;}}
+.sidebar::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:3px;}}
+.sidebar.collapsed{{flex:0 0 0;width:0;padding:14px 0;opacity:0;overflow:hidden;border-color:transparent;}}
+.sidebar-head{{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}}
+.sidebar-collapse-btn{{flex:0 0 auto;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:999px;color:var(--txt3);font-size:13px;line-height:1;width:24px;height:24px;cursor:pointer;}}
+.sidebar-collapse-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt2);}}
+.main-col{{flex:1;min-width:0;}}
+.sidebar-open-btn{{display:none;}}
+.sidebar-open-btn.show{{display:inline-flex;}}
 /* ── Панели ── */
 .panel{{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:16px;margin-bottom:14px;}}
 .panel-inner{{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:10px;}}
@@ -2084,6 +2096,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <div class="logo">INVEST-BOT · DASHBOARD</div>
     <div class="logo-sub">VIRTUAL TRADES BACKTEST &amp; BUG COUNCIL</div>
   </div>
+  <button class="btn-pill btn-sm sidebar-open-btn" id="sidebarOpenBtn" onclick="toggleSidebar()" title="Показать список тикеров">☰ Тикеры</button>
 </div>
 
 <nav class="tab-nav">
@@ -2092,6 +2105,16 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="tab-btn" onclick="showTab('diag')">ДИАГНОСТИКА</button>
   <button class="tab-btn" onclick="showTab('live')">БОТ (LIVE)</button>
 </nav>
+
+<div class="app-layout">
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <div class="sec-lg" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">Тикеры</div>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Свернуть">‹</button>
+  </div>
+  <div id="tickers">__TICKER_CHECKBOXES__</div>
+</aside>
+<div class="main-col">
 
 <!-- ══════════════════════ TAB: СИМУЛЯЦИЯ ══════════════════════ -->
 <div class="tab-pane active" id="tab-sim">
@@ -2105,7 +2128,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
-  <div id="tickers">__TICKER_CHECKBOXES__</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">Список тикеров — в сайдбаре слева (☰ в шапке — свернуть/развернуть).</div>
   <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
        (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
        _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
@@ -2481,7 +2504,24 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 </div><!-- /tab-live -->
 
+</div><!-- /main-col -->
+</div><!-- /app-layout -->
+
 <script>
+function toggleSidebar() {{
+  const sb = document.getElementById('sidebar');
+  const collapsed = sb.classList.toggle('collapsed');
+  document.getElementById('sidebarOpenBtn').classList.toggle('show', collapsed);
+  try {{ localStorage.setItem('ba_sidebar_collapsed', collapsed ? '1' : '0'); }} catch (e) {{}}
+}}
+(function() {{
+  let collapsed = false;
+  try {{ collapsed = localStorage.getItem('ba_sidebar_collapsed') === '1'; }} catch (e) {{}}
+  if (collapsed) {{
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('sidebarOpenBtn').classList.add('show');
+  }}
+}})();
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
 function filterInstrKind(kind) {{
