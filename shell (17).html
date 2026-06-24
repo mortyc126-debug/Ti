@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOEX Toolkit</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0613;--panel:#140A24;--card:#1A1030;--acc:#FF006E;
+  --pos:#52F2C9;--text:#F2F0FF;--text2:#A79BC9;--muted:#6F648F;
+  --brd:rgba(255,255,255,0.06);--mono:'IBM Plex Mono',monospace;--sans:'Inter',sans-serif
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text2);font-family:var(--sans)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#140A24}
+::-webkit-scrollbar-thumb{background:#3d2d60;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#52F2C9}
+*{scrollbar-width:thin;scrollbar-color:#3d2d60 #140A24}
+
+#topbar{
+  height:48px;display:flex;align-items:center;gap:2px;padding:0 10px;
+  background:var(--panel);border-bottom:1px solid var(--brd);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;position:relative;z-index:200
+}
+#topbar::-webkit-scrollbar{display:none}
+#logo{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--acc);
+  letter-spacing:.04em;margin-right:12px;flex-shrink:0;white-space:nowrap;
+  cursor:pointer;user-select:none}
+#logo span{color:var(--muted)}
+
+.ntab{
+  display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;
+  font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;
+  border:1px solid transparent;background:none;font-family:var(--sans);
+  transition:all .12s;flex-shrink:0;position:relative
+}
+.ntab:hover{color:var(--text2);background:rgba(255,255,255,.04)}
+.ntab.active{color:var(--text);background:rgba(255,0,110,.1);border-color:rgba(255,0,110,.22)}
+.ntab .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.ntab.active .dot{background:var(--acc);box-shadow:0 0 6px var(--acc)}
+.ntab.loading .dot{background:#FFB86C;animation:pulse 1s infinite}
+.ntab .close-btn{
+  margin-left:3px;opacity:0;background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:13px;padding:0 2px;line-height:1;transition:opacity .12s
+}
+.ntab:hover .close-btn{opacity:1}
+.ntab .pop-btn{
+  margin-left:1px;opacity:0;background:none;border:none;color:var(--muted);
+  cursor:pointer;font-size:11px;padding:0 2px;line-height:1;transition:opacity .12s
+}
+.ntab:hover .pop-btn{opacity:1}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+#add-btn{
+  flex-shrink:0;padding:4px 10px;border-radius:6px;font-size:12px;
+  font-family:var(--sans);cursor:pointer;white-space:nowrap;
+  background:rgba(255,0,110,.06);border:1px solid rgba(255,0,110,.2);
+  color:var(--acc);transition:all .12s;margin-left:4px
+}
+#add-btn:hover{background:rgba(255,0,110,.14)}
+
+#tb-spacer{flex:1;min-width:8px}
+#tb-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pill{display:flex;align-items:center;gap:5px;background:var(--card);
+  border:1px solid var(--brd);border-radius:7px;padding:3px 9px}
+.pill label{font-size:10px;color:var(--muted);font-family:var(--mono);
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.pill input{background:none;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:12px}
+.pill input::placeholder{color:var(--muted)}
+#ticker-input{width:72px;font-size:13px;font-weight:500;letter-spacing:.05em}
+#token-input{width:80px}
+#token-st{font-size:10px;font-family:var(--mono)}
+#token-st.ok{color:var(--pos)}
+#btn-go{background:rgba(255,0,110,.14);border:1px solid rgba(255,0,110,.25);
+  color:var(--acc);border-radius:4px;font-size:10px;padding:2px 6px;
+  cursor:pointer;font-family:var(--mono)}
+#btn-go:hover{background:rgba(255,0,110,.24)}
+
+/* ── DROP SCREEN ── */
+#drop-screen{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;
+  background:var(--bg);z-index:5
+}
+#drop-screen.hidden{display:none}
+#drop-box{
+  width:420px;max-width:92vw;border:2px dashed rgba(255,0,110,.3);
+  border-radius:16px;padding:40px 32px;display:flex;flex-direction:column;
+  align-items:center;gap:14px;cursor:pointer;background:rgba(255,0,110,.03);
+  transition:all .2s
+}
+#drop-box.over{border-color:var(--acc);background:rgba(255,0,110,.07)}
+#drop-icon{font-size:36px;opacity:.5}
+#drop-title{font-size:16px;font-weight:500;color:var(--text)}
+#drop-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+#file-list-drop{width:420px;max-width:92vw;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto}
+.fitem{display:flex;align-items:center;gap:8px;background:var(--card);
+  border:1px solid var(--brd);border-radius:7px;padding:7px 11px}
+.fitem-name{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fitem-badge{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:4px;
+  background:rgba(82,242,201,.12);color:var(--pos)}
+#open-btn{
+  background:var(--acc);color:#fff;border:none;border-radius:8px;
+  padding:9px 26px;font-size:13px;font-weight:500;cursor:pointer;
+  font-family:var(--sans);opacity:.4;pointer-events:none;transition:opacity .15s
+}
+#open-btn.ready{opacity:1;pointer-events:auto}
+#open-btn.ready:hover{opacity:.85}
+#file-input{display:none}
+
+/* ── FRAME AREA ── */
+#frame-area{flex:1;position:relative;overflow:hidden}
+.mod-wrap{position:absolute;inset:0;display:none}
+.mod-wrap.active{display:block}
+.mod-frame{width:100%;height:100%;border:none;display:block}
+.mod-loading{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:12px;background:var(--bg);pointer-events:none;
+  font-size:13px;color:var(--muted);font-family:var(--mono)
+}
+.mod-loading.done{display:none}
+.spinner{width:24px;height:24px;border:2px solid var(--brd);
+  border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── FLOATING WINDOWS ── */
+#win-layer{position:fixed;inset:0;top:48px;pointer-events:none;z-index:100}
+.fwin{position:absolute;pointer-events:auto;display:flex;flex-direction:column;
+  background:var(--card);border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6);
+  overflow:hidden;min-width:240px;min-height:140px}
+.fwin.focused{border-color:rgba(255,0,110,.35)}
+.fwin-bar{height:32px;display:flex;align-items:center;gap:6px;padding:0 10px;
+  background:var(--panel);cursor:move;user-select:none;flex-shrink:0;border-bottom:1px solid var(--brd)}
+.fwin-dot{width:5px;height:5px;border-radius:50%;background:var(--acc);box-shadow:0 0 5px var(--acc);flex-shrink:0}
+.fwin-title{font-family:var(--mono);font-size:11px;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fwin-btns{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.fwbtn{width:22px;height:22px;border:none;background:none;cursor:pointer;
+  color:var(--muted);border-radius:4px;font-size:12px;display:flex;
+  align-items:center;justify-content:center;transition:all .12s}
+.fwbtn:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.fwin-body{flex:1;position:relative;overflow:hidden}
+.fwin-body iframe{width:100%;height:100%;border:none;display:block}
+.fwin.micro .fwin-body{display:none}
+.fwin.micro{height:32px!important;min-height:32px}
+.fwin-edge{position:absolute;z-index:10}
+.fwin-edge.n{top:0;left:8px;right:8px;height:6px;cursor:n-resize}
+.fwin-edge.s{bottom:0;left:8px;right:8px;height:6px;cursor:s-resize}
+.fwin-edge.e{right:0;top:8px;bottom:8px;width:6px;cursor:e-resize}
+.fwin-edge.w{left:0;top:8px;bottom:8px;width:6px;cursor:w-resize}
+.fwin-edge.ne{top:0;right:0;width:10px;height:10px;cursor:ne-resize}
+.fwin-edge.nw{top:0;left:0;width:10px;height:10px;cursor:nw-resize}
+.fwin-edge.se{bottom:0;right:0;width:10px;height:10px;cursor:se-resize}
+.fwin-edge.sw{bottom:0;left:0;width:10px;height:10px;cursor:sw-resize}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(50px);
+  background:var(--card);border:1px solid var(--brd);border-radius:7px;
+  padding:6px 14px;font-size:12px;font-family:var(--mono);color:var(--text2);
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1);z-index:9999;
+  white-space:nowrap;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body style="display:flex;flex-direction:column;height:100%">
+
+<div id="topbar">
+  <div id="logo" onclick="showDropScreen()" title="Добавить модули">MOEX<span>/</span>toolkit</div>
+  <!-- вкладки добавляются динамически -->
+  <div id="tb-spacer"></div>
+  <button id="add-btn" onclick="showDropScreen()">＋ модуль</button>
+  <div id="tb-right">
+    <div class="pill">
+      <label>тикер</label>
+      <input id="ticker-input" type="text" placeholder="SBER…"
+        oninput="this.value=this.value.toUpperCase()"
+        onkeydown="if(event.key==='Enter')sendTicker()">
+      <button id="btn-go" onclick="sendTicker()">→</button>
+    </div>
+    <div class="pill">
+      <label>T-токен</label>
+      <input id="token-input" type="password" placeholder="••••••••"
+        oninput="onTokenInput(this.value)">
+      <span id="token-st">—</span>
+    </div>
+  </div>
+</div>
+
+<div id="frame-area">
+  <div id="drop-screen">
+    <div id="drop-box"
+      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
+      onclick="document.getElementById('file-input').click()">
+      <div id="drop-icon">📂</div>
+      <div id="drop-title">Перетащите HTML-файлы модулей сюда</div>
+      <div id="drop-sub">Или нажмите чтобы выбрать · каждый файл — отдельная вкладка<br>
+        <span style="font-size:11px;opacity:.6">Модули загружаются один раз и остаются в памяти</span>
+      </div>
+    </div>
+    <input id="file-input" type="file" accept=".html" multiple onchange="onFilePick(event)">
+    <div id="file-list-drop"></div>
+    <button id="open-btn" onclick="openPendingFiles()">Открыть</button>
+  </div>
+</div>
+
+<div id="win-layer"></div>
+<div id="toast"></div>
+
+<script>
+const KEY_TOKEN  = 't_api_token';
+const KEY_TICKER = 'shared_ticker';
+
+// ══ APP-мост ══
+// Из любого модуля:
+//   window.parent.APP.call('debt', 'fn', args) → Promise
+//   window.parent.APP.on('ticker', fn)
+//   window.parent.APP.emit('ticker', 'SBER')
+// Регистрация (вставить в конец модуля):
+//   if(window.parent!==window)
+//     window.parent.postMessage({type:'APP_REGISTER',id:'debt',api:{fn:function(){}}}, '*');
+window.APP = (function(){
+  var _mods = {};   // id → {ready, api, iframe}
+  var _subs = {};   // event → [fn]
+  var _q    = {};   // id → [{fn,args,resolve,reject}]
+  return {
+    call: function(id, fn, args){
+      return new Promise(function(resolve, reject){
+        var m = _mods[id];
+        if (!m){ reject('no module: '+id); return; }
+        if (m.ready && m.api[fn]){ try{ resolve(m.api[fn](args)); }catch(e){ reject(e); } }
+        else {
+          if (!_q[id]) _q[id] = [];
+          _q[id].push({fn:fn, args:args, resolve:resolve, reject:reject});
+        }
+      });
+    },
+    on:  function(ev, fn){ if(!_subs[ev]) _subs[ev]=[]; _subs[ev].push(fn); },
+    off: function(ev, fn){ if(_subs[ev]) _subs[ev]=_subs[ev].filter(function(f){return f!==fn;}); },
+    emit: function(ev, data){ (_subs[ev]||[]).forEach(function(fn){ try{fn(data);}catch(e){} }); },
+    _register: function(id, api){
+      if (!_mods[id]) _mods[id] = {ready:false, api:{}, iframe:null};
+      _mods[id].api = api||{}; _mods[id].ready = true;
+      var q = _q[id]||[]; delete _q[id];
+      q.forEach(function(item){
+        try{ item.resolve((_mods[id].api[item.fn]||function(){})(item.args)); }
+        catch(e){ item.reject(e); }
+      });
+    },
+    _addFrame: function(id, el){ if(!_mods[id]) _mods[id]={ready:false,api:{},iframe:null}; _mods[id].iframe=el; },
+    modules: _mods,
+  };
+})();
+
+// ══ МОДУЛИ ══
+// { id, label, html (blob content), blobUrl, iframe, loaded }
+var mods = [];
+var activeId = null;
+
+// pending до нажатия "Открыть"
+var pendingFiles = [];
+
+// ══ ВСПОМОГАТЕЛЬНЫЕ ══
+function labelFor(name){
+  if (/v22|срочн/i.test(name))          return 'Срочный рынок';
+  if (/indlab|индикатор/i.test(name))   return 'Индикаторы';
+  if (/долг|nagruzka|debt/i.test(name)) return 'Долговая нагрузка';
+  if (/oi.signal/i.test(name))          return 'OI Signal';
+  if (/report|отчёт/i.test(name))       return 'Отчётность';
+  if (/factor|фактор/i.test(name))      return 'Факторная';
+  if (/monte|карло/i.test(name))        return 'Монте-Карло';
+  if (/bond|облиг/i.test(name))         return 'Облигации';
+  if (/portfolio|портфель/i.test(name)) return 'Портфель';
+  return name.replace(/\.html?$/i,'').replace(/[\s_\-]+/g,' ').trim();
+}
+
+function idFor(name){
+  return name.replace(/\.html?$/i,'')
+    .replace(/[^a-zA-Zа-яА-Я0-9]/g,'_')
+    .slice(0,24)
+    .replace(/^_+|_+$/g,'');
+}
+
+// ══ DRAG & DROP ══
+function onDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('over'); }
+function onDragLeave(e){ e.currentTarget.classList.remove('over'); }
+function onDrop(e){ e.preventDefault(); e.currentTarget.classList.remove('over'); collectFiles(e.dataTransfer.files); }
+function onFilePick(e){ collectFiles(e.target.files); e.target.value=''; }
+
+function collectFiles(fileList){
+  var added = 0;
+  var total = fileList.length;
+  if (!total) return;
+  Array.from(fileList).forEach(function(f){
+    if (!f.name.match(/\.html?$/i)){ total--; return; }
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var existing = pendingFiles.findIndex(function(p){ return p.name===f.name; });
+      if (existing !== -1) pendingFiles[existing].html = e.target.result;
+      else pendingFiles.push({ name:f.name, label:labelFor(f.name), html:e.target.result });
+      added++;
+      if (added === total) renderPendingList();
+    };
+    reader.readAsText(f, 'utf-8');
+  });
+}
+
+function renderPendingList(){
+  var el = document.getElementById('file-list-drop');
+  el.innerHTML = pendingFiles.map(function(p){
+    return '<div class="fitem"><span class="fitem-name">'+p.label+'</span>' +
+           '<span class="fitem-name" style="color:var(--muted);font-size:10px">'+p.name+'</span>' +
+           '<span class="fitem-badge">готов</span></div>';
+  }).join('');
+  var btn = document.getElementById('open-btn');
+  if (pendingFiles.length) btn.classList.add('ready');
+  else btn.classList.remove('ready');
+}
+
+function openPendingFiles(){
+  if (!pendingFiles.length) return;
+  pendingFiles.forEach(function(p){ addModule(p.name, p.label, p.html); });
+  pendingFiles = [];
+  renderPendingList();
+  hideDropScreen();
+}
+
+// ══ ДОБАВЛЕНИЕ МОДУЛЯ ══
+function addModule(name, label, html){
+  var id = idFor(name);
+  // если уже есть — обновить html, перезагрузить iframe
+  var existing = mods.find(function(m){ return m.id===id; });
+  if (existing){
+    existing.html  = html;
+    existing.label = label;
+    reloadModFrame(existing);
+    toast(label+' — обновлён');
+    return;
+  }
+
+  var mod = { id:id, name:name, label:label, html:html, blobUrl:null, iframe:null, loaded:false };
+  mods.push(mod);
+
+  // создать wrap + iframe в #frame-area
+  var area = document.getElementById('frame-area');
+  var wrap = document.createElement('div');
+  wrap.className = 'mod-wrap';
+  wrap.id = 'wrap-'+id;
+
+  var loading = document.createElement('div');
+  loading.className = 'mod-loading';
+  loading.id = 'loading-'+id;
+  loading.innerHTML = '<div class="spinner"></div><span>'+label+'…</span>';
+
+  var iframe = document.createElement('iframe');
+  iframe.className = 'mod-frame';
+  iframe.id = 'frame-'+id;
+  iframe.title = label;
+
+  wrap.appendChild(loading);
+  wrap.appendChild(iframe);
+  area.appendChild(wrap);
+
+  mod.iframe = iframe;
+  APP._addFrame(id, iframe);
+
+  iframe.onload = function(){
+    mod.loaded = true;
+    var ld = document.getElementById('loading-'+id);
+    if (ld) ld.classList.add('done');
+    setTimeout(function(){ pushStateToFrame(iframe, true); }, 300);
+    var btn = document.getElementById('nav-'+id);
+    if (btn) btn.classList.remove('loading');
+    // отозвать старый blob
+    if (mod._oldBlobUrl){ URL.revokeObjectURL(mod._oldBlobUrl); mod._oldBlobUrl=null; }
+  };
+
+  loadModFrame(mod);
+  addTab(mod);
+
+  // первый модуль — показываем сразу
+  if (mods.length === 1) showModule(id);
+  toast(label+' загружен');
+}
+
+function loadModFrame(mod){
+  mod.loaded = false;
+  var blob = new Blob([mod.html], { type:'text/html' });
+  mod._oldBlobUrl = mod.blobUrl;
+  mod.blobUrl = URL.createObjectURL(blob);
+  mod.iframe.src = mod.blobUrl;
+}
+
+function reloadModFrame(mod){
+  mod.loaded = false;
+  var ld = document.getElementById('loading-'+mod.id);
+  if (ld) ld.classList.remove('done');
+  var btn = document.getElementById('nav-'+mod.id);
+  if (btn) btn.classList.add('loading');
+  loadModFrame(mod);
+}
+
+// ══ ВКЛАДКИ ══
+function addTab(mod){
+  var spacer = document.getElementById('tb-spacer');
+  var btn = document.createElement('button');
+  btn.className = 'ntab loading';
+  btn.id = 'nav-'+mod.id;
+  btn.innerHTML =
+    '<span class="dot"></span>'+
+    '<span class="tlabel">'+mod.label+'</span>'+
+    '<button class="pop-btn" title="В плавающее окно" onclick="event.stopPropagation();openWindow(\''+mod.id+'\')">⧉</button>'+
+    '<button class="close-btn" title="Закрыть вкладку" onclick="event.stopPropagation();removeModule(\''+mod.id+'\')">×</button>';
+  btn.onclick = function(){ showModule(mod.id); };
+  spacer.parentNode.insertBefore(btn, spacer);
+}
+
+function showModule(id){
+  activeId = id;
+  localStorage.setItem('shell_active_mod', id);
+  mods.forEach(function(m){
+    var w = document.getElementById('wrap-'+m.id);
+    if (w) w.classList.toggle('active', m.id===id);
+    var b = document.getElementById('nav-'+m.id);
+    if (b) b.classList.toggle('active', m.id===id);
+  });
+}
+
+function removeModule(id){
+  var idx = mods.findIndex(function(m){ return m.id===id; });
+  if (idx === -1) return;
+  var mod = mods[idx];
+  // убрать из DOM
+  var wrap = document.getElementById('wrap-'+id);
+  if (wrap) wrap.remove();
+  var btn = document.getElementById('nav-'+id);
+  if (btn) btn.remove();
+  // освободить blob
+  if (mod.blobUrl) URL.revokeObjectURL(mod.blobUrl);
+  mods.splice(idx, 1);
+  // показать соседний модуль
+  if (mods.length === 0){ showDropScreen(); return; }
+  var next = mods[Math.min(idx, mods.length-1)];
+  showModule(next.id);
+}
+
+// ══ DROP SCREEN ══
+function showDropScreen(){
+  document.getElementById('drop-screen').classList.remove('hidden');
+}
+function hideDropScreen(){
+  if (mods.length > 0) document.getElementById('drop-screen').classList.add('hidden');
+}
+
+// ══ ОБЩЕЕ СОСТОЯНИЕ → iframe ══
+function pushStateToFrame(frameEl, silent){
+  if (!frameEl || !frameEl.contentWindow) return;
+  try {
+    frameEl.contentWindow.postMessage({
+      type:  'SHELL_STATE',
+      token: localStorage.getItem(KEY_TOKEN) || '',
+      ticker: silent ? '' : (localStorage.getItem(KEY_TICKER) || ''),
+      silent: !!silent,
+    }, '*');
+  } catch(e){}
+}
+
+function pushStateToAll(silent){
+  mods.forEach(function(m){ if(m.iframe) pushStateToFrame(m.iframe, silent); });
+  document.querySelectorAll('.fwin iframe').forEach(function(f){ pushStateToFrame(f, silent); });
+}
+
+function sendTicker(){
+  var v = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!v) return;
+  localStorage.setItem(KEY_TICKER, v);
+  pushStateToAll(false);
+  APP.emit('ticker', v);
+  toast('Тикер '+v+' → все модули');
+}
+
+function onTokenInput(v){
+  v = v.trim();
+  var st = document.getElementById('token-st');
+  if (v){
+    localStorage.setItem(KEY_TOKEN, v);
+    localStorage.setItem('tinkoff_token', v);
+    st.textContent='✓'; st.className='ok';
+    pushStateToAll(true);
+  } else {
+    localStorage.removeItem(KEY_TOKEN);
+    localStorage.removeItem('tinkoff_token');
+    st.textContent='—'; st.className='';
+  }
+}
+
+// ══ СООБЩЕНИЯ ОТ МОДУЛЕЙ ══
+var pendingRpc = {}; // reqId → source window, для релея MODULE_RPC_*
+window.addEventListener('message', function(e){
+  var d = e.data; if (!d) return;
+  if (d.type==='APP_REGISTER'){
+    APP._register(d.id, d.api||{});
+    return;
+  }
+  if (d.type==='APP_CALL'){
+    APP.call(d.target, d.fn, d.args).then(function(r){
+      try{ e.source.postMessage({type:'APP_CALL_RESULT',reqId:d.reqId,result:r},'*'); }catch(_){}
+    }).catch(function(err){
+      try{ e.source.postMessage({type:'APP_CALL_RESULT',reqId:d.reqId,error:String(err)},'*'); }catch(_){}
+    });
+    return;
+  }
+  // Релей между модулями для запросов, которые не сериализуются через APP_REGISTER
+  // (например, indlab отдаёт вердикт по индикаторам через MODULE_RPC_*)
+  if (d.type==='MODULE_RPC_REQUEST'){
+    var target = mods.find(function(m){ return /indlab|индикатор/i.test(m.id) || /indlab|индикатор/i.test(m.label); });
+    if (!target || !target.iframe || !target.iframe.contentWindow){
+      try{ e.source.postMessage({type:'MODULE_RPC_RESPONSE',reqId:d.reqId,error:'модуль indlab не открыт в shell'},'*'); }catch(_){}
+      return;
+    }
+    pendingRpc[d.reqId] = e.source;
+    target.iframe.contentWindow.postMessage({type:'MODULE_RPC_REQUEST',reqId:d.reqId,payload:d.payload}, '*');
+    return;
+  }
+  if (d.type==='MODULE_RPC_RESPONSE'){
+    var caller = pendingRpc[d.reqId];
+    delete pendingRpc[d.reqId];
+    if (caller){ try{ caller.postMessage(d,'*'); }catch(_){} }
+    return;
+  }
+  if (d.type==='MODULE_EVENT'){
+    if (d.action==='SET_TICKER' && d.ticker){
+      var t = String(d.ticker).trim().toUpperCase();
+      if (!/^[A-Za-z][A-Za-z0-9\-]{0,11}$/.test(t)) return;
+      document.getElementById('ticker-input').value = t;
+      localStorage.setItem(KEY_TICKER, t);
+      pushStateToAll(false);
+      APP.emit('ticker', t);
+    }
+    if (d.action==='SET_TOKEN' && d.token){
+      onTokenInput(d.token);
+      document.getElementById('token-input').value='';
+    }
+    if (d.action==='APP_EMIT' && d.event){
+      APP.emit(d.event, d.data);
+    }
+  }
+});
+
+// ══ ПЛАВАЮЩИЕ ОКНА ══
+// Плавающее окно — отдельный iframe с тем же blob (независимая копия)
+var _zTop=10, _wins={};
+
+function openWindow(modId, opts){
+  opts = opts||{};
+  var mod = mods.find(function(m){ return m.id===modId; });
+  if (!mod) return;
+  var id='w'+Date.now(), w=opts.w||600, h=opts.h||500;
+  var x=opts.x||(80+Object.keys(_wins).length*24);
+  var y=opts.y||(80+Object.keys(_wins).length*24);
+
+  var el = document.createElement('div');
+  el.className='fwin'; el.id=id;
+  el.style.cssText='left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;z-index:'+(++_zTop);
+  el.innerHTML=
+    '<div class="fwin-bar">'+
+      '<div class="fwin-dot"></div>'+
+      '<div class="fwin-title">'+mod.label+'</div>'+
+      '<div class="fwin-btns">'+
+        '<button class="fwbtn" title="Свернуть" onclick="toggleMicro(\''+id+'\')">▭</button>'+
+        '<button class="fwbtn" title="Закрыть"  onclick="closeWindow(\''+id+'\')">✕</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="fwin-body"><iframe></iframe></div>'+
+    '<div class="fwin-edge n" data-dir="n"></div><div class="fwin-edge s" data-dir="s"></div>'+
+    '<div class="fwin-edge e" data-dir="e"></div><div class="fwin-edge w" data-dir="w"></div>'+
+    '<div class="fwin-edge ne" data-dir="ne"></div><div class="fwin-edge nw" data-dir="nw"></div>'+
+    '<div class="fwin-edge se" data-dir="se"></div><div class="fwin-edge sw" data-dir="sw"></div>';
+  document.getElementById('win-layer').appendChild(el);
+
+  var iframe = el.querySelector('iframe');
+  iframe.onload = function(){ setTimeout(function(){ pushStateToFrame(iframe, true); }, 300); };
+  // создать новый blob для окна (независимая копия)
+  var blob = new Blob([mod.html], {type:'text/html'});
+  var burl = URL.createObjectURL(blob);
+  iframe.src = burl;
+  _wins[id] = { el:el, iframe:iframe, micro:false, blobUrl:burl };
+  el.addEventListener('mousedown', function(){ focusWindow(id); });
+  makeDraggable(el, el.querySelector('.fwin-bar'));
+  el.querySelectorAll('.fwin-edge').forEach(function(h){ makeResizable(el,h,h.dataset.dir); });
+  focusWindow(id);
+  toast(mod.label+' → окно');
+}
+
+function focusWindow(id){
+  Object.values(_wins).forEach(function(w){ w.el.classList.remove('focused'); });
+  if(_wins[id]){ _wins[id].el.style.zIndex=++_zTop; _wins[id].el.classList.add('focused'); }
+}
+function closeWindow(id){
+  if(!_wins[id]) return;
+  _wins[id].el.remove();
+  if(_wins[id].blobUrl) URL.revokeObjectURL(_wins[id].blobUrl);
+  delete _wins[id];
+}
+function toggleMicro(id){
+  var w=_wins[id]; if(!w) return;
+  w.micro=!w.micro;
+  w.el.classList.toggle('micro',w.micro);
+  w.el.querySelector('.fwbtn').textContent=w.micro?'↕':'▭';
+}
+
+function makeDraggable(el, handle){
+  handle.addEventListener('mousedown', function(e){
+    if(e.target.tagName==='BUTTON') return;
+    e.preventDefault();
+    var ox=e.clientX-el.offsetLeft, oy=e.clientY-el.offsetTop;
+    function mv(e){ el.style.left=Math.max(0,e.clientX-ox)+'px'; el.style.top=Math.max(0,e.clientY-oy)+'px'; }
+    function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  });
+}
+
+function makeResizable(el, handle, dir){
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault(); e.stopPropagation();
+    var sx=e.clientX,sy=e.clientY,sw=el.offsetWidth,sh=el.offsetHeight,sl=el.offsetLeft,st=el.offsetTop;
+    function mv(e){
+      var dx=e.clientX-sx,dy=e.clientY-sy,nw=sw,nh=sh,nl=sl,nt=st;
+      if(/e/.test(dir)) nw=Math.max(240,sw+dx);
+      if(/w/.test(dir)){ nw=Math.max(240,sw-dx); nl=sl+sw-nw; }
+      if(/s/.test(dir)) nh=Math.max(140,sh+dy);
+      if(/n/.test(dir)){ nh=Math.max(140,sh-dy); nt=st+sh-nh; }
+      el.style.cssText='left:'+nl+'px;top:'+nt+'px;width:'+nw+'px;height:'+nh+'px;z-index:'+el.style.zIndex;
+    }
+    function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  });
+}
+
+// ══ TOAST ══
+var _tt;
+function toast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(function(){ el.classList.remove('show'); },2200);
+}
+
+// ══ INIT ══
+(function(){
+  var tok    = localStorage.getItem(KEY_TOKEN);
+  var ticker = localStorage.getItem(KEY_TICKER);
+  if(tok){ document.getElementById('token-st').textContent='✓'; document.getElementById('token-st').className='ok'; }
+  if(ticker && /^[A-Za-z][A-Za-z0-9\-]{0,11}$/.test(ticker.trim()))
+    document.getElementById('ticker-input').value=ticker;
+})();
+</script>
+</body>
+</html>

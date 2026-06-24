@@ -1,0 +1,2832 @@
+import asyncio
+import datetime
+import json
+import logging
+import os
+from collections import deque
+from decimal import Decimal
+
+from tinkoff.invest import Candle, OrderExecutionReportStatus
+from tinkoff.invest.utils import quotation_to_decimal
+
+from blog.blogger import Blogger
+from invest_api.services.client_service import ClientService
+from invest_api.services.instruments_service import InstrumentService
+from invest_api.services.market_data_service import MarketDataService
+from invest_api.services.operations_service import OperationService
+from invest_api.services.orders_service import OrderService
+from invest_api.services.stop_orders_service import StopOrderService
+from invest_api.services.market_data_stream_service import MarketDataStreamService
+from invest_api.utils import aggcandle_to_historiccandle
+from trade_system.issuer_filter import issuer_key, select_top_tickers
+from trade_system.signal import Signal, SignalType
+from trade_system.strategies.base_strategy import IStrategy
+from history import HistoryStore
+from calibration import PercentileCalibrator
+from timeframe import MultiTfBuffer
+from trading.trade_results import TradeResults
+from configuration.settings import TradingSettings, MegaAlertsSettings, StrategySettings, FuturesTradingSettings
+from trade_system.strategies.strategy_factory import StrategyFactory
+from risk import RiskManager
+from oi_layers import OiLayersService
+from orderbook import OrderBookService
+from tradestats import TradeStatsService
+from mega_alerts import MegaAlertsService
+from archive import ArchiveStore
+from candle_archive import get_candles_cached
+from db_api_client import DbApiClient
+from runtime_overrides import RuntimeOverrides
+import bot_control
+import lasso_calibration
+
+__all__ = ("Trader")
+
+logger = logging.getLogger(__name__)
+
+# Адаптивный выход (risk.check_exit: трейлинг Chandelier + безубыток после 1R
+# + giveback-защита пика) — единственный путь, которым в принципе вызывается
+# risk.check_exit() для целой позиции. Без него стоп/тейк сигнала статичны
+# и risk.py не двигает защиту прибыли вообще. Включён по умолчанию — для
+# отключения (вернуться к статичным stop/take сигнала) поставить ADAPTIVE_EXIT=0.
+ADAPTIVE_EXIT_ENABLED = os.getenv("ADAPTIVE_EXIT", "1") == "1"
+
+# Частичная фиксация на первом тейке (risk.check_partial_take/reduce_position):
+# половина закрывается на тейке, остаток держится с фиксированным уровнем
+# защиты (треть пройденного расстояния вход->тейк). Управляется с дашборда
+# (RuntimeOverrides.partial_tp_enabled) — здесь только дефолт, если в
+# data/bot_overrides.json явно не выставлено. Несовместимо с ADAPTIVE_EXIT
+# (там стоп/тейк сигнала вообще не используются).
+PARTIAL_TP_DEFAULT_ENABLED = os.getenv("PARTIAL_TP", "0") == "1"
+
+# После убыточного закрытия (стоп/remainder_stop в минус) — повод для входа
+# мог быть ошибочным, новый вход в тот же тикер блокируется на это время.
+# Прибыльное закрытие НЕ блокирует — повторный заход на той же идее это
+# нормально (см. __risk_close).
+LOSS_REENTRY_COOLDOWN_MINUTES = int(os.getenv("LOSS_COOLDOWN_MIN", "30"))
+
+# Глубина истории для авто-подбора ATR_TAKE_K/ATR_STOP_K (OICompositeStrategy.
+# set_atr_history_provider) — столько дней свечей берётся для sweep раз в день.
+# 20 дней давало 3-24 сделки на тикер — недостаточно для надёжного выбора
+# параметра по шумной метрике (expectancy на горстке исходов). D1-архив свечей
+# растёт инкрементально не только за последние 90 дней, поэтому можно брать
+# окно шире без доп. нагрузки на Tinkoff API.
+AUTO_ATR_HISTORY_DAYS = 90
+
+# Стрим стакана (OrderBookService): отдельная gRPC-подписка сверх свечной,
+# глубина ORDERBOOK_DEPTH уровней. Выключен по умолчанию (новая живая
+# подписка с доп. нагрузкой на лимиты API) — включается с дашборда
+# (RuntimeOverrides.orderbook_enabled) или ORDERBOOK=1.
+ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "0") == "1"
+ORDERBOOK_DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "10"))
+
+# Спред-фильтр: пропускаем вход если bid-ask спред шире этой доли от цены.
+# 0 = выключено. Типовой ликвидный MOEX-инструмент — спред 0.02-0.1%.
+MAX_ENTRY_SPREAD_PCT = float(os.getenv("MAX_SPREAD_PCT", "0.003"))  # 0.3%
+
+# Дробный вход: первый транш TRANCHE1_RATIO*lots сразу, остаток через
+# TRANCHE2_BARS свечей если откат от входа не превысил TRANCHE2_MAX_ADVERSE_ATR*ATR.
+# Знак P&L — плохой фильтр: любой тик против нас (0.01%) отменит транш.
+# ATR-порог лучше: нормальный шум ≤0.5 ATR — добавляем, движение ≥1 ATR против — отменяем.
+FRACTIONAL_ENTRY_ENABLED = os.getenv("FRACTIONAL_ENTRY", "0") == "1"
+TRANCHE1_RATIO = float(os.getenv("TRANCHE1_RATIO", "0.5"))  # доля первого транша
+TRANCHE2_BARS = int(os.getenv("TRANCHE2_BARS", "3"))  # свечей ожидания до 2-го
+TRANCHE2_MAX_ADVERSE_ATR = float(os.getenv("TRANCHE2_MAX_ADV_ATR", "0.5"))  # макс откат в ATR
+
+# Фильтр режима при входе: сигналы в этих режимах игнорируются.
+# "ranging" — боковик без тренда, momentum-стратегия там статистически убыточна.
+# "stress" — аномальная волатильность, паттерны ломаются, соотношение сигнал/шум падает.
+# Отключить: ENTRY_BLOCKED_REGIMES=
+_ENTRY_BLOCKED_REGIMES_DEFAULT = {"ranging", "stress"}
+_ebr_env = os.getenv("ENTRY_BLOCKED_REGIMES", None)
+ENTRY_BLOCKED_REGIMES: set[str] = (
+    set(r.strip() for r in _ebr_env.split(",") if r.strip())
+    if _ebr_env is not None else _ENTRY_BLOCKED_REGIMES_DEFAULT
+)
+
+# Фильтр imbalance стакана: imbalance_score должен совпадать с направлением
+# сигнала. Только когда стакан активен (ORDERBOOK=1) и не "мёртвый" (stale).
+# 0.0 = любой ненулевой имбаланс в нашу сторону, 0.1 = уверенный перевес.
+# -1.0 = выключено (фильтр не применяется).
+ENTRY_IMBALANCE_MIN = float(os.getenv("ENTRY_IMBALANCE_MIN", "0.0"))
+# Порог "мёртвости" стакана: если доля stale-объёма выше этого — не доверяем
+ENTRY_IMBALANCE_MAX_STALE = float(os.getenv("ENTRY_IMBALANCE_MAX_STALE", "0.6"))
+
+# Пирамидинг: при движении ≥ PYRAMID_R * R добавляем PYRAMID_ADD_RATIO*лотов.
+# Стоп нового транша = текущий (не ниже безубытка). Выключен по умолчанию.
+PYRAMID_ENABLED = os.getenv("PYRAMID", "0") == "1"
+PYRAMID_R_THRESHOLD = float(os.getenv("PYRAMID_R", "0.5"))  # сколько R пройти
+PYRAMID_ADD_RATIO = float(os.getenv("PYRAMID_ADD_RATIO", "0.5"))  # доля добавки
+
+# Drift-алерт: разъезд утреннего backtest-прогноза и фактического конца дня
+# (см. __record_backtest_calibration). DRIFT_ALERT_THRESHOLD — разовый скачок,
+# DRIFT_ROLLING_WINDOW/DRIFT_ROLLING_THRESHOLD — устойчивое смещение за
+# последние N дней по тикеру (сигнал "пора пересчитать narrative/lasso", а
+# не просто шум одного дня).
+DRIFT_ALERT_THRESHOLD = float(os.getenv("DRIFT_ALERT_THRESHOLD", "0.25"))
+DRIFT_ROLLING_WINDOW = int(os.getenv("DRIFT_ROLLING_WINDOW", "5"))
+DRIFT_ROLLING_THRESHOLD = float(os.getenv("DRIFT_ROLLING_THRESHOLD", "0.15"))
+
+
+class Trader:
+    """
+    The class encapsulate main trade logic.
+    """
+
+    def __init__(
+            self,
+            client_service: ClientService,
+            instrument_service: InstrumentService,
+            operation_service: OperationService,
+            order_service: OrderService,
+            stop_order_service: StopOrderService,
+            stream_service: MarketDataStreamService,
+            market_data_service: MarketDataService,
+            blogger: Blogger,
+            mega_alerts: MegaAlertsService,
+            mega_alerts_settings: MegaAlertsSettings = MegaAlertsSettings(),
+            futures_trading_settings: FuturesTradingSettings = FuturesTradingSettings()
+    ) -> None:
+        self.__today_trade_results: TradeResults = None
+        self.__client_service = client_service
+        self.__instrument_service = instrument_service
+        self.__operation_service = operation_service
+        self.__order_service = order_service
+        self.__stop_order_service = stop_order_service
+        self.__stream_service = stream_service
+        self.__market_data_service = market_data_service
+        self.__blogger = blogger
+        self.__mega_alerts_settings = mega_alerts_settings
+        self.__futures_trading_settings = futures_trading_settings
+        self.__risk = RiskManager()
+        self.__last_prices: dict[str, float] = {}
+        self.__oi_layers = OiLayersService(price_getter=lambda t: self.__last_prices.get(t))
+        self.__oi_task: asyncio.Task | None = None
+        self.__orderbook = OrderBookService()
+        self.__orderbook_task: asyncio.Task | None = None
+        self.__tradestats = TradeStatsService()
+        self.__tradestats_task: asyncio.Task | None = None
+        # MegaAlertsService и его daily_loop живут на уровне TradeService —
+        # один процесс-долгоживущий инстанс на весь срок работы бота, а не
+        # пересоздаётся вместе с новым Trader каждый торговый день. Иначе
+        # вчерашняя daily_loop-задача от вчерашнего Trader продолжала бы
+        # жить вечно в фоне (ссылку на неё уже никто не держит, отменить
+        # нельзя) — за N дней работы накопилось бы N независимых циклов,
+        # каждый раз в сутки бьющих MOEX API и конкурирующих за запись в
+        # один и тот же data/mega_alerts.json.
+        self.__mega_alerts = mega_alerts
+        self.__archive = ArchiveStore()
+        self.__trading_settings: TradingSettings = TradingSettings()
+        self.__candle_volumes: dict[str, deque] = {}
+        # Аналитическая история: per-trade attribution, перцентильная калибровка
+        self.__history = HistoryStore()
+        self.__calibrator = PercentileCalibrator()
+        self.__tf_buffer = MultiTfBuffer()
+        # Прогноз утреннего backtest-гейта (ticker -> {quality, n_trades, live})
+        # для сверки с фактическим rolling_quality конца дня — см. __archive_today.
+        self.__backtest_predictions: dict[str, dict] = {}
+        # Трекинг MFE/MAE для открытых позиций: {figi: {entry, direction, max_fav, max_adv}}
+        self.__pos_tracking: dict[str, dict] = {}
+        # Биржевые стоп/тейк ордера, выставленные после открытия позиции.
+        # figi -> {take_id, stop_id, lots, is_long, ticker, min_price_step}
+        # Живут на бирже независимо от бота — защита при падении процесса.
+        self.__active_exit_orders: dict[str, dict] = {}
+        # Текущие стратегии торгового дня — для TG /status и /close
+        self.__current_strategies: dict[str, IStrategy] = {}
+        # Настройки с дашборда (live/sandbox, take/stop, allow/deny по тикерам) —
+        # см. runtime_overrides.py. Перечитывается на каждой свече по mtime.
+        self.__overrides = RuntimeOverrides()
+        # Кулдаун повторного входа после убыточного закрытия — см. __risk_close.
+        self.__loss_cooldown_until: dict[str, datetime.datetime] = {}
+        # Последние пропущенные сигналы — для статус-файла дашборда.
+        self.__skipped_signals: list[dict] = []
+        # figi, для которых размещение ордера (__smart_order, до 45с репрайса)
+        # сейчас идёт фоновой asyncio.Task — см. __trading/__place_order_task.
+        # Не даёт открыть вторую заявку по тому же тикеру, пока первая летит,
+        # и не блокирует чтение стрима свечей по ОСТАЛЬНЫМ тикерам на это время.
+        self.__pending_orders: set[str] = set()
+        # Дата последнего запуска lasso-калибровки (еженедельно, по понедельникам).
+        self.__lasso_last_run: datetime.date | None = None
+        # Кэш MULTI_TICKER-скора (ticker -> (date, score)) — пересчитывается
+        # раз в день в __multi_ticker_signal, а не на каждой свече: расчёт
+        # требует скачивания истории по двум тикерам и тяжёлых numpy-вычислений
+        # (transfer entropy / wavelet coherence), см. set_multi_ticker_provider.
+        self.__multi_ticker_cache: dict[str, tuple] = {}
+        # future_ticker -> base_ticker (его акция), заполняется в
+        # __build_futures_strategies — используется __multi_ticker_signal,
+        # чтобы фьюч ставился в пару именно со своей акцией, а не с
+        # циркулярным соседом по алфавиту.
+        self.__future_base_ticker: dict[str, str] = {}
+        # Дробный вход: {figi: {remaining_lots, bars_left, signal, strategy,
+        #   direction, confidence, entry_price, stop_price}}
+        self.__pending_tranche2: dict[str, dict] = {}
+        # Пирамидинг: figi -> True если доп. транш уже добавлен к текущей позиции
+        self.__pyramided: set[str] = set()
+
+    def pause(self) -> None:
+        bot_control.control.paused = True
+
+    def resume(self) -> None:
+        bot_control.control.paused = False
+
+    def request_close(self, ticker: str) -> None:
+        bot_control.control.close_requests.add(ticker.upper())
+
+    def status_text(self) -> str:
+        """
+        Текстовый статус для TG /status: режим (пауза/торговля) + по
+        каждой открытой позиции текущий PnL и пик MFE/MAE с момента входа.
+        """
+        lines = ["⏸ Пауза (новые позиции не открываются)" if bot_control.control.paused else "▶ Торговля активна"]
+        has_position = False
+        for figi, strategy in self.__current_strategies.items():
+            order = self.__today_trade_results.get_current_trade_order(figi) if self.__today_trade_results else None
+            if not order:
+                continue
+            has_position = True
+            ticker = strategy.settings.ticker
+            direction = "LONG" if order.signal.signal_type == SignalType.LONG else "SHORT"
+            pt = self.__pos_tracking.get(figi)
+            cur_price = self.__last_prices.get(ticker)
+            line = f"{ticker} {direction}"
+            if pt and pt["entry"] > 0 and cur_price:
+                ep = pt["entry"]
+                if direction == "LONG":
+                    cur_pnl = (cur_price - ep) / ep
+                    mfe = (pt["max_fav"] - ep) / ep
+                    mae = (ep - pt["max_adv"]) / ep
+                else:
+                    cur_pnl = (ep - cur_price) / ep
+                    mfe = (ep - pt["max_fav"]) / ep
+                    mae = (pt["max_adv"] - ep) / ep
+                line += f": сейчас {cur_pnl * 100:+.2f}%, пик +{mfe * 100:.2f}% / просадка -{mae * 100:.2f}%"
+            lines.append(line)
+        if not has_position:
+            lines.append("Открытых позиций нет.")
+        return "\n".join(lines)
+
+    def write_status_file(self, path: str = "data/bot_status.json") -> None:
+        """Снимок состояния для дашборда: пауза, позиции, риск, кулдауны, сделки дня."""
+        paused = bot_control.control.paused or self.__overrides.is_paused()
+
+        # Открытые позиции
+        positions = []
+        for figi, strategy in self.__current_strategies.items():
+            order = self.__today_trade_results.get_current_trade_order(figi) if self.__today_trade_results else None
+            if not order:
+                continue
+            ticker = strategy.settings.ticker
+            direction = "LONG" if order.signal.signal_type == SignalType.LONG else "SHORT"
+            pt = self.__pos_tracking.get(figi)
+            cur_price = self.__last_prices.get(ticker)
+            pos: dict = {
+                "ticker": ticker, "direction": direction,
+                "take": round(float(order.signal.take_profit_level), 4),
+                "stop": round(float(order.signal.stop_loss_level), 4),
+            }
+            if pt and pt["entry"] > 0 and cur_price:
+                ep = pt["entry"]
+                if direction == "LONG":
+                    pos["cur_pnl_pct"] = round((cur_price - ep) / ep * 100, 3)
+                    pos["mfe_pct"] = round((pt["max_fav"] - ep) / ep * 100, 3)
+                    pos["mae_pct"] = round((ep - pt["max_adv"]) / ep * 100, 3)
+                else:
+                    pos["cur_pnl_pct"] = round((ep - cur_price) / ep * 100, 3)
+                    pos["mfe_pct"] = round((ep - pt["max_fav"]) / ep * 100, 3)
+                    pos["mae_pct"] = round((pt["max_adv"] - ep) / ep * 100, 3)
+                pos["entry_price"] = round(ep, 4)
+                pos["cur_price"] = round(cur_price, 4)
+            positions.append(pos)
+
+        # Риск-метрики
+        trading_ok, trading_why = self.__risk.trading_allowed()
+        risk = {
+            "portfolio_risk_pct": self.__risk.portfolio_risk_pct(),
+            "day_pnl_rub": round(self.__risk.state.get("day_pnl_rub", 0.0), 0),
+            "trades_today": self.__risk.state.get("trades_today", 0),
+            "daily_stop_hit": not trading_ok,
+            "daily_stop_reason": trading_why if not trading_ok else "",
+            "open_count": len(positions),
+        }
+
+        # Кулдауны после убыточного закрытия
+        now = datetime.datetime.utcnow()
+        cooldowns = {
+            ticker: until.isoformat()
+            for ticker, until in self.__loss_cooldown_until.items()
+            if until > now
+        }
+
+        # Закрытые сделки сегодня
+        closed_today = []
+        if self.__today_trade_results:
+            for figi, orders in self.__today_trade_results.get_closed_orders().items():
+                strategy = self.__current_strategies.get(figi)
+                ticker = strategy.settings.ticker if strategy else figi
+                for o in orders:
+                    direction = "LONG" if o.signal.signal_type == SignalType.LONG else "SHORT"
+                    closed_today.append({
+                        "ticker": ticker, "direction": direction,
+                        "take": round(float(o.signal.take_profit_level), 4),
+                        "stop": round(float(o.signal.stop_loss_level), 4),
+                    })
+
+        data = {
+            "paused": paused,
+            "positions": positions,
+            "risk": risk,
+            "cooldowns": cooldowns,
+            "closed_today": closed_today,
+            "skipped_signals": list(self.__skipped_signals[-20:]),
+            "updated_at": datetime.datetime.utcnow().isoformat(),
+        }
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            os.replace(tmp, path)
+        except OSError:
+            pass
+
+    def __record_skip(self, ticker: str, signal, reason: str) -> None:
+        direction = "LONG" if signal.signal_type == SignalType.LONG else "SHORT"
+        self.__skipped_signals.append({
+            "ticker": ticker,
+            "direction": direction,
+            "reason": reason,
+            "at": datetime.datetime.utcnow().strftime("%H:%M"),
+        })
+        # Держим не более 50 последних — старые отбрасываем
+        if len(self.__skipped_signals) > 50:
+            self.__skipped_signals = self.__skipped_signals[-50:]
+
+    async def trade_day(
+            self,
+            account_id: str,
+            trading_settings: TradingSettings,
+            strategies: list[IStrategy],
+            trade_day_end_time: datetime,
+            min_rub: int
+    ) -> None:
+        logger.info("Start preparations for trading today")
+        self.__trading_settings = trading_settings
+        # Очищаем MFE/MAE трекер между торговыми днями: иначе max_fav/max_adv
+        # накапливаются бессрочно и показывают «лучший максимум» из прошлых дней.
+        self.__pos_tracking.clear()
+        today_trade_strategies = self.__get_today_strategies(strategies)
+        if not today_trade_strategies:
+            logger.info("No shares to trade today.")
+            return None
+
+        self.__risk.equity_getter = lambda: float(self.__operation_service.available_rub_on_account(account_id) or 0)
+
+        for strategy in today_trade_strategies.values():
+            self.__validate_strategy_backtest(strategy)
+
+        configured_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
+        # daily_loop() самой MegaAlertsService уже крутится фоном на уровне
+        # TradeService — здесь только форсируем свежий срез на старт дня.
+        await self.__mega_alerts.refresh_once()
+        tracked_hits = [t for t in configured_tickers if self.__mega_alerts.alerts_for(t)]
+        candidate_tickers = self.__dedup_mega_alerts_candidates(configured_tickers)
+
+        added_strategies: dict[str, IStrategy] = {}
+        if self.__mega_alerts_settings.auto_trade and candidate_tickers:
+            dynamic_strategies = self.__build_dynamic_strategies(candidate_tickers)
+            if dynamic_strategies:
+                added_strategies = self.__get_today_strategies(dynamic_strategies)
+                today_trade_strategies.update(added_strategies)
+                logger.info(
+                    f"MEGA-ALERTS: добавлены в торговлю на сегодня "
+                    f"{[s.settings.ticker for s in added_strategies.values()]}"
+                )
+        if self.__futures_trading_settings.enabled and self.__futures_trading_settings.base_tickers:
+            futures_strategies = self.__build_futures_strategies(
+                today_trade_strategies, self.__futures_trading_settings.base_tickers
+            )
+            if futures_strategies:
+                added_futures = self.__get_today_strategies(futures_strategies)
+                for strategy in added_futures.values():
+                    self.__validate_strategy_backtest(strategy)
+                today_trade_strategies.update(added_futures)
+                logger.info(
+                    f"FUTURES: добавлены в торговлю на сегодня "
+                    f"{[s.settings.ticker for s in added_futures.values()]}"
+                )
+
+        self.__blogger.mega_alerts_message(
+            tracked_hits, [t for t in candidate_tickers if t not in [s.settings.ticker for s in added_strategies.values()]]
+        )
+
+        self.__clear_all_positions(account_id, today_trade_strategies)
+
+        tracked_tickers = [s.settings.ticker for s in today_trade_strategies.values()]
+        self.__oi_task = asyncio.create_task(self.__oi_layers.poll_loop(tracked_tickers))
+        self.__tradestats_task = asyncio.create_task(self.__tradestats.poll_loop(tracked_tickers))
+        if self.__overrides.orderbook_enabled(ORDERBOOK_DEFAULT_ENABLED):
+            figi_to_ticker = {s.settings.figi: s.settings.ticker for s in today_trade_strategies.values()}
+            self.__orderbook_task = asyncio.create_task(
+                self.__orderbook_loop(figi_to_ticker, trade_day_end_time)
+            )
+
+        db_for_history = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
+        for strategy in today_trade_strategies.values():
+            if hasattr(strategy, "set_squeeze_provider"):
+                strategy.set_squeeze_provider(self.__oi_layers.squeeze_score)
+            if hasattr(strategy, "set_inst_oi_provider"):
+                strategy.set_inst_oi_provider(self.__oi_layers.inst_oi_score)
+            if hasattr(strategy, "set_retail_contra_provider"):
+                strategy.set_retail_contra_provider(self.__oi_layers.retail_contra_score)
+            if hasattr(strategy, "set_tradestats_provider"):
+                strategy.set_tradestats_provider(self.__tradestats.score)
+            if hasattr(strategy, "set_atr_history_provider"):
+                figi = strategy.settings.figi
+                strategy.set_atr_history_provider(
+                    lambda ticker, figi=figi: get_candles_cached(
+                        ticker, figi, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+                    )
+                )
+            if hasattr(strategy, "set_multi_ticker_provider"):
+                strategy.set_multi_ticker_provider(
+                    lambda ticker: self.__multi_ticker_signal(
+                        ticker, today_trade_strategies, db_for_history
+                    )
+                )
+            # Инжекция аналитической истории и калибратора — прогревает
+            # перцентильные буферы и загружает динамические режимные моды.
+            # db (если настроен) — дублирует закрытые сделки в общую базу.
+            if hasattr(strategy, "set_history"):
+                strategy.set_history(self.__history, self.__calibrator, db=db_for_history)
+
+        rub_before_trade_day = self.__operation_service.available_rub_on_account(account_id)
+        logger.info(f"Amount of RUB on account {rub_before_trade_day} and minimum for trading: {min_rub}")
+        if rub_before_trade_day < min_rub:
+            return None
+
+        logger.info("Start trading today")
+        self.__blogger.start_trading_message(today_trade_strategies, rub_before_trade_day)
+
+        try:
+            await self.__trading(
+                account_id,
+                trading_settings,
+                today_trade_strategies,
+                trade_day_end_time
+            )
+            logger.debug("Test Results:")
+            logger.debug(f"Current: {self.__today_trade_results.get_current_open_orders()}")
+            logger.debug(f"Old: {self.__today_trade_results.get_closed_orders()}")
+        except Exception as ex:
+            logger.error(f"Trading error: {repr(ex)}")
+        finally:
+            await self.__cancel_task(self.__oi_task)
+            self.__oi_task = None
+            await self.__cancel_task(self.__tradestats_task)
+            self.__tradestats_task = None
+            await self.__cancel_task(self.__orderbook_task)
+            self.__orderbook_task = None
+
+        self.__archive_today(today_trade_strategies)
+
+        logger.info("Finishing trading today")
+        self.__blogger.finish_trading_message()
+
+        try:
+            if self.__today_trade_results:
+                for key_figi, value_order_id in self.__clear_all_positions(account_id, today_trade_strategies).items():
+                    trade_order = self.__today_trade_results.close_position(key_figi, value_order_id)
+                    self.__blogger.close_position_message(trade_order)
+            else:
+                self.__clear_all_positions(account_id, today_trade_strategies)
+        except Exception as ex:
+            logger.error(f"Finishing trading error: {repr(ex)}")
+
+        logger.info("Show trade results today")
+        try:
+            self.__summary_today_trade_results(account_id, rub_before_trade_day)
+        except Exception as ex:
+            logger.error(f"Summary trading day error: {repr(ex)}")
+
+        self.__maybe_run_lasso(list(today_trade_strategies.values()))
+
+    def __drifted_tickers(self) -> list[str]:
+        """Тикеры, у которых rolling-разъезд прогноза/факта (см.
+        __check_drift_alert) держится DRIFT_ROLLING_WINDOW дней подряд —
+        повод пересчитать lasso раньше штатного понедельника, а не ждать,
+        пока устаревшая модель неделю торгует по сигналам сменившегося
+        режима рынка."""
+        path = "data/backtest_calibration.json"
+        if not os.path.exists(path):
+            return []
+        try:
+            with open(path, encoding="utf-8") as f:
+                records = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return []
+        by_ticker: dict[str, list[dict]] = {}
+        for r in records:
+            by_ticker.setdefault(r.get("ticker"), []).append(r)
+        drifted = []
+        for ticker, recs in by_ticker.items():
+            rolling = recs[-DRIFT_ROLLING_WINDOW:]
+            if len(rolling) < DRIFT_ROLLING_WINDOW:
+                continue
+            mean_drift = sum(abs(r["actual_quality"] - r["predicted_quality"]) for r in rolling) / len(rolling)
+            if mean_drift >= DRIFT_ROLLING_THRESHOLD:
+                drifted.append(ticker)
+        return drifted
+
+    def __maybe_run_lasso(self, strategies: list) -> None:
+        """Lasso-калибровка по понедельникам (первый торговый день недели) —
+        ИЛИ раньше срока, если у части тикеров устойчиво разъехался
+        утренний прогноз и факт (см. __drifted_tickers): смена режима
+        рынка, ждать неделю до штатного понедельника не нужно. Запускается
+        в конце торгового дня — когда Tinkoff API уже не занят стримом.
+        После успешного прогона вызывает reload_lasso_priors() на каждой стратегии."""
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        if self.__lasso_last_run == today:
+            return
+        is_monday = today.weekday() == 0
+        drifted = [] if is_monday else self.__drifted_tickers()
+        if not is_monday and not drifted:
+            return
+        self.__lasso_last_run = today
+        reason = "понедельник" if is_monday else f"drift по тикерам: {', '.join(drifted)}"
+        logger.info(f"Lasso-калибровка: старт ({reason})")
+        try:
+            existing = lasso_calibration._load_existing()
+            by_ticker = lasso_calibration._strategy_settings_by_ticker()
+            for strategy in strategies:
+                ticker = strategy.settings.ticker
+                if ticker not in by_ticker:
+                    continue
+                try:
+                    result = lasso_calibration._calibrate_one(
+                        ticker, days=90,
+                        alpha=0.01, l1_ratio=0.8, use_group_lasso=False,
+                    )
+                except Exception as e:
+                    logger.warning(f"Lasso {ticker}: {repr(e)}")
+                    continue
+                if result:
+                    existing[strategy.settings.figi] = result
+            lasso_calibration._save(existing)
+            logger.info(f"Lasso-калибровка: сохранено {len(existing)} тикеров")
+            # Применяем новые prior к живым стратегиям без перезапуска
+            for strategy in strategies:
+                if hasattr(strategy, "reload_lasso_priors"):
+                    strategy.reload_lasso_priors()
+        except Exception as ex:
+            logger.error(f"Lasso-калибровка упала: {repr(ex)}")
+
+    def adopt_position(
+            self,
+            account_id: str,
+            strategies: dict[str, "IStrategy"],
+            req: "bot_control.AdoptRequest",
+    ) -> str:
+        """
+        Принимает ручную позицию под управление бота.
+        Ищет реальную позицию на счёте по тикеру, регистрирует её в
+        TradeResults и RiskManager — после этого бот ведёт трейлинг/стоп/тейк
+        как будто сам открыл эту позицию.
+        Возвращает строку с результатом для ответа в ТГ/дашборд.
+        """
+        ticker = req.ticker.upper()
+        figi = next((s.settings.figi for s in strategies.values()
+                     if s.settings.ticker.upper() == ticker), None)
+        if figi is None:
+            return f"❌ {ticker}: тикер не найден в активных стратегиях бота"
+
+        strategy = next(s for s in strategies.values() if s.settings.ticker.upper() == ticker)
+
+        if self.__today_trade_results and self.__today_trade_results.get_current_trade_order(figi):
+            return f"❌ {ticker}: бот уже ведёт позицию по этому тикеру"
+
+        # Проверяем реальную позицию на счёте
+        all_pos = list(self.__operation_service.positions_securities(account_id) or []) + \
+                  list(self.__operation_service.positions_futures(account_id) or [])
+        broker_pos = next((p for p in all_pos if p.figi == figi and p.balance != 0), None)
+        if broker_pos is None:
+            return f"❌ {ticker}: на счёте нет открытой позиции"
+
+        qty = abs(int(broker_pos.balance))
+        direction = req.direction.upper()
+
+        # Цена входа: из запроса или текущая рыночная
+        if req.entry is not None:
+            entry_price = float(req.entry)
+        else:
+            last_q = self.__market_data_service.get_last_price(figi)
+            if last_q is None:
+                return f"❌ {ticker}: не удалось получить текущую цену"
+            from invest_api.utils import quotation_to_decimal as _qtd
+            entry_price = float(_qtd(last_q))
+
+        take = float(req.take)
+        stop = float(req.stop)
+
+        signal = Signal(
+            figi=figi,
+            signal_type=SignalType.LONG if direction == "LONG" else SignalType.SHORT,
+            take_profit_level=Decimal(str(take)),
+            stop_loss_level=Decimal(str(stop)),
+        )
+
+        _act_levels = {}
+        if hasattr(strategy, "get_activation_levels"):
+            try:
+                _act_levels = strategy.get_activation_levels()
+            except Exception:
+                pass
+        self.__risk.open_position(
+            ticker, direction.lower(), qty,
+            entry_price, stop,
+            point_value=strategy.settings.point_value,
+            confidence=0.7,
+            take_target=take,
+            activation_levels=_act_levels,
+        )
+
+        if self.__today_trade_results is None:
+            self.__today_trade_results = TradeResults()
+        self.__today_trade_results.open_position(figi, "manual_adopt", signal)
+
+        self.__pos_tracking[figi] = {
+            "direction": direction,
+            "entry": entry_price,
+            "max_fav": entry_price,
+            "max_adv": entry_price,
+        }
+
+        logger.info(f"ADOPT: принята позиция {ticker} {direction} qty={qty} "
+                    f"entry={entry_price} take={take} stop={stop}")
+        self.__blogger.send_message(
+            f"📥 Принята ручная позиция: {ticker} {direction}\n"
+            f"Вход: {entry_price:.4f}  Тейк: {take:.4f}  Стоп: {stop:.4f}\n"
+            f"Бот ведёт трейлинг/стоп/тейк."
+        )
+        return f"✅ {ticker} {direction}: позиция принята. Вход {entry_price:.4f}, тейк {take:.4f}, стоп {stop:.4f}"
+
+    def move_stop(self, strategies: dict[str, "IStrategy"], req: "bot_control.MoveStopRequest") -> str:
+        """
+        Двигает стоп (и опционально тейк) уже открытой позиции.
+        Обновляет Signal внутри TradeResults и стоп в RiskManager.
+        Только в сторону прибыли — защита от случайного расширения стопа не встроена,
+        решение остаётся за пользователем.
+        """
+        ticker = req.ticker.upper()
+        figi = next((s.settings.figi for s in strategies.values()
+                     if s.settings.ticker.upper() == ticker), None)
+        if figi is None:
+            return f"❌ {ticker}: тикер не найден"
+
+        if not self.__today_trade_results:
+            return f"❌ {ticker}: нет активных сделок сегодня"
+        order = self.__today_trade_results.get_current_trade_order(figi)
+        if order is None:
+            return f"❌ {ticker}: нет открытой позиции под управлением бота"
+
+        new_stop = float(req.new_stop)
+        new_take = float(req.new_take) if req.new_take is not None else float(order.signal.take_profit_level)
+
+        # Обновляем Signal (frozen=True, пересоздаём)
+        old_signal = order.signal
+        new_signal = Signal(
+            figi=old_signal.figi,
+            signal_type=old_signal.signal_type,
+            take_profit_level=Decimal(str(new_take)),
+            stop_loss_level=Decimal(str(new_stop)),
+        )
+        order.signal = new_signal
+
+        # Обновляем стоп в RiskManager (трейлинг отталкивается от него)
+        pos = self.__risk.positions.get(ticker)
+        if pos:
+            pos.stop_price = new_stop
+            self.__risk.save_positions()
+
+        msg = f"📐 {ticker}: стоп → {new_stop:.4f}"
+        if req.new_take is not None:
+            msg += f", тейк → {new_take:.4f}"
+        logger.info(f"MOVE_STOP: {msg}")
+        self.__blogger.send_message(msg)
+        return f"✅ {msg}"
+
+    async def __trading(
+            self,
+            account_id: str,
+            trading_settings: TradingSettings,
+            strategies: dict[str, "IStrategy"],
+            trade_day_end_time: datetime
+    ) -> None:
+        logger.info(f"Subscribe and read Candles for {strategies.keys()}")
+
+        # End trading before close trade session
+        trade_before_time: datetime = \
+            trade_day_end_time - datetime.timedelta(seconds=trading_settings.stop_trade_before_close)
+
+        signals_before_time: datetime = \
+            trade_day_end_time - datetime.timedelta(minutes=trading_settings.stop_signals_before_close)
+        logger.debug(f"Stop time: signals - {signals_before_time}, trading - {trade_before_time}")
+
+        current_candles: dict[str, Candle] = dict()
+        self.__today_trade_results = TradeResults()
+        self.__current_strategies = strategies
+        bot_control.control.current_trader = self
+        self.__overrides.maybe_reload()
+        self.__apply_overrides(strategies)
+
+        async for candle in self.__stream_service.start_async_candles_stream(
+                list(strategies.keys()),
+                trade_before_time
+        ):
+            current_figi_candle = current_candles.setdefault(candle.figi, candle)
+            if candle.time < current_figi_candle.time:
+                # it happens (based on API documentation)
+                logger.debug("Skip candle from past.")
+                continue
+
+            ticker = strategies[candle.figi].settings.ticker
+            cur_price = float(quotation_to_decimal(candle.close))
+            self.__last_prices[ticker] = cur_price
+
+            # Срочное закрытие по команде из Telegram (/close) или с дашборда.
+            if bot_control.control.close_requests:
+                self.__process_close_requests(account_id, strategies)
+
+            # Принятие ручных позиций под управление (/adopt или дашборд).
+            if bot_control.control.adopt_requests:
+                for req in list(bot_control.control.adopt_requests):
+                    result = self.adopt_position(account_id, strategies, req)
+                    logger.info(f"adopt_position result: {result}")
+                bot_control.control.adopt_requests.clear()
+
+            # Перемещение стопа/тейка (/move_stop или дашборд).
+            if bot_control.control.move_stop_requests:
+                for req in list(bot_control.control.move_stop_requests):
+                    result = self.move_stop(strategies, req)
+                    logger.info(f"move_stop result: {result}")
+                bot_control.control.move_stop_requests.clear()
+
+            # Настройки с дашборда (live/sandbox, take/stop, пауза) — перечитываем
+            # дёшево (stat()), применяем к стратегиям только если файл менялся.
+            if self.__overrides.maybe_reload():
+                self.__apply_overrides(strategies)
+                # close_requests из файла — добавляем к in-memory и сразу обрабатываем
+                file_reqs = self.__overrides.pop_close_requests()
+                if file_reqs:
+                    bot_control.control.close_requests.update(file_reqs)
+                    self.__process_close_requests(account_id, strategies)
+                for adopt_dict in self.__overrides.pop_adopt_requests():
+                    try:
+                        req = bot_control.AdoptRequest(
+                            ticker=adopt_dict["ticker"],
+                            direction=adopt_dict["direction"],
+                            take=Decimal(adopt_dict["take"]),
+                            stop=Decimal(adopt_dict["stop"]),
+                            entry=Decimal(adopt_dict["entry"]) if adopt_dict.get("entry") else None,
+                        )
+                        result = self.adopt_position(account_id, strategies, req)
+                        logger.info(f"adopt_position (dashboard): {result}")
+                    except Exception as e:
+                        logger.error(f"adopt_position (dashboard) ошибка: {repr(e)}")
+                for ms_dict in self.__overrides.pop_move_stop_requests():
+                    try:
+                        req = bot_control.MoveStopRequest(
+                            ticker=ms_dict["ticker"],
+                            new_stop=Decimal(ms_dict["new_stop"]),
+                            new_take=Decimal(ms_dict["new_take"]) if ms_dict.get("new_take") else None,
+                        )
+                        result = self.move_stop(strategies, req)
+                        logger.info(f"move_stop (dashboard): {result}")
+                    except Exception as e:
+                        logger.error(f"move_stop (dashboard) ошибка: {repr(e)}")
+            self.write_status_file()
+
+            # Обновляем MFE/MAE трекинг для открытой позиции
+            pt = self.__pos_tracking.get(candle.figi)
+            if pt:
+                high_p = float(quotation_to_decimal(candle.high))
+                low_p = float(quotation_to_decimal(candle.low))
+                if pt["direction"] == "LONG":
+                    pt["max_fav"] = max(pt["max_fav"], high_p)
+                    pt["max_adv"] = min(pt["max_adv"], low_p)
+                else:
+                    pt["max_fav"] = min(pt["max_fav"], low_p)
+                    pt["max_adv"] = max(pt["max_adv"], high_p)
+
+            # Обновляем tf-буфер ТОЛЬКО закрытой минутной свечой — push(candle)
+            # с текущим (ещё формирующимся) candle здесь раньше вызывался на
+            # каждое промежуточное обновление потока (стрим шлёт обновления
+            # текущей минуты на каждую сделку внутри неё, а не только финальное
+            # закрытое значение), из-за чего "5-минутный"/"часовой" бар в
+            # MultiTfBuffer закрывался за случайное число тиков, а не за
+            # реальные 5/60 минут, и volume суммировался многократно.
+            if candle.time > current_figi_candle.time:
+                _new5, _new1h = self.__tf_buffer.push(current_figi_candle)
+            if hasattr(strategies[candle.figi], "set_tf_regimes"):
+                tf_regimes = {"1min": strategies[candle.figi].last_snapshot().get("regime", "")}
+                if self.__tf_buffer.has_5min(candle.figi):
+                    from regime import classify_regime as _cr
+                    c5 = self.__tf_buffer.closes_5min(candle.figi)
+                    if len(c5) >= 5:
+                        r5, _ = _cr(c5, [])
+                        tf_regimes["5min"] = r5
+                if self.__tf_buffer.has_1h(candle.figi):
+                    c1h = self.__tf_buffer.closes_1h(candle.figi)
+                    if len(c1h) >= 3:
+                        r1h, _ = _cr(c1h, [])
+                        tf_regimes["1h"] = r1h
+                strategies[candle.figi].set_tf_regimes(tf_regimes)
+
+            # check price from candle for take or stop price levels
+            current_trade_order = self.__today_trade_results.get_current_trade_order(candle.figi)
+            if current_trade_order:
+                high, low = quotation_to_decimal(candle.high), quotation_to_decimal(candle.low)
+
+                # Logic is:
+                # if stop or take price level is between high and low, then stop or take will be executed
+                risk_ticker_cur = strategies[candle.figi].settings.ticker
+                risk_pos_cur = self.__risk.positions.get(risk_ticker_cur)
+                try:
+                    if self.__overrides.adaptive_exit_enabled(ADAPTIVE_EXIT_ENABLED):
+                        # Адаптивный выход — единственная логика закрытия позиции:
+                        # фиксированные stop/take из сигнала игнорируются, чтобы
+                        # трейлинг-стоп мог двигаться и забирать большее движение,
+                        # а не закрываться по первому касанию исходного take_profit.
+                        self.__check_adaptive_exit(account_id, candle, strategies)
+                    elif risk_pos_cur and risk_pos_cur.half_closed:
+                        # Остаток после частичной фиксации — стоп/тейк сигнала больше не
+                        # действуют, его судьбу решает remainder_stop (risk.check_exit).
+                        # Если цена идёт ещё дальше в плюс — оцениваем, не пора ли
+                        # зафиксировать ещё часть (размазывание по check_scale_out).
+                        self.__try_scale_out(account_id, candle, strategies, risk_ticker_cur, risk_pos_cur)
+                        should_close, reason = self.__risk.check_exit(risk_ticker_cur, float(quotation_to_decimal(candle.close)))
+                        if should_close:
+                            logger.info(f"PARTIAL TP REMAINDER CLOSE {risk_ticker_cur}: {reason}")
+                            self.__exit_position(account_id, strategies[candle.figi], strategies, float(quotation_to_decimal(candle.close)), reason)
+                    elif self.__overrides.partial_tp_enabled(PARTIAL_TP_DEFAULT_ENABLED) and \
+                            self.__try_partial_take(account_id, candle, strategies):
+                        pass  # частичная фиксация сработала — остаток остаётся открытым
+                    elif low <= current_trade_order.signal.stop_loss_level <= high:
+                        logger.info(f"STOP LOSS уровень достигнут: {current_trade_order}")
+                        # Биржевой стоп-лимит должен уже исполниться/исполняться —
+                        # отменяем тейк-ордер и обновляем внутреннее состояние.
+                        self.__cancel_exit_orders(account_id, candle.figi, which="take")
+                        self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.stop_loss_level), "stop_loss")
+
+                    elif low <= current_trade_order.signal.take_profit_level <= high:
+                        logger.info(f"TAKE PROFIT уровень достигнут: {current_trade_order}")
+                        # Биржевой тейк-лимит должен уже исполниться/исполняться —
+                        # отменяем стоп-ордер и обновляем внутреннее состояние.
+                        self.__cancel_exit_orders(account_id, candle.figi, which="stop")
+                        self.__exit_position(account_id, strategies[candle.figi], strategies, float(current_trade_order.signal.take_profit_level), "take_profit")
+                except Exception as ex:
+                    logger.error(f"Error check Stop loss and Take profit levels: {repr(ex)}")
+
+            if candle.time > current_figi_candle.time:
+                self.__candle_volumes.setdefault(candle.figi, deque(maxlen=20)).append(current_figi_candle.volume)
+
+            # ── Дробный вход: второй транш ─────────────────────────────────────
+            if candle.time > current_figi_candle.time and candle.figi in self.__pending_tranche2:
+                t2 = self.__pending_tranche2[candle.figi]
+                t2["bars_left"] -= 1
+                pos_t2 = self.__risk.positions.get(t2["strategy"].settings.ticker)
+                current_close = float(quotation_to_decimal(candle.close))
+                if pos_t2 is None:
+                    # Позиция уже закрыта — отменяем второй транш
+                    del self.__pending_tranche2[candle.figi]
+                    continue
+                # Проверяем что стоп актуален: если текущая цена уже за
+                # стопом первого транша — вход ошибочный, транш отменяем.
+                t2_stop = float(t2["signal"].stop_loss_level)
+                stop_hit = (t2["direction"] == "long" and current_close <= t2_stop) or \
+                           (t2["direction"] == "short" and current_close >= t2_stop)
+                if stop_hit:
+                    logger.info(
+                        f"TRANCHE2 {t2['strategy'].settings.ticker}: "
+                        f"отменён — цена {current_close:.4f} уже за стопом {t2_stop:.4f}"
+                    )
+                    del self.__pending_tranche2[candle.figi]
+                    continue
+                if t2["bars_left"] <= 0:
+                    # Фильтр: откат от входа не превышает TRANCHE2_MAX_ADVERSE_ATR * ATR.
+                    # Знак P&L плохой критерий — отменял бы транш при любом тике против.
+                    # ATR-порог: нормальный шум (≤0.5 ATR) — добавляем, сильное движение
+                    # против (≥0.5 ATR) — вход был ошибочным, второй транш не нужен.
+                    atr_abs = t2["entry_price"] * t2["atr_pct"] if t2["atr_pct"] > 0 else 0.0
+                    adverse_move = (t2["entry_price"] - current_close) if t2["direction"] == "long" \
+                        else (current_close - t2["entry_price"])
+                    adverse_ok = atr_abs <= 0 or adverse_move <= TRANCHE2_MAX_ADVERSE_ATR * atr_abs
+                    if adverse_ok:
+                        logger.info(
+                            f"TRANCHE2 {t2['strategy'].settings.ticker}: "
+                            f"добавляем {t2['remaining_lots']} лотов "
+                            f"(откат {adverse_move:.4f} ≤ {TRANCHE2_MAX_ADVERSE_ATR}×ATR {atr_abs:.4f})"
+                        )
+                        asyncio.create_task(self.__add_lots_task(
+                            account_id=account_id,
+                            figi=candle.figi,
+                            lots=t2["remaining_lots"],
+                            is_long=(t2["direction"] == "long"),
+                            entry_price=current_close,
+                            strategy=t2["strategy"],
+                            atr_pct=t2["atr_pct"],
+                        ))
+                    else:
+                        logger.info(
+                            f"TRANCHE2 {t2['strategy'].settings.ticker}: "
+                            f"отменён — откат {adverse_move:.4f} > {TRANCHE2_MAX_ADVERSE_ATR}×ATR {atr_abs:.4f}"
+                        )
+                    del self.__pending_tranche2[candle.figi]
+
+            # ── Пирамидинг ────────────────────────────────────────────────────
+            if PYRAMID_ENABLED and candle.time > current_figi_candle.time \
+                    and candle.figi not in self.__pyramided \
+                    and candle.figi not in self.__pending_orders:
+                figi_strat = strategies.get(candle.figi)
+                if figi_strat:
+                    pos_pyr = self.__risk.positions.get(figi_strat.settings.ticker)
+                    if pos_pyr and not pos_pyr.half_closed:
+                        entry_p = pos_pyr.entry_price
+                        stop_p = pos_pyr.stop_price
+                        current_p = float(quotation_to_decimal(candle.close))
+                        risk_dist = abs(entry_p - stop_p)
+                        if risk_dist > 0:
+                            moved = (current_p - entry_p) if pos_pyr.direction == "long" \
+                                else (entry_p - current_p)
+                            if moved >= PYRAMID_R_THRESHOLD * risk_dist:
+                                add_lots = max(1, round(pos_pyr.lots * PYRAMID_ADD_RATIO))
+                                logger.info(
+                                    f"PYRAMID {figi_strat.settings.ticker}: "
+                                    f"+{add_lots} лотов при {moved/risk_dist:.1f}R прибыли"
+                                )
+                                self.__pyramided.add(candle.figi)
+                                atr_pct_pyr = 0.0
+                                if hasattr(figi_strat, "last_snapshot"):
+                                    try:
+                                        atr_pct_pyr = figi_strat.last_snapshot().get("atr_pct", 0.0) or 0.0
+                                    except Exception:
+                                        pass
+                                asyncio.create_task(self.__add_lots_task(
+                                    account_id=account_id,
+                                    figi=candle.figi,
+                                    lots=add_lots,
+                                    is_long=(pos_pyr.direction == "long"),
+                                    entry_price=current_p,
+                                    strategy=figi_strat,
+                                    atr_pct=atr_pct_pyr,
+                                    new_stop=max(entry_p, stop_p)  # стоп не ниже безубытка
+                                    if pos_pyr.direction == "long"
+                                    else min(entry_p, stop_p),
+                                ))
+
+            if candle.time > current_figi_candle.time and \
+                    datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) <= signals_before_time:
+                signal_new = None
+                if _new5 is not None:
+                    # Решение о входе считается на агрегированном 5min-баре — так же,
+                    # как в бэктесте (там CANDLE_WINDOW=30 строится из 5min-свечей).
+                    # Раньше здесь отдавался каждый 1min-бар, и стратегия фактически
+                    # считала сигнал по последним 30 минутам, а бэктест — по последним
+                    # ~2.5 часам на тех же CANDLE_WINDOW=30: разные окна для одной цифры.
+                    signal_new = strategies[candle.figi].analyze_candles(
+                        [aggcandle_to_historiccandle(_new5, current_figi_candle.time)]
+                    )
+
+                if signal_new:
+                    # Раньше здесь была отложенная проверка "подтверждения" сигнала
+                    # на 1min-барах (до 5 минут ожидания) — на практике задержка
+                    # входа относительно момента сигнала только теряла часть
+                    # движения, а не повышала качество входа. Убрано — входим
+                    # сразу по сигналу.
+                    self.__handle_new_signal(account_id, candle, strategies, current_trade_order, signal_new)
+
+            current_candles[candle.figi] = candle
+
+        logger.info("Today trading has been completed")
+
+    def __handle_new_signal(self, account_id, candle, strategies, current_trade_order, signal_new) -> None:
+        logger.info(f"New signal: {signal_new}")
+
+        try:
+            if signal_new.signal_type == SignalType.CLOSE:
+                if current_trade_order:
+                    logger.info(f"Close position by close signal: {current_trade_order}")
+                    self.__exit_position(account_id, strategies[candle.figi], strategies, float(quotation_to_decimal(candle.close)), "close_signal")
+                else:
+                    logger.info(f"New signal has been skipped. No open position to close.")
+
+            elif current_trade_order:
+                logger.info(f"New signal has been skipped. Previous signal is still alive.")
+
+            elif candle.figi in self.__pending_orders:
+                logger.info(f"New signal has been skipped. Ордер по тикеру уже в процессе размещения.")
+
+            elif not self.__market_data_service.is_stock_ready_for_trading(candle.figi):
+                logger.info(f"New signal has been skipped. Stock isn't ready for trading")
+
+            elif bot_control.control.paused or self.__overrides.is_paused():
+                logger.info(f"New signal has been skipped. Бот на паузе")
+                self.__record_skip(strategies[candle.figi].settings.ticker, signal_new, "пауза")
+
+            elif self.__overrides.is_ticker_disabled(strategies[candle.figi].settings.ticker):
+                logger.info(f"New signal has been skipped. Тикер запрещён к торговле с дашборда")
+                self.__record_skip(strategies[candle.figi].settings.ticker, signal_new, "тикер отключён")
+
+            elif self.__loss_cooldown_until.get(strategies[candle.figi].settings.ticker, datetime.datetime.min) \
+                    > datetime.datetime.utcnow():
+                until = self.__loss_cooldown_until[strategies[candle.figi].settings.ticker]
+                logger.info(
+                    f"New signal has been skipped. Кулдаун после убыточного закрытия до "
+                    f"{until.isoformat()}"
+                )
+                self.__record_skip(strategies[candle.figi].settings.ticker, signal_new,
+                                   f"кулдаун до {until.strftime('%H:%M')}")
+
+            else:
+                strategy = strategies[candle.figi]
+                # signal_only = только Telegram, без реального ордера;
+                # дашборд может форсировать sandbox глобально или для тикера
+                is_signal_only = self.__overrides.signal_only_for(
+                    strategy.settings.ticker, getattr(strategy, 'signal_only', False)
+                )
+
+                if is_signal_only:
+                    logger.info(f"SIGNAL ONLY mode: {signal_new} (no order placed)")
+                    self.__blogger.open_position_message(
+                        self.__today_trade_results.open_position(
+                            candle.figi, "signal_only", signal_new
+                        )
+                    )
+                else:
+                    risk_ticker = strategy.settings.ticker
+                    direction = "long" if signal_new.signal_type == SignalType.LONG else "short"
+                    confidence = getattr(strategy, 'confidence', 0.7)
+
+                    # Фильтр режима: в боковике и стрессе momentum-сигналы
+                    # статистически убыточны — входа нет.
+                    if ENTRY_BLOCKED_REGIMES and hasattr(strategy, "last_snapshot"):
+                        try:
+                            current_regime = strategy.last_snapshot().get("regime", "")
+                            if current_regime in ENTRY_BLOCKED_REGIMES:
+                                logger.info(
+                                    f"New signal has been skipped. "
+                                    f"Режим {current_regime!r} заблокирован для входа"
+                                )
+                                self.__record_skip(risk_ticker, signal_new, f"режим: {current_regime}")
+                                return
+                        except Exception:
+                            pass
+
+                    # Фильтр imbalance: живой стакан должен подтверждать направление.
+                    # stale_ratio проверяем первым — если большинство объёма "мёртвое"
+                    # (заявки не двигаются, хотя цена идёт сквозь них), imbalance
+                    # искажён и не несёт информации.
+                    if ENTRY_IMBALANCE_MIN >= 0 and self.__orderbook.has_data(risk_ticker):
+                        stale = self.__orderbook.stale_ratio(risk_ticker)
+                        if stale <= ENTRY_IMBALANCE_MAX_STALE:
+                            imbalance = self.__orderbook.imbalance_score(risk_ticker)
+                            required_sign = 1 if direction == "long" else -1
+                            if imbalance * required_sign < ENTRY_IMBALANCE_MIN:
+                                logger.info(
+                                    f"New signal has been skipped. "
+                                    f"Стакан против: imbalance={imbalance:.2f} "
+                                    f"(нужно ≥{ENTRY_IMBALANCE_MIN} для {direction}), "
+                                    f"stale={stale:.2f}"
+                                )
+                                self.__record_skip(
+                                    risk_ticker, signal_new,
+                                    f"стакан против: {imbalance:.2f}"
+                                )
+                                return
+
+                    risk_ok, risk_why = self.__risk.can_open(risk_ticker, direction, confidence)
+                    if not risk_ok:
+                        logger.info(f"New signal has been skipped. Risk gate: {risk_why}")
+                        self.__record_skip(risk_ticker, signal_new, f"риск: {risk_why}")
+                        return
+
+                    entry_price = float(quotation_to_decimal(candle.close))
+                    stop_price = float(signal_new.stop_loss_level)
+                    risk_qty, risk_size_why = self.__risk.position_size(
+                        entry_price, stop_price,
+                        point_value=strategy.settings.point_value,
+                        lot=strategy.settings.lot_size, confidence=confidence
+                    )
+                    logger.debug(f"Risk position_size: {risk_size_why}")
+
+                    cash_lots = self.__open_position_lots_count(
+                        account_id,
+                        strategy.settings.max_lots_per_order,
+                        quotation_to_decimal(candle.close),
+                        strategy.settings.lot_size,
+                        margin_per_lot=Decimal(str(strategy.settings.margin_per_lot))
+                        if strategy.settings.is_future else None
+                    )
+                    liquidity_lots = self.__liquidity_lots_cap(
+                        candle.figi, strategy.settings.lot_size,
+                        ticker=risk_ticker,
+                        is_buy=(signal_new.signal_type == SignalType.LONG),
+                    )
+                    available_lots = min(cash_lots, risk_qty, liquidity_lots) if risk_qty > 0 else 0
+
+                    logger.debug(
+                        f"Available lots: {available_lots} "
+                        f"(cash={cash_lots}, risk={risk_qty}, liquidity={liquidity_lots})"
+                    )
+                    if available_lots > 0:
+                        # Размещение/репрайс ордера (__smart_order) может ждать
+                        # до limit_reprice_interval_sec * limit_reprice_max_attempts
+                        # (десятки секунд). await прямо тут блокировал бы чтение
+                        # стрима свечей по ВСЕМ остальным тикерам — стопы/тейки по
+                        # уже открытым позициям не проверялись бы это время. Гоним
+                        # фоновой таской, помечаем figi как "ордер в процессе".
+                        self.__pending_orders.add(candle.figi)
+                        asyncio.create_task(self.__place_order_task(
+                            account_id, candle.figi, available_lots, signal_new,
+                            strategy, direction, confidence, entry_price, stop_price,
+                        ))
+                    else:
+                        logger.info(f"New signal has been skipped. No available money or risk budget")
+                        self.__record_skip(risk_ticker, signal_new, "нет денег / риск-бюджет")
+        except Exception as ex:
+            logger.error(f"Error open new position by new signal: {repr(ex)}")
+
+    def __summary_today_trade_results(
+            self,
+            account_id: str,
+            rub_before_trade_day: Decimal
+    ) -> None:
+        logger.info("Today trading summary:")
+        self.__blogger.summary_message()
+
+        current_rub_on_depo = self.__operation_service.available_rub_on_account(account_id)
+        logger.info(f"RUBs on account before:{rub_before_trade_day}, after:{current_rub_on_depo}")
+
+        today_profit = current_rub_on_depo - rub_before_trade_day
+        today_percent_profit = (today_profit / rub_before_trade_day) * 100
+        logger.info(f"Today Profit:{today_profit} rub ({today_percent_profit} %)")
+        self.__blogger.trading_depo_summary_message(rub_before_trade_day, current_rub_on_depo)
+
+        if self.__today_trade_results:
+            logger.info(f"Today Open Signals:")
+            for figi_key, trade_order_value in self.__today_trade_results.get_current_open_orders().items():
+                logger.info(f"Stock: {figi_key}")
+
+                open_order_state = self.__order_service.get_order_state(account_id, trade_order_value.open_order_id)
+                logger.info(f"Signal {trade_order_value.signal}")
+                logger.info(f"Open: {open_order_state}")
+                self.__blogger.summary_open_signal_message(trade_order_value, open_order_state)
+
+            logger.info(f"All open positions should be closed manually.")
+
+            logger.info(f"Today Closed Signals:")
+            for figi_key, trade_orders_value in self.__today_trade_results.get_closed_orders().items():
+                logger.info(f"Stock: {figi_key}")
+                for trade_order in trade_orders_value:
+                    open_order_state = self.__order_service.get_order_state(account_id, trade_order.open_order_id)
+                    close_order_state = self.__order_service.get_order_state(account_id, trade_order.close_order_id)
+                    logger.info(f"Signal {trade_order.signal}")
+                    logger.info(f"Open: {open_order_state}")
+                    logger.info(f"Close: {close_order_state}")
+                    self.__blogger.summary_closed_signal_message(trade_order, open_order_state, close_order_state)
+        else:
+            logger.info(f"Something went wrong: today trade results is empty")
+            logger.info(f"All open positions should be closed manually.")
+            self.__blogger.fail_message()
+
+        self.__blogger.final_message()
+
+    def __open_position_lots_count(
+            self,
+            account_id: str,
+            max_lots_per_order: int,
+            price: Decimal,
+            share_lot_size: int,
+            margin_per_lot: Decimal | None = None
+    ) -> int:
+        """
+        Calculate counts of lots for order.
+
+        Для акций стоимость лота — price*lot_size (полная оплата). Для
+        фьючерсов (margin_per_lot задан) — это в разы меньше: реальная
+        стоимость владения одним лотом — ГО (гарантийное обеспечение),
+        а не полная номинальная стоимость контракта.
+        """
+        current_rub_on_depo = self.__operation_service.available_rub_on_account(account_id)
+
+        cost_per_lot = margin_per_lot if margin_per_lot and margin_per_lot > 0 else (share_lot_size * price)
+        available_lots = int(current_rub_on_depo / cost_per_lot)
+
+        return available_lots if max_lots_per_order > available_lots else max_lots_per_order
+
+    def __multi_ticker_signal(
+            self,
+            ticker: str,
+            today_trade_strategies: dict[str, IStrategy],
+            db_for_history: DbApiClient
+    ) -> float:
+        """
+        MULTI_TICKER провайдер: межинструментальный сигнал между ticker и
+        вторым тикером.
+
+        Если ticker — фьюч, открытый через [FUTURES_TRADING] (см.
+        __future_base_ticker, заполняется в __build_futures_strategies),
+        пара — его СОБСТВЕННАЯ акция-базис: цена фьюча на FORTS реально
+        подстраивается под цену акции с лагом (тонкий стакан single-stock
+        фьючерса), это не случайное соседство, а конкретная экономическая
+        связь. Раньше пара выбиралась детерминированно, но произвольно —
+        "следующий тикер по сортированному списку, по кругу" — то есть
+        фьюч на одну акцию мог попасть в пару с совершенно несвязанным
+        тикером, и сигнал не отражал реальный лид-лаг.
+        Для остальных тикеров (просто акции без привязанного фьюча в
+        сегодняшней корзине) пары не считается без явной связи — circular
+        fallback убран как источник шума без экономического смысла.
+
+        Направление — знак transfer_entropy_score (информационный поток
+        между рядами, см. indicators_multi.py), отвзвешенный
+        wavelet_coherence_score как уверенностью в синхронности пары на
+        средних горизонтах.
+
+        Тяжёлые вычисления (скачивание истории, numpy) — раз в день на
+        тикер, кэшируется в self.__multi_ticker_cache; между пересчётами
+        отдаётся кэшированное значение.
+        """
+        today = datetime.datetime.now(datetime.timezone.utc).date()
+        cached = self.__multi_ticker_cache.get(ticker)
+        if cached and cached[0] == today:
+            return cached[1]
+
+        figis = list(today_trade_strategies.keys())
+        figi_self = next((f for f in figis if today_trade_strategies[f].settings.ticker == ticker), None)
+        if figi_self is None:
+            self.__multi_ticker_cache[ticker] = (today, 0.0)
+            return 0.0
+
+        peer_ticker_target = self.__future_base_ticker.get(ticker)
+        if peer_ticker_target is None:
+            # Без привязанного фьюч/акция-пары считать нечего — циркулярный
+            # сосед по алфавиту не имеет экономического смысла.
+            self.__multi_ticker_cache[ticker] = (today, 0.0)
+            return 0.0
+        peer_figi = next(
+            (f for f in figis if today_trade_strategies[f].settings.ticker == peer_ticker_target), None
+        )
+        if peer_figi is None:
+            # Базовая акция сегодня не торгуется ботом (нет в STRATEGY_*/
+            # MEGA-ALERTS) — нет свечей для пары, сигнал недоступен.
+            self.__multi_ticker_cache[ticker] = (today, 0.0)
+            return 0.0
+
+        try:
+            from indicators_multi import transfer_entropy_score, wavelet_coherence_score
+
+            candles_self = get_candles_cached(
+                ticker, figi_self, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+            )
+            peer_ticker = today_trade_strategies[peer_figi].settings.ticker
+            candles_peer = get_candles_cached(
+                peer_ticker, peer_figi, AUTO_ATR_HISTORY_DAYS, self.__market_data_service, db_for_history
+            )
+            n = min(len(candles_self), len(candles_peer))
+            closes_self = [float(quotation_to_decimal(c.close)) for c in candles_self[-n:]]
+            closes_peer = [float(quotation_to_decimal(c.close)) for c in candles_peer[-n:]]
+
+            direction = transfer_entropy_score(closes_self, closes_peer)
+            confidence = wavelet_coherence_score(closes_self, closes_peer)
+            score = max(-1.0, min(1.0, direction * confidence))
+        except Exception as ex:
+            logger.warning(f"multi_ticker_signal {ticker} failed: {repr(ex)}")
+            score = 0.0
+
+        self.__multi_ticker_cache[ticker] = (today, score)
+        return score
+
+    def __liquidity_lots_cap(self, figi: str, share_lot_size: int, ticker: str = "",
+                             is_buy: bool = True) -> int:
+        """
+        Ограничивает размер ордера двумя независимыми метриками:
+
+        1. Средний объём свечей × MAX_VOLUME_PARTICIPATION (0.1) — защита от
+           выставления ордера больше, чем рынок переваривает за минуту.
+
+        2. Лучший bid/ask size из стакана (если OrderBookService активен) —
+           защита от входа когда в стакане стоит единственная заявка на 1 лот:
+           объём свечи может быть высоким (прошла крупная сделка), но прямо
+           сейчас встречной ликвидности нет. Берём min(cap_candles, cap_book).
+
+        Пока истории свечей нет (старт дня) — не ограничиваем по свечам.
+        """
+        cap_candles = 10 ** 9
+        volumes = self.__candle_volumes.get(figi)
+        if volumes:
+            avg_volume = sum(volumes) / len(volumes)
+            cap_candles = max(1, int(avg_volume * self.__trading_settings.max_volume_participation
+                                     / share_lot_size))
+
+        cap_book = 10 ** 9
+        if ticker and self.__orderbook.has_data(ticker):
+            # Берём объём на нашей стороне (bid если покупаем, ask если продаём)
+            # в единицах базового актива, делим на размер лота.
+            book_size_shares = (self.__orderbook.best_bid_size(ticker) if is_buy
+                                else self.__orderbook.best_ask_size(ticker))
+            if book_size_shares > 0:
+                cap_book = max(1, int(book_size_shares / share_lot_size))
+
+        return min(cap_candles, cap_book)
+
+    async def __place_order_task(
+            self,
+            account_id: str,
+            figi: str,
+            available_lots: int,
+            signal_new: Signal,
+            strategy: IStrategy,
+            direction: str,
+            confidence: float,
+            entry_price: float,
+            stop_price: float,
+    ) -> None:
+        """
+        Фоновая таска размещения ордера (см. вызов в __trading) — выполняет
+        __smart_order и последующую регистрацию позиции (today_trade_results,
+        risk.open_position, MFE/MAE трекинг) без блокировки чтения стрима
+        свечей по остальным тикерам на время репрайса.
+        """
+        risk_ticker = strategy.settings.ticker
+        # ATR в долях цены — для адаптивного буфера стоп-лимита
+        atr_pct = 0.0
+        if hasattr(strategy, "last_snapshot"):
+            try:
+                atr_pct = strategy.last_snapshot().get("atr_pct", 0.0) or 0.0
+            except Exception:
+                pass
+
+        # Дробный вход: первый транш = TRANCHE1_RATIO*lots, остаток — позже
+        first_lots = available_lots
+        remaining_lots = 0
+        if FRACTIONAL_ENTRY_ENABLED and available_lots >= 2:
+            first_lots = max(1, round(available_lots * TRANCHE1_RATIO))
+            remaining_lots = available_lots - first_lots
+
+        try:
+            open_order_id, actual_lots = await self.__limit_entry_order(
+                account_id=account_id,
+                figi=figi,
+                count_lots=first_lots,
+                is_buy=(signal_new.signal_type == SignalType.LONG),
+                last_price=entry_price,
+                strategy=strategy
+            )
+            if open_order_id and actual_lots > 0:
+                if actual_lots < first_lots:
+                    logger.warning(
+                        f"PARTIAL FILL {risk_ticker}: "
+                        f"запрошено {first_lots}, исполнено {actual_lots}"
+                    )
+                # Ордер уже реально исполнен на бирже — отсюда и до конца
+                # блока нельзя просто залогировать исключение и пойти дальше:
+                # риск.py должен зарегистрировать позицию ПЕРВЫМ (на нём
+                # держится корреляционный/портфельный лимит и трейлинг), а
+                # если что-то всё равно упадёт ниже — компенсируем закрытием
+                # "осиротевшего" реального ордера, а не просто логом.
+                try:
+                    entry_composite = 0.0
+                    if hasattr(strategy, "last_snapshot"):
+                        try:
+                            _comp = strategy.last_snapshot().get("composite", 0.0)
+                            entry_composite = _comp if direction == "long" else -_comp
+                        except Exception as ex:
+                            logger.warning(f"{risk_ticker}: last_snapshot() упал, entry_composite=0.0: {repr(ex)}")
+
+                    _act_levels = {}
+                    if hasattr(strategy, "get_activation_levels"):
+                        try:
+                            _act_levels = strategy.get_activation_levels()
+                        except Exception as ex:
+                            logger.warning(f"{risk_ticker}: get_activation_levels() упал: {repr(ex)}")
+                    self.__risk.open_position(
+                        risk_ticker, direction, actual_lots,
+                        entry_price, stop_price,
+                        point_value=strategy.settings.point_value,
+                        confidence=confidence,
+                        take_target=float(signal_new.take_profit_level),
+                        entry_composite=entry_composite,
+                        activation_levels=_act_levels,
+                    )
+                    open_position = self.__today_trade_results.open_position(
+                        figi,
+                        open_order_id,
+                        signal_new
+                    )
+                    self.__blogger.open_position_message(open_position)
+                    logger.info(f"Open position: {open_position}")
+                    # Запускаем MFE/MAE трекинг для этой позиции
+                    self.__pos_tracking[figi] = {
+                        "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
+                        "entry": entry_price,
+                        "max_fav": entry_price,
+                        "max_adv": entry_price,
+                    }
+                    # Второй транш: запомнить для добавления через TRANCHE2_BARS свечей
+                    if remaining_lots > 0:
+                        self.__pending_tranche2[figi] = {
+                            "remaining_lots": remaining_lots,
+                            "bars_left": TRANCHE2_BARS,
+                            "signal": signal_new,
+                            "strategy": strategy,
+                            "direction": direction,
+                            "confidence": confidence,
+                            "entry_price": entry_price,
+                            "stop_price": stop_price,
+                            "atr_pct": atr_pct,
+                        }
+                        logger.info(
+                            f"TRANCHE2 {risk_ticker}: запланировано +{remaining_lots} лотов "
+                            f"через {TRANCHE2_BARS} свечей"
+                        )
+                    # Выставляем биржевые стоп-лимит + тейк-лимит немедленно.
+                    # Они живут на бирже независимо от процесса бота — защита
+                    # от падения / потери связи. __place_exit_orders не бросает
+                    # исключений наружу (ловит внутри), так что позиция в любом
+                    # случае остаётся под трекингом risk.py.
+                    is_long = (signal_new.signal_type == SignalType.LONG)
+                    self.__place_exit_orders(
+                        account_id=account_id,
+                        figi=figi,
+                        is_long=is_long,
+                        lots=actual_lots,
+                        take_price=float(signal_new.take_profit_level),
+                        stop_price=stop_price,
+                        ticker=risk_ticker,
+                        min_price_step=strategy.settings.min_price_increment,
+                        atr_pct=atr_pct,
+                    )
+                except Exception as ex:
+                    logger.error(
+                        f"{risk_ticker}: ошибка регистрации позиции после реального исполнения "
+                        f"ордера {open_order_id} — закрываю осиротевшую позицию на бирже: {repr(ex)}"
+                    )
+                    self.__risk.positions.pop(risk_ticker, None)
+                    try:
+                        self.__close_figi_with_fill_info(account_id, figi, {figi: strategy})
+                    except Exception as close_ex:
+                        logger.error(f"{risk_ticker}: не удалось закрыть осиротевшую позицию: {repr(close_ex)}")
+            else:
+                logger.warning(f"Open order REJECTED/FAILED для {risk_ticker}")
+        except Exception as ex:
+            logger.error(f"Error open new position by new signal: {repr(ex)}")
+        finally:
+            self.__pending_orders.discard(figi)
+
+    async def __smart_order(
+            self,
+            account_id: str,
+            figi: str,
+            count_lots: int,
+            is_buy: bool,
+            last_price: float,
+            strategy: IStrategy
+    ) -> tuple[str | None, int]:
+        """
+        Лимитная заявка с авто-репрайсингом и переходом на рыночную.
+        Возвращает (order_id, actual_lots) при успешном исполнении или (None, 0).
+
+        Логика:
+        1. Выставить лимит на уровне last_price.
+        2. Каждые 5 сек проверять статус заявки.
+        3. Если цена ушла против нас более чем на adverse_pct — немедленно
+           переходим на рынок (хуже будет ещё больше).
+        4. Если прошёл reprice_interval и заявка не исполнена — отменяем,
+           переставляем на текущую цену (до max_attempts раз).
+        5. После всех попыток — рыночная заявка.
+        """
+        ts = self.__trading_settings
+        ticker = strategy.settings.ticker
+        poll_interval = 5  # секунды между опросами состояния
+
+        def _adverse(current: float) -> bool:
+            if last_price == 0:
+                return False
+            move = (current - last_price) / last_price
+            # Для покупки плохо когда цена выросла (платим дороже),
+            # для продажи — когда упала.
+            return (is_buy and move > ts.limit_adverse_move_pct) or \
+                   (not is_buy and move < -ts.limit_adverse_move_pct)
+
+        def _place_limit(price: float) -> tuple[str | None, object]:
+            try:
+                p = Decimal(str(price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy, price=p
+                )
+                return resp.order_id, resp
+            except Exception as ex:
+                logger.warning(f"__smart_order place limit failed: {repr(ex)}")
+                return None, None
+
+        def _to_market() -> tuple[str | None, int]:
+            try:
+                resp = self.__order_service.post_market_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy
+                )
+                if resp.execution_report_status in (
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+                ):
+                    try:
+                        state = self.__order_service.get_order_state(account_id, resp.order_id)
+                        return resp.order_id, state.lots_executed or count_lots
+                    except Exception:
+                        return resp.order_id, count_lots
+                logger.warning(f"__smart_order market fallback REJECTED: {resp}")
+                return None, 0
+            except Exception as ex:
+                logger.warning(f"__smart_order market fallback error: {repr(ex)}")
+                return None, 0
+
+        def _cancel(order_id: str) -> None:
+            try:
+                self.__order_service.cancel_order(account_id, order_id)
+            except Exception:
+                pass
+
+        entry_price = last_price
+        order_id, _ = _place_limit(entry_price)
+        if order_id is None:
+            logger.warning(f"__smart_order: limit place failed, falling back to market")
+            return _to_market()
+
+        elapsed_since_reprice = 0
+        attempt = 0
+
+        while True:
+            await asyncio.sleep(poll_interval)
+            elapsed_since_reprice += poll_interval
+
+            # Проверяем статус
+            try:
+                state = self.__order_service.get_order_state(account_id, order_id)
+            except Exception as ex:
+                logger.warning(f"__smart_order get_order_state error: {repr(ex)}")
+                break
+
+            if state.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL:
+                return order_id, state.lots_executed or count_lots
+
+            if state.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
+                # Частичное — продолжаем ждать, но не бесконечно
+                pass
+
+            if state.execution_report_status in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_REJECTED,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_CANCELLED,
+            ):
+                logger.warning(f"__smart_order: заявка {order_id} отклонена/отменена, рынок")
+                return _to_market()
+
+            # Проверяем неблагоприятное движение цены
+            current_price = self.__last_prices.get(ticker, entry_price)
+            if _adverse(current_price):
+                logger.info(
+                    f"__smart_order {ticker}: неблагоприятное движение "
+                    f"{entry_price:.4f}->{current_price:.4f}, переход на рынок"
+                )
+                _cancel(order_id)
+                return _to_market()
+
+            # Репрайс по таймеру
+            if elapsed_since_reprice >= ts.limit_reprice_interval_sec:
+                elapsed_since_reprice = 0
+                attempt += 1
+                if attempt > ts.limit_reprice_max_attempts:
+                    logger.info(f"__smart_order {ticker}: исчерпаны попытки репрайса, рынок")
+                    _cancel(order_id)
+                    return _to_market()
+
+                _cancel(order_id)
+                entry_price = current_price
+                order_id, _ = _place_limit(entry_price)
+                if order_id is None:
+                    return _to_market()
+                logger.info(f"__smart_order {ticker}: репрайс #{attempt} на {entry_price:.4f}")
+
+        # Нештатный выход из цикла — рынок
+        _cancel(order_id)
+        return _to_market()
+
+    # ── Добавление лотов (дробный вход / пирамидинг) ─────────────────────────
+
+    async def __add_lots_task(
+            self,
+            account_id: str,
+            figi: str,
+            lots: int,
+            is_long: bool,
+            entry_price: float,
+            strategy: IStrategy,
+            atr_pct: float = 0.0,
+            new_stop: float | None = None,
+    ) -> None:
+        """
+        Добавляет лоты к существующей позиции (дробный вход или пирамидинг).
+        После исполнения обновляет биржевые стоп/тейк ордера (отменяет старые,
+        выставляет новые с увеличенным объёмом). Если new_stop задан — сдвигает
+        стоп (для пирамидинга: стоп не хуже безубытка).
+        """
+        ticker = strategy.settings.ticker
+        self.__pending_orders.add(figi)
+        try:
+            order_id, filled_lots = await self.__limit_entry_order(
+                account_id=account_id, figi=figi,
+                count_lots=lots, is_buy=is_long,
+                last_price=entry_price, strategy=strategy,
+            )
+            if not order_id or filled_lots <= 0:
+                logger.warning(f"ADD_LOTS {ticker}: ордер не исполнился, лоты не добавлены")
+                return
+
+            logger.info(f"ADD_LOTS {ticker}: +{filled_lots} лотов по ~{entry_price:.4f}")
+
+            pos = self.__risk.positions.get(ticker)
+            if pos is None:
+                logger.warning(f"ADD_LOTS {ticker}: позиция уже закрыта, лоты остаются на бирже — закрываем")
+                try:
+                    self.__close_figi_with_fill_info(account_id, figi, {figi: strategy})
+                except Exception as ex:
+                    logger.error(f"ADD_LOTS {ticker}: не удалось закрыть осиротевший лот: {repr(ex)}")
+                return
+
+            # Обновляем лоты в позиции risk.py (средневзвешенный вход)
+            old_lots = pos.lots
+            total_lots = old_lots + filled_lots
+            avg_entry = (pos.entry_price * old_lots + entry_price * filled_lots) / total_lots
+            pos.lots = total_lots
+            pos.entry_price = avg_entry
+
+            if new_stop is not None and new_stop != pos.stop_price:
+                pos.stop_price = new_stop
+
+            # Переставляем биржевые ордера на новый суммарный объём
+            take_target = pos.take_target if hasattr(pos, "take_target") and pos.take_target else None
+            self.__cancel_exit_orders(account_id, figi, which="both")
+            if take_target:
+                self.__place_exit_orders(
+                    account_id=account_id, figi=figi,
+                    is_long=is_long, lots=total_lots,
+                    take_price=take_target, stop_price=pos.stop_price,
+                    ticker=ticker,
+                    min_price_step=strategy.settings.min_price_increment,
+                    atr_pct=atr_pct,
+                )
+        except Exception as ex:
+            logger.error(f"ADD_LOTS {ticker}: ошибка: {repr(ex)}")
+        finally:
+            self.__pending_orders.discard(figi)
+
+    # ── Биржевые стоп/тейк ордера ────────────────────────────────────────────
+
+    def __place_exit_orders(
+            self,
+            account_id: str,
+            figi: str,
+            is_long: bool,
+            lots: int,
+            take_price: float,
+            stop_price: float,
+            ticker: str,
+            min_price_step: float = 0.01,
+            atr_pct: float = 0.0,
+    ) -> None:
+        """
+        После исполнения входа немедленно ставим на бирже:
+        - Тейк: обычная лимитная заявка на уровне take_price (противоположная сторона)
+        - Стоп: стоп-лимит на stop_price, лимит = stop_price ± буфер, где
+          буфер = max(3*шаг, ATR*0.1) — адаптивный, чтобы при высокой
+          волатильности стоп не превращался в мёртвую лимитку при гэпе.
+
+        Оба ордера живут на бирже независимо от состояния процесса бота.
+        При срабатывании одного нужно отменить другой (см. __cancel_exit_orders).
+        """
+        take_id: str | None = None
+        stop_id: str | None = None
+
+        # Лимит тейка: продаём если лонг (закрываем), покупаем если шорт
+        try:
+            p = Decimal(str(take_price))
+            resp = self.__order_service.post_limit_order(
+                account_id=account_id, figi=figi,
+                count_lots=lots, is_buy=(not is_long), price=p
+            )
+            take_id = resp.order_id
+            logger.info(f"EXIT_ORDERS {ticker}: тейк-лимит {take_price:.4f} → {take_id}")
+        except Exception as ex:
+            logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить тейк-лимит: {repr(ex)}")
+
+        # Адаптивный буфер стоп-лимита: 3 тика или 10% ATR — что больше.
+        # На ликвидных акциях с малым ATR работает как раньше (3 тика).
+        # На волатильных фьючерсах или в момент новостей ATR-буфер шире и
+        # защищает от ситуации когда цена гэпнула через лимит и заявка повисла.
+        step = max(min_price_step, 1e-9)
+        atr_buffer = stop_price * atr_pct * 0.1 if atr_pct > 0 and stop_price > 0 else 0.0
+        limit_offset = max(3 * step, atr_buffer)
+        stop_limit_price = (stop_price - limit_offset) if is_long else (stop_price + limit_offset)
+        stop_limit_price = max(step, stop_limit_price)
+        try:
+            stop_id = self.__stop_order_service.post_stop_limit(
+                account_id=account_id, figi=figi, lots=lots,
+                is_buy=(not is_long),
+                stop_price=stop_price,
+                limit_price=stop_limit_price,
+            )
+            logger.info(f"EXIT_ORDERS {ticker}: стоп-лимит {stop_price:.4f} (лимит {stop_limit_price:.4f}) → {stop_id}")
+        except Exception as ex:
+            logger.warning(f"EXIT_ORDERS {ticker}: не удалось поставить стоп-лимит: {repr(ex)}")
+
+        self.__active_exit_orders[figi] = {
+            "take_id": take_id,
+            "stop_id": stop_id,
+            "lots": lots,
+            "is_long": is_long,
+            "ticker": ticker,
+            "min_price_step": step,
+        }
+
+    def __cancel_exit_orders(self, account_id: str, figi: str, which: str = "both") -> None:
+        """
+        Отменяет биржевые выходные ордера.
+        which: "both" | "take" | "stop"
+        Вызывается при: адаптация уровней, срабатывание одного из ордеров,
+        принудительное закрытие (Telegram/EOD).
+        """
+        ex_info = self.__active_exit_orders.get(figi)
+        if not ex_info:
+            return
+        ticker = ex_info.get("ticker", figi)
+
+        if which in ("both", "take") and ex_info.get("take_id"):
+            try:
+                self.__order_service.cancel_order(account_id, ex_info["take_id"])
+                logger.info(f"EXIT_ORDERS {ticker}: отменён тейк {ex_info['take_id']}")
+            except Exception as ex:
+                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены тейка: {repr(ex)}")
+            ex_info["take_id"] = None
+
+        if which in ("both", "stop") and ex_info.get("stop_id"):
+            try:
+                self.__stop_order_service.cancel_stop_order(account_id, ex_info["stop_id"])
+                logger.info(f"EXIT_ORDERS {ticker}: отменён стоп {ex_info['stop_id']}")
+            except Exception as ex:
+                logger.warning(f"EXIT_ORDERS {ticker}: ошибка отмены стопа: {repr(ex)}")
+            ex_info["stop_id"] = None
+
+        if which == "both":
+            self.__active_exit_orders.pop(figi, None)
+
+    def __update_stop_order(
+            self,
+            account_id: str,
+            figi: str,
+            new_stop_price: float,
+            new_take_price: float | None = None,
+    ) -> None:
+        """
+        Переставить биржевой стоп (и опционально тейк) на новые уровни.
+        Вызывается из адаптивного выхода при трейлинге Chandelier.
+        """
+        ex_info = self.__active_exit_orders.get(figi)
+        if not ex_info:
+            return
+        ticker = ex_info.get("ticker", figi)
+        lots = ex_info["lots"]
+        is_long = ex_info["is_long"]
+        step = ex_info["min_price_step"]
+
+        # Отменяем старый стоп и ставим новый
+        if ex_info.get("stop_id"):
+            try:
+                self.__stop_order_service.cancel_stop_order(account_id, ex_info["stop_id"])
+            except Exception as ex:
+                logger.warning(f"UPDATE_STOP {ticker}: отмена старого стопа: {repr(ex)}")
+            ex_info["stop_id"] = None
+
+        limit_offset = 3 * step
+        stop_limit_price = (new_stop_price - limit_offset) if is_long else (new_stop_price + limit_offset)
+        stop_limit_price = max(step, stop_limit_price)
+        try:
+            new_id = self.__stop_order_service.post_stop_limit(
+                account_id=account_id, figi=figi, lots=lots,
+                is_buy=(not is_long),
+                stop_price=new_stop_price,
+                limit_price=stop_limit_price,
+            )
+            ex_info["stop_id"] = new_id
+            logger.info(f"UPDATE_STOP {ticker}: новый стоп {new_stop_price:.4f} → {new_id}")
+        except Exception as ex:
+            logger.warning(f"UPDATE_STOP {ticker}: ошибка постановки нового стопа: {repr(ex)}")
+
+        # Если тейк тоже изменился (частичный TP / scale-out)
+        if new_take_price is not None and ex_info.get("take_id"):
+            try:
+                self.__order_service.cancel_order(account_id, ex_info["take_id"])
+            except Exception:
+                pass
+            ex_info["take_id"] = None
+            try:
+                p = Decimal(str(new_take_price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=lots, is_buy=(not is_long), price=p
+                )
+                ex_info["take_id"] = resp.order_id
+                logger.info(f"UPDATE_TAKE {ticker}: новый тейк {new_take_price:.4f} → {resp.order_id}")
+            except Exception as ex:
+                logger.warning(f"UPDATE_TAKE {ticker}: ошибка постановки нового тейка: {repr(ex)}")
+
+    # ── Book-following вход ───────────────────────────────────────────────────
+
+    async def __limit_entry_order(
+            self,
+            account_id: str,
+            figi: str,
+            count_lots: int,
+            is_buy: bool,
+            last_price: float,
+            strategy: IStrategy,
+    ) -> tuple[str | None, int]:
+        """
+        Лимитный вход с book-following: встаём в очередь по лучшей цене
+        из стакана (bid при покупке, ask при продаже), двигаемся за книгой
+        если лучшая цена уходит. Рыночная заявка только в аварийном случае.
+
+        Алгоритм:
+        1. Берём best_bid (покупка) / best_ask (продажа) из OrderBookService.
+           Если стакан недоступен — last_price как fallback.
+        2. Ставим лимит туда.
+        3. Каждые 2 сек: если лучшая цена сдвинулась на ≥1 шаг в любую сторону
+           (кто-то выставил лучше нас или очередь сместилась) — переставляемся.
+        4. Если за MAX_WAIT_SEC так и не исполнились — рыночная заявка (аварий).
+        """
+        ticker = strategy.settings.ticker
+        step = max(strategy.settings.min_price_increment, 1e-9)
+        ts = self.__trading_settings
+        MAX_WAIT_SEC = ts.limit_reprice_interval_sec * ts.limit_reprice_max_attempts
+        POLL_SEC = 2
+
+        def _book_price() -> float:
+            """Лучшая цена из стакана на нашей стороне."""
+            if is_buy:
+                p = self.__orderbook.best_bid(ticker)
+            else:
+                p = self.__orderbook.best_ask(ticker)
+            return p if p else last_price
+
+        def _place_limit(price: float) -> tuple[str | None, object]:
+            try:
+                p = Decimal(str(price))
+                resp = self.__order_service.post_limit_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy, price=p
+                )
+                return resp.order_id, resp
+            except Exception as ex:
+                logger.warning(f"__limit_entry_order {ticker}: limit place failed: {repr(ex)}")
+                return None, None
+
+        def _cancel(oid: str) -> None:
+            try:
+                self.__order_service.cancel_order(account_id, oid)
+            except Exception:
+                pass
+
+        def _to_market() -> tuple[str | None, int]:
+            # Аварийный fallback — используем только если рынок закрывается
+            # или критическое время (не нашли контрагента за MAX_WAIT_SEC)
+            try:
+                resp = self.__order_service.post_market_order(
+                    account_id=account_id, figi=figi,
+                    count_lots=count_lots, is_buy=is_buy
+                )
+                if resp.execution_report_status in (
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                    OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+                ):
+                    try:
+                        state = self.__order_service.get_order_state(account_id, resp.order_id)
+                        return resp.order_id, state.lots_executed or count_lots
+                    except Exception:
+                        return resp.order_id, count_lots
+                return None, 0
+            except Exception as ex:
+                logger.warning(f"__limit_entry_order {ticker}: market fallback error: {repr(ex)}")
+                return None, 0
+
+        # ── Спред-фильтр ──────────────────────────────────────────────────────
+        # Если стакан доступен и спред шире порога — вход невыгоден: мы сразу
+        # теряем полспреда при открытии. Рынок в этот момент неликвиден.
+        if MAX_ENTRY_SPREAD_PCT > 0 and self.__orderbook.has_data(ticker):
+            bid = self.__orderbook.best_bid(ticker)
+            ask = self.__orderbook.best_ask(ticker)
+            if bid and ask and bid > 0:
+                spread_pct = (ask - bid) / bid
+                if spread_pct > MAX_ENTRY_SPREAD_PCT:
+                    logger.info(
+                        f"__limit_entry_order {ticker}: вход пропущен — "
+                        f"спред {spread_pct*100:.3f}% > {MAX_ENTRY_SPREAD_PCT*100:.3f}%"
+                    )
+                    return None, 0
+
+        entry_price = _book_price()
+        order_id, _ = _place_limit(entry_price)
+        if order_id is None:
+            logger.warning(f"__limit_entry_order {ticker}: первичная заявка не прошла, пробуем рынок")
+            return _to_market()
+
+        logger.info(f"__limit_entry_order {ticker}: лимит {entry_price:.4f} {'BUY' if is_buy else 'SELL'}")
+        elapsed = 0.0
+
+        while elapsed < MAX_WAIT_SEC:
+            await asyncio.sleep(POLL_SEC)
+            elapsed += POLL_SEC
+
+            try:
+                state = self.__order_service.get_order_state(account_id, order_id)
+            except Exception as ex:
+                logger.warning(f"__limit_entry_order {ticker}: get_order_state: {repr(ex)}")
+                break
+
+            status = state.execution_report_status
+            if status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL:
+                return order_id, state.lots_executed or count_lots
+
+            if status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
+                pass  # ждём полного исполнения, но не вечно
+
+            if status in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_REJECTED,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_CANCELLED,
+            ):
+                logger.warning(f"__limit_entry_order {ticker}: заявка отклонена, повтор")
+                entry_price = _book_price()
+                order_id, _ = _place_limit(entry_price)
+                if order_id is None:
+                    return _to_market()
+                continue
+
+            # Book-following: лучшая цена сместилась — переставляем
+            current_best = _book_price()
+            if abs(current_best - entry_price) >= step:
+                logger.info(
+                    f"__limit_entry_order {ticker}: книга сместилась "
+                    f"{entry_price:.4f} → {current_best:.4f}, переставляемся"
+                )
+                _cancel(order_id)
+                entry_price = current_best
+                order_id, _ = _place_limit(entry_price)
+                if order_id is None:
+                    return _to_market()
+
+        # Таймаут — аварийная рыночная заявка
+        logger.warning(f"__limit_entry_order {ticker}: таймаут {MAX_WAIT_SEC}с, переход на рынок")
+        _cancel(order_id)
+        return _to_market()
+
+    def __clear_all_positions(
+            self,
+            account_id: str,
+            strategies: dict[str, IStrategy]
+    ) -> dict[str, str]:
+        logger.info("Clear all orders and close all open positions")
+
+        # Сначала отменяем все биржевые стоп/тейк ордера, чтобы после
+        # рыночного закрытия не осталось висячих заявок на чистом счёте.
+        for figi in list(self.__active_exit_orders.keys()):
+            self.__cancel_exit_orders(account_id, figi, which="both")
+        self.__pending_tranche2.clear()
+        self.__pyramided.clear()
+
+        logger.debug("Cancel all order.")
+        self.__client_service.cancel_all_orders(account_id)
+
+        logger.debug("Close all positions.")
+        # Снимаем с учёта risk.py то, что осталось открытым к концу дня. Точная
+        # цена выхода здесь неизвестна (как и в остальном коде — closing order
+        # тоже не хранит цену исполнения), поэтому approx = entry_price
+        # (нейтральный pnl, не искажает день вверх/вниз).
+        for strategy in strategies.values():
+            risk_ticker = strategy.settings.ticker
+            pos = self.__risk.positions.get(risk_ticker)
+            if pos:
+                self.__risk.close_position(
+                    risk_ticker, pos.entry_price,
+                    point_value=strategy.settings.point_value, reason="eod_clear")
+
+        result = self.__close_position_by_figi(account_id, strategies.keys(), strategies)
+
+        # Если какая-то позиция не закрылась (halt, rejected) — уведомляем
+        by_figi = {s.settings.figi: s for s in strategies.values()}
+        for figi, strategy in by_figi.items():
+            if figi not in result:
+                # Проверяем, есть ли реально позиция на бирже
+                all_pos = list(self.__operation_service.positions_securities(account_id) or []) + \
+                          list(self.__operation_service.positions_futures(account_id) or [])
+                still_open = [p for p in all_pos if p.figi == figi and p.balance != 0]
+                if still_open:
+                    logger.error(
+                        f"EOD ALERT: позиция {strategy.settings.ticker} ({figi}) "
+                        f"НЕ ЗАКРЫТА (halt/rejected). Баланс={still_open[0].balance}. "
+                        f"Требуется ручное закрытие!"
+                    )
+                    self.__blogger.fail_message()
+        return result
+
+    def __apply_overrides(self, strategies: dict[str, IStrategy]) -> None:
+        """
+        Применяет take/stop оверрайды с дашборда к уже сконструированным
+        стратегиям (set_take_stop_overrides переписывает закэшированные в
+        __init__ Decimal). signal_only и enabled/disabled читаются на
+        каждый новый сигнал напрямую из RuntimeOverrides (см. __trading) —
+        здесь они не кэшируются.
+
+        Вызывается на каждый реальный реload оверрайдов (не только когда
+        для тикера заданы take/stop) — set_take_stop_overrides сама умеет
+        сбрасывать множитель на дефолт settings.ini для полей, которых нет
+        в overrides. Раньше вызов пропускался при пустом overrides, из-за
+        чего снятие оверрайда с дашборда (поле очищено -> null) не
+        применялось: стратегия молча торговала со старым значением.
+        """
+        for strategy in strategies.values():
+            if not hasattr(strategy, "set_take_stop_overrides"):
+                continue
+            overrides = self.__overrides.take_stop_for(strategy.settings.ticker)
+            strategy.set_take_stop_overrides(**overrides)
+            logger.info(f"OVERRIDES: {strategy.settings.ticker} take/stop -> {overrides or 'default (settings.ini)'}")
+
+    def __try_partial_take(
+            self,
+            account_id: str,
+            candle: Candle,
+            strategies: dict[str, IStrategy]
+    ) -> bool:
+        """
+        Частичная фиксация: половина позиции закрывается реальным маркет-
+        ордером при достижении take_target (см. risk.check_partial_take),
+        остаток дальше защищён remainder_stop (risk.check_exit). Для
+        signal_only позиций risk.positions пуст — функция просто вернёт
+        False, обычные stop/take-проверки сигнала сработают как раньше.
+        """
+        strategy = strategies[candle.figi]
+        ticker = strategy.settings.ticker
+        pos = self.__risk.positions.get(ticker)
+        if not pos or pos.half_closed or pos.take_target <= 0:
+            return False
+        high, low = float(quotation_to_decimal(candle.high)), float(quotation_to_decimal(candle.low))
+        if not (low <= pos.take_target <= high):
+            return False
+        should, qty, remainder_stop = self.__risk.check_partial_take(ticker, pos.take_target)
+        if not should:
+            return False
+        is_buy = (pos.direction == "short")  # закрыть часть шорта -> купить
+        order_id = self.__partial_close_order(account_id, candle.figi, qty, is_buy)
+        if not order_id:
+            return False
+        self.__risk.reduce_position(
+            ticker, qty, pos.take_target,
+            point_value=strategy.settings.point_value,
+            reason="partial_take_profit", remainder_stop=remainder_stop,
+        )
+        logger.info(
+            f"PARTIAL TAKE PROFIT {ticker}: -{qty} лотов @ {pos.take_target}, "
+            f"остаток защищён уровнем {remainder_stop:.4f}"
+        )
+        return True
+
+    def __partial_close_order(self, account_id: str, figi: str, lots: int, is_buy: bool) -> str | None:
+        if not self.__market_data_service.is_stock_ready_for_trading(figi):
+            return None
+        order = self.__order_service.post_market_order(
+            account_id=account_id, figi=figi, count_lots=lots, is_buy=is_buy
+        )
+        if order.execution_report_status in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+        ):
+            return order.order_id
+        logger.warning(f"Partial-TP close order REJECTED/FAILED: {order}")
+        return None
+
+    def __try_scale_out(
+            self,
+            account_id: str,
+            candle: Candle,
+            strategies: dict[str, IStrategy],
+            ticker: str,
+            pos,
+    ) -> None:
+        """
+        Размазывание фиксации после первого тейка: пока остаток открыт,
+        на каждый следующий шаг (та же дистанция вход->тейк) сверяем
+        текущий знаковый edge сигнала (composite) с тем, что был на входе
+        (risk.check_scale_out). Если преимущество исчезает — фиксируем ещё
+        часть остатка реальным ордером; иначе risk.py сам подтянет
+        remainder_stop вперёд без закрытия.
+        """
+        if pos.fix_step <= 0 or pos.qty < 2:
+            return
+        strategy = strategies[candle.figi]
+        if not hasattr(strategy, "last_snapshot"):
+            return
+        composite = strategy.last_snapshot().get("composite", 0.0)
+        current_edge = composite if pos.direction == "long" else -composite
+        price = float(quotation_to_decimal(candle.close))
+        should, qty, remainder_stop = self.__risk.check_scale_out(ticker, price, current_edge)
+        if not should:
+            return
+        is_buy = (pos.direction == "short")  # закрыть часть шорта -> купить
+        order_id = self.__partial_close_order(account_id, candle.figi, qty, is_buy)
+        if not order_id:
+            return
+        self.__risk.reduce_position(
+            ticker, qty, price,
+            point_value=strategy.settings.point_value,
+            reason="scale_out_decay", remainder_stop=remainder_stop,
+        )
+        logger.info(
+            f"SCALE-OUT FIX {ticker}: -{qty} лотов @ {price} (edge просел), "
+            f"остаток защищён уровнем {remainder_stop:.4f}"
+        )
+
+    def __risk_close(self, strategy: IStrategy, price: float, reason: str) -> dict | None:
+        """Снять позицию из risk.py при выходе по стопу/тейку/close-сигналу.
+        Возвращает результат close_position (нужен pnl_rub для loss-cooldown)."""
+        risk_ticker = strategy.settings.ticker
+        if risk_ticker not in self.__risk.positions:
+            return None
+        result = self.__risk.close_position(
+            risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
+        if result and result.get("pnl_rub", 0) < 0:
+            self.__loss_cooldown_until[risk_ticker] = datetime.datetime.utcnow() + \
+                datetime.timedelta(minutes=LOSS_REENTRY_COOLDOWN_MINUTES)
+            logger.info(
+                f"LOSS COOLDOWN {risk_ticker}: pnl={result['pnl_rub']:+.0f}₽ — "
+                f"новые входы заблокированы на {LOSS_REENTRY_COOLDOWN_MINUTES} мин"
+            )
+        return result
+
+    async def __orderbook_loop(
+            self,
+            figi_to_ticker: dict[str, str],
+            trade_day_end_time: datetime.datetime
+    ) -> None:
+        """Фоновая задача: читает стрим стакана и кормит OrderBookService.on_orderbook."""
+        figies = list(figi_to_ticker.keys())
+        async for ob in self.__stream_service.start_async_orderbook_stream(
+                figies, trade_day_end_time, depth=ORDERBOOK_DEPTH
+        ):
+            ticker = figi_to_ticker.get(ob.figi)
+            if not ticker:
+                continue
+            bids = [(float(quotation_to_decimal(o.price)), float(o.quantity)) for o in ob.bids]
+            asks = [(float(quotation_to_decimal(o.price)), float(o.quantity)) for o in ob.asks]
+            self.__orderbook.on_orderbook(ticker, bids, asks)
+
+    def __check_adaptive_exit(
+            self,
+            account_id: str,
+            candle: Candle,
+            strategies: dict[str, IStrategy]
+    ) -> None:
+        """
+        Режим ADAPTIVE_EXIT=1: для ВСЕХ открытых позиций вместо фиксированных
+        stop_loss_level/take_profit_level из сигнала — risk.check_exit
+        (трейлинг Chandelier + безубыток после 1R + giveback-защита пика),
+        плюс для шортов — доп. squeeze-протекция по реальному squeeze_score
+        из oi_layers.py (не статичный порог, а недавнее крупное наращивание
+        стороны, которое сейчас в минусе по цене).
+        """
+        strategy = strategies[candle.figi]
+        risk_ticker = strategy.settings.ticker
+        pos = self.__risk.positions.get(risk_ticker)
+        if not pos:
+            return
+
+        price = float(quotation_to_decimal(candle.close))
+        squeeze = self.__oi_layers.is_squeeze_risk(risk_ticker, pos.direction)
+        drift_per_bar, vol_per_bar = strategy.path_estimate()
+        regime_confidence = strategy.last_snapshot().get("regime_confidence", 1.0)
+        order_flow = 0.0
+        if self.__orderbook.has_data(risk_ticker):
+            imbalance = self.__orderbook.imbalance_score(risk_ticker)
+            order_flow = imbalance if pos.direction == "long" else -imbalance
+
+        # Запоминаем стоп ДО вызова check_exit — чтобы обнаружить трейлинг
+        stop_before = pos.stop_price
+
+        should_close, reason = self.__risk.check_exit(
+            risk_ticker, price, squeeze=squeeze,
+            drift_per_bar=drift_per_bar, vol_per_bar=vol_per_bar,
+            regime_confidence=regime_confidence, order_flow=order_flow,
+        )
+        if should_close:
+            logger.info(f"ADAPTIVE EXIT {risk_ticker}: {reason}")
+            self.__exit_position(account_id, strategy, strategies, price, reason)
+        elif pos.stop_price != stop_before:
+            # Chandelier подтянул стоп — переставляем биржевой стоп-лимит
+            logger.info(
+                f"TRAIL_STOP {risk_ticker}: стоп {stop_before:.4f} → {pos.stop_price:.4f}, "
+                f"переставляем биржевой ордер"
+            )
+            self.__update_stop_order(
+                account_id=account_id,
+                figi=candle.figi,
+                new_stop_price=pos.stop_price,
+            )
+
+    def __process_close_requests(
+            self,
+            account_id: str,
+            strategies: dict[str, IStrategy]
+    ) -> None:
+        """
+        Срочное закрытие по команде из Telegram: тикер или "ALL".
+        Запрос снимается сразу после исполнения (или если позиции по нему
+        нет — чтобы не висел вечно, если тикер указали с опечаткой).
+        """
+        reqs = bot_control.control.close_requests
+        close_all = "ALL" in reqs
+        for figi, strategy in list(strategies.items()):
+            ticker = strategy.settings.ticker.upper()
+            if not (close_all or ticker in reqs):
+                continue
+            if self.__today_trade_results and self.__today_trade_results.get_current_trade_order(figi):
+                logger.info(f"TG /close: срочное закрытие {strategy.settings.ticker}")
+                self.__exit_position(account_id, strategy, strategies, self.__last_prices.get(strategy.settings.ticker, 0.0), "tg_close_request")
+            reqs.discard(ticker)
+        reqs.discard("ALL")
+
+    def __close_figi_with_fill_info(
+            self,
+            account_id: str,
+            figi: str,
+            strategies: dict[str, IStrategy]
+    ) -> tuple[str | None, int, int]:
+        """
+        Закрывает одну позицию по figi market-ордером, возвращает
+        (order_id, исполнено_лотов, запрошено_лотов) — в отличие от
+        __close_position_by_figi не прячет PARTIALLYFILL, чтобы вызывающий
+        код (__exit_position) мог не терять видимость непогашенного
+        остатка реальной позиции в risk.py.
+        """
+        current_positions = list(self.__operation_service.positions_securities(account_id) or []) + \
+            list(self.__operation_service.positions_futures(account_id) or [])
+        for position in current_positions:
+            if position.figi != figi or position.balance == 0:
+                continue
+            if not self.__market_data_service.is_stock_ready_for_trading(position.figi):
+                return None, 0, 0
+            lot_size = strategies[position.figi].settings.lot_size
+            requested_lots = abs(int(position.balance / lot_size))
+            if requested_lots <= 0:
+                return None, 0, 0
+            close_order = self.__order_service.post_market_order(
+                account_id=account_id, figi=position.figi,
+                count_lots=requested_lots, is_buy=(position.balance < 0)
+            )
+            if close_order.execution_report_status not in (
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL,
+                OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL,
+            ):
+                logger.warning(f"Close order REJECTED/FAILED: {close_order}")
+                return None, 0, requested_lots
+            try:
+                state = self.__order_service.get_order_state(account_id, close_order.order_id)
+                filled_lots = state.lots_executed or requested_lots
+            except Exception as ex:
+                logger.warning(f"__close_figi_with_fill_info get_order_state error: {repr(ex)}")
+                filled_lots = requested_lots \
+                    if close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL \
+                    else 0
+            return close_order.order_id, filled_lots, requested_lots
+        return None, 0, 0
+
+    def __exit_position(
+            self,
+            account_id: str,
+            strategy: IStrategy,
+            strategies: dict[str, IStrategy],
+            price: float,
+            reason: str,
+    ) -> None:
+        """
+        Единая точка выхода из позиции по стопу/тейку/сигналу/Telegram.
+        Раньше risk_close (снятие позиции из risk.py) вызывался ДО
+        закрывающего ордера на бирже — при PARTIALLYFILL бот считал
+        позицию закрытой целиком, хотя на бирже остаётся непогашенный
+        остаток, который risk.py больше не трейлит и не видит для
+        корреляционного/портфельного риск-лимита. Теперь risk.py
+        обновляется только по факту исполнения закрывающего ордера.
+        """
+        figi = strategy.settings.figi
+        risk_ticker = strategy.settings.ticker
+        if risk_ticker not in self.__risk.positions:
+            return
+
+        # Перед закрытием отменяем оставшиеся биржевые стоп/тейк ордера,
+        # чтобы не осталось "висячих" заявок после закрытия позиции.
+        self.__cancel_exit_orders(account_id, figi, which="both")
+
+        order_id, filled_lots, requested_lots = self.__close_figi_with_fill_info(account_id, figi, strategies)
+        if not order_id or filled_lots <= 0:
+            # Позиция не найдена на бирже — вероятно, уже закрыта биржевым
+            # стоп/тейк ордером. Проверяем реальный баланс.
+            all_pos = (list(self.__operation_service.positions_securities(account_id) or []) +
+                       list(self.__operation_service.positions_futures(account_id) or []))
+            real_balance = next((p.balance for p in all_pos if p.figi == figi), 0)
+            if real_balance == 0 and risk_ticker in self.__risk.positions:
+                # Биржевой ордер уже исполнился — обновляем только внутреннее состояние
+                logger.info(
+                    f"{risk_ticker}: позиция уже закрыта биржевым ордером ({reason}) @ {price:.4f}, "
+                    f"обновляем внутреннее состояние"
+                )
+                filled_lots = self.__risk.positions[risk_ticker].qty
+                # Используем синтетический order_id чтобы пройти дальше
+                order_id = f"exchange_{reason}"
+            else:
+                logger.warning(
+                    f"{risk_ticker}: закрывающий ордер не исполнился ({reason}), "
+                    f"позиция остаётся под трекингом risk.py — повтор на следующей свече"
+                )
+                return
+
+        if filled_lots < requested_lots:
+            logger.warning(
+                f"PARTIAL CLOSE {risk_ticker}: запрошено {requested_lots}, исполнено {filled_lots} "
+                f"лотов ({reason}) — остаток {requested_lots - filled_lots} лотов остаётся в risk.positions"
+            )
+            self.__risk.reduce_position(
+                risk_ticker, filled_lots, price,
+                point_value=strategy.settings.point_value, reason=reason,
+            )
+            # today_trade_results НЕ закрываем — current_trade_order остаётся
+            # активным, следующая свеча повторит попытку закрыть остаток.
+            return
+
+        self.__risk_close(strategy, price, reason)
+        trade_order = self.__today_trade_results.close_position(figi, order_id)
+        self.__blogger.close_position_message(trade_order)
+        self.__notify_closed_with_tracking(figi, strategies)
+        # Сбрасываем состояние дробного входа и пирамидинга для этого инструмента
+        self.__pending_tranche2.pop(figi, None)
+        self.__pyramided.discard(figi)
+
+    def __notify_closed_with_tracking(
+            self,
+            figi: str,
+            strategies: dict[str, IStrategy]
+    ) -> None:
+        """
+        При закрытии позиции вычисляет реальные MFE/MAE из трекинга цен и
+        передаёт их в стратегию вместо приближённого расчёта по after_candles.
+        """
+        strategy = strategies.get(figi)
+        if strategy is None or not hasattr(strategy, "notify_position_closed"):
+            return
+        pt = self.__pos_tracking.pop(figi, None)
+        exit_price = self.__last_prices.get(strategy.settings.ticker, 0.0)
+        if pt and pt["entry"] > 0 and exit_price > 0:
+            ep = pt["entry"]
+            if pt["direction"] == "LONG":
+                mfe = max(0.0, (pt["max_fav"] - ep) / ep)
+                mae = max(0.0, (ep - pt["max_adv"]) / ep)
+            else:
+                mfe = max(0.0, (ep - pt["max_fav"]) / ep)
+                mae = max(0.0, (pt["max_adv"] - ep) / ep)
+            strategy.notify_position_closed(exit_price=exit_price, mfe=mfe, mae=mae)
+        else:
+            strategy.notify_position_closed()
+
+    def __close_position_by_figi(
+            self,
+            account_id: str,
+            figies: list[str],
+            strategies: dict[str, IStrategy]
+    ) -> dict[str, str]:
+        result: dict[str, str] = dict()
+        # Tinkoff API держит фьючерсные позиции отдельно от securities — без
+        # этого объединения открытые фьючерсы никогда бы не закрылись в конце дня.
+        current_positions = list(self.__operation_service.positions_securities(account_id) or []) + \
+            list(self.__operation_service.positions_futures(account_id) or [])
+
+        if current_positions:
+            logger.info(f"Current positions: {current_positions}")
+            for position in current_positions:
+                if position.figi in figies:
+                    # Check a stock
+                    if self.__market_data_service.is_stock_ready_for_trading(position.figi):
+                        close_order = self.__order_service.post_market_order(
+                            account_id=account_id,
+                            figi=position.figi,
+                            count_lots=abs(int(position.balance / strategies[position.figi].settings.lot_size)),
+                            is_buy=(position.balance < 0)
+                        )
+                        if close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_FILL or \
+                                close_order.execution_report_status == OrderExecutionReportStatus.EXECUTION_REPORT_STATUS_PARTIALLYFILL:
+                            result[position.figi] = close_order.order_id
+                            # Уведомляем стратегию о закрытии — обновляет EWA-веса по факту
+                            strategy = strategies.get(position.figi)
+                            if strategy and hasattr(strategy, "notify_position_closed"):
+                                self.__notify_closed_with_tracking(position.figi, strategies)
+                        else:
+                            logger.warning(f"Close order REJECTED/FAILED: {close_order}")
+        return result
+
+    def __archive_today(self, today_trade_strategies: dict[str, IStrategy]) -> None:
+        """
+        Конец торгового дня — кладём в data/archive.json (archive.py) итоговый
+        снэпшок композита по каждому тикеру, который сегодня считался, не
+        только по тем, что реально торговались. Это и есть "база данных" с
+        расчётами, а не только живая память процесса. Дополнительно, если
+        настроена общая база (DB_API), отправляем тот же снэпшок туда —
+        чтобы collector_worker.py и этот бот писали в одно общее хранилище.
+        """
+        db = DbApiClient(self.__mega_alerts_settings.db_api_url, self.__mega_alerts_settings.db_api_key)
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        for strategy in today_trade_strategies.values():
+            if not hasattr(strategy, "last_snapshot"):
+                continue
+            snapshot = strategy.last_snapshot()
+            if not snapshot.get("scores"):
+                continue
+            if hasattr(strategy, "is_signal_only"):
+                signal_only = strategy.is_signal_only()
+            else:
+                signal_only = str(getattr(strategy.settings, "settings", {}).get("SIGNAL_ONLY", "1")) == "1"
+            self.__archive.record(
+                strategy.settings.ticker,
+                composite=snapshot["composite"],
+                scores=snapshot["scores"],
+                regime=snapshot["regime"],
+                rolling_quality=snapshot["rolling_quality"],
+                live=not signal_only,
+                auto_atr_take_k=snapshot.get("auto_atr_take_k"),
+                auto_atr_stop_k=snapshot.get("auto_atr_stop_k"),
+                noise_mode=snapshot.get("noise_mode"),
+                ic_warm=snapshot.get("ic_warm"),
+                stat_break_uncertainty=snapshot.get("stat_break_uncertainty"),
+                narrative_state=snapshot.get("narrative_state"),
+                rejection_stats=snapshot.get("rejection_stats"),
+            )
+            # Дублируем в HistoryStore — там хранятся ещё и сделки с attribution
+            self.__history.record_daily(
+                strategy.settings.ticker,
+                composite=snapshot["composite"],
+                scores=snapshot["scores"],
+                regime=snapshot["regime"],
+                regime_confidence=snapshot.get("regime_confidence", 1.0),
+                rolling_quality=snapshot["rolling_quality"],
+                live=not signal_only,
+            )
+            if db.configured:
+                method_perf = self.__history.method_performance(strategy.settings.ticker)
+                db.push_snapshot(
+                    strategy.settings.ticker,
+                    date=today,
+                    composite=snapshot["composite"],
+                    scores=snapshot["scores"],
+                    regime=snapshot["regime"],
+                    regime_confidence=snapshot.get("regime_confidence", 1.0),
+                    method_weights={m: v["ewa_weight"] for m, v in method_perf.items()} or None,
+                    rolling_quality=snapshot["rolling_quality"],
+                    live=not signal_only
+                )
+            self.__record_backtest_calibration(strategy.settings.ticker, today, snapshot["rolling_quality"])
+
+            # Лог rejection_stats — главный диагностический инструмент.
+            # Показывает распределение причин отказа в сигналах за день.
+            if hasattr(strategy, "rejection_stats"):
+                rs = strategy.rejection_stats
+                total = sum(rs.values())
+                if total > 0:
+                    parts = ", ".join(
+                        f"{k}={v} ({v/total:.0%})"
+                        for k, v in sorted(rs.items(), key=lambda x: -x[1])
+                        if v > 0
+                    )
+                    logger.info(
+                        f"REJECTION_STATS {strategy.settings.ticker}: "
+                        f"всего отфильтровано={total} | {parts}"
+                    )
+                else:
+                    logger.info(f"REJECTION_STATS {strategy.settings.ticker}: нет отфильтрованных сигналов")
+        self.__backtest_predictions.clear()
+
+    def __record_backtest_calibration(self, ticker: str, date: str, actual_quality: float) -> None:
+        """
+        Сверяет утренний прогноз backtest-гейта (__validate_strategy_backtest)
+        с фактическим rolling_quality конца дня — без этого нет способа узнать,
+        насколько BACKTEST_QUALITY_MIN/историческая выборка вообще предсказывают
+        реальный результат, а не просто шум на 5 днях истории.
+        """
+        prediction = self.__backtest_predictions.get(ticker)
+        if prediction is None:
+            return
+        record = {"date": date, "ticker": ticker, "actual_quality": round(actual_quality, 4), **prediction}
+        logger.info(
+            f"BACKTEST-СВЕРКА: {ticker} прогноз={prediction['predicted_quality']:.2f} "
+            f"факт={actual_quality:.2f} ({'торговали' if prediction['gated_live'] else 'signal-only'})"
+        )
+        path = "data/backtest_calibration.json"
+        try:
+            os.makedirs("data", exist_ok=True)
+            records = []
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    records = json.load(f)
+            records.append(record)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(records[-500:], f, ensure_ascii=False)
+            os.replace(tmp, path)
+        except (OSError, json.JSONDecodeError) as ex:
+            logger.warning(f"BACKTEST-СВЕРКА: не удалось сохранить {path}: {repr(ex)}")
+            return
+        self.__check_drift_alert(ticker, records, prediction["predicted_quality"], actual_quality)
+
+    def __check_drift_alert(
+            self, ticker: str, records: list[dict], predicted_quality: float, actual_quality: float,
+    ) -> None:
+        """Шлёт в Telegram (через self.__blogger), если прогноз и факт
+        разъехались сильно — разово или устойчиво за последние дни.
+        См. DRIFT_ALERT_THRESHOLD/DRIFT_ROLLING_*."""
+        same_ticker = [r for r in records if r.get("ticker") == ticker]
+        rolling = same_ticker[-DRIFT_ROLLING_WINDOW:]
+        rolling_mean_drift = None
+        if len(rolling) >= DRIFT_ROLLING_WINDOW:
+            rolling_mean_drift = sum(
+                abs(r["actual_quality"] - r["predicted_quality"]) for r in rolling
+            ) / len(rolling)
+        single_drift = abs(actual_quality - predicted_quality)
+        if single_drift >= DRIFT_ALERT_THRESHOLD or (
+                rolling_mean_drift is not None and rolling_mean_drift >= DRIFT_ROLLING_THRESHOLD):
+            self.__blogger.drift_alert(ticker, predicted_quality, actual_quality, rolling_mean_drift)
+
+    def __validate_strategy_backtest(self, strategy: IStrategy) -> None:
+        """
+        До сих пор backtest_quality прогонялся только для тикеров, найденных
+        MEGA-ALERTS — сконфигурированные в settings.ini STRATEGY_<TICKER>
+        с SIGNAL_ONLY=0 шли в реальную торговлю без какой-либо проверки на
+        истории. Теперь перед стартом дня каждый такой тикер тоже прогоняется
+        через backtest_quality (история — [MEGA_ALERTS] HISTORY_DAYS, пороги —
+        BACKTEST_QUALITY_MIN/BACKTEST_MIN_TRADES). Если на истории недостаточно
+        качественных вирт. сделок — стратегия на сегодня переводится в
+        SIGNAL_ONLY (только Telegram), settings.ini не трогается.
+        """
+        if not hasattr(strategy, "is_signal_only") or not hasattr(strategy, "backtest_quality"):
+            return
+        if strategy.is_signal_only():
+            return
+        cfg = self.__mega_alerts_settings
+        try:
+            from tinkoff.invest import CandleInterval as _CI
+            _imap = {1: _CI.CANDLE_INTERVAL_1_MIN, 5: _CI.CANDLE_INTERVAL_5_MIN}
+            candles = self.__market_data_service.get_candles_history(
+                strategy.settings.figi, days=cfg.history_days,
+                interval=_imap.get(strategy.settings.candle_interval_min, _CI.CANDLE_INTERVAL_5_MIN))
+        except Exception as ex:
+            logger.warning(f"BACKTEST: история свечей {strategy.settings.ticker} не получена: {repr(ex)}")
+            return
+        if not candles:
+            return
+        if hasattr(strategy, "warmup"):
+            strategy.warmup(candles)
+        quality, n_trades = strategy.backtest_quality(candles)
+        live = n_trades >= cfg.backtest_min_trades and quality >= cfg.backtest_quality_min
+        logger.info(
+            f"BACKTEST: {strategy.settings.ticker} quality={quality:.2f} на {n_trades} вирт. сделках "
+            f"({'ок, торгуем' if live else 'НЕДОСТАТОЧНО — переводим в signal-only на сегодня'})"
+        )
+        if hasattr(strategy, "rejection_stats"):
+            rs = strategy.rejection_stats
+            total = sum(rs.values())
+            if total > 0:
+                parts = ", ".join(
+                    f"{k}={v} ({v/total:.0%})"
+                    for k, v in sorted(rs.items(), key=lambda x: -x[1])
+                    if v > 0
+                )
+                logger.info(f"BACKTEST REJECTION_STATS {strategy.settings.ticker}: {parts}")
+            else:
+                logger.info(f"BACKTEST REJECTION_STATS {strategy.settings.ticker}: нет отфильтрованных")
+        self.__backtest_predictions[strategy.settings.ticker] = {
+            "predicted_quality": round(quality, 4), "n_trades": n_trades, "gated_live": live,
+        }
+        if not live and hasattr(strategy, "set_signal_only"):
+            strategy.set_signal_only(True)
+
+    def __dedup_mega_alerts_candidates(self, configured_tickers: list[str]) -> list[str]:
+        """
+        MOEX MEGA-ALERTS отдаёт сырой список тикеров с сегодняшними
+        аномалиями — без учёта того, что обычка+префы одного эмитента
+        (SBER/SBERP и т.п.) это один и тот же риск. Без дедупа бот мог бы
+        потратить MAX_TICKERS слотов на дубли вместо разных эмитентов,
+        а лучшую из пары мог бы и вовсе пропустить, если хуже отсортирована
+        в alerts.json. Дедуп — тот же trade_system/issuer_filter.py, что
+        и в dashboard.py, чтобы бэктест и реальная торговля видели
+        одинаковый список тикеров.
+
+        Порядок MEGA-ALERTS (по убыванию значимости аномалии) используем
+        как demand — раньше в списке значит более востребован сегодня.
+        """
+        raw = [t for t in self.__mega_alerts.tickers_today("eq") if t not in configured_tickers]
+        configured_keys = {issuer_key(t) for t in configured_tickers}
+        infos = [
+            {"ticker": t, "issuer_key": issuer_key(t), "demand": len(raw) - i}
+            for i, t in enumerate(raw)
+            if issuer_key(t) not in configured_keys
+        ]
+        kept, _ = select_top_tickers(infos, top_pct=1.0)
+        return kept
+
+    def __build_dynamic_strategies(self, tickers: list[str]) -> list[IStrategy]:
+        """
+        Создаёт OICompositeStrategy на лету для тикеров, которые сегодня
+        отметил MOEX MEGA-ALERTS, но которых нет в settings.ini. Параметры —
+        дефолтные из [MEGA_ALERTS] (тот же шаблон, что у сконфигурированных
+        тикеров). Список не сохраняется на диск — пересобирается каждый
+        торговый день из текущего срез аномалий (расчёты — в data/archive.json).
+
+        Перед включением реальной торговли: сначала спрашиваем общую базу
+        расчётов (DB_API, Cloudflare D1) — если там уже есть свежий (за
+        сегодня) бэктест по тикеру от collector_worker.py, используем его
+        качество напрямую, не считая всё заново. Если в базе нет свежих
+        данных — достраиваем недостающее сами: запрашиваем историю свечей
+        (HISTORY_DAYS дней), прогреваем стратегию ей же (warmup) и считаем
+        backtest_quality локально. В обоих случаях: если на истории
+        >= BACKTEST_MIN_TRADES виртуальных сделок с quality >=
+        BACKTEST_QUALITY_MIN, разрешаем реальные ордера (SIGNAL_ONLY=0),
+        иначе тикер только шлёт сигналы.
+        """
+        cfg = self.__mega_alerts_settings
+        db = DbApiClient(cfg.db_api_url, cfg.db_api_key)
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        result: list[IStrategy] = []
+        for ticker in tickers[:cfg.max_tickers]:
+            resolved = self.__instrument_service.share_by_ticker(ticker)
+            if not resolved:
+                logger.debug(f"MEGA-ALERTS: не удалось определить figi для {ticker}, пропуск")
+                continue
+            share_settings, figi = resolved
+            settings = StrategySettings(
+                name="OICompositeStrategy",
+                figi=figi,
+                ticker=ticker,
+                max_lots_per_order=cfg.max_lots_per_order,
+                settings={
+                    "SIGNAL_THRESHOLD": cfg.signal_threshold,
+                    "LONG_TAKE": cfg.long_take,
+                    "LONG_STOP": cfg.long_stop,
+                    "SHORT_TAKE": cfg.short_take,
+                    "SHORT_STOP": cfg.short_stop,
+                    "SIGNAL_ONLY": cfg.signal_only,
+                },
+                lot_size=share_settings.lot,
+                short_enabled_flag=share_settings.short_enabled_flag
+            )
+            strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
+            if not strategy:
+                continue
+
+            try:
+                from tinkoff.invest import CandleInterval as _CI
+                _imap = {1: _CI.CANDLE_INTERVAL_1_MIN, 5: _CI.CANDLE_INTERVAL_5_MIN}
+                candles = self.__market_data_service.get_candles_history(
+                    figi, days=cfg.history_days,
+                    interval=_imap.get(strategy.settings.candle_interval_min, _CI.CANDLE_INTERVAL_5_MIN))
+            except Exception as ex:
+                logger.warning(f"MEGA-ALERTS: история свечей {ticker} не получена: {repr(ex)}")
+                candles = []
+
+            if candles and hasattr(strategy, "warmup"):
+                strategy.warmup(candles)
+
+            db_snapshot = db.latest(ticker) if db.configured else None
+            from_db = bool(db_snapshot and db_snapshot.get("date") == today
+                            and db_snapshot.get("backtest_trades") is not None)
+
+            if from_db:
+                quality = db_snapshot.get("backtest_quality") or 0.5
+                n_trades = db_snapshot.get("backtest_trades") or 0
+                logger.info(f"MEGA-ALERTS: {ticker} — беру расчёт из общей базы, локальный бэктест не считаю")
+            elif candles and hasattr(strategy, "backtest_quality"):
+                quality, n_trades = strategy.backtest_quality(candles)
+            else:
+                quality, n_trades = 0.5, 0
+
+            live = n_trades >= cfg.backtest_min_trades and quality >= cfg.backtest_quality_min
+            if live and hasattr(strategy, "set_signal_only"):
+                strategy.set_signal_only(False)
+            logger.info(
+                f"MEGA-ALERTS: {ticker} backtest quality={quality:.2f} на {n_trades} вирт. сделках "
+                f"({'реальная торговля' if live else 'только сигналы'})"
+            )
+            result.append(strategy)
+        return result
+
+    def __build_futures_strategies(
+            self,
+            base_strategies: dict[str, IStrategy],
+            base_tickers: list[str]
+    ) -> list[IStrategy]:
+        """
+        Для каждого базового тикера из [FUTURES_TRADING] BASE_TICKERS находит
+        ближайший по экспирации фьючерс (FORTS) и торгует ИМ вместо акции —
+        сигнальные настройки (threshold/take/stop) переиспользуются из
+        STRATEGY_<TICKER>_SETTINGS той же акции в settings.ini, если она
+        сконфигурирована, иначе берутся дефолты из [MEGA_ALERTS]. Размер
+        позиции считается отдельно, по ГО (см. __liquidity-аналог в
+        __open_position_lots_count и место вызова в __trading).
+        """
+        cfg = self.__mega_alerts_settings
+        result: list[IStrategy] = []
+
+        by_ticker = {s.settings.ticker: s for s in base_strategies.values()}
+
+        for base_ticker in base_tickers:
+            resolved = self.__instrument_service.future_by_base_ticker(base_ticker)
+            if not resolved:
+                logger.warning(f"FUTURES: контракт на {base_ticker} не найден, пропуск")
+                continue
+            future_settings, figi = resolved
+
+            base_strategy = by_ticker.get(base_ticker)
+            if base_strategy:
+                settings_dict = dict(base_strategy.settings.settings)
+                max_lots_per_order = base_strategy.settings.max_lots_per_order
+            else:
+                settings_dict = {
+                    "SIGNAL_THRESHOLD": cfg.signal_threshold,
+                    "LONG_TAKE": cfg.long_take,
+                    "LONG_STOP": cfg.long_stop,
+                    "SHORT_TAKE": cfg.short_take,
+                    "SHORT_STOP": cfg.short_stop,
+                    "SIGNAL_ONLY": cfg.signal_only,
+                }
+                max_lots_per_order = cfg.max_lots_per_order
+
+            settings = StrategySettings(
+                name="OICompositeStrategy",
+                figi=figi,
+                ticker=future_settings.ticker,
+                max_lots_per_order=max_lots_per_order,
+                settings=settings_dict,
+                lot_size=future_settings.lot,
+                short_enabled_flag=future_settings.short_enabled_flag,
+                is_future=True,
+                margin_per_lot=future_settings.margin_per_lot
+            )
+            strategy = StrategyFactory.new_factory("OICompositeStrategy", settings)
+            if not strategy:
+                continue
+            self.__future_base_ticker[future_settings.ticker] = base_ticker
+            logger.info(
+                f"FUTURES: {base_ticker} -> {future_settings.ticker} (figi={figi}), "
+                f"ГО за лот={future_settings.margin_per_lot:.2f} ₽, экспирация={future_settings.expiration_date}"
+            )
+            result.append(strategy)
+
+        return result
+
+    def __get_today_strategies(self, strategies: list[IStrategy]) -> dict[str, IStrategy]:
+        """
+        Check and Select stocks for trading today.
+        """
+        logger.info("Check shares and strategy settings")
+        today_trade_strategy: dict[str, IStrategy] = dict()
+
+        for strategy in strategies:
+            if strategy.settings.is_future:
+                # фьючерс уже проверен на торгуемость в future_by_base_ticker
+                # (api_trade_available_flag) — share-специфичных полей у него нет.
+                today_trade_strategy[strategy.settings.figi] = strategy
+                continue
+
+            share_settings = self.__instrument_service.share_by_figi(strategy.settings.figi)
+            logger.debug(f"Check share settings for figi {strategy.settings.figi}: {share_settings}")
+
+            if (not share_settings.otc_flag) \
+                    and share_settings.buy_available_flag \
+                    and share_settings.sell_available_flag \
+                    and share_settings.api_trade_available_flag:
+                logger.debug(f"Share is ready for trading")
+
+                # refresh information by latest info
+                strategy.update_lot_count(share_settings.lot)
+                strategy.update_short_status(share_settings.short_enabled_flag)
+
+                today_trade_strategy[strategy.settings.figi] = strategy
+
+        return today_trade_strategy
