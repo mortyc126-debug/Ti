@@ -1060,7 +1060,46 @@ def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
     return {"csv": buf.getvalue(), "rows": len(rows), "ticker": ticker}
 
 
-def get_diagnostics(ticker: str, days: int = 30) -> dict:
+BAR_SCORES_DIR = "data/bar_scores"
+
+
+def list_bar_scores_files() -> list[dict]:
+    """Список сохранённых CSV-файлов bar_scores с метаданными."""
+    os.makedirs(BAR_SCORES_DIR, exist_ok=True)
+    result = []
+    for fname in sorted(os.listdir(BAR_SCORES_DIR)):
+        if not fname.endswith(".csv"):
+            continue
+        path = os.path.join(BAR_SCORES_DIR, fname)
+        stat = os.stat(path)
+        result.append({
+            "filename": fname,
+            "size_kb": round(stat.st_size / 1024, 1),
+            "mtime": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+        })
+    return result
+
+
+def export_bar_scores_batch(tickers: list[str], days: int, yield_progress):
+    """
+    Серийная качка bar_scores для списка тикеров.
+    yield_progress(ticker, status, rows, error) — колбэк для SSE.
+    Сохраняет файлы в BAR_SCORES_DIR.
+    """
+    os.makedirs(BAR_SCORES_DIR, exist_ok=True)
+    for ticker in tickers:
+        try:
+            result = export_bar_scores_csv(ticker, days)
+            if "error" in result:
+                yield_progress(ticker, "error", 0, result["error"])
+                continue
+            fname = f"{ticker}_{days}d.csv"
+            path = os.path.join(BAR_SCORES_DIR, fname)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(result["csv"])
+            yield_progress(ticker, "done", result["rows"], None)
+        except Exception as e:
+            yield_progress(ticker, "error", 0, str(e))
     """
     Снимок того, КАК сейчас реально считается композит для тикера — на
     живой истории (data/history.json через HistoryStore, не пустой
@@ -2141,6 +2180,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="tab-btn active" onclick="showTab('sim')">СИМУЛЯЦИЯ</button>
   <button class="tab-btn" onclick="showTab('analytics')">АНАЛИТИКА</button>
   <button class="tab-btn" onclick="showTab('diag')">ДИАГНОСТИКА</button>
+  <button class="tab-btn" onclick="showTab('barscores')">BAR SCORES</button>
   <button class="tab-btn" onclick="showTab('live')">БОТ (LIVE)</button>
 </nav>
 
@@ -2439,6 +2479,49 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 </div><!-- /tab-diag -->
 
+<!-- ══════════════════════ TAB: BAR SCORES ══════════════════════ -->
+<div class="tab-pane" id="tab-barscores">
+
+<div class="panel">
+  <div class="sec-lg">Серийная качка Bar Scores</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Экспорт CSV со скорами всех методов по каждому бару для AI-анализа.
+    Файлы сохраняются в <b style="color:var(--txt2)">data/bar_scores/</b>.
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+      Глубина (дней):
+      <select id="bs_days" class="inp" style="border-radius:6px;padding:4px 8px;width:90px;">
+        <option value="90">90</option>
+        <option value="180">180</option>
+        <option value="365" selected>365</option>
+        <option value="730">730</option>
+      </select>
+    </label>
+    <button class="btn-pill btn-sm" onclick="bsSelectAll()">☑ все</button>
+    <button class="btn-pill btn-sm" onclick="bsSelectNone()">☐ сбросить</button>
+    <button class="btn-pill" id="bs_run_btn" onclick="bsStartBatch()">▶ КАЧАТЬ</button>
+    <button class="btn-pill btn-sm" onclick="bsLoadFiles()">⟳ файлы</button>
+  </div>
+
+  <div id="bs_ticker_grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+
+  <div id="bs_progress_wrap" style="display:none;">
+    <div class="sec-sm" style="margin-bottom:6px;">Прогресс</div>
+    <div id="bs_progress_log" style="font-size:11px;font-family:monospace;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;max-height:180px;overflow-y:auto;line-height:1.7;"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-lg">Сохранённые файлы</div>
+  <div id="bs_files_wrap">
+    <div style="font-size:11px;color:var(--txt3);">нажми ⟳ файлы выше</div>
+  </div>
+</div>
+
+</div><!-- /tab-barscores -->
+
 <!-- ══════════════════════ TAB: БОТ (LIVE) ══════════════════════ -->
 <div class="tab-pane" id="tab-live">
 
@@ -2611,6 +2694,7 @@ function showTab(name) {{
   }} else {{
     if (_statusPollTimer) {{ clearInterval(_statusPollTimer); _statusPollTimer = null; }}
   }}
+  if (name === 'barscores') {{ bsInit(); }}
 }}
 
 function modelStatsToHtml(modelStats) {{
@@ -4715,6 +4799,149 @@ function _drawLearningCurve(canvasId, data) {{
   ctx.fillStyle = '#FF9F40'; ctx.fillText('Cum WR', PAD.left + 130, PAD.top + 12);
 }}
 
+// ════════════════════ BAR SCORES ════════════════════
+
+let _bsAllTickers = [];
+let _bsBatchRunning = false;
+
+function bsInit() {{
+  // получаем список тикеров из чекбоксов сайдбара
+  _bsAllTickers = Array.from(document.querySelectorAll('#tickers input[type=checkbox]'))
+    .map(cb => cb.value).filter(Boolean);
+  bsRenderGrid();
+  bsLoadFiles();
+}}
+
+function bsRenderGrid() {{
+  const grid = document.getElementById('bs_ticker_grid');
+  if (!_bsAllTickers.length) {{
+    grid.innerHTML = '<span style="font-size:11px;color:var(--txt3);">тикеры не найдены — откройте другой таб сначала</span>';
+    return;
+  }}
+  grid.innerHTML = _bsAllTickers.map(t => {{
+    return `<label id="bs_chip_${{t}}" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--card);border:1px solid var(--border2);border-radius:999px;cursor:pointer;font-size:11px;font-family:monospace;">
+      <input type="checkbox" value="${{t}}" checked style="accent-color:var(--accent);"> ${{t}}
+      <span id="bs_status_${{t}}" style="font-size:10px;"></span>
+    </label>`;
+  }}).join('');
+}}
+
+function bsSelectAll() {{
+  document.querySelectorAll('#bs_ticker_grid input[type=checkbox]').forEach(cb => cb.checked = true);
+}}
+function bsSelectNone() {{
+  document.querySelectorAll('#bs_ticker_grid input[type=checkbox]').forEach(cb => cb.checked = false);
+}}
+
+function bsSetStatus(ticker, status, rows, error) {{
+  const el = document.getElementById('bs_status_' + ticker);
+  const chip = document.getElementById('bs_chip_' + ticker);
+  if (!el) return;
+  if (status === 'running') {{
+    el.textContent = '⏳';
+    el.style.color = 'var(--txt3)';
+  }} else if (status === 'done') {{
+    el.textContent = `✓ ${{rows}}б`;
+    el.style.color = '#52F2C9';
+    if (chip) chip.style.borderColor = '#52F2C9';
+  }} else if (status === 'error') {{
+    el.textContent = '✗';
+    el.style.color = 'var(--neg)';
+    if (chip) chip.style.borderColor = 'var(--neg)';
+    el.title = error || '';
+  }}
+}}
+
+function bsLog(msg, color) {{
+  const log = document.getElementById('bs_progress_log');
+  if (!log) return;
+  const ts = new Date().toLocaleTimeString('ru');
+  const line = document.createElement('div');
+  line.style.color = color || 'var(--txt2)';
+  line.textContent = `[${{ts}}] ${{msg}}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}}
+
+function bsStartBatch() {{
+  if (_bsBatchRunning) return;
+  const selected = Array.from(document.querySelectorAll('#bs_ticker_grid input[type=checkbox]:checked'))
+    .map(cb => cb.value);
+  if (!selected.length) {{ alert('Выбери хотя бы один тикер'); return; }}
+  const days = parseInt(document.getElementById('bs_days').value);
+
+  _bsBatchRunning = true;
+  document.getElementById('bs_run_btn').disabled = true;
+  document.getElementById('bs_run_btn').textContent = '⏳ качаем...';
+  document.getElementById('bs_progress_wrap').style.display = '';
+  document.getElementById('bs_progress_log').innerHTML = '';
+  bsLog(`Старт: ${{selected.length}} тикеров, ${{days}} дней`, 'var(--accent)');
+
+  const url = `/api/bar_scores_batch?tickers=${{encodeURIComponent(selected.join(','))}}&days=${{days}}`;
+  const es = new EventSource(url);
+
+  es.addEventListener('progress', e => {{
+    const d = JSON.parse(e.data);
+    if (d.status === 'running') {{
+      bsSetStatus(d.ticker, 'running');
+      bsLog(`${{d.ticker}}: загружаем...`, 'var(--txt3)');
+    }} else if (d.status === 'done') {{
+      bsSetStatus(d.ticker, 'done', d.rows);
+      bsLog(`${{d.ticker}}: ✓ ${{d.rows}} баров сохранено`, '#52F2C9');
+    }} else if (d.status === 'error') {{
+      bsSetStatus(d.ticker, 'error', 0, d.error);
+      bsLog(`${{d.ticker}}: ✗ ${{d.error}}`, 'var(--neg)');
+    }}
+  }});
+
+  es.addEventListener('done', e => {{
+    es.close();
+    _bsBatchRunning = false;
+    document.getElementById('bs_run_btn').disabled = false;
+    document.getElementById('bs_run_btn').textContent = '▶ КАЧАТЬ';
+    bsLog('Готово!', 'var(--accent)');
+    bsLoadFiles();
+  }});
+
+  es.onerror = () => {{
+    es.close();
+    _bsBatchRunning = false;
+    document.getElementById('bs_run_btn').disabled = false;
+    document.getElementById('bs_run_btn').textContent = '▶ КАЧАТЬ';
+    bsLog('Соединение прервано', 'var(--neg)');
+  }};
+}}
+
+async function bsLoadFiles() {{
+  const wrap = document.getElementById('bs_files_wrap');
+  wrap.innerHTML = '<div style="font-size:11px;color:var(--txt3);">загружаем...</div>';
+  try {{
+    const r = await fetch('/api/bar_scores_list');
+    const files = await r.json();
+    if (!files.length) {{
+      wrap.innerHTML = '<div style="font-size:11px;color:var(--txt3);">нет сохранённых файлов</div>';
+      return;
+    }}
+    let html = `<table class="scen-table"><thead><tr>
+      <th>Файл</th><th>Размер</th><th>Дата</th><th></th>
+    </tr></thead><tbody>`;
+    for (const f of files) {{
+      html += `<tr>
+        <td style="font-family:monospace;font-size:11px;">${{f.filename}}</td>
+        <td>${{f.size_kb}} KB</td>
+        <td style="color:var(--txt3);">${{f.mtime}}</td>
+        <td><a href="/api/bar_scores_download?file=${{encodeURIComponent(f.filename)}}"
+               download="${{f.filename}}"
+               class="btn-pill btn-sm" style="text-decoration:none;display:inline-block;">⬇ скачать</a></td>
+      </tr>`;
+    }}
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }} catch(e) {{
+    wrap.innerHTML = `<div style="color:var(--neg);font-size:11px;">ошибка: ${{e.message}}</div>`;
+  }}
+}}
+
 </script>
 </body>
 </html>
@@ -5032,6 +5259,48 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":
             self._send_json(get_bot_status())
+        elif self.path.startswith("/api/bar_scores_list"):
+            self._send_json(list_bar_scores_files())
+        elif self.path.startswith("/api/bar_scores_download"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            fname = qs.get("file", [""])[0]
+            # безопасность: только имя файла, без path traversal
+            fname = os.path.basename(fname)
+            fpath = os.path.join(BAR_SCORES_DIR, fname)
+            if not fname.endswith(".csv") or not os.path.exists(fpath):
+                self.send_error(404)
+                return
+            data = open(fpath, "rb").read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif self.path.startswith("/api/bar_scores_batch"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            tickers = [t.strip() for t in qs.get("tickers", [""])[0].split(",") if t.strip()]
+            days = int(qs.get("days", ["365"])[0])
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+            def send_sse(event, data_dict):
+                line = f"event: {event}\ndata: {json.dumps(data_dict, ensure_ascii=False)}\n\n"
+                try:
+                    self.wfile.write(line.encode("utf-8"))
+                    self.wfile.flush()
+                except Exception:
+                    pass
+            def on_progress(ticker, status, rows, error):
+                send_sse("progress", {"ticker": ticker, "status": status, "rows": rows, "error": error})
+            for t in tickers:
+                send_sse("progress", {"ticker": t, "status": "running", "rows": 0, "error": None})
+                export_bar_scores_batch([t], days, on_progress)
+            send_sse("done", {"msg": "all done"})
         else:
             self.send_error(404)
 
