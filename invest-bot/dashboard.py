@@ -2545,6 +2545,15 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <label style="font-size:12px;">Глубина:
       <input type="number" id="br_depth" value="4" min="2" max="6" class="inp" style="width:50px;border-radius:6px;padding:4px 8px;">
     </label>
+    <label style="font-size:12px;">Фильтр:
+      <select id="br_filter" class="inp" style="border-radius:6px;padding:4px 6px;">
+        <option value="all">все бары</option>
+        <option value="reversals">развороты</option>
+        <option value="regime_change">смена режима</option>
+        <option value="high_vol">высокий объём</option>
+        <option value="combined">все события</option>
+      </select>
+    </label>
     <button class="btn-pill" id="br_run_btn" onclick="brRunMiner()">▶ НАЙТИ ПРАВИЛА</button>
     <button class="btn-pill btn-sm" onclick="brLoadRules()">⟳ загрузить</button>
   </div>
@@ -4863,18 +4872,19 @@ async function brRunMiner() {{
   const ticker = document.getElementById('br_ticker').value;
   const target = document.getElementById('br_target').value;
   const depth  = parseInt(document.getElementById('br_depth').value);
+  const event_filter = (document.getElementById('br_filter') || {{}}).value || 'all';
   if (!ticker) return;
   const btn = document.getElementById('br_run_btn');
   const status = document.getElementById('br_miner_status');
   btn.disabled = true;
   btn.textContent = '⏳ считаем...';
-  status.textContent = `Запускаем майнер для ${{ticker}}...`;
+  status.textContent = `Запускаем майнер для ${{ticker}} (фильтр: ${{event_filter}})...`;
   status.style.color = 'var(--txt3)';
   try {{
     const r = await fetch('/api/bar_rules_mine', {{
       method: 'POST',
       headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{ticker, target, max_depth: depth}})
+      body: JSON.stringify({{ticker, target, max_depth: depth, event_filter}})
     }});
     const d = await r.json();
     if (d.error) {{
@@ -5558,12 +5568,13 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bar_rules_mine":
-            ticker    = payload.get("ticker", "").upper()
-            target    = payload.get("target", "fwd_ret_3")
-            max_depth = int(payload.get("max_depth", 4))
+            ticker       = payload.get("ticker", "").upper()
+            target       = payload.get("target", "fwd_ret_3")
+            max_depth    = int(payload.get("max_depth", 4))
+            event_filter = payload.get("event_filter", "all")
             try:
                 from bar_rule_miner import mine_ticker, save_rules
-                result = mine_ticker(ticker, None, max_depth, target)
+                result = mine_ticker(ticker, None, max_depth, target, event_filter)
                 if result is None:
                     self._send_json({"error": f"{ticker}: нет CSV или пустой результат"})
                 else:
