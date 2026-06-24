@@ -4849,18 +4849,15 @@ def _render_page() -> bytes:
             ) + '</div>'
         ))
 
-    toc_items = "".join(
-        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}">'
-        f'<span onclick="showCatPanel(\'{pid}\')" style="flex:1;cursor:pointer">{label}</span>'
+    cat_sections = "".join(
+        f'<details class="chip-section cat-panel {"chip-stock-section" if pid == "stock" else "chip-fut-section"}" '
+        f'data-panel="{pid}"{" open" if i == 0 else ""}>'
+        f'<summary><span style="flex:1">{label}</span>'
         f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
-        f'onclick="event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span>'
-        f'</div>'
-        for i, (pid, label, _) in enumerate(panels)
-    )
-    cat_panels = "".join(
-        '<div class="cat-panel" data-panel="{}" style="display:{}">{}</div>'.format(
-            pid, "block" if i == 0 else "none", panel_html)
-        for i, (pid, _, panel_html) in enumerate(panels)
+        f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
+        f'{panel_html}'
+        f'</details>'
+        for i, (pid, label, panel_html) in enumerate(panels)
     )
 
     reload_hint = (
@@ -4868,7 +4865,7 @@ def _render_page() -> bytes:
         if reload_running else ""
     )
     checkboxes = (
-        f'<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center">'
+        f'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
         f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\');setAllChips(true)">Все</button>'
         f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'futures\')" style="color:#7eb8f7">🔷 Фьючерсы ({len(futures)})</button>'
         f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'stock\')" style="color:#a0d4a0">📈 Акции ({len(stocks)})</button>'
@@ -4876,10 +4873,7 @@ def _render_page() -> bytes:
         f'<button class="btn-pill btn-sm" onclick="setAllChips(false)">✗ снять</button>'
         f'<button class="btn-pill btn-sm" onclick="reloadFutures()" style="color:#aaa" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты{reload_hint}</button>'
         f'</div>'
-        f'<div class="cat-toc-wrap">'
-        f'<div class="cat-toc">{toc_items}</div>'
-        f'<div class="cat-panels">{cat_panels}</div>'
-        f'</div>'
+        f'{cat_sections}'
     )
     rendered = (PAGE_HTML
                 .replace("__TICKER_CHECKBOXES__", checkboxes)
