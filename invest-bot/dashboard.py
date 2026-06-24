@@ -2108,7 +2108,10 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .cfg-group label{{display:flex;align-items:center;gap:6px;margin:0 0 8px 0;font-size:11px;color:var(--txt2);}}
 .cfg-group label:last-child{{margin-bottom:0;}}
 .cfg-group label.cfg-check{{cursor:help;}}
-.cfg-group .inp{{flex:0 0 auto;}}
+.cfg-group .inp{{flex:0 0 auto;max-width:100%;}}
+.cfg-group select.inp{{min-width:0;width:100%;overflow:hidden;text-overflow:ellipsis;}}
+.cfg-group label:has(select.inp){{flex-wrap:wrap;}}
+input[type="checkbox"]{{accent-color:var(--accent);}}
 .cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
@@ -2136,7 +2139,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="showTab('sim')">СИМУЛЯЦИЯ</button>
-  <button class="tab-btn" onclick="showTab('analytics')">📈 АНАЛИТИКА</button>
+  <button class="tab-btn" onclick="showTab('analytics')">АНАЛИТИКА</button>
   <button class="tab-btn" onclick="showTab('diag')">ДИАГНОСТИКА</button>
   <button class="tab-btn" onclick="showTab('live')">БОТ (LIVE)</button>
 </nav>
@@ -2157,7 +2160,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <div class="panel">
   <div class="sec-lg">Настройки симуляции</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
-    🔷 Фьючерсы — из [FUTURES_TRADING] (авто). 📈 Акции — settings.ini + OI.
+    🔷 Фьючерсы — из [FUTURES_TRADING] (авто). ♦️ Акции — settings.ini + OI.
     Список тикеров — в сайдбаре слева (☰ в шапке — свернуть/развернуть).
   </div>
   <div class="cfg-grid">
@@ -2309,7 +2312,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <div class="tab-pane" id="tab-analytics">
 
 <div class="panel">
-  <div class="sec-lg">📈 Анализ капитала и обучения модели</div>
+  <div class="sec-lg">Анализ капитала и обучения модели</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
     Прогон бэктеста по всем выбранным тикерам → equity-кривая, rolling winrate,
     кривая обучения (растёт ли WR по мере накопления истории). Запускай на ночь.
@@ -4921,7 +4924,7 @@ def _render_page() -> bytes:
     if stock_subs:
         cat_sections += (
             f'<details class="chip-group" open><summary class="chip-group-title">'
-            f'<span class="chip-section-title">📈 Акции ({len(stocks)})</span></summary>'
+            f'<span class="chip-section-title">♦️ Акции ({len(stocks)})</span></summary>'
             f'<div class="chip-group-body">{"".join(stock_subs)}</div></details>'
         )
     if futures_subs:
