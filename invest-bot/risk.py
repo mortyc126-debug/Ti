@@ -47,9 +47,11 @@ from risk_config import (
     ORDERBOOK_EXIT_ENABLED, ORDERBOOK_EXIT_THR,
     BEHAVIORAL_EXIT_VOTES_NEEDED, BEHAVIORAL_EXIT_ORDER_FLOW_THR,
     BEHAVIORAL_EXIT_HH_BARS, BEHAVIORAL_EXIT_MOMENTUM_BARS, BEHAVIORAL_EXIT_MOMENTUM_THR,
+    MULTIPORT_DAILY_LOSS_PCT, MULTIPORT_WEEKLY_LOSS_PCT, MULTIPORT_MONTHLY_LOSS_PCT,
+    MULTIPORT_TOTAL_RISK_MAX_PCT, MULTIPORT_TIGHTENED_GIVEBACK_PCT,
 )
 
-__all__ = ("Position", "RiskManager")
+__all__ = ("Position", "RiskManager", "PortfolioRiskManager")
 
 
 def _first_passage_prob(dist_to_stop: float, dist_to_take: float,
@@ -486,7 +488,8 @@ class RiskManager:
                     recent_highs: list[float] | None = None,
                     recent_lows: list[float] | None = None,
                     recent_opens: list[float] | None = None,
-                    recent_closes: list[float] | None = None) -> tuple[bool, str]:
+                    recent_closes: list[float] | None = None,
+                    giveback_pct: float | None = None) -> tuple[bool, str]:
         """Вызывается на каждом обновлении цены. Возвращает (закрыть, причина)."""
         pos = self.positions.get(ticker)
         if not pos:
@@ -594,10 +597,11 @@ class RiskManager:
         # Giveback защищает прибыль, а не фиксирует убыток — активен только
         # после того как стоп перенесён в безубыток (breakeven_set).
         if pos.breakeven_set:
+            effective_giveback = giveback_pct if giveback_pct is not None else TRAIL_GIVEBACK_PCT
             giveback = pos.peak_profit_rub - pnl
-            if giveback > pos.peak_profit_rub * TRAIL_GIVEBACK_PCT / 100:
+            if giveback > pos.peak_profit_rub * effective_giveback / 100:
                 return True, (f"трейлинг: пик +{pos.peak_profit_rub:.0f}₽, "
-                               f"отдали {giveback:.0f}₽ — фиксируем")
+                               f"отдали {giveback:.0f}₽ (порог {effective_giveback:.0f}%) — фиксируем")
 
         # Инвалидация гипотезы входа: стоп — аварийный выключатель, а не
         # основной выход. Эти две проверки не трогают уже отработавшие
@@ -788,4 +792,110 @@ class RiskManager:
             "portfolio_risk_pct": port_risk,
             "squeeze_factor": squeeze,
             "group_directions": group_dirs,
+        }
+
+
+class PortfolioRiskManager:
+    """
+    Мульти-счётный риск-менеджер: агрегирует несколько RiskManager'ов и
+    применяет единые лимиты по СУММЕ всех счетов.
+
+    Логика двух уровней защиты:
+      1. can_enter: блокирует новые входы если суммарный убыток превысил
+         дневной/недельный/месячный лимит или суммарный риск переполнен.
+      2. exit_giveback_pct: при достижении дневного лимита ужесточает
+         giveback с TRAIL_GIVEBACK_PCT до MULTIPORT_TIGHTENED_GIVEBACK_PCT
+         на всех счетах — открытые позиции закрываются быстрее и не дают
+         убытку расти далеко за лимит.
+
+    Использование:
+        pf = PortfolioRiskManager([rm_account1, rm_account2])
+        ok, why = pf.can_enter(signal_risk_rub=5000)
+        gb = pf.exit_giveback_pct()      # передаётся в rm.check_exit(giveback_pct=gb)
+    """
+
+    def __init__(self, accounts: list["RiskManager"]):
+        self.accounts = accounts
+
+    def total_equity(self) -> float:
+        return sum(rm.equity_getter() for rm in self.accounts)
+
+    def total_day_pnl_rub(self) -> float:
+        return sum(rm.state.get("day_pnl_rub", 0.0) for rm in self.accounts)
+
+    def total_week_pnl_rub(self) -> float:
+        return sum(rm.state.get("week_pnl_rub", 0.0) for rm in self.accounts)
+
+    def total_month_pnl_rub(self) -> float:
+        return sum(rm.state.get("month_pnl_rub", 0.0) for rm in self.accounts)
+
+    def total_open_risk_rub(self) -> float:
+        return sum(
+            sum(p.risk_rub for p in rm.positions.values())
+            for rm in self.accounts
+        )
+
+    def daily_limit_hit(self) -> bool:
+        eq = self.total_equity()
+        if eq <= 0:
+            return False
+        return self.total_day_pnl_rub() <= -eq * MULTIPORT_DAILY_LOSS_PCT / 100
+
+    def can_enter(self, signal_risk_rub: float = 0.0) -> tuple[bool, str]:
+        """Проверить, разрешён ли новый вход по суммарным лимитам портфеля."""
+        eq = self.total_equity()
+        if eq <= 0:
+            return True, ""
+
+        if self.daily_limit_hit():
+            day_pnl_pct = self.total_day_pnl_rub() / eq * 100
+            return False, (
+                f"портфельный дневной лимит: суммарный убыток {day_pnl_pct:.2f}% "
+                f"≤ -{MULTIPORT_DAILY_LOSS_PCT}% — входы заблокированы на всех счетах"
+            )
+
+        week_pnl_pct = self.total_week_pnl_rub() / eq * 100
+        if week_pnl_pct <= -MULTIPORT_WEEKLY_LOSS_PCT:
+            return False, (
+                f"портфельный недельный лимит: суммарный убыток {week_pnl_pct:.2f}% "
+                f"≤ -{MULTIPORT_WEEKLY_LOSS_PCT}%"
+            )
+
+        month_pnl_pct = self.total_month_pnl_rub() / eq * 100
+        if month_pnl_pct <= -MULTIPORT_MONTHLY_LOSS_PCT:
+            return False, (
+                f"портфельный месячный лимит: суммарный убыток {month_pnl_pct:.2f}% "
+                f"≤ -{MULTIPORT_MONTHLY_LOSS_PCT}%"
+            )
+
+        total_risk_pct = (self.total_open_risk_rub() + signal_risk_rub) / eq * 100
+        if total_risk_pct > MULTIPORT_TOTAL_RISK_MAX_PCT:
+            return False, (
+                f"суммарный открытый риск {total_risk_pct:.2f}% "
+                f"> лимита {MULTIPORT_TOTAL_RISK_MAX_PCT}% — новый вход запрещён"
+            )
+
+        return True, f"портфель: риск {total_risk_pct:.2f}% / {MULTIPORT_TOTAL_RISK_MAX_PCT}%"
+
+    def exit_giveback_pct(self) -> float:
+        """
+        Возвращает актуальный порог giveback для всех счетов.
+        При достижении дневного лимита ужесточается с TRAIL_GIVEBACK_PCT
+        до MULTIPORT_TIGHTENED_GIVEBACK_PCT, чтобы открытые позиции
+        закрывались раньше и не наращивали убыток за пределы лимита.
+        """
+        return MULTIPORT_TIGHTENED_GIVEBACK_PCT if self.daily_limit_hit() else TRAIL_GIVEBACK_PCT
+
+    def status(self) -> dict:
+        eq = self.total_equity()
+        return {
+            "total_equity": round(eq, 2),
+            "total_day_pnl_rub": round(self.total_day_pnl_rub(), 2),
+            "total_week_pnl_rub": round(self.total_week_pnl_rub(), 2),
+            "total_month_pnl_rub": round(self.total_month_pnl_rub(), 2),
+            "total_open_risk_rub": round(self.total_open_risk_rub(), 2),
+            "total_open_risk_pct": round(self.total_open_risk_rub() / eq * 100, 2) if eq > 0 else 0.0,
+            "daily_limit_hit": self.daily_limit_hit(),
+            "exit_giveback_pct": self.exit_giveback_pct(),
+            "accounts": len(self.accounts),
         }

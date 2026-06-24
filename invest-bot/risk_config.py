@@ -51,8 +51,19 @@ CORR_GROUPS: dict[str, list[str]] = {
 }
 
 # ── Портфельный риск-лимит ───────────────────────────────────────────────
-PORTFOLIO_RISK_MAX_PCT = 3.0   # макс. суммарный риск портфеля, % депо
+PORTFOLIO_RISK_MAX_PCT = 3.0   # макс. суммарный риск портфеля, % депо (один счёт)
 PORTFOLIO_STOP_SQUEEZE = True  # сжимать стоп нового входа при перегрузке
+
+# ── Мульти-счётный портфельный менеджер (PortfolioRiskManager) ───────────
+# Лимиты считаются по СУММЕ всех счетов. При достижении дневного лимита
+# новые входы блокируются на всех счетах, а giveback ужесточается с
+# TRAIL_GIVEBACK_PCT до MULTIPORT_TIGHTENED_GIVEBACK_PCT — иначе открытые
+# позиции продолжают давать убыток далеко за лимит.
+MULTIPORT_DAILY_LOSS_PCT   = 2.0   # % от суммарного депо
+MULTIPORT_WEEKLY_LOSS_PCT  = 5.0
+MULTIPORT_MONTHLY_LOSS_PCT = 10.0
+MULTIPORT_TOTAL_RISK_MAX_PCT = 3.0          # суммарный открытый риск % всех счетов
+MULTIPORT_TIGHTENED_GIVEBACK_PCT = 15       # вместо TRAIL_GIVEBACK_PCT при лимите
 
 # ── Прочие параметры ─────────────────────────────────────────────────────
 MAX_OPEN_POSITIONS = 2
