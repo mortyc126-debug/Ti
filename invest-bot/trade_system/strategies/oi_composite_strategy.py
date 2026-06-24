@@ -1949,9 +1949,24 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
 #
 # Возвращает (playbook_score ∈[-1,1], список активных плейбуков).
 # Если ни один не активирован — (0.0, []), тогда работает чистая линейная сумма.
-def _compute_playbooks(sd: dict[str, float], regime: str) -> tuple[float, list[str]]:
+def _compute_playbooks(sd: dict[str, float], regime: str,
+                       sd_l2: dict[str, float] | None = None) -> tuple[float, list[str]]:
     def g(name: str) -> float:
         return sd.get(name, 0.0)
+
+    def l2(name: str) -> float:
+        """Скор метода на L2 (5м). 0.0 если L2 недоступен."""
+        return (sd_l2 or {}).get(name, 0.0)
+
+    def cross_tf_mult(name: str, d: int) -> float:
+        """
+        Кросс-ТФ согласованность: L1 и L2 в одну сторону → буст ×1.15,
+        в разные → штраф ×0.70. Если L2 нейтрален (|v|<0.1) → нет эффекта.
+        """
+        v = l2(name)
+        if abs(v) < 0.1:
+            return 1.0
+        return 1.15 if v * d > 0 else 0.70
 
     active: list[str] = []
     scores: list[float] = []
@@ -1988,6 +2003,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str) -> tuple[float, list[s
             strength = (abs(hawkes) + abs(vsa) + abs(level)) / 3
             if aggr * d > 0.2:
                 strength *= 1.3
+            # HAWKES на 5м подтверждает — поглощение уже реальное, не шум 1м
+            strength *= cross_tf_mult("HAWKES_SIGNAL", d)
             active.append("ABSORPTION")
             scores.append(d * min(1.0, strength) * 1.2)
 
@@ -2005,12 +2022,16 @@ def _compute_playbooks(sd: dict[str, float], regime: str) -> tuple[float, list[s
 
     # ── Плейбук 3: Смена режима — первое движение ─────────────────────────────
     # CHANGE_POINT = нулевой уровень: сработал → перезапуск, не просто голос.
+    # CHANGE_POINT_L2 на 5м — излом первичен, 1м лишь подтверждает.
     if abs(cp) > 0.45 and abs(sine) > 0.25:
         d = 1 if cp > 0 else -1
         if sine * d > 0 and mkt * d > 0:
             strength = (abs(cp) + abs(sine) + abs(mkt)) / 3
             if fractal * d > 0.15:
                 strength *= 1.15
+            cp_l2 = l2("CHANGE_POINT_L2")
+            if abs(cp_l2) > 0.3 and cp_l2 * d > 0:
+                strength *= 1.20  # излом виден и на 5м — очень сильный сигнал
             active.append("REGIME_SHIFT")
             scores.append(d * min(1.0, strength) * 1.1)
 
@@ -2028,12 +2049,24 @@ def _compute_playbooks(sd: dict[str, float], regime: str) -> tuple[float, list[s
 
     # ── Плейбук 5: Трендовое продолжение на откате ───────────────────────────
     # Здоровый тренд (фрактал + TQ), откат слабый по объёму, свечной сигнал.
+    # TQ и FRACTAL на L2 (5м) — более надёжная оценка тренда чем 1м.
+    tq_l2  = l2("TREND_QUALITY")
+    frac_l2 = l2("FRACTAL")
     if tq > 0.5 and fractal > 0.1 and vwap < 0.15 and 0.0 < vol_mom < 0.35 and candle_p > 0.2:
         strength = (tq + fractal + candle_p) / 3
+        # Если L2 тоже бычий — тренд реален, не только на 1м-шуме
+        if tq_l2 > 0.3:
+            strength *= 1.15
+        elif tq_l2 < -0.2:
+            strength *= 0.65  # L2 против L3-тренда — ослабляем
         active.append("TREND_PULLBACK_L")
         scores.append(min(1.0, strength) * 0.85)
     elif tq < -0.5 and fractal > 0.1 and vwap > -0.15 and -0.35 < vol_mom < 0.0 and candle_p < -0.2:
         strength = (abs(tq) + fractal + abs(candle_p)) / 3
+        if tq_l2 < -0.3:
+            strength *= 1.15
+        elif tq_l2 > 0.2:
+            strength *= 0.65
         active.append("TREND_PULLBACK_S")
         scores.append(-min(1.0, strength) * 0.85)
 
@@ -2163,6 +2196,77 @@ BASE_METHOD_NAMES = (
     + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
 )
 CLUSTER_MODEL_NAMES = [M1_NAME, M2_NAME, M3_NAME]
+
+# ── L2 (5м): методы-аналитики старшего ТФ ────────────────────────────────────
+# Подмножество методов, которые имеют смысл на 5м-барах.
+# Tick-данные (BS_PRESSURE_TS, AGGRESSOR_FLOW и др.) работают только на 1м —
+# они завязаны на поток реальных тиков, агрегация их убьёт.
+# Осцилляторы RSI-типа (FISHER_RSI, RMI) перевозбуждаются на 1м; на 5м лучше
+# себя ведут, но SINEWAVE/CYBER_CYCLE тоже нестабильнее — оставляем только
+# трендовые, объёмные и паттерновые.
+_MTF5_BUFFER_1M  = 500   # сколько 1м-баров используем для 5м-агрегации (= 100 5м-баров)
+_MTF5_MIN_5M_BARS = 12   # минимум 5м-баров для расчёта L2 composite
+_MTF5_BLEND_W    = 0.30  # доля L2 в финальном composite (L3 получает 1 - 0.30 = 0.70)
+
+# (name, score_fn) — только те, что устойчивы на 5м и являются чистыми функциями.
+_MTF5_METHODS_NAMES = frozenset({
+    "PRICE_TREND", "VOL_MOMENTUM", "VWAP_SIGNAL", "TREND_QUALITY",
+    "ADAPTIVE_MA", "FRACTAL", "KLINGER", "VZO", "TWIGGS",
+    "HAWKES_SIGNAL", "CANDLE_PATTERN", "WICK_REJECTION",
+    "SINEWAVE_SIGNAL", "VSA",
+})
+_MTF5_FUNCS: list[tuple[str, object]] = [
+    (name, fn) for name, fn in METHODS if name in _MTF5_METHODS_NAMES
+]
+# На 5м некоторые методы ценнее — буст, применяется внутри _compute_l2_composite.
+_MTF5_WEIGHT_MODS: dict[str, float] = {
+    "HAWKES_SIGNAL":  1.25,   # самоусиление реального потока весомее на 5м
+    "TREND_QUALITY":  1.15,   # TQI стабильнее на 5м (меньше шума HH/HL)
+    "FRACTAL":        1.20,   # Hurst надёжнее на более длинных рядах
+    "CANDLE_PATTERN": 1.10,   # 5м-паттерн значимее 1м
+    "WICK_REJECTION": 1.10,
+    "VWAP_SIGNAL":    0.85,   # 1м-VWAP ближе к реальному; на 5м чуть слабее
+    "SINEWAVE_SIGNAL": 0.80,  # цикл менее чёткий на 5м при коротком окне
+}
+
+
+def _compute_l2_composite(candles_1m: list, factor: int = _MTF_FACTOR) -> tuple[float, dict[str, float]]:
+    """
+    Вычисляет L2-composite и индивидуальные скоры методов на виртуальных 5м-барах.
+    Входные candles_1m — последние _MTF5_BUFFER_1M 1м-свечей.
+    Возвращает (composite ∈[-1,1], {method_name: score}).
+    Возвращает (0.0, {}) если данных недостаточно или произошла ошибка.
+    """
+    try:
+        bars_5m = _aggregate_candles(candles_1m, factor)
+    except Exception:
+        return 0.0, {}
+    if len(bars_5m) < _MTF5_MIN_5M_BARS:
+        return 0.0, {}
+
+    scores: dict[str, float] = {}
+    for name, fn in _MTF5_FUNCS:
+        try:
+            scores[name] = fn(bars_5m)
+        except Exception:
+            scores[name] = 0.0
+
+    # CHANGE_POINT на 5м — детектирует излом режима раньше чем на 1м
+    try:
+        closes_5m = [_to_f(c.close) for c in bars_5m]
+        scores["CHANGE_POINT_L2"] = change_point_score(closes_5m)
+    except Exception:
+        scores["CHANGE_POINT_L2"] = 0.0
+
+    # Взвешенная сумма с per-method модификаторами ТФ
+    total_w = 0.0
+    total_wv = 0.0
+    for name, sc in scores.items():
+        w = _MTF5_WEIGHT_MODS.get(name, 1.0)
+        total_wv += sc * w
+        total_w  += w
+    composite = (total_wv / total_w) if total_w > 0 else 0.0
+    return max(-1.0, min(1.0, composite)), scores
 
 # M1/M2/M3 считаются и трекаются (вес/история/attribution) наравне с базовыми
 # методами — чтобы их качество было сравнимо с остальными в архиве и при
@@ -2364,6 +2468,8 @@ class OICompositeStrategy(IStrategy):
         self.__cached_regime_probs: dict = {"ranging": 1.0}
         self.__cached_change_point: float = 0.0
         self.__cached_mtf_trend: float = 0.0
+        self.__cached_mtf5_composite: float = 0.0
+        self.__cached_mtf5_scores: dict[str, float] = {}
         # Narrative-гейт (narrative.py): FSM с памятью между барами + EWA-доверие
         # по (narrative, regime). Локальный, без внешних провайдеров — в отличие
         # от history/calibrator, не нуждается в set_*-инъекции.
@@ -3550,6 +3656,12 @@ class OICompositeStrategy(IStrategy):
             self.__cached_wavelet_mult = wavelet_confidence_mult(closes)
             if self.__interval_min == 1 and len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
                 self.__cached_mtf_trend = _mtf_trend_score(self.__candles, factor=_MTF_FACTOR)
+            # L2: compute composite из 14 методов на виртуальных 5м-барах.
+            # Используем l1_buffer (полная история), а не короткое окно self.__candles.
+            if self.__interval_min == 1:
+                src = (self.__l1_buffer or self.__candles)[-_MTF5_BUFFER_1M:]
+                if len(src) >= _MTF5_MIN_5M_BARS * _MTF_FACTOR:
+                    self.__cached_mtf5_composite, self.__cached_mtf5_scores = _compute_l2_composite(src)
             self.__recalc_l1_context()
 
         regime_probs = self.__cached_regime_probs
@@ -3652,7 +3764,9 @@ class OICompositeStrategy(IStrategy):
 
         # Плейбуки: нелинейные конъюнкции — при активации берут 60% итога.
         # Дивергенция инжектируется как дополнительное смещение linear_raw.
-        playbook_score, active_playbooks = _compute_playbooks(base_score_dict, regime)
+        playbook_score, active_playbooks = _compute_playbooks(
+            base_score_dict, regime, sd_l2=self.__cached_mtf5_scores
+        )
         div_score = _divergence_score(base_score_dict)
         if abs(div_score) > 0.1:
             # Дивергенция подмешивается с весом 0.25 в линейную часть.
@@ -3673,13 +3787,20 @@ class OICompositeStrategy(IStrategy):
         confidence_mult *= lag_mult
         composite *= confidence_mult
 
-        # MTF-гейт: тренд на 5м-свечах против текущего направления → штраф.
-        htf_trend = self.__cached_mtf_trend
-        if htf_trend != 0.0:
-            if (composite > 0 and htf_trend < 0) or (composite < 0 and htf_trend > 0):
-                composite *= _MTF_COUNTER_MULT
-            else:
-                composite *= _MTF_TREND_MULT
+        # L2-блендинг: заменяет старый бинарный MTF-гейт (×0.25/×1.15).
+        # L2 (5м) теперь аналитик: добавляет 30% своего composite к L3.
+        # Если данных нет или ТФ ≠ 1м — поведение прежнее через htf_trend.
+        l2_comp = self.__cached_mtf5_composite
+        if abs(l2_comp) > 0.01 and self.__interval_min == 1:
+            composite = (1.0 - _MTF5_BLEND_W) * composite + _MTF5_BLEND_W * l2_comp
+        else:
+            # Fallback: старый ZLEMA-фильтр (для не-1м ТФ или пока нет 5м-истории)
+            htf_trend = self.__cached_mtf_trend
+            if htf_trend != 0.0:
+                if (composite > 0 and htf_trend < 0) or (composite < 0 and htf_trend > 0):
+                    composite *= _MTF_COUNTER_MULT
+                else:
+                    composite *= _MTF_TREND_MULT
 
         # L1-гейт: структурный контекст (30d диапазон + 50d MA).
         # Старший ворот иерархии: лонг в верхних 15% диапазона в боковике → ×0.10.
