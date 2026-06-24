@@ -4614,6 +4614,7 @@ class OICompositeStrategy(IStrategy):
     def last_snapshot(self) -> dict:
         """Последний расчёт composite/scores/режима — для архива (archive.py), не торговая логика."""
         atr_pct = _compute_atr(self.__candles) if self.__candles else 0.0
+        priors_cur = self.__ic_priors.get(self.__last_regime) or self.__ic_priors.get("__global__", {})
         return {
             "composite": self.__last_composite,
             "scores": dict(self.__last_scores),
@@ -4628,6 +4629,13 @@ class OICompositeStrategy(IStrategy):
             "trail_activation_pct": self.__trail_activation_pct(
                 self.__last_regime, self.__last_playbooks),
             "active_playbooks": list(self.__last_playbooks),
+            # Диагностика P1: noise_mode и прогрев IC
+            "noise_mode": any(p.noise_mode for p in priors_cur.values()),
+            "ic_bar_counter": self.__ic_bar_counter,
+            "ic_warm": self.__ic_bar_counter >= IC_WINDOW // 2,
+            "stat_break_uncertainty": round(self.__stat_break.uncertainty, 3),
+            "narrative_state": self.__narrative_state.name,
+            "rejection_stats": dict(self.rejection_stats),
         }
 
     def path_estimate(self, lookback: int = 20) -> tuple[float, float]:
@@ -5071,8 +5079,11 @@ class OICompositeStrategy(IStrategy):
         # P8: волатильность/тикер/режим/сессия.
         thr = self.__threshold_adapters.effective_threshold(thr, regime, hour)
         # P1: режим шума — порог ×1.5.
+        # Холодный старт: первые IC_WINDOW/2 баров IC физически не мог накопиться —
+        # штрафовать за отсутствие данных которых ещё не могло быть логически неверно.
         priors = self.__ic_priors.get(regime) or self.__ic_priors["__global__"]
-        if any(p.noise_mode for p in priors.values()):
+        _ic_warm = self.__ic_bar_counter >= IC_WINDOW // 2
+        if _ic_warm and any(p.noise_mode for p in priors.values()):
             thr *= 1.5
         # P10: статистический слом > 0.3 → ×(1+uncertainty).
         if self.__stat_break.uncertainty > 0.3:

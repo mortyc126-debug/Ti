@@ -59,6 +59,11 @@ class ArchiveStore:
             backtest_trades: int | None = None,
             auto_atr_take_k: float | None = None,
             auto_atr_stop_k: float | None = None,
+            noise_mode: bool | None = None,
+            ic_warm: bool | None = None,
+            stat_break_uncertainty: float | None = None,
+            narrative_state: str | None = None,
+            rejection_stats: dict | None = None,
     ) -> None:
         """
         Снэпшок на конец дня по одному тикеру (вызывается раз в trade_day).
@@ -77,6 +82,11 @@ class ArchiveStore:
             "backtest_trades": backtest_trades,
             "auto_atr_take_k": auto_atr_take_k,
             "auto_atr_stop_k": auto_atr_stop_k,
+            "noise_mode": noise_mode,
+            "ic_warm": ic_warm,
+            "stat_break_uncertainty": stat_break_uncertainty,
+            "narrative_state": narrative_state,
+            "rejection_stats": rejection_stats,
         }
         cutoff = (datetime.now(timezone.utc).date() - timedelta(days=DAYS_KEPT)).isoformat()
         per_ticker_trimmed = {d: v for d, v in per_ticker.items() if d >= cutoff}

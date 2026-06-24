@@ -2474,6 +2474,11 @@ class Trader:
                 live=not signal_only,
                 auto_atr_take_k=snapshot.get("auto_atr_take_k"),
                 auto_atr_stop_k=snapshot.get("auto_atr_stop_k"),
+                noise_mode=snapshot.get("noise_mode"),
+                ic_warm=snapshot.get("ic_warm"),
+                stat_break_uncertainty=snapshot.get("stat_break_uncertainty"),
+                narrative_state=snapshot.get("narrative_state"),
+                rejection_stats=snapshot.get("rejection_stats"),
             )
             # Дублируем в HistoryStore — там хранятся ещё и сделки с attribution
             self.__history.record_daily(
@@ -2499,6 +2504,24 @@ class Trader:
                     live=not signal_only
                 )
             self.__record_backtest_calibration(strategy.settings.ticker, today, snapshot["rolling_quality"])
+
+            # Лог rejection_stats — главный диагностический инструмент.
+            # Показывает распределение причин отказа в сигналах за день.
+            if hasattr(strategy, "rejection_stats"):
+                rs = strategy.rejection_stats
+                total = sum(rs.values())
+                if total > 0:
+                    parts = ", ".join(
+                        f"{k}={v} ({v/total:.0%})"
+                        for k, v in sorted(rs.items(), key=lambda x: -x[1])
+                        if v > 0
+                    )
+                    logger.info(
+                        f"REJECTION_STATS {strategy.settings.ticker}: "
+                        f"всего отфильтровано={total} | {parts}"
+                    )
+                else:
+                    logger.info(f"REJECTION_STATS {strategy.settings.ticker}: нет отфильтрованных сигналов")
         self.__backtest_predictions.clear()
 
     def __record_backtest_calibration(self, ticker: str, date: str, actual_quality: float) -> None:
