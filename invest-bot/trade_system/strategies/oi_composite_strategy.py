@@ -235,6 +235,10 @@ GATE_STABILITY_DECAY = 0.3
 # 4. Конфликт L2/L3: блокировать если L2 уверен в обратном
 GATE_L2_CONFLICT_THRESHOLD = 0.30
 
+# BOCD–FSM синхронизация: ниже этого порога FSM откатывается из CONFIRMED
+# в WATCHING — вход невозможен пока BOCD не подтвердит стабильность режима.
+BOCD_NARRATIVE_SYNC_THR = 0.60
+
 # Группы методов для условия 2 (независимость голосов)
 _GATE_GROUPS: dict[str, frozenset] = {
     "trend": frozenset({"PRICE_TREND", "TREND_QUALITY", "ZLEMA_SIGNAL", "T3_SIGNAL",
@@ -4846,6 +4850,14 @@ class OICompositeStrategy(IStrategy):
             self.__narrative_state, trend=trend, volume=volume,
             price_reaction=price_reaction, regime=regime, exhaustion=exhaustion,
         )
+        # BOCD–FSM синхронизация: BOCD первичный детектор режима — FSM не
+        # может оставаться в CONFIRMED пока BOCD неуверен. Откат в WATCHING
+        # блокирует новые входы до восстановления стабильности режима.
+        if self.__regime_confidence < BOCD_NARRATIVE_SYNC_THR:
+            if self.__narrative_state.name == "CONFIRMED_UPTREND":
+                self.__narrative_state = NarrativeState("WATCHING_ACCUMULATION")
+            elif self.__narrative_state.name == "CONFIRMED_DOWNTREND":
+                self.__narrative_state = NarrativeState("WATCHING_DISTRIBUTION")
         self.__last_narrative_tags = {
             "trend": trend.value, "volume": volume.value,
             "price_reaction": price_reaction.value,
