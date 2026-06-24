@@ -2142,9 +2142,9 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
-    <label>мин сделок: <input type="number" id="min_trades" value="0" min="0" style="width:44px;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
+    <label>мин сделок: <input type="number" id="min_trades" value="0" min="0" style="width:44px;background:var(--panel);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
     <label>сортировка:
-      <select id="sort_by" onchange="renderResultsTable()" style="background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;font-size:11px;">
+      <select id="sort_by" onchange="renderResultsTable()" style="background:var(--panel);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;font-size:11px;">
         <option value="">по умолчанию</option>
         <option value="win_desc">win% ↓</option>
         <option value="win_asc">win% ↑</option>
@@ -2156,7 +2156,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
         <option value="n_asc">сделок ↑</option>
       </select>
     </label>
-    <label>топ N: <input type="number" id="top_n" value="" min="1" placeholder="все" style="width:44px;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
+    <label>топ N: <input type="number" id="top_n" value="" min="1" placeholder="все" style="width:44px;background:var(--panel);border:1px solid var(--border2);color:var(--txt);border-radius:4px;padding:1px 4px;" onchange="renderResultsTable()"></label>
     <label><input type="checkbox" id="top_n_worst" onchange="renderResultsTable()"> худшие</label>
   </div>
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
