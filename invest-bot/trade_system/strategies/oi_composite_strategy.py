@@ -3154,7 +3154,7 @@ class OICompositeStrategy(IStrategy):
                 self.rejection_stats[_reason] += 1
             return None
 
-        if not self.__narrative_allows(direction):
+        if not self.__narrative_allows(direction, composite=composite, threshold=threshold_long if direction == SignalType.LONG else threshold_short):
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — сюжет не сложился ({self.__narrative_state.name})")
             self.rejection_stats["narrative_blocked"] += 1
             return None
@@ -3625,7 +3625,8 @@ class OICompositeStrategy(IStrategy):
                 # _NARRATIVE_WARMUP_BARS баров FSM разогревается (NEUTRAL → WATCHING
                 # → CONFIRMED требует ≥2 переходов) — пока пропускаем.
                 if narrative_bars_seen >= _NARRATIVE_WARMUP_BARS:
-                    if not self.__narrative_allows(direction):
+                    _thr_dir = thr_long if direction == SignalType.LONG else thr_short
+                    if not self.__narrative_allows(direction, composite=composite, threshold=_thr_dir):
                         self.rejection_stats["narrative_blocked"] += 1
                         i += 1
                         continue
@@ -4944,18 +4945,30 @@ class OICompositeStrategy(IStrategy):
                 cnt[regime] = 0
         lc[regime] = state
 
-    def __narrative_allows(self, direction: SignalType) -> bool:
+    def __narrative_allows(self, direction: SignalType,
+                           composite: float = 0.0, threshold: float = 0.0) -> bool:
         """
         Бинарный гейт (не множитель — см. narrative.py docstring): сигнал
         проходит только если сюжет уже СЛОЖИЛСЯ (is_actionable), совпадает по
         направлению с composite, и этому (narrative, regime) сейчас доверяют
         по истории сделок (NarrativeWeights, EWA quality).
+
+        Fast-track: если composite >= threshold * 1.5 (очень сильный сигнал,
+        уже прошедший все остальные гейты) — FSM не блокирует вход. Ожидание
+        CONFIRMED при таком перевесе методов означало бы опоздание на 25-75 минут.
         """
         # P6: жизненный цикл нарратива — disabled пропускает гейт полностью.
         lc = self.__narrative_lifecycle.get(self.__settings.ticker, {})
         lifecycle = lc.get(self.__last_regime, "active")
         if lifecycle == "disabled":
             return True
+        # Fast-track: очень сильный composite обходит требование CONFIRMED.
+        if threshold > 0 and abs(composite) >= threshold * 1.5:
+            sign = 1 if direction == SignalType.LONG else -1
+            # Разрешаем если FSM не против (neutral или совпадает по направлению).
+            state = self.__narrative_state
+            if state.direction == 0 or state.direction == sign:
+                return True
         state = self.__narrative_state
         if not state.is_actionable:
             return False
