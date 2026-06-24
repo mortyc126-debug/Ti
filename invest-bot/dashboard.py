@@ -1388,7 +1388,7 @@ def run_backtest_one(
         rej = dict(strategy.rejection_stats)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с"
                     + (" (адаптивная калибровка narrative)" if adaptive_narrative else "")
-                    + f" | отклонений: порог={rej['below_threshold']} методы={rej['methods_disagree']} объём={rej['liquidity']}")
+                    + f" | отклонений: порог={rej['below_threshold']} методы={rej['methods_disagree']} M3_veto={rej.get('gate_m3_veto', 0)} объём={rej['liquidity']}")
 
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff, adaptive_lasso=adaptive_lasso)
@@ -2656,6 +2656,7 @@ function rowsToHtml(rows) {{
           rs.gate_group_diversity ? `groups ${rs.gate_group_diversity}` : '',
           rs.gate_composite_std ? `cmp_std ${rs.gate_composite_std}` : '',
           rs.gate_l2_conflict ? `L2↔L3 ${rs.gate_l2_conflict}` : '',
+          rs.gate_m3_veto ? `M3_veto ${rs.gate_m3_veto}` : '',
         ].filter(Boolean).join(' / ');
         html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3)">🚫 отклонено баров: порог ${{rs.below_threshold||0}} · методы ${{rs.methods_disagree||0}}${{gateDetails ? ' (' + gateDetails + ')' : ''}} · объём ${{rs.liquidity||0}}${{rs.narrative_blocked ? ' · нарратив ' + rs.narrative_blocked : ''}}</td></tr>`;
       }}

@@ -61,6 +61,7 @@ import os
 import statistics
 import time
 from configparser import ConfigParser
+from collections import deque
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable, Optional
@@ -159,6 +160,25 @@ IC_WINDOW         = 500    # количество баров для rolling IC
 IC_FORWARD_LAG    = 20     # горизонт форвардного возврата (баров)
 IC_SIGNIFICANCE   = 0.03   # порог значимости IC (ниже → метод нейтральный)
 
+# P1: per-method естественный горизонт прогноза (минуты). Трендовые методы
+# предсказывают на ~2ч вперёд, осцилляторы — на ~30мин, объём — на ~1ч,
+# микроструктура — на ~15мин. Лаг в барах = TARGET // interval_min.
+_METHOD_IC_TARGET_MINUTES: dict[str, int] = {
+    "PRICE_TREND": 120, "TREND_QUALITY": 120, "ZLEMA_SIGNAL": 120, "T3_SIGNAL": 120,
+    "ADAPTIVE_MA": 120, "DECYCLER": 120, "SINEWAVE_SIGNAL": 120, "SSA_SIGNAL": 120,
+    "MKT_STRUCTURE": 120, "TRIANGLE": 120,
+    "CYBER_CYCLE": 30, "FISHER_RSI": 30, "EBSW": 30, "RMI": 30, "ZSCORE": 30,
+    "MMI_SIGNAL": 30, "VR_SIGNAL": 30, "FRACTAL": 30, "ENTROPY": 30,
+    "VOL_MOMENTUM": 60, "KLINGER": 60, "VZO": 60, "TWIGGS": 60, "BS_PRESSURE": 60,
+    "YZ_VOL_SIGNAL": 60, "VSA": 60, "VWAP_SIGNAL": 60, "VOLATILITY_REGIME": 60,
+    "HAWKES_SIGNAL": 15, "BS_PRESSURE_TS": 15, "AGGRESSOR_FLOW": 15, "LARGE_IMPACT": 15,
+    "VWAP_SIGNAL_TS": 15, "VOL_MOMENTUM_TS": 15, "OB_IMBALANCE": 15, "CANCEL_SIGNAL": 15,
+    "OI_SQUEEZE": 15, "INST_OI": 15, "RETAIL_CONTRA": 15, "WICK_REJECTION": 15,
+    "SPRING": 15, "LEVEL_CONTEXT": 15, "CANDLE_PATTERN": 15, "CHANGE_POINT": 15,
+    "MULTI_TICKER": 60, "WAVELET_SIGNAL": 60,
+}
+_IC_DEFAULT_TARGET_MINUTES = 60   # для методов вне таблицы (M1/M2/M3 и пр.)
+
 # ── Lag-коррекция по результатам lag_analysis.py ─────────────────────────────
 # Таблица составлена по 60-дневному прогону (медиана лага по 35 тикерам).
 # Корректируем только методы с лагом < 10 баров И стабильным лагом в режиме
@@ -190,6 +210,12 @@ _LAG_TABLE: dict[str, dict[str, int]] = {
 _LAG_HISTORY_LEN = 14  # max lag в таблице + 2 буфера
 MFE_MAE_BARS = 15                  # максимум баров для записи MFE/MAE
 
+# P3: отключение убыточных плейбуков по фактической статистике.
+PLAYBOOK_DISABLE_MIN_N = 8
+PLAYBOOK_DISABLE_MIN_AVG_R = -0.3
+# P9: трейлинг-стоп из распределения MFE.
+TRAIL_MIN_DIST_FRACTION = 0.5
+
 # ── Фильтры качества сигнала ────────────────────────────────────────────────
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
 AGREE_STRENGTH_MIN = 0.12          # минимальная взвешенная сила согласных методов
@@ -203,6 +229,9 @@ GATE_MIN_GROUPS_AGREE = 3
 # 3. Нестабильность composite: std за последние 5 баров
 GATE_COMPOSITE_STD_MAX = 0.35
 GATE_COMPOSITE_HISTORY_LEN = 5
+# P2: знаковая стабильность вместо сырого std (замена условия 3).
+GATE_STABILITY_MIN = 0.55
+GATE_STABILITY_DECAY = 0.3
 # 4. Конфликт L2/L3: блокировать если L2 уверен в обратном
 GATE_L2_CONFLICT_THRESHOLD = 0.30
 
@@ -536,21 +565,166 @@ class MethodWeight:
 @dataclass
 class ICPrior:
     """IC-prior для метода: предсказательная сила на ценовой динамике."""
-    ic_smoothed: float = 0.0   # сглаженный IC (EMA α=0.2)
+    ic_smoothed: float = 0.0   # сглаженный IC (EMA, адаптивная α)
     invert: bool = False        # True если метод работает в инверсии (IC отрицательный)
     n_updates: int = 0          # сколько раз пересчитывался
+    # P1: режим шума — все IC ниже порога значимости (метод неинформативен).
+    noise_mode: bool = False
+    # P4: «эффективное» число обновлений с распадом 0.99 за апдейт — для
+    # доверия к IC (conf = n_updates_effective / 50). Свежий поток обновлений
+    # повышает уверенность, давняя тишина — снижает.
+    n_updates_effective: float = 0.0
 
     def update(self, ic_raw: float, significance: float = 0.03) -> None:
-        """Обновляет сглаженный IC. Порог значимости = 0.03."""
+        """Обновляет сглаженный IC. P4: α адаптивна — при низкой уверенности
+        (нестабильный IC) обновляемся быстрее (0.15), при стабильной — медленнее
+        (0.05)."""
         self.n_updates += 1
-        self.ic_smoothed = 0.8 * self.ic_smoothed + 0.2 * ic_raw
+        self.n_updates_effective = self.n_updates_effective * 0.99 + 1.0
+        conf = self.confidence()
+        alpha = 0.15 if conf < 0.5 else 0.05
+        self.ic_smoothed = (1.0 - alpha) * self.ic_smoothed + alpha * ic_raw
         self.invert = self.ic_smoothed < -significance
+
+    def confidence(self) -> float:
+        """P4: уверенность в IC ∈ [0, 1] по эффективному числу обновлений."""
+        return min(1.0, self.n_updates_effective / 50.0)
 
     def weight(self) -> float:
         """Переводит IC в вес [0.1, 1.0]."""
         ic_abs = abs(self.ic_smoothed)
         # IC=0 → 0.1 (минимальный вес), IC=0.20+ → 1.0
         return max(0.1, min(1.0, 0.1 + 0.9 * ic_abs / 0.20))
+
+
+@dataclass
+class ThresholdAdapters:
+    """P8: компоненты адаптивного порога сигнала.
+    vol_history — последние ATR% (волатильность); ticker_composite_history —
+    нормированные |composite|; session_stats — r-результаты по часу суток;
+    regime_thresholds — калиброванный множитель порога по режиму."""
+    vol_history: list = field(default_factory=list)             # последние 100 ATR%
+    ticker_composite_history: list = field(default_factory=list)  # последние 200 |composite|
+    session_stats: dict = field(default_factory=dict)            # {hour: [r,...]}
+    regime_thresholds: dict = field(default_factory=dict)        # {regime: mult}
+
+    def add_vol(self, atr_pct: float) -> None:
+        if atr_pct and atr_pct > 0:
+            self.vol_history.append(atr_pct)
+            if len(self.vol_history) > 100:
+                self.vol_history.pop(0)
+
+    def add_composite(self, comp: float) -> None:
+        if comp:
+            self.ticker_composite_history.append(abs(comp))
+            if len(self.ticker_composite_history) > 200:
+                self.ticker_composite_history.pop(0)
+
+    def add_session(self, hour: int, r_value: float) -> None:
+        lst = self.session_stats.setdefault(int(hour), [])
+        lst.append(r_value)
+        if len(lst) > 100:
+            lst.pop(0)
+
+    def effective_threshold(self, base: float, regime: str, hour: int) -> float:
+        """Множит base на vol/ticker/regime/session-множители, клип [0.5,3.0]×base."""
+        import statistics as _st
+        vol_mult = 1.0
+        if len(self.vol_history) >= 20:
+            med = _st.median(self.vol_history)
+            if med > 0:
+                vol_mult = (self.vol_history[-1] / med) ** 0.5
+        ticker_mult = 1.0
+        if len(self.ticker_composite_history) >= 50:
+            srt = sorted(self.ticker_composite_history)
+            p70 = srt[min(len(srt) - 1, int(0.70 * len(srt)))]
+            if p70 > 0:
+                ticker_mult = p70 / 0.20
+        regime_mult = self.regime_thresholds.get(regime, 1.0)
+        session_mult = 1.0
+        hs = self.session_stats.get(int(hour))
+        if hs and len(hs) >= 8:
+            wr = sum(1 for r in hs if r > 0) / len(hs)
+            session_mult = 1.0 + 0.2 * (wr - 0.5) * 2.0
+        raw = base * vol_mult * ticker_mult * regime_mult * session_mult
+        return max(base * 0.5, min(base * 3.0, raw))
+
+
+@dataclass
+class StatBreakDetector:
+    """P10: детектор статистического слома распределения цены/волатильности.
+    Сравнивает две половины истории по 4 признакам; при ≥2 флагах наращивает
+    uncertainty, иначе экспоненциально гасит."""
+    close_history: deque = field(default_factory=lambda: deque(maxlen=100))
+    vol_history: deque = field(default_factory=lambda: deque(maxlen=100))
+    uncertainty: float = 0.0
+    breaks_detected: int = 0
+
+    def update(self, close: float, atr_pct: float) -> None:
+        if close and close > 0:
+            self.close_history.append(float(close))
+        if atr_pct is not None:
+            self.vol_history.append(float(atr_pct))
+
+    @staticmethod
+    def _std(xs):
+        n = len(xs)
+        if n < 2:
+            return 0.0
+        m = sum(xs) / n
+        return (sum((x - m) ** 2 for x in xs) / n) ** 0.5
+
+    @staticmethod
+    def _mean(xs):
+        return sum(xs) / len(xs) if xs else 0.0
+
+    @staticmethod
+    def _autocorr1(xs):
+        n = len(xs)
+        if n < 3:
+            return 0.0
+        m = sum(xs) / n
+        num = sum((xs[i] - m) * (xs[i - 1] - m) for i in range(1, n))
+        den = sum((x - m) ** 2 for x in xs)
+        return num / den if den > 1e-12 else 0.0
+
+    @staticmethod
+    def _kurtosis(xs):
+        n = len(xs)
+        if n < 4:
+            return 0.0
+        m = sum(xs) / n
+        var = sum((x - m) ** 2 for x in xs) / n
+        if var <= 1e-12:
+            return 0.0
+        return sum((x - m) ** 4 for x in xs) / n / (var ** 2)
+
+    def check_break(self) -> float:
+        ch = list(self.close_history)
+        if len(ch) < 20:
+            self.uncertainty *= 0.9
+            return self.uncertainty
+        half = len(ch) // 2
+        older, recent = ch[:half], ch[half:]
+        n_flags = 0
+        std_o = self._std(older)
+        std_r = self._std(recent)
+        if std_o > 1e-12:
+            ratio = std_r / std_o
+            if ratio > 2.0 or ratio < 0.5:
+                n_flags += 1
+            if abs(self._mean(recent) - self._mean(older)) / std_o > 2.0:
+                n_flags += 1
+        if abs(self._autocorr1(recent) - self._autocorr1(older)) > 0.3:
+            n_flags += 1
+        if self._kurtosis(recent) / max(1.0, self._kurtosis(older)) > 2.5:
+            n_flags += 1
+        if n_flags >= 2:
+            self.breaks_detected += 1
+            self.uncertainty = min(1.0, self.uncertainty + 0.3 * n_flags / 4.0)
+        else:
+            self.uncertainty *= 0.9
+        return self.uncertainty
 
 
 @dataclass
@@ -561,6 +735,8 @@ class OpenTrade:
     after_candles: list = field(default_factory=list)
     commission_rt: float = COMMISSION_RT  # ставка по типу инструмента (акция/фьючерс)
     narrative_name: str = "NEUTRAL"  # имя состояния NarrativeState на момент входа
+    playbooks: list = field(default_factory=list)  # активные плейбуки на входе (P3)
+    regime: str = "ranging"  # режим на момент входа (P3)
 
     def add_candle(self, candle: HistoricCandle) -> None:
         self.after_candles.append(candle)
@@ -2551,8 +2727,20 @@ class OICompositeStrategy(IStrategy):
         self.__open_trade: Optional[OpenTrade] = None
         self.__weights: dict[str, MethodWeight] = self.__load_weights()
         self.__regime_weights: dict[str, dict[str, MethodWeight]] = self.__load_regime_weights()
-        # IC-prior: предсказательная сила метода по ценовой динамике
-        self.__ic_priors: dict[str, ICPrior] = {name: ICPrior() for name in ALL_METHOD_NAMES}
+        # IC-prior: предсказательная сила метода по ценовой динамике.
+        # P4: per-regime — {regime: {method: ICPrior}}. Глобальный слой ("__global__")
+        # — фолбэк для ещё не виденных режимов.
+        self.__ic_priors: dict[str, dict[str, ICPrior]] = {
+            "__global__": {name: ICPrior() for name in ALL_METHOD_NAMES}
+        }
+        for _rg in REGIMES:
+            self.__ic_priors[_rg] = {name: ICPrior() for name in ALL_METHOD_NAMES}
+        # P1: per-method лаг (бары) = естественный горизонт // interval_min.
+        self.__ic_lags: dict[str, int] = {
+            name: _METHOD_IC_TARGET_MINUTES.get(name, _IC_DEFAULT_TARGET_MINUTES)
+                  // max(1, interval_min)
+            for name in ALL_METHOD_NAMES
+        }
         # Буфер скоров и closes для rolling IC
         self.__ic_score_buf: dict[str, list[float]] = {name: [] for name in ALL_METHOD_NAMES}
         self.__ic_close_buf: list[float] = []
@@ -2584,6 +2772,20 @@ class OICompositeStrategy(IStrategy):
         self.__last_playbooks: list[str] = []
         self.__last_entropy_score: float = 0.0
         self.__last_yz_vol_l2: float = 0.0
+        # P5: единый L1-скор [-1,1], влияет на пороги и согласие методов.
+        self.__l1_score: float = 0.0
+        # P3: статистика плейбуков {regime: {playbook: {n,wins,sum_r,mfe_list,mae_list}}}
+        self.__playbook_stats: dict[str, dict[str, dict]] = {}
+        self.__playbook_disabled: dict[str, set] = {}
+        # P6: жизненный цикл нарратива {ticker: {regime: state}} + счётчик баров.
+        self.__narrative_lifecycle: dict[str, dict[str, str]] = {}
+        self.__narrative_bars_since_confirmed: dict[str, dict[str, int]] = {}
+        # P8: адаптивный порог сигнала.
+        self.__threshold_adapters: ThresholdAdapters = ThresholdAdapters()
+        # P9: распределение MFE {regime: {playbook: [mfe,...]}}
+        self.__mfe_distribution: dict[str, dict[str, list]] = {}
+        # P10: детектор статистического слома.
+        self.__stat_break: StatBreakDetector = StatBreakDetector()
         # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
         self.__history = None
         self.__calibrator = None
@@ -2661,6 +2863,7 @@ class OICompositeStrategy(IStrategy):
             "gate_group_diversity": 0,  # условие 2: < 3 групп согласны
             "gate_composite_std": 0,    # условие 3: нестабильный composite
             "gate_l2_conflict": 0,      # условие 4: L2/L3 конфликт
+            "gate_m3_veto": 0,          # P7: вето кластерных моделей M1/M2/M3
             "narrative_blocked": 0,
             "liquidity": 0,
         }
@@ -2894,9 +3097,13 @@ class OICompositeStrategy(IStrategy):
 
         # Асимметричный порог: L2 бычий → шорты требуют больше подтверждений,
         # и наоборот. Шаг от 0 до ×1.20 в зависимости от силы L2.
+        # P5/P8/P10/P1: единый адаптивный порог по направлению.
+        _hour = self.__candles[-1].time.hour if self.__candles else 0
+        threshold_long  = self.__effective_signal_threshold(
+            effective_threshold, SignalType.LONG, self.__last_regime, _hour)
+        threshold_short = self.__effective_signal_threshold(
+            effective_threshold, SignalType.SHORT, self.__last_regime, _hour)
         l2_comp = self.__cached_mtf5_composite
-        threshold_long  = effective_threshold
-        threshold_short = effective_threshold
         if abs(l2_comp) > 0.1:
             asym = min(0.20, abs(l2_comp) * 0.25)
             if l2_comp > 0:      # L2 бычий: лонги легче, шорты труднее
@@ -3018,10 +3225,22 @@ class OICompositeStrategy(IStrategy):
             list(self.__mtf5_momentum_buf),
         )
         saved_ic_state_q = (
-            {n: ICPrior(p.ic_smoothed, p.invert, p.n_updates) for n, p in self.__ic_priors.items()},
+            {rg: {n: ICPrior(p.ic_smoothed, p.invert, p.n_updates, p.noise_mode, p.n_updates_effective)
+                  for n, p in bucket.items()} for rg, bucket in self.__ic_priors.items()},
             {n: list(v) for n, v in self.__ic_score_buf.items()},
             list(self.__ic_close_buf),
             self.__ic_bar_counter,
+        )
+        import copy as _copy
+        saved_new_state_q = (
+            self.__l1_score,
+            _copy.deepcopy(self.__playbook_stats),
+            _copy.deepcopy(self.__playbook_disabled),
+            _copy.deepcopy(self.__narrative_lifecycle),
+            _copy.deepcopy(self.__narrative_bars_since_confirmed),
+            _copy.deepcopy(self.__threshold_adapters),
+            _copy.deepcopy(self.__mfe_distribution),
+            _copy.deepcopy(self.__stat_break),
         )
         qualities: list[float] = []
         comm = commission_rt(self.__settings.is_future)
@@ -3064,11 +3283,16 @@ class OICompositeStrategy(IStrategy):
                 composite, scores = self.__compute_composite()
                 adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
                 effective_threshold = self.__effective_threshold(adaptive)
+                _hour = candles[i].time.hour
+                thr_long = self.__effective_signal_threshold(
+                    effective_threshold, SignalType.LONG, self.__last_regime, _hour)
+                thr_short = self.__effective_signal_threshold(
+                    effective_threshold, SignalType.SHORT, self.__last_regime, _hour)
 
                 direction: Optional[SignalType] = None
-                if composite >= effective_threshold:
+                if composite >= thr_long:
                     direction = SignalType.LONG
-                elif self.__settings.short_enabled_flag and composite <= -effective_threshold:
+                elif self.__settings.short_enabled_flag and composite <= -thr_short:
                     direction = SignalType.SHORT
 
                 if direction is None:
@@ -3158,6 +3382,10 @@ class OICompositeStrategy(IStrategy):
              self.__mtf5_momentum_buf) = saved_l2_state_q
             (self.__ic_priors, self.__ic_score_buf,
              self.__ic_close_buf, self.__ic_bar_counter) = saved_ic_state_q
+            (self.__l1_score, self.__playbook_stats, self.__playbook_disabled,
+             self.__narrative_lifecycle, self.__narrative_bars_since_confirmed,
+             self.__threshold_adapters, self.__mfe_distribution,
+             self.__stat_break) = saved_new_state_q
 
         if not qualities:
             return 0.5, 0
@@ -3199,7 +3427,8 @@ class OICompositeStrategy(IStrategy):
             list(self.__mtf5_momentum_buf),
         )
         saved_ic_state = (
-            {n: ICPrior(p.ic_smoothed, p.invert, p.n_updates) for n, p in self.__ic_priors.items()},
+            {rg: {n: ICPrior(p.ic_smoothed, p.invert, p.n_updates, p.noise_mode, p.n_updates_effective)
+                  for n, p in bucket.items()} for rg, bucket in self.__ic_priors.items()},
             {n: list(v) for n, v in self.__ic_score_buf.items()},
             list(self.__ic_close_buf),
             self.__ic_bar_counter,
@@ -3224,6 +3453,17 @@ class OICompositeStrategy(IStrategy):
         self.__weights = {name: MethodWeight() for name in ALL_METHOD_NAMES}
         self.__regime_weights = {regime: {name: MethodWeight() for name in ALL_METHOD_NAMES}
                                   for regime in REGIMES}
+        import copy as _copy
+        saved_new_state = (
+            self.__l1_score,
+            _copy.deepcopy(self.__playbook_stats),
+            _copy.deepcopy(self.__playbook_disabled),
+            _copy.deepcopy(self.__narrative_lifecycle),
+            _copy.deepcopy(self.__narrative_bars_since_confirmed),
+            _copy.deepcopy(self.__threshold_adapters),
+            _copy.deepcopy(self.__mfe_distribution),
+            _copy.deepcopy(self.__stat_break),
+        )
         signals: list[dict] = []
         total_bars = len(candles) - 1 - self.__candle_window
         t_start = time.monotonic()
@@ -3327,9 +3567,12 @@ class OICompositeStrategy(IStrategy):
                 yz_l2 = self.__last_yz_vol_l2
                 if yz_l2 < -0.3:
                     effective_threshold *= min(1.30, 1.0 + abs(yz_l2) * 0.4)
+                _hour = candles[i].time.hour
+                thr_long = self.__effective_signal_threshold(
+                    effective_threshold, SignalType.LONG, self.__last_regime, _hour)
+                thr_short = self.__effective_signal_threshold(
+                    effective_threshold, SignalType.SHORT, self.__last_regime, _hour)
                 l2c = self.__cached_mtf5_composite
-                thr_long = effective_threshold
-                thr_short = effective_threshold
                 if abs(l2c) > 0.1:
                     asym = min(0.20, abs(l2c) * 0.25)
                     if l2c > 0:
@@ -3413,6 +3656,10 @@ class OICompositeStrategy(IStrategy):
             self.__composite_history = saved_composite_history
             (self.__ic_priors, self.__ic_score_buf,
              self.__ic_close_buf, self.__ic_bar_counter) = saved_ic_state
+            (self.__l1_score, self.__playbook_stats, self.__playbook_disabled,
+             self.__narrative_lifecycle, self.__narrative_bars_since_confirmed,
+             self.__threshold_adapters, self.__mfe_distribution,
+             self.__stat_break) = saved_new_state
 
         return signals
 
@@ -3677,8 +3924,17 @@ class OICompositeStrategy(IStrategy):
                     stop_dist = _lp.stop_dist_pct
                     entry_mode = "level"
 
+            # P9: уровень активации трейлинга (p50 MFE для regime/playbook).
+            sig_regime = sig.get("regime", "")
+            sig_playbooks = sig.get("active_playbooks") or []
+            trail_activation_pct = self.__trail_activation_pct(sig_regime, sig_playbooks)
+            entry_mode_trailing = False
+
             exit_pct: Optional[float] = None
             exit_time = window[-1].time if window else sig.get("entry_time")
+            extreme = entry   # лучший экстремум хода (high для LONG, low для SHORT)
+            trail_active = False
+            trail_stop_price = None
             for c in window:
                 h = _to_f(c.high)
                 lo = _to_f(c.low)
@@ -3693,12 +3949,37 @@ class OICompositeStrategy(IStrategy):
                     exit_pct = -stop_dist
                     exit_time = c.time
                     break
-                if hit_take:
-                    exit_pct = take_dist
-                    exit_time = c.time
-                    break
                 if hit_stop:
                     exit_pct = -stop_dist
+                    exit_time = c.time
+                    break
+                # P9: до фиксированного тейка проверяем активацию трейлинга.
+                if trail_activation_pct is not None and not trail_active and take_dist > 0:
+                    if direction == SignalType.LONG:
+                        moved = (h - entry) / entry
+                    else:
+                        moved = (entry - lo) / entry
+                    if moved >= trail_activation_pct:
+                        trail_active = True
+                        entry_mode_trailing = True
+                if trail_active:
+                    # обновляем экстремум и Chandelier-стоп (take_dist × 0.5)
+                    if direction == SignalType.LONG:
+                        extreme = max(extreme, h)
+                        trail_stop_price = extreme * (1 - take_dist * TRAIL_MIN_DIST_FRACTION)
+                        if lo <= trail_stop_price:
+                            exit_pct = (trail_stop_price - entry) / entry
+                            exit_time = c.time
+                            break
+                    else:
+                        extreme = min(extreme, lo)
+                        trail_stop_price = extreme * (1 + take_dist * TRAIL_MIN_DIST_FRACTION)
+                        if h >= trail_stop_price:
+                            exit_pct = (entry - trail_stop_price) / entry
+                            exit_time = c.time
+                            break
+                if hit_take and not trail_active:
+                    exit_pct = take_dist
                     exit_time = c.time
                     break
             if exit_pct is None:
@@ -3710,6 +3991,18 @@ class OICompositeStrategy(IStrategy):
             r_multiple = net_pct / stop_dist if stop_dist > 0 else 0.0
             win = net_pct > 0
             results.append((win, r_multiple, net_pct))
+
+            # P3/P9: статистика плейбуков + распределение MFE по этой сделке.
+            _approx_mfe = max(0.0, exit_pct) if exit_pct > 0 else (take_dist if win else 0.0)
+            _approx_mae = 0.0 if exit_pct > 0 else abs(exit_pct)
+            self.__update_playbook_stats(
+                sig.get("regime", ""), sig.get("active_playbooks") or [],
+                r_multiple, win, _approx_mfe, _approx_mae,
+            )
+            # P8: посессионная статистика (r по часу входа).
+            _et = sig.get("entry_time")
+            if _et is not None and hasattr(_et, "hour"):
+                self.__threshold_adapters.add_session(_et.hour, r_multiple)
 
             if adaptive_lasso and sig.get("method_scores"):
                 lasso_trades.append({
@@ -3847,6 +4140,10 @@ class OICompositeStrategy(IStrategy):
                     "l1_trending_down": sig.get("l1_trending_down"),
                     "atr_ex_ratio": sig.get("atr_ex_ratio"),
                     "active_playbooks": sig.get("active_playbooks", []),
+                    # P9: трейлинг-стоп из распределения MFE.
+                    "trail_activation_pct": round(trail_activation_pct, 6)
+                                            if trail_activation_pct is not None else None,
+                    "entry_mode_trailing": entry_mode_trailing,
                 })
 
         if not results:
@@ -3950,6 +4247,12 @@ class OICompositeStrategy(IStrategy):
         self.__l1_trending_up   = ma5 > ma20 * 1.002
         self.__l1_trending_down = ma5 < ma20 * 0.998
         self.__l1_data_ready = True
+        # P5: единый L1-скор [-1,1] = 0.5·тренд + 0.3·позиция + 0.2·диапазон.
+        trend_component = 1.0 if self.__l1_trending_up else (-1.0 if self.__l1_trending_down else 0.0)
+        position_component = 2.0 * self.__l1_pct - 1.0
+        range_component = 1.0 - 2.0 * abs(self.__l1_pct - 0.5)
+        self.__l1_score = max(-1.0, min(1.0,
+            0.5 * trend_component + 0.3 * position_component + 0.2 * range_component))
 
     # ── Внутренние методы ─────────────────────────────────────────────────────
 
@@ -4024,19 +4327,29 @@ class OICompositeStrategy(IStrategy):
 
         scores = base_scores + [m1_sc, m2_sc, m3_sc]
 
-        # Накапливаем буфер для IC-калибровки
+        # Накапливаем буфер для IC-калибровки. P1: запас под максимальный
+        # per-method лаг (трендовые методы могут смотреть на ~120мин вперёд).
+        _max_ic_lag = max(self.__ic_lags.values()) if self.__ic_lags else IC_FORWARD_LAG
         if self.__candles:
             self.__ic_close_buf.append(_to_f(self.__candles[-1].close))
-            if len(self.__ic_close_buf) > IC_WINDOW + IC_FORWARD_LAG + 10:
-                self.__ic_close_buf = self.__ic_close_buf[-(IC_WINDOW + IC_FORWARD_LAG + 10):]
+            if len(self.__ic_close_buf) > IC_WINDOW + _max_ic_lag + 10:
+                self.__ic_close_buf = self.__ic_close_buf[-(IC_WINDOW + _max_ic_lag + 10):]
         for name in ALL_METHOD_NAMES:
             s = base_score_dict.get(name, 0.0)
             self.__ic_score_buf[name].append(s)
             if len(self.__ic_score_buf[name]) > IC_WINDOW + 10:
                 self.__ic_score_buf[name] = self.__ic_score_buf[name][-IC_WINDOW - 10:]
         self.__ic_bar_counter += 1
+        # P8: история волатильности для адаптивного порога.
+        self.__threshold_adapters.add_vol(self.__last_atr_pct)
         if self.__ic_bar_counter % IC_RECALC_INTERVAL == 0:
             self.__recalc_ic_priors()
+            # P10: статистический детектор слома — обновляем раз в IC_RECALC_INTERVAL.
+            self.__stat_break.update(
+                _to_f(self.__candles[-1].close) if self.__candles else 0.0,
+                self.__last_atr_pct,
+            )
+            self.__stat_break.check_break()
 
         # Перцентильная нормализация: если калибратор прогрет — приводим каждый
         # скор к шкале [-1, 1] относительно его исторического распределения.
@@ -4081,16 +4394,21 @@ class OICompositeStrategy(IStrategy):
 
         # Инверсия скора для методов с отрицательным IC (метод работает наоборот)
         scores_for_composite = [
-            -s if self.__ic_priors[n].invert else s
+            -s if self.__ic(n).invert else s
             for n, s in zip(ALL_METHOD_NAMES, scores_for_composite)
         ]
 
+        # P5: в середине дневного диапазона (0.3<l1_pct<0.7) осцилляторы
+        # информативнее — +10% методам осцилляторной группы.
+        osc_boost_on = self.__l1_data_ready and 0.3 < self.__l1_pct < 0.7
+        osc_group = _GATE_GROUPS["oscillator"]
         weights = [
             self.__blended_hedge_weight(name, regime_probs)
-            * self.__ic_priors[name].weight()   # IC-prior: предсказательная сила на цене
+            * self.__ic_bayes_weight(name)   # IC-prior (байес-фьюжн с фолбэком 0.5)
             * regime_mods.get(name, 1.0)
             * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
+            * (1.10 if (osc_boost_on and name in osc_group) else 1.0)
             * self.__ticker_weights[name].weight
             for name in ALL_METHOD_NAMES
         ]
@@ -4109,6 +4427,12 @@ class OICompositeStrategy(IStrategy):
         playbook_score, active_playbooks = _compute_playbooks(
             base_score_dict, regime, sd_l2=self.__cached_mtf5_scores
         )
+        # P3: исключаем плейбуки, отключённые по убыточной статистике в этом режиме.
+        _disabled_pb = self.__playbook_disabled.get(regime)
+        if _disabled_pb and active_playbooks:
+            active_playbooks = [p for p in active_playbooks if p not in _disabled_pb]
+            if not active_playbooks:
+                playbook_score = 0.0
         div_score = _divergence_score(base_score_dict)
         if abs(div_score) > 0.1:
             # Дивергенция подмешивается с весом 0.25 в линейную часть.
@@ -4240,8 +4564,12 @@ class OICompositeStrategy(IStrategy):
         self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
         self.__last_composite = composite
         self.__composite_history.append(composite)
-        if len(self.__composite_history) > GATE_COMPOSITE_HISTORY_LEN + 2:
+        # P2: знаковой стабильности нужно больше истории, чем прежним 5+2 барам.
+        _hist_cap = max(GATE_COMPOSITE_HISTORY_LEN + 2, 12)
+        if len(self.__composite_history) > _hist_cap:
             self.__composite_history.pop(0)
+        # P8: накапливаем нормированный |composite| для калибровки порога.
+        self.__threshold_adapters.add_composite(composite)
         self.__advance_narrative(base_score_dict, closes, regime, exhaustion)
         return composite, scores
 
@@ -4367,115 +4695,87 @@ class OICompositeStrategy(IStrategy):
             return 0.0
 
     def __methods_agree(self, scores: list[float], direction: SignalType) -> bool:
-        """
-        Четырёхусловный гейт:
+        """Тонкая обёртка (для обратной совместимости) — реальная логика в
+        __methods_agree_with_reason."""
+        ok, _ = self.__methods_agree_with_reason(scores, direction)
+        return ok
 
-        1. IC-взвешенный net_agreement: sum(ic_weight[m] * score[m] * sign) > порога.
-           Один сильный против с высоким IC перевешивает несколько слабых "за".
-           Также проверяем унаследованный agree_share (для обратной совместимости).
-
-        2. Групповая независимость: минимум GATE_MIN_GROUPS_AGREE из 5 групп
-           (тренд/объём/осцилляторы/структура/микроструктура) должны голосовать
-           "за" по IC-взвешенному внутригрупповому счёту. Три метода объёмной
-           группы (VZO+TWIGGS+KLINGER) — это один голос, а не три.
-
-        3. Стабильность composite: std(последних N composite) < порога.
-           Дёрганый composite означает неустойчивый режим — входить рискованно.
-
-        4. Конфликт L2/L3: если L2 достаточно уверен в противоположном знаке
-           (L3 — это текущий composite до блендинга, L2 — кэшированный).
-        """
-        sign_val = 1 if direction == SignalType.LONG else -1
-        n_base = len(BASE_METHOD_NAMES)
-        score_map = dict(zip(BASE_METHOD_NAMES, scores[:n_base]))
-
-        # ── Условие 1a: унаследованный agree_share (взвешенная доля) ──────────
-        agree_strength = 0.0
-        total_strength = 0.0
-        for name, s in score_map.items():
-            if abs(s) < AGREE_SCORE_MIN:
-                continue
-            strength = self.__weights[name].weight * abs(s)
-            if name in MICROSTRUCTURE_METHOD_NAMES:
-                strength *= MICROSTRUCTURE_AGREE_BOOST
-            total_strength += strength
-            if (s > 0) == (sign_val > 0):
-                agree_strength += strength
-        if total_strength <= 0:
-            return False
-        if not (agree_strength >= AGREE_STRENGTH_MIN and
-                agree_strength / total_strength >= AGREE_SHARE_MIN):
-            return False
-
-        # ── Условие 1b: IC-взвешенный net_agreement ───────────────────────────
-        # ic_weight = ic_prior.weight() ∈ [0.1, 1.0]; учитывает знак через sign_val
-        net = sum(
-            self.__ic_priors[name].weight() * s * sign_val
-            for name, s in score_map.items()
-            if abs(s) >= AGREE_SCORE_MIN
-        )
-        if net < GATE_NET_AGREEMENT_THRESHOLD:
-            return False
-
-        # ── Условие 2: групповая независимость ────────────────────────────────
-        groups_agree = 0
-        for group_members in _GATE_GROUPS.values():
-            group_net = sum(
-                self.__ic_priors[name].weight() * s * sign_val
-                for name, s in score_map.items()
-                if name in group_members and abs(s) >= AGREE_SCORE_MIN
+    def __sign_stability_score(self, sign_val: int) -> float:
+        """P2: знаковая стабильность взамен сырого std composite.
+        sign_stability — взвешенная по свежести доля совпадений знака с
+        последним composite; amplitude — средняя |c|/порог; group_stability —
+        IC-взвешенная доля стабильных групп; l2_confirm — подтверждение L2.
+        Возвращает stability_score ∈ [0,1]."""
+        hist = self.__composite_history
+        if len(hist) < 2:
+            return 1.0   # нет данных — не блокируем
+        last = hist[-1]
+        N = len(hist)
+        decay = GATE_STABILITY_DECAY
+        weights = [math.exp(-decay * (N - 1 - i)) for i in range(N)]
+        wsum = sum(weights) or 1.0
+        last_sign = 1 if last >= 0 else -1
+        sign_stability = sum(
+            w * (1.0 if ((1 if c >= 0 else -1) == last_sign) else 0.0)
+            for w, c in zip(weights, hist)
+        ) / wsum
+        thr = self.__threshold if self.__threshold > 0 else SIGNAL_THRESHOLD
+        amplitude = (sum(abs(c) for c in hist) / N) / thr
+        amplitude = min(1.0, amplitude)
+        # group_stability: IC-взвешенная доля групп, согласных по знаку с last
+        score_map = self.__last_scores
+        stable_groups = 0.0
+        total_groups = 0.0
+        for members in _GATE_GROUPS.values():
+            gnet = sum(
+                self.__ic(n).weight() * score_map.get(n, 0.0)
+                for n in members
             )
-            if group_net > 0:
-                groups_agree += 1
-        if groups_agree < GATE_MIN_GROUPS_AGREE:
-            return False
-
-        # ── Условие 3: стабильность composite ─────────────────────────────────
-        if len(self.__composite_history) >= GATE_COMPOSITE_HISTORY_LEN:
-            recent = self.__composite_history[-GATE_COMPOSITE_HISTORY_LEN:]
-            mean_c = sum(recent) / len(recent)
-            std_c = (sum((x - mean_c) ** 2 for x in recent) / len(recent)) ** 0.5
-            if std_c > GATE_COMPOSITE_STD_MAX:
-                return False
-
-        # ── Условие 4: конфликт L2/L3 ─────────────────────────────────────────
+            total_groups += 1.0
+            if (1 if gnet >= 0 else -1) == last_sign:
+                stable_groups += 1.0
+        group_stability = stable_groups / total_groups if total_groups else 0.0
         l2 = self.__cached_mtf5_composite
-        l3 = self.__last_composite  # до блендинга не храним, берём финальный
-        if (abs(l2) > GATE_L2_CONFLICT_THRESHOLD and
-                l2 * sign_val < 0 and l3 * sign_val > 0):
-            return False
-
-        return True
+        l2_confirm = 1.0 if ((1 if l2 >= 0 else -1) == last_sign) else 0.6
+        return (sign_stability * 0.4 + amplitude * 0.3
+                + group_stability * 0.2 + l2_confirm * 0.1)
 
     def __methods_agree_with_reason(
         self, scores: list[float], direction: SignalType,
     ) -> tuple[bool, str]:
-        """Обёртка над __methods_agree, возвращающая причину отказа для счётчиков."""
+        """Гейт согласия методов с причиной отказа (для счётчиков).
+        Условия: 1a доля силы / 1b IC-net / 2 групповая независимость /
+        3 знаковая стабильность (P2) / 4 конфликт L2 / 5 вето кластеров (P7).
+        P5: порог доли согласия адаптивен по L1-скору."""
         sign_val = 1 if direction == SignalType.LONG else -1
         n_base = len(BASE_METHOD_NAMES)
         score_map = dict(zip(BASE_METHOD_NAMES, scores[:n_base]))
 
+        # P5: адаптивный порог доли согласия по L1-контексту (клип 0.40..0.60).
+        agreement_threshold = AGREE_SHARE_MIN - 0.10 * self.__l1_score * sign_val
+        agreement_threshold = max(0.40, min(0.60, agreement_threshold))
+
         agree_strength = 0.0
         total_strength = 0.0
-        for name, s in score_map.items():
-            if abs(s) < AGREE_SCORE_MIN:
+        for name, sv in score_map.items():
+            if abs(sv) < AGREE_SCORE_MIN:
                 continue
-            strength = self.__weights[name].weight * abs(s)
+            strength = self.__weights[name].weight * abs(sv)
             if name in MICROSTRUCTURE_METHOD_NAMES:
                 strength *= MICROSTRUCTURE_AGREE_BOOST
             total_strength += strength
-            if (s > 0) == (sign_val > 0):
+            if (sv > 0) == (sign_val > 0):
                 agree_strength += strength
         if total_strength <= 0 or not (
             agree_strength >= AGREE_STRENGTH_MIN and
-            agree_strength / total_strength >= AGREE_SHARE_MIN
+            agree_strength / total_strength >= agreement_threshold
         ):
             return False, "methods_disagree"
 
         net = sum(
-            self.__ic_priors[name].weight() * s * sign_val
-            for name, s in score_map.items()
-            if abs(s) >= AGREE_SCORE_MIN
+            self.__ic(name).weight() * sv * sign_val
+            for name, sv in score_map.items()
+            if abs(sv) >= AGREE_SCORE_MIN
         )
         if net < GATE_NET_AGREEMENT_THRESHOLD:
             return False, "gate_net_agreement"
@@ -4483,19 +4783,17 @@ class OICompositeStrategy(IStrategy):
         groups_agree = sum(
             1 for group_members in _GATE_GROUPS.values()
             if sum(
-                self.__ic_priors[name].weight() * s * sign_val
-                for name, s in score_map.items()
-                if name in group_members and abs(s) >= AGREE_SCORE_MIN
+                self.__ic(name).weight() * sv * sign_val
+                for name, sv in score_map.items()
+                if name in group_members and abs(sv) >= AGREE_SCORE_MIN
             ) > 0
         )
         if groups_agree < GATE_MIN_GROUPS_AGREE:
             return False, "gate_group_diversity"
 
-        if len(self.__composite_history) >= GATE_COMPOSITE_HISTORY_LEN:
-            recent = self.__composite_history[-GATE_COMPOSITE_HISTORY_LEN:]
-            mean_c = sum(recent) / len(recent)
-            std_c = (sum((x - mean_c) ** 2 for x in recent) / len(recent)) ** 0.5
-            if std_c > GATE_COMPOSITE_STD_MAX:
+        # ── Условие 3 (P2): знаковая стабильность вместо сырого std ────────────
+        if len(self.__composite_history) >= 2:
+            if self.__sign_stability_score(sign_val) < GATE_STABILITY_MIN:
                 return False, "gate_composite_std"
 
         l2 = self.__cached_mtf5_composite
@@ -4503,6 +4801,19 @@ class OICompositeStrategy(IStrategy):
         if (abs(l2) > GATE_L2_CONFLICT_THRESHOLD and
                 l2 * sign_val < 0 and l3 * sign_val > 0):
             return False, "gate_l2_conflict"
+
+        # ── Условие 5 (P7): вето кластерных моделей M1/M2/M3 по уверенности IC ──
+        against_votes = 0.0
+        for mname in (M1_NAME, M2_NAME, M3_NAME):
+            prior = self.__ic(mname)
+            ic_conf = min(1.0, prior.n_updates / 15.0)
+            score = self.__last_scores.get(mname, 0.0)
+            if prior.ic_smoothed < -IC_SIGNIFICANCE:
+                continue   # модель работает наоборот для этого тикера — игнор
+            if score * sign_val < -0.3:
+                against_votes += ic_conf
+        if against_votes >= 2.0:
+            return False, "gate_m3_veto"
 
         return True, ""
 
@@ -4539,6 +4850,40 @@ class OICompositeStrategy(IStrategy):
             "trend": trend.value, "volume": volume.value,
             "price_reaction": price_reaction.value,
         }
+        self.__update_narrative_lifecycle(regime)
+
+    def __update_narrative_lifecycle(self, regime: str) -> None:
+        """P6: жизненный цикл FSM нарратива по (ticker, regime).
+        Если FSM не доходит до CONFIRMED 200 баров → degraded (порог ×1.5);
+        ещё 200 → disabled (гейт нарратива не блокирует). Восстановление в
+        active, если IC любого тега выше порога значимости."""
+        ticker = self.__settings.ticker
+        lc = self.__narrative_lifecycle.setdefault(ticker, {})
+        cnt = self.__narrative_bars_since_confirmed.setdefault(ticker, {})
+        state = lc.get(regime, "active")
+        confirmed = self.__narrative_state.name.startswith("CONFIRMED")
+        if confirmed:
+            cnt[regime] = 0
+        else:
+            cnt[regime] = cnt.get(regime, 0) + 1
+        n = cnt.get(regime, 0)
+        if n >= 400:
+            state = "disabled"
+        elif n >= 200:
+            state = "degraded"
+        elif confirmed:
+            state = "active"
+        # Восстановление: если IC любого «трендового/объёмного» тега значим —
+        # нарратив снова информативен, возвращаем в active.
+        if state != "active":
+            recovered = any(
+                abs(self.__ic(m).ic_smoothed) > IC_SIGNIFICANCE
+                for m in ("PRICE_TREND", "VOL_MOMENTUM", "TREND_QUALITY")
+            )
+            if recovered:
+                state = "active"
+                cnt[regime] = 0
+        lc[regime] = state
 
     def __narrative_allows(self, direction: SignalType) -> bool:
         """
@@ -4547,13 +4892,20 @@ class OICompositeStrategy(IStrategy):
         направлению с composite, и этому (narrative, regime) сейчас доверяют
         по истории сделок (NarrativeWeights, EWA quality).
         """
+        # P6: жизненный цикл нарратива — disabled пропускает гейт полностью.
+        lc = self.__narrative_lifecycle.get(self.__settings.ticker, {})
+        lifecycle = lc.get(self.__last_regime, "active")
+        if lifecycle == "disabled":
+            return True
         state = self.__narrative_state
         if not state.is_actionable:
             return False
         sign = 1 if direction == SignalType.LONG else -1
         if state.direction != sign:
             return False
-        return self.__narrative_weights.is_trusted(state.name, self.__last_regime)
+        # degraded → порог доверия жёстче (×1.5).
+        min_q = 0.45 * 1.5 if lifecycle == "degraded" else 0.45
+        return self.__narrative_weights.is_trusted(state.name, self.__last_regime, min_quality=min_q)
 
     def __liquidity_ok(self) -> bool:
         """Объём последней свечи не аномально мал относительно медианы окна."""
@@ -4580,6 +4932,94 @@ class OICompositeStrategy(IStrategy):
         if self.__rolling_quality < LOW_QUALITY_THRESHOLD:
             mult *= LOW_QUALITY_MULT
         return base * mult
+
+    def __update_playbook_stats(self, regime: str, playbooks, r_value: float,
+                                win: bool, mfe: float, mae: float) -> None:
+        """P3: накопить статистику плейбука и при необходимости отключить его.
+        P9: попутно копим распределение MFE."""
+        if not playbooks:
+            return
+        rg_stats = self.__playbook_stats.setdefault(regime, {})
+        rg_mfe = self.__mfe_distribution.setdefault(regime, {})
+        for pb in playbooks:
+            st = rg_stats.setdefault(pb, {"n": 0, "wins": 0, "sum_r": 0.0,
+                                          "mfe_list": [], "mae_list": []})
+            st["n"] += 1
+            st["wins"] += int(win)
+            st["sum_r"] += r_value
+            st["mfe_list"].append(mfe)
+            st["mae_list"].append(mae)
+            if len(st["mfe_list"]) > 200:
+                st["mfe_list"].pop(0)
+            if len(st["mae_list"]) > 200:
+                st["mae_list"].pop(0)
+            # P9: распределение MFE для трейлинга.
+            dist = rg_mfe.setdefault(pb, [])
+            dist.append(mfe)
+            if len(dist) > 200:
+                dist.pop(0)
+            # P3: отключение убыточного плейбука.
+            avg_r = st["sum_r"] / st["n"] if st["n"] else 0.0
+            disabled = self.__playbook_disabled.setdefault(regime, set())
+            if st["n"] >= PLAYBOOK_DISABLE_MIN_N and avg_r < PLAYBOOK_DISABLE_MIN_AVG_R:
+                disabled.add(pb)
+            elif pb in disabled and avg_r >= PLAYBOOK_DISABLE_MIN_AVG_R:
+                disabled.discard(pb)
+
+    def __trail_activation_pct(self, regime: str, playbooks):
+        """P9: уровень активации трейлинга = p50 MFE для (regime, playbook),
+        если накоплено >= PLAYBOOK_DISABLE_MIN_N значений. None — недостаточно."""
+        rg = self.__mfe_distribution.get(regime, {})
+        best = None
+        for pb in (playbooks or []):
+            dist = rg.get(pb)
+            if dist and len(dist) >= PLAYBOOK_DISABLE_MIN_N:
+                srt = sorted(dist)
+                p50 = srt[len(srt) // 2]
+                if best is None or p50 < best:
+                    best = p50
+        return best
+
+    def __system_uncertainty(self) -> float:
+        """Агрегатор неопределённости системы ∈ [0,1] по нескольким источникам:
+        noise_mode (все IC незначимы), статистический слом, degraded-нарратив.
+        Берём максимум вклада, слегка усиливая если активно несколько."""
+        priors = self.__ic_priors.get(self.__last_regime) or self.__ic_priors["__global__"]
+        noise = any(p.noise_mode for p in priors.values())
+        lc = self.__narrative_lifecycle.get(self.__settings.ticker, {})
+        contributions = {
+            "noise_mode": 0.5 if noise else 0.0,
+            "stat_break": self.__stat_break.uncertainty,
+            "narrative_degraded": 0.2 if lc.get(self.__last_regime) == "degraded" else 0.0,
+        }
+        if not contributions:
+            return 0.0
+        n_active = sum(1 for v in contributions.values() if v > 0.1)
+        return max(contributions.values()) * (1.0 + 0.1 * max(0, n_active - 1))
+
+    def __effective_signal_threshold(self, base: float, direction: SignalType,
+                                     regime: str, hour: int) -> float:
+        """Единый порог сигнала с учётом P5 (L1), P8 (адаптеры), P10 (слом),
+        P1 (noise_mode) и системной неопределённости.
+        base — уже адаптированный под режим/энтропию порог."""
+        sign_val = 1 if direction == SignalType.LONG else -1
+        # P5: L1-скор смещает порог (по тренду — легче, против — труднее).
+        thr = base * (1.0 - 0.3 * self.__l1_score * sign_val)
+        thr = max(0.06, min(0.24, thr))
+        # P8: волатильность/тикер/режим/сессия.
+        thr = self.__threshold_adapters.effective_threshold(thr, regime, hour)
+        # P1: режим шума — порог ×1.5.
+        priors = self.__ic_priors.get(regime) or self.__ic_priors["__global__"]
+        if any(p.noise_mode for p in priors.values()):
+            thr *= 1.5
+        # P10: статистический слом > 0.3 → ×(1+uncertainty).
+        if self.__stat_break.uncertainty > 0.3:
+            thr *= (1.0 + self.__stat_break.uncertainty)
+        # Системная неопределённость — мягкий дополнительный множитель.
+        su = self.__system_uncertainty()
+        if su > 0.3:
+            thr *= (1.0 + 0.5 * su)
+        return thr
 
     def __recalc_auto_atr(self) -> None:
         """
@@ -4723,6 +5163,8 @@ class OICompositeStrategy(IStrategy):
             method_scores=method_scores,
             commission_rt=commission_rt(self.__settings.is_future),
             narrative_name=self.__narrative_state.name,
+            playbooks=list(self.__last_playbooks),
+            regime=self.__last_regime,
         )
 
         signal = Signal(
@@ -4775,6 +5217,14 @@ class OICompositeStrategy(IStrategy):
         )
 
         self.__rolling_quality = (1 - QUALITY_ALPHA) * self.__rolling_quality + QUALITY_ALPHA * quality
+
+        # P3: статистика плейбуков по живой сделке. r-аппроксимация = (mfe-mae)/mae
+        # (или mfe-mae если стоп не сработал), win = mfe>mae.
+        _ot = self.__open_trade
+        _r = (mfe - mae) / mae if mae > 1e-9 else (mfe - mae)
+        self.__update_playbook_stats(
+            _ot.regime, _ot.playbooks, _r, mfe > mae, mfe, mae,
+        )
 
         self.__narrative_weights.record_outcome(
             self.__open_trade.narrative_name, self.__last_regime, quality,
@@ -4986,18 +5436,39 @@ class OICompositeStrategy(IStrategy):
             logger.warning(f"Could not load regime weights: {e}")
         return rw
 
+    def __ic(self, name: str) -> ICPrior:
+        """P4: ICPrior метода для текущего режима; фолбэк на глобальный слой."""
+        rg = self.__last_regime
+        bucket = self.__ic_priors.get(rg)
+        if bucket is None or bucket[name].n_updates == 0:
+            return self.__ic_priors["__global__"][name]
+        return bucket[name]
+
     def __recalc_ic_priors(self) -> None:
         """Пересчитывает IC для каждого метода на скользящем окне.
-        Вызывается каждые IC_RECALC_INTERVAL баров."""
-        closes = self.__ic_close_buf[-IC_WINDOW - IC_FORWARD_LAG:]
+        P1: per-method лаг (естественный горизонт). P4: обновляем и глобальный
+        слой, и слой текущего режима. После апдейта помечаем noise_mode, если
+        все IC незначимы (< IC_SIGNIFICANCE)."""
+        max_lag = max(self.__ic_lags.values()) if self.__ic_lags else IC_FORWARD_LAG
+        closes = self.__ic_close_buf[-IC_WINDOW - max_lag:]
+        rg = self.__last_regime
+        buckets = [self.__ic_priors["__global__"]]
+        if rg in self.__ic_priors:
+            buckets.append(self.__ic_priors[rg])
         for name in ALL_METHOD_NAMES:
             scores = self.__ic_score_buf[name][-IC_WINDOW:]
             if len(scores) < 30:
                 continue
-            # closes нужны: len(scores) + IC_FORWARD_LAG
-            closes_needed = closes[-(len(scores) + IC_FORWARD_LAG):]
-            ic_raw = _compute_ic(scores, closes_needed, IC_FORWARD_LAG)
-            self.__ic_priors[name].update(ic_raw, IC_SIGNIFICANCE)
+            lag = self.__ic_lags.get(name, IC_FORWARD_LAG)
+            closes_needed = closes[-(len(scores) + lag):]
+            ic_raw = _compute_ic(scores, closes_needed, lag)
+            for b in buckets:
+                b[name].update(ic_raw, IC_SIGNIFICANCE)
+        # P1: noise_mode — все IC ниже порога значимости (поток неинформативен).
+        for b in buckets:
+            noisy = all(abs(p.ic_smoothed) < IC_SIGNIFICANCE for p in b.values())
+            for p in b.values():
+                p.noise_mode = noisy
 
     def __blended_hedge_weight(self, name: str, regime_probs: dict[str, float]) -> float:
         """Hedge-вес метода — иерархический, два уровня shrinkage:
@@ -5036,6 +5507,14 @@ class OICompositeStrategy(IStrategy):
             w_local = rw.weight if rw is not None else global_weight
             blended += p * (alpha * w_local + (1.0 - alpha) * global_weight)
         return blended if blended > 0.0 else global_weight
+
+    def __ic_bayes_weight(self, name: str) -> float:
+        """P4: байесовское объединение IC-веса с фолбэком 0.5 по уверенности.
+        final = weight()*conf + 0.5*(1-conf). При неуверенном IC тяготеет к 0.5
+        (нейтрально), при уверенном — к фактическому IC-весу."""
+        prior = self.__ic(name)
+        conf = prior.confidence()
+        return prior.weight() * conf + 0.5 * (1.0 - conf)
 
     def __load_rolling_quality(self) -> float:
         if not os.path.exists(WEIGHTS_FILE):
