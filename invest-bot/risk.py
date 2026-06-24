@@ -45,6 +45,8 @@ from risk_config import (
     PROB_EXIT_ENABLED, PROB_EXIT_MIN_PTAKE, PROB_EXIT_GRACE_R,
     BOCD_EXIT_CONFIDENCE,
     ORDERBOOK_EXIT_ENABLED, ORDERBOOK_EXIT_THR,
+    BEHAVIORAL_EXIT_VOTES_NEEDED, BEHAVIORAL_EXIT_ORDER_FLOW_THR,
+    BEHAVIORAL_EXIT_HH_BARS, BEHAVIORAL_EXIT_MOMENTUM_BARS, BEHAVIORAL_EXIT_MOMENTUM_THR,
 )
 
 __all__ = ("Position", "RiskManager")
@@ -480,7 +482,11 @@ class RiskManager:
                     drift_per_bar: float = 0.0,
                     vol_per_bar: float = 0.0,
                     regime_confidence: float = 1.0,
-                    order_flow: float = 0.0) -> tuple[bool, str]:
+                    order_flow: float = 0.0,
+                    recent_highs: list[float] | None = None,
+                    recent_lows: list[float] | None = None,
+                    recent_opens: list[float] | None = None,
+                    recent_closes: list[float] | None = None) -> tuple[bool, str]:
         """Вызывается на каждом обновлении цены. Возвращает (закрыть, причина)."""
         pos = self.positions.get(ticker)
         if not pos:
@@ -499,10 +505,36 @@ class RiskManager:
                 pos.stop_price = min(pos.stop_price, pos.peak_price + pos.trail_dist)
         self._recalc_risk_rub(pos)
 
-        # Срочный выход по слому потока заявок в стакане — приоритетнее
-        # стопа/тейка и не ждёт grace-окна (может закрыть и прибыльную
-        # позицию). order_flow уже знаковый по направлению позиции.
-        if ORDERBOOK_EXIT_ENABLED and order_flow <= ORDERBOOK_EXIT_THR:
+        # Поведенческий выход: 2 из 3 (стакан + структура + нитки).
+        # Без grace-окна — нитки+тонкий стакан предшествуют гэпу.
+        # Если данные свечей не переданы — fallback на одиночный экстремальный
+        # порог стакана (обратная совместимость).
+        if recent_highs is not None and recent_lows is not None \
+                and recent_opens is not None and recent_closes is not None:
+            votes: dict[str, bool] = {}
+            # 1. Стакан против позиции (мягкий порог, т.к. это один голос)
+            votes['order_flow'] = order_flow < BEHAVIORAL_EXIT_ORDER_FLOW_THR
+            # 2. Структура: последние N баров не обновили HH (для лонга) / LL (для шорта)
+            n = BEHAVIORAL_EXIT_HH_BARS
+            if len(recent_highs) >= 2 * n and len(recent_lows) >= 2 * n:
+                if pos.direction == "long":
+                    votes['structure'] = max(recent_highs[-n:]) <= max(recent_highs[-2 * n:-n])
+                else:
+                    votes['structure'] = min(recent_lows[-n:]) >= min(recent_lows[-2 * n:-n])
+            # 3. Нитки: среднее тело / средний диапазон < порога → импульс иссяк
+            m = BEHAVIORAL_EXIT_MOMENTUM_BARS
+            if (len(recent_opens) >= m and len(recent_closes) >= m
+                    and len(recent_highs) >= m and len(recent_lows) >= m):
+                avg_body = sum(abs(recent_closes[-(m - i)] - recent_opens[-(m - i)]) for i in range(m)) / m
+                avg_range = sum(recent_highs[-(m - i)] - recent_lows[-(m - i)] for i in range(m)) / m
+                if avg_range > 0:
+                    votes['momentum_dead'] = avg_body / avg_range < BEHAVIORAL_EXIT_MOMENTUM_THR
+            if sum(votes.values()) >= BEHAVIORAL_EXIT_VOTES_NEEDED:
+                reasons = '+'.join(k for k, v in votes.items() if v)
+                return True, (f"поведенческий выход ({reasons}): "
+                               f"{sum(votes.values())}/{len(votes)} условий")
+        elif ORDERBOOK_EXIT_ENABLED and order_flow <= ORDERBOOK_EXIT_THR:
+            # fallback: данные свечей не переданы — экстремальный дисбаланс стакана
             return True, (f"стакан: дисбаланс заявок против позиции "
                            f"({order_flow:.2f}) — выходим немедленно")
 
