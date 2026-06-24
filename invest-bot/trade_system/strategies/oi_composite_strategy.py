@@ -195,6 +195,34 @@ AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод 
 AGREE_STRENGTH_MIN = 0.12          # минимальная взвешенная сила согласных методов
 AGREE_SHARE_MIN = 0.50             # доля силы согласных от силы всех высказавшихся
 
+# Четыре дополнительных условия гейта:
+# 1. IC-взвешенный net_agreement (абсолютный, не доля)
+GATE_NET_AGREEMENT_THRESHOLD = 0.05  # net = sum(ic_weight * score * sign); > 0.05 → pass
+# 2. Групповое согласие: минимум групп из 5 (тренд/объём/осцилляторы/структура/микроструктура)
+GATE_MIN_GROUPS_AGREE = 3
+# 3. Нестабильность composite: std за последние 5 баров
+GATE_COMPOSITE_STD_MAX = 0.35
+GATE_COMPOSITE_HISTORY_LEN = 5
+# 4. Конфликт L2/L3: блокировать если L2 уверен в обратном
+GATE_L2_CONFLICT_THRESHOLD = 0.30
+
+# Группы методов для условия 2 (независимость голосов)
+_GATE_GROUPS: dict[str, frozenset] = {
+    "trend": frozenset({"PRICE_TREND", "TREND_QUALITY", "ZLEMA_SIGNAL", "T3_SIGNAL",
+                        "ADAPTIVE_MA", "DECYCLER", "SINEWAVE_SIGNAL", "SSA_SIGNAL"}),
+    "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE",
+                         "YZ_VOL_SIGNAL", "VR_SIGNAL"}),
+    "oscillator": frozenset({"CYBER_CYCLE", "FISHER_RSI", "EBSW", "RMI", "ZSCORE",
+                              "MMI_SIGNAL"}),
+    "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
+                             "CANDLE_PATTERN", "TRIANGLE", "FRACTAL", "ENTROPY",
+                             "LEVEL_CONTEXT", "MKT_STRUCTURE", "SPRING"}),
+    "microstructure": frozenset({"HAWKES_SIGNAL", "BS_PRESSURE_TS", "AGGRESSOR_FLOW",
+                                  "LARGE_IMPACT", "VWAP_SIGNAL_TS", "VOL_MOMENTUM_TS",
+                                  "OB_IMBALANCE", "CANCEL_SIGNAL",
+                                  "OI_SQUEEZE", "INST_OI", "RETAIL_CONTRA"}),
+}
+
 # Микроструктурные методы (TRADESTATS + HAWKES_SIGNAL) смотрят на действие
 # участников рынка (поток ордеров/агрессии) ДО того как оно проявится в цене —
 # структурно ведущие, в отличие от технических индикаторов цены (PRICE_TREND,
@@ -2552,6 +2580,7 @@ class OICompositeStrategy(IStrategy):
         self.__regime_stable_bars: int = 0
         self.__last_scores: dict[str, float] = {}
         self.__last_composite: float = 0.0
+        self.__composite_history: list[float] = []   # буфер для gate условия 3
         self.__last_playbooks: list[str] = []
         self.__last_entropy_score: float = 0.0
         self.__last_yz_vol_l2: float = 0.0
@@ -2627,7 +2656,11 @@ class OICompositeStrategy(IStrategy):
         # Счётчики отклонений — сбрасываются при каждом бэктесте через reset_rejection_stats()
         self.rejection_stats: dict[str, int] = {
             "below_threshold": 0,
-            "methods_disagree": 0,
+            "methods_disagree": 0,   # включает все 4 условия гейта
+            "gate_net_agreement": 0,  # условие 1b: IC-взвешенный net
+            "gate_group_diversity": 0,  # условие 2: < 3 групп согласны
+            "gate_composite_std": 0,    # условие 3: нестабильный composite
+            "gate_l2_conflict": 0,      # условие 4: L2/L3 конфликт
             "narrative_blocked": 0,
             "liquidity": 0,
         }
@@ -2883,9 +2916,12 @@ class OICompositeStrategy(IStrategy):
             self.rejection_stats["below_threshold"] += 1
             return None
 
-        if not self.__methods_agree(scores, direction):
-            logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — мало методов согласны")
+        _agree, _reason = self.__methods_agree_with_reason(scores, direction)
+        if not _agree:
+            logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — {_reason}")
             self.rejection_stats["methods_disagree"] += 1
+            if _reason in self.rejection_stats:
+                self.rejection_stats[_reason] += 1
             return None
 
         if not self.__narrative_allows(direction):
@@ -3043,8 +3079,11 @@ class OICompositeStrategy(IStrategy):
                     self.rejection_stats["below_threshold"] += 1
                     i += 1
                     continue
-                if not self.__methods_agree(scores, direction):
+                _agree, _reason = self.__methods_agree_with_reason(scores, direction)
+                if not _agree:
                     self.rejection_stats["methods_disagree"] += 1
+                    if _reason in self.rejection_stats:
+                        self.rejection_stats[_reason] += 1
                     i += 1
                     continue
                 # Narrative-гейт убран из backtest_scan_signals: FSM требует разогрева
@@ -3167,6 +3206,8 @@ class OICompositeStrategy(IStrategy):
         )
         # Narrative FSM сбрасывается в начале: в бэктесте нет накопленной истории
         # переходов живой торговли, поэтому стартуем с NEUTRAL честно.
+        saved_composite_history = list(self.__composite_history)
+        self.__composite_history = []
         saved_narrative_state = self.__narrative_state
         self.__narrative_state = NarrativeState()
         # Сброс EWA-весов до равномерных: бэктест должен стартовать «холодным»,
@@ -3307,7 +3348,11 @@ class OICompositeStrategy(IStrategy):
                 if direction is None:
                     i += 1
                     continue
-                if not self.__methods_agree(scores, direction):
+                _agree, _reason = self.__methods_agree_with_reason(scores, direction)
+                if not _agree:
+                    self.rejection_stats["methods_disagree"] += 1
+                    if _reason in self.rejection_stats:
+                        self.rejection_stats[_reason] += 1
                     i += 1
                     continue
                 # Narrative-гейт: применяем только после warmup-окна. Первые
@@ -3365,6 +3410,7 @@ class OICompositeStrategy(IStrategy):
             self.__weights = saved_weights
             self.__regime_weights = saved_regime_weights
             self.__narrative_state = saved_narrative_state
+            self.__composite_history = saved_composite_history
             (self.__ic_priors, self.__ic_score_buf,
              self.__ic_close_buf, self.__ic_bar_counter) = saved_ic_state
 
@@ -4193,6 +4239,9 @@ class OICompositeStrategy(IStrategy):
         # __last_scores хранит сырые скоры — для архива и диагностики
         self.__last_scores = dict(zip(ALL_METHOD_NAMES, scores))
         self.__last_composite = composite
+        self.__composite_history.append(composite)
+        if len(self.__composite_history) > GATE_COMPOSITE_HISTORY_LEN + 2:
+            self.__composite_history.pop(0)
         self.__advance_narrative(base_score_dict, closes, regime, exhaustion)
         return composite, scores
 
@@ -4319,41 +4368,143 @@ class OICompositeStrategy(IStrategy):
 
     def __methods_agree(self, scores: list[float], direction: SignalType) -> bool:
         """
-        Гейт по взвешенной силе согласия, а не по сырому счёту методов:
-        раньше "3 любых метода с |score|>=0.15" пропускало сигналы, где
-        согласны три слабых/ненадёжных метода, а несогласен один сильный
-        (с высоким EWA-весом) — гейт это не видел. Теперь:
-          agree_strength = sum(weight[m] * |score[m]| for m согласных)
-          total_strength = sum(weight[m] * |score[m]| for m высказавшихся)
-        Пропускаем, если согласных силы достаточно АБСОЛЮТНО
-        (AGREE_STRENGTH_MIN) И они составляют достаточную ДОЛЮ от всей
-        высказавшейся силы (AGREE_SHARE_MIN) — это отсекает и "тихое"
-        согласие (мало кто высказался вообще), и "перетянутое" (сильное
-        несогласное меньшинство).
-        Берём только BASE_METHOD_NAMES — M1/M2/M3 в scores идут последними
-        и не входят в композит (см. __compute_composite), не должны
-        входить и в гейт по той же причине (двойной счёт).
-        Микроструктурные методы (MICROSTRUCTURE_METHOD_NAMES) получают
-        MICROSTRUCTURE_AGREE_BOOST к strength — они ведущие и могут "созреть"
-        раньше технических индикаторов; без буста гейт требовал бы от них
-        ждать того же уровня |score|, что обнуляет их преимущество в скорости.
+        Четырёхусловный гейт:
+
+        1. IC-взвешенный net_agreement: sum(ic_weight[m] * score[m] * sign) > порога.
+           Один сильный против с высоким IC перевешивает несколько слабых "за".
+           Также проверяем унаследованный agree_share (для обратной совместимости).
+
+        2. Групповая независимость: минимум GATE_MIN_GROUPS_AGREE из 5 групп
+           (тренд/объём/осцилляторы/структура/микроструктура) должны голосовать
+           "за" по IC-взвешенному внутригрупповому счёту. Три метода объёмной
+           группы (VZO+TWIGGS+KLINGER) — это один голос, а не три.
+
+        3. Стабильность composite: std(последних N composite) < порога.
+           Дёрганый composite означает неустойчивый режим — входить рискованно.
+
+        4. Конфликт L2/L3: если L2 достаточно уверен в противоположном знаке
+           (L3 — это текущий composite до блендинга, L2 — кэшированный).
         """
-        sign = 1 if direction == SignalType.LONG else -1
+        sign_val = 1 if direction == SignalType.LONG else -1
         n_base = len(BASE_METHOD_NAMES)
+        score_map = dict(zip(BASE_METHOD_NAMES, scores[:n_base]))
+
+        # ── Условие 1a: унаследованный agree_share (взвешенная доля) ──────────
         agree_strength = 0.0
         total_strength = 0.0
-        for name, s in zip(BASE_METHOD_NAMES, scores[:n_base]):
+        for name, s in score_map.items():
             if abs(s) < AGREE_SCORE_MIN:
                 continue
             strength = self.__weights[name].weight * abs(s)
             if name in MICROSTRUCTURE_METHOD_NAMES:
                 strength *= MICROSTRUCTURE_AGREE_BOOST
             total_strength += strength
-            if (s > 0) == (sign > 0):
+            if (s > 0) == (sign_val > 0):
                 agree_strength += strength
         if total_strength <= 0:
             return False
-        return agree_strength >= AGREE_STRENGTH_MIN and agree_strength / total_strength >= AGREE_SHARE_MIN
+        if not (agree_strength >= AGREE_STRENGTH_MIN and
+                agree_strength / total_strength >= AGREE_SHARE_MIN):
+            return False
+
+        # ── Условие 1b: IC-взвешенный net_agreement ───────────────────────────
+        # ic_weight = ic_prior.weight() ∈ [0.1, 1.0]; учитывает знак через sign_val
+        net = sum(
+            self.__ic_priors[name].weight() * s * sign_val
+            for name, s in score_map.items()
+            if abs(s) >= AGREE_SCORE_MIN
+        )
+        if net < GATE_NET_AGREEMENT_THRESHOLD:
+            return False
+
+        # ── Условие 2: групповая независимость ────────────────────────────────
+        groups_agree = 0
+        for group_members in _GATE_GROUPS.values():
+            group_net = sum(
+                self.__ic_priors[name].weight() * s * sign_val
+                for name, s in score_map.items()
+                if name in group_members and abs(s) >= AGREE_SCORE_MIN
+            )
+            if group_net > 0:
+                groups_agree += 1
+        if groups_agree < GATE_MIN_GROUPS_AGREE:
+            return False
+
+        # ── Условие 3: стабильность composite ─────────────────────────────────
+        if len(self.__composite_history) >= GATE_COMPOSITE_HISTORY_LEN:
+            recent = self.__composite_history[-GATE_COMPOSITE_HISTORY_LEN:]
+            mean_c = sum(recent) / len(recent)
+            std_c = (sum((x - mean_c) ** 2 for x in recent) / len(recent)) ** 0.5
+            if std_c > GATE_COMPOSITE_STD_MAX:
+                return False
+
+        # ── Условие 4: конфликт L2/L3 ─────────────────────────────────────────
+        l2 = self.__cached_mtf5_composite
+        l3 = self.__last_composite  # до блендинга не храним, берём финальный
+        if (abs(l2) > GATE_L2_CONFLICT_THRESHOLD and
+                l2 * sign_val < 0 and l3 * sign_val > 0):
+            return False
+
+        return True
+
+    def __methods_agree_with_reason(
+        self, scores: list[float], direction: SignalType,
+    ) -> tuple[bool, str]:
+        """Обёртка над __methods_agree, возвращающая причину отказа для счётчиков."""
+        sign_val = 1 if direction == SignalType.LONG else -1
+        n_base = len(BASE_METHOD_NAMES)
+        score_map = dict(zip(BASE_METHOD_NAMES, scores[:n_base]))
+
+        agree_strength = 0.0
+        total_strength = 0.0
+        for name, s in score_map.items():
+            if abs(s) < AGREE_SCORE_MIN:
+                continue
+            strength = self.__weights[name].weight * abs(s)
+            if name in MICROSTRUCTURE_METHOD_NAMES:
+                strength *= MICROSTRUCTURE_AGREE_BOOST
+            total_strength += strength
+            if (s > 0) == (sign_val > 0):
+                agree_strength += strength
+        if total_strength <= 0 or not (
+            agree_strength >= AGREE_STRENGTH_MIN and
+            agree_strength / total_strength >= AGREE_SHARE_MIN
+        ):
+            return False, "methods_disagree"
+
+        net = sum(
+            self.__ic_priors[name].weight() * s * sign_val
+            for name, s in score_map.items()
+            if abs(s) >= AGREE_SCORE_MIN
+        )
+        if net < GATE_NET_AGREEMENT_THRESHOLD:
+            return False, "gate_net_agreement"
+
+        groups_agree = sum(
+            1 for group_members in _GATE_GROUPS.values()
+            if sum(
+                self.__ic_priors[name].weight() * s * sign_val
+                for name, s in score_map.items()
+                if name in group_members and abs(s) >= AGREE_SCORE_MIN
+            ) > 0
+        )
+        if groups_agree < GATE_MIN_GROUPS_AGREE:
+            return False, "gate_group_diversity"
+
+        if len(self.__composite_history) >= GATE_COMPOSITE_HISTORY_LEN:
+            recent = self.__composite_history[-GATE_COMPOSITE_HISTORY_LEN:]
+            mean_c = sum(recent) / len(recent)
+            std_c = (sum((x - mean_c) ** 2 for x in recent) / len(recent)) ** 0.5
+            if std_c > GATE_COMPOSITE_STD_MAX:
+                return False, "gate_composite_std"
+
+        l2 = self.__cached_mtf5_composite
+        l3 = self.__last_composite
+        if (abs(l2) > GATE_L2_CONFLICT_THRESHOLD and
+                l2 * sign_val < 0 and l3 * sign_val > 0):
+            return False, "gate_l2_conflict"
+
+        return True, ""
 
     def __advance_narrative(
             self, base_score_dict: dict, closes: list[float], regime: str, exhaustion: bool,

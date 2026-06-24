@@ -2651,7 +2651,13 @@ function rowsToHtml(rows) {{
       const rs = r.rejection_stats;
       const total = (rs.below_threshold||0) + (rs.methods_disagree||0) + (rs.liquidity||0) + (rs.narrative_blocked||0);
       if (total > 0) {{
-        html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3)">🚫 отклонено баров: порог ${{rs.below_threshold||0}} · методы ${{rs.methods_disagree||0}} · объём ${{rs.liquidity||0}}${{rs.narrative_blocked ? ' · нарратив ' + rs.narrative_blocked : ''}}</td></tr>`;
+        const gateDetails = [
+          rs.gate_net_agreement ? `net_agr ${rs.gate_net_agreement}` : '',
+          rs.gate_group_diversity ? `groups ${rs.gate_group_diversity}` : '',
+          rs.gate_composite_std ? `cmp_std ${rs.gate_composite_std}` : '',
+          rs.gate_l2_conflict ? `L2↔L3 ${rs.gate_l2_conflict}` : '',
+        ].filter(Boolean).join(' / ');
+        html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3)">🚫 отклонено баров: порог ${{rs.below_threshold||0}} · методы ${{rs.methods_disagree||0}}${{gateDetails ? ' (' + gateDetails + ')' : ''}} · объём ${{rs.liquidity||0}}${{rs.narrative_blocked ? ' · нарратив ' + rs.narrative_blocked : ''}}</td></tr>`;
       }}
     }}
     if (r.trades_list && r.trades_list.length) {{
