@@ -2162,6 +2162,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="calib_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
+  <div id="compare_block" style="display:none;margin-top:8px"></div>
 </div>
 
 <div class="panel">
@@ -2720,19 +2721,91 @@ function _isZeroResult(r) {{
   return r.n_trades !== undefined && r.n_trades === 0;
 }}
 
-function summaryRowToHtml(rows) {{
+function _summaryOne(label, rows, borderStyle) {{
   const valid = rows.filter(r => r.win_rate !== undefined && r.n_trades > 0);
-  if (!valid.length) return '';
-  const totalTrades = valid.reduce((s, r) => s + r.n_trades, 0);
-  // Средневзвешенно по числу сделок — тикер с 2 сделками не должен иметь
-  // тот же вес в среднем, что тикер с 80.
-  const avgWin = valid.reduce((s, r) => s + r.win_rate * r.n_trades, 0) / totalTrades;
-  const avgExp = valid.reduce((s, r) => s + (r.expectancy_pct || 0) * r.n_trades, 0) / totalTrades;
-  const avgR = valid.reduce((s, r) => s + (r.avg_r || 0) * r.n_trades, 0) / totalTrades;
-  return `<tr style="font-weight:bold;border-top:2px solid var(--txt3);">` +
-    `<td>ИТОГО (${{valid.length}} тикер(ов))</td><td></td><td>${{totalTrades}}</td>` +
-    `<td>${{(avgWin * 100).toFixed(1)}}%</td><td>${{avgR.toFixed(2)}}</td>` +
-    `<td>${{(avgExp * 100).toFixed(2)}}%</td><td></td></tr>`;
+  if (!valid.length) return `<tr style="${{borderStyle}}"><td style="color:var(--txt3)">${{label}}</td><td colspan="6" style="color:var(--txt3)">нет данных</td></tr>`;
+  const n = valid.reduce((s, r) => s + r.n_trades, 0);
+  const wr = valid.reduce((s, r) => s + r.win_rate * r.n_trades, 0) / n;
+  const exp = valid.reduce((s, r) => s + (r.expectancy_pct || 0) * r.n_trades, 0) / n;
+  const avgR = valid.reduce((s, r) => s + (r.avg_r || 0) * r.n_trades, 0) / n;
+  const tickers = new Set(valid.map(r => r.ticker)).size;
+  const wrColor = wr > 0.55 ? 'color:var(--pos)' : wr < 0.45 ? 'color:var(--neg)' : '';
+  const expColor = exp > 0 ? 'color:var(--pos)' : exp < 0 ? 'color:var(--neg)' : '';
+  return `<tr style="${{borderStyle}}">` +
+    `<td style="font-weight:bold">${{label}} <span style="font-weight:normal;color:var(--txt3);font-size:10px">(${{tickers}} тик.)</span></td>` +
+    `<td></td><td>${{n}}</td>` +
+    `<td style="${{wrColor}};font-weight:bold">${{(wr * 100).toFixed(1)}}%</td>` +
+    `<td>${{avgR.toFixed(2)}}</td>` +
+    `<td style="${{expColor}};font-weight:bold">${{(exp * 100).toFixed(2)}}%</td>` +
+    `<td></td></tr>`;
+}}
+
+function summaryRowToHtml(rows) {{
+  const fixed = rows.filter(r => r.mode === 'fixed');
+  const atr = rows.filter(r => r.mode !== 'fixed');
+  const allValid = rows.filter(r => r.win_rate !== undefined && r.n_trades > 0);
+  if (!allValid.length) return '';
+  let html = '';
+  if (fixed.length && atr.length) {{
+    html += _summaryOne('Фиксированные стопы', fixed, 'border-top:2px solid var(--txt3)');
+    html += _summaryOne('ATR walk-forward', atr, '');
+    html += _summaryOne('ИТОГО', allValid, 'border-top:1px dashed var(--txt3)');
+  }} else {{
+    html += _summaryOne('ИТОГО', allValid, 'border-top:2px solid var(--txt3)');
+  }}
+  return html;
+}}
+
+function comparisonTableToHtml(rows) {{
+  // Группируем по тикеру: {ticker: {fixed: row, atr: row}}
+  const byTicker = {{}};
+  for (const r of rows) {{
+    if (r.win_rate === undefined || !r.n_trades) continue;
+    if (!byTicker[r.ticker]) byTicker[r.ticker] = {{}};
+    if (r.mode === 'fixed') byTicker[r.ticker].fixed = r;
+    else byTicker[r.ticker].atr = r;
+  }}
+  const pairs = Object.entries(byTicker).filter(([, v]) => v.fixed && v.atr);
+  if (!pairs.length) return '';
+
+  const fmt = (v, digits, pct) => v != null ? (pct ? (v*100).toFixed(digits)+'%' : v.toFixed(digits)) : '—';
+  const deltaColor = (d) => d == null ? '' : d > 0.005 ? 'color:var(--pos)' : d < -0.005 ? 'color:var(--neg)' : '';
+
+  let html = '<table style="border-collapse:collapse;width:100%;font-size:11px;margin-top:8px">';
+  html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:2px 6px">Тикер</th>'
+        + '<th colspan="3" style="padding:2px 6px;border-left:1px solid var(--border2)">Фиксированные</th>'
+        + '<th colspan="3" style="padding:2px 6px;border-left:1px solid var(--border2)">ATR walk-forward</th>'
+        + '<th colspan="2" style="padding:2px 6px;border-left:1px solid var(--border2)">Δ (ATR − fixed)</th></tr>';
+  html += '<tr style="color:var(--txt3);font-size:10px"><th></th>'
+        + '<th style="padding:1px 6px;border-left:1px solid var(--border2)">n</th><th style="padding:1px 6px">Win%</th><th style="padding:1px 6px">Exp%</th>'
+        + '<th style="padding:1px 6px;border-left:1px solid var(--border2)">n</th><th style="padding:1px 6px">Win%</th><th style="padding:1px 6px">Exp%</th>'
+        + '<th style="padding:1px 6px;border-left:1px solid var(--border2)">ΔWin%</th><th style="padding:1px 6px">ΔExp%</th></tr>';
+
+  // Сортируем по ΔExp% desc
+  pairs.sort((a, b) => {{
+    const da = (a[1].atr.expectancy_pct||0) - (a[1].fixed.expectancy_pct||0);
+    const db = (b[1].atr.expectancy_pct||0) - (b[1].fixed.expectancy_pct||0);
+    return db - da;
+  }});
+
+  for (const [ticker, {{fixed, atr}}] of pairs) {{
+    const dwr = atr.win_rate - fixed.win_rate;
+    const dexp = (atr.expectancy_pct||0) - (fixed.expectancy_pct||0);
+    const bg = pairs.indexOf(pairs.find(p => p[0] === ticker)) % 2 === 0 ? 'background:var(--bg2)' : '';
+    html += `<tr style="${{bg}}">` +
+      `<td style="padding:2px 6px;font-weight:bold">${{ticker}}</td>` +
+      `<td style="padding:2px 6px;border-left:1px solid var(--border2);text-align:right">${{fixed.n_trades}}</td>` +
+      `<td style="padding:2px 6px;text-align:right">${{fmt(fixed.win_rate,1,true)}}</td>` +
+      `<td style="padding:2px 6px;text-align:right">${{fmt(fixed.expectancy_pct,2,true)}}</td>` +
+      `<td style="padding:2px 6px;border-left:1px solid var(--border2);text-align:right">${{atr.n_trades}}</td>` +
+      `<td style="padding:2px 6px;text-align:right">${{fmt(atr.win_rate,1,true)}}</td>` +
+      `<td style="padding:2px 6px;text-align:right">${{fmt(atr.expectancy_pct,2,true)}}</td>` +
+      `<td style="padding:2px 6px;border-left:1px solid var(--border2);text-align:right;${{deltaColor(dwr)}}">${{dwr>=0?'+':''}}${{(dwr*100).toFixed(1)}}%</td>` +
+      `<td style="padding:2px 6px;text-align:right;${{deltaColor(dexp)}}">${{dexp>=0?'+':''}}${{(dexp*100).toFixed(2)}}%</td>` +
+      `</tr>`;
+  }}
+  html += '</table>';
+  return html;
 }}
 
 function renderResultsTable() {{
@@ -2764,6 +2837,18 @@ function renderResultsTable() {{
   html += rowsToHtml(errors.concat(shown));
   html += summaryRowToHtml(shown);
   table.innerHTML = html;
+
+  // Таблица сравнения fixed vs ATR — отдельный блок под основной таблицей
+  const cmp = comparisonTableToHtml(shown);
+  const cmpDiv = document.getElementById('compare_block');
+  if (cmpDiv) {{
+    if (cmp) {{
+      cmpDiv.innerHTML = `<details><summary style="cursor:pointer;font-size:12px;color:var(--txt3);padding:4px 0">📊 Сравнение fixed vs ATR по тикерам</summary>${{cmp}}</details>`;
+      cmpDiv.style.display = '';
+    }} else {{
+      cmpDiv.style.display = 'none';
+    }}
+  }}
 }}
 
 function _rowToText(r) {{
