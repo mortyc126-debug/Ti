@@ -2765,6 +2765,10 @@ class OICompositeStrategy(IStrategy):
         self.__ic_close_buf: list[float] = []
         self.__ic_bar_counter: int = 0
         self.__rolling_quality: float = self.__load_rolling_quality()
+        # per-regime EWA: ключ = режим, значение = скользящее качество только по сделкам в этом режиме.
+        # Используется в __effective_threshold вместо глобального — чтобы убыточная серия в ranging
+        # не ужесточала порог для trending_up и наоборот.
+        self.__rolling_quality_by_regime: dict[str, float] = self.__load_rolling_quality_by_regime()
         self.__confidence: float = 0.7
         # Буфер скоров за последние _LAG_HISTORY_LEN баров — для lag-коррекции.
         # Хранит scores_for_composite (после нормализации, до взвешивания),
@@ -3791,6 +3795,7 @@ class OICompositeStrategy(IStrategy):
             "regime": regime,
             "regime_probs": {r: round(p, 3) for r, p in regime_probs.items()},
             "rolling_quality": round(self.__rolling_quality, 4),
+            "rolling_quality_by_regime": {r: round(q, 4) for r, q in self.__rolling_quality_by_regime.items()},
             "cluster_models_ready": cluster_ready,
             "cluster_corr_regimes": corr_regimes,
             "methods": methods,
@@ -4983,7 +4988,12 @@ class OICompositeStrategy(IStrategy):
         """
         base = self.__threshold if base is None else base
         mult = 1.0
-        if self.__rolling_quality < LOW_QUALITY_THRESHOLD:
+        # Используем per-regime качество если для текущего режима накопилась статистика,
+        # иначе fallback на глобальное. Это предотвращает ужесточение порога в trending_up
+        # из-за убыточной серии в ranging и наоборот.
+        regime_q = self.__rolling_quality_by_regime.get(self.__last_regime)
+        effective_q = regime_q if regime_q is not None else self.__rolling_quality
+        if effective_q < LOW_QUALITY_THRESHOLD:
             mult *= LOW_QUALITY_MULT
         return base * mult
 
@@ -5305,6 +5315,9 @@ class OICompositeStrategy(IStrategy):
         )
 
         self.__rolling_quality = (1 - QUALITY_ALPHA) * self.__rolling_quality + QUALITY_ALPHA * quality
+        regime_key = self.__open_trade.regime if hasattr(self.__open_trade, "regime") else self.__last_regime
+        prev_rq = self.__rolling_quality_by_regime.get(regime_key, 0.5)
+        self.__rolling_quality_by_regime[regime_key] = (1 - QUALITY_ALPHA) * prev_rq + QUALITY_ALPHA * quality
 
         # P3: статистика плейбуков по живой сделке. r-аппроксимация = (mfe-mae)/mae
         # (или mfe-mae если стоп не сработал), win = mfe>mae.
@@ -5626,6 +5639,18 @@ class OICompositeStrategy(IStrategy):
             logger.warning(f"Could not load rolling_quality: {e}")
             return 0.5
 
+    def __load_rolling_quality_by_regime(self) -> dict[str, float]:
+        if not os.path.exists(WEIGHTS_FILE):
+            return {}
+        try:
+            with open(WEIGHTS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            stored = data.get(self.__settings.figi, {}).get("__rolling_quality_by_regime__", {})
+            return {k: float(v) for k, v in stored.items()} if isinstance(stored, dict) else {}
+        except Exception as e:
+            logger.warning(f"Could not load rolling_quality_by_regime: {e}")
+            return {}
+
     def __save_rolling_quality(self) -> None:
         try:
             data = {}
@@ -5634,6 +5659,7 @@ class OICompositeStrategy(IStrategy):
                     data = json.load(f)
             key = self.__settings.figi
             data.setdefault(key, {})["__rolling_quality__"] = self.__rolling_quality
+            data[key]["__rolling_quality_by_regime__"] = self.__rolling_quality_by_regime
             with open(WEIGHTS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
