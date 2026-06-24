@@ -257,6 +257,11 @@ _LEVEL_VETO_THRESH = 0.65  # |score_level_context| выше — считаетс
                             # (было 0.45, но MTF-версия может давать до ±1.0, порог поднят)
 _LEVEL_VETO_MULT   = 0.15  # composite × это при вето
 
+# Narrative-гейт в бэктесте: сколько баров нужно FSM для разогрева
+# (NEUTRAL → WATCHING → CONFIRMED требует ≥2 переходов). Пока баров < порога
+# гейт молчит, после — работает точно так же как в живой торговле.
+_NARRATIVE_WARMUP_BARS = 5
+
 
 def _aggregate_candles(candles: list, factor: int) -> list:
     """Агрегирует список 1м-свечей в виртуальные свечи старшего ТФ.
@@ -1968,6 +1973,14 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
             return 1.0
         return 1.15 if v * d > 0 else 0.70
 
+    def conf(value: float, threshold: float) -> float:
+        """Нормировка уверенности: насколько значение превышает порог.
+        threshold=0.35, value=0.80 → conf=0.69. Сглаживает бинарную активацию:
+        сигнал чуть выше порога весит меньше, чем чётко выраженный."""
+        if threshold >= 1.0:
+            return 1.0
+        return min(1.0, (abs(value) - threshold) / (1.0 - threshold))
+
     active: list[str] = []
     scores: list[float] = []
 
@@ -2000,7 +2013,9 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
     if abs(hawkes) > 0.35 and abs(vsa) > 0.3 and abs(level) > 0.25:
         d = 1 if hawkes > 0 else -1
         if vsa * d > 0 and level * d > 0:
-            strength = (abs(hawkes) + abs(vsa) + abs(level)) / 3
+            # уверенность = среднее нормированных превышений порогов
+            c = (conf(hawkes, 0.35) + conf(vsa, 0.3) + conf(level, 0.25)) / 3
+            strength = (abs(hawkes) + abs(vsa) + abs(level)) / 3 * (0.5 + 0.5 * c)
             if aggr * d > 0.2:
                 strength *= 1.3
             # HAWKES на 5м подтверждает — поглощение уже реальное, не шум 1м
@@ -2014,7 +2029,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
         d = 1 if spring > 0 else -1
         if wick * d > 0 and level * d > 0:
             if abs(tq) < 0.65 or tq * d > 0:
-                strength = (abs(spring) + abs(wick)) / 2
+                c = (conf(spring, 0.3) + conf(wick, 0.3)) / 2
+                strength = (abs(spring) + abs(wick)) / 2 * (0.5 + 0.5 * c)
                 if abs(oi_sq) > 0.15 and oi_sq * d > 0:
                     strength *= 1.2
                 active.append("FAKEOUT")
@@ -2026,7 +2042,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
     if abs(cp) > 0.45 and abs(sine) > 0.25:
         d = 1 if cp > 0 else -1
         if sine * d > 0 and mkt * d > 0:
-            strength = (abs(cp) + abs(sine) + abs(mkt)) / 3
+            c = (conf(cp, 0.45) + conf(sine, 0.25) + conf(mkt, 0.1)) / 3
+            strength = (abs(cp) + abs(sine) + abs(mkt)) / 3 * (0.5 + 0.5 * c)
             if fractal * d > 0.15:
                 strength *= 1.15
             cp_l2 = l2("CHANGE_POINT_L2")
@@ -2041,7 +2058,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
         d = 1 if triangle > 0 else -1
         if oi_sq * d > 0:
             oi_bias = inst_oi * d + retail * d
-            strength = (abs(triangle) + abs(oi_sq)) / 2
+            c = (conf(triangle, 0.35) + conf(oi_sq, 0.15)) / 2
+            strength = (abs(triangle) + abs(oi_sq)) / 2 * (0.5 + 0.5 * c)
             if oi_bias > 0.1:
                 strength *= 1.15
             active.append("CONSOLIDATION_BREAK")
@@ -2053,7 +2071,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
     tq_l2  = l2("TREND_QUALITY")
     frac_l2 = l2("FRACTAL")
     if tq > 0.5 and fractal > 0.1 and vwap < 0.15 and 0.0 < vol_mom < 0.35 and candle_p > 0.2:
-        strength = (tq + fractal + candle_p) / 3
+        c = (conf(tq, 0.5) + conf(fractal, 0.1) + conf(candle_p, 0.2)) / 3
+        strength = (tq + fractal + candle_p) / 3 * (0.5 + 0.5 * c)
         # Если L2 тоже бычий — тренд реален, не только на 1м-шуме
         if tq_l2 > 0.3:
             strength *= 1.15
@@ -2062,7 +2081,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
         active.append("TREND_PULLBACK_L")
         scores.append(min(1.0, strength) * 0.85)
     elif tq < -0.5 and fractal > 0.1 and vwap > -0.15 and -0.35 < vol_mom < 0.0 and candle_p < -0.2:
-        strength = (abs(tq) + fractal + abs(candle_p)) / 3
+        c = (conf(tq, 0.5) + conf(fractal, 0.1) + conf(candle_p, 0.2)) / 3
+        strength = (abs(tq) + fractal + abs(candle_p)) / 3 * (0.5 + 0.5 * c)
         if tq_l2 < -0.3:
             strength *= 1.15
         elif tq_l2 > 0.2:
@@ -2078,7 +2098,8 @@ def _compute_playbooks(sd: dict[str, float], regime: str,
         osc_extreme = (rmi * d < -0.35) or (fisher * d < -0.35)
         multi_disagrees = multi != 0.0 and multi * d < 0
         if osc_extreme and vol_mom * d < 0.05:
-            strength = abs(price_t) * 0.55
+            c = conf(price_t, 0.45)
+            strength = abs(price_t) * 0.55 * (0.5 + 0.5 * c)
             if multi_disagrees:
                 strength *= 1.2
             active.append("EXHAUSTION_DIV")
@@ -3075,6 +3096,10 @@ class OICompositeStrategy(IStrategy):
             dict(self.__cached_mtf5_scores),
             list(self.__mtf5_momentum_buf),
         )
+        # Narrative FSM сбрасывается в начале: в бэктесте нет накопленной истории
+        # переходов живой торговли, поэтому стартуем с NEUTRAL честно.
+        saved_narrative_state = self.__narrative_state
+        self.__narrative_state = NarrativeState()
         # Сброс EWA-весов до равномерных: бэктест должен стартовать «холодным»,
         # без знания исходов сделок, которые ещё не произошли. Использование
         # весов из oi_weights.json (обученных на полной истории, включая будущее
@@ -3096,6 +3121,7 @@ class OICompositeStrategy(IStrategy):
         last_sim_day: Optional[str] = None
         last_l1_day = None
         days_since_recalib = 0
+        narrative_bars_seen = 0   # счётчик для warmup narrative-гейта
         try:
             i = CANDLE_WINDOW
             while i < len(candles) - 1:
@@ -3145,6 +3171,7 @@ class OICompositeStrategy(IStrategy):
                     self.__day_move_pct = (close_px - self.__daily_open_price) / self.__daily_open_price * 100
 
                 composite, scores = self.__compute_composite()
+                narrative_bars_seen += 1
 
                 if self.__history is not None and hasattr(self.__history, "set_sim_date"):
                     sim_day = candles[i].time.date().isoformat()
@@ -3214,6 +3241,14 @@ class OICompositeStrategy(IStrategy):
                 if not self.__methods_agree(scores, direction):
                     i += 1
                     continue
+                # Narrative-гейт: применяем только после warmup-окна. Первые
+                # _NARRATIVE_WARMUP_BARS баров FSM разогревается (NEUTRAL → WATCHING
+                # → CONFIRMED требует ≥2 переходов) — пока пропускаем.
+                if narrative_bars_seen >= _NARRATIVE_WARMUP_BARS:
+                    if not self.__narrative_allows(direction):
+                        self.rejection_stats["narrative_blocked"] += 1
+                        i += 1
+                        continue
                 if not self.__liquidity_ok():
                     i += 1
                     continue
@@ -3260,6 +3295,7 @@ class OICompositeStrategy(IStrategy):
              self.__mtf5_momentum_buf) = saved_l2_state
             self.__weights = saved_weights
             self.__regime_weights = saved_regime_weights
+            self.__narrative_state = saved_narrative_state
 
         return signals
 
