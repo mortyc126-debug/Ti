@@ -153,6 +153,12 @@ HEDGE_REGIME_SHRINK_N = 20
 # сначала доверяем data-driven prior, затем Hedge берёт управление).
 LASSO_SHRINK_N = 30
 
+# IC-калибровка: предсказательная сила методов по ценовой динамике
+IC_RECALC_INTERVAL = 100   # каждые N баров пересчитываем IC
+IC_WINDOW         = 500    # количество баров для rolling IC
+IC_FORWARD_LAG    = 20     # горизонт форвардного возврата (баров)
+IC_SIGNIFICANCE   = 0.03   # порог значимости IC (ниже → метод нейтральный)
+
 # ── Lag-коррекция по результатам lag_analysis.py ─────────────────────────────
 # Таблица составлена по 60-дневному прогону (медиана лага по 35 тикерам).
 # Корректируем только методы с лагом < 10 баров И стабильным лагом в режиме
@@ -497,6 +503,26 @@ class MethodWeight:
         eta = HEDGE_ETA * min(1.0, self.total / HEDGE_WARMUP_TRADES)
         self.weight *= math.exp(eta * (quality - 0.5))
         self.weight = max(0.05, min(1.0, self.weight))
+
+
+@dataclass
+class ICPrior:
+    """IC-prior для метода: предсказательная сила на ценовой динамике."""
+    ic_smoothed: float = 0.0   # сглаженный IC (EMA α=0.2)
+    invert: bool = False        # True если метод работает в инверсии (IC отрицательный)
+    n_updates: int = 0          # сколько раз пересчитывался
+
+    def update(self, ic_raw: float, significance: float = 0.03) -> None:
+        """Обновляет сглаженный IC. Порог значимости = 0.03."""
+        self.n_updates += 1
+        self.ic_smoothed = 0.8 * self.ic_smoothed + 0.2 * ic_raw
+        self.invert = self.ic_smoothed < -significance
+
+    def weight(self) -> float:
+        """Переводит IC в вес [0.1, 1.0]."""
+        ic_abs = abs(self.ic_smoothed)
+        # IC=0 → 0.1 (минимальный вес), IC=0.20+ → 1.0
+        return max(0.1, min(1.0, 0.1 + 0.9 * ic_abs / 0.20))
 
 
 @dataclass
@@ -2427,6 +2453,29 @@ def _shrunk_atr_score(trades: list[dict], fixed_pct: float, k: int = ATR_SHRINK_
     return shrunk, sem
 
 
+def _compute_ic(scores: list[float], closes: list[float], forward_lag: int) -> float:
+    """
+    Pearson IC между scores[t] и return(t, forward_lag).
+    Форвардный возврат: (close[t+lag] - close[t]) / close[t].
+    Только бары где есть и score и форвардный возврат.
+    """
+    if len(scores) < forward_lag + 10 or len(closes) < len(scores) + forward_lag:
+        return 0.0
+    n = len(scores) - forward_lag
+    xs = scores[:n]
+    ys = [(closes[t + forward_lag] - closes[t]) / closes[t] if closes[t] != 0 else 0.0
+          for t in range(n)]
+    if len(xs) < 10:
+        return 0.0
+    mean_x = sum(xs) / len(xs)
+    mean_y = sum(ys) / len(ys)
+    cov = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    var_x = sum((x - mean_x) ** 2 for x in xs)
+    var_y = sum((y - mean_y) ** 2 for y in ys)
+    denom = (var_x * var_y) ** 0.5
+    return cov / denom if denom > 1e-10 else 0.0
+
+
 class OICompositeStrategy(IStrategy):
     """
     Многометодная стратегия. Комбинирует 5 методов анализа свечей с обучаемыми весами.
@@ -2474,6 +2523,12 @@ class OICompositeStrategy(IStrategy):
         self.__open_trade: Optional[OpenTrade] = None
         self.__weights: dict[str, MethodWeight] = self.__load_weights()
         self.__regime_weights: dict[str, dict[str, MethodWeight]] = self.__load_regime_weights()
+        # IC-prior: предсказательная сила метода по ценовой динамике
+        self.__ic_priors: dict[str, ICPrior] = {name: ICPrior() for name in ALL_METHOD_NAMES}
+        # Буфер скоров и closes для rolling IC
+        self.__ic_score_buf: dict[str, list[float]] = {name: [] for name in ALL_METHOD_NAMES}
+        self.__ic_close_buf: list[float] = []
+        self.__ic_bar_counter: int = 0
         self.__rolling_quality: float = self.__load_rolling_quality()
         self.__confidence: float = 0.7
         # Буфер скоров за последние _LAG_HISTORY_LEN баров — для lag-коррекции.
@@ -2926,6 +2981,12 @@ class OICompositeStrategy(IStrategy):
             dict(self.__cached_mtf5_scores),
             list(self.__mtf5_momentum_buf),
         )
+        saved_ic_state_q = (
+            {n: ICPrior(p.ic_smoothed, p.invert, p.n_updates) for n, p in self.__ic_priors.items()},
+            {n: list(v) for n, v in self.__ic_score_buf.items()},
+            list(self.__ic_close_buf),
+            self.__ic_bar_counter,
+        )
         qualities: list[float] = []
         comm = commission_rt(self.__settings.is_future)
         last_l1_day = None
@@ -3056,6 +3117,8 @@ class OICompositeStrategy(IStrategy):
             (self.__cached_mtf5_composite,
              self.__cached_mtf5_scores,
              self.__mtf5_momentum_buf) = saved_l2_state_q
+            (self.__ic_priors, self.__ic_score_buf,
+             self.__ic_close_buf, self.__ic_bar_counter) = saved_ic_state_q
 
         if not qualities:
             return 0.5, 0
@@ -3095,6 +3158,12 @@ class OICompositeStrategy(IStrategy):
             self.__cached_mtf5_composite,
             dict(self.__cached_mtf5_scores),
             list(self.__mtf5_momentum_buf),
+        )
+        saved_ic_state = (
+            {n: ICPrior(p.ic_smoothed, p.invert, p.n_updates) for n, p in self.__ic_priors.items()},
+            {n: list(v) for n, v in self.__ic_score_buf.items()},
+            list(self.__ic_close_buf),
+            self.__ic_bar_counter,
         )
         # Narrative FSM сбрасывается в начале: в бэктесте нет накопленной истории
         # переходов живой торговли, поэтому стартуем с NEUTRAL честно.
@@ -3296,6 +3365,8 @@ class OICompositeStrategy(IStrategy):
             self.__weights = saved_weights
             self.__regime_weights = saved_regime_weights
             self.__narrative_state = saved_narrative_state
+            (self.__ic_priors, self.__ic_score_buf,
+             self.__ic_close_buf, self.__ic_bar_counter) = saved_ic_state
 
         return signals
 
@@ -3907,6 +3978,20 @@ class OICompositeStrategy(IStrategy):
 
         scores = base_scores + [m1_sc, m2_sc, m3_sc]
 
+        # Накапливаем буфер для IC-калибровки
+        if self.__candles:
+            self.__ic_close_buf.append(_to_f(self.__candles[-1].close))
+            if len(self.__ic_close_buf) > IC_WINDOW + IC_FORWARD_LAG + 10:
+                self.__ic_close_buf = self.__ic_close_buf[-(IC_WINDOW + IC_FORWARD_LAG + 10):]
+        for name in ALL_METHOD_NAMES:
+            s = base_score_dict.get(name, 0.0)
+            self.__ic_score_buf[name].append(s)
+            if len(self.__ic_score_buf[name]) > IC_WINDOW + 10:
+                self.__ic_score_buf[name] = self.__ic_score_buf[name][-IC_WINDOW - 10:]
+        self.__ic_bar_counter += 1
+        if self.__ic_bar_counter % IC_RECALC_INTERVAL == 0:
+            self.__recalc_ic_priors()
+
         # Перцентильная нормализация: если калибратор прогрет — приводим каждый
         # скор к шкале [-1, 1] относительно его исторического распределения.
         # Без нормализации "громкие" методы (большой масштаб) доминируют случайно.
@@ -3948,8 +4033,17 @@ class OICompositeStrategy(IStrategy):
         else:
             redundancy_mult = {}
 
+        # Инверсия скора для методов с отрицательным IC (метод работает наоборот)
+        scores_for_composite = [
+            -s if self.__ic_priors[n].invert else s
+            for n, s in zip(ALL_METHOD_NAMES, scores_for_composite)
+        ]
+
         weights = [
-            self.__blended_hedge_weight(name, regime_probs) * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+            self.__blended_hedge_weight(name, regime_probs)
+            * self.__ic_priors[name].weight()   # IC-prior: предсказательная сила на цене
+            * regime_mods.get(name, 1.0)
+            * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             * self.__ticker_weights[name].weight
             for name in ALL_METHOD_NAMES
@@ -4740,6 +4834,19 @@ class OICompositeStrategy(IStrategy):
         except Exception as e:
             logger.warning(f"Could not load regime weights: {e}")
         return rw
+
+    def __recalc_ic_priors(self) -> None:
+        """Пересчитывает IC для каждого метода на скользящем окне.
+        Вызывается каждые IC_RECALC_INTERVAL баров."""
+        closes = self.__ic_close_buf[-IC_WINDOW - IC_FORWARD_LAG:]
+        for name in ALL_METHOD_NAMES:
+            scores = self.__ic_score_buf[name][-IC_WINDOW:]
+            if len(scores) < 30:
+                continue
+            # closes нужны: len(scores) + IC_FORWARD_LAG
+            closes_needed = closes[-(len(scores) + IC_FORWARD_LAG):]
+            ic_raw = _compute_ic(scores, closes_needed, IC_FORWARD_LAG)
+            self.__ic_priors[name].update(ic_raw, IC_SIGNIFICANCE)
 
     def __blended_hedge_weight(self, name: str, regime_probs: dict[str, float]) -> float:
         """Hedge-вес метода — иерархический, два уровня shrinkage:
