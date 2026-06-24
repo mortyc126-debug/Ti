@@ -1323,6 +1323,7 @@ def run_backtest_one(
         tariff: str | None = None, atr_scale_exps: list[float] | None = None,
         progress: dict | None = None, offset_days: int = 0,
         adaptive_narrative: bool = False, adaptive_lasso: bool = False,
+        block_ranging: bool = False,
 ) -> tuple[list[dict], dict | None]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает (rows, history_data):
@@ -1382,7 +1383,8 @@ def run_backtest_one(
         long_stop = Decimal(s.get("LONG_STOP", "0.985"))
 
         t1 = time.monotonic()
-        signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative)
+        signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative,
+                                                   block_ranging=block_ranging)
         rej = dict(strategy.rejection_stats)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с"
                     + (" (адаптивная калибровка narrative)" if adaptive_narrative else "")
@@ -2115,6 +2117,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <label title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
   <label title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json."><input type="checkbox" id="adaptive_narrative"> Адаптивная калибровка narrative</label>
   <label title="Lasso-приоры методов пере-фитятся прямо в процессе бэктеста: сигналы и так обрабатываются в хронологическом порядке (как M1/M2/M3 cluster-models выше), и исход сделки (take/stop/timeout) известен сразу после неё — без отдельного прохода backtest_barriers ПОСЛЕ скана. Каждые ~30 сделок фитим lasso на всех сделках, накопленных к этому моменту, и обновляем веса методов для последующих сделок того же прогона (причинно корректно — приоры влияют только на будущее внутри прогона)."><input type="checkbox" id="adaptive_lasso"> Адаптивная калибровка lasso</label>
+  <label title="Блокировать вход в позицию когда классификатор определяет режим рынка как боковик (ranging). По умолчанию ranging разрешён, только stress блокируется. Включи, чтобы избежать торговли в флэте — может сильно снизить число сделок."><input type="checkbox" id="block_ranging"> Не торговать в боковике (ranging)</label>
   <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
   <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
   <label>Тариф комиссии <select class="inp" id="tariff">
@@ -3033,7 +3036,8 @@ async function runBacktest() {{
       body: JSON.stringify({{tickers: tickers, days: days, offset_days: offsetDays, atr_take: atrTake, atr_stop: atrStop,
                               tariff: document.getElementById('tariff').value,
                               adaptive_narrative: document.getElementById('adaptive_narrative').checked,
-                              adaptive_lasso: document.getElementById('adaptive_lasso').checked}})
+                              adaptive_lasso: document.getElementById('adaptive_lasso').checked,
+                              block_ranging: document.getElementById('block_ranging').checked}})
     }});
     if (!resp.ok || !resp.body) throw new Error('stream недоступен');
     const reader = resp.body.getReader();
@@ -4876,6 +4880,7 @@ class Handler(BaseHTTPRequestHandler):
             tariff = payload.get("tariff") or None
             adaptive_narrative = bool(payload.get("adaptive_narrative", False))
             adaptive_lasso = bool(payload.get("adaptive_lasso", False))
+            block_ranging = bool(payload.get("block_ranging", False))
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -4907,7 +4912,8 @@ class Handler(BaseHTTPRequestHandler):
                 fs = {
                     pool.submit(run_backtest_one, t, days, atr_take_ks, atr_stop_ks,
                                 tariff=tariff, progress=progress, offset_days=offset_days,
-                                adaptive_narrative=adaptive_narrative, adaptive_lasso=adaptive_lasso): t
+                                adaptive_narrative=adaptive_narrative, adaptive_lasso=adaptive_lasso,
+                                block_ranging=block_ranging): t
                     for t in tickers
                 }
                 for fut in as_completed(fs):

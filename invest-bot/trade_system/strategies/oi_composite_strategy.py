@@ -2594,7 +2594,8 @@ class OICompositeStrategy(IStrategy):
                     self.rejection_stats["below_threshold"] += 1
                     i += 1
                     continue
-                if self.__last_regime in BACKTEST_BLOCKED_REGIMES:
+                if self.__last_regime in BACKTEST_BLOCKED_REGIMES or (block_ranging and self.__last_regime == "ranging"):
+                    self.rejection_stats["below_threshold"] += 1
                     i += 1
                     continue
                 if not self.__methods_agree(scores, direction):
@@ -2675,7 +2676,8 @@ class OICompositeStrategy(IStrategy):
 
     def backtest_scan_signals(self, candles: list[HistoricCandle], max_bars: int = 60,
                                adaptive_narrative: bool = False,
-                               narrative_recalib_every_days: int = 20) -> list[dict]:
+                               narrative_recalib_every_days: int = 20,
+                               block_ranging: bool = False) -> list[dict]:
         """
         Один проход по свечам с дорогим __compute_composite() (внутри —
         Hawkes-MLE через scipy.optimize и другие методы) — собирает все бары,
@@ -3241,11 +3243,11 @@ class OICompositeStrategy(IStrategy):
                 dir_sign = 1 if direction == SignalType.LONG else -1
                 ms = sig.get("method_scores", {})
                 top_agree = sorted(
-                    [(n, v) for n, v in ms.items() if v * dir_sign > 0.05],
+                    [(n, v) for n, v in ms.items() if v * dir_sign > 0.01],
                     key=lambda x: abs(x[1]), reverse=True
                 )[:5]
                 top_against = sorted(
-                    [(n, v) for n, v in ms.items() if v * dir_sign < -0.05],
+                    [(n, v) for n, v in ms.items() if v * dir_sign < -0.01],
                     key=lambda x: abs(x[1]), reverse=True
                 )[:3]
 
