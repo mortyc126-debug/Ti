@@ -2609,6 +2609,18 @@ class Trader:
             f"BACKTEST: {strategy.settings.ticker} quality={quality:.2f} на {n_trades} вирт. сделках "
             f"({'ок, торгуем' if live else 'НЕДОСТАТОЧНО — переводим в signal-only на сегодня'})"
         )
+        if hasattr(strategy, "rejection_stats"):
+            rs = strategy.rejection_stats
+            total = sum(rs.values())
+            if total > 0:
+                parts = ", ".join(
+                    f"{k}={v} ({v/total:.0%})"
+                    for k, v in sorted(rs.items(), key=lambda x: -x[1])
+                    if v > 0
+                )
+                logger.info(f"BACKTEST REJECTION_STATS {strategy.settings.ticker}: {parts}")
+            else:
+                logger.info(f"BACKTEST REJECTION_STATS {strategy.settings.ticker}: нет отфильтрованных")
         self.__backtest_predictions[strategy.settings.ticker] = {
             "predicted_quality": round(quality, 4), "n_trades": n_trades, "gated_live": live,
         }
