@@ -1232,19 +1232,19 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
         for mname, m_sc in t.get("method_scores", {}).items():
             if abs(m_sc) < 0.02:
                 continue
-            e = tally.setdefault(mname, {"for_n": 0, "for_win": 0, "against_n": 0, "against_win": 0})
+            e = tally.setdefault(mname, {"agree_n": 0, "agree_win": 0, "disagree_n": 0, "disagree_win": 0})
             if (m_sc > 0) == (dir_sign > 0):
-                e["for_n"] += 1
-                e["for_win"] += int(t["win"])
+                e["agree_n"] += 1
+                e["agree_win"] += int(t["win"])
             else:
-                e["against_n"] += 1
-                e["against_win"] += int(t["win"])
+                e["disagree_n"] += 1
+                e["disagree_win"] += int(t["win"])
     return {
         mname: {
-            "for_n": e["for_n"],
-            "for_win_rate": e["for_win"] / e["for_n"] if e["for_n"] else None,
-            "against_n": e["against_n"],
-            "against_win_rate": e["against_win"] / e["against_n"] if e["against_n"] else None,
+            "agree_n": e["agree_n"],
+            "agree_win_rate": e["agree_win"] / e["agree_n"] if e["agree_n"] else None,
+            "disagree_n": e["disagree_n"],
+            "disagree_win_rate": e["disagree_win"] / e["disagree_n"] if e["disagree_n"] else None,
         }
         for mname, e in tally.items()
     }
@@ -2793,18 +2793,18 @@ function _rowToText(r) {{
     lines.push('  Attribution по методам:');
     lines.push('  метод\tза n\tза win%\tпротив n\tпротив win%');
     for (const [m, s] of Object.entries(r.method_stats)) {{
-      const fw = s.for_win_rate !== null && s.for_win_rate !== undefined ? (s.for_win_rate*100).toFixed(0)+'%' : '—';
-      const aw = s.against_win_rate !== null && s.against_win_rate !== undefined ? (s.against_win_rate*100).toFixed(0)+'%' : '—';
-      lines.push(`  ${{m}}\t${{s.for_n}}\t${{fw}}\t${{s.against_n}}\t${{aw}}`);
+      const fw = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate*100).toFixed(0)+'%' : '—';
+      const aw = s.disagree_win_rate !== null && s.disagree_win_rate !== undefined ? (s.disagree_win_rate*100).toFixed(0)+'%' : '—';
+      lines.push(`  ${{m}}\t${{s.agree_n}}\t${{fw}}\t${{s.disagree_n}}\t${{aw}}`);
     }}
   }}
   if (r.method_stats_by_regime) {{
     for (const [regime, ms] of Object.entries(r.method_stats_by_regime)) {{
       lines.push(`  Attribution по методам (режим ${{regime}}):`);
       for (const [m, s] of Object.entries(ms)) {{
-        const fw = s.for_win_rate !== null && s.for_win_rate !== undefined ? (s.for_win_rate*100).toFixed(0)+'%' : '—';
-        const aw = s.against_win_rate !== null && s.against_win_rate !== undefined ? (s.against_win_rate*100).toFixed(0)+'%' : '—';
-        lines.push(`  ${{m}}\t${{s.for_n}}\t${{fw}}\t${{s.against_n}}\t${{aw}}`);
+        const fw = s.agree_win_rate !== null && s.agree_win_rate !== undefined ? (s.agree_win_rate*100).toFixed(0)+'%' : '—';
+        const aw = s.disagree_win_rate !== null && s.disagree_win_rate !== undefined ? (s.disagree_win_rate*100).toFixed(0)+'%' : '—';
+        lines.push(`  ${{m}}\t${{s.agree_n}}\t${{fw}}\t${{s.disagree_n}}\t${{aw}}`);
       }}
     }}
   }}
@@ -2842,9 +2842,9 @@ async function copyAllResults(btn) {{
 async function calibrateMethodWeights(btn) {{
   if (!_backtestRows.length) {{ alert('Нет результатов бэктеста'); return; }}
   // Для каждого тикера и каждого метода вычисляем мультипликатор из атрибуции.
-  // overall win rate по тикеру = r.win_rate; для метода: for_win_rate vs against_win_rate.
-  // Если метод против (against_win_rate - for_win_rate > 0.2, against_n >= 3) → mult=0.1.
-  // Если for_n >= 5 → mult = clamp(for_win_rate / overallWr, 0.2, 2.0).
+  // overall win rate по тикеру = r.win_rate; для метода: agree_win_rate vs disagree_win_rate.
+  // Если метод против (disagree_win_rate - agree_win_rate > 0.2, disagree_n >= 3) → mult=0.1.
+  // Если agree_n >= 5 → mult = clamp(agree_win_rate / overallWr, 0.2, 2.0).
   // Иначе → 1.0 (нейтральный).
   const MIN_FOR_N = 5, MIN_AGAINST_N = 3, ANTI_DELTA = 0.2;
   const weights = {{}};
@@ -2854,10 +2854,10 @@ async function calibrateMethodWeights(btn) {{
     if (wr <= 0) continue;
     const tickerMults = {{}};
     for (const [method, ms] of Object.entries(r.method_stats)) {{
-      const fn = ms.for_n || 0;
-      const an = ms.against_n || 0;
-      const fwr = ms.for_win_rate != null ? ms.for_win_rate / 100 : null;
-      const awr = ms.against_win_rate != null ? ms.against_win_rate / 100 : null;
+      const fn = ms.agree_n || 0;
+      const an = ms.disagree_n || 0;
+      const fwr = ms.agree_win_rate != null ? ms.agree_win_rate : null;
+      const awr = ms.disagree_win_rate != null ? ms.disagree_win_rate : null;
       let mult = 1.0;
       if (fwr !== null && awr !== null && an >= MIN_AGAINST_N && (awr - fwr) > ANTI_DELTA) {{
         mult = 0.1; // антисигнал — подавить
@@ -2868,7 +2868,7 @@ async function calibrateMethodWeights(btn) {{
     }}
     if (Object.keys(tickerMults).length) weights[r.ticker] = tickerMults;
   }}
-  if (!Object.keys(weights).length) {{ alert('Недостаточно данных атрибуции (нужно for_n≥5)'); return; }}
+  if (!Object.keys(weights).length) {{ alert('Недостаточно данных атрибуции (нужно agree_n≥5)'); return; }}
   btn.disabled = true; btn.textContent = '⏳ сохранение…';
   try {{
     const resp = await fetch('/api/save_method_weights', {{
