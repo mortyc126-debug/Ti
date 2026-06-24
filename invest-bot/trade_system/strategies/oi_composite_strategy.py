@@ -142,7 +142,7 @@ logger = logging.getLogger(__name__)
 WEIGHTS_FILE = "oi_weights.json"   # файл весов (рядом с main.py)
 CANDLE_WINDOW = 30                 # свечей в окне для расчётов
 MIN_CANDLES = 10                   # минимум свечей для первого сигнала
-SIGNAL_THRESHOLD = 0.08            # порог composite для сигнала
+SIGNAL_THRESHOLD = 0.12            # порог composite для сигнала
 HEDGE_ETA = 0.6                    # темп Hedge-обучения весов методов (multiplicative weights)
 HEDGE_WARMUP_TRADES = 15           # на первых N сделках eta линейно растёт от 0 до HEDGE_ETA
 # Байесовский shrinkage: per-regime вес → global.
