@@ -4805,10 +4805,18 @@ let _bsAllTickers = [];
 let _bsBatchRunning = false;
 
 function bsInit() {{
-  // получаем список тикеров из чекбоксов сайдбара
+  // читаем тикеры из DOM (#tickers — серверная подстановка, всегда в HTML)
   _bsAllTickers = Array.from(document.querySelectorAll('#tickers input[type=checkbox]'))
     .map(cb => cb.value).filter(Boolean);
-  bsRenderGrid();
+  // fallback: если DOM ещё не готов, пробуем через API
+  if (!_bsAllTickers.length) {{
+    fetch('/api/tickers_list').then(r => r.json()).then(list => {{
+      _bsAllTickers = list;
+      bsRenderGrid();
+    }}).catch(() => {{}});
+  }} else {{
+    bsRenderGrid();
+  }}
   bsLoadFiles();
 }}
 
@@ -5259,6 +5267,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":
             self._send_json(get_bot_status())
+        elif self.path == "/api/tickers_list":
+            self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path.startswith("/api/bar_scores_list"):
             self._send_json(list_bar_scores_files())
         elif self.path.startswith("/api/bar_scores_download"):
