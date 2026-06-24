@@ -1941,6 +1941,159 @@ def score_triangle(candles: list[HistoricCandle]) -> float:
     return max(-1.0, min(1.0, score))
 
 
+# ── Плейбуки: конъюнктивные сигналы ──────────────────────────────────────────
+# Линейная взвешенная сумма (composite) хорошо агрегирует независимые сигналы,
+# но теряет нелинейные эффекты: Hawkes(+0.8) + VSA(+0.7) вместе — качественно
+# другое событие, не сумма. Плейбуки проверяют смысловые конъюнкции ПЕРЕД
+# усреднением и при совпадении дают этой связке 60% веса в итоговом composite.
+#
+# Возвращает (playbook_score ∈[-1,1], список активных плейбуков).
+# Если ни один не активирован — (0.0, []), тогда работает чистая линейная сумма.
+def _compute_playbooks(sd: dict[str, float], regime: str) -> tuple[float, list[str]]:
+    def g(name: str) -> float:
+        return sd.get(name, 0.0)
+
+    active: list[str] = []
+    scores: list[float] = []
+
+    hawkes  = g("HAWKES_SIGNAL")
+    vsa     = g("VSA")
+    level   = g("LEVEL_CONTEXT")
+    tq      = g("TREND_QUALITY")
+    fractal = g("FRACTAL")
+    vol_mom = g("VOL_MOMENTUM")
+    cp      = g("CHANGE_POINT")
+    oi_sq   = g("OI_SQUEEZE")
+    spring  = g("SPRING")
+    wick    = g("WICK_REJECTION")
+    sine    = g("SINEWAVE_SIGNAL")
+    mkt     = g("MKT_STRUCTURE")
+    vwap    = g("VWAP_SIGNAL")
+    candle_p = g("CANDLE_PATTERN")
+    triangle = g("TRIANGLE")
+    price_t  = g("PRICE_TREND")
+    rmi      = g("RMI")
+    fisher   = g("FISHER_RSI")
+    multi    = g("MULTI_TICKER")
+    inst_oi  = g("INST_OI")
+    retail   = g("RETAIL_CONTRA")
+    aggr     = g("AGGRESSOR_FLOW") or g("BS_PRESSURE_TS")
+
+    # ── Плейбук 1: Институциональное поглощение ──────────────────────────────
+    # Крупный агрессор поглощает на уровне с самоусиливающимся потоком.
+    # Вероятность движения нелинейно выше суммы частей.
+    if abs(hawkes) > 0.35 and abs(vsa) > 0.3 and abs(level) > 0.25:
+        d = 1 if hawkes > 0 else -1
+        if vsa * d > 0 and level * d > 0:
+            strength = (abs(hawkes) + abs(vsa) + abs(level)) / 3
+            if aggr * d > 0.2:
+                strength *= 1.3
+            active.append("ABSORPTION")
+            scores.append(d * min(1.0, strength) * 1.2)
+
+    # ── Плейбук 2: Ложный пробой (Вайкофф) ───────────────────────────────────
+    # Медведей выбило стопы, возврат от уровня. Не работает в сильном тренде.
+    if abs(spring) > 0.3 and abs(wick) > 0.3:
+        d = 1 if spring > 0 else -1
+        if wick * d > 0 and level * d > 0:
+            if abs(tq) < 0.65 or tq * d > 0:
+                strength = (abs(spring) + abs(wick)) / 2
+                if abs(oi_sq) > 0.15 and oi_sq * d > 0:
+                    strength *= 1.2
+                active.append("FAKEOUT")
+                scores.append(d * min(1.0, strength))
+
+    # ── Плейбук 3: Смена режима — первое движение ─────────────────────────────
+    # CHANGE_POINT = нулевой уровень: сработал → перезапуск, не просто голос.
+    if abs(cp) > 0.45 and abs(sine) > 0.25:
+        d = 1 if cp > 0 else -1
+        if sine * d > 0 and mkt * d > 0:
+            strength = (abs(cp) + abs(sine) + abs(mkt)) / 3
+            if fractal * d > 0.15:
+                strength *= 1.15
+            active.append("REGIME_SHIFT")
+            scores.append(d * min(1.0, strength) * 1.1)
+
+    # ── Плейбук 4: Консолидация перед пробоем ────────────────────────────────
+    # Нарастающее давление в треугольнике. Направление — по inst_oi vs retail.
+    if abs(triangle) > 0.35 and abs(oi_sq) > 0.15:
+        d = 1 if triangle > 0 else -1
+        if oi_sq * d > 0:
+            oi_bias = inst_oi * d + retail * d
+            strength = (abs(triangle) + abs(oi_sq)) / 2
+            if oi_bias > 0.1:
+                strength *= 1.15
+            active.append("CONSOLIDATION_BREAK")
+            scores.append(d * min(1.0, strength) * 0.9)
+
+    # ── Плейбук 5: Трендовое продолжение на откате ───────────────────────────
+    # Здоровый тренд (фрактал + TQ), откат слабый по объёму, свечной сигнал.
+    if tq > 0.5 and fractal > 0.1 and vwap < 0.15 and 0.0 < vol_mom < 0.35 and candle_p > 0.2:
+        strength = (tq + fractal + candle_p) / 3
+        active.append("TREND_PULLBACK_L")
+        scores.append(min(1.0, strength) * 0.85)
+    elif tq < -0.5 and fractal > 0.1 and vwap > -0.15 and -0.35 < vol_mom < 0.0 and candle_p < -0.2:
+        strength = (abs(tq) + fractal + abs(candle_p)) / 3
+        active.append("TREND_PULLBACK_S")
+        scores.append(-min(1.0, strength) * 0.85)
+
+    # ── Плейбук 6: Дивергенция истощения (контртрендовый) ────────────────────
+    # Движение "на пустышке": без агрессии и объёма, осциллятор перегрет,
+    # корреляты не подтверждают. Меньший размер — поэтому cap 0.7.
+    if abs(price_t) > 0.45 and abs(vol_mom) < 0.2 and abs(hawkes) < 0.25:
+        d = 1 if price_t > 0 else -1
+        osc_extreme = (rmi * d < -0.35) or (fisher * d < -0.35)
+        multi_disagrees = multi != 0.0 and multi * d < 0
+        if osc_extreme and vol_mom * d < 0.05:
+            strength = abs(price_t) * 0.55
+            if multi_disagrees:
+                strength *= 1.2
+            active.append("EXHAUSTION_DIV")
+            scores.append(-d * min(0.7, strength))
+
+    if not scores:
+        return 0.0, []
+
+    # Конфликт плейбуков (разные направления) = неопределённость → ослабление.
+    pos = sum(1 for s in scores if s > 0)
+    neg = sum(1 for s in scores if s < 0)
+    if pos > 0 and neg > 0:
+        net = sum(scores)
+        if abs(net) < 0.15:
+            return 0.0, active
+        return max(-1.0, min(1.0, net * 0.35)), active
+
+    return max(-1.0, min(1.0, sum(scores) / len(scores))), active
+
+
+# ── Дивергентный мета-сигнал ──────────────────────────────────────────────────
+# Отдельно от плейбуков: измеряет расхождение между трендовой и объёмной группой.
+# Если цена делает экстремум, а объём/агрессия угасают — дивергенция сильнее
+# нейтрального скора, который получается при простом суммировании.
+def _divergence_score(sd: dict[str, float]) -> float:
+    """
+    Возвращает скор дивергенции ∈[-1,1].
+    Положительный = цена падает, но объём бычий (скрытое накопление).
+    Отрицательный = цена растёт, но объём медвежий (скрытое распределение).
+    0.0 = нет значимой дивергенции.
+    """
+    def g(n: str) -> float:
+        return sd.get(n, 0.0)
+
+    trend_sign = (g("PRICE_TREND") + g("TREND_QUALITY") + g("ZLEMA_SIGNAL")) / 3
+    vol_sign   = (g("VOL_MOMENTUM") + g("KLINGER") + g("VZO")) / 3
+
+    if abs(trend_sign) < 0.15 or abs(vol_sign) < 0.1:
+        return 0.0  # обе группы нейтральны — не дивергенция
+
+    # Дивергенция: знаки противоположны
+    if trend_sign * vol_sign < 0:
+        # сила дивергенции = среднее абсолютных значений × направление (по объёму)
+        magnitude = (abs(trend_sign) + abs(vol_sign)) / 2
+        return max(-1.0, min(1.0, (1 if vol_sign > 0 else -1) * magnitude * 0.7))
+    return 0.0
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -2158,6 +2311,8 @@ class OICompositeStrategy(IStrategy):
         self.__regime_stable_bars: int = 0
         self.__last_scores: dict[str, float] = {}
         self.__last_composite: float = 0.0
+        self.__last_playbooks: list[str] = []
+        self.__last_entropy_score: float = 0.0
         # HistoryStore + PercentileCalibrator — опциональны, инжектируются извне
         self.__history = None
         self.__calibrator = None
@@ -2438,6 +2593,14 @@ class OICompositeStrategy(IStrategy):
         # порог адаптируется под режим рынка, поверх — прогрев/плохая полоса
         adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
         effective_threshold = self.__effective_threshold(adaptive)
+        # Энтропийная коррекция: низкая энтропия (упорядоченный рынок) → порог
+        # снижается до ×0.85; высокая (хаос) → поднимается до ×1.25.
+        # __last_entropy_score > 0 = упорядоченно, < 0 = хаотично.
+        ent = self.__last_entropy_score
+        if ent > 0.2:
+            effective_threshold *= max(0.85, 1.0 - ent * 0.3)
+        elif ent < -0.2:
+            effective_threshold *= min(1.25, 1.0 + abs(ent) * 0.5)
 
         direction: Optional[SignalType] = None
         if composite >= effective_threshold:
@@ -2794,6 +2957,11 @@ class OICompositeStrategy(IStrategy):
                                     self.__narrative_thresholds.set_data(fitted)
                 adaptive = _adaptive_threshold(self.__threshold, self.__last_regime)
                 effective_threshold = self.__effective_threshold(adaptive)
+                ent = self.__last_entropy_score
+                if ent > 0.2:
+                    effective_threshold *= max(0.85, 1.0 - ent * 0.3)
+                elif ent < -0.2:
+                    effective_threshold *= min(1.25, 1.0 + abs(ent) * 0.5)
 
                 direction: Optional[SignalType] = None
                 if composite >= effective_threshold:
@@ -3480,7 +3648,24 @@ class OICompositeStrategy(IStrategy):
 
         weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
         weight_sum = sum(weights[:n_base]) or 1.0
-        composite = (weighted / weight_sum) * (0.6 + 0.4 * vhf_mult)
+        linear_raw = weighted / weight_sum
+
+        # Плейбуки: нелинейные конъюнкции — при активации берут 60% итога.
+        # Дивергенция инжектируется как дополнительное смещение linear_raw.
+        playbook_score, active_playbooks = _compute_playbooks(base_score_dict, regime)
+        div_score = _divergence_score(base_score_dict)
+        if abs(div_score) > 0.1:
+            # Дивергенция подмешивается с весом 0.25 в линейную часть.
+            linear_raw = linear_raw * 0.75 + div_score * 0.25
+
+        if abs(playbook_score) > 0.08 and active_playbooks:
+            blended_raw = 0.6 * playbook_score + 0.4 * linear_raw
+        else:
+            blended_raw = linear_raw
+            active_playbooks = []
+        self.__last_playbooks = active_playbooks
+
+        composite = blended_raw * (0.6 + 0.4 * vhf_mult)
 
         confidence_mult = self.__cached_rqa_mult
         confidence_mult *= self.__cached_wavelet_mult
@@ -3527,6 +3712,41 @@ class OICompositeStrategy(IStrategy):
                 f"composite={composite:+.3f} → вето ×{_LEVEL_VETO_MULT}"
             )
             composite *= _LEVEL_VETO_MULT
+
+        # Расширенное вето 1: MMI > 75 (рынок случайный) — подавляем трендовые
+        # сигналы. MMI_SIGNAL возвращает -0.5 при m>75, 0.5 при m<50.
+        # Если он сильно против — трендовые плейбуки нейтрализуем.
+        try:
+            mmi_idx = BASE_METHOD_NAMES.index("MMI_SIGNAL")
+            mmi_score = scores[mmi_idx]
+        except (ValueError, IndexError):
+            mmi_score = 0.0
+        trend_playbook_active = any(p in ("TREND_PULLBACK_L", "TREND_PULLBACK_S", "REGIME_SHIFT") for p in active_playbooks)
+        if mmi_score < -0.4 and abs(composite) > 0.05 and not trend_playbook_active:
+            composite *= 0.35
+            logger.debug(f"{self.__settings.figi}: MMI вето (рынок вязкий) → ×0.35")
+
+        # Расширенное вето 2: FRACTAL (Hurst < 0.5) — mean-reverting рынок,
+        # подавляем трендовые методы (PRICE_TREND/ZLEMA/T3 доминируют в сумме).
+        # fractal < -0.25 значит Hurst ≈ <0.45 (по реализации score_fractal).
+        try:
+            frac_idx = BASE_METHOD_NAMES.index("FRACTAL")
+            frac_score = scores[frac_idx]
+        except (ValueError, IndexError):
+            frac_score = 0.0
+        if frac_score < -0.25 and not active_playbooks:
+            # Нет активного плейбука + рынок mean-reverting: трендовая часть ненадёжна.
+            composite *= 0.45
+            logger.debug(f"{self.__settings.figi}: Hurst вето (mean-revert) → ×0.45")
+
+        # Энтропийный порог сохраняется для использования в analyze_candles/backtest.
+        # ENTROPY возвращает > 0 при упорядоченном рынке (→ порог можно снизить),
+        # < 0 при хаотичном (→ порог надо поднять).
+        try:
+            ent_idx = BASE_METHOD_NAMES.index("ENTROPY")
+            self.__last_entropy_score = scores[ent_idx]
+        except (ValueError, IndexError):
+            self.__last_entropy_score = 0.0
 
         # ATR-exhaustion: если цена уже прошла 60-85%+ дневного ATR в направлении
         # сигнала — потенциал движения исчерпывается, демпфируем composite.
