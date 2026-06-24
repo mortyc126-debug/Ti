@@ -370,6 +370,9 @@ class Trader:
     ) -> None:
         logger.info("Start preparations for trading today")
         self.__trading_settings = trading_settings
+        # Очищаем MFE/MAE трекер между торговыми днями: иначе max_fav/max_adv
+        # накапливаются бессрочно и показывают «лучший максимум» из прошлых дней.
+        self.__pos_tracking.clear()
         today_trade_strategies = self.__get_today_strategies(strategies)
         if not today_trade_strategies:
             logger.info("No shares to trade today.")
@@ -894,7 +897,20 @@ class Trader:
                 if pos_t2 is None:
                     # Позиция уже закрыта — отменяем второй транш
                     del self.__pending_tranche2[candle.figi]
-                elif t2["bars_left"] <= 0:
+                    continue
+                # Проверяем что стоп актуален: если текущая цена уже за
+                # стопом первого транша — вход ошибочный, транш отменяем.
+                t2_stop = float(t2["signal"].stop_loss_level)
+                stop_hit = (t2["direction"] == "long" and current_close <= t2_stop) or \
+                           (t2["direction"] == "short" and current_close >= t2_stop)
+                if stop_hit:
+                    logger.info(
+                        f"TRANCHE2 {t2['strategy'].settings.ticker}: "
+                        f"отменён — цена {current_close:.4f} уже за стопом {t2_stop:.4f}"
+                    )
+                    del self.__pending_tranche2[candle.figi]
+                    continue
+                if t2["bars_left"] <= 0:
                     # Фильтр: откат от входа не превышает TRANCHE2_MAX_ADVERSE_ATR * ATR.
                     # Знак P&L плохой критерий — отменял бы транш при любом тике против.
                     # ATR-порог: нормальный шум (≤0.5 ATR) — добавляем, сильное движение

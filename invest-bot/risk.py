@@ -294,7 +294,14 @@ class RiskManager:
         equity = self.equity_getter() or 0
         if equity <= 0:
             return 0.0
-        total_risk = sum(p.risk_rub for p in self.positions.values())
+        # Используем initial_risk_rub (неизменный с момента открытия), а не risk_rub
+        # который падает к нулю после подтягивания стопа в безубыток.
+        # Это даёт консервативную оценку: портфель «занят» пока позиция открыта,
+        # независимо от того, насколько стоп подтянут вперёд.
+        total_risk = sum(
+            (p.initial_risk_rub if p.initial_risk_rub > 0 else p.risk_rub)
+            for p in self.positions.values()
+        )
         return round(total_risk / equity * 100, 2)
 
     def stop_squeeze_factor(self) -> float:
@@ -347,16 +354,29 @@ class RiskManager:
         # разрешалось — корреляционная защита фактически не работала.
         group = self._ticker_group.get(ticker)
         if group:
-            tickers_in_group = [t for t, p in self.positions.items()
+            tickers_in_group = [(t, p) for t, p in self.positions.items()
                                  if self._ticker_group.get(t) == group]
             if tickers_in_group:
-                group_dir = self.group_direction(group)
-                return False, (
-                    f"КОРРЕЛЯЦИОННЫЙ КОНФЛИКТ: группа {group} уже занята "
-                    f"({group_dir.upper() if group_dir else '?'} по {tickers_in_group}), "
-                    f"новая позиция {direction.upper()} по {ticker} в той же группе запрещена "
-                    f"независимо от направления — это не диверсификация."
-                )
+                for t, p in tickers_in_group:
+                    if p.direction == direction:
+                        # Одинаковое направление — всегда блокируем (удвоение ставки)
+                        return False, (
+                            f"КОРРЕЛЯЦИОННЫЙ КОНФЛИКТ: группа {group} уже занята "
+                            f"({p.direction.upper()} {t}), "
+                            f"ещё один {direction.upper()} по {ticker} — удвоение ставки."
+                        )
+                    else:
+                        # Противоположное направление: разрешено только при независимых горизонтах.
+                        # expected_bars хранится на Position если был передан, иначе дефолт 20 баров.
+                        existing_horizon = getattr(p, "expected_bars", 20) * 1  # tf неизвестен на RiskManager
+                        # Без tf_minutes использовать горизонт в барах как proxy: 20 = "короткий"
+                        # Если вызывается через PortfolioRiskManager — там горизонты в минутах.
+                        # Здесь просто запрещаем хедж при одном RiskManager (без multi-account контекста)
+                        return False, (
+                            f"КОРРЕЛЯЦИОННЫЙ КОНФЛИКТ: группа {group} уже занята "
+                            f"({p.direction.upper()} {t}), противоположный {direction.upper()} "
+                            f"по {ticker} требует PortfolioRiskManager для проверки горизонтов."
+                        )
 
         # ── Уверенность в сигнале ──────────────────────────────────────────
         risk_pct, risk_why = self.risk_pct_from_confidence(confidence)
@@ -505,15 +525,21 @@ class RiskManager:
         pnl = pos.pnl_rub(price, point_value)
         pos.peak_profit_rub = max(pos.peak_profit_rub, pnl)
 
+        chandelier_moved = False
         if pos.direction == "long":
             pos.peak_price = max(pos.peak_price, price)
             if pos.trail_dist > 0:
-                pos.stop_price = max(pos.stop_price, pos.peak_price - pos.trail_dist)
+                new_stop = max(pos.stop_price, pos.peak_price - pos.trail_dist)
+                chandelier_moved = (new_stop != pos.stop_price)
+                pos.stop_price = new_stop
         else:
             pos.peak_price = min(pos.peak_price, price)
             if pos.trail_dist > 0:
-                pos.stop_price = min(pos.stop_price, pos.peak_price + pos.trail_dist)
-        self._recalc_risk_rub(pos)
+                new_stop = min(pos.stop_price, pos.peak_price + pos.trail_dist)
+                chandelier_moved = (new_stop != pos.stop_price)
+                pos.stop_price = new_stop
+        if chandelier_moved:
+            self._recalc_risk_rub(pos)
 
         # Поведенческий выход: 2 из 3 (стакан + структура + нитки).
         # Без grace-окна — нитки+тонкий стакан предшествуют гэпу.
@@ -577,34 +603,52 @@ class RiskManager:
         # Chandelier работает параллельно и всегда берётся max(chandelier, ступень),
         # т.к. Chandelier пишет через max() выше, а ступени тоже через max().
         # Итого: стоп = max(chandelier_stop, breakeven_ступень) — проблема 2 закрыта.
+        # breakeven_set НЕ является одноразовым замком — сбрасывается если pnl
+        # опустился обратно ниже _be_start (позиция откатилась, ступени могут
+        # реактивироваться при следующем росте). Стоп при этом не двигается назад
+        # (max/min выше гарантируют монотонность), поэтому безубыток не «отменяется».
         ir = pos.initial_risk_rub if pos.initial_risk_rub > 0 else pos.risk_rub
         lvl = pos.activation_levels
         _be_start = lvl.get('breakeven', BREAKEVEN_SLIDE_START_R)   # дефолт 0.5R
         _be_step2 = lvl.get('partial', BREAKEVEN_SLIDE_STEP2_R)     # дефолт 0.75R
         _be_trail = lvl.get('trailing', BREAKEVEN_AT_R)             # дефолт 1.0R
-        if not pos.breakeven_set and ir > 0:
+        stop_moved = False
+        if ir > 0:
             if pnl >= ir * _be_trail:
+                if not pos.breakeven_set:
+                    log.info(f"{ticker}: прибыль >= {_be_trail:.2f}R — безубыток, Chandelier+giveback активны")
                 if pos.direction == "long":
-                    pos.stop_price = max(pos.stop_price, pos.entry_price)
+                    new_stop = max(pos.stop_price, pos.entry_price)
                 else:
-                    pos.stop_price = min(pos.stop_price, pos.entry_price)
+                    new_stop = min(pos.stop_price, pos.entry_price)
+                stop_moved = (new_stop != pos.stop_price)
+                pos.stop_price = new_stop
                 pos.breakeven_set = True
-                self._recalc_risk_rub(pos)
-                log.info(f"{ticker}: прибыль >= {_be_trail:.2f}R — безубыток, Chandelier+giveback активны")
             elif pnl >= ir * _be_step2:
+                # Откат из _be_trail назад — сбрасываем флаг, ступени активны снова
+                pos.breakeven_set = False
                 lock_dist = BREAKEVEN_SLIDE_LOCK2_R * ir / (pos.qty * pos.point_value) \
                     if pos.qty and pos.point_value else 0.0
                 if pos.direction == "long":
-                    pos.stop_price = max(pos.stop_price, pos.entry_price + lock_dist)
+                    new_stop = max(pos.stop_price, pos.entry_price + lock_dist)
                 else:
-                    pos.stop_price = min(pos.stop_price, pos.entry_price - lock_dist)
-                self._recalc_risk_rub(pos)
+                    new_stop = min(pos.stop_price, pos.entry_price - lock_dist)
+                stop_moved = (new_stop != pos.stop_price)
+                pos.stop_price = new_stop
             elif pnl >= ir * _be_start:
+                pos.breakeven_set = False
                 if pos.direction == "long":
-                    pos.stop_price = max(pos.stop_price, pos.entry_price)
+                    new_stop = max(pos.stop_price, pos.entry_price)
                 else:
-                    pos.stop_price = min(pos.stop_price, pos.entry_price)
-                self._recalc_risk_rub(pos)
+                    new_stop = min(pos.stop_price, pos.entry_price)
+                stop_moved = (new_stop != pos.stop_price)
+                pos.stop_price = new_stop
+            else:
+                # pnl упал ниже первой ступени — сбрасываем флаг полностью
+                pos.breakeven_set = False
+        # Один пересчёт risk_rub за всё движение стопа на этом баре
+        if stop_moved:
+            self._recalc_risk_rub(pos)
 
         # Giveback защищает прибыль, а не фиксирует убыток — активен только
         # после того как стоп перенесён в безубыток (breakeven_set).
@@ -688,16 +732,23 @@ class RiskManager:
 
         retrace = pos.fix_step * PARTIAL_TP_RETRACE_FRACTION
         candidate_stop = price - retrace if pos.direction == "long" else price + retrace
-        if pos.direction == "long":
-            pos.remainder_stop = max(pos.remainder_stop, candidate_stop)
-        else:
-            pos.remainder_stop = min(pos.remainder_stop, candidate_stop)
-        pos.next_fix_level += pos.fix_step if pos.direction == "long" else -pos.fix_step
+        # Вычисляем новый remainder_stop до решения о фиксации, но применяем
+        # мутацию только один раз: сначала edge-проверка, потом — обновление стопа.
+        # Это предотвращает ситуацию когда стоп уже сдвинулся, а закрытия не было.
+        new_remainder_stop = (max(pos.remainder_stop, candidate_stop)
+                              if pos.direction == "long"
+                              else min(pos.remainder_stop, candidate_stop))
 
         decayed = current_edge < pos.entry_composite * SCALE_OUT_EDGE_DECAY
         if not decayed:
+            # Edge жив — просто подтягиваем стоп и сдвигаем уровень следующего шага
+            pos.remainder_stop = new_remainder_stop
+            pos.next_fix_level += pos.fix_step if pos.direction == "long" else -pos.fix_step
             return False, 0, pos.remainder_stop
 
+        # Edge исчез — фиксируем, обновляем состояние
+        pos.remainder_stop = new_remainder_stop
+        pos.next_fix_level += pos.fix_step if pos.direction == "long" else -pos.fix_step
         qty_to_close = max(1, int(pos.qty * SCALE_OUT_CLOSE_FRACTION))
         qty_to_close = min(qty_to_close, pos.qty - 1)  # хотя бы 1 лот остаётся
         pos.fix_count += 1
@@ -746,7 +797,11 @@ class RiskManager:
         total = pos.qty + qty
         pos.entry_price = (pos.entry_price * pos.qty + price * qty) / total
         pos.qty = total
-        pos.risk_rub += abs(price - pos.stop_price) * qty * point_value
+        add_risk = abs(price - pos.stop_price) * qty * point_value
+        pos.risk_rub += add_risk
+        # initial_risk_rub растёт вместе с позицией — иначе скользящий безубыток
+        # защищает только первоначальный транш, а добавленный остаётся незащищённым.
+        pos.initial_risk_rub += add_risk
         pos.adds_count += 1
         pos.scaled_out = False
         log.info(f"ADD {ticker} +{qty} @ {price} -> qty={total}, "

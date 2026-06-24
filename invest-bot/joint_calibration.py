@@ -32,8 +32,15 @@ def converged(params_prev: dict, params_curr: dict, tol: float = 0.02) -> bool:
     return True
 
 
-def clip_step(new_val: float, prev_val: float, max_change: float = 0.30) -> float:
-    """Ограничить изменение параметра за итерацию на ±max_change (30%)."""
+def clip_step(new_val: float, prev_val: float, max_change: float = 0.30,
+              n_observations: int = 0) -> float:
+    """Ограничить изменение параметра за итерацию на ±max_change.
+    При малом числе наблюдений (< 30) max_change урезается до 15% —
+    оптимум нестабилен, большие прыжки приводят к расходимости."""
+    if n_observations > 0:
+        # При n < 30: max_change = 0.15; при n ≥ 100: полный max_change; линейно между.
+        scale = max(0.5, min(1.0, (n_observations - 30) / 70))
+        max_change = max_change * scale
     lo = prev_val * (1.0 - max_change)
     hi = prev_val * (1.0 + max_change)
     return max(lo, min(hi, new_val))
@@ -111,6 +118,7 @@ def calibrate_iterative(
     tol: float = 0.02,
     max_iter: int = 10,
     max_change_per_iter: float = 0.30,
+    n_observations: int = 0,
 ) -> tuple[dict, int]:
     """
     Итеративная совместная калибровка взаимозависимых параметров.
@@ -120,6 +128,7 @@ def calibrate_iterative(
     tol            — порог сходимости (2%)
     max_iter       — максимум итераций
     max_change_per_iter — ±30% изменения за итерацию (защита от расходимости)
+    n_observations  — число сделок для адаптивного clip_step (0 = не адаптировать)
 
     Возвращает (итоговые параметры, число итераций).
 
@@ -129,7 +138,8 @@ def calibrate_iterative(
             lambda p: {'l1_coeff':   calibrate_l1(records, p['signal_thr'])},
             lambda p: {'agree_thr':  calibrate_agreement_threshold(records)},
         ]
-        params, n_iter = calibrate_iterative({'signal_thr': 0.10, ...}, fns)
+        params, n_iter = calibrate_iterative({'signal_thr': 0.10, ...}, fns,
+                                             n_observations=len(records))
     """
     params = dict(params_init)
     for iteration in range(1, max_iter + 1):
@@ -140,7 +150,7 @@ def calibrate_iterative(
                 if k in params and isinstance(params.get(k), (int, float)) \
                         and isinstance(v, (int, float)):
                     params[k] = clip_step(v, params_prev.get(k, v),
-                                          max_change_per_iter)
+                                          max_change_per_iter, n_observations)
                 else:
                     params[k] = v
         if converged(params_prev, params, tol):

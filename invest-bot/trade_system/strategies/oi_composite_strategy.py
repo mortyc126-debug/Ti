@@ -3638,6 +3638,15 @@ class OICompositeStrategy(IStrategy):
                                     if self.__last_atr_pct > 0 else None,
                     # Активные плейбуки на момент входа — для attribution в дашборде
                     "active_playbooks": list(self.__last_playbooks),
+                    # Уровень активации трейлинга на момент входа — не пересчитывать
+                    # при последующих backtest-прогонах по этому же сигналу.
+                    "trail_activation_pct": self.__trail_activation_pct(
+                        self.__last_regime, self.__last_playbooks),
+                    # Стабильность режима на момент входа: BOCD confidence < 0.60
+                    # означало FSM откатился из CONFIRMED в WATCHING — вход мог быть
+                    # на переходном режиме. Для attribution и аудита.
+                    "regime_confidence_at_entry": round(self.__regime_confidence, 4),
+                    "regime_unstable_at_entry": self.__regime_confidence < BOCD_NARRATIVE_SYNC_THR,
                     # Исторические свечи до точки входа — для detect_level_pattern
                     "history_window": candles[max(0, i - 60):i + 1],
                 })
@@ -3929,9 +3938,15 @@ class OICompositeStrategy(IStrategy):
                     entry_mode = "level"
 
             # P9: уровень активации трейлинга (p50 MFE для regime/playbook).
+            # Используем уже сохранённый уровень из снапшота сигнала (если есть) —
+            # это значение было актуальным на момент входа. Пересчёт по текущему
+            # __mfe_distribution дал бы уровень из будущего → дисконтинюити backtest/live.
             sig_regime = sig.get("regime", "")
             sig_playbooks = sig.get("active_playbooks") or []
-            trail_activation_pct = self.__trail_activation_pct(sig_regime, sig_playbooks)
+            if "trail_activation_pct" in sig:
+                trail_activation_pct = sig["trail_activation_pct"]  # сохранённый на момент входа
+            else:
+                trail_activation_pct = self.__trail_activation_pct(sig_regime, sig_playbooks)
             entry_mode_trailing = False
 
             exit_pct: Optional[float] = None
@@ -4604,11 +4619,15 @@ class OICompositeStrategy(IStrategy):
             "scores": dict(self.__last_scores),
             "regime": self.__last_regime,
             "regime_confidence": self.__regime_confidence,
+            "regime_unstable": self.__regime_confidence < BOCD_NARRATIVE_SYNC_THR,
             "rolling_quality": self.__rolling_quality,
             "auto_atr_take_k": self.__auto_atr_take_k,
             "auto_atr_stop_k": self.__auto_atr_stop_k,
             "auto_atr_scale_exp": self.__auto_atr_scale_exp,
             "atr_pct": atr_pct,
+            "trail_activation_pct": self.__trail_activation_pct(
+                self.__last_regime, self.__last_playbooks),
+            "active_playbooks": list(self.__last_playbooks),
         }
 
     def path_estimate(self, lookback: int = 20) -> tuple[float, float]:
@@ -5009,12 +5028,18 @@ class OICompositeStrategy(IStrategy):
         # Берём наименьшие уровни (самый осторожный плейбук из активных) как единый dict
         if not per_pb:
             return {}
+        from risk_config import BREAKEVEN_SLIDE_START_R, BREAKEVEN_SLIDE_STEP2_R, BREAKEVEN_AT_R
+        defaults = {"breakeven": BREAKEVEN_SLIDE_START_R,
+                    "partial": BREAKEVEN_SLIDE_STEP2_R,
+                    "trailing": BREAKEVEN_AT_R}
         keys = ("breakeven", "partial", "trailing")
         merged = {}
         for k in keys:
             vals = [per_pb[pb][k] for pb in per_pb if k in per_pb[pb]]
-            if vals:
-                merged[k] = min(vals)
+            # Если ни один плейбук не дал значение — используем дефолт явно,
+            # чтобы activation_levels всегда был полным (не было молчаливого
+            # fallback в check_exit через lvl.get(k, default)).
+            merged[k] = min(vals) if vals else defaults[k]
         return merged
 
     def __system_uncertainty(self) -> float:

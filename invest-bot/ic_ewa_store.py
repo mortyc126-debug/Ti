@@ -12,6 +12,7 @@ ic_ewa_store.py — общее хранилище IC и EWA-весов для mu
 """
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 
 
@@ -28,22 +29,30 @@ class SharedICEWAStore:
     Стратегия получает ic_bucket(tf) вместо своего внутреннего __ic_priors
     и работает с ним напрямую — все записи автоматически видны другим
     счетам с тем же TF.
+
+    Потокобезопасность: bucket-создание защищено lock (asyncio.Tasks могут
+    обращаться из разных корутин). Внутри bucket'а данные пишутся только
+    стратегией на своём TF — пересечений нет, lock не нужен при доступе к
+    содержимому.
     """
     _ic: dict = field(default_factory=dict)   # {tf: {regime: {method: ICPrior}}}
     _ewa: dict = field(default_factory=dict)  # {tf: {regime: {method: float}}}
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def ic_bucket(self, tf: int) -> dict:
         """Возвращает {regime: {method: ICPrior}} для данного TF.
         При первом обращении создаёт пустой bucket — стратегия заполняет его сама."""
-        if tf not in self._ic:
-            self._ic[tf] = {}
-        return self._ic[tf]
+        with self._lock:
+            if tf not in self._ic:
+                self._ic[tf] = {}
+            return self._ic[tf]
 
     def ewa_bucket(self, tf: int) -> dict:
         """Возвращает {regime: {method: float}} для данного TF."""
-        if tf not in self._ewa:
-            self._ewa[tf] = {}
-        return self._ewa[tf]
+        with self._lock:
+            if tf not in self._ewa:
+                self._ewa[tf] = {}
+            return self._ewa[tf]
 
     def all_tfs(self) -> list[int]:
         return sorted(set(list(self._ic.keys()) + list(self._ewa.keys())))
