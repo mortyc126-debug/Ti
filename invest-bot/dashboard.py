@@ -744,12 +744,18 @@ _BASE_ASSET_LABEL: dict[str, str] = {
     "ETHA": "Ethereum ETF ETHA",
 }
 
-# Коды, которые относятся к товарным/индексным базисам — их показываем
-# каждый своей категорией; остальное (акции РФ, валюта) — в группу.
-_COMMODITY_BASES = frozenset(_BASE_ASSET_LABEL) - frozenset({
+_METAL_BASES = frozenset({
+    "GD", "GOLD", "GLD", "GLDRUB_TOM", "SLVR", "PD", "PT", "AL", "CU", "NI", "ZN",
+})
+_INDEX_BASES = frozenset({"MX", "RI", "MM"})
+_CURRENCY_BASES = frozenset({
     "Si", "Eu", "CNYRUB_TOM", "GBPRUB_TOM", "HKDRUB_TOM",
     "TRYRUB_TOM", "AMDRUB_TOM", "KZTRUB_TOM", "EUR_USD000UTSTOM",
 })
+_FOREIGN_STOCK_BASES = frozenset({"BABA", "BIDU", "IBIT", "ETHA"})
+
+# Товарные базисы (нефть/газ/агро), которые не металл, не индекс, не валюта.
+_COMMODITY_BASES = frozenset(_BASE_ASSET_LABEL) - _METAL_BASES - _INDEX_BASES - _CURRENCY_BASES - _FOREIGN_STOCK_BASES
 
 _RU_STOCK_BASE_TICKERS = frozenset({
     "ABIO", "AFKS", "AFLT", "ALRS", "ASTR", "BANE", "BELU", "BSPB", "CBOM", "CHMF",
@@ -762,20 +768,24 @@ _RU_STOCK_BASE_TICKERS = frozenset({
 })
 
 
+_FUTURES_CATEGORY_ORDER = ("Акции", "Сырьё", "Металлы", "Индексы", "Валюта")
+
+
 def _futures_category(base: str) -> str:
-    """Категория для группировки чипов дашборда.
-    Товарные/индексные базисы из _BASE_ASSET_LABEL — каждый своей
-    категорией с человекочитаемым именем. Акции РФ и валюты — в широкую
-    группу, иначе TOC становится бесконечным."""
-    if not base:
-        return "Прочее"
+    """Категория для группировки чипов дашборда: акции / сырьё / металлы /
+    индексы / валюта — без «прочего». Базис, которого нет ни в одном
+    известном списке (металлы/сырьё/индексы/валюта/иностр. акции), почти
+    всегда сам является тикером акции МосБиржи — относим его к «Акции»,
+    а не сваливаем в неинформативную мусорную категорию."""
+    if base in _METAL_BASES:
+        return "Металлы"
     if base in _COMMODITY_BASES:
         return "Сырьё"
-    if base in _RU_STOCK_BASE_TICKERS:
-        return "Акции РФ"
-    if base in _BASE_ASSET_LABEL:
+    if base in _INDEX_BASES:
+        return "Индексы"
+    if base in _CURRENCY_BASES:
         return "Валюта"
-    return "Прочее"
+    return "Акции"
 
 
 # ticker → категория / basic_asset, пересчитываются вместе в _build_strategy_settings.
@@ -2047,34 +2057,30 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .btn-pill:hover{{box-shadow:0 0 14px rgba(255,0,128,.25);}}
 .btn-sm{{padding:4px 12px;font-size:10px;}}
 .chips{{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}}
-.chip{{display:inline-flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}}
+.chip{{display:inline-flex;align-items:center;height:24px;padding:0 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;line-height:1;color:var(--txt);white-space:nowrap;}}
 .chip:hover{{border-color:rgba(255,0,128,.25);}}
 .chip.active{{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}}
 .chip-fut{{border-color:rgba(80,140,255,.25);}}
 .chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
 .chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
 .chip-row{{display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;}}
+/* ── Тулбар тикеров (сайдбар): один размер кнопки, одна нейтральная цветовая
+   тема — цвет несут только эмодзи-иконки, не текст. ── */
+.tk-toolbar{{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}}
+.tk-btn{{display:inline-flex;align-items:center;height:26px;padding:0 11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:8px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;line-height:1;cursor:pointer;transition:all .15s;white-space:nowrap;}}
+.tk-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt);}}
+.tk-btn-note{{font-size:11px;color:var(--txt3);}}
+/* ── Категории тикеров — вертикальный аккордеон, раскрывается вниз ── */
 .chip-section{{margin-bottom:4px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;}}
-.chip-section>summary{{list-style:none;cursor:pointer;padding:7px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:6px;}}
+.chip-section>summary{{list-style:none;cursor:pointer;height:30px;padding:0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:8px;}}
 .chip-section>summary::-webkit-details-marker{{display:none;}}
-.chip-section>summary::before{{content:'▸';display:inline-block;color:var(--txt3);transition:transform .15s;}}
+.chip-section>summary::before{{content:'▸';display:inline-flex;align-items:center;justify-content:center;width:10px;flex:0 0 10px;color:var(--txt3);font-size:10px;line-height:1;transition:transform .15s;}}
 .chip-section[open]>summary::before{{transform:rotate(90deg);}}
 .chip-section>summary:hover{{background:rgba(255,255,255,.05);}}
+.chip-section-title{{flex:1;overflow:hidden;text-overflow:ellipsis;}}
 .chip-section>.chip-row{{padding:8px 12px 10px;}}
-.chip-stock-section>summary{{color:#a0d4a0;}}
-.chip-fut-section>summary{{color:#7eb8f7;}}
-.cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:220px;}}
-.cat-toc{{flex:0 0 260px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);height:100%;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
-.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:default;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:4px;}}
-.cat-toc-toggle{{flex:0 0 auto;font-size:14px;color:var(--txt3);cursor:pointer;line-height:1;padding:0 2px;border-radius:3px;}}
+.cat-toc-toggle{{flex:0 0 16px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.05);color:var(--txt3);font-size:11px;line-height:1;cursor:pointer;}}
 .cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
-.cat-toc-item:hover{{background:rgba(255,255,255,.05);color:var(--txt);}}
-.cat-toc-item.active{{background:rgba(126,184,247,.12);color:var(--accent);font-weight:600;}}
-.cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;height:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
-.cat-panel .chip-row{{padding:0;}}
-.cat-toc::-webkit-scrollbar,.cat-panels::-webkit-scrollbar{{width:6px;}}
-.cat-toc::-webkit-scrollbar-thumb,.cat-panels::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:3px;}}
-.cat-toc::-webkit-scrollbar-track,.cat-panels::-webkit-scrollbar-track{{background:transparent;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -2533,11 +2539,6 @@ function filterInstrKind(kind) {{
   const ofKind = Array.from(document.querySelectorAll('.chip[data-kind="' + kind + '"]'));
   const allActive = ofKind.every(c => c.classList.contains('active'));
   ofKind.forEach(c => allActive ? c.classList.remove('active') : c.classList.add('active'));
-}}
-
-function showCatPanel(panelId) {{
-  document.querySelectorAll('.cat-toc-item').forEach(el => el.classList.toggle('active', el.dataset.panel === panelId));
-  document.querySelectorAll('.cat-panel').forEach(el => el.style.display = el.dataset.panel === panelId ? 'block' : 'none');
 }}
 
 function setAllChips(active) {{
@@ -4826,33 +4827,46 @@ def _render_page() -> bytes:
 
     futures_by_cat: dict[str, list[str]] = {}
     for t in sorted(futures):
-        cat = _futures_category_by_ticker.get(t, "Прочее")
+        cat = _futures_category_by_ticker.get(t, "Акции")
         futures_by_cat.setdefault(cat, []).append(t)
 
-    # panels: список (panel_id, заголовок_toc, html_содержимого_панели)
-    panels: list[tuple[str, str, str]] = [(
-        "stock", f"Акции ({len(stocks)})",
-        '<div class="chip-row">' + "".join(
+    stock_tickers = sorted(stocks)
+    stocks_ru = [t for t in stock_tickers if t in _RU_STOCK_BASE_TICKERS]
+    stocks_other = [t for t in stock_tickers if t not in _RU_STOCK_BASE_TICKERS]
+
+    def _stock_chip_row(ts: list[str]) -> str:
+        return '<div class="chip-row">' + "".join(
             f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
             f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
-            for t in sorted(stocks)
+            for t in ts
         ) + '</div>'
-    )]
+
+    def _futures_chip_row(ts: list[str]) -> str:
+        return '<div class="chip-row">' + "".join(
+            f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
+            f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
+            f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+            for t in ts
+        ) + '</div>'
+
+    # panels: список (panel_id, заголовок_toc, html_содержимого_панели).
+    # Порядок фиксирован (не алфавитный), чтобы вкладки не «прыгали» между прогонами.
+    panels: list[tuple[str, str, str]] = []
+    if stocks_ru:
+        panels.append(("stock-ru", f"Акции РФ ({len(stocks_ru)})", _stock_chip_row(stocks_ru)))
+    if stocks_other:
+        panels.append(("stock-other", f"Акции — другие ({len(stocks_other)})", _stock_chip_row(stocks_other)))
+    for cat in _FUTURES_CATEGORY_ORDER:
+        ts = futures_by_cat.get(cat)
+        if ts:
+            panels.append((f"fut-{cat}", f"Фьючерсы: {cat} ({len(ts)})", _futures_chip_row(ts)))
     for cat, ts in sorted(futures_by_cat.items()):
-        panels.append((
-            f"fut-{cat}", f"{cat} ({len(ts)})",
-            '<div class="chip-row">' + "".join(
-                f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-                f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
-                f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
-                for t in ts
-            ) + '</div>'
-        ))
+        if cat not in _FUTURES_CATEGORY_ORDER:
+            panels.append((f"fut-{cat}", f"Фьючерсы: {cat} ({len(ts)})", _futures_chip_row(ts)))
 
     cat_sections = "".join(
-        f'<details class="chip-section cat-panel {"chip-stock-section" if pid == "stock" else "chip-fut-section"}" '
-        f'data-panel="{pid}"{" open" if i == 0 else ""}>'
-        f'<summary><span style="flex:1">{label}</span>'
+        f'<details class="chip-section cat-panel" data-panel="{pid}"{" open" if i == 0 else ""}>'
+        f'<summary><span class="chip-section-title">{label}</span>'
         f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
         f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
         f'{panel_html}'
@@ -4861,17 +4875,17 @@ def _render_page() -> bytes:
     )
 
     reload_hint = (
-        ' <span style="color:#7eb8f7;font-size:11px">⏳ обновляется…</span>'
-        if reload_running else ""
+        '<span class="tk-btn-note">⏳ обновляется…</span>' if reload_running else ""
     )
     checkboxes = (
-        f'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\');setAllChips(true)">Все</button>'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'futures\')" style="color:#7eb8f7">🔷 Фьючерсы ({len(futures)})</button>'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'stock\')" style="color:#a0d4a0">📈 Акции ({len(stocks)})</button>'
-        f'<button class="btn-pill btn-sm" onclick="setAllChips(true)">✓ все</button>'
-        f'<button class="btn-pill btn-sm" onclick="setAllChips(false)">✗ снять</button>'
-        f'<button class="btn-pill btn-sm" onclick="reloadFutures()" style="color:#aaa" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты{reload_hint}</button>'
+        f'<div class="tk-toolbar">'
+        f'<button class="tk-btn" onclick="filterInstrKind(\'all\');setAllChips(true)">Все</button>'
+        f'<button class="tk-btn" onclick="filterInstrKind(\'futures\')">🔷 Фьючерсы ({len(futures)})</button>'
+        f'<button class="tk-btn" onclick="filterInstrKind(\'stock\')">📈 Акции ({len(stocks)})</button>'
+        f'<button class="tk-btn" onclick="setAllChips(true)">✓ все</button>'
+        f'<button class="tk-btn" onclick="setAllChips(false)">✗ снять</button>'
+        f'<button class="tk-btn" onclick="reloadFutures()" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты</button>'
+        f'{reload_hint}'
         f'</div>'
         f'{cat_sections}'
     )
