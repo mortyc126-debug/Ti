@@ -2071,7 +2071,13 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .tk-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt);}}
 .tk-btn-note{{font-size:11px;color:var(--txt3);}}
 /* ── Категории тикеров — вертикальный аккордеон, раскрывается вниз ── */
-.chip-section{{margin-bottom:4px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;}}
+.chip-group{{margin-bottom:8px;border:1px solid var(--border2);border-radius:10px;overflow:hidden;}}
+.chip-group>summary{{list-style:none;cursor:pointer;height:32px;padding:0 12px;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--txt);background:rgba(255,255,255,.035);display:flex;align-items:center;gap:8px;}}
+.chip-group>summary::-webkit-details-marker{{display:none;}}
+.chip-group>summary::before{{content:'▾';display:inline-flex;align-items:center;justify-content:center;width:10px;flex:0 0 10px;color:var(--txt2);font-size:10px;line-height:1;transition:transform .15s;}}
+.chip-group:not([open])>summary::before{{transform:rotate(-90deg);}}
+.chip-group-body{{padding:8px;display:flex;flex-direction:column;gap:4px;}}
+.chip-section{{margin-bottom:0;border:1px solid var(--border2);border-radius:8px;overflow:hidden;}}
 .chip-section>summary{{list-style:none;cursor:pointer;height:30px;padding:0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:8px;}}
 .chip-section>summary::-webkit-details-marker{{display:none;}}
 .chip-section>summary::before{{content:'▸';display:inline-flex;align-items:center;justify-content:center;width:10px;flex:0 0 10px;color:var(--txt3);font-size:10px;line-height:1;transition:transform .15s;}}
@@ -4849,30 +4855,48 @@ def _render_page() -> bytes:
             for t in ts
         ) + '</div>'
 
-    # panels: список (panel_id, заголовок_toc, html_содержимого_панели).
-    # Порядок фиксирован (не алфавитный), чтобы вкладки не «прыгали» между прогонами.
-    panels: list[tuple[str, str, str]] = []
+    def _sub_section(pid: str, label: str, panel_html: str, open_: bool) -> str:
+        return (
+            f'<details class="chip-section cat-panel" data-panel="{pid}"{" open" if open_ else ""}>'
+            f'<summary><span class="chip-section-title">{label}</span>'
+            f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
+            f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
+            f'{panel_html}'
+            f'</details>'
+        )
+
+    # Подкатегории внутри «Акции» — фиксированный порядок: РФ, затем другие.
+    stock_subs = []
     if stocks_ru:
-        panels.append(("stock-ru", f"Акции РФ ({len(stocks_ru)})", _stock_chip_row(stocks_ru)))
+        stock_subs.append(_sub_section("stock-ru", f"РФ ({len(stocks_ru)})", _stock_chip_row(stocks_ru), True))
     if stocks_other:
-        panels.append(("stock-other", f"Акции — другие ({len(stocks_other)})", _stock_chip_row(stocks_other)))
-    for cat in _FUTURES_CATEGORY_ORDER:
+        stock_subs.append(_sub_section("stock-other", f"Другие ({len(stocks_other)})", _stock_chip_row(stocks_other), False))
+
+    # Подкатегории внутри «Фьючерсы» — фиксированный порядок: акции, сырьё,
+    # металлы, индексы, валюта; неучтённые (если появится новый код) — следом.
+    futures_subs = []
+    ordered_cats = list(_FUTURES_CATEGORY_ORDER) + sorted(
+        cat for cat in futures_by_cat if cat not in _FUTURES_CATEGORY_ORDER
+    )
+    for i, cat in enumerate(ordered_cats):
         ts = futures_by_cat.get(cat)
         if ts:
-            panels.append((f"fut-{cat}", f"Фьючерсы: {cat} ({len(ts)})", _futures_chip_row(ts)))
-    for cat, ts in sorted(futures_by_cat.items()):
-        if cat not in _FUTURES_CATEGORY_ORDER:
-            panels.append((f"fut-{cat}", f"Фьючерсы: {cat} ({len(ts)})", _futures_chip_row(ts)))
+            futures_subs.append(_sub_section(f"fut-{cat}", f"{cat} ({len(ts)})", _futures_chip_row(ts), i == 0))
 
-    cat_sections = "".join(
-        f'<details class="chip-section cat-panel" data-panel="{pid}"{" open" if i == 0 else ""}>'
-        f'<summary><span class="chip-section-title">{label}</span>'
-        f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
-        f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
-        f'{panel_html}'
-        f'</details>'
-        for i, (pid, label, panel_html) in enumerate(panels)
-    )
+    # Два верхних раздела — Акции и Фьючерсы — каждый со своими подкатегориями внутри.
+    cat_sections = ""
+    if stock_subs:
+        cat_sections += (
+            f'<details class="chip-group" open><summary class="chip-group-title">'
+            f'<span class="chip-section-title">📈 Акции ({len(stocks)})</span></summary>'
+            f'<div class="chip-group-body">{"".join(stock_subs)}</div></details>'
+        )
+    if futures_subs:
+        cat_sections += (
+            f'<details class="chip-group" open><summary class="chip-group-title">'
+            f'<span class="chip-section-title">🔷 Фьючерсы ({len(futures)})</span></summary>'
+            f'<div class="chip-group-body">{"".join(futures_subs)}</div></details>'
+        )
 
     reload_hint = (
         '<span class="tk-btn-note">⏳ обновляется…</span>' if reload_running else ""
