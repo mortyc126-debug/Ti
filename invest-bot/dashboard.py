@@ -2056,6 +2056,21 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .btn-pill{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.12));border:1px solid rgba(255,0,128,.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:8px 18px;cursor:pointer;transition:all .15s;}}
 .btn-pill:hover{{box-shadow:0 0 14px rgba(255,0,128,.25);}}
 .btn-sm{{padding:4px 12px;font-size:10px;}}
+.btn-xs{{padding:3px 10px;font-size:10px;}}
+/* ── Варианты кнопок: цвет = смысл действия, не случайность.
+   primary (розовый, дефолт) — главное действие панели.
+   danger — стоп/закрыть/остановить. ghost — нейтральная утилита.
+   info — информационное/копировать. ok — сохранить/положительное.
+   toggled — активный режим переключателя (тумблер). ── */
+.btn-pill.danger{{background:linear-gradient(180deg,rgba(255,60,60,.32),rgba(255,60,60,.16));border-color:rgba(255,60,60,.55);color:#ffb3b3;}}
+.btn-pill.danger:hover{{box-shadow:0 0 14px rgba(255,60,60,.3);}}
+.btn-pill.ghost{{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.12);color:var(--txt2);}}
+.btn-pill.ghost:hover{{box-shadow:none;border-color:rgba(255,255,255,.22);}}
+.btn-pill.info{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.1));border-color:rgba(80,140,255,.45);color:#7eb8f7;}}
+.btn-pill.info:hover{{box-shadow:0 0 14px rgba(80,140,255,.25);}}
+.btn-pill.ok{{background:linear-gradient(180deg,rgba(82,242,201,.2),rgba(82,242,201,.1));border-color:rgba(82,242,201,.45);color:#9fe8ce;}}
+.btn-pill.ok:hover{{box-shadow:0 0 14px rgba(82,242,201,.25);}}
+.btn-pill.toggled{{background:linear-gradient(180deg,rgba(124,77,255,.4),rgba(124,77,255,.22));border-color:rgba(124,77,255,.65);color:#fff;}}
 .chips{{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}}
 .chip{{display:inline-flex;align-items:center;height:24px;padding:0 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;line-height:1;color:var(--txt);white-space:nowrap;}}
 .chip:hover{{border-color:rgba(255,0,128,.25);}}
@@ -2136,8 +2151,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
     🔷 Фьючерсы — из [FUTURES_TRADING] (авто). 📈 Акции — settings.ini + OI.
     <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
-    <button class="btn-pill btn-sm" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
-    <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
+    <button class="btn-pill btn-sm ghost" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
+    <button class="btn-pill btn-sm ghost" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
     <span id="oi_status"></span>
   </div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">Список тикеров — в сайдбаре слева (☰ в шапке — свернуть/развернуть).</div>
@@ -2147,7 +2162,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
        короче 90 дней молчит почти весь прогон. -->
   <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
   <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
-  <button type="button" class="btn-pill btn-sm" style="color:#aaa" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
+  <button type="button" class="btn-pill btn-sm ghost" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
   <span id="history_coverage_out" style="display:block;width:100%;font-size:12px;color:var(--muted);white-space:pre-wrap;"></span>
   <label title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
   <label title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json."><input type="checkbox" id="adaptive_narrative"> Адаптивная калибровка narrative</label>
@@ -2168,12 +2183,12 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <div class="panel">
   <div class="sec-lg">Бэктест по тикерам</div>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
-  <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
-  <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
-  <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
-  <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
-  <button class="btn-pill btn-sm" style="color:#7eb8f7" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
-  <button class="btn-pill btn-sm" style="color:#b8e6b8" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
+  <button class="btn-pill danger" onclick="cancelRun()">⏹ СТОП</button>
+  <button class="btn-pill btn-sm ghost" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
+  <button class="btn-pill btn-sm ghost" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
+  <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
+  <button class="btn-pill btn-sm info" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
+  <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -2218,7 +2233,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </label>
   <br><br>
   <button class="btn-pill" onclick="runPortfolioSim()">▶ ПРОГНАТЬ ПОРТФЕЛЬ</button>
-  <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
+  <button class="btn-pill danger" onclick="cancelRun()">⏹ СТОП</button>
   <span id="pf_status"></span>
   <div id="pf_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="pf_summary"></div>
@@ -2242,18 +2257,18 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <label>ATR_TAKE_K <input type="number" class="inp mid" id="tc_take" value="2.0" min="0.5" step="0.5"></label>
     <label>ATR_STOP_K <input type="number" class="inp mid" id="tc_stop" value="1.0" min="0.3" step="0.5"></label>
     <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
-    <button class="btn-pill" style="background:var(--accent2,#2a4a2a);" onclick="exportBarScores()" title="Скачать CSV со всеми method_scores по каждому бару — для AI-анализа">📥 CSV для AI</button>
+    <button class="btn-pill ok" onclick="exportBarScores()" title="Скачать CSV со всеми method_scores по каждому бару — для AI-анализа">📥 CSV для AI</button>
     <span id="tc_status" style="font-size:11px;color:var(--txt3);"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--txt3);">
     <span>🔍 колесо/пинч — масштаб &nbsp;|&nbsp; перетащи — панорама &nbsp;|&nbsp; Shift+drag — выделить область</span>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomAll()">Всё</button>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(30)">30д</button>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(14)">14д</button>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(7)">7д</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomAll()">Всё</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomLast(30)">30д</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomLast(14)">14д</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomLast(7)">7д</button>
     <span style="margin-left:8px;">Вид:</span>
-    <button class="btn-pill" id="tc_mode_candle" style="padding:3px 10px;font-size:10px;background:var(--mem);" onclick="tcSetMode('candle')">Свечи</button>
-    <button class="btn-pill" id="tc_mode_line"   style="padding:3px 10px;font-size:10px;" onclick="tcSetMode('line')">Линия</button>
+    <button class="btn-pill btn-xs toggled" id="tc_mode_candle" onclick="tcSetMode('candle')">Свечи</button>
+    <button class="btn-pill btn-xs ghost"   id="tc_mode_line"   onclick="tcSetMode('line')">Линия</button>
   </div>
   <canvas id="tc_canvas" style="width:100%;height:480px;display:block;cursor:crosshair;background:var(--panel);border-radius:10px;border:1px solid var(--border);"></canvas>
   <div id="tc_sel_info" style="font-size:12px;color:var(--txt2);margin-top:6px;min-height:24px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
@@ -2402,8 +2417,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
     <span id="bot_state_dot" class="sdot"></span>
     <span id="bot_state_label" style="font-size:12px;font-weight:600;color:var(--txt2);">загружаем...</span>
-    <button class="btn-pill" id="btn_pause" onclick="botPause()" style="padding:5px 16px;font-size:11px;">⏸ Пауза</button>
-    <button class="btn-pill" id="btn_resume" onclick="botResume()" style="padding:5px 16px;font-size:11px;display:none;">▶ Возобновить</button>
+    <button class="btn-pill btn-sm" id="btn_pause" onclick="botPause()">⏸ Пауза</button>
+    <button class="btn-pill btn-sm" id="btn_resume" onclick="botResume()" style="display:none;">▶ Возобновить</button>
     <button class="btn-pill btn-sm" onclick="loadBotStatus()">⟳</button>
     <span style="font-size:10px;color:var(--txt3);">авто-обновление каждые 30с</span>
   </div>
@@ -2415,8 +2430,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <div class="sec" style="margin-bottom:6px;">Срочное закрытие позиции</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <select class="inp mid" id="close_ticker_sel" style="min-width:120px;"></select>
-      <button class="btn-pill" style="background:rgba(255,60,60,.25);border-color:rgba(255,60,60,.5);color:#ff6060;padding:5px 14px;font-size:11px;" onclick="botClose()">✕ Закрыть</button>
-      <button class="btn-pill" style="background:rgba(255,60,60,.15);border-color:rgba(255,60,60,.4);color:#ff8080;padding:5px 14px;font-size:11px;" onclick="botCloseAll()">✕ Закрыть все</button>
+      <button class="btn-pill btn-sm danger" onclick="botClose()">✕ Закрыть</button>
+      <button class="btn-pill btn-sm danger" onclick="botCloseAll()">✕ Закрыть все</button>
       <span id="close_status" style="font-size:11px;color:var(--txt3);"></span>
     </div>
   </div>
@@ -2437,7 +2452,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <label>Тейк <input type="number" class="inp mid" id="adopt_take" placeholder="250.00" step="0.01" style="width:90px;"></label>
       <label>Стоп <input type="number" class="inp mid" id="adopt_stop" placeholder="240.00" step="0.01" style="width:90px;"></label>
       <label>Вход <input type="number" class="inp mid" id="adopt_entry" placeholder="(текущая)" step="0.01" style="width:90px;"></label>
-      <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botAdopt()">📥 Передать боту</button>
+      <button class="btn-pill btn-sm" onclick="botAdopt()">📥 Передать боту</button>
     </div>
     <div id="adopt_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   </div>
@@ -2447,7 +2462,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <label>Тикер <input type="text" class="inp mid" id="ms_ticker" placeholder="SBER" style="width:80px;"></label>
       <label>Новый стоп <input type="number" class="inp mid" id="ms_stop" placeholder="242.00" step="0.01" style="width:90px;"></label>
       <label>Новый тейк <input type="number" class="inp mid" id="ms_take" placeholder="(не менять)" step="0.01" style="width:100px;"></label>
-      <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botMoveStop()">📐 Переставить</button>
+      <button class="btn-pill btn-sm" onclick="botMoveStop()">📐 Переставить</button>
     </div>
     <div id="ms_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   </div>
@@ -2535,17 +2550,6 @@ function toggleSidebar() {{
   }}
 }})();
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
-
-function filterInstrKind(kind) {{
-  if (kind === 'all') {{
-    document.querySelectorAll('.chip').forEach(c => c.style.display = '');
-    return;
-  }}
-  // toggle: если все чипы этого типа активны — снять все, иначе — включить все
-  const ofKind = Array.from(document.querySelectorAll('.chip[data-kind="' + kind + '"]'));
-  const allActive = ofKind.every(c => c.classList.contains('active'));
-  ofKind.forEach(c => allActive ? c.classList.remove('active') : c.classList.add('active'));
-}}
 
 function setAllChips(active) {{
   document.querySelectorAll('.chip').forEach(c => {{
@@ -4249,8 +4253,10 @@ async function askCouncil() {{
   // ── Зум ─────────────────────────────────────────────────────────────────
   window.tcSetMode = function(mode) {{
     _chartMode = mode;
-    document.getElementById('tc_mode_candle').style.background = mode === 'candle' ? 'var(--mem)' : '';
-    document.getElementById('tc_mode_line').style.background   = mode === 'line'   ? 'var(--mem)' : '';
+    document.getElementById('tc_mode_candle').classList.toggle('toggled', mode === 'candle');
+    document.getElementById('tc_mode_candle').classList.toggle('ghost', mode !== 'candle');
+    document.getElementById('tc_mode_line').classList.toggle('toggled', mode === 'line');
+    document.getElementById('tc_mode_line').classList.toggle('ghost', mode !== 'line');
     _draw();
   }};
 
@@ -4903,9 +4909,6 @@ def _render_page() -> bytes:
     )
     checkboxes = (
         f'<div class="tk-toolbar">'
-        f'<button class="tk-btn" onclick="filterInstrKind(\'all\');setAllChips(true)">Все</button>'
-        f'<button class="tk-btn" onclick="filterInstrKind(\'futures\')">🔷 Фьючерсы ({len(futures)})</button>'
-        f'<button class="tk-btn" onclick="filterInstrKind(\'stock\')">📈 Акции ({len(stocks)})</button>'
         f'<button class="tk-btn" onclick="setAllChips(true)">✓ все</button>'
         f'<button class="tk-btn" onclick="setAllChips(false)">✗ снять</button>'
         f'<button class="tk-btn" onclick="reloadFutures()" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты</button>'
