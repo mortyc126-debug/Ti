@@ -48,7 +48,7 @@ from risk_config import (
     BEHAVIORAL_EXIT_VOTES_NEEDED, BEHAVIORAL_EXIT_ORDER_FLOW_THR,
     BEHAVIORAL_EXIT_HH_BARS, BEHAVIORAL_EXIT_MOMENTUM_BARS, BEHAVIORAL_EXIT_MOMENTUM_THR,
     MULTIPORT_DAILY_LOSS_PCT, MULTIPORT_WEEKLY_LOSS_PCT, MULTIPORT_MONTHLY_LOSS_PCT,
-    MULTIPORT_TOTAL_RISK_MAX_PCT, MULTIPORT_TIGHTENED_GIVEBACK_PCT,
+    MULTIPORT_TOTAL_RISK_MAX_PCT,
 )
 
 __all__ = ("Position", "RiskManager", "PortfolioRiskManager")
@@ -797,94 +797,189 @@ class RiskManager:
 
 class PortfolioRiskManager:
     """
-    Мульти-счётный риск-менеджер: агрегирует несколько RiskManager'ов и
-    применяет единые лимиты по СУММЕ всех счетов.
+    Мульти-счётный риск-менеджер для multi-account торговли.
 
-    Логика двух уровней защиты:
-      1. can_enter: блокирует новые входы если суммарный убыток превысил
-         дневной/недельный/месячный лимит или суммарный риск переполнен.
-      2. exit_giveback_pct: при достижении дневного лимита ужесточает
-         giveback с TRAIL_GIVEBACK_PCT до MULTIPORT_TIGHTENED_GIVEBACK_PCT
-         на всех счетах — открытые позиции закрываются быстрее и не дают
-         убытку расти далеко за лимит.
+    Принимает список TradingSystem (из trading_system.py). Каждый счёт имеет
+    свой RiskManager, таймфрейм и плейбуки, но лимиты убытка и суммарный риск
+    проверяются ЕДИНЫМ образом по всем счетам.
+
+    Ключевые правила:
+      - Дневной/недельный/месячный лимит: суммарно по всем счетам.
+      - Суммарный открытый риск ≤ MULTIPORT_TOTAL_RISK_MAX_PCT.
+      - Корреляционная группа занята в том же направлении = доп.риск суммируется.
+      - Противоположные позиции разрешены только если горизонты не перекрываются.
+      - При достижении лимита входы блокируются; открытые позиции НЕ трогаются.
+      - stat_break на любом счёте — блокирует входы на всех.
 
     Использование:
-        pf = PortfolioRiskManager([rm_account1, rm_account2])
-        ok, why = pf.can_enter(signal_risk_rub=5000)
-        gb = pf.exit_giveback_pct()      # передаётся в rm.check_exit(giveback_pct=gb)
+        from trading_system import TradingSystem, Signal
+        pf = PortfolioRiskManager([sys_a, sys_b])
+        ok, why = pf.can_enter(signal)
+        entered = pf.sort_and_filter([sig_a, sig_b])   # расставляет приоритеты
     """
 
-    def __init__(self, accounts: list["RiskManager"]):
+    HORIZON_OVERLAP_MAX = 0.30   # >30% перекрытия горизонтов → не независимые
+
+    def __init__(self, accounts: list):
+        # accounts — список TradingSystem (typing: list["TradingSystem"])
         self.accounts = accounts
 
+    # ── Агрегаты по всем счетам ──────────────────────────────────────────────
+
     def total_equity(self) -> float:
-        return sum(rm.equity_getter() for rm in self.accounts)
+        return sum(a.equity for a in self.accounts)
 
     def total_day_pnl_rub(self) -> float:
-        return sum(rm.state.get("day_pnl_rub", 0.0) for rm in self.accounts)
+        return sum(a.daily_pnl_rub for a in self.accounts)
 
     def total_week_pnl_rub(self) -> float:
-        return sum(rm.state.get("week_pnl_rub", 0.0) for rm in self.accounts)
+        return sum(a.week_pnl_rub for a in self.accounts)
 
     def total_month_pnl_rub(self) -> float:
-        return sum(rm.state.get("month_pnl_rub", 0.0) for rm in self.accounts)
+        return sum(a.month_pnl_rub for a in self.accounts)
 
     def total_open_risk_rub(self) -> float:
-        return sum(
-            sum(p.risk_rub for p in rm.positions.values())
-            for rm in self.accounts
-        )
+        return sum(a.current_risk_rub for a in self.accounts)
 
     def daily_limit_hit(self) -> bool:
         eq = self.total_equity()
-        if eq <= 0:
-            return False
-        return self.total_day_pnl_rub() <= -eq * MULTIPORT_DAILY_LOSS_PCT / 100
+        return eq > 0 and self.total_day_pnl_rub() <= -eq * MULTIPORT_DAILY_LOSS_PCT / 100
 
-    def can_enter(self, signal_risk_rub: float = 0.0) -> tuple[bool, str]:
-        """Проверить, разрешён ли новый вход по суммарным лимитам портфеля."""
+    def stat_break_active(self) -> bool:
+        """True если stat_break сработал на ЛЮБОМ счёте — блокирует все входы."""
+        for a in self.accounts:
+            strat = getattr(a, "strategy", None)
+            if strat and getattr(strat, "stat_break_quarantine_active", False):
+                return True
+        return False
+
+    # ── Корреляция между счетами ─────────────────────────────────────────────
+
+    def _correlated_tickers(self, ticker_a: str, ticker_b: str) -> bool:
+        """True если тикеры в одной корреляционной группе CORR_GROUPS."""
+        from risk_config import CORR_GROUPS
+        for group in CORR_GROUPS.values():
+            if ticker_a in group and ticker_b in group:
+                return True
+        return False
+
+    @staticmethod
+    def horizons_independent(horizon_new_min: float, horizon_existing_min: float) -> bool:
+        """True если горизонты сделок достаточно различаются (overlap < 30%)."""
+        hi = max(horizon_new_min, horizon_existing_min)
+        if hi <= 0:
+            return False
+        lo = min(horizon_new_min, horizon_existing_min)
+        return lo / hi < PortfolioRiskManager.HORIZON_OVERLAP_MAX
+
+    # ── Основная проверка входа ──────────────────────────────────────────────
+
+    def can_enter(self, signal) -> tuple[bool, str]:
+        """
+        Проверить, разрешён ли вход signal (Signal из trading_system.py)
+        по суммарным портфельным лимитам.
+
+        Порядок проверок:
+          1. Дневной / недельный / месячный лимит
+          2. Суммарный открытый риск (с учётом новой позиции)
+          3. Stat_break на любом счёте
+          4. Корреляционная группа: одинаковое направление = доп.проверка риска
+          5. Противоположная позиция: только если горизонты независимы
+        """
         eq = self.total_equity()
         if eq <= 0:
             return True, ""
 
+        # 1. Временны́е лимиты убытка
         if self.daily_limit_hit():
-            day_pnl_pct = self.total_day_pnl_rub() / eq * 100
-            return False, (
-                f"портфельный дневной лимит: суммарный убыток {day_pnl_pct:.2f}% "
-                f"≤ -{MULTIPORT_DAILY_LOSS_PCT}% — входы заблокированы на всех счетах"
-            )
+            pct = self.total_day_pnl_rub() / eq * 100
+            return False, (f"портфельный дневной лимит: суммарный убыток {pct:.2f}% "
+                            f"≤ -{MULTIPORT_DAILY_LOSS_PCT}% — входы заблокированы")
 
-        week_pnl_pct = self.total_week_pnl_rub() / eq * 100
-        if week_pnl_pct <= -MULTIPORT_WEEKLY_LOSS_PCT:
-            return False, (
-                f"портфельный недельный лимит: суммарный убыток {week_pnl_pct:.2f}% "
-                f"≤ -{MULTIPORT_WEEKLY_LOSS_PCT}%"
-            )
+        week_pct = self.total_week_pnl_rub() / eq * 100
+        if week_pct <= -MULTIPORT_WEEKLY_LOSS_PCT:
+            return False, f"портфельный недельный лимит: {week_pct:.2f}% ≤ -{MULTIPORT_WEEKLY_LOSS_PCT}%"
 
-        month_pnl_pct = self.total_month_pnl_rub() / eq * 100
-        if month_pnl_pct <= -MULTIPORT_MONTHLY_LOSS_PCT:
-            return False, (
-                f"портфельный месячный лимит: суммарный убыток {month_pnl_pct:.2f}% "
-                f"≤ -{MULTIPORT_MONTHLY_LOSS_PCT}%"
-            )
+        month_pct = self.total_month_pnl_rub() / eq * 100
+        if month_pct <= -MULTIPORT_MONTHLY_LOSS_PCT:
+            return False, f"портфельный месячный лимит: {month_pct:.2f}% ≤ -{MULTIPORT_MONTHLY_LOSS_PCT}%"
 
-        total_risk_pct = (self.total_open_risk_rub() + signal_risk_rub) / eq * 100
+        # 2. Суммарный риск с учётом новой позиции
+        total_risk_pct = (self.total_open_risk_rub() + signal.risk_rub) / eq * 100
         if total_risk_pct > MULTIPORT_TOTAL_RISK_MAX_PCT:
-            return False, (
-                f"суммарный открытый риск {total_risk_pct:.2f}% "
-                f"> лимита {MULTIPORT_TOTAL_RISK_MAX_PCT}% — новый вход запрещён"
-            )
+            return False, (f"суммарный открытый риск {total_risk_pct:.2f}% "
+                            f"> лимита {MULTIPORT_TOTAL_RISK_MAX_PCT}%")
 
-        return True, f"портфель: риск {total_risk_pct:.2f}% / {MULTIPORT_TOTAL_RISK_MAX_PCT}%"
+        # 3. Stat_break
+        if self.stat_break_active():
+            return False, "stat_break активен — входы заблокированы на всех счетах"
 
-    def exit_giveback_pct(self) -> float:
+        # 4–5. Кросс-счётные позиции
+        extra_risk = 0.0
+        for a in self.accounts:
+            for ticker, pos in a.open_positions.items():
+                if not self._correlated_tickers(ticker, signal.ticker):
+                    continue
+                if pos.direction == signal.direction:
+                    # Одинаковое направление — риск суммируется, повторная проверка
+                    extra_risk += pos.risk_rub
+                else:
+                    # Противоположная позиция: разрешена только при независимых горизонтах
+                    pos_horizon = getattr(pos, "expected_bars", 20) * a.tf_minutes
+                    if not self.horizons_independent(signal.horizon_minutes, pos_horizon):
+                        return False, (
+                            f"противоположная позиция {ticker} (tf={a.tf_minutes}m): "
+                            f"горизонты перекрываются > {self.HORIZON_OVERLAP_MAX:.0%} — "
+                            f"вход запрещён (риск гэпа по обоим стопам)"
+                        )
+
+        if extra_risk > 0:
+            corr_risk_pct = (self.total_open_risk_rub() + signal.risk_rub + extra_risk) / eq * 100
+            if corr_risk_pct > MULTIPORT_TOTAL_RISK_MAX_PCT:
+                return False, (
+                    f"скоррелированные позиции: суммарный риск с учётом "
+                    f"дублирующегося направления {corr_risk_pct:.2f}% > лимита"
+                )
+
+        return True, f"портфель OK: риск {total_risk_pct:.2f}% / {MULTIPORT_TOTAL_RISK_MAX_PCT}%"
+
+    # ── Приоритизация одновременных сигналов ─────────────────────────────────
+
+    @staticmethod
+    def entry_priority(signal) -> float:
+        """confidence × log(горизонт в минутах) — чем выше, тем раньше входим."""
+        import math
+        h = max(1.0, signal.horizon_minutes)
+        return signal.confidence * math.log(h)
+
+    def sort_and_filter(self, signals: list) -> list:
         """
-        Возвращает актуальный порог giveback для всех счетов.
-        При достижении дневного лимита ужесточается с TRAIL_GIVEBACK_PCT
-        до MULTIPORT_TIGHTENED_GIVEBACK_PCT, чтобы открытые позиции
-        закрывались раньше и не наращивали убыток за пределы лимита.
+        Принимает список Signal, сортирует по приоритету, пропускает через
+        can_enter — возвращает только те, которые разрешены риск-менеджером.
+        Каждый сигнал проверяется с учётом уже разрешённых ранее в очереди.
         """
-        return MULTIPORT_TIGHTENED_GIVEBACK_PCT if self.daily_limit_hit() else TRAIL_GIVEBACK_PCT
+        ordered = sorted(signals, key=self.entry_priority, reverse=True)
+        approved = []
+        for sig in ordered:
+            ok, why = self.can_enter(sig)
+            if ok:
+                approved.append(sig)
+                # Эмулируем добавление риска для следующих проверок в этом батче,
+                # чтобы второй сигнал не проходил если суммарный риск уже исчерпан.
+                # Мутировать state не хотим — используем временную заглушку.
+                _placeholder = _RiskPlaceholder(sig.risk_rub)
+                for a in self.accounts:
+                    if a is sig.account:
+                        a.rm.positions.setdefault(f"__pending_{sig.ticker}", _placeholder)
+                        break
+        # Убираем временные заглушки
+        for a in self.accounts:
+            pending = [k for k in a.rm.positions if k.startswith("__pending_")]
+            for k in pending:
+                del a.rm.positions[k]
+        return approved
+
+    # ── Статус ───────────────────────────────────────────────────────────────
 
     def status(self) -> dict:
         eq = self.total_equity()
@@ -896,6 +991,12 @@ class PortfolioRiskManager:
             "total_open_risk_rub": round(self.total_open_risk_rub(), 2),
             "total_open_risk_pct": round(self.total_open_risk_rub() / eq * 100, 2) if eq > 0 else 0.0,
             "daily_limit_hit": self.daily_limit_hit(),
-            "exit_giveback_pct": self.exit_giveback_pct(),
+            "stat_break_active": self.stat_break_active(),
             "accounts": len(self.accounts),
         }
+
+
+class _RiskPlaceholder:
+    """Временная заглушка позиции для учёта pending-риска в sort_and_filter."""
+    def __init__(self, risk_rub: float):
+        self.risk_rub = risk_rub

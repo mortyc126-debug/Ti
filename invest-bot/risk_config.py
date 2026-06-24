@@ -62,8 +62,8 @@ PORTFOLIO_STOP_SQUEEZE = True  # сжимать стоп нового входа
 MULTIPORT_DAILY_LOSS_PCT   = 2.0   # % от суммарного депо
 MULTIPORT_WEEKLY_LOSS_PCT  = 5.0
 MULTIPORT_MONTHLY_LOSS_PCT = 10.0
-MULTIPORT_TOTAL_RISK_MAX_PCT = 3.0          # суммарный открытый риск % всех счетов
-MULTIPORT_TIGHTENED_GIVEBACK_PCT = 15       # вместо TRAIL_GIVEBACK_PCT при лимите
+MULTIPORT_TOTAL_RISK_MAX_PCT = 3.0  # суммарный открытый риск % всех счетов
+# При достижении дневного лимита: входы блокируются, открытые позиции не трогаются.
 
 # ── Прочие параметры ─────────────────────────────────────────────────────
 MAX_OPEN_POSITIONS = 2

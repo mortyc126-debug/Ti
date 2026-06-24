@@ -5369,6 +5369,17 @@ class OICompositeStrategy(IStrategy):
         if data:
             self.__narrative_thresholds.set_data(data)
 
+    def set_shared_ic_store(self, store, tf_minutes: int) -> None:
+        """Подключить SharedICEWAStore для multi-account обучения.
+        После вызова __ic_priors указывает на TF-срез общего хранилища —
+        все обновления IC автоматически видны другим счетам с тем же TF."""
+        bucket = store.ic_bucket(tf_minutes)
+        if not bucket:
+            # Инициализировать bucket данными из текущего (уже обученного) состояния
+            for regime, methods in self.__ic_priors.items():
+                bucket[regime] = dict(methods)
+        self.__ic_priors = bucket
+
     # ── Персистентность весов ─────────────────────────────────────────────────
 
     def __weights_key(self) -> str:
