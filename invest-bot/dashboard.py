@@ -1387,14 +1387,17 @@ def run_backtest_one(
 
         t1 = time.monotonic()
         signals = strategy.backtest_scan_signals(candles, adaptive_narrative=adaptive_narrative)
+        rej = dict(strategy.rejection_stats)
         logger.info(f"{ticker}: {len(signals)} сигналов, скан занял {time.monotonic() - t1:.1f}с"
-                    + (" (адаптивная калибровка narrative)" if adaptive_narrative else ""))
+                    + (" (адаптивная калибровка narrative)" if adaptive_narrative else "")
+                    + f" | отклонений: порог={rej['below_threshold']} методы={rej['methods_disagree']} объём={rej['liquidity']}")
 
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff, adaptive_lasso=adaptive_lasso)
         fixed_trades = fixed.pop("trades", [])
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
+                     "rejection_stats": rej,
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
                      "trades_list": _trades_list_compact(fixed_trades), **fixed})
 
@@ -2641,6 +2644,13 @@ function rowsToHtml(rows) {{
       const mtr = methodStatsByRegimeToHtml(r.method_stats_by_regime);
       if (mtr) {{
         html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--txt3)">Attribution по методам — по режимам</summary>${{mtr}}</details></td></tr>`;
+      }}
+    }}
+    if (r.rejection_stats) {{
+      const rs = r.rejection_stats;
+      const total = (rs.below_threshold||0) + (rs.methods_disagree||0) + (rs.liquidity||0) + (rs.narrative_blocked||0);
+      if (total > 0) {{
+        html += `<tr><td></td><td colspan="6" style="font-size:10px;color:var(--txt3)">🚫 отклонено баров: порог ${{rs.below_threshold||0}} · методы ${{rs.methods_disagree||0}} · объём ${{rs.liquidity||0}}${{rs.narrative_blocked ? ' · нарратив ' + rs.narrative_blocked : ''}}</td></tr>`;
       }}
     }}
     if (r.trades_list && r.trades_list.length) {{

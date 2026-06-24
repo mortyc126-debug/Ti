@@ -2217,6 +2217,14 @@ class OICompositeStrategy(IStrategy):
         self.__narrative_thresholds = NarrativeThresholds()
         self.__last_narrative_tags: dict = {}
 
+        # Счётчики отклонений — сбрасываются при каждом бэктесте через reset_rejection_stats()
+        self.rejection_stats: dict[str, int] = {
+            "below_threshold": 0,
+            "methods_disagree": 0,
+            "narrative_blocked": 0,
+            "liquidity": 0,
+        }
+
         logger.info(
             f"OICompositeStrategy init: figi={settings.figi} "
             f"threshold={self.__threshold} signal_only={self.__signal_only}"
@@ -2438,18 +2446,22 @@ class OICompositeStrategy(IStrategy):
             direction = SignalType.SHORT
 
         if direction is None:
+            self.rejection_stats["below_threshold"] += 1
             return None
 
         if not self.__methods_agree(scores, direction):
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — мало методов согласны")
+            self.rejection_stats["methods_disagree"] += 1
             return None
 
         if not self.__narrative_allows(direction):
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — сюжет не сложился ({self.__narrative_state.name})")
+            self.rejection_stats["narrative_blocked"] += 1
             return None
 
         if not self.__liquidity_ok():
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — тонкая свеча (низкий объём)")
+            self.rejection_stats["liquidity"] += 1
             return None
 
         # take/stop: ATR-based если заданы коэффициенты, иначе фиксированные множители
@@ -2579,12 +2591,14 @@ class OICompositeStrategy(IStrategy):
                     direction = SignalType.SHORT
 
                 if direction is None:
+                    self.rejection_stats["below_threshold"] += 1
                     i += 1
                     continue
                 if self.__last_regime in BACKTEST_BLOCKED_REGIMES:
                     i += 1
                     continue
                 if not self.__methods_agree(scores, direction):
+                    self.rejection_stats["methods_disagree"] += 1
                     i += 1
                     continue
                 # Narrative-гейт убран из backtest_scan_signals: FSM требует разогрева
@@ -2592,6 +2606,7 @@ class OICompositeStrategy(IStrategy):
                 # старте бэктеста — в итоге блокирует почти все сигналы. В живой торговле
                 # (analyze_candles) гейт остаётся и продолжает фильтровать.
                 if not self.__liquidity_ok():
+                    self.rejection_stats["liquidity"] += 1
                     i += 1
                     continue
 
