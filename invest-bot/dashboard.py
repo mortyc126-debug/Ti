@@ -744,12 +744,18 @@ _BASE_ASSET_LABEL: dict[str, str] = {
     "ETHA": "Ethereum ETF ETHA",
 }
 
-# Коды, которые относятся к товарным/индексным базисам — их показываем
-# каждый своей категорией; остальное (акции РФ, валюта) — в группу.
-_COMMODITY_BASES = frozenset(_BASE_ASSET_LABEL) - frozenset({
+_METAL_BASES = frozenset({
+    "GD", "GOLD", "GLD", "GLDRUB_TOM", "SLVR", "PD", "PT", "AL", "CU", "NI", "ZN",
+})
+_INDEX_BASES = frozenset({"MX", "RI", "MM"})
+_CURRENCY_BASES = frozenset({
     "Si", "Eu", "CNYRUB_TOM", "GBPRUB_TOM", "HKDRUB_TOM",
     "TRYRUB_TOM", "AMDRUB_TOM", "KZTRUB_TOM", "EUR_USD000UTSTOM",
 })
+_FOREIGN_STOCK_BASES = frozenset({"BABA", "BIDU", "IBIT", "ETHA"})
+
+# Товарные базисы (нефть/газ/агро), которые не металл, не индекс, не валюта.
+_COMMODITY_BASES = frozenset(_BASE_ASSET_LABEL) - _METAL_BASES - _INDEX_BASES - _CURRENCY_BASES - _FOREIGN_STOCK_BASES
 
 _RU_STOCK_BASE_TICKERS = frozenset({
     "ABIO", "AFKS", "AFLT", "ALRS", "ASTR", "BANE", "BELU", "BSPB", "CBOM", "CHMF",
@@ -762,20 +768,24 @@ _RU_STOCK_BASE_TICKERS = frozenset({
 })
 
 
+_FUTURES_CATEGORY_ORDER = ("Акции", "Сырьё", "Металлы", "Индексы", "Валюта")
+
+
 def _futures_category(base: str) -> str:
-    """Категория для группировки чипов дашборда.
-    Товарные/индексные базисы из _BASE_ASSET_LABEL — каждый своей
-    категорией с человекочитаемым именем. Акции РФ и валюты — в широкую
-    группу, иначе TOC становится бесконечным."""
-    if not base:
-        return "Прочее"
+    """Категория для группировки чипов дашборда: акции / сырьё / металлы /
+    индексы / валюта — без «прочего». Базис, которого нет ни в одном
+    известном списке (металлы/сырьё/индексы/валюта/иностр. акции), почти
+    всегда сам является тикером акции МосБиржи — относим его к «Акции»,
+    а не сваливаем в неинформативную мусорную категорию."""
+    if base in _METAL_BASES:
+        return "Металлы"
     if base in _COMMODITY_BASES:
         return "Сырьё"
-    if base in _RU_STOCK_BASE_TICKERS:
-        return "Акции РФ"
-    if base in _BASE_ASSET_LABEL:
+    if base in _INDEX_BASES:
+        return "Индексы"
+    if base in _CURRENCY_BASES:
         return "Валюта"
-    return "Прочее"
+    return "Акции"
 
 
 # ticker → категория / basic_asset, пересчитываются вместе в _build_strategy_settings.
@@ -2022,6 +2032,18 @@ body{{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);min
 .tab-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt2);}}
 .tab-btn.active{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.10));border-color:rgba(255,0,128,.55);color:var(--accent);box-shadow:0 0 12px rgba(255,0,128,.15);}}
 .tab-pane{{display:none;}}.tab-pane.active{{display:block;}}
+/* ── Раскладка: сайдбар тикеров + основная колонка ── */
+.app-layout{{display:flex;gap:14px;align-items:flex-start;}}
+.sidebar{{flex:0 0 300px;width:300px;position:sticky;top:14px;max-height:calc(100vh - 28px);overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:14px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;transition:flex-basis .18s,width .18s,opacity .12s,padding .18s;}}
+.sidebar::-webkit-scrollbar{{width:6px;}}
+.sidebar::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:3px;}}
+.sidebar.collapsed{{flex:0 0 0;width:0;padding:14px 0;opacity:0;overflow:hidden;border-color:transparent;}}
+.sidebar-head{{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}}
+.sidebar-collapse-btn{{flex:0 0 auto;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:999px;color:var(--txt3);font-size:13px;line-height:1;width:24px;height:24px;cursor:pointer;}}
+.sidebar-collapse-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt2);}}
+.main-col{{flex:1;min-width:0;}}
+.sidebar-open-btn{{display:none;}}
+.sidebar-open-btn.show{{display:inline-flex;}}
 /* ── Панели ── */
 .panel{{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:16px;margin-bottom:14px;}}
 .panel-inner{{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;margin-bottom:10px;}}
@@ -2034,35 +2056,63 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .btn-pill{{background:linear-gradient(180deg,rgba(255,0,128,.22),rgba(255,0,128,.12));border:1px solid rgba(255,0,128,.5);border-radius:999px;color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;padding:8px 18px;cursor:pointer;transition:all .15s;}}
 .btn-pill:hover{{box-shadow:0 0 14px rgba(255,0,128,.25);}}
 .btn-sm{{padding:4px 12px;font-size:10px;}}
+.btn-xs{{padding:3px 10px;font-size:10px;}}
+/* ── Варианты кнопок: цвет = смысл действия, не случайность.
+   primary (розовый, дефолт) — главное действие панели.
+   danger — стоп/закрыть/остановить. ghost — нейтральная утилита.
+   info — информационное/копировать. ok — сохранить/положительное.
+   toggled — активный режим переключателя (тумблер). ── */
+.btn-pill.danger{{background:linear-gradient(180deg,rgba(255,60,60,.32),rgba(255,60,60,.16));border-color:rgba(255,60,60,.55);color:#ffb3b3;}}
+.btn-pill.danger:hover{{box-shadow:0 0 14px rgba(255,60,60,.3);}}
+.btn-pill.ghost{{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.12);color:var(--txt2);}}
+.btn-pill.ghost:hover{{box-shadow:none;border-color:rgba(255,255,255,.22);}}
+.btn-pill.info{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.1));border-color:rgba(80,140,255,.45);color:#7eb8f7;}}
+.btn-pill.info:hover{{box-shadow:0 0 14px rgba(80,140,255,.25);}}
+.btn-pill.ok{{background:linear-gradient(180deg,rgba(82,242,201,.2),rgba(82,242,201,.1));border-color:rgba(82,242,201,.45);color:#9fe8ce;}}
+.btn-pill.ok:hover{{box-shadow:0 0 14px rgba(82,242,201,.25);}}
+.btn-pill.toggled{{background:linear-gradient(180deg,rgba(124,77,255,.4),rgba(124,77,255,.22));border-color:rgba(124,77,255,.65);color:#fff;}}
 .chips{{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;}}
-.chip{{display:inline-flex;align-items:center;gap:1px;padding:5px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;}}
+.chip{{display:inline-flex;align-items:center;height:24px;padding:0 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:999px;cursor:pointer;transition:all .15s;font-size:11px;font-weight:600;line-height:1;color:var(--txt);white-space:nowrap;}}
 .chip:hover{{border-color:rgba(255,0,128,.25);}}
 .chip.active{{background:linear-gradient(180deg,rgba(255,0,128,.18),rgba(255,0,128,.08));border-color:rgba(255,0,128,.45);color:var(--accent);}}
 .chip-fut{{border-color:rgba(80,140,255,.25);}}
 .chip-fut.active{{background:linear-gradient(180deg,rgba(80,140,255,.2),rgba(80,140,255,.08));border-color:rgba(80,140,255,.6);color:#7eb8f7;}}
 .chip-fut:hover{{border-color:rgba(80,140,255,.5);}}
 .chip-row{{display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;}}
-.chip-section{{margin-bottom:4px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;}}
-.chip-section>summary{{list-style:none;cursor:pointer;padding:7px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:6px;}}
+/* ── Тулбар тикеров (сайдбар): один размер кнопки, одна нейтральная цветовая
+   тема — цвет несут только эмодзи-иконки, не текст. ── */
+.tk-toolbar{{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}}
+.tk-btn{{display:inline-flex;align-items:center;height:26px;padding:0 11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:8px;color:var(--txt2);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;line-height:1;cursor:pointer;transition:all .15s;white-space:nowrap;}}
+.tk-btn:hover{{border-color:rgba(255,0,128,.3);color:var(--txt);}}
+.tk-btn-note{{font-size:11px;color:var(--txt3);}}
+/* ── Категории тикеров — вертикальный аккордеон, раскрывается вниз ── */
+.chip-group{{margin-bottom:8px;border:1px solid var(--border2);border-radius:10px;overflow:hidden;}}
+.chip-group>summary{{list-style:none;cursor:pointer;height:32px;padding:0 12px;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--txt);background:rgba(255,255,255,.035);display:flex;align-items:center;gap:8px;}}
+.chip-group>summary::-webkit-details-marker{{display:none;}}
+.chip-group>summary::before{{content:'▾';display:inline-flex;align-items:center;justify-content:center;width:10px;flex:0 0 10px;color:var(--txt2);font-size:10px;line-height:1;transition:transform .15s;}}
+.chip-group:not([open])>summary::before{{transform:rotate(-90deg);}}
+.chip-group-body{{padding:8px;display:flex;flex-direction:column;gap:4px;}}
+.chip-section{{margin-bottom:0;border:1px solid var(--border2);border-radius:8px;overflow:hidden;}}
+.chip-section>summary{{list-style:none;cursor:pointer;height:30px;padding:0 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2);background:rgba(255,255,255,.02);display:flex;align-items:center;gap:8px;}}
 .chip-section>summary::-webkit-details-marker{{display:none;}}
-.chip-section>summary::before{{content:'▸';display:inline-block;color:var(--txt3);transition:transform .15s;}}
+.chip-section>summary::before{{content:'▸';display:inline-flex;align-items:center;justify-content:center;width:10px;flex:0 0 10px;color:var(--txt3);font-size:10px;line-height:1;transition:transform .15s;}}
 .chip-section[open]>summary::before{{transform:rotate(90deg);}}
 .chip-section>summary:hover{{background:rgba(255,255,255,.05);}}
+.chip-section-title{{flex:1;overflow:hidden;text-overflow:ellipsis;}}
 .chip-section>.chip-row{{padding:8px 12px 10px;}}
-.chip-stock-section>summary{{color:#a0d4a0;}}
-.chip-fut-section>summary{{color:#7eb8f7;}}
-.cat-toc-wrap{{display:flex;gap:10px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;height:220px;}}
-.cat-toc{{flex:0 0 260px;overflow-y:auto;border-right:1px solid var(--border2);background:rgba(255,255,255,.02);height:100%;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
-.cat-toc-item{{padding:6px 12px;font-size:12px;color:var(--txt2);cursor:default;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:4px;}}
-.cat-toc-toggle{{flex:0 0 auto;font-size:14px;color:var(--txt3);cursor:pointer;line-height:1;padding:0 2px;border-radius:3px;}}
+.cat-toc-toggle{{flex:0 0 16px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.05);color:var(--txt3);font-size:11px;line-height:1;cursor:pointer;}}
+/* ── Группы настроек — сетка карточек вместо ленты ярлыков подряд ── */
+.cfg-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:6px;}}
+.cfg-group{{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;}}
+.cfg-group-title{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px;}}
+.cfg-group label{{display:flex;align-items:center;gap:6px;margin:0 0 8px 0;font-size:11px;color:var(--txt2);}}
+.cfg-group label:last-child{{margin-bottom:0;}}
+.cfg-group label.cfg-check{{cursor:help;}}
+.cfg-group .inp{{flex:0 0 auto;max-width:100%;}}
+.cfg-group select.inp{{min-width:0;width:100%;overflow:hidden;text-overflow:ellipsis;}}
+.cfg-group label:has(select.inp){{flex-wrap:wrap;}}
+input[type="checkbox"]{{accent-color:var(--accent);}}
 .cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
-.cat-toc-item:hover{{background:rgba(255,255,255,.05);color:var(--txt);}}
-.cat-toc-item.active{{background:rgba(126,184,247,.12);color:var(--accent);font-weight:600;}}
-.cat-panels{{flex:1;overflow-y:auto;padding:8px 10px;height:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}}
-.cat-panel .chip-row{{padding:0;}}
-.cat-toc::-webkit-scrollbar,.cat-panels::-webkit-scrollbar{{width:6px;}}
-.cat-toc::-webkit-scrollbar-thumb,.cat-panels::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:3px;}}
-.cat-toc::-webkit-scrollbar-track,.cat-panels::-webkit-scrollbar-track{{background:transparent;}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
 .scen-table th:first-child,.scen-table td:first-child{{text-align:left;}}
@@ -2084,61 +2134,91 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <div class="logo">INVEST-BOT · DASHBOARD</div>
     <div class="logo-sub">VIRTUAL TRADES BACKTEST &amp; BUG COUNCIL</div>
   </div>
+  <button class="btn-pill btn-sm sidebar-open-btn" id="sidebarOpenBtn" onclick="toggleSidebar()" title="Показать список тикеров">☰ Тикеры</button>
 </div>
 
 <nav class="tab-nav">
   <button class="tab-btn active" onclick="showTab('sim')">СИМУЛЯЦИЯ</button>
-  <button class="tab-btn" onclick="showTab('analytics')">📈 АНАЛИТИКА</button>
+  <button class="tab-btn" onclick="showTab('analytics')">АНАЛИТИКА</button>
   <button class="tab-btn" onclick="showTab('diag')">ДИАГНОСТИКА</button>
   <button class="tab-btn" onclick="showTab('live')">БОТ (LIVE)</button>
 </nav>
+
+<div class="app-layout">
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <div class="sec-lg" style="margin-bottom:0;border-bottom:none;padding-bottom:0;">Тикеры</div>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Свернуть">‹</button>
+  </div>
+  <div id="tickers">__TICKER_CHECKBOXES__</div>
+</aside>
+<div class="main-col">
 
 <!-- ══════════════════════ TAB: СИМУЛЯЦИЯ ══════════════════════ -->
 <div class="tab-pane active" id="tab-sim">
 
 <div class="panel">
   <div class="sec-lg">Настройки симуляции</div>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
-    🔷 Фьючерсы — из [FUTURES_TRADING] (авто). 📈 Акции — settings.ini + OI.
-    <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
-    <button class="btn-pill btn-sm" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
-    <button class="btn-pill btn-sm" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
-    <span id="oi_status"></span>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    🔷 Фьючерсы — из [FUTURES_TRADING] (авто). ♦️ Акции — settings.ini + OI.
+    Список тикеров — в сайдбаре слева (☰ в шапке — свернуть/развернуть).
   </div>
-  <div id="tickers">__TICKER_CHECKBOXES__</div>
-  <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
-       (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
-       _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
-       короче 90 дней молчит почти весь прогон. -->
-  <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
-  <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
-  <button type="button" class="btn-pill btn-sm" style="color:#aaa" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
-  <span id="history_coverage_out" style="display:block;width:100%;font-size:12px;color:var(--muted);white-space:pre-wrap;"></span>
-  <label title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
-  <label title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json."><input type="checkbox" id="adaptive_narrative"> Адаптивная калибровка narrative</label>
-  <label title="Lasso-приоры методов пере-фитятся прямо в процессе бэктеста: сигналы и так обрабатываются в хронологическом порядке (как M1/M2/M3 cluster-models выше), и исход сделки (take/stop/timeout) известен сразу после неё — без отдельного прохода backtest_barriers ПОСЛЕ скана. Каждые ~30 сделок фитим lasso на всех сделках, накопленных к этому моменту, и обновляем веса методов для последующих сделок того же прогона (причинно корректно — приоры влияют только на будущее внутри прогона)."><input type="checkbox" id="adaptive_lasso"> Адаптивная калибровка lasso</label>
-  <label title="Блокировать вход в позицию когда классификатор определяет режим рынка как боковик (ranging). По умолчанию ranging разрешён, только stress блокируется. Включи, чтобы избежать торговли в флэте — может сильно снизить число сделок."><input type="checkbox" id="block_ranging"> Не торговать в боковике (ranging)</label>
-  <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
-  <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
-  <label>Тариф комиссии <select class="inp" id="tariff">
-    <option value="">как в settings.ini</option>
-    <option value="TRADER">Трейдер (0.05%/0.04% за сторону)</option>
-    <option value="PREMIUM">Премиум (0.04%/0.025% за сторону)</option>
-  </select></label>
-  <br>
-  <label><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту (обычка/префы, фьючерс/базис) —
-    топ <input type="number" class="inp" style="width:50px;padding:6px 8px;" id="top_pct" value="70" min="1" max="100">% по востребованности</label>
+  <div class="cfg-grid">
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Период бэктеста</div>
+      <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
+      <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
+      <button type="button" class="btn-pill btn-xs ghost" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
+      <span id="history_coverage_out" style="display:block;width:100%;font-size:11px;color:var(--txt3);white-space:pre-wrap;margin-top:6px;"></span>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Режим прогона</div>
+      <label class="cfg-check" title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
+      <label class="cfg-check" title="Блокировать вход в позицию когда классификатор определяет режим рынка как боковик (ranging). По умолчанию ranging разрешён, только stress блокируется. Включи, чтобы избежать торговли в флэте — может сильно снизить число сделок."><input type="checkbox" id="block_ranging"> Не торговать в боковике (ranging)</label>
+      <label class="cfg-check" title="Без дублей по эмитенту (обычка/префы, фьючерс/базис) — отбирает топ N% по востребованности."><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту, топ <input type="number" class="inp" style="width:46px;padding:4px 6px;" id="top_pct" value="70" min="1" max="100">%</label>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Адаптивная калибровка</div>
+      <label class="cfg-check" title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json."><input type="checkbox" id="adaptive_narrative"> Narrative</label>
+      <label class="cfg-check" title="Lasso-приоры методов пере-фитятся прямо в процессе бэктеста: сигналы и так обрабатываются в хронологическом порядке (как M1/M2/M3 cluster-models), и исход сделки (take/stop/timeout) известен сразу после неё. Каждые ~30 сделок фитим lasso на всех сделках, накопленных к этому моменту, и обновляем веса методов для последующих сделок того же прогона."><input type="checkbox" id="adaptive_lasso"> Lasso-приоры</label>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Параметры стратегии</div>
+      <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
+      <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
+      <label>Тариф комиссии <select class="inp" id="tariff">
+        <option value="">как в settings.ini</option>
+        <option value="TRADER">Трейдер (0.05%/0.04% за сторону)</option>
+        <option value="PREMIUM">Премиум (0.04%/0.025% за сторону)</option>
+      </select></label>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Источники данных</div>
+      <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
+      <label style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-pill btn-xs ghost" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
+        <button class="btn-pill btn-xs ghost" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
+      </label>
+      <span id="oi_status" style="font-size:11px;color:var(--txt3);"></span>
+    </div>
+
+  </div>
 </div>
 
 <div class="panel">
   <div class="sec-lg">Бэктест по тикерам</div>
   <button class="btn-pill" onclick="runBacktest()">▶ ЗАПУСТИТЬ БЭКТЕСТ</button>
-  <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
-  <button class="btn-pill btn-sm" style="color:#aaa" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
-  <button class="btn-pill btn-sm" style="color:#aaa" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
-  <button class="btn-pill btn-sm" style="color:#aaa" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
-  <button class="btn-pill btn-sm" style="color:#7eb8f7" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
-  <button class="btn-pill btn-sm" style="color:#b8e6b8" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
+  <button class="btn-pill danger" onclick="cancelRun()">⏹ СТОП</button>
+  <button class="btn-pill btn-sm ghost" onclick="saveBacktestHistory()" title="Сохранить сделки бэктеста в history.json для калибровки lasso">💾 сохранить историю</button>
+  <button class="btn-pill btn-sm ghost" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
+  <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
+  <button class="btn-pill btn-sm info" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
+  <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -2183,7 +2263,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </label>
   <br><br>
   <button class="btn-pill" onclick="runPortfolioSim()">▶ ПРОГНАТЬ ПОРТФЕЛЬ</button>
-  <button class="btn-pill" style="background:var(--neg);" onclick="cancelRun()">⏹ СТОП</button>
+  <button class="btn-pill danger" onclick="cancelRun()">⏹ СТОП</button>
   <span id="pf_status"></span>
   <div id="pf_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <div id="pf_summary"></div>
@@ -2207,18 +2287,18 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <label>ATR_TAKE_K <input type="number" class="inp mid" id="tc_take" value="2.0" min="0.5" step="0.5"></label>
     <label>ATR_STOP_K <input type="number" class="inp mid" id="tc_stop" value="1.0" min="0.3" step="0.5"></label>
     <button class="btn-pill" onclick="loadTradeChart()">▶ ЗАГРУЗИТЬ</button>
-    <button class="btn-pill" style="background:var(--accent2,#2a4a2a);" onclick="exportBarScores()" title="Скачать CSV со всеми method_scores по каждому бару — для AI-анализа">📥 CSV для AI</button>
+    <button class="btn-pill ok" onclick="exportBarScores()" title="Скачать CSV со всеми method_scores по каждому бару — для AI-анализа">📥 CSV для AI</button>
     <span id="tc_status" style="font-size:11px;color:var(--txt3);"></span>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--txt3);">
     <span>🔍 колесо/пинч — масштаб &nbsp;|&nbsp; перетащи — панорама &nbsp;|&nbsp; Shift+drag — выделить область</span>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomAll()">Всё</button>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(30)">30д</button>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(14)">14д</button>
-    <button class="btn-pill" style="padding:3px 10px;font-size:10px;" onclick="tcZoomLast(7)">7д</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomAll()">Всё</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomLast(30)">30д</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomLast(14)">14д</button>
+    <button class="btn-pill btn-xs ghost" onclick="tcZoomLast(7)">7д</button>
     <span style="margin-left:8px;">Вид:</span>
-    <button class="btn-pill" id="tc_mode_candle" style="padding:3px 10px;font-size:10px;background:var(--mem);" onclick="tcSetMode('candle')">Свечи</button>
-    <button class="btn-pill" id="tc_mode_line"   style="padding:3px 10px;font-size:10px;" onclick="tcSetMode('line')">Линия</button>
+    <button class="btn-pill btn-xs toggled" id="tc_mode_candle" onclick="tcSetMode('candle')">Свечи</button>
+    <button class="btn-pill btn-xs ghost"   id="tc_mode_line"   onclick="tcSetMode('line')">Линия</button>
   </div>
   <canvas id="tc_canvas" style="width:100%;height:480px;display:block;cursor:crosshair;background:var(--panel);border-radius:10px;border:1px solid var(--border);"></canvas>
   <div id="tc_sel_info" style="font-size:12px;color:var(--txt2);margin-top:6px;min-height:24px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
@@ -2232,7 +2312,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <div class="tab-pane" id="tab-analytics">
 
 <div class="panel">
-  <div class="sec-lg">📈 Анализ капитала и обучения модели</div>
+  <div class="sec-lg">Анализ капитала и обучения модели</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
     Прогон бэктеста по всем выбранным тикерам → equity-кривая, rolling winrate,
     кривая обучения (растёт ли WR по мере накопления истории). Запускай на ночь.
@@ -2367,8 +2447,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
     <span id="bot_state_dot" class="sdot"></span>
     <span id="bot_state_label" style="font-size:12px;font-weight:600;color:var(--txt2);">загружаем...</span>
-    <button class="btn-pill" id="btn_pause" onclick="botPause()" style="padding:5px 16px;font-size:11px;">⏸ Пауза</button>
-    <button class="btn-pill" id="btn_resume" onclick="botResume()" style="padding:5px 16px;font-size:11px;display:none;">▶ Возобновить</button>
+    <button class="btn-pill btn-sm" id="btn_pause" onclick="botPause()">⏸ Пауза</button>
+    <button class="btn-pill btn-sm" id="btn_resume" onclick="botResume()" style="display:none;">▶ Возобновить</button>
     <button class="btn-pill btn-sm" onclick="loadBotStatus()">⟳</button>
     <span style="font-size:10px;color:var(--txt3);">авто-обновление каждые 30с</span>
   </div>
@@ -2380,8 +2460,8 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <div class="sec" style="margin-bottom:6px;">Срочное закрытие позиции</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <select class="inp mid" id="close_ticker_sel" style="min-width:120px;"></select>
-      <button class="btn-pill" style="background:rgba(255,60,60,.25);border-color:rgba(255,60,60,.5);color:#ff6060;padding:5px 14px;font-size:11px;" onclick="botClose()">✕ Закрыть</button>
-      <button class="btn-pill" style="background:rgba(255,60,60,.15);border-color:rgba(255,60,60,.4);color:#ff8080;padding:5px 14px;font-size:11px;" onclick="botCloseAll()">✕ Закрыть все</button>
+      <button class="btn-pill btn-sm danger" onclick="botClose()">✕ Закрыть</button>
+      <button class="btn-pill btn-sm danger" onclick="botCloseAll()">✕ Закрыть все</button>
       <span id="close_status" style="font-size:11px;color:var(--txt3);"></span>
     </div>
   </div>
@@ -2402,7 +2482,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <label>Тейк <input type="number" class="inp mid" id="adopt_take" placeholder="250.00" step="0.01" style="width:90px;"></label>
       <label>Стоп <input type="number" class="inp mid" id="adopt_stop" placeholder="240.00" step="0.01" style="width:90px;"></label>
       <label>Вход <input type="number" class="inp mid" id="adopt_entry" placeholder="(текущая)" step="0.01" style="width:90px;"></label>
-      <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botAdopt()">📥 Передать боту</button>
+      <button class="btn-pill btn-sm" onclick="botAdopt()">📥 Передать боту</button>
     </div>
     <div id="adopt_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   </div>
@@ -2412,7 +2492,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <label>Тикер <input type="text" class="inp mid" id="ms_ticker" placeholder="SBER" style="width:80px;"></label>
       <label>Новый стоп <input type="number" class="inp mid" id="ms_stop" placeholder="242.00" step="0.01" style="width:90px;"></label>
       <label>Новый тейк <input type="number" class="inp mid" id="ms_take" placeholder="(не менять)" step="0.01" style="width:100px;"></label>
-      <button class="btn-pill" style="padding:5px 16px;font-size:11px;" onclick="botMoveStop()">📐 Переставить</button>
+      <button class="btn-pill btn-sm" onclick="botMoveStop()">📐 Переставить</button>
     </div>
     <div id="ms_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   </div>
@@ -2481,24 +2561,25 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 </div><!-- /tab-live -->
 
+</div><!-- /main-col -->
+</div><!-- /app-layout -->
+
 <script>
-document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
-
-function filterInstrKind(kind) {{
-  if (kind === 'all') {{
-    document.querySelectorAll('.chip').forEach(c => c.style.display = '');
-    return;
+function toggleSidebar() {{
+  const sb = document.getElementById('sidebar');
+  const collapsed = sb.classList.toggle('collapsed');
+  document.getElementById('sidebarOpenBtn').classList.toggle('show', collapsed);
+  try {{ localStorage.setItem('ba_sidebar_collapsed', collapsed ? '1' : '0'); }} catch (e) {{}}
+}}
+(function() {{
+  let collapsed = false;
+  try {{ collapsed = localStorage.getItem('ba_sidebar_collapsed') === '1'; }} catch (e) {{}}
+  if (collapsed) {{
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.getElementById('sidebarOpenBtn').classList.add('show');
   }}
-  // toggle: если все чипы этого типа активны — снять все, иначе — включить все
-  const ofKind = Array.from(document.querySelectorAll('.chip[data-kind="' + kind + '"]'));
-  const allActive = ofKind.every(c => c.classList.contains('active'));
-  ofKind.forEach(c => allActive ? c.classList.remove('active') : c.classList.add('active'));
-}}
-
-function showCatPanel(panelId) {{
-  document.querySelectorAll('.cat-toc-item').forEach(el => el.classList.toggle('active', el.dataset.panel === panelId));
-  document.querySelectorAll('.cat-panel').forEach(el => el.style.display = el.dataset.panel === panelId ? 'block' : 'none');
-}}
+}})();
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('active')));
 
 function setAllChips(active) {{
   document.querySelectorAll('.chip').forEach(c => {{
@@ -4202,8 +4283,10 @@ async function askCouncil() {{
   // ── Зум ─────────────────────────────────────────────────────────────────
   window.tcSetMode = function(mode) {{
     _chartMode = mode;
-    document.getElementById('tc_mode_candle').style.background = mode === 'candle' ? 'var(--mem)' : '';
-    document.getElementById('tc_mode_line').style.background   = mode === 'line'   ? 'var(--mem)' : '';
+    document.getElementById('tc_mode_candle').classList.toggle('toggled', mode === 'candle');
+    document.getElementById('tc_mode_candle').classList.toggle('ghost', mode !== 'candle');
+    document.getElementById('tc_mode_line').classList.toggle('toggled', mode === 'line');
+    document.getElementById('tc_mode_line').classList.toggle('ghost', mode !== 'line');
     _draw();
   }};
 
@@ -4786,60 +4869,82 @@ def _render_page() -> bytes:
 
     futures_by_cat: dict[str, list[str]] = {}
     for t in sorted(futures):
-        cat = _futures_category_by_ticker.get(t, "Прочее")
+        cat = _futures_category_by_ticker.get(t, "Акции")
         futures_by_cat.setdefault(cat, []).append(t)
 
-    # panels: список (panel_id, заголовок_toc, html_содержимого_панели)
-    panels: list[tuple[str, str, str]] = [(
-        "stock", f"Акции ({len(stocks)})",
-        '<div class="chip-row">' + "".join(
+    stock_tickers = sorted(stocks)
+    stocks_ru = [t for t in stock_tickers if t in _RU_STOCK_BASE_TICKERS]
+    stocks_other = [t for t in stock_tickers if t not in _RU_STOCK_BASE_TICKERS]
+
+    def _stock_chip_row(ts: list[str]) -> str:
+        return '<div class="chip-row">' + "".join(
             f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
             f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
-            for t in sorted(stocks)
+            for t in ts
         ) + '</div>'
-    )]
-    for cat, ts in sorted(futures_by_cat.items()):
-        panels.append((
-            f"fut-{cat}", f"{cat} ({len(ts)})",
-            '<div class="chip-row">' + "".join(
-                f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-                f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
-                f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
-                for t in ts
-            ) + '</div>'
-        ))
 
-    toc_items = "".join(
-        f'<div class="cat-toc-item{" active" if i == 0 else ""}" data-panel="{pid}">'
-        f'<span onclick="showCatPanel(\'{pid}\')" style="flex:1;cursor:pointer">{label}</span>'
-        f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
-        f'onclick="event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span>'
-        f'</div>'
-        for i, (pid, label, _) in enumerate(panels)
+    def _futures_chip_row(ts: list[str]) -> str:
+        return '<div class="chip-row">' + "".join(
+            f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
+            f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
+            f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+            for t in ts
+        ) + '</div>'
+
+    def _sub_section(pid: str, label: str, panel_html: str, open_: bool) -> str:
+        return (
+            f'<details class="chip-section cat-panel" data-panel="{pid}"{" open" if open_ else ""}>'
+            f'<summary><span class="chip-section-title">{label}</span>'
+            f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
+            f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
+            f'{panel_html}'
+            f'</details>'
+        )
+
+    # Подкатегории внутри «Акции» — фиксированный порядок: РФ, затем другие.
+    stock_subs = []
+    if stocks_ru:
+        stock_subs.append(_sub_section("stock-ru", f"РФ ({len(stocks_ru)})", _stock_chip_row(stocks_ru), True))
+    if stocks_other:
+        stock_subs.append(_sub_section("stock-other", f"Другие ({len(stocks_other)})", _stock_chip_row(stocks_other), False))
+
+    # Подкатегории внутри «Фьючерсы» — фиксированный порядок: акции, сырьё,
+    # металлы, индексы, валюта; неучтённые (если появится новый код) — следом.
+    futures_subs = []
+    ordered_cats = list(_FUTURES_CATEGORY_ORDER) + sorted(
+        cat for cat in futures_by_cat if cat not in _FUTURES_CATEGORY_ORDER
     )
-    cat_panels = "".join(
-        '<div class="cat-panel" data-panel="{}" style="display:{}">{}</div>'.format(
-            pid, "block" if i == 0 else "none", panel_html)
-        for i, (pid, _, panel_html) in enumerate(panels)
-    )
+    for i, cat in enumerate(ordered_cats):
+        ts = futures_by_cat.get(cat)
+        if ts:
+            futures_subs.append(_sub_section(f"fut-{cat}", f"{cat} ({len(ts)})", _futures_chip_row(ts), i == 0))
+
+    # Два верхних раздела — Акции и Фьючерсы — каждый со своими подкатегориями внутри.
+    cat_sections = ""
+    if stock_subs:
+        cat_sections += (
+            f'<details class="chip-group" open><summary class="chip-group-title">'
+            f'<span class="chip-section-title">♦️ Акции ({len(stocks)})</span></summary>'
+            f'<div class="chip-group-body">{"".join(stock_subs)}</div></details>'
+        )
+    if futures_subs:
+        cat_sections += (
+            f'<details class="chip-group" open><summary class="chip-group-title">'
+            f'<span class="chip-section-title">🔷 Фьючерсы ({len(futures)})</span></summary>'
+            f'<div class="chip-group-body">{"".join(futures_subs)}</div></details>'
+        )
 
     reload_hint = (
-        ' <span style="color:#7eb8f7;font-size:11px">⏳ обновляется…</span>'
-        if reload_running else ""
+        '<span class="tk-btn-note">⏳ обновляется…</span>' if reload_running else ""
     )
     checkboxes = (
-        f'<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center">'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'all\');setAllChips(true)">Все</button>'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'futures\')" style="color:#7eb8f7">🔷 Фьючерсы ({len(futures)})</button>'
-        f'<button class="btn-pill btn-sm" onclick="filterInstrKind(\'stock\')" style="color:#a0d4a0">📈 Акции ({len(stocks)})</button>'
-        f'<button class="btn-pill btn-sm" onclick="setAllChips(true)">✓ все</button>'
-        f'<button class="btn-pill btn-sm" onclick="setAllChips(false)">✗ снять</button>'
-        f'<button class="btn-pill btn-sm" onclick="reloadFutures()" style="color:#aaa" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты{reload_hint}</button>'
+        f'<div class="tk-toolbar">'
+        f'<button class="tk-btn" onclick="setAllChips(true)">✓ все</button>'
+        f'<button class="tk-btn" onclick="setAllChips(false)">✗ снять</button>'
+        f'<button class="tk-btn" onclick="reloadFutures()" title="Загрузить актуальные контракты из API (~10 мин)">🔄 контракты</button>'
+        f'{reload_hint}'
         f'</div>'
-        f'<div class="cat-toc-wrap">'
-        f'<div class="cat-toc">{toc_items}</div>'
-        f'<div class="cat-panels">{cat_panels}</div>'
-        f'</div>'
+        f'{cat_sections}'
     )
     rendered = (PAGE_HTML
                 .replace("__TICKER_CHECKBOXES__", checkboxes)
