@@ -2101,6 +2101,14 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .chip-section-title{{flex:1;overflow:hidden;text-overflow:ellipsis;}}
 .chip-section>.chip-row{{padding:8px 12px 10px;}}
 .cat-toc-toggle{{flex:0 0 16px;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.05);color:var(--txt3);font-size:11px;line-height:1;cursor:pointer;}}
+/* ── Группы настроек — сетка карточек вместо ленты ярлыков подряд ── */
+.cfg-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:6px;}}
+.cfg-group{{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;}}
+.cfg-group-title{{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin-bottom:8px;}}
+.cfg-group label{{display:flex;align-items:center;gap:6px;margin:0 0 8px 0;font-size:11px;color:var(--txt2);}}
+.cfg-group label:last-child{{margin-bottom:0;}}
+.cfg-group label.cfg-check{{cursor:help;}}
+.cfg-group .inp{{flex:0 0 auto;}}
 .cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
@@ -2148,36 +2156,55 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 
 <div class="panel">
   <div class="sec-lg">Настройки симуляции</div>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
     🔷 Фьючерсы — из [FUTURES_TRADING] (авто). 📈 Акции — settings.ini + OI.
-    <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
-    <button class="btn-pill btn-sm ghost" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
-    <button class="btn-pill btn-sm ghost" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
-    <span id="oi_status"></span>
+    Список тикеров — в сайдбаре слева (☰ в шапке — свернуть/развернуть).
   </div>
-  <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">Список тикеров — в сайдбаре слева (☰ в шапке — свернуть/развернуть).</div>
-  <!-- 150+ дней нужно для "разогрева" M1/M2/M3: regime_method_performance
-       (effWR кластеров) требует 90 дней накопленной истории скоров, иначе
-       _MIN_OBS не набирается и M1=M2=M3 (см. cluster_models.py) — бэктест
-       короче 90 дней молчит почти весь прогон. -->
-  <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
-  <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
-  <button type="button" class="btn-pill btn-sm ghost" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
-  <span id="history_coverage_out" style="display:block;width:100%;font-size:12px;color:var(--muted);white-space:pre-wrap;"></span>
-  <label title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
-  <label title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json."><input type="checkbox" id="adaptive_narrative"> Адаптивная калибровка narrative</label>
-  <label title="Lasso-приоры методов пере-фитятся прямо в процессе бэктеста: сигналы и так обрабатываются в хронологическом порядке (как M1/M2/M3 cluster-models выше), и исход сделки (take/stop/timeout) известен сразу после неё — без отдельного прохода backtest_barriers ПОСЛЕ скана. Каждые ~30 сделок фитим lasso на всех сделках, накопленных к этому моменту, и обновляем веса методов для последующих сделок того же прогона (причинно корректно — приоры влияют только на будущее внутри прогона)."><input type="checkbox" id="adaptive_lasso"> Адаптивная калибровка lasso</label>
-  <label title="Блокировать вход в позицию когда классификатор определяет режим рынка как боковик (ranging). По умолчанию ranging разрешён, только stress блокируется. Включи, чтобы избежать торговли в флэте — может сильно снизить число сделок."><input type="checkbox" id="block_ranging"> Не торговать в боковике (ranging)</label>
-  <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
-  <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
-  <label>Тариф комиссии <select class="inp" id="tariff">
-    <option value="">как в settings.ini</option>
-    <option value="TRADER">Трейдер (0.05%/0.04% за сторону)</option>
-    <option value="PREMIUM">Премиум (0.04%/0.025% за сторону)</option>
-  </select></label>
-  <br>
-  <label><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту (обычка/префы, фьючерс/базис) —
-    топ <input type="number" class="inp" style="width:50px;padding:6px 8px;" id="top_pct" value="70" min="1" max="100">% по востребованности</label>
+  <div class="cfg-grid">
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Период бэктеста</div>
+      <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
+      <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
+      <button type="button" class="btn-pill btn-xs ghost" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
+      <span id="history_coverage_out" style="display:block;width:100%;font-size:11px;color:var(--txt3);white-space:pre-wrap;margin-top:6px;"></span>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Режим прогона</div>
+      <label class="cfg-check" title="Прогонять активные чипы тикеров в обратном порядке (с конца списка). Удобно, если на весь список обычно не хватает терпения и не запомнила, где остановилась прошлый раз — следующий прогон зацепит другой край списка."><input type="checkbox" id="reverse_order"> С конца списка</label>
+      <label class="cfg-check" title="Блокировать вход в позицию когда классификатор определяет режим рынка как боковик (ranging). По умолчанию ranging разрешён, только stress блокируется. Включи, чтобы избежать торговли в флэте — может сильно снизить число сделок."><input type="checkbox" id="block_ranging"> Не торговать в боковике (ranging)</label>
+      <label class="cfg-check" title="Без дублей по эмитенту (обычка/префы, фьючерс/базис) — отбирает топ N% по востребованности."><input type="checkbox" id="dedup_issuer" checked> Без дублей по эмитенту, топ <input type="number" class="inp" style="width:46px;padding:4px 6px;" id="top_pct" value="70" min="1" max="100">%</label>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Адаптивная калибровка</div>
+      <label class="cfg-check" title="Пороги тегов narrative (bullish/accum/climax_spread) пере-калибруются прямо в процессе скана, раз в ~20 симулированных дней, по уже накопленным внутри этого же прогона дневным method_scores — без захардкоженных дефолтов и без файла narrative_thresholds.json."><input type="checkbox" id="adaptive_narrative"> Narrative</label>
+      <label class="cfg-check" title="Lasso-приоры методов пере-фитятся прямо в процессе бэктеста: сигналы и так обрабатываются в хронологическом порядке (как M1/M2/M3 cluster-models), и исход сделки (take/stop/timeout) известен сразу после неё. Каждые ~30 сделок фитим lasso на всех сделках, накопленных к этому моменту, и обновляем веса методов для последующих сделок того же прогона."><input type="checkbox" id="adaptive_lasso"> Lasso-приоры</label>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Параметры стратегии</div>
+      <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
+      <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
+      <label>Тариф комиссии <select class="inp" id="tariff">
+        <option value="">как в settings.ini</option>
+        <option value="TRADER">Трейдер (0.05%/0.04% за сторону)</option>
+        <option value="PREMIUM">Премиум (0.04%/0.025% за сторону)</option>
+      </select></label>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-group-title">Источники данных</div>
+      <input type="file" id="oiFile" accept="application/json" style="display:none" onchange="importOiFile(event)">
+      <label style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-pill btn-xs ghost" onclick="document.getElementById('oiFile').click()">↓ Импорт из OI</button>
+        <button class="btn-pill btn-xs ghost" onclick="fetchMegaAlerts()">🔥 Аномалии MOEX</button>
+      </label>
+      <span id="oi_status" style="font-size:11px;color:var(--txt3);"></span>
+    </div>
+
+  </div>
 </div>
 
 <div class="panel">
