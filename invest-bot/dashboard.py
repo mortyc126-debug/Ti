@@ -1024,7 +1024,7 @@ def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
     fieldnames = (
         ["time", "open", "high", "low", "close", "volume", "regime"]
         + score_names
-        + ["fwd_ret_3", "fwd_ret_6", "fwd_ret_12"]
+        + ["fwd_ret_3", "fwd_ret_6", "fwd_ret_12", "fwd_ret_24", "fwd_ret_48"]
     )
 
     buf = io.StringIO()
@@ -1052,6 +1052,8 @@ def export_bar_scores_csv(ticker: str, days: int = 90) -> dict:
             "fwd_ret_3":  fwd(3),
             "fwd_ret_6":  fwd(6),
             "fwd_ret_12": fwd(12),
+            "fwd_ret_24": fwd(24),
+            "fwd_ret_48": fwd(48),
         }
         for sn in score_names:
             record[sn] = round(row["scores"].get(sn, 0.0), 4)
@@ -2533,8 +2535,11 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     </label>
     <label style="font-size:12px;">Цель:
       <select id="br_target" class="inp" style="border-radius:6px;padding:4px 8px;">
-        <option value="fwd_ret_3">fwd_ret_3 (15м)</option>
-        <option value="fwd_ret_6">fwd_ret_6 (30м)</option>
+        <option value="fwd_ret_3">fwd_ret_3 (+3 бара ~15м)</option>
+        <option value="fwd_ret_6">fwd_ret_6 (+6 баров ~30м)</option>
+        <option value="fwd_ret_12">fwd_ret_12 (+12 баров ~1ч)</option>
+        <option value="fwd_ret_24">fwd_ret_24 (+24 бара ~2ч)</option>
+        <option value="fwd_ret_48">fwd_ret_48 (+48 баров ~4ч)</option>
       </select>
     </label>
     <label style="font-size:12px;">Глубина:
@@ -2544,7 +2549,20 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="brLoadRules()">⟳ загрузить</button>
   </div>
   <div id="br_miner_status" style="font-size:11px;color:var(--txt3);margin-bottom:8px;"></div>
-  <div id="br_rules_wrap"></div>
+
+  <details style="margin-top:10px;">
+    <summary style="font-size:11px;color:var(--txt2);cursor:pointer;font-weight:700;">▸ Применить правила к другому тикеру (фьючерс / кросс-проверка)</summary>
+    <div style="padding:8px 0 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <label style="font-size:12px;">Применить к:
+        <select id="br_apply_to" class="inp" style="border-radius:6px;padding:4px 8px;width:110px;"></select>
+      </label>
+      <button class="btn-pill btn-sm" onclick="brApplyRules()">▶ ПРИМЕНИТЬ</button>
+    </div>
+    <div id="br_apply_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
+    <div id="br_apply_rules_wrap" style="margin-top:8px;"></div>
+  </details>
+
+  <div id="br_rules_wrap" style="margin-top:12px;"></div>
 </div>
 
 </div><!-- /tab-barscores -->
@@ -4829,15 +4847,15 @@ function _drawLearningCurve(canvasId, data) {{
 // ════════════════════ BAR RULES ════════════════════
 
 async function brPopulateTickers() {{
-  const sel = document.getElementById('br_ticker');
-  if (!sel) return;
   try {{
     const r = await fetch('/api/bar_scores_list');
     const files = await r.json();
-    sel.innerHTML = files.map(f => {{
-      const ticker = f.filename.replace(/_\d+d\.csv$/, '');
-      return `<option value="${{ticker}}">${{ticker}}</option>`;
-    }}).join('');
+    const tickers = files.map(f => f.filename.replace(/_\d+d\.csv$/, ''));
+    const opts = tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('');
+    const sel = document.getElementById('br_ticker');
+    if (sel) sel.innerHTML = opts;
+    const sel2 = document.getElementById('br_apply_to');
+    if (sel2) sel2.innerHTML = opts;
   }} catch(e) {{}}
 }}
 
@@ -4938,6 +4956,43 @@ function brRenderRules(result) {{
     html += renderSection(rg.toUpperCase(), data);
   }}
   wrap.innerHTML = html || '<div style="color:var(--txt3);font-size:11px;">нет правил</div>';
+}}
+
+async function brApplyRules() {{
+  const fromTicker = document.getElementById('br_ticker').value;
+  const toTicker   = document.getElementById('br_apply_to').value;
+  const target     = document.getElementById('br_target').value;
+  if (!fromTicker || !toTicker) return;
+  const status = document.getElementById('br_apply_status');
+  const wrap   = document.getElementById('br_apply_rules_wrap');
+  status.textContent = `Применяем правила ${{fromTicker}} → ${{toTicker}}...`;
+  status.style.color = 'var(--txt3)';
+  wrap.innerHTML = '';
+  try {{
+    const r = await fetch('/api/bar_rules_apply', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{from_ticker: fromTicker, to_ticker: toTicker, target}})
+    }});
+    const d = await r.json();
+    if (d.error) {{
+      status.textContent = '✗ ' + d.error;
+      status.style.color = 'var(--neg)';
+    }} else {{
+      status.textContent = `✓ ${{fromTicker}} → ${{toTicker}}: ${{d.n_rules_global}} правил`;
+      status.style.color = '#52F2C9';
+      wrap.innerHTML = `<div style="font-size:11px;color:var(--txt3);margin-bottom:6px;">
+        Правила ${{fromTicker}} проверены на данных ${{toTicker}}
+      </div>`;
+      const tmpDiv = document.createElement('div');
+      brRenderRules(d.result);
+      // правила рендерятся в br_rules_wrap — переместим копию
+      wrap.innerHTML += document.getElementById('br_rules_wrap').innerHTML;
+    }}
+  }} catch(e) {{
+    status.textContent = '✗ ' + e.message;
+    status.style.color = 'var(--neg)';
+  }}
 }}
 
 // ════════════════════ BAR SCORES ════════════════════
@@ -5483,7 +5538,26 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"error": "bad json"}, 400)
             return
 
-        if self.path == "/api/bar_rules_mine":
+        if self.path == "/api/bar_rules_apply":
+            from_ticker = payload.get("from_ticker", "").upper()
+            to_ticker   = payload.get("to_ticker", "").upper()
+            target      = payload.get("target", "fwd_ret_3")
+            try:
+                from bar_rule_miner import load_rules, apply_rules_to_csv, save_rules
+                src = load_rules(from_ticker)
+                if src is None:
+                    self._send_json({"error": f"{from_ticker}: правила не найдены, сначала запусти майнер"})
+                    return
+                result = apply_rules_to_csv(src, to_ticker, None, target)
+                if result is None:
+                    self._send_json({"error": f"{to_ticker}: нет CSV"})
+                    return
+                path = save_rules(f"{to_ticker}_from_{from_ticker}", result, None)
+                n_global = len(result.get("global", {}).get("rules", []))
+                self._send_json({"result": result, "path": path, "n_rules_global": n_global})
+            except Exception as e:
+                self._send_json({"error": str(e)})
+        elif self.path == "/api/bar_rules_mine":
             ticker    = payload.get("ticker", "").upper()
             target    = payload.get("target", "fwd_ret_3")
             max_depth = int(payload.get("max_depth", 4))
