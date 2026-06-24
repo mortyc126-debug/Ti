@@ -38,6 +38,9 @@ class PriceLevel:
                  # today_high, today_low, fib_236/382/500/618/786,
                  # round, fractal_high, fractal_low
     tier: int    # 1..5, меньше = сильнее
+    polarity: str = "neutral"   # "support" | "resistance" | "neutral"
+    touch_count: int = 0        # сколько свечей касались зоны уровня
+    flipped: bool = False       # True = S/R flip: бывшая поддержка→сопротивление или наоборот
 
 
 @dataclass
@@ -216,7 +219,8 @@ def build_levels(candles: list) -> LevelSet:
 
     # Убираем дубли: уровни ближе 0.2 ATR — оставляем с меньшим tier.
     # ATR-based вместо фиксированного %: корректно работает на любой цене инструмента.
-    atr_tol = _atr(candles) * 0.2 if candles else 0.0
+    atr_val = _atr(candles)
+    atr_tol = atr_val * 0.2 if candles else 0.0
     min_tol = (_f(candles[-1].close) if candles else 1.0) * 0.0001
     tol = max(atr_tol, min_tol)
     deduped: list[PriceLevel] = []
@@ -224,7 +228,91 @@ def build_levels(candles: list) -> LevelSet:
         if not any(abs(lv.price - ex.price) < tol for ex in deduped):
             deduped.append(lv)
 
+    _enrich_levels_sr(deduped, candles, atr_val)
     return LevelSet(deduped)
+
+
+# Параметры S/R enrichment
+_SR_TOUCH_ZONE_ATR   = 0.4   # свеча касается уровня если диапазон перекрывает p ± zone
+_SR_BREAK_CONFIRM_ATR = 0.5  # закрытие дальше этого = подтверждённый пробой
+_SR_BREAK_MIN_BARS   = 2     # минимум подтверждающих закрытий за уровнем
+
+
+def _enrich_levels_sr(levels: list[PriceLevel], candles: list, atr: float) -> None:
+    """
+    Проставляет каждому уровню polarity / touch_count / flipped.
+
+    Полярность — не свойство уровня самого по себе, а отношение уровня
+    к текущей позиции цены:
+      • price выше уровня → уровень поддержка
+      • price ниже уровня → уровень сопротивление
+      • S/R flip: цена подтверждённо пробила уровень и держится по другую
+        сторону — уровень меняет роль, flipped=True (такие уровни особенно
+        сильны как зоны реакции при ретесте).
+
+    Уровни не удаляем — tier-1/2 структурные точки актуальны пока не пробиты,
+    независимо от давности. Caller (build_levels) уже выполнил дедупликацию.
+    """
+    if not candles or atr <= 0:
+        for lv in levels:
+            lv.polarity = "neutral"
+        return
+
+    highs  = [_f(c.high)  for c in candles]
+    lows   = [_f(c.low)   for c in candles]
+    closes = [_f(c.close) for c in candles]
+    cur    = closes[-1]
+
+    touch_zone    = atr * _SR_TOUCH_ZONE_ATR
+    break_confirm = atr * _SR_BREAK_CONFIRM_ATR
+
+    for lv in levels:
+        p = lv.price
+
+        # ── касания: диапазон свечи перекрывает [p-zone, p+zone] ─────────────
+        lv.touch_count = sum(
+            1 for i in range(len(candles))
+            if lows[i] <= p + touch_zone and highs[i] >= p - touch_zone
+        )
+
+        # ── проверяем последние бары на подтверждённый пробой ────────────────
+        # Идём с конца, считаем последовательные закрытия с одной стороны.
+        consec_above = 0
+        for cl in reversed(closes[-10:]):
+            if cl > p + break_confirm:
+                consec_above += 1
+            else:
+                break
+
+        consec_below = 0
+        for cl in reversed(closes[-10:]):
+            if cl < p - break_confirm:
+                consec_below += 1
+            else:
+                break
+
+        broken_up   = consec_above >= _SR_BREAK_MIN_BARS
+        broken_down = consec_below >= _SR_BREAK_MIN_BARS
+
+        # ── полярность ────────────────────────────────────────────────────────
+        if broken_up:
+            # Цена пробила вверх и держится — уровень теперь поддержка.
+            # flipped=True если до этого цена была ниже (классический S/R flip).
+            lv.polarity = "support"
+            lv.flipped = cur > p  # True = цена сейчас выше (пробой вверх подтверждён)
+        elif broken_down:
+            # Цена пробила вниз — уровень теперь сопротивление.
+            lv.polarity = "resistance"
+            lv.flipped = cur < p
+        elif cur > p:
+            lv.polarity = "support"
+            lv.flipped = False
+        elif cur < p:
+            lv.polarity = "resistance"
+            lv.flipped = False
+        else:
+            lv.polarity = "neutral"
+            lv.flipped = False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

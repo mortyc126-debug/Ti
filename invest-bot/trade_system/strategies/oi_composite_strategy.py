@@ -1644,6 +1644,21 @@ def score_level_context(candles: list[HistoricCandle], external_nearest=None) ->
                                   _VOL_STRONG, _VOL_BREAKOUT,
                                   vols_ref=[float(c.volume) for c in candles[-(_WINDOW + 20): -_WINDOW]])
             if s != 0.0:
+                # Корректировка по полярности уровня (S/R flip enrichment):
+                # Сигнал совпадает с полярностью (бычий у поддержки / медвежий у сопротивления) —
+                # усиливаем; противоречит (например, медвежий сигнал, но уровень поддержка) —
+                # гасим. S/R flip-уровни (flipped=True) реагируют сильнее: ретест после пробоя
+                # — одна из самых надёжных точек входа.
+                pol = getattr(lv, "polarity", "neutral")
+                flipped = getattr(lv, "flipped", False)
+                if pol == "support" and s > 0:
+                    s *= 1.20 if flipped else 1.10
+                elif pol == "resistance" and s < 0:
+                    s *= 1.20 if flipped else 1.10
+                elif pol == "support" and s < 0:
+                    s *= 0.70   # медвежий сигнал у поддержки — контрарный, гасим
+                elif pol == "resistance" and s > 0:
+                    s *= 0.70   # бычий сигнал у сопротивления — контрарный, гасим
                 hw = _HORIZON_W.get(horizon, 1.0)
                 horizon_scores.append((s, hw))
         if not horizon_scores:
