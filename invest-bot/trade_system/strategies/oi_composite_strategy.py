@@ -276,6 +276,17 @@ MICROSTRUCTURE_AGREE_BOOST = 1.3    # множитель силы в гейте 
 
 # На 1-минутных свечах RSI/z-score-осцилляторы перевозбуждаются за 2-3 бара
 # и сигнализируют разворот в начале тренда. Трендовые методы — наоборот, точнее.
+
+# Режим-специфичные знаки скора: +1 прямой, -1 инвертировать.
+# Данные: AFKS 90д bar_scores, корреляция ZSCORE→fwd_ret_3 по режимам.
+# low_vol:     ZSCORE шорт→+0.88%, лонг→-0.97% (контрарный: z-рост = перехай).
+# trending_up: ZSCORE лонг→-2.03% (вершина тренда, двусторонне медвежий).
+# stress/trending_down/ranging/high_vol: ZSCORE прямой (momentum/breakout).
+_REGIME_METHOD_SIGN: dict[str, dict[str, int]] = {
+    "low_vol":      {"ZSCORE": -1},
+    "trending_up":  {"ZSCORE": -1},
+}
+
 _1MIN_WEIGHT_MODS: dict[str, float] = {
     "FISHER_RSI":       0.2,   # RSI-осциллятор
     "RMI":              0.2,   # RSI-вариант
@@ -4475,6 +4486,16 @@ class OICompositeStrategy(IStrategy):
             -s if self.__ic(n).invert else s
             for n, s in zip(ALL_METHOD_NAMES, scores_for_composite)
         ]
+
+        # Режим-специфичная инверсия: некоторые методы меняют знак в зависимости
+        # от режима (напр. ZSCORE контрарен в low_vol/trending_up — ловит перехаи,
+        # но является momentum-сигналом в stress/trending_down/ranging).
+        if regime in _REGIME_METHOD_SIGN:
+            _rsign = _REGIME_METHOD_SIGN[regime]
+            scores_for_composite = [
+                s * _rsign[n] if n in _rsign else s
+                for n, s in zip(ALL_METHOD_NAMES, scores_for_composite)
+            ]
 
         # P5: в середине дневного диапазона (0.3<l1_pct<0.7) осцилляторы
         # информативнее — +10% методам осцилляторной группы.
