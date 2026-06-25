@@ -596,7 +596,9 @@ class MethodWeight:
         conf = max(0.1, min(1.0, abs_score))
         eta = HEDGE_ETA * min(1.0, self.total / HEDGE_WARMUP_TRADES) * conf
         self.weight *= math.exp(eta * (quality - neutral))
-        self.weight = max(0.05, min(1.0, self.weight))
+        # Отрицательный вес допустим: метод систематически вредный → инвертируем его голос.
+        # Нижний порог -1.0 симметричен верхнему 1.0.
+        self.weight = max(-1.0, min(1.0, self.weight))
 
 
 @dataclass
@@ -5006,7 +5008,9 @@ class OICompositeStrategy(IStrategy):
         n_base = len(BASE_METHOD_NAMES)
 
         weighted = sum(s * w for s, w in zip(scores_for_composite[:n_base], weights[:n_base]))
-        weight_sum = sum(weights[:n_base]) or 1.0
+        # Нормируем на sum(|w|), а не sum(w): отрицательные веса вредных методов
+        # корректно инвертируют их голос, не схлопывая знаменатель в ноль.
+        weight_sum = sum(abs(w) for w in weights[:n_base]) or 1.0
         linear_raw = weighted / weight_sum
 
         # Плейбуки: нелинейные конъюнкции — при активации берут 60% итога.
