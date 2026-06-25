@@ -440,6 +440,10 @@ class Trader:
                 strategy.set_inst_oi_provider(self.__oi_layers.inst_oi_score)
             if hasattr(strategy, "set_retail_contra_provider"):
                 strategy.set_retail_contra_provider(self.__oi_layers.retail_contra_score)
+            if hasattr(strategy, "set_delta_quadrant_provider"):
+                strategy.set_delta_quadrant_provider(self.__oi_layers.delta_quadrant_score)
+            if hasattr(strategy, "set_oi_absorption_provider"):
+                strategy.set_oi_absorption_provider(self.__oi_layers.absorption_score)
             if hasattr(strategy, "set_tradestats_provider"):
                 strategy.set_tradestats_provider(self.__tradestats.score)
             if hasattr(strategy, "set_atr_history_provider"):

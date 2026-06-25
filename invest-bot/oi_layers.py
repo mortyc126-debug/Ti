@@ -194,6 +194,94 @@ def _divergence_correction(score: float, rows: list[dict], long_key: str, short_
     return score * 0.4
 
 
+def _delta_quadrant_score(rows: list[dict], n: int = 3) -> float:
+    """
+    Динамический квадрант: смотрим ΔОИ юр и физ за последние n снэпшотов.
+    Оба набирают лонг одновременно → медвежий сигнал (перегруженная сторона).
+    Оба набирают шорт → бычий (шорт-сквиз потенциал).
+    ЮР лонг + ФИЗ шорт → бычий (умные vs толпа). ЮР шорт + ФИЗ лонг → медвежий.
+    Возвращает [-1..+1], >0 бычий, <0 медвежий.
+    """
+    if len(rows) < 2:
+        return 0.0
+    window = rows[-min(n + 1, len(rows)):]
+    d_yur_long = d_yur_short = d_fiz_long = d_fiz_short = 0.0
+    for i in range(1, len(window)):
+        r1, r0 = window[i], window[i - 1]
+        d_yur_long  += float(r1.get("yur_long")  or 0) - float(r0.get("yur_long")  or 0)
+        d_yur_short += float(r1.get("yur_short") or 0) - float(r0.get("yur_short") or 0)
+        d_fiz_long  += float(r1.get("fiz_long")  or 0) - float(r0.get("fiz_long")  or 0)
+        d_fiz_short += float(r1.get("fiz_short") or 0) - float(r0.get("fiz_short") or 0)
+
+    # Нетто-направление ΔОИ каждой группы
+    d_yur = d_yur_long - d_yur_short
+    d_fiz = d_fiz_long - d_fiz_short
+    total = abs(d_yur) + abs(d_fiz)
+    if total < 1e-9:
+        return 0.0
+
+    if d_yur > 0 and d_fiz > 0:
+        # Оба доливают лонг — перегрев, медвежий
+        intensity = (d_yur + d_fiz) / total  # всегда 1.0 при одном знаке
+        return -math.tanh(intensity * 1.5) * 0.7
+
+    if d_yur < 0 and d_fiz < 0:
+        # Оба доливают шорт — перегрев шорта, бычий
+        intensity = (abs(d_yur) + abs(d_fiz)) / total
+        return math.tanh(intensity * 1.5) * 0.7
+
+    if d_yur > 0 and d_fiz < 0:
+        # ЮР набирает лонг, ФИЗ шортит — умные vs толпа → бычий
+        return math.tanh((d_yur - d_fiz) / total * 2.0) * 0.85
+
+    if d_yur < 0 and d_fiz > 0:
+        # ЮР шортит, ФИЗ набирает лонг → медвежий
+        return -math.tanh((abs(d_yur) + d_fiz) / total * 2.0) * 0.85
+
+    return 0.0
+
+
+def _absorption_score(rows: list[dict], n: int = 3) -> float:
+    """
+    ОИ растёт (обе стороны доливают), а цена не реагирует → поглощение.
+    Кто-то снаружи (маркетмейкер) продаёт в лонг или покупает шорт.
+    Когда он выйдет — рынок рванёт против перегруженной стороны.
+    Возвращает (-1..+1): >0 — поглощение шортов (бычий потенциал), <0 — лонгов (медвежий).
+    """
+    if len(rows) < 2:
+        return 0.0
+    window = rows[-min(n + 1, len(rows)):]
+    total_d_long = total_d_short = 0.0
+    p_start = float(window[0].get("price") or 0)
+    p_end   = float(window[-1].get("price") or 0)
+    for i in range(1, len(window)):
+        r1, r0 = window[i], window[i - 1]
+        total_d_long  += max(0.0, float(r1.get("long")  or 0) - float(r0.get("long")  or 0))
+        total_d_short += max(0.0, float(r1.get("short") or 0) - float(r0.get("short") or 0))
+
+    oi_growth = total_d_long + total_d_short
+    if oi_growth < 1e-9 or p_start <= 0 or p_end <= 0:
+        return 0.0
+
+    # Нормируем рост ОИ к среднему значению
+    avg_total = sum(float(r.get("long", 0)) + float(r.get("short", 0)) for r in window) / len(window)
+    if avg_total < 1e-9:
+        return 0.0
+    oi_growth_rel = oi_growth / avg_total
+
+    price_move = abs(p_end - p_start) / p_start
+    # Поглощение = ОИ растёт, цена стоит (price_move < 0.005 = <0.5%)
+    if price_move > 0.01:  # цена двигается — не поглощение
+        return 0.0
+    stagnation = max(0.0, 1.0 - price_move / 0.005)
+    intensity = math.tanh(oi_growth_rel * 3.0) * stagnation
+
+    # Перегружена та сторона, которая больше доливала
+    net_bias = total_d_long - total_d_short
+    # >0 — лонги перегружены → медвежий, <0 — шорты → бычий
+    return -math.copysign(intensity * 0.8, net_bias)
+
+
 def _inst_oi_score(rows: list[dict]) -> float:
     """
     Порт m_INST_OI: позиция юрлиц (YUR) — "умные деньги" срочного рынка.
@@ -306,6 +394,8 @@ class OiLayersService:
                 scores = self._scores.get(ticker, {"squeeze_up": 0.0, "squeeze_down": 0.0})
             scores["inst_oi"] = _inst_oi_score(hist)
             scores["retail_contra"] = _retail_contra_score(hist)
+            scores["delta_quadrant"] = _delta_quadrant_score(hist)
+            scores["absorption"] = _absorption_score(hist)
             self._scores[ticker] = scores
         self._save()
 
@@ -340,3 +430,19 @@ class OiLayersService:
     def retail_contra_score(self, ticker: str) -> float:
         """m_RETAIL_CONTRA: расхождение юр/физ по направлению. 0.0 если данных нет."""
         return self._scores.get(ticker, {}).get("retail_contra", 0.0)
+
+    def delta_quadrant_score(self, ticker: str) -> float:
+        """
+        Динамический квадрант ΔОИ: кто и куда доливает прямо сейчас.
+        >0 бычий (ЮР лонг vs ФИЗ шорт, или оба в шорте = сквиз потенциал).
+        <0 медвежий (ЮР шорт vs ФИЗ лонг, или оба в лонге = перегрев).
+        """
+        return self._scores.get(ticker, {}).get("delta_quadrant", 0.0)
+
+    def absorption_score(self, ticker: str) -> float:
+        """
+        Поглощение: ОИ растёт, цена не двигается.
+        >0 — шорты поглощаются (бычий потенциал выброса вверх).
+        <0 — лонги поглощаются (медвежий потенциал выброса вниз).
+        """
+        return self._scores.get(ticker, {}).get("absorption", 0.0)

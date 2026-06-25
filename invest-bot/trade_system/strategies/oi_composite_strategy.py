@@ -2974,6 +2974,8 @@ STRUCTURAL_METHOD_NAMES = [LEVEL_CONTEXT_NAME, MKT_STRUCTURE_NAME, SPRING_NAME]
 OI_SQUEEZE_NAME = "OI_SQUEEZE"
 INST_OI_NAME = "INST_OI"
 RETAIL_CONTRA_NAME = "RETAIL_CONTRA"
+DELTA_QUADRANT_NAME = "DELTA_QUADRANT"
+OI_ABSORPTION_NAME = "OI_ABSORPTION"
 # Методы микроструктуры (tradestats/obstats/orderstats, см. tradestats.py).
 # Имена соответствуют ключам TradeStatsService.SCORE_FUNCS.
 TRADESTATS_METHOD_NAMES = [
@@ -2993,7 +2995,7 @@ M3_NAME = "M3_CLUSTER"
 BASE_METHOD_NAMES = (
     [name for name, _ in METHODS]
     + STRUCTURAL_METHOD_NAMES
-    + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
+    + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME, DELTA_QUADRANT_NAME, OI_ABSORPTION_NAME]
     + TRADESTATS_METHOD_NAMES
     + [CHANGE_POINT_NAME, MULTI_TICKER_NAME]
 )
@@ -3350,6 +3352,8 @@ class OICompositeStrategy(IStrategy):
         self.__squeeze_provider: Optional[SqueezeProvider] = None
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
+        self.__delta_quadrant_provider: Optional[ScoreProvider] = None
+        self.__oi_absorption_provider: Optional[ScoreProvider] = None
         self.__tradestats_provider: Optional[TradeStatsProvider] = None
         self.__multi_ticker_provider: Optional[MultiTickerProvider] = None
         self.__regime_confidence: float = 1.0
@@ -3532,6 +3536,14 @@ class OICompositeStrategy(IStrategy):
     def set_retail_contra_provider(self, provider: Optional[ScoreProvider]) -> None:
         """provider(ticker) -> m_RETAIL_CONTRA score, см. oi_layers.py.OiLayersService.retail_contra_score."""
         self.__retail_contra_provider = provider
+
+    def set_delta_quadrant_provider(self, provider: Optional[ScoreProvider]) -> None:
+        """provider(ticker) -> DELTA_QUADRANT score, см. oi_layers.py.OiLayersService.delta_quadrant_score."""
+        self.__delta_quadrant_provider = provider
+
+    def set_oi_absorption_provider(self, provider: Optional[ScoreProvider]) -> None:
+        """provider(ticker) -> OI_ABSORPTION score, см. oi_layers.py.OiLayersService.absorption_score."""
+        self.__oi_absorption_provider = provider
 
     def set_tradestats_provider(self, provider: Optional[TradeStatsProvider]) -> None:
         """provider(ticker, method_name) -> score, см. tradestats.py.TradeStatsService.score."""
@@ -4924,6 +4936,8 @@ class OICompositeStrategy(IStrategy):
             self.__score_oi_squeeze(),
             self.__score_provider(self.__inst_oi_provider),
             self.__score_provider(self.__retail_contra_provider),
+            self.__score_provider(self.__delta_quadrant_provider),
+            self.__score_provider(self.__oi_absorption_provider),
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [self.__cached_change_point, self.__score_multi_ticker()]
 
@@ -4943,7 +4957,7 @@ class OICompositeStrategy(IStrategy):
         base_score_dict = dict(zip(
             [name for name, _ in METHODS]
             + STRUCTURAL_METHOD_NAMES
-            + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME]
+            + [OI_SQUEEZE_NAME, INST_OI_NAME, RETAIL_CONTRA_NAME, DELTA_QUADRANT_NAME, OI_ABSORPTION_NAME]
             + TRADESTATS_METHOD_NAMES
             + [CHANGE_POINT_NAME, MULTI_TICKER_NAME],
             base_scores
