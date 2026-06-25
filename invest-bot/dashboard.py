@@ -2343,36 +2343,49 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div id="dash-grid" style="display:none;padding:12px 16px;">
-  <div style="display:grid;grid-template-columns:280px 1fr;gap:10px;height:82vh;min-height:500px;">
+  <div style="display:grid;grid-template-columns:260px 1fr;gap:10px;height:90vh;min-height:600px;">
 
     <!-- Левая колонка: список тикеров -->
     <div style="display:flex;flex-direction:column;gap:6px;min-height:0;">
       <div style="font-size:11px;color:var(--txt3);padding:0 2px;">Тикеры прогона</div>
       <div id="dg-ticker-list" style="overflow-y:auto;flex:1;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px 0;"></div>
-      <div id="dg-summary" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:11px;"></div>
+      <div id="dg-summary" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:11px;flex-shrink:0;"></div>
     </div>
 
-    <!-- Правая колонка: 3 панели -->
-    <div style="display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr 1fr;gap:10px;min-height:0;">
+    <!-- Правая часть: график вверху + 3 панели снизу -->
+    <div style="display:grid;grid-template-rows:55% 45%;gap:10px;min-height:0;">
 
-      <!-- Сделки по тикеру (занимает всю левую колонку) -->
-      <div style="grid-row:1/3;background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
-        <div id="dg-trades-header" style="padding:8px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">Сделки — выбери тикер слева</div>
-        <div id="dg-trades-body" style="overflow-y:auto;flex:1;padding:4px;"></div>
+      <!-- График со сделками -->
+      <div id="dg-chart-panel" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+        <div id="dg-chart-header" style="padding:6px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:10px;">
+          <span id="dg-chart-title">График — выбери тикер</span>
+          <span style="color:var(--txt3);font-size:10px;">колесо — масштаб · перетащи — панорама</span>
+        </div>
+        <div id="dg-chart-body" style="flex:1;min-height:0;padding:4px;overflow:hidden;"></div>
       </div>
 
-      <!-- Лучшие / худшие сделки -->
-      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
-        <div style="padding:8px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">▲▼ Лучшие / худшие сделки</div>
-        <div id="dg-bestworst-body" style="overflow-y:auto;flex:1;padding:4px;"></div>
-      </div>
+      <!-- Три нижних панели -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;min-height:0;">
 
-      <!-- Методы -->
-      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
-        <div style="padding:8px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">Методы</div>
-        <div id="dg-methods-body" style="overflow-y:auto;flex:1;padding:4px;"></div>
-      </div>
+        <!-- Сделки -->
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
+          <div id="dg-trades-header" style="padding:6px 10px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">Сделки</div>
+          <div id="dg-trades-body" style="overflow-y:auto;flex:1;padding:4px;font-size:10px;"></div>
+        </div>
 
+        <!-- Лучшие / худшие -->
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
+          <div style="padding:6px 10px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">▲▼ Лучшие / худшие</div>
+          <div id="dg-bestworst-body" style="overflow-y:auto;flex:1;padding:4px;font-size:10px;"></div>
+        </div>
+
+        <!-- Методы -->
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
+          <div style="padding:6px 10px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">Методы</div>
+          <div id="dg-methods-body" style="overflow-y:auto;flex:1;padding:4px;font-size:10px;"></div>
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
@@ -2432,10 +2445,12 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-xs toggled" id="tc_mode_candle" onclick="tcSetMode('candle')">Свечи</button>
     <button class="btn-pill btn-xs ghost"   id="tc_mode_line"   onclick="tcSetMode('line')">Линия</button>
   </div>
-  <canvas id="tc_canvas" style="width:100%;height:480px;display:block;cursor:crosshair;background:var(--panel);border-radius:10px;border:1px solid var(--border);"></canvas>
-  <div id="tc_sel_info" style="font-size:12px;color:var(--txt2);margin-top:6px;min-height:24px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
-  <div id="tc_tooltip" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:28px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
-  <div id="tc_trade_detail" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:24px;"></div>
+  <div id="tc_canvas_wrap">
+    <canvas id="tc_canvas" style="width:100%;height:480px;display:block;cursor:crosshair;background:var(--panel);border-radius:10px;border:1px solid var(--border);"></canvas>
+    <div id="tc_sel_info" style="font-size:12px;color:var(--txt2);margin-top:6px;min-height:24px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
+    <div id="tc_tooltip" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:28px;padding:4px 8px;background:var(--card);border-radius:8px;border:1px solid var(--border);display:none;"></div>
+    <div id="tc_trade_detail" style="font-size:11px;color:var(--txt2);margin-top:4px;min-height:24px;"></div>
+  </div>
 </div>
 
 </div><!-- /tab-sim -->
@@ -3570,6 +3585,7 @@ function showMfeStats() {{
 
 let _dashViewActive = false;
 let _dgSelectedTicker = null;
+let _tcCanvasOrigParent = null;  // куда вернуть канвас при выходе из дашборда
 
 function toggleDashView() {{
   _dashViewActive = !_dashViewActive;
@@ -3577,7 +3593,28 @@ function toggleDashView() {{
   document.getElementById('compare_block').style.display = 'none';
   document.getElementById('dash-grid').style.display = _dashViewActive ? 'block' : 'none';
   document.getElementById('btnDashView').textContent = _dashViewActive ? '☰ таблица' : '⊞ дашборд';
-  if (_dashViewActive) renderDashGrid();
+
+  const wrap = document.getElementById('tc_canvas_wrap');
+  const chartBody = document.getElementById('dg-chart-body');
+  const canvas = document.getElementById('tc_canvas');
+
+  if (_dashViewActive) {{
+    // Перемещаем канвас в grid-панель
+    _tcCanvasOrigParent = wrap.parentElement;
+    chartBody.appendChild(wrap);
+    // Растягиваем canvas на всю панель
+    canvas.style.height = '100%';
+    canvas.style.borderRadius = '6px';
+    // Перерисовываем после перемещения
+    setTimeout(() => {{ if (typeof _resize === 'function') _resize(); }}, 50);
+    renderDashGrid();
+  }} else {{
+    // Возвращаем канвас на место
+    if (_tcCanvasOrigParent) _tcCanvasOrigParent.appendChild(wrap);
+    canvas.style.height = '480px';
+    canvas.style.borderRadius = '10px';
+    setTimeout(() => {{ if (typeof _resize === 'function') _resize(); }}, 50);
+  }}
 }}
 
 function renderDashGrid() {{
@@ -3604,8 +3641,8 @@ function renderDashGrid() {{
   for (const r of rows) {{
     const wr2 = r.win_rate !== undefined ? (r.win_rate*100).toFixed(0)+'%' : '—';
     const wrC = r.win_rate>0.55?'var(--pos)':r.win_rate<0.45?'var(--neg)':'var(--txt2)';
-    const sel = r.ticker===_dgSelectedTicker ? 'background:var(--accent2,#2d2060);font-weight:700;' : '';
-    html += `<div onclick="dgSelectTicker('${{r.ticker}}')" style="cursor:pointer;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;${{sel}}" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='${{r.ticker===_dgSelectedTicker?'var(--accent2,#2d2060)':''}}'">`+
+    const sel = r.ticker===_dgSelectedTicker ? 'background:var(--accent2,#1e1a4a);font-weight:700;' : '';
+    html += `<div data-ticker="${{r.ticker}}" onclick="dgSelectTicker('${{r.ticker}}')" style="cursor:pointer;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;${{sel}}">`+
       `<span style="font-size:12px;color:var(--mem)">${{r.ticker}}</span>`+
       `<span style="font-size:11px;display:flex;gap:8px;color:var(--txt3)">`+
       `<span style="color:${{wrC}}">${{wr2}}</span>`+
@@ -3624,17 +3661,28 @@ function renderDashGrid() {{
 
 function dgSelectTicker(ticker) {{
   _dgSelectedTicker = ticker;
-  // Перекрасить выделенную строку
+  // Подсветить выбранную строку
   for (const el of document.querySelectorAll('#dg-ticker-list > div')) {{
-    const isSelected = el.querySelector('span')?.textContent === ticker;
-    el.style.background = isSelected ? 'var(--accent2,#2d2060)' : '';
-    el.style.fontWeight = isSelected ? '700' : '';
+    const t = el.dataset.ticker;
+    el.style.background = t === ticker ? 'var(--accent2,#1e1a4a)' : '';
+    el.style.fontWeight = t === ticker ? '700' : '';
   }}
   const r = _backtestRows.find(x=>x.ticker===ticker);
-  if (r) {{
-    dgShowDetails(r);
-    selectTicker(ticker); // авто-грузим график
+  if (r) dgShowDetails(r);
+
+  // Грузим график: ставим тикер в дропдаун + дни + вызываем loadTradeChart
+  document.getElementById('dg-chart-title').textContent = 'График: ' + ticker + ' (загрузка...)';
+  const sel = document.getElementById('tc_ticker');
+  let found = false;
+  for (const opt of sel.options) {{ if (opt.value===ticker) {{ sel.value=ticker; found=true; break; }} }}
+  if (!found) {{
+    const opt = new Option(ticker, ticker);
+    sel.add(opt);
+    sel.value = ticker;
   }}
+  loadTradeChart().then(()=>{{
+    document.getElementById('dg-chart-title').textContent = 'График: ' + ticker;
+  }}).catch(()=>{{}});
 }}
 
 function dgShowDetails(r) {{
