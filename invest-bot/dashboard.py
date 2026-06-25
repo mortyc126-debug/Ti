@@ -2207,6 +2207,13 @@ label{{display:inline-block;margin:4px 12px 4px 0;font-size:11px;color:var(--txt
 .cfg-group select.inp{{min-width:0;width:100%;overflow:hidden;text-overflow:ellipsis;}}
 .cfg-group label:has(select.inp){{flex-wrap:wrap;}}
 input[type="checkbox"]{{accent-color:var(--accent);}}
+input[type="number"]{{background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;-moz-appearance:textfield;}}
+input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{{filter:invert(1) brightness(0.4);opacity:.6;}}
+input[type="range"]{{-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;background:rgba(255,255,255,.12);outline:none;cursor:pointer;}}
+input[type="range"]::-webkit-slider-thumb{{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid rgba(255,255,255,.2);cursor:pointer;}}
+input[type="range"]::-moz-range-thumb{{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid rgba(255,255,255,.2);cursor:pointer;}}
+input[type="range"]::-webkit-slider-runnable-track{{border-radius:4px;}}
+select{{background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--txt);padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;}}
 .cat-toc-toggle:hover{{color:var(--accent);background:rgba(255,0,128,.12);}}
 .scen-table{{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px;}}
 .scen-table th{{text-align:right;color:var(--txt3);font-weight:400;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.08);}}
@@ -3118,10 +3125,10 @@ function tradesListToHtml(trades, overallWr) {{
   const W = 10;
   let cumR = 0;
   const hasEp = trades.some(t => t.ep && t.ep > 0);
-  let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;width:100%">';
-  html += '<tr style="color:var(--txt3)">'
-    + '<th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th>'
-    + '<th>MFE%</th><th>MAE%</th>'
+  let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;width:100%;border-spacing:0">';
+  html += '<tr style="color:var(--txt3);font-size:11px">'
+    + '<th style="padding:3px 6px">#</th><th style="padding:3px 8px">Дата</th><th style="padding:3px 6px">Dir</th><th style="padding:3px 6px">Win</th><th style="padding:3px 8px">R</th><th style="padding:3px 8px">cumR</th>'
+    + '<th style="padding:3px 8px">MFE%</th><th style="padding:3px 8px">MAE%</th>'
     + (hasEp ? '<th title="Вход → Выход / Тейк / Стоп">Вход/Тейк/Стоп</th>' : '')
     + '<th title="Позиция цены входа в дневном хай-лой: 0%=у лоя, 100%=у хая">Hi-Lo%</th>'
     + '<th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
@@ -3166,19 +3173,25 @@ function tradesListToHtml(trades, overallWr) {{
       priceCell = '<td></td>';
     }}
     const l1bar = _l1pctBar(t.l1pct != null ? t.l1pct : -1, t.d);
+    // Формат даты: YYYY-MM-DD HH:MM → DD.MM HH:MM (короче, читаемее)
+    const dtParts = (t.t || '').split(' ');
+    const datePart = dtParts[0] ? dtParts[0].split('-').slice(1).reverse().join('.') : '—';
+    const timePart = dtParts[1] ? dtParts[1].substring(0,5) : '';
+    const dtFmt = datePart + (timePart ? ' ' + timePart : '');
+    const td = s => `<td style="padding:2px 8px;${s||''}">`; const _td = '</td>';
     html += `<tr style="${{bg}}">
-      <td style="color:var(--txt3)">${{i+1}}</td>
-      <td style="white-space:nowrap">${{t.t}}</td>
-      <td>${{t.d}}</td><td>${{winMark}}</td>
-      <td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td>
-      <td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td>
-      <td style="color:${{mfeColor}}">${{mfePct}}</td>
-      <td style="color:${{maeColor}}">${{maePct}}</td>
+      ${td('color:var(--txt3)')}${{i+1}}${_td}
+      ${td('white-space:nowrap;letter-spacing:.01em')}${{dtFmt}}${_td}
+      ${td('font-weight:600')}${{t.d}}${_td}${td('')}${{winMark}}${_td}
+      ${td('color:'+rColor+';font-weight:600')}${{t.r.toFixed(2)}}${_td}
+      ${td('color:'+cumRColor)}${{cumR.toFixed(2)}}${_td}
+      ${td('color:'+mfeColor)}${{mfePct}}${_td}
+      ${td('color:'+maeColor)}${{maePct}}${_td}
       ${{priceCell}}
-      <td style="padding:1px 4px">${{l1bar}}</td>
-      <td style="color:${{rwrColor}}">${{rwrPct}}</td>
-      <td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{forStr}}</td>
-      <td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{againstStr}}</td>
+      <td style="padding:2px 4px">${{l1bar}}</td>
+      ${td('color:'+rwrColor)}${{rwrPct}}${_td}
+      ${td('color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden')}${{forStr}}${_td}
+      ${td('color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden')}${{againstStr}}${_td}
     </tr>`;
   }}
   html += '</table></div>';
@@ -3810,13 +3823,15 @@ function toggleDashView() {{
     // Растягиваем canvas на всю панель
     canvas.style.height = '100%';
     canvas.style.borderRadius = '6px';
-    // Перерисовываем после перемещения
-    setTimeout(() => {{ if (typeof _resize === 'function') _resize(); }}, 50);
     renderDashGrid();
-    // Скроллим к grid-панели — без этого она появляется ниже кнопок и не видна
+    // Скроллим к grid-панели и перерисовываем после layout — нужны два RAF,
+    // чтобы flex успел раздать размеры до _resize (иначе clientWidth=0).
     setTimeout(() => {{
       document.getElementById('dash-grid').scrollIntoView({{behavior: 'smooth', block: 'start'}});
     }}, 80);
+    requestAnimationFrame(() => requestAnimationFrame(() => {{
+      if (typeof _resize === 'function') _resize();
+    }}));
   }} else {{
     // Возвращаем канвас на место
     if (_tcCanvasOrigParent) _tcCanvasOrigParent.appendChild(wrap);
@@ -3891,6 +3906,11 @@ function dgSelectTicker(ticker) {{
   }}
   loadTradeChart().then(()=>{{
     document.getElementById('dg-chart-title').textContent = 'График: ' + ticker;
+    // После загрузки форсируем resize — flex-панель может быть уже растянута,
+    // но canvas ещё не знает о своих размерах (особенно при переключении тикера).
+    requestAnimationFrame(() => requestAnimationFrame(() => {{
+      if (typeof _resize === 'function') _resize();
+    }}));
   }}).catch(()=>{{}});
 }}
 
