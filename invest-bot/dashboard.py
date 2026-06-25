@@ -3462,6 +3462,18 @@ async function copyAllResults(btn) {{
   if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
   const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
   let text = header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
+  // Добавляем сделки по каждому тикеру
+  const rowsWithTrades = _backtestRows.filter(r => r.trades_list && r.trades_list.length);
+  if (rowsWithTrades.length) {{
+    text += '\\n--- Сделки ---\\n';
+    text += 'Тикер\tДата\tDir\tWin\tR\tMFE%\tMAE%\tВход\tВыход\tТейк\tСтоп\tHi-Lo%\\n';
+    for (const r of rowsWithTrades) {{
+      for (const t of r.trades_list) {{
+        const l1 = t.l1pct != null && t.l1pct >= 0 ? (t.l1pct*100).toFixed(0)+'%' : '—';
+        text += `${{r.ticker}}\t${{t.t}}\t${{t.d}}\t${{t.w?'W':'L'}}\t${{t.r.toFixed(2)}}\t${{t.mfe!=null?t.mfe.toFixed(2)+'%':'—'}}\t${{t.mae!=null?t.mae.toFixed(2)+'%':'—'}}\t${{t.ep||'—'}}\t${{t.xp||'—'}}\t${{t.tp||'—'}}\t${{t.sp||'—'}}\t${{l1}}\\n`;
+      }}
+    }}
+  }}
   // Добавляем MFE/MAE если есть
   try {{
     const mfeResp = await fetch('/api/mfe_stats');
