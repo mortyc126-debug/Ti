@@ -3196,7 +3196,7 @@ async function calibrateMethodWeights(btn) {{
 }}
 
 async function resetWeights() {{
-  if (!confirm('Сбросить все Hedge-веса методов в oi_weights.json до 0.5?\\nIC-prior\'ы не затрагиваются.')) return;
+  if (!confirm('Сбросить все Hedge-веса методов в oi_weights.json до 0.5?\nIC-prior не затрагивается.')) return;
   const btn = document.getElementById('btnResetWeights');
   btn.disabled = true; btn.textContent = '⏳…';
   try {{
