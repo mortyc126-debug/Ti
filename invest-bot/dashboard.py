@@ -2312,6 +2312,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <button class="btn-pill btn-sm info" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
   <button class="btn-pill btn-sm ghost" onclick="showMfeStats()" title="Медианы MFE/MAE из текущего прогона — показывает структурное соотношение хода цены за/против позиции">📐 MFE/MAE</button>
+  <button id="btnDashView" class="btn-pill btn-sm ghost" onclick="toggleDashView()" title="Переключить между видом таблицы и видом дашборда с панелями">⊞ дашборд</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до равномерных 0.5. IC-prior не затрагивается.">🔄 сброс весов</button>
   <span id="status"></span>
@@ -2339,6 +2340,41 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <table class="scen-table" id="results"></table>
   <div id="compare_block" style="display:none;margin-top:8px"></div>
   <div id="mfe_stats_out" style="display:none;margin-top:12px;"></div>
+</div>
+
+<div id="dash-grid" style="display:none;padding:12px 16px;">
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:10px;height:82vh;min-height:500px;">
+
+    <!-- Левая колонка: список тикеров -->
+    <div style="display:flex;flex-direction:column;gap:6px;min-height:0;">
+      <div style="font-size:11px;color:var(--txt3);padding:0 2px;">Тикеры прогона</div>
+      <div id="dg-ticker-list" style="overflow-y:auto;flex:1;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px 0;"></div>
+      <div id="dg-summary" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:11px;"></div>
+    </div>
+
+    <!-- Правая колонка: 3 панели -->
+    <div style="display:grid;grid-template-rows:1fr 1fr;grid-template-columns:1fr 1fr;gap:10px;min-height:0;">
+
+      <!-- Сделки по тикеру (занимает всю левую колонку) -->
+      <div style="grid-row:1/3;background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
+        <div id="dg-trades-header" style="padding:8px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">Сделки — выбери тикер слева</div>
+        <div id="dg-trades-body" style="overflow-y:auto;flex:1;padding:4px;"></div>
+      </div>
+
+      <!-- Лучшие / худшие сделки -->
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
+        <div style="padding:8px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">▲▼ Лучшие / худшие сделки</div>
+        <div id="dg-bestworst-body" style="overflow-y:auto;flex:1;padding:4px;"></div>
+      </div>
+
+      <!-- Методы -->
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:0;">
+        <div style="padding:8px 12px;font-size:11px;color:var(--txt3);border-bottom:1px solid var(--border);flex-shrink:0;">Методы</div>
+        <div id="dg-methods-body" style="overflow-y:auto;flex:1;padding:4px;"></div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <div class="panel">
@@ -3161,6 +3197,7 @@ function comparisonTableToHtml(rows) {{
 }}
 
 function renderResultsTable() {{
+  if (_dashViewActive) {{ renderDashGrid(); return; }}
   const table = document.getElementById('results');
   const hideZero = document.getElementById('hide_zero').checked;
   const minTrades = parseInt(document.getElementById('min_trades').value) || 0;
@@ -3527,6 +3564,104 @@ function showMfeStats() {{
   html += '</tbody></table></div>';
   out.style.display = 'block';
   out.innerHTML = html;
+}}
+
+// ── Dashboard grid view ──────────────────────────────────────────────────────
+
+let _dashViewActive = false;
+let _dgSelectedTicker = null;
+
+function toggleDashView() {{
+  _dashViewActive = !_dashViewActive;
+  document.getElementById('results').style.display = _dashViewActive ? 'none' : '';
+  document.getElementById('compare_block').style.display = 'none';
+  document.getElementById('dash-grid').style.display = _dashViewActive ? 'block' : 'none';
+  document.getElementById('btnDashView').textContent = _dashViewActive ? '☰ таблица' : '⊞ дашборд';
+  if (_dashViewActive) renderDashGrid();
+}}
+
+function renderDashGrid() {{
+  // Итоговая строка
+  const valid = _backtestRows.filter(r => r.win_rate !== undefined && (r.n_trades||0) > 0);
+  const n = valid.reduce((s,r)=>s+r.n_trades,0);
+  const wr = n ? valid.reduce((s,r)=>s+r.win_rate*r.n_trades,0)/n : 0;
+  const exp = n ? valid.reduce((s,r)=>s+(r.expectancy_pct||0)*r.n_trades,0)/n : 0;
+  const avgR = n ? valid.reduce((s,r)=>s+(r.avg_r||0)*r.n_trades,0)/n : 0;
+  const wrColor = wr>0.55?'var(--pos)':wr<0.45?'var(--neg)':'var(--txt2)';
+  const expColor = exp>0?'var(--pos)':exp<0?'var(--neg)':'var(--txt2)';
+  document.getElementById('dg-summary').innerHTML =
+    `<div style="color:var(--txt3);margin-bottom:4px;">Итого ${{valid.length}} тикеров, ${{n}} сделок</div>`+
+    `<div>WR <span style="color:${{wrColor}};font-weight:700">${{(wr*100).toFixed(1)}}%</span> &nbsp; avg R <b>${{avgR.toFixed(2)}}</b> &nbsp; Exp <span style="color:${{expColor}}">${{(exp*100).toFixed(2)}}%</span></div>`;
+
+  // Список тикеров
+  const hideZero = document.getElementById('hide_zero').checked;
+  const minT = parseInt(document.getElementById('min_trades').value)||0;
+  let rows = _backtestRows.filter(r=>r.n_trades!==undefined);
+  if (hideZero) rows = rows.filter(r=>r.n_trades>0);
+  if (minT>0) rows = rows.filter(r=>r.n_trades>=minT);
+
+  let html = '';
+  for (const r of rows) {{
+    const wr2 = r.win_rate !== undefined ? (r.win_rate*100).toFixed(0)+'%' : '—';
+    const wrC = r.win_rate>0.55?'var(--pos)':r.win_rate<0.45?'var(--neg)':'var(--txt2)';
+    const sel = r.ticker===_dgSelectedTicker ? 'background:var(--accent2,#2d2060);font-weight:700;' : '';
+    html += `<div onclick="dgSelectTicker('${{r.ticker}}')" style="cursor:pointer;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;${{sel}}" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='${{r.ticker===_dgSelectedTicker?'var(--accent2,#2d2060)':''}}'">`+
+      `<span style="font-size:12px;color:var(--mem)">${{r.ticker}}</span>`+
+      `<span style="font-size:11px;display:flex;gap:8px;color:var(--txt3)">`+
+      `<span style="color:${{wrC}}">${{wr2}}</span>`+
+      `<span>${{r.n_trades||0}}</span>`+
+      `<span style="color:${{(r.avg_r||0)>0?'var(--pos)':'var(--neg)'}}">${{(r.avg_r||0).toFixed(2)}}R</span>`+
+      `</span></div>`;
+  }}
+  document.getElementById('dg-ticker-list').innerHTML = html;
+
+  // Если был выбран тикер — обновить детали
+  if (_dgSelectedTicker) {{
+    const r = _backtestRows.find(x=>x.ticker===_dgSelectedTicker);
+    if (r) dgShowDetails(r);
+  }}
+}}
+
+function dgSelectTicker(ticker) {{
+  _dgSelectedTicker = ticker;
+  // Перекрасить выделенную строку
+  for (const el of document.querySelectorAll('#dg-ticker-list > div')) {{
+    const isSelected = el.querySelector('span')?.textContent === ticker;
+    el.style.background = isSelected ? 'var(--accent2,#2d2060)' : '';
+    el.style.fontWeight = isSelected ? '700' : '';
+  }}
+  const r = _backtestRows.find(x=>x.ticker===ticker);
+  if (r) {{
+    dgShowDetails(r);
+    selectTicker(ticker); // авто-грузим график
+  }}
+}}
+
+function dgShowDetails(r) {{
+  // Сделки
+  const hdr = document.getElementById('dg-trades-header');
+  const body = document.getElementById('dg-trades-body');
+  const n = r.n_trades||0;
+  const wr = r.win_rate !== undefined ? (r.win_rate*100).toFixed(1)+'%' : '—';
+  const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2)+'R' : '';
+  const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct*100).toFixed(2)+'%' : '';
+  hdr.innerHTML = `<b style="color:var(--mem)">${{r.ticker}}</b> &nbsp; ${{n}} сделок &nbsp; WR <b>${{wr}}</b> &nbsp; avg ${{avgR}} &nbsp; exp ${{exp}}`;
+  body.innerHTML = r.trades_list && r.trades_list.length
+    ? tradesListToHtml(r.trades_list, r.win_rate)
+    : '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных о сделках</span>';
+
+  // Best/Worst
+  const bw = bestWorstTradesToHtml(r.trades_list||[], 7);
+  document.getElementById('dg-bestworst-body').innerHTML = bw ||
+    '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных</span>';
+
+  // Методы
+  const mth = bestWorstMethodsToHtml(r.method_stats);
+  const fullMth = r.method_stats ? methodStatsToHtml(r.method_stats) : '';
+  document.getElementById('dg-methods-body').innerHTML =
+    (mth || '') +
+    (fullMth ? `<details style="font-size:10px;margin-top:6px;padding:0 4px"><summary style="cursor:pointer;color:var(--txt3)">Все методы</summary>${{fullMth}}</details>` : '') ||
+    '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных</span>';
 }}
 
 async function runBacktest() {{
