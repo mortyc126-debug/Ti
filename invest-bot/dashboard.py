@@ -3622,7 +3622,7 @@ function startProgressPolling(tickers, statusElId) {{
       ${{bar}}
       <div class="progress-detail" style="display:none;font-size:10px;color:var(--txt3);margin-top:2px;line-height:1.7">${{parts}}</div>`;
   }};
-  el.className = (el.className || '') + ' progress-wrap';
+  if (el && !el.classList.contains('progress-wrap')) el.classList.add('progress-wrap');
   render({{}});
   _progressTimer = setInterval(async () => {{
     try {{
