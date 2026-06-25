@@ -2420,6 +2420,66 @@ def _divergence_score(sd: dict[str, float]) -> float:
     return 0.0
 
 
+def score_price_accel(candles: list[HistoricCandle]) -> float:
+    """
+    Ускорение/замедление ценового движения.
+
+    Смотрит на то как меняется скорость баров, а не их направление.
+    Скорость бара = знак × |close - open| / price (направленное тело в %).
+
+    Acceleration = текущая скорость vs средняя скорость предыдущих N баров.
+    Jerk = изменение ускорения (2-я производная).
+
+    Сигналы:
+    > 0: движение ускоряется в бычью сторону (или замедляется медвежье) → бычий.
+    < 0: движение ускоряется в медвежью сторону → медвежий.
+
+    Применения:
+    - Нарастающие бычьи бары → тренд развивается, входить по тренду.
+    - Нарастающие медвежьи бары → каскад ускоряется, ждать разворота.
+    - Затухающие бары в сторону тренда → истощение, риск разворота.
+
+    Нормируется через tanh чтобы не быть слишком чувствительным к масштабу.
+    """
+    _WIN = _adaptive_window(candles, target_hours=0.75, min_bars=6, max_bars=40)
+    if len(candles) < _WIN + 5:
+        return 0.0
+
+    price_ref = _to_f(candles[-1].close) or 1.0
+
+    # Скорость каждого бара: знак × тело / цена
+    def bar_velocity(c) -> float:
+        cl, op = _to_f(c.close), _to_f(c.open)
+        return (cl - op) / price_ref
+
+    window = candles[-_WIN - 1:]
+    velocities = [bar_velocity(c) for c in window]
+
+    if len(velocities) < 4:
+        return 0.0
+
+    # Средняя скорость окна (без последнего бара)
+    avg_v = statistics.mean(velocities[:-1])
+    curr_v = velocities[-1]
+
+    # Ускорение: текущий vs средний
+    accel = curr_v - avg_v
+
+    # Jerk: последние 3 скорости — растёт ли ускорение?
+    if len(velocities) >= 5:
+        v_recent = velocities[-3:]
+        dv = [v_recent[i+1] - v_recent[i] for i in range(len(v_recent)-1)]
+        jerk = dv[-1] - dv[0] if len(dv) >= 2 else 0.0
+    else:
+        jerk = 0.0
+
+    # Итоговый сигнал: ускорение + слабый вклад jerk
+    raw = accel + jerk * 0.3
+    # Масштаб: типичное тело ~0.1-0.3% → нормируем на 0.002
+    norm = math.tanh(raw / (0.002 or 1e-9))
+    return round(max(-1.0, min(1.0, norm)), 4)
+
+
 def score_cumul_delta(candles: list[HistoricCandle]) -> float:
     """
     Накопленный tick-flow (Order Flow): сумма направленного объёма за N баров.
@@ -2575,80 +2635,101 @@ def score_vsa_absorption(candles: list[HistoricCandle]) -> float:
 
 def score_cascade(candles: list[HistoricCandle]) -> float:
     """
-    Ликвидационный каскад — обнаружение и оценка его фазы.
+    Ликвидационный каскад — обнаружение по аномальному объёму и свечам,
+    без жёсткого требования к спреду.
 
-    Каскад = принудительная волна стоп-аутов:
-    1. ФАЗА 1 — ускорение: огромный объём + широкий бар + закрытие у экстремума.
-       Сигнал: контрарный (идти ПРОТИВ направления каскада — ждём разворота).
-    2. ФАЗА 2 — остановка каскада: после 1-2 экстремальных баров появляется
-       Stopping Volume или поглощение (VSA-признаки) — подтверждение разворота.
-    3. ФАЗА 3 — возврат: цена движется обратно с нарастающим объёмом покупок.
+    Три признака каскадного бара (достаточно двух из трёх):
+      1. vol_ratio > 2.5 × среднего
+      2. body_ratio > 1.8 × среднего тела (аномально большая свеча)
+      3. Прокол-ловушка: длинный хвост в направлении каскада + откат
+         (бар сделал новый экстремум, но закрылся против него)
 
-    Алгоритм:
-    - Ищем каскадный бар: vol_ratio>2.5, spread_ratio>1.8, close у экстремума.
-    - Если каскадный бар был 1-4 бара назад → смотрим текущий бар как сигнал.
-    - Если текущий бар показывает разворот (close_pos против направления каскада)
-      + объём нормализуется → даём контрарный сигнал (иди против каскада).
-    - Если каскадный бар прямо сейчас (текущий) → слабый сигнал (ранний).
+    Фазы:
+      — Активный каскад (текущий бар): ранний слабый контрарный сигнал.
+      — Каскад был 1-5 баров назад + текущий бар против него → сильный сигнал.
+      — «Прокол»: бар пробил экстремум + вернулся — мышеловка, следующий бар
+        уже может быть контрарным.
     """
-    _LOOKBACK = 5  # ищем каскад в последних N барах
+    _LOOKBACK = 5
     if len(candles) < 20:
         return 0.0
 
     vols = [float(c.volume) for c in candles]
     avg_vol = statistics.mean(vols[-20:-1]) or 1.0
-    avg_spread_lst = [_to_f(c.high) - _to_f(c.low) for c in candles[-15:-1]]
-    avg_spread = statistics.mean(avg_spread_lst) or 1e-9
+
+    bodies = [abs(_to_f(c.close) - _to_f(c.open)) for c in candles[-15:-1]]
+    avg_body = statistics.mean(bodies) or 1e-9
 
     def bar_info(c):
         h, lo, op, cl = _to_f(c.high), _to_f(c.low), _to_f(c.open), _to_f(c.close)
         rng = h - lo or 1e-9
+        body = abs(cl - op)
+        close_pos = (cl - lo) / rng
+        # Прокол (spike): большой хвост + закрытие против хвоста
+        upper_wick = (h - max(op, cl)) / rng
+        lower_wick = (min(op, cl) - lo) / rng
+        spike_up   = upper_wick > 0.55 and close_pos < 0.45   # пробой вверх + откат
+        spike_down = lower_wick > 0.55 and close_pos > 0.55   # пробой вниз + откат
         return {
-            "vol_r": float(c.volume) / avg_vol,
-            "spread_r": rng / avg_spread,
-            "close_pos": (cl - lo) / rng,
-            "dir": 1 if cl >= op else -1,
+            "vol_r":    float(c.volume) / avg_vol,
+            "body_r":   body / avg_body,
+            "close_pos": close_pos,
+            "dir":      1 if cl >= op else -1,
+            "spike_up": spike_up,    # прокол вверх (медвежий паттерн)
+            "spike_dn": spike_down,  # прокол вниз (бычий паттерн)
         }
 
-    # Ищем каскадный бар в окне
-    cascade_bar = None
-    cascade_age = None
+    def is_cascade_bar(b: dict) -> bool:
+        # Два из трёх признаков
+        signs = [
+            b["vol_r"] > 2.5,
+            b["body_r"] > 1.8 and (b["close_pos"] < 0.2 or b["close_pos"] > 0.8),
+            b["spike_up"] or b["spike_dn"],
+        ]
+        return sum(signs) >= 2
+
+    # Ищем каскадный бар в прошлом
+    cascade_bar: dict | None = None
+    cascade_age: int | None = None
     for age in range(1, min(_LOOKBACK + 1, len(candles))):
         b = bar_info(candles[-1 - age])
-        is_cascade = (b["vol_r"] > 2.5 and b["spread_r"] > 1.8
-                      and (b["close_pos"] < 0.2 or b["close_pos"] > 0.8))
-        if is_cascade:
+        if is_cascade_bar(b):
             cascade_bar = b
             cascade_age = age
             break
 
     curr = bar_info(candles[-1])
 
-    # Нет каскадного бара в прошлом — проверяем текущий
+    # Нет каскада в прошлом → проверяем текущий
     if cascade_bar is None:
-        if (curr["vol_r"] > 3.0 and curr["spread_r"] > 2.0
-                and (curr["close_pos"] < 0.15 or curr["close_pos"] > 0.85)):
-            # Активный каскад прямо сейчас — ранний слабый контрарный
-            cascade_dir = curr["dir"]
-            return round(-cascade_dir * 0.4, 4)
+        if is_cascade_bar(curr):
+            # Активный каскад прямо сейчас → ранний контрарный
+            # Прокол даёт более сильный сигнал (цена уже вернулась)
+            if curr["spike_up"]:
+                return -0.55   # пробой вверх + возврат → медвежий
+            if curr["spike_dn"]:
+                return +0.55   # прокол вниз + возврат → бычий
+            return round(-curr["dir"] * 0.35, 4)
         return 0.0
 
-    # Каскад был cascade_age баров назад — оцениваем разворот
-    cascade_dir = cascade_bar["dir"]   # направление каскада (+1 вверх, -1 вниз)
+    # Каскад был cascade_age баров назад → оцениваем разворот
+    # Прокол-ловушка: разворот уже в теле бара, сигнал приоритетный
+    spike_reversal = (cascade_bar["spike_up"] and cascade_bar["dir"] < 0) or \
+                     (cascade_bar["spike_dn"] and cascade_bar["dir"] > 0)
+    cascade_dir = cascade_bar["dir"]
+    reversal_sign = -cascade_dir
 
-    # Признаки разворота: текущий бар идёт ПРОТИВ направления каскада
-    reversal_sign = -1 if cascade_dir > 0 else 1
-    curr_against = (reversal_sign > 0 and curr["close_pos"] > 0.55) or \
-                   (reversal_sign < 0 and curr["close_pos"] < 0.45)
+    # Текущий бар идёт против каскада
+    curr_against = (reversal_sign > 0 and curr["close_pos"] > 0.50) or \
+                   (reversal_sign < 0 and curr["close_pos"] < 0.50)
+    vol_ok = curr["vol_r"] < 2.5   # не ещё один каскад
 
-    # Объём нормализуется (не ещё один каскадный бар)
-    vol_normalized = curr["vol_r"] < 2.0
-
-    if curr_against and vol_normalized:
-        # Чем свежее каскад (age=1) — тем сильнее сигнал разворота
+    if curr_against and vol_ok:
         freshness = 1.0 - (cascade_age - 1) / _LOOKBACK
-        strength = min(1.0, cascade_bar["vol_r"] / 3.0 * freshness)
-        return round(reversal_sign * strength * 0.85, 4)
+        vol_factor = min(1.0, cascade_bar["vol_r"] / 2.5)
+        spike_boost = 1.3 if spike_reversal else 1.0
+        strength = min(1.0, vol_factor * freshness * spike_boost)
+        return round(reversal_sign * strength * 0.9, 4)
 
     return 0.0
 
@@ -2687,6 +2768,7 @@ METHODS = [
     ("WICK_REJECTION", score_wick_rejection),
     ("TRIANGLE",       score_triangle),
     # VSA/Wyckoff/AMT/OrderFlow — расширенный блок
+    ("PRICE_ACCEL",    score_price_accel),
     ("CUMUL_DELTA",    score_cumul_delta),
     ("AMT_POC",        score_amt_poc),
     ("VSA_ABSORPTION", score_vsa_absorption),
@@ -2756,6 +2838,7 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
     "HAWKES_SIGNAL":  {"min_bars": 25, "weight_5m": 1.30},  # самоусиление потока
     "VSA":            {"min_bars": 12, "weight_5m": 1.05},
+    "PRICE_ACCEL":    {"min_bars": 8,  "weight_5m": 1.10},  # ускорение/замедление баров
     "CUMUL_DELTA":    {"min_bars": 15, "weight_5m": 1.20},  # накопленная агрессия на 5м надёжнее
     "AMT_POC":        {"min_bars": 20, "weight_5m": 1.10},  # POC смысл на 5м-сессии
     "VSA_ABSORPTION": {"min_bars": 12, "weight_5m": 1.15},  # поглощение на 5м крупнее
