@@ -395,58 +395,83 @@ class NarrativeThresholds:
             logger.warning(f"narrative_thresholds: не удалось сохранить: {e}")
 
 
-# Перцентили, определяющие "явно выраженный" сигнал — выше них направление
-# считается не шумом, а реальным согласием кластера. 65/35 — не середина
-# (50/50 ловила бы шум), но и не крайность (90/10 почти никогда не сработает).
-_DIRECTIONAL_PCT = 0.65
-_VOLUME_PCT = 0.65
-# Перцентиль РАЗБРОСА (не среднего) для CLIMAX — верхний хвост распределения
-# спреда внутри группы "Объём" за день.
-_CLIMAX_SPREAD_PCT = 0.85
+MIN_TRADES_PER_REGIME = 10
 
-MIN_DAYS_PER_REGIME = 20
+# Сетка кандидатов для поиска оптимального порога.
+_THRESHOLD_CANDIDATES = [0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.25, 0.30]
 
 
-def _percentile(values: list[float], pct: float) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    idx = min(len(s) - 1, max(0, int(len(s) * pct)))
-    return s[idx]
+def fit_narrative_thresholds(
+        trades_by_regime: dict[str, list[dict]],
+) -> dict | None:
+    """Outcome-based калибровка narrative-порогов.
 
+    Для каждой пары (кластер, режим) ищет порог T, при котором
+    sign(cluster_avg) == направление сделки максимально часто (accuracy).
+    Взвешено на quality сделки — плохой исход весит меньше.
 
-def fit_narrative_thresholds(by_regime: dict[str, list[dict[str, float]]]) -> dict | None:
-    """Чистая версия расчёта порогов — принимает уже собранные дневные
-    method_scores по режимам (см. HistoryStore.daily_method_scores_by_regime
-    / BacktestHistoryStore — структура та же), без обращения к диску.
-    Используется и для офлайн-калибровки (calibrate_narrative.py), и для
-    адаптивной пере-калибровки внутри бэктеста (run_backtest_one)."""
-    if not by_regime:
+    trades_by_regime: {regime: [{"method_scores": {...}, "dir": "LONG"/"SHORT",
+                                  "quality": float}]}
+    Получается через HistoryStore.trades_by_regime() или BacktestHistoryStore.
+    """
+    if not trades_by_regime:
         return None
+
     result: dict[str, dict[str, dict[str, float]]] = {}
+
     for cl in STRATEGY_CLUSTERS:
         label = cl["label"]
         ids = cl["ids"]
-        for regime, day_scores_list in by_regime.items():
-            if len(day_scores_list) < MIN_DAYS_PER_REGIME:
-                continue
-            avgs: list[float] = []
-            spreads: list[float] = []
-            for day_scores in day_scores_list:
-                vals = [day_scores[m] for m in ids if m in day_scores]
+
+        for regime, trades in trades_by_regime.items():
+            # Собираем (cluster_avg, aligned, quality) для всех сделок
+            points: list[tuple[float, bool, float]] = []
+            for t in trades:
+                ms = t.get("method_scores", {})
+                vals = [ms[m] for m in ids if m in ms]
                 if not vals:
                     continue
-                avgs.append(sum(vals) / len(vals))
-                spreads.append(max(vals) - min(vals))
-            if not avgs:
+                avg = sum(vals) / len(vals)
+                if abs(avg) < 1e-6:
+                    continue
+                direction = t.get("dir", "")
+                aligned = (avg > 0 and direction == "LONG") or \
+                          (avg < 0 and direction == "SHORT")
+                points.append((abs(avg), aligned, t.get("quality", 0.5)))
+
+            if len(points) < MIN_TRADES_PER_REGIME:
                 continue
-            bullish = _percentile([abs(a) for a in avgs], _DIRECTIONAL_PCT)
-            accum = _percentile([abs(a) for a in avgs], _VOLUME_PCT)
-            climax_spread = _percentile(spreads, _CLIMAX_SPREAD_PCT)
+
+            # Ищем порог с максимальной взвешенной accuracy
+            best_thr, best_acc = _THRESHOLD_CANDIDATES[0], 0.0
+            for thr in _THRESHOLD_CANDIDATES:
+                filtered = [(al, q) for (v, al, q) in points if v >= thr]
+                if len(filtered) < max(5, len(points) // 5):
+                    # Слишком мало остаётся — не достаточно данных для этого T
+                    continue
+                w_correct = sum(q for al, q in filtered if al)
+                w_total = sum(q for _, q in filtered) or 1e-9
+                acc = w_correct / w_total
+                if acc > best_acc:
+                    best_acc, best_thr = acc, thr
+
+            # climax_spread: spread внутри кластера — используем MAD как меру
+            # разброса (нет прямого аналога для сделочных данных — берём медиану
+            # abs разницы между max и min score кластера по всем сделкам)
+            spreads = []
+            for t in trades:
+                ms = t.get("method_scores", {})
+                vals = [ms[m] for m in ids if m in ms]
+                if len(vals) >= 2:
+                    spreads.append(max(vals) - min(vals))
+            climax_spread = sorted(spreads)[int(len(spreads) * 0.85)] if len(spreads) >= 5 else 1.0
+
             result.setdefault(label, {})[regime] = {
-                "bullish": round(bullish, 4),
-                "accum": round(accum, 4),
+                "bullish": round(best_thr, 4),
+                "accum": round(best_thr, 4),
                 "climax_spread": round(climax_spread, 4),
-                "n_days": len(avgs),
+                "n_trades": len(points),
+                "accuracy": round(best_acc, 4),
             }
+
     return result or None
