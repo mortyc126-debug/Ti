@@ -3217,6 +3217,514 @@ def score_level_absorption(candles: list[HistoricCandle]) -> float:
     return round(approach_dir * strength, 4)
 
 
+# ── Вспомогательные функции для новых методов ────────────────────────────────
+
+def _sma(values: list[float], period: int) -> list[float]:
+    out = []
+    for i in range(len(values)):
+        if i < period - 1:
+            out.append(float('nan'))
+        else:
+            out.append(sum(values[i - period + 1:i + 1]) / period)
+    return out
+
+def _ema(values: list[float], period: int) -> list[float]:
+    k = 2.0 / (period + 1)
+    out = []
+    for i, v in enumerate(values):
+        if i == 0:
+            out.append(v)
+        else:
+            out.append(out[-1] + k * (v - out[-1]))
+    return out
+
+def _smma(values: list[float], period: int) -> list[float]:
+    """Wilder's smoothed MA (используется в Аллигаторе)."""
+    out = []
+    for i, v in enumerate(values):
+        if i < period - 1:
+            out.append(float('nan'))
+        elif i == period - 1:
+            out.append(sum(values[:period]) / period)
+        else:
+            out.append((out[-1] * (period - 1) + v) / period)
+    return out
+
+def _rsi(closes: list[float], period: int = 14) -> list[float]:
+    gains, losses = [], []
+    rsi_out = [float('nan')] * len(closes)
+    for i in range(1, len(closes)):
+        d = closes[i] - closes[i - 1]
+        gains.append(max(0.0, d))
+        losses.append(max(0.0, -d))
+        if i < period:
+            continue
+        if i == period:
+            ag = sum(gains[-period:]) / period
+            al = sum(losses[-period:]) / period
+        else:
+            ag = (ag * (period - 1) + gains[-1]) / period  # type: ignore[possibly-undefined]
+            al = (al * (period - 1) + losses[-1]) / period  # type: ignore[possibly-undefined]
+        rsi_out[i] = 100.0 - 100.0 / (1.0 + ag / (al or 1e-9))
+    return rsi_out
+
+def _std(values: list[float]) -> float:
+    n = len(values)
+    if n < 2:
+        return 0.0
+    m = sum(values) / n
+    return math.sqrt(sum((v - m) ** 2 for v in values) / (n - 1))
+
+def _true_atr_list(candles: list[HistoricCandle], period: int) -> list[float]:
+    """Классический ATR(period) барный список."""
+    trs = [0.0]
+    for i in range(1, len(candles)):
+        h = _to_f(candles[i].high); l = _to_f(candles[i].low)
+        pc = _to_f(candles[i - 1].close)
+        trs.append(max(h - l, abs(h - pc), abs(l - pc)))
+    result = []
+    for i in range(len(trs)):
+        if i < period:
+            result.append(float('nan'))
+        elif i == period:
+            result.append(sum(trs[1:period + 1]) / period)
+        else:
+            result.append((result[-1] * (period - 1) + trs[i]) / period)
+    return result
+
+
+# ── Новые методы: Ишимоку / BB-Keltner / MA-tension / RSI-div / ATR-fuel / Alligator ──
+
+def score_ichimoku_signal(candles: list[HistoricCandle]) -> float:
+    """
+    ICHIMOKU_SIGNAL: неклассическое использование Ишимоку.
+
+    Сигналы (все нормированы в [-1, +1]):
+    1. Kijun-магнит: цена далеко от Kijun(26) → она туда вернётся (против тренда).
+    2. Толщина текущего облака: толстое = трение, тонкое = пустота (усиливает или тормозит).
+    3. Толщина будущего облака (26 баров вперёд): оценивается по текущим значениям
+       Senkou A/B — карта сопротивления впереди.
+    4. Chikou в пустоте: закрытие 26 баров назад — нет свечей вокруг → свободное пространство.
+
+    Итог: взвешенная комбинация. Основной сигнал — от kijun-магнита и будущего облака.
+    """
+    if len(candles) < 60:
+        return 0.0
+
+    highs  = [_to_f(c.high)  for c in candles]
+    lows   = [_to_f(c.low)   for c in candles]
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+
+    def _midprice(h_slice, l_slice):
+        return (max(h_slice) + min(l_slice)) / 2.0 if h_slice else 0.0
+
+    # Tenkan-sen (9) и Kijun-sen (26) — текущие
+    if n < 26:
+        return 0.0
+    tenkan = _midprice(highs[-9:],  lows[-9:])
+    kijun  = _midprice(highs[-26:], lows[-26:])
+    cur    = closes[-1]
+
+    # 1. Kijun-магнит: расстояние цены от кидзун
+    kijun_dev = (cur - kijun) / (kijun or 1e-9)
+    # Умеренное отклонение → нейтрально; большое → сигнал возврата (против тренда)
+    kijun_signal = -math.tanh(kijun_dev * 8.0) * 0.5
+
+    # 2. Текущее облако (Senkou A/B, построенное 26 баров назад)
+    cloud_score = 0.0
+    if n >= 52:
+        sa_past = _midprice(highs[-52:-26], lows[-52:-26])  # приближение senkou A 26 баров назад
+        sb_past = _midprice(highs[-78:-26], lows[-78:-26]) if n >= 78 else sa_past
+        cloud_thick_past = abs(sa_past - sb_past)
+        atr_now = _compute_atr(candles)
+        cloud_in_atr = cloud_thick_past / ((_to_f(candles[-1].close) or 1) * max(atr_now, 0.001))
+        # Цена внутри прошлого облака
+        cloud_top  = max(sa_past, sb_past)
+        cloud_bot  = min(sa_past, sb_past)
+        in_cloud   = cloud_bot <= cur <= cloud_top
+        if in_cloud and cloud_in_atr > 1.5:
+            cloud_score = -0.3   # толстое облако = трение, против входа
+
+    # 3. Будущее облако (следующие 26 периодов): строим из текущих значений
+    senkou_a_future = (tenkan + kijun) / 2.0
+    senkou_b_future = _midprice(highs[-52:], lows[-52:]) if n >= 52 else tenkan
+    future_cloud_thick = abs(senkou_a_future - senkou_b_future)
+    # Нормируем на ATR
+    atr_abs = _compute_atr(candles) * (cur or 1)
+    future_void = future_cloud_thick / (atr_abs or 1e-9)
+    # Тонкое будущее облако → усиливаем сигнал в направлении тренда
+    trend_dir_sign = 1 if cur > kijun else -1
+    if future_void < 0.5:   # пустота впереди
+        future_score = trend_dir_sign * 0.30
+    elif future_void > 2.0: # стена впереди
+        future_score = -trend_dir_sign * 0.25
+    else:
+        future_score = 0.0
+
+    # 4. Chikou в пустоте: закрытие 26 баров назад, сравниваем с диапазоном окружающих свечей
+    chikou_score = 0.0
+    if n >= 27:
+        chikou_price = closes[-1]      # chikou = текущее закрытие на графике 26 баров назад
+        chikou_context = candles[-28:-24] if n >= 28 else []
+        if chikou_context:
+            ctx_hi = max(_to_f(c.high) for c in chikou_context)
+            ctx_lo = min(_to_f(c.low)  for c in chikou_context)
+            ctx_range = ctx_hi - ctx_lo
+            if ctx_range > 1e-9:
+                gap_ratio = min(1.0, max(0.0,
+                    (chikou_price - ctx_hi) / ctx_range if chikou_price > ctx_hi
+                    else (ctx_lo - chikou_price) / ctx_range if chikou_price < ctx_lo
+                    else 0.0
+                ))
+                # Chikou в пустоте → подтверждает направление
+                chikou_score = trend_dir_sign * gap_ratio * 0.25
+
+    total = kijun_signal * 0.40 + cloud_score * 0.20 + future_score * 0.25 + chikou_score * 0.15
+    return round(max(-1.0, min(1.0, total)), 4)
+
+
+def score_bb_keltner_squeeze(candles: list[HistoricCandle]) -> float:
+    """
+    BB_KELTNER_SQUEEZE (TTM Squeeze): Bollinger Bands внутри Keltner Channels.
+
+    Когда BB_upper < KC_upper И BB_lower > KC_lower — компрессия на максимуме,
+    энергия накоплена. Выход из сжатия (BB вышли из KC) + импульс momentum →
+    сильный направленный сигнал.
+
+    Momentum: закрытие относительно средней из (высокого хая + низкого лоя +
+    закрытия) за N баров — стандартный TTM-momentum. Его наклон определяет
+    направление пробоя.
+    """
+    if len(candles) < 25:
+        return 0.0
+
+    P = 20
+    win = candles[-P - 5:]
+    closes = [_to_f(c.close) for c in win]
+    highs  = [_to_f(c.high)  for c in win]
+    lows   = [_to_f(c.low)   for c in win]
+
+    if len(closes) < P:
+        return 0.0
+
+    # Bollinger Bands (20, 2σ)
+    bb_mid = sum(closes[-P:]) / P
+    bb_std = _std(closes[-P:])
+    bb_upper = bb_mid + 2.0 * bb_std
+    bb_lower = bb_mid - 2.0 * bb_std
+
+    # Keltner Channel (EMA20, 1.5×ATR14)
+    kc_mid = _ema(closes, P)[-1]
+    atr_vals = _true_atr_list(win, 14)
+    kc_atr = next((v for v in reversed(atr_vals) if not math.isnan(v)), 0.0)
+    kc_upper = kc_mid + 1.5 * kc_atr
+    kc_lower = kc_mid - 1.5 * kc_atr
+
+    squeeze_on  = (bb_upper < kc_upper) and (bb_lower > kc_lower)
+    squeeze_off = (bb_upper > kc_upper) and (bb_lower < kc_lower)
+
+    # TTM momentum
+    hh = max(highs[-P:])
+    ll = min(lows[-P:])
+    delta = closes[-1] - (hh + ll + bb_mid) / 3.0
+    mom_vals = []
+    for i in range(min(5, len(closes) - P)):
+        idx = -(P + i)
+        hh_i = max(highs[idx - P:idx] or [highs[idx]])
+        ll_i = min(lows[idx - P:idx]  or [lows[idx]])
+        mid_i = sum(closes[idx - P:idx] or [closes[idx]]) / P
+        mom_vals.insert(0, closes[idx] - (hh_i + ll_i + mid_i) / 3.0)
+
+    mom_slope = 0.0
+    if len(mom_vals) >= 2:
+        mom_slope = (delta - mom_vals[0]) / (abs(mom_vals[0]) or 1e-9)
+
+    if squeeze_on:
+        # Компрессия активна → небольшой нейтральный сигнал в сторону momentum
+        direction = math.copysign(1, delta) if abs(delta) > 1e-9 else 0
+        return round(direction * 0.20, 4)
+
+    if squeeze_off:
+        # Только что вышли из сжатия → сильный сигнал в направлении momentum
+        direction = math.copysign(1, delta) if abs(delta) > 1e-9 else 0
+        strength = min(0.80, 0.45 + min(1.0, abs(mom_slope)) * 0.35)
+        return round(direction * strength, 4)
+
+    return 0.0
+
+
+def score_ma_tension(candles: list[HistoricCandle]) -> float:
+    """
+    MA_TENSION: неклассическое использование скользящих средних.
+
+    Три сигнала:
+    1. Резинка MA50: расстояние цены от MA50 → натяжение, ожидание возврата.
+    2. Все три МА (MA5, MA20, MA50) в дискомфорте одновременно →
+       максимальное напряжение (сигнал против тренда).
+    3. Угол MA20: резкий перегиб → импульс реальный, а не шум (сигнал по тренду).
+
+    Комбинация: при сильном натяжении → против тренда;
+    при свежем перегибе без натяжения → по тренду.
+    """
+    if len(candles) < 55:
+        return 0.0
+
+    closes = [_to_f(c.close) for c in candles]
+    cur = closes[-1]
+
+    ma5  = sum(closes[-5:])  / 5
+    ma20 = sum(closes[-20:]) / 20
+    ma50 = sum(closes[-50:]) / 50
+
+    # Нормированные отклонения
+    dev5  = (cur - ma5)  / (cur or 1e-9)
+    dev20 = (cur - ma20) / (cur or 1e-9)
+    dev50 = (cur - ma50) / (cur or 1e-9)
+
+    # 1. Натяжение от MA50
+    tension = math.tanh(dev50 * 15.0)   # ±1 при ~7% отклонении
+    rubber_score = -tension * 0.40       # против тренда
+
+    # 2. Все три в одном направлении и далеко → максимальное напряжение
+    same_side = (dev5 > 0) == (dev20 > 0) == (dev50 > 0)
+    all_far = abs(dev5) > 0.005 and abs(dev20) > 0.008 and abs(dev50) > 0.012
+    if same_side and all_far:
+        direction = 1 if dev50 > 0 else -1
+        spread_score = -direction * 0.25  # против: все в дискомфорте → разрядка
+    else:
+        spread_score = 0.0
+
+    # 3. Угол MA20: наклон за последние 5 баров
+    ma20_prev = sum(closes[-25:-5]) / 20
+    angle = (ma20 - ma20_prev) / (ma20_prev or 1e-9)
+    # Резкий перегиб (>0.5% за 5 баров) → подтверждение импульса
+    if abs(angle) > 0.003:
+        bend_dir = 1 if angle > 0 else -1
+        bend_score = bend_dir * min(0.35, abs(angle) * 80)
+    else:
+        bend_score = 0.0
+
+    total = rubber_score * 0.45 + spread_score * 0.30 + bend_score * 0.25
+    return round(max(-1.0, min(1.0, total)), 4)
+
+
+def score_rsi_divergence(candles: list[HistoricCandle]) -> float:
+    """
+    RSI_DIVERGENCE: дивергенция RSI vs цена.
+
+    Цена делает новый экстремум, RSI нет → затухание импульса.
+    Совпадает с WANING_IMPULSES но через другой инструмент — двойное подтверждение.
+
+    Логика:
+    - Берём RSI(14) за последние 40 баров.
+    - Ищем два последних ценовых экстремума (пиков/впадин) с шагом ≥8 баров.
+    - Если цена обновила экстремум, но RSI нет → дивергенция.
+    - Вес: RSI(3) в экстремальной зоне (>90 или <10) → усиление сигнала.
+    """
+    if len(candles) < 45:
+        return 0.0
+
+    win = candles[-45:]
+    closes = [_to_f(c.close) for c in win]
+    highs  = [_to_f(c.high)  for c in win]
+    lows   = [_to_f(c.low)   for c in win]
+    n = len(closes)
+
+    rsi14 = _rsi(closes, 14)
+    rsi3  = _rsi(closes, 3)
+
+    # Направление: последний бар vs первый
+    overall_dir = 1 if closes[-1] > closes[0] else -1
+
+    # Ищем два пика (бычий тренд) или две впадины (медвежий)
+    SW = 4
+    extremes = []   # (idx, price, rsi)
+    for i in range(SW, n - SW):
+        if math.isnan(rsi14[i]):
+            continue
+        if overall_dir > 0:
+            if all(highs[i] >= highs[j] for j in range(i - SW, i + SW + 1) if j != i):
+                extremes.append((i, highs[i], rsi14[i]))
+        else:
+            if all(lows[i] <= lows[j] for j in range(i - SW, i + SW + 1) if j != i):
+                extremes.append((i, lows[i], rsi14[i]))
+
+    if len(extremes) < 2:
+        return 0.0
+
+    # Берём последние два экстремума с разницей ≥ 6 баров
+    e2 = extremes[-1]
+    e1 = next((e for e in reversed(extremes[:-1]) if e2[0] - e[0] >= 6), None)
+    if e1 is None:
+        return 0.0
+
+    price_new_extreme = (e2[1] > e1[1]) if overall_dir > 0 else (e2[1] < e1[1])
+    rsi_new_extreme   = (e2[2] > e1[2]) if overall_dir > 0 else (e2[2] < e1[2])
+
+    if not price_new_extreme or rsi_new_extreme:
+        return 0.0   # нет дивергенции
+
+    # Дивергенция: цена обновила экстремум, RSI нет
+    rsi_gap = abs(e2[2] - e1[2]) / 100.0   # 0..1
+    last_rsi3 = next((v for v in reversed(rsi3) if not math.isnan(v)), 50.0)
+
+    # RSI(3) в экстремальной зоне → истощение подтверждено
+    rsi3_extreme = (overall_dir > 0 and last_rsi3 > 85) or \
+                   (overall_dir < 0 and last_rsi3 < 15)
+    strength = min(0.75, 0.35 + rsi_gap * 0.80)
+    if rsi3_extreme:
+        strength = min(0.85, strength + 0.15)
+
+    return round(-overall_dir * strength, 4)
+
+
+def score_atr_exhaustion(candles: list[HistoricCandle]) -> float:
+    """
+    ATR_EXHAUSTION: сколько ATR пройдено за последние N баров.
+
+    Если цена прошла уже 1.8+ ATR за последние 20 баров — режим каскада,
+    но топливо заканчивается: дальнейшее продолжение всё менее вероятно.
+    Если прошла 0.3 ATR — потенциал ещё огромный.
+
+    Возвращает:
+    - Отрицательное значение (против направления): при >1.5 ATR → истощение
+    - Нейтрально (0): при 0.5..1.5 ATR
+    - Положительное (по направлению): при <0.4 ATR → топлива много
+    """
+    if len(candles) < 25:
+        return 0.0
+
+    atr_pct = _compute_atr(candles, period=14)
+    if atr_pct < 1e-6:
+        return 0.0
+
+    win = candles[-20:]
+    first_close = _to_f(win[0].close)
+    last_close  = _to_f(win[-1].close)
+    move_pct = abs(last_close - first_close) / (first_close or 1e-9)
+    direction = 1 if last_close > first_close else -1
+
+    # Также учитываем суммарный путь (не только нетто), чтобы ловить пилу
+    total_path = sum(abs(_to_f(win[i].close) - _to_f(win[i - 1].close))
+                     for i in range(1, len(win)))
+    path_ratio  = total_path / (first_close * atr_pct or 1e-9)
+    netto_ratio = move_pct / atr_pct
+
+    if netto_ratio > 1.8 or path_ratio > 2.5:
+        # Истощение: пройдено много ATR
+        excess = min(1.0, (netto_ratio - 1.5) / 1.5)
+        return round(-direction * min(0.70, 0.35 + excess * 0.45), 4)
+
+    if netto_ratio < 0.40:
+        # Потенциал: мало пройдено, рынок ещё не определился
+        slack = min(1.0, (0.40 - netto_ratio) / 0.40)
+        return round(direction * min(0.35, 0.15 + slack * 0.25), 4)
+
+    return 0.0
+
+
+def score_alligator(candles: list[HistoricCandle]) -> float:
+    """
+    ALLIGATOR: три SMMA (5, 8, 13) — неклассическое использование.
+
+    Сигналы:
+    1. Расхождение линий (аллигатор ест): тренд силён, каскад в полную силу.
+    2. Схождение после расхождения (засыпает): движение затухает.
+    3. Резкое расхождение всех трёх сразу → импульс очень силён.
+    4. Все три слились → максимальная неопределённость, готовится движение.
+    5. Цена vs линии: откат до "зубов" (SMMA8) — тренд жив.
+       Пробой "губ" (SMMA13) — тренд под вопросом.
+    """
+    if len(candles) < 20:
+        return 0.0
+
+    closes = [_to_f(c.close) for c in candles]
+    highs  = [_to_f(c.high)  for c in candles]
+    lows   = [_to_f(c.low)   for c in candles]
+
+    # Медиан-цена как база для Аллигатора
+    median = [(highs[i] + lows[i]) / 2.0 for i in range(len(closes))]
+
+    lips  = _smma(median, 5)
+    teeth = _smma(median, 8)
+    jaw   = _smma(median, 13)
+
+    # Берём последние валидные значения
+    def _last_valid(arr):
+        return next((v for v in reversed(arr) if not math.isnan(v)), None)
+
+    lv_lips  = _last_valid(lips)
+    lv_teeth = _last_valid(teeth)
+    lv_jaw   = _last_valid(jaw)
+    if lv_lips is None or lv_teeth is None or lv_jaw is None:
+        return 0.0
+
+    cur = closes[-1]
+    spread = max(lv_lips, lv_teeth, lv_jaw) - min(lv_lips, lv_teeth, lv_jaw)
+    atr_abs = _compute_atr(candles) * (cur or 1)
+
+    if atr_abs < 1e-9:
+        return 0.0
+
+    spread_ratio = spread / atr_abs
+
+    # История расхождения: сравниваем spread сейчас vs 5 баров назад
+    def _spread_at(idx):
+        l5 = lips[idx]  if idx < len(lips)  else float('nan')
+        t8 = teeth[idx] if idx < len(teeth) else float('nan')
+        j13 = jaw[idx]  if idx < len(jaw)   else float('nan')
+        if any(math.isnan(v) for v in (l5, t8, j13)):
+            return 0.0
+        return max(l5, t8, j13) - min(l5, t8, j13)
+
+    spread_5ago = _spread_at(-6) / atr_abs if len(candles) >= 6 else spread_ratio
+
+    spread_growing   = spread_ratio > spread_5ago * 1.05
+    spread_shrinking = spread_ratio < spread_5ago * 0.90
+
+    # Тренд-направление: порядок линий
+    bull_order = lv_lips > lv_teeth > lv_jaw   # губы выше зубов выше челюсти
+    bear_order = lv_lips < lv_teeth < lv_jaw
+    trend_dir  = 1 if bull_order else (-1 if bear_order else 0)
+
+    score = 0.0
+
+    # 4. Все три слились → компрессия, готовится движение (нейтральный сигнал)
+    if spread_ratio < 0.15:
+        return 0.0   # молчим, не знаем направление
+
+    # 3. Резкое расхождение — импульс реален
+    if spread_growing and spread_ratio > 0.5:
+        score += trend_dir * min(0.45, spread_ratio * 0.35)
+
+    # 2. Схождение после расхождения — затухание
+    if spread_shrinking and spread_5ago > 0.4:
+        score -= trend_dir * 0.30
+
+    # 5. Цена относительно линий
+    if trend_dir != 0:
+        above_jaw   = cur > lv_jaw
+        above_teeth = cur > lv_teeth
+        above_lips  = cur > lv_lips
+        if trend_dir > 0:
+            if above_lips and above_teeth and above_jaw:
+                score += 0.20   # всё по тренду
+            elif above_jaw and not above_lips:
+                score += 0.05   # откат до зубов, тренд жив
+            elif not above_jaw:
+                score -= 0.20   # пробой губ, тренд под вопросом
+        else:
+            if not above_lips and not above_teeth and not above_jaw:
+                score -= 0.20
+            elif not above_jaw and above_lips:
+                score -= 0.05
+            elif above_jaw:
+                score += 0.20
+
+    return round(max(-1.0, min(1.0, score)), 4)
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -3262,6 +3770,13 @@ METHODS = [
     ("VOL_COMPRESSION",  score_vol_compression),
     ("FALSE_BREAKOUT",   score_false_breakout),
     ("LEVEL_ABSORPTION", score_level_absorption),
+    # Ишимоку / BB-Keltner / MA / RSI-div / ATR-топливо / Аллигатор
+    ("ICHIMOKU_SIGNAL",     score_ichimoku_signal),
+    ("BB_KELTNER_SQUEEZE",  score_bb_keltner_squeeze),
+    ("MA_TENSION",          score_ma_tension),
+    ("RSI_DIVERGENCE",      score_rsi_divergence),
+    ("ATR_EXHAUSTION",      score_atr_exhaustion),
+    ("ALLIGATOR",           score_alligator),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
