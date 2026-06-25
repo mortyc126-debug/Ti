@@ -85,6 +85,7 @@ from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
+    score_mama_fama, score_ehlers_mode, score_cyber_phase,
 )
 from indicators_volume import (
     score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
@@ -1251,6 +1252,21 @@ def score_fisher_rsi_candle(candles: list[HistoricCandle]) -> float:
 def score_ebsw_candle(candles: list[HistoricCandle]) -> float:
     """EBSW: Even Better Sinewave, RMS-нормированный roofing filter (Фаза 3)."""
     return score_ebsw([_to_f(c.close) for c in candles])
+
+
+def score_mama_fama_candle(candles: list[HistoricCandle]) -> float:
+    """MAMA_FAMA: скорость и направление разрыва MESA Adaptive MA (Эрлерс)."""
+    return score_mama_fama([_to_f(c.close) for c in candles])
+
+
+def score_ehlers_mode_candle(candles: list[HistoricCandle]) -> float:
+    """EHLERS_MODE: детектор режима цикл→тренд; молчит в цикле (Эрлерс)."""
+    return score_ehlers_mode([_to_f(c.close) for c in candles])
+
+
+def score_cyber_phase_candle(candles: list[HistoricCandle]) -> float:
+    """CYBER_PHASE: позиция + скорость в цикле Эрлерса (≠ пересечение нуля)."""
+    return score_cyber_phase([_to_f(c.close) for c in candles])
 
 
 def _hlcv(candles: list[HistoricCandle]) -> tuple[list[float], list[float], list[float], list[float]]:
@@ -3777,6 +3793,9 @@ METHODS = [
     ("RSI_DIVERGENCE",      score_rsi_divergence),
     ("ATR_EXHAUSTION",      score_atr_exhaustion),
     ("ALLIGATOR",           score_alligator),
+    ("MAMA_FAMA",           score_mama_fama_candle),
+    ("EHLERS_MODE",         score_ehlers_mode_candle),
+    ("CYBER_PHASE",         score_cyber_phase_candle),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
