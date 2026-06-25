@@ -17,6 +17,7 @@ level_pattern.py — детекция разворотных паттернов 
 """
 from __future__ import annotations
 import math
+import statistics
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -697,3 +698,177 @@ class MultiTFLevelCache:
                     seen_prices.append(lv.price)
         result.sort(key=lambda x: (x[1].tier, abs(x[1].price - price)))
         return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Гейт входа: уровень + объём
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Параметры близости к уровню
+_LVG_PROXIMITY_ATR   = 1.0   # цена должна быть в пределах N×ATR от уровня
+_LVG_TOUCH_ZONE_ATR  = 0.35  # зона касания при поиске исторических реакций
+
+# Параметры силы уровня
+_LVG_REACTION_BARS   = 25    # смотрим на N баров после касания
+_LVG_MIN_REACTION    = 0.004 # минимальный отскок ≥ 0.4% чтобы считать реакцией
+_LVG_MIN_STRENGTH    = 0.30  # минимальный strength_score для прохождения гейта
+
+# Параметры объёма
+_LVG_VOL_SPIKE_X     = 1.5   # текущий бар: объём ≥ 1.5× медианы — спайк
+_LVG_VOL_ACCUM_BARS  = 6     # окно накопления (баров у уровня)
+_LVG_VOL_ACCUM_X     = 1.3   # среднее по окну ≥ 1.3× медианы — накопление
+_LVG_VOL_MEDIAN_WIN  = 40    # окно для медианы объёма
+
+
+@dataclass
+class LevelGateResult:
+    passed: bool
+    level: Optional[PriceLevel] = None
+    strength: float = 0.0          # [0, 1]: сила уровня по истории реакций
+    vol_ok: bool = False            # объём прошёл (спайк или накопление)
+    vol_spike: bool = False         # именно спайк на текущем баре
+    vol_accum: bool = False         # именно накопление за последние N баров
+    dist_atr: float = 0.0          # расстояние до уровня в ATR
+    reason: str = ""
+
+
+def _level_strength(
+    level: PriceLevel,
+    candles: list,
+    atr: float,
+) -> float:
+    """Сила уровня по истории реакций: ищет касания зоны в candles и меряет
+    max ход противоположного направления за _LVG_REACTION_BARS баров.
+
+    strength = (доля касаний с реакцией) × tanh(avg_bounce / MIN_REACTION × 0.8)
+    Возвращает [0, 1].
+    """
+    if atr <= 0 or not candles:
+        return 0.0
+
+    touch_zone = atr * _LVG_TOUCH_ZONE_ATR
+    p = level.price
+    is_support = level.polarity in ("support", "neutral")
+
+    bounces: list[float] = []
+    n = len(candles)
+
+    i = 0
+    while i < n - 2:
+        hi, lo = _f(candles[i].high), _f(candles[i].low)
+        if lo <= p + touch_zone and hi >= p - touch_zone:
+            # касание — ищем отскок в следующих REACTION_BARS барах
+            end = min(i + _LVG_REACTION_BARS, n)
+            if is_support:
+                # поддержка — ищем ход вверх
+                touch_low = _f(candles[i].low)
+                peak = max(_f(c.high) for c in candles[i + 1:end]) if i + 1 < end else touch_low
+                bounce = (peak - touch_low) / touch_low if touch_low > 0 else 0.0
+            else:
+                # сопротивление — ищем ход вниз
+                touch_high = _f(candles[i].high)
+                trough = min(_f(c.low) for c in candles[i + 1:end]) if i + 1 < end else touch_high
+                bounce = (touch_high - trough) / touch_high if touch_high > 0 else 0.0
+            bounces.append(bounce)
+            i += max(1, _LVG_REACTION_BARS // 2)  # не накладываем окна друг на друга
+        else:
+            i += 1
+
+    if not bounces:
+        # нет истории касаний — даём минимальное ненулевое доверие tier 1
+        return 0.20 if level.tier == 1 else 0.10
+
+    good = [b for b in bounces if b >= _LVG_MIN_REACTION]
+    consistency = len(good) / len(bounces)
+    avg_bounce = statistics.mean(good) if good else 0.0
+    # tanh нормирует avg_bounce: при avg=MIN_REACTION → ~0.62, при 2× → ~0.96
+    magnitude = math.tanh(avg_bounce / _LVG_MIN_REACTION * 0.8) if avg_bounce > 0 else 0.0
+    return round(consistency * magnitude, 3)
+
+
+def level_volume_gate(
+    candles: list,
+    l1_buffer: list,
+    atr: float,
+    tier_max: int = 2,
+) -> LevelGateResult:
+    """Главный гейт входа: цена у tier 1-2 уровня с исторической силой реакций
+    + подтверждение объёмом (спайк или накопление).
+
+    candles  — короткое окно (~30 баров) для текущей цены и объёма
+    l1_buffer — длинная история (200-500 баров) для подсчёта реакций уровня
+    atr      — текущий ATR в абсолютных единицах цены
+    tier_max — максимальный tier (1 = только неделя/месяц, 2 = + дневные)
+
+    Возвращает LevelGateResult. passed=True если:
+      1. Ближайший tier ≤ tier_max уровень в пределах _LVG_PROXIMITY_ATR × ATR
+      2. strength_score ≥ _LVG_MIN_STRENGTH
+      3. Объём: текущий бар ≥ _LVG_VOL_SPIKE_X × медианы
+               ИЛИ среднее за _LVG_VOL_ACCUM_BARS баров у уровня ≥ _LVG_VOL_ACCUM_X × медианы
+    """
+    if not candles or atr <= 0:
+        return LevelGateResult(passed=False, reason="no_data")
+
+    history = l1_buffer if len(l1_buffer) >= 50 else candles
+    cur_price = _f(candles[-1].close)
+    proximity = atr * _LVG_PROXIMITY_ATR
+
+    # Объём: медиана и текущий
+    vols = [float(c.volume) for c in (l1_buffer or candles)[-_LVG_VOL_MEDIAN_WIN:]]
+    vol_med = statistics.median(vols) if vols else 0.0
+    cur_vol  = float(candles[-1].volume)
+    vol_spike = vol_med > 0 and cur_vol >= _LVG_VOL_SPIKE_X * vol_med
+
+    # Строим уровни из длинной истории
+    ls = build_levels(history)
+
+    # Ищем ближайший tier 1-2 уровень в пределах proximity
+    candidates = [
+        lv for lv in ls.levels
+        if lv.tier <= tier_max and abs(lv.price - cur_price) <= proximity
+    ]
+    if not candidates:
+        return LevelGateResult(
+            passed=False, reason="no_tier12_nearby",
+            dist_atr=min(
+                (abs(lv.price - cur_price) / atr for lv in ls.levels if lv.tier <= tier_max),
+                default=999.0,
+            ),
+        )
+
+    # Выбираем лучший (tier → расстояние)
+    best = min(candidates, key=lambda lv: (lv.tier, abs(lv.price - cur_price)))
+    dist_atr = abs(best.price - cur_price) / atr
+
+    # Сила уровня по истории реакций
+    strength = _level_strength(best, history, atr)
+    if strength < _LVG_MIN_STRENGTH:
+        return LevelGateResult(
+            passed=False, reason="level_weak",
+            level=best, strength=strength, dist_atr=dist_atr,
+        )
+
+    # Накопление: средний объём за последние ACCUM_BARS баров вблизи уровня
+    touch_zone = atr * _LVG_TOUCH_ZONE_ATR
+    near_candles = [
+        c for c in candles[-_LVG_VOL_ACCUM_BARS:]
+        if abs(_f(c.close) - best.price) <= touch_zone * 2
+    ]
+    vol_accum = False
+    if near_candles and vol_med > 0:
+        avg_near_vol = statistics.mean(float(c.volume) for c in near_candles)
+        vol_accum = avg_near_vol >= _LVG_VOL_ACCUM_X * vol_med
+
+    vol_ok = vol_spike or vol_accum
+    if not vol_ok:
+        return LevelGateResult(
+            passed=False, reason="vol_weak",
+            level=best, strength=strength, dist_atr=dist_atr,
+            vol_ok=False, vol_spike=vol_spike, vol_accum=vol_accum,
+        )
+
+    return LevelGateResult(
+        passed=True, level=best, strength=strength, dist_atr=dist_atr,
+        vol_ok=True, vol_spike=vol_spike, vol_accum=vol_accum,
+        reason="ok",
+    )

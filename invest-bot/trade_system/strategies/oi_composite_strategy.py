@@ -87,7 +87,10 @@ from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
 )
 from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
-from trade_system.strategies.level_pattern import detect_level_pattern, build_levels, MultiTFLevelCache
+from trade_system.strategies.level_pattern import (
+    detect_level_pattern, build_levels, MultiTFLevelCache,
+    level_volume_gate, LevelGateResult,
+)
 
 # Ревизия логики стратегии — пишется в каждую сделку (history.py record_trade),
 # чтобы калибровка (lasso_calibration.py, rule_miner.py) могла отличить сделки,
@@ -142,6 +145,10 @@ logger = logging.getLogger(__name__)
 # ── Константы ────────────────────────────────────────────────────────────────
 WEIGHTS_FILE = "oi_weights.json"       # файл весов (рядом с main.py)
 GLOBAL_IC_FILE = "data/global_ic_prior.json"  # агрегированный sign-IC по всем тикерам
+
+# Гейт "уровень + объём": если LEVEL_VOLUME_GATE=1, вход только у tier 1-2
+# дневных/недельных уровней с исторической силой реакций и объёмным подтверждением.
+LEVEL_VOLUME_GATE_ENABLED: bool = os.getenv("LEVEL_VOLUME_GATE", "0") == "1"
 CANDLE_WINDOW = 30                 # свечей в окне для расчётов
 MIN_CANDLES = 10                   # минимум свечей для первого сигнала
 SIGNAL_THRESHOLD = 0.12            # порог composite для сигнала
@@ -3207,6 +3214,22 @@ class OICompositeStrategy(IStrategy):
             logger.debug(f"{self.__settings.figi}: сигнал {direction} отфильтрован — тонкая свеча (низкий объём)")
             self.rejection_stats["liquidity"] += 1
             return None
+
+        if LEVEL_VOLUME_GATE_ENABLED:
+            _lvg = level_volume_gate(
+                candles=self.__candles,
+                l1_buffer=self.__l1_buffer,
+                atr=atr_pct * (_to_f(self.__candles[-1].close) if self.__candles else 1.0),
+            )
+            if not _lvg.passed:
+                logger.debug(
+                    f"{self.__settings.figi}: сигнал {direction} отфильтрован — "
+                    f"level_volume_gate ({_lvg.reason}, "
+                    f"dist_atr={_lvg.dist_atr:.2f}, strength={_lvg.strength:.2f})"
+                )
+                self.rejection_stats.setdefault("level_volume_gate", 0)
+                self.rejection_stats["level_volume_gate"] += 1
+                return None
 
         # take/stop: ATR-based если заданы коэффициенты, иначе фиксированные множители
         take_mult, stop_mult = self.__take_stop_mults(direction, atr_pct)
