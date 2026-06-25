@@ -1319,6 +1319,9 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
             "mae": round((t.get("mae") or 0.0) * 100, 3),
             "ep": round(t.get("entry_price") or 0.0, 4),
             "xp": round(t.get("exit_price") or 0.0, 4),
+            "tp": round(t.get("take_price") or 0.0, 4),
+            "sp": round(t.get("stop_price") or 0.0, 4),
+            "l1pct": round(t.get("l1_pct") or -1.0, 3),  # позиция цены в дневном hi-lo [0..1], -1 если нет
             "fa": [[n, round(s, 2)] for n, s in for_m],
             "ag": [[n, round(s, 2)] for n, s in against_m],
         })
@@ -3083,11 +3086,39 @@ function rowsToHtml(rows) {{
   return html;
 }}
 
+// Мини-бар «позиция входа в дневном диапазоне». l1pct ∈ [0..1],
+// 0=у лоя, 1=у хая. -1 — нет данных.
+function _l1pctBar(l1pct, dir) {{
+  if (l1pct < 0) return '<span style="color:var(--txt3)">—</span>';
+  const pct = Math.round(l1pct * 100);
+  // Покупка в нижней трети — хорошо (зелёный). В верхней трети лонга — плохо (красный).
+  const isLong = dir === 'L';
+  const good = isLong ? l1pct < 0.35 : l1pct > 0.65;
+  const bad  = isLong ? l1pct > 0.65 : l1pct < 0.35;
+  const c = good ? '#7dcc7d' : bad ? '#e07070' : 'var(--txt2)';
+  // Мини-прогресс-бар: 40px, заливка до l1pct
+  const fill = Math.round(l1pct * 38);
+  return `<span title="Позиция цены входа в дневном hi-lo: ${{pct}}%. Лонг снизу/шорт сверху = хорошо."
+    style="display:inline-flex;align-items:center;gap:3px;color:${{c}}">
+    <svg width="38" height="8" style="flex-shrink:0;border-radius:2px;background:var(--bg2)">
+      <rect x="0" y="0" width="${{fill}}" height="8" rx="2" fill="${{c}}" opacity="0.7"/>
+      <rect x="${{fill}}" y="3" width="2" height="2" rx="1" fill="${{c}}"/>
+    </svg>
+    <span style="font-size:9px">${{pct}}%</span>
+  </span>`;
+}}
+
 function tradesListToHtml(trades, overallWr) {{
   const W = 10;
   let cumR = 0;
+  const hasEp = trades.some(t => t.ep && t.ep > 0);
   let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;width:100%">';
-  html += '<tr style="color:var(--txt3)"><th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th><th>MFE%</th><th>MAE%</th><th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
+  html += '<tr style="color:var(--txt3)">'
+    + '<th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th>'
+    + '<th>MFE%</th><th>MAE%</th>'
+    + (hasEp ? '<th title="Вход → Выход / Тейк / Стоп">Вход/Тейк/Стоп</th>' : '')
+    + '<th title="Позиция цены входа в дневном хай-лой: 0%=у лоя, 100%=у хая">Hi-Lo%</th>'
+    + '<th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
   const rollWin = [];
   for (let i = 0; i < trades.length; i++) {{
     const t = trades[i];
@@ -3104,13 +3135,45 @@ function tradesListToHtml(trades, overallWr) {{
     const cumRColor = cumR >= 0 ? '#7dcc7d' : '#e07070';
     const mfePct = t.mfe != null ? t.mfe.toFixed(2) + '%' : '—';
     const maePct = t.mae != null ? t.mae.toFixed(2) + '%' : '—';
-    // цвет MFE/MAE: зелёный если MFE > MAE (позиция шла в пользу)
     const mfeColor = (t.mfe != null && t.mae != null && t.mfe > t.mae) ? '#7dcc7d' : 'var(--txt3)';
     const maeColor = (t.mfe != null && t.mae != null && t.mae > t.mfe) ? '#e07070' : 'var(--txt3)';
     const forStr = t.fa.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const againstStr = t.ag.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
-    html += `<tr style="${{bg}}"><td style="color:var(--txt3)">${{i+1}}</td><td style="white-space:nowrap">${{t.t}}</td><td>${{t.d}}</td><td>${{winMark}}</td><td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td><td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td><td style="color:${{mfeColor}}">${{mfePct}}</td><td style="color:${{maeColor}}">${{maePct}}</td><td style="color:${{rwrColor}}">${{rwrPct}}</td><td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{forStr}}</td><td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{againstStr}}</td></tr>`;
+    // Блок цен: ep→xp | tp ✓ | sp ✗
+    let priceCell = '';
+    if (hasEp && t.ep) {{
+      const epStr = t.ep > 0 ? t.ep.toFixed(2) : '—';
+      const xpStr = t.xp > 0 ? t.xp.toFixed(2) : '—';
+      const tpStr = t.tp > 0 ? `<span style="color:#7dcc7d" title="Тейк">${{t.tp.toFixed(2)}}</span>` : '';
+      const spStr = t.sp > 0 ? `<span style="color:#e07070" title="Стоп">${{t.sp.toFixed(2)}}</span>` : '';
+      // Расстояние тейк/стоп в %
+      const takePct = (t.tp && t.ep) ? Math.abs(t.tp - t.ep)/t.ep*100 : 0;
+      const stopPct = (t.sp && t.ep) ? Math.abs(t.sp - t.ep)/t.ep*100 : 0;
+      const takePctStr = takePct > 0 ? `<span style="font-size:9px;color:var(--txt3)">+${{takePct.toFixed(2)}}%</span>` : '';
+      const stopPctStr = stopPct > 0 ? `<span style="font-size:9px;color:var(--txt3)">-${{stopPct.toFixed(2)}}%</span>` : '';
+      priceCell = `<td style="padding:1px 4px;white-space:nowrap;font-size:9px;color:var(--txt2)">
+        ${{epStr}}→${{xpStr}}<br>
+        ${{tpStr}} ${{takePctStr}} / ${{spStr}} ${{stopPctStr}}
+      </td>`;
+    }} else if (hasEp) {{
+      priceCell = '<td></td>';
+    }}
+    const l1bar = _l1pctBar(t.l1pct != null ? t.l1pct : -1, t.d);
+    html += `<tr style="${{bg}}">
+      <td style="color:var(--txt3)">${{i+1}}</td>
+      <td style="white-space:nowrap">${{t.t}}</td>
+      <td>${{t.d}}</td><td>${{winMark}}</td>
+      <td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td>
+      <td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td>
+      <td style="color:${{mfeColor}}">${{mfePct}}</td>
+      <td style="color:${{maeColor}}">${{maePct}}</td>
+      ${{priceCell}}
+      <td style="padding:1px 4px">${{l1bar}}</td>
+      <td style="color:${{rwrColor}}">${{rwrPct}}</td>
+      <td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{forStr}}</td>
+      <td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{againstStr}}</td>
+    </tr>`;
   }}
   html += '</table></div>';
   return html;
