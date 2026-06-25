@@ -2261,6 +2261,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <button class="btn-pill btn-sm info" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
+  <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до равномерных 0.5. IC-prior не затрагивается.">🔄 сброс весов</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -3192,6 +3193,24 @@ async function calibrateMethodWeights(btn) {{
   }} catch(e) {{
     btn.textContent = 'Ошибка сети'; btn.disabled = false;
   }}
+}}
+
+async function resetWeights() {{
+  if (!confirm('Сбросить все Hedge-веса методов в oi_weights.json до 0.5?\\nIC-prior\'ы не затрагиваются.')) return;
+  const btn = document.getElementById('btnResetWeights');
+  btn.disabled = true; btn.textContent = '⏳…';
+  try {{
+    const resp = await fetch('/api/reset_weights', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: '{{}}'}});
+    const j = await resp.json();
+    if (j.ok) {{
+      btn.textContent = `✓ сброшено ${{j.reset_count}} записей (${{j.tickers}}т)`;
+    }} else {{
+      btn.textContent = `Ошибка: ${{j.error}}`;
+    }}
+  }} catch(e) {{
+    btn.textContent = 'Ошибка сети';
+  }}
+  setTimeout(() => {{ btn.textContent = '🔄 сброс весов'; btn.disabled = false; }}, 3000);
 }}
 
 let _progressTimer = null;
@@ -5765,6 +5784,41 @@ class Handler(BaseHTTPRequestHandler):
                 json.dump(existing, f, ensure_ascii=False, indent=2)
             os.replace(tmp, path)
             self._send_json({"ok": True, "tickers": len(payload)})
+        elif self.path == "/api/reset_weights":
+            # Сброс oi_weights.json: все Hedge-веса методов → 0.5 (равномерные).
+            # Не удаляет файл целиком — сохраняет структуру (tickers/regimes),
+            # только обнуляет накопленные веса. IC-prior'ы не трогает.
+            weights_path = "oi_weights.json"
+            reset_count = 0
+            try:
+                data = {}
+                if os.path.exists(weights_path):
+                    with open(weights_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                for figi_key, figi_data in data.items():
+                    if not isinstance(figi_data, dict):
+                        continue
+                    for mname, mdata in figi_data.items():
+                        if mname == "__regimes__":
+                            for rdata in mdata.values():
+                                for rm in rdata.values():
+                                    if isinstance(rm, dict) and "weight" in rm:
+                                        rm["weight"] = 0.5
+                                        rm["total"] = 0
+                                        rm["sum_quality"] = 0.0
+                                        reset_count += 1
+                        elif isinstance(mdata, dict) and "weight" in mdata:
+                            mdata["weight"] = 0.5
+                            mdata["total"] = 0
+                            mdata["sum_quality"] = 0.0
+                            reset_count += 1
+                tmp = weights_path + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                os.replace(tmp, weights_path)
+                self._send_json({"ok": True, "reset_count": reset_count, "tickers": len(data)})
+            except Exception as e:
+                self._send_json({"error": str(e)}, status=500)
         elif self.path == "/api/save_backtest_history":
             tickers = payload.get("tickers", [])
             days = int(payload.get("days", 90))
