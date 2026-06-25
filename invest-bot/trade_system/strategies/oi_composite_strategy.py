@@ -86,7 +86,11 @@ from indicators_fractal import score_fractal, score_entropy_regime
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
 )
-from indicators_volume import score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore
+from indicators_volume import (
+    score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
+    score_obv_div, score_chaikin_ad, score_mfi_div,
+    score_vol_asymmetry, volume_profile, score_vol_profile,
+)
 from trade_system.strategies.level_pattern import (
     detect_level_pattern, build_levels, MultiTFLevelCache,
     level_volume_gate, LevelGateResult,
@@ -915,51 +919,105 @@ def score_price_trend(candles: list[HistoricCandle]) -> float:
 
 def score_vol_momentum(candles: list[HistoricCandle]) -> float:
     """
-    Объём × направление за последние N свечей, нормировано. Поверх базовой
-    формулы — множитель Хокса: если всплески объёма образуют самовозбуждающийся
-    каскад (branching_ratio n = alpha/decay >= 1.0), движение по объёму усиливаем
-    ×1.5; затухающий поток (n < 0.5) ослабляем ×0.5. Без scipy/Hawkes или при
-    сбое оптимизации — исходная формула (множитель ×1.0).
+    Асимметрия объёма: объём на барах по тренду vs против тренда.
+
+    Если движение вниз идёт на нарастающем объёме, а откаты вверх — на
+    падающем → продавцы агрессивны, следуем вниз. Наоборот → поглощение.
+
+    В связке с OI это даёт почти полную картину: OI говорит кто и сколько,
+    объём говорит с какой агрессией прямо сейчас.
+
+    Поверх базового сигнала — мультипликатор Хокса: самовозбуждающийся каскад
+    крупных баров (branching_ratio ≥ 1) → ×1.5; затухающий → ×0.5.
     """
-    if len(candles) < 2:
+    if len(candles) < 6:
         return 0.0
-    bull_vol = sum(c.volume for c in candles if _to_f(c.close) >= _to_f(c.open))
-    bear_vol = sum(c.volume for c in candles if _to_f(c.close) < _to_f(c.open))
-    total = bull_vol + bear_vol or 1
-    base = (bull_vol - bear_vol) / total
+    closes = [_to_f(c.close) for c in candles]
+    volumes = [float(c.volume) for c in candles]
+    lb = min(20, len(closes))
+    base = score_vol_asymmetry(closes, volumes, lookback=lb)
 
     if not _HAS_HAWKES:
         return base
     try:
-        volumes = [float(c.volume) for c in candles]
         med = statistics.median(volumes) if volumes else 0.0
-        # крупные бары = объём > median*1.5; их индексы — времена событий потока
         event_times = [float(i) for i, v in enumerate(volumes) if v > med * 1.5]
         if len(event_times) < 5:
             return base
         res = hawkes_processes(event_times)
         n = res["branching_ratio"]
-        if n >= 1.0:
-            mult = 1.5
-        elif n < 0.5:
-            mult = 0.5
-        else:
-            mult = 1.0
+        mult = 1.5 if n >= 1.0 else (0.5 if n < 0.5 else 1.0)
         return max(-1.0, min(1.0, base * mult))
     except Exception:
         return base
 
 
 def score_vwap_signal(candles: list[HistoricCandle]) -> float:
-    """Отклонение последней цены от скользящего VWAP."""
-    volumes = [c.volume for c in candles]
-    total_vol = sum(volumes) or 1
-    typicals = [(_to_f(c.high) + _to_f(c.low) + _to_f(c.close)) / 3 for c in candles]
-    vwap = sum(t * v for t, v in zip(typicals, volumes)) / total_vol
+    """
+    Сессионный VWAP как маркер «кто в плюсе».
+
+    Логика:
+    - VWAP сбрасывается на каждый торговый день (по времени свечей).
+      Все кто купили ниже VWAP — в прибыли, выше — в убытке.
+    - Пробой VWAP с удержанием → смена баланса (сильный сигнал).
+    - Возврат к VWAP в середине движения и отскок → продолжение.
+    - Большое отклонение + убывающий объём → истощение расширения.
+
+    Три компонента итогового score:
+    1. Позиция цены относительно VWAP (в ATR-единицах) — базовый сигнал.
+    2. Пробой/отскок: пересечение VWAP за последние 3 бара.
+    3. Истощение: цена далеко от VWAP + объём на убыли.
+    """
+    if len(candles) < 5:
+        return 0.0
+
+    # Определяем начало текущей сессии по дате первой свечи
+    try:
+        last_date = candles[-1].time.date()
+        session = [c for c in candles if c.time.date() == last_date]
+    except Exception:
+        session = candles
+
+    if not session:
+        session = candles
+
+    # Сессионный VWAP
+    cum_pv = cum_v = 0.0
+    for c in session:
+        tp = (_to_f(c.high) + _to_f(c.low) + _to_f(c.close)) / 3
+        cum_pv += tp * c.volume
+        cum_v += c.volume
+    vwap = cum_pv / (cum_v or 1e-9)
+
     last_price = _to_f(candles[-1].close)
-    deviation = (last_price - vwap) / (vwap or 1)
-    # насыщение при ±1%
-    return max(-1.0, min(1.0, deviation / 0.01))
+    atr = _compute_atr(candles)
+    if atr <= 0 or vwap <= 0:
+        return 0.0
+    atr_abs = atr * vwap
+
+    # 1. Позиция в ATR-единицах (насыщение при 2 ATR)
+    pos_score = math.tanh((last_price - vwap) / (atr_abs * 2.0))
+
+    # 2. Пересечение VWAP за последние 3 бара → подтверждение пробоя
+    cross_score = 0.0
+    prev_closes = [_to_f(c.close) for c in candles[-4:-1]]
+    if prev_closes:
+        prev_side = [1 if p > vwap else -1 for p in prev_closes]
+        cur_side = 1 if last_price > vwap else -1
+        if cur_side != prev_side[-1]:
+            # Пересечение — добавляем в сторону пробоя, но только если держится 1+ бар
+            cross_score = cur_side * 0.3
+
+    # 3. Истощение: далеко от VWAP + убывающий объём
+    exhaust_score = 0.0
+    dist_atr = abs(last_price - vwap) / atr_abs
+    if dist_atr > 1.5 and len(session) >= 4:
+        vols = [c.volume for c in session[-4:]]
+        if vols[-1] < vols[-2] < vols[-3]:  # объём падает 3 бара подряд
+            exhaust_score = -(1 if last_price > vwap else -1) * 0.4
+
+    raw = pos_score + cross_score + exhaust_score
+    return round(max(-1.0, min(1.0, raw)), 4)
 
 
 def score_bs_pressure(candles: list[HistoricCandle]) -> float:
@@ -1204,21 +1262,25 @@ def _hlcv(candles: list[HistoricCandle]) -> tuple[list[float], list[float], list
 
 
 def score_klinger_candle(candles: list[HistoricCandle]) -> float:
-    """KLINGER: Klinger Volume Oscillator, пересечение нуля (indicators_volume.py, Фаза 3)."""
-    h, l, c, v = _hlcv(candles)
-    return score_klinger(h, l, c, v)
+    """KLINGER: OBV-дивергенция (цена vs накопленный объём). +1 бычья, -1 медвежья."""
+    _, _, c, v = _hlcv(candles)
+    lb = min(20, len(c) - 1)
+    return score_obv_div(c, v, lookback=lb)
 
 
 def score_vzo_candle(candles: list[HistoricCandle]) -> float:
-    """VZO: Volume Zone Oscillator (Фаза 3)."""
-    _, _, c, v = _hlcv(candles)
-    return score_vzo(c, v)
+    """VZO: MFI-дивергенция — RSI взвешенный на объём, расхождение с ценой."""
+    h, l, c, v = _hlcv(candles)
+    lb = min(20, len(c) - 1)
+    period = min(14, lb // 2 or 1)
+    return score_mfi_div(h, l, c, v, period=period, lookback=lb)
 
 
 def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
-    """TWIGGS: Twiggs Money Flow (Фаза 3)."""
+    """TWIGGS: Chaikin A/D дивергенция — накопление/распределение vs цена."""
     h, l, c, v = _hlcv(candles)
-    return score_twiggs(h, l, c, v)
+    lb = min(20, len(c) - 1)
+    return score_chaikin_ad(h, l, c, v, lookback=lb)
 
 
 def score_rmi_candle(candles: list[HistoricCandle]) -> float:
@@ -2577,48 +2639,40 @@ def score_cumul_delta(candles: list[HistoricCandle]) -> float:
 
 def score_amt_poc(candles: list[HistoricCandle]) -> float:
     """
-    Auction Market Theory: грубый POC (Point of Control) и расстояние от него.
+    Volume Profile: настоящая гистограмма volume-at-price.
 
-    POC = бар с максимальным объёмом в сессии (последние N баров).
-    Логика AMT: цена тяготеет к POC при балансе, уходит от него при дисбалансе.
+    POC (Point of Control) — ценовой уровень с максимальным накопленным
+    объёмом за сессию. Это магнит: цена к нему тяготеет при балансе.
 
-    Сигнал:
-      >0: цена выше POC + последние бары уходят вверх → бычий дисбаланс.
-      <0: цена ниже POC + уходит вниз → медвежий дисбаланс.
-      ≈0: цена у POC → принятие (рынок сбалансирован).
+    Value Area (70% объёма) — зона принятия цены.
+    Выход из VA + тонкая зона над/под ней → ускорение движения.
+    Возврат внутрь VA — поглощение экстремума.
 
-    При нахождении у POC сигнал слабый — цена ищет двустороннюю торговлю.
+    Сигнал ∈ [-1, 1]:
+      +1: цена выше VAH + пустая зона выше (пробой, ускорение вверх)
+      -1: цена ниже VAL + пустая зона ниже (пробой, ускорение вниз)
+       0: цена у POC (принятие, нейтральная зона баланса)
     """
-    _WIN = _adaptive_window(candles, target_hours=4.0, min_bars=20, max_bars=200)
-    if len(candles) < _WIN + 5:
+    _WIN = _adaptive_window(candles, target_hours=4.0, min_bars=20, max_bars=240)
+    if len(candles) < max(20, _WIN // 2):
         return 0.0
 
     window = candles[-_WIN:]
-    vols = [float(c.volume) for c in window]
-    avg_vol = statistics.mean(vols) or 1.0
+    highs = [_to_f(c.high) for c in window]
+    lows  = [_to_f(c.low)  for c in window]
+    vols  = [float(c.volume) for c in window]
 
-    # Грубый POC: бар с максимальным объёмом
-    poc_idx = max(range(len(window)), key=lambda i: vols[i])
-    poc_price = (_to_f(window[poc_idx].high) + _to_f(window[poc_idx].low)) / 2
-
-    cl_now = _to_f(candles[-1].close)
     atr = _compute_atr(candles)
-    if atr <= 0 or poc_price <= 0:
+    if atr <= 0:
         return 0.0
-    atr_abs = atr * poc_price
+    cl_now = _to_f(candles[-1].close)
+    atr_abs = atr * (cl_now or 1.0)
 
-    dist = (cl_now - poc_price) / atr_abs   # в единицах ATR
+    poc, vah, val, bins, price_lo, bin_size = volume_profile(highs, lows, vols, n_bins=48)
+    if poc <= 0:
+        return 0.0
 
-    # Слабый сигнал у POC, нарастающий при удалении
-    # Направление последних 3 баров усиливает/ослабляет
-    last_closes = [_to_f(c.close) for c in candles[-4:]]
-    momentum = (last_closes[-1] - last_closes[0]) / (atr_abs or 1e-9)
-
-    raw = math.tanh(dist * 0.5) * math.tanh(abs(momentum) * 0.3) * (1 if momentum > 0 else -1)
-    # Если цена рядом с POC (< 0.3 ATR) — нейтральный сигнал (принятие)
-    if abs(dist) < 0.3:
-        raw *= 0.2
-    return round(max(-1.0, min(1.0, raw)), 4)
+    return score_vol_profile(cl_now, poc, vah, val, bins, price_lo, bin_size, atr_abs)
 
 
 def score_vsa_absorption(candles: list[HistoricCandle]) -> float:
