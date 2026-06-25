@@ -5445,11 +5445,15 @@ class OICompositeStrategy(IStrategy):
             aligned = (score > 0 and self.__open_trade.signal_type == SignalType.LONG) or \
                       (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
-            abs_sc = abs(score)
-            self.__weights[name].update(target, abs_sc)
-            self.__ticker_weights[name].update(target, abs_sc)
+            # Мультипликатор обновления = IC-точность метода, а не abs(score).
+            # abs(score) отражает "громкость" — уверенные но плохие методы
+            # получали такой же сильный апдейт как точные. ICPrior.weight()
+            # нормирует накопленную предсказательную силу в [0.1, 1.0].
+            ic_acc = self.__ic(name).weight()
+            self.__weights[name].update(target, ic_acc)
+            self.__ticker_weights[name].update(target, ic_acc)
             if self.__last_regime in self.__regime_weights:
-                self.__regime_weights[self.__last_regime][name].update(target, abs_sc)
+                self.__regime_weights[self.__last_regime][name].update(target, ic_acc)
 
         # Сохранить сделку в историю с attribution по методам
         if self.__history is not None:
