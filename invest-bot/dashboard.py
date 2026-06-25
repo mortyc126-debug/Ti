@@ -1315,6 +1315,10 @@ def _trades_list_compact(trades: list[dict]) -> list[dict]:
             "d": t.get("direction", "?")[0],  # L / S
             "w": int(t.get("win", False)),
             "r": round(t.get("r_multiple", 0.0), 2),
+            "mfe": round((t.get("mfe") or 0.0) * 100, 3),
+            "mae": round((t.get("mae") or 0.0) * 100, 3),
+            "ep": round(t.get("entry_price") or 0.0, 4),
+            "xp": round(t.get("exit_price") or 0.0, 4),
             "fa": [[n, round(s, 2)] for n, s in for_m],
             "ag": [[n, round(s, 2)] for n, s in against_m],
         })
@@ -2897,7 +2901,8 @@ function rowsToHtml(rows) {{
     const exp = r.expectancy_pct !== undefined ? (r.expectancy_pct * 100).toFixed(2) + '%' : '';
     const avgR = r.avg_r !== undefined ? r.avg_r.toFixed(2) : '';
     const models = modelStatsToHtml(r.model_stats);
-    html += `<tr><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
+    const clickStyle = 'cursor:pointer;' + (r.trades_list && r.trades_list.length ? 'border-left:2px solid var(--accent);' : '');
+    html += `<tr onclick="selectTicker('${{r.ticker}}')" title="Кликни — загрузить график" style="${{clickStyle}}"><td><span class="sdot ok"></span>${{r.ticker}}</td><td>${{r.mode}}</td><td>${{r.n_trades ?? ''}}</td><td>${{winPct}}</td><td>${{avgR}}</td><td>${{exp}}</td><td style="font-size:10px;color:var(--txt3);">${{models}}</td></tr>`;
     if (r.what_if) {{
       const wi = whatIfToHtml(r.what_if);
       if (wi) {{
@@ -2931,18 +2936,23 @@ function rowsToHtml(rows) {{
       }}
     }}
     if (r.trades_list && r.trades_list.length) {{
-      html += `<tr><td></td><td colspan="6"><details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 сделки по времени (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate)}}</details></td></tr>`;
+      const bw = bestWorstTradesToHtml(r.trades_list);
+      const bwm = bestWorstMethodsToHtml(r.method_stats);
+      let detailHtml = '';
+      if (bw) detailHtml += `<details style="font-size:11px;margin-bottom:4px"><summary style="cursor:pointer;color:var(--txt3)">▲▼ лучшие / худшие сделки</summary>${{bw}}</details>`;
+      if (bwm) detailHtml += `<details style="font-size:11px;margin-bottom:4px"><summary style="cursor:pointer;color:var(--txt3)">▲▼ методы</summary>${{bwm}}</details>`;
+      detailHtml += `<details style="font-size:11px"><summary style="cursor:pointer;color:var(--accent)">📈 все сделки (n=${{r.trades_list.length}})</summary>${{tradesListToHtml(r.trades_list, r.win_rate)}}</details>`;
+      html += `<tr><td></td><td colspan="6">${{detailHtml}}</td></tr>`;
     }}
   }}
   return html;
 }}
 
 function tradesListToHtml(trades, overallWr) {{
-  // Rolling win% по окну 10 сделок
   const W = 10;
   let cumR = 0;
   let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;width:100%">';
-  html += '<tr style="color:var(--txt3)"><th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th><th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
+  html += '<tr style="color:var(--txt3)"><th>#</th><th>Дата</th><th>Dir</th><th>Win</th><th>R</th><th>cumR</th><th>MFE%</th><th>MAE%</th><th style="min-width:60px">roll WR(10)</th><th>Топ ЗА</th><th>Топ ПРОТИВ</th></tr>';
   const rollWin = [];
   for (let i = 0; i < trades.length; i++) {{
     const t = trades[i];
@@ -2951,20 +2961,86 @@ function tradesListToHtml(trades, overallWr) {{
     if (rollWin.length > W) rollWin.shift();
     const rwr = rollWin.reduce((a, b) => a + b, 0) / rollWin.length;
     const rwrPct = (rwr * 100).toFixed(0) + '%';
-    // цвет rolling WR: зеленее если выше общего, краснее если ниже
     const rwrColor = overallWr !== undefined
       ? (rwr > overallWr ? '#7dcc7d' : rwr < overallWr - 0.1 ? '#e07070' : 'var(--txt3)')
       : 'var(--txt3)';
     const winMark = t.w ? '<span style="color:#7dcc7d">✓</span>' : '<span style="color:#e07070">✗</span>';
     const rColor = t.r > 0 ? '#7dcc7d' : '#e07070';
     const cumRColor = cumR >= 0 ? '#7dcc7d' : '#e07070';
+    const mfePct = t.mfe != null ? t.mfe.toFixed(2) + '%' : '—';
+    const maePct = t.mae != null ? t.mae.toFixed(2) + '%' : '—';
+    // цвет MFE/MAE: зелёный если MFE > MAE (позиция шла в пользу)
+    const mfeColor = (t.mfe != null && t.mae != null && t.mfe > t.mae) ? '#7dcc7d' : 'var(--txt3)';
+    const maeColor = (t.mfe != null && t.mae != null && t.mae > t.mfe) ? '#e07070' : 'var(--txt3)';
     const forStr = t.fa.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const againstStr = t.ag.map(([n, s]) => `<span title="${{n}}">${{n.replace(/_/g,' ').substring(0,10)}} ${{s.toFixed(2)}}</span>`).join(' ');
     const bg = i % 2 === 0 ? 'background:var(--bg2)' : '';
-    html += `<tr style="${{bg}}"><td style="color:var(--txt3)">${{i+1}}</td><td style="white-space:nowrap">${{t.t}}</td><td>${{t.d}}</td><td>${{winMark}}</td><td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td><td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td><td style="color:${{rwrColor}}">${{rwrPct}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{forStr}}</td><td style="color:var(--txt3);max-width:160px;white-space:nowrap;overflow:hidden">${{againstStr}}</td></tr>`;
+    html += `<tr style="${{bg}}"><td style="color:var(--txt3)">${{i+1}}</td><td style="white-space:nowrap">${{t.t}}</td><td>${{t.d}}</td><td>${{winMark}}</td><td style="color:${{rColor}}">${{t.r.toFixed(2)}}</td><td style="color:${{cumRColor}}">${{cumR.toFixed(2)}}</td><td style="color:${{mfeColor}}">${{mfePct}}</td><td style="color:${{maeColor}}">${{maePct}}</td><td style="color:${{rwrColor}}">${{rwrPct}}</td><td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{forStr}}</td><td style="color:var(--txt3);max-width:140px;white-space:nowrap;overflow:hidden">${{againstStr}}</td></tr>`;
   }}
   html += '</table></div>';
   return html;
+}}
+
+function bestWorstTradesToHtml(trades, n=5) {{
+  if (!trades || !trades.length) return '';
+  const sorted = [...trades].sort((a, b) => b.r - a.r);
+  const best = sorted.slice(0, n);
+  const worst = sorted.slice(-n).reverse();
+  const row = (t, i) => {{
+    const rColor = t.r > 0 ? '#7dcc7d' : '#e07070';
+    const winMark = t.w ? '✓' : '✗';
+    const mfe = t.mfe != null ? t.mfe.toFixed(2) + '%' : '';
+    const mae = t.mae != null ? t.mae.toFixed(2) + '%' : '';
+    return `<tr><td style="color:var(--txt3);padding:1px 4px">${{i+1}}</td><td style="white-space:nowrap;padding:1px 4px">${{t.t}}</td><td style="padding:1px 4px">${{t.d}}</td><td style="padding:1px 4px">${{winMark}}</td><td style="color:${{rColor}};padding:1px 4px;font-weight:600">${{t.r.toFixed(2)}}R</td><td style="color:#7dcc7d;padding:1px 4px">${{mfe}}</td><td style="color:#e07070;padding:1px 4px">${{mae}}</td></tr>`;
+  }};
+  const tblStyle = 'border-collapse:collapse;font-size:10px;';
+  const hdr = '<tr style="color:var(--txt3)"><th></th><th>Дата</th><th>Dir</th><th>W</th><th>R</th><th>MFE</th><th>MAE</th></tr>';
+  return `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;">
+    <div><div style="font-size:10px;color:var(--pos);margin-bottom:2px;">▲ лучшие ${{best.length}}</div><table style="${{tblStyle}}">${{hdr}}${{best.map(row).join('')}}</table></div>
+    <div><div style="font-size:10px;color:var(--neg);margin-bottom:2px;">▼ худшие ${{worst.length}}</div><table style="${{tblStyle}}">${{hdr}}${{worst.map(row).join('')}}</table></div>
+  </div>`;
+}}
+
+function bestWorstMethodsToHtml(methodStats) {{
+  if (!methodStats) return '';
+  const rows = Object.entries(methodStats)
+    .filter(([, s]) => s.agree_n >= 3 || s.disagree_n >= 3)
+    .map(([name, s]) => {{
+      const fwr = s.agree_win_rate != null ? s.agree_win_rate : 0.5;
+      const awr = s.disagree_win_rate != null ? s.disagree_win_rate : 0.5;
+      return {{name, fwr, awr, fn: s.agree_n||0, an: s.disagree_n||0}};
+    }});
+  if (!rows.length) return '';
+  const byFor = [...rows].filter(r=>r.fn>=3).sort((a,b)=>b.fwr-a.fwr);
+  const byAgainst = [...rows].filter(r=>r.an>=3).sort((a,b)=>b.awr-a.awr);
+  const best = byFor.slice(0,5);
+  const worst = byFor.slice(-5).reverse();
+  const contra = byAgainst.filter(r=>r.awr>0.6).slice(0,4);
+  const mRow = (r) => {{
+    const c = r.fwr >= 0.6 ? '#7dcc7d' : r.fwr <= 0.45 ? '#e07070' : 'var(--txt2)';
+    return `<tr><td style="padding:1px 6px;white-space:nowrap;font-size:10px">${{r.name.replace(/_/g,' ')}}</td><td style="padding:1px 6px;color:${{c}};font-size:10px">${{(r.fwr*100).toFixed(0)}}% n=${{r.fn}}</td></tr>`;
+  }};
+  let html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;">';
+  if (best.length) html += `<div><div style="font-size:10px;color:var(--pos);margin-bottom:2px;">▲ лучшие методы (за)</div><table style="border-collapse:collapse">${{best.map(mRow).join('')}}</table></div>`;
+  if (worst.length) html += `<div><div style="font-size:10px;color:var(--neg);margin-bottom:2px;">▼ худшие методы (за)</div><table style="border-collapse:collapse">${{worst.map(mRow).join('')}}</table></div>`;
+  if (contra.length) html += `<div><div style="font-size:10px;color:var(--warn,#f5a623);margin-bottom:2px;">↻ контрарные (против wins)</div><table style="border-collapse:collapse">${{contra.map(r=>{{
+    return `<tr><td style="padding:1px 6px;white-space:nowrap;font-size:10px">${{r.name.replace(/_/g,' ')}}</td><td style="padding:1px 6px;color:var(--warn,#f5a623);font-size:10px">${{(r.awr*100).toFixed(0)}}% n=${{r.an}}</td></tr>`;
+  }}).join('')}}</table></div>`;
+  html += '</div>';
+  return html;
+}}
+
+function selectTicker(ticker) {{
+  const sel = document.getElementById('tc_ticker');
+  if (!sel) return;
+  let found = false;
+  for (const opt of sel.options) {{
+    if (opt.value === ticker) {{ sel.value = ticker; found = true; break; }}
+  }}
+  if (found) {{
+    sel.scrollIntoView({{behavior:'smooth', block:'nearest'}});
+    loadTradeChart();
+  }}
 }}
 
 async function applyDedup(tickersIn) {{
@@ -3186,7 +3262,21 @@ function _rowToText(r) {{
 async function copyAllResults(btn) {{
   if (!_backtestRows.length) {{ alert('Нет результатов'); return; }}
   const header = 'Тикер\tРежим\tСделок\tWin%\tavg R\tExp%\tM1/M2/M3';
-  const text = header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
+  let text = header + '\\n' + _backtestRows.map(_rowToText).join('\\n') + '\\n';
+  // Добавляем MFE/MAE если есть
+  try {{
+    const mfeResp = await fetch('/api/mfe_stats');
+    const mfeData = await mfeResp.json();
+    if (mfeData.rows && mfeData.rows.length) {{
+      text += '\\n--- MFE / MAE из history.json ---\\n';
+      text += 'Тикер\tN\tMFE мед.%\tMAE мед.%\tMFE/MAE\tQuality мед.%\\n';
+      for (const row of mfeData.rows) {{
+        text += `${{row.ticker}}\t${{row.n}}\t${{row.mfe_med}}\t${{row.mae_med}}\t${{row.ratio}}\t${{row.q_med ?? ''}}\\n`;
+      }}
+      const t = mfeData.total;
+      if (t) text += `ИТОГО\t${{t.n}}\t${{t.mfe_med}}\t${{t.mae_med}}\t${{t.ratio}}\t${{t.q_med ?? ''}}\\n`;
+    }}
+  }} catch(e) {{}}
   try {{
     await navigator.clipboard.writeText(text);
     const orig = btn.textContent;
