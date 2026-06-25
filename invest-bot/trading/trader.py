@@ -95,8 +95,11 @@ TRANCHE2_MAX_ADVERSE_ATR = float(os.getenv("TRANCHE2_MAX_ADV_ATR", "0.5"))  # м
 # Фильтр режима при входе: сигналы в этих режимах игнорируются.
 # "ranging" — боковик без тренда, momentum-стратегия там статистически убыточна.
 # "stress" — аномальная волатильность, паттерны ломаются, соотношение сигнал/шум падает.
+# "trending_up" — атрибуция 150 дней по 8 тикерам даёт 35-44% WR (хуже случайности);
+#                 trending_down — 50-60% WR. Логика: в растущем тренде шорты не работают,
+#                 а лонги перебиваются коррекциями быстрее, чем успевают закрыться.
 # Отключить: ENTRY_BLOCKED_REGIMES=
-_ENTRY_BLOCKED_REGIMES_DEFAULT = {"ranging", "stress"}
+_ENTRY_BLOCKED_REGIMES_DEFAULT = {"ranging", "stress", "trending_up"}
 _ebr_env = os.getenv("ENTRY_BLOCKED_REGIMES", None)
 ENTRY_BLOCKED_REGIMES: set[str] = (
     set(r.strip() for r in _ebr_env.split(",") if r.strip())

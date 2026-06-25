@@ -524,7 +524,7 @@ MIN_ATR_FACTOR = 1.5               # ATR должен быть >= комисси
 _ebr_bt = os.getenv("ENTRY_BLOCKED_REGIMES", None)
 BACKTEST_BLOCKED_REGIMES: frozenset[str] = frozenset(
     r.strip() for r in _ebr_bt.split(",") if r.strip()
-) if _ebr_bt is not None else frozenset({"stress"})
+) if _ebr_bt is not None else frozenset({"stress", "ranging", "trending_up"})
 
 # ── Комиссия Т-Инвестиций по тарифам (round-trip = вход+выход) ──────────────
 # Акции/облигации/ETF/расписки — фикс. % от суммы сделки. Фьючерсы — % от
