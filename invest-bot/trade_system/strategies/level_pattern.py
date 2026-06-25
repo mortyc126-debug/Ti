@@ -333,7 +333,7 @@ def _make_entry(
     take = entry + take_dist if stop < entry else entry - take_dist
     stop_pct = stop_dist / entry
     take_pct = take_dist / entry
-    if stop_pct > 0.04 or take_pct < 0.001:
+    if stop_pct > 0.02 or take_pct < 0.001:
         return None
     return LevelEntry(
         entry=round(entry, 6), stop=round(stop, 6), take=round(take, 6),
@@ -587,21 +587,26 @@ def detect_level_pattern(
     candles: list,
     direction: str,
     atr_value: float = 0.0,
+    tier_max: int = 2,
     **kwargs,
 ) -> Optional[LevelEntry]:
     """
     Строит иерархические уровни один раз, пробует три паттерна:
     FALSE_BREAKOUT → LEVEL_REVERSAL → THREAD.
+    tier_max=2 — используем только дневные и ниже (без недельных/месячных),
+    чтобы стопы оставались в разумном диапазоне для внутридневки.
     Возвращает первый найденный или None.
     """
     ls = build_levels(candles)
-    result = detect_false_breakout(candles, direction, atr_value=atr_value, level_set=ls)
+    # Исключаем tier < min_tier (недельные/месячные tier=1 дают стопы 3-4% — слишком широко)
+    ls_filtered = LevelSet(levels=[lv for lv in ls.levels if lv.tier >= tier_max])
+    result = detect_false_breakout(candles, direction, atr_value=atr_value, level_set=ls_filtered)
     if result:
         return result
-    result = detect_level_reversal(candles, direction, atr_value=atr_value, level_set=ls)
+    result = detect_level_reversal(candles, direction, atr_value=atr_value, level_set=ls_filtered)
     if result:
         return result
-    return detect_thread(candles, direction, atr_value=atr_value, level_set=ls)
+    return detect_thread(candles, direction, atr_value=atr_value, level_set=ls_filtered)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
