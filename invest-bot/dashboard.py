@@ -3580,28 +3580,49 @@ function startProgressPolling(tickers, statusElId) {{
     'ошибка': '✗ ошибка', 'ошибка API': '✗ ошибка API', 'нет истории': '— нет истории', 'пропуск': '— пропуск',
   }};
   const render = (progress) => {{
-    const parts = tickers.map(t => {{
-      const p = progress[t];
-      const status = p ? (statusRu[p.status] || p.status) : 'в очереди';
-      const cls = p && p.status === 'готово' ? 'color:var(--pos);' : (p && p.status.startsWith('ошибка') ? 'color:var(--neg);' : '');
-      return `<span style="${{cls}}">${{t}}: ${{status}}</span>`;
-    }});
-
-    // Общий ETA: средн. время на завершённый тикер (от старта прогона) ×
-    // сколько тикеров ещё не done — грубо, но по мере прогресса точнее
-    // (первые тикеры обычно дороже из-за прогрева кэша/расчёта индикаторов).
     const total = tickers.length;
     const doneCount = tickers.filter(t => progress[t] && DONE_STATUSES.has(progress[t].status)).length;
+    const errCount  = tickers.filter(t => progress[t] && progress[t].status.startsWith('ошибка')).length;
     const elapsedSec = (Date.now() - startedAt) / 1000;
-    let overall = `Готово ${{doneCount}}/${{total}}`;
+    const pct = total > 0 ? doneCount / total : 0;
+
+    let etaStr = '';
     if (doneCount > 0 && doneCount < total) {{
       const etaSec = (elapsedSec / doneCount) * (total - doneCount);
-      overall += ` · осталось ~${{_fmtEta(etaSec)}}`;
+      etaStr = ` · ~${{_fmtEta(etaSec)}}`;
     }} else if (doneCount === 0 && total > 1) {{
-      overall += ` · считаю время...`;
+      etaStr = ' · считаю...';
     }}
-    el.innerHTML = `<div style="margin-bottom:4px;font-weight:600;">${{overall}}</div>` + parts.join(' &nbsp;·&nbsp; ');
+    const errBadge = errCount > 0 ? `<span style="color:var(--neg);margin-left:6px">✗${{errCount}}</span>` : '';
+    const doneColor = doneCount === total ? 'var(--pos)' : 'var(--txt)';
+
+    // Тонкая прогресс-линия
+    const barW = Math.round(pct * 100);
+    const bar = `<div style="height:3px;border-radius:2px;background:var(--bg2);margin:4px 0;overflow:hidden">
+      <div style="height:100%;width:${{barW}}%;background:var(--accent,#5c6bc0);border-radius:2px;transition:width .4s"></div>
+    </div>`;
+
+    // Детали по тикерам — свёрнуты по умолчанию
+    const parts = tickers.map(t => {{
+      const p = progress[t];
+      const status = p ? (statusRu[p.status] || p.status) : '…';
+      const c = p && p.status === 'готово' ? 'var(--pos)' : p && p.status.startsWith('ошибка') ? 'var(--neg)' : 'var(--txt3)';
+      return `<span style="color:${{c}};white-space:nowrap">${{t}}&thinsp;${{status}}</span>`;
+    }}).join(' <span style="color:var(--border2)">·</span> ');
+
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+        <span style="color:${{doneColor}};font-weight:600">${{doneCount}}/${{total}}</span>
+        <span style="color:var(--txt3)">${{etaStr}}</span>
+        ${{errBadge}}
+        <span style="margin-left:auto;font-size:11px;color:var(--txt3);cursor:pointer;user-select:none"
+          onclick="this.closest('.progress-wrap').querySelector('.progress-detail').style.display=this.closest('.progress-wrap').querySelector('.progress-detail').style.display==='none'?'':'none';this.textContent=this.textContent==='▸ детали'?'▾ детали':'▸ детали'"
+        >▸ детали</span>
+      </div>
+      ${{bar}}
+      <div class="progress-detail" style="display:none;font-size:10px;color:var(--txt3);margin-top:2px;line-height:1.7">${{parts}}</div>`;
   }};
+  el.className = (el.className || '') + ' progress-wrap';
   render({{}});
   _progressTimer = setInterval(async () => {{
     try {{
