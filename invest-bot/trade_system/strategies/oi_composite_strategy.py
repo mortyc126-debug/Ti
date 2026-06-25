@@ -277,15 +277,10 @@ MICROSTRUCTURE_AGREE_BOOST = 1.3    # множитель силы в гейте 
 # На 1-минутных свечах RSI/z-score-осцилляторы перевозбуждаются за 2-3 бара
 # и сигнализируют разворот в начале тренда. Трендовые методы — наоборот, точнее.
 
-# Режим-специфичные знаки скора: +1 прямой, -1 инвертировать.
-# Данные: AFKS 90д bar_scores, корреляция ZSCORE→fwd_ret_3 по режимам.
-# low_vol:     ZSCORE шорт→+0.88%, лонг→-0.97% (контрарный: z-рост = перехай).
-# trending_up: ZSCORE лонг→-2.03% (вершина тренда, двусторонне медвежий).
-# stress/trending_down/ranging/high_vol: ZSCORE прямой (momentum/breakout).
-_REGIME_METHOD_SIGN: dict[str, dict[str, int]] = {
-    "low_vol":      {"ZSCORE": -1},
-    "trending_up":  {"ZSCORE": -1},
-}
+# Режим-специфичные знаки скора отключены: анализ AFKS давал инверсию ZSCORE
+# в trending_up/low_vol, но AFLT показал противоположное — константа глобальная
+# и ломает тикеры где ZSCORE прямой. Оставлено для возможного per-ticker подхода.
+_REGIME_METHOD_SIGN: dict[str, dict[str, int]] = {}
 
 _1MIN_WEIGHT_MODS: dict[str, float] = {
     "FISHER_RSI":       0.2,   # RSI-осциллятор
