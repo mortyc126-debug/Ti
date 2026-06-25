@@ -350,7 +350,7 @@ _LEVEL_VETO_MULT   = 0.15  # composite × это при вето
 # Вето сильного структурного сигнала (CASCADE/VSA_ABSORPTION/IMPULSE_PULLBACK):
 # если один из этих методов даёт |score| >= порога И направлен против composite,
 # composite давится сильнее, чем через линейное взвешивание.
-_STRONG_SIGNAL_VETO_METHODS = {"CASCADE", "VSA_ABSORPTION", "IMPULSE_PULLBACK"}
+_STRONG_SIGNAL_VETO_METHODS = {"CASCADE", "VSA_ABSORPTION", "IMPULSE_PULLBACK", "WANING_IMPULSES", "FALSE_BREAKOUT"}
 _STRONG_SIGNAL_VETO_THRESH  = 0.60  # |score| >= этого → считается "сильным" противосигналом
 _STRONG_SIGNAL_VETO_MULT    = 0.12  # composite × это (жёстче LEVEL_VETO, т.к. методы прицельные)
 
@@ -2922,6 +2922,301 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
         return round(-imp_dir * excess * 0.25, 4)
 
 
+def score_waning_impulses(candles: list[HistoricCandle]) -> float:
+    """
+    WANING_IMPULSES: затухающие импульсы — три признака одновременно:
+      1. Объём на последовательных импульсных волнах убывает.
+      2. Откаты становятся пропорционально больше от волны к волне.
+      3. На последнем (третьем) импульсе — длинная тень в направлении движения
+         (пробная агрессия, которую никто не поддержал).
+
+    Сигнал: истощение текущего движения → разворот ближе.
+    Возвращает score против направления последнего движения (от -0.3 до -0.85).
+    При отсутствии паттерна → 0.0.
+
+    Алгоритм:
+    - Делим последние 60 баров на импульс-откат-импульс-откат-импульс
+      через последовательные локальные экстремумы (свинги).
+    - Требуем не менее 3 импульсных фаз.
+    - Проверяем убывание среднего объёма волн и рост относительного размера откатов.
+    - Дополнительный балл за длинную тень на последнем баре в направлении тренда.
+    """
+    if len(candles) < 30:
+        return 0.0
+
+    win = candles[-60:]
+    closes = [_to_f(c.close) for c in win]
+    highs  = [_to_f(c.high)  for c in win]
+    lows   = [_to_f(c.low)   for c in win]
+    vols   = [float(c.volume) for c in win]
+    n = len(win)
+
+    overall = closes[-1] - closes[0]
+    if abs(overall) < 1e-9:
+        return 0.0
+    trend_dir = 1 if overall > 0 else -1
+
+    # Находим свинг-точки (локальные экстремумы с окном ±3)
+    SW = 3
+    swings = []   # (idx, price, kind) — kind: 'peak' | 'trough'
+    for i in range(SW, n - SW):
+        hi = all(highs[i] >= highs[j] for j in range(i - SW, i + SW + 1) if j != i)
+        lo = all(lows[i]  <= lows[j]  for j in range(i - SW, i + SW + 1) if j != i)
+        if hi:
+            swings.append((i, highs[i], 'peak'))
+        elif lo:
+            swings.append((i, lows[i], 'trough'))
+
+    if len(swings) < 4:
+        return 0.0
+
+    # Фильтруем: чередующиеся peak/trough
+    alt = [swings[0]]
+    for s in swings[1:]:
+        if s[2] != alt[-1][2]:
+            alt.append(s)
+    if len(alt) < 4:
+        return 0.0
+
+    # Собираем фазы: импульс = движение по тренду, откат = против тренда
+    impulse_vols = []   # средний объём i-го импульса
+    pullback_sizes = [] # относительный размер i-го отката / предшествующего импульса
+
+    for i in range(len(alt) - 1):
+        a, b = alt[i], alt[i + 1]
+        seg_vols = vols[a[0]:b[0] + 1]
+        if not seg_vols:
+            continue
+        avg_v = sum(seg_vols) / len(seg_vols)
+        price_move = abs(b[1] - a[1])
+
+        is_impulse = (trend_dir > 0 and b[2] == 'peak') or (trend_dir < 0 and b[2] == 'trough')
+        if is_impulse:
+            impulse_vols.append((avg_v, price_move))
+        else:
+            if impulse_vols:
+                prev_imp_move = impulse_vols[-1][1]
+                rel = price_move / (prev_imp_move or 1e-9)
+                pullback_sizes.append(rel)
+
+    if len(impulse_vols) < 3 or len(pullback_sizes) < 2:
+        return 0.0
+
+    # Признак 1: убывание объёма на импульсах
+    imp_vs = [v for v, _ in impulse_vols[-3:]]
+    vol_decay = (imp_vs[0] - imp_vs[-1]) / (imp_vs[0] or 1e-9)
+    # vol_decay > 0 = убывание; <0 = нарастание (паттерн не тот)
+    if vol_decay <= 0:
+        return 0.0
+
+    # Признак 2: рост относительного размера откатов
+    pb = pullback_sizes[-min(2, len(pullback_sizes)):]
+    pb_growing = len(pb) < 2 or pb[-1] >= pb[0] * 0.85  # допуск 15%
+
+    # Признак 3: длинная тень последнего бара в направлении тренда
+    last = win[-1]
+    body = abs(_to_f(last.close) - _to_f(last.open))
+    if trend_dir > 0:
+        upper_wick = _to_f(last.high) - max(_to_f(last.close), _to_f(last.open))
+        tail_ratio = upper_wick / (body or 1e-9)
+    else:
+        lower_wick = min(_to_f(last.close), _to_f(last.open)) - _to_f(last.low)
+        tail_ratio = lower_wick / (body or 1e-9)
+    has_exhaustion_wick = tail_ratio > 1.5
+
+    # Итоговый сигнал против текущего тренда
+    strength = min(1.0, vol_decay * 2.0)   # 0..1
+    base = 0.30 + strength * 0.40          # 0.30..0.70
+    if pb_growing:
+        base = min(0.85, base + 0.15)
+    if has_exhaustion_wick:
+        base = min(0.85, base + 0.10)
+
+    return round(-trend_dir * base, 4)
+
+
+def score_vol_compression(candles: list[HistoricCandle]) -> float:
+    """
+    VOL_COMPRESSION: сужение ценового диапазона при сохранении/нарастании объёма.
+
+    Это накопление или распределение в компрессии. Чем дольше и плотнее —
+    тем резче выход. Направление определяется первым импульсом на пробое
+    (этот метод сам по себе не даёт направление — возвращает 0 пока
+    нет пробоя; после пробоя усиливает сигнал в его сторону).
+
+    Логика:
+    - ATR последних 10 баров vs ATR предыдущих 20 — если ATR сжался >30%
+      при объёме ≥ 80% от среднего за 30 баров → компрессия активна.
+    - Пробой: последний бар выходит за диапазон сжатия с объёмом > 120% среднего.
+    - До пробоя: 0.0. После пробоя: +0.4..+0.75 в сторону пробоя.
+    """
+    if len(candles) < 35:
+        return 0.0
+
+    def _atr(cs):
+        tr = []
+        for i in range(1, len(cs)):
+            h, l, pc = _to_f(cs[i].high), _to_f(cs[i].low), _to_f(cs[i - 1].close)
+            tr.append(max(h - l, abs(h - pc), abs(l - pc)))
+        return sum(tr) / len(tr) if tr else 0.0
+
+    recent_atr  = _atr(candles[-11:])   # последние 10 баров
+    base_atr    = _atr(candles[-31:-10]) # предыдущие 20 баров
+    if base_atr < 1e-9:
+        return 0.0
+    compression_ratio = recent_atr / base_atr  # <1 = сжатие
+
+    if compression_ratio > 0.72:  # сжатие меньше 28% — не компрессия
+        return 0.0
+
+    avg_vol_30 = sum(float(c.volume) for c in candles[-30:]) / 30
+    avg_vol_10 = sum(float(c.volume) for c in candles[-10:]) / 10
+    vol_sustain = avg_vol_10 / (avg_vol_30 or 1e-9)
+
+    if vol_sustain < 0.75:  # объём просел — просто тихий рынок, не компрессия
+        return 0.0
+
+    # Граница компрессионного диапазона
+    comp_candles = candles[-12:-1]  # последние 10 баров без текущего
+    comp_high = max(_to_f(c.high)  for c in comp_candles)
+    comp_low  = min(_to_f(c.low)   for c in comp_candles)
+
+    last = candles[-1]
+    last_close = _to_f(last.close)
+    last_vol   = float(last.volume)
+    vol_surge  = last_vol / (avg_vol_30 or 1e-9)
+
+    breakout_up   = last_close > comp_high and vol_surge > 1.15
+    breakout_down = last_close < comp_low  and vol_surge > 1.15
+
+    if not breakout_up and not breakout_down:
+        return 0.0   # компрессия активна, но пробоя ещё нет
+
+    # Сила сигнала: чем сильнее сжатие и больше объём — тем больше
+    squeeze_depth = min(1.0, (0.72 - compression_ratio) / 0.42)  # 0..1
+    vol_factor    = min(1.0, (vol_surge - 1.0) / 1.0)
+    base = 0.40 + 0.35 * squeeze_depth + 0.15 * vol_factor
+    base = min(0.80, base)
+    return round((1 if breakout_up else -1) * base, 4)
+
+
+def score_false_breakout(candles: list[HistoricCandle]) -> float:
+    """
+    FALSE_BREAKOUT: ложный пробой с быстрым возвратом на объёме.
+
+    Пробили уровень → собрали стопы → вернулись быстро и на хорошем объёме.
+    После этого движение идёт в противоположную сторону — стопы уже сняты,
+    сопротивления нет.
+
+    Детектируем:
+    - За последние 3–5 баров: выход за 20-барный хай/лой.
+    - Затем быстрый возврат внутрь диапазона (в пределах 3 баров).
+    - Объём на баре возврата ≥ 110% среднего.
+    """
+    if len(candles) < 25:
+        return 0.0
+
+    range_bars = candles[-22:-2]  # 20 баров до последних 2
+    rng_high = max(_to_f(c.high)  for c in range_bars)
+    rng_low  = min(_to_f(c.low)   for c in range_bars)
+    rng      = rng_high - rng_low
+    if rng < 1e-9:
+        return 0.0
+
+    avg_vol = sum(float(c.volume) for c in candles[-20:]) / 20
+
+    # Смотрим последние 5 баров: был ли выход за границу с последующим возвратом
+    tail = candles[-5:]
+    for i in range(len(tail) - 1):
+        c = tail[i]
+        broke_up   = _to_f(c.high)  > rng_high * 1.001
+        broke_down = _to_f(c.low)   < rng_low  * 0.999
+
+        if not broke_up and not broke_down:
+            continue
+
+        # Последующие бары возвращаются внутрь диапазона?
+        returned_bars = tail[i + 1:]
+        for rb in returned_bars:
+            rb_close = _to_f(rb.close)
+            vol_ok   = float(rb.volume) >= avg_vol * 1.05
+
+            if broke_up and rb_close < rng_high and vol_ok:
+                # Пробой вверх → возврат → медвежий сигнал (стопы сняты сверху)
+                penetration = (_to_f(c.high) - rng_high) / rng
+                strength = min(0.80, 0.45 + penetration * 2.0)
+                return round(-strength, 4)
+
+            if broke_down and rb_close > rng_low and vol_ok:
+                # Пробой вниз → возврат → бычий сигнал (стопы сняты снизу)
+                penetration = (rng_low - _to_f(c.low)) / rng
+                strength = min(0.80, 0.45 + penetration * 2.0)
+                return round(strength, 4)
+
+    return 0.0
+
+
+def score_level_absorption(candles: list[HistoricCandle]) -> float:
+    """
+    LEVEL_ABSORPTION: объём нарастает при подходе к уровню, цена там тормозит.
+
+    Кто-то поглощает поток прямо на уровне. Когда поглотители закончат —
+    пробой будет резким (за уровнем стоят стопы). Метод НЕ предсказывает
+    направление сам по себе — он усиливает уже имеющийся сигнал или молчит.
+
+    Детектирует:
+    - Цена движется к экстремуму последних 15 баров (≤ ATR × 0.5 от него).
+    - Объём последних 3 баров нарастает (каждый следующий > предыдущего).
+    - Последний бар: маленькое тело (< 35% от диапазона) → цена там тормозит.
+    - Возвращает +0.3..+0.6 в направлении движения к уровню (предстоящий пробой).
+    """
+    if len(candles) < 20:
+        return 0.0
+
+    win = candles[-16:]
+    closes = [_to_f(c.close) for c in win]
+    highs  = [_to_f(c.high)  for c in win]
+    lows   = [_to_f(c.low)   for c in win]
+
+    level_high = max(highs[:-1])   # экстремум без текущего бара
+    level_low  = min(lows[:-1])
+
+    # ATR за 15 баров
+    trs = [max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]),
+               abs(lows[i] - closes[i - 1])) for i in range(1, len(win) - 1)]
+    atr = sum(trs) / len(trs) if trs else 0.0
+    if atr < 1e-9:
+        return 0.0
+
+    last = win[-1]
+    lc = _to_f(last.close)
+    lh = _to_f(last.high)
+    ll = _to_f(last.low)
+    body = abs(_to_f(last.close) - _to_f(last.open))
+    bar_range = lh - ll
+    small_body = bar_range > 1e-9 and (body / bar_range) < 0.35
+
+    near_high = (level_high - lc) < atr * 0.5
+    near_low  = (lc - level_low)  < atr * 0.5
+
+    if not near_high and not near_low:
+        return 0.0
+
+    # Объём нарастает последние 3 бара
+    tail_vols = [float(c.volume) for c in win[-3:]]
+    vol_rising = tail_vols[1] > tail_vols[0] * 0.90 and tail_vols[2] > tail_vols[1] * 0.90
+
+    if not vol_rising or not small_body:
+        return 0.0
+
+    # Направление: движение к уровню
+    approach_dir = 1 if near_high else -1
+    avg_vol_15 = sum(float(c.volume) for c in win) / len(win)
+    vol_surge = tail_vols[-1] / (avg_vol_15 or 1e-9)
+    strength = min(0.60, 0.30 + min(1.0, vol_surge - 0.8) * 0.30)
+    return round(approach_dir * strength, 4)
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -2962,6 +3257,11 @@ METHODS = [
     ("VSA_ABSORPTION",   score_vsa_absorption),
     ("CASCADE",          score_cascade),
     ("IMPULSE_PULLBACK", score_impulse_pullback),
+    # Затухание / компрессия / ложный пробой / поглощение на уровне
+    ("WANING_IMPULSES",  score_waning_impulses),
+    ("VOL_COMPRESSION",  score_vol_compression),
+    ("FALSE_BREAKOUT",   score_false_breakout),
+    ("LEVEL_ABSORPTION", score_level_absorption),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
