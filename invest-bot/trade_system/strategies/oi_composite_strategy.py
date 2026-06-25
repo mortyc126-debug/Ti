@@ -2839,91 +2839,87 @@ def score_cascade(candles: list[HistoricCandle]) -> float:
 
 def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
     """
-    IMPULSE_PULLBACK: отслеживает соотношение импульса и последующего отката.
+    IMPULSE_PULLBACK: классификация отката по объёму, а не по ценовой глубине.
 
-    В сильном тренде откат < 50% импульса + объём на откате ниже объёма импульса
-    → сигнал продолжения тренда. Глубокий откат (>65%) → ослабление тренда.
+    Главная ось: vol_ratio = средний объём на баре отката / средний объём на баре импульса.
 
-    Логика:
-    1. Находим последний значимый импульс (серию баров в одну сторону).
-    2. Измеряем глубину текущего отката от пика/дна импульса.
-    3. Сравниваем объём отката с объёмом импульса.
+    < 0.30  — откат без интереса, никто не мешает. Продолжение вероятно (+).
+    0.30–0.65 — нейтрально, рыночные движения.
+    > 0.65  — кто-то активно толкает против тренда. Само по себе не разворот,
+              но если следующий импульс слабее по объёму чем этот откат — разворот
+              очень вероятен. Проверяем: смотрим на последние «возобновляющие» бары.
+
+    Импульс определяется через свинг-экстремум за окно последних 25 баров:
+    peak (для бычьего тренда) или trough (для медвежьего) — точка между
+    импульсной фазой и откатной. Не требует «3 бара подряд без перерыва».
     """
-    if len(candles) < 20:
+    if len(candles) < 15:
         return 0.0
 
-    def f(c, a): return _to_f(getattr(c, a))
+    win = candles[-25:]
+    n = len(win)
+    closes = [_to_f(c.close) for c in win]
+    vols   = [float(c.volume) for c in win]
 
-    closes  = [f(c, "close") for c in candles]
-    highs   = [f(c, "high")  for c in candles]
-    lows    = [f(c, "low")   for c in candles]
-    vols    = [c.volume      for c in candles]
-
-    # Ищем импульс: минимум 3 бара подряд в одну сторону в окне [-20..-4]
-    best_impulse = None   # (direction, start_price, end_price, avg_vol, end_idx)
-    window = candles[-20:-3]
-    for start in range(len(window) - 2):
-        seg = window[start:start + 3]
-        seg_closes = [f(c, "close") for c in seg]
-        # Бычий импульс
-        if all(seg_closes[i] < seg_closes[i+1] for i in range(len(seg_closes)-1)):
-            imp_move = seg_closes[-1] - seg_closes[0]
-            mid_price = (seg_closes[0] + seg_closes[-1]) / 2 or 1e-9
-            if imp_move / mid_price > 0.003:   # минимум 0.3% движения
-                avg_vol = sum(c.volume for c in seg) / len(seg) or 1
-                if best_impulse is None or imp_move > abs(best_impulse[2] - best_impulse[1]):
-                    best_impulse = (1, seg_closes[0], seg_closes[-1], avg_vol,
-                                    max(f(c, "high") for c in seg), min(f(c, "low") for c in seg))
-        # Медвежий импульс
-        elif all(seg_closes[i] > seg_closes[i+1] for i in range(len(seg_closes)-1)):
-            imp_move = seg_closes[0] - seg_closes[-1]
-            mid_price = (seg_closes[0] + seg_closes[-1]) / 2 or 1e-9
-            if imp_move / mid_price > 0.003:
-                avg_vol = sum(c.volume for c in seg) / len(seg) or 1
-                if best_impulse is None or imp_move > abs(best_impulse[2] - best_impulse[1]):
-                    best_impulse = (-1, seg_closes[0], seg_closes[-1], avg_vol,
-                                    max(f(c, "high") for c in seg), min(f(c, "low") for c in seg))
-
-    if best_impulse is None:
+    # Направление общего движения за окно
+    overall = closes[-1] - closes[0]
+    if abs(overall) < 1e-9:
         return 0.0
+    imp_dir = 1 if overall > 0 else -1
 
-    imp_dir, imp_start, imp_end, imp_avg_vol, imp_high, imp_low = best_impulse
-    imp_size = abs(imp_end - imp_start) or 1e-9
-
-    # Текущие бары откатной фазы (последние 3 бара)
-    pb_candles = candles[-3:]
-    pb_avg_vol = sum(c.volume for c in pb_candles) / len(pb_candles) or 1
-
-    curr_close = closes[-1]
-    curr_high  = highs[-1]
-    curr_low   = lows[-1]
-
+    # Находим свинг-точку: пик (бычий) или дно (медвежий) в диапазоне [2..n-4]
+    # — это граница между импульсной и откатной фазами
+    search = range(2, n - 3)
     if imp_dir > 0:
-        # Бычий импульс → откат вниз от пика
-        pullback_depth = (imp_end - curr_close) / imp_size
+        swing_idx = max(search, key=lambda i: closes[i])
+        # Подтверждение: текущая цена ниже свинга (реальный откат)
+        if closes[-1] >= closes[swing_idx]:
+            return 0.0
     else:
-        # Медвежий импульс → откат вверх от дна
-        pullback_depth = (curr_close - imp_end) / imp_size
+        swing_idx = min(search, key=lambda i: closes[i])
+        if closes[-1] <= closes[swing_idx]:
+            return 0.0
 
-    # Объём на откате относительно импульса (< 0.7 → слабый откат = хороший знак)
-    vol_ratio = pb_avg_vol / imp_avg_vol if imp_avg_vol > 0 else 1.0
+    # Фазы: импульс = [0..swing_idx], откат = [swing_idx..-1]
+    imp_vols = vols[:swing_idx + 1]
+    pb_vols  = vols[swing_idx:]
 
-    # Слабый откат (<50%) + низкий объём → продолжение тренда
-    if pullback_depth < 0:
-        return 0.0   # цена уже за пределами импульса (пробой продолжается)
-    if 0.0 <= pullback_depth < 0.50 and vol_ratio < 0.75:
-        # Сильный сигнал продолжения
-        strength = (0.50 - pullback_depth) / 0.50 * (1.0 - vol_ratio / 0.75)
-        return round(imp_dir * min(0.85, 0.4 + strength * 0.6), 4)
-    if 0.0 <= pullback_depth < 0.50:
-        # Откат неглубокий, но объём нормальный — слабый сигнал
-        return round(imp_dir * 0.25, 4)
-    if pullback_depth > 0.65:
-        # Глубокий откат → тренд слабеет, возможен разворот
-        excess = min(1.0, (pullback_depth - 0.65) / 0.35)
-        return round(-imp_dir * excess * 0.45, 4)
+    if len(imp_vols) < 2 or len(pb_vols) < 2:
+        return 0.0
 
-    return 0.0
+    imp_avg = sum(imp_vols) / len(imp_vols)
+    pb_avg  = sum(pb_vols)  / len(pb_vols)
+    vol_ratio = pb_avg / (imp_avg or 1e-9)
+
+    if vol_ratio < 0.30:
+        # Здоровый откат: никто не мешает, движение сохраняет силу
+        strength = (0.30 - vol_ratio) / 0.30   # 1.0 при vol_ratio=0, 0 при 0.30
+        return round(imp_dir * (0.45 + 0.45 * strength), 4)
+
+    if vol_ratio <= 0.65:
+        # Нейтральная зона: рыночные движения, нет явного сигнала
+        return 0.0
+
+    # vol_ratio > 0.65: агрессивный откат — кто-то толкает против тренда.
+    # Проверяем «следующий импульс»: последние 4 бара, которые идут ПО тренду.
+    # Если их средний объём меньше pb_avg — слабый возобновляющий импульс → разворот.
+    resuming = [vols[i] for i in range(swing_idx, n)
+                if (closes[i] > closes[i - 1] if imp_dir > 0 else closes[i] < closes[i - 1])
+                and i > 0]
+    excess = min(1.0, (vol_ratio - 0.65) / 0.35)
+
+    if resuming:
+        resume_avg = sum(resuming) / len(resuming)
+        next_impulse_weak = resume_avg < pb_avg * 0.80
+        if next_impulse_weak:
+            # Слабый следующий импульс + сильный откат → разворот очень вероятен
+            return round(-imp_dir * min(0.80, 0.45 + excess * 0.45), 4)
+        else:
+            # Откат агрессивный, но следующий импульс удерживает объём → предупреждение
+            return round(-imp_dir * excess * 0.30, 4)
+    else:
+        # Нет возобновляющих баров после отката — ещё в откате, осторожно
+        return round(-imp_dir * excess * 0.25, 4)
 
 
 # ── Стратегия ─────────────────────────────────────────────────────────────────
