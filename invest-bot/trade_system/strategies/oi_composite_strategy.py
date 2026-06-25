@@ -343,6 +343,13 @@ _LEVEL_VETO_THRESH = 0.65  # |score_level_context| выше — считаетс
                             # (было 0.45, но MTF-версия может давать до ±1.0, порог поднят)
 _LEVEL_VETO_MULT   = 0.15  # composite × это при вето
 
+# Вето сильного структурного сигнала (CASCADE/VSA_ABSORPTION/IMPULSE_PULLBACK):
+# если один из этих методов даёт |score| >= порога И направлен против composite,
+# composite давится сильнее, чем через линейное взвешивание.
+_STRONG_SIGNAL_VETO_METHODS = {"CASCADE", "VSA_ABSORPTION", "IMPULSE_PULLBACK"}
+_STRONG_SIGNAL_VETO_THRESH  = 0.60  # |score| >= этого → считается "сильным" противосигналом
+_STRONG_SIGNAL_VETO_MULT    = 0.12  # composite × это (жёстче LEVEL_VETO, т.к. методы прицельные)
+
 # Narrative-гейт в бэктесте: сколько баров нужно FSM для разогрева
 # (NEUTRAL → WATCHING → CONFIRMED требует ≥2 переходов). Пока баров < порога
 # гейт молчит, после — работает точно так же как в живой торговле.
@@ -567,8 +574,8 @@ class MethodWeight:
     total: int = 0
     sum_quality: float = 0.0  # больше не входит в update(); оставлено для статистики и старого JSON-формата
 
-    def update(self, quality: float, abs_score: float = 1.0) -> None:
-        """Hedge (multiplicative weights): вес умножается на exp(eta·(quality-0.5))
+    def update(self, quality: float, abs_score: float = 1.0, neutral: float = 0.5) -> None:
+        """Hedge (multiplicative weights): вес умножается на exp(eta·(quality-neutral))
         вместо прежнего EWA-от-средней-за-всю-историю. Старая схема (rolling_acc =
         sum_quality/total, затем EWA к ней) тем медленнее реагировала на свежий
         результат, чем больше сделок уже накопилось — отклик затухал со временем,
@@ -580,12 +587,15 @@ class MethodWeight:
         диапазона [0.05, 1.0] на пустой выборке.
         abs_score ∈ [0,1] — уверенность метода в своём сигнале: масштабирует eta
         так что слабый (|score|≈0.1) голос почти не меняет вес, а уверенный
-        (|score|≈0.9) — обновляет его в полную силу."""
+        (|score|≈0.9) — обновляет его в полную силу.
+        neutral — скользящее среднее quality по всем сделкам; метод награждается
+        за то, что его сделки превышают средний уровень, а не за абстрактный 0.5.
+        Это устраняет систематическое снижение весов когда среднее quality < 0.5."""
         self.total += 1
         self.sum_quality += quality
         conf = max(0.1, min(1.0, abs_score))
         eta = HEDGE_ETA * min(1.0, self.total / HEDGE_WARMUP_TRADES) * conf
-        self.weight *= math.exp(eta * (quality - 0.5))
+        self.weight *= math.exp(eta * (quality - neutral))
         self.weight = max(0.05, min(1.0, self.weight))
 
 
@@ -5112,6 +5122,25 @@ class OICompositeStrategy(IStrategy):
             composite *= 0.45
             logger.debug(f"{self.__settings.figi}: Hurst вето (mean-revert) → ×0.45")
 
+        # Вето сильного структурного противосигнала: CASCADE / VSA_ABSORPTION /
+        # IMPULSE_PULLBACK — специализированные методы с направленным Edge. Если
+        # любой из них даёт |score| ≥ порога и направлен ПРОТИВ composite, то
+        # остальные 35+ методов не могут «задавить» этот сигнал голосованием —
+        # composite давится тем же множителем, что и LEVEL_VETO.
+        for _veto_name in _STRONG_SIGNAL_VETO_METHODS:
+            try:
+                _vi = BASE_METHOD_NAMES.index(_veto_name)
+                _vs = scores[_vi]
+            except (ValueError, IndexError):
+                _vs = 0.0
+            if abs(_vs) >= _STRONG_SIGNAL_VETO_THRESH and composite * _vs < 0:
+                logger.debug(
+                    f"{self.__settings.figi}: {_veto_name}={_vs:+.2f} против "
+                    f"composite={composite:+.3f} → вето ×{_STRONG_SIGNAL_VETO_MULT}"
+                )
+                composite *= _STRONG_SIGNAL_VETO_MULT
+                break  # достаточно одного вето
+
         # Энтропийный порог сохраняется для использования в analyze_candles/backtest.
         # ENTROPY возвращает > 0 при упорядоченном рынке (→ порог можно снизить),
         # < 0 при хаотичном (→ порог надо поднять).
@@ -5892,6 +5921,12 @@ class OICompositeStrategy(IStrategy):
             self.__open_trade.narrative_name, self.__last_regime, quality,
         )
 
+        # Нейтральная точка hedge = текущее rolling_quality, а не 0.5.
+        # Если среднее качество сделок = 0.40, то метод с target=0.42 уже
+        # выше среднего и должен получить небольшую награду, а не штраф.
+        # Без этой коррекции при quality_avg < 0.5 все методы систематически
+        # деградируют к минимуму 0.05 по мере накопления выборки.
+        _neutral = max(0.20, min(0.80, self.__rolling_quality))
         for name in ALL_METHOD_NAMES:
             score = self.__open_trade.method_scores.get(name, 0.0)
             if abs(score) < 0.05:
@@ -5904,10 +5939,10 @@ class OICompositeStrategy(IStrategy):
             # получали такой же сильный апдейт как точные. ICPrior.weight()
             # нормирует накопленную предсказательную силу в [0.1, 1.0].
             ic_acc = self.__ic(name).weight()
-            self.__weights[name].update(target, ic_acc)
-            self.__ticker_weights[name].update(target, ic_acc)
+            self.__weights[name].update(target, ic_acc, neutral=_neutral)
+            self.__ticker_weights[name].update(target, ic_acc, neutral=_neutral)
             if self.__last_regime in self.__regime_weights:
-                self.__regime_weights[self.__last_regime][name].update(target, ic_acc)
+                self.__regime_weights[self.__last_regime][name].update(target, ic_acc, neutral=_neutral)
 
         # Сохранить сделку в историю с attribution по методам
         if self.__history is not None:

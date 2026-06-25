@@ -3813,6 +3813,10 @@ function toggleDashView() {{
     // Перерисовываем после перемещения
     setTimeout(() => {{ if (typeof _resize === 'function') _resize(); }}, 50);
     renderDashGrid();
+    // Скроллим к grid-панели — без этого она появляется ниже кнопок и не видна
+    setTimeout(() => {{
+      document.getElementById('dash-grid').scrollIntoView({{behavior: 'smooth', block: 'start'}});
+    }}, 80);
   }} else {{
     // Возвращаем канвас на место
     if (_tcCanvasOrigParent) _tcCanvasOrigParent.appendChild(wrap);
