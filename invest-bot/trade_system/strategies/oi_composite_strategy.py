@@ -575,7 +575,7 @@ COMMISSION_RT = commission_rt(is_future=False)  # дефолт для мест �
 
 @dataclass
 class MethodWeight:
-    weight: float = 0.5
+    weight: float = 0.30   # консервативный старт: метод зарабатывает доверие, не получает аванс
     total: int = 0
     sum_quality: float = 0.0  # больше не входит в update(); оставлено для статистики и старого JSON-формата
 
@@ -4182,7 +4182,7 @@ class OICompositeStrategy(IStrategy):
         # Пер-тикерные Hedge-веса методов — второй слой адаптации поверх глобального.
         # Обновляются в close_trade так же как __weights, но отдельно для каждой
         # стратегии (тикера): один метод может быть хорош на BR и плох на Si.
-        self.__ticker_weights: dict[str, MethodWeight] = {name: MethodWeight() for name in ALL_METHOD_NAMES}
+        self.__ticker_weights: dict[str, MethodWeight] = self.__load_ticker_weights()
         self.__squeeze_provider: Optional[SqueezeProvider] = None
         self.__inst_oi_provider: Optional[ScoreProvider] = None
         self.__retail_contra_provider: Optional[ScoreProvider] = None
@@ -5466,9 +5466,10 @@ class OICompositeStrategy(IStrategy):
             win = net_pct > 0
             results.append((win, r_multiple, net_pct))
 
-            # Hedge-обучение весов в бэктесте — аналогично close_trade, но без
-            # MFE/MAE (берём упрощённый quality = 1 если win, 0 если loss).
-            # Без этого все методы весь прогон голосуют с weight=0.5.
+            # Hedge-обучение весов в бэктесте — точная копия логики close_trade:
+            # aligned метод получает quality как target, opposed — 1-quality.
+            # Без разделения aligned/opposed при 50% win rate веса взаимно
+            # компенсируют и не двигаются с 0.5, даже при сотнях сделок.
             _approx_mfe_h = take_dist if win else 0.0
             _approx_mae_h = 0.0 if win else stop_dist
             _quality_h = _approx_mfe_h / (_approx_mfe_h + _approx_mae_h + 1e-9)
@@ -5476,11 +5477,17 @@ class OICompositeStrategy(IStrategy):
             self.__rolling_quality = 0.95 * self.__rolling_quality + 0.05 * _quality_h
             _ms = sig.get("method_scores") or {}
             for _name in list(self.__weights):
-                _ic_acc = min(1.0, abs(_ms.get(_name, 0.0)))
-                self.__weights[_name].update(_quality_h, _ic_acc, neutral=_neutral_h)
-                self.__ticker_weights[_name].update(_quality_h, _ic_acc, neutral=_neutral_h)
+                _sc = _ms.get(_name, 0.0)
+                if abs(_sc) < 0.05:
+                    continue
+                _aligned = (_sc > 0 and direction == SignalType.LONG) or \
+                           (_sc < 0 and direction == SignalType.SHORT)
+                _target = _quality_h if _aligned else 1.0 - _quality_h
+                _ic_acc = min(1.0, abs(_sc))
+                self.__weights[_name].update(_target, _ic_acc, neutral=_neutral_h)
+                self.__ticker_weights[_name].update(_target, _ic_acc, neutral=_neutral_h)
                 if self.__last_regime in self.__regime_weights:
-                    self.__regime_weights[self.__last_regime][_name].update(_quality_h, _ic_acc, neutral=_neutral_h)
+                    self.__regime_weights[self.__last_regime][_name].update(_target, _ic_acc, neutral=_neutral_h)
 
             # P3/P9: статистика плейбуков + распределение MFE по этой сделке.
             _approx_mfe = max(0.0, exit_pct) if exit_pct > 0 else (take_dist if win else 0.0)
@@ -7057,6 +7064,27 @@ class OICompositeStrategy(IStrategy):
             logger.warning(f"Could not load weights: {e}")
         return w
 
+    def __load_ticker_weights(self) -> dict[str, MethodWeight]:
+        tw: dict[str, MethodWeight] = {name: MethodWeight() for name in ALL_METHOD_NAMES}
+        if not os.path.exists(WEIGHTS_FILE):
+            return tw
+        try:
+            with open(WEIGHTS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            key = self.__settings.figi
+            ticker_data = data.get(key, {}).get("__ticker__", {})
+            for name in tw:
+                if name in ticker_data:
+                    d = ticker_data[name]
+                    tw[name] = MethodWeight(
+                        weight=d.get("weight", 0.30),
+                        total=d.get("total", 0),
+                        sum_quality=d.get("sum_quality", 0.0),
+                    )
+        except Exception as e:
+            logger.warning(f"Could not load ticker weights: {e}")
+        return tw
+
     def __save_weights(self) -> None:
         try:
             data = {}
@@ -7068,6 +7096,10 @@ class OICompositeStrategy(IStrategy):
                 name: {"weight": w.weight, "total": w.total, "sum_quality": w.sum_quality}
                 for name, w in self.__weights.items()
             })
+            data[key]["__ticker__"] = {
+                name: {"weight": w.weight, "total": w.total, "sum_quality": w.sum_quality}
+                for name, w in self.__ticker_weights.items()
+            }
             data[key]["__regimes__"] = {
                 regime: {
                     name: {"weight": w.weight, "total": w.total, "sum_quality": w.sum_quality}
