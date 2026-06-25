@@ -604,6 +604,53 @@ def get_history_coverage() -> list[dict]:
     return rows
 
 
+def get_mfe_mae_stats() -> dict:
+    """Медианы MFE/MAE/quality по тикерам и общий итог из data/history.json."""
+    store = HistoryStore()
+    per_ticker = []
+    all_mfe, all_mae, all_q = [], [], []
+
+    for ticker in sorted(store.tickers()):
+        mfes, maes, qs = [], [], []
+        for day_data in store._data.get(ticker, {}).values():
+            for t in day_data.get("trades", []):
+                mfe = t.get("mfe")
+                mae = t.get("mae")
+                q   = t.get("quality")
+                if mfe is not None and mae is not None:
+                    mfes.append(mfe)
+                    maes.append(mae)
+                    all_mfe.append(mfe)
+                    all_mae.append(mae)
+                if q is not None:
+                    qs.append(q)
+                    all_q.append(q)
+        if not mfes:
+            continue
+        med = statistics.median
+        per_ticker.append({
+            "ticker":   ticker,
+            "n":        len(mfes),
+            "mfe_med":  round(med(mfes) * 100, 3),
+            "mae_med":  round(med(maes) * 100, 3),
+            "ratio":    round(med(mfes) / (med(maes) + 1e-8), 2),
+            "q_med":    round(med(qs) * 100, 1) if qs else None,
+        })
+
+    total = {}
+    if all_mfe:
+        med = statistics.median
+        total = {
+            "n":       len(all_mfe),
+            "mfe_med": round(med(all_mfe) * 100, 3),
+            "mae_med": round(med(all_mae) * 100, 3),
+            "ratio":   round(med(all_mfe) / (med(all_mae) + 1e-8), 2),
+            "q_med":   round(med(all_q) * 100, 1) if all_q else None,
+        }
+
+    return {"rows": per_ticker, "total": total}
+
+
 def load_oi_tickers() -> dict:
     """{ticker: {figi, name}} — тикеры, импортированные из экспорта oi-signal-v10.html."""
     if not os.path.exists(OI_TICKERS_FILE):
@@ -2212,7 +2259,9 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
       <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
       <button type="button" class="btn-pill btn-xs ghost" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
+      <button type="button" class="btn-pill btn-xs ghost" onclick="showMfeStats()" title="Медианы MFE/MAE/quality по тикерам из history.json — показывает реальное соотношение хода цены в пользу и против позиции">📐 MFE / MAE</button>
       <span id="history_coverage_out" style="display:block;width:100%;font-size:11px;color:var(--txt3);white-space:pre-wrap;margin-top:6px;"></span>
+      <div id="mfe_stats_out" style="display:none;margin-top:8px;"></div>
     </div>
 
     <div class="cfg-group">
@@ -3323,6 +3372,63 @@ async function checkHistoryCoverage() {{
     ).join('\\n');
   }} catch (e) {{
     out.textContent = 'Ошибка: ' + e;
+  }}
+}}
+
+async function showMfeStats() {{
+  const out = document.getElementById('mfe_stats_out');
+  out.style.display = 'block';
+  out.innerHTML = '<span style="color:var(--txt3);font-size:11px;">Загрузка...</span>';
+  try {{
+    const r = await fetch('/api/mfe_stats');
+    const data = await r.json();
+    const rows = data.rows || [];
+    const tot = data.total || {{}};
+    if (rows.length === 0) {{ out.innerHTML = '<span style="color:var(--txt3);font-size:11px;">history.json пуст.</span>'; return; }}
+
+    const ratioColor = v => v >= 1.0 ? 'var(--pos)' : v >= 0.7 ? 'var(--warn,#f5a623)' : 'var(--neg)';
+    const pct = v => v == null ? '—' : v.toFixed(3) + '%';
+    const qFmt = v => v == null ? '—' : v.toFixed(1) + '%';
+
+    let html = '<table style="width:100%;font-size:11px;border-collapse:collapse;">';
+    html += '<thead><tr style="color:var(--txt3);text-align:right;">'
+      + '<th style="text-align:left;padding:2px 6px;">Тикер</th>'
+      + '<th style="padding:2px 6px;">Сделок</th>'
+      + '<th style="padding:2px 6px;">MFE мед.</th>'
+      + '<th style="padding:2px 6px;">MAE мед.</th>'
+      + '<th style="padding:2px 6px;">MFE/MAE</th>'
+      + '<th style="padding:2px 6px;">Quality мед.</th>'
+      + '</tr></thead><tbody>';
+
+    for (const row of rows) {{
+      const rc = ratioColor(row.ratio);
+      html += `<tr style="border-top:1px solid var(--border);">
+        <td style="padding:2px 6px;color:var(--mem);">${{row.ticker}}</td>
+        <td style="padding:2px 6px;text-align:right;color:var(--txt2);">${{row.n}}</td>
+        <td style="padding:2px 6px;text-align:right;color:var(--pos);">${{pct(row.mfe_med)}}</td>
+        <td style="padding:2px 6px;text-align:right;color:var(--neg);">${{pct(row.mae_med)}}</td>
+        <td style="padding:2px 6px;text-align:right;color:${{rc}};font-weight:600;">${{row.ratio.toFixed(2)}}</td>
+        <td style="padding:2px 6px;text-align:right;color:var(--txt2);">${{qFmt(row.q_med)}}</td>
+      </tr>`;
+    }}
+
+    if (tot.n) {{
+      const rc = ratioColor(tot.ratio);
+      html += `<tr style="border-top:2px solid var(--border);font-weight:700;">
+        <td style="padding:4px 6px;">ИТОГО</td>
+        <td style="padding:4px 6px;text-align:right;color:var(--txt2);">${{tot.n}}</td>
+        <td style="padding:4px 6px;text-align:right;color:var(--pos);">${{pct(tot.mfe_med)}}</td>
+        <td style="padding:4px 6px;text-align:right;color:var(--neg);">${{pct(tot.mae_med)}}</td>
+        <td style="padding:4px 6px;text-align:right;color:${{rc}};font-weight:700;">${{tot.ratio.toFixed(2)}}</td>
+        <td style="padding:4px 6px;text-align:right;color:var(--txt2);">${{qFmt(tot.q_med)}}</td>
+      </tr>`;
+    }}
+
+    html += '</tbody></table>';
+    html += '<div style="font-size:10px;color:var(--txt3);margin-top:4px;">MFE/MAE > 1.0 — цена чаще идёт в пользу позиции; < 1.0 — против.</div>';
+    out.innerHTML = html;
+  }} catch (e) {{
+    out.innerHTML = '<span style="color:var(--neg);font-size:11px;">Ошибка: ' + e + '</span>';
   }}
 }}
 
@@ -5443,6 +5549,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"rows": get_auto_atr_snapshot()})
         elif self.path == "/api/history_coverage":
             self._send_json({"rows": get_history_coverage()})
+        elif self.path == "/api/mfe_stats":
+            self._send_json(get_mfe_mae_stats())
         elif self.path == "/api/progress":
             self._send_json({"progress": dict(_get_progress_proxy())})
         elif self.path.startswith("/api/last_result"):
