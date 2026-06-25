@@ -994,10 +994,10 @@ def score_candle_pattern(candles: list[HistoricCandle]) -> float:
     prior_bullish = trend_slope > 0.001
     prior_bearish = trend_slope < -0.001
 
-    # Объём: последняя свеча vs медиана окна
-    vols = [c.volume for c in candles[-20:]]
-    med_vol = sorted(vols)[len(vols) // 2] or 1
-    vol_ratio = last.volume / med_vol  # 1.0 = средний объём
+    # Объём: медиана длинного окна (50 баров) — устойчивее к всплескам волатильности
+    vols_window = [c.volume for c in candles[-50:]]
+    med_vol = sorted(vols_window)[len(vols_window) // 2] or 1
+    vol_ratio = last.volume / med_vol  # 1.0 = нормальный объём
 
     # Объём хвоста: насколько объём «принадлежит» отвергнутой зоне
     lower_wick = (min(lo_, lc) - ll) / lrng
@@ -1014,6 +1014,17 @@ def score_candle_pattern(candles: list[HistoricCandle]) -> float:
     last3_vols = [c.volume for c in last3]
     vol_fading = last3_vols[-1] < last3_vols[0] * 0.8 if last3_vols[0] > 0 else False
 
+    # Близость к уровню: лоу/хай последних 20 баров — грубая поддержка/сопротивление
+    level_window = candles[-21:-1]  # исключаем саму текущую
+    if level_window:
+        support_lvl  = min(f(c, "low")  for c in level_window)
+        resist_lvl   = max(f(c, "high") for c in level_window)
+        price_range  = resist_lvl - support_lvl or lrng
+        near_support = (ll - support_lvl) / price_range < 0.08   # лоу в 8% от нижней зоны
+        near_resist  = (resist_lvl - lh)  / price_range < 0.08   # хай в 8% от верхней зоны
+    else:
+        near_support = near_resist = False
+
     scores = []
 
     # ── Молот (Hammer) ──────────────────────────────────────────────────────
@@ -1022,32 +1033,58 @@ def score_candle_pattern(candles: list[HistoricCandle]) -> float:
     if lower_wick > 0.55 and lbody_frac < 0.35 and upper_wick < 0.2:
         base = 0.65
         ctx = (1.3 if consec_down else 0.6) * (1.2 if prior_bearish else 0.8)
-        scores.append(base * ctx * vol_mult)
+        lvl_boost = 1.25 if near_support else 1.0   # у уровня сигнал значимее
+        scores.append(base * ctx * vol_mult * lvl_boost)
 
     # ── Перевёрнутый молот / Shooting Star ──────────────────────────────────
     # Длинный верхний хвост: продавцы поглотили покупателей.
     if upper_wick > 0.55 and lbody_frac < 0.35 and lower_wick < 0.2:
         base = -0.65
         ctx = (1.3 if consec_up else 0.6) * (1.2 if prior_bullish else 0.8)
-        scores.append(base * ctx * vol_mult)
+        lvl_boost = 1.25 if near_resist else 1.0
+        scores.append(base * ctx * vol_mult * lvl_boost)
 
     # ── Бычье поглощение (Bullish Engulfing) ────────────────────────────────
-    # Тело последней свечи полностью поглощает тело предыдущей медвежьей.
-    # Контекст: после серии падения, объём нарастает.
-    if pc < po and lc > lo_ and lc >= po and lo_ <= pc:
-        engulf_strength = lbody / (abs(pc - po) or 1e-9)  # насколько больше тела
-        base = min(0.9, 0.55 + engulf_strength * 0.15)
-        ctx = (1.3 if consec_down else 0.7) * (1.2 if prior_bearish else 0.9)
-        vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))  # объём важнее для engulfing
-        scores.append(base * ctx * vol_eng)
+    # Тело (или диапазон) последней свечи полностью накрывает тела 1-5 предыдущих.
+    # Многосвечное поглощение = более сильный сигнал разворота.
+    if lc > lo_:  # последняя бычья
+        # Считаем сколько последовательных медвежьих свечей поглощает текущий бар
+        engulf_count = 0
+        for i in range(2, min(7, len(candles))):
+            pc_i  = f(candles[-i], "close")
+            po_i  = f(candles[-i], "open")
+            ph_i  = f(candles[-i], "high")
+            pl_i  = f(candles[-i], "low")
+            if pc_i < po_i and lh >= ph_i and ll <= pl_i:  # покрывает диапазон
+                engulf_count += 1
+            else:
+                break
+        if engulf_count >= 1 and prior_bearish:
+            # сила растёт с числом поглощённых свечей (max ≈ 0.95 при 5 барах)
+            engulf_strength = min(1.0, 0.55 + engulf_count * 0.10)
+            ctx = (1.3 if consec_down else 0.7) * (1.2 if prior_bearish else 0.9)
+            vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))
+            multi_boost = 1.0 + (engulf_count - 1) * 0.12  # бонус за каждый доп. бар
+            scores.append(engulf_strength * ctx * vol_eng * multi_boost)
 
     # ── Медвежье поглощение (Bearish Engulfing) ─────────────────────────────
-    if pc > po and lc < lo_ and lc <= po and lo_ >= pc:
-        engulf_strength = lbody / (abs(pc - po) or 1e-9)
-        base = -min(0.9, 0.55 + engulf_strength * 0.15)
-        ctx = (1.3 if consec_up else 0.7) * (1.2 if prior_bullish else 0.9)
-        vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))
-        scores.append(base * ctx * vol_eng)
+    if lc < lo_:  # последняя медвежья
+        engulf_count = 0
+        for i in range(2, min(7, len(candles))):
+            pc_i  = f(candles[-i], "close")
+            po_i  = f(candles[-i], "open")
+            ph_i  = f(candles[-i], "high")
+            pl_i  = f(candles[-i], "low")
+            if pc_i > po_i and lh >= ph_i and ll <= pl_i:
+                engulf_count += 1
+            else:
+                break
+        if engulf_count >= 1 and prior_bullish:
+            engulf_strength = min(1.0, 0.55 + engulf_count * 0.10)
+            ctx = (1.3 if consec_up else 0.7) * (1.2 if prior_bullish else 0.9)
+            vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))
+            multi_boost = 1.0 + (engulf_count - 1) * 0.12
+            scores.append(-engulf_strength * ctx * vol_eng * multi_boost)
 
     # ── Doji (неопределённость после движения) ──────────────────────────────
     # Сам по себе нейтрален, но после сильного движения = истощение.
@@ -2734,6 +2771,95 @@ def score_cascade(candles: list[HistoricCandle]) -> float:
     return 0.0
 
 
+def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
+    """
+    IMPULSE_PULLBACK: отслеживает соотношение импульса и последующего отката.
+
+    В сильном тренде откат < 50% импульса + объём на откате ниже объёма импульса
+    → сигнал продолжения тренда. Глубокий откат (>65%) → ослабление тренда.
+
+    Логика:
+    1. Находим последний значимый импульс (серию баров в одну сторону).
+    2. Измеряем глубину текущего отката от пика/дна импульса.
+    3. Сравниваем объём отката с объёмом импульса.
+    """
+    if len(candles) < 20:
+        return 0.0
+
+    def f(c, a): return _to_f(getattr(c, a))
+
+    closes  = [f(c, "close") for c in candles]
+    highs   = [f(c, "high")  for c in candles]
+    lows    = [f(c, "low")   for c in candles]
+    vols    = [c.volume      for c in candles]
+
+    # Ищем импульс: минимум 3 бара подряд в одну сторону в окне [-20..-4]
+    best_impulse = None   # (direction, start_price, end_price, avg_vol, end_idx)
+    window = candles[-20:-3]
+    for start in range(len(window) - 2):
+        seg = window[start:start + 3]
+        seg_closes = [f(c, "close") for c in seg]
+        # Бычий импульс
+        if all(seg_closes[i] < seg_closes[i+1] for i in range(len(seg_closes)-1)):
+            imp_move = seg_closes[-1] - seg_closes[0]
+            mid_price = (seg_closes[0] + seg_closes[-1]) / 2 or 1e-9
+            if imp_move / mid_price > 0.003:   # минимум 0.3% движения
+                avg_vol = sum(c.volume for c in seg) / len(seg) or 1
+                if best_impulse is None or imp_move > abs(best_impulse[2] - best_impulse[1]):
+                    best_impulse = (1, seg_closes[0], seg_closes[-1], avg_vol,
+                                    max(f(c, "high") for c in seg), min(f(c, "low") for c in seg))
+        # Медвежий импульс
+        elif all(seg_closes[i] > seg_closes[i+1] for i in range(len(seg_closes)-1)):
+            imp_move = seg_closes[0] - seg_closes[-1]
+            mid_price = (seg_closes[0] + seg_closes[-1]) / 2 or 1e-9
+            if imp_move / mid_price > 0.003:
+                avg_vol = sum(c.volume for c in seg) / len(seg) or 1
+                if best_impulse is None or imp_move > abs(best_impulse[2] - best_impulse[1]):
+                    best_impulse = (-1, seg_closes[0], seg_closes[-1], avg_vol,
+                                    max(f(c, "high") for c in seg), min(f(c, "low") for c in seg))
+
+    if best_impulse is None:
+        return 0.0
+
+    imp_dir, imp_start, imp_end, imp_avg_vol, imp_high, imp_low = best_impulse
+    imp_size = abs(imp_end - imp_start) or 1e-9
+
+    # Текущие бары откатной фазы (последние 3 бара)
+    pb_candles = candles[-3:]
+    pb_avg_vol = sum(c.volume for c in pb_candles) / len(pb_candles) or 1
+
+    curr_close = closes[-1]
+    curr_high  = highs[-1]
+    curr_low   = lows[-1]
+
+    if imp_dir > 0:
+        # Бычий импульс → откат вниз от пика
+        pullback_depth = (imp_end - curr_close) / imp_size
+    else:
+        # Медвежий импульс → откат вверх от дна
+        pullback_depth = (curr_close - imp_end) / imp_size
+
+    # Объём на откате относительно импульса (< 0.7 → слабый откат = хороший знак)
+    vol_ratio = pb_avg_vol / imp_avg_vol if imp_avg_vol > 0 else 1.0
+
+    # Слабый откат (<50%) + низкий объём → продолжение тренда
+    if pullback_depth < 0:
+        return 0.0   # цена уже за пределами импульса (пробой продолжается)
+    if 0.0 <= pullback_depth < 0.50 and vol_ratio < 0.75:
+        # Сильный сигнал продолжения
+        strength = (0.50 - pullback_depth) / 0.50 * (1.0 - vol_ratio / 0.75)
+        return round(imp_dir * min(0.85, 0.4 + strength * 0.6), 4)
+    if 0.0 <= pullback_depth < 0.50:
+        # Откат неглубокий, но объём нормальный — слабый сигнал
+        return round(imp_dir * 0.25, 4)
+    if pullback_depth > 0.65:
+        # Глубокий откат → тренд слабеет, возможен разворот
+        excess = min(1.0, (pullback_depth - 0.65) / 0.35)
+        return round(-imp_dir * excess * 0.45, 4)
+
+    return 0.0
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -2771,8 +2897,9 @@ METHODS = [
     ("PRICE_ACCEL",    score_price_accel),
     ("CUMUL_DELTA",    score_cumul_delta),
     ("AMT_POC",        score_amt_poc),
-    ("VSA_ABSORPTION", score_vsa_absorption),
-    ("CASCADE",        score_cascade),
+    ("VSA_ABSORPTION",   score_vsa_absorption),
+    ("CASCADE",          score_cascade),
+    ("IMPULSE_PULLBACK", score_impulse_pullback),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
@@ -2842,7 +2969,8 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "CUMUL_DELTA":    {"min_bars": 15, "weight_5m": 1.20},  # накопленная агрессия на 5м надёжнее
     "AMT_POC":        {"min_bars": 20, "weight_5m": 1.10},  # POC смысл на 5м-сессии
     "VSA_ABSORPTION": {"min_bars": 12, "weight_5m": 1.15},  # поглощение на 5м крупнее
-    "CASCADE":        {"min_bars": 15, "weight_5m": 1.25},  # каскады видны на 5м лучше
+    "CASCADE":          {"min_bars": 15, "weight_5m": 1.25},  # каскады видны на 5м лучше
+    "IMPULSE_PULLBACK": {"min_bars": 20, "weight_5m": 1.15},  # откат от импульса — среднесрок
     # Паттерновые — на 5м значимее чем на 1м
     "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
     "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
