@@ -2263,9 +2263,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
       <label>Дней истории <input type="number" class="inp mid" id="days" value="150" min="1" max="240"></label>
       <label title="Сдвиг конца периода назад от сегодня, в днях. 0 = период кончается сегодня. Чтобы добрать более старый период без повторного прогона уже посчитанного — например, прогнала days=150 offset=0 (последние 150 дней), затем days=150 offset=150 (предыдущие 150, т.е. 150-300 дней назад).">Сдвиг начала, дн. <input type="number" class="inp mid" id="offset_days" value="0" min="0" max="2000"></label>
       <button type="button" class="btn-pill btn-xs ghost" onclick="checkHistoryCoverage()" title="Показать, какой период уже посчитан и сохранён в data/history.json по каждому тикеру — чтобы не угадывать offset_days">📅 что уже посчитано?</button>
-      <button type="button" class="btn-pill btn-xs ghost" onclick="showMfeStats()" title="Медианы MFE/MAE/quality по тикерам из history.json — показывает реальное соотношение хода цены в пользу и против позиции">📐 MFE / MAE</button>
       <span id="history_coverage_out" style="display:block;width:100%;font-size:11px;color:var(--txt3);white-space:pre-wrap;margin-top:6px;"></span>
-      <div id="mfe_stats_out" style="display:none;margin-top:8px;"></div>
     </div>
 
     <div class="cfg-group">
@@ -2313,6 +2311,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm ghost" onclick="runCalibration()" title="Калибровка порогов narrative.py + lasso_calibration + rule_miner по уже сохранённой history.json">🎯 калибровать (narrative+lasso+rules)</button>
   <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <button class="btn-pill btn-sm info" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
+  <button class="btn-pill btn-sm ghost" onclick="showMfeStats()" title="Медианы MFE/MAE из текущего прогона — показывает структурное соотношение хода цены за/против позиции">📐 MFE/MAE</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до равномерных 0.5. IC-prior не затрагивается.">🔄 сброс весов</button>
   <span id="status"></span>
@@ -2339,6 +2338,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="calib_status_detail" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
   <table class="scen-table" id="results"></table>
   <div id="compare_block" style="display:none;margin-top:8px"></div>
+  <div id="mfe_stats_out" style="display:none;margin-top:12px;"></div>
 </div>
 
 <div class="panel">
@@ -3465,61 +3465,68 @@ async function checkHistoryCoverage() {{
   }}
 }}
 
-async function showMfeStats() {{
+function _median(arr) {{
+  if (!arr.length) return null;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}}
+
+function showMfeStats() {{
   const out = document.getElementById('mfe_stats_out');
-  out.style.display = 'block';
-  out.innerHTML = '<span style="color:var(--txt3);font-size:11px;">Загрузка...</span>';
-  try {{
-    const r = await fetch('/api/mfe_stats');
-    const data = await r.json();
-    const rows = data.rows || [];
-    const tot = data.total || {{}};
-    if (rows.length === 0) {{ out.innerHTML = '<span style="color:var(--txt3);font-size:11px;">history.json пуст.</span>'; return; }}
-
-    const ratioColor = v => v >= 1.0 ? 'var(--pos)' : v >= 0.7 ? 'var(--warn,#f5a623)' : 'var(--neg)';
-    const pct = v => v == null ? '—' : v.toFixed(3) + '%';
-    const qFmt = v => v == null ? '—' : v.toFixed(1) + '%';
-
-    let html = '<table style="width:100%;font-size:11px;border-collapse:collapse;">';
-    html += '<thead><tr style="color:var(--txt3);text-align:right;">'
-      + '<th style="text-align:left;padding:2px 6px;">Тикер</th>'
-      + '<th style="padding:2px 6px;">Сделок</th>'
-      + '<th style="padding:2px 6px;">MFE мед.</th>'
-      + '<th style="padding:2px 6px;">MAE мед.</th>'
-      + '<th style="padding:2px 6px;">MFE/MAE</th>'
-      + '<th style="padding:2px 6px;">Quality мед.</th>'
-      + '</tr></thead><tbody>';
-
-    for (const row of rows) {{
-      const rc = ratioColor(row.ratio);
-      html += `<tr style="border-top:1px solid var(--border);">
-        <td style="padding:2px 6px;color:var(--mem);">${{row.ticker}}</td>
-        <td style="padding:2px 6px;text-align:right;color:var(--txt2);">${{row.n}}</td>
-        <td style="padding:2px 6px;text-align:right;color:var(--pos);">${{pct(row.mfe_med)}}</td>
-        <td style="padding:2px 6px;text-align:right;color:var(--neg);">${{pct(row.mae_med)}}</td>
-        <td style="padding:2px 6px;text-align:right;color:${{rc}};font-weight:600;">${{row.ratio.toFixed(2)}}</td>
-        <td style="padding:2px 6px;text-align:right;color:var(--txt2);">${{qFmt(row.q_med)}}</td>
-      </tr>`;
-    }}
-
-    if (tot.n) {{
-      const rc = ratioColor(tot.ratio);
-      html += `<tr style="border-top:2px solid var(--border);font-weight:700;">
-        <td style="padding:4px 6px;">ИТОГО</td>
-        <td style="padding:4px 6px;text-align:right;color:var(--txt2);">${{tot.n}}</td>
-        <td style="padding:4px 6px;text-align:right;color:var(--pos);">${{pct(tot.mfe_med)}}</td>
-        <td style="padding:4px 6px;text-align:right;color:var(--neg);">${{pct(tot.mae_med)}}</td>
-        <td style="padding:4px 6px;text-align:right;color:${{rc}};font-weight:700;">${{tot.ratio.toFixed(2)}}</td>
-        <td style="padding:4px 6px;text-align:right;color:var(--txt2);">${{qFmt(tot.q_med)}}</td>
-      </tr>`;
-    }}
-
-    html += '</tbody></table>';
-    html += '<div style="font-size:10px;color:var(--txt3);margin-top:4px;">MFE/MAE > 1.0 — цена чаще идёт в пользу позиции; < 1.0 — против.</div>';
-    out.innerHTML = html;
-  }} catch (e) {{
-    out.innerHTML = '<span style="color:var(--neg);font-size:11px;">Ошибка: ' + e + '</span>';
+  // Считаем из текущего _backtestRows (trades_list с mfe/mae добавленными при прогоне)
+  const rows = [];
+  const allMfe = [], allMae = [];
+  for (const r of _backtestRows) {{
+    if (!r.trades_list || !r.trades_list.length) continue;
+    const mfes = r.trades_list.map(t=>t.mfe).filter(v=>v!=null && v>0);
+    const maes = r.trades_list.map(t=>t.mae).filter(v=>v!=null && v>=0);
+    if (!mfes.length) continue;
+    const mfeMed = _median(mfes);
+    const maeMed = _median(maes);
+    const ratio = maeMed > 0 ? mfeMed/maeMed : (mfeMed > 0 ? 99 : 0);
+    allMfe.push(...mfes); allMae.push(...maes);
+    rows.push({{ticker: r.ticker, n: r.trades_list.length, mfe_med: mfeMed, mae_med: maeMed, ratio}});
   }}
+
+  if (!rows.length) {{
+    out.style.display = 'block';
+    out.innerHTML = '<span style="color:var(--txt3);font-size:11px;">Нет данных в текущем прогоне (запусти бэктест).</span>';
+    return;
+  }}
+
+  const totMfe = _median(allMfe), totMae = _median(allMae);
+  const totRatio = totMae > 0 ? totMfe/totMae : (totMfe>0?99:0);
+
+  const ratioColor = v => v >= 1.0 ? 'var(--pos)' : v >= 0.7 ? '#f5a623' : 'var(--neg)';
+  const pct = v => v == null ? '—' : v.toFixed(3) + '%';
+  const ratFmt = v => v >= 99 ? '∞' : v.toFixed(2);
+
+  let html = '<div style="font-size:11px;color:var(--txt3);margin-bottom:4px;">MFE/MAE из текущего прогона. > 1.0 — цена чаще идёт в пользу позиции.</div>';
+  html += '<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;min-width:400px;">';
+  html += '<thead><tr style="color:var(--txt3);text-align:right;"><th style="text-align:left;padding:2px 8px;">Тикер</th><th style="padding:2px 8px;">Сделок</th><th style="padding:2px 8px;">MFE мед.</th><th style="padding:2px 8px;">MAE мед.</th><th style="padding:2px 8px;">MFE/MAE</th></tr></thead><tbody>';
+
+  for (const row of rows.sort((a,b)=>a.ratio-b.ratio)) {{
+    const rc = ratioColor(row.ratio);
+    html += `<tr style="border-top:1px solid var(--border);">
+      <td style="padding:2px 8px;color:var(--mem);">${{row.ticker}}</td>
+      <td style="padding:2px 8px;text-align:right;color:var(--txt2);">${{row.n}}</td>
+      <td style="padding:2px 8px;text-align:right;color:var(--pos);">${{pct(row.mfe_med)}}</td>
+      <td style="padding:2px 8px;text-align:right;color:var(--neg);">${{pct(row.mae_med)}}</td>
+      <td style="padding:2px 8px;text-align:right;color:${{rc}};font-weight:600;">${{ratFmt(row.ratio)}}</td>
+    </tr>`;
+  }}
+
+  html += `<tr style="border-top:2px solid var(--border);font-weight:700;">
+    <td style="padding:4px 8px;">ИТОГО</td>
+    <td style="padding:4px 8px;text-align:right;color:var(--txt2);">${{allMfe.length}}</td>
+    <td style="padding:4px 8px;text-align:right;color:var(--pos);">${{pct(totMfe)}}</td>
+    <td style="padding:4px 8px;text-align:right;color:var(--neg);">${{pct(totMae)}}</td>
+    <td style="padding:4px 8px;text-align:right;color:${{ratioColor(totRatio)}};font-weight:700;">${{ratFmt(totRatio)}}</td>
+  </tr>`;
+  html += '</tbody></table></div>';
+  out.style.display = 'block';
+  out.innerHTML = html;
 }}
 
 async function runBacktest() {{
