@@ -2420,6 +2420,239 @@ def _divergence_score(sd: dict[str, float]) -> float:
     return 0.0
 
 
+def score_cumul_delta(candles: list[HistoricCandle]) -> float:
+    """
+    Накопленный tick-flow (Order Flow): сумма направленного объёма за N баров.
+
+    Прокси tick_flow на баре = объём × знак(close - open).
+    Накопленная дельта показывает кто доминирует в агрессии суммарно —
+    не за один бар, а за последний час/полтора.
+
+    Нормируется на диапазон [min..max] накопленной дельты в окне,
+    чтобы сигнал был ∈ [-1, 1] и сравним между инструментами.
+
+    >0: покупатели накапливают агрессию → бычий.
+    <0: продавцы накапливают → медвежий.
+    Уклон к нулю в середине окна = рынок двусторонний (AMT balance).
+    """
+    _WIN = _adaptive_window(candles, target_hours=1.5, min_bars=15, max_bars=90)
+    if len(candles) < _WIN + 5:
+        return 0.0
+
+    window = candles[-_WIN:]
+    deltas = []
+    cum = 0.0
+    for c in window:
+        vol = float(c.volume)
+        cl, op = _to_f(c.close), _to_f(c.open)
+        sign = 1.0 if cl >= op else -1.0
+        # масштабируем на body_frac чтобы дожи почти не давали вклад
+        body_frac = abs(cl - op) / ((_to_f(c.high) - _to_f(c.low)) or 1e-9)
+        cum += vol * sign * min(1.0, body_frac * 2)
+        deltas.append(cum)
+
+    if not deltas:
+        return 0.0
+    mn, mx = min(deltas), max(deltas)
+    rng = mx - mn
+    if rng < 1e-9:
+        return 0.0
+    # нормируем: текущее значение в диапазоне окна
+    norm = (deltas[-1] - mn) / rng * 2 - 1   # [-1..1]
+    # бонус: если дельта растёт последние 3 бара — усиливаем сигнал
+    if len(deltas) >= 4:
+        recent_trend = (deltas[-1] - deltas[-4]) / (rng or 1e-9)
+        norm = max(-1.0, min(1.0, norm + recent_trend * 0.3))
+    return round(norm, 4)
+
+
+def score_amt_poc(candles: list[HistoricCandle]) -> float:
+    """
+    Auction Market Theory: грубый POC (Point of Control) и расстояние от него.
+
+    POC = бар с максимальным объёмом в сессии (последние N баров).
+    Логика AMT: цена тяготеет к POC при балансе, уходит от него при дисбалансе.
+
+    Сигнал:
+      >0: цена выше POC + последние бары уходят вверх → бычий дисбаланс.
+      <0: цена ниже POC + уходит вниз → медвежий дисбаланс.
+      ≈0: цена у POC → принятие (рынок сбалансирован).
+
+    При нахождении у POC сигнал слабый — цена ищет двустороннюю торговлю.
+    """
+    _WIN = _adaptive_window(candles, target_hours=4.0, min_bars=20, max_bars=200)
+    if len(candles) < _WIN + 5:
+        return 0.0
+
+    window = candles[-_WIN:]
+    vols = [float(c.volume) for c in window]
+    avg_vol = statistics.mean(vols) or 1.0
+
+    # Грубый POC: бар с максимальным объёмом
+    poc_idx = max(range(len(window)), key=lambda i: vols[i])
+    poc_price = (_to_f(window[poc_idx].high) + _to_f(window[poc_idx].low)) / 2
+
+    cl_now = _to_f(candles[-1].close)
+    atr = _compute_atr(candles)
+    if atr <= 0 or poc_price <= 0:
+        return 0.0
+    atr_abs = atr * poc_price
+
+    dist = (cl_now - poc_price) / atr_abs   # в единицах ATR
+
+    # Слабый сигнал у POC, нарастающий при удалении
+    # Направление последних 3 баров усиливает/ослабляет
+    last_closes = [_to_f(c.close) for c in candles[-4:]]
+    momentum = (last_closes[-1] - last_closes[0]) / (atr_abs or 1e-9)
+
+    raw = math.tanh(dist * 0.5) * math.tanh(abs(momentum) * 0.3) * (1 if momentum > 0 else -1)
+    # Если цена рядом с POC (< 0.3 ATR) — нейтральный сигнал (принятие)
+    if abs(dist) < 0.3:
+        raw *= 0.2
+    return round(max(-1.0, min(1.0, raw)), 4)
+
+
+def score_vsa_absorption(candles: list[HistoricCandle]) -> float:
+    """
+    VSA-поглощение (Absorption / Effort without Result).
+
+    Распознаёт бары где объём сильно выше среднего, но ценовой диапазон
+    непропорционально мал — крупный участник поглощает давление противоположной стороны.
+
+    Поглощение продаж (бычий):
+      - большой объём (>2× средний)
+      - маленький спред (< 0.6× средний)
+      - закрытие в верхней половине бара
+      - на нисходящем движении (3-5 баров до)
+      → продавцы выдыхаются, покупатели поглощают
+
+    Поглощение покупок (медвежий):
+      - те же условия по объёму/спреду
+      - закрытие в нижней половине
+      - на восходящем движении
+      → покупатели поглощаются, скоро разворот
+
+    Сила сигнала пропорциональна: (vol_ratio - 2) × (1 - spread_ratio).
+    """
+    _TREND_W = _adaptive_window(candles, target_hours=0.5, min_bars=5, max_bars=30)
+    if len(candles) < _TREND_W + 10:
+        return 0.0
+
+    # Базовые параметры текущего бара
+    last = candles[-1]
+    lh, ll = _to_f(last.high), _to_f(last.low)
+    lo_, lc = _to_f(last.open), _to_f(last.close)
+    spread = lh - ll or 1e-9
+    close_pos = (lc - ll) / spread
+
+    vols = [float(c.volume) for c in candles[-20:]]
+    spreads = [_to_f(c.high) - _to_f(c.low) for c in candles[-10:-1]]
+    avg_vol = statistics.mean(vols[:-1]) or 1.0
+    avg_spread = statistics.mean(spreads) or 1e-9
+
+    vol_ratio = float(last.volume) / avg_vol
+    spread_ratio = spread / avg_spread
+
+    # Поглощение: аномальный объём + аномально маленький ход
+    if vol_ratio < 1.8 or spread_ratio > 0.7:
+        return 0.0
+
+    # Предшествующий тренд
+    trend_closes = [_to_f(c.close) for c in candles[-_TREND_W - 1:-1]]
+    trend = (trend_closes[-1] - trend_closes[0]) / (abs(trend_closes[0]) or 1.0)
+
+    # Сила поглощения
+    strength = min(1.0, (vol_ratio - 1.8) * 0.5) * (1.0 - min(0.7, spread_ratio)) / 0.7
+
+    if close_pos >= 0.5 and trend < -0.001:
+        # Поглощение продаж → бычий
+        return round(min(1.0, strength * 0.9), 4)
+    elif close_pos < 0.5 and trend > 0.001:
+        # Поглощение покупок → медвежий
+        return round(-min(1.0, strength * 0.9), 4)
+    return 0.0
+
+
+def score_cascade(candles: list[HistoricCandle]) -> float:
+    """
+    Ликвидационный каскад — обнаружение и оценка его фазы.
+
+    Каскад = принудительная волна стоп-аутов:
+    1. ФАЗА 1 — ускорение: огромный объём + широкий бар + закрытие у экстремума.
+       Сигнал: контрарный (идти ПРОТИВ направления каскада — ждём разворота).
+    2. ФАЗА 2 — остановка каскада: после 1-2 экстремальных баров появляется
+       Stopping Volume или поглощение (VSA-признаки) — подтверждение разворота.
+    3. ФАЗА 3 — возврат: цена движется обратно с нарастающим объёмом покупок.
+
+    Алгоритм:
+    - Ищем каскадный бар: vol_ratio>2.5, spread_ratio>1.8, close у экстремума.
+    - Если каскадный бар был 1-4 бара назад → смотрим текущий бар как сигнал.
+    - Если текущий бар показывает разворот (close_pos против направления каскада)
+      + объём нормализуется → даём контрарный сигнал (иди против каскада).
+    - Если каскадный бар прямо сейчас (текущий) → слабый сигнал (ранний).
+    """
+    _LOOKBACK = 5  # ищем каскад в последних N барах
+    if len(candles) < 20:
+        return 0.0
+
+    vols = [float(c.volume) for c in candles]
+    avg_vol = statistics.mean(vols[-20:-1]) or 1.0
+    avg_spread_lst = [_to_f(c.high) - _to_f(c.low) for c in candles[-15:-1]]
+    avg_spread = statistics.mean(avg_spread_lst) or 1e-9
+
+    def bar_info(c):
+        h, lo, op, cl = _to_f(c.high), _to_f(c.low), _to_f(c.open), _to_f(c.close)
+        rng = h - lo or 1e-9
+        return {
+            "vol_r": float(c.volume) / avg_vol,
+            "spread_r": rng / avg_spread,
+            "close_pos": (cl - lo) / rng,
+            "dir": 1 if cl >= op else -1,
+        }
+
+    # Ищем каскадный бар в окне
+    cascade_bar = None
+    cascade_age = None
+    for age in range(1, min(_LOOKBACK + 1, len(candles))):
+        b = bar_info(candles[-1 - age])
+        is_cascade = (b["vol_r"] > 2.5 and b["spread_r"] > 1.8
+                      and (b["close_pos"] < 0.2 or b["close_pos"] > 0.8))
+        if is_cascade:
+            cascade_bar = b
+            cascade_age = age
+            break
+
+    curr = bar_info(candles[-1])
+
+    # Нет каскадного бара в прошлом — проверяем текущий
+    if cascade_bar is None:
+        if (curr["vol_r"] > 3.0 and curr["spread_r"] > 2.0
+                and (curr["close_pos"] < 0.15 or curr["close_pos"] > 0.85)):
+            # Активный каскад прямо сейчас — ранний слабый контрарный
+            cascade_dir = curr["dir"]
+            return round(-cascade_dir * 0.4, 4)
+        return 0.0
+
+    # Каскад был cascade_age баров назад — оцениваем разворот
+    cascade_dir = cascade_bar["dir"]   # направление каскада (+1 вверх, -1 вниз)
+
+    # Признаки разворота: текущий бар идёт ПРОТИВ направления каскада
+    reversal_sign = -1 if cascade_dir > 0 else 1
+    curr_against = (reversal_sign > 0 and curr["close_pos"] > 0.55) or \
+                   (reversal_sign < 0 and curr["close_pos"] < 0.45)
+
+    # Объём нормализуется (не ещё один каскадный бар)
+    vol_normalized = curr["vol_r"] < 2.0
+
+    if curr_against and vol_normalized:
+        # Чем свежее каскад (age=1) — тем сильнее сигнал разворота
+        freshness = 1.0 - (cascade_age - 1) / _LOOKBACK
+        strength = min(1.0, cascade_bar["vol_r"] / 3.0 * freshness)
+        return round(reversal_sign * strength * 0.85, 4)
+
+    return 0.0
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -2453,6 +2686,11 @@ METHODS = [
     ("VSA",            score_vsa),
     ("WICK_REJECTION", score_wick_rejection),
     ("TRIANGLE",       score_triangle),
+    # VSA/Wyckoff/AMT/OrderFlow — расширенный блок
+    ("CUMUL_DELTA",    score_cumul_delta),
+    ("AMT_POC",        score_amt_poc),
+    ("VSA_ABSORPTION", score_vsa_absorption),
+    ("CASCADE",        score_cascade),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
@@ -2518,6 +2756,10 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
     "HAWKES_SIGNAL":  {"min_bars": 25, "weight_5m": 1.30},  # самоусиление потока
     "VSA":            {"min_bars": 12, "weight_5m": 1.05},
+    "CUMUL_DELTA":    {"min_bars": 15, "weight_5m": 1.20},  # накопленная агрессия на 5м надёжнее
+    "AMT_POC":        {"min_bars": 20, "weight_5m": 1.10},  # POC смысл на 5м-сессии
+    "VSA_ABSORPTION": {"min_bars": 12, "weight_5m": 1.15},  # поглощение на 5м крупнее
+    "CASCADE":        {"min_bars": 15, "weight_5m": 1.25},  # каскады видны на 5м лучше
     # Паттерновые — на 5м значимее чем на 1м
     "CANDLE_PATTERN": {"min_bars": 8,  "weight_5m": 1.15},
     "WICK_REJECTION": {"min_bars": 8,  "weight_5m": 1.15},
