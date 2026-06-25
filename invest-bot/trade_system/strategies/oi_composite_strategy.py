@@ -140,7 +140,8 @@ __all__ = ("OICompositeStrategy",)
 logger = logging.getLogger(__name__)
 
 # ── Константы ────────────────────────────────────────────────────────────────
-WEIGHTS_FILE = "oi_weights.json"   # файл весов (рядом с main.py)
+WEIGHTS_FILE = "oi_weights.json"       # файл весов (рядом с main.py)
+GLOBAL_IC_FILE = "data/global_ic_prior.json"  # агрегированный sign-IC по всем тикерам
 CANDLE_WINDOW = 30                 # свечей в окне для расчётов
 MIN_CANDLES = 10                   # минимум свечей для первого сигнала
 SIGNAL_THRESHOLD = 0.12            # порог composite для сигнала
@@ -559,7 +560,7 @@ class MethodWeight:
     total: int = 0
     sum_quality: float = 0.0  # больше не входит в update(); оставлено для статистики и старого JSON-формата
 
-    def update(self, quality: float) -> None:
+    def update(self, quality: float, abs_score: float = 1.0) -> None:
         """Hedge (multiplicative weights): вес умножается на exp(eta·(quality-0.5))
         вместо прежнего EWA-от-средней-за-всю-историю. Старая схема (rolling_acc =
         sum_quality/total, затем EWA к ней) тем медленнее реагировала на свежий
@@ -569,10 +570,14 @@ class MethodWeight:
         текущие условия рынка.
         eta линейно растёт от 0 до HEDGE_ETA на первых HEDGE_WARMUP_TRADES сделках,
         чтобы шум одной-двух первых сделок не выталкивал вес метода в край
-        диапазона [0.05, 1.0] на пустой выборке."""
+        диапазона [0.05, 1.0] на пустой выборке.
+        abs_score ∈ [0,1] — уверенность метода в своём сигнале: масштабирует eta
+        так что слабый (|score|≈0.1) голос почти не меняет вес, а уверенный
+        (|score|≈0.9) — обновляет его в полную силу."""
         self.total += 1
         self.sum_quality += quality
-        eta = HEDGE_ETA * min(1.0, self.total / HEDGE_WARMUP_TRADES)
+        conf = max(0.1, min(1.0, abs_score))
+        eta = HEDGE_ETA * min(1.0, self.total / HEDGE_WARMUP_TRADES) * conf
         self.weight *= math.exp(eta * (quality - 0.5))
         self.weight = max(0.05, min(1.0, self.weight))
 
@@ -2788,6 +2793,7 @@ class OICompositeStrategy(IStrategy):
         }
         for _rg in REGIMES:
             self.__ic_priors[_rg] = {name: ICPrior() for name in ALL_METHOD_NAMES}
+        self.__load_global_ic_prior()  # warm-start: агрегированный sign-IC по всем тикерам
         # P1: per-method лаг (бары) = естественный горизонт // interval_min.
         self.__ic_lags: dict[str, int] = {
             name: _METHOD_IC_TARGET_MINUTES.get(name, _IC_DEFAULT_TARGET_MINUTES)
@@ -5416,10 +5422,11 @@ class OICompositeStrategy(IStrategy):
             aligned = (score > 0 and self.__open_trade.signal_type == SignalType.LONG) or \
                       (score < 0 and self.__open_trade.signal_type == SignalType.SHORT)
             target = quality if aligned else 1.0 - quality
-            self.__weights[name].update(target)
-            self.__ticker_weights[name].update(target)
+            abs_sc = abs(score)
+            self.__weights[name].update(target, abs_sc)
+            self.__ticker_weights[name].update(target, abs_sc)
             if self.__last_regime in self.__regime_weights:
-                self.__regime_weights[self.__last_regime][name].update(target)
+                self.__regime_weights[self.__last_regime][name].update(target, abs_sc)
 
         # Сохранить сделку в историю с attribution по методам
         if self.__history is not None:
@@ -5551,6 +5558,48 @@ class OICompositeStrategy(IStrategy):
 
     def __weights_key(self) -> str:
         return self.__settings.figi
+
+    def __load_global_ic_prior(self) -> None:
+        """Warm-start глобального IC-prior'а из data/global_ic_prior.json.
+
+        aggregate_ic.py агрегирует sign-IC по всем тикерам из history.json
+        и пишет этот файл. При холодном старте тикера (n_updates==0) глобальный
+        слой __ic_priors["__global__"] засевается знаком и «виртуальными»
+        обновлениями — контрарные методы сразу получают invert=True, а не ждут
+        20+ сделок на КАЖДОМ тикере отдельно.
+        """
+        if not os.path.exists(GLOBAL_IC_FILE):
+            return
+        try:
+            with open(GLOBAL_IC_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            loaded = 0
+            global_bucket = self.__ic_priors["__global__"]
+            for name, entry in data.items():
+                if name not in global_bucket:
+                    continue
+                prior = global_bucket[name]
+                if prior.n_updates > 0:
+                    continue  # уже есть собственная история — не перезаписываем
+                n_global = entry.get("n", 0)
+                sign_ic = entry.get("sign_ic", 0.5)
+                # sign_ic ∈ [0,1] → IC ∈ [-1,1]: 0.5 → 0 (нейтральный), 0.4 → -0.2 (контрарный)
+                ic_equivalent = (sign_ic - 0.5) * 2.0
+                prior.ic_smoothed = ic_equivalent
+                prior.invert = entry.get("invert", False)
+                # Виртуальные обновления — cap 25, чтобы собственные сделки тикера
+                # могли перекрыть глобальный prior за разумное время.
+                prior.n_updates = min(n_global // 10, 25)
+                prior.n_updates_effective = float(prior.n_updates)
+                loaded += 1
+            if loaded:
+                logger.info(
+                    f"[{self.__settings.ticker}] Global IC prior warm-start: "
+                    f"{loaded} methods, "
+                    f"invert={[n for n,e in data.items() if e.get('invert')]}"
+                )
+        except Exception as exc:
+            logger.warning(f"Could not load global IC prior: {exc}")
 
     def __load_weights(self) -> dict[str, MethodWeight]:
         w: dict[str, MethodWeight] = {name: MethodWeight() for name in ALL_METHOD_NAMES}
