@@ -25,7 +25,7 @@ import os
 from dashboard import _strategy_settings_by_ticker
 from history import HistoryStore
 from narrative import (
-    MIN_DAYS_PER_REGIME,
+    MIN_TRADES_PER_REGIME,
     NARRATIVE_THRESHOLDS_FILE,
     fit_narrative_thresholds as fit_thresholds,
 )
@@ -33,18 +33,21 @@ from narrative import (
 
 def _calibrate_one(ticker: str, days: int) -> dict | None:
     store = HistoryStore()
-    by_regime = store.daily_method_scores_by_regime(ticker, window_days=days)
-    if not by_regime:
-        print(f"{ticker}: нет дневной истории scores — пропуск")
+    trades_by_regime = store.trades_by_regime(ticker, window_days=days)
+    if not trades_by_regime:
+        print(f"{ticker}: нет сделок в истории — пропуск")
         return None
 
-    result = fit_thresholds(by_regime)
+    result = fit_thresholds(trades_by_regime)
     if not result:
-        print(f"{ticker}: ни одного (кластер, режим) с >= {MIN_DAYS_PER_REGIME} дней — пропуск")
+        print(f"{ticker}: ни одного (кластер, режим) с >= {MIN_TRADES_PER_REGIME} сделок — пропуск")
         return None
 
     n_pairs = sum(len(v) for v in result.values())
     print(f"{ticker}: калибровано {n_pairs} пар (кластер, режим)")
+    for label, regimes in result.items():
+        for reg, vals in regimes.items():
+            print(f"  {label}/{reg}: thr={vals['bullish']:.3f} acc={vals.get('accuracy', 0):.2%} n={vals.get('n_trades', '?')}")
     return result
 
 

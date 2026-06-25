@@ -224,6 +224,27 @@ class HistoryStore:
             out.setdefault(regime, []).append(day["scores"][method])
         return out
 
+    def trades_by_regime(
+            self, ticker: str, window_days: int = 90
+    ) -> dict[str, list[dict]]:
+        """Сделки по режимам для outcome-based калибровки narrative-порогов.
+        Возвращает {regime: [{"method_scores": {...}, "dir": "LONG"/"SHORT", "quality": float}]}."""
+        cutoff = self._cutoff(window_days)
+        out: dict[str, list[dict]] = {}
+        for date, day in self._data.get(ticker, {}).items():
+            if date < cutoff:
+                continue
+            regime = day.get("regime", "")
+            for t in day.get("trades", []):
+                if t.get("method_scores") and t.get("dir"):
+                    out.setdefault(regime, []).append({
+                        "method_scores": t["method_scores"],
+                        "dir": t["dir"],
+                        "quality": t.get("quality", 0.5),
+                        "regime": t.get("regime", regime),
+                    })
+        return out
+
     def daily_method_scores_by_regime(
             self, ticker: str, window_days: int = 90
     ) -> dict[str, list[dict[str, float]]]:
