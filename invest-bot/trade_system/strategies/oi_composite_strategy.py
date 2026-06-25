@@ -4287,6 +4287,7 @@ class OICompositeStrategy(IStrategy):
                 "agree_win_rate": t["agree_win"] / t["agree_n"] if t["agree_n"] else None,
                 "disagree_n": t["disagree_n"],
                 "disagree_win_rate": t["disagree_win"] / t["disagree_n"] if t["disagree_n"] else None,
+                "hedge_weight": round(self.__weights[mname].weight, 4) if mname in self.__weights else None,
             }
             for mname, t in method_tally.items()
         }

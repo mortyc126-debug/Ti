@@ -2312,6 +2312,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm ghost" onclick="calibrateAllHistory()" title="Калибровать по ВСЕМ тикерам/датам, что уже лежат в data/history.json, независимо от того, какие чипы сейчас активны на странице">🎯 калибровать по всей history.json</button>
   <button class="btn-pill btn-sm info" onclick="copyAllResults(this)" title="Скопировать все результаты включая attribution по методам">📋 копировать всё</button>
   <button class="btn-pill btn-sm ghost" onclick="showMfeStats()" title="Медианы MFE/MAE из текущего прогона — показывает структурное соотношение хода цены за/против позиции">📐 MFE/MAE</button>
+  <button class="btn-pill btn-sm ghost" onclick="showRunWeights()" title="Hedge-веса методов из текущего прогона — усиленные >1 и ослабленные <1. Наведи на строку — описание метода.">⚖️ веса прогона</button>
   <button id="btnDashView" class="btn-pill btn-sm ghost" onclick="toggleDashView()" title="Переключить между видом таблицы и видом дашборда с панелями">⊞ дашборд</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
   <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до равномерных 0.5. IC-prior не затрагивается.">🔄 сброс весов</button>
@@ -2340,6 +2341,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <table class="scen-table" id="results"></table>
   <div id="compare_block" style="display:none;margin-top:8px"></div>
   <div id="mfe_stats_out" style="display:none;margin-top:12px;"></div>
+  <div id="run_weights_out" style="display:none;margin-top:12px;"></div>
 </div>
 
 <div id="dash-grid" style="display:none;padding:12px 16px;">
@@ -2896,15 +2898,35 @@ function whatIfToHtml(whatIf) {{
   return parts.join(' / ');
 }}
 
+// Подсказки к методам — что значит каждый сигнал.
+const _METHOD_HINTS = {{
+  PRICE_TREND: 'Ценовой тренд: MA-5 vs MA-20 — куда смотрит рынок за несколько дней',
+  VOL_MOMENTUM: 'Объёмный моментум: объём ускоряется vs замедляется — подтверждение движения',
+  OI_PRESSURE: 'Давление открытого интереса: накопление vs снижение OI — кто держит позицию',
+  FUNDING_SIGNAL: 'Ставка финансирования: слишком много лонгов/шортов на рынке — контрарный',
+  TICK_FLOW: 'Поток тиков (агрессоры): buy vs sell тиков — моментальное давление',
+  SPREAD_REGIME: 'Режим спреда: узкий=ликвидность есть, широкий=риск исполнения',
+  NOISE_RATIO: 'Соотношение сигнал/шум: высокий шум = выходим из рынка, низкий = торгуем',
+  CLUSTER_BIAS: 'Кластерный перекос: крупные участники покупают или продают',
+  IMBALANCE_SIGNAL: 'Дисбаланс стакана: аск vs бид навес — где стена',
+  LARGE_TRADE_SIGNAL: 'Крупные сделки: куда идут «слоны» — smart money tracker',
+  TAPE_SPEED: 'Скорость ленты: рынок ускоряется — ловим моментум',
+  TAPE_DIRECTION: 'Направление ленты: средневзвешенное направление последних сделок',
+  M1_NAME: 'ML-кластер M1: первая модель ансамбля на базе всех выше методов',
+  M2_NAME: 'ML-кластер M2: вторая модель — другая кластеризация',
+  M3_NAME: 'ML-кластер M3: третья модель — режимный фильтр',
+}};
+
 function methodStatsToHtml(ms) {{
   if (!ms || !Object.keys(ms).length) return '';
-  // Сортируем по agree_n desc, оставляем методы где есть хоть одна сделка
   const rows = Object.entries(ms)
     .filter(([, s]) => s.agree_n > 0 || s.disagree_n > 0)
     .sort((a, b) => (b[1].agree_n + b[1].disagree_n) - (a[1].agree_n + a[1].disagree_n));
   if (!rows.length) return '';
+  const hasHedge = rows.some(([, s]) => s.hedge_weight != null);
   let html = '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:4px">';
   html += '<tr style="color:var(--txt3)"><th style="text-align:left;padding:1px 6px">метод</th>'
+        + (hasHedge ? '<th style="padding:1px 6px" title="Hedge-вес [0..2]: обученный мультипликатор метода. 1.0=нейтральный, >1=усилен, <1=ослаблен">вес</th>' : '')
         + '<th style="padding:1px 6px">за n</th><th style="padding:1px 6px">за win%</th>'
         + '<th style="padding:1px 6px">против n</th><th style="padding:1px 6px">против win%</th></tr>';
   for (const [name, s] of rows) {{
@@ -2912,13 +2934,75 @@ function methodStatsToHtml(ms) {{
     const disWr = s.disagree_win_rate !== null && s.disagree_win_rate !== undefined ? (s.disagree_win_rate*100).toFixed(0)+'%' : '—';
     const agStyle = s.agree_win_rate !== null && s.agree_win_rate > 0.6 ? 'color:var(--pos)' : (s.agree_win_rate !== null && s.agree_win_rate < 0.4 ? 'color:var(--neg)' : '');
     const disStyle = s.disagree_win_rate !== null && s.disagree_win_rate > 0.6 ? 'color:var(--neg)' : (s.disagree_win_rate !== null && s.disagree_win_rate < 0.4 ? 'color:var(--pos)' : '');
-    html += `<tr><td style="padding:1px 6px">${{name}}</td>`
+    const hw = s.hedge_weight != null ? s.hedge_weight : null;
+    const hwStyle = hw != null ? (hw > 1.1 ? 'color:var(--pos)' : hw < 0.9 ? 'color:var(--neg)' : 'color:var(--txt3)') : '';
+    const hint = _METHOD_HINTS[name] || '';
+    html += `<tr title="${{hint}}"><td style="padding:1px 6px">${{name.replace(/_/g,' ')}}</td>`
+          + (hasHedge ? `<td style="text-align:right;padding:1px 6px;${{hwStyle}}">${{hw != null ? hw.toFixed(3) : '—'}}</td>` : '')
           + `<td style="text-align:right;padding:1px 6px">${{s.agree_n}}</td>`
           + `<td style="text-align:right;padding:1px 6px;${{agStyle}}">${{agWr}}</td>`
           + `<td style="text-align:right;padding:1px 6px">${{s.disagree_n}}</td>`
           + `<td style="text-align:right;padding:1px 6px;${{disStyle}}">${{disWr}}</td></tr>`;
   }}
   html += '</table>';
+  return html;
+}}
+
+// Сводная таблица весов методов по всем тикерам прогона.
+// Показывает медианный Hedge-вес каждого метода и его attribution (согласие/disagreement).
+function runWeightsSummaryToHtml(rows) {{
+  if (!rows || !rows.length) return '';
+  // Собираем статистику по каждому методу через все тикеры
+  const methods = {{}};
+  for (const r of rows) {{
+    if (!r.method_stats) continue;
+    for (const [name, s] of Object.entries(r.method_stats)) {{
+      if (!methods[name]) methods[name] = {{weights: [], agree: 0, disagree: 0, agWins: 0, disWins: 0}};
+      const m = methods[name];
+      if (s.hedge_weight != null) m.weights.push(s.hedge_weight);
+      m.agree += s.agree_n || 0;
+      m.agWins += (s.agree_win_rate || 0) * (s.agree_n || 0);
+      m.disagree += s.disagree_n || 0;
+      m.disWins += (s.disagree_win_rate || 0) * (s.disagree_n || 0);
+    }}
+  }}
+  const sorted = Object.entries(methods)
+    .filter(([, m]) => m.weights.length > 0 || m.agree + m.disagree > 0)
+    .sort((a, b) => {{
+      const wa = a[1].weights.length ? a[1].weights.reduce((s,v)=>s+v,0)/a[1].weights.length : 1;
+      const wb = b[1].weights.length ? b[1].weights.reduce((s,v)=>s+v,0)/b[1].weights.length : 1;
+      return wb - wa;
+    }});
+  if (!sorted.length) return '';
+  let html = '<table style="font-size:11px;border-collapse:collapse;width:100%;margin-top:6px">';
+  html += `<tr style="color:var(--txt3)">
+    <th style="text-align:left;padding:2px 6px">метод</th>
+    <th style="padding:2px 6px" title="Среднее Hedge-вес по всем тикерам. >1=метод усилен обучением, <1=ослаблен">ср.вес</th>
+    <th style="padding:2px 6px">за n</th><th style="padding:2px 6px">за win%</th>
+    <th style="padding:2px 6px">против n</th><th style="padding:2px 6px">против win%</th>
+  </tr>`;
+  for (const [name, m] of sorted) {{
+    const avgW = m.weights.length ? m.weights.reduce((s,v)=>s+v,0)/m.weights.length : null;
+    const agWr = m.agree > 0 ? (m.agWins/m.agree*100).toFixed(0)+'%' : '—';
+    const disWr = m.disagree > 0 ? (m.disWins/m.disagree*100).toFixed(0)+'%' : '—';
+    const wStyle = avgW != null ? (avgW > 1.1 ? 'color:var(--pos);font-weight:bold' : avgW < 0.9 ? 'color:var(--neg)' : 'color:var(--txt3)') : '';
+    const agStyle = m.agree > 0 ? (m.agWins/m.agree > 0.6 ? 'color:var(--pos)' : m.agWins/m.agree < 0.4 ? 'color:var(--neg)' : '') : '';
+    const hint = _METHOD_HINTS[name] || '';
+    html += `<tr title="${{hint}}">
+      <td style="padding:2px 6px;white-space:nowrap">${{name.replace(/_/g,' ')}}</td>
+      <td style="text-align:right;padding:2px 6px;${{wStyle}}">${{avgW != null ? avgW.toFixed(3) : '—'}}</td>
+      <td style="text-align:right;padding:2px 6px">${{m.agree}}</td>
+      <td style="text-align:right;padding:2px 6px;${{agStyle}}">${{agWr}}</td>
+      <td style="text-align:right;padding:2px 6px">${{m.disagree}}</td>
+      <td style="text-align:right;padding:2px 6px">${{disWr}}</td>
+    </tr>`;
+  }}
+  html += '</table>';
+  html += `<p style="font-size:10px;color:var(--txt3);margin:4px 0 0">
+    <b>Вес</b> — Hedge-мультипликатор [0..2], обученный из истории сделок в oi_weights.json.
+    1.0=нейтральный, &gt;1=метод исторически давал edge, &lt;1=ослаблен или ненадёжен.
+    Наведи мышь на строку — описание метода.
+  </p>`;
   return html;
 }}
 
@@ -3581,6 +3665,21 @@ function showMfeStats() {{
   out.innerHTML = html;
 }}
 
+function showRunWeights() {{
+  const out = document.getElementById('run_weights_out');
+  const rows = _backtestRows.filter(r => r.method_stats && Object.keys(r.method_stats).length);
+  if (!rows.length) {{
+    out.style.display = 'block';
+    out.innerHTML = '<span style="color:var(--txt3);font-size:11px;">Нет данных (запусти бэктест).</span>';
+    return;
+  }}
+  const title = '<div style="font-size:12px;font-weight:bold;margin-bottom:4px;">⚖️ Веса методов — текущий прогон</div>';
+  out.style.display = out.style.display === 'block' ? 'none' : 'block';
+  if (out.style.display === 'block') {{
+    out.innerHTML = title + runWeightsSummaryToHtml(rows);
+  }}
+}}
+
 // ── Dashboard grid view ──────────────────────────────────────────────────────
 
 let _dashViewActive = false;
@@ -3703,12 +3802,12 @@ function dgShowDetails(r) {{
   document.getElementById('dg-bestworst-body').innerHTML = bw ||
     '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных</span>';
 
-  // Методы
+  // Методы + Веса
   const mth = bestWorstMethodsToHtml(r.method_stats);
   const fullMth = r.method_stats ? methodStatsToHtml(r.method_stats) : '';
   document.getElementById('dg-methods-body').innerHTML =
     (mth || '') +
-    (fullMth ? `<details style="font-size:10px;margin-top:6px;padding:0 4px"><summary style="cursor:pointer;color:var(--txt3)">Все методы</summary>${{fullMth}}</details>` : '') ||
+    (fullMth ? `<details style="font-size:10px;margin-top:6px;padding:0 4px" open><summary style="cursor:pointer;color:var(--txt3)">Все методы + веса</summary>${{fullMth}}</details>` : '') ||
     '<span style="color:var(--txt3);font-size:11px;padding:8px">Нет данных</span>';
 }}
 
