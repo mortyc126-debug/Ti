@@ -3607,8 +3607,12 @@ function startProgressPolling(tickers, statusElId) {{
     try {{
       const resp = await fetch('/api/progress');
       const data = await resp.json();
-      render(data.progress || {{}});
-    }} catch (e) {{ /* сетевая ошибка опроса — не критично, просто не обновили */ }}
+      const prog = data.progress || {{}};
+      render(prog);
+      // Останавливаем опрос когда все тикеры завершились
+      const allDone = tickers.length > 0 && tickers.every(t => prog[t] && DONE_STATUSES.has(prog[t].status));
+      if (allDone) stopProgressPolling();
+    }} catch (e) {{ /* сетевая ошибка опроса — не критично */ }}
   }}, 800);
 }}
 
