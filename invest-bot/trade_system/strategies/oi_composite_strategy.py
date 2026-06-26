@@ -91,6 +91,7 @@ from indicators_volume import (
     score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
     score_obv_div, score_chaikin_ad, score_mfi_div,
     score_vol_asymmetry, volume_profile, score_vol_profile,
+    twiggs_money_flow,
 )
 from trade_system.strategies.level_pattern import (
     detect_level_pattern, build_levels, MultiTFLevelCache,
@@ -1302,10 +1303,76 @@ def score_vzo_candle(candles: list[HistoricCandle]) -> float:
 
 
 def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
-    """TWIGGS: Chaikin A/D дивергенция — накопление/распределение vs цена."""
+    """
+    TWIGGS: Twiggs Money Flow — поток денег как прокси дельты.
+
+    Шесть режимов (все без нулевого пересечения как примитивного сигнала):
+    1. Базовое направление + сила потока (tanh-нормировка)
+    2. Дивергенция: цена делает экстремум, TMF не подтверждает → затухание
+    3. Насыщение: TMF в экстремуме ≥3 бара → сигнал разворота
+    4. Скорость: TMF и цена синхронно ускоряются → подтверждение, иначе штраф
+    5. Накопление в боковике: TMF долго чуть выше нуля → абсорбция
+    6. Вспышка: TMF резко вырос и упал → импульс зафиксирован, не добавляться
+    """
     h, l, c, v = _hlcv(candles)
-    lb = min(20, len(c) - 1)
-    return score_chaikin_ad(h, l, c, v, lookback=lb)
+    n = len(c)
+    if n < 15:
+        return 0.0
+    period = min(21, n - 1)
+    tmf = twiggs_money_flow(h, l, c, v, period=period)
+    if len(tmf) < 5:
+        return 0.0
+
+    tmf_now = tmf[-1]
+
+    # 1. Базовый сигнал: сила и направление, не бинарный порог
+    base = math.tanh(tmf_now * 5.0)
+
+    # 2. Дивергенция за lookback баров
+    lb = min(20, n - 1)
+    price_dir = c[-1] - c[-lb]
+    tmf_dir   = tmf[-1] - tmf[-lb]
+    divergence = 0.0
+    if price_dir < -1e-4 and tmf_dir > 0.02:     # цена вниз, деньги не подтверждают → бычья дивергенция
+        divergence = min(0.6, tmf_dir * 8)
+    elif price_dir > 1e-4 and tmf_dir < -0.02:   # цена вверх, деньги уходят → медвежья дивергенция
+        divergence = max(-0.6, tmf_dir * 8)
+
+    # 3. Насыщение: TMF прилип к экстремуму ≥3 баров → вероятен откат
+    sat_win = min(5, n)
+    sat_vals = tmf[-sat_win:]
+    at_extreme = sum(1 for x in sat_vals if abs(x) > 0.75)
+    saturation = 0.0
+    if at_extreme >= 3:
+        saturation = -math.copysign(0.4, tmf_now)   # контр-сигнал
+
+    # 4. Синхронность скорости TMF и цены
+    lb3 = min(4, n - 1)
+    price_mom = (c[-1] - c[-lb3]) / (abs(c[-lb3]) + 1e-9)
+    tmf_mom   = tmf[-1] - tmf[-lb3]
+    in_sync = (price_mom > 0 and tmf_mom > 0) or (price_mom < 0 and tmf_mom < 0)
+    speed_mult = 1.15 if in_sync else 0.70
+
+    # 5. Тихое накопление в боковике: TMF долго умеренно позитивен/негативен
+    acc_win = min(10, n)
+    acc_vals = tmf[-acc_win:]
+    pos_count = sum(1 for x in acc_vals if 0.02 < x < 0.6)
+    neg_count = sum(1 for x in acc_vals if -0.6 < x < -0.02)
+    accumulation = 0.0
+    if pos_count >= acc_win * 0.7 and abs(tmf_now) < 0.7:
+        accumulation = 0.25   # тихое накопление
+    elif neg_count >= acc_win * 0.7 and abs(tmf_now) < 0.7:
+        accumulation = -0.25  # тихое распределение
+
+    # 6. Вспышка: TMF резко рванул и уже падает — импульс зафиксирован
+    flash = 0.0
+    if n >= 4:
+        peak = max(abs(x) for x in tmf[-4:-1])
+        if peak > 0.7 and abs(tmf_now) < peak * 0.5:
+            flash = -math.copysign(0.3, tmf[-2])   # деньги вошли и вышли
+
+    result = base * speed_mult + divergence * 0.5 + saturation + accumulation + flash
+    return max(-1.0, min(1.0, result))
 
 
 def score_rmi_candle(candles: list[HistoricCandle]) -> float:
