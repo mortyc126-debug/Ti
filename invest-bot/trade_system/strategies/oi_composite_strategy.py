@@ -3397,18 +3397,20 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
     pb_avg  = sum(pb_vols)  / len(pb_vols)
     vol_ratio = pb_avg / (imp_avg or 1e-9)
 
+    # Любой детектируемый откат = признак завершения импульса.
+    # Чем сильнее откат по объёму — тем выше вероятность полного разворота.
+    # Никогда не сигнализируем ЗА направление импульса — он уже закончился.
+
     if vol_ratio < 0.30:
-        # Здоровый откат: никто не мешает, движение сохраняет силу
-        strength = (0.30 - vol_ratio) / 0.30   # 1.0 при vol_ratio=0, 0 при 0.30
-        return round(imp_dir * (0.45 + 0.45 * strength), 4)
+        # Откат почти без объёма: инерция кончилась тихо. Импульс израсходован.
+        slack = (0.30 - vol_ratio) / 0.30
+        return round(-imp_dir * (0.30 + slack * 0.20), 4)
 
     if vol_ratio <= 0.65:
-        # Нейтральная зона: рыночные движения, нет явного сигнала
-        return 0.0
+        # Умеренный откат: движение нейтрализуется
+        return round(-imp_dir * 0.30, 4)
 
-    # vol_ratio > 0.65: агрессивный откат — кто-то толкает против тренда.
-    # Проверяем «следующий импульс»: последние 4 бара, которые идут ПО тренду.
-    # Если их средний объём меньше pb_avg — слабый возобновляющий импульс → разворот.
+    # vol_ratio > 0.65: агрессивный откат — активное давление против тренда.
     resuming = [vols[i] for i in range(swing_idx, n)
                 if (closes[i] > closes[i - 1] if imp_dir > 0 else closes[i] < closes[i - 1])
                 and i > 0]
@@ -3416,16 +3418,13 @@ def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
 
     if resuming:
         resume_avg = sum(resuming) / len(resuming)
-        next_impulse_weak = resume_avg < pb_avg * 0.80
-        if next_impulse_weak:
-            # Слабый следующий импульс + сильный откат → разворот очень вероятен
-            return round(-imp_dir * min(0.80, 0.45 + excess * 0.45), 4)
+        if resume_avg < pb_avg * 0.80:
+            # Следующий импульс слабее отката → разворот очень вероятен
+            return round(-imp_dir * min(0.85, 0.55 + excess * 0.35), 4)
         else:
-            # Откат агрессивный, но следующий импульс удерживает объём → предупреждение
-            return round(-imp_dir * excess * 0.30, 4)
+            return round(-imp_dir * (0.35 + excess * 0.25), 4)
     else:
-        # Нет возобновляющих баров после отката — ещё в откате, осторожно
-        return round(-imp_dir * excess * 0.25, 4)
+        return round(-imp_dir * (0.30 + excess * 0.30), 4)
 
 
 def score_waning_impulses(candles: list[HistoricCandle]) -> float:
@@ -6265,7 +6264,9 @@ class OICompositeStrategy(IStrategy):
 
         if do_heavy:
             self.__cached_regime_probs = classify_regime_probs(closes, volumes)
-            self.__cached_change_point = change_point_score(closes)
+            # Инвертируем: алгоритмы детектируют излом с запозданием, движение
+            # уже состоялось — сигнал теперь против нового направления (разворот).
+            self.__cached_change_point = -change_point_score(closes)
             self.__cached_rqa_mult    = self.__rqa_confidence_mult(closes)
             self.__cached_wavelet_mult = wavelet_confidence_mult(closes)
             if len(self.__candles) >= _MTF_MIN_BARS * _MTF_FACTOR:
