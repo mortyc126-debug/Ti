@@ -405,6 +405,64 @@ input[type=range] { touch-action: none; }
   background:rgba(255,0,110,0.15); border-color:rgba(255,0,110,0.4); color:#FF006E;
 }
 
+/* ══ MOBILE ≤ 600px ══ */
+@media (max-width: 600px) {
+  .nav { position: relative; }
+  .nav::after {
+    content:''; position:absolute; right:0; top:0; bottom:0; width:24px;
+    background:linear-gradient(to right,transparent,rgba(14,17,34,0.95));
+    pointer-events:none;
+  }
+  .nav-btn { font-size: 11px; margin-right: 14px; padding: 8px 0; }
+
+  #cp-topbar-row1 { flex-wrap: wrap !important; }
+  #cp-topbar-row1 > div { flex: 1 1 40% !important; min-width: 0; }
+  #chart-load-btn { width: 100% !important; flex: 1 1 100% !important; order: 3; }
+
+  #cp-main-area { flex-direction: column !important; height: auto !important; min-height: 0 !important; }
+  #cp-canvas-col { min-height: 55vh; }
+
+  #cp-indpanel {
+    width: 100% !important;
+    max-height: 0;
+    overflow: hidden !important;
+    transition: max-height 0.3s ease;
+    border-left: none !important;
+    border-top: 1px solid rgba(255,0,110,0.15);
+  }
+  #cp-indpanel.mob-open { max-height: 60vh; overflow: hidden !important; }
+
+  #mob-panel-toggle {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    gap: 6px; width: 100%;
+    padding: 7px 14px;
+    background: rgba(199,27,82,0.12);
+    border: none; border-top: 1px solid rgba(199,27,82,0.2);
+    color: #C71B52; font-family: var(--mono); font-size: 11px;
+    cursor: pointer; letter-spacing: 0.05em;
+  }
+
+  .cp-tab { font-size: 12px !important; padding: 8px 10px !important; }
+  .cp-ind-group-title, .cp-subpanel-label, .cpnl-lbl, .cpnl-val,
+  .hmb, .gauge-ticks span { font-size: 11px !important; }
+
+  #cp-tooltip, #chart-tooltip {
+    max-width: min(280px, calc(100vw - 20px)) !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  #cmp-grid { grid-template-columns: repeat(auto-fill, minmax(min(260px,100%),1fr)) !important; }
+
+  #guide-scroll { scroll-snap-type: x mandatory; }
+  #guide-scroll > * { scroll-snap-align: start; min-width: calc(100vw - 32px); }
+
+  .ind-label { min-width: 60px !important; font-size: 11px !important; }
+  .num-input  { width: 52px !important; }
+}
+#mob-panel-toggle { display: none; }
+
 </style>
 </head>
 <body>
@@ -698,7 +756,7 @@ input[type=range] { touch-action: none; }
     display:flex; flex-direction:column; gap:8px;
   ">
     <!-- Row 1: token + ticker + load -->
-    <div style="display:flex;gap:6px;align-items:center;">
+    <div id="cp-topbar-row1" style="display:flex;gap:6px;align-items:center;">
       <div style="position:relative;flex:1;">
         <input id="chart-token" type="password" placeholder="Токен T-Invest API…"
           autocomplete="off" oninput="chartSaveToken()"
@@ -755,11 +813,14 @@ input[type=range] { touch-action: none; }
     <button onclick="cpLoadMoex()" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:6px;padding:2px 8px;color:var(--text3);font-size:10px;font-family:var(--mono);cursor:pointer;flex-shrink:0;">↻</button>
   </div>
 
+  <!-- Toggle панели индикаторов (только мобил) -->
+  <button id="mob-panel-toggle" onclick="mobTogglePanel()">▲ Индикаторы</button>
+
   <!-- MAIN AREA: chart + right panel -->
-  <div style="display:flex;height:calc(100vh - 232px);min-height:420px;">
+  <div id="cp-main-area" style="display:flex;height:calc(100vh - 232px);min-height:420px;">
 
     <!-- LEFT: canvases stack -->
-    <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;">
+    <div id="cp-canvas-col" style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;">
 
       <!-- Price header -->
       <div style="padding:6px 12px;display:flex;align-items:baseline;gap:10px;border-bottom:1px solid rgba(255,255,255,0.04);">
@@ -4773,6 +4834,7 @@ let chartFibShow  = false; // show fib overlay on chart
 let chartIchiShow = false; // show Ichimoku overlay on chart
 let chartFigi = '';
 let chartOffset = 0; // scroll offset in candles from right
+let chartCandleW = 8; // px на свечу (зум)
 
 function chartSaveToken() {
   const v = document.getElementById('chart-token')?.value || '';
@@ -5078,7 +5140,7 @@ function _chartDrawLine(values, color, lineWidth, dash) {
   const dpr = devicePixelRatio||1;
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   const closes = chartCandles.map(c=>c.close);
-  const maxVis = Math.min(chartCandles.length, Math.floor(W/8));
+  const maxVis = Math.min(chartCandles.length, Math.floor(W/chartCandleW));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -5181,7 +5243,7 @@ function _chartDrawMain() {
   const closes  = candles.map(c=>c.close);
 
   // Visible window — show last N candles
-  const maxVis = Math.min(candles.length, Math.floor(W / 8));
+  const maxVis = Math.min(candles.length, Math.floor(W / chartCandleW));
   const endIdx  = Math.max(maxVis, candles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = candles.slice(startIdx, endIdx);
@@ -5796,7 +5858,7 @@ function _chartDrawFractals() {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   const ctx = canvas.getContext('2d');
 
-  const maxVis = Math.min(chartCandles.length, Math.floor(W / 8));
+  const maxVis = Math.min(chartCandles.length, Math.floor(W / chartCandleW));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -5843,7 +5905,7 @@ function _chartDrawVWAP() {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   const ctx = canvas.getContext('2d');
 
-  const maxVis = Math.min(chartCandles.length, Math.floor(W / 8));
+  const maxVis = Math.min(chartCandles.length, Math.floor(W / chartCandleW));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -5929,7 +5991,7 @@ function _iATR(cn,per){const n=cn.length,r=new Array(n).fill(null);const tr=cn.m
 function _win(W){
   const mainCv=document.getElementById('chart-main');
   const refW=mainCv?mainCv.offsetWidth:(W||800);
-  const maxVis=Math.min(chartCandles.length,Math.max(Math.floor(refW/8),1));
+  const maxVis=Math.min(chartCandles.length,Math.max(Math.floor(refW/chartCandleW),1));
   const endIdx=Math.max(maxVis,chartCandles.length-(chartOffset||0));
   const startIdx=Math.max(0,endIdx-maxVis);
   const visN=endIdx-startIdx;
@@ -6782,7 +6844,7 @@ function _cpGetCandleIdx(e, canvas) {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const W = canvas.offsetWidth;
-  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / 8), 1));
+  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const visN = endIdx - startIdx;
@@ -6791,7 +6853,7 @@ function _cpGetCandleIdx(e, canvas) {
 }
 
 function _cpXhairX(idx, W) {
-  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / 8), 1));
+  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const visN = endIdx - startIdx;
@@ -6840,7 +6902,7 @@ function _cpDrawXhair(idx, mouseY) {
 
 function _cpGetScale(W) {
   if (!chartCandles.length) return null;
-  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / 8), 1));
+  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -7200,6 +7262,42 @@ function cpInitCanvasEvents() {
     if (xc) { const ctx = xc.getContext('2d'); ctx.clearRect(0,0,xc.width,xc.height); }
     const tip = document.getElementById('cp-tooltip'); if (tip) tip.style.display = 'none';
   });
+
+  // Touch: свайп (пан) + пинч (зум) + тап (кроссхэр)
+  let tx0=null, toff0=0, tpinch0=null, tcw0=0;
+  c.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      tx0 = e.touches[0].clientX; toff0 = chartOffset; tpinch0 = null;
+    } else if (e.touches.length === 2) {
+      tpinch0 = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      tcw0 = chartCandleW; tx0 = null;
+    }
+  }, { passive: true });
+  c.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && tx0 !== null) {
+      const r = chartCandles.length / Math.max(c.offsetWidth, 1);
+      chartOffset = Math.max(0, Math.min(chartCandles.length - 10, Math.round(toff0 + (tx0 - e.touches[0].clientX) * r * 1.5)));
+      chartRedraw();
+    } else if (e.touches.length === 2 && tpinch0 !== null) {
+      const dist = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      chartCandleW = Math.max(4, Math.min(40, tcw0 * (tpinch0 / Math.max(dist, 1))));
+      chartRedraw();
+    }
+  }, { passive: false });
+  c.addEventListener('touchend', e => {
+    if (e.touches.length === 0 && tx0 !== null && e.changedTouches.length) {
+      const t = e.changedTouches[0];
+      const fakeEvt = { clientX: t.clientX, clientY: t.clientY };
+      const idx = _cpGetCandleIdx(fakeEvt, c);
+      const rect = c.getBoundingClientRect();
+      _cpDrawXhair(idx, t.clientY - rect.top);
+      _cpShowTooltip(idx, fakeEvt, c);
+      _cpUpdatePanelVals(idx);
+      tx0 = null;
+    }
+    tpinch0 = null;
+  }, { passive: true });
 }
 
 // goPage patch — redirect dead pages to chart
@@ -7392,6 +7490,16 @@ async function cpLoadMoex() {
 
 
 // ═══════════════════════════════════════════
+// ── Мобильный тоггл панели индикаторов ──
+function mobTogglePanel() {
+  const panel = document.getElementById('cp-indpanel');
+  const btn   = document.getElementById('mob-panel-toggle');
+  if (!panel || !btn) return;
+  const open = panel.classList.toggle('mob-open');
+  btn.textContent = open ? '▼ Скрыть' : '▲ Индикаторы';
+  if (!open && chartCandles.length) setTimeout(chartRedraw, 350);
+}
+
 // INIT
 // ═══════════════════════════════════════════
 try { updateMain(); } catch(e) { console.error('updateMain crash:', e); }
