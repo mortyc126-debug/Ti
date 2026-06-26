@@ -3385,14 +3385,19 @@ function renderGlobalMethodStats() {{
 
   const pct = v => v != null ? (v * 100).toFixed(0) + '%' : '—';
   const col = v => v == null ? 'var(--txt3)' : v >= 0.60 ? '#7dcc7d' : v <= 0.42 ? '#e07070' : 'var(--txt2)';
+  const netCol = v => v == null ? 'var(--txt3)' : v > 0.08 ? '#7dcc7d' : v < -0.05 ? '#e07070' : 'var(--txt2)';
+  const netPct = v => v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(0) + '%';
 
   const trs = rows.map(r => {{
     const disabled = getDisabledMethods().includes(r.name);
     const inverted = getInvertedMethods().includes(r.name);
+    // чистый% = ЗА win% минус ПРОТИВ win% (насколько метод лучше когда в большинстве)
+    const net = (r.fwr != null && r.awr != null) ? r.fwr - r.awr : (r.fwr != null ? r.fwr - 0.5 : null);
     return `<tr style="${{disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : ''}}">
       <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}</td>
       <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="color:var(--txt3)">n=${{r.fn}}</span></td>
       <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="color:var(--txt3)">n=${{r.dn}}</span></td>
+      <td style="padding:2px 8px;font-size:10px;color:${{netCol(net)}};text-align:right;font-weight:600;">${{netPct(net)}}</td>
       <td style="padding:2px 4px;display:flex;gap:3px;">
         <button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button>
         <button class="btn-pill btn-xs ghost" onclick="toggleInvertMethodFromStats('${{r.name}}')" style="font-size:9px;padding:1px 6px;color:${{inverted ? '#f0a030' : 'var(--txt3)'}};">↔</button>
@@ -3405,16 +3410,17 @@ function renderGlobalMethodStats() {{
     <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--txt2);margin-bottom:8px;border-bottom:1px solid var(--border2);padding-bottom:6px;">
       📊 Глобальная статистика методов (все тикеры агрегированно)
     </div>
-    <table style="border-collapse:collapse;width:100%;max-width:520px;">
+    <table style="border-collapse:collapse;width:100%;max-width:580px;">
       <thead><tr>
         <th style="text-align:left;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;letter-spacing:.06em;">МЕТОД</th>
         <th style="text-align:right;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;">ЗА win%</th>
         <th style="text-align:right;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;">ПРОТИВ win%</th>
+        <th style="text-align:right;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;">ЧИСТЫЙ%</th>
         <th></th>
       </tr></thead>
       <tbody>${{trs}}</tbody>
     </table>
-    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">«Против» = когда метод был в меньшинстве (проиграл голосование). Зелёный ≥60%, красный ≤42%.</div>
+    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">«Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ (насколько метод предсказывает лучше случайного). Зелёный ≥60% / +8%, красный ≤42% / −5%.</div>
   `;
 }}
 
