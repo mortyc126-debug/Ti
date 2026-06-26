@@ -4194,6 +4194,7 @@ async function runBacktest() {{
         if (evt.rows) {{
           _backtestRows.push(...evt.rows);
           renderResultsTable();
+          renderGlobalMethodStats();
           doneCount++;
           document.getElementById('status').textContent =
             `Готово ${{doneCount}}/${{tickers.length}} тикер(ов)...`;
