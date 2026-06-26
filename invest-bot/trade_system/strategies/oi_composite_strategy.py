@@ -85,7 +85,7 @@ from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
 from indicators_fractal import score_fractal, score_entropy_regime, chop_energy_mult
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
-    score_mama_fama, score_ehlers_mode, score_cyber_phase,
+    score_mama_fama, score_ehlers_mode, score_cyber_phase, fisher_rsi,
 )
 from indicators_volume import (
     score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
@@ -1255,8 +1255,72 @@ def score_decycler_candle(candles: list[HistoricCandle]) -> float:
 
 
 def score_fisher_rsi_candle(candles: list[HistoricCandle]) -> float:
-    """FISHER_RSI: преобразование Фишера от RSI (Фаза 3)."""
-    return score_fisher_rsi([_to_f(c.close) for c in candles])
+    """
+    FISHER_RSI: Fisher-преобразование RSI — состояние перегрева/перепроданности.
+
+    Классические пороги удалены — Fisher нелинеен, в крайностях очень резкий.
+
+    1. Крайность состояния: Fisher > +2 / < -2 = физическое перегревание.
+       Когда начинает возвращаться из крайности — сигнал начала выброса/разворота.
+    2. "Честность" движения: цена движется но Fisher не в экстремуме и уже откатывает → ловушка.
+    3. Дивергенция: цена новый экстремум, Fisher нет → энергия уже развернулась.
+    4. Зависание в нейтрали (-0.5..+0.5) при движущейся цене → шум, не тренд.
+    5. Скорость выхода из крайности: резкое → режим меняется агрессивно.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 15:
+        return 0.0
+    period = min(10, n - 1)
+    fr = fisher_rsi(closes, period=period)
+    if len(fr) < 5:
+        return 0.0
+
+    v = fr[-1]
+    prev = fr[-2]
+
+    # 1. Крайность + поворот из неё
+    EXTREME = 1.8
+    at_top    = v > EXTREME
+    at_bottom = v < -EXTREME
+    turning_down = at_top    and v < prev   # поворачивает вниз из перегрева
+    turning_up   = at_bottom and v > prev   # поворачивает вверх из перепроданности
+
+    if turning_up:
+        phase = 0.90
+    elif turning_down:
+        phase = -0.90
+    elif at_top:
+        phase = 0.30    # ещё в крайности, пока не повернул — слабый сигнал продолжения
+    elif at_bottom:
+        phase = -0.30
+    else:
+        phase = math.tanh(v * 0.5) * 0.4   # в середине — слабый сигнал по направлению
+
+    # 2. Нейтральное зависание при движущейся цене → антисигнал (шум)
+    lb = min(10, n - 1)
+    price_move = abs(closes[-1] - closes[-lb]) / (closes[-lb] + 1e-9)
+    neutral_zone = abs(v) < 0.5
+    trap_penalty = 0.0
+    if neutral_zone and price_move > 0.005:   # цена движется, Fisher в нейтрали
+        trap_penalty = -math.copysign(0.25, closes[-1] - closes[-lb])
+
+    # 3. Дивергенция: цена на новом экстремуме, Fisher нет
+    lb2 = min(20, n - 1)
+    price_chg = closes[-1] - closes[-lb2]
+    fr_chg    = fr[-1] - fr[-lb2]
+    divergence = 0.0
+    if price_chg < -1e-4 and fr_chg > 0.3:    # цена вниз, Fisher разворачивается вверх
+        divergence = min(0.5, fr_chg * 0.3)
+    elif price_chg > 1e-4 and fr_chg < -0.3:  # цена вверх, Fisher разворачивается вниз
+        divergence = max(-0.5, fr_chg * 0.3)
+
+    # 4. Скорость выхода из крайности (крутой разворот = агрессивная смена режима)
+    speed = abs(v - fr[-3]) if n >= 3 else 0.0
+    speed_mult = 1.0 + min(0.20, speed * 0.15)
+
+    result = phase * speed_mult + trap_penalty + divergence * 0.4
+    return max(-1.0, min(1.0, result))
 
 
 def score_ebsw_candle(candles: list[HistoricCandle]) -> float:
@@ -1367,11 +1431,83 @@ def score_klinger_candle(candles: list[HistoricCandle]) -> float:
 
 
 def score_vzo_candle(candles: list[HistoricCandle]) -> float:
-    """VZO: MFI-дивергенция — RSI взвешенный на объём, расхождение с ценой."""
+    """
+    VZO: Volume Zone Oscillator — объём в контексте зоны цены.
+
+    Взвешивает объём по положению закрытия внутри диапазона свечи:
+    закрылась вверху → объём считается «покупкой», внизу → «продажей».
+    Точнее OBV (тот только знак) — показывает где физически торговался объём.
+
+    1. Асимметрия в боковике: объём систематически вверху/внизу диапазона
+    2. Насыщение в экстремуме + поворот → начало выброса
+    3. Дивергенция VZO и цены: скрытое накопление при боковой цене
+    4. Переключение направления: смена инициативы
+    5. Скорость прыжка к экстремуму: агрессивность концентрации объёма
+    """
     h, l, c, v = _hlcv(candles)
-    lb = min(20, len(c) - 1)
-    period = min(14, lb // 2 or 1)
-    return score_mfi_div(h, l, c, v, period=period, lookback=lb)
+    n = len(c)
+    if n < 10:
+        return 0.0
+
+    # Взвешиваем объём по положению закрытия в диапазоне свечи [0..1]
+    # 1.0 = закрылся на хае (весь объём — покупка), 0.0 = на лоу (продажа)
+    signed_vol = []
+    for i in range(n):
+        rng = (h[i] - l[i]) or 1e-9
+        close_pos = (c[i] - l[i]) / rng   # 0..1
+        weight = 2 * close_pos - 1         # -1..+1
+        signed_vol.append(v[i] * weight)
+
+    period = min(14, n - 1)
+    alpha = 2 / (period + 1)
+    ema_sv = [signed_vol[0]]
+    ema_v  = [v[0]]
+    for i in range(1, n):
+        ema_sv.append(alpha * signed_vol[i] + (1 - alpha) * ema_sv[-1])
+        ema_v.append(alpha * v[i]           + (1 - alpha) * ema_v[-1])
+    vzo_series = [ema_sv[i] / ema_v[i] if ema_v[i] else 0.0 for i in range(n)]
+
+    vzo_now = vzo_series[-1]
+    vzo_prev = vzo_series[-2] if n >= 2 else vzo_now
+
+    # 1. Базовый сигнал
+    base = math.tanh(vzo_now * 3.0)
+
+    # 2. Насыщение в экстремуме + поворот
+    EXTREME = 0.65
+    at_top    = vzo_now > EXTREME
+    at_bottom = vzo_now < -EXTREME
+    if at_top and vzo_now < vzo_prev:
+        saturation = -0.50   # объём был вверху, дисбаланс разруливается → выброс вниз
+    elif at_bottom and vzo_now > vzo_prev:
+        saturation = 0.50    # объём был внизу, разруливается → выброс вверх
+    else:
+        saturation = 0.0
+
+    # 3. Дивергенция: VZO монотонно растёт при боковой цене → скрытое накопление
+    lb = min(20, n - 1)
+    price_range = max(c[-lb:]) - min(c[-lb:])
+    price_mean  = sum(c[-lb:]) / lb
+    flat = price_range / (price_mean + 1e-9) < 0.015
+    vzo_trend = vzo_series[-1] - vzo_series[-lb]
+    accumulation = 0.0
+    if flat and abs(vzo_trend) > 0.10:
+        accumulation = math.copysign(min(0.40, abs(vzo_trend) * 2), vzo_trend)
+
+    # 4. Переключение: смена инициативы
+    switch = 0.0
+    if n >= 3 and vzo_series[-2] < 0 and vzo_now > 0:
+        switch = 0.20
+    elif n >= 3 and vzo_series[-2] > 0 and vzo_now < 0:
+        switch = -0.20
+
+    # 5. Скорость прыжка к экстремуму
+    lb3 = min(3, n - 1)
+    speed = abs(vzo_now - vzo_series[-lb3])
+    speed_mult = 1.0 + min(0.25, speed * 0.8)
+
+    result = (base * 0.35 + saturation + accumulation + switch) * speed_mult
+    return max(-1.0, min(1.0, result))
 
 
 def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
