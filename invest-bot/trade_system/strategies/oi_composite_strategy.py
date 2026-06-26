@@ -188,7 +188,7 @@ _METHOD_IC_TARGET_MINUTES: dict[str, int] = {
     "MKT_STRUCTURE": 120, "TRIANGLE": 120,
     "CYBER_CYCLE": 30, "FISHER_RSI": 30, "EBSW": 30, "RMI": 30, "ZSCORE": 30,
     "MMI_SIGNAL": 30, "VR_SIGNAL": 30, "FRACTAL": 30, "ENTROPY": 30,
-    "VOL_MOMENTUM": 60, "KLINGER": 60, "VZO": 60, "TWIGGS": 60, "BS_PRESSURE": 60,
+    "VOL_MOMENTUM": 60, "KLINGER": 60, "VZO": 60, "TWIGGS": 60, "BS_PRESSURE": 60, "DONCHIAN": 60,
     "YZ_VOL_SIGNAL": 60, "VSA": 60, "VWAP_SIGNAL": 60, "VOLATILITY_REGIME": 60,
     "HAWKES_SIGNAL": 15, "BS_PRESSURE_TS": 15, "AGGRESSOR_FLOW": 15, "LARGE_IMPACT": 15,
     "VWAP_SIGNAL_TS": 15, "VOL_MOMENTUM_TS": 15, "OB_IMBALANCE": 15, "CANCEL_SIGNAL": 15,
@@ -265,6 +265,7 @@ _GATE_GROUPS: dict[str, frozenset] = {
     "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE"}),
     "oscillator": frozenset({"FISHER_RSI", "RMI", "ZSCORE"}),
     "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
+                             "DONCHIAN",
                              "CANDLE_PATTERN", "TRIANGLE", "FRACTAL", "ENTROPY",
                              "LEVEL_CONTEXT", "MKT_STRUCTURE", "SPRING"}),
     "microstructure": frozenset({"HAWKES_SIGNAL", "BS_PRESSURE_TS", "AGGRESSOR_FLOW",
@@ -1316,8 +1317,20 @@ def score_fisher_rsi_candle(candles: list[HistoricCandle]) -> float:
         divergence = max(-0.5, fr_chg * 0.3)
 
     # 4. Скорость выхода из крайности (крутой разворот = агрессивная смена режима)
-    speed = abs(v - fr[-3]) if n >= 3 else 0.0
+    speed = abs(v - fr[-3]) if len(fr) >= 3 else 0.0
     speed_mult = 1.0 + min(0.20, speed * 0.15)
+
+    # 5. Нитка в крайности: сколько баров подряд Fisher держался у порога
+    streak = 0
+    for val in reversed(fr[:-1]):
+        if abs(val) > EXTREME:
+            streak += 1
+        else:
+            break
+    # Первый поворот после длинного зависания = выброс
+    if (turning_up or turning_down) and streak >= 2:
+        streak_mult = 1.0 + min(0.50, streak * 0.15)
+        phase *= streak_mult
 
     result = phase * speed_mult + trap_penalty + divergence * 0.4
     return max(-1.0, min(1.0, result))
@@ -1426,7 +1439,19 @@ def score_klinger_candle(candles: list[HistoricCandle]) -> float:
         elif kvo[-2] > 0 and kvo_now < 0:
             switch = -0.20   # переключился в продажу
 
-    result = base * 0.5 + divergence * 0.5 + accumulation + expansion_bonus + switch
+    # 6. Экстремум + начало поворота = выброс из накопления
+    # Если KVO был на пике амплитуды и начал разворачиваться → деньги пошли
+    extreme_win = min(10, len(kvo))
+    kvo_peak = max(abs(x) for x in kvo[-extreme_win:]) or 1.0
+    at_kvo_extreme = abs(kvo[-2] if len(kvo) >= 2 else kvo_now) > kvo_peak * 0.80
+    breakout_pulse = 0.0
+    if at_kvo_extreme and len(kvo) >= 3:
+        if kvo[-2] > 0 and kvo_now < kvo[-2]:     # был вверху, начал опускаться
+            breakout_pulse = -0.30
+        elif kvo[-2] < 0 and kvo_now > kvo[-2]:   # был внизу, начал подниматься
+            breakout_pulse = 0.30
+
+    result = base * 0.45 + divergence * 0.45 + accumulation + expansion_bonus + switch + breakout_pulse
     return max(-1.0, min(1.0, result))
 
 
@@ -1508,6 +1533,63 @@ def score_vzo_candle(candles: list[HistoricCandle]) -> float:
 
     result = (base * 0.35 + saturation + accumulation + switch) * speed_mult
     return max(-1.0, min(1.0, result))
+
+
+def score_donchian_candle(candles: list[HistoricCandle]) -> float:
+    """
+    DONCHIAN: асимметрия боковика через каналы Дончиана.
+
+    В боковике максимумы касались верхней полосы много раз → там плотно накопились
+    позиции/стопы. Выброс пойдёт в сторону менее плотного края (там меньше барьеров).
+
+    1. Считаем касания верхней/нижней полосы за период боковика
+    2. Асимметрия = скрытое направление: плотная сторона = стена → выброс в другую
+    3. Только в боковике (price_range_pct < 4%): вне боковика сигнал бесполезен
+    4. Близость к краю на последнем баре как дополнение (прижали к полосе)
+    """
+    h, l, c, _ = _hlcv(candles)
+    n = len(c)
+    if n < 20:
+        return 0.0
+
+    period = min(20, n - 1)
+    upper = max(h[-period:])
+    lower = min(l[-period:])
+    mid = (upper + lower) / 2
+    band_range = upper - lower
+    if band_range < 1e-9:
+        return 0.0
+
+    # Только в боковике
+    price_range_pct = band_range / (mid + 1e-9)
+    if price_range_pct > 0.04:
+        return 0.0
+
+    # Касания полос: high близко к верхней, low близко к нижней
+    touch_thr = band_range * 0.15
+    upper_touches = sum(1 for hi in h[-period:] if hi >= upper - touch_thr)
+    lower_touches = sum(1 for lo in l[-period:] if lo <= lower + touch_thr)
+    total = upper_touches + lower_touches
+    if total < 2:
+        return 0.0
+
+    # asymmetry > 0 = верх плотнее → выброс идёт вниз → сигнал отрицательный
+    asymmetry = (upper_touches - lower_touches) / total
+    signal = -math.tanh(asymmetry * 2.5)
+
+    # Сила пропорциональна степени асимметрии
+    strength = abs(asymmetry)
+    if strength < 0.20:
+        return 0.0
+
+    # Близость текущей цены к менее плотному краю усиливает сигнал
+    close_pos = (c[-1] - lower) / band_range  # 0=у нижней, 1=у верхней
+    if signal > 0 and close_pos < 0.25:       # ждём выброса вверх, цена у нижней → усиление
+        signal *= 1.20
+    elif signal < 0 and close_pos > 0.75:     # ждём выброса вниз, цена у верхней → усиление
+        signal *= 1.20
+
+    return max(-1.0, min(1.0, signal * (0.5 + strength * 0.5)))
 
 
 def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
@@ -4068,6 +4150,7 @@ METHODS = [
     ("FISHER_RSI",     score_fisher_rsi_candle),
     ("KLINGER",        score_klinger_candle),
     ("VZO",            score_vzo_candle),
+    ("DONCHIAN",       score_donchian_candle),
     ("TWIGGS",         score_twiggs_candle),
     ("RMI",            score_rmi_candle),
     ("ZSCORE",         score_zscore_candle),
@@ -4168,6 +4251,7 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "VOL_MOMENTUM":   {"min_bars": 10, "weight_5m": 1.10},
     "KLINGER":        {"min_bars": 15, "weight_5m": 1.10},
     "VZO":            {"min_bars": 15, "weight_5m": 1.05},
+    "DONCHIAN":       {"min_bars": 20, "weight_5m": 1.10},  # структура боковика лучше на 5м
     "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
     "HAWKES_SIGNAL":  {"min_bars": 25, "weight_5m": 1.30},  # самоусиление потока
     "VSA":            {"min_bars": 12, "weight_5m": 1.05},
