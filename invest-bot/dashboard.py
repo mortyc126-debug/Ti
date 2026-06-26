@@ -1429,6 +1429,7 @@ def run_backtest_one(
         progress: dict | None = None, offset_days: int = 0,
         adaptive_narrative: bool = False, adaptive_lasso: bool = False,
         block_ranging: bool = False,
+        disabled_methods: list[str] | None = None,
 ) -> tuple[list[dict], dict | None]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает (rows, history_data):
@@ -1457,6 +1458,8 @@ def run_backtest_one(
     _set_progress(progress, ticker, "загрузка свечей")
     try:
         strategy = StrategyFactory.new_factory(strategy_settings.name, _backtest_strategy_settings(strategy_settings))
+        if disabled_methods and hasattr(strategy, "set_disabled_methods"):
+            strategy.set_disabled_methods(disabled_methods)
         bt_store = _wire_history_returning(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
@@ -2290,6 +2293,19 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     </div>
 
     <div class="cfg-group">
+      <div class="cfg-group-title" style="display:flex;align-items:center;gap:8px;">
+        Отключить методы для прогона
+        <button class="btn-pill btn-xs ghost" onclick="toggleMethodDisable()" style="font-size:10px;padding:2px 8px;">показать/скрыть</button>
+        <button class="btn-pill btn-xs ghost" onclick="clearDisabledMethods()" style="font-size:10px;padding:2px 8px;">сбросить</button>
+        <span id="disabled_count" style="font-size:10px;color:var(--neg);"></span>
+      </div>
+      <div id="method_disable_panel" style="display:none;margin-top:6px;">
+        <div style="font-size:10px;color:var(--txt3);margin-bottom:6px;">Отмеченные методы будут давать 0 в голосовании (как будто не существуют). Удобно для тестирования без худших методов.</div>
+        <div id="method_checkboxes" style="display:flex;flex-wrap:wrap;gap:4px 10px;"></div>
+      </div>
+    </div>
+
+    <div class="cfg-group">
       <div class="cfg-group-title">Параметры стратегии</div>
       <label>ATR_TAKE_K <input type="text" class="inp mid" id="atr_take" value="2,3,4"></label>
       <label>ATR_STOP_K <input type="text" class="inp mid" id="atr_stop" value="1,1.5,2"></label>
@@ -2352,6 +2368,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="compare_block" style="display:none;margin-top:8px"></div>
   <div id="mfe_stats_out" style="display:none;margin-top:12px;"></div>
   <div id="run_weights_out" style="display:none;margin-top:12px;"></div>
+  <div id="global_method_stats" style="display:none;margin-top:14px;"></div>
 </div>
 
 <div id="dash-grid" style="display:none;padding:12px 16px;">
@@ -3247,6 +3264,118 @@ function bestWorstMethodsToHtml(methodStats) {{
   return html;
 }}
 
+// ===== Глобальная статистика методов =====
+
+const _ALL_METHODS = [
+  "PRICE_TREND","VOL_MOMENTUM","VWAP_SIGNAL","BS_PRESSURE","CANDLE_PATTERN",
+  "ADAPTIVE_MA","TREND_QUALITY","FRACTAL","ENTROPY","FISHER_RSI","KLINGER","VZO",
+  "DONCHIAN","TWIGGS","RMI","ZSCORE","ZLEMA_SIGNAL","T3_SIGNAL","SINEWAVE_SIGNAL",
+  "SSA_SIGNAL","HAWKES_SIGNAL","VSA","WICK_REJECTION","TRIANGLE","PRICE_ACCEL",
+  "CUMUL_DELTA","AMT_POC","VSA_ABSORPTION","CASCADE","IMPULSE_PULLBACK",
+  "WANING_IMPULSES","VOL_COMPRESSION","FALSE_BREAKOUT","LEVEL_ABSORPTION",
+  "ICHIMOKU_SIGNAL","BB_KELTNER_SQUEEZE","MA_TENSION","RSI_DIVERGENCE",
+  "ATR_EXHAUSTION","ALLIGATOR","MAMA_FAMA","EHLERS_MODE","CYBER_PHASE"
+];
+
+function initMethodCheckboxes() {{
+  const box = document.getElementById('method_checkboxes');
+  if (!box || box.children.length) return;
+  for (const name of _ALL_METHODS) {{
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
+    cb.onchange = updateDisabledCount;
+    lbl.append(cb, name.replace(/_/g,' '));
+    box.appendChild(lbl);
+  }}
+}}
+
+function toggleMethodDisable() {{
+  initMethodCheckboxes();
+  const p = document.getElementById('method_disable_panel');
+  p.style.display = p.style.display === 'none' ? '' : 'none';
+}}
+
+function clearDisabledMethods() {{
+  document.querySelectorAll('#method_checkboxes input[type=checkbox]').forEach(cb => cb.checked = false);
+  updateDisabledCount();
+}}
+
+function updateDisabledCount() {{
+  const n = getDisabledMethods().length;
+  const el = document.getElementById('disabled_count');
+  el.textContent = n ? `отключено: ${{n}}` : '';
+}}
+
+function getDisabledMethods() {{
+  return Array.from(document.querySelectorAll('#method_checkboxes input[type=checkbox]:checked')).map(cb => cb.value);
+}}
+
+// Агрегирует method_stats по всем строкам _backtestRows и рисует глобальную таблицу
+function renderGlobalMethodStats() {{
+  const agg = {{}};
+  for (const r of _backtestRows) {{
+    if (!r.method_stats) continue;
+    for (const [name, s] of Object.entries(r.method_stats)) {{
+      if (!agg[name]) agg[name] = {{an: 0, aw: 0, dn: 0, dw: 0}};
+      agg[name].an += s.agree_n || 0;
+      agg[name].aw += s.agree_win || 0;
+      agg[name].dn += s.disagree_n || 0;
+      agg[name].dw += s.disagree_win || 0;
+    }}
+  }}
+  const rows = Object.entries(agg)
+    .filter(([, s]) => s.an + s.dn >= 5)
+    .map(([name, s]) => {{
+      const fwr = s.an > 0 ? s.aw / s.an : null;
+      const awr = s.dn > 0 ? s.dw / s.dn : null;
+      return {{name, fwr, awr, fn: s.an, dn: s.dn}};
+    }})
+    .filter(r => r.fwr !== null)
+    .sort((a, b) => b.fwr - a.fwr);
+
+  const el = document.getElementById('global_method_stats');
+  if (!rows.length) {{ el.style.display = 'none'; return; }}
+
+  const pct = v => v != null ? (v * 100).toFixed(0) + '%' : '—';
+  const col = v => v == null ? 'var(--txt3)' : v >= 0.60 ? '#7dcc7d' : v <= 0.42 ? '#e07070' : 'var(--txt2)';
+
+  const trs = rows.map(r => {{
+    const disabled = getDisabledMethods().includes(r.name);
+    return `<tr style="${{disabled ? 'opacity:.45;' : ''}}">
+      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}</td>
+      <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="color:var(--txt3)">n=${{r.fn}}</span></td>
+      <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="color:var(--txt3)">n=${{r.dn}}</span></td>
+      <td style="padding:2px 4px;"><button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button></td>
+    </tr>`;
+  }}).join('');
+
+  el.style.display = '';
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--txt2);margin-bottom:8px;border-bottom:1px solid var(--border2);padding-bottom:6px;">
+      📊 Глобальная статистика методов (все тикеры агрегированно)
+    </div>
+    <table style="border-collapse:collapse;width:100%;max-width:520px;">
+      <thead><tr>
+        <th style="text-align:left;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;letter-spacing:.06em;">МЕТОД</th>
+        <th style="text-align:right;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;">ЗА win%</th>
+        <th style="text-align:right;font-size:9px;color:var(--txt3);padding:2px 8px;font-weight:400;">ПРОТИВ win%</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${{trs}}</tbody>
+    </table>
+    <div style="font-size:9px;color:var(--txt3);margin-top:6px;">«Против» = когда метод был в меньшинстве (проиграл голосование). Зелёный ≥60%, красный ≤42%.</div>
+  `;
+}}
+
+function toggleMethodInRun(name) {{
+  initMethodCheckboxes();
+  const cb = document.getElementById('dm_' + name);
+  if (cb) {{ cb.checked = !cb.checked; updateDisabledCount(); }}
+  renderGlobalMethodStats(); // обновить подсветку disabled строк
+}}
+
 function selectTicker(ticker) {{
   const sel = document.getElementById('tc_ticker');
   if (!sel) return;
@@ -3982,7 +4111,8 @@ async function runBacktest() {{
                               tariff: document.getElementById('tariff').value,
                               adaptive_narrative: document.getElementById('adaptive_narrative').checked,
                               adaptive_lasso: document.getElementById('adaptive_lasso').checked,
-                              block_ranging: document.getElementById('block_ranging').checked}})
+                              block_ranging: document.getElementById('block_ranging').checked,
+                              disabled_methods: getDisabledMethods()}})
     }});
     if (!resp.ok || !resp.body) throw new Error('stream недоступен');
     const reader = resp.body.getReader();
@@ -4031,6 +4161,7 @@ async function runBacktest() {{
   document.getElementById('status').textContent = autoSaved
     ? `Готово: ${{tickers.length}} тикер(ов). Автосохранено в history.json: ${{autoSaved.days}} дн., ${{autoSaved.trades}} сделок.`
     : `Готово: ${{tickers.length}} тикер(ов)`;
+  renderGlobalMethodStats();
   // Заполнить панель графика тикерами из только что завершённого бэктеста
   if (tickers.length > 0) {{
     // Первый ATR из сетки — берём первые числа из строк вида "2,3,4"
@@ -6253,6 +6384,7 @@ class Handler(BaseHTTPRequestHandler):
             adaptive_narrative = bool(payload.get("adaptive_narrative", False))
             adaptive_lasso = bool(payload.get("adaptive_lasso", False))
             block_ranging = bool(payload.get("block_ranging", False))
+            disabled_methods = payload.get("disabled_methods") or []
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -6285,7 +6417,8 @@ class Handler(BaseHTTPRequestHandler):
                     pool.submit(run_backtest_one, t, days, atr_take_ks, atr_stop_ks,
                                 tariff=tariff, progress=progress, offset_days=offset_days,
                                 adaptive_narrative=adaptive_narrative, adaptive_lasso=adaptive_lasso,
-                                block_ranging=block_ranging): t
+                                block_ranging=block_ranging,
+                                disabled_methods=disabled_methods or None): t
                     for t in tickers
                 }
                 for fut in as_completed(fs):

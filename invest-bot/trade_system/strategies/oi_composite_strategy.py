@@ -4782,6 +4782,7 @@ class OICompositeStrategy(IStrategy):
         self.__settings = settings
         s = settings.settings
 
+        self._disabled_methods: set[str] = set()
         self.__threshold = float(s.get("SIGNAL_THRESHOLD", SIGNAL_THRESHOLD))
         self.__long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         self.__long_stop = Decimal(s.get("LONG_STOP", "0.985"))
@@ -5001,6 +5002,10 @@ class OICompositeStrategy(IStrategy):
 
     def is_signal_only(self) -> bool:
         return self.__signal_only
+
+    def set_disabled_methods(self, names: list[str] | set[str]) -> None:
+        """Отключить указанные методы голосования для прогона бэктеста."""
+        self._disabled_methods = set(names)
 
     def set_take_stop_overrides(
             self,
@@ -6463,7 +6468,8 @@ class OICompositeStrategy(IStrategy):
 
         regime_probs = self.__cached_regime_probs
 
-        base_scores = [fn(window) for _, fn in METHODS] + [
+        _dm = self._disabled_methods
+        base_scores = [(0.0 if name in _dm else fn(window)) for name, fn in METHODS] + [
             self.__score_level_context_mtf(),
             self.__score_market_structure_mtf(),
             self.__score_spring_mtf(),
