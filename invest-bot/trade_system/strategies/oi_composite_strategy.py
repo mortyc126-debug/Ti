@@ -1442,22 +1442,66 @@ def score_t3_signal(candles: list[HistoricCandle]) -> float:
 
 def score_sinewave_signal(candles: list[HistoricCandle]) -> float:
     """
-    SINEWAVE_SIGNAL: Ehlers Even Better Sinewave (indicators_ehlers.py).
-    Знак последнего значения → направление; пересечение нуля усиливает сигнал.
+    SINEWAVE_SIGNAL: Ehlers Even Better Sinewave — фаза и амплитуда цикла.
+
+    Классическое пересечение нуля удалено — это запаздывающий шумный дубль.
+
+    Что реально используется:
+    1. Фаза: синусоида в экстремуме = максимальное натяжение (нитка).
+       Поворот от экстремума = начало выброса → основной сигнал.
+    2. Амплитуда: энергия цикла. Большой размах = выброс будет сильным.
+    3. Скорость разворота: крутой поворот от экстремума = резкий выброс.
+    4. Дивергенция: цена делает новый экстремум, EBS не подтверждает →
+       энергия цикла уже разворачивается, цена скоро последует.
     """
     closes = [_to_f(c.close) for c in candles]
-    if len(closes) < 15:
+    n = len(closes)
+    if n < 20:
         return 0.0
-    period = min(10, max(3, len(closes) // 3))
-    series = even_better_sinewave(closes, hp_period=min(40, len(closes)), period=period)
-    if len(series) < 2:
+    period = min(10, max(3, n // 3))
+    series = even_better_sinewave(closes, hp_period=min(40, n), period=period)
+    if len(series) < 6:
         return 0.0
-    v, prev = series[-1], series[-2]
-    if v > 0 and prev < 0:
-        return 1.0
-    if v < 0 and prev > 0:
-        return -1.0
-    return max(-1.0, min(1.0, v))
+
+    v = series[-1]
+
+    # 1. Фаза цикла: экстремум → поворот
+    win5 = series[-5:]
+    at_peak   = (v > 0.55) and (v >= max(win5[:-1]))   # вверху, начинает поворачивать
+    at_trough = (v < -0.55) and (v <= min(win5[:-1]))  # внизу, начинает поворачивать
+
+    turn_down = at_peak   and v < series[-2]   # повернул вниз от вершины
+    turn_up   = at_trough and v > series[-2]   # повернул вверх от дна
+
+    if turn_up:
+        phase_signal = 0.85
+    elif turn_down:
+        phase_signal = -0.85
+    else:
+        # В середине цикла — слабый сигнал по направлению движения синусоиды
+        phase_signal = math.tanh((v - series[-2]) * 8) * 0.4
+
+    # 2. Амплитуда как энергия: RMS последних 5 баров vs предыдущих 10
+    rms_now  = (sum(x * x for x in series[-5:]) / 5) ** 0.5
+    rms_old  = (sum(x * x for x in series[-15:-5]) / 10) ** 0.5 if n >= 15 else rms_now
+    energy_mult = min(1.4, max(0.6, rms_now / (rms_old + 1e-9)))
+
+    # 3. Скорость поворота: чем круче разворот, тем резче выброс
+    speed = abs(v - series[-3]) if n >= 3 else 0.0
+    speed_mult = 1.0 + min(0.25, speed * 0.8)
+
+    # 4. Дивергенция: цена делает новый экстремум, EBS — нет
+    lb = min(15, n - 1)
+    price_chg = closes[-1] - closes[-lb]
+    ebs_chg   = series[-1] - series[-lb]
+    divergence = 0.0
+    if price_chg < -1e-4 and ebs_chg > 0.08:    # цена вниз, EBS разворачивается вверх
+        divergence = min(0.5, ebs_chg * 4)
+    elif price_chg > 1e-4 and ebs_chg < -0.08:  # цена вверх, EBS разворачивается вниз
+        divergence = max(-0.5, ebs_chg * 4)
+
+    result = phase_signal * energy_mult * speed_mult + divergence * 0.4
+    return max(-1.0, min(1.0, result))
 
 
 def score_mmi_signal(candles: list[HistoricCandle]) -> float:
