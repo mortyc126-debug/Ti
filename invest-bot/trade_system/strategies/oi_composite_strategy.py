@@ -1342,8 +1342,58 @@ def score_ebsw_candle(candles: list[HistoricCandle]) -> float:
 
 
 def score_mama_fama_candle(candles: list[HistoricCandle]) -> float:
-    """MAMA_FAMA: скорость и направление разрыва MESA Adaptive MA (Эрлерс)."""
-    return score_mama_fama([_to_f(c.close) for c in candles])
+    """
+    MAMA_FAMA: антисигнал схождения линий при продолжающемся движении цены.
+
+    MAMA и FAMA расходились = тренд набирал силу.
+    Начали сходиться назад при продолжении движения цены = тренд ломается изнутри.
+    Антисигнал продолжения: согласие MAMA/FAMA теряется.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 20:
+        return 0.0
+
+    base = score_mama_fama(closes)
+
+    # Детектируем схождение после расхождения
+    from indicators_ehlers import mama_fama as _mama_fama
+    mama_s, fama_s, _ = _mama_fama(closes)
+
+    def _last(arr, k=1):
+        vals = [v for v in arr if not (isinstance(v, float) and math.isnan(v))]
+        return vals[-k] if len(vals) >= k else None
+
+    m1 = _last(mama_s, 1); f1 = _last(fama_s, 1)
+    m3 = _last(mama_s, 3); f3 = _last(fama_s, 3)
+    m8 = _last(mama_s, 8); f8 = _last(fama_s, 8)
+    if None in (m1, f1, m3, f3, m8, f8):
+        return base
+
+    price_ref = abs(m1) or 1.0
+    gap_now  = abs(m1 - f1) / price_ref
+    gap_3    = abs(m3 - f3) / price_ref
+    gap_8    = abs(m8 - f8) / price_ref
+
+    # Был большой разрыв (расхождение), сейчас сходится
+    was_diverging = gap_8 > gap_now * 1.3
+    converging    = gap_now < gap_3 * 0.85
+
+    if was_diverging and converging:
+        # Определяем направление предыдущего разрыва
+        direction = 1 if (m8 - f8) > 0 else -1
+        convergence_speed = min(1.0, (gap_3 - gap_now) / (gap_3 + 1e-9))
+        # Антисигнал: против направления прежнего разрыва
+        anti = -direction * min(0.70, 0.35 + convergence_speed * 0.45)
+
+        # Проверяем что цена продолжает двигаться в старом направлении (ловушка)
+        lb = min(8, n - 1)
+        price_move = (closes[-1] - closes[-lb]) / (closes[-lb] + 1e-9)
+        price_dir = 1 if price_move > 0 else -1
+        if price_dir == direction and abs(price_move) > 0.002:
+            return max(-1.0, min(1.0, anti))
+
+    return base
 
 
 def score_ehlers_mode_candle(candles: list[HistoricCandle]) -> float:
@@ -1671,8 +1721,44 @@ def score_rmi_candle(candles: list[HistoricCandle]) -> float:
 
 
 def score_zscore_candle(candles: list[HistoricCandle]) -> float:
-    """ZSCORE: rolling z-score, контр-сигнал на возврат к среднему (Фаза 3)."""
-    return score_zscore([_to_f(c.close) for c in candles])
+    """
+    ZSCORE: антисигнал на статистически незначимое движение.
+
+    Z-score близко к 0 при движущейся цене = движение без статистической базы,
+    это шум а не тренд. Входить в такое движение — ловушка.
+
+    1. |Z| < 0.5 при движении цены → против направления (движение = шум)
+    2. |Z| > 2   → возврат к среднему (классический контрарный)
+    3. Середина   → нейтрально
+    """
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 15:
+        return 0.0
+    period = min(20, n)
+    window = closes[-period:]
+    mean = sum(window) / period
+    std = (sum((x - mean) ** 2 for x in window) / period) ** 0.5
+    if std < 1e-9:
+        return 0.0
+    z = (closes[-1] - mean) / std
+
+    lb = min(10, n - 1)
+    price_move = (closes[-1] - closes[-lb]) / (closes[-lb] + 1e-9)
+    moving = abs(price_move) > 0.003
+    direction = 1 if price_move > 0 else -1
+
+    # Z ≈ 0: движение статистически незначимо → антисигнал против цены
+    if abs(z) < 0.5 and moving:
+        return max(-1.0, min(1.0, -direction * min(0.70, abs(price_move) * 60)))
+
+    # |Z| > 2: экстремальное отклонение → возврат к среднему
+    if z > 2.0:
+        return -min(0.75, (z - 1.5) * 0.40)
+    if z < -2.0:
+        return min(0.75, (-z - 1.5) * 0.40)
+
+    return 0.0
 
 
 def score_volatility_regime(candles: list[HistoricCandle]) -> float:
@@ -2050,6 +2136,20 @@ def score_vsa(candles: list[HistoricCandle]) -> float:
     # ── Effort Down (медвежий) ──────────────────────────────────────────────
     if (not is_up and vol_ratio > 1.5 and spread_ratio > 1.1 and close_pos < 0.35):
         signals.append(-0.8)
+
+    # ── Широкий спред + низкий объём = ложный пробой (антисигнал) ─────────────
+    # Цена показывает большое движение, но объём не поддерживает → не верить
+    if spread_ratio > 1.3 and vol_ratio < 0.60:
+        anti_dir = 1 if is_up else -1
+        signals.append(-anti_dir * 0.75)   # против направления свечи
+
+    # ── Узкий спред + высокий объём = поглощение (антисигнал движения) ─────────
+    # Большой объём при маленьком движении = кто-то поглощает, цена не пойдёт
+    if spread_ratio < 0.55 and vol_ratio > 1.8:
+        # Направление поглощения: цена выше или ниже середины предыдущих баров
+        recent_close = sum(_to_f(c.close) for c in candles[-5:-1]) / 4
+        absorb_dir = 1 if cl > recent_close else -1
+        signals.append(-absorb_dir * 0.70)  # против направления накопленного движения
 
     if not signals:
         return 0.0
@@ -3990,22 +4090,20 @@ def score_rsi_divergence(candles: list[HistoricCandle]) -> float:
 
 def score_atr_exhaustion(candles: list[HistoricCandle]) -> float:
     """
-    ATR_EXHAUSTION: сколько ATR пройдено за последние N баров.
+    ATR_EXHAUSTION: антисигнал на движение без волатильной энергии.
 
-    Если цена прошла уже 1.8+ ATR за последние 20 баров — режим каскада,
-    но топливо заканчивается: дальнейшее продолжение всё менее вероятно.
-    Если прошла 0.3 ATR — потенциал ещё огромный.
-
-    Возвращает:
-    - Отрицательное значение (против направления): при >1.5 ATR → истощение
-    - Нейтрально (0): при 0.5..1.5 ATR
-    - Положительное (по направлению): при <0.4 ATR → топлива много
+    1. Волатильность сжалась (короткий ATR < длинного * 0.75) при движущейся цене
+       = движение по инерции без энергии → антисигнал продолжения.
+    2. Пройдено >1.8 ATR за 20 баров → топливо исчерпано → антисигнал продолжения.
+    3. Пройдено <0.4 ATR → потенциал ещё есть → слабый сигнал за продолжение.
     """
-    if len(candles) < 25:
+    n = len(candles)
+    if n < 25:
         return 0.0
 
-    atr_pct = _compute_atr(candles, period=14)
-    if atr_pct < 1e-6:
+    atr_long = _compute_atr(candles, period=21)
+    atr_short = _compute_atr(candles[-15:], period=7) if n >= 15 else atr_long
+    if atr_long < 1e-6:
         return 0.0
 
     win = candles[-20:]
@@ -4014,19 +4112,25 @@ def score_atr_exhaustion(candles: list[HistoricCandle]) -> float:
     move_pct = abs(last_close - first_close) / (first_close or 1e-9)
     direction = 1 if last_close > first_close else -1
 
-    # Также учитываем суммарный путь (не только нетто), чтобы ловить пилу
     total_path = sum(abs(_to_f(win[i].close) - _to_f(win[i - 1].close))
                      for i in range(1, len(win)))
-    path_ratio  = total_path / (first_close * atr_pct or 1e-9)
-    netto_ratio = move_pct / atr_pct
+    path_ratio  = total_path / (first_close * atr_long or 1e-9)
+    netto_ratio = move_pct / atr_long
+
+    # Сжатие волатильности при движении цены = инерция без энергии
+    vol_contracting = atr_short < atr_long * 0.75
+    moving = move_pct > atr_long * 0.3
+    if vol_contracting and moving:
+        contraction = min(1.0, (atr_long - atr_short) / (atr_long + 1e-9))
+        return round(-direction * min(0.65, 0.30 + contraction * 0.45), 4)
 
     if netto_ratio > 1.8 or path_ratio > 2.5:
-        # Истощение: пройдено много ATR
+        # Пройдено слишком много ATR → топливо кончилось
         excess = min(1.0, (netto_ratio - 1.5) / 1.5)
         return round(-direction * min(0.70, 0.35 + excess * 0.45), 4)
 
     if netto_ratio < 0.40:
-        # Потенциал: мало пройдено, рынок ещё не определился
+        # Потенциал не использован → рынок ещё не определился
         slack = min(1.0, (0.40 - netto_ratio) / 0.40)
         return round(direction * min(0.35, 0.15 + slack * 0.25), 4)
 
