@@ -1507,6 +1507,7 @@ def run_backtest_one(
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
                      "rejection_stats": rej,
+                     "method_stats": _method_stats_from_trades(fixed_trades),
                      "method_stats_by_regime": _method_stats_by_regime_from_trades(fixed_trades),
                      "trades_list": _trades_list_compact(fixed_trades), **fixed})
 
