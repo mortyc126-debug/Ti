@@ -1347,8 +1347,10 @@ def _method_stats_from_trades(trades: list[dict]) -> dict:
     return {
         mname: {
             "agree_n": e["agree_n"],
+            "agree_win": e["agree_win"],
             "agree_win_rate": e["agree_win"] / e["agree_n"] if e["agree_n"] else None,
             "disagree_n": e["disagree_n"],
+            "disagree_win": e["disagree_win"],
             "disagree_win_rate": e["disagree_win"] / e["disagree_n"] if e["disagree_n"] else None,
         }
         for mname, e in tally.items()
