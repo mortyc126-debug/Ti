@@ -261,10 +261,8 @@ BOCD_NARRATIVE_SYNC_THR = 0.60
 _GATE_GROUPS: dict[str, frozenset] = {
     "trend": frozenset({"PRICE_TREND", "TREND_QUALITY", "ZLEMA_SIGNAL", "T3_SIGNAL",
                         "ADAPTIVE_MA", "DECYCLER", "SINEWAVE_SIGNAL", "SSA_SIGNAL"}),
-    "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE",
-                         "YZ_VOL_SIGNAL", "VR_SIGNAL"}),
-    "oscillator": frozenset({"CYBER_CYCLE", "FISHER_RSI", "EBSW", "RMI", "ZSCORE",
-                              "MMI_SIGNAL"}),
+    "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE"}),
+    "oscillator": frozenset({"CYBER_CYCLE", "FISHER_RSI", "EBSW", "RMI", "ZSCORE"}),
     "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
                              "CANDLE_PATTERN", "TRIANGLE", "FRACTAL", "ENTROPY",
                              "LEVEL_CONTEXT", "MKT_STRUCTURE", "SPRING"}),
@@ -7140,8 +7138,11 @@ class OICompositeStrategy(IStrategy):
         """P4: ICPrior метода для текущего режима; фолбэк на глобальный слой."""
         rg = self.__last_regime
         bucket = self.__ic_priors.get(rg)
-        if bucket is None or bucket[name].n_updates == 0:
-            return self.__ic_priors["__global__"][name]
+        global_bucket = self.__ic_priors.get("__global__", {})
+        if name not in global_bucket:
+            return ICPrior()   # метод убран из METHODS — нейтральный prior
+        if bucket is None or name not in bucket or bucket[name].n_updates == 0:
+            return global_bucket[name]
         return bucket[name]
 
     def __recalc_ic_priors(self) -> None:
