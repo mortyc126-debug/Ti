@@ -29,7 +29,7 @@
 /CLAUDE.md                        — этот файл
 ```
 
-Ветка разработки: **`claude/add-rosstat-ratios-WzAsa`** (всё пушится сюда).
+Ветка разработки: **`main`** (всё пушится сюда).
 
 ## Ключевые структуры в памяти (localStorage)
 
@@ -148,10 +148,10 @@ node -e "const t=require('fs').readFileSync('index.html','utf8'); const m=t.matc
 Должно выдавать `OK`. Если `SyntaxError` — ищи место.
 
 ### Git
-- Ветка: `claude/add-rosstat-ratios-WzAsa`.
+- Ветка: **`main`** — всегда пушить только в неё.
 - Коммиты — **на русском, развёрнутые**, объясняют что и зачем. Пример
   в `git log`.
-- После коммита — обязательный `git push -u origin claude/add-rosstat-ratios-WzAsa`.
+- После коммита — обязательный `git push -u origin main`.
 - **Не** создавать PR'ы без явной просьбы.
 - GitHub MCP доступен (scoped на `mortyc126-debug/ti`), но в большинстве
   задач нужен только `git push`.
@@ -170,7 +170,7 @@ node -e "const t=require('fs').readFileSync('index.html','utf8'); const m=t.matc
 
 ### URL для превью
 - Свежий (CDN-кеш 5-10 мин):
-  `https://raw.githack.com/mortyc126-debug/ti/claude/add-rosstat-ratios-WzAsa/index.html`
+  `https://raw.githack.com/mortyc126-debug/ti/main/index.html`
 - На конкретный коммит (мгновенно, вечный кеш):
   `https://rawcdn.githack.com/mortyc126-debug/ti/<sha>/index.html`
 
