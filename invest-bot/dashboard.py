@@ -2318,7 +2318,7 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <button class="btn-pill btn-sm ghost" onclick="showRunWeights()" title="Hedge-веса методов из текущего прогона — усиленные >1 и ослабленные <1. Наведи на строку — описание метода.">⚖️ веса прогона</button>
   <button id="btnDashView" class="btn-pill btn-sm ghost" onclick="toggleDashView()" title="Переключить между видом таблицы и видом дашборда с панелями">⊞ дашборд</button>
   <button class="btn-pill btn-sm ok" onclick="calibrateMethodWeights(this)" title="Рассчитать мультипликаторы весов методов из атрибуции и сохранить в data/ticker_method_weights.json">💾 веса методов</button>
-  <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до равномерных 0.5. IC-prior не затрагивается.">🔄 сброс весов</button>
+  <button id="btnResetWeights" class="btn-pill btn-sm warn" onclick="resetWeights()" title="Сбросить Hedge-веса методов в oi_weights.json до 0.30 (консервативный старт). IC-prior не затрагивается.">🔄 сброс весов</button>
   <span id="status"></span>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--txt3);">
     <label><input type="checkbox" id="hide_zero" onchange="renderResultsTable()"> скрыть нулевые</label>
@@ -3552,7 +3552,7 @@ async function calibrateMethodWeights(btn) {{
 }}
 
 async function resetWeights() {{
-  if (!confirm('Сбросить все Hedge-веса методов в oi_weights.json до 0.5?\\nIC-prior не затрагивается.')) return;
+  if (!confirm('Сбросить все Hedge-веса методов в oi_weights.json до 0.30?\\nIC-prior не затрагивается.')) return;
   const btn = document.getElementById('btnResetWeights');
   btn.disabled = true; btn.textContent = '⏳…';
   try {{
@@ -6378,7 +6378,7 @@ class Handler(BaseHTTPRequestHandler):
             os.replace(tmp, path)
             self._send_json({"ok": True, "tickers": len(payload)})
         elif self.path == "/api/reset_weights":
-            # Сброс oi_weights.json: все Hedge-веса методов → 0.5 (равномерные).
+            # Сброс oi_weights.json: все Hedge-веса методов → 0.30 (консервативный старт).
             # Не удаляет файл целиком — сохраняет структуру (tickers/regimes),
             # только обнуляет накопленные веса. IC-prior'ы не трогает.
             weights_path = "oi_weights.json"
@@ -6396,12 +6396,12 @@ class Handler(BaseHTTPRequestHandler):
                             for rdata in mdata.values():
                                 for rm in rdata.values():
                                     if isinstance(rm, dict) and "weight" in rm:
-                                        rm["weight"] = 0.5
+                                        rm["weight"] = 0.30
                                         rm["total"] = 0
                                         rm["sum_quality"] = 0.0
                                         reset_count += 1
                         elif isinstance(mdata, dict) and "weight" in mdata:
-                            mdata["weight"] = 0.5
+                            mdata["weight"] = 0.30
                             mdata["total"] = 0
                             mdata["sum_quality"] = 0.0
                             reset_count += 1
