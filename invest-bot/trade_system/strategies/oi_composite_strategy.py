@@ -261,9 +261,9 @@ BOCD_NARRATIVE_SYNC_THR = 0.60
 # Группы методов для условия 2 (независимость голосов)
 _GATE_GROUPS: dict[str, frozenset] = {
     "trend": frozenset({"PRICE_TREND", "TREND_QUALITY", "ZLEMA_SIGNAL", "T3_SIGNAL",
-                        "ADAPTIVE_MA", "DECYCLER", "SINEWAVE_SIGNAL", "SSA_SIGNAL"}),
+                        "ADAPTIVE_MA", "SINEWAVE_SIGNAL", "SSA_SIGNAL"}),
     "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE"}),
-    "oscillator": frozenset({"CYBER_CYCLE", "FISHER_RSI", "EBSW", "RMI", "ZSCORE"}),
+    "oscillator": frozenset({"FISHER_RSI", "RMI", "ZSCORE"}),
     "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
                              "CANDLE_PATTERN", "TRIANGLE", "FRACTAL", "ENTROPY",
                              "LEVEL_CONTEXT", "MKT_STRUCTURE", "SPRING"}),
@@ -3928,10 +3928,8 @@ METHODS = [
     ("TREND_QUALITY",  score_trend_quality_candle),
     ("FRACTAL",        score_fractal_candle),
     ("ENTROPY",        score_entropy_candle),
-    ("CYBER_CYCLE",    score_cyber_cycle_candle),
-    ("DECYCLER",       score_decycler_candle),
+    # CYBER_CYCLE, DECYCLER, EBSW — классические пересечения нуля, не переработаны → убраны из голосования
     ("FISHER_RSI",     score_fisher_rsi_candle),
-    ("EBSW",           score_ebsw_candle),
     ("KLINGER",        score_klinger_candle),
     ("VZO",            score_vzo_candle),
     ("TWIGGS",         score_twiggs_candle),
