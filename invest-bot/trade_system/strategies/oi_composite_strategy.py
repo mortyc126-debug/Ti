@@ -1396,9 +1396,15 @@ def score_sinewave_signal(candles: list[HistoricCandle]) -> float:
 
 
 def score_mmi_signal(candles: list[HistoricCandle]) -> float:
-    """MMI_SIGNAL: убран из голосования — режим без направления.
-    Полезная роль MMI сохранена в вето-логике __compute_scores (MMI>75 → ×0.35).
-    Функция сохранена для совместимости с WEIGHTS_FILE."""
+    """MMI_SIGNAL: не в METHODS — вызывается только из вето-логики напрямую."""
+    closes = [_to_f(c.close) for c in candles]
+    if len(closes) < 5:
+        return 0.0
+    m = mmi(closes, period=min(200, len(closes)))
+    if m > 75:
+        return -0.5
+    if m < 50:
+        return 0.5
     return 0.0
 
 
@@ -1411,9 +1417,29 @@ def _log_returns(values: list[float]) -> list[float]:
 
 
 def score_yz_vol_signal(candles: list[HistoricCandle]) -> float:
-    """YZ_VOL_SIGNAL: убран из голосования — волатильность не говорит направление.
-    Режим волатильности учитывается в REGIME_WEIGHT_MODS (high_vol/low_vol).
-    Функция сохранена для совместимости с WEIGHTS_FILE."""
+    """YZ_VOL_SIGNAL: не в METHODS — режим волатильности учтён в REGIME_WEIGHT_MODS."""
+    if len(candles) < 12:
+        return 0.0
+    vols: list[float] = []
+    for i in range(1, len(candles)):
+        prev_c = _to_f(candles[i - 1].close)
+        o = _to_f(candles[i].open)
+        h = _to_f(candles[i].high)
+        lo = _to_f(candles[i].low)
+        cl = _to_f(candles[i].close)
+        if prev_c <= 0 or o <= 0 or h <= 0 or lo <= 0 or cl <= 0:
+            continue
+        overnight = math.log(o / prev_c) ** 2
+        rs = (math.log(h / cl) * math.log(h / o) + math.log(lo / cl) * math.log(lo / o))
+        vols.append(math.sqrt(max(0.0, overnight + rs)))
+    if len(vols) < 6:
+        return 0.0
+    cur = vols[-1]
+    rank = sum(1 for v in vols if v <= cur) / len(vols)
+    if rank > 0.8:
+        return -0.5
+    if rank < 0.2:
+        return 0.5
     return 0.0
 
 
@@ -1442,9 +1468,14 @@ def _variance_ratio(candles: list[HistoricCandle], q: int = 4) -> Optional[float
 
 
 def score_vr_signal(candles: list[HistoricCandle]) -> float:
-    """VR_SIGNAL: убран из голосования — Variance Ratio говорит о режиме (тренд/шум),
-    но не о направлении. Полезная роль сохранена в __noise_stop_scale (масштаб стопа).
-    Функция сохранена для совместимости с WEIGHTS_FILE."""
+    """VR_SIGNAL: не в METHODS — Variance Ratio используется в __noise_stop_scale."""
+    vr = _variance_ratio(candles)
+    if vr is None:
+        return 0.0
+    if vr > 1.3:
+        return 0.5
+    if vr < 0.7:
+        return -0.5
     return 0.0
 
 
@@ -3729,9 +3760,8 @@ METHODS = [
     ("ZLEMA_SIGNAL",   score_zlema_signal),
     ("T3_SIGNAL",      score_t3_signal),
     ("SINEWAVE_SIGNAL", score_sinewave_signal),
-    ("MMI_SIGNAL",     score_mmi_signal),
-    ("YZ_VOL_SIGNAL",  score_yz_vol_signal),
-    ("VR_SIGNAL",      score_vr_signal),
+    # MMI_SIGNAL, YZ_VOL_SIGNAL, VR_SIGNAL убраны — режим без направления.
+    # MMI → вето в __compute_scores; VR → __noise_stop_scale; YZ → REGIME_WEIGHT_MODS.
     ("SSA_SIGNAL",     score_ssa_signal),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
     ("VSA",            score_vsa),
