@@ -405,6 +405,82 @@ input[type=range] { touch-action: none; }
   background:rgba(255,0,110,0.15); border-color:rgba(255,0,110,0.4); color:#FF006E;
 }
 
+/* ══ MOBILE ≤ 600px ══ */
+@media (max-width: 600px) {
+  /* Nav: fade-edge hint */
+  .nav { position: relative; }
+  .nav::after {
+    content:''; position:absolute; right:0; top:0; bottom:0; width:24px;
+    background:linear-gradient(to right,transparent,rgba(14,17,34,0.95));
+    pointer-events:none;
+  }
+  .nav-btn { font-size: 11px; margin-right: 14px; padding: 8px 0; }
+
+  /* Topbar token+ticker row — wrap, button full width */
+  #cp-topbar-row1 { flex-wrap: wrap !important; }
+  #cp-topbar-row1 > div { flex: 1 1 40% !important; min-width: 0; }
+  #chart-load-btn { width: 100% !important; flex: 1 1 100% !important; order: 3; }
+
+  /* Main chart area — stack vertically, panel below chart */
+  #cp-main-area { flex-direction: column !important; height: auto !important; min-height: 0 !important; }
+
+  /* Chart canvases take ~55vh */
+  #cp-canvas-col { min-height: 55vh; }
+
+  /* Right panel — full width, collapsible */
+  #cp-indpanel {
+    width: 100% !important;
+    max-height: 0;
+    overflow: hidden !important;
+    transition: max-height 0.3s ease;
+    border-left: none !important;
+    border-top: 1px solid rgba(255,0,110,0.15);
+  }
+  #cp-indpanel.mob-open { max-height: 60vh; overflow: hidden !important; }
+  #cp-indpanel.mob-open > * { overflow-y: auto; }
+
+  /* Toggle button — only visible on mobile */
+  #mob-panel-toggle {
+    display: flex !important;
+    align-items: center; justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 7px 14px;
+    background: rgba(199,27,82,0.12);
+    border: none; border-top: 1px solid rgba(199,27,82,0.2);
+    color: #C71B52; font-family: var(--mono); font-size: 11px;
+    cursor: pointer; letter-spacing: 0.05em;
+  }
+
+  /* Panel tabs bigger */
+  .cp-tab { font-size: 12px !important; padding: 8px 10px !important; }
+
+  /* Tiny labels — bump up */
+  .cp-ind-group-title, .cp-subpanel-label, .cpnl-lbl, .cpnl-val,
+  .hmb, .gauge-ticks span { font-size: 11px !important; }
+
+  /* Tooltip max-width + wrap */
+  #cp-tooltip, #chart-tooltip {
+    max-width: min(280px, calc(100vw - 20px)) !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  /* Compare grid — narrower min */
+  #cmp-grid { grid-template-columns: repeat(auto-fill, minmax(min(260px,100%),1fr)) !important; }
+
+  /* Guide scroll snap */
+  #guide-scroll { scroll-snap-type: x mandatory; }
+  #guide-scroll > * { scroll-snap-align: start; min-width: calc(100vw - 32px); }
+
+  /* Ind param rows — tighter */
+  .ind-label { min-width: 60px !important; font-size: 11px !important; }
+  .num-input  { width: 52px !important; }
+}
+
+/* Toggle button hidden on desktop */
+#mob-panel-toggle { display: none; }
+
 </style>
 </head>
 <body>
@@ -687,7 +763,7 @@ input[type=range] { touch-action: none; }
     display:flex; flex-direction:column; gap:8px;
   ">
     <!-- Row 1: token + ticker + load -->
-    <div style="display:flex;gap:6px;align-items:center;">
+    <div id="cp-topbar-row1" style="display:flex;gap:6px;align-items:center;">
       <div style="position:relative;flex:1;">
         <input id="chart-token" type="password" placeholder="Токен T-Invest API…"
           autocomplete="off" oninput="chartSaveToken()"
@@ -736,11 +812,14 @@ input[type=range] { touch-action: none; }
     <button onclick="cpLoadMoex()" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:6px;padding:2px 8px;color:var(--text3);font-size:10px;font-family:var(--mono);cursor:pointer;flex-shrink:0;">↻</button>
   </div>
 
+  <!-- Toggle панели индикаторов (только мобил) -->
+  <button id="mob-panel-toggle" onclick="mobTogglePanel()">▲ Индикаторы</button>
+
   <!-- MAIN AREA: chart + right panel -->
-  <div style="display:flex;height:calc(100vh - 232px);min-height:420px;">
+  <div id="cp-main-area" style="display:flex;height:calc(100vh - 232px);min-height:420px;">
 
     <!-- LEFT: canvases stack -->
-    <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;">
+    <div id="cp-canvas-col" style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;">
 
       <!-- Price header -->
       <div style="padding:6px 12px;display:flex;align-items:baseline;gap:10px;border-bottom:1px solid rgba(255,255,255,0.04);">
@@ -7387,6 +7466,17 @@ async function cpLoadMoex() {
 
 
 // ═══════════════════════════════════════════
+// ── Мобильный тоггл панели индикаторов ──
+function mobTogglePanel() {
+  const panel = document.getElementById('cp-indpanel');
+  const btn   = document.getElementById('mob-panel-toggle');
+  if (!panel || !btn) return;
+  const open = panel.classList.toggle('mob-open');
+  btn.textContent = open ? '▼ Скрыть' : '▲ Индикаторы';
+  // после открытия перерисовать график (размеры изменились)
+  if (!open && chartCandles.length) setTimeout(chartRedraw, 350);
+}
+
 // INIT
 // ═══════════════════════════════════════════
 try { updateMain(); } catch(e) { console.error('updateMain crash:', e); }
