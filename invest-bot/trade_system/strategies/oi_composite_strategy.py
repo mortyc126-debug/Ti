@@ -1396,19 +1396,9 @@ def score_sinewave_signal(candles: list[HistoricCandle]) -> float:
 
 
 def score_mmi_signal(candles: list[HistoricCandle]) -> float:
-    """
-    MMI_SIGNAL: Market Meanness Index (indicators.py). Высокий MMI → рынок
-    "вязкий", тренд-следящие методы рискованны (лёгкий контр-голос). Низкий →
-    благоприятен для следования за движением.
-    """
-    closes = [_to_f(c.close) for c in candles]
-    if len(closes) < 5:
-        return 0.0
-    m = mmi(closes, period=min(200, len(closes)))
-    if m > 75:
-        return -0.5
-    if m < 50:
-        return 0.5
+    """MMI_SIGNAL: убран из голосования — режим без направления.
+    Полезная роль MMI сохранена в вето-логике __compute_scores (MMI>75 → ×0.35).
+    Функция сохранена для совместимости с WEIGHTS_FILE."""
     return 0.0
 
 
@@ -1421,39 +1411,9 @@ def _log_returns(values: list[float]) -> list[float]:
 
 
 def score_yz_vol_signal(candles: list[HistoricCandle]) -> float:
-    """
-    YZ_VOL_SIGNAL: Yang-Zhang волатильность (учитывает гэпы overnight + тело
-    бара) и её перцентиль в скользящем окне. Высокая волатильность (>80-й
-    перцентиль) — risk-off (−0.5); низкая (<20-й) — спокойный фон (+0.5).
-    """
-    if len(candles) < 12:
-        return 0.0
-    # покомпонентная YZ: overnight (close[-1]->open) + open->close (rogers-satchell-ish)
-    vols: list[float] = []
-    for i in range(1, len(candles)):
-        prev_c = _to_f(candles[i - 1].close)
-        o = _to_f(candles[i].open)
-        h = _to_f(candles[i].high)
-        lo = _to_f(candles[i].low)
-        cl = _to_f(candles[i].close)
-        if prev_c <= 0 or o <= 0 or h <= 0 or lo <= 0 or cl <= 0:
-            continue
-        overnight = math.log(o / prev_c) ** 2
-        rs = 0.0
-        if h > 0 and cl > 0 and o > 0 and lo > 0:
-            rs = (math.log(h / cl) * math.log(h / o) +
-                  math.log(lo / cl) * math.log(lo / o))
-        vols.append(math.sqrt(max(0.0, overnight + rs)))
-    if len(vols) < 6:
-        return 0.0
-    cur = vols[-1]
-    hist = sorted(vols)
-    # перцентиль текущего значения среди исторических
-    rank = sum(1 for v in hist if v <= cur) / len(hist)
-    if rank > 0.8:
-        return -0.5
-    if rank < 0.2:
-        return 0.5
+    """YZ_VOL_SIGNAL: убран из голосования — волатильность не говорит направление.
+    Режим волатильности учитывается в REGIME_WEIGHT_MODS (high_vol/low_vol).
+    Функция сохранена для совместимости с WEIGHTS_FILE."""
     return 0.0
 
 
@@ -1482,17 +1442,9 @@ def _variance_ratio(candles: list[HistoricCandle], q: int = 4) -> Optional[float
 
 
 def score_vr_signal(candles: list[HistoricCandle]) -> float:
-    """
-    VR_SIGNAL: VR>1.3 → +0.5 (тренд), VR<0.7 → −0.5 (возврат к среднему),
-    иначе нейтрально. См. _variance_ratio.
-    """
-    vr = _variance_ratio(candles)
-    if vr is None:
-        return 0.0
-    if vr > 1.3:
-        return 0.5
-    if vr < 0.7:
-        return -0.5
+    """VR_SIGNAL: убран из голосования — Variance Ratio говорит о режиме (тренд/шум),
+    но не о направлении. Полезная роль сохранена в __noise_stop_scale (масштаб стопа).
+    Функция сохранена для совместимости с WEIGHTS_FILE."""
     return 0.0
 
 
@@ -6033,17 +5985,14 @@ class OICompositeStrategy(IStrategy):
             composite *= _LEVEL_VETO_MULT
 
         # Расширенное вето 1: MMI > 75 (рынок случайный) — подавляем трендовые
-        # сигналы. MMI_SIGNAL возвращает -0.5 при m>75, 0.5 при m<50.
-        # Если он сильно против — трендовые плейбуки нейтрализуем.
-        try:
-            mmi_idx = BASE_METHOD_NAMES.index("MMI_SIGNAL")
-            mmi_score = scores[mmi_idx]
-        except (ValueError, IndexError):
-            mmi_score = 0.0
+        # сигналы. MMI читается напрямую (не через scores: score_mmi_signal
+        # теперь 0.0, чтобы не давать ложный направленный голос в композите).
+        closes_for_mmi = [_to_f(c.close) for c in self.__candles] if self.__candles else []
+        _mmi_val = mmi(closes_for_mmi, period=min(200, len(closes_for_mmi))) if len(closes_for_mmi) >= 5 else 50.0
         trend_playbook_active = any(p in ("TREND_PULLBACK_L", "TREND_PULLBACK_S", "REGIME_SHIFT") for p in active_playbooks)
-        if mmi_score < -0.4 and abs(composite) > 0.05 and not trend_playbook_active:
+        if _mmi_val > 75 and abs(composite) > 0.05 and not trend_playbook_active:
             composite *= 0.35
-            logger.debug(f"{self.__settings.figi}: MMI вето (рынок вязкий) → ×0.35")
+            logger.debug(f"{self.__settings.figi}: MMI вето (рынок вязкий, MMI={_mmi_val:.1f}) → ×0.35")
 
         # Расширенное вето 2: FRACTAL (Hurst < 0.5) — mean-reverting рынок,
         # подавляем трендовые методы (PRICE_TREND/ZLEMA/T3 доминируют в сумме).
