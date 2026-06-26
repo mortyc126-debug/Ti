@@ -4261,6 +4261,157 @@ def score_alligator(candles: list[HistoricCandle]) -> float:
     return round(max(-1.0, min(1.0, score)), 4)
 
 
+# ── Расширение тейк-профита при сильном потенциале ────────────────────────────
+
+def _tp_extension_mult(candles: list, is_long: bool) -> float:
+    """
+    Оценивает потенциал продолжения движения по набору признаков.
+
+    Три признака → ×1.5 (тейк на 50% дальше).
+    Четыре+ включая Fisher RSI в крайности → ×2.0 (тейк вдвое дальше).
+
+    Признаки: Klinger в экстремуме не переключается, Fisher RSI в крайности,
+    объём на импульсах держится, Donchian расширяется, VZO асимметрия чистая,
+    MAMA/FAMA расходятся, ATR растёт, Z-score усиливается в сторону движения.
+    """
+    if not candles or len(candles) < 25:
+        return 1.0
+
+    try:
+        hl   = [_to_f(c.high)  for c in candles]
+        ll   = [_to_f(c.low)   for c in candles]
+        cl   = [_to_f(c.close) for c in candles]
+        vl   = [float(c.volume) for c in candles]
+        n    = len(cl)
+
+        score = 0
+        fisher_holding = False
+
+        # 1. Klinger в экстремуме + не переключается + в нужную сторону
+        try:
+            fast = min(34, n // 2); slow = min(55, n - 1)
+            kvo = klinger_oscillator(hl, ll, cl, vl, fast=fast, slow=slow)
+            if len(kvo) >= 3:
+                rms = (sum(x * x for x in kvo[-20:]) / min(20, n)) ** 0.5 or 1.0
+                kvo_dir_ok = (kvo[-1] > 0) == is_long
+                kvo_extreme = abs(kvo[-1]) > rms * 1.1
+                kvo_stable  = abs(kvo[-1]) >= abs(kvo[-2]) * 0.80
+                if kvo_dir_ok and kvo_extreme and kvo_stable:
+                    score += 1
+        except Exception:
+            pass
+
+        # 2. Fisher RSI в крайности + там держится
+        try:
+            fr = fisher_rsi(cl, period=min(10, n - 1))
+            if len(fr) >= 3:
+                EXTREME = 1.8
+                fr_now = fr[-1]
+                fr_dir_ok = (fr_now > 0) == is_long
+                fr_in_ext = abs(fr_now) > EXTREME
+                fr_stable  = abs(fr_now) >= abs(fr[-2]) * 0.85
+                if fr_dir_ok and fr_in_ext and fr_stable:
+                    score += 1
+                    fisher_holding = True
+        except Exception:
+            pass
+
+        # 3. Объём на последних импульсах держится (не падает)
+        try:
+            vol_recent = sum(vl[-5:]) / 5
+            vol_base   = sum(vl[-15:]) / 15
+            if vol_base > 0 and vol_recent >= vol_base * 0.88:
+                score += 1
+        except Exception:
+            pass
+
+        # 4. Donchian расширяется в сторону движения
+        try:
+            p = min(20, n - 1)
+            cur_upper = max(hl[-p:]); cur_lower = min(ll[-p:])
+            if n > p + 5:
+                old_upper = max(hl[-p - 5:-5]); old_lower = min(ll[-p - 5:-5])
+            else:
+                old_upper, old_lower = cur_upper, cur_lower
+            cur_range = cur_upper - cur_lower
+            old_range = old_upper - old_lower
+            expanding = cur_range > old_range * 1.04
+            upper_broke = cur_upper > old_upper and is_long
+            lower_broke = cur_lower < old_lower and not is_long
+            if expanding and (upper_broke or lower_broke):
+                score += 1
+        except Exception:
+            pass
+
+        # 5. VZO асимметрия чистая (объём в одну сторону)
+        try:
+            sv = []
+            for i in range(n):
+                rng = (hl[i] - ll[i]) or 1e-9
+                sv.append(vl[i] * (2 * (cl[i] - ll[i]) / rng - 1))
+            alpha_v = 2 / 15
+            esv = [sv[0]]; ev = [vl[0]]
+            for i in range(1, n):
+                esv.append(alpha_v * sv[i] + (1 - alpha_v) * esv[-1])
+                ev.append(alpha_v * vl[i] + (1 - alpha_v) * ev[-1])
+            vzo_now = esv[-1] / ev[-1] if ev[-1] else 0.0
+            vzo_ok = (vzo_now > 0.20 and is_long) or (vzo_now < -0.20 and not is_long)
+            if vzo_ok:
+                score += 1
+        except Exception:
+            pass
+
+        # 6. MAMA/FAMA расходятся (тренд усиливается)
+        try:
+            from indicators_ehlers import mama_fama as _mf
+            ms, fs, _ = _mf(cl)
+            def _lv(arr, k=1):
+                v = [x for x in arr if not (isinstance(x, float) and math.isnan(x))]
+                return v[-k] if len(v) >= k else None
+            m1, f1, m3, f3 = _lv(ms,1), _lv(fs,1), _lv(ms,3), _lv(fs,3)
+            if None not in (m1, f1, m3, f3):
+                pr = abs(m1) or 1.0
+                gap_now = abs(m1 - f1) / pr
+                gap_3   = abs(m3 - f3) / pr
+                dir_ok  = (m1 > f1) == is_long
+                if dir_ok and gap_now > gap_3 * 1.05:
+                    score += 1
+        except Exception:
+            pass
+
+        # 7. ATR растёт (волатильность нарастает, каскад ускоряется)
+        try:
+            atr_s = _compute_atr(candles[-12:], period=7) if n >= 12 else 0.0
+            atr_l = _compute_atr(candles,       period=21)
+            if atr_l > 0 and atr_s > atr_l * 1.10:
+                score += 1
+        except Exception:
+            pass
+
+        # 8. Z-score усиливается в сторону движения
+        try:
+            pw = min(20, n)
+            ww = cl[-pw:]
+            mu = sum(ww) / pw
+            sd = (sum((x - mu) ** 2 for x in ww) / pw) ** 0.5
+            if sd > 1e-9:
+                z = (cl[-1] - mu) / sd
+                z_dir_ok = (z > 0.8 and is_long) or (z < -0.8 and not is_long)
+                if z_dir_ok:
+                    score += 1
+        except Exception:
+            pass
+
+        if score >= 4 and fisher_holding:
+            return 2.0
+        if score >= 3:
+            return 1.5
+        return 1.0
+
+    except Exception:
+        return 1.0
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -5883,6 +6034,11 @@ class OICompositeStrategy(IStrategy):
             noise_scale = sig.get("noise_scale", 1.0)
             take_dist *= noise_scale
             stop_dist *= noise_scale
+
+            # Расширение тейка при наличии признаков сильного потенциала на входе
+            _hist = sig.get("history_window") or []
+            _tp_ext = _tp_extension_mult(_hist, direction == SignalType.LONG)
+            take_dist *= _tp_ext
 
             if direction == SignalType.LONG:
                 take_price = entry * (1 + take_dist)
