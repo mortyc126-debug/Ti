@@ -11,7 +11,8 @@ ENTROPY-методу: низкая энтропия (предсказуемое 
 import math
 
 __all__ = ("fdi", "hurst_exponent", "pfe", "shannon_entropy", "permutation_entropy",
-           "score_fractal", "score_entropy_regime")
+           "score_fractal", "score_entropy_regime",
+           "choppiness_index", "efficiency_ratio", "chop_energy_mult")
 
 
 def fdi(closes: list[float], period: int = 30) -> float:
@@ -179,6 +180,127 @@ def score_fractal(closes: list[float]) -> float:
     s_pfe = _score_pfe(pfe(closes, period=min(10, len(closes) - 1)))
     trend_confidence = max(0.0, (s_fdi + s_hurst) / 2)
     return max(-1.0, min(1.0, s_pfe * (0.5 + 0.5 * trend_confidence)))
+
+
+def choppiness_index(highs: list[float], lows: list[float], closes: list[float],
+                     period: int = 14) -> list[float]:
+    """
+    Choppiness Index (Dreiss, 1993). Шкала 0–100.
+    >61.8 — хаотичный рынок (боковик), <38.2 — трендовый.
+    Возвращает ряд значений по всей длине входных данных.
+    """
+    n = len(closes)
+    result = [50.0] * n
+    if n < period + 1:
+        return result
+    # True Range
+    tr = [0.0] * n
+    tr[0] = highs[0] - lows[0]
+    for i in range(1, n):
+        tr[i] = max(highs[i] - lows[i],
+                    abs(highs[i] - closes[i - 1]),
+                    abs(lows[i] - closes[i - 1]))
+    log_period = math.log10(period)
+    for i in range(period, n):
+        atr_sum = sum(tr[i - period + 1:i + 1])
+        hi_p = max(highs[i - period + 1:i + 1])
+        lo_p = min(lows[i - period + 1:i + 1])
+        rng = hi_p - lo_p
+        if rng <= 0 or atr_sum <= 0:
+            result[i] = result[i - 1]
+            continue
+        result[i] = 100.0 * math.log10(atr_sum / rng) / log_period
+    return result
+
+
+def efficiency_ratio(closes: list[float], period: int = 14) -> list[float]:
+    """
+    Efficiency Ratio (Kaufman, 1995). Шкала 0–1.
+    1.0 — цена шла строго в одну сторону, 0.0 — металась без прогресса.
+    Используется для подтверждения смены режима совместно с Choppiness.
+    """
+    n = len(closes)
+    result = [0.5] * n
+    for i in range(period, n):
+        window = closes[i - period:i + 1]
+        direction = abs(window[-1] - window[0])
+        volatility = sum(abs(window[j] - window[j - 1]) for j in range(1, len(window)))
+        result[i] = direction / volatility if volatility > 0 else 0.5
+    return result
+
+
+def chop_energy_mult(highs: list[float], lows: list[float], closes: list[float],
+                     period: int = 14,
+                     chop_threshold: float = 61.8,
+                     trend_threshold: float = 38.2) -> float:
+    """
+    Множитель тейк-профита от «накопленной энергии хаоса».
+
+    Логика (по описанию пользователя):
+    1. Считаем как долго Choppiness Index был выше порога перед текущим баром.
+    2. Скорость перехода: резкое падение индекса = агрессивный слом режима.
+    3. Подтверждение ER: оба показывают переход → множитель выше.
+    4. Если жёсткость ниже нормы → коэф 0.8 (каскад слабее обычного).
+
+    Возвращает float [0.7 .. 2.0] для масштабирования take_dist.
+    """
+    n = len(closes)
+    if n < period * 3:
+        return 1.0
+
+    ci = choppiness_index(highs, lows, closes, period)
+    er = efficiency_ratio(closes, period)
+
+    # Текущее значение
+    ci_now = ci[-1]
+    er_now = er[-1]
+
+    # Не в момент перехода — нейтрально
+    if ci_now > 50:
+        return 1.0   # рынок всё ещё хаотичен, не входить или обычные тейки
+
+    # Считаем длительность предшествующей жёсткости (сколько баров ci > chop_threshold)
+    chop_bars = 0
+    for i in range(n - 2, max(0, n - 120), -1):
+        if ci[i] > chop_threshold:
+            chop_bars += 1
+        else:
+            break
+
+    # Нормируем на «типичную» жёсткость: медиана серий выше порога за всю историю
+    # Упрощение: берём 6 баров как «норму» (пользователь: 3-5 дней = норма)
+    norm_bars = 6.0
+
+    # Скорость падения индекса за последние 3 бара
+    look_back = min(3, n - 1)
+    ci_prev = ci[-1 - look_back]
+    drop_speed = (ci_prev - ci_now) / (look_back or 1)   # >0 = падает, быстро = >10/бар
+
+    # Коэффициент от длительности хаоса
+    if chop_bars < norm_bars * 0.7:
+        duration_k = 0.80   # ниже нормы — каскад слабее
+    elif chop_bars < norm_bars * 1.5:
+        duration_k = 1.00   # норма
+    elif chop_bars < norm_bars * 2.5:
+        duration_k = 1.30
+    elif chop_bars < norm_bars * 4.0:
+        duration_k = 1.60
+    else:
+        duration_k = 2.00   # очень долгий боковик → максимальная энергия
+
+    # Коэффициент от скорости перехода
+    if drop_speed > 15:
+        speed_k = 1.20   # резкий слом режима
+    elif drop_speed > 7:
+        speed_k = 1.10
+    else:
+        speed_k = 1.00
+
+    # ER подтверждение
+    er_k = 1.10 if er_now > 0.50 else 1.00
+
+    result = duration_k * speed_k * er_k
+    return max(0.70, min(2.00, result))
 
 
 def score_entropy_regime(closes: list[float]) -> float:

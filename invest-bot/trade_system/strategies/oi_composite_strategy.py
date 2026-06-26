@@ -82,7 +82,7 @@ from narrative import (
     fit_narrative_thresholds,
 )
 from indicators import score_adaptive_ma, score_trend_quality, zlema, t3, mmi
-from indicators_fractal import score_fractal, score_entropy_regime
+from indicators_fractal import score_fractal, score_entropy_regime, chop_energy_mult
 from indicators_ehlers import (
     score_cyber_cycle, score_decycler, score_fisher_rsi, score_ebsw, even_better_sinewave,
     score_mama_fama, score_ehlers_mode, score_cyber_phase,
@@ -1225,8 +1225,19 @@ def score_trend_quality_candle(candles: list[HistoricCandle]) -> float:
 
 
 def score_fractal_candle(candles: list[HistoricCandle]) -> float:
-    """FRACTAL: среднее FDI/Hurst/PFE-скоров (indicators_fractal.py, Фаза 3)."""
-    return score_fractal([_to_f(c.close) for c in candles])
+    """FRACTAL: убран из голосования — FDI/Hurst не дают направление. Всегда 0.0.
+    Функция сохранена для обратной совместимости весов в WEIGHTS_FILE."""
+    return 0.0
+
+
+def _chop_energy_mult_candle(candles: list[HistoricCandle]) -> float:
+    """Множитель тейка от накопленной энергии хаоса (Choppiness + ER)."""
+    if len(candles) < 30:
+        return 1.0
+    highs  = [_to_f(c.high)  for c in candles]
+    lows   = [_to_f(c.low)   for c in candles]
+    closes = [_to_f(c.close) for c in candles]
+    return chop_energy_mult(highs, lows, closes)
 
 
 def score_entropy_candle(candles: list[HistoricCandle]) -> float:
@@ -6722,22 +6733,27 @@ class OICompositeStrategy(IStrategy):
         сделка держится десятки баров (см. ATR_SCALE_HOLDING_BARS).
         """
         noise_scale = self.__noise_stop_scale()
+        # Множитель тейка от накопленной энергии хаоса: чем дольше был боковик,
+        # тем больше позиций накоплено и тем дальше ставим тейк при каскаде.
+        # Стоп не трогаем — он защищает от потерь независимо от энергии.
+        chop_k = _chop_energy_mult_candle(self.__candles) if len(self.__candles) >= 30 else 1.0
         take_k = self.__atr_take_k if self.__atr_take_k is not None else self.__auto_atr_take_k
         stop_k = self.__atr_stop_k if self.__atr_stop_k is not None else self.__auto_atr_stop_k
         if take_k is not None and stop_k is not None and atr_pct > 0:
             scale_exp = self.__atr_scale_exp if self.__atr_scale_exp is not None else self.__auto_atr_scale_exp
             hold_scale = ATR_SCALE_HOLDING_BARS ** scale_exp if scale_exp else 1.0
-            take_off = Decimal(str(take_k * atr_pct * hold_scale * noise_scale))
+            take_off = Decimal(str(take_k * atr_pct * hold_scale * noise_scale * chop_k))
             stop_off = Decimal(str(stop_k * atr_pct * hold_scale * noise_scale))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
         scale = Decimal(str(noise_scale))
+        chop_d = Decimal(str(chop_k))
         if direction == SignalType.LONG:
-            take_off = (self.__long_take - Decimal("1")) * scale
+            take_off = (self.__long_take - Decimal("1")) * scale * chop_d
             stop_off = (Decimal("1") - self.__long_stop) * scale
             return Decimal("1") + take_off, Decimal("1") - stop_off
-        take_off = (Decimal("1") - self.__short_take) * scale
+        take_off = (Decimal("1") - self.__short_take) * scale * chop_d
         stop_off = (self.__short_stop - Decimal("1")) * scale
         return Decimal("1") - take_off, Decimal("1") + stop_off
 
