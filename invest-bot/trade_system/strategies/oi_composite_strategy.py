@@ -1640,15 +1640,21 @@ def score_donchian_candle(candles: list[HistoricCandle]) -> float:
 
 def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
     """
-    TWIGGS: Twiggs Money Flow — поток денег как прокси дельты.
+    TWIGGS: детектор фазового перехода денежного потока.
 
-    Шесть режимов (все без нулевого пересечения как примитивного сигнала):
-    1. Базовое направление + сила потока (tanh-нормировка)
-    2. Дивергенция: цена делает экстремум, TMF не подтверждает → затухание
-    3. Насыщение: TMF в экстремуме ≥3 бара → сигнал разворота
-    4. Скорость: TMF и цена синхронно ускоряются → подтверждение, иначе штраф
-    5. Накопление в боковике: TMF долго чуть выше нуля → абсорбция
-    6. Вспышка: TMF резко вырос и упал → импульс зафиксирован, не добавляться
+    TMF как индикатор состояния цикла денег, не «куда идут».
+    Когда TMF в экстремуме — фаза накопления/распределения завершается.
+    Когда начинает разворачиваться — выброс в противоположную сторону.
+
+    1. Экстремум + поворот: TMF был высоко/низко, начал разворачиваться →
+       деньги сменили сторону, выброс. Главный сигнал.
+    2. Насыщение (streak ≥3 баров в экстремуме): максимальное напряжение →
+       усиление сигнала разворота как у Fisher.
+    3. Дивергенция: цена на новом экстремуме, TMF не подтверждает → ловушка.
+    4. Вспышка: TMF резко вырос и уже падает → деньги вошли и вышли,
+       пора в обратную сторону.
+    5. Тихое накопление в боковике → направленный выброс (единственный
+       про-направленный сигнал: энергия накоплена, ещё не реализована).
     """
     h, l, c, v = _hlcv(candles)
     n = len(c)
@@ -1659,55 +1665,72 @@ def score_twiggs_candle(candles: list[HistoricCandle]) -> float:
     if len(tmf) < 5:
         return 0.0
 
-    tmf_now = tmf[-1]
+    tmf_now  = tmf[-1]
+    tmf_prev = tmf[-2]
 
-    # 1. Базовый сигнал: сила и направление, не бинарный порог
-    base = math.tanh(tmf_now * 5.0)
+    EXTREME = 0.65
 
-    # 2. Дивергенция за lookback баров
+    # 1. Экстремум + поворот = смена фазы денежного потока
+    at_top    = tmf_now > EXTREME
+    at_bottom = tmf_now < -EXTREME
+    turning_down = at_top    and tmf_now < tmf_prev
+    turning_up   = at_bottom and tmf_now > tmf_prev
+
+    if turning_up:
+        phase = 0.85
+    elif turning_down:
+        phase = -0.85
+    elif at_top:
+        phase = -0.25   # ещё в экстремуме, но сигнализируем насыщение
+    elif at_bottom:
+        phase = 0.25
+    else:
+        # Вне экстремума: слабый сигнал по направлению (деньги ещё накапливаются)
+        phase = math.tanh(tmf_now * 3.0) * 0.30
+
+    # 2. Streak в экстремуме усиливает сигнал разворота
+    streak = 0
+    for val in reversed(tmf[:-1]):
+        if abs(val) > EXTREME:
+            streak += 1
+        else:
+            break
+    if (turning_up or turning_down) and streak >= 2:
+        phase *= 1.0 + min(0.45, streak * 0.15)
+
+    # 3. Дивергенция: цена на экстремуме, TMF нет → ловушка
     lb = min(20, n - 1)
-    price_dir = c[-1] - c[-lb]
-    tmf_dir   = tmf[-1] - tmf[-lb]
+    price_chg = c[-1] - c[-lb]
+    tmf_chg   = tmf[-1] - tmf[-lb]
     divergence = 0.0
-    if price_dir < -1e-4 and tmf_dir > 0.02:     # цена вниз, деньги не подтверждают → бычья дивергенция
-        divergence = min(0.6, tmf_dir * 8)
-    elif price_dir > 1e-4 and tmf_dir < -0.02:   # цена вверх, деньги уходят → медвежья дивергенция
-        divergence = max(-0.6, tmf_dir * 8)
+    if price_chg < -1e-4 and tmf_chg > 0.02:
+        divergence = min(0.55, tmf_chg * 7)
+    elif price_chg > 1e-4 and tmf_chg < -0.02:
+        divergence = max(-0.55, tmf_chg * 7)
 
-    # 3. Насыщение: TMF прилип к экстремуму ≥3 баров → вероятен откат
-    sat_win = min(5, n)
-    sat_vals = tmf[-sat_win:]
-    at_extreme = sum(1 for x in sat_vals if abs(x) > 0.75)
-    saturation = 0.0
-    if at_extreme >= 3:
-        saturation = -math.copysign(0.4, tmf_now)   # контр-сигнал
+    # 4. Вспышка: TMF резко вырос и уже падает → деньги вошли и вышли
+    flash = 0.0
+    if len(tmf) >= 4:
+        peak = max(abs(x) for x in tmf[-4:-1])
+        if peak > 0.70 and abs(tmf_now) < peak * 0.50:
+            flash = -math.copysign(0.40, tmf[-2])
 
-    # 4. Синхронность скорости TMF и цены
-    lb3 = min(4, n - 1)
-    price_mom = (c[-1] - c[-lb3]) / (abs(c[-lb3]) + 1e-9)
-    tmf_mom   = tmf[-1] - tmf[-lb3]
-    in_sync = (price_mom > 0 and tmf_mom > 0) or (price_mom < 0 and tmf_mom < 0)
-    speed_mult = 1.15 if in_sync else 0.70
-
-    # 5. Тихое накопление в боковике: TMF долго умеренно позитивен/негативен
+    # 5. Тихое накопление: TMF долго умеренно в одну сторону при плоской цене
     acc_win = min(10, n)
     acc_vals = tmf[-acc_win:]
-    pos_count = sum(1 for x in acc_vals if 0.02 < x < 0.6)
-    neg_count = sum(1 for x in acc_vals if -0.6 < x < -0.02)
+    pos_count = sum(1 for x in acc_vals if 0.05 < x < EXTREME)
+    neg_count = sum(1 for x in acc_vals if -EXTREME < x < -0.05)
     accumulation = 0.0
-    if pos_count >= acc_win * 0.7 and abs(tmf_now) < 0.7:
-        accumulation = 0.25   # тихое накопление
-    elif neg_count >= acc_win * 0.7 and abs(tmf_now) < 0.7:
-        accumulation = -0.25  # тихое распределение
+    lb2 = min(acc_win, n - 1)
+    price_range_pct = (max(c[-lb2:]) - min(c[-lb2:])) / (c[-1] + 1e-9)
+    flat = price_range_pct < 0.015
+    if flat:
+        if pos_count >= acc_win * 0.7:
+            accumulation = 0.35   # деньги тихо накапливались → выброс вверх
+        elif neg_count >= acc_win * 0.7:
+            accumulation = -0.35
 
-    # 6. Вспышка: TMF резко рванул и уже падает — импульс зафиксирован
-    flash = 0.0
-    if n >= 4:
-        peak = max(abs(x) for x in tmf[-4:-1])
-        if peak > 0.7 and abs(tmf_now) < peak * 0.5:
-            flash = -math.copysign(0.3, tmf[-2])   # деньги вошли и вышли
-
-    result = base * speed_mult + divergence * 0.5 + saturation + accumulation + flash
+    result = phase + divergence * 0.45 + flash + accumulation
     return max(-1.0, min(1.0, result))
 
 
