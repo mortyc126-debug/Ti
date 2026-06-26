@@ -7264,22 +7264,30 @@ function cpInitCanvasEvents() {
   });
 
   // Touch: свайп (пан) + пинч (зум) + тап (кроссхэр)
-  let tx0=null, toff0=0, tpinch0=null, tcw0=0;
+  let tx0=null, ty0=null, toff0=0, tpinch0=null, tcw0=0, tIsHoriz=null;
   c.addEventListener('touchstart', e => {
     if (e.touches.length === 1) {
-      tx0 = e.touches[0].clientX; toff0 = chartOffset; tpinch0 = null;
+      tx0 = e.touches[0].clientX; ty0 = e.touches[0].clientY;
+      toff0 = chartOffset; tpinch0 = null; tIsHoriz = null;
     } else if (e.touches.length === 2) {
       tpinch0 = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
-      tcw0 = chartCandleW; tx0 = null;
+      tcw0 = chartCandleW; tx0 = null; tIsHoriz = null;
     }
   }, { passive: true });
   c.addEventListener('touchmove', e => {
-    e.preventDefault();
     if (e.touches.length === 1 && tx0 !== null) {
+      const dx = Math.abs(e.touches[0].clientX - tx0);
+      const dy = Math.abs(e.touches[0].clientY - ty0);
+      // определяем направление при первом движении
+      if (tIsHoriz === null && (dx > 4 || dy > 4)) tIsHoriz = dx > dy;
+      // вертикальный свайп — отдаём странице (скролл к кнопкам)
+      if (tIsHoriz === false) return;
+      e.preventDefault();
       const r = chartCandles.length / Math.max(c.offsetWidth, 1);
       chartOffset = Math.max(0, Math.min(chartCandles.length - 10, Math.round(toff0 + (tx0 - e.touches[0].clientX) * r * 1.5)));
       chartRedraw();
     } else if (e.touches.length === 2 && tpinch0 !== null) {
+      e.preventDefault();
       const dist = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
       chartCandleW = Math.max(4, Math.min(40, tcw0 * (tpinch0 / Math.max(dist, 1))));
       chartRedraw();
