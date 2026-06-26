@@ -91,7 +91,7 @@ from indicators_volume import (
     score_klinger, score_vzo, score_twiggs, score_rmi, score_zscore,  # совместимость
     score_obv_div, score_chaikin_ad, score_mfi_div,
     score_vol_asymmetry, volume_profile, score_vol_profile,
-    twiggs_money_flow,
+    twiggs_money_flow, klinger_oscillator,
 )
 from trade_system.strategies.level_pattern import (
     detect_level_pattern, build_levels, MultiTFLevelCache,
@@ -1288,10 +1288,82 @@ def _hlcv(candles: list[HistoricCandle]) -> tuple[list[float], list[float], list
 
 
 def score_klinger_candle(candles: list[HistoricCandle]) -> float:
-    """KLINGER: OBV-дивергенция (цена vs накопленный объём). +1 бычья, -1 медвежья."""
-    _, _, c, v = _hlcv(candles)
-    lb = min(20, len(c) - 1)
-    return score_obv_div(c, v, lookback=lb)
+    """
+    KLINGER: Klinger Volume Oscillator — денежный поток через истинный диапазон.
+
+    Не OBV (тот просто знак объёма). KVO учитывает направление hlc и диапазон свечи —
+    точнее показывает где деньги были агрессивны внутри бара.
+
+    1. Направление + амплитуда потока (tanh-нормировка по rolling RMS)
+    2. Дивергенция: цена на новом экстремуме, KVO нет → затухание потока
+    3. Накопление в боковике: KVO систематически в одну сторону при плоской цене
+    4. Расширение KVO/signal: сжатие = компрессия, расширение = начало выброса
+    5. Переключение: KVO пересёк нуль → инициатива переключилась
+    """
+    h, l, c, v = _hlcv(candles)
+    n = len(c)
+    if n < 20:
+        return 0.0
+    fast = min(34, n // 2)
+    slow = min(55, n - 1)
+    kvo = klinger_oscillator(h, l, c, v, fast=fast, slow=slow)
+    if len(kvo) < 5:
+        return 0.0
+    signal_period = min(13, len(kvo) // 2)
+    # signal line — EMA от KVO
+    alpha = 2 / (signal_period + 1)
+    sig = [kvo[0]]
+    for x in kvo[1:]:
+        sig.append(alpha * x + (1 - alpha) * sig[-1])
+
+    kvo_now = kvo[-1]
+    sig_now = sig[-1]
+
+    # Нормируем KVO по rolling RMS чтобы сравнивать амплитуды разных тикеров
+    rms = (sum(x * x for x in kvo[-20:]) / min(20, n)) ** 0.5 or 1.0
+
+    # 1. Направление + амплитуда: tanh нормированного значения
+    base = math.tanh(kvo_now / (rms * 1.5))
+
+    # 2. Дивергенция: цена на новом экстремуме, KVO нет
+    lb = min(20, n - 1)
+    price_chg = c[-1] - c[-lb]
+    kvo_chg   = kvo[-1] - kvo[-lb]
+    divergence = 0.0
+    if price_chg < -1e-4 and kvo_chg > rms * 0.1:    # цена вниз, поток разворачивается → бычья
+        divergence = min(0.6, kvo_chg / (rms + 1e-9) * 0.4)
+    elif price_chg > 1e-4 and kvo_chg < -rms * 0.1:  # цена вверх, поток слабеет → медвежья
+        divergence = max(-0.6, kvo_chg / (rms + 1e-9) * 0.4)
+
+    # 3. Накопление в боковике: KVO систематически в одну сторону при плоской цене
+    price_range = max(c[-lb:]) - min(c[-lb:])
+    price_mean  = sum(c[-lb:]) / lb
+    flat = price_range / (price_mean + 1e-9) < 0.015   # цена двигалась менее 1.5%
+    acc_win = min(10, n)
+    pos_kvo = sum(1 for x in kvo[-acc_win:] if x > rms * 0.05)
+    neg_kvo = sum(1 for x in kvo[-acc_win:] if x < -rms * 0.05)
+    accumulation = 0.0
+    if flat:
+        if pos_kvo >= acc_win * 0.7:
+            accumulation = 0.30    # скрытое накопление
+        elif neg_kvo >= acc_win * 0.7:
+            accumulation = -0.30   # скрытое распределение
+
+    # 4. Расширение KVO/signal: большой спред = сильный направленный поток
+    spread = kvo_now - sig_now
+    spread_norm = math.tanh(spread / (rms + 1e-9))
+    expansion_bonus = spread_norm * 0.25
+
+    # 5. Переключение: недавнее пересечение нуля = смена инициативы
+    switch = 0.0
+    if len(kvo) >= 3:
+        if kvo[-2] < 0 and kvo_now > 0:
+            switch = 0.20    # переключился в покупку
+        elif kvo[-2] > 0 and kvo_now < 0:
+            switch = -0.20   # переключился в продажу
+
+    result = base * 0.5 + divergence * 0.5 + accumulation + expansion_bonus + switch
+    return max(-1.0, min(1.0, result))
 
 
 def score_vzo_candle(candles: list[HistoricCandle]) -> float:
