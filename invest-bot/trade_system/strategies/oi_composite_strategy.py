@@ -1380,18 +1380,14 @@ def score_mama_fama_candle(candles: list[HistoricCandle]) -> float:
     converging    = gap_now < gap_3 * 0.85
 
     if was_diverging and converging:
-        # Определяем направление предыдущего разрыва
-        direction = 1 if (m8 - f8) > 0 else -1
+        # Цикл завершается: линии сходятся после расхождения.
+        # Точка максимальной неопределённости приближается — вот-вот новый цикл
+        # в противоположную сторону, часто резкий потому что цикл накопился.
+        old_direction = 1 if (m8 - f8) > 0 else -1
         convergence_speed = min(1.0, (gap_3 - gap_now) / (gap_3 + 1e-9))
-        # Антисигнал: против направления прежнего разрыва
-        anti = -direction * min(0.70, 0.35 + convergence_speed * 0.45)
-
-        # Проверяем что цена продолжает двигаться в старом направлении (ловушка)
-        lb = min(8, n - 1)
-        price_move = (closes[-1] - closes[-lb]) / (closes[-lb] + 1e-9)
-        price_dir = 1 if price_move > 0 else -1
-        if price_dir == direction and abs(price_move) > 0.002:
-            return max(-1.0, min(1.0, anti))
+        reversal_strength = min(0.75, 0.35 + convergence_speed * 0.50)
+        # Сигнал разворота: против направления завершающегося цикла
+        return max(-1.0, min(1.0, -old_direction * reversal_strength))
 
     return base
 
@@ -1722,14 +1718,13 @@ def score_rmi_candle(candles: list[HistoricCandle]) -> float:
 
 def score_zscore_candle(candles: list[HistoricCandle]) -> float:
     """
-    ZSCORE: антисигнал на статистически незначимое движение.
+    ZSCORE: детектор исчерпания энергии → сигнал разворота.
 
-    Z-score близко к 0 при движущейся цене = движение без статистической базы,
-    это шум а не тренд. Входить в такое движение — ловушка.
+    Z близко к 0 при движущейся цене = цена на пределе напряжения в текущую сторону,
+    энергия в этом направлении кончилась. Вот-вот переключится, часто резче.
+    Сигнал: разворот в противоположную сторону.
 
-    1. |Z| < 0.5 при движении цены → против направления (движение = шум)
-    2. |Z| > 2   → возврат к среднему (классический контрарный)
-    3. Середина   → нейтрально
+    |Z| > 2 = экстремальное отклонение → классический возврат к среднему.
     """
     closes = [_to_f(c.close) for c in candles]
     n = len(closes)
@@ -1748,9 +1743,10 @@ def score_zscore_candle(candles: list[HistoricCandle]) -> float:
     moving = abs(price_move) > 0.003
     direction = 1 if price_move > 0 else -1
 
-    # Z ≈ 0: движение статистически незначимо → антисигнал против цены
+    # Z ≈ 0 при движущейся цене: энергия в этом направлении исчерпана → разворот
     if abs(z) < 0.5 and moving:
-        return max(-1.0, min(1.0, -direction * min(0.70, abs(price_move) * 60)))
+        reversal_strength = min(0.75, 0.40 + abs(price_move) * 40)
+        return max(-1.0, min(1.0, -direction * reversal_strength))
 
     # |Z| > 2: экстремальное отклонение → возврат к среднему
     if z > 2.0:
@@ -2137,19 +2133,20 @@ def score_vsa(candles: list[HistoricCandle]) -> float:
     if (not is_up and vol_ratio > 1.5 and spread_ratio > 1.1 and close_pos < 0.35):
         signals.append(-0.8)
 
-    # ── Широкий спред + низкий объём = ложный пробой (антисигнал) ─────────────
-    # Цена показывает большое движение, но объём не поддерживает → не верить
+    # ── Широкий спред + низкий объём = охота за стопами ───────────────────────
+    # Цена выбила стопы (широкая свеча), но объём мал = стопы собраны, инициативы нет.
+    # Охота завершена → цена разворачивается и идёт в противоположную сторону резче.
     if spread_ratio > 1.3 and vol_ratio < 0.60:
-        anti_dir = 1 if is_up else -1
-        signals.append(-anti_dir * 0.75)   # против направления свечи
+        stop_hunt_dir = 1 if is_up else -1
+        signals.append(-stop_hunt_dir * 0.80)  # разворот после охоты
 
-    # ── Узкий спред + высокий объём = поглощение (антисигнал движения) ─────────
-    # Большой объём при маленьком движении = кто-то поглощает, цена не пойдёт
+    # ── Узкий спред + высокий объём = поглощение → каскад в другую сторону ────
+    # Огромный объём не двигает цену = поглощение. Когда поглощение завершится,
+    # цена резко пойдёт в противоположную сторону — накопленная энергия выйдет.
     if spread_ratio < 0.55 and vol_ratio > 1.8:
-        # Направление поглощения: цена выше или ниже середины предыдущих баров
         recent_close = sum(_to_f(c.close) for c in candles[-5:-1]) / 4
         absorb_dir = 1 if cl > recent_close else -1
-        signals.append(-absorb_dir * 0.70)  # против направления накопленного движения
+        signals.append(-absorb_dir * 0.75)  # каскад против направления поглощения
 
     if not signals:
         return 0.0
@@ -4117,15 +4114,19 @@ def score_atr_exhaustion(candles: list[HistoricCandle]) -> float:
     path_ratio  = total_path / (first_close * atr_long or 1e-9)
     netto_ratio = move_pct / atr_long
 
-    # Сжатие волатильности при движении цены = инерция без энергии
+    # Сжатие волатильности = максимальная компрессия энергии
+    # Волатильность на минимуме → выброс неизбежен и будет резким
+    # Направление: по стороне куда цена медленно дрейфовала во время сжатия
     vol_contracting = atr_short < atr_long * 0.75
-    moving = move_pct > atr_long * 0.3
-    if vol_contracting and moving:
+    if vol_contracting:
         contraction = min(1.0, (atr_long - atr_short) / (atr_long + 1e-9))
-        return round(-direction * min(0.65, 0.30 + contraction * 0.45), 4)
+        # Чем сильнее сжатие — тем сильнее будущий выброс
+        spring_strength = min(0.80, 0.40 + contraction * 0.50)
+        # Направление дрейфа во время компрессии = вероятное направление выброса
+        return round(direction * spring_strength, 4)
 
     if netto_ratio > 1.8 or path_ratio > 2.5:
-        # Пройдено слишком много ATR → топливо кончилось
+        # Пройдено слишком много ATR → топливо кончилось → разворот
         excess = min(1.0, (netto_ratio - 1.5) / 1.5)
         return round(-direction * min(0.70, 0.35 + excess * 0.45), 4)
 
