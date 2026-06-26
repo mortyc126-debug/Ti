@@ -4754,6 +4754,7 @@ let chartFibShow  = false; // show fib overlay on chart
 let chartIchiShow = false; // show Ichimoku overlay on chart
 let chartFigi = '';
 let chartOffset = 0; // scroll offset in candles from right
+let chartCandleW = 8; // min px per candle (zoom level)
 
 function chartSaveToken() {
   const v = document.getElementById('chart-token')?.value || '';
@@ -5030,7 +5031,7 @@ function _chartDrawLine(values, color, lineWidth, dash) {
   const dpr = devicePixelRatio||1;
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   const closes = chartCandles.map(c=>c.close);
-  const maxVis = Math.min(chartCandles.length, Math.floor(W/8));
+  const maxVis = Math.min(chartCandles.length, Math.floor(W/chartCandleW));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -5133,7 +5134,7 @@ function _chartDrawMain() {
   const closes  = candles.map(c=>c.close);
 
   // Visible window — show last N candles
-  const maxVis = Math.min(candles.length, Math.floor(W / 8));
+  const maxVis = Math.min(candles.length, Math.floor(W / chartCandleW));
   const endIdx  = Math.max(maxVis, candles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = candles.slice(startIdx, endIdx);
@@ -5748,7 +5749,7 @@ function _chartDrawFractals() {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   const ctx = canvas.getContext('2d');
 
-  const maxVis = Math.min(chartCandles.length, Math.floor(W / 8));
+  const maxVis = Math.min(chartCandles.length, Math.floor(W / chartCandleW));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -5795,7 +5796,7 @@ function _chartDrawVWAP() {
   const W = canvas.offsetWidth, H = canvas.offsetHeight;
   const ctx = canvas.getContext('2d');
 
-  const maxVis = Math.min(chartCandles.length, Math.floor(W / 8));
+  const maxVis = Math.min(chartCandles.length, Math.floor(W / chartCandleW));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -5881,7 +5882,7 @@ function _iATR(cn,per){const n=cn.length,r=new Array(n).fill(null);const tr=cn.m
 function _win(W){
   const mainCv=document.getElementById('chart-main');
   const refW=mainCv?mainCv.offsetWidth:(W||800);
-  const maxVis=Math.min(chartCandles.length,Math.max(Math.floor(refW/8),1));
+  const maxVis=Math.min(chartCandles.length,Math.max(Math.floor(refW/chartCandleW),1));
   const endIdx=Math.max(maxVis,chartCandles.length-(chartOffset||0));
   const startIdx=Math.max(0,endIdx-maxVis);
   const visN=endIdx-startIdx;
@@ -6734,7 +6735,7 @@ function _cpGetCandleIdx(e, canvas) {
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const W = canvas.offsetWidth;
-  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / 8), 1));
+  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const visN = endIdx - startIdx;
@@ -6743,7 +6744,7 @@ function _cpGetCandleIdx(e, canvas) {
 }
 
 function _cpXhairX(idx, W) {
-  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / 8), 1));
+  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const visN = endIdx - startIdx;
@@ -6792,7 +6793,7 @@ function _cpDrawXhair(idx, mouseY) {
 
 function _cpGetScale(W) {
   if (!chartCandles.length) return null;
-  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / 8), 1));
+  const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
   const endIdx  = Math.max(maxVis, chartCandles.length - chartOffset);
   const startIdx = Math.max(0, endIdx - maxVis);
   const vis = chartCandles.slice(startIdx, endIdx);
@@ -7152,6 +7153,50 @@ function cpInitCanvasEvents() {
     if (xc) { const ctx = xc.getContext('2d'); ctx.clearRect(0,0,xc.width,xc.height); }
     const tip = document.getElementById('cp-tooltip'); if (tip) tip.style.display = 'none';
   });
+
+  // Touch: пан свайпом + пинч-зум + кроссхэр по тапу
+  let tx0=null, toff0=0, tpinch0=null, tcw0=0;
+  c.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      tx0 = e.touches[0].clientX; toff0 = chartOffset;
+      tpinch0 = null;
+    } else if (e.touches.length === 2) {
+      tpinch0 = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      tcw0 = chartCandleW;
+      tx0 = null;
+    }
+  }, { passive: true });
+  c.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && tx0 !== null) {
+      // пан
+      const r = chartCandles.length / Math.max(c.offsetWidth, 1);
+      chartOffset = Math.max(0, Math.min(chartCandles.length - 10, Math.round(toff0 + (tx0 - e.touches[0].clientX) * r * 1.5)));
+      chartRedraw();
+    } else if (e.touches.length === 2 && tpinch0 !== null) {
+      // пинч-зум: сжать/растянуть через chartCandleW
+      const dist = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+      const scale = tpinch0 / Math.max(dist, 1);
+      chartCandleW = Math.max(4, Math.min(40, tcw0 * scale));
+      chartRedraw();
+    }
+  }, { passive: false });
+  c.addEventListener('touchend', e => {
+    if (e.touches.length === 0 && tx0 !== null) {
+      // если почти не двигали — показать кроссхэр/тултип по последней позиции
+      if (e.changedTouches.length) {
+        const t = e.changedTouches[0];
+        const fakeEvt = { clientX: t.clientX, clientY: t.clientY };
+        const idx = _cpGetCandleIdx(fakeEvt, c);
+        const rect = c.getBoundingClientRect();
+        _cpDrawXhair(idx, t.clientY - rect.top);
+        _cpShowTooltip(idx, fakeEvt, c);
+        _cpUpdatePanelVals(idx);
+      }
+      tx0 = null;
+    }
+    tpinch0 = null;
+  }, { passive: true });
 }
 
 // goPage patch — redirect dead pages to chart
