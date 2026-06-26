@@ -4783,6 +4783,7 @@ class OICompositeStrategy(IStrategy):
         s = settings.settings
 
         self._disabled_methods: set[str] = set()
+        self._inverted_methods: set[str] = set()  # методы-контр-индикаторы: скор инвертируется
         self.__threshold = float(s.get("SIGNAL_THRESHOLD", SIGNAL_THRESHOLD))
         self.__long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         self.__long_stop = Decimal(s.get("LONG_STOP", "0.985"))
@@ -5006,6 +5007,10 @@ class OICompositeStrategy(IStrategy):
     def set_disabled_methods(self, names: list[str] | set[str]) -> None:
         """Отключить указанные методы голосования для прогона бэктеста."""
         self._disabled_methods = set(names)
+
+    def set_inverted_methods(self, names: list[str] | set[str]) -> None:
+        """Методы-контр-индикаторы: их скор умножается на -1 вместо обнуления."""
+        self._inverted_methods = set(names)
 
     def set_take_stop_overrides(
             self,
@@ -6469,7 +6474,8 @@ class OICompositeStrategy(IStrategy):
         regime_probs = self.__cached_regime_probs
 
         _dm = self._disabled_methods
-        base_scores = [(0.0 if name in _dm else fn(window)) for name, fn in METHODS] + [
+        _inv = self._inverted_methods
+        base_scores = [(0.0 if name in _dm else (-fn(window) if name in _inv else fn(window))) for name, fn in METHODS] + [
             self.__score_level_context_mtf(),
             self.__score_market_structure_mtf(),
             self.__score_spring_mtf(),

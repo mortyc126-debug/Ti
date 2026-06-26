@@ -1430,6 +1430,7 @@ def run_backtest_one(
         adaptive_narrative: bool = False, adaptive_lasso: bool = False,
         block_ranging: bool = False,
         disabled_methods: list[str] | None = None,
+        inverted_methods: list[str] | None = None,
 ) -> tuple[list[dict], dict | None]:
     """
     Прогоняет бэктест по одному тикеру. Возвращает (rows, history_data):
@@ -1460,6 +1461,8 @@ def run_backtest_one(
         strategy = StrategyFactory.new_factory(strategy_settings.name, _backtest_strategy_settings(strategy_settings))
         if disabled_methods and hasattr(strategy, "set_disabled_methods"):
             strategy.set_disabled_methods(disabled_methods)
+        if inverted_methods and hasattr(strategy, "set_inverted_methods"):
+            strategy.set_inverted_methods(inverted_methods)
         bt_store = _wire_history_returning(strategy)
         if strategy is None or not hasattr(strategy, "backtest_barriers"):
             rows.append({"ticker": ticker, "mode": "пропуск",
@@ -3281,13 +3284,22 @@ function initMethodCheckboxes() {{
   const box = document.getElementById('method_checkboxes');
   if (!box || box.children.length) return;
   for (const name of _ALL_METHODS) {{
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:1px;';
     const lbl = document.createElement('label');
-    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;cursor:pointer;';
+    lbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:10px;color:var(--txt2);white-space:nowrap;cursor:pointer;flex:1;';
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.value = name; cb.id = 'dm_' + name;
     cb.onchange = updateDisabledCount;
     lbl.append(cb, name.replace(/_/g,' '));
-    box.appendChild(lbl);
+    // кнопка инверсии
+    const inv = document.createElement('button');
+    inv.textContent = '↔'; inv.title = 'Использовать как контр-индикатор (инвертировать скор)';
+    inv.id = 'inv_' + name;
+    inv.style.cssText = 'font-size:9px;padding:0 5px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--txt3);cursor:pointer;line-height:14px;';
+    inv.onclick = () => toggleInvertMethod(name);
+    wrap.append(lbl, inv);
+    box.appendChild(wrap);
   }}
 }}
 
@@ -3299,13 +3311,43 @@ function toggleMethodDisable() {{
 
 function clearDisabledMethods() {{
   document.querySelectorAll('#method_checkboxes input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#method_checkboxes button[id^=inv_]').forEach(b => {{
+    b.style.background = 'transparent'; b.style.color = 'var(--txt3)';
+    b.dataset.active = '';
+  }});
   updateDisabledCount();
 }}
 
+function toggleInvertMethod(name) {{
+  initMethodCheckboxes();
+  const btn = document.getElementById('inv_' + name);
+  if (!btn) return;
+  const active = btn.dataset.active === '1';
+  btn.dataset.active = active ? '' : '1';
+  btn.style.background = active ? 'transparent' : '#6b4c00';
+  btn.style.color = active ? 'var(--txt3)' : '#f0a030';
+  btn.style.borderColor = active ? 'var(--border2)' : '#f0a030';
+  // снять "отключён" если включаем инверсию
+  if (!active) {{
+    const cb = document.getElementById('dm_' + name);
+    if (cb) {{ cb.checked = false; updateDisabledCount(); }}
+  }}
+}}
+
+function getInvertedMethods() {{
+  return Array.from(document.querySelectorAll('#method_checkboxes button[id^=inv_]'))
+    .filter(b => b.dataset.active === '1')
+    .map(b => b.id.replace('inv_', ''));
+}}
+
 function updateDisabledCount() {{
-  const n = getDisabledMethods().length;
+  const nd = getDisabledMethods().length;
+  const ni = getInvertedMethods().length;
   const el = document.getElementById('disabled_count');
-  el.textContent = n ? `отключено: ${{n}}` : '';
+  const parts = [];
+  if (nd) parts.push(`откл: ${{nd}}`);
+  if (ni) parts.push(`↔ инв: ${{ni}}`);
+  el.textContent = parts.join(' · ');
 }}
 
 function getDisabledMethods() {{
@@ -3343,11 +3385,15 @@ function renderGlobalMethodStats() {{
 
   const trs = rows.map(r => {{
     const disabled = getDisabledMethods().includes(r.name);
-    return `<tr style="${{disabled ? 'opacity:.45;' : ''}}">
-      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}</td>
+    const inverted = getInvertedMethods().includes(r.name);
+    return `<tr style="${{disabled ? 'opacity:.45;' : inverted ? 'background:rgba(107,76,0,.15);' : ''}}">
+      <td style="padding:2px 8px;font-size:10px;white-space:nowrap;">${{r.name.replace(/_/g,' ')}}${{inverted ? ' <span style="color:#f0a030;font-size:9px;">↔</span>' : ''}}</td>
       <td style="padding:2px 8px;font-size:10px;color:${{col(r.fwr)}};text-align:right;">${{pct(r.fwr)}} <span style="color:var(--txt3)">n=${{r.fn}}</span></td>
       <td style="padding:2px 8px;font-size:10px;color:${{col(r.awr)}};text-align:right;">${{pct(r.awr)}} <span style="color:var(--txt3)">n=${{r.dn}}</span></td>
-      <td style="padding:2px 4px;"><button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button></td>
+      <td style="padding:2px 4px;display:flex;gap:3px;">
+        <button class="btn-pill btn-xs ghost" onclick="toggleMethodInRun('${{r.name}}')" style="font-size:9px;padding:1px 6px;">${{disabled ? '✓ вкл' : '✗ откл'}}</button>
+        <button class="btn-pill btn-xs ghost" onclick="toggleInvertMethodFromStats('${{r.name}}')" style="font-size:9px;padding:1px 6px;color:${{inverted ? '#f0a030' : 'var(--txt3)'}};">↔</button>
+      </td>
     </tr>`;
   }}).join('');
 
@@ -3373,7 +3419,19 @@ function toggleMethodInRun(name) {{
   initMethodCheckboxes();
   const cb = document.getElementById('dm_' + name);
   if (cb) {{ cb.checked = !cb.checked; updateDisabledCount(); }}
-  renderGlobalMethodStats(); // обновить подсветку disabled строк
+  // если отключаем — снять инверсию
+  if (cb && cb.checked) {{
+    const inv = document.getElementById('inv_' + name);
+    if (inv && inv.dataset.active === '1') toggleInvertMethod(name);
+  }}
+  renderGlobalMethodStats();
+}}
+
+function toggleInvertMethodFromStats(name) {{
+  initMethodCheckboxes();
+  toggleInvertMethod(name);
+  updateDisabledCount();
+  renderGlobalMethodStats();
 }}
 
 function selectTicker(ticker) {{
@@ -4112,7 +4170,8 @@ async function runBacktest() {{
                               adaptive_narrative: document.getElementById('adaptive_narrative').checked,
                               adaptive_lasso: document.getElementById('adaptive_lasso').checked,
                               block_ranging: document.getElementById('block_ranging').checked,
-                              disabled_methods: getDisabledMethods()}})
+                              disabled_methods: getDisabledMethods(),
+                              inverted_methods: getInvertedMethods()}})
     }});
     if (!resp.ok || !resp.body) throw new Error('stream недоступен');
     const reader = resp.body.getReader();
@@ -6385,6 +6444,7 @@ class Handler(BaseHTTPRequestHandler):
             adaptive_lasso = bool(payload.get("adaptive_lasso", False))
             block_ranging = bool(payload.get("block_ranging", False))
             disabled_methods = payload.get("disabled_methods") or []
+            inverted_methods = payload.get("inverted_methods") or []
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -6418,7 +6478,8 @@ class Handler(BaseHTTPRequestHandler):
                                 tariff=tariff, progress=progress, offset_days=offset_days,
                                 adaptive_narrative=adaptive_narrative, adaptive_lasso=adaptive_lasso,
                                 block_ranging=block_ranging,
-                                disabled_methods=disabled_methods or None): t
+                                disabled_methods=disabled_methods or None,
+                                inverted_methods=inverted_methods or None): t
                     for t in tickers
                 }
                 for fut in as_completed(fs):
