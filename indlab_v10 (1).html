@@ -789,6 +789,15 @@ input[type=range] { touch-action: none; }
       </button>
     </div>
 
+    <!-- Row 1.5: proxy URL (опционально) -->
+    <div style="display:flex;gap:6px;align-items:center;">
+      <span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;">Прокси</span>
+      <input id="chart-proxy" type="text" placeholder="https://oi.marginacall.workers.dev"
+        autocomplete="off" oninput="chartSaveProxy()"
+        style="flex:1;background:#1A1030;border:1px solid rgba(255,0,110,0.12);border-radius:10px;
+          padding:5px 10px;font-family:var(--mono);font-size:10px;color:var(--text3);outline:none;">
+    </div>
+
     <!-- Row 2: timeframe pills -->
     <div style="display:flex;gap:5px;flex-wrap:wrap;">
       <button class="cp-tf active" data-tf="CANDLE_INTERVAL_1_MIN"   onclick="cpSetTF(this)">1м</button>
@@ -4827,6 +4836,17 @@ function setMainMode(mode) {
 // ═══════════════════════════════════════════
 // CHART PAGE — Т-ИНВЕСТИЦИИ
 // ═══════════════════════════════════════════
+// Прокси для Tinkoff API (опционально, сохраняется в localStorage)
+let _tProxyBase = localStorage.getItem('indlab_proxy') || '';
+function _tUrl(path) {
+  const base = _tProxyBase.replace(/\/$/, '') || 'https://invest-public-api.tinkoff.ru';
+  return base + path;
+}
+function chartSaveProxy() {
+  _tProxyBase = (document.getElementById('chart-proxy')?.value || '').trim();
+  try { localStorage.setItem('indlab_proxy', _tProxyBase); } catch(e) {}
+}
+
 let chartCandles = [];
 let chartInds = { ma:true, ema:true, bb:false, vol:false, rsi:false, macd:false, alligator:false, donchian:false, stoch:false, cci:false, adx:false, wr:false, ao:false, mfi:false, obv:false, fractals:false, vwap:false };
 let chartFibShow  = false; // show fib overlay on chart
@@ -4858,6 +4878,12 @@ function chartPageInit() {
     const saved = localStorage.getItem('tinkoff_token');
     const inp = document.getElementById('chart-token');
     if (saved && inp && !inp.value) inp.value = saved;
+  } catch(e){}
+  // restore proxy from storage
+  try {
+    const proxy = localStorage.getItem('indlab_proxy');
+    const pinp = document.getElementById('chart-proxy');
+    if (proxy && pinp) pinp.value = proxy;
   } catch(e){}
   // draw empty state
   if (!chartCandles.length) chartDrawEmpty();
@@ -4905,7 +4931,7 @@ async function chartLoad() {
     let figi = raw;
     if (!raw.startsWith('BBG') && !raw.startsWith('TCS')) {
       // Search instrument (UNSPECIFIED = shares + futures + ETFs + bonds)
-      const searchResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+      const searchResp = await fetch(_tUrl('/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'), {
         method:'POST',
         headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
         body: JSON.stringify({ query: raw, instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED', apiTradeAvailableFlag:false })
@@ -4919,7 +4945,7 @@ async function chartLoad() {
                 || instruments[0];
       // If still not found, try futures-specific search
       if (!found) {
-        const futResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+        const futResp = await fetch(_tUrl('/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures'), {
           method:'POST',
           headers:{ 'Authorization': `Bearer ${token}`, 'Content-Type':'application/json', 'accept':'application/json' },
           body: JSON.stringify({ instrumentStatus:'INSTRUMENT_STATUS_ALL' })
@@ -4953,7 +4979,7 @@ async function chartLoad() {
     from.setDate(from.getDate() - (tfDays[tf] || 365));
 
     // Fetch candles
-    const candleResp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+    const candleResp = await fetch(_tUrl('/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'accept': 'application/json' },
       body: JSON.stringify({
@@ -7436,14 +7462,14 @@ async function cpLoadMoex() {
   if(!tok){if(xe)xe.textContent='Введи токен для контекста рынка';return;}
   if(pe)pe.textContent='…';
   try{
-    const sr=await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument',{
+    const sr=await fetch(_tUrl('/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument'),{
       method:'POST',headers:{'Authorization':`Bearer ${tok}`,'Content-Type':'application/json','accept':'application/json'},
       body:JSON.stringify({query:'IMOEX',instrumentKind:'INSTRUMENT_TYPE_UNSPECIFIED',apiTradeAvailableFlag:false})});
     if(!sr.ok)throw new Error(sr.status);
     const sd=await sr.json(), found=(sd.instruments||[]).find(i=>i.ticker==='IMOEX')||(sd.instruments||[])[0];
     if(!found)throw new Error('not found');
     const now=new Date(),from=new Date(now);from.setDate(from.getDate()-30);
-    const cr=await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles',{
+    const cr=await fetch(_tUrl('/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'),{
       method:'POST',headers:{'Authorization':`Bearer ${tok}`,'Content-Type':'application/json','accept':'application/json'},
       body:JSON.stringify({figi:found.figi,from:from.toISOString(),to:now.toISOString(),interval:'CANDLE_INTERVAL_DAY'})});
     const cd=await cr.json();
