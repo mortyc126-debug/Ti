@@ -74,7 +74,7 @@ from trade_system.signal import Signal, SignalType
 from trade_system.strategies.base_strategy import IStrategy
 # regime импортируется первым: его модуль-уровневый код кладёт ../formulas в
 # sys.path, поэтому ниже научные модули из formulas/ становятся импортируемы.
-from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score
+from regime import REGIMES, classify_regime, classify_regime_probs, REGIME_WEIGHT_MODS, change_point_score, classify_phase, PHASE_WEIGHT_MODS
 from cluster_models import ClusterModels
 from narrative import (
     NarrativeState, NarrativeWeights, NarrativeThresholds, classify_directional,
@@ -4934,6 +4934,8 @@ class OICompositeStrategy(IStrategy):
         self.__cached_rqa_mult: float = 1.0
         self.__cached_wavelet_mult: float = 1.0
         self.__cached_regime_probs: dict = {"ranging": 1.0}
+        self.__cached_phase: str = "accumulation"
+        self.__cached_phase_conf: float = 0.3
         self.__cached_change_point: float = 0.0
         self.__cached_mtf_trend: float = 0.0
         self.__cached_mtf5_composite: float = 0.0
@@ -5909,6 +5911,8 @@ class OICompositeStrategy(IStrategy):
             "ready": True,
             "regime": regime,
             "regime_probs": {r: round(p, 3) for r, p in regime_probs.items()},
+            "phase": self.__cached_phase,
+            "phase_conf": round(self.__cached_phase_conf, 3),
             "rolling_quality": round(self.__rolling_quality, 4),
             "rolling_quality_by_regime": {r: round(q, 4) for r, q in self.__rolling_quality_by_regime.items()},
             "cluster_models_ready": cluster_ready,
@@ -6453,6 +6457,11 @@ class OICompositeStrategy(IStrategy):
 
         if do_heavy:
             self.__cached_regime_probs = classify_regime_probs(closes, volumes)
+            self.__cached_phase, self.__cached_phase_conf = classify_phase(
+                closes, volumes,
+                highs=[float(quotation_to_decimal(c.high)) for c in self.__candles[-len(closes):]],
+                lows=[float(quotation_to_decimal(c.low)) for c in self.__candles[-len(closes):]],
+            )
             # Инвертируем: алгоритмы детектируют излом с запозданием, движение
             # уже состоялось — сигнал теперь против нового направления (разворот).
             self.__cached_change_point = -change_point_score(closes)
@@ -6601,10 +6610,20 @@ class OICompositeStrategy(IStrategy):
         # информативнее — +10% методам осцилляторной группы.
         osc_boost_on = self.__l1_data_ready and 0.3 < self.__l1_pct < 0.7
         osc_group = _GATE_GROUPS["oscillator"]
+        # Фазовый слой: множители PHASE_WEIGHT_MODS, сглаженные уверенностью фазы.
+        # При conf=1.0 применяется полный множитель; при conf=0.3 — только 30% отклонения от 1.0.
+        _phase_mods_raw = PHASE_WEIGHT_MODS.get(self.__cached_phase, {})
+        _phase_conf = self.__cached_phase_conf
+        phase_mods: dict[str, float] = {
+            name: 1.0 + (_phase_mods_raw.get(name, 1.0) - 1.0) * _phase_conf
+            for name in ALL_METHOD_NAMES
+        }
+
         weights = [
             self.__blended_hedge_weight(name, regime_probs)
             * self.__ic_bayes_weight(name)   # IC-prior (байес-фьюжн с фолбэком 0.5)
             * regime_mods.get(name, 1.0)
+            * phase_mods.get(name, 1.0)
             * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             * (1.10 if (osc_boost_on and name in osc_group) else 1.0)

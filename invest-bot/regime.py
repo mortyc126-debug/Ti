@@ -16,7 +16,8 @@ import os
 import sys
 import statistics
 
-__all__ = ("classify_regime", "classify_regime_probs", "REGIME_WEIGHT_MODS", "change_point_score")
+__all__ = ("classify_regime", "classify_regime_probs", "REGIME_WEIGHT_MODS",
+           "change_point_score", "classify_phase", "PHASE_WEIGHT_MODS")
 
 # formulas/ лежит рядом с invest-bot/ (на уровень выше cwd). Добавляем в путь
 # один раз, чтобы тяжёлые научные модули (BOCD, Hawkes, RQA, Kalman ...) были
@@ -295,3 +296,250 @@ def change_point_score(closes: list[float]) -> float:
     if down >= 2:
         return -1.0 if down == 3 else -0.6
     return 0.0
+
+
+# ── Фазовый анализ (боговик → spring → markup → distribution → reversal) ──
+# Поверх существующего classify_regime — второй слой множителей на веса методов.
+# Источник концепции: unified_trading_system.md (VSA+Wyckoff+AMT интеграция).
+
+PHASES = ("accumulation", "spring", "markup", "distribution", "reversal")
+
+# Множители на вес метода по фазе. 1.0 = без изменений (не упомянутые = 1.0).
+PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
+    # Боговик: компрессия, накопление, нет тренда.
+    # Важны: детекторы сжатия, объёмные накопители, Fisher в крайности.
+    # Не нужны: трендовые, импульсные.
+    "accumulation": {
+        "ENTROPY": 1.5,          # энтропия низкая = сжатие = это и есть боговик
+        "BB_KELTNER_SQUEEZE": 1.5,
+        "ATR_EXHAUSTION": 1.4,   # низкий ATR = компрессия
+        "VWAP_SIGNAL": 1.3,      # в боковике VWAP работает лучше
+        "AMT_POC": 1.3,          # POC формируется именно в боговике
+        "KLINGER": 1.2,          # накопление денежного потока
+        "VZO": 1.2,
+        "CUMUL_DELTA": 1.2,
+        "PRICE_TREND": 0.5,      # тренда нет — линрег шумит
+        "VOL_MOMENTUM": 0.6,
+        "IMPULSE_PULLBACK": 0.6,
+        "CASCADE": 0.5,
+        "MA_TENSION": 0.6,
+        "ADAPTIVE_MA": 0.7,
+        "ICHIMOKU_SIGNAL": 0.7,
+    },
+    # Spring: резкий пробой + возврат за одну-две свечи, охота за стопами.
+    # Важны: паттерны свечей, объёмные всплески, детекторы пробоя.
+    # Снижаем: запаздывающие трендовые.
+    "spring": {
+        "CANDLE_PATTERN": 1.8,   # игла + возврат — это паттерн свечей
+        "WICK_REJECTION": 1.8,   # хвостовое отвержение = суть spring
+        "BB_KELTNER_SQUEEZE": 1.5,  # BB расширяется резко
+        "FALSE_BREAKOUT": 1.6,   # spring это и есть ложный пробой
+        "IMPULSE_PULLBACK": 1.5,
+        "BS_PRESSURE": 1.4,      # давление разворачивается
+        "CUMUL_DELTA": 1.4,      # дельта переключается
+        "VOL_MOMENTUM": 1.3,
+        "KLINGER": 1.3,          # пересекает ноль
+        "CHANGE_POINT": 1.5,     # излом именно здесь
+        "PRICE_TREND": 0.4,      # линрег не видит spring
+        "ADAPTIVE_MA": 0.5,
+        "MA_TENSION": 0.5,
+        "SINEWAVE_SIGNAL": 0.6,
+        "ALLIGATOR": 0.5,
+        "ICHIMOKU_SIGNAL": 0.6,
+        "ZLEMA_SIGNAL": 0.5,
+        "T3_SIGNAL": 0.5,
+    },
+    # Markup (каскад): направленное ускоряющееся движение.
+    # Важны: трендовые, импульсные, объёмные тренды.
+    # Снижаем: осцилляторы перегрева (они всегда в крайности на каскаде — шум).
+    "markup": {
+        "PRICE_TREND": 1.5,
+        "VOL_MOMENTUM": 1.5,
+        "ADAPTIVE_MA": 1.4,
+        "MA_TENSION": 1.4,
+        "KLINGER": 1.3,
+        "TREND_QUALITY": 1.4,
+        "FRACTAL": 1.3,
+        "ICHIMOKU_SIGNAL": 1.3,
+        "ALLIGATOR": 1.3,
+        "CASCADE": 1.4,
+        "WANING_IMPULSES": 1.3,
+        "ZLEMA_SIGNAL": 1.2,
+        "T3_SIGNAL": 1.2,
+        "ATR_EXHAUSTION": 0.5,   # ATR высокий = не "истощение" — это норма каскада
+        "VWAP_SIGNAL": 0.7,      # на каскаде цена далеко от VWAP — шум
+        "AMT_POC": 0.7,
+        "ENTROPY": 0.7,
+        "BB_KELTNER_SQUEEZE": 0.6,
+        "CHANGE_POINT": 0.7,
+    },
+    # Distribution (затухание): новые хаи но объём падает, дивергенции.
+    # Важны: детекторы дивергенции, затухания, поглощения.
+    "distribution": {
+        "WANING_IMPULSES": 1.6,  # затухание импульсов — суть фазы
+        "VSA_ABSORPTION": 1.5,   # поглощение на хаях
+        "ATR_EXHAUSTION": 1.5,   # ATR падает несмотря на движение
+        "LEVEL_ABSORPTION": 1.4,
+        "KLINGER": 1.3,          # дивергенция Klinger
+        "CUMUL_DELTA": 1.3,
+        "FALSE_BREAKOUT": 1.3,   # ложные пробои хаёв
+        "WICK_REJECTION": 1.3,
+        "PRICE_TREND": 0.7,      # тренд ещё видит движение — но оно умирает
+        "VOL_MOMENTUM": 0.7,
+        "CASCADE": 0.5,
+        "MA_TENSION": 0.7,
+        "ALLIGATOR": 0.7,
+        "ICHIMOKU_SIGNAL": 0.7,
+    },
+    # Reversal: переключение Fisher+Klinger через ноль, ADX упал, новое направление.
+    # Важны: детекторы смены режима, свечные паттерны разворота.
+    "reversal": {
+        "CANDLE_PATTERN": 1.5,
+        "WICK_REJECTION": 1.4,
+        "CHANGE_POINT": 1.6,     # излом — суть разворота
+        "BS_PRESSURE": 1.4,
+        "CUMUL_DELTA": 1.4,
+        "FALSE_BREAKOUT": 1.3,
+        "IMPULSE_PULLBACK": 1.3,
+        "KLINGER": 1.3,
+        "VZO": 1.2,
+        "PRICE_TREND": 0.5,      # старый тренд мешает видеть разворот
+        "ADAPTIVE_MA": 0.6,
+        "MA_TENSION": 0.6,
+        "ALLIGATOR": 0.6,
+        "ICHIMOKU_SIGNAL": 0.6,
+        "CASCADE": 0.4,
+    },
+}
+
+
+def classify_phase(
+    closes: list[float],
+    volumes: list[float] | None = None,
+    highs: list[float] | None = None,
+    lows: list[float] | None = None,
+) -> tuple[str, float]:
+    """
+    Определяет текущую фазу рынка по пяти категориям:
+      accumulation → spring → markup → distribution → reversal
+
+    Возвращает (phase_name, confidence ∈ [0,1]).
+    Использует только closes/volumes/highs/lows — никаких внешних зависимостей.
+
+    Алгоритм: каждый из 5 признаков-блоков голосует за свою фазу с весом.
+    Победитель — argmax взвешенной суммы голосов.
+    """
+    n = len(closes)
+    if n < 10:
+        return "accumulation", 0.3
+
+    votes: dict[str, float] = {p: 0.0 for p in PHASES}
+
+    # ── Блок 1: компрессия BB / ATR → признак accumulation ──────────────────
+    # Узкий диапазон последних свечей относительно исторического = боговик.
+    if n >= 20:
+        recent_ranges = [(highs[i] - lows[i]) / (closes[i] or 1.0)
+                         for i in range(n - 10, n)] if highs and lows else []
+        hist_ranges = [(highs[i] - lows[i]) / (closes[i] or 1.0)
+                       for i in range(n - 20, n - 10)] if highs and lows else []
+        if recent_ranges and hist_ranges:
+            med_recent = statistics.median(recent_ranges)
+            med_hist = statistics.median(hist_ranges) or 1e-9
+            compression_ratio = med_recent / med_hist  # <1 = сжатие
+            if compression_ratio < 0.6:
+                votes["accumulation"] += 2.0
+            elif compression_ratio < 0.85:
+                votes["accumulation"] += 1.0
+            elif compression_ratio > 1.8:
+                # расширение диапазона — spring или markup
+                votes["spring"] += 0.5
+                votes["markup"] += 0.5
+
+    # ── Блок 2: тренд closes (линрег наклон) ────────────────────────────────
+    trend_str, trend_dir = _trend_strength(closes[-20:] if n >= 20 else closes)
+    if trend_str > 0.55:
+        # сильный тренд — markup или distribution
+        votes["markup"] += 1.5
+    elif trend_str > 0.3:
+        votes["markup"] += 0.7
+    else:
+        # нет тренда — accumulation или reversal
+        votes["accumulation"] += 0.8
+
+    # ── Блок 3: объёмный всплеск на последней свече ──────────────────────────
+    # Резкий всплеск объёма при слабом диапазоне = поглощение (distribution/spring).
+    # Резкий всплеск при большом диапазоне = markup или spring.
+    if volumes and len(volumes) >= 10:
+        med_vol = statistics.median(volumes[-10:-1]) or 1e-9
+        last_vol_ratio = volumes[-1] / med_vol
+        last_range = ((highs[-1] - lows[-1]) / (closes[-1] or 1.0)) if highs and lows else 0.0
+        med_range = (statistics.median(
+            [(highs[i] - lows[i]) / (closes[i] or 1.0) for i in range(n - 10, n - 1)]
+        ) if highs and lows else 0.0) or 1e-9
+
+        if last_vol_ratio > 2.5:
+            if last_range / med_range > 1.5:
+                # большой объём + большой диапазон = spring или начало markup
+                votes["spring"] += 1.5
+                votes["markup"] += 0.5
+            else:
+                # большой объём + узкий диапазон = поглощение (distribution)
+                votes["distribution"] += 1.5
+                votes["spring"] += 0.5
+        elif last_vol_ratio < 0.5:
+            # маленький объём = откат в каскаде или боговик
+            votes["accumulation"] += 0.5
+            votes["markup"] += 0.3
+
+    # ── Блок 4: скорость изменения цены (momentum) ──────────────────────────
+    # Считаем ускорение: сравниваем returns последних 5 свечей vs предыдущих 5.
+    if n >= 12:
+        ret_recent = [(closes[i] - closes[i - 1]) / (closes[i - 1] or 1.0)
+                      for i in range(n - 5, n)]
+        ret_prev = [(closes[i] - closes[i - 1]) / (closes[i - 1] or 1.0)
+                    for i in range(n - 10, n - 5)]
+        abs_recent = statistics.mean(abs(r) for r in ret_recent)
+        abs_prev = statistics.mean(abs(r) for r in ret_prev) or 1e-9
+        momentum_accel = abs_recent / abs_prev
+
+        if momentum_accel > 1.5:
+            # ускорение — spring или markup
+            votes["spring"] += 1.0
+            votes["markup"] += 0.8
+        elif momentum_accel < 0.6:
+            # торможение при продолжении тренда — distribution или reversal
+            if trend_str > 0.3:
+                votes["distribution"] += 1.2
+            else:
+                votes["reversal"] += 0.8
+
+    # ── Блок 5: разворот direction (смена знака тренда) ─────────────────────
+    # Если короткий тренд противоположен длинному — разворот или spring.
+    if n >= 20:
+        trend_short, dir_short = _trend_strength(closes[-7:])
+        trend_long, dir_long = _trend_strength(closes[-20:])
+        if trend_short > 0.3 and trend_long > 0.3 and dir_short != dir_long:
+            # направления противоположны — возможно reversal или spring
+            votes["reversal"] += 1.2
+            votes["spring"] += 0.8
+
+    # ── Блок 6: признак затухания — новый ценовой экстремум без объёма ───────
+    # Если последние 3 свечи делают новый хай/лой, но объём падает = distribution.
+    if highs and lows and volumes and n >= 15:
+        recent_high = max(highs[n - 3:n])
+        hist_high = max(highs[n - 15:n - 3])
+        recent_vol = statistics.mean(volumes[n - 3:n])
+        hist_vol = statistics.mean(volumes[n - 15:n - 3]) or 1e-9
+        if recent_high > hist_high and recent_vol / hist_vol < 0.75:
+            votes["distribution"] += 1.5  # новый хай на слабом объёме
+        recent_low = min(lows[n - 3:n])
+        hist_low = min(lows[n - 15:n - 3])
+        if recent_low < hist_low and recent_vol / hist_vol < 0.75:
+            votes["distribution"] += 1.5  # новый лой на слабом объёме
+
+    # ── Нормировка и уверенность ─────────────────────────────────────────────
+    total = sum(votes.values()) or 1.0
+    probs = {p: votes[p] / total for p in PHASES}
+    phase = max(probs, key=probs.get)
+    confidence = probs[phase]
+    return phase, confidence
