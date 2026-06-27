@@ -281,7 +281,20 @@ input[type=range] { touch-action: none; }
 .cp-ind-row:hover .cp-ind-del { opacity: 0.5 !important; }
 .cp-ind-row:hover .cp-ind-fav { opacity: 1 !important; }
 .analysis-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
-.analysis-card-title { font-size: 12px; color: #9090B8; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; }
+.analysis-card-title { font-size: 12px; color: #9090B8; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; display:flex; align-items:center; gap:6px; }
+.il-legend-btn { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:rgba(214,92,255,0.18); border:1px solid rgba(214,92,255,0.45); color:#D65CFF; font-size:9px; cursor:pointer; flex-shrink:0; line-height:1; font-family:sans-serif; font-weight:700; transition:background .15s; user-select:none; }
+.il-legend-btn:hover { background:rgba(214,92,255,0.35); }
+/* Модал легенды линий */
+#il-legend-modal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); align-items:center; justify-content:center; }
+#il-legend-modal.open { display:flex; }
+#il-legend-box { background:#1A1730; border:1px solid rgba(214,92,255,0.35); border-radius:10px; padding:16px 18px; min-width:240px; max-width:340px; box-shadow:0 0 32px rgba(214,92,255,0.25); }
+#il-legend-title { font-size:11px; color:#D65CFF; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; display:flex; justify-content:space-between; }
+#il-legend-title span { cursor:pointer; opacity:.6; font-size:14px; line-height:1; }
+#il-legend-title span:hover { opacity:1; }
+.il-legend-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px; font-family:'JetBrains Mono',monospace; color:#D0D0E8; }
+.il-legend-swatch { width:28px; height:4px; border-radius:2px; flex-shrink:0; }
+.il-legend-name { flex:1; font-size:11px; }
+.il-legend-color-inp { width:26px; height:20px; padding:0; border:none; background:none; cursor:pointer; border-radius:3px; }
 .analysis-item { font-size: 12px; font-family: 'JetBrains Mono', monospace; display: flex; gap: 6px; padding: 3px 0; color: #D0D0E8; line-height: 1.5; }
 .analysis-bullish .analysis-dot { color: #60A4A1; }
 .analysis-bearish .analysis-dot { color: #C71B52; }
@@ -11491,6 +11504,73 @@ function _renderAnalysisInner(panel) {
     return chips ? `<div class="analysis-tf-row">${chips}</div>` : '';
   }
 
+  // ─── Цвета линий по ключу индикатора (Neon Magenta Terminal) ──────────────────────
+  const _IL_LINE_DEFS = {
+    macd:       [{name:'MACD',     color:'#B45CFF'}, {name:'Сигнал',      color:'#FF4D9D'}, {name:'Гистограмма ▲', color:'#52F2C9'}, {name:'Гистограмма ▼', color:'#FF4D7A'}],
+    bb:         [{name:'Верхняя полоса',color:'#3DD9FF'}, {name:'Средняя (SMA)',color:'#FFD166'}, {name:'Нижняя полоса',color:'#3DD9FF'}],
+    stoch:      [{name:'%K (быстрый)', color:'#D65CFF'}, {name:'%D (сигнал)',   color:'#FFB84D'}],
+    ichimoku:   [{name:'Tenkan-sen / Поворотная',color:'#FF006E'}, {name:'Kijun-sen / Эталонная',color:'#3DD9FF'}, {name:'Senkou A / Пролёт A (облако)', color:'#52F2C9'}, {name:'Senkou B / Пролёт B (облако)', color:'#7B61FF'}, {name:'Chikou / Запаздывающая', color:'#D65CFF'}],
+    alligator:  [{name:'Jaw / Челюсть (Kijun)',  color:'#3DD9FF'}, {name:'Teeth / Зубы (Tenkan)',  color:'#FF4D7A'}, {name:'Lips / Губы (быстрая)',  color:'#52F2C9'}],
+    ma:         [{name:'SMA',    color:'#FFD166'}, {name:'EMA',    color:'#FF8A4C'}],
+    adx:        [{name:'ADX (сила тренда)', color:'#D65CFF'}, {name:'+DI (давление вверх)', color:'#52F2C9'}, {name:'−DI (давление вниз)',  color:'#FF4D7A'}],
+    keltner:    [{name:'Верхняя',color:'#3DD9FF'}, {name:'Средняя (EMA)',color:'#FFD166'}, {name:'Нижняя',color:'#3DD9FF'}],
+    elder_ray:  [{name:'Bull Power / Сила быков', color:'#52F2C9'}, {name:'Bear Power / Сила медведей', color:'#FF4D7A'}],
+    vortex:     [{name:'V+ (бычий вортекс)', color:'#52F2C9'}, {name:'V− (медвежий вортекс)', color:'#FF4D7A'}],
+    dmi:        [{name:'ADX', color:'#D65CFF'}, {name:'+DI', color:'#52F2C9'}, {name:'−DI', color:'#FF4D7A'}],
+    mama:       [{name:'MAMA (быстрая)', color:'#FF006E'}, {name:'FAMA (медленная)', color:'#3DD9FF'}],
+    kvo:        [{name:'KVO', color:'#B45CFF'}, {name:'Сигнал KVO', color:'#FF4D9D'}],
+    donchian:   [{name:'Верхняя (макс.)', color:'#3DD9FF'}, {name:'Средняя', color:'#A79BC9'}, {name:'Нижняя (мин.)', color:'#3DD9FF'}],
+    envelopes:  [{name:'Верхний конверт', color:'#3DD9FF'}, {name:'EMA (центр)', color:'#FFD166'}, {name:'Нижний конверт', color:'#3DD9FF'}],
+    bbpb:       [{name:'%B', color:'#D65CFF'}, {name:'Уровень 1.0 (перекупленность)', color:'#52F2C9'}, {name:'Уровень 0.0 (перепроданность)', color:'#FF4D7A'}],
+    tsi:        [{name:'TSI', color:'#D65CFF'}, {name:'Сигнал', color:'#FFB84D'}],
+    uo:         [{name:'Ultimate Oscillator', color:'#B45CFF'}],
+    elder_imp:  [{name:'Бычий импульс', color:'#52F2C9'}, {name:'Медвежий импульс', color:'#FF4D7A'}, {name:'Нейтрально', color:'#4C4666'}],
+    cyber_cyc:  [{name:'Cyber Cycle', color:'#FF006E'}, {name:'Триггер (сдвиг 1)', color:'#3DD9FF'}],
+    ebs:        [{name:'EBS синус', color:'#D65CFF'}, {name:'Лид синус', color:'#FF8A4C'}],
+  };
+
+  // localStorage-хранилище пользовательских цветов (перезапись)
+  const _IL_USER_COLORS_KEY = 'il_line_colors_v1';
+  function _ilGetColors(key) {
+    try { return JSON.parse(localStorage.getItem(_IL_USER_COLORS_KEY)||'{}'); } catch(e) { return {}; }
+  }
+  function _ilSetColor(key, idx, color) {
+    const all = _ilGetColors();
+    if (!all[key]) all[key] = {};
+    all[key][idx] = color;
+    localStorage.setItem(_IL_USER_COLORS_KEY, JSON.stringify(all));
+  }
+  function ilShowLegend(key) {
+    const defs = _IL_LINE_DEFS[key];
+    if (!defs) return;
+    const userColors = _ilGetColors()[key] || {};
+    document.getElementById('il-legend-label').textContent = key.toUpperCase() + ' — линии';
+    const rows = defs.map((d,i) => {
+      const col = userColors[i] || d.color;
+      return `<div class="il-legend-row">
+        <div class="il-legend-swatch" id="ilsw-${key}-${i}" style="background:${col}"></div>
+        <span class="il-legend-name">${d.name}</span>
+        <input class="il-legend-color-inp" type="color" value="${col}" oninput="_ilOnColorChange('${key}',${i},this.value)">
+      </div>`;
+    }).join('');
+    document.getElementById('il-legend-rows').innerHTML = rows;
+    document.getElementById('il-legend-modal').classList.add('open');
+  }
+  function ilHideLegend() {
+    document.getElementById('il-legend-modal').classList.remove('open');
+  }
+  function _ilOnColorChange(key, idx, color) {
+    _ilSetColor(key, idx, color);
+    const sw = document.getElementById(`ilsw-${key}-${idx}`);
+    if (sw) sw.style.background = color;
+  }
+
+  // Кнопка «?» для карточки с несколькими линиями
+  function _legendBtn(key) {
+    if (!_IL_LINE_DEFS[key]) return '';
+    return `<span class="il-legend-btn" onclick="event.stopPropagation();ilShowLegend('${key}')" title="Цвета линий">?</span>`;
+  }
+
   // makeCard(title, ncItems, ncKey, classicItems?, classicKey?)
   function makeCard(title, items, key, classicItems, classicKey) {
     const hasNc = items && items.length > 0;
@@ -11521,7 +11601,7 @@ function _renderAnalysisInner(panel) {
       </div>`;
     }
 
-    return `<div class="analysis-card"><div class="analysis-card-title">${title}</div>${inner}</div>`;
+    return `<div class="analysis-card"><div class="analysis-card-title"><span>${title}</span>${_legendBtn(key)}</div>${inner}</div>`;
   }
 
   // ─── Хелпер: блок «что делать» для лонга/шорта/без позиции ─────────────────────
@@ -11996,7 +12076,7 @@ function _renderAnalysisInner(panel) {
         else if (r < 50 && r1 > 50) clRsiItems.push({type:'bearish', text:`RSI пересёк 50 сверху вниз — классическое подтверждение смены на медвежий режим`});
         else clRsiItems.push({type:'neutral', text:`RSI=${r.toFixed(1)} в нейтральной зоне (30–70) — классика не даёт сигнала`});
 
-        html += makeCard(`RSI(14)`, items, 'rsi', clRsiItems, 'rsi');
+        html += makeCard('RSI(14) / Индекс относительной силы', items, 'rsi', clRsiItems, 'rsi');
       }
     } else if (idL.includes('macd')) {
       if (closes.length >= 35) {
@@ -12079,7 +12159,7 @@ function _renderAnalysisInner(panel) {
             else clMacdItems.push({type:'neutral', text:`Гистограмма: ${h.toFixed(4)} — линии сходятся или разворачиваются`});
           }
 
-          html += makeCard('MACD', items, 'macd', clMacdItems, 'macd');
+          html += makeCard('MACD / Схождение-расхождение скользящих', items, 'macd', clMacdItems, 'macd');
         }
       }
     } else if (idL === 'bb' || idL.includes('boll')) {
@@ -12165,7 +12245,7 @@ function _renderAnalysisInner(panel) {
             const maxW = Math.max(...bbWidths.slice(-50).map(b=>b.upper-b.lower));
             if (w < 0.2 * maxW) clBBItems.push({type:'neutral', text:`Squeeze BB: ширина ${(w/lb.middle*100).toFixed(2)}% — компрессия. Классически — накопление энергии перед взрывом`});
           }
-          html += makeCard('Bollinger Bands', items, 'bb', clBBItems, 'bb');
+          html += makeCard('BB / Полосы Боллинджера', items, 'bb', clBBItems, 'bb');
         }
       }
     } else if (idL.includes('atr') && !idL.includes('matr')) {
@@ -12218,7 +12298,7 @@ function _renderAnalysisInner(panel) {
             : null;
           _trade(pDir, atrConf, tLong, tShort).forEach(t => items.push(t));
         }
-        html += makeCard('ATR(14)', items, 'atr');
+        html += makeCard('ATR(14) / Средний истинный диапазон', items, 'atr');
       }
     } else if (idL.includes('stoch')) {
       const period = 14, smooth = 3;
@@ -12321,7 +12401,7 @@ function _renderAnalysisInner(panel) {
           else if (crossDn) clStochItems.push({type:'bearish', text:`K пересёк D сверху вниз — классический сигнал продажи`});
           else clStochItems.push({type:'neutral', text:`Stochastic K=${k.toFixed(0)} — нейтральная зона (20–80), нет классического сигнала`});
         }
-        html += makeCard('Stochastic', items, 'stoch', clStochItems, 'stoch');
+        html += makeCard('Stochastic / Стохастик', items, 'stoch', clStochItems, 'stoch');
       }
     } else if (idL.includes('obv')) {
       if (candles.length >= 6) {
@@ -12375,7 +12455,7 @@ function _renderAnalysisInner(panel) {
         } else {
           clObvItems.push({type:'neutral', text:`OBV движется ${obvTrend}, цена ${priceTrend} — дивергенция. Классически: текущий тренд цены под сомнением`});
         }
-        html += makeCard('OBV', items, 'obv', clObvItems, 'obv');
+        html += makeCard('OBV / Балансовый объём', items, 'obv', clObvItems, 'obv');
       }
     } else if (idL.includes('mfi')) {
       const period = 14;
@@ -12429,7 +12509,7 @@ function _renderAnalysisInner(panel) {
         if (mfi < 20) clMfiItems.push({type:'bullish', text:`MFI=${mfi.toFixed(1)} — перепродан (< 20). Классика: объёмное давление продаж иссякает, ожидается разворот вверх`});
         else if (mfi > 80) clMfiItems.push({type:'bearish', text:`MFI=${mfi.toFixed(1)} — перекуплен (> 80). Классика: объёмное давление покупок иссякает, ожидается разворот вниз`});
         else clMfiItems.push({type:'neutral', text:`MFI=${mfi.toFixed(1)} — нейтральная зона. Классика молчит`});
-        html += makeCard('MFI', items, 'mfi', clMfiItems, 'mfi');
+        html += makeCard('MFI / Индекс потока денег', items, 'mfi', clMfiItems, 'mfi');
       }
     } else if (idL.includes('ichi') || idL.includes('ichimoku')) {
       if (candles.length >= 52) {
@@ -12580,7 +12660,7 @@ function _renderAnalysisInner(panel) {
         else clIchiItems.push({type:'neutral', text:`Цена внутри облака — нейтральная зона. Классика: позиции не открываются до выхода из облака`});
         if (tenkan > kijun) clIchiItems.push({type:'bullish', text:`Tenkan (${tenkan.toFixed(2)}) > Kijun (${kijun.toFixed(2)}) — краткосрочный импульс выше долгосрочного. Классический "золотой крест" Ichimoku`});
         else if (tenkan < kijun) clIchiItems.push({type:'bearish', text:`Tenkan (${tenkan.toFixed(2)}) < Kijun (${kijun.toFixed(2)}) — классический "мёртвый крест" Ichimoku`});
-        html += makeCard('Ichimoku', items, 'ichimoku', clIchiItems, 'ichimoku');
+        html += makeCard('Ichimoku / Облако Ишимоку', items, 'ichimoku', clIchiItems, 'ichimoku');
       }
     } else if (idL.includes('alligator') || idL.includes('gator')) {
       function smmaAl(data, period, shift) {
@@ -12656,7 +12736,7 @@ function _renderAnalysisInner(panel) {
             const allShort = allDir==='bearish' && expanding ? 'Медвежий веер + расхождение вниз — держи шорт. Откат к зубам — возможность доращивания шорта.' : allDir==='bearish' && !expanding ? 'Медвежий порядок, но замедляется. Держи с коротким стопом.' : null;
             _trade(allDir, allConf, allLong, allShort).forEach(t => items.push(t));
           }
-          html += makeCard('Alligator', items, 'alligator');
+          html += makeCard('Alligator / Аллигатор Вильямса', items, 'alligator');
         }
       }
     } else if ((idL.includes('ma') || idL.includes('ema')) && !idL.includes('macd') && !idL.includes('smma')) {
@@ -12738,7 +12818,7 @@ function _renderAnalysisInner(panel) {
         else if (bearFan) clMaItems.push({type:'bearish', text:`EMA 8<13<21<34 — классический медвежий порядок`});
         const ema8ema21cross = (e8[n-1]>e21[n-1])!==(e8[n-2]>e21[n-2]);
         if (ema8ema21cross) clMaItems.push({type:e8[n-1]>e21[n-1]?'bullish':'bearish', text:`EMA(8) пересекла EMA(21) — классический ${e8[n-1]>e21[n-1]?'золотой':'мёртвый'} крест`});
-        html += makeCard('MA/EMA', items, 'ma', clMaItems, 'ma');
+        html += makeCard('MA/EMA / Скользящие средние', items, 'ma', clMaItems, 'ma');
       }
     } else if (idL.includes('donchian') || idL === 'dc') {
       const period = 20;
@@ -12788,7 +12868,7 @@ function _renderAnalysisInner(panel) {
           const dcShort = distDown < 0.2 ? `Цена у нижней границы (${lower.toFixed(4)}) — пробой вниз активирует стопы лонгистов. Если в шорте — держи.` : dcDir==='bearish' ? 'Цена в нижней половине канала — держи шорт пока ниже середины.' : null;
           _trade(dcDir, dcConf, dcLong, dcShort).forEach(t => items.push(t));
         }
-        html += makeCard('Donchian', items, 'donchian');
+        html += makeCard('Donchian / Канал Дончиана', items, 'donchian');
       }
     } else if (idL.includes('adx')) {
       const period = 14;
@@ -12881,7 +12961,7 @@ function _renderAnalysisInner(panel) {
         } else {
           clAdxItems.push({type:'neutral', text:`ADX=${adx.toFixed(1)} < 25 — тренд слабый. Классика: осцилляторы работают лучше трендовых инструментов`});
         }
-        html += makeCard('ADX / DMI', items, 'adx', clAdxItems, 'adx');
+        html += makeCard('ADX/DMI / Индекс средн. направленности', items, 'adx', clAdxItems, 'adx');
       }
     } else if (idL.includes('cci')) {
       const period = 20;
@@ -12977,7 +13057,7 @@ function _renderAnalysisInner(panel) {
         else if (cci > 100) clCciItems.push({type:'bearish', text:`CCI=${cci.toFixed(1)} выше +100 — классический сигнал перекупленности. Возврат к средней`});
         else if (cci > 0 && cci < 100) clCciItems.push({type:'bullish', text:`CCI=${cci.toFixed(1)} в зоне 0–100 — умеренный бычий импульс. Классически: можно держать лонг`});
         else clCciItems.push({type:'bearish', text:`CCI=${cci.toFixed(1)} в зоне 0 — −100 — умеренное медвежье давление`});
-        html += makeCard('CCI', items, 'cci', clCciItems, 'cci');
+        html += makeCard('CCI / Индекс товарного канала', items, 'cci', clCciItems, 'cci');
       }
     } else if (idL.includes('keltner')) {
       const per = 20, atrPer = 10, mult = 2;
@@ -13035,7 +13115,7 @@ function _renderAnalysisInner(panel) {
             : ((lastClose - kd) / (ku - kd) < 0.3) ? 'Цена у нижней границы Keltner — медвежий контекст. Шорт осторожно.' : null;
           _trade(kPos, kConf, kLong, kShort).forEach(t => items.push(t));
         }
-        html += makeCard('Keltner Channel (неклассически)', items, 'keltner');
+        html += makeCard('Keltner Channel / Канал Келтнера (неклассически)', items, 'keltner');
       }
     } else if (idL.includes('vwap')) {
       const n = candles.length;
@@ -13069,7 +13149,7 @@ function _renderAnalysisInner(panel) {
           }
         }
         if (!items.length) items.push({type:'neutral', text:`VWAP активен`});
-        html += makeCard('VWAP (неклассически)', items, 'vwap');
+        html += makeCard('VWAP / Средневзвеш. цена по объёму (неклассически)', items, 'vwap');
       }
     } else if (idL === 'wr') {
       const n = candles.length;
@@ -13146,7 +13226,7 @@ function _renderAnalysisInner(panel) {
         if (wr > -20) clWrItems.push({type:'bearish', text:`WR=${wr.toFixed(1)} выше −20 — классически перекуплен. Сигнал разворота вниз`});
         else if (wr < -80) clWrItems.push({type:'bullish', text:`WR=${wr.toFixed(1)} ниже −80 — классически перепродан. Сигнал разворота вверх`});
         else clWrItems.push({type:'neutral', text:`WR=${wr.toFixed(1)} — нейтральная зона, нет классического сигнала`});
-        html += makeCard('Williams %R', items, 'williams', clWrItems, 'williams');
+        html += makeCard('Williams %R / %R Вильямса', items, 'williams', clWrItems, 'williams');
       }
     } else if (idL === 'ao') {
       const n = candles.length;
@@ -13205,7 +13285,7 @@ function _renderAnalysisInner(panel) {
           }
         }
         if (!items.length) items.push({type:'neutral', text:`Awesome Oscillator: данных недостаточно`});
-        html += makeCard('Awesome Oscillator', items, 'ao');
+        html += makeCard('Awesome Oscillator / Чудесный осциллятор', items, 'ao');
       }
     } else if (idL === 'acc_dist' || idL === 'ad_line') {
       const n = candles.length;
@@ -13253,7 +13333,7 @@ function _renderAnalysisInner(panel) {
                         : null;
           _trade(adDir, adConf, adLong, adShort).forEach(t => items.push(t));
         }
-        html += makeCard('A/D Line (неклассически)', items, 'ad');
+        html += makeCard('A/D Line / Линия накопления-распределения (неклассически)', items, 'ad');
       }
     } else if (idL.includes('chaikin_osc')) {
       const n = candles.length;
@@ -13294,7 +13374,7 @@ function _renderAnalysisInner(panel) {
                         : last < 0 ? 'Chaikin ниже нуля — держи шорт, денежный поток против лонгов.' : null;
           _trade(chDir, chConf, chLong, chShort).forEach(t => items.push(t));
         }
-        html += makeCard('Chaikin Oscillator (неклассически)', items, 'chaikosc');
+        html += makeCard('Chaikin Oscillator / Осциллятор Чайкина (неклассически)', items, 'chaikosc');
       }
     } else if (idL === 'cmf') {
       const n = candles.length;
@@ -13369,7 +13449,7 @@ function _renderAnalysisInner(panel) {
                         : last < 0 && prev >= 0 ? 'AC пересёк ноль вниз — начало медвежьего ускорения, точка входа в шорт.' : null;
           _trade(acDir, acConf, acLong, acShort).forEach(t => items.push(t));
         }
-        html += makeCard('AC Oscillator (неклассически)', items, 'ac');
+        html += makeCard('AC Oscillator / Осциллятор ускорения (неклассически)', items, 'ac');
       }
     } else if (idL === 'elder_ray') {
       const n = candles.length;
@@ -13413,7 +13493,7 @@ function _renderAnalysisInner(panel) {
                         : bull < 0 ? 'Bull Power ниже нуля — быки слабы. Шорт в контексте.' : null;
           _trade(erDir, erConf, erLong, erShort).forEach(t => items.push(t));
         }
-        html += makeCard('Elder Ray (неклассически)', items, 'elder_ray');
+        html += makeCard('Elder Ray / Луч Элдера (неклассически)', items, 'elder_ray');
       }
     } else if (idL === 'force_idx') {
       const n = candles.length;
@@ -13440,7 +13520,7 @@ function _renderAnalysisInner(panel) {
             : fi13 < 0 ? 'Force Index(13) отрицательный — нисходящий тренд подтверждён объёмом. Держи шорт.' : null;
           _trade(fiDir, fiConf, fiLong, fiShort).forEach(t => items.push(t));
         }
-        html += makeCard('Force Index (неклассически)', items, 'force_idx');
+        html += makeCard('Force Index / Индекс силы (неклассически)', items, 'force_idx');
       }
     } else if (idL === 'elder_impulse') {
       const n = candles.length;
@@ -13479,7 +13559,7 @@ function _renderAnalysisInner(panel) {
                         : eiDir === 'neutral' ? 'Синий бар — шорт возможен, но без уверенности в направлении.' : null;
           _trade(eiDir, eiConf, eiLong, eiShort).forEach(t => items.push(t));
         }
-        html += makeCard('Elder Impulse System (неклассически)', items, 'elder_imp');
+        html += makeCard('Elder Impulse System / Импульсная система Элдера (неклассически)', items, 'elder_imp');
       }
     } else if (idL === 'parabolic') {
       const n = candles.length;
@@ -13534,7 +13614,7 @@ function _renderAnalysisInner(panel) {
         const clSarItems = [];
         if (dist < 3 && recentFlips50 <= 2) clSarItems.push({type:bull2?'bullish':'bearish', text:`SAR только что перешёл в ${bull2?'бычий':'медвежий'} режим — классический сигнал ${bull2?'покупки':'продажи'}`});
         else clSarItems.push({type:bull2?'bullish':'bearish', text:`SAR ${bull2?'ниже':'выше'} цены уже ${dist} баров — классически ${bull2?'бычье':'медвежье'} направление`});
-        html += makeCard('Parabolic SAR', items, 'sar', clSarItems, 'sar');
+        html += makeCard('Parabolic SAR / Параболический SAR', items, 'sar', clSarItems, 'sar');
       }
     } else if (idL === 'supertrend') {
       const n = candles.length;
@@ -13576,7 +13656,7 @@ function _renderAnalysisInner(panel) {
         const clStItems = [];
         clStItems.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend ${trend2===1?'бычий':'медвежий'} — классический сигнал ${trend2===1?'держать лонг / покупать на откатах':'держать шорт / продавать на отскоках'}`});
         if (flips <= 2 && n >= 50) clStItems.push({type:trend2===1?'bullish':'bearish', text:`${flips} смены за весь период — устойчивый тренд. Классика: не торговать против направления SuperTrend`});
-        html += makeCard('SuperTrend', items, 'supertrend', clStItems, 'supertrend');
+        html += makeCard('SuperTrend / Супертренд', items, 'supertrend', clStItems, 'supertrend');
       }
     } else if (idL.includes('fisher')) {
       const n = candles.length;
@@ -13616,7 +13696,7 @@ function _renderAnalysisInner(panel) {
                        : fisher < -2 ? 'Fisher экстремально перепродан — не входить в шорт, момент неблагоприятен для продаж.' : null;
           _trade(fDir, fConf, fLong, fShort).forEach(t => items.push(t));
         }
-        html += makeCard('Fisher Transform (неклассически)', items, 'fisher');
+        html += makeCard('Fisher Transform / Преобразование Фишера (неклассически)', items, 'fisher');
       }
     } else if (idL === 'pivot') {
       const n = candles.length;
@@ -13664,7 +13744,7 @@ function _renderAnalysisInner(panel) {
                         : crossedPP && !abovePP ? `Пробой пивота вниз — смена контроля к продавцам. Шорт с узким стопом над P (${pp.toFixed(4)}).` : null;
           _trade(pvDir, pvConf, pvLong, pvShort).forEach(t => items.push(t));
         }
-        html += makeCard('Pivot Points (неклассически)', items, 'pivot');
+        html += makeCard('Pivot Points / Опорные точки (неклассически)', items, 'pivot');
       }
     } else if (idL === 'zigzag') {
       const n = candles.length;
@@ -13699,7 +13779,7 @@ function _renderAnalysisInner(panel) {
         } else {
           items.push({type:'neutral', text:`ZigZag: недостаточно волн для структурного анализа`});
         }
-        html += makeCard('ZigZag (неклассически)', items, 'zigzag');
+        html += makeCard('ZigZag / Зигзаг (неклассически)', items, 'zigzag');
       }
     } else if (idL === 'tsi') {
       const n = candles.length;
@@ -13741,7 +13821,7 @@ function _renderAnalysisInner(panel) {
                          : last < 0 && prev > 0 ? 'TSI пересёк ноль вниз — смена моментума на медвежий. Потенциальная точка входа в шорт.' : null;
           _trade(tsiDir, tsiConf, tsiLong, tsiShort).forEach(t => items.push(t));
         }
-        html += makeCard('TSI (неклассически)', items, 'tsi');
+        html += makeCard('TSI / Индекс истинной силы (неклассически)', items, 'tsi');
       }
     } else if (idL === 'ult_osc') {
       const n = candles.length;
@@ -13777,7 +13857,7 @@ function _renderAnalysisInner(panel) {
                         : uo < 45 ? 'UO умеренно медвежий — держи шорт.' : null;
           _trade(uoDir, uoConf, uoLong, uoShort).forEach(t => items.push(t));
         }
-        html += makeCard('Ultimate Oscillator (неклассически)', items, 'uo');
+        html += makeCard('Ultimate Oscillator / Предельный осциллятор (неклассически)', items, 'uo');
       }
     } else if (idL === 'chop' || idL === 'frac_dim' || idL === 'efficiency_ratio' || idL === 'entropy') {
       // Все измерители режима рынка — обрабатываем вместе для кросс-анализа
@@ -13914,7 +13994,7 @@ function _renderAnalysisInner(panel) {
                         : vDist < 0.05 ? 'Боковик по Vortex — не входить в шорт без сигнала.' : null;
           _trade(vtDir, vtConf, vtLong, vtShort).forEach(t => items.push(t));
         }
-        html += makeCard('Vortex (неклассически)', items, 'vortex');
+        html += makeCard('Vortex / Вортекс (неклассически)', items, 'vortex');
       }
     } else if (idL === 'bb_pct') {
       const n = candles.length;
@@ -13955,7 +14035,7 @@ function _renderAnalysisInner(panel) {
           }
         }
         if(!items.length) items.push({type:'neutral',text:'BB %B активен'});
-        html += makeCard('BB %B (неклассически)', items, 'bbpb');
+        html += makeCard('BB %B / Процент полос Боллинджера (неклассически)', items, 'bbpb');
       }
     } else if (idL === 'bb_width') {
       const n = candles.length;
@@ -14000,7 +14080,7 @@ function _renderAnalysisInner(panel) {
                          : wRank > 0.85 && priceSlope < 0 ? 'BB Width максимальный при снижении — конец медвежьего выброса. Шорт опасен, скоро разворот.' : null;
           _trade(bbwDir, bbwConf, bbwLong, bbwShort).forEach(t => items.push(t));
         }
-        html += makeCard('BB Width (неклассически)', items, 'bbw');
+        html += makeCard('BB Width / Ширина полос Боллинджера (неклассически)', items, 'bbw');
       }
     } else if (idL === 'dmi') {
       const n = candles.length;
@@ -14048,7 +14128,7 @@ function _renderAnalysisInner(panel) {
                          : dim > dip && adxNow <= 25 ? '-DI доминирует но тренд слабый. Осторожный шорт.' : null;
           _trade(dmiDir, dmiConf, dmiLong, dmiShort).forEach(t => items.push(t));
         }
-        html += makeCard('DMI / ADX (неклассически)', items, 'dmi');
+        html += makeCard('DMI/ADX / Направленное движение (неклассически)', items, 'dmi');
       }
     } else if (idL.includes('hist_vol') || idL.includes('close2close') || idL.includes('ohlc_vol') || idL.includes('vix_like')) {
       const n = candles.length;
@@ -14332,7 +14412,7 @@ function _renderAnalysisInner(panel) {
                         : dev < 0 ? 'Цена ниже VWMA — медвежий контекст. Шорт в контексте.' : null;
           _trade(vmDir, vmConf, vmLong, vmShort).forEach(t => items.push(t));
         }
-        html += makeCard('VWMA (неклассически)', items, 'vwma');
+        html += makeCard('VWMA / Взвеш. по объёму скользящая (неклассически)', items, 'vwma');
       }
     } else if (idL === 'fractals') {
       const n = candles.length;
@@ -14361,7 +14441,7 @@ function _renderAnalysisInner(panel) {
             : lastDn ? `Фрактальный минимум ${lastDn.toFixed(4)} — цель для медведей. Шорт при пробое вниз.` : null;
           _trade(frcDir, frcConf, frcLong, frcShort).forEach(t => items.push(t));
         }
-        html += makeCard('Fractals Вильямса (неклассически)', items, 'fractals');
+        html += makeCard('Fractals / Фракталы Вильямса (неклассически)', items, 'fractals');
       }
     } else if (idL === 'mcginley') {
       const n = candles.length;
@@ -14392,7 +14472,7 @@ function _renderAnalysisInner(panel) {
                         : dev < 0 ? 'Цена ниже McGinley — медвежий контекст.' : null;
           _trade(mcDir, mcConf, mcLong, mcShort).forEach(t => items.push(t));
         }
-        html += makeCard('McGinley Dynamic (неклассически)', items, 'mcginley');
+        html += makeCard('McGinley Dynamic / Динамика Макгинли (неклассически)', items, 'mcginley');
       }
     } else if (idL === 'std_dev') {
       const n = candles.length;
@@ -14475,7 +14555,7 @@ function _renderAnalysisInner(panel) {
                          : last < ma ? 'Цена ниже MA конвертов — медвежий контекст.' : null;
           _trade(envDir, envConf, envLong, envShort).forEach(t => items.push(t));
         }
-        html += makeCard('Envelopes (неклассически)', items, 'envelopes');
+        html += makeCard('Envelopes / Конверты скользящих (неклассически)', items, 'envelopes');
       }
     } else if (idL === 'dpo') {
       const n = candles.length;
@@ -14559,7 +14639,7 @@ function _renderAnalysisInner(panel) {
           const cvShort = chgV > 20 && priceSlope < 0 ? 'Диапазон расширяется при снижении — подтверждённый медвежий каскад. Держи шорт.' : null;
           _trade(cvDir, cvConf, cvLong, cvShort).forEach(t => items.push(t));
         }
-        html += makeCard('Chaikin Volatility (неклассически)', items, 'chaikvol');
+        html += makeCard('Chaikin Volatility / Волатильность Чайкина (неклассически)', items, 'chaikvol');
       }
     } else if (idL === 'cum_delta' || idL.includes('cumulative') || idL.includes('cum_d')) {
       const n = candles.length;
@@ -14609,7 +14689,7 @@ function _renderAnalysisInner(panel) {
                         : cdPUp && !cdDUp ? 'Медвежья дивергенция Delta: рост без агрессивных покупок. Потенциальная точка шорта.' : null;
           _trade(cdDir, cdConf, cdLong, cdShort).forEach(t => items.push(t));
         }
-        html += makeCard('Cumulative Delta (неклассически)', items, 'cum_delta');
+        html += makeCard('Cumulative Delta / Кумулятивная дельта (неклассически)', items, 'cum_delta');
       }
     } else if (idL === 'cyber_cycle' || idL.includes('cybercycle') || idL.includes('cyber')) {
       const n = candles.length;
@@ -14657,7 +14737,7 @@ function _renderAnalysisInner(panel) {
                         : last > 0 && last < (cc[n-3]||last) ? 'CC разворачивается сверху — начало медвежьей фазы цикла.' : null;
           _trade(ccDir, ccConf, ccLong, ccShort).forEach(t => items.push(t));
         }
-        html += makeCard('Cyber Cycle Элерса (неклассически)', items, 'cyber_cyc');
+        html += makeCard('Cyber Cycle / Кибер-цикл Элерса (неклассически)', items, 'cyber_cyc');
       }
     } else if (idL === 'mama') {
       const n = candles.length;
@@ -14719,7 +14799,7 @@ function _renderAnalysisInner(panel) {
                           : null;
           _trade(mamaDir, mamaConf, mamaLong, mamaShort).forEach(t => items.push(t));
         }
-        html += makeCard('MAMA / FAMA Элерса (неклассически)', items, 'mama');
+        html += makeCard('MAMA/FAMA / Адапт. скользящие Элерса (неклассически)', items, 'mama');
       }
     } else if (idL === 'kvo') {
       const n = candles.length;
@@ -14840,7 +14920,7 @@ function _renderAnalysisInner(panel) {
           items.push({type:'neutral', text:`KVO/Signal схлопываются после расширения — денежный поток теряет направление. Выброс может завершаться`});
         }
 
-        html += makeCard('Klinger Volume Oscillator (неклассически)', items, 'kvo');
+        html += makeCard('KVO / Осциллятор объёма Клингера (неклассически)', items, 'kvo');
       }
     } else if (idL === 'ebs') {
       const n = candles.length;
@@ -14931,7 +15011,7 @@ function _renderAnalysisInner(panel) {
                      : ebs > 0 && ebs < ebs1 ? 'EBS разворачивается из верхней фазы — начало снижения. Осторожный шорт.' : null;
           _trade(ebsD, ebsC, ebsL, ebsS).forEach(t => items.push(t));
         }
-        html += makeCard('Even Better Sinewave (неклассически)', items, 'ebs');
+        html += makeCard('EBS / Улучшенная синусоида Элерса (неклассически)', items, 'ebs');
       }
     } else if (idL === 'tmf') {
       const n = candles.length;
@@ -15021,7 +15101,7 @@ function _renderAnalysisInner(panel) {
                      : now < 0 ? 'TMF отрицательный — деньги выходят. Держи шорт.' : null;
           _trade(tmfD, tmfC, tmfL, tmfS).forEach(t => items.push(t));
         }
-        html += makeCard('Twiggs Money Flow (неклассически)', items, 'tmf');
+        html += makeCard('TMF / Денежный поток Твиггса (неклассически)', items, 'tmf');
       }
     } else if (idL === 'pvi') {
       const n = candles.length;
@@ -15068,7 +15148,7 @@ function _renderAnalysisInner(panel) {
         const pct=atr/closes[n-1]*100;
         items.push({type:'neutral', text:`ATR = ${atr.toFixed(2)} (${pct.toFixed(1)}% от цены) — ставь стоп минимум за ${(atr*1.5).toFixed(2)} от входа`});
         if(pct>3) items.push({type:'neutral', text:`ATR высокий — позиция требует широкого стопа или меньшего объёма`});
-        html += makeCard('ATR / Управление стопом (неклассически)', items, 'atr_stop');
+        html += makeCard('ATR Stop / Стоп по ATR (неклассически)', items, 'atr_stop');
       }
     } else if (idL.includes('ichi_tk') || idL.includes('ichi_cloud')) {
       const n = candles.length;
@@ -15091,7 +15171,7 @@ function _renderAnalysisInner(panel) {
         else items.push({type:'neutral', text:`Цена внутри облака Kumo — зона неопределённости`});
         if(tenkan>kijun) items.push({type:'bullish', text:`TK Cross бычий: Tenkan выше Kijun`});
         else if(tenkan<kijun) items.push({type:'bearish', text:`TK Cross медвежий: Tenkan ниже Kijun`});
-        html += makeCard('Ichimoku (TK/Kumo, неклассически)', items, 'ichi_tk');
+        html += makeCard('Ichimoku TK/Kumo / Ишимоку (неклассически)', items, 'ichi_tk');
       }
     } else if (idL.includes('bb_full') || idL.includes('ma_channel') || idL.includes('price_ch')) {
       const n = candles.length;
@@ -15113,7 +15193,7 @@ function _renderAnalysisInner(panel) {
           else if(val<=30) items.push({type:'bearish', text:`RSI(Wilder) = ${val.toFixed(1)} — перепродан; в тренде прилипает к 30`});
           else items.push({type:'neutral', text:`RSI(Wilder) = ${val.toFixed(1)}`});
         }
-        html += makeCard('RSI Wilder (неклассически)', items, 'rsi_wil');
+        html += makeCard('RSI Wilder / RSI Уайлдера (неклассически)', items, 'rsi_wil');
       }
     } else {
       html += makeCard(id, [{type:'neutral', text:`Индикатор активен`}]);
@@ -15174,5 +15254,13 @@ window.addEventListener('message', (ev) => {
     .catch(err => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*'));
 });
 </script>
+
+<!-- Модал легенды цветов линий индикатора -->
+<div id="il-legend-modal" onclick="if(event.target===this)ilHideLegend()">
+  <div id="il-legend-box">
+    <div id="il-legend-title"><span id="il-legend-label">Линии</span><span onclick="ilHideLegend()">✕</span></div>
+    <div id="il-legend-rows"></div>
+  </div>
+</div>
 </body>
 </html>
