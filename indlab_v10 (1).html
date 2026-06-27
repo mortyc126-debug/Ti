@@ -11524,6 +11524,66 @@ function _renderAnalysisInner(panel) {
     return `<div class="analysis-card"><div class="analysis-card-title">${title}</div>${inner}</div>`;
   }
 
+  // ─── Хелпер: блок «что делать» для лонга/шорта/без позиции ─────────────────────
+  // dir: 'bullish'|'bearish'|'neutral'  conf: 'strong'|'moderate'|'weak'
+  // customLong/customShort — дополнительный контекст (строка или null)
+  function _trade(dir, conf, customLong, customShort) {
+    const guidance = {
+      bullish: {
+        strong: {
+          long:  'Держать лонг, не закрывать на откатах — это нормальная пульсация тренда. Подтяни стоп под ближайший структурный минимум.',
+          short: 'Выходи из шорта или хотя бы сокращай объём. Ты против тренда, и индикатор это подтверждает.',
+          none:  'Можно рассматривать лонг на откате к поддержке. Не гонись за уже ушедшим движением — жди реакции от уровня.'
+        },
+        moderate: {
+          long:  'Держать лонг, но подтяни стоп — движение продолжается, но без прежней уверенности.',
+          short: 'Шорт под давлением, сигнал против тебя. Частичный выход снизит риск.',
+          none:  'Осторожный вход в лонг возможен — дождись отката и реакции от уровня для подтверждения.'
+        },
+        weak: {
+          long:  'Уменьши размер позиции или подтяни стоп вплотную. Сигнал слабый — неопределённость.',
+          short: 'Шорт пока живёт, но осторожно: есть признаки давления вверх.',
+          none:  'Не входить без дополнительного подтверждения от другого индикатора.'
+        }
+      },
+      bearish: {
+        strong: {
+          long:  'Выходи из лонга или существенно сокращай. Держать против подтверждённого давления — дорого.',
+          short: 'Держать шорт. Откаты вверх — нормально, используй их для доращивания позиции у сопротивления.',
+          none:  'Рассмотреть шорт на откате к сопротивлению. Не входи в панике на уже сильно упавшем рынке.'
+        },
+        moderate: {
+          long:  'Лонг под давлением — частичная фиксация или подтяжка стопа.',
+          short: 'Держать шорт с мониторингом. Нет оснований для выхода, но импульс не экстремальный.',
+          none:  'Вход в шорт возможен на отскоке к сопротивлению с коротким стопом выше уровня.'
+        },
+        weak: {
+          long:  'Лонг под лёгким давлением — держи, но держи стоп близко.',
+          short: 'Шорт пока нормально, но сигнал слабый — без жёстких усреднений.',
+          none:  'Подождать чёткого сигнала. Слабое давление вниз — не лучший момент для входа.'
+        }
+      },
+      neutral: {
+        none: {
+          long:  'Нейтральный сигнал — держи лонг только если есть основание от других индикаторов.',
+          short: 'Нейтральный сигнал — держи шорт только если есть основание от других индикаторов.',
+          none:  'Не входить. Нейтральный сигнал — рынок без направления, деньги зарабатываются терпением.'
+        }
+      }
+    };
+    const g = dir === 'neutral' ? guidance.neutral.none :
+              (guidance[dir]?.[conf] || guidance[dir]?.moderate || guidance.neutral.none);
+    const lText = (customLong ? customLong + ' ' : '') + g.long;
+    const sText = (customShort ? customShort + ' ' : '') + g.short;
+    return [
+      {type: dir==='bullish'?'bullish':dir==='bearish'?'neutral':'neutral',
+       text: `▲ Лонг: ${lText}`},
+      {type: dir==='bearish'?'bearish':dir==='bullish'?'neutral':'neutral',
+       text: `▼ Шорт: ${sText}`},
+      {type: 'neutral', text: `◎ Без позиции: ${g.none}`}
+    ];
+  }
+
   // ─── Бэктест по текущим свечам — score-массивы + _btMini по горизонтам ───────
   const _ss2 = candles.length >= 60 ? _ilCalcAllSeries(candles, closes) : {};
 
@@ -11919,6 +11979,15 @@ function _renderAnalysisInner(panel) {
           else if (diverge) items.push({type:'neutral', text:`RSI(14)=${r.toFixed(0)} ≠ RSI(2)=${r2v.toFixed(0)} — дивергенция масштабов: долгосрочный и краткосрочный в разных режимах. Неопределённость`});
         }
 
+        // Блок «что делать»
+        {
+          const rDir = r > 55 ? 'bullish' : r < 45 ? 'bearish' : 'neutral';
+          const rConf = (r > 70 || r < 30) ? 'strong' : (r > 60 || r < 40) ? 'moderate' : 'weak';
+          const rLong = r > 70 ? 'RSI в зоне перегрева — в каскаде это нормально, не закрывай раньше времени.' : r < 30 ? 'RSI перепродан — если ты в лонге от более низкого уровня, жди подтверждения отскока.' : null;
+          const rShort = r < 30 ? 'RSI перепродан — хороший момент задуматься о фиксации части шорта.' : r > 70 ? 'RSI перегрет — шорт в тренде опасен, но при дивергенции допустим с коротким стопом.' : null;
+          _trade(rDir, rConf, rLong, rShort).forEach(t => items.push(t));
+        }
+
         // Классические сигналы RSI
         const clRsiItems = [];
         if (r < 30) clRsiItems.push({type:'bullish', text:`RSI=${r.toFixed(1)} — перепродан. Классический сигнал разворота вверх. Работает лучше на дне волатильности, хуже в сильном нисходящем тренде`});
@@ -11979,6 +12048,15 @@ function _renderAnalysisInner(panel) {
             const macdLo = h <= Math.min(...hist.slice(-15,-1));
             if (priceHi && !macdHi) items.push({type:'bearish', text:`Цена на хае 15 баров — MACD гистограмма нет. Затухание импульса, не нового хая нет`});
             if (priceLo && !macdLo) items.push({type:'bullish', text:`Цена на лоу 15 баров — MACD гистограмма нет нового минимума. Затухание падения`});
+          }
+
+          // Блок «что делать» для MACD
+          {
+            const mDir = h > 0 ? (accel > 0 ? 'bullish' : 'bullish') : (accel < 0 ? 'bearish' : 'bearish');
+            const mConf = speedRatio > 2 ? 'strong' : speedRatio > 0.7 ? 'moderate' : 'weak';
+            const mLong = h > 0 && accel > 0 ? 'Гистограмма растёт — импульс нарастает, лонг в фазе силы.' : h > 0 && accel < 0 ? 'Гистограмма падает при положительном значении — импульс остывает. Не усредняй, подтяни стоп.' : null;
+            const mShort = h < 0 && accel < 0 ? 'Нисходящий импульс усиливается — шорт в фазе силы.' : h < 0 && accel > 0 ? 'Гистограмма разворачивается вверх — возможен конец медвежьей фазы. Рассмотри частичный выход из шорта.' : null;
+            _trade(mDir, mConf, mLong, mShort).forEach(t => items.push(t));
           }
 
           // Классика MACD: пересечение signal line
@@ -12062,6 +12140,16 @@ function _renderAnalysisInner(panel) {
             else if (emaSmaGap < -0.3) items.push({type:'bearish', text:`EMA(20) на ${Math.abs(emaSmaGap).toFixed(2)}% ниже SMA(20) — падение ускоряется`});
             else items.push({type:'neutral', text:`EMA ≈ SMA — ускорение близко к нулю, движение равномерное`});
           }
+          // Блок «что делать» по BB
+          {
+            const squeeze = curW < 0.2 * maxW;
+            const bbDir = outsideUp2 ? 'bullish' : outsideDown2 ? 'bearish' : beyondUp > 0.5 ? 'bullish' : beyondDn > 0.5 ? 'bearish' : 'neutral';
+            const bbConf = outsideUp2||outsideDown2 ? 'strong' : beyondUp > 1||beyondDn > 1 ? 'moderate' : 'weak';
+            const bbLong = outsideUp2 ? 'Цена 3+ бара идёт вдоль верхней полосы — это каскад, держи лонг и не продавай против движения.' : squeeze ? 'Сжатие BB — жди выброса. Если он вверх — входи в лонг с небольшим размером, стоп ниже полосы.' : beyondUp > 1 ? 'Цена далеко за верхней полосой — не добавляй в лонг здесь, это перегрев. Жди возврата к средней.' : null;
+            const bbShort = outsideDown2 ? 'Цена 3+ бара ниже нижней полосы — каскад вниз, держи шорт.' : squeeze ? 'Жди выброса из Squeeze. Если вниз — короткий шорт с узким стопом выше полосы.' : beyondDn > 1 ? 'Цена далеко за нижней полосой — не добавляй в шорт здесь. Жди отскока к средней.' : null;
+            _trade(bbDir, bbConf, bbLong, bbShort).forEach(t => items.push(t));
+          }
+
           // Классика BB: отскок от полос
           const clBBItems = [];
           const lastCloseBB = closes[closes.length-1];
@@ -12168,6 +12256,15 @@ function _renderAnalysisInner(panel) {
           items.push({type:'neutral', text:`Stochastic K=${k.toFixed(0)} — нейтральная зона`});
         }
 
+        // Блок «что делать» по Stochastic
+        {
+          const sDir = k > 70 && kSpeed >= 0 ? 'bullish' : k > 70 && kSpeed < 0 ? 'neutral' : k < 30 && kSpeed <= 0 ? 'bearish' : k < 30 && kSpeed > 0 ? 'neutral' : k > 50 ? 'bullish' : k < 50 ? 'bearish' : 'neutral';
+          const sConf = barsInHigh >= 5 || barsInLow >= 5 ? 'strong' : (k > 70 || k < 30) ? 'moderate' : 'weak';
+          const sLong = barsInHigh >= 5 ? `K=${k.toFixed(0)} прилип к верхней зоне — признак каскада. Держи лонг, стоп под структурой.` : k > 70 && kSpeed < 0 ? 'K начинает выходить из >80 — рассмотри частичную фиксацию лонга.' : k < 30 && kSpeed > 0 ? 'K разворачивается из перепроданности — потенциальная точка входа в лонг при подтверждении.' : null;
+          const sShort = barsInLow >= 5 ? `K=${k.toFixed(0)} прилип к нижней зоне — давление устойчиво. Держи шорт.` : k < 30 && kSpeed > 0 ? 'K выходит из перепроданности — рассмотри частичный выход из шорта.' : k > 70 && kSpeed < 0 ? 'K выходит из перекупленности — потенциальная точка входа в шорт с коротким стопом.' : null;
+          _trade(sDir, sConf, sLong, sShort).forEach(t => items.push(t));
+        }
+
         // K/D расхождение как опережающий сигнал
         if (d != null && Math.abs(kD_spread) > 15) {
           if (kD_spread > 0) items.push({type:'bullish', text:`K(${k.toFixed(0)}) опережает D(${d.toFixed(0)}) на ${kD_spread.toFixed(0)} пунктов — краткосрочный импульс ускоряется вверх быстрее сглаженного. Сигнал усиления движения`});
@@ -12242,6 +12339,15 @@ function _renderAnalysisInner(panel) {
         } else if (obvSlope !== 0 && Math.abs(obvFast) < Math.abs(obvSlow5) * 0.3) {
           items.push({type:'neutral', text:`OBV ползёт медленно (скорость падает) — мелкие покупатели, крупного входа нет`});
         }
+        // Блок «что делать» по OBV
+        {
+          const oDir = priceSlope > 0 && obvSlope > 0 ? 'bullish' : priceSlope < 0 && obvSlope < 0 ? 'bearish' : 'neutral';
+          const oConf = Math.abs(obvSlope) > Math.abs(obvSlope)*0.5 ? 'moderate' : 'weak';
+          const oLong = oDir==='bullish' ? 'OBV подтверждает рост — объём стоит за покупателями. Держи лонг.' : oDir==='neutral' && priceSlope > 0 ? 'Цена растёт, OBV не растёт — слабое движение. Уменьши размер лонга или подтяни стоп.' : null;
+          const oShort = oDir==='bearish' ? 'OBV подтверждает снижение — объём за продавцами. Держи шорт.' : oDir==='neutral' && priceSlope < 0 ? 'Цена падает, OBV не падает — слабое снижение. Будь осторожен с шортом.' : null;
+          _trade(oDir, oConf, oLong, oShort).forEach(t => items.push(t));
+        }
+
         // Классика OBV: тренд OBV подтверждает или опровергает цену
         const clObvItems = [];
         const obvCur = obvArr[obvArr.length-1], obvPrev20 = obvArr[Math.max(0,obvArr.length-20)];
@@ -12292,6 +12398,15 @@ function _renderAnalysisInner(panel) {
           if (barsInExtreme<=2) items.push({type:'neutral', text:`MFI скакнул в крайность быстро — ложный перегрев, проверяй: ловушка покупателей/продавцов`});
           else items.push({type:mfi>75?'bullish':'bearish', text:`MFI держится в крайности ${barsInExtreme}+ баров — настоящий перегрев на объёме. Когда начнёт откатывать = выброс`});
         }
+        // Блок «что делать» по MFI
+        {
+          const mfiDir = mfi > 60 && priceSlope5 > 0 ? 'bullish' : mfi < 40 && priceSlope5 < 0 ? 'bearish' : mfi > 80 ? 'neutral' : mfi < 20 ? 'neutral' : 'neutral';
+          const mfiConf = mfi > 80 || mfi < 20 ? 'strong' : mfi > 60 || mfi < 40 ? 'moderate' : 'weak';
+          const mfiLong = mfi > 80 && priceSlope5 > 0 ? 'Объёмной давление покупателей высокое — держи лонг, но следи за разворотом MFI: когда начнёт падать с >80, готовь выход.' : mfi < 20 ? 'MFI перепродан — хорошая точка для входа в лонг при первых признаках разворота цены.' : null;
+          const mfiShort = mfi < 20 && priceSlope5 < 0 ? 'Объёмное давление медвежье — держи шорт. Когда MFI начнёт расти из <20 — частичная фиксация.' : mfi > 80 ? 'MFI перекуплен — хорошая точка для входа в шорт при первом признаке слабости цены.' : null;
+          _trade(mfiDir, mfiConf, mfiLong, mfiShort).forEach(t => items.push(t));
+        }
+
         // Классика MFI
         const clMfiItems = [];
         if (mfi < 20) clMfiItems.push({type:'bullish', text:`MFI=${mfi.toFixed(1)} — перепродан (< 20). Классика: объёмное давление продаж иссякает, ожидается разворот вверх`});
@@ -12432,6 +12547,15 @@ function _renderAnalysisInner(panel) {
           }
         }
 
+        // Блок «что делать» по Ichimoku
+        {
+          const iDir = aboveCloud ? 'bullish' : belowCloud ? 'bearish' : 'neutral';
+          const iConf = cloudThickness > 1.5 ? 'strong' : cloudThickness > 0.5 ? 'moderate' : 'weak';
+          const iLong = aboveCloud ? `Цена выше облака толщиной ${cloudThickness.toFixed(2)}% — это поддержка снизу. Держи лонг пока цена не войдёт в облако.` : inCloud ? 'Цена в облаке — неопределённость. Уменьши позицию до выхода.' : null;
+          const iShort = belowCloud ? `Цена ниже облака — сопротивление сверху. Держи шорт пока цена не войдёт в облако.` : inCloud ? 'В облаке — шорт под давлением, частичный выход не лишний.' : null;
+          _trade(iDir, iConf, iLong, iShort).forEach(t => items.push(t));
+        }
+
         // Классика Ichimoku: 5 сигналов
         const clIchiItems = [];
         if (aboveCloud) clIchiItems.push({type:'bullish', text:`Цена выше облака — бычий тренд (условие №1 Ichimoku). Все позиции покупки предпочтительнее`});
@@ -12507,7 +12631,15 @@ function _renderAnalysisInner(panel) {
               items.push({type:'neutral', text:`Расхождение замедляется — пауза внутри тренда. Следующее расхождение = новый импульс`});
             }
           }
-          html += makeCard('Alligator (неклассически)', items, 'alligator');
+          // Блок «что делать» по Alligator
+          {
+            const allDir = (l0>t0&&t0>j0) ? 'bullish' : (l0<t0&&t0<j0) ? 'bearish' : 'neutral';
+            const allConf = expanding && !wasSleeping ? 'strong' : expanding ? 'moderate' : 'weak';
+            const allLong = allDir==='bullish' && expanding ? 'Бычий веер + расхождение линий — держи лонг, тренд в полную силу. Откат к зубам — возможность доращивания.' : allDir==='bullish' && !expanding ? 'Бычий порядок, но аллигатор замедляется. Держи лонг с подтянутым стопом.' : allDir==='neutral' && wasSleeping ? 'Аллигатор спит — не входи в лонг. Жди пробоя и расхождения линий.' : null;
+            const allShort = allDir==='bearish' && expanding ? 'Медвежий веер + расхождение вниз — держи шорт. Откат к зубам — возможность доращивания шорта.' : allDir==='bearish' && !expanding ? 'Медвежий порядок, но замедляется. Держи с коротким стопом.' : null;
+            _trade(allDir, allConf, allLong, allShort).forEach(t => items.push(t));
+          }
+          html += makeCard('Alligator', items, 'alligator');
         }
       }
     } else if ((idL.includes('ma') || idL.includes('ema')) && !idL.includes('macd') && !idL.includes('smma')) {
@@ -12571,6 +12703,15 @@ function _renderAnalysisInner(panel) {
         const emaFlat = Math.abs(v21-e21[n-6])/v21*100;
         if (smaFlat < 0.1 && emaFlat < 0.1) items.push({type:'neutral', text:`SMA(20) и EMA(21) обе плоские (<0.1% за 5 баров) — нитка, максимальное согласие на отсутствие движения`});
 
+        // Блок «что делать» по MA/EMA
+        {
+          const maDir = bullFan ? 'bullish' : bearFan ? 'bearish' : 'neutral';
+          const maConf = (bullFan||bearFan) ? (Math.abs(slope5)>0.5?'strong':'moderate') : 'weak';
+          const maLong = bullFan ? `Веер EMA бычий — держи лонг, откаты к EMA8/13 используй для доращивания с узким стопом.` : bearFan ? 'EMA показывают чистый нисходящий тренд — лонг опасен.' : null;
+          const maShort = bearFan ? 'Веер EMA медвежий — держи шорт, отскоки к EMA8/13 — точки для доращивания.' : bullFan ? 'Шорт против бычьего вееpa — высокий риск. Только со стопом выше EMA8.' : null;
+          _trade(maDir, maConf, maLong, maShort).forEach(t => items.push(t));
+        }
+
         // Классика MA: цена выше/ниже EMA(21), пересечение EMA8/EMA21
         const clMaItems = [];
         const lastCloseMA = closes[n-1];
@@ -12622,7 +12763,15 @@ function _renderAnalysisInner(panel) {
         else if (distDown < 0.2) items.push({type:'bearish', text:`Цена у нижней границы (${lower.toFixed(4)}) — ниже скоплены стопы лонгистов. Пробой = их охота`});
         else items.push({type:'neutral', text:`До верх.границы ${distUp.toFixed(1)}%, до нижней ${distDown.toFixed(1)}%`});
 
-        html += makeCard('Donchian (неклассически)', items, 'donchian');
+        // Блок «что делать» по Donchian
+        {
+          const dcDir = lastClose > (upper+lower)/2 ? 'bullish' : 'bearish';
+          const dcConf = Math.min(distUp,distDown) < 0.2 ? 'strong' : 'moderate';
+          const dcLong = distUp < 0.2 ? `Цена у верхней границы (${upper.toFixed(4)}) — пробой вверх может запустить волну стоп-лоссов шортистов. Если держишь лонг — не выходи раньше пробоя.` : dcDir==='bullish' ? 'Цена в верхней половине канала — держи лонг пока выше середины.' : null;
+          const dcShort = distDown < 0.2 ? `Цена у нижней границы (${lower.toFixed(4)}) — пробой вниз активирует стопы лонгистов. Если в шорте — держи.` : dcDir==='bearish' ? 'Цена в нижней половине канала — держи шорт пока ниже середины.' : null;
+          _trade(dcDir, dcConf, dcLong, dcShort).forEach(t => items.push(t));
+        }
+        html += makeCard('Donchian', items, 'donchian');
       }
     } else if (idL.includes('adx')) {
       const period = 14;
@@ -12698,6 +12847,15 @@ function _renderAnalysisInner(panel) {
         } else if (diSpread > 20) {
           items.push({type:diP>diM?'bullish':'bearish', text:`Огромный спред DI+/DI−: ${diSpread.toFixed(1)} пунктов — ${diP>diM?'быки':'медведи'} безоговорочно контролируют рынок. Откаты будут выкупаться (продаваться)`});
         }
+        // Блок «что делать» по ADX
+        {
+          const adxDir = adx > 25 ? (diP > diM ? 'bullish' : 'bearish') : 'neutral';
+          const adxConf = adx > 40 ? 'strong' : adx > 25 ? 'moderate' : 'weak';
+          const adxLong = adx > 40 && diP > diM ? 'ADX сильный, DI+ доминирует — лонг в потоке. Держи, не закрывай на откатах пока ADX не начнёт падать.' : adx > 25 && diP > diM && adxRising ? 'Тренд набирает силу — лонг уместен. Следи за тем, не начнёт ли ADX снижаться.' : adx < 20 ? 'Боковик — лонг только у нижнего края диапазона с коротким стопом.' : null;
+          const adxShort = adx > 40 && diM > diP ? 'ADX сильный, DI− доминирует — шорт в потоке. Держи пока ADX не начнёт снижаться.' : adx > 25 && diM > diP && adxRising ? 'Нисходящий тренд усиливается — шорт уместен.' : adx < 20 ? 'Боковик — шорт только у верхнего края диапазона.' : null;
+          _trade(adxDir, adxConf, adxLong, adxShort).forEach(t => items.push(t));
+        }
+
         // Классика ADX: >25 = тренд есть, направление по DI
         const clAdxItems = [];
         if (adx > 25) {
@@ -12787,6 +12945,15 @@ function _renderAnalysisInner(panel) {
           if (cci > 80 && cci < cci) {/* handled below */}
           if (Math.abs(cci) > 150) items.push({type:'neutral', text:`CCI в экстремуме — ${cci>0?'верх':'низ'} цикла. Скоро разворот внутри цикла`});
         }
+        // Блок «что делать» по CCI
+        {
+          const cciDir = cci > 100 ? 'bullish' : cci < -100 ? 'bearish' : cci > 0 ? 'bullish' : 'bearish';
+          const cciConf = Math.abs(cci) > 200 ? 'strong' : Math.abs(cci) > 100 ? 'moderate' : 'weak';
+          const cciLong = cci > 200 ? 'CCI экстремально высокий — лонг перегрет. Не добавляй, подтяни стоп. Жди признаков охлаждения.' : cci > 100 && cciRising ? 'CCI в бычьей зоне и растёт — держи лонг, импульс сильный.' : cci > 100 && !cciRising ? 'CCI в бычьей зоне но разворачивается — рассмотри частичную фиксацию лонга.' : cci < -100 ? 'CCI перепродан — потенциальная точка входа в лонг при развороте CCI вверх.' : null;
+          const cciShort = cci < -200 ? 'CCI экстремально низкий — шорт перегрет. Не добавляй, подтяни стоп.' : cci < -100 && !cciRising ? 'CCI падает ниже −100 — держи шорт, импульс вниз.' : cci < -100 && cciRising ? 'CCI разворачивается из перепроданности — рассмотри частичный выход из шорта.' : cci > 100 ? 'CCI перекуплен — потенциальная точка входа в шорт при развороте CCI вниз.' : null;
+          _trade(cciDir, cciConf, cciLong, cciShort).forEach(t => items.push(t));
+        }
+
         // Классика CCI
         const clCciItems = [];
         if (cci < -100) clCciItems.push({type:'bullish', text:`CCI=${cci.toFixed(1)} ниже −100 — классический сигнал перепроданности. Ожидается разворот вверх`});
@@ -12921,6 +13088,14 @@ function _renderAnalysisInner(panel) {
         }
         if (prevExtreme && wr > -80 && wr < -20) {
           items.push({type:'neutral', text:`Вышел из экстремальной зоны — краткосрочное давление ослабло. Следи за объёмом при выходе: с объёмом = настоящий разворот, без объёма = коррекция в тренде`});
+        }
+        // Блок «что делать» по WR
+        {
+          const wrDir = barsInTop >= 3 ? 'bullish' : barsInBot >= 3 ? 'bearish' : wr > -50 ? 'bullish' : 'bearish';
+          const wrConf = barsInTop >= 5 || barsInBot >= 5 ? 'strong' : barsInTop >= 2 || barsInBot >= 2 ? 'moderate' : 'weak';
+          const wrLong = barsInTop >= 5 ? 'WR прилип к верхней зоне — тренд сильный, держи лонг. Не продавай перекупленность в тренде.' : barsInBot >= 2 && wr > wrPrev ? 'WR выходит из перепроданности — хорошая точка входа в лонг с узким стопом под минимумом.' : null;
+          const wrShort = barsInBot >= 5 ? 'WR прилип к нижней зоне — нисходящий тренд устойчив, держи шорт.' : barsInTop >= 2 && wr < wrPrev ? 'WR выходит из перекупленности — потенциальная точка входа в шорт.' : null;
+          _trade(wrDir, wrConf, wrLong, wrShort).forEach(t => items.push(t));
         }
         // Классика Williams %R
         const clWrItems = [];
@@ -13218,6 +13393,15 @@ function _renderAnalysisInner(panel) {
         const sarApproach = sarDistPrev - sarDist; // >0 = SAR приближается
         if (sarApproach > 0.5) items.push({type:'bearish', text:`SAR быстро приближается к цене (+${sarApproach.toFixed(1)}% за 5 баров) — ускорение падает, тренд на финише`});
         else if (sarApproach < -0.5 && sarDist > 1) items.push({type:bull2?'bullish':'bearish', text:`SAR отдаляется от цены — цена уходит быстрее SAR, каскад здоров`});
+        // Блок «что делать» по SAR
+        {
+          const sarDir = bull2 ? 'bullish' : 'bearish';
+          const sarConf = dist >= 10 ? 'strong' : dist >= 4 ? 'moderate' : 'weak';
+          const sarLong = bull2 && dist >= 10 ? `SAR держится бычьим уже ${dist} баров — устойчивый тренд. Держи лонг, стоп ниже SAR (${sar.toFixed(4)}).` : bull2 && dist < 3 ? 'SAR только что переключился вверх — осторожный вход в лонг. Стоп сразу под SAR.' : !bull2 ? 'SAR медвежий — лонг против тренда. Не входи, жди переключения SAR.' : null;
+          const sarShort = !bull2 && dist >= 10 ? `SAR держится медвежьим ${dist} баров. Держи шорт, стоп выше SAR (${sar.toFixed(4)}).` : !bull2 && dist < 3 ? 'SAR только что переключился вниз — вход в шорт с стопом выше SAR.' : bull2 ? 'SAR бычий — шорт против тренда, высокий риск.' : null;
+          _trade(sarDir, sarConf, sarLong, sarShort).forEach(t => items.push(t));
+        }
+
         // Классика Parabolic SAR: направление и момент переключения
         const clSarItems = [];
         if (dist < 3 && recentFlips50 <= 2) clSarItems.push({type:bull2?'bullish':'bearish', text:`SAR только что перешёл в ${bull2?'бычий':'медвежий'} режим — классический сигнал ${bull2?'покупки':'продажи'}`});
@@ -13251,6 +13435,15 @@ function _renderAnalysisInner(panel) {
         // Неклассика: ширина как измеритель волатильности
         if (stWidth < 1.0) items.push({type:'neutral', text:`SuperTrend близко (${stWidth.toFixed(1)}%) — волатильность низкая, сжатие. Разворот может быть резким`});
         else if (stWidth > 3.0) items.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend далеко (${stWidth.toFixed(1)}%) — пространство есть, каскад в силе`});
+        // Блок «что делать» по SuperTrend
+        {
+          const stDir2 = trend2 === 1 ? 'bullish' : 'bearish';
+          const stConf2 = flips <= 2 ? 'strong' : flips <= 5 ? 'moderate' : 'weak';
+          const stLong2 = trend2 === 1 ? `SuperTrend бычий. Стоп-линия на ${stLine.toFixed(4)} — держи лонг пока цена выше неё. При пробитии — выходи.` : 'SuperTrend медвежий — лонг опасен. Жди переключения тренда прежде чем входить.';
+          const stShort2 = trend2 === -1 ? `SuperTrend медвежий. Стоп-линия на ${stLine.toFixed(4)} — держи шорт пока цена ниже неё.` : 'SuperTrend бычий — шорт против тренда. Очень высокий риск.';
+          _trade(stDir2, stConf2, stLong2, stShort2).forEach(t => items.push(t));
+        }
+
         // Классика SuperTrend: направление и смена
         const clStItems = [];
         clStItems.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend ${trend2===1?'бычий':'медвежий'} — классический сигнал ${trend2===1?'держать лонг / покупать на откатах':'держать шорт / продавать на отскоках'}`});
