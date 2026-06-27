@@ -7791,8 +7791,6 @@ function _sysRenderSMC() {
     }
   }
 
-  if (!items.length) html = '<span style="color:var(--text3)">Нет активных SMC-сигналов прямо сейчас.</span>';
-
   let html = items.map(it => `<div style="color:${it.col};margin-bottom:5px;border-left:2px solid ${it.col};padding-left:6px;">${it.text}</div>`).join('');
   if (!html) html = '<span style="color:var(--text3)">Нет активных SMC-сигналов прямо сейчас.</span>';
   el.innerHTML = html;
