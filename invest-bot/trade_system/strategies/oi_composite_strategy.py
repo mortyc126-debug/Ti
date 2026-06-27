@@ -3244,28 +3244,30 @@ def score_cumul_delta(candles: list[HistoricCandle]) -> float:
 
 def score_amt_poc(candles: list[HistoricCandle]) -> float:
     """
-    Volume Profile: настоящая гистограмма volume-at-price.
+    Volume Profile — нестандартное применение по документу.
 
-    POC (Point of Control) — ценовой уровень с максимальным накопленным
-    объёмом за сессию. Это магнит: цена к нему тяготеет при балансе.
+    Пять компонентов:
 
-    Value Area (70% объёма) — зона принятия цены.
-    Выход из VA + тонкая зона над/под ней → ускорение движения.
-    Возврат внутрь VA — поглощение экстремума.
+    1. POC-дрейф (термометр накопления): POC медленно ползёт вверх/вниз
+       за 5 «сессий» — скрытое накопление/распределение, опережает цену.
 
-    Сигнал ∈ [-1, 1]:
-      +1: цена выше VAH + пустая зона выше (пробой, ускорение вверх)
-      -1: цена ниже VAL + пустая зона ниже (пробой, ускорение вниз)
-       0: цена у POC (принятие, нейтральная зона баланса)
+    2. CHoCH на объёме: POC вчерашней сессии меняет роль — если цена
+       пробила его вверх и держит = поддержка (бычий); пробила и упала
+       обратно = перевёртыш, POC стал сопротивлением (медвежий).
+
+    3. Расстояние цена→POC в ATR-зонах:
+       < 0.5 ATR → нейтраль (рынок у баланса)
+       1–2 ATR  → резинка натянута, тяготение обратно к POC
+       > 3 ATR  → экстремум, каскад заканчивается ИЛИ начинается режим
+
+    4. LVN-карман: пустая зона (< 20% avg-бина) выше/ниже текущей цены
+       — ускоритель, нет сопротивления до следующего HVN.
+
+    5. Позиция внутри/вне Value Area (базовый сигнал, как раньше).
     """
     _WIN = _adaptive_window(candles, target_hours=4.0, min_bars=20, max_bars=240)
-    if len(candles) < max(20, _WIN // 2):
+    if len(candles) < max(30, _WIN // 2):
         return 0.0
-
-    window = candles[-_WIN:]
-    highs = [_to_f(c.high) for c in window]
-    lows  = [_to_f(c.low)  for c in window]
-    vols  = [float(c.volume) for c in window]
 
     atr = _compute_atr(candles)
     if atr <= 0:
@@ -3273,11 +3275,135 @@ def score_amt_poc(candles: list[HistoricCandle]) -> float:
     cl_now = _to_f(candles[-1].close)
     atr_abs = atr * (cl_now or 1.0)
 
+    # ── Текущая сессия ─────────────────────────────────────────────────────────
+    window = candles[-_WIN:]
+    highs = [_to_f(c.high) for c in window]
+    lows  = [_to_f(c.low)  for c in window]
+    vols  = [float(c.volume) for c in window]
+
     poc, vah, val, bins, price_lo, bin_size = volume_profile(highs, lows, vols, n_bins=48)
-    if poc <= 0:
+    if poc <= 0 or bin_size <= 0:
         return 0.0
 
-    return score_vol_profile(cl_now, poc, vah, val, bins, price_lo, bin_size, atr_abs)
+    n_bins = len(bins)
+    avg_bin = (sum(bins) / n_bins) or 1e-9
+
+    # ── Компонент 1: POC-дрейф за 5 сессий ────────────────────────────────────
+    # Делим доступную историю на 5 равных кусков, считаем POC каждого.
+    poc_drift_score = 0.0
+    chunk_size = min(_WIN, len(candles) // 5)
+    if chunk_size >= 10:
+        poc_series = []
+        for i in range(5):
+            slc = candles[-(5 - i) * chunk_size: -(4 - i) * chunk_size or len(candles)]
+            if len(slc) < 5:
+                continue
+            ph = [_to_f(c.high) for c in slc]
+            pl = [_to_f(c.low) for c in slc]
+            pv = [float(c.volume) for c in slc]
+            p, *_ = volume_profile(ph, pl, pv, n_bins=24)
+            if p > 0:
+                poc_series.append(p)
+        if len(poc_series) >= 3:
+            # Линейный уклон POC — нормируем на ATR
+            xs = list(range(len(poc_series)))
+            mx = sum(xs) / len(xs)
+            my = sum(poc_series) / len(poc_series)
+            slope_num = sum((xs[i] - mx) * (poc_series[i] - my) for i in range(len(xs)))
+            slope_den = sum((x - mx) ** 2 for x in xs) or 1e-9
+            slope = slope_num / slope_den  # цена/период
+            # Нормируем: сколько ATR в среднем движется POC за период
+            drift_atr = slope / (atr_abs or 1e-9)
+            # 0.05 ATR/период = умеренное накопление; 0.15+ = сильное
+            poc_drift_score = max(-0.5, min(0.5, drift_atr * 4.0))
+
+    # ── Компонент 2: CHoCH на объёме ──────────────────────────────────────────
+    # «Прошлый» POC = POC предыдущей сессии (второй кусок с конца).
+    choch_score = 0.0
+    if chunk_size >= 10 and len(candles) >= chunk_size * 2:
+        prev_slc = candles[-2 * chunk_size:-chunk_size]
+        ph2 = [_to_f(c.high) for c in prev_slc]
+        pl2 = [_to_f(c.low) for c in prev_slc]
+        pv2 = [float(c.volume) for c in prev_slc]
+        prev_poc, *_ = volume_profile(ph2, pl2, pv2, n_bins=24)
+        if prev_poc > 0:
+            dist_prev = cl_now - prev_poc
+            # Цена выше прошлого POC → тест как поддержки?
+            if 0 < dist_prev < 0.5 * atr_abs:
+                # Цена вернулась почти к prev_poc снизу → держит = бычий
+                choch_score = +0.35
+            elif -0.5 * atr_abs < dist_prev < 0:
+                # Пробила вниз и вернулась → держит сверху = медвежий CHoCH
+                choch_score = -0.35
+            elif dist_prev < -atr_abs:
+                # Далеко ниже прошлого POC — структура сломана, медвежий
+                choch_score = -0.20
+            elif dist_prev > atr_abs:
+                # Далеко выше — принятие нового уровня, бычий
+                choch_score = +0.20
+
+    # ── Компонент 3: расстояние цена→POC в ATR-зонах ─────────────────────────
+    dist_poc = cl_now - poc
+    dist_atr = abs(dist_poc) / (atr_abs or 1e-9)
+    dist_sign = 1 if dist_poc >= 0 else -1
+
+    if dist_atr < 0.5:
+        # У баланса — нейтраль
+        dist_score = 0.0
+    elif dist_atr <= 2.0:
+        # Резинка: тяготение обратно к POC (сигнал ПРОТИВ текущего удаления)
+        dist_score = -dist_sign * min(0.35, (dist_atr - 0.5) * 0.20)
+    elif dist_atr <= 3.0:
+        # Ещё не экстремум, но далеко — слабый против
+        dist_score = -dist_sign * 0.25
+    else:
+        # > 3 ATR: экстремум — либо каскад истощается (контрарный),
+        # либо новый режим (сигнал слабый, нужны другие подтверждения)
+        dist_score = -dist_sign * 0.40
+
+    # ── Компонент 4: LVN-карман выше/ниже (ускоритель) ───────────────────────
+    lvn_score = 0.0
+    # Ищем зону LVN (< 20% avg_bin) в 1–2 ATR над/под ценой
+    if bin_size > 0:
+        search_bins = max(1, int(2.0 * atr_abs / bin_size))
+        curr_bin = max(0, min(n_bins - 1, int((cl_now - price_lo) / bin_size)))
+
+        # Над ценой
+        above_end = min(n_bins, curr_bin + search_bins + 1)
+        above_zone = bins[curr_bin + 1:above_end] if curr_bin + 1 < n_bins else []
+        if above_zone and (sum(above_zone) / len(above_zone)) < 0.20 * avg_bin:
+            lvn_score += 0.25   # воздушный карман вверх — ускоритель бычий
+
+        # Под ценой
+        below_start = max(0, curr_bin - search_bins)
+        below_zone = bins[below_start:curr_bin] if curr_bin > 0 else []
+        if below_zone and (sum(below_zone) / len(below_zone)) < 0.20 * avg_bin:
+            lvn_score -= 0.25   # воздушный карман вниз — ускоритель медвежий
+
+    # ── Компонент 5: базовая позиция VA (как раньше, уменьшен вес) ───────────
+    va_score = 0.0
+    if cl_now > vah:
+        va_strength = min(0.5, (cl_now - vah) / (atr_abs or 1e-9) * 0.4)
+        va_score = 0.25 + va_strength
+    elif cl_now < val:
+        va_strength = min(0.5, (val - cl_now) / (atr_abs or 1e-9) * 0.4)
+        va_score = -(0.25 + va_strength)
+    elif cl_now > poc:
+        va_score = 0.15 * (cl_now - poc) / ((vah - poc) or 1e-9)
+    else:
+        va_score = -0.15 * (poc - cl_now) / ((poc - val) or 1e-9)
+
+    # ── Итог: взвешенная сумма ─────────────────────────────────────────────────
+    # Веса: дрейф POC и CHoCH — самые «редкие» и ценные сигналы.
+    # dist_score контрарный → не перевешивает трендовые компоненты.
+    total = (
+        poc_drift_score * 0.30 +
+        choch_score     * 0.25 +
+        dist_score      * 0.20 +
+        lvn_score       * 0.15 +
+        va_score        * 0.10
+    )
+    return round(max(-1.0, min(1.0, total)), 4)
 
 
 def score_vsa_absorption(candles: list[HistoricCandle]) -> float:
