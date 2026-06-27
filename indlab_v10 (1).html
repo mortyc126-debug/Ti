@@ -11106,109 +11106,131 @@ async function ilRunAnalysis() {
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
 }
 
+// Смысловые группы индикаторов
+const _IL_GROUPS = [
+  { label: 'Осциллятор / перекупленность',  color: '#A78BFA', ids: ['rsi','wr','cci','mfi','stoch','cmo','tsi','ult_osc'] },
+  { label: 'Тренд / импульс',               color: '#52F2C9', ids: ['macd','ao','ema','adx','dmi','fisher','parabolic','supertrend'] },
+  { label: 'Канал / волатильность',          color: '#FF9F40', ids: ['bb','keltner','envelopes','donchian','atr_w','hist_vol','bb_pct','bb_width'] },
+  { label: 'Объём / деньги',                color: '#60A4A1', ids: ['obv','ad','chaikosc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
+  { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cyc','mama','er','frac_dim','entropy'] },
+];
+
 function ilRenderAnalysis() {
   const r=_ilBtResults, el=document.getElementById('an-results');
   if(!el||!r) return;
-  const CC=['#52F2C9','#A78BFA','#FF9F40','#FF006E','#6366F1','#60A4A1','#FFD700'];
-  const fA=(s)=>{
-    if(!s||s.acc==null||s.n<5) return '<span style="color:#333">—</span>';
-    const p=(s.acc*100).toFixed(0), c=s.acc>=0.60?'#52F2C9':s.acc>=0.52?'var(--text2)':'#FF4D7A';
-    return `<span style="color:${c}">${p}%</span>`;
+
+  // Точность: возвращает строку с цветом только по порогу, никаких градуировок цвета
+  const acc=(s)=>{
+    if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3050">—</span>';
+    const p=Math.round(s.acc*100);
+    const col=p>=62?'#52F2C9':p>=55?'#B4A050':p<=45?'#C71B52':'#5a5070';
+    return `<span style="color:${col};font-weight:${p>=62||p<=45?'600':'400'}">${p}%</span>`;
   };
-  const fI=(s)=>{
-    if(!s||s.ig==null||s.n<5) return '<span style="color:#333">—</span>';
-    const p=(s.ig*100).toFixed(1), c=s.ig>0.05?'#52F2C9':s.ig>0?'#A78BFA':'#FF4D7A';
-    return `<span style="color:${c}">${p>0?'+':''}${p}%</span>`;
+  // Тренд vs боковик — показываем разницу
+  const regDiff=(sT,sR)=>{
+    if(!sT||sT.acc==null||sT.n<3||!sR||sR.acc==null||sR.n<3) return '<span style="color:#3a3050">—</span>';
+    const tP=Math.round(sT.acc*100), rP=Math.round(sR.acc*100), d=tP-rP;
+    if(Math.abs(d)<3) return `<span style="color:#5a5070">≈${tP}/${rP}</span>`;
+    return d>0
+      ? `<span style="color:#52F2C9" title="лучше в тренде">${tP}<span style="opacity:.5">/${rP}</span></span>`
+      : `<span style="color:#A78BFA" title="лучше в боковике">${rP}<span style="opacity:.5">/${tP}</span></span>`;
   };
+
   let html='';
-  // Блок текущего рыночного режима
+
+  // Режим рынка
   try {
-    const closes_=r.closes, last_=closes_.length-1;
-    const regime=ilDetectRegime(closes_,r.candles||null,last_);
+    const regime=ilDetectRegime(r.closes,r.candles||null,r.closes.length-1);
     if(regime&&regime.labels&&regime.labels.length){
-      html+=`<div style="margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid #2a1f3d;">`;
-      html+=`<div style="font-size:9px;color:var(--text3);margin-bottom:6px;">ТЕКУЩИЙ РЕЖИМ РЫНКА</div>`;
-      html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;">`;
-      regime.labels.forEach(l=>{
-        const col=regime.color||'#A78BFA';
-        html+=`<span style="padding:3px 8px;border-radius:12px;background:${col}22;border:1px solid ${col}66;color:${col};font-size:10px;font-family:var(--mono);">${l}</span>`;
-      });
-      html+=`</div></div>`;
+      const col=regime.color||'#A78BFA';
+      html+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid #2a1f3d;">
+        <span style="font-size:9px;color:var(--text3);letter-spacing:.08em;">РЕЖИМ</span>`;
+      regime.labels.forEach(l=>html+=`<span style="padding:2px 8px;border-radius:10px;background:${col}18;border:1px solid ${col}44;color:${col};font-size:10px;">${l}</span>`);
+      html+=`</div>`;
     }
-  } catch(e) {}
-  // Кластеры
-  html+=`<div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--mono);">Кластеры по корреляции score-серий (порог 0.5)</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">`;
-  r.clusters.forEach((cl,ci)=>{
-    const clr=CC[ci%CC.length];
-    html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}55;border-radius:8px;padding:6px 10px;"><div style="font-size:9px;color:${clr};margin-bottom:3px;">Кластер ${ci+1}</div>`;
-    cl.forEach(id=>html+=`<div style="font-size:10px;color:var(--text2);">• ${IL_NAMES[id]}</div>`);
-    html+=`</div>`;
-  });
-  html+=`</div>`;
-  // Таблица
-  html+=`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);"><tr style="color:var(--text3);border-bottom:1px solid #2a1f3d;">
-    <th style="text-align:left;padding:4px 6px;">Индикатор</th><th>Кл.</th>
-    <th colspan="2" style="padding:4px;">5 баров<br><span style="font-size:8px">acc/IG</span></th>
-    <th colspan="2" style="padding:4px;">15 баров<br><span style="font-size:8px">acc/IG</span></th>
-    <th colspan="2" style="padding:4px;">30 баров<br><span style="font-size:8px">acc/IG</span></th>
-    <th style="padding:4px;">Тренд<br><span style="font-size:8px">H5</span></th>
-    <th style="padding:4px;">Боков.<br><span style="font-size:8px">H5</span></th>
-    <th style="padding:4px;">Bias%</th></tr>`;
-  [...IL_INDICATORS].sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0)).forEach(id=>{
-    const ci=r.clusterOf[id]??0, clr=CC[ci%CC.length];
-    const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30, s5T=r.stats[id].h5T, s5R=r.stats[id].h5R;
-    const bc=s5.bias!=null?(s5.bias>0.75||s5.bias<0.25?'#FF9F40':'var(--text2)'):'var(--text3)';
-    html+=`<tr style="border-bottom:1px solid #1a1028;">
-      <td style="padding:5px 6px;color:var(--text2);">${IL_NAMES[id]}</td>
-      <td style="text-align:center;"><span style="color:${clr};font-size:9px;">●${ci+1}</span></td>
-      <td style="text-align:center;">${fA(s5)}</td><td style="text-align:center;">${fI(s5)}</td>
-      <td style="text-align:center;">${fA(s15)}</td><td style="text-align:center;">${fI(s15)}</td>
-      <td style="text-align:center;">${fA(s30)}</td><td style="text-align:center;">${fI(s30)}</td>
-      <td style="text-align:center;">${fA(s5T)}</td><td style="text-align:center;">${fA(s5R)}</td>
-      <td style="text-align:center;color:${bc}">${s5.bias!=null?(s5.bias*100).toFixed(0)+'%':'—'}</td></tr>`;
-  });
-  html+=`</table></div>`;
-  // Конструктор комбо
-  html+=`<div style="margin-top:16px;border-top:1px solid #2a1f3d;padding-top:12px;">
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;font-family:var(--mono);">Конструктор комбинации (H30 acc в скобках)</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">`;
-  r.clusters.forEach((cl,ci)=>{
-    const clr=CC[ci%CC.length];
-    html+=`<div style="background:rgba(255,255,255,0.02);border:1px solid ${clr}33;border-radius:8px;padding:8px 12px;min-width:140px;">
-      <div style="font-size:9px;color:${clr};margin-bottom:5px;">Кластер ${ci+1}</div>`;
-    cl.forEach(id=>{
-      const s=r.stats[id].h30;
-      const q=s.acc!=null&&s.n>=5?` <span style="font-size:8px;color:${s.acc>=0.55?'#52F2C9':'var(--text3)'}">${(s.acc*100).toFixed(0)}%</span>`:'';
-      html+=`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;padding:2px 0;">
-        <input type="checkbox" class="an-cb" data-id="${id}" style="accent-color:${clr};">${IL_NAMES[id]}${q}</label>`;
+  } catch(e){}
+
+  // Легенда
+  html+=`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:9px;font-family:var(--mono);color:var(--text3);">
+    <span>Точность: <span style="color:#52F2C9">≥62%</span> сильная · <span style="color:#B4A050">55–61%</span> умеренная · <span style="color:#5a5070">&lt;55%</span> случайная · <span style="color:#C71B52">≤45%</span> антисигнал</span>
+    <span>Тренд/Боков: зелёный = лучше в тренде, фиолетовый = лучше в боковике</span>
+  </div>`;
+
+  // По группам
+  _IL_GROUPS.forEach(grp=>{
+    const ids=grp.ids.filter(id=>IL_INDICATORS.includes(id)&&r.stats[id]);
+    if(!ids.length)return;
+    // сортировка по h15 acc
+    ids.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
+    html+=`<div style="margin-bottom:14px;">
+      <div style="font-size:9px;color:${grp.color};letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding-left:2px;">${grp.label}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">
+        <tr style="color:#3a3050;font-size:9px;">
+          <th style="text-align:left;padding:3px 6px;font-weight:400;">Индикатор</th>
+          <th style="padding:3px 6px;font-weight:400;">H5</th>
+          <th style="padding:3px 6px;font-weight:400;">H15</th>
+          <th style="padding:3px 6px;font-weight:400;">H30</th>
+          <th style="padding:3px 6px;font-weight:400;white-space:nowrap;">Тренд/Бок H15</th>
+          <th style="padding:3px 6px;font-weight:400;white-space:nowrap;">Bias</th>
+        </tr>`;
+    ids.forEach(id=>{
+      const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30;
+      const s15T=r.stats[id].h15T, s15R=r.stats[id].h15R;
+      // Лучший горизонт
+      const best=[s5,s15,s30].filter(s=>s&&s.acc!=null&&s.n>=5).sort((a,b)=>b.acc-a.acc)[0];
+      const isBest=s=>s&&best&&s===best&&best.acc>=0.55;
+      const bias=s15?.bias;
+      const biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—';
+      const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#FF9F40':'#3a3050';
+      html+=`<tr style="border-top:1px solid #1a1028;">
+        <td style="padding:4px 6px;color:var(--text2);">${IL_NAMES[id]||id}</td>
+        <td style="text-align:center;padding:4px 6px;${isBest(s5)?'background:rgba(255,255,255,0.03);border-radius:4px;':''}">${acc(s5)}</td>
+        <td style="text-align:center;padding:4px 6px;${isBest(s15)?'background:rgba(255,255,255,0.03);border-radius:4px;':''}">${acc(s15)}</td>
+        <td style="text-align:center;padding:4px 6px;${isBest(s30)?'background:rgba(255,255,255,0.03);border-radius:4px;':''}">${acc(s30)}</td>
+        <td style="text-align:center;padding:4px 6px;">${regDiff(s15T,s15R)}</td>
+        <td style="text-align:center;padding:4px 6px;color:${biasCol}">${biasStr}</td>
+      </tr>`;
     });
-    html+=`</div>`;
+    html+=`</table></div>`;
   });
-  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-    <button onclick="ilSelectBestCombo()" style="padding:5px 12px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">✦ Лучшая из кластеров</button>
-    <button onclick="ilCalcSelectedCombo()" style="padding:5px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Рассчитать</button>
-  </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:40px;"></div></div>`;
-  // Матрица корреляций (свёрнута)
-  html+=`<details style="margin-top:14px;"><summary style="font-size:10px;color:var(--text3);cursor:pointer;font-family:var(--mono);">Матрица корреляций</summary><div style="overflow-x:auto;margin-top:8px;">
-    <table style="border-collapse:collapse;font-size:8px;font-family:var(--mono);"><tr><th></th>`;
-  IL_INDICATORS.forEach(id=>html+=`<th style="writing-mode:vertical-rl;transform:rotate(180deg);padding:2px;min-width:16px;color:var(--text3);">${IL_NAMES[id].split(' ')[0]}</th>`);
-  html+=`</tr>`;
-  IL_INDICATORS.forEach(a=>{
-    html+=`<tr><td style="padding:2px 4px;color:var(--text3);white-space:nowrap;">${IL_NAMES[a].split(' ')[0]}</td>`;
-    IL_INDICATORS.forEach(b=>{
-      const v=r.corrMatrix[a][b], abs=Math.abs(v);
-      const bg=abs>0.7?`rgba(199,27,82,${abs*0.7})`:abs>0.4?`rgba(255,159,64,${abs*0.5})`:'transparent';
-      html+=`<td style="background:${bg};text-align:center;padding:2px;color:var(--text2);">${v.toFixed(2)}</td>`;
+  // Индикаторы не попавшие в группы
+  const grouped=new Set(_IL_GROUPS.flatMap(g=>g.ids));
+  const rest=IL_INDICATORS.filter(id=>!grouped.has(id)&&r.stats[id]);
+  if(rest.length){
+    rest.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
+    html+=`<div style="margin-bottom:14px;"><div style="font-size:9px;color:#3a3050;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Прочие</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">
+        <tr style="color:#3a3050;font-size:9px;"><th style="text-align:left;padding:3px 6px;font-weight:400;">Индикатор</th><th style="padding:3px 6px;font-weight:400;">H5</th><th style="padding:3px 6px;font-weight:400;">H15</th><th style="padding:3px 6px;font-weight:400;">H30</th><th style="padding:3px 6px;font-weight:400;">Тренд/Бок</th><th style="padding:3px 6px;font-weight:400;">Bias</th></tr>`;
+    rest.forEach(id=>{
+      const s5=r.stats[id].h5,s15=r.stats[id].h15,s30=r.stats[id].h30,s15T=r.stats[id].h15T,s15R=r.stats[id].h15R;
+      const bias=s15?.bias,biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—',biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#FF9F40':'#3a3050';
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 6px;color:var(--text2);">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 6px;">${acc(s5)}</td><td style="text-align:center;padding:4px 6px;">${acc(s15)}</td><td style="text-align:center;padding:4px 6px;">${acc(s30)}</td><td style="text-align:center;padding:4px 6px;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 6px;color:${biasCol}">${biasStr}</td></tr>`;
     });
-    html+=`</tr>`;
+    html+=`</table></div>`;
+  }
+
+  // Конструктор комбо — выбор из всех
+  html+=`<div style="margin-top:14px;border-top:1px solid #2a1f3d;padding-top:12px;">
+    <div style="font-size:9px;color:var(--text3);margin-bottom:8px;letter-spacing:.06em;">КОНСТРУКТОР КОМБИНАЦИИ</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">`;
+  [...IL_INDICATORS].filter(id=>r.stats[id]).sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0)).forEach(id=>{
+    const s=r.stats[id].h15;
+    const p=s&&s.acc!=null&&s.n>=5?Math.round(s.acc*100):null;
+    const col=p!=null?(p>=62?'#52F2C9':p>=55?'#B4A050':'#3a3050'):'#3a3050';
+    html+=`<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);cursor:pointer;padding:3px 8px;border:1px solid #2a1f3d;border-radius:6px;">
+      <input type="checkbox" class="an-cb" data-id="${id}" style="accent-color:#52F2C9;">${IL_NAMES[id]||id}${p!=null?` <span style="color:${col}">${p}%</span>`:''}
+    </label>`;
   });
-  html+=`</table></div></details>`;
+  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;">
+    <button onclick="ilSelectBestCombo()" style="padding:4px 10px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.25);border-radius:6px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие по H15</button>
+    <button onclick="ilCalcSelectedCombo()" style="padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">Рассчитать</button>
+  </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:36px;"></div></div>`;
   el.innerHTML=html;
 }
 
 function ilSelectBestCombo() {
   const r=_ilBtResults; if(!r)return;
-  const best=r.clusters.map(cl=>cl.slice().sort((a,b)=>(r.stats[b].h30?.acc??0)-(r.stats[a].h30?.acc??0))[0]);
+  const best=IL_INDICATORS.filter(id=>r.stats[id]).sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0)).slice(0,5);
   document.querySelectorAll('.an-cb').forEach(cb=>{ cb.checked=best.includes(cb.dataset.id); });
   ilCalcSelectedCombo();
 }
