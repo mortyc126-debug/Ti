@@ -6006,7 +6006,8 @@ class OICompositeStrategy(IStrategy):
         for name in ALL_METHOD_NAMES:
             hedge = self.__weights[name]
             blended_weight = self.__blended_hedge_weight(name, regime_probs)
-            snap_blended_mod = max(0.25, min(1.75,
+            _snap_floor = max(0.0, 0.25 * (1.0 - _snap_phase_conf))
+            snap_blended_mod = max(_snap_floor, min(1.75,
                 1.0
                 + (regime_mods.get(name, 1.0) - 1.0)
                 + (_snap_phase_raw.get(name, 1.0) - 1.0) * _snap_phase_conf
@@ -6738,9 +6739,12 @@ class OICompositeStrategy(IStrategy):
 
         # Блендинг regime + phase: аддитивное сложение отклонений вместо перемножения.
         # Перемножение возводило эффект в квадрат (1.5×1.5=2.25, 0.5×0.5=0.25).
-        # Теперь отклонения складываются и ограничиваются ±0.75 от 1.0 → [0.25, 1.75].
+        # Пол масштабируется уверенностью: чем выше conf — тем сильнее глушит
+        # неподходящие методы вплоть до полного выключения при conf→1.0.
+        # conf=0.3 → пол≈0.175; conf=0.7 → пол≈0.075; conf=1.0 → пол=0.0.
+        _floor = max(0.0, 0.25 * (1.0 - _phase_conf))
         blended_mods: dict[str, float] = {
-            name: max(0.25, min(1.75,
+            name: max(_floor, min(1.75,
                 1.0
                 + (regime_mods.get(name, 1.0) - 1.0)
                 + (_phase_mods_raw.get(name, 1.0) - 1.0) * _phase_conf
