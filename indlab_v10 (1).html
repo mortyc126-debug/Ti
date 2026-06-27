@@ -7063,6 +7063,16 @@ function _sysRenderStaticSections() {
       {label:'+ Klinger (из раньше)', lc:IND, text:'Медленный кумулятивный денежный поток. Force Index = быстрый снимок. Klinger = медленный тренд денег. Вместе: полная картина денежного потока (быстрый + медленный) + режима (DPO) + энергии (AC) + перегрева (Fisher).'},
     ]),
 
+    sec('💧', 'Денежные потоки · Комбо-паттерны', [
+      {label:'Пятиуровневая абсорбция (вход в боковике)', lc:NC, text:'1. OBV скорость резко растёт (крупный входит агрессивно) · 2. A/D показывает в какой зоне диапазона · 3. CMF в той же зоне в экстремуме (концентрация денег) · 4. MFI в экстремуме + держится (перегрев подтверждён объёмом) · 5. EOM падает (объём нужен всё больше = сопротивление). Все пять = крупный методично входит против сопротивления. Точка входа.'},
+      {label:'Дивергентный триплет (антисигнал затухания)', lc:NC, text:'Цена новый экстремум, а: PVT нет + Klinger нет + Force Index нет. Три независимые математики показывают одно = затухание реальное, каскад кончается.'},
+      {label:'Асимметрия боковика (куда выброс)', lc:NC, text:'1. NVI vs PVI — дни падения на объёме или роста? · 2. CMF зоны — верхняя или нижняя половина получает объём? · 3. A/D — куда входят деньги? · 4. Donchian — какой край боковика плотнее? Все четыре в одну сторону = туда выброс.'},
+      {label:'Согласие денежного потока (здоровье каскада)', lc:NC, text:'На каскаде: OBV растёт в сторону + A/D растёт в сторону + Chaikin в экстремуме + MFI в верхней крайности + EOM высокий. Все пять согласны = каскад здоров, держи позицию. Один переключился = осторожно.'},
+      {label:'Денежный скепсис (большая свеча = шум)', lc:NC, text:'Большая свеча на объёме выглядит как каскад. Проверяешь: EOM низкий (объём неэффективен) + CMF нейтральный (не концентрировался) + PVT не подтверждает + VO нет тренда (всплеск). Объём был, но это охота на стопах, не каскад. Не входить.'},
+      {label:'Боковик максимального сжатия', lc:NC, text:'VO близко к нулю (нет тренда объёма) + EOM низкий (компрессия, деньги входят неэффективно) + NVI/PVI расходятся максимально (асимметрия максимальна) + CMF в экстремуме какой-то зоны (деньги накопились на краю). Денежный поток сжат = вот-вот выпустит.'},
+      {label:'Рейтинг: что информативнее', lc:IND, text:'1. CMF — где деньги (самый информативный) · 2. A/D — честнее OBV, видит зону · 3. Chaikin Osc — тренд денежного потока · 4. EOM — эффективность, фильтр ложных · 5. NVI/PVI — асимметрия боковика. OBV + Klinger + Force Index закрывают картину.'},
+    ]),
+
   ].join('');
 }
 
@@ -10287,7 +10297,16 @@ function renderAnalysis() {
         } else {
           items.push({type:'neutral', text:`OBV: направление нейтральное`});
         }
-        html += makeCard('OBV', items, 'obv');
+        // Неклассика: скорость роста OBV
+        const obvFast = obvArr[obvArr.length-1] - obvArr[obvArr.length-3]; // за 2 свечи
+        const obvSlow5 = obvSlope; // за 5 свечей
+        const priceMoved = Math.abs(priceSlope) / (closes[n-5] || 1) * 100;
+        if (Math.abs(obvFast) > Math.abs(obvSlow5) * 0.8 && priceMoved < 0.3) {
+          items.push({type: obvFast>0?'bullish':'bearish', text:`OBV резко ускорился за 2 свечи при стоящей цене — крупный участник входит агрессивно`});
+        } else if (obvSlope !== 0 && Math.abs(obvFast) < Math.abs(obvSlow5) * 0.3) {
+          items.push({type:'neutral', text:`OBV ползёт медленно (скорость падает) — мелкие покупатели, крупного входа нет`});
+        }
+        html += makeCard('OBV (неклассически)', items, 'obv');
       }
     } else if (idL.includes('mfi')) {
       const period = 14;
@@ -10311,7 +10330,23 @@ function renderAnalysis() {
         } else {
           items.push({type:'neutral', text:`MFI = ${mfi.toFixed(1)}`});
         }
-        html += makeCard('MFI', items, 'mfi');
+        // Неклассика: скорость достижения экстремума vs время удержания
+        const typical2 = candles.map(c=>(c.high+c.low+c.close)/3);
+        const mfiHistory=[];
+        for(let t=period;t<=Math.min(candles.length,period+14);t++){
+          let pF=0,nF=0;
+          for(let i=candles.length-t;i<candles.length-t+period;i++){
+            const rawmf=typical2[i]*(vols[i]||0);
+            if(typical2[i]>typical2[i-1]) pF+=rawmf; else nF+=rawmf;
+          }
+          mfiHistory.push(nF===0?100:100-100/(1+pF/nF));
+        }
+        const barsInExtreme = mfiHistory.filter(v=>v>80||v<20).length;
+        if (mfi>75 || mfi<25) {
+          if (barsInExtreme<=2) items.push({type:'neutral', text:`MFI скакнул в крайность быстро — ложный перегрев, проверяй: ловушка покупателей/продавцов`});
+          else items.push({type:mfi>75?'bullish':'bearish', text:`MFI держится в крайности ${barsInExtreme}+ баров — настоящий перегрев на объёме. Когда начнёт откатывать = выброс`});
+        }
+        html += makeCard('MFI (неклассически)', items, 'mfi');
       }
     } else if (idL.includes('ichi') || idL.includes('ichimoku')) {
       if (candles.length >= 52) {
@@ -10672,6 +10707,21 @@ function renderAnalysis() {
         else if (!priceUp && adUp) items.push({type:'bullish', text:`Цена падает, A/D растёт — бычья дивергенция: накопление идёт на снижении`});
         else if (priceUp && adUp) items.push({type:'bullish', text:`Цена и A/D растут — подтверждённое накопление, тренд здоровый`});
         else items.push({type:'bearish', text:`Цена и A/D падают — подтверждённое распределение`});
+        // Неклассика: в какой зоне диапазона деньги входят
+        const rangeHi = Math.max(...candles.slice(-20).map(c=>c.high));
+        const rangeLo = Math.min(...candles.slice(-20).map(c=>c.low));
+        const midRange = (rangeHi + rangeLo) / 2;
+        let adUpperSum=0, adLowerSum=0;
+        for (let i=n-20; i<n; i++) {
+          const c=candles[i], clv=(c.high>c.low)?((c.close-c.low)-(c.high-c.close))/(c.high-c.low):0;
+          const mf=clv*(c.volume||0);
+          if (c.close > midRange) adUpperSum+=mf; else adLowerSum+=mf;
+        }
+        if (adUpperSum > 0 && adUpperSum > Math.abs(adLowerSum)*1.3) {
+          items.push({type:'bullish', text:`A/D зона: деньги входят систематически в верхней половине диапазона — накопление у сопротивления. При развороте A/D вниз = выброс вверх`});
+        } else if (adLowerSum < 0 && Math.abs(adLowerSum) > adUpperSum*1.3) {
+          items.push({type:'bearish', text:`A/D зона: деньги выходят в нижней половине диапазона — распределение у поддержки`});
+        }
         html += makeCard('A/D Line (неклассически)', items, 'ad');
       }
     } else if (idL.includes('chaikin_osc')) {
@@ -10692,6 +10742,16 @@ function renderAnalysis() {
         if (last>0&&prev<0) items.push({type:'bullish', text:`Chaikin Osc пересёк ноль снизу — накопление берёт верх над распределением`});
         else if (last<0&&prev>0) items.push({type:'bearish', text:`Chaikin Osc пересёк ноль сверху — распределение берёт верх`});
         else items.push({type:last>0?'bullish':'bearish', text:`Chaikin Osc ${last>0?'выше':'ниже'} нуля: ${last>0?'накопление':'распределение'} преобладает`});
+        // Неклассика: асимметрия колебаний = скрытое давление
+        const winOsc = oscArr.slice(-20);
+        const maxPos = Math.max(...winOsc.filter(v=>v>0).concat([0]));
+        const minNeg = Math.abs(Math.min(...winOsc.filter(v=>v<0).concat([0])));
+        if (maxPos > 0 && minNeg > 0) {
+          const ratio = maxPos / (minNeg || 0.0001);
+          if (ratio > 1.5) items.push({type:'bullish', text:`Chaikin асимметрия ↑${maxPos.toFixed(0)} vs ↓${minNeg.toFixed(0)}: давление вверх скрытое. Больше денег входит чем выходит`});
+          else if (ratio < 0.67) items.push({type:'bearish', text:`Chaikin асимметрия ↑${maxPos.toFixed(0)} vs ↓${minNeg.toFixed(0)}: давление вниз скрытое`});
+          else items.push({type:'neutral', text:`Chaikin колеблется симметрично — денежный поток сбалансирован`});
+        }
         html += makeCard('Chaikin Oscillator (неклассически)', items, 'chaikosc');
       }
     } else if (idL === 'cmf') {
@@ -10710,6 +10770,21 @@ function renderAnalysis() {
         else if (cmfVal<-0.25) items.push({type:'bearish', text:`CMF = ${cmfVal.toFixed(3)} — сильное распределение: умные деньги выходят`});
         else if (cmfVal>0) items.push({type:'bullish', text:`CMF = ${cmfVal.toFixed(3)} — слабое накопление`});
         else items.push({type:'bearish', text:`CMF = ${cmfVal.toFixed(3)} — слабое распределение`});
+        // Неклассика: CMF по зонам диапазона
+        const cRangeHi=Math.max(...candles.slice(-per).map(c=>c.high));
+        const cRangeLo=Math.min(...candles.slice(-per).map(c=>c.low));
+        const cMid=(cRangeHi+cRangeLo)/2;
+        let mfvUp=0,volUp=0,mfvDn=0,volDn=0;
+        for(let i=n-per;i<n;i++){
+          const c=candles[i], clv=(c.high>c.low)?((c.close-c.low)-(c.high-c.close))/(c.high-c.low):0;
+          const v=c.volume||0;
+          if(c.close>cMid){mfvUp+=clv*v;volUp+=v;} else {mfvDn+=clv*v;volDn+=v;}
+        }
+        const cmfUp=volUp>0?mfvUp/volUp:0, cmfDn=volDn>0?mfvDn/volDn:0;
+        if (Math.abs(cmfUp-cmfDn)>0.2) {
+          const domZone=cmfUp>cmfDn?'верхней (↑выброс)':'нижней (↓выброс)';
+          items.push({type:cmfUp>cmfDn?'bullish':'bearish', text:`CMF зоны: верх=${cmfUp.toFixed(2)} низ=${cmfDn.toFixed(2)} — деньги концентрируются в ${domZone} половине диапазона`});
+        }
         html += makeCard('CMF / Деньги Чайкина (неклассически)', items, 'cmf');
       }
     } else if (idL === 'accel_osc') {
@@ -11136,6 +11211,20 @@ function renderAnalysis() {
         const last=eomArr.slice(n-14).reduce((a,b)=>a+b,0)/14;
         if(last>0) items.push({type:'bullish', text:`EOM > 0 — цена легко растёт на небольших объёмах: продавцы не сопротивляются`});
         else items.push({type:'bearish', text:`EOM < 0 — цена легко падает: покупатели не поддерживают`});
+        // Неклассика: честность движения = эффективность объёма
+        const priceMove5=Math.abs(closes[n-1]-closes[n-6])/(closes[n-6]||1)*100;
+        const avgVol5=candles.slice(-5).reduce((a,c)=>a+(c.volume||0),0)/5;
+        const avgVolAll=candles.slice(-50).reduce((a,c)=>a+(c.volume||0),0)/Math.min(50,n);
+        const volRatio=avgVol5/(avgVolAll||1);
+        if (priceMove5>0.5 && volRatio>1.3 && last<0.05) {
+          items.push({type:'bearish', text:`Цена летит на большом объёме, EOM низкий — объём требуется много чтобы двигать цену мало. Скрытое сопротивление, движение нечестное`});
+        } else if (priceMove5>0.5 && volRatio<0.9 && last>0) {
+          items.push({type:'bullish', text:`Цена движется на среднем объёме, EOM высокий — объём эффективен, движение чистое. Согласие рынка`});
+        }
+        if (Math.abs(last)>0 && last<0) {
+          const eomTrend=eomArr.slice(n-5).reduce((a,b)=>a+b,0)/5;
+          if(eomTrend<-0.05) items.push({type:'bearish', text:`EOM падает несколько свечей — каскад требует всё больше объёма, теряет силу`});
+        }
         html += makeCard('EOM / Лёгкость движения (неклассически)', items, 'eom');
       }
     } else if (idL === 'nvi') {
@@ -11150,6 +11239,21 @@ function renderAnalysis() {
         }
         const sma=nviArr.slice(-100).reduce((a,b)=>a+b,0)/Math.min(100,nviArr.length);
         items.push({type: nviArr[n-1]>sma?'bullish':'bearish', text:`NVI ${nviArr[n-1]>sma?'выше':'ниже'} своей SMA — когда NVI растёт вместе с умными деньгами, рынок здоров`});
+        // Неклассика: соотношение NVI и PVI (асимметрия)
+        let pvi=1000; const pviArr=[1000];
+        for(let i=1;i<n;i++) {
+          if((candles[i].volume||0)>(candles[i-1].volume||1)) pvi+=pvi*(closes[i]-closes[i-1])/closes[i-1];
+          pviArr.push(pvi);
+        }
+        const nviSlope=nviArr[n-1]-nviArr[Math.max(0,n-20)];
+        const pviSlope=pviArr[n-1]-pviArr[Math.max(0,n-20)];
+        if (nviSlope>0&&pviSlope>0) items.push({type:'bullish', text:`NVI и PVI оба растут — движение согласованное, объём поддерживает и рост и падение одинаково`});
+        else if (nviSlope<0&&pviSlope>0) items.push({type:'neutral', text:`PVI растёт, NVI плоский/вниз — объём входит только в дни роста. Слабый тренд: падения не поддержаны`});
+        else if (nviSlope>0&&pviSlope<0) items.push({type:'bearish', text:`NVI растёт, PVI падает — дни падения на объёме, дни роста на сжатии. Разворот готовится`});
+        else {
+          const nviRelPvi=(nviArr[n-1]/pviArr[n-1])/(nviArr[Math.max(0,n-50)]/pviArr[Math.max(0,n-50)]);
+          if(Math.abs(nviRelPvi-1)>0.1) items.push({type:'neutral', text:`NVI/PVI асимметрия: ${(nviRelPvi>1)?'дни без объёма опережают':'дни с объёмом опережают'} — боковик неравномерный`});
+        }
         html += makeCard('NVI / Индекс отрицательного объёма', items, 'nvi');
       }
     } else if (idL === 'pvt') {
@@ -11164,6 +11268,15 @@ function renderAnalysis() {
         if(priceUp&&pvtNow<pvt20) items.push({type:'bearish', text:`Цена растёт, PVT падает — дивергенция: объём не подтверждает рост`});
         else if(!priceUp&&pvtNow>pvt20) items.push({type:'bullish', text:`Цена падает, PVT растёт — скрытое накопление`});
         else items.push({type:pvtNow>pvt20?'bullish':'bearish', text:`PVT ${pvtNow>pvt20?'растёт':'падает'} вместе с ценой — тренд подтверждён объёмом`});
+        // Неклассика: дивергенция PVT как сильнейший антисигнал
+        if (n>=30) {
+          const priceHi=Math.max(...closes.slice(-5)), priceLo=Math.min(...closes.slice(-5));
+          const pvtHi=Math.max(...pvtArr.slice(-5)), pvtLo=Math.min(...pvtArr.slice(-5));
+          const prevHi=Math.max(...closes.slice(-30,-5)), prevLo=Math.min(...closes.slice(-30,-5));
+          const prevPvtHi=Math.max(...pvtArr.slice(-30,-5)), prevPvtLo=Math.min(...pvtArr.slice(-30,-5));
+          if (priceHi>prevHi && pvtHi<prevPvtHi*0.98) items.push({type:'bearish', text:`Цена новый хай — PVT нет. Денежный поток уже развернулся хотя цена ещё растёт. Один из сильнейших антисигналов`});
+          else if (priceLo<prevLo && pvtLo>prevPvtLo*1.02) items.push({type:'bullish', text:`Цена новый лой — PVT нет. Денежный поток развернулся хотя цена ещё падает. Один из сильнейших антисигналов роста`});
+        }
         html += makeCard('PVT / Тренд цена-объём (неклассически)', items, 'pvt');
       }
     } else if (idL === 'vo') {
@@ -11177,6 +11290,13 @@ function renderAnalysis() {
         if(vo>25) items.push({type:'neutral', text:`Volume Oscillator +${vo.toFixed(0)}% — объём резко выше нормы: сильное событие`});
         else if(vo<-25) items.push({type:'neutral', text:`VO ${vo.toFixed(0)}% — объём иссяк: движение слабо поддержано`});
         else items.push({type:'neutral', text:`VO = ${vo.toFixed(0)}% — объём в пределах нормы`});
+        // Неклассика: угол и скорость VO = спринт vs марш
+        const fast3=vols.slice(-3).reduce((a,b)=>a+b,0)/3;
+        const fast10=vols.slice(-10).reduce((a,b)=>a+b,0)/10;
+        const voTrend=slow>0?(fast3-fast10)/slow*100:0;
+        if (voTrend>15) items.push({type:'neutral', text:`VO ускоряется резко (+${voTrend.toFixed(0)}% угол) — спринт объёма. Выброс будет резким`});
+        else if (voTrend>5) items.push({type:'neutral', text:`VO растёт постепенно — марш объёма. Давление нарастает медленно, выброс подготовительный`});
+        else if (voTrend<-10) items.push({type:'neutral', text:`VO замедляется — объёмный импульс затухает`});
         html += makeCard('Volume Oscillator (неклассически)', items, 'volosc');
       }
     } else if (idL === 'vwma') {
@@ -11682,8 +11802,19 @@ function renderAnalysis() {
           pviArr.push(pvi);
         }
         const sma=pviArr.slice(-50).reduce((a,b)=>a+b,0)/Math.min(50,pviArr.length);
-        items.push({type:pviArr[n-1]>sma?'neutral':'neutral', text:`PVI ${pviArr[n-1]>sma?'выше':'ниже'} своей средней — высокий объём ${pviArr[n-1]>sma?'двигает цену вверх':'распределяется вниз'}`});
-        html += makeCard('PVI / Индекс положительного объёма', items, 'pvi');
+        items.push({type:pviArr[n-1]>sma?'bullish':'bearish', text:`PVI ${pviArr[n-1]>sma?'выше':'ниже'} своей средней — высокий объём ${pviArr[n-1]>sma?'двигает цену вверх':'распределяется вниз'}`});
+        // Неклассика: NVI vs PVI соотношение
+        let nviP=1000; const nviArrP=[1000];
+        for(let i=1;i<n;i++) {
+          if((candles[i].volume||0)<(candles[i-1].volume||1)) nviP+=nviP*(closes[i]-closes[i-1])/closes[i-1];
+          nviArrP.push(nviP);
+        }
+        const pviSlope=pviArr[n-1]-pviArr[Math.max(0,n-20)];
+        const nviSlope=nviArrP[n-1]-nviArrP[Math.max(0,n-20)];
+        if (pviSlope>0&&nviSlope<0) items.push({type:'neutral', text:`PVI↑ NVI↓ — объём входит в дни роста, в дни падения всё тихо. Слабый тренд без подтверждения`});
+        else if (pviSlope<0&&nviSlope>0) items.push({type:'bearish', text:`PVI↓ NVI↑ — дни падения на объёме, дни роста на воздухе. Разворот готовится`});
+        else if (pviSlope>0&&nviSlope>0) items.push({type:'bullish', text:`PVI и NVI оба растут — движение согласованное в обе стороны`});
+        html += makeCard('PVI / Индекс положительного объёма (неклассически)', items, 'pvi');
       }
     } else if (idL.includes('atr_stop') || idL.includes('atr_ch') || idL.includes('atr_w')) {
       const n = candles.length;
