@@ -9900,54 +9900,37 @@ async function ilFindFigi(ticker, token, proxy) {
 }
 
 // Непрерывный ряд свечей для фьючерса: если у текущего контракта мало истории
-// ── Кэш свечей в localStorage ──────────────────────────────────────────────
-// Ключ: _cpcd_<figi>_<interval>, значение: [{t,o,h,l,c,v}, ...] (компактно)
-const _IL_CANDLE_CACHE_KEY = (figi, iv) => `_cpcd_${figi}_${iv}`;
+// ── Кэш свечей в D1 (Cloudflare Worker) ────────────────────────────────────
 const _IL_CHUNK_DAYS = {
   CANDLE_INTERVAL_1_MIN:1, CANDLE_INTERVAL_5_MIN:1, CANDLE_INTERVAL_15_MIN:1,
   CANDLE_INTERVAL_30_MIN:2, CANDLE_INTERVAL_HOUR:7, CANDLE_INTERVAL_2_HOUR:30,
   CANDLE_INTERVAL_4_HOUR:30, CANDLE_INTERVAL_DAY:365
 };
 
-function _ilCacheRead(figi, iv) {
-  try {
-    const raw = localStorage.getItem(_IL_CANDLE_CACHE_KEY(figi, iv));
-    if (!raw) return [];
-    return JSON.parse(raw).map(c=>({
-      time:new Date(c.t), open:c.o, high:c.h, low:c.l, close:c.c, volume:c.v
-    }));
-  } catch(e) { return []; }
-}
-
-function _ilCacheWrite(figi, iv, candles) {
-  try {
-    const compact = candles.map(c=>({t:c.time.getTime(),o:c.open,h:c.high,l:c.low,c:c.close,v:c.volume}));
-    localStorage.setItem(_IL_CANDLE_CACHE_KEY(figi, iv), JSON.stringify(compact));
-  } catch(e) {} // квота — молча игнорируем
-}
-
-// Загрузка свечей: сначала кэш, потом только пробел из API (с чанкованием)
-async function _ilFetchCandlesWithCache(figi, iv, from, now, token, proxy, statusEl) {
+// Загрузка свечей: сначала D1, потом только пробел из T-Invest API (с чанкованием)
+async function _ilFetchCandlesWithCache(ticker, figi, iv, from, now, token, proxy, statusEl) {
   const chunkMs = (_IL_CHUNK_DAYS[iv]||1) * 86400000;
-  const cached = _ilCacheRead(figi, iv);
 
-  // Определяем что уже есть и что нужно догрузить
-  const cacheFrom = cached.length ? cached[0].time.getTime() : null;
-  const cacheTo   = cached.length ? cached[cached.length-1].time.getTime() : null;
-  const needFrom  = from.getTime();
-  const needTo    = now.getTime();
-
-  // Какие диапазоны нужно запросить из API
-  const gaps = [];
-  if (!cached.length) {
-    gaps.push([from, now]);
-  } else {
-    if (needFrom < cacheFrom - 60000) gaps.push([from, new Date(cacheFrom)]);
-    // свежий хвост (последние ~2ч могут быть неполными — перезапрашиваем)
-    const refreshFrom = new Date(Math.max(cacheTo - 2*3600000, needFrom));
-    if (refreshFrom < now) gaps.push([refreshFrom, now]);
+  // 1. Читаем что есть в D1
+  let cached = [];
+  if (proxy) {
+    try {
+      const r = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(ticker)}&tf=${encodeURIComponent(iv)}&from=0`);
+      if (r.ok) {
+        const rows = await r.json();
+        cached = (rows||[]).map(c=>({
+          time:new Date(c.time), open:c.o, high:c.h, low:c.l, close:c.cl, volume:c.vol||0
+        })).filter(c=>c.close>0);
+      }
+    } catch(e) {}
   }
 
+  // 2. Определяем пробел — что нужно догрузить из T-Invest
+  const cacheTo = cached.length ? cached[cached.length-1].time.getTime() : null;
+  // Перезапрашиваем последние 2ч (свечи могут быть неполными)
+  const fetchFrom = cacheTo ? new Date(Math.max(cacheTo - 2*3600000, from.getTime())) : from;
+
+  // 3. Качаем пробел чанками
   const fetchChunk = async (f, t) => {
     const cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
       method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
@@ -9962,23 +9945,33 @@ async function _ilFetchCandlesWithCache(figi, iv, from, now, token, proxy, statu
   };
 
   let fetched = [];
-  for (const [gf, gt] of gaps) {
-    let cur = new Date(gf);
-    while (cur < gt) {
-      const next = new Date(Math.min(cur.getTime()+chunkMs, gt.getTime()));
-      if (statusEl) statusEl.textContent = `Загружаю ${new Date(cur).toLocaleDateString('ru')}…`;
-      fetched.push(...(await fetchChunk(cur, next)));
-      cur = next;
-    }
+  let cur = new Date(fetchFrom);
+  while (cur < now) {
+    const next = new Date(Math.min(cur.getTime()+chunkMs, now.getTime()));
+    if (statusEl) statusEl.textContent = `Загружаю ${cur.toLocaleDateString('ru')}…`;
+    fetched.push(...(await fetchChunk(cur, next)));
+    cur = next;
   }
 
-  // Слияние кэша и новых данных, дедупликация по времени
+  // 4. Сохраняем новые свечи в D1
+  if (fetched.length && proxy) {
+    try {
+      const rows = fetched.map(c=>({
+        key:`${ticker}__${iv}__${c.time.getTime()}`,
+        ticker, tf:iv, time:c.time.getTime(),
+        o:c.open, h:c.high, l:c.low, cl:c.close, vol:c.volume
+      }));
+      fetch(`${proxy}/db/candles`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(rows)
+      }).catch(()=>{});
+    } catch(e) {}
+  }
+
+  // 5. Слияние, дедупликация, фильтр по запрошенному диапазону
   const map = new Map();
   [...cached, ...fetched].forEach(c=>map.set(c.time.getTime(), c));
-  const merged = [...map.values()].filter(c=>c.time>=from&&c.time<=now).sort((a,b)=>a.time-b.time);
-
-  if (fetched.length) _ilCacheWrite(figi, iv, merged);
-  return merged;
+  return [...map.values()].filter(c=>c.time>=from&&c.time<=now).sort((a,b)=>a.time-b.time);
 }
 
 // (свежий контракт только начал торговаться), достраиваем хвост из предыдущего
@@ -11169,10 +11162,7 @@ async function ilRunAnalysis() {
     const now=new Date(), from=new Date(now);
     from.setDate(from.getDate()-tfDays);
     const _proxy = chartGetProxy?.();
-    let candles = await _ilFetchCandlesWithCache(found.figi, tfConst, from, now, token, _proxy, statusEl);
-    // Цепочка фьючерсов — при малом кол-ве свечей доподнять из предыдущего контракта
-    if (candles.length < 60) { const ch = await ilGetCandlesChain(found, token, from, now, _proxy, tfConst); candles = ch.candles; }
-    const _dummy = {candles};
+    let candles = await _ilFetchCandlesWithCache(ticker, found.figi, tfConst, from, now, token, _proxy, statusEl);
     if (!candles||candles.length<30) throw new Error('Мало данных: '+(candles?.length||0)+' свечей');
     const closes = candles.map(c=>c.close);
     const interval = tfLabel;
