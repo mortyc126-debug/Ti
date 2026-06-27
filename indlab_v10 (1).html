@@ -2038,6 +2038,20 @@ const IND_GROUPS = [
           return {s:'warn', t:`CHOP = ${v.val.toFixed(1)} — переходная зона между трендом и флэтом.`};
         }
       },
+      { id:'kvo', name:'KVO / Осциллятор объёма Клинджера', full:'Klinger Volume Oscillator — денежный поток через истинный диапазон и объём',
+        desc:'EMA(34) − EMA(55) от Volume Force. Положительный = накопление, отрицательный = распределение. Амплитуда = агрессия.',
+        params:[
+          {id:'val',  label:'KVO значение',      min:-1e9, max:1e9, def:50000,  step:1000},
+          {id:'sig',  label:'Signal EMA(13)',     min:-1e9, max:1e9, def:20000,  step:1000},
+        ],
+        interpret: v => {
+          const k=v.val, s=v.sig;
+          if(k>0&&k>s) return {s:'buy-strong', t:`KVO=${(k/1000).toFixed(0)}k — деньги входят и растут. Накопление активно`};
+          if(k<0&&k<s) return {s:'sell-strong',t:`KVO=${(k/1000).toFixed(0)}k — деньги выходят. Распределение`};
+          if(k>0)      return {s:'buy',          t:`KVO положительный, сигнальная линия выше — ослабление накопления`};
+          return {s:'neutral', t:`KVO≈0 — денежный поток нейтральный`};
+        }
+      },
       { id:'ebs', name:'EBS / Even Better Sinewave Элерса', full:'Even Better Sinewave — синтетическая синусоида доминирующего цикла',
         desc:'Синусоида подстраивается под доминирующий цикл в реальном времени. Фаза = где сейчас цена внутри цикла.',
         params:[
@@ -5245,6 +5259,7 @@ function chartRedraw() {
   if (chartInds.ult_osc)       _indDrawPanel('ult_osc');
   if (chartInds.dpo)           _indDrawPanel('dpo');
   if (chartInds.std_dev)       _indDrawPanel('std_dev');
+  if (chartInds.kvo)              _indDrawPanel('kvo');
   if (chartInds.ebs)              _indDrawPanel('ebs');
   if (chartInds.tmf)              _indDrawPanel('tmf');
   if (chartInds.frac_dim)         _indDrawPanel('frac_dim');
@@ -6481,6 +6496,37 @@ function _indDrawPanel(id){
       const per=20,sd=closes.map((_,i)=>{if(i<per)return null;const sl=closes.slice(i-per+1,i+1),m=sl.reduce((s,v)=>s+v,0)/per;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/per);});
       drawLine(sd,'#4cc9f0',1.5);_pLabel(ctx,'Std Dev');
       const vs=sd.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-std_dev-badge',lv>avg*1.5?'sell':lv<avg*0.7?'buy':'neutral');
+    } else if(id==='kvo'){
+      // Klinger Volume Oscillator
+      // 1. Trend: hlc = H+L+C; trend = hlc > prev_hlc ? 1 : -1
+      // 2. dm = H - L (диапазон свечи)
+      // 3. cm (кумулятивное движение): если тренд не изменился → cm += dm, иначе cm = dm_prev + dm
+      // 4. VF = vol × |2×dm/cm - 1| × trend × 100 (Volume Force)
+      // 5. KVO = EMA(VF,34) − EMA(VF,55); Signal = EMA(KVO,13)
+      const hlc=cn.map(c=>c.high+c.low+c.close);
+      const trend=hlc.map((v,i)=>i===0?1:v>hlc[i-1]?1:-1);
+      let cm=0,prevDm=0,prevTrend=1;
+      const vf=cn.map((c,i)=>{
+        const dm=c.high-c.low;
+        if(i===0){cm=dm;prevDm=dm;prevTrend=trend[0];return 0;}
+        if(trend[i]!==prevTrend) cm=prevDm+dm; else cm+=dm;
+        prevDm=dm;prevTrend=trend[i];
+        return cm>0?(c.vol||0)*Math.abs(2*dm/cm-1)*trend[i]*100:0;
+      });
+      const e34=_iEMA(vf,34),e55=_iEMA(vf,55);
+      const kvo=e34.map((v,i)=>v!=null&&e55[i]!=null?v-e55[i]:null);
+      const sig=_iEMA(kvo.map(v=>v||0),13);
+      // Гистограмма (kvo - signal)
+      const hist=kvo.map((v,i)=>v!=null&&sig[i]!=null?v-sig[i]:null);
+      const sc=_oscScale(kvo,startIdx,endIdx,H);if(!sc)return;
+      _pGrid(ctx,W,sc.zero);
+      const bw=Math.max(1,(W/visN)*0.6);
+      hist.forEach((v,i)=>{if(v==null||i<startIdx||i>=endIdx)return;const bh=Math.abs(sc.toY(v)-sc.zero);ctx.fillStyle=v>=0?'rgba(96,164,161,0.45)':'rgba(199,27,82,0.45)';ctx.fillRect(xOf(i-startIdx)-bw/2,v>=0?sc.zero-bh:sc.zero,bw,Math.max(bh,1));});
+      _pl(ctx,W,H,kvo,'rgba(82,242,194,0.9)',1.5,startIdx,endIdx,xOf,sc.toY);
+      _pl(ctx,W,H,sig,'rgba(255,159,28,0.7)',1,startIdx,endIdx,xOf,sc.toY);
+      _pLabel(ctx,'KVO');
+      const lv=kvo.filter(v=>v!=null).pop()||0,ls=sig.filter(v=>v!=null).pop()||0;
+      setPill('chart-kvo-badge',lv>0&&lv>ls?'buy-strong':lv<0&&lv<ls?'sell-strong':lv>0?'buy':'sell');
     } else if(id==='ebs'){
       // Even Better Sinewave (Элерс):
       // 1. Cyber Cycle как HP-фильтр (alpha=0.07)
@@ -10522,6 +10568,93 @@ function renderAnalysis() {
         if (spPct > 70) items.push({type:'neutral', text:`Расхождение MAMA/FAMA на исторически высоком уровне (${spPct.toFixed(0)}% от макс.) — тренд перегрет, сворачивается`});
         items.push({type:'neutral', text:`Рыночный режим Элерса: ${Math.abs(sp)<maxSp*0.1?'цикличный (боковик/накопление)':'трендовый (направленное движение)'}`});
         html += makeCard('MAMA / FAMA Элерса (неклассически)', items);
+      }
+    } else if (idL === 'kvo') {
+      const n = candles.length;
+      if (n >= 60) {
+        const items = [];
+        // Вычисляем KVO
+        const hlc = candles.map(c=>c.high+c.low+c.close);
+        const trend = hlc.map((v,i)=>i===0?1:v>hlc[i-1]?1:-1);
+        let cm=0, prevDm=0, prevTr=1;
+        const vf = candles.map((c,i)=>{
+          const dm=c.high-c.low;
+          if(!i){cm=dm;prevDm=dm;prevTr=trend[0];return 0;}
+          if(trend[i]!==prevTr) cm=prevDm+dm; else cm+=dm;
+          prevDm=dm;prevTr=trend[i];
+          return cm>0?(c.volume||0)*Math.abs(2*dm/cm-1)*trend[i]*100:0;
+        });
+        const emaFn=(arr,p)=>{const k=2/(p+1);let s=arr[0];return arr.map(v=>{s=s*(1-k)+(v||0)*k;return s;});};
+        const e34=emaFn(vf,34), e55=emaFn(vf,55);
+        const kvo=e34.map((v,i)=>v-e55[i]);
+        const sig=emaFn(kvo,13);
+        const now=kvo[n-1], prev5=kvo[n-6], prev10=kvo[n-11], sigNow=sig[n-1];
+
+        // --- 1. Направление и характер денежного потока ---
+        if (now > 0 && now > sigNow) {
+          items.push({type:'bullish', text:`KVO положительный и выше сигнальной линии — деньги агрессивно входят в накопление`});
+        } else if (now < 0 && now < sigNow) {
+          items.push({type:'bearish', text:`KVO отрицательный ниже сигнала — деньги агрессивно выходят, распределение`});
+        } else if (now > 0) {
+          items.push({type:'neutral', text:`KVO положительный но сигнальная линия выше — накопление ослабевает`});
+        } else {
+          items.push({type:'neutral', text:`KVO отрицательный но сигнал ниже — давление продаж спадает`});
+        }
+
+        // --- 2. Амплитуда — агрессия крупного участника ---
+        const absKvo = kvo.slice(n-30).map(Math.abs);
+        const maxAmp = Math.max(...absKvo), avgAmp = absKvo.reduce((a,b)=>a+b,0)/absKvo.length;
+        const relAmp = avgAmp>0 ? Math.abs(now)/avgAmp : 1;
+        if (relAmp > 2) {
+          items.push({type: now>0?'bullish':'bearish', text:`Амплитуда KVO в ${relAmp.toFixed(1)}× выше нормы — крупный участник активно торгует. Нитка накопила максимум давления`});
+        } else if (relAmp > 1.3) {
+          items.push({type:'neutral', text:`Амплитуда KVO повышенная (${relAmp.toFixed(1)}× нормы) — накопление/распределение активнее обычного`});
+        } else if (relAmp < 0.3) {
+          items.push({type:'neutral', text:`Амплитуда KVO низкая — денежный поток вялый, крупных участников нет`});
+        }
+
+        // --- 3. Нулевое пересечение = переключение инициативы ---
+        const crossedUp   = prev5 < 0 && now > 0;
+        const crossedDown = prev5 > 0 && now < 0;
+        if (crossedUp) {
+          items.push({type:'bullish', text:`KVO пересёк ноль снизу — деньги переключились из распределения в накопление. Инициатива сменилась`});
+        } else if (crossedDown) {
+          items.push({type:'bearish', text:`KVO пересёк ноль сверху — накопление сменилось распределением. Те кто входили — теперь выходят`});
+        }
+
+        // --- 4. На откате: держит ли KVO сторону каскада? ---
+        const priceUp5 = closes[n-1] > closes[n-6];
+        const kvoUp5   = now > prev5;
+        if (!priceUp5 && now > 0) {
+          items.push({type:'bullish', text:`Цена откатывает, KVO остаётся положительным — поглощение не прекратилось. Откат в рамках каскада вверх`});
+        } else if (priceUp5 && now < 0) {
+          items.push({type:'bearish', text:`Цена растёт, KVO отрицательный — рост без поддержки денежного потока. Движение может быть коротким`});
+        }
+
+        // --- 5. Дивергенция = затухание импульса ---
+        // Ищем: цена на новом лое, KVO не подтверждает
+        const priceMin15 = Math.min(...closes.slice(n-15));
+        const kvoMin15   = Math.min(...kvo.slice(n-15));
+        const priceMax15 = Math.max(...closes.slice(n-15));
+        const kvoMax15   = Math.max(...kvo.slice(n-15));
+        const atPriceLow  = closes[n-1] <= priceMin15 * 1.003;
+        const atPriceHigh = closes[n-1] >= priceMax15 * 0.997;
+        if (atPriceLow && now > kvoMin15 + avgAmp * 0.2) {
+          items.push({type:'bullish', text:`Дивергенция: цена на минимуме, KVO выше своего минимума — денежный поток уже не поддерживает снижение. Каскад вниз на излёте`});
+        } else if (atPriceHigh && now < kvoMax15 - avgAmp * 0.2) {
+          items.push({type:'bearish', text:`Дивергенция: цена на максимуме, KVO слабее пика — деньги перестали входить. Каскад вверх теряет топливо`});
+        }
+
+        // --- 6. Боковик + систематический KVO = скрытое накопление ---
+        const priceRange20 = (Math.max(...closes.slice(n-20)) - Math.min(...closes.slice(n-20))) / closes[n-1] * 100;
+        const kvoTrend20 = kvo[n-1] > kvo[n-20]; // растёт ли KVO?
+        if (priceRange20 < 2 && now > 0 && kvoTrend20) {
+          items.push({type:'bullish', text:`Боковик (диапазон ${priceRange20.toFixed(1)}%), KVO положительный и растёт — скрытое накопление. Деньги входят систематически при боковой цене. Нитка созревает`});
+        } else if (priceRange20 < 2 && now < 0 && !kvoTrend20) {
+          items.push({type:'bearish', text:`Боковик при отрицательном растущем по модулю KVO — скрытое распределение под боковым движением`});
+        }
+
+        html += makeCard('Klinger Volume Oscillator (неклассически)', items);
       }
     } else if (idL === 'ebs') {
       const n = candles.length;
