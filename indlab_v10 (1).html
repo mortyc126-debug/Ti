@@ -1146,6 +1146,12 @@ input[type=range] { touch-action: none; }
           <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">⚡ Карта напряжения системы</div>
           <div id="sys-voltage" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
+
+        <!-- Фазовый детектор -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">🔬 Фазовый детектор рынка</div>
+          <div id="sys-phase" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
+        </div>
       </div>
 
     </div>
@@ -7288,6 +7294,7 @@ function cpRenderSystems() {
   _sysRenderTrendLines();
   _sysRenderHLevels();
   _sysRenderVoltageMap();
+  _sysRenderPhaseDetector();
 }
 
 // Единый оптимальный набор: накапливается из всех категорий
@@ -7463,6 +7470,276 @@ function _sysRenderStaticSections() {
     ]),
 
   ].join('');
+}
+
+function _sysRenderPhaseDetector() {
+  const el = document.getElementById('sys-phase');
+  if (!el) return;
+  const candles = chartCandles;
+  const n = candles.length;
+  if (n < 50) { el.innerHTML = '<span style="color:var(--text3)">Нужно минимум 50 баров.</span>'; return; }
+
+  const closes = candles.map(c=>c.close);
+  const highs  = candles.map(c=>c.high);
+  const lows   = candles.map(c=>c.low);
+  const vols   = candles.map(c=>c.volume||0);
+
+  // ---- helpers ----
+  const ema = (arr, p) => {
+    const k = 2/(p+1); let e = arr[0];
+    return arr.map(v => { e = v*k + e*(1-k); return e; });
+  };
+  const slope = (arr, bars) => {
+    const s = arr.slice(-bars);
+    const N = s.length;
+    let sx=0,sy=0,sxy=0,sxx=0;
+    for(let i=0;i<N;i++){sx+=i;sy+=s[i];sxy+=i*s[i];sxx+=i*i;}
+    return (N*sxy-sx*sy)/(N*sxx-sx*sx||1);
+  };
+  const mean = arr => arr.reduce((s,v)=>s+v,0)/arr.length;
+
+  // ATR14
+  const atrArr = [];
+  for(let i=1;i<n;i++){
+    const tr=Math.max(highs[i]-lows[i],Math.abs(highs[i]-closes[i-1]),Math.abs(lows[i]-closes[i-1]));
+    atrArr.push(tr);
+  }
+  const atr14Ser = ema(atrArr,14);
+  const atr14 = atr14Ser[atr14Ser.length-1];
+  const atrAvg = mean(atr14Ser.slice(-50));
+
+  // BB Width (20,2)
+  const bbW = [];
+  for(let i=19;i<n;i++){
+    const sl=closes.slice(i-19,i+1);
+    const m=mean(sl);
+    const sd=Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/sl.length);
+    bbW.push((4*sd)/closes[i]*100);
+  }
+  const bbWNow = bbW[bbW.length-1];
+  const bbWMin = Math.min(...bbW.slice(-100));
+  const bbWMax = Math.max(...bbW.slice(-100));
+  const bbWRank = bbWMax>bbWMin?(bbWNow-bbWMin)/(bbWMax-bbWMin):0.5;
+
+  // Choppiness (14)
+  let chopArr=[];
+  for(let i=14;i<n;i++){
+    const sl=closes.slice(i-14,i+1);
+    const hl=highs.slice(i-14,i+1);
+    const ll=lows.slice(i-14,i+1);
+    let sumTR=0;
+    for(let j=1;j<=14;j++){const tr=Math.max(hl[j]-ll[j],Math.abs(hl[j]-sl[j-1]),Math.abs(ll[j]-sl[j-1]));sumTR+=tr;}
+    const totalHL=Math.max(...hl)-Math.min(...ll)||0.0001;
+    chopArr.push(100*Math.log10(sumTR/totalHL)/Math.log10(14));
+  }
+  const chop = chopArr[chopArr.length-1];
+
+  // ADX (14)
+  let adxSer=[];
+  {
+    const pdms=[], ndms=[], trs=[];
+    for(let i=1;i<n;i++){
+      const pdm=Math.max(highs[i]-highs[i-1],0);
+      const ndm=Math.max(lows[i-1]-lows[i],0);
+      const tr=Math.max(highs[i]-lows[i],Math.abs(highs[i]-closes[i-1]),Math.abs(lows[i]-closes[i-1]));
+      pdms.push(pdm>ndm?pdm:0);
+      ndms.push(ndm>pdm?ndm:0);
+      trs.push(tr);
+    }
+    const smTR=ema(trs,14), smPDM=ema(pdms,14), smNDM=ema(ndms,14);
+    const dx=smTR.map((t,i)=>t?Math.abs((smPDM[i]-smNDM[i])/(smPDM[i]+smNDM[i]))*100:0);
+    adxSer=ema(dx,14);
+  }
+  const adx = adxSer[adxSer.length-1];
+  const adxPrev10 = adxSer[Math.max(0,adxSer.length-11)];
+
+  // Klinger-like: EMA(5) vs EMA(34) of volume-signed
+  const kSign = closes.map((c,i)=>i===0?1:(c>=closes[i-1]?1:-1));
+  const kForce = vols.map((v,i)=>v*kSign[i]);
+  const kFast = ema(kForce,13), kSlow = ema(kForce,34);
+  const kOsc = kFast.map((v,i)=>v-kSlow[i]);
+  const kNow = kOsc[kOsc.length-1];
+  const kPrev5 = kOsc[Math.max(0,kOsc.length-6)];
+  const kSlope = slope(kOsc.slice(-10),10);
+  const kRising = kSlope > 0;
+  // Klinger monotonic (last 5 rising)
+  const kMono = kOsc.slice(-5).every((v,i,a)=>i===0||v>a[i-1]);
+
+  // OBV slope
+  const obv = [0];
+  for(let i=1;i<n;i++) obv.push(obv[i-1]+(closes[i]>closes[i-1]?vols[i]:closes[i]<closes[i-1]?-vols[i]:0));
+  const obvSlope5 = slope(obv.slice(-5),5);
+  const obvSlope20 = slope(obv.slice(-20),20);
+  const obvAccel = Math.abs(obvSlope5) > Math.abs(obvSlope20)*1.5;
+
+  // Fisher-like: normalize closes over 10 bars
+  const fisherArr = [];
+  for(let i=9;i<n;i++){
+    const sl=closes.slice(i-9,i+1);
+    const hi=Math.max(...sl), lo=Math.min(...sl);
+    const val=hi>lo?2*((closes[i]-lo)/(hi-lo))-1:0;
+    const clamped=Math.max(-0.999,Math.min(0.999,val));
+    fisherArr.push(0.5*Math.log((1+clamped)/(1-clamped)));
+  }
+  const fisherNow = fisherArr[fisherArr.length-1];
+  const fisherPrev5 = fisherArr[Math.max(0,fisherArr.length-6)];
+  const fisherExtreme = Math.abs(fisherNow) > 1.5;
+  const fisherHolding = fisherExtreme && Math.sign(fisherNow)===Math.sign(fisherPrev5);
+  const fisherSwitching = Math.sign(fisherNow)!==Math.sign(fisherPrev5) && fisherArr.length>5;
+
+  // Price slope (flat = accumulation context)
+  const priceSlope10 = slope(closes.slice(-10),10);
+  const priceFlat = Math.abs(priceSlope10/closes[n-1]) < 0.001;
+  const priceSlope5 = slope(closes.slice(-5),5);
+
+  // AC Oscillator approx: AO = SMA5(midpoint) - SMA34(midpoint)
+  const mid = candles.map(c=>(c.high+c.low)/2);
+  const sma5 = (arr,i) => mean(arr.slice(Math.max(0,i-4),i+1));
+  const sma34 = (arr,i) => mean(arr.slice(Math.max(0,i-33),i+1));
+  const aoArr = mid.map((_,i)=>sma5(mid,i)-sma34(mid,i));
+  const acArr = aoArr.map((_,i)=>sma5(aoArr,i)-sma34(aoArr,i));
+  const acNow = acArr[acArr.length-1];
+  const acPrev3 = acArr[Math.max(0,acArr.length-4)];
+  const acRising = acNow > acPrev3;
+
+  // SAR approximate: parabolic distance
+  const sarStep = 0.02, sarMax = 0.2;
+  let sarVal = lows[0], sarAF = sarStep, sarBull = true, sarEP = highs[0];
+  for(let i=1;i<n;i++){
+    sarVal = sarVal + sarAF*(sarEP-sarVal);
+    if(sarBull){
+      if(lows[i]<sarVal){sarBull=false;sarVal=sarEP;sarAF=sarStep;sarEP=lows[i];}
+      else{if(highs[i]>sarEP){sarEP=highs[i];sarAF=Math.min(sarAF+sarStep,sarMax);}}
+    } else {
+      if(highs[i]>sarVal){sarBull=true;sarVal=sarEP;sarAF=sarStep;sarEP=highs[i];}
+      else{if(lows[i]<sarEP){sarEP=lows[i];sarAF=Math.min(sarAF+sarStep,sarMax);}}
+    }
+  }
+  const sarDist = Math.abs(closes[n-1]-sarVal)/closes[n-1]*100;
+  const sarBullNow = sarBull;
+
+  // Divergences: price new high vs Klinger not new high (last 15 bars)
+  const priceNewHi = closes[n-1] >= Math.max(...closes.slice(-15,-1));
+  const kNewHi = kNow >= Math.max(...kOsc.slice(-15,-1));
+  const kDivBear = priceNewHi && !kNewHi;
+  const priceNewLo = closes[n-1] <= Math.min(...closes.slice(-15,-1));
+  const obvNewHi = obv[n-1] >= Math.max(...obv.slice(-15,-1));
+  const obvDivBull = priceNewLo && obvNewHi;
+
+  // MFI (14) approximate
+  const mfi14 = (() => {
+    const tp = candles.map(c=>(c.high+c.low+c.close)/3);
+    let posFlow=0, negFlow=0;
+    for(let i=n-14;i<n;i++){
+      const mf = tp[i]*vols[i];
+      if(i>0 && tp[i]>tp[i-1]) posFlow+=mf; else negFlow+=mf;
+    }
+    return negFlow===0?100:100-(100/(1+posFlow/negFlow));
+  })();
+
+  // ---- Phase scores ----
+  // Phase 1: Накопление
+  const p1conds = [
+    { ok: kRising && priceFlat,       label: 'Klinger растёт, цена в боковике' },
+    { ok: fisherHolding,              label: 'Fisher в экстремуме и держится' },
+    { ok: bbWRank < 0.25,             label: 'BB Width близко к историческому минимуму' },
+    { ok: chop > 61.8,                label: 'Choppiness > 61.8 (рынок хаотичен)' },
+    { ok: adx < 25,                   label: 'ADX < 25 (нет тренда)' },
+  ];
+
+  // Phase 2: Выброс
+  const p2conds = [
+    { ok: fisherSwitching,            label: 'Fisher резко переключает полярность' },
+    { ok: adx > adxPrev10 + 5,        label: 'ADX прыгает (рост более 5 пт за 10 баров)' },
+    { ok: bbWRank > 0.5 && bbWRank > 0.3, label: 'BB Width расширяется от сжатия' },
+    { ok: chop < 55,                  label: 'Choppiness падает ниже 55' },
+    { ok: acRising,                   label: 'AC Oscillator разворачивается вверх' },
+  ];
+
+  // Phase 3: Каскад
+  const p3conds = [
+    { ok: adx > 35,                   label: 'ADX > 35 (сильный тренд)' },
+    { ok: Math.abs(kNow) > Math.abs(kPrev5) && kMono, label: 'Klinger в экстремуме монотонно' },
+    { ok: acRising && acNow > 0,      label: 'AC Oscillator растёт и в плюсе' },
+    { ok: fisherExtreme && fisherHolding, label: 'Fisher в экстремуме и удерживается' },
+    { ok: mfi14 > 75 || mfi14 < 25,   label: `MFI в экстремуме (${mfi14.toFixed(0)})` },
+  ];
+
+  // Phase 4: Затухание
+  const p4conds = [
+    { ok: kDivBear,                   label: 'Дивергенция: цена на хае — Klinger нет' },
+    { ok: adx < adxPrev10 - 5,        label: 'ADX падает (снижение >5 пт за 10 баров)' },
+    { ok: !acRising,                  label: 'AC Oscillator разворачивается вниз' },
+    { ok: sarDist < atr14/closes[n-1]*100*1.5, label: 'SAR приближается к цене' },
+    { ok: obvDivBull || (priceNewHi && !obvNewHi), label: 'Дивергенция OBV / цена' },
+  ];
+
+  // Phase 5: Разворот
+  const p5conds = [
+    { ok: fisherSwitching,            label: 'Fisher резко переключает полярность' },
+    { ok: kNow * kPrev5 < 0,          label: 'Klinger пересекает ноль' },
+    { ok: sarBullNow !== (priceSlope5 > 0), label: 'SAR переключился против недавнего движения' },
+    { ok: [kDivBear, !obvNewHi && priceNewHi, fisherSwitching].filter(Boolean).length >= 2, label: 'Два и более дивергенций одновременно' },
+  ];
+
+  const phases = [
+    { num:1, name:'Накопление',  emoji:'🟤', conds:p1conds,
+      desc:'Умные деньги входят. Объём незаметен, цена топчется на месте.' },
+    { num:2, name:'Выброс',      emoji:'🟡', conds:p2conds,
+      desc:'Хаос заканчивается, тренд начинается. Прорыв.' },
+    { num:3, name:'Каскад',      emoji:'🟢', conds:p3conds,
+      desc:'Тренд в полной силе. Все системы согласованы.' },
+    { num:4, name:'Затухание',   emoji:'🟠', conds:p4conds,
+      desc:'Дивергенции. Тренд жив, но теряет энергию.' },
+    { num:5, name:'Разворот',    emoji:'🔴', conds:p5conds,
+      desc:'Структурный слом. Начало противоположной фазы.' },
+  ];
+
+  const scores = phases.map(p=>p.conds.filter(c=>c.ok).length/p.conds.length);
+  const maxScore = Math.max(...scores);
+  const bestPhase = scores.indexOf(maxScore);
+
+  const phaseColor = ['#8B7355','#D4A017','#3CB371','#E07B39','#C71B52'];
+
+  let html = '';
+  phases.forEach((ph, pi) => {
+    const score = ph.conds.filter(c=>c.ok).length;
+    const total = ph.conds.length;
+    const pct = score/total;
+    const isBest = pi === bestPhase && pct >= 0.4;
+    const col = phaseColor[pi];
+    const barW = Math.round(pct*100);
+    const dimmed = !isBest && maxScore >= 0.6;
+
+    html += `<div style="margin-bottom:10px;${dimmed?'opacity:0.45':''}">`;
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">`;
+    html += `<span style="font-size:12px;">${ph.emoji}</span>`;
+    html += `<span style="color:${col};font-weight:${isBest?700:400};">Фаза ${ph.num}: ${ph.name}</span>`;
+    html += `<span style="margin-left:auto;color:var(--text3);">${score}/${total}</span>`;
+    html += `</div>`;
+    // progress bar
+    html += `<div style="height:3px;background:var(--bg2);border-radius:2px;margin-bottom:4px;">`;
+    html += `<div style="height:3px;width:${barW}%;background:${col};border-radius:2px;"></div></div>`;
+    // desc
+    if (isBest) html += `<div style="color:var(--text3);margin-bottom:4px;">${ph.desc}</div>`;
+    // checklist
+    html += `<div style="padding-left:4px;">` + ph.conds.map(c =>
+      `<div style="color:${c.ok?(isBest?col:'var(--text2)'):'var(--text3)'}">${c.ok?'✓':'✗'} ${c.label}</div>`
+    ).join('') + '</div>';
+    html += '</div>';
+  });
+
+  // summary
+  const dominant = phases[bestPhase];
+  const domScore = phases[bestPhase].conds.filter(c=>c.ok).length;
+  const domTotal = dominant.conds.length;
+  if (domScore/domTotal >= 0.4) {
+    html = `<div style="color:${phaseColor[bestPhase]};font-size:11px;margin-bottom:10px;border-left:2px solid ${phaseColor[bestPhase]};padding-left:6px;">` +
+      `Активная фаза: ${dominant.emoji} <b>Фаза ${dominant.num} — ${dominant.name}</b> (${domScore}/${domTotal} условий)<br>` +
+      `<span style="color:var(--text3);font-size:10px;">${dominant.desc}</span></div>` + html;
+  }
+
+  el.innerHTML = html;
 }
 
 function _sysRenderVoltageMap() {
