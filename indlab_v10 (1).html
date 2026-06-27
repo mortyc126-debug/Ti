@@ -10654,6 +10654,28 @@ function renderAnalysis() {
           items.push({type:'bearish', text:`Боковик при отрицательном растущем по модулю KVO — скрытое распределение под боковым движением`});
         }
 
+        // --- 7. Расширение KVO/Signal = момент выброса ---
+        const spread = now - sigNow;
+        const spread5 = prev5 - sig[n-6];
+        const spread10 = prev10 - sig[n-11];
+        const spreadAbs = Math.abs(spread), spreadAbs5 = Math.abs(spread5), spreadAbs10 = Math.abs(spread10);
+        // Компрессия: обе линии рядом
+        if (spreadAbs < avgAmp * 0.15) {
+          items.push({type:'neutral', text:`KVO и Signal почти совпадают (спред ${(spreadAbs/1000).toFixed(0)}k) — денежный поток в компрессии. Нитка: момент расширения = начало выброса`});
+        }
+        // Резкое расширение после сжатия
+        else if (spreadAbs > spreadAbs5 * 2 && spreadAbs5 < avgAmp * 0.3) {
+          items.push({type: spread>0?'bullish':'bearish', text:`Резкое расширение KVO/Signal (${(spreadAbs/1000).toFixed(0)}k после ${(spreadAbs5/1000).toFixed(0)}k) — денежный поток вышел из компрессии. Это начало выброса в ${spread>0?'покупку':'продажу'}`});
+        }
+        // Расширение нарастает постепенно
+        else if (spreadAbs > spreadAbs5 && spreadAbs5 > spreadAbs10 && spreadAbs > avgAmp * 0.3) {
+          items.push({type: spread>0?'bullish':'bearish', text:`KVO/Signal постепенно расширяются — плановый тренд денежного потока ${spread>0?'в покупку':'в продажу'}, не каскад`});
+        }
+        // Сжатие после расширения
+        else if (spreadAbs < spreadAbs5 * 0.4 && spreadAbs5 > avgAmp * 0.5) {
+          items.push({type:'neutral', text:`KVO/Signal схлопываются после расширения — денежный поток теряет направление. Выброс может завершаться`});
+        }
+
         html += makeCard('Klinger Volume Oscillator (неклассически)', items);
       }
     } else if (idL === 'ebs') {
