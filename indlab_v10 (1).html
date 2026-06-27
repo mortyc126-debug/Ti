@@ -5821,6 +5821,116 @@ function _chartDrawMain() {
     ctx.fill(); ctx.restore();
   }
 
+  // ── Market Structure overlay: swing pivots + BOS/CHoCH lines ──────────────
+  if (chartCandles.length >= 20) {
+    const _n = chartCandles.length;
+    const _lb = Math.max(3, Math.min(7, Math.floor(_n / 15)));
+    const _swH = [], _swL = [];
+    for (let i = _lb; i < _n - _lb; i++) {
+      const h = chartCandles[i].high, l = chartCandles[i].low;
+      let isH = true, isL = true;
+      for (let j = i - _lb; j <= i + _lb; j++) {
+        if (j === i) continue;
+        if (chartCandles[j].high >= h) isH = false;
+        if (chartCandles[j].low  <= l) isL = false;
+      }
+      if (isH) _swH.push({i, p: h});
+      if (isL) _swL.push({i, p: l});
+    }
+    ctx.font = '9px monospace'; ctx.textAlign = 'center';
+    _swH.forEach(({i, p}) => {
+      if (i < startIdx || i >= endIdx) return;
+      ctx.fillStyle = 'rgba(199,27,82,0.75)';
+      ctx.fillText('▼', xOf(i - startIdx), toY(p) - 5);
+    });
+    _swL.forEach(({i, p}) => {
+      if (i < startIdx || i >= endIdx) return;
+      ctx.fillStyle = 'rgba(96,164,161,0.75)';
+      ctx.fillText('▲', xOf(i - startIdx), toY(p) + 12);
+    });
+    // BOS: last close beyond last swing
+    const _lc = chartCandles[_n - 1].close;
+    if (_swH.length) {
+      const sh = _swH[_swH.length - 1];
+      if (_lc > sh.p) {
+        const y = toY(sh.p); const x0 = sh.i >= startIdx ? xOf(sh.i - startIdx) : 0;
+        ctx.save(); ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(96,164,161,0.6)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(W, y); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+        ctx.fillStyle = 'rgba(96,164,161,0.9)'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+        ctx.fillText('BOS↑', W - 3, y - 2);
+      }
+    }
+    if (_swL.length) {
+      const sl = _swL[_swL.length - 1];
+      if (_lc < sl.p) {
+        const y = toY(sl.p); const x0 = sl.i >= startIdx ? xOf(sl.i - startIdx) : 0;
+        ctx.save(); ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(199,27,82,0.6)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(W, y); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+        ctx.fillStyle = 'rgba(199,27,82,0.9)'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+        ctx.fillText('BOS↓', W - 3, y + 10);
+      }
+    }
+    // CHoCH: structure flip — last HH→LH or LL→HL
+    if (_swH.length >= 2) {
+      const prev = _swH[_swH.length - 2], cur = _swH[_swH.length - 1];
+      if (cur.p < prev.p) { // LH after HH → bearish CHoCH
+        const y = toY(cur.p); const x0 = cur.i >= startIdx ? xOf(cur.i - startIdx) : 0;
+        ctx.save(); ctx.setLineDash([2, 4]);
+        ctx.strokeStyle = 'rgba(255,159,28,0.6)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(W, y); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+        ctx.fillStyle = 'rgba(255,159,28,0.9)'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+        ctx.fillText('CHoCH', W - 3, y - 2);
+      }
+    }
+    if (_swL.length >= 2) {
+      const prev = _swL[_swL.length - 2], cur = _swL[_swL.length - 1];
+      if (cur.p > prev.p) { // HL after LL → bullish CHoCH
+        const y = toY(cur.p); const x0 = cur.i >= startIdx ? xOf(cur.i - startIdx) : 0;
+        ctx.save(); ctx.setLineDash([2, 4]);
+        ctx.strokeStyle = 'rgba(255,159,28,0.6)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(W, y); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+        ctx.fillStyle = 'rgba(255,159,28,0.9)'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+        ctx.fillText('CHoCH', W - 3, y + 10);
+      }
+    }
+  }
+
+  // ── SMC: Fair Value Gaps (FVG) drawn as semi-transparent rectangles ────────
+  if (chartCandles.length >= 5) {
+    const _n = chartCandles.length;
+    const _fvgs = [];
+    for (let i = 2; i < _n; i++) {
+      const c0 = chartCandles[i - 2], c2 = chartCandles[i];
+      const gapB = c2.low - c0.high;
+      if (gapB > 0 && gapB / c0.high > 0.0015) _fvgs.push({i, top: c2.low, bot: c0.high, bull: true});
+      const gapBr = c0.low - c2.high;
+      if (gapBr > 0 && gapBr / c0.low > 0.0015) _fvgs.push({i, top: c0.low, bot: c2.high, bull: false});
+    }
+    const _lc2 = chartCandles[_n - 1].close;
+    const _unf = _fvgs.filter(fg => fg.bull ? _lc2 > fg.bot : _lc2 < fg.top).slice(-5);
+    _unf.forEach(fg => {
+      if (fg.i < startIdx || fg.i >= endIdx) return;
+      const x1 = xOf(fg.i - startIdx), x2 = W;
+      const y1 = toY(fg.top), y2 = toY(fg.bot);
+      ctx.fillStyle = fg.bull ? 'rgba(96,164,161,0.08)' : 'rgba(199,27,82,0.08)';
+      ctx.fillRect(x1, y1, x2 - x1, Math.abs(y2 - y1));
+      ctx.save(); ctx.setLineDash([2, 3]);
+      ctx.strokeStyle = fg.bull ? 'rgba(96,164,161,0.35)' : 'rgba(199,27,82,0.35)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x1, y1, x2 - x1, Math.abs(y2 - y1));
+      ctx.setLineDash([]); ctx.restore();
+      ctx.fillStyle = fg.bull ? 'rgba(96,164,161,0.7)' : 'rgba(199,27,82,0.7)';
+      ctx.font = '7px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('FVG', x1 + 2, y1 + 7);
+    });
+  }
+
   // Price display
   const chg = last.close - vis[0].open;
   const chgPct = (chg/vis[0].open*100).toFixed(2);
@@ -5874,6 +5984,50 @@ function _chartDrawRSI() {
 
   const lastRsi=rsi.filter(v=>v!==null).pop()||50;
   setPill('chart-rsi-badge', interpRSI(Math.round(lastRsi)).s);
+
+  // RSI divergence lines
+  const maxVis2 = Math.min(n, Math.floor(W / (chartCandleW || 8)));
+  const endIdx2 = Math.max(maxVis2, n - (chartOffset || 0));
+  const startIdx2 = Math.max(0, endIdx2 - maxVis2);
+  const toX2 = i => ((i - startIdx2) / (maxVis2 - 1 || 1)) * W;
+  const toRY = v => (1 - v / 100) * H;
+  // find local RSI lows (bullish div) and highs (bearish div) in last 60 bars
+  const _wnd = Math.min(60, n - startIdx2);
+  const _st = Math.max(startIdx2, n - _wnd);
+  const _rsiFilt = [], _prFilt = [];
+  for (let i = _st + 2; i < n - 2; i++) {
+    const r = rsi[i];
+    if (r === null) continue;
+    const isLow  = r < rsi[i-1] && r < rsi[i-2] && r < rsi[i+1] && r < rsi[i+2];
+    const isHigh = r > rsi[i-1] && r > rsi[i-2] && r > rsi[i+1] && r > rsi[i+2];
+    const pr = chartCandles[i].low;
+    const ph = chartCandles[i].high;
+    if (isLow)  _rsiFilt.push({i, r, p: pr, type: 'low'});
+    if (isHigh) _rsiFilt.push({i, r, p: ph, type: 'high'});
+  }
+  // Bullish div: last two RSI lows — RSI higher but price lower
+  const _rLows  = _rsiFilt.filter(x => x.type === 'low');
+  const _rHighs = _rsiFilt.filter(x => x.type === 'high');
+  if (_rLows.length >= 2) {
+    const a = _rLows[_rLows.length - 2], b = _rLows[_rLows.length - 1];
+    if (b.r > a.r && b.p < a.p) { // RSI up, price down → bullish div
+      ctx.save(); ctx.strokeStyle = 'rgba(96,164,161,0.9)'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(toX2(a.i), toRY(a.r)); ctx.lineTo(toX2(b.i), toRY(b.r)); ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+      ctx.fillStyle = 'rgba(96,164,161,0.9)'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('DIV↑', toX2(b.i) + 2, toRY(b.r) - 3);
+    }
+  }
+  if (_rHighs.length >= 2) {
+    const a = _rHighs[_rHighs.length - 2], b = _rHighs[_rHighs.length - 1];
+    if (b.r < a.r && b.p > a.p) { // RSI down, price up → bearish div
+      ctx.save(); ctx.strokeStyle = 'rgba(199,27,82,0.9)'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(toX2(a.i), toRY(a.r)); ctx.lineTo(toX2(b.i), toRY(b.r)); ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+      ctx.fillStyle = 'rgba(199,27,82,0.9)'; ctx.font = '8px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('DIV↓', toX2(b.i) + 2, toRY(b.r) + 9);
+    }
+  }
 }
 
 function _chartDrawMACD() {
