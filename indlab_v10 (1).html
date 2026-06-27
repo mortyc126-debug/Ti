@@ -1152,6 +1152,12 @@ input[type=range] { touch-action: none; }
           <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">🔬 Фазовый детектор рынка</div>
           <div id="sys-phase" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
+
+        <!-- Матрица пар сигналов -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">⚡ Активные пары сигналов</div>
+          <div id="sys-sigpairs" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
+        </div>
       </div>
 
     </div>
@@ -7295,6 +7301,7 @@ function cpRenderSystems() {
   _sysRenderHLevels();
   _sysRenderVoltageMap();
   _sysRenderPhaseDetector();
+  _sysRenderSigPairs();
 }
 
 // Единый оптимальный набор: накапливается из всех категорий
@@ -7470,6 +7477,227 @@ function _sysRenderStaticSections() {
     ]),
 
   ].join('');
+}
+
+function _sysRenderSigPairs() {
+  const el = document.getElementById('sys-sigpairs');
+  if (!el) return;
+  const candles = chartCandles;
+  const n = candles.length;
+  if (n < 50) { el.innerHTML = '<span style="color:var(--text3)">Нужно минимум 50 баров.</span>'; return; }
+
+  const closes = candles.map(c=>c.close);
+  const highs  = candles.map(c=>c.high);
+  const lows   = candles.map(c=>c.low);
+  const vols   = candles.map(c=>c.volume||0);
+
+  const ema = (arr,p) => { const k=2/(p+1); let e=arr[0]; return arr.map(v=>{e=v*k+e*(1-k);return e;}); };
+  const slope = (arr,bars) => { const s=arr.slice(-bars),N=s.length; let sx=0,sy=0,sxy=0,sxx=0; for(let i=0;i<N;i++){sx+=i;sy+=s[i];sxy+=i*s[i];sxx+=i*i;} return (N*sxy-sx*sy)/(N*sxx-sx*sx||1); };
+  const mean = arr => arr.reduce((s,v)=>s+v,0)/arr.length;
+
+  // ATR14
+  const atrRaw=[];
+  for(let i=1;i<n;i++) atrRaw.push(Math.max(highs[i]-lows[i],Math.abs(highs[i]-closes[i-1]),Math.abs(lows[i]-closes[i-1])));
+  const atr14=ema(atrRaw,14)[atrRaw.length-1];
+  const atrAvg100=mean(ema(atrRaw,14).slice(-100));
+
+  // BB Width
+  const bbW=[];
+  for(let i=19;i<n;i++){const sl=closes.slice(i-19,i+1);const m=mean(sl);const sd=Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/sl.length);bbW.push((4*sd)/closes[i]*100);}
+  const bbWNow=bbW[bbW.length-1], bbW5ago=bbW[Math.max(0,bbW.length-6)];
+  const bbWMin100=Math.min(...bbW.slice(-100)), bbWMax100=Math.max(...bbW.slice(-100));
+  const bbWRank=(bbWMax100>bbWMin100)?(bbWNow-bbWMin100)/(bbWMax100-bbWMin100):0.5;
+  const bbExpand2x = bbWNow > bbW5ago * 1.5;
+
+  // Choppiness
+  const chopArr=[];
+  for(let i=14;i<n;i++){const sl=candles.slice(i-14,i+1);let atr=0;for(let j=1;j<sl.length;j++)atr+=Math.max(sl[j].high-sl[j].low,Math.abs(sl[j].high-sl[j-1].close),Math.abs(sl[j].low-sl[j-1].close));const hl=Math.max(...sl.map(c=>c.high))-Math.min(...sl.map(c=>c.low))||0.001;chopArr.push(100*Math.log10(atr/hl)/Math.log10(14));}
+  const chopNow=chopArr[chopArr.length-1];
+  const chop5ago=chopArr[Math.max(0,chopArr.length-6)];
+  const chopFalling15 = chop5ago-chopNow > 15;
+
+  // ADX
+  const adxSer=(() => {
+    const pdms=[],ndms=[],trs=[];
+    for(let i=1;i<n;i++){const pdm=Math.max(highs[i]-highs[i-1],0),ndm=Math.max(lows[i-1]-lows[i],0),tr=Math.max(highs[i]-lows[i],Math.abs(highs[i]-closes[i-1]),Math.abs(lows[i]-closes[i-1]));pdms.push(pdm>ndm?pdm:0);ndms.push(ndm>pdm?ndm:0);trs.push(tr);}
+    const smTR=ema(trs,14),smPDM=ema(pdms,14),smNDM=ema(ndms,14);
+    return ema(smTR.map((t,i)=>t?Math.abs((smPDM[i]-smNDM[i])/(smPDM[i]+smNDM[i]))*100:0),14);
+  })();
+  const adxNow=adxSer[adxSer.length-1];
+  const adx10ago=adxSer[Math.max(0,adxSer.length-11)];
+  const adxJump10 = adxNow-adx10ago > 10;
+  const adxFall10 = adx10ago-adxNow > 10;
+
+  // Klinger
+  const kSign=closes.map((c,i)=>i===0?1:(c>=closes[i-1]?1:-1));
+  const kForce=vols.map((v,i)=>v*kSign[i]);
+  const kFast=ema(kForce,13),kSlow=ema(kForce,34);
+  const kOsc=kFast.map((v,i)=>v-kSlow[i]);
+  const kNow=kOsc[kOsc.length-1],kPrev5=kOsc[Math.max(0,kOsc.length-6)];
+  const kRising=kNow>kPrev5;
+  const kCrossedZero=kNow*kPrev5<0;
+  // Klinger divergence: price new hi, klinger not
+  const priceNewHi15=closes[n-1]>=Math.max(...closes.slice(-15,-1));
+  const kNewHi15=kNow>=Math.max(...kOsc.slice(-15,-1));
+  const kDivBear=priceNewHi15&&!kNewHi15;
+  const priceNewLo15=closes[n-1]<=Math.min(...closes.slice(-15,-1));
+  const kNewLo15=kNow<=Math.min(...kOsc.slice(-15,-1));
+  const kDivBull=priceNewLo15&&!kNewLo15;
+
+  // OBV
+  const obv=[0]; for(let i=1;i<n;i++) obv.push(obv[i-1]+(closes[i]>closes[i-1]?vols[i]:closes[i]<closes[i-1]?-vols[i]:0));
+  const obvNewHi15=obv[n-1]>=Math.max(...obv.slice(-15,-1));
+  const obvDivBear=priceNewHi15&&!obvNewHi15;
+  const obvNewLo15=obv[n-1]<=Math.min(...obv.slice(-15,-1));
+  const obvDivBull=priceNewLo15&&!obvNewLo15;
+
+  // OBV speed: compare last 5 vs prev 5
+  const obvSpeed5=slope(obv.slice(-5),5);
+  const obvSpeed10=slope(obv.slice(-10,-5),5);
+  const obvAccel=Math.abs(obvSpeed5)>Math.abs(obvSpeed10)*1.5&&Math.sign(obvSpeed5)===Math.sign(obvSpeed10);
+
+  // Fisher
+  const fisherArr=[];
+  for(let i=9;i<n;i++){const sl=closes.slice(i-9,i+1);const hi=Math.max(...sl),lo=Math.min(...sl);const val=hi>lo?2*((closes[i]-lo)/(hi-lo))-1:0;const c=Math.max(-0.999,Math.min(0.999,val));fisherArr.push(0.5*Math.log((1+c)/(1-c)));}
+  const fisherNow=fisherArr[fisherArr.length-1];
+  const fisherPrev5=fisherArr[Math.max(0,fisherArr.length-6)];
+  const fisherExtreme=Math.abs(fisherNow)>1.5;
+  const fisherHolding=fisherExtreme&&Math.sign(fisherNow)===Math.sign(fisherPrev5);
+  const fisherSwitching=Math.sign(fisherNow)!==Math.sign(fisherPrev5)&&fisherArr.length>5;
+
+  // AC Oscillator
+  const mid=candles.map(c=>(c.high+c.low)/2);
+  const sma5=(arr,i)=>mean(arr.slice(Math.max(0,i-4),i+1));
+  const sma34=(arr,i)=>mean(arr.slice(Math.max(0,i-33),i+1));
+  const aoArr=mid.map((_,i)=>sma5(mid,i)-sma34(mid,i));
+  const acArr=aoArr.map((_,i)=>sma5(aoArr,i)-sma34(aoArr,i));
+  const acNow=acArr[acArr.length-1],acPrev3=acArr[Math.max(0,acArr.length-4)];
+  const acRising=acNow>acPrev3;
+
+  // SAR
+  const sarStep=0.02,sarMax=0.2;
+  let sarVal=lows[0],sarAF=sarStep,sarBull=true,sarEP=highs[0];
+  for(let i=1;i<n;i++){sarVal=sarVal+sarAF*(sarEP-sarVal);if(sarBull){if(lows[i]<sarVal){sarBull=false;sarVal=sarEP;sarAF=sarStep;sarEP=lows[i];}else{if(highs[i]>sarEP){sarEP=highs[i];sarAF=Math.min(sarAF+sarStep,sarMax);}}}else{if(highs[i]>sarVal){sarBull=true;sarVal=sarEP;sarAF=sarStep;sarEP=highs[i];}else{if(lows[i]<sarEP){sarEP=lows[i];sarAF=Math.min(sarAF+sarStep,sarMax);}}}}
+  const sarDist=Math.abs(closes[n-1]-sarVal)/closes[n-1]*100;
+  const sarApproaching=sarDist<atr14/closes[n-1]*100*1.5;
+
+  // Price flat
+  const priceSlope5=slope(closes.slice(-5),5);
+  const priceFlat=Math.abs(priceSlope5/closes[n-1])<0.001;
+
+  // VSA: volume on impulse vs volume on pullback (last 20 bars)
+  const impulseVols=[], pullbackVols=[];
+  for(let i=n-20;i<n;i++){const body=Math.abs(closes[i]-(candles[i].open||closes[i]));if(body/closes[i]>0.003) impulseVols.push(vols[i]); else pullbackVols.push(vols[i]);}
+  const avgImpV=impulseVols.length?mean(impulseVols):0;
+  const avgPullV=pullbackVols.length?mean(pullbackVols):1;
+  const vsaHealthy=avgImpV>avgPullV*2;
+  // VSA divergence: price new hi, volume lower
+  const volNow=vols[n-1],volPrev=mean(vols.slice(-15,-1));
+  const vsaDivBear=priceNewHi15&&volNow<volPrev*0.75;
+
+  // Spring-like: large wick reversal (last 3 bars)
+  let springLike=false;
+  for(let i=n-3;i<n;i++){
+    const body=Math.abs(closes[i]-(candles[i].open||closes[i]));
+    const lowerWick=Math.min(closes[i],candles[i].open||closes[i])-lows[i];
+    const upperWick=highs[i]-Math.max(closes[i],candles[i].open||closes[i]);
+    if(lowerWick>body*2&&lowerWick/closes[i]>0.008&&vols[i]>mean(vols.slice(-20))*2) springLike=true;
+  }
+
+  // HV: historical volatility rank
+  const hvArr=[];
+  for(let i=20;i<n;i++){const ret=closes.slice(i-19,i+1).map((v,j,a)=>j===0?0:Math.log(v/a[j-1])).slice(1);const sd=Math.sqrt(ret.reduce((s,v)=>s+v*v,0)/ret.length);hvArr.push(sd*Math.sqrt(252)*100);}
+  const hvNow=hvArr[hvArr.length-1]||0;
+  const hvMin100=hvArr.length>=100?Math.min(...hvArr.slice(-100)):Math.min(...hvArr);
+  const hvMax100=hvArr.length>=100?Math.max(...hvArr.slice(-100)):Math.max(...hvArr);
+  const hvRising=hvNow>(hvArr[Math.max(0,hvArr.length-6)]||0)*1.2;
+
+  // Three divergences simultaneously
+  const divCount=[kDivBear,obvDivBear,vsaDivBear,fisherSwitching&&fisherPrev5>1].filter(Boolean).length;
+
+  // ---- Define pairs ----
+  const pairs = [
+    // 95%+ confidence
+    { name:'Spring + AMT выход за Value Area', rel:95, group:'max',
+      ok: springLike && bbWRank < 0.2,
+      desc:'Охота за стопами + нет сопротивления впереди → максимально агрессивный вход' },
+    { name:'VSA дивергенция + Klinger дивергенция', rel:95, group:'max',
+      ok: vsaDivBear && kDivBear,
+      desc:'Два денежных потока показывают одно: разворот в 3-5 дней' },
+    { name:'Order Flow (Fisher) + смена режима (SAR)', rel:98, group:'max',
+      ok: fisherSwitching && sarApproaching,
+      desc:'Состояние развернулось на двух независимых уровнях' },
+    { name:'ADX +10 пт + BB Width расширилась ×1.5', rel:95, group:'max',
+      ok: adxJump10 && bbExpand2x,
+      desc:'Тренд включился + энергия пошла → вход в каскад максимальная уверенность' },
+
+    // 85-94%
+    { name:'Klinger монотонно + OBV ускоряется', rel:90, group:'strong',
+      ok: kRising && obvAccel,
+      desc:'Два индикатора накопления говорят одно: боговик здоров, выброс вот-вот' },
+    { name:'Fisher в крайности + AC гистограмма растёт', rel:85, group:'strong',
+      ok: fisherHolding && acRising,
+      desc:'Перегрев есть, но движение продолжится. Держи позицию' },
+    { name:'Choppiness -15 пт + ADX +8 пт', rel:82, group:'strong',
+      ok: chopFalling15 && adxJump10,
+      desc:'Два измерителя режима: тренд включился' },
+
+    // 75-84%
+    { name:'Объём откат маленький + Fisher держит крайность', rel:80, group:'medium',
+      ok: avgPullV < avgImpV * 0.4 && fisherHolding,
+      desc:'Откат слабый, состояние не развернулось → каскад продолжится' },
+    { name:'SAR не переключается + Klinger не переходит ноль', rel:78, group:'medium',
+      ok: !sarApproaching && !kCrossedZero && adxNow > 25,
+      desc:'Два независимых подтверждения: режим не сломан' },
+    { name:'HV растёт + BB Width расширяется', rel:76, group:'medium',
+      ok: hvRising && bbExpand2x,
+      desc:'Энергия системы растёт → каскад продолжится' },
+
+    // exit signals
+    { name:'Klinger диверг + ADX начал падать', rel:80, group:'exit',
+      ok: kDivBear && adxFall10,
+      desc:'Деньги ушли, тренд слабеет → частичный выход' },
+    { name:'3+ дивергенции одновременно', rel:95, group:'exit',
+      ok: divCount >= 3,
+      desc:`${divCount} дивергенции: VSA+Klinger+OBV+Fisher → каскад на финише` },
+    { name:'SAR приближается + AC разворачивается', rel:82, group:'exit',
+      ok: sarApproaching && !acRising && adxNow > 25,
+      desc:'Тренд жив но терят энергию → готовь выход' },
+  ];
+
+  const active = pairs.filter(p=>p.ok);
+  const inactive = pairs.filter(p=>!p.ok);
+
+  const groupLabel = { max:'🔴 Уверенность 95%+', strong:'🟠 Уверенность 85-94%', medium:'🟡 Уверенность 75-84%', exit:'🔵 Сигнал выхода' };
+  const groupCol   = { max:'#E04060', strong:'#D4903A', medium:'#C9A826', exit:'#60A4A1' };
+
+  let html = '';
+  if (active.length === 0) {
+    html = '<span style="color:var(--text3)">Сейчас ни одна сильная пара не активна.</span>';
+  } else {
+    html = `<div style="color:var(--text3);margin-bottom:8px;">${active.length} из ${pairs.length} пар активны прямо сейчас:</div>`;
+    ['max','strong','medium','exit'].forEach(g => {
+      const gPairs = active.filter(p=>p.group===g);
+      if (!gPairs.length) return;
+      html += `<div style="color:${groupCol[g]};font-size:9px;margin:6px 0 3px;text-transform:uppercase;letter-spacing:0.05em;">${groupLabel[g]}</div>`;
+      gPairs.forEach(p => {
+        html += `<div style="border-left:2px solid ${groupCol[p.group]};padding-left:6px;margin-bottom:6px;">`;
+        html += `<div style="color:${groupCol[p.group]};font-weight:600;">✓ ${p.name} <span style="color:var(--text3);font-weight:400;">(${p.rel}%)</span></div>`;
+        html += `<div style="color:var(--text3);font-size:9px;">${p.desc}</div>`;
+        html += '</div>';
+      });
+    });
+  }
+
+  if (inactive.length > 0 && inactive.length < pairs.length) {
+    html += `<details style="margin-top:8px;"><summary style="color:var(--text3);cursor:pointer;font-size:9px;">Неактивные пары (${inactive.length})</summary><div style="padding-top:4px;">`;
+    inactive.forEach(p => {
+      html += `<div style="color:var(--text3);margin-bottom:3px;">✗ ${p.name} <span style="opacity:0.5;">(${p.rel}%)</span></div>`;
+    });
+    html += '</div></details>';
+  }
+
+  el.innerHTML = html;
 }
 
 function _sysRenderPhaseDetector() {
