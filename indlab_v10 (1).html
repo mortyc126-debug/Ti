@@ -10847,6 +10847,7 @@ function renderAnalysis() {
     } else if (idL.includes('ichi') || idL.includes('ichimoku')) {
       if (candles.length >= 52) {
         const n = candles.length;
+        // Компоненты текущего момента
         const tenkan9h = Math.max(...highs.slice(n-9)), tenkan9l = Math.min(...lows.slice(n-9));
         const kijun26h = Math.max(...highs.slice(n-26)), kijun26l = Math.min(...lows.slice(n-26));
         const tenkan = (tenkan9h + tenkan9l) / 2;
@@ -10855,33 +10856,127 @@ function renderAnalysis() {
         const span52h = Math.max(...highs.slice(n-52)), span52l = Math.min(...lows.slice(n-52));
         const senkouB = (span52h + span52l) / 2;
         const lastClose = closes[n-1];
+        const cloudTop = Math.max(senkouA, senkouB), cloudBot = Math.min(senkouA, senkouB);
         const cloudThickness = Math.abs(senkouA - senkouB) / lastClose * 100;
         const kijunDev = (lastClose - kijun) / kijun * 100;
+        const tkDist = Math.abs(tenkan - kijun) / lastClose * 100; // расстояние Tenkan-Kijun
         const items = [];
-        if (cloudThickness < 0.5) {
-          items.push({type:'neutral', text:`Тонкое облако (${cloudThickness.toFixed(2)}%) — пустота, цена пройдёт быстро`});
-        } else if (cloudThickness > 2) {
-          items.push({type:'neutral', text:`Плотное облако (${cloudThickness.toFixed(2)}%) — зона ликвидности, возможно торможение`});
-        }
-        const kijunStr = Math.abs(kijunDev) > 2 ? 'натянута' : 'в норме';
-        items.push({type: Math.abs(kijunDev)>2?(kijunDev>0?'bullish':'bearish'):'neutral', text:`Цена на ${kijunDev.toFixed(2)}% от kijun — резинка ${kijunStr}`});
 
-        // Chikou Span — пустое пространство = нет прошлого сопротивления
-        if (n >= 53) {
-          const chikouClose = closes[n-1]; // Chikou = текущее закрытие, смещённое на 26 назад
-          const chikouZone = candles.slice(n-27, n-22); // свечи рядом с chikou
-          const chikouHigh = Math.max(...chikouZone.map(c=>c.high));
-          const chikouLow  = Math.min(...chikouZone.map(c=>c.low));
-          const gapUp   = chikouClose > chikouHigh * 1.005;
-          const gapDown = chikouClose < chikouLow  * 0.995;
-          if (gapUp) {
-            items.push({type:'bullish', text:`Chikou в пустом пространстве выше свечей 26 баров назад — прошлого сопротивления нет. Зона откуда ждать быстрого движения вверх`});
-          } else if (gapDown) {
-            items.push({type:'bearish', text:`Chikou ниже свечей 26 баров назад — нет прошлей поддержки. Зона ускорения вниз`});
+        // ── 1. Где цена относительно облака ──────────────────────────────
+        const inCloud = lastClose >= cloudBot && lastClose <= cloudTop;
+        const aboveCloud = lastClose > cloudTop;
+        const belowCloud = lastClose < cloudBot;
+        if (aboveCloud) items.push({type:'bullish', text:`Цена выше облака — быки контролируют. Облако = поддержка снизу`});
+        else if (belowCloud) items.push({type:'bearish', text:`Цена ниже облака — медведи контролируют. Облако = сопротивление сверху`});
+        else items.push({type:'neutral', text:`Цена внутри облака — аукцион, никто не контролирует. Встреча горизонтов участников`});
+
+        // ── 2. Толщина облака = согласие vs разногласие ──────────────────
+        if (cloudThickness < 0.3) {
+          items.push({type:'neutral', text:`Облако тонкое (${cloudThickness.toFixed(2)}%) — горизонты согласны, мало препятствий. Цена пройдёт быстро`});
+        } else if (cloudThickness > 2.5) {
+          items.push({type:'neutral', text:`Облако толстое (${cloudThickness.toFixed(2)}%) — горизонты расходятся сильно. Много уровней-"кладбища" внутри, возможны микро-остановки`});
+        } else {
+          items.push({type:'neutral', text:`Облако ${cloudThickness.toFixed(2)}% — умеренное`});
+        }
+
+        // ── 3. Tenkan как сердцебиение: стоит = нитка, двигается = выброс ─
+        // Tenkan предыдущего бара
+        if (n >= 10) {
+          const tk1h = Math.max(...highs.slice(n-10,n-1)), tk1l = Math.min(...lows.slice(n-10,n-1));
+          const tenkanPrev = (tk1h + tk1l) / 2;
+          const tkMove = Math.abs(tenkan - tenkanPrev) / lastClose * 100;
+          if (tkMove < 0.05) {
+            items.push({type:'neutral', text:`Tenkan стоит (${tkMove.toFixed(3)}% за 1 бар) — нет новых 9-барных экстремумов. Нитка: выброс начнётся когда Tenkan сдвинется`});
           } else {
-            items.push({type:'neutral', text:`Chikou находится среди свечей 26-барной давности — прошлое сопротивление/поддержка присутствует`});
+            const tkDir = tenkan > tenkanPrev ? 'вверх' : 'вниз';
+            items.push({type: tenkan>tenkanPrev?'bullish':'bearish', text:`Tenkan двинулся ${tkDir} (${tkMove.toFixed(3)}% за 1 бар) — новый 9-барный экстремум формируется. Агрессия выброса = ${tkMove>0.2?'высокая':'умеренная'}`});
           }
         }
+
+        // ── 4. Расстояние Tenkan-Kijun = нестабильность масштабов ─────────
+        if (tkDist < 0.1) {
+          items.push({type:'neutral', text:`Tenkan ≈ Kijun (${tkDist.toFixed(3)}%) — волатильность масштабов согласована. Стабильность. На нитке = нормально`});
+        } else if (tkDist > 1.5) {
+          items.push({type:'neutral', text:`Tenkan далеко от Kijun (${tkDist.toFixed(2)}%) — краткосрочная волатильность намного выше среднесрочной. Нестабильность`});
+        }
+
+        // ── 5. Kijun как якорь на откатах ────────────────────────────────
+        const kijunStr = Math.abs(kijunDev) > 2 ? 'натянута' : 'в норме';
+        items.push({type: Math.abs(kijunDev)>2?(kijunDev>0?'bullish':'bearish'):'neutral',
+          text:`Цена ${kijunDev>0?'+':''}${kijunDev.toFixed(2)}% от Kijun — резинка ${kijunStr}. ${Math.abs(kijunDev)>2?'На откате цена тянется к Kijun как якорю':''}`});
+
+        // ── 6. Сколько баров цена провела в облаке (подряд или за 26 баров) ─
+        if (n >= 30) {
+          let barsInCloud = 0;
+          for (let i = n-1; i >= n-26; i--) {
+            const cA = (Math.max(...highs.slice(Math.max(0,i-26),i)) + Math.min(...lows.slice(Math.max(0,i-26),i)))/2; // упрощение
+            if (closes[i] >= cloudBot*0.995 && closes[i] <= cloudTop*1.005) barsInCloud++;
+            else break;
+          }
+          if (barsInCloud >= 15) {
+            items.push({type:'neutral', text:`Цена в облаке уже ${barsInCloud} баров — длинная переформатировка. Выброс когда выйдет = будет очень сильным`});
+          } else if (barsInCloud >= 5) {
+            items.push({type:'neutral', text:`Цена в облаке ${barsInCloud} баров — борьба, может застрять ещё`});
+          } else if (barsInCloud === 1 && (aboveCloud || belowCloud)) {
+            items.push({type:'neutral', text:`Цена только что покинула облако — рикошет или начало нового движения. Смотри следующий бар`});
+          }
+        }
+
+        // ── 7. Senkou B: горизонтальна = "спит", движется = активный тренд ─
+        if (n >= 60) {
+          const sBprevH = Math.max(...highs.slice(n-58,n-6)), sBprevL = Math.min(...lows.slice(n-58,n-6));
+          const senkouBprev = (sBprevH + sBprevL) / 2;
+          const sBmove = Math.abs(senkouB - senkouBprev) / lastClose * 100;
+          if (sBmove < 0.1) items.push({type:'neutral', text:`Senkou B горизонтальна (${sBmove.toFixed(3)}%) — долгая стабильность, там скоплены стопы/заявки многих месяцев`});
+          else items.push({type:'neutral', text:`Senkou B движется (${sBmove.toFixed(2)}%) — долгий тренд, уровней консолидации нет, движение быстрее`});
+        }
+
+        // ── 8. Смена власти: пробой облака после долгого пребывания ─────
+        if (n >= 30) {
+          let barsOutside = 0, wasSide = null;
+          for (let i = n-2; i >= n-26; i--) {
+            if (closes[i] > cloudTop*1.002) { if(wasSide===null)wasSide='above'; if(wasSide==='above')barsOutside++; else break; }
+            else if (closes[i] < cloudBot*0.998) { if(wasSide===null)wasSide='below'; if(wasSide==='below')barsOutside++; else break; }
+            else break;
+          }
+          if (barsOutside >= 10 && inCloud) {
+            items.push({type:'neutral', text:`Цена ${barsOutside} баров была ${wasSide==='above'?'выше':'ниже'} облака и вошла в него — смена власти. Много ${wasSide==='above'?'лонгов':'шортов'} в убытке`});
+          }
+        }
+
+        // ── 9. Chikou Span: пространство ─────────────────────────────────
+        if (n >= 53) {
+          const chikouZone = candles.slice(n-29, n-23);
+          const chikouHigh = Math.max(...chikouZone.map(c=>c.high));
+          const chikouLow  = Math.min(...chikouZone.map(c=>c.low));
+          const gapUp   = lastClose > chikouHigh * 1.005;
+          const gapDown = lastClose < chikouLow  * 0.995;
+          if (gapUp) {
+            items.push({type:'bullish', text:`Chikou в пустоте выше уровней 26 баров назад — нет прошлого сопротивления. Цена летит в чистое небо`});
+          } else if (gapDown) {
+            items.push({type:'bearish', text:`Chikou ниже уровней 26 баров назад — нет прошлой поддержки. Зона ускорения вниз`});
+          } else {
+            const chikouDist = Math.min(
+              Math.abs(lastClose - chikouHigh)/lastClose*100,
+              Math.abs(lastClose - chikouLow)/lastClose*100
+            );
+            items.push({type:'neutral', text:`Chikou среди свечей 26-барной давности (${chikouDist.toFixed(2)}% до ближ. уровня) — прошлые уровни сопротивляются. Откат может быть глубоким`});
+          }
+        }
+
+        // ── 10. Геометрия: три события одновременно = точка выброса ──────
+        if (n >= 10) {
+          const tk1h = Math.max(...highs.slice(n-10,n-1)), tk1l = Math.min(...lows.slice(n-10,n-1));
+          const tenkanPrev = (tk1h + tk1l) / 2;
+          const tkMoving = Math.abs(tenkan - tenkanPrev) / lastClose * 100 > 0.05;
+          const cloudExpanding = cloudThickness > 0.3; // не сжато
+          const chikouFar = n>=53 && Math.abs(lastClose - (candles[n-27].high+candles[n-27].low)/2)/lastClose*100 > 1;
+          const eventsCount = [tkMoving, cloudExpanding, chikouFar].filter(Boolean).length;
+          if (eventsCount === 3) {
+            items.push({type: tenkan>tenkanPrev?'bullish':'bearish', text:`Три геометрических события: Tenkan двинулся + облако расширяется + Chikou чистая — выброс начался или вот-вот`});
+          }
+        }
+
         html += makeCard('Ichimoku (неклассически)', items, 'ichimoku');
       }
     } else if (idL.includes('alligator') || idL.includes('gator')) {
