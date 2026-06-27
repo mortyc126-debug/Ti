@@ -12848,7 +12848,7 @@ function renderAnalysis() {
         if(n>=per*2+5) {
           for(let t=per;t<=n;t++) {
             let pdmT=0,mdmT=0,atrT=0;
-            for(let i=t-per;i<t;i++) {
+            for(let i=t-per+1;i<t;i++) {
               const up=candles[i].high-candles[i-1].high, dn=candles[i-1].low-candles[i].low;
               pdmT+=(up>dn&&up>0)?up:0; mdmT+=(dn>up&&dn>0)?dn:0;
               atrT+=Math.max(candles[i].high,candles[i-1].close)-Math.min(candles[i].low,candles[i-1].close);
