@@ -12201,6 +12201,23 @@ function _renderAnalysisInner(panel) {
             else if (atrSpeed < 0.65) items.push({type:'neutral', text:`ATR упал в ${(1/atrSpeed).toFixed(1)}× за 5 баров — резкое успокоение, компрессия`});
           }
         }
+        // Блок «что делать» по ATR: ATR = измеритель риска, не направления
+        {
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const pDir = priceSlope > 1 ? 'bullish' : priceSlope < -1 ? 'bearish' : 'neutral';
+          const atrPct = atr / (last.close || 1) * 100;
+          const atrConf = atrPct < 0.8 ? 'strong' : atrPct > 3 ? 'weak' : 'moderate';
+          const tLong = atrPct > 3
+            ? `ATR=${atrPct.toFixed(1)}% — волатильность высокая. Уменьши размер позиции в лонге вдвое. Стоп минимум ${(atrPct*1.5).toFixed(1)}% от цены — иначе выбьет на первом же откате.`
+            : atrPct < 0.8
+            ? `ATR=${atrPct.toFixed(1)}% — рынок в спячке. Стоп можно ставить узко, но будь готов к резкому выбросу — тишина конечна. В лонге — низкий риск.`
+            : `ATR=${atrPct.toFixed(1)}%: нормальная волатильность. Стоп 1–1.5 ATR (${(atr*1.5/last.close*100).toFixed(1)}%) от входа.`;
+          const tShort = atrPct > 3
+            ? `ATR высокий: шорт с широким стопом (${(atrPct*1.5).toFixed(1)}% мин.). Без широкого стопа выбьет на откате вверх.`
+            : null;
+          _trade(pDir, atrConf, tLong, tShort).forEach(t => items.push(t));
+        }
         html += makeCard('ATR(14)', items, 'atr');
       }
     } else if (idL.includes('stoch')) {
@@ -13004,6 +13021,20 @@ function _renderAnalysisInner(panel) {
           }
         }
         if (!items.length) items.push({type:'neutral', text:`Keltner Channel активен`});
+        // Блок «что делать» по Keltner
+        if (ku && kd && km) {
+          const kPos = lastClose > ku ? 'bullish' : lastClose < kd ? 'bearish' : ((lastClose - kd) / (ku - kd) > 0.5 ? 'bullish' : 'bearish');
+          const bbSq = n >= 20 && (() => { const bbt=_chartCalcBB(closes,20,2); const bv=bbt[n-1]; return bv && bv.upper < ku && bv.lower > kd; })();
+          const kConf = bbSq ? 'weak' : (lastClose > ku || lastClose < kd) ? 'strong' : 'moderate';
+          const kLong = lastClose > ku
+            ? `Цена вышла выше канала Keltner — подтверждённый каскад. Держи лонг, стоп за EMA(20) (${km.toFixed(4)}). Не закрывай пока цена снова не войдёт в канал.`
+            : bbSq ? 'BB внутри Keltner — Squeeze. Ждать пробоя и входить по его направлению с узким стопом.'
+            : ((lastClose - kd) / (ku - kd) > 0.7) ? 'Цена у верхней границы Keltner — бычий контекст сохраняется. Держи лонг.' : null;
+          const kShort = lastClose < kd
+            ? `Цена ниже Keltner — подтверждённый нисходящий тренд. Держи шорт, стоп за EMA(20) (${km.toFixed(4)}).`
+            : ((lastClose - kd) / (ku - kd) < 0.3) ? 'Цена у нижней границы Keltner — медвежий контекст. Шорт осторожно.' : null;
+          _trade(kPos, kConf, kLong, kShort).forEach(t => items.push(t));
+        }
         html += makeCard('Keltner Channel (неклассически)', items, 'keltner');
       }
     } else if (idL.includes('vwap')) {
@@ -13023,6 +13054,19 @@ function _renderAnalysisInner(panel) {
           else items.push({type:'bearish', text:`Цена чуть ниже VWAP (${dev.toFixed(2)}%) — лёгкий медвежий контекст`});
           // Дискомфорт: большое отклонение = "резинка натянута"
           if (Math.abs(dev) > 3) items.push({type:'neutral', text:`Отклонение ${Math.abs(dev).toFixed(1)}% — "резинка натянута", высокая вероятность возврата к VWAP`});
+          // Блок «что делать» по VWAP
+          {
+            const vDir = Math.abs(dev) < 0.3 ? 'neutral' : dev > 0 ? 'bullish' : 'bearish';
+            const vConf = Math.abs(dev) > 3 ? 'weak' : Math.abs(dev) > 1.5 ? 'moderate' : 'moderate';
+            const vLong = dev > 3
+              ? `Цена на ${dev.toFixed(1)}% выше VWAP — лонги давно в прибыли, резинка натянута. Фиксируй часть позиции. Возврат к VWAP (${vwap.toFixed(4)}) вероятен.`
+              : dev < -1.5 ? `Цена ниже VWAP (${vwap.toFixed(4)}) — хорошая зона для входа в лонг с прицелом на возврат к балансу.`
+              : dev > 0 ? `Цена выше VWAP — лонг в контексте. Стоп под VWAP (${vwap.toFixed(4)}).` : null;
+            const vShort = dev < -3
+              ? `Цена на ${Math.abs(dev).toFixed(1)}% ниже VWAP — шорты давно в прибыли. Резинка натянута вниз, частичная фиксация разумна.`
+              : dev > 1.5 ? `Цена выше VWAP — продавцы считают текущий уровень дорогим. Шорт к VWAP (${vwap.toFixed(4)}).` : null;
+            _trade(vDir, vConf, vLong, vShort).forEach(t => items.push(t));
+          }
         }
         if (!items.length) items.push({type:'neutral', text:`VWAP активен`});
         html += makeCard('VWAP (неклассически)', items, 'vwap');
@@ -13196,6 +13240,19 @@ function _renderAnalysisInner(panel) {
         } else if (adLowerSum < 0 && Math.abs(adLowerSum) > adUpperSum*1.3) {
           items.push({type:'bearish', text:`A/D зона: деньги выходят в нижней половине диапазона — распределение у поддержки`});
         }
+        // Блок «что делать» по A/D
+        {
+          const adDir = priceUp && adUp ? 'bullish' : !priceUp && !adUp ? 'bearish'
+                      : priceUp && !adUp ? 'bearish' : 'bullish'; // дивергенции
+          const adConf = (priceUp !== adUp) ? 'weak' : 'moderate'; // дивергенция = низкая уверенность в текущем тренде
+          const adLong = priceUp && adUp ? 'A/D подтверждает рост — накопление реально. Держи лонг.'
+                       : !priceUp && adUp ? 'Скрытое накопление: A/D растёт при снижении цены. Это потенциальная точка входа в лонг — умные деньги покупают падение.'
+                       : 'A/D не подтверждает рост — рост на ненадёжной основе. Будь осторожен с увеличением лонга.';
+          const adShort = !priceUp && !adUp ? 'A/D подтверждает снижение — держи шорт, распределение реально.'
+                        : priceUp && !adUp ? 'Медвежья дивергенция A/D: рост без накопления. Потенциальная точка для осторожного шорта или фиксации лонга.'
+                        : null;
+          _trade(adDir, adConf, adLong, adShort).forEach(t => items.push(t));
+        }
         html += makeCard('A/D Line (неклассически)', items, 'ad');
       }
     } else if (idL.includes('chaikin_osc')) {
@@ -13225,6 +13282,17 @@ function _renderAnalysisInner(panel) {
           if (ratio > 1.5) items.push({type:'bullish', text:`Chaikin асимметрия ↑${maxPos.toFixed(0)} vs ↓${minNeg.toFixed(0)}: давление вверх скрытое. Больше денег входит чем выходит`});
           else if (ratio < 0.67) items.push({type:'bearish', text:`Chaikin асимметрия ↑${maxPos.toFixed(0)} vs ↓${minNeg.toFixed(0)}: давление вниз скрытое`});
           else items.push({type:'neutral', text:`Chaikin колеблется симметрично — денежный поток сбалансирован`});
+        }
+        // Блок «что делать» по Chaikin Oscillator
+        {
+          const chDir = last > 0 ? 'bullish' : 'bearish';
+          const chConf = (last>0&&prev<0)||(last<0&&prev>0) ? 'strong' : 'moderate';
+          const chLong = last > 0 && prev < 0 ? 'Chaikin пересёк ноль снизу — накопление берёт верх. Вход в лонг или добавление.'
+                       : last > 0 ? 'Chaikin выше нуля — накопление преобладает. Держи лонг, деньги входят.'
+                       : 'Chaikin отрицательный — не входить в лонг против потока денег.';
+          const chShort = last < 0 && prev > 0 ? 'Chaikin пересёк ноль сверху — распределение перевешивает. Потенциальная точка для шорта.'
+                        : last < 0 ? 'Chaikin ниже нуля — держи шорт, денежный поток против лонгов.' : null;
+          _trade(chDir, chConf, chLong, chShort).forEach(t => items.push(t));
         }
         html += makeCard('Chaikin Oscillator (неклассически)', items, 'chaikosc');
       }
@@ -13259,6 +13327,17 @@ function _renderAnalysisInner(panel) {
           const domZone=cmfUp>cmfDn?'верхней (↑выброс)':'нижней (↓выброс)';
           items.push({type:cmfUp>cmfDn?'bullish':'bearish', text:`CMF зоны: верх=${cmfUp.toFixed(2)} низ=${cmfDn.toFixed(2)} — деньги концентрируются в ${domZone} половине диапазона`});
         }
+        // Блок «что делать» по CMF
+        {
+          const cmfDir = cmfVal > 0.1 ? 'bullish' : cmfVal < -0.1 ? 'bearish' : 'neutral';
+          const cmfConf = Math.abs(cmfVal) > 0.25 ? 'strong' : Math.abs(cmfVal) > 0.1 ? 'moderate' : 'weak';
+          const cmfLong = cmfVal > 0.25 ? `CMF=${cmfVal.toFixed(2)}: сильное накопление — институционалы покупают. Держи лонг, деньги за тебя.`
+                        : cmfVal > 0 ? `CMF слабо положительный — накопление есть, но без агрессии. Лонг в контексте, но без большой уверенности.`
+                        : 'CMF отрицательный — не входить в лонг против денежного потока.';
+          const cmfShort = cmfVal < -0.25 ? `CMF=${cmfVal.toFixed(2)}: умные деньги выходят. Держи шорт — распределение реально.`
+                         : cmfVal < 0 ? 'CMF слабо отрицательный — осторожный шорт возможен, но без агрессии.' : null;
+          _trade(cmfDir, cmfConf, cmfLong, cmfShort).forEach(t => items.push(t));
+        }
         html += makeCard('CMF / Деньги Чайкина (неклассически)', items, 'cmf');
       }
     } else if (idL === 'accel_osc') {
@@ -13278,6 +13357,18 @@ function _renderAnalysisInner(panel) {
         else if (last>0&&prev>0&&prev2&&last>prev&&prev>prev2) items.push({type:'bullish', text:`AC выше нуля и ускоряется — три подряд растущих бара: нарастающий импульс`});
         else if (last<0&&prev<0&&prev2&&last<prev&&prev<prev2) items.push({type:'bearish', text:`AC ниже нуля и ускоряется вниз: усиление давления`});
         else items.push({type:last>0?'bullish':'bearish', text:`Acceleration Oscillator ${last>0?'положительный':'отрицательный'}: импульс ${last>prev?'набирает':'теряет'} силу`});
+        // Блок «что делать» по AC
+        if (last !== null) {
+          const acDir = last > 0 && last > prev ? 'bullish' : last < 0 && last < prev ? 'bearish' : last > 0 ? 'bullish' : 'bearish';
+          const acConf = (last>0&&prev<=0)||(last<0&&prev>=0) ? 'strong' : (last>0&&last>prev)||(last<0&&last<prev) ? 'moderate' : 'weak';
+          const acLong = last > 0 && last > prev && prev2 && prev > prev2 ? 'AC ускоряется выше нуля (три подряд бара) — максимальный бычий импульс. Держи лонг, добавление возможно.'
+                       : last > 0 && prev <= 0 ? 'AC только что пересёк ноль вверх — начало бычьего ускорения. Потенциальная точка входа в лонг.'
+                       : last > 0 ? 'AC положительный — ускорение бычье. Держи лонг или рассматривай вход.'
+                       : 'AC отрицательный — ускорение медвежье. Не входить в лонг.';
+          const acShort = last < 0 && last < prev ? 'AC ускоряется вниз — держи шорт, импульс нарастает.'
+                        : last < 0 && prev >= 0 ? 'AC пересёк ноль вниз — начало медвежьего ускорения, точка входа в шорт.' : null;
+          _trade(acDir, acConf, acLong, acShort).forEach(t => items.push(t));
+        }
         html += makeCard('AC Oscillator (неклассически)', items, 'ac');
       }
     } else if (idL === 'elder_ray') {
@@ -13309,6 +13400,19 @@ function _renderAnalysisInner(panel) {
         } else {
           items.push({type:'neutral', text:`Ray симметричен — полная неопределённость, боковик продолжится`});
         }
+        // Блок «что делать» по Elder Ray
+        {
+          const erDir = bull > 0 && bear > 0 ? 'bullish' : bull < 0 && bear < 0 ? 'bearish'
+                      : bull > 0 ? (bear > (lows[n-2]-ema13[n-2]) ? 'bullish' : 'neutral') : 'bearish';
+          const erConf = bull > 0 && bear > 0 ? 'strong' : bull < 0 && bear < 0 ? 'strong' : 'moderate';
+          const erLong = bull > 0 && bear > 0 ? 'Оба Power выше нуля — исключительная сила быков. Держи лонг, не ищи повод закрыть.'
+                       : bull > 0 && bear < 0 && bear > (lows[n-2]-ema13[n-2]) ? 'Bear Power растёт (слабость медведей убывает) — хорошая точка добавления в лонг с узким стопом.'
+                       : bull > 0 ? 'Bull Power положительный, медведи давят. Держи лонг, но стоп не далеко.'
+                       : 'Bull Power отрицательный — против тренда. Не входить в лонг.';
+          const erShort = bull < 0 && bear < 0 ? 'Оба Power отрицательны — сильный медвежий тренд. Держи шорт.'
+                        : bull < 0 ? 'Bull Power ниже нуля — быки слабы. Шорт в контексте.' : null;
+          _trade(erDir, erConf, erLong, erShort).forEach(t => items.push(t));
+        }
         html += makeCard('Elder Ray (неклассически)', items, 'elder_ray');
       }
     } else if (idL === 'force_idx') {
@@ -13323,6 +13427,19 @@ function _renderAnalysisInner(panel) {
         else if (fi2<0&&fi13>0) items.push({type:'bearish', text:`Force(2) отрицательный, Force(13) положительный — краткосрочное давление в растущем тренде: возможна коррекция`});
         else if (fi13>0) items.push({type:'bullish', text:`Force Index(13) > 0 — среднесрочный восходящий тренд подтверждается объёмом`});
         else items.push({type:'bearish', text:`Force Index(13) < 0 — среднесрочный нисходящий тренд подтверждается объёмом`});
+        // Блок «что делать» по Force Index
+        {
+          const fiDir = fi13 > 0 ? 'bullish' : 'bearish';
+          const fiConf = (fi2 > 0 && fi13 < 0) || (fi2 < 0 && fi13 > 0) ? 'weak' : 'moderate';
+          const fiLong = fi2 > 0 && fi13 < 0
+            ? 'Force(2)+ но Force(13)− — откат в нисходящем тренде. Можно взять лонг на откате, но это против среднесрочного тренда. Узкий стоп, маленький размер.'
+            : fi13 > 0 ? 'Force Index(13) положительный — тренд вверх подтверждён объёмом. Держи лонг, объём работает на тебя.'
+            : 'Force Index отрицательный — не входить в лонг против объёмного давления.';
+          const fiShort = fi2 < 0 && fi13 > 0
+            ? 'Force(2)− но Force(13)+ — краткосрочное давление в восходящем тренде. Можно взять шорт на откате, но против тренда. Осторожно.'
+            : fi13 < 0 ? 'Force Index(13) отрицательный — нисходящий тренд подтверждён объёмом. Держи шорт.' : null;
+          _trade(fiDir, fiConf, fiLong, fiShort).forEach(t => items.push(t));
+        }
         html += makeCard('Force Index (неклассически)', items, 'force_idx');
       }
     } else if (idL === 'elder_impulse') {
@@ -13350,6 +13467,17 @@ function _renderAnalysisInner(panel) {
           const stableGreen=lastHists.every(v=>v>0), stableRed=lastHists.every(v=>v<0);
           if (stableGreen&&emaDir>0) items.push({type:'bullish', text:`Все 8 баров MACD зелёный и EMA вверх — трёхслойное согласие. На нитке это максимум уверенности`});
           else if (stableRed&&emaDir<0) items.push({type:'bearish', text:`Все 8 баров MACD красный и EMA вниз — трёхслойное согласие медведей`});
+        }
+        // Блок «что делать» по Elder Impulse
+        {
+          const eiDir = emaDir > 0 && macdDir > 0 ? 'bullish' : emaDir < 0 && macdDir < 0 ? 'bearish' : 'neutral';
+          const eiConf = eiDir === 'neutral' ? 'weak' : 'strong';
+          const eiLong = emaDir > 0 && macdDir > 0 ? 'Зелёный бар — Элдер запрещает шортить, разрешает покупать. Держи лонг. При смене на синий или красный — пересматривай позицию.'
+                       : eiDir === 'neutral' ? 'Синий бар — разрешено в любую сторону. Без однозначного сигнала. Ждать согласия EMA и MACD перед крупным входом.'
+                       : 'Красный бар — Элдер запрещает покупать. Не входить в лонг.';
+          const eiShort = emaDir < 0 && macdDir < 0 ? 'Красный бар — Элдер запрещает покупать, разрешает шортить. Держи шорт, входи на откатах.'
+                        : eiDir === 'neutral' ? 'Синий бар — шорт возможен, но без уверенности в направлении.' : null;
+          _trade(eiDir, eiConf, eiLong, eiShort).forEach(t => items.push(t));
         }
         html += makeCard('Elder Impulse System (неклассически)', items, 'elder_imp');
       }
@@ -13465,6 +13593,29 @@ function _renderAnalysisInner(panel) {
         else if(fisher>0.5) items.push({type:'bullish', text:`Fisher = ${fisher.toFixed(2)} — цена в верхней части диапазона`});
         else if(fisher<-0.5) items.push({type:'bearish', text:`Fisher = ${fisher.toFixed(2)} — цена в нижней части диапазона`});
         else items.push({type:'neutral', text:`Fisher = ${fisher.toFixed(2)} — цена в середине диапазона`});
+        // Дополнительно: динамика Fisher
+        const slicePrev = candles.slice(Math.max(0,n-per*2), n-1);
+        if (slicePrev.length >= per) {
+          const hhP=Math.max(...slicePrev.map(c=>c.high)), llP=Math.min(...slicePrev.map(c=>c.low));
+          const prevVal = hhP>llP ? (closes[n-2]-llP)/(hhP-llP) : 0.5;
+          const prevCl = Math.min(0.999,Math.max(0.001,prevVal));
+          const prevFisher = 0.5*Math.log((1+prevCl)/(1-prevCl));
+          const fisherDir = fisher > prevFisher ? 'rising' : 'falling';
+          if (fisher > 1.5 && fisherDir === 'falling') items.push({type:'bearish', text:`Fisher разворачивается сверху — экстремум пройден, начинается фаза снижения`});
+          else if (fisher < -1.5 && fisherDir === 'rising') items.push({type:'bullish', text:`Fisher разворачивается снизу из экстремума — начинается фаза роста`});
+          else if (Math.abs(fisher) < 0.2 && Math.abs(prevFisher) > 1) items.push({type:'neutral', text:`Fisher вернулся к нулю — фаза завершена, рынок нейтрален`});
+        }
+        // Блок «что делать» по Fisher
+        {
+          const fDir = fisher > 2 ? 'bearish' : fisher < -2 ? 'bullish' : fisher > 0.5 ? 'bullish' : fisher < -0.5 ? 'bearish' : 'neutral';
+          const fConf = Math.abs(fisher) > 2 ? 'weak' : Math.abs(fisher) > 1 ? 'moderate' : 'weak';
+          const fLong = fisher < -2 ? `Fisher=${fisher.toFixed(2)}: экстремально перепродан — классически сильный сигнал разворота вверх. Это точка входа в лонг с узким стопом за недавний минимум.`
+                      : fisher > 2 ? 'Fisher в экстремальной перекупленности — не входить в лонг, текущий момент опасен. Жди разворота.'
+                      : fisher > 0.5 ? 'Fisher в верхней части диапазона — лонг в контексте, цена у хаёв последних периодов.' : null;
+          const fShort = fisher > 2 ? `Fisher=${fisher.toFixed(2)}: экстремально перекуплен — разворот вниз вероятен. Точка входа в шорт или фиксации лонга.`
+                       : fisher < -2 ? 'Fisher экстремально перепродан — не входить в шорт, момент неблагоприятен для продаж.' : null;
+          _trade(fDir, fConf, fLong, fShort).forEach(t => items.push(t));
+        }
         html += makeCard('Fisher Transform (неклассически)', items, 'fisher');
       }
     } else if (idL === 'pivot') {
@@ -13501,7 +13652,18 @@ function _renderAnalysisInner(panel) {
         else if (last > r1) items.push({type:'bullish', text:`Между R1 и R2 — сильный бычий день, мало продавцов`});
         else if (last < s2) items.push({type:'bearish', text:`Ниже S2 (${s2.toFixed(4)}) — исключительно слабый день`});
         else if (last < s1) items.push({type:'bearish', text:`Между S1 и S2 — сильный медвежий день`});
-
+        // Блок «что делать» по Pivot
+        {
+          const pvDir = abovePP ? 'bullish' : 'bearish';
+          const pvConf = last > r1 || last < s1 ? 'strong' : crossedPP ? 'moderate' : 'weak';
+          const pvLong = last > r1 ? `Цена выше R1 (${r1.toFixed(4)}) — сильный бычий день. Держи лонг, следующая цель R2 (${r2.toFixed(4)}).`
+                       : abovePP && !crossedPP ? `Цена выше пивота P=${pp.toFixed(4)} и удерживает позицию. Держи лонг, стоп под P.`
+                       : crossedPP && abovePP ? `Пробой пивота вверх — смена контроля к покупателям. Вход в лонг с узким стопом под P (${pp.toFixed(4)}).` : null;
+          const pvShort = last < s1 ? `Цена ниже S1 (${s1.toFixed(4)}) — сильный медвежий день. Держи шорт, цель S2 (${s2.toFixed(4)}).`
+                        : !abovePP && !crossedPP ? `Цена ниже пивота P=${pp.toFixed(4)}, продавцы в контроле. Шорт в контексте, стоп над P.`
+                        : crossedPP && !abovePP ? `Пробой пивота вниз — смена контроля к продавцам. Шорт с узким стопом над P (${pp.toFixed(4)}).` : null;
+          _trade(pvDir, pvConf, pvLong, pvShort).forEach(t => items.push(t));
+        }
         html += makeCard('Pivot Points (неклассически)', items, 'pivot');
       }
     } else if (idL === 'zigzag') {
@@ -13523,6 +13685,17 @@ function _renderAnalysisInner(panel) {
           else if(!hhUp&&!llUp) items.push({type:'bearish', text:`ZigZag: ниже максимумы И ниже минимумы — классический нисходящий тренд`});
           else if(hhUp&&!llUp) items.push({type:'neutral', text:`ZigZag: расходящиеся волны — расширение, неопределённость`});
           else items.push({type:'neutral', text:`ZigZag: сходящиеся волны — компрессия, рынок готовится к выбору`});
+          // Блок «что делать» по ZigZag
+          {
+            const zzDir = hhUp && llUp ? 'bullish' : !hhUp && !llUp ? 'bearish' : 'neutral';
+            const zzConf = (hhUp && llUp) || (!hhUp && !llUp) ? 'strong' : 'weak';
+            const zzLong = hhUp && llUp ? 'Структура бычья (HH+HL) — держи лонг. Классика Доу: входить на откатах к предыдущему максимуму, стоп под последним минимумом.'
+                         : hhUp && !llUp ? 'Расходящиеся волны вверх — неопределённость. Вход в лонг только при пробое нового максимума.'
+                         : 'Структура медвежья или сходящаяся — не входить в лонг без пробоя.';
+            const zzShort = !hhUp && !llUp ? 'Структура медвежья (LH+LL) — держи шорт. Входи на откатах к предыдущему минимуму, стоп над последним максимумом.'
+                          : !hhUp && llUp ? 'Сходящиеся волны — компрессия. Шорт после пробоя нового минимума.' : null;
+            _trade(zzDir, zzConf, zzLong, zzShort).forEach(t => items.push(t));
+          }
         } else {
           items.push({type:'neutral', text:`ZigZag: недостаточно волн для структурного анализа`});
         }
@@ -13546,6 +13719,28 @@ function _renderAnalysisInner(panel) {
         else if(last>0&&prev<0) items.push({type:'bullish', text:`TSI пересёк ноль вверх — смена моментума на бычий`});
         else if(last<0&&prev>0) items.push({type:'bearish', text:`TSI пересёк ноль вниз — смена моментума на медвежий`});
         else items.push({type:last>0?'bullish':'bearish', text:`TSI = ${last.toFixed(1)}: двойное сглаживание моментума ${last>0?'выше':'ниже'} нуля`});
+        // Дополнительная динамика TSI
+        if (tsArr.length >= 10) {
+          const tsi10ago = tsArr[tsArr.length-10];
+          const tsiSpeed = last - tsi10ago;
+          if (Math.abs(tsiSpeed) > 15) {
+            items.push({type: tsiSpeed > 0 ? 'bullish' : 'bearish', text:`TSI изменился на ${tsiSpeed.toFixed(1)} за 10 баров — ${Math.abs(tsiSpeed)>30?'резкое':'заметное'} изменение моментума. Дважды сглаженный сигнал, значит реальный`});
+          }
+          // TSI в экстремуме долго = сила тренда
+          const tsiExtreme = tsArr.slice(-15).every(v => v > 25) || tsArr.slice(-15).every(v => v < -25);
+          if (tsiExtreme) items.push({type: last > 0 ? 'bullish' : 'bearish', text:`TSI держится в экстремуме уже 15+ баров — сильный устойчивый тренд. Моментум не иссякает.`});
+        }
+        // Блок «что делать» по TSI
+        {
+          const tsiDir = last > 25 ? 'bullish' : last < -25 ? 'bearish' : last > 0 && prev < 0 ? 'bullish' : last < 0 && prev > 0 ? 'bearish' : last > 0 ? 'bullish' : 'bearish';
+          const tsiConf = Math.abs(last) > 25 ? 'strong' : (last>0&&prev<0)||(last<0&&prev>0) ? 'strong' : 'moderate';
+          const tsiLong = last > 25 ? `TSI=${last.toFixed(0)}: устойчивый бычий моментум. Держи лонг — дважды сглаженный индикатор медленно разворачивается, это значит тренд реальный.`
+                        : last > 0 && prev < 0 ? 'TSI пересёк ноль вверх — смена моментума на бычий. Потенциальная точка входа в лонг.'
+                        : last > 0 ? 'TSI положительный — лонг в контексте.' : 'TSI отрицательный — не входить в лонг.';
+          const tsiShort = last < -25 ? `TSI=${last.toFixed(0)}: устойчивый медвежий моментум. Держи шорт.`
+                         : last < 0 && prev > 0 ? 'TSI пересёк ноль вниз — смена моментума на медвежий. Потенциальная точка входа в шорт.' : null;
+          _trade(tsiDir, tsiConf, tsiLong, tsiShort).forEach(t => items.push(t));
+        }
         html += makeCard('TSI (неклассически)', items, 'tsi');
       }
     } else if (idL === 'ult_osc') {
@@ -13561,6 +13756,27 @@ function _renderAnalysisInner(panel) {
         else if(uo>55) items.push({type:'bullish', text:`UO = ${uo.toFixed(1)} — умеренно бычий: покупки преобладают по всем горизонтам`});
         else if(uo<45) items.push({type:'bearish', text:`UO = ${uo.toFixed(1)} — умеренно медвежий: продажи преобладают`});
         else items.push({type:'neutral', text:`UO = ${uo.toFixed(1)} — нейтрально, трёхкомпонентный осциллятор`});
+        // Неклассика UO: UO по трём горизонтам — какой таймфрейм даёт сигнал
+        {
+          const uo7 = 100*rawMid(7)/1, uo14 = 100*rawMid(14)/1, uo28 = 100*rawMid(28)/1;
+          // rawMid уже нормализован (0-1), поэтому не умножаем на 100 дважды
+          const raw7 = rawMid(7), raw14 = rawMid(14), raw28 = rawMid(28);
+          if (raw7 > 0.65 && raw14 < 0.45) items.push({type:'neutral', text:`UO: краткосрочный (7) перекуплен при нейтральном среднесрочном (14) — скорее откат, чем разворот`});
+          else if (raw28 > 0.6 && raw7 < 0.4) items.push({type:'bullish', text:`UO: долгосрочный (28) бычий при кратком (7) откате — коррекция в бычьем тренде, потенциальный вход`});
+          else if (raw28 < 0.4 && raw7 > 0.6) items.push({type:'bearish', text:`UO: краткий отскок (7) при медвежьем долгосрочном (28) — продавать отскок`});
+        }
+        // Блок «что делать» по UO
+        {
+          const uoDir = uo > 55 ? 'bullish' : uo < 45 ? 'bearish' : 'neutral';
+          const uoConf = uo > 70 || uo < 30 ? 'weak' : uo > 60 || uo < 40 ? 'moderate' : 'weak';
+          const uoLong = uo < 30 ? `UO=${uo.toFixed(0)}: перепроданность по трём горизонтам — один из сильнейших сигналов разворота. Входить в лонг, стоп за последний минимум.`
+                       : uo > 70 ? 'UO перекуплен — не входить в лонг. Возможна фиксация.'
+                       : uo > 55 ? 'UO умеренно бычий — держи лонг или осторожный вход.' : null;
+          const uoShort = uo > 70 ? `UO=${uo.toFixed(0)}: перекупленность по всем горизонтам — сигнал разворота вниз. Фиксируй лонг или осторожный шорт.`
+                        : uo < 30 ? 'UO перепродан — не входить в шорт. Покупатели у цели.'
+                        : uo < 45 ? 'UO умеренно медвежий — держи шорт.' : null;
+          _trade(uoDir, uoConf, uoLong, uoShort).forEach(t => items.push(t));
+        }
         html += makeCard('Ultimate Oscillator (неклассически)', items, 'uo');
       }
     } else if (idL === 'chop' || idL === 'frac_dim' || idL === 'efficiency_ratio' || idL === 'entropy') {
@@ -13642,6 +13858,19 @@ function _renderAnalysisInner(panel) {
           items.push({type:'neutral', text:`Калибровка тейков: FD≈${fd.toFixed(2)} — хаотичный режим, брать тейки раньше, движения быстро разворачиваются`});
         }
 
+        // Блок «что делать» по CHOP / режиму рынка
+        {
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const chopDir = chopNow < 38.2 ? (priceSlope > 0 ? 'bullish' : 'bearish') : 'neutral';
+          const chopConf = chopNow < 38.2 ? 'strong' : chopNow > 61.8 ? 'weak' : 'moderate';
+          const chopLong = chopNow < 38.2 && priceSlope > 0 ? 'Трендовый режим подтверждён, цена растёт — держи лонг. Трендовые индикаторы работают, тейки ставь широко.'
+                         : chopNow > 61.8 ? 'Хаотичный режим — не входить в лонг на пробое. Подождать пока CHOP не упадёт ниже 50.'
+                         : chopSpeed5 > 10 ? 'CHOP активно падает — режим меняется к трендовому. Можно начинать присматриваться к направленным входам.' : null;
+          const chopShort = chopNow < 38.2 && priceSlope < 0 ? 'Трендовый режим, цена падает — держи шорт. Тейки широко, стоп за структурный максимум.'
+                          : chopNow > 61.8 ? 'Хаотичный режим — не входить в шорт на пробое. Высокий шанс разворота.' : null;
+          _trade(chopDir, chopConf, chopLong, chopShort).forEach(t => items.push(t));
+        }
         const title = idL === 'chop' ? 'Choppiness Index (неклассически)' :
                       idL === 'frac_dim' ? 'Фрактальная размерность (неклассически)' :
                       idL === 'efficiency_ratio' ? 'Efficiency Ratio (неклассически)' : 'Энтропия (неклассически)';
@@ -13675,6 +13904,16 @@ function _renderAnalysisInner(panel) {
           const vDistPrev=Math.abs(vip2-vim2);
           if (vDist>vDistPrev+0.05) items.push({type:vip>vim?'bullish':'bearish', text:`Vortex расходится — опережающий сигнал. Волатильность уже идёт в ${vip>vim?'бычью':'медвежью'} сторону раньше чем цена показывает направление`});
         }
+        // Блок «что делать» по Vortex
+        {
+          const vtDir = vip > vim && vip > 1.1 ? 'bullish' : vim > vip && vim > 1.1 ? 'bearish' : 'neutral';
+          const vtConf = vDist > 0.3 ? 'strong' : vDist > 0.1 ? 'moderate' : 'weak';
+          const vtLong = vip > vim && vip > 1.1 ? `VI+=${vip.toFixed(2)} доминирует — бычье движение в силе. Держи лонг. Когда VI+ и VI− начнут сходиться — готовиться к выходу.`
+                       : vDist < 0.05 ? 'Vortex сходится — боковик. Не входить. Ждать расхождения линий как сигнал направления.' : null;
+          const vtShort = vim > vip && vim > 1.1 ? `VI−=${vim.toFixed(2)} доминирует — медвежье движение в силе. Держи шорт. Стоп за уровень где VI+ снова обгонит VI−.`
+                        : vDist < 0.05 ? 'Боковик по Vortex — не входить в шорт без сигнала.' : null;
+          _trade(vtDir, vtConf, vtLong, vtShort).forEach(t => items.push(t));
+        }
         html += makeCard('Vortex (неклассически)', items, 'vortex');
       }
     } else if (idL === 'bb_pct') {
@@ -13702,6 +13941,17 @@ function _renderAnalysisInner(panel) {
             const priceHi=Math.max(...closes.slice(-5))>Math.max(...closes.slice(-25,-5));
             const bbHi=bbHist[bbHist.length-1]>Math.max(...bbHist.slice(-20,-1))*0.95;
             if (priceHi && !bbHi) items.push({type:'bearish', text:`Цена новый хай — %B не дошёл до 1 (${pct.toFixed(2)}). Дивергенция: затухание импульса`});
+          }
+          // Блок «что делать» по BB %B
+          {
+            const bbpDir = pct > 1 ? 'bullish' : pct < 0 ? 'bearish' : pct > 0.5 ? 'bullish' : 'bearish';
+            const bbpConf = pct > 1 || pct < 0 ? 'strong' : Math.abs(pct - 0.5) > 0.3 ? 'moderate' : 'weak';
+            const bbpLong = pct > 1 ? '%B выше 1 — цена пробила верхнюю полосу BB. В тренде это норма и повод держать лонг. Если сразу вернулась под 1 — ложный пробой.'
+                          : pct < 0 ? '%B ниже 0 — классически перепродано. Хорошая точка входа в лонг с узким стопом.'
+                          : pct > 0.8 ? 'Цена у верхней полосы BB — держи лонг, импульс силён.' : null;
+            const bbpShort = pct < 0 ? '%B под нижней полосой — в тренде это зона добавления в шорт, не разворота. Ждать подтверждения.'
+                           : pct > 0.8 && (() => { const bh=bbHist; return bh.length>=5 && bh[bh.length-1]<bh[bh.length-3]; })() ? 'Дивергенция %B: цена у максимума, %B ниже прошлого. Осторожный шорт при снижении цены.' : null;
+            _trade(bbpDir, bbpConf, bbpLong, bbpShort).forEach(t => items.push(t));
           }
         }
         if(!items.length) items.push({type:'neutral',text:'BB %B активен'});
@@ -13736,6 +13986,19 @@ function _renderAnalysisInner(panel) {
         // Минимальная ширина как уровень: насколько далеко от исторического squeeze?
         if (wLen >= 50 && now/minW100 > 1.5) {
           items.push({type:'neutral', text:`Текущая ширина в ${(now/minW100).toFixed(1)}× выше исторического minimum (${minW100.toFixed(2)}%). Потенциал компрессии ещё есть`});
+        }
+        // Блок «что делать» по BB Width
+        {
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const bbwDir = wRank < 0.2 ? 'neutral' : priceSlope > 0 ? 'bullish' : 'bearish';
+          const bbwConf = wRank < 0.1 ? 'weak' : wRank > 0.85 ? 'weak' : 'moderate';
+          const bbwLong = wRank < 0.1 ? 'BB Width на историческом минимуме — максимальная компрессия (Squeeze). Следующий выброс будет сильным. Жди пробоя вверх и входи по нему.'
+                        : wRank > 0.85 && priceSlope > 0 ? 'BB Width максимальный — пик волатильности обычно совпадает с концом тренда. Если в лонге — рассмотри частичную фиксацию.'
+                        : priceSlope > 0 ? 'BB нормальной ширины при росте цены — держи лонг.' : null;
+          const bbwShort = wRank < 0.1 ? 'BB Squeeze: жди пробоя вниз для шорта, не входить до выбора направления.'
+                         : wRank > 0.85 && priceSlope < 0 ? 'BB Width максимальный при снижении — конец медвежьего выброса. Шорт опасен, скоро разворот.' : null;
+          _trade(bbwDir, bbwConf, bbwLong, bbwShort).forEach(t => items.push(t));
         }
         html += makeCard('BB Width (неклассически)', items, 'bbw');
       }
@@ -13774,6 +14037,17 @@ function _renderAnalysisInner(panel) {
         if (adxNow>adxPrev+5) items.push({type:'bullish', text:`ADX растёт (+${(adxNow-adxPrev).toFixed(0)} за 5 баров) — тренд усиливается, не ломайся`});
         else if (adxNow<adxPrev-5 && adxPrev>25) items.push({type:'bearish', text:`ADX падает с пика (−${(adxPrev-adxNow).toFixed(0)}) — тренд ломается, разворот готовится`});
         else if (adxNow<28 && adxNow>22) items.push({type:'neutral', text:`ADX застрял ~25 — рынок на грани тренд/флэт, неопределённость`});
+        // Блок «что делать» по DMI
+        {
+          const dmiDir = dip > dim ? 'bullish' : 'bearish';
+          const dmiConf = adxNow > 40 ? 'strong' : adxNow > 25 ? 'moderate' : 'weak';
+          const dmiLong = dip > dim && adxNow > 25 ? `+DI>${dim.toFixed(0)} — бычье движение при тренде ADX=${adxNow.toFixed(0)}. Держи лонг. Стоп ставь по структуре, не по ADX.`
+                        : dip > dim && adxNow <= 25 ? '+DI доминирует но ADX низкий — тренд слабый или начинающийся. Осторожный лонг небольшим размером.'
+                        : 'DMI медвежий — не входить в лонг против -DI.';
+          const dmiShort = dim > dip && adxNow > 25 ? `-DI>${dip.toFixed(0)} при тренде ADX=${adxNow.toFixed(0)}. Держи шорт — нисходящий тренд подтверждён.`
+                         : dim > dip && adxNow <= 25 ? '-DI доминирует но тренд слабый. Осторожный шорт.' : null;
+          _trade(dmiDir, dmiConf, dmiLong, dmiShort).forEach(t => items.push(t));
+        }
         html += makeCard('DMI / ADX (неклассически)', items, 'dmi');
       }
     } else if (idL.includes('hist_vol') || idL.includes('close2close') || idL.includes('ohlc_vol') || idL.includes('vix_like')) {
@@ -13821,6 +14095,19 @@ function _renderAnalysisInner(panel) {
           if (hv10 > hv50*1.5) items.push({type:'neutral', text:`HV(10) = ${hv10.toFixed(0)}% >> HV(50) = ${hv50.toFixed(0)}% — кратко-срочный взрыв на фоне нормальной долгосрочной. Локальное событие`});
           else if (hv10 < hv50*0.6) items.push({type:'neutral', text:`HV(10) = ${hv10.toFixed(0)}% << HV(50) = ${hv50.toFixed(0)}% — сжатие ниже долгосрочной нормы. Тихий омут`});
         }
+        // Блок «что делать» по HV
+        {
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const hvDir = hvRank < 0.1 ? 'neutral' : priceSlope > 0 ? 'bullish' : 'bearish';
+          const hvConf = hv20 > 60 ? 'weak' : hv20 < 15 ? 'moderate' : 'moderate';
+          const hvLong = hvRank < 0.1 ? `HV на историческом минимуме (${hv20.toFixed(0)}%) — рынок замер. Следующий выброс скорее всего сильный. Стоп можно ставить узко, позиция с умом.`
+                       : hv20 > 60 ? `HV=${hv20.toFixed(0)}%: экстремально высокая волатильность. Лонг только с очень широким стопом и малым размером. Либо вообще пропустить.`
+                       : priceSlope > 0 ? `HV=${hv20.toFixed(0)}% — нормальная волатильность. Держи лонг со стопом на уровне 1–2×ATR (≈${(hv20/Math.sqrt(252)).toFixed(1)}% в день).` : null;
+          const hvShort = hv20 > 60 ? 'Волатильность экстремальная — шорт опасен, будет жёсткий откат. Либо очень широкий стоп, либо пропустить.'
+                        : priceSlope < 0 ? `HV=${hv20.toFixed(0)}%. Держи шорт со стопом с учётом волатильности.` : null;
+          _trade(hvDir, hvConf, hvLong, hvShort).forEach(t => items.push(t));
+        }
         html += makeCard('Историческая волатильность (неклассически)', items, 'hv');
       }
     } else if (idL === 'cmo') {
@@ -13835,6 +14122,38 @@ function _renderAnalysisInner(panel) {
         else if(cmo<-50) items.push({type:'bearish', text:`CMO = ${cmo.toFixed(1)} — медвежья перепроданность`});
         else if(cmo>0) items.push({type:'bullish', text:`CMO = ${cmo.toFixed(1)}: слабый бычий моментум`});
         else items.push({type:'bearish', text:`CMO = ${cmo.toFixed(1)}: слабый медвежий моментум`});
+        // Неклассика CMO: динамика и что это значит
+        {
+          // Строим ряд CMO для динамики
+          const cmoHistory = [];
+          for (let ci = per; ci <= n; ci++) {
+            let cUp=0, cDn=0;
+            for (let j=ci-per; j<ci; j++) { const d=closes[j]-(j>0?closes[j-1]:closes[j]); if(d>0)cUp+=d; else cDn+=Math.abs(d); }
+            cmoHistory.push((cUp+cDn)>0?(cUp-cDn)/(cUp+cDn)*100:0);
+          }
+          const cmo5ago = cmoHistory.length >= 6 ? cmoHistory[cmoHistory.length-6] : cmo;
+          const cmoSpeed = cmo - cmo5ago;
+          if (Math.abs(cmoSpeed) > 20) {
+            items.push({type: cmoSpeed > 0 ? 'bullish' : 'bearish', text:`CMO изменился на ${cmoSpeed.toFixed(1)} за 5 баров — ${cmoSpeed > 0 ? 'резкое усиление бычьего моментума' : 'резкое ослабление моментума'}. CMO отражает чистое движение без сглаживания`});
+          }
+          if (cmo > 0 && cmo5ago < 0) items.push({type:'bullish', text:`CMO пересёк ноль вверх — смена моментума. Продавцы уступили покупателям за последние ${per} баров`});
+          else if (cmo < 0 && cmo5ago > 0) items.push({type:'bearish', text:`CMO пересёк ноль вниз — моментум развернулся в пользу продавцов`});
+          // Прилипание к экстремуму
+          if (cmoHistory.length >= 10 && cmoHistory.slice(-10).every(v => v > 50)) {
+            items.push({type:'bullish', text:`CMO держится выше 50 уже 10+ баров — устойчивый бычий моментум. В тренде это норма`});
+          }
+        }
+        // Блок «что делать» по CMO
+        {
+          const cmoDir = cmo > 50 ? 'bullish' : cmo < -50 ? 'bearish' : cmo > 0 ? 'bullish' : 'bearish';
+          const cmoConf = Math.abs(cmo) > 50 ? 'strong' : Math.abs(cmo) > 25 ? 'moderate' : 'weak';
+          const cmoLong = cmo > 50 ? `CMO=${cmo.toFixed(0)}: бычья перекупленность. В тренде остаётся здесь долго — держи лонг. Разворот только при смене ниже 0.`
+                        : cmo > 0 ? 'CMO положительный — бычий моментум. Держи лонг.'
+                        : 'CMO отрицательный — против моментума. Не входить в лонг.';
+          const cmoShort = cmo < -50 ? `CMO=${cmo.toFixed(0)}: медвежья перепроданность. В тренде держится — держи шорт.`
+                         : cmo < 0 ? 'CMO отрицательный — держи шорт.' : null;
+          _trade(cmoDir, cmoConf, cmoLong, cmoShort).forEach(t => items.push(t));
+        }
         html += makeCard('CMO / Моментум Чанде (неклассически)', items, 'cmo');
       }
     } else if (idL === 'eom') {
@@ -13863,6 +14182,23 @@ function _renderAnalysisInner(panel) {
         if (Math.abs(last)>0 && last<0) {
           const eomTrend=eomArr.slice(n-5).reduce((a,b)=>a+b,0)/5;
           if(eomTrend<-0.05) items.push({type:'bearish', text:`EOM падает несколько свечей — каскад требует всё больше объёма, теряет силу`});
+        }
+        // Дополнительная динамика EOM: ускорение/замедление
+        if (n >= 20) {
+          const eomRecent = eomArr.slice(n-7, n);
+          const eomPosCount = eomRecent.filter(v => v > 0).length;
+          const eomNegCount = eomRecent.filter(v => v < 0).length;
+          if (eomPosCount >= 6) items.push({type:'bullish', text:`EOM положительный 6 из 7 последних баров — систематическая лёгкость роста. Покупатели двигают цену без усилий`});
+          else if (eomNegCount >= 6) items.push({type:'bearish', text:`EOM отрицательный 6 из 7 последних баров — систематическое давление продаж`});
+        }
+        // Блок «что делать» по EOM
+        {
+          const eomDir = last > 0.05 ? 'bullish' : last < -0.05 ? 'bearish' : 'neutral';
+          const eomConf = Math.abs(last) > 0.1 ? 'moderate' : 'weak';
+          const eomLong = last > 0 ? 'EOM положительный — цена движется вверх с минимальными затратами объёма. Держи лонг: если объём возрастёт при EOM>0 = ускорение.'
+                        : 'EOM отрицательный — движение требует усилий или идёт вниз. Не входить в лонг.';
+          const eomShort = last < 0 ? 'EOM отрицательный — падение лёгкое, покупатели слабы. Держи шорт.' : null;
+          _trade(eomDir, eomConf, eomLong, eomShort).forEach(t => items.push(t));
         }
         html += makeCard('EOM / Лёгкость движения (неклассически)', items, 'eom');
       }
@@ -13893,6 +14229,17 @@ function _renderAnalysisInner(panel) {
           const nviRelPvi=(nviArr[n-1]/pviArr[n-1])/(nviArr[Math.max(0,n-50)]/pviArr[Math.max(0,n-50)]);
           if(Math.abs(nviRelPvi-1)>0.1) items.push({type:'neutral', text:`NVI/PVI асимметрия: ${(nviRelPvi>1)?'дни без объёма опережают':'дни с объёмом опережают'} — боковик неравномерный`});
         }
+        // Блок «что делать» по NVI
+        {
+          const nviDir = nviArr[n-1] > sma ? 'bullish' : 'bearish';
+          const nviConf = nviSlope > 0 && pviSlope > 0 ? 'strong' : nviSlope < 0 && pviSlope < 0 ? 'strong' : 'moderate';
+          const nviLong = nviArr[n-1] > sma && nviSlope > 0 ? 'NVI выше средней и растёт — умные деньги (тихие дни) покупают. Держи лонг с уверенностью.'
+                        : nviArr[n-1] > sma ? 'NVI выше средней — бычий фон. Держи лонг.'
+                        : 'NVI ниже средней — умные деньги не поддерживают рост. Осторожно с лонгом.';
+          const nviShort = nviArr[n-1] < sma && nviSlope < 0 ? 'NVI падает ниже средней — тихий выход умных денег. Держи шорт.'
+                         : null;
+          _trade(nviDir, nviConf, nviLong, nviShort).forEach(t => items.push(t));
+        }
         html += makeCard('NVI / Индекс отрицательного объёма', items, 'nvi');
       }
     } else if (idL === 'pvt') {
@@ -13916,6 +14263,18 @@ function _renderAnalysisInner(panel) {
           if (priceHi>prevHi && pvtHi<prevPvtHi*0.98) items.push({type:'bearish', text:`Цена новый хай — PVT нет. Денежный поток уже развернулся хотя цена ещё растёт. Один из сильнейших антисигналов`});
           else if (priceLo<prevLo && pvtLo>prevPvtLo*1.02) items.push({type:'bullish', text:`Цена новый лой — PVT нет. Денежный поток развернулся хотя цена ещё падает. Один из сильнейших антисигналов роста`});
         }
+        // Блок «что делать» по PVT
+        {
+          const pvtDir = priceUp && pvtNow > pvt20 ? 'bullish' : !priceUp && pvtNow < pvt20 ? 'bearish'
+                       : priceUp && pvtNow < pvt20 ? 'bearish' : 'bullish'; // дивергенция
+          const pvtConf = (priceUp && pvtNow > pvt20) || (!priceUp && pvtNow < pvt20) ? 'moderate' : 'weak';
+          const pvtLong2 = priceUp && pvtNow > pvt20 ? 'PVT подтверждает рост — объём работает на тебя. Держи лонг.'
+                         : !priceUp && pvtNow > pvt20 ? 'Скрытое накопление: PVT растёт при снижении цены — один из сильнейших сигналов. Рассматривай вход в лонг.'
+                         : 'PVT не подтверждает рост — рискованно добавлять в лонг.';
+          const pvtShort2 = !priceUp && pvtNow < pvt20 ? 'PVT подтверждает снижение. Держи шорт.'
+                          : priceUp && pvtNow < pvt20 ? 'Медвежья дивергенция PVT — денежный поток ушёл. Потенциал шорта.' : null;
+          _trade(pvtDir, pvtConf, pvtLong2, pvtShort2).forEach(t => items.push(t));
+        }
         html += makeCard('PVT / Тренд цена-объём (неклассически)', items, 'pvt');
       }
     } else if (idL === 'vo') {
@@ -13936,6 +14295,19 @@ function _renderAnalysisInner(panel) {
         if (voTrend>15) items.push({type:'neutral', text:`VO ускоряется резко (+${voTrend.toFixed(0)}% угол) — спринт объёма. Выброс будет резким`});
         else if (voTrend>5) items.push({type:'neutral', text:`VO растёт постепенно — марш объёма. Давление нарастает медленно, выброс подготовительный`});
         else if (voTrend<-10) items.push({type:'neutral', text:`VO замедляется — объёмный импульс затухает`});
+        // Блок «что делать» по Volume Oscillator
+        {
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const voDir = priceSlope > 0.5 ? 'bullish' : priceSlope < -0.5 ? 'bearish' : 'neutral';
+          const voConf = vo > 25 ? (priceSlope > 0 ? 'strong' : 'weak') : vo < -25 ? 'weak' : 'moderate';
+          const voLong = vo > 25 && priceSlope > 0 ? `VO +${vo.toFixed(0)}%: объёмный всплеск подтверждает рост. Держи лонг — деньги входят активно.`
+                       : vo < -25 ? 'VO отрицательный — объём иссяк. Рост на пустом объёме ненадёжен. Если в лонге — уменьши размер.'
+                       : priceSlope > 0 ? 'VO в норме при росте — нормальный контекст для лонга.' : null;
+          const voShort = vo > 25 && priceSlope < 0 ? `VO +${vo.toFixed(0)}% при падении цены — объём подтверждает снижение. Держи шорт.`
+                        : null;
+          _trade(voDir, voConf, voLong, voShort).forEach(t => items.push(t));
+        }
         html += makeCard('Volume Oscillator (неклассически)', items, 'volosc');
       }
     } else if (idL === 'vwma') {
@@ -13950,6 +14322,16 @@ function _renderAnalysisInner(panel) {
         if(Math.abs(dev)<0.5) items.push({type:'neutral', text:`Цена ≈ VWMA: объёмно-взвешенный центр прямо здесь`});
         else if(dev>0) items.push({type:'bullish', text:`Цена на ${dev.toFixed(1)}% выше VWMA — участники с большим объёмом в прибыли: поддержка сильная`});
         else items.push({type:'bearish', text:`Цена на ${Math.abs(dev).toFixed(1)}% ниже VWMA — давление продаж от крупных объёмов`});
+        // Блок «что делать» по VWMA
+        {
+          const vmDir = Math.abs(dev) < 0.5 ? 'neutral' : dev > 0 ? 'bullish' : 'bearish';
+          const vmConf = Math.abs(dev) > 2 ? 'strong' : Math.abs(dev) > 0.5 ? 'moderate' : 'weak';
+          const vmLong = dev > 2 ? `Цена в ${dev.toFixed(1)}% выше VWMA — поддержка объёмных участников сильная. Держи лонг. Возврат к VWMA (${vwmaVal.toFixed(4)}) = хорошая точка добавления.`
+                       : dev > 0 ? 'Цена выше VWMA — объёмные участники в прибыли. Держи лонг.' : null;
+          const vmShort = dev < -2 ? `Цена ниже VWMA на ${Math.abs(dev).toFixed(1)}% — держатели в убытке давят на продажу. Держи шорт.`
+                        : dev < 0 ? 'Цена ниже VWMA — медвежий контекст. Шорт в контексте.' : null;
+          _trade(vmDir, vmConf, vmLong, vmShort).forEach(t => items.push(t));
+        }
         html += makeCard('VWMA (неклассически)', items, 'vwma');
       }
     } else if (idL === 'fractals') {
@@ -13965,6 +14347,20 @@ function _renderAnalysisInner(panel) {
         else if(lastDn&&closes[n-1]<lastDn) items.push({type:'bearish', text:`Цена ниже последнего фрактального минимума (${lastDn.toFixed(2)}) — структурный прорыв вниз`});
         else { if(lastUp) items.push({type:'neutral', text:`Фрактальный максимум: ${lastUp.toFixed(2)} — цель для быков`}); if(lastDn) items.push({type:'neutral', text:`Фрактальный минимум: ${lastDn.toFixed(2)} — цель для медведей`}); }
         if(!items.length) items.push({type:'neutral', text:'Fractals: нет подтверждённых фракталов'});
+        // Блок «что делать» по Fractals
+        {
+          const priceAboveLastUp = lastUp && closes[n-1] > lastUp;
+          const priceBelowLastDn = lastDn && closes[n-1] < lastDn;
+          const frcDir = priceAboveLastUp ? 'bullish' : priceBelowLastDn ? 'bearish' : 'neutral';
+          const frcConf = priceAboveLastUp || priceBelowLastDn ? 'strong' : 'weak';
+          const frcLong = priceAboveLastUp
+            ? `Цена выше фрактального максимума (${lastUp.toFixed(4)}) — структурный пробой вверх. Держи лонг, стоп за предыдущий фрактальный минимум${lastDn ? ' (' + lastDn.toFixed(4) + ')' : ''}.`
+            : lastUp ? `Фрактальный максимум ${lastUp.toFixed(4)} — цель для быков. Лонг при закреплении выше него.` : null;
+          const frcShort = priceBelowLastDn
+            ? `Цена ниже фрактального минимума (${lastDn.toFixed(4)}) — структурный пробой вниз. Держи шорт, стоп за фрактальный максимум${lastUp ? ' (' + lastUp.toFixed(4) + ')' : ''}.`
+            : lastDn ? `Фрактальный минимум ${lastDn.toFixed(4)} — цель для медведей. Шорт при пробое вниз.` : null;
+          _trade(frcDir, frcConf, frcLong, frcShort).forEach(t => items.push(t));
+        }
         html += makeCard('Fractals Вильямса (неклассически)', items, 'fractals');
       }
     } else if (idL === 'mcginley') {
@@ -13985,6 +14381,17 @@ function _renderAnalysisInner(panel) {
         for(let i=Math.max(1,n-20);i<n;i++) if(mdArr[i]>mdArr[i-1]!==mdArr[i-1]>mdArr[i-2]) mcDirs++;
         if (mcDirs>=5) items.push({type:'neutral', text:`McGinley часто меняет направление (${mcDirs} раз/20 баров) — режим нестабилен, боковик`});
         else if (mcDirs<=1) items.push({type:dev>0?'bullish':'bearish', text:`McGinley стабильно ползёт в одну сторону (${mcDirs} разворотов/20 баров) — режим чистый, каскад ровный`});
+        // Блок «что делать» по McGinley
+        {
+          const mcDir = Math.abs(dev) < 0.3 ? 'neutral' : dev > 0 ? 'bullish' : 'bearish';
+          const mcConf = mcDirs <= 1 ? 'strong' : mcDirs >= 5 ? 'weak' : 'moderate';
+          const mcLong = dev > 0 && mcDirs <= 1 ? `Цена выше McGinley (${md.toFixed(4)}), режим стабильный. Держи лонг. McGinley быстро адаптируется к ценовому ускорению — если цена не отстаёт = тренд жив.`
+                       : dev > 0 ? 'Цена выше McGinley — держи лонг. Адаптивная MA в бычьем режиме.'
+                       : Math.abs(dev) < 0.3 ? 'Цена у McGinley — зона равновесия. Жди выхода для направленного входа.' : null;
+          const mcShort = dev < 0 && mcDirs <= 1 ? 'Цена ниже McGinley, режим стабильно медвежий. Держи шорт.'
+                        : dev < 0 ? 'Цена ниже McGinley — медвежий контекст.' : null;
+          _trade(mcDir, mcConf, mcLong, mcShort).forEach(t => items.push(t));
+        }
         html += makeCard('McGinley Dynamic (неклассически)', items, 'mcginley');
       }
     } else if (idL === 'std_dev') {
@@ -14011,6 +14418,19 @@ function _renderAnalysisInner(panel) {
           const sdJump = sd5ago>0 ? sdNow/sd5ago : 1;
           if (sdJump > 1.8) items.push({type:'neutral', text:`σ выросла в ${sdJump.toFixed(1)}× за 5 баров — резкий прыжок отклонения. Рынок вошёл в новую фазу`});
           else if (sdJump < 0.55) items.push({type:'neutral', text:`σ упала в ${(1/sdJump).toFixed(1)}× за 5 баров — быстрое успокоение. Компрессия началась`});
+        }
+        // Блок «что делать» по σ (StdDev)
+        {
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const sdDir = sdRatio < 0.4 ? 'neutral' : priceSlope > 0 ? 'bullish' : 'bearish';
+          const sdConf = sdRatio > 2 ? 'weak' : sdRatio < 0.4 ? 'weak' : 'moderate';
+          const sdLong = sdRatio < 0.4 ? `σ ниже нормы в ${(1/sdRatio).toFixed(1)}× — ненормальная тишина. Следующий выброс будет резким. Стоп можно поставить узко (${(sdNow*1.5).toFixed(1)}% мин.).`
+                       : sdRatio > 2 && priceSlope > 0 ? 'σ экстремально высокая: лонг с очень широким стопом или выйти. Пиковая волатильность часто совпадает с концом движения.'
+                       : priceSlope > 0 ? `σ нормальная (${sdNow.toFixed(1)}%). Держи лонг, стоп с учётом отклонения.` : null;
+          const sdShort = sdRatio < 0.4 ? 'σ на минимуме — не входить в шорт до выброса, неясно направление.'
+                        : priceSlope < 0 ? `σ = ${sdNow.toFixed(1)}%. Держи шорт.` : null;
+          _trade(sdDir, sdConf, sdLong, sdShort).forEach(t => items.push(t));
         }
         html += makeCard('Стандартное отклонение (неклассически)', items, 'stddev');
       }
@@ -14044,6 +14464,17 @@ function _renderAnalysisInner(panel) {
         }
         if(touchUpper>touchLower+2) items.push({type:'bullish', text:`Верхняя полоса касалась ${touchUpper}× vs нижняя ${touchLower}× за 30 баров — выброс вверх более вероятен`});
         else if(touchLower>touchUpper+2) items.push({type:'bearish', text:`Нижняя полоса касалась ${touchLower}× vs верхняя ${touchUpper}× — давление вниз`});
+        // Блок «что делать» по Envelopes
+        {
+          const envDir = last > upper ? 'bearish' : last < lower ? 'bullish' : last > ma ? 'bullish' : 'bearish';
+          const envConf = last > upper || last < lower ? 'weak' : last > ma ? 'moderate' : 'moderate';
+          const envLong = last < lower ? 'Цена ниже нижнего конверта — классически перепродана. Точка входа в лонг с коротким стопом.'
+                        : last > ma ? 'Цена выше MA конвертов — бычий контекст. Держи лонг.'
+                        : last > upper ? 'Цена выше верхнего конверта — в тренде нормально. Держи лонг, но это не точка добавления.' : null;
+          const envShort = last > upper ? 'Выше верхнего конверта — потенциальная зона фиксации лонга или осторожного шорта на разворот.'
+                         : last < ma ? 'Цена ниже MA конвертов — медвежий контекст.' : null;
+          _trade(envDir, envConf, envLong, envShort).forEach(t => items.push(t));
+        }
         html += makeCard('Envelopes (неклассически)', items, 'envelopes');
       }
     } else if (idL === 'dpo') {
@@ -14057,6 +14488,30 @@ function _renderAnalysisInner(panel) {
         const sma=sl.reduce((a,b)=>a+b,0)/sl.length;
         const dpo=closes[n-1]-sma;
         items.push({type:dpo>0?'bullish':'bearish', text:`DPO = ${dpo.toFixed(2)}: цена ${dpo>0?'выше':'ниже'} цикличного центра — деталь цикличного анализа без влияния долгосрочного тренда`});
+        // Неклассика DPO: динамика и цикличность
+        {
+          const dpoHistory = [];
+          for (let ci = per + shift; ci <= n; ci++) {
+            const idx2 = ci - 1 - shift;
+            const sl2 = closes.slice(Math.max(0, idx2-per+1), idx2+1);
+            const sma2 = sl2.reduce((a,b)=>a+b,0)/sl2.length;
+            dpoHistory.push(closes[ci-1] - sma2);
+          }
+          if (dpoHistory.length >= 5) {
+            const prevDpo = dpoHistory[dpoHistory.length-2];
+            if (dpo > 0 && prevDpo < 0) items.push({type:'bullish', text:'DPO пересёк ноль вверх — цена вошла в повышающую фазу цикла'});
+            else if (dpo < 0 && prevDpo > 0) items.push({type:'bearish', text:'DPO пересёк ноль вниз — цена в понижающей фазе цикла'});
+            const dpoSpeed = dpo - (dpoHistory.length >= 6 ? dpoHistory[dpoHistory.length-6] : dpo);
+            if (Math.abs(dpoSpeed) > Math.abs(dpo) * 0.5 && Math.abs(dpo) > 0.001) {
+              items.push({type: dpoSpeed > 0 ? 'bullish' : 'bearish', text:`DPO быстро меняется (${dpoSpeed.toFixed(4)} за 5 баров) — цикл ускоряется`});
+            }
+          }
+          // Блок «что делать»
+          const dpoDir = dpo > 0 ? 'bullish' : 'bearish';
+          const dpoLong = dpo > 0 ? 'DPO положительный — цена в повышающей цикличной фазе. Держи лонг с тейком к следующему циклическому пику.' : 'DPO отрицательный — понижающая фаза. Не входить в лонг.';
+          const dpoShort = dpo < 0 ? 'DPO отрицательный — держи шорт до следующего цикличного минимума.' : null;
+          _trade(dpoDir, 'weak', dpoLong, dpoShort).forEach(t => items.push(t));
+        }
         html += makeCard('DPO / Деттрендовый осциллятор (неклассически)', items, 'dpo');
       }
     } else if (idL === 'chaikin_vol') {
@@ -14091,6 +14546,19 @@ function _renderAnalysisInner(panel) {
           else if (chg < -10 && volRatio > 1.3) items.push({type:'neutral', text:`Диапазон сжался, но объём растёт (×${volRatio.toFixed(2)}). Тихое накопление на сжатии — сильный сигнал`});
         }
         if(!items.length) items.push({type:'neutral',text:'Chaikin Volatility активен'});
+        // Блок «что делать» по Chaikin Volatility
+        if (now && prev10) {
+          const chgV = (now-prev10)/prev10*100;
+          const n2 = closes.length;
+          const priceSlope = n2 >= 6 ? (closes[n2-1] - closes[n2-6]) / closes[n2-6] * 100 : 0;
+          const cvDir = priceSlope > 0 ? 'bullish' : 'bearish';
+          const cvConf = Math.abs(chgV) > 20 ? 'weak' : 'moderate';
+          const cvLong = chgV > 20 && priceSlope > 0 ? 'Диапазон расширяется при росте цены — волатильность здоровая. Держи лонг, каскад активен.'
+                       : chgV < -20 ? 'Диапазон сжимается — компрессия. Ожидай резкий выброс. Пока ждать, не входить.'
+                       : priceSlope > 0 ? 'Chaikin Volatility нормальная. Держи лонг.' : null;
+          const cvShort = chgV > 20 && priceSlope < 0 ? 'Диапазон расширяется при снижении — подтверждённый медвежий каскад. Держи шорт.' : null;
+          _trade(cvDir, cvConf, cvLong, cvShort).forEach(t => items.push(t));
+        }
         html += makeCard('Chaikin Volatility (неклассически)', items, 'chaikvol');
       }
     } else if (idL === 'cum_delta' || idL.includes('cumulative') || idL.includes('cum_d')) {
@@ -14128,6 +14596,19 @@ function _renderAnalysisInner(panel) {
         if (Math.abs(recentDelta) > Math.abs(prevDelta) * 2 && Math.sign(recentDelta) !== Math.sign(prevDelta)) {
           items.push({type:'neutral', text:`Резкое ускорение и смена направления дельты — возможная смена режима`});
         }
+        // Блок «что делать» по Cumulative Delta
+        {
+          const cdPUp = closes[n-1] > closes[n-20];
+          const cdDUp = cd[n-1] > cd[n-20];
+          const cdDir = cdPUp && cdDUp ? 'bullish' : !cdPUp && !cdDUp ? 'bearish' : cdPUp && !cdDUp ? 'bearish' : 'bullish';
+          const cdConf = (cdPUp !== cdDUp) ? 'weak' : 'moderate';
+          const cdLong = cdPUp && cdDUp ? 'Покупатели агрессивнее продавцов, и цена это подтверждает. Держи лонг — Delta работает на тебя.'
+                       : !cdPUp && cdDUp ? 'Скрытое накопление: Delta растёт при снижении цены. Рассматривай вход в лонг — умные деньги покупают.'
+                       : 'Delta не подтверждает рост. Лонг рискован — покупки неагрессивны.';
+          const cdShort = !cdPUp && !cdDUp ? 'Продавцы агрессивнее. Держи шорт — Delta подтверждает.'
+                        : cdPUp && !cdDUp ? 'Медвежья дивергенция Delta: рост без агрессивных покупок. Потенциальная точка шорта.' : null;
+          _trade(cdDir, cdConf, cdLong, cdShort).forEach(t => items.push(t));
+        }
         html += makeCard('Cumulative Delta (неклассически)', items, 'cum_delta');
       }
     } else if (idL === 'cyber_cycle' || idL.includes('cybercycle') || idL.includes('cyber')) {
@@ -14164,6 +14645,17 @@ function _renderAnalysisInner(panel) {
           if (avgCycle < 10) items.push({type:'neutral', text:`Доминирующий цикл ~${avgCycle.toFixed(0)} свечей — короткий: нервный рынок, тейки брать раньше`});
           else if (avgCycle > 30) items.push({type:'neutral', text:`Доминирующий цикл ~${avgCycle.toFixed(0)} свечей — длинный: движения медленные но масштабные, тейки дальше`});
           else items.push({type:'neutral', text:`Доминирующий цикл ~${avgCycle.toFixed(0)} свечей — стандартный`});
+        }
+        // Блок «что делать» по Cyber Cycle
+        {
+          const ccDir = atBottom ? 'bullish' : atTop ? 'bearish' : last < 0 ? 'bearish' : 'bullish';
+          const ccConf = atBottom || atTop ? 'strong' : amplitude > 0.7 ? 'moderate' : 'weak';
+          const ccLong = atBottom ? 'Cyber Cycle на дне цикла — максимальная вероятность разворота вверх. Точка входа в лонг с узким стопом.'
+                       : last < 0 && last > (cc[n-3]||last) ? 'CC разворачивается из нижней полуволны. Входить в лонг осторожно — начало фазы роста.'
+                       : 'CC в верхней полуволне — лонг в рамках цикла.' ;
+          const ccShort = atTop ? 'Cyber Cycle на вершине цикла — вероятен разворот вниз. Фиксируй лонг или осторожный шорт.'
+                        : last > 0 && last < (cc[n-3]||last) ? 'CC разворачивается сверху — начало медвежьей фазы цикла.' : null;
+          _trade(ccDir, ccConf, ccLong, ccShort).forEach(t => items.push(t));
         }
         html += makeCard('Cyber Cycle Элерса (неклассически)', items, 'cyber_cyc');
       }
@@ -14216,6 +14708,17 @@ function _renderAnalysisInner(panel) {
         }
         if (spPct > 70) items.push({type:'neutral', text:`Расхождение MAMA/FAMA на исторически высоком уровне (${spPct.toFixed(0)}% от макс.) — тренд перегрет, сворачивается`});
         items.push({type:'neutral', text:`Рыночный режим Элерса: ${Math.abs(sp)<maxSp*0.1?'цикличный (боковик/накопление)':'трендовый (направленное движение)'}`});
+        // Блок «что делать» по MAMA/FAMA
+        {
+          const mamaDir = Math.abs(sp) < maxSp * 0.05 ? 'neutral' : sp > 0 ? 'bullish' : 'bearish';
+          const mamaConf = spPct > 70 ? 'weak' : sp > 0 && Math.abs(sp) > maxSp*0.05 ? 'moderate' : 'weak';
+          const mamaLong = sp > 0 && spPct > 70 ? 'MAMA/FAMA в перегреве — тренд может заканчиваться. Не добавлять в лонг, готовь выход.'
+                         : sp > 0 && Math.abs(sp) > maxSp*0.05 ? 'MAMA выше FAMA — трендовый режим вверх. Держи лонг. Выходи когда MAMA вернётся к FAMA.'
+                         : Math.abs(sp) < maxSp*0.05 ? 'MAMA ≈ FAMA — цикличный режим (боковик). Не входить в направленные сделки, работай от уровней.' : null;
+          const mamaShort = sp < 0 && Math.abs(sp) > maxSp*0.05 ? 'MAMA ниже FAMA — трендовый режим вниз. Держи шорт.'
+                          : null;
+          _trade(mamaDir, mamaConf, mamaLong, mamaShort).forEach(t => items.push(t));
+        }
         html += makeCard('MAMA / FAMA Элерса (неклассически)', items, 'mama');
       }
     } else if (idL === 'kvo') {
@@ -14303,6 +14806,18 @@ function _renderAnalysisInner(panel) {
           items.push({type:'bearish', text:`Боковик при отрицательном растущем по модулю KVO — скрытое распределение под боковым движением`});
         }
 
+        // Блок «что делать» по KVO
+        {
+          const kvoDir2 = now > 0 && now > sigNow ? 'bullish' : now < 0 && now < sigNow ? 'bearish' : now > 0 ? 'bullish' : 'bearish';
+          const kvoConf2 = crossedUp || crossedDown ? 'strong' : relAmp > 2 ? 'strong' : relAmp > 1.3 ? 'moderate' : 'weak';
+          const kvoLong2 = crossedUp ? 'KVO пересёк ноль снизу — деньги переключились в накопление. Точка входа в лонг.'
+                         : now > 0 && now > sigNow && !priceUp5 ? 'KVO положительный при откате цены — поглощение продолжается. Откат в рамках каскада вверх. Держи лонг.'
+                         : now > 0 && now > sigNow ? 'KVO и Signal положительны — держи лонг, деньги входят агрессивно.'
+                         : 'KVO отрицательный — против денежного потока. Не входить в лонг.';
+          const kvoShort2 = crossedDown ? 'KVO пересёк ноль сверху — деньги вышли. Точка входа в шорт.'
+                           : now < 0 && now < sigNow ? 'KVO и Signal отрицательны — держи шорт, распределение продолжается.' : null;
+          _trade(kvoDir2, kvoConf2, kvoLong2, kvoShort2).forEach(t => items.push(t));
+        }
         // --- 7. Расширение KVO/Signal = момент выброса ---
         const spread = now - sigNow;
         const spread5 = prev5 - sig[n-6];
@@ -14404,7 +14919,18 @@ function _renderAnalysisInner(panel) {
 
         // 6. Доминирующий период — контекст для тейков
         items.push({type:'neutral', text:`Доминирующий цикл ~${per} свечей. ${per<12?'Короткий цикл — фиксировать раньше':per>25?'Длинный цикл — держать дольше, движение масштабнее':'Стандартная длина цикла'}`});
-
+        // Блок «что делать» по EBS
+        {
+          const ebsD = ebs < -0.8 ? 'bullish' : ebs > 0.8 ? 'bearish' : ebs < 0 && ebs > ebs1 ? 'bullish' : ebs > 0 && ebs < ebs1 ? 'bearish' : ebs < 0 ? 'bearish' : 'bullish';
+          const ebsC = (ebs < -0.8 || ebs > 0.8) ? 'strong' : amplitude > 0.7 ? 'moderate' : 'weak';
+          const ebsL = ebs < -0.8 ? `EBS на дне цикла (${ebs.toFixed(2)}) — максимальная вероятность разворота вверх. Точка входа в лонг с узким стопом под минимумом.`
+                     : ebs < 0 && ebs > ebs1 ? 'EBS разворачивается из нижней фазы — начало роста. Осторожный вход в лонг.'
+                     : ebs > 0.8 ? 'EBS на пике — не входить в лонг, вероятен разворот вниз.'
+                     : 'EBS в верхней фазе цикла — держи лонг пока EBS растёт.';
+          const ebsS = ebs > 0.8 ? `EBS на пике (${ebs.toFixed(2)}) — максимальная вероятность разворота вниз. Фиксируй лонг или осторожный шорт.`
+                     : ebs > 0 && ebs < ebs1 ? 'EBS разворачивается из верхней фазы — начало снижения. Осторожный шорт.' : null;
+          _trade(ebsD, ebsC, ebsL, ebsS).forEach(t => items.push(t));
+        }
         html += makeCard('Even Better Sinewave (неклассически)', items, 'ebs');
       }
     } else if (idL === 'tmf') {
@@ -14484,7 +15010,17 @@ function _renderAnalysisInner(panel) {
         } else if (priceRange20 < 2 && prev5 > 0.05 && now < 0) {
           items.push({type:'bearish', text:`TMF перешёл ниже нуля при боковой цене — поглощающая сторона переключилась или исчерпала спрос`});
         }
-
+        // Блок «что делать» по TMF
+        {
+          const tmfD = now > 0.7 ? 'bearish' : now < -0.7 ? 'bullish' : now > 0 ? 'bullish' : 'bearish';
+          const tmfC = Math.abs(now) > 0.7 ? 'weak' : Math.abs(now) > 0.3 ? 'strong' : 'moderate';
+          const tmfL = now < -0.7 ? `TMF=${now.toFixed(2)}: насыщение продаж. Все деньги вышли — потенциальный разворот вверх. Точка входа в лонг с узким стопом.`
+                     : now > 0.7 ? 'TMF перекуплен — не входить в лонг. Деньги перестают входить, разворот близко.'
+                     : now > 0 ? 'TMF положительный — деньги входят. Держи лонг.' : 'TMF отрицательный — не входить в лонг.';
+          const tmfS = now > 0.7 ? `TMF=${now.toFixed(2)}: насыщение покупок. Все кто хотел — уже вошли. Фиксируй лонг или осторожный шорт.`
+                     : now < 0 ? 'TMF отрицательный — деньги выходят. Держи шорт.' : null;
+          _trade(tmfD, tmfC, tmfL, tmfS).forEach(t => items.push(t));
+        }
         html += makeCard('Twiggs Money Flow (неклассически)', items, 'tmf');
       }
     } else if (idL === 'pvi') {
@@ -14509,6 +15045,16 @@ function _renderAnalysisInner(panel) {
         if (pviSlope>0&&nviSlope<0) items.push({type:'neutral', text:`PVI↑ NVI↓ — объём входит в дни роста, в дни падения всё тихо. Слабый тренд без подтверждения`});
         else if (pviSlope<0&&nviSlope>0) items.push({type:'bearish', text:`PVI↓ NVI↑ — дни падения на объёме, дни роста на воздухе. Разворот готовится`});
         else if (pviSlope>0&&nviSlope>0) items.push({type:'bullish', text:`PVI и NVI оба растут — движение согласованное в обе стороны`});
+        // Блок «что делать» по PVI
+        {
+          const pviAboveSma = pviArr[n-1] > sma;
+          const pviD = pviAboveSma ? 'bullish' : 'bearish';
+          const pviC = pviSlope > 0 && nviSlope > 0 ? 'strong' : 'moderate';
+          const pviL = pviAboveSma && pviSlope > 0 ? 'PVI выше средней и растёт — дни с высоким объёмом бычьи. Держи лонг — толпа покупает.'
+                     : !pviAboveSma && pviSlope < 0 ? 'PVI ниже средней — высокий объём идёт в продажу. Не входить в лонг.' : null;
+          const pviS = !pviAboveSma && pviSlope < 0 && nviSlope < 0 ? 'PVI и NVI оба падают — согласованное давление. Держи шорт.' : null;
+          _trade(pviD, pviC, pviL, pviS).forEach(t => items.push(t));
+        }
         html += makeCard('PVI / Индекс положительного объёма (неклассически)', items, 'pvi');
       }
     } else if (idL.includes('atr_stop') || idL.includes('atr_ch') || idL.includes('atr_w')) {
