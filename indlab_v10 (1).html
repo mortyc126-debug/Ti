@@ -7073,6 +7073,17 @@ function _sysRenderStaticSections() {
       {label:'Рейтинг: что информативнее', lc:IND, text:'1. CMF — где деньги (самый информативный) · 2. A/D — честнее OBV, видит зону · 3. Chaikin Osc — тренд денежного потока · 4. EOM — эффективность, фильтр ложных · 5. NVI/PVI — асимметрия боковика. OBV + Klinger + Force Index закрывают картину.'},
     ]),
 
+    sec('📈', 'Трендовые инструменты · Комбо', [
+      {label:'Особенность всех трендовых', lc:'#6F648F', text:'Все запаздывают на начало тренда, но опережают на конец. SAR/SuperTrend/DMI видят когда тренд ломается раньше чем цена показывает разворот. Главное применение — не ловить вход, а видеть когда тренд заканчивается.'},
+      {label:'Четырёхслойное подтверждение (каскад)', lc:NC, text:'1. SuperTrend — цена выше/ниже, ширина растёт · 2. DMI — ADX растёт, DI чистый · 3. Vortex — VI+ и VI− максимально разошлись · 4. Elder Impulse — один цвет, стабилен. Все четыре согласны = тренд здоров, держи позицию.'},
+      {label:'Разворотный триплет (антисигнал)', lc:NC, text:'1. SAR начал быстро приближаться к цене · 2. ADX упал с пика · 3. Vortex линии начали сходиться. Три независимых = разворот готовится, готовься к выходу.'},
+      {label:'Структурный анализ боковика', lc:NC, text:'1. Elder Ray — быки vs медведи: кто уже сильнее? · 2. DI+ vs DI− — какое направление давит? · 3. Vortex куда расходится — волатильность куда идёт? · 4. Envelopes — верхняя или нижняя активнее? Все четыре в одну сторону = туда выброс.'},
+      {label:'Фаза тренда (SAR + McGinley)', lc:NC, text:'SAR близко + McGinley быстро адаптирует = тренд рассыпается (конец phase 3). SAR далеко + McGinley стабильно ползёт = тренд здоров (phase 3 середина). SAR далеко + McGinley только развернулась = тренд начался (phase 2→3). Видит какая фаза Wyckoff сейчас.'},
+      {label:'Волатильность тренда (Envelopes+ST+DMI)', lc:NC, text:'Envelopes расширяются + SuperTrend отдаляется + ADX растёт — все три = каскад набирает силу. Если какой-то остановился = каскад на финише.'},
+      {label:'Согласие всех восьми', lc:NC, text:'SAR не переключается + SuperTrend широкий + Elder Impulse один цвет + Elder Ray максимальная асимметрия + Vortex в экстремуме расхождения + ADX в пике + McGinley стабильна + Envelopes максимальные. Все восемь в одну сторону на нитке = выброс 100%.'},
+      {label:'Оптимальный набор', lc:IND, text:'1. DMI (ADX) — есть ли вообще тренд (фильтр) · 2. SuperTrend — динамичный стоп · 3. Vortex — опережающий разворот · 4. Envelopes — волатильность в тренде. Остальные на подтверждение.'},
+    ]),
+
   ].join('');
 }
 
@@ -10822,6 +10833,19 @@ function renderAnalysis() {
           else items.push({type:'neutral', text:`Bull Power +${bull.toFixed(2)}, Bear Power ${bear.toFixed(2)} — тренд вверх, но медведи ещё давят`});
         } else if (bull < 0 && bear < 0) items.push({type:'bearish', text:`Оба Power ниже нуля — цена ниже EMA13, сильное медвежье давление`});
         else items.push({type:'bearish', text:`Bull Power ${bull.toFixed(2)}, медведи слабые`});
+        // Неклассика: абсолютные значения Ray как измеритель усилия + асимметрия
+        const priceRef = closes[n-1] || 1;
+        const bullAbs=bull/priceRef*100, bearAbs=Math.abs(bear)/priceRef*100;
+        if (bullAbs>1.5) items.push({type:'bullish', text:`Bull Power высокий (+${bullAbs.toFixed(1)}% от EMA) — быки агрессивны, верхние тени большие, попытки прорыва есть`});
+        else if (bullAbs<0.3 && bull>0) items.push({type:'neutral', text:`Bull Power низкий (+${bullAbs.toFixed(1)}%) — быки слабые, верхние тени маленькие`});
+        if (bearAbs>1.5) items.push({type:'bearish', text:`Bear Power высокий (${bearAbs.toFixed(1)}% от EMA) — медведи агрессивны, нижние тени большие`});
+        // Асимметрия в боковике
+        if (Math.abs(bullAbs-bearAbs)>0.5) {
+          const stronger=bullAbs>bearAbs?'быки':'медведи';
+          items.push({type:bullAbs>bearAbs?'bullish':'bearish', text:`Асимметрия Ray: ${stronger} сильнее прямо сейчас (${bullAbs.toFixed(1)}% vs ${bearAbs.toFixed(1)}%) — выброс вероятно туда`});
+        } else {
+          items.push({type:'neutral', text:`Ray симметричен — полная неопределённость, боковик продолжится`});
+        }
         html += makeCard('Elder Ray (неклассически)', items, 'elder_ray');
       }
     } else if (idL === 'force_idx') {
@@ -10850,6 +10874,20 @@ function renderAnalysis() {
         if (emaDir>0&&macdDir>0) items.push({type:'bullish', text:`Импульс Элдера: EMA13 ↑ + MACD-гист ↑ — зелёный бар. Запрещено шортить, разрешено покупать`});
         else if (emaDir<0&&macdDir<0) items.push({type:'bearish', text:`Импульс Элдера: EMA13 ↓ + MACD-гист ↓ — красный бар. Запрещено покупать, разрешено шортить`});
         else items.push({type:'neutral', text:`Импульс Элдера: нет синхронизации EMA/MACD — синий бар. Можно торговать в любую сторону`});
+        // Неклассика: цвет раньше сигнала — кто переключился первым
+        if (hist && hist[n-1]!==null && hist[n-2]!==null) {
+          const macdSwitched = (hist[n-1]>0) !== (hist[n-2]>0);
+          const emaSwitched = emaDir !== ((ema13[n-2]||0)>(ema13[n-3]||0)?1:-1);
+          if (macdSwitched && !emaSwitched && emaDir>0) items.push({type:'bearish', text:`MACD только что переключился в красный, EMA13 ещё вверх — опережающий антисигнал MACD. Разворот готовится`});
+          else if (macdSwitched && !emaSwitched && emaDir<0) items.push({type:'bullish', text:`MACD только что переключился в зелёный, EMA13 ещё вниз — опережающий сигнал MACD. Ждать согласия EMA`});
+        }
+        // Стабильность = согласие структуры
+        if (n>=8) {
+          const lastHists=(hist||[]).slice(-8).filter(v=>v!==null);
+          const stableGreen=lastHists.every(v=>v>0), stableRed=lastHists.every(v=>v<0);
+          if (stableGreen&&emaDir>0) items.push({type:'bullish', text:`Все 8 баров MACD зелёный и EMA вверх — трёхслойное согласие. На нитке это максимум уверенности`});
+          else if (stableRed&&emaDir<0) items.push({type:'bearish', text:`Все 8 баров MACD красный и EMA вниз — трёхслойное согласие медведей`});
+        }
         html += makeCard('Elder Impulse System (неклассически)', items, 'elder_imp');
       }
     } else if (idL === 'parabolic') {
@@ -10880,6 +10918,18 @@ function renderAnalysis() {
         // 2. Дистанция SAR от цены = визуальная сила движения
         const sarDist = Math.abs(closes[n-1] - sar) / closes[n-1] * 100;
         if (sarDist > 3) items.push({type:bull2?'bullish':'bearish', text:`SAR далеко от цены (${sarDist.toFixed(1)}%) — подтверждение силы движения, каскад в полную силу`});
+        // Неклассика: скорость приближения SAR к цене
+        const sarArr=[]; let b3=true, s3=candles[0].low, ep3=candles[0].high, af3=0.02;
+        for(let i=1;i<n;i++) {
+          s3=s3+af3*(ep3-s3);
+          sarArr.push(Math.abs(closes[i]-s3)/closes[i]*100);
+          if(b3){if(candles[i].close<s3){b3=false;s3=ep3;ep3=candles[i].low;af3=0.02;}else if(candles[i].high>ep3){ep3=candles[i].high;af3=Math.min(0.2,af3+0.02);}}
+          else{if(candles[i].close>s3){b3=true;s3=ep3;ep3=candles[i].high;af3=0.02;}else if(candles[i].low<ep3){ep3=candles[i].low;af3=Math.min(0.2,af3+0.02);}}
+        }
+        const sarDistPrev = sarArr.length>=5 ? sarArr[sarArr.length-5] : sarDist;
+        const sarApproach = sarDistPrev - sarDist; // >0 = SAR приближается
+        if (sarApproach > 0.5) items.push({type:'bearish', text:`SAR быстро приближается к цене (+${sarApproach.toFixed(1)}% за 5 баров) — ускорение падает, тренд на финише`});
+        else if (sarApproach < -0.5 && sarDist > 1) items.push({type:bull2?'bullish':'bearish', text:`SAR отдаляется от цены — цена уходит быстрее SAR, каскад здоров`});
         html += makeCard('Parabolic SAR (неклассически)', items, 'sar');
       }
     } else if (idL === 'supertrend') {
@@ -10901,9 +10951,14 @@ function renderAnalysis() {
           if(trend2==-1&&closes[i]>stDn){trend2=1;flips++;}
           else if(trend2==1&&closes[i]<stUp){trend2=-1;flips++;}
         }
-        items.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend ${trend2===1?'бычий — стоп ниже цены':'медвежий — стоп выше цены'}`});
+        const stLine = trend2===1 ? (candles[n-1].close - mult*atrArr[n-1]) : (candles[n-1].close + mult*atrArr[n-1]);
+        const stWidth = Math.abs(closes[n-1] - stLine) / closes[n-1] * 100;
+        items.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend ${trend2===1?'бычий — стоп ниже цены':'медвежий — стоп выше цены'}, ширина ${stWidth.toFixed(1)}%`});
         if(flips<=2) items.push({type:trend2===1?'bullish':'bearish', text:`Мало переворотов (${flips}) — устойчивый тренд`});
         else if(flips>6) items.push({type:'neutral', text:`Много переворотов (${flips}) — пила/флэт, сигналы ненадёжны`});
+        // Неклассика: ширина как измеритель волатильности
+        if (stWidth < 1.0) items.push({type:'neutral', text:`SuperTrend близко (${stWidth.toFixed(1)}%) — волатильность низкая, сжатие. Разворот может быть резким`});
+        else if (stWidth > 3.0) items.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend далеко (${stWidth.toFixed(1)}%) — пространство есть, каскад в силе`});
         html += makeCard('SuperTrend (неклассически)', items, 'supertrend');
       }
     } else if (idL.includes('fisher')) {
@@ -11119,7 +11174,18 @@ function renderAnalysis() {
         if(vip>vim&&vip>1.1) items.push({type:'bullish', text:`VI+ (${vip.toFixed(2)}) > VI− (${vim.toFixed(2)}) — бычье движение доминирует`});
         else if(vim>vip&&vim>1.1) items.push({type:'bearish', text:`VI− (${vim.toFixed(2)}) > VI+ (${vip.toFixed(2)}) — медвежье движение доминирует`});
         else items.push({type:'neutral', text:`VI+ (${vip.toFixed(2)}) ≈ VI− (${vim.toFixed(2)}) — рынок без выраженного направления`});
-        if(Math.abs(vip-vim)<0.05) items.push({type:'neutral', text:`Vortex сближается — смена тренда возможна`});
+        // Неклассика: расстояние между линиями = ясность тренда + опережающий сигнал
+        const vDist = Math.abs(vip-vim);
+        if(vDist<0.05) items.push({type:'neutral', text:`Vortex сходится (разрыв ${vDist.toFixed(3)}) — волатильность разнонаправленная, боковик. Когда начнут расходиться = выброс вот-вот`});
+        else if(vDist>0.3) items.push({type:vip>vim?'bullish':'bearish', text:`Vortex расходится сильно (разрыв ${vDist.toFixed(2)}) — вся волатильность в одну сторону, тренд очень ясный`});
+        // Опережающий сигнал: расхождение растёт
+        if (n>=per+3) {
+          let vmp2=0,vmm2=0,atrS2=0;
+          for(let i=n-per-2;i<n-2;i++) { vmp2+=Math.abs(candles[i].high-candles[i-1].low); vmm2+=Math.abs(candles[i].low-candles[i-1].high); atrS2+=Math.max(candles[i].high,candles[i-1].close)-Math.min(candles[i].low,candles[i-1].close); }
+          const vip2=atrS2>0?vmp2/atrS2:1, vim2=atrS2>0?vmm2/atrS2:1;
+          const vDistPrev=Math.abs(vip2-vim2);
+          if (vDist>vDistPrev+0.05) items.push({type:vip>vim?'bullish':'bearish', text:`Vortex расходится — опережающий сигнал. Волатильность уже идёт в ${vip>vim?'бычью':'медвежью'} сторону раньше чем цена показывает направление`});
+        }
         html += makeCard('Vortex (неклассически)', items, 'vortex');
       }
     } else if (idL === 'bb_pct') {
@@ -11167,7 +11233,27 @@ function renderAnalysis() {
         const dip=atrS>0?pdm/atrS*100:0, dim=atrS>0?mdm/atrS*100:0;
         if(dip>dim) items.push({type:'bullish', text:`+DI (${dip.toFixed(1)}) > −DI (${dim.toFixed(1)}) — бычье движение преобладает`});
         else items.push({type:'bearish', text:`−DI (${dim.toFixed(1)}) > +DI (${dip.toFixed(1)}) — медвежье движение преобладает`});
-        html += makeCard('DMI (неклассически)', items, 'dmi');
+        // ADX + его скорость изменения
+        const adxArr=[];
+        if(n>=per*2+5) {
+          for(let t=per;t<=n;t++) {
+            let pdmT=0,mdmT=0,atrT=0;
+            for(let i=t-per;i<t;i++) {
+              const up=candles[i].high-candles[i-1].high, dn=candles[i-1].low-candles[i].low;
+              pdmT+=(up>dn&&up>0)?up:0; mdmT+=(dn>up&&dn>0)?dn:0;
+              atrT+=Math.max(candles[i].high,candles[i-1].close)-Math.min(candles[i].low,candles[i-1].close);
+            }
+            const di1=atrT>0?pdmT/atrT*100:0, di2=atrT>0?mdmT/atrT*100:0;
+            adxArr.push((di1+di2)>0?Math.abs(di1-di2)/(di1+di2)*100:0);
+          }
+        }
+        const adxNow=adxArr.length?adxArr[adxArr.length-1]:((dip+dim)>0?Math.abs(dip-dim)/(dip+dim)*100:0);
+        const adxPrev=adxArr.length>=6?adxArr[adxArr.length-6]:adxNow;
+        items.push({type:adxNow>25?'bullish':'neutral', text:`ADX ≈ ${adxNow.toFixed(0)} — ${adxNow>40?'сильный тренд':adxNow>25?'тренд есть':'флэт/боковик'}`});
+        if (adxNow>adxPrev+5) items.push({type:'bullish', text:`ADX растёт (+${(adxNow-adxPrev).toFixed(0)} за 5 баров) — тренд усиливается, не ломайся`});
+        else if (adxNow<adxPrev-5 && adxPrev>25) items.push({type:'bearish', text:`ADX падает с пика (−${(adxPrev-adxNow).toFixed(0)}) — тренд ломается, разворот готовится`});
+        else if (adxNow<28 && adxNow>22) items.push({type:'neutral', text:`ADX застрял ~25 — рынок на грани тренд/флэт, неопределённость`});
+        html += makeCard('DMI / ADX (неклассически)', items, 'dmi');
       }
     } else if (idL.includes('hist_vol') || idL.includes('close2close') || idL.includes('ohlc_vol') || idL.includes('vix_like')) {
       const n = candles.length;
@@ -11337,7 +11423,15 @@ function renderAnalysis() {
         for(let i=1;i<n;i++) md=md+(closes[i]-md)/(per*Math.pow(closes[i]/md,4)||1);
         const dev=(closes[n-1]-md)/md*100;
         items.push({type:dev>0?'bullish':'bearish', text:`McGinley Dynamic: цена ${dev>0?'выше':'ниже'} на ${Math.abs(dev).toFixed(2)}% — авто-адаптивная MA устраняет задержку`});
-        if(Math.abs(dev)<0.3) items.push({type:'neutral', text:`Цена ≈ McGinley — равновесие, рынок в балансе`});
+        if(Math.abs(dev)<0.3) items.push({type:'neutral', text:`Цена ≈ McGinley — равновесие, максимальная дилемма. Когда выберет направление = выброс`});
+        // Неклассика: скорость адаптации = стабильность режима
+        const mdArr=[closes[0]]; let md2=closes[0];
+        for(let i=1;i<n;i++) { md2=md2+(closes[i]-md2)/(per*Math.pow(closes[i]/md2,4)||1); mdArr.push(md2); }
+        // Подсчитать сколько раз МА меняла направление за последние 20 баров
+        let mcDirs=0;
+        for(let i=Math.max(1,n-20);i<n;i++) if(mdArr[i]>mdArr[i-1]!==mdArr[i-1]>mdArr[i-2]) mcDirs++;
+        if (mcDirs>=5) items.push({type:'neutral', text:`McGinley часто меняет направление (${mcDirs} раз/20 баров) — режим нестабилен, боковик`});
+        else if (mcDirs<=1) items.push({type:dev>0?'bullish':'bearish', text:`McGinley стабильно ползёт в одну сторону (${mcDirs} разворотов/20 баров) — режим чистый, каскад ровный`});
         html += makeCard('McGinley Dynamic (неклассически)', items, 'mcginley');
       }
     } else if (idL === 'std_dev') {
@@ -11366,6 +11460,24 @@ function renderAnalysis() {
         if(last>upper) items.push({type:'bearish', text:`Цена выше верхнего конверта — сигнал перекупленности; в тренде может ходить выше конверта долго`});
         else if(last<lower) items.push({type:'bullish', text:`Цена ниже нижнего конверта — перепроданность; в тренде может держаться ниже`});
         else items.push({type:'neutral', text:`Цена внутри конвертов ± ${(pct*100).toFixed(1)}%`});
+        // Неклассика: ширина конвертов как волатильность в тренде + асимметрия
+        const maArr=[]; for(let i=per-1;i<n;i++) { const sl=closes.slice(i-per+1,i+1); maArr.push(sl.reduce((a,b)=>a+b,0)/per); }
+        const envWidths=maArr.map(m=>m*pct*2/m*100); // всегда pct*2*100 — постоянная ширина
+        // Для динамики смотрим на ATR vs fixed envelope
+        let atrSumE=0;
+        for(let i=n-per;i<n;i++) { atrSumE+=Math.max(highs[i]-lows[i],i>0?Math.abs(highs[i]-closes[i-1]):0,i>0?Math.abs(lows[i]-closes[i-1]):0); }
+        const atrNowE=atrSumE/per, atrVsEnv=atrNowE/(ma*pct||0.001)*100;
+        if(atrVsEnv<50) items.push({type:'neutral', text:`Envelope широкий относительно ATR — цена движется плавно, тренд опасно гладкий`});
+        else if(atrVsEnv>100) items.push({type:last>ma?'bullish':'bearish', text:`ATR больше половины ширины конверта — волатильность высокая, тренд с жизнью`});
+        // Сколько раз касалась верхней vs нижней полосы за 30 баров
+        let touchUpper=0, touchLower=0;
+        for(let i=Math.max(per,n-30);i<n;i++) {
+          const m=maArr[i-per+1]||ma;
+          if(highs[i]>=m*(1+pct)) touchUpper++;
+          if(lows[i]<=m*(1-pct)) touchLower++;
+        }
+        if(touchUpper>touchLower+2) items.push({type:'bullish', text:`Верхняя полоса касалась ${touchUpper}× vs нижняя ${touchLower}× за 30 баров — выброс вверх более вероятен`});
+        else if(touchLower>touchUpper+2) items.push({type:'bearish', text:`Нижняя полоса касалась ${touchLower}× vs верхняя ${touchUpper}× — давление вниз`});
         html += makeCard('Envelopes (неклассически)', items, 'envelopes');
       }
     } else if (idL === 'dpo') {
