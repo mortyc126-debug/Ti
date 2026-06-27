@@ -3658,86 +3658,155 @@ def score_cascade(candles: list[HistoricCandle]) -> float:
 
 def score_impulse_pullback(candles: list[HistoricCandle]) -> float:
     """
-    IMPULSE_PULLBACK: классификация отката по объёму, а не по ценовой глубине.
+    IMPULSE_PULLBACK: откат vs разворот — три оси различия.
 
-    Главная ось: vol_ratio = средний объём на баре отката / средний объём на баре импульса.
+    Откат (продолжение тренда):
+      - объём на откате < объёма импульса (никто не мешает)
+      - глубина отката < 38% размера импульса (HL держится)
+      - No Supply на дне: последние бары отката — убывающий объём + закрытие
+        выше 50% диапазона (покупатели поглощают без усилий)
 
-    < 0.30  — откат без интереса, никто не мешает. Продолжение вероятно (+).
-    0.30–0.65 — нейтрально, рыночные движения.
-    > 0.65  — кто-то активно толкает против тренда. Само по себе не разворот,
-              но если следующий импульс слабее по объёму чем этот откат — разворот
-              очень вероятен. Проверяем: смотрим на последние «возобновляющие» бары.
+    Разворот (против импульса):
+      - объём на откате > 65% объёма импульса (агрессивное давление)
+      - глубина > 62% (CHoCH: пробой предыдущего HL/LH)
+      - возобновление слабее отката по объёму
 
-    Импульс определяется через свинг-экстремум за окно последних 25 баров:
-    peak (для бычьего тренда) или trough (для медвежьего) — точка между
-    импульсной фазой и откатной. Не требует «3 бара подряд без перерыва».
+    Нейтраль: глубина 38–62%, объём умеренный → 0.
+
+    Сигнал:
+      Откат + No Supply → +0.45..+0.75 (лучшая точка входа в тренд)
+      Разворот слабый возобновление → −0.55..−0.85
+      Промежуточные зоны — пропорционально.
     """
     if len(candles) < 15:
         return 0.0
+    try:
+        atr = _compute_atr(candles)
 
-    win = candles[-25:]
-    n = len(win)
-    closes = [_to_f(c.close) for c in win]
-    vols   = [float(c.volume) for c in win]
+        win = candles[-28:]
+        n   = len(win)
+        closes = [_to_f(c.close) for c in win]
+        highs  = [_to_f(c.high)  for c in win]
+        lows   = [_to_f(c.low)   for c in win]
+        vols   = [float(c.volume) for c in win]
 
-    # Направление общего движения за окно
-    overall = closes[-1] - closes[0]
-    if abs(overall) < 1e-9:
-        return 0.0
-    imp_dir = 1 if overall > 0 else -1
-
-    # Находим свинг-точку: пик (бычий) или дно (медвежий) в диапазоне [2..n-4]
-    # — это граница между импульсной и откатной фазами
-    search = range(2, n - 3)
-    if imp_dir > 0:
-        swing_idx = max(search, key=lambda i: closes[i])
-        # Подтверждение: текущая цена ниже свинга (реальный откат)
-        if closes[-1] >= closes[swing_idx]:
+        overall = closes[-1] - closes[0]
+        if abs(overall) < 1e-9:
             return 0.0
-    else:
-        swing_idx = min(search, key=lambda i: closes[i])
-        if closes[-1] <= closes[swing_idx]:
-            return 0.0
+        imp_dir = 1 if overall > 0 else -1
 
-    # Фазы: импульс = [0..swing_idx], откат = [swing_idx..-1]
-    imp_vols = vols[:swing_idx + 1]
-    pb_vols  = vols[swing_idx:]
-
-    if len(imp_vols) < 2 or len(pb_vols) < 2:
-        return 0.0
-
-    imp_avg = sum(imp_vols) / len(imp_vols)
-    pb_avg  = sum(pb_vols)  / len(pb_vols)
-    vol_ratio = pb_avg / (imp_avg or 1e-9)
-
-    # Любой детектируемый откат = признак завершения импульса.
-    # Чем сильнее откат по объёму — тем выше вероятность полного разворота.
-    # Никогда не сигнализируем ЗА направление импульса — он уже закончился.
-
-    if vol_ratio < 0.30:
-        # Откат почти без объёма: инерция кончилась тихо. Импульс израсходован.
-        slack = (0.30 - vol_ratio) / 0.30
-        return round(-imp_dir * (0.30 + slack * 0.20), 4)
-
-    if vol_ratio <= 0.65:
-        # Умеренный откат: движение нейтрализуется
-        return round(-imp_dir * 0.30, 4)
-
-    # vol_ratio > 0.65: агрессивный откат — активное давление против тренда.
-    resuming = [vols[i] for i in range(swing_idx, n)
-                if (closes[i] > closes[i - 1] if imp_dir > 0 else closes[i] < closes[i - 1])
-                and i > 0]
-    excess = min(1.0, (vol_ratio - 0.65) / 0.35)
-
-    if resuming:
-        resume_avg = sum(resuming) / len(resuming)
-        if resume_avg < pb_avg * 0.80:
-            # Следующий импульс слабее отката → разворот очень вероятен
-            return round(-imp_dir * min(0.85, 0.55 + excess * 0.35), 4)
+        # Свинг-точка: граница импульс → откат
+        search = range(2, n - 3)
+        if imp_dir > 0:
+            swing_idx = max(search, key=lambda i: closes[i])
+            if closes[-1] >= closes[swing_idx]:
+                return 0.0
+            impulse_range = closes[swing_idx] - closes[0]
+            pullback_depth = closes[swing_idx] - closes[-1]
         else:
-            return round(-imp_dir * (0.35 + excess * 0.25), 4)
-    else:
-        return round(-imp_dir * (0.30 + excess * 0.30), 4)
+            swing_idx = min(search, key=lambda i: closes[i])
+            if closes[-1] <= closes[swing_idx]:
+                return 0.0
+            impulse_range = closes[0] - closes[swing_idx]
+            pullback_depth = closes[-1] - closes[swing_idx]
+
+        if impulse_range <= 0:
+            return 0.0
+
+        depth_ratio = pullback_depth / impulse_range  # 0..1+
+
+        # Объёмные фазы
+        imp_vols = vols[:swing_idx + 1]
+        pb_vols  = vols[swing_idx:]
+        if len(imp_vols) < 2 or len(pb_vols) < 2:
+            return 0.0
+
+        imp_avg = sum(imp_vols) / len(imp_vols)
+        pb_avg  = sum(pb_vols)  / len(pb_vols)
+        vol_ratio = pb_avg / (imp_avg or 1e-9)
+
+        # ── No Supply: дно отката на убывающем объёме + закрытие выше середины ──
+        # Последние 3 бара фазы отката
+        last_pb = win[swing_idx:][-3:]
+        no_supply = False
+        if len(last_pb) >= 2:
+            pb_tail_vols = [float(c.volume) for c in last_pb]
+            vol_falling = pb_tail_vols[-1] < pb_tail_vols[0] * 0.75
+            last_c = last_pb[-1]
+            lc_ = _to_f(last_c.close)
+            lh_ = _to_f(last_c.high)
+            ll_ = _to_f(last_c.low)
+            close_pos = (lc_ - ll_) / (lh_ - ll_ or 1e-9)
+            # Закрытие выше 50% диапазона свечи = покупатели поглощают
+            no_supply = vol_falling and close_pos > 0.50
+
+        # ── HL integrity: предыдущий HL (или LH) не пробит ──
+        # Для бычьего: предыдущее дно импульса (closes[0]) — если откат не ушёл ниже
+        if imp_dir > 0:
+            prev_hl = min(closes[:swing_idx + 1])
+            hl_intact = closes[-1] > prev_hl - 0.3 * atr
+        else:
+            prev_lh = max(closes[:swing_idx + 1])
+            hl_intact = closes[-1] < prev_lh + 0.3 * atr
+
+        # ── Возобновляющие бары (в направлении импульса после свинга) ──
+        resuming_vols = [
+            vols[i] for i in range(swing_idx, n)
+            if i > 0 and (
+                closes[i] > closes[i - 1] if imp_dir > 0 else closes[i] < closes[i - 1]
+            )
+        ]
+        resume_avg = sum(resuming_vols) / len(resuming_vols) if resuming_vols else 0.0
+        resumption_weak = resume_avg < pb_avg * 0.80 if resuming_vols else True
+
+        # ══ Классификация ════════════════════════════════════════════════════
+
+        # 1. Здоровый HL-откат → продолжение в направлении импульса
+        if depth_ratio < 0.38 and vol_ratio < 0.50 and hl_intact:
+            base = 0.45
+            if no_supply:
+                base += 0.20   # No Supply = лучшая точка входа
+            if vol_ratio < 0.25:
+                base += 0.10   # совсем тихий откат
+            return round(imp_dir * min(0.75, base), 4)
+
+        # 2. Умеренный откат, HL держится → слабый сигнал продолжения
+        if depth_ratio < 0.50 and vol_ratio < 0.65 and hl_intact:
+            base = 0.20
+            if no_supply:
+                base += 0.15
+            return round(imp_dir * base, 4)
+
+        # 3. Нейтральная зона — ничего не говорим
+        if 0.38 <= depth_ratio <= 0.62 and 0.40 <= vol_ratio <= 0.70:
+            return 0.0
+
+        # 4. Глубокий откат + агрессивный объём → разворот
+        if depth_ratio > 0.62 and vol_ratio > 0.65:
+            excess = min(1.0, (vol_ratio - 0.65) / 0.35)
+            if resumption_weak:
+                # Возобновление слабее отката — разворот подтверждён
+                return round(-imp_dir * min(0.85, 0.55 + excess * 0.30), 4)
+            else:
+                return round(-imp_dir * (0.35 + excess * 0.20), 4)
+
+        # 5. HL пробит (CHoCH) при любом объёме → против импульса
+        if not hl_intact:
+            choch_strength = min(0.65, 0.35 + depth_ratio * 0.20)
+            return round(-imp_dir * choch_strength, 4)
+
+        # 6. Агрессивный объём без глубины — давление против, но HL держится
+        if vol_ratio > 0.65 and depth_ratio < 0.38:
+            excess = min(1.0, (vol_ratio - 0.65) / 0.35)
+            if resumption_weak:
+                return round(-imp_dir * (0.30 + excess * 0.20), 4)
+            else:
+                # Возобновление сильнее → откат поглощён, продолжение
+                return round(imp_dir * 0.20, 4)
+
+        return 0.0
+    except Exception:
+        return 0.0
 
 
 def score_waning_impulses(candles: list[HistoricCandle]) -> float:
