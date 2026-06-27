@@ -1137,6 +1137,15 @@ input[type=range] { touch-action: none; }
           <div style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Расчёт уровней коррекции/расширения — в табе <span style="color:#FF006E;cursor:pointer;" onclick="cpTab(document.querySelector('.cp-tab[data-tab=fib]'))">Фиб ↗</span>.<br>
           <span style="color:var(--text3);">Неклассически: уровни как зоны интереса, не как триггеры. Ищи кластер из 2+ уровней разных волн. Не торгуй отдельно взятый уровень — только с подтверждением объёма или Price Action.</span></div>
         </div>
+
+        <!-- Динамические секции систем -->
+        <div id="sys-static-sections"></div>
+
+        <!-- Карта напряжения -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">⚡ Карта напряжения системы</div>
+          <div id="sys-voltage" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
+        </div>
       </div>
 
     </div>
@@ -6949,8 +6958,9 @@ function cpRenderCombos() {
 }
 
 function cpRenderSystems() {
+  _sysRenderStaticSections();
   if (!chartCandles || chartCandles.length < 20) {
-    ['sys-vp-chart','sys-vp-analysis','sys-trendlines-text','sys-hlevels-text'].forEach(id => {
+    ['sys-vp-chart','sys-vp-analysis','sys-trendlines-text','sys-hlevels-text','sys-voltage'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<span style="color:var(--text3);">Загрузите данные.</span>';
     });
@@ -6959,6 +6969,183 @@ function cpRenderSystems() {
   _sysRenderVP();
   _sysRenderTrendLines();
   _sysRenderHLevels();
+  _sysRenderVoltageMap();
+}
+
+function _sysRenderStaticSections() {
+  const el = document.getElementById('sys-static-sections');
+  if (!el) return;
+
+  function sec(emoji, title, rows) {
+    const inner = rows.map(r => {
+      const lc = r.lc || '#6F648F';
+      return '<div style="margin-bottom:5px;">'
+        + '<div style="font-size:9px;color:' + lc + ';font-family:var(--mono);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:1px;">' + r.label + '</div>'
+        + '<div style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.55;">' + r.text + '</div>'
+        + '</div>';
+    }).join('');
+    return '<details style="margin-bottom:8px;border:1px solid rgba(199,27,82,0.15);border-radius:6px;">'
+      + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
+      + '<span style="font-size:12px;">' + emoji + '</span>' + title + '</summary>'
+      + '<div style="padding:8px 10px 10px;">' + inner + '</div>'
+      + '</details>';
+  }
+
+  const NC = '#C71B52', IND = '#60A4A1', CL = '#6F648F';
+
+  el.innerHTML = [
+
+    sec('📦', 'VSA · Volume Spread Analysis', [
+      {label:'Классика', lc:CL, text:'Большой объём без движения = поглощение, входи.'},
+      {label:'Неклассика 1: Тройка признаков', lc:NC, text:'Узкая свеча (малый спред) + большой объём + цена в верхней части диапазона = тестирование уровня агрессивно. Если свеча закрылась ниже — это накопление перед <b>падением</b>, не поглощением вверх. Ложный пробой на объёме.'},
+      {label:'→ Klinger', lc:IND, text:'Klinger в экстремуме вверх, но уровень не пробит = дивергенция. Деньги вроде входят, уровень держит. Это точка.'},
+      {label:'Неклассика 2: Пульс поглощения', lc:NC, text:'Серия свечей: широкая→узкая→широкая→узкая при <b>нарастающем объёме</b>. Не одна свеча — ритм. Каждая широкая = попытка движения, узкая = остановка. Объём растёт = сопротивление ломается постепенно.'},
+      {label:'→ EBS (Even Better Sinewave)', lc:IND, text:'EBS должен быть в амплитуде (размах растёт). Если размах EBS падает при пульсе VSA = ловушка, движение не состоится.'},
+    ]),
+
+    sec('🏗', 'Wyckoff', [
+      {label:'Классика', lc:CL, text:'Spring → test → breakout как последовательность фаз накопления.'},
+      {label:'Неклассика 1: Временные интервалы', lc:NC, text:'Spring + test через 3 свечи = быстрое восстановление доверия. Spring + 10 свечей боковика + test = долгое накопление после встряса → более <b>сильный breakout</b> потому что энергия копилась дольше.'},
+      {label:'→ Choppiness Index', lc:IND, text:'В период между spring и test Choppiness показывает компрессию энергии. Чем выше жёсткость и чем дольше держится = тем сильнее breakout.'},
+      {label:'Неклассика 2: Обратный spring', lc:NC, text:'Цена пробила вниз, собрала стопы, вернулась выше точки пробоя за <b>одну свечу</b>. Агрессивный вариант spring. Breakout после такого очень резкий.'},
+      {label:'→ Fisher RSI', lc:IND, text:'В момент ложного пробоя — Fisher RSI в крайности одной стороны, потом резко переключается в противоположную. Два переключения в одной точке = охота за стопами подтверждена.'},
+      {label:'Редкое: Двойной Wyckoff', lc:NC, text:'На часовом идёт phase 2 (accumulation). На минутном внутри боковика — свой spring/test/breakout. Когда минутный breakout совпадает с выходом часового из phase 2 в phase 3 = <b>каскад в полную силу</b>.'},
+      {label:'→ Choppiness (час) + MAMA/FAMA (мин)', lc:IND, text:'Choppiness на часовом начинает падать (phase 2 заканчивается). MAMA/FAMA на минутном расходятся (phase 3 начинается). Оба одновременно = двойное ускорение.'},
+    ]),
+
+    sec('🏛', 'AMT · Auction Market Theory', [
+      {label:'Классика', lc:CL, text:'Point of Control = уровень поддержки/сопротивления.'},
+      {label:'Неклассика 1: Кластер POC', lc:NC, text:'Дневной POC + недельный POC + месячный POC совпадают на одном уровне = <b>кластер величины</b>. Цена туда вернётся почти 100%. Откат будет резким — там сосредоточены стопы и заявки всех таймфреймов.'},
+      {label:'→ Donchian Channel', lc:IND, text:'Donchian асимметрия показывает с какой стороны прорыв. Много касаний максимума, редко минимума = прорыв вниз.'},
+      {label:'Неклассика 2: VAL/VAH как границы хаоса', lc:NC, text:'Цена летит вниз из VAL — это пустая зона (там нет торговли), скорость максимальна. Как только вернётся в VAL = вернётся в зону торговли, там сопротивление. VAH и VAL — не уровни поддержки, а <b>границы пустоты</b>.'},
+      {label:'→ ATR', lc:IND, text:'ATR вырос = цена в пустой зоне (спреды больше). ATR упал = цена в плотной зоне торговли. Подтверждает где сейчас идёт цена.'},
+    ]),
+
+    sec('🌊', 'Order Flow', [
+      {label:'Классика', lc:CL, text:'Дельта показывает купили или продали больше.'},
+      {label:'Неклассика 1: Скорость изменения дельты', lc:NC, text:'Дельта была нейтральной, потом за две свечи резко выскочила в положительное = <b>смена режима агрессии</b>. Резкое переключение показывает насколько внезапно пришли деньги. Резкое = каскад вот-вот.'},
+      {label:'→ Z-score', lc:IND, text:'Дельта растёт + Z-score резко растёт = движение становится статистически значимым очень быстро. Опережающий сигнал.'},
+      {label:'Неклассика 2: Стакан как кино', lc:NC, text:'Не где заявки стоят сейчас, а как они <b>переставляются</b>. Заявки исчезают чуть раньше агрессивного движения. Маркетмейкер убирает сопротивление перед тем как цена движется. Скрытие ликвидности = намерение раньше чем выполнится.'},
+      {label:'→ Bollinger Squeeze', lc:IND, text:'Стакан сужается + заявки убираются одновременно. Двойной сигнал компрессии.'},
+    ]),
+
+    sec('🕯', 'Price Action', [
+      {label:'Классика', lc:CL, text:'Паттерны свечей = сигналы входа.'},
+      {label:'Неклассика 1: Направленность теней в боковике', lc:NC, text:'В боковике свечи имеют тени только вверх = верхний край плотный, сопротивление рабочее. Когда свечи начнут иметь тени вниз = нижний край становится интересен. Перекос теней предсказывает <b>направление выброса</b>.'},
+      {label:'→ Alligator', lc:IND, text:'Alligator разворачивается в сторону куда идут тени. Перекос теней + разворот Alligator = оба показывают одно направление.'},
+      {label:'Неклассика 2: Угол свечей', lc:NC, text:'Свечи сжимаются (нитки) но угол каждой следующей становится <b>вертикальнее</b> (вверх или вниз). Энергия не в размере движения а в скорости. Вертикальная нитка = вот-вот выброс с ускорением.'},
+      {label:'→ MAMA/FAMA', lc:IND, text:'Угол MAMA/FAMA тоже становится острее. Две независимые геометрии (свечи + линии) говорят одно — ускорение вот-вот.'},
+    ]),
+
+    sec('🔗', 'Комбинации методов', [
+      {label:'Вход в боковике (5+4)', lc:NC, text:'<b>VSA:</b> узкая свеча + объём + цена вверху → <b>Wyckoff:</b> это test → <b>AMT:</b> цена у POC → <b>Order Flow:</b> деньги входят → <b>Price Action:</b> тень вверх + откат.'},
+      {label:'Индикаторы подтверждают вход', lc:IND, text:'Klinger в экстремуме (деньги накопились) · Fisher RSI в крайности (перегрето) · EBS амплитуда растёт (энергия копится) · Choppiness высокий (компрессия). Все пять + четыре = вход максимально уверенный.'},
+      {label:'Выход из позиции', lc:NC, text:'<b>VSA:</b> объём падает на новом экстремуме → <b>Wyckoff:</b> нет нового теста выше → <b>AMT:</b> цена у POC → <b>Order Flow:</b> боты исчезли → <b>Price Action:</b> длинная тень вверху.'},
+      {label:'Индикаторы предупреждают о выходе', lc:IND, text:'Klinger переключается (деньги выходят) · Fisher RSI выходит из крайности · EBS амплитуда падает · MAMA/FAMA сходятся (тренд ломается). Антисигналы загорелись = точка выхода.'},
+      {label:'Тройной каскад (ускорение)', lc:NC, text:'VSA: спреды шире при объёме → Wyckoff: phase 3 (velocity) → Price Action: свечи вертикальнее. Плюс: Z-score резко растёт + ATR растёт + VZO в экстремуме. Все три = каскад в максимальную силу. Тейк переставляешь далеко.'},
+      {label:'Ловушка Зуб (конфликт)', lc:NC, text:'VSA: объём есть → Wyckoff: ложный пробой → Order Flow: деньги входят не агрессивно. Плюс: Fisher RSI не в крайности + Klinger не в экстремуме + Z-score невысокий. Картина конфликтна = не входишь или очень маленько.'},
+    ]),
+
+  ].join('');
+}
+
+function _sysRenderVoltageMap() {
+  const el = document.getElementById('sys-voltage');
+  if (!el) return;
+  const candles = chartCandles;
+  const closes = candles.map(c=>c.close);
+  const highs  = candles.map(c=>c.high);
+  const lows   = candles.map(c=>c.low);
+  const n = closes.length;
+
+  // ATR(14) vs avg ATR(100)
+  const atrN = Math.min(14, n-1);
+  const atrWin = Math.min(100, n);
+  function calcATR(from, len) {
+    let s=0; for (let i=from; i<from+len; i++) { const tr=Math.max(highs[i]-lows[i], i>0?Math.abs(highs[i]-closes[i-1]):0, i>0?Math.abs(lows[i]-closes[i-1]):0); s+=tr; } return s/len;
+  }
+  const atrNow = calcATR(n-atrN, atrN);
+  const atrAvg = calcATR(n-atrWin, atrWin);
+  const atrRatio = atrNow / (atrAvg || atrNow);
+
+  // Choppiness(14)
+  const chopN = Math.min(14, n-1);
+  let atrSumC=0; for (let i=n-chopN; i<n; i++) { const tr=Math.max(highs[i]-lows[i], i>0?Math.abs(highs[i]-closes[i-1]):0, i>0?Math.abs(lows[i]-closes[i-1]):0); atrSumC+=tr; }
+  const hN=Math.max(...highs.slice(-chopN)), lN=Math.min(...lows.slice(-chopN));
+  const chop = (hN-lN)>0 ? Math.min(100, Math.log10(atrSumC/(hN-lN))/Math.log10(chopN)*100) : 50;
+
+  // BB squeeze: current width vs historical avg
+  const bbN = Math.min(20, n);
+  const bbSl = closes.slice(-bbN);
+  const bbMean = bbSl.reduce((a,b)=>a+b,0)/bbN;
+  const bbStd = Math.sqrt(bbSl.reduce((a,b)=>a+(b-bbMean)**2,0)/bbN);
+  const bbWidthNow = (bbMean>0) ? bbStd*4/bbMean*100 : 1;
+  const histWin = Math.min(100, n-bbN);
+  let bbHistSum=0, bbHistCnt=0;
+  for (let i=bbN; i<bbN+histWin; i++) {
+    const sl=closes.slice(i-bbN,i), m=sl.reduce((a,b)=>a+b,0)/bbN;
+    const s=Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/bbN);
+    bbHistSum += (m>0?s*4/m*100:1); bbHistCnt++;
+  }
+  const bbAvg = bbHistCnt ? bbHistSum/bbHistCnt : bbWidthNow;
+  const bbSqueeze = bbWidthNow / (bbAvg || bbWidthNow); // <0.7 = сильный сквиз
+
+  // Z-score(20)
+  const zsN = Math.min(20, n);
+  const zsSl = closes.slice(-zsN);
+  const zsMean = zsSl.reduce((a,b)=>a+b,0)/zsN;
+  const zsStd = Math.sqrt(zsSl.reduce((a,b)=>a+(b-zsMean)**2,0)/zsN) || 1;
+  const zscore = Math.abs((closes[n-1]-zsMean)/zsStd);
+
+  // RSI(14) → Fisher transform
+  const rsiN = Math.min(14, n-1);
+  let g=0, ls=0;
+  for (let i=n-rsiN; i<n; i++) { const d=closes[i]-closes[i-1]; if(d>0) g+=d; else ls-=d; }
+  const rs = ls===0 ? 100 : g/ls;
+  const rsiVal = 100 - 100/(1+rs);
+  const rsiNorm = Math.max(0.001, Math.min(0.999, rsiVal/100));
+  const fisherRsi = Math.abs(0.5*Math.log((1+rsiNorm)/(1-rsiNorm)));
+
+  // Score each dimension: 0=ok, 1=warning, 2=alert
+  function gauge(val, low, high) { return val<low ? 2 : val>high ? 2 : 0; }
+  // High choppiness = compressed, low ATR = compressed, high BB squeeze ratio <1 = squeeze, Z-score ~0 = neutral
+  const scores = {
+    'Choppiness':  { val: chop.toFixed(0),  unit:'', compressed: chop>61.8, trending: chop<38.2,
+      color: chop>61.8?'#C08080':chop<38.2?'#60A4A1':'#B4A050',
+      note: chop>61.8?'сжатие (↑61.8) — энергия копится':chop<38.2?'тренд (↓38.2) — движение идёт':'нейтральная зона' },
+    'ATR rel.':    { val: (atrRatio*100).toFixed(0), unit:'%',
+      color: atrRatio<0.7?'#C08080':atrRatio>1.3?'#60A4A1':'#B4A050',
+      note: atrRatio<0.7?'спреды малы (↓70%) — рынок спит':atrRatio>1.3?'спреды большие (↑130%) — движение идёт':'нормальная волатильность' },
+    'BB Squeeze':  { val: (bbSqueeze*100).toFixed(0), unit:'%',
+      color: bbSqueeze<0.7?'#C08080':bbSqueeze>1.3?'#60A4A1':'#B4A050',
+      note: bbSqueeze<0.7?'сильный сквиз (↓70% avg) — взрыв близко':bbSqueeze>1.3?'полосы расширены — движение в процессе':'нормальная ширина' },
+    'Z-score':     { val: zscore.toFixed(2), unit:'',
+      color: zscore<0.5?'#C08080':zscore>2?'#60A4A1':'#B4A050',
+      note: zscore<0.5?'движение случайное — энергия не выпущена':zscore>2?'статистический экстремум — движение значимо':'умеренное отклонение' },
+    'Fisher RSI':  { val: fisherRsi.toFixed(2), unit:'',
+      color: fisherRsi>1.5?'#C08080':fisherRsi<0.5?'#B4A050':'#60A4A1',
+      note: fisherRsi>1.5?'крайность — перегрето, вот-вот разворот':fisherRsi<0.5?'нейтральное состояние':'умеренное напряжение' },
+  };
+
+  // Count compressions
+  const compressedCount = [chop>61.8, atrRatio<0.7, bbSqueeze<0.7, zscore<0.5].filter(Boolean).length;
+  const fishExtreme = fisherRsi > 1.5;
+
+  let verdict = '', vColor = '#6F648F';
+  if (compressedCount >= 3 && fishExtreme) { verdict = '🔴 МАКСИМАЛЬНОЕ СЖАТИЕ — система на пределе. Методы (VSA/Wyckoff/AMT) покажут куда выпустит.'; vColor='#C08080'; }
+  else if (compressedCount >= 2) { verdict = '🟡 Умеренное сжатие — энергия накапливается. Следи за пульсом VSA и Choppiness.'; vColor='#B4A050'; }
+  else { verdict = '🟢 Система в движении или нейтральна — компрессии нет.'; vColor='#60A4A1'; }
+
+  const rows = Object.entries(scores).map(([name,s]) =>
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+    + '<div style="width:78px;font-size:9px;color:var(--text3);font-family:var(--mono);">' + name + '</div>'
+    + '<div style="font-size:10px;font-family:var(--mono);color:' + s.color + ';font-weight:600;width:40px;">' + s.val + s.unit + '</div>'
+    + '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);flex:1;">' + s.note + '</div>'
+    + '</div>'
+  ).join('');
+
+  el.innerHTML = rows
+    + '<div style="margin-top:8px;padding:6px 8px;background:rgba(0,0,0,0.3);border-radius:5px;border-left:2px solid ' + vColor + ';font-size:10px;color:' + vColor + ';font-family:var(--mono);line-height:1.5;">' + verdict + '</div>';
 }
 
 function _sysRenderVP() {
