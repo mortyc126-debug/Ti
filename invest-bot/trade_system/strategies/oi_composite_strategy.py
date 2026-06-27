@@ -1215,8 +1215,60 @@ def score_candle_pattern(candles: list[HistoricCandle]) -> float:
 
 
 def score_adaptive_ma_candle(candles: list[HistoricCandle]) -> float:
-    """ADAPTIVE_MA: отклонение цены от KAMA (indicators.py, Фаза 3)."""
-    return score_adaptive_ma([_to_f(c.close) for c in candles])
+    """
+    ADAPTIVE_MA: Efficiency Ratio (ER) Кауфмана + отклонение от KAMA.
+
+    Документ: ER = реальное движение / сумма всех колебаний.
+    - ER 0-0.3: боговик/компрессия (цена металась туда-сюда)
+    - ER 0.7-0.95: здоровый каскад (цена идёт направленно)
+    - ER падает при росте цены = дивергенция = затухание (распределение)
+
+    1. Базовый сигнал: отклонение цены от KAMA (тренд vs. KAMA-линия)
+    2. ER как усилитель/ослабитель: высокий ER → каскад → усиливаем;
+       низкий ER → боговик → ослабляем
+    3. ER-дивергенция: цена новый экстремум, ER падает → распределение
+    """
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 20:
+        return score_adaptive_ma(closes)
+
+    # Efficiency Ratio за последние N баров
+    er_period = min(20, n - 1)
+
+    def _er(series, period):
+        if len(series) < period + 1:
+            return 0.5
+        direction = abs(series[-1] - series[-period])
+        volatility = sum(abs(series[i] - series[i - 1]) for i in range(len(series) - period, len(series)))
+        return direction / (volatility or 1e-9)
+
+    er_now = _er(closes, er_period)
+    # ER 10 баров назад для дивергенции
+    er_past = _er(closes[:-10], er_period) if n > er_period + 10 else er_now
+
+    # 1. Базовый: отклонение от KAMA
+    base = score_adaptive_ma(closes)
+
+    # 2. ER-множитель: высокий ER = каскад (усиляем), низкий = боговик (ослабляем)
+    # ER 0.7+ → mult ~1.3; ER 0.2- → mult ~0.5
+    if er_now > 0.7:
+        er_mult = 1.0 + (er_now - 0.7) * 1.0    # до +0.3 при ER=1.0
+    elif er_now < 0.3:
+        er_mult = 0.4 + er_now * 2.0             # от 0.4 до 1.0
+    else:
+        er_mult = 1.0
+
+    # 3. ER-дивергенция: цена идёт вверх, ER падает — каскад затухает
+    price_chg = closes[-1] - closes[-(min(10, n))]
+    er_fell = er_past - er_now > 0.20   # ER упал значимо
+    divergence = 0.0
+    if er_fell and abs(price_chg) > closes[-1] * 0.003:
+        # Цена движется но ER падает → контр-сигнал
+        divergence = -math.copysign(min(0.40, (er_past - er_now) * 1.5), price_chg)
+
+    result = base * er_mult + divergence
+    return max(-1.0, min(1.0, result))
 
 
 def score_trend_quality_candle(candles: list[HistoricCandle]) -> float:
@@ -1773,11 +1825,35 @@ def score_zscore_candle(candles: list[HistoricCandle]) -> float:
 
     # |Z| > 2: экстремальное отклонение → возврат к среднему
     if z > 2.0:
-        return -min(0.75, (z - 1.5) * 0.40)
-    if z < -2.0:
-        return min(0.75, (-z - 1.5) * 0.40)
+        base = -min(0.75, (z - 1.5) * 0.40)
+    elif z < -2.0:
+        base = min(0.75, (-z - 1.5) * 0.40)
+    else:
+        base = 0.0
 
-    return 0.0
+    # Z-дивергенция: документ — цена новый экстремум, Z нет → распределение/затухание
+    # Смотрим на окно: где был пик цены и какой там был Z
+    divergence = 0.0
+    if n >= 25:
+        lb_div = min(20, n - 2)
+        window_closes = closes[-lb_div - 1:]
+        # Считаем Z для каждого бара окна
+        zs = []
+        for i in range(len(window_closes)):
+            w = window_closes[max(0, i - period + 1):i + 1]
+            if len(w) < 3:
+                zs.append(0.0)
+                continue
+            m = sum(w) / len(w)
+            s = (sum((x - m) ** 2 for x in w) / len(w)) ** 0.5 or 1e-9
+            zs.append((w[-1] - m) / s)
+        # Если цена сейчас на новом максимуме за окно, но Z не на новом максимуме
+        if closes[-1] >= max(window_closes) - 1e-9 and zs and z < max(zs) - 0.5:
+            divergence = -min(0.45, (max(zs) - z) * 0.2)   # медвежья дивергенция
+        elif closes[-1] <= min(window_closes) + 1e-9 and zs and z > min(zs) + 0.5:
+            divergence = min(0.45, (z - min(zs)) * 0.2)    # бычья дивергенция
+
+    return max(-1.0, min(1.0, base + divergence))
 
 
 def score_volatility_regime(candles: list[HistoricCandle]) -> float:
@@ -3827,14 +3903,15 @@ def score_ichimoku_signal(candles: list[HistoricCandle]) -> float:
     """
     ICHIMOKU_SIGNAL: неклассическое использование Ишимоку.
 
-    Сигналы (все нормированы в [-1, +1]):
-    1. Kijun-магнит: цена далеко от Kijun(26) → она туда вернётся (против тренда).
-    2. Толщина текущего облака: толстое = трение, тонкое = пустота (усиливает или тормозит).
-    3. Толщина будущего облака (26 баров вперёд): оценивается по текущим значениям
-       Senkou A/B — карта сопротивления впереди.
-    4. Chikou в пустоте: закрытие 26 баров назад — нет свечей вокруг → свободное пространство.
-
-    Итог: взвешенная комбинация. Основной сигнал — от kijun-магнита и будущего облака.
+    1. Tenkan/Kijun дистанция как режим-детектор:
+       - близко (<0.1%) = боговик/неопределённость → слабый нейтральный сигнал
+       - далеко (>0.3%) = каскад/сильный тренд → усиливаем сигнал по направлению TK
+       - пересечение = начало смены фазы → сигнал в сторону нового направления
+    2. Kijun-магнит: цена далеко от Kijun → ожидание возврата (против тренда).
+    3. Толщина будущего облака: тонкое = пустота (пространство для движения),
+       толстое = стена впереди.
+    4. Chikou в пустоте: текущее закрытие вне диапазона 26 баров назад → свобода.
+    5. Текущее облако: цена внутри толстого облака = трение.
     """
     if len(candles) < 60:
         return 0.0
@@ -3847,53 +3924,69 @@ def score_ichimoku_signal(candles: list[HistoricCandle]) -> float:
     def _midprice(h_slice, l_slice):
         return (max(h_slice) + min(l_slice)) / 2.0 if h_slice else 0.0
 
-    # Tenkan-sen (9) и Kijun-sen (26) — текущие
     if n < 26:
         return 0.0
     tenkan = _midprice(highs[-9:],  lows[-9:])
     kijun  = _midprice(highs[-26:], lows[-26:])
     cur    = closes[-1]
 
-    # 1. Kijun-магнит: расстояние цены от кидзун
-    kijun_dev = (cur - kijun) / (kijun or 1e-9)
-    # Умеренное отклонение → нейтрально; большое → сигнал возврата (против тренда)
-    kijun_signal = -math.tanh(kijun_dev * 8.0) * 0.5
+    # 1. Tenkan/Kijun — режим-детектор (документ: дистанция определяет фазу)
+    tk_dist = abs(tenkan - kijun) / (kijun or 1e-9)
+    tk_dir = 1 if tenkan > kijun else -1   # +1 бычий, -1 медвежий
+    if tk_dist < 0.001:
+        # Боговик: Tenkan и Kijun почти совпадают — неопределённость
+        tk_score = 0.0
+    elif tk_dist > 0.003:
+        # Каскад: далеко → сильный тренд, голосуем по направлению TK/KJ
+        tk_score = tk_dir * min(0.45, tk_dist * 100)
+    else:
+        tk_score = tk_dir * 0.20   # переходная зона
 
-    # 2. Текущее облако (Senkou A/B, построенное 26 баров назад)
+    # Пересечение Tenkan/Kijun за последние 3 бара = начало смены фазы
+    tk_cross = 0.0
+    if n >= 12:
+        tenkan_3 = _midprice(highs[-12:-3], lows[-12:-3])
+        kijun_3  = _midprice(highs[-29:-3], lows[-29:-3]) if n >= 32 else tenkan_3
+        prev_tk_dir = 1 if tenkan_3 > kijun_3 else -1
+        if prev_tk_dir != tk_dir:
+            # Свежее пересечение: сигнал в новую сторону
+            tk_cross = tk_dir * 0.35
+
+    # 2. Kijun-магнит: цена далеко → возврат (против тренда)
+    kijun_dev = (cur - kijun) / (kijun or 1e-9)
+    kijun_signal = -math.tanh(kijun_dev * 8.0) * 0.35
+
+    # 3. Текущее облако (Senkou A/B построенное 26 баров назад)
     cloud_score = 0.0
     if n >= 52:
-        sa_past = _midprice(highs[-52:-26], lows[-52:-26])  # приближение senkou A 26 баров назад
+        sa_past = _midprice(highs[-52:-26], lows[-52:-26])
         sb_past = _midprice(highs[-78:-26], lows[-78:-26]) if n >= 78 else sa_past
         cloud_thick_past = abs(sa_past - sb_past)
         atr_now = _compute_atr(candles)
         cloud_in_atr = cloud_thick_past / ((_to_f(candles[-1].close) or 1) * max(atr_now, 0.001))
-        # Цена внутри прошлого облака
-        cloud_top  = max(sa_past, sb_past)
-        cloud_bot  = min(sa_past, sb_past)
-        in_cloud   = cloud_bot <= cur <= cloud_top
-        if in_cloud and cloud_in_atr > 1.5:
-            cloud_score = -0.3   # толстое облако = трение, против входа
+        cloud_top = max(sa_past, sb_past)
+        cloud_bot = min(sa_past, sb_past)
+        if cloud_bot <= cur <= cloud_top and cloud_in_atr > 1.5:
+            cloud_score = -0.25   # цена в толстом облаке = трение
 
-    # 3. Будущее облако (следующие 26 периодов): строим из текущих значений
+    # 4. Будущее облако: тонкое = пустота, толстое = стена
     senkou_a_future = (tenkan + kijun) / 2.0
     senkou_b_future = _midprice(highs[-52:], lows[-52:]) if n >= 52 else tenkan
     future_cloud_thick = abs(senkou_a_future - senkou_b_future)
-    # Нормируем на ATR
     atr_abs = _compute_atr(candles) * (cur or 1)
     future_void = future_cloud_thick / (atr_abs or 1e-9)
-    # Тонкое будущее облако → усиливаем сигнал в направлении тренда
     trend_dir_sign = 1 if cur > kijun else -1
-    if future_void < 0.5:   # пустота впереди
-        future_score = trend_dir_sign * 0.30
-    elif future_void > 2.0: # стена впереди
-        future_score = -trend_dir_sign * 0.25
+    if future_void < 0.5:
+        future_score = trend_dir_sign * 0.25   # пустота впереди
+    elif future_void > 2.0:
+        future_score = -trend_dir_sign * 0.20  # стена впереди
     else:
         future_score = 0.0
 
-    # 4. Chikou в пустоте: закрытие 26 баров назад, сравниваем с диапазоном окружающих свечей
+    # 5. Chikou в пустоте
     chikou_score = 0.0
     if n >= 27:
-        chikou_price = closes[-1]      # chikou = текущее закрытие на графике 26 баров назад
+        chikou_price = closes[-1]
         chikou_context = candles[-28:-24] if n >= 28 else []
         if chikou_context:
             ctx_hi = max(_to_f(c.high) for c in chikou_context)
@@ -3905,10 +3998,11 @@ def score_ichimoku_signal(candles: list[HistoricCandle]) -> float:
                     else (ctx_lo - chikou_price) / ctx_range if chikou_price < ctx_lo
                     else 0.0
                 ))
-                # Chikou в пустоте → подтверждает направление
-                chikou_score = trend_dir_sign * gap_ratio * 0.25
+                chikou_score = trend_dir_sign * gap_ratio * 0.20
 
-    total = kijun_signal * 0.40 + cloud_score * 0.20 + future_score * 0.25 + chikou_score * 0.15
+    total = (tk_score * 0.30 + tk_cross * 0.20
+             + kijun_signal * 0.25 + cloud_score * 0.10
+             + future_score * 0.10 + chikou_score * 0.05)
     return round(max(-1.0, min(1.0, total)), 4)
 
 
@@ -3968,15 +4062,40 @@ def score_bb_keltner_squeeze(candles: list[HistoricCandle]) -> float:
     if len(mom_vals) >= 2:
         mom_slope = (delta - mom_vals[0]) / (abs(mom_vals[0]) or 1e-9)
 
+    # Длительность сжатия: сколько предыдущих баров тоже были в squeeze
+    # Документ: 1-2 бара = вялый выброс; 3-5 = нормальный; 7+ = очень резкий
+    squeeze_duration = 0
+    for c_prev in reversed(candles[:-1]):
+        wins = candles[max(0, len(candles) - P - 5):]
+        c_sl = [_to_f(c.close) for c in wins]
+        c_hi = [_to_f(c.high)  for c in wins]
+        c_lo = [_to_f(c.low)   for c in wins]
+        if len(c_sl) < P:
+            break
+        _bb_m = sum(c_sl[-P:]) / P
+        _bb_s = _std(c_sl[-P:])
+        _kc_m = _ema(c_sl, P)[-1]
+        _atr  = next((v for v in reversed(_true_atr_list(wins, 14)) if not math.isnan(v)), 0.0)
+        if (_bb_m + 2 * _bb_s < _kc_m + 1.5 * _atr) and (_bb_m - 2 * _bb_s > _kc_m - 1.5 * _atr):
+            squeeze_duration += 1
+        else:
+            break
+        if squeeze_duration >= 10:
+            break
+
+    # Множитель силы выброса от длительности сжатия
+    duration_mult = 1.0 + min(0.60, squeeze_duration * 0.08)  # +8% за каждый бар, max +60%
+
     if squeeze_on:
-        # Компрессия активна → небольшой нейтральный сигнал в сторону momentum
+        # Компрессия активна: слабый сигнал в сторону momentum, усиленный длительностью
         direction = math.copysign(1, delta) if abs(delta) > 1e-9 else 0
-        return round(direction * 0.20, 4)
+        base_strength = min(0.35, 0.15 + squeeze_duration * 0.02)
+        return round(direction * base_strength, 4)
 
     if squeeze_off:
-        # Только что вышли из сжатия → сильный сигнал в направлении momentum
+        # Вышли из сжатия: сильный направленный сигнал, тем сильнее чем дольше был squeeze
         direction = math.copysign(1, delta) if abs(delta) > 1e-9 else 0
-        strength = min(0.80, 0.45 + min(1.0, abs(mom_slope)) * 0.35)
+        strength = min(0.95, (0.45 + min(1.0, abs(mom_slope)) * 0.35) * duration_mult)
         return round(direction * strength, 4)
 
     return 0.0
