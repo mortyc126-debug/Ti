@@ -2178,6 +2178,36 @@ const IND_GROUPS = [
           return {s:'neutral', t:`DPO = ${x.toFixed(1)} — середина цикла.`};
         }
       },
+      { id:'frac_dim', name:'Fractal Dimension / ФР', full:'Фрактальная размерность ценового ряда',
+        desc:'1–2: ближе к 1 = тренд, ближе к 2 = случайное блуждание/боковик. Резкое падение FD = смена режима.',
+        params:[{id:'val', label:'FD значение', min:1, max:2, def:1.5, step:0.01}],
+        interpret: v => {
+          const f=v.val;
+          if(f<1.3) return {s:'buy', t:`FD=${f.toFixed(2)} — сильный тренд, рынок направленный`};
+          if(f>1.7) return {s:'neutral', t:`FD=${f.toFixed(2)} — высокий хаос, боковик/накопление`};
+          return {s:'warn', t:`FD=${f.toFixed(2)} — переходная зона`};
+        }
+      },
+      { id:'efficiency_ratio', name:'Efficiency Ratio / ИЭ', full:'Efficiency Ratio Кауфмана — индекс эффективности движения',
+        desc:'0–1: 1 = цена идёт прямо, 0 = металась туда-сюда. Переход от 0 к 1 = ваша точка входа.',
+        params:[{id:'val', label:'ER значение', min:0, max:1, def:0.3, step:0.01}],
+        interpret: v => {
+          const e=v.val;
+          if(e>0.7) return {s:'buy',     t:`ER=${e.toFixed(2)} — высокая эффективность, тренд`};
+          if(e<0.2) return {s:'neutral', t:`ER=${e.toFixed(2)} — хаос/накопление`};
+          return {s:'warn', t:`ER=${e.toFixed(2)} — переход режима`};
+        }
+      },
+      { id:'entropy', name:'Entropy / Энтропия', full:'Пермутационная энтропия — мера хаотичности движений',
+        desc:'0–1: 0 = полный порядок (тренд), 1 = максимальный хаос. Падение энтропии = структура формируется.',
+        params:[{id:'val', label:'Энтропия', min:0, max:1, def:0.8, step:0.01}],
+        interpret: v => {
+          const e=v.val;
+          if(e<0.5) return {s:'buy',     t:`Энтропия=${e.toFixed(2)} — низкий хаос, есть структура и направление`};
+          if(e>0.85) return {s:'neutral', t:`Энтропия=${e.toFixed(2)} — высокий хаос, рынок шумный`};
+          return {s:'warn', t:`Энтропия=${e.toFixed(2)} — умеренная неопределённость`};
+        }
+      },
       { id:'cum_delta', name:'Cumulative Delta / КД', full:'Кумулятивная дельта — накопленный дисбаланс покупок и продаж',
         desc:'Аппроксимация агрессивных покупок/продаж через OHLCV. Расхождение с ценой — главный сигнал.',
         params:[
@@ -5183,6 +5213,9 @@ function chartRedraw() {
   if (chartInds.ult_osc)       _indDrawPanel('ult_osc');
   if (chartInds.dpo)           _indDrawPanel('dpo');
   if (chartInds.std_dev)       _indDrawPanel('std_dev');
+  if (chartInds.frac_dim)         _indDrawPanel('frac_dim');
+  if (chartInds.efficiency_ratio) _indDrawPanel('efficiency_ratio');
+  if (chartInds.entropy)          _indDrawPanel('entropy');
   if (chartInds.cum_delta)    _indDrawPanel('cum_delta');
   if (chartInds.cyber_cycle)  _indDrawPanel('cyber_cycle');
   if (chartInds.mama)         _indDrawOverlay('mama');
@@ -6414,6 +6447,61 @@ function _indDrawPanel(id){
       const per=20,sd=closes.map((_,i)=>{if(i<per)return null;const sl=closes.slice(i-per+1,i+1),m=sl.reduce((s,v)=>s+v,0)/per;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/per);});
       drawLine(sd,'#4cc9f0',1.5);_pLabel(ctx,'Std Dev');
       const vs=sd.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-std_dev-badge',lv>avg*1.5?'sell':lv<avg*0.7?'buy':'neutral');
+    } else if(id==='frac_dim'){
+      // FD ≈ 1 + log10(sumATR / range) / log10(period) — прямая связь с Choppiness
+      const per=14;
+      const fd=closes.map((_,i)=>{
+        if(i<per)return null;
+        const sl=chartCandles.slice(i-per+1,i+1);
+        const hl=Math.max(...sl.map(c=>c.high))-Math.min(...sl.map(c=>c.low));
+        if(!hl)return 1.5;
+        const atr=sl.reduce((s,c,j)=>j===0?s:s+Math.max(c.high-c.low,Math.abs(c.high-sl[j-1].close),Math.abs(c.low-sl[j-1].close)),0);
+        const v=1+Math.log10(atr/hl)/Math.log10(per);
+        return Math.min(2,Math.max(1,v));
+      });
+      // Шкала 1..2 с зонами
+      const toYfd=v=>H*(1-(v-1)); // 1→H, 2→0
+      _pGrid(ctx,W,toYfd(1.5));
+      [1.3,1.5,1.7].forEach(lvl=>{_pGrid(ctx,W,toYfd(lvl));ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText(lvl.toFixed(1),W-2,toYfd(lvl)-1);});
+      ctx.textAlign='left';
+      // Цветовая линия: красная зона тренда (<1.4), синяя хаос (>1.6)
+      _pl(ctx,W,H,fd,'#52F2C9',1.5,startIdx,endIdx,xOf,toYfd);
+      _pLabel(ctx,'Frac Dim');
+      const lv=fd.filter(v=>v!=null).pop()||1.5,pv=fd.slice(0,fd.length-3).filter(v=>v!=null).pop()||lv;
+      setPill('chart-frac_dim-badge',lv<1.3?'buy-strong':lv<1.4?'buy':lv>1.7?'neutral':lv<pv?'buy':'neutral');
+    } else if(id==='efficiency_ratio'){
+      const per=10;
+      const er=closes.map((c,i)=>{
+        if(i<per)return null;
+        const dir=Math.abs(c-closes[i-per]);
+        const path=closes.slice(i-per+1,i+1).reduce((s,v,j,a)=>j===0?s:s+Math.abs(v-a[j-1]),0);
+        return path>0?Math.min(1,dir/path):0;
+      });
+      drawRange(er.map(v=>v!=null?v*100:null),'#52F2C9',20,70);
+      ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('ER',W-2,10);ctx.textAlign='left';
+      _pLabel(ctx,'Effic.Ratio');
+      const lv=er.filter(v=>v!=null).pop()||0;
+      setPill('chart-efficiency_ratio-badge',lv>0.7?'buy-strong':lv>0.4?'buy':lv<0.1?'neutral':'warn');
+    } else if(id==='entropy'){
+      // Пермутационная энтропия (m=3): 6 паттернов порядка 3-х последовательных доходностей
+      const per=20;
+      const ent=closes.map((_,i)=>{
+        if(i<per+2)return null;
+        const rets=closes.slice(i-per,i+1).map((c,j,a)=>j===0?0:c-a[j-1]).slice(1);
+        const pats={};
+        for(let j=0;j<rets.length-2;j++){
+          const t=[rets[j],rets[j+1],rets[j+2]];
+          const k=[0,1,2].sort((a,b)=>t[a]-t[b]).join('');
+          pats[k]=(pats[k]||0)+1;
+        }
+        const tot=rets.length-2;
+        let H=0;Object.values(pats).forEach(cnt=>{const p=cnt/tot;if(p>0)H-=p*Math.log2(p);});
+        return H/Math.log2(6); // нормировать к 0..1
+      });
+      drawRange(ent.map(v=>v!=null?v*100:null),'#4cc9f0',40,80);
+      _pLabel(ctx,'Entropy');
+      const lv=ent.filter(v=>v!=null).pop()||0.8;
+      setPill('chart-entropy-badge',lv<0.5?'buy-strong':lv<0.65?'buy':lv>0.85?'neutral':'warn');
     } else if(id==='cum_delta'){
       // Аппроксимация дельты: buy_vol ≈ vol*(close-low)/(high-low), sell_vol ≈ vol*(high-close)/(high-low)
       let cum=0;
@@ -9876,20 +9964,89 @@ function renderAnalysis() {
         else items.push({type:'neutral', text:`UO = ${uo.toFixed(1)} — нейтрально, трёхкомпонентный осциллятор`});
         html += makeCard('Ultimate Oscillator (неклассически)', items);
       }
-    } else if (idL === 'chop') {
+    } else if (idL === 'chop' || idL === 'frac_dim' || idL === 'efficiency_ratio' || idL === 'entropy') {
+      // Все измерители режима рынка — обрабатываем вместе для кросс-анализа
       const n = candles.length;
-      const per=14;
-      if (n >= per) {
+      const per = 14;
+      if (n >= per + 10) {
         const items = [];
-        const tr=candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high,candles[i-1].close)-Math.min(c.low,candles[i-1].close));
-        const atrSum=tr.slice(n-per).reduce((a,b)=>a+b,0);
-        const hh=Math.max(...candles.slice(n-per).map(c=>c.high));
-        const ll=Math.min(...candles.slice(n-per).map(c=>c.low));
-        const chop = (hh>ll&&atrSum>0) ? 100*Math.log10(atrSum/(hh-ll))/Math.log10(per) : 50;
-        if(chop<38.2) items.push({type:'bullish', text:`CHOP = ${chop.toFixed(1)} — рынок трендовый: ATR мал относительно диапазона`});
-        else if(chop>61.8) items.push({type:'neutral', text:`CHOP = ${chop.toFixed(1)} — флэт: энергия накапливается, пробой может быть резким`});
-        else items.push({type:'neutral', text:`CHOP = ${chop.toFixed(1)} — переходная зона (норма 38.2–61.8)`});
-        html += makeCard('Choppiness Index (неклассически)', items);
+        // --- Вычисляем CHOP за всю историю ---
+        const chopArr = closes.map((_,i) => {
+          if (i < per) return null;
+          const sl = candles.slice(i-per+1, i+1);
+          const hl = Math.max(...sl.map(c=>c.high)) - Math.min(...sl.map(c=>c.low));
+          if (!hl) return 50;
+          const atr = sl.reduce((s,c,j)=>j===0?s:s+Math.max(c.high-c.low,Math.abs(c.high-sl[j-1].close),Math.abs(c.low-sl[j-1].close)),0);
+          return 100 * Math.log10(atr/hl) / Math.log10(per);
+        });
+        const chopNow = chopArr[n-1] || 50;
+        const chop5ago = chopArr[n-6] || 50;
+        const chop10ago = chopArr[n-11] || 50;
+
+        // --- Текущий режим ---
+        if (chopNow < 38.2) items.push({type:'bullish', text:`CHOP = ${chopNow.toFixed(1)} — трендовый режим. Трендовые индикаторы работают, осцилляторы дают ложные сигналы`});
+        else if (chopNow > 61.8) items.push({type:'neutral', text:`CHOP = ${chopNow.toFixed(1)} — хаос/боковик. Накопление идёт — осцилляторы работают, трендовые — нет`});
+        else items.push({type:'neutral', text:`CHOP = ${chopNow.toFixed(1)} — переходная зона (38.2–61.8)`});
+
+        // --- 1. Накопленная энергия: сколько свечей провели в высокой жёсткости ---
+        const highChopStreak = (() => {
+          let streak = 0;
+          for (let i = n-1; i >= per; i--) {
+            if (chopArr[i] > 61.8) streak++;
+            else break;
+          }
+          return streak;
+        })();
+        if (highChopStreak >= 20) items.push({type:'neutral', text:`${highChopStreak} свечей в зоне хаоса — накоплена значительная энергия. Чем дольше боковик, тем сильнее выход: это не сигнал входа, это контекст`});
+        else if (highChopStreak >= 10) items.push({type:'neutral', text:`${highChopStreak} свечей в боковике — умеренное накопление напряжения`});
+        else if (chopNow < 38.2 && chop5ago > 61.8) items.push({type:'bullish', text:`Только что вышли из зоны хаоса (было ${chop5ago.toFixed(1)}) — режим сломан, начало направленного движения`});
+
+        // --- 2. Скорость изменения CHOP (опережающий сигнал) ---
+        const chopSpeed5 = chop5ago - chopNow;   // >0 = падает (→ тренд)
+        const chopSpeed10 = chop10ago - chop5ago; // сравниваем два периода скорости
+        if (chopNow > 50 && chopSpeed5 > 10) {
+          if (chopSpeed5 > chopSpeed10 * 1.5) items.push({type:'bullish', text:`CHOP резко падает: -${chopSpeed5.toFixed(1)} за 5 свечей (ускорение) — режим ломается агрессивно, высокая вероятность каскада`});
+          else items.push({type:'neutral', text:`CHOP снижается -${chopSpeed5.toFixed(1)} за 5 свечей — плановый переход в тренд, управляемое движение`});
+        } else if (chopNow < 45 && chopSpeed5 < -8) {
+          items.push({type:'neutral', text:`CHOP растёт +${Math.abs(chopSpeed5).toFixed(1)} — тренд ослабевает, возможно возврат в накопление`});
+        }
+
+        // --- 3. Дивергенция: цена стоит, CHOP падает = опережающий сигнал ---
+        const priceMove = Math.abs(closes[n-1] - closes[n-6]) / closes[n-6] * 100;
+        if (priceMove < 0.5 && chopSpeed5 > 8 && chopNow > 45) {
+          items.push({type:'bullish', text:`Дивергенция: цена в боковике (${priceMove.toFixed(1)}%), CHOP падает — режим меняется раньше цены. Опережающий сигнал совместно с OI`});
+        }
+
+        // --- ER (Efficiency Ratio, period=10) ---
+        const er10 = (() => {
+          if (n < 12) return null;
+          const dir = Math.abs(closes[n-1] - closes[n-11]);
+          const path = closes.slice(n-10).reduce((s,v,j,a)=>j===0?s:s+Math.abs(v-a[j-1]),0);
+          return path > 0 ? Math.min(1, dir/path) : 0;
+        })();
+        if (er10 !== null) {
+          if (er10 > 0.7) {
+            if (chopNow < 45) items.push({type:'bullish', text:`ER = ${er10.toFixed(2)} — высокая эффективность: цена идёт прямо. CHOP+ER оба подтверждают тренд — двойное подтверждение`});
+            else items.push({type:'neutral', text:`ER = ${er10.toFixed(2)} — высокая эффективность, но CHOP ещё высокий — расхождение измерителей, лучше подождать`});
+          } else if (er10 < 0.15) {
+            items.push({type:'neutral', text:`ER = ${er10.toFixed(2)} — максимальный хаос по Кауфману: цена "металась" и прошла ноль. Боковик с накоплением`});
+          } else if (er10 > 0.4 && chop5ago > 61.8 && chopNow < 55) {
+            items.push({type:'bullish', text:`ER растёт (${er10.toFixed(2)}) при снижении CHOP — два независимых измерителя говорят: режим меняется`});
+          }
+        }
+
+        // --- Калибровка тейков ---
+        const fd = chopNow / 100 + 1; // FD ≈ 1 + CHOP/100 — упрощение
+        if (chopNow < 38.2) {
+          items.push({type:'bullish', text:`Калибровка тейков: FD≈${fd.toFixed(2)} — трендовый режим, держать позицию дольше, тейки ставить широко`});
+        } else if (chopNow > 61.8) {
+          items.push({type:'neutral', text:`Калибровка тейков: FD≈${fd.toFixed(2)} — хаотичный режим, брать тейки раньше, движения быстро разворачиваются`});
+        }
+
+        const title = idL === 'chop' ? 'Choppiness Index (неклассически)' :
+                      idL === 'frac_dim' ? 'Фрактальная размерность (неклассически)' :
+                      idL === 'efficiency_ratio' ? 'Efficiency Ratio (неклассически)' : 'Энтропия (неклассически)';
+        html += makeCard(title, items);
       }
     } else if (idL === 'vortex') {
       const n = candles.length;
