@@ -1091,7 +1091,7 @@ def score_candle_pattern(candles: list[HistoricCandle]) -> float:
     vols_20 = [float(c.volume) for c in candles[-20:]]
     mu_v = sum(vols_20) / len(vols_20)
     sd_v = (sum((v - mu_v) ** 2 for v in vols_20) / len(vols_20)) ** 0.5
-    vol_z = (float(last.volume) - mu_v) / (sd_v or mu_v)
+    vol_z = (float(last.volume) - mu_v) / (sd_v if sd_v > 1e-9 else max(mu_v, 1.0))
 
     # ── 1. Закрытие внутри диапазона (direction pressure) ────────────────────
     # 0 = нижний экстремум, 1 = верхний; не цвет, а позиция закрытия
