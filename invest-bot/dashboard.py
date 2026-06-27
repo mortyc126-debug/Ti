@@ -67,6 +67,7 @@ from runtime_overrides import load_overrides, save_overrides
 from trade_system.issuer_filter import issuer_key, select_top_tickers
 from trade_system.strategies.oi_composite_strategy import (
     AUTO_ATR_MIN_TRADES, AUTO_ATR_SCALE_EXPS, AUTO_ATR_STOP_KS, AUTO_ATR_TAKE_KS,
+    ATR_EVAL_LOOKBACK,
 )
 from trade_system.strategies.strategy_factory import StrategyFactory
 
@@ -1496,8 +1497,8 @@ def _what_if_from_trades(trades: list[dict]) -> dict:
 ATR_REOPT_MIN_NEW_TRADES = 15   # переоптимизировать не каждый день, а раз в N новых сделок —
                                 # меньше "точек выбора" -> меньше шансов у шума выиграть argmax
 ATR_SHRINK_K = 8                # псевдо-наблюдения к fixed-бейзлайну (как REGIME_SHRINKAGE_K в history.py)
-ATR_MIN_EDGE_SEM = 1.0          # ATR-кандидат должен превосходить fixed минимум на N своих SEM,
-                                # иначе остаёмся на текущих параметрах (не дёргаем из-за шума)
+ATR_MIN_EDGE_SEM = 2.0          # ATR-кандидат должен превосходить fixed минимум на 2 своих SEM;
+                                # 1.0 было слишком мягко — шум на 12-16 eval-сделках регулярно проходил порог
 
 
 def _shrunk_score(trades: list[dict], fixed_pct: float, k: int = ATR_SHRINK_K) -> tuple[float, float]:
@@ -1640,8 +1641,11 @@ def run_backtest_one(
                     # окне просто случайно не выбило шумом. Оцениваем sweep на
                     # более позднем хвосте past_signals, не участвовавшем в
                     # отборе кандидатов.
-                    split = int(len(past_signals) * 0.6)
-                    eval_signals = past_signals[split:] if len(past_signals) - split >= AUTO_ATR_MIN_TRADES else past_signals
+                    # Rolling lookback: берём только последние ATR_EVAL_LOOKBACK сигналов,
+                    # чтобы старые режимные данные не тянули параметры в прошлое.
+                    lookback_signals = past_signals[-ATR_EVAL_LOOKBACK:]
+                    split = int(len(lookback_signals) * 0.6)
+                    eval_signals = lookback_signals[split:] if len(lookback_signals) - split >= AUTO_ATR_MIN_TRADES else lookback_signals
                     best = None
                     for tk in atr_take_ks:
                         for sk in atr_stop_ks:
