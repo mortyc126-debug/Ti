@@ -9380,6 +9380,181 @@ function renderAnalysis() {
 
   let html = '';
 
+  // ─── АНТИСИГНАЛЫ — всегда первый блок ───────────────────────────────────────
+  if (candles.length >= 40) {
+    const n = candles.length;
+    const notTrend = []; // антисигналы «это НЕ тренд»
+    const notFlat  = []; // антисигналы «это НЕ боковик»
+
+    // Вспомогательные вычисления (один раз)
+    // ATR
+    const tr = candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high-c.low,Math.abs(c.high-candles[i-1].close),Math.abs(c.low-candles[i-1].close)));
+    // Cumulative Delta
+    let cdCum=0;
+    const cd = candles.map(c=>{const hl=c.high-c.low,v=c.volume||0;if(!hl)return(cdCum+=0,cdCum);cdCum+=v*(c.close-c.low)/hl-v*(c.high-c.close)/hl;return cdCum;});
+    // EMA helper
+    const ema=(arr,p)=>{const k=2/(p+1);let s=arr[0];return arr.map(v=>{s=s*(1-k)+(v||0)*k;return s;});};
+    // CHOP за скользящее окно
+    const chopNow=(per=14)=>{const sl=candles.slice(n-per);const hl=Math.max(...sl.map(c=>c.high))-Math.min(...sl.map(c=>c.low));const sa=tr.slice(n-per).reduce((a,b)=>a+b,0);return hl>0?100*Math.log10(sa/hl)/Math.log10(per):50;};
+    // ER
+    const erNow=(per=10)=>{const dir=Math.abs(closes[n-1]-closes[n-1-per]);const path=closes.slice(n-per).reduce((s,v,j,a)=>j===0?s:s+Math.abs(v-a[j-1]),0);return path>0?Math.min(1,dir/path):0;};
+    // BB width
+    const bbwNow=(per=20)=>{const sl=closes.slice(n-per);const m=sl.reduce((a,b)=>a+b,0)/per;const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/per);return m>0?(sd*4)/m*100:0;};
+    // KVO
+    const kvoNow=()=>{
+      const hlc=candles.map(c=>c.high+c.low+c.close);
+      const trend=hlc.map((v,i)=>i===0?1:v>hlc[i-1]?1:-1);
+      let cm=0,prevDm=0,prevTr=1;
+      const vf=candles.map((c,i)=>{const dm=c.high-c.low;if(!i){cm=dm;prevDm=dm;prevTr=trend[0];return 0;}if(trend[i]!==prevTr)cm=prevDm+dm;else cm+=dm;prevDm=dm;prevTr=trend[i];return cm>0?(c.volume||0)*Math.abs(2*dm/cm-1)*trend[i]*100:0;});
+      const e34=ema(vf,34),e55=ema(vf,55);return{now:e34[n-1]-e55[n-1],prev5:e34[n-6]-e55[n-6],prev10:e34[n-11]-e55[n-11]};
+    };
+    // EBS (Cyber Cycle фаза)
+    const ebsNow=()=>{const alpha=0.07,a1=(1-alpha/2)**2,a2=2*(1-alpha),a3=(1-alpha)**2;const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);const cc=new Array(n).fill(0);for(let i=2;i<n;i++)cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];return cc[n-1];};
+
+    // ── А. Антисигналы «это НЕ тренд» ──────────────────────────
+    const priceChange5  = (closes[n-1]-closes[n-6])/closes[n-6]*100;
+    const priceChange10 = (closes[n-1]-closes[n-11])/closes[n-11]*100;
+    const isTrending = Math.abs(priceChange10) > 1.5;
+
+    if (isTrending) {
+      const dir = priceChange10 > 0 ? 1 : -1;
+
+      // 1. Дивергенция объёма: новый экстремум цены, объём меньше чем на предыдущем
+      if (n >= 25) {
+        const vol10 = vols.slice(n-10).reduce((a,b)=>a+b,0)/10;
+        const vol20 = vols.slice(n-25,n-10).reduce((a,b)=>a+b,0)/15;
+        if (dir===1 && closes[n-1]>closes[n-10] && vol10<vol20*0.7) {
+          notTrend.push({cnt:1, text:`Объём на росте: ${(vol10/1000).toFixed(0)}k vs ${(vol20/1000).toFixed(0)}k ранее — новые максимумы цены при падающем объёме. Тренд без топлива`});
+        } else if (dir===-1 && closes[n-1]<closes[n-10] && vol10<vol20*0.7) {
+          notTrend.push({cnt:1, text:`Объём на снижении иссякает (${(vol10/1000).toFixed(0)}k vs ${(vol20/1000).toFixed(0)}k) — продавцы теряют агрессию`});
+        }
+      }
+
+      // 2. Дивергенция Cumulative Delta и цены
+      const cdNow = cd[n-1], cd10 = cd[n-11];
+      if (dir===1 && closes[n-1]>closes[n-11] && cdNow<cd10) {
+        notTrend.push({cnt:1, text:`Дивергенция дельты: цена на новых максимумах, Cum.Delta падает — продавцы агрессивнее покупателей хотя цена растёт`});
+      } else if (dir===-1 && closes[n-1]<closes[n-11] && cdNow>cd10) {
+        notTrend.push({cnt:1, text:`Дивергенция дельты: цена на новых лоях, Cum.Delta растёт — покупатели поглощают давление, импульс снижения затухает`});
+      }
+
+      // 3. ATR сужается в середине тренда
+      const atrNow5  = tr.slice(n-5).reduce((a,b)=>a+b,0)/5;
+      const atrPrev5 = tr.slice(n-15,n-10).reduce((a,b)=>a+b,0)/5;
+      if (atrPrev5>0 && atrNow5 < atrPrev5*0.55) {
+        notTrend.push({cnt:1, text:`ATR сузился до ${(atrNow5/atrPrev5*100).toFixed(0)}% от прежнего уровня — диапазоны свечей тают при продолжении движения. Энергия на исходе`});
+      }
+
+      // 4. CHOP растёт при продолжении ценового движения
+      const chop5 = chopNow(5), chop14 = chopNow(14);
+      if (chop14 > 50 && chop5 > chop14 + 8) {
+        notTrend.push({cnt:1, text:`CHOP(14)=${chop14.toFixed(0)} и растёт — режим дрейфует в хаос хотя цена ещё движется. Движение по инерции`});
+      }
+
+      // 5. ER падает при продолжении движения
+      const er5 = erNow(5), er10 = erNow(10);
+      if (er10 > 0.6 && er5 < 0.35) {
+        notTrend.push({cnt:1, text:`Efficiency Ratio: был ${er10.toFixed(2)}, теперь ${er5.toFixed(2)} — цена движется туда-сюда больше чем вперёд. Эффективность тренда рухнула`});
+      }
+
+      // 6. EBS переключил фазу при продолжении движения
+      if (n >= 35) {
+        const cc1=ebsNow(), cc5=(() => {const alpha=0.07,a1=(1-alpha/2)**2,a2=2*(1-alpha),a3=(1-alpha)**2;const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);const cc=new Array(n).fill(0);for(let i=2;i<n;i++)cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];return cc[n-6];})();
+        if (dir===1 && cc1<0 && cc5>0) notTrend.push({cnt:1, text:`EBS перешёл в нижнюю фазу синусоиды хотя цена ещё растёт — цикловой компонент развернулся раньше цены`});
+        else if (dir===-1 && cc1>0 && cc5<0) notTrend.push({cnt:1, text:`EBS перешёл в верхнюю фазу при продолжении снижения — циклическая составляющая уже разворачивается`});
+      }
+
+      // 7. KVO: не подтверждает новый экстремум
+      if (n >= 60) {
+        const kv=kvoNow();
+        if (dir===1 && kv.now<kv.prev10 && closes[n-1]>closes[n-11]) {
+          notTrend.push({cnt:1, text:`KVO не подтверждает новый максимум цены (${(kv.now/1000).toFixed(0)}k < ${(kv.prev10/1000).toFixed(0)}k ранее) — денежный поток слабеет`});
+        } else if (dir===-1 && kv.now>kv.prev10 && closes[n-1]<closes[n-11]) {
+          notTrend.push({cnt:1, text:`KVO не подтверждает новый минимум цены — давление денег ослабевает при новых лоях`});
+        }
+      }
+    }
+
+    // ── Б. Антисигналы «это НЕ боковик» ────────────────────────
+    const priceRange20pct = (Math.max(...closes.slice(n-20))-Math.min(...closes.slice(n-20)))/closes[n-1]*100;
+    const isFlat = priceRange20pct < 2.5 && Math.abs(priceChange10) < 1;
+
+    if (isFlat) {
+      // 1. Cumulative Delta трендует в боковике
+      const cdTrend = (cd[n-1]-cd[n-20]) / (Math.abs(cd[n-1])+Math.abs(cd[n-20])+1);
+      if (Math.abs(cdTrend) > 0.2) {
+        notFlat.push({cnt:1, text:`Цена в боковике (${priceRange20pct.toFixed(1)}%), но Cum.Delta монотонно ${cdTrend>0?'растёт':'падает'} — деньги систематически входят в ${cdTrend>0?'покупку':'продажу'}`});
+      }
+
+      // 2. KVO в экстремуме при боковой цене
+      if (n >= 60) {
+        const kv=kvoNow();
+        const absNow=Math.abs(kv.now), absAvg=(Math.abs(kv.prev5)+Math.abs(kv.prev10))/2;
+        if (absNow>absAvg*1.8 && absAvg>0) {
+          notFlat.push({cnt:1, text:`KVO в экстремуме (${(kv.now/1000).toFixed(0)}k) при боковой цене — крупный участник систематически накапливает. Нитка созревает`});
+        }
+      }
+
+      // 3. BB расширяются при цене в диапазоне
+      const bbw5 = bbwNow(10), bbw20 = bbwNow(20);
+      if (bbw5 > bbw20 * 1.4) {
+        notFlat.push({cnt:1, text:`BB Width расширяется (${bbw5.toFixed(1)}% vs ${bbw20.toFixed(1)}%) хотя цена в диапазоне — волатильность пробуждается. Боковик нестабилен`});
+      }
+
+      // 4. CHOP падает при боковике = режим меняется
+      const chopC = chopNow(14), chopOld = (() => {const sl=candles.slice(n-24,n-10);const hl=Math.max(...sl.map(c=>c.high))-Math.min(...sl.map(c=>c.low));const sa=tr.slice(n-24,n-10).reduce((a,b)=>a+b,0);return hl>0?100*Math.log10(sa/hl)/Math.log10(14):50;})();
+      if (chopOld > 60 && chopC < chopOld - 10) {
+        notFlat.push({cnt:1, text:`CHOP падает (${chopOld.toFixed(0)}→${chopC.toFixed(0)}) — режим меняется внутри боковика. Опережающий сигнал смены направления`});
+      }
+
+      // 5. Асимметрия скорости движений в диапазоне
+      if (n >= 30) {
+        let upBars=0,upCandles=0,dnBars=0,dnCandles=0;
+        for(let i=n-20;i<n;i++){const d=closes[i]-closes[i-1];if(d>0)upBars+=d;else dnBars+=Math.abs(d);}
+        // Число зелёных vs красных свечей
+        for(let i=n-20;i<n;i++){if(closes[i]>closes[i-1])upCandles++;else dnCandles++;}
+        if (upCandles > dnCandles*1.6 || dnCandles > upCandles*1.6) {
+          const side=upCandles>dnCandles?'вверх':'вниз';
+          notFlat.push({cnt:1, text:`Асимметрия свечей в диапазоне: ${Math.max(upCandles,dnCandles)} vs ${Math.min(upCandles,dnCandles)} в пользу ${side} — скрытая направленность боковика`});
+        }
+      }
+
+      // 6. EBS/CC в экстремуме при боковике = фаза меняется
+      if (n >= 35) {
+        const cc=ebsNow();
+        if (Math.abs(cc)>0.6) {
+          notFlat.push({cnt:1, text:`EBS в экстремуме (${cc.toFixed(2)}) при боковой цене — цикловая составляющая в точке максимального натяжения. Выброс совпадёт с разворотом синусоиды`});
+        }
+      }
+    }
+
+    // ── Собираем итоговую карточку антисигналов ──────────────────
+    if (notTrend.length >= 1 || notFlat.length >= 1) {
+      let aHtml = '<div class="analysis-card" style="border-left-color:#c77dff">';
+      aHtml += '<div class="analysis-card-title" style="color:#c77dff">⚡ Антисигналы</div><div class="analysis-items">';
+
+      if (notTrend.length > 0) {
+        const strength = notTrend.length >= 3 ? '3+ независимых — высокая вероятность ловушки' : notTrend.length === 2 ? '2 независимых — осторожность' : '1 сигнал — наблюдать';
+        aHtml += `<div class="analysis-item analysis-neutral"><span class="analysis-dot">●</span><span>Это НЕ тренд? (${strength})</span></div>`;
+        notTrend.forEach(s => {
+          aHtml += `<div class="analysis-item analysis-neutral" style="margin-left:8px;opacity:0.9"><span class="analysis-dot" style="color:#c77dff">▸</span><span>${s.text}</span></div>`;
+        });
+      }
+
+      if (notFlat.length > 0) {
+        const strength = notFlat.length >= 3 ? '3+ независимых — режим точно меняется' : notFlat.length === 2 ? '2 независимых — вероятно готовится движение' : '1 сигнал — наблюдать';
+        aHtml += `<div class="analysis-item analysis-bullish"><span class="analysis-dot">●</span><span>Это НЕ боковик? (${strength})</span></div>`;
+        notFlat.forEach(s => {
+          aHtml += `<div class="analysis-item analysis-bullish" style="margin-left:8px;opacity:0.9"><span class="analysis-dot" style="color:#52F2C9">▸</span><span>${s.text}</span></div>`;
+        });
+      }
+
+      aHtml += '</div></div>';
+      html += aHtml;
+    }
+  }
+  // ─── конец блока антисигналов ────────────────────────────────────────────────
+
   for (const id of activeIds) {
     const idL = id.toLowerCase();
 
