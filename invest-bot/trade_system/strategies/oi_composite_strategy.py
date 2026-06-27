@@ -6640,11 +6640,9 @@ class OICompositeStrategy(IStrategy):
             + [CHANGE_POINT_NAME, MULTI_TICKER_NAME],
             base_scores
         ))
+        # M1/M2/M3 отключены: win rate ~35-37% → они блокировали хорошие входы
+        # через P7-вето. Скоры держим 0.0 для совместимости ALL_METHOD_NAMES.
         m1_sc = m2_sc = m3_sc = 0.0
-        if self.__cluster_models is not None:
-            if self.__cluster_models.needs_refresh(regime):
-                self.__cluster_models.refresh(regime)
-            m1_sc, m2_sc, m3_sc = self.__cluster_models.compute(base_score_dict)
 
         scores = base_scores + [m1_sc, m2_sc, m3_sc]
 
@@ -7181,19 +7179,6 @@ class OICompositeStrategy(IStrategy):
         if (abs(l2) > GATE_L2_CONFLICT_THRESHOLD and
                 l2 * sign_val < 0 and l3 * sign_val > 0):
             return False, "gate_l2_conflict"
-
-        # ── Условие 5 (P7): вето кластерных моделей M1/M2/M3 по уверенности IC ──
-        against_votes = 0.0
-        for mname in (M1_NAME, M2_NAME, M3_NAME):
-            prior = self.__ic(mname)
-            ic_conf = min(1.0, prior.n_updates / 15.0)
-            score = self.__last_scores.get(mname, 0.0)
-            if prior.ic_smoothed < -IC_SIGNIFICANCE:
-                continue   # модель работает наоборот для этого тикера — игнор
-            if score * sign_val < -0.3:
-                against_votes += ic_conf
-        if against_votes >= 2.0:
-            return False, "gate_m3_veto"
 
         return True, ""
 
