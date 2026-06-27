@@ -9578,13 +9578,13 @@ function cpInitCanvasEvents() {
   c._cp = true;
   c.addEventListener('wheel', e => {
     e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      // Ctrl/Cmd + wheel = зум
-      chartCandleW = Math.max(4, Math.min(40, chartCandleW + (e.deltaY < 0 ? 1 : -1)));
-    } else {
-      // Обычный wheel = скролл (горизонт. pan)
-      const step = e.shiftKey ? 1 : Math.max(1, Math.round(3 * Math.abs(e.deltaY) / 100));
+    // Колесо = зум (как TradingView). Drag мышью = скролл по истории.
+    // Shift+колесо = скролл (для тех кто привык)
+    if (e.shiftKey) {
+      const step = Math.max(1, Math.round(3 * Math.abs(e.deltaY) / 100));
       chartOffset = Math.max(0, Math.min(chartCandles.length - 10, chartOffset + (e.deltaY > 0 ? step : -step)));
+    } else {
+      chartCandleW = Math.max(4, Math.min(40, chartCandleW + (e.deltaY < 0 ? 1 : -1)));
     }
     chartRedraw();
   }, { passive:false });
