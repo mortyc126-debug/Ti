@@ -9705,7 +9705,18 @@ function renderAnalysis() {
           }
         }
 
-        html += makeCard(`RSI(${period}) (неклассически)`, items, 'rsi');
+        // 3. RSI на коротком периоде — экстремальный краткосрочный маркер
+        const rsi2 = _anCalcRSI(closes, 2);
+        const rsi3 = _anCalcRSI(closes, 3);
+        const r2v = rsi2 && rsi2[rsi2.length-1];
+        const r3v = rsi3 && rsi3[rsi3.length-1];
+        if (r2v != null && (r2v > 95 || r2v < 5)) {
+          items.push({type:r2v>95?'bearish':'bullish', text:`RSI(2) = ${r2v.toFixed(0)} — экстремум. Статистически часто откатывает в следующих 1-3 свечах. Не сигнал входа, маркер перегрева`});
+        } else if (r3v != null && (r3v > 95 || r3v < 5)) {
+          items.push({type:r3v>95?'bearish':'bullish', text:`RSI(3) = ${r3v.toFixed(0)} — экстремум краткосрочного перегрева. Маркер, не сигнал`});
+        }
+
+        html += makeCard(`RSI (неклассически)`, items, 'rsi');
       }
     } else if (idL.includes('macd')) {
       if (closes.length >= 35) {
@@ -9714,21 +9725,35 @@ function renderAnalysis() {
         const macdLine = ema12.map((v, i) => v - ema26[i]);
         const signal = _anCalcEMA(macdLine.slice(-20), 9);
         const hist = macdLine.slice(-signal.length).map((v, i) => v - signal[i]);
-        if (hist.length >= 2) {
-          const h = hist[hist.length - 1], h1 = hist[hist.length - 2];
+        if (hist.length >= 5) {
+          const hLen = hist.length;
+          const h=hist[hLen-1], h1=hist[hLen-2], h2=hist[hLen-3], h3=hist[hLen-4];
           const priceSlope = closes[closes.length-1] - closes[closes.length-3];
           const items = [];
-          const signChanged = (h > 0) !== (h1 > 0);
-          if (signChanged) {
-            items.push({type:'neutral', text:`Смена направления momentum (гистограмма сменила знак)`});
-          } else if (h > h1) {
-            items.push({type:'bullish', text:`Ускорение импульса, движение набирает силу`});
-          } else if (h < h1 && priceSlope > 0) {
-            items.push({type:'bearish', text:`Momentum слабеет на движении вверх — скрытое затухание`});
-          } else if (h < h1) {
-            items.push({type:'bearish', text:`Гистограмма MACD убывает — импульс слабеет`});
+
+          // Изменение гистограммы — главный сигнал (не знак, а динамика)
+          const accel = h - h1; // ускорение
+          const accel1 = h1 - h2;
+          if (accel > 0 && h1 < 0 && h > 0) {
+            items.push({type:'bullish', text:`Гистограмма сменила знак на +: разворот momentum. Не пересечение линий — именно это важно`});
+          } else if (accel < 0 && h1 > 0 && h < 0) {
+            items.push({type:'bearish', text:`Гистограмма сменила знак на −: разворот momentum вниз`});
+          } else if (accel > 0 && Math.abs(h) > Math.abs(h2)) {
+            items.push({type:'bullish', text:`Гистограмма растёт второй бар — импульс ускоряется. Совпадение с объёмом = двойное подтверждение`});
+          } else if (accel < 0 && priceSlope > 0) {
+            items.push({type:'bearish', text:`Цена растёт, гистограмма падает — скрытое затухание momentum. Классический признак каскада на исходе`});
+          } else if (accel < 0 && priceSlope < 0) {
+            items.push({type:'bearish', text:`Гистограмма убывает — импульс слабеет`});
+          } else if (accel > 0) {
+            items.push({type:'bullish', text:`Гистограмма растёт — импульс набирает силу`});
           }
-          html += makeCard('MACD', items, 'macd');
+
+          // Резкий скачок гистограммы = ускорение (каскад)
+          if (Math.abs(h) > Math.abs(h3) * 2 && Math.abs(h3) > 0) {
+            items.push({type:'bullish', text:`Резкий рост гистограммы — импульс удвоился за 3 бара. Признак начала каскада`});
+          }
+
+          html += makeCard('MACD (неклассически)', items, 'macd');
         }
       }
     } else if (idL === 'bb' || idL.includes('boll')) {
@@ -9803,20 +9828,33 @@ function renderAnalysis() {
         }
         const k = kVals[kVals.length - 1];
         const k1 = kVals[kVals.length - 2];
-        const k2 = kVals[kVals.length - 3];
         const items = [];
+
+        // Считаем сколько баров подряд в экстремуме
+        let barsInHigh=0, barsInLow=0;
+        for (let i=kVals.length-1; i>=0; i--) { if(kVals[i]>80) barsInHigh++; else break; }
+        for (let i=kVals.length-1; i>=0; i--) { if(kVals[i]<20) barsInLow++; else break; }
+
         if (k > 80) {
-          if (k > 80 && k1 > 80 && k2 > 80) items.push({type:'bullish', text:`Stochastic в зоне перегрева и не падает — признак силы, не продавай`});
-          else if (k < k1) items.push({type:'bearish', text:`Выход из экстремума — думать о завершении движения`});
-          else items.push({type:'neutral', text:`Stochastic = ${k.toFixed(1)}`});
+          if (barsInHigh >= 5) {
+            items.push({type:'bullish', text:`Stochastic выше 80 уже ${barsInHigh} баров и не падает — это сила, не сигнал продажи. Настоящий каскад держит экстремум долго`});
+          } else if (k < k1 && barsInHigh >= 2) {
+            items.push({type:'bearish', text:`Stochastic начинает выходить из зоны >80 после ${barsInHigh} баров — думать о завершении движения`});
+          } else {
+            items.push({type:'bullish', text:`Stochastic = ${k.toFixed(0)} — вошёл в зону перегрева. Подожди: если задержится здесь — это сила`});
+          }
         } else if (k < 20) {
-          if (k < 20 && k1 < 20 && k2 < 20) items.push({type:'bearish', text:`Stochastic в зоне перепроданности и не растёт — давление продавцов`});
-          else if (k > k1) items.push({type:'bullish', text:`Выход из перепроданности — возможен отскок`});
-          else items.push({type:'neutral', text:`Stochastic = ${k.toFixed(1)}`});
+          if (barsInLow >= 5) {
+            items.push({type:'bearish', text:`Stochastic ниже 20 уже ${barsInLow} баров — давление продавцов устойчиво`});
+          } else if (k > k1 && barsInLow >= 2) {
+            items.push({type:'bullish', text:`Stochastic выходит из зоны <20 после ${barsInLow} баров — возможен отскок`});
+          } else {
+            items.push({type:'bearish', text:`Stochastic = ${k.toFixed(0)} — вошёл в перепроданность`});
+          }
         } else {
-          items.push({type:'neutral', text:`Stochastic = ${k.toFixed(1)}`});
+          items.push({type:'neutral', text:`Stochastic = ${k.toFixed(0)} — между экстремумами, направленного сигнала нет`});
         }
-        html += makeCard('Stochastic', items, 'stoch');
+        html += makeCard('Stochastic (неклассически)', items, 'stoch');
       }
     } else if (idL.includes('obv')) {
       if (candles.length >= 6) {
@@ -9883,13 +9921,30 @@ function renderAnalysis() {
         const kijunDev = (lastClose - kijun) / kijun * 100;
         const items = [];
         if (cloudThickness < 0.5) {
-          items.push({type:'neutral', text:`Тонкое облако (${cloudThickness.toFixed(2)}% от цены) — пустота, цена пройдёт быстро`});
+          items.push({type:'neutral', text:`Тонкое облако (${cloudThickness.toFixed(2)}%) — пустота, цена пройдёт быстро`});
         } else if (cloudThickness > 2) {
-          items.push({type:'neutral', text:`Плотное облако (${cloudThickness.toFixed(2)}% от цены) — зона ликвидности, возможно торможение`});
+          items.push({type:'neutral', text:`Плотное облако (${cloudThickness.toFixed(2)}%) — зона ликвидности, возможно торможение`});
         }
         const kijunStr = Math.abs(kijunDev) > 2 ? 'натянута' : 'в норме';
-        items.push({type: Math.abs(kijunDev) > 2 ? (kijunDev > 0 ? 'bullish' : 'bearish') : 'neutral', text:`Цена на ${kijunDev.toFixed(2)}% от kijun — резинка ${kijunStr}`});
-        html += makeCard('Ichimoku', items, 'ichimoku');
+        items.push({type: Math.abs(kijunDev)>2?(kijunDev>0?'bullish':'bearish'):'neutral', text:`Цена на ${kijunDev.toFixed(2)}% от kijun — резинка ${kijunStr}`});
+
+        // Chikou Span — пустое пространство = нет прошлого сопротивления
+        if (n >= 53) {
+          const chikouClose = closes[n-1]; // Chikou = текущее закрытие, смещённое на 26 назад
+          const chikouZone = candles.slice(n-27, n-22); // свечи рядом с chikou
+          const chikouHigh = Math.max(...chikouZone.map(c=>c.high));
+          const chikouLow  = Math.min(...chikouZone.map(c=>c.low));
+          const gapUp   = chikouClose > chikouHigh * 1.005;
+          const gapDown = chikouClose < chikouLow  * 0.995;
+          if (gapUp) {
+            items.push({type:'bullish', text:`Chikou в пустом пространстве выше свечей 26 баров назад — прошлого сопротивления нет. Зона откуда ждать быстрого движения вверх`});
+          } else if (gapDown) {
+            items.push({type:'bearish', text:`Chikou ниже свечей 26 баров назад — нет прошлей поддержки. Зона ускорения вниз`});
+          } else {
+            items.push({type:'neutral', text:`Chikou находится среди свечей 26-барной давности — прошлое сопротивление/поддержка присутствует`});
+          }
+        }
+        html += makeCard('Ichimoku (неклассически)', items, 'ichimoku');
       }
     } else if (idL.includes('alligator') || idL.includes('gator')) {
       function smmaAl(data, period, shift) {
@@ -9997,15 +10052,33 @@ function renderAnalysis() {
           widths.push((Math.max(...s.map(c => c.high)) - Math.min(...s.map(c => c.low))) / candles[i].close);
         }
         const maxW = Math.max(...widths.slice(-50));
+        const minW = Math.min(...widths.slice(-50));
         const curW = (upper - lower) / lastClose;
         const items = [];
-        if (curW < 0.2 * maxW) {
-          items.push({type:'neutral', text:`Компрессия в канале, пробой будет сильным`});
+
+        // 1. Ширина как измеритель режима
+        const isNarrow = curW < minW * 1.3;
+        const wasNarrow = widths.slice(-10,-1).every(w => w < minW * 1.5);
+        if (isNarrow) {
+          items.push({type:'neutral', text:`Канал Дончиана узкий — максимальная компрессия. Пробой после долгой компрессии даёт большее продолжение`});
+        } else if (curW > maxW * 0.8) {
+          items.push({type:'neutral', text:`Канал широкий — волатильная фаза. Пробой после расширения статистически слабее`});
         }
-        if (lastClose >= upper) items.push({type:'bullish', text:`Цена у верхней границы Дончиана — скопление стопов выше`});
-        else if (lastClose <= lower) items.push({type:'bearish', text:`Цена у нижней границы Дончиана — скопление стопов ниже`});
-        if (!items.length) items.push({type:'neutral', text:`Канал Дончиана: ${lower.toFixed(4)} — ${upper.toFixed(4)}`});
-        html += makeCard('Donchian', items, 'donchian');
+
+        // 2. Пробой после компрессии — особо значимый
+        if (!isNarrow && wasNarrow) {
+          const dir = lastClose > (upper+lower)/2 ? 'bullish' : 'bearish';
+          items.push({type:dir, text:`Пробой после долгой компрессии (канал был узким 10+ баров) — статистически сильное продолжение`});
+        }
+
+        // 3. Границы как скопление стопов
+        const distUp = (upper - lastClose) / lastClose * 100;
+        const distDown = (lastClose - lower) / lastClose * 100;
+        if (distUp < 0.2) items.push({type:'bullish', text:`Цена у верхней границы (${upper.toFixed(4)}) — выше скоплены стопы шортистов. Пробой = их охота`});
+        else if (distDown < 0.2) items.push({type:'bearish', text:`Цена у нижней границы (${lower.toFixed(4)}) — ниже скоплены стопы лонгистов. Пробой = их охота`});
+        else items.push({type:'neutral', text:`До верх.границы ${distUp.toFixed(1)}%, до нижней ${distDown.toFixed(1)}%`});
+
+        html += makeCard('Donchian (неклассически)', items, 'donchian');
       }
     } else if (idL.includes('adx')) {
       const period = 14;
@@ -10310,13 +10383,21 @@ function renderAnalysis() {
           else { if(candles[i].close>sar){bull2=true;sar=ep;ep=candles[i].high;af=0.02;flips.push(i);lastFlip=i;} else {if(candles[i].low<ep){ep=candles[i].low;af=Math.min(0.2,af+0.02);}}}
         }
         const dist = lastFlip!==null ? n-1-lastFlip : n;
-        items.push({type: bull2?'bullish':'bearish', text:`SAR ${bull2?'ниже цены (бычий)':'выше цены (медвежий)'} — ${dist} свечей без разворота`});
-        if (dist < 3) items.push({type:'neutral', text:`Разворот только что произошёл — SAR особенно чувствителен к ложным сигналам в начале тренда`});
-        else if (dist > 30) items.push({type:'neutral', text:`${dist} свечей — длинный забег: AF вырос, SAR прижался к цене. Любой откат может вызвать разворот`});
-        if (flips.length > 0) {
-          const recentFlips = flips.filter(f=>f>n-50).length;
-          if (recentFlips >= 5) items.push({type:'neutral', text:`≥5 разворотов SAR за 50 свечей — флэт: SAR даёт много ложных сигналов`});
+        // 1. Скорость переключений — главный неклассический сигнал
+        const recentFlips50 = flips.filter(f=>f>n-50).length;
+        const recentFlips20 = flips.filter(f=>f>n-20).length;
+        if (recentFlips20 >= 3) {
+          items.push({type:'neutral', text:`SAR переключается часто (${recentFlips20} раз за 20 баров) — рынок неопределён, не входить`});
+        } else if (dist >= 15) {
+          items.push({type:bull2?'bullish':'bearish', text:`SAR держится ${dist} баров без переключения — смена режима реальная. На каскаде SAR далеко от цены и не переключается`});
+        } else if (dist < 3 && recentFlips50 <= 2) {
+          items.push({type:bull2?'bullish':'bearish', text:`SAR только что переключился после долгого удержания — реальная смена режима`});
+        } else {
+          items.push({type:bull2?'bullish':'bearish', text:`SAR ${bull2?'бычий':'медвежий'} — ${dist} баров без разворота`});
         }
+        // 2. Дистанция SAR от цены = визуальная сила движения
+        const sarDist = Math.abs(closes[n-1] - sar) / closes[n-1] * 100;
+        if (sarDist > 3) items.push({type:bull2?'bullish':'bearish', text:`SAR далеко от цены (${sarDist.toFixed(1)}%) — подтверждение силы движения, каскад в полную силу`});
         html += makeCard('Parabolic SAR (неклассически)', items, 'sar');
       }
     } else if (idL === 'supertrend') {
