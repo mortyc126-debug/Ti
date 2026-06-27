@@ -265,7 +265,7 @@ _GATE_GROUPS: dict[str, frozenset] = {
     "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE"}),
     "oscillator": frozenset({"FISHER_RSI", "RMI", "ZSCORE"}),
     "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
-                             "DONCHIAN",
+                             "DONCHIAN", "MA_ENVELOPE",
                              "CANDLE_PATTERN", "TRIANGLE", "FRACTAL", "ENTROPY",
                              "LEVEL_CONTEXT", "MKT_STRUCTURE", "SPRING"}),
     "microstructure": frozenset({"HAWKES_SIGNAL", "BS_PRESSURE_TS", "AGGRESSOR_FLOW",
@@ -4358,6 +4358,72 @@ def score_ichimoku_signal(candles: list[HistoricCandle]) -> float:
     return round(max(-1.0, min(1.0, total)), 4)
 
 
+def score_ma_envelope(candles: list[HistoricCandle]) -> float:
+    """
+    MA_ENVELOPE: канал из двух линий MA ± k%.
+
+    Двойная логика зависящая от режима:
+    - Боковик (цена долго внутри канала): касание нижней границы → LONG,
+      касание верхней → SHORT (контрарная, mean-reversion).
+    - Тренд (цена пробила границу и держится снаружи): пробой вверх → LONG,
+      пробой вниз → SHORT (импульсная, трендовая).
+
+    Параметры: MA20, ширина канала = 1.5 × ATR / цена.
+    Адаптивная ширина: для медленных инструментов канал уже, для летучих — шире.
+    """
+    h, l, c, v = _hlcv(candles)
+    n = len(c)
+    if n < 22:
+        return 0.0
+
+    period = 20
+    ma = sum(c[-period:]) / period
+
+    # Ширина канала: 1.5 × ATR / MA (адаптивно к волатильности)
+    atr = sum(max(h[i] - l[i], abs(h[i] - c[i-1]), abs(l[i] - c[i-1]))
+              for i in range(-period, 0)) / period
+    k = min(0.03, max(0.005, 1.5 * atr / (ma + 1e-9)))
+
+    upper = ma * (1 + k)
+    lower = ma * (1 - k)
+    price = c[-1]
+
+    # Позиция цены относительно канала: <0 ниже нижней, >1 выше верхней, 0..1 внутри
+    band_range = upper - lower
+    if band_range < 1e-9:
+        return 0.0
+    pos = (price - lower) / band_range  # 0=у нижней, 1=у верхней, <0 или >1 снаружи
+
+    # Сколько последних баров цена провела внутри/снаружи канала
+    lookback = min(10, n - 1)
+    inside = sum(1 for i in range(-lookback, 0) if lower <= c[i] <= upper)
+    inside_ratio = inside / lookback
+
+    if inside_ratio >= 0.7:
+        # Режим боковика: цена долго внутри — контрарная логика
+        if pos <= 0.15:
+            # У нижней границы — отскок вверх
+            raw = 0.4 + (0.15 - pos) * 2.0
+        elif pos >= 0.85:
+            # У верхней границы — отскок вниз
+            raw = -(0.4 + (pos - 0.85) * 2.0)
+        else:
+            return 0.0
+    else:
+        # Режим пробоя: цена снаружи канала — импульсная логика
+        if pos > 1.0:
+            # Выше верхней границы — бычий пробой
+            raw = 0.3 + min(0.5, (pos - 1.0) * 3.0)
+        elif pos < 0.0:
+            # Ниже нижней границы — медвежий пробой
+            raw = -(0.3 + min(0.5, abs(pos) * 3.0))
+        else:
+            # Возврат внутрь после пробоя — угасание импульса
+            raw = 0.0
+
+    return float(max(-1.0, min(1.0, raw)))
+
+
 def score_bb_keltner_squeeze(candles: list[HistoricCandle]) -> float:
     """
     BB_KELTNER_SQUEEZE (TTM Squeeze): Bollinger Bands внутри Keltner Channels.
@@ -5449,6 +5515,7 @@ METHODS = [
     # Ишимоку / BB-Keltner / MA / RSI-div / ATR-топливо / Аллигатор
     ("ICHIMOKU_SIGNAL",     score_ichimoku_signal),
     ("BB_KELTNER_SQUEEZE",  score_bb_keltner_squeeze),
+    ("MA_ENVELOPE",         score_ma_envelope),
     ("MA_TENSION",          score_ma_tension),
     ("RSI_DIVERGENCE",      score_rsi_divergence),
     ("ATR_EXHAUSTION",      score_atr_exhaustion),
@@ -5527,6 +5594,7 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "KLINGER":        {"min_bars": 15, "weight_5m": 1.10},
     "VZO":            {"min_bars": 15, "weight_5m": 1.05},
     "DONCHIAN":       {"min_bars": 20, "weight_5m": 1.10},  # структура боковика лучше на 5м
+    "MA_ENVELOPE":    {"min_bars": 22, "weight_5m": 1.10},
     "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
     "HAWKES_SIGNAL":  {"min_bars": 25, "weight_5m": 1.30},  # самоусиление потока
     "VSA":            {"min_bars": 12, "weight_5m": 1.05},
