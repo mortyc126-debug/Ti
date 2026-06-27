@@ -2038,6 +2038,21 @@ const IND_GROUPS = [
           return {s:'warn', t:`CHOP = ${v.val.toFixed(1)} — переходная зона между трендом и флэтом.`};
         }
       },
+      { id:'ebs', name:'EBS / Even Better Sinewave Элерса', full:'Even Better Sinewave — синтетическая синусоида доминирующего цикла',
+        desc:'Синусоида подстраивается под доминирующий цикл в реальном времени. Фаза = где сейчас цена внутри цикла.',
+        params:[
+          {id:'val',  label:'EBS (синусоида)',  min:-1, max:1, def:0,    step:0.01},
+          {id:'lead', label:'Lead (опережение)', min:-1, max:1, def:0.1,  step:0.01},
+        ],
+        interpret: v => {
+          const e=v.val, l=v.lead;
+          if(e<-0.8) return {s:'buy',  t:`EBS=${e.toFixed(2)}: нижний экстремум цикла — максимум натяжения, готовность к выбросу вверх`};
+          if(e>0.8)  return {s:'sell', t:`EBS=${e.toFixed(2)}: верхний экстремум — пик фазы, выброс завершается`};
+          if(e<0&&e>l) return {s:'buy', t:`EBS переходит через ноль снизу — выброс начинается`};
+          if(e>0&&e<l) return {s:'sell',t:`EBS переходит через ноль сверху — движение разворачивается`};
+          return {s:'neutral', t:`EBS=${e.toFixed(2)}: фаза цикла ${e>0?'верхняя':'нижняя'}`};
+        }
+      },
       { id:'tmf', name:'TMF / Денежный поток Твиггса', full:'Twiggs Money Flow — Money Flow с True Range',
         desc:'Аналог A/D но с True Range. Показывает агрессию денег внутри свечи. Диапазон -1..+1.',
         params:[
@@ -5230,6 +5245,7 @@ function chartRedraw() {
   if (chartInds.ult_osc)       _indDrawPanel('ult_osc');
   if (chartInds.dpo)           _indDrawPanel('dpo');
   if (chartInds.std_dev)       _indDrawPanel('std_dev');
+  if (chartInds.ebs)              _indDrawPanel('ebs');
   if (chartInds.tmf)              _indDrawPanel('tmf');
   if (chartInds.frac_dim)         _indDrawPanel('frac_dim');
   if (chartInds.efficiency_ratio) _indDrawPanel('efficiency_ratio');
@@ -6465,6 +6481,48 @@ function _indDrawPanel(id){
       const per=20,sd=closes.map((_,i)=>{if(i<per)return null;const sl=closes.slice(i-per+1,i+1),m=sl.reduce((s,v)=>s+v,0)/per;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/per);});
       drawLine(sd,'#4cc9f0',1.5);_pLabel(ctx,'Std Dev');
       const vs=sd.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-std_dev-badge',lv>avg*1.5?'sell':lv<avg*0.7?'buy':'neutral');
+    } else if(id==='ebs'){
+      // Even Better Sinewave (Элерс):
+      // 1. Cyber Cycle как HP-фильтр (alpha=0.07)
+      // 2. Оценка доминирующего периода по нулевым переходам CC
+      // 3. Генерация синусоиды с периодом из п.2; Lead = синусоида с опережением +90°
+      const alpha=0.07, a1=(1-alpha/2)**2, a2=2*(1-alpha), a3=(1-alpha)**2;
+      const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);
+      const cc=new Array(n).fill(0);
+      for(let i=2;i<n;i++) cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];
+      // Период: расстояние между нулевыми переходами × 2
+      const domPer=new Array(n).fill(14);
+      let lastZ=0,curPer=14;
+      for(let i=1;i<n;i++){
+        if((cc[i]>=0&&cc[i-1]<0)||(cc[i]<0&&cc[i-1]>=0)){
+          const half=i-lastZ; lastZ=i;
+          curPer=Math.max(6,Math.min(50,0.8*curPer+0.2*half*2));
+        }
+        domPer[i]=curPer;
+      }
+      // Накапливаем фазу и генерируем синусоиду
+      const ebsArr=new Array(n).fill(null), leadArr=new Array(n).fill(null);
+      let ph=0;
+      for(let i=10;i<n;i++){
+        ph+=360/domPer[i]; if(ph>=360)ph-=360;
+        ebsArr[i]=Math.sin(ph*Math.PI/180);
+        leadArr[i]=Math.sin((ph+90)*Math.PI/180); // +90° = опережение на четверть цикла
+      }
+      // Отрисовка: шкала -1..1, нулевая линия по центру
+      const toYebs=v=>H*(0.5-v*0.45);
+      _pGrid(ctx,W,H*0.5);
+      [-1,-0.5,0,0.5,1].forEach(lvl=>{const y=toYebs(lvl);ctx.fillStyle='rgba(112,128,168,0.35)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText(lvl.toFixed(1),W-2,y-1);ctx.textAlign='left';});
+      // Заливка под кривой
+      ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
+      ctx.beginPath();let f=true;
+      for(let i=startIdx;i<endIdx;i++){if(ebsArr[i]==null){f=true;continue;}const x=xOf(i-startIdx),y=toYebs(ebsArr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
+      ctx.lineTo(xOf(endIdx-1-startIdx),H*0.5);ctx.lineTo(xOf(0),H*0.5);ctx.closePath();
+      ctx.fillStyle=ebsArr[n-1]>0?'rgba(82,242,194,0.08)':'rgba(199,27,82,0.08)';ctx.fill();ctx.restore();
+      _pl(ctx,W,H,ebsArr,'rgba(82,242,194,0.9)',1.8,startIdx,endIdx,xOf,toYebs);
+      _pl(ctx,W,H,leadArr,'rgba(255,159,28,0.65)',1,startIdx,endIdx,xOf,toYebs);
+      _pLabel(ctx,'EBS');
+      const lv=ebsArr.filter(v=>v!=null).pop()||0, ll=leadArr.filter(v=>v!=null).pop()||0;
+      setPill('chart-ebs-badge',lv<-0.7&&lv>ll?'buy-strong':lv>0.7&&lv<ll?'sell-strong':lv>0?'buy':'sell');
     } else if(id==='tmf'){
       // Twiggs Money Flow: CLV по True Range, затем EMA(CLV*Vol)/EMA(Vol)
       const per=21;
@@ -10464,6 +10522,86 @@ function renderAnalysis() {
         if (spPct > 70) items.push({type:'neutral', text:`Расхождение MAMA/FAMA на исторически высоком уровне (${spPct.toFixed(0)}% от макс.) — тренд перегрет, сворачивается`});
         items.push({type:'neutral', text:`Рыночный режим Элерса: ${Math.abs(sp)<maxSp*0.1?'цикличный (боковик/накопление)':'трендовый (направленное движение)'}`});
         html += makeCard('MAMA / FAMA Элерса (неклассически)', items);
+      }
+    } else if (idL === 'ebs') {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        // Вычисляем EBS
+        const alpha=0.07, a1=(1-alpha/2)**2, a2=2*(1-alpha), a3=(1-alpha)**2;
+        const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);
+        const cc=new Array(n).fill(0);
+        for(let i=2;i<n;i++) cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];
+        let lastZ=0, curPer=14;
+        const domPer=new Array(n).fill(14);
+        for(let i=1;i<n;i++){
+          if((cc[i]>=0&&cc[i-1]<0)||(cc[i]<0&&cc[i-1]>=0)){const h=i-lastZ;lastZ=i;curPer=Math.max(6,Math.min(50,0.8*curPer+0.2*h*2));}
+          domPer[i]=curPer;
+        }
+        const ebsArr=new Array(n).fill(null), leadArr=new Array(n).fill(null);
+        let ph=0;
+        for(let i=10;i<n;i++){ph+=360/domPer[i];if(ph>=360)ph-=360;ebsArr[i]=Math.sin(ph*Math.PI/180);leadArr[i]=Math.sin((ph+90)*Math.PI/180);}
+        const ebs=ebsArr[n-1]||0, lead=leadArr[n-1]||0;
+        const ebs1=ebsArr[n-2]||0; // предыдущий бар
+        const per=Math.round(domPer[n-1]);
+
+        // 1. Фаза цикла — где сейчас
+        if (ebs < -0.8) {
+          items.push({type:'bullish', text:`EBS = ${ebs.toFixed(2)}: нижний экстремум синусоиды. Максимум фазы — нитка в точке максимального натяжения. Следующее движение — вверх`});
+        } else if (ebs > 0.8) {
+          items.push({type:'bearish', text:`EBS = ${ebs.toFixed(2)}: верхний экстремум. Пик фазы — каскад на излёте, думать о фиксации`});
+        } else if (ebs < 0 && ebs > ebs1) {
+          items.push({type:'bullish', text:`EBS разворачивается из нижней полуволны вверх — цикл начинает фазу роста`});
+        } else if (ebs > 0 && ebs < ebs1) {
+          items.push({type:'bearish', text:`EBS разворачивается из верхней полуволны вниз — цикл начинает фазу снижения`});
+        } else {
+          items.push({type:'neutral', text:`EBS = ${ebs.toFixed(2)}: ${ebs>0?'верхняя':'нижняя'} полуволна, период ~${per} свечей`});
+        }
+
+        // 2. Амплитуда — энергия цикла
+        const window30 = ebsArr.slice(n-30).filter(v=>v!=null);
+        const amplitude = window30.length ? Math.max(...window30.map(Math.abs)) : 0;
+        if (amplitude > 0.8) {
+          items.push({type:'bullish', text:`Амплитуда синусоиды ${amplitude.toFixed(2)} — высокая энергия в цикле. Выброс будет сильным`});
+        } else if (amplitude < 0.4) {
+          items.push({type:'neutral', text:`Амплитуда ${amplitude.toFixed(2)} — цикл затухает. Энергия на исходе, выброс может быть слабым`});
+        } else {
+          items.push({type:'neutral', text:`Амплитуда ${amplitude.toFixed(2)} — умеренная энергия цикла`});
+        }
+
+        // 3. Скорость прохождения через ноль — резкий или вялый переход
+        const crossedZeroRecently = n >= 4 && ebsArr.slice(n-4, n-1).some((v,i,a) => i>0 && Math.sign(v)!==Math.sign(a[i-1]));
+        if (crossedZeroRecently) {
+          const speedAtCross = Math.abs(ebs - (ebsArr[n-3]||0));
+          if (speedAtCross > 0.5) {
+            items.push({type:'bullish', text:`Быстрое пересечение нулевой линии EBS (скорость ${speedAtCross.toFixed(2)}) — режим меняется резко. Выброс будет острым`});
+          } else {
+            items.push({type:'neutral', text:`Медленное пересечение нулевой линии — переход вялый, движение без импульса`});
+          }
+        }
+
+        // 4. Момент входа: Lead vs EBS кросс
+        if (lead > ebs && ebs < 0 && ebs > ebs1) {
+          items.push({type:'bullish', text:`Lead опережает EBS при развороте снизу — опережающий сигнал входа. EBS подтверждает переход в фазу роста`});
+        } else if (lead < ebs && ebs > 0 && ebs < ebs1) {
+          items.push({type:'bearish', text:`Lead под EBS при развороте сверху — опережающий сигнал смены фазы`});
+        }
+
+        // 5. Дивергенция: цена на новом экстремуме, EBS нет
+        const priceMin20 = Math.min(...closes.slice(n-20));
+        const ebsMin20 = Math.min(...ebsArr.slice(n-20).filter(v=>v!=null));
+        const priceMax20 = Math.max(...closes.slice(n-20));
+        const ebsMax20 = Math.max(...ebsArr.slice(n-20).filter(v=>v!=null));
+        if (closes[n-1] <= priceMin20 * 1.002 && ebs > ebsMin20 + 0.2) {
+          items.push({type:'bullish', text:`Дивергенция: цена на минимуме периода, EBS не подтверждает — цикловая энергия уже разворачивается. Конец нисходящей фазы`});
+        } else if (closes[n-1] >= priceMax20 * 0.998 && ebs < ebsMax20 - 0.2) {
+          items.push({type:'bearish', text:`Дивергенция: цена на максимуме, EBS слабее — циклическая энергия иссякает`});
+        }
+
+        // 6. Доминирующий период — контекст для тейков
+        items.push({type:'neutral', text:`Доминирующий цикл ~${per} свечей. ${per<12?'Короткий цикл — фиксировать раньше':per>25?'Длинный цикл — держать дольше, движение масштабнее':'Стандартная длина цикла'}`});
+
+        html += makeCard('Even Better Sinewave (неклассически)', items);
       }
     } else if (idL === 'tmf') {
       const n = candles.length;
