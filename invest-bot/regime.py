@@ -312,7 +312,8 @@ PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
     "accumulation": {
         "ENTROPY": 1.5,          # энтропия низкая = сжатие = это и есть боговик
         "BB_KELTNER_SQUEEZE": 1.5,
-        "ATR_EXHAUSTION": 1.4,   # низкий ATR = компрессия
+        "ATR_EXHAUSTION": 1.4,   # в режиме сжатия голосует ЗА дрейф (направление компрессии)
+        "TWIGGS": 1.3,           # тихое накопление в боковике — единственный pro-direction сигнал TWIGGS
         "VWAP_SIGNAL": 1.3,      # в боковике VWAP работает лучше
         "AMT_POC": 1.3,          # POC формируется именно в боговике
         "KLINGER": 1.2,          # накопление денежного потока
@@ -320,21 +321,29 @@ PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
         "CUMUL_DELTA": 1.2,
         "PRICE_TREND": 0.5,      # тренда нет — линрег шумит
         "VOL_MOMENTUM": 0.6,
-        "IMPULSE_PULLBACK": 0.6,
+        "IMPULSE_PULLBACK": 0.5, # антисигнал, в боговике нет чёткого импульса/отката — шум
         "CASCADE": 0.5,
         "MA_TENSION": 0.6,
         "ADAPTIVE_MA": 0.7,
         "ICHIMOKU_SIGNAL": 0.7,
+        "MAMA_FAMA": 0.6,        # в боговике линии MAMA/FAMA рядом — сигнала нет, шум
+        "ZSCORE": 0.6,           # Z нейтрален в боковике — сигнал слабый
     },
     # Spring: резкий пробой + возврат за одну-две свечи, охота за стопами.
     # Важны: паттерны свечей, объёмные всплески, детекторы пробоя.
     # Снижаем: запаздывающие трендовые.
     "spring": {
-        "CANDLE_PATTERN": 1.8,   # игла + возврат — это паттерн свечей
+        "CANDLE_PATTERN": 1.8,   # игла + возврат — суть spring
         "WICK_REJECTION": 1.8,   # хвостовое отвержение = суть spring
         "BB_KELTNER_SQUEEZE": 1.5,  # BB расширяется резко
         "FALSE_BREAKOUT": 1.6,   # spring это и есть ложный пробой
+        # IMPULSE_PULLBACK всегда голосует -imp_dir (против направления импульса).
+        # На spring пробой вниз = импульс вниз, IMPULSE_PULLBACK голосует вверх = правильно.
         "IMPULSE_PULLBACK": 1.5,
+        "TWIGGS": 1.3,           # поворот от экстремума TMF = подтверждение смены фазы
+        "ZSCORE": 1.2,           # Z≈0 при движении = энергия исчерпана, разворот близко
+        "MAMA_FAMA": 1.2,        # схождение линий = смена цикла
+        "ATR_EXHAUSTION": 1.3,   # при перерасходе пути голосует против пробоя = ЗА возврат
         "BS_PRESSURE": 1.4,      # давление разворачивается
         "CUMUL_DELTA": 1.4,      # дельта переключается
         "VOL_MOMENTUM": 1.3,
@@ -366,7 +375,12 @@ PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
         "WANING_IMPULSES": 1.3,
         "ZLEMA_SIGNAL": 1.2,
         "T3_SIGNAL": 1.2,
-        "ATR_EXHAUSTION": 0.5,   # ATR высокий = не "истощение" — это норма каскада
+        # Антисигналы — на здоровом каскаде мешают (голосуют против тренда):
+        "ATR_EXHAUSTION": 0.4,   # в начале каскада ATR растёт — вызывает ложный "перерасход"
+        "IMPULSE_PULLBACK": 0.4, # всегда -imp_dir, на каскаде без отката = шум
+        "MAMA_FAMA": 0.5,        # на каскаде линии расходятся (нет схождения) — сигнала нет
+        "TWIGGS": 0.6,           # в экстремуме TMF = сигнал разворота, на здоровом каскаде вреден
+        "ZSCORE": 0.5,           # на каскаде Z высокий, но движение продолжается — ложный разворот
         "VWAP_SIGNAL": 0.7,      # на каскаде цена далеко от VWAP — шум
         "AMT_POC": 0.7,
         "ENTROPY": 0.7,
@@ -378,9 +392,21 @@ PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
     "distribution": {
         "WANING_IMPULSES": 1.6,  # затухание импульсов — суть фазы
         "VSA_ABSORPTION": 1.5,   # поглощение на хаях
-        "ATR_EXHAUSTION": 1.5,   # ATR падает несмотря на движение
+        # ATR_EXHAUSTION в режиме перерасхода голосует -direction = против текущего хая.
+        # Это именно то что нужно в distribution — антисигнал продолжения.
+        "ATR_EXHAUSTION": 1.5,
+        # MAMA_FAMA сходится после расхождения = цикл завершается → разворот.
+        # В distribution это главный сигнал конца тренда.
+        "MAMA_FAMA": 1.4,
+        # TWIGGS поворачивает от экстремума = деньги смегали сторону.
+        "TWIGGS": 1.4,
+        # ZSCORE ≈ 0 при движущейся цене = энергия исчерпана.
+        "ZSCORE": 1.3,
+        # IMPULSE_PULLBACK голосует -imp_dir. На distribution откат глубокий
+        # и volumetric — он будет сигнализировать против слабеющего тренда.
+        "IMPULSE_PULLBACK": 1.3,
         "LEVEL_ABSORPTION": 1.4,
-        "KLINGER": 1.3,          # дивергенция Klinger
+        "KLINGER": 1.3,
         "CUMUL_DELTA": 1.3,
         "FALSE_BREAKOUT": 1.3,   # ложные пробои хаёв
         "WICK_REJECTION": 1.3,
@@ -391,8 +417,8 @@ PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
         "ALLIGATOR": 0.7,
         "ICHIMOKU_SIGNAL": 0.7,
     },
-    # Reversal: переключение Fisher+Klinger через ноль, ADX упал, новое направление.
-    # Важны: детекторы смены режима, свечные паттерны разворота.
+    # Reversal: переключение через ноль, новое направление.
+    # Важны: все антисигналы + детекторы смены режима.
     "reversal": {
         "CANDLE_PATTERN": 1.5,
         "WICK_REJECTION": 1.4,
@@ -400,7 +426,16 @@ PHASE_WEIGHT_MODS: dict[str, dict[str, float]] = {
         "BS_PRESSURE": 1.4,
         "CUMUL_DELTA": 1.4,
         "FALSE_BREAKOUT": 1.3,
-        "IMPULSE_PULLBACK": 1.3,
+        # IMPULSE_PULLBACK: на развороте откат = старый тренд, он голосует против = новое направление.
+        "IMPULSE_PULLBACK": 1.4,
+        # MAMA_FAMA: схождение = смена цикла. На развороте это основной сигнал.
+        "MAMA_FAMA": 1.5,
+        # TWIGGS: поворот от экстремума = главный сигнал разворота TMF.
+        "TWIGGS": 1.4,
+        # ZSCORE: при низком Z и движении = энергия иссякла, вот-вот разворот.
+        "ZSCORE": 1.4,
+        # ATR_EXHAUSTION: если перерасход пути → -direction = в новую сторону.
+        "ATR_EXHAUSTION": 1.3,
         "KLINGER": 1.3,
         "VZO": 1.2,
         "PRICE_TREND": 0.5,      # старый тренд мешает видеть разворот
