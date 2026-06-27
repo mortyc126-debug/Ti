@@ -6277,6 +6277,24 @@ class OICompositeStrategy(IStrategy):
                 self.rejection_stats["level_volume_gate"] += 1
                 return None
 
+        # Gate: «мусорная» микроструктура — три сильных микроструктурных метода
+        # против направления → рынок реально движется в другую сторону.
+        # ENTROPY, VSA, KLINGER показывают наибольший Δ WR (8-8.7%) при
+        # голосовании против направления; комбинация всех трёх — надёжный фильтр.
+        _dir_sign = 1 if direction == SignalType.LONG else -1
+        _entropy = scores.get("ENTROPY", 0.0) * _dir_sign
+        _vsa     = scores.get("VSA",     0.0) * _dir_sign
+        _klinger = scores.get("KLINGER", 0.0) * _dir_sign
+        _ms_against = sum(1 for v in (_entropy, _vsa, _klinger) if v < 0.0)
+        if _ms_against >= 2:
+            logger.debug(
+                f"{self.__settings.figi}: сигнал {direction} отфильтрован — "
+                f"entropy={_entropy:.3f} vsa={_vsa:.3f} klinger={_klinger:.3f} (микроструктура против)"
+            )
+            self.rejection_stats.setdefault("gate_microstructure", 0)
+            self.rejection_stats["gate_microstructure"] += 1
+            return None
+
         # take/stop: ATR-based если заданы коэффициенты, иначе фиксированные множители
         take_mult, stop_mult = self.__take_stop_mults(direction, atr_pct)
 
