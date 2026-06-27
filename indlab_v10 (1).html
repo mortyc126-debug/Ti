@@ -2038,6 +2038,23 @@ const IND_GROUPS = [
           return {s:'warn', t:`CHOP = ${v.val.toFixed(1)} — переходная зона между трендом и флэтом.`};
         }
       },
+      { id:'tmf', name:'TMF / Денежный поток Твиггса', full:'Twiggs Money Flow — Money Flow с True Range',
+        desc:'Аналог A/D но с True Range. Показывает агрессию денег внутри свечи. Диапазон -1..+1.',
+        params:[
+          {id:'val',  label:'TMF текущий',       min:-1, max:1, def:0.1,  step:0.01},
+          {id:'prev', label:'TMF 5 свечей назад', min:-1, max:1, def:0.05, step:0.01},
+        ],
+        interpret: v => {
+          const t=v.val, p=v.prev, spd=t-p;
+          if(t>0.7) return {s:'warn', t:`TMF=${t.toFixed(2)} — насыщение покупок, думать о фиксации`};
+          if(t<-0.7) return {s:'warn', t:`TMF=${t.toFixed(2)} — насыщение продаж, экстремум`};
+          if(t>0&&spd>0.2) return {s:'buy-strong', t:`TMF резко растёт +${spd.toFixed(2)} — вспышка агрессии покупателей`};
+          if(t<0&&spd<-0.2) return {s:'sell-strong', t:`TMF резко падает ${spd.toFixed(2)} — агрессивные продажи`};
+          if(t>0) return {s:'buy', t:`TMF=${t.toFixed(2)} — деньги входят в покупку`};
+          if(t<0) return {s:'sell', t:`TMF=${t.toFixed(2)} — деньги выходят, распределение`};
+          return {s:'neutral', t:`TMF≈0 — баланс покупателей и продавцов`};
+        }
+      },
       { id:'vix_like', name:'VI / Индекс волатильности', full:'Volatility Index — Индекс волатильности',
         desc:'Аналог VIX — измеряет ожидаемую волатильность рынка. Высокий = страх, низкий = самодовольство.',
         params:[{id:'val', label:'Значение VI', min:0, max:100, def:20, step:0.1}],
@@ -5213,6 +5230,7 @@ function chartRedraw() {
   if (chartInds.ult_osc)       _indDrawPanel('ult_osc');
   if (chartInds.dpo)           _indDrawPanel('dpo');
   if (chartInds.std_dev)       _indDrawPanel('std_dev');
+  if (chartInds.tmf)              _indDrawPanel('tmf');
   if (chartInds.frac_dim)         _indDrawPanel('frac_dim');
   if (chartInds.efficiency_ratio) _indDrawPanel('efficiency_ratio');
   if (chartInds.entropy)          _indDrawPanel('entropy');
@@ -6447,6 +6465,31 @@ function _indDrawPanel(id){
       const per=20,sd=closes.map((_,i)=>{if(i<per)return null;const sl=closes.slice(i-per+1,i+1),m=sl.reduce((s,v)=>s+v,0)/per;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/per);});
       drawLine(sd,'#4cc9f0',1.5);_pLabel(ctx,'Std Dev');
       const vs=sd.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-std_dev-badge',lv>avg*1.5?'sell':lv<avg*0.7?'buy':'neutral');
+    } else if(id==='tmf'){
+      // Twiggs Money Flow: CLV по True Range, затем EMA(CLV*Vol)/EMA(Vol)
+      const per=21;
+      const tmfArr=closes.map((_,i)=>{
+        if(i===0)return null;
+        const c=cn[i],pc=cn[i-1];
+        const trh=Math.max(c.high,pc.close),trl=Math.min(c.low,pc.close);
+        const rng=trh-trl;
+        return rng>0?(2*c.close-trh-trl)/rng*(c.vol||0):0;
+      });
+      const volArr=cn.map(c=>c.vol||0);
+      // EMA вручную
+      const emaV=(arr,p)=>{const r=new Array(arr.length).fill(null);const k=2/(p+1);let s=null;for(let i=0;i<arr.length;i++){if(arr[i]==null){continue;}s=s===null?arr[i]:s*( 1-k)+arr[i]*k;r[i]=s;}return r;};
+      const emMFV=emaV(tmfArr.map(v=>v||0),per);
+      const emVol=emaV(volArr,per);
+      const tmf=emMFV.map((v,i)=>v!=null&&emVol[i]?v/emVol[i]:null);
+      // Ограничиваем диапазон [-1,1]
+      const tmfC=tmf.map(v=>v!=null?Math.max(-1,Math.min(1,v)):null);
+      drawRange(tmfC.map(v=>v!=null?(v+1)/2*100:null),'#52F2C9',20,80);
+      // Нарисуем нулевую линию отдельно (50% на шкале)
+      _pGrid(ctx,W,H*0.5);
+      ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('0',W-2,H*0.5-1);ctx.textAlign='left';
+      _pLabel(ctx,'TMF');
+      const lv=tmfC.filter(v=>v!=null).pop()||0;
+      setPill('chart-tmf-badge',lv>0.5?'buy-strong':lv>0.1?'buy':lv<-0.5?'sell-strong':lv<-0.1?'sell':'neutral');
     } else if(id==='frac_dim'){
       // FD ≈ 1 + log10(sumATR / range) / log10(period) — прямая связь с Choppiness
       const per=14;
@@ -10421,6 +10464,86 @@ function renderAnalysis() {
         if (spPct > 70) items.push({type:'neutral', text:`Расхождение MAMA/FAMA на исторически высоком уровне (${spPct.toFixed(0)}% от макс.) — тренд перегрет, сворачивается`});
         items.push({type:'neutral', text:`Рыночный режим Элерса: ${Math.abs(sp)<maxSp*0.1?'цикличный (боковик/накопление)':'трендовый (направленное движение)'}`});
         html += makeCard('MAMA / FAMA Элерса (неклассически)', items);
+      }
+    } else if (idL === 'tmf') {
+      const n = candles.length;
+      const per = 21;
+      if (n >= per + 5) {
+        const items = [];
+        // Вычисляем TMF
+        const mfvArr = candles.map((c,i) => {
+          if (!i) return 0;
+          const pc = candles[i-1], trh = Math.max(c.high,pc.close), trl = Math.min(c.low,pc.close);
+          const rng = trh - trl;
+          return rng > 0 ? (2*c.close - trh - trl) / rng * (c.volume||0) : 0;
+        });
+        const volArr = candles.map(c => c.volume || 0);
+        const emaFn = (arr, p) => {
+          const k=2/(p+1); let s=arr[0];
+          return arr.map(v => { s=s*(1-k)+v*k; return s; });
+        };
+        const eMFV = emaFn(mfvArr, per), eVol = emaFn(volArr, per);
+        const tmf = eMFV.map((v,i) => eVol[i] > 0 ? Math.max(-1, Math.min(1, v/eVol[i])) : null);
+        const now = tmf[n-1] || 0;
+        const prev5 = tmf[n-6] || 0;
+        const prev10 = tmf[n-11] || 0;
+        const speed = now - prev5;
+        const priceUp20 = closes[n-1] > closes[n-20];
+
+        // 1. Текущее состояние потока денег
+        if (now > 0.7) {
+          items.push({type:'bearish', text:`TMF = ${now.toFixed(2)} — насыщение покупок. Все кто хотел войти — уже вошли. Думать о фиксации, не о добавлении`});
+        } else if (now < -0.7) {
+          items.push({type:'bullish', text:`TMF = ${now.toFixed(2)} — насыщение продаж. Все деньги вышли. Обычно предшествует откату или развороту`});
+        } else if (now > 0 && Math.abs(speed) < 0.05) {
+          items.push({type:'bullish', text:`TMF = ${now.toFixed(2)}, держится выше нуля без экстремума — систематическое накопление. Деньги входят медленно, без агрессии`});
+        } else if (now < 0 && Math.abs(speed) < 0.05) {
+          items.push({type:'bearish', text:`TMF = ${now.toFixed(2)}, держится ниже нуля — систематическое распределение`});
+        } else if (now > 0) {
+          items.push({type:'bullish', text:`TMF = ${now.toFixed(2)} — деньги входят в покупку`});
+        } else {
+          items.push({type:'bearish', text:`TMF = ${now.toFixed(2)} — деньги выходят, преобладает распределение`});
+        }
+
+        // 2. Скорость: вспышка агрессии vs вялое движение
+        if (speed > 0.25 && now > 0) {
+          items.push({type:'bullish', text:`Резкий скачок TMF +${speed.toFixed(2)} за 5 свечей — вспышка агрессии покупателей. Проверь синхронность с ценой: если цена ускоряется вместе — движение чистое`});
+        } else if (speed < -0.25 && now < 0) {
+          items.push({type:'bearish', text:`Резкое падение TMF ${speed.toFixed(2)} — агрессивный выход. Импульс продаж нарастает`});
+        } else if (speed > 0.1 && now > 0) {
+          items.push({type:'bullish', text:`TMF медленно растёт (+${speed.toFixed(2)}) — вялое накопление, без спешки`});
+        }
+
+        // 3. Синхронность TMF и скорости цены
+        const priceSpeed = Math.abs(closes[n-1] - closes[n-6]) / closes[n-6] * 100;
+        const tmfAccel = Math.abs(speed) > 0.15;
+        if (priceSpeed > 1.5 && !tmfAccel) {
+          items.push({type:'neutral', text:`Цена ускоряется (+${priceSpeed.toFixed(1)}%), TMF не успевает — движение идёт без согласия денег. Потенциальная ловушка`});
+        } else if (priceSpeed > 1 && tmfAccel && Math.sign(speed) === (closes[n-1]>closes[n-6]?1:-1)) {
+          items.push({type:'bullish', text:`TMF и цена ускоряются синхронно — движение чистое, деньги подтверждают`});
+        }
+
+        // 4. Дивергенция (затухание импульса)
+        const priceNewLow = closes[n-1] < closes[n-10] && closes[n-10] < closes[n-20];
+        const tmfNotLow = tmf[n-1] > tmf[n-10];
+        if (priceNewLow && tmfNotLow) {
+          items.push({type:'bullish', text:`Дивергенция: цена делает нижние лои, TMF не подтверждает — деньги больше не агрессивны на продаже. Затухание импульса вниз`});
+        }
+        const priceNewHigh = closes[n-1] > closes[n-10] && closes[n-10] > closes[n-20];
+        const tmfNotHigh = tmf[n-1] < tmf[n-10];
+        if (priceNewHigh && tmfNotHigh) {
+          items.push({type:'bearish', text:`Дивергенция: цена на новых максимумах, TMF слабее — покупки теряют импульс. Затухание вверха`});
+        }
+
+        // 5. TMF в боковике = поглощение
+        const priceRange20 = (Math.max(...closes.slice(n-20)) - Math.min(...closes.slice(n-20))) / closes[n-1] * 100;
+        if (priceRange20 < 2 && now > 0.05 && now < 0.6) {
+          items.push({type:'bullish', text:`Боковик (диапазон ${priceRange20.toFixed(1)}%), TMF стабильно положительный — систематическое поглощение продаж. Аналог накопления OI без движения цены`});
+        } else if (priceRange20 < 2 && prev5 > 0.05 && now < 0) {
+          items.push({type:'bearish', text:`TMF перешёл ниже нуля при боковой цене — поглощающая сторона переключилась или исчерпала спрос`});
+        }
+
+        html += makeCard('Twiggs Money Flow (неклассически)', items);
       }
     } else if (idL === 'pvi') {
       const n = candles.length;
