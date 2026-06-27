@@ -11116,6 +11116,9 @@ function _anCalcATR(candles, period) {
 function renderAnalysis() {
   const panel = document.getElementById('cp-analysis-panel');
   if (!panel) return;
+  try { _renderAnalysisInner(panel); } catch(e) { panel.innerHTML = `<div style="color:#C71B52;font-size:11px;padding:8px;font-family:'JetBrains Mono',monospace;">⚠ Ошибка анализа: ${e.message}<br><small style="opacity:.6">${e.stack ? e.stack.split('\n')[1] : ''}</small></div>`; }
+}
+function _renderAnalysisInner(panel) {
   const candles = typeof chartCandles !== 'undefined' ? chartCandles : [];
   if (!candles || candles.length < 30) {
     panel.innerHTML = '<div style="color:#6F648F;font-size:11px;padding:8px;font-family:\'JetBrains Mono\',monospace;">Недостаточно данных для анализа</div>';
