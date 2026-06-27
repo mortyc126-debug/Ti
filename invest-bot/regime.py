@@ -41,42 +41,57 @@ REGIME_WEIGHT_MODS = {
     "trending_up": {
         "BS_PRESSURE": 1.3, "BS_PRESSURE_TS": 1.3, "AGGRESSOR_FLOW": 1.3, "LARGE_IMPACT": 1.2,
         "VWAP_SIGNAL": 1.1, "VWAP_SIGNAL_TS": 1.1, "VOL_MOMENTUM": 1.4, "VOL_MOMENTUM_TS": 1.4,
-        "OB_IMBALANCE": 1.0, "CANCEL_SIGNAL": 0.8, "INST_OI": 1.2, "RETAIL_CONTRA": 1.1, "PRICE_TREND": 1.4,
-        "MKT_STRUCTURE": 1.4, "LEVEL_CONTEXT": 1.2, "SPRING": 1.1,
-        # В тренде: хвостовое отвержение важно (ложный откат или реальная усталость),
-        # треугольник восходящий — сильный сигнал продолжения
-        "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
+        "OB_IMBALANCE": 1.0, "CANCEL_SIGNAL": 0.8, "INST_OI": 1.2, "RETAIL_CONTRA": 1.1,
+        # Трендовые методы — главные судьи в трендовом режиме
+        "PRICE_TREND": 1.6, "MKT_STRUCTURE": 1.5, "ADAPTIVE_MA": 1.4, "DONCHIAN": 1.4,
+        "ALLIGATOR": 1.3, "T3_SIGNAL": 1.3, "ZLEMA_SIGNAL": 1.3, "MAMA_FAMA": 1.3,
+        "TWIGGS": 1.3, "IMPULSE_PULLBACK": 1.4,
+        "LEVEL_CONTEXT": 1.2, "SPRING": 1.1, "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
+        # Осцилляторы в тренде ненадёжны — приглушаем
+        "SINEWAVE_SIGNAL": 0.7, "CYBER_PHASE": 0.7, "FISHER_RSI": 0.8, "ZSCORE": 0.8,
     },
     "trending_down": {
         "BS_PRESSURE": 1.3, "BS_PRESSURE_TS": 1.3, "AGGRESSOR_FLOW": 1.3, "LARGE_IMPACT": 1.2,
         "VWAP_SIGNAL": 1.1, "VWAP_SIGNAL_TS": 1.1, "VOL_MOMENTUM": 1.4, "VOL_MOMENTUM_TS": 1.4,
-        "OB_IMBALANCE": 1.0, "CANCEL_SIGNAL": 0.8, "INST_OI": 1.2, "RETAIL_CONTRA": 1.1, "PRICE_TREND": 1.4,
-        "MKT_STRUCTURE": 1.4, "LEVEL_CONTEXT": 1.2, "SPRING": 1.1,
-        "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
+        "OB_IMBALANCE": 1.0, "CANCEL_SIGNAL": 0.8, "INST_OI": 1.2, "RETAIL_CONTRA": 1.1,
+        "PRICE_TREND": 1.6, "MKT_STRUCTURE": 1.5, "ADAPTIVE_MA": 1.4, "DONCHIAN": 1.4,
+        "ALLIGATOR": 1.3, "T3_SIGNAL": 1.3, "ZLEMA_SIGNAL": 1.3, "MAMA_FAMA": 1.3,
+        "TWIGGS": 1.3, "IMPULSE_PULLBACK": 1.4,
+        "LEVEL_CONTEXT": 1.2, "SPRING": 1.1, "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
+        "SINEWAVE_SIGNAL": 0.7, "CYBER_PHASE": 0.7, "FISHER_RSI": 0.8, "ZSCORE": 0.8,
     },
     "ranging": {
         "BS_PRESSURE": 0.9, "BS_PRESSURE_TS": 0.9, "AGGRESSOR_FLOW": 0.9, "LARGE_IMPACT": 0.8,
         "VWAP_SIGNAL": 1.4, "VWAP_SIGNAL_TS": 1.4, "VOL_MOMENTUM": 0.7, "VOL_MOMENTUM_TS": 0.7,
-        "OB_IMBALANCE": 1.3, "CANCEL_SIGNAL": 1.2, "INST_OI": 1.0, "RETAIL_CONTRA": 0.9, "PRICE_TREND": 0.5,
-        "MKT_STRUCTURE": 0.7, "LEVEL_CONTEXT": 1.5, "SPRING": 1.3,
-        # Боковик — идеальная среда для треугольников и хвостового отвержения у границ
-        "WICK_REJECTION": 1.5, "TRIANGLE": 1.6,
+        "OB_IMBALANCE": 1.3, "CANCEL_SIGNAL": 1.2, "INST_OI": 1.0, "RETAIL_CONTRA": 0.9,
+        # В боковике трендовые методы шумят — приглушаем
+        "PRICE_TREND": 0.5, "MKT_STRUCTURE": 0.7, "ADAPTIVE_MA": 0.6, "DONCHIAN": 0.6,
+        "ALLIGATOR": 0.7, "T3_SIGNAL": 0.7, "ZLEMA_SIGNAL": 0.7, "MAMA_FAMA": 0.7,
+        "TWIGGS": 0.7, "IMPULSE_PULLBACK": 0.8,
+        "LEVEL_CONTEXT": 1.5, "SPRING": 1.3, "WICK_REJECTION": 1.5, "TRIANGLE": 1.6,
+        # Осцилляторы в боковике работают хорошо
+        "SINEWAVE_SIGNAL": 1.3, "CYBER_PHASE": 1.3, "FISHER_RSI": 1.2, "ZSCORE": 1.2,
     },
     "high_vol": {
         "BS_PRESSURE": 0.8, "BS_PRESSURE_TS": 0.8, "AGGRESSOR_FLOW": 0.8, "LARGE_IMPACT": 1.2,
         "VWAP_SIGNAL": 0.6, "VWAP_SIGNAL_TS": 0.6, "VOL_MOMENTUM": 0.7, "VOL_MOMENTUM_TS": 0.7,
-        "OB_IMBALANCE": 0.7, "CANCEL_SIGNAL": 1.3, "INST_OI": 1.1, "RETAIL_CONTRA": 1.4, "PRICE_TREND": 0.5,
-        "MKT_STRUCTURE": 1.2, "LEVEL_CONTEXT": 1.3, "SPRING": 0.7,
-        # Высокая волатильность: хвосты длинные но ненадёжные, треугольники часто ложные
-        "WICK_REJECTION": 0.8, "TRIANGLE": 0.7,
+        "OB_IMBALANCE": 0.7, "CANCEL_SIGNAL": 1.3, "INST_OI": 1.1, "RETAIL_CONTRA": 1.4,
+        "PRICE_TREND": 0.5, "MKT_STRUCTURE": 1.2, "ADAPTIVE_MA": 0.6, "DONCHIAN": 0.7,
+        "ALLIGATOR": 0.7, "T3_SIGNAL": 0.7, "ZLEMA_SIGNAL": 0.7, "MAMA_FAMA": 0.7,
+        "TWIGGS": 0.7, "IMPULSE_PULLBACK": 0.9,
+        "LEVEL_CONTEXT": 1.3, "SPRING": 0.7, "WICK_REJECTION": 0.8, "TRIANGLE": 0.7,
+        "SINEWAVE_SIGNAL": 0.8, "CYBER_PHASE": 0.8, "FISHER_RSI": 0.9, "ZSCORE": 0.9,
     },
     "low_vol": {
         "BS_PRESSURE": 0.7, "BS_PRESSURE_TS": 0.7, "AGGRESSOR_FLOW": 0.7, "LARGE_IMPACT": 1.3,
         "VWAP_SIGNAL": 1.2, "VWAP_SIGNAL_TS": 1.2, "VOL_MOMENTUM": 0.6, "VOL_MOMENTUM_TS": 0.6,
-        "OB_IMBALANCE": 1.4, "CANCEL_SIGNAL": 1.1, "INST_OI": 1.0, "RETAIL_CONTRA": 0.8, "PRICE_TREND": 0.7,
-        "MKT_STRUCTURE": 0.8, "LEVEL_CONTEXT": 1.1, "SPRING": 1.4,
-        # Низкая волатильность — треугольники формируются классически, хвосты значимы
-        "WICK_REJECTION": 1.4, "TRIANGLE": 1.5,
+        "OB_IMBALANCE": 1.4, "CANCEL_SIGNAL": 1.1, "INST_OI": 1.0, "RETAIL_CONTRA": 0.8,
+        # Низкая волатильность — тренд может быть, но слабый; умеренное доверие трендовым
+        "PRICE_TREND": 0.8, "MKT_STRUCTURE": 0.8, "ADAPTIVE_MA": 0.8, "DONCHIAN": 0.8,
+        "ALLIGATOR": 0.8, "T3_SIGNAL": 0.8, "ZLEMA_SIGNAL": 0.8, "MAMA_FAMA": 0.8,
+        "TWIGGS": 0.8, "IMPULSE_PULLBACK": 0.9,
+        "LEVEL_CONTEXT": 1.1, "SPRING": 1.4, "WICK_REJECTION": 1.4, "TRIANGLE": 1.5,
+        "SINEWAVE_SIGNAL": 1.2, "CYBER_PHASE": 1.2, "FISHER_RSI": 1.1, "ZSCORE": 1.1,
     },
     "stress": {
         "BS_PRESSURE": 0.5, "BS_PRESSURE_TS": 0.5, "AGGRESSOR_FLOW": 0.5, "LARGE_IMPACT": 0.9,
