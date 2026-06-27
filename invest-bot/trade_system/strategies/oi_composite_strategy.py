@@ -3989,58 +3989,127 @@ def score_vol_compression(candles: list[HistoricCandle]) -> float:
 
 def score_false_breakout(candles: list[HistoricCandle]) -> float:
     """
-    FALSE_BREAKOUT: ложный пробой с быстрым возвратом на объёме.
+    FALSE_BREAKOUT: настоящий ложный пробой — 4 из 6 условий обязательны.
 
-    Пробили уровень → собрали стопы → вернулись быстро и на хорошем объёме.
-    После этого движение идёт в противоположную сторону — стопы уже сняты,
-    сопротивления нет.
+    Чек-лист (по документу):
+    1. Объём на sweep-баре × 2+ от среднего               (обязательно)
+    2. Глубина пробоя ≥ 0.3% от цены / ≥ 0.5 ATR         (обязательно)
+    3. Возврат за 1-2 свечи (не дрейф за 5-10)           (обязательно)
+    4. Объёмное основание: вблизи уровня был исторический объём ≥ 1.5× avg
+    5. Подтверждение потока: объём на возврате > объёма sweep
+    6. За уровнем — пространство (нет плотного объёма сразу за ним)
 
-    Детектируем:
-    - За последние 3–5 баров: выход за 20-барный хай/лой.
-    - Затем быстрый возврат внутрь диапазона (в пределах 3 баров).
-    - Объём на баре возврата ≥ 110% среднего.
+    < 4 условий → sweep сомнительный → 0.
     """
-    if len(candles) < 25:
+    if len(candles) < 30:
         return 0.0
+    try:
+        atr = _compute_atr(candles)
+        price = _to_f(candles[-1].close)
+        avg_vol = sum(float(c.volume) for c in candles[-20:]) / 20
+        if avg_vol <= 0 or atr <= 0:
+            return 0.0
 
-    range_bars = candles[-22:-2]  # 20 баров до последних 2
-    rng_high = max(_to_f(c.high)  for c in range_bars)
-    rng_low  = min(_to_f(c.low)   for c in range_bars)
-    rng      = rng_high - rng_low
-    if rng < 1e-9:
+        range_bars = candles[-22:-2]
+        rng_high = max(_to_f(c.high) for c in range_bars)
+        rng_low  = min(_to_f(c.low)  for c in range_bars)
+        rng = rng_high - rng_low
+        if rng < 1e-9:
+            return 0.0
+
+        # Объёмное основание: был ли исторически высокий объём вблизи уровня
+        # (прокси для POC/HVN — бар с объёмом ≥ 1.5× avg в ±1 ATR от уровня)
+        def _has_vol_basis(level: float) -> bool:
+            for c in candles[-40:-2]:
+                mid = (_to_f(c.high) + _to_f(c.low)) / 2
+                if abs(mid - level) <= 1.0 * atr and float(c.volume) >= 1.5 * avg_vol:
+                    return True
+            return False
+
+        # LVN за уровнем: пространство (нет плотного объёма сразу за ним)
+        def _has_space_beyond(level: float, direction: int) -> bool:
+            beyond = [c for c in candles[-40:-2]
+                      if (direction > 0 and _to_f(c.low) > level)
+                      or (direction < 0 and _to_f(c.high) < level)]
+            if not beyond:
+                return True  # нет баров за уровнем → пространство есть
+            avg_beyond = sum(float(c.volume) for c in beyond) / len(beyond)
+            return avg_beyond < 1.3 * avg_vol  # нет плотного объёма
+
+        tail = candles[-4:]  # смотрим последние 4 бара
+        for i in range(len(tail) - 1):
+            c_sweep = tail[i]
+            sweep_vol = float(c_sweep.volume)
+            ch = _to_f(c_sweep.high)
+            cl = _to_f(c_sweep.low)
+
+            broke_up   = ch > rng_high * 1.001
+            broke_down = cl < rng_low  * 0.999
+            if not broke_up and not broke_down:
+                continue
+
+            # Проверяем возврат за 1-2 бара после sweep (не медленный дрейф)
+            return_bars = tail[i + 1: i + 3]  # макс 2 бара
+            for j, rb in enumerate(return_bars):
+                rb_close = _to_f(rb.close)
+                rb_vol   = float(rb.volume)
+                lag = j + 1  # 1 или 2 бара
+
+                if broke_up and rb_close >= rng_high:
+                    continue  # ещё не вернулся
+                if broke_down and rb_close <= rng_low:
+                    continue
+
+                # ── Чек-лист ──────────────────────────────────────────────
+                conditions = 0
+
+                # 1. Объём sweep × 2+
+                if sweep_vol >= 2.0 * avg_vol:
+                    conditions += 1
+
+                # 2. Глубина ≥ 0.3% И ≥ 0.5 ATR
+                if broke_up:
+                    depth = ch - rng_high
+                    direction = -1
+                else:
+                    depth = rng_low - cl
+                    direction = +1
+                depth_pct = depth / (price or 1.0)
+                if depth_pct >= 0.003 and depth >= 0.5 * atr:
+                    conditions += 1
+
+                # 3. Возврат быстрый (lag ≤ 2 — уже гарантировано диапазоном)
+                if lag <= 2:
+                    conditions += 1
+
+                # 4. Объёмное основание у уровня
+                level = rng_high if broke_up else rng_low
+                if _has_vol_basis(level):
+                    conditions += 1
+
+                # 5. Объём возврата > объёма sweep (агрессивное отторжение)
+                if rb_vol > sweep_vol * 0.85:
+                    conditions += 1
+
+                # 6. Пространство за уровнем
+                if _has_space_beyond(level, direction):
+                    conditions += 1
+
+                if conditions < 4:
+                    return 0.0  # сомнительный sweep — пропускаем
+
+                # Сила пропорциональна глубине + числу условий
+                cond_mult = 0.7 + (conditions - 4) * 0.15  # 0.70 / 0.85 / 1.00
+                strength  = min(0.85, (0.40 + depth_pct * 30) * cond_mult)
+                # Слабый объём sweep → гасим (уже прошло условие 1, но можно усилить)
+                if sweep_vol < 3.0 * avg_vol:
+                    strength *= 0.85
+
+                return round(direction * strength, 4)
+
         return 0.0
-
-    avg_vol = sum(float(c.volume) for c in candles[-20:]) / 20
-
-    # Смотрим последние 5 баров: был ли выход за границу с последующим возвратом
-    tail = candles[-5:]
-    for i in range(len(tail) - 1):
-        c = tail[i]
-        broke_up   = _to_f(c.high)  > rng_high * 1.001
-        broke_down = _to_f(c.low)   < rng_low  * 0.999
-
-        if not broke_up and not broke_down:
-            continue
-
-        # Последующие бары возвращаются внутрь диапазона?
-        returned_bars = tail[i + 1:]
-        for rb in returned_bars:
-            rb_close = _to_f(rb.close)
-            vol_ok   = float(rb.volume) >= avg_vol * 1.05
-
-            if broke_up and rb_close < rng_high and vol_ok:
-                # Пробой вверх → возврат → медвежий сигнал (стопы сняты сверху)
-                penetration = (_to_f(c.high) - rng_high) / rng
-                strength = min(0.80, 0.45 + penetration * 2.0)
-                return round(-strength, 4)
-
-            if broke_down and rb_close > rng_low and vol_ok:
-                # Пробой вниз → возврат → бычий сигнал (стопы сняты снизу)
-                penetration = (rng_low - _to_f(c.low)) / rng
-                strength = min(0.80, 0.45 + penetration * 2.0)
-                return round(strength, 4)
-
-    return 0.0
+    except Exception:
+        return 0.0
 
 
 def score_level_absorption(candles: list[HistoricCandle]) -> float:
@@ -5221,16 +5290,34 @@ def score_liquidity_sweep(candles: list[HistoricCandle]) -> float:
         if atr <= 0 or avg_vol <= 0:
             return 0.0
 
+        # Объёмное основание у уровня: прокси для POC/HVN
+        def _vol_basis(level: float) -> bool:
+            for c in candles[-60:-3]:
+                mid = (_h(c) + _l(c)) / 2
+                if abs(mid - level) <= 1.0 * atr and _v(c) >= 1.5 * avg_vol:
+                    return True
+            return False
+
+        # Пространство за уровнем: нет плотного объёма сразу за ним (LVN)
+        def _space_beyond(level: float, direction: int) -> bool:
+            beyond = [c for c in candles[-60:-3]
+                      if (direction > 0 and _l(c) > level)
+                      or (direction < 0 and _h(c) < level)]
+            if not beyond:
+                return True
+            avg_b = sum(_v(c) for c in beyond) / len(beyond)
+            return avg_b < 1.3 * avg_vol
+
         # Уровни ликвидности по иерархии
         TIERS: list[tuple[int, float, float]] = [
-            (8,  0.30, 1.0),   # слабая: 8 баров, вес 0.30, порог возврата 1.0 ATR
-            (20, 0.50, 0.8),   # средняя: 20 баров
-            (50, 0.75, 0.6),   # сильная: 50 баров
+            (8,  0.30, 2.0),   # слабая: 8 баров, вес 0.30, мин объём ×2
+            (20, 0.50, 2.0),   # средняя: 20 баров
+            (50, 0.75, 2.0),   # сильная: 50 баров
         ]
 
         score       = 0.0
-        sweep_count_ssl = 0  # sweeps вниз (SSL)
-        sweep_count_bsl = 0  # sweeps вверх (BSL)
+        sweep_count_ssl = 0
+        sweep_count_bsl = 0
 
         for bars, weight, vol_thresh in TIERS:
             if len(candles) < bars + 3:
@@ -5247,27 +5334,50 @@ def score_liquidity_sweep(candles: list[HistoricCandle]) -> float:
 
             # SSL Sweep: пробой лоя + возврат вверх
             if _l(cur) < lvl_low and _c(prev) > lvl_low:
-                depth    = (lvl_low - _l(cur)) / atr
-                ret_ok   = price > lvl_low
-                vol_ok   = cur_vol >= vol_thresh * avg_vol
-                vol_mult = 1.2 if (vol_ok and prev_vol > cur_vol * 0.5) else (0.5 if not vol_ok else 0.85)
-                depth_mult = min(1.4, 0.8 + depth * 0.4)
-                s = weight * depth_mult * vol_mult if ret_ok else 0.0
+                depth_abs = lvl_low - _l(cur)
+                depth_pct = depth_abs / (price or 1.0)
+                depth_atr = depth_abs / atr
+
+                # Чек-лист: считаем выполненные условия
+                conds = 0
+                if cur_vol >= vol_thresh * avg_vol:   conds += 1  # 1. объём ×2+
+                if depth_pct >= 0.003 and depth_atr >= 0.5: conds += 1  # 2. глубина
+                conds += 1                                         # 3. возврат 1 бар (гарантирован)
+                if _vol_basis(lvl_low):               conds += 1  # 4. объёмное основание
+                if prev_vol >= cur_vol * 0.7:         conds += 1  # 5. объём возврата
+                if _space_beyond(lvl_low, +1):        conds += 1  # 6. пространство за
+
+                if conds < 4:
+                    continue  # сомнительный sweep
+
+                cond_mult  = 0.70 + (conds - 4) * 0.15
+                depth_mult = min(1.4, 0.8 + depth_atr * 0.4)
+                s = weight * depth_mult * cond_mult
                 score += s
-                if s > 0:
-                    sweep_count_ssl += 1
+                sweep_count_ssl += 1
 
             # BSL Sweep: пробой хая + возврат вниз
             if _h(cur) > lvl_high and _c(prev) < lvl_high:
-                depth    = (_h(cur) - lvl_high) / atr
-                ret_ok   = price < lvl_high
-                vol_ok   = cur_vol >= vol_thresh * avg_vol
-                vol_mult = 1.2 if (vol_ok and prev_vol > cur_vol * 0.5) else (0.5 if not vol_ok else 0.85)
-                depth_mult = min(1.4, 0.8 + depth * 0.4)
-                s = -(weight * depth_mult * vol_mult) if ret_ok else 0.0
+                depth_abs = _h(cur) - lvl_high
+                depth_pct = depth_abs / (price or 1.0)
+                depth_atr = depth_abs / atr
+
+                conds = 0
+                if cur_vol >= vol_thresh * avg_vol:   conds += 1
+                if depth_pct >= 0.003 and depth_atr >= 0.5: conds += 1
+                conds += 1
+                if _vol_basis(lvl_high):              conds += 1
+                if prev_vol >= cur_vol * 0.7:         conds += 1
+                if _space_beyond(lvl_high, -1):       conds += 1
+
+                if conds < 4:
+                    continue
+
+                cond_mult  = 0.70 + (conds - 4) * 0.15
+                depth_mult = min(1.4, 0.8 + depth_atr * 0.4)
+                s = -(weight * depth_mult * cond_mult)
                 score += s
-                if s < 0:
-                    sweep_count_bsl += 1
+                sweep_count_bsl += 1
 
         # Cascade of Sweeps: несколько sweeps подряд = ×1.5
         # Ищем последовательные SSL sweeps в последних 10 барах
