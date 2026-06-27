@@ -294,6 +294,11 @@ input[type=range] { touch-action: none; }
 .tf-mid   { background: rgba(180,160,80,0.18);  color: #B4A050; }
 .tf-low   { background: rgba(120,80,80,0.20);   color: #C08080; }
 .tf-desc  { font-size: 9px; color: #6A6A8A; font-family: 'JetBrains Mono', monospace; }
+.analysis-section-header { font-size: 9px; color: #4A4A6A; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.1em; padding: 6px 0 4px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.04); display: flex; align-items: center; gap: 6px; }
+.analysis-section-header::after { content:''; flex:1; height:1px; background:rgba(255,255,255,0.04); }
+.vp-bar-row { display:flex; align-items:center; gap:4px; margin:1px 0; }
+.vp-bar-fill { height:7px; border-radius:2px; min-width:1px; }
+.vp-bar-label { font-size:8px; font-family:'JetBrains Mono',monospace; color:#6A6A8A; white-space:nowrap; }
 .cp-ind-eye:hover { opacity: 1 !important; color: #4cc9f0 !important; }
 .cp-ind-del:hover { opacity: 1 !important; color: #FF4D7A !important; }
 .cp-ind-name { pointer-events: auto !important; }
@@ -1039,6 +1044,7 @@ input[type=range] { touch-action: none; }
       <div style="display:flex;border-bottom:1px solid rgba(255,0,110,0.1);flex-shrink:0;">
         <button class="cp-tab active" data-tab="ind"   onclick="cpTab(this)">Инд.</button>
         <button class="cp-tab"        data-tab="combo" onclick="cpTab(this)">Комбо</button>
+        <button class="cp-tab"        data-tab="sys"   onclick="cpTab(this)">Системы</button>
         <button class="cp-tab"        data-tab="ichi"  onclick="cpTab(this)">Ишимоку</button>
         <button class="cp-tab"        data-tab="fib"   onclick="cpTab(this)">Фиб</button>
       </div>
@@ -1100,6 +1106,37 @@ input[type=range] { touch-action: none; }
           <div style="flex:1;"><div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">Лоу</div><input id="fl-num" type="number" step="0.01" value="158" oninput="renderFib()" style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
         </div>
         <div id="fib-table" style="font-family:var(--mono);font-size:10px;line-height:1.8;"></div>
+      </div>
+
+      <!-- СИСТЕМЫ -->
+      <div id="cp-panel-sys" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color:#C71B52 #0D0820;">
+        <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">Системы · не-индикаторные методы</div>
+
+        <!-- Ценовой профиль -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">📊 Ценовой профиль</div>
+          <div id="sys-vp-chart" style="margin-bottom:8px;"></div>
+          <div id="sys-vp-analysis" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
+        </div>
+
+        <!-- Линии тренда -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">📐 Линии тренда</div>
+          <div id="sys-trendlines-text" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Загрузите данные для анализа.</div>
+        </div>
+
+        <!-- Горизонтальные уровни -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">📏 Горизонтальные уровни</div>
+          <div id="sys-hlevels-text" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Загрузите данные для анализа.</div>
+        </div>
+
+        <!-- Фибоначчи — ссылка на таб -->
+        <div style="margin-bottom:14px;">
+          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">🌀 Фибоначчи</div>
+          <div style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Расчёт уровней коррекции/расширения — в табе <span style="color:#FF006E;cursor:pointer;" onclick="cpTab(document.querySelector('.cp-tab[data-tab=fib]'))">Фиб ↗</span>.<br>
+          <span style="color:var(--text3);">Неклассически: уровни как зоны интереса, не как триггеры. Ищи кластер из 2+ уровней разных волн. Не торгуй отдельно взятый уровень — только с подтверждением объёма или Price Action.</span></div>
+        </div>
       </div>
 
     </div>
@@ -6791,7 +6828,7 @@ function cpTab(btn) {
   const name = btn.dataset.tab;
   document.querySelectorAll('.cp-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const panels = ['ind','combo','ichi','fib'];
+  const panels = ['ind','combo','ichi','fib','sys'];
   panels.forEach(p => {
     const el = document.getElementById('cp-panel-' + p);
     if (!el) return;
@@ -6824,6 +6861,7 @@ function cpTab(btn) {
     if (fibBtn) fibBtn.textContent = chartFibShow ? '✓ На графике' : 'На график';
   }
   if (name === 'combo') cpRenderCombos();
+  if (name === 'sys') cpRenderSystems();
 }
 
 // cpFilterInds — search in indicator list (hide whole ind block)
@@ -6908,6 +6946,171 @@ function cpRenderCombos() {
       </div>
     </div>`;
   }).join('');
+}
+
+function cpRenderSystems() {
+  if (!chartCandles || chartCandles.length < 20) {
+    ['sys-vp-chart','sys-vp-analysis','sys-trendlines-text','sys-hlevels-text'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<span style="color:var(--text3);">Загрузите данные.</span>';
+    });
+    return;
+  }
+  _sysRenderVP();
+  _sysRenderTrendLines();
+  _sysRenderHLevels();
+}
+
+function _sysRenderVP() {
+  const candles = chartCandles;
+  const BUCKETS = 24;
+  const highs = candles.map(c=>c.high), lows = candles.map(c=>c.low);
+  const pMin = Math.min(...lows), pMax = Math.max(...highs);
+  const step = (pMax - pMin) / BUCKETS;
+  if (step <= 0) return;
+  const vol = new Float64Array(BUCKETS);
+  candles.forEach(c => {
+    const v = (c.volume || 1);
+    const lo = c.low, hi = c.high, rng = hi - lo || step;
+    const b0 = Math.max(0, Math.floor((lo - pMin) / step));
+    const b1 = Math.min(BUCKETS-1, Math.floor((hi - pMin) / step));
+    for (let b = b0; b <= b1; b++) {
+      const bLo = pMin + b*step, bHi = bLo + step;
+      const overlap = Math.min(hi,bHi) - Math.max(lo,bLo);
+      vol[b] += v * (overlap / rng);
+    }
+  });
+  // POC
+  let pocIdx = 0;
+  for (let i=1;i<BUCKETS;i++) if (vol[i]>vol[pocIdx]) pocIdx=i;
+  // Value Area (70%)
+  const totalVol = vol.reduce((a,b)=>a+b,0);
+  let vaVol = vol[pocIdx], vaLo = pocIdx, vaHi = pocIdx;
+  while (vaVol < totalVol * 0.7 && (vaLo > 0 || vaHi < BUCKETS-1)) {
+    const addLo = vaLo > 0 ? vol[vaLo-1] : 0;
+    const addHi = vaHi < BUCKETS-1 ? vol[vaHi+1] : 0;
+    if (addHi >= addLo) { vaHi++; vaVol += vol[vaHi]; }
+    else { vaLo--; vaVol += vol[vaLo]; }
+  }
+  const pocPrice = pMin + (pocIdx + 0.5) * step;
+  const vaLowPrice = pMin + vaLo * step;
+  const vaHighPrice = pMin + (vaHi+1) * step;
+  const lastClose = candles[candles.length-1].close;
+
+  // Shape analysis
+  const top3 = [...vol].map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v).slice(0,3);
+  top3.sort((a,b)=>a.i-b.i);
+  let shape = 'нормальный';
+  const spread = top3[top3.length-1].i - top3[0].i;
+  if (spread >= BUCKETS*0.4) shape = 'двойной пик';
+  else if (pocIdx < BUCKETS*0.35) shape = 'скошенный вниз';
+  else if (pocIdx > BUCKETS*0.65) shape = 'скошенный вверх';
+
+  // Render bar chart
+  const maxV = vol[pocIdx];
+  const barWidth = 90; // % max width
+  let chartHtml = '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;">Объём по ценовым зонам (высокий→низкий)</div>';
+  chartHtml += '<div style="position:relative;">';
+  for (let i=BUCKETS-1;i>=0;i--) {
+    const price = pMin + (i+0.5)*step;
+    const pct = vol[i]/maxV;
+    const w = Math.round(pct*barWidth);
+    const isPoc = i===pocIdx;
+    const isVA = i>=vaLo && i<=vaHi;
+    const isNearPrice = Math.abs(price - lastClose) < step;
+    const barColor = isPoc ? '#C71B52' : isVA ? 'rgba(199,27,82,0.35)' : 'rgba(111,100,143,0.3)';
+    const label = price.toFixed(price<100?2:0);
+    chartHtml += `<div class="vp-bar-row" style="${isNearPrice?'outline:1px solid rgba(255,255,100,0.4);':''}">`
+      + `<div class="vp-bar-label">${label}</div>`
+      + `<div class="vp-bar-fill" style="width:${w}%;background:${barColor};"></div>`
+      + (isPoc?'<span style="font-size:8px;color:#C71B52;margin-left:3px;font-family:var(--mono);">POC</span>':'')
+      + '</div>';
+  }
+  chartHtml += '</div>';
+
+  // Analysis text
+  const priceVsPoc = lastClose > pocPrice ? 'выше POC' : 'ниже POC';
+  const priceVsVA = lastClose > vaHighPrice ? 'выше VA' : lastClose < vaLowPrice ? 'ниже VA' : 'внутри VA';
+  let classicText = `<b style="color:var(--text);">Классически:</b><br>`
+    + `POC: ${pocPrice.toFixed(pocPrice<100?2:0)} · VA: ${vaLowPrice.toFixed(vaLowPrice<100?2:0)}–${vaHighPrice.toFixed(vaHighPrice<100?2:0)}<br>`
+    + `Форма: ${shape}. Цена ${priceVsPoc}, ${priceVsVA}.<br>`;
+  if (shape === 'двойной пик') classicText += 'Два пика → борьба покупателей и продавцов, возможный разворот при пробое одного из пиков.<br>';
+  else if (shape === 'скошенный вниз') classicText += 'Объём смещён вниз → продавцы доминировали в сессии.<br>';
+  else if (shape === 'скошенный вверх') classicText += 'Объём смещён вверх → покупатели доминировали.<br>';
+  else classicText += 'Форма колокола → рынок принял цену, нет сильного дисбаланса.<br>';
+  if (lastClose > vaHighPrice) classicText += 'Цена выше VA → агрессия покупателей, может уйти к следующему POC.';
+  else if (lastClose < vaLowPrice) classicText += 'Цена ниже VA → агрессия продавцов, риск продолжения снижения.';
+  else classicText += 'Цена внутри VA → справедливая цена, флэт вероятен.';
+
+  let nclassText = `<br><b style="color:var(--text);">Неклассически:</b><br>`
+    + `POC — не уровень для входа, а магнит. Если цена долго не возвращается к POC — рынок создаёт новый центр тяжести.<br>`;
+  if (lastClose > pocPrice) nclassText += 'Цена выше POC: ищи шорты при возврате к POC как к поддержке-ставшей-сопротивлением, если пробой был ложным.';
+  else nclassText += 'Цена ниже POC: POC работает как потолок, первый тест снизу — возможный шорт.';
+  nclassText += '<br>Узкий VA (<20% диапазона) = накопление → жди взрыва в любую сторону.';
+
+  const chartEl = document.getElementById('sys-vp-chart');
+  const analysisEl = document.getElementById('sys-vp-analysis');
+  if (chartEl) chartEl.innerHTML = chartHtml;
+  if (analysisEl) analysisEl.innerHTML = classicText + nclassText;
+}
+
+function _sysRenderTrendLines() {
+  const el = document.getElementById('sys-trendlines-text');
+  if (!el || !chartCandles || chartCandles.length < 30) return;
+  const candles = chartCandles;
+  const closes = candles.map(c=>c.close);
+  const n = closes.length;
+  // Find local highs/lows for trend
+  const highs = [], lows = [];
+  for (let i=2;i<n-2;i++) {
+    if (candles[i].high > candles[i-1].high && candles[i].high > candles[i-2].high &&
+        candles[i].high > candles[i+1].high && candles[i].high > candles[i+2].high) highs.push({i,v:candles[i].high});
+    if (candles[i].low < candles[i-1].low && candles[i].low < candles[i-2].low &&
+        candles[i].low < candles[i+1].low && candles[i].low < candles[i+2].low) lows.push({i,v:candles[i].low});
+  }
+  const last2H = highs.slice(-2), last2L = lows.slice(-2);
+  let txt = '';
+  if (last2H.length === 2) {
+    const slope = (last2H[1].v - last2H[0].v) / (last2H[1].i - last2H[0].i);
+    const dir = slope > 0 ? '↗ восходящая' : '↘ нисходящая';
+    txt += `Линия сопротивления по хаям: ${dir} (угол ${Math.abs(slope/last2H[0].v*1000).toFixed(1)}‰/бар).<br>`;
+    txt += `<span style="color:var(--text3);">Неклас: сопротивление работает, пока цена не закрылась выше 2+ свечами. Ложный пробой + возврат = сигнал шорта.</span><br>`;
+  }
+  if (last2L.length === 2) {
+    const slope = (last2L[1].v - last2L[0].v) / (last2L[1].i - last2L[0].i);
+    const dir = slope > 0 ? '↗ восходящая' : '↘ нисходящая';
+    txt += `Линия поддержки по лоям: ${dir}.<br>`;
+    txt += `<span style="color:var(--text3);">Неклас: касание лини поддержки без закрытия ниже + растущий объём = потенциальный лонг. Без объёма — не сигнал.</span><br>`;
+  }
+  if (!txt) txt = 'Недостаточно локальных экстремумов для построения линий.';
+  el.innerHTML = `<span style="color:var(--text2);">${txt}</span>`;
+}
+
+function _sysRenderHLevels() {
+  const el = document.getElementById('sys-hlevels-text');
+  if (!el || !chartCandles || chartCandles.length < 20) return;
+  const candles = chartCandles;
+  // Find price clusters by rounding to 0.1%
+  const closes = candles.map(c=>c.close);
+  const lastClose = closes[closes.length-1];
+  const bucketSize = lastClose * 0.002; // 0.2% buckets
+  const clusters = {};
+  candles.forEach(c => {
+    [c.high, c.low, c.close].forEach(p => {
+      const key = Math.round(p/bucketSize);
+      clusters[key] = (clusters[key]||0) + 1;
+    });
+  });
+  const sorted = Object.entries(clusters).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  let txt = 'Ключевые ценовые кластеры (по частоте касаний):<br>';
+  sorted.forEach(([key,cnt]) => {
+    const price = key*bucketSize;
+    const rel = price > lastClose ? '↑ сопр.' : price < lastClose ? '↓ подд.' : '= текущая';
+    const dist = ((price-lastClose)/lastClose*100).toFixed(2);
+    txt += `<span style="color:${price>lastClose?'#C08080':'#60A4A1'};">${price.toFixed(price<100?2:0)}</span> — ${cnt} касаний, ${rel} (${dist>0?'+':''}${dist}%)<br>`;
+  });
+  txt += `<br><span style="color:var(--text3);">Неклас: уровень силён, если касался 3+ раза без пробоя. При первом пробое с объёмом — смена роли. Кластер из 2+ соседних зон = сильная поддержка/сопротивление.</span>`;
+  el.innerHTML = `<span style="color:var(--text2);">${txt}</span>`;
 }
 
 function cpComboToggle(id) {
