@@ -279,6 +279,13 @@ input[type=range] { touch-action: none; }
 }
 .cp-ind-row:hover .cp-ind-eye,
 .cp-ind-row:hover .cp-ind-del { opacity: 0.5 !important; }
+.cp-ind-row:hover .cp-ind-fav { opacity: 1 !important; }
+.analysis-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; padding: 8px; margin-bottom: 6px; }
+.analysis-card-title { font-size: 10px; color: #8080A0; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+.analysis-item { font-size: 10px; font-family: 'JetBrains Mono', monospace; display: flex; gap: 6px; padding: 2px 0; color: #C0C0D8; }
+.analysis-bullish .analysis-dot { color: #60A4A1; }
+.analysis-bearish .analysis-dot { color: #C71B52; }
+.analysis-neutral .analysis-dot { color: #6F648F; }
 .cp-ind-eye:hover { opacity: 1 !important; color: #4cc9f0 !important; }
 .cp-ind-del:hover { opacity: 1 !important; color: #FF4D7A !important; }
 .cp-ind-name { pointer-events: auto !important; }
@@ -854,6 +861,13 @@ input[type=range] { touch-action: none; }
         </div>
       </div>
 
+      <!-- Tab bar: Методы / Анализ -->
+      <div id="cp-tab-bar" style="display:flex;gap:2px;padding:4px 8px;background:#0A0C18;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <button id="cp-tab-methods" onclick="cpSwitchTab('methods')" style="font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 10px;border:none;border-radius:3px;cursor:pointer;background:#C71B52;color:#fff;">Методы</button>
+        <button id="cp-tab-analysis" onclick="cpSwitchTab('analysis')" style="font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 10px;border:none;border-radius:3px;cursor:pointer;background:rgba(255,255,255,0.05);color:#8080A0;">Анализ</button>
+      </div>
+      <div id="cp-analysis-panel" style="display:none;overflow-y:auto;padding:8px;flex:1;"></div>
+
       <!-- Sub-chart panels -->
       <div id="cp-subpanels" style="border-top:1px solid rgba(255,255,255,0.04);flex-shrink:0;">
         <div id="chart-rsi-panel" class="chart-ind-panel" style="display:none;height:78px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
@@ -1024,10 +1038,14 @@ input[type=range] { touch-action: none; }
       <!-- INDICATORS -->
       <div id="cp-panel-ind" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
         <div style="padding:6px 8px;flex-shrink:0;">
-          <div style="position:relative;">
-            <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:11px;">⌕</span>
-            <input id="cp-ind-search" type="text" placeholder="Поиск…" oninput="cpFilterInds(this.value)"
-              style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:5px 8px 5px 24px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
+          <div style="position:relative;display:flex;gap:4px;align-items:center;">
+            <div style="position:relative;flex:1;">
+              <span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:11px;">⌕</span>
+              <input id="cp-ind-search" type="text" placeholder="Поиск…" oninput="cpFilterInds(this.value)"
+                style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:5px 8px 5px 24px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
+            </div>
+            <button id="cp-fav-filter-btn" onclick="cpToggleFavFilter()" title="Только избранные"
+              style="flex-shrink:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#6F648F;line-height:1;">★</button>
           </div>
         </div>
         <div id="cp-ind-list" style="flex:1;overflow-y:auto;padding:0 8px 12px;scrollbar-width:thin;scrollbar-color: #C71B52 #0D0820;"></div>
@@ -5034,10 +5052,11 @@ async function chartLoad() {
 
     chartRedraw();
     chartComputeSignals();
+    cpAutoloadFavs();
 
   } catch(err) {
     chartStatus(`✗ ${err.message}`, 'var(--accent)');
-    
+
     console.error('Chart load error:', err);
   } finally {
     document.getElementById('chart-load-btn').textContent = 'Загрузить график →';
@@ -6470,17 +6489,40 @@ function cpTab(btn) {
 }
 
 // cpFilterInds — search in indicator list (hide whole ind block)
+let _cpFavFilter = false;
 function cpFilterInds(q) {
-  const ql = q.toLowerCase();
+  const ql = (q || '').toLowerCase();
   const el = document.getElementById('cp-ind-list');
   if (!el) return;
-  // Each indicator occupies a wrapper div containing .cp-ind-row + detail
+  const favs = _cpFavFilter ? cpGetFavs() : null;
   el.querySelectorAll('.cp-ind-row').forEach(row => {
     const wrapper = row.parentElement;
-    const match = !ql || row.textContent.toLowerCase().includes(ql);
-    if (wrapper) wrapper.style.display = match ? '' : 'none';
-    else row.style.display = match ? '' : 'none';
+    const id = row.dataset.indid;
+    const matchQ = !ql || row.textContent.toLowerCase().includes(ql);
+    const matchFav = !favs || favs.includes(id);
+    const show = matchQ && matchFav;
+    if (wrapper) wrapper.style.display = show ? '' : 'none';
+    else row.style.display = show ? '' : 'none';
   });
+}
+function cpToggleFavFilter() {
+  _cpFavFilter = !_cpFavFilter;
+  const btn = document.getElementById('cp-fav-filter-btn');
+  if (btn) {
+    btn.style.background = _cpFavFilter ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.05)';
+    btn.style.color = _cpFavFilter ? '#FFD700' : '#6F648F';
+    btn.style.borderColor = _cpFavFilter ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.08)';
+  }
+  const q = (document.getElementById('cp-ind-search') || {}).value || '';
+  cpFilterInds(q);
+}
+function cpRenderIndList() {
+  // Re-render by calling the main render function
+  if (typeof cpRenderInds === 'function') cpRenderInds();
+  else {
+    const q = (document.getElementById('cp-ind-search') || {}).value || '';
+    cpFilterInds(q);
+  }
 }
 
 // cpRenderCombos — full rich cards
@@ -6596,6 +6638,7 @@ function cpInitIndPanel() {
               box-shadow:${on?'0 0 6px rgba(255,0,110,0.5)':'none'};"></div>
           <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
+          <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${cpGetFavs().includes(ind.id)?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${cpGetFavs().includes(ind.id)?'#FFD700':'#6F648F'};">★</span>
           <span class="cp-ind-eye" data-indid="${ind.id}" title="Скрыть / показать" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">◉</span>
           <span class="cp-ind-del" data-indid="${ind.id}" title="Убрать с графика" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">✕</span>
           <span id="cparrow-${ind.id}" style="font-size:10px;color:#6F648F;pointer-events:none;">›</span>
@@ -6633,6 +6676,9 @@ function cpInitIndPanel() {
   // ── Event delegation: guard against duplicates on re-init ──
   if (el._cpListener) { el.removeEventListener('click', el._cpListener); }
   el._cpListener = function(e) {
+    // Fav star button
+    const fav = e.target.closest('.cp-ind-fav');
+    if (fav) { e.stopPropagation(); cpToggleFav(fav.dataset.indid); return; }
     // Eye button
     const eye = e.target.closest('.cp-ind-eye');
     if (eye) { e.stopPropagation(); cpToggleIndVis(eye.dataset.indid); return; }
@@ -8908,6 +8954,503 @@ function initAnalysis() {
   if(el && typeof _cpTicker!=='undefined' && _cpTicker) el.value=_cpTicker;
   else if(el && typeof _chartTicker!=='undefined' && _chartTicker) el.value=_chartTicker;
   if(_ilBtResults) ilRenderAnalysis();
+}
+
+// --- Tab switching Методы / Анализ ---
+function cpSwitchTab(tab) {
+  const methods = document.getElementById('cp-subpanels');
+  const analysis = document.getElementById('cp-analysis-panel');
+  const btnM = document.getElementById('cp-tab-methods');
+  const btnA = document.getElementById('cp-tab-analysis');
+  if (tab === 'methods') {
+    if (methods) methods.style.display = '';
+    if (analysis) analysis.style.display = 'none';
+    if (btnM) { btnM.style.background = '#C71B52'; btnM.style.color = '#fff'; }
+    if (btnA) { btnA.style.background = 'rgba(255,255,255,0.05)'; btnA.style.color = '#8080A0'; }
+  } else {
+    if (methods) methods.style.display = 'none';
+    if (analysis) analysis.style.display = '';
+    if (btnA) { btnA.style.background = '#C71B52'; btnA.style.color = '#fff'; }
+    if (btnM) { btnM.style.background = 'rgba(255,255,255,0.05)'; btnM.style.color = '#8080A0'; }
+    renderAnalysis();
+  }
+}
+
+// --- Helper calcs for analysis tab ---
+function _anCalcEMA(data, period) {
+  const k = 2 / (period + 1);
+  let ema = data[0];
+  const res = [ema];
+  for (let i = 1; i < data.length; i++) { ema = data[i] * k + ema * (1 - k); res.push(ema); }
+  return res;
+}
+function _anCalcSMA(data, period) {
+  const res = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < period - 1) { res.push(null); continue; }
+    let s = 0; for (let j = i - period + 1; j <= i; j++) s += data[j];
+    res.push(s / period);
+  }
+  return res;
+}
+function _anCalcRSI(closes, period) {
+  if (closes.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = closes[i] - closes[i-1];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  let avgG = gains / period, avgL = losses / period;
+  const res = [avgL === 0 ? 100 : 100 - 100 / (1 + avgG / avgL)];
+  for (let i = period + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i-1];
+    avgG = (avgG * (period - 1) + Math.max(d, 0)) / period;
+    avgL = (avgL * (period - 1) + Math.max(-d, 0)) / period;
+    res.push(avgL === 0 ? 100 : 100 - 100 / (1 + avgG / avgL));
+  }
+  return res;
+}
+function _anCalcATR(candles, period) {
+  if (candles.length < 2) return null;
+  const trs = [];
+  for (let i = 1; i < candles.length; i++) {
+    const c = candles[i], p = candles[i-1];
+    trs.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
+  }
+  let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < trs.length; i++) atr = (atr * (period - 1) + trs[i]) / period;
+  return atr;
+}
+
+// --- Main analysis renderer ---
+function renderAnalysis() {
+  const panel = document.getElementById('cp-analysis-panel');
+  if (!panel) return;
+  const candles = typeof chartCandles !== 'undefined' ? chartCandles : [];
+  if (!candles || candles.length < 30) {
+    panel.innerHTML = '<div style="color:#6F648F;font-size:11px;padding:8px;font-family:\'JetBrains Mono\',monospace;">Недостаточно данных для анализа</div>';
+    return;
+  }
+  const inds = typeof chartInds !== 'undefined' ? chartInds : {};
+  const activeIds = Object.keys(inds).filter(k => inds[k]);
+  if (!activeIds.length) {
+    panel.innerHTML = '<div style="color:#6F648F;font-size:11px;padding:8px;font-family:\'JetBrains Mono\',monospace;">Нет активных индикаторов</div>';
+    return;
+  }
+  const closes = candles.map(c => c.close);
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const vols = candles.map(c => c.volume || 0);
+
+  function makeCard(title, items) {
+    if (!items.length) return '';
+    const rows = items.map(it => `<div class="analysis-item analysis-${it.type}"><span class="analysis-dot">●</span><span>${it.text}</span></div>`).join('');
+    return `<div class="analysis-card"><div class="analysis-card-title">${title}</div><div class="analysis-items">${rows}</div></div>`;
+  }
+
+  let html = '';
+
+  for (const id of activeIds) {
+    const idL = id.toLowerCase();
+
+    if (idL.includes('rsi') && !idL.includes('macd')) {
+      const period = 14;
+      const rsiVals = _anCalcRSI(closes, period);
+      if (rsiVals && rsiVals.length >= 3) {
+        const r = rsiVals[rsiVals.length - 1];
+        const r1 = rsiVals[rsiVals.length - 2];
+        const r2 = rsiVals[rsiVals.length - 3];
+        const items = [];
+        if (r > 95 || r < 5) {
+          items.push({type:'neutral', text:`Краткосрочный экстремум (RSI=${r.toFixed(1)}), статистически вероятен откат в течение 1-3 свечей`});
+        } else if (r > 70) {
+          if (r > r1 && r1 > r2) items.push({type:'bullish', text:`Импульс силён, RSI=${r.toFixed(1)} удерживается в зоне перегрева — признак каскада, не разворота`});
+          else if (r < r1) items.push({type:'bearish', text:`Momentum ослабевает при продолжении роста — дивергенция, затухание (RSI=${r.toFixed(1)})`});
+          else items.push({type:'neutral', text:`RSI = ${r.toFixed(1)}`});
+        } else if (r < 30) {
+          if (r < r1) items.push({type:'bearish', text:`Импульс вниз силён (RSI=${r.toFixed(1)})`});
+          else items.push({type:'bullish', text:`Momentum снизу ослабевает — возможен отскок (RSI=${r.toFixed(1)})`});
+        } else if (r >= 40 && r <= 60) {
+          items.push({type:'neutral', text:`RSI в нейтральной зоне (${r.toFixed(1)}), направленного импульса нет`});
+        } else {
+          items.push({type:'neutral', text:`RSI = ${r.toFixed(1)}`});
+        }
+        html += makeCard(`RSI(${period})`, items);
+      }
+    } else if (idL.includes('macd')) {
+      if (closes.length >= 35) {
+        const ema12 = _anCalcEMA(closes, 12);
+        const ema26 = _anCalcEMA(closes, 26);
+        const macdLine = ema12.map((v, i) => v - ema26[i]);
+        const signal = _anCalcEMA(macdLine.slice(-20), 9);
+        const hist = macdLine.slice(-signal.length).map((v, i) => v - signal[i]);
+        if (hist.length >= 2) {
+          const h = hist[hist.length - 1], h1 = hist[hist.length - 2];
+          const priceSlope = closes[closes.length-1] - closes[closes.length-3];
+          const items = [];
+          const signChanged = (h > 0) !== (h1 > 0);
+          if (signChanged) {
+            items.push({type:'neutral', text:`Смена направления momentum (гистограмма сменила знак)`});
+          } else if (h > h1) {
+            items.push({type:'bullish', text:`Ускорение импульса, движение набирает силу`});
+          } else if (h < h1 && priceSlope > 0) {
+            items.push({type:'bearish', text:`Momentum слабеет на движении вверх — скрытое затухание`});
+          } else if (h < h1) {
+            items.push({type:'bearish', text:`Гистограмма MACD убывает — импульс слабеет`});
+          }
+          html += makeCard('MACD', items);
+        }
+      }
+    } else if (idL === 'bb' || idL.includes('boll')) {
+      const period = 20;
+      if (closes.length >= period + 10) {
+        const sma = _anCalcSMA(closes, period);
+        const items = [];
+        const n = closes.length;
+        const bbWidths = [];
+        for (let i = period - 1; i < n; i++) {
+          if (sma[i] == null) continue;
+          let variance = 0;
+          for (let j = i - period + 1; j <= i; j++) variance += (closes[j] - sma[i]) ** 2;
+          const std = Math.sqrt(variance / period);
+          const upper = sma[i] + 2 * std, lower = sma[i] - 2 * std;
+          bbWidths.push({upper, lower, middle: sma[i], std, i});
+        }
+        if (bbWidths.length >= 3) {
+          const last = bbWidths[bbWidths.length - 1];
+          const prev = bbWidths[bbWidths.length - 2];
+          const last3 = bbWidths.slice(-3);
+          const recent50 = bbWidths.slice(-50);
+          const maxW = Math.max(...recent50.map(b => b.upper - b.lower));
+          const curW = last.upper - last.lower;
+          const lastClose = closes[n - 1];
+          if (curW < 0.2 * maxW) {
+            items.push({type:'neutral', text:`Squeeze — компрессия волатильности, энергия накоплена, ожидай резкий выход`});
+          }
+          const outsideUp2 = last3.every((b) => closes[b.i] > b.upper);
+          const outsideDown2 = last3.every((b) => closes[b.i] < b.lower);
+          if (outsideUp2) {
+            items.push({type:'bullish', text:`Исключительная сила движения — настоящий каскад идёт вдоль верхней полосы`});
+          } else if (outsideDown2) {
+            items.push({type:'bearish', text:`Исключительная сила движения — настоящий каскад идёт вдоль нижней полосы`});
+          }
+          const prevOut = closes[prev.i] > prev.upper || closes[prev.i] < prev.lower;
+          const curIn = lastClose >= last.lower && lastClose <= last.upper;
+          if (prevOut && curIn) {
+            items.push({type:'neutral', text:`Выход закончился, возможен разворот`});
+          }
+          if (!items.length) {
+            const pct = ((lastClose - last.middle) / last.middle * 100).toFixed(2);
+            items.push({type:'neutral', text:`Цена ${pct > 0 ? '+' : ''}${pct}% от средней BB`});
+          }
+          html += makeCard('Bollinger Bands', items);
+        }
+      }
+    } else if (idL.includes('atr') && !idL.includes('matr')) {
+      const atr = _anCalcATR(candles, 14);
+      if (atr != null) {
+        const last = candles[candles.length - 1];
+        const range = last.high - last.low;
+        const items = [];
+        if (range > 1.5 * atr) {
+          items.push({type:'bearish', text:`Бумага прошла ${(range/atr).toFixed(1)} ATR — топливо движения заканчивается быстрее нормы`});
+        } else if (range < 0.3 * atr) {
+          items.push({type:'bullish', text:`Прошло только ${(range/atr).toFixed(2)} ATR — потенциал движения ещё велик`});
+        } else {
+          items.push({type:'neutral', text:`Норма волатильности: ${(atr/last.close*100).toFixed(2)}% от цены`});
+        }
+        html += makeCard('ATR(14)', items);
+      }
+    } else if (idL.includes('stoch')) {
+      const period = 14, smooth = 3;
+      if (candles.length >= period + smooth) {
+        const kVals = [];
+        for (let i = period - 1; i < candles.length; i++) {
+          const slice = candles.slice(i - period + 1, i + 1);
+          const hh = Math.max(...slice.map(c => c.high));
+          const ll = Math.min(...slice.map(c => c.low));
+          kVals.push(hh === ll ? 50 : (candles[i].close - ll) / (hh - ll) * 100);
+        }
+        const k = kVals[kVals.length - 1];
+        const k1 = kVals[kVals.length - 2];
+        const k2 = kVals[kVals.length - 3];
+        const items = [];
+        if (k > 80) {
+          if (k > 80 && k1 > 80 && k2 > 80) items.push({type:'bullish', text:`Stochastic в зоне перегрева и не падает — признак силы, не продавай`});
+          else if (k < k1) items.push({type:'bearish', text:`Выход из экстремума — думать о завершении движения`});
+          else items.push({type:'neutral', text:`Stochastic = ${k.toFixed(1)}`});
+        } else if (k < 20) {
+          if (k < 20 && k1 < 20 && k2 < 20) items.push({type:'bearish', text:`Stochastic в зоне перепроданности и не растёт — давление продавцов`});
+          else if (k > k1) items.push({type:'bullish', text:`Выход из перепроданности — возможен отскок`});
+          else items.push({type:'neutral', text:`Stochastic = ${k.toFixed(1)}`});
+        } else {
+          items.push({type:'neutral', text:`Stochastic = ${k.toFixed(1)}`});
+        }
+        html += makeCard('Stochastic', items);
+      }
+    } else if (idL.includes('obv')) {
+      if (candles.length >= 6) {
+        let obv = 0;
+        const obvArr = [0];
+        for (let i = 1; i < candles.length; i++) {
+          if (candles[i].close > candles[i-1].close) obv += vols[i];
+          else if (candles[i].close < candles[i-1].close) obv -= vols[i];
+          obvArr.push(obv);
+        }
+        const n = candles.length;
+        const priceSlope = closes[n-1] - closes[n-5];
+        const obvSlope = obvArr[obvArr.length-1] - obvArr[obvArr.length-5];
+        const items = [];
+        if (priceSlope > 0 && obvSlope < 0) {
+          items.push({type:'bearish', text:`Дивергенция OBV: продавцы поглощают рост — слабость движения`});
+        } else if (priceSlope < 0 && obvSlope > 0) {
+          items.push({type:'bullish', text:`Дивергенция OBV: покупатели поглощают падение — слабость снижения`});
+        } else if (priceSlope > 0 && obvSlope > 0) {
+          items.push({type:'bullish', text:`OBV подтверждает рост`});
+        } else if (priceSlope < 0 && obvSlope < 0) {
+          items.push({type:'bearish', text:`OBV подтверждает снижение`});
+        } else {
+          items.push({type:'neutral', text:`OBV: направление нейтральное`});
+        }
+        html += makeCard('OBV', items);
+      }
+    } else if (idL.includes('mfi')) {
+      const period = 14;
+      if (candles.length >= period + 1) {
+        const typical = candles.map(c => (c.high + c.low + c.close) / 3);
+        const rawMF = typical.map((t, i) => t * (vols[i] || 0));
+        let posFlow = 0, negFlow = 0;
+        for (let i = candles.length - period; i < candles.length; i++) {
+          if (typical[i] > typical[i-1]) posFlow += rawMF[i];
+          else negFlow += rawMF[i];
+        }
+        const mfi = negFlow === 0 ? 100 : 100 - 100 / (1 + posFlow / negFlow);
+        const priceSlope5 = closes[closes.length-1] - closes[closes.length-5];
+        const items = [];
+        if (mfi > 80 && priceSlope5 > 0) {
+          items.push({type:'bullish', text:`Объёмное давление подтверждает импульс (MFI=${mfi.toFixed(1)})`});
+        } else if (mfi < 20 && priceSlope5 < 0) {
+          items.push({type:'bearish', text:`Объёмная перепроданность подтверждает снижение (MFI=${mfi.toFixed(1)})`});
+        } else if (priceSlope5 > 0 && mfi < 50) {
+          items.push({type:'bearish', text:`Объёмный momentum расходится с ценой (цена↑, MFI=${mfi.toFixed(1)})`});
+        } else {
+          items.push({type:'neutral', text:`MFI = ${mfi.toFixed(1)}`});
+        }
+        html += makeCard('MFI', items);
+      }
+    } else if (idL.includes('ichi') || idL.includes('ichimoku')) {
+      if (candles.length >= 52) {
+        const n = candles.length;
+        const tenkan9h = Math.max(...highs.slice(n-9)), tenkan9l = Math.min(...lows.slice(n-9));
+        const kijun26h = Math.max(...highs.slice(n-26)), kijun26l = Math.min(...lows.slice(n-26));
+        const tenkan = (tenkan9h + tenkan9l) / 2;
+        const kijun = (kijun26h + kijun26l) / 2;
+        const senkouA = (tenkan + kijun) / 2;
+        const span52h = Math.max(...highs.slice(n-52)), span52l = Math.min(...lows.slice(n-52));
+        const senkouB = (span52h + span52l) / 2;
+        const lastClose = closes[n-1];
+        const cloudThickness = Math.abs(senkouA - senkouB) / lastClose * 100;
+        const kijunDev = (lastClose - kijun) / kijun * 100;
+        const items = [];
+        if (cloudThickness < 0.5) {
+          items.push({type:'neutral', text:`Тонкое облако (${cloudThickness.toFixed(2)}% от цены) — пустота, цена пройдёт быстро`});
+        } else if (cloudThickness > 2) {
+          items.push({type:'neutral', text:`Плотное облако (${cloudThickness.toFixed(2)}% от цены) — зона ликвидности, возможно торможение`});
+        }
+        const kijunStr = Math.abs(kijunDev) > 2 ? 'натянута' : 'в норме';
+        items.push({type: Math.abs(kijunDev) > 2 ? (kijunDev > 0 ? 'bullish' : 'bearish') : 'neutral', text:`Цена на ${kijunDev.toFixed(2)}% от kijun — резинка ${kijunStr}`});
+        html += makeCard('Ichimoku', items);
+      }
+    } else if (idL.includes('alligator') || idL.includes('gator')) {
+      function smmaAl(data, period, shift) {
+        let sum = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+        const res = new Array(period + shift - 1).fill(null);
+        res.push(sum);
+        for (let i = period; i < data.length - shift; i++) {
+          sum = (sum * (period - 1) + data[i]) / period;
+          res.push(sum);
+        }
+        return res;
+      }
+      const mid = candles.map(c => (c.high + c.low) / 2);
+      const jaw = smmaAl(mid, 13, 8);
+      const teeth = smmaAl(mid, 8, 5);
+      const lips = smmaAl(mid, 5, 3);
+      const nAl = jaw.length;
+      if (nAl >= 4) {
+        const j0 = jaw[nAl-1], j1 = jaw[nAl-2];
+        const t0 = teeth[nAl-1], t1 = teeth[nAl-2];
+        const l0 = lips[nAl-1], l1 = lips[nAl-2];
+        if (j0 != null && t0 != null && l0 != null) {
+          const lipsTSpread = Math.abs(l0 - t0), prev = Math.abs(l1 - t1);
+          const teethJSpread = Math.abs(t0 - j0), prevTJ = Math.abs(t1 - j1);
+          const items = [];
+          if (lipsTSpread > prev && teethJSpread > prevTJ) {
+            items.push({type:'bullish', text:`Аллигатор ест — тренд в полной силе`});
+          } else if (lipsTSpread < prev && teethJSpread < prevTJ) {
+            items.push({type:'neutral', text:`Аллигатор спит — компрессия, готовится движение`});
+          } else {
+            items.push({type:'neutral', text:`Аллигатор в переходном состоянии`});
+          }
+          html += makeCard('Alligator', items);
+        }
+      }
+    } else if ((idL.includes('ma') || idL.includes('ema')) && !idL.includes('macd') && !idL.includes('smma')) {
+      if (closes.length >= 50) {
+        const sma20 = _anCalcSMA(closes, 20);
+        const sma5 = _anCalcSMA(closes, 5);
+        const sma50 = _anCalcSMA(closes, 50);
+        const n = closes.length;
+        const ma20 = sma20[n-1];
+        const items = [];
+        if (ma20) {
+          const dev = (closes[n-1] - ma20) / ma20;
+          const ma20std = (() => {
+            let v = 0;
+            for (let i = n-20; i < n; i++) v += (closes[i] - ma20) ** 2;
+            return Math.sqrt(v / 20);
+          })();
+          if (Math.abs(closes[n-1] - ma20) > 3 * ma20std) {
+            items.push({type: dev > 0 ? 'bullish' : 'bearish', text:`Цена сильно оторвалась от MA20 (${(dev*100).toFixed(2)}%) — резинка натянута`});
+          }
+          const slope = (sma20[n-1] - sma20[n-4]) / sma20[n-4] * 100;
+          if (Math.abs(slope) > 0.5) {
+            items.push({type:'neutral', text:`Резкий перегиб MA — импульс реальный, не шум (угол ${slope.toFixed(2)}%)`});
+          }
+          const m5 = sma5[n-1], m50 = sma50[n-1];
+          if (m5 && m50) {
+            if (m5 > ma20 && ma20 > m50) items.push({type:'bullish', text:`Веер MA выстроен (5 > 20 > 50) — тренд чистый`});
+            else if (m5 < ma20 && ma20 < m50) items.push({type:'bearish', text:`Медвежий веер MA (5 < 20 < 50) — тренд вниз чистый`});
+          }
+          if (!items.length) items.push({type:'neutral', text:`MA20 = ${ma20.toFixed(4)}, отклонение ${(dev*100).toFixed(2)}%`});
+        }
+        html += makeCard('MA/EMA', items);
+      }
+    } else if (idL.includes('donchian') || idL === 'dc') {
+      const period = 20;
+      if (candles.length >= period + 10) {
+        const n = candles.length;
+        const recent = candles.slice(n - period);
+        const upper = Math.max(...recent.map(c => c.high));
+        const lower = Math.min(...recent.map(c => c.low));
+        const lastClose = closes[n-1];
+        const widths = [];
+        for (let i = period - 1; i < n; i++) {
+          const s = candles.slice(i - period + 1, i + 1);
+          widths.push((Math.max(...s.map(c => c.high)) - Math.min(...s.map(c => c.low))) / candles[i].close);
+        }
+        const maxW = Math.max(...widths.slice(-50));
+        const curW = (upper - lower) / lastClose;
+        const items = [];
+        if (curW < 0.2 * maxW) {
+          items.push({type:'neutral', text:`Компрессия в канале, пробой будет сильным`});
+        }
+        if (lastClose >= upper) items.push({type:'bullish', text:`Цена у верхней границы Дончиана — скопление стопов выше`});
+        else if (lastClose <= lower) items.push({type:'bearish', text:`Цена у нижней границы Дончиана — скопление стопов ниже`});
+        if (!items.length) items.push({type:'neutral', text:`Канал Дончиана: ${lower.toFixed(4)} — ${upper.toFixed(4)}`});
+        html += makeCard('Donchian', items);
+      }
+    } else if (idL.includes('adx')) {
+      const period = 14;
+      if (candles.length >= period + 2) {
+        const n = candles.length;
+        const trArr = [], plusDM = [], minusDM = [];
+        for (let i = 1; i < n; i++) {
+          const c = candles[i], p = candles[i-1];
+          trArr.push(Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close)));
+          const up = c.high - p.high, down = p.low - c.low;
+          plusDM.push(up > down && up > 0 ? up : 0);
+          minusDM.push(down > up && down > 0 ? down : 0);
+        }
+        let atr14 = trArr.slice(0, period).reduce((a,b)=>a+b,0);
+        let pDM14 = plusDM.slice(0,period).reduce((a,b)=>a+b,0);
+        let mDM14 = minusDM.slice(0,period).reduce((a,b)=>a+b,0);
+        const dxArr = [];
+        for (let i = period; i < trArr.length; i++) {
+          atr14 = atr14 - atr14/period + trArr[i];
+          pDM14 = pDM14 - pDM14/period + plusDM[i];
+          mDM14 = mDM14 - mDM14/period + minusDM[i];
+          const pDI = atr14 ? pDM14/atr14*100 : 0;
+          const mDI = atr14 ? mDM14/atr14*100 : 0;
+          dxArr.push(pDI + mDI ? Math.abs(pDI - mDI) / (pDI + mDI) * 100 : 0);
+        }
+        let adx = dxArr.slice(0, period).reduce((a,b)=>a+b,0) / period;
+        for (let i = period; i < dxArr.length; i++) adx = (adx * (period-1) + dxArr[i]) / period;
+        const items = [];
+        if (adx > 25) {
+          const dir = closes[n-1] > closes[n-4] ? 'bullish' : 'bearish';
+          items.push({type: dir, text:`Тренд присутствует, ADX=${adx.toFixed(1)}`});
+        } else if (adx < 20) {
+          items.push({type:'neutral', text:`Рынок в боковике, трендовые сигналы ненадёжны (ADX=${adx.toFixed(1)})`});
+        } else {
+          items.push({type:'neutral', text:`ADX=${adx.toFixed(1)} — умеренный тренд`});
+        }
+        html += makeCard('ADX', items);
+      }
+    } else if (idL.includes('cci')) {
+      const period = 20;
+      if (closes.length >= period + 5) {
+        const typical = candles.map(c => (c.high + c.low + c.close) / 3);
+        const n = typical.length;
+        const smaT = _anCalcSMA(typical, period);
+        const meanDev = (() => {
+          let sum = 0;
+          for (let i = n - period; i < n; i++) sum += Math.abs(typical[i] - smaT[n-1]);
+          return sum / period;
+        })();
+        const cci = meanDev ? (typical[n-1] - smaT[n-1]) / (0.015 * meanDev) : 0;
+        const priceSlope5 = closes[n-1] - closes[n-5];
+        const items = [];
+        if (cci > 100) items.push({type:'bullish', text:`CCI в зоне перекупленности (${cci.toFixed(1)}), импульс силён`});
+        else if (cci < -100) items.push({type:'bearish', text:`CCI в зоне перепроданности (${cci.toFixed(1)}), импульс вниз`});
+        else items.push({type:'neutral', text:`CCI = ${cci.toFixed(1)}`});
+        html += makeCard('CCI', items);
+      }
+    } else {
+      html += makeCard(id, [{type:'neutral', text:`Индикатор активен`}]);
+    }
+  }
+
+  panel.innerHTML = html || '<div style="color:#6F648F;font-size:11px;padding:8px;font-family:\'JetBrains Mono\',monospace;">Нет данных для анализа</div>';
+}
+
+// --- Favorites ---
+function cpGetFavs() {
+  try { return JSON.parse(localStorage.getItem('indlab_fav') || '[]'); } catch(e) { return []; }
+}
+function cpSaveFavs(arr) {
+  localStorage.setItem('indlab_fav', JSON.stringify(arr));
+}
+function cpToggleFav(id) {
+  let favs = cpGetFavs();
+  const idx = favs.indexOf(id);
+  if (idx === -1) {
+    favs.push(id);
+    if (typeof chartInds !== 'undefined' && !chartInds[id] && typeof cpChartToggle === 'function') {
+      cpChartToggle(id);
+    }
+  } else {
+    favs.splice(idx, 1);
+  }
+  cpSaveFavs(favs);
+  // Update stars in DOM
+  document.querySelectorAll('.cp-ind-fav').forEach(el => {
+    const eid = el.dataset.indid;
+    if (cpGetFavs().includes(eid)) {
+      el.style.opacity = '1'; el.style.color = '#FFD700';
+    } else {
+      el.style.opacity = '0'; el.style.color = '#6F648F';
+    }
+  });
+}
+function cpAutoloadFavs() {
+  const favs = cpGetFavs();
+  if (!favs.length) return;
+  favs.forEach(id => {
+    if (typeof chartInds !== 'undefined' && !chartInds[id] && typeof cpChartToggle === 'function') {
+      cpChartToggle(id);
+    }
+  });
 }
 
 // Отвечаем на запросы вердикта от других модулей (через релей MODULE_RPC_* в shell).
