@@ -4715,6 +4715,315 @@ def _tp_extension_mult(candles: list, is_long: bool) -> float:
         return 1.0
 
 
+# ── SMC / ICT ─────────────────────────────────────────────────────────────────
+
+def score_fvg(candles: list[HistoricCandle]) -> float:
+    """
+    Fair Value Gap (имбаланс): три свечи, где между тенью 1-й и тенью 3-й
+    осталась «дыра» — зона без торговли.
+
+    Логика:
+    - Откат вошёл в ближайший незакрытый FVG → сигнал в направлении FVG.
+    - Размер FVG (% от цены) масштабирует силу сигнала.
+    - Незакрытые «старые» FVG выше/ниже цены = признак силы тренда
+      (рынок не возвращается → тренд жив).
+    - Вложенный FVG (nested): внутри зоны ещё один → максимальное ускорение.
+    """
+    if len(candles) < 20:
+        return 0.0
+    try:
+        def _f(c): return _to_f(c.close)
+        def _h(c): return _to_f(c.high)
+        def _l(c): return _to_f(c.low)
+
+        price = _f(candles[-1])
+        atr   = _compute_atr(candles)
+        if atr <= 0:
+            return 0.0
+
+        # Собираем все незакрытые FVG за последние 40 баров
+        window = candles[-42:-2]  # оставляем [-2:] как «текущий» трипл
+        bullish_fvgs: list[tuple[float, float, int]] = []  # (low, high, age)
+        bearish_fvgs: list[tuple[float, float, int]] = []
+
+        for i in range(1, len(window) - 1):
+            c1, c2, c3 = window[i - 1], window[i], window[i + 1]
+            gap_bull = _l(c3) - _h(c1)   # бычий FVG: low c3 > high c1
+            gap_bear = _l(c1) - _h(c3)   # медвежий FVG: low c1 > high c3
+            age = len(window) - i
+            if gap_bull > 0.0001 * price:
+                bullish_fvgs.append((_h(c1), _l(c3), age))
+            if gap_bear > 0.0001 * price:
+                bearish_fvgs.append((_h(c3), _l(c1), age))
+
+        if not bullish_fvgs and not bearish_fvgs:
+            return 0.0
+
+        score = 0.0
+
+        # 1. Откат вошёл в ближайший незакрытый FVG → сигнал в направлении FVG
+        # Бычий FVG: цена опустилась в зону [low_fvg, high_fvg] с нижней стороны
+        for fvg_lo, fvg_hi, age in sorted(bullish_fvgs, key=lambda x: x[2]):
+            mid = (fvg_lo + fvg_hi) / 2
+            gap_size = (fvg_hi - fvg_lo) / price
+            size_mult = min(1.5, 0.6 + gap_size / (atr / price) * 0.3)
+            age_decay = max(0.4, 1.0 - age * 0.02)
+            if fvg_lo <= price <= fvg_hi:
+                # Цена внутри зоны — восстановление к верхней границе
+                s = 0.45 * size_mult * age_decay
+                score += s
+                break
+            elif price < fvg_lo and price > fvg_lo - 0.5 * atr:
+                # Откат коснулся верхней границы снизу — лучшая точка входа
+                s = 0.55 * size_mult * age_decay
+                score += s
+                break
+
+        # Медвежий FVG
+        for fvg_lo, fvg_hi, age in sorted(bearish_fvgs, key=lambda x: x[2]):
+            gap_size = (fvg_hi - fvg_lo) / price
+            size_mult = min(1.5, 0.6 + gap_size / (atr / price) * 0.3)
+            age_decay = max(0.4, 1.0 - age * 0.02)
+            if fvg_lo <= price <= fvg_hi:
+                s = -0.45 * size_mult * age_decay
+                score += s
+                break
+            elif price > fvg_hi and price < fvg_hi + 0.5 * atr:
+                s = -0.55 * size_mult * age_decay
+                score += s
+                break
+
+        # 2. Незакрытые старые FVG в направлении тренда = признак силы
+        # Если FVG выше цены (бычьи) и цена не вернулась → бычья сила
+        above_bull = sum(1 for lo, hi, a in bullish_fvgs if lo > price and a > 3)
+        below_bear = sum(1 for lo, hi, a in bearish_fvgs if hi < price and a > 3)
+        if above_bull >= 2:
+            score += min(0.20, 0.07 * above_bull)
+        if below_bear >= 2:
+            score -= min(0.20, 0.07 * below_bear)
+
+        # 3. Вложенный FVG (nested): зона внутри зоны — ускорение
+        # Упрощённо: бычий FVG внутри другого бычьего FVG
+        nested_bull = 0
+        nested_bear = 0
+        for i in range(len(bullish_fvgs)):
+            lo1, hi1, _ = bullish_fvgs[i]
+            for j in range(len(bullish_fvgs)):
+                if i == j: continue
+                lo2, hi2, _ = bullish_fvgs[j]
+                if lo2 >= lo1 and hi2 <= hi1:
+                    nested_bull += 1
+        for i in range(len(bearish_fvgs)):
+            lo1, hi1, _ = bearish_fvgs[i]
+            for j in range(len(bearish_fvgs)):
+                if i == j: continue
+                lo2, hi2, _ = bearish_fvgs[j]
+                if lo2 >= lo1 and hi2 <= hi1:
+                    nested_bear += 1
+        if nested_bull and score > 0:
+            score *= 1.25
+        if nested_bear and score < 0:
+            score *= 1.25
+
+        return max(-1.0, min(1.0, round(score, 4)))
+    except Exception:
+        return 0.0
+
+
+def score_order_block(candles: list[HistoricCandle]) -> float:
+    """
+    Order Block (OB): последняя свеча противоположного направления перед
+    импульсом — место где крупняк ставил лимитные заявки.
+
+    Бычий OB: последняя медвежья свеча перед бычьим импульсом ≥ 1.5 ATR.
+    Цена возвращается к диапазону этой свечи → бычий сигнал.
+
+    Состояния:
+    - Fresh OB (нетронутый): первое касание → максимальный сигнал.
+    - Mitigated OB: уже использован (цена прошла насквозь) → смена роли,
+      становится Breaker Block (противоположный сигнал).
+    - OB + HVN: если OB совпадает с зоной высокого объёма → бонус ×1.3.
+    """
+    if len(candles) < 30:
+        return 0.0
+    try:
+        def _o(c): return _to_f(c.open)
+        def _c(c): return _to_f(c.close)
+        def _h(c): return _to_f(c.high)
+        def _l(c): return _to_f(c.low)
+        def _v(c): return _to_f(c.volume)
+
+        atr = _compute_atr(candles)
+        if atr <= 0:
+            return 0.0
+
+        price   = _c(candles[-1])
+        avg_vol = sum(_v(c) for c in candles[-20:]) / 20
+
+        # Ищем OB в последних 30 барах (не считая текущий)
+        lookback = candles[-31:-1]
+        score = 0.0
+
+        for i in range(2, len(lookback)):
+            c_ob  = lookback[i - 2]   # потенциальный OB
+            c_imp = lookback[i - 1]   # импульсная свеча
+            # Размер импульса
+            imp_size = abs(_c(c_imp) - _o(c_imp))
+            if imp_size < 1.2 * atr:
+                continue
+
+            is_bull_ob = _c(c_ob) < _o(c_ob) and _c(c_imp) > _o(c_imp)
+            is_bear_ob = _c(c_ob) > _o(c_ob) and _c(c_imp) < _o(c_imp)
+
+            if not is_bull_ob and not is_bear_ob:
+                continue
+
+            ob_lo = min(_o(c_ob), _c(c_ob), _l(c_ob))
+            ob_hi = max(_o(c_ob), _c(c_ob), _h(c_ob))
+            age   = len(lookback) - i + 1
+
+            # Проверяем был ли OB пробит насквозь после импульса (Mitigation)
+            post_candles = lookback[i:]
+            mitigated = False
+            for pc in post_candles:
+                if is_bull_ob and _l(pc) < ob_lo:
+                    mitigated = True; break
+                if is_bear_ob and _h(pc) > ob_hi:
+                    mitigated = True; break
+
+            age_decay  = max(0.3, 1.0 - age * 0.025)
+            imp_mult   = min(1.5, imp_size / atr * 0.5)
+
+            # Объёмный бонус: OB совпадает с зоной повышенного объёма (≈HVN)
+            ob_vol = _v(c_ob)
+            vol_mult = 1.3 if ob_vol > 1.5 * avg_vol else 1.0
+
+            if is_bull_ob:
+                # Fresh OB: цена вернулась в зону снизу
+                if not mitigated and ob_lo <= price <= ob_hi + 0.3 * atr:
+                    s = 0.50 * age_decay * imp_mult * vol_mult
+                    score += s
+                # Breaker Block: OB пробит → смена роли на медвежье
+                elif mitigated and ob_hi - 0.2 * atr <= price <= ob_hi + 0.5 * atr:
+                    s = -0.30 * age_decay * imp_mult
+                    score += s
+
+            if is_bear_ob:
+                if not mitigated and ob_lo - 0.3 * atr <= price <= ob_hi:
+                    s = -0.50 * age_decay * imp_mult * vol_mult
+                    score += s
+                elif mitigated and ob_lo - 0.5 * atr <= price <= ob_lo + 0.2 * atr:
+                    s = 0.30 * age_decay * imp_mult
+                    score += s
+
+        return max(-1.0, min(1.0, round(score, 4)))
+    except Exception:
+        return 0.0
+
+
+def score_liquidity_sweep(candles: list[HistoricCandle]) -> float:
+    """
+    Liquidity Sweep = Wyckoff Spring/Upthrust в языке SMC.
+
+    Классификация ликвидности по иерархии:
+    - Слабая: внутридневные хаи/лои (5-10 баров)
+    - Средняя: хаи/лои 15-30 баров
+    - Сильная: хаи/лои 50+ баров
+
+    Сигнал: пробой уровня + возврат за 1-2 бара.
+    Чем выше иерархия уровня → тем сильнее сигнал.
+
+    Cascade of Sweeps: несколько sweeps подряд в одном направлении =
+    методичный сбор ликвидности → удваивает ожидаемое движение.
+
+    Sweep без объёма = слабый (×0.5). С объёмом > avg = сильный.
+    """
+    if len(candles) < 60:
+        return 0.0
+    try:
+        def _h(c): return _to_f(c.high)
+        def _l(c): return _to_f(c.low)
+        def _c(c): return _to_f(c.close)
+        def _v(c): return _to_f(c.volume)
+
+        atr     = _compute_atr(candles)
+        price   = _c(candles[-1])
+        avg_vol = sum(_v(c) for c in candles[-20:]) / 20
+        if atr <= 0 or avg_vol <= 0:
+            return 0.0
+
+        # Уровни ликвидности по иерархии
+        TIERS: list[tuple[int, float, float]] = [
+            (8,  0.30, 1.0),   # слабая: 8 баров, вес 0.30, порог возврата 1.0 ATR
+            (20, 0.50, 0.8),   # средняя: 20 баров
+            (50, 0.75, 0.6),   # сильная: 50 баров
+        ]
+
+        score       = 0.0
+        sweep_count_ssl = 0  # sweeps вниз (SSL)
+        sweep_count_bsl = 0  # sweeps вверх (BSL)
+
+        for bars, weight, vol_thresh in TIERS:
+            if len(candles) < bars + 3:
+                continue
+            window   = candles[-(bars + 3):-2]
+            lvl_high = max(_h(c) for c in window)
+            lvl_low  = min(_l(c) for c in window)
+
+            cur  = candles[-2]   # потенциальная sweep-свеча
+            prev = candles[-1]   # возврат
+
+            cur_vol  = _v(cur)
+            prev_vol = _v(prev)
+
+            # SSL Sweep: пробой лоя + возврат вверх
+            if _l(cur) < lvl_low and _c(prev) > lvl_low:
+                depth    = (lvl_low - _l(cur)) / atr
+                ret_ok   = price > lvl_low
+                vol_ok   = cur_vol >= vol_thresh * avg_vol
+                vol_mult = 1.2 if (vol_ok and prev_vol > cur_vol * 0.5) else (0.5 if not vol_ok else 0.85)
+                depth_mult = min(1.4, 0.8 + depth * 0.4)
+                s = weight * depth_mult * vol_mult if ret_ok else 0.0
+                score += s
+                if s > 0:
+                    sweep_count_ssl += 1
+
+            # BSL Sweep: пробой хая + возврат вниз
+            if _h(cur) > lvl_high and _c(prev) < lvl_high:
+                depth    = (_h(cur) - lvl_high) / atr
+                ret_ok   = price < lvl_high
+                vol_ok   = cur_vol >= vol_thresh * avg_vol
+                vol_mult = 1.2 if (vol_ok and prev_vol > cur_vol * 0.5) else (0.5 if not vol_ok else 0.85)
+                depth_mult = min(1.4, 0.8 + depth * 0.4)
+                s = -(weight * depth_mult * vol_mult) if ret_ok else 0.0
+                score += s
+                if s < 0:
+                    sweep_count_bsl += 1
+
+        # Cascade of Sweeps: несколько sweeps подряд = ×1.5
+        # Ищем последовательные SSL sweeps в последних 10 барах
+        cascade_ssl = 0
+        cascade_bsl = 0
+        for i in range(max(0, len(candles) - 12), len(candles) - 3):
+            seg     = candles[max(0, i - 10):i]
+            if len(seg) < 5: continue
+            lv_lo   = min(_l(c) for c in seg)
+            lv_hi   = max(_h(c) for c in seg)
+            if _l(candles[i]) < lv_lo and _c(candles[i + 1]) > lv_lo:
+                cascade_ssl += 1
+            if _h(candles[i]) > lv_hi and _c(candles[i + 1]) < lv_hi:
+                cascade_bsl += 1
+
+        if cascade_ssl >= 3 and score > 0:
+            score *= 1.5
+        if cascade_bsl >= 3 and score < 0:
+            score *= 1.5
+
+        return max(-1.0, min(1.0, round(score, 4)))
+    except Exception:
+        return 0.0
+
+
 # ── Стратегия ─────────────────────────────────────────────────────────────────
 
 METHODS = [
@@ -4768,6 +5077,10 @@ METHODS = [
     ("MAMA_FAMA",           score_mama_fama_candle),
     ("EHLERS_MODE",         score_ehlers_mode_candle),
     ("CYBER_PHASE",         score_cyber_phase_candle),
+    # SMC / ICT
+    ("FVG",                 score_fvg),
+    ("ORDER_BLOCK",         score_order_block),
+    ("LIQUIDITY_SWEEP",     score_liquidity_sweep),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
