@@ -3614,6 +3614,110 @@ const COMBO_PRESETS = [
     ],
     read:'MACD выше нуля → ищем только лонг-сигналы SAR. SAR разворачивается вверх (цена пробила SAR) → вход. SAR = трейлинг стоп.',
   },
+  {
+    id: 'vsa_absorption',
+    name: 'VSA — Пульс поглощения',
+    icon: '📦',
+    tag: 'VSA · Volume',
+    tagColor: '#7c6aff',
+    short: 'Узкая свеча + большой объём + цена вверху диапазона. Тестирование уровня агрессивно.',
+    signal: 'neutral',
+    chartIds: ['kvo','eom','vo','bb_width'],
+    inds: ['Klinger (KVO)', 'EOM', 'Volume Oscillator', 'BB Width'],
+    rules: ['Узкая свеча (тело < 30% ATR) + объём выше нормы на 30%+', 'Цена закрылась в верхней половине диапазона свечи', 'Klinger в экстремуме (деньги накопились)', 'Если закрылась ниже — ложное поглощение (антисигнал)'],
+    read: 'Узкая свеча + большой объём = кто-то поглощает предложение. Цена в верхней части = покупатели. Klinger подтверждает что деньги накопились. Вход после следующего бара-подтверждения.',
+  },
+  {
+    id: 'wyckoff_spring',
+    name: 'Wyckoff Spring',
+    icon: '🏗',
+    tag: 'Wyckoff',
+    tagColor: '#ff9f1c',
+    short: 'Цена пробила поддержку вниз, собрала стопы и вернулась выше за 1–2 свечи.',
+    signal: 'neutral',
+    chartIds: ['fisher','bb_width','hist_vol','chaikin_vol'],
+    inds: ['Fisher Transform', 'Choppiness', 'BB Width', 'EBS'],
+    rules: ['Цена пробила под поддержку (min последних 30 баров)', 'Вернулась выше поддержки за 1–2 свечи', 'Fisher RSI был в крайности → переключился', 'Choppiness высокий = энергия сжата'],
+    read: 'Spring = ложный пробой вниз. Цена собирает стопы под поддержкой и резко возвращается. Самый сильный сетап Wyckoff. Вход на баре возврата.',
+  },
+  {
+    id: 'amt_poc_cluster',
+    name: 'AMT — Кластер POC',
+    icon: '🏛',
+    tag: 'AMT · Auction',
+    tagColor: '#4cc9f0',
+    short: 'POC нескольких таймфреймов совпал на одном уровне — цена вернётся.',
+    signal: 'neutral',
+    chartIds: ['atr','bb_pct','vol'],
+    inds: ['Donchian Channel', 'ATR', 'BB %B', 'Volume'],
+    rules: ['POC = свеча с наибольшим объёмом за 50 баров', 'Цена далеко от POC > 2% → ждём возврат', 'Donchian асимметрия показывает с какой стороны давление', 'ATR растёт = цена в пустой зоне, скорость высокая'],
+    read: 'POC притягивает цену. Чем дальше ушла — тем сильнее тяга. Donchian покажет когда давление иссякнет. ATR — подтвердит что цена ещё в пустой зоне.',
+  },
+  {
+    id: 'orderflow_aggression',
+    name: 'Order Flow — Смена агрессии',
+    icon: '🌊',
+    tag: 'Order Flow',
+    tagColor: '#52F2C9',
+    short: 'Дельта резко переключилась за 2 свечи — смена режима агрессии покупателей/продавцов.',
+    signal: 'neutral',
+    chartIds: ['cum_delta','std_dev','force_idx','bb_width'],
+    inds: ['Cumulative Delta', 'Z-score (StdDev)', 'BB Squeeze', 'Force Index'],
+    rules: ['Дельта последних 2 свечей > 3× средней дельты = смена агрессии', 'Z-score (StdDev) резко растёт = статистически значимо', 'Сильный сигнал — каскад может начаться немедленно'],
+    read: 'Резкое переключение дельты = крупный агрессивно вошёл против рынка. Не хватаешь после факта — ждёшь откат и входишь с рынком.',
+  },
+  {
+    id: 'pa_shadow_skew',
+    name: 'Price Action — Перекос теней',
+    icon: '🕯',
+    tag: 'Price Action',
+    tagColor: '#C71B52',
+    short: 'В боковике тени направлены только в одну сторону — предсказывает куда выброс.',
+    signal: 'neutral',
+    chartIds: ['alligator','mama','atr','bb_pct'],
+    inds: ['Alligator', 'MAMA/FAMA', 'ATR', 'BB %B'],
+    rules: ['Тени верхние > нижних на 30%+ за 10 свечей = сопротивление у хаёв', 'Alligator разворачивается в сторону куда идут тени', 'MAMA/FAMA угол подтверждает направление'],
+    read: 'Перекос теней = рынок показывает где сопротивление. Не один паттерн — 10-свечной ритм. Alligator и MAMA подтверждают направление выброса.',
+  },
+  {
+    id: 'vol_5layer_squeeze',
+    name: 'Пятислойная компрессия',
+    icon: '🌡',
+    tag: 'Волатильность · Сжатие',
+    tagColor: '#60A4A1',
+    short: 'Все пять мер волатильности на минимумах одновременно — взрыв неизбежен.',
+    signal: 'neutral',
+    chartIds: ['bb_width','hist_vol','chaikin_vol','std_dev','atr'],
+    inds: ['BB Width', 'Historical Volatility', 'Chaikin Vol', 'StdDev', 'ATR'],
+    rules: ['BB Width в нижних 20% своего диапазона', 'HV в нижних 20% своего диапазона', 'Chaikin Vol сжимается (−10%+)', 'StdDev ниже 60% от нормы', 'ATR ниже 70% от среднего'],
+    read: 'Сжатие волатильности по 5 независимым метрикам. Взрыв неизбежен — но направление определяется пробоем.',
+  },
+  {
+    id: 'vol_triple_breakout',
+    name: 'Тройное ускорение волатильности',
+    icon: '🚀',
+    tag: 'Волатильность · Пробой',
+    tagColor: '#ff9f1c',
+    short: 'BB Width + HV + Chaikin Vol все расширились — пробой реальный, не ложный.',
+    signal: 'neutral',
+    chartIds: ['bb_width','hist_vol','chaikin_vol','vol'],
+    inds: ['BB Width', 'Historical Volatility', 'Chaikin Vol', 'Volume'],
+    rules: ['BB Width выросла на 30%+ за 5 баров', 'HV выросла на 50%+ за 10 баров', 'Chaikin Vol расширился +15%+', 'Все три — пробой реальный, не ложный'],
+    read: 'Три независимые меры волатильности говорят одно = пробой настоящий. Ложный пробой не расширяет все три одновременно.',
+  },
+  {
+    id: 'sys_optimal_full',
+    name: 'Оптимальный набор (большое комбо)',
+    icon: '✅',
+    tag: 'Мастер-стратегия',
+    tagColor: '#60A4A1',
+    short: '16 инструментов из всех категорий: режим + деньги + тренд + волатильность.',
+    signal: 'neutral',
+    chartIds: ['dpo','accel_osc','fisher','kvo','force_idx','cmf','adline','eom','nvi','dmi','supertrend','vortex','envelopes','bb_width','hist_vol','chaikin_vol'],
+    inds: ['DPO','AC Oscillator','Fisher Transform','Klinger','Force Index','CMF','A/D Line','EOM','NVI/PVI','DMI/ADX','SuperTrend','Vortex','Envelopes','BB Width','Historical Vol','Chaikin Vol'],
+    rules: ['Режим: DPO + AC + Fisher — где цикл и сколько энергии', 'Деньги: Klinger + Force + CMF + AD + EOM + NVI — 6 независимых денежных потоков', 'Тренд: DMI + SuperTrend + Vortex + Envelopes — фильтр и уровни', 'Волатильность: BB Width + HV + Chaikin — компрессия и пробой'],
+    read: 'Полная система. Не для каждого сигнала — для построения картины рынка. Запускаешь, смотришь какие из 16 согласны в одну сторону. Минимум 10 из 16 = входишь.',
+  },
 ];
 
 function initCombos() {
@@ -3671,6 +3775,17 @@ function toggleCombo(id) {
 function applyPreset(id) {
   const p = COMBO_PRESETS.find(c => c.id === id);
   if (!p) return;
+
+  // Новые пресеты с chartIds — управляем через cpChartToggle
+  if (p.chartIds) {
+    Object.keys(chartInds).forEach(function(k){ if(chartInds[k]) cpChartToggle(k); });
+    p.chartIds.forEach(function(id){ if(!chartInds[id]) cpChartToggle(id); });
+    cpActiveCombo = id;
+    cpRenderCombos();
+    showToast('✓ ' + p.name, '#60A4A1');
+    setTimeout(function(){ if(chartCandles && chartCandles.length) chartRedraw(); }, 80);
+    return;
+  }
 
   // Map real combo ids to chart indicator toggles
   const PRESET_INDS = {
@@ -6913,13 +7028,216 @@ function cpRenderIndList() {
 // cpRenderCombos — full rich cards
 let cpActiveCombo = null;
 
+// Вычисляет живые сигналы для 8 новых пресетов на основе chartCandles
+function _computeSysSignals() {
+  var candles = (typeof chartCandles !== 'undefined' ? chartCandles : []) || [];
+  var n = candles.length;
+  if (n < 20) return {};
+  var signals = {};
+  var closes = candles.map(function(c){return c.close;});
+  var highs = candles.map(function(c){return c.high;});
+  var lows = candles.map(function(c){return c.low;});
+  var opens = candles.map(function(c){return c.open;});
+  var vols = candles.map(function(c){return c.volume||0;});
+
+  // ATR helper (simple)
+  function atr14() {
+    var sum=0, cnt=0;
+    for(var i=Math.max(1,n-15);i<n;i++){
+      sum+=Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1]));
+      cnt++;
+    }
+    return cnt>0?sum/cnt:1;
+  }
+
+  // vsa_absorption
+  try {
+    var atrVal = atr14();
+    var narrowCount=0, highCloseCount=0;
+    for(var i=n-5;i<n;i++){
+      var body=Math.abs(closes[i]-opens[i]);
+      if(atrVal>0&&body/atrVal<0.3) narrowCount++;
+      if(closes[i]>(highs[i]+lows[i])/2+(highs[i]-lows[i])*0.2) highCloseCount++;
+    }
+    var vol5=0; for(var i=n-5;i<n;i++) vol5+=vols[i]; vol5/=5;
+    var vol50=0; for(var i=Math.max(0,n-50);i<n;i++) vol50+=vols[i]; vol50/=Math.min(50,n);
+    signals['vsa_absorption']=(narrowCount>=2&&highCloseCount>=2&&vol5>vol50*1.3)?'buy':'neutral';
+  } catch(e){}
+
+  // wyckoff_spring
+  try {
+    var support=Infinity;
+    for(var i=Math.max(0,n-30);i<n-5;i++) if(closes[i]<support) support=closes[i];
+    var minLast5=Infinity;
+    for(var i=n-5;i<n;i++) if(closes[i]<minLast5) minLast5=closes[i];
+    var breakBelow=minLast5<support*0.998;
+    var recovered=closes[n-1]>support;
+    signals['wyckoff_spring']=(breakBelow&&recovered)?'buy-strong':'neutral';
+  } catch(e){}
+
+  // amt_poc_cluster
+  try {
+    var pocIdx=Math.max(0,n-50);
+    var pocVol=vols[pocIdx], pocClose=closes[pocIdx];
+    for(var i=Math.max(0,n-50);i<n;i++){
+      if(vols[i]>pocVol){pocVol=vols[i];pocClose=closes[i];}
+    }
+    var dist=Math.abs(closes[n-1]-pocClose)/pocClose*100;
+    if(dist<0.5) signals['amt_poc_cluster']='neutral';
+    else if(dist>2) signals['amt_poc_cluster']=closes[n-1]>pocClose?'buy':'sell';
+    else signals['amt_poc_cluster']='neutral';
+  } catch(e){}
+
+  // orderflow_aggression
+  try {
+    var delta2=0;
+    for(var i=n-2;i<n;i++) delta2+=(closes[i]>opens[i]?1:-1)*vols[i];
+    var delta10avg=0;
+    var cnt10=Math.min(10,n-2);
+    for(var i=n-2-cnt10;i<n-2;i++) delta10avg+=Math.abs((closes[i]>opens[i]?1:-1)*vols[i]);
+    delta10avg/=cnt10||1;
+    if(delta2>delta10avg*3) signals['orderflow_aggression']='buy-strong';
+    else if(delta2<-delta10avg*3) signals['orderflow_aggression']='sell-strong';
+    else signals['orderflow_aggression']='neutral';
+  } catch(e){}
+
+  // pa_shadow_skew
+  try {
+    var upS=0,dnS=0;
+    for(var i=Math.max(0,n-10);i<n;i++){
+      upS+=highs[i]-Math.max(opens[i],closes[i]);
+      dnS+=Math.min(opens[i],closes[i])-lows[i];
+    }
+    var total=upS+dnS;
+    var skew=total>0?(upS-dnS)/total:0;
+    if(skew>0.3) signals['pa_shadow_skew']='sell';
+    else if(skew<-0.3) signals['pa_shadow_skew']='buy';
+    else signals['pa_shadow_skew']='neutral';
+  } catch(e){}
+
+  // vol_5layer_squeeze
+  try {
+    var score=0;
+    if(n>=120){
+      var bwArr=[];
+      for(var i=20;i<n;i++){
+        var sl=closes.slice(i-20,i);
+        var mn=sl.reduce(function(a,b){return a+b;},0)/20;
+        var sd=Math.sqrt(sl.reduce(function(a,b){return a+(b-mn)*(b-mn);},0)/20);
+        bwArr.push(sd*4/mn);
+      }
+      var nowBw=bwArr[bwArr.length-1];
+      var sorted=bwArr.slice(-100).slice().sort(function(a,b){return a-b;});
+      var rank=sorted.indexOf(sorted.reduce(function(a,b){return Math.abs(a-nowBw)<Math.abs(b-nowBw)?a:b;}))/sorted.length;
+      if(rank<0.2) score++;
+    }
+    if(n>=120){
+      var rets=[];
+      for(var i=1;i<n;i++) rets.push(Math.log(closes[i]/closes[i-1]));
+      var hvArr=[];
+      for(var i=20;i<rets.length;i++){
+        var sl=rets.slice(i-20,i);
+        var mn=sl.reduce(function(a,b){return a+b;},0)/20;
+        var v=sl.reduce(function(a,b){return a+(b-mn)*(b-mn);},0)/20;
+        hvArr.push(Math.sqrt(v)*Math.sqrt(252));
+      }
+      var nowHv=hvArr[hvArr.length-1];
+      var hvSorted=hvArr.slice(-100).slice().sort(function(a,b){return a-b;});
+      var hvRank=hvSorted.indexOf(hvSorted.reduce(function(a,b){return Math.abs(a-nowHv)<Math.abs(b-nowHv)?a:b;}))/hvSorted.length;
+      if(hvRank<0.2) score++;
+    }
+    if(n>=20){
+      var hl=candles.map(function(c){return c.high-c.low;});
+      var ema10a=hl[0]; for(var i=1;i<n-10;i++) ema10a=ema10a*0.818+hl[i]*0.182;
+      var ema10b=hl[n-10]; for(var i=n-9;i<n;i++) ema10b=ema10b*0.818+hl[i]*0.182;
+      if(ema10a>0&&(ema10b-ema10a)/ema10a*100<-10) score++;
+    }
+    if(n>=100){
+      var sl20=closes.slice(n-20); var mn20=sl20.reduce(function(a,b){return a+b;},0)/20;
+      var sdNow=Math.sqrt(sl20.reduce(function(a,b){return a+(b-mn20)*(b-mn20);},0)/20);
+      var sdArr=[];
+      for(var i=20;i<=Math.min(n,120);i++){
+        var sl=closes.slice(i-20,i); var mn=sl.reduce(function(a,b){return a+b;},0)/20;
+        sdArr.push(Math.sqrt(sl.reduce(function(a,b){return a+(b-mn)*(b-mn);},0)/20));
+      }
+      var sdAvg=sdArr.reduce(function(a,b){return a+b;},0)/sdArr.length;
+      if(sdAvg>0&&sdNow/sdAvg<0.6) score++;
+    }
+    if(n>=55){
+      var atrNow=atr14();
+      var atrArr=[];
+      for(var i=15;i<=Math.min(n,65);i++){
+        var sum=0;
+        for(var j=i-14;j<i;j++) sum+=Math.max(highs[j]-lows[j],Math.abs(highs[j]-closes[j-1]),Math.abs(lows[j]-closes[j-1]));
+        atrArr.push(sum/14);
+      }
+      var atrAvg=atrArr.reduce(function(a,b){return a+b;},0)/atrArr.length;
+      if(atrAvg>0&&atrNow/atrAvg<0.7) score++;
+    }
+    signals['vol_5layer_squeeze']='neutral';
+    signals['_vol5score']=score;
+  } catch(e){}
+
+  // vol_triple_breakout
+  try {
+    var bwNow=0, bw5ago=0;
+    if(n>=25){
+      var sl=closes.slice(n-20); var mn=sl.reduce(function(a,b){return a+b;},0)/20; var sd=Math.sqrt(sl.reduce(function(a,b){return a+(b-mn)*(b-mn);},0)/20); bwNow=sd*4/(mn||1);
+      var sl5=closes.slice(n-25,n-5); var mn5=sl5.reduce(function(a,b){return a+b;},0)/20; var sd5=Math.sqrt(sl5.reduce(function(a,b){return a+(b-mn5)*(b-mn5);},0)/20); bw5ago=sd5*4/(mn5||1);
+    }
+    var bbExpand=bw5ago>0&&bwNow/bw5ago>1.3;
+    var hvNow=0,hvAgo=0;
+    if(n>=30){
+      var rets=[];
+      for(var i=1;i<n;i++) rets.push(Math.log(closes[i]/closes[i-1]));
+      var sl=rets.slice(-20); var mn=sl.reduce(function(a,b){return a+b;},0)/20; hvNow=Math.sqrt(sl.reduce(function(a,b){return a+(b-mn)*(b-mn);},0)/20)*Math.sqrt(252);
+      var sl2=rets.slice(-30,-10); var mn2=sl2.reduce(function(a,b){return a+b;},0)/20; hvAgo=Math.sqrt(sl2.reduce(function(a,b){return a+(b-mn2)*(b-mn2);},0)/20)*Math.sqrt(252);
+    }
+    var hvExpand=hvAgo>0&&hvNow/hvAgo>1.5;
+    var hl=candles.map(function(c){return c.high-c.low;});
+    var ema10a=hl[0]; for(var i=1;i<n-10;i++) ema10a=ema10a*0.818+hl[i]*0.182;
+    var ema10b=hl[n-10]; for(var i=n-9;i<n;i++) ema10b=ema10b*0.818+hl[i]*0.182;
+    var cvExpand=ema10a>0&&(ema10b-ema10a)/ema10a*100>15;
+    if(bbExpand&&hvExpand&&cvExpand){
+      signals['vol_triple_breakout']=closes[n-1]>closes[n-6]?'buy':'sell';
+    } else {
+      signals['vol_triple_breakout']='neutral';
+    }
+  } catch(e){}
+
+  // sys_optimal_full
+  try {
+    var trendScore=0;
+    var up=0,dn=0;
+    for(var i=Math.max(1,n-14);i<n;i++){
+      var chg=closes[i]-closes[i-1];
+      if(chg>0) up+=chg; else dn+=Math.abs(chg);
+    }
+    if(up>dn*1.3) trendScore=1; else if(dn>up*1.3) trendScore=-1;
+    var obvSlope=0;
+    var obv=0;
+    var obvArr=[];
+    for(var i=1;i<n;i++){obv+=(closes[i]>closes[i-1]?1:-1)*vols[i];obvArr.push(obv);}
+    if(obvArr.length>=10){obvSlope=obvArr[obvArr.length-1]-obvArr[obvArr.length-11];}
+    var moneyScore=obvSlope>0?1:-1;
+    var totalScore=trendScore+moneyScore;
+    if(totalScore>=2) signals['sys_optimal_full']='buy';
+    else if(totalScore<=-2) signals['sys_optimal_full']='sell';
+    else signals['sys_optimal_full']='neutral';
+  } catch(e){}
+
+  return signals;
+}
+
 function cpRenderCombos() {
   const el = document.getElementById('cp-combo-inner');
   if (!el) return;
+  var sysSignals = (typeof _computeSysSignals === 'function') ? _computeSysSignals() : {};
   el.innerHTML = COMBO_PRESETS.map(c => {
     const isActive = cpActiveCombo === c.id;
     const SIG_COL = {'buy-strong':'#52F2C9','buy':'#52F2C9','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
-    const col = SIG_COL[c.signal] || '#6F648F';
+    const sig = sysSignals[c.id] || c.signal || 'neutral';
+    const col = SIG_COL[sig] || '#6F648F';
     return `
     <div id="cpcombo-${c.id}" style="margin-bottom:8px;border-radius:10px;overflow:hidden;
       border:1px solid ${isActive ? 'rgba(255,0,110,0.45)' : 'rgba(255,255,255,0.06)'};
@@ -6931,7 +7249,7 @@ function cpRenderCombos() {
           <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px;">${c.icon||'◈'} ${c.name}</div>
           <span style="font-size:9px;padding:1px 6px;border-radius:6px;background:${c.tagColor||'#6F648F'}22;color:${c.tagColor||'#6F648F'};font-family:var(--mono);border:1px solid ${c.tagColor||'#6F648F'}44;">${c.tag||''}</span>
         </div>
-        <span style="font-size:9px;padding:2px 6px;border-radius:6px;background:${col}22;color:${col};font-family:var(--mono);">${(c.signal||'').replace('-',' ')}</span>
+        <span style="font-size:9px;padding:2px 6px;border-radius:6px;background:${col}22;color:${col};font-family:var(--mono);">${(sig||'').replace('-',' ')}</span>
         <span style="font-size:11px;color:#6F648F;">${isActive ? '‹' : '›'}</span>
       </div>
       <!-- Detail (toggle) -->
