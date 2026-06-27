@@ -1038,180 +1038,203 @@ def score_bs_pressure(candles: list[HistoricCandle]) -> float:
 
 def score_candle_pattern(candles: list[HistoricCandle]) -> float:
     """
-    Контекстные свечные паттерны: форма × объём × предшествующий тренд × близость к уровню.
-    Каждый паттерн имеет базовый скор, который умножается на контекстные множители.
-    Итог ∈ [-1, 1].
+    Свечной анализ через параметры, а не паттерны по имени.
+
+    Пять независимых измерений текущей свечи:
+    1. Закрытие внутри диапазона (важнее цвета)
+    2. Перекрытие соседей (сколько баров «проглочено»)
+    3. Тень против угла тренда (sweep против движения)
+    4. Тело/тень (чистота движения vs борьба)
+    5. Аномалия объёма (статистический выброс)
+
+    Каждое измерение даёт вклад ∈ [-1, 1].
+    Итог = взвешенная сумма с учётом контекста (тренд, уровень).
     """
-    if len(candles) < 5:
+    if len(candles) < 20:
         return 0.0
 
-    def f(c, attr): return _to_f(getattr(c, attr))
+    def _f(c, attr): return _to_f(getattr(c, attr))
 
-    # Последние свечи
     last = candles[-1]
-    lh, ll, lo_, lc = f(last, "high"), f(last, "low"), f(last, "open"), f(last, "close")
-    lrng = lh - ll or 1e-9
+    lh = _f(last, "high");  ll = _f(last, "low")
+    lo_ = _f(last, "open"); lc = _f(last, "close")
+    lrng  = lh - ll or 1e-9
     lbody = abs(lc - lo_)
     lbody_frac = lbody / lrng
 
     prev = candles[-2]
-    ph, pl, po, pc = f(prev, "high"), f(prev, "low"), f(prev, "open"), f(prev, "close")
-    prng = ph - pl or 1e-9
+    ph = _f(prev, "high"); pl = _f(prev, "low")
 
-    # Предшествующий тренд: последние N свечей (не считая текущую)
-    trend_w = candles[-6:-1]
-    trend_closes = [f(c, "close") for c in trend_w]
-    trend_slope = (trend_closes[-1] - trend_closes[0]) / (abs(trend_closes[0]) or 1.0)
-    prior_bullish = trend_slope > 0.001
-    prior_bearish = trend_slope < -0.001
-
-    # Объём: медиана длинного окна (50 баров) — устойчивее к всплескам волатильности
-    vols_window = [c.volume for c in candles[-50:]]
-    med_vol = sorted(vols_window)[len(vols_window) // 2] or 1
-    vol_ratio = last.volume / med_vol  # 1.0 = нормальный объём
-
-    # Объём хвоста: насколько объём «принадлежит» отвергнутой зоне
-    lower_wick = (min(lo_, lc) - ll) / lrng
-    upper_wick = (lh - max(lo_, lc)) / lrng
-
-    # Множитель объёма: от 0.5 (мёртвый) до 1.5 (высокий)
-    vol_mult = min(1.5, max(0.5, 0.5 + vol_ratio * 0.5))
-
-    # Контекст истощения: 3+ свечи подряд в одну сторону перед текущей
-    last3 = candles[-4:-1]
-    consec_down = all(f(c, "close") < f(c, "open") for c in last3)
-    consec_up   = all(f(c, "close") > f(c, "open") for c in last3)
-    # Объём последних свечей убывает → истощение движения
-    last3_vols = [c.volume for c in last3]
-    vol_fading = last3_vols[-1] < last3_vols[0] * 0.8 if last3_vols[0] > 0 else False
-
-    # Близость к уровню: лоу/хай последних 20 баров — грубая поддержка/сопротивление
-    level_window = candles[-21:-1]  # исключаем саму текущую
-    if level_window:
-        support_lvl  = min(f(c, "low")  for c in level_window)
-        resist_lvl   = max(f(c, "high") for c in level_window)
-        price_range  = resist_lvl - support_lvl or lrng
-        near_support = (ll - support_lvl) / price_range < 0.08   # лоу в 8% от нижней зоны
-        near_resist  = (resist_lvl - lh)  / price_range < 0.08   # хай в 8% от верхней зоны
-    else:
-        near_support = near_resist = False
-
-    scores = []
-
-    # ── Молот (Hammer) ──────────────────────────────────────────────────────
-    # Длинный нижний хвост + маленькое тело: покупатели поглотили продажи.
-    # Контекст: после медвежьего движения, лучше на уровне поддержки.
-    if lower_wick > 0.55 and lbody_frac < 0.35 and upper_wick < 0.2:
-        base = 0.65
-        ctx = (1.3 if consec_down else 0.6) * (1.2 if prior_bearish else 0.8)
-        lvl_boost = 1.25 if near_support else 1.0   # у уровня сигнал значимее
-        scores.append(base * ctx * vol_mult * lvl_boost)
-
-    # ── Перевёрнутый молот / Shooting Star ──────────────────────────────────
-    # Длинный верхний хвост: продавцы поглотили покупателей.
-    if upper_wick > 0.55 and lbody_frac < 0.35 and lower_wick < 0.2:
-        base = -0.65
-        ctx = (1.3 if consec_up else 0.6) * (1.2 if prior_bullish else 0.8)
-        lvl_boost = 1.25 if near_resist else 1.0
-        scores.append(base * ctx * vol_mult * lvl_boost)
-
-    # ── Бычье поглощение (Bullish Engulfing) ────────────────────────────────
-    # Тело (или диапазон) последней свечи полностью накрывает тела 1-5 предыдущих.
-    # Многосвечное поглощение = более сильный сигнал разворота.
-    if lc > lo_:  # последняя бычья
-        # Считаем сколько последовательных медвежьих свечей поглощает текущий бар
-        engulf_count = 0
-        for i in range(2, min(7, len(candles))):
-            pc_i  = f(candles[-i], "close")
-            po_i  = f(candles[-i], "open")
-            ph_i  = f(candles[-i], "high")
-            pl_i  = f(candles[-i], "low")
-            if pc_i < po_i and lh >= ph_i and ll <= pl_i:  # покрывает диапазон
-                engulf_count += 1
-            else:
-                break
-        if engulf_count >= 1 and prior_bearish:
-            # сила растёт с числом поглощённых свечей (max ≈ 0.95 при 5 барах)
-            engulf_strength = min(1.0, 0.55 + engulf_count * 0.10)
-            ctx = (1.3 if consec_down else 0.7) * (1.2 if prior_bearish else 0.9)
-            vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))
-            multi_boost = 1.0 + (engulf_count - 1) * 0.12  # бонус за каждый доп. бар
-            scores.append(engulf_strength * ctx * vol_eng * multi_boost)
-
-    # ── Медвежье поглощение (Bearish Engulfing) ─────────────────────────────
-    if lc < lo_:  # последняя медвежья
-        engulf_count = 0
-        for i in range(2, min(7, len(candles))):
-            pc_i  = f(candles[-i], "close")
-            po_i  = f(candles[-i], "open")
-            ph_i  = f(candles[-i], "high")
-            pl_i  = f(candles[-i], "low")
-            if pc_i > po_i and lh >= ph_i and ll <= pl_i:
-                engulf_count += 1
-            else:
-                break
-        if engulf_count >= 1 and prior_bullish:
-            engulf_strength = min(1.0, 0.55 + engulf_count * 0.10)
-            ctx = (1.3 if consec_up else 0.7) * (1.2 if prior_bullish else 0.9)
-            vol_eng = min(1.6, max(0.5, vol_ratio * 0.6 + 0.7))
-            multi_boost = 1.0 + (engulf_count - 1) * 0.12
-            scores.append(-engulf_strength * ctx * vol_eng * multi_boost)
-
-    # ── Doji (неопределённость после движения) ──────────────────────────────
-    # Сам по себе нейтрален, но после сильного движения = истощение.
-    if lbody_frac < 0.08:
-        if consec_down and vol_fading:
-            scores.append(0.35 * vol_mult)   # возможный разворот вверх
-        elif consec_up and vol_fading:
-            scores.append(-0.35 * vol_mult)  # возможный разворот вниз
-        # Doji без контекста — 0, не добавляем шум
-
-    # ── Inside Bar (компрессия) ──────────────────────────────────────────────
-    # Диапазон последней свечи внутри предыдущей — сжатие энергии.
-    # Не голосует если текущий бар NR7 (тогда SPRING уже считает компрессию,
-    # двойной счёт раздует composite без оснований).
-    ranges_7_ib = [_to_f(c.high) - _to_f(c.low) for c in candles[-7:]] if len(candles) >= 7 else []
-    is_nr7 = bool(ranges_7_ib) and lrng == min(ranges_7_ib)
-    if lh <= ph and ll >= pl and not is_nr7:
-        compression = (lrng / prng) if prng > 0 else 1.0
-        base_strength = (1.0 - compression) * 0.4
-        if prior_bullish:
-            scores.append(base_strength * vol_mult)
-        elif prior_bearish:
-            scores.append(-base_strength * vol_mult)
-
-    # ── Три солдата / три вороны ─────────────────────────────────────────────
-    # 3 последовательные направленные свечи с нарастающим объёмом — не разворот,
-    # а ПРОДОЛЖЕНИЕ тренда (не против него!).
-    if len(candles) >= 4:
-        last3c = candles[-3:]
-        c1, c2, c3 = last3c
-        three_up = (f(c1,"close")>f(c1,"open") and f(c2,"close")>f(c2,"open") and f(c3,"close")>f(c3,"open")
-                    and f(c2,"close")>f(c1,"close") and f(c3,"close")>f(c2,"close"))
-        three_dn = (f(c1,"close")<f(c1,"open") and f(c2,"close")<f(c2,"open") and f(c3,"close")<f(c3,"open")
-                    and f(c2,"close")<f(c1,"close") and f(c3,"close")<f(c2,"close"))
-        vol3 = [c.volume for c in last3c]
-        vol_growing = vol3[2] >= vol3[0] * 0.9  # объём не падает
-
-        if three_up and vol_growing and prior_bullish:
-            scores.append(0.5 * vol_mult)   # тренд продолжается
-        if three_dn and vol_growing and prior_bearish:
-            scores.append(-0.5 * vol_mult)
-
-    # ── Tweezer (пинцет) — двойная вершина/основание ─────────────────────────
-    # Два бара с одинаковым хаем (шорт) или лоем (лонг) ± 0.1% → отвержение уровня.
-    tolerance = lrng * 0.15
-    if abs(lh - ph) < tolerance and upper_wick > 0.3 and prior_bullish:
-        scores.append(-0.5 * vol_mult)   # двойная вершина
-    if abs(ll - pl) < tolerance and lower_wick > 0.3 and prior_bearish:
-        scores.append(0.5 * vol_mult)    # двойное основание
-
-    if not scores:
+    # ── Предшествующий тренд (угол) ──────────────────────────────────────────
+    # Взвешенный по позиции: ближние свечи весят больше
+    trend_w = candles[-8:-1]
+    if len(trend_w) < 2:
         return 0.0
+    closes = [_f(c, "close") for c in trend_w]
+    # Линейный наклон через least-squares-like (простой)
+    n = len(closes)
+    mean_c = sum(closes) / n
+    mean_i = (n - 1) / 2
+    num = sum((i - mean_i) * (closes[i] - mean_c) for i in range(n))
+    den = sum((i - mean_i) ** 2 for i in range(n)) or 1.0
+    slope_pct = num / den / (mean_c or 1.0)   # нормирован к цене
+    prior_bullish = slope_pct > 0.0005
+    prior_bearish = slope_pct < -0.0005
+    angle_mult = min(2.0, 1.0 + abs(slope_pct) * 500)  # крутой угол = сильнее контраст
 
-    # Берём сигнал с максимальным abs (самый сильный паттерн на баре)
-    best = max(scores, key=abs)
-    return max(-1.0, min(1.0, best))
+    # ── Объём: медиана 50 баров (устойчива к выбросам) ───────────────────────
+    vols_w = sorted(float(c.volume) for c in candles[-50:])
+    med_vol = vols_w[len(vols_w) // 2] or 1.0
+    vol_ratio = float(last.volume) / med_vol
+
+    # Аномалия объёма: Z-score по последним 20 барам
+    vols_20 = [float(c.volume) for c in candles[-20:]]
+    mu_v = sum(vols_20) / len(vols_20)
+    sd_v = (sum((v - mu_v) ** 2 for v in vols_20) / len(vols_20)) ** 0.5
+    vol_z = (float(last.volume) - mu_v) / (sd_v or mu_v)
+
+    # ── 1. Закрытие внутри диапазона (direction pressure) ────────────────────
+    # 0 = нижний экстремум, 1 = верхний; не цвет, а позиция закрытия
+    close_pos = (lc - ll) / lrng  # 0..1
+    if close_pos >= 0.85:
+        dp = 1.0        # максимальное давление вверх
+    elif close_pos >= 0.65:
+        dp = 0.55
+    elif close_pos >= 0.35:
+        dp = 0.0        # неопределённость
+    elif close_pos >= 0.15:
+        dp = -0.55
+    else:
+        dp = -1.0       # максимальное давление вниз
+
+    # ── 2. Перекрытие соседей (каскадное поглощение) ─────────────────────────
+    # Считаем сколько предыдущих баров входит в диапазон текущего
+    overlap_count = 0
+    for i in range(2, min(12, len(candles))):
+        ph_i = _f(candles[-i], "high")
+        pl_i = _f(candles[-i], "low")
+        if lh >= ph_i and ll <= pl_i:
+            overlap_count += 1
+        else:
+            break  # только непрерывная цепочка
+    # Перекрытие 1-2 = норма (0), 5-7 = значимое событие, 10+ = институциональный
+    if overlap_count >= 10:
+        overlap_score = 0.90
+    elif overlap_count >= 7:
+        overlap_score = 0.70
+    elif overlap_count >= 5:
+        overlap_score = 0.50
+    elif overlap_count >= 3:
+        overlap_score = 0.30
+    elif overlap_count >= 1:
+        overlap_score = 0.10
+    else:
+        overlap_score = 0.0
+    # Знак: если тело вверх → бычий sweep, вниз → медвежий
+    overlap_dir = 1.0 if dp >= 0 else -1.0
+
+    # ── 3. Тень против угла тренда (sweep против движения) ───────────────────
+    lower_wick_frac = (min(lo_, lc) - ll) / lrng
+    upper_wick_frac = (lh - max(lo_, lc)) / lrng
+
+    # Аномалия тени: длиннее среднего за 20 баров?
+    avg_lwick = sum(
+        (min(_f(c,"open"), _f(c,"close")) - _f(c,"low")) / max(_f(c,"high") - _f(c,"low"), 1e-9)
+        for c in candles[-20:-1]
+    ) / 19
+    avg_uwick = sum(
+        (_f(c,"high") - max(_f(c,"open"), _f(c,"close"))) / max(_f(c,"high") - _f(c,"low"), 1e-9)
+        for c in candles[-20:-1]
+    ) / 19
+
+    shadow_score = 0.0
+    # Нижняя тень против бычьего угла = попытка продавцов отбита
+    if prior_bullish and lower_wick_frac > max(0.40, avg_lwick * 1.5):
+        shadow_score = lower_wick_frac * angle_mult * 0.6
+    # Верхняя тень против медвежьего угла = попытка покупателей отбита
+    elif prior_bearish and upper_wick_frac > max(0.40, avg_uwick * 1.5):
+        shadow_score = -upper_wick_frac * angle_mult * 0.6
+    # Нижняя тень вдоль медвежьего движения — продолжение давления
+    elif prior_bearish and lower_wick_frac < 0.15 and dp < -0.4:
+        shadow_score = -0.25
+    # Верхняя тень вдоль бычьего движения — продолжение
+    elif prior_bullish and upper_wick_frac < 0.15 and dp > 0.4:
+        shadow_score = 0.25
+
+    # ── 4. Тело/тень: чистота победителя ─────────────────────────────────────
+    # Тело 80%+ = нет борьбы, чистое движение → сигнал продолжения
+    # Тело < 15% после серии = равновесие / истощение → возможный разворот
+    last3_vols = [float(c.volume) for c in candles[-4:-1]]
+    vol_fading = (last3_vols[-1] < last3_vols[0] * 0.75) if last3_vols[0] > 0 else False
+    consec_down = all(_f(c,"close") < _f(c,"open") for c in candles[-4:-1])
+    consec_up   = all(_f(c,"close") > _f(c,"open") for c in candles[-4:-1])
+
+    body_score = 0.0
+    if lbody_frac >= 0.80:
+        # Чистое движение → продолжение в направлении dp
+        body_score = 0.40 * (1.0 if dp > 0 else -1.0)
+    elif lbody_frac < 0.12:
+        # Истощение: значимо только после серии + убывающий объём
+        if consec_down and vol_fading:
+            body_score = 0.30   # разворот вверх
+        elif consec_up and vol_fading:
+            body_score = -0.30  # разворот вниз
+
+    # ── 5. Аномалия объёма ────────────────────────────────────────────────────
+    # Z-score > 2 = статистически аномальная свеча, там что-то произошло.
+    # Усиливает другие сигналы, сам по себе не даёт направления.
+    vol_anomaly_mult = 1.0
+    if vol_z > 3.0:
+        vol_anomaly_mult = 1.50   # institutional move
+    elif vol_z > 2.0:
+        vol_anomaly_mult = 1.30
+    elif vol_z > 1.0:
+        vol_anomaly_mult = 1.15
+    elif vol_ratio < 0.4:
+        vol_anomaly_mult = 0.50   # мёртвый объём — глушим сигнал
+
+    # ── Контекст: близость к уровню (грубо) ──────────────────────────────────
+    lvl_w = candles[-21:-1]
+    level_mult = 1.0
+    if lvl_w:
+        sup = min(_f(c, "low")  for c in lvl_w)
+        res = max(_f(c, "high") for c in lvl_w)
+        rng = res - sup or lrng
+        near_sup = (ll - sup) / rng < 0.08
+        near_res = (res - lh)  / rng < 0.08
+        if (near_sup and dp > 0) or (near_res and dp < 0):
+            level_mult = 1.30   # сигнал у уровня в правильном направлении
+        elif (near_sup and dp < 0) or (near_res and dp > 0):
+            level_mult = 0.70   # контрарный сигнал у уровня — гасим
+
+    # ── Сборка ────────────────────────────────────────────────────────────────
+    # dp — основное направление (закрытие в диапазоне)
+    # shadow_score — тень против/вдоль угла
+    # overlap_score × overlap_dir — каскадное поглощение
+    # body_score — чистота движения / истощение
+    # Веса подобраны так чтобы сумма не превышала ±1 в типичных случаях
+
+    raw = (
+        dp * 0.35
+        + shadow_score * 0.30
+        + overlap_score * overlap_dir * 0.25
+        + body_score * 0.10
+    )
+    raw *= vol_anomaly_mult * level_mult
+
+    # Inside Bar (компрессия без NR7): сжатие → продолжение тренда
+    # Не входит в основную формулу чтобы не бить дважды в ту же сторону
+    ranges_7 = [_to_f(c.high) - _to_f(c.low) for c in candles[-7:]] if len(candles) >= 7 else []
+    is_nr7 = bool(ranges_7) and lrng == min(ranges_7)
+    if lh <= ph and ll >= pl and not is_nr7:
+        compression = (lrng / (ph - pl)) if (ph - pl) > 0 else 1.0
+        inside_push = (1.0 - compression) * 0.20
+        if prior_bullish:
+            raw += inside_push
+        elif prior_bearish:
+            raw -= inside_push
+
+    return max(-1.0, min(1.0, round(raw, 4)))
 
 
 def score_adaptive_ma_candle(candles: list[HistoricCandle]) -> float:
