@@ -10522,6 +10522,41 @@ function renderAnalysis() {
           items.push({type:r3v>95?'bearish':'bullish', text:`RSI(3) = ${r3v.toFixed(0)} — экстремум краткосрочного перегрева. Маркер, не сигнал`});
         }
 
+        // 4. Скорость прыжка RSI = нестабильность состояния
+        if (nR >= 5) {
+          const rsiJump = Math.abs(r - rsiVals[nR-5]);
+          if (rsiJump > 40) {
+            items.push({type:'neutral', text:`RSI прыгнул на ${rsiJump.toFixed(0)} пунктов за 5 баров — состояние нестабильно, режим сломан резко. Обычно предшествует откату`});
+          } else if (rsiJump > 25) {
+            items.push({type:'neutral', text:`RSI изменился на ${rsiJump.toFixed(0)} пунктов за 5 баров — быстрая смена режима`});
+          }
+        }
+        // 5. Стабильность в зоне — индикатор здоровья каскада
+        if (nR >= 8) {
+          const zone = r > 50 ? 'high' : 'low';
+          let barsInZone = 0;
+          for (let i = nR-1; i >= Math.max(0,nR-8); i--) {
+            if (zone==='high' && rsiVals[i]>=55) barsInZone++;
+            else if (zone==='low' && rsiVals[i]<=45) barsInZone++;
+            else break;
+          }
+          if (barsInZone >= 6 && r > 55) items.push({type:'bullish', text:`RSI ${barsInZone} баров подряд держится выше 55 — каскад стабилен. Выходить рано`});
+          else if (barsInZone >= 6 && r < 45) items.push({type:'bearish', text:`RSI ${barsInZone} баров подряд держится ниже 45 — давление устойчиво`});
+          // RSI скачет в 40-60 = слабый каскад
+          const last8 = rsiVals.slice(-8);
+          const crossings = last8.filter((v,i,a)=>i>0&&((v>50&&a[i-1]<50)||(v<50&&a[i-1]>50))).length;
+          if (crossings >= 3) items.push({type:'neutral', text:`RSI ${crossings} раз пересёк 50 за 8 баров — каскад вялый, боковик. Нет направленного давления`});
+        }
+        // 6. RSI(14) vs RSI(2): масштабное согласие
+        if (r2v != null) {
+          const both_bull = r > 60 && r2v > 60;
+          const both_bear = r < 40 && r2v < 40;
+          const diverge = (r > 55 && r2v < 40) || (r < 45 && r2v > 60);
+          if (both_bull) items.push({type:'bullish', text:`RSI(14)=${r.toFixed(0)} и RSI(2)=${r2v.toFixed(0)} оба выше 60 — макро и микро согласны. Сильный сигнал`});
+          else if (both_bear) items.push({type:'bearish', text:`RSI(14)=${r.toFixed(0)} и RSI(2)=${r2v.toFixed(0)} оба ниже 40 — масштабное согласие вниз`});
+          else if (diverge) items.push({type:'neutral', text:`RSI(14)=${r.toFixed(0)} ≠ RSI(2)=${r2v.toFixed(0)} — дивергенция масштабов: долгосрочный и краткосрочный в разных режимах. Неопределённость`});
+        }
+
         html += makeCard(`RSI (неклассически)`, items, 'rsi');
       }
     } else if (idL.includes('macd')) {
@@ -10557,6 +10592,23 @@ function renderAnalysis() {
           // Резкий скачок гистограммы = ускорение (каскад)
           if (Math.abs(h) > Math.abs(h3) * 2 && Math.abs(h3) > 0) {
             items.push({type:'bullish', text:`Резкий рост гистограммы — импульс удвоился за 3 бара. Признак начала каскада`});
+          }
+          // Скорость ускорения: резкий vs вялый каскад
+          const histAvg5 = hist.slice(-6,-1).reduce((s,v)=>s+Math.abs(v),0)/5 || 0.0001;
+          const speedRatio = Math.abs(h) / histAvg5;
+          if (speedRatio > 3 && Math.abs(h) > 0) {
+            items.push({type:h>0?'bullish':'bearish', text:`Гистограмма в ${speedRatio.toFixed(1)}× выше средней за 5 баров — взрывное ускорение, каскад в полную силу`});
+          } else if (speedRatio < 0.4 && Math.abs(h) > 0) {
+            items.push({type:'neutral', text:`Гистограмма в ${speedRatio.toFixed(1)}× от нормы — вялое движение по инерции`});
+          }
+          // Дивергенция цены и MACD-линии — более точный антисигнал
+          if (hist.length >= 15) {
+            const priceHi = closes[closes.length-1] >= Math.max(...closes.slice(-15,-1));
+            const macdHi = h >= Math.max(...hist.slice(-15,-1));
+            const priceLo = closes[closes.length-1] <= Math.min(...closes.slice(-15,-1));
+            const macdLo = h <= Math.min(...hist.slice(-15,-1));
+            if (priceHi && !macdHi) items.push({type:'bearish', text:`Цена на хае 15 баров — MACD гистограмма нет. Затухание импульса, не нового хая нет`});
+            if (priceLo && !macdLo) items.push({type:'bullish', text:`Цена на лоу 15 баров — MACD гистограмма нет нового минимума. Затухание падения`});
           }
 
           html += makeCard('MACD (неклассически)', items, 'macd');
@@ -10600,9 +10652,25 @@ function renderAnalysis() {
           if (prevOut && curIn) {
             items.push({type:'neutral', text:`Выход закончился, возможен разворот`});
           }
-          if (!items.length) {
+          // Расстояние за полосой = степень переигра (0.3% слабый откат, 2%+ резкий)
+          const beyondUp = lastClose > last.upper ? (lastClose - last.upper) / last.upper * 100 : 0;
+          const beyondDn = lastClose < last.lower ? (last.lower - lastClose) / last.lower * 100 : 0;
+          if (beyondUp > 1.5) items.push({type:'bearish', text:`Цена за верхней полосой на ${beyondUp.toFixed(2)}% — сильное переигра. На каскаде норма, на финише = сигнал возврата`});
+          else if (beyondUp > 0.3) items.push({type:'neutral', text:`Цена за верхней полосой на ${beyondUp.toFixed(2)}% — небольшое переигра, откат будет умеренным`});
+          else if (beyondDn > 1.5) items.push({type:'bullish', text:`Цена за нижней полосой на ${beyondDn.toFixed(2)}% — сильное переигра вниз. Откат может быть резким`});
+          else if (beyondDn > 0.3) items.push({type:'neutral', text:`Цена за нижней полосой на ${beyondDn.toFixed(2)}%`});
+          if (!beyondUp && !beyondDn) {
             const pct = ((lastClose - last.middle) / last.middle * 100).toFixed(2);
             items.push({type:'neutral', text:`Цена ${pct > 0 ? '+' : ''}${pct}% от средней BB`});
+          }
+          // EMA(20) vs SMA(20) — расстояние = ускорение
+          const ema20 = _anCalcEMA(closes, 20);
+          const emaLast = ema20[ema20.length-1], smaLast = last.middle;
+          if (emaLast != null && smaLast > 0) {
+            const emaSmaGap = (emaLast - smaLast) / smaLast * 100;
+            if (emaSmaGap > 0.3) items.push({type:'bullish', text:`EMA(20) на ${emaSmaGap.toFixed(2)}% выше SMA(20) — рост ускоряется: последние бары давят вверх сильнее нормы`});
+            else if (emaSmaGap < -0.3) items.push({type:'bearish', text:`EMA(20) на ${Math.abs(emaSmaGap).toFixed(2)}% ниже SMA(20) — падение ускоряется`});
+            else items.push({type:'neutral', text:`EMA ≈ SMA — ускорение близко к нулю, движение равномерное`});
           }
           html += makeCard('Bollinger Bands', items, 'bb');
         }
@@ -10619,6 +10687,26 @@ function renderAnalysis() {
           items.push({type:'bullish', text:`Прошло только ${(range/atr).toFixed(2)} ATR — потенциал движения ещё велик`});
         } else {
           items.push({type:'neutral', text:`Норма волатильности: ${(atr/last.close*100).toFixed(2)}% от цены`});
+        }
+        // ATR как измеритель режима: соотношение к 100-барному среднему
+        if (candles.length >= 30) {
+          const atrArr = [];
+          for (let i = 14; i < candles.length; i++) {
+            let s=0; for(let j=i-13;j<=i;j++) s+=Math.max(candles[j].high-candles[j].low,j>0?Math.abs(candles[j].high-candles[j-1].close):0,j>0?Math.abs(candles[j].low-candles[j-1].close):0);
+            atrArr.push(s/14);
+          }
+          const atrAvg = atrArr.slice(-100).reduce((a,b)=>a+b,0)/Math.min(100,atrArr.length);
+          const atrRatio = atrAvg > 0 ? atr / atrAvg : 1;
+          if (atrRatio > 1.5) items.push({type:'neutral', text:`ATR в ${atrRatio.toFixed(1)}× выше 100-барной нормы — ускорение: рынок в возбуждении, стопы шире обычного`});
+          else if (atrRatio < 0.6) items.push({type:'neutral', text:`ATR в ${atrRatio.toFixed(2)}× от нормы (${(atrRatio*100).toFixed(0)}%) — компрессия: физическое сжатие, нитка. Пробой будет резким`});
+          else items.push({type:'neutral', text:`ATR = ${(atrRatio*100).toFixed(0)}% от нормы — обычный режим`});
+          // Скорость изменения ATR за 5 баров
+          if (atrArr.length >= 5) {
+            const atr5ago = atrArr[atrArr.length-5];
+            const atrSpeed = atr5ago > 0 ? atr/atr5ago : 1;
+            if (atrSpeed > 1.5) items.push({type:'neutral', text:`ATR вырос в ${atrSpeed.toFixed(1)}× за 5 баров — новый режим волатильности начался`});
+            else if (atrSpeed < 0.65) items.push({type:'neutral', text:`ATR упал в ${(1/atrSpeed).toFixed(1)}× за 5 баров — резкое успокоение, компрессия`});
+          }
         }
         html += makeCard('ATR(14)', items, 'atr');
       }
@@ -10659,6 +10747,25 @@ function renderAnalysis() {
           }
         } else {
           items.push({type:'neutral', text:`Stochastic = ${k.toFixed(0)} — между экстремумами, направленного сигнала нет`});
+        }
+        // Асимметрия в боковике: сколько баров за последние 20 провёл выше/ниже 50
+        if (kVals.length >= 20) {
+          const last20 = kVals.slice(-20);
+          const aboveCount = last20.filter(v=>v>50).length;
+          const belowCount = 20 - aboveCount;
+          const bias = (aboveCount - belowCount) / 20; // -1..+1
+          if (aboveCount >= 16) items.push({type:'bullish', text:`Stochastic ${aboveCount}/20 баров держался выше 50 — скрытое давление вверх в боковике. Выброс вверх вероятнее`});
+          else if (belowCount >= 16) items.push({type:'bearish', text:`Stochastic ${belowCount}/20 баров держался ниже 50 — скрытое давление вниз в боковике. Выброс вниз вероятнее`});
+          else if (Math.abs(bias) < 0.1) items.push({type:'neutral', text:`Stochastic 50/50 выше и ниже 50 — истинный боковик, нет скрытого давления`});
+        }
+        // Дивергенция Stochastic с ценой
+        if (kVals.length >= 15) {
+          const priceHi = closes[closes.length-1] >= Math.max(...closes.slice(-15,-1));
+          const stochHi = k >= Math.max(...kVals.slice(-15,-1));
+          if (priceHi && !stochHi) items.push({type:'bearish', text:`Цена на хае — Stochastic нет: затухание импульса (универсальная дивергенция)`});
+          const priceLo = closes[closes.length-1] <= Math.min(...closes.slice(-15,-1));
+          const stochLo = k <= Math.min(...kVals.slice(-15,-1));
+          if (priceLo && !stochLo) items.push({type:'bullish', text:`Цена на лоу — Stochastic нет: затухание падения`});
         }
         html += makeCard('Stochastic (неклассически)', items, 'stoch');
       }
@@ -10826,6 +10933,23 @@ function renderAnalysis() {
           // 4. Порядок линий как направление
           if (l0>t0 && t0>j0) items.push({type:'bullish', text:`Порядок: губы > зубы > челюсть — бычье выравнивание`});
           else if (l0<t0 && t0<j0) items.push({type:'bearish', text:`Порядок: губы < зубы < челюсть — медвежье выравнивание`});
+          // 5. Карта энергии: ритм расхождений/сближений = импульсы внутри тренда
+          if (nAl >= 20) {
+            const spreads = [];
+            for(let i=nAl-20;i<nAl;i++) {
+              if(jaw[i]!=null&&teeth[i]!=null&&lips[i]!=null) spreads.push(Math.abs(jaw[i]-teeth[i])+Math.abs(teeth[i]-lips[i]));
+            }
+            // Найти последнее сближение внутри тренда (локальный минимум)
+            let lastConv = null;
+            for(let i=spreads.length-2;i>=1;i--) {
+              if(spreads[i]<spreads[i-1]&&spreads[i]<spreads[i+1]&&spreads[i]<spreadNow*0.7){lastConv=spreads.length-1-i;break;}
+            }
+            if(lastConv!==null&&expanding) {
+              items.push({type:'bullish', text:`Последняя пауза-сближение была ${lastConv} баров назад — сейчас импульс возобновился. Карта энергии: каскад жив`});
+            } else if(!expanding&&spreadNow>spread5ago*0.8) {
+              items.push({type:'neutral', text:`Расхождение замедляется — пауза внутри тренда. Следующее расхождение = новый импульс`});
+            }
+          }
           html += makeCard('Alligator (неклассически)', items, 'alligator');
         }
       }
@@ -10866,6 +10990,29 @@ function renderAnalysis() {
           const crossSpeed = Math.abs(e8[n-1]-e21[n-1])/(e21[n-1]||1)*100;
           items.push({type:e8[n-1]>e21[n-1]?'bullish':'bearish', text:`Пересечение EMA8/21 ${crossBars} баров назад, угол ${crossSpeed.toFixed(2)}% — ${crossSpeed>0.3?'участники реально переключились':'слабый сигнал, возможен возврат'}`});
         }
+
+        // 5. Скорость приближения цены к EMA = давление противоположной стороны
+        // Если цена летит к EMA быстро снизу = сильное давление вниз (продавцы останавливают)
+        const priceDist21 = closes.map(c=>(c-v21)/v21*100);
+        if (n >= 6) {
+          const dist0 = (closes[n-1]-v21)/v21*100;
+          const dist5 = (closes[n-6]-e21[n-6])/e21[n-6]*100;
+          const approaching = Math.abs(dist0) < Math.abs(dist5) && Math.sign(dist0)===Math.sign(dist5);
+          const speed = Math.abs(dist5-dist0); // насколько быстро сближается
+          if (approaching && speed > 0.5) {
+            const dir = dist0 > 0 ? 'цена летит к EMA сверху' : 'цена летит к EMA снизу';
+            const pressure = dist0 > 0 ? 'давление вниз сильное, покупатели теряют энергию' : 'давление вверх, продавцы слабеют';
+            items.push({type: dist0>0?'bearish':'bullish', text:`${dir} (${speed.toFixed(2)}% за 5 баров) — ${pressure}`});
+          } else if (!approaching && Math.abs(dist0) > Math.abs(dist5) + 0.3) {
+            const dir = dist0 > 0 ? 'вверх' : 'вниз';
+            items.push({type: dist0>0?'bullish':'bearish', text:`Цена уходит от EMA21 ${dir} (${Math.abs(dist0).toFixed(2)}%) — слабое сопротивление, движение чистое`});
+          }
+        }
+        // 6. Две MA в боковике: обе плоские = нитка
+        const sma20 = _anCalcSMA(closes, 20);
+        const smaFlat = sma20[n-1] && sma20[n-6] ? Math.abs(sma20[n-1]-sma20[n-6])/sma20[n-1]*100 : 1;
+        const emaFlat = Math.abs(v21-e21[n-6])/v21*100;
+        if (smaFlat < 0.1 && emaFlat < 0.1) items.push({type:'neutral', text:`SMA(20) и EMA(21) обе плоские (<0.1% за 5 баров) — нитка, максимальное согласие на отсутствие движения`});
 
         html += makeCard('MA/EMA (неклассически)', items, 'ma');
       }
@@ -10962,10 +11109,38 @@ function renderAnalysis() {
         const cci = meanDev ? (typical[n-1] - smaT[n-1]) / (0.015 * meanDev) : 0;
         const priceSlope5 = closes[n-1] - closes[n-5];
         const items = [];
-        if (cci > 100) items.push({type:'bullish', text:`CCI в зоне перекупленности (${cci.toFixed(1)}), импульс силён`});
-        else if (cci < -100) items.push({type:'bearish', text:`CCI в зоне перепроданности (${cci.toFixed(1)}), импульс вниз`});
+        if (cci > 100) items.push({type:'bullish', text:`CCI = ${cci.toFixed(1)}: импульс силён`});
+        else if (cci < -100) items.push({type:'bearish', text:`CCI = ${cci.toFixed(1)}: импульс вниз`});
         else items.push({type:'neutral', text:`CCI = ${cci.toFixed(1)}`});
-        html += makeCard('CCI', items, 'cci');
+        // Длина цикла CCI: от минимума к максимуму = доминирующий цикл рынка
+        const cciArr = [];
+        for (let i = period; i <= n; i++) {
+          const sl = typical.slice(i-period, i), avg = sl.reduce((a,b)=>a+b,0)/period;
+          const md = sl.reduce((a,b)=>a+Math.abs(b-avg),0)/period;
+          cciArr.push(md ? (typical[i-1]-avg)/(0.015*md) : 0);
+        }
+        // Найти последние максимум и минимум CCI
+        if (cciArr.length >= 10) {
+          let lastPeak = null, lastTrough = null;
+          let peakIdx = -1, troughIdx = -1;
+          for (let i = cciArr.length-2; i >= 1; i--) {
+            if (lastPeak === null && cciArr[i] > cciArr[i-1] && cciArr[i] > cciArr[i+1] && cciArr[i] > 80) { lastPeak = i; }
+            if (lastTrough === null && cciArr[i] < cciArr[i-1] && cciArr[i] < cciArr[i+1] && cciArr[i] < -80) { lastTrough = i; }
+            if (lastPeak !== null && lastTrough !== null) break;
+          }
+          if (lastPeak !== null && lastTrough !== null) {
+            const cycleLen = Math.abs(lastPeak - lastTrough) * 2;
+            if (cycleLen <= 8) items.push({type:'neutral', text:`Цикл CCI ≈ ${cycleLen} баров — рынок нервный, быстрые развороты. Держи короткие позиции`});
+            else if (cycleLen <= 20) items.push({type:'neutral', text:`Цикл CCI ≈ ${cycleLen} баров — нормальный ритм`});
+            else items.push({type:'neutral', text:`Цикл CCI ≈ ${cycleLen} баров — длинный цикл, медленные развороты. Позиции держать дольше`});
+          }
+          // CCI на финише цикла (в экстремуме)?
+          const barsFromPeak = lastPeak !== null ? cciArr.length-1-lastPeak : null;
+          const barsFromTrough = lastTrough !== null ? cciArr.length-1-lastTrough : null;
+          if (cci > 80 && cci < cci) {/* handled below */}
+          if (Math.abs(cci) > 150) items.push({type:'neutral', text:`CCI в экстремуме — ${cci>0?'верх':'низ'} цикла. Скоро разворот внутри цикла`});
+        }
+        html += makeCard('CCI (неклассически)', items, 'cci');
       }
     } else if (idL.includes('keltner')) {
       const per = 20, atrPer = 10, mult = 2;
