@@ -1033,6 +1033,38 @@ input[type=range] { touch-action: none; }
           <div class="cpnl-hdr"><span class="cpnl-lbl">Std Dev</span><span class="cpnl-val" id="chart-std_dev-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="std_dev" title="Скрыть">◉</span><span class="cpnl-del" data-id="std_dev" title="Убрать">✕</span></div>
           <canvas id="chart-std_dev-canvas" style="width:100%;height:70px;display:block;"></canvas>
         </div>
+        <div id="chart-kvo-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">KVO</span><span class="cpnl-val" id="chart-kvo-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="kvo" title="Скрыть">◉</span><span class="cpnl-del" data-id="kvo" title="Убрать">✕</span></div>
+          <canvas id="chart-kvo-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-ebs-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">EBS</span><span class="cpnl-val" id="chart-ebs-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="ebs" title="Скрыть">◉</span><span class="cpnl-del" data-id="ebs" title="Убрать">✕</span></div>
+          <canvas id="chart-ebs-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-tmf-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">TMF</span><span class="cpnl-val" id="chart-tmf-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="tmf" title="Скрыть">◉</span><span class="cpnl-del" data-id="tmf" title="Убрать">✕</span></div>
+          <canvas id="chart-tmf-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-frac_dim-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Frac Dim</span><span class="cpnl-val" id="chart-frac_dim-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="frac_dim" title="Скрыть">◉</span><span class="cpnl-del" data-id="frac_dim" title="Убрать">✕</span></div>
+          <canvas id="chart-frac_dim-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-efficiency_ratio-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Eff Ratio</span><span class="cpnl-val" id="chart-efficiency_ratio-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="efficiency_ratio" title="Скрыть">◉</span><span class="cpnl-del" data-id="efficiency_ratio" title="Убрать">✕</span></div>
+          <canvas id="chart-efficiency_ratio-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-entropy-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Entropy</span><span class="cpnl-val" id="chart-entropy-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="entropy" title="Скрыть">◉</span><span class="cpnl-del" data-id="entropy" title="Убрать">✕</span></div>
+          <canvas id="chart-entropy-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-cum_delta-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Cum Delta</span><span class="cpnl-val" id="chart-cum_delta-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="cum_delta" title="Скрыть">◉</span><span class="cpnl-del" data-id="cum_delta" title="Убрать">✕</span></div>
+          <canvas id="chart-cum_delta-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-cyber_cycle-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Cyber Cycle</span><span class="cpnl-val" id="chart-cyber_cycle-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="cyber_cycle" title="Скрыть">◉</span><span class="cpnl-del" data-id="cyber_cycle" title="Убрать">✕</span></div>
+          <canvas id="chart-cyber_cycle-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
       </div>
 
     </div>
@@ -9053,6 +9085,10 @@ function cpChartToggle(id) {
     vortex:'chart-vortex-panel', fisher:'chart-fisher-panel',
     tsi:'chart-tsi-panel', ult_osc:'chart-ult_osc-panel',
     dpo:'chart-dpo-panel', std_dev:'chart-std_dev-panel',
+    kvo:'chart-kvo-panel', ebs:'chart-ebs-panel', tmf:'chart-tmf-panel',
+    frac_dim:'chart-frac_dim-panel', efficiency_ratio:'chart-efficiency_ratio-panel',
+    entropy:'chart-entropy-panel', cum_delta:'chart-cum_delta-panel',
+    cyber_cycle:'chart-cyber_cycle-panel',
   };
   if (panels[id]) {
     const p = document.getElementById(panels[id]);
