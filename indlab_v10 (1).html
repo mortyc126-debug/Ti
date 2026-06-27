@@ -743,15 +743,14 @@ input[type=range] { touch-action: none; }
     <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
     <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
   </div>
-  <div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;">
-    <span style="font-size:9px;color:#3a3050;font-family:var(--mono);align-self:center;margin-right:4px;">ТФ:</span>
-    <button class="an-tf active" data-tf="CANDLE_INTERVAL_5_MIN"  data-label="5 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);background:rgba(82,242,201,0.12);color:#52F2C9;">5м</button>
-    <button class="an-tf"        data-tf="CANDLE_INTERVAL_15_MIN" data-label="15 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">15м</button>
-    <button class="an-tf"        data-tf="CANDLE_INTERVAL_30_MIN" data-label="30 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">30м</button>
-    <button class="an-tf"        data-tf="CANDLE_INTERVAL_HOUR"   data-label="1 час"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1ч</button>
-    <button class="an-tf"        data-tf="CANDLE_INTERVAL_2_HOUR" data-label="2 часа" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">2ч</button>
-    <button class="an-tf"        data-tf="CANDLE_INTERVAL_4_HOUR" data-label="4 часа" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">4ч</button>
-    <button class="an-tf"        data-tf="CANDLE_INTERVAL_DAY"    data-label="день"   onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1д</button>
+  <div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+    <span style="font-size:9px;color:#5a5070;font-family:var(--mono);margin-right:2px;">ТФ свечи:</span>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_1_MIN"  data-bm="1"   data-label="1 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1м</button>
+    <button class="an-tf active" data-tf="CANDLE_INTERVAL_5_MIN"  data-bm="5"   data-label="5 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);background:rgba(82,242,201,0.12);color:#52F2C9;">5м</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_15_MIN" data-bm="15"  data-label="15 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">15м</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_30_MIN" data-bm="30"  data-label="30 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">30м</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_HOUR"   data-bm="60"  data-label="1 час"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1ч</button>
+    <span style="font-size:9px;color:#3a3050;font-family:var(--mono);margin-left:4px;">· горизонты: 5 / 10 / 15 / 30 свечей</span>
   </div>
   <div id="an-results"></div>
 </div>
@@ -11094,10 +11093,9 @@ async function ilRunAnalysis() {
     const tfConst = tfBtn?.dataset?.tf || 'CANDLE_INTERVAL_DAY';
     const tfLabel = tfBtn?.dataset?.label || 'день';
     const tfDays = {
-      CANDLE_INTERVAL_5_MIN:5, CANDLE_INTERVAL_15_MIN:14, CANDLE_INTERVAL_30_MIN:30,
-      CANDLE_INTERVAL_HOUR:60, CANDLE_INTERVAL_2_HOUR:120, CANDLE_INTERVAL_4_HOUR:250,
-      CANDLE_INTERVAL_DAY:500
-    }[tfConst] || 90;
+      CANDLE_INTERVAL_1_MIN:2, CANDLE_INTERVAL_5_MIN:5, CANDLE_INTERVAL_15_MIN:14,
+      CANDLE_INTERVAL_30_MIN:30, CANDLE_INTERVAL_HOUR:60
+    }[tfConst] || 14;
     const now=new Date(), from=new Date(now);
     from.setDate(from.getDate()-tfDays);
     const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.(), tfConst);
@@ -11111,7 +11109,7 @@ async function ilRunAnalysis() {
     const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
     const trendMask = returns5.map(r=>r>=med5);
     const rangeMask = returns5.map(r=>r<med5);
-    const HORIZONS = [5,15,30];
+    const HORIZONS = [5,10,15,30];
     const stats = {};
     IL_INDICATORS.forEach(id=>{
       stats[id]={};
@@ -11132,7 +11130,7 @@ async function ilRunAnalysis() {
       clusters.push(cl);
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
-    const barMinutes = {CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60,CANDLE_INTERVAL_2_HOUR:120,CANDLE_INTERVAL_4_HOUR:240,CANDLE_INTERVAL_DAY:1440}[tfConst]||1440;
+    const barMinutes = {CANDLE_INTERVAL_1_MIN:1,CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60}[tfConst]||5;
     _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,interval,barMinutes};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
@@ -11160,7 +11158,7 @@ function ilRenderAnalysis() {
     if (m < 1440) { const h=Math.floor(m/60), min=m%60; return min ? `${h}ч ${min}м` : `${h}ч`; }
     return `${Math.round(m/1440)} дн`;
   };
-  const h5lbl = fmtHorizon(5), h15lbl = fmtHorizon(15), h30lbl = fmtHorizon(30);
+  const h5lbl = fmtHorizon(5), h10lbl = fmtHorizon(10), h15lbl = fmtHorizon(15), h30lbl = fmtHorizon(30);
 
   // Цвета: достаточно яркие для тёмного фона
   const acc=(s)=>{
@@ -11203,7 +11201,7 @@ function ilRenderAnalysis() {
     <span style="color:#E04060">≤45%</span> — антисигнал<br>
     <span style="color:#52C88A">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
     <span style="color:#9080C8">Фиолетовый</span> = лучше в боковике<br>
-    <span style="color:#6a6090">Колонки: прогноз на</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span> <span style="color:#6a6090">вперёд (5/15/30 баров × таймфрейм)</span>
+    <span style="color:#6a6090">Горизонты:</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h10lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span> <span style="color:#6a6090">вперёд (5/10/15/30 свечей)</span>
   </div>`;
 
   // По группам
@@ -11217,24 +11215,23 @@ function ilRenderAnalysis() {
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
         <thead><tr style="background:#13101e;">
           <th style="text-align:left;padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Индикатор</th>
-          <th style="padding:5px 10px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h5lbl}</th>
-          <th style="padding:5px 10px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h15lbl}</th>
-          <th style="padding:5px 10px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h30lbl}</th>
-          <th style="padding:5px 10px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;white-space:nowrap;">Тренд / Бок</th>
-          <th style="padding:5px 10px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Bias</th>
+          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h5lbl}</th>
+          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h10lbl}</th>
+          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h15lbl}</th>
+          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h30lbl}</th>
+          <th style="padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;white-space:nowrap;">Тренд / Бок</th>
+          <th style="padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Bias</th>
         </tr></thead>`;
     ids.forEach(id=>{
-      const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30;
+      const s5=r.stats[id].h5, s10=r.stats[id].h10, s15=r.stats[id].h15, s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T, s15R=r.stats[id].h15R;
-      // Лучший горизонт
-      const best=[s5,s15,s30].filter(s=>s&&s.acc!=null&&s.n>=5).sort((a,b)=>b.acc-a.acc)[0];
-      const isBest=s=>s&&best&&s===best&&best.acc>=0.55;
       const bias=s15?.bias;
       const biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—';
       const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#C8A840':'#5a5070';
       html+=`<tr style="border-top:1px solid #180f28;">
         <td style="padding:5px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td>
         <td style="text-align:center;padding:5px 8px;">${acc(s5)}</td>
+        <td style="text-align:center;padding:5px 8px;">${acc(s10)}</td>
         <td style="text-align:center;padding:5px 8px;">${acc(s15)}</td>
         <td style="text-align:center;padding:5px 8px;">${acc(s30)}</td>
         <td style="text-align:center;padding:5px 8px;">${regDiff(s15T,s15R)}</td>
@@ -11250,11 +11247,11 @@ function ilRenderAnalysis() {
     rest.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
     html+=`<div style="margin-bottom:14px;"><div style="font-size:10px;color:#7068a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding:5px 8px;background:rgba(255,255,255,0.015);">Прочие</div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
-        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Тренд/Бок</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Bias</th></tr>`;
+        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h10lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Тренд/Бок</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Bias</th></tr>`;
     rest.forEach(id=>{
-      const s5=r.stats[id].h5,s15=r.stats[id].h15,s30=r.stats[id].h30,s15T=r.stats[id].h15T,s15R=r.stats[id].h15R;
+      const s5=r.stats[id].h5,s10=r.stats[id].h10,s15=r.stats[id].h15,s30=r.stats[id].h30,s15T=r.stats[id].h15T,s15R=r.stats[id].h15R;
       const bias=s15?.bias,biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—',biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#C8A840':'#5a5070';
-      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 8px;color:${biasCol}">${biasStr}</td></tr>`;
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 8px;color:${biasCol}">${biasStr}</td></tr>`;
     });
     html+=`</table></div>`;
   }
