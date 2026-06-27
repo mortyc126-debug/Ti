@@ -2178,6 +2178,40 @@ const IND_GROUPS = [
           return {s:'neutral', t:`DPO = ${x.toFixed(1)} — середина цикла.`};
         }
       },
+      { id:'cum_delta', name:'Cumulative Delta / КД', full:'Кумулятивная дельта — накопленный дисбаланс покупок и продаж',
+        desc:'Аппроксимация агрессивных покупок/продаж через OHLCV. Расхождение с ценой — главный сигнал.',
+        params:[
+          {id:'diverg', label:'Дивергенция (1=есть)', min:0, max:1, def:0, step:1,
+           interpret: v => v.diverg>0.5?{s:'sell',t:'Дивергенция: цена растёт, Δ падает — продавцы агрессивнее'}:{s:'neutral',t:'Расхождения нет'}},
+        ],
+        interpret: () => ({s:'neutral', t:'Cumulative Delta активен'})
+      },
+      { id:'cyber_cycle', name:'Cyber Cycle / Киберцикл Элерса', full:'Cyber Cycle — адаптивный цикловой осциллятор Дж. Элерса',
+        desc:'Выделяет циклическую составляющую цены. Показывает фазу доминирующего цикла в реальном времени.',
+        params:[
+          {id:'val',  label:'CC значение',   min:-1,  max:1,  def:0,   step:0.01},
+          {id:'trig', label:'Trigger CC[-1]',min:-1,  max:1,  def:0,   step:0.01},
+        ],
+        interpret: v => {
+          const cc=v.val, tr=v.trig;
+          if(cc<-0.3&&cc>tr) return {s:'buy',  t:`CC=${cc.toFixed(3)}: нижняя точка цикла, разворот вверх — вход`};
+          if(cc>0.3&&cc<tr)  return {s:'sell', t:`CC=${cc.toFixed(3)}: верхняя точка цикла, разворот вниз — выход`};
+          return {s:'neutral', t:`CC=${cc.toFixed(3)}: фаза ${cc>0?'верхняя':'нижняя'}, ${cc>tr?'↑':'↓'}`};
+        }
+      },
+      { id:'mama', name:'MAMA / FAMA — Адаптивные МА Элерса', full:'MESA Adaptive Moving Average — адаптивная МА на базе фазы Хилберта',
+        desc:'MAMA быстро адаптируется к темпу цикла. Расхождение MAMA/FAMA: медленное = плановый тренд, резкое = каскад.',
+        params:[
+          {id:'price', label:'Цена',  min:0, max:100000, def:170, step:0.01},
+          {id:'mama',  label:'MAMA',  min:0, max:100000, def:168, step:0.01},
+          {id:'fama',  label:'FAMA',  min:0, max:100000, def:167, step:0.01},
+        ],
+        interpret: v => {
+          const sp=v.mama-v.fama;
+          if(Math.abs(sp)<0.05) return {s:'neutral', t:'MAMA≈FAMA — цикличный режим, накопление'};
+          return {s:sp>0?'buy':'sell', t:`Расхождение ${sp>0?'+':''}${sp.toFixed(2)}: тренд ${sp>0?'вверх':'вниз'}`};
+        }
+      },
     ]
   },
 ];
@@ -5149,6 +5183,9 @@ function chartRedraw() {
   if (chartInds.ult_osc)       _indDrawPanel('ult_osc');
   if (chartInds.dpo)           _indDrawPanel('dpo');
   if (chartInds.std_dev)       _indDrawPanel('std_dev');
+  if (chartInds.cum_delta)    _indDrawPanel('cum_delta');
+  if (chartInds.cyber_cycle)  _indDrawPanel('cyber_cycle');
+  if (chartInds.mama)         _indDrawOverlay('mama');
   _drawOverlayNames();
 }
 
@@ -6148,6 +6185,36 @@ function _indDrawOverlay(id){
       ctx.save();ctx.setLineDash([3,5]);ctx.lineWidth=1;
       Object.entries(lv).forEach(([nm,price])=>{const y=toY(price);if(y<0||y>H)return;ctx.strokeStyle=cl[nm];ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();ctx.fillStyle=cl[nm];ctx.font='9px monospace';ctx.fillText(nm+' '+price.toFixed(1),4,y-2);});
       ctx.setLineDash([]);ctx.restore();
+    } else if(id==='mama'){
+      // MAMA/FAMA — адаптивные МА Элерса через оценку фазы методом Хилберта (упрощённая реализация)
+      const fastL=0.5,slowL=0.05;
+      const sm=closes.map((c,i)=>i>=3?(4*c+3*closes[i-1]+2*closes[i-2]+closes[i-3])/10:c);
+      let period=15,phase=0,mamaV=closes[0],famaV=closes[0];
+      let det1=0,det2=0,i1_1=0,i1_2=0,q1_1=0,q1_2=0,re=0,im_=0;
+      const mamaArr=new Array(n).fill(null),famaArr=new Array(n).fill(null);
+      for(let i=6;i<n;i++){
+        const c=(0.0962*sm[i]+0.5769*sm[i-2]-0.5769*sm[i-4]-0.0962*sm[i-6])*(0.075*period+0.54);
+        const q1=(0.0962*c+0.5769*det1-0.5769*(i>=10?det2:0)-0.0962*(i>=12?sm[i-6]:0))*(0.075*period+0.54);
+        const i1=det1;
+        const jI=(0.0962*i1+0.5769*i1_1)*(0.075*period+0.54);
+        const jQ=(0.0962*q1+0.5769*q1_1)*(0.075*period+0.54);
+        let i2=i1-jQ,q2=q1+jI;
+        i2=0.2*i2+0.8*(i1_2||i2);q2=0.2*q2+0.8*(q1_2||q2);
+        let newRe=i2*(i1_2||0)+q2*(q1_2||0),newIm=i2*(q1_2||0)-q2*(i1_2||0);
+        newRe=0.2*newRe+0.8*re;newIm=0.2*newIm+0.8*im_;re=newRe;im_=newIm;
+        if(re!==0&&im_!==0){let p=6.28318/Math.atan(im_/re);p=Math.max(6,Math.min(50,p));period=0.2*p+0.8*period;}
+        const prevPhase=phase;
+        if(i1!==0) phase=Math.atan(q1/i1)*180/Math.PI;
+        let dp=prevPhase-phase;if(dp<1)dp=1;
+        const alpha=Math.max(fastL/dp,slowL);
+        mamaV=alpha*closes[i]+(1-alpha)*mamaV;
+        famaV=0.5*alpha*mamaV+(1-0.5*alpha)*famaV;
+        mamaArr[i]=mamaV;famaArr[i]=famaV;
+        det2=det1;det1=c;i1_2=i1_1;i1_1=i1;q1_2=q1_1;q1_1=q1;
+      }
+      fillBand(mamaArr,famaArr,mamaArr[n-1]>famaArr[n-1]?'rgba(82,242,194,0.5)':'rgba(199,27,82,0.5)',0.06);
+      dLine(mamaArr,'rgba(82,242,194,0.9)',1.5);
+      dLine(famaArr,'rgba(255,159,28,0.7)',1,[4,2]);
     } else if(id==='zigzag'){
       const thresh=0.05,pts=[];let dir=0,lH=chartCandles[0].high,lL=chartCandles[0].low,lHi=0,lLi=0;
       for(let i=1;i<n;i++){if(dir>=0&&chartCandles[i].high>lH){lH=chartCandles[i].high;lHi=i;}if(dir<=0&&chartCandles[i].low<lL){lL=chartCandles[i].low;lLi=i;}if(dir>=0&&chartCandles[i].low<lH*(1-thresh)){pts.push({i:lHi,p:lH});dir=-1;lL=chartCandles[i].low;lLi=i;}else if(dir<=0&&chartCandles[i].high>lL*(1+thresh)){pts.push({i:lLi,p:lL});dir=1;lH=chartCandles[i].high;lHi=i;}}
@@ -6347,6 +6414,34 @@ function _indDrawPanel(id){
       const per=20,sd=closes.map((_,i)=>{if(i<per)return null;const sl=closes.slice(i-per+1,i+1),m=sl.reduce((s,v)=>s+v,0)/per;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/per);});
       drawLine(sd,'#4cc9f0',1.5);_pLabel(ctx,'Std Dev');
       const vs=sd.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-std_dev-badge',lv>avg*1.5?'sell':lv<avg*0.7?'buy':'neutral');
+    } else if(id==='cum_delta'){
+      // Аппроксимация дельты: buy_vol ≈ vol*(close-low)/(high-low), sell_vol ≈ vol*(high-close)/(high-low)
+      let cum=0;
+      const cd=cn.map(c=>{const hl=c.high-c.low,v=c.vol||0;if(!hl)return(cum+=0);const bv=v*(c.close-c.low)/hl,sv=v*(c.high-c.close)/hl;cum+=bv-sv;return cum;});
+      // Нормировать к 0 от начала окна
+      const base=cd[startIdx]||0;const cdf=cd.map(v=>v-base);
+      const sc=_scaleWin(cdf,startIdx,endIdx,H);if(!sc)return;
+      _pGrid(ctx,W,sc.toY(0));
+      // Цвет: сравниваем направление дельты и цены за окно
+      const pUp=closes[endIdx-1]>closes[startIdx],dUp=cdf[endIdx-1]>0;
+      const lineCol=pUp===dUp?'#52F2C9':'#FF4D7A'; // совпадение = здоровый тренд, расхождение = красный
+      _pl(ctx,W,H,cdf,lineCol,1.5,startIdx,endIdx,xOf,sc.toY);
+      _pLabel(ctx,'Cum Δ');
+      const diverg=pUp!==dUp;
+      setPill('chart-cum_delta-badge',diverg?(pUp?'sell-strong':'buy-strong'):pUp?'buy':'sell');
+    } else if(id==='cyber_cycle'){
+      // Cyber Cycle Элерса: smooth → второй разностный оператор с экспоненциальным затуханием
+      const alpha=0.07,a1=(1-alpha/2)**2,a2=2*(1-alpha),a3=(1-alpha)**2;
+      const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);
+      const cc=new Array(n).fill(0);
+      for(let i=2;i<n;i++) cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];
+      const trig=[0,...cc.slice(0,n-1)]; // trigger = cc сдвинутый на 1
+      drawOsc(cc,'#52F2C9');
+      const sc2=_oscScale(cc,startIdx,endIdx,H);
+      if(sc2) _pl(ctx,W,H,trig,'rgba(255,159,28,0.7)',1,startIdx,endIdx,xOf,sc2.toY);
+      _pLabel(ctx,'Cyber Cycle');
+      const lv=cc[n-1],lt=trig[n-1];
+      setPill('chart-cyber_cycle-badge',lv<-0.1&&lv>lt?'buy-strong':lv>0.1&&lv<lt?'sell-strong':lv>lt?'buy':'sell');
     }
   } catch(e){console.warn('panel',id,e);}
 }
@@ -10044,6 +10139,131 @@ function renderAnalysis() {
         }
         if(!items.length) items.push({type:'neutral',text:'Chaikin Volatility активен'});
         html += makeCard('Chaikin Volatility (неклассически)', items);
+      }
+    } else if (idL === 'cum_delta' || idL.includes('cumulative') || idL.includes('cum_d')) {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        let cum = 0;
+        const cd = candles.map(c => {
+          const hl = c.high - c.low, v = c.volume || 0;
+          if (!hl) return (cum += 0, cum);
+          cum += v * (c.close - c.low) / hl - v * (c.high - c.close) / hl;
+          return cum;
+        });
+        // Расхождение за 20 и 50 свечей
+        const checkDiv = (per) => {
+          if (n < per) return null;
+          const pUp = closes[n-1] > closes[n-per];
+          const dUp = cd[n-1] > cd[n-per];
+          return pUp !== dUp ? (pUp ? 'bearish' : 'bullish') : null;
+        };
+        const div20 = checkDiv(20), div50 = checkDiv(50);
+        if (div20 === 'bearish') items.push({type:'bearish', text:`Дивергенция (20 свечей): цена растёт, Cumulative Delta падает — продавцы агрессивнее покупателей, рост не поддержан`});
+        else if (div20 === 'bullish') items.push({type:'bullish', text:`Скрытое накопление (20): цена падает, Delta растёт — покупатели поглощают продажи агрессивнее`});
+        if (div50 && div50 !== div20) {
+          if (div50 === 'bearish') items.push({type:'bearish', text:`Дивергенция (50 свечей): среднесрочный дисбаланс в пользу продавцов`});
+          else items.push({type:'bullish', text:`Скрытое накопление (50): среднесрочный дисбаланс в пользу покупателей`});
+        }
+        if (!div20 && !div50) {
+          const pUp = closes[n-1] > closes[n-20];
+          items.push({type: pUp?'bullish':'bearish', text:`Delta подтверждает ${pUp?'рост':'падение'} — ${pUp?'покупатели':'продавцы'} агрессивнее, тренд здоровый`});
+        }
+        // Скорость изменения дельты за последние 5 свечей
+        const recentDelta = cd[n-1] - cd[n-6];
+        const prevDelta = cd[n-6] - cd[n-11 < 0 ? 0 : n-11];
+        if (Math.abs(recentDelta) > Math.abs(prevDelta) * 2 && Math.sign(recentDelta) !== Math.sign(prevDelta)) {
+          items.push({type:'neutral', text:`Резкое ускорение и смена направления дельты — возможная смена режима`});
+        }
+        html += makeCard('Cumulative Delta (неклассически)', items);
+      }
+    } else if (idL === 'cyber_cycle' || idL.includes('cybercycle') || idL.includes('cyber')) {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        const alpha = 0.07, a1 = (1-alpha/2)**2, a2 = 2*(1-alpha), a3 = (1-alpha)**2;
+        const sm = closes.map((c,i) => i>=3 ? (c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6 : c);
+        const cc = new Array(n).fill(0);
+        for (let i=2; i<n; i++) cc[i] = a1*(sm[i]-2*sm[i-1]+sm[i-2]) + a2*cc[i-1] - a3*cc[i-2];
+        const last = cc[n-1], prev = cc[n-2], prev2 = cc[n-3];
+        // Фаза: нижняя точка = минимум, верхняя = максимум
+        const atBottom = last < -0.1 && last > prev; // разворот снизу
+        const atTop = last > 0.1 && last < prev;     // разворот сверху
+        const speed = Math.abs(last - prev2); // скорость изменения за 2 бара
+        const avgSpeed = new Array(Math.min(20,n)).fill(0).map((_,i)=>Math.abs(cc[n-1-i]-cc[n-3-i])).reduce((a,b)=>a+b,0)/20;
+
+        if (atBottom) items.push({type:'bullish', text:`Cyber Cycle: нижняя точка цикла, разворот вверх — каскад вверх в этой фазе получает циклическую поддержку`});
+        else if (atTop) items.push({type:'bearish', text:`Cyber Cycle: верхняя точка цикла, разворот вниз — движение вниз в этой фазе имеет циклическую поддержку`});
+        else if (last > 0) items.push({type:'neutral', text:`Фаза верхней половины цикла (CC=${last.toFixed(3)}) — ${last<prev?'ближе к пику':'набирает силу'}`});
+        else items.push({type:'neutral', text:`Фаза нижней половины цикла (CC=${last.toFixed(3)}) — ${last>prev?'ближе к дну':'снижается'}`});
+
+        if (speed > avgSpeed * 2) items.push({type:'neutral', text:`Высокая скорость изменения CC — импульс силён, фаза меняется быстро: каскад возможен`});
+        else if (speed < avgSpeed * 0.4) items.push({type:'neutral', text:`Медленное движение CC — вялый рынок, накопление без выраженного сигнала`});
+
+        // Длина цикла: считаем расстояние между экстремумами
+        let extremes = [];
+        for (let i=2; i<n-1; i++) {
+          if ((cc[i]>cc[i-1]&&cc[i]>cc[i+1]) || (cc[i]<cc[i-1]&&cc[i]<cc[i+1])) extremes.push(i);
+        }
+        if (extremes.length >= 3) {
+          const gaps = extremes.slice(-4).map((v,i,a)=>i?v-a[i-1]:0).filter(v=>v>0);
+          const avgCycle = gaps.reduce((a,b)=>a+b,0)/(gaps.length||1) * 2; // полный цикл ≈ 2 полупериода
+          if (avgCycle < 10) items.push({type:'neutral', text:`Доминирующий цикл ~${avgCycle.toFixed(0)} свечей — короткий: нервный рынок, тейки брать раньше`});
+          else if (avgCycle > 30) items.push({type:'neutral', text:`Доминирующий цикл ~${avgCycle.toFixed(0)} свечей — длинный: движения медленные но масштабные, тейки дальше`});
+          else items.push({type:'neutral', text:`Доминирующий цикл ~${avgCycle.toFixed(0)} свечей — стандартный`});
+        }
+        html += makeCard('Cyber Cycle Элерса (неклассически)', items);
+      }
+    } else if (idL === 'mama') {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        // Вычислить MAMA/FAMA
+        const fastL=0.5, slowL=0.05;
+        const sm2 = closes.map((c,i)=>i>=3?(4*c+3*closes[i-1]+2*closes[i-2]+closes[i-3])/10:c);
+        let period=15, phase=0, mamaV=closes[0], famaV=closes[0];
+        let det1=0,det2=0,i1_1=0,i1_2=0,q1_1=0,q1_2=0,re=0,im_=0;
+        const mamaArr=new Array(n).fill(null), famaArr=new Array(n).fill(null);
+        const spreadArr=[];
+        for(let i=6;i<n;i++){
+          const c=(0.0962*sm2[i]+0.5769*sm2[i-2]-0.5769*sm2[i-4]-0.0962*sm2[i-6])*(0.075*period+0.54);
+          const q1=(0.0962*c+0.5769*det1-0.5769*(i>=10?det2:0))*(0.075*period+0.54);
+          const i1=det1;
+          const jI=(0.0962*i1+0.5769*i1_1)*(0.075*period+0.54);
+          const jQ=(0.0962*q1+0.5769*q1_1)*(0.075*period+0.54);
+          let i2=i1-jQ,q2=q1+jI;
+          i2=0.2*i2+0.8*(i1_2||i2);q2=0.2*q2+0.8*(q1_2||q2);
+          let nR=i2*(i1_2||0)+q2*(q1_2||0),nI=i2*(q1_2||0)-q2*(i1_2||0);
+          nR=0.2*nR+0.8*re;nI=0.2*nI+0.8*im_;re=nR;im_=nI;
+          if(re!==0&&im_!==0){let p=6.28318/Math.atan(im_/re);p=Math.max(6,Math.min(50,p));period=0.2*p+0.8*period;}
+          const prevPh=phase;if(i1!==0) phase=Math.atan(q1/i1)*180/Math.PI;
+          let dp=prevPh-phase;if(dp<1)dp=1;
+          const alph=Math.max(fastL/dp,slowL);
+          mamaV=alph*closes[i]+(1-alph)*mamaV;
+          famaV=0.5*alph*mamaV+(1-0.5*alph)*famaV;
+          mamaArr[i]=mamaV;famaArr[i]=famaV;
+          spreadArr.push(mamaV-famaV);
+          det2=det1;det1=c;i1_2=i1_1;i1_1=i1;q1_2=q1_1;q1_1=q1;
+        }
+        const sp = mamaArr[n-1] - famaArr[n-1];
+        const prevSp = spreadArr.length>=2 ? spreadArr[spreadArr.length-2] : sp;
+        const maxSp = Math.max(...spreadArr.map(Math.abs));
+        const spPct = maxSp>0 ? Math.abs(sp)/maxSp*100 : 0;
+
+        if (Math.abs(sp) < maxSp * 0.05) {
+          items.push({type:'neutral', text:`MAMA ≈ FAMA (расхождение ${(Math.abs(sp)/closes[n-1]*100).toFixed(2)}%) — цикличный режим: рынок в боковике, идёт накопление`});
+        } else if (sp > 0) {
+          const accel = Math.abs(sp) > Math.abs(prevSp) * 1.3;
+          if (accel) items.push({type:'bullish', text:`MAMA резко отрывается вверх от FAMA (+${(sp/closes[n-1]*100).toFixed(2)}%) — переход в трендовый режим, возможен каскад`});
+          else items.push({type:'bullish', text:`MAMA выше FAMA (+${(sp/closes[n-1]*100).toFixed(2)}%) — трендовый режим вверх, плановое движение`});
+        } else {
+          const accel = Math.abs(sp) > Math.abs(prevSp) * 1.3;
+          if (accel) items.push({type:'bearish', text:`MAMA резко уходит под FAMA (${(sp/closes[n-1]*100).toFixed(2)}%) — переход в нисходящий тренд, возможен каскад`});
+          else items.push({type:'bearish', text:`MAMA ниже FAMA (${(sp/closes[n-1]*100).toFixed(2)}%) — трендовый режим вниз`});
+        }
+        if (spPct > 70) items.push({type:'neutral', text:`Расхождение MAMA/FAMA на исторически высоком уровне (${spPct.toFixed(0)}% от макс.) — тренд перегрет, сворачивается`});
+        items.push({type:'neutral', text:`Рыночный режим Элерса: ${Math.abs(sp)<maxSp*0.1?'цикличный (боковик/накопление)':'трендовый (направленное движение)'}`});
+        html += makeCard('MAMA / FAMA Элерса (неклассически)', items);
       }
     } else if (idL === 'pvi') {
       const n = candles.length;
