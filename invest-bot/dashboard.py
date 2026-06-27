@@ -1544,12 +1544,13 @@ def run_backtest_one(
         progress = _get_progress_proxy()
     by_ticker = _all_settings_by_ticker()
     rows: list[dict] = []
+    _ticker_full_trades: list[dict] = []
 
     strategy_settings = by_ticker.get(ticker)
     if strategy_settings is None:
         rows.append({"ticker": ticker, "mode": "ошибка", "error": "нет в settings.ini"})
         _set_progress(progress, ticker, "ошибка")
-        return rows
+        return rows, None, {}
 
     t0 = time.monotonic()
     logger.info(f"{ticker}: получаю историю свечей ({days} дн.)...")
@@ -1565,23 +1566,23 @@ def run_backtest_one(
             rows.append({"ticker": ticker, "mode": "пропуск",
                          "error": "стратегия не поддерживает backtest_barriers"})
             _set_progress(progress, ticker, "пропуск")
-            return rows, None
+            return rows, None, {}
 
         try:
             candles = _get_backtest_candles(ticker, strategy_settings, days, offset_days)
         except RequestError as ex:
             rows.append({"ticker": ticker, "mode": "ошибка API", "error": str(ex.details)})
             _set_progress(progress, ticker, "ошибка API")
-            return rows, None
+            return rows, None, {}
         except Exception as ex:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": str(ex)})
             _set_progress(progress, ticker, "нет истории")
-            return rows, None
+            return rows, None, {}
 
         if not candles:
             rows.append({"ticker": ticker, "mode": "нет истории", "error": ""})
             _set_progress(progress, ticker, "нет истории")
-            return rows, None
+            return rows, None, {}
 
         logger.info(f"{ticker}: {len(candles)} свечей за {time.monotonic() - t0:.1f}с, считаю сигналы "
                     f"(может занять минуту-две — внутри Hawkes-MLE на каждый бар)...")
@@ -1601,9 +1602,7 @@ def run_backtest_one(
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff, adaptive_lasso=adaptive_lasso)
         fixed_trades = fixed.pop("trades", [])
-        # Сохраняем полные трейды (с method_scores и candle_context) для CSV-экспорта
-        with _last_full_trades_lock:
-            _last_full_trades[ticker] = fixed_trades
+        _ticker_full_trades = fixed_trades  # вернём как третий элемент tuple
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
                      "rejection_stats": rej,
@@ -1697,7 +1696,7 @@ def run_backtest_one(
         rows.append({"ticker": ticker, "mode": "ошибка", "error": tb.strip().splitlines()[-1],
                      "traceback": tb, "advice": advice})
         _set_progress(progress, ticker, "ошибка")
-        return rows, None
+        return rows, None, {}
 
     _set_progress(progress, ticker, "готово")
     # .get(ticker, {}) а не None: если у тикера слишком мало свечей для скана
@@ -1705,7 +1704,7 @@ def run_backtest_one(
     # данных — а не "не пытались". {} != None дальше отличает это от реально
     # отсутствующего кэша (см. save_cached_backtest_history) — иначе такие
     # тикеры заново и заново уходили в пересчёт при каждом "сохранить историю".
-    return rows, bt_store._data.get(ticker, {})
+    return rows, bt_store._data.get(ticker, {}), {ticker: _ticker_full_trades}
 
 
 def run_backtest(
@@ -1730,10 +1729,12 @@ def run_backtest(
         for ticker in tickers:
             if _cancel_event.is_set():
                 break
-            r_rows, r_hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress, offset_days=offset_days)
+            r_rows, r_hist, r_trades = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, progress=progress, offset_days=offset_days)
             rows.extend(r_rows)
             if r_hist is not None:
                 hist_by_ticker[ticker] = r_hist
+            with _last_full_trades_lock:
+                _last_full_trades.update(r_trades)
         if _cancel_event.is_set():
             _mark_unfinished_cancelled(progress, tickers)
         return rows, hist_by_ticker
@@ -1752,10 +1753,12 @@ def run_backtest(
                 break
             ticker = futures[fut]
             try:
-                r_rows, r_hist = fut.result()
+                r_rows, r_hist, r_trades = fut.result()
                 by_ticker_rows[ticker] = r_rows
                 if r_hist is not None:
                     hist_by_ticker[ticker] = r_hist
+                with _last_full_trades_lock:
+                    _last_full_trades.update(r_trades)
             except Exception:
                 pass  # воркер мог быть убит через /api/cancel — это ожидаемо
     finally:
@@ -6614,9 +6617,11 @@ class Handler(BaseHTTPRequestHandler):
             atr_take_ks = [float(x) for x in str(payload.get("atr_take", "2,3,4")).split(",") if x.strip()]
             atr_stop_ks = [float(x) for x in str(payload.get("atr_stop", "1,1.5,2")).split(",") if x.strip()]
             tariff = payload.get("tariff") or None
-            rows, hist = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, offset_days=offset_days)
+            rows, hist, r_trades = run_backtest_one(ticker, days, atr_take_ks, atr_stop_ks, tariff=tariff, offset_days=offset_days)
             if hist is not None:
                 _last_backtest_history_data[ticker] = hist
+            with _last_full_trades_lock:
+                _last_full_trades.update(r_trades)
             self._send_json({"rows": rows})
         elif self.path == "/api/backtest":
             tickers = payload.get("tickers", [])
@@ -6685,9 +6690,11 @@ class Handler(BaseHTTPRequestHandler):
                         break
                     t = fs[fut]
                     try:
-                        rows, hist = fut.result()
+                        rows, hist, r_trades = fut.result()
                         if hist is not None:
                             _last_backtest_history_data[t] = hist
+                        with _last_full_trades_lock:
+                            _last_full_trades.update(r_trades)
                     except Exception as ex:
                         rows = [{"ticker": t, "mode": "ошибка", "error": str(ex)}]
                         _set_progress(progress, t, "ошибка")
