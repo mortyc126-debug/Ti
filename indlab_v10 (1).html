@@ -11132,7 +11132,8 @@ async function ilRunAnalysis() {
       clusters.push(cl);
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,interval};
+    const barMinutes = {CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60,CANDLE_INTERVAL_2_HOUR:120,CANDLE_INTERVAL_4_HOUR:240,CANDLE_INTERVAL_DAY:1440}[tfConst]||1440;
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,interval,barMinutes};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
@@ -11151,23 +11152,33 @@ function ilRenderAnalysis() {
   const r=_ilBtResults, el=document.getElementById('an-results');
   if(!el||!r) return;
 
-  // Точность: цвет только по смыслу, без лишней яркости
+  // Форматировать горизонт в читаемое время
+  const bm = r.barMinutes || 1440;
+  const fmtHorizon = (bars) => {
+    const m = bars * bm;
+    if (m < 60) return `${m} мин`;
+    if (m < 1440) { const h=Math.floor(m/60), min=m%60; return min ? `${h}ч ${min}м` : `${h}ч`; }
+    return `${Math.round(m/1440)} дн`;
+  };
+  const h5lbl = fmtHorizon(5), h15lbl = fmtHorizon(15), h30lbl = fmtHorizon(30);
+
+  // Цвета: достаточно яркие для тёмного фона
   const acc=(s)=>{
-    if(!s||s.acc==null||s.n<5) return '<span style="color:#2e2845">—</span>';
+    if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
-    if(p>=62) return `<span style="color:#47b89a">${p}%</span>`;
-    if(p>=55) return `<span style="color:#8a7c3a">${p}%</span>`;
-    if(p<=45) return `<span style="color:#8a3040">${p}%</span>`;
-    return `<span style="color:#40384e">${p}%</span>`;
+    if(p>=62) return `<span style="color:#52E8A0;font-weight:600">${p}%</span>`;
+    if(p>=55) return `<span style="color:#C8A840">${p}%</span>`;
+    if(p<=45) return `<span style="color:#E04060">${p}%</span>`;
+    return `<span style="color:#8878a8">${p}%</span>`;
   };
   // Тренд vs боковик
   const regDiff=(sT,sR)=>{
-    if(!sT||sT.acc==null||sT.n<3||!sR||sR.acc==null||sR.n<3) return '<span style="color:#2e2845">—</span>';
+    if(!sT||sT.acc==null||sT.n<3||!sR||sR.acc==null||sR.n<3) return '<span style="color:#3a3260">—</span>';
     const tP=Math.round(sT.acc*100), rP=Math.round(sR.acc*100), d=tP-rP;
-    if(Math.abs(d)<3) return `<span style="color:#40384e">${tP}/${rP}</span>`;
+    if(Math.abs(d)<3) return `<span style="color:#8878a8">${tP}/${rP}</span>`;
     return d>0
-      ? `<span style="color:#3a8a70" title="лучше в тренде">${tP}<span style="color:#2e2845">/${rP}</span></span>`
-      : `<span style="color:#6b5fa0" title="лучше в боковике">${rP}<span style="color:#2e2845">/${tP}</span></span>`;
+      ? `<span style="color:#52C88A" title="лучше в тренде">${tP}<span style="color:#5a5070">/${rP}</span></span>`
+      : `<span style="color:#9080C8" title="лучше в боковике">${rP}<span style="color:#5a5070">/${tP}</span></span>`;
   };
 
   let html='';
@@ -11184,15 +11195,15 @@ function ilRenderAnalysis() {
     }
   } catch(e){}
 
-  const itvl = r.interval || 'день';
-
   // Легенда
-  html+=`<div style="margin-bottom:14px;font-size:9px;font-family:var(--mono);color:#40384e;line-height:2;">
-    <span style="color:#47b89a">≥62%</span> устойчивый &nbsp;·&nbsp;
-    <span style="color:#8a7c3a">55–61%</span> умеренный &nbsp;·&nbsp;
-    <span style="color:#40384e">&lt;55%</span> случайный &nbsp;·&nbsp;
-    <span style="color:#8a3040">≤45%</span> антисигнал<br>
-    Тренд/Боков: <span style="color:#3a8a70">зелёный</span> = лучше в тренде &nbsp;·&nbsp; <span style="color:#6b5fa0">фиолетовый</span> = лучше в боковике
+  html+=`<div style="margin-bottom:14px;font-size:10px;font-family:var(--mono);color:#8878a8;line-height:1.9;">
+    <span style="color:#52E8A0">≥62%</span> — устойчивый сигнал &nbsp;·&nbsp;
+    <span style="color:#C8A840">55–61%</span> — умеренный &nbsp;·&nbsp;
+    <span style="color:#8878a8">&lt;55%</span> — случайный &nbsp;·&nbsp;
+    <span style="color:#E04060">≤45%</span> — антисигнал<br>
+    <span style="color:#52C88A">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
+    <span style="color:#9080C8">Фиолетовый</span> = лучше в боковике<br>
+    <span style="color:#6a6090">Колонки: прогноз на</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span> <span style="color:#6a6090">вперёд (5/15/30 баров × таймфрейм)</span>
   </div>`;
 
   // По группам
@@ -11202,15 +11213,15 @@ function ilRenderAnalysis() {
     // сортировка по h15 acc
     ids.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
     html+=`<div style="margin-bottom:18px;">
-      <div style="font-size:9px;color:${grp.color};opacity:0.65;letter-spacing:.1em;text-transform:uppercase;margin-bottom:0;padding:4px 6px;border-left:2px solid ${grp.color}44;">${grp.label}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">
+      <div style="font-size:10px;color:${grp.color};letter-spacing:.08em;text-transform:uppercase;margin-bottom:0;padding:5px 8px;border-left:2px solid ${grp.color}88;background:rgba(255,255,255,0.015);">${grp.label}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
         <thead><tr style="background:#13101e;">
-          <th style="text-align:left;padding:5px 6px;font-weight:400;font-size:9px;color:#3a3050;border-bottom:1px solid #1e1830;">Индикатор</th>
-          <th style="padding:5px 10px;font-weight:600;font-size:10px;color:#4a4060;border-bottom:1px solid #1e1830;white-space:nowrap;">5 ${itvl}</th>
-          <th style="padding:5px 10px;font-weight:600;font-size:10px;color:#4a4060;border-bottom:1px solid #1e1830;white-space:nowrap;">15 ${itvl}</th>
-          <th style="padding:5px 10px;font-weight:600;font-size:10px;color:#4a4060;border-bottom:1px solid #1e1830;white-space:nowrap;">30 ${itvl}</th>
-          <th style="padding:5px 10px;font-weight:400;font-size:9px;color:#3a3050;border-bottom:1px solid #1e1830;white-space:nowrap;">Тренд / Бок</th>
-          <th style="padding:5px 10px;font-weight:400;font-size:9px;color:#3a3050;border-bottom:1px solid #1e1830;">Bias</th>
+          <th style="text-align:left;padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Индикатор</th>
+          <th style="padding:5px 10px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h5lbl}</th>
+          <th style="padding:5px 10px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h15lbl}</th>
+          <th style="padding:5px 10px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h30lbl}</th>
+          <th style="padding:5px 10px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;white-space:nowrap;">Тренд / Бок</th>
+          <th style="padding:5px 10px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Bias</th>
         </tr></thead>`;
     ids.forEach(id=>{
       const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30;
@@ -11220,9 +11231,9 @@ function ilRenderAnalysis() {
       const isBest=s=>s&&best&&s===best&&best.acc>=0.55;
       const bias=s15?.bias;
       const biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—';
-      const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#7a6030':'#2e2845';
+      const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#C8A840':'#5a5070';
       html+=`<tr style="border-top:1px solid #180f28;">
-        <td style="padding:5px 6px;color:#7a7090;">${IL_NAMES[id]||id}</td>
+        <td style="padding:5px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td>
         <td style="text-align:center;padding:5px 8px;">${acc(s5)}</td>
         <td style="text-align:center;padding:5px 8px;">${acc(s15)}</td>
         <td style="text-align:center;padding:5px 8px;">${acc(s30)}</td>
@@ -11237,13 +11248,13 @@ function ilRenderAnalysis() {
   const rest=IL_INDICATORS.filter(id=>!grouped.has(id)&&r.stats[id]);
   if(rest.length){
     rest.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
-    html+=`<div style="margin-bottom:14px;"><div style="font-size:9px;color:#3a3050;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Прочие</div>
-      <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">
-        <tr style="color:#3a3050;font-size:9px;"><th style="text-align:left;padding:3px 6px;font-weight:400;">Индикатор</th><th style="padding:3px 6px;font-weight:400;">H5</th><th style="padding:3px 6px;font-weight:400;">H15</th><th style="padding:3px 6px;font-weight:400;">H30</th><th style="padding:3px 6px;font-weight:400;">Тренд/Бок</th><th style="padding:3px 6px;font-weight:400;">Bias</th></tr>`;
+    html+=`<div style="margin-bottom:14px;"><div style="font-size:10px;color:#7068a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding:5px 8px;background:rgba(255,255,255,0.015);">Прочие</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
+        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Тренд/Бок</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Bias</th></tr>`;
     rest.forEach(id=>{
       const s5=r.stats[id].h5,s15=r.stats[id].h15,s30=r.stats[id].h30,s15T=r.stats[id].h15T,s15R=r.stats[id].h15R;
-      const bias=s15?.bias,biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—',biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#FF9F40':'#3a3050';
-      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 6px;color:var(--text2);">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 6px;">${acc(s5)}</td><td style="text-align:center;padding:4px 6px;">${acc(s15)}</td><td style="text-align:center;padding:4px 6px;">${acc(s30)}</td><td style="text-align:center;padding:4px 6px;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 6px;color:${biasCol}">${biasStr}</td></tr>`;
+      const bias=s15?.bias,biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—',biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#C8A840':'#5a5070';
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 8px;color:${biasCol}">${biasStr}</td></tr>`;
     });
     html+=`</table></div>`;
   }
