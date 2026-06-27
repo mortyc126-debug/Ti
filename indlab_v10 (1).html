@@ -11093,9 +11093,9 @@ async function ilRunAnalysis() {
     const tfConst = tfBtn?.dataset?.tf || 'CANDLE_INTERVAL_DAY';
     const tfLabel = tfBtn?.dataset?.label || 'день';
     const tfDays = {
-      CANDLE_INTERVAL_1_MIN:2, CANDLE_INTERVAL_5_MIN:5, CANDLE_INTERVAL_15_MIN:14,
-      CANDLE_INTERVAL_30_MIN:30, CANDLE_INTERVAL_HOUR:60
-    }[tfConst] || 14;
+      CANDLE_INTERVAL_1_MIN:7, CANDLE_INTERVAL_5_MIN:90, CANDLE_INTERVAL_15_MIN:90,
+      CANDLE_INTERVAL_30_MIN:90, CANDLE_INTERVAL_HOUR:90
+    }[tfConst] || 90;
     const now=new Date(), from=new Date(now);
     from.setDate(from.getDate()-tfDays);
     const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.(), tfConst);
