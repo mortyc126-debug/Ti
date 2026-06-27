@@ -6485,9 +6485,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(e)})
         elif self.path.startswith("/api/export_trades_csv"):
             try:
+                with _last_full_trades_lock:
+                    debug_counts = {t: len(v) for t, v in _last_full_trades.items()}
+                logger.info(f"export_trades_csv: _last_full_trades = {debug_counts}")
                 csv_str = export_trades_csv_all()
                 if not csv_str:
-                    self._send_json({"error": "нет данных — сначала запустите прогон"})
+                    self._send_json({"error": f"нет данных — _last_full_trades={debug_counts}"})
                 else:
                     csv_bytes = csv_str.encode("utf-8")
                     self.send_response(200)
@@ -6695,6 +6698,8 @@ class Handler(BaseHTTPRequestHandler):
                             _last_backtest_history_data[t] = hist
                         with _last_full_trades_lock:
                             _last_full_trades.update(r_trades)
+                        n_tr = sum(len(v) for v in r_trades.values())
+                        logger.info(f"backtest_stream {t}: получено {n_tr} трейдов в r_trades")
                     except Exception as ex:
                         rows = [{"ticker": t, "mode": "ошибка", "error": str(ex)}]
                         _set_progress(progress, t, "ошибка")
@@ -6702,7 +6707,7 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         _sse({"ticker": t, "rows": rows})
                     except Exception:
-                        break  # клиент отвалился
+                        pass  # клиент отвалился — НЕ break, чтобы r_trades остальных тикеров дошли
             finally:
                 _unregister_pool(pool)
                 # wait=True: дожидаемся, чтобы воркер-процессы реально
