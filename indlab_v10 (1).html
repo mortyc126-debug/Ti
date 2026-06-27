@@ -797,17 +797,8 @@ input[type=range] { touch-action: none; }
     border-bottom:1px solid rgba(255,0,110,0.12);
     display:flex; flex-direction:column; gap:8px;
   ">
-    <!-- Row 1: token + ticker + load -->
+    <!-- Row 1: ticker + load + ⚙ -->
     <div id="cp-topbar-row1" style="display:flex;gap:6px;align-items:center;">
-      <div style="position:relative;flex:1;">
-        <input id="chart-token" type="password" placeholder="Токен T-Invest API…"
-          autocomplete="off" oninput="chartSaveToken()"
-          style="width:100%;background:#1A1030;border:1px solid rgba(255,0,110,0.15);border-radius:10px;
-            padding:7px 32px 7px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
-        <button onclick="chartToggleTokenVis()" id="chart-token-eye"
-          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
-            color:var(--text3);cursor:pointer;font-size:12px;padding:0;">👁</button>
-      </div>
       <div style="position:relative;flex:1;">
         <input id="chart-ticker" type="text" placeholder="SBER / GAZP / FIGI…"
           autocomplete="off"
@@ -822,10 +813,23 @@ input[type=range] { touch-action: none; }
           box-shadow:0 0 14px rgba(255,0,110,0.15);">
         ↓ Загрузить
       </button>
+      <button onclick="cpToggleSettings()" id="cp-settings-btn" title="Настройки (токен, прокси)"
+        style="flex-shrink:0;width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
+          background:rgba(255,255,255,0.04);color:#6F648F;font-size:14px;cursor:pointer;display:flex;
+          align-items:center;justify-content:center;">⚙</button>
     </div>
 
-    <!-- Row 1.5: proxy (CF Worker), для прямых запросов к T-Invest API, заблокированных без него -->
-    <div style="display:flex;gap:6px;align-items:center;">
+    <!-- Скрытый блок: токен + прокси (открывается по ⚙) -->
+    <div id="cp-settings-drawer" style="display:none;flex-direction:column;gap:6px;">
+      <div style="position:relative;">
+        <input id="chart-token" type="password" placeholder="Токен T-Invest API…"
+          autocomplete="off" oninput="chartSaveToken()"
+          style="width:100%;background:#1A1030;border:1px solid rgba(255,0,110,0.15);border-radius:10px;
+            padding:7px 32px 7px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
+        <button onclick="chartToggleTokenVis()" id="chart-token-eye"
+          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
+            color:var(--text3);cursor:pointer;font-size:12px;padding:0;">👁</button>
+      </div>
       <input id="chart-proxy" type="text" placeholder="https://your-worker.workers.dev (прокси T-Invest, опционально)"
         autocomplete="off" oninput="chartSaveProxy()"
         style="width:100%;background:#1A1030;border:1px solid rgba(255,0,110,0.15);border-radius:10px;
@@ -5225,6 +5229,45 @@ let chartFigi = '';
 let chartOffset = 0; // scroll offset in candles from right
 let chartCandleW = 8; // px на свечу (зум)
 
+function cpToggleSettings() {
+  const d = document.getElementById('cp-settings-drawer');
+  const b = document.getElementById('cp-settings-btn');
+  const open = d.style.display === 'none';
+  d.style.display = open ? 'flex' : 'none';
+  b.style.color = open ? '#FF4D9D' : '#6F648F';
+  b.style.borderColor = open ? 'rgba(255,77,157,0.4)' : 'rgba(255,255,255,0.1)';
+}
+
+// ─── Глобальный хелпер: цвет линии индикатора (с учётом пользовательских настроек) ──
+// Дефолты совпадают с _IL_LINE_DEFS, но переопределяются через il_line_colors_v1
+const _IL_COLOR_DEFAULTS = {
+  macd:      ['#B45CFF','#FF4D9D','#52F2C9','#FF4D7A'],
+  bb:        ['#3DD9FF','#FFD166','#3DD9FF'],
+  stoch:     ['#D65CFF','#FFB84D'],
+  ichimoku:  ['#FF006E','#3DD9FF','#52F2C9','#7B61FF','#D65CFF'],
+  alligator: ['#3DD9FF','#FF4D7A','#52F2C9'],
+  ma:        ['#FFD166','#FF8A4C'],
+  adx:       ['#D65CFF','#52F2C9','#FF4D7A'],
+  keltner:   ['#3DD9FF','#FFD166','#3DD9FF'],
+  elder_ray: ['#52F2C9','#FF4D7A'],
+  vortex:    ['#52F2C9','#FF4D7A'],
+  dmi:       ['#D65CFF','#52F2C9','#FF4D7A'],
+  mama:      ['#FF006E','#3DD9FF'],
+  kvo:       ['#B45CFF','#FF4D9D'],
+  donchian:  ['#3DD9FF','#A79BC9','#3DD9FF'],
+  envelopes: ['#3DD9FF','#FFD166','#3DD9FF'],
+  tsi:       ['#D65CFF','#FFB84D'],
+  cyber_cyc: ['#FF006E','#3DD9FF'],
+  ebs:       ['#D65CFF','#FF8A4C'],
+};
+function _ilC(key, idx) {
+  try {
+    const saved = JSON.parse(localStorage.getItem('il_line_colors_v1') || '{}');
+    if (saved[key] && saved[key][idx] != null) return saved[key][idx];
+  } catch(e) {}
+  return (_IL_COLOR_DEFAULTS[key] || [])[idx] || '#9090B8';
+}
+
 function chartSaveToken() {
   const v = document.getElementById('chart-token')?.value || '';
   try { localStorage.setItem('tinkoff_token', v); } catch(e){}
@@ -5765,9 +5808,9 @@ function _chartDrawMain() {
       }
       ctx.stroke();
     };
-    drawSMA(jaw,   '#4cc9f0'); // blue — Jaw
-    drawSMA(teeth, '#ff9f1c'); // orange — Teeth
-    drawSMA(lips,  '#52F2C9'); // green — Lips
+    drawSMA(jaw,   _ilC('alligator',0));
+    drawSMA(teeth, _ilC('alligator',1));
+    drawSMA(lips,  _ilC('alligator',2));
   }
 
   // Donchian Channel (20-period high/low)
@@ -5863,10 +5906,10 @@ function _chartDrawMain() {
       if (i >= 25) { const sA=(tenkanArr[i]!=null&&kijunArr[i]!=null)?(tenkanArr[i]+kijunArr[i])/2:null; senkAArr.push(sA); } else senkAArr.push(null);
       if (i >= 51) { const h=Math.max(...allH.slice(i-51,i+1)), l=Math.min(...allL.slice(i-51,i+1)); senkBArr.push((h+l)/2); } else senkBArr.push(null);
     }
-    drawIchiLine(tenkanArr, 'rgba(76,201,240,0.8)', []);
-    drawIchiLine(kijunArr,  'rgba(255,159,28,0.8)', []);
-    drawIchiLine(senkAArr,  'rgba(82,242,194,0.5)', [2,3]);
-    drawIchiLine(senkBArr,  'rgba(255,77,122,0.5)', [2,3]);
+    drawIchiLine(tenkanArr, _ilC('ichimoku',0)+'CC', []);
+    drawIchiLine(kijunArr,  _ilC('ichimoku',1)+'CC', []);
+    drawIchiLine(senkAArr,  _ilC('ichimoku',2)+'88', [2,3]);
+    drawIchiLine(senkBArr,  _ilC('ichimoku',3)+'88', [2,3]);
     // Kumo cloud fill between Senkou A and B
     ctx.save(); ctx.globalAlpha = 0.07;
     ctx.beginPath(); let ff2 = true;
@@ -6120,18 +6163,18 @@ function _chartDrawMACD() {
   hist.forEach((v,i)=>{
     if(v===null) return;
     const x=i/(n-1)*W, bh=Math.abs(toY(v)-H/2);
-    ctx.fillStyle=v>0?'rgba(96,164,161,0.4)':'rgba(199,27,82,0.4)';
+    ctx.fillStyle=v>0?_ilC('macd',2)+'99':_ilC('macd',3)+'99';
     v>0?ctx.fillRect(x-2,H/2-bh,4,bh):ctx.fillRect(x-2,H/2,4,bh);
   });
 
   // MACD line
-  ctx.beginPath(); ctx.strokeStyle='#4cc9f0'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.strokeStyle=_ilC('macd',0); ctx.lineWidth=1.5;
   let f=true;
   macd.forEach((v,i)=>{ if(v===null) return; const x=i/(n-1)*W,y=toY(v); f?ctx.moveTo(x,y):ctx.lineTo(x,y); f=false; });
   ctx.stroke();
 
   // Signal line
-  ctx.beginPath(); ctx.strokeStyle='#ff9f1c'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.strokeStyle=_ilC('macd',1); ctx.lineWidth=1.5;
   f=true;
   signal.forEach((v,i)=>{ if(v===null) return; const x=i/(n-1)*W,y=toY(v); f?ctx.moveTo(x,y):ctx.lineTo(x,y); f=false; });
   ctx.stroke();
@@ -6177,7 +6220,7 @@ function _chartDrawStoch() {
   });
   const drawLine=(arr,col)=>{ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=1.5;let f=true;
     arr.forEach((v,i)=>{if(v===null)return;const x=i/(n-1)*W,y=(1-v/100)*H;f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;});ctx.stroke();};
-  drawLine(pctK,'#4cc9f0'); drawLine(pctD,'#ff9f1c');
+  drawLine(pctK, _ilC('stoch',0)); drawLine(pctD, _ilC('stoch',1));
   const lk=pctK.filter(v=>v!==null).pop()||50;
   const ld=pctD.filter(v=>v!==null).pop()||50;
   const s=lk>80&&ld>80?'sell-strong':lk<20&&ld<20?'buy-strong':lk>ld&&lk<50?'buy':lk<ld&&lk>50?'sell':'neutral';
