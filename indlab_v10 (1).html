@@ -11158,7 +11158,8 @@ function ilRenderAnalysis() {
     if (m < 1440) { const h=Math.floor(m/60), min=m%60; return min ? `${h}ч ${min}м` : `${h}ч`; }
     return `${Math.round(m/1440)} дн`;
   };
-  const h5lbl = fmtHorizon(5), h10lbl = fmtHorizon(10), h15lbl = fmtHorizon(15), h30lbl = fmtHorizon(30);
+  const hLbl = (bars) => `${bars}св / ${fmtHorizon(bars)}`;
+  const h5lbl = hLbl(5), h10lbl = hLbl(10), h15lbl = hLbl(15), h30lbl = hLbl(30);
 
   // Цвета: достаточно яркие для тёмного фона
   const acc=(s)=>{
