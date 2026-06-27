@@ -4062,38 +4062,31 @@ def score_bb_keltner_squeeze(candles: list[HistoricCandle]) -> float:
     if len(mom_vals) >= 2:
         mom_slope = (delta - mom_vals[0]) / (abs(mom_vals[0]) or 1e-9)
 
-    # Длительность сжатия: сколько предыдущих баров тоже были в squeeze
-    # Документ: 1-2 бара = вялый выброс; 3-5 = нормальный; 7+ = очень резкий
-    squeeze_duration = 0
-    for c_prev in reversed(candles[:-1]):
-        wins = candles[max(0, len(candles) - P - 5):]
-        c_sl = [_to_f(c.close) for c in wins]
-        c_hi = [_to_f(c.high)  for c in wins]
-        c_lo = [_to_f(c.low)   for c in wins]
-        if len(c_sl) < P:
-            break
-        _bb_m = sum(c_sl[-P:]) / P
-        _bb_s = _std(c_sl[-P:])
-        _kc_m = _ema(c_sl, P)[-1]
-        _atr  = next((v for v in reversed(_true_atr_list(wins, 14)) if not math.isnan(v)), 0.0)
-        if (_bb_m + 2 * _bb_s < _kc_m + 1.5 * _atr) and (_bb_m - 2 * _bb_s > _kc_m - 1.5 * _atr):
-            squeeze_duration += 1
-        else:
-            break
-        if squeeze_duration >= 10:
-            break
-
-    # Множитель силы выброса от длительности сжатия
-    duration_mult = 1.0 + min(0.60, squeeze_duration * 0.08)  # +8% за каждый бар, max +60%
+    # Длительность сжатия — прокси через насколько текущая ширина BB ниже
+    # исторического медиана. Используем уже вычисленные closes/highs/lows.
+    # Считаем за последние 40 баров серию bb_std и смотрим сколько подряд
+    # были ниже медианы — без повторного вызова _true_atr_list.
+    duration_mult = 1.0
+    if len(closes) >= P + 10:
+        hist_window = min(40, len(closes) - P)
+        bb_stds = []
+        for k in range(hist_window):
+            slc = closes[-(P + hist_window) + k: -(hist_window) + k or len(closes)]
+            if len(slc) >= P:
+                bb_stds.append(_std(slc[-P:]))
+        if bb_stds:
+            med_std = sorted(bb_stds)[len(bb_stds) // 2]
+            # Текущая ширина в долях от медианной: <0.5 = глубокое сжатие
+            compression_depth = bb_std / (med_std or 1e-9)
+            # duration_mult: чем глубже и дольше сжатие — тем сильнее выброс
+            duration_mult = max(1.0, min(1.60, 1.0 + (1.0 - compression_depth) * 0.8))
 
     if squeeze_on:
-        # Компрессия активна: слабый сигнал в сторону momentum, усиленный длительностью
         direction = math.copysign(1, delta) if abs(delta) > 1e-9 else 0
-        base_strength = min(0.35, 0.15 + squeeze_duration * 0.02)
-        return round(direction * base_strength, 4)
+        # В сжатии: слабый сигнал по направлению momentum
+        return round(direction * 0.20, 4)
 
     if squeeze_off:
-        # Вышли из сжатия: сильный направленный сигнал, тем сильнее чем дольше был squeeze
         direction = math.copysign(1, delta) if abs(delta) > 1e-9 else 0
         strength = min(0.95, (0.45 + min(1.0, abs(mom_slope)) * 0.35) * duration_mult)
         return round(direction * strength, 4)
