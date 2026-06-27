@@ -11072,6 +11072,7 @@ async function ilRunAnalysis() {
     const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
     if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
     const closes = candles.map(c=>c.close);
+    const interval = 'день';
     if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
     const ss = _ilCalcAllSeries(candles, closes);
     // Режимная маска: trending = |5-bar return| ≥ медианы
@@ -11100,7 +11101,7 @@ async function ilRunAnalysis() {
       clusters.push(cl);
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss};
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,interval};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
@@ -11152,9 +11153,11 @@ function ilRenderAnalysis() {
     }
   } catch(e){}
 
+  const itvl = r.interval || 'день';
+
   // Легенда
-  html+=`<div style="margin-bottom:12px;font-size:9px;font-family:var(--mono);color:#40384e;line-height:1.9;">
-    <span style="color:#47b89a">≥62%</span> устойчивый сигнал &nbsp;·&nbsp;
+  html+=`<div style="margin-bottom:14px;font-size:9px;font-family:var(--mono);color:#40384e;line-height:2;">
+    <span style="color:#47b89a">≥62%</span> устойчивый &nbsp;·&nbsp;
     <span style="color:#8a7c3a">55–61%</span> умеренный &nbsp;·&nbsp;
     <span style="color:#40384e">&lt;55%</span> случайный &nbsp;·&nbsp;
     <span style="color:#8a3040">≤45%</span> антисигнал<br>
@@ -11168,16 +11171,16 @@ function ilRenderAnalysis() {
     // сортировка по h15 acc
     ids.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
     html+=`<div style="margin-bottom:18px;">
-      <div style="font-size:9px;color:${grp.color};opacity:0.7;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;padding-left:2px;">${grp.label}</div>
+      <div style="font-size:9px;color:${grp.color};opacity:0.65;letter-spacing:.1em;text-transform:uppercase;margin-bottom:0;padding:4px 6px;border-left:2px solid ${grp.color}44;">${grp.label}</div>
       <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">
-        <tr style="color:#2e2845;font-size:8px;border-bottom:1px solid #1e1830;">
-          <th style="text-align:left;padding:2px 6px;font-weight:400;">Индикатор</th>
-          <th style="padding:2px 8px;font-weight:400;">H5</th>
-          <th style="padding:2px 8px;font-weight:400;">H15</th>
-          <th style="padding:2px 8px;font-weight:400;">H30</th>
-          <th style="padding:2px 8px;font-weight:400;white-space:nowrap;">Тренд/Бок</th>
-          <th style="padding:2px 8px;font-weight:400;">Bias</th>
-        </tr>`;
+        <thead><tr style="background:#13101e;">
+          <th style="text-align:left;padding:5px 6px;font-weight:400;font-size:9px;color:#3a3050;border-bottom:1px solid #1e1830;">Индикатор</th>
+          <th style="padding:5px 10px;font-weight:600;font-size:10px;color:#4a4060;border-bottom:1px solid #1e1830;white-space:nowrap;">5 ${itvl}</th>
+          <th style="padding:5px 10px;font-weight:600;font-size:10px;color:#4a4060;border-bottom:1px solid #1e1830;white-space:nowrap;">15 ${itvl}</th>
+          <th style="padding:5px 10px;font-weight:600;font-size:10px;color:#4a4060;border-bottom:1px solid #1e1830;white-space:nowrap;">30 ${itvl}</th>
+          <th style="padding:5px 10px;font-weight:400;font-size:9px;color:#3a3050;border-bottom:1px solid #1e1830;white-space:nowrap;">Тренд / Бок</th>
+          <th style="padding:5px 10px;font-weight:400;font-size:9px;color:#3a3050;border-bottom:1px solid #1e1830;">Bias</th>
+        </tr></thead>`;
     ids.forEach(id=>{
       const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T, s15R=r.stats[id].h15R;
