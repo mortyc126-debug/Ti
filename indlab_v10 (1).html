@@ -503,7 +503,7 @@ input[type=range] { touch-action: none; }
   <button class="nav-btn" onclick="goPage('combos',this)">Комбинации</button>
   <button class="nav-btn" onclick="goPage('compare',this)">Сравнение</button>
   <button class="nav-btn" onclick="goPage('guide',this)">Справочник</button>
-  <button class="nav-btn" onclick="goPage('analysis',this)">Анализ</button>
+  <button class="nav-btn" onclick="goPage('analysis',this)">Точность</button>
 </div>
 
 <!-- ══ GUIDE PAGE ══ -->
@@ -11119,21 +11119,23 @@ function ilRenderAnalysis() {
   const r=_ilBtResults, el=document.getElementById('an-results');
   if(!el||!r) return;
 
-  // Точность: возвращает строку с цветом только по порогу, никаких градуировок цвета
+  // Точность: цвет только по смыслу, без лишней яркости
   const acc=(s)=>{
-    if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3050">—</span>';
+    if(!s||s.acc==null||s.n<5) return '<span style="color:#2e2845">—</span>';
     const p=Math.round(s.acc*100);
-    const col=p>=62?'#52F2C9':p>=55?'#B4A050':p<=45?'#C71B52':'#5a5070';
-    return `<span style="color:${col};font-weight:${p>=62||p<=45?'600':'400'}">${p}%</span>`;
+    if(p>=62) return `<span style="color:#47b89a">${p}%</span>`;
+    if(p>=55) return `<span style="color:#8a7c3a">${p}%</span>`;
+    if(p<=45) return `<span style="color:#8a3040">${p}%</span>`;
+    return `<span style="color:#40384e">${p}%</span>`;
   };
-  // Тренд vs боковик — показываем разницу
+  // Тренд vs боковик
   const regDiff=(sT,sR)=>{
-    if(!sT||sT.acc==null||sT.n<3||!sR||sR.acc==null||sR.n<3) return '<span style="color:#3a3050">—</span>';
+    if(!sT||sT.acc==null||sT.n<3||!sR||sR.acc==null||sR.n<3) return '<span style="color:#2e2845">—</span>';
     const tP=Math.round(sT.acc*100), rP=Math.round(sR.acc*100), d=tP-rP;
-    if(Math.abs(d)<3) return `<span style="color:#5a5070">≈${tP}/${rP}</span>`;
+    if(Math.abs(d)<3) return `<span style="color:#40384e">${tP}/${rP}</span>`;
     return d>0
-      ? `<span style="color:#52F2C9" title="лучше в тренде">${tP}<span style="opacity:.5">/${rP}</span></span>`
-      : `<span style="color:#A78BFA" title="лучше в боковике">${rP}<span style="opacity:.5">/${tP}</span></span>`;
+      ? `<span style="color:#3a8a70" title="лучше в тренде">${tP}<span style="color:#2e2845">/${rP}</span></span>`
+      : `<span style="color:#6b5fa0" title="лучше в боковике">${rP}<span style="color:#2e2845">/${tP}</span></span>`;
   };
 
   let html='';
@@ -11151,9 +11153,12 @@ function ilRenderAnalysis() {
   } catch(e){}
 
   // Легенда
-  html+=`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:9px;font-family:var(--mono);color:var(--text3);">
-    <span>Точность: <span style="color:#52F2C9">≥62%</span> сильная · <span style="color:#B4A050">55–61%</span> умеренная · <span style="color:#5a5070">&lt;55%</span> случайная · <span style="color:#C71B52">≤45%</span> антисигнал</span>
-    <span>Тренд/Боков: зелёный = лучше в тренде, фиолетовый = лучше в боковике</span>
+  html+=`<div style="margin-bottom:12px;font-size:9px;font-family:var(--mono);color:#40384e;line-height:1.9;">
+    <span style="color:#47b89a">≥62%</span> устойчивый сигнал &nbsp;·&nbsp;
+    <span style="color:#8a7c3a">55–61%</span> умеренный &nbsp;·&nbsp;
+    <span style="color:#40384e">&lt;55%</span> случайный &nbsp;·&nbsp;
+    <span style="color:#8a3040">≤45%</span> антисигнал<br>
+    Тренд/Боков: <span style="color:#3a8a70">зелёный</span> = лучше в тренде &nbsp;·&nbsp; <span style="color:#6b5fa0">фиолетовый</span> = лучше в боковике
   </div>`;
 
   // По группам
@@ -11162,16 +11167,16 @@ function ilRenderAnalysis() {
     if(!ids.length)return;
     // сортировка по h15 acc
     ids.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
-    html+=`<div style="margin-bottom:14px;">
-      <div style="font-size:9px;color:${grp.color};letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding-left:2px;">${grp.label}</div>
+    html+=`<div style="margin-bottom:18px;">
+      <div style="font-size:9px;color:${grp.color};opacity:0.7;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;padding-left:2px;">${grp.label}</div>
       <table style="width:100%;border-collapse:collapse;font-size:10px;font-family:var(--mono);">
-        <tr style="color:#3a3050;font-size:9px;">
-          <th style="text-align:left;padding:3px 6px;font-weight:400;">Индикатор</th>
-          <th style="padding:3px 6px;font-weight:400;">H5</th>
-          <th style="padding:3px 6px;font-weight:400;">H15</th>
-          <th style="padding:3px 6px;font-weight:400;">H30</th>
-          <th style="padding:3px 6px;font-weight:400;white-space:nowrap;">Тренд/Бок H15</th>
-          <th style="padding:3px 6px;font-weight:400;white-space:nowrap;">Bias</th>
+        <tr style="color:#2e2845;font-size:8px;border-bottom:1px solid #1e1830;">
+          <th style="text-align:left;padding:2px 6px;font-weight:400;">Индикатор</th>
+          <th style="padding:2px 8px;font-weight:400;">H5</th>
+          <th style="padding:2px 8px;font-weight:400;">H15</th>
+          <th style="padding:2px 8px;font-weight:400;">H30</th>
+          <th style="padding:2px 8px;font-weight:400;white-space:nowrap;">Тренд/Бок</th>
+          <th style="padding:2px 8px;font-weight:400;">Bias</th>
         </tr>`;
     ids.forEach(id=>{
       const s5=r.stats[id].h5, s15=r.stats[id].h15, s30=r.stats[id].h30;
@@ -11181,14 +11186,14 @@ function ilRenderAnalysis() {
       const isBest=s=>s&&best&&s===best&&best.acc>=0.55;
       const bias=s15?.bias;
       const biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—';
-      const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#FF9F40':'#3a3050';
-      html+=`<tr style="border-top:1px solid #1a1028;">
-        <td style="padding:4px 6px;color:var(--text2);">${IL_NAMES[id]||id}</td>
-        <td style="text-align:center;padding:4px 6px;${isBest(s5)?'background:rgba(255,255,255,0.03);border-radius:4px;':''}">${acc(s5)}</td>
-        <td style="text-align:center;padding:4px 6px;${isBest(s15)?'background:rgba(255,255,255,0.03);border-radius:4px;':''}">${acc(s15)}</td>
-        <td style="text-align:center;padding:4px 6px;${isBest(s30)?'background:rgba(255,255,255,0.03);border-radius:4px;':''}">${acc(s30)}</td>
-        <td style="text-align:center;padding:4px 6px;">${regDiff(s15T,s15R)}</td>
-        <td style="text-align:center;padding:4px 6px;color:${biasCol}">${biasStr}</td>
+      const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#7a6030':'#2e2845';
+      html+=`<tr style="border-top:1px solid #180f28;">
+        <td style="padding:5px 6px;color:#7a7090;">${IL_NAMES[id]||id}</td>
+        <td style="text-align:center;padding:5px 8px;">${acc(s5)}</td>
+        <td style="text-align:center;padding:5px 8px;">${acc(s15)}</td>
+        <td style="text-align:center;padding:5px 8px;">${acc(s30)}</td>
+        <td style="text-align:center;padding:5px 8px;">${regDiff(s15T,s15R)}</td>
+        <td style="text-align:center;padding:5px 8px;color:${biasCol}">${biasStr}</td>
       </tr>`;
     });
     html+=`</table></div>`;
