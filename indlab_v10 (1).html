@@ -6990,6 +6990,10 @@ const _SYS_OPTIMAL = [
   { id:'supertrend', label:'SuperTrend',      role:'Динамичный стоп и уровни' },
   { id:'vortex',     label:'Vortex',          role:'Опережающий сигнал разворота' },
   { id:'envelopes',  label:'Envelopes',       role:'Волатильность в контексте тренда' },
+  // Волатильность
+  { id:'bb_width',   label:'BB Width',        role:'Компрессия — история ширины, исторический minimum = пружина' },
+  { id:'hist_vol',   label:'Historical Vol',  role:'Режим волатильности — HV относительно своего max/min' },
+  { id:'chaikin_vol',label:'Chaikin Vol',     role:'Асимметрия спреда — кто давит: покупатели или продавцы' },
 ];
 
 function _sysOptimalSection() {
@@ -7120,6 +7124,14 @@ function _sysRenderStaticSections() {
       {label:'Согласие денежного потока (здоровье каскада)', lc:NC, text:'На каскаде: OBV растёт в сторону + A/D растёт в сторону + Chaikin в экстремуме + MFI в верхней крайности + EOM высокий. Все пять согласны = каскад здоров, держи позицию. Один переключился = осторожно.'},
       {label:'Денежный скепсис (большая свеча = шум)', lc:NC, text:'Большая свеча на объёме выглядит как каскад. Проверяешь: EOM низкий (объём неэффективен) + CMF нейтральный (не концентрировался) + PVT не подтверждает + VO нет тренда (всплеск). Объём был, но это охота на стопах, не каскад. Не входить.'},
       {label:'Боковик максимального сжатия', lc:NC, text:'VO близко к нулю (нет тренда объёма) + EOM низкий (компрессия, деньги входят неэффективно) + NVI/PVI расходятся максимально (асимметрия максимальна) + CMF в экстремуме какой-то зоны (деньги накопились на краю). Денежный поток сжат = вот-вот выпустит.'},
+    ]),
+
+    sec('🌡', 'Волатильность · Комбо-паттерны', [
+      {label:'Пятислойная компрессия (максимальный squeeze)', lc:NC, text:'1. BB Width на историческом minimum · 2. HV ниже своего 100-барного minimum · 3. Chaikin Vol сжимается (−20%+) · 4. StdDev в 2–3× ниже нормы · 5. ATR ниже своего среднего. Все пять = рынок в ненормальной тишине, выброс неизбежен. Ждёшь первый бар с объёмом и входишь.'},
+      {label:'Тройное ускорение (пробой подтверждён)', lc:NC, text:'1. BB Width удвоилась за 5 баров · 2. HV удвоилась за 10 баров · 3. Chaikin Vol +30%+ с нарастанием объёма. Три независимые меры волатильности говорят одно = пробой реальный, не ложный. Входишь агрессивно.'},
+      {label:'Асимметрия спредов (куда давят)', lc:NC, text:'Chaikin Vol: верхние тени больше нижних = давление вверху, цена хочет вниз. Нижние тени больше = давление внизу, цена хочет вверх. + BB %B: если спред вверх а %B ниже 0.5 = разворотный сетап. Если спред вниз а %B выше 0.5 = антисигнал.'},
+      {label:'Фильтр ложного объёма (волатильность vs объём)', lc:NC, text:'Большой объём без расширения волатильности (BB Width, HV, Chaikin Vol без изменений) = поглощение, не движение. Объём поглотили внутри диапазона. Наоборот: волатильность растёт без объёма = тонкий рынок, манипуляция. Настоящий пробой = и объём и волатильность растут вместе.'},
+      {label:'Волатильность vs объём (идеальный вход)', lc:NC, text:'HV падает к минимуму + BB Width squeeze + Chaikin Vol −20% (сжатие подтверждено тремя мерами). Объём при этом выше нормы. Объём аккумулируется в тихий период = крупный входит незаметно. Когда волатильность взорвётся = каскад поддержан.'},
     ]),
 
     sec('📈', 'Трендовые инструменты · Комбо', [
@@ -11244,11 +11256,24 @@ function renderAnalysis() {
         const v = bb[n-1];
         if (v) {
           const pct = (v.upper > v.lower) ? (closes[n-1]-v.lower)/(v.upper-v.lower) : 0.5;
-          if(pct>1) items.push({type:'bullish', text:`%B = ${pct.toFixed(2)} — цена выше верхней полосы: в сильном тренде %B > 1 — норма, не разворот`});
-          else if(pct<0) items.push({type:'bearish', text:`%B = ${pct.toFixed(2)} — цена ниже нижней полосы: в нисходящем тренде может ходить <0 долго`});
-          else if(pct>0.8) items.push({type:'bullish', text:`%B = ${pct.toFixed(2)}: верхняя половина BB — покупатели контролируют`});
-          else if(pct<0.2) items.push({type:'bearish', text:`%B = ${pct.toFixed(2)}: нижняя половина BB — продавцы контролируют`});
-          else items.push({type:'neutral', text:`%B = ${pct.toFixed(2)}: цена в середине Bollinger — нет выраженной силы`});
+          if(pct>1) items.push({type:'bullish', text:`%B = ${pct.toFixed(2)} — цена выше верхней полосы: в тренде норма`});
+          else if(pct<0) items.push({type:'bearish', text:`%B = ${pct.toFixed(2)} — ниже нижней полосы`});
+          else if(pct>0.8) items.push({type:'bullish', text:`%B = ${pct.toFixed(2)}: верхняя половина — покупатели контролируют`});
+          else if(pct<0.2) items.push({type:'bearish', text:`%B = ${pct.toFixed(2)}: нижняя половина — продавцы контролируют`});
+          else items.push({type:'neutral', text:`%B = ${pct.toFixed(2)}: цена в середине Bollinger — нитка зона`});
+          // Неклассика 1: скорость прохождения %B от края к краю
+          const bbHist=bb.map((bv,i)=>bv&&closes[i]&&(bv.upper>bv.lower)?(closes[i]-bv.lower)/(bv.upper-bv.lower):null).filter(v=>v!==null);
+          if (bbHist.length>=5) {
+            const speed5 = Math.abs(bbHist[bbHist.length-1] - bbHist[bbHist.length-5]);
+            if (speed5 > 0.6) items.push({type:pct>0.5?'bullish':'bearish', text:`%B прыгнул на ${(speed5*100).toFixed(0)}% за 5 баров — взрывное расширение, цена вырвалась агрессивно. Каскад`});
+            else if (speed5 < 0.1 && Math.abs(pct-0.5)<0.15) items.push({type:'neutral', text:`%B стоит у центра — нитка. Когда резко скакнет в крайность = выброс`});
+          }
+          // Неклассика 2: дивергенция %B и цены
+          if (bbHist.length>=20) {
+            const priceHi=Math.max(...closes.slice(-5))>Math.max(...closes.slice(-25,-5));
+            const bbHi=bbHist[bbHist.length-1]>Math.max(...bbHist.slice(-20,-1))*0.95;
+            if (priceHi && !bbHi) items.push({type:'bearish', text:`Цена новый хай — %B не дошёл до 1 (${pct.toFixed(2)}). Дивергенция: затухание импульса`});
+          }
         }
         if(!items.length) items.push({type:'neutral',text:'BB %B активен'});
         html += makeCard('BB %B (неклассически)', items, 'bbpb');
@@ -11259,11 +11284,30 @@ function renderAnalysis() {
         const items = [];
         const bb = _chartCalcBB(closes, 20, 2);
         const widths = bb.map((v,i)=>v&&closes[i]?((v.upper-v.lower)/closes[i]*100):null).filter(v=>v!==null);
-        const now = widths[widths.length-1];
-        const minW = Math.min(...widths.slice(-50));
-        if(now/minW < 1.2) items.push({type:'neutral', text:`BB Width минимальна (${now.toFixed(2)}%) — Squeeze. Пробой будет резким и ложных сигналов мало`});
-        else if(now/minW > 3) items.push({type:'neutral', text:`BB Width расширена (${now.toFixed(2)}%) — волатильность высокая: обычно конец тренда, а не начало`});
-        else items.push({type:'neutral', text:`BB Width = ${now.toFixed(2)}% — нормальная волатильность`});
+        const wLen = widths.length;
+        const now = widths[wLen-1];
+        const minW50 = Math.min(...widths.slice(-50));
+        const minW100 = wLen>=100 ? Math.min(...widths.slice(-100)) : minW50;
+        const maxW100 = wLen>=100 ? Math.max(...widths.slice(-100)) : Math.max(...widths);
+        // Позиция ширины в историческом диапазоне (0=min, 1=max)
+        const wRank = maxW100>minW100 ? (now-minW100)/(maxW100-minW100) : 0.5;
+        if (wRank < 0.1) items.push({type:'neutral', text:`BB Width ${now.toFixed(2)}% — исторический минимум (нижние 10% диапазона). Максимальная компрессия — пружина сжата до предела`});
+        else if (wRank < 0.2) items.push({type:'neutral', text:`BB Width ${now.toFixed(2)}% — очень узко (нижние 20%). Компрессия нарастает, пробой ждать скоро`});
+        else if (wRank > 0.85) items.push({type:'neutral', text:`BB Width ${now.toFixed(2)}% — исторически широко (верхние 15%). Волатильность на пике, обычно конец тренда`});
+        else items.push({type:'neutral', text:`BB Width ${now.toFixed(2)}% — ${(wRank*100).toFixed(0)}-й перцентиль своего диапазона`});
+        // Неклассика: ускорение расширения — выброс уже идёт?
+        if (wLen >= 10) {
+          const w5ago = widths[wLen-5], w10ago = widths[wLen-10];
+          const expand5 = w5ago>0 ? (now-w5ago)/w5ago*100 : 0;
+          const expand10 = w10ago>0 ? (now-w10ago)/w10ago*100 : 0;
+          if (expand5 > 30 && expand5 > expand10*0.5) items.push({type:'neutral', text:`Ширина +${expand5.toFixed(0)}% за 5 баров — ускоренное расширение. Выброс уже в ходу, ловить поздно`});
+          else if (expand10 > 50 && expand5 < 10) items.push({type:'neutral', text:`Ширина расширилась на ${expand10.toFixed(0)}% за 10 баров, но замедляется — волатильность на паузе после выброса`});
+          else if (w10ago > 0 && now < w10ago * 0.85) items.push({type:'neutral', text:`Ширина сжимается (−${((1-now/w10ago)*100).toFixed(0)}% за 10 баров) — компрессия активная, накопление`});
+        }
+        // Минимальная ширина как уровень: насколько далеко от исторического squeeze?
+        if (wLen >= 50 && now/minW100 > 1.5) {
+          items.push({type:'neutral', text:`Текущая ширина в ${(now/minW100).toFixed(1)}× выше исторического minimum (${minW100.toFixed(2)}%). Потенциал компрессии ещё есть`});
+        }
         html += makeCard('BB Width (неклассически)', items, 'bbw');
       }
     } else if (idL === 'dmi') {
@@ -11308,15 +11352,47 @@ function renderAnalysis() {
       if (n >= 20) {
         const items = [];
         const rets = closes.map((c,i)=>i===0?0:Math.log(c/closes[i-1]));
-        const slice=rets.slice(n-20);
-        const avg=slice.reduce((a,b)=>a+b,0)/20;
-        const vari=slice.reduce((a,b)=>a+(b-avg)**2,0)/19;
-        const hvPct=Math.sqrt(vari*252)*100;
-        if(hvPct>60) items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — экстремально высокая: риск велик в обе стороны`});
-        else if(hvPct>30) items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — повышенная: можно продавать опционы`});
-        else if(hvPct<15) items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — низкая: пружина сжата`});
-        else items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — нормальный диапазон`});
-        html += makeCard('Историческая волатильность', items, 'hv');
+        // HV функция для любого периода
+        const calcHV = (per) => {
+          if (n < per) return null;
+          const sl = rets.slice(n-per);
+          const avg = sl.reduce((a,b)=>a+b,0)/per;
+          return Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/(per-1)*252)*100;
+        };
+        const hv20 = calcHV(20);
+        const hv50 = calcHV(50);
+        // Строим ряд HV20 для истории
+        const hvSeries = [];
+        for (let i=20; i<=n; i++) {
+          const sl=rets.slice(i-20,i), avg=sl.reduce((a,b)=>a+b,0)/20;
+          hvSeries.push(Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/19*252)*100);
+        }
+        const hvMax100 = hvSeries.length>=100 ? Math.max(...hvSeries.slice(-100)) : Math.max(...hvSeries);
+        const hvMin100 = hvSeries.length>=100 ? Math.min(...hvSeries.slice(-100)) : Math.min(...hvSeries);
+        const hvRank = (hvMax100>hvMin100) ? (hv20-hvMin100)/(hvMax100-hvMin100) : 0.5;
+        if(hv20>60) items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — экстремально высокая (${(hvRank*100).toFixed(0)}-й перцентиль). Риск велик в обе стороны`});
+        else if(hv20>30) items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — повышенная (${(hvRank*100).toFixed(0)}-й перцентиль). Опционные премии высоки`});
+        else if(hv20<15) items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — низкая (${(hvRank*100).toFixed(0)}-й перцентиль). Рынок в спячке, взрыв готовится`});
+        else items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — нормально (${(hvRank*100).toFixed(0)}-й перцентиль в 100-барном диапазоне)`});
+        // Неклассика 1: HV относительно собственного max/min
+        if (hvRank < 0.1) items.push({type:'neutral', text:`HV на историческом минимуме — максимальная компрессия. Это состояние предшествует резким движениям`});
+        else if (hvRank > 0.9) items.push({type:'neutral', text:`HV на историческом максимуме — паника или кульминация. Волатильность обычно разворачивается вниз отсюда`});
+        // Неклассика 2: скорость роста HV (удвоение = сигнал взрыва)
+        if (hvSeries.length >= 10) {
+          const hv10ago = hvSeries[hvSeries.length-10];
+          if (hv10ago > 0) {
+            const hvSpeed = hv20/hv10ago;
+            if (hvSpeed > 2) items.push({type:'neutral', text:`HV удвоилась за 10 баров (${hv10ago.toFixed(0)}% → ${hv20.toFixed(0)}%) — взрывной рост волатильности, новый режим`});
+            else if (hvSpeed < 0.5) items.push({type:'neutral', text:`HV упала вдвое за 10 баров (${hv10ago.toFixed(0)}% → ${hv20.toFixed(0)}%) — резкое успокоение, компрессия начинается`});
+          }
+        }
+        // Неклассика 3: HV10 vs HV50 — краткосрочная vs долгосрочная
+        const hv10 = calcHV(10);
+        if (hv10 && hv50) {
+          if (hv10 > hv50*1.5) items.push({type:'neutral', text:`HV(10) = ${hv10.toFixed(0)}% >> HV(50) = ${hv50.toFixed(0)}% — кратко-срочный взрыв на фоне нормальной долгосрочной. Локальное событие`});
+          else if (hv10 < hv50*0.6) items.push({type:'neutral', text:`HV(10) = ${hv10.toFixed(0)}% << HV(50) = ${hv50.toFixed(0)}% — сжатие ниже долгосрочной нормы. Тихий омут`});
+        }
+        html += makeCard('Историческая волатильность (неклассически)', items, 'hv');
       }
     } else if (idL === 'cmo') {
       const n = candles.length;
@@ -11487,13 +11563,26 @@ function renderAnalysis() {
       const per=20;
       if (n >= per) {
         const items = [];
-        const sl=closes.slice(n-per);
-        const avg=sl.reduce((a,b)=>a+b,0)/per;
-        const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/(per-1));
-        const sdPct=sd/avg*100;
-        if(sdPct>4) items.push({type:'neutral', text:`σ = ${sdPct.toFixed(1)}% — высокое отклонение: рынок в возбуждении, уровни ненадёжны`});
-        else if(sdPct<1) items.push({type:'neutral', text:`σ = ${sdPct.toFixed(1)}% — очень низкое: флэт/компрессия, пробой будет резким`});
-        else items.push({type:'neutral', text:`σ = ${sdPct.toFixed(1)}% цены — нормальный разброс`});
+        // Строим ряд SD для истории
+        const calcSD = (slice) => { const avg=slice.reduce((a,b)=>a+b,0)/slice.length; return Math.sqrt(slice.reduce((a,b)=>a+(b-avg)**2,0)/(slice.length-1)); };
+        const sdSeries = [];
+        for (let i=per; i<=n; i++) { const sl=closes.slice(i-per,i); sdSeries.push(calcSD(sl)/sl[sl.length-1]*100); }
+        const sdNow = sdSeries[sdSeries.length-1];
+        const sdAvg100 = sdSeries.length>=100 ? sdSeries.slice(-100).reduce((a,b)=>a+b,0)/100 : sdSeries.reduce((a,b)=>a+b,0)/sdSeries.length;
+        const sdRatio = sdAvg100>0 ? sdNow/sdAvg100 : 1;
+        if(sdNow>4) items.push({type:'neutral', text:`σ = ${sdNow.toFixed(1)}% (в ${sdRatio.toFixed(1)}× от нормы) — высокое: рынок возбуждён, уровни ненадёжны`});
+        else if(sdNow<1) items.push({type:'neutral', text:`σ = ${sdNow.toFixed(1)}% (в ${sdRatio.toFixed(1)}× от нормы) — минимум: флэт/компрессия, пробой будет резким`});
+        else items.push({type:'neutral', text:`σ = ${sdNow.toFixed(1)}% — в ${sdRatio.toFixed(1)}× от 100-барной нормы (${sdAvg100.toFixed(1)}%)`});
+        // Неклассика 1: σ относительно своей 100-барной средней = режим
+        if (sdRatio > 2) items.push({type:'neutral', text:`σ вдвое выше нормы — экстраординарный всплеск. Либо новый тренд, либо паника, либо скоро успокоение`});
+        else if (sdRatio < 0.4) items.push({type:'neutral', text:`σ в 2.5× ниже нормы — ненормальная тишина. Рынок замер, что-то готовится`});
+        // Неклассика 2: скорость прыжка σ
+        if (sdSeries.length >= 5) {
+          const sd5ago = sdSeries[sdSeries.length-5];
+          const sdJump = sd5ago>0 ? sdNow/sd5ago : 1;
+          if (sdJump > 1.8) items.push({type:'neutral', text:`σ выросла в ${sdJump.toFixed(1)}× за 5 баров — резкий прыжок отклонения. Рынок вошёл в новую фазу`});
+          else if (sdJump < 0.55) items.push({type:'neutral', text:`σ упала в ${(1/sdJump).toFixed(1)}× за 5 баров — быстрое успокоение. Компрессия началась`});
+        }
         html += makeCard('Стандартное отклонение (неклассически)', items, 'stddev');
       }
     } else if (idL.includes('envelopes')) {
@@ -11551,9 +11640,26 @@ function renderAnalysis() {
         const now=ema[n-1], prev10=ema[n-1-per];
         if(now&&prev10) {
           const chg=(now-prev10)/prev10*100;
-          if(chg>20) items.push({type:'neutral', text:`Chaikin Vol +${chg.toFixed(0)}% — диапазон расширяется: сделки крупных участников`});
-          else if(chg<-20) items.push({type:'neutral', text:`Chaikin Vol ${chg.toFixed(0)}% — диапазон сжимается: нарастает компрессия`});
-          else items.push({type:'neutral', text:`Chaikin Volatility ${chg.toFixed(0)}% — умеренное изменение диапазона`});
+          if(chg>20) items.push({type:'neutral', text:`Chaikin Vol +${chg.toFixed(0)}% — диапазон расширяется: крупные участники активны`});
+          else if(chg<-20) items.push({type:'neutral', text:`Chaikin Vol ${chg.toFixed(0)}% — диапазон сжимается, нарастает компрессия`});
+          else items.push({type:'neutral', text:`Chaikin Vol ${chg.toFixed(0)}% — умеренное изменение диапазона`});
+          // Неклассика 1: асимметрия спреда — верх vs низ свечи
+          // upperSpread = high−close (потенциал отклонения вверх от закрытия)
+          // lowerSpread = close−low (потенциал отклонения вниз)
+          const upSpreads = candles.slice(-per).map(c=>c.high-c.close);
+          const dnSpreads = candles.slice(-per).map(c=>c.close-c.low);
+          const avgUp = upSpreads.reduce((a,b)=>a+b,0)/per;
+          const avgDn = dnSpreads.reduce((a,b)=>a+b,0)/per;
+          const spreadAsym = (avgUp+avgDn)>0 ? (avgUp-avgDn)/(avgUp+avgDn) : 0;
+          if (spreadAsym > 0.2) items.push({type:'bearish', text:`Верхние тени ${(avgUp/closes[n-1]*100).toFixed(2)}% > нижние ${(avgDn/closes[n-1]*100).toFixed(2)}% — диапазон асимметричен вверх: давление продаж у хаёв`});
+          else if (spreadAsym < -0.2) items.push({type:'bullish', text:`Нижние тени ${(avgDn/closes[n-1]*100).toFixed(2)}% > верхние ${(avgUp/closes[n-1]*100).toFixed(2)}% — диапазон асимметричен вниз: покупки у лоёв`});
+          else items.push({type:'neutral', text:`Спред симметричен: верх ${(avgUp/closes[n-1]*100).toFixed(2)}% ≈ низ ${(avgDn/closes[n-1]*100).toFixed(2)}% — обоюдная неопределённость`});
+          // Неклассика 2: дивергенция волатильность vs объём
+          const avgVol10 = candles.slice(-per).reduce((a,c)=>a+(c.volume||0),0)/per;
+          const avgVol20 = n>=20 ? candles.slice(-20).reduce((a,c)=>a+(c.volume||0),0)/20 : avgVol10;
+          const volRatio = avgVol20>0 ? avgVol10/avgVol20 : 1;
+          if (chg > 15 && volRatio < 0.85) items.push({type:'neutral', text:`Диапазон расширился, но объём упал (×${volRatio.toFixed(2)}). Волатильность без участников — ложный импульс`});
+          else if (chg < -10 && volRatio > 1.3) items.push({type:'neutral', text:`Диапазон сжался, но объём растёт (×${volRatio.toFixed(2)}). Тихое накопление на сжатии — сильный сигнал`});
         }
         if(!items.length) items.push({type:'neutral',text:'Chaikin Volatility активен'});
         html += makeCard('Chaikin Volatility (неклассически)', items, 'chaikvol');
