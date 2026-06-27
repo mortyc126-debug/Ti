@@ -161,6 +161,7 @@ def build_levels(candles: list) -> LevelSet:
     # ── tier 1: недельные и месячные H/L ──
     week_days  = past_days[-5:]  if len(past_days) >= 5  else past_days
     month_days = past_days[-22:] if len(past_days) >= 22 else past_days
+    year_days  = past_days[-252:] if len(past_days) >= 252 else past_days
 
     if week_days:
         wh = max(by_day[d]["h"] for d in week_days)
@@ -174,6 +175,40 @@ def build_levels(candles: list) -> LevelSet:
         levels.append(PriceLevel(mh, "month_high", 1))
         levels.append(PriceLevel(ml, "month_low",  1))
 
+    # 52W high/low — sweep таких уровней один из самых надёжных сигналов
+    if len(year_days) > len(month_days):
+        yh = max(by_day[d]["h"] for d in year_days)
+        yl = min(by_day[d]["l"] for d in year_days)
+        levels.append(PriceLevel(yh, "year_high", 1))
+        levels.append(PriceLevel(yl, "year_low",  1))
+
+    # Weekly Open: открытие текущей торговой недели (ICT — институционалы
+    # измеряют PnL от Weekly Open → их хеджирование создаёт реакцию)
+    import datetime as _dt
+    current_weekday = today.weekday()  # 0=пн, 4=пт
+    week_start = today - _dt.timedelta(days=current_weekday)
+    week_open_day = next((d for d in sorted_days if d >= week_start), None)
+    if week_open_day and week_open_day in by_day:
+        levels.append(PriceLevel(by_day[week_open_day]["o"], "weekly_open", 1))
+
+    # Significant High/Low: экстремум при объёме ≥ 2× среднего = там были
+    # крупные продавцы/покупатели, они стоят снова. Tier 1.
+    avg_vol_all = _avg_volume(candles, 40)
+    if avg_vol_all > 0:
+        # Ищем в последних 60 торговых днях дни с аномальным объёмом
+        sig_window_days = past_days[-60:] if len(past_days) >= 60 else past_days
+        for d in sig_window_days:
+            day_candles = [c for c in candles if c.time.date() == d]
+            if not day_candles:
+                continue
+            day_vol = sum(float(c.volume) for c in day_candles)
+            if day_vol >= 2.0 * avg_vol_all * len(day_candles):
+                # Значимый день — его H/L это Significant High/Low
+                dh = max(_f(c.high) for c in day_candles)
+                dl = min(_f(c.low)  for c in day_candles)
+                levels.append(PriceLevel(dh, "sig_high", 1))
+                levels.append(PriceLevel(dl, "sig_low",  1))
+
     # ── tier 2: вчерашние H/L/O/C + сегодняшние H/L до текущего бара ──
     if past_days:
         prev = past_days[-1]
@@ -183,8 +218,19 @@ def build_levels(candles: list) -> LevelSet:
         levels.append(PriceLevel(pd["o"], "day_open",  2))
         levels.append(PriceLevel(pd["c"], "day_close", 2))
 
+        # Overnight Gap: открытие сегодня vs закрытие вчера — граница гэпа
+        # это FVG на дневном уровне, там обрывается объём.
+        today_candles = [c for c in candles if c.time.date() == today]
+        if today_candles:
+            today_open = _f(today_candles[0].open)
+            prev_close = pd["c"]
+            gap_pct = abs(today_open - prev_close) / prev_close if prev_close > 0 else 0.0
+            if gap_pct >= 0.003:  # гэп ≥ 0.3%
+                levels.append(PriceLevel(today_open,  "gap_open",  2))
+                levels.append(PriceLevel(prev_close,  "gap_close", 2))
+
     # Сегодняшние экстремумы (до текущего бара) — важны внутри дня
-    today_candles = [c for c in candles if c.time.date() == today]
+    today_candles = [c for c in candles if c.time.date() == today]  # может быть определён выше, не критично
     if len(today_candles) > 1:
         th = max(_f(c.high) for c in today_candles[:-1])
         tl = min(_f(c.low)  for c in today_candles[:-1])

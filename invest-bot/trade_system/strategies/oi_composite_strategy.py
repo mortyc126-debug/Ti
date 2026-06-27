@@ -4717,6 +4717,183 @@ def _tp_extension_mult(candles: list, is_long: bool) -> float:
 
 # ── SMC / ICT ─────────────────────────────────────────────────────────────────
 
+def score_level_quality(candles: list[HistoricCandle]) -> float:
+    """
+    Качество текущего уровня: сколько независимых методов его «видят».
+
+    Алгоритм «3 из 5» (по документу):
+      1. Order Block (свеча с объёмом ≥ 2×) рядом с ценой
+      2. POC / HVN Volume Profile рядом (кластер ≈ HVN)
+      3. Значимый H/L структуры (Significant High/Low, объём × 2+)
+      4. Weekly Open / 52W High/Low
+      5. Второе касание с реакцией (подтверждённый уровень)
+
+    Score = (count / 5) × direction × strength_mult.
+    Сигнал в направлении отскока от уровня (бычий снизу, медвежий сверху).
+
+    Composite POC cluster: несколько недельных POC в 0.5% зоне → ×1.3.
+    """
+    if len(candles) < 50:
+        return 0.0
+    try:
+        def _h(c): return _to_f(c.high)
+        def _l(c): return _to_f(c.low)
+        def _c(c): return _to_f(c.close)
+        def _o(c): return _to_f(c.open)
+        def _v(c): return _to_f(c.volume)
+
+        atr     = _compute_atr(candles)
+        price   = _c(candles[-1])
+        avg_vol = sum(_v(c) for c in candles[-20:]) / 20
+        if atr <= 0 or avg_vol <= 0:
+            return 0.0
+
+        prox = 1.2 * atr  # «рядом» = 1.2 ATR
+
+        criteria = 0
+        direction = 0.0  # +1 бычий, -1 медвежий
+
+        # ── 1. Order Block: последняя медвежья/бычья свеча перед импульсом ──
+        for i in range(2, min(25, len(candles) - 1)):
+            c_ob  = candles[-(i + 1)]
+            c_imp = candles[-i]
+            imp_size = abs(_c(c_imp) - _o(c_imp))
+            if imp_size < 1.2 * atr:
+                continue
+            is_bull_ob = _c(c_ob) < _o(c_ob) and _c(c_imp) > _o(c_imp)
+            is_bear_ob = _c(c_ob) > _o(c_ob) and _c(c_imp) < _o(c_imp)
+            ob_lo = min(_o(c_ob), _c(c_ob), _l(c_ob))
+            ob_hi = max(_o(c_ob), _c(c_ob), _h(c_ob))
+            if is_bull_ob and ob_lo <= price <= ob_hi + prox:
+                criteria += 1
+                direction += 1.0
+                break
+            if is_bear_ob and ob_lo - prox <= price <= ob_hi:
+                criteria += 1
+                direction -= 1.0
+                break
+
+        # ── 2. POC / HVN: зона с концентрацией объёма рядом ──
+        win = min(100, len(candles) - 1)
+        seg = candles[-win:-1]
+        if seg:
+            prices_v: list[tuple[float, float]] = [
+                ((_h(c) + _l(c)) / 2, _v(c)) for c in seg
+            ]
+            prices_v.sort(key=lambda x: x[0])
+            total_v   = sum(v for _, v in prices_v) or 1.0
+            top_pv    = max(prices_v, key=lambda x: x[1])
+            poc_price = top_pv[0]
+            if abs(poc_price - price) <= prox:
+                criteria += 1
+                direction += 1.0 if price < poc_price else -1.0
+
+        # ── 3. Significant High/Low: хай/лой на объёме ≥ 2× среднего ──
+        sig_found = False
+        for i in range(2, min(50, len(candles) - 1)):
+            c = candles[-i]
+            if _v(c) < 2.0 * avg_vol:
+                continue
+            hi, lo = _h(c), _l(c)
+            if abs(hi - price) <= prox:
+                criteria += 1
+                direction -= 1.0  # сопротивление сверху
+                sig_found = True
+                break
+            if abs(lo - price) <= prox:
+                criteria += 1
+                direction += 1.0  # поддержка снизу
+                sig_found = True
+                break
+
+        # ── 4. Weekly Open / 52W High/Low ──
+        # Группируем по дням
+        by_day: dict = {}
+        for c in candles:
+            d = c.time.date()
+            if d not in by_day:
+                by_day[d] = {"h": _h(c), "l": _l(c), "o": _o(c), "c": _c(c)}
+            else:
+                if _h(c) > by_day[d]["h"]: by_day[d]["h"] = _h(c)
+                if _l(c) < by_day[d]["l"]: by_day[d]["l"] = _l(c)
+                by_day[d]["c"] = _c(c)
+        sorted_days = sorted(by_day.keys())
+        today_d = candles[-1].time.date()
+
+        # Weekly Open
+        import datetime as _dt
+        wday = today_d.weekday()
+        week_start = today_d - _dt.timedelta(days=wday)
+        wo_day = next((d for d in sorted_days if d >= week_start), None)
+        if wo_day and wo_day in by_day:
+            wo = by_day[wo_day]["o"]
+            if abs(wo - price) <= prox:
+                criteria += 1
+                direction += 1.0 if price >= wo else -1.0
+
+        # 52W high/low
+        year_days = [d for d in sorted_days if d < today_d][-252:]
+        if year_days:
+            yh = max(by_day[d]["h"] for d in year_days)
+            yl = min(by_day[d]["l"] for d in year_days)
+            if abs(yh - price) <= prox:
+                criteria += 1
+                direction -= 1.0
+            elif abs(yl - price) <= prox:
+                criteria += 1
+                direction += 1.0
+
+        # ── 5. Второе касание с реакцией: уровень подтверждён ──
+        # Ищем касание любого из выявленных POC/OB-уровней раньше в истории
+        # Упрощённо: был ли ценовой разворот вблизи текущей цены в прошлом
+        touches_with_reaction = 0
+        for i in range(5, min(60, len(candles) - 1)):
+            cp = _c(candles[-i])
+            if abs(cp - price) <= prox:
+                # Был ли разворот: свеча перед касанием и после — противоположные стороны
+                before = _c(candles[-(i + 1)]) if i + 1 < len(candles) else cp
+                after  = _c(candles[-(i - 1)]) if i > 1 else cp
+                moved_away = abs(after - price) > 0.8 * atr
+                if moved_away:
+                    touches_with_reaction += 1
+        if touches_with_reaction >= 2:
+            criteria += 1
+            # Направление: последнее касание было снизу или сверху
+            direction += 1.0 if price > sum(
+                _c(candles[-i]) for i in range(5, min(15, len(candles)-1))
+            ) / min(10, len(candles)-6) else -1.0
+
+        if criteria == 0:
+            return 0.0
+
+        # ── Composite POC cluster: несколько недельных POC в 0.5% зоне ──
+        cluster_mult = 1.0
+        week_pocs: list[float] = []
+        for start_i in range(0, min(5, len(sorted_days) // 5)):
+            w_days = sorted_days[start_i * 5: (start_i + 1) * 5]
+            if not w_days:
+                continue
+            w_seg = [c for c in candles if c.time.date() in set(w_days)]
+            if not w_seg:
+                continue
+            w_pv = [( (_h(c) + _l(c)) / 2, _v(c)) for c in w_seg]
+            if w_pv:
+                wm = max(w_pv, key=lambda x: x[1])
+                week_pocs.append(wm[0])
+        if len(week_pocs) >= 2:
+            cluster_zone = 0.005 * price
+            near_poc = [p for p in week_pocs if abs(p - price) <= cluster_zone]
+            if len(near_poc) >= 2:
+                cluster_mult = 1.3
+
+        strength_mult = min(1.5, 0.5 + criteria * 0.25) * cluster_mult
+        dir_sign = 1.0 if direction > 0 else -1.0 if direction < 0 else 0.0
+        raw = dir_sign * (criteria / 5.0) * strength_mult
+        return max(-1.0, min(1.0, round(raw, 4)))
+    except Exception:
+        return 0.0
+
+
 def score_fvg(candles: list[HistoricCandle]) -> float:
     """
     Fair Value Gap (имбаланс): три свечи, где между тенью 1-й и тенью 3-й
@@ -5081,6 +5258,8 @@ METHODS = [
     ("FVG",                 score_fvg),
     ("ORDER_BLOCK",         score_order_block),
     ("LIQUIDITY_SWEEP",     score_liquidity_sweep),
+    # Качество уровня: 3 из 5 независимых методов
+    ("LEVEL_QUALITY",       score_level_quality),
 ]
 
 # Структурные методы — используют MultiTFLevelCache инстанса стратегии,
