@@ -2422,27 +2422,26 @@ def score_level_context(candles: list[HistoricCandle], external_nearest=None) ->
 
 def score_market_structure(candles: list[HistoricCandle]) -> float:
     """
-    Слом рыночной структуры (BOS — Break of Structure).
+    Рыночная структура: BOS, CHoCH, Equal Highs, глубина HL, скорость структуры.
 
-    Алгоритм:
-    1. Находим свинг-хаи и свинг-лои за окно SWING_W (фракталы ±LOOKBACK баров).
-    2. Проверяем последнюю последовательность: восходящая структура = HH + HL
-       (каждый новый хай/лой выше предыдущего), нисходящая = LH + LL.
-    3. Слом восходящей: появился LH (хай ниже предыдущего) ИЛИ LL (лой ниже предыдущего).
-       Слом нисходящей: появился HH или HL.
-    4. Сила сигнала зависит от:
-       - насколько "сломан" хай/лой в % (глубина нарушения);
-       - объёма на баре, сформировавшем слом (аномальный объём = сильный сигнал);
-       - количества свингов в последовательности до слома (3+ = устоявшийся тренд).
+    Уровни сигнала:
+      CHoCH (Change of Character) — только один из пары сломан (LH без LL, или LL без LH).
+        Это предупреждение, не разворот. Оценка × 0.35.
+      BOS (Break of Structure) — сломаны ОБА (LH + LL в бычьей структуре).
+        Подтверждённый слом. Полная оценка × 0.8.
 
-    Возвращает: > 0 (бычий BOS — структура разворачивается вверх),
-                < 0 (медвежий BOS — структура разворачивается вниз),
-                0   (структура не сломана или данных недостаточно).
+    Дополнительные компоненты:
+      - Глубина HL (только для бычьей структуры):
+          < 30% откат от импульса = сильная структура (+бонус)
+          > 60% = слабая, накопление ещё не зрело (−бонус)
+      - Скорость структуры: если время между HL и следующим HH растёт (2→4→8 баров),
+          энергия падает — опережает дивергенции.
+      - Equal Highs: два хая в пределах 0.2% — пул ликвидности, сигнал ловушки.
+      - BOS на низком объёме (< 1.2× avg) = fake BOS, оценка × 0.4.
     """
-    # ~8 торговых часов: на M5 ≈ 96 баров, на H1 ≈ 8, на M1 ≈ 480
     _SWING_W = _adaptive_window(candles, target_hours=8.0, min_bars=30, max_bars=300)
-    _LOOKBACK = 3       # баров с каждой стороны для подтверждения свинга
-    _MIN_SWINGS = 2     # минимум свингов для определения структуры
+    _LOOKBACK = 3
+    _MIN_SWINGS = 2
 
     if len(candles) < _SWING_W:
         return 0.0
@@ -2453,83 +2452,127 @@ def score_market_structure(candles: list[HistoricCandle]) -> float:
     window = candles[-_SWING_W:]
     vols = [float(c.volume) for c in window]
     avg_vol = statistics.mean(vols) or 1.0
-
-    # Находим свинг-хаи и свинг-лои
-    swing_highs: list[tuple[int, float, float]] = []  # (idx, price, vol_ratio)
-    swing_lows:  list[tuple[int, float, float]] = []
     n = len(window)
+
+    # Свинг-хаи и лои: (idx_in_window, price, vol_ratio)
+    swing_highs: list[tuple[int, float, float]] = []
+    swing_lows:  list[tuple[int, float, float]] = []
     for i in range(_LOOKBACK, n - _LOOKBACK):
-        h = _to_f(window[i].high)
+        h  = _to_f(window[i].high)
         lo = _to_f(window[i].low)
-        vol_r = float(window[i].volume) / avg_vol
+        vr = float(window[i].volume) / avg_vol
         if all(_to_f(window[i - j].high) < h and _to_f(window[i + j].high) < h
                for j in range(1, _LOOKBACK + 1)):
-            swing_highs.append((i, h, vol_r))
+            swing_highs.append((i, h, vr))
         if all(_to_f(window[i - j].low) > lo and _to_f(window[i + j].low) > lo
                for j in range(1, _LOOKBACK + 1)):
-            swing_lows.append((i, lo, vol_r))
+            swing_lows.append((i, lo, vr))
 
     if len(swing_highs) < _MIN_SWINGS or len(swing_lows) < _MIN_SWINGS:
         return 0.0
 
-    sh = swing_highs
-    sl = swing_lows
+    sh, sl = swing_highs, swing_lows
 
-    # Структура определяется по последним 2 парам свингов (было 3 — слишком редко).
-    # «Бычья» = оба последних хая выше предыдущих И оба последних лоя выше предыдущих.
-    # «Медвежья» = зеркально.
-    # Достаточно 2 свингов каждого типа — это минимальная наблюдаемая структура.
-    def seq_ascending(pts: list) -> bool:
-        return len(pts) >= 2 and pts[-1][1] > pts[-2][1]
-
-    def seq_descending(pts: list) -> bool:
-        return len(pts) >= 2 and pts[-1][1] < pts[-2][1]
-
-    was_bullish = seq_ascending(sh) and seq_ascending(sl)
-    was_bearish = seq_descending(sh) and seq_descending(sl)
+    was_bullish = sh[-1][1] > sh[-2][1] and sl[-1][1] > sl[-2][1]
+    was_bearish = sh[-1][1] < sh[-2][1] and sl[-1][1] < sl[-2][1]
 
     if not was_bullish and not was_bearish:
         return 0.0
 
-    # Сила структуры: сколько последовательных свингов подтверждают структуру
     def count_seq(pts: list, ascending: bool) -> int:
-        count = 0
+        c = 0
         for i in range(len(pts) - 1, 0, -1):
-            if ascending and pts[i][1] > pts[i - 1][1]:
-                count += 1
-            elif not ascending and pts[i][1] < pts[i - 1][1]:
-                count += 1
+            if (ascending and pts[i][1] > pts[i - 1][1]) or \
+               (not ascending and pts[i][1] < pts[i - 1][1]):
+                c += 1
             else:
                 break
-        return count
+        return c
 
     score = 0.0
 
     if was_bullish:
-        lh_broken = sh[-1][1] < sh[-2][1] if len(sh) >= 2 else False
-        ll_broken = sl[-1][1] < sl[-2][1] if len(sl) >= 2 else False
-        if lh_broken or ll_broken:
-            depth_h = (sh[-2][1] - sh[-1][1]) / (sh[-2][1] or 1) if lh_broken else 0.0
-            depth_l = (sl[-2][1] - sl[-1][1]) / (sl[-2][1] or 1) if ll_broken else 0.0
-            depth = max(depth_h, depth_l)
-            vol_boost = min(1.5, (sh[-1][2] if lh_broken else sl[-1][2]))
-            strength = min(1.0, depth / atr_pct) * vol_boost
-            trend_len = count_seq(sh, ascending=True) + count_seq(sl, ascending=True)
-            n_swings_bonus = min(1.4, 1.0 + 0.1 * trend_len)
-            score = -min(1.0, strength * 0.8 * n_swings_bonus)
+        lh = sh[-1][1] < sh[-2][1]   # последний хай ниже предыдущего → LH
+        ll = sl[-1][1] < sl[-2][1]   # последний лой ниже → LL
+
+        if not lh and not ll:
+            # Структура цела — смотрим глубину HL и скорость
+            # Глубина последнего HL: откат / (предыдущий импульс)
+            impulse = sh[-1][1] - sl[-2][1] if len(sl) >= 2 and len(sh) >= 1 else 0.0
+            retrace = sh[-1][1] - sl[-1][1] if impulse > 0 else 0.0
+            depth_ratio = retrace / (impulse or 1e-9) if impulse > 0 else 0.5
+            # Чем мельче откат — тем сильнее структура (бычий бонус)
+            if impulse > 0:
+                if depth_ratio < 0.30:
+                    score = +0.30   # очень мелкий откат — агрессивное накопление
+                elif depth_ratio < 0.50:
+                    score = +0.15
+                elif depth_ratio > 0.65:
+                    score = -0.10   # глубокий откат — слабая структура
+            # Скорость: расстояние HL→HH в барах (последние 2 пары)
+            if len(sh) >= 2 and len(sl) >= 2:
+                speed_prev = sh[-2][0] - sl[-2][0]
+                speed_curr = sh[-1][0] - sl[-1][0]
+                if speed_prev > 0 and speed_curr > speed_prev * 1.5:
+                    score -= 0.15   # структура замедляется — затухание
+        elif lh or ll:
+            # CHoCH: один из пары сломан (предупреждение)
+            bos = lh and ll  # оба — подтверждённый BOS
+            depth = max(
+                (sh[-2][1] - sh[-1][1]) / (sh[-2][1] or 1) if lh else 0.0,
+                (sl[-2][1] - sl[-1][1]) / (sl[-2][1] or 1) if ll else 0.0,
+            )
+            vol_r = sh[-1][2] if lh else sl[-1][2]
+            # Фильтр fake BOS: объём должен быть > 1.2× avg на баре слома
+            vol_factor = 1.0 if vol_r >= 1.2 else 0.4
+            strength = min(1.0, depth / atr_pct) * min(1.5, vol_r)
+            trend_bonus = min(1.4, 1.0 + 0.1 * (count_seq(sh, True) + count_seq(sl, True)))
+            choch_mult = 0.8 if bos else 0.35   # BOS полный / CHoCH предупреждение
+            score = -min(1.0, strength * choch_mult * trend_bonus) * vol_factor
 
     elif was_bearish:
-        hh_broken = sh[-1][1] > sh[-2][1] if len(sh) >= 2 else False
-        hl_broken = sl[-1][1] > sl[-2][1] if len(sl) >= 2 else False
-        if hh_broken or hl_broken:
-            depth_h = (sh[-1][1] - sh[-2][1]) / (sh[-2][1] or 1) if hh_broken else 0.0
-            depth_l = (sl[-1][1] - sl[-2][1]) / (sl[-2][1] or 1) if hl_broken else 0.0
-            depth = max(depth_h, depth_l)
-            vol_boost = min(1.5, (sh[-1][2] if hh_broken else sl[-1][2]))
-            strength = min(1.0, depth / atr_pct) * vol_boost
-            trend_len = count_seq(sh, ascending=False) + count_seq(sl, ascending=False)
-            n_swings_bonus = min(1.4, 1.0 + 0.1 * trend_len)
-            score = +min(1.0, strength * 0.8 * n_swings_bonus)
+        hh = sh[-1][1] > sh[-2][1]
+        hl = sl[-1][1] > sl[-2][1]
+
+        if not hh and not hl:
+            impulse = sl[-1][1] - sh[-2][1] if len(sh) >= 2 and len(sl) >= 1 else 0.0
+            retrace = sl[-1][1] - sh[-1][1] if impulse < 0 else 0.0
+            depth_ratio = abs(retrace) / (abs(impulse) or 1e-9) if impulse < 0 else 0.5
+            if impulse < 0:
+                if depth_ratio < 0.30:
+                    score = -0.30
+                elif depth_ratio < 0.50:
+                    score = -0.15
+                elif depth_ratio > 0.65:
+                    score = +0.10
+            if len(sh) >= 2 and len(sl) >= 2:
+                speed_prev = sl[-2][0] - sh[-2][0]
+                speed_curr = sl[-1][0] - sh[-1][0]
+                if speed_prev > 0 and speed_curr > speed_prev * 1.5:
+                    score += 0.15
+        elif hh or hl:
+            bos = hh and hl
+            depth = max(
+                (sh[-1][1] - sh[-2][1]) / (sh[-2][1] or 1) if hh else 0.0,
+                (sl[-1][1] - sl[-2][1]) / (sl[-2][1] or 1) if hl else 0.0,
+            )
+            vol_r = sh[-1][2] if hh else sl[-1][2]
+            vol_factor = 1.0 if vol_r >= 1.2 else 0.4
+            strength = min(1.0, depth / atr_pct) * min(1.5, vol_r)
+            trend_bonus = min(1.4, 1.0 + 0.1 * (count_seq(sh, False) + count_seq(sl, False)))
+            choch_mult = 0.8 if bos else 0.35
+            score = +min(1.0, strength * choch_mult * trend_bonus) * vol_factor
+
+    # Equal Highs: два последних свинг-хая в пределах 0.2% — пул ликвидности.
+    # Сам по себе не направленный сигнал, но усиливает противоположный CHoCH.
+    eq_high_trap = (len(sh) >= 2 and
+                    abs(sh[-1][1] - sh[-2][1]) / (sh[-2][1] or 1) < 0.002)
+    eq_low_trap  = (len(sl) >= 2 and
+                    abs(sl[-1][1] - sl[-2][1]) / (sl[-2][1] or 1) < 0.002)
+    if eq_high_trap and score < 0:
+        score *= 1.25   # equal highs + CHoCH вниз = ловушка сработала, усиливаем медвежий
+    if eq_low_trap and score > 0:
+        score *= 1.25
 
     return max(-1.0, min(1.0, score))
 
