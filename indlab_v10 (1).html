@@ -9450,6 +9450,672 @@ function renderAnalysis() {
         if (!items.length) items.push({type:'neutral', text:`Keltner Channel активен`});
         html += makeCard('Keltner Channel (неклассически)', items);
       }
+    } else if (idL.includes('vwap')) {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const vols = candles.map(c=>c.volume||0);
+        const totalVol = vols.reduce((a,b)=>a+b,0);
+        if (totalVol > 0) {
+          const vwap = candles.reduce((s,c)=>s+(c.high+c.low+c.close)/3*(c.volume||0),0) / totalVol;
+          const lastClose = closes[n-1];
+          const dev = (lastClose - vwap) / vwap * 100;
+          if (Math.abs(dev) < 0.3) items.push({type:'neutral', text:`Цена ≈ VWAP (откл. ${dev.toFixed(2)}%) — рынок в балансе, ни у кого нет существенной прибыли`});
+          else if (dev > 1.5) items.push({type:'bearish', text:`Цена выше VWAP на ${dev.toFixed(1)}% — лонги в прибыли, продавцы могут фиксировать`});
+          else if (dev < -1.5) items.push({type:'bullish', text:`Цена ниже VWAP на ${Math.abs(dev).toFixed(1)}% — шорты в прибыли, покупатели ищут точку входа`});
+          else if (dev > 0) items.push({type:'bullish', text:`Цена чуть выше VWAP (+${dev.toFixed(2)}%) — лёгкий бычий контекст`});
+          else items.push({type:'bearish', text:`Цена чуть ниже VWAP (${dev.toFixed(2)}%) — лёгкий медвежий контекст`});
+          // Дискомфорт: большое отклонение = "резинка натянута"
+          if (Math.abs(dev) > 3) items.push({type:'neutral', text:`Отклонение ${Math.abs(dev).toFixed(1)}% — "резинка натянута", высокая вероятность возврата к VWAP`});
+        }
+        if (!items.length) items.push({type:'neutral', text:`VWAP активен`});
+        html += makeCard('VWAP (неклассически)', items);
+      }
+    } else if (idL === 'wr') {
+      const n = candles.length;
+      const per = 14;
+      if (n >= per) {
+        const items = [];
+        const slice = candles.slice(n-per);
+        const hh = Math.max(...slice.map(c=>c.high));
+        const ll = Math.min(...slice.map(c=>c.low));
+        const wr = hh > ll ? (hh - closes[n-1]) / (hh - ll) * (-100) : -50;
+        if (wr > -20) items.push({type:'bullish', text:`Williams %R = ${wr.toFixed(1)} — зона перекупленности: в сильном тренде цена "прилипает" к -20, это признак силы, а не разворота`});
+        else if (wr < -80) items.push({type:'bearish', text:`Williams %R = ${wr.toFixed(1)} — зона перепроданности: в нисходящем тренде цена "прилипает" к -80, сигнал продолжения`});
+        else if (wr > -50) items.push({type:'neutral', text:`Williams %R = ${wr.toFixed(1)}: цена выше середины диапазона периода`});
+        else items.push({type:'neutral', text:`Williams %R = ${wr.toFixed(1)}: цена ниже середины диапазона периода`});
+        // Скорость выхода из зон
+        let prevExtreme = false;
+        for (let i=n-5; i<n-1; i++) {
+          const sl2 = candles.slice(Math.max(0,i-per+1), i+1);
+          const h2 = Math.max(...sl2.map(c=>c.high)), l2 = Math.min(...sl2.map(c=>c.low));
+          const w2 = h2>l2 ? (h2-closes[i])/(h2-l2)*(-100) : -50;
+          if (w2 > -20 || w2 < -80) prevExtreme = true;
+        }
+        if (prevExtreme && wr > -80 && wr < -20) items.push({type:'neutral', text:`Вышел из экстремальной зоны — смена краткосрочного давления`});
+        html += makeCard('Williams %R (неклассически)', items);
+      }
+    } else if (idL === 'ao') {
+      const n = candles.length;
+      if (n >= 34) {
+        const items = [];
+        const mids = candles.map(c=>(c.high+c.low)/2);
+        const sma = (arr, from, len) => { let s=0; for(let i=from;i<from+len;i++) s+=arr[i]; return s/len; };
+        const ao = candles.map((_,i) => i>=33 ? sma(mids,i-4,5)-sma(mids,i-33,34) : null);
+        const last = ao[n-1], prev = ao[n-2], prev2 = n>2?ao[n-3]:null;
+        if (last !== null && prev !== null) {
+          if (last > 0 && prev < 0) items.push({type:'bullish', text:`AO пересёк ноль снизу вверх — бычий импульс набирает силу`});
+          else if (last < 0 && prev > 0) items.push({type:'bearish', text:`AO пересёк ноль сверху вниз — медвежий импульс нарастает`});
+          else if (last > 0 && prev > 0 && prev2 && last < prev && ao[n-4] && prev < ao[n-4]) {
+            items.push({type:'bullish', text:`AO: Двойной пик / блюдце — ускорение бычьего импульса выше нуля`});
+          } else if (last < 0 && prev < 0 && prev2 && last > prev && ao[n-4] && prev > ao[n-4]) {
+            items.push({type:'bearish', text:`AO: блюдце ниже нуля — ускорение медвежьего импульса`});
+          } else {
+            items.push({type: last>0?'bullish':'bearish', text:`AO = ${last.toFixed(2)}, ${last>0?'выше':'ниже'} нуля — ${last>prev?'растёт':'падает'}`});
+          }
+        }
+        if (!items.length) items.push({type:'neutral', text:`Awesome Oscillator активен`});
+        html += makeCard('Awesome Oscillator (неклассически)', items);
+      }
+    } else if (idL === 'acc_dist' || idL === 'ad_line') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        // A/D = CLV × Volume, CLV = (close-low - high+close)/(high-low)
+        let adArr = [0];
+        for (let i=1; i<n; i++) {
+          const c = candles[i];
+          const clv = (c.high > c.low) ? ((c.close-c.low)-(c.high-c.close))/(c.high-c.low) : 0;
+          adArr.push(adArr[i-1] + clv*(c.volume||0));
+        }
+        const adNow = adArr[n-1], ad20 = adArr[n-20];
+        const priceUp = closes[n-1] > closes[n-20];
+        const adUp = adNow > ad20;
+        if (priceUp && !adUp) items.push({type:'bearish', text:`Цена растёт, A/D падает — медвежья дивергенция: рост не подкреплён накоплением`});
+        else if (!priceUp && adUp) items.push({type:'bullish', text:`Цена падает, A/D растёт — бычья дивергенция: накопление идёт на снижении`});
+        else if (priceUp && adUp) items.push({type:'bullish', text:`Цена и A/D растут — подтверждённое накопление, тренд здоровый`});
+        else items.push({type:'bearish', text:`Цена и A/D падают — подтверждённое распределение`});
+        html += makeCard('A/D Line (неклассически)', items);
+      }
+    } else if (idL.includes('chaikin_osc')) {
+      const n = candles.length;
+      if (n >= 34) {
+        const items = [];
+        let ad = 0, ema3 = null, ema10 = null;
+        const oscArr = [];
+        for (let i=0; i<n; i++) {
+          const c = candles[i];
+          const clv = (c.high>c.low) ? ((c.close-c.low)-(c.high-c.close))/(c.high-c.low) : 0;
+          ad += clv*(c.volume||0);
+          if (i===0) { ema3=ad; ema10=ad; }
+          else { ema3=ema3*2/4+ad*2/4; ema10=ema10*2/11+ad*2/11; }
+          oscArr.push(ema3-ema10);
+        }
+        const last=oscArr[n-1], prev=oscArr[n-2];
+        if (last>0&&prev<0) items.push({type:'bullish', text:`Chaikin Osc пересёк ноль снизу — накопление берёт верх над распределением`});
+        else if (last<0&&prev>0) items.push({type:'bearish', text:`Chaikin Osc пересёк ноль сверху — распределение берёт верх`});
+        else items.push({type:last>0?'bullish':'bearish', text:`Chaikin Osc ${last>0?'выше':'ниже'} нуля: ${last>0?'накопление':'распределение'} преобладает`});
+        html += makeCard('Chaikin Oscillator (неклассически)', items);
+      }
+    } else if (idL === 'cmf') {
+      const n = candles.length;
+      const per = 20;
+      if (n >= per) {
+        const items = [];
+        let mfv=0, vol=0;
+        for(let i=n-per;i<n;i++) {
+          const c=candles[i];
+          const clv=(c.high>c.low)?((c.close-c.low)-(c.high-c.close))/(c.high-c.low):0;
+          mfv+=clv*(c.volume||0); vol+=(c.volume||0);
+        }
+        const cmfVal = vol>0 ? mfv/vol : 0;
+        if (cmfVal>0.25) items.push({type:'bullish', text:`CMF = ${cmfVal.toFixed(3)} — сильное накопление: институционалы покупают`});
+        else if (cmfVal<-0.25) items.push({type:'bearish', text:`CMF = ${cmfVal.toFixed(3)} — сильное распределение: умные деньги выходят`});
+        else if (cmfVal>0) items.push({type:'bullish', text:`CMF = ${cmfVal.toFixed(3)} — слабое накопление`});
+        else items.push({type:'bearish', text:`CMF = ${cmfVal.toFixed(3)} — слабое распределение`});
+        html += makeCard('CMF / Деньги Чайкина (неклассически)', items);
+      }
+    } else if (idL === 'accel_osc') {
+      const n = candles.length;
+      if (n >= 34) {
+        const items = [];
+        const mids = candles.map(c=>(c.high+c.low)/2);
+        const sma5 = i => { let s=0; for(let j=i-4;j<=i;j++) s+=mids[j]; return s/5; };
+        const sma34 = i => { let s=0; for(let j=i-33;j<=i;j++) s+=mids[j]; return s/34; };
+        const ao = i => i>=33 ? sma5(i)-sma34(i) : 0;
+        const aoArr = candles.map((_,i)=>ao(i));
+        const acArr = candles.map((_,i)=>i>=37?aoArr[i]-(aoArr.slice(i-4,i+1).reduce((a,b)=>a+b,0)/5):null);
+        const last=acArr[n-1], prev=acArr[n-2], prev2=n>2?acArr[n-3]:null;
+        if (last===null) { items.push({type:'neutral',text:'AC активен'}); }
+        else if (last>0&&prev<=0) items.push({type:'bullish', text:`AC пересёк ноль вверх — ускорение переходит на бычью сторону`});
+        else if (last<0&&prev>=0) items.push({type:'bearish', text:`AC пересёк ноль вниз — ускорение ослабевает`});
+        else if (last>0&&prev>0&&prev2&&last>prev&&prev>prev2) items.push({type:'bullish', text:`AC выше нуля и ускоряется — три подряд растущих бара: нарастающий импульс`});
+        else if (last<0&&prev<0&&prev2&&last<prev&&prev<prev2) items.push({type:'bearish', text:`AC ниже нуля и ускоряется вниз: усиление давления`});
+        else items.push({type:last>0?'bullish':'bearish', text:`Acceleration Oscillator ${last>0?'положительный':'отрицательный'}: импульс ${last>prev?'набирает':'теряет'} силу`});
+        html += makeCard('AC Oscillator (неклассически)', items);
+      }
+    } else if (idL === 'elder_ray') {
+      const n = candles.length;
+      const per = 13;
+      if (n >= per+5) {
+        const items = [];
+        const ema13 = _chartCalcEMA(closes, per);
+        const highs = candles.map(c=>c.high), lows = candles.map(c=>c.low);
+        const bull = highs[n-1] - ema13[n-1];
+        const bear = lows[n-1] - ema13[n-1];
+        // Бычья сила положительная = быки поднимают выше EMA
+        if (bull > 0 && bear > 0) items.push({type:'bullish', text:`Bull Power +${bull.toFixed(2)}, Bear Power +${bear.toFixed(2)} — оба выше нуля: исключительная бычья сила`});
+        else if (bull > 0 && bear < 0) {
+          if (bear > (lows[n-2]-ema13[n-2])) items.push({type:'bullish', text:`Bear Power отрицательный, но растёт — слабость медведей убывает, хорошая точка входа`});
+          else items.push({type:'neutral', text:`Bull Power +${bull.toFixed(2)}, Bear Power ${bear.toFixed(2)} — тренд вверх, но медведи ещё давят`});
+        } else if (bull < 0 && bear < 0) items.push({type:'bearish', text:`Оба Power ниже нуля — цена ниже EMA13, сильное медвежье давление`});
+        else items.push({type:'bearish', text:`Bull Power ${bull.toFixed(2)}, медведи слабые`});
+        html += makeCard('Elder Ray (неклассически)', items);
+      }
+    } else if (idL === 'force_idx') {
+      const n = candles.length;
+      if (n >= 15) {
+        const items = [];
+        const fi = candles.map((c,i)=>i===0?0:(c.close-candles[i-1].close)*(c.volume||0));
+        const ema2 = _chartCalcEMA(fi, 2);
+        const ema13 = _chartCalcEMA(fi, 13);
+        const fi2=ema2[n-1], fi13=ema13[n-1];
+        if (fi2>0&&fi13<0) items.push({type:'bullish', text:`Force(2) положительный, Force(13) отрицательный — краткосрочный откат в нисходящем тренде: возможна точка входа`});
+        else if (fi2<0&&fi13>0) items.push({type:'bearish', text:`Force(2) отрицательный, Force(13) положительный — краткосрочное давление в растущем тренде: возможна коррекция`});
+        else if (fi13>0) items.push({type:'bullish', text:`Force Index(13) > 0 — среднесрочный восходящий тренд подтверждается объёмом`});
+        else items.push({type:'bearish', text:`Force Index(13) < 0 — среднесрочный нисходящий тренд подтверждается объёмом`});
+        html += makeCard('Force Index (неклассически)', items);
+      }
+    } else if (idL === 'elder_impulse') {
+      const n = candles.length;
+      if (n >= 26) {
+        const items = [];
+        const ema13 = _chartCalcEMA(closes, 13);
+        const emaDir = (ema13[n-1]||0) > (ema13[n-2]||0) ? 1 : -1;
+        const macdData = _chartCalcMACD(closes, 12, 26, 9);
+        const hist = macdData ? macdData.hist : null;
+        const macdDir = hist && hist[n-1]!==null && hist[n-2]!==null ? (hist[n-1]>hist[n-2]?1:-1) : 0;
+        if (emaDir>0&&macdDir>0) items.push({type:'bullish', text:`Импульс Элдера: EMA13 ↑ + MACD-гист ↑ — зелёный бар. Запрещено шортить, разрешено покупать`});
+        else if (emaDir<0&&macdDir<0) items.push({type:'bearish', text:`Импульс Элдера: EMA13 ↓ + MACD-гист ↓ — красный бар. Запрещено покупать, разрешено шортить`});
+        else items.push({type:'neutral', text:`Импульс Элдера: нет синхронизации EMA/MACD — синий бар. Можно торговать в любую сторону`});
+        html += makeCard('Elder Impulse System (неклассически)', items);
+      }
+    } else if (idL === 'parabolic') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        // Compute SAR
+        let bull2=true, sar=candles[0].low, ep=candles[0].high, af=0.02;
+        let flips=[], lastFlip=null;
+        for(let i=1;i<n;i++) {
+          sar = sar + af*(ep-sar);
+          if (bull2) { if(candles[i].close<sar){bull2=false;sar=ep;ep=candles[i].low;af=0.02;flips.push(i);lastFlip=i;} else {if(candles[i].high>ep){ep=candles[i].high;af=Math.min(0.2,af+0.02);}}}
+          else { if(candles[i].close>sar){bull2=true;sar=ep;ep=candles[i].high;af=0.02;flips.push(i);lastFlip=i;} else {if(candles[i].low<ep){ep=candles[i].low;af=Math.min(0.2,af+0.02);}}}
+        }
+        const dist = lastFlip!==null ? n-1-lastFlip : n;
+        items.push({type: bull2?'bullish':'bearish', text:`SAR ${bull2?'ниже цены (бычий)':'выше цены (медвежий)'} — ${dist} свечей без разворота`});
+        if (dist < 3) items.push({type:'neutral', text:`Разворот только что произошёл — SAR особенно чувствителен к ложным сигналам в начале тренда`});
+        else if (dist > 30) items.push({type:'neutral', text:`${dist} свечей — длинный забег: AF вырос, SAR прижался к цене. Любой откат может вызвать разворот`});
+        if (flips.length > 0) {
+          const recentFlips = flips.filter(f=>f>n-50).length;
+          if (recentFlips >= 5) items.push({type:'neutral', text:`≥5 разворотов SAR за 50 свечей — флэт: SAR даёт много ложных сигналов`});
+        }
+        html += makeCard('Parabolic SAR (неклассически)', items);
+      }
+    } else if (idL === 'supertrend') {
+      const n = candles.length;
+      const per=10, mult=3;
+      if (n >= per+5) {
+        const items = [];
+        const tr = candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high-c.low,Math.abs(c.high-candles[i-1].close),Math.abs(c.low-candles[i-1].close)));
+        const atrArr=new Array(n).fill(0);
+        let s=0; for(let i=0;i<per;i++) s+=tr[i]; atrArr[per-1]=s/per;
+        for(let i=per;i<n;i++) atrArr[i]=(atrArr[i-1]*(per-1)+tr[i])/per;
+        let stUp=candles[0].close-mult*atrArr[0], stDn=candles[0].close+mult*atrArr[0], trend2=1;
+        let flips=0;
+        for(let i=1;i<n;i++) {
+          const newUp=closes[i]-mult*atrArr[i], newDn=closes[i]+mult*atrArr[i];
+          stUp=newUp>stUp||closes[i-1]<stUp?newUp:stUp;
+          stDn=newDn<stDn||closes[i-1]>stDn?newDn:stDn;
+          const prev=trend2;
+          if(trend2==-1&&closes[i]>stDn){trend2=1;flips++;}
+          else if(trend2==1&&closes[i]<stUp){trend2=-1;flips++;}
+        }
+        items.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend ${trend2===1?'бычий — стоп ниже цены':'медвежий — стоп выше цены'}`});
+        if(flips<=2) items.push({type:trend2===1?'bullish':'bearish', text:`Мало переворотов (${flips}) — устойчивый тренд`});
+        else if(flips>6) items.push({type:'neutral', text:`Много переворотов (${flips}) — пила/флэт, сигналы ненадёжны`});
+        html += makeCard('SuperTrend (неклассически)', items);
+      }
+    } else if (idL.includes('fisher')) {
+      const n = candles.length;
+      const per=9;
+      if (n >= per) {
+        const items = [];
+        const slice=candles.slice(n-per);
+        const hh=Math.max(...slice.map(c=>c.high)), ll=Math.min(...slice.map(c=>c.low));
+        const val = hh>ll ? (closes[n-1]-ll)/(hh-ll) : 0.5;
+        const clamped=Math.min(0.999,Math.max(0.001,val));
+        const fisher=0.5*Math.log((1+clamped)/(1-clamped));
+        if(fisher>2) items.push({type:'bearish', text:`Fisher = ${fisher.toFixed(2)} — экстремально бычье состояние, вероятен разворот вниз`});
+        else if(fisher<-2) items.push({type:'bullish', text:`Fisher = ${fisher.toFixed(2)} — экстремально медвежье состояние, вероятен разворот вверх`});
+        else if(fisher>0.5) items.push({type:'bullish', text:`Fisher = ${fisher.toFixed(2)} — цена в верхней части диапазона`});
+        else if(fisher<-0.5) items.push({type:'bearish', text:`Fisher = ${fisher.toFixed(2)} — цена в нижней части диапазона`});
+        else items.push({type:'neutral', text:`Fisher = ${fisher.toFixed(2)} — цена в середине диапазона`});
+        html += makeCard('Fisher Transform (неклассически)', items);
+      }
+    } else if (idL === 'pivot') {
+      const n = candles.length;
+      if (n >= 2) {
+        const items = [];
+        const prev = candles[n-2];
+        const pp = (prev.high+prev.low+prev.close)/3;
+        const r1=2*pp-prev.low, s1=2*pp-prev.high;
+        const r2=pp+(prev.high-prev.low), s2=pp-(prev.high-prev.low);
+        const last=closes[n-1];
+        items.push({type:'neutral', text:`Пивот P = ${pp.toFixed(2)} — точка равновесия: выше = быки контролируют, ниже = медведи`});
+        if(last>r1) items.push({type:'bullish', text:`Цена выше R1 (${r1.toFixed(2)}) — сильный бычий день`});
+        else if(last>pp) items.push({type:'bullish', text:`Цена между P и R1 — лёгкое бычье преимущество`});
+        else if(last>s1) items.push({type:'bearish', text:`Цена между S1 и P — лёгкое медвежье давление`});
+        else items.push({type:'bearish', text:`Цена ниже S1 (${s1.toFixed(2)}) — сильный медвежий день`});
+        // Открытие относительно P
+        const open0=candles[n-1].open;
+        if(Math.abs(open0-pp)/pp<0.002) items.push({type:'neutral', text:`Открытие у пивота — день без выраженного контроля, жди пробоя`});
+        html += makeCard('Pivot Points (неклассически)', items);
+      }
+    } else if (idL === 'zigzag') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const pct=5, minDev=pct/100;
+        let peaks=[],troughs=[],dir=0,refHigh=candles[0].high,refLow=candles[0].low;
+        for(let i=1;i<n;i++) {
+          if(dir>=0&&candles[i].low<refLow*(1-minDev)){dir=-1;peaks.push({i:i,v:refHigh});refLow=candles[i].low;}
+          else if(dir<=0&&candles[i].high>refHigh*(1+minDev)){dir=1;troughs.push({i:i,v:refLow});refHigh=candles[i].high;}
+          if(candles[i].high>refHigh) refHigh=candles[i].high;
+          if(candles[i].low<refLow) refLow=candles[i].low;
+        }
+        if(peaks.length>=2&&troughs.length>=2) {
+          const hhUp=peaks[peaks.length-1].v>peaks[peaks.length-2].v;
+          const llUp=troughs[troughs.length-1].v>troughs[troughs.length-2].v;
+          if(hhUp&&llUp) items.push({type:'bullish', text:`ZigZag: выше максимумы И выше минимумы — классический восходящий тренд`});
+          else if(!hhUp&&!llUp) items.push({type:'bearish', text:`ZigZag: ниже максимумы И ниже минимумы — классический нисходящий тренд`});
+          else if(hhUp&&!llUp) items.push({type:'neutral', text:`ZigZag: расходящиеся волны — расширение, неопределённость`});
+          else items.push({type:'neutral', text:`ZigZag: сходящиеся волны — компрессия, рынок готовится к выбору`});
+        } else {
+          items.push({type:'neutral', text:`ZigZag: недостаточно волн для структурного анализа`});
+        }
+        html += makeCard('ZigZag (неклассически)', items);
+      }
+    } else if (idL === 'tsi') {
+      const n = candles.length;
+      if (n >= 35) {
+        const items = [];
+        const mom = closes.map((c,i)=>i===0?0:c-closes[i-1]);
+        let ds1=mom[0], ds2=mom[0], dabs1=Math.abs(mom[0]), dabs2=Math.abs(mom[0]);
+        const ts=[], tsArr=[];
+        for(let i=1;i<n;i++) {
+          ds1=ds1*24/25+mom[i]*1/25; ds2=ds2*12/13+ds1*1/13;
+          dabs1=dabs1*24/25+Math.abs(mom[i])*1/25; dabs2=dabs2*12/13+dabs1*1/13;
+          tsArr.push(dabs2!==0?ds2/dabs2*100:0);
+        }
+        const last=tsArr[tsArr.length-1], prev=tsArr[tsArr.length-2];
+        if(last>25) items.push({type:'bullish', text:`TSI = ${last.toFixed(1)} — перекуплен; в сильном тренде остаётся здесь надолго`});
+        else if(last<-25) items.push({type:'bearish', text:`TSI = ${last.toFixed(1)} — перепродан; в нисходящем тренде "прилипает" к дну`});
+        else if(last>0&&prev<0) items.push({type:'bullish', text:`TSI пересёк ноль вверх — смена моментума на бычий`});
+        else if(last<0&&prev>0) items.push({type:'bearish', text:`TSI пересёк ноль вниз — смена моментума на медвежий`});
+        else items.push({type:last>0?'bullish':'bearish', text:`TSI = ${last.toFixed(1)}: двойное сглаживание моментума ${last>0?'выше':'ниже'} нуля`});
+        html += makeCard('TSI (неклассически)', items);
+      }
+    } else if (idL === 'ult_osc') {
+      const n = candles.length;
+      if (n >= 28) {
+        const items = [];
+        const bp=candles.map((c,i)=>i===0?0:c.close-Math.min(c.low,candles[i-1].close));
+        const tr=candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high,candles[i-1].close)-Math.min(c.low,candles[i-1].close));
+        const rawMid=(per)=>{let sb=0,st=0;for(let i=n-per;i<n;i++){sb+=bp[i];st+=tr[i];}return st>0?sb/st:0;};
+        const uo=100*(4*rawMid(7)+2*rawMid(14)+rawMid(28))/7;
+        if(uo>70) items.push({type:'bearish', text:`UO = ${uo.toFixed(1)} — перекупленность по трём таймфреймам: разворотная зона`});
+        else if(uo<30) items.push({type:'bullish', text:`UO = ${uo.toFixed(1)} — перепроданность по трём таймфреймам: разворотная зона`});
+        else if(uo>55) items.push({type:'bullish', text:`UO = ${uo.toFixed(1)} — умеренно бычий: покупки преобладают по всем горизонтам`});
+        else if(uo<45) items.push({type:'bearish', text:`UO = ${uo.toFixed(1)} — умеренно медвежий: продажи преобладают`});
+        else items.push({type:'neutral', text:`UO = ${uo.toFixed(1)} — нейтрально, трёхкомпонентный осциллятор`});
+        html += makeCard('Ultimate Oscillator (неклассически)', items);
+      }
+    } else if (idL === 'chop') {
+      const n = candles.length;
+      const per=14;
+      if (n >= per) {
+        const items = [];
+        const tr=candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high,candles[i-1].close)-Math.min(c.low,candles[i-1].close));
+        const atrSum=tr.slice(n-per).reduce((a,b)=>a+b,0);
+        const hh=Math.max(...candles.slice(n-per).map(c=>c.high));
+        const ll=Math.min(...candles.slice(n-per).map(c=>c.low));
+        const chop = (hh>ll&&atrSum>0) ? 100*Math.log10(atrSum/(hh-ll))/Math.log10(per) : 50;
+        if(chop<38.2) items.push({type:'bullish', text:`CHOP = ${chop.toFixed(1)} — рынок трендовый: ATR мал относительно диапазона`});
+        else if(chop>61.8) items.push({type:'neutral', text:`CHOP = ${chop.toFixed(1)} — флэт: энергия накапливается, пробой может быть резким`});
+        else items.push({type:'neutral', text:`CHOP = ${chop.toFixed(1)} — переходная зона (норма 38.2–61.8)`});
+        html += makeCard('Choppiness Index (неклассически)', items);
+      }
+    } else if (idL === 'vortex') {
+      const n = candles.length;
+      const per=14;
+      if (n >= per+1) {
+        const items = [];
+        let vmp=0,vmm=0,atrS=0;
+        for(let i=n-per;i<n;i++) {
+          vmp+=Math.abs(candles[i].high-candles[i-1].low);
+          vmm+=Math.abs(candles[i].low-candles[i-1].high);
+          atrS+=Math.max(candles[i].high,candles[i-1].close)-Math.min(candles[i].low,candles[i-1].close);
+        }
+        const vip=atrS>0?vmp/atrS:1, vim=atrS>0?vmm/atrS:1;
+        if(vip>vim&&vip>1.1) items.push({type:'bullish', text:`VI+ (${vip.toFixed(2)}) > VI− (${vim.toFixed(2)}) — бычье движение доминирует`});
+        else if(vim>vip&&vim>1.1) items.push({type:'bearish', text:`VI− (${vim.toFixed(2)}) > VI+ (${vip.toFixed(2)}) — медвежье движение доминирует`});
+        else items.push({type:'neutral', text:`VI+ (${vip.toFixed(2)}) ≈ VI− (${vim.toFixed(2)}) — рынок без выраженного направления`});
+        if(Math.abs(vip-vim)<0.05) items.push({type:'neutral', text:`Vortex сближается — смена тренда возможна`});
+        html += makeCard('Vortex (неклассически)', items);
+      }
+    } else if (idL === 'bb_pct') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const bb = _chartCalcBB(closes, 20, 2);
+        const v = bb[n-1];
+        if (v) {
+          const pct = (v.upper > v.lower) ? (closes[n-1]-v.lower)/(v.upper-v.lower) : 0.5;
+          if(pct>1) items.push({type:'bullish', text:`%B = ${pct.toFixed(2)} — цена выше верхней полосы: в сильном тренде %B > 1 — норма, не разворот`});
+          else if(pct<0) items.push({type:'bearish', text:`%B = ${pct.toFixed(2)} — цена ниже нижней полосы: в нисходящем тренде может ходить <0 долго`});
+          else if(pct>0.8) items.push({type:'bullish', text:`%B = ${pct.toFixed(2)}: верхняя половина BB — покупатели контролируют`});
+          else if(pct<0.2) items.push({type:'bearish', text:`%B = ${pct.toFixed(2)}: нижняя половина BB — продавцы контролируют`});
+          else items.push({type:'neutral', text:`%B = ${pct.toFixed(2)}: цена в середине Bollinger — нет выраженной силы`});
+        }
+        if(!items.length) items.push({type:'neutral',text:'BB %B активен'});
+        html += makeCard('BB %B (неклассически)', items);
+      }
+    } else if (idL === 'bb_width') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const bb = _chartCalcBB(closes, 20, 2);
+        const widths = bb.map((v,i)=>v&&closes[i]?((v.upper-v.lower)/closes[i]*100):null).filter(v=>v!==null);
+        const now = widths[widths.length-1];
+        const minW = Math.min(...widths.slice(-50));
+        if(now/minW < 1.2) items.push({type:'neutral', text:`BB Width минимальна (${now.toFixed(2)}%) — Squeeze. Пробой будет резким и ложных сигналов мало`});
+        else if(now/minW > 3) items.push({type:'neutral', text:`BB Width расширена (${now.toFixed(2)}%) — волатильность высокая: обычно конец тренда, а не начало`});
+        else items.push({type:'neutral', text:`BB Width = ${now.toFixed(2)}% — нормальная волатильность`});
+        html += makeCard('BB Width (неклассически)', items);
+      }
+    } else if (idL === 'dmi') {
+      const n = candles.length;
+      const per=14;
+      if (n >= per+5) {
+        const items = [];
+        let pdm=0,mdm=0,atrS=0;
+        for(let i=n-per;i<n;i++) {
+          const up=candles[i].high-candles[i-1].high, dn=candles[i-1].low-candles[i].low;
+          pdm+=(up>dn&&up>0)?up:0;
+          mdm+=(dn>up&&dn>0)?dn:0;
+          atrS+=Math.max(candles[i].high,candles[i-1].close)-Math.min(candles[i].low,candles[i-1].close);
+        }
+        const dip=atrS>0?pdm/atrS*100:0, dim=atrS>0?mdm/atrS*100:0;
+        if(dip>dim) items.push({type:'bullish', text:`+DI (${dip.toFixed(1)}) > −DI (${dim.toFixed(1)}) — бычье движение преобладает`});
+        else items.push({type:'bearish', text:`−DI (${dim.toFixed(1)}) > +DI (${dip.toFixed(1)}) — медвежье движение преобладает`});
+        html += makeCard('DMI (неклассически)', items);
+      }
+    } else if (idL.includes('hist_vol') || idL.includes('close2close') || idL.includes('ohlc_vol') || idL.includes('vix_like')) {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const rets = closes.map((c,i)=>i===0?0:Math.log(c/closes[i-1]));
+        const slice=rets.slice(n-20);
+        const avg=slice.reduce((a,b)=>a+b,0)/20;
+        const vari=slice.reduce((a,b)=>a+(b-avg)**2,0)/19;
+        const hvPct=Math.sqrt(vari*252)*100;
+        if(hvPct>60) items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — экстремально высокая: риск велик в обе стороны`});
+        else if(hvPct>30) items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — повышенная: можно продавать опционы`});
+        else if(hvPct<15) items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — низкая: пружина сжата`});
+        else items.push({type:'neutral', text:`Историческая волатильность ${hvPct.toFixed(0)}% — нормальный диапазон`});
+        html += makeCard('Историческая волатильность', items);
+      }
+    } else if (idL === 'cmo') {
+      const n = candles.length;
+      const per=14;
+      if (n >= per) {
+        const items = [];
+        let up=0,dn=0;
+        for(let i=n-per;i<n;i++) { const d=closes[i]-(i>0?closes[i-1]:closes[i]); if(d>0)up+=d; else dn+=Math.abs(d); }
+        const cmo=(up+dn)>0?(up-dn)/(up+dn)*100:0;
+        if(cmo>50) items.push({type:'bullish', text:`CMO = ${cmo.toFixed(1)} — бычья перекупленность`});
+        else if(cmo<-50) items.push({type:'bearish', text:`CMO = ${cmo.toFixed(1)} — медвежья перепроданность`});
+        else if(cmo>0) items.push({type:'bullish', text:`CMO = ${cmo.toFixed(1)}: слабый бычий моментум`});
+        else items.push({type:'bearish', text:`CMO = ${cmo.toFixed(1)}: слабый медвежий моментум`});
+        html += makeCard('CMO / Моментум Чанде (неклассически)', items);
+      }
+    } else if (idL === 'eom') {
+      const n = candles.length;
+      if (n >= 15) {
+        const items = [];
+        const eomArr = candles.map((c,i)=>{
+          if(i===0) return 0;
+          const mm=((c.high+c.low)/2-(candles[i-1].high+candles[i-1].low)/2);
+          const br=(c.volume||1)/1e6/(c.high-c.low||0.01);
+          return mm/br;
+        });
+        const last=eomArr.slice(n-14).reduce((a,b)=>a+b,0)/14;
+        if(last>0) items.push({type:'bullish', text:`EOM > 0 — цена легко растёт на небольших объёмах: продавцы не сопротивляются`});
+        else items.push({type:'bearish', text:`EOM < 0 — цена легко падает: покупатели не поддерживают`});
+        html += makeCard('EOM / Лёгкость движения (неклассически)', items);
+      }
+    } else if (idL === 'nvi') {
+      const n = candles.length;
+      if (n >= 50) {
+        const items = [];
+        let nvi=1000;
+        const nviArr=[1000];
+        for(let i=1;i<n;i++) {
+          if((candles[i].volume||0)<(candles[i-1].volume||1)) nvi+=nvi*(closes[i]-closes[i-1])/closes[i-1];
+          nviArr.push(nvi);
+        }
+        const sma=nviArr.slice(-100).reduce((a,b)=>a+b,0)/Math.min(100,nviArr.length);
+        items.push({type: nviArr[n-1]>sma?'bullish':'bearish', text:`NVI ${nviArr[n-1]>sma?'выше':'ниже'} своей SMA — когда NVI растёт вместе с умными деньгами, рынок здоров`});
+        html += makeCard('NVI / Индекс отрицательного объёма', items);
+      }
+    } else if (idL === 'pvt') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        let pvt=0;
+        const pvtArr=[0];
+        for(let i=1;i<n;i++) { pvt+=pvt===0?0:(closes[i]-closes[i-1])/closes[i-1]*(candles[i].volume||0); pvtArr.push(pvt); }
+        const pvt20=pvtArr[n-20], pvtNow=pvtArr[n-1];
+        const priceUp=closes[n-1]>closes[n-20];
+        if(priceUp&&pvtNow<pvt20) items.push({type:'bearish', text:`Цена растёт, PVT падает — дивергенция: объём не подтверждает рост`});
+        else if(!priceUp&&pvtNow>pvt20) items.push({type:'bullish', text:`Цена падает, PVT растёт — скрытое накопление`});
+        else items.push({type:pvtNow>pvt20?'bullish':'bearish', text:`PVT ${pvtNow>pvt20?'растёт':'падает'} вместе с ценой — тренд подтверждён объёмом`});
+        html += makeCard('PVT / Тренд цена-объём (неклассически)', items);
+      }
+    } else if (idL === 'vo') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const vols=candles.map(c=>c.volume||0);
+        const fast=vols.slice(-5).reduce((a,b)=>a+b,0)/5;
+        const slow=vols.slice(-20).reduce((a,b)=>a+b,0)/20;
+        const vo=slow>0?(fast-slow)/slow*100:0;
+        if(vo>25) items.push({type:'neutral', text:`Volume Oscillator +${vo.toFixed(0)}% — объём резко выше нормы: сильное событие`});
+        else if(vo<-25) items.push({type:'neutral', text:`VO ${vo.toFixed(0)}% — объём иссяк: движение слабо поддержано`});
+        else items.push({type:'neutral', text:`VO = ${vo.toFixed(0)}% — объём в пределах нормы`});
+        html += makeCard('Volume Oscillator (неклассически)', items);
+      }
+    } else if (idL === 'vwma') {
+      const n = candles.length;
+      const per=20;
+      if (n >= per) {
+        const items = [];
+        let vwmaVal=0,volS=0;
+        for(let i=n-per;i<n;i++) { const v=candles[i].volume||0; vwmaVal+=closes[i]*v; volS+=v; }
+        vwmaVal=volS>0?vwmaVal/volS:closes[n-1];
+        const dev=(closes[n-1]-vwmaVal)/vwmaVal*100;
+        if(Math.abs(dev)<0.5) items.push({type:'neutral', text:`Цена ≈ VWMA: объёмно-взвешенный центр прямо здесь`});
+        else if(dev>0) items.push({type:'bullish', text:`Цена на ${dev.toFixed(1)}% выше VWMA — участники с большим объёмом в прибыли: поддержка сильная`});
+        else items.push({type:'bearish', text:`Цена на ${Math.abs(dev).toFixed(1)}% ниже VWMA — давление продаж от крупных объёмов`});
+        html += makeCard('VWMA (неклассически)', items);
+      }
+    } else if (idL === 'fractals') {
+      const n = candles.length;
+      if (n >= 10) {
+        const items = [];
+        let lastUp=null, lastDn=null;
+        for(let i=2;i<n-2;i++) {
+          if(candles[i].high>candles[i-1].high&&candles[i].high>candles[i-2].high&&candles[i].high>candles[i+1].high&&candles[i].high>candles[i+2].high) lastUp=candles[i].high;
+          if(candles[i].low<candles[i-1].low&&candles[i].low<candles[i-2].low&&candles[i].low<candles[i+1].low&&candles[i].low<candles[i+2].low) lastDn=candles[i].low;
+        }
+        if(lastUp&&closes[n-1]>lastUp) items.push({type:'bullish', text:`Цена выше последнего фрактального максимума (${lastUp.toFixed(2)}) — структурный прорыв вверх`});
+        else if(lastDn&&closes[n-1]<lastDn) items.push({type:'bearish', text:`Цена ниже последнего фрактального минимума (${lastDn.toFixed(2)}) — структурный прорыв вниз`});
+        else { if(lastUp) items.push({type:'neutral', text:`Фрактальный максимум: ${lastUp.toFixed(2)} — цель для быков`}); if(lastDn) items.push({type:'neutral', text:`Фрактальный минимум: ${lastDn.toFixed(2)} — цель для медведей`}); }
+        if(!items.length) items.push({type:'neutral', text:'Fractals: нет подтверждённых фракталов'});
+        html += makeCard('Fractals Вильямса (неклассически)', items);
+      }
+    } else if (idL === 'mcginley') {
+      const n = candles.length;
+      const per=10;
+      if (n >= per+5) {
+        const items = [];
+        let md=closes[0];
+        for(let i=1;i<n;i++) md=md+(closes[i]-md)/(per*Math.pow(closes[i]/md,4)||1);
+        const dev=(closes[n-1]-md)/md*100;
+        items.push({type:dev>0?'bullish':'bearish', text:`McGinley Dynamic: цена ${dev>0?'выше':'ниже'} на ${Math.abs(dev).toFixed(2)}% — авто-адаптивная MA устраняет задержку`});
+        if(Math.abs(dev)<0.3) items.push({type:'neutral', text:`Цена ≈ McGinley — равновесие, рынок в балансе`});
+        html += makeCard('McGinley Dynamic (неклассически)', items);
+      }
+    } else if (idL === 'std_dev') {
+      const n = candles.length;
+      const per=20;
+      if (n >= per) {
+        const items = [];
+        const sl=closes.slice(n-per);
+        const avg=sl.reduce((a,b)=>a+b,0)/per;
+        const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/(per-1));
+        const sdPct=sd/avg*100;
+        if(sdPct>4) items.push({type:'neutral', text:`σ = ${sdPct.toFixed(1)}% — высокое отклонение: рынок в возбуждении, уровни ненадёжны`});
+        else if(sdPct<1) items.push({type:'neutral', text:`σ = ${sdPct.toFixed(1)}% — очень низкое: флэт/компрессия, пробой будет резким`});
+        else items.push({type:'neutral', text:`σ = ${sdPct.toFixed(1)}% цены — нормальный разброс`});
+        html += makeCard('Стандартное отклонение (неклассически)', items);
+      }
+    } else if (idL.includes('envelopes')) {
+      const n = candles.length;
+      const per=20;
+      if (n >= per) {
+        const items = [];
+        const ma=closes.slice(n-per).reduce((a,b)=>a+b,0)/per;
+        const pct=2.5/100;
+        const upper=ma*(1+pct), lower=ma*(1-pct);
+        const last=closes[n-1];
+        if(last>upper) items.push({type:'bearish', text:`Цена выше верхнего конверта — сигнал перекупленности; в тренде может ходить выше конверта долго`});
+        else if(last<lower) items.push({type:'bullish', text:`Цена ниже нижнего конверта — перепроданность; в тренде может держаться ниже`});
+        else items.push({type:'neutral', text:`Цена внутри конвертов ± ${(pct*100).toFixed(1)}%`});
+        html += makeCard('Envelopes (неклассически)', items);
+      }
+    } else if (idL === 'dpo') {
+      const n = candles.length;
+      const per=20;
+      if (n >= per+per/2) {
+        const items = [];
+        const shift=Math.floor(per/2)+1;
+        const idx=n-1-shift;
+        const sl=closes.slice(Math.max(0,idx-per+1), idx+1);
+        const sma=sl.reduce((a,b)=>a+b,0)/sl.length;
+        const dpo=closes[n-1]-sma;
+        items.push({type:dpo>0?'bullish':'bearish', text:`DPO = ${dpo.toFixed(2)}: цена ${dpo>0?'выше':'ниже'} цикличного центра — деталь цикличного анализа без влияния долгосрочного тренда`});
+        html += makeCard('DPO / Деттрендовый осциллятор (неклассически)', items);
+      }
+    } else if (idL === 'chaikin_vol') {
+      const n = candles.length;
+      const per=10;
+      if (n >= per*2) {
+        const items = [];
+        const hl=candles.map(c=>c.high-c.low);
+        const ema=_chartCalcEMA(hl, per);
+        const now=ema[n-1], prev10=ema[n-1-per];
+        if(now&&prev10) {
+          const chg=(now-prev10)/prev10*100;
+          if(chg>20) items.push({type:'neutral', text:`Chaikin Vol +${chg.toFixed(0)}% — диапазон расширяется: сделки крупных участников`});
+          else if(chg<-20) items.push({type:'neutral', text:`Chaikin Vol ${chg.toFixed(0)}% — диапазон сжимается: нарастает компрессия`});
+          else items.push({type:'neutral', text:`Chaikin Volatility ${chg.toFixed(0)}% — умеренное изменение диапазона`});
+        }
+        if(!items.length) items.push({type:'neutral',text:'Chaikin Volatility активен'});
+        html += makeCard('Chaikin Volatility (неклассически)', items);
+      }
+    } else if (idL === 'pvi') {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        let pvi=1000; const pviArr=[1000];
+        for(let i=1;i<n;i++) {
+          if((candles[i].volume||0)>(candles[i-1].volume||0)) pvi+=pvi*(closes[i]-closes[i-1])/closes[i-1];
+          pviArr.push(pvi);
+        }
+        const sma=pviArr.slice(-50).reduce((a,b)=>a+b,0)/Math.min(50,pviArr.length);
+        items.push({type:pviArr[n-1]>sma?'neutral':'neutral', text:`PVI ${pviArr[n-1]>sma?'выше':'ниже'} своей средней — высокий объём ${pviArr[n-1]>sma?'двигает цену вверх':'распределяется вниз'}`});
+        html += makeCard('PVI / Индекс положительного объёма', items);
+      }
+    } else if (idL.includes('atr_stop') || idL.includes('atr_ch') || idL.includes('atr_w')) {
+      const n = candles.length;
+      const per=14;
+      if (n >= per) {
+        const items = [];
+        const tr=candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high,candles[i-1].close)-Math.min(c.low,candles[i-1].close));
+        let atr=tr.slice(0,per).reduce((a,b)=>a+b,0)/per;
+        for(let i=per;i<n;i++) atr=(atr*(per-1)+tr[i])/per;
+        const pct=atr/closes[n-1]*100;
+        items.push({type:'neutral', text:`ATR = ${atr.toFixed(2)} (${pct.toFixed(1)}% от цены) — ставь стоп минимум за ${(atr*1.5).toFixed(2)} от входа`});
+        if(pct>3) items.push({type:'neutral', text:`ATR высокий — позиция требует широкого стопа или меньшего объёма`});
+        html += makeCard('ATR / Управление стопом (неклассически)', items);
+      }
+    } else if (idL.includes('ichi_tk') || idL.includes('ichi_cloud')) {
+      const n = candles.length;
+      if (n >= 52) {
+        const items = [];
+        const highK=i=>Math.max(...candles.slice(i-8,i+1).map(c=>c.high));
+        const lowK=i=>Math.min(...candles.slice(i-8,i+1).map(c=>c.low));
+        const highKi=i=>Math.max(...candles.slice(i-25,i+1).map(c=>c.high));
+        const lowKi=i=>Math.min(...candles.slice(i-25,i+1).map(c=>c.low));
+        const tenkan=(highK(n-1)+lowK(n-1))/2;
+        const kijun=(highKi(n-1)+lowKi(n-1))/2;
+        const spanA=(tenkan+kijun)/2;
+        const spanBH=Math.max(...candles.slice(n-52,n).map(c=>c.high));
+        const spanBL=Math.min(...candles.slice(n-52,n).map(c=>c.low));
+        const spanB=(spanBH+spanBL)/2;
+        const last=closes[n-1];
+        const aboveCloud=last>Math.max(spanA,spanB), belowCloud=last<Math.min(spanA,spanB);
+        if(aboveCloud) items.push({type:'bullish', text:`Цена выше облака Kumo — бычий контекст по Ишимоку`});
+        else if(belowCloud) items.push({type:'bearish', text:`Цена ниже облака Kumo — медвежий контекст`});
+        else items.push({type:'neutral', text:`Цена внутри облака Kumo — зона неопределённости`});
+        if(tenkan>kijun) items.push({type:'bullish', text:`TK Cross бычий: Tenkan выше Kijun`});
+        else if(tenkan<kijun) items.push({type:'bearish', text:`TK Cross медвежий: Tenkan ниже Kijun`});
+        html += makeCard('Ichimoku (TK/Kumo, неклассически)', items);
+      }
+    } else if (idL.includes('bb_full') || idL.includes('ma_channel') || idL.includes('price_ch')) {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const last=closes[n-1];
+        const ma=closes.slice(n-20).reduce((a,b)=>a+b,0)/20;
+        items.push({type:last>ma?'bullish':'bearish', text:`Цена ${last>ma?'выше':'ниже'} MA(20) — ${last>ma?'бычий':'медвежий'} контекст`});
+        html += makeCard('Канал / MA (неклассически)', items);
+      }
+    } else if (idL === 'rsi_w') {
+      const n = candles.length;
+      if (n >= 14) {
+        const items = [];
+        const rsi=_chartCalcRSI(closes, 14);
+        const val=rsi[n-1];
+        if(val!==null) {
+          if(val>=70) items.push({type:'bullish', text:`RSI(Wilder) = ${val.toFixed(1)} — в тренде остаётся выше 70 долго: продавать рано`});
+          else if(val<=30) items.push({type:'bearish', text:`RSI(Wilder) = ${val.toFixed(1)} — перепродан; в тренде прилипает к 30`});
+          else items.push({type:'neutral', text:`RSI(Wilder) = ${val.toFixed(1)}`});
+        }
+        html += makeCard('RSI Wilder (неклассически)', items);
+      }
     } else {
       html += makeCard(id, [{type:'neutral', text:`Индикатор активен`}]);
     }
