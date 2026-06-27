@@ -738,10 +738,20 @@ input[type=range] { touch-action: none; }
 
 <!-- ══ ANALYSIS PAGE ══ -->
 <div id="page-analysis" class="page">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
     <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;">
-    <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить анализ</button>
+    <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
     <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
+  </div>
+  <div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;">
+    <span style="font-size:9px;color:#3a3050;font-family:var(--mono);align-self:center;margin-right:4px;">ТФ:</span>
+    <button class="an-tf active" data-tf="CANDLE_INTERVAL_5_MIN"  data-label="5 мин"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);background:rgba(82,242,201,0.12);color:#52F2C9;">5м</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_15_MIN" data-label="15 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">15м</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_30_MIN" data-label="30 мин" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">30м</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_HOUR"   data-label="1 час"  onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1ч</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_2_HOUR" data-label="2 часа" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">2ч</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_4_HOUR" data-label="4 часа" onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">4ч</button>
+    <button class="an-tf"        data-tf="CANDLE_INTERVAL_DAY"    data-label="день"   onclick="anSetTF(this)" style="padding:3px 9px;border-radius:5px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:var(--text3);">1д</button>
   </div>
   <div id="an-results"></div>
 </div>
@@ -9893,11 +9903,11 @@ async function ilFindFigi(ticker, token, proxy) {
 // Непрерывный ряд свечей для фьючерса: если у текущего контракта мало истории
 // (свежий контракт только начал торговаться), достраиваем хвост из предыдущего
 // контракта той же цепочки (общий basicAsset) — для бэктеста индикаторов.
-async function ilGetCandlesChain(found, token, from, now, proxy) {
+async function ilGetCandlesChain(found, token, from, now, proxy, interval) {
   const fetchCandles = async (figi, f, t) => {
     const cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
       method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
-      body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval:'CANDLE_INTERVAL_DAY'})
+      body: JSON.stringify({figi, from:f.toISOString(), to:t.toISOString(), interval: interval||'CANDLE_INTERVAL_DAY'})
     });
     if (!cr.ok) throw new Error('GetCandles '+cr.status);
     const cd = await cr.json();
@@ -11058,6 +11068,19 @@ function _ilPearson(a, b) {
 
 let _ilBtResults = null;
 
+function anSetTF(btn) {
+  document.querySelectorAll('.an-tf').forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'rgba(255,255,255,0.03)';
+    b.style.color = 'var(--text3)';
+    b.style.borderColor = 'rgba(255,255,255,0.1)';
+  });
+  btn.classList.add('active');
+  btn.style.background = 'rgba(82,242,201,0.12)';
+  btn.style.color = '#52F2C9';
+  btn.style.borderColor = 'rgba(82,242,201,0.4)';
+}
+
 async function ilRunAnalysis() {
   const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
   const statusEl = document.getElementById('an-status');
@@ -11067,12 +11090,20 @@ async function ilRunAnalysis() {
   try {
     const found = await ilFindFigi(ticker, token, chartGetProxy?.());
     if (!found) throw new Error('Тикер не найден: '+ticker);
+    const tfBtn = document.querySelector('.an-tf.active');
+    const tfConst = tfBtn?.dataset?.tf || 'CANDLE_INTERVAL_DAY';
+    const tfLabel = tfBtn?.dataset?.label || 'день';
+    const tfDays = {
+      CANDLE_INTERVAL_5_MIN:5, CANDLE_INTERVAL_15_MIN:14, CANDLE_INTERVAL_30_MIN:30,
+      CANDLE_INTERVAL_HOUR:60, CANDLE_INTERVAL_2_HOUR:120, CANDLE_INTERVAL_4_HOUR:250,
+      CANDLE_INTERVAL_DAY:500
+    }[tfConst] || 90;
     const now=new Date(), from=new Date(now);
-    from.setDate(from.getDate()-90);
-    const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.());
+    from.setDate(from.getDate()-tfDays);
+    const {candles} = await ilGetCandlesChain(found, token, from, now, chartGetProxy?.(), tfConst);
     if (candles.length<30) throw new Error('Мало данных: '+candles.length+' свечей');
     const closes = candles.map(c=>c.close);
-    const interval = 'день';
+    const interval = tfLabel;
     if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
     const ss = _ilCalcAllSeries(candles, closes);
     // Режимная маска: trending = |5-bar return| ≥ медианы
