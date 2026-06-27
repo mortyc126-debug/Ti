@@ -9651,26 +9651,61 @@ function renderAnalysis() {
     if (idL.includes('rsi') && !idL.includes('macd')) {
       const period = 14;
       const rsiVals = _anCalcRSI(closes, period);
-      if (rsiVals && rsiVals.length >= 3) {
-        const r = rsiVals[rsiVals.length - 1];
-        const r1 = rsiVals[rsiVals.length - 2];
-        const r2 = rsiVals[rsiVals.length - 3];
+      if (rsiVals && rsiVals.length >= 10) {
+        const nR = rsiVals.length;
+        const r=rsiVals[nR-1], r1=rsiVals[nR-2], r2=rsiVals[nR-3];
         const items = [];
-        if (r > 95 || r < 5) {
-          items.push({type:'neutral', text:`Краткосрочный экстремум (RSI=${r.toFixed(1)}), статистически вероятен откат в течение 1-3 свечей`});
-        } else if (r > 70) {
-          if (r > r1 && r1 > r2) items.push({type:'bullish', text:`Импульс силён, RSI=${r.toFixed(1)} удерживается в зоне перегрева — признак каскада, не разворота`});
-          else if (r < r1) items.push({type:'bearish', text:`Momentum ослабевает при продолжении роста — дивергенция, затухание (RSI=${r.toFixed(1)})`});
-          else items.push({type:'neutral', text:`RSI = ${r.toFixed(1)}`});
-        } else if (r < 30) {
-          if (r < r1) items.push({type:'bearish', text:`Импульс вниз силён (RSI=${r.toFixed(1)})`});
-          else items.push({type:'bullish', text:`Momentum снизу ослабевает — возможен отскок (RSI=${r.toFixed(1)})`});
-        } else if (r >= 40 && r <= 60) {
-          items.push({type:'neutral', text:`RSI в нейтральной зоне (${r.toFixed(1)}), направленного импульса нет`});
-        } else {
-          items.push({type:'neutral', text:`RSI = ${r.toFixed(1)}`});
+
+        // 1. Скорость прихода к экстремуму (за сколько баров RSI поднялся/упал на >30 пунктов)
+        let barsToExtreme = null;
+        if (r > 60 || r < 40) {
+          const threshold = r > 60 ? r - 30 : r + 30;
+          for (let i = nR-2; i >= Math.max(0,nR-15); i--) {
+            if ((r>60 && rsiVals[i] < threshold) || (r<40 && rsiVals[i] > threshold)) {
+              barsToExtreme = nR-1-i; break;
+            }
+          }
         }
-        html += makeCard(`RSI(${period})`, items, 'rsi');
+
+        if (r > 95 || r < 5) {
+          items.push({type:'neutral', text:`Краткосрочный экстремум RSI=${r.toFixed(1)} — статистически вероятен откат 1-3 свечи`});
+        } else if (r > 70) {
+          if (r > r1 && r1 > r2) {
+            const speed = barsToExtreme ? `за ${barsToExtreme} баров` : '';
+            items.push({type:'bullish', text:`RSI=${r.toFixed(1)} растёт ${speed} — резкий импульс. Признак каскада, не разворота`});
+          } else if (r < r1) {
+            items.push({type:'bearish', text:`RSI=${r.toFixed(1)} но падает — momentum ослабевает при продолжении роста`});
+          } else {
+            items.push({type:'neutral', text:`RSI=${r.toFixed(1)} в зоне перегрева, без динамики`});
+          }
+        } else if (r < 30) {
+          if (r < r1) {
+            items.push({type:'bearish', text:`RSI=${r.toFixed(1)} падает — импульс вниз силён${barsToExtreme?` (${barsToExtreme} баров)`:''}`});
+          } else {
+            items.push({type:'bullish', text:`RSI=${r.toFixed(1)} перестал падать — momentum снизу ослабевает`});
+          }
+        } else {
+          items.push({type:'neutral', text:`RSI=${r.toFixed(1)}${barsToExtreme?` — пришёл сюда за ${barsToExtreme} баров`:''}`});
+        }
+
+        // 2. Дивергенция: цена делает новый экстремум, RSI нет (третий затухающий импульс)
+        if (closes.length >= 20 && nR >= 20) {
+          const lookback = 20;
+          const priceHigh1 = Math.max(...closes.slice(-lookback));
+          const priceHigh0 = closes[closes.length-1];
+          const rsiHigh1 = Math.max(...rsiVals.slice(-lookback));
+          if (priceHigh0 >= priceHigh1 * 0.999 && r < rsiHigh1 * 0.95) {
+            items.push({type:'bearish', text:`Бычья дивергенция RSI: новый хай цены без нового хая RSI — затухание импульса, третий удар?`});
+          }
+          const priceLow1 = Math.min(...closes.slice(-lookback));
+          const priceLow0 = closes[closes.length-1];
+          const rsiLow1 = Math.min(...rsiVals.slice(-lookback));
+          if (priceLow0 <= priceLow1 * 1.001 && r > rsiLow1 * 1.05) {
+            items.push({type:'bullish', text:`Медвежья дивергенция RSI: новый лоу цены без нового лоу RSI — затухание падения`});
+          }
+        }
+
+        html += makeCard(`RSI(${period}) (неклассически)`, items, 'rsi');
       }
     } else if (idL.includes('macd')) {
       if (closes.length >= 35) {
@@ -9872,54 +9907,81 @@ function renderAnalysis() {
       const teeth = smmaAl(mid, 8, 5);
       const lips = smmaAl(mid, 5, 3);
       const nAl = jaw.length;
-      if (nAl >= 4) {
-        const j0 = jaw[nAl-1], j1 = jaw[nAl-2];
-        const t0 = teeth[nAl-1], t1 = teeth[nAl-2];
-        const l0 = lips[nAl-1], l1 = lips[nAl-2];
-        if (j0 != null && t0 != null && l0 != null) {
-          const lipsTSpread = Math.abs(l0 - t0), prev = Math.abs(l1 - t1);
-          const teethJSpread = Math.abs(t0 - j0), prevTJ = Math.abs(t1 - j1);
+      if (nAl >= 10) {
+        const j0=jaw[nAl-1], j1=jaw[nAl-2], j5=jaw[nAl-6];
+        const t0=teeth[nAl-1], t1=teeth[nAl-2], t5=teeth[nAl-6];
+        const l0=lips[nAl-1], l1=lips[nAl-2], l5=lips[nAl-6];
+        if (j0!=null && t0!=null && l0!=null && j5!=null && t5!=null && l5!=null) {
           const items = [];
-          if (lipsTSpread > prev && teethJSpread > prevTJ) {
-            items.push({type:'bullish', text:`Аллигатор ест — тренд в полной силе`});
-          } else if (lipsTSpread < prev && teethJSpread < prevTJ) {
-            items.push({type:'neutral', text:`Аллигатор спит — компрессия, готовится движение`});
+          // 1. Рот — сила тренда
+          const spreadNow = Math.abs(j0-t0) + Math.abs(t0-l0);
+          const spreadPrev = Math.abs(j1-t1) + Math.abs(t1-l1);
+          const spread5ago = Math.abs(j5-t5) + Math.abs(t5-l5);
+          const expanding = spreadNow > spreadPrev;
+          const wasSleeping = spread5ago < spreadNow * 0.5;
+          if (expanding && wasSleeping) {
+            items.push({type:'bullish', text:`Аллигатор просыпается после сжатия — начало направленного движения, момент входа`});
+          } else if (expanding) {
+            // 2. Скорость расхождения
+            const speed = (spreadNow - spreadPrev) / (spreadPrev || 0.0001);
+            if (speed > 0.2) items.push({type:'bullish', text:`Резкое расхождение всех трёх линий (+${(speed*100).toFixed(0)}%) — каскад в полную силу`});
+            else items.push({type:'bullish', text:`Аллигатор ест — тренд активен, линии расходятся медленно (возможна ловушка)`});
+          } else if (spreadNow < spread5ago * 0.6) {
+            items.push({type:'neutral', text:`Аллигатор спит — максимальная компрессия. Энергия накоплена, следующий выброс будет резким`});
           } else {
-            items.push({type:'neutral', text:`Аллигатор в переходном состоянии`});
+            items.push({type:'neutral', text:`Аллигатор сыт — расхождение замедляется, тренд теряет силу`});
           }
-          html += makeCard('Alligator', items, 'alligator');
+          // 3. Динамические зоны притяжения: где цена на откате
+          const lastC = closes[closes.length-1];
+          const toTeeth = Math.abs(lastC - t0) / lastC * 100;
+          const toJaw   = Math.abs(lastC - j0) / lastC * 100;
+          if (expanding && toTeeth < 0.3) items.push({type:'bullish', text:`Цена у зубов (${t0.toFixed(4)}) — классическая точка входа на откате внутри тренда`});
+          else if (expanding && toJaw < 0.3) items.push({type:'neutral', text:`Цена у челюсти (${j0.toFixed(4)}) — линия нарушена, тренд под вопросом`});
+          // 4. Порядок линий как направление
+          if (l0>t0 && t0>j0) items.push({type:'bullish', text:`Порядок: губы > зубы > челюсть — бычье выравнивание`});
+          else if (l0<t0 && t0<j0) items.push({type:'bearish', text:`Порядок: губы < зубы < челюсть — медвежье выравнивание`});
+          html += makeCard('Alligator (неклассически)', items, 'alligator');
         }
       }
     } else if ((idL.includes('ma') || idL.includes('ema')) && !idL.includes('macd') && !idL.includes('smma')) {
       if (closes.length >= 50) {
-        const sma20 = _anCalcSMA(closes, 20);
-        const sma5 = _anCalcSMA(closes, 5);
-        const sma50 = _anCalcSMA(closes, 50);
         const n = closes.length;
-        const ma20 = sma20[n-1];
+        const ek=(arr,p)=>{const k=2/(p+1);let s=arr[0];return arr.map(v=>{s=s*(1-k)+v*k;return s;});};
+        const e8=ek(closes,8),e13=ek(closes,13),e21=ek(closes,21),e34=ek(closes,34);
         const items = [];
-        if (ma20) {
-          const dev = (closes[n-1] - ma20) / ma20;
-          const ma20std = (() => {
-            let v = 0;
-            for (let i = n-20; i < n; i++) v += (closes[i] - ma20) ** 2;
-            return Math.sqrt(v / 20);
-          })();
-          if (Math.abs(closes[n-1] - ma20) > 3 * ma20std) {
-            items.push({type: dev > 0 ? 'bullish' : 'bearish', text:`Цена сильно оторвалась от MA20 (${(dev*100).toFixed(2)}%) — резинка натянута`});
-          }
-          const slope = (sma20[n-1] - sma20[n-4]) / sma20[n-4] * 100;
-          if (Math.abs(slope) > 0.5) {
-            items.push({type:'neutral', text:`Резкий перегиб MA — импульс реальный, не шум (угол ${slope.toFixed(2)}%)`});
-          }
-          const m5 = sma5[n-1], m50 = sma50[n-1];
-          if (m5 && m50) {
-            if (m5 > ma20 && ma20 > m50) items.push({type:'bullish', text:`Веер MA выстроен (5 > 20 > 50) — тренд чистый`});
-            else if (m5 < ma20 && ma20 < m50) items.push({type:'bearish', text:`Медвежий веер MA (5 < 20 < 50) — тренд вниз чистый`});
-          }
-          if (!items.length) items.push({type:'neutral', text:`MA20 = ${ma20.toFixed(4)}, отклонение ${(dev*100).toFixed(2)}%`});
+
+        // 1. Лента EMA — порядок как чистота тренда
+        const v8=e8[n-1],v13=e13[n-1],v21=e21[n-1],v34=e34[n-1];
+        const bullFan = v8>v13 && v13>v21 && v21>v34;
+        const bearFan = v8<v13 && v13<v21 && v21<v34;
+        if (bullFan) items.push({type:'bullish', text:`Веер EMA выстроен (8>13>21>34) — тренд чистый и сильный`});
+        else if (bearFan) items.push({type:'bearish', text:`Медвежий веер EMA (8<13<21<34) — тренд вниз чистый`});
+        else items.push({type:'neutral', text:`EMA переплетаются — рынок в хаосе, входить опасно`});
+
+        // 2. Угол EMA как спидометр (изменение e21 за 5 баров)
+        const slope5 = (e21[n-1]-e21[n-6])/e21[n-6]*100;
+        const slopeWas = (e21[n-6]-e21[n-11])/e21[n-11]*100;
+        if (Math.abs(slope5) > 0.3) {
+          items.push({type:slope5>0?'bullish':'bearish', text:`Угол EMA21: ${slope5.toFixed(2)}% за 5 баров — ${Math.abs(slope5)>0.8?'сильный импульс':'умеренный импульс'}`});
         }
-        html += makeCard('MA/EMA', items, 'ma');
+        if (Math.abs(slope5) < Math.abs(slopeWas)*0.5 && Math.abs(slopeWas)>0.3) {
+          items.push({type:'neutral', text:`Угол EMA21 уменьшился вдвое — затухание импульса при продолжении цены`});
+        }
+
+        // 3. Отрыв цены от EMA21 — натянутая резинка
+        const dev21 = (closes[n-1]-v21)/v21*100;
+        if (Math.abs(dev21) > 2) {
+          items.push({type:dev21>0?'bearish':'bullish', text:`Отрыв от EMA21: ${dev21.toFixed(1)}% — резинка натянута. ${dev21>0?'На каскаде: сигнал силы, не разворота':'Цена далеко от средней вниз'}`});
+        }
+
+        // 4. Угол пересечения e8/e21 — сила смены моментума
+        const crossBars = [0,1,2,3,4].find(i=>(e8[n-1-i]-e21[n-1-i])*(e8[n-2-i]-e21[n-2-i])<0);
+        if (crossBars!=null && crossBars<=3) {
+          const crossSpeed = Math.abs(e8[n-1]-e21[n-1])/(e21[n-1]||1)*100;
+          items.push({type:e8[n-1]>e21[n-1]?'bullish':'bearish', text:`Пересечение EMA8/21 ${crossBars} баров назад, угол ${crossSpeed.toFixed(2)}% — ${crossSpeed>0.3?'участники реально переключились':'слабый сигнал, возможен возврат'}`});
+        }
+
+        html += makeCard('MA/EMA (неклассически)', items, 'ma');
       }
     } else if (idL.includes('donchian') || idL === 'dc') {
       const period = 20;
@@ -10300,21 +10362,39 @@ function renderAnalysis() {
       }
     } else if (idL === 'pivot') {
       const n = candles.length;
-      if (n >= 2) {
+      if (n >= 3) {
         const items = [];
         const prev = candles[n-2];
         const pp = (prev.high+prev.low+prev.close)/3;
-        const r1=2*pp-prev.low, s1=2*pp-prev.high;
-        const r2=pp+(prev.high-prev.low), s2=pp-(prev.high-prev.low);
-        const last=closes[n-1];
-        items.push({type:'neutral', text:`Пивот P = ${pp.toFixed(2)} — точка равновесия: выше = быки контролируют, ниже = медведи`});
-        if(last>r1) items.push({type:'bullish', text:`Цена выше R1 (${r1.toFixed(2)}) — сильный бычий день`});
-        else if(last>pp) items.push({type:'bullish', text:`Цена между P и R1 — лёгкое бычье преимущество`});
-        else if(last>s1) items.push({type:'bearish', text:`Цена между S1 и P — лёгкое медвежье давление`});
-        else items.push({type:'bearish', text:`Цена ниже S1 (${s1.toFixed(2)}) — сильный медвежий день`});
-        // Открытие относительно P
-        const open0=candles[n-1].open;
-        if(Math.abs(open0-pp)/pp<0.002) items.push({type:'neutral', text:`Открытие у пивота — день без выраженного контроля, жди пробоя`});
+        const r1=2*pp-prev.low, r2=pp+(prev.high-prev.low);
+        const s1=2*pp-prev.high, s2=pp-(prev.high-prev.low);
+        const last=closes[n-1], open0=candles[n-1].open;
+        const prevLast=closes[n-2];
+
+        // 1. Пивот как маркер баланса, не уровень входа
+        const abovePP = last > pp;
+        items.push({type:'neutral', text:`Пивот P = ${pp.toFixed(4)} — вчерашняя средняя цена. Сегодня ${abovePP?'выше':'ниже'} — ${abovePP?'покупатели контролируют':'продавцы контролируют'}`});
+
+        // 2. Открытие выше пивота + удержание = сила
+        if (open0 > pp && last > pp) {
+          items.push({type:'bullish', text:`Открытись выше пивота и удерживается — покупатели в контроле весь бар`});
+        } else if (open0 < pp && last < pp) {
+          items.push({type:'bearish', text:`Открылись ниже пивота и удерживается — продавцы в контроле весь бар`});
+        }
+
+        // 3. Пробой пивота = смена контроля и часто ускорение
+        const crossedPP = (prevLast > pp && last < pp) || (prevLast < pp && last > pp);
+        if (crossedPP) {
+          const dir = last < pp ? 'вниз' : 'вверх';
+          items.push({type:last<pp?'bearish':'bullish', text:`Цена пробила пивот ${dir} — смена контроля. Те кто был на другой стороне теперь в убытке → вероятно ускорение`});
+        }
+
+        // 4. Положение относительно R1/S1/R2/S2
+        if (last > r2) items.push({type:'bullish', text:`Выше R2 (${r2.toFixed(4)}) — исключительно сильный день`});
+        else if (last > r1) items.push({type:'bullish', text:`Между R1 и R2 — сильный бычий день, мало продавцов`});
+        else if (last < s2) items.push({type:'bearish', text:`Ниже S2 (${s2.toFixed(4)}) — исключительно слабый день`});
+        else if (last < s1) items.push({type:'bearish', text:`Между S1 и S2 — сильный медвежий день`});
+
         html += makeCard('Pivot Points (неклассически)', items, 'pivot');
       }
     } else if (idL === 'zigzag') {
