@@ -11223,20 +11223,20 @@ function ilRenderAnalysis() {
           <th style="padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;white-space:nowrap;">Тренд / Бок</th>
           <th style="padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Bias</th>
         </tr></thead>`;
-    ids.forEach(id=>{
+    ids.filter(id=>{ const s=r.stats[id]; return s&&(s.h5?.n>=5||s.h10?.n>=5||s.h15?.n>=5||s.h30?.n>=5); }).forEach(id=>{
       const s5=r.stats[id].h5, s10=r.stats[id].h10, s15=r.stats[id].h15, s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T, s15R=r.stats[id].h15R;
       const bias=s15?.bias;
       const biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—';
       const biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#C8A840':'#5a5070';
       html+=`<tr style="border-top:1px solid #180f28;">
-        <td style="padding:5px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td>
-        <td style="text-align:center;padding:5px 8px;">${acc(s5)}</td>
-        <td style="text-align:center;padding:5px 8px;">${acc(s10)}</td>
-        <td style="text-align:center;padding:5px 8px;">${acc(s15)}</td>
-        <td style="text-align:center;padding:5px 8px;">${acc(s30)}</td>
-        <td style="text-align:center;padding:5px 8px;">${regDiff(s15T,s15R)}</td>
-        <td style="text-align:center;padding:5px 8px;color:${biasCol}">${biasStr}</td>
+        <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}</td>
+        <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s5)}</td>
+        <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s10)}</td>
+        <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s15)}</td>
+        <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s30)}</td>
+        <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${regDiff(s15T,s15R)}</td>
+        <td style="text-align:center;padding:5px 8px;vertical-align:middle;color:${biasCol}">${biasStr}</td>
       </tr>`;
     });
     html+=`</table></div>`;
@@ -11249,10 +11249,10 @@ function ilRenderAnalysis() {
     html+=`<div style="margin-bottom:14px;"><div style="font-size:10px;color:#7068a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding:5px 8px;background:rgba(255,255,255,0.015);">Прочие</div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
         <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h10lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Тренд/Бок</th><th style="padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Bias</th></tr>`;
-    rest.forEach(id=>{
+    rest.filter(id=>{ const s=r.stats[id]; return s&&(s.h5?.n>=5||s.h10?.n>=5||s.h15?.n>=5||s.h30?.n>=5); }).forEach(id=>{
       const s5=r.stats[id].h5,s10=r.stats[id].h10,s15=r.stats[id].h15,s30=r.stats[id].h30,s15T=r.stats[id].h15T,s15R=r.stats[id].h15R;
       const bias=s15?.bias,biasStr=bias!=null?`${(bias*100).toFixed(0)}%`:'—',biasCol=bias!=null&&(bias>0.72||bias<0.28)?'#C8A840':'#5a5070';
-      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 8px;color:${biasCol}">${biasStr}</td></tr>`;
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regDiff(s15T,s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;color:${biasCol}">${biasStr}</td></tr>`;
     });
     html+=`</table></div>`;
   }
