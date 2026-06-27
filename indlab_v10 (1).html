@@ -12138,24 +12138,40 @@ function _renderAnalysisInner(panel) {
         for (let i=kVals.length-1; i>=0; i--) { if(kVals[i]>80) barsInHigh++; else break; }
         for (let i=kVals.length-1; i>=0; i--) { if(kVals[i]<20) barsInLow++; else break; }
 
+        // Скорость и направление K
+        const kSpeed = k - k1; // изменение за 1 бар
+        const kD_spread = d != null ? k - d : 0; // K vs D = короткосрочная vs сглаженная
+
         if (k > 80) {
           if (barsInHigh >= 5) {
-            items.push({type:'bullish', text:`Stochastic выше 80 уже ${barsInHigh} баров и не падает — это сила, не сигнал продажи. Настоящий каскад держит экстремум долго`});
+            items.push({type:'bullish', text:`K=${k.toFixed(0)} держится выше 80 уже ${barsInHigh} баров — это признак сильного тренда, а не перегрева. В каскаде Stochastic "прилипает" к верхней зоне. Чем дольше держится — тем устойчивее импульс`});
+            if (k < k1) items.push({type:'neutral', text:`K начал снижаться (${k1.toFixed(0)} → ${k.toFixed(0)}). Первый сигнал возможного завершения фазы. Если K выйдет из зоны >80 — следующие 2–5 баров могут дать откат`});
           } else if (k < k1 && barsInHigh >= 2) {
-            items.push({type:'bearish', text:`Stochastic начинает выходить из зоны >80 после ${barsInHigh} баров — думать о завершении движения`});
+            items.push({type:'bearish', text:`K=${k.toFixed(0)} выходит из перекупленности (был ${k1.toFixed(0)}). После ${barsInHigh} баров в зоне — вероятна консолидация или небольшой откат. Но не разворот, если тренд сильный`});
           } else {
-            items.push({type:'bullish', text:`Stochastic = ${k.toFixed(0)} — вошёл в зону перегрева. Подожди: если задержится здесь — это сила`});
+            items.push({type:'bullish', text:`K=${k.toFixed(0)} только что вошёл в зону >80. Если задержится здесь 3+ бара — это подтверждение силы, не продавай. Если сразу выйдет — был ложный выброс`});
           }
         } else if (k < 20) {
           if (barsInLow >= 5) {
-            items.push({type:'bearish', text:`Stochastic ниже 20 уже ${barsInLow} баров — давление продавцов устойчиво`});
+            items.push({type:'bearish', text:`K=${k.toFixed(0)} ниже 20 уже ${barsInLow} баров — устойчивое давление продавцов. Цена раз за разом закрывается у минимумов периода. Выход из зоны < 20 = первый признак смены`});
+            if (k > k1) items.push({type:'neutral', text:`K начал отскакивать (${k1.toFixed(0)} → ${k.toFixed(0)}). Потенциальная смена режима. Если K пробьёт 20 снизу вверх — вероятен отскок`});
           } else if (k > k1 && barsInLow >= 2) {
-            items.push({type:'bullish', text:`Stochastic выходит из зоны <20 после ${barsInLow} баров — возможен отскок`});
+            items.push({type:'bullish', text:`K=${k.toFixed(0)} разворачивается из перепроданности (рос с ${k1.toFixed(0)}). После ${barsInLow} баров в зоне <20 — часто следует отскок 10–30% от диапазона. Не разворот тренда, но коррекционное движение`});
           } else {
-            items.push({type:'bearish', text:`Stochastic = ${k.toFixed(0)} — вошёл в перепроданность`});
+            items.push({type:'bearish', text:`K=${k.toFixed(0)} только что вошёл в перепроданность. Если задержится — сигнал силы медведей. Если сразу выйдет выше 20 — ложный сигнал`});
           }
+        } else if (k > 50 && k < 80) {
+          items.push({type:'bullish', text:`K=${k.toFixed(0)} в нейтрально-бычьей зоне (50–80). Цена закрывается выше середины диапазона ${kSpeed>0?'и растёт — накопление продолжается':'но замедляется'}`});
+        } else if (k < 50 && k > 20) {
+          items.push({type:'bearish', text:`K=${k.toFixed(0)} в нейтрально-медвежьей зоне (20–50). Цена закрывается ниже середины диапазона ${kSpeed<0?'и продолжает снижаться':'но падение замедляется'}`});
         } else {
-          items.push({type:'neutral', text:`Stochastic = ${k.toFixed(0)} — между экстремумами, направленного сигнала нет`});
+          items.push({type:'neutral', text:`Stochastic K=${k.toFixed(0)} — нейтральная зона`});
+        }
+
+        // K/D расхождение как опережающий сигнал
+        if (d != null && Math.abs(kD_spread) > 15) {
+          if (kD_spread > 0) items.push({type:'bullish', text:`K(${k.toFixed(0)}) опережает D(${d.toFixed(0)}) на ${kD_spread.toFixed(0)} пунктов — краткосрочный импульс ускоряется вверх быстрее сглаженного. Сигнал усиления движения`});
+          else items.push({type:'bearish', text:`K(${k.toFixed(0)}) опережает D(${d.toFixed(0)}) вниз на ${Math.abs(kD_spread).toFixed(0)} пунктов — краткосрочный импульс падает резче сглаженного. Усиление давления продавцов`});
         }
         // Асимметрия в боковике: сколько баров за последние 20 провёл выше/ниже 50
         if (kVals.length >= 20) {
@@ -12634,23 +12650,56 @@ function _renderAnalysisInner(panel) {
         }
         let adx = dxArr.slice(0, period).reduce((a,b)=>a+b,0) / period;
         for (let i = period; i < dxArr.length; i++) adx = (adx * (period-1) + dxArr[i]) / period;
+        // Для истории ADX вычислим серию
+        const adxHistory = [];
+        {let adxH = dxArr.slice(0, period).reduce((a,b)=>a+b,0) / period;
+        adxHistory.push(adxH);
+        for (let i = period; i < dxArr.length; i++) { adxH = (adxH*(period-1)+dxArr[i])/period; adxHistory.push(adxH); }}
+        const adxPrev5 = adxHistory.length>=6 ? adxHistory[adxHistory.length-6] : adx;
+        const adxRising = adx > adxPrev5;
+        const adxDelta = adx - adxPrev5;
+        const diP = atr14 ? pDM14/atr14*100 : 0;
+        const diM = atr14 ? mDM14/atr14*100 : 0;
+        const diSpread = Math.abs(diP - diM);
         const items = [];
-        if (adx > 25) {
-          const dir = closes[n-1] > closes[n-4] ? 'bullish' : 'bearish';
-          items.push({type: dir, text:`Тренд присутствует, ADX=${adx.toFixed(1)}`});
+
+        // 1. Уровень тренда + контекст
+        if (adx > 50) {
+          const dir = diP > diM ? 'bullish' : 'bearish';
+          items.push({type:dir, text:`ADX=${adx.toFixed(1)} — экстремально сильный тренд. ${dir==='bullish'?'Покупатели доминируют полностью':'Продавцы доминируют полностью'}. На таких уровнях тренд часто заканчивается откатом или консолидацией в ближайшие 5–10 баров`});
+        } else if (adx > 35) {
+          const dir = diP > diM ? 'bullish' : 'bearish';
+          items.push({type:dir, text:`ADX=${adx.toFixed(1)} — сильный тренд. ${diP>diM?`DI+(${diP.toFixed(1)}) > DI−(${diM.toFixed(1)}) — давление покупателей чётко доминирует`:`DI−(${diM.toFixed(1)}) > DI+(${diP.toFixed(1)}) — давление продавцов доминирует`}`});
+        } else if (adx > 25) {
+          const dir = diP > diM ? 'bullish' : 'bearish';
+          items.push({type:dir, text:`ADX=${adx.toFixed(1)} — тренд присутствует. Спред DI: ${diSpread.toFixed(1)} пункта — ${diSpread>10?'уверенное преимущество одной стороны':'небольшой перевес, тренд неустойчивый'}`});
         } else if (adx < 20) {
-          items.push({type:'neutral', text:`Рынок в боковике, трендовые сигналы ненадёжны (ADX=${adx.toFixed(1)})`});
+          items.push({type:'neutral', text:`ADX=${adx.toFixed(1)} — боковик. Тренд отсутствует. Трендовые стратегии убыточны, осцилляторы предпочтительнее. Покупать у нижнего края диапазона, продавать у верхнего`});
         } else {
-          items.push({type:'neutral', text:`ADX=${adx.toFixed(1)} — умеренный тренд`});
+          items.push({type:'neutral', text:`ADX=${adx.toFixed(1)} — переходная зона (20–25). Тренд формируется или затухает. Ждать выхода ADX за 25 для подтверждения`});
+        }
+
+        // 2. Направление движения ADX (растёт или падает)
+        if (Math.abs(adxDelta) > 1) {
+          if (adxRising && adx < 25) {
+            items.push({type:'neutral', text:`ADX растёт (+${adxDelta.toFixed(1)} за 5 баров) из зоны боковика — рынок начинает формировать тренд. Если ADX пробьёт 25 — войти по направлению DI`});
+          } else if (adxRising && adx >= 25) {
+            items.push({type:diP>diM?'bullish':'bearish', text:`ADX набирает силу (+${adxDelta.toFixed(1)} за 5 баров) — тренд ускоряется, не закрывай позицию в направлении ${diP>diM?'покупки':'продажи'} раньше времени`});
+          } else if (!adxRising && adx > 35) {
+            items.push({type:'neutral', text:`ADX начинает снижаться (${adxDelta.toFixed(1)} за 5 баров) с высоких уровней — тренд замедляется. Возможна консолидация или откат, но не разворот`});
+          } else if (!adxRising && adx < 25) {
+            items.push({type:'neutral', text:`ADX снижается — боковик углубляется. Нет смысла торговать по тренду`});
+          }
+        }
+
+        // 3. DI конвергенция/дивергенция
+        if (diSpread < 3 && adx > 15) {
+          items.push({type:'neutral', text:`DI+ (${diP.toFixed(1)}) ≈ DI− (${diM.toFixed(1)}) — линии сходятся. Рынок в равновесии, выброс в любую сторону вероятен. Наблюдай за тем, чья линия уйдёт первой`});
+        } else if (diSpread > 20) {
+          items.push({type:diP>diM?'bullish':'bearish', text:`Огромный спред DI+/DI−: ${diSpread.toFixed(1)} пунктов — ${diP>diM?'быки':'медведи'} безоговорочно контролируют рынок. Откаты будут выкупаться (продаваться)`});
         }
         // Классика ADX: >25 = тренд есть, направление по DI
         const clAdxItems = [];
-        // Recalc DI+ DI- at last bar
-        const lastTR = trArr[trArr.length-1]||0;
-        const lastPDM = plusDM[plusDM.length-1]||0;
-        const lastMDM = minusDM[minusDM.length-1]||0;
-        const diP = lastTR ? pDM14/atr14*100 : 0;
-        const diM = lastTR ? mDM14/atr14*100 : 0;
         if (adx > 25) {
           if (diP > diM) clAdxItems.push({type:'bullish', text:`ADX=${adx.toFixed(1)} > 25 + DI+(${diP.toFixed(1)}) > DI−(${diM.toFixed(1)}) — классический сигнал покупки в сильном тренде`});
           else clAdxItems.push({type:'bearish', text:`ADX=${adx.toFixed(1)} > 25 + DI−(${diM.toFixed(1)}) > DI+(${diP.toFixed(1)}) — классический сигнал продажи в сильном тренде`});
@@ -12673,9 +12722,43 @@ function _renderAnalysisInner(panel) {
         const cci = meanDev ? (typical[n-1] - smaT[n-1]) / (0.015 * meanDev) : 0;
         const priceSlope5 = closes[n-1] - closes[n-5];
         const items = [];
-        if (cci > 100) items.push({type:'bullish', text:`CCI = ${cci.toFixed(1)}: импульс силён`});
-        else if (cci < -100) items.push({type:'bearish', text:`CCI = ${cci.toFixed(1)}: импульс вниз`});
-        else items.push({type:'neutral', text:`CCI = ${cci.toFixed(1)}`});
+        // История CCI за последние бары
+        const cciRecent = [];
+        for (let i = Math.max(period, n-15); i <= n; i++) {
+          const sl = typical.slice(i-period, i), avg2 = sl.reduce((a,b)=>a+b,0)/period;
+          const md2 = sl.reduce((a,b)=>a+Math.abs(b-avg2),0)/period;
+          cciRecent.push(md2 ? (typical[i-1]-avg2)/(0.015*md2) : 0);
+        }
+        const cciPrev = cciRecent.length>=2 ? cciRecent[cciRecent.length-2] : cci;
+        const cciPrev5 = cciRecent.length>=6 ? cciRecent[cciRecent.length-6] : cci;
+        const cciRising = cci > cciPrev;
+        const cciDelta5 = cci - cciPrev5;
+
+        // 1. Текущий уровень + динамика
+        if (cci > 200) {
+          items.push({type:'bullish', text:`CCI=${cci.toFixed(1)} — экстремально высокий импульс. Рынок в состоянии хаоса покупок. Статистически это предшествует резкому охлаждению, но не сразу: в 40–50% случаев ещё 1–3 бара продолжения`});
+        } else if (cci > 100) {
+          if (cciRising) items.push({type:'bullish', text:`CCI=${cci.toFixed(1)} и растёт — сильный импульс продолжается. Цена систематически закрывается выше своей 20-дневной средней. Тренд здоровый`});
+          else items.push({type:'neutral', text:`CCI=${cci.toFixed(1)} но начинает снижаться — импульс перегревается. Следи за падением CCI ниже 100: это первый сигнал завершения фазы`});
+        } else if (cci < -200) {
+          items.push({type:'bearish', text:`CCI=${cci.toFixed(1)} — крайнее медвежье давление. Цена сильно ниже нормы. Возможен кратковременный отскок из-за перепроданности, но направление вниз`});
+        } else if (cci < -100) {
+          if (!cciRising) items.push({type:'bearish', text:`CCI=${cci.toFixed(1)} и продолжает падать — нисходящий импульс нарастает. Каждое новое закрытие ниже средней`});
+          else items.push({type:'neutral', text:`CCI=${cci.toFixed(1)} и разворачивается вверх — импульс вниз ослабевает. Если CCI пробьёт −100 снизу вверх — потенциальный отскок`});
+        } else {
+          const zone = cci > 0 ? 'бычьей' : 'медвежьей';
+          items.push({type:cci>0?'bullish':'bearish', text:`CCI=${cci.toFixed(1)} — умеренная ${zone} зона (от 0 до ±100). Тренд слабый. ${cciRising?'Нарастает':'Снижается'}, ${Math.abs(cciDelta5)>30?'быстро за 5 баров':'медленно'}`});
+        }
+
+        // 2. Скорость прихода к уровню
+        if (Math.abs(cciDelta5) > 100) {
+          items.push({type:cciDelta5>0?'bullish':'bearish', text:`CCI изменился на ${cciDelta5.toFixed(0)} за 5 баров — стремительный ${cciDelta5>0?'взлёт':'обвал'} импульса. Возможен откат после такого резкого движения`});
+        }
+
+        // 3. Пересечение нуля CCI
+        if ((cci > 0 && cciPrev < 0) || (cci < 0 && cciPrev > 0)) {
+          items.push({type:cci>0?'bullish':'bearish', text:`CCI пересёк ноль ${cci>0?'снизу вверх — переход к бычьей фазе':'сверху вниз — переход к медвежьей фазе'}. Цена вернулась ${cci>0?'выше':'ниже'} своей нормы`});
+        }
         // Длина цикла CCI: от минимума к максимуму = доминирующий цикл рынка
         const cciArr = [];
         for (let i = period; i <= n; i++) {
@@ -12786,11 +12869,49 @@ function _renderAnalysisInner(panel) {
         const hh = Math.max(...slice.map(c=>c.high));
         const ll = Math.min(...slice.map(c=>c.low));
         const wr = hh > ll ? (hh - closes[n-1]) / (hh - ll) * (-100) : -50;
-        if (wr > -20) items.push({type:'bullish', text:`Williams %R = ${wr.toFixed(1)} — зона перекупленности: в сильном тренде цена "прилипает" к -20, это признак силы, а не разворота`});
-        else if (wr < -80) items.push({type:'bearish', text:`Williams %R = ${wr.toFixed(1)} — зона перепроданности: в нисходящем тренде цена "прилипает" к -80, сигнал продолжения`});
-        else if (wr > -50) items.push({type:'neutral', text:`Williams %R = ${wr.toFixed(1)}: цена выше середины диапазона периода`});
-        else items.push({type:'neutral', text:`Williams %R = ${wr.toFixed(1)}: цена ниже середины диапазона периода`});
-        // Скорость выхода из зон
+        // История WR за последние бары
+        const wrHistory = [];
+        for (let i = Math.max(per, n-30); i < n; i++) {
+          const sl2 = candles.slice(i-per, i);
+          const h2 = Math.max(...sl2.map(c=>c.high)), l2 = Math.min(...sl2.map(c=>c.low));
+          wrHistory.push(h2>l2 ? (h2-closes[i-1])/(h2-l2)*(-100) : -50);
+        }
+        wrHistory.push(wr);
+        const wrPrev = wrHistory.length>=2 ? wrHistory[wrHistory.length-2] : wr;
+        const wrPrev5 = wrHistory.length>=6 ? wrHistory[wrHistory.length-6] : wr;
+        // Сколько баров подряд в экстремуме
+        let barsInTop=0, barsInBot=0;
+        for (let i=wrHistory.length-1; i>=0; i--) { if(wrHistory[i]>-20) barsInTop++; else break; }
+        for (let i=wrHistory.length-1; i>=0; i--) { if(wrHistory[i]<-80) barsInBot++; else break; }
+
+        // 1. Текущая зона + интерпретация
+        if (wr > -20) {
+          if (barsInTop >= 5) {
+            items.push({type:'bullish', text:`WR=${wr.toFixed(1)} держится в зоне >−20 уже ${barsInTop} баров — это признак сильного тренда вверх, а не сигнал разворота. В каскаде цена "прилипает" к верхней зоне. Выходить из позиции рано`});
+          } else {
+            items.push({type:'neutral', text:`WR=${wr.toFixed(1)} вошёл в зону перекупленности (>−20). Пока держится — сигнал продолжения. Если в следующие 2–3 бара выйдет обратно ниже −20 — тренд слабый`});
+          }
+        } else if (wr < -80) {
+          if (barsInBot >= 5) {
+            items.push({type:'bearish', text:`WR=${wr.toFixed(1)} держится в зоне <−80 уже ${barsInBot} баров — устойчивое давление продавцов. Нисходящий тренд набирает силу, а не выдыхается`});
+          } else {
+            items.push({type:'neutral', text:`WR=${wr.toFixed(1)} в зоне перепроданности (<−80). Если задержится — сигнал продолжения вниз. Быстрый выход обратно выше −80 = отскок вероятен`});
+          }
+        } else {
+          const posInRange = wr;
+          if (posInRange > -35) items.push({type:'bullish', text:`WR=${wr.toFixed(1)} в верхней половине диапазона — покупатели доминируют в последних ${per} барах, цена закрывается ближе к максимуму периода`});
+          else if (posInRange < -65) items.push({type:'bearish', text:`WR=${wr.toFixed(1)} в нижней половине диапазона — продавцы доминируют, цена у минимумов периода`});
+          else items.push({type:'neutral', text:`WR=${wr.toFixed(1)} — цена посередине диапазона, нет явного преимущества ни у кого`});
+        }
+
+        // 2. Динамика (откуда пришёл WR)
+        const wrMove5 = wr - wrPrev5;
+        if (Math.abs(wrMove5) > 25) {
+          if (wrMove5 > 0) items.push({type:'bullish', text:`WR поднялся на ${wrMove5.toFixed(1)} за 5 баров — стремительный разворот из зоны продаж. Покупатели перехватили инициативу`});
+          else items.push({type:'bearish', text:`WR упал на ${Math.abs(wrMove5).toFixed(1)} за 5 баров — быстрый слом бычьего диапазона. Продавцы агрессивно забирают контроль`});
+        }
+
+        // 3. Выход из экстремума = смена давления
         let prevExtreme = false;
         for (let i=n-5; i<n-1; i++) {
           const sl2 = candles.slice(Math.max(0,i-per+1), i+1);
@@ -12798,7 +12919,9 @@ function _renderAnalysisInner(panel) {
           const w2 = h2>l2 ? (h2-closes[i])/(h2-l2)*(-100) : -50;
           if (w2 > -20 || w2 < -80) prevExtreme = true;
         }
-        if (prevExtreme && wr > -80 && wr < -20) items.push({type:'neutral', text:`Вышел из экстремальной зоны — смена краткосрочного давления`});
+        if (prevExtreme && wr > -80 && wr < -20) {
+          items.push({type:'neutral', text:`Вышел из экстремальной зоны — краткосрочное давление ослабло. Следи за объёмом при выходе: с объёмом = настоящий разворот, без объёма = коррекция в тренде`});
+        }
         // Классика Williams %R
         const clWrItems = [];
         if (wr > -20) clWrItems.push({type:'bearish', text:`WR=${wr.toFixed(1)} выше −20 — классически перекуплен. Сигнал разворота вниз`});
@@ -12815,18 +12938,55 @@ function _renderAnalysisInner(panel) {
         const ao = candles.map((_,i) => i>=33 ? sma(mids,i-4,5)-sma(mids,i-33,34) : null);
         const last = ao[n-1], prev = ao[n-2], prev2 = n>2?ao[n-3]:null;
         if (last !== null && prev !== null) {
-          if (last > 0 && prev < 0) items.push({type:'bullish', text:`AO пересёк ноль снизу вверх — бычий импульс набирает силу`});
-          else if (last < 0 && prev > 0) items.push({type:'bearish', text:`AO пересёк ноль сверху вниз — медвежий импульс нарастает`});
-          else if (last > 0 && prev > 0 && prev2 && last < prev && ao[n-4] && prev < ao[n-4]) {
-            items.push({type:'bullish', text:`AO: Двойной пик / блюдце — ускорение бычьего импульса выше нуля`});
-          } else if (last < 0 && prev < 0 && prev2 && last > prev && ao[n-4] && prev > ao[n-4]) {
-            items.push({type:'bearish', text:`AO: блюдце ниже нуля — ускорение медвежьего импульса`});
-          } else {
-            items.push({type: last>0?'bullish':'bearish', text:`AO = ${last.toFixed(2)}, ${last>0?'выше':'ниже'} нуля — ${last>prev?'растёт':'падает'}`});
+          // 1. Переход через ноль — главное событие для AO
+          if (last > 0 && prev < 0) {
+            items.push({type:'bullish', text:`AO пересёк ноль снизу вверх — краткосрочный импульс (5-бар SMA) впервые стал сильнее среднесрочного (34-бар). Это начало бычьей фазы, не разворот уже сформированного тренда. Ближайшие 3–7 баров покажут, удержится ли рост`});
+          } else if (last < 0 && prev > 0) {
+            items.push({type:'bearish', text:`AO пересёк ноль сверху вниз — краткосрочный импульс ослаб ниже среднесрочного. Медвежья фаза начинается. Особенно значимо если это происходит после нескольких недель выше нуля`});
+          }
+          // 2. Паттерн «Блюдце» — ускорение без смены знака
+          else if (last > 0 && prev > 0 && prev2 && last < prev && ao[n-4] != null && prev < ao[n-4]) {
+            items.push({type:'bullish', text:`AO: паттерн «Блюдце» выше нуля — два последовательных бара снижения, затем разворот. Импульс переформировывается для нового толчка вверх`});
+          } else if (last < 0 && prev < 0 && prev2 != null && last > prev && ao[n-4] != null && prev > ao[n-4]) {
+            items.push({type:'bearish', text:`AO: паттерн «Блюдце» ниже нуля — перегруппировка медвежьего импульса. Вероятное продолжение снижения`});
+          }
+          // 3. Нарастание выше нуля — здоровый тренд
+          else if (last > 0 && last > prev && (prev2==null || prev > prev2)) {
+            items.push({type:'bullish', text:`AO растёт выше нуля уже 2+ бара — бычий импульс нарастает. Краткосрочное давление покупателей усиливается на фоне среднесрочного`});
+          }
+          // 4. Падение ниже нуля
+          else if (last < 0 && last < prev && (prev2==null || prev < prev2)) {
+            items.push({type:'bearish', text:`AO снижается ниже нуля — медвежий импульс усиливается. Не жди разворота без изменения динамики`});
+          }
+          // 5. Обычные состояния
+          else {
+            items.push({type:last>0?'bullish':'bearish', text:`AO = ${last.toFixed(4)} (${last>0?'выше':'ниже'} нуля, ${last>prev?'растёт':'падает'}). ${last>0?'Бычья фаза продолжается':'Медвежья фаза продолжается'}`});
+          }
+
+          // 6. Двойной пик (дивергенция AO с ценой)
+          const aoLast20 = ao.slice(-20).filter(v=>v!=null);
+          if (aoLast20.length >= 10) {
+            const priceMax = Math.max(...closes.slice(-10));
+            const priceNow = closes[n-1];
+            const aoMax20 = Math.max(...aoLast20.slice(0,-1));
+            if (priceNow >= priceMax * 0.998 && last < aoMax20 * 0.7 && last > 0) {
+              items.push({type:'bearish', text:`AO: двойной пик — цена обновляет максимум, но AO не достигает прошлого пика. Импульс иссякает. Признак скорого завершения движения`});
+            }
+          }
+
+          // 7. Скорость изменения AO
+          if (ao.length >= 5) {
+            const ao5ago = ao[ao.length-6];
+            if (ao5ago != null && Math.abs(last - ao5ago) > 0) {
+              const speed = last - ao5ago;
+              if (Math.abs(speed) > Math.abs(last) * 0.8 && Math.abs(last) > 0.001) {
+                items.push({type:speed>0?'bullish':'bearish', text:`AO изменился на ${speed.toFixed(4)} за 5 баров — ${Math.abs(speed)>Math.abs(last)*2?'взрывное ускорение импульса':'быстрое изменение импульса'}`});
+              }
+            }
           }
         }
-        if (!items.length) items.push({type:'neutral', text:`Awesome Oscillator активен`});
-        html += makeCard('Awesome Oscillator (неклассически)', items, 'ao');
+        if (!items.length) items.push({type:'neutral', text:`Awesome Oscillator: данных недостаточно`});
+        html += makeCard('Awesome Oscillator', items, 'ao');
       }
     } else if (idL === 'acc_dist' || idL === 'ad_line') {
       const n = candles.length;
