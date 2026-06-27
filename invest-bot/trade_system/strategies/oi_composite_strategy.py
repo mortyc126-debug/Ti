@@ -6007,19 +6007,26 @@ class OICompositeStrategy(IStrategy):
             cluster_ready = False
             corr_regimes = []
 
+        _snap_phase_raw = PHASE_WEIGHT_MODS.get(self.__cached_phase, {})
+        _snap_phase_conf = self.__cached_phase_conf
         methods = []
         for name in ALL_METHOD_NAMES:
             hedge = self.__weights[name]
             blended_weight = self.__blended_hedge_weight(name, regime_probs)
+            snap_blended_mod = max(0.25, min(1.75,
+                1.0
+                + (regime_mods.get(name, 1.0) - 1.0)
+                + (_snap_phase_raw.get(name, 1.0) - 1.0) * _snap_phase_conf
+            ))
             eff_weight = (
-                blended_weight * regime_mods.get(name, 1.0) * redundancy_mult.get(name, 1.0)
+                blended_weight * snap_blended_mod * redundancy_mult.get(name, 1.0)
                 * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             )
             methods.append({
                 "name": name,
                 "hedge_weight": round(blended_weight, 4),
                 "hedge_trades": hedge.total,
-                "regime_mult": round(regime_mods.get(name, 1.0), 4),
+                "regime_mult": round(snap_blended_mod, 4),
                 "redundancy_mult": round(redundancy_mult.get(name, 1.0), 4),
                 "effective_weight": round(eff_weight, 4),
                 "is_microstructure": name in MICROSTRUCTURE_METHOD_NAMES,
@@ -6574,13 +6581,16 @@ class OICompositeStrategy(IStrategy):
         self.__heavy_bar_counter += 1
         do_heavy = (self.__heavy_bar_counter % self.__heavy_cache_n == 1)
 
+        # classify_phase — лёгкая (только статистика), обновляем на каждом баре.
+        # Фазы spring/reversal короткие (2-4 свечи) — лаг do_heavy их пропускал.
+        _ph_highs = [float(quotation_to_decimal(c.high)) for c in self.__candles[-len(closes):]]
+        _ph_lows  = [float(quotation_to_decimal(c.low))  for c in self.__candles[-len(closes):]]
+        self.__cached_phase, self.__cached_phase_conf = classify_phase(
+            closes, volumes, highs=_ph_highs, lows=_ph_lows,
+        )
+
         if do_heavy:
             self.__cached_regime_probs = classify_regime_probs(closes, volumes)
-            self.__cached_phase, self.__cached_phase_conf = classify_phase(
-                closes, volumes,
-                highs=[float(quotation_to_decimal(c.high)) for c in self.__candles[-len(closes):]],
-                lows=[float(quotation_to_decimal(c.low)) for c in self.__candles[-len(closes):]],
-            )
             # Инвертируем: алгоритмы детектируют излом с запозданием, движение
             # уже состоялось — сигнал теперь против нового направления (разворот).
             self.__cached_change_point = -change_point_score(closes)
@@ -6729,20 +6739,26 @@ class OICompositeStrategy(IStrategy):
         # информативнее — +10% методам осцилляторной группы.
         osc_boost_on = self.__l1_data_ready and 0.3 < self.__l1_pct < 0.7
         osc_group = _GATE_GROUPS["oscillator"]
-        # Фазовый слой: множители PHASE_WEIGHT_MODS, сглаженные уверенностью фазы.
-        # При conf=1.0 применяется полный множитель; при conf=0.3 — только 30% отклонения от 1.0.
+        # Фазовый слой: отклонение от 1.0, сглаженное уверенностью фазы.
         _phase_mods_raw = PHASE_WEIGHT_MODS.get(self.__cached_phase, {})
         _phase_conf = self.__cached_phase_conf
-        phase_mods: dict[str, float] = {
-            name: 1.0 + (_phase_mods_raw.get(name, 1.0) - 1.0) * _phase_conf
+
+        # Блендинг regime + phase: аддитивное сложение отклонений вместо перемножения.
+        # Перемножение возводило эффект в квадрат (1.5×1.5=2.25, 0.5×0.5=0.25).
+        # Теперь отклонения складываются и ограничиваются ±0.75 от 1.0 → [0.25, 1.75].
+        blended_mods: dict[str, float] = {
+            name: max(0.25, min(1.75,
+                1.0
+                + (regime_mods.get(name, 1.0) - 1.0)
+                + (_phase_mods_raw.get(name, 1.0) - 1.0) * _phase_conf
+            ))
             for name in ALL_METHOD_NAMES
         }
 
         weights = [
             self.__blended_hedge_weight(name, regime_probs)
             * self.__ic_bayes_weight(name)   # IC-prior (байес-фьюжн с фолбэком 0.5)
-            * regime_mods.get(name, 1.0)
-            * phase_mods.get(name, 1.0)
+            * blended_mods.get(name, 1.0)
             * redundancy_mult.get(name, 1.0)
             * (MICROSTRUCTURE_WEIGHT_BOOST if name in MICROSTRUCTURE_METHOD_NAMES else 1.0)
             * (1.10 if (osc_boost_on and name in osc_group) else 1.0)
