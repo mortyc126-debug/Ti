@@ -6972,6 +6972,63 @@ function cpRenderSystems() {
   _sysRenderVoltageMap();
 }
 
+// Единый оптимальный набор: накапливается из всех категорий
+const _SYS_OPTIMAL = [
+  // Осцилляторы / режим / энергия
+  { id:'dpo',        label:'DPO',            role:'Режим — видит боковик и когда он ломается' },
+  { id:'accel_osc',  label:'AC Oscillator',  role:'Энергия — затухание импульсов' },
+  { id:'fisher',     label:'Fisher Transform',role:'Перегрев — крайности острее обычного осциллятора' },
+  // Денежные потоки
+  { id:'kvo',        label:'Klinger',         role:'Деньги медленно — кумулятивный поток' },
+  { id:'force_idx',  label:'Force Index',     role:'Деньги быстро — агрессивный вход крупного' },
+  { id:'cmf',        label:'CMF',             role:'Деньги где — концентрация по зонам диапазона' },
+  { id:'adline',     label:'A/D Line',        role:'Деньги направление — честнее OBV, видит зону' },
+  { id:'eom',        label:'EOM',             role:'Эффективность объёма — фильтр ложных движений' },
+  { id:'nvi',        label:'NVI/PVI',         role:'Асимметрия — дни роста vs падения на объёме' },
+  // Трендовые
+  { id:'dmi',        label:'DMI / ADX',       role:'Фильтр — есть ли вообще тренд' },
+  { id:'supertrend', label:'SuperTrend',      role:'Динамичный стоп и уровни' },
+  { id:'vortex',     label:'Vortex',          role:'Опережающий сигнал разворота' },
+  { id:'envelopes',  label:'Envelopes',       role:'Волатильность в контексте тренда' },
+];
+
+function _sysOptimalSection() {
+  const rows = _SYS_OPTIMAL.map((item, i) => {
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+      + '<span style="font-size:9px;color:#6F648F;font-family:var(--mono);width:14px;">' + (i+1) + '.</span>'
+      + '<span style="font-size:10px;color:#C71B52;font-family:var(--mono);width:120px;flex-shrink:0;">' + item.label + '</span>'
+      + '<span style="font-size:9px;color:var(--text3);font-family:var(--mono);flex:1;">' + item.role + '</span>'
+      + '</div>';
+  }).join('');
+  return '<details style="margin-bottom:8px;border:1px solid rgba(96,164,161,0.3);border-radius:6px;">'
+    + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#60A4A1;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
+    + '<span style="font-size:12px;">✅</span>Оптимальный набор</summary>'
+    + '<div style="padding:8px 10px 10px;">'
+    + '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">Накапливается из всех категорий. Активировать = включить все на графике.</div>'
+    + rows
+    + '<button onclick="_sysActivateOptimal()" style="margin-top:10px;width:100%;padding:5px;background:rgba(96,164,161,0.12);border:1px solid rgba(96,164,161,0.35);border-radius:6px;color:#60A4A1;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать всё на графике</button>'
+    + '</div></details>';
+}
+
+function _sysActivateOptimal() {
+  // Сначала выключаем всё что есть
+  Object.keys(chartInds).forEach(k => {
+    if (chartInds[k]) cpChartToggle(k);
+  });
+  // Включаем каждый из оптимального набора
+  _SYS_OPTIMAL.forEach(item => {
+    if (!chartInds[item.id]) cpChartToggle(item.id);
+  });
+  showToast('✓ Оптимальный набор активирован (' + _SYS_OPTIMAL.length + ' инструментов)', '#60A4A1');
+  // Обновить панель индикаторов
+  setTimeout(() => {
+    for (const g of IND_GROUPS) {
+      for (const ind of g.items) { try { cpUpdateInd(ind.id); } catch(e) {} }
+    }
+    if (chartCandles.length) chartRedraw();
+  }, 80);
+}
+
 function _sysRenderStaticSections() {
   const el = document.getElementById('sys-static-sections');
   if (!el) return;
@@ -7054,14 +7111,7 @@ function _sysRenderStaticSections() {
       {label:'Три убывающих = антисигнал', lc:NC, text:'AC убывает + MAMA/FAMA сходятся + EBS амплитуда падает. Три независимых показателя: убывание ускорения + конвергенция адаптивных MA + угасание волны. <b>Антисигнал продолжения</b> — готовься к развороту.'},
     ]),
 
-    sec('✅', 'Оптимальный минимальный набор', [
-      {label:'Что дублируется — выброси', lc:'#6F648F', text:'CMO и Ultimate Oscillator часто согласны. Берёшь Ultimate = CMO не нужен. TSI и Force Index часто согласны. Берёшь TSI = Force Index только на подтверждение. Williams %R = просто положение цены, полезен только для скорости переключения.'},
-      {label:'1. DPO · Режим', lc:NC, text:'Видит боковик и когда он ломается. Снимает трендовую составляющую — остаётся чистый цикл.'},
-      {label:'2. AC Oscillator · Энергия', lc:NC, text:'Видит затухание импульсов. Если движение есть но AC убывает = momentum кончается.'},
-      {label:'3. Fisher Transform · Перегрев', lc:NC, text:'Применить к CMO или Williams %R. Видит крайности состояния острее чем обычный осциллятор.'},
-      {label:'4. Force Index · Деньги быстро', lc:NC, text:'Быстрый датчик денежного потока. Volume × изменение цены. Резкий пик = агрессивный вход крупного.'},
-      {label:'+ Klinger (из раньше)', lc:IND, text:'Медленный кумулятивный денежный поток. Force Index = быстрый снимок. Klinger = медленный тренд денег. Вместе: полная картина денежного потока (быстрый + медленный) + режима (DPO) + энергии (AC) + перегрева (Fisher).'},
-    ]),
+    _sysOptimalSection(),
 
     sec('💧', 'Денежные потоки · Комбо-паттерны', [
       {label:'Пятиуровневая абсорбция (вход в боковике)', lc:NC, text:'1. OBV скорость резко растёт (крупный входит агрессивно) · 2. A/D показывает в какой зоне диапазона · 3. CMF в той же зоне в экстремуме (концентрация денег) · 4. MFI в экстремуме + держится (перегрев подтверждён объёмом) · 5. EOM падает (объём нужен всё больше = сопротивление). Все пять = крупный методично входит против сопротивления. Точка входа.'},
@@ -7070,7 +7120,6 @@ function _sysRenderStaticSections() {
       {label:'Согласие денежного потока (здоровье каскада)', lc:NC, text:'На каскаде: OBV растёт в сторону + A/D растёт в сторону + Chaikin в экстремуме + MFI в верхней крайности + EOM высокий. Все пять согласны = каскад здоров, держи позицию. Один переключился = осторожно.'},
       {label:'Денежный скепсис (большая свеча = шум)', lc:NC, text:'Большая свеча на объёме выглядит как каскад. Проверяешь: EOM низкий (объём неэффективен) + CMF нейтральный (не концентрировался) + PVT не подтверждает + VO нет тренда (всплеск). Объём был, но это охота на стопах, не каскад. Не входить.'},
       {label:'Боковик максимального сжатия', lc:NC, text:'VO близко к нулю (нет тренда объёма) + EOM низкий (компрессия, деньги входят неэффективно) + NVI/PVI расходятся максимально (асимметрия максимальна) + CMF в экстремуме какой-то зоны (деньги накопились на краю). Денежный поток сжат = вот-вот выпустит.'},
-      {label:'Рейтинг: что информативнее', lc:IND, text:'1. CMF — где деньги (самый информативный) · 2. A/D — честнее OBV, видит зону · 3. Chaikin Osc — тренд денежного потока · 4. EOM — эффективность, фильтр ложных · 5. NVI/PVI — асимметрия боковика. OBV + Klinger + Force Index закрывают картину.'},
     ]),
 
     sec('📈', 'Трендовые инструменты · Комбо', [
@@ -7081,7 +7130,6 @@ function _sysRenderStaticSections() {
       {label:'Фаза тренда (SAR + McGinley)', lc:NC, text:'SAR близко + McGinley быстро адаптирует = тренд рассыпается (конец phase 3). SAR далеко + McGinley стабильно ползёт = тренд здоров (phase 3 середина). SAR далеко + McGinley только развернулась = тренд начался (phase 2→3). Видит какая фаза Wyckoff сейчас.'},
       {label:'Волатильность тренда (Envelopes+ST+DMI)', lc:NC, text:'Envelopes расширяются + SuperTrend отдаляется + ADX растёт — все три = каскад набирает силу. Если какой-то остановился = каскад на финише.'},
       {label:'Согласие всех восьми', lc:NC, text:'SAR не переключается + SuperTrend широкий + Elder Impulse один цвет + Elder Ray максимальная асимметрия + Vortex в экстремуме расхождения + ADX в пике + McGinley стабильна + Envelopes максимальные. Все восемь в одну сторону на нитке = выброс 100%.'},
-      {label:'Оптимальный набор', lc:IND, text:'1. DMI (ADX) — есть ли вообще тренд (фильтр) · 2. SuperTrend — динамичный стоп · 3. Vortex — опережающий разворот · 4. Envelopes — волатильность в тренде. Остальные на подтверждение.'},
     ]),
 
   ].join('');
