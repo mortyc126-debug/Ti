@@ -11484,7 +11484,7 @@ function _renderAnalysisInner(panel) {
         const pct = Math.round(s.acc*100);
         const mv = s.avgMove!=null ? `·${s.avgMove.toFixed(1)}%` : '';
         const col = pct>=65?'#60A4A1':pct>=55?'#B4A050':'#C08080';
-        return `<span class="analysis-tf-chip" style="color:${col};background:rgba(0,0,0,0.25)">${h}б→${pct}%${mv}</span>`;
+        return `<span class="analysis-tf-chip" style="color:${col};background:rgba(0,0,0,0.25)">${h}св→${pct}%${mv}</span>`;
       }).join('');
       if (chips) btHtml = `<div class="analysis-tf"><div class="analysis-tf-label">Бэктест (${closes.length} баров)</div><div class="analysis-tf-row">${chips}</div></div>`;
     }
