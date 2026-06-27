@@ -2579,92 +2579,140 @@ def score_market_structure(candles: list[HistoricCandle]) -> float:
 
 def score_spring(candles: list[HistoricCandle]) -> float:
     """
-    Сжатие пружины (Spring/Compression → Impulse).
+    Wyckoff Spring / Upthrust / Тихий Spring + компрессия-импульс.
 
-    Два суб-паттерна:
+    Блок 1 — Wyckoff Spring (бычий): пробой лоя диапазона + быстрый возврат.
+      Глубина пробоя → сила каскада (собрали много стопов → сильнее движение).
+      Соотношение объёма: vol_return > vol_breakout = аномально агрессивный вход.
 
-    A. КОМПРЕССИЯ + ИМПУЛЬС (после отката в тренде или у уровня):
-       - последние COMP_BARS баров показывают убывающий диапазон (ATR убывает);
-       - объём в компрессии выше среднего (накопление/распределение);
-       - текущий бар — резкий выход: диапазон > IMPULSE_FRAC * ATR, закрытие
-         в верхней/нижней трети, объём > VOL_THRESH * среднего.
+    Блок 2 — Тихий Spring (No Supply): цена касается лоя на объёме 3-5× НИЖЕ
+      среднего → крупняк уже набрал, стопов почти нет → самое взрывное движение.
 
-    B. NR7 с объёмом (Narrow Range 7):
-       - текущий бар имеет наименьший диапазон за последние 7 баров (NR7);
-       - объём накапливался в компрессии (средний объём компрессии > базового);
-       - следующий (текущий) бар — расширение с объёмом.
-       Возвращает слабый сигнал (±0.4) о готовности к выходу.
+    Блок 3 — Upthrust (медвежий): зеркало spring — пробой хая + возврат.
+      Держит пробой < 2 баров = upthrust (vs BOS который держит 2+).
+      Equal Highs + upthrust = двойная ловушка (усиление ×1.25).
 
-    Направление определяется:
-    - предшествующим трендом (slope closes);
-    - закрытием импульсного бара (верх/низ диапазона).
-
-    Объём — обязательный фактор: компрессия без накопленного объёма = не пружина.
+    Блок 4 — Компрессия + импульс (прежняя логика: NR / ATR squeeze → выход).
     """
-    # компрессия ~1 час: M5→12 баров, H1→1 (min 4), M1→60
-    _COMP_BARS = _adaptive_window(candles, target_hours=1.0, min_bars=4, max_bars=60)
-    _VOL_THRESH = 1.4   # объём на импульсном баре
-    _VOL_COMP = 0.9     # средний объём во время компрессии (≥ базового × это)
-    _IMPULSE_FRAC = 0.9 # импульсный бар ≥ IMPULSE_FRAC * ATR
-    # база объёма: ~2.5 часа до компрессии
     _BASE_VOL_BARS = _adaptive_window(candles, target_hours=2.5, min_bars=10, max_bars=150)
+    _COMP_BARS     = _adaptive_window(candles, target_hours=1.0,  min_bars=4,  max_bars=60)
 
-    if len(candles) < _COMP_BARS + 15:
+    if len(candles) < _BASE_VOL_BARS + 5:
         return 0.0
     atr_pct = _compute_atr(candles)
     if atr_pct <= 0:
         return 0.0
     last_price = _to_f(candles[-1].close)
-    atr_abs = atr_pct * last_price
+    atr_abs = atr_pct * last_price or 1e-9
 
     vols_base = [float(c.volume) for c in candles[-_BASE_VOL_BARS:-_COMP_BARS - 1]]
     avg_vol = statistics.mean(vols_base) if vols_base else 1.0
     if avg_vol <= 0:
         return 0.0
 
-    last = candles[-1]
-    lh = _to_f(last.high); ll = _to_f(last.low)
-    lc = _to_f(last.close); lo_ = _to_f(last.open)
-    lrng = lh - ll or 1e-9
-    last_vol_r = float(last.volume) / avg_vol
-
-    comp_candles = candles[-_COMP_BARS - 1:-1]  # предшествующие COMP_BARS баров
-    comp_ranges = [_to_f(c.high) - _to_f(c.low) for c in comp_candles]
-    comp_vol_r = statistics.mean(float(c.volume) / avg_vol for c in comp_candles)
-
-    # Убывающий диапазон: каждый следующий меньше предыдущего (не строго — допускаем 1 выброс)
-    violations = sum(1 for i in range(1, len(comp_ranges)) if comp_ranges[i] > comp_ranges[i - 1])
-    is_compressing = violations <= 1 and comp_ranges[-1] < comp_ranges[0] * 0.7
+    # Диапазон за последние ~20 баров (до текущего) — уровень поддержки/сопротивления
+    _RANGE_W = min(20, len(candles) - 3)
+    range_window = candles[-_RANGE_W - 2:-2]
+    rng_high = max(_to_f(c.high) for c in range_window)
+    rng_low  = min(_to_f(c.low)  for c in range_window)
 
     score = 0.0
 
-    # ── Паттерн A: компрессия + импульсный выход ──────────────────────────
-    if (is_compressing
-            and comp_vol_r >= _VOL_COMP
-            and lrng >= _IMPULSE_FRAC * atr_abs
-            and last_vol_r >= _VOL_THRESH):
+    # ── Блок 1: Wyckoff Spring / Upthrust ─────────────────────────────────────
+    # Смотрим последние 3 бара: был ли пробой + возврат за 1-2 свечи
+    for lag in range(1, 3):
+        if len(candles) < lag + 2:
+            break
+        bar_poke  = candles[-(lag + 1)]    # бар пробоя
+        bar_after = candles[-lag]           # бар после (или текущий)
+        curr_bar  = candles[-1]
 
-        # Направление по закрытию импульсного бара
-        close_pos = (lc - ll) / lrng
-        trend_closes = [_to_f(c.close) for c in candles[-15:-1]]
-        trend_slope = (trend_closes[-1] - trend_closes[0]) / (abs(trend_closes[0]) or 1)
+        poke_low  = _to_f(bar_poke.low)
+        poke_high = _to_f(bar_poke.high)
+        poke_vol  = float(bar_poke.volume)
+        after_cl  = _to_f(bar_after.close)
+        after_vol = float(bar_after.volume)
 
-        if close_pos >= 0.65:
-            # Закрытие в верхней трети — бычий выход
-            strength = min(1.0, (lrng / atr_abs) * last_vol_r * 0.4)
-            score = +strength
-        elif close_pos <= 0.35:
-            # Закрытие в нижней трети — медвежий выход
-            strength = min(1.0, (lrng / atr_abs) * last_vol_r * 0.4)
-            score = -strength
+        # Spring: пробил лой диапазона вниз, следующий бар вернулся выше лоя
+        if poke_low < rng_low * 0.9995 and after_cl > rng_low:
+            depth = (rng_low - poke_low) / (atr_abs or 1e-9)
+            # Глубина → сила (0.3% = слабо; 1.5-2% = много стопов собрали)
+            depth_mult = min(1.5, 0.6 + depth * 0.6)
+            # Соотношение объёмов: return_vol > breakout_vol = агрессивный вход
+            vol_ratio = after_vol / (poke_vol or 1.0)
+            if vol_ratio > 1.2:
+                vol_mult = min(1.4, 0.9 + vol_ratio * 0.25)
+            elif vol_ratio < 0.4:
+                # Объём возврата мал — ложный spring
+                vol_mult = 0.4
+            else:
+                vol_mult = 1.0
+            spring_score = min(0.85, 0.45 * depth_mult * vol_mult) / max(1, lag)
+            if spring_score > score:
+                score = spring_score
+            break
 
-        # Если импульс против недавнего тренда — это не продолжение, а разворот;
-        # сигнал всё равно даём (пружина отталкивается), но без дополнительного буста.
+        # Upthrust: пробил хай диапазона вверх, следующий бар вернулся ниже хая
+        if poke_high > rng_high * 1.0005 and after_cl < rng_high:
+            depth = (poke_high - rng_high) / (atr_abs or 1e-9)
+            depth_mult = min(1.5, 0.6 + depth * 0.6)
+            vol_ratio = after_vol / (poke_vol or 1.0)
+            if vol_ratio > 1.2:
+                vol_mult = min(1.4, 0.9 + vol_ratio * 0.25)
+            elif vol_ratio < 0.4:
+                vol_mult = 0.4
+            else:
+                vol_mult = 1.0
+            ut_score = -min(0.85, 0.45 * depth_mult * vol_mult) / max(1, lag)
+            # Equal Highs + Upthrust = двойная ловушка (усиление)
+            prev_high_bars = candles[-_RANGE_W - 4:-_RANGE_W - 1] if len(candles) >= _RANGE_W + 4 else []
+            if prev_high_bars:
+                prev_rng_high = max(_to_f(c.high) for c in prev_high_bars)
+                if abs(poke_high - prev_rng_high) / (prev_rng_high or 1) < 0.002:
+                    ut_score *= 1.25  # sweep двойной ликвидности
+            if ut_score < score:
+                score = ut_score
+            break
 
-    # NR7 (Narrow Range 7) намеренно не даёт направленного сигнала:
-    # самый узкий бар за 7 = сжатие без известного направления выхода.
-    # Давать голос в сторону предшествующего тренда — двойной счёт с PRICE_TREND.
-    # Паттерн A (компрессия + подтверждённый импульс) достаточен.
+    # ── Блок 2: Тихий Spring (No Supply Test) ─────────────────────────────────
+    # Касание лоя диапазона на объёме << среднего → крупняк уже набрал
+    if score == 0.0:
+        curr = candles[-1]
+        curr_low = _to_f(curr.low)
+        curr_cl  = _to_f(curr.close)
+        curr_vol = float(curr.volume)
+        vol_ratio_quiet = curr_vol / avg_vol
+        # Цена близко к лою диапазона, закрытие выше → тест без пробоя
+        near_low  = curr_low <= rng_low * 1.001 and curr_cl > rng_low
+        near_high = _to_f(curr.high) >= rng_high * 0.999 and curr_cl < rng_high
+        if near_low and vol_ratio_quiet < 0.30:
+            # Тихий spring: аномально мало продавцов у поддержки
+            score = +min(0.70, 0.50 + (0.30 - vol_ratio_quiet) * 1.5)
+        elif near_high and vol_ratio_quiet < 0.30:
+            # Тихий upthrust: мало покупателей у сопротивления
+            score = -min(0.70, 0.50 + (0.30 - vol_ratio_quiet) * 1.5)
+
+    # ── Блок 4: Компрессия + импульс (прежняя логика) ────────────────────────
+    if score == 0.0 and len(candles) >= _COMP_BARS + 10:
+        last = candles[-1]
+        lh = _to_f(last.high); ll = _to_f(last.low)
+        lc = _to_f(last.close)
+        lrng = lh - ll or 1e-9
+        last_vol_r = float(last.volume) / avg_vol
+
+        comp_candles = candles[-_COMP_BARS - 1:-1]
+        comp_ranges = [_to_f(c.high) - _to_f(c.low) for c in comp_candles]
+        comp_vol_r = statistics.mean(float(c.volume) / avg_vol for c in comp_candles)
+        violations = sum(1 for i in range(1, len(comp_ranges)) if comp_ranges[i] > comp_ranges[i - 1])
+        is_compressing = violations <= 1 and comp_ranges[-1] < comp_ranges[0] * 0.7
+
+        if (is_compressing and comp_vol_r >= 0.9
+                and lrng >= 0.9 * atr_abs and last_vol_r >= 1.4):
+            close_pos = (lc - ll) / lrng
+            if close_pos >= 0.65:
+                score = +min(1.0, (lrng / atr_abs) * last_vol_r * 0.4)
+            elif close_pos <= 0.35:
+                score = -min(1.0, (lrng / atr_abs) * last_vol_r * 0.4)
 
     return max(-1.0, min(1.0, score))
 
