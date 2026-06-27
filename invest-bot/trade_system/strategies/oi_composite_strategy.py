@@ -6450,6 +6450,18 @@ class OICompositeStrategy(IStrategy):
                     "trail_activation_pct": round(trail_activation_pct, 6)
                                             if trail_activation_pct is not None else None,
                     "entry_mode_trailing": entry_mode_trailing,
+                    # Последние 5 свечей до входа (OHLCV) — для CSV-экспорта и AI-анализа
+                    "candle_context": [
+                        {
+                            "t": str(c.time)[:16],
+                            "o": round(_to_f(c.open), 4),
+                            "h": round(_to_f(c.high), 4),
+                            "l": round(_to_f(c.low), 4),
+                            "c": round(_to_f(c.close), 4),
+                            "v": int(c.volume),
+                        }
+                        for c in (sig.get("history_window") or [])[-5:]
+                    ],
                 })
 
         if not results:

@@ -74,6 +74,11 @@ CONFIG_FILE = "settings.ini"
 LOG_FILE = "dashboard.log"
 OI_TICKERS_FILE = "oi_tickers.json"
 
+# Полные трейды последнего прогона (ticker → list[trade_dict]).
+# Хранятся в памяти для CSV-экспорта (/api/export_trades_csv).
+_last_full_trades: dict[str, list[dict]] = {}
+_last_full_trades_lock = threading.Lock()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -1149,6 +1154,95 @@ def export_bar_scores_batch(tickers: list[str], days: int, yield_progress):
             yield_progress(ticker, "done", result["rows"], None)
         except Exception as e:
             yield_progress(ticker, "error", 0, str(e))
+
+
+def export_trades_csv_all() -> str:
+    """CSV со всеми трейдами из _last_full_trades: технические параметры +
+    все method_scores + 5 свечей контекста (candle_context)."""
+    with _last_full_trades_lock:
+        all_trades = [(ticker, t) for ticker, trades in _last_full_trades.items()
+                      for t in trades]
+    if not all_trades:
+        return ""
+
+    # Собираем все имена методов из первого трейда с method_scores
+    method_names: list[str] = []
+    for _, t in all_trades:
+        ms = t.get("method_scores") or {}
+        if ms:
+            method_names = sorted(ms.keys())
+            break
+
+    # Колонки базовые
+    base_cols = [
+        "ticker", "entry_time", "exit_time", "direction", "win",
+        "r_multiple", "net_pct", "mfe_pct", "mae_pct",
+        "entry_price", "exit_price", "take_price", "stop_price",
+        "duration_min", "exit_reason", "regime", "entry_mode",
+        "atr_pct", "l1_pct", "l1_above_ma50", "l1_trending_up",
+        "l1_trending_down", "atr_ex_ratio", "agree_count", "against_count",
+    ]
+    # Колонки для 5 свечей контекста (c0 = самая старая, c4 = вход)
+    candle_cols = []
+    for ci in range(5):
+        for field in ("t", "o", "h", "l", "c", "v"):
+            candle_cols.append(f"c{ci}_{field}")
+    # method_scores
+    method_cols = [f"ms_{n}" for n in method_names]
+
+    fieldnames = base_cols + candle_cols + method_cols
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+
+    for ticker, t in all_trades:
+        ctx = t.get("candle_context") or []
+        # дополняем до 5 пустышками слева если свечей меньше
+        while len(ctx) < 5:
+            ctx = [{}] + ctx
+
+        row: dict = {
+            "ticker": ticker,
+            "entry_time": str(t.get("entry_time", ""))[:16],
+            "exit_time": str(t.get("exit_time", ""))[:16],
+            "direction": t.get("direction", ""),
+            "win": int(t.get("win", False)),
+            "r_multiple": round(t.get("r_multiple", 0.0), 3),
+            "net_pct": round(t.get("net_pct", 0.0) * 100, 3),
+            "mfe_pct": round((t.get("mfe") or 0.0) * 100, 3),
+            "mae_pct": round((t.get("mae") or 0.0) * 100, 3),
+            "entry_price": t.get("entry_price", ""),
+            "exit_price": t.get("exit_price", ""),
+            "take_price": t.get("take_price", ""),
+            "stop_price": t.get("stop_price", ""),
+            "duration_min": t.get("duration_min", ""),
+            "exit_reason": t.get("exit_reason", ""),
+            "regime": t.get("regime", ""),
+            "entry_mode": t.get("entry_mode", ""),
+            "atr_pct": round(t.get("atr_pct") or 0.0, 5),
+            "l1_pct": t.get("l1_pct", ""),
+            "l1_above_ma50": t.get("l1_above_ma50", ""),
+            "l1_trending_up": t.get("l1_trending_up", ""),
+            "l1_trending_down": t.get("l1_trending_down", ""),
+            "atr_ex_ratio": t.get("atr_ex_ratio", ""),
+            "agree_count": t.get("agree_count", ""),
+            "against_count": t.get("against_count", ""),
+        }
+        # свечи контекста
+        for ci, candle in enumerate(ctx):
+            for field in ("t", "o", "h", "l", "c", "v"):
+                row[f"c{ci}_{field}"] = candle.get(field, "")
+        # method_scores
+        ms = t.get("method_scores") or {}
+        for n in method_names:
+            row[f"ms_{n}"] = round(ms.get(n, 0.0), 4)
+
+        writer.writerow(row)
+
+    return buf.getvalue()
+
+
     """
     Снимок того, КАК сейчас реально считается композит для тикера — на
     живой истории (data/history.json через HistoryStore, не пустой
@@ -1506,6 +1600,9 @@ def run_backtest_one(
         fixed = strategy.backtest_barriers(signals=signals, take_mult=long_take, stop_mult=long_stop,
                                             return_trades=True, tariff=tariff, adaptive_lasso=adaptive_lasso)
         fixed_trades = fixed.pop("trades", [])
+        # Сохраняем полные трейды (с method_scores и candle_context) для CSV-экспорта
+        with _last_full_trades_lock:
+            _last_full_trades[ticker] = fixed_trades
         fixed_pct = fixed.get("expectancy_pct", 0.0)
         rows.append({"ticker": ticker, "mode": "fixed", "what_if": _what_if_from_trades(fixed_trades),
                      "rejection_stats": rej,
@@ -3421,7 +3518,79 @@ function renderGlobalMethodStats() {{
       <tbody>${{trs}}</tbody>
     </table>
     <div style="font-size:9px;color:var(--txt3);margin-top:6px;">«Против» = когда метод в меньшинстве. Чистый% = ЗА − ПРОТИВ (насколько метод предсказывает лучше случайного). Зелёный ≥60% / +8%, красный ≤42% / −5%.</div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn-pill btn-sm ghost" onclick="autoDisableWeakMethods()" title="Выключить методы с win% ЗА ≤25% (минимум 5 сделок в роли)">⛔ выкл слабые (≤25%)</button>
+      <button class="btn-pill btn-sm ghost" onclick="autoInvertAntisignals()" title="Инвертировать методы где ПРОТИВ win% > ЗА win% + 10% (антисигналы)">↔ инверт анти-сигналы</button>
+      <button class="btn-pill btn-sm ghost" onclick="downloadTradesCsv()" title="Скачать CSV всех сделок с техническими параметрами и контекстом свечей">📥 CSV сделок</button>
+    </div>
   `;
+}}
+
+function autoDisableWeakMethods() {{
+  const agg = {{}};
+  for (const r of _backtestRows) {{
+    if (!r.method_stats) continue;
+    for (const [name, s] of Object.entries(r.method_stats)) {{
+      if (!agg[name]) agg[name] = {{an: 0, aw: 0}};
+      agg[name].an += s.agree_n || 0;
+      agg[name].aw += s.agree_win || 0;
+    }}
+  }}
+  let disabled = 0;
+  for (const [name, s] of Object.entries(agg)) {{
+    if (s.an < 5) continue;
+    const wr = s.aw / s.an;
+    if (wr <= 0.25) {{
+      initMethodCheckboxes();
+      const cb = document.getElementById('dm_' + name);
+      if (cb && !cb.checked) {{ cb.checked = true; disabled++; updateDisabledCount(); }}
+    }}
+  }}
+  renderGlobalMethodStats();
+  alert(`Выключено методов: ${{disabled}} (win% ЗА ≤25%, n≥5)`);
+}}
+
+function autoInvertAntisignals() {{
+  const agg = {{}};
+  for (const r of _backtestRows) {{
+    if (!r.method_stats) continue;
+    for (const [name, s] of Object.entries(r.method_stats)) {{
+      if (!agg[name]) agg[name] = {{an: 0, aw: 0, dn: 0, dw: 0}};
+      agg[name].an += s.agree_n || 0;
+      agg[name].aw += s.agree_win || 0;
+      agg[name].dn += s.disagree_n || 0;
+      agg[name].dw += s.disagree_win || 0;
+    }}
+  }}
+  let inverted = 0;
+  for (const [name, s] of Object.entries(agg)) {{
+    if (s.an < 5 || s.dn < 5) continue;
+    const fwr = s.aw / s.an;
+    const dwr = s.dw / s.dn;
+    if (dwr - fwr > 0.10) {{
+      // ПРОТИВ выигрывает на >10% — метод антисигнал
+      const inv = document.getElementById('inv_' + name);
+      if (inv && inv.dataset.active !== '1') {{ toggleInvertMethod(name); inverted++; }}
+    }}
+  }}
+  renderGlobalMethodStats();
+  alert(`Инвертировано методов: ${{inverted}} (ПРОТИВ − ЗА > 10%, n≥5)`);
+}}
+
+async function downloadTradesCsv() {{
+  const resp = await fetch('/api/export_trades_csv');
+  if (!resp.ok) {{
+    const j = await resp.json().catch(() => ({{}}));
+    alert('Ошибка: ' + (j.error || resp.statusText));
+    return;
+  }}
+  const blob = await resp.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'trades_export.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }}
 
 function toggleMethodInRun(name) {{
@@ -6302,6 +6471,21 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", "text/csv; charset=utf-8")
                     self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+                    self.send_header("Content-Length", str(len(csv_bytes)))
+                    self.end_headers()
+                    self.wfile.write(csv_bytes)
+            except Exception as e:
+                self._send_json({"error": str(e)})
+        elif self.path.startswith("/api/export_trades_csv"):
+            try:
+                csv_str = export_trades_csv_all()
+                if not csv_str:
+                    self._send_json({"error": "нет данных — сначала запустите прогон"})
+                else:
+                    csv_bytes = csv_str.encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/csv; charset=utf-8")
+                    self.send_header("Content-Disposition", 'attachment; filename="trades_export.csv"')
                     self.send_header("Content-Length", str(len(csv_bytes)))
                     self.end_headers()
                     self.wfile.write(csv_bytes)
