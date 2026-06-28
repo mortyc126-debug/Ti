@@ -9,27 +9,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #0E1122;
-  --surface: #160F20;
-  --surface2: #1E1530;
+  --bg: #0B0613;
+  --surface: #140A24;
+  --surface2: #1A1030;
   --border: #2a1f3d;
-  --border2: #372952;
-  --text: #F0F3FF;
-  --text2: #B8C4E0;
-  --text3: #7080a8;
+  --border2: #3a2a50;
+  --text: #F2F0FF;
+  --text2: #A79BC9;
+  --text3: #6F648F;
   --accent: #C71B52;
-  --green: #60A4A1;
-  --green-bg: rgba(96,164,161,0.1);
-  --green-glow: 0 0 8px rgba(96,164,161,0.5);
+  --green: #52F2C9;
+  --green-bg: rgba(82,242,201,0.08);
+  --green-glow: 0 0 8px rgba(82,242,201,0.4);
   --red: #C71B52;
   --red-bg: rgba(199,27,82,0.1);
   --red-glow: 0 0 8px rgba(199,27,82,0.6);
-  --orange: #60A4A1;
-  --orange-bg: rgba(96,164,161,0.08);
-  --blue: #60A4A1;
-  --blue-bg: rgba(96,164,161,0.08);
-  --yellow: #B8C4E0;
-  --grad2: #17506E;
+  --orange: #F4C36A;
+  --orange-bg: rgba(244,195,106,0.08);
+  --blue: #7CC7FF;
+  --blue-bg: rgba(124,199,255,0.08);
+  --yellow: #F4C36A;
+  --grad2: #1A0A30;
   --mono: 'JetBrains Mono', monospace;
   --sans: 'Inter', sans-serif;
 }
@@ -37,12 +37,12 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 html {
-  background: #090b18;
+  background: #0B0613;
   overscroll-behavior: none;
 }
 
 body {
-  background: radial-gradient(ellipse at top, #160F20 0%, #0E1122 100%);
+  background: linear-gradient(180deg, #0A0615 0%, #0D0718 35%, #12091F 100%);
   background-attachment: fixed;
   color: var(--text); font-family: var(--sans);
   min-height: 100vh; font-size: 14px; line-height: 1.5;
@@ -53,7 +53,7 @@ body {
 
 /* ── Topbar ── */
 .topbar {
-  background: rgba(14,17,34,0.97); border-bottom: 1px solid var(--border);
+  background: rgba(11,6,19,0.97); border-bottom: 1px solid var(--border);
   padding: 12px 16px; position: sticky; top: 0; z-index: 20;
   backdrop-filter: blur(14px);
   display: flex; align-items: center; gap: 12px;
