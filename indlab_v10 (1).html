@@ -8448,6 +8448,79 @@ function _computeSysSignals() {
   return signals;
 }
 
+// ---- Агрегированный альт/классика сигнал для Комбо/Системы ----
+// Названия в COMBO_PRESETS.inds / _SYS_OPTIMAL — человекочитаемые, поэтому
+// нужна ручная карта «название → id из IL_INDICATORS» (только для тех id,
+// для которых вообще есть score-функция на странице «Точность»).
+const _IL_LABEL_TO_ID = {
+  'MACD':'macd','MACD (недельный/старший ТФ)':'macd','MACD (12, 26, 9)':'macd','MACD-гистограмма':'macd',
+  'RSI':'rsi','RSI (14)':'rsi','RSI или Stochastic (дневной)':'rsi',
+  'Stochastic':'stoch','Stochastic (14, 3, 3)':'stoch',
+  'Ichimoku Cloud':'ichimoku',
+  'EMA(13)':'ema','Bull/Bear Power':'elder_ray','Force Index(2)':'force_idx','Force Index':'force_idx',
+  'Keltner Channel (20, 2×ATR)':'keltner','Keltner Channel (20, 1.5×ATR)':'keltner',
+  'Donchian Channel (20)':'donchian','Donchian Channel':'donchian','ADX (14)':'adx','ADX':'adx','ADX/DI':'adx',
+  'OBV':'obv','Parabolic SAR':'parabolic',
+  'Bollinger Bands (20, 2σ)':'bb','Momentum или MACD-гист.':'macd',
+  'EOM':'eom','Volume Oscillator':'vo','BB Width':'bb_width',
+  'Fisher Transform':'fisher','Choppiness':'chop','EBS':'ebs',
+  'ATR':null,'BB %B':'bb_pct','Volume':null,
+  'Cumulative Delta':'cum_delta','Z-score (StdDev)':'std_dev','BB Squeeze':'bb_width',
+  'Alligator':'alligator','MAMA/FAMA':'mama',
+  'Historical Volatility':'hist_vol','Historical Vol':'hist_vol','Chaikin Vol':'chaikin_vol','StdDev':'std_dev',
+  'DPO':'dpo','AC Oscillator':'accel_osc','Klinger':null,'Klinger (KVO)':null,'CMF':'cmf','A/D Line':'acc_dist',
+  'NVI/PVI':'nvi','DMI/ADX':'adx','SuperTrend':'supertrend','Vortex':'vortex','Envelopes':'envelopes',
+};
+function _ilAggLabelToId(label) { return Object.prototype.hasOwnProperty.call(_IL_LABEL_TO_ID, label) ? _IL_LABEL_TO_ID[label] : null; }
+
+const IL_ALT_PREF_KEY = 'il_alt_pref';
+function _ilAltPrefAll() { try { return JSON.parse(localStorage.getItem(IL_ALT_PREF_KEY) || '{}'); } catch(e) { return {}; } }
+function _ilAltPrefGet(id) { return !!_ilAltPrefAll()[id]; }
+function _ilAltPrefSet(id, val) { const all = _ilAltPrefAll(); if (val) all[id] = true; else delete all[id]; localStorage.setItem(IL_ALT_PREF_KEY, JSON.stringify(all)); }
+function _ilAltPrefToggle(id) { _ilAltPrefSet(id, !_ilAltPrefGet(id)); }
+
+let _ilAggCache = null; // {len, last, ss, ssAlt}
+function _ilAggGetSeries() {
+  if (!chartCandles || chartCandles.length < 30) return null;
+  const last = chartCandles[chartCandles.length - 1]?.close;
+  if (_ilAggCache && _ilAggCache.len === chartCandles.length && _ilAggCache.last === last) return _ilAggCache;
+  const closes = chartCandles.map(c => c.close);
+  const ss = _ilCalcAllSeries(chartCandles, closes);
+  const chopArr = (typeof ilCalcChop === 'function') ? ilCalcChop(chartCandles, 14) : null;
+  const ssAlt = {};
+  IL_INDICATORS.forEach(id => { ssAlt[id] = _ilAltScoreSeries(id, ss, closes, chartCandles, chopArr); });
+  _ilAggCache = { len: chartCandles.length, last, ss, ssAlt };
+  return _ilAggCache;
+}
+function _ilAggLastScore(arr) { if (!arr) return null; for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i]; return null; }
+// Возвращает {id, hasAlt, score} по id из IL_INDICATORS с учётом выбора альт/классика.
+function _ilAggIndScore(id, cache) {
+  if (!IL_INDICATORS.includes(id)) return null;
+  const hasAlt = _ilAltFamilyOf(id) != null;
+  const useAlt = hasAlt && _ilAltPrefGet(id);
+  const score = _ilAggLastScore(useAlt ? cache.ssAlt[id] : cache.ss[id]);
+  return { id, hasAlt, useAlt, score };
+}
+// Голосование по списку id (или человекочитаемых названий из COMBO_PRESETS.inds).
+function _ilAggVote(labelsOrIds) {
+  const cache = _ilAggGetSeries();
+  if (!cache) return { sig: null, items: [] };
+  const items = labelsOrIds.map(l => {
+    const id = IL_INDICATORS.includes(l) ? l : _ilAggLabelToId(l);
+    return id ? _ilAggIndScore(id, cache) : null;
+  }).filter(Boolean);
+  if (!items.length) return { sig: null, items: [] };
+  let pos = 0, neg = 0, n = 0;
+  items.forEach(it => { if (it.score == null) return; n++; if (it.score > 0) pos++; else if (it.score < 0) neg++; });
+  if (!n) return { sig: null, items };
+  let sig = 'neutral';
+  const ratio = (pos - neg) / n;
+  if (ratio >= 0.6) sig = 'buy-strong'; else if (ratio >= 0.2) sig = 'buy';
+  else if (ratio <= -0.6) sig = 'sell-strong'; else if (ratio <= -0.2) sig = 'sell';
+  return { sig, items };
+}
+function ilAggToggleAlt(id) { _ilAltPrefToggle(id); if (typeof cpRenderCombos === 'function') cpRenderCombos(); if (typeof _sysOptimalSection === 'function' && typeof _sysRenderStaticSections === 'function') _sysRenderStaticSections(); }
+
 function cpRenderCombos() {
   const el = document.getElementById('cp-combo-inner');
   if (!el) return;
@@ -8457,6 +8530,8 @@ function cpRenderCombos() {
     const SIG_COL = {'buy-strong':'#52F2C9','buy':'#52F2C9','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
     const sig = sysSignals[c.id] || c.signal || 'neutral';
     const col = SIG_COL[sig] || '#6F648F';
+    const agg = c.inds?.length ? _ilAggVote(c.inds) : { sig: null, items: [] };
+    const aggCol = agg.sig ? (SIG_COL[agg.sig] || '#6F648F') : '#6F648F';
     return `
     <div id="cpcombo-${c.id}" style="margin-bottom:8px;border-radius:10px;overflow:hidden;
       border:1px solid ${isActive ? 'rgba(255,0,110,0.45)' : 'rgba(255,255,255,0.06)'};
@@ -8469,6 +8544,7 @@ function cpRenderCombos() {
           <span style="font-size:9px;padding:1px 6px;border-radius:6px;background:${c.tagColor||'#6F648F'}22;color:${c.tagColor||'#6F648F'};font-family:var(--mono);border:1px solid ${c.tagColor||'#6F648F'}44;">${c.tag||''}</span>
         </div>
         <span style="font-size:9px;padding:2px 6px;border-radius:6px;background:${col}22;color:${col};font-family:var(--mono);">${(sig||'').replace('-',' ')}</span>
+        ${agg.sig ? `<span title="Агрегированный сигнал по классике/альт выбору индикаторов" style="font-size:9px;padding:2px 6px;border-radius:6px;background:${aggCol}22;color:${aggCol};font-family:var(--mono);border:1px dashed ${aggCol}66;">Σ ${agg.sig.replace('-',' ')}</span>` : ''}
         <span style="font-size:11px;color:#6F648F;">${isActive ? '‹' : '›'}</span>
       </div>
       <!-- Detail (toggle) -->
@@ -8476,9 +8552,15 @@ function cpRenderCombos() {
         <div style="font-size:10px;color:var(--text2);line-height:1.5;margin:8px 0 6px;">${c.desc||c.short||''}</div>
         ${c.why ? `<div style="font-size:9px;color:#52A8E0;line-height:1.4;margin-bottom:7px;padding:4px 7px;background:rgba(82,168,224,0.06);border-radius:5px;border-left:2px solid #52A8E044;">${c.why}</div>` : ''}
         ${c.inds?.length ? `
-        <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Индикаторы</div>
+        <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Индикаторы ${agg.sig?'<span style="opacity:.6;">(клик — альт/классика, где доступно)</span>':''}</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;">
-          ${c.inds.map(i=>`<span style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text3);font-family:var(--mono);">${i}</span>`).join('')}
+          ${c.inds.map(i=>{
+            const id = _ilAggLabelToId(i);
+            const it = agg.items.find(x=>x.id===id);
+            if (!id || !it || !it.hasAlt) return `<span style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text3);font-family:var(--mono);">${i}</span>`;
+            const on = it.useAlt;
+            return `<span onclick="ilAggToggleAlt('${id}')" title="Классика/альт для ${i}" style="cursor:pointer;font-size:9px;padding:2px 6px;border-radius:6px;background:${on?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)'};color:${on?'#FF006E':'var(--text3)'};font-family:var(--mono);border:1px solid ${on?'rgba(255,0,110,0.35)':'transparent'};">${i} · ${on?'альт':'клас'}</span>`;
+          }).join('')}
         </div>` : ''}
         ${c.rules?.length ? `
         <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Правила входа</div>
@@ -8539,18 +8621,27 @@ const _SYS_OPTIMAL = [
 ];
 
 function _sysOptimalSection() {
+  const agg = _ilAggVote(_SYS_OPTIMAL.map(it => it.id));
+  const SIG_COL = {'buy-strong':'#52F2C9','buy':'#52F2C9','sell':'#FF4D7A','sell-strong':'#FF4D7A','neutral':'#6F648F'};
+  const aggCol = agg.sig ? (SIG_COL[agg.sig] || '#6F648F') : '#6F648F';
   const rows = _SYS_OPTIMAL.map((item, i) => {
+    const it = agg.items.find(x => x.id === item.id);
+    const toggle = (it && it.hasAlt)
+      ? ('<span onclick="event.stopPropagation();ilAggToggleAlt(\'' + item.id + '\')" title="Классика/альт" style="cursor:pointer;font-size:8px;padding:1px 5px;border-radius:5px;margin-left:4px;background:' + (it.useAlt?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)') + ';color:' + (it.useAlt?'#FF006E':'var(--text3)') + ';border:1px solid ' + (it.useAlt?'rgba(255,0,110,0.35)':'transparent') + ';">' + (it.useAlt?'альт':'клас') + '</span>')
+      : '';
     return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
       + '<span style="font-size:9px;color:#6F648F;font-family:var(--mono);width:14px;">' + (i+1) + '.</span>'
-      + '<span style="font-size:10px;color:var(--text2);font-family:var(--mono);width:120px;flex-shrink:0;">' + item.label + '</span>'
+      + '<span style="font-size:10px;color:var(--text2);font-family:var(--mono);width:120px;flex-shrink:0;">' + item.label + toggle + '</span>'
       + '<span style="font-size:9px;color:var(--text3);font-family:var(--mono);flex:1;">' + item.role + '</span>'
       + '</div>';
   }).join('');
   return '<details style="margin-bottom:8px;border:1px solid rgba(96,164,161,0.3);border-radius:6px;">'
     + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#60A4A1;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
-    + '<span style="font-size:12px;">◆</span>Оптимальный набор</summary>'
+    + '<span style="font-size:12px;">◆</span>Оптимальный набор'
+    + (agg.sig ? ('<span title="Агрегированный сигнал по классике/альт выбору" style="font-size:9px;padding:1px 6px;border-radius:6px;background:' + aggCol + '22;color:' + aggCol + ';border:1px dashed ' + aggCol + '66;margin-left:auto;">Σ ' + agg.sig.replace('-',' ') + '</span>') : '')
+    + '</summary>'
     + '<div style="padding:8px 10px 10px;">'
-    + '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">Накапливается из всех категорий. Активировать = включить все на графике.</div>'
+    + '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">Накапливается из всех категорий. Метка клас/альт у строки — клик переключает формулу для агрегированного сигнала (Σ выше). Активировать = включить все на графике.</div>'
     + rows
     + '<button onclick="_sysActivateOptimal()" style="margin-top:10px;width:100%;padding:5px;background:rgba(96,164,161,0.12);border:1px solid rgba(96,164,161,0.35);border-radius:6px;color:#60A4A1;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать всё на графике</button>'
     + '</div></details>';
