@@ -136,11 +136,10 @@ body {
   will-change: transform; contain: strict;
 }
 .slider-combo input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
-  background: var(--accent); border: 2px solid var(--surface);
-  box-shadow: 0 0 6px rgba(199,27,82,0.6); transition: transform 0.1s;
+  -webkit-appearance: none; width: 9px; height: 9px; border-radius: 0;
+  background: #7A5FBF; transform: rotate(45deg); margin-top: -3.5px; transition: background .12s;
 }
-.slider-combo input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
+.slider-combo input[type=range]::-webkit-slider-thumb:hover { background: #B487F8; }
 .num-input {
   width: 68px; background: var(--surface2); border: 1px solid var(--border2);
   border-radius: 3px; padding: 4px 7px; font-family: var(--mono);
@@ -264,13 +263,13 @@ input[type=range] { touch-action: none; }
 
 /* ── Scrollbar: dark track + crimson thumb ── */
 /* ── Scrollbar: dark track + crimson thumb ── */
-* { scrollbar-width: thin; scrollbar-color: #7A5FBF #0D0820; }
-*::-webkit-scrollbar { width: 5px !important; height: 5px !important; }
-*::-webkit-scrollbar-track { background: #0D0820 !important; }
-*::-webkit-scrollbar-thumb { background: #7A5FBF !important; border-radius: 0 !important; min-height: 30px; }
-*::-webkit-scrollbar-thumb:hover { background: #B487F8 !important; }
+* { scrollbar-width: thin; scrollbar-color: rgba(90,60,140,0.5) transparent; }
+*::-webkit-scrollbar { width: 4px !important; height: 4px !important; }
+*::-webkit-scrollbar-track { background: transparent !important; }
+*::-webkit-scrollbar-thumb { background: rgba(100,70,160,0.45) !important; border-radius: 0 !important; min-height: 28px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); transition: background .15s; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(180,135,248,0.7) !important; }
 *::-webkit-scrollbar-button { display: none !important; }
-*::-webkit-scrollbar-corner { background: #0D0820 !important; }
+*::-webkit-scrollbar-corner { background: transparent !important; }
 
 input, textarea, select {
   color-scheme: dark;
@@ -286,8 +285,10 @@ input[type=range] { -webkit-appearance: none; appearance: none; background: tran
 input[type=range]::-webkit-slider-runnable-track { height: 2px; background: rgba(122,95,191,0.35); border-radius: 0; }
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 9px; background: #7A5FBF; border-radius: 0; transform: rotate(45deg); margin-top: -3.5px; transition: background .12s; }
 input[type=range]::-webkit-slider-thumb:hover { background: #B487F8; }
+input[type=range]::-webkit-slider-progress { height: 2px; background: rgba(180,135,248,0.55); border-radius: 0; }
 input[type=range]::-moz-range-track { height: 2px; background: rgba(122,95,191,0.35); }
 input[type=range]::-moz-range-thumb { width: 9px; height: 9px; background: #7A5FBF; border: none; border-radius: 0; transform: rotate(45deg); }
+input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,248,0.55); }
 
 /* ── Indicator rows: reliable tap on mobile ── */
 .cp-ind-row {
@@ -10253,7 +10254,7 @@ function cpInitIndPanel() {
             <input type="range" id="cpslider-${ind.id}-${p.id}"
               min="${p.min}" max="${p.max}" step="${p.step||1}" value="${p.def}"
               oninput="document.getElementById('cpval-${ind.id}-${p.id}').value=this.value;cpUpdateInd('${ind.id}')"
-              style="width:100%;height:3px;accent-color:#B487F8;cursor:pointer;">
+              style="width:100%;cursor:pointer;">
           </div>`).join('')}
           ${isChart ? `<button id="cpchartbtn-${ind.id}" data-indid="${ind.id}" class="cp-chart-toggle-btn"
             style="width:100%;padding:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
