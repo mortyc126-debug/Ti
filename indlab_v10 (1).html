@@ -347,6 +347,17 @@ input[type=range] { touch-action: none; }
   border-color: #FF006E;
   box-shadow: 0 0 8px rgba(255,0,110,0.6);
 }
+.cp-ind-alt-diamond-btn {
+  width: 10px; height: 10px; flex-shrink: 0;
+  transform: rotate(45deg);
+  border: 1.5px solid rgba(122,140,255,0.35); background: transparent;
+  transition: all 0.12s; cursor: pointer;
+}
+.cp-ind-alt-diamond-btn.active {
+  background: #7A8CFF;
+  border-color: #7A8CFF;
+  box-shadow: 0 0 6px rgba(122,140,255,0.55);
+}
 .cp-ind-label { font-size: 11px; color: var(--text2); font-family: var(--mono); }
 .cp-ind-group-title {
   font-size: 9px; color: #6F648F; font-family: var(--mono);
@@ -781,6 +792,29 @@ input[type=range] { touch-action: none; }
     <span style="font-size:9px;color:#3a3050;font-family:var(--mono);margin-left:4px;">· горизонты: 5 / 10 / 15 / 30 свечей</span>
   </div>
   <div id="an-results"></div>
+
+  <!-- ══ МУЛЬТИТИКЕР СРАВНЕНИЕ ══ -->
+  <div id="an-multi-section" style="margin-top:28px;border-top:1px solid rgba(255,255,255,0.06);padding-top:18px;">
+    <div style="font-size:11px;color:#7A8CFF;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;">⚖ Сравнение точности по тикерам</div>
+    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;line-height:1.7;">
+      Введи несколько тикеров — получишь таблицу точности классика/альт по каждому индикатору и вывод о том, насколько поведение универсально (или специфично для конкретного инструмента).
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-bottom:8px;">
+      <textarea id="an-multi-tickers" placeholder="SBER&#10;GAZP&#10;LKOH&#10;NVTK" rows="4"
+        style="padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:160px;resize:vertical;line-height:1.6;"></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button onclick="ilRunMultiComp()" style="padding:7px 16px;background:rgba(122,140,255,0.1);border:1px solid rgba(122,140,255,0.35);border-radius:8px;color:#7A8CFF;font-family:var(--mono);font-size:10px;cursor:pointer;white-space:nowrap;">▷ Запустить всё</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="an-multi-altonly" style="accent-color:#7A8CFF;"> только альт
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2);cursor:pointer;">
+          <input type="checkbox" id="an-multi-best" checked style="accent-color:#52F2C9;"> только ≥55%
+        </label>
+      </div>
+      <span id="an-multi-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);align-self:center;flex:1;min-width:120px;"></span>
+    </div>
+    <div id="an-multi-results"></div>
+  </div>
 </div>
 
 <!-- ══ COMPARE PAGE ══ -->
@@ -955,9 +989,13 @@ input[type=range] { touch-action: none; }
           <div class="cpnl-hdr"><span class="cpnl-lbl">MACD</span><span class="cpnl-val" id="chart-macd-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="macd" title="Скрыть">◉</span><span class="cpnl-del" data-id="macd" title="Убрать">✕</span></div>
           <canvas id="chart-macd-canvas" style="width:100%;height:78px;display:block;"></canvas>
         </div>
-        <!-- Альт-версии активных индикаторов: одна общая панель, линии score -2..2 -->
-        <div id="chart-altind-panel" style="display:none;height:90px;position:relative;border-top:1px solid rgba(255,0,110,0.15);">
-          <div class="cpnl-hdr"><span class="cpnl-lbl" style="color:#FF006E;">Альт</span><span id="chart-altind-legend" style="flex:1;font-size:9px;color:var(--text3);font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></span></div>
+        <!-- Альт-версии индикаторов: панель с выбором и графиком score -2..2 -->
+        <div id="chart-altind-panel" style="display:none;position:relative;border-top:1px solid rgba(255,0,110,0.15);">
+          <div class="cpnl-hdr" style="flex-wrap:wrap;gap:2px;height:auto;padding:4px 8px;min-height:24px;">
+            <span class="cpnl-lbl" style="color:#FF006E;flex-shrink:0;">Альт-сигналы</span>
+            <span id="chart-altind-legend" style="flex:1;font-size:9px;color:var(--text3);font-family:var(--mono);white-space:normal;line-height:1.6;"></span>
+          </div>
+          <div id="chart-altind-picker" style="padding:4px 8px 6px;display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid rgba(255,0,110,0.08);"></div>
           <canvas id="chart-altind-canvas" style="width:100%;height:90px;display:block;"></canvas>
         </div>
         <div id="chart-stoch-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
@@ -5818,34 +5856,41 @@ function chartRedraw() {
 function _chartDrawAltInd() {
   const panel = document.getElementById('chart-altind-panel');
   const legend = document.getElementById('chart-altind-legend');
+  const picker = document.getElementById('chart-altind-picker');
   if (!panel) return;
   if (typeof _ilAggGetSeries !== 'function' || !chartCandles.length) { panel.style.display = 'none'; return; }
   const cache = _ilAggGetSeries();
   if (!cache) { panel.style.display = 'none'; return; }
-  const candidates = Object.keys(chartInds).filter(id => chartInds[id])
+
+  // Все индикаторы у которых есть alt-формула — независимо от chartInds
+  const allWithAlt = (typeof IL_INDICATORS !== 'undefined' ? IL_INDICATORS : [])
     .map(id => ({ id, it: _ilAggIndScore(id, cache) }))
     .filter(x => x.it && x.it.hasAlt);
-  const activeAlt = candidates.filter(x => x.it.useAlt);
-  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0'];
+  if (!allWithAlt.length) { panel.style.display = 'none'; return; }
+
+  const activeAlt = allWithAlt.filter(x => x.it.useAlt);
+  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0','#FF9F40','#A78BFA'];
+
   if (legend) {
-    const onChips = activeAlt.map((x,i) => {
-      const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-      const tip = 'Клик — вернуть классику. Чем альт отличается: ' + (x.it.altDesc || '');
-      return `<span onclick="ilAggToggleAlt('${x.id}')" title="${tip.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
-    }).join('');
-    const offCandidates = candidates.filter(x => !x.it.useAlt);
-    const offChips = offCandidates.map(x => {
-      const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-      const tip = 'Клик — показать альт-версию. Чем отличается: ' + (x.it.altDesc || '');
-      return `<span onclick="ilAggToggleAlt('${x.id}')" title="${tip.replace(/"/g,'&quot;')}" style="cursor:pointer;opacity:.45;margin-right:8px;">+ ${name}</span>`;
-    }).join('');
-    legend.innerHTML = onChips + (offChips ? `<span style="opacity:.5;">| доступно: </span>${offChips}` : '');
+    if (activeAlt.length) {
+      legend.innerHTML = activeAlt.map((x,i) => {
+        const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
+        return `<span style="color:${palette[i%palette.length]};margin-right:8px;">◆ ${name}</span>`;
+      }).join('') + '<span style="color:#4a4060;font-size:8px;">· ◆ в списке Инд. чтобы убрать</span>';
+    } else {
+      legend.innerHTML = '<span style="color:#4a4060;">Активируй ◆ (фиолетовый) у индикаторов в списке Инд.</span>';
+    }
   }
-  if (!activeAlt.length) { panel.style.display = candidates.length ? 'block' : 'none'; if(!candidates.length) return; }
-  else panel.style.display = 'block';
+
+  if (picker) picker.style.display = 'none';
+
+  panel.style.display = 'block';
+
   const cv = document.getElementById('chart-altind-canvas');
   if (!cv) return;
-  const dpr = devicePixelRatio || 1, W = cv.offsetWidth, H = cv.offsetHeight;
+  if (!activeAlt.length) { cv.style.display = 'none'; return; }
+  cv.style.display = 'block';
+  const dpr = devicePixelRatio || 1, W = cv.offsetWidth, H = cv.offsetHeight || 90;
   if (!W || !H) return;
   cv.width = W*dpr; cv.height = H*dpr;
   const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0,0,W,H);
@@ -8584,8 +8629,17 @@ function _ilAggVote(labelsOrIds) {
   else if (ratio <= -0.6) sig = 'sell-strong'; else if (ratio <= -0.2) sig = 'sell';
   return { sig, items };
 }
+function cpUpdateAltDiamonds() {
+  document.querySelectorAll('.cp-ind-alt-diamond-btn').forEach(el => {
+    const id = el.dataset.indid;
+    const on = (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(id);
+    el.classList.toggle('active', !!on);
+  });
+}
+
 function ilAggToggleAlt(id) {
   _ilAltPrefToggle(id);
+  cpUpdateAltDiamonds();
   if (typeof cpRenderCombos === 'function') try { cpRenderCombos(); } catch(e) {}
   if (typeof _sysRenderStaticSections === 'function') try { _sysRenderStaticSections(); } catch(e) {}
   if (typeof chartCandles !== 'undefined' && chartCandles.length) try { chartRedraw(); } catch(e) {}
@@ -10076,6 +10130,9 @@ function cpInitIndPanel() {
         cpIndVals[ind.id] = {};
         (ind.params||[]).forEach(p => { cpIndVals[ind.id][p.id] = p.def; });
       }
+      const hasAlt = (typeof _ilAltFamilyOf === 'function') && _ilAltFamilyOf(ind.id) != null;
+      const altOn = hasAlt && (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(ind.id);
+      const altTip = hasAlt && (typeof _IL_ALT_FAMILY_DESC !== 'undefined') ? (_IL_ALT_FAMILY_DESC[_ilAltFamilyOf(ind.id)]||'Альт-интерпретация') : '';
       html += `
       <div style="margin-bottom:2px;">
         <div class="cp-ind-row" id="cprow-${ind.id}"
@@ -10091,6 +10148,10 @@ function cpInitIndPanel() {
             style="width:10px;height:10px;transform:rotate(45deg);flex-shrink:0;transition:all 0.12s;cursor:pointer;
               border:1.5px solid ${on?'#FF006E':'rgba(255,0,110,0.4)'};background:${on?'#FF006E':'none'};
               box-shadow:${on?'0 0 6px rgba(255,0,110,0.5)':'none'};"></div>
+          ${hasAlt ? `<div id="cpaltdiam-${ind.id}"
+            data-indid="${ind.id}"
+            class="cp-ind-alt-diamond-btn${altOn?' active':''}"
+            title="Альт-режим на графике: ${altTip.replace(/"/g,'&quot;')}"></div>` : '<div style="width:10px;flex-shrink:0;"></div>'}
           <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
           <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${cpGetFavs().includes(ind.id)?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${cpGetFavs().includes(ind.id)?'#FFD700':'#6F648F'};">★</span>
@@ -10143,6 +10204,13 @@ function cpInitIndPanel() {
     // "На график" button inside detail
     const chartBtn = e.target.closest('.cp-chart-toggle-btn');
     if (chartBtn) { e.stopPropagation(); cpChartToggle(chartBtn.dataset.indid); return; }
+    // Alt diamond button
+    const altDiam = e.target.closest('.cp-ind-alt-diamond-btn');
+    if (altDiam) {
+      e.stopPropagation();
+      if (typeof ilAggToggleAlt === 'function') ilAggToggleAlt(altDiam.dataset.indid);
+      return;
+    }
     // Diamond button
     const diam = e.target.closest('.cp-ind-diamond-btn');
     if (diam) {
@@ -13131,6 +13199,201 @@ function initAnalysis() {
   if(el && typeof _cpTicker!=='undefined' && _cpTicker) el.value=_cpTicker;
   else if(el && typeof _chartTicker!=='undefined' && _chartTicker) el.value=_chartTicker;
   if(_ilBtResults) ilRenderAnalysis();
+}
+
+// ══ МУЛЬТИТИКЕР: сравнение точности индикаторов по набору тикеров ══
+let _ilMultiCompResults = []; // [{ticker, stats}]
+
+async function ilRunMultiComp() {
+  const raw = (document.getElementById('an-multi-tickers')?.value || '').trim();
+  const statusEl = document.getElementById('an-multi-status');
+  const token = _ilShellToken;
+  if (!raw || !token) { if(statusEl) statusEl.textContent='Введи тикеры и убедись, что токен задан на странице График'; return; }
+  const tickers = [...new Set(raw.split(/[\s,;]+/).map(t=>t.trim().toUpperCase()).filter(Boolean))];
+  if (!tickers.length) { if(statusEl) statusEl.textContent='Нет тикеров'; return; }
+
+  const tfBtn = document.querySelector('.an-tf.active');
+  const tfConst = tfBtn?.dataset?.tf || 'CANDLE_INTERVAL_5_MIN';
+  const tfLabel = tfBtn?.dataset?.label || '5 мин';
+  const tfDays = {CANDLE_INTERVAL_1_MIN:7,CANDLE_INTERVAL_5_MIN:90,CANDLE_INTERVAL_15_MIN:90,CANDLE_INTERVAL_30_MIN:90,CANDLE_INTERVAL_HOUR:90,CANDLE_INTERVAL_DAY:365}[tfConst]||90;
+  const barMinutes = {CANDLE_INTERVAL_1_MIN:1,CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60}[tfConst]||5;
+
+  _ilMultiCompResults = [];
+  const failed = [];
+
+  for (let i=0; i<tickers.length; i++) {
+    const tk = tickers[i];
+    if(statusEl) statusEl.textContent = `[${i+1}/${tickers.length}] ${tk}…`;
+    try {
+      const found = await ilFindFigi(tk, token, chartGetProxy?.());
+      if (!found) throw new Error('не найден');
+      const now=new Date(), from=new Date(now);
+      from.setDate(from.getDate()-tfDays);
+      const candles = await _ilFetchCandlesWithCache(tk, found.figi, tfConst, from, now, token, chartGetProxy?.(), null);
+      if (!candles || candles.length<30) throw new Error('мало данных ('+candles?.length+')');
+      const closes = candles.map(c=>c.close);
+      const ss = _ilCalcAllSeries(candles, closes);
+      const chopArr = ilCalcChop(candles,14);
+      const ssAlt = {};
+      IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(id, ss, closes, candles, chopArr); });
+      const stats = {};
+      IL_INDICATORS.forEach(id=>{
+        const s15 = _ilBtStats(ss[id],closes,15,null);
+        const s15a = _ilBtStats(ssAlt[id],closes,15,null);
+        stats[id] = { cl: s15, alt: s15a };
+      });
+      _ilMultiCompResults.push({ ticker:tk, stats, closes, barMinutes });
+    } catch(e) { failed.push(`${tk}(${e.message})`); }
+  }
+
+  let msg = `✓ ${_ilMultiCompResults.length} тикеров`;
+  if (failed.length) msg += ` · ⚠ пропущены: ${failed.join(', ')}`;
+  if(statusEl) statusEl.textContent = msg;
+  ilRenderMultiComp(tfLabel);
+}
+
+function ilRenderMultiComp(tfLabel) {
+  const el = document.getElementById('an-multi-results');
+  if (!el) return;
+  const results = _ilMultiCompResults;
+  if (!results.length) { el.innerHTML='<div style="color:var(--text3);font-size:10px;padding:10px 0;">Нет данных</div>'; return; }
+
+  const onlyBest = document.getElementById('an-multi-best')?.checked;
+  const onlyAlt  = document.getElementById('an-multi-altonly')?.checked;
+  const tickers = results.map(r=>r.ticker);
+
+  // Собираем данные по каждому индикатору: [{id, clAcc[tkIdx], altAcc[tkIdx]}]
+  const rows = IL_INDICATORS.map(id=>{
+    const clVals = results.map(r=>{ const s=r.stats[id]?.cl; return (s&&s.n>=5&&s.acc!=null)?Math.round(s.acc*100):null; });
+    const altVals= results.map(r=>{ const s=r.stats[id]?.alt; return (s&&s.n>=3&&s.acc!=null)?Math.round(s.acc*100):null; });
+    // Отбрасываем если все null
+    const anyVal = (onlyAlt?altVals:clVals).some(v=>v!=null);
+    if (!anyVal) return null;
+    // Считаем конвергенцию (std по тикерам)
+    const refVals = (onlyAlt?altVals:clVals).filter(v=>v!=null);
+    const mean = refVals.reduce((a,v)=>a+v,0)/refVals.length;
+    const std = refVals.length>1 ? Math.sqrt(refVals.reduce((a,v)=>a+(v-mean)**2,0)/refVals.length) : 0;
+    const altWins = results.filter((_,i)=>clVals[i]!=null&&altVals[i]!=null&&altVals[i]>clVals[i]).length;
+    const bothCount = results.filter((_,i)=>clVals[i]!=null&&altVals[i]!=null).length;
+    return { id, clVals, altVals, mean: Math.round(mean), std: Math.round(std*10)/10, altWins, bothCount };
+  }).filter(Boolean);
+
+  // Фильтр «только ≥55%»
+  const visRows = onlyBest
+    ? rows.filter(r=>{ const ref=onlyAlt?r.altVals:r.clVals; return ref.some(v=>v!=null&&v>=55); })
+    : rows;
+
+  if (!visRows.length) { el.innerHTML='<div style="color:var(--text3);font-size:10px;padding:10px 0;">Ничего не подошло под фильтры</div>'; return; }
+
+  // Сортировка: по mean desc
+  visRows.sort((a,b)=>b.mean-a.mean);
+
+  const fmtAcc = (v,bold)=>{
+    if(v==null) return '<td style="color:#2a2050;text-align:center;font-size:10px;">—</td>';
+    let col='#8878a8';
+    if(v>=62) col='#52E8A0'; else if(v>=55) col='#C8A840'; else if(v<=45) col='#E04060';
+    return `<td style="text-align:center;font-size:10px;color:${col};${bold?'font-weight:700;':''}">${v}%</td>`;
+  };
+  const fmtDelta = (cl,alt)=>{
+    if(cl==null||alt==null) return '<td style="color:#2a2050;text-align:center;font-size:9px;">—</td>';
+    const d=alt-cl;
+    const col=d>0?'#52E8A0':d<0?'#E04060':'#5a5070';
+    return `<td style="text-align:center;font-size:9px;color:${col};">${d>0?'+':''}${d}</td>`;
+  };
+  const fmtStd = (std)=>{
+    const col=std<=5?'#52E8A0':std<=10?'#C8A840':'#E04060';
+    return `<td style="text-align:center;font-size:10px;color:${col};">${std}</td>`;
+  };
+
+  // Шапка таблицы
+  let th = `<tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+    <th style="text-align:left;font-size:9px;color:#5a5070;padding:4px 6px;font-weight:400;min-width:90px;">Индикатор</th>
+    <th style="text-align:center;font-size:9px;color:#5a5070;padding:4px 6px;font-weight:400;" title="Среднее по тикерам">Ср.%</th>
+    <th style="text-align:center;font-size:9px;color:#5a5070;padding:4px 6px;font-weight:400;" title="Стандартное отклонение — насколько по-разному ведёт себя у разных тикеров. ≤5 — универсальный, >10 — тикер-специфичный">Разброс σ</th>`;
+  tickers.forEach(tk=>{
+    th+=`<th colspan="${onlyAlt?1:2}" style="text-align:center;font-size:9px;color:#7A8CFF;padding:4px 6px;font-weight:400;">${tk}</th>`;
+  });
+  th+=`<th style="text-align:center;font-size:9px;color:#5a5070;padding:4px 6px;font-weight:400;">Альт лучше</th></tr>`;
+
+  // Подзаголовок колонок тикеров
+  if (!onlyAlt) {
+    th+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+      <th></th><th></th><th></th>`;
+    tickers.forEach(()=>{ th+=`<th style="text-align:center;font-size:8px;color:#4a4060;padding:1px 4px;">кл</th><th style="text-align:center;font-size:8px;color:#6a5080;padding:1px 4px;">альт Δ</th>`; });
+    th+=`<th></th></tr>`;
+  }
+
+  // Строки по группам
+  let tbody='';
+  _IL_GROUPS.forEach(grp=>{
+    const grpRows = visRows.filter(r=>grp.ids.includes(r.id));
+    if (!grpRows.length) return;
+    tbody+=`<tr><td colspan="${onlyAlt ? tickers.length+3 : tickers.length*2+3}" style="font-size:9px;color:${grp.color};padding:8px 6px 3px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,0.15);">${grp.label}</td></tr>`;
+    grpRows.forEach(row=>{
+      tbody+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+        <td style="font-size:10px;color:var(--text2);padding:3px 6px;white-space:nowrap;">${IL_NAMES[row.id]||row.id}</td>
+        <td style="text-align:center;font-size:10px;color:var(--text2);padding:3px 4px;">${row.mean}%</td>
+        ${fmtStd(row.std)}`;
+      tickers.forEach((_,i)=>{
+        if (onlyAlt) {
+          tbody += fmtAcc(row.altVals[i]);
+        } else {
+          tbody += fmtAcc(row.clVals[i]) + fmtDelta(row.clVals[i], row.altVals[i]);
+        }
+      });
+      const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
+      const pCol = pct==null?'#3a3060':pct>=60?'#52E8A0':pct<=40?'#E04060':'#8878a8';
+      tbody+=`<td style="text-align:center;font-size:10px;color:${pCol};padding:3px 4px;">${pct!=null?pct+'%':'—'}</td></tr>`;
+    });
+  });
+  // Индикаторы не в группах
+  const inGroups = _IL_GROUPS.flatMap(g=>g.ids);
+  const orphans = visRows.filter(r=>!inGroups.includes(r.id));
+  if (orphans.length) {
+    tbody+=`<tr><td colspan="${onlyAlt ? tickers.length+3 : tickers.length*2+3}" style="font-size:9px;color:#5a5070;padding:8px 6px 3px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,0.15);">Прочие</td></tr>`;
+    orphans.forEach(row=>{
+      tbody+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+        <td style="font-size:10px;color:var(--text2);padding:3px 6px;">${IL_NAMES[row.id]||row.id}</td>
+        <td style="text-align:center;font-size:10px;color:var(--text2);padding:3px 4px;">${row.mean}%</td>
+        ${fmtStd(row.std)}`;
+      tickers.forEach((_,i)=>{
+        if (onlyAlt) tbody += fmtAcc(row.altVals[i]);
+        else tbody += fmtAcc(row.clVals[i]) + fmtDelta(row.clVals[i], row.altVals[i]);
+      });
+      const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
+      const pCol = pct==null?'#3a3060':pct>=60?'#52E8A0':pct<=40?'#E04060':'#8878a8';
+      tbody+=`<td style="text-align:center;font-size:10px;color:${pCol};padding:3px 4px;">${pct!=null?pct+'%':'—'}</td></tr>`;
+    });
+  }
+
+  // Сводные выводы
+  const universals = visRows.filter(r=>r.std<=5&&r.mean>=55).sort((a,b)=>b.mean-a.mean).slice(0,8);
+  const specific   = visRows.filter(r=>r.std>10).sort((a,b)=>b.std-a.std).slice(0,5);
+  const altBetter  = visRows.filter(r=>r.altWins>r.bothCount/2&&r.bothCount>=2).sort((a,b)=>(b.altWins/b.bothCount)-(a.altWins/a.bothCount)).slice(0,6);
+  const clBetter   = visRows.filter(r=>r.altWins<r.bothCount/2&&r.bothCount>=2).sort((a,b)=>(a.altWins/a.bothCount)-(b.altWins/b.bothCount)).slice(0,6);
+
+  let summary=`<div style="margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">`;
+  const card=(title,col,items,hint)=>`<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 12px;">
+    <div style="font-size:9px;color:${col};letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px;">${title}</div>
+    ${hint?`<div style="font-size:9px;color:#4a4060;margin-bottom:5px;">${hint}</div>`:''}
+    ${items.length?items.map(r=>`<div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${IL_NAMES[r.id]||r.id} <span style="color:#5a5070;">${r.mean}%${r.std!=null?' σ'+r.std:''}</span></div>`).join(''):'<div style="font-size:10px;color:#3a3060;">—</div>'}
+  </div>`;
+  summary+=card('Универсальные (σ≤5, ≥55%)','#52E8A0',universals,'Работают стабильно у всех тикеров');
+  summary+=card('Тикер-специфичные (σ>10)','#E04060',specific,'Поведение сильно зависит от инструмента');
+  summary+=card('Альт-формула лучше в большинстве','#7A8CFF',altBetter,'У этих индикаторов альт-интерпретация точнее для ≥50% тикеров');
+  summary+=card('Классика надёжнее','#C8A840',clBetter,'Альт-формула у большинства тикеров хуже классики');
+  summary+=`</div>`;
+
+  // Легенда колонок
+  const legend = `<div style="margin-bottom:8px;font-size:9px;color:#4a4060;font-family:var(--mono);line-height:1.8;">
+    ТФ: <span style="color:#a898c8;">${tfLabel||''}</span> · горизонт H15 ·
+    <span style="color:#52E8A0">≥62%</span> устойчивый · <span style="color:#C8A840">55–61%</span> умеренный · <span style="color:#8878a8">&lt;55%</span> случайный · <span style="color:#E04060">≤45%</span> антисигнал<br>
+    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:#52E8A0">≤5</span> = универсальный · <span style="color:#C8A840">6–10</span> = умеренно специфичный · <span style="color:#E04060">&gt;10</span> = тикер-специфичный<br>
+    ${onlyAlt?'':'<b style="color:var(--text3);">Δ</b> = альт − классика · '}
+    <b style="color:var(--text3);">Альт лучше</b>: % тикеров, где альт-формула точнее классики
+  </div>`;
+
+  el.innerHTML=legend+_ilCopyToolbar('an-multi-table')+`<div id="an-multi-table" style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:var(--mono);width:100%;min-width:400px;"><thead>${th}</thead><tbody>${tbody}</tbody></table></div>`+summary;
 }
 
 // --- Tab switching Методы / Анализ ---
