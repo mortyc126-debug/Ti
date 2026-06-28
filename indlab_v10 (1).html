@@ -778,11 +778,11 @@ input[type=range] { touch-action: none; }
 <!-- ══ ANALYSIS PAGE ══ -->
 <div id="page-analysis" class="page">
   <!-- Вкладки -->
-  <div style="display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0;">
+  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px;">
     <button id="an-tab-single" onclick="anSwitchTab('single')"
-      style="padding:5px 14px;font-family:var(--mono);font-size:10px;cursor:pointer;border:none;border-radius:4px 4px 0 0;background:#52F2C9;color:#0a0618;">Один тикер</button>
+      style="padding:4px 14px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);border-radius:6px;background:rgba(82,242,201,0.1);color:#52F2C9;">Один тикер</button>
     <button id="an-tab-multi" onclick="anSwitchTab('multi')"
-      style="padding:5px 14px;font-family:var(--mono);font-size:10px;cursor:pointer;border:none;border-radius:4px 4px 0 0;background:rgba(255,255,255,0.05);color:#8080A0;">Несколько тикеров</button>
+      style="padding:4px 14px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.08);border-radius:6px;background:rgba(255,255,255,0.03);color:var(--text3);">Несколько тикеров</button>
   </div>
 
   <!-- ТФ (общий для обеих вкладок) -->
@@ -799,7 +799,7 @@ input[type=range] { touch-action: none; }
   <!-- Вкладка: Один тикер -->
   <div id="an-panel-single">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;">
+      <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;color-scheme:dark;outline:none;">
       <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
       <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
     </div>
@@ -12931,13 +12931,13 @@ function anSwitchTab(tab) {
   if (tab === 'single') {
     if(single) single.style.display = '';
     if(multi)  multi.style.display  = 'none';
-    if(btnS) { btnS.style.background='#52F2C9'; btnS.style.color='#0a0618'; }
-    if(btnM) { btnM.style.background='rgba(255,255,255,0.05)'; btnM.style.color='#8080A0'; }
+    if(btnS) { btnS.style.background='rgba(82,242,201,0.1)'; btnS.style.color='#52F2C9'; btnS.style.borderColor='rgba(82,242,201,0.4)'; }
+    if(btnM) { btnM.style.background='rgba(255,255,255,0.03)'; btnM.style.color='var(--text3)'; btnM.style.borderColor='rgba(255,255,255,0.08)'; }
   } else {
     if(single) single.style.display = 'none';
     if(multi)  multi.style.display  = '';
-    if(btnM) { btnM.style.background='#7A8CFF'; btnM.style.color='#0a0618'; }
-    if(btnS) { btnS.style.background='rgba(255,255,255,0.05)'; btnS.style.color='#8080A0'; }
+    if(btnM) { btnM.style.background='rgba(180,135,248,0.1)'; btnM.style.color='#B487F8'; btnM.style.borderColor='rgba(180,135,248,0.4)'; }
+    if(btnS) { btnS.style.background='rgba(255,255,255,0.03)'; btnS.style.color='var(--text3)'; btnS.style.borderColor='rgba(255,255,255,0.08)'; }
   }
 }
 
