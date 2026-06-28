@@ -8640,11 +8640,8 @@ function _ilAggVote(labelsOrIds) {
   return { sig, items };
 }
 function cpUpdateAltDiamonds() {
-  document.querySelectorAll('.cp-ind-alt-diamond-btn').forEach(el => {
-    const id = el.dataset.indid;
-    const on = (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(id);
-    el.classList.toggle('active', !!on);
-  });
+  if (typeof _ilAltFamilyOf !== 'function') return;
+  cpInitAltDiamonds();
 }
 
 function ilAggToggleAlt(id) {
@@ -10140,9 +10137,6 @@ function cpInitIndPanel() {
         cpIndVals[ind.id] = {};
         (ind.params||[]).forEach(p => { cpIndVals[ind.id][p.id] = p.def; });
       }
-      const hasAlt = (typeof _ilAltFamilyOf === 'function') && _ilAltFamilyOf(ind.id) != null;
-      const altOn = hasAlt && (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(ind.id);
-      const altTip = hasAlt && (typeof _IL_ALT_FAMILY_DESC !== 'undefined') ? (_IL_ALT_FAMILY_DESC[_ilAltFamilyOf(ind.id)]||'Альт-интерпретация') : '';
       html += `
       <div style="margin-bottom:2px;">
         <div class="cp-ind-row" id="cprow-${ind.id}"
@@ -10158,10 +10152,8 @@ function cpInitIndPanel() {
             style="width:10px;height:10px;transform:rotate(45deg);flex-shrink:0;transition:all 0.12s;cursor:pointer;
               border:1.5px solid ${on?'#FF006E':'rgba(255,0,110,0.4)'};background:${on?'#FF006E':'none'};
               box-shadow:${on?'0 0 6px rgba(255,0,110,0.5)':'none'};"></div>
-          ${hasAlt ? `<div id="cpaltdiam-${ind.id}"
-            data-indid="${ind.id}"
-            class="cp-ind-alt-diamond-btn${altOn?' active':''}"
-            title="Альт-режим на графике: ${altTip.replace(/"/g,'&quot;')}"></div>` : '<div style="width:10px;flex-shrink:0;"></div>'}
+          <div id="cpaltdiam-${ind.id}" data-indid="${ind.id}"
+            class="cp-ind-alt-diamond-btn" style="display:none;"></div>
           <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
           <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${cpGetFavs().includes(ind.id)?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${cpGetFavs().includes(ind.id)?'#FFD700':'#6F648F'};">★</span>
@@ -12992,6 +12984,22 @@ const _IL_GROUPS = [
   { label: 'Продвинутая статистика / DSP',  color: '#7A8CFF', ids: ['nw','kalman','gpr','cusum','tmf','cum_delta','bb_pct'] },
   { label: 'Режим рынка (без винрейта)',    color: '#9090B8', ids: ['hmm','hurst','mprof','te','rough','frac_dim','efficiency_ratio','entropy'] },
 ];
+
+// Показывает/скрывает и стилизует alt-ромбики — вызывается после того как
+// _IL_GROUPS и _ilAltFamilyOf уже определены.
+function cpInitAltDiamonds() {
+  document.querySelectorAll('.cp-ind-alt-diamond-btn').forEach(el => {
+    const id = el.dataset.indid;
+    if (!id) return;
+    const fam = _ilAltFamilyOf(id);
+    if (!fam) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const on = _ilAltPrefGet(id);
+    el.classList.toggle('active', !!on);
+    const desc = _IL_ALT_FAMILY_DESC[fam] || 'Альт-интерпретация';
+    el.title = 'Альт-режим: ' + desc;
+  });
+}
 
 function _ilCopyTable(containerId, fmt) {
   const cont = document.getElementById(containerId);
@@ -17977,6 +17985,9 @@ window.addEventListener('message', (ev) => {
     .then(result => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, result}, '*'))
     .catch(err => ev.source.postMessage({type:'MODULE_RPC_RESPONSE', reqId:d.reqId, error:String(err&&err.message||err)}, '*'));
 });
+
+// Alt-ромбики инициализируются здесь — после всех const (_IL_GROUPS, _ilAltFamilyOf и т.д.)
+try { cpInitAltDiamonds(); } catch(e) {}
 </script>
 
 <!-- Модал легенды цветов линий индикатора -->
