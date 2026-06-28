@@ -3593,6 +3593,7 @@ const COMBO_PRESETS = [
     tagColor:'#4cc9f0',
     short:'MACD задаёт тренд — RSI/Stoch ловят точку входа внутри него.',
     question:'Есть восходящий тренд, ищу момент для входа?',
+    chartIds: ['ema', 'rsi', 'macd', 'stoch', 'vol'],
     sets:{ rsi:38, sk:22, sd:35, mf:12, ms:8, hist:'растёт' },
     fields:[
       {id:'rsi', label:'RSI — ищем откат (< 40)', hint:'Ждём когда RSI опустится в зону 30–40, сигнализируя об откате в тренде'},
@@ -3609,6 +3610,7 @@ const COMBO_PRESETS = [
     tagColor:'#60A4A1',
     short:'BB показывает экстремум — RSI подтверждает что это не тренд.',
     question:'Цена у края канала, думаю о развороте?',
+    chartIds: ['bb', 'rsi', 'stoch'],
     sets:{ rsi:28, sk:18, sd:25, mf:-2, ms:1, hist:'иссякает' },
     fields:[
       {id:'rsi', label:'RSI — зона перепроданности', hint:'< 30 = перепроданность подтверждена'},
@@ -3625,6 +3627,7 @@ const COMBO_PRESETS = [
     tagColor:'#ff9f1c',
     short:'MACD — направление. Stoch — точка. Вместе компенсируют запаздывание.',
     question:'Есть тренд, нужна точка входа без лишнего ожидания?',
+    chartIds: ['ema', 'macd', 'stoch'],
     sets:{ rsi:45, sk:19, sd:28, mf:5, ms:2, hist:'растёт' },
     fields:[
       {id:'mf',  label:'MACD быстрая — тренд задан', hint:'Выше нуля = бычий контекст'},
@@ -3641,6 +3644,7 @@ const COMBO_PRESETS = [
     tagColor:'#7c6aff',
     short:'Облако задаёт тренд и уровни — MACD ускоряет точку входа.',
     question:'Использую Ишимоку, хочу чёткий момент для входа?',
+    chartIds: ['ichi_main', 'ichi_cloud', 'macd', 'rsi'],
     sets:{ rsi:55, sk:60, sd:52, mf:8, ms:3, hist:'растёт' },
     fields:[
       {id:'rsi',  label:'RSI — подтверждение силы', hint:'> 50 в бычьем контексте Ишимоку = тренд жив'},
@@ -3657,6 +3661,7 @@ const COMBO_PRESETS = [
     tagColor:'#ff9f1c',
     short:'EMA задаёт тренд. MACD — импульс. Bear Power — точка входа.',
     question:'Хочу полную систему с фильтром тренда, входом и выходом?',
+    chartIds: ['ema', 'macd', 'rsi', 'elder_ray', 'vol'],
     sets:{ rsi:42, sk:25, sd:33, mf:6, ms:2, hist:'растёт' },
     fields:[
       {id:'rsi',  label:'RSI — общий тон рынка', hint:'40–60 = нейтрально, ждём подтверждения'},
@@ -3673,6 +3678,7 @@ const COMBO_PRESETS = [
     tagColor:'#ffe066',
     short:'OBV опережает цену. RSI подтверждает перепроданность. Дивергенция обоих = сильный разворотный сигнал.',
     question:'Цена падает, думаю что разворот близко?',
+    chartIds: ['ma', 'obv', 'rsi', 'vol'],
     sets:{ rsi:28, sk:15, sd:20, mf:-8, ms:-5, hist:'иссякает' },
     fields:[
       {id:'rsi',  label:'RSI — перепроданность', hint:'< 30 + разворачивается вверх = бычья дивергенция'},
@@ -3689,6 +3695,7 @@ const COMBO_PRESETS = [
     tagColor:'#ffe066',
     short:'Полосы сжались → энергия накоплена. Ждём направление выхода по MACD.',
     question:'Долгий боковик, жду взрывного движения?',
+    chartIds: ['bb', 'bb_width', 'rsi', 'macd', 'stoch'],
     sets:{ rsi:50, sk:50, sd:50, mf:1, ms:-1, hist:'иссякает' },
     fields:[
       {id:'rsi',  label:'RSI — нейтрален (сквиз)', hint:'Около 50 = рынок в накоплении, нет направления'},
@@ -3705,6 +3712,7 @@ const COMBO_PRESETS = [
     tagColor:'#C71B52',
     short:'MACD фильтрует тренд — SAR торговать только в его направлении.',
     question:'Хочу трейлинг-стоп который не даёт ложных сигналов?',
+    chartIds: ['ema', 'macd', 'rsi'],
     sets:{ rsi:58, sk:65, sd:60, mf:10, ms:6, hist:'растёт' },
     fields:[
       {id:'mf',   label:'MACD — фильтр направления', hint:'Выше нуля = торгуем SAR только в лонг'},
@@ -13548,6 +13556,18 @@ function _renderAnalysisInner(panel) {
           }
         }
         if (!items.length) items.push({type:'neutral', text:`Awesome Oscillator: данных недостаточно`});
+        // Определяем направление для _trade
+        let aoDir = 'neutral', aoConf = 'low';
+        if (last !== null && prev !== null) {
+          if (last > 0 && prev < 0) { aoDir = 'long'; aoConf = 'medium'; }
+          else if (last < 0 && prev > 0) { aoDir = 'short'; aoConf = 'medium'; }
+          else if (last > 0 && last > prev) { aoDir = 'long'; aoConf = 'low'; }
+          else if (last < 0 && last < prev) { aoDir = 'short'; aoConf = 'low'; }
+        }
+        items.push(..._trade(aoDir, aoConf,
+          'AO выше нуля и растёт — бычий импульс подтверждён. Лонг по тренду.',
+          'AO ниже нуля и падает — медвежий импульс подтверждён. Шорт по тренду.'
+        ));
         html += makeCard('Awesome Oscillator / Чудесный осциллятор', items, 'ao');
       }
     } else if (idL === 'acc_dist' || idL === 'ad_line') {
@@ -15414,13 +15434,14 @@ function _renderAnalysisInner(panel) {
         html += makeCard('ATR Stop / Стоп по ATR (неклассически)', items, 'atr_stop');
       }
     } else if (idL.includes('ichi_tk') || idL.includes('ichi_cloud')) {
+      // Встраиваем ichi_tk прямо в карточку Ишимоку — те же расчёты, тот же вид
       const n = candles.length;
       if (n >= 52) {
         const items = [];
-        const highK=i=>Math.max(...candles.slice(i-8,i+1).map(c=>c.high));
-        const lowK=i=>Math.min(...candles.slice(i-8,i+1).map(c=>c.low));
-        const highKi=i=>Math.max(...candles.slice(i-25,i+1).map(c=>c.high));
-        const lowKi=i=>Math.min(...candles.slice(i-25,i+1).map(c=>c.low));
+        const highK=i=>Math.max(...candles.slice(Math.max(0,i-8),i+1).map(c=>c.high));
+        const lowK=i=>Math.min(...candles.slice(Math.max(0,i-8),i+1).map(c=>c.low));
+        const highKi=i=>Math.max(...candles.slice(Math.max(0,i-25),i+1).map(c=>c.high));
+        const lowKi=i=>Math.min(...candles.slice(Math.max(0,i-25),i+1).map(c=>c.low));
         const tenkan=(highK(n-1)+lowK(n-1))/2;
         const kijun=(highKi(n-1)+lowKi(n-1))/2;
         const spanA=(tenkan+kijun)/2;
@@ -15428,13 +15449,27 @@ function _renderAnalysisInner(panel) {
         const spanBL=Math.min(...candles.slice(n-52,n).map(c=>c.low));
         const spanB=(spanBH+spanBL)/2;
         const last=closes[n-1];
-        const aboveCloud=last>Math.max(spanA,spanB), belowCloud=last<Math.min(spanA,spanB);
-        if(aboveCloud) items.push({type:'bullish', text:`Цена выше облака Kumo — бычий контекст по Ишимоку`});
+        const cloudTop=Math.max(spanA,spanB), cloudBot=Math.min(spanA,spanB);
+        const aboveCloud=last>cloudTop, belowCloud=last<cloudBot, inCloud=!aboveCloud&&!belowCloud;
+        const cloudThickness=(cloudTop-cloudBot)/last*100;
+        if(aboveCloud) items.push({type:'bullish', text:`Цена выше облака Kumo (${cloudThickness.toFixed(2)}% толщина) — бычий контекст`});
         else if(belowCloud) items.push({type:'bearish', text:`Цена ниже облака Kumo — медвежий контекст`});
         else items.push({type:'neutral', text:`Цена внутри облака Kumo — зона неопределённости`});
-        if(tenkan>kijun) items.push({type:'bullish', text:`TK Cross бычий: Tenkan выше Kijun`});
-        else if(tenkan<kijun) items.push({type:'bearish', text:`TK Cross медвежий: Tenkan ниже Kijun`});
-        html += makeCard('Ichimoku TK/Kumo / Ишимоку (неклассически)', items, 'ichi_tk');
+        if(tenkan>kijun) items.push({type:'bullish', text:`TK Cross бычий: Tenkan (${tenkan.toFixed(2)}) выше Kijun (${kijun.toFixed(2)})`});
+        else if(tenkan<kijun) items.push({type:'bearish', text:`TK Cross медвежий: Tenkan (${tenkan.toFixed(2)}) ниже Kijun (${kijun.toFixed(2)})`});
+        else items.push({type:'neutral', text:`TK Cross: Tenkan = Kijun — импульс нейтрален`});
+        { const iDir=aboveCloud?'bullish':belowCloud?'bearish':'neutral';
+          const iConf=cloudThickness>1.5?'strong':cloudThickness>0.5?'moderate':'weak';
+          const iL=aboveCloud?`Цена выше облака — поддержка снизу. Держи лонг пока не войдёт в облако.`:inCloud?'В облаке — неопределённость, уменьши позицию.':null;
+          const iS=belowCloud?'Цена ниже облака — сопротивление сверху. Держи шорт пока не войдёт в облако.':inCloud?'В облаке — шорт под давлением, частичный выход.':null;
+          _trade(iDir,iConf,iL,iS).forEach(t=>items.push(t)); }
+        const clItems=[];
+        if(aboveCloud) clItems.push({type:'bullish', text:`Цена выше облака — бычий тренд (условие №1 Ichimoku)`});
+        else if(belowCloud) clItems.push({type:'bearish', text:`Цена ниже облака — медвежий тренд`});
+        else clItems.push({type:'neutral', text:`Цена внутри облака — классически позиции не открываются`});
+        if(tenkan>kijun) clItems.push({type:'bullish', text:`TK Cross: Tenkan > Kijun — классический "золотой крест" Ichimoku`});
+        else clItems.push({type:'bearish', text:`TK Cross: Tenkan ≤ Kijun — классический "мёртвый крест" Ichimoku`});
+        html += makeCard('Ichimoku / Облако Ишимоку', items, 'ichimoku', clItems, 'ichimoku');
       }
     } else if (idL.includes('bb_full') || idL.includes('ma_channel') || idL.includes('price_ch')) {
       const n = candles.length;
