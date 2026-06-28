@@ -13269,33 +13269,39 @@ function ilRenderAnalysis() {
     html+=`</table></div>`;
   }
 
-  // Конструктор комбо — классика + альт раздельно, свободное смешение
+  // Конструктор комбо — единый список, у каждого инд. два ромба: ◆ классика + ◆ альт
   const sortedIds = [...IL_INDICATORS].filter(id=>r.stats[id]).sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
-  const altIds = sortedIds.filter(id=>r.ssAlt&&r.ssAlt[id]&&r.ssAlt[id].some(v=>v!=null));
-  const _comboTag=(id,cls,accentColor,pct)=>{
-    const p=pct!=null?` <span style="color:${_accColor(pct)}">${pct}%</span>`:'';
-    return `<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);cursor:pointer;padding:3px 8px;border:1px solid #2a1f3d;border-radius:6px;">
-      <input type="checkbox" class="${cls}" data-id="${id}" style="accent-color:${accentColor};">${IL_NAMES[id]||id}${p}</label>`;
-  };
+  const hasAltSet = new Set(sortedIds.filter(id=>r.ssAlt&&r.ssAlt[id]&&r.ssAlt[id].some(v=>v!=null)));
+  const _diam=(id,cls,color,title)=>
+    `<span class="an-diam ${cls}" data-id="${id}" title="${title}"
+      style="display:inline-block;width:9px;height:9px;transform:rotate(45deg);flex-shrink:0;
+        border:1.5px solid ${color};background:transparent;cursor:pointer;transition:all .12s;"
+      onclick="(function(el){el.classList.toggle('on');
+        var cb=document.getElementById('an-chk-${cls.replace('an-diam-','')}-'+el.dataset.id);
+        if(cb)cb.checked=el.classList.contains('on');
+        el.style.background=el.classList.contains('on')?'${color}':'transparent';
+        el.style.boxShadow=el.classList.contains('on')?'0 0 5px ${color}':'none';
+        ilCalcSelectedCombo();
+      })(this)"></span>
+    <input type="checkbox" class="${cls.replace('an-diam-','an-cb-')}" id="an-chk-${cls.replace('an-diam-','')}-${id}" data-id="${id}" style="display:none;">`;
   html+=`<div style="margin-top:14px;border-top:1px solid #2a1f3d;padding-top:12px;">
-    <div style="font-size:9px;color:var(--text3);margin-bottom:10px;letter-spacing:.06em;">КОНСТРУКТОР КОМБИНАЦИИ</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-      <div style="background:rgba(255,255,255,0.02);border:1px solid #2a1f3d;border-radius:8px;padding:8px;">
-        <div style="font-size:9px;color:#52F2C9;letter-spacing:.06em;margin-bottom:6px;">КЛАССИКА</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;">`;
+    <div style="font-size:9px;color:var(--text3);margin-bottom:6px;letter-spacing:.06em;">КОНСТРУКТОР КОМБИНАЦИИ
+      <span style="color:#5a5070;margin-left:6px;">◆ классика · <span style="color:#7a6090;">◆ альт</span></span>
+    </div>
+    <div style="background:rgba(255,255,255,0.015);border:1px solid #2a1f3d;border-radius:8px;padding:6px 0;margin-bottom:8px;max-height:260px;overflow-y:auto;">`;
   sortedIds.forEach(id=>{
-    const s=r.stats[id].h15; const p=s&&s.acc!=null&&s.n>=5?Math.round(s.acc*100):null;
-    html+=_comboTag(id,'an-cb-c','#52F2C9',p);
+    const sc=r.stats[id].h15; const pc=sc&&sc.acc!=null&&sc.n>=5?Math.round(sc.acc*100):null;
+    const sa=r.statsAlt&&r.statsAlt[id]&&r.statsAlt[id].h15; const pa=sa&&sa.acc!=null&&sa.n>=5?Math.round(sa.acc*100):null;
+    const hasAlt=hasAltSet.has(id);
+    html+=`<div style="display:flex;align-items:center;gap:7px;padding:3px 10px;font-size:10px;font-family:var(--mono);">
+      ${_diam(id,'an-diam-c','#52F2C9','Классика')}
+      ${hasAlt?_diam(id,'an-diam-a','#B487F8','Альт-сигнал'):'<span style="display:inline-block;width:9px;height:9px;flex-shrink:0;opacity:0;"></span>'}
+      <span style="flex:1;color:var(--text2);">${IL_NAMES[id]||id}</span>
+      ${pc!=null?`<span style="color:${_accColor(pc)};min-width:28px;text-align:right;">${pc}%</span>`:''}
+      ${hasAlt&&pa!=null?`<span style="color:${_accColor(pa)};min-width:28px;text-align:right;opacity:.7;">${pa}%</span>`:'<span style="min-width:28px;"></span>'}
+    </div>`;
   });
-  html+=`</div></div>
-      <div style="background:rgba(255,255,255,0.02);border:1px solid #2a1f3d;border-radius:8px;padding:8px;">
-        <div style="font-size:9px;color:#B487F8;letter-spacing:.06em;margin-bottom:6px;">АЛЬТ-СИГНАЛЫ</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;">`;
-  altIds.forEach(id=>{
-    const s=r.statsAlt&&r.statsAlt[id]&&r.statsAlt[id].h15; const p=s&&s.acc!=null&&s.n>=5?Math.round(s.acc*100):null;
-    html+=_comboTag(id,'an-cb-a','#B487F8',p);
-  });
-  html+=`</div></div></div>
+  html+=`</div>
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
       <button onclick="ilSelectBestCombo()" style="padding:4px 10px;background:rgba(82,242,201,0.06);border:1px solid rgba(82,242,201,0.2);border-radius:6px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие классика</button>
       <button onclick="ilSelectBestAltCombo()" style="padding:4px 10px;background:rgba(180,135,248,0.06);border:1px solid rgba(180,135,248,0.2);border-radius:6px;color:#B487F8;font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие альт</button>
@@ -13306,18 +13312,27 @@ function ilRenderAnalysis() {
   el.innerHTML=html;
 }
 
+function _ilSyncDiamonds() {
+  document.querySelectorAll('.an-cb-c,.an-cb-a').forEach(cb=>{
+    const cls = cb.classList.contains('an-cb-c') ? 'an-diam-c' : 'an-diam-a';
+    const color = cb.classList.contains('an-cb-c') ? '#52F2C9' : '#B487F8';
+    const diam = document.querySelector(`.${cls}[data-id="${cb.dataset.id}"]`);
+    if (!diam) return;
+    if (cb.checked) { diam.classList.add('on'); diam.style.background=color; diam.style.boxShadow=`0 0 5px ${color}`; }
+    else { diam.classList.remove('on'); diam.style.background='transparent'; diam.style.boxShadow='none'; }
+  });
+}
 function ilSelectBestCombo() {
   const r=_ilBtResults; if(!r)return;
   const best=IL_INDICATORS.filter(id=>r.stats[id]).sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0)).slice(0,5);
   document.querySelectorAll('.an-cb-c').forEach(cb=>{ cb.checked=best.includes(cb.dataset.id); });
-  ilCalcSelectedCombo();
+  _ilSyncDiamonds(); ilCalcSelectedCombo();
 }
-
 function ilSelectBestAltCombo() {
   const r=_ilBtResults; if(!r)return;
   const best=IL_INDICATORS.filter(id=>r.statsAlt&&r.statsAlt[id]).sort((a,b)=>((r.statsAlt[b]?.h15?.acc)??0)-((r.statsAlt[a]?.h15?.acc)??0)).slice(0,5);
   document.querySelectorAll('.an-cb-a').forEach(cb=>{ cb.checked=best.includes(cb.dataset.id); });
-  ilCalcSelectedCombo();
+  _ilSyncDiamonds(); ilCalcSelectedCombo();
 }
 
 function ilCalcSelectedCombo() {
