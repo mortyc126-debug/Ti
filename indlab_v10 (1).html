@@ -264,11 +264,11 @@ input[type=range] { touch-action: none; }
 
 /* ── Scrollbar: dark track + crimson thumb ── */
 /* ── Scrollbar: dark track + crimson thumb ── */
-* { scrollbar-width: thin; scrollbar-color: #C71B52 #0D0820; }
-*::-webkit-scrollbar { width: 6px !important; height: 6px !important; }
+* { scrollbar-width: thin; scrollbar-color: #7A5FBF #0D0820; }
+*::-webkit-scrollbar { width: 5px !important; height: 5px !important; }
 *::-webkit-scrollbar-track { background: #0D0820 !important; }
-*::-webkit-scrollbar-thumb { background: #C71B52 !important; border-radius: 3px !important; min-height: 30px; }
-*::-webkit-scrollbar-thumb:hover { background: #FF006E !important; }
+*::-webkit-scrollbar-thumb { background: #7A5FBF !important; border-radius: 0 !important; min-height: 30px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+*::-webkit-scrollbar-thumb:hover { background: #B487F8 !important; }
 *::-webkit-scrollbar-button { display: none !important; }
 *::-webkit-scrollbar-corner { background: #0D0820 !important; }
 
@@ -282,11 +282,6 @@ input:-webkit-autofill, input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 100px #140A24 inset !important;
   -webkit-text-fill-color: var(--text) !important;
 }
-input[type=range] {
-  accent-color: #B487F8;
-  background: transparent !important;
-}
-
 /* ── Indicator rows: reliable tap on mobile ── */
 .cp-ind-row {
   touch-action: manipulation;
@@ -570,7 +565,7 @@ input[type=range] {
     <button class="tag" onclick="filterGuide('breakout',this)">Пробой</button>
     <button class="tag" onclick="filterGuide('flat',this)">Флэт</button>
   </div>
-  <div id="guide-scroll" style="display:flex;gap:14px;overflow-x:auto;padding:10px 16px 18px;scrollbar-width:thin;scrollbar-color: #C71B52 #0D0820;"></div>
+  <div id="guide-scroll" style="display:flex;gap:14px;overflow-x:auto;padding:10px 16px 18px;scrollbar-width:thin;scrollbar-color: #7A5FBF #0D0820;"></div>
 </div>
 
 <!-- ══ MAIN PAGE ══ -->
@@ -1227,16 +1222,16 @@ input[type=range] {
               style="flex-shrink:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#6F648F;line-height:1;">★</button>
           </div>
         </div>
-        <div id="cp-ind-list" style="flex:1;overflow-y:auto;padding:0 8px 12px;scrollbar-width:thin;scrollbar-color: #C71B52 #0D0820;"></div>
+        <div id="cp-ind-list" style="flex:1;overflow-y:auto;padding:0 8px 12px;scrollbar-width:thin;scrollbar-color: #7A5FBF #0D0820;"></div>
       </div>
 
       <!-- COMBOS -->
-      <div id="cp-panel-combo" style="display:none;flex:1;overflow-y:auto;padding:8px;scrollbar-width:thin;scrollbar-color: #C71B52 #0D0820;">
+      <div id="cp-panel-combo" style="display:none;flex:1;overflow-y:auto;padding:8px;scrollbar-width:thin;scrollbar-color: #7A5FBF #0D0820;">
         <div id="cp-combo-inner"></div>
       </div>
 
       <!-- ICHIMOKU -->
-      <div id="cp-panel-ichi" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color: #C71B52 #0D0820;">
+      <div id="cp-panel-ichi" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color: #7A5FBF #0D0820;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;flex:1;">Ишимоку · значения</div>
           <button onclick="chartIchiShow=!chartIchiShow;_togChartBtn(this,chartIchiShow);if(chartCandles.length)chartRedraw();"
@@ -1257,7 +1252,7 @@ input[type=range] {
       </div>
 
       <!-- СИСТЕМЫ -->
-      <div id="cp-panel-sys" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color:#C71B52 #0D0820;">
+      <div id="cp-panel-sys" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color:#7A5FBF #0D0820;">
         <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">Системы · не-индикаторные методы</div>
 
         <!-- Ценовой профиль -->
