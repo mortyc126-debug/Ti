@@ -969,7 +969,7 @@ input[type=range] {
 
       <!-- Main candle canvas -->
       <div style="flex:1;position:relative;min-height:280px;">
-        <canvas id="chart-main" style="width:100%;height:100%;display:block;cursor:crosshair;touch-action:pan-y;"></canvas>
+        <canvas id="chart-main" style="width:100%;height:100%;display:block;cursor:crosshair;touch-action:pan-y;user-select:none;-webkit-user-select:none;" draggable="false"></canvas>
         <canvas id="chart-xhair" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;"></canvas>
         <div id="chart-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
           <div id="chart-overlay-msg" style="font-family:var(--mono);font-size:12px;color:var(--text3);text-align:center;line-height:2;padding:20px;"></div>
@@ -10542,6 +10542,14 @@ function _cpGetScale(W) {
   const vis = chartCandles.slice(startIdx, endIdx);
   let lo = Infinity, hi = -Infinity;
   vis.forEach(c => { lo = Math.min(lo, c.low); hi = Math.max(hi, c.high); });
+  // Точно такое же BB-расширение как в _chartDrawMain
+  if (chartInds && chartInds.bb && typeof _chartCalcBB === 'function') {
+    const closes = chartCandles.map(c => c.close);
+    const bb = _chartCalcBB(closes, 20, 2);
+    for (let i = startIdx; i < endIdx; i++) {
+      if (bb[i]) { lo = Math.min(lo, bb[i].lower); hi = Math.max(hi, bb[i].upper); }
+    }
+  }
   const pad = (hi - lo) * 0.05;
   return { lo: lo - pad, hi: hi + pad };
 }
@@ -10876,7 +10884,7 @@ function cpInitCanvasEvents() {
   let dx0=null, off0=0;
   // Snap-to-candle measure: {idx, price, xPx, yPx}
   let measPt1=null;
-  // Snap X к ближайшей свече, Y свободный (цена по фактической позиции мыши)
+  // Snap X к ближайшей свече. Y: мягкое притяжение к OHLC свечи (±12px), иначе свободный
   function _measSnap(ex, ey, W, H) {
     const idx = _cpIdxFromX(ex, W);
     const sc = _cpGetScale(W);
@@ -10885,9 +10893,16 @@ function cpInitCanvasEvents() {
     const endIdx = Math.max(maxVis, chartCandles.length - chartOffset);
     const startIdx = Math.max(0, endIdx - maxVis);
     const xPx = (idx - startIdx + 0.5) * (W / (endIdx - startIdx));
-    // Y свободный — цена из позиции мыши
-    const price = sc.lo + (1 - (ey / H - 0.05) / 0.9) * (sc.hi - sc.lo);
-    return { idx, price, xPx, yPx: ey };
+    const toY = v => H - ((v - sc.lo) / (sc.hi - sc.lo)) * H * 0.9 - H * 0.05;
+    const c = chartCandles[idx];
+    // Мягкое притяжение к OHLC: если мышь ближе 12px к уровню — прилипаем
+    const SNAP_PX = 12;
+    let yPx = ey, price = sc.lo + (1 - (ey / H - 0.05) / 0.9) * (sc.hi - sc.lo);
+    const candidates = [c.open, c.high, c.low, c.close];
+    let best = null, bestD = SNAP_PX;
+    candidates.forEach(v => { const d = Math.abs(toY(v) - ey); if (d < bestD) { bestD = d; best = v; } });
+    if (best !== null) { price = best; yPx = toY(best); }
+    return { idx, price, xPx, yPx };
   }
   c.addEventListener('click', e => {
     if (!chartMeasureMode) return;
@@ -10920,6 +10935,7 @@ function cpInitCanvasEvents() {
     }
   });
   c.addEventListener('mousedown', e => {
+    e.preventDefault(); // блокируем нативное выделение/drag
     if (chartMeasureMode) return; // клики обрабатываются через click
     dx0=e.clientX; off0=chartOffset; c.style.cursor='grabbing';
   });
