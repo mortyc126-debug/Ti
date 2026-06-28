@@ -8229,54 +8229,77 @@ function _cpPriceFromY(y, H, W) {
   return sc.lo + (1 - (y / H - 0.05) / 0.9) * (sc.hi - sc.lo);
 }
 
-// Рисует прямоугольник выделения + подпись с Δ%, Δцена, Δвремя на канвасе #chart-xhair
-function _cpDrawMeasure(x0, y0, x1, y1) {
+// Snap-to-candle measure: рисует точки привязки и линию между ними
+// pt1 = первая точка {idx,price,xPx,yPx}, pt2 = вторая (или null = только превью курсора)
+function _cpDrawMeasurePts(pt1, pt2, W, H) {
   const xc = document.getElementById('chart-xhair');
-  const mc = document.getElementById('chart-main');
-  if (!xc || !mc) { console.log('[measure] no xc or mc'); return; }
+  if (!xc) return;
   const dpr = devicePixelRatio || 1;
-  const W = mc.offsetWidth, H = mc.offsetHeight;
-  console.log('[measure] draw W=', W, 'H=', H, 'candles=', chartCandles.length);
   xc.width = W * dpr; xc.height = H * dpr;
   const ctx = xc.getContext('2d');
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, H);
 
-  const left = Math.min(x0, x1), top = Math.min(y0, y1);
-  const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
-  const i0 = _cpIdxFromX(x0, W), i1 = _cpIdxFromX(x1, W);
-  const p0 = _cpPriceFromY(y0, H, W), p1 = _cpPriceFromY(y1, H, W);
-  if (p0 == null || p1 == null) { console.log('[measure] p0/p1 null, scale=', _cpGetScale(W)); return; }
-  const up = p1 >= p0;
+  // Курсорная точка (pt2) — всегда рисуем перекрестие
+  const cur = pt2 || pt1;
+  if (!cur) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(cur.xPx, 0); ctx.lineTo(cur.xPx, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, cur.yPx); ctx.lineTo(W, cur.yPx); ctx.stroke();
+  ctx.setLineDash([]);
+  // Точка-круг
+  ctx.beginPath(); ctx.arc(cur.xPx, cur.yPx, 4, 0, Math.PI*2);
+  ctx.fillStyle = pt1 ? '#52F2C9' : 'rgba(255,255,255,0.5)'; ctx.fill();
+
+  if (!pt1 || !pt2) return; // только одна точка — больше нечего рисовать
+
+  const up = pt2.price >= pt1.price;
   const col = up ? '#52F2C9' : '#FF4D7A';
 
-  ctx.fillStyle = up ? 'rgba(82,242,201,0.12)' : 'rgba(255,77,122,0.12)';
-  ctx.fillRect(left, top, w, h);
-  ctx.strokeStyle = col + '99';
-  ctx.lineWidth = 1; ctx.strokeRect(left, top, w, h);
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  // Горизонтальная линия от pt1 до pt2 (на уровне pt1.price)
+  ctx.strokeStyle = col + 'AA'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(pt1.xPx, pt1.yPx); ctx.lineTo(pt2.xPx, pt1.yPx); ctx.stroke();
+  // Вертикальная линия от pt1.price до pt2.price у pt2
+  ctx.beginPath(); ctx.moveTo(pt2.xPx, pt1.yPx); ctx.lineTo(pt2.xPx, pt2.yPx); ctx.stroke();
+  // Диагональ
+  ctx.strokeStyle = col + '55'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pt1.xPx, pt1.yPx); ctx.lineTo(pt2.xPx, pt2.yPx); ctx.stroke();
   ctx.setLineDash([]);
 
-  const dPrice = p1 - p0;
-  const dPct = p0 ? (dPrice / p0 * 100) : 0;
-  const t0 = chartCandles[i0]?.time, t1 = chartCandles[i1]?.time;
-  let dtTxt = '—';
+  // Точки
+  [pt1, pt2].forEach((p, i) => {
+    ctx.beginPath(); ctx.arc(p.xPx, p.yPx, 4, 0, Math.PI*2);
+    ctx.fillStyle = i===0 ? '#FFD166' : col; ctx.fill();
+  });
+
+  // Метка
+  const dPrice = pt2.price - pt1.price;
+  const dPct = pt1.price ? (dPrice / pt1.price * 100) : 0;
+  const bars = Math.abs(pt2.idx - pt1.idx);
+  const t0 = chartCandles[pt1.idx]?.time, t1 = chartCandles[pt2.idx]?.time;
+  let dtTxt = `${bars} баров`;
   if (t0 && t1) {
     const mins = Math.round(Math.abs(new Date(t1) - new Date(t0)) / 60000);
     dtTxt = mins < 60 ? `${mins}м` : mins < 1440 ? `${(mins/60).toFixed(1)}ч` : `${(mins/1440).toFixed(1)}д`;
   }
-  const txt = `${up ? '▲' : '▼'} ${dPct.toFixed(2)}%   Δ${dPrice.toFixed(2)}   ${dtTxt}`;
-  ctx.font = '11px monospace';
-  const tw = ctx.measureText(txt).width + 14;
-  const lx = Math.max(2, Math.min(left + w + 8, W - tw - 4));
-  const ly = Math.max(16, top - 8);
-  ctx.fillStyle = 'rgba(20,10,36,0.92)';
-  ctx.fillRect(lx, ly - 14, tw, 19);
-  ctx.strokeStyle = col + '80';
-  ctx.strokeRect(lx, ly - 14, tw, 19);
+  const lines = [
+    `${up?'▲':'▼'} ${dPct.toFixed(2)}%`,
+    `Δ ${dPrice > 0 ? '+' : ''}${dPrice.toFixed(2)}`,
+    dtTxt
+  ];
+  ctx.font = 'bold 11px monospace';
+  const maxW = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16;
+  const bh = lines.length * 16 + 8;
+  let lx = pt2.xPx + 12, ly = Math.min(pt2.yPx - 8, H - bh - 4);
+  if (lx + maxW > W - 4) lx = pt2.xPx - maxW - 12;
+  lx = Math.max(2, lx); ly = Math.max(2, ly);
+  ctx.fillStyle = 'rgba(14,8,28,0.93)';
+  ctx.beginPath(); ctx.roundRect(lx, ly, maxW, bh, 5); ctx.fill();
+  ctx.strokeStyle = col + '80'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(lx, ly, maxW, bh, 5); ctx.stroke();
   ctx.fillStyle = col; ctx.textAlign = 'left';
-  ctx.fillText(txt, lx + 7, ly - 1);
+  lines.forEach((l, i) => ctx.fillText(l, lx + 8, ly + 14 + i * 16));
 }
 
 // cpTab — right panel tabs
@@ -10819,36 +10842,67 @@ function cpInitCanvasEvents() {
     chartRedraw();
   }, { passive:false });
   let dx0=null, off0=0;
-  let meas0=null; // {x,y} начало выделения в режиме измерения
-  c.addEventListener('mousedown', e => {
-    if (chartMeasureMode) {
-      const rect = c.getBoundingClientRect();
-      meas0 = { x: e.clientX-rect.left, y: e.clientY-rect.top };
-      console.log('[measure] mousedown meas0=', meas0, 'rect=', rect.width, rect.height);
-      return;
+  // Snap-to-candle measure: {idx, price, xPx, yPx}
+  let measPt1=null;
+  // Snap cursor X to candle index and return canvas coords of its close price
+  function _measSnap(ex, W, H) {
+    const idx = _cpIdxFromX(ex, W);
+    const sc = _cpGetScale(W);
+    if (!sc || !chartCandles[idx]) return null;
+    const yPx = H - ((chartCandles[idx].close - sc.lo) / (sc.hi - sc.lo)) * H * 0.9 - H * 0.05;
+    const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
+    const endIdx = Math.max(maxVis, chartCandles.length - chartOffset);
+    const startIdx = Math.max(0, endIdx - maxVis);
+    const xPx = (idx - startIdx + 0.5) * (W / (endIdx - startIdx));
+    return { idx, price: chartCandles[idx].close, xPx, yPx };
+  }
+  c.addEventListener('click', e => {
+    if (!chartMeasureMode) return;
+    const rect = c.getBoundingClientRect();
+    const W = c.offsetWidth, H = c.offsetHeight;
+    const snap = _measSnap(e.clientX - rect.left, W, H);
+    if (!snap) return;
+    if (!measPt1) {
+      measPt1 = snap;
+      _cpDrawMeasurePts(measPt1, null, W, H);
+    } else {
+      _cpDrawMeasurePts(measPt1, snap, W, H);
+      measPt1 = null;
     }
+  });
+  c.addEventListener('mousemove', e => {
+    if (!chartMeasureMode) return;
+    const rect = c.getBoundingClientRect();
+    const W = c.offsetWidth, H = c.offsetHeight;
+    const snap = _measSnap(e.clientX - rect.left, W, H);
+    if (!snap) return;
+    _cpDrawMeasurePts(measPt1, snap, W, H);
+    c.style.cursor = 'crosshair';
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && chartMeasureMode) {
+      measPt1 = null;
+      const xc = document.getElementById('chart-xhair');
+      if (xc) { const ctx = xc.getContext('2d'); ctx.clearRect(0,0,xc.width,xc.height); }
+    }
+  });
+  c.addEventListener('mousedown', e => {
+    if (chartMeasureMode) return; // клики обрабатываются через click
     dx0=e.clientX; off0=chartOffset; c.style.cursor='grabbing';
   });
   window.addEventListener('mousemove', e => {
-    if (meas0) {
-      const rect = c.getBoundingClientRect();
-      console.log('[measure] mousemove', e.clientX-rect.left, e.clientY-rect.top);
-      _cpDrawMeasure(meas0.x, meas0.y, e.clientX-rect.left, e.clientY-rect.top);
-      return;
-    }
     if (dx0===null) return;
     const r = chartCandles.length / Math.max(c.offsetWidth,1);
     chartOffset = Math.max(0, Math.min(chartCandles.length-10, Math.round(off0+(dx0-e.clientX)*r*1.5)));
     chartRedraw();
   });
   window.addEventListener('mouseup', () => {
-    if (meas0) { meas0=null; return; }
     if(dx0===null)return; dx0=null; const cc=document.getElementById('chart-main'); if(cc)cc.style.cursor='crosshair';
   });
 
   // Crosshair + tooltip on hover
   c.addEventListener('mousemove', e => {
-    if (dx0 !== null || meas0 || chartMeasureMode) return; // dragging/измерение — пропустить кроссхэр
+    if (dx0 !== null || chartMeasureMode) return; // dragging/измерение — пропустить кроссхэр
     const idx = _cpGetCandleIdx(e, c);
     const rect = c.getBoundingClientRect();
     _cpDrawXhair(idx, e.clientY - rect.top);
