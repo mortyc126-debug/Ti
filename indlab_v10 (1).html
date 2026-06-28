@@ -347,6 +347,17 @@ input[type=range] { touch-action: none; }
   border-color: #FF006E;
   box-shadow: 0 0 8px rgba(255,0,110,0.6);
 }
+.cp-ind-alt-diamond-btn {
+  width: 10px; height: 10px; flex-shrink: 0;
+  transform: rotate(45deg);
+  border: 1.5px solid rgba(122,140,255,0.35); background: transparent;
+  transition: all 0.12s; cursor: pointer;
+}
+.cp-ind-alt-diamond-btn.active {
+  background: #7A8CFF;
+  border-color: #7A8CFF;
+  box-shadow: 0 0 6px rgba(122,140,255,0.55);
+}
 .cp-ind-label { font-size: 11px; color: var(--text2); font-family: var(--mono); }
 .cp-ind-group-title {
   font-size: 9px; color: #6F648F; font-family: var(--mono);
@@ -5860,53 +5871,18 @@ function _chartDrawAltInd() {
   const activeAlt = allWithAlt.filter(x => x.it.useAlt);
   const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0','#FF9F40','#A78BFA'];
 
-  // Легенда активных (активные рисуются на canvas)
   if (legend) {
     if (activeAlt.length) {
       legend.innerHTML = activeAlt.map((x,i) => {
         const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-        return `<span style="color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
-      }).join('') + '<span style="color:#4a4060;font-size:8px;">· кликни чип ниже чтобы убрать</span>';
+        return `<span style="color:${palette[i%palette.length]};margin-right:8px;">◆ ${name}</span>`;
+      }).join('') + '<span style="color:#4a4060;font-size:8px;">· ◆ в списке Инд. чтобы убрать</span>';
     } else {
-      legend.innerHTML = '<span style="color:#4a4060;">Выбери индикаторы ниже →</span>';
+      legend.innerHTML = '<span style="color:#4a4060;">Активируй ◆ (фиолетовый) у индикаторов в списке Инд.</span>';
     }
   }
 
-  // Пикер: все доступные индикаторы по группам (6 семейств)
-  if (picker) {
-    // Группируем по семейству
-    const byFam = {};
-    const famOrder = ['osc','trend','channel','volume','structure','dsp'];
-    const famLabel = { osc:'Осциллятор', trend:'Тренд', channel:'Канал', volume:'Объём', structure:'Структура', dsp:'DSP' };
-    const famColor = { osc:'#A78BFA', trend:'#52F2C9', channel:'#FF9F40', volume:'#60A4A1', structure:'#6366F1', dsp:'#7A8CFF' };
-    allWithAlt.forEach(x => {
-      const fam = typeof _ilAltFamilyOf === 'function' ? _ilAltFamilyOf(x.id) : null;
-      if (!fam) return;
-      if (!byFam[fam]) byFam[fam] = [];
-      byFam[fam].push(x);
-    });
-    let html = '';
-    famOrder.forEach(fam => {
-      if (!byFam[fam] || !byFam[fam].length) return;
-      const col = famColor[fam];
-      const tip = (typeof _IL_ALT_FAMILY_DESC !== 'undefined' && _IL_ALT_FAMILY_DESC[fam]) || '';
-      html += `<span title="${tip.replace(/"/g,'&quot;')}" style="font-size:8px;color:${col};font-family:var(--mono);opacity:.7;margin-right:2px;align-self:center;">${famLabel[fam]}:</span>`;
-      byFam[fam].forEach(x => {
-        const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-        const on = x.it.useAlt;
-        const indTip = (tip + (on ? ' [АКТИВЕН — кликни чтобы убрать]' : ' [кликни чтобы показать на графике]')).replace(/"/g,'&quot;');
-        html += `<span onclick="ilAggToggleAlt('${x.id}')" title="${indTip}"
-          style="cursor:pointer;font-size:9px;padding:2px 7px;border-radius:10px;font-family:var(--mono);
-          background:${on?col+'22':'rgba(255,255,255,0.04)'};
-          color:${on?col:'#5a5070'};
-          border:1px solid ${on?col+'55':'rgba(255,255,255,0.08)'};
-          font-weight:${on?'600':'400'};">
-          ${on?'● ':''}${name}</span>`;
-      });
-      html += `<span style="color:rgba(255,255,255,0.06);margin:0 4px;">|</span>`;
-    });
-    picker.innerHTML = html;
-  }
+  if (picker) picker.style.display = 'none';
 
   panel.style.display = 'block';
 
@@ -8653,8 +8629,17 @@ function _ilAggVote(labelsOrIds) {
   else if (ratio <= -0.6) sig = 'sell-strong'; else if (ratio <= -0.2) sig = 'sell';
   return { sig, items };
 }
+function cpUpdateAltDiamonds() {
+  document.querySelectorAll('.cp-ind-alt-diamond-btn').forEach(el => {
+    const id = el.dataset.indid;
+    const on = (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(id);
+    el.classList.toggle('active', !!on);
+  });
+}
+
 function ilAggToggleAlt(id) {
   _ilAltPrefToggle(id);
+  cpUpdateAltDiamonds();
   if (typeof cpRenderCombos === 'function') try { cpRenderCombos(); } catch(e) {}
   if (typeof _sysRenderStaticSections === 'function') try { _sysRenderStaticSections(); } catch(e) {}
   if (typeof chartCandles !== 'undefined' && chartCandles.length) try { chartRedraw(); } catch(e) {}
@@ -10145,6 +10130,9 @@ function cpInitIndPanel() {
         cpIndVals[ind.id] = {};
         (ind.params||[]).forEach(p => { cpIndVals[ind.id][p.id] = p.def; });
       }
+      const hasAlt = (typeof _ilAltFamilyOf === 'function') && _ilAltFamilyOf(ind.id) != null;
+      const altOn = hasAlt && (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(ind.id);
+      const altTip = hasAlt && (typeof _IL_ALT_FAMILY_DESC !== 'undefined') ? (_IL_ALT_FAMILY_DESC[_ilAltFamilyOf(ind.id)]||'Альт-интерпретация') : '';
       html += `
       <div style="margin-bottom:2px;">
         <div class="cp-ind-row" id="cprow-${ind.id}"
@@ -10160,6 +10148,10 @@ function cpInitIndPanel() {
             style="width:10px;height:10px;transform:rotate(45deg);flex-shrink:0;transition:all 0.12s;cursor:pointer;
               border:1.5px solid ${on?'#FF006E':'rgba(255,0,110,0.4)'};background:${on?'#FF006E':'none'};
               box-shadow:${on?'0 0 6px rgba(255,0,110,0.5)':'none'};"></div>
+          ${hasAlt ? `<div id="cpaltdiam-${ind.id}"
+            data-indid="${ind.id}"
+            class="cp-ind-alt-diamond-btn${altOn?' active':''}"
+            title="Альт-режим на графике: ${altTip.replace(/"/g,'&quot;')}"></div>` : '<div style="width:10px;flex-shrink:0;"></div>'}
           <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
           <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${cpGetFavs().includes(ind.id)?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${cpGetFavs().includes(ind.id)?'#FFD700':'#6F648F'};">★</span>
@@ -10212,6 +10204,13 @@ function cpInitIndPanel() {
     // "На график" button inside detail
     const chartBtn = e.target.closest('.cp-chart-toggle-btn');
     if (chartBtn) { e.stopPropagation(); cpChartToggle(chartBtn.dataset.indid); return; }
+    // Alt diamond button
+    const altDiam = e.target.closest('.cp-ind-alt-diamond-btn');
+    if (altDiam) {
+      e.stopPropagation();
+      if (typeof ilAggToggleAlt === 'function') ilAggToggleAlt(altDiam.dataset.indid);
+      return;
+    }
     // Diamond button
     const diam = e.target.closest('.cp-ind-diamond-btn');
     if (diam) {
