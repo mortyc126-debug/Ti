@@ -2758,6 +2758,7 @@ class Trader:
         __open_position_lots_count и место вызова в __trading).
         """
         cfg = self.__mega_alerts_settings
+        ft_cfg = self.__futures_trading_settings
         result: list[IStrategy] = []
 
         by_ticker = {s.settings.ticker: s for s in base_strategies.values()}
@@ -2768,6 +2769,28 @@ class Trader:
                 logger.warning(f"FUTURES: контракт на {base_ticker} не найден, пропуск")
                 continue
             future_settings, figi = resolved
+
+            # Фильтр ликвидности: средний объём за последние 20 свечей.
+            # Низколиквидные фьючерсы (avg_vol < MIN_AVG_VOLUME) дают только шум —
+            # сигналы строятся на 1-5 лотах, нет смысла торговать.
+            min_vol = ft_cfg.min_avg_volume
+            if min_vol > 0:
+                try:
+                    vol_candles = get_candles_cached(
+                        future_settings.ticker, figi, 5,
+                        self.__market_data_service, None
+                    )
+                    if vol_candles:
+                        recent = vol_candles[-20:]
+                        avg_vol = sum(float(c.volume) for c in recent) / len(recent)
+                        if avg_vol < min_vol:
+                            logger.info(
+                                f"FUTURES: {future_settings.ticker} пропущен — "
+                                f"avg_vol={avg_vol:.1f} < MIN_AVG_VOLUME={min_vol}"
+                            )
+                            continue
+                except Exception as e:
+                    logger.warning(f"FUTURES: не удалось проверить объём {future_settings.ticker}: {e}")
 
             base_strategy = by_ticker.get(base_ticker)
             if base_strategy:

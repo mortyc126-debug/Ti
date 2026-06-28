@@ -68,6 +68,10 @@ class FuturesTradingSettings:
     """Автоторговля фьючерсами на базовые активы из STRATEGY_* (вместо акций)."""
     enabled: bool = False
     base_tickers: list = field(default_factory=list)
+    # Минимальный средний объём (лотов/свечу) за последние 20 баров.
+    # Фьючерсы ниже порога — пропускаются (шум, нет edge).
+    # 0 = фильтр отключён (поведение по умолчанию).
+    min_avg_volume: int = 0
 
 
 @dataclass(eq=False, repr=True)
@@ -103,6 +107,9 @@ class MegaAlertsSettings:
     backtest_min_trades: int = 3
     db_api_url: str = ""
     db_api_key: str = ""
+    # Минимальный средний объём (лотов/свечу) за последние 20 баров.
+    # 0 = фильтр отключён.
+    min_avg_volume: int = 0
 
 
 @dataclass(eq=False, repr=True)

@@ -52,7 +52,8 @@ class ProgramConfiguration:
                 backtest_quality_min=float(ma.get("BACKTEST_QUALITY_MIN", "0.55")),
                 backtest_min_trades=int(ma.get("BACKTEST_MIN_TRADES", "3")),
                 db_api_url=config["DB_API"].get("URL", "") if "DB_API" in config else "",
-                db_api_key=config["DB_API"].get("API_KEY", "") if "DB_API" in config else ""
+                db_api_key=config["DB_API"].get("API_KEY", "") if "DB_API" in config else "",
+                min_avg_volume=int(ma.get("MIN_AVG_VOLUME", "0")),
             )
         else:
             self.__mega_alerts_settings = MegaAlertsSettings()
@@ -63,7 +64,8 @@ class ProgramConfiguration:
             base_tickers = [t.strip() for t in raw.split(",") if t.strip()]
             self.__futures_trading_settings = FuturesTradingSettings(
                 enabled=ft.get("ENABLED", "0") == "1",
-                base_tickers=base_tickers
+                base_tickers=base_tickers,
+                min_avg_volume=int(ft.get("MIN_AVG_VOLUME", "0")),
             )
         else:
             self.__futures_trading_settings = FuturesTradingSettings()
