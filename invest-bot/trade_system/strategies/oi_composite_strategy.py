@@ -6418,10 +6418,47 @@ class OICompositeStrategy(IStrategy):
                 for name in ALL_METHOD_NAMES
             }
             calibrator.warm_up(ticker, {k: v for k, v in method_scores.items() if v})
+        # Прогрев калибратора из полной истории баров (bar-by-bar replay).
+        # daily_scores даёт ≤90 точек (1/день) — этого мало для новых инструментов.
+        # Здесь прокручиваем все исторические свечи через scan_method_scores и
+        # наполняем калибратор реальным распределением скоров по конкретному тикеру.
+        if calibrator is not None and self.__atr_history_provider is not None:
+            self.__warm_up_calibrator_from_candles(ticker, calibrator)
         # Загрузка динамических режимных модификаторов из истории сделок
         self._reload_dynamic_regime_mods()
         # Инициализация кластерных моделей M1/M2/M3
         self.__cluster_models = ClusterModels(history, self.__settings.ticker)
+
+    def __warm_up_calibrator_from_candles(self, ticker: str, calibrator) -> None:
+        """
+        Bar-by-bar replay исторических свечей → populate calibrator.
+        Вместо ≤90 daily snapshots получаем тысячи реальных наблюдений
+        скоров, специфичных для этого тикера/режима/волатильности.
+        Сэмплируем каждый STEP-й бар чтобы не делать полный O(N²) проход.
+        """
+        try:
+            candles = self.__atr_history_provider(ticker)
+        except Exception as exc:
+            logger.warning(f"{ticker}: не удалось получить свечи для bar-calibration: {exc}")
+            return
+        if not candles or len(candles) < self.__candle_window + 2:
+            logger.info(f"{ticker}: слишком мало свечей для bar-calibration ({len(candles) if candles else 0})")
+            return
+
+        # Шаг сэмплирования: не нужно каждый бар — соседние корреляции высоки.
+        # STEP=3 даёт ~1000 точек из 3000 свечей за AUTO_ATR_HISTORY_DAYS.
+        STEP = 3
+        rows = self.scan_method_scores(candles)
+        sampled = rows[::STEP]
+        n_updated = 0
+        for row in sampled:
+            for name, s in row["scores"].items():
+                calibrator.update(ticker, name, s)
+            n_updated += 1
+        logger.info(
+            f"{ticker}: bar-calibration из {len(candles)} свечей → "
+            f"{n_updated} баров × {len(ALL_METHOD_NAMES)} методов"
+        )
 
     def _reload_dynamic_regime_mods(self) -> None:
         """Пересчитывает per-regime accuracy из истории и сохраняет в __dynamic_regime_mods."""
