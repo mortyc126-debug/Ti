@@ -9559,7 +9559,7 @@ function _sysRenderSigPairs() {
   const inactive = pairs.filter(p=>!p.ok);
 
   const groupLabel = { max:'Уверенность 95%+', strong:'Уверенность 85-94%', medium:'Уверенность 75-84%', exit:'Сигнал выхода' };
-  const groupCol   = { max:'#E04060', strong:'#7A8CFF', medium:'#6F7CA8', exit:'#60A4A1' };
+  const groupCol   = { max:'#FF6A8B', strong:'#7A8CFF', medium:'#6F7CA8', exit:'#60A4A1' };
 
   let html = '';
   if (active.length === 0) {
@@ -13107,23 +13107,17 @@ function ilRenderAnalysis() {
   const h5lbl = hLbl(5), h10lbl = hLbl(10), h15lbl = hLbl(15), h30lbl = hLbl(30);
 
   // Цвета: достаточно яркие для тёмного фона
+  const _accColor=(p)=>p>=62?'#52F2C9':p>=55?'#F4C36A':p<=45?'#FF6A8B':'#7870a0';
   const acc=(s)=>{
     if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
-    if(p>=62) return `<span style="color:#52E8A0;font-weight:600">${p}%</span>`;
-    if(p>=55) return `<span style="color:#C8A840">${p}%</span>`;
-    if(p<=45) return `<span style="color:#E04060">${p}%</span>`;
-    return `<span style="color:#8878a8">${p}%</span>`;
+    return `<span style="color:${_accColor(p)}${p>=62?';font-weight:600':''}">${p}%</span>`;
   };
-  // Точность в одном режиме
   const regAcc=(s, minN)=>{
     minN = minN==null ? 3 : minN;
     if(!s||s.acc==null||s.n<minN) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
-    if(p>=62) return `<span style="color:#52E8A0;font-weight:600">${p}%</span>`;
-    if(p>=55) return `<span style="color:#C8A840">${p}%</span>`;
-    if(p<=45) return `<span style="color:#E04060">${p}%</span>`;
-    return `<span style="color:#8878a8">${p}%</span>`;
+    return `<span style="color:${_accColor(p)}${p>=62?';font-weight:600':''}">${p}%</span>`;
   };
   // Альт-сигналы — события редче классики, поэтому минимум выборки ниже (2 вместо 3)
   const regAccAlt=(s)=>regAcc(s,2);
@@ -13143,15 +13137,15 @@ function ilRenderAnalysis() {
   } catch(e){}
 
   // Легенда
-  html+=`<div style="margin-bottom:14px;font-size:10px;font-family:var(--mono);color:#8878a8;line-height:1.9;">
-    <span style="color:#52E8A0">≥62%</span> — устойчивый сигнал &nbsp;·&nbsp;
-    <span style="color:#C8A840">55–61%</span> — умеренный &nbsp;·&nbsp;
-    <span style="color:#8878a8">&lt;55%</span> — случайный &nbsp;·&nbsp;
-    <span style="color:#E04060">≤45%</span> — антисигнал<br>
-    <span style="color:#52C88A">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
-    <span style="color:#9080C8">Фиолетовый</span> = лучше в боковике<br>
+  html+=`<div style="margin-bottom:14px;font-size:10px;font-family:var(--mono);color:#7870a0;line-height:1.9;">
+    <span style="color:#52F2C9">≥62%</span> — устойчивый сигнал &nbsp;·&nbsp;
+    <span style="color:#F4C36A">55–61%</span> — умеренный &nbsp;·&nbsp;
+    <span style="color:#7870a0">&lt;55%</span> — случайный &nbsp;·&nbsp;
+    <span style="color:#FF6A8B">≤45%</span> — антисигнал<br>
+    <span style="color:#52F2C9">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
+    <span style="color:#C9A0FF">Фиолетовый</span> = лучше в боковике<br>
     <span style="color:#6a6090">Горизонты (общая точность):</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h10lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span><br>
-    <span style="color:#6a6090">Режимы (точность при горизонте ${h15lbl}):</span> <span style="color:#52C88A">Тренд</span> · <span style="color:#9080C8">Бок</span> · <span style="color:#FF9F40">Выс.вол</span> · <span style="color:#60A4C8">Низ.вол</span><br>
+    <span style="color:#6a6090">Режимы (точность при горизонте ${h15lbl}):</span> <span style="color:#52F2C9">Тренд</span> · <span style="color:#C9A0FF">Бок</span> · <span style="color:#FF9F40">Выс.вол</span> · <span style="color:#7CC7FF">Низ.вол</span><br>
     <span style="color:#6a6090">Строка «↳ альт-сигнал»</span> — своя обоснованная альтернативная формула на категорию (это бэктестируемый числовой ряд, НЕ то же самое, что текстовые заметки «неклассически» на странице «Методы» — там качественные подсказки по VSA/Wyckoff, здесь — отдельная формула с собственной точностью): осцилляторы — дивергенция по экстремумам цены/индикатора; тренд — климакс-истощение серии экстремумов (или истощение изолированного спайка для событийных сигналов типа EMA-кросса); канал — band-walk (серия касаний границы ≠ разворот); объём — VSA-дивергенция цена/объём, привязанная к собственному сигналу индикатора; структура/цикл — инверсия в боковике (Chop≥61.8); DSP-фильтры — непродтверждённый флип знака (с учётом флипа через ноль). У части индикаторов вне этих 6 категорий обоснованной формулы нет — «—» честно, а не подмена.
   </div>`;
 
@@ -13188,10 +13182,10 @@ function ilRenderAnalysis() {
           <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h10lbl}</th>
           <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h15lbl}</th>
           <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h30lbl}</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#52C88A;border-bottom:1px solid #1e1830;border-left:1px solid #2a1f3d;white-space:nowrap;">Тренд</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#9080C8;border-bottom:1px solid #1e1830;white-space:nowrap;">Бок</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#FF9F40;border-bottom:1px solid #1e1830;white-space:nowrap;">Выс.вол</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#60A4C8;border-bottom:1px solid #1e1830;white-space:nowrap;">Низ.вол</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#52F2C9;border-bottom:1px solid #1e1830;border-left:1px solid #2a1f3d;white-space:nowrap;">Тренд</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#C9A0FF;border-bottom:1px solid #1e1830;white-space:nowrap;">Бок</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#F4C36A;border-bottom:1px solid #1e1830;white-space:nowrap;">Выс.вол</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7CC7FF;border-bottom:1px solid #1e1830;white-space:nowrap;">Низ.вол</th>
         </tr></thead>`;
     ids.filter(id=>{ const s=r.stats[id]; return s&&(s.h5?.n>=5||s.h10?.n>=5||s.h15?.n>=5||s.h30?.n>=5); }).forEach(id=>{
       const s5=r.stats[id].h5, s10=r.stats[id].h10, s15=r.stats[id].h15, s30=r.stats[id].h30;
@@ -13231,7 +13225,7 @@ function ilRenderAnalysis() {
     html+=`<div id="ilgrp-rest" style="margin-bottom:14px;"><div style="font-size:10px;color:#7068a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding:5px 8px;background:rgba(255,255,255,0.015);">Прочие</div>
       ${_ilCopyToolbar('ilgrp-rest')}
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
-        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h10lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#52C88A;border-left:1px solid #2a1f3d;">Тренд</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#9080C8;">Бок</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#FF9F40;">Выс.вол</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#60A4C8;">Низ.вол</th></tr>`;
+        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h10lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#52F2C9;border-left:1px solid #2a1f3d;">Тренд</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#C9A0FF;">Бок</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#FF9F40;">Выс.вол</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#7CC7FF;">Низ.вол</th></tr>`;
     rest.filter(id=>{ const s=r.stats[id]; return s&&(s.h5?.n>=5||s.h10?.n>=5||s.h15?.n>=5||s.h30?.n>=5); }).forEach(id=>{
       const s5=r.stats[id].h5,s10=r.stats[id].h10,s15=r.stats[id].h15,s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T,s15R=r.stats[id].h15R,s15HV=r.stats[id].h15HV,s15LV=r.stats[id].h15LV;
@@ -13389,18 +13383,18 @@ function ilRenderMultiComp(tfLabel) {
 
   const fmtAcc = (v,bold)=>{
     if(v==null) return '<td style="color:#2a2050;text-align:center;font-size:10px;">—</td>';
-    let col='#8878a8';
-    if(v>=62) col='#52E8A0'; else if(v>=55) col='#C8A840'; else if(v<=45) col='#E04060';
+    let col='#7870a0';
+    if(v>=62) col='#52F2C9'; else if(v>=55) col='#F4C36A'; else if(v<=45) col='#FF6A8B';
     return `<td style="text-align:center;font-size:10px;color:${col};${bold?'font-weight:700;':''}">${v}%</td>`;
   };
   const fmtDelta = (cl,alt)=>{
     if(cl==null||alt==null) return '<td style="color:#2a2050;text-align:center;font-size:9px;">—</td>';
     const d=alt-cl;
-    const col=d>0?'#52E8A0':d<0?'#E04060':'#5a5070';
+    const col=d>0?'#52F2C9':d<0?'#FF6A8B':'#5a5070';
     return `<td style="text-align:center;font-size:9px;color:${col};">${d>0?'+':''}${d}</td>`;
   };
   const fmtStd = (std)=>{
-    const col=std<=5?'#52E8A0':std<=10?'#C8A840':'#E04060';
+    const col=std<=5?'#52F2C9':std<=10?'#F4C36A':'#FF6A8B';
     return `<td style="text-align:center;font-size:10px;color:${col};">${std}</td>`;
   };
 
@@ -13441,7 +13435,7 @@ function ilRenderMultiComp(tfLabel) {
         }
       });
       const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
-      const pCol = pct==null?'#3a3060':pct>=60?'#52E8A0':pct<=40?'#E04060':'#8878a8';
+      const pCol = pct==null?'#3a3060':pct>=60?'#52F2C9':pct<=40?'#FF6A8B':'#7870a0';
       tbody+=`<td style="text-align:center;font-size:10px;color:${pCol};padding:3px 4px;">${pct!=null?pct+'%':'—'}</td></tr>`;
     });
   });
@@ -13460,7 +13454,7 @@ function ilRenderMultiComp(tfLabel) {
         else tbody += fmtAcc(row.clVals[i]) + fmtDelta(row.clVals[i], row.altVals[i]);
       });
       const pct = row.bothCount>0 ? Math.round(row.altWins/row.bothCount*100) : null;
-      const pCol = pct==null?'#3a3060':pct>=60?'#52E8A0':pct<=40?'#E04060':'#8878a8';
+      const pCol = pct==null?'#3a3060':pct>=60?'#52F2C9':pct<=40?'#FF6A8B':'#7870a0';
       tbody+=`<td style="text-align:center;font-size:10px;color:${pCol};padding:3px 4px;">${pct!=null?pct+'%':'—'}</td></tr>`;
     });
   }
@@ -13477,17 +13471,17 @@ function ilRenderMultiComp(tfLabel) {
     ${hint?`<div style="font-size:9px;color:#4a4060;margin-bottom:5px;">${hint}</div>`:''}
     ${items.length?items.map(r=>`<div style="font-size:10px;color:var(--text2);margin-bottom:2px;">${IL_NAMES[r.id]||r.id} <span style="color:#5a5070;">${r.mean}%${r.std!=null?' σ'+r.std:''}</span></div>`).join(''):'<div style="font-size:10px;color:#3a3060;">—</div>'}
   </div>`;
-  summary+=card('Универсальные (σ≤5, ≥55%)','#52E8A0',universals,'Работают стабильно у всех тикеров');
-  summary+=card('Тикер-специфичные (σ>10)','#E04060',specific,'Поведение сильно зависит от инструмента');
+  summary+=card('Универсальные (σ≤5, ≥55%)','#52F2C9',universals,'Работают стабильно у всех тикеров');
+  summary+=card('Тикер-специфичные (σ>10)','#FF6A8B',specific,'Поведение сильно зависит от инструмента');
   summary+=card('Альт-формула лучше в большинстве','#7A8CFF',altBetter,'У этих индикаторов альт-интерпретация точнее для ≥50% тикеров');
-  summary+=card('Классика надёжнее','#C8A840',clBetter,'Альт-формула у большинства тикеров хуже классики');
+  summary+=card('Классика надёжнее','#F4C36A',clBetter,'Альт-формула у большинства тикеров хуже классики');
   summary+=`</div>`;
 
   // Легенда колонок
   const legend = `<div style="margin-bottom:8px;font-size:9px;color:#4a4060;font-family:var(--mono);line-height:1.8;">
     ТФ: <span style="color:#a898c8;">${tfLabel||''}</span> · горизонт H15 ·
-    <span style="color:#52E8A0">≥62%</span> устойчивый · <span style="color:#C8A840">55–61%</span> умеренный · <span style="color:#8878a8">&lt;55%</span> случайный · <span style="color:#E04060">≤45%</span> антисигнал<br>
-    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:#52E8A0">≤5</span> = универсальный · <span style="color:#C8A840">6–10</span> = умеренно специфичный · <span style="color:#E04060">&gt;10</span> = тикер-специфичный<br>
+    <span style="color:#52F2C9">≥62%</span> устойчивый · <span style="color:#F4C36A">55–61%</span> умеренный · <span style="color:#7870a0">&lt;55%</span> случайный · <span style="color:#FF6A8B">≤45%</span> антисигнал<br>
+    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:#52F2C9">≤5</span> = универсальный · <span style="color:#F4C36A">6–10</span> = умеренно специфичный · <span style="color:#FF6A8B">&gt;10</span> = тикер-специфичный<br>
     ${onlyAlt?'':'<b style="color:var(--text3);">Δ</b> = альт − классика · '}
     <b style="color:var(--text3);">Альт лучше</b>: % тикеров, где альт-формула точнее классики
   </div>`;
@@ -13593,7 +13587,7 @@ function _renderAnalysisInner(panel) {
       if (!s || s.acc==null) return '';
       const pct = Math.round(s.acc*100);
       const mv = s.avgMove!=null ? `·${s.avgMove>=0?'+':''}${s.avgMove.toFixed(2)}%` : '';
-      const col = pct>=65?'#52D8A0':pct>=55?'#C8A840':'#C06070';
+      const col = pct>=65?'#52D8A0':pct>=55?'#F4C36A':'#C06070';
       return `<span class="analysis-tf-chip" style="color:${col};background:rgba(0,0,0,0.25)">${h}св: ${pct}% точн${mv}</span>`;
     }).join('');
     return chips ? `<div class="analysis-tf-row">${chips}</div>` : '';
