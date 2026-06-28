@@ -10844,23 +10844,24 @@ function cpInitCanvasEvents() {
   let dx0=null, off0=0;
   // Snap-to-candle measure: {idx, price, xPx, yPx}
   let measPt1=null;
-  // Snap cursor X to candle index and return canvas coords of its close price
-  function _measSnap(ex, W, H) {
+  // Snap X к ближайшей свече, Y свободный (цена по фактической позиции мыши)
+  function _measSnap(ex, ey, W, H) {
     const idx = _cpIdxFromX(ex, W);
     const sc = _cpGetScale(W);
     if (!sc || !chartCandles[idx]) return null;
-    const yPx = H - ((chartCandles[idx].close - sc.lo) / (sc.hi - sc.lo)) * H * 0.9 - H * 0.05;
     const maxVis = Math.min(chartCandles.length, Math.max(Math.floor(W / chartCandleW), 1));
     const endIdx = Math.max(maxVis, chartCandles.length - chartOffset);
     const startIdx = Math.max(0, endIdx - maxVis);
     const xPx = (idx - startIdx + 0.5) * (W / (endIdx - startIdx));
-    return { idx, price: chartCandles[idx].close, xPx, yPx };
+    // Y свободный — цена из позиции мыши
+    const price = sc.lo + (1 - (ey / H - 0.05) / 0.9) * (sc.hi - sc.lo);
+    return { idx, price, xPx, yPx: ey };
   }
   c.addEventListener('click', e => {
     if (!chartMeasureMode) return;
     const rect = c.getBoundingClientRect();
     const W = c.offsetWidth, H = c.offsetHeight;
-    const snap = _measSnap(e.clientX - rect.left, W, H);
+    const snap = _measSnap(e.clientX - rect.left, e.clientY - rect.top, W, H);
     if (!snap) return;
     if (!measPt1) {
       measPt1 = snap;
@@ -10874,7 +10875,7 @@ function cpInitCanvasEvents() {
     if (!chartMeasureMode) return;
     const rect = c.getBoundingClientRect();
     const W = c.offsetWidth, H = c.offsetHeight;
-    const snap = _measSnap(e.clientX - rect.left, W, H);
+    const snap = _measSnap(e.clientX - rect.left, e.clientY - rect.top, W, H);
     if (!snap) return;
     _cpDrawMeasurePts(measPt1, snap, W, H);
     c.style.cursor = 'crosshair';
