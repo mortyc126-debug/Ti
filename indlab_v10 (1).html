@@ -12265,22 +12265,130 @@ function _ilBtStats(scoreArr, closes, horizon, mask) {
   return { acc, ig: acc!=null ? acc-baseRate : null, n, bias: n>0?longN/n:null, baseRate };
 }
 
-// Неклассика: альтернативная (дивергентная) интерпретация того же индикатора.
-// Если классический скор и цена расходятся на окне lookback — это контр-сигнал
-// (минус-2/плюс-2), иначе — «не сработало» (0, не попадает в выборку _ilBtStats).
-function _ilAltScoreSeries(scoreArr, closes, lookback) {
-  lookback = lookback || 5;
+// Неклассика: для каждой смысловой категории индикаторов — своя обоснованная
+// альтернативная гипотеза (известная слабость/паттерн этой категории), а не
+// единый сдвиг чисел на все индикаторы подряд.
+
+// 1. Осцилляторы: классическая дивергенция по локальным экстремумам —
+// цена обновила хай/лой за lookback баров, а сам осциллятор — нет.
+function _ilAltOscDivergence(scoreArr, closes, lookback) {
+  lookback = lookback || 10;
   const out = new Array(scoreArr.length).fill(null);
   for (let i = lookback; i < scoreArr.length; i++) {
-    const s0 = scoreArr[i], s1 = scoreArr[i-lookback];
-    if (s0 == null || s1 == null) { out[i] = null; continue; }
-    const dScore = s0 - s1;
-    const dPrice = closes[i] - closes[i-lookback];
-    if (dScore > 0 && dPrice < 0) out[i] = 2;        // бычья дивергенция
-    else if (dScore < 0 && dPrice > 0) out[i] = -2;  // медвежья дивергенция
+    if (scoreArr[i] == null) { out[i] = null; continue; }
+    const priceWin = closes.slice(i-lookback, i);
+    const scoreWin = scoreArr.slice(i-lookback, i).filter(v=>v!=null);
+    if (!scoreWin.length) { out[i] = 0; continue; }
+    const priceMaxPrev = Math.max(...priceWin), priceMinPrev = Math.min(...priceWin);
+    const scoreMaxPrev = Math.max(...scoreWin), scoreMinPrev = Math.min(...scoreWin);
+    const newHigh = closes[i] >= priceMaxPrev, newLow = closes[i] <= priceMinPrev;
+    if (newHigh && scoreArr[i] < scoreMaxPrev) out[i] = -2;       // медвежья дивергенция
+    else if (newLow && scoreArr[i] > scoreMinPrev) out[i] = 2;    // бычья дивергенция
     else out[i] = 0;
   }
   return out;
+}
+
+// 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
+// на экстремуме (±2) streakLen баров подряд, это не подтверждение, а признак
+// разворота прежней трактовки — берём противоположный знак.
+// Для тренда (streakLen=4) это климакс-истощение импульса.
+// Для канала (streakLen=3) это band-walk — известная слабость BB/Keltner/Donchian,
+// где многократное касание границы при сильном тренде ошибочно читается как
+// перекупленность, хотя на деле подтверждает продолжение движения.
+function _ilAltStreakFade(scoreArr, streakLen) {
+  streakLen = streakLen || 4;
+  const out = new Array(scoreArr.length).fill(null);
+  for (let i = 0; i < scoreArr.length; i++) {
+    if (scoreArr[i] == null) { out[i] = null; continue; }
+    if (i < streakLen-1) { out[i] = 0; continue; }
+    const win = scoreArr.slice(i-streakLen+1, i+1);
+    if (win.some(v=>v==null)) { out[i] = 0; continue; }
+    if (win.every(v=>v>=2)) out[i] = -2;
+    else if (win.every(v=>v<=-2)) out[i] = 2;
+    else out[i] = 0;
+  }
+  return out;
+}
+
+// 4. Объём/деньги: реальная межрядная дивергенция цена/объём (VSA «no demand /
+// no supply») — рост цены на затухающем объёме слабее, чем кажется, и наоборот.
+// Считается один раз по сырым closes/volume, одинаково для всех индикаторов
+// группы — здесь дивергенция не искусственная, ряды независимы по построению.
+function _ilAltVolDivergence(closes, candles, lookback) {
+  lookback = lookback || 10;
+  const vols = candles.map(c=>c.volume||0);
+  const out = new Array(closes.length).fill(null);
+  for (let i = lookback; i < closes.length; i++) {
+    const priceWin = closes.slice(i-lookback, i);
+    const volWin = vols.slice(i-lookback, i);
+    const priceMaxPrev = Math.max(...priceWin), priceMinPrev = Math.min(...priceWin);
+    const volMaxPrev = Math.max(...volWin);
+    const newHigh = closes[i] >= priceMaxPrev, newLow = closes[i] <= priceMinPrev;
+    if (newHigh && vols[i] < volMaxPrev*0.7) out[i] = -2;      // no demand
+    else if (newLow && vols[i] < volMaxPrev*0.7) out[i] = 2;   // no supply
+    else out[i] = 0;
+  }
+  return out;
+}
+
+// 5. Структура/цикл: эти индикаторы известны ложными сигналами в боковике
+// («пила»). Если Choppiness Index ≥ 61.8 (стандартный порог «рынок шумит» из
+// самой методики индекса) — инвертируем структурный сигнал, иначе считаем,
+// что неклассической трактовки нет (0).
+function _ilAltStructureChopFade(scoreArr, chopArr, chopThresh) {
+  chopThresh = chopThresh || 61.8;
+  const out = new Array(scoreArr.length).fill(null);
+  for (let i = 0; i < scoreArr.length; i++) {
+    if (scoreArr[i] == null || chopArr[i] == null) { out[i] = null; continue; }
+    if (scoreArr[i] === 0) { out[i] = 0; continue; }
+    out[i] = chopArr[i] >= chopThresh ? -scoreArr[i] : 0;
+  }
+  return out;
+}
+
+// 6. DSP/продвинутая статистика: сглаживающие фильтры (Kalman/NW/GPR/CUSUM…)
+// часто дают первый разворот знака на шуме, а не на реальном переломе.
+// Неклассика = именно непродтверждённый флип знака трактуется как антисигнал
+// (а не как сигнал в его собственном направлении).
+function _ilAltDspFlipFade(scoreArr) {
+  const out = new Array(scoreArr.length).fill(null);
+  for (let i = 1; i < scoreArr.length; i++) {
+    const cur = scoreArr[i], prev = scoreArr[i-1];
+    if (cur == null || prev == null) { out[i] = null; continue; }
+    const sCur = Math.sign(cur), sPrev = Math.sign(prev);
+    out[i] = (sCur!==0 && sPrev!==0 && sCur!==sPrev) ? -sCur*2 : 0;
+  }
+  return out;
+}
+
+// Категория по индикатору — по совпадению с _IL_GROUPS (см. ниже объявление группы).
+function _ilAltFamilyOf(id) {
+  for (const grp of _IL_GROUPS) {
+    if (!grp.ids.includes(id)) continue;
+    if (grp.label.includes('Осциллятор')) return 'osc';
+    if (grp.label.includes('Тренд')) return 'trend';
+    if (grp.label.includes('Канал')) return 'channel';
+    if (grp.label.includes('Объём')) return 'volume';
+    if (grp.label.includes('Структура')) return 'structure';
+    if (grp.label.includes('Продвинутая')) return 'dsp';
+    return null; // «Режим рынка (без винрейта)» — неклассике не подлежит
+  }
+  return 'osc'; // «Прочие» — по умолчанию самая обоснованная универсальная трактовка
+}
+
+function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
+  const fam = _ilAltFamilyOf(id);
+  const scoreArr = ss[id];
+  switch (fam) {
+    case 'osc':       return _ilAltOscDivergence(scoreArr, closes, 10);
+    case 'trend':     return _ilAltStreakFade(scoreArr, 4);
+    case 'channel':   return _ilAltStreakFade(scoreArr, 3);
+    case 'volume':    return _ilAltVolDivergence(closes, candles, 10);
+    case 'structure': return _ilAltStructureChopFade(scoreArr, chopArr, 61.8);
+    case 'dsp':       return _ilAltDspFlipFade(scoreArr);
+    default:          return scoreArr.map(()=>null); // без винрейта — неклассика не считается
+  }
 }
 
 function _ilPearson(a, b) {
@@ -12349,8 +12457,9 @@ async function ilRunAnalysis() {
     const highVolMask = vol10.map(v=>v!=null&&v>=medVol);
     const lowVolMask  = vol10.map(v=>v!=null&&v<medVol);
     const HORIZONS = [5,10,15,30];
+    const chopArrAlt = ilCalcChop(candles,14);
     const ssAlt = {};
-    IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(ss[id], closes, 5); });
+    IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(id, ss, closes, candles, chopArrAlt); });
     const stats = {};
     IL_INDICATORS.forEach(id=>{
       stats[id]={};
@@ -12479,7 +12588,7 @@ function ilRenderAnalysis() {
     <span style="color:#9080C8">Фиолетовый</span> = лучше в боковике<br>
     <span style="color:#6a6090">Горизонты (общая точность):</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h10lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span><br>
     <span style="color:#6a6090">Режимы (точность при горизонте ${h15lbl}):</span> <span style="color:#52C88A">Тренд</span> · <span style="color:#9080C8">Бок</span> · <span style="color:#FF9F40">Выс.вол</span> · <span style="color:#60A4C8">Низ.вол</span><br>
-    <span style="color:#6a6090">Строка «↳ неклассика»</span> — альтернативная (дивергентная) трактовка того же индикатора: расхождение его скора с ценой за 5 баров считается контр-сигналом.
+    <span style="color:#6a6090">Строка «↳ неклассика»</span> — своя обоснованная альтернатива на категорию: осцилляторы — дивергенция по экстремумам цены/индикатора; тренд — климакс-истощение серии экстремумов; канал — band-walk (серия касаний границы ≠ разворот); объём — VSA-дивергенция цена/объём; структура/цикл — инверсия в боковике (Chop≥61.8); DSP-фильтры — непродтверждённый флип знака.
   </div>`;
 
   // По группам
