@@ -11823,6 +11823,11 @@ function _renderAnalysisInner(panel) {
     if (sw) sw.style.background = color;
   }
 
+  // Выносим на window — onclick в HTML не видит локальных функций
+  window.ilShowLegend = ilShowLegend;
+  window.ilHideLegend = ilHideLegend;
+  window._ilOnColorChange = _ilOnColorChange;
+
   // Кнопка «?» для любой карточки у которой есть определение в _IL_LINE_DEFS
   function _legendBtn(key) {
     if (!_IL_LINE_DEFS[key]) return '';
