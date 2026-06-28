@@ -11825,8 +11825,13 @@ function ilCalcGPR(closes){
 }
 function ilScoreGPR(close,gm){ if(gm==null)return null; const d=(close-gm)/gm*100; return d>1?2:d>0.2?1:d<-1?-2:d<-0.2?-1:0; }
 function ilCalcSSA(closes){
-  const src=closes.slice(-Math.min(closes.length,200)), off=closes.length-src.length;
-  const L=20,N=src.length,K=N-L+1, full=new Array(closes.length).fill(null);
+  // Раньше брался только хвост в 200 баров — на бэктесте за месяцы/годы это
+  // оставляло почти весь ряд (всё, что раньше последних 200 баров) null,
+  // отсюда прочерки по всем горизонтам и режимам. Считаем на всей серии:
+  // ковариация/реконструкция SSA не завязаны на длину окна, а на полном
+  // ряде стоимость остаётся приемлемой (O(L*K) для covariance/reconstruction,
+  // O(it*L^2) для power iteration — L=20 фиксировано).
+  const src=closes, L=20,N=src.length,K=N-L+1, full=new Array(closes.length).fill(null);
   if(K<=L) return full;
   const C=new Array(L); for(let i=0;i<L;i++) C[i]=new Array(L).fill(0);
   for(let i=0;i<L;i++) for(let j=i;j<L;j++){ let s=0; for(let k=0;k<K;k++) s+=src[i+k]*src[j+k]; C[i][j]=s/K; C[j][i]=C[i][j]; }
@@ -11836,7 +11841,7 @@ function ilCalcSSA(closes){
   const recon=new Array(N).fill(0), counts=new Array(N).fill(0);
   for(let i=0;i<L;i++) for(let k=0;k<K;k++){ recon[i+k]+=v[i]*pc[k]; counts[i+k]++; }
   for(let n=0;n<N;n++) recon[n]/=(counts[n]||1);
-  for(let n=0;n<N;n++) full[n+off]=recon[n];
+  for(let n=0;n<N;n++) full[n]=recon[n];
   return full;
 }
 function ilScoreSSA(close,ssa,prevSsa){ if(ssa==null||prevSsa==null)return null; const slope=(ssa-prevSsa)/(prevSsa||1)*100; return slope>0.3?2:slope>0.05?1:slope<-0.3?-2:slope<-0.05?-1:0; }
@@ -11882,8 +11887,11 @@ function ilCalcEBS(closes){
 }
 function ilScoreEBS(v,l){ if(v==null||l==null)return null; if(v<-0.7&&v>l) return 2; if(v>0.7&&v<l) return -2; return v>l?1:-1; }
 function ilCalcTMF(candles, per=21){
-  const tmfRaw=candles.map((c,i)=>{ if(i===0) return null; const pc=candles[i-1]; const trh=Math.max(c.high,pc.close),trl=Math.min(c.low,pc.close); const rng=trh-trl; return rng>0?(2*c.close-trh-trl)/rng*(c.vol||0):0; });
-  const vol=candles.map(c=>c.vol||0);
+  // Тот же баг с полем объёма, что и в ilCalcCumDelta: на «Точности» оно
+  // называется volume, а не vol — с vol объём всегда 0, emVol всегда 0,
+  // и индикатор был вырожденным (всегда null из-за деления на emVol[i]=0).
+  const tmfRaw=candles.map((c,i)=>{ if(i===0) return null; const pc=candles[i-1]; const trh=Math.max(c.high,pc.close),trl=Math.min(c.low,pc.close); const rng=trh-trl; return rng>0?(2*c.close-trh-trl)/rng*(c.volume||0):0; });
+  const vol=candles.map(c=>c.volume||0);
   const emaV=(arr,p)=>{ const r=new Array(arr.length).fill(null); const k=2/(p+1); let s=null; for(let i=0;i<arr.length;i++){ if(arr[i]==null) continue; s=s===null?arr[i]:s*(1-k)+arr[i]*k; r[i]=s; } return r; };
   const emMFV=emaV(tmfRaw.map(v=>v||0),per), emVol=emaV(vol,per);
   return emMFV.map((v,i)=>v!=null&&emVol[i]?Math.max(-1,Math.min(1,v/emVol[i])):null);
@@ -11921,7 +11929,10 @@ function ilCalcEntropy(closes, per=20){
 }
 function ilScoreEntropy(v){ return null; } // мера предсказуемости, не направление
 function ilCalcCumDelta(candles){
-  let cum=0; return candles.map(c=>{ const hl=c.high-c.low, v=c.vol||0; if(!hl) return cum; const bv=v*(c.close-c.low)/hl, sv=v*(c.high-c.close)/hl; cum+=bv-sv; return cum; });
+  // На странице «Точность» свечи приходят из _ilFetchCandlesWithCache с полем
+  // volume (не vol, как на странице «График») — иначе объём всегда читался
+  // как 0 и индикатор был вырожденным (cum всегда 0).
+  let cum=0; return candles.map(c=>{ const hl=c.high-c.low, v=c.volume||0; if(!hl) return cum; const bv=v*(c.close-c.low)/hl, sv=v*(c.high-c.close)/hl; cum+=bv-sv; return cum; });
 }
 function ilScoreCumDelta(close,prevClose,delta,prevDelta){
   if(delta==null||prevDelta==null) return null;
