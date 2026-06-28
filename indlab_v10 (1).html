@@ -5799,7 +5799,13 @@ function chartDrawEmpty() {
   if (ovW) ovW.style.display = 'flex';
 }
 
+let _chartRedrawRaf = null;
+function chartRedrawDeferred() {
+  if (_chartRedrawRaf) return;
+  _chartRedrawRaf = requestAnimationFrame(() => { _chartRedrawRaf = null; chartRedraw(); });
+}
 function chartRedraw() {
+  if (_chartRedrawRaf) { cancelAnimationFrame(_chartRedrawRaf); _chartRedrawRaf = null; }
   if (!chartCandles.length) return;
   const ov = document.getElementById('chart-overlay');
   if (ov) ov.style.display = 'none';
@@ -13600,9 +13606,14 @@ function _anCalcATR(candles, period) {
 }
 
 // --- Main analysis renderer ---
-function renderAnalysis() {
+let _renderAnalysisCache = null;
+function renderAnalysis(force) {
   const panel = document.getElementById('cp-analysis-panel');
   if (!panel) return;
+  const inds = typeof chartInds !== 'undefined' ? chartInds : {};
+  const key = (typeof chartCandles!=='undefined'?chartCandles.length:0) + '|' + Object.keys(inds).filter(k=>inds[k]).sort().join(',');
+  if (!force && _renderAnalysisCache === key && panel.innerHTML) return;
+  _renderAnalysisCache = key;
   try { _renderAnalysisInner(panel); } catch(e) { panel.innerHTML = `<div style="color:#C71B52;font-size:11px;padding:8px;font-family:'JetBrains Mono',monospace;">⚠ Ошибка анализа: ${e.message}<br><small style="opacity:.6">${e.stack ? e.stack.split('\n')[1] : ''}</small></div>`; }
 }
 function _renderAnalysisInner(panel) {
