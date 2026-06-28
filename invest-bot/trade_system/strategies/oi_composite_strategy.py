@@ -993,7 +993,9 @@ def _adaptive_threshold(base: float, regime: str) -> float:
     Порог входа под режим рынка: в тренде вход дешевле (легче ловить движение),
     в стрессе/высокой волатильности дороже (меньше ложных входов на шуме).
     """
-    mods = {"trending_up": 0.85, "trending_down": 0.85, "ranging": 1.0,
+    # trending_down был 0.85 (опускал порог) → убыток -22% net на 55% сделок.
+    # Поднято до 1.50: в нисходящем режиме нужно сильное подтверждение.
+    mods = {"trending_up": 0.85, "trending_down": 1.50, "ranging": 1.0,
             "high_vol": 1.25, "low_vol": 0.90, "stress": 1.40}
     return base * mods.get(regime, 1.0)
 
@@ -8717,6 +8719,10 @@ class OICompositeStrategy(IStrategy):
         sign_val = 1 if direction == SignalType.LONG else -1
         # P5: L1-скор смещает порог (по тренду — легче, против — труднее).
         thr = base * (1.0 - 0.3 * self.__l1_score * sign_val)
+        # Контртрендовый LONG в trending_down — исторически убыточен (-22% net).
+        # Дополнительный множитель ×1.5: нужна вдвое более сильная уверенность.
+        if regime == "trending_down" and direction == SignalType.LONG:
+            thr *= 1.5
         thr = max(0.06, min(0.24, thr))
         # P8: волатильность/тикер/режим/сессия.
         thr = self.__threshold_adapters.effective_threshold(thr, regime, hour)
