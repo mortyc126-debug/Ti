@@ -12290,7 +12290,9 @@ function _ilAltOscDivergence(scoreArr, closes, lookback) {
 }
 
 // 2/3. Тренд и Канал: «истощение/band-walk» — если классический скор держится
-// на экстремуме (±2) streakLen баров подряд, это не подтверждение, а признак
+// streakLen баров подряд на своём собственном максимуме по модулю (а не на
+// жёстком ±2 — у Parabolic/SuperTrend шкала ±1, у MACD/ADX ±2, формула сама
+// определяет потолок конкретного индикатора), это не подтверждение, а признак
 // разворота прежней трактовки — берём противоположный знак.
 // Для тренда (streakLen=4) это климакс-истощение импульса.
 // Для канала (streakLen=3) это band-walk — известная слабость BB/Keltner/Donchian,
@@ -12298,35 +12300,45 @@ function _ilAltOscDivergence(scoreArr, closes, lookback) {
 // перекупленность, хотя на деле подтверждает продолжение движения.
 function _ilAltStreakFade(scoreArr, streakLen) {
   streakLen = streakLen || 4;
+  let maxAbs = 0;
+  for (const v of scoreArr) if (v!=null && Math.abs(v)>maxAbs) maxAbs = Math.abs(v);
   const out = new Array(scoreArr.length).fill(null);
+  if (maxAbs === 0) return out; // индикатор вообще не дирекциональный — неклассика не определена
   for (let i = 0; i < scoreArr.length; i++) {
     if (scoreArr[i] == null) { out[i] = null; continue; }
     if (i < streakLen-1) { out[i] = 0; continue; }
     const win = scoreArr.slice(i-streakLen+1, i+1);
     if (win.some(v=>v==null)) { out[i] = 0; continue; }
-    if (win.every(v=>v>=2)) out[i] = -2;
-    else if (win.every(v=>v<=-2)) out[i] = 2;
+    if (win.every(v=>v>=maxAbs)) out[i] = -maxAbs;
+    else if (win.every(v=>v<=-maxAbs)) out[i] = maxAbs;
     else out[i] = 0;
   }
   return out;
 }
 
-// 4. Объём/деньги: реальная межрядная дивергенция цена/объём (VSA «no demand /
-// no supply») — рост цены на затухающем объёме слабее, чем кажется, и наоборот.
-// Считается один раз по сырым closes/volume, одинаково для всех индикаторов
-// группы — здесь дивергенция не искусственная, ряды независимы по построению.
-function _ilAltVolDivergence(closes, candles, lookback) {
+// 4. Объём/деньги: VSA «no demand / no supply», но применённый к ТЕКУЩЕМУ
+// сигналу конкретного индикатора, а не как общий ряд на всю категорию —
+// иначе у OBV/CMF/Elder Ray/Force Index/PVT/VO была бы идентичная неклассика.
+// Срабатывает только в момент, когда у ЭТОГО индикатора есть классический
+// сигнал (own!=0), и проверяет, подтверждён ли он объёмом на новом
+// хае/лое цены — момент срабатывания у каждого индикатора свой (own[i]),
+// поэтому строки внутри категории расходятся по таймингу и точности.
+function _ilAltVolDivergence(ownScore, closes, candles, lookback) {
   lookback = lookback || 10;
   const vols = candles.map(c=>c.volume||0);
   const out = new Array(closes.length).fill(null);
   for (let i = lookback; i < closes.length; i++) {
+    const own = ownScore[i];
+    if (own == null) { out[i] = null; continue; }
+    if (own === 0) { out[i] = 0; continue; }
     const priceWin = closes.slice(i-lookback, i);
     const volWin = vols.slice(i-lookback, i);
     const priceMaxPrev = Math.max(...priceWin), priceMinPrev = Math.min(...priceWin);
     const volMaxPrev = Math.max(...volWin);
-    const newHigh = closes[i] >= priceMaxPrev, newLow = closes[i] <= priceMinPrev;
-    if (newHigh && vols[i] < volMaxPrev*0.7) out[i] = -2;      // no demand
-    else if (newLow && vols[i] < volMaxPrev*0.7) out[i] = 2;   // no supply
+    const noDemand = closes[i] >= priceMaxPrev && vols[i] < volMaxPrev*0.7;
+    const noSupply = closes[i] <= priceMinPrev && vols[i] < volMaxPrev*0.7;
+    if (own > 0 && noDemand) out[i] = -2;      // индикатор зовёт «вверх», но объём не подтверждает
+    else if (own < 0 && noSupply) out[i] = 2;  // индикатор зовёт «вниз», но объём не подтверждает
     else out[i] = 0;
   }
   return out;
@@ -12362,8 +12374,15 @@ function _ilAltDspFlipFade(scoreArr) {
   return out;
 }
 
+// Явные исключения: индикатор формально состоит в двух группах сразу
+// (mfi — и осциллятор, и объём; bb_pct — и канал, и DSP). Без этого
+// победила бы первая по порядку группа, и более содержательная трактовка
+// (объёмная для mfi, DSP-фильтр для bb_pct) была бы недостижима.
+const _IL_ALT_FAMILY_OVERRIDE = { mfi: 'volume', bb_pct: 'dsp' };
+
 // Категория по индикатору — по совпадению с _IL_GROUPS (см. ниже объявление группы).
 function _ilAltFamilyOf(id) {
+  if (_IL_ALT_FAMILY_OVERRIDE[id]) return _IL_ALT_FAMILY_OVERRIDE[id];
   for (const grp of _IL_GROUPS) {
     if (!grp.ids.includes(id)) continue;
     if (grp.label.includes('Осциллятор')) return 'osc';
@@ -12384,7 +12403,7 @@ function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
     case 'osc':       return _ilAltOscDivergence(scoreArr, closes, 10);
     case 'trend':     return _ilAltStreakFade(scoreArr, 4);
     case 'channel':   return _ilAltStreakFade(scoreArr, 3);
-    case 'volume':    return _ilAltVolDivergence(closes, candles, 10);
+    case 'volume':    return _ilAltVolDivergence(scoreArr, closes, candles, 10);
     case 'structure': return _ilAltStructureChopFade(scoreArr, chopArr, 61.8);
     case 'dsp':       return _ilAltDspFlipFade(scoreArr);
     default:          return scoreArr.map(()=>null); // без винрейта — неклассика не считается
