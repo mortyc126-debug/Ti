@@ -5885,8 +5885,11 @@ function _chartDrawAltInd() {
     if (activeAlt.length) {
       legend.innerHTML = activeAlt.map((x,i) => {
         const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-        return `<span style="color:${palette[i%palette.length]};margin-right:8px;">◆ ${name}</span>`;
-      }).join('') + '<span style="color:#4a4060;font-size:8px;">· ◆ в списке Инд. чтобы убрать</span>';
+        const fam = (typeof _ilAltFamilyOf === 'function') ? _ilAltFamilyOf(x.id) : null;
+        const desc = (fam && typeof _IL_ALT_FAMILY_DESC !== 'undefined') ? _IL_ALT_FAMILY_DESC[fam] : '';
+        return `<span style="color:${palette[i%palette.length]};font-weight:600;">◆ ${name}</span>`
+          + (desc ? `<span style="color:#9080b0;font-size:9px;margin-left:6px;">${desc}</span>` : '');
+      }).join('<br>') + '<br><span style="color:#4a4060;font-size:8px;">· ◆ в списке Инд. чтобы убрать</span>';
     } else {
       legend.innerHTML = '<span style="color:#4a4060;">Активируй ◆ (фиолетовый) у индикаторов в списке Инд.</span>';
     }
