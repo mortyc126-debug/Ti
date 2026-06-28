@@ -185,6 +185,7 @@ IC_QUALITY_BLEND      = 0.55  # доля quality-IC при смешивании 
 _METHOD_IC_TARGET_MINUTES: dict[str, int] = {
     "PRICE_TREND": 120, "TREND_QUALITY": 120, "ZLEMA_SIGNAL": 120, "T3_SIGNAL": 120,
     "ADAPTIVE_MA": 120, "DECYCLER": 120, "SINEWAVE_SIGNAL": 120, "SSA_SIGNAL": 120,
+    "NADARAYA_WATSON": 120, "FRACTIONAL_DIFF": 120,
     "MKT_STRUCTURE": 120, "TRIANGLE": 120,
     "CYBER_CYCLE": 30, "FISHER_RSI": 30, "EBSW": 30, "RMI": 30, "ZSCORE": 30,
     "MMI_SIGNAL": 30, "VR_SIGNAL": 30, "FRACTAL": 30, "ENTROPY": 30,
@@ -261,7 +262,8 @@ BOCD_NARRATIVE_SYNC_THR = 0.60
 # Группы методов для условия 2 (независимость голосов)
 _GATE_GROUPS: dict[str, frozenset] = {
     "trend": frozenset({"PRICE_TREND", "TREND_QUALITY", "ZLEMA_SIGNAL", "T3_SIGNAL",
-                        "ADAPTIVE_MA", "SINEWAVE_SIGNAL", "SSA_SIGNAL"}),
+                        "ADAPTIVE_MA", "SINEWAVE_SIGNAL", "SSA_SIGNAL",
+                        "NADARAYA_WATSON", "FRACTIONAL_DIFF"}),
     "volume": frozenset({"VOL_MOMENTUM", "KLINGER", "VZO", "TWIGGS", "BS_PRESSURE"}),
     "oscillator": frozenset({"FISHER_RSI", "RMI", "ZSCORE"}),
     "structure": frozenset({"VWAP_SIGNAL", "CHANGE_POINT", "WICK_REJECTION", "VSA",
@@ -2102,6 +2104,112 @@ def score_ssa_signal(candles: list[HistoricCandle]) -> float:
         return max(-1.0, min(1.0, math.tanh(dev * 30)))
     except Exception:
         return 0.0
+
+
+def score_nadaraya_watson(candles: list[HistoricCandle]) -> float:
+    """
+    NADARAYA_WATSON: ядерная регрессия с гауссовым ядром даёт гладкую
+    оценку «справедливой цены» без предположений о форме тренда.
+
+    Сигнал двухкомпонентный:
+    1. Наклон NW-линии за последние 5 баров → направление тренда
+    2. Отклонение текущей цены от NW-линии → mean-reversion потенциал
+
+    Итог: если тренд вверх и цена выше NW → слабый бычий сигнал (подтверждение);
+    если тренд вверх но цена сильно выше NW → риск перекупленности (ослабление);
+    если тренд вверх и цена ниже NW → сильный бычий сигнал (откат в тренде).
+    """
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 25:
+        return 0.0
+
+    # Ширина окна: ~30% длины ряда, минимум 8 баров
+    h = max(8.0, n * 0.30)
+
+    def nw(idx: int) -> float:
+        total_w = 0.0
+        total_wc = 0.0
+        for j in range(n):
+            w = math.exp(-0.5 * ((idx - j) / h) ** 2)
+            total_w += w
+            total_wc += w * closes[j]
+        return total_wc / (total_w + 1e-9)
+
+    nw_now  = nw(n - 1)
+    nw_prev = nw(n - 6)   # 5 баров назад — для оценки наклона
+
+    if nw_now <= 0 or nw_prev <= 0:
+        return 0.0
+
+    # Наклон NW-линии (нормированный)
+    slope = (nw_now - nw_prev) / (nw_prev * 5)   # % в бар
+    slope_signal = math.tanh(slope * 200)          # ±1 при наклоне ≥0.5% за 5 баров
+
+    # Отклонение цены от NW (mean-reversion компонента, знак инверсный к наклону)
+    dev = (closes[-1] - nw_now) / (nw_now + 1e-9)
+    # Если цена ниже NW при восходящем наклоне — усиливаем бычий сигнал
+    # Если цена выше NW при восходящем наклоне — ослабляем (риск перекупленности)
+    dev_signal = -math.tanh(dev * 50)             # инверсия: ниже NW → +, выше → −
+
+    # Итог: 60% наклон (тренд первичен) + 40% отклонение (mean-reversion вторично)
+    raw = slope_signal * 0.60 + dev_signal * 0.40
+    return float(max(-1.0, min(1.0, raw)))
+
+
+def score_fractional_diff(candles: list[HistoricCandle]) -> float:
+    """
+    FRACTIONAL_DIFF: дробное дифференцирование ряда цен с d=0.4.
+
+    Стандартная разность (d=1) убирает тренд но теряет всю память о прошлом.
+    Дробная (d∈(0,1)) делает ряд стационарнее чем цены, но сохраняет долгосрочную
+    память — важную для понимания где находимся в цикле.
+
+    Веса обрываются при |w_k| < threshold (fixed-width window).
+    Сигнал: знак + наклон frac-diff серии → направление «очищенного» тренда.
+    """
+    closes = [_to_f(c.close) for c in candles]
+    n = len(closes)
+    if n < 30:
+        return 0.0
+
+    d = 0.4       # оптимальный баланс: стационарность без потери памяти
+    threshold = 1e-4
+    window = min(n - 1, 40)
+
+    # Вычисляем веса w_k = (-1)^k * C(d, k)
+    weights = [1.0]
+    for k in range(1, window + 1):
+        w = weights[-1] * (d - k + 1) / k
+        if abs(w) < threshold:
+            break
+        weights.append(w)
+
+    wlen = len(weights)
+    if n < wlen:
+        return 0.0
+
+    # Применяем к концу ряда
+    def fd(idx: int) -> float:
+        return sum(weights[k] * closes[idx - k] for k in range(wlen))
+
+    fd_now  = fd(n - 1)
+    fd_prev = fd(n - 4)
+    fd_old  = fd(n - 9) if n >= wlen + 9 else fd_prev
+
+    # Знак текущего значения (≈ позиция цены относительно долгосрочного тренда)
+    # fd > 0 → цена выше своей взвешенной «памяти» → бычий контекст
+    sign_signal = math.tanh(fd_now / (abs(fd_now) + 1e-3) * abs(fd_now) / (closes[-1] * 0.005 + 1e-9))
+
+    # Наклон frac-diff серии — краткосрочный импульс в очищенном пространстве
+    slope = fd_now - fd_prev
+    slope_old = fd_prev - fd_old
+    # Ускорение наклона: нарастающий импульс сильнее одиночного значения
+    accel_mult = 1.2 if (slope > 0 and slope_old > 0) or (slope < 0 and slope_old < 0) else 0.8
+    slope_signal = math.tanh(slope / (closes[-1] * 0.002 + 1e-9)) * accel_mult
+
+    raw = sign_signal * 0.45 + slope_signal * 0.55
+    return float(max(-1.0, min(1.0, raw)))
 
 
 def score_hawkes_signal(candles: list[HistoricCandle]) -> float:
@@ -5495,7 +5603,9 @@ METHODS = [
     ("SINEWAVE_SIGNAL", score_sinewave_signal),
     # MMI_SIGNAL, YZ_VOL_SIGNAL, VR_SIGNAL убраны — режим без направления.
     # MMI → вето в __compute_scores; VR → __noise_stop_scale; YZ → REGIME_WEIGHT_MODS.
-    ("SSA_SIGNAL",     score_ssa_signal),
+    ("SSA_SIGNAL",        score_ssa_signal),
+    ("NADARAYA_WATSON",   score_nadaraya_watson),
+    ("FRACTIONAL_DIFF",   score_fractional_diff),
     ("HAWKES_SIGNAL",  score_hawkes_signal),
     ("VSA",            score_vsa),
     ("WICK_REJECTION", score_wick_rejection),
@@ -5596,7 +5706,9 @@ METHOD_TF_CONFIG: dict[str, dict] = {
     "DONCHIAN":       {"min_bars": 20, "weight_5m": 1.10},  # структура боковика лучше на 5м
     "MA_ENVELOPE":    {"min_bars": 22, "weight_5m": 1.10},
     "TWIGGS":         {"min_bars": 15, "weight_5m": 1.05},
-    "HAWKES_SIGNAL":  {"min_bars": 25, "weight_5m": 1.30},  # самоусиление потока
+    "HAWKES_SIGNAL":     {"min_bars": 25, "weight_5m": 1.30},
+    "NADARAYA_WATSON":   {"min_bars": 25, "weight_5m": 1.10},
+    "FRACTIONAL_DIFF":   {"min_bars": 30, "weight_5m": 1.10},
     "VSA":            {"min_bars": 12, "weight_5m": 1.05},
     "PRICE_ACCEL":    {"min_bars": 8,  "weight_5m": 1.10},  # ускорение/замедление баров
     "CUMUL_DELTA":    {"min_bars": 15, "weight_5m": 1.20},  # накопленная агрессия на 5м надёжнее

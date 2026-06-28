@@ -46,10 +46,9 @@ REGIME_WEIGHT_MODS = {
         "PRICE_TREND": 1.6, "MKT_STRUCTURE": 1.5, "ADAPTIVE_MA": 1.4, "DONCHIAN": 1.4,
         "ALLIGATOR": 1.3, "T3_SIGNAL": 1.3, "ZLEMA_SIGNAL": 1.3, "MAMA_FAMA": 1.3,
         "TWIGGS": 1.3, "IMPULSE_PULLBACK": 1.4,
+        "NADARAYA_WATSON": 1.3, "FRACTIONAL_DIFF": 1.3,
         "LEVEL_CONTEXT": 1.2, "SPRING": 1.1, "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
-        # Конверт в тренде работает в импульсном режиме (пробой границы)
         "MA_ENVELOPE": 1.2,
-        # Осцилляторы в тренде ненадёжны — приглушаем
         "SINEWAVE_SIGNAL": 0.7, "CYBER_PHASE": 0.7, "FISHER_RSI": 0.8, "ZSCORE": 0.8,
     },
     "trending_down": {
@@ -59,6 +58,7 @@ REGIME_WEIGHT_MODS = {
         "PRICE_TREND": 1.6, "MKT_STRUCTURE": 1.5, "ADAPTIVE_MA": 1.4, "DONCHIAN": 1.4,
         "ALLIGATOR": 1.3, "T3_SIGNAL": 1.3, "ZLEMA_SIGNAL": 1.3, "MAMA_FAMA": 1.3,
         "TWIGGS": 1.3, "IMPULSE_PULLBACK": 1.4,
+        "NADARAYA_WATSON": 1.3, "FRACTIONAL_DIFF": 1.3,
         "LEVEL_CONTEXT": 1.2, "SPRING": 1.1, "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
         "MA_ENVELOPE": 1.2,
         "SINEWAVE_SIGNAL": 0.7, "CYBER_PHASE": 0.7, "FISHER_RSI": 0.8, "ZSCORE": 0.8,
@@ -69,6 +69,7 @@ REGIME_WEIGHT_MODS = {
         "OB_IMBALANCE": 1.3, "CANCEL_SIGNAL": 1.2, "INST_OI": 1.0, "RETAIL_CONTRA": 0.9,
         # В боковике трендовые методы шумят — приглушаем
         "PRICE_TREND": 0.5, "MKT_STRUCTURE": 0.7, "ADAPTIVE_MA": 0.6, "DONCHIAN": 0.6, "MA_ENVELOPE": 1.4,
+        "NADARAYA_WATSON": 0.7, "FRACTIONAL_DIFF": 0.8,
         "ALLIGATOR": 0.7, "T3_SIGNAL": 0.7, "ZLEMA_SIGNAL": 0.7, "MAMA_FAMA": 0.7,
         "TWIGGS": 0.7, "IMPULSE_PULLBACK": 0.8,
         "LEVEL_CONTEXT": 1.5, "SPRING": 1.3, "WICK_REJECTION": 1.5, "TRIANGLE": 1.6,
