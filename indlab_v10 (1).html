@@ -3890,7 +3890,11 @@ function applyPreset(id) {
     cpActiveCombo = id;
     cpRenderCombos();
     showToast('✓ ' + p.name, '#60A4A1');
-    setTimeout(function(){ if(chartCandles && chartCandles.length) chartRedraw(); }, 80);
+    setTimeout(function(){
+      if(chartCandles && chartCandles.length) chartRedraw();
+      // Автоматически открываем вкладку Анализ
+      cpSwitchTab('analysis');
+    }, 120);
     return;
   }
 
@@ -7651,6 +7655,16 @@ function _sysOptimalSection() {
     + '</div></details>';
 }
 
+function _sysActivateIds(ids) {
+  Object.keys(chartInds).forEach(k => { if(chartInds[k]) cpChartToggle(k); });
+  ids.forEach(id => { if(!chartInds[id]) cpChartToggle(id); });
+  showToast('✓ ' + ids.length + ' инд. активированы', '#C71B52');
+  setTimeout(() => {
+    if (chartCandles.length) chartRedraw();
+    cpSwitchTab('analysis');
+  }, 100);
+}
+
 function _sysActivateOptimal() {
   // Сначала выключаем всё что есть
   Object.keys(chartInds).forEach(k => {
@@ -7674,7 +7688,7 @@ function _sysRenderStaticSections() {
   const el = document.getElementById('sys-static-sections');
   if (!el) return;
 
-  function sec(emoji, title, rows) {
+  function sec(emoji, title, rows, chartIds) {
     const inner = rows.map(r => {
       const lc = r.lc || '#6F648F';
       return '<div style="margin-bottom:5px;">'
@@ -7682,10 +7696,14 @@ function _sysRenderStaticSections() {
         + '<div style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.55;">' + r.text + '</div>'
         + '</div>';
     }).join('');
+    const idsJson = chartIds ? JSON.stringify(chartIds) : null;
+    const btn = idsJson
+      ? '<button onclick="_sysActivateIds(' + idsJson.replace(/"/g,"'") + ')" style="margin-top:8px;width:100%;padding:5px;background:rgba(199,27,82,0.12);border:1px solid rgba(199,27,82,0.3);border-radius:6px;color:#C71B52;font-family:var(--mono);font-size:10px;cursor:pointer;letter-spacing:0.04em;">▶ Активировать на графике · Анализ</button>'
+      : '';
     return '<details style="margin-bottom:8px;border:1px solid rgba(199,27,82,0.15);border-radius:6px;">'
       + '<summary style="cursor:pointer;padding:6px 10px;font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;list-style:none;display:flex;align-items:center;gap:6px;">'
       + '<span style="font-size:12px;">' + emoji + '</span>' + title + '</summary>'
-      + '<div style="padding:8px 10px 10px;">' + inner + '</div>'
+      + '<div style="padding:8px 10px 10px;">' + inner + btn + '</div>'
       + '</details>';
   }
 
@@ -7699,7 +7717,7 @@ function _sysRenderStaticSections() {
       {label:'→ Klinger', lc:IND, text:'Klinger в экстремуме вверх, но уровень не пробит = дивергенция. Деньги вроде входят, уровень держит. Это точка.'},
       {label:'Неклассика 2: Пульс поглощения', lc:NC, text:'Серия свечей: широкая→узкая→широкая→узкая при <b>нарастающем объёме</b>. Не одна свеча — ритм. Каждая широкая = попытка движения, узкая = остановка. Объём растёт = сопротивление ломается постепенно.'},
       {label:'→ EBS (Even Better Sinewave)', lc:IND, text:'EBS должен быть в амплитуде (размах растёт). Если размах EBS падает при пульсе VSA = ловушка, движение не состоится.'},
-    ]),
+    ], ['kvo','eom','vo','bb_width','ebs']),
 
     sec('🏗', 'Wyckoff', [
       {label:'Классика', lc:CL, text:'Spring → test → breakout как последовательность фаз накопления.'},
@@ -7709,7 +7727,7 @@ function _sysRenderStaticSections() {
       {label:'→ Fisher RSI', lc:IND, text:'В момент ложного пробоя — Fisher RSI в крайности одной стороны, потом резко переключается в противоположную. Два переключения в одной точке = охота за стопами подтверждена.'},
       {label:'Редкое: Двойной Wyckoff', lc:NC, text:'На часовом идёт phase 2 (accumulation). На минутном внутри боковика — свой spring/test/breakout. Когда минутный breakout совпадает с выходом часового из phase 2 в phase 3 = <b>каскад в полную силу</b>.'},
       {label:'→ Choppiness (час) + MAMA/FAMA (мин)', lc:IND, text:'Choppiness на часовом начинает падать (phase 2 заканчивается). MAMA/FAMA на минутном расходятся (phase 3 начинается). Оба одновременно = двойное ускорение.'},
-    ]),
+    ], ['chop','fisher','mama','bb_width','hist_vol']),
 
     sec('🏛', 'AMT · Auction Market Theory', [
       {label:'Классика', lc:CL, text:'Point of Control = уровень поддержки/сопротивления.'},
@@ -7717,7 +7735,7 @@ function _sysRenderStaticSections() {
       {label:'→ Donchian Channel', lc:IND, text:'Donchian асимметрия показывает с какой стороны прорыв. Много касаний максимума, редко минимума = прорыв вниз.'},
       {label:'Неклассика 2: VAL/VAH как границы хаоса', lc:NC, text:'Цена летит вниз из VAL — это пустая зона (там нет торговли), скорость максимальна. Как только вернётся в VAL = вернётся в зону торговли, там сопротивление. VAH и VAL — не уровни поддержки, а <b>границы пустоты</b>.'},
       {label:'→ ATR', lc:IND, text:'ATR вырос = цена в пустой зоне (спреды больше). ATR упал = цена в плотной зоне торговли. Подтверждает где сейчас идёт цена.'},
-    ]),
+    ], ['donchian','atr_w','bb_pct','vol']),
 
     sec('🌊', 'Order Flow', [
       {label:'Классика', lc:CL, text:'Дельта показывает купили или продали больше.'},
@@ -7725,7 +7743,7 @@ function _sysRenderStaticSections() {
       {label:'→ Z-score', lc:IND, text:'Дельта растёт + Z-score резко растёт = движение становится статистически значимым очень быстро. Опережающий сигнал.'},
       {label:'Неклассика 2: Стакан как кино', lc:NC, text:'Не где заявки стоят сейчас, а как они <b>переставляются</b>. Заявки исчезают чуть раньше агрессивного движения. Маркетмейкер убирает сопротивление перед тем как цена движется. Скрытие ликвидности = намерение раньше чем выполнится.'},
       {label:'→ Bollinger Squeeze', lc:IND, text:'Стакан сужается + заявки убираются одновременно. Двойной сигнал компрессии.'},
-    ]),
+    ], ['cum_delta','std_dev','force_idx','bb_width']),
 
     sec('🕯', 'Price Action', [
       {label:'Классика', lc:CL, text:'Паттерны свечей = сигналы входа.'},
@@ -7733,7 +7751,7 @@ function _sysRenderStaticSections() {
       {label:'→ Alligator', lc:IND, text:'Alligator разворачивается в сторону куда идут тени. Перекос теней + разворот Alligator = оба показывают одно направление.'},
       {label:'Неклассика 2: Угол свечей', lc:NC, text:'Свечи сжимаются (нитки) но угол каждой следующей становится <b>вертикальнее</b> (вверх или вниз). Энергия не в размере движения а в скорости. Вертикальная нитка = вот-вот выброс с ускорением.'},
       {label:'→ MAMA/FAMA', lc:IND, text:'Угол MAMA/FAMA тоже становится острее. Две независимые геометрии (свечи + линии) говорят одно — ускорение вот-вот.'},
-    ]),
+    ], ['alligator','mama','atr_w','bb_pct']),
 
     sec('🔗', 'Комбинации методов', [
       {label:'Вход в боковике (5+4)', lc:NC, text:'<b>VSA:</b> узкая свеча + объём + цена вверху → <b>Wyckoff:</b> это test → <b>AMT:</b> цена у POC → <b>Order Flow:</b> деньги входят → <b>Price Action:</b> тень вверх + откат.'},
@@ -7742,7 +7760,7 @@ function _sysRenderStaticSections() {
       {label:'Индикаторы предупреждают о выходе', lc:IND, text:'Klinger переключается (деньги выходят) · Fisher RSI выходит из крайности · EBS амплитуда падает · MAMA/FAMA сходятся (тренд ломается). Антисигналы загорелись = точка выхода.'},
       {label:'Тройной каскад (ускорение)', lc:NC, text:'VSA: спреды шире при объёме → Wyckoff: phase 3 (velocity) → Price Action: свечи вертикальнее. Плюс: Z-score резко растёт + ATR растёт + VZO в экстремуме. Все три = каскад в максимальную силу. Тейк переставляешь далеко.'},
       {label:'Ловушка Зуб (конфликт)', lc:NC, text:'VSA: объём есть → Wyckoff: ложный пробой → Order Flow: деньги входят не агрессивно. Плюс: Fisher RSI не в крайности + Klinger не в экстремуме + Z-score невысокий. Картина конфликтна = не входишь или очень маленько.'},
-    ]),
+    ], ['kvo','fisher','ebs','chop','cum_delta','mama','alligator']),
 
     sec('🧬', 'Мета-комбо осцилляторов', [
       {label:'Двойной Fisher', lc:NC, text:'Fisher Transform (CMO) + Fisher Transform (Williams %R). Два осциллятора, оба преобразованы Fisher-ом. Если оба в крайностях одновременно = <b>максимальный перегрев</b> состояния. Нормальный осциллятор в крайности даёт сигнал. Fisher-преобразованный в крайности = сигнал в степени.'},
@@ -7750,7 +7768,7 @@ function _sysRenderStaticSections() {
       {label:'Цикл + Ускорение', lc:NC, text:'DPO (деtrended Price Oscillator) + AC Oscillator (ускорение). DPO показывает <b>где ты находишься в цикле</b> (пик/дно/середина). AC показывает <b>как быстро</b> идёт движение. Вместе = полная картина фазы и энергии цикла.'},
       {label:'→ Как читать', lc:IND, text:'DPO разворачивается (пик/дно цикла) + AC начинает убывать = энергия цикла затухает, готовься к развороту. DPO в середине + AC растёт = цикл набирает скорость, движение ещё не исчерпано.'},
       {label:'Три убывающих = антисигнал', lc:NC, text:'AC убывает + MAMA/FAMA сходятся + EBS амплитуда падает. Три независимых показателя: убывание ускорения + конвергенция адаптивных MA + угасание волны. <b>Антисигнал продолжения</b> — готовься к развороту.'},
-    ]),
+    ], ['fisher','dpo','accel_osc','mama','ebs','cmo','wr']),
 
     _sysOptimalSection(),
 
@@ -7761,7 +7779,7 @@ function _sysRenderStaticSections() {
       {label:'Согласие денежного потока (здоровье каскада)', lc:NC, text:'На каскаде: OBV растёт в сторону + A/D растёт в сторону + Chaikin в экстремуме + MFI в верхней крайности + EOM высокий. Все пять согласны = каскад здоров, держи позицию. Один переключился = осторожно.'},
       {label:'Денежный скепсис (большая свеча = шум)', lc:NC, text:'Большая свеча на объёме выглядит как каскад. Проверяешь: EOM низкий (объём неэффективен) + CMF нейтральный (не концентрировался) + PVT не подтверждает + VO нет тренда (всплеск). Объём был, но это охота на стопах, не каскад. Не входить.'},
       {label:'Боковик максимального сжатия', lc:NC, text:'VO близко к нулю (нет тренда объёма) + EOM низкий (компрессия, деньги входят неэффективно) + NVI/PVI расходятся максимально (асимметрия максимальна) + CMF в экстремуме какой-то зоны (деньги накопились на краю). Денежный поток сжат = вот-вот выпустит.'},
-    ]),
+    ], ['obv','adline','cmf','mfi','eom','kvo','force_idx','pvt','nvi','vo']),
 
     sec('🌡', 'Волатильность · Комбо-паттерны', [
       {label:'Пятислойная компрессия (максимальный squeeze)', lc:NC, text:'1. BB Width на историческом minimum · 2. HV ниже своего 100-барного minimum · 3. Chaikin Vol сжимается (−20%+) · 4. StdDev в 2–3× ниже нормы · 5. ATR ниже своего среднего. Все пять = рынок в ненормальной тишине, выброс неизбежен. Ждёшь первый бар с объёмом и входишь.'},
@@ -7769,7 +7787,7 @@ function _sysRenderStaticSections() {
       {label:'Асимметрия спредов (куда давят)', lc:NC, text:'Chaikin Vol: верхние тени больше нижних = давление вверху, цена хочет вниз. Нижние тени больше = давление внизу, цена хочет вверх. + BB %B: если спред вверх а %B ниже 0.5 = разворотный сетап. Если спред вниз а %B выше 0.5 = антисигнал.'},
       {label:'Фильтр ложного объёма (волатильность vs объём)', lc:NC, text:'Большой объём без расширения волатильности (BB Width, HV, Chaikin Vol без изменений) = поглощение, не движение. Объём поглотили внутри диапазона. Наоборот: волатильность растёт без объёма = тонкий рынок, манипуляция. Настоящий пробой = и объём и волатильность растут вместе.'},
       {label:'Волатильность vs объём (идеальный вход)', lc:NC, text:'HV падает к минимуму + BB Width squeeze + Chaikin Vol −20% (сжатие подтверждено тремя мерами). Объём при этом выше нормы. Объём аккумулируется в тихий период = крупный входит незаметно. Когда волатильность взорвётся = каскад поддержан.'},
-    ]),
+    ], ['bb_width','hist_vol','chaikin_vol','std_dev','atr_w','bb_pct']),
 
     sec('📈', 'Трендовые инструменты · Комбо', [
       {label:'Особенность всех трендовых', lc:'#6F648F', text:'Все запаздывают на начало тренда, но опережают на конец. SAR/SuperTrend/DMI видят когда тренд ломается раньше чем цена показывает разворот. Главное применение — не ловить вход, а видеть когда тренд заканчивается.'},
@@ -7779,7 +7797,7 @@ function _sysRenderStaticSections() {
       {label:'Фаза тренда (SAR + McGinley)', lc:NC, text:'SAR близко + McGinley быстро адаптирует = тренд рассыпается (конец phase 3). SAR далеко + McGinley стабильно ползёт = тренд здоров (phase 3 середина). SAR далеко + McGinley только развернулась = тренд начался (phase 2→3). Видит какая фаза Wyckoff сейчас.'},
       {label:'Волатильность тренда (Envelopes+ST+DMI)', lc:NC, text:'Envelopes расширяются + SuperTrend отдаляется + ADX растёт — все три = каскад набирает силу. Если какой-то остановился = каскад на финише.'},
       {label:'Согласие всех восьми', lc:NC, text:'SAR не переключается + SuperTrend широкий + Elder Impulse один цвет + Elder Ray максимальная асимметрия + Vortex в экстремуме расхождения + ADX в пике + McGinley стабильна + Envelopes максимальные. Все восемь в одну сторону на нитке = выброс 100%.'},
-    ]),
+    ], ['supertrend','dmi','vortex','elder_ray','elder_impulse','adx','mcginley','envelopes']),
 
   ].join('');
 }
@@ -12054,6 +12072,20 @@ function _renderAnalysisInner(panel) {
 
   let html = '';
 
+  // ─── КАРТОЧКА АКТИВНОГО КОМБО — если выбран пресет ──────────────────────────
+  if (typeof cpActiveCombo !== 'undefined' && cpActiveCombo) {
+    const _cp = (typeof COMBO_PRESETS !== 'undefined' ? COMBO_PRESETS : []).find(x => x.id === cpActiveCombo);
+    if (_cp) {
+      const rulesHtml = (_cp.rules || []).map(r => `<div class="analysis-item analysis-neutral" style="margin-left:4px"><span class="analysis-dot" style="color:#7B61FF">▸</span><span>${r}</span></div>`).join('');
+      html += `<div class="analysis-card" style="border-left-color:#7B61FF;margin-bottom:10px">
+        <div class="analysis-card-title" style="color:#D65CFF">${_cp.icon||'◈'} ${_cp.name}</div>
+        <div class="analysis-items">
+          ${rulesHtml}
+          ${_cp.read ? `<div class="analysis-item analysis-neutral" style="margin-top:6px;opacity:.9"><span class="analysis-dot" style="color:#52F2C9">📖</span><span style="white-space:pre-line">${_cp.read}</span></div>` : ''}
+        </div></div>`;
+    }
+  }
+
   // ─── АНТИСИГНАЛЫ — всегда первый блок ───────────────────────────────────────
   if (candles.length >= 40) {
     const n = candles.length;
@@ -13575,7 +13607,7 @@ function _renderAnalysisInner(panel) {
         ));
         html += makeCard('Awesome Oscillator / Чудесный осциллятор', items, 'ao');
       }
-    } else if (idL === 'acc_dist' || idL === 'ad_line') {
+    } else if (idL === 'acc_dist' || idL === 'ad_line' || idL === 'adline') {
       const n = candles.length;
       if (n >= 20) {
         const items = [];
