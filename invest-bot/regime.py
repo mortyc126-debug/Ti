@@ -46,9 +46,11 @@ REGIME_WEIGHT_MODS = {
         "PRICE_TREND": 1.6, "MKT_STRUCTURE": 1.5, "ADAPTIVE_MA": 1.4, "DONCHIAN": 1.4,
         "ALLIGATOR": 1.3, "T3_SIGNAL": 1.3, "ZLEMA_SIGNAL": 1.3, "MAMA_FAMA": 1.3,
         "TWIGGS": 1.3, "IMPULSE_PULLBACK": 1.4,
-        "NADARAYA_WATSON": 1.3, "FRACTIONAL_DIFF": 1.3,
+        # NW хорошо чувствует «справедливую цену» в тренде; FracDiff нейтрален → умеренно
+        "NADARAYA_WATSON": 1.3, "FRACTIONAL_DIFF": 1.1,
         "LEVEL_CONTEXT": 1.2, "SPRING": 1.1, "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
-        "MA_ENVELOPE": 1.2,
+        # MA_ENVELOPE: за=55% WR в trending_up, чёткое разделение → поднимаем
+        "MA_ENVELOPE": 1.4,
         "SINEWAVE_SIGNAL": 0.7, "CYBER_PHASE": 0.7, "FISHER_RSI": 0.8, "ZSCORE": 0.8,
     },
     "trending_down": {
@@ -58,9 +60,11 @@ REGIME_WEIGHT_MODS = {
         "PRICE_TREND": 1.6, "MKT_STRUCTURE": 1.5, "ADAPTIVE_MA": 1.4, "DONCHIAN": 1.4,
         "ALLIGATOR": 1.3, "T3_SIGNAL": 1.3, "ZLEMA_SIGNAL": 1.3, "MAMA_FAMA": 1.3,
         "TWIGGS": 1.3, "IMPULSE_PULLBACK": 1.4,
-        "NADARAYA_WATSON": 1.3, "FRACTIONAL_DIFF": 1.3,
+        # NW: за=62% WR в trending_down → поднимаем; FracDiff за=42% → приглушаем
+        "NADARAYA_WATSON": 1.4, "FRACTIONAL_DIFF": 0.9,
         "LEVEL_CONTEXT": 1.2, "SPRING": 1.1, "WICK_REJECTION": 1.2, "TRIANGLE": 1.3,
-        "MA_ENVELOPE": 1.2,
+        # MA_ENVELOPE: за=55%/против=27% — сильный разрыв → высокий вес
+        "MA_ENVELOPE": 1.5,
         "SINEWAVE_SIGNAL": 0.7, "CYBER_PHASE": 0.7, "FISHER_RSI": 0.8, "ZSCORE": 0.8,
     },
     "ranging": {
@@ -69,7 +73,9 @@ REGIME_WEIGHT_MODS = {
         "OB_IMBALANCE": 1.3, "CANCEL_SIGNAL": 1.2, "INST_OI": 1.0, "RETAIL_CONTRA": 0.9,
         # В боковике трендовые методы шумят — приглушаем
         "PRICE_TREND": 0.5, "MKT_STRUCTURE": 0.7, "ADAPTIVE_MA": 0.6, "DONCHIAN": 0.6, "MA_ENVELOPE": 1.4,
-        "NADARAYA_WATSON": 0.7, "FRACTIONAL_DIFF": 0.8,
+        # NW в боковике даёт контрарный сигнал (против=70% WR) — но как directional vote мешает → снижаем
+        # FracDiff нейтрален в ranging → умеренно
+        "NADARAYA_WATSON": 0.5, "FRACTIONAL_DIFF": 0.7,
         "ALLIGATOR": 0.7, "T3_SIGNAL": 0.7, "ZLEMA_SIGNAL": 0.7, "MAMA_FAMA": 0.7,
         "TWIGGS": 0.7, "IMPULSE_PULLBACK": 0.8,
         "LEVEL_CONTEXT": 1.5, "SPRING": 1.3, "WICK_REJECTION": 1.5, "TRIANGLE": 1.6,
@@ -84,6 +90,8 @@ REGIME_WEIGHT_MODS = {
         "ALLIGATOR": 0.7, "T3_SIGNAL": 0.7, "ZLEMA_SIGNAL": 0.7, "MAMA_FAMA": 0.7,
         "TWIGGS": 0.7, "IMPULSE_PULLBACK": 0.9,
         "LEVEL_CONTEXT": 1.3, "SPRING": 0.7, "WICK_REJECTION": 0.8, "TRIANGLE": 0.7,
+        # high_vol: мало данных (11 сделок), NW против=100% — осторожно снижаем как directional
+        "MA_ENVELOPE": 0.9, "NADARAYA_WATSON": 0.7, "FRACTIONAL_DIFF": 0.8,
         "SINEWAVE_SIGNAL": 0.8, "CYBER_PHASE": 0.8, "FISHER_RSI": 0.9, "ZSCORE": 0.9,
     },
     "low_vol": {
@@ -95,7 +103,10 @@ REGIME_WEIGHT_MODS = {
         "ALLIGATOR": 0.8, "T3_SIGNAL": 0.8, "ZLEMA_SIGNAL": 0.8, "MAMA_FAMA": 0.8,
         "TWIGGS": 0.8, "IMPULSE_PULLBACK": 0.9,
         "LEVEL_CONTEXT": 1.1, "SPRING": 1.4, "WICK_REJECTION": 1.4, "TRIANGLE": 1.5,
-        "MA_ENVELOPE": 1.3,
+        # MA_ENVELOPE в low_vol: за/против ~60% — нейтрально, оставляем умеренно
+        # NW в low_vol: контрарный (против=70%), как directional vote — ненадёжен → приглушаем
+        # FracDiff в low_vol: за=61% → полезен
+        "MA_ENVELOPE": 1.1, "NADARAYA_WATSON": 0.6, "FRACTIONAL_DIFF": 1.2,
         "SINEWAVE_SIGNAL": 1.2, "CYBER_PHASE": 1.2, "FISHER_RSI": 1.1, "ZSCORE": 1.1,
     },
     "stress": {
@@ -103,8 +114,9 @@ REGIME_WEIGHT_MODS = {
         "VWAP_SIGNAL": 0.4, "VWAP_SIGNAL_TS": 0.4, "VOL_MOMENTUM": 0.5, "VOL_MOMENTUM_TS": 0.5,
         "OB_IMBALANCE": 0.5, "CANCEL_SIGNAL": 0.9, "INST_OI": 1.5, "RETAIL_CONTRA": 1.5, "PRICE_TREND": 0.3,
         "MKT_STRUCTURE": 0.3, "LEVEL_CONTEXT": 0.5, "SPRING": 0.3,
-        # Стресс: паника ломает любые паттерны
+        # Стресс: паника ломает любые паттерны, новые методы тоже приглушаем
         "WICK_REJECTION": 0.4, "TRIANGLE": 0.3,
+        "MA_ENVELOPE": 0.5, "NADARAYA_WATSON": 0.5, "FRACTIONAL_DIFF": 0.6,
     },
 }
 
