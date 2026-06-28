@@ -978,9 +978,13 @@ input[type=range] { touch-action: none; }
           <div class="cpnl-hdr"><span class="cpnl-lbl">MACD</span><span class="cpnl-val" id="chart-macd-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="macd" title="Скрыть">◉</span><span class="cpnl-del" data-id="macd" title="Убрать">✕</span></div>
           <canvas id="chart-macd-canvas" style="width:100%;height:78px;display:block;"></canvas>
         </div>
-        <!-- Альт-версии активных индикаторов: одна общая панель, линии score -2..2 -->
-        <div id="chart-altind-panel" style="display:none;height:90px;position:relative;border-top:1px solid rgba(255,0,110,0.15);">
-          <div class="cpnl-hdr"><span class="cpnl-lbl" style="color:#FF006E;">Альт</span><span id="chart-altind-legend" style="flex:1;font-size:9px;color:var(--text3);font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></span></div>
+        <!-- Альт-версии индикаторов: панель с выбором и графиком score -2..2 -->
+        <div id="chart-altind-panel" style="display:none;position:relative;border-top:1px solid rgba(255,0,110,0.15);">
+          <div class="cpnl-hdr" style="flex-wrap:wrap;gap:2px;height:auto;padding:4px 8px;min-height:24px;">
+            <span class="cpnl-lbl" style="color:#FF006E;flex-shrink:0;">Альт-сигналы</span>
+            <span id="chart-altind-legend" style="flex:1;font-size:9px;color:var(--text3);font-family:var(--mono);white-space:normal;line-height:1.6;"></span>
+          </div>
+          <div id="chart-altind-picker" style="padding:4px 8px 6px;display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid rgba(255,0,110,0.08);"></div>
           <canvas id="chart-altind-canvas" style="width:100%;height:90px;display:block;"></canvas>
         </div>
         <div id="chart-stoch-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
@@ -5841,34 +5845,76 @@ function chartRedraw() {
 function _chartDrawAltInd() {
   const panel = document.getElementById('chart-altind-panel');
   const legend = document.getElementById('chart-altind-legend');
+  const picker = document.getElementById('chart-altind-picker');
   if (!panel) return;
   if (typeof _ilAggGetSeries !== 'function' || !chartCandles.length) { panel.style.display = 'none'; return; }
   const cache = _ilAggGetSeries();
   if (!cache) { panel.style.display = 'none'; return; }
-  const candidates = Object.keys(chartInds).filter(id => chartInds[id])
+
+  // Все индикаторы у которых есть alt-формула — независимо от chartInds
+  const allWithAlt = (typeof IL_INDICATORS !== 'undefined' ? IL_INDICATORS : [])
     .map(id => ({ id, it: _ilAggIndScore(id, cache) }))
     .filter(x => x.it && x.it.hasAlt);
-  const activeAlt = candidates.filter(x => x.it.useAlt);
-  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0'];
+  if (!allWithAlt.length) { panel.style.display = 'none'; return; }
+
+  const activeAlt = allWithAlt.filter(x => x.it.useAlt);
+  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0','#FF9F40','#A78BFA'];
+
+  // Легенда активных (активные рисуются на canvas)
   if (legend) {
-    const onChips = activeAlt.map((x,i) => {
-      const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-      const tip = 'Клик — вернуть классику. Чем альт отличается: ' + (x.it.altDesc || '');
-      return `<span onclick="ilAggToggleAlt('${x.id}')" title="${tip.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
-    }).join('');
-    const offCandidates = candidates.filter(x => !x.it.useAlt);
-    const offChips = offCandidates.map(x => {
-      const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-      const tip = 'Клик — показать альт-версию. Чем отличается: ' + (x.it.altDesc || '');
-      return `<span onclick="ilAggToggleAlt('${x.id}')" title="${tip.replace(/"/g,'&quot;')}" style="cursor:pointer;opacity:.45;margin-right:8px;">+ ${name}</span>`;
-    }).join('');
-    legend.innerHTML = onChips + (offChips ? `<span style="opacity:.5;">| доступно: </span>${offChips}` : '');
+    if (activeAlt.length) {
+      legend.innerHTML = activeAlt.map((x,i) => {
+        const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
+        return `<span style="color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
+      }).join('') + '<span style="color:#4a4060;font-size:8px;">· кликни чип ниже чтобы убрать</span>';
+    } else {
+      legend.innerHTML = '<span style="color:#4a4060;">Выбери индикаторы ниже →</span>';
+    }
   }
-  if (!activeAlt.length) { panel.style.display = candidates.length ? 'block' : 'none'; if(!candidates.length) return; }
-  else panel.style.display = 'block';
+
+  // Пикер: все доступные индикаторы по группам (6 семейств)
+  if (picker) {
+    // Группируем по семейству
+    const byFam = {};
+    const famOrder = ['osc','trend','channel','volume','structure','dsp'];
+    const famLabel = { osc:'Осциллятор', trend:'Тренд', channel:'Канал', volume:'Объём', structure:'Структура', dsp:'DSP' };
+    const famColor = { osc:'#A78BFA', trend:'#52F2C9', channel:'#FF9F40', volume:'#60A4A1', structure:'#6366F1', dsp:'#7A8CFF' };
+    allWithAlt.forEach(x => {
+      const fam = typeof _ilAltFamilyOf === 'function' ? _ilAltFamilyOf(x.id) : null;
+      if (!fam) return;
+      if (!byFam[fam]) byFam[fam] = [];
+      byFam[fam].push(x);
+    });
+    let html = '';
+    famOrder.forEach(fam => {
+      if (!byFam[fam] || !byFam[fam].length) return;
+      const col = famColor[fam];
+      const tip = (typeof _IL_ALT_FAMILY_DESC !== 'undefined' && _IL_ALT_FAMILY_DESC[fam]) || '';
+      html += `<span title="${tip.replace(/"/g,'&quot;')}" style="font-size:8px;color:${col};font-family:var(--mono);opacity:.7;margin-right:2px;align-self:center;">${famLabel[fam]}:</span>`;
+      byFam[fam].forEach(x => {
+        const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
+        const on = x.it.useAlt;
+        const indTip = (tip + (on ? ' [АКТИВЕН — кликни чтобы убрать]' : ' [кликни чтобы показать на графике]')).replace(/"/g,'&quot;');
+        html += `<span onclick="ilAggToggleAlt('${x.id}')" title="${indTip}"
+          style="cursor:pointer;font-size:9px;padding:2px 7px;border-radius:10px;font-family:var(--mono);
+          background:${on?col+'22':'rgba(255,255,255,0.04)'};
+          color:${on?col:'#5a5070'};
+          border:1px solid ${on?col+'55':'rgba(255,255,255,0.08)'};
+          font-weight:${on?'600':'400'};">
+          ${on?'● ':''}${name}</span>`;
+      });
+      html += `<span style="color:rgba(255,255,255,0.06);margin:0 4px;">|</span>`;
+    });
+    picker.innerHTML = html;
+  }
+
+  panel.style.display = 'block';
+
   const cv = document.getElementById('chart-altind-canvas');
   if (!cv) return;
-  const dpr = devicePixelRatio || 1, W = cv.offsetWidth, H = cv.offsetHeight;
+  if (!activeAlt.length) { cv.style.display = 'none'; return; }
+  cv.style.display = 'block';
+  const dpr = devicePixelRatio || 1, W = cv.offsetWidth, H = cv.offsetHeight || 90;
   if (!W || !H) return;
   cv.width = W*dpr; cv.height = H*dpr;
   const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0,0,W,H);
