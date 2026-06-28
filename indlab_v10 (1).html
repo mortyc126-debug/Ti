@@ -8233,9 +8233,10 @@ function _cpPriceFromY(y, H, W) {
 function _cpDrawMeasure(x0, y0, x1, y1) {
   const xc = document.getElementById('chart-xhair');
   const mc = document.getElementById('chart-main');
-  if (!xc || !mc) return;
+  if (!xc || !mc) { console.log('[measure] no xc or mc'); return; }
   const dpr = devicePixelRatio || 1;
   const W = mc.offsetWidth, H = mc.offsetHeight;
+  console.log('[measure] draw W=', W, 'H=', H, 'candles=', chartCandles.length);
   xc.width = W * dpr; xc.height = H * dpr;
   const ctx = xc.getContext('2d');
   ctx.scale(dpr, dpr);
@@ -8245,7 +8246,7 @@ function _cpDrawMeasure(x0, y0, x1, y1) {
   const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
   const i0 = _cpIdxFromX(x0, W), i1 = _cpIdxFromX(x1, W);
   const p0 = _cpPriceFromY(y0, H, W), p1 = _cpPriceFromY(y1, H, W);
-  if (p0 == null || p1 == null) return;
+  if (p0 == null || p1 == null) { console.log('[measure] p0/p1 null, scale=', _cpGetScale(W)); return; }
   const up = p1 >= p0;
   const col = up ? '#52F2C9' : '#FF4D7A';
 
@@ -10823,6 +10824,7 @@ function cpInitCanvasEvents() {
     if (chartMeasureMode) {
       const rect = c.getBoundingClientRect();
       meas0 = { x: e.clientX-rect.left, y: e.clientY-rect.top };
+      console.log('[measure] mousedown meas0=', meas0, 'rect=', rect.width, rect.height);
       return;
     }
     dx0=e.clientX; off0=chartOffset; c.style.cursor='grabbing';
@@ -10830,6 +10832,7 @@ function cpInitCanvasEvents() {
   window.addEventListener('mousemove', e => {
     if (meas0) {
       const rect = c.getBoundingClientRect();
+      console.log('[measure] mousemove', e.clientX-rect.left, e.clientY-rect.top);
       _cpDrawMeasure(meas0.x, meas0.y, e.clientX-rect.left, e.clientY-rect.top);
       return;
     }
