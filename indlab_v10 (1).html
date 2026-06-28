@@ -7400,7 +7400,7 @@ function _pSetup(id){
 // ── Draw line on sub-panel (windowed) ────────────────
 function _pl(ctx,W,H,arr,col,lw,si,ei,xOf,toY){
   ctx.save();ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=lw||1.5;let f=true;
-  for(let i=si;i<ei;i++){if(arr[i]==null){f=true;continue;}const x=xOf(i-si),y=toY(arr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
+  for(let i=si;i<ei;i++){if(arr[i]==null){f=true;continue;};const x=xOf(i-si),y=toY(arr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
   ctx.stroke();ctx.restore();
 }
 function _pLabel(ctx,txt,col){ctx.save();ctx.font='9px monospace';ctx.fillStyle=col||'rgba(112,128,168,0.8)';ctx.fillText(txt,6,11);ctx.restore();}
@@ -7448,13 +7448,13 @@ function _indDrawOverlay(id){
     ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
     if(dash)ctx.setLineDash(dash);
     ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=lw||1.5;let f=true;
-    for(let i=startIdx;i<endIdx;i++){if(arr[i]==null){f=true;continue;}const x=xOf(i-startIdx),y=toY(arr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
+    for(let i=startIdx;i<endIdx;i++){if(arr[i]==null){f=true;continue;};const x=xOf(i-startIdx),y=toY(arr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
     ctx.stroke();ctx.setLineDash([]);ctx.restore();
   };
   const fillBand=(up,dn,col,alpha)=>{
     ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();ctx.globalAlpha=alpha||0.04;
     ctx.beginPath();let f=true;
-    for(let i=startIdx;i<endIdx;i++){if(up[i]==null){f=true;continue;}const x=xOf(i-startIdx),y=toY(up[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
+    for(let i=startIdx;i<endIdx;i++){if(up[i]==null){f=true;continue;};const x=xOf(i-startIdx),y=toY(up[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
     for(let i=endIdx-1;i>=startIdx;i--){if(dn[i]==null)continue;ctx.lineTo(xOf(i-startIdx),toY(dn[i]));}
     ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.restore();
   };
@@ -7551,7 +7551,7 @@ function _indDrawOverlay(id){
       const thresh=0.05,pts=[];let dir=0,lH=chartCandles[0].high,lL=chartCandles[0].low,lHi=0,lLi=0;
       for(let i=1;i<n;i++){if(dir>=0&&chartCandles[i].high>lH){lH=chartCandles[i].high;lHi=i;}if(dir<=0&&chartCandles[i].low<lL){lL=chartCandles[i].low;lLi=i;}if(dir>=0&&chartCandles[i].low<lH*(1-thresh)){pts.push({i:lHi,p:lH});dir=-1;lL=chartCandles[i].low;lLi=i;}else if(dir<=0&&chartCandles[i].high>lL*(1+thresh)){pts.push({i:lLi,p:lL});dir=1;lH=chartCandles[i].high;lHi=i;}}
       ctx.save();ctx.strokeStyle='rgba(255,215,0,0.8)';ctx.lineWidth=1.5;ctx.beginPath();let f=true;
-      pts.forEach(pt=>{if(pt.i<startIdx||pt.i>=endIdx){f=true;return;}const y=toY(pt.p),x=xOf(pt.i-startIdx);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;});
+      pts.forEach(pt=>{if(pt.i<startIdx||pt.i>=endIdx){f=true;return;};const y=toY(pt.p),x=xOf(pt.i-startIdx);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;});
       ctx.stroke();ctx.restore();
     }
   } catch(e){console.warn('overlay',id,e);}
@@ -7595,12 +7595,12 @@ function _indDrawPanel(id){
     if(id==='bb_pct'){
       const bb=_chartCalcBB(closes,20,2);
       const pct=bb.map((b,i)=>b&&(b.upper-b.lower)>0?(closes[i]-b.lower)/(b.upper-b.lower)*100:null);
-      drawRange(pct,'#4cc9f0',20,80);_pLabel(ctx,'%B');
+      drawRange(pct,'#4cc9f0',20,80)
       const lv=pct.filter(v=>v!=null).pop()||50;setPill('chart-bb_pct-badge',lv>80?'sell-strong':lv<20?'buy-strong':lv>60?'sell':lv<40?'buy':'neutral');
     } else if(id==='bb_width'){
       const bb=_chartCalcBB(closes,20,2);
       const w=bb.map((b,i)=>b&&b.mid?(b.upper-b.lower)/b.mid*100:null);
-      drawLine(w,'#4cc9f0',1.5);_pLabel(ctx,'BB Width');
+      drawLine(w,'#4cc9f0',1.5)
       const vs=w.filter(v=>v!=null),lv=vs.pop()||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);
       setPill('chart-bb_width-badge',lv>avg*1.5?'sell':lv<avg*0.5?'buy':'neutral');
     } else if(id==='chaikin_osc'){
@@ -7608,21 +7608,21 @@ function _indDrawPanel(id){
       let s=0;const ad=mfv.map(v=>{s+=v;return s;});
       const fast=_iEMA(ad,3),slow=_iEMA(ad,10);
       const osc=fast.map((v,i)=>v!=null&&slow[i]!=null?v-slow[i]:null);
-      drawOsc(osc,'#4cc9f0');_pLabel(ctx,'Chaikin Osc');
+      drawOsc(osc,'#4cc9f0')
       const lv=osc.filter(v=>v!=null).pop()||0;setPill('chart-chaikin_osc-badge',lv>0?'buy':'sell');
     } else if(id==='adline'){
       const mfv=cn.map(c=>(c.high-c.low)>0?((c.close-c.low)-(c.high-c.close))/(c.high-c.low)*(c.vol||0):0);
       let s=0;const ad=mfv.map(v=>{s+=v;return s;});
-      drawLine(ad,'#52F2C9',1.5);_pLabel(ctx,'A/D Line','rgba(82,242,194,0.85)');
+      drawLine(ad,'#52F2C9',1.5)
       const lv=ad[n-1],pv=ad[Math.max(0,n-10)];setPill('chart-adline-badge',lv>pv?'buy':'sell');
     } else if(id==='cmf'){
       const cmf=closes.map((_,i)=>{if(i<19)return null;let sv=0,sv2=0;for(let j=i-19;j<=i;j++){const c=cn[j],hl=c.high-c.low;sv+=(hl>0?((c.close-c.low)-(c.high-c.close))/hl:0)*(c.vol||0);sv2+=(c.vol||0);}return sv2?sv/sv2:null;});
-      drawOsc(cmf,'#4cc9f0');_pLabel(ctx,'CMF');
+      drawOsc(cmf,'#4cc9f0')
       const lv=cmf.filter(v=>v!=null).pop()||0;setPill('chart-cmf-badge',lv>0.1?'buy-strong':lv>0?'buy':lv<-0.1?'sell-strong':'sell');
     } else if(id==='chaikin_vol'){
       const hl=cn.map(c=>c.high-c.low),e=_iEMA(hl,10);
       const cv=e.map((v,i)=>i>=10&&e[i-10]?(((v||0)-e[i-10])/(e[i-10]||1))*100:null);
-      drawOsc(cv,'#4cc9f0');_pLabel(ctx,'Chaikin Vol');
+      drawOsc(cv,'#4cc9f0')
       const lv=cv.filter(v=>v!=null).pop()||0;setPill('chart-chaikin_vol-badge',lv>5?'sell':lv<-5?'buy':'neutral');
     } else if(id==='accel_osc'){
       const mid=cn.map(c=>(c.high+c.low)/2);
@@ -7631,8 +7631,7 @@ function _indDrawPanel(id){
       const sc=_oscScale(ac,startIdx,endIdx,H);if(!sc)return;
       _pGrid(ctx,W,sc.zero);
       const bw=Math.max(1,(W/visN)*0.6);
-      ac.forEach((v,i)=>{if(v==null||i<startIdx||i>=endIdx)return;const prev=ac.slice(0,i).filter(x=>x!=null).pop();ctx.fillStyle=prev==null||v>=prev?'rgba(96,164,161,0.65)':'rgba(199,27,82,0.65)';const bh=Math.abs(sc.toY(v)-sc.zero);ctx.fillRect(xOf(i-startIdx)-bw/2,v>=0?sc.zero-bh:sc.zero,bw,Math.max(bh,1));});
-      _pLabel(ctx,'Accel Osc');
+      ac.forEach((v,i)=>{if(v==null||i<startIdx||i>=endIdx)return;const prev=ac.slice(0,i).filter(x=>x!=null).pop();ctx.fillStyle=prev==null||v>=prev?'rgba(96,164,161,0.65)':'rgba(199,27,82,0.65)';const bh=Math.abs(sc.toY(v)-sc.zero);ctx.fillRect(xOf(i-startIdx)-bw/2,v>=0?sc.zero-bh:sc.zero,bw,Math.max(bh,1));})
       const lv=ac.filter(v=>v!=null).pop()||0;setPill('chart-accel_osc-badge',lv>0?'buy':'sell');
     } else if(id==='elder_ray'){
       const ema13=_iEMA(closes,13);
@@ -7640,12 +7639,11 @@ function _indDrawPanel(id){
       const bear=lows.map((l,i)=>ema13[i]?l-ema13[i]:null);
       const all=[...bull.slice(startIdx,endIdx),...bear.slice(startIdx,endIdx)].filter(v=>v!=null);
       const maxV=Math.max(...all.map(Math.abs),0.001),ys=H/2/maxV;
-      _pGrid(ctx,W,H/2);drawBars(bull,'rgba(96,164,161,0.55)','rgba(199,27,82,0.55)',H/2,ys);drawBars(bear,'rgba(96,164,161,0.35)','rgba(199,27,82,0.35)',H/2,ys);
-      _pLabel(ctx,'Elder Ray');
+      _pGrid(ctx,W,H/2);drawBars(bull,'rgba(96,164,161,0.55)','rgba(199,27,82,0.55)',H/2,ys);drawBars(bear,'rgba(96,164,161,0.35)','rgba(199,27,82,0.35)',H/2,ys)
       const lb=bull.filter(v=>v!=null).pop()||0,lbr=bear.filter(v=>v!=null).pop()||0;setPill('chart-elder_ray-badge',lb>0&&lbr>-lb?'buy':lbr<0&&lb<Math.abs(lbr)?'sell':'neutral');
     } else if(id==='force_idx'){
       const fi=closes.map((c,i)=>i===0?null:(c-closes[i-1])*(cn[i].vol||0));
-      drawOsc(_iEMA(fi.map(v=>v||0),13),'#4cc9f0');_pLabel(ctx,'Force Index');
+      drawOsc(_iEMA(fi.map(v=>v||0),13),'#4cc9f0')
       const sm=_iEMA(fi.map(v=>v||0),13);const lv=sm.filter(v=>v!=null).pop()||0;setPill('chart-force_idx-badge',lv>0?'buy':'sell');
     } else if(id==='elder_impulse'){
       const ema13=_iEMA(closes,13);
@@ -7655,31 +7653,29 @@ function _indDrawPanel(id){
       const hist=macdL.map((v,i)=>{const s=sigL[i];return v&&s?v-s:null;});
       const imp=ema13.map((v,i)=>{if(!v||!i||!ema13[i-1]||hist[i]==null||hist[i-1]==null)return null;const eu=v>ema13[i-1],hu=hist[i]>hist[i-1];return eu&&hu?1:(!eu&&!hu)?-1:0;});
       _pGrid(ctx,W,H/2);const bw=Math.max(1,(W/visN)*0.9);
-      imp.forEach((v,i)=>{if(v==null||i<startIdx||i>=endIdx)return;ctx.fillStyle=v>0?'rgba(82,242,194,0.75)':v<0?'rgba(199,27,82,0.75)':'rgba(76,201,240,0.5)';ctx.fillRect(xOf(i-startIdx)-bw/2,H*0.08,bw,H*0.84);});
-      _pLabel(ctx,'Elder Impulse');const lv=imp.filter(v=>v!=null).pop();setPill('chart-elder_impulse-badge',lv>0?'buy-strong':lv<0?'sell-strong':'neutral');
+      imp.forEach((v,i)=>{if(v==null||i<startIdx||i>=endIdx)return;ctx.fillStyle=v>0?'rgba(82,242,194,0.75)':v<0?'rgba(199,27,82,0.75)':'rgba(76,201,240,0.5)';ctx.fillRect(xOf(i-startIdx)-bw/2,H*0.08,bw,H*0.84);});const lv=imp.filter(v=>v!=null).pop();setPill('chart-elder_impulse-badge',lv>0?'buy-strong':lv<0?'sell-strong':'neutral');
     } else if(id==='cmo'){
       const p=14,cmo=closes.map((_,i)=>{if(i<p)return null;let up=0,dn=0;for(let j=i-p+1;j<=i;j++){const d=closes[j]-closes[j-1];d>0?up+=d:dn+=Math.abs(d);}return(up+dn)?((up-dn)/(up+dn))*100:0;});
-      drawRange(cmo.map(v=>v!=null?v+50:null),'#4cc9f0',20,80);_pLabel(ctx,'CMO');
+      drawRange(cmo.map(v=>v!=null?v+50:null),'#4cc9f0',20,80)
       const lv=cmo.filter(v=>v!=null).pop()||0;setPill('chart-cmo-badge',lv>50?'buy-strong':lv>20?'buy':lv<-50?'sell-strong':lv<-20?'sell':'neutral');
     } else if(id==='eom'){
       const eom=closes.map((_,i)=>{if(!i)return null;const c=cn[i],pc=cn[i-1];return((c.high+c.low)/2-(pc.high+pc.low)/2)/((c.vol||1)/(c.high-c.low||0.001))*10000;});
-      drawOsc(_iSMA(eom.map(v=>v||0),14),'#4cc9f0');_pLabel(ctx,'EOM');
+      drawOsc(_iSMA(eom.map(v=>v||0),14),'#4cc9f0')
       const sm=_iSMA(eom.map(v=>v||0),14);const lv=sm.filter(v=>v!=null).pop()||0;setPill('chart-eom-badge',lv>0?'buy':'sell');
     } else if(id==='nvi'){
       const nv=[1000];for(let i=1;i<n;i++){const r=(closes[i]-closes[i-1])/closes[i-1];nv.push((cn[i].vol||0)<(cn[i-1].vol||0)?nv[i-1]+nv[i-1]*r:nv[i-1]);}
       const nem=_iEMA(nv,255);drawLine(nv,'#4cc9f0',1.5);
-      const sc2=_scaleWin(nv,startIdx,endIdx,H);if(sc2)_pl(ctx,W,H,nem,'rgba(255,159,28,0.6)',1,startIdx,endIdx,xOf,sc2.toY);
-      _pLabel(ctx,'NVI');const em=nem.filter(v=>v!=null).pop();setPill('chart-nvi-badge',em&&nv[n-1]>em?'buy':em&&nv[n-1]<em?'sell':'neutral');
+      const sc2=_scaleWin(nv,startIdx,endIdx,H);if(sc2)_pl(ctx,W,H,nem,'rgba(255,159,28,0.6)',1,startIdx,endIdx,xOf,sc2.toY);const em=nem.filter(v=>v!=null).pop();setPill('chart-nvi-badge',em&&nv[n-1]>em?'buy':em&&nv[n-1]<em?'sell':'neutral');
     } else if(id==='pvi'){
       const pv=[1000];for(let i=1;i<n;i++){const r=(closes[i]-closes[i-1])/closes[i-1];pv.push((cn[i].vol||0)>(cn[i-1].vol||0)?pv[i-1]+pv[i-1]*r:pv[i-1]);}
-      drawLine(pv,'#52F2C9',1.5);_pLabel(ctx,'PVI','rgba(82,242,194,0.85)');const lv=pv[n-1];setPill('chart-pvi-badge',lv>pv[Math.max(0,n-20)]*1.02?'buy':lv<pv[Math.max(0,n-20)]*0.98?'sell':'neutral');
+      drawLine(pv,'#52F2C9',1.5);const lv=pv[n-1];setPill('chart-pvi-badge',lv>pv[Math.max(0,n-20)]*1.02?'buy':lv<pv[Math.max(0,n-20)]*0.98?'sell':'neutral');
     } else if(id==='pvt'){
       let cum=0;const pvt=closes.map((c,i)=>{if(!i)return 0;cum+=cum*(c-closes[i-1])/(closes[i-1]||1);return cum;});
-      drawLine(pvt,'#4cc9f0',1.5);_pLabel(ctx,'PVT');setPill('chart-pvt-badge',pvt[n-1]>pvt[Math.max(0,n-6)]?'buy':'sell');
+      drawLine(pvt,'#4cc9f0',1.5);setPill('chart-pvt-badge',pvt[n-1]>pvt[Math.max(0,n-6)]?'buy':'sell');
     } else if(id==='vo'){
       const vf=_iEMA(vols,5),vs=_iEMA(vols,10);
       const vo=vf.map((v,i)=>v&&vs[i]?(v-vs[i])/vs[i]*100:null);
-      drawOsc(vo,'#4cc9f0');_pLabel(ctx,'Vol Osc');const lv=vo.filter(v=>v!=null).pop()||0;setPill('chart-vo-badge',lv>0?'buy':'sell');
+      drawOsc(vo,'#4cc9f0');const lv=vo.filter(v=>v!=null).pop()||0;setPill('chart-vo-badge',lv>0?'buy':'sell');
     } else if(id==='dmi'){
       const per=14,tr=[],pDM=[],mDM=[];
       for(let i=1;i<n;i++){const c=cn[i],pc=cn[i-1];tr.push(Math.max(c.high-c.low,Math.abs(c.high-pc.close),Math.abs(c.low-pc.close)));const up=c.high-pc.high,dn=pc.low-c.low;pDM.push(up>dn&&up>0?up:0);mDM.push(dn>up&&dn>0?dn:0);}
@@ -7690,61 +7686,59 @@ function _indDrawPanel(id){
       const allV=[...pDI,...mDI].slice(startIdx).filter(v=>v!=null);const mx=Math.max(...allV,50);
       const toY=v=>H*(1-v/mx);_pGrid(ctx,W,toY(25));
       ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText(25,W-2,toY(25)-1);ctx.textAlign='left';
-      _pl(ctx,W,H,pDI,'#52F2C9',1.5,startIdx,endIdx,xOf,toY);_pl(ctx,W,H,mDI,'#FF4D7A',1.5,startIdx,endIdx,xOf,toY);
-      _pLabel(ctx,'DMI');const lp=pDI.filter(v=>v!=null).pop()||0,lm=mDI.filter(v=>v!=null).pop()||0;setPill('chart-dmi-badge',lp>lm&&lp>25?'buy':lm>lp&&lm>25?'sell':'neutral');
+      _pl(ctx,W,H,pDI,'#52F2C9',1.5,startIdx,endIdx,xOf,toY);_pl(ctx,W,H,mDI,'#FF4D7A',1.5,startIdx,endIdx,xOf,toY);const lp=pDI.filter(v=>v!=null).pop()||0,lm=mDI.filter(v=>v!=null).pop()||0;setPill('chart-dmi-badge',lp>lm&&lp>25?'buy':lm>lp&&lm>25?'sell':'neutral');
     } else if(id==='atr_w'){
-      const a=_iATR(cn,14);drawLine(a,'#4cc9f0',1.5);_pLabel(ctx,'ATR');
+      const a=_iATR(cn,14);drawLine(a,'#4cc9f0',1.5)
       const vs=a.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-atr_w-badge',lv>avg*1.5?'sell':'neutral');
     } else if(id==='hist_vol'){
       const lr=closes.map((c,i)=>i?Math.log(c/closes[i-1]):null);
       const hv=lr.map((_,i)=>{if(i<19)return null;const sl=lr.slice(i-19,i+1).filter(v=>v!=null),m=sl.reduce((s,v)=>s+v,0)/sl.length;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/sl.length)*Math.sqrt(252)*100;});
-      drawLine(hv,'#4cc9f0',1.5);_pLabel(ctx,'Hist Vol');
+      drawLine(hv,'#4cc9f0',1.5)
       const vs=hv.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-hist_vol-badge',lv>avg*1.3?'sell':lv<avg*0.7?'buy':'neutral');
     } else if(id==='close2close'){
       const lr=closes.map((c,i)=>i?Math.log(c/closes[i-1]):null);
       const hv=lr.map((_,i)=>{if(i<9)return null;const sl=lr.slice(i-9,i+1).filter(v=>v!=null),m=sl.reduce((s,v)=>s+v,0)/sl.length;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/sl.length)*Math.sqrt(252)*100;});
-      drawLine(hv,'#52F2C9',1.5);_pLabel(ctx,'C2C Vol','rgba(82,242,194,0.85)');
+      drawLine(hv,'#52F2C9',1.5)
       const vs=hv.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-close2close-badge',lv>avg*1.3?'sell':'neutral');
     } else if(id==='ohlc_vol'){
       const ov=cn.map((_,i)=>{if(i<9)return null;const sl=cn.slice(i-9,i+1);return Math.sqrt(sl.reduce((s,c)=>s+0.5*(Math.log(c.high/(c.low||0.001)))**2,0)/sl.length)*Math.sqrt(252)*100;});
-      drawLine(ov,'#52A8E0',1.5);_pLabel(ctx,'OHLC Vol','rgba(255,159,28,0.85)');
+      drawLine(ov,'#52A8E0',1.5)
       const vs=ov.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-ohlc_vol-badge',lv>avg*1.3?'sell':'neutral');
     } else if(id==='chop'){
       const per=14,a1=_iATR(cn,1);
       const chop=closes.map((_,i)=>{if(i<per)return null;const sl=cn.slice(i-per+1,i+1),hi=Math.max(...sl.map(c=>c.high)),lo2=Math.min(...sl.map(c=>c.low)),sa=a1.slice(i-per+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0);return(hi-lo2)>0?100*Math.log10(sa/(hi-lo2))/Math.log10(per):null;});
-      drawRange(chop,'#4cc9f0',38.2,61.8);_pLabel(ctx,'CHOP');
+      drawRange(chop,'#4cc9f0',38.2,61.8)
       const lv=chop.filter(v=>v!=null).pop()||50;setPill('chart-chop-badge',lv>61.8?'neutral':lv<38.2?'buy':'neutral');
     } else if(id==='vortex'){
       const per=14,vp=new Array(n).fill(null),vm=new Array(n).fill(null);
       for(let i=per;i<n;i++){let sp=0,sm=0,st=0;for(let j=i-per+1;j<=i;j++){sp+=Math.abs(cn[j].high-cn[j-1].low);sm+=Math.abs(cn[j].low-cn[j-1].high);st+=Math.max(cn[j].high-cn[j].low,Math.abs(cn[j].high-cn[j-1].close),Math.abs(cn[j].low-cn[j-1].close));}vp[i]=st?sp/st:null;vm[i]=st?sm/st:null;}
       const allV=[...vp,...vm].slice(startIdx).filter(v=>v!=null);const mx=Math.max(...allV,1);const toY=v=>H*(1-v/mx);
-      _pGrid(ctx,W,toY(1));_pl(ctx,W,H,vp,'#52F2C9',1.5,startIdx,endIdx,xOf,toY);_pl(ctx,W,H,vm,'#FF4D7A',1.5,startIdx,endIdx,xOf,toY);
-      _pLabel(ctx,'Vortex');const lp=vp.filter(v=>v!=null).pop()||1,lm=vm.filter(v=>v!=null).pop()||1;setPill('chart-vortex-badge',lp>lm?'buy':'sell');
+      _pGrid(ctx,W,toY(1));_pl(ctx,W,H,vp,'#52F2C9',1.5,startIdx,endIdx,xOf,toY);_pl(ctx,W,H,vm,'#FF4D7A',1.5,startIdx,endIdx,xOf,toY);const lp=vp.filter(v=>v!=null).pop()||1,lm=vm.filter(v=>v!=null).pop()||1;setPill('chart-vortex-badge',lp>lm?'buy':'sell');
     } else if(id==='fisher'){
       const per=10;
       const fish=closes.map((_,i)=>{if(i<per)return null;const sl=cn.slice(i-per+1,i+1),hi=Math.max(...sl.map(c=>c.high)),lo2=Math.min(...sl.map(c=>c.low));const x=Math.max(Math.min(2*(closes[i]-lo2)/(hi-lo2||0.0001)-1,0.999),-0.999);return 0.5*Math.log((1+x)/(1-x));});
-      drawOsc(fish,'#4cc9f0');_pLabel(ctx,'Fisher');
+      drawOsc(fish,'#4cc9f0')
       const lv=fish.filter(v=>v!=null).pop()||0;setPill('chart-fisher-badge',lv>1.5?'sell-strong':lv>0.5?'sell':lv<-1.5?'buy-strong':lv<-0.5?'buy':'neutral');
     } else if(id==='tsi'){
       const pc=closes.map((c,i)=>i?c-closes[i-1]:null);
       const s1=_iEMA(_iEMA(pc.map(v=>v||0),25),13),s2=_iEMA(_iEMA(pc.map(v=>Math.abs(v||0)),25),13);
       const tsi=s1.map((v,i)=>s2[i]?v/s2[i]*100:null);
-      drawRange(tsi.map(v=>v!=null?v+50:null),'#4cc9f0',25,75);_pLabel(ctx,'TSI');
+      drawRange(tsi.map(v=>v!=null?v+50:null),'#4cc9f0',25,75)
       const lv=tsi.filter(v=>v!=null).pop()||0;setPill('chart-tsi-badge',lv>25?'buy-strong':lv>0?'buy':lv<-25?'sell-strong':'sell');
     } else if(id==='ult_osc'){
       const bp=closes.map((c,i)=>i?c-Math.min(cn[i].low,closes[i-1]):null);
       const tr2=closes.map((c,i)=>i?Math.max(cn[i].high,closes[i-1])-Math.min(cn[i].low,closes[i-1]):null);
       const avg=per=>bp.map((_,i)=>{if(i<per)return null;const sb=bp.slice(i-per+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0),st=tr2.slice(i-per+1,i+1).filter(v=>v!=null).reduce((s,v)=>s+v,0);return st?sb/st:null;});
       const a7=avg(7),a14=avg(14),a28=avg(28);const uo=a7.map((v,i)=>v&&a14[i]&&a28[i]?100*(4*v+2*a14[i]+a28[i])/7:null);
-      drawRange(uo,'#4cc9f0',30,70);_pLabel(ctx,'Ult Osc');
+      drawRange(uo,'#4cc9f0',30,70)
       const lv=uo.filter(v=>v!=null).pop()||50;setPill('chart-ult_osc-badge',lv>70?'sell-strong':lv>60?'sell':lv<30?'buy-strong':lv<40?'buy':'neutral');
     } else if(id==='dpo'){
       const per=14,shift=Math.floor(per/2)+1,ma=_iSMA(closes,per);
       const dpo=closes.map((_,i)=>i<shift+per-1||!ma[i-shift]?null:closes[i]-ma[i-shift]);
-      drawOsc(dpo,'#4cc9f0');_pLabel(ctx,'DPO');const lv=dpo.filter(v=>v!=null).pop()||0;setPill('chart-dpo-badge',lv>0?'buy':'sell');
+      drawOsc(dpo,'#4cc9f0');const lv=dpo.filter(v=>v!=null).pop()||0;setPill('chart-dpo-badge',lv>0?'buy':'sell');
     } else if(id==='std_dev'){
       const per=20,sd=closes.map((_,i)=>{if(i<per)return null;const sl=closes.slice(i-per+1,i+1),m=sl.reduce((s,v)=>s+v,0)/per;return Math.sqrt(sl.reduce((s,v)=>s+(v-m)**2,0)/per);});
-      drawLine(sd,'#4cc9f0',1.5);_pLabel(ctx,'Std Dev');
+      drawLine(sd,'#4cc9f0',1.5)
       const vs=sd.filter(v=>v!=null),lv=vs[vs.length-1]||0,avg=vs.reduce((s,v)=>s+v,0)/(vs.length||1);setPill('chart-std_dev-badge',lv>avg*1.5?'sell':lv<avg*0.7?'buy':'neutral');
     } else if(id==='kvo'){
       // Klinger Volume Oscillator
@@ -7773,8 +7767,7 @@ function _indDrawPanel(id){
       const bw=Math.max(1,(W/visN)*0.6);
       hist.forEach((v,i)=>{if(v==null||i<startIdx||i>=endIdx)return;const bh=Math.abs(sc.toY(v)-sc.zero);ctx.fillStyle=v>=0?'rgba(96,164,161,0.45)':'rgba(199,27,82,0.45)';ctx.fillRect(xOf(i-startIdx)-bw/2,v>=0?sc.zero-bh:sc.zero,bw,Math.max(bh,1));});
       _pl(ctx,W,H,kvo,'rgba(82,242,194,0.9)',1.5,startIdx,endIdx,xOf,sc.toY);
-      _pl(ctx,W,H,sig,'rgba(255,159,28,0.7)',1,startIdx,endIdx,xOf,sc.toY);
-      _pLabel(ctx,'KVO');
+      _pl(ctx,W,H,sig,'rgba(255,159,28,0.7)',1,startIdx,endIdx,xOf,sc.toY)
       const lv=kvo.filter(v=>v!=null).pop()||0,ls=sig.filter(v=>v!=null).pop()||0;
       setPill('chart-kvo-badge',lv>0&&lv>ls?'buy-strong':lv<0&&lv<ls?'sell-strong':lv>0?'buy':'sell');
     } else if(id==='ebs'){
@@ -7811,12 +7804,11 @@ function _indDrawPanel(id){
       // Заливка под кривой
       ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
       ctx.beginPath();let f=true;
-      for(let i=startIdx;i<endIdx;i++){if(ebsArr[i]==null){f=true;continue;}const x=xOf(i-startIdx),y=toYebs(ebsArr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
+      for(let i=startIdx;i<endIdx;i++){if(ebsArr[i]==null){f=true;continue;};const x=xOf(i-startIdx),y=toYebs(ebsArr[i]);f?ctx.moveTo(x,y):ctx.lineTo(x,y);f=false;}
       ctx.lineTo(xOf(endIdx-1-startIdx),H*0.5);ctx.lineTo(xOf(0),H*0.5);ctx.closePath();
       ctx.fillStyle=ebsArr[n-1]>0?'rgba(82,242,194,0.08)':'rgba(199,27,82,0.08)';ctx.fill();ctx.restore();
       _pl(ctx,W,H,ebsArr,'rgba(82,242,194,0.9)',1.8,startIdx,endIdx,xOf,toYebs);
-      _pl(ctx,W,H,leadArr,'rgba(255,159,28,0.65)',1,startIdx,endIdx,xOf,toYebs);
-      _pLabel(ctx,'EBS');
+      _pl(ctx,W,H,leadArr,'rgba(255,159,28,0.65)',1,startIdx,endIdx,xOf,toYebs)
       const lv=ebsArr.filter(v=>v!=null).pop()||0, ll=leadArr.filter(v=>v!=null).pop()||0;
       setPill('chart-ebs-badge',lv<-0.7&&lv>ll?'buy-strong':lv>0.7&&lv<ll?'sell-strong':lv>0?'buy':'sell');
     } else if(id==='tmf'){
@@ -7840,8 +7832,7 @@ function _indDrawPanel(id){
       drawRange(tmfC.map(v=>v!=null?(v+1)/2*100:null),'#52F2C9',20,80);
       // Нарисуем нулевую линию отдельно (50% на шкале)
       _pGrid(ctx,W,H*0.5);
-      ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('0',W-2,H*0.5-1);ctx.textAlign='left';
-      _pLabel(ctx,'TMF');
+      ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('0',W-2,H*0.5-1);ctx.textAlign='left'
       const lv=tmfC.filter(v=>v!=null).pop()||0;
       setPill('chart-tmf-badge',lv>0.5?'buy-strong':lv>0.1?'buy':lv<-0.5?'sell-strong':lv<-0.1?'sell':'neutral');
     } else if(id==='frac_dim'){
@@ -7862,8 +7853,7 @@ function _indDrawPanel(id){
       [1.3,1.5,1.7].forEach(lvl=>{_pGrid(ctx,W,toYfd(lvl));ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText(lvl.toFixed(1),W-2,toYfd(lvl)-1);});
       ctx.textAlign='left';
       // Цветовая линия: красная зона тренда (<1.4), синяя хаос (>1.6)
-      _pl(ctx,W,H,fd,'#52F2C9',1.5,startIdx,endIdx,xOf,toYfd);
-      _pLabel(ctx,'Frac Dim');
+      _pl(ctx,W,H,fd,'#52F2C9',1.5,startIdx,endIdx,xOf,toYfd)
       const lv=fd.filter(v=>v!=null).pop()||1.5,pv=fd.slice(0,fd.length-3).filter(v=>v!=null).pop()||lv;
       setPill('chart-frac_dim-badge',lv<1.3?'buy-strong':lv<1.4?'buy':lv>1.7?'neutral':lv<pv?'buy':'neutral');
     } else if(id==='efficiency_ratio'){
@@ -7875,8 +7865,7 @@ function _indDrawPanel(id){
         return path>0?Math.min(1,dir/path):0;
       });
       drawRange(er.map(v=>v!=null?v*100:null),'#52F2C9',20,70);
-      ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('ER',W-2,10);ctx.textAlign='left';
-      _pLabel(ctx,'Effic.Ratio');
+      ctx.fillStyle='rgba(112,128,168,0.5)';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('ER',W-2,10);ctx.textAlign='left'
       const lv=er.filter(v=>v!=null).pop()||0;
       setPill('chart-efficiency_ratio-badge',lv>0.7?'buy-strong':lv>0.4?'buy':lv<0.1?'neutral':'warn');
     } else if(id==='entropy'){
@@ -7895,8 +7884,7 @@ function _indDrawPanel(id){
         let H=0;Object.values(pats).forEach(cnt=>{const p=cnt/tot;if(p>0)H-=p*Math.log2(p);});
         return H/Math.log2(6); // нормировать к 0..1
       });
-      drawRange(ent.map(v=>v!=null?v*100:null),'#4cc9f0',40,80);
-      _pLabel(ctx,'Entropy');
+      drawRange(ent.map(v=>v!=null?v*100:null),'#4cc9f0',40,80)
       const lv=ent.filter(v=>v!=null).pop()||0.8;
       setPill('chart-entropy-badge',lv<0.5?'buy-strong':lv<0.65?'buy':lv>0.85?'neutral':'warn');
     } else if(id==='cum_delta'){
@@ -7907,11 +7895,12 @@ function _indDrawPanel(id){
       const base=cd[startIdx]||0;const cdf=cd.map(v=>v-base);
       const sc=_scaleWin(cdf,startIdx,endIdx,H);if(!sc)return;
       _pGrid(ctx,W,sc.toY(0));
-      // Цвет: сравниваем направление дельты и цены за окно
-      const pUp=closes[endIdx-1]>closes[startIdx],dUp=cdf[endIdx-1]>0;
+      // Цвет: сравниваем направление дельты и цены за фиксированный лукбэк
+      // (не за видимое окно — иначе цвет менялся бы при каждом скролле/зуме графика)
+      const lbk=Math.max(0,n-20);
+      const pUp=closes[n-1]>closes[lbk],dUp=cdf[n-1]>0;
       const lineCol=pUp===dUp?'#52F2C9':'#FF4D7A'; // совпадение = здоровый тренд, расхождение = красный
-      _pl(ctx,W,H,cdf,lineCol,1.5,startIdx,endIdx,xOf,sc.toY);
-      _pLabel(ctx,'Cum Δ');
+      _pl(ctx,W,H,cdf,lineCol,1.5,startIdx,endIdx,xOf,sc.toY)
       const diverg=pUp!==dUp;
       setPill('chart-cum_delta-badge',diverg?(pUp?'sell-strong':'buy-strong'):pUp?'buy':'sell');
     } else if(id==='cyber_cycle'){
@@ -7923,8 +7912,7 @@ function _indDrawPanel(id){
       const trig=[0,...cc.slice(0,n-1)]; // trigger = cc сдвинутый на 1
       drawOsc(cc,'#52F2C9');
       const sc2=_oscScale(cc,startIdx,endIdx,H);
-      if(sc2) _pl(ctx,W,H,trig,'rgba(255,159,28,0.7)',1,startIdx,endIdx,xOf,sc2.toY);
-      _pLabel(ctx,'Cyber Cycle');
+      if(sc2) _pl(ctx,W,H,trig,'rgba(255,159,28,0.7)',1,startIdx,endIdx,xOf,sc2.toY)
       const lv=cc[n-1],lt=trig[n-1];
       setPill('chart-cyber_cycle-badge',lv<-0.1&&lv>lt?'buy-strong':lv>0.1&&lv<lt?'sell-strong':lv>lt?'buy':'sell');
     }
@@ -13335,7 +13323,7 @@ function _renderAnalysisInner(panel) {
     // FracDim: low FD → trending → price direction
     {const trA=candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high-c.low,Math.abs(c.high-candles[i-1].close),Math.abs(c.low-candles[i-1].close)));_ss2.fd_score=closes.map((_,i)=>{if(i<14)return null;const sl=candles.slice(i-13,i+1);const hl=Math.max(...sl.map(c=>c.high))-Math.min(...sl.map(c=>c.low));const sa=trA.slice(i-13,i+1).reduce((a,b)=>a+b,0);const fd=hl>0?1+Math.log10(sa/hl)/Math.log10(14):1.5;return fd>1.5?null:closes[i]>closes[i-5]?1:-1;});}
     // Entropy: low H → price direction
-    {_ss2.entropy_score=closes.map((_,i)=>{if(i<12)return null;const ret=closes.slice(i-12,i+1).map((v,j,a)=>j===0?0:v-a[j-1]);const cnt={};for(let j=0;j<ret.length-2;j++){const o=[0,1,2].sort((a2,b2)=>ret[j+a2]-ret[j+b2]).join('');cnt[o]=(cnt[o]||0)+1;}const tot=Object.values(cnt).reduce((a,b)=>a+b,0);const H=-Object.values(cnt).reduce((s,c)=>s+(c/tot)*Math.log2(c/tot||1),0)/Math.log2(6);return H>0.75?null:closes[i]>closes[i-5]?1:-1;});}
+    {_ss2.entropy_score=closes.map((_,i)=>{if(i<12)return null;const ret=closes.slice(i-12,i+1).map((v,j,a)=>j===0?0:v-a[j-1]);const cnt={};for(let j=0;j<ret.length-2;j++){const o=[0,1,2].sort((a2,b2)=>ret[j+a2]-ret[j+b2]).join('');cnt[o]=(cnt[o]||0)+1;};const tot=Object.values(cnt).reduce((a,b)=>a+b,0);const H=-Object.values(cnt).reduce((s,c)=>s+(c/tot)*Math.log2(c/tot||1),0)/Math.log2(6);return H>0.75?null:closes[i]>closes[i-5]?1:-1;});}
   }
 
   // Маппинг ключ карточки → ключ в _ss2
