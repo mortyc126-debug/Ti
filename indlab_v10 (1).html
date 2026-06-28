@@ -272,6 +272,17 @@ input[type=range] { touch-action: none; }
 *::-webkit-scrollbar-button { display: none !important; }
 *::-webkit-scrollbar-corner { background: #0D0820 !important; }
 
+input, textarea, select {
+  color-scheme: dark;
+  background: rgba(255,255,255,0.04) !important;
+  color: var(--text) !important;
+}
+input:focus, textarea:focus { outline: 1px solid rgba(199,27,82,0.4); outline-offset: 0; }
+input:-webkit-autofill, input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 100px #140A24 inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+}
+
 /* ── Indicator rows: reliable tap on mobile ── */
 .cp-ind-row {
   touch-action: manipulation;
@@ -778,11 +789,11 @@ input[type=range] { touch-action: none; }
 <!-- ══ ANALYSIS PAGE ══ -->
 <div id="page-analysis" class="page">
   <!-- Вкладки -->
-  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px;">
+  <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);">
     <button id="an-tab-single" onclick="anSwitchTab('single')"
-      style="padding:4px 14px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(82,242,201,0.4);border-radius:6px;background:rgba(82,242,201,0.1);color:#52F2C9;">Один тикер</button>
+      style="padding:7px 16px;font-family:var(--mono);font-size:9px;letter-spacing:0.04em;cursor:pointer;border:none;border-bottom:2px solid #C71B52;background:none;color:#C71B52;">Один тикер</button>
     <button id="an-tab-multi" onclick="anSwitchTab('multi')"
-      style="padding:4px 14px;font-family:var(--mono);font-size:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.08);border-radius:6px;background:rgba(255,255,255,0.03);color:var(--text3);">Несколько тикеров</button>
+      style="padding:7px 16px;font-family:var(--mono);font-size:9px;letter-spacing:0.04em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:var(--text3);">Несколько тикеров</button>
   </div>
 
   <!-- ТФ (общий для обеих вкладок) -->
@@ -12931,13 +12942,13 @@ function anSwitchTab(tab) {
   if (tab === 'single') {
     if(single) single.style.display = '';
     if(multi)  multi.style.display  = 'none';
-    if(btnS) { btnS.style.background='rgba(82,242,201,0.1)'; btnS.style.color='#52F2C9'; btnS.style.borderColor='rgba(82,242,201,0.4)'; }
-    if(btnM) { btnM.style.background='rgba(255,255,255,0.03)'; btnM.style.color='var(--text3)'; btnM.style.borderColor='rgba(255,255,255,0.08)'; }
+    if(btnS) { btnS.style.borderBottomColor='#C71B52'; btnS.style.color='#C71B52'; }
+    if(btnM) { btnM.style.borderBottomColor='transparent'; btnM.style.color='var(--text3)'; }
   } else {
     if(single) single.style.display = 'none';
     if(multi)  multi.style.display  = '';
-    if(btnM) { btnM.style.background='rgba(180,135,248,0.1)'; btnM.style.color='#B487F8'; btnM.style.borderColor='rgba(180,135,248,0.4)'; }
-    if(btnS) { btnS.style.background='rgba(255,255,255,0.03)'; btnS.style.color='var(--text3)'; btnS.style.borderColor='rgba(255,255,255,0.08)'; }
+    if(btnM) { btnM.style.borderBottomColor='#C71B52'; btnM.style.color='#C71B52'; }
+    if(btnS) { btnS.style.borderBottomColor='transparent'; btnS.style.color='var(--text3)'; }
   }
 }
 
