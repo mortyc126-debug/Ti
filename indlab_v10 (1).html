@@ -5429,6 +5429,13 @@ const _IL_COLOR_DEFAULTS = {
   tsi:       ['#D65CFF','#FFB84D'],
   cyber_cyc: ['#FF006E','#3DD9FF'],
   ebs:       ['#D65CFF','#FF8A4C'],
+  cusum:     ['#60A4A1','#C71B52'],
+  hmm:       ['#FF4D7A','#60A4A1'],
+  hurst:     ['#FF4D7A','#52F2C9','#9090B8'],
+  mprof:     ['#52F2C9','#FF4D7A'],
+  te:        ['#FFD23F','#9090B8'],
+  ssa:       ['#FF8800'],
+  rough:     ['#FF8800','#FFD23F','#9090B8','#52F2C9'],
 };
 function _ilC(key, idx) {
   try {
@@ -6106,11 +6113,11 @@ function _chartDrawMain() {
       if (i < startIdx || i >= endIdx) return;
       const x = xOf(i - startIdx);
       ctx.setLineDash([2,3]);
-      ctx.strokeStyle = dir > 0 ? 'rgba(96,164,161,0.7)' : 'rgba(199,27,82,0.7)';
+      ctx.strokeStyle = dir > 0 ? _ilC('cusum',0) : _ilC('cusum',1);
       ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = dir > 0 ? 'rgba(96,164,161,0.9)' : 'rgba(199,27,82,0.9)';
+      ctx.fillStyle = dir > 0 ? _ilC('cusum',0) : _ilC('cusum',1);
       ctx.font = '8px monospace'; ctx.textAlign = 'center';
       ctx.fillText('CP', x, 10);
     });
@@ -6180,7 +6187,7 @@ function _chartDrawMain() {
     for (let i = startIdx+1; i <= endIdx; i++) {
       if (i === endIdx || _stateArr[i] !== _stateArr[_segStart]) {
         const x1 = xOf(_segStart - startIdx), x2 = xOf(Math.min(i,endIdx-1) - startIdx) + (chartCandleW||8)/2;
-        ctx.fillStyle = _stateArr[_segStart] === 1 ? 'rgba(199,27,82,0.05)' : 'rgba(96,164,161,0.04)';
+        ctx.fillStyle = _stateArr[_segStart] === 1 ? _ilC('hmm',0)+'0d' : _ilC('hmm',1)+'0a';
         ctx.fillRect(x1, 0, x2-x1, H);
         _segStart = i;
       }
@@ -6193,8 +6200,8 @@ function _chartDrawMain() {
     const _hmmTxt = `HMM: ${_curState===1?'высокая волатильность':'спокойный режим'} (p=${(_curState===1?_curProb:1-_curProb).toFixed(2)})`;
     const _bw = ctx.measureText(_hmmTxt).width + 10;
     ctx.fillStyle='rgba(13,8,32,0.85)'; ctx.fillRect(4, 4, _bw, 16);
-    ctx.strokeStyle = _curState===1?'rgba(199,27,82,0.5)':'rgba(96,164,161,0.5)'; ctx.lineWidth=1; ctx.strokeRect(4,4,_bw,16);
-    ctx.fillStyle = _curState===1?'#FF4D7A':'#60A4A1';
+    ctx.strokeStyle = (_curState===1?_ilC('hmm',0):_ilC('hmm',1))+'80'; ctx.lineWidth=1; ctx.strokeRect(4,4,_bw,16);
+    ctx.fillStyle = _curState===1?_ilC('hmm',0):_ilC('hmm',1);
     ctx.fillText(_hmmTxt, 9, 14);
     ctx.restore();
   }
@@ -6233,7 +6240,7 @@ function _chartDrawMain() {
       for (const [x,y] of _pts) { _num += (x-_mx2)*(y-_my2); _den += (x-_mx2)*(x-_mx2); }
       const _H = _den>0 ? _num/_den : 0.5;
       const _label = _H < 0.45 ? 'антиперсистентный (mean-reversion)' : _H > 0.55 ? 'персистентный (тренд)' : 'случайное блуждание';
-      const _col = _H < 0.45 ? '#FF4D7A' : _H > 0.55 ? '#52F2C9' : '#9090B8';
+      const _col = _H < 0.45 ? _ilC('hurst',0) : _H > 0.55 ? _ilC('hurst',1) : _ilC('hurst',2);
       ctx.save();
       ctx.font='8px monospace'; ctx.textAlign='left';
       const _huTxt = `Hurst H=${_H.toFixed(2)} — ${_label}`;
@@ -6354,8 +6361,8 @@ function _chartDrawMain() {
         ctx.font = '8px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = color;
         ctx.fillText(label, x1+2, H-6);
       };
-      _drawMarker(_motifIdx, 'MOTIF', '#52F2C9');
-      _drawMarker(_discordIdx, 'ANOMALY', '#FF4D7A');
+      _drawMarker(_motifIdx, 'MOTIF', _ilC('mprof',0));
+      _drawMarker(_discordIdx, 'ANOMALY', _ilC('mprof',1));
       ctx.restore();
     }
   }
@@ -6401,7 +6408,7 @@ function _chartDrawMain() {
       _te = Math.max(0, _te);
       ctx.save();
       ctx.font='8px monospace'; ctx.textAlign='left';
-      const _col = _te > 0.05 ? '#FFD23F' : '#9090B8';
+      const _col = _te > 0.05 ? _ilC('te',0) : _ilC('te',1);
       const _teTxt = `TE(объём→цена) = ${_te.toFixed(3)} бит`;
       const _bw3 = ctx.measureText(_teTxt).width + 10;
       ctx.fillStyle='rgba(13,8,32,0.85)'; ctx.fillRect(4, 44, _bw3, 16);
@@ -6443,7 +6450,7 @@ function _chartDrawMain() {
       for (let i=0;i<_L;i++) for (let k=0;k<_K;k++) { _recon[i+k] += _v[i]*_pc[k]; _counts[i+k]++; }
       for (let n=0;n<_N;n++) _recon[n] /= (_counts[n] || 1);
       ctx.save();
-      ctx.beginPath(); ctx.strokeStyle = '#FF8800'; ctx.lineWidth = 1.8; let _ffs = true;
+      ctx.beginPath(); ctx.strokeStyle = _ilC('ssa',0); ctx.lineWidth = 1.8; let _ffs = true;
       for (let i = startIdx; i < endIdx; i++) {
         const si = i - _ssaOff;
         if (si < 0 || si >= _N) continue;
@@ -6484,7 +6491,7 @@ function _chartDrawMain() {
         const _slope = _den>0 ? _num/_den : 1;
         const _Hrv = Math.max(0, Math.min(1, _slope/2));
         const _label = _Hrv < 0.2 ? 'грубая волатильность (rough, типично для рынков)' : _Hrv < 0.4 ? 'умеренно грубая' : _Hrv <= 0.6 ? 'стандартная (броуновская)' : 'персистентная (кластеризация волатильности)';
-        const _col = _Hrv < 0.2 ? '#FF8800' : _Hrv < 0.4 ? '#FFD23F' : _Hrv <= 0.6 ? '#9090B8' : '#52F2C9';
+        const _col = _Hrv < 0.2 ? _ilC('rough',0) : _Hrv < 0.4 ? _ilC('rough',1) : _Hrv <= 0.6 ? _ilC('rough',2) : _ilC('rough',3);
         ctx.save();
         ctx.font='8px monospace'; ctx.textAlign='left';
         const _rvTxt = `Rough Vol: H=${_Hrv.toFixed(2)} — ${_label}`;
@@ -12568,6 +12575,48 @@ function _renderAnalysisInner(panel) {
     ],
     fisher: [
       {name:'Fisher Transform / Преобразование Фишера', color:'#D65CFF', desc:'Переводит цены в гауссово распределение. Экстремумы ±2…±3 = статистически редкие события.\n► Пересечение нуля = смена тренда. Высокий Fisher (>2.5) + дивергенция с ценой = сильный разворотный сигнал. Работает лучше на ликвидных инструментах.'},
+    ],
+    nw: [
+      {name:'Доверительная огибающая', color:'#FFD23F', desc:'Ширина полосы вокруг ядерной (Nadaraya-Watson) регрессии — оценка локальной неопределённости тренда. Расширение полосы = рост волатильности/неопределённости.'},
+      {name:'Центральная линия (ядерная регрессия)', color:'#FF8800', desc:'Сглаженная непараметрическая оценка тренда (взвешенное по гауссову ядру среднее). Реагирует мягче, чем обычная MA, без фазового лага EMA.\n► Меньше bandwidth = ближе к цене, больше шума. Больше — глаже, отстаёт сильнее.'},
+    ],
+    kalman: [
+      {name:'Доверительный коридор', color:'#3DD9FF', desc:'Полоса неопределённости фильтра Калмана (оценка дисперсии состояния). Узкая полоса = модель уверена в оценке, широкая = высокая неопределённость/шум.'},
+      {name:'Отфильтрованная линия', color:'#7B61FF', desc:'Оптимальная байесовская оценка «истинной» цены, очищенная от шума измерений. Меньше лага, чем у MA, при сильном шумоподавлении.'},
+    ],
+    cusum: [
+      {name:'Точка разворота вверх (CP, бычья)', color:'#60A4A1', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону роста — структурный сдвиг среднего значения цены вверх.'},
+      {name:'Точка разворота вниз (CP, медвежья)', color:'#C71B52', desc:'CUSUM зафиксировал накопленное отклонение выше порога в сторону падения — структурный сдвиг среднего значения цены вниз.'},
+    ],
+    hmm: [
+      {name:'Режим высокой волатильности', color:'#FF4D7A', desc:'Скрытая марковская модель относит текущий бар к состоянию с повышенной волатильностью/риском (на основе матрицы переходов и распределений по состояниям).'},
+      {name:'Режим спокойного рынка', color:'#60A4A1', desc:'HMM относит текущий бар к низковолатильному/«спокойному» состоянию. Переключение между режимами часто предшествует изменению поведения цены.'},
+    ],
+    hurst: [
+      {name:'Антиперсистентный (H < 0.45)', color:'#FF4D7A', desc:'Показатель Хёрста ниже 0.45 — ряд склонен к возврату к среднему (mean-reversion), движения чаще разворачиваются, чем продолжаются.'},
+      {name:'Персистентный (H > 0.55)', color:'#52F2C9', desc:'Показатель Хёрста выше 0.55 — ряд трендовый, движения склонны продолжаться в том же направлении (моментум).'},
+      {name:'Случайное блуждание (H ≈ 0.5)', color:'#9090B8', desc:'Показатель Хёрста около 0.5 — поведение близко к случайному блужданию, предсказуемость минимальна.'},
+    ],
+    gpr: [
+      {name:'Доверительный интервал GPR', color:'#52F2C9', desc:'Полоса неопределённости гауссовского процесса (Gaussian Process Regression) вокруг прогнозируемого среднего. Расширяется там, где данных меньше или они противоречивы.'},
+      {name:'Среднее GPR (прогноз)', color:'#2BA98B', desc:'Байесовская непараметрическая оценка тренда/прогноза. Учитывает ковариационную структуру (ядро) между точками, в отличие от обычной регрессии.'},
+    ],
+    mprof: [
+      {name:'MOTIF — повторяющийся паттерн', color:'#52F2C9', desc:'Matrix Profile нашёл пару наиболее похожих друг на друга подпоследовательностей (минимальное расстояние) — повторяющийся ценовой паттерн.'},
+      {name:'ANOMALY — аномалия (discord)', color:'#FF4D7A', desc:'Matrix Profile нашёл подпоследовательность с максимальным расстоянием до ближайшего соседа — нетипичный, аномальный участок ряда.'},
+    ],
+    te: [
+      {name:'Значимый перенос информации', color:'#FFD23F', desc:'Transfer Entropy выше порога значимости — есть статистически заметный направленный информационный поток между рядами (предсказуемость одного по другому).'},
+      {name:'Незначимый перенос', color:'#9090B8', desc:'Transfer Entropy ниже порога — направленная связь между рядами не подтверждается, вероятно шум.'},
+    ],
+    ssa: [
+      {name:'Восстановленный тренд (SSA)', color:'#FF8800', desc:'Главная(е) компонента(ы) сингулярного спектрального анализа (Singular Spectrum Analysis) — выделенный низкочастотный тренд без шумовых гармоник.'},
+    ],
+    rough: [
+      {name:'Грубая (rough, H < 0.2)', color:'#FF8800', desc:'Показатель Хёрста грубой волатильности ниже 0.2 — режим «шероховатой» волатильности, характерный для реальных рынков (всплески, кластеризация).'},
+      {name:'Умеренно грубая (0.2 ≤ H < 0.4)', color:'#FFD23F', desc:'Промежуточный режим грубости волатильности — между классической шероховатой и стандартной броуновской динамикой.'},
+      {name:'Стандартная (0.4 ≤ H ≤ 0.6)', color:'#9090B8', desc:'Показатель близок к 0.5 — волатильность ведёт себя близко к классическому броуновскому движению.'},
+      {name:'Персистентная (H > 0.6)', color:'#52F2C9', desc:'Показатель выше 0.6 — волатильность демонстрирует трендовое, персистентное поведение (редко на практике, но возможно в спокойных режимах).'},
     ],
   };
 
