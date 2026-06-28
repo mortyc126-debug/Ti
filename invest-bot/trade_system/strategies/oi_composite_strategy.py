@@ -7284,10 +7284,12 @@ class OICompositeStrategy(IStrategy):
                     atr_value=atr_pct * entry if atr_pct > 0 else 0.0,
                 )
                 if _lp is not None:
-                    stop_price = _lp.stop
+                    # Вариант В: уровневый тейк (структурная цель) + фиксированный стоп
+                    # (ATR-based, устойчив к шуму). Полная замена стопа давала WR=19%
+                    # из-за тесных уровневых стопов, выбиваемых шумом фьючерсов.
                     take_price = _lp.take
                     take_dist = _lp.take_dist_pct
-                    stop_dist = _lp.stop_dist_pct
+                    # stop_price / stop_dist остаются фиксированными
                     entry_mode = "level"
 
             # P9: уровень активации трейлинга (p50 MFE для regime/playbook).
