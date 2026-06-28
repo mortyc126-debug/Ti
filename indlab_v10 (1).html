@@ -3755,7 +3755,7 @@ const COMBO_PRESETS = [
     tagColor: '#4cc9f0',
     short: 'POC нескольких таймфреймов совпал на одном уровне — цена вернётся.',
     signal: 'neutral',
-    chartIds: ['atr','bb_pct','vol'],
+    chartIds: ['atr_w','bb_pct','vol'],
     inds: ['Donchian Channel', 'ATR', 'BB %B', 'Volume'],
     rules: ['POC = свеча с наибольшим объёмом за 50 баров', 'Цена далеко от POC > 2% → ждём возврат', 'Donchian асимметрия показывает с какой стороны давление', 'ATR растёт = цена в пустой зоне, скорость высокая'],
     read: 'POC притягивает цену. Чем дальше ушла — тем сильнее тяга. Donchian покажет когда давление иссякнет. ATR — подтвердит что цена ещё в пустой зоне.',
@@ -3781,7 +3781,7 @@ const COMBO_PRESETS = [
     tagColor: '#C71B52',
     short: 'В боковике тени направлены только в одну сторону — предсказывает куда выброс.',
     signal: 'neutral',
-    chartIds: ['alligator','mama','atr','bb_pct'],
+    chartIds: ['alligator','mama','atr_w','bb_pct'],
     inds: ['Alligator', 'MAMA/FAMA', 'ATR', 'BB %B'],
     rules: ['Тени верхние > нижних на 30%+ за 10 свечей = сопротивление у хаёв', 'Alligator разворачивается в сторону куда идут тени', 'MAMA/FAMA угол подтверждает направление'],
     read: 'Перекос теней = рынок показывает где сопротивление. Не один паттерн — 10-свечной ритм. Alligator и MAMA подтверждают направление выброса.',
@@ -3794,7 +3794,7 @@ const COMBO_PRESETS = [
     tagColor: '#60A4A1',
     short: 'Все пять мер волатильности на минимумах одновременно — взрыв неизбежен.',
     signal: 'neutral',
-    chartIds: ['bb_width','hist_vol','chaikin_vol','std_dev','atr'],
+    chartIds: ['bb_width','hist_vol','chaikin_vol','std_dev','atr_w'],
     inds: ['BB Width', 'Historical Volatility', 'Chaikin Vol', 'StdDev', 'ATR'],
     rules: ['BB Width в нижних 20% своего диапазона', 'HV в нижних 20% своего диапазона', 'Chaikin Vol сжимается (−10%+)', 'StdDev ниже 60% от нормы', 'ATR ниже 70% от среднего'],
     read: 'Сжатие волатильности по 5 независимым метрикам. Взрыв неизбежен — но направление определяется пробоем.',
@@ -3830,7 +3830,7 @@ const COMBO_PRESETS = [
 function initCombos() {
   const el = document.getElementById('combos-list');
   if (!el) return;
-  el.innerHTML = COMBO_PRESETS.map(c => `
+  el.innerHTML = COMBO_PRESETS.filter(c => c.fields).map(c => `
     <div class="card" style="margin-bottom:12px;">
       <div class="card-header" style="cursor:pointer;" onclick="toggleCombo('${c.id}')">
         <div style="display:flex;align-items:center;gap:10px;flex:1;">
