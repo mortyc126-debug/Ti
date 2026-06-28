@@ -24,11 +24,11 @@
   --red: #C71B52;
   --red-bg: rgba(199,27,82,0.1);
   --red-glow: 0 0 8px rgba(199,27,82,0.6);
-  --orange: #F4C36A;
+  --orange: #B487F8;
   --orange-bg: rgba(244,195,106,0.08);
   --blue: #7CC7FF;
   --blue-bg: rgba(124,199,255,0.08);
-  --yellow: #F4C36A;
+  --yellow: #B487F8;
   --grad2: #1A0A30;
   --mono: 'JetBrains Mono', monospace;
   --sans: 'Inter', sans-serif;
@@ -13107,7 +13107,7 @@ function ilRenderAnalysis() {
   const h5lbl = hLbl(5), h10lbl = hLbl(10), h15lbl = hLbl(15), h30lbl = hLbl(30);
 
   // Цвета: достаточно яркие для тёмного фона
-  const _accColor=(p)=>p>=62?'#52F2C9':p>=55?'#F4C36A':p<=45?'#FF6A8B':'#6a6090';
+  const _accColor=(p)=>p>=62?'#52F2C9':p>=55?'#B487F8':p<=45?'#FF6A8B':'#6a6090';
   const acc=(s)=>{
     if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
@@ -13139,7 +13139,7 @@ function ilRenderAnalysis() {
   // Легенда
   html+=`<div style="margin-bottom:14px;font-size:10px;font-family:var(--mono);color:#7870a0;line-height:1.9;">
     <span style="color:#52F2C9">≥62%</span> — устойчивый сигнал &nbsp;·&nbsp;
-    <span style="color:#F4C36A">55–61%</span> — умеренный &nbsp;·&nbsp;
+    <span style="color:#B487F8">55–61%</span> — умеренный &nbsp;·&nbsp;
     <span style="color:#7870a0">&lt;55%</span> — случайный &nbsp;·&nbsp;
     <span style="color:#FF6A8B">≤45%</span> — антисигнал<br>
     <span style="color:#52F2C9">Зелёный</span> Тренд/Бок = лучше в тренде &nbsp;·&nbsp;
@@ -13384,7 +13384,7 @@ function ilRenderMultiComp(tfLabel) {
   const fmtAcc = (v,bold)=>{
     if(v==null) return '<td style="color:#2a2050;text-align:center;font-size:10px;">—</td>';
     let col='#7870a0';
-    if(v>=62) col='#52F2C9'; else if(v>=55) col='#F4C36A'; else if(v<=45) col='#FF6A8B';
+    if(v>=62) col='#52F2C9'; else if(v>=55) col='#B487F8'; else if(v<=45) col='#FF6A8B';
     return `<td style="text-align:center;font-size:10px;color:${col};${bold?'font-weight:700;':''}">${v}%</td>`;
   };
   const fmtDelta = (cl,alt)=>{
@@ -13394,7 +13394,7 @@ function ilRenderMultiComp(tfLabel) {
     return `<td style="text-align:center;font-size:9px;color:${col};">${d>0?'+':''}${d}</td>`;
   };
   const fmtStd = (std)=>{
-    const col=std<=5?'#52F2C9':std<=10?'#F4C36A':'#FF6A8B';
+    const col=std<=5?'#52F2C9':std<=10?'#B487F8':'#FF6A8B';
     return `<td style="text-align:center;font-size:10px;color:${col};">${std}</td>`;
   };
 
@@ -13474,14 +13474,14 @@ function ilRenderMultiComp(tfLabel) {
   summary+=card('Универсальные (σ≤5, ≥55%)','#52F2C9',universals,'Работают стабильно у всех тикеров');
   summary+=card('Тикер-специфичные (σ>10)','#FF6A8B',specific,'Поведение сильно зависит от инструмента');
   summary+=card('Альт-формула лучше в большинстве','#7A8CFF',altBetter,'У этих индикаторов альт-интерпретация точнее для ≥50% тикеров');
-  summary+=card('Классика надёжнее','#F4C36A',clBetter,'Альт-формула у большинства тикеров хуже классики');
+  summary+=card('Классика надёжнее','#B487F8',clBetter,'Альт-формула у большинства тикеров хуже классики');
   summary+=`</div>`;
 
   // Легенда колонок
   const legend = `<div style="margin-bottom:8px;font-size:9px;color:#4a4060;font-family:var(--mono);line-height:1.8;">
     ТФ: <span style="color:#a898c8;">${tfLabel||''}</span> · горизонт H15 ·
-    <span style="color:#52F2C9">≥62%</span> устойчивый · <span style="color:#F4C36A">55–61%</span> умеренный · <span style="color:#7870a0">&lt;55%</span> случайный · <span style="color:#FF6A8B">≤45%</span> антисигнал<br>
-    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:#52F2C9">≤5</span> = универсальный · <span style="color:#F4C36A">6–10</span> = умеренно специфичный · <span style="color:#FF6A8B">&gt;10</span> = тикер-специфичный<br>
+    <span style="color:#52F2C9">≥62%</span> устойчивый · <span style="color:#B487F8">55–61%</span> умеренный · <span style="color:#7870a0">&lt;55%</span> случайный · <span style="color:#FF6A8B">≤45%</span> антисигнал<br>
+    <b style="color:var(--text3);">Разброс σ</b>: <span style="color:#52F2C9">≤5</span> = универсальный · <span style="color:#B487F8">6–10</span> = умеренно специфичный · <span style="color:#FF6A8B">&gt;10</span> = тикер-специфичный<br>
     ${onlyAlt?'':'<b style="color:var(--text3);">Δ</b> = альт − классика · '}
     <b style="color:var(--text3);">Альт лучше</b>: % тикеров, где альт-формула точнее классики
   </div>`;
@@ -13587,7 +13587,7 @@ function _renderAnalysisInner(panel) {
       if (!s || s.acc==null) return '';
       const pct = Math.round(s.acc*100);
       const mv = s.avgMove!=null ? `·${s.avgMove>=0?'+':''}${s.avgMove.toFixed(2)}%` : '';
-      const col = pct>=65?'#52D8A0':pct>=55?'#F4C36A':'#C06070';
+      const col = pct>=65?'#52D8A0':pct>=55?'#B487F8':'#C06070';
       return `<span class="analysis-tf-chip" style="color:${col};background:rgba(0,0,0,0.25)">${h}св: ${pct}% точн${mv}</span>`;
     }).join('');
     return chips ? `<div class="analysis-tf-row">${chips}</div>` : '';
