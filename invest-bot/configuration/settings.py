@@ -79,15 +79,23 @@ class TradingSettings:
     delay_start_after_open: int = 10
     stop_trade_before_close: int = 300
     stop_signals_before_close: int = 60
-    # Доля от среднего объёма последних свечей по тикеру, которую разрешено
-    # выставить в одном ордере (защита от проскальзывания на неликвиде).
     max_volume_participation: float = 0.1
-    # Лимитные ордера: интервал между попытками re-price (секунды)
     limit_reprice_interval_sec: int = 15
-    # Максимум re-price попыток перед переходом на маркет
     limit_reprice_max_attempts: int = 3
-    # Порог ухода цены против нас (доля от цены) для немедленного перехода на маркет
-    limit_adverse_move_pct: float = 0.0006  # 0.06%
+    limit_adverse_move_pct: float = 0.0006
+    # Мёртвая зона внутри дня (UTC): сигналы в этом окне отклоняются.
+    # MOEX: 08:30-12:00 UTC = 11:30-15:00 MSK — обеденный боковик.
+    # Формат "HH:MM-HH:MM". Пусто = фильтр отключён.
+    intraday_dead_zone_utc: str = "08:30-12:00"
+    # Дневной режимный гейт: если рынок сегодня в боковике (ranging/low_vol)
+    # по дневным закрытиям — сигналы не генерируются. 1=включён, 0=выключен.
+    daily_trend_gate: bool = True
+    # Корреляционный фильтр: максимум одновременных позиций в одной группе
+    # (нефть, металлы, банки и т.д.). 0 = фильтр отключён.
+    corr_max_sector_positions: int = 2
+    # ATR-масштабирование лотов: 1=включено. Инструменты с высоким ATR
+    # получают меньше лотов (единый риск в рублях на сделку).
+    atr_lot_scale: bool = True
 
 
 @dataclass(eq=False, repr=True)

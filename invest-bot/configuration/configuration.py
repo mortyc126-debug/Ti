@@ -29,11 +29,16 @@ class ProgramConfiguration:
             min_rub_on_account=int(config["TRADING_ACCOUNT"]["MIN_RUB_ON_ACCOUNT"])
         )
 
+        ts = config["TRADING_SETTINGS"]
         self.__trading_settings = TradingSettings(
-            delay_start_after_open=int(config["TRADING_SETTINGS"]["DELAY_START_AFTER_EXCHANGE_OPEN_SECONDS"]),
-            stop_trade_before_close=int(config["TRADING_SETTINGS"]["STOP_TRADE_BEFORE_EXCHANGE_CLOSE_SECONDS"]),
-            stop_signals_before_close=int(config["TRADING_SETTINGS"]["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"]),
-            max_volume_participation=float(config["TRADING_SETTINGS"].get("MAX_VOLUME_PARTICIPATION", "0.1"))
+            delay_start_after_open=int(ts["DELAY_START_AFTER_EXCHANGE_OPEN_SECONDS"]),
+            stop_trade_before_close=int(ts["STOP_TRADE_BEFORE_EXCHANGE_CLOSE_SECONDS"]),
+            stop_signals_before_close=int(ts["STOP_SIGNALS_BEFORE_EXCHANGE_CLOSE_MINUTES"]),
+            max_volume_participation=float(ts.get("MAX_VOLUME_PARTICIPATION", "0.1")),
+            intraday_dead_zone_utc=ts.get("INTRADAY_DEAD_ZONE_UTC", "08:30-12:00"),
+            daily_trend_gate=ts.get("DAILY_TREND_GATE", "1") == "1",
+            corr_max_sector_positions=int(ts.get("CORR_MAX_SECTOR_POSITIONS", "2")),
+            atr_lot_scale=ts.get("ATR_LOT_SCALE", "1") == "1",
         )
 
         if "MEGA_ALERTS" in config:
