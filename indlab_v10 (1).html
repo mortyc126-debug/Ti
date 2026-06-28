@@ -896,10 +896,10 @@ input[type=range] { touch-action: none; }
         "></div>
         <!-- Кнопки навигации по графику (зум + скролл) -->
         <div id="cp-nav-btns" style="position:absolute;bottom:6px;right:8px;display:flex;gap:4px;z-index:6;">
-          <button onclick="chartCandleW=Math.max(4,chartCandleW-2);chartRedraw();" title="Уменьшить масштаб (−)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
-          <button onclick="chartCandleW=Math.min(40,chartCandleW+2);chartRedraw();" title="Увеличить масштаб (+)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
-          <button onclick="chartOffset=Math.min(chartCandles.length-10,chartOffset+Math.max(10,Math.floor(chartCandles.length/10)));chartRedraw();" title="Листать назад (в историю) ◀" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:#52F2C9;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">◀</button>
-          <button onclick="chartOffset=Math.max(0,chartOffset-Math.max(10,Math.floor(chartCandles.length/10)));chartRedraw();" title="Листать вперёд (к последнему) ▶" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:#52F2C9;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">▶</button>
+          <button onclick="chartCandleW=Math.max(4,chartCandleW-2);chartRedraw();" title="Уменьшить зум (Ctrl+колесо вниз)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
+          <button onclick="chartCandleW=Math.min(40,chartCandleW+2);chartRedraw();" title="Увеличить зум (Ctrl+колесо вверх)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,0,110,0.35);background:rgba(20,10,36,0.85);color:#FF4D9D;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+          <button onclick="chartOffset=Math.min(chartCandles.length-1,chartOffset+Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="В прошлое (колесо вниз / свайп влево)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:#52F2C9;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">◀</button>
+          <button onclick="chartOffset=Math.max(0,chartOffset-Math.max(10,Math.floor(chartCandles.length/8)));chartRedraw();" title="Вперёд к последней свече (колесо вверх / свайп вправо)" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(82,242,201,0.35);background:rgba(20,10,36,0.85);color:#52F2C9;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">▶</button>
           <button onclick="chartOffset=0;chartRedraw();" title="К последней свече" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,10,36,0.85);color:#9090B8;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--mono);">⇥</button>
         </div>
         <!-- Candle info toggle bar -->
@@ -5412,38 +5412,49 @@ async function chartLoad() {
       document.getElementById('chart-title').textContent = raw;
     }
 
-    // Calculate date range
-    const now = new Date();
-    const from = new Date(now);
-    const tfDays = {
-      'CANDLE_INTERVAL_1_MIN': 1,
-      'CANDLE_INTERVAL_5_MIN': 3,
-      'CANDLE_INTERVAL_15_MIN': 7,
-      'CANDLE_INTERVAL_HOUR': 30,
-      'CANDLE_INTERVAL_DAY': 365,
-      'CANDLE_INTERVAL_WEEK': 730,
+    // Лимиты API Tinkoff на один запрос GetCandles
+    const TF_CHUNK_DAYS = {
+      'CANDLE_INTERVAL_1_MIN':  1,
+      'CANDLE_INTERVAL_5_MIN':  1,
+      'CANDLE_INTERVAL_15_MIN': 1,
+      'CANDLE_INTERVAL_HOUR':   7,
+      'CANDLE_INTERVAL_DAY':   365,
+      'CANDLE_INTERVAL_WEEK':  365,
     };
-    from.setDate(from.getDate() - (tfDays[tf] || 365));
+    // Сколько чанков запрашивать — итоговая глубина истории
+    const TF_CHUNKS = {
+      'CANDLE_INTERVAL_1_MIN':  2,   // 2 дня
+      'CANDLE_INTERVAL_5_MIN':  7,   // 7 дней
+      'CANDLE_INTERVAL_15_MIN': 14,  // 14 дней
+      'CANDLE_INTERVAL_HOUR':   12,  // 12 недель ≈ 3 месяца
+      'CANDLE_INTERVAL_DAY':    1,   // 1 год (один запрос)
+      'CANDLE_INTERVAL_WEEK':   2,   // 2 года
+    };
+    const chunkDays = TF_CHUNK_DAYS[tf] || 365;
+    const chunks    = TF_CHUNKS[tf] || 1;
 
-    // Fetch candles
-    const candleResp = await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'accept': 'application/json' },
-      body: JSON.stringify({
-        figi: figi,
-        from: from.toISOString(),
-        to:   now.toISOString(),
-        interval: tf,
-        candleSourceType: 'CANDLE_SOURCE_UNSPECIFIED'
-      })
-    });
-    if (!candleResp.ok) {
-      const errText = await candleResp.text();
-      throw new Error(`Ошибка свечей: ${candleResp.status} — ${errText.slice(0,120)}`);
+    // Загружаем чанками от сегодня назад
+    const now = new Date();
+    let allRaw = [];
+    for (let i = 0; i < chunks; i++) {
+      const chunkTo   = new Date(now); chunkTo.setDate(chunkTo.getDate() - i * chunkDays);
+      const chunkFrom = new Date(chunkTo); chunkFrom.setDate(chunkFrom.getDate() - chunkDays);
+      chartStatus(`Загрузка истории... ${i+1}/${chunks}`, 'var(--text3)');
+      const resp = await fetch(ilTinvestUrl(chartGetProxy(), '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify({ figi, from: chunkFrom.toISOString(), to: chunkTo.toISOString(), interval: tf, candleSourceType: 'CANDLE_SOURCE_UNSPECIFIED' })
+      });
+      if (!resp.ok) { if (i === 0) { const t = await resp.text(); throw new Error(`Ошибка свечей: ${resp.status} — ${t.slice(0,120)}`); } break; }
+      const d = await resp.json();
+      allRaw = (d.candles || []).concat(allRaw);
     }
-    const candleData = await candleResp.json();
-    const rawCandles = candleData.candles || [];
-    if (!rawCandles.length) throw new Error('Нет данных свечей для этого инструмента');
+    if (!allRaw.length) throw new Error('Нет данных свечей для этого инструмента');
+
+    // Дедупликация по времени и сортировка
+    const seen = new Set();
+    const rawCandles = allRaw.filter(c => { const k=c.time; if(seen.has(k))return false; seen.add(k); return true; })
+      .sort((a,b)=>a.time<b.time?-1:1);
 
     // Parse candles
     chartCandles = rawCandles.map(c => ({
@@ -9632,13 +9643,12 @@ function cpInitCanvasEvents() {
   c._cp = true;
   c.addEventListener('wheel', e => {
     e.preventDefault();
-    // Колесо = зум (как TradingView). Drag мышью = скролл по истории.
-    // Shift+колесо = скролл (для тех кто привык)
-    if (e.shiftKey) {
-      const step = Math.max(1, Math.round(3 * Math.abs(e.deltaY) / 100));
-      chartOffset = Math.max(0, Math.min(chartCandles.length - 10, chartOffset + (e.deltaY > 0 ? step : -step)));
-    } else {
+    // Колесо = скролл по истории. Ctrl+колесо = зум.
+    if (e.ctrlKey || e.metaKey) {
       chartCandleW = Math.max(4, Math.min(40, chartCandleW + (e.deltaY < 0 ? 1 : -1)));
+    } else {
+      const step = Math.max(1, Math.round(Math.max(3, Math.floor(chartCandles.length / 40)) * Math.abs(e.deltaY) / 100));
+      chartOffset = Math.max(0, Math.min(chartCandles.length - 1, chartOffset + (e.deltaY > 0 ? step : -step)));
     }
     chartRedraw();
   }, { passive:false });
