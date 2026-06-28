@@ -995,8 +995,9 @@ def _adaptive_threshold(base: float, regime: str) -> float:
     """
     # trending_down был 0.85 (опускал порог) → убыток -22% net на 55% сделок.
     # Поднято до 1.50: в нисходящем режиме нужно сильное подтверждение.
+    # low_vol: было 0.90 → 1.30. В боковике стопы бьют случайно (1118 стопов, net=-705%).
     mods = {"trending_up": 0.85, "trending_down": 1.50, "ranging": 1.0,
-            "high_vol": 1.25, "low_vol": 0.90, "stress": 1.40}
+            "high_vol": 1.25, "low_vol": 1.30, "stress": 1.40}
     return base * mods.get(regime, 1.0)
 
 
