@@ -13107,17 +13107,17 @@ function ilRenderAnalysis() {
   const h5lbl = hLbl(5), h10lbl = hLbl(10), h15lbl = hLbl(15), h30lbl = hLbl(30);
 
   // Цвета: достаточно яркие для тёмного фона
-  const _accColor=(p)=>p>=62?'#52F2C9':p>=55?'#F4C36A':p<=45?'#FF6A8B':'#7870a0';
+  const _accColor=(p)=>p>=62?'#52F2C9':p>=55?'#F4C36A':p<=45?'#FF6A8B':'#6a6090';
   const acc=(s)=>{
     if(!s||s.acc==null||s.n<5) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
-    return `<span style="color:${_accColor(p)}${p>=62?';font-weight:600':''}">${p}%</span>`;
+    return `<span style="color:${_accColor(p)}">${p}%</span>`;
   };
   const regAcc=(s, minN)=>{
     minN = minN==null ? 3 : minN;
     if(!s||s.acc==null||s.n<minN) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
-    return `<span style="color:${_accColor(p)}${p>=62?';font-weight:600':''}">${p}%</span>`;
+    return `<span style="color:${_accColor(p)}">${p}%</span>`;
   };
   // Альт-сигналы — события редче классики, поэтому минимум выборки ниже (2 вместо 3)
   const regAccAlt=(s)=>regAcc(s,2);
@@ -13182,10 +13182,10 @@ function ilRenderAnalysis() {
           <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h10lbl}</th>
           <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h15lbl}</th>
           <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h30lbl}</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#52F2C9;border-bottom:1px solid #1e1830;border-left:1px solid #2a1f3d;white-space:nowrap;">Тренд</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#C9A0FF;border-bottom:1px solid #1e1830;white-space:nowrap;">Бок</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#F4C36A;border-bottom:1px solid #1e1830;white-space:nowrap;">Выс.вол</th>
-          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7CC7FF;border-bottom:1px solid #1e1830;white-space:nowrap;">Низ.вол</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;border-left:1px solid #2a1f3d;white-space:nowrap;">Тренд</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;white-space:nowrap;">Бок</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;white-space:nowrap;">Выс.вол</th>
+          <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;white-space:nowrap;">Низ.вол</th>
         </tr></thead>`;
     ids.filter(id=>{ const s=r.stats[id]; return s&&(s.h5?.n>=5||s.h10?.n>=5||s.h15?.n>=5||s.h30?.n>=5); }).forEach(id=>{
       const s5=r.stats[id].h5, s10=r.stats[id].h10, s15=r.stats[id].h15, s30=r.stats[id].h30;
@@ -13225,7 +13225,7 @@ function ilRenderAnalysis() {
     html+=`<div id="ilgrp-rest" style="margin-bottom:14px;"><div style="font-size:10px;color:#7068a0;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding:5px 8px;background:rgba(255,255,255,0.015);">Прочие</div>
       ${_ilCopyToolbar('ilgrp-rest')}
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
-        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h10lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#52F2C9;border-left:1px solid #2a1f3d;">Тренд</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#C9A0FF;">Бок</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#FF9F40;">Выс.вол</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#7CC7FF;">Низ.вол</th></tr>`;
+        <tr style="background:#13101e;"><th style="text-align:left;padding:4px 8px;font-weight:400;font-size:10px;color:#7068a0;">Индикатор</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h5lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h10lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h15lbl}</th><th style="padding:4px 8px;font-weight:600;font-size:11px;color:#a090c8;">${h30lbl}</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-left:1px solid #2a1f3d;">Тренд</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;">Бок</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;">Выс.вол</th><th style="padding:4px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;">Низ.вол</th></tr>`;
     rest.filter(id=>{ const s=r.stats[id]; return s&&(s.h5?.n>=5||s.h10?.n>=5||s.h15?.n>=5||s.h30?.n>=5); }).forEach(id=>{
       const s5=r.stats[id].h5,s10=r.stats[id].h10,s15=r.stats[id].h15,s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T,s15R=r.stats[id].h15R,s15HV=r.stats[id].h15HV,s15LV=r.stats[id].h15LV;
