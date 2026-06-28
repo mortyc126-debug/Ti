@@ -904,7 +904,7 @@ input[type=range] {
             padding:7px 32px 7px 10px;font-family:var(--mono);font-size:11px;color:var(--text);outline:none;">
         <button onclick="chartToggleTokenVis()" id="chart-token-eye"
           style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
-            color:var(--text3);cursor:pointer;font-size:12px;padding:0;">👁</button>
+            color:var(--text3);cursor:pointer;font-size:12px;padding:0;">○</button>
       </div>
       <input id="chart-proxy" type="text" placeholder="https://your-worker.workers.dev (прокси T-Invest, опционально)"
         autocomplete="off" oninput="chartSaveProxy()"
@@ -937,7 +937,7 @@ input[type=range] {
       <div style="flex:1;"></div>
       <button class="cp-viewmode active" onclick="chartSetViewMode('candle',this)">Свечи</button>
       <button class="cp-viewmode" onclick="chartSetViewMode('line',this)">Линия</button>
-      <button id="cp-measure-btn" onclick="chartToggleMeasure(this)" title="Выделить область — Δ% / время / пункты цены">📐 Измерить</button>
+      <button id="cp-measure-btn" onclick="chartToggleMeasure(this)" title="Выделить область — Δ% / время / пункты цены">[ ] Измерить</button>
     </div>
   </div>
 
@@ -5571,8 +5571,8 @@ function chartToggleTokenVis() {
   const inp = document.getElementById('chart-token');
   const btn = document.getElementById('chart-token-eye');
   if (!inp) return;
-  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
-  else { inp.type = 'password'; btn.textContent = '👁'; }
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '●'; }
+  else { inp.type = 'password'; btn.textContent = '○'; }
 }
 
 function chartTickerInput() {
@@ -5908,13 +5908,10 @@ function _chartDrawAltInd() {
     if (activeAlt.length) {
       legend.innerHTML = activeAlt.map((x,i) => {
         const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-        const fam = (typeof _ilAltFamilyOf === 'function') ? _ilAltFamilyOf(x.id) : null;
-        const desc = (fam && typeof _IL_ALT_FAMILY_DESC !== 'undefined') ? _IL_ALT_FAMILY_DESC[fam] : '';
-        return `<span style="color:${palette[i%palette.length]};font-weight:600;">◆ ${name}</span>`
-          + (desc ? `<span style="color:#9080b0;font-size:9px;margin-left:6px;">${desc}</span>` : '');
-      }).join('<br>') + '<br><span style="color:#4a4060;font-size:8px;">· ◆ в списке Инд. чтобы убрать</span>';
+        return `<span style="color:${palette[i%palette.length]};">◆ ${name}</span>`;
+      }).join('<span style="color:#3a3060;"> · </span>');
     } else {
-      legend.innerHTML = '<span style="color:#4a4060;">Активируй ◆ (фиолетовый) у индикаторов в списке Инд.</span>';
+      legend.innerHTML = '<span style="color:#4a4060;">◆ (фиолетовый) у индикаторов в списке Инд.</span>';
     }
   }
 
