@@ -297,6 +297,143 @@ MICROSTRUCTURE_AGREE_BOOST = 1.3    # множитель силы в гейте 
 # и ломает тикеры где ZSCORE прямой. Оставлено для возможного per-ticker подхода.
 _REGIME_METHOD_SIGN: dict[str, dict[str, int]] = {}
 
+# ── Альт-трансформации скоров (по данным IndLab) ─────────────────────────────
+# Для каждой категории — своя логика переинтерпретации классического скора.
+# Применяется к scores_for_composite перед взвешиванием.
+# Категории и методы выбраны там, где alt лучше классики ≥80% тикеров.
+_ALT_OSC: frozenset = frozenset({
+    # Осцилляторы: дивергенция цены и скора → антисигнал (lookback=10)
+    "FISHER_RSI", "RMI", "VZO", "ZSCORE", "T3_SIGNAL", "ZLEMA_SIGNAL",
+})
+_ALT_TREND: frozenset = frozenset({
+    # Тренд: климакс-истощение (4 бара на экстремуме → разворот)
+    "PRICE_TREND", "TREND_QUALITY", "ADAPTIVE_MA", "MA_TENSION", "PRICE_ACCEL",
+})
+_ALT_VOLUME: frozenset = frozenset({
+    # Объём/деньги: сигнал без подтверждения объёмом → антисигнал
+    "CUMUL_DELTA", "TWIGGS", "KLINGER", "AGGRESSOR_FLOW",
+    "VOL_MOMENTUM", "VOL_MOMENTUM_TS",
+})
+_ALT_STRUCTURE: frozenset = frozenset({
+    # Структура/цикл: инверсия при боковике (Chop ≥ 61.8)
+    "CYBER_PHASE", "ICHIMOKU_SIGNAL", "ALLIGATOR", "FRACTAL",
+    "MAMA_FAMA", "SINEWAVE_SIGNAL",
+})
+_ALT_DSP: frozenset = frozenset({
+    # DSP/сглаживание: первый разворот знака → антисигнал (ложный флип)
+    "NADARAYA_WATSON", "FRACTIONAL_DIFF", "CHANGE_POINT", "ENTROPY",
+    "HAWKES_SIGNAL",
+})
+# Методы без альт-трансформации (классика лучше): каналы, SSA, MFI-подобные
+_ALT_NONE: frozenset = frozenset({
+    "BB_KELTNER_SQUEEZE", "DONCHIAN", "MA_ENVELOPE", "SSA_SIGNAL",
+    "OI_SQUEEZE", "INST_OI",
+})
+
+_ALT_LOOKBACK = 10   # окно дивергенции для осцилляторов и объёма
+_ALT_STREAK   = 4    # баров подряд на экстремуме для тренда
+_ALT_CHOP_THR = 61.8 # порог Choppiness Index для структурного инвертирования
+
+
+def _choppiness_index(candles: list, period: int = 14) -> float:
+    """Choppiness Index — мера хаотичности рынка. >61.8 = боковик/шум."""
+    if len(candles) < period + 1:
+        return 50.0
+    window = candles[-period - 1:]
+    highs  = [float(c.high.units) + float(c.high.nano) / 1e9 if hasattr(c.high, 'units') else float(c.high) for c in window]
+    lows   = [float(c.low.units)  + float(c.low.nano)  / 1e9 if hasattr(c.low, 'units')  else float(c.low)  for c in window]
+    closes = [float(c.close.units)+ float(c.close.nano)/ 1e9 if hasattr(c.close,'units')  else float(c.close) for c in window]
+    try:
+        true_ranges = []
+        for i in range(1, len(window)):
+            tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
+            true_ranges.append(tr)
+        atr_sum = sum(true_ranges)
+        high_max = max(highs[1:])
+        low_min  = min(lows[1:])
+        rng = high_max - low_min
+        if rng < 1e-9 or atr_sum < 1e-9:
+            return 50.0
+        import math
+        ci = 100.0 * math.log10(atr_sum / rng) / math.log10(period)
+        return max(0.0, min(100.0, ci))
+    except Exception:
+        return 50.0
+
+
+def _apply_alt_transforms(
+    names: list,
+    scores_fc: list,
+    score_history: dict,   # name → list[float] (raw, уже обновлены)
+    closes: list,
+    candles: list,
+) -> list:
+    """
+    Применяет alt-трансформации к scores_for_composite.
+    Возвращает новый список той же длины.
+    """
+    chop = _choppiness_index(candles)
+    result = list(scores_fc)
+
+    for i, name in enumerate(names):
+        if name in _ALT_NONE:
+            continue
+        s = scores_fc[i]
+        hist = score_history.get(name, [])
+
+        if name in _ALT_OSC:
+            # Дивергенция: цена обновила экстремум, а скор — нет → антисигнал
+            lb = _ALT_LOOKBACK
+            if len(hist) >= lb and len(closes) >= lb:
+                ph = closes[-lb:]
+                sh = [h for h in hist[-lb:] if h is not None]
+                if sh and ph:
+                    p_max, p_min = max(ph), min(ph)
+                    s_max, s_min = max(sh), min(sh)
+                    if closes[-1] >= p_max and s < s_max:
+                        result[i] = -abs(s) if s != 0 else -0.3   # медвежья дивергенция
+                    elif closes[-1] <= p_min and s > s_min:
+                        result[i] =  abs(s) if s != 0 else  0.3   # бычья дивергенция
+
+        elif name in _ALT_TREND:
+            # Климакс-истощение: 4+ баров подряд на максимуме |score| → разворот
+            if len(hist) >= _ALT_STREAK:
+                nz = [v for v in hist if v is not None]
+                if nz:
+                    max_abs = max(abs(v) for v in nz)
+                    if max_abs > 0:
+                        win = hist[-_ALT_STREAK:]
+                        if all(v is not None and v >= max_abs for v in win):
+                            result[i] = -max_abs
+                        elif all(v is not None and v <= -max_abs for v in win):
+                            result[i] =  max_abs
+
+        elif name in _ALT_VOLUME:
+            # Нет подтверждения объёмом → антисигнал
+            if s != 0 and candles and len(candles) >= _ALT_LOOKBACK + 1:
+                vols = [float(c.volume) if hasattr(c, 'volume') else 0.0 for c in candles]
+                vol_avg = sum(vols[-_ALT_LOOKBACK-1:-1]) / _ALT_LOOKBACK if _ALT_LOOKBACK > 0 else 0.0
+                if vol_avg > 0 and vols[-1] < vol_avg * 0.7:
+                    result[i] = -s   # сигнал без объёмного подтверждения
+
+        elif name in _ALT_STRUCTURE:
+            # Боковик (Chop ≥ 61.8) → инвертируем структурный сигнал
+            if chop >= _ALT_CHOP_THR and s != 0:
+                result[i] = -s
+
+        elif name in _ALT_DSP:
+            # Первый разворот знака DSP-фильтра → антисигнал (ложный флип)
+            if len(hist) >= 2:
+                nz_hist = [v for v in hist[:-1] if v is not None and v != 0]
+                if nz_hist:
+                    last_sign = 1 if nz_hist[-1] > 0 else -1
+                    cur_sign  = 1 if s > 0 else (-1 if s < 0 else 0)
+                    if cur_sign != 0 and cur_sign != last_sign:
+                        result[i] = -cur_sign * abs(s)   # первый флип = ложный
+
+    return result
+
+
 _1MIN_WEIGHT_MODS: dict[str, float] = {
     "FISHER_RSI":       0.2,   # RSI-осциллятор
     "RMI":              0.2,   # RSI-вариант
@@ -7788,6 +7925,20 @@ class OICompositeStrategy(IStrategy):
             scores_for_composite = norm_scores
         else:
             scores_for_composite = scores
+
+        # Alt-трансформации: дивергенция/истощение/объём/чоп/флип-фейд
+        # применяются к нормализованным скорам, до взвешивания.
+        # История берётся из __ic_score_buf (raw), что корректно:
+        # трансформация работает с тем, что метод "думал" раньше.
+        if self.__candles and len(self.__candles) >= _ALT_LOOKBACK:
+            _closes_for_alt = [_to_f(c.close) for c in self.__candles]
+            scores_for_composite = _apply_alt_transforms(
+                list(ALL_METHOD_NAMES),
+                scores_for_composite,
+                self.__ic_score_buf,
+                _closes_for_alt,
+                self.__candles,
+            )
 
         # Layer 2: режимные мультипликаторы — взвешенная смесь по ВСЕМ режимам
         # (regime_probs), а не жёсткий выбор одного. Динамические (из истории)
