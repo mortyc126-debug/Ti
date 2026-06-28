@@ -8545,6 +8545,13 @@ function _sysRenderStaticSections() {
       {label:'Согласие всех восьми', lc:NC, text:'SAR не переключается + SuperTrend широкий + Elder Impulse один цвет + Elder Ray максимальная асимметрия + Vortex в экстремуме расхождения + ADX в пике + McGinley стабильна + Envelopes максимальные. Все восемь в одну сторону на нитке = выброс 100%.'},
     ], ['supertrend','dmi','vortex','elder_ray','elder_impulse','adx','mcginley','envelopes']),
 
+    sec('🧪', 'Продвинутая статистика / DSP', [
+      {label:'Что внутри', lc:CL, text:'Nadaraya-Watson (ядерная регрессия), Kalman Filter, CUSUM (детектор структурных сдвигов), HMM (скрытый режим волатильности), Hurst Exponent (персистентность), Gaussian Process Regression (байесовская регрессия с доверительным интервалом), Matrix Profile (поиск мотивов/аномалий), Transfer Entropy (направленная причинность объём↔цена), SSA (разложение тренда без лага), Rough Volatility (грубость волатильности).'},
+      {label:'Неклассика: связка режима', lc:NC, text:'HMM + Hurst вместе: HMM говорит «волатильность высокая/низкая», Hurst говорит «трендовый/mean-reverting». Комбинация из четырёх квадрантов задаёт класс стратегии раньше, чем сработает обычный осциллятор.'},
+      {label:'Неклассика: причинность объёма', lc:NC, text:'Transfer Entropy в обе стороны проверяет, действительно ли объём ведёт цену здесь и сейчас, а не предполагает это по умолчанию, как делает классический OBV/MFI.'},
+      {label:'Подробные карточки', lc:IND, text:'После активации открой вкладку «Анализ» рядом с «Методы» — там для каждого из десяти есть отдельная карточка с классической и неклассической трактовкой.'},
+    ], ['nw','kalman','cusum','hmm','hurst','gpr','mprof','te','ssa','rough']),
+
   ].join('');
 }
 
@@ -9730,6 +9737,8 @@ function cpInitIndPanel() {
     'supertrend','fisher','pivot','zigzag','mcginley','tsi','ult_osc','dpo',
     // Продвинутая статистика
     'nw','kalman','cusum','hmm','hurst','gpr','mprof','te','ssa','rough',
+    // Доп. панели (рисуются, но не были в списке chart-able)
+    'mama','ebs','tmf','frac_dim','efficiency_ratio','entropy','cum_delta','cyber_cycle','bb_pct','std_dev',
   ]);
 
   let html = '';
