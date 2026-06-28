@@ -955,6 +955,11 @@ input[type=range] { touch-action: none; }
           <div class="cpnl-hdr"><span class="cpnl-lbl">MACD</span><span class="cpnl-val" id="chart-macd-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="macd" title="Скрыть">◉</span><span class="cpnl-del" data-id="macd" title="Убрать">✕</span></div>
           <canvas id="chart-macd-canvas" style="width:100%;height:78px;display:block;"></canvas>
         </div>
+        <!-- Альт-версии активных индикаторов: одна общая панель, линии score -2..2 -->
+        <div id="chart-altind-panel" style="display:none;height:90px;position:relative;border-top:1px solid rgba(255,0,110,0.15);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl" style="color:#FF006E;">Альт</span><span id="chart-altind-legend" style="flex:1;font-size:9px;color:var(--text3);font-family:var(--mono);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></span></div>
+          <canvas id="chart-altind-canvas" style="width:100%;height:90px;display:block;"></canvas>
+        </div>
         <div id="chart-stoch-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
           <div class="cpnl-hdr"><span class="cpnl-lbl">Stochastic</span><span class="cpnl-val" id="chart-stoch-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="stoch" title="Скрыть">◉</span><span class="cpnl-del" data-id="stoch" title="Убрать">✕</span></div>
           <canvas id="chart-stoch-canvas" style="width:100%;height:70px;display:block;"></canvas>
@@ -5803,6 +5808,53 @@ function chartRedraw() {
   if (chartInds.cyber_cycle)  _indDrawPanel('cyber_cycle');
   if (chartInds.mama)         _indDrawOverlay('mama');
   _drawOverlayNames();
+  try { _chartDrawAltInd(); } catch(e) { console.warn('chartDrawAltInd', e); }
+}
+
+// ── Альт-версии активных индикаторов: одна общая панель ────
+// Рисует score-ряды (-2..2) для тех активных на графике id, у которых
+// в il_alt_pref выбрана альт-формула (см. _ilAltPrefGet/_ilAggGetSeries) —
+// это та же неклассика, что считается на «Точности», просто наложенная на график.
+function _chartDrawAltInd() {
+  const panel = document.getElementById('chart-altind-panel');
+  const legend = document.getElementById('chart-altind-legend');
+  if (!panel) return;
+  if (typeof _ilAggGetSeries !== 'function' || !chartCandles.length) { panel.style.display = 'none'; return; }
+  const cache = _ilAggGetSeries();
+  if (!cache) { panel.style.display = 'none'; return; }
+  const candidates = Object.keys(chartInds).filter(id => chartInds[id])
+    .map(id => ({ id, it: _ilAggIndScore(id, cache) }))
+    .filter(x => x.it && x.it.hasAlt);
+  const activeAlt = candidates.filter(x => x.it.useAlt);
+  const palette = ['#FF006E','#52F2C9','#3DD9FF','#FFD166','#D65CFF','#FFB84D','#7B61FF','#52D8A0'];
+  if (legend) {
+    const onChips = activeAlt.map((x,i) => {
+      const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
+      return `<span onclick="ilAggToggleAlt('${x.id}')" title="Клик — вернуть классику" style="cursor:pointer;color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
+    }).join('');
+    const offCandidates = candidates.filter(x => !x.it.useAlt);
+    const offChips = offCandidates.map(x => {
+      const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
+      return `<span onclick="ilAggToggleAlt('${x.id}')" title="Клик — показать альт-версию" style="cursor:pointer;opacity:.45;margin-right:8px;">+ ${name}</span>`;
+    }).join('');
+    legend.innerHTML = onChips + (offChips ? `<span style="opacity:.5;">| доступно: </span>${offChips}` : '');
+  }
+  if (!activeAlt.length) { panel.style.display = candidates.length ? 'block' : 'none'; if(!candidates.length) return; }
+  else panel.style.display = 'block';
+  const cv = document.getElementById('chart-altind-canvas');
+  if (!cv) return;
+  const dpr = devicePixelRatio || 1, W = cv.offsetWidth, H = cv.offsetHeight;
+  if (!W || !H) return;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0,0,W,H);
+  const win = _win(W);
+  const { startIdx, endIdx, xOf } = win;
+  const toY = v => H/2 - (v/2) * (H/2 - 6); // фиксированный диапазон -2..2
+  _pGrid(ctx, W, H/2);
+  activeAlt.forEach((x,i) => {
+    const arr = cache.ssAlt[x.id];
+    if (arr) _pl(ctx, W, H, arr, palette[i%palette.length], 1.5, startIdx, endIdx, xOf, toY);
+  });
 }
 
 // Draw extra overlay line on main canvas (for Alligator etc)
@@ -8519,7 +8571,14 @@ function _ilAggVote(labelsOrIds) {
   else if (ratio <= -0.6) sig = 'sell-strong'; else if (ratio <= -0.2) sig = 'sell';
   return { sig, items };
 }
-function ilAggToggleAlt(id) { _ilAltPrefToggle(id); if (typeof cpRenderCombos === 'function') cpRenderCombos(); if (typeof _sysOptimalSection === 'function' && typeof _sysRenderStaticSections === 'function') _sysRenderStaticSections(); }
+function ilAggToggleAlt(id) {
+  _ilAltPrefToggle(id);
+  if (typeof cpRenderCombos === 'function') try { cpRenderCombos(); } catch(e) {}
+  if (typeof _sysRenderStaticSections === 'function') try { _sysRenderStaticSections(); } catch(e) {}
+  if (typeof chartCandles !== 'undefined' && chartCandles.length) try { chartRedraw(); } catch(e) {}
+  const _anaPanel = document.getElementById('cp-analysis-panel');
+  if (_anaPanel && typeof _renderAnalysisInner === 'function') try { _renderAnalysisInner(_anaPanel); } catch(e) {}
+}
 
 function cpRenderCombos() {
   const el = document.getElementById('cp-combo-inner');
@@ -17534,6 +17593,25 @@ function _renderAnalysisInner(panel) {
       }
     } else {
       html += makeCard(id, [{type:'neutral', text:`Индикатор активен`}]);
+    }
+  }
+
+  // ─── Альт-версии активных индикаторов (только те, где включён альт-режим) ─────
+  if (typeof _ilAggGetSeries === 'function') {
+    const altCache = _ilAggGetSeries();
+    if (altCache) {
+      const altRows = activeIds.map(aid => {
+        const it = _ilAggIndScore(aid, altCache);
+        if (!it || !it.hasAlt || !it.useAlt) return null;
+        const s = it.score;
+        const type = s == null ? 'neutral' : s >= 1 ? 'bullish' : s <= -1 ? 'bearish' : s > 0 ? 'bullish' : s < 0 ? 'bearish' : 'neutral';
+        const label = (typeof IL_NAMES !== 'undefined' && IL_NAMES[aid]) || aid;
+        const txt = s == null ? `${label} (альт): нет данных` : `${label} (альт): score ${s>0?'+':''}${s.toFixed(2)} — ${s>=1?'сильный бычий контекст':s>0?'слабый бычий контекст':s<=-1?'сильный медвежий контекст':s<0?'слабый медвежий контекст':'нейтрально'}`;
+        return `<div class="analysis-item analysis-${type}"><span class="analysis-dot">●</span><span>${txt}</span></div>`;
+      }).filter(Boolean);
+      if (altRows.length) {
+        html += `<div class="analysis-card"><div class="analysis-card-title" style="color:#FF006E">Альт-версии (вместо классики)</div><div class="analysis-items">${altRows.join('')}</div></div>`;
+      }
     }
   }
 
