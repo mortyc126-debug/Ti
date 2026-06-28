@@ -130,6 +130,52 @@ DRIFT_ROLLING_WINDOW = int(os.getenv("DRIFT_ROLLING_WINDOW", "5"))
 DRIFT_ROLLING_THRESHOLD = float(os.getenv("DRIFT_ROLLING_THRESHOLD", "0.15"))
 
 
+def _parse_dead_zone(s: str):
+    """Parse "HH:MM-HH:MM" → ((h1,m1),(h2,m2)) or None if empty/invalid."""
+    if not s:
+        return None
+    try:
+        left, right = s.strip().split("-")
+        h1, m1 = (int(x) for x in left.split(":"))
+        h2, m2 = (int(x) for x in right.split(":"))
+        return (h1, m1), (h2, m2)
+    except Exception:
+        return None
+
+
+def _in_dead_zone(dt: datetime.datetime, zone) -> bool:
+    """True если время UTC попадает в мёртвую зону торгового дня."""
+    if zone is None:
+        return False
+    (h1, m1), (h2, m2) = zone
+    t = dt.hour * 60 + dt.minute
+    return h1 * 60 + m1 <= t < h2 * 60 + m2
+
+
+# Отраслевые группы для корреляционного фильтра (max N одновременных позиций)
+_SECTOR_GROUPS: dict[str, list[str]] = {
+    "oil":         ["LKOH", "ROSN", "TATN", "TATNP", "SNGS", "SNGSP", "SIBN", "RNFT", "NVTK"],
+    "metals":      ["GMKN", "RUAL", "NLMK", "CHMF", "MAGN", "ALRS", "PLZL"],
+    "banks":       ["SBER", "SBERP", "VTBR", "BSPB", "T", "CBOM", "SVCB"],
+    "tech":        ["YDEX", "VKCO", "OZON", "POSI", "HEAD", "SOFL"],
+    "retail":      ["MGNT", "X5", "LENT", "MVID"],
+    "telecom":     ["MTSS", "RTKM", "RTKMP"],
+    "energy":      ["IRAO", "FEES", "HYDR", "UPRO"],
+    "real_estate": ["SMLT", "PIKK", "DOMRF", "MREDC"],
+    "chemicals":   ["PHOR", "SGZH"],
+    "transport":   ["FLOT", "FESH", "AFLT", "KMAZ"],
+}
+
+
+def _sector_for(ticker: str) -> str | None:
+    """Возвращает название группы для тикера или None."""
+    t = ticker.upper()
+    for sector, tickers in _SECTOR_GROUPS.items():
+        if t in tickers:
+            return sector
+    return None
+
+
 class Trader:
     """
     The class encapsulate main trade logic.
@@ -224,6 +270,8 @@ class Trader:
         self.__pending_tranche2: dict[str, dict] = {}
         # Пирамидинг: figi -> True если доп. транш уже добавлен к текущей позиции
         self.__pyramided: set[str] = set()
+        # Кэш разобранной мёртвой зоны — пересобирается при смене настроек
+        self.__dead_zone_parsed = _parse_dead_zone(self.__trading_settings.intraday_dead_zone_utc)
 
     def pause(self) -> None:
         bot_control.control.paused = True
@@ -373,6 +421,7 @@ class Trader:
     ) -> None:
         logger.info("Start preparations for trading today")
         self.__trading_settings = trading_settings
+        self.__dead_zone_parsed = _parse_dead_zone(trading_settings.intraday_dead_zone_utc)
         # Очищаем MFE/MAE трекер между торговыми днями: иначе max_fav/max_adv
         # накапливаются бессрочно и показывают «лучший максимум» из прошлых дней.
         self.__pos_tracking.clear()
@@ -1052,6 +1101,14 @@ class Trader:
                 self.__record_skip(strategies[candle.figi].settings.ticker, signal_new,
                                    f"кулдаун до {until.strftime('%H:%M')}")
 
+            elif _in_dead_zone(candle.time, self.__dead_zone_parsed):
+                ticker_dz = strategies[candle.figi].settings.ticker
+                logger.info(
+                    f"New signal has been skipped. Мёртвая зона "
+                    f"{self.__trading_settings.intraday_dead_zone_utc} UTC"
+                )
+                self.__record_skip(ticker_dz, signal_new, "мёртвая зона")
+
             else:
                 strategy = strategies[candle.figi]
                 # signal_only = только Telegram, без реального ордера;
@@ -1086,6 +1143,43 @@ class Trader:
                                 return
                         except Exception:
                             pass
+
+                    # Дневной режимный гейт: если дневные свечи показывают боковик
+                    # или low_vol — momentum-стратегия на внутридневных свечах
+                    # статистически не работает.
+                    if self.__trading_settings.daily_trend_gate and hasattr(strategy, "last_snapshot"):
+                        try:
+                            daily_regime = strategy.last_snapshot().get("daily_regime", "")
+                            if daily_regime in ("ranging", "low_vol"):
+                                logger.info(
+                                    f"New signal has been skipped. "
+                                    f"Дневной режим {daily_regime!r} — торговля заблокирована"
+                                )
+                                self.__record_skip(risk_ticker, signal_new, f"дневной режим: {daily_regime}")
+                                return
+                        except Exception:
+                            pass
+
+                    # Корреляционный фильтр: не более N позиций в одной отраслевой группе.
+                    max_sector = self.__trading_settings.corr_max_sector_positions
+                    if max_sector > 0:
+                        sector = _sector_for(risk_ticker)
+                        if sector is not None:
+                            sector_tickers = _SECTOR_GROUPS[sector]
+                            open_in_sector = sum(
+                                1 for figi_s, strat_s in strategies.items()
+                                if strat_s.settings.ticker.upper() in sector_tickers
+                                and self.__today_trade_results.get_current_trade_order(figi_s) is not None
+                            )
+                            if open_in_sector >= max_sector:
+                                logger.info(
+                                    f"New signal has been skipped. "
+                                    f"Отрасль {sector!r}: уже {open_in_sector} позиций "
+                                    f"(лимит {max_sector})"
+                                )
+                                self.__record_skip(risk_ticker, signal_new,
+                                                   f"отрасль {sector}: {open_in_sector}/{max_sector}")
+                                return
 
                     # Фильтр imbalance: живой стакан должен подтверждать направление.
                     # stale_ratio проверяем первым — если большинство объёма "мёртвое"
@@ -1124,13 +1218,18 @@ class Trader:
                     )
                     logger.debug(f"Risk position_size: {risk_size_why}")
 
+                    # ATR в долях от цены для масштабирования лотов
+                    _snap = strategy.last_snapshot() if hasattr(strategy, "last_snapshot") else {}
+                    _atr_pct = _snap.get("atr_pct", 0.0) if isinstance(_snap, dict) else 0.0
+
                     cash_lots = self.__open_position_lots_count(
                         account_id,
                         strategy.settings.max_lots_per_order,
                         quotation_to_decimal(candle.close),
                         strategy.settings.lot_size,
                         margin_per_lot=Decimal(str(strategy.settings.margin_per_lot))
-                        if strategy.settings.is_future else None
+                        if strategy.settings.is_future else None,
+                        atr_pct=_atr_pct
                     )
                     liquidity_lots = self.__liquidity_lots_cap(
                         candle.figi, strategy.settings.lot_size,
@@ -1212,7 +1311,8 @@ class Trader:
             max_lots_per_order: int,
             price: Decimal,
             share_lot_size: int,
-            margin_per_lot: Decimal | None = None
+            margin_per_lot: Decimal | None = None,
+            atr_pct: float = 0.0
     ) -> int:
         """
         Calculate counts of lots for order.
@@ -1221,13 +1321,28 @@ class Trader:
         фьючерсов (margin_per_lot задан) — это в разы меньше: реальная
         стоимость владения одним лотом — ГО (гарантийное обеспечение),
         а не полная номинальная стоимость контракта.
+
+        atr_pct — ATR текущего инструмента в долях от цены (0.01 = 1%).
+        Если ATR_LOT_SCALE включён, лоты масштабируются обратно пропорционально
+        ATR: при высоком ATR риск в рублях одинаков (меньше лотов).
         """
         current_rub_on_depo = self.__operation_service.available_rub_on_account(account_id)
 
         cost_per_lot = margin_per_lot if margin_per_lot and margin_per_lot > 0 else (share_lot_size * price)
         available_lots = int(current_rub_on_depo / cost_per_lot)
 
-        return available_lots if max_lots_per_order > available_lots else max_lots_per_order
+        base_lots = available_lots if max_lots_per_order > available_lots else max_lots_per_order
+
+        # ATR-масштабирование: уменьшаем лоты когда волатильность выше нормы
+        if self.__trading_settings.atr_lot_scale and atr_pct > 0 and base_lots > 1:
+            # "Нормальная" волатильность для акций MOEX ≈ 0.5% за свечу
+            ATR_BASELINE = 0.005
+            scale = ATR_BASELINE / atr_pct
+            # Ограничиваем масштаб: не больше 2× лотов, не меньше 1
+            scale = max(0.25, min(2.0, scale))
+            base_lots = max(1, round(base_lots * scale))
+
+        return base_lots
 
     def __multi_ticker_signal(
             self,
