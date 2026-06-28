@@ -267,7 +267,7 @@ input[type=range] { touch-action: none; }
 * { scrollbar-width: thin; scrollbar-color: #7A5FBF #0D0820; }
 *::-webkit-scrollbar { width: 5px !important; height: 5px !important; }
 *::-webkit-scrollbar-track { background: #0D0820 !important; }
-*::-webkit-scrollbar-thumb { background: #7A5FBF !important; border-radius: 0 !important; min-height: 30px; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+*::-webkit-scrollbar-thumb { background: #7A5FBF !important; border-radius: 0 !important; min-height: 30px; }
 *::-webkit-scrollbar-thumb:hover { background: #B487F8 !important; }
 *::-webkit-scrollbar-button { display: none !important; }
 *::-webkit-scrollbar-corner { background: #0D0820 !important; }
@@ -283,11 +283,11 @@ input:-webkit-autofill, input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--text) !important;
 }
 input[type=range] { -webkit-appearance: none; appearance: none; background: transparent !important; cursor: pointer; }
-input[type=range]::-webkit-slider-runnable-track { height: 3px; background: rgba(122,95,191,0.3); border-radius: 0; }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; background: #7A5FBF; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); margin-top: -4px; transition: background .12s; }
+input[type=range]::-webkit-slider-runnable-track { height: 2px; background: rgba(122,95,191,0.35); border-radius: 0; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 9px; background: #7A5FBF; border-radius: 0; transform: rotate(45deg); margin-top: -3.5px; transition: background .12s; }
 input[type=range]::-webkit-slider-thumb:hover { background: #B487F8; }
-input[type=range]::-moz-range-track { height: 3px; background: rgba(122,95,191,0.3); }
-input[type=range]::-moz-range-thumb { width: 11px; height: 11px; background: #7A5FBF; border: none; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border-radius: 0; }
+input[type=range]::-moz-range-track { height: 2px; background: rgba(122,95,191,0.35); }
+input[type=range]::-moz-range-thumb { width: 9px; height: 9px; background: #7A5FBF; border: none; border-radius: 0; transform: rotate(45deg); }
 
 /* ── Indicator rows: reliable tap on mobile ── */
 .cp-ind-row {
