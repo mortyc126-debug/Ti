@@ -9643,13 +9643,8 @@ function cpInitCanvasEvents() {
   c._cp = true;
   c.addEventListener('wheel', e => {
     e.preventDefault();
-    // Колесо = скролл по истории. Ctrl+колесо = зум.
-    if (e.ctrlKey || e.metaKey) {
-      chartCandleW = Math.max(4, Math.min(40, chartCandleW + (e.deltaY < 0 ? 1 : -1)));
-    } else {
-      const step = Math.max(1, Math.round(Math.max(3, Math.floor(chartCandles.length / 40)) * Math.abs(e.deltaY) / 100));
-      chartOffset = Math.max(0, Math.min(chartCandles.length - 1, chartOffset + (e.deltaY > 0 ? step : -step)));
-    }
+    // Колесо = зум. Drag мышью = скролл по истории.
+    chartCandleW = Math.max(4, Math.min(40, chartCandleW + (e.deltaY < 0 ? 1 : -1)));
     chartRedraw();
   }, { passive:false });
   let dx0=null, off0=0;
