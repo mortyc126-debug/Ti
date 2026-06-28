@@ -4032,12 +4032,17 @@ function applyPreset(id) {
     p.chartIds.forEach(function(id){ if(!chartInds[id]) cpChartToggle(id); });
     cpActiveCombo = id;
     cpRenderCombos();
-    showToast('✓ ' + p.name, '#60A4A1');
-    setTimeout(function(){
-      if(chartCandles && chartCandles.length) chartRedraw();
-      // Автоматически открываем вкладку Анализ
-      cpSwitchTab('analysis');
-    }, 120);
+    if (chartCandles && chartCandles.length) {
+      showToast('✓ ' + p.name, '#60A4A1');
+      setTimeout(function(){
+        chartRedraw();
+        // Автоматически открываем вкладку Анализ
+        cpSwitchTab('analysis');
+      }, 120);
+    } else {
+      // Индикаторы включены, но график пуст — без свечей рисовать нечего
+      showToast('⚠ Индикаторы выбраны — сначала загрузи инструмент на графике (тикер + токен)', 'var(--orange)');
+    }
     return;
   }
 
@@ -4083,8 +4088,13 @@ function applyPreset(id) {
   const txtEl = document.getElementById('chart-combined-text');
   if (txtEl) txtEl.textContent = `${p.icon||'◈'} ${p.name} — ${p.short||''}`;
 
-  if (chartCandles.length) { chartRedraw(); chartComputeSignals(); }
-  showToast(`✓ Пресет «${p.name}» применён`, 'var(--green)');
+  if (chartCandles.length) {
+    chartRedraw(); chartComputeSignals();
+    showToast(`✓ Пресет «${p.name}» применён`, 'var(--green)');
+  } else {
+    // Индикаторы включены, но график пуст — без свечей рисовать нечего
+    showToast(`⚠ Индикаторы выбраны — сначала загрузи инструмент на графике (тикер + токен)`, 'var(--orange)');
+  }
   const sigBar = document.getElementById('cp-signals');
   if (sigBar) sigBar.style.display = 'block';
 
@@ -10799,12 +10809,20 @@ async function _ilFetchCandlesWithCache(ticker, figi, iv, from, now, token, prox
     } catch(e) {}
   }
 
-  // 2. Определяем пробел — что нужно догрузить из T-Invest
-  const cacheTo = cached.length ? cached[cached.length-1].time.getTime() : null;
+  // 2. Определяем пробелы — что нужно догрузить из T-Invest.
+  // Кэш может не покрывать весь запрошенный диапазон с двух сторон:
+  // догружаем и "хвост" (новые свечи после последней кэшированной),
+  // и "голову" (старую историю, если кэш раньше создавался с меньшим окном).
+  const cacheFrom = cached.length ? cached[0].time.getTime() : null;
+  const cacheTo   = cached.length ? cached[cached.length-1].time.getTime() : null;
   // Перезапрашиваем последние 2ч (свечи могут быть неполными)
-  const fetchFrom = cacheTo ? new Date(Math.max(cacheTo - 2*3600000, from.getTime())) : from;
+  const tailFrom = cacheTo ? new Date(Math.max(cacheTo - 2*3600000, from.getTime())) : from;
+  const gaps = [{f: tailFrom, t: now}];
+  if (cacheFrom != null && cacheFrom > from.getTime()) {
+    gaps.push({f: from, t: new Date(cacheFrom)});
+  }
 
-  // 3. Качаем пробел чанками
+  // 3. Качаем пробелы чанками
   const fetchChunk = async (f, t) => {
     const cr = await fetch(ilTinvestUrl(proxy, '/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles'), {
       method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json','accept':'application/json'},
@@ -10819,12 +10837,14 @@ async function _ilFetchCandlesWithCache(ticker, figi, iv, from, now, token, prox
   };
 
   let fetched = [];
-  let cur = new Date(fetchFrom);
-  while (cur < now) {
-    const next = new Date(Math.min(cur.getTime()+chunkMs, now.getTime()));
-    if (statusEl) statusEl.textContent = `Загружаю ${cur.toLocaleDateString('ru')}…`;
-    fetched.push(...(await fetchChunk(cur, next)));
-    cur = next;
+  for (const gap of gaps) {
+    let cur = new Date(gap.f);
+    while (cur < gap.t) {
+      const next = new Date(Math.min(cur.getTime()+chunkMs, gap.t.getTime()));
+      if (statusEl) statusEl.textContent = `Загружаю ${cur.toLocaleDateString('ru')}…`;
+      fetched.push(...(await fetchChunk(cur, next)));
+      cur = next;
+    }
   }
 
   // 4. Сохраняем новые свечи в D1
