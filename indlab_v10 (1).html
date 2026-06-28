@@ -8732,15 +8732,23 @@ function cpRenderCombos() {
         <div style="font-size:10px;color:var(--text2);line-height:1.5;margin:8px 0 6px;">${c.desc||c.short||''}</div>
         ${c.why ? `<div style="font-size:9px;color:#52A8E0;line-height:1.4;margin-bottom:7px;padding:4px 7px;background:rgba(82,168,224,0.06);border-radius:5px;border-left:2px solid #52A8E044;">${c.why}</div>` : ''}
         ${c.inds?.length ? `
-        <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Индикаторы ${agg.sig?'<span style="opacity:.6;">(клик — альт/классика, где доступно)</span>':''}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;">
+        <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">
+          Индикаторы <span style="color:#3a3260;font-size:8px;text-transform:none;letter-spacing:0;">◆ классика · <span style="color:#5a4080;">◆ альт</span></span>
+        </div>
+        <div style="margin-bottom:7px;">
           ${c.inds.map(i=>{
             const id = _ilAggLabelToId(i);
             const it = agg.items.find(x=>x.id===id);
-            if (!id || !it || !it.hasAlt) return `<span style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text3);font-family:var(--mono);">${i}</span>`;
-            const on = it.useAlt;
-            const tip = ('Классика/альт для '+i+'. '+(it.altDesc?'Чем отличается альт: '+it.altDesc:'')).replace(/"/g,'&quot;');
-            return `<span onclick="ilAggToggleAlt('${id}')" title="${tip}" style="cursor:pointer;font-size:9px;padding:2px 6px;border-radius:6px;background:${on?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)'};color:${on?'#FF006E':'var(--text3)'};font-family:var(--mono);border:1px solid ${on?'rgba(255,0,110,0.35)':'transparent'};">${i} · ${on?'альт':'клас'}</span>`;
+            const hasAlt = id && it && it.hasAlt;
+            const useAlt = hasAlt && it.useAlt;
+            const cDiamStyle = `display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:2px;border:1.5px solid #52F2C9;background:transparent;cursor:pointer;flex-shrink:0;transition:all .12s;`;
+            const aDiamStyle = `display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:4px;border:1.5px solid ${hasAlt?'#B487F8':'#2a1f3d'};background:${useAlt?'#B487F8':'transparent'};cursor:${hasAlt?'pointer':'default'};flex-shrink:0;transition:all .12s;`;
+            const altClick = hasAlt ? `onclick="ilAggToggleAlt('${id}')"` : '';
+            return `<div style="display:flex;align-items:center;gap:0;padding:2px 0;">
+              <span style="${cDiamStyle}" title="Классика"></span>
+              <span ${altClick} style="${aDiamStyle}" title="${hasAlt?'Альт (клик для переключения)':'нет альт-версии'}"></span>
+              <span style="font-size:10px;color:${useAlt?'#B487F8':'var(--text2)'};font-family:var(--mono);">${i}${useAlt?' <span style="font-size:8px;color:#7a5090;">альт</span>':''}</span>
+            </div>`;
           }).join('')}
         </div>` : ''}
         ${c.rules?.length ? `
