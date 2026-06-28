@@ -1115,7 +1115,6 @@ input[type=range] { touch-action: none; }
         <button class="cp-tab"        data-tab="combo" onclick="cpTab(this)">Комбо</button>
         <button class="cp-tab"        data-tab="sys"   onclick="cpTab(this)">Системы</button>
         <button class="cp-tab"        data-tab="ichi"  onclick="cpTab(this)">Ишимоку</button>
-        <button class="cp-tab"        data-tab="fib"   onclick="cpTab(this)">Фиб</button>
       </div>
 
       <!-- INDICATORS -->
@@ -1160,51 +1159,52 @@ input[type=range] { touch-action: none; }
         <div id="ichi-result" style="margin-top:8px;font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--text2);"></div>
       </div>
 
-      <!-- FIBONACCI -->
-      <div id="cp-panel-fib" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color: #C71B52 #0D0820;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-          <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;flex:1;">Фибоначчи · уровни</div>
-          <button onclick="chartFibShow=!chartFibShow;this.textContent=chartFibShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();"
-            id="fib-chart-btn"
-            style="padding:3px 10px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:6px;color:#FF006E;font-family:var(--mono);font-size:10px;cursor:pointer;">
-            На график
-          </button>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <div style="flex:1;"><div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">Хай</div><input id="fh-num" type="number" step="0.01" value="177" oninput="renderFib()" style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
-          <div style="flex:1;"><div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">Лоу</div><input id="fl-num" type="number" step="0.01" value="158" oninput="renderFib()" style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
-        </div>
-        <div id="fib-table" style="font-family:var(--mono);font-size:10px;line-height:1.8;"></div>
-      </div>
-
       <!-- СИСТЕМЫ -->
       <div id="cp-panel-sys" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color:#C71B52 #0D0820;">
         <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">Системы · не-индикаторные методы</div>
 
         <!-- Ценовой профиль -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">📊 Ценовой профиль</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">📊 Ценовой профиль</div>
+            <button onclick="chartVPShow=!chartVPShow;this.textContent=chartVPShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-vp-chart" style="margin-bottom:8px;"></div>
           <div id="sys-vp-analysis" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
 
         <!-- Линии тренда -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">📐 Линии тренда</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">📐 Линии тренда</div>
+            <button onclick="chartTrendShow=!chartTrendShow;this.textContent=chartTrendShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-trendlines-text" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Загрузите данные для анализа.</div>
         </div>
 
         <!-- Горизонтальные уровни -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">📏 Горизонтальные уровни</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">📏 Горизонтальные уровни</div>
+            <button onclick="chartHLevShow=!chartHLevShow;this.textContent=chartHLevShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-hlevels-text" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Загрузите данные для анализа.</div>
         </div>
 
-        <!-- Фибоначчи — ссылка на таб -->
+        <!-- Фибоначчи -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">🌀 Фибоначчи</div>
-          <div style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;">Расчёт уровней коррекции/расширения — в табе <span style="color:#FF006E;cursor:pointer;" onclick="cpTab(document.querySelector('.cp-tab[data-tab=fib]'))">Фиб ↗</span>.<br>
-          <span style="color:var(--text3);">Неклассически: уровни как зоны интереса, не как триггеры. Ищи кластер из 2+ уровней разных волн. Не торгуй отдельно взятый уровень — только с подтверждением объёма или Price Action.</span></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">🌀 Фибоначчи</div>
+            <button onclick="chartFibShow=!chartFibShow;this.textContent=chartFibShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();"
+              id="fib-chart-btn"
+              style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <div style="flex:1;"><div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">Хай</div><input id="fh-num" type="number" step="0.01" value="177" oninput="renderFib()" style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
+            <div style="flex:1;"><div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:3px;">Лоу</div><input id="fl-num" type="number" step="0.01" value="158" oninput="renderFib()" style="width:100%;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
+          </div>
+          <div id="fib-table" style="font-family:var(--mono);font-size:10px;line-height:1.8;"></div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.6;margin-top:6px;">Неклассически: уровни как зоны интереса, не как триггеры. Ищи кластер из 2+ уровней разных волн. Не торгуй отдельно взятый уровень — только с подтверждением объёма или Price Action.</div>
         </div>
 
         <!-- Динамические секции систем -->
@@ -1212,37 +1212,55 @@ input[type=range] { touch-action: none; }
 
         <!-- Карта напряжения -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">⚡ Карта напряжения системы</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">⚡ Карта напряжения системы</div>
+            <button onclick="chartVoltageShow=!chartVoltageShow;this.textContent=chartVoltageShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-voltage" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
 
         <!-- Фазовый детектор -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">🔬 Фазовый детектор рынка</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">🔬 Фазовый детектор рынка</div>
+            <button onclick="chartPhaseShow=!chartPhaseShow;this.textContent=chartPhaseShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-phase" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
 
         <!-- Матрица пар сигналов -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">⚡ Активные пары сигналов</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">⚡ Активные пары сигналов</div>
+            <button onclick="chartSigpairsShow=!chartSigpairsShow;this.textContent=chartSigpairsShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-sigpairs" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
 
         <!-- Market Structure -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">📐 Market Structure</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">📐 Market Structure</div>
+            <button onclick="chartMSShow=!chartMSShow;this.textContent=chartMSShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">✓ На графике</button>
+          </div>
           <div id="sys-ms" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
 
         <!-- SMC / ICT -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">🧲 SMC / ICT — FVG · OB · Sweep</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">🧲 SMC / ICT — FVG · OB · Sweep</div>
+            <button onclick="chartSMCShow=!chartSMCShow;this.textContent=chartSMCShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">✓ На графике</button>
+          </div>
           <div id="sys-smc" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
 
         <!-- Свечной анализ -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:10px;color:#C71B52;font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">🕯 Свечной анализ</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:10px;color:#C71B52;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.05em;flex:1;">🕯 Свечной анализ</div>
+            <button onclick="chartCandleShow=!chartCandleShow;this.textContent=chartCandleShow?'✓ На графике':'На график';if(chartCandles.length)chartRedraw();" style="padding:2px 8px;background:rgba(255,0,110,0.1);border:1px solid rgba(255,0,110,0.3);border-radius:5px;color:#FF006E;font-family:var(--mono);font-size:9px;cursor:pointer;">На график</button>
+          </div>
           <div id="sys-candle" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
       </div>
@@ -2443,6 +2461,130 @@ const IND_GROUPS = [
       },
     ]
   },
+  {
+    id: 'advanced', label: 'Продвинутая статистика',
+    items: [
+      { id:'nw', name:'Nadaraya–Watson', full:'Nadaraya–Watson Estimator — ядерная регрессия',
+        desc:'Каузальное ядерное (гауссово) сглаживание цены: каждая точка — взвешенная сумма прошлых close, вес убывает с расстоянием (bandwidth h). Даёт более гладкую и устойчивую к шуму линию тренда, чем обычная MA, с envelope из средней абсолютной ошибки (MAE).',
+        params:[
+          {id:'price', label:'Цена',          min:0, max:100000, def:170, step:0.01},
+          {id:'nw',    label:'NW-линия',      min:0, max:100000, def:168, step:0.01},
+          {id:'mae',   label:'MAE (envelope)', min:0, max:10000, def:1.5, step:0.01},
+        ],
+        interpret: v => {
+          const dist = ((v.price - v.nw) / v.nw * 100);
+          const env = v.mae * 2 / v.nw * 100;
+          if (Math.abs(dist) > env) return {s: dist>0?'sell':'buy', t:`Цена вне envelope (${dist.toFixed(2)}% от NW при ±${env.toFixed(2)}%) — отклонение от ядерного тренда, возможен возврат к линии.`};
+          if (Math.abs(dist) < env*0.2) return {s:'neutral', t:`Цена почти на линии NW (${dist.toFixed(2)}%) — равновесие, нет выраженного отклонения.`};
+          return {s: dist>0?'buy':'sell', t:`Цена ${dist>0?'выше':'ниже'} NW на ${Math.abs(dist).toFixed(2)}% — умеренный импульс ${dist>0?'вверх':'вниз'} в рамках envelope.`};
+        }
+      },
+      { id:'kalman', name:'Kalman Filter', full:'Фильтр Калмана — рекурсивная оценка скрытого уровня цены',
+        desc:'Модель локального уровня (random walk + шум измерения). На каждом баре: предсказание → коррекция по новому close. R оценивается из дисперсии приращений цены, Q = 0.05×R (фиксированное соотношение шум-процесса/шум-измерения). Полоса — 95% доверительный интервал оценки (±1.96×√P).',
+        params:[
+          {id:'price', label:'Цена',        min:0, max:100000, def:170, step:0.01},
+          {id:'x',     label:'Kalman-оценка',min:0, max:100000, def:169, step:0.01},
+          {id:'sd',    label:'√P (неопредел.)', min:0, max:10000, def:0.8, step:0.01},
+        ],
+        interpret: v => {
+          const dist = (v.price - v.x) / (v.sd || 1e-6);
+          if (Math.abs(dist) > 1.96) return {s: dist>0?'sell':'buy', t:`Цена вне 95% доверительного интервала фильтра (${dist.toFixed(2)}σ) — сильное отклонение от скрытого уровня, повышенная вероятность возврата.`};
+          if (Math.abs(dist) < 0.3) return {s:'neutral', t:`Цена практически совпадает с оценкой Калмана — фильтр «догнал» цену, нет накопленного отклонения.`};
+          return {s: dist>0?'buy':'sell', t:`Цена ${dist>0?'выше':'ниже'} оценки Калмана на ${Math.abs(dist).toFixed(2)}σ — умеренное отклонение от скрытого уровня.`};
+        }
+      },
+      { id:'cusum', name:'CUSUM CP Detection', full:'CUSUM — кумулятивная сумма для детекции структурных сдвигов',
+        desc:'Двусторонний CUSUM по лог-доходностям в скользящем окне (30 баров): S⁺/S⁻ накапливают отклонение от локального среднего за вычетом допуска на дрейф (k=0.5σ); пробой порога h=4σ помечается как точка структурного сдвига (CP) и сбрасывает накопление.',
+        params:[
+          {id:'cpCount', label:'Найдено CP (видимое окно)', min:0, max:50, def:0, step:1},
+        ],
+        interpret: v => {
+          if (v.cpCount === 0) return {s:'neutral', t:'В видимом окне структурных сдвигов не найдено — режим стабилен.'};
+          if (v.cpCount >= 3)  return {s:'warn', t:`Найдено ${v.cpCount} точек структурного сдвига — рынок часто меняет режим, повышенная нестабильность.`};
+          return {s:'warn', t:`Найдено ${v.cpCount} точка(и) структурного сдвига — недавняя смена режима волатильности/доходности.`};
+        }
+      },
+      { id:'hmm', name:'HMM Regime Detector', full:'Hidden Markov Model — детектор скрытого режима волатильности (2 состояния)',
+        desc:'Скрытая марковская модель с 2 гауссовскими состояниями (спокойный / высокая волатильность), обучается на лог-приращениях через scaled Baum-Welch (EM, 12 итераций). Фон графика подсвечивается по апостериорной вероятности режима (γ_t), также показан текущий режим и его вероятность. Это и есть классический пример State Space Model со скрытым дискретным состоянием.',
+        params:[
+          {id:'prob', label:'P(высокая волатильность)', min:0, max:1, def:0.3, step:0.01},
+        ],
+        interpret: v => {
+          if (v.prob >= 0.7) return {s:'warn', t:`P(выс. волатильность) = ${v.prob.toFixed(2)} — рынок в режиме высокой волатильности, риски шире обычного, стопы — шире.`};
+          if (v.prob <= 0.3) return {s:'neutral', t:`P(выс. волатильность) = ${v.prob.toFixed(2)} — спокойный режим, волатильность близка к норме.`};
+          return {s:'warn', t:`P(выс. волатильность) = ${v.prob.toFixed(2)} — переходная зона между режимами, возможна смена в ближайшие бары.`};
+        }
+      },
+      { id:'hurst', name:'Hurst Exponent', full:'Показатель Хёрста — персистентность ряда (R/S-анализ Мандельброта)',
+        desc:'Классический R/S-анализ: ряд лог-доходностей разбивается на блоки разных масштабов n, для каждого считается R/S (диапазон накопленного отклонения / стандартное отклонение), наклон log(R/S) от log(n) — оценка H. H<0.5 — антиперсистентность (mean-reversion), H≈0.5 — случайное блуждание, H>0.5 — персистентный трендовый режим.',
+        params:[
+          {id:'H', label:'Hurst H', min:0, max:1, def:0.5, step:0.01},
+        ],
+        interpret: v => {
+          if (v.H < 0.4)  return {s:'warn', t:`H = ${v.H.toFixed(2)} — выраженная антиперсистентность. Ряд склонен к развороту после движений, mean-reversion стратегии уместнее трендовых.`};
+          if (v.H < 0.45) return {s:'neutral', t:`H = ${v.H.toFixed(2)} — слабая антиперсистентность.`};
+          if (v.H <= 0.55) return {s:'neutral', t:`H = ${v.H.toFixed(2)} — близко к случайному блужданию, структурного преимущества для тренд/контр-тренд систем нет.`};
+          if (v.H <= 0.6) return {s:'neutral', t:`H = ${v.H.toFixed(2)} — слабая персистентность.`};
+          return {s:'buy', t:`H = ${v.H.toFixed(2)} — выраженная персистентность. Трендовые системы статистически уместнее.`};
+        }
+      },
+      { id:'gpr', name:'Gaussian Process Regression', full:'Гауссовский процесс — байесовская непараметрическая регрессия с доверительным интервалом',
+        desc:'Регрессия на скользящем окне (60 баров) с RBF-ядром: цена моделируется как реализация гауссовского процесса, среднее — апостериорное ожидание, ширина ленты — 95% доверительный интервал (±1.96σ из апостериорной дисперсии). В отличие от Nadaraya-Watson, явно учитывает шум измерения и даёт калиброванную неопределённость, которая растёт на разрывных/непредсказуемых участках.',
+        params:[
+          {id:'z', label:'Z-отклонение от среднего GP', min:-3, max:3, def:0, step:0.1},
+        ],
+        interpret: v => {
+          if (v.z > 1.5)  return {s:'sell', t:`Цена выше GP-среднего на ${v.z.toFixed(1)}σ — растянутое отклонение, повышен риск возврата к среднему.`};
+          if (v.z < -1.5) return {s:'buy', t:`Цена ниже GP-среднего на ${Math.abs(v.z).toFixed(1)}σ — растянутое отклонение вниз, возможен возврат к среднему.`};
+          return {s:'neutral', t:`Цена в пределах ±1.5σ от GP-среднего (z=${v.z.toFixed(2)}) — без выраженного отклонения.`};
+        }
+      },
+      { id:'mprof', name:'Matrix Profile', full:'Matrix Profile — поиск мотивов и аномалий (discord) по z-normalized расстоянию подрядов',
+        desc:'Для каждого подряда длины 16 баров считается z-normalized Euclidean расстояние до всех непересекающихся подрядов; минимум по подряду — расстояние до ближайшего «похожего» паттерна (профиль). Глобальный минимум профиля помечается как MOTIF (наиболее повторяющийся паттерн на истории), глобальный максимум — как ANOMALY (наиболее уникальный, ни на что не похожий участок). Окно поиска ограничено последними 300 барами.',
+        params:[
+          {id:'minD', label:'Мин. расстояние профиля (мотив)', min:0, max:10, def:1, step:0.1},
+        ],
+        interpret: v => {
+          if (v.minD < 0.5) return {s:'neutral', t:`Найден сильный мотив (d=${v.minD.toFixed(2)}) — текущий участок почти точно повторяет паттерн из истории, можно сверить его исход.`};
+          return {s:'neutral', t:`Профиль мотива d=${v.minD.toFixed(2)} — повторяемость паттерна умеренная.`};
+        }
+      },
+      { id:'te', name:'Transfer Entropy', full:'Перенос энтропии (Шрайбер) — направленная информационная причинность объём → цена',
+        desc:'Мера направленной информационной зависимости (не требует линейности, в отличие от корреляции): сколько бит неопределённости о следующей доходности снимается, если знать предыдущее изменение объёма (сверх того, что объясняет автокорреляция самой цены). Дискретизация на терцили, окно — последние 200 баров. TE=0 означает отсутствие предсказательной связи объём→цена.',
+        params:[
+          {id:'te', label:'TE, бит', min:0, max:1, def:0, step:0.01},
+        ],
+        interpret: v => {
+          if (v.te > 0.1) return {s:'warn', t:`TE = ${v.te.toFixed(3)} бит — заметная информационная связь объём→цена, изменения объёма статистически предшествуют движениям цены.`};
+          if (v.te > 0.05) return {s:'neutral', t:`TE = ${v.te.toFixed(3)} бит — слабая связь объём→цена.`};
+          return {s:'neutral', t:`TE = ${v.te.toFixed(3)} бит — объём не несёт предсказательной информации о цене сверх автокорреляции.`};
+        }
+      },
+      { id:'ssa', name:'SSA Trend', full:'Singular Spectrum Analysis — выделение тренд-компоненты через сингулярное разложение траектория-матрицы',
+        desc:'Классический SSA: ряд встраивается в траектория-матрицу (окно вложения L=20), берётся ведущая собственная компонента лаг-ковариационной матрицы (power iteration), затем диагональное усреднение восстанавливает гладкую тренд-компоненту без фазовой задержки скользящих средних. Окно расчёта — последние 200 баров. По сути — представитель класса методов разложения сигнала (вместе с Wavelets/VMD), наиболее устойчивый к шуму при простой реализации.',
+        params:[
+          {id:'dev', label:'Отклонение цены от SSA-тренда, %', min:-10, max:10, def:0, step:0.1},
+        ],
+        interpret: v => {
+          if (v.dev > 2) return {s:'sell', t:`Цена выше SSA-тренда на ${v.dev.toFixed(1)}% — растянутое отклонение от сглаженной тренд-компоненты.`};
+          if (v.dev < -2) return {s:'buy', t:`Цена ниже SSA-тренда на ${Math.abs(v.dev).toFixed(1)}% — растянутое отклонение вниз от сглаженной тренд-компоненты.`};
+          return {s:'neutral', t:`Цена близко к SSA-тренду (${v.dev.toFixed(1)}%) — отклонения нет.`};
+        }
+      },
+      { id:'rough', name:'Rough Volatility', full:'Грубость волатильности (Gatheral/Rosenbaum) — показатель Хёрста log-реализованной волатильности',
+        desc:'В отличие от обычного Hurst (на ценах), здесь оценивается H для лог-реализованной волатильности через структурную функцию (variogram): E[(log RV_{t+h} - log RV_t)²] ~ h^(2H), регрессия log-вариограммы на log(лаг) по лагам {1,2,3,5,8,13,21}, H = наклон/2. Эмпирически на финансовых рынках H обычно очень мал (~0.1) — волатильность «грубая», то есть резко и часто меняется, в отличие от гладких диффузионных моделей (где H=0.5).',
+        params:[
+          {id:'H', label:'Hurst волатильности', min:0, max:1, def:0.1, step:0.01},
+        ],
+        interpret: v => {
+          if (v.H < 0.2) return {s:'warn', t:`H(vol) = ${v.H.toFixed(2)} — типичная «грубая» волатильность, резкие скачки реализованной волатильности, классические диффузионные модели (GBM) её недооценивают.`};
+          if (v.H < 0.4) return {s:'neutral', t:`H(vol) = ${v.H.toFixed(2)} — умеренно грубая волатильность.`};
+          if (v.H <= 0.6) return {s:'neutral', t:`H(vol) = ${v.H.toFixed(2)} — близко к стандартной броуновской динамике волатильности.`};
+          return {s:'warn', t:`H(vol) = ${v.H.toFixed(2)} — выраженная персистентность/кластеризация волатильности (затяжные периоды высокой/низкой turbulence).`};
+        }
+      },
+    ]
+  },
 ];
 
 // ═══════════════════════════════════════════
@@ -3141,6 +3283,7 @@ function quickCalc() {
   const b=parseFloat(document.getElementById('q-b')?.value);
   const el=document.getElementById('q-result');
   if(!el||isNaN(a)||isNaN(b)){el&&(el.innerHTML='');return;}
+  if(a===0||b===0){el.innerHTML='<div style="font-size:11px;color:var(--text3)">Деление на ноль — введите значения, отличные от 0.</div>';return;}
   const dR=b-a, dP=(b-a)/Math.abs(a)*100;
   const col=dR>=0?'var(--green)':'var(--red)', s=dR>=0?'+':'';
   el.innerHTML=`
@@ -5237,9 +5380,18 @@ function setMainMode(mode) {
 // CHART PAGE — Т-ИНВЕСТИЦИИ
 // ═══════════════════════════════════════════
 let chartCandles = [];
-let chartInds = { ma:true, ema:true, bb:false, vol:false, rsi:false, macd:false, alligator:false, donchian:false, stoch:false, cci:false, adx:false, wr:false, ao:false, mfi:false, obv:false, fractals:false, vwap:false };
+let chartInds = { ma:true, ema:true, bb:false, vol:false, rsi:false, macd:false, alligator:false, donchian:false, stoch:false, cci:false, adx:false, wr:false, ao:false, mfi:false, obv:false, fractals:false, vwap:false, nw:false, kalman:false, cusum:false, hmm:false, hurst:false, gpr:false, mprof:false, te:false, ssa:false, rough:false };
 let chartFibShow  = false; // show fib overlay on chart
 let chartIchiShow = false; // show Ichimoku overlay on chart
+let chartVPShow       = false; // Ценовой профиль на графике
+let chartTrendShow    = false; // Линии тренда на графике
+let chartHLevShow     = false; // Горизонтальные уровни на графике
+let chartMSShow       = true;  // Market Structure (был всегда включён)
+let chartSMCShow      = true;  // SMC/ICT FVG (был всегда включён)
+let chartVoltageShow  = false; // Карта напряжения — бейдж на графике
+let chartPhaseShow    = false; // Фазовый детектор — бейдж на графике
+let chartSigpairsShow = false; // Активные пары сигналов — бейдж на графике
+let chartCandleShow   = false; // Свечной анализ — бейдж на графике
 let chartFigi = '';
 let chartOffset = 0; // scroll offset in candles from right
 let chartCandleW = 8; // px на свечу (зум)
@@ -5270,6 +5422,9 @@ const _IL_COLOR_DEFAULTS = {
   mama:      ['#FF006E','#3DD9FF'],
   kvo:       ['#B45CFF','#FF4D9D'],
   donchian:  ['#3DD9FF','#A79BC9','#3DD9FF'],
+  nw:        ['#FFD23F','#FF8800'],
+  kalman:    ['#3DD9FF','#7B61FF'],
+  gpr:       ['#52F2C9','#2BA98B'],
   envelopes: ['#3DD9FF','#FFD166','#3DD9FF'],
   tsi:       ['#D65CFF','#FFB84D'],
   cyber_cyc: ['#FF006E','#3DD9FF'],
@@ -5859,6 +6014,490 @@ function _chartDrawMain() {
     ctx.stroke(); ctx.setLineDash([]); ctx.restore();
   }
 
+  // Nadaraya–Watson Estimator: каузальная ядерная (Gauss) регрессия + envelope из MAE
+  if (chartInds.nw) {
+    const _h = Math.max(2, Math.min(50, chartCandles.length > 300 ? 12 : Math.round(chartCandles.length/15) || 8));
+    const _win2 = Math.max(_h*4, 20);
+    const _nwArr = new Array(closes.length).fill(null);
+    for (let i = 0; i < closes.length; i++) {
+      const j0 = Math.max(0, i - _win2);
+      let wsum = 0, vsum = 0;
+      for (let j = j0; j <= i; j++) {
+        const d = i - j;
+        const w = Math.exp(-(d*d) / (2*_h*_h));
+        wsum += w; vsum += w * closes[j];
+      }
+      _nwArr[i] = wsum > 0 ? vsum / wsum : closes[i];
+    }
+    const _resid = closes.map((c,i) => Math.abs(c - _nwArr[i]));
+    const _mae = _resid.reduce((a,b)=>a+b,0) / (_resid.length || 1);
+    ctx.save();
+    // envelope (±2×MAE)
+    ctx.beginPath();
+    for (let i = startIdx; i < endIdx; i++) { const x=xOf(i-startIdx), y=toY(_nwArr[i] + _mae*2); i===startIdx?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+    for (let i = endIdx-1; i >= startIdx; i--) { const x=xOf(i-startIdx), y=toY(_nwArr[i] - _mae*2); ctx.lineTo(x,y); }
+    ctx.closePath();
+    ctx.fillStyle = _ilC('nw',0) + '14';
+    ctx.fill();
+    // центральная линия регрессии
+    ctx.beginPath(); ctx.strokeStyle = _ilC('nw',0); ctx.lineWidth = 1.8; let _ffnw = true;
+    for (let i = startIdx; i < endIdx; i++) { const x=xOf(i-startIdx), y=toY(_nwArr[i]); _ffnw?ctx.moveTo(x,y):ctx.lineTo(x,y); _ffnw=false; }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Kalman Filter: скалярная модель локального уровня (random walk + шум измерения)
+  if (chartInds.kalman) {
+    // R — дисперсия измерения, оценена из дисперсии приращений close; Q — дисперсия процесса, доля от R
+    const _krets = [];
+    for (let i=1;i<closes.length;i++) _krets.push(closes[i]-closes[i-1]);
+    const _kmeanR = _krets.reduce((a,b)=>a+b,0)/(_krets.length||1);
+    const _R = _krets.reduce((a,b)=>a+(b-_kmeanR)*(b-_kmeanR),0)/(_krets.length||1) || 1e-6;
+    const _Q = _R * 0.05; // меньше Q/R → более гладкий, медленнее реагирующий фильтр
+    const _kx = new Array(closes.length), _kP = new Array(closes.length);
+    let _x = closes[0], _P = _R;
+    for (let i=0;i<closes.length;i++) {
+      // predict
+      const _xPred = _x, _PPred = _P + _Q;
+      // update
+      const _K = _PPred / (_PPred + _R);
+      _x = _xPred + _K * (closes[i] - _xPred);
+      _P = (1 - _K) * _PPred;
+      _kx[i] = _x; _kP[i] = _P;
+    }
+    ctx.save();
+    // доверительная полоса ±1.96×sqrt(P) (95%)
+    ctx.beginPath();
+    for (let i = startIdx; i < endIdx; i++) { const sd=Math.sqrt(_kP[i]); const x=xOf(i-startIdx), y=toY(_kx[i]+1.96*sd); i===startIdx?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+    for (let i = endIdx-1; i >= startIdx; i--) { const sd=Math.sqrt(_kP[i]); const x=xOf(i-startIdx), y=toY(_kx[i]-1.96*sd); ctx.lineTo(x,y); }
+    ctx.closePath();
+    ctx.fillStyle = _ilC('kalman',0) + '12';
+    ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle = _ilC('kalman',0); ctx.lineWidth = 1.6; let _ffk = true;
+    for (let i = startIdx; i < endIdx; i++) { const x=xOf(i-startIdx), y=toY(_kx[i]); _ffk?ctx.moveTo(x,y):ctx.lineTo(x,y); _ffk=false; }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Change Point Detection (CUSUM): структурные сдвиги в среднем логдоходности
+  if (chartInds.cusum) {
+    const _n4 = closes.length;
+    const _lrets = new Array(_n4).fill(0);
+    for (let i=1;i<_n4;i++) _lrets[i] = Math.log(closes[i]/closes[i-1]);
+    // скользящие оценки на окне 30 для адаптивности к локальной волатильности
+    const _cpWin = 30;
+    const _cps = [];
+    let _Sp = 0, _Sm = 0, _lastCp = -Infinity;
+    for (let i=1;i<_n4;i++) {
+      const j0 = Math.max(1, i - _cpWin);
+      const seg = _lrets.slice(j0, i);
+      const mu = seg.reduce((a,b)=>a+b,0) / (seg.length || 1);
+      const sd = Math.sqrt(seg.reduce((a,b)=>a+(b-mu)*(b-mu),0) / (seg.length || 1)) || 1e-8;
+      const k = 0.5 * sd, h = 4 * sd;
+      _Sp = Math.max(0, _Sp + (_lrets[i] - mu) - k);
+      _Sm = Math.min(0, _Sm + (_lrets[i] - mu) + k);
+      if ((_Sp > h || _Sm < -h) && i - _lastCp > 5) {
+        _cps.push({i, dir: _Sp > h ? 1 : -1});
+        _Sp = 0; _Sm = 0; _lastCp = i;
+      }
+    }
+    ctx.save();
+    _cps.forEach(({i, dir}) => {
+      if (i < startIdx || i >= endIdx) return;
+      const x = xOf(i - startIdx);
+      ctx.setLineDash([2,3]);
+      ctx.strokeStyle = dir > 0 ? 'rgba(96,164,161,0.7)' : 'rgba(199,27,82,0.7)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = dir > 0 ? 'rgba(96,164,161,0.9)' : 'rgba(199,27,82,0.9)';
+      ctx.font = '8px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('CP', x, 10);
+    });
+    ctx.restore();
+  }
+
+  // HMM: 2-состояния, Gaussian emissions, обучение через scaled Baum-Welch (EM)
+  if (chartInds.hmm && closes.length >= 30) {
+    const _hr = []; for (let i=1;i<closes.length;i++) _hr.push(closes[i]-closes[i-1]);
+    const _T = _hr.length;
+    const _hmean = _hr.reduce((a,b)=>a+b,0)/_T;
+    const _hvar = _hr.reduce((a,b)=>a+(b-_hmean)*(b-_hmean),0)/_T || 1e-8;
+    let _mu = [_hmean, _hmean];
+    let _vr = [Math.max(_hvar*0.4,1e-10), Math.max(_hvar*1.8,1e-10)];
+    let _A = [[0.95,0.05],[0.05,0.95]];
+    let _pi = [0.5,0.5];
+    const _gpdf = (x,m,v) => Math.exp(-((x-m)*(x-m))/(2*v)) / Math.sqrt(2*Math.PI*v);
+    let _gamma = null;
+    for (let it=0; it<12; it++) {
+      const _B = new Array(_T);
+      for (let t=0;t<_T;t++) _B[t] = [_gpdf(_hr[t],_mu[0],_vr[0])+1e-300, _gpdf(_hr[t],_mu[1],_vr[1])+1e-300];
+      const _aHat = new Array(_T), _c = new Array(_T);
+      _aHat[0] = [_pi[0]*_B[0][0], _pi[1]*_B[0][1]];
+      _c[0] = _aHat[0][0]+_aHat[0][1]; _aHat[0][0]/=_c[0]; _aHat[0][1]/=_c[0];
+      for (let t=1;t<_T;t++) {
+        const s0 = _aHat[t-1][0]*_A[0][0] + _aHat[t-1][1]*_A[1][0];
+        const s1 = _aHat[t-1][0]*_A[0][1] + _aHat[t-1][1]*_A[1][1];
+        _aHat[t] = [s0*_B[t][0], s1*_B[t][1]];
+        _c[t] = _aHat[t][0]+_aHat[t][1] || 1e-300; _aHat[t][0]/=_c[t]; _aHat[t][1]/=_c[t];
+      }
+      const _bHat = new Array(_T); _bHat[_T-1] = [1,1];
+      for (let t=_T-2;t>=0;t--) {
+        const b0 = (_A[0][0]*_B[t+1][0]*_bHat[t+1][0] + _A[0][1]*_B[t+1][1]*_bHat[t+1][1]) / _c[t+1];
+        const b1 = (_A[1][0]*_B[t+1][0]*_bHat[t+1][0] + _A[1][1]*_B[t+1][1]*_bHat[t+1][1]) / _c[t+1];
+        _bHat[t] = [b0,b1];
+      }
+      _gamma = new Array(_T);
+      for (let t=0;t<_T;t++) { const g0=_aHat[t][0]*_bHat[t][0], g1=_aHat[t][1]*_bHat[t][1]; const gs=(g0+g1)||1e-300; _gamma[t]=[g0/gs,g1/gs]; }
+      const _sumXi=[[0,0],[0,0]]; const _sumGexcl=[0,0];
+      for (let t=0;t<_T-1;t++) {
+        let x00=_aHat[t][0]*_A[0][0]*_B[t+1][0]*_bHat[t+1][0], x01=_aHat[t][0]*_A[0][1]*_B[t+1][1]*_bHat[t+1][1];
+        let x10=_aHat[t][1]*_A[1][0]*_B[t+1][0]*_bHat[t+1][0], x11=_aHat[t][1]*_A[1][1]*_B[t+1][1]*_bHat[t+1][1];
+        const xs=(x00+x01+x10+x11)||1e-300; x00/=xs;x01/=xs;x10/=xs;x11/=xs;
+        _sumXi[0][0]+=x00; _sumXi[0][1]+=x01; _sumXi[1][0]+=x10; _sumXi[1][1]+=x11;
+        _sumGexcl[0]+=_gamma[t][0]; _sumGexcl[1]+=_gamma[t][1];
+      }
+      _pi = [_gamma[0][0], _gamma[0][1]];
+      _A = [
+        [_sumXi[0][0]/(_sumGexcl[0]||1e-300), _sumXi[0][1]/(_sumGexcl[0]||1e-300)],
+        [_sumXi[1][0]/(_sumGexcl[1]||1e-300), _sumXi[1][1]/(_sumGexcl[1]||1e-300)],
+      ];
+      for (let k=0;k<2;k++) {
+        let gw=0, mw=0; for (let t=0;t<_T;t++){ gw+=_gamma[t][k]; mw+=_gamma[t][k]*_hr[t]; }
+        _mu[k] = mw/(gw||1e-300);
+        let vw=0; for (let t=0;t<_T;t++) vw += _gamma[t][k]*(_hr[t]-_mu[k])*(_hr[t]-_mu[k]);
+        _vr[k] = Math.max(vw/(gw||1e-300), 1e-10);
+      }
+    }
+    const _hiVolState = _vr[1] > _vr[0] ? 1 : 0;
+    // gamma[t] относится к returns[t] = close[t+1]-close[t], сдвигаем состояние на индекс close[t+1]
+    const _stateArr = new Array(closes.length).fill(null);
+    for (let t=0;t<_T;t++) _stateArr[t+1] = _gamma[t][_hiVolState] > 0.5 ? 1 : 0;
+    _stateArr[0] = _stateArr[1];
+    // закраска фоном по сегментам в видимом окне
+    ctx.save();
+    let _segStart = startIdx;
+    for (let i = startIdx+1; i <= endIdx; i++) {
+      if (i === endIdx || _stateArr[i] !== _stateArr[_segStart]) {
+        const x1 = xOf(_segStart - startIdx), x2 = xOf(Math.min(i,endIdx-1) - startIdx) + (chartCandleW||8)/2;
+        ctx.fillStyle = _stateArr[_segStart] === 1 ? 'rgba(199,27,82,0.05)' : 'rgba(96,164,161,0.04)';
+        ctx.fillRect(x1, 0, x2-x1, H);
+        _segStart = i;
+      }
+    }
+    ctx.restore();
+    const _curState = _stateArr[closes.length-1];
+    const _curProb = _gamma[_T-1][_hiVolState];
+    ctx.save();
+    ctx.font='8px monospace'; ctx.textAlign='left';
+    const _hmmTxt = `HMM: ${_curState===1?'высокая волатильность':'спокойный режим'} (p=${(_curState===1?_curProb:1-_curProb).toFixed(2)})`;
+    const _bw = ctx.measureText(_hmmTxt).width + 10;
+    ctx.fillStyle='rgba(13,8,32,0.85)'; ctx.fillRect(4, 4, _bw, 16);
+    ctx.strokeStyle = _curState===1?'rgba(199,27,82,0.5)':'rgba(96,164,161,0.5)'; ctx.lineWidth=1; ctx.strokeRect(4,4,_bw,16);
+    ctx.fillStyle = _curState===1?'#FF4D7A':'#60A4A1';
+    ctx.fillText(_hmmTxt, 9, 14);
+    ctx.restore();
+  }
+
+  // Hurst Exponent: классический R/S анализ (Mandelbrot) на лог-доходностях, regression log(R/S) vs log(n)
+  if (chartInds.hurst && closes.length >= 40) {
+    const _hSrc = closes.slice(-Math.min(closes.length, 600));
+    const _hret = []; for (let i=1;i<_hSrc.length;i++) _hret.push(Math.log(_hSrc[i]/_hSrc[i-1]));
+    const _N = _hret.length;
+    const _pts = [];
+    let _sz = _N;
+    while (_sz >= 8) {
+      const chunks = Math.floor(_N/_sz);
+      if (chunks >= 1) {
+        const _rsList = [];
+        for (let c=0;c<chunks;c++) {
+          const seg = _hret.slice(c*_sz, (c+1)*_sz);
+          const m = seg.reduce((a,b)=>a+b,0)/seg.length;
+          let cum=0, mx=-Infinity, mn=Infinity;
+          for (const v of seg) { cum += (v-m); if (cum>mx) mx=cum; if (cum<mn) mn=cum; }
+          const R = mx-mn;
+          const S = Math.sqrt(seg.reduce((a,b)=>a+(b-m)*(b-m),0)/seg.length);
+          if (S>1e-12) _rsList.push(R/S);
+        }
+        if (_rsList.length) {
+          const avgRS = _rsList.reduce((a,b)=>a+b,0)/_rsList.length;
+          if (avgRS>0) _pts.push([Math.log(_sz), Math.log(avgRS)]);
+        }
+      }
+      _sz = Math.floor(_sz/2);
+    }
+    if (_pts.length >= 2) {
+      const _nx = _pts.length;
+      const _mx2 = _pts.reduce((a,p)=>a+p[0],0)/_nx, _my2 = _pts.reduce((a,p)=>a+p[1],0)/_nx;
+      let _num=0, _den=0;
+      for (const [x,y] of _pts) { _num += (x-_mx2)*(y-_my2); _den += (x-_mx2)*(x-_mx2); }
+      const _H = _den>0 ? _num/_den : 0.5;
+      const _label = _H < 0.45 ? 'антиперсистентный (mean-reversion)' : _H > 0.55 ? 'персистентный (тренд)' : 'случайное блуждание';
+      const _col = _H < 0.45 ? '#FF4D7A' : _H > 0.55 ? '#52F2C9' : '#9090B8';
+      ctx.save();
+      ctx.font='8px monospace'; ctx.textAlign='left';
+      const _huTxt = `Hurst H=${_H.toFixed(2)} — ${_label}`;
+      const _bw2 = ctx.measureText(_huTxt).width + 10;
+      ctx.fillStyle='rgba(13,8,32,0.85)'; ctx.fillRect(4, 24, _bw2, 16);
+      ctx.strokeStyle = _col+'80'; ctx.lineWidth=1; ctx.strokeRect(4,24,_bw2,16);
+      ctx.fillStyle = _col;
+      ctx.fillText(_huTxt, 9, 34);
+      ctx.restore();
+    }
+  }
+
+  // Gaussian Process Regression: RBF-ядро, скользящее окно (для производительности), causal
+  if (chartInds.gpr) {
+    const _gWin = 60;
+    const _gLS = _gWin / 6;
+    const _gMean = new Array(closes.length).fill(null);
+    const _gStd = new Array(closes.length).fill(null);
+    const _gKern = (a,b) => Math.exp(-((a-b)*(a-b))/(2*_gLS*_gLS));
+    for (let i = 0; i < closes.length; i++) {
+      const j0 = Math.max(0, i - _gWin + 1);
+      const xs = []; const ys = [];
+      for (let j = j0; j <= i; j++) { xs.push(j); ys.push(closes[j]); }
+      const n = xs.length;
+      if (n < 5) { _gMean[i] = closes[i]; _gStd[i] = 0; continue; }
+      const _gMy = ys.reduce((a,b)=>a+b,0)/n;
+      const _ysC = ys.map(v => v - _gMy); // де-мин: GP моделирует отклонение от локального среднего (иначе тянет к нулю при near-singular K)
+      const _gSigF2 = Math.max(1e-8, _ysC.reduce((a,b)=>a+b*b,0)/n);
+      const _gObsNoise = _gSigF2 * 0.01 + 1e-9;
+      const K = new Array(n);
+      for (let a=0;a<n;a++) { K[a] = new Array(n); for (let b=0;b<n;b++) K[a][b] = _gSigF2*_gKern(xs[a],xs[b]) + (a===b ? _gObsNoise : 0); }
+      // обращаем K методом Gauss-Jordan (n ограничено окном _gWin, матрица маленькая)
+      const Aug = K.map((row,a) => { const r = row.slice(); for (let c=0;c<n;c++) r.push(a===c?1:0); return r; });
+      for (let col=0; col<n; col++) {
+        let piv = col;
+        for (let r=col+1;r<n;r++) if (Math.abs(Aug[r][col]) > Math.abs(Aug[piv][col])) piv = r;
+        if (piv !== col) { const tmp = Aug[col]; Aug[col] = Aug[piv]; Aug[piv] = tmp; }
+        const pv = Aug[col][col] || 1e-9;
+        for (let c2=0;c2<2*n;c2++) Aug[col][c2] /= pv;
+        for (let r=0;r<n;r++) {
+          if (r === col) continue;
+          const f = Aug[r][col];
+          if (f === 0) continue;
+          for (let c2=0;c2<2*n;c2++) Aug[r][c2] -= f * Aug[col][c2];
+        }
+      }
+      const Kinv = Aug.map(row => row.slice(n));
+      const xi = xs[n-1];
+      const kvec = xs.map(xj => _gSigF2*_gKern(xi, xj));
+      const alpha = new Array(n).fill(0);
+      const beta = new Array(n).fill(0);
+      for (let a=0;a<n;a++) for (let b=0;b<n;b++) { alpha[a] += Kinv[a][b]*_ysC[b]; beta[a] += Kinv[a][b]*kvec[b]; }
+      let meanC = 0, kKinvk = 0;
+      for (let a=0;a<n;a++) { meanC += kvec[a]*alpha[a]; kKinvk += kvec[a]*beta[a]; }
+      const kxx = _gSigF2*_gKern(xi,xi);
+      const variance = Math.max(0, kxx - kKinvk);
+      _gMean[i] = meanC + _gMy; _gStd[i] = Math.sqrt(variance);
+    }
+    ctx.save();
+    ctx.beginPath();
+    for (let i = startIdx; i < endIdx; i++) { const x=xOf(i-startIdx), y=toY(_gMean[i] + 1.96*_gStd[i]); i===startIdx?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+    for (let i = endIdx-1; i >= startIdx; i--) { const x=xOf(i-startIdx), y=toY(_gMean[i] - 1.96*_gStd[i]); ctx.lineTo(x,y); }
+    ctx.closePath();
+    ctx.fillStyle = (_ilC('gpr',0)) + '14';
+    ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle = _ilC('gpr',0); ctx.lineWidth = 1.6; let _ffg = true;
+    for (let i = startIdx; i < endIdx; i++) { const x=xOf(i-startIdx), y=toY(_gMean[i]); _ffg?ctx.moveTo(x,y):ctx.lineTo(x,y); _ffg=false; }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Matrix Profile: для каждого подряда длины m — расстояние (z-normalized Euclidean) до ближайшего
+  // непересекающегося подряда; минимум профиля = мотив (повторяющийся паттерн), максимум = дискорд (аномалия)
+  if (chartInds.mprof && closes.length >= 60) {
+    const _mpSrc = closes.slice(-Math.min(closes.length, 300));
+    const _mpOff = closes.length - _mpSrc.length;
+    const _m = 16;
+    const _nSub = _mpSrc.length - _m + 1;
+    if (_nSub > 4) {
+      const _mu = new Array(_nSub), _sd = new Array(_nSub);
+      for (let i=0;i<_nSub;i++) {
+        let s=0; for (let k=0;k<_m;k++) s += _mpSrc[i+k];
+        const mean = s/_m;
+        let v=0; for (let k=0;k<_m;k++) v += (_mpSrc[i+k]-mean)*(_mpSrc[i+k]-mean);
+        _mu[i] = mean; _sd[i] = Math.sqrt(v/_m) || 1e-9;
+      }
+      const _profile = new Array(_nSub).fill(Infinity);
+      const _excl = Math.ceil(_m/2);
+      for (let i=0;i<_nSub;i++) {
+        for (let j=i+_excl;j<_nSub;j++) {
+          let dist = 0;
+          for (let k=0;k<_m;k++) {
+            const za = (_mpSrc[i+k]-_mu[i])/_sd[i];
+            const zb = (_mpSrc[j+k]-_mu[j])/_sd[j];
+            const d = za-zb; dist += d*d;
+          }
+          dist = Math.sqrt(dist);
+          if (dist < _profile[i]) _profile[i] = dist;
+          if (dist < _profile[j]) _profile[j] = dist;
+        }
+      }
+      let _motifIdx = 0, _discordIdx = 0, _minP = Infinity, _maxP = -Infinity;
+      for (let i=0;i<_nSub;i++) {
+        if (_profile[i] < _minP) { _minP = _profile[i]; _motifIdx = i; }
+        if (_profile[i] > _maxP && _profile[i] < Infinity) { _maxP = _profile[i]; _discordIdx = i; }
+      }
+      ctx.save();
+      const _drawMarker = (subIdx, label, color) => {
+        const barIdx = subIdx + _mpOff;
+        if (barIdx < startIdx - _m || barIdx >= endIdx) return;
+        const x1 = xOf(Math.max(barIdx, startIdx) - startIdx);
+        const x2 = xOf(Math.min(barIdx + _m, endIdx) - startIdx);
+        ctx.fillStyle = color + '1a';
+        ctx.fillRect(x1, 0, Math.max(1, x2-x1), H);
+        ctx.strokeStyle = color + '90'; ctx.lineWidth = 1; ctx.setLineDash([2,2]);
+        ctx.strokeRect(x1, 0, Math.max(1, x2-x1), H);
+        ctx.setLineDash([]);
+        ctx.font = '8px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = color;
+        ctx.fillText(label, x1+2, H-6);
+      };
+      _drawMarker(_motifIdx, 'MOTIF', '#52F2C9');
+      _drawMarker(_discordIdx, 'ANOMALY', '#FF4D7A');
+      ctx.restore();
+    }
+  }
+
+  // Transfer Entropy (объём → цена): информационная причинность по Шрайберу, дискретизация по терцилям
+  if (chartInds.te && closes.length >= 60) {
+    const _teWin = Math.min(closes.length - 1, 200);
+    const _tY = []; // доходность (эффект)
+    const _tX = []; // изменение объёма (причина)
+    const _j0te = closes.length - _teWin;
+    for (let i = Math.max(1,_j0te); i < closes.length; i++) {
+      _tY.push(closes[i] - closes[i-1]);
+      _tX.push((chartCandles[i] && chartCandles[i].vol != null ? chartCandles[i].vol : 0) - (chartCandles[i-1] && chartCandles[i-1].vol != null ? chartCandles[i-1].vol : 0));
+    }
+    const _teBin = (arr) => {
+      const sorted = [...arr].sort((a,b)=>a-b);
+      const q1 = sorted[Math.floor(sorted.length/3)];
+      const q2 = sorted[Math.floor(2*sorted.length/3)];
+      return arr.map(v => v <= q1 ? 0 : (v <= q2 ? 1 : 2));
+    };
+    if (_tY.length >= 20) {
+      const _yb = _teBin(_tY), _xb = _teBin(_tX);
+      const _n = _yb.length;
+      // совместные распределения: p(y_t, y_t-1, x_t-1) и p(y_t, y_t-1) для условных энтропий
+      const _cnt3 = {}, _cnt2 = {}, _cntYprev = {}, _cnt2x = {};
+      for (let t=1;t<_n;t++) {
+        const yt=_yb[t], yp=_yb[t-1], xp=_xb[t-1];
+        const k3 = yt+'_'+yp+'_'+xp, k2 = yt+'_'+yp, kyp = yp+'', k2x = yp+'_'+xp;
+        _cnt3[k3] = (_cnt3[k3]||0)+1;
+        _cnt2[k2] = (_cnt2[k2]||0)+1;
+        _cntYprev[kyp] = (_cntYprev[kyp]||0)+1;
+        _cnt2x[k2x] = (_cnt2x[k2x]||0)+1;
+      }
+      const _total = _n - 1;
+      let _te = 0;
+      for (const k3 in _cnt3) {
+        const [yt,yp,xp] = k3.split('_');
+        const pXYZ = _cnt3[k3] / _total;
+        const pYgivenYpXp = _cnt3[k3] / _cnt2x[yp+'_'+xp];
+        const pYgivenYp = _cnt2[yt+'_'+yp] / _cntYprev[yp];
+        if (pYgivenYpXp > 0 && pYgivenYp > 0) _te += pXYZ * Math.log2(pYgivenYpXp / pYgivenYp);
+      }
+      _te = Math.max(0, _te);
+      ctx.save();
+      ctx.font='8px monospace'; ctx.textAlign='left';
+      const _col = _te > 0.05 ? '#FFD23F' : '#9090B8';
+      const _teTxt = `TE(объём→цена) = ${_te.toFixed(3)} бит`;
+      const _bw3 = ctx.measureText(_teTxt).width + 10;
+      ctx.fillStyle='rgba(13,8,32,0.85)'; ctx.fillRect(4, 44, _bw3, 16);
+      ctx.strokeStyle = _col+'80'; ctx.lineWidth=1; ctx.strokeRect(4,44,_bw3,16);
+      ctx.fillStyle = _col;
+      ctx.fillText(_teTxt, 9, 54);
+      ctx.restore();
+    }
+  }
+
+  // SSA (Singular Spectrum Analysis): траектория-матрица + power iteration (top eigentriple) + диагональное усреднение → тренд-компонента
+  if (chartInds.ssa && closes.length >= 50) {
+    const _ssaSrc = closes.slice(-Math.min(closes.length, 200));
+    const _ssaOff = closes.length - _ssaSrc.length;
+    const _L = 20;
+    const _N = _ssaSrc.length;
+    const _K = _N - _L + 1;
+    if (_K > _L) {
+      const _C = new Array(_L);
+      for (let i=0;i<_L;i++) _C[i] = new Array(_L).fill(0);
+      for (let i=0;i<_L;i++) {
+        for (let j=i;j<_L;j++) {
+          let s = 0;
+          for (let k=0;k<_K;k++) s += _ssaSrc[i+k]*_ssaSrc[j+k];
+          _C[i][j] = s/_K; _C[j][i] = _C[i][j];
+        }
+      }
+      let _v = new Array(_L).fill(1/Math.sqrt(_L));
+      for (let it=0; it<60; it++) {
+        const w = new Array(_L).fill(0);
+        for (let i=0;i<_L;i++) for (let j=0;j<_L;j++) w[i] += _C[i][j]*_v[j];
+        const norm = Math.sqrt(w.reduce((a,b)=>a+b*b,0)) || 1;
+        for (let i=0;i<_L;i++) _v[i] = w[i]/norm;
+      }
+      const _pc = new Array(_K).fill(0);
+      for (let k=0;k<_K;k++) { let s=0; for (let i=0;i<_L;i++) s += _v[i]*_ssaSrc[i+k]; _pc[k]=s; }
+      const _recon = new Array(_N).fill(0);
+      const _counts = new Array(_N).fill(0);
+      for (let i=0;i<_L;i++) for (let k=0;k<_K;k++) { _recon[i+k] += _v[i]*_pc[k]; _counts[i+k]++; }
+      for (let n=0;n<_N;n++) _recon[n] /= (_counts[n] || 1);
+      ctx.save();
+      ctx.beginPath(); ctx.strokeStyle = '#FF8800'; ctx.lineWidth = 1.8; let _ffs = true;
+      for (let i = startIdx; i < endIdx; i++) {
+        const si = i - _ssaOff;
+        if (si < 0 || si >= _N) continue;
+        const x=xOf(i-startIdx), y=toY(_recon[si]);
+        _ffs?ctx.moveTo(x,y):ctx.lineTo(x,y); _ffs=false;
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Rough Volatility: оценка "грубости" волатильности (Gatheral/Rosenbaum) через структурную функцию log-RV
+  if (chartInds.rough && closes.length >= 80) {
+    const _rvSrc = closes.slice(-Math.min(closes.length, 400));
+    const _rets = []; for (let i=1;i<_rvSrc.length;i++) _rets.push(Math.log(_rvSrc[i]/_rvSrc[i-1]));
+    const _rvWin = 5;
+    const _logRV = [];
+    for (let i=_rvWin;i<_rets.length;i++) {
+      let s = 0; for (let k=0;k<_rvWin;k++) s += _rets[i-k]*_rets[i-k];
+      const rv = s/_rvWin;
+      _logRV.push(Math.log(Math.max(rv, 1e-12)));
+    }
+    const _Nrv = _logRV.length;
+    if (_Nrv > 30) {
+      const _lags = [1,2,3,5,8,13,21];
+      const _pts = [];
+      for (const h of _lags) {
+        if (h >= _Nrv) continue;
+        let sum2 = 0, cnt = 0;
+        for (let i=h;i<_Nrv;i++) { const d = _logRV[i]-_logRV[i-h]; sum2 += d*d; cnt++; }
+        if (cnt > 5) { const m2 = sum2/cnt; if (m2>0) _pts.push([Math.log(h), Math.log(m2)]); }
+      }
+      if (_pts.length >= 3) {
+        const _nx = _pts.length;
+        const _mx = _pts.reduce((a,p)=>a+p[0],0)/_nx, _my = _pts.reduce((a,p)=>a+p[1],0)/_nx;
+        let _num=0,_den=0;
+        for (const [x,y] of _pts) { _num += (x-_mx)*(y-_my); _den += (x-_mx)*(x-_mx); }
+        const _slope = _den>0 ? _num/_den : 1;
+        const _Hrv = Math.max(0, Math.min(1, _slope/2));
+        const _label = _Hrv < 0.2 ? 'грубая волатильность (rough, типично для рынков)' : _Hrv < 0.4 ? 'умеренно грубая' : _Hrv <= 0.6 ? 'стандартная (броуновская)' : 'персистентная (кластеризация волатильности)';
+        const _col = _Hrv < 0.2 ? '#FF8800' : _Hrv < 0.4 ? '#FFD23F' : _Hrv <= 0.6 ? '#9090B8' : '#52F2C9';
+        ctx.save();
+        ctx.font='8px monospace'; ctx.textAlign='left';
+        const _rvTxt = `Rough Vol: H=${_Hrv.toFixed(2)} — ${_label}`;
+        const _bw4 = ctx.measureText(_rvTxt).width + 10;
+        ctx.fillStyle='rgba(13,8,32,0.85)'; ctx.fillRect(4, 64, _bw4, 16);
+        ctx.strokeStyle = _col+'80'; ctx.lineWidth=1; ctx.strokeRect(4,64,_bw4,16);
+        ctx.fillStyle = _col;
+        ctx.fillText(_rvTxt, 9, 74);
+        ctx.restore();
+      }
+    }
+  }
+
   // Candles
   vis.forEach((c, i) => {
     const x=xOf(i), op=toY(c.open), cl=toY(c.close), hi2=toY(c.high), lo2=toY(c.low);
@@ -5902,6 +6541,113 @@ function _chartDrawMain() {
       ctx.restore();
     });
   }
+
+  // ── Ценовой профиль: POC + Value Area ──────────────────────────────────────
+  if (chartVPShow && chartCandles.length >= 10) {
+    const _hh = chartCandles.map(c=>c.high), _ll = chartCandles.map(c=>c.low);
+    const _pMin = Math.min(..._ll), _pMax = Math.max(..._hh);
+    const _BK = 24, _step = (_pMax - _pMin) / _BK;
+    if (_step > 0) {
+      const _vol = new Float64Array(_BK);
+      chartCandles.forEach(c => {
+        const v = (c.volume || 1), lo2=c.low, hi3=c.high, rng=hi3-lo2||_step;
+        const b0 = Math.max(0, Math.floor((lo2-_pMin)/_step)), b1 = Math.min(_BK-1, Math.floor((hi3-_pMin)/_step));
+        for (let b=b0;b<=b1;b++){ const bLo=_pMin+b*_step, bHi=bLo+_step; const ov=Math.min(hi3,bHi)-Math.max(lo2,bLo); _vol[b]+=v*(ov/rng); }
+      });
+      let _pocIdx=0; for(let i=1;i<_BK;i++) if(_vol[i]>_vol[_pocIdx]) _pocIdx=i;
+      const _total=_vol.reduce((a,b)=>a+b,0);
+      let _vaVol=_vol[_pocIdx], _vaLo=_pocIdx, _vaHi=_pocIdx;
+      while (_vaVol < _total*0.7 && (_vaLo>0 || _vaHi<_BK-1)) {
+        const aLo=_vaLo>0?_vol[_vaLo-1]:0, aHi=_vaHi<_BK-1?_vol[_vaHi+1]:0;
+        if (aHi>=aLo){_vaHi++;_vaVol+=_vol[_vaHi];} else {_vaLo--;_vaVol+=_vol[_vaLo];}
+      }
+      const _pocPrice=_pMin+(_pocIdx+0.5)*_step, _vaLoP=_pMin+_vaLo*_step, _vaHiP=_pMin+(_vaHi+1)*_step;
+      if (_vaHiP>=lo && _vaLoP<=hi) { ctx.save(); ctx.fillStyle='rgba(199,27,82,0.07)'; ctx.fillRect(0, toY(_vaHiP), W, toY(_vaLoP)-toY(_vaHiP)); ctx.restore(); }
+      if (_pocPrice>=lo && _pocPrice<=hi) {
+        const y=toY(_pocPrice);
+        ctx.save(); ctx.setLineDash([6,3]); ctx.strokeStyle='rgba(199,27,82,0.7)'; ctx.lineWidth=1.2;
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle='#C71B52'; ctx.font='9px monospace'; ctx.textAlign='left';
+        ctx.fillText(`POC ${_pocPrice.toFixed(_pocPrice<100?2:0)}`, 4, y-2);
+        ctx.restore();
+      }
+    }
+  }
+
+  // ── Линии тренда: соединяем последние 2 свинг-хая / свинг-лоя ─────────────
+  if (chartTrendShow && chartCandles.length >= 30) {
+    const _n3=chartCandles.length, _highs=[], _lows=[];
+    for (let i=2;i<_n3-2;i++) {
+      const c=chartCandles[i];
+      if (c.high>chartCandles[i-1].high && c.high>chartCandles[i-2].high && c.high>chartCandles[i+1].high && c.high>chartCandles[i+2].high) _highs.push({i,v:c.high});
+      if (c.low<chartCandles[i-1].low && c.low<chartCandles[i-2].low && c.low<chartCandles[i+1].low && c.low<chartCandles[i+2].low) _lows.push({i,v:c.low});
+    }
+    const _drawTrend = (pts, color) => {
+      if (pts.length < 2) return;
+      const [a,b] = pts.slice(-2);
+      const slope = (b.v - a.v) / (b.i - a.i);
+      const xA = a.i - startIdx, xB = endIdx - 1 - startIdx;
+      const vB = b.v + slope * ((endIdx-1) - b.i);
+      ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=1.3; ctx.setLineDash([5,3]);
+      ctx.beginPath(); ctx.moveTo(xOf(Math.max(xA,0)), toY(a.i>=startIdx?a.v:a.v)); ctx.lineTo(xOf(xB), toY(vB)); ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+    };
+    _drawTrend(_highs, 'rgba(199,27,82,0.6)');
+    _drawTrend(_lows, 'rgba(96,164,161,0.6)');
+  }
+
+  // ── Горизонтальные уровни: ценовые кластеры по частоте касаний ────────────
+  if (chartHLevShow && chartCandles.length >= 20) {
+    const _closes2 = chartCandles.map(c=>c.close);
+    const _lastClose2 = _closes2[_closes2.length-1];
+    const _bSize = _lastClose2 * 0.002;
+    const _clusters = {};
+    chartCandles.forEach(c => { [c.high,c.low,c.close].forEach(p=>{ const k=Math.round(p/_bSize); _clusters[k]=(_clusters[k]||0)+1; }); });
+    const _sortedC = Object.entries(_clusters).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    _sortedC.forEach(([key,cnt]) => {
+      const price = key*_bSize;
+      if (price<lo || price>hi) return;
+      const y = toY(price);
+      ctx.save(); ctx.setLineDash([2,4]);
+      ctx.strokeStyle = price>_lastClose2 ? 'rgba(192,128,128,0.55)' : 'rgba(96,164,161,0.55)';
+      ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = price>_lastClose2 ? '#C08080' : '#60A4A1'; ctx.font='8px monospace'; ctx.textAlign='left';
+      ctx.fillText(`${price.toFixed(price<100?2:0)} (${cnt})`, 4, y-2);
+      ctx.restore();
+    });
+  }
+
+  // ── Бейджи систем без чёткой геометрии: Напряжение / Фаза / Пары / Свечи ──
+  (function _sysBadges() {
+    const _badges = [
+      [chartVoltageShow, 'sys-voltage', '⚡ Напряжение'],
+      [chartPhaseShow,   'sys-phase',   '🔬 Фаза'],
+      [chartSigpairsShow,'sys-sigpairs','⚡ Пары сигналов'],
+      [chartCandleShow,  'sys-candle',  '🕯 Свечи'],
+    ].filter(b => b[0]);
+    if (!_badges.length) return;
+    let by = 4;
+    _badges.forEach(([, elId, title]) => {
+      const srcEl = document.getElementById(elId);
+      if (!srcEl) return;
+      let txt = (srcEl.textContent || '').trim().replace(/\s+/g,' ').slice(0, 90);
+      if (!txt) return;
+      ctx.save();
+      ctx.font = '8px monospace'; ctx.textAlign='right';
+      const boxW = Math.min(220, ctx.measureText(txt).width + 10);
+      ctx.fillStyle = 'rgba(13,8,32,0.85)';
+      ctx.fillRect(W - boxW - 4, by, boxW, 24);
+      ctx.strokeStyle = 'rgba(199,27,82,0.4)'; ctx.lineWidth=1;
+      ctx.strokeRect(W - boxW - 4, by, boxW, 24);
+      ctx.fillStyle = '#FF006E'; ctx.font='8px monospace'; ctx.textAlign='right';
+      ctx.fillText(title, W - 8, by + 10);
+      ctx.fillStyle = 'rgba(220,220,235,0.85)'; ctx.font='7px monospace';
+      ctx.fillText(txt.slice(0, 40), W - 8, by + 20);
+      ctx.restore();
+      by += 28;
+    });
+  })();
 
   // Ichimoku overlay
   if (chartIchiShow && chartCandles.length >= 52) {
@@ -5956,7 +6702,7 @@ function _chartDrawMain() {
   }
 
   // ── Market Structure overlay: swing pivots + BOS/CHoCH lines ──────────────
-  if (chartCandles.length >= 20) {
+  if (chartMSShow && chartCandles.length >= 20) {
     const _n = chartCandles.length;
     const _lb = Math.max(3, Math.min(7, Math.floor(_n / 15)));
     const _swH = [], _swL = [];
@@ -6036,7 +6782,7 @@ function _chartDrawMain() {
   }
 
   // ── SMC: Fair Value Gaps (FVG) drawn as semi-transparent rectangles ────────
-  if (chartCandles.length >= 5) {
+  if (chartSMCShow && chartCandles.length >= 5) {
     const _n = chartCandles.length;
     const _fvgs = [];
     for (let i = 2; i < _n; i++) {
@@ -6798,7 +7544,7 @@ function _indDrawOverlay(id){
 function _drawOverlayNames(){
   const cv=document.getElementById('chart-main');if(!cv)return;
   const ctx=cv.getContext('2d'),H=cv.offsetHeight;
-  const NAMES={atr_ch:'ATR Ch',bb_full:'BB Full',envelopes:'Envelopes',keltner:'Keltner',ma_channel:'MA Ch',price_ch:'Price Ch',parabolic:'SAR',atr_stop:'ATR Stop',vwma:'VWMA',supertrend:'SuperTrend',mcginley:'McGinley',pivot:'Pivots',zigzag:'ZigZag',fractals:'Fractals',vwap:'VWAP',alligator:'Alligator',donchian:'Donchian',ma:'MA',ema:'EMA',bb:'BB'};
+  const NAMES={atr_ch:'ATR Ch',bb_full:'BB Full',envelopes:'Envelopes',keltner:'Keltner',ma_channel:'MA Ch',price_ch:'Price Ch',parabolic:'SAR',atr_stop:'ATR Stop',vwma:'VWMA',supertrend:'SuperTrend',mcginley:'McGinley',pivot:'Pivots',zigzag:'ZigZag',fractals:'Fractals',vwap:'VWAP',alligator:'Alligator',donchian:'Donchian',ma:'MA',ema:'EMA',bb:'BB',nw:'Nadaraya-Watson',kalman:'Kalman Filter',cusum:'CUSUM CP',hmm:'HMM Regime',hurst:'Hurst Exponent',gpr:'Gaussian Process',mprof:'Matrix Profile',te:'Transfer Entropy',ssa:'SSA Trend',rough:'Rough Volatility'};
   ctx.save();ctx.font='9px monospace';let x=8;
   Object.entries(NAMES).forEach(([id,nm])=>{if(!chartInds[id])return;ctx.fillStyle=chartIndsHidden.has(id)?'rgba(255,255,255,0.2)':'rgba(112,128,168,0.85)';ctx.fillText(nm,x,14);x+=ctx.measureText(nm).width+10;});
   ctx.restore();
@@ -7270,7 +8016,7 @@ function cpTab(btn) {
   const name = btn.dataset.tab;
   document.querySelectorAll('.cp-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const panels = ['ind','combo','ichi','fib','sys'];
+  const panels = ['ind','combo','ichi','sys'];
   panels.forEach(p => {
     const el = document.getElementById('cp-panel-' + p);
     if (!el) return;
@@ -8982,6 +9728,8 @@ function cpInitIndPanel() {
     'hist_vol','close2close','ohlc_vol','chop','vix_like','vortex',
     // Misc
     'supertrend','fisher','pivot','zigzag','mcginley','tsi','ult_osc','dpo',
+    // Продвинутая статистика
+    'nw','kalman','cusum','hmm','hurst','gpr','mprof','te','ssa','rough',
   ]);
 
   let html = '';
@@ -9355,7 +10103,7 @@ function _cpShowTooltip(idx, e, canvas) {
 
   let h = '<div style="font-size:9px;color:#6F648F;margin-bottom:4px;">';
   if (c.time) {
-    const d = new Date(c.time * 1000);
+    const d = new Date(c.time);
     h += d.toLocaleDateString('ru-RU', {day:'2-digit',month:'short'}) + ' ' +
          d.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'});
   }
@@ -10086,7 +10834,7 @@ async function _ilFetchCandlesWithCache(ticker, figi, iv, from, now, token, prox
 // контракта той же цепочки (общий basicAsset) — для бэктеста индикаторов.
 async function ilGetCandlesChain(found, token, from, now, proxy, interval) {
   const fetchCandles = async (figi, f, t) =>
-    _ilFetchCandlesWithCache(figi, interval||'CANDLE_INTERVAL_DAY', f, t, token, proxy, null);
+    _ilFetchCandlesWithCache(figi, figi, interval||'CANDLE_INTERVAL_DAY', f, t, token, proxy, null);
 
   let candles = await fetchCandles(found.figi, from, now);
   let chained = false;
@@ -15529,6 +16277,399 @@ function _renderAnalysisInner(panel) {
           else items.push({type:'neutral', text:`RSI(Wilder) = ${val.toFixed(1)}`});
         }
         html += makeCard('RSI Wilder / RSI Уайлдера (неклассически)', items, 'rsi_wil');
+      }
+    } else if (idL === 'nw') {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        const h = Math.max(2, Math.min(50, n > 300 ? 12 : Math.round(n/15) || 8));
+        const win2 = Math.max(h*4, 20);
+        const nwArr = new Array(n).fill(null);
+        for (let i=0;i<n;i++) {
+          const j0=Math.max(0,i-win2); let wsum=0,vsum=0;
+          for (let j=j0;j<=i;j++) { const d=i-j, w=Math.exp(-(d*d)/(2*h*h)); wsum+=w; vsum+=w*closes[j]; }
+          nwArr[i] = wsum>0 ? vsum/wsum : closes[i];
+        }
+        const resid = closes.map((c,i)=>Math.abs(c-nwArr[i]));
+        const mae = resid.reduce((a,b)=>a+b,0)/(resid.length||1);
+        const last = closes[n-1], center = nwArr[n-1];
+        const devPct = (last-center)/center*100;
+        const slope5 = n>=6 ? (nwArr[n-1]-nwArr[n-6])/nwArr[n-6]*100 : 0;
+        if (Math.abs(devPct) > (mae/center*100*2)) {
+          items.push({type: devPct>0?'bearish':'bullish', text:`Цена вышла за ленту Надарая-Уотсона (откл. ${devPct.toFixed(2)}%, лента ±${(mae/center*100*2).toFixed(2)}%) — растянутое движение, ядерное среднее тянет назад`});
+        } else {
+          items.push({type:'neutral', text:`Цена внутри ленты NW (откл. ${devPct.toFixed(2)}%) — движение в пределах нормального шума относительно ядерного сглаживания`});
+        }
+        items.push({type: slope5>0.1?'bullish':slope5<-0.1?'bearish':'neutral', text:`Наклон ядерного центра за 5 баров: ${slope5>0?'+':''}${slope5.toFixed(2)}% — ${Math.abs(slope5)<0.1?'плоско, локальный флэт':slope5>0?'центр тяжести смещается вверх':'центр тяжести смещается вниз'}`});
+        // Неклассика: расширение/сжатие ленты как предиктор волатильности наперёд
+        const resid20 = resid.slice(-20).reduce((a,b)=>a+b,0)/20;
+        const resid60 = resid.slice(-60).reduce((a,b)=>a+b,0)/Math.min(60,resid.length);
+        if (resid20 > resid60*1.4) items.push({type:'neutral', text:`Лента расширяется (MAE20=${resid20.toFixed(3)} > MAE60=${resid60.toFixed(3)}) — рынок входит в более шумный режим, ядерная оценка теряет точность как опора`});
+        else if (resid20 < resid60*0.6) items.push({type:'neutral', text:`Лента сжимается (MAE20=${resid20.toFixed(3)} < MAE60=${resid60.toFixed(3)}) — затишье, ядерный центр становится надёжнее как уровень для входа от него`});
+        {
+          const dir = devPct < -1 ? 'bullish' : devPct > 1 ? 'bearish' : 'neutral';
+          const conf = Math.abs(devPct) > (mae/center*100*3) ? 'moderate' : 'weak';
+          _trade(dir, conf,
+            devPct < -1 ? `Цена ниже ядерного центра — можно ловить возврат к нему, стоп за локальный минимум.` : null,
+            devPct > 1 ? `Цена выше ядерного центра — фиксируй часть на возврате, шорт от верхней границы ленты с подтверждением.` : null
+          ).forEach(t=>items.push(t));
+        }
+        const classicItems = [];
+        classicItems.push({type: last>center?'bullish':last<center?'bearish':'neutral', text:`Цена ${last>center?'выше':last<center?'ниже':'на уровне'} линии Nadaraya-Watson (${center.toFixed(2)}) — классическая трактовка как сглаженная скользящая: выше = бычий перекос, ниже = медвежий`});
+        classicItems.push({type:'neutral', text:`Ядерная линия используется как динамический уровень поддержки/сопротивления, аналог EMA с адаптивным сглаживанием`});
+        html += makeCard('Nadaraya-Watson / Ядерная регрессия', items, 'nw', classicItems, 'nw');
+      }
+    } else if (idL === 'kalman') {
+      const n = candles.length;
+      if (n >= 20) {
+        const items = [];
+        const rets=[]; for(let i=1;i<n;i++) rets.push(closes[i]-closes[i-1]);
+        const meanR=rets.reduce((a,b)=>a+b,0)/(rets.length||1);
+        const R=rets.reduce((a,b)=>a+(b-meanR)*(b-meanR),0)/(rets.length||1)||1e-6;
+        const Q=R*0.05;
+        const kx=new Array(n), kP=new Array(n);
+        let x=closes[0],P=R;
+        for(let i=0;i<n;i++){ const xPred=x,PPred=P+Q; const K=PPred/(PPred+R); x=xPred+K*(closes[i]-xPred); P=(1-K)*PPred; kx[i]=x; kP[i]=P; }
+        const last=closes[n-1], filt=kx[n-1], sd=Math.sqrt(kP[n-1]);
+        const z=(last-filt)/(sd||1e-9);
+        if (Math.abs(z)>1.96) items.push({type:z>0?'bearish':'bullish', text:`Цена ${z>0?'выше':'ниже'} Kalman-оценки на ${z.toFixed(1)}σ — наблюдение статистически выбивается из модели локального уровня, ожидай притяжение к фильтру`});
+        else items.push({type:'neutral', text:`Цена в пределах ${z.toFixed(1)}σ от Kalman-фильтра — наблюдение согласуется с моделью random walk`});
+        const Pslope = kP[n-1] - kP[Math.max(0,n-10)];
+        items.push({type:'neutral', text: Pslope>0 ? `Неопределённость фильтра (P) растёт за 10 баров — модель «теряет уверенность», шум на рынке усиливается` : `Неопределённость фильтра (P) падает — модель «уверена», поведение цены стало предсказуемее локально`});
+        // Неклассика: K (коэффициент усиления) как мера, насколько рынок доверяет новой информации
+        const PPredLast = kP[n-1] + Q; const Kgain = PPredLast/(PPredLast+R);
+        if (Kgain > 0.5) items.push({type:'neutral', text:`Коэффициент усиления Kalman K=${Kgain.toFixed(2)} высокий — фильтр почти полностью доверяет последней цене, режим нестабилен, использовать как трендовый, не mean-reversion`});
+        else items.push({type:'neutral', text:`K=${Kgain.toFixed(2)} низкий — фильтр сильно сглаживает, доверяет истории больше новой цены, подходит как опорная линия для mean-reversion входов`});
+        {
+          const dir = z < -1 ? 'bullish' : z > 1 ? 'bearish' : 'neutral';
+          _trade(dir, Math.abs(z)>1.96?'moderate':'weak',
+            z < -1 ? 'Цена ниже фильтра — лонг на возврат к Kalman-линии, стоп под локальный минимум.' : null,
+            z > 1 ? 'Цена выше фильтра — шорт на возврат, стоп над локальным максимумом.' : null
+          ).forEach(t=>items.push(t));
+        }
+        const classicItems = [{type: last>filt?'bullish':last<filt?'bearish':'neutral', text:`Цена ${last>filt?'выше':last<filt?'ниже':'на уровне'} Kalman-оценки (${filt.toFixed(2)}) — классическая трактовка: отфильтрованная линия как сглаженный тренд без лага, аналог адаптивной MA`}];
+        html += makeCard('Kalman Filter', items, 'kalman', classicItems, 'kalman');
+      }
+    } else if (idL === 'cusum') {
+      const n = candles.length;
+      if (n >= 35) {
+        const items = [];
+        const lrets = new Array(n).fill(0);
+        for (let i=1;i<n;i++) lrets[i] = Math.log(closes[i]/closes[i-1]);
+        const cpWin=30; const cps=[]; let Sp=0,Sm=0,lastCp=-Infinity;
+        for (let i=1;i<n;i++) {
+          const j0=Math.max(1,i-cpWin); const seg=lrets.slice(j0,i);
+          const mu=seg.reduce((a,b)=>a+b,0)/(seg.length||1);
+          const sd=Math.sqrt(seg.reduce((a,b)=>a+(b-mu)*(b-mu),0)/(seg.length||1))||1e-8;
+          const k=0.5*sd, hh=4*sd;
+          Sp=Math.max(0,Sp+(lrets[i]-mu)-k); Sm=Math.min(0,Sm+(lrets[i]-mu)+k);
+          if ((Sp>hh||Sm<-hh) && i-lastCp>5) { cps.push({i,dir:Sp>hh?1:-1}); Sp=0;Sm=0;lastCp=i; }
+        }
+        const barsSince = cps.length ? n-1-cps[cps.length-1].i : null;
+        if (cps.length && barsSince!=null && barsSince < 10) {
+          const lastDir = cps[cps.length-1].dir;
+          items.push({type: lastDir>0?'bullish':'bearish', text:`Структурный сдвиг CUSUM обнаружен ${barsSince} баров назад (${lastDir>0?'рост среднего':'падение среднего'}) — режим свежий, текущее движение скорее всего ещё не выдохлось`});
+        } else if (cps.length) {
+          items.push({type:'neutral', text:`Последний сдвиг CUSUM — ${barsSince} баров назад. Режим зрелый, статистически ближе к следующему сдвигу, чем к предыдущему`});
+        } else {
+          items.push({type:'neutral', text:`Сдвигов среднего не обнаружено на доступной истории — режим стабилен от начала окна`});
+        }
+        // Неклассика: частота сдвигов как мера "нервности" рынка
+        const recentCps = cps.filter(c => c.i > n-100).length;
+        if (recentCps >= 3) items.push({type:'neutral', text:`${recentCps} сдвигов за последние 100 баров — рынок «нервный», режимы короткие. Снижай горизонт удержания позиции`});
+        else if (recentCps === 0 && n>100) items.push({type:'neutral', text:`0 сдвигов за 100 баров — спокойный затяжной режим, можно держать позицию дольше обычного`});
+        const classicItems = [cps.length ? {type: cps[cps.length-1].dir>0?'bullish':'bearish', text:`Классически CUSUM используется как детектор разладки (structural break) среднего ряда — последний сдвиг: ${cps[cps.length-1].dir>0?'вверх':'вниз'}, ${barsSince} баров назад`} : {type:'neutral', text:`Классически CUSUM сигнализирует о начале нового тренда при выходе суммы отклонений за порог — пока сигналов нет`}];
+        html += makeCard('CUSUM Change Point Detection', items, 'cusum', classicItems, 'cusum');
+      }
+    } else if (idL === 'hmm') {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        const hr=[]; for(let i=1;i<n;i++) hr.push(closes[i]-closes[i-1]);
+        const T=hr.length;
+        const hmean=hr.reduce((a,b)=>a+b,0)/T;
+        const hvar=hr.reduce((a,b)=>a+(b-hmean)*(b-hmean),0)/T||1e-8;
+        let mu=[hmean,hmean], vr=[Math.max(hvar*0.4,1e-10),Math.max(hvar*1.8,1e-10)];
+        let A=[[0.95,0.05],[0.05,0.95]], pi=[0.5,0.5];
+        const gpdf=(x,m,v)=>Math.exp(-((x-m)*(x-m))/(2*v))/Math.sqrt(2*Math.PI*v);
+        let gamma=null;
+        for (let it=0; it<12; it++) {
+          const B=new Array(T);
+          for(let t=0;t<T;t++) B[t]=[gpdf(hr[t],mu[0],vr[0])+1e-300, gpdf(hr[t],mu[1],vr[1])+1e-300];
+          const aHat=new Array(T), c=new Array(T);
+          aHat[0]=[pi[0]*B[0][0], pi[1]*B[0][1]]; c[0]=aHat[0][0]+aHat[0][1]; aHat[0][0]/=c[0]; aHat[0][1]/=c[0];
+          for (let t=1;t<T;t++) {
+            const s0=aHat[t-1][0]*A[0][0]+aHat[t-1][1]*A[1][0], s1=aHat[t-1][0]*A[0][1]+aHat[t-1][1]*A[1][1];
+            aHat[t]=[s0*B[t][0], s1*B[t][1]]; c[t]=aHat[t][0]+aHat[t][1]||1e-300; aHat[t][0]/=c[t]; aHat[t][1]/=c[t];
+          }
+          const bHat=new Array(T); bHat[T-1]=[1,1];
+          for (let t=T-2;t>=0;t--) {
+            const b0=(A[0][0]*B[t+1][0]*bHat[t+1][0]+A[0][1]*B[t+1][1]*bHat[t+1][1])/c[t+1];
+            const b1=(A[1][0]*B[t+1][0]*bHat[t+1][0]+A[1][1]*B[t+1][1]*bHat[t+1][1])/c[t+1];
+            bHat[t]=[b0,b1];
+          }
+          gamma=new Array(T);
+          for (let t=0;t<T;t++) { const g0=aHat[t][0]*bHat[t][0], g1=aHat[t][1]*bHat[t][1]; const gs=(g0+g1)||1e-300; gamma[t]=[g0/gs,g1/gs]; }
+          const sumXi=[[0,0],[0,0]]; const sumGexcl=[0,0];
+          for (let t=0;t<T-1;t++) {
+            let x00=aHat[t][0]*A[0][0]*B[t+1][0]*bHat[t+1][0], x01=aHat[t][0]*A[0][1]*B[t+1][1]*bHat[t+1][1];
+            let x10=aHat[t][1]*A[1][0]*B[t+1][0]*bHat[t+1][0], x11=aHat[t][1]*A[1][1]*B[t+1][1]*bHat[t+1][1];
+            const xs=(x00+x01+x10+x11)||1e-300; x00/=xs;x01/=xs;x10/=xs;x11/=xs;
+            sumXi[0][0]+=x00; sumXi[0][1]+=x01; sumXi[1][0]+=x10; sumXi[1][1]+=x11;
+            sumGexcl[0]+=gamma[t][0]; sumGexcl[1]+=gamma[t][1];
+          }
+          pi=[gamma[0][0], gamma[0][1]];
+          A=[[sumXi[0][0]/(sumGexcl[0]||1e-300), sumXi[0][1]/(sumGexcl[0]||1e-300)],[sumXi[1][0]/(sumGexcl[1]||1e-300), sumXi[1][1]/(sumGexcl[1]||1e-300)]];
+          for (let k=0;k<2;k++) {
+            let gw=0,mw=0; for(let t=0;t<T;t++){gw+=gamma[t][k]; mw+=gamma[t][k]*hr[t];}
+            mu[k]=mw/(gw||1e-300);
+            let vw=0; for(let t=0;t<T;t++) vw+=gamma[t][k]*(hr[t]-mu[k])*(hr[t]-mu[k]);
+            vr[k]=Math.max(vw/(gw||1e-300),1e-10);
+          }
+        }
+        const hiVolState = vr[1]>vr[0]?1:0;
+        const curProb = gamma[T-1][hiVolState];
+        const stateNow = curProb>0.5 ? 1 : 0;
+        let runLen=0; for (let t=T-1;t>=0;t--) { const st = gamma[t][hiVolState]>0.5?1:0; if (st===stateNow) runLen++; else break; }
+        if (stateNow===1) items.push({type:'bearish', text:`Режим: высокая волатильность (p=${curProb.toFixed(2)}), держится ${runLen} баров — расширяй стопы, снижай размер позиции`});
+        else items.push({type:'bullish', text:`Режим: спокойный (p=${(1-curProb).toFixed(2)}), держится ${runLen} баров — можно использовать более тесные стопы`});
+        // Неклассика: близость к переходу режима (вероятность около 0.5 = неустойчивость)
+        if (curProb > 0.35 && curProb < 0.65) items.push({type:'neutral', text:`Вероятность режима в переходной зоне (${curProb.toFixed(2)}) — модель не уверена, смена режима вероятна в ближайшие бары`});
+        else if (runLen <= 3) items.push({type:'neutral', text:`Режим сменился совсем недавно (${runLen} баров) — раннее наблюдение, доверять стоит с осторожностью`});
+        const classicItems = [{type: stateNow===1?'bearish':'bullish', text:`Классическая трактовка HMM: рынок в состоянии «${stateNow===1?'высокая волатильность':'спокойный'}» с вероятностью ${(stateNow===1?curProb:1-curProb).toFixed(2)} — используется как фильтр режима для выбора стратегии (трендследящая vs контртрендовая)`}];
+        html += makeCard('HMM Regime Detector', items, 'hmm', classicItems, 'hmm');
+      }
+    } else if (idL === 'hurst') {
+      const n = candles.length;
+      if (n >= 40) {
+        const items = [];
+        const calcH = (src) => {
+          const ret=[]; for(let i=1;i<src.length;i++) ret.push(Math.log(src[i]/src[i-1]));
+          const N=ret.length; const pts=[]; let sz=N;
+          while (sz>=8) {
+            const chunks=Math.floor(N/sz);
+            if (chunks>=1) {
+              const rsList=[];
+              for (let c=0;c<chunks;c++) {
+                const seg=ret.slice(c*sz,(c+1)*sz);
+                const m=seg.reduce((a,b)=>a+b,0)/seg.length;
+                let cum=0,mx=-Infinity,mn=Infinity;
+                for (const v of seg) { cum+=(v-m); if(cum>mx)mx=cum; if(cum<mn)mn=cum; }
+                const R=mx-mn; const S=Math.sqrt(seg.reduce((a,b)=>a+(b-m)*(b-m),0)/seg.length);
+                if (S>1e-12) rsList.push(R/S);
+              }
+              if (rsList.length) { const avgRS=rsList.reduce((a,b)=>a+b,0)/rsList.length; if (avgRS>0) pts.push([Math.log(sz), Math.log(avgRS)]); }
+            }
+            sz=Math.floor(sz/2);
+          }
+          if (pts.length<2) return null;
+          const nx=pts.length; const mx2=pts.reduce((a,p)=>a+p[0],0)/nx, my2=pts.reduce((a,p)=>a+p[1],0)/nx;
+          let num=0,den=0; for (const [x,y] of pts) { num+=(x-mx2)*(y-my2); den+=(x-mx2)*(x-mx2); }
+          return den>0?num/den:0.5;
+        };
+        const Hfull = calcH(closes.slice(-Math.min(n,600)));
+        if (Hfull!=null) {
+          const label = Hfull<0.45?'антиперсистентный (mean-reversion)':Hfull>0.55?'персистентный (тренд)':'случайное блуждание';
+          items.push({type: Hfull>0.55?'bullish':Hfull<0.45?'bearish':'neutral', text:`H = ${Hfull.toFixed(2)} — ${label} на доступной истории`});
+          const Hrecent = n>=150 ? calcH(closes.slice(-150)) : null;
+          if (Hrecent!=null) {
+            const delta = Hrecent - Hfull;
+            if (Math.abs(delta) > 0.08) items.push({type:'neutral', text:`H на последних 150 барах (${Hrecent.toFixed(2)}) отличается от долгосрочного (${Hfull.toFixed(2)}) — характер рынка меняется: ${delta>0?'смещение к трендовости':'смещение к развороту/шуму'}`});
+            else items.push({type:'neutral', text:`H устойчив (долгосрочный ${Hfull.toFixed(2)}, недавний ${Hrecent.toFixed(2)}) — характер рынка не меняется, текущий режим (тренд/реверсия) надёжен для стратегии`});
+          }
+        }
+        // Неклассика: H как переключатель класса стратегии, а не сигнал входа
+        if (Hfull!=null) {
+          if (Hfull > 0.6) items.push({type:'bullish', text:`Структурно трендовый рынок — пробойные стратегии и трейлинг-стоп статистически уместнее RSI/осцилляторов здесь`});
+          else if (Hfull < 0.4) items.push({type:'bearish', text:`Структурно mean-reverting рынок — осцилляторы и продажа экстремумов работают лучше пробоев`});
+        }
+        const classicItems = Hfull!=null ? [{type: Hfull>0.55?'bullish':Hfull<0.45?'bearish':'neutral', text:`Классическая трактовка: H=${Hfull.toFixed(2)} ${Hfull>0.5?'> 0.5 — персистентный ряд, тренды статистически продолжаются':Hfull<0.5?'< 0.5 — антиперсистентный ряд, движения статистически разворачиваются':'≈ 0.5 — близко к случайному блужданию (не предсказуем по этой метрике)'}`}] : [{type:'neutral', text:`Недостаточно данных для расчёта H`}];
+        html += makeCard('Hurst Exponent', items, 'hurst', classicItems, 'hurst');
+      }
+    } else if (idL === 'gpr') {
+      const n = candles.length;
+      if (n >= 30) {
+        const items = [];
+        const gWin=60, gLS=gWin/6;
+        const gKern=(a,b)=>Math.exp(-((a-b)*(a-b))/(2*gLS*gLS));
+        const computeAt = (i) => {
+          const j0=Math.max(0,i-gWin+1); const xs=[],ys=[];
+          for (let j=j0;j<=i;j++){ xs.push(j); ys.push(closes[j]); }
+          const m=xs.length; if (m<5) return {mean:closes[i], std:0};
+          const my=ys.reduce((a,b)=>a+b,0)/m;
+          const ysC=ys.map(v=>v-my);
+          const sigF2=Math.max(1e-8, ysC.reduce((a,b)=>a+b*b,0)/m);
+          const obsNoise=sigF2*0.01+1e-9;
+          const K=new Array(m); for (let a=0;a<m;a++){ K[a]=new Array(m); for(let b=0;b<m;b++) K[a][b]=sigF2*gKern(xs[a],xs[b])+(a===b?obsNoise:0); }
+          const Aug=K.map((row,a)=>{ const r=row.slice(); for(let c=0;c<m;c++) r.push(a===c?1:0); return r; });
+          for (let col=0;col<m;col++) {
+            let piv=col; for (let r=col+1;r<m;r++) if (Math.abs(Aug[r][col])>Math.abs(Aug[piv][col])) piv=r;
+            if (piv!==col) { const tmp=Aug[col]; Aug[col]=Aug[piv]; Aug[piv]=tmp; }
+            const pv=Aug[col][col]||1e-9; for (let c2=0;c2<2*m;c2++) Aug[col][c2]/=pv;
+            for (let r=0;r<m;r++) { if (r===col) continue; const f=Aug[r][col]; if (f===0) continue; for (let c2=0;c2<2*m;c2++) Aug[r][c2]-=f*Aug[col][c2]; }
+          }
+          const Kinv=Aug.map(row=>row.slice(m));
+          const xi=xs[m-1]; const kvec=xs.map(xj=>sigF2*gKern(xi,xj));
+          const alpha=new Array(m).fill(0), beta=new Array(m).fill(0);
+          for (let a=0;a<m;a++) for (let b=0;b<m;b++) { alpha[a]+=Kinv[a][b]*ysC[b]; beta[a]+=Kinv[a][b]*kvec[b]; }
+          let meanC=0,kKinvk=0; for (let a=0;a<m;a++) { meanC+=kvec[a]*alpha[a]; kKinvk+=kvec[a]*beta[a]; }
+          const kxx=sigF2*gKern(xi,xi); const variance=Math.max(0,kxx-kKinvk);
+          return {mean:meanC+my, std:Math.sqrt(variance)};
+        };
+        const cur = computeAt(n-1);
+        const prev = n>=11 ? computeAt(n-11) : null;
+        const z = (closes[n-1]-cur.mean)/(cur.std||1e-9);
+        if (Math.abs(z)>1.96) items.push({type:z>0?'bearish':'bullish', text:`Цена выходит за 95% GP-доверительный интервал (z=${z.toFixed(1)}σ) — статистически аномальное отклонение для текущего локального режима`});
+        else items.push({type:'neutral', text:`Цена внутри 95% GP-интервала (z=${z.toFixed(2)}σ)`});
+        if (prev) {
+          const stdGrowth = (cur.std-prev.std)/(prev.std||1e-9)*100;
+          if (stdGrowth > 30) items.push({type:'neutral', text:`Неопределённость GP выросла на ${stdGrowth.toFixed(0)}% за 10 баров — модель теряет калибровку, разумно сузить горизонт прогноза`});
+          else if (stdGrowth < -30) items.push({type:'neutral', text:`Неопределённость GP упала на ${Math.abs(stdGrowth).toFixed(0)}% за 10 баров — режим стабилизируется, доверие к среднему растёт`});
+        }
+        // Неклассика: использование std как адаптивного множителя для стопов вместо фиксированного ATR
+        items.push({type:'neutral', text:`σ(GP) = ${cur.std.toFixed(3)} — можно использовать как адаптивный масштаб стопа вместо фиксированного ATR: стоп ≈ цена ± 2-3×σ(GP)`});
+        const classicItems = [{type:'neutral', text:`Классическая трактовка: GP-среднее (${cur.mean.toFixed(2)}) ± 2σ — доверительный коридор как у Bollinger Bands, цена внутри коридора считается «нормальной»`}];
+        html += makeCard('Gaussian Process Regression', items, 'gpr', classicItems, 'gpr');
+      }
+    } else if (idL === 'mprof') {
+      const n = candles.length;
+      if (n >= 60) {
+        const items = [];
+        const mpSrc = closes.slice(-Math.min(n,300));
+        const mpOff = n - mpSrc.length;
+        const m = 16; const nSub = mpSrc.length - m + 1;
+        if (nSub > 4) {
+          const mu=new Array(nSub), sd=new Array(nSub);
+          for (let i=0;i<nSub;i++) { let s=0; for(let k=0;k<m;k++) s+=mpSrc[i+k]; const mean=s/m; let v=0; for(let k=0;k<m;k++) v+=(mpSrc[i+k]-mean)*(mpSrc[i+k]-mean); mu[i]=mean; sd[i]=Math.sqrt(v/m)||1e-9; }
+          const profile=new Array(nSub).fill(Infinity); const excl=Math.ceil(m/2); const nn=new Array(nSub).fill(-1);
+          for (let i=0;i<nSub;i++) for (let j=i+excl;j<nSub;j++) {
+            let dist=0; for(let k=0;k<m;k++){ const za=(mpSrc[i+k]-mu[i])/sd[i], zb=(mpSrc[j+k]-mu[j])/sd[j]; const d=za-zb; dist+=d*d; }
+            dist=Math.sqrt(dist);
+            if (dist<profile[i]) { profile[i]=dist; nn[i]=j; }
+            if (dist<profile[j]) { profile[j]=dist; nn[j]=i; }
+          }
+          const lastSub = nSub-1;
+          const curDist = profile[lastSub], matchIdx = nn[lastSub];
+          if (curDist < 1.5 && matchIdx >= 0) {
+            const futureStart = matchIdx + m;
+            if (futureStart + 5 <= mpSrc.length) {
+              const moveAfter = (mpSrc[Math.min(futureStart+5, mpSrc.length-1)] - mpSrc[futureStart]) / mpSrc[futureStart] * 100;
+              items.push({type: moveAfter>0?'bullish':'bearish', text:`Текущий участок почти повторяет паттерн на баре ${mpOff+matchIdx} (расстояние ${curDist.toFixed(2)}). После него цена прошла ${moveAfter>0?'+':''}${moveAfter.toFixed(2)}% за 5 баров — аналогия для прогноза, не гарантия`});
+            } else {
+              items.push({type:'neutral', text:`Текущий участок похож на паттерн ${mpOff+matchIdx} баров назад (расстояние ${curDist.toFixed(2)}), но история после него обрывается — исход неизвестен`});
+            }
+          } else {
+            items.push({type:'neutral', text:`Текущий паттерн уникален (мин. расстояние ${curDist.toFixed(2)} — нет близких аналогов в истории). Прошлые мотивы здесь не помогут`});
+          }
+          let minP=Infinity,maxP=-Infinity,minI=0,maxI=0;
+          for (let i=0;i<nSub;i++) { if (profile[i]<minP){minP=profile[i];minI=i;} if (profile[i]>maxP&&profile[i]<Infinity){maxP=profile[i];maxI=i;} }
+          items.push({type:'neutral', text:`Глобальный мотив на баре ${mpOff+minI} (d=${minP.toFixed(2)}), дискорд (аномалия) на баре ${mpOff+maxI} (d=${maxP.toFixed(2)}) — неклассически: дискорд часто маркирует начало нового режима, а не разовый выброс`});
+          var _mprofClassic = [{type:'neutral', text:`Классическое применение Matrix Profile: поиск повторяющихся паттернов (мотивов) и аномалий (дискордов) во временном ряду без обучения модели — текущий мин. дистанция профиля = ${curDist.toFixed(2)}`}];
+        }
+        html += makeCard('Matrix Profile', items, 'mprof', typeof _mprofClassic!=='undefined'?_mprofClassic:[], 'mprof');
+      }
+    } else if (idL === 'te') {
+      const n = candles.length;
+      if (n >= 60) {
+        const items = [];
+        const teWin=Math.min(n-1,200);
+        const teBin=(arr)=>{ const sorted=[...arr].sort((a,b)=>a-b); const q1=sorted[Math.floor(sorted.length/3)], q2=sorted[Math.floor(2*sorted.length/3)]; return arr.map(v=>v<=q1?0:(v<=q2?1:2)); };
+        const calcTE=(tY,tX)=>{
+          const yb=teBin(tY), xb=teBin(tX); const nn=yb.length;
+          const cnt3={}, cnt2={}, cntYprev={}, cnt2x={};
+          for (let t=1;t<nn;t++) {
+            const yt=yb[t],yp=yb[t-1],xp=xb[t-1];
+            const k3=yt+'_'+yp+'_'+xp, k2=yt+'_'+yp, kyp=yp+'', k2x=yp+'_'+xp;
+            cnt3[k3]=(cnt3[k3]||0)+1; cnt2[k2]=(cnt2[k2]||0)+1; cntYprev[kyp]=(cntYprev[kyp]||0)+1; cnt2x[k2x]=(cnt2x[k2x]||0)+1;
+          }
+          const total=nn-1; let te=0;
+          for (const k3 in cnt3) {
+            const [yt,yp,xp]=k3.split('_');
+            const pXYZ=cnt3[k3]/total;
+            const pYgivenYpXp=cnt3[k3]/cnt2x[yp+'_'+xp];
+            const pYgivenYp=cnt2[yt+'_'+yp]/cntYprev[yp];
+            if (pYgivenYpXp>0 && pYgivenYp>0) te += pXYZ*Math.log2(pYgivenYpXp/pYgivenYp);
+          }
+          return Math.max(0,te);
+        };
+        const tY=[],tXvol=[];
+        const j0te=n-teWin;
+        for (let i=Math.max(1,j0te);i<n;i++) { tY.push(closes[i]-closes[i-1]); tXvol.push((candles[i].volume||0)-(candles[i-1].volume||0)); }
+        if (tY.length>=20) {
+          const teVolToPrice = calcTE(tY, tXvol);
+          const tePriceToVol = calcTE(tXvol, tY.slice());
+          if (teVolToPrice > 0.08) items.push({type:'neutral', text:`TE(объём→цена) = ${teVolToPrice.toFixed(3)} бит — изменения объёма статистически предшествуют движению цены, объём можно использовать как раннее предупреждение`});
+          else items.push({type:'neutral', text:`TE(объём→цена) = ${teVolToPrice.toFixed(3)} бит — слабая предсказательная связь, объём как лидирующий индикатор здесь не работает`});
+          // Неклассика: асимметрия причинности — кто на самом деле ведёт
+          if (teVolToPrice > tePriceToVol*1.3) items.push({type:'neutral', text:`Асимметрия: TE(объём→цена)=${teVolToPrice.toFixed(3)} > TE(цена→объём)=${tePriceToVol.toFixed(3)} — объём ведущий, цена реактивна. Смотри на объём первым`});
+          else if (tePriceToVol > teVolToPrice*1.3) items.push({type:'neutral', text:`Асимметрия обратная: TE(цена→объём)=${tePriceToVol.toFixed(3)} > TE(объём→цена)=${teVolToPrice.toFixed(3)} — объём здесь следствие движения цены, а не его причина (классическое использование объёма как опережающего сигнала может вводить в заблуждение)`});
+          var _teClassic = [{type:'neutral', text:`Классическая трактовка: TE(объём→цена)=${teVolToPrice.toFixed(3)} бит измеряет, сколько неопределённости о будущей цене снимает знание прошлого объёма (нелинейный аналог корреляции/причинности Грейнджера)`}];
+        }
+        html += makeCard('Transfer Entropy', items, 'te', typeof _teClassic!=='undefined'?_teClassic:[], 'te');
+      }
+    } else if (idL === 'ssa') {
+      const n = candles.length;
+      if (n >= 50) {
+        const items = [];
+        const ssaSrc = closes.slice(-Math.min(n,200));
+        const ssaOff = n - ssaSrc.length;
+        const L=20; const N2=ssaSrc.length; const K=N2-L+1;
+        if (K>L) {
+          const C=new Array(L); for(let i=0;i<L;i++) C[i]=new Array(L).fill(0);
+          for (let i=0;i<L;i++) for (let j=i;j<L;j++) { let s=0; for(let k=0;k<K;k++) s+=ssaSrc[i+k]*ssaSrc[j+k]; C[i][j]=s/K; C[j][i]=C[i][j]; }
+          let v=new Array(L).fill(1/Math.sqrt(L));
+          for (let it=0; it<60; it++) { const w=new Array(L).fill(0); for(let i=0;i<L;i++) for(let j=0;j<L;j++) w[i]+=C[i][j]*v[j]; const norm=Math.sqrt(w.reduce((a,b)=>a+b*b,0))||1; for(let i=0;i<L;i++) v[i]=w[i]/norm; }
+          const pc=new Array(K).fill(0); for (let k=0;k<K;k++) { let s=0; for(let i=0;i<L;i++) s+=v[i]*ssaSrc[i+k]; pc[k]=s; }
+          const recon=new Array(N2).fill(0); const counts=new Array(N2).fill(0);
+          for (let i=0;i<L;i++) for (let k=0;k<K;k++) { recon[i+k]+=v[i]*pc[k]; counts[i+k]++; }
+          for (let nIdx=0;nIdx<N2;nIdx++) recon[nIdx]/=(counts[nIdx]||1);
+          const last=closes[n-1], trendNow=recon[N2-1];
+          const devPct=(last-trendNow)/trendNow*100;
+          const slope5 = N2>=6 ? (recon[N2-1]-recon[N2-6])/recon[N2-6]*100 : 0;
+          items.push({type: slope5>0.1?'bullish':slope5<-0.1?'bearish':'neutral', text:`SSA-тренд за 5 баров: ${slope5>0?'+':''}${slope5.toFixed(2)}% — ${Math.abs(slope5)<0.1?'компонента почти плоская (флэт)':slope5>0?'устойчивый рост низкочастотной составляющей':'устойчивое снижение низкочастотной составляющей'}`});
+          if (Math.abs(devPct)>1.5) items.push({type:devPct>0?'bearish':'bullish', text:`Цена отклонилась от SSA-тренда на ${devPct.toFixed(2)}% — выброс относительно гладкой компоненты, без фазовой задержки MA`});
+          else items.push({type:'neutral', text:`Цена близка к SSA-тренду (${devPct.toFixed(2)}%)`});
+          // Неклассика: использование как фильтр шума перед другими индикаторами
+          items.push({type:'neutral', text:`Неклассически: можно прогонять через SSA-тренд саму цену перед расчётом RSI/MACD — устраняет высокочастотный шум без лага классических MA`});
+          const classicItems = [{type: last>trendNow?'bullish':last<trendNow?'bearish':'neutral', text:`Классическая трактовка: цена ${last>trendNow?'выше':last<trendNow?'ниже':'на уровне'} извлечённой SSA-компоненты тренда (${trendNow.toFixed(2)}) — используется как сглаженная альтернатива MA`}];
+          html += makeCard('SSA Trend', items, 'ssa', classicItems, 'ssa');
+        }
+      }
+    } else if (idL === 'rough') {
+      const n = candles.length;
+      if (n >= 80) {
+        const items = [];
+        const rvSrc = closes.slice(-Math.min(n,400));
+        const calcRoughH = (src) => {
+          const rets=[]; for(let i=1;i<src.length;i++) rets.push(Math.log(src[i]/src[i-1]));
+          const rvWin=5; const logRV=[];
+          for (let i=rvWin;i<rets.length;i++) { let s=0; for(let k=0;k<rvWin;k++) s+=rets[i-k]*rets[i-k]; logRV.push(Math.log(Math.max(s/rvWin,1e-12))); }
+          const Nrv=logRV.length; const lags=[1,2,3,5,8,13,21]; const pts=[];
+          for (const h of lags) {
+            if (h>=Nrv) continue;
+            let sum2=0,cnt=0; for (let i=h;i<Nrv;i++) { const d=logRV[i]-logRV[i-h]; sum2+=d*d; cnt++; }
+            if (cnt>5) { const m2=sum2/cnt; if (m2>0) pts.push([Math.log(h), Math.log(m2)]); }
+          }
+          if (pts.length<3) return null;
+          const nx=pts.length; const mx=pts.reduce((a,p)=>a+p[0],0)/nx, my=pts.reduce((a,p)=>a+p[1],0)/nx;
+          let num=0,den=0; for (const [x,y] of pts) { num+=(x-mx)*(y-my); den+=(x-mx)*(x-mx); }
+          const slope=den>0?num/den:1;
+          return Math.max(0,Math.min(1,slope/2));
+        };
+        const Hrv = calcRoughH(rvSrc);
+        if (Hrv!=null) {
+          const label = Hrv<0.2?'грубая (типична для рынков)':Hrv<0.4?'умеренно грубая':Hrv<=0.6?'стандартная':'персистентная';
+          items.push({type:'neutral', text:`H(vol) = ${Hrv.toFixed(2)} — волатильность ${label}. ${Hrv<0.2?'Резкие скачки реализованной волатильности — GBM-модели её недооценивают':''}`});
+          const Hrv200 = n>=280 ? calcRoughH(closes.slice(-200)) : null;
+          if (Hrv200!=null) {
+            const delta = Hrv - Hrv200;
+            if (Math.abs(delta) > 0.05) items.push({type:'neutral', text:`H(vol) на полной истории (${Hrv.toFixed(2)}) отличается от последних 200 баров (${Hrv200.toFixed(2)}) — грубость волатильности нестационарна, её саму нужно пересчитывать регулярно, а не использовать как константу`});
+          }
+        }
+        // Неклассика: H(vol) низкий => кластеры волатильности короче, использовать узкие окна для HV/ATR
+        if (Hrv!=null && Hrv < 0.2) items.push({type:'neutral', text:`Неклассически: при низком H(vol) короткие окна ATR/HV (5-10 баров) точнее долгосрочных (20-50) — грубая волатильность не успевает усредниться корректно на длинном окне`});
+        const classicItems = Hrv!=null ? [{type:'neutral', text:`Классическая трактовка: H(vol)=${Hrv.toFixed(2)} — в стандартных моделях (GBM) ожидается H≈0.5; значения ниже указывают на более резкую, скачкообразную динамику волатильности, чем предполагает классическая модель`}] : [{type:'neutral', text:`Недостаточно данных`}];
+        html += makeCard('Rough Volatility', items, 'rough', classicItems, 'rough');
       }
     } else {
       html += makeCard(id, [{type:'neutral', text:`Индикатор активен`}]);
