@@ -12304,14 +12304,32 @@ function _ilAltStreakFade(scoreArr, streakLen) {
   for (const v of scoreArr) if (v!=null && Math.abs(v)>maxAbs) maxAbs = Math.abs(v);
   const out = new Array(scoreArr.length).fill(null);
   if (maxAbs === 0) return out; // индикатор вообще не дирекциональный — неклассика не определена
+  // Часть индикаторов (cross-событие, fisher) никогда не держат экстремум
+  // streakLen баров подряд — они спайкают на один бар и гаснут. Для них
+  // климакс-истощение технически невозможно, поэтому используем
+  // структурно иной, но логически родственный вариант: непосредственно
+  // следующий бар после изолированного спайка трактуем как «спайк без
+  // подтверждения продолжением» — та же идея истощения импульса,
+  // адаптированная к одно-барной природе сигнала.
+  let everSustained = false;
+  for (let i = streakLen-1; i < scoreArr.length; i++) {
+    const win = scoreArr.slice(i-streakLen+1, i+1);
+    if (win.every(v=>v!=null && v>=maxAbs) || win.every(v=>v!=null && v<=-maxAbs)) { everSustained = true; break; }
+  }
   for (let i = 0; i < scoreArr.length; i++) {
     if (scoreArr[i] == null) { out[i] = null; continue; }
-    if (i < streakLen-1) { out[i] = 0; continue; }
-    const win = scoreArr.slice(i-streakLen+1, i+1);
-    if (win.some(v=>v==null)) { out[i] = 0; continue; }
-    if (win.every(v=>v>=maxAbs)) out[i] = -maxAbs;
-    else if (win.every(v=>v<=-maxAbs)) out[i] = maxAbs;
-    else out[i] = 0;
+    if (everSustained) {
+      if (i < streakLen-1) { out[i] = 0; continue; }
+      const win = scoreArr.slice(i-streakLen+1, i+1);
+      if (win.some(v=>v==null)) { out[i] = 0; continue; }
+      if (win.every(v=>v>=maxAbs)) out[i] = -maxAbs;
+      else if (win.every(v=>v<=-maxAbs)) out[i] = maxAbs;
+      else out[i] = 0;
+    } else {
+      const prev = i>0 ? scoreArr[i-1] : null;
+      if (prev == null) { out[i] = 0; continue; }
+      out[i] = (Math.abs(prev)>=maxAbs && Math.abs(scoreArr[i])<maxAbs) ? -Math.sign(prev)*maxAbs : 0;
+    }
   }
   return out;
 }
@@ -12320,9 +12338,12 @@ function _ilAltStreakFade(scoreArr, streakLen) {
 // сигналу конкретного индикатора, а не как общий ряд на всю категорию —
 // иначе у OBV/CMF/Elder Ray/Force Index/PVT/VO была бы идентичная неклассика.
 // Срабатывает только в момент, когда у ЭТОГО индикатора есть классический
-// сигнал (own!=0), и проверяет, подтверждён ли он объёмом на новом
-// хае/лое цены — момент срабатывания у каждого индикатора свой (own[i]),
-// поэтому строки внутри категории расходятся по таймингу и точности.
+// сигнал (own!=0), и проверяет, подтверждён ли он объёмом относительно
+// своей недавней нормы — момент срабатывания у каждого индикатора свой
+// (own[i]), поэтому строки внутри категории расходятся по таймингу и
+// точности. (Жёсткое требование «именно на новом хае/лое цены» убрано —
+// почти никогда не совпадало с тем же баром, что и own-сигнал, и давало
+// 0 выборки почти у всех индикаторов категории.)
 function _ilAltVolDivergence(ownScore, closes, candles, lookback) {
   lookback = lookback || 10;
   const vols = candles.map(c=>c.volume||0);
@@ -12331,14 +12352,11 @@ function _ilAltVolDivergence(ownScore, closes, candles, lookback) {
     const own = ownScore[i];
     if (own == null) { out[i] = null; continue; }
     if (own === 0) { out[i] = 0; continue; }
-    const priceWin = closes.slice(i-lookback, i);
     const volWin = vols.slice(i-lookback, i);
-    const priceMaxPrev = Math.max(...priceWin), priceMinPrev = Math.min(...priceWin);
-    const volMaxPrev = Math.max(...volWin);
-    const noDemand = closes[i] >= priceMaxPrev && vols[i] < volMaxPrev*0.7;
-    const noSupply = closes[i] <= priceMinPrev && vols[i] < volMaxPrev*0.7;
-    if (own > 0 && noDemand) out[i] = -2;      // индикатор зовёт «вверх», но объём не подтверждает
-    else if (own < 0 && noSupply) out[i] = 2;  // индикатор зовёт «вниз», но объём не подтверждает
+    const volAvgPrev = volWin.reduce((s,v)=>s+v,0)/volWin.length;
+    const noConfirm = vols[i] < volAvgPrev*0.7; // сигнал есть, но объём ниже своей недавней нормы — нет подтверждения
+    if (own > 0 && noConfirm) out[i] = -2;      // индикатор зовёт «вверх», но объём не подтверждает
+    else if (own < 0 && noConfirm) out[i] = 2;  // индикатор зовёт «вниз», но объём не подтверждает
     else out[i] = 0;
   }
   return out;
@@ -12365,11 +12383,13 @@ function _ilAltStructureChopFade(scoreArr, chopArr, chopThresh) {
 // (а не как сигнал в его собственном направлении).
 function _ilAltDspFlipFade(scoreArr) {
   const out = new Array(scoreArr.length).fill(null);
-  for (let i = 1; i < scoreArr.length; i++) {
-    const cur = scoreArr[i], prev = scoreArr[i-1];
-    if (cur == null || prev == null) { out[i] = null; continue; }
-    const sCur = Math.sign(cur), sPrev = Math.sign(prev);
-    out[i] = (sCur!==0 && sPrev!==0 && sCur!==sPrev) ? -sCur*2 : 0;
+  let lastSign = 0; // знак последнего НЕнулевого значения — флипы через 0 тоже разворот
+  for (let i = 0; i < scoreArr.length; i++) {
+    const cur = scoreArr[i];
+    if (cur == null) { out[i] = null; continue; }
+    const sCur = Math.sign(cur);
+    out[i] = (sCur!==0 && lastSign!==0 && sCur!==lastSign) ? -sCur*2 : 0;
+    if (sCur !== 0) lastSign = sCur;
   }
   return out;
 }
@@ -12393,7 +12413,7 @@ function _ilAltFamilyOf(id) {
     if (grp.label.includes('Продвинутая')) return 'dsp';
     return null; // «Режим рынка (без винрейта)» — неклассике не подлежит
   }
-  return 'osc'; // «Прочие» — по умолчанию самая обоснованная универсальная трактовка
+  return null; // «Прочие» вне 6 категорий — нет обоснованной формулы, честно «—»
 }
 
 function _ilAltScoreSeries(id, ss, closes, candles, chopArr) {
@@ -12449,8 +12469,8 @@ async function ilRunAnalysis() {
     const tfLabel = tfBtn?.dataset?.label || 'день';
     const tfDays = {
       CANDLE_INTERVAL_1_MIN:7, CANDLE_INTERVAL_5_MIN:90, CANDLE_INTERVAL_15_MIN:90,
-      CANDLE_INTERVAL_30_MIN:90, CANDLE_INTERVAL_HOUR:90
-    }[tfConst] || 90;
+      CANDLE_INTERVAL_30_MIN:90, CANDLE_INTERVAL_HOUR:90, CANDLE_INTERVAL_DAY:365
+    }[tfConst] || 365;
     const now=new Date(), from=new Date(now);
     from.setDate(from.getDate()-tfDays);
     const _proxy = chartGetProxy?.();
@@ -12489,6 +12509,12 @@ async function ilRunAnalysis() {
         stats[id][`h${h}HV`]  = _ilBtStats(ss[id],closes,h,highVolMask);
         stats[id][`h${h}LV`]  = _ilBtStats(ss[id],closes,h,lowVolMask);
         stats[id][`h${h}Alt`] = _ilBtStats(ssAlt[id],closes,h,null);
+        if (h===15) {
+          stats[id].h15AltT  = _ilBtStats(ssAlt[id],closes,h,trendMask);
+          stats[id].h15AltR  = _ilBtStats(ssAlt[id],closes,h,rangeMask);
+          stats[id].h15AltHV = _ilBtStats(ssAlt[id],closes,h,highVolMask);
+          stats[id].h15AltLV = _ilBtStats(ssAlt[id],closes,h,lowVolMask);
+        }
       });
     });
     // Корреляционная матрица и кластеры
@@ -12512,9 +12538,9 @@ async function ilRunAnalysis() {
 // Смысловые группы индикаторов
 const _IL_GROUPS = [
   { label: 'Осциллятор / перекупленность',  color: '#A78BFA', ids: ['rsi','wr','cci','mfi','stoch','cmo','tsi','ult_osc'] },
-  { label: 'Тренд / импульс',               color: '#52F2C9', ids: ['macd','ao','ema','adx','dmi','fisher','parabolic','supertrend'] },
-  { label: 'Канал / волатильность',          color: '#FF9F40', ids: ['bb','keltner','envelopes','donchian','atr_w','hist_vol','bb_pct','bb_width'] },
-  { label: 'Объём / деньги',                color: '#60A4A1', ids: ['obv','ad','chaikosc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
+  { label: 'Тренд / импульс',               color: '#52F2C9', ids: ['macd','ao','ema','adx','fisher','parabolic','supertrend'] },
+  { label: 'Канал / волатильность',          color: '#FF9F40', ids: ['bb','keltner','envelopes','donchian','hist_vol','bb_pct','bb_width'] },
+  { label: 'Объём / деньги',                color: '#60A4A1', ids: ['obv','acc_dist','chaikin_osc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
   { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cycle','mama','ebs','ssa'] },
   { label: 'Продвинутая статистика / DSP',  color: '#7A8CFF', ids: ['nw','kalman','gpr','cusum','tmf','cum_delta','bb_pct'] },
   { label: 'Режим рынка (без винрейта)',    color: '#9090B8', ids: ['hmm','hurst','mprof','te','rough','frac_dim','efficiency_ratio','entropy'] },
@@ -12574,14 +12600,17 @@ function ilRenderAnalysis() {
     return `<span style="color:#8878a8">${p}%</span>`;
   };
   // Точность в одном режиме
-  const regAcc=(s)=>{
-    if(!s||s.acc==null||s.n<3) return '<span style="color:#3a3260">—</span>';
+  const regAcc=(s, minN)=>{
+    minN = minN==null ? 3 : minN;
+    if(!s||s.acc==null||s.n<minN) return '<span style="color:#3a3260">—</span>';
     const p=Math.round(s.acc*100);
     if(p>=62) return `<span style="color:#52E8A0;font-weight:600">${p}%</span>`;
     if(p>=55) return `<span style="color:#C8A840">${p}%</span>`;
     if(p<=45) return `<span style="color:#E04060">${p}%</span>`;
     return `<span style="color:#8878a8">${p}%</span>`;
   };
+  // Альт-сигналы — события редче классики, поэтому минимум выборки ниже (2 вместо 3)
+  const regAccAlt=(s)=>regAcc(s,2);
 
   let html='';
 
@@ -12607,7 +12636,7 @@ function ilRenderAnalysis() {
     <span style="color:#9080C8">Фиолетовый</span> = лучше в боковике<br>
     <span style="color:#6a6090">Горизонты (общая точность):</span> <span style="color:#a898c8">${h5lbl}</span> / <span style="color:#a898c8">${h10lbl}</span> / <span style="color:#a898c8">${h15lbl}</span> / <span style="color:#a898c8">${h30lbl}</span><br>
     <span style="color:#6a6090">Режимы (точность при горизонте ${h15lbl}):</span> <span style="color:#52C88A">Тренд</span> · <span style="color:#9080C8">Бок</span> · <span style="color:#FF9F40">Выс.вол</span> · <span style="color:#60A4C8">Низ.вол</span><br>
-    <span style="color:#6a6090">Строка «↳ неклассика»</span> — своя обоснованная альтернатива на категорию: осцилляторы — дивергенция по экстремумам цены/индикатора; тренд — климакс-истощение серии экстремумов; канал — band-walk (серия касаний границы ≠ разворот); объём — VSA-дивергенция цена/объём; структура/цикл — инверсия в боковике (Chop≥61.8); DSP-фильтры — непродтверждённый флип знака.
+    <span style="color:#6a6090">Строка «↳ альт-сигнал»</span> — своя обоснованная альтернативная формула на категорию (это бэктестируемый числовой ряд, НЕ то же самое, что текстовые заметки «неклассически» на странице «Методы» — там качественные подсказки по VSA/Wyckoff, здесь — отдельная формула с собственной точностью): осцилляторы — дивергенция по экстремумам цены/индикатора; тренд — климакс-истощение серии экстремумов (или истощение изолированного спайка для событийных сигналов типа EMA-кросса); канал — band-walk (серия касаний границы ≠ разворот); объём — VSA-дивергенция цена/объём, привязанная к собственному сигналу индикатора; структура/цикл — инверсия в боковике (Chop≥61.8); DSP-фильтры — непродтверждённый флип знака (с учётом флипа через ноль). У части индикаторов вне этих 6 категорий обоснованной формулы нет — «—» честно, а не подмена.
   </div>`;
 
   // По группам
@@ -12652,6 +12681,7 @@ function ilRenderAnalysis() {
       const s5=r.stats[id].h5, s10=r.stats[id].h10, s15=r.stats[id].h15, s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T, s15R=r.stats[id].h15R, s15HV=r.stats[id].h15HV, s15LV=r.stats[id].h15LV;
       const a5=r.stats[id].h5Alt, a10=r.stats[id].h10Alt, a15=r.stats[id].h15Alt, a30=r.stats[id].h30Alt;
+      const a15T=r.stats[id].h15AltT, a15R=r.stats[id].h15AltR, a15HV=r.stats[id].h15AltHV, a15LV=r.stats[id].h15AltLV;
       html+=`<tr style="border-top:1px solid #180f28;">
         <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s5)}</td>
@@ -12664,15 +12694,15 @@ function ilRenderAnalysis() {
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${regAcc(s15LV)}</td>
       </tr>
       <tr style="border-top:1px dashed #180f28;">
-        <td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;vertical-align:middle;font-size:10px;">↳ неклассика</td>
+        <td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;vertical-align:middle;font-size:10px;">↳ альт-сигнал</td>
         <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td>
         <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a10)}</td>
         <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a15)}</td>
         <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a30)}</td>
-        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;color:#3a3260;">—</td>
-        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;color:#3a3260;">—</td>
-        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;color:#3a3260;">—</td>
-        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;color:#3a3260;">—</td>
+        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAccAlt(a15T)}</td>
+        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15R)}</td>
+        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15HV)}</td>
+        <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15LV)}</td>
       </tr>`;
     });
     html+=`</table></div>`;
@@ -12690,8 +12720,9 @@ function ilRenderAnalysis() {
       const s5=r.stats[id].h5,s10=r.stats[id].h10,s15=r.stats[id].h15,s30=r.stats[id].h30;
       const s15T=r.stats[id].h15T,s15R=r.stats[id].h15R,s15HV=r.stats[id].h15HV,s15LV=r.stats[id].h15LV;
       const a5=r.stats[id].h5Alt,a10=r.stats[id].h10Alt,a15=r.stats[id].h15Alt,a30=r.stats[id].h30Alt;
+      const a15T=r.stats[id].h15AltT,a15R=r.stats[id].h15AltR,a15HV=r.stats[id].h15AltHV,a15LV=r.stats[id].h15AltLV;
       html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
-      <tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;font-size:10px;vertical-align:middle;">↳ неклассика</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a10)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a15)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a30)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;color:#3a3260;">—</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;color:#3a3260;">—</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;color:#3a3260;">—</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;color:#3a3260;">—</td></tr>`;
+      <tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;font-size:10px;vertical-align:middle;">↳ альт-сигнал</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a10)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a15)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a30)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAccAlt(a15T)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15R)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15HV)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15LV)}</td></tr>`;
     });
     html+=`</table></div>`;
   }
@@ -12708,9 +12739,12 @@ function ilRenderAnalysis() {
       <input type="checkbox" class="an-cb" data-id="${id}" style="accent-color:#52F2C9;">${IL_NAMES[id]||id}${p!=null?` <span style="color:${col}">${p}%</span>`:''}
     </label>`;
   });
-  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;">
+  html+=`</div><div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
     <button onclick="ilSelectBestCombo()" style="padding:4px 10px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.25);border-radius:6px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">Лучшие по H15</button>
     <button onclick="ilCalcSelectedCombo()" style="padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;">Рассчитать</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);cursor:pointer;margin-left:auto;">
+      <input type="checkbox" id="an-combo-alt" style="accent-color:#7A8CFF;">неклассика (альт-серии вместо классики)
+    </label>
   </div><div id="an-combo-result" style="font-size:10px;font-family:var(--mono);color:var(--text2);min-height:36px;"></div></div>`;
   el.innerHTML=html;
 }
@@ -12727,15 +12761,19 @@ function ilCalcSelectedCombo() {
   const sel=[...document.querySelectorAll('.an-cb:checked')].map(cb=>cb.dataset.id);
   const el=document.getElementById('an-combo-result');
   if(!sel.length){el.textContent='Выберите хотя бы один индикатор';return;}
+  const useAlt = document.getElementById('an-combo-alt')?.checked;
+  const src = useAlt ? r.ssAlt : r.ss;
   const closes=r.closes;
-  const compArr=closes.map((_,i)=>{const vals=sel.map(id=>r.ss[id][i]).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;});
+  const missing = useAlt ? sel.filter(id=>!src[id] || src[id].every(v=>v==null)) : [];
+  const compArr=closes.map((_,i)=>{const vals=sel.map(id=>src[id]&&src[id][i]).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;});
   const btRow=(h)=>{
     const s=_ilBtStats(compArr,closes,h,null);
     if(!s.acc||s.n<5)return `H${h}: —`;
     const c=s.acc>=0.55?'#52F2C9':s.acc>=0.50?'var(--text2)':'#FF4D7A';
     return `H${h}: <span style="color:${c}">${(s.acc*100).toFixed(0)}%</span> acc, IG <span style="color:${s.ig>0?'#52F2C9':'#FF4D7A'}">${s.ig>0?'+':''}${(s.ig*100).toFixed(1)}%</span> (n=${s.n})`;
   };
-  el.innerHTML=`<div style="margin-bottom:4px;color:var(--text3);">Выбрано: <span style="color:var(--text2)">${sel.map(id=>IL_NAMES[id]).join(', ')}</span></div><div>${btRow(5)}</div><div>${btRow(15)}</div><div>${btRow(30)}</div>`;
+  const warn = missing.length ? `<div style="color:#FF9F40;margin-bottom:4px;">У ${missing.map(id=>IL_NAMES[id]||id).join(', ')} неклассика не определена (—), в расчёт не вошли.</div>` : '';
+  el.innerHTML=`<div style="margin-bottom:4px;color:var(--text3);">Выбрано (${useAlt?'неклассика':'классика'}): <span style="color:var(--text2)">${sel.map(id=>IL_NAMES[id]).join(', ')}</span></div>${warn}<div>${btRow(5)}</div><div>${btRow(15)}</div><div>${btRow(30)}</div>`;
 }
 
 function initAnalysis() {
