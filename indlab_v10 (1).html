@@ -5830,12 +5830,14 @@ function _chartDrawAltInd() {
   if (legend) {
     const onChips = activeAlt.map((x,i) => {
       const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-      return `<span onclick="ilAggToggleAlt('${x.id}')" title="Клик — вернуть классику" style="cursor:pointer;color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
+      const tip = 'Клик — вернуть классику. Чем альт отличается: ' + (x.it.altDesc || '');
+      return `<span onclick="ilAggToggleAlt('${x.id}')" title="${tip.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${palette[i%palette.length]};margin-right:8px;">● ${name}</span>`;
     }).join('');
     const offCandidates = candidates.filter(x => !x.it.useAlt);
     const offChips = offCandidates.map(x => {
       const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[x.id]) || x.id;
-      return `<span onclick="ilAggToggleAlt('${x.id}')" title="Клик — показать альт-версию" style="cursor:pointer;opacity:.45;margin-right:8px;">+ ${name}</span>`;
+      const tip = 'Клик — показать альт-версию. Чем отличается: ' + (x.it.altDesc || '');
+      return `<span onclick="ilAggToggleAlt('${x.id}')" title="${tip.replace(/"/g,'&quot;')}" style="cursor:pointer;opacity:.45;margin-right:8px;">+ ${name}</span>`;
     }).join('');
     legend.innerHTML = onChips + (offChips ? `<span style="opacity:.5;">| доступно: </span>${offChips}` : '');
   }
@@ -8545,13 +8547,24 @@ function _ilAggGetSeries() {
   return _ilAggCache;
 }
 function _ilAggLastScore(arr) { if (!arr) return null; for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i]; return null; }
+// Краткое пояснение «чем альт отличается от классики» по каждому из 6 семейств
+// (см. формулы _ilAlt* выше) — для тултипов на графике и для текста в «Анализ».
+const _IL_ALT_FAMILY_DESC = {
+  osc:       'Не уровень перекупленности/перепроданности, а дивергенция: цена обновила хай/лой за 10 баров, а осциллятор — нет.',
+  trend:     'Не подтверждение тренда, а климакс-истощение: если сигнал держится на своём максимуме 4 бара подряд — это сигнал на разворот, а не продолжение.',
+  channel:   'Не пробой канала, а band-walk: многократное касание границы при тренде — это не перекупленность, а признак продолжения (классика тут ошибается).',
+  volume:    'Не сам факт сигнала, а его подтверждение объёмом: если объём ниже своей недавней нормы — сигнал индикатора без подтверждения, трактуется как антисигнал.',
+  structure: 'Активна только в боковике (Choppiness ≥ 61.8): структурный сигнал инвертируется, потому что в шуме такие индикаторы дают ложную «пилу».',
+  dsp:       'Не направление после флипа знака, а сам неподтверждённый флип: первый разворот сглаживающего фильтра чаще шум, чем перелом — трактуется как антисигнал.',
+};
+function _ilAltFamilyDesc(id) { const fam = _ilAltFamilyOf(id); return fam ? _IL_ALT_FAMILY_DESC[fam] : null; }
 // Возвращает {id, hasAlt, score} по id из IL_INDICATORS с учётом выбора альт/классика.
 function _ilAggIndScore(id, cache) {
   if (!IL_INDICATORS.includes(id)) return null;
   const hasAlt = _ilAltFamilyOf(id) != null;
   const useAlt = hasAlt && _ilAltPrefGet(id);
   const score = _ilAggLastScore(useAlt ? cache.ssAlt[id] : cache.ss[id]);
-  return { id, hasAlt, useAlt, score };
+  return { id, hasAlt, useAlt, score, altDesc: hasAlt ? _IL_ALT_FAMILY_DESC[_ilAltFamilyOf(id)] : null };
 }
 // Голосование по списку id (или человекочитаемых названий из COMBO_PRESETS.inds).
 function _ilAggVote(labelsOrIds) {
@@ -8618,7 +8631,8 @@ function cpRenderCombos() {
             const it = agg.items.find(x=>x.id===id);
             if (!id || !it || !it.hasAlt) return `<span style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text3);font-family:var(--mono);">${i}</span>`;
             const on = it.useAlt;
-            return `<span onclick="ilAggToggleAlt('${id}')" title="Классика/альт для ${i}" style="cursor:pointer;font-size:9px;padding:2px 6px;border-radius:6px;background:${on?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)'};color:${on?'#FF006E':'var(--text3)'};font-family:var(--mono);border:1px solid ${on?'rgba(255,0,110,0.35)':'transparent'};">${i} · ${on?'альт':'клас'}</span>`;
+            const tip = ('Классика/альт для '+i+'. '+(it.altDesc?'Чем отличается альт: '+it.altDesc:'')).replace(/"/g,'&quot;');
+            return `<span onclick="ilAggToggleAlt('${id}')" title="${tip}" style="cursor:pointer;font-size:9px;padding:2px 6px;border-radius:6px;background:${on?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)'};color:${on?'#FF006E':'var(--text3)'};font-family:var(--mono);border:1px solid ${on?'rgba(255,0,110,0.35)':'transparent'};">${i} · ${on?'альт':'клас'}</span>`;
           }).join('')}
         </div>` : ''}
         ${c.rules?.length ? `
@@ -8685,8 +8699,9 @@ function _sysOptimalSection() {
   const aggCol = agg.sig ? (SIG_COL[agg.sig] || '#6F648F') : '#6F648F';
   const rows = _SYS_OPTIMAL.map((item, i) => {
     const it = agg.items.find(x => x.id === item.id);
+    const toggleTip = (it && it.altDesc ? ('Чем отличается альт: '+it.altDesc) : 'Классика/альт').replace(/"/g,'&quot;');
     const toggle = (it && it.hasAlt)
-      ? ('<span onclick="event.stopPropagation();ilAggToggleAlt(\'' + item.id + '\')" title="Классика/альт" style="cursor:pointer;font-size:8px;padding:1px 5px;border-radius:5px;margin-left:4px;background:' + (it.useAlt?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)') + ';color:' + (it.useAlt?'#FF006E':'var(--text3)') + ';border:1px solid ' + (it.useAlt?'rgba(255,0,110,0.35)':'transparent') + ';">' + (it.useAlt?'альт':'клас') + '</span>')
+      ? ('<span onclick="event.stopPropagation();ilAggToggleAlt(\'' + item.id + '\')" title="' + toggleTip + '" style="cursor:pointer;font-size:8px;padding:1px 5px;border-radius:5px;margin-left:4px;background:' + (it.useAlt?'rgba(255,0,110,0.12)':'rgba(255,255,255,0.05)') + ';color:' + (it.useAlt?'#FF006E':'var(--text3)') + ';border:1px solid ' + (it.useAlt?'rgba(255,0,110,0.35)':'transparent') + ';">' + (it.useAlt?'альт':'клас') + '</span>')
       : '';
     return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
       + '<span style="font-size:9px;color:#6F648F;font-family:var(--mono);width:14px;">' + (i+1) + '.</span>'
@@ -17607,7 +17622,8 @@ function _renderAnalysisInner(panel) {
         const type = s == null ? 'neutral' : s >= 1 ? 'bullish' : s <= -1 ? 'bearish' : s > 0 ? 'bullish' : s < 0 ? 'bearish' : 'neutral';
         const label = (typeof IL_NAMES !== 'undefined' && IL_NAMES[aid]) || aid;
         const txt = s == null ? `${label} (альт): нет данных` : `${label} (альт): score ${s>0?'+':''}${s.toFixed(2)} — ${s>=1?'сильный бычий контекст':s>0?'слабый бычий контекст':s<=-1?'сильный медвежий контекст':s<0?'слабый медвежий контекст':'нейтрально'}`;
-        return `<div class="analysis-item analysis-${type}"><span class="analysis-dot">●</span><span>${txt}</span></div>`;
+        const descTxt = it.altDesc ? `<div style="margin-left:14px;margin-top:1px;font-size:9px;color:var(--text3);line-height:1.4;">↳ ${it.altDesc}</div>` : '';
+        return `<div class="analysis-item analysis-${type}"><span class="analysis-dot">●</span><span>${txt}</span></div>${descTxt}`;
       }).filter(Boolean);
       if (altRows.length) {
         html += `<div class="analysis-card"><div class="analysis-card-title" style="color:#FF006E">Альт-версии (вместо классики)</div><div class="analysis-items">${altRows.join('')}</div></div>`;
