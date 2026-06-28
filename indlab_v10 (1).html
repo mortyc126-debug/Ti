@@ -11460,10 +11460,13 @@ function ilCalcStockTrend(closes,smaPeriod=200,momPeriod=20){
 // Scoring для пакета 4
 function ilScoreZigzag(v){ return v; } // уже -1/0/1 из calcZigzagSignal
 function ilScoreFractals(v){ return v; }
-function ilScoreCrash(v){ return v; }
-function ilScoreRecovery(v){ return v; }
+// crash/recovery/stock_trend — режимные классификаторы, определённые ЧЕРЕЗ уже случившееся
+// движение цены: бэктест на их же сигнал давал бы тавтологичный «винрейт» близкий к 100%.
+// score=null ⇒ строка не попадает в таблицу точности (аналогично flat/vol-режимам).
+function ilScoreCrash(v){ return null; }
+function ilScoreRecovery(v){ return null; }
 function ilScoreFlat(v){ return 0; } // боковик не дирекциональный
-function ilScoreStockTrend(v){ return v; }
+function ilScoreStockTrend(v){ return null; }
 // VolRegime — режимный, не дирекциональный (возвращает null)
 function ilScoreVolRegime(v){ return null; }
 
@@ -11577,6 +11580,203 @@ function ilScoreTSI(v){ return v==null?null:(v>=25?2:v>=5?1:v<=-25?-2:v<=-5?-1:0
 function ilScoreForceIdx(arr,i){ if(arr[i]==null)return null; const v=arr[i]; const abs=Math.abs(v); return v>0?(abs>arr.filter(x=>x!=null).reduce((a,b)=>a>Math.abs(b)?a:Math.abs(b),0)*0.3?2:1):(abs>arr.filter(x=>x!=null).reduce((a,b)=>a>Math.abs(b)?a:Math.abs(b),0)*0.3?-2:-1); }
 function ilScoreUltOsc(v){ return v==null?null:(v>=70?-2:v>=60?-1:v<=30?2:v<=40?1:0); }
 
+// ═══ Пакет 5: продвинутая статистика/DSP + ранее «висевшие» без бэктеста индикаторы ═══
+function ilCalcNW(closes){
+  const h=Math.max(2,Math.min(50,closes.length>300?12:Math.round(closes.length/15)||8));
+  const win=Math.max(h*4,20);
+  const arr=new Array(closes.length).fill(null);
+  for(let i=0;i<closes.length;i++){
+    const j0=Math.max(0,i-win); let wsum=0,vsum=0;
+    for(let j=j0;j<=i;j++){const d=i-j,w=Math.exp(-(d*d)/(2*h*h));wsum+=w;vsum+=w*closes[j];}
+    arr[i]=wsum>0?vsum/wsum:closes[i];
+  }
+  return arr;
+}
+function ilScoreNW(close,nw){ if(nw==null)return null; const d=(close-nw)/nw*100; return d>1?2:d>0.2?1:d<-1?-2:d<-0.2?-1:0; }
+function ilCalcKalman(closes){
+  const rets=[]; for(let i=1;i<closes.length;i++) rets.push(closes[i]-closes[i-1]);
+  const mR=rets.reduce((a,b)=>a+b,0)/(rets.length||1);
+  const R=rets.reduce((a,b)=>a+(b-mR)*(b-mR),0)/(rets.length||1)||1e-6;
+  const Q=R*0.05;
+  const x=new Array(closes.length); let xv=closes[0],P=R;
+  for(let i=0;i<closes.length;i++){const xPred=xv,PPred=P+Q;const K=PPred/(PPred+R);xv=xPred+K*(closes[i]-xPred);P=(1-K)*PPred;x[i]=xv;}
+  return x;
+}
+function ilScoreKalman(close,kx){ if(kx==null)return null; const d=(close-kx)/kx*100; return d>0.8?2:d>0.15?1:d<-0.8?-2:d<-0.15?-1:0; }
+function ilCalcCUSUM(closes){
+  const n=closes.length, lrets=new Array(n).fill(0);
+  for(let i=1;i<n;i++) lrets[i]=Math.log(closes[i]/closes[i-1]);
+  const win=30, dirArr=new Array(n).fill(0);
+  let Sp=0,Sm=0,lastCp=-Infinity,curDir=0;
+  for(let i=1;i<n;i++){
+    const j0=Math.max(1,i-win), seg=lrets.slice(j0,i);
+    const mu=seg.reduce((a,b)=>a+b,0)/(seg.length||1);
+    const sd=Math.sqrt(seg.reduce((a,b)=>a+(b-mu)*(b-mu),0)/(seg.length||1))||1e-8;
+    const k=0.5*sd,h=4*sd;
+    Sp=Math.max(0,Sp+(lrets[i]-mu)-k); Sm=Math.min(0,Sm+(lrets[i]-mu)+k);
+    if((Sp>h||Sm<-h)&&i-lastCp>5){ curDir=Sp>h?1:-1; Sp=0;Sm=0;lastCp=i; }
+    dirArr[i]=(i-lastCp<=15)?curDir:0; // сигнал затухает через 15 баров после CP
+  }
+  return dirArr;
+}
+function ilScoreCUSUM(v){ return v==null?null:v; }
+function ilCalcGPR(closes){
+  const winN=60, lenScale=winN/6, mean=new Array(closes.length).fill(null);
+  const kern=(a,b)=>Math.exp(-((a-b)*(a-b))/(2*lenScale*lenScale));
+  for(let i=0;i<closes.length;i++){
+    const j0=Math.max(0,i-winN+1); const xs=[],ys=[];
+    for(let j=j0;j<=i;j++){xs.push(j);ys.push(closes[j]);}
+    const n=xs.length; if(n<5){mean[i]=closes[i];continue;}
+    const my=ys.reduce((a,b)=>a+b,0)/n, ysC=ys.map(v=>v-my);
+    const sigF2=Math.max(1e-8,ysC.reduce((a,b)=>a+b*b,0)/n), obsNoise=sigF2*0.01+1e-9;
+    const K=new Array(n);
+    for(let a=0;a<n;a++){K[a]=new Array(n);for(let b=0;b<n;b++)K[a][b]=sigF2*kern(xs[a],xs[b])+(a===b?obsNoise:0);}
+    const Aug=K.map((row,a)=>{const r=row.slice();for(let c=0;c<n;c++)r.push(a===c?1:0);return r;});
+    for(let col=0;col<n;col++){
+      let piv=col; for(let r=col+1;r<n;r++) if(Math.abs(Aug[r][col])>Math.abs(Aug[piv][col])) piv=r;
+      if(piv!==col){const tmp=Aug[col];Aug[col]=Aug[piv];Aug[piv]=tmp;}
+      const pv=Aug[col][col]||1e-9; for(let c2=0;c2<2*n;c2++) Aug[col][c2]/=pv;
+      for(let r=0;r<n;r++){ if(r===col) continue; const f=Aug[r][col]; if(!f) continue; for(let c2=0;c2<2*n;c2++) Aug[r][c2]-=f*Aug[col][c2]; }
+    }
+    const Kinv=Aug.map(row=>row.slice(n));
+    const xi=xs[n-1], kvec=xs.map(xj=>sigF2*kern(xi,xj));
+    const alpha=new Array(n).fill(0);
+    for(let a=0;a<n;a++) for(let b=0;b<n;b++) alpha[a]+=Kinv[a][b]*ysC[b];
+    let meanC=0; for(let a=0;a<n;a++) meanC+=kvec[a]*alpha[a];
+    mean[i]=meanC+my;
+  }
+  return mean;
+}
+function ilScoreGPR(close,gm){ if(gm==null)return null; const d=(close-gm)/gm*100; return d>1?2:d>0.2?1:d<-1?-2:d<-0.2?-1:0; }
+function ilCalcSSA(closes){
+  const src=closes.slice(-Math.min(closes.length,200)), off=closes.length-src.length;
+  const L=20,N=src.length,K=N-L+1, full=new Array(closes.length).fill(null);
+  if(K<=L) return full;
+  const C=new Array(L); for(let i=0;i<L;i++) C[i]=new Array(L).fill(0);
+  for(let i=0;i<L;i++) for(let j=i;j<L;j++){ let s=0; for(let k=0;k<K;k++) s+=src[i+k]*src[j+k]; C[i][j]=s/K; C[j][i]=C[i][j]; }
+  let v=new Array(L).fill(1/Math.sqrt(L));
+  for(let it=0;it<60;it++){ const w=new Array(L).fill(0); for(let i=0;i<L;i++) for(let j=0;j<L;j++) w[i]+=C[i][j]*v[j]; const norm=Math.sqrt(w.reduce((a,b)=>a+b*b,0))||1; for(let i=0;i<L;i++) v[i]=w[i]/norm; }
+  const pc=new Array(K).fill(0); for(let k=0;k<K;k++){ let s=0; for(let i=0;i<L;i++) s+=v[i]*src[i+k]; pc[k]=s; }
+  const recon=new Array(N).fill(0), counts=new Array(N).fill(0);
+  for(let i=0;i<L;i++) for(let k=0;k<K;k++){ recon[i+k]+=v[i]*pc[k]; counts[i+k]++; }
+  for(let n=0;n<N;n++) recon[n]/=(counts[n]||1);
+  for(let n=0;n<N;n++) full[n+off]=recon[n];
+  return full;
+}
+function ilScoreSSA(close,ssa,prevSsa){ if(ssa==null||prevSsa==null)return null; const slope=(ssa-prevSsa)/(prevSsa||1)*100; return slope>0.3?2:slope>0.05?1:slope<-0.3?-2:slope<-0.05?-1:0; }
+function ilCalcMAMA(closes){
+  const n=closes.length, fastL=0.5,slowL=0.05;
+  const sm=closes.map((c,i)=>i>=3?(4*c+3*closes[i-1]+2*closes[i-2]+closes[i-3])/10:c);
+  let period=15,phase=0,mamaV=closes[0],famaV=closes[0];
+  let det1=0,det2=0,i1_1=0,i1_2=0,q1_1=0,q1_2=0,re=0,im_=0;
+  const mamaArr=new Array(n).fill(null),famaArr=new Array(n).fill(null);
+  for(let i=6;i<n;i++){
+    const c=(0.0962*sm[i]+0.5769*sm[i-2]-0.5769*sm[i-4]-0.0962*sm[i-6])*(0.075*period+0.54);
+    const q1=(0.0962*c+0.5769*det1-0.5769*(i>=10?det2:0)-0.0962*(i>=12?sm[i-6]:0))*(0.075*period+0.54);
+    const i1=det1;
+    const jI=(0.0962*i1+0.5769*i1_1)*(0.075*period+0.54);
+    const jQ=(0.0962*q1+0.5769*q1_1)*(0.075*period+0.54);
+    let i2=i1-jQ,q2=q1+jI;
+    i2=0.2*i2+0.8*(i1_2||i2); q2=0.2*q2+0.8*(q1_2||q2);
+    let newRe=i2*(i1_2||0)+q2*(q1_2||0), newIm=i2*(q1_2||0)-q2*(i1_2||0);
+    newRe=0.2*newRe+0.8*re; newIm=0.2*newIm+0.8*im_; re=newRe; im_=newIm;
+    if(re!==0&&im_!==0){ let p=6.28318/Math.atan(im_/re); p=Math.max(6,Math.min(50,p)); period=0.2*p+0.8*period; }
+    const prevPhase=phase;
+    if(i1!==0) phase=Math.atan(q1/i1)*180/Math.PI;
+    let dp=prevPhase-phase; if(dp<1) dp=1;
+    const alpha=Math.max(fastL/dp,slowL);
+    mamaV=alpha*closes[i]+(1-alpha)*mamaV;
+    famaV=0.5*alpha*mamaV+(1-0.5*alpha)*famaV;
+    mamaArr[i]=mamaV; famaArr[i]=famaV;
+    det2=det1; det1=c; i1_2=i1_1; i1_1=i1; q1_2=q1_1; q1_1=q1;
+  }
+  return {mama:mamaArr, fama:famaArr};
+}
+function ilScoreMAMA(m,f){ if(m==null||f==null)return null; const d=(m-f)/(f||1)*100; return d>0.5?2:d>0.05?1:d<-0.5?-2:d<-0.05?-1:0; }
+function ilCalcEBS(closes){
+  const n=closes.length, alpha=0.07, a1=(1-alpha/2)**2, a2=2*(1-alpha), a3=(1-alpha)**2;
+  const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);
+  const cc=new Array(n).fill(0);
+  for(let i=2;i<n;i++) cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];
+  const domPer=new Array(n).fill(14); let lastZ=0,curPer=14;
+  for(let i=1;i<n;i++){ if((cc[i]>=0&&cc[i-1]<0)||(cc[i]<0&&cc[i-1]>=0)){ const half=i-lastZ; lastZ=i; curPer=Math.max(6,Math.min(50,0.8*curPer+0.2*half*2)); } domPer[i]=curPer; }
+  const ebs=new Array(n).fill(null), lead=new Array(n).fill(null); let ph=0;
+  for(let i=10;i<n;i++){ ph+=360/domPer[i]; if(ph>=360) ph-=360; ebs[i]=Math.sin(ph*Math.PI/180); lead[i]=Math.sin((ph+90)*Math.PI/180); }
+  return {ebs, lead};
+}
+function ilScoreEBS(v,l){ if(v==null||l==null)return null; if(v<-0.7&&v>l) return 2; if(v>0.7&&v<l) return -2; return v>l?1:-1; }
+function ilCalcTMF(candles, per=21){
+  const tmfRaw=candles.map((c,i)=>{ if(i===0) return null; const pc=candles[i-1]; const trh=Math.max(c.high,pc.close),trl=Math.min(c.low,pc.close); const rng=trh-trl; return rng>0?(2*c.close-trh-trl)/rng*(c.vol||0):0; });
+  const vol=candles.map(c=>c.vol||0);
+  const emaV=(arr,p)=>{ const r=new Array(arr.length).fill(null); const k=2/(p+1); let s=null; for(let i=0;i<arr.length;i++){ if(arr[i]==null) continue; s=s===null?arr[i]:s*(1-k)+arr[i]*k; r[i]=s; } return r; };
+  const emMFV=emaV(tmfRaw.map(v=>v||0),per), emVol=emaV(vol,per);
+  return emMFV.map((v,i)=>v!=null&&emVol[i]?Math.max(-1,Math.min(1,v/emVol[i])):null);
+}
+function ilScoreTMF(v){ return v==null?null:(v>0.5?2:v>0.1?1:v<-0.5?-2:v<-0.1?-1:0); }
+function ilCalcFracDim(candles, per=14){
+  return candles.map((_,i)=>{
+    if(i<per) return null;
+    const sl=candles.slice(i-per+1,i+1);
+    const hl=Math.max(...sl.map(c=>c.high))-Math.min(...sl.map(c=>c.low));
+    if(!hl) return 1.5;
+    const atr=sl.reduce((s,c,j)=>j===0?s:s+Math.max(c.high-c.low,Math.abs(c.high-sl[j-1].close),Math.abs(c.low-sl[j-1].close)),0);
+    return Math.min(2,Math.max(1,1+Math.log10(atr/hl)/Math.log10(per)));
+  });
+}
+function ilScoreFracDim(v){ return null; } // мера «шероховатости» рынка, не дирекциональна
+function ilCalcEfficiencyRatio(closes, per=10){
+  return closes.map((c,i)=>{
+    if(i<per) return null;
+    const dir=Math.abs(c-closes[i-per]);
+    const path=closes.slice(i-per+1,i+1).reduce((s,v,j,a)=>j===0?s:s+Math.abs(v-a[j-1]),0);
+    return path>0?Math.min(1,dir/path):0;
+  });
+}
+function ilScoreEfficiencyRatio(v){ return null; } // сила тренда, не направление
+function ilCalcEntropy(closes, per=20){
+  return closes.map((_,i)=>{
+    if(i<per+2) return null;
+    const rets=closes.slice(i-per,i+1).map((c,j,a)=>j===0?0:c-a[j-1]).slice(1);
+    const pats={};
+    for(let j=0;j<rets.length-2;j++){ const t=[rets[j],rets[j+1],rets[j+2]]; const k=[0,1,2].sort((a,b)=>t[a]-t[b]).join(''); pats[k]=(pats[k]||0)+1; }
+    const tot=rets.length-2; let H=0; Object.values(pats).forEach(cnt=>{ const p=cnt/tot; if(p>0) H-=p*Math.log2(p); });
+    return H/Math.log2(6);
+  });
+}
+function ilScoreEntropy(v){ return null; } // мера предсказуемости, не направление
+function ilCalcCumDelta(candles){
+  let cum=0; return candles.map(c=>{ const hl=c.high-c.low, v=c.vol||0; if(!hl) return cum; const bv=v*(c.close-c.low)/hl, sv=v*(c.high-c.close)/hl; cum+=bv-sv; return cum; });
+}
+function ilScoreCumDelta(close,prevClose,delta,prevDelta){
+  if(delta==null||prevDelta==null) return null;
+  const pUp=close>prevClose, dUp=delta>prevDelta;
+  if(pUp===dUp) return pUp?1:-1; // подтверждение
+  return pUp?-2:2; // дивергенция — сильный контр-сигнал
+}
+function ilCalcCyberCycle(closes){
+  const n=closes.length, alpha=0.07, a1=(1-alpha/2)**2, a2=2*(1-alpha), a3=(1-alpha)**2;
+  const sm=closes.map((c,i)=>i>=3?(c+2*closes[i-1]+2*closes[i-2]+closes[i-3])/6:c);
+  const cc=new Array(n).fill(0);
+  for(let i=2;i<n;i++) cc[i]=a1*(sm[i]-2*sm[i-1]+sm[i-2])+a2*cc[i-1]-a3*cc[i-2];
+  const trig=[0,...cc.slice(0,n-1)];
+  return {cc, trig};
+}
+function ilScoreCyberCycle(cc,trig){ if(cc==null||trig==null)return null; if(cc<-0.1&&cc>trig) return 2; if(cc>0.1&&cc<trig) return -2; return cc>trig?1:-1; }
+function ilCalcBBPct(closes, period=20, mult=2){
+  const bb=_chartCalcBB(closes,period,mult);
+  return bb.map((b,i)=>b&&(b.upper-b.lower)>0?(closes[i]-b.lower)/(b.upper-b.lower)*100:null);
+}
+function ilScoreBBPct(v){ return v==null?null:(v>90?-2:v>80?-1:v<10?2:v<20?1:0); }
+// Регимные классификаторы (HMM/Hurst/Matrix Profile/Transfer Entropy/Rough Vol): по требованию
+// эти показатели НЕ участвуют в винрейте/бэктесте раздела «Точность» — они описывают РЕЖИМ
+// рынка (структуру, а не направление), и тautологичный «винрейт» для них вводил бы в заблуждение.
+// score всегда null ⇒ строка остаётся вне таблицы точности (как chop/flat/vol-режимы).
+function ilScoreHMM(){ return null; }
+function ilScoreHurst(){ return null; }
+function ilScoreMProf(){ return null; }
+function ilScoreTE(){ return null; }
+function ilScoreRough(){ return null; }
+
 const IL_INDICATORS = [
   // Пакет 1 (15 оригинальных)
   'rsi','wr','cci','mfi','stoch','macd','bb','ao','ema','adx','donchian','keltner','envelopes','ichimoku','alligator',
@@ -11588,6 +11788,11 @@ const IL_INDICATORS = [
   'std_dev','fisher','mcginley','dpo','bb_width','rsi_w','ohlc_vol',
   // Пакет 4: ценовые паттерны + режимные классификаторы
   'zigzag','fractals','crash','recovery','flat','high_vol','low_vol','stock_trend',
+  // Пакет 5: продвинутая статистика/DSP + ранее не охваченные индикаторы со страницы «Системы»
+  'nw','kalman','cusum','gpr','ssa','mama','ebs','tmf','cum_delta','cyber_cycle','bb_pct',
+  'frac_dim','efficiency_ratio','entropy',
+  // Режимные классификаторы без бэктеста (см. примечание у score-функций) — для полноты карты индикаторов
+  'hmm','hurst','mprof','te','rough',
 ];
 const IL_NAMES = {
   rsi:'RSI', wr:'Williams %R', cci:'CCI', mfi:'MFI', stoch:'Stochastic', macd:'MACD', bb:'Bollinger %B',
@@ -11605,6 +11810,14 @@ const IL_NAMES = {
   zigzag:'ZigZag сигнал', fractals:'Фракталы (пробой)', crash:'Режим: крах',
   recovery:'Режим: отскок', flat:'Режим: боковик', high_vol:'Режим: высокая вол.',
   low_vol:'Режим: низкая вол.', stock_trend:'Режим: тренд (SMA200)',
+  nw:'Nadaraya-Watson', kalman:'Kalman Filter', cusum:'CUSUM (смена режима)',
+  gpr:'Gaussian Process', ssa:'SSA тренд', mama:'MAMA/FAMA', ebs:'Even Better Sinewave',
+  tmf:'Twiggs Money Flow', cum_delta:'Кумулятивная дельта', cyber_cycle:'Cyber Cycle',
+  bb_pct:'%B Боллинджера', frac_dim:'Фрактальная размерность', efficiency_ratio:'Efficiency Ratio',
+  entropy:'Энтропия (предсказуемость)',
+  hmm:'Режим: HMM-волатильность', hurst:'Режим: Hurst (персистентность)',
+  mprof:'Режим: Matrix Profile (мотив/аномалия)', te:'Режим: Transfer Entropy',
+  rough:'Режим: грубость волатильности',
 };
 
 // Вердикт по набору индикаторов на дневках за ~90 дней.
@@ -11718,6 +11931,30 @@ async function ilGetVerdict({ticker, token, proxy, figi}) {
   seriesScore.high_vol   = _vrA.map(v=>v!=null?(v>=0.7?-0.5:null):null);
   seriesScore.low_vol    = _vrA.map(v=>v!=null?(v<=0.3?0.5:null):null);
   seriesScore.stock_trend= _strendA.map(v=>ilScoreStockTrend(v));
+  // Пакет 5: продвинутая статистика/DSP
+  const _nwA=ilCalcNW(closes), _kalA=ilCalcKalman(closes), _cusA=ilCalcCUSUM(closes);
+  const _gprA=ilCalcGPR(closes), _ssaA=ilCalcSSA(closes), _mamaA=ilCalcMAMA(closes), _ebsA=ilCalcEBS(closes);
+  const _tmfA=ilCalcTMF(candles,21), _fdA=ilCalcFracDim(candles,14), _er2A=ilCalcEfficiencyRatio(closes,10);
+  const _enA=ilCalcEntropy(closes,20), _cdA=ilCalcCumDelta(candles), _ccA=ilCalcCyberCycle(closes), _bbpA=ilCalcBBPct(closes,20,2);
+  seriesScore.nw          = closes.map((c,i)=>_nwA[i]==null?null:ilScoreNW(c,_nwA[i]));
+  seriesScore.kalman      = closes.map((c,i)=>_kalA[i]==null?null:ilScoreKalman(c,_kalA[i]));
+  seriesScore.cusum       = _cusA.map(v=>ilScoreCUSUM(v));
+  seriesScore.gpr         = closes.map((c,i)=>_gprA[i]==null?null:ilScoreGPR(c,_gprA[i]));
+  seriesScore.ssa         = closes.map((c,i)=>_ssaA[i]==null?null:ilScoreSSA(c,_ssaA[i],i>0?_ssaA[i-1]:null));
+  seriesScore.mama        = _mamaA.mama.map((m,i)=>(m==null||_mamaA.fama[i]==null)?null:ilScoreMAMA(m,_mamaA.fama[i]));
+  seriesScore.ebs         = _ebsA.ebs.map((v,i)=>v==null?null:ilScoreEBS(v,_ebsA.lead[i]));
+  seriesScore.tmf         = _tmfA.map(v=>ilScoreTMF(v));
+  seriesScore.frac_dim    = _fdA.map(v=>ilScoreFracDim(v));
+  seriesScore.efficiency_ratio = _er2A.map(v=>ilScoreEfficiencyRatio(v));
+  seriesScore.entropy     = _enA.map(v=>ilScoreEntropy(v));
+  seriesScore.cum_delta   = _cdA.map((v,i)=>(v==null||i<1||closes[i-1]==null)?null:ilScoreCumDelta(closes[i],closes[i-1],v,_cdA[i-1]));
+  seriesScore.cyber_cycle = _ccA.cc.map((v,i)=>v==null?null:ilScoreCyberCycle(v,_ccA.trig[i]));
+  seriesScore.bb_pct      = _bbpA.map(v=>ilScoreBBPct(v));
+  seriesScore.hmm    = closes.map(()=>null);
+  seriesScore.hurst  = closes.map(()=>null);
+  seriesScore.mprof  = closes.map(()=>null);
+  seriesScore.te     = closes.map(()=>null);
+  seriesScore.rough  = closes.map(()=>null);
 
   // Бэктест эффективности: горизонт 5 баров, винрейт совпадения знака score с направлением цены
   const horizon = 5;
@@ -11948,6 +12185,42 @@ function _ilCalcAllSeries(candles, closes) {
   ss.high_vol    = vrArr.map(v=>v!=null?(v>=0.7?-0.5:null):null);
   ss.low_vol     = vrArr.map(v=>v!=null?(v<=0.3?0.5:null):null);
   ss.stock_trend = strendArr.map(v=>ilScoreStockTrend(v));
+  // Пакет 5: продвинутая статистика/DSP
+  const nwArr   = ilCalcNW(closes);
+  const kalArr  = ilCalcKalman(closes);
+  const cusArr  = ilCalcCUSUM(closes);
+  const gprArr  = ilCalcGPR(closes);
+  const ssaArr  = ilCalcSSA(closes);
+  const mamaR   = ilCalcMAMA(closes);
+  const ebsR    = ilCalcEBS(closes);
+  const tmfArr  = ilCalcTMF(candles,21);
+  const fdArr   = ilCalcFracDim(candles,14);
+  const erArr2  = ilCalcEfficiencyRatio(closes,10);
+  const enArr   = ilCalcEntropy(closes,20);
+  const cdArr   = ilCalcCumDelta(candles);
+  const ccR     = ilCalcCyberCycle(closes);
+  const bbpArr  = ilCalcBBPct(closes,20,2);
+  ss.nw          = closes.map((c,i)=>nwArr[i]==null?null:ilScoreNW(c,nwArr[i]));
+  ss.kalman      = closes.map((c,i)=>kalArr[i]==null?null:ilScoreKalman(c,kalArr[i]));
+  ss.cusum       = cusArr.map(v=>ilScoreCUSUM(v));
+  ss.gpr         = closes.map((c,i)=>gprArr[i]==null?null:ilScoreGPR(c,gprArr[i]));
+  ss.ssa         = closes.map((c,i)=>ssaArr[i]==null?null:ilScoreSSA(c,ssaArr[i],i>0?ssaArr[i-1]:null));
+  ss.mama        = mamaR.mama.map((m,i)=>(m==null||mamaR.fama[i]==null)?null:ilScoreMAMA(m,mamaR.fama[i]));
+  ss.ebs         = ebsR.ebs.map((v,i)=>v==null?null:ilScoreEBS(v,ebsR.lead[i]));
+  ss.tmf         = tmfArr.map(v=>ilScoreTMF(v));
+  ss.frac_dim    = fdArr.map(v=>ilScoreFracDim(v));
+  ss.efficiency_ratio = erArr2.map(v=>ilScoreEfficiencyRatio(v));
+  ss.entropy     = enArr.map(v=>ilScoreEntropy(v));
+  ss.cum_delta   = cdArr.map((v,i)=>(v==null||i<1||closes[i-1]==null)?null:ilScoreCumDelta(closes[i],closes[i-1],v,cdArr[i-1]));
+  ss.cyber_cycle = ccR.cc.map((v,i)=>v==null?null:ilScoreCyberCycle(v,ccR.trig[i]));
+  ss.bb_pct      = bbpArr.map(v=>ilScoreBBPct(v));
+  // Режимные классификаторы без бэктеста — last-value для бейджа считаем,
+  // но score всегда null (см. ilScoreHMM и др.), поэтому в винрейт они не попадают
+  ss.hmm    = closes.map(()=>null);
+  ss.hurst  = closes.map(()=>null);
+  ss.mprof  = closes.map(()=>null);
+  ss.te     = closes.map(()=>null);
+  ss.rough  = closes.map(()=>null);
   return ss;
 }
 
@@ -12091,7 +12364,9 @@ const _IL_GROUPS = [
   { label: 'Тренд / импульс',               color: '#52F2C9', ids: ['macd','ao','ema','adx','dmi','fisher','parabolic','supertrend'] },
   { label: 'Канал / волатильность',          color: '#FF9F40', ids: ['bb','keltner','envelopes','donchian','atr_w','hist_vol','bb_pct','bb_width'] },
   { label: 'Объём / деньги',                color: '#60A4A1', ids: ['obv','ad','chaikosc','cmf','mfi','elder_ray','force_idx','pvt','vo'] },
-  { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cyc','mama','er','frac_dim','entropy'] },
+  { label: 'Структура / цикл',              color: '#6366F1', ids: ['ichimoku','alligator','zigzag','fractals','dpo','chop','vortex','cyber_cycle','mama','ebs','ssa'] },
+  { label: 'Продвинутая статистика / DSP',  color: '#FFD23F', ids: ['nw','kalman','gpr','cusum','tmf','cum_delta','bb_pct'] },
+  { label: 'Режим рынка (без винрейта)',    color: '#9090B8', ids: ['hmm','hurst','mprof','te','rough','frac_dim','efficiency_ratio','entropy'] },
 ];
 
 function ilRenderAnalysis() {
@@ -12158,6 +12433,21 @@ function ilRenderAnalysis() {
   _IL_GROUPS.forEach(grp=>{
     const ids=grp.ids.filter(id=>IL_INDICATORS.includes(id)&&r.stats[id]);
     if(!ids.length)return;
+    // Режимные классификаторы (HMM/Hurst/Matrix Profile/Transfer Entropy/Rough Vol/Frac Dim/ER/Entropy)
+    // умышленно не участвуют в бэктесте — у них всегда score=null (см. ilScoreHMM и др.), поэтому
+    // вместо таблицы винрейтов выводим только текущее структурное состояние без процентов точности.
+    if(grp.label.includes('без винрейта')){
+      html+=`<div style="margin-bottom:18px;">
+        <div style="font-size:10px;color:${grp.color};letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;padding:5px 8px;border-left:2px dashed ${grp.color}88;background:rgba(255,255,255,0.015);">${grp.label}</div>
+        <div style="font-size:10px;color:#6a6090;margin-bottom:6px;padding:0 8px;">Это режимные/структурные оценки рынка, а не торговые сигналы — для них не считается винрейт, чтобы не выдавать тавтологичную точность за реальное предсказание.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 8px;">`;
+      ids.forEach(id=>{
+        const ss=r.ss?.[id]; const last=ss?ss[ss.length-1]:null;
+        html+=`<span style="padding:4px 10px;border-radius:8px;background:${grp.color}10;border:1px dashed ${grp.color}55;color:#b8b0d8;font-size:10px;font-family:var(--mono);">${IL_NAMES[id]||id}${last!=null?` <span style="color:${grp.color};opacity:.8;">(${last>0?'+':''}${(+last).toFixed(2)})</span>`:''}</span>`;
+      });
+      html+=`</div></div>`;
+      return;
+    }
     // сортировка по h15 acc
     ids.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
     html+=`<div style="margin-bottom:18px;">
