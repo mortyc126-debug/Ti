@@ -11133,7 +11133,7 @@ window.addEventListener('message', (ev) => {
   }
 });
 try {
-  _ilShellToken = localStorage.getItem('t_api_token') || _ilShellToken;
+  _ilShellToken = localStorage.getItem('tinkoff_token') || localStorage.getItem('t_api_token') || _ilShellToken;
 } catch(e) {}
 
 // Базовый URL T-Invest API: если передан proxy (воркер из shell), бьём через
@@ -12905,7 +12905,8 @@ async function ilRunAnalysis() {
   const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
   const statusEl = document.getElementById('an-status');
   const token = _ilShellToken;
-  if (!ticker||!token) { if(statusEl) statusEl.textContent='Введите тикер; токен берётся со страницы График'; return; }
+  if (!token) { showToast?.('Токен не задан — введи его на странице График (⚙)', '#FF9F40'); return; }
+  if (!ticker) { showToast?.('Введи тикер', '#FF9F40'); return; }
   if (statusEl) statusEl.textContent = `Загружаю ${ticker}…`;
   try {
     const found = await ilFindFigi(ticker, token, chartGetProxy?.());
@@ -13236,7 +13237,8 @@ async function ilRunMultiComp() {
   const raw = (document.getElementById('an-multi-tickers')?.value || '').trim();
   const statusEl = document.getElementById('an-multi-status');
   const token = _ilShellToken;
-  if (!raw || !token) { if(statusEl) statusEl.textContent='Введи тикеры и убедись, что токен задан на странице График'; return; }
+  if (!token) { showToast?.('Токен не задан — введи его на странице График (⚙)', '#FF9F40'); return; }
+  if (!raw) { showToast?.('Введи хотя бы один тикер', '#FF9F40'); return; }
   const tickers = [...new Set(raw.split(/[\s,;]+/).map(t=>t.trim().toUpperCase()).filter(Boolean))];
   if (!tickers.length) { if(statusEl) statusEl.textContent='Нет тикеров'; return; }
 
