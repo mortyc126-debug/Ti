@@ -2864,133 +2864,6 @@ const IND_GROUPS = [
 ];
 
 // ═══════════════════════════════════════════
-// LIBRARY
-// ═══════════════════════════════════════════
-let activeTag = 'all';
-let libValues = {}; // { indId: { paramId: value } }
-
-function initLibrary() {
-  // Tags
-  const tags = document.getElementById('lib-tags');
-  tags.innerHTML = `<span class="tag active" onclick="filterLib('',this,'all')">Все</span>` +
-    IND_GROUPS.map(g => `<span class="tag" onclick="filterLib('',this,'${g.id}')">${g.label}</span>`).join('');
-
-  renderLib('', 'all');
-}
-
-function filterLib(q) {
-  const qLow = q.toLowerCase();
-  renderLib(qLow, activeTag);
-}
-
-function filterLibByTag(q, tagEl, gid) {
-  activeTag = gid;
-  document.querySelectorAll('#lib-tags .tag').forEach(t => t.classList.remove('active'));
-  tagEl.classList.add('active');
-  renderLib(document.getElementById('lib-search').value.toLowerCase(), gid);
-}
-
-function renderLib(q, gid) {
-  const el = document.getElementById('lib-content');
-  let html = '';
-  for (const g of IND_GROUPS) {
-    if (gid !== 'all' && g.id !== gid) continue;
-    const items = g.items.filter(i =>
-      !q || i.name.toLowerCase().includes(q) || i.full.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)
-    );
-    if (!items.length) continue;
-    html += `<div class="group-header">${g.label}</div>`;
-    for (const ind of items) {
-      if (!libValues[ind.id]) {
-        libValues[ind.id] = {};
-        for (const p of ind.params) libValues[ind.id][p.id] = p.def;
-      }
-      const res = ind.interpret(libValues[ind.id]);
-      html += `<div class="card" id="lib-card-${ind.id}">
-        <div class="card-header">
-          <span class="card-title">${ind.name}</span>
-          <span>${pill(res.s)}</span>
-        </div>
-        <div class="card-body">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.5">${ind.desc}</div>
-          ${ind.params.map(p => renderLibParam(ind.id, p)).join('')}
-          <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-top:10px;padding-top:8px;border-top:1px solid var(--border)" id="lib-text-${ind.id}">${res.t}</div>
-        </div>
-      </div>`;
-    }
-  }
-  if (!html) html = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px;">Ничего не найдено</div>';
-  el.innerHTML = html;
-}
-
-function renderLibParam(indId, p) {
-  const val = libValues[indId][p.id];
-  const step = p.step || 1;
-  return `<div style="margin-bottom:10px;">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
-      <span style="font-size:12px;color:var(--text2)">${p.label}</span>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <input type="range" min="${p.min}" max="${p.max}" value="${val}" step="${step}"
-        style="flex:1;height:3px;-webkit-appearance:none;background:var(--border2);border-radius:2px;cursor:pointer;outline:none;"
-        oninput="libSlider('${indId}','${p.id}',this.value)">
-      <input type="number" class="num-input" value="${val}" step="${step}" min="${p.min}" max="${p.max}"
-        id="lib-num-${indId}-${p.id}"
-        oninput="libNum('${indId}','${p.id}',this.value)">
-    </div>
-  </div>`;
-}
-
-function libSlider(indId, paramId, val) {
-  const v = parseFloat(val);
-  libValues[indId][paramId] = v;
-  const numEl = document.getElementById(`lib-num-${indId}-${paramId}`);
-  if (numEl) numEl.value = v;
-  updateLibCard(indId);
-}
-
-function libNum(indId, paramId, val) {
-  const v = parseFloat(val);
-  if (isNaN(v)) return;
-  libValues[indId][paramId] = v;
-  // sync slider range if needed
-  const ind = IND_GROUPS.flatMap(g=>g.items).find(i=>i.id===indId);
-  const p = ind?.params.find(p=>p.id===paramId);
-  const card = document.getElementById(`lib-card-${indId}`);
-  if (card && p) {
-    const slider = card.querySelectorAll('input[type=range]');
-    const idx = ind.params.indexOf(p);
-    if (slider[idx]) {
-      if (v > +slider[idx].max) slider[idx].max = v * 1.5;
-      if (v < +slider[idx].min) slider[idx].min = v * 1.5;
-      slider[idx].value = v;
-    }
-  }
-  updateLibCard(indId);
-}
-
-function updateLibCard(indId) {
-  const ind = IND_GROUPS.flatMap(g=>g.items).find(i=>i.id===indId);
-  if (!ind) return;
-  const res = ind.interpret(libValues[indId]);
-  const card = document.getElementById(`lib-card-${indId}`);
-  if (!card) return;
-  card.querySelector('.card-header span:last-child').innerHTML = pill(res.s);
-  const textEl = document.getElementById(`lib-text-${indId}`);
-  if (textEl) textEl.textContent = res.t;
-}
-
-// fix filterLib onclick
-document.addEventListener('click', e => {
-  const t = e.target.closest('.tag');
-  if (!t || !t.closest('#lib-tags')) return;
-  const gid = t.getAttribute('onclick')?.match(/'([^']+)'\)$/)?.[1] || 'all';
-  activeTag = gid;
-  document.querySelectorAll('#lib-tags .tag').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  renderLib(document.getElementById('lib-search')?.value?.toLowerCase() || '', gid);
-});
-
 // ═══════════════════════════════════════════
 // MAIN INDICATORS
 // ═══════════════════════════════════════════
@@ -4244,62 +4117,6 @@ const COMBO_PRESETS = [
   },
 ];
 
-function initCombos() {
-  const el = document.getElementById('combos-list');
-  if (!el) return;
-  const _isBull = _sysIsBull();
-  el.innerHTML = COMBO_PRESETS.filter(c => c.fields).map(c => `
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header" style="cursor:pointer;" onclick="toggleCombo('${c.id}')">
-        <div style="display:flex;align-items:center;gap:10px;flex:1;">
-          <span style="font-size:20px;">${c.icon}</span>
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;">${c.name}</div>
-            <div style="font-size:11px;color:var(--text3);">${c.short}</div>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-          <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${c.tagColor}22;color:${c.tagColor};font-family:var(--mono);border:1px solid ${c.tagColor}44;">${c.tag}</span>
-          <span id="combo-arrow-${c.id}" style="color:var(--text3);font-size:12px;">▼</span>
-        </div>
-      </div>
-      <div id="combo-body-${c.id}" style="display:none;">
-        <div style="padding:12px 16px;background:rgba(199,27,82,0.05);border-bottom:1px solid var(--border);">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-style:italic;">Когда использовать:</div>
-          <div style="font-size:12px;color:var(--text2);">${c.question}</div>
-        </div>
-        <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-          ${c.fields.map(f => {
-            const lbl = (!_isBull && f.labelBear) ? f.labelBear : f.label;
-            const hnt = (!_isBull && f.hintBear)  ? f.hintBear  : f.hint;
-            return `<div style="margin-bottom:10px;">
-              <div style="font-size:11px;color:var(--text2);margin-bottom:3px;">${lbl}</div>
-              <div style="font-size:10px;color:var(--text3);line-height:1.4;">${hnt}</div>
-            </div>`;
-          }).join('')}
-        </div>
-        <div style="padding:12px 16px;background:rgba(96,164,161,0.03);border-bottom:1px solid var(--border);">
-          <div style="font-size:10px;color:var(--green);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:5px;">КАК ЧИТАТЬ</div>
-          <div style="font-size:12px;color:var(--text2);line-height:1.6;">${c.read}</div>
-        </div>
-        <div style="padding:12px 16px;">
-          <button onclick="applyPreset('${c.id}')"
-            style="width:100%;padding:10px;background:rgba(199,27,82,0.15);border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:0.04em;">
-            → Применить пресет к основным индикаторам
-          </button>
-        </div>
-      </div>
-    </div>`).join('');
-}
-
-function toggleCombo(id) {
-  const body  = document.getElementById(`combo-body-${id}`);
-  const arrow = document.getElementById(`combo-arrow-${id}`);
-  const open  = body.style.display !== 'none';
-  body.style.display  = open ? 'none' : 'block';
-  arrow.textContent   = open ? '▼' : '▲';
-}
-
 function applyPreset(id) {
   const p = COMBO_PRESETS.find(c => c.id === id);
   if (!p) return;
@@ -4634,51 +4451,6 @@ function cmpAdd() {
   document.getElementById('cmp-ticker') && ((document.getElementById('cmp-ticker')||{value:''}).value = '');
   renderCmpTable();
 }
-
-// ═══════════════════════════════════════════
-// ADD PROS/CONS TO LIBRARY RENDER
-// ═══════════════════════════════════════════
-const _origRenderLibParam = renderLibParam;
-
-function renderLibCard_withProsCons(ind, res) {
-  const pc = PROS_CONS[ind.id];
-  if (!pc) return '';
-  return `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-      <div style="background:rgba(96,164,161,0.05);border:1px solid rgba(96,164,161,0.15);border-radius:4px;padding:8px 10px;">
-        <div style="font-size:10px;color:var(--green);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:5px;">+ ПЛЮСЫ</div>
-        ${pc.pros.map(p=>`<div style="font-size:11px;color:var(--text2);padding:2px 0;line-height:1.4;">· ${p}</div>`).join('')}
-      </div>
-      <div style="background:rgba(199,27,82,0.05);border:1px solid rgba(199,27,82,0.15);border-radius:4px;padding:8px 10px;">
-        <div style="font-size:10px;color:var(--red);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:5px;">− МИНУСЫ</div>
-        ${pc.cons.map(c=>`<div style="font-size:11px;color:var(--text2);padding:2px 0;line-height:1.4;">· ${c}</div>`).join('')}
-      </div>
-    </div>`;
-}
-
-// Patch renderLib to include pros/cons
-const _origRenderLib = renderLib;
-renderLib = function(q, gid) {
-  _origRenderLib(q, gid);
-  // After render, inject pros/cons into each card
-  for (const g of IND_GROUPS) {
-    for (const ind of g.items) {
-      const card = document.getElementById(`lib-card-${ind.id}`);
-      if (!card) continue;
-      const existing = card.querySelector('.pros-cons-block');
-      if (existing) continue;
-      const pc = PROS_CONS[ind.id];
-      if (!pc) continue;
-      const body = card.querySelector('.card-body');
-      if (!body) continue;
-      const div = document.createElement('div');
-      div.className = 'pros-cons-block';
-      const res = ind.interpret(libValues[ind.id] || {});
-      div.innerHTML = renderLibCard_withProsCons(ind, res);
-      body.appendChild(div);
-    }
-  }
-};
 
 // ═══════════════════════════════════════════
 // GUIDE — VISUAL PATTERN REFERENCE
@@ -10952,9 +10724,11 @@ function _globalAutoTune() {
 
 function _globalAutoReset() {
   anResetParams?.();
-  // Сброс слайдеров в карточках индикаторов к дефолтным значениям
+  // Сбрасываем cpIndVals и DOM-слайдеры к дефолтным значениям
   IND_GROUPS.flatMap(g => g.items).forEach(ind => {
+    cpIndVals[ind.id] = {};
     (ind.params || []).forEach(p => {
+      cpIndVals[ind.id][p.id] = p.def;
       const numEl = document.getElementById(`cpval-${ind.id}-${p.id}`);
       const slEl  = document.getElementById(`cpslider-${ind.id}-${p.id}`);
       if (numEl) numEl.value = p.def;
