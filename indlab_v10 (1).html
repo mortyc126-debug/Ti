@@ -1297,6 +1297,24 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
             <button id="cp-fav-filter-btn" onclick="cpToggleFavFilter()" title="Только избранные"
               style="flex-shrink:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#6F648F;line-height:1;">★</button>
           </div>
+          <!-- Глобальная авто-настройка параметров -->
+          <div style="margin-top:6px;background:rgba(82,242,201,0.03);border:1px solid rgba(82,242,201,0.12);border-radius:7px;padding:6px 8px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:8px;color:#52a890;font-family:var(--mono);letter-spacing:.05em;flex:1;white-space:nowrap;">◆ АВТО-ПАРАМЕТРЫ</span>
+              <select id="cp-global-style" style="font-size:9px;padding:2px 4px;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:var(--text2);font-family:var(--mono);color-scheme:dark;cursor:pointer;">
+                <option value="">нейтрально</option>
+                <option value="breakout">пробой</option>
+                <option value="reversal">разворот</option>
+              </select>
+              <input type="number" id="cp-global-hz" value="20" min="3" max="300" title="Горизонт (свечей)"
+                style="width:38px;font-size:9px;padding:2px 4px;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:var(--text2);font-family:var(--mono);color-scheme:dark;outline:none;">
+              <button onclick="_globalAutoTune()" title="Рассчитать оптимальные параметры для всех индикаторов"
+                style="font-size:9px;padding:2px 8px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.25);border-radius:4px;color:#52F2C9;font-family:var(--mono);cursor:pointer;white-space:nowrap;">▷ Авто</button>
+              <button onclick="_globalAutoReset()" title="Сбросить к классическим параметрам"
+                style="font-size:9px;padding:2px 6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:var(--text3);font-family:var(--mono);cursor:pointer;">↺</button>
+            </div>
+            <div id="cp-global-status" style="font-size:8px;color:#5a6870;font-family:var(--mono);margin-top:4px;display:none;"></div>
+          </div>
         </div>
         <div id="cp-ind-list" style="flex:1;overflow-y:auto;padding:0 8px 12px;scrollbar-width:thin;scrollbar-color: #7A5FBF #0D0820;"></div>
       </div>
@@ -10559,6 +10577,81 @@ function _indAutoCompute(id, style, horizon) {
   ].join(' · ');
 
   return { params: result, explain };
+}
+
+// Маппинг: id параметра индикатора → id поля формы в «Точность»
+const _GLOBAL_PARAM_MAP = {
+  rsi:   { value: 'tp-rsi' },
+  wr:    { value: 'tp-wr' },
+  cci:   { period: 'tp-cci' },
+  mfi:   { value: 'tp-mfi' },
+  stoch: { k: 'tp-stk', d: 'tp-std' },
+  macd:  { fast: 'tp-mf', slow: 'tp-ms', signal: 'tp-msig' },
+  bb:    { period: 'tp-bbp' },
+  ema:   { fast: 'tp-ef', slow: 'tp-es' },
+  adx:   { value: 'tp-adx' },
+  supertrend: { atr: 'tp-stp' },
+  elder_ray:  { value: 'tp-elder' },
+  elder_impulse: { value: 'tp-elder' },
+  tsi:   { len: 'tp-tsil', smooth: 'tp-tsis' },
+};
+
+function _globalAutoTune() {
+  if (!chartCandles || chartCandles.length < 20) {
+    showToast?.('Загрузи данные на графике', '#FF9F40'); return;
+  }
+  const style = document.getElementById('cp-global-style')?.value || '';
+  const hz    = parseInt(document.getElementById('cp-global-hz')?.value) || 20;
+  const statusEl = document.getElementById('cp-global-status');
+
+  const applied = [];
+  const allInds = IND_GROUPS.flatMap(g => g.items);
+
+  // Для каждого индикатора с маппингом считаем авто-параметры
+  Object.keys(_GLOBAL_PARAM_MAP).forEach(indId => {
+    const map = _GLOBAL_PARAM_MAP[indId];
+    const res = _indAutoCompute(indId, style || null, hz);
+    if (!res) return;
+    Object.entries(map).forEach(([paramId, fieldId]) => {
+      const val = res.params[paramId];
+      const el = document.getElementById(fieldId);
+      if (el && val != null) { el.value = val; applied.push(fieldId); }
+    });
+  });
+
+  // Также обновляем слайдеры в карточках индикаторов (если открыты)
+  allInds.forEach(ind => {
+    const res = _indAutoCompute(ind.id, style || null, hz);
+    if (!res) return;
+    Object.entries(res.params).forEach(([pid, val]) => {
+      const numEl = document.getElementById(`cpval-${ind.id}-${pid}`);
+      const slEl  = document.getElementById(`cpslider-${ind.id}-${pid}`);
+      if (numEl) numEl.value = val;
+      if (slEl)  slEl.value  = val;
+    });
+  });
+
+  // Показать статус
+  const tfLabel = {'1':'1м','5':'5м','15':'15м','30':'30м','60':'1ч','1440':'1д','10080':'1н'}[String(chartTf)] || String(chartTf);
+  const info = `TF ${tfLabel} · ${style||'нейтр.'} · горизонт ${hz}св → обновлено полей: ${new Set(applied).size}`;
+  if (statusEl) { statusEl.textContent = info; statusEl.style.display = 'block'; }
+  showToast?.('✓ Параметры рассчитаны', '#52F2C9');
+}
+
+function _globalAutoReset() {
+  anResetParams?.();
+  // Сброс слайдеров в карточках индикаторов к дефолтным значениям
+  IND_GROUPS.flatMap(g => g.items).forEach(ind => {
+    (ind.params || []).forEach(p => {
+      const numEl = document.getElementById(`cpval-${ind.id}-${p.id}`);
+      const slEl  = document.getElementById(`cpslider-${ind.id}-${p.id}`);
+      if (numEl) numEl.value = p.def;
+      if (slEl)  slEl.value  = p.def;
+    });
+  });
+  const statusEl = document.getElementById('cp-global-status');
+  if (statusEl) statusEl.style.display = 'none';
+  showToast?.('↺ Параметры сброшены', '#B487F8');
 }
 
 function cpApplyAuto(id) {
