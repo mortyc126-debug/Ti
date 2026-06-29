@@ -4121,10 +4121,12 @@ function applyPreset(id) {
   const p = COMBO_PRESETS.find(c => c.id === id);
   if (!p) return;
 
-  // Новые пресеты с chartIds — управляем через cpChartToggle
+  // Новые пресеты с chartIds — управляем через cpChartToggle (batch, без RAF на каждый)
   if (p.chartIds) {
+    window._cpBatchToggle = true;
     Object.keys(chartInds).forEach(function(k){ if(chartInds[k]) cpChartToggle(k); });
     p.chartIds.forEach(function(id){ if(!chartInds[id]) cpChartToggle(id); });
+    window._cpBatchToggle = false;
     cpActiveCombo = id;
     cpRenderCombos();
     if (chartCandles && chartCandles.length) {
@@ -9004,8 +9006,10 @@ function _sysOptimalSection() {
 }
 
 function _sysActivateIds(ids) {
+  window._cpBatchToggle = true;
   Object.keys(chartInds).forEach(k => { if(chartInds[k]) cpChartToggle(k); });
   ids.forEach(id => { if(!chartInds[id]) cpChartToggle(id); });
+  window._cpBatchToggle = false;
   showToast('✓ ' + ids.length + ' инд. активированы', '#C71B52');
   setTimeout(() => {
     if (chartCandles.length) chartRedraw();
@@ -9014,20 +9018,13 @@ function _sysActivateIds(ids) {
 }
 
 function _sysActivateOptimal() {
-  // Сначала выключаем всё что есть
-  Object.keys(chartInds).forEach(k => {
-    if (chartInds[k]) cpChartToggle(k);
-  });
-  // Включаем каждый из оптимального набора
-  _SYS_OPTIMAL.forEach(item => {
-    if (!chartInds[item.id]) cpChartToggle(item.id);
-  });
+  window._cpBatchToggle = true;
+  Object.keys(chartInds).forEach(k => { if(chartInds[k]) cpChartToggle(k); });
+  _SYS_OPTIMAL.forEach(item => { if(!chartInds[item.id]) cpChartToggle(item.id); });
+  window._cpBatchToggle = false;
   showToast('✓ Оптимальный набор активирован (' + _SYS_OPTIMAL.length + ' инструментов)', '#60A4A1');
-  // Обновить панель индикаторов
+  // Одна перерисовка после всех переключений
   setTimeout(() => {
-    for (const g of IND_GROUPS) {
-      for (const ind of g.items) { try { cpUpdateInd(ind.id); } catch(e) {} }
-    }
     if (chartCandles.length) chartRedraw();
   }, 80);
 }
@@ -10905,8 +10902,8 @@ function cpChartToggle(id) {
   if (['ichi_main','ichi_tk','ichi_cloud'].includes(id)) {
     chartIchiShow = chartInds.ichi_main || chartInds.ichi_tk || chartInds.ichi_cloud;
   }
-  // ↓ KEY FIX: defer redraw so browser reflows layout first
-  if (chartCandles.length) requestAnimationFrame(() => requestAnimationFrame(() => chartRedraw()));
+  // ↓ defer redraw; подавляется при пакетных операциях (_cpBatchToggle)
+  if (chartCandles.length && !window._cpBatchToggle) requestAnimationFrame(() => requestAnimationFrame(() => chartRedraw()));
 }
 
 // Extend chartToggleInd — just delegate to cpChartToggle for visual sync
