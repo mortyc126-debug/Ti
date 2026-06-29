@@ -15241,11 +15241,32 @@ function _renderAnalysisInner(panel) {
   }
   // ─── конец блока антисигналов ────────────────────────────────────────────────
 
+  // Читаем параметры из формы теста (если открыта вкладка «Точность»), иначе дефолты
+  const _rawP = (typeof _anReadTestParams === 'function') ? _anReadTestParams() : {};
+  const _P = {
+    rsi:  _rawP.rsi  || 14,  wr:   _rawP.wr   || 14,  cci:  _rawP.cci  || 20,
+    mfi:  _rawP.mfi  || 14,  stk:  _rawP.stk  || 14,  std:  _rawP.std  || 3,
+    mf:   _rawP.mf   || 12,  ms:   _rawP.ms   || 26,  msig: _rawP.msig || 9,
+    bbp:  _rawP.bbp  || 20,  adx:  _rawP.adx  || 14,  stp:  _rawP.stp  || 10,
+    elder:_rawP.elder|| 13,  tsil: _rawP.tsil || 25,  tsis: _rawP.tsis || 13,
+  };
+  // Флаг: отличаются ли текущие параметры от классических дефолтов
+  const _pCustom = _rawP.rsi!=null && (
+    _P.rsi!==14||_P.wr!==14||_P.cci!==20||_P.mfi!==14||_P.stk!==14||
+    _P.mf!==12||_P.ms!==26||_P.msig!==9||_P.bbp!==20||_P.adx!==14||
+    _P.stp!==10||_P.elder!==13||_P.tsil!==25||_P.tsis!==13
+  );
+  if (_pCustom) {
+    html += `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(82,242,201,0.07);border:1px solid rgba(82,242,201,0.2);border-radius:6px;font-size:9.5px;font-family:var(--mono);color:#52F2C9;">
+      ◆ Анализ с пользовательскими параметрами: RSI(${_P.rsi}) WR(${_P.wr}) CCI(${_P.cci}) MFI(${_P.mfi}) Stoch(${_P.stk},${_P.std}) MACD(${_P.mf},${_P.ms},${_P.msig}) BB(${_P.bbp}) ADX(${_P.adx}) ST(${_P.stp}) ELD(${_P.elder}) TSI(${_P.tsil},${_P.tsis})
+    </div>`;
+  }
+
   for (const id of activeIds) {
     const idL = id.toLowerCase();
 
     if (idL.includes('rsi') && !idL.includes('macd')) {
-      const period = 14;
+      const period = _P.rsi;
       const rsiVals = _anCalcRSI(closes, period);
       if (rsiVals && rsiVals.length >= 10) {
         const nR = rsiVals.length;
@@ -15337,14 +15358,14 @@ function _renderAnalysisInner(panel) {
           const crossings = last8.filter((v,i,a)=>i>0&&((v>50&&a[i-1]<50)||(v<50&&a[i-1]>50))).length;
           if (crossings >= 3) items.push({type:'neutral', text:`RSI ${crossings} раз пересёк 50 за 8 баров — каскад вялый, боковик. Нет направленного давления`});
         }
-        // 6. RSI(14) vs RSI(2): масштабное согласие
+        // 6. RSI(period) vs RSI(2): масштабное согласие
         if (r2v != null) {
           const both_bull = r > 60 && r2v > 60;
           const both_bear = r < 40 && r2v < 40;
           const diverge = (r > 55 && r2v < 40) || (r < 45 && r2v > 60);
-          if (both_bull) items.push({type:'bullish', text:`RSI(14)=${r.toFixed(0)} и RSI(2)=${r2v.toFixed(0)} оба выше 60 — макро и микро согласны. Сильный сигнал`});
-          else if (both_bear) items.push({type:'bearish', text:`RSI(14)=${r.toFixed(0)} и RSI(2)=${r2v.toFixed(0)} оба ниже 40 — масштабное согласие вниз`});
-          else if (diverge) items.push({type:'neutral', text:`RSI(14)=${r.toFixed(0)} ≠ RSI(2)=${r2v.toFixed(0)} — дивергенция масштабов: долгосрочный и краткосрочный в разных режимах. Неопределённость`});
+          if (both_bull) items.push({type:'bullish', text:`RSI(${period})=${r.toFixed(0)} и RSI(2)=${r2v.toFixed(0)} оба выше 60 — макро и микро согласны. Сильный сигнал`});
+          else if (both_bear) items.push({type:'bearish', text:`RSI(${period})=${r.toFixed(0)} и RSI(2)=${r2v.toFixed(0)} оба ниже 40 — масштабное согласие вниз`});
+          else if (diverge) items.push({type:'neutral', text:`RSI(${period})=${r.toFixed(0)} ≠ RSI(2)=${r2v.toFixed(0)} — дивергенция масштабов: долгосрочный и краткосрочный в разных режимах. Неопределённость`});
         }
 
         // Блок «что делать»
@@ -15364,14 +15385,14 @@ function _renderAnalysisInner(panel) {
         else if (r < 50 && r1 > 50) clRsiItems.push({type:'bearish', text:`RSI пересёк 50 сверху вниз — классическое подтверждение смены на медвежий режим`});
         else clRsiItems.push({type:'neutral', text:`RSI=${r.toFixed(1)} в нейтральной зоне (30–70) — классика не даёт сигнала`});
 
-        html += makeCard('RSI(14) / Индекс относительной силы', items, 'rsi', clRsiItems, 'rsi');
+        html += makeCard(`RSI(${period}) / Индекс относительной силы`, items, 'rsi', clRsiItems, 'rsi');
       }
     } else if (idL.includes('macd')) {
-      if (closes.length >= 35) {
-        const ema12 = _anCalcEMA(closes, 12);
-        const ema26 = _anCalcEMA(closes, 26);
+      if (closes.length >= _P.ms + 10) {
+        const ema12 = _anCalcEMA(closes, _P.mf);
+        const ema26 = _anCalcEMA(closes, _P.ms);
         const macdLine = ema12.map((v, i) => v - ema26[i]);
-        const signal = _anCalcEMA(macdLine.slice(-20), 9);
+        const signal = _anCalcEMA(macdLine.slice(-20), _P.msig);
         const hist = macdLine.slice(-signal.length).map((v, i) => v - signal[i]);
         if (hist.length >= 5) {
           const hLen = hist.length;
@@ -15447,11 +15468,11 @@ function _renderAnalysisInner(panel) {
             else clMacdItems.push({type:'neutral', text:`Гистограмма: ${h.toFixed(4)} — линии сходятся или разворачиваются`});
           }
 
-          html += makeCard('MACD / Схождение-расхождение скользящих', items, 'macd', clMacdItems, 'macd');
+          html += makeCard(`MACD(${_P.mf},${_P.ms},${_P.msig}) / Схождение-расхождение скользящих`, items, 'macd', clMacdItems, 'macd');
         }
       }
     } else if (idL === 'bb' || idL.includes('boll')) {
-      const period = 20;
+      const period = _P.bbp;
       if (closes.length >= period + 10) {
         const sma = _anCalcSMA(closes, period);
         const items = [];
@@ -15533,7 +15554,7 @@ function _renderAnalysisInner(panel) {
             const maxW = Math.max(...bbWidths.slice(-50).map(b=>b.upper-b.lower));
             if (w < 0.2 * maxW) clBBItems.push({type:'neutral', text:`Squeeze BB: ширина ${(w/lb.middle*100).toFixed(2)}% — компрессия. Классически — накопление энергии перед взрывом`});
           }
-          html += makeCard('BB / Полосы Боллинджера', items, 'bb', clBBItems, 'bb');
+          html += makeCard(`BB(${period}) / Полосы Боллинджера`, items, 'bb', clBBItems, 'bb');
         }
       }
     } else if (idL.includes('atr') && !idL.includes('matr')) {
@@ -15589,7 +15610,7 @@ function _renderAnalysisInner(panel) {
         html += makeCard('ATR(14) / Средний истинный диапазон', items, 'atr');
       }
     } else if (idL.includes('stoch')) {
-      const period = 14, smooth = 3;
+      const period = _P.stk, smooth = _P.std;
       if (candles.length >= period + smooth) {
         const kVals = [];
         for (let i = period - 1; i < candles.length; i++) {
@@ -15689,7 +15710,7 @@ function _renderAnalysisInner(panel) {
           else if (crossDn) clStochItems.push({type:'bearish', text:`K пересёк D сверху вниз — классический сигнал продажи`});
           else clStochItems.push({type:'neutral', text:`Stochastic K=${k.toFixed(0)} — нейтральная зона (20–80), нет классического сигнала`});
         }
-        html += makeCard('Stochastic / Стохастик', items, 'stoch', clStochItems, 'stoch');
+        html += makeCard(`Stochastic(${period},${smooth}) / Стохастик`, items, 'stoch', clStochItems, 'stoch');
       }
     } else if (idL.includes('obv')) {
       if (candles.length >= 6) {
@@ -15746,7 +15767,7 @@ function _renderAnalysisInner(panel) {
         html += makeCard('OBV / Балансовый объём', items, 'obv', clObvItems, 'obv');
       }
     } else if (idL.includes('mfi')) {
-      const period = 14;
+      const period = _P.mfi;
       if (candles.length >= period + 1) {
         const typical = candles.map(c => (c.high + c.low + c.close) / 3);
         const rawMF = typical.map((t, i) => t * (vols[i] || 0));
@@ -15797,7 +15818,7 @@ function _renderAnalysisInner(panel) {
         if (mfi < 20) clMfiItems.push({type:'bullish', text:`MFI=${mfi.toFixed(1)} — перепродан (< 20). Классика: объёмное давление продаж иссякает, ожидается разворот вверх`});
         else if (mfi > 80) clMfiItems.push({type:'bearish', text:`MFI=${mfi.toFixed(1)} — перекуплен (> 80). Классика: объёмное давление покупок иссякает, ожидается разворот вниз`});
         else clMfiItems.push({type:'neutral', text:`MFI=${mfi.toFixed(1)} — нейтральная зона. Классика молчит`});
-        html += makeCard('MFI / Индекс потока денег', items, 'mfi', clMfiItems, 'mfi');
+        html += makeCard(`MFI(${period}) / Индекс потока денег`, items, 'mfi', clMfiItems, 'mfi');
       }
     } else if (idL.includes('ichi') || idL.includes('ichimoku')) {
       if (candles.length >= 52) {
@@ -16159,7 +16180,7 @@ function _renderAnalysisInner(panel) {
         html += makeCard('Donchian / Канал Дончиана', items, 'donchian');
       }
     } else if (idL.includes('adx')) {
-      const period = 14;
+      const period = _P.adx;
       if (candles.length >= period + 2) {
         const n = candles.length;
         const trArr = [], plusDM = [], minusDM = [];
@@ -16249,10 +16270,10 @@ function _renderAnalysisInner(panel) {
         } else {
           clAdxItems.push({type:'neutral', text:`ADX=${adx.toFixed(1)} < 25 — тренд слабый. Классика: осцилляторы работают лучше трендовых инструментов`});
         }
-        html += makeCard('ADX/DMI / Индекс средн. направленности', items, 'adx', clAdxItems, 'adx');
+        html += makeCard(`ADX/DMI(${period}) / Индекс средн. направленности`, items, 'adx', clAdxItems, 'adx');
       }
     } else if (idL.includes('cci')) {
-      const period = 20;
+      const period = _P.cci;
       if (closes.length >= period + 5) {
         const typical = candles.map(c => (c.high + c.low + c.close) / 3);
         const n = typical.length;
@@ -16345,7 +16366,7 @@ function _renderAnalysisInner(panel) {
         else if (cci > 100) clCciItems.push({type:'bearish', text:`CCI=${cci.toFixed(1)} выше +100 — классический сигнал перекупленности. Возврат к средней`});
         else if (cci > 0 && cci < 100) clCciItems.push({type:'bullish', text:`CCI=${cci.toFixed(1)} в зоне 0–100 — умеренный бычий импульс. Классически: можно держать лонг`});
         else clCciItems.push({type:'bearish', text:`CCI=${cci.toFixed(1)} в зоне 0 — −100 — умеренное медвежье давление`});
-        html += makeCard('CCI / Индекс товарного канала', items, 'cci', clCciItems, 'cci');
+        html += makeCard(`CCI(${period}) / Индекс товарного канала`, items, 'cci', clCciItems, 'cci');
       }
     } else if (idL.includes('keltner')) {
       const per = 20, atrPer = 10, mult = 2;
@@ -16441,7 +16462,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'wr') {
       const n = candles.length;
-      const per = 14;
+      const per = _P.wr;
       if (n >= per) {
         const items = [];
         const slice = candles.slice(n-per);
@@ -16514,7 +16535,7 @@ function _renderAnalysisInner(panel) {
         if (wr > -20) clWrItems.push({type:'bearish', text:`WR=${wr.toFixed(1)} выше −20 — классически перекуплен. Сигнал разворота вниз`});
         else if (wr < -80) clWrItems.push({type:'bullish', text:`WR=${wr.toFixed(1)} ниже −80 — классически перепродан. Сигнал разворота вверх`});
         else clWrItems.push({type:'neutral', text:`WR=${wr.toFixed(1)} — нейтральная зона, нет классического сигнала`});
-        html += makeCard('Williams %R / %R Вильямса', items, 'williams', clWrItems, 'williams');
+        html += makeCard(`Williams %R(${per}) / %R Вильямса`, items, 'williams', clWrItems, 'williams');
       }
     } else if (idL === 'ao') {
       const n = candles.length;
@@ -16753,7 +16774,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'elder_ray') {
       const n = candles.length;
-      const per = 13;
+      const per = _P.elder;
       if (n >= per+5) {
         const items = [];
         const ema13 = _chartCalcEMA(closes, per);
@@ -16793,7 +16814,7 @@ function _renderAnalysisInner(panel) {
                         : bull < 0 ? 'Bull Power ниже нуля — быки слабы. Шорт в контексте.' : null;
           _trade(erDir, erConf, erLong, erShort).forEach(t => items.push(t));
         }
-        html += makeCard('Elder Ray / Луч Элдера (неклассически)', items, 'elder_ray');
+        html += makeCard(`Elder Ray(EMA${per}) / Луч Элдера (неклассически)`, items, 'elder_ray');
       }
     } else if (idL === 'force_idx') {
       const n = candles.length;
@@ -16824,16 +16845,16 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'elder_impulse') {
       const n = candles.length;
-      if (n >= 26) {
+      if (n >= _P.ms + 10) {
         const items = [];
-        const ema13 = _chartCalcEMA(closes, 13);
+        const ema13 = _chartCalcEMA(closes, _P.elder);
         const emaDir = (ema13[n-1]||0) > (ema13[n-2]||0) ? 1 : -1;
-        const macdData = _chartCalcMACD(closes, 12, 26, 9);
+        const macdData = _chartCalcMACD(closes, _P.mf, _P.ms, _P.msig);
         const hist = macdData ? macdData.hist : null;
         const macdDir = hist && hist[n-1]!==null && hist[n-2]!==null ? (hist[n-1]>hist[n-2]?1:-1) : 0;
-        if (emaDir>0&&macdDir>0) items.push({type:'bullish', text:`Импульс Элдера: EMA13 ↑ + MACD-гист ↑ — зелёный бар. Запрещено шортить, разрешено покупать`});
-        else if (emaDir<0&&macdDir<0) items.push({type:'bearish', text:`Импульс Элдера: EMA13 ↓ + MACD-гист ↓ — красный бар. Запрещено покупать, разрешено шортить`});
-        else items.push({type:'neutral', text:`Импульс Элдера: нет синхронизации EMA/MACD — синий бар. Можно торговать в любую сторону`});
+        if (emaDir>0&&macdDir>0) items.push({type:'bullish', text:`Импульс Элдера: EMA(${_P.elder}) ↑ + MACD-гист ↑ — зелёный бар. Запрещено шортить, разрешено покупать`});
+        else if (emaDir<0&&macdDir<0) items.push({type:'bearish', text:`Импульс Элдера: EMA(${_P.elder}) ↓ + MACD-гист ↓ — красный бар. Запрещено покупать, разрешено шортить`});
+        else items.push({type:'neutral', text:`Импульс Элдера: нет синхронизации EMA(${_P.elder})/MACD — синий бар. Можно торговать в любую сторону`});
         // Неклассика: цвет раньше сигнала — кто переключился первым
         if (hist && hist[n-1]!==null && hist[n-2]!==null) {
           const macdSwitched = (hist[n-1]>0) !== (hist[n-2]>0);
@@ -16859,7 +16880,7 @@ function _renderAnalysisInner(panel) {
                         : eiDir === 'neutral' ? 'Синий бар — шорт возможен, но без уверенности в направлении.' : null;
           _trade(eiDir, eiConf, eiLong, eiShort).forEach(t => items.push(t));
         }
-        html += makeCard('Elder Impulse System / Импульсная система Элдера (неклассически)', items, 'elder_imp');
+        html += makeCard(`Elder Impulse System(EMA${_P.elder},MACD${_P.mf}/${_P.ms}) / Импульсная система Элдера (неклассически)`, items, 'elder_imp');
       }
     } else if (idL === 'parabolic') {
       const n = candles.length;
@@ -16918,7 +16939,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'supertrend') {
       const n = candles.length;
-      const per=10, mult=3;
+      const per=_P.stp, mult=3;
       if (n >= per+5) {
         const items = [];
         const tr = candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high-c.low,Math.abs(c.high-candles[i-1].close),Math.abs(c.low-candles[i-1].close)));
@@ -16956,7 +16977,7 @@ function _renderAnalysisInner(panel) {
         const clStItems = [];
         clStItems.push({type:trend2===1?'bullish':'bearish', text:`SuperTrend ${trend2===1?'бычий':'медвежий'} — классический сигнал ${trend2===1?'держать лонг / покупать на откатах':'держать шорт / продавать на отскоках'}`});
         if (flips <= 2 && n >= 50) clStItems.push({type:trend2===1?'bullish':'bearish', text:`${flips} смены за весь период — устойчивый тренд. Классика: не торговать против направления SuperTrend`});
-        html += makeCard('SuperTrend / Супертренд', items, 'supertrend', clStItems, 'supertrend');
+        html += makeCard(`SuperTrend(ATR${per}×${mult}) / Супертренд`, items, 'supertrend', clStItems, 'supertrend');
       }
     } else if (idL.includes('fisher')) {
       const n = candles.length;
@@ -17083,14 +17104,16 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'tsi') {
       const n = candles.length;
-      if (n >= 35) {
+      const _tsil = _P.tsil, _tsis = _P.tsis;
+      if (n >= _tsil + _tsis) {
         const items = [];
         const mom = closes.map((c,i)=>i===0?0:c-closes[i-1]);
+        const _k1=1/_tsil, _k2=1/_tsis, _m1=1-_k1, _m2=1-_k2;
         let ds1=mom[0], ds2=mom[0], dabs1=Math.abs(mom[0]), dabs2=Math.abs(mom[0]);
-        const ts=[], tsArr=[];
+        const tsArr=[];
         for(let i=1;i<n;i++) {
-          ds1=ds1*24/25+mom[i]*1/25; ds2=ds2*12/13+ds1*1/13;
-          dabs1=dabs1*24/25+Math.abs(mom[i])*1/25; dabs2=dabs2*12/13+dabs1*1/13;
+          ds1=ds1*_m1+mom[i]*_k1; ds2=ds2*_m2+ds1*_k2;
+          dabs1=dabs1*_m1+Math.abs(mom[i])*_k1; dabs2=dabs2*_m2+dabs1*_k2;
           tsArr.push(dabs2!==0?ds2/dabs2*100:0);
         }
         const last=tsArr[tsArr.length-1], prev=tsArr[tsArr.length-2];
@@ -17121,7 +17144,7 @@ function _renderAnalysisInner(panel) {
                          : last < 0 && prev > 0 ? 'TSI пересёк ноль вниз — смена моментума на медвежий. Потенциальная точка входа в шорт.' : null;
           _trade(tsiDir, tsiConf, tsiLong, tsiShort).forEach(t => items.push(t));
         }
-        html += makeCard('TSI / Индекс истинной силы (неклассически)', items, 'tsi');
+        html += makeCard(`TSI(${_tsil},${_tsis}) / Индекс истинной силы (неклассически)`, items, 'tsi');
       }
     } else if (idL === 'ult_osc') {
       const n = candles.length;
