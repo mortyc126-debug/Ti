@@ -821,6 +821,70 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
       <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
       <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
     </div>
+    <!-- Форма параметров теста -->
+    <div id="an-params-block" style="margin-bottom:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;">
+      <div onclick="anToggleParams()" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;user-select:none;">
+        <span style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:0.06em;">◆ ПАРАМЕТРЫ ТЕСТА</span>
+        <span id="an-params-chevron" style="font-size:9px;color:var(--text3);">▾</span>
+      </div>
+      <div id="an-params-body" style="display:none;padding:0 12px 12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px 16px;margin-top:4px;">
+          <!-- RSI -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">RSI период</span>
+            <input type="number" id="tp-rsi" value="14" min="2" max="100" style="width:100%;margin-top:2px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div>
+          <!-- WR -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">Williams %R период</span>
+            <input type="number" id="tp-wr" value="14" min="2" max="100" style="width:100%;margin-top:2px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div>
+          <!-- CCI -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">CCI период</span>
+            <input type="number" id="tp-cci" value="20" min="2" max="200" style="width:100%;margin-top:2px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div>
+          <!-- MFI -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">MFI период</span>
+            <input type="number" id="tp-mfi" value="14" min="2" max="100" style="width:100%;margin-top:2px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div>
+          <!-- Stoch -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">Stoch K / D</span>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+              <input type="number" id="tp-stk" value="14" min="2" max="100" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-std" value="3" min="1" max="20" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div></div>
+          <!-- MACD -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">MACD fast / slow / sig</span>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+              <input type="number" id="tp-mf" value="12" min="2" max="100" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-ms" value="26" min="2" max="200" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-msig" value="9" min="1" max="50" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div></div>
+          <!-- BB -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">BB период / std</span>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+              <input type="number" id="tp-bbp" value="20" min="2" max="200" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-bbs" value="2" min="0.5" max="5" step="0.5" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div></div>
+          <!-- EMA -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">EMA fast / slow</span>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+              <input type="number" id="tp-ef" value="12" min="2" max="100" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-es" value="26" min="2" max="200" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div></div>
+          <!-- ADX -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">ADX период</span>
+            <input type="number" id="tp-adx" value="14" min="2" max="100" style="width:100%;margin-top:2px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div>
+          <!-- SuperTrend -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">SuperTrend период / mult</span>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+              <input type="number" id="tp-stp" value="10" min="2" max="100" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-stm" value="3" min="0.5" max="10" step="0.5" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div></div>
+          <!-- Elder -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">Elder Ray / Impulse EMA</span>
+            <input type="number" id="tp-elder" value="13" min="2" max="100" style="width:100%;margin-top:2px;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div>
+          <!-- TSI -->
+          <div><span style="font-size:9px;color:var(--text3);font-family:var(--mono);">TSI длинный / короткий</span>
+            <div style="display:flex;gap:4px;margin-top:2px;">
+              <input type="number" id="tp-tsil" value="25" min="2" max="100" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;">
+              <input type="number" id="tp-tsis" value="13" min="1" max="50" style="flex:1;padding:4px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(180,135,248,0.2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;color-scheme:dark;outline:none;"></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+          <button onclick="anResetParams()" style="padding:4px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--text3);font-family:var(--mono);font-size:9px;cursor:pointer;">↺ Сброс</button>
+          <span style="font-size:9px;color:#5a5080;font-family:var(--mono);">Применятся при следующем запуске ▷</span>
+        </div>
+      </div>
+    </div>
     <div id="an-results"></div>
   </div>
 
@@ -13246,6 +13310,103 @@ function anSetTF(btn) {
   btn.style.borderColor = 'rgba(82,242,201,0.4)';
 }
 
+function anToggleParams() {
+  const body = document.getElementById('an-params-body');
+  const chev = document.getElementById('an-params-chevron');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (chev) chev.textContent = open ? '▾' : '▴';
+}
+
+function anResetParams() {
+  const defs = {
+    'tp-rsi':14,'tp-wr':14,'tp-cci':20,'tp-mfi':14,
+    'tp-stk':14,'tp-std':3,
+    'tp-mf':12,'tp-ms':26,'tp-msig':9,
+    'tp-bbp':20,'tp-bbs':2,
+    'tp-ef':12,'tp-es':26,
+    'tp-adx':14,'tp-stp':10,'tp-stm':3,
+    'tp-elder':13,'tp-tsil':25,'tp-tsis':13
+  };
+  Object.entries(defs).forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.value=v; });
+}
+
+function _anReadTestParams() {
+  const n = id => parseFloat(document.getElementById(id)?.value)||0;
+  return {
+    rsi: Math.max(2,n('tp-rsi')),
+    wr:  Math.max(2,n('tp-wr')),
+    cci: Math.max(2,n('tp-cci')),
+    mfi: Math.max(2,n('tp-mfi')),
+    stk: Math.max(2,n('tp-stk')), std: Math.max(1,n('tp-std')),
+    mf:  Math.max(2,n('tp-mf')),  ms: Math.max(2,n('tp-ms')), msig: Math.max(1,n('tp-msig')),
+    bbp: Math.max(2,n('tp-bbp')), bbs: Math.max(0.5,n('tp-bbs')),
+    ef:  Math.max(2,n('tp-ef')),  es: Math.max(2,n('tp-es')),
+    adx: Math.max(2,n('tp-adx')),
+    stp: Math.max(2,n('tp-stp')), stm: Math.max(0.5,n('tp-stm')),
+    elder: Math.max(2,n('tp-elder')),
+    tsil: Math.max(2,n('tp-tsil')), tsis: Math.max(1,n('tp-tsis'))
+  };
+}
+
+// Пересчитывает только индикаторы с изменёнными параметрами, остальное берёт из базового ss
+function _ilCalcCustomSeries(candles, closes, p) {
+  const base = _ilCalcAllSeries(candles, closes);
+  const ss = Object.assign({}, base);
+  // RSI
+  ss.rsi = _chartCalcRSI(closes, p.rsi).map(v => v==null?null:ilScore.rsi(v));
+  // Williams %R
+  ss.wr  = ilCalcWR(candles, p.wr).map(v => v==null?null:ilScore.wr(v));
+  // CCI
+  ss.cci = ilCalcCCI(candles, p.cci).map(v => v==null?null:ilScore.cci(v));
+  // MFI
+  ss.mfi = ilCalcMFI(candles, p.mfi).map(v => v==null?null:ilScore.mfi(v));
+  // Stoch
+  ss.stoch = ilCalcStoch(candles, p.stk, p.std).map(v => (v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d));
+  // MACD
+  const macdR = _chartCalcMACD(closes, p.mf, p.ms, p.msig);
+  ss.macd = closes.map((_,i) => macdR.macd[i]==null?null:ilScoreMACD(macdR.macd,macdR.signal,macdR.hist,i));
+  // BB
+  const bbArr = _chartCalcBB(closes, p.bbp, p.bbs);
+  ss.bb = bbArr.map((b,i) => b==null?null:ilScore.bb((closes[i]-b.lower)/((b.upper-b.lower)||1)*100));
+  // EMA cross
+  const ef = _chartCalcEMA(closes, p.ef), es2 = _chartCalcEMA(closes, p.es);
+  ss.ema = closes.map((_,i) => ilScoreCross(ef, es2, i));
+  // ADX
+  ss.adx = ilCalcADX(candles, p.adx).map((_,i,a) => ilScoreADX(a,i));
+  // SuperTrend
+  ss.supertrend = ilCalcSuperTrend(candles, p.stp, p.stm).map((_,i,a) => ilScoreSuperTrend(a,i));
+  // Elder Ray / Impulse
+  const erArr = ilCalcElderRay(closes, candles, p.elder);
+  const eiArr = ilCalcElderImpulse(closes, candles, p.elder);
+  ss.elder_ray     = erArr.map(v => ilScoreElderRay(v));
+  ss.elder_impulse = eiArr.map(v => ilScoreElderImpulse(v));
+  // TSI
+  ss.tsi = ilCalcTSI(closes, p.tsil, p.tsis).map(v => ilScoreTSI(v));
+  return ss;
+}
+
+// Строит читаемый суффикс с параметрами для имени индикатора
+function _anParamSuffix(id, p) {
+  const D = {rsi:14,wr:14,cci:20,mfi:14,stk:14,std:3,mf:12,ms:26,msig:9,bbp:20,bbs:2,ef:12,es:26,adx:14,stp:10,stm:3,elder:13,tsil:25,tsis:13};
+  switch(id){
+    case 'rsi': return p.rsi!==D.rsi?`(${p.rsi})`:'';
+    case 'wr':  return p.wr!==D.wr?`(${p.wr})`:'';
+    case 'cci': return p.cci!==D.cci?`(${p.cci})`:'';
+    case 'mfi': return p.mfi!==D.mfi?`(${p.mfi})`:'';
+    case 'stoch': return (p.stk!==D.stk||p.std!==D.std)?`(${p.stk},${p.std})`:'';
+    case 'macd': return (p.mf!==D.mf||p.ms!==D.ms||p.msig!==D.msig)?`(${p.mf},${p.ms},${p.msig})`:'';
+    case 'bb':   return (p.bbp!==D.bbp||p.bbs!==D.bbs)?`(${p.bbp},${p.bbs})`:'';
+    case 'ema':  return (p.ef!==D.ef||p.es!==D.es)?`(${p.ef},${p.es})`:'';
+    case 'adx':  return p.adx!==D.adx?`(${p.adx})`:'';
+    case 'supertrend': return (p.stp!==D.stp||p.stm!==D.stm)?`(${p.stp},${p.stm})`:'';
+    case 'elder_ray': case 'elder_impulse': return p.elder!==D.elder?`(${p.elder})`:'';
+    case 'tsi': return (p.tsil!==D.tsil||p.tsis!==D.tsis)?`(${p.tsil},${p.tsis})`:'';
+    default: return '';
+  }
+}
+
 async function ilRunAnalysis() {
   const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
   const statusEl = document.getElementById('an-status');
@@ -13271,7 +13432,8 @@ async function ilRunAnalysis() {
     const closes = candles.map(c=>c.close);
     const interval = tfLabel;
     if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
-    const ss = _ilCalcAllSeries(candles, closes);
+    const _testParams = _anReadTestParams();
+    const ss = _ilCalcCustomSeries(candles, closes, _testParams);
     // Режимные маски
     const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
     const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
@@ -13321,7 +13483,7 @@ async function ilRunAnalysis() {
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
     const barMinutes = {CANDLE_INTERVAL_1_MIN:1,CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60}[tfConst]||5;
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,interval,barMinutes};
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,interval,barMinutes,testParams:_testParams};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
@@ -13485,7 +13647,7 @@ function ilRenderAnalysis() {
       const a5=r.stats[id].h5Alt, a10=r.stats[id].h10Alt, a15=r.stats[id].h15Alt, a30=r.stats[id].h30Alt;
       const a15T=r.stats[id].h15AltT, a15R=r.stats[id].h15AltR, a15HV=r.stats[id].h15AltHV, a15LV=r.stats[id].h15AltLV;
       html+=`<tr style="border-top:1px solid #180f28;">
-        <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}</td>
+        <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:#7868a8;font-size:9px;font-family:var(--mono);">${r.testParams?_anParamSuffix(id,r.testParams):''}</span></td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s5)}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s10)}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s15)}</td>
