@@ -1128,6 +1128,11 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
           <div class="cpnl-hdr"><span class="cpnl-lbl">OBV</span><span class="cpnl-val" id="chart-obv-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="obv" title="Скрыть">◉</span><span class="cpnl-del" data-id="obv" title="Убрать">✕</span></div>
           <canvas id="chart-obv-canvas" style="width:100%;height:70px;display:block;"></canvas>
         </div>
+        <!-- Volume bars panel -->
+        <div id="chart-volbars-panel" class="chart-ind-panel" style="display:none;height:72px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Объём</span><span class="cpnl-val" id="chart-volbars-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="volbars" title="Скрыть">◉</span><span class="cpnl-del" data-id="volbars" title="Убрать">✕</span></div>
+          <canvas id="chart-volbars-canvas" style="width:100%;height:72px;display:block;"></canvas>
+        </div>
         <!-- ── NEW INDICATOR PANELS ── -->
         
         <div id="chart-bb_pct-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
@@ -1722,6 +1727,11 @@ const IND_GROUPS = [
   {
     id: 'volume', label: 'Объём',
     items: [
+      { id:'volbars', name:'Объём (столбцы)', full:'Volume Bars — гистограмма объёма',
+        desc:'Объём каждой свечи в виде столбцов. Зелёный — бычья свеча, красный — медвежья. Фиолетовая линия — MA(20) объёма.',
+        params:[],
+        interpret: () => ({s:'neutral',t:'Столбцы объёма — посмотри на аномальные всплески и их контекст.'})
+      },
       { id:'obv',   name:'OBV', full:'On Balance Volume',
         desc:'Накопительный объём. Дивергенция с ценой — опережающий сигнал разворота.',
         params:[
@@ -5753,7 +5763,16 @@ async function chartLoad() {
 
   const tf = document.getElementById('chart-tf')?.value || 'CANDLE_INTERVAL_DAY';
   chartStatus('Загрузка…', 'var(--text3)');
-  document.getElementById('chart-load-btn').textContent = '⏳ Загрузка…';
+  document.getElementById('chart-load-btn').textContent = '◆ ◇ ◇ Загрузка…';
+  let _loadDotI = 0;
+  const _loadAnim = setInterval(() => {
+    const frames = ['◆ ◇ ◇','◇ ◆ ◇','◇ ◇ ◆'];
+    const btn = document.getElementById('chart-load-btn');
+    if (btn) btn.textContent = frames[_loadDotI % 3] + ' Загрузка…';
+    _loadDotI++;
+  }, 300);
+  // Сохраняем handle чтобы остановить после загрузки
+  window._chartLoadAnimHandle = _loadAnim;
 
   try {
     // Resolve ticker → FIGI if not already a FIGI
@@ -5898,6 +5917,7 @@ async function chartLoad() {
 
     console.error('Chart load error:', err);
   } finally {
+    clearInterval(window._chartLoadAnimHandle);
     document.getElementById('chart-load-btn').textContent = 'Загрузить график →';
   }
 }
@@ -5946,7 +5966,8 @@ function chartRedraw() {
   if (chartInds.wr)    _chartDrawWR();
   if (chartInds.ao)    _chartDrawAO();
   if (chartInds.mfi)   _chartDrawMFI();
-  if (chartInds.obv)   _chartDrawOBV();
+  if (chartInds.obv)     _chartDrawOBV();
+  if (chartInds.volbars) _chartDrawVolBars();
   // Fractals overlay on main chart
   if (chartInds.fractals) _chartDrawFractals();
   // VWAP overlay on main chart
@@ -7532,6 +7553,73 @@ function _chartDrawOBV() {
   const lv=obv[n-1], pv=obv[Math.max(0,n-6)];
   const s=lv>pv*1.02?'buy':lv<pv*0.98?'sell':'neutral';
   const el=document.getElementById('chart-obv-badge'); if(el)setPill('chart-obv-badge',s);
+}
+
+// ── Volume Bars — отдельная панель под основным графиком ──
+function _chartDrawVolBars() {
+  const canvas = document.getElementById('chart-volbars-canvas');
+  if (!canvas || !chartCandles.length) return;
+  const dpr = devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  ctx.clearRect(0, 0, W, H);
+
+  const candles = chartCandles;
+  const maxVis  = Math.min(candles.length, Math.floor(W / chartCandleW));
+  const endIdx  = Math.max(maxVis, candles.length - chartOffset);
+  const startIdx = Math.max(0, endIdx - maxVis);
+  const vis = candles.slice(startIdx, endIdx);
+  if (!vis.length) return;
+
+  const n = vis.length;
+  const cw = Math.max(2, W / n - 1);
+  const xOf = i => (i + 0.5) * (W / n);
+  const maxVol = Math.max(...vis.map(c => c.vol || 0), 1);
+  // Скользящая средняя объёма (20 баров) для ориентира
+  const maLen = 20;
+  const volSeries = vis.map(c => c.vol || 0);
+  const volMa = volSeries.map((_, i) => {
+    if (i < maLen - 1) return null;
+    return volSeries.slice(i - maLen + 1, i + 1).reduce((a, b) => a + b, 0) / maLen;
+  });
+
+  // Фоновые линии сетки
+  ctx.strokeStyle = 'rgba(42,31,61,0.5)'; ctx.lineWidth = 1;
+  [0.33, 0.66, 1].forEach(f => {
+    const y = H * 0.05 + H * 0.88 * (1 - f);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  });
+
+  // Столбцы
+  vis.forEach((c, i) => {
+    const vol = c.vol || 0;
+    const bh = (vol / maxVol) * H * 0.88;
+    const x  = xOf(i);
+    const bull = c.close >= c.open;
+    ctx.fillStyle = bull ? 'rgba(82,242,201,0.55)' : 'rgba(255,77,122,0.55)';
+    ctx.fillRect(x - cw / 2, H * 0.07 + H * 0.88 - bh, Math.max(1, cw), bh);
+  });
+
+  // MA объёма
+  ctx.beginPath(); ctx.strokeStyle = 'rgba(180,135,248,0.7)'; ctx.lineWidth = 1.2;
+  let started = false;
+  volMa.forEach((v, i) => {
+    if (v == null) return;
+    const x = xOf(i), y = H * 0.07 + H * 0.88 - (v / maxVol) * H * 0.88;
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Текущий объём в заголовке
+  const last = vis[vis.length - 1];
+  const valEl = document.getElementById('chart-volbars-val');
+  if (valEl && last) {
+    const v = last.vol || 0;
+    const fmt = v >= 1e9 ? (v/1e9).toFixed(2)+'B' : v >= 1e6 ? (v/1e6).toFixed(2)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : String(v);
+    valEl.textContent = fmt;
+  }
 }
 
 // ── Fractals (Williams) — triangles on main chart ─────────
@@ -10792,7 +10880,7 @@ function cpChartToggle(id) {
   const panels = {
     rsi:'chart-rsi-panel', macd:'chart-macd-panel', stoch:'chart-stoch-panel',
     cci:'chart-cci-panel', adx:'chart-adx-panel', wr:'chart-wr-panel', ao:'chart-ao-panel',
-    mfi:'chart-mfi-panel', obv:'chart-obv-panel',
+    mfi:'chart-mfi-panel', obv:'chart-obv-panel', volbars:'chart-volbars-panel',
     bb_pct:'chart-bb_pct-panel', bb_width:'chart-bb_width-panel',
     chaikin_osc:'chart-chaikin_osc-panel', adline:'chart-adline-panel',
     cmf:'chart-cmf-panel', chaikin_vol:'chart-chaikin_vol-panel',
