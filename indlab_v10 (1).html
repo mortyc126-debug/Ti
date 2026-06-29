@@ -10291,15 +10291,17 @@ function cpInitIndPanel() {
         </div>
         <div id="cpdetail-${ind.id}" style="display:none;padding:6px 8px 8px 20px;background:rgba(255,255,255,0.02);border-radius:0 0 7px 7px;border:1px solid rgba(255,255,255,0.05);border-top:none;margin-top:-2px;">
           <div style="font-size:9px;color:#6F648F;line-height:1.5;margin-bottom:6px;">${ind.desc||''}</div>
+          ${(ind.params||[]).length ? `<div style="font-size:8px;color:#5a5080;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;">Параметры</div>` : ''}
           ${(ind.params||[]).map(p => `
-          <div style="margin-bottom:6px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+          <div style="margin-bottom:7px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
               <span style="font-size:9px;color:var(--text3);font-family:var(--mono);">${p.label}</span>
               <input type="number" id="cpval-${ind.id}-${p.id}"
                 value="${p.def}" min="${p.min}" max="${p.max}" step="${p.step||1}"
                 oninput="cpUpdateInd('${ind.id}')"
-                style="width:60px;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:4px;
-                  padding:2px 5px;color:var(--text);font-family:var(--mono);font-size:10px;outline:none;text-align:right;">
+                style="width:70px;background:#1A1030;border:1px solid rgba(180,135,248,0.2);border-radius:4px;
+                  padding:3px 6px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;text-align:right;
+                  transition:border-color .15s;" onfocus="this.style.borderColor='rgba(180,135,248,0.6)'" onblur="this.style.borderColor='rgba(180,135,248,0.2)'">
             </div>
             <input type="range" id="cpslider-${ind.id}-${p.id}"
               min="${p.min}" max="${p.max}" step="${p.step||1}" value="${p.def}"
