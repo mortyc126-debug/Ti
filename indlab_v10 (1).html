@@ -14772,6 +14772,24 @@ function _renderAnalysisInner(panel) {
       {name:'Стандартная (0.4 ≤ H ≤ 0.6)', color:'#9090B8', desc:'Показатель близок к 0.5 — волатильность ведёт себя близко к классическому броуновскому движению.'},
       {name:'Персистентная (H > 0.6)', color:'#52F2C9', desc:'Показатель выше 0.6 — волатильность демонстрирует трендовое, персистентное поведение (редко на практике, но возможно в спокойных режимах).'},
     ],
+    roc: [
+      {name:'ROC / Скорость цены', color:'#52F2C9', desc:'(Close − Close[10]) / Close[10] × 100. Процентное изменение цены за последние 10 баров.\n► Нулевой лаг — мгновенно реагирует на изменение импульса. Пересечение нуля сверху вниз = потеря восходящего импульса. Экстремумы ROC часто совпадают с разворотными точками. Работает лучше всего вместе с объёмом: ROC вверх + объём выше нормы = подтверждённый импульс.'},
+    ],
+    momentum: [
+      {name:'Momentum / Импульс', color:'#52F2C9', desc:'Close − Close[10]. Абсолютное изменение цены за 10 баров.\n► Показывает «скорость» в единицах цены, а не процентах — удобно сравнивать с историческими уровнями этого же инструмента. Пересечение нуля = смена импульса. Дивергенция с ценой (новый максимум цены при более низком Momentum) = сигнал ослабления тренда.'},
+    ],
+    volspike: [
+      {name:'Volume Spike / Аномалия объёма', color:'#B487F8', desc:'Текущий объём / MA(объём, 20). Измеряет кратность отклонения объёма от 20-периодной средней.\n► ×1–×2 = обычная активность (серый). ×2–×4 = повышенная (тёмно-фиолетовый). ×4+ = аномальный всплеск (оранжевый). Аномальный объём без движения цены = накопление/распределение. Аномальный объём + резкое движение = институциональная активность.'},
+    ],
+    vwap_pct: [
+      {name:'VWAP % / Отклонение от VWAP', color:'#FFD166', desc:'(Close − VWAP) / VWAP × 100. Насколько цена отклонилась от средневзвешенной по объёму цены за сессию.\n► VWAP — ориентир крупных участников. Цена выше VWAP = инициатива у покупателей, ниже = у продавцов. Значительное отклонение (>1–2%) часто притягивает возврат к VWAP. Особенно актуален в первые часы торговой сессии.'},
+    ],
+    fast_combo: [
+      {name:'◆ Быстрый сигнал (комбо)', color:'#52F2C9', desc:'Голосование трёх быстрых индикаторов: ROC + Volume Spike + VWAP%. Каждый даёт голос за лонг (+1), шорт (−1) или нейтраль (0).\n► +3 / −3 = единогласный сигнал (сильный). ±2 = большинство согласно (умеренный). ±1 = слабый, противоречивый. Преимущество перед классическими осцилляторами: минимальный лаг, работает на волатильных инструментах где EMA-сигналы запаздывают.'},
+    ],
+    volbars: [
+      {name:'Объём (столбцы)', color:'#52F2C9', desc:'Гистограмма объёма по барам. Зелёные столбцы — бар закрылся выше открытия, красные — ниже. Фиолетовая линия — MA(20) объёма.\n► Резкое превышение MA(20) = аномальная активность. Сравнивай объём с движением цены: рост на низком объёме = слабый сигнал, пробой на высоком = сильный. Убывающий объём при тренде = ослабление движения.'},
+    ],
   };
 
   // localStorage-хранилище пользовательских цветов (перезапись)
@@ -18885,6 +18903,133 @@ function _renderAnalysisInner(panel) {
         const classicItems = Hrv!=null ? [{type:'neutral', text:`Классическая трактовка: H(vol)=${Hrv.toFixed(2)} — в стандартных моделях (GBM) ожидается H≈0.5; значения ниже указывают на более резкую, скачкообразную динамику волатильности, чем предполагает классическая модель`}] : [{type:'neutral', text:`Недостаточно данных`}];
         html += makeCard('Rough Volatility', items, 'rough', classicItems, 'rough');
       }
+    } else if (idL === 'roc') {
+      const n = candles.length;
+      const period = 10;
+      const items = [];
+      if (n > period + 2) {
+        const rocArr = closes.map((c,i) => i < period ? null : (c - closes[i-period]) / closes[i-period] * 100);
+        const last = rocArr[n-1];
+        const prev = rocArr[n-2];
+        const avg = rocArr.slice(-20).filter(v=>v!=null).reduce((a,b)=>a+b,0) / Math.min(20, n-period);
+        const cross = (prev <= 0 && last > 0) ? 'up' : (prev >= 0 && last < 0) ? 'down' : null;
+        items.push({type: last > 0.5 ? 'bullish' : last < -0.5 ? 'bearish' : 'neutral', text: `ROC(${period}) = ${last > 0 ? '+' : ''}${last.toFixed(2)}% — ${Math.abs(last) < 0.3 ? 'импульс иссякает, цена почти на месте' : last > 0 ? 'восходящий импульс, цена ускоряется вверх' : 'нисходящий импульс, цена ускоряется вниз'}`});
+        if (cross === 'up') items.push({type:'bullish', text:`ROC пересёк ноль снизу вверх — смена импульса на бычий, потенциальный разворот`});
+        if (cross === 'down') items.push({type:'bearish', text:`ROC пересёк ноль сверху вниз — потеря восходящего импульса, потенциальный разворот`});
+        if (Math.abs(last) > Math.abs(avg) * 2.5) items.push({type:'neutral', text:`Текущий ROC (${last.toFixed(2)}%) в 2.5× выше среднего за 20 баров (${avg.toFixed(2)}%) — аномальный импульс, возможен откат/разворот`});
+        items.push({type:'neutral', text:`Неклассически: ROC без лага — используй для ранней засечки слома тренда до того, как MACD или EMA подтвердят сигнал`});
+      } else items.push({type:'neutral', text:`Мало данных для ROC(${period})`});
+      const classicItems = [{type:'neutral', text:`Классическая трактовка: ROC > 0 = бычий контекст, ROC < 0 = медвежий. Пересечение нуля — торговый сигнал`}];
+      html += makeCard('ROC / Скорость цены', items, 'roc', classicItems, 'roc');
+    } else if (idL === 'momentum') {
+      const n = candles.length;
+      const period = 10;
+      const items = [];
+      if (n > period + 2) {
+        const momArr = closes.map((c,i) => i < period ? null : c - closes[i-period]);
+        const last = momArr[n-1];
+        const prev = momArr[n-2];
+        const cross = (prev <= 0 && last > 0) ? 'up' : (prev >= 0 && last < 0) ? 'down' : null;
+        const avgAbs = momArr.slice(-20).filter(v=>v!=null).reduce((a,b)=>a+Math.abs(b),0) / Math.min(20, n-period);
+        items.push({type: last > 0 ? 'bullish' : last < 0 ? 'bearish' : 'neutral', text: `Momentum(${period}) = ${last > 0 ? '+' : ''}${last.toFixed(2)} — цена ${Math.abs(last) < avgAbs * 0.15 ? 'стагнирует (сила равна нулю)' : last > 0 ? 'за 10 баров выросла' : 'за 10 баров снизилась'}`});
+        if (cross === 'up') items.push({type:'bullish', text:`Momentum пересёк ноль снизу — смена импульса, медвежья сила сошла на нет`});
+        if (cross === 'down') items.push({type:'bearish', text:`Momentum пересёк ноль сверху — бычья сила иссякла, движение замедляется`});
+        const last3 = [momArr[n-3], momArr[n-2], last].filter(v=>v!=null);
+        if (last3.length === 3 && last3[0] > last3[1] && last3[1] > last3[2] && last3[2] > 0) items.push({type:'neutral', text:`Дивергенция: Momentum убывает 3 бара подряд, хотя ещё положительный — ослабление бычьего давления`});
+        if (last3.length === 3 && last3[0] < last3[1] && last3[1] < last3[2] && last3[2] < 0) items.push({type:'neutral', text:`Дивергенция: Momentum нарастает 3 бара подряд со дна — ослабление медвежьего давления`});
+        items.push({type:'neutral', text:`Неклассически: Momentum в отличие от ROC — абсолютный, а не процентный; удобен для сравнения силы движений в рублях/пунктах`});
+      } else items.push({type:'neutral', text:`Мало данных для Momentum(${period})`});
+      const classicItems = [{type:'neutral', text:`Классическая трактовка: пересечение нуля как сигнал смены тренда; дивергенция Momentum ↓ при новом максимуме цены = медвежий сигнал`}];
+      html += makeCard('Momentum / Импульс', items, 'momentum', classicItems, 'momentum');
+    } else if (idL === 'volspike') {
+      const n = candles.length;
+      const maPeriod = 20;
+      const items = [];
+      if (n > maPeriod + 2) {
+        const vols = candles.map(c => c.v || 0);
+        const maVol = vols.map((v,i) => { if (i < maPeriod-1) return null; let s=0; for(let j=0;j<maPeriod;j++) s+=vols[i-j]; return s/maPeriod; });
+        const ratio = n > maPeriod ? vols[n-1] / (maVol[n-1] || 1) : null;
+        if (ratio != null) {
+          const label = ratio > 4 ? 'аномальный всплеск (×'+ratio.toFixed(1)+')' : ratio > 2 ? 'повышенная активность (×'+ratio.toFixed(1)+')' : ratio > 1.2 ? 'чуть выше нормы (×'+ratio.toFixed(1)+')' : 'нормальный объём (×'+ratio.toFixed(1)+')';
+          const type = ratio > 4 ? 'bearish' : ratio > 2 ? 'neutral' : 'neutral';
+          items.push({type, text:`Volume Spike = ${label} относительно MA(${maPeriod})`});
+          const priceMove = n >= 2 ? (closes[n-1] - closes[n-2]) / closes[n-2] * 100 : 0;
+          if (ratio > 3 && Math.abs(priceMove) < 0.3) items.push({type:'neutral', text:`Аномальный объём при малом движении цены (${priceMove.toFixed(2)}%) — возможное накопление/распределение крупным участником`});
+          else if (ratio > 3 && Math.abs(priceMove) > 1) items.push({type: priceMove > 0 ? 'bullish' : 'bearish', text:`Аномальный объём + сильное движение цены (${priceMove > 0 ? '+' : ''}${priceMove.toFixed(2)}%) — институциональная активность, подтверждённый импульс`});
+        }
+        const spikes = vols.slice(maPeriod).filter((v,i) => maVol[i+maPeriod] && v / maVol[i+maPeriod] > 3).length;
+        const pct = (spikes / (n - maPeriod) * 100).toFixed(1);
+        items.push({type:'neutral', text:`Аномальных всплесков (×3+) за историю: ${spikes} из ${n-maPeriod} баров (${pct}%) — базовая частота для оценки редкости текущего события`});
+        items.push({type:'neutral', text:`Неклассически: высокий объём без движения ≠ нейтральность — это чаще поглощение стакана маркетмейкером или накопление позиции`});
+      } else items.push({type:'neutral', text:`Мало данных для Volume Spike (нужно >${maPeriod} баров)`});
+      const classicItems = [{type:'neutral', text:`Классическая трактовка: объём подтверждает тренд — рост цены при росте объёма = сильный сигнал; рост цены при падении объёма = слабый сигнал`}];
+      html += makeCard('Volume Spike / Аномалия объёма', items, 'volspike', classicItems, 'volspike');
+    } else if (idL === 'vwap_pct') {
+      const n = candles.length;
+      const items = [];
+      if (n >= 5) {
+        let cumPV = 0, cumV = 0;
+        for (let i = 0; i < n; i++) { const tp = (candles[i].h + candles[i].l + candles[i].c) / 3; const v = candles[i].v || 0; cumPV += tp * v; cumV += v; }
+        const vwap = cumV > 0 ? cumPV / cumV : closes[n-1];
+        const pct = (closes[n-1] - vwap) / vwap * 100;
+        items.push({type: pct > 1 ? 'bullish' : pct < -1 ? 'bearish' : 'neutral', text: `Цена ${pct > 0 ? '+' : ''}${pct.toFixed(2)}% от VWAP (${vwap.toFixed(2)}) — ${Math.abs(pct) < 0.5 ? 'цена у VWAP, баланс покупателей и продавцов' : pct > 0 ? 'цена выше VWAP, инициатива у покупателей' : 'цена ниже VWAP, инициатива у продавцов'}`});
+        if (Math.abs(pct) > 2) items.push({type: pct > 0 ? 'neutral' : 'neutral', text: `Значительное отклонение (${pct.toFixed(2)}%) — часто притягивает возврат к VWAP, при слабом импульсе ожидай реверсию`});
+        items.push({type:'neutral', text:`Неклассически: VWAP — реальная цена исполнения институционалов; отклонение > 1.5-2% создаёт давление возврата, особенно при снижении объёма`});
+      } else items.push({type:'neutral', text:'Мало данных для VWAP'});
+      const classicItems = [{type:'neutral', text:`Классическая трактовка: цена выше VWAP = бычий контекст, ниже = медвежий. VWAP как уровень поддержки/сопротивления для дневного трейдинга`}];
+      html += makeCard('VWAP % / Отклонение', items, 'vwap_pct', classicItems, 'vwap_pct');
+    } else if (idL === 'fast_combo') {
+      const n = candles.length;
+      const items = [];
+      if (n >= 21) {
+        const period = 10, maPeriod = 20;
+        // ROC
+        const roc = n > period ? (closes[n-1] - closes[n-1-period]) / closes[n-1-period] * 100 : null;
+        const rocVote = roc == null ? 0 : roc > 0.3 ? 1 : roc < -0.3 ? -1 : 0;
+        // Volume Spike
+        const vols = candles.map(c => c.v || 0);
+        let sumV = 0; for (let i = n - maPeriod; i < n - 1; i++) sumV += vols[i];
+        const maV = sumV / (maPeriod - 1);
+        const vsRatio = maV > 0 ? vols[n-1] / maV : 1;
+        const priceDir = closes[n-1] > closes[n-2] ? 1 : closes[n-1] < closes[n-2] ? -1 : 0;
+        const vsVote = vsRatio > 1.5 ? priceDir : 0;
+        // VWAP%
+        let cumPV = 0, cumV = 0;
+        for (let i = 0; i < n; i++) { const tp = (candles[i].h + candles[i].l + candles[i].c) / 3; cumPV += tp * (candles[i].v || 0); cumV += candles[i].v || 0; }
+        const vwap = cumV > 0 ? cumPV / cumV : closes[n-1];
+        const vwapPct = (closes[n-1] - vwap) / vwap * 100;
+        const vwapVote = vwapPct > 0.5 ? 1 : vwapPct < -0.5 ? -1 : 0;
+        const total = rocVote + vsVote + vwapVote;
+        const strength = Math.abs(total) === 3 ? 'единогласный' : Math.abs(total) === 2 ? 'большинство' : 'слабый / противоречивый';
+        const dir = total > 0 ? 'бычий' : total < 0 ? 'медвежий' : 'нейтральный';
+        items.push({type: total >= 2 ? 'bullish' : total <= -2 ? 'bearish' : 'neutral', text: `Быстрый комбо: ${total > 0 ? '+' : ''}${total} из 3 голосов — ${strength} ${dir} сигнал`});
+        items.push({type:'neutral', text:`Голоса: ROC ${rocVote > 0 ? '▲ лонг' : rocVote < 0 ? '▼ шорт' : '— нейтр'} | Volume Spike ${vsVote > 0 ? '▲ лонг' : vsVote < 0 ? '▼ шорт' : '— нейтр'} | VWAP% ${vwapVote > 0 ? '▲ лонг' : vwapVote < 0 ? '▼ шорт' : '— нейтр'}`});
+        if (Math.abs(total) <= 1) items.push({type:'neutral', text:`Индикаторы противоречат друг другу — воздержись от входа, жди консенсуса`});
+        items.push({type:'neutral', text:`Неклассически: комбо из опережающих индикаторов без лага показывает текущее состояние рынка, а не его прошлое — особенно ценно на волатильных инструментах`});
+      } else items.push({type:'neutral', text:'Мало данных для Быстрого комбо'});
+      const classicItems = [{type:'neutral', text:`Классическая трактовка: голосование 3/3 (или 2/3) — подтверждение сигнала несколькими инструментами снижает ложные срабатывания`}];
+      html += makeCard('◆ Быстрый сигнал (комбо)', items, 'fast_combo', classicItems, 'fast_combo');
+    } else if (idL === 'volbars') {
+      const n = candles.length;
+      const maPeriod = 20;
+      const items = [];
+      if (n >= maPeriod + 2) {
+        const vols = candles.map(c => c.v || 0);
+        const maVol = [];
+        for (let i = maPeriod - 1; i < n; i++) { let s = 0; for (let j = 0; j < maPeriod; j++) s += vols[i-j]; maVol.push(s / maPeriod); }
+        const lastVol = vols[n-1];
+        const lastMa = maVol[maVol.length - 1];
+        const ratio = lastMa > 0 ? lastVol / lastMa : 1;
+        const isBullBar = candles[n-1].c >= candles[n-1].o;
+        items.push({type: ratio > 2 ? (isBullBar ? 'bullish' : 'bearish') : 'neutral', text: `Объём последнего бара: ${lastVol.toLocaleString('ru')} (×${ratio.toFixed(2)} от MA${maPeriod}). Бар ${isBullBar ? 'бычий (зелёный)' : 'медвежий (красный)'}`});
+        const downtrend = maVol.slice(-5).every((v,i,a) => i === 0 || v <= a[i-1]);
+        const uptrend = maVol.slice(-5).every((v,i,a) => i === 0 || v >= a[i-1]);
+        if (downtrend) items.push({type:'neutral', text:`MA(${maPeriod}) объёма убывает 5 баров подряд — активность иссякает, движение цены без объёма теряет доверие`});
+        if (uptrend) items.push({type:'neutral', text:`MA(${maPeriod}) объёма нарастает 5 баров подряд — рост активности участников, усиление интереса к инструменту`});
+        items.push({type:'neutral', text:`Неклассически: объём — единственный непроизводный показатель. Все остальные индикаторы — лишь производные от цены. Объём не врёт`});
+      } else items.push({type:'neutral', text:`Мало данных для анализа объёма (нужно >${maPeriod} баров)`});
+      const classicItems = [{type:'neutral', text:`Классическая трактовка: тренд подтверждается, если движение цены сопровождается ростом объёма; откат при снижении объёма — нормальная пауза в тренде`}];
+      html += makeCard('Объём (столбцы)', items, 'volbars', classicItems, 'volbars');
     } else {
       html += makeCard(id, [{type:'neutral', text:`Индикатор активен`}]);
     }
