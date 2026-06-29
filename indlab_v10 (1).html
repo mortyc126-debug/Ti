@@ -9300,20 +9300,26 @@ function _sysRenderStaticSections() {
           const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[id]) || id;
           const hasAlt = !!_ilAltFamilyOf(id);
           const useAlt = hasAlt && (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(id);
-          // ромб классика — чисто индикатор, не кликабельный
-          const cDiam = '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid rgba(82,242,201,0.6);background:transparent;"></span>';
+          // ромб классика — клик вкл/выкл индикатор на графике
+          const cOn = !!(typeof chartInds !== 'undefined' && chartInds[id]);
+          const cBg = cOn ? 'rgba(82,242,201,0.85)' : 'transparent';
+          const cBorder = cOn ? '#52F2C9' : 'rgba(82,242,201,0.6)';
+          const cGlow = cOn ? '0 0 5px rgba(82,242,201,0.6)' : 'none';
+          const cDiam = '<span onclick="event.stopPropagation();cpChartToggle(\''+id+'\');_sysRenderStaticSections();" title="Вкл/выкл на графике" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:pointer;">'
+            + '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid '+cBorder+';background:'+cBg+';transition:all .15s;box-shadow:'+cGlow+';"></span>'
+            + '</span>';
           // ромб альт — кликабельный если есть альт
           const aColor = hasAlt ? '#B487F8' : '#2a1f3d';
           const aBg = useAlt ? '#B487F8' : 'transparent';
-          const aClick = hasAlt ? 'onclick="ilAggToggleAlt(\''+id+'\')" title="Переключить классика/альт"' : '';
+          const aClick = hasAlt ? 'onclick="event.stopPropagation();ilAggToggleAlt(\''+id+'\');_sysRenderStaticSections();" title="Переключить классика/альт"' : '';
           // обёртка 28px обеспечивает нормальную кликабельную зону
           const aDiam = '<span '+aClick+' style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:'+(hasAlt?'pointer':'default')+';">'
             + '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);border:1.5px solid '+aColor+';background:'+aBg+';transition:all .15s;box-shadow:'+(useAlt?'0 0 5px rgba(180,135,248,0.5)':'none')+';">'
             + '</span></span>';
           return '<div style="display:flex;align-items:center;gap:0;padding:1px 0;">'
-            + '<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:28px;flex-shrink:0;">'+cDiam+'</span>'
+            + cDiam
             + aDiam
-            + '<span style="font-size:10px;color:'+(useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
+            + '<span style="font-size:10px;color:'+(cOn?'#52F2C9':useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
             + '</div>';
         }).join('')
         + '</div>';
