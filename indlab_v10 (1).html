@@ -7029,12 +7029,15 @@ function _chartDrawMain() {
 
   // ── Горизонтальные уровни: ценовые кластеры по частоте касаний ────────────
   if (chartHLevShow && chartCandles.length >= 20) {
-    const _closes2 = chartCandles.map(c=>c.close);
+    const _recentC = chartCandles.slice(-500);
+    const _closes2 = _recentC.map(c=>c.close);
     const _lastClose2 = _closes2[_closes2.length-1];
     const _bSize = _lastClose2 * 0.002;
     const _clusters = {};
-    chartCandles.forEach(c => { [c.high,c.low,c.close].forEach(p=>{ const k=Math.round(p/_bSize); _clusters[k]=(_clusters[k]||0)+1; }); });
-    const _sortedC = Object.entries(_clusters).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    _recentC.forEach(c => { [c.high,c.low,c.close].forEach(p=>{ const k=Math.round(p/_bSize); _clusters[k]=(_clusters[k]||0)+1; }); });
+    const _sortedC = Object.entries(_clusters)
+      .filter(([k]) => Math.abs(k*_bSize - _lastClose2)/_lastClose2 <= 0.40)
+      .sort((a,b)=>b[1]-a[1]).slice(0,5);
     _sortedC.forEach(([key,cnt]) => {
       const price = key*_bSize;
       if (price<lo || price>hi) return;
@@ -10559,8 +10562,9 @@ function _sysRenderTrendLines() {
 function _sysRenderHLevels() {
   const el = document.getElementById('sys-hlevels-text');
   if (!el || !chartCandles || chartCandles.length < 20) return;
-  const candles = chartCandles;
-  // Find price clusters by rounding to 0.1%
+  // Берём только последние 500 свечей, чтобы старые цены не засоряли кластеры
+  const candles = chartCandles.slice(-500);
+  // Find price clusters by rounding to 0.2%
   const closes = candles.map(c=>c.close);
   const lastClose = closes[closes.length-1];
   const bucketSize = lastClose * 0.002; // 0.2% buckets
@@ -10571,7 +10575,10 @@ function _sysRenderHLevels() {
       clusters[key] = (clusters[key]||0) + 1;
     });
   });
-  const sorted = Object.entries(clusters).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  // Фильтруем кластеры: только в пределах ±40% от текущей цены
+  const sorted = Object.entries(clusters)
+    .filter(([key]) => { const p=key*bucketSize; return Math.abs(p-lastClose)/lastClose <= 0.40; })
+    .sort((a,b)=>b[1]-a[1]).slice(0,5);
   let txt = 'Ключевые ценовые кластеры (по частоте касаний):<br>';
   sorted.forEach(([key,cnt]) => {
     const price = key*bucketSize;
