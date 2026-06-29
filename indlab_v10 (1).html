@@ -432,7 +432,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 /* ═══ Full-width pages ═══ */
 #page-chart, #page-guide { padding:0 !important; max-width:none !important; width:100%; }
 .page { max-width:1400px; }
-#page-compare, #page-library, #page-combos { max-width:1400px; }
+#page-compare { max-width:1400px; }
 
 
 /* ── Crosshair tooltip ── */
@@ -556,8 +556,6 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 <!-- NAV -->
 <div class="nav">
   <button class="nav-btn active" onclick="goPage('chart',this)">График</button>
-  <button class="nav-btn" onclick="goPage('library',this)">Библиотека</button>
-  <button class="nav-btn" onclick="goPage('combos',this)">Комбинации</button>
   <button class="nav-btn" onclick="goPage('compare',this)">Сравнение</button>
   <button class="nav-btn" onclick="goPage('guide',this)">Справочник</button>
   <button class="nav-btn" onclick="goPage('analysis',this)">Точность</button>
@@ -773,26 +771,10 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 </div>
 
 <!-- ══ LIBRARY PAGE ══ -->
-<div id="page-library" class="page">
-  <div class="search-wrap-rel">
-    <span class="search-icon-abs">⌕</span>
-    <input class="search-input" id="lib-search" type="text" placeholder="Найти индикатор..." oninput="filterLib(this.value)">
-  </div>
-  <div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:4px;" id="lib-tags"></div>
-  <div id="lib-content"></div>
-</div>
-
 <!-- ══ ICHIMOKU PAGE ══ -->
 <div id="page-ichimoku" class="page"></div>
 
 <!-- ══ COMBOS PAGE ══ -->
-<div id="page-combos" class="page">
-  <div class="hint" style="margin-bottom:14px;">
-    Выбери стратегию — индикаторы настроятся автоматически. Потом скорректируй значения под свою ситуацию.
-  </div>
-  <div id="combos-list"></div>
-</div>
-
 <!-- ══ ANALYSIS PAGE ══ -->
 <div id="page-analysis" class="page">
   <!-- Вкладки -->
@@ -3642,10 +3624,8 @@ function goPage(name, btn) {
   if(btn) btn.classList.add('active');
   if(name==='main')     { setTimeout(()=>{ updateMain(); renderMainSavedList(); }, 50); }
   if(name==='chart')    { setTimeout(()=>{ chartPageInit(); }, 50); }
-  if(name==='library')  { if(!document.getElementById('lib-content').innerHTML) initLibrary(); }
   if(name==='fib')      { renderFib(); }
   if(name==='ichimoku') { setTimeout(()=>ichiDraw(), 60); }
-  if(name==='combos')   { initCombos(); }
   if(name==='compare')  { renderCmpTable(); }
   if(name==='context')  { setCtxMode('q'); renderQuestion('q1'); updateExt(); }
   if(name==='guide')    { setTimeout(()=>{ renderGuide(); }, 50); }
@@ -9143,6 +9123,8 @@ function cpRenderCombos() {
       <div id="cpcombodet-${c.id}" style="display:${isActive ? 'block' : 'none'};padding:0 10px 10px;border-top:1px solid rgba(255,255,255,0.05);">
         <div style="font-size:10px;color:var(--text2);line-height:1.5;margin:8px 0 6px;">${c.desc||c.short||''}</div>
         ${c.why ? `<div style="font-size:9px;color:#52A8E0;line-height:1.4;margin-bottom:7px;padding:4px 7px;background:rgba(82,168,224,0.06);border-radius:5px;border-left:2px solid #52A8E044;">${c.why}</div>` : ''}
+        ${c.question ? `<div style="font-size:9px;color:#FFD166;line-height:1.4;margin-bottom:6px;padding:4px 7px;background:rgba(255,209,102,0.05);border-radius:5px;border-left:2px solid rgba(255,209,102,0.3);">❓ ${c.question}</div>` : ''}
+        ${c.fields?.length ? `<div style="margin-bottom:7px;">${c.fields.map(ff=>`<div style="margin-bottom:6px;"><div style="font-size:9px;color:var(--text2);margin-bottom:2px;">${ff.label}</div><div style="font-size:9px;color:var(--text3);line-height:1.4;">${ff.hint}</div></div>`).join('')}</div>` : ''}
         ${c.inds?.length ? `
         <div style="font-size:9px;color:#6F648F;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">
           Индикаторы <span style="color:#3a3260;font-size:8px;text-transform:none;letter-spacing:0;">◆ классика · <span style="color:#5a4080;">◆ альт</span></span>
@@ -10675,6 +10657,7 @@ function cpInitIndPanel() {
         </div>
         <div id="cpdetail-${ind.id}" style="display:none;padding:6px 8px 8px 20px;background:rgba(255,255,255,0.02);border-radius:0 0 7px 7px;border:1px solid rgba(255,255,255,0.05);border-top:none;margin-top:-2px;">
           <div style="font-size:9px;color:#6F648F;line-height:1.5;margin-bottom:6px;">${ind.desc||''}</div>
+          ${(()=>{const pc=(typeof PROS_CONS!=='undefined')&&PROS_CONS[ind.id];if(!pc)return'';return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;"><div style="background:rgba(96,164,161,0.06);border:1px solid rgba(96,164,161,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#60A4A1;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">+ ПЛЮСЫ</div>${pc.pros.map(p=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${p}</div>`).join('')}</div><div style="background:rgba(199,27,82,0.06);border:1px solid rgba(199,27,82,0.18);border-radius:5px;padding:6px 7px;"><div style="font-size:8px;color:#C71B52;font-family:var(--mono);letter-spacing:0.05em;margin-bottom:3px;">− МИНУСЫ</div>${pc.cons.map(c=>`<div style="font-size:9px;color:var(--text2);padding:1px 0;line-height:1.4;">· ${c}</div>`).join('')}</div></div>`;})()}
           ${(ind.params||[]).length ? `<div style="font-size:8px;color:#5a5080;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:5px;">Параметры</div>` : ''}
           ${(ind.params||[]).map(p => `
           <div style="margin-bottom:7px;">
