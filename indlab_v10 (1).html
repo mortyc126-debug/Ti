@@ -11366,7 +11366,7 @@ function cpInitCanvasEvents() {
     e.preventDefault();
     // Колесо = зум. Drag мышью = скролл по истории.
     chartCandleW = Math.max(4, Math.min(40, chartCandleW + (e.deltaY < 0 ? 1 : -1)));
-    chartRedraw();
+    chartRedrawDeferred();
   }, { passive:false });
   let dx0=null, off0=0;
   // Snap-to-candle measure: {idx, price, xPx, yPx}
@@ -11430,7 +11430,7 @@ function cpInitCanvasEvents() {
     if (dx0===null) return;
     const r = chartCandles.length / Math.max(c.offsetWidth,1);
     chartOffset = Math.max(0, Math.min(chartCandles.length-10, Math.round(off0+(dx0-e.clientX)*r*1.5)));
-    chartRedraw();
+    chartRedrawDeferred();
   });
   window.addEventListener('mouseup', () => {
     if(dx0===null)return; dx0=null; const cc=document.getElementById('chart-main'); if(cc)cc.style.cursor='crosshair';
