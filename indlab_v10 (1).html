@@ -13453,6 +13453,10 @@ async function ilRunAnalysis() {
     const chopArrAlt = ilCalcChop(candles,14);
     const ssAlt = {};
     IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(id, ss, closes, candles, chopArrAlt); });
+    // Считаем дефолтные серии для сравнения, если параметры отличаются от дефолта
+    const _D = {rsi:14,wr:14,cci:20,mfi:14,stk:14,std:3,mf:12,ms:26,msig:9,bbp:20,bbs:2,ef:12,es:26,adx:14,stp:10,stm:3,elder:13,tsil:25,tsis:13};
+    const _paramsChanged = Object.keys(_D).some(k => _testParams[k] !== _D[k]);
+    const ssDefault = _paramsChanged ? _ilCalcAllSeries(candles, closes) : null;
     const stats = {};
     IL_INDICATORS.forEach(id=>{
       stats[id]={};
@@ -13469,6 +13473,15 @@ async function ilRunAnalysis() {
           stats[id].h15AltHV = _ilBtStats(ssAlt[id],closes,h,highVolMask);
           stats[id].h15AltLV = _ilBtStats(ssAlt[id],closes,h,lowVolMask);
         }
+        if (ssDefault) {
+          stats[id][`h${h}Def`] = _ilBtStats(ssDefault[id],closes,h,null);
+          if (h===15) {
+            stats[id].h15DefT  = _ilBtStats(ssDefault[id],closes,h,trendMask);
+            stats[id].h15DefR  = _ilBtStats(ssDefault[id],closes,h,rangeMask);
+            stats[id].h15DefHV = _ilBtStats(ssDefault[id],closes,h,highVolMask);
+            stats[id].h15DefLV = _ilBtStats(ssDefault[id],closes,h,lowVolMask);
+          }
+        }
       });
     });
     // Корреляционная матрица и кластеры
@@ -13483,7 +13496,7 @@ async function ilRunAnalysis() {
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
     const barMinutes = {CANDLE_INTERVAL_1_MIN:1,CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60}[tfConst]||5;
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,interval,barMinutes,testParams:_testParams};
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,ssDefault,interval,barMinutes,testParams:_testParams,paramsChanged:_paramsChanged};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
@@ -13646,8 +13659,14 @@ function ilRenderAnalysis() {
       const s15T=r.stats[id].h15T, s15R=r.stats[id].h15R, s15HV=r.stats[id].h15HV, s15LV=r.stats[id].h15LV;
       const a5=r.stats[id].h5Alt, a10=r.stats[id].h10Alt, a15=r.stats[id].h15Alt, a30=r.stats[id].h30Alt;
       const a15T=r.stats[id].h15AltT, a15R=r.stats[id].h15AltR, a15HV=r.stats[id].h15AltHV, a15LV=r.stats[id].h15AltLV;
+      const hasDef = r.paramsChanged && r.stats[id].h5Def != null;
+      const d5=r.stats[id].h5Def, d10=r.stats[id].h10Def, d15=r.stats[id].h15Def, d30=r.stats[id].h30Def;
+      const d15T=r.stats[id].h15DefT, d15R=r.stats[id].h15DefR, d15HV=r.stats[id].h15DefHV, d15LV=r.stats[id].h15DefLV;
+      const suffix = r.testParams ? _anParamSuffix(id, r.testParams) : '';
+      const nameLbl = `${IL_NAMES[id]||id}<span style="color:#7868a8;font-size:9px;font-family:var(--mono);">${suffix}</span>`;
+      const classicLbl = suffix ? `↳ классика` : `↳ альт-сигнал`;
       html+=`<tr style="border-top:1px solid #180f28;">
-        <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:#7868a8;font-size:9px;font-family:var(--mono);">${r.testParams?_anParamSuffix(id,r.testParams):''}</span></td>
+        <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${nameLbl}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s5)}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s10)}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${acc(s15)}</td>
@@ -13657,6 +13676,17 @@ function ilRenderAnalysis() {
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${regAcc(s15HV)}</td>
         <td style="text-align:center;padding:5px 8px;vertical-align:middle;">${regAcc(s15LV)}</td>
       </tr>
+      ${hasDef ? `<tr style="border-top:1px dashed #180f28;">
+        <td style="padding:3px 8px 2px 18px;color:#52a890;font-style:italic;vertical-align:middle;font-size:10px;">↳ классика</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d5)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d10)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d15)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d30)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(d15T)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15R)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15HV)}</td>
+        <td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15LV)}</td>
+      </tr>` : ''}
       <tr style="border-top:1px dashed #180f28;">
         <td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;vertical-align:middle;font-size:10px;">↳ альт-сигнал</td>
         <td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td>
@@ -13685,7 +13715,12 @@ function ilRenderAnalysis() {
       const s15T=r.stats[id].h15T,s15R=r.stats[id].h15R,s15HV=r.stats[id].h15HV,s15LV=r.stats[id].h15LV;
       const a5=r.stats[id].h5Alt,a10=r.stats[id].h10Alt,a15=r.stats[id].h15Alt,a30=r.stats[id].h30Alt;
       const a15T=r.stats[id].h15AltT,a15R=r.stats[id].h15AltR,a15HV=r.stats[id].h15AltHV,a15LV=r.stats[id].h15AltLV;
-      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
+      const hasDef2=r.paramsChanged&&r.stats[id].h5Def!=null;
+      const d5b=r.stats[id].h5Def,d10b=r.stats[id].h10Def,d15b=r.stats[id].h15Def,d30b=r.stats[id].h30Def;
+      const d15Tb=r.stats[id].h15DefT,d15Rb=r.stats[id].h15DefR,d15HVb=r.stats[id].h15DefHV,d15LVb=r.stats[id].h15DefLV;
+      const sfx2=r.testParams?_anParamSuffix(id,r.testParams):'';
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:#7868a8;font-size:9px;">${sfx2}</span></td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
+      ${hasDef2?`<tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 2px 18px;color:#52a890;font-style:italic;font-size:10px;vertical-align:middle;">↳ классика</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d5b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d10b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d15b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d30b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(d15Tb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15Rb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15HVb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15LVb)}</td></tr>`:''}
       <tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;font-size:10px;vertical-align:middle;">↳ альт-сигнал</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a10)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a15)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a30)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAccAlt(a15T)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15R)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15HV)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15LV)}</td></tr>`;
     });
     html+=`</table></div>`;
