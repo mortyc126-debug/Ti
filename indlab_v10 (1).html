@@ -10414,12 +10414,14 @@ function cpInitIndPanel() {
   ]);
 
   let html = '';
+  const favs = cpGetFavs(); // читаем localStorage один раз, не на каждую строку
   for (const g of IND_GROUPS) {
     html += `<div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;
       text-transform:uppercase;padding:10px 4px 3px;border-top:1px solid rgba(255,255,255,0.04);
       margin-top:2px;">${g.label}</div>`;
     for (const ind of g.items) {
       const isChart = CHART_INDS.has(ind.id);
+      const isFav = favs.includes(ind.id);
       const on = isChart && !!chartInds[ind.id];
       // Init default values
       if (!cpIndVals[ind.id]) {
@@ -10445,7 +10447,7 @@ function cpInitIndPanel() {
             class="cp-ind-alt-diamond-btn" style="display:none;"></div>
           <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
-          <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${cpGetFavs().includes(ind.id)?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${cpGetFavs().includes(ind.id)?'#FFD700':'#6F648F'};">★</span>
+          <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${isFav?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${isFav?'#FFD700':'#6F648F'};">★</span>
           <span class="cp-ind-eye" data-indid="${ind.id}" title="Скрыть / показать" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">◉</span>
           <span class="cp-ind-del" data-indid="${ind.id}" title="Убрать с графика" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">✕</span>
           <span id="cparrow-${ind.id}" style="font-size:10px;color:#6F648F;pointer-events:none;">›</span>
@@ -10775,15 +10777,30 @@ function cpToggleIndDetail(id) {
   // Fix: use id-based arrow element instead of broken :last-child selector
   const arrow = document.getElementById('cparrow-' + id);
   if (arrow) arrow.textContent = open ? '›' : '‹';
-  // Scroll detail into view when opening
+  // Scroll detail into view when opening (instant — smooth вызывал второй reflow одновременно с раскрытием)
   if (!open) {
-    setTimeout(() => { det.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 30);
+    setTimeout(() => { det.scrollIntoView({ block: 'nearest', behavior: 'instant' }); }, 30);
   }
 }
 
-// Update indicator interpret when slider changes
+// Кэш id→индикатор, чтобы не гонять flatMap по всем группам на каждое движение слайдера
+let _indByIdCache = null;
+function _getIndById(id) {
+  if (!_indByIdCache) {
+    _indByIdCache = {};
+    IND_GROUPS.forEach(g => g.items.forEach(i => { _indByIdCache[i.id] = i; }));
+  }
+  return _indByIdCache[id];
+}
+
+// Update indicator interpret when slider changes (дебаунс — слайдер шлёт oninput на каждый пиксель)
+const _cpUpdateIndTimers = {};
 function cpUpdateInd(id) {
-  const ind = IND_GROUPS.flatMap(g=>g.items).find(i=>i.id===id);
+  clearTimeout(_cpUpdateIndTimers[id]);
+  _cpUpdateIndTimers[id] = setTimeout(() => _cpUpdateIndNow(id), 60);
+}
+function _cpUpdateIndNow(id) {
+  const ind = _getIndById(id);
   if (!ind) return;
   // Read current param values
   const vals = {};
