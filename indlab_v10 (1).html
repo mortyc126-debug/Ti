@@ -9287,21 +9287,21 @@ function _sysRenderStaticSections() {
           const cBg = cOn ? 'rgba(82,242,201,0.85)' : 'transparent';
           const cBorder = cOn ? '#52F2C9' : 'rgba(82,242,201,0.6)';
           const cGlow = cOn ? '0 0 5px rgba(82,242,201,0.6)' : 'none';
-          const cDiam = '<span onclick="event.stopPropagation();cpChartToggle(\''+id+'\');_sysRenderStaticSections();" title="Вкл/выкл на графике" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:pointer;">'
-            + '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid '+cBorder+';background:'+cBg+';transition:all .15s;box-shadow:'+cGlow+';"></span>'
+          const cDiam = '<span onclick="event.stopPropagation();cpChartToggle(\''+id+'\');_sysUpdateDiam(\''+id+'\')" title="Вкл/выкл на графике" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:pointer;">'
+            + '<span id="sysdiam-c-'+id+'" style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid '+cBorder+';background:'+cBg+';transition:all .15s;box-shadow:'+cGlow+';"></span>'
             + '</span>';
           // ромб альт — кликабельный если есть альт
           const aColor = hasAlt ? '#B487F8' : '#2a1f3d';
           const aBg = useAlt ? '#B487F8' : 'transparent';
-          const aClick = hasAlt ? 'onclick="event.stopPropagation();ilAggToggleAlt(\''+id+'\');_sysRenderStaticSections();" title="Переключить классика/альт"' : '';
+          const aClick = hasAlt ? 'onclick="event.stopPropagation();ilAggToggleAlt(\''+id+'\');_sysUpdateDiam(\''+id+'\')" title="Переключить классика/альт"' : '';
           // обёртка 28px обеспечивает нормальную кликабельную зону
           const aDiam = '<span '+aClick+' style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:'+(hasAlt?'pointer':'default')+';">'
-            + '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);border:1.5px solid '+aColor+';background:'+aBg+';transition:all .15s;box-shadow:'+(useAlt?'0 0 5px rgba(180,135,248,0.5)':'none')+';">'
+            + '<span id="sysdiam-a-'+id+'" style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);border:1.5px solid '+aColor+';background:'+aBg+';transition:all .15s;box-shadow:'+(useAlt?'0 0 5px rgba(180,135,248,0.5)':'none')+';">'
             + '</span></span>';
           return '<div style="display:flex;align-items:center;gap:0;padding:1px 0;">'
             + cDiam
             + aDiam
-            + '<span style="font-size:10px;color:'+(cOn?'#52F2C9':useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
+            + '<span id="sysname-'+id+'" style="font-size:10px;color:'+(cOn?'#52F2C9':useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
             + '</div>';
         }).join('')
         + '</div>';
@@ -10420,6 +10420,28 @@ function _sysRenderVoltageMap() {
 
   el.innerHTML = rows
     + '<div style="margin-top:8px;padding:6px 8px;background:rgba(0,0,0,0.3);border-radius:5px;border-left:2px solid ' + vColor + ';font-size:10px;color:' + vColor + ';font-family:var(--mono);line-height:1.5;">' + verdict + '</div>';
+}
+
+// Точечное обновление ромбов в Системах — без полной перерисовки и схлопывания details
+function _sysUpdateDiam(id) {
+  const cOn = !!(typeof chartInds !== 'undefined' && chartInds[id]);
+  const hasAlt = typeof _ilAltFamilyOf === 'function' && !!_ilAltFamilyOf(id);
+  const useAlt = hasAlt && typeof _ilAltPrefGet === 'function' && _ilAltPrefGet(id);
+
+  const cEl = document.getElementById('sysdiam-c-' + id);
+  if (cEl) {
+    cEl.style.background   = cOn ? 'rgba(82,242,201,0.85)' : 'transparent';
+    cEl.style.borderColor  = cOn ? '#52F2C9' : 'rgba(82,242,201,0.6)';
+    cEl.style.boxShadow    = cOn ? '0 0 5px rgba(82,242,201,0.6)' : 'none';
+  }
+  const aEl = document.getElementById('sysdiam-a-' + id);
+  if (aEl) {
+    aEl.style.background   = useAlt ? '#B487F8' : 'transparent';
+    aEl.style.borderColor  = hasAlt ? '#B487F8' : '#2a1f3d';
+    aEl.style.boxShadow    = useAlt ? '0 0 5px rgba(180,135,248,0.5)' : 'none';
+  }
+  const nEl = document.getElementById('sysname-' + id);
+  if (nEl) nEl.style.color = cOn ? '#52F2C9' : useAlt ? '#B487F8' : 'var(--text2)';
 }
 
 function _sysRenderVP() {
