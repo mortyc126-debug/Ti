@@ -3843,9 +3843,9 @@ const COMBO_PRESETS = [
     chartIds: ['ema', 'rsi', 'macd', 'stoch', 'vol'],
     sets:{ rsi:38, sk:22, sd:35, mf:12, ms:8, hist:'растёт' },
     fields:[
-      {id:'rsi', label:'RSI — ищем откат (< 40)', hint:'Ждём когда RSI опустится в зону 30–40, сигнализируя об откате в тренде'},
-      {id:'sk',  label:'Stoch %K — перепроданность', hint:'%K < 25 в контексте тренда = точка входа'},
-      {id:'mf',  label:'MACD быстрая — подтверждение тренда', hint:'Должна быть выше нуля и выше медленной'},
+      {id:'rsi', label:'RSI — откат (30–40)', labelBear:'RSI — откат (60–70)', hint:'RSI 30–40 = откат в тренде вверх, точка входа', hintBear:'RSI 60–70 = откат в тренде вниз, точка входа'},
+      {id:'sk',  label:'Stoch %K — перепроданность (< 25)', labelBear:'Stoch %K — перекупленность (> 75)', hint:'%K < 25 в контексте тренда вверх = точка входа', hintBear:'%K > 75 в контексте тренда вниз = точка входа'},
+      {id:'mf',  label:'MACD — выше нуля (тренд вверх)', labelBear:'MACD — ниже нуля (тренд вниз)', hint:'Быстрая выше нуля и выше медленной = бычий контекст', hintBear:'Быстрая ниже нуля и ниже медленной = медвежий контекст'},
     ],
     read:'Лонг: MACD выше нуля + RSI откатился к 30–40 + Stoch разворачивается вверх. Шорт: MACD ниже нуля + RSI откатился к 60–70 + Stoch разворачивается вниз. Все три экрана согласны → сильный сетап.',
   },
@@ -3860,9 +3860,9 @@ const COMBO_PRESETS = [
     chartIds: ['bb', 'rsi', 'stoch'],
     sets:{ rsi:28, sk:18, sd:25, mf:-2, ms:1, hist:'иссякает' },
     fields:[
-      {id:'rsi', label:'RSI — зона перепроданности', hint:'< 30 = перепроданность подтверждена'},
-      {id:'sk',  label:'Stoch %K — у нижней полосы', hint:'< 20 = совпадение с нижней BB'},
-      {id:'mf',  label:'MACD — импульс иссякает', hint:'Близко к нулю или разворачивается'},
+      {id:'rsi', label:'RSI — перепроданность (< 30)', labelBear:'RSI — перекупленность (> 70)', hint:'< 30 = перепроданность, подтверждена нижняя BB', hintBear:'> 70 = перекупленность, подтверждена верхняя BB'},
+      {id:'sk',  label:'Stoch — у нижней BB (< 20)', labelBear:'Stoch — у верхней BB (> 80)', hint:'< 20 = экстремум совпадает с нижней BB', hintBear:'> 80 = экстремум совпадает с верхней BB'},
+      {id:'mf',  label:'MACD — импульс иссякает', hint:'Близко к нулю или разворачивается (в обоих направлениях)'},
     ],
     read:'Лонг: цена на нижней BB + RSI < 30 + Stoch разворачивается вверх = отскок. Шорт: цена на верхней BB + RSI > 70 + Stoch разворачивается вниз = разворот. Без подтверждения RSI — BB-сигнал ненадёжен.',
   },
@@ -3877,9 +3877,9 @@ const COMBO_PRESETS = [
     chartIds: ['ema', 'macd', 'stoch'],
     sets:{ rsi:45, sk:19, sd:28, mf:5, ms:2, hist:'растёт' },
     fields:[
-      {id:'mf',  label:'MACD быстрая — тренд задан', hint:'Выше нуля = бычий контекст'},
-      {id:'sk',  label:'Stoch %K — точка входа', hint:'Заходит в перепроданность и разворачивается'},
-      {id:'sd',  label:'Stoch %D — подтверждение', hint:'%K пересекает %D снизу вверх'},
+      {id:'mf',  label:'MACD — выше нуля (бычий)', labelBear:'MACD — ниже нуля (медвежий)', hint:'Выше нуля = бычий контекст, ищем лонг', hintBear:'Ниже нуля = медвежий контекст, ищем шорт'},
+      {id:'sk',  label:'Stoch — перепроданность (< 25)', labelBear:'Stoch — перекупленность (> 75)', hint:'Заходит в перепроданность и разворачивается вверх', hintBear:'Заходит в перекупленность и разворачивается вниз'},
+      {id:'sd',  label:'Stoch %D — %K пересекает снизу', labelBear:'Stoch %D — %K пересекает сверху', hint:'%K пересекает %D снизу вверх = вход в лонг', hintBear:'%K пересекает %D сверху вниз = вход в шорт'},
     ],
     read:'Лонг: MACD выше нуля + Stoch в перепроданности + %K пересекает %D снизу вверх → вход. Шорт: MACD ниже нуля + Stoch в перекупленности + %K пересекает %D сверху вниз → вход.',
   },
@@ -3894,9 +3894,9 @@ const COMBO_PRESETS = [
     chartIds: ['ichi_main', 'ichi_cloud', 'macd', 'rsi'],
     sets:{ rsi:55, sk:60, sd:52, mf:8, ms:3, hist:'растёт' },
     fields:[
-      {id:'rsi',  label:'RSI — подтверждение силы', hint:'> 50 в бычьем контексте Ишимоку = тренд жив'},
-      {id:'mf',   label:'MACD — пересечение', hint:'Быстрая пересекает медленную снизу вверх'},
-      {id:'sk',   label:'Stoch — не в перекупленности', hint:'< 80 = есть ещё пространство для роста'},
+      {id:'rsi',  label:'RSI — сила (> 50)', labelBear:'RSI — слабость (< 50)', hint:'> 50 в бычьем облаке = тренд вверх жив', hintBear:'< 50 в медвежьем облаке = тренд вниз жив'},
+      {id:'mf',   label:'MACD — пересекает вверх', labelBear:'MACD — пересекает вниз', hint:'Быстрая пересекает медленную снизу вверх', hintBear:'Быстрая пересекает медленную сверху вниз'},
+      {id:'sk',   label:'Stoch — не перекуплен (< 80)', labelBear:'Stoch — не перепродан (> 20)', hint:'< 80 = есть пространство для роста', hintBear:'> 20 = есть пространство для падения'},
     ],
     read:'Лонг: цена выше облака + TK Cross бычий, MACD пересекает вверх, RSI > 50. Шорт: цена ниже облака + TK Cross медвежий, MACD пересекает вниз, RSI < 50. Облако = фильтр тренда, MACD = триггер входа.',
   },
@@ -3928,9 +3928,9 @@ const COMBO_PRESETS = [
     chartIds: ['ma', 'obv', 'rsi', 'vol'],
     sets:{ rsi:28, sk:15, sd:20, mf:-8, ms:-5, hist:'иссякает' },
     fields:[
-      {id:'rsi',  label:'RSI — перепроданность', hint:'< 30 + разворачивается вверх = бычья дивергенция'},
-      {id:'sk',   label:'Stoch %K — экстремум', hint:'< 20 = дно подтверждено осциллятором'},
-      {id:'mf',   label:'MACD — импульс иссякает', hint:'Близко к нулю или гистограмма уменьшается'},
+      {id:'rsi',  label:'RSI — перепроданность (бычья див.)', labelBear:'RSI — перекупленность (медвежья див.)', hint:'< 30 + разворачивается вверх при новом минимуме цены', hintBear:'> 70 + разворачивается вниз при новом максимуме цены'},
+      {id:'sk',   label:'Stoch — экстремум дна (< 20)', labelBear:'Stoch — экстремум вершины (> 80)', hint:'< 20 = дно подтверждено осциллятором', hintBear:'> 80 = вершина подтверждена осциллятором'},
+      {id:'mf',   label:'MACD — импульс иссякает', hint:'Гистограмма уменьшается (в обоих направлениях)'},
     ],
     read:'Бычья дивергенция: цена делает новый минимум — OBV не подтверждает (растёт). RSI < 30 и разворачивается, Stoch в перепроданности разворачивается → лонг. Медвежья: цена делает новый максимум — OBV не подтверждает (падает). RSI > 70 и разворачивается → шорт.',
   },
@@ -3962,9 +3962,9 @@ const COMBO_PRESETS = [
     chartIds: ['ema', 'macd', 'rsi'],
     sets:{ rsi:58, sk:65, sd:60, mf:10, ms:6, hist:'растёт' },
     fields:[
-      {id:'mf',   label:'MACD — фильтр направления', hint:'Выше нуля = торгуем SAR только в лонг'},
-      {id:'rsi',  label:'RSI — сила тренда', hint:'50–70 = тренд есть, не перегрет'},
-      {id:'sk',   label:'Stoch — не в перекупленности', hint:'< 80 = тренд не истощён'},
+      {id:'mf',   label:'MACD — выше нуля (лонг)', labelBear:'MACD — ниже нуля (шорт)', hint:'Выше нуля = торгуем SAR только в лонг', hintBear:'Ниже нуля = торгуем SAR только в шорт'},
+      {id:'rsi',  label:'RSI — сила бычьего тренда (50–70)', labelBear:'RSI — сила медвежьего тренда (30–50)', hint:'50–70 = тренд есть, не перегрет', hintBear:'30–50 = тренд есть, не перепродан'},
+      {id:'sk',   label:'Stoch — не перекуплен (< 80)', labelBear:'Stoch — не перепродан (> 20)', hint:'< 80 = тренд не истощён', hintBear:'> 20 = тренд не истощён'},
     ],
     read:'Лонг: MACD выше нуля + SAR разворачивается вверх (цена пробила SAR снизу) → вход. Шорт: MACD ниже нуля + SAR разворачивается вниз → вход. SAR = трейлинг стоп в обоих случаях.',
   },
@@ -4077,6 +4077,7 @@ const COMBO_PRESETS = [
 function initCombos() {
   const el = document.getElementById('combos-list');
   if (!el) return;
+  const _isBull = _sysIsBull();
   el.innerHTML = COMBO_PRESETS.filter(c => c.fields).map(c => `
     <div class="card" style="margin-bottom:12px;">
       <div class="card-header" style="cursor:pointer;" onclick="toggleCombo('${c.id}')">
@@ -4098,11 +4099,14 @@ function initCombos() {
           <div style="font-size:12px;color:var(--text2);">${c.question}</div>
         </div>
         <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-          ${c.fields.map(f => `
-            <div style="margin-bottom:10px;">
-              <div style="font-size:11px;color:var(--text2);margin-bottom:3px;">${f.label}</div>
-              <div style="font-size:10px;color:var(--text3);line-height:1.4;">${f.hint}</div>
-            </div>`).join('')}
+          ${c.fields.map(f => {
+            const lbl = (!_isBull && f.labelBear) ? f.labelBear : f.label;
+            const hnt = (!_isBull && f.hintBear)  ? f.hintBear  : f.hint;
+            return `<div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--text2);margin-bottom:3px;">${lbl}</div>
+              <div style="font-size:10px;color:var(--text3);line-height:1.4;">${hnt}</div>
+            </div>`;
+          }).join('')}
         </div>
         <div style="padding:12px 16px;background:rgba(96,164,161,0.03);border-bottom:1px solid var(--border);">
           <div style="font-size:10px;color:var(--green);font-family:var(--mono);letter-spacing:0.05em;margin-bottom:5px;">КАК ЧИТАТЬ</div>
@@ -8734,6 +8738,13 @@ function ilAggToggleAlt(id) {
   if (typeof chartCandles !== 'undefined' && chartCandles.length) try { chartRedraw(); } catch(e) {}
   const _anaPanel = document.getElementById('cp-analysis-panel');
   if (_anaPanel && typeof _renderAnalysisInner === 'function') try { _renderAnalysisInner(_anaPanel); } catch(e) {}
+}
+
+function _sysIsBull() {
+  if (!chartCandles || chartCandles.length < 21) return true;
+  const closes = chartCandles.slice(-21).map(c => c.close);
+  const sma20 = closes.slice(0, 20).reduce((a, b) => a + b, 0) / 20;
+  return closes[20] >= sma20;
 }
 
 function cpRenderCombos() {
