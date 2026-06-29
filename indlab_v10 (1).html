@@ -8918,17 +8918,24 @@ function _sysRenderStaticSections() {
     let indList = '';
     if (chartIds && chartIds.length && typeof _ilAltFamilyOf === 'function') {
       indList = '<div style="margin-top:8px;margin-bottom:6px;border-top:1px solid rgba(255,255,255,0.05);padding-top:7px;">'
-        + '<div style="font-size:8px;color:#3a3260;font-family:var(--mono);margin-bottom:4px;">◆ классика · <span style="color:#4a3870;">◆ альт</span></div>'
+        + '<div style="font-size:8px;color:#5a5080;font-family:var(--mono);margin-bottom:6px;">◆ классика · ◆ альт</div>'
         + chartIds.map(id => {
           const name = (typeof IL_NAMES !== 'undefined' && IL_NAMES[id]) || id;
           const hasAlt = !!_ilAltFamilyOf(id);
           const useAlt = hasAlt && (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(id);
-          const cStyle = 'display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:2px;border:1.5px solid #52F2C9;background:transparent;';
-          const aStyle = 'display:inline-block;width:8px;height:8px;transform:rotate(45deg);vertical-align:middle;margin-right:5px;border:1.5px solid '+(hasAlt?'#B487F8':'#2a1f3d')+';background:'+(useAlt?'#B487F8':'transparent')+';cursor:'+(hasAlt?'pointer':'default')+';transition:all .12s;';
-          const altClick = hasAlt ? 'onclick="ilAggToggleAlt(\''+id+'\')"' : '';
-          return '<div style="display:flex;align-items:center;padding:2px 0;">'
-            + '<span style="'+cStyle+'"></span>'
-            + '<span '+altClick+' style="'+aStyle+'"></span>'
+          // ромб классика — чисто индикатор, не кликабельный
+          const cDiam = '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid rgba(82,242,201,0.6);background:transparent;"></span>';
+          // ромб альт — кликабельный если есть альт
+          const aColor = hasAlt ? '#B487F8' : '#2a1f3d';
+          const aBg = useAlt ? '#B487F8' : 'transparent';
+          const aClick = hasAlt ? 'onclick="ilAggToggleAlt(\''+id+'\')" title="Переключить классика/альт"' : '';
+          // обёртка 28px обеспечивает нормальную кликабельную зону
+          const aDiam = '<span '+aClick+' style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:'+(hasAlt?'pointer':'default')+';">'
+            + '<span style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);border:1.5px solid '+aColor+';background:'+aBg+';transition:all .15s;box-shadow:'+(useAlt?'0 0 5px rgba(180,135,248,0.5)':'none')+';">'
+            + '</span></span>';
+          return '<div style="display:flex;align-items:center;gap:0;padding:1px 0;">'
+            + '<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:28px;flex-shrink:0;">'+cDiam+'</span>'
+            + aDiam
             + '<span style="font-size:10px;color:'+(useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
             + '</div>';
         }).join('')
