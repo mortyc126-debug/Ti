@@ -8816,7 +8816,7 @@ const _IL_ALT_FAMILY_DESC = {
   channel:   'Не пробой канала, а band-walk: многократное касание границы при тренде — это не перекупленность, а признак продолжения (классика тут ошибается).',
   volume:    'Не сам факт сигнала, а его подтверждение объёмом: если объём ниже своей недавней нормы — сигнал индикатора без подтверждения, трактуется как антисигнал.',
   structure: 'Активна только в боковике (Choppiness ≥ 61.8): структурный сигнал инвертируется, потому что в шуме такие индикаторы дают ложную «пилу».',
-  dsp:       'Не направление после флипа знака, а сам неподтверждённый флип: первый разворот сглаживающего фильтра чаще шум, чем перелом — трактуется как антисигнал.',
+  dsp:       'Первая смена направления сглаженного ряда игнорируется — она чаще оказывается ложной. Сигнал засчитывается только если направление удерживается второй бар подряд.',
 };
 function _ilAltFamilyDesc(id) { const fam = _ilAltFamilyOf(id); return fam ? _IL_ALT_FAMILY_DESC[fam] : null; }
 // Возвращает {id, hasAlt, score} по id из IL_INDICATORS с учётом выбора альт/классика.
@@ -18907,7 +18907,7 @@ function _renderAnalysisInner(panel) {
         const type = s == null ? 'neutral' : s >= 1 ? 'bullish' : s <= -1 ? 'bearish' : s > 0 ? 'bullish' : s < 0 ? 'bearish' : 'neutral';
         const label = (typeof IL_NAMES !== 'undefined' && IL_NAMES[aid]) || aid;
         const txt = s == null ? `${label} (альт): нет данных` : `${label} (альт): score ${s>0?'+':''}${s.toFixed(2)} — ${s>=1?'сильный бычий контекст':s>0?'слабый бычий контекст':s<=-1?'сильный медвежий контекст':s<0?'слабый медвежий контекст':'нейтрально'}`;
-        const descTxt = it.altDesc ? `<div style="margin-left:14px;margin-top:1px;font-size:9px;color:var(--text3);line-height:1.4;">↳ ${it.altDesc}</div>` : '';
+        const descTxt = it.altDesc ? `<div style="margin-left:14px;margin-top:3px;font-size:11px;color:#9090B8;line-height:1.5;">↳ ${it.altDesc}</div>` : '';
         return `<div class="analysis-item analysis-${type}"><span class="analysis-dot">●</span><span>${txt}</span></div>${descTxt}`;
       }).filter(Boolean);
       if (altRows.length) {
