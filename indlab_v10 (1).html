@@ -10928,11 +10928,13 @@ function _globalAutoTune() {
     });
   });
 
-  // Также обновляем слайдеры в карточках индикаторов (если открыты)
+  // Обновляем cpIndVals (главное хранилище для _getIndParam) + DOM если открыт
   allInds.forEach(ind => {
     const res = _indAutoCompute(ind.id, style || null, hz);
     if (!res) return;
+    cpIndVals[ind.id] = cpIndVals[ind.id] || {};
     Object.entries(res.params).forEach(([pid, val]) => {
+      cpIndVals[ind.id][pid] = val; // всегда пишем в память
       const numEl = document.getElementById(`cpval-${ind.id}-${pid}`);
       const slEl  = document.getElementById(`cpslider-${ind.id}-${pid}`);
       if (numEl) numEl.value = val;
@@ -10972,8 +10974,10 @@ function cpApplyAuto(id) {
   const resEl = document.getElementById('cpautores-' + id);
   if (!res) { if (resEl) resEl.textContent = 'Недостаточно данных на графике'; return; }
 
-  // Применяем к слайдерам
+  // Пишем в cpIndVals (читается _getIndParam даже при закрытой панели) + в DOM
+  cpIndVals[id] = cpIndVals[id] || {};
   Object.entries(res.params).forEach(([pid, val]) => {
+    cpIndVals[id][pid] = val;
     const numEl = document.getElementById(`cpval-${id}-${pid}`);
     const slEl  = document.getElementById(`cpslider-${id}-${pid}`);
     if (numEl) numEl.value = val;
