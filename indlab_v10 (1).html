@@ -15241,14 +15241,39 @@ function _renderAnalysisInner(panel) {
   }
   // ─── конец блока антисигналов ────────────────────────────────────────────────
 
+  // Универсальный считыватель параметра индикатора:
+  // 1) cpIndVals[id][pid] — значение из слайдера карточки (обновляется автотюном)
+  // 2) DOM-инпут cpval-{id}-{pid}
+  // 3) дефолт
+  function _getIndParam(id, pid, def) {
+    const cv = (typeof cpIndVals !== 'undefined') && cpIndVals[id] && cpIndVals[id][pid];
+    if (cv != null && !isNaN(cv)) return +cv;
+    const el = document.getElementById(`cpval-${id}-${pid}`);
+    if (el && el.value !== '') { const v = +el.value; if (!isNaN(v)) return v; }
+    return def;
+  }
+
   // Читаем параметры из формы теста (если открыта вкладка «Точность»), иначе дефолты
   const _rawP = (typeof _anReadTestParams === 'function') ? _anReadTestParams() : {};
   const _P = {
-    rsi:  _rawP.rsi  || 14,  wr:   _rawP.wr   || 14,  cci:  _rawP.cci  || 20,
-    mfi:  _rawP.mfi  || 14,  stk:  _rawP.stk  || 14,  std:  _rawP.std  || 3,
-    mf:   _rawP.mf   || 12,  ms:   _rawP.ms   || 26,  msig: _rawP.msig || 9,
-    bbp:  _rawP.bbp  || 20,  adx:  _rawP.adx  || 14,  stp:  _rawP.stp  || 10,
-    elder:_rawP.elder|| 13,  tsil: _rawP.tsil || 25,  tsis: _rawP.tsis || 13,
+    // Форма «Точность» — приоритет; затем слайдеры карточек; затем дефолт
+    rsi:  _rawP.rsi  || _getIndParam('rsi','value',14),
+    wr:   _rawP.wr   || _getIndParam('wr','value',14),
+    cci:  _rawP.cci  || _getIndParam('cci','period',20),
+    mfi:  _rawP.mfi  || _getIndParam('mfi','value',14),
+    stk:  _rawP.stk  || _getIndParam('stoch','k',14),
+    std:  _rawP.std  || _getIndParam('stoch','d',3),
+    mf:   _rawP.mf   || _getIndParam('macd','fast',12),
+    ms:   _rawP.ms   || _getIndParam('macd','slow',26),
+    msig: _rawP.msig || _getIndParam('macd','signal',9),
+    bbp:  _rawP.bbp  || _getIndParam('bb','period',20),
+    adx:  _rawP.adx  || _getIndParam('adx','value',14),
+    stp:  _rawP.stp  || _getIndParam('supertrend','atr',10),
+    elder:_rawP.elder|| _getIndParam('elder_ray','value',13),
+    tsil: _rawP.tsil || _getIndParam('tsi','len',25),
+    tsis: _rawP.tsis || _getIndParam('tsi','smooth',13),
+    ef:   _rawP.ef   || _getIndParam('ema','fast',9),
+    es:   _rawP.es   || _getIndParam('ema','slow',21),
   };
   // Флаг: отличаются ли текущие параметры от классических дефолтов
   const _pCustom = _rawP.rsi!=null && (
@@ -15558,7 +15583,8 @@ function _renderAnalysisInner(panel) {
         }
       }
     } else if (idL.includes('atr') && !idL.includes('matr')) {
-      const atr = _anCalcATR(candles, 14);
+      const _atrPer = _getIndParam('atr','period',14);
+      const atr = _anCalcATR(candles, _atrPer);
       if (atr != null) {
         const last = candles[candles.length - 1];
         const range = last.high - last.low;
@@ -15607,7 +15633,7 @@ function _renderAnalysisInner(panel) {
             : null;
           _trade(pDir, atrConf, tLong, tShort).forEach(t => items.push(t));
         }
-        html += makeCard('ATR(14) / Средний истинный диапазон', items, 'atr');
+        html += makeCard(`ATR(${_atrPer}) / Средний истинный диапазон`, items, 'atr');
       }
     } else if (idL.includes('stoch')) {
       const period = _P.stk, smooth = _P.std;
@@ -16138,7 +16164,7 @@ function _renderAnalysisInner(panel) {
         html += makeCard(`MA/EMA(${ef},${es}) / Скользящие средние`, items, 'ma', clMaItems, 'ma');
       }
     } else if (idL.includes('donchian') || idL === 'dc') {
-      const period = 20;
+      const period = _getIndParam('donchian','period',20);
       if (candles.length >= period + 10) {
         const n = candles.length;
         const recent = candles.slice(n - period);
@@ -16377,7 +16403,7 @@ function _renderAnalysisInner(panel) {
         html += makeCard(`CCI(${period}) / Индекс товарного канала`, items, 'cci', clCciItems, 'cci');
       }
     } else if (idL.includes('keltner')) {
-      const per = 20, atrPer = 10, mult = 2;
+      const per = _getIndParam('keltner','period',20), atrPer = _getIndParam('keltner','atr',10), mult = _getIndParam('keltner','mult',2);
       const n = candles.length;
       if (n >= Math.max(per, atrPer) + 5) {
         const items = [];
@@ -16432,7 +16458,7 @@ function _renderAnalysisInner(panel) {
             : ((lastClose - kd) / (ku - kd) < 0.3) ? 'Цена у нижней границы Keltner — медвежий контекст. Шорт осторожно.' : null;
           _trade(kPos, kConf, kLong, kShort).forEach(t => items.push(t));
         }
-        html += makeCard('Keltner Channel / Канал Келтнера (неклассически)', items, 'keltner');
+        html += makeCard(`Keltner Channel(EMA${per},ATR${atrPer}×${mult}) / Канал Келтнера (неклассически)`, items, 'keltner');
       }
     } else if (idL.includes('vwap')) {
       const n = candles.length;
@@ -16707,7 +16733,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'cmf') {
       const n = candles.length;
-      const per = 20;
+      const per = _getIndParam('cmf','period',20);
       if (n >= per) {
         const items = [];
         let mfv=0, vol=0;
@@ -16747,7 +16773,7 @@ function _renderAnalysisInner(panel) {
                          : cmfVal < 0 ? 'CMF слабо отрицательный — осторожный шорт возможен, но без агрессии.' : null;
           _trade(cmfDir, cmfConf, cmfLong, cmfShort).forEach(t => items.push(t));
         }
-        html += makeCard('CMF / Деньги Чайкина (неклассически)', items, 'cmf');
+        html += makeCard(`CMF(${per}) / Деньги Чайкина (неклассически)`, items, 'cmf');
       }
     } else if (idL === 'accel_osc') {
       const n = candles.length;
@@ -17193,7 +17219,7 @@ function _renderAnalysisInner(panel) {
     } else if (idL === 'chop' || idL === 'frac_dim' || idL === 'efficiency_ratio' || idL === 'entropy') {
       // Все измерители режима рынка — обрабатываем вместе для кросс-анализа
       const n = candles.length;
-      const per = 14;
+      const per = _getIndParam('chop','period',14);
       if (n >= per + 10) {
         const items = [];
         // --- Вычисляем CHOP за всю историю ---
@@ -17290,7 +17316,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'vortex') {
       const n = candles.length;
-      const per=14;
+      const per=_getIndParam('vortex','period',14);
       if (n >= per+1) {
         const items = [];
         let vmp=0,vmm=0,atrS=0;
@@ -17325,7 +17351,7 @@ function _renderAnalysisInner(panel) {
                         : vDist < 0.05 ? 'Боковик по Vortex — не входить в шорт без сигнала.' : null;
           _trade(vtDir, vtConf, vtLong, vtShort).forEach(t => items.push(t));
         }
-        html += makeCard('Vortex / Вортекс (неклассически)', items, 'vortex');
+        html += makeCard(`Vortex(${per}) / Вортекс (неклассически)`, items, 'vortex');
       }
     } else if (idL === 'bb_pct') {
       const n = candles.length;
@@ -17463,7 +17489,9 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL.includes('hist_vol') || idL.includes('close2close') || idL.includes('ohlc_vol') || idL.includes('vix_like')) {
       const n = candles.length;
-      if (n >= 20) {
+      const _hvPer = _getIndParam('hv','period',20);
+      const _hvPerLong = Math.round(_hvPer * 2.5);
+      if (n >= _hvPer) {
         const items = [];
         const rets = closes.map((c,i)=>i===0?0:Math.log(c/closes[i-1]));
         // HV функция для любого периода
@@ -17473,21 +17501,21 @@ function _renderAnalysisInner(panel) {
           const avg = sl.reduce((a,b)=>a+b,0)/per;
           return Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/(per-1)*252)*100;
         };
-        const hv20 = calcHV(20);
-        const hv50 = calcHV(50);
-        // Строим ряд HV20 для истории
+        const hv20 = calcHV(_hvPer);
+        const hv50 = calcHV(_hvPerLong);
+        // Строим ряд HV для истории
         const hvSeries = [];
-        for (let i=20; i<=n; i++) {
-          const sl=rets.slice(i-20,i), avg=sl.reduce((a,b)=>a+b,0)/20;
-          hvSeries.push(Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/19*252)*100);
+        for (let i=_hvPer; i<=n; i++) {
+          const sl=rets.slice(i-_hvPer,i), avg=sl.reduce((a,b)=>a+b,0)/_hvPer;
+          hvSeries.push(Math.sqrt(sl.reduce((a,b)=>a+(b-avg)**2,0)/(_hvPer-1)*252)*100);
         }
         const hvMax100 = hvSeries.length>=100 ? Math.max(...hvSeries.slice(-100)) : Math.max(...hvSeries);
         const hvMin100 = hvSeries.length>=100 ? Math.min(...hvSeries.slice(-100)) : Math.min(...hvSeries);
         const hvRank = (hvMax100>hvMin100) ? (hv20-hvMin100)/(hvMax100-hvMin100) : 0.5;
-        if(hv20>60) items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — экстремально высокая (${(hvRank*100).toFixed(0)}-й перцентиль). Риск велик в обе стороны`});
-        else if(hv20>30) items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — повышенная (${(hvRank*100).toFixed(0)}-й перцентиль). Опционные премии высоки`});
-        else if(hv20<15) items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — низкая (${(hvRank*100).toFixed(0)}-й перцентиль). Рынок в спячке, взрыв готовится`});
-        else items.push({type:'neutral', text:`HV(20) = ${hv20.toFixed(0)}% — нормально (${(hvRank*100).toFixed(0)}-й перцентиль в 100-барном диапазоне)`});
+        if(hv20>60) items.push({type:'neutral', text:`HV(${_hvPer}) = ${hv20.toFixed(0)}% — экстремально высокая (${(hvRank*100).toFixed(0)}-й перцентиль). Риск велик в обе стороны`});
+        else if(hv20>30) items.push({type:'neutral', text:`HV(${_hvPer}) = ${hv20.toFixed(0)}% — повышенная (${(hvRank*100).toFixed(0)}-й перцентиль). Опционные премии высоки`});
+        else if(hv20<15) items.push({type:'neutral', text:`HV(${_hvPer}) = ${hv20.toFixed(0)}% — низкая (${(hvRank*100).toFixed(0)}-й перцентиль). Рынок в спячке, взрыв готовится`});
+        else items.push({type:'neutral', text:`HV(${_hvPer}) = ${hv20.toFixed(0)}% — нормально (${(hvRank*100).toFixed(0)}-й перцентиль в 100-барном диапазоне)`});
         // Неклассика 1: HV относительно собственного max/min
         if (hvRank < 0.1) items.push({type:'neutral', text:`HV на историческом минимуме — максимальная компрессия. Это состояние предшествует резким движениям`});
         else if (hvRank > 0.9) items.push({type:'neutral', text:`HV на историческом максимуме — паника или кульминация. Волатильность обычно разворачивается вниз отсюда`});
@@ -17500,11 +17528,12 @@ function _renderAnalysisInner(panel) {
             else if (hvSpeed < 0.5) items.push({type:'neutral', text:`HV упала вдвое за 10 баров (${hv10ago.toFixed(0)}% → ${hv20.toFixed(0)}%) — резкое успокоение, компрессия начинается`});
           }
         }
-        // Неклассика 3: HV10 vs HV50 — краткосрочная vs долгосрочная
-        const hv10 = calcHV(10);
+        // Неклассика 3: короткий HV vs длинный HV — краткосрочная vs долгосрочная
+        const _hvShort = Math.max(5, Math.round(_hvPer/2));
+        const hv10 = calcHV(_hvShort);
         if (hv10 && hv50) {
-          if (hv10 > hv50*1.5) items.push({type:'neutral', text:`HV(10) = ${hv10.toFixed(0)}% >> HV(50) = ${hv50.toFixed(0)}% — кратко-срочный взрыв на фоне нормальной долгосрочной. Локальное событие`});
-          else if (hv10 < hv50*0.6) items.push({type:'neutral', text:`HV(10) = ${hv10.toFixed(0)}% << HV(50) = ${hv50.toFixed(0)}% — сжатие ниже долгосрочной нормы. Тихий омут`});
+          if (hv10 > hv50*1.5) items.push({type:'neutral', text:`HV(${_hvShort}) = ${hv10.toFixed(0)}% >> HV(${_hvPerLong}) = ${hv50.toFixed(0)}% — кратко-срочный взрыв на фоне нормальной долгосрочной. Локальное событие`});
+          else if (hv10 < hv50*0.6) items.push({type:'neutral', text:`HV(${_hvShort}) = ${hv10.toFixed(0)}% << HV(${_hvPerLong}) = ${hv50.toFixed(0)}% — сжатие ниже долгосрочной нормы. Тихий омут`});
         }
         // Блок «что делать» по HV
         {
@@ -17519,11 +17548,11 @@ function _renderAnalysisInner(panel) {
                         : priceSlope < 0 ? `HV=${hv20.toFixed(0)}%. Держи шорт со стопом с учётом волатильности.` : null;
           _trade(hvDir, hvConf, hvLong, hvShort).forEach(t => items.push(t));
         }
-        html += makeCard('Историческая волатильность (неклассически)', items, 'hv');
+        html += makeCard(`Историческая волатильность HV(${_hvPer}) (неклассически)`, items, 'hv');
       }
     } else if (idL === 'cmo') {
       const n = candles.length;
-      const per=14;
+      const per=_getIndParam('cmo','period',14);
       if (n >= per) {
         const items = [];
         let up=0,dn=0;
@@ -17565,11 +17594,12 @@ function _renderAnalysisInner(panel) {
                          : cmo < 0 ? 'CMO отрицательный — держи шорт.' : null;
           _trade(cmoDir, cmoConf, cmoLong, cmoShort).forEach(t => items.push(t));
         }
-        html += makeCard('CMO / Моментум Чанде (неклассически)', items, 'cmo');
+        html += makeCard(`CMO(${per}) / Моментум Чанде (неклассически)`, items, 'cmo');
       }
     } else if (idL === 'eom') {
       const n = candles.length;
-      if (n >= 15) {
+      const _eomPer = _getIndParam('eom','period',14);
+      if (n >= _eomPer + 1) {
         const items = [];
         const eomArr = candles.map((c,i)=>{
           if(i===0) return 0;
@@ -17577,7 +17607,7 @@ function _renderAnalysisInner(panel) {
           const br=(c.volume||1)/1e6/(c.high-c.low||0.01);
           return mm/br;
         });
-        const last=eomArr.slice(n-14).reduce((a,b)=>a+b,0)/14;
+        const last=eomArr.slice(n-_eomPer).reduce((a,b)=>a+b,0)/_eomPer;
         if(last>0) items.push({type:'bullish', text:`EOM > 0 — цена легко растёт на небольших объёмах: продавцы не сопротивляются`});
         else items.push({type:'bearish', text:`EOM < 0 — цена легко падает: покупатели не поддерживают`});
         // Неклассика: честность движения = эффективность объёма
@@ -17611,7 +17641,7 @@ function _renderAnalysisInner(panel) {
           const eomShort = last < 0 ? 'EOM отрицательный — падение лёгкое, покупатели слабы. Держи шорт.' : null;
           _trade(eomDir, eomConf, eomLong, eomShort).forEach(t => items.push(t));
         }
-        html += makeCard('EOM / Лёгкость движения (неклассически)', items, 'eom');
+        html += makeCard(`EOM(${_eomPer}) / Лёгкость движения (неклассически)`, items, 'eom');
       }
     } else if (idL === 'nvi') {
       const n = candles.length;
@@ -17890,7 +17920,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'dpo') {
       const n = candles.length;
-      const per=20;
+      const per=_getIndParam('dpo','period',20);
       if (n >= per+per/2) {
         const items = [];
         const shift=Math.floor(per/2)+1;
@@ -17923,11 +17953,11 @@ function _renderAnalysisInner(panel) {
           const dpoShort = dpo < 0 ? 'DPO отрицательный — держи шорт до следующего цикличного минимума.' : null;
           _trade(dpoDir, 'weak', dpoLong, dpoShort).forEach(t => items.push(t));
         }
-        html += makeCard('DPO / Деттрендовый осциллятор (неклассически)', items, 'dpo');
+        html += makeCard(`DPO(${per}) / Деттрендовый осциллятор (неклассически)`, items, 'dpo');
       }
     } else if (idL === 'chaikin_vol') {
       const n = candles.length;
-      const per=10;
+      const per=_getIndParam('chaikvol','period',10);
       if (n >= per*2) {
         const items = [];
         const hl=candles.map(c=>c.high-c.low);
@@ -17970,7 +18000,7 @@ function _renderAnalysisInner(panel) {
           const cvShort = chgV > 20 && priceSlope < 0 ? 'Диапазон расширяется при снижении — подтверждённый медвежий каскад. Держи шорт.' : null;
           _trade(cvDir, cvConf, cvLong, cvShort).forEach(t => items.push(t));
         }
-        html += makeCard('Chaikin Volatility / Волатильность Чайкина (неклассически)', items, 'chaikvol');
+        html += makeCard(`Chaikin Volatility(${per}) / Волатильность Чайкина (неклассически)`, items, 'chaikvol');
       }
     } else if (idL === 'cum_delta' || idL.includes('cumulative') || idL.includes('cum_d')) {
       const n = candles.length;
@@ -18346,7 +18376,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'tmf') {
       const n = candles.length;
-      const per = 21;
+      const per = _getIndParam('tmf','period',21);
       if (n >= per + 5) {
         const items = [];
         // Вычисляем TMF
@@ -18470,7 +18500,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL.includes('atr_stop') || idL.includes('atr_ch') || idL.includes('atr_w')) {
       const n = candles.length;
-      const per=14;
+      const per=_getIndParam('atr_stop','atr',14);
       if (n >= per) {
         const items = [];
         const tr=candles.map((c,i)=>i===0?c.high-c.low:Math.max(c.high,candles[i-1].close)-Math.min(c.low,candles[i-1].close));
@@ -18479,7 +18509,7 @@ function _renderAnalysisInner(panel) {
         const pct=atr/closes[n-1]*100;
         items.push({type:'neutral', text:`ATR = ${atr.toFixed(2)} (${pct.toFixed(1)}% от цены) — ставь стоп минимум за ${(atr*1.5).toFixed(2)} от входа`});
         if(pct>3) items.push({type:'neutral', text:`ATR высокий — позиция требует широкого стопа или меньшего объёма`});
-        html += makeCard('ATR Stop / Стоп по ATR (неклассически)', items, 'atr_stop');
+        html += makeCard(`ATR Stop(${per}) / Стоп по ATR (неклассически)`, items, 'atr_stop');
       }
     } else if (idL.includes('ichi_tk') || idL.includes('ichi_cloud')) {
       // Встраиваем ichi_tk прямо в карточку Ишимоку — те же расчёты, тот же вид
