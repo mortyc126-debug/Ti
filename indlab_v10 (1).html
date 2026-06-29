@@ -17015,7 +17015,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL.includes('fisher')) {
       const n = candles.length;
-      const per=9;
+      const per=_getIndParam('fisher','period',9);
       if (n >= per) {
         const items = [];
         const slice=candles.slice(n-per);
@@ -17051,7 +17051,7 @@ function _renderAnalysisInner(panel) {
                        : fisher < -2 ? 'Fisher экстремально перепродан — не входить в шорт, момент неблагоприятен для продаж.' : null;
           _trade(fDir, fConf, fLong, fShort).forEach(t => items.push(t));
         }
-        html += makeCard('Fisher Transform / Преобразование Фишера (неклассически)', items, 'fisher');
+        html += makeCard(`Fisher Transform(${per}) / Преобразование Фишера (неклассически)`, items, 'fisher');
       }
     } else if (idL === 'pivot') {
       const n = candles.length;
@@ -17441,7 +17441,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'dmi') {
       const n = candles.length;
-      const per=14;
+      const per=_getIndParam('dmi','period',14);
       if (n >= per+5) {
         const items = [];
         let pdm=0,mdm=0,atrS=0;
@@ -17485,7 +17485,7 @@ function _renderAnalysisInner(panel) {
                          : dim > dip && adxNow <= 25 ? '-DI доминирует но тренд слабый. Осторожный шорт.' : null;
           _trade(dmiDir, dmiConf, dmiLong, dmiShort).forEach(t => items.push(t));
         }
-        html += makeCard('DMI/ADX / Направленное движение (неклассически)', items, 'dmi');
+        html += makeCard(`DMI/ADX(${per}) / Направленное движение (неклассически)`, items, 'dmi');
       }
     } else if (idL.includes('hist_vol') || idL.includes('close2close') || idL.includes('ohlc_vol') || idL.includes('vix_like')) {
       const n = candles.length;
@@ -17753,7 +17753,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'vwma') {
       const n = candles.length;
-      const per=20;
+      const per=_getIndParam('vwma','period',20);
       if (n >= per) {
         const items = [];
         let vwmaVal=0,volS=0;
@@ -17773,7 +17773,7 @@ function _renderAnalysisInner(panel) {
                         : dev < 0 ? 'Цена ниже VWMA — медвежий контекст. Шорт в контексте.' : null;
           _trade(vmDir, vmConf, vmLong, vmShort).forEach(t => items.push(t));
         }
-        html += makeCard('VWMA / Взвеш. по объёму скользящая (неклассически)', items, 'vwma');
+        html += makeCard(`VWMA(${per}) / Взвеш. по объёму скользящая (неклассически)`, items, 'vwma');
       }
     } else if (idL === 'fractals') {
       const n = candles.length;
@@ -17806,7 +17806,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'mcginley') {
       const n = candles.length;
-      const per=10;
+      const per=_getIndParam('mcginley','period',10);
       if (n >= per+5) {
         const items = [];
         let md=closes[0];
@@ -17833,11 +17833,11 @@ function _renderAnalysisInner(panel) {
                         : dev < 0 ? 'Цена ниже McGinley — медвежий контекст.' : null;
           _trade(mcDir, mcConf, mcLong, mcShort).forEach(t => items.push(t));
         }
-        html += makeCard('McGinley Dynamic / Динамика Макгинли (неклассически)', items, 'mcginley');
+        html += makeCard(`McGinley Dynamic(${per}) / Динамика Макгинли (неклассически)`, items, 'mcginley');
       }
     } else if (idL === 'std_dev') {
       const n = candles.length;
-      const per=20;
+      const per=_getIndParam('stddev','period',20);
       if (n >= per) {
         const items = [];
         // Строим ряд SD для истории
@@ -17873,11 +17873,11 @@ function _renderAnalysisInner(panel) {
                         : priceSlope < 0 ? `σ = ${sdNow.toFixed(1)}%. Держи шорт.` : null;
           _trade(sdDir, sdConf, sdLong, sdShort).forEach(t => items.push(t));
         }
-        html += makeCard('Стандартное отклонение (неклассически)', items, 'stddev');
+        html += makeCard(`Стандартное отклонение(${per}) (неклассически)`, items, 'stddev');
       }
     } else if (idL.includes('envelopes')) {
       const n = candles.length;
-      const per=20;
+      const per=_getIndParam('envelopes','period',20);
       if (n >= per) {
         const items = [];
         const ma=closes.slice(n-per).reduce((a,b)=>a+b,0)/per;
@@ -17916,7 +17916,7 @@ function _renderAnalysisInner(panel) {
                          : last < ma ? 'Цена ниже MA конвертов — медвежий контекст.' : null;
           _trade(envDir, envConf, envLong, envShort).forEach(t => items.push(t));
         }
-        html += makeCard('Envelopes / Конверты скользящих (неклассически)', items, 'envelopes');
+        html += makeCard(`Envelopes(${per}) / Конверты скользящих (неклассически)`, items, 'envelopes');
       }
     } else if (idL === 'dpo') {
       const n = candles.length;
@@ -18966,7 +18966,7 @@ function _renderAnalysisInner(panel) {
       }
     } else if (idL === 'roc') {
       const n = candles.length;
-      const period = 10;
+      const period = _getIndParam('roc','period',10);
       const items = [];
       if (n > period + 2) {
         const rocArr = closes.map((c,i) => i < period ? null : (c - closes[i-period]) / closes[i-period] * 100);
@@ -18981,10 +18981,10 @@ function _renderAnalysisInner(panel) {
         items.push({type:'neutral', text:`Неклассически: ROC без лага — используй для ранней засечки слома тренда до того, как MACD или EMA подтвердят сигнал`});
       } else items.push({type:'neutral', text:`Мало данных для ROC(${period})`});
       const classicItems = [{type:'neutral', text:`Классическая трактовка: ROC > 0 = бычий контекст, ROC < 0 = медвежий. Пересечение нуля — торговый сигнал`}];
-      html += makeCard('ROC / Скорость цены', items, 'roc', classicItems, 'roc');
+      html += makeCard(`ROC(${period}) / Скорость цены`, items, 'roc', classicItems, 'roc');
     } else if (idL === 'momentum') {
       const n = candles.length;
-      const period = 10;
+      const period = _getIndParam('momentum','period',10);
       const items = [];
       if (n > period + 2) {
         const momArr = closes.map((c,i) => i < period ? null : c - closes[i-period]);
@@ -19001,7 +19001,7 @@ function _renderAnalysisInner(panel) {
         items.push({type:'neutral', text:`Неклассически: Momentum в отличие от ROC — абсолютный, а не процентный; удобен для сравнения силы движений в рублях/пунктах`});
       } else items.push({type:'neutral', text:`Мало данных для Momentum(${period})`});
       const classicItems = [{type:'neutral', text:`Классическая трактовка: пересечение нуля как сигнал смены тренда; дивергенция Momentum ↓ при новом максимуме цены = медвежий сигнал`}];
-      html += makeCard('Momentum / Импульс', items, 'momentum', classicItems, 'momentum');
+      html += makeCard(`Momentum(${period}) / Импульс`, items, 'momentum', classicItems, 'momentum');
     } else if (idL === 'volspike') {
       const n = candles.length;
       const maPeriod = 20;
@@ -19043,7 +19043,7 @@ function _renderAnalysisInner(panel) {
       const n = candles.length;
       const items = [];
       if (n >= 21) {
-        const period = 10, maPeriod = 20;
+        const period = _getIndParam('roc','period',10), maPeriod = _getIndParam('volspike','ma_period',20);
         // ROC
         const roc = n > period ? (closes[n-1] - closes[n-1-period]) / closes[n-1-period] * 100 : null;
         const rocVote = roc == null ? 0 : roc > 0.3 ? 1 : roc < -0.3 ? -1 : 0;
