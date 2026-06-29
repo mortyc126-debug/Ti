@@ -8852,12 +8852,16 @@ function cpUpdateAltDiamonds() {
 
 function ilAggToggleAlt(id) {
   _ilAltPrefToggle(id);
+  // точечное обновление ромбика — не перестраиваем весь HTML Систем
+  if (typeof _sysUpdateDiam === 'function') try { _sysUpdateDiam(id); } catch(e) {}
   cpUpdateAltDiamonds();
-  if (typeof cpRenderCombos === 'function') try { cpRenderCombos(); } catch(e) {}
-  if (typeof _sysRenderStaticSections === 'function') try { _sysRenderStaticSections(); } catch(e) {}
-  if (typeof chartCandles !== 'undefined' && chartCandles.length) try { chartRedraw(); } catch(e) {}
-  const _anaPanel = document.getElementById('cp-analysis-panel');
-  if (_anaPanel && typeof _renderAnalysisInner === 'function') try { _renderAnalysisInner(_anaPanel); } catch(e) {}
+  // тяжёлые операции — отложить через RAF чтобы браузер успел отрисовать клик
+  requestAnimationFrame(() => {
+    if (typeof cpRenderCombos === 'function') try { cpRenderCombos(); } catch(e) {}
+    if (typeof chartCandles !== 'undefined' && chartCandles.length) try { chartRedrawDeferred(); } catch(e) {}
+    const _anaPanel = document.getElementById('cp-analysis-panel');
+    if (_anaPanel && typeof _renderAnalysisInner === 'function') try { _renderAnalysisInner(_anaPanel); } catch(e) {}
+  });
 }
 
 function _sysIsBull() {
