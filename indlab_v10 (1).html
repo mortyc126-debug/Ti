@@ -16052,82 +16052,90 @@ function _renderAnalysisInner(panel) {
       if (closes.length >= 50) {
         const n = closes.length;
         const ek=(arr,p)=>{const k=2/(p+1);let s=arr[0];return arr.map(v=>{s=s*(1-k)+v*k;return s;});};
-        const e8=ek(closes,8),e13=ek(closes,13),e21=ek(closes,21),e34=ek(closes,34);
+        // ef = быстрая EMA (пользовательская или дефолт 9), es = медленная (21)
+        const ef = _P.ef || 9, es = _P.es || 21;
+        const eFast=ek(closes,ef), eSlow=ek(closes,es);
+        // Фиксированные вспомогательные для структуры вееpa
+        const e8=ef===8?eFast:ek(closes,8), e13=ek(closes,13), e21=es===21?eSlow:ek(closes,21), e34=ek(closes,34);
         const items = [];
 
-        // 1. Лента EMA — порядок как чистота тренда
-        const v8=e8[n-1],v13=e13[n-1],v21=e21[n-1],v34=e34[n-1];
-        const bullFan = v8>v13 && v13>v21 && v21>v34;
-        const bearFan = v8<v13 && v13<v21 && v21<v34;
+        // 1. Пользовательская пара fast/slow — основной сигнал
+        const vF=eFast[n-1], vS=eSlow[n-1];
+        const crossBarsCustom = [0,1,2,3,4].find(i=>(eFast[n-1-i]-eSlow[n-1-i])*(eFast[n-2-i]-eSlow[n-2-i])<0);
+        if (crossBarsCustom!=null && crossBarsCustom<=3) {
+          const crossSpeed = Math.abs(vF-vS)/(vS||1)*100;
+          items.push({type:vF>vS?'bullish':'bearish', text:`Пересечение EMA(${ef})/EMA(${es}) ${crossBarsCustom} баров назад, угол ${crossSpeed.toFixed(2)}% — ${crossSpeed>0.3?'участники реально переключились':'слабый сигнал, возможен возврат'}`});
+        } else {
+          items.push({type:vF>vS?'bullish':vF<vS?'bearish':'neutral', text:`EMA(${ef}) ${vF>vS?'>':'<'} EMA(${es}) — ${vF>vS?'бычий':'медвежий'} контекст`});
+        }
+
+        // 2. Структурный веер 8/13/21/34 — чистота тренда
+        const v8=e8[n-1],v13=e13[n-1],v21_=e21[n-1],v34=e34[n-1];
+        const bullFan = v8>v13 && v13>v21_ && v21_>v34;
+        const bearFan = v8<v13 && v13<v21_ && v21_<v34;
         if (bullFan) items.push({type:'bullish', text:`Веер EMA выстроен (8>13>21>34) — тренд чистый и сильный`});
         else if (bearFan) items.push({type:'bearish', text:`Медвежий веер EMA (8<13<21<34) — тренд вниз чистый`});
         else items.push({type:'neutral', text:`EMA переплетаются — рынок в хаосе, входить опасно`});
 
-        // 2. Угол EMA как спидометр (изменение e21 за 5 баров)
-        const slope5 = (e21[n-1]-e21[n-6])/e21[n-6]*100;
-        const slopeWas = (e21[n-6]-e21[n-11])/e21[n-11]*100;
-        if (Math.abs(slope5) > 0.3) {
-          items.push({type:slope5>0?'bullish':'bearish', text:`Угол EMA21: ${slope5.toFixed(2)}% за 5 баров — ${Math.abs(slope5)>0.8?'сильный импульс':'умеренный импульс'}`});
-        }
-        if (Math.abs(slope5) < Math.abs(slopeWas)*0.5 && Math.abs(slopeWas)>0.3) {
-          items.push({type:'neutral', text:`Угол EMA21 уменьшился вдвое — затухание импульса при продолжении цены`});
-        }
-
-        // 3. Отрыв цены от EMA21 — натянутая резинка
-        const dev21 = (closes[n-1]-v21)/v21*100;
-        if (Math.abs(dev21) > 2) {
-          items.push({type:dev21>0?'bearish':'bullish', text:`Отрыв от EMA21: ${dev21.toFixed(1)}% — резинка натянута. ${dev21>0?'На каскаде: сигнал силы, не разворота':'Цена далеко от средней вниз'}`});
+        // 3. Угол медленной EMA как спидометр
+        if (n >= 11) {
+          const slope5 = (vS-eSlow[n-6])/eSlow[n-6]*100;
+          const slopeWas = (eSlow[n-6]-eSlow[n-11])/eSlow[n-11]*100;
+          if (Math.abs(slope5) > 0.3) {
+            items.push({type:slope5>0?'bullish':'bearish', text:`Угол EMA(${es}): ${slope5.toFixed(2)}% за 5 баров — ${Math.abs(slope5)>0.8?'сильный импульс':'умеренный импульс'}`});
+          }
+          if (Math.abs(slope5) < Math.abs(slopeWas)*0.5 && Math.abs(slopeWas)>0.3) {
+            items.push({type:'neutral', text:`Угол EMA(${es}) уменьшился вдвое — затухание импульса при продолжении цены`});
+          }
         }
 
-        // 4. Угол пересечения e8/e21 — сила смены моментума
-        const crossBars = [0,1,2,3,4].find(i=>(e8[n-1-i]-e21[n-1-i])*(e8[n-2-i]-e21[n-2-i])<0);
-        if (crossBars!=null && crossBars<=3) {
-          const crossSpeed = Math.abs(e8[n-1]-e21[n-1])/(e21[n-1]||1)*100;
-          items.push({type:e8[n-1]>e21[n-1]?'bullish':'bearish', text:`Пересечение EMA8/21 ${crossBars} баров назад, угол ${crossSpeed.toFixed(2)}% — ${crossSpeed>0.3?'участники реально переключились':'слабый сигнал, возможен возврат'}`});
+        // 4. Отрыв цены от медленной EMA — натянутая резинка
+        const devS = (closes[n-1]-vS)/vS*100;
+        if (Math.abs(devS) > 2) {
+          items.push({type:devS>0?'bearish':'bullish', text:`Отрыв от EMA(${es}): ${devS.toFixed(1)}% — резинка натянута. ${devS>0?'На каскаде: сигнал силы, не разворота':'Цена далеко от средней вниз'}`});
         }
 
-        // 5. Скорость приближения цены к EMA = давление противоположной стороны
-        // Если цена летит к EMA быстро снизу = сильное давление вниз (продавцы останавливают)
-        const priceDist21 = closes.map(c=>(c-v21)/v21*100);
+        // 5. Скорость сближения с медленной EMA
         if (n >= 6) {
-          const dist0 = (closes[n-1]-v21)/v21*100;
-          const dist5 = (closes[n-6]-e21[n-6])/e21[n-6]*100;
+          const dist0 = (closes[n-1]-vS)/vS*100;
+          const dist5 = (closes[n-6]-eSlow[n-6])/eSlow[n-6]*100;
           const approaching = Math.abs(dist0) < Math.abs(dist5) && Math.sign(dist0)===Math.sign(dist5);
-          const speed = Math.abs(dist5-dist0); // насколько быстро сближается
+          const speed = Math.abs(dist5-dist0);
           if (approaching && speed > 0.5) {
             const dir = dist0 > 0 ? 'цена летит к EMA сверху' : 'цена летит к EMA снизу';
             const pressure = dist0 > 0 ? 'давление вниз сильное, покупатели теряют энергию' : 'давление вверх, продавцы слабеют';
             items.push({type: dist0>0?'bearish':'bullish', text:`${dir} (${speed.toFixed(2)}% за 5 баров) — ${pressure}`});
           } else if (!approaching && Math.abs(dist0) > Math.abs(dist5) + 0.3) {
             const dir = dist0 > 0 ? 'вверх' : 'вниз';
-            items.push({type: dist0>0?'bullish':'bearish', text:`Цена уходит от EMA21 ${dir} (${Math.abs(dist0).toFixed(2)}%) — слабое сопротивление, движение чистое`});
+            items.push({type: dist0>0?'bullish':'bearish', text:`Цена уходит от EMA(${es}) ${dir} (${Math.abs(dist0).toFixed(2)}%) — слабое сопротивление, движение чистое`});
           }
         }
-        // 6. Две MA в боковике: обе плоские = нитка
-        const sma20 = _anCalcSMA(closes, 20);
-        const smaFlat = sma20[n-1] && sma20[n-6] ? Math.abs(sma20[n-1]-sma20[n-6])/sma20[n-1]*100 : 1;
-        const emaFlat = Math.abs(v21-e21[n-6])/v21*100;
-        if (smaFlat < 0.1 && emaFlat < 0.1) items.push({type:'neutral', text:`SMA(20) и EMA(21) обе плоские (<0.1% за 5 баров) — нитка, максимальное согласие на отсутствие движения`});
+        // 6. Боковик: обе EMA плоские
+        if (n >= 6) {
+          const sma20 = _anCalcSMA(closes, 20);
+          const smaFlat = sma20[n-1] && sma20[n-6] ? Math.abs(sma20[n-1]-sma20[n-6])/sma20[n-1]*100 : 1;
+          const emaFlat = Math.abs(vS-eSlow[n-6])/vS*100;
+          if (smaFlat < 0.1 && emaFlat < 0.1) items.push({type:'neutral', text:`SMA(20) и EMA(${es}) обе плоские (<0.1% за 5 баров) — нитка, максимальное согласие на отсутствие движения`});
+        }
 
         // Блок «что делать» по MA/EMA
         {
-          const maDir = bullFan ? 'bullish' : bearFan ? 'bearish' : 'neutral';
-          const maConf = (bullFan||bearFan) ? (Math.abs(slope5)>0.5?'strong':'moderate') : 'weak';
-          const maLong = bullFan ? `Веер EMA бычий — держи лонг, откаты к EMA8/13 используй для доращивания с узким стопом.` : bearFan ? 'EMA показывают чистый нисходящий тренд — лонг опасен.' : null;
-          const maShort = bearFan ? 'Веер EMA медвежий — держи шорт, отскоки к EMA8/13 — точки для доращивания.' : bullFan ? 'Шорт против бычьего вееpa — высокий риск. Только со стопом выше EMA8.' : null;
+          const maDir = bullFan ? 'bullish' : bearFan ? 'bearish' : (vF>vS?'bullish':vF<vS?'bearish':'neutral');
+          const maConf = (bullFan||bearFan) ? 'moderate' : 'weak';
+          const maLong = bullFan ? `Веер EMA бычий — держи лонг, откаты к EMA(${ef}) используй для доращивания с узким стопом.` : bearFan ? 'EMA показывают чистый нисходящий тренд — лонг опасен.' : null;
+          const maShort = bearFan ? `Веер EMA медвежий — держи шорт, отскоки к EMA(${ef}) — точки для доращивания.` : bullFan ? `Шорт против бычьего вееpa — высокий риск. Только со стопом выше EMA(${ef}).` : null;
           _trade(maDir, maConf, maLong, maShort).forEach(t => items.push(t));
         }
 
-        // Классика MA: цена выше/ниже EMA(21), пересечение EMA8/EMA21
+        // Классика MA: цена выше/ниже медленной EMA, пересечение fast/slow
         const clMaItems = [];
         const lastCloseMA = closes[n-1];
-        if (lastCloseMA > v21) clMaItems.push({type:'bullish', text:`Цена (${lastCloseMA.toFixed(2)}) выше EMA(21) (${v21.toFixed(2)}) — классически бычье. Лонги предпочтительнее`});
-        else clMaItems.push({type:'bearish', text:`Цена (${lastCloseMA.toFixed(2)}) ниже EMA(21) (${v21.toFixed(2)}) — классически медвежье`});
+        if (lastCloseMA > vS) clMaItems.push({type:'bullish', text:`Цена (${lastCloseMA.toFixed(2)}) выше EMA(${es}) (${vS.toFixed(2)}) — классически бычье. Лонги предпочтительнее`});
+        else clMaItems.push({type:'bearish', text:`Цена (${lastCloseMA.toFixed(2)}) ниже EMA(${es}) (${vS.toFixed(2)}) — классически медвежье`});
         if (bullFan) clMaItems.push({type:'bullish', text:`EMA 8>13>21>34 — классический бычий выстрел, тренд подтверждён на всех периодах`});
         else if (bearFan) clMaItems.push({type:'bearish', text:`EMA 8<13<21<34 — классический медвежий порядок`});
-        const ema8ema21cross = (e8[n-1]>e21[n-1])!==(e8[n-2]>e21[n-2]);
-        if (ema8ema21cross) clMaItems.push({type:e8[n-1]>e21[n-1]?'bullish':'bearish', text:`EMA(8) пересекла EMA(21) — классический ${e8[n-1]>e21[n-1]?'золотой':'мёртвый'} крест`});
-        html += makeCard('MA/EMA / Скользящие средние', items, 'ma', clMaItems, 'ma');
+        if (crossBarsCustom!=null && crossBarsCustom<=1) clMaItems.push({type:vF>vS?'bullish':'bearish', text:`EMA(${ef}) пересекла EMA(${es}) — классический ${vF>vS?'золотой':'мёртвый'} крест`});
+        html += makeCard(`MA/EMA(${ef},${es}) / Скользящие средние`, items, 'ma', clMaItems, 'ma');
       }
     } else if (idL.includes('donchian') || idL === 'dc') {
       const period = 20;
