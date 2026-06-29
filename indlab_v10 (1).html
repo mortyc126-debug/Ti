@@ -1128,6 +1128,19 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
           <div class="cpnl-hdr"><span class="cpnl-lbl">OBV</span><span class="cpnl-val" id="chart-obv-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="obv" title="Скрыть">◉</span><span class="cpnl-del" data-id="obv" title="Убрать">✕</span></div>
           <canvas id="chart-obv-canvas" style="width:100%;height:70px;display:block;"></canvas>
         </div>
+        <!-- Fast indicators panels -->
+        <div id="chart-roc-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">ROC</span><span class="cpnl-val" id="chart-roc-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="roc" title="Скрыть">◉</span><span class="cpnl-del" data-id="roc" title="Убрать">✕</span></div>
+          <canvas id="chart-roc-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-momentum-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Momentum</span><span class="cpnl-val" id="chart-momentum-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="momentum" title="Скрыть">◉</span><span class="cpnl-del" data-id="momentum" title="Убрать">✕</span></div>
+          <canvas id="chart-momentum-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
+        <div id="chart-volspike-panel" class="chart-ind-panel" style="display:none;height:70px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
+          <div class="cpnl-hdr"><span class="cpnl-lbl">Vol Spike</span><span class="cpnl-val" id="chart-volspike-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="volspike" title="Скрыть">◉</span><span class="cpnl-del" data-id="volspike" title="Убрать">✕</span></div>
+          <canvas id="chart-volspike-canvas" style="width:100%;height:70px;display:block;"></canvas>
+        </div>
         <!-- Volume bars panel -->
         <div id="chart-volbars-panel" class="chart-ind-panel" style="display:none;height:72px;position:relative;border-top:1px solid rgba(255,255,255,0.04);">
           <div class="cpnl-hdr"><span class="cpnl-lbl">Объём</span><span class="cpnl-val" id="chart-volbars-val"></span><span style="flex:1"></span><span class="cpnl-eye" data-id="volbars" title="Скрыть">◉</span><span class="cpnl-del" data-id="volbars" title="Убрать">✕</span></div>
@@ -2657,6 +2670,87 @@ const IND_GROUPS = [
           const sp=v.mama-v.fama;
           if(Math.abs(sp)<0.05) return {s:'neutral', t:'MAMA≈FAMA — цикличный режим, накопление'};
           return {s:sp>0?'buy':'sell', t:`Расхождение ${sp>0?'+':''}${sp.toFixed(2)}: тренд ${sp>0?'вверх':'вниз'}`};
+        }
+      },
+    ]
+  },
+  {
+    id: 'fast', label: 'Быстрые / опережающие',
+    items: [
+      { id:'roc', name:'ROC / Скорость цены', full:'Rate of Change — скорость изменения цены',
+        desc:'(Close − Close[n]) / Close[n] × 100. Нулевой лаг — показывает текущее ускорение, не среднее прошлого. Пересечение нуля = потенциальный разворот импульса.',
+        params:[
+          {id:'val', label:'ROC %', min:-30, max:30, def:0, step:0.1},
+          {id:'n',   label:'Период', min:1, max:100, def:10, step:1},
+        ],
+        interpret: v => {
+          const x = v.val;
+          if(x > 5)  return {s:'buy-strong',  t:`ROC = +${x.toFixed(1)}% — сильное ускорение вверх. Импульс активен.`};
+          if(x > 1)  return {s:'buy',         t:`ROC = +${x.toFixed(1)}% — умеренный рост скорости.`};
+          if(x < -5) return {s:'sell-strong', t:`ROC = ${x.toFixed(1)}% — резкое падение. Продавцы доминируют.`};
+          if(x < -1) return {s:'sell',        t:`ROC = ${x.toFixed(1)}% — замедление, пробой возможен.`};
+          return {s:'neutral', t:`ROC = ${x.toFixed(1)}% — нет направленного импульса.`};
+        }
+      },
+      { id:'momentum', name:'Momentum / Импульс', full:'Momentum — абсолютное изменение цены за период',
+        desc:'Close − Close[n]. В отличие от ROC не нормирован — показывает абсолютную силу движения. Дивергенция с ценой опережает разворот на 2-5 баров.',
+        params:[
+          {id:'val', label:'Momentum', min:-100000, max:100000, def:0, step:0.01},
+          {id:'n',   label:'Период',   min:1, max:100, def:10, step:1},
+        ],
+        interpret: v => {
+          const x = v.val;
+          if(x > 0)  return {s:'buy',  t:`Momentum = +${x.toFixed(2)} — цена выше чем ${v.n} баров назад. Бычий импульс.`};
+          if(x < 0)  return {s:'sell', t:`Momentum = ${x.toFixed(2)} — цена ниже чем ${v.n} баров назад. Медвежий импульс.`};
+          return {s:'neutral', t:'Momentum = 0 — цена не изменилась за период.'};
+        }
+      },
+      { id:'volspike', name:'Volume Spike / Аномалия объёма', full:'Volume Spike — отношение текущего объёма к средней',
+        desc:'Vol[i] / MA(Vol, 20). Значение > 2 означает аномальный всплеск. Без лага — реагирует на текущий бар. Всплески на ключевых уровнях = подтверждение пробоя или поглощения.',
+        params:[
+          {id:'ratio', label:'Vol / MA ratio', min:0, max:10, def:1, step:0.01},
+        ],
+        interpret: v => {
+          const x = v.ratio;
+          if(x > 4)  return {s:'buy-strong',  t:`Объём в ${x.toFixed(1)}× от нормы — экстремальный всплеск. Крупный игрок.`};
+          if(x > 2)  return {s:'buy',         t:`Объём в ${x.toFixed(1)}× от нормы — аномальный всплеск. Подтверждение движения.`};
+          if(x > 1.3)return {s:'neutral',     t:`Объём в ${x.toFixed(1)}× — выше среднего, умеренный интерес.`};
+          if(x < 0.5)return {s:'warn',        t:`Объём в ${x.toFixed(1)}× — очень низкий. Движение без участия рынка, ненадёжно.`};
+          return {s:'neutral', t:`Объём в ${x.toFixed(1)}× — в норме.`};
+        }
+      },
+      { id:'vwap_pct', name:'VWAP % / Отклонение от VWAP', full:'VWAP % Deviation — отклонение цены от VWAP в процентах',
+        desc:'(Close − VWAP) / VWAP × 100. Показывает насколько цена оторвалась от справедливой стоимости дня. Экстремальные отклонения статистически откатываются.',
+        params:[
+          {id:'pct', label:'% от VWAP', min:-20, max:20, def:0, step:0.01},
+        ],
+        interpret: v => {
+          const x = v.pct;
+          if(x > 3)  return {s:'sell-strong', t:`+${x.toFixed(2)}% выше VWAP — перегрев, высокая вероятность возврата вниз.`};
+          if(x > 1)  return {s:'sell',        t:`+${x.toFixed(2)}% — цена выше VWAP, покупатели доминируют но близко к возврату.`};
+          if(x < -3) return {s:'buy-strong',  t:`${x.toFixed(2)}% ниже VWAP — перепроданность внутри дня, откат вероятен.`};
+          if(x < -1) return {s:'buy',         t:`${x.toFixed(2)}% ниже VWAP — продавцы доминируют, следи за разворотом.`};
+          return {s:'neutral', t:`${x.toFixed(2)}% — цена у VWAP, равновесие.`};
+        }
+      },
+      { id:'fast_combo', name:'◆ Быстрый сигнал (комбо)', full:'Fast Signal — комбинация опережающих индикаторов',
+        desc:'ROC + Volume Spike + VWAP % отклонение. Три быстрых инструмента без запаздывания. Все три в одну сторону = высокая достоверность. Два из трёх = рабочий сигнал. Один = предупреждение.',
+        params:[
+          {id:'roc',   label:'ROC %',         min:-30,  max:30,   def:0,  step:0.1},
+          {id:'spike', label:'Vol × норма',   min:0,    max:10,   def:1,  step:0.01},
+          {id:'vpct',  label:'VWAP %',        min:-20,  max:20,   def:0,  step:0.01},
+        ],
+        interpret: v => {
+          let bull = 0, bear = 0;
+          if(v.roc > 1)   bull++; else if(v.roc < -1) bear++;
+          if(v.spike > 2) { if(v.roc > 0) bull++; else bear++; }
+          if(v.vpct < -1) bull++; else if(v.vpct > 1) bear++;
+          const total = bull + bear;
+          if(bull >= 2 && v.spike > 2) return {s:'buy-strong',  t:`${bull}/3 за рост + аномальный объём (×${v.spike.toFixed(1)}). ROC ${v.roc>0?'+':''}${v.roc.toFixed(1)}%, VWAP ${v.vpct.toFixed(1)}%.`};
+          if(bull >= 2)               return {s:'buy',          t:`${bull}/3 опережающих за рост. ROC ${v.roc>0?'+':''}${v.roc.toFixed(1)}%, VWAP ${v.vpct.toFixed(1)}%.`};
+          if(bear >= 2 && v.spike > 2)return {s:'sell-strong', t:`${bear}/3 за падение + аномальный объём (×${v.spike.toFixed(1)}). ROC ${v.roc.toFixed(1)}%, VWAP ${v.vpct.toFixed(1)}%.`};
+          if(bear >= 2)               return {s:'sell',         t:`${bear}/3 опережающих за падение. ROC ${v.roc.toFixed(1)}%, VWAP ${v.vpct.toFixed(1)}%.`};
+          return {s:'neutral', t:`Нет консенсуса: бычьих ${bull}, медвежьих ${bear}. ROC ${v.roc>0?'+':''}${v.roc.toFixed(1)}%, объём ×${v.spike.toFixed(1)}, VWAP ${v.vpct.toFixed(1)}%.`};
         }
       },
     ]
@@ -5966,8 +6060,11 @@ function chartRedraw() {
   if (chartInds.wr)    _chartDrawWR();
   if (chartInds.ao)    _chartDrawAO();
   if (chartInds.mfi)   _chartDrawMFI();
-  if (chartInds.obv)     _chartDrawOBV();
-  if (chartInds.volbars) _chartDrawVolBars();
+  if (chartInds.obv)      _chartDrawOBV();
+  if (chartInds.volbars)  _chartDrawVolBars();
+  if (chartInds.roc)      _chartDrawROC();
+  if (chartInds.momentum) _chartDrawMomentum();
+  if (chartInds.volspike) _chartDrawVolSpike();
   // Fractals overlay on main chart
   if (chartInds.fractals) _chartDrawFractals();
   // VWAP overlay on main chart
@@ -7555,6 +7652,98 @@ function _chartDrawOBV() {
   const el=document.getElementById('chart-obv-badge'); if(el)setPill('chart-obv-badge',s);
 }
 
+// ── Быстрые индикаторы ────────────────────────────────────
+function _chartDrawFastPanel(id, series, zeroLine, colorPos, colorNeg, fmtVal) {
+  const canvas = document.getElementById(`chart-${id}-canvas`);
+  if (!canvas || !chartCandles.length) return;
+  const dpr = devicePixelRatio||1;
+  canvas.width = canvas.offsetWidth*dpr; canvas.height = canvas.offsetHeight*dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  ctx.clearRect(0,0,W,H);
+  const candles = chartCandles;
+  const maxVis = Math.min(candles.length, Math.floor(W/chartCandleW));
+  const endIdx  = Math.max(maxVis, candles.length-chartOffset);
+  const startIdx = Math.max(0, endIdx-maxVis);
+  const vis = series.slice(startIdx, endIdx).filter(v=>v!=null);
+  if (!vis.length) return;
+  const visSeries = series.slice(startIdx, endIdx);
+  const mn = Math.min(...vis), mx = Math.max(...vis);
+  const rng = mx-mn || 1;
+  const toY = v => H - ((v-mn)/rng)*H*0.88 - H*0.06;
+  const n = visSeries.length;
+  const xOf = i => (i+0.5)*(W/n);
+  // grid
+  ctx.strokeStyle='rgba(42,31,61,0.5)'; ctx.lineWidth=1;
+  if (zeroLine && mn<0 && mx>0) {
+    const y0=toY(0); ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(W,y0); ctx.stroke();
+  }
+  // histogram bars
+  visSeries.forEach((v,i)=>{
+    if(v==null) return;
+    const x=xOf(i), y0=zeroLine?toY(0):H*0.94, y=toY(v);
+    const bh=Math.abs(y-(zeroLine?y0:H*0.94));
+    ctx.fillStyle=v>=0?colorPos:colorNeg;
+    ctx.fillRect(x-Math.max(1,W/n/2-0.5), Math.min(y,zeroLine?y0:H*0.94), Math.max(1,W/n-1), Math.max(1,bh));
+  });
+  // value label
+  const last = visSeries[visSeries.length-1];
+  const valEl = document.getElementById(`chart-${id}-val`);
+  if (valEl && last!=null) valEl.textContent = fmtVal(last);
+}
+
+function _chartDrawROC() {
+  if (!chartCandles.length) return;
+  const n=10, closes=chartCandles.map(c=>c.close);
+  const roc=closes.map((c,i)=>i<n?null:(c-closes[i-n])/closes[i-n]*100);
+  _chartDrawFastPanel('roc', roc, true, 'rgba(82,242,201,0.6)', 'rgba(255,77,122,0.6)', v=>v.toFixed(2)+'%');
+}
+
+function _chartDrawMomentum() {
+  if (!chartCandles.length) return;
+  const n=10, closes=chartCandles.map(c=>c.close);
+  const mom=closes.map((c,i)=>i<n?null:c-closes[i-n]);
+  _chartDrawFastPanel('momentum', mom, true, 'rgba(82,242,201,0.6)', 'rgba(255,77,122,0.6)', v=>(v>=0?'+':'')+v.toFixed(2));
+}
+
+function _chartDrawVolSpike() {
+  if (!chartCandles.length) return;
+  const maLen=20, vols=chartCandles.map(c=>c.vol||0);
+  const spike=vols.map((v,i)=>{
+    if(i<maLen) return null;
+    const ma=vols.slice(i-maLen,i).reduce((a,b)=>a+b,0)/maLen;
+    return ma>0?v/ma:null;
+  });
+  // Цвет: >2 = яркий, 1-2 = тусклый, <1 = серый
+  const canvas = document.getElementById('chart-volspike-canvas');
+  if (!canvas || !chartCandles.length) return;
+  const dpr=devicePixelRatio||1;
+  canvas.width=canvas.offsetWidth*dpr; canvas.height=canvas.offsetHeight*dpr;
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  const W=canvas.offsetWidth, H=canvas.offsetHeight;
+  ctx.clearRect(0,0,W,H);
+  const maxVis=Math.min(chartCandles.length,Math.floor(W/chartCandleW));
+  const endIdx=Math.max(maxVis,chartCandles.length-chartOffset);
+  const startIdx=Math.max(0,endIdx-maxVis);
+  const vis=spike.slice(startIdx,endIdx);
+  const n=vis.length, mx=Math.max(...vis.filter(v=>v!=null),1);
+  const toY=v=>H-((v/Math.max(mx,4))*H*0.88)-H*0.06;
+  // ref line x1, x2, x4
+  ctx.strokeStyle='rgba(42,31,61,0.6)'; ctx.lineWidth=1;
+  [1,2,4].forEach(ref=>{
+    if(ref<=Math.max(mx,4)){const y=toY(ref);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  });
+  vis.forEach((v,i)=>{
+    if(v==null) return;
+    const x=(i+0.5)*(W/n), bh=Math.max(1,(v/Math.max(mx,4))*H*0.88);
+    ctx.fillStyle=v>=4?'rgba(255,159,64,0.85)':v>=2?'rgba(180,135,248,0.75)':v>=1?'rgba(100,80,160,0.45)':'rgba(60,50,100,0.3)';
+    ctx.fillRect(x-Math.max(1,W/n/2-0.5), H*0.94-bh, Math.max(1,W/n-1), bh);
+  });
+  const last=vis[vis.length-1];
+  const valEl=document.getElementById('chart-volspike-val');
+  if(valEl&&last!=null) valEl.textContent='×'+last.toFixed(2);
+}
+
 // ── Volume Bars — отдельная панель под основным графиком ──
 function _chartDrawVolBars() {
   const canvas = document.getElementById('chart-volbars-canvas');
@@ -9139,6 +9328,14 @@ function _sysRenderStaticSections() {
   const NC = '#C71B52', IND = '#60A4A1', CL = '#6F648F';
 
   el.innerHTML = [
+
+    sec('◆', 'Быстрый сигнал — опережающее комбо', [
+      {label:'Идея', lc:'#52F2C9', text:'Три инструмента без существенного лага: <b>ROC</b> (скорость цены), <b>Volume Spike</b> (аномальный объём), <b>VWAP %</b> (отклонение от справедливой цены дня). Показывают не что было, а что происходит прямо сейчас.'},
+      {label:'ROC / Скорость', lc:IND, text:'(Close − Close[10]) / Close[10] × 100. Нулевой лаг. Пересечение нуля = смена импульса. Значение > +3% или < −3% = сильный направленный импульс.'},
+      {label:'Volume Spike', lc:IND, text:'Текущий объём / MA(20) объёма. ×2 = подтверждение. ×4 = крупный игрок. Всплеск на уровне без движения = поглощение. Всплеск с движением = подтверждение пробоя.'},
+      {label:'VWAP %', lc:IND, text:'Отклонение от VWAP. >+2% = перегрев, вероятен откат. <−2% = перепроданность внутри дня. Вблизи нуля = равновесие, жди сигнала направления.'},
+      {label:'Чтение', lc:'#B487F8', text:'Все три в одну сторону = высокое доверие. Два из трёх = рабочий сигнал. Один = предупреждение. Важно: на очень волатильном инструменте Volume Spike без ROC = ещё неизвестно в какую сторону пойдёт.'},
+    ], ['roc','momentum','volspike','vwap']),
 
     sec('◆', 'VSA · Volume Spread Analysis', [
       {label:'Классика', lc:CL, text:'Большой объём без движения = поглощение, входи.'},
@@ -10881,6 +11078,7 @@ function cpChartToggle(id) {
     rsi:'chart-rsi-panel', macd:'chart-macd-panel', stoch:'chart-stoch-panel',
     cci:'chart-cci-panel', adx:'chart-adx-panel', wr:'chart-wr-panel', ao:'chart-ao-panel',
     mfi:'chart-mfi-panel', obv:'chart-obv-panel', volbars:'chart-volbars-panel',
+    roc:'chart-roc-panel', momentum:'chart-momentum-panel', volspike:'chart-volspike-panel',
     bb_pct:'chart-bb_pct-panel', bb_width:'chart-bb_width-panel',
     chaikin_osc:'chart-chaikin_osc-panel', adline:'chart-adline-panel',
     cmf:'chart-cmf-panel', chaikin_vol:'chart-chaikin_vol-panel',
