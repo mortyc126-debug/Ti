@@ -240,6 +240,9 @@ TRAIL_MIN_DIST_FRACTION = 0.5
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
 AGREE_STRENGTH_MIN = 0.12          # минимальная взвешенная сила согласных методов
 AGREE_SHARE_MIN = 0.35             # доля силы согласных от силы всех высказавшихся
+# Сниженный порог согласия для сделок ПО тренду (trending_down SHORT, trending_up LONG).
+# Трендовый контекст сам по себе — фильтр; не нужно дополнительно требовать 35% согласия.
+AGREE_SHARE_TREND_FOLLOW = 0.28
 
 # Четыре дополнительных условия гейта:
 # 1. IC-взвешенный net_agreement (абсолютный, не доля)
@@ -8483,9 +8486,20 @@ class OICompositeStrategy(IStrategy):
         n_base = len(BASE_METHOD_NAMES)
         score_map = dict(zip(BASE_METHOD_NAMES, scores[:n_base]))
 
-        # P5: адаптивный порог доли согласия по L1-контексту (клип 0.40..0.60).
-        agreement_threshold = AGREE_SHARE_MIN - 0.10 * self.__l1_score * sign_val
-        agreement_threshold = max(0.40, min(0.60, agreement_threshold))
+        # Блокировка контртрендового LONG в trending_down: статистически убыточен.
+        if self.__last_regime == "trending_down" and direction == SignalType.LONG:
+            return False, "blocked_counter_trend"
+
+        # P5: адаптивный порог доли согласия по L1-контексту (клип 0.25..0.60).
+        # Для сделок ПО тренду (trending_down SHORT / trending_up LONG) снижаем
+        # базовый порог — режим уже является дополнительным фильтром направления.
+        is_trend_follow = (
+            (self.__last_regime == "trending_down" and direction == SignalType.SHORT) or
+            (self.__last_regime == "trending_up"   and direction == SignalType.LONG)
+        )
+        base_share = AGREE_SHARE_TREND_FOLLOW if is_trend_follow else AGREE_SHARE_MIN
+        agreement_threshold = base_share - 0.10 * self.__l1_score * sign_val
+        agreement_threshold = max(0.25, min(0.60, agreement_threshold))
 
         agree_strength = 0.0
         total_strength = 0.0
