@@ -6212,6 +6212,8 @@ class OICompositeStrategy(IStrategy):
         self.__history = None
         self.__calibrator = None
         self.__db = None
+        # MethodCalibrator — адаптивные параметры индикаторов под тикер (еженедельно)
+        self.__method_calibrator = None
         # Динамические REGIME_WEIGHT_MODS из истории (обновляются при set_history)
         self.__dynamic_regime_mods: dict[str, dict[str, float]] = {}
         # tf-регимы от MultiTfBuffer (обновляются трейдером на каждой свече)
@@ -6427,6 +6429,25 @@ class OICompositeStrategy(IStrategy):
         # наполняем калибратор реальным распределением скоров по конкретному тикеру.
         if calibrator is not None and self.__atr_history_provider is not None:
             self.__warm_up_calibrator_from_candles(ticker, calibrator)
+        # MethodCalibrator: адаптивный подбор параметров индикаторов под тикер.
+        # Запускается раз в 7 дней; параметры сохраняются в method_params.json.
+        try:
+            from method_calibrator import MethodCalibrator
+            import os as _os
+            _mc_path = _os.path.join(_os.path.dirname(__file__), "../../method_params.json")
+            mc = MethodCalibrator(store_path=_mc_path, window=self.__candle_window)
+            if mc.needs_recalc(ticker) and self.__atr_history_provider is not None:
+                _mc_candles = self.__atr_history_provider(ticker)
+                if _mc_candles and len(_mc_candles) >= self.__candle_window + 20:
+                    _raw = [
+                        {"close": _to_f(c.close), "high": _to_f(c.high),
+                         "low": _to_f(c.low), "vol": float(c.volume)}
+                        for c in _mc_candles
+                    ]
+                    mc.calibrate(ticker, _raw)
+            self.__method_calibrator = mc
+        except Exception as _mc_exc:
+            logger.warning(f"{ticker}: MethodCalibrator init/calibrate failed: {_mc_exc}")
         # Загрузка динамических режимных модификаторов из истории сделок
         self._reload_dynamic_regime_mods()
         # Инициализация кластерных моделей M1/M2/M3
@@ -7899,6 +7920,23 @@ class OICompositeStrategy(IStrategy):
         ] + [self.__score_tradestats(name) for name in TRADESTATS_METHOD_NAMES] \
           + [self.__cached_change_point, self.__score_multi_ticker()]
 
+        # Адаптивные параметры индикаторов: заменяем скор tunable-метода
+        # откалиброванной под тикер функцией (MethodCalibrator).
+        if self.__method_calibrator is not None:
+            _mc_ticker = self.__settings.ticker
+            _mc_highs   = [_to_f(c.high)  for c in window]
+            _mc_lows    = [_to_f(c.low)   for c in window]
+            for _mc_i, (_mc_name, _) in enumerate(METHODS):
+                if _mc_name in _dm:
+                    continue
+                _cfn = self.__method_calibrator.get_fn(_mc_ticker, _mc_name)
+                if _cfn is not None:
+                    try:
+                        _cv = _cfn(closes, _mc_highs, _mc_lows, volumes)
+                        base_scores[_mc_i] = -_cv if _mc_name in _inv else _cv
+                    except Exception:
+                        pass
+
         # Layer 0: непрерывное распределение по всем режимам.
         regime = max(regime_probs, key=regime_probs.get)
         regime_conf = regime_probs[regime]
@@ -8760,6 +8798,22 @@ class OICompositeStrategy(IStrategy):
         if self.__auto_atr_recalc_date == today:
             return
         self.__auto_atr_recalc_date = today
+
+        # MethodCalibrator: еженедельный пересчёт (внутри needs_recalc проверяет 7 дней).
+        if self.__method_calibrator is not None:
+            try:
+                _mc_ticker = self.__settings.ticker
+                if self.__method_calibrator.needs_recalc(_mc_ticker):
+                    _mc_candles = self.__atr_history_provider(_mc_ticker)
+                    if _mc_candles and len(_mc_candles) >= self.__candle_window + 20:
+                        _mc_raw = [
+                            {"close": _to_f(c.close), "high": _to_f(c.high),
+                             "low": _to_f(c.low), "vol": float(c.volume)}
+                            for c in _mc_candles
+                        ]
+                        self.__method_calibrator.calibrate(_mc_ticker, _mc_raw)
+            except Exception as _mc_exc:
+                logger.warning(f"MethodCalibrator daily recalc failed: {_mc_exc}")
 
         try:
             history = self.__atr_history_provider(self.__settings.ticker)
