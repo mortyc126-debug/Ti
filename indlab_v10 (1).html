@@ -5883,6 +5883,57 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sel) sel.addEventListener('change', () => { if (_chartAutoActive) _chartAutoTick(); });
 });
 
+// Drag-to-scroll: тащим мышкой по любому скроллируемому контейнеру
+// Срабатывает только на «пустом» месте (не текст, не кнопка, не input)
+(function _initDragScroll() {
+  const DRAG_TAGS = new Set(['BUTTON','INPUT','SELECT','TEXTAREA','A','LABEL']);
+  let _ds = null; // {el, startX, startY, scrollX, scrollY}
+
+  document.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    // Если цель — интерактивный элемент или выделяемый текст — не перехватываем
+    let t = e.target;
+    while (t && t !== document.body) {
+      if (DRAG_TAGS.has(t.tagName)) return;
+      t = t.parentElement;
+    }
+    // Ищем ближайший скроллируемый предок
+    let el = e.target;
+    while (el && el !== document.body) {
+      const st = getComputedStyle(el);
+      const oy = st.overflowY, ox = st.overflowX;
+      const scrollable = ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight)
+                      || ((ox === 'auto' || ox === 'scroll') && el.scrollWidth  > el.clientWidth);
+      if (scrollable) break;
+      el = el.parentElement;
+    }
+    if (!el || el === document.body) return;
+    _ds = { el, startX: e.clientX, startY: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop };
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('mousemove', e => {
+    if (!_ds) return;
+    const dx = e.clientX - _ds.startX;
+    const dy = e.clientY - _ds.startY;
+    _ds.el.scrollLeft = _ds.scrollX - dx;
+    _ds.el.scrollTop  = _ds.scrollY - dy;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!_ds) return;
+    _ds.el.style.cursor = '';
+    _ds = null;
+  });
+
+  document.addEventListener('mouseleave', () => {
+    if (!_ds) return;
+    _ds.el.style.cursor = '';
+    _ds = null;
+  });
+})();
+
 function chartStatus(msg, color) {
   const el = document.getElementById('chart-status');
   if (el) { el.textContent = msg; el.style.color = color || 'var(--text3)'; }
