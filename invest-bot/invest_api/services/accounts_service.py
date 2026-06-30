@@ -1,6 +1,8 @@
 import logging
+import os
 
 from tinkoff.invest import Client, AccessLevel, AccountType, AccountStatus
+from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
 from invest_api.invest_target import INVEST_TARGET
 
 from configuration.settings import AccountSettings
@@ -9,6 +11,8 @@ from invest_api.invest_error_decorators import invest_error_logging, invest_api_
 __all__ = ("AccountService")
 
 logger = logging.getLogger(__name__)
+
+_IS_SANDBOX = os.getenv("TINKOFF_SANDBOX") == "1"
 
 
 class AccountService:
@@ -23,11 +27,27 @@ class AccountService:
     @invest_error_logging
     def trading_account_id(self, account_settings: AccountSettings) -> str:
         """
-        Method returns appropriate account id for trading:
+        Возвращает account_id для торговли.
+        В sandbox-режиме (TINKOFF_SANDBOX=1) использует sandbox API —
+        sandbox-счета не видны через users.get_accounts() и не имеют
+        маржинальных атрибутов, поэтому нужна отдельная ветка.
+        """
+        if _IS_SANDBOX:
+            return self._sandbox_account_id()
+        return self._live_account_id(account_settings)
+
+    def _sandbox_account_id(self) -> str | None:
+        """Возвращает (или создаёт) первый sandbox-счёт."""
+        from sandbox_monitor import get_or_create_sandbox_account
+        return get_or_create_sandbox_account(self.__token, self.__app_name)
+
+    def _live_account_id(self, account_settings: AccountSettings) -> str | None:
+        """
+        Стандартный выбор боевого счёта:
         Full rights, common type (avoid IIS etc), account is open and ready,
         liquid_portfolio more that configured,
-        green margin status (liquid > starting_margin)
-        Account with high liquid_portfolio will be selected if more that one found
+        green margin status (liquid > starting_margin).
+        Account with high liquid_portfolio will be selected if more that one found.
         """
         result = None
         max_liquid_portfolio = -1

@@ -47,7 +47,8 @@ export default {
       /^https:\/\/api\.stlouisfed\.org\/fred\//,    // FRED REST API (US Fed, world macro, требует API-key)
       /^https:\/\/query[12]\.finance\.yahoo\.com\//, // Yahoo Finance — котировки, курсы, Brent, индексы
       /^https:\/\/stooq\.com\//,                     // Stooq — CSV исторических котировок (без ключа)
-      /^https:\/\/data-api\.ecb\.europa\.eu\//       // ECB SDMX API — евро-ставки, HICP
+      /^https:\/\/data-api\.ecb\.europa\.eu\//,      // ECB SDMX API — евро-ставки, HICP
+      /^https:\/\/invest-public-api\.tinkoff\.ru\//  // T-Invest API (T-Bank) — котировки акций MOEX
     ];
     const isAllowed = (u) => ALLOWED.some((re) => re.test(u));
 

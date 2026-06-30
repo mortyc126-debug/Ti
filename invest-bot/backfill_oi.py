@@ -1,0 +1,321 @@
+"""
+backfill_oi.py — Загрузка исторического FutOI из MOEX AlgoPack.
+
+AlgoPack отдаёт FutOI только на конкретную дату (один запрос = один день).
+Скрипт перебирает торговые дни за последние N месяцев, на каждый делает
+отдельный запрос и сохраняет результат в data/oi_daily.json.
+
+Для каждого акционного тикера (SBER, GAZP...) скрипт сначала запрашивает
+публичный MOEX ISS чтобы найти фьючерсные контракты (SBERH6, SBERZ5...).
+Затем для каждой исторической даты выбирает тот контракт, у которого
+lasttradedate >= дата (ближайший незакрытый, т.е. фронт-месяц).
+Ни одного тикера не генерируем — всё берём из MOEX.
+
+Запуск:
+    python backfill_oi.py            # 12 месяцев для всех тикеров из settings.ini
+    python backfill_oi.py --months 6
+    python backfill_oi.py --tickers SBER,GAZP --months 3
+"""
+
+import argparse
+import json
+import logging
+import os
+import time
+import urllib.parse
+import urllib.request
+from configparser import ConfigParser
+from datetime import date, timedelta
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+FUTOI_URL = "https://apim.moex.com/iss/analyticalproducts/futoi/securities.json"
+MOEX_ISS  = "https://iss.moex.com/iss"
+HISTORY_FILE = "data/oi_daily.json"
+PAUSE_SEC = 0.4   # пауза между запросами к AlgoPack
+
+
+def _get_token() -> str | None:
+    token = os.getenv("MOEX_TOKEN")
+    if token:
+        return token
+    ini = ConfigParser()
+    ini.read("settings.ini", encoding="utf-8")
+    return ini.get("MOEX", "TOKEN", fallback=None) or None
+
+
+def _get_strategy_tickers() -> list[str]:
+    """Читает тикеры из секций STRATEGY_* settings.ini (акционные, не фьючерсные)."""
+    ini = ConfigParser()
+    ini.read("settings.ini", encoding="utf-8")
+    tickers = []
+    for section in ini.sections():
+        if not section.startswith("STRATEGY_") or "_SETTINGS" in section:
+            continue
+        t = ini.get(section, "TICKER", fallback=None)
+        if t:
+            tickers.append(t.upper())
+    return tickers
+
+
+def _fetch_futures_contracts(stock_ticker: str) -> list[dict]:
+    """
+    Запрашивает публичный MOEX ISS чтобы найти все фьючерсные контракты
+    на данный акционный тикер (включая истёкшие за последние годы).
+    Возвращает [{secid, lasttradedate}] отсортированных по lasttradedate.
+    Не требует MOEX токена.
+    """
+    # Ищем по имени/коду: запрос возвращает и активные, и ближайшие истёкшие.
+    # Сначала пробуем активные на FORTS (RFUD — квартальные фьючерсы).
+    contracts: dict[str, str] = {}  # secid -> lasttradedate
+
+    # 1. Активные контракты из стакана фьючерсов FORTS
+    try:
+        url = (f"{MOEX_ISS}/engines/futures/markets/forts/boards/RFUD/securities.json"
+               f"?iss.meta=off&securities.columns=SECID,LASTTRADEDATE")
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            data = json.load(resp)
+        block = data.get("securities", {})
+        cols = block.get("columns", [])
+        rows = block.get("data", [])
+        secid_i = cols.index("SECID") if "SECID" in cols else -1
+        ltd_i   = cols.index("LASTTRADEDATE") if "LASTTRADEDATE" in cols else -1
+        if secid_i >= 0 and ltd_i >= 0:
+            for row in rows:
+                sid = str(row[secid_i] or "")
+                ltd = str(row[ltd_i] or "")
+                if sid.upper().startswith(stock_ticker.upper()) and ltd:
+                    contracts[sid] = ltd[:10]  # берём только дату YYYY-MM-DD
+    except Exception as e:
+        logger.debug(f"ISS RFUD запрос упал: {e}")
+
+    # 2. Поиск через /securities.json — покрывает истёкшие контракты за последние годы
+    try:
+        params = urllib.parse.urlencode({"q": stock_ticker, "iss.meta": "off",
+                                         "securities.columns": "secid,matdate,type"})
+        url = f"{MOEX_ISS}/securities.json?{params}"
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            data = json.load(resp)
+        block = data.get("securities", {})
+        cols = block.get("columns", [])
+        rows = block.get("data", [])
+        secid_i = cols.index("secid") if "secid" in cols else -1
+        mat_i   = cols.index("matdate") if "matdate" in cols else -1
+        type_i  = cols.index("type") if "type" in cols else -1
+        if secid_i >= 0 and mat_i >= 0:
+            for row in rows:
+                sid  = str(row[secid_i] or "")
+                mat  = str(row[mat_i] or "")
+                typ  = str(row[type_i] or "") if type_i >= 0 else ""
+                # фьючерсы = type 'futures', secid начинается на тикер
+                if sid.upper().startswith(stock_ticker.upper()) and mat and "future" in typ.lower():
+                    contracts.setdefault(sid, mat[:10])
+    except Exception as e:
+        logger.debug(f"ISS securities search упал: {e}")
+
+    if not contracts:
+        logger.warning(f"{stock_ticker}: не нашли фьючерсных контрактов на MOEX ISS")
+        return []
+
+    result = sorted(
+        [{"secid": k, "lasttradedate": v} for k, v in contracts.items()],
+        key=lambda x: x["lasttradedate"],
+    )
+    logger.info(f"{stock_ticker}: найдено {len(result)} контрактов: "
+                f"{[r['secid'] for r in result]}")
+    return result
+
+
+def _pick_contract(contracts: list[dict], trade_date: str) -> str | None:
+    """
+    Для заданной даты выбирает фронт-месяц: контракт с наименьшим lasttradedate
+    при условии lasttradedate >= trade_date (контракт ещё не истёк).
+    """
+    candidates = [c for c in contracts if c["lasttradedate"] >= trade_date]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda x: x["lasttradedate"])["secid"]
+
+
+def _trading_days(date_from: date, date_till: date) -> list[date]:
+    """Все будние дни в диапазоне (пн–пт)."""
+    days = []
+    cur = date_from
+    while cur <= date_till:
+        if cur.weekday() < 5:
+            days.append(cur)
+        cur += timedelta(days=1)
+    return days
+
+
+def _fetch_day(sym: str, token: str, trade_date: str) -> dict | None:
+    """Запрос FutOI на конкретную дату и конкретный тикер фьючерса."""
+    params = {
+        "ticker": sym,
+        "date": trade_date,
+        "iss.meta": "off",
+        "limit": 100,
+    }
+    url = f"{FUTOI_URL}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.load(resp)
+    except Exception as e:
+        logger.debug(f"  {sym} {trade_date}: ошибка запроса: {e}")
+        return None
+
+    block = data.get("futoi")
+    if not block or not block.get("columns") or not block.get("data"):
+        return None
+    cols = block["columns"]
+    rows = [dict(zip(cols, row)) for row in block["data"]]
+    rows = [r for r in rows if str(r.get("ticker") or "") == sym]
+    if not rows:
+        return None
+
+    by_group: dict[str, dict] = {}
+    for r in rows:
+        g = str(r.get("clgroup") or "").upper()
+        if g not in ("YUR", "FIZ"):
+            continue
+        tt = str(r.get("tradetime") or r.get("tradedate") or "")
+        if g not in by_group or tt > str(by_group[g].get("tradetime") or ""):
+            by_group[g] = r
+
+    if not by_group:
+        return None
+
+    yur = by_group.get("YUR", {})
+    fiz = by_group.get("FIZ", {})
+    yur_long  = float(yur.get("pos_long")  or 0)
+    yur_short = abs(float(yur.get("pos_short") or 0))
+    fiz_long  = float(fiz.get("pos_long")  or 0)
+    fiz_short = abs(float(fiz.get("pos_short") or 0))
+
+    return {
+        "tradedate": trade_date,
+        "fut_ticker": sym,   # сохраняем для отладки
+        "long":      yur_long + fiz_long,
+        "short":     yur_short + fiz_short,
+        "yur_long":  yur_long,
+        "yur_short": yur_short,
+        "fiz_long":  fiz_long,
+        "fiz_short": fiz_short,
+    }
+
+
+def _load_existing() -> dict:
+    if not os.path.exists(HISTORY_FILE):
+        return {}
+    try:
+        with open(HISTORY_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning(f"Не удалось прочитать {HISTORY_FILE}: {e}")
+        return {}
+
+
+def _save(history: dict) -> None:
+    os.makedirs("data", exist_ok=True)
+    tmp = HISTORY_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False)
+    os.replace(tmp, HISTORY_FILE)
+
+
+def _merge(existing: list[dict], new_rows: list[dict]) -> list[dict]:
+    by_date = {r["tradedate"]: r for r in existing}
+    for r in new_rows:
+        td = r["tradedate"]
+        if td not in by_date or r.get("long", 0) > by_date[td].get("long", 0):
+            by_date[td] = r
+    return sorted(by_date.values(), key=lambda x: x["tradedate"])[-500:]
+
+
+def backfill(tickers: list[str], months: int, token: str) -> dict:
+    date_till = date.today()
+    date_from = date_till - timedelta(days=months * 31)
+    days = _trading_days(date_from, date_till)
+
+    logger.info(f"Период: {date_from} → {date_till}, дней: {len(days)}, тикеров: {len(tickers)}")
+
+    history = _load_existing()
+    log_lines: list[str] = []
+    total_new = 0
+
+    for stock_ticker in tickers:
+        # Получаем реальные фьючерсные контракты с MOEX ISS
+        contracts = _fetch_futures_contracts(stock_ticker)
+        if not contracts:
+            msg = f"{stock_ticker}: контракты не найдены на MOEX ISS — пропущен"
+            logger.warning(msg); log_lines.append(msg)
+            continue
+
+        existing_dates = {r["tradedate"] for r in history.get(stock_ticker, [])}
+        new_rows: list[dict] = []
+        fetched = skipped = no_contract = 0
+
+        logger.info(f"{stock_ticker}: {len(days)} дней...")
+        for d in days:
+            ds = d.isoformat()
+            if ds in existing_dates:
+                skipped += 1
+                continue
+
+            # Для этой даты выбираем нужный контракт из MOEX ISS
+            fut_sym = _pick_contract(contracts, ds)
+            if not fut_sym:
+                no_contract += 1
+                continue
+
+            row = _fetch_day(fut_sym, token, ds)
+            if row:
+                new_rows.append(row)
+                fetched += 1
+            time.sleep(PAUSE_SEC)
+
+        merged = _merge(history.get(stock_ticker, []), new_rows)
+        history[stock_ticker] = merged
+        total_new += fetched
+        msg = (f"{stock_ticker}: +{fetched} новых дней "
+               f"(пропущено известных: {skipped}, нет контракта: {no_contract}, итого: {len(merged)})")
+        logger.info(msg); log_lines.append(msg)
+
+        # Сохраняем после каждого тикера
+        _save(history)
+
+    logger.info(f"Готово. Новых записей: {total_new}")
+    return {"total_new": total_new, "tickers": len(tickers), "log": log_lines}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--months",  type=int, default=12)
+    parser.add_argument("--tickers", type=str, default="")
+    args = parser.parse_args()
+
+    token = _get_token()
+    if not token:
+        logger.error("MOEX_TOKEN не задан. Укажите в env или settings.ini [MOEX] TOKEN=...")
+        return
+
+    if args.tickers:
+        tickers = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+    else:
+        tickers = _get_strategy_tickers()
+        if not tickers:
+            logger.error("Не найдено ни одного тикера в settings.ini [STRATEGY_*]. "
+                         "Укажите --tickers SBER,GAZP или добавьте стратегии.")
+            return
+
+    logger.info(f"Тикеры: {tickers}")
+    backfill(tickers, args.months, token)
+
+
+if __name__ == "__main__":
+    main()

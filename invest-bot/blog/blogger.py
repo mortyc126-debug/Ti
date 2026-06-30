@@ -37,6 +37,10 @@ class Blogger:
         except Exception as ex:
             logger.error(f"Error put message to telegram messages queue: {repr(ex)}")
 
+    def send_raw(self, text: str) -> None:
+        """Отправить произвольный текст в Telegram (без проверки blog_status — всегда)."""
+        self.__send_text_message(text)
+
     def start_trading_message(
             self,
             today_trade_strategy: dict[str, IStrategy],

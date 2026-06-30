@@ -6,6 +6,14 @@ import os
 from collections import deque
 from decimal import Decimal
 
+# Консилиум агентов: Cerebras-based ИИ-совет перед входом в позицию.
+# Выключается через COUNCIL=0, работает только если задан CEREBRAS_API_KEY.
+_COUNCIL_ENABLED = os.getenv("COUNCIL", "1") == "1"
+
+# В sandbox-режиме включаем стакан по умолчанию — на реальном стриме данные
+# актуальны, и imbalance-фильтр + squeeze работают полноценно.
+_IS_SANDBOX = os.getenv("TINKOFF_SANDBOX") == "1"
+
 from tinkoff.invest import Candle, OrderExecutionReportStatus
 from tinkoff.invest.utils import quotation_to_decimal
 
@@ -34,6 +42,9 @@ from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
 from candle_archive import get_candles_cached
+import council
+import trade_analytics
+import metrics
 from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
 import bot_control
@@ -76,7 +87,7 @@ AUTO_ATR_HISTORY_DAYS = 90
 # глубина ORDERBOOK_DEPTH уровней. Выключен по умолчанию (новая живая
 # подписка с доп. нагрузкой на лимиты API) — включается с дашборда
 # (RuntimeOverrides.orderbook_enabled) или ORDERBOOK=1.
-ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "0") == "1"
+ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "1" if os.getenv("TINKOFF_SANDBOX") == "1" else "0") == "1"
 ORDERBOOK_DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "10"))
 
 # Спред-фильтр: пропускаем вход если bid-ask спред шире этой доли от цены.
@@ -1486,6 +1497,39 @@ class Trader:
             except Exception:
                 pass
 
+        # Консилиум: ИИ-совет перед входом (Альфа + Скептик + опционально Модератор).
+        # Если council говорит "skip" — ордер не выставляется, торговлю не блокирует.
+        # Работает только при COUNCIL=1 и наличии CEREBRAS_API_KEY.
+        if _COUNCIL_ENABLED:
+            try:
+                _snap = strategy.last_snapshot() if hasattr(strategy, "last_snapshot") else {}
+                _analytics = trade_analytics.full_report_for_council(risk_ticker)
+                _cr = await council.consult_signal(
+                    ticker=risk_ticker,
+                    direction=direction,
+                    snapshot=_snap,
+                    analytics_text=_analytics,
+                    timeout=25.0,
+                )
+                if _cr.get("verdict") == "skip":
+                    _reason = _cr.get("reason", "")
+                    logger.info(
+                        f"Консилиум пропускает {risk_ticker} {direction}: {_reason}"
+                    )
+                    self.__blogger.send_raw(
+                        f"🏛 Консилиум: {risk_ticker} {direction.upper()} → ПРОПУСК\n"
+                        f"Причина: {_reason}\n"
+                        f"Уверенность: {_cr.get('confidence', 0):.0%}"
+                    )
+                    self.__pending_orders.discard(figi)
+                    return
+                logger.info(
+                    f"Консилиум одобрил {risk_ticker}: "
+                    f"conf={_cr.get('confidence', 0):.2f}"
+                )
+            except Exception as _ce:
+                logger.warning(f"Консилиум ошибка ({risk_ticker}): {_ce} — продолжаем без совета")
+
         # Дробный вход: первый транш = TRANCHE1_RATIO*lots, остаток — позже
         first_lots = available_lots
         remaining_lots = 0
@@ -1545,6 +1589,15 @@ class Trader:
                     )
                     self.__blogger.open_position_message(open_position)
                     logger.info(f"Open position: {open_position}")
+                    # Лог открытия в trades.jsonl для metrics.py
+                    metrics.log_trade("open", {
+                        "ticker": risk_ticker, "direction": direction,
+                        "qty": actual_lots, "entry": entry_price,
+                        "stop": stop_price,
+                        "take": float(signal_new.take_profit_level),
+                        "confidence": confidence,
+                        "order_id": open_order_id,
+                    })
                     # Запускаем MFE/MAE трекинг для этой позиции
                     self.__pos_tracking[figi] = {
                         "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
@@ -2290,6 +2343,9 @@ class Trader:
             return None
         result = self.__risk.close_position(
             risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
+        if result:
+            # Лог закрытия в trades.jsonl — основа для metrics.py (PnL, WR, Kelly)
+            metrics.log_trade("close", result)
         if result and result.get("pnl_rub", 0) < 0:
             self.__loss_cooldown_until[risk_ticker] = datetime.datetime.utcnow() + \
                 datetime.timedelta(minutes=LOSS_REENTRY_COOLDOWN_MINUTES)

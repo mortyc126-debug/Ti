@@ -171,7 +171,15 @@ def _save_backtest_history_one(
             _set_progress(progress, ticker, "нет истории")
             return ticker, None, 0, f"{ticker}: нет свечей"
         _set_progress(progress, ticker, f"скан сигналов ({len(candles)} свечей)")
-        strategy.backtest_barriers(candles)
+        from oi_layers import OiBacktestProvider
+        oi_prov = OiBacktestProvider.load()
+        if oi_prov.has_data(ticker):
+            strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+            strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+            strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+            strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+            strategy.set_squeeze_provider(oi_prov.squeeze_score)
+        strategy.backtest_barriers(candles, oi_date_hook=oi_prov.set_date if oi_prov.has_data(ticker) else None)
         hist = bt_store._data.get(ticker, {})
         n_trades = sum(len(day.get("trades", [])) for day in hist.values())
         _set_progress(progress, ticker, "готово")
@@ -1000,7 +1008,19 @@ def get_trade_chart(ticker: str, days: int, atr_take: float, atr_stop: float) ->
         return {"error": f"{ticker}: стратегия не создана"}
     _wire_history(strategy)
 
-    signals = strategy.backtest_scan_signals(candles)
+    from oi_layers import OiBacktestProvider
+    oi_prov = OiBacktestProvider.load()
+    if oi_prov.has_data(ticker):
+        strategy.set_inst_oi_provider(oi_prov.inst_oi_score)
+        strategy.set_retail_contra_provider(oi_prov.retail_contra_score)
+        strategy.set_delta_quadrant_provider(oi_prov.delta_quadrant_score)
+        strategy.set_oi_absorption_provider(oi_prov.absorption_score)
+        strategy.set_squeeze_provider(oi_prov.squeeze_score)
+        oi_hook = oi_prov.set_date
+    else:
+        oi_hook = None
+
+    signals = strategy.backtest_scan_signals(candles, oi_date_hook=oi_hook)
     result = strategy.backtest_barriers(
         candles, signals=signals,
         atr_take_k=atr_take, atr_stop_k=atr_stop,
@@ -2823,6 +2843,17 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <!-- ══════════════════════ TAB: БОТ (LIVE) ══════════════════════ -->
 <div class="tab-pane" id="tab-live">
 
+<!-- суб-табы -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+  <button class="btn-pill" id="live-sub-btn-ctrl"   onclick="liveSub('ctrl')"   style="opacity:1;">📡 Управление</button>
+  <button class="btn-pill" id="live-sub-btn-cfg"    onclick="liveSub('cfg')"    style="opacity:.5;">⚙️ Настройки</button>
+  <button class="btn-pill" id="live-sub-btn-chart"  onclick="liveSub('chart')"  style="opacity:.5;">📊 График</button>
+  <button class="btn-pill" id="live-sub-btn-council" onclick="liveSub('council')" style="opacity:.5;">🧠 Консилиум</button>
+  <button class="btn-pill" id="live-sub-btn-oi"     onclick="liveSub('oi')"     style="opacity:.5;">📥 OI</button>
+</div>
+
+<!-- ══ СУБ-ТАБ: УПРАВЛЕНИЕ ══ -->
+<div id="live-sub-ctrl">
 <div class="panel">
   <div class="sec-lg">Статус и управление</div>
   <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
@@ -2879,6 +2910,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </div>
 </div>
 
+</div><!-- /live-sub-ctrl -->
+
+<!-- ══ СУБ-ТАБ: НАСТРОЙКИ ══ -->
+<div id="live-sub-cfg" style="display:none;">
 <div class="panel">
   <div class="sec-lg">Глобальные настройки бота</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
@@ -2930,7 +2965,13 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div class="panel">
-  <div class="sec-lg">Настройки по тикерам</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+    <div class="sec-lg" style="margin:0;">Настройки по тикерам</div>
+    <button class="btn-pill btn-sm" onclick="ovBulk('enabled',true)">✅ Все торговать</button>
+    <button class="btn-pill btn-sm" onclick="ovBulk('enabled',false)">⏸ Все паузу</button>
+    <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',true)">🔔 Все сигнал</button>
+    <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',false)">💸 Все торговля</button>
+  </div>
   <table class="scen-table">
     <thead><tr>
       <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
@@ -2939,6 +2980,122 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <tbody id="ov_table"></tbody>
   </table>
 </div>
+
+</div><!-- /live-sub-cfg -->
+
+<!-- ══ СУБ-ТАБ: ГРАФИК СДЕЛОК ══ -->
+<div id="live-sub-chart" style="display:none;">
+<div class="panel">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+    <div class="sec-lg" style="margin:0;">График сделок (live)</div>
+    <select class="inp mid" id="lc_ticker" style="width:90px;"></select>
+    <select class="inp mid" id="lc_days" style="width:80px;">
+      <option value="3">3 дня</option>
+      <option value="7" selected>7 дней</option>
+      <option value="14">14 дней</option>
+      <option value="30">30 дней</option>
+    </select>
+    <button class="btn-pill btn-sm" onclick="loadLiveChart()">⟳ Обновить</button>
+    <span id="lc_status" style="font-size:11px;color:var(--txt3);"></span>
+  </div>
+  <div id="lc_chart" style="width:100%;height:400px;background:var(--card);border-radius:8px;border:1px solid var(--border2);position:relative;">
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;" id="lc_placeholder">Выбери тикер и нажми ⟳</div>
+    <canvas id="lc_canvas" style="display:none;width:100%;height:100%;"></canvas>
+  </div>
+  <div id="lc_trades_list" style="margin-top:8px;font-size:11px;color:var(--txt2);"></div>
+</div>
+
+<div class="panel">
+  <div class="sec-lg">Fitness scorecard</div>
+  <div id="live_scorecard" style="font-size:12px;color:var(--txt2);">загрузка...</div>
+  <div style="margin-top:10px;font-size:11px;color:var(--txt3);" id="live_per_ticker"></div>
+</div>
+
+</div><!-- /live-sub-chart -->
+
+<!-- ══ СУБ-ТАБ: КОНСИЛИУМ ══ -->
+<div id="live-sub-council" style="display:none;">
+
+<div class="panel">
+  <div class="sec-lg">Запрос к консилиуму</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Задай вопрос агентам-аналитикам. Альфа строит тезис, Бета критикует, Модератор резюмирует.
+    Можно спросить по конкретному тикеру или задать общий вопрос.
+  </div>
+  <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:260px;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" class="inp mid" id="ca_ticker" placeholder="Тикер (напр. SBER)" style="width:120px;">
+        <select class="inp" id="ca_direction" style="width:100px;">
+          <option value="LONG">LONG</option>
+          <option value="SHORT">SHORT</option>
+        </select>
+      </div>
+      <textarea class="inp" id="ca_question" placeholder="Вопрос или контекст (необязательно)..." rows="3" style="width:100%;resize:vertical;font-family:inherit;"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <button class="btn-pill" onclick="councilAsk()" id="ca_btn">🧠 Спросить</button>
+      <span style="font-size:10px;color:var(--txt3);">~20-35 секунд</span>
+    </div>
+  </div>
+  <div id="ca_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
+  <div id="ca_result" style="margin-top:12px;display:none;">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:12px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span id="ca_verdict_badge" style="font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;"></span>
+        <span id="ca_confidence" style="font-size:11px;color:var(--txt3);"></span>
+      </div>
+      <div id="ca_reason" style="font-size:12px;color:var(--txt2);white-space:pre-wrap;"></div>
+      <details style="margin-top:8px;">
+        <summary style="font-size:11px;color:var(--txt3);cursor:pointer;">Полный диалог агентов</summary>
+        <div id="ca_dialog" style="font-size:11px;color:var(--txt2);margin-top:6px;white-space:pre-wrap;"></div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <div class="sec-lg" style="margin:0;">История решений консилиума</div>
+    <button class="btn-pill btn-sm" onclick="loadCouncilLog()">⟳</button>
+  </div>
+  <div id="live_council" style="font-size:11px;color:var(--txt2);max-height:400px;overflow-y:auto;">загрузка...</div>
+</div>
+
+</div><!-- /live-sub-council -->
+
+<!-- ══ СУБ-ТАБ: OI ══ -->
+<div id="live-sub-oi" style="display:none;">
+<div class="panel">
+  <div class="sec-lg">Исторический OI (AlgoPack)</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Загружает данные открытого интереса (юр/физ) с MOEX AlgoPack за выбранный период.
+    Тикеры фьючерсных контрактов запрашиваются автоматически с MOEX ISS по каждой дате.
+    Требует токен <code>[MOEX] TOKEN=</code> в settings.ini.
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">Период
+      <select class="inp mid" id="oi_bf_months" style="width:100px;">
+        <option value="3">3 мес.</option>
+        <option value="6">6 мес.</option>
+        <option value="12" selected>12 мес.</option>
+        <option value="24">24 мес.</option>
+      </select>
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">Тикеры (через запятую)
+      <input type="text" class="inp mid" id="oi_bf_tickers" placeholder="пусто = все из settings.ini" style="width:240px;">
+    </label>
+    <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
+      <button class="btn-pill" onclick="oiBackfill()" id="oi_bf_btn">⬇ Запустить загрузку</button>
+      <button class="btn-pill btn-sm" onclick="oiBackfillStatus()">⟳ Статус</button>
+    </div>
+  </div>
+  <div id="oi_bf_status" style="font-size:12px;color:var(--txt2);padding:8px;background:var(--card);border-radius:6px;border:1px solid var(--border2);min-height:30px;">
+    Не запущено
+  </div>
+  <div id="oi_bf_log" style="margin-top:8px;font-size:11px;color:var(--txt2);max-height:200px;overflow-y:auto;display:none;"></div>
+</div>
+</div><!-- /live-sub-oi -->
 
 </div><!-- /tab-live -->
 
@@ -2987,6 +3144,7 @@ function showTab(name) {{
   document.getElementById('tab-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
   if (name === 'live') {{
+    liveSub('ctrl');
     loadBotStatus(); loadOverrides(); loadAutoAtr();
     if (!_statusPollTimer) _statusPollTimer = setInterval(loadBotStatus, 30000);
   }} else {{
@@ -4852,6 +5010,364 @@ async function loadBotStatus() {{
   }}
 }}
 
+// ── Живой график сделок ────────────────────────────────────────────────────
+
+let _lcChart = null;  // Canvas 2D context
+
+function _lcDrawChart(candles, trades) {{
+  const canvas = document.getElementById('lc_canvas');
+  const placeholder = document.getElementById('lc_placeholder');
+  if (!candles || !candles.length) {{
+    placeholder.textContent = 'Нет свечей'; placeholder.style.display = '';
+    canvas.style.display = 'none'; return;
+  }}
+  placeholder.style.display = 'none';
+  canvas.style.display = 'block';
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Цены min/max
+  let lo = Infinity, hi = -Infinity;
+  for (const c of candles) {{ lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); }}
+  // Маркеры входа/стопа/тейка
+  for (const t of (trades || [])) {{
+    if (t.entry_price) {{ lo = Math.min(lo, t.entry_price); hi = Math.max(hi, t.entry_price); }}
+    if (t.stop_price)  {{ lo = Math.min(lo, t.stop_price);  hi = Math.max(hi, t.stop_price); }}
+    if (t.take_price)  {{ lo = Math.min(lo, t.take_price);  hi = Math.max(hi, t.take_price); }}
+  }}
+  const pad = (hi - lo) * 0.05 || 1;
+  lo -= pad; hi += pad;
+  const scaleY = (price) => H - ((price - lo) / (hi - lo)) * H;
+
+  const n = candles.length;
+  const marginLeft = 52, marginRight = 8;
+  const chartW = W - marginLeft - marginRight;
+  const candleW = Math.max(2, Math.floor(chartW / n) - 1);
+  const scaleX = (i) => marginLeft + (i + 0.5) * chartW / n;
+
+  // Фон
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || '#16161e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Сетка
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+  for (let gi = 0; gi <= 4; gi++) {{
+    const y = Math.round(H * gi / 4) + 0.5;
+    ctx.beginPath(); ctx.moveTo(marginLeft, y); ctx.lineTo(W - marginRight, y); ctx.stroke();
+    const price = hi - (hi - lo) * gi / 4;
+    ctx.fillStyle = '#666'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(price.toFixed(2), marginLeft - 2, y + 3);
+  }}
+
+  // Свечи
+  for (let i = 0; i < n; i++) {{
+    const c = candles[i];
+    const x = Math.round(scaleX(i));
+    const isUp = c.c >= c.o;
+    const color = isUp ? '#26a37b' : '#e05260';
+    ctx.strokeStyle = color; ctx.fillStyle = color;
+    // Тень
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, Math.round(scaleY(c.h)));
+    ctx.lineTo(x, Math.round(scaleY(c.l)));
+    ctx.stroke();
+    // Тело
+    const yO = Math.round(scaleY(c.o)), yC = Math.round(scaleY(c.c));
+    const top = Math.min(yO, yC), bodyH = Math.max(1, Math.abs(yC - yO));
+    ctx.fillRect(Math.round(x - candleW / 2), top, candleW, bodyH);
+  }}
+
+  // Горизонтальные линии сделок
+  const times = candles.map(c => new Date(c.t).getTime());
+  function timeToX(ts) {{
+    const t = new Date(ts).getTime();
+    let best = 0;
+    for (let i = 1; i < times.length; i++) if (Math.abs(times[i]-t) < Math.abs(times[best]-t)) best = i;
+    return scaleX(best);
+  }}
+
+  for (const t of (trades || [])) {{
+    const x0 = t.entry_time ? timeToX(t.entry_time) : marginLeft;
+    const x1 = t.exit_time  ? timeToX(t.exit_time)  : W - marginRight;
+    const isLong = (t.direction || '').toLowerCase() === 'long';
+
+    if (t.take_price) {{
+      ctx.setLineDash([4,3]); ctx.strokeStyle = '#26a37b'; ctx.lineWidth = 1;
+      const y = Math.round(scaleY(t.take_price));
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    }}
+    if (t.stop_price) {{
+      ctx.setLineDash([4,3]); ctx.strokeStyle = '#e05260'; ctx.lineWidth = 1;
+      const y = Math.round(scaleY(t.stop_price));
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    }}
+    ctx.setLineDash([]);
+
+    if (t.entry_price) {{
+      const y = Math.round(scaleY(t.entry_price));
+      // Треугольник входа
+      ctx.fillStyle = isLong ? '#26a37b' : '#e05260';
+      ctx.beginPath();
+      if (isLong) {{ ctx.moveTo(x0-5, y+6); ctx.lineTo(x0+5, y+6); ctx.lineTo(x0, y); }}
+      else         {{ ctx.moveTo(x0-5, y-6); ctx.lineTo(x0+5, y-6); ctx.lineTo(x0, y); }}
+      ctx.closePath(); ctx.fill();
+    }}
+    if (t.exit_price) {{
+      const y = Math.round(scaleY(t.exit_price));
+      const win = t.pnl_rub != null ? t.pnl_rub >= 0 : t.win;
+      ctx.fillStyle = win ? '#26a37b' : '#e05260';
+      ctx.beginPath(); ctx.arc(x1, y, 4, 0, 2*Math.PI); ctx.fill();
+    }}
+  }}
+}}
+
+function _lcInitTickers() {{
+  const sel = document.getElementById('lc_ticker');
+  if (sel.options.length > 1) return;
+  const chips = document.querySelectorAll('.chip');
+  const tickers = Array.from(chips).map(c => c.dataset.ticker || c.textContent.trim()).filter(Boolean);
+  sel.innerHTML = tickers.length
+    ? tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('')
+    : '<option value="">—</option>';
+}}
+
+async function loadLiveChart() {{
+  const ticker = document.getElementById('lc_ticker').value;
+  const days   = document.getElementById('lc_days').value;
+  if (!ticker) return;
+  const status = document.getElementById('lc_status');
+  status.textContent = 'загрузка...';
+  try {{
+    const data = await fetch(`/api/live_chart?ticker=${{encodeURIComponent(ticker)}}&days=${{days}}`).then(r=>r.json());
+    if (data.error) {{ status.textContent = '⚠ ' + data.error; return; }}
+    status.textContent = `${{data.candles?.length||0}} свечей · ${{data.trades?.length||0}} сделок`;
+    _lcDrawChart(data.candles, data.trades);
+
+    // Список сделок
+    const list = document.getElementById('lc_trades_list');
+    if (data.trades && data.trades.length) {{
+      list.innerHTML = data.trades.slice().reverse().map(t => {{
+        const pnlRub = t.pnl_rub != null ? `<span style="color:${{t.pnl_rub>=0?'var(--pos)':'var(--neg)'}}">${{t.pnl_rub>=0?'+':''}}${{t.pnl_rub?.toFixed(0)}}₽</span>` : '';
+        const pnlPct = t.net_pct != null ? ` (${{t.net_pct>=0?'+':''}}${{t.net_pct?.toFixed(2)}}%)` : '';
+        const dir = (t.direction||'').toLowerCase()==='long'
+          ? '<span style="color:var(--pos)">▲ LONG</span>'
+          : '<span style="color:var(--neg)">▼ SHORT</span>';
+        const ts = (t.entry_time||'').slice(5,16).replace('T',' ');
+        return `<div style="padding:3px 8px;margin:2px 0;background:var(--card);border-radius:6px;border:1px solid var(--border2);display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <span style="color:var(--txt3)">${{ts}}</span>
+          ${{dir}} ${{pnlRub}}${{pnlPct}}
+          <span style="color:var(--txt3);font-size:10px;">вход ${{t.entry_price?.toFixed(2)||'—'}} · стоп ${{t.stop_price?.toFixed(2)||'—'}} · тейк ${{t.take_price?.toFixed(2)||'—'}}</span>
+        </div>`;
+      }}).join('');
+    }} else {{
+      list.innerHTML = '<span style="color:var(--txt3)">Сделок пока нет</span>';
+    }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+}}
+
+async function loadCouncilLog() {{
+  try {{
+    const data = await fetch('/api/council_log').then(r=>r.json());
+    const el = document.getElementById('live_council');
+    if (!data.lessons || !data.lessons.length) {{
+      el.innerHTML = '<span style="color:var(--txt3)">Диалогов консилиума пока нет</span>'; return;
+    }}
+    el.innerHTML = data.lessons.slice().reverse().map(l => {{
+      const verdict = l.verdict === 'trade'
+        ? '<span style="color:var(--pos);font-weight:700">✓ ТОРГОВАТЬ</span>'
+        : '<span style="color:var(--neg);font-weight:700">✗ ПРОПУСТИТЬ</span>';
+      const ts = (l.ts||'').slice(5,16).replace('T',' ');
+      const lesson = (l.lesson||'').slice(0,250);
+      return `<div style="padding:6px 8px;margin:3px 0;background:var(--card);border-radius:6px;border:1px solid var(--border2);">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:3px;">
+          <span style="color:var(--txt3);font-size:10px;">${{ts}}</span>
+          <b style="color:var(--mem)">${{l.ticker||'?'}}</b>
+          <span style="color:var(--txt3)">${{l.direction||''}}</span>
+          ${{verdict}}
+          <span style="color:var(--txt3);font-size:10px;">режим: ${{l.regime||'?'}}</span>
+        </div>
+        <div style="color:var(--txt2);font-size:10px;line-height:1.4;">${{lesson}}</div>
+      </div>`;
+    }}).join('');
+  }} catch(e) {{
+    document.getElementById('live_council').textContent = '⚠ ' + e;
+  }}
+}}
+
+// ── суб-табы внутри БОТ (LIVE) ──────────────────────────────────────
+function liveSub(name) {{
+  ['ctrl','cfg','chart','council','oi'].forEach(n => {{
+    const el = document.getElementById('live-sub-' + n);
+    const btn = document.getElementById('live-sub-btn-' + n);
+    if (el) el.style.display = n === name ? '' : 'none';
+    if (btn) btn.style.opacity = n === name ? '1' : '.5';
+  }});
+  // подгружаем данные при первом открытии
+  if (name === 'chart') {{ _lcInitTickers(); loadLiveScorecard(); }}
+  if (name === 'council') loadCouncilLog();
+  if (name === 'oi') oiBackfillStatus();
+}}
+
+// ── Bulk-действия для таблицы тикеров ───────────────────────────────
+function ovBulk(field, value) {{
+  const tbody = document.getElementById('ov_table');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {{
+    if (field === 'enabled') {{
+      const cb = row.querySelector('input[type=checkbox][id^=ov_en_]');
+      if (cb) cb.checked = value;
+    }} else if (field === 'signal_only') {{
+      const sel = row.querySelector('select[id^=ov_so_]');
+      if (sel) sel.value = value ? '1' : '0';
+    }}
+  }});
+}}
+
+// ── OI Backfill ──────────────────────────────────────────────────────
+async function oiBackfill() {{
+  const months  = document.getElementById('oi_bf_months').value;
+  const tickers = document.getElementById('oi_bf_tickers').value.trim();
+  const status  = document.getElementById('oi_bf_status');
+  const btn     = document.getElementById('oi_bf_btn');
+  status.textContent = '⏳ запускаю в фоне...';
+  if (btn) btn.disabled = true;
+  try {{
+    const body = {{ months: parseInt(months) }};
+    if (tickers) body.tickers = tickers;
+    const data = await fetch('/api/oi_backfill', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(body),
+    }}).then(r => r.json());
+    if (data.error) {{ status.textContent = '⚠ ' + data.error; if(btn) btn.disabled=false; return; }}
+    if (!data.started) {{ status.textContent = '⚠ ' + (data.error || 'не удалось запустить'); if(btn) btn.disabled=false; return; }}
+    status.textContent = `⏳ запущен для тикеров: ${{(data.tickers||[]).join(', ')}}. Проверяй статус кнопкой ⟳`;
+    // авто-опрос каждые 5 сек
+    const poll = setInterval(async () => {{
+      const s = await fetch('/api/oi_backfill_status').then(r=>r.json());
+      if (s.running) {{
+        status.textContent = `⏳ в процессе... (записей: ${{s.total_new||0}})`;
+      }} else {{
+        clearInterval(poll);
+        if(btn) btn.disabled = false;
+        if (s.error) {{ status.textContent = '⚠ Ошибка: ' + s.error; return; }}
+        const log = document.getElementById('oi_bf_log');
+        status.textContent = `✅ готово: +${{s.total_new||0}} новых записей`;
+        if (s.log && s.log.length) {{
+          log.innerHTML = s.log.map(l => `<div>${{l}}</div>`).join('');
+          log.style.display = '';
+        }}
+      }}
+    }}, 5000);
+  }} catch(e) {{ status.textContent = '⚠ ' + e; if(btn) btn.disabled=false; }}
+}}
+
+async function oiBackfillStatus() {{
+  const status = document.getElementById('oi_bf_status');
+  try {{
+    const s = await fetch('/api/oi_backfill_status').then(r=>r.json());
+    if (!s || !s.running && !s.done) {{ status.textContent = 'Не запущено'; return; }}
+    const log = document.getElementById('oi_bf_log');
+    if (s.running) {{
+      status.textContent = `⏳ в процессе... (записей: ${{s.total_new||0}})`;
+    }} else if (s.error) {{
+      status.textContent = '⚠ Ошибка: ' + s.error;
+    }} else {{
+      status.textContent = `✅ готово: +${{s.total_new||0}} новых записей`;
+      if (s.log && s.log.length) {{
+        log.innerHTML = s.log.map(l => `<div>${{l}}</div>`).join('');
+        log.style.display = '';
+      }}
+    }}
+  }} catch(e) {{ if(status) status.textContent = '⚠ ' + e; }}
+}}
+
+// ── Диалог консилиума ────────────────────────────────────────────────
+async function councilAsk() {{
+  const ticker    = document.getElementById('ca_ticker').value.trim().toUpperCase();
+  const question  = document.getElementById('ca_question').value.trim();
+  const direction = document.getElementById('ca_direction').value;
+  const btn       = document.getElementById('ca_btn');
+  const statusEl  = document.getElementById('ca_status');
+  const resultEl  = document.getElementById('ca_result');
+  if (!ticker && !question) {{ statusEl.textContent = '⚠ Укажи тикер или задай вопрос'; return; }}
+  btn.disabled = true;
+  statusEl.textContent = '⏳ агенты совещаются (~20-35 сек)...';
+  resultEl.style.display = 'none';
+  try {{
+    const data = await fetch('/api/council_ask', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{ ticker, question, direction }}),
+    }}).then(r => r.json());
+    if (!data.ok) {{ statusEl.textContent = '⚠ ' + (data.error || 'ошибка'); btn.disabled=false; return; }}
+    const r = data.result || {{}};
+    const verdict = r.verdict || 'skip';
+    const vBadge = document.getElementById('ca_verdict_badge');
+    vBadge.textContent = verdict === 'trade' ? '✓ ТОРГОВАТЬ' : '✗ ПРОПУСТИТЬ';
+    vBadge.style.background = verdict === 'trade' ? 'rgba(38,163,123,.25)' : 'rgba(224,82,96,.25)';
+    vBadge.style.color = verdict === 'trade' ? 'var(--pos)' : 'var(--neg)';
+    document.getElementById('ca_confidence').textContent = r.confidence != null ? `уверенность ${{(r.confidence*100).toFixed(0)}}%` : '';
+    document.getElementById('ca_reason').textContent = r.reason || r.summary || '';
+    const dialog = r.alpha_thesis || r.alpha || '';
+    const skeptic = r.beta_critique || r.beta || '';
+    const mod = r.moderator || '';
+    document.getElementById('ca_dialog').textContent = [
+      dialog ? `Альфа: ${{dialog}}` : '',
+      skeptic ? `Бета: ${{skeptic}}` : '',
+      mod ? `Модератор: ${{mod}}` : '',
+    ].filter(Boolean).join('\n\n');
+    statusEl.textContent = '';
+    resultEl.style.display = '';
+  }} catch(e) {{ statusEl.textContent = '⚠ ' + e; }}
+  btn.disabled = false;
+}}
+
+async function loadLiveScorecard() {{
+  try {{
+    const data = await fetch('/api/scorecard').then(r=>r.json());
+    const el = document.getElementById('live_scorecard');
+    const pt = document.getElementById('live_per_ticker');
+    if (!data || data.n === 0) {{
+      el.innerHTML = '<span style="color:var(--txt3)">Статистики пока нет (trades.jsonl пуст)</span>';
+      pt.innerHTML = ''; return;
+    }}
+    const icons = {{healthy:'✅', ok:'🟡', weak:'🔴', unproven:'⚪'}};
+    const icon = icons[data.fitness] || '?';
+    const col = {{healthy:'var(--pos)', ok:'#e8b04b', weak:'var(--neg)', unproven:'var(--txt3)'}}[data.fitness] || 'var(--txt2)';
+    el.innerHTML =
+      `<div style="font-size:14px;font-weight:700;color:${{col}};margin-bottom:6px;">${{icon}} ${{(data.fitness||'').toUpperCase()}} <span style="font-size:11px;font-weight:400;color:var(--txt3);">— ${{data.n}} сделок (окно ${{data.window}})</span></div>` +
+      `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Win Rate</div><div style="font-weight:700;">${{data.win_rate!=null?(data.win_rate*100).toFixed(0)+'%':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Profit Factor</div><div style="font-weight:700;">${{data.profit_factor??'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Expectancy</div><div style="font-weight:700;">${{data.expectancy!=null?data.expectancy+'₽':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Total PnL</div><div style="font-weight:700;color:${{(data.total_pnl||0)>=0?'var(--pos)':'var(--neg)'}}">${{data.total_pnl!=null?(data.total_pnl>=0?'+':'')+data.total_pnl.toFixed(0)+'₽':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Max Drawdown</div><div style="font-weight:700;color:var(--neg)">${{data.max_drawdown!=null?data.max_drawdown.toFixed(0)+'₽':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">½-Kelly риск</div><div style="font-weight:700;">${{data.kelly_pct!=null?data.kelly_pct.toFixed(2)+'%':'—'}}</div></div>` +
+      `</div>` +
+      (data.verdict ? `<div style="margin-top:6px;font-size:10px;color:var(--txt3);">${{data.verdict}}</div>` : '');
+
+    if (data.per_ticker && data.per_ticker.length) {{
+      pt.innerHTML = '<div style="margin-top:2px;color:var(--txt3);font-size:10px;margin-bottom:4px;">По тикерам:</div>' +
+        data.per_ticker.map(r =>
+          `<div style="display:flex;gap:8px;padding:2px 0;border-bottom:1px solid var(--border2);">
+            <b style="min-width:60px;">${{r.ticker}}</b>
+            <span style="color:${{r.total>=0?'var(--pos)':'var(--neg)'}}">${{r.total>=0?'+':''}}${{r.total.toFixed(0)}}₽</span>
+            <span style="color:var(--txt3)">${{r.n}} сделок</span>
+            <span>WR ${{(r.wr*100).toFixed(0)}}%</span>
+          </div>`
+        ).join('');
+    }} else pt.innerHTML = '';
+  }} catch(e) {{
+    document.getElementById('live_scorecard').textContent = '⚠ ' + e;
+  }}
+}}
+
 async function botPause() {{
   await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'pause'}})}});
   await loadBotStatus();
@@ -6190,6 +6706,163 @@ def get_overrides_payload() -> dict:
     }
 
 
+def get_live_chart(ticker: str, days: int = 7) -> dict:
+    """Свечи из candle_archive + реальные сделки из data/trades.jsonl для живого графика."""
+    try:
+        from candle_archive import get_candles_cached, _candle_to_row
+    except ImportError:
+        return {"error": "candle_archive недоступен"}
+
+    by_ticker = _all_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"error": f"{ticker}: нет в настройках"}
+
+    try:
+        candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    except Exception as e:
+        return {"error": str(e)}
+
+    candle_rows = [_candle_to_row(c) for c in candles]
+
+    # Реальные сделки из trades.jsonl
+    import metrics as _metrics
+    trades_raw = _metrics.load_closed_trades(500)
+    ticker_trades = [t for t in trades_raw if t.get("ticker") == ticker]
+
+    # Также открытые позиции из bot_status
+    status = get_bot_status()
+    open_positions = [p for p in status.get("positions", []) if p.get("ticker") == ticker]
+
+    trades_out = []
+    for t in ticker_trades:
+        trades_out.append({
+            "entry_time": t.get("ts"),       # время закрытия — близко к выходу
+            "exit_time": t.get("closed_ts") or t.get("ts"),
+            "direction": t.get("direction", "").lower(),
+            "entry_price": t.get("entry"),
+            "exit_price": t.get("exit_price") or t.get("close_price"),
+            "stop_price": t.get("stop"),
+            "take_price": t.get("take"),
+            "pnl_rub": t.get("pnl_rub"),
+            "net_pct": round(t["pnl_rub"] / max(t.get("entry", 1), 1) * 100, 3) if t.get("pnl_rub") is not None else None,
+            "reason": t.get("reason", ""),
+        })
+
+    for p in open_positions:
+        trades_out.append({
+            "entry_time": p.get("opened_at"),
+            "exit_time": None,
+            "direction": (p.get("direction") or "").lower(),
+            "entry_price": p.get("entry_price"),
+            "exit_price": None,
+            "stop_price": p.get("stop"),
+            "take_price": p.get("take"),
+            "pnl_rub": None,
+            "net_pct": None,
+            "reason": "открыта",
+        })
+
+    return {"ticker": ticker, "candles": candle_rows, "trades": trades_out}
+
+
+def get_scorecard_api() -> dict:
+    """Scorecard + per_ticker stats + kelly для живого дашборда."""
+    import metrics as _metrics
+    card = _metrics.scorecard()
+    kelly_pct, _ = _metrics.dynamic_risk_pct()
+
+    # Per-ticker
+    trades = _metrics.load_closed_trades(10_000)
+    by_ticker: dict = {}
+    for t in trades:
+        tk = t.get("ticker", "?")
+        by_ticker.setdefault(tk, []).append(t.get("pnl_rub", 0))
+    per_ticker = []
+    for tk, pnls in sorted(by_ticker.items(), key=lambda x: -sum(x[1])):
+        wins = sum(1 for p in pnls if p > 0)
+        per_ticker.append({
+            "ticker": tk,
+            "n": len(pnls),
+            "total": round(sum(pnls), 2),
+            "wr": round(wins / len(pnls), 3) if pnls else 0,
+        })
+
+    return {**card, "kelly_pct": round(kelly_pct, 2), "per_ticker": per_ticker}
+
+
+def get_council_log() -> dict:
+    """Последние уроки консилиума из data/council_lessons.json."""
+    import council as _council
+    lessons = _council._load_lessons()
+    return {"lessons": lessons}
+
+
+def council_ask_sync(ticker: str, question: str, direction: str = "LONG") -> dict:
+    """Синхронный вызов консилиума из дашборда (с таймаутом 35с)."""
+    import asyncio
+    try:
+        import council as _council
+        from trade_analytics import full_report_for_council
+        analytics = full_report_for_council(ticker) if ticker else question
+        snap = {"regime": "unknown", "composite": 0.0, "scores": {}, "atr_pct": 0.0}
+        coro = _council.consult_signal(ticker or "?", direction, snap, analytics_text=question or analytics, timeout=35.0)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+            result = loop.run_until_complete(coro)
+        except RuntimeError:
+            result = asyncio.run(coro)
+        return {"ok": True, "result": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+_oi_backfill_job: dict = {}  # {running, log, total_new, error, done}
+_oi_backfill_lock = __import__("threading").Lock()
+
+
+def run_oi_backfill(months: int, tickers: list[str] | None = None) -> dict:
+    """Запускает backfill в фоновом потоке. Возвращает сразу."""
+    import threading
+    import backfill_oi
+
+    with _oi_backfill_lock:
+        if _oi_backfill_job.get("running"):
+            return {"started": False, "error": "уже запущен — дождись завершения"}
+
+        token = backfill_oi._get_token()
+        if not token:
+            return {"started": False, "error": "MOEX_TOKEN не задан в env или settings.ini [MOEX] TOKEN=..."}
+
+        target_tickers = tickers or backfill_oi._get_strategy_tickers() or list(backfill_oi.FUTOI_MAP.keys() if hasattr(backfill_oi, "FUTOI_MAP") else [])
+        if not target_tickers:
+            return {"started": False, "error": "Нет тикеров: добавь STRATEGY_* секции в settings.ini или укажи вручную"}
+
+        _oi_backfill_job.clear()
+        _oi_backfill_job.update({"running": True, "log": [], "total_new": 0, "error": None, "done": False, "tickers": target_tickers})
+
+    def _worker():
+        try:
+            result = backfill_oi.backfill(target_tickers, months, token)
+            with _oi_backfill_lock:
+                _oi_backfill_job.update({"running": False, "done": True,
+                                         "total_new": result.get("total_new", 0),
+                                         "log": result.get("log", [])})
+        except Exception as e:
+            with _oi_backfill_lock:
+                _oi_backfill_job.update({"running": False, "done": True, "error": str(e)})
+
+    threading.Thread(target=_worker, daemon=True).start()
+    return {"started": True, "tickers": target_tickers}
+
+
+def get_oi_backfill_status() -> dict:
+    with _oi_backfill_lock:
+        return dict(_oi_backfill_job)
+
+
 def get_bot_status() -> dict:
     """data/bot_status.json — живой снимок, который бот обновляет на каждой свече."""
     path = "data/bot_status.json"
@@ -6327,27 +7000,31 @@ def _render_page() -> bytes:
     stocks_ru = [t for t in stock_tickers if t in _RU_STOCK_BASE_TICKERS]
     stocks_other = [t for t in stock_tickers if t not in _RU_STOCK_BASE_TICKERS]
 
+    from html import escape as _he
+
     def _stock_chip_row(ts: list[str]) -> str:
         return '<div class="chip-row">' + "".join(
-            f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
-            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
+            f'<div class="chip active chip-stock" data-ticker="{_he(t)}" data-kind="stock" '
+            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{_he(t)}{"•" if t in oi_tickers else ""}</div>'
             for t in ts
         ) + '</div>'
 
     def _futures_chip_row(ts: list[str]) -> str:
         return '<div class="chip-row">' + "".join(
-            f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-            f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
-            f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+            f'<div class="chip active chip-fut" data-ticker="{_he(t)}" data-kind="futures" '
+            f'title="{_he(_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t)))}'
+            f' · GO {futures[t].margin_per_lot:.0f}₽">{_he(t)}</div>'
             for t in ts
         ) + '</div>'
 
     def _sub_section(pid: str, label: str, panel_html: str, open_: bool) -> str:
+        safe_pid = _he(pid)
+        js_pid = pid.replace("\\", "\\\\").replace("'", "\\'")
         return (
-            f'<details class="chip-section cat-panel" data-panel="{pid}"{" open" if open_ else ""}>'
-            f'<summary><span class="chip-section-title">{label}</span>'
+            f'<details class="chip-section cat-panel" data-panel="{safe_pid}"{" open" if open_ else ""}>'
+            f'<summary><span class="chip-section-title">{_he(label)}</span>'
             f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
-            f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
+            f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{js_pid}\',this)">⊙</span></summary>'
             f'{panel_html}'
             f'</details>'
         )
@@ -6422,10 +7099,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/":
-            body = _render_page()
+            try:
+                body = _render_page()
+            except Exception as _e:
+                import traceback
+                err_html = f"<pre>Ошибка рендеринга: {traceback.format_exc()}</pre>".encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(err_html)))
+                self.end_headers()
+                self.wfile.write(err_html)
+                return
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/api/overrides":
@@ -6503,6 +7192,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":
             self._send_json(get_bot_status())
+        elif self.path.startswith("/api/live_chart"):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0].upper()
+            days = int(qs.get("days", ["7"])[0])
+            self._send_json(get_live_chart(ticker, days))
+        elif self.path == "/api/scorecard":
+            self._send_json(get_scorecard_api())
+        elif self.path == "/api/council_log":
+            self._send_json(get_council_log())
+        elif self.path == "/api/oi_backfill_status":
+            self._send_json(get_oi_backfill_status())
         elif self.path == "/api/tickers_list":
             self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path.startswith("/api/bar_rules_load"):
@@ -6885,6 +7585,13 @@ class Handler(BaseHTTPRequestHandler):
             action = payload.get("action", "")
             ticker = payload.get("ticker", "")
             self._send_json(bot_control_action(action, ticker))
+        elif self.path == "/api/oi_backfill":
+            months = int(payload.get("months", 12))
+            raw_t = payload.get("tickers") or None
+            tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
+            self._send_json(run_oi_backfill(months, tickers))
+        elif self.path == "/api/council_ask":
+            self._send_json(council_ask_sync(payload.get("ticker","").upper(), payload.get("question",""), payload.get("direction","LONG").upper()))
         elif self.path == "/api/bot_adopt":
             try:
                 ticker = payload.get("ticker", "").strip()

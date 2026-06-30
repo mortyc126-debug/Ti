@@ -165,15 +165,19 @@ const SCHEMA_STMTS = [
   // на основе этой истории клиент строит слои позиций по дате/цене открытия
   // для анализа сквизов. Не чистим по времени — это и есть вся ценность таблицы.
   `CREATE TABLE IF NOT EXISTS oi_daily (
-    key        TEXT PRIMARY KEY,
-    ticker     TEXT NOT NULL,
-    tradedate  TEXT NOT NULL,
-    price      REAL DEFAULT 0,
-    yur_long   REAL DEFAULT 0,
-    yur_short  REAL DEFAULT 0,
-    fiz_long   REAL DEFAULT 0,
-    fiz_short  REAL DEFAULT 0,
-    updated_at INTEGER DEFAULT 0
+    key            TEXT PRIMARY KEY,
+    ticker         TEXT NOT NULL,
+    tradedate      TEXT NOT NULL,
+    price          REAL DEFAULT 0,
+    yur_long       REAL DEFAULT 0,
+    yur_short      REAL DEFAULT 0,
+    fiz_long       REAL DEFAULT 0,
+    fiz_short      REAL DEFAULT 0,
+    yur_long_num   REAL DEFAULT 0,
+    yur_short_num  REAL DEFAULT 0,
+    fiz_long_num   REAL DEFAULT 0,
+    fiz_short_num  REAL DEFAULT 0,
+    updated_at     INTEGER DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS idx_oidaily_ticker ON oi_daily(ticker, tradedate)`,
 
@@ -188,14 +192,33 @@ const SCHEMA_STMTS = [
 ];
 
 // ── D1 Route Handler ───────────────────────────────────────────────────────
+// Миграция для БД, созданных до добавления колонок *_num (число счетов —
+// нужно индикатору OI Imbalance для Conviction/LiquidityConfidence). На уже
+// существующей таблице ALTER TABLE ADD COLUMN падает, если колонка уже есть —
+// поэтому try/catch на каждую, выполняется при каждом /db/init безболезненно.
+const OI_DAILY_NUM_MIGRATIONS = [
+  `ALTER TABLE oi_daily ADD COLUMN yur_long_num REAL DEFAULT 0`,
+  `ALTER TABLE oi_daily ADD COLUMN yur_short_num REAL DEFAULT 0`,
+  `ALTER TABLE oi_daily ADD COLUMN fiz_long_num REAL DEFAULT 0`,
+  `ALTER TABLE oi_daily ADD COLUMN fiz_short_num REAL DEFAULT 0`,
+];
+async function migrateOiDailyNumCols(db) {
+  for (const stmt of OI_DAILY_NUM_MIGRATIONS) {
+    try { await db.prepare(stmt).run(); } catch (_) { /* колонка уже есть */ }
+  }
+}
+
 // ── Upsert одного снэпшока в oi_daily (общий код для /db/oidaily и cron) ──
 async function upsertOiDaily(db, r) {
   await db.prepare(
-    `INSERT OR REPLACE INTO oi_daily(key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,updated_at)
-     VALUES(?,?,?,?,?,?,?,?,?)`
+    `INSERT OR REPLACE INTO oi_daily(key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+       yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).bind(
     `${r.ticker}__${r.tradedate}`, r.ticker, r.tradedate, r.price ?? 0,
-    r.yur_long ?? 0, r.yur_short ?? 0, r.fiz_long ?? 0, r.fiz_short ?? 0, Date.now()
+    r.yur_long ?? 0, r.yur_short ?? 0, r.fiz_long ?? 0, r.fiz_short ?? 0,
+    r.yur_long_num ?? 0, r.yur_short_num ?? 0, r.fiz_long_num ?? 0, r.fiz_short_num ?? 0,
+    Date.now()
   ).run();
 }
 
@@ -340,6 +363,10 @@ async function scheduledCollectOi(env) {
           yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
           fiz_long: Number(byGroup.FIZ?.pos_long || 0),
           fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+          yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
+          yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
+          fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
+          fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
         });
       } catch (e) { console.warn('oi cron:', r.ticker, e.message); }
     }));
@@ -385,6 +412,10 @@ async function backfillOiHistory(db, env, tickers, days) {
           yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
           fiz_long: Number(byGroup.FIZ?.pos_long || 0),
           fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+          yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
+          yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
+          fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
+          fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
         });
         saved++;
       } catch (e) { failed++; }
@@ -404,6 +435,7 @@ async function handleDb(path, req, env) {
     for (const stmt of SCHEMA_STMTS) {
       await db.prepare(stmt).run();
     }
+    await migrateOiDailyNumCols(db);
     return json({ ok: true, msg: 'schema ready (v2 — adaptive)' });
   }
 

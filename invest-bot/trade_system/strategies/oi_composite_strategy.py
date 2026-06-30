@@ -240,6 +240,14 @@ TRAIL_MIN_DIST_FRACTION = 0.5
 AGREE_SCORE_MIN = 0.15             # |score| >= это значит "метод высказался"
 AGREE_STRENGTH_MIN = 0.12          # минимальная взвешенная сила согласных методов
 AGREE_SHARE_MIN = 0.35             # доля силы согласных от силы всех высказавшихся
+# Сниженный порог согласия для сделок ПО тренду (trending_down SHORT, trending_up LONG).
+# Трендовый контекст сам по себе — фильтр; не нужно дополнительно требовать 35% согласия.
+AGREE_SHARE_TREND_FOLLOW = 0.28
+
+# Методы-контрсигналы: когда «согласны» с направлением, WR падает ниже базы.
+# KLINGER WR=36%, DONCHIAN=35%, PRICE_ACCEL=40% при согласии vs 47-57% при несогласии.
+# Инвертируются в __init__ через _inverted_methods — их голос идёт против направления.
+_EMPIRICAL_INVERTED_METHODS: frozenset[str] = frozenset({"KLINGER", "DONCHIAN", "PRICE_ACCEL"})
 
 # Четыре дополнительных условия гейта:
 # 1. IC-взвешенный net_agreement (абсолютный, не доля)
@@ -5986,6 +5994,17 @@ MultiTickerProvider = Callable[[str], float]
 # (или если в settings.ini заданы явные ATR_TAKE_K/ATR_STOP_K) авто-подбор не запускается.
 AtrHistoryProvider = Callable[[str], list[HistoricCandle]]
 
+# Лимитный вход: смещение от рыночной цены (0.025% ≈ полспреда фьючерса).
+# LONG покупает ниже last.close, SHORT продаёт выше — экономия на спреде.
+LIMIT_ENTRY_OFFSET_PCT = 0.00025
+
+# Минимальное соотношение тейк/стоп. При R:R < 1.5 и WR 46% EV отрицателен.
+# Если ATR-расчёт даёт меньший тейк, принудительно расширяем до 1.5× стопа.
+MIN_TAKE_STOP_RATIO = 1.5
+
+# Минимальная дистанция стопа. При стопе < 0.6% комиссия RT (~0.08%) = 13%+ от стопа.
+MIN_STOP_DIST_PCT = 0.006
+
 AUTO_ATR_TAKE_KS = (2.5, 3.0, 3.5)
 # Нижняя граница была 1.0 — на минутных барах atr_pct часто ~0.4-0.6%, и
 # stop_dist=1.0*atr_pct получался теснее fixed-стопа (1.5%): walk-forward
@@ -6106,7 +6125,7 @@ class OICompositeStrategy(IStrategy):
         s = settings.settings
 
         self._disabled_methods: set[str] = set()
-        self._inverted_methods: set[str] = set()  # методы-контр-индикаторы: скор инвертируется
+        self._inverted_methods: set[str] = set()
         self.__threshold = float(s.get("SIGNAL_THRESHOLD", SIGNAL_THRESHOLD))
         self.__long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         self.__long_stop = Decimal(s.get("LONG_STOP", "0.985"))
@@ -6929,7 +6948,8 @@ class OICompositeStrategy(IStrategy):
     def backtest_scan_signals(self, candles: list[HistoricCandle], max_bars: int = 60,
                                adaptive_narrative: bool = False,
                                narrative_recalib_every_days: int = 20,
-                               block_ranging: bool = False) -> list[dict]:
+                               block_ranging: bool = False,
+                               oi_date_hook=None) -> list[dict]:
         """
         Один проход по свечам с дорогим __compute_composite() (внутри —
         Hawkes-MLE через scipy.optimize и другие методы) — собирает все бары,
@@ -7027,6 +7047,8 @@ class OICompositeStrategy(IStrategy):
                 # L1-буфер: обновляем раз в день (агрегация — O(N) баров)
                 cur_day = candles[i].time.date()
                 if cur_day != last_l1_day:
+                    if oi_date_hook is not None:
+                        oi_date_hook(cur_day.isoformat())
                     last_l1_day = cur_day
                     self.__l1_buffer = candles[max(0, i - self.__l1_buffer_size):i]
                     self.__recalc_l1_context()
@@ -7151,7 +7173,13 @@ class OICompositeStrategy(IStrategy):
                     i += 1
                     continue
 
-                entry = _to_f(candles[i].close)
+                _close = _to_f(candles[i].close)
+                # Лимитный вход: покупаем LONG чуть ниже close, SHORT — чуть выше.
+                # Экономит ~полспреда (LIMIT_ENTRY_OFFSET_PCT) по сравнению с рыночным.
+                if direction == SignalType.LONG:
+                    entry = _close * (1 - LIMIT_ENTRY_OFFSET_PCT)
+                else:
+                    entry = _close * (1 + LIMIT_ENTRY_OFFSET_PCT)
                 window = candles[i + 1:i + 1 + max_bars]
                 # Последние 3 элемента scores — M1/M2/M3 (см. ALL_METHOD_NAMES) —
                 # сохраняем сырыми скорами для attribution в дашборде/бэктесте.
@@ -7342,6 +7370,7 @@ class OICompositeStrategy(IStrategy):
             record_history: bool = True,
             adaptive_lasso: bool = False,
             lasso_recalib_every_trades: int = 30,
+            oi_date_hook=None,
     ) -> dict:
         """
         В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
@@ -7390,7 +7419,7 @@ class OICompositeStrategy(IStrategy):
         именно исходы, поэтому раньше это не делалось вообще).
         """
         if signals is None:
-            signals = self.backtest_scan_signals(candles, max_bars=max_bars)
+            signals = self.backtest_scan_signals(candles, max_bars=max_bars, oi_date_hook=oi_date_hook)
 
         empty = {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0, "model_stats": {}}
         if return_trades:
@@ -7460,6 +7489,11 @@ class OICompositeStrategy(IStrategy):
             _hist = sig.get("history_window") or []
             _tp_ext = _tp_extension_mult(_hist, direction == SignalType.LONG)
             take_dist *= _tp_ext
+
+            # Минимальный стоп: при стопе < 0.6% комиссия RT (~0.08%) съедает >13%.
+            stop_dist = max(stop_dist, MIN_STOP_DIST_PCT)
+            # Минимальное R:R: тейк должен быть ≥ 1.5× стопа, иначе EV отрицателен.
+            take_dist = max(take_dist, stop_dist * MIN_TAKE_STOP_RATIO)
 
             if direction == SignalType.LONG:
                 take_price = entry * (1 + take_dist)
@@ -8461,9 +8495,45 @@ class OICompositeStrategy(IStrategy):
         n_base = len(BASE_METHOD_NAMES)
         score_map = dict(zip(BASE_METHOD_NAMES, scores[:n_base]))
 
-        # P5: адаптивный порог доли согласия по L1-контексту (клип 0.40..0.60).
-        agreement_threshold = AGREE_SHARE_MIN - 0.10 * self.__l1_score * sign_val
-        agreement_threshold = max(0.40, min(0.60, agreement_threshold))
+        # Блокировка контртрендового LONG в trending_down: статистически убыточен.
+        if self.__last_regime == "trending_down" and direction == SignalType.LONG:
+            return False, "blocked_counter_trend"
+
+        # Динамический фильтр по IC: вместо захардкоженных имён — методы, у которых
+        # ic_smoothed > IC_KEY_THRESHOLD в текущем режиме (per-regime из __ic_priors).
+        # Работает только после прогрева (IC_WINDOW/2 баров); до этого — нейтрально.
+        # Правила:
+        #   • среди IC-сильных методов ни один не согласен → блокировать
+        #   • 2+ IC-сильных согласны → fast-pass (прошли доп. фильтр)
+        _IC_KEY_THRESHOLD = 0.05   # ic_smoothed > 5% edge → метод "ключевой"
+        _IC_KEY_MIN_CONF  = 0.40   # мин. уверенность (n_effective >= ~20)
+        _ic_warm = self.__ic_bar_counter >= IC_WINDOW // 2
+        _key_fast_pass = False
+        if _ic_warm:
+            _ic_strong = [
+                name for name in score_map
+                if self.__ic(name).ic_smoothed > _IC_KEY_THRESHOLD
+                and self.__ic(name).confidence() >= _IC_KEY_MIN_CONF
+            ]
+            if len(_ic_strong) >= 2:
+                _ic_key_agree = sum(
+                    1 for name in _ic_strong
+                    if score_map[name] * sign_val > AGREE_SCORE_MIN
+                )
+                if _ic_key_agree == 0:
+                    return False, "ic_key_none_agree"
+                _key_fast_pass = _ic_key_agree >= 2
+
+        # P5: адаптивный порог доли согласия по L1-контексту (клип 0.25..0.60).
+        # Для сделок ПО тренду (trending_down SHORT / trending_up LONG) снижаем
+        # базовый порог — режим уже является дополнительным фильтром направления.
+        is_trend_follow = (
+            (self.__last_regime == "trending_down" and direction == SignalType.SHORT) or
+            (self.__last_regime == "trending_up"   and direction == SignalType.LONG)
+        )
+        base_share = AGREE_SHARE_TREND_FOLLOW if is_trend_follow else AGREE_SHARE_MIN
+        agreement_threshold = base_share - 0.10 * self.__l1_score * sign_val
+        agreement_threshold = max(0.25, min(0.60, agreement_threshold))
 
         agree_strength = 0.0
         total_strength = 0.0
@@ -8476,10 +8546,10 @@ class OICompositeStrategy(IStrategy):
             total_strength += strength
             if (sv > 0) == (sign_val > 0):
                 agree_strength += strength
-        if total_strength <= 0 or not (
+        if not _key_fast_pass and (total_strength <= 0 or not (
             agree_strength >= AGREE_STRENGTH_MIN and
             agree_strength / total_strength >= agreement_threshold
-        ):
+        )):
             return False, "methods_disagree"
 
         net = sum(
@@ -8907,8 +8977,12 @@ class OICompositeStrategy(IStrategy):
         if take_k is not None and stop_k is not None and atr_pct > 0:
             scale_exp = self.__atr_scale_exp if self.__atr_scale_exp is not None else self.__auto_atr_scale_exp
             hold_scale = ATR_SCALE_HOLDING_BARS ** scale_exp if scale_exp else 1.0
-            take_off = Decimal(str(take_k * atr_pct * hold_scale * noise_scale * chop_k))
-            stop_off = Decimal(str(stop_k * atr_pct * hold_scale * noise_scale))
+            stop_raw = stop_k * atr_pct * hold_scale * noise_scale
+            stop_raw = max(stop_raw, MIN_STOP_DIST_PCT)
+            take_raw = take_k * atr_pct * hold_scale * noise_scale * chop_k
+            take_raw = max(take_raw, stop_raw * MIN_TAKE_STOP_RATIO)
+            take_off = Decimal(str(take_raw))
+            stop_off = Decimal(str(stop_raw))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
@@ -8917,9 +8991,14 @@ class OICompositeStrategy(IStrategy):
         if direction == SignalType.LONG:
             take_off = (self.__long_take - Decimal("1")) * scale * chop_d
             stop_off = (Decimal("1") - self.__long_stop) * scale
+        else:
+            take_off = (Decimal("1") - self.__short_take) * scale * chop_d
+            stop_off = (self.__short_stop - Decimal("1")) * scale
+        # Те же ограничения для fixed-режима
+        stop_off = max(stop_off, Decimal(str(MIN_STOP_DIST_PCT)))
+        take_off = max(take_off, stop_off * Decimal(str(MIN_TAKE_STOP_RATIO)))
+        if direction == SignalType.LONG:
             return Decimal("1") + take_off, Decimal("1") - stop_off
-        take_off = (Decimal("1") - self.__short_take) * scale * chop_d
-        stop_off = (self.__short_stop - Decimal("1")) * scale
         return Decimal("1") - take_off, Decimal("1") + stop_off
 
     def __make_signal(
@@ -8930,7 +9009,13 @@ class OICompositeStrategy(IStrategy):
             scores: list[float],
     ) -> Signal:
         last = self.__candles[-1]
-        entry = quotation_to_decimal(last.close)
+        _close = quotation_to_decimal(last.close)
+        # Лимитный вход: цена чуть лучше рынка, Trader выставит лимитку.
+        _offset = Decimal(str(LIMIT_ENTRY_OFFSET_PCT))
+        if signal_type == SignalType.LONG:
+            entry = _close * (Decimal("1") - _offset)
+        else:
+            entry = _close * (Decimal("1") + _offset)
 
         method_scores = {name: scores[i] for i, name in enumerate(ALL_METHOD_NAMES)}
         # confidence должен опираться на тот же composite, что реально

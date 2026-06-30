@@ -16,6 +16,7 @@ from invest_api.services.market_data_stream_service import MarketDataStreamServi
 from mega_alerts import MegaAlertsService
 from trade_system.strategies.base_strategy import IStrategy
 from trading.trader import Trader
+import sandbox_monitor
 
 __all__ = ("TradeService")
 
@@ -66,9 +67,19 @@ class TradeService:
         # же data/mega_alerts.json.
         self.__mega_alerts = MegaAlertsService()
         self.__mega_alerts_task: asyncio.Task | None = None
+        self.__sandbox_monitor_task: asyncio.Task | None = None
 
     async def worker(self) -> None:
         self.__mega_alerts_task = asyncio.create_task(self.__mega_alerts.daily_loop())
+        # Sandbox-монитор: периодически шлёт в Telegram статус virtual-портфеля.
+        # При TINKOFF_SANDBOX=0 run_monitor() мгновенно выходит (no-op).
+        self.__sandbox_monitor_task = asyncio.create_task(
+            sandbox_monitor.run_monitor(
+                self.__account_service._AccountService__token,
+                self.__account_service._AccountService__app_name,
+                self.__blogger._Blogger__messages_queue,
+            )
+        )
         try:
             try:
                 logger.info("Finding account for trading")
@@ -87,6 +98,8 @@ class TradeService:
             await self.__working_loop(account_id)
         finally:
             self.__mega_alerts_task.cancel()
+            if self.__sandbox_monitor_task:
+                self.__sandbox_monitor_task.cancel()
 
     async def __working_loop(self, account_id: str) -> None:
         logger.info("Start every day trading")

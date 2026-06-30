@@ -801,6 +801,9 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <input id="an-ticker" type="text" placeholder="Тикер (SBER, GAZP…)" style="padding:6px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;width:130px;color-scheme:dark;outline:none;">
       <button onclick="ilRunAnalysis()" style="padding:6px 14px;background:rgba(82,242,201,0.08);border:1px solid rgba(82,242,201,0.3);border-radius:8px;color:#52F2C9;font-family:var(--mono);font-size:10px;cursor:pointer;">▷ Запустить</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--mono);cursor:pointer;" title="Подбирает период каждого индикатора по бэктесту вместо классического — альт считается уже от подобранного периода">
+        <input type="checkbox" id="an-adaptive" style="accent-color:#B487F8;"> 🎯 адаптивный период (авто)
+      </label>
       <span id="an-status" style="font-size:10px;color:var(--text3);font-family:var(--mono);flex:1;"></span>
     </div>
     <!-- Форма параметров теста -->
@@ -1286,7 +1289,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
         <button class="cp-tab active" data-tab="ind"   onclick="cpTab(this)">Инд.</button>
         <button class="cp-tab"        data-tab="combo" onclick="cpTab(this)">Комбо</button>
         <button class="cp-tab"        data-tab="sys"   onclick="cpTab(this)">Системы</button>
-        <button class="cp-tab"        data-tab="ichi"  onclick="cpTab(this)">Ишимоку</button>
+        <button class="cp-tab"        data-tab="ichi"  onclick="cpTab(this)">OI Дисб.</button>
       </div>
 
       <!-- INDICATORS -->
@@ -1328,25 +1331,19 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
         <div id="cp-combo-inner"></div>
       </div>
 
-      <!-- ICHIMOKU -->
+      <!-- OI ДИСБАЛАНС (физ/юр позиционирование FORTS) -->
       <div id="cp-panel-ichi" style="display:none;flex:1;overflow-y:auto;padding:10px 12px;scrollbar-width:thin;scrollbar-color: #7A5FBF #0D0820;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-          <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;flex:1;">Ишимоку · значения</div>
-          <button onclick="chartIchiShow=!chartIchiShow;_togChartBtn(this,chartIchiShow);if(chartCandles.length)chartRedraw();"
-            id="ichi-chart-btn"
-            style="padding:3px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text3);font-family:var(--mono);font-size:10px;cursor:pointer;">
-            На график
-          </button>
+          <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;text-transform:uppercase;flex:1;">OI Дисбаланс · физ/юр</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:10px;color:var(--text3);font-family:var(--mono);width:65px;flex-shrink:0;">Тенкан</label><input id="i-tenkan" type="number" step="0.01" oninput="ichiUpdate()" style="flex:1;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
-          <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:10px;color:var(--text3);font-family:var(--mono);width:65px;flex-shrink:0;">Киджун</label><input id="i-kijun" type="number" step="0.01" oninput="ichiUpdate()" style="flex:1;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
-          <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:10px;color:var(--text3);font-family:var(--mono);width:65px;flex-shrink:0;">Сенкоу A</label><input id="i-sena" type="number" step="0.01" oninput="ichiUpdate()" style="flex:1;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
-          <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:10px;color:var(--text3);font-family:var(--mono);width:65px;flex-shrink:0;">Сенкоу B</label><input id="i-senb" type="number" step="0.01" oninput="ichiUpdate()" style="flex:1;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
-          <div style="display:flex;align-items:center;gap:6px;"><label style="font-size:10px;color:var(--text3);font-family:var(--mono);width:65px;flex-shrink:0;">Цена</label><input id="i-price" type="number" step="0.01" oninput="ichiUpdate()" style="flex:1;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;"></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          <input id="oi-tickers" type="text" placeholder="Фьючерс(ы), напр. SBRF6 или SBRF6,SBRF9"
+            style="flex:1;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;">
+          <button onclick="oiLoadAndRender()" style="padding:4px 10px;background:rgba(255,0,110,0.12);border:1px solid rgba(255,0,110,0.3);border-radius:6px;color:#FF006E;font-family:var(--mono);font-size:10px;cursor:pointer;flex-shrink:0;">Загрузить</button>
         </div>
-        <canvas id="ichi-canvas" height="170" style="width:100%;display:block;margin-top:10px;border-radius:6px;"></canvas>
-        <div id="ichi-result" style="margin-top:8px;font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--text2);"></div>
+        <div id="oi-vals" style="display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2);"></div>
+        <canvas id="oi-canvas" height="170" style="width:100%;display:block;margin-top:10px;border-radius:6px;"></canvas>
+        <div id="oi-result" style="margin-top:8px;font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--text2);"></div>
       </div>
 
       <!-- СИСТЕМЫ -->
@@ -3689,6 +3686,352 @@ function updateIchiSignals(price, tenkan, kijun, senA, senB) {
   el.innerHTML = lines.length
     ? lines.map(l => `<div style="margin-bottom:6px;">${l}</div>`).join('')
     : '<span style="color:var(--text3)">Введи значения для анализа</span>';
+}
+
+// ═══════════════════════════════════════════
+// OI ИМБАЛАНС (физ/юр позиционирование FORTS) — порт fresh_oi_indicator v2.3
+// Источник данных: invest-bot/cf-worker.js → /db/oidaily?ticker=XXX (дневные
+// снэпшоты, накапливаются cron'ом с момента включения фичи). Окна конфига
+// пересчитаны под ДНЕВНЫЕ бары (исходный питон считался на 5-мин барах FORTS).
+// ═══════════════════════════════════════════
+let chartOiShow = false; // показывать osc-панель OI на графике
+let _oiLastResult = null; // последний посчитанный ряд {dates,rows:[{date,close,net_phys_pct,...}]}
+
+const OI_CFG = {
+  decay: 0.90, decayWindow: 10,        // было 20 баров@5мин(~1.7ч) → 10 дней
+  zWindow: 60,                          // было 288(1 день) → 60 дней (квартал)
+  convictionWindow: 60, convictionAlpha: 0.4,
+  liquidityWindow: 60,                  // было 1440(5 дней) → 60 дней
+  minPersonsFloor: 10,
+  velocityWindow: 5,                    // было 12(1ч) → 5 дней (неделя)
+  velocityDecelGamma: 0.3,
+  rangeWindow: 60, rangePercentile: 0.25,
+};
+
+// Грубая эвристика тикер акции → корень фьючерса FORTS (как FUTOI_FULL_MAP в воркере)
+const OI_FUT_ROOT = {
+  SBER:'SBRF', GAZP:'GAZR', LKOH:'LKOH', GMKN:'GMKN', NVTK:'NOTK', ROSN:'ROSN',
+  TATN:'TATN', SNGS:'SNGR', MGNT:'MGNT', MTSS:'MTSI', VTBR:'VTBR', ALRS:'ALRS',
+  CHMF:'CHMF', NLMK:'NLMK', PLZL:'PLZL', POLY:'POLY', YNDX:'YDEX', AFLT:'AFLT',
+  MOEX:'MOEX', PHOR:'PHOR', RUAL:'RUAL', IRAO:'IRAO', FEES:'FEES', HYDR:'HYDR',
+};
+function oiGuessFuturesTicker(stockTicker) {
+  const root = OI_FUT_ROOT[stockTicker];
+  if (!root) return '';
+  // месяц/год не угадываем — оставляем пользователю дописать суффикс контракта,
+  // подставляем только корень как подсказку
+  return root;
+}
+
+function _oiMean(a){ const v=a.filter(x=>x!=null && !isNaN(x)); return v.length?v.reduce((s,x)=>s+x,0)/v.length:null; }
+function _oiStd(a){ const v=a.filter(x=>x!=null && !isNaN(x)); if(v.length<2) return null; const m=_oiMean(v); return Math.sqrt(v.reduce((s,x)=>s+(x-m)*(x-m),0)/v.length); }
+
+// rows: [{tradedate, price, yur_long, yur_short, fiz_long, fiz_short, yur_long_num, yur_short_num, fiz_long_num, fiz_short_num}]
+// отсортированы по tradedate ASC. Возвращает массив {date, close, total_oi, total_persons,
+// net_phys_pct, velocity, velocity_deceleration, force, imbalance_z, conviction,
+// liquidity_confidence, weighted_imbalance, accumulation_flag}
+function oiComputeIndicator(rows, cfg, refSwitchDates) {
+  const n = rows.length;
+  const totalOi = rows.map(r => {
+    const hasLegal = r.yur_long != null || r.yur_short != null;
+    if (hasLegal) return ((r.fiz_long||0)+(r.yur_long||0) + (r.fiz_short||0)+(r.yur_short||0)) / 2;
+    return (r.fiz_long||0) + (r.fiz_short||0);
+  });
+  const totalPersons = rows.map(r => {
+    const phys = (r.fiz_long_num||0) + (r.fiz_short_num||0);
+    const legalNum = (r.yur_long_num||0) + (r.yur_short_num||0);
+    return phys + legalNum; // legalNum=0, если данных нет — fallback на физ
+  });
+  const netPhysPct = rows.map((r,i) => {
+    const t = totalOi[i];
+    if (!t) return null;
+    return ((r.fiz_long||0) - (r.fiz_short||0)) / t;
+  });
+  const close = rows.map(r => r.price || null);
+
+  // velocity = pct_change(velocityWindow)
+  const velocity = rows.map((r,i) => {
+    if (i < cfg.velocityWindow || !close[i] || !close[i-cfg.velocityWindow]) return null;
+    return close[i]/close[i-cfg.velocityWindow] - 1;
+  });
+  // velocity deceleration: -diff(|velocity|) rolling mean, затем z, затем tanh
+  const absVel = velocity.map(v => v==null?null:Math.abs(v));
+  const rawDecel = absVel.map((v,i) => {
+    if (i===0 || v==null || absVel[i-1]==null) return null;
+    const w = cfg.velocityWindow;
+    const start = Math.max(1, i-w+1);
+    const diffs = [];
+    for (let j=start;j<=i;j++){ if (absVel[j]!=null && absVel[j-1]!=null) diffs.push(absVel[j]-absVel[j-1]); }
+    if (diffs.length < Math.ceil(w/2)) return null;
+    return -_oiMean(diffs);
+  });
+  const velocityDeceleration = rawDecel.map((v,i) => {
+    if (v==null) return null;
+    const start = Math.max(0, i-cfg.zWindow+1);
+    const win = rawDecel.slice(start, i+1);
+    const sd = _oiStd(win);
+    if (!sd) return null;
+    return Math.tanh(v/sd);
+  });
+
+  // force: decay-weighted sum of diff(netPhysPct) over decayWindow
+  const w = cfg.decayWindow;
+  const weights = []; for (let i=0;i<w;i++) weights.push(Math.pow(cfg.decay, w-1-i));
+  const wsum = weights.reduce((s,x)=>s+x,0);
+  const force = netPhysPct.map((_,i) => {
+    if (i < w) return null;
+    let acc = 0, ok = true;
+    for (let j=0;j<w;j++) {
+      const idx = i-w+1+j;
+      const d = (netPhysPct[idx]!=null && netPhysPct[idx-1]!=null) ? netPhysPct[idx]-netPhysPct[idx-1] : null;
+      if (d==null) { ok=false; break; }
+      acc += d*weights[j];
+    }
+    return ok ? acc/wsum : null;
+  });
+
+  // imbalance z-score
+  const imbalanceZ = netPhysPct.map((v,i) => {
+    if (v==null) return null;
+    const start = Math.max(0, i-cfg.zWindow+1);
+    const win = netPhysPct.slice(start, i+1);
+    const m = _oiMean(win), sd = _oiStd(win);
+    if (m==null || !sd) return null;
+    return (v-m)/sd;
+  });
+
+  // avg size phys long/short (NaN ниже minPersonsFloor)
+  const avgLong = rows.map(r => (r.fiz_long_num||0) >= cfg.minPersonsFloor ? (r.fiz_long||0)/r.fiz_long_num : null);
+  const avgShort = rows.map(r => (r.fiz_short_num||0) >= cfg.minPersonsFloor ? (r.fiz_short||0)/r.fiz_short_num : null);
+  const dominantAvgSize = netPhysPct.map((v,i) => v==null ? null : (v>0 ? avgLong[i] : avgShort[i]));
+  const conviction = dominantAvgSize.map((v,i) => {
+    if (i===0 || v==null || dominantAvgSize[i-1]==null) return null;
+    const delta = v - dominantAvgSize[i-1];
+    const start = Math.max(1, i-cfg.convictionWindow+1);
+    const deltas = [];
+    for (let j=start;j<=i;j++){ if (dominantAvgSize[j]!=null && dominantAvgSize[j-1]!=null) deltas.push(dominantAvgSize[j]-dominantAvgSize[j-1]); }
+    const sd = _oiStd(deltas);
+    if (!sd) return null;
+    return delta/sd;
+  });
+
+  // liquidity confidence: персентиль текущего total_persons за liquidityWindow
+  const liquidityConfidence = totalPersons.map((v,i) => {
+    const lw = cfg.liquidityWindow;
+    const minP = Math.max(20, Math.floor(lw/10));
+    const start = Math.max(0, i-lw+1);
+    const win = totalPersons.slice(start, i+1);
+    if (win.length < minP) return null;
+    const cur = win[win.length-1];
+    return win.filter(x => x<=cur).length / win.length;
+  });
+
+  // accumulation flag: узкий диапазон цены + рост |imbalance_z|
+  const accumulationFlag = rows.map((_,i) => {
+    const rw = cfg.rangeWindow;
+    if (i < rw*2-1) return false;
+    const win = close.slice(i-rw+1, i+1).filter(x=>x!=null);
+    if (win.length < rw*0.5) return false;
+    const range = Math.max(...win) - Math.min(...win);
+    // распределение диапазонов за окно для квантиля
+    const ranges = [];
+    for (let k=i-rw+1;k<=i;k++){
+      const s = Math.max(0,k-rw+1);
+      const ww = close.slice(s,k+1).filter(x=>x!=null);
+      if (ww.length) ranges.push(Math.max(...ww)-Math.min(...ww));
+    }
+    ranges.sort((a,b)=>a-b);
+    const qIdx = Math.floor(cfg.rangePercentile*(ranges.length-1));
+    const threshold = ranges[qIdx];
+    const narrow = range <= threshold;
+    const vw = cfg.velocityWindow;
+    const start = Math.max(1, i-vw+1);
+    const diffs = [];
+    for (let j=start;j<=i;j++){ if (imbalanceZ[j]!=null && imbalanceZ[j-1]!=null) diffs.push(Math.abs(imbalanceZ[j])-Math.abs(imbalanceZ[j-1])); }
+    const rising = diffs.length && _oiMean(diffs) > 0;
+    return narrow && rising;
+  });
+
+  const out = rows.map((r,i) => {
+    const baseSignal = imbalanceZ[i]==null ? null : imbalanceZ[i] * (1 + cfg.convictionAlpha * (conviction[i]||0));
+    let decelMult = 1 + cfg.velocityDecelGamma * (velocityDeceleration[i]||0);
+    if (refSwitchDates && refSwitchDates.has(r.tradedate)) decelMult = 1.0;
+    const lc = liquidityConfidence[i]||0;
+    const weighted = baseSignal==null ? null : baseSignal * lc * decelMult;
+    return {
+      date: r.tradedate, close: close[i],
+      total_oi: totalOi[i], total_persons: totalPersons[i],
+      net_phys_pct: netPhysPct[i], velocity: velocity[i], velocity_deceleration: velocityDeceleration[i],
+      force: force[i], imbalance_z: imbalanceZ[i], conviction: conviction[i],
+      liquidity_confidence: liquidityConfidence[i], weighted_imbalance: weighted,
+      accumulation_flag: accumulationFlag[i],
+    };
+  });
+  return out;
+}
+
+// Склейка нескольких одновременно живых контрактов (роллировка): суммируем
+// позиционные метрики по датам, цену берём у контракта с большим total_oi.
+function oiAggregateContracts(contractsMap) {
+  const allDates = new Set();
+  Object.values(contractsMap).forEach(rows => rows.forEach(r => allDates.add(r.tradedate)));
+  const dates = Array.from(allDates).sort();
+  const byCodeByDate = {};
+  for (const code in contractsMap) {
+    byCodeByDate[code] = {};
+    contractsMap[code].forEach(r => { byCodeByDate[code][r.tradedate] = r; });
+  }
+  const posCols = ['fiz_long','fiz_short','yur_long','yur_short','fiz_long_num','fiz_short_num','yur_long_num','yur_short_num'];
+  const refSwitchDates = new Set();
+  let prevRef = null;
+  const merged = dates.map(date => {
+    const agg = { tradedate: date };
+    posCols.forEach(c => agg[c] = 0);
+    let refCode = null, refOi = -Infinity;
+    for (const code in byCodeByDate) {
+      const r = byCodeByDate[code][date];
+      if (!r) continue;
+      posCols.forEach(c => agg[c] += (r[c]||0));
+      const oiHere = (r.fiz_long||0)+(r.fiz_short||0)+(r.yur_long||0)+(r.yur_short||0);
+      if (oiHere > refOi) { refOi = oiHere; refCode = code; }
+    }
+    if (refCode && prevRef && refCode !== prevRef) refSwitchDates.add(date);
+    if (refCode) prevRef = refCode;
+    agg.price = refCode ? (byCodeByDate[refCode][date]?.price || 0) : 0;
+    agg._refCode = refCode;
+    return agg;
+  });
+  return { rows: merged, refSwitchDates };
+}
+
+async function oiFetchTickerHistory(ticker) {
+  const proxy = chartGetProxy();
+  if (!proxy) throw new Error('Не задан прокси-воркер (поле выше, вкладка графика)');
+  const url = proxy.replace(/\/$/,'') + '/db/oidaily?ticker=' + encodeURIComponent(ticker);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('oidaily ' + r.status);
+  const rows = await r.json();
+  return (rows||[]).sort((a,b)=> a.tradedate < b.tradedate ? -1 : 1);
+}
+
+async function oiLoadAndRender() {
+  const raw = (document.getElementById('oi-tickers')?.value || '').trim().toUpperCase();
+  const resEl = document.getElementById('oi-result');
+  if (!raw) { if (resEl) resEl.innerHTML = '<span style="color:var(--text3)">Введи код фьючерса FORTS</span>'; return; }
+  const tickers = raw.split(',').map(s=>s.trim()).filter(Boolean);
+  if (resEl) resEl.innerHTML = '<span style="color:var(--text3)">Загрузка…</span>';
+  try {
+    const contractsMap = {};
+    for (const t of tickers) contractsMap[t] = await oiFetchTickerHistory(t);
+    const totalRows = Object.values(contractsMap).reduce((s,r)=>s+r.length,0);
+    if (!totalRows) { if (resEl) resEl.innerHTML = '<span style="color:#C71B52">Нет данных в oi_daily — тикер не отслеживается cron\'ом воркера или ещё не накопилась история</span>'; return; }
+    let rows, refSwitchDates;
+    if (tickers.length > 1) {
+      const agg = oiAggregateContracts(contractsMap);
+      rows = agg.rows; refSwitchDates = agg.refSwitchDates;
+    } else {
+      rows = contractsMap[tickers[0]]; refSwitchDates = new Set();
+    }
+    const result = oiComputeIndicator(rows, OI_CFG, refSwitchDates);
+    _oiLastResult = { dates: rows.map(r=>r.tradedate), rows: result };
+    oiRenderVals(result[result.length-1]);
+    oiDraw();
+    if (chartCandles.length) chartRedraw();
+  } catch (e) {
+    if (resEl) resEl.innerHTML = `<span style="color:#C71B52">Ошибка: ${e.message}</span>`;
+  }
+}
+
+function oiRenderVals(last) {
+  const el = document.getElementById('oi-vals');
+  if (!el || !last) return;
+  const fmt = (v,d=3) => v==null||isNaN(v) ? '—' : v.toFixed(d);
+  const row = (label,val,color) => `<div style="display:flex;justify-content:space-between;"><span style="color:var(--text3);">${label}</span><span style="color:${color||'var(--text)'};font-weight:600;">${val}</span></div>`;
+  const wi = last.weighted_imbalance;
+  const wiColor = wi==null ? 'var(--text3)' : wi>0.3 ? '#C71B52' : wi<-0.3 ? '#60A4A1' : 'var(--text)';
+  el.innerHTML = [
+    row('Дата', last.date),
+    row('NetPhys%', fmt(last.net_phys_pct!=null?last.net_phys_pct*100:null,2)+'%'),
+    row('Force', fmt(last.force)),
+    row('Imbalance z', fmt(last.imbalance_z)),
+    row('Conviction', fmt(last.conviction)),
+    row('LiquidityConf.', fmt(last.liquidity_confidence,2)),
+    row('VelocityDecel', fmt(last.velocity_deceleration,2)),
+    row('Accumulation', last.accumulation_flag ? 'ДА' : 'нет', last.accumulation_flag?'#FFD700':'var(--text3)'),
+    row('WeightedImbalance', fmt(wi), wiColor),
+  ].join('');
+  const resEl = document.getElementById('oi-result');
+  if (resEl) resEl.innerHTML = oiInterpretText(last);
+}
+
+// Контртрендовая интерпретация: сильный устойчивый перекос физ.лиц на
+// экстремуме исторически чаще означает потенциал движения ПРОТИВ него,
+// а не подтверждение тренда (см. docstring fresh_oi_indicator v2.3).
+function oiInterpretText(last) {
+  if (last.weighted_imbalance == null) return '<span style="color:var(--text3)">Недостаточно истории для расчёта (нужно ~'+OI_CFG.zWindow+' дней)</span>';
+  const wi = last.weighted_imbalance;
+  const lc = last.liquidity_confidence;
+  let lines = [];
+  if (lc != null && lc < 0.2) {
+    lines.push(`<span style="color:#FFD700">⚠ Низкая ликвидность (перс. ${(lc*100).toFixed(0)}%) — сигналу нельзя доверять</span>`);
+  }
+  if (Math.abs(wi) < 0.5) {
+    lines.push('<span style="color:var(--text3)">Нейтрально — перекос физ.лиц не выражен</span>');
+  } else if (wi > 0) {
+    lines.push(`<span style="color:#C71B52">Физ.лица перегружены лонгом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВНИЗ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
+  } else {
+    lines.push(`<span style="color:#60A4A1">Физ.лица перегружены шортом (z=${wi.toFixed(2)}) — контртрендовый риск движения ВВЕРХ${last.accumulation_flag?', + признак накопления (узкий диапазон)':''}</span>`);
+  }
+  return lines.join('<br>');
+}
+
+function oiDraw() {
+  const canvas = document.getElementById('oi-canvas');
+  if (!canvas || !_oiLastResult) return;
+  const dpr = devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  ctx.clearRect(0,0,W,H);
+
+  const series = _oiLastResult.rows.map(r => r.weighted_imbalance).filter(v=>v!=null);
+  if (series.length < 2) {
+    ctx.fillStyle = '#6F648F'; ctx.font = '11px monospace'; ctx.textAlign='center';
+    ctx.fillText('Недостаточно истории для графика', W/2, H/2);
+    return;
+  }
+  const all = _oiLastResult.rows.map(r => r.weighted_imbalance);
+  const maxAbs = Math.max(1, ...all.filter(v=>v!=null).map(Math.abs));
+  const midY = H/2;
+  const toY = v => midY - (v/maxAbs) * (midY - 12);
+  const stepX = W / (all.length - 1 || 1);
+
+  // zero line
+  ctx.strokeStyle = '#2a1f3d'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
+
+  ctx.beginPath();
+  let started = false;
+  all.forEach((v,i) => {
+    if (v==null) { started = false; return; }
+    const x = i*stepX, y = toY(v);
+    if (!started) { ctx.moveTo(x,y); started = true; } else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = '#B487F8'; ctx.lineWidth = 1.6; ctx.stroke();
+
+  // fill above/below zero with bullish/bearish tint (контртрендово: + perekos long = риск вниз = красный)
+  all.forEach((v,i) => {
+    if (v==null) return;
+    const x = i*stepX, y = toY(v);
+    ctx.fillStyle = v > 0 ? 'rgba(199,27,82,0.5)' : 'rgba(96,164,161,0.5)';
+    ctx.fillRect(x-1, Math.min(y,midY), 2, Math.abs(midY-y));
+  });
+
+  ctx.fillStyle = '#6F648F'; ctx.font = '9px monospace'; ctx.textAlign = 'left';
+  ctx.fillText(`+${maxAbs.toFixed(2)}`, 4, 12);
+  ctx.fillText(`-${maxAbs.toFixed(2)}`, 4, H-4);
 }
 
 // ═══════════════════════════════════════════
@@ -8493,24 +8836,13 @@ function cpTab(btn) {
     el.style.display = p === name ? (p === 'ind' ? 'flex' : 'block') : 'none';
   });
   if (name === 'ichi') {
-    // Auto-compute Ichimoku from loaded candles
-    if (chartCandles.length >= 52) {
-      const highs = chartCandles.map(c=>c.high);
-      const lows  = chartCandles.map(c=>c.low);
-      const n = chartCandles.length;
-      const hi9  = Math.max(...highs.slice(-9));   const lo9  = Math.min(...lows.slice(-9));
-      const hi26 = Math.max(...highs.slice(-26));  const lo26 = Math.min(...lows.slice(-26));
-      const hi52 = Math.max(...highs.slice(-52));  const lo52 = Math.min(...lows.slice(-52));
-      const tenkan = (hi9+lo9)/2;
-      const kijun  = (hi26+lo26)/2;
-      const senkA  = (tenkan+kijun)/2;
-      const senkB  = (hi52+lo52)/2;
-      const price  = chartCandles[n-1].close;
-      const setV = (id,v) => { const el=document.getElementById(id); if(el) el.value=v.toFixed(2); };
-      setV('i-tenkan', tenkan); setV('i-kijun', kijun);
-      setV('i-sena', senkA);   setV('i-senb', senkB); setV('i-price', price);
+    // Автоподстановка тикера фьючерса по текущему инструменту графика, если поле пустое
+    const oiInp = document.getElementById('oi-tickers');
+    if (oiInp && !oiInp.value) {
+      const guess = oiGuessFuturesTicker((document.getElementById('chart-ticker')?.value || '').trim().toUpperCase());
+      if (guess) oiInp.value = guess;
     }
-    setTimeout(() => ichiDraw(), 50);
+    if (_oiLastResult) setTimeout(() => oiDraw(), 50);
   }
   if (name === 'fib') {
     setTimeout(() => renderFib(), 20);
@@ -10414,18 +10746,30 @@ function cpInitIndPanel() {
   ]);
 
   let html = '';
+  const favs = cpGetFavs(); // читаем localStorage один раз, не на каждую строку
   for (const g of IND_GROUPS) {
     html += `<div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.06em;
       text-transform:uppercase;padding:10px 4px 3px;border-top:1px solid rgba(255,255,255,0.04);
       margin-top:2px;">${g.label}</div>`;
     for (const ind of g.items) {
       const isChart = CHART_INDS.has(ind.id);
+      const isFav = favs.includes(ind.id);
       const on = isChart && !!chartInds[ind.id];
       // Init default values
       if (!cpIndVals[ind.id]) {
         cpIndVals[ind.id] = {};
         (ind.params||[]).forEach(p => { cpIndVals[ind.id][p.id] = p.def; });
       }
+      // Сравниваем текущие значения параметров с дефолтом — чтобы показать, реально ли автотюн что-то изменил
+      const _changedParams = (ind.params||[]).filter(p => cpIndVals[ind.id][p.id] !== p.def);
+      const _tuneTitle = _changedParams.length
+        ? 'Изменено автотюном: ' + _changedParams.map(p => `${p.label} ${p.def}→${cpIndVals[ind.id][p.id]}`).join(', ')
+        : 'Значения параметров — классика (без изменений)';
+      const _tuneBadge = (ind.params||[]).length
+        ? `<span title="${_tuneTitle}" style="font-size:8px;font-family:var(--mono);padding:1px 4px;border-radius:4px;margin-right:2px;flex-shrink:0;
+            color:${_changedParams.length?'#B487F8':'#6F648F'};background:${_changedParams.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
+            border:1px solid ${_changedParams.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${_changedParams.length?'🎯 изм.':'классика'}</span>`
+        : '';
       html += `
       <div style="margin-bottom:2px;">
         <div class="cp-ind-row" id="cprow-${ind.id}"
@@ -10444,8 +10788,9 @@ function cpInitIndPanel() {
           <div id="cpaltdiam-${ind.id}" data-indid="${ind.id}"
             class="cp-ind-alt-diamond-btn" style="display:none;"></div>
           <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
+          <span id="cptune-${ind.id}">${_tuneBadge}</span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
-          <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${cpGetFavs().includes(ind.id)?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${cpGetFavs().includes(ind.id)?'#FFD700':'#6F648F'};">★</span>
+          <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${isFav?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${isFav?'#FFD700':'#6F648F'};">★</span>
           <span class="cp-ind-eye" data-indid="${ind.id}" title="Скрыть / показать" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">◉</span>
           <span class="cp-ind-del" data-indid="${ind.id}" title="Убрать с графика" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">✕</span>
           <span id="cparrow-${ind.id}" style="font-size:10px;color:#6F648F;pointer-events:none;">›</span>
@@ -10678,6 +11023,20 @@ const _GLOBAL_PARAM_MAP = {
   tsi:   { len: 'tp-tsil', smooth: 'tp-tsis' },
 };
 
+// Перерисовывает бейдж "классика/изм." у одной строки списка после автотюна
+function _cpRefreshTuneBadge(ind) {
+  const el = document.getElementById(`cptune-${ind.id}`);
+  if (!el) return;
+  const changed = (ind.params||[]).filter(p => cpIndVals[ind.id]?.[p.id] !== p.def);
+  if (!(ind.params||[]).length) { el.innerHTML = ''; return; }
+  const title = changed.length
+    ? 'Изменено автотюном: ' + changed.map(p => `${p.label} ${p.def}→${cpIndVals[ind.id][p.id]}`).join(', ')
+    : 'Значения параметров — классика (без изменений)';
+  el.innerHTML = `<span title="${title}" style="font-size:8px;font-family:var(--mono);padding:1px 4px;border-radius:4px;margin-right:2px;flex-shrink:0;
+    color:${changed.length?'#B487F8':'#6F648F'};background:${changed.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
+    border:1px solid ${changed.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${changed.length?'🎯 изм.':'классика'}</span>`;
+}
+
 function _globalAutoTune() {
   if (!chartCandles || chartCandles.length < 20) {
     showToast?.('Загрузи данные на графике', '#FF9F40'); return;
@@ -10713,6 +11072,7 @@ function _globalAutoTune() {
       if (numEl) numEl.value = val;
       if (slEl)  slEl.value  = val;
     });
+    _cpRefreshTuneBadge(ind);
   });
 
   // Показать статус
@@ -10735,6 +11095,7 @@ function _globalAutoReset() {
       if (numEl) numEl.value = p.def;
       if (slEl)  slEl.value  = p.def;
     });
+    _cpRefreshTuneBadge(ind);
   });
   const statusEl = document.getElementById('cp-global-status');
   if (statusEl) statusEl.style.display = 'none';
@@ -10759,6 +11120,7 @@ function cpApplyAuto(id) {
     if (slEl)  slEl.value  = val;
   });
   cpUpdateInd(id);
+  _cpRefreshTuneBadge(_getIndById(id));
 
   if (resEl) {
     const changed = Object.entries(res.params).map(([k,v]) => `${k}=${v}`).join(', ');
@@ -10775,15 +11137,30 @@ function cpToggleIndDetail(id) {
   // Fix: use id-based arrow element instead of broken :last-child selector
   const arrow = document.getElementById('cparrow-' + id);
   if (arrow) arrow.textContent = open ? '›' : '‹';
-  // Scroll detail into view when opening
+  // Scroll detail into view when opening (instant — smooth вызывал второй reflow одновременно с раскрытием)
   if (!open) {
-    setTimeout(() => { det.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 30);
+    setTimeout(() => { det.scrollIntoView({ block: 'nearest', behavior: 'instant' }); }, 30);
   }
 }
 
-// Update indicator interpret when slider changes
+// Кэш id→индикатор, чтобы не гонять flatMap по всем группам на каждое движение слайдера
+let _indByIdCache = null;
+function _getIndById(id) {
+  if (!_indByIdCache) {
+    _indByIdCache = {};
+    IND_GROUPS.forEach(g => g.items.forEach(i => { _indByIdCache[i.id] = i; }));
+  }
+  return _indByIdCache[id];
+}
+
+// Update indicator interpret when slider changes (дебаунс — слайдер шлёт oninput на каждый пиксель)
+const _cpUpdateIndTimers = {};
 function cpUpdateInd(id) {
-  const ind = IND_GROUPS.flatMap(g=>g.items).find(i=>i.id===id);
+  clearTimeout(_cpUpdateIndTimers[id]);
+  _cpUpdateIndTimers[id] = setTimeout(() => _cpUpdateIndNow(id), 60);
+}
+function _cpUpdateIndNow(id) {
+  const ind = _getIndById(id);
   if (!ind) return;
   // Read current param values
   const vals = {};
@@ -10796,6 +11173,7 @@ function cpUpdateInd(id) {
     cpIndVals[id] = cpIndVals[id] || {};
     cpIndVals[id][p.id] = vals[p.id];
   });
+  _cpRefreshTuneBadge(ind);
 
   // For chart-able indicators, also update from real candles if available
   const CHART_INDS_SET = new Set(['ma','ema','bb','vol','rsi','macd']);
@@ -13590,6 +13968,35 @@ function _anParamSuffix(id, p) {
   }
 }
 
+// Подбирает по бэктесту лучший период для каждого индикатора (вместо классического),
+// альт-серия считается потом от ss[id] — т.е. наследует подобранный период автоматически.
+const _IL_ADAPTIVE_GRID = [7,9,11,14,18,21,25,30];
+function _ilAdaptiveSeries(candles, closes, baseSS) {
+  const ss = Object.assign({}, baseSS);
+  const chosen = {};
+  const pick = (id, grid, calcFn) => {
+    let best = null, bestAcc = -1;
+    grid.forEach(p => {
+      const arr = calcFn(p);
+      const st = _ilBtStats(arr, closes, 15, null);
+      if (st.n >= 10 && st.acc != null && st.acc > bestAcc) { bestAcc = st.acc; best = { period: p, arr }; }
+    });
+    if (best) { ss[id] = best.arr; chosen[id] = best.period; }
+  };
+  pick('rsi', _IL_ADAPTIVE_GRID, p => _chartCalcRSI(closes, p).map(v => v==null?null:ilScore.rsi(v)));
+  pick('wr',  _IL_ADAPTIVE_GRID, p => ilCalcWR(candles, p).map(v => v==null?null:ilScore.wr(v)));
+  pick('cci', _IL_ADAPTIVE_GRID, p => ilCalcCCI(candles, p).map(v => v==null?null:ilScore.cci(v)));
+  pick('mfi', _IL_ADAPTIVE_GRID, p => ilCalcMFI(candles, p).map(v => v==null?null:ilScore.mfi(v)));
+  pick('adx', _IL_ADAPTIVE_GRID, p => ilCalcADX(candles, p).map((_,i,a) => ilScoreADX(a,i)));
+  pick('bb',  _IL_ADAPTIVE_GRID, p => { const b=_chartCalcBB(closes,p,2); return b.map((bb,i) => bb==null?null:ilScore.bb((closes[i]-bb.lower)/((bb.upper-bb.lower)||1)*100)); });
+  pick('stoch', _IL_ADAPTIVE_GRID, p => { const s=ilCalcStoch(candles,p,3); return s.map(v => (v.k==null||v.d==null)?null:ilScoreStoch(v.k,v.d)); });
+  pick('supertrend', _IL_ADAPTIVE_GRID, p => ilCalcSuperTrend(candles, p, 3).map((_,i,a) => ilScoreSuperTrend(a,i)));
+  pick('elder_ray', _IL_ADAPTIVE_GRID, p => ilCalcElderRay(closes, candles, p).map(v => ilScoreElderRay(v)));
+  pick('elder_impulse', _IL_ADAPTIVE_GRID, p => ilCalcElderImpulse(closes, candles, p).map(v => ilScoreElderImpulse(v)));
+  pick('tsi', _IL_ADAPTIVE_GRID, p => ilCalcTSI(closes, p, 13).map(v => ilScoreTSI(v)));
+  return { ss, chosen };
+}
+
 async function ilRunAnalysis() {
   const ticker = (document.getElementById('an-ticker')?.value||'').trim().toUpperCase();
   const statusEl = document.getElementById('an-status');
@@ -13616,7 +14023,14 @@ async function ilRunAnalysis() {
     const interval = tfLabel;
     if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
     const _testParams = _anReadTestParams();
-    const ss = _ilCalcCustomSeries(candles, closes, _testParams);
+    let ss = _ilCalcCustomSeries(candles, closes, _testParams);
+    const _adaptive = document.getElementById('an-adaptive')?.checked;
+    let _adaptiveChosen = null;
+    if (_adaptive) {
+      if (statusEl) statusEl.textContent = `Подбираю периоды (${closes.length} баров)…`;
+      const r = _ilAdaptiveSeries(candles, closes, ss);
+      ss = r.ss; _adaptiveChosen = r.chosen;
+    }
     // Режимные маски
     const returns5 = closes.slice(0,-5).map((c,i)=>Math.abs(closes[i+5]-c)/c);
     const med5 = [...returns5].sort((a,b)=>a-b)[Math.floor(returns5.length/2)];
@@ -13638,7 +14052,7 @@ async function ilRunAnalysis() {
     IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(id, ss, closes, candles, chopArrAlt); });
     // Считаем дефолтные серии для сравнения, если параметры отличаются от дефолта
     const _D = {rsi:14,wr:14,cci:20,mfi:14,stk:14,std:3,mf:12,ms:26,msig:9,bbp:20,bbs:2,ef:12,es:26,adx:14,stp:10,stm:3,elder:13,tsil:25,tsis:13};
-    const _paramsChanged = Object.keys(_D).some(k => _testParams[k] !== _D[k]);
+    const _paramsChanged = _adaptive || Object.keys(_D).some(k => _testParams[k] !== _D[k]);
     const ssDefault = _paramsChanged ? _ilCalcAllSeries(candles, closes) : null;
     const stats = {};
     IL_INDICATORS.forEach(id=>{
@@ -13679,7 +14093,7 @@ async function ilRunAnalysis() {
     });
     const clusterOf={};clusters.forEach((cl,ci)=>cl.forEach(id=>clusterOf[id]=ci));
     const barMinutes = {CANDLE_INTERVAL_1_MIN:1,CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60}[tfConst]||5;
-    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,ssDefault,interval,barMinutes,testParams:_testParams,paramsChanged:_paramsChanged};
+    _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,ssDefault,interval,barMinutes,testParams:_testParams,paramsChanged:_paramsChanged,adaptiveChosen:_adaptiveChosen};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
     ilRenderAnalysis();
   } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
@@ -13845,8 +14259,9 @@ function ilRenderAnalysis() {
       const hasDef = r.paramsChanged && r.stats[id].h5Def != null;
       const d5=r.stats[id].h5Def, d10=r.stats[id].h10Def, d15=r.stats[id].h15Def, d30=r.stats[id].h30Def;
       const d15T=r.stats[id].h15DefT, d15R=r.stats[id].h15DefR, d15HV=r.stats[id].h15DefHV, d15LV=r.stats[id].h15DefLV;
-      const suffix = r.testParams ? _anParamSuffix(id, r.testParams) : '';
-      const nameLbl = `${IL_NAMES[id]||id}<span style="color:#7868a8;font-size:9px;font-family:var(--mono);">${suffix}</span>`;
+      const adaptP = r.adaptiveChosen && r.adaptiveChosen[id];
+      const suffix = adaptP ? `🎯(${adaptP})` : (r.testParams ? _anParamSuffix(id, r.testParams) : '');
+      const nameLbl = `${IL_NAMES[id]||id}<span style="color:${adaptP?'#B487F8':'#7868a8'};font-size:9px;font-family:var(--mono);">${suffix}</span>`;
       const classicLbl = suffix ? `↳ классика` : `↳ альт-сигнал`;
       html+=`<tr style="border-top:1px solid #180f28;">
         <td style="padding:5px 8px;color:#c0b8d8;vertical-align:middle;">${nameLbl}</td>
@@ -13901,8 +14316,9 @@ function ilRenderAnalysis() {
       const hasDef2=r.paramsChanged&&r.stats[id].h5Def!=null;
       const d5b=r.stats[id].h5Def,d10b=r.stats[id].h10Def,d15b=r.stats[id].h15Def,d30b=r.stats[id].h30Def;
       const d15Tb=r.stats[id].h15DefT,d15Rb=r.stats[id].h15DefR,d15HVb=r.stats[id].h15DefHV,d15LVb=r.stats[id].h15DefLV;
-      const sfx2=r.testParams?_anParamSuffix(id,r.testParams):'';
-      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:#7868a8;font-size:9px;">${sfx2}</span></td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
+      const adaptP2=r.adaptiveChosen&&r.adaptiveChosen[id];
+      const sfx2=adaptP2?`🎯(${adaptP2})`:(r.testParams?_anParamSuffix(id,r.testParams):'');
+      html+=`<tr style="border-top:1px solid #1a1028;"><td style="padding:4px 8px;color:#c0b8d8;vertical-align:middle;">${IL_NAMES[id]||id}<span style="color:${adaptP2?'#B487F8':'#7868a8'};font-size:9px;">${sfx2}</span></td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s5)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s10)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s15)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${acc(s30)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(s15T)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15R)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15HV)}</td><td style="text-align:center;padding:4px 8px;vertical-align:middle;">${regAcc(s15LV)}</td></tr>
       ${hasDef2?`<tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 2px 18px;color:#52a890;font-style:italic;font-size:10px;vertical-align:middle;">↳ классика</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d5b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d10b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d15b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${acc(d30b)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAcc(d15Tb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15Rb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15HVb)}</td><td style="text-align:center;padding:3px 8px 2px;vertical-align:middle;">${regAcc(d15LVb)}</td></tr>`:''}
       <tr style="border-top:1px dashed #1a1028;"><td style="padding:3px 8px 6px 18px;color:#7068a0;font-style:italic;font-size:10px;vertical-align:middle;">↳ альт-сигнал</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a5)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a10)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a15)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${acc(a30)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;border-left:1px solid #2a1f3d;">${regAccAlt(a15T)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15R)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15HV)}</td><td style="text-align:center;padding:3px 8px 6px;vertical-align:middle;">${regAccAlt(a15LV)}</td></tr>`;
     });
