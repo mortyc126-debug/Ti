@@ -707,38 +707,34 @@ async function handleDb(path, req, env) {
     return json({ sym, date, status: resp.status, body });
   }
 
-  // ── Разовый backfill одной даты: /db/oibackfill?tickers=SSU6&date=2026-06-25 ──
-  // Без date — весь диапазон days (таймаут при days>3, использовать пошагово из браузера).
+  // ── Разовый backfill одной даты: /db/oibackfill?date=2026-06-25[&all=1|&tickers=X] ──
+  // all=1 — сохранить все тикеры из ответа FutOI без фильтра.
   if (p === '/oibackfill' && req.method === 'GET') {
     const u = new URL(req.url);
+    const saveAll = u.searchParams.get('all') === '1';
     let tickers = (u.searchParams.get('tickers') || '').split(',').map(s => s.trim()).filter(Boolean);
-    if (!tickers.length) {
+    if (!saveAll && !tickers.length) {
       const { results } = await db.prepare('SELECT ticker FROM oi_tracked_state WHERE tracked=1').all();
       tickers = results.map(r => r.ticker);
     }
-    if (!tickers.length) return json({ error: 'нет тикеров: пусто и в параметре, и в oi_tracked_state' }, 400);
+    if (!saveAll && !tickers.length) return json({ error: 'нет тикеров: пусто и в параметре, и в oi_tracked_state' }, 400);
 
     // Если передан date= — один запрос на всю дату, сохраняем все запрошенные тикеры.
     // FutOI API возвращает ВСЕ тикеры в одном ответе, поэтому делаем 1 fetch на дату.
     const singleDate = u.searchParams.get('date');
     if (singleDate) {
       const moexKey = env.MOEX_KEY;
-      // Строим map sym→[тикеры] (несколько контрактов могут иметь один sym, напр. SiU6+SiZ6→Si)
-      const symMap = {};
-      for (const ticker of tickers) {
-        const sym = futoi2sym(ticker);
-        (symMap[sym] = symMap[sym] || []).push(ticker);
-      }
-      const anyTicker = Object.keys(symMap)[0];
+      // Один запрос — весь снэпшот сессии (все тикеры в одном ответе)
+      const anyRef = saveAll ? 'SS' : futoi2sym(tickers[0]);
       try {
-        const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(anyTicker)}&date=${singleDate}&iss.meta=off&limit=10000`;
+        const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(anyRef)}&date=${singleDate}&iss.meta=off&limit=10000`;
         const resp = await fetch(url2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
-        if (!resp.ok) return json({ tickers: tickers.length, date: singleDate, saved: 0, empty: 0, failed: tickers.length, httpStatus: resp.status });
+        if (!resp.ok) return json({ date: singleDate, saved: 0, empty: 0, failed: 1, httpStatus: resp.status });
         const json2 = await resp.json();
         const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
         const allRows = issBlockToObjects(block);
 
-        // Группируем по sym → clgroup → лучшая запись
+        // Группируем sym → clgroup → лучшая запись по tradetime
         const bySym = {};
         allRows.forEach(o => {
           const g = (o.clgroup || '').toUpperCase();
@@ -750,13 +746,14 @@ async function handleDb(path, req, env) {
 
         let saved = 0, empty = 0;
         const upserts = [];
-        for (const [sym, tickerList] of Object.entries(symMap)) {
-          const byGroup = bySym[sym] || {};
-          if (!byGroup.YUR && !byGroup.FIZ) { empty += tickerList.length; continue; }
-          const tradedate = (byGroup.YUR || byGroup.FIZ).tradedate || singleDate;
-          for (const ticker of tickerList) {
+
+        if (saveAll) {
+          // Сохраняем каждый sym как есть — ticker = sym (2-буквенный код)
+          for (const [sym, byGroup] of Object.entries(bySym)) {
+            if (!byGroup.YUR && !byGroup.FIZ) { empty++; continue; }
+            const tradedate = (byGroup.YUR || byGroup.FIZ).tradedate || singleDate;
             upserts.push(upsertOiDaily(db, {
-              ticker, tradedate, price: 0,
+              ticker: sym, tradedate, price: 0,
               yur_long: Number(byGroup.YUR?.pos_long || 0),
               yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
               fiz_long: Number(byGroup.FIZ?.pos_long || 0),
@@ -768,11 +765,37 @@ async function handleDb(path, req, env) {
             }));
             saved++;
           }
+        } else {
+          // Строим map sym→[тикеры] и фильтруем только запрошенные
+          const symMap = {};
+          for (const ticker of tickers) {
+            const sym = futoi2sym(ticker);
+            (symMap[sym] = symMap[sym] || []).push(ticker);
+          }
+          for (const [sym, tickerList] of Object.entries(symMap)) {
+            const byGroup = bySym[sym] || {};
+            if (!byGroup.YUR && !byGroup.FIZ) { empty += tickerList.length; continue; }
+            const tradedate = (byGroup.YUR || byGroup.FIZ).tradedate || singleDate;
+            for (const ticker of tickerList) {
+              upserts.push(upsertOiDaily(db, {
+                ticker, tradedate, price: 0,
+                yur_long: Number(byGroup.YUR?.pos_long || 0),
+                yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
+                fiz_long: Number(byGroup.FIZ?.pos_long || 0),
+                fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+                yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
+                yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
+                fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
+                fiz_short_num: Math.abs(Number(byGroup.FIZ?.pos_short_num || 0)),
+              }));
+              saved++;
+            }
+          }
         }
         await Promise.all(upserts);
-        return json({ tickers: tickers.length, date: singleDate, saved, empty, failed: 0 });
+        return json({ date: singleDate, saved, empty, failed: 0 });
       } catch(e) {
-        return json({ tickers: tickers.length, date: singleDate, saved: 0, empty: 0, failed: tickers.length, error: e.message });
+        return json({ date: singleDate, saved: 0, empty: 0, failed: 1, error: e.message });
       }
     }
 
