@@ -215,9 +215,9 @@ input::placeholder{color:var(--t3);opacity:.5}
 
 <!-- Tabs -->
 <div class="tabs" id="mainTabs">
-  <button class="tab-btn on" data-tab="breadth">Market Breadth</button>
-  <button class="tab-btn" data-tab="rs">Relative Strength</button>
-  <button class="tab-btn" data-tab="attr">Performance Attribution</button>
+  <button class="tab-btn on" data-tab="breadth">Широта рынка</button>
+  <button class="tab-btn" data-tab="rs">Относительная сила</button>
+  <button class="tab-btn" data-tab="attr">Атрибуция доходности</button>
 </div>
 
 <!-- ═══════════════════ MARKET BREADTH ═══════════════════ -->
@@ -300,9 +300,9 @@ input::placeholder{color:var(--t3);opacity:.5}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div class="sl">Матрица: бумага × бумага (Percentile Rank)</div>
         <div class="rs-legend">
-          <div class="rs-leg-item"><div class="rs-leg-dot" style="background:rgba(82,242,201,.4)"></div>Outperform</div>
+          <div class="rs-leg-item"><div class="rs-leg-dot" style="background:rgba(82,242,201,.4)"></div>Лидирует</div>
           <div class="rs-leg-item"><div class="rs-leg-dot" style="background:rgba(255,255,255,.07)"></div>Нейтрально</div>
-          <div class="rs-leg-item"><div class="rs-leg-dot" style="background:rgba(255,77,122,.4)"></div>Underperform</div>
+          <div class="rs-leg-item"><div class="rs-leg-dot" style="background:rgba(255,77,122,.4)"></div>Отстаёт</div>
         </div>
       </div>
       <div style="overflow-x:auto"><div id="rs-matrix"></div></div>
@@ -348,16 +348,16 @@ const showErr=m=>{const e=$('errbox');e.textContent='⚠ '+m;e.style.display='bl
 const hideErr=()=>$('errbox').style.display='none';
 
 const MOEX='https://iss.moex.com';
-const PROXY='https://api.allorigins.win/raw?url=';
+const PROXY='https://corsproxy.io/?url=';
 
 async function moexFetch(path){
   const url=MOEX+path+(path.includes('?')?'&':'?')+'lang=ru';
   try{
-    const r=await fetch(url,{signal:AbortSignal.timeout(14000)});
+    const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
     if(!r.ok) throw new Error('HTTP '+r.status);
     return await r.json();
   }catch(e){
-    const r2=await fetch(PROXY+encodeURIComponent(url),{signal:AbortSignal.timeout(18000)});
+    const r2=await fetch(PROXY+encodeURIComponent(url),{signal:AbortSignal.timeout(20000)});
     if(!r2.ok) throw new Error('proxy HTTP '+r2.status);
     return await r2.json();
   }
