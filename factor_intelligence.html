@@ -198,7 +198,7 @@ input::placeholder{color:var(--t3);opacity:.5}
       </div>
       <div class="ig">
         <label class="il">CF-Worker прокси URL (если нужен)</label>
-        <input type="text" id="proxyUrl" placeholder="https://…workers.dev/?u=" autocomplete="off"/>
+        <input type="text" id="proxyUrl" placeholder="https://….workers.dev  (без слэша)" autocomplete="off"/>
       </div>
       <button class="btn" onclick="saveSettings()">Сохранить</button>
     </div>
@@ -402,12 +402,14 @@ function getToken(){return localStorage.getItem(LS_TOKEN)||'';}
 function getProxy(){return localStorage.getItem(LS_PROXY)||'';}
 
 // T-Invest REST (gRPC-gateway). Через прокси если задан.
+// Прокси (invest-bot/cf-worker.js) перехватывает пути начинающиеся с /tinkoff —
+// поэтому передаём только base воркера, путь /tinkoff... добавляем сами.
 async function tFetch(service,method,body){
   const token=getToken();
   if(!token) throw new Error('Не задан T-Invest токен — откройте Настройки API');
-  const path=TINVEST_BASE+'/tinkoff.public.invest.api.contract.v1.'+service+'/'+method;
-  const prx=getProxy();
-  const url=prx?prx+encodeURIComponent(path):path;
+  const apiPath='/tinkoff.public.invest.api.contract.v1.'+service+'/'+method;
+  const prx=getProxy().replace(/\/$/,'');
+  const url=prx?(prx+apiPath):(TINVEST_BASE+apiPath);
   const r=await fetch(url,{
     method:'POST',
     headers:{
