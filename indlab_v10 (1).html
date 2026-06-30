@@ -559,6 +559,7 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
   <button class="nav-btn" onclick="goPage('compare',this)">Сравнение</button>
   <button class="nav-btn" onclick="goPage('guide',this)">Справочник</button>
   <button class="nav-btn" onclick="goPage('analysis',this)">Точность</button>
+  <button class="nav-btn" onclick="goPage('ichimoku',this)">Ишимоку</button>
 </div>
 
 <!-- ══ GUIDE PAGE ══ -->
@@ -772,7 +773,72 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
 
 <!-- ══ LIBRARY PAGE ══ -->
 <!-- ══ ICHIMOKU PAGE ══ -->
-<div id="page-ichimoku" class="page"></div>
+<div id="page-ichimoku" class="page" style="display:flex;flex-direction:column;gap:0;overflow:hidden;height:100%;">
+  <!-- шапка -->
+  <div style="padding:10px 16px 8px;background:#0D0820;border-bottom:1px solid rgba(255,0,110,0.12);flex-shrink:0;display:flex;align-items:center;gap:10px;">
+    <div style="font-size:9px;color:#6F648F;font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase;flex:1;">Ишимоку · интерактивный анализ</div>
+    <button onclick="ichiPageFromChart()" title="Подставить значения из загруженного графика"
+      style="padding:3px 10px;background:rgba(82,242,201,0.07);border:1px solid rgba(82,242,201,0.2);border-radius:6px;color:#52F2C9;font-family:var(--mono);font-size:9px;cursor:pointer;letter-spacing:0.04em;">
+      ⟳ Из графика
+    </button>
+    <span id="ichip-badge" style="font-size:11px;"></span>
+  </div>
+
+  <!-- тело -->
+  <div style="display:flex;flex:1;overflow:hidden;">
+    <!-- левая панель: ввод + сигналы -->
+    <div style="width:220px;flex-shrink:0;padding:12px 14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;background:#0E0922;border-right:1px solid rgba(255,255,255,0.05);">
+      <div style="font-size:8px;color:#6F648F;font-family:var(--mono);letter-spacing:0.07em;text-transform:uppercase;">Значения</div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:10px;color:#4cc9f0;font-family:var(--mono);width:72px;flex-shrink:0;">Tenkan-sen</label>
+          <input id="ichip-tenkan" type="number" step="0.01" oninput="ichiPageDraw()"
+            style="flex:1;background:#1A1030;border:1px solid rgba(76,201,240,0.2);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;" placeholder="9 свечей">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:10px;color:#52A8E0;font-family:var(--mono);width:72px;flex-shrink:0;">Kijun-sen</label>
+          <input id="ichip-kijun" type="number" step="0.01" oninput="ichiPageDraw()"
+            style="flex:1;background:#1A1030;border:1px solid rgba(82,168,224,0.2);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;" placeholder="26 свечей">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:10px;color:rgba(96,164,161,0.9);font-family:var(--mono);width:72px;flex-shrink:0;">Senkou A</label>
+          <input id="ichip-sena" type="number" step="0.01" oninput="ichiPageDraw()"
+            style="flex:1;background:#1A1030;border:1px solid rgba(96,164,161,0.2);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;" placeholder="(T+K)/2 →26">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:10px;color:rgba(199,27,82,0.9);font-family:var(--mono);width:72px;flex-shrink:0;">Senkou B</label>
+          <input id="ichip-senb" type="number" step="0.01" oninput="ichiPageDraw()"
+            style="flex:1;background:#1A1030;border:1px solid rgba(199,27,82,0.2);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;" placeholder="52 свечи →26">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-size:10px;color:var(--text2);font-family:var(--mono);width:72px;flex-shrink:0;">Цена</label>
+          <input id="ichip-price" type="number" step="0.01" oninput="ichiPageDraw()"
+            style="flex:1;background:#1A1030;border:1px solid rgba(214,226,240,0.15);border-radius:6px;padding:4px 7px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;" placeholder="текущая">
+        </div>
+      </div>
+      <div id="ichip-signals" style="font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--text2);margin-top:4px;">
+        <span style="color:var(--text3)">Введи значения для анализа</span>
+      </div>
+
+      <!-- справка -->
+      <div style="margin-top:6px;border-top:1px solid rgba(255,255,255,0.05);padding-top:10px;">
+        <div style="font-size:8px;color:#6F648F;font-family:var(--mono);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:6px;">Компоненты</div>
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);line-height:1.7;">
+          <div><span style="color:#4cc9f0;">Tenkan</span> — 9-свечной mid-range (быстрая)</div>
+          <div><span style="color:#52A8E0;">Kijun</span> — 26-свечной mid-range (медленная)</div>
+          <div><span style="color:rgba(96,164,161,0.9);">Senkou A</span> — (Tenkan+Kijun)/2 сдвинуто +26</div>
+          <div><span style="color:rgba(199,27,82,0.9);">Senkou B</span> — 52-свечной mid-range сдвинуто +26</div>
+          <div style="margin-top:5px;color:#5a6870;">TK-пересечение выше облака = сильный сигнал. Внутри облака = слабый. Ниже = осторожно.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- правая часть: визуализация -->
+    <div style="flex:1;display:flex;flex-direction:column;padding:14px;gap:10px;overflow:hidden;">
+      <canvas id="ichip-canvas" style="width:100%;flex:1;display:block;border-radius:8px;background:#0B0718;border:1px solid rgba(255,255,255,0.04);"></canvas>
+    </div>
+  </div>
+</div>
 
 <!-- ══ COMBOS PAGE ══ -->
 <!-- ══ ANALYSIS PAGE ══ -->
@@ -998,6 +1064,19 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
         style="width:14px;height:14px;border-radius:50%;background:#7A5FBF;border:1.5px solid rgba(255,255,255,0.2);cursor:pointer;flex-shrink:0;transition:transform .1s;"
         onmouseover="this.style.transform='scale(1.25)'" onmouseout="this.style.transform=''"></div>
       <button id="cp-measure-btn" onclick="chartToggleMeasure(this)" title="Выделить область — Δ% / время / пункты цены">[ ] Измерить</button>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+        <button id="cp-autorefresh-btn" onclick="chartAutoRefreshToggle()"
+          title="Автообновление графика (только пока вкладка активна)"
+          style="padding:3px 7px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:var(--text3);font-family:var(--mono);font-size:9px;cursor:pointer;white-space:nowrap;">⟳ Авто</button>
+        <select id="cp-autorefresh-interval" title="Интервал обновления"
+          style="padding:2px 4px;background:#1A1030;border:1px solid rgba(255,255,255,0.08);border-radius:5px;color:var(--text2);font-family:var(--mono);font-size:9px;cursor:pointer;color-scheme:dark;">
+          <option value="30">30с</option>
+          <option value="60" selected>1м</option>
+          <option value="120">2м</option>
+          <option value="300">5м</option>
+        </select>
+        <span id="cp-autorefresh-ts" style="font-size:8px;color:#5a6870;font-family:var(--mono);white-space:nowrap;display:none;"></span>
+      </div>
     </div>
   </div>
 
@@ -1303,6 +1382,8 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
             </div>
             <button id="cp-fav-filter-btn" onclick="cpToggleFavFilter()" title="Только избранные"
               style="flex-shrink:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;color:#6F648F;line-height:1;">★</button>
+            <button id="cp-delta-btn" onclick="cpShowParamDelta()" title="Показать изменённые параметры индикаторов"
+              style="flex-shrink:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;color:#6F648F;line-height:1;font-family:var(--mono);">Δ</button>
           </div>
           <!-- Глобальная авто-настройка параметров -->
           <div style="margin-top:6px;background:rgba(82,242,201,0.03);border:1px solid rgba(82,242,201,0.12);border-radius:7px;padding:6px 8px;">
@@ -3501,7 +3582,7 @@ function goPage(name, btn) {
   if(name==='main')     { setTimeout(()=>{ updateMain(); renderMainSavedList(); }, 50); }
   if(name==='chart')    { setTimeout(()=>{ chartPageInit(); }, 50); }
   if(name==='fib')      { renderFib(); }
-  if(name==='ichimoku') { setTimeout(()=>ichiDraw(), 60); }
+  if(name==='ichimoku') { setTimeout(()=>{ ichiDraw(); ichiPageDraw(); }, 60); }
   if(name==='compare')  { renderCmpTable(); }
   if(name==='context')  { setCtxMode('q'); renderQuestion('q1'); updateExt(); }
   if(name==='guide')    { setTimeout(()=>{ renderGuide(); }, 50); }
@@ -3692,6 +3773,165 @@ function updateIchiSignals(price, tenkan, kijun, senA, senB) {
   el.innerHTML = lines.length
     ? lines.map(l => `<div style="margin-bottom:6px;">${l}</div>`).join('')
     : '<span style="color:var(--text3)">Введи значения для анализа</span>';
+}
+
+// ═══════════════════════════════════════════
+// ICHIMOKU PAGE — отдельная страница (ichip-*)
+// ═══════════════════════════════════════════
+function ichiPageDraw() {
+  const get = id => { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; };
+  const price  = get('ichip-price');
+  const tenkan = get('ichip-tenkan');
+  const kijun  = get('ichip-kijun');
+  const senA   = get('ichip-sena');
+  const senB   = get('ichip-senb');
+
+  const canvas = document.getElementById('ichip-canvas');
+  if (!canvas) return;
+  const dpr = devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  ctx.clearRect(0,0,W,H);
+
+  const vals = [price, tenkan, kijun, senA, senB].filter(v => v !== null);
+  if (vals.length < 2) {
+    ctx.fillStyle = '#6F648F'; ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Введи значения или нажми «Из графика»', W/2, H/2);
+    return;
+  }
+
+  const minV = Math.min(...vals) * 0.999;
+  const maxV = Math.max(...vals) * 1.001;
+  const range = maxV - minV || 1;
+  const toY = v => H - ((v - minV) / range) * (H - 36) - 18;
+
+  // сетка
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = H - (i/5) * (H-36) - 18;
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillStyle = '#3a4050'; ctx.font = '9px monospace'; ctx.textAlign = 'right';
+    ctx.fillText((minV + range*i/5).toFixed(2), 36, y + 3);
+  }
+
+  // Kumo (облако)
+  if (senA !== null && senB !== null) {
+    const yA = toY(senA), yB = toY(senB);
+    const bullish = senA > senB;
+    ctx.fillStyle = bullish ? 'rgba(96,164,161,0.15)' : 'rgba(199,27,82,0.12)';
+    ctx.fillRect(40, Math.min(yA,yB), W-40, Math.abs(yA-yB));
+    ctx.strokeStyle = 'rgba(96,164,161,0.7)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(40, yA); ctx.lineTo(W, yA); ctx.stroke();
+    ctx.strokeStyle = 'rgba(199,27,82,0.7)';
+    ctx.beginPath(); ctx.moveTo(40, yB); ctx.lineTo(W, yB); ctx.stroke();
+    ctx.fillStyle = 'rgba(96,164,161,0.85)'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`Sen A  ${senA.toFixed(2)}`, 44, yA - 5);
+    ctx.fillStyle = 'rgba(199,27,82,0.85)';
+    ctx.fillText(`Sen B  ${senB.toFixed(2)}`, 44, yB + 13);
+  }
+
+  // Kijun
+  if (kijun !== null) {
+    const y = toY(kijun);
+    ctx.strokeStyle = '#52A8E0'; ctx.lineWidth = 2;
+    ctx.setLineDash([6,3]);
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#52A8E0'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`Kijun  ${kijun.toFixed(2)}`, 44, y - 5);
+  }
+
+  // Tenkan
+  if (tenkan !== null) {
+    const y = toY(tenkan);
+    ctx.strokeStyle = '#4cc9f0'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillStyle = '#4cc9f0'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'left';
+    ctx.fillText(`Tenkan  ${tenkan.toFixed(2)}`, 44, y - 5);
+  }
+
+  // Цена
+  if (price !== null) {
+    const y = toY(price);
+    ctx.strokeStyle = 'rgba(214,226,240,0.35)'; ctx.lineWidth = 1;
+    ctx.setLineDash([2,4]);
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(W - 18, y, 8, 0, Math.PI*2);
+    ctx.fillStyle = '#d6e2f0'; ctx.shadowBlur = 12; ctx.shadowColor = '#d6e2f0'; ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0E1122'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('P', W-18, y+3);
+    ctx.fillStyle = '#d6e2f0'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'right';
+    ctx.fillText(price.toFixed(2), W-30, y-6);
+  }
+
+  // сигналы
+  _ichiPageSignals(price, tenkan, kijun, senA, senB);
+}
+
+function _ichiPageSignals(price, tenkan, kijun, senA, senB) {
+  const el = document.getElementById('ichip-signals');
+  const bd = document.getElementById('ichip-badge');
+  if (!el) return;
+  const lines = [];
+  const badge = s => {
+    const map = {'buy-strong':'var(--green)','buy':'var(--green)','neutral':'var(--text3)','warn':'#6F7CA8','sell':'var(--red)','sell-strong':'var(--red)'};
+    return `<span style="color:${map[s]||'var(--text3)'};">◆</span>`;
+  };
+  let score = 0;
+
+  if (senA !== null && senB !== null && price !== null) {
+    const cloudTop = Math.max(senA,senB), cloudBot = Math.min(senA,senB);
+    if (price > cloudTop)      { lines.push(`${badge('buy')} Цена выше облака (${cloudTop.toFixed(2)}) — бычья зона`); score+=2; }
+    else if (price < cloudBot) { lines.push(`${badge('sell')} Цена ниже облака (${cloudBot.toFixed(2)}) — медвежья зона`); score-=2; }
+    else                       { lines.push(`${badge('warn')} Цена внутри облака — зона неопределённости`); }
+    const bull = senA > senB;
+    lines.push(`${bull ? badge('buy') : badge('sell')} Облако ${bull ? 'бычье (A > B)' : 'медвежье (B > A)'}`);
+    if (bull) score++; else score--;
+  }
+
+  if (tenkan !== null && kijun !== null) {
+    if (tenkan > kijun)      { lines.push(`${badge('buy')} TK Cross: Tenkan (${tenkan.toFixed(2)}) > Kijun (${kijun.toFixed(2)}) — бычье`); score++; }
+    else if (tenkan < kijun) { lines.push(`${badge('sell')} TK Cross: Tenkan (${tenkan.toFixed(2)}) < Kijun (${kijun.toFixed(2)}) — медвежье`); score--; }
+    else                     { lines.push(`${badge('neutral')} Tenkan = Kijun`); }
+  }
+
+  if (price !== null && kijun !== null) {
+    const diff = ((price-kijun)/kijun*100).toFixed(2);
+    lines.push(price > kijun
+      ? `${badge('buy')} Цена выше Kijun (+${diff}%) — поддержка`
+      : `${badge('sell')} Цена ниже Kijun (${diff}%) — сопротивление`);
+  }
+
+  const sig = score >= 3 ? 'buy-strong' : score >= 1 ? 'buy' : score <= -3 ? 'sell-strong' : score <= -1 ? 'sell' : 'neutral';
+  if (bd && typeof pill === 'function') bd.innerHTML = pill(sig);
+  el.innerHTML = lines.length
+    ? lines.map(l => `<div style="margin-bottom:6px;">${l}</div>`).join('')
+    : '<span style="color:var(--text3)">Введи значения для анализа</span>';
+}
+
+// Подставляет последние значения Ишимоку из загруженного графика
+function ichiPageFromChart() {
+  if (typeof chartCandles === 'undefined' || !chartCandles.length) {
+    if (typeof showToast === 'function') showToast('Сначала загрузи график', 'var(--negative)');
+    return;
+  }
+  // Берём значения из sidebar-инпутов (они заполняются при загрузке графика)
+  const copy = (src, dst) => {
+    const v = document.getElementById(src)?.value;
+    const el = document.getElementById(dst);
+    if (el && v) el.value = v;
+  };
+  copy('i-tenkan', 'ichip-tenkan');
+  copy('i-kijun',  'ichip-kijun');
+  copy('i-sena',   'ichip-sena');
+  copy('i-senb',   'ichip-senb');
+  copy('i-price',  'ichip-price');
+  ichiPageDraw();
 }
 
 // ═══════════════════════════════════════════
@@ -5591,6 +5831,57 @@ function chartToggleInd(name, btn) {
   }
   if (chartCandles.length) requestAnimationFrame(() => requestAnimationFrame(() => chartRedraw()));
 }
+
+// ═══════════════════════════════════════════
+// АВТООБНОВЛЕНИЕ ГРАФИКА
+// ═══════════════════════════════════════════
+let _chartAutoTimer = null;
+let _chartAutoActive = false;
+
+function chartAutoRefreshToggle() {
+  _chartAutoActive = !_chartAutoActive;
+  const btn = document.getElementById('cp-autorefresh-btn');
+  const ts  = document.getElementById('cp-autorefresh-ts');
+  if (_chartAutoActive) {
+    if (btn) { btn.style.background='rgba(82,242,201,0.12)'; btn.style.borderColor='rgba(82,242,201,0.35)'; btn.style.color='#52F2C9'; }
+    if (ts) ts.style.display = '';
+    _chartAutoTick();
+    document.addEventListener('visibilitychange', _chartAutoVisChange);
+  } else {
+    _chartAutoStop();
+    if (btn) { btn.style.background='rgba(255,255,255,0.04)'; btn.style.borderColor='rgba(255,255,255,0.1)'; btn.style.color='var(--text3)'; }
+    if (ts) ts.style.display = 'none';
+    document.removeEventListener('visibilitychange', _chartAutoVisChange);
+  }
+}
+
+function _chartAutoStop() {
+  if (_chartAutoTimer) { clearInterval(_chartAutoTimer); _chartAutoTimer = null; }
+}
+
+function _chartAutoVisChange() {
+  if (!_chartAutoActive) return;
+  if (document.hidden) { _chartAutoStop(); }
+  else { _chartAutoTick(); }
+}
+
+function _chartAutoTick() {
+  _chartAutoStop();
+  const sec = parseInt(document.getElementById('cp-autorefresh-interval')?.value || '60', 10);
+  _chartAutoTimer = setInterval(async () => {
+    if (document.hidden) return;
+    if (typeof chartCandles === 'undefined' || !chartCandles.length) return;
+    await chartLoad();
+    const ts = document.getElementById('cp-autorefresh-ts');
+    if (ts) ts.textContent = 'обн. ' + new Date().toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }, sec * 1000);
+}
+
+// При смене интервала — перезапустить таймер если авто активно
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('cp-autorefresh-interval');
+  if (sel) sel.addEventListener('change', () => { if (_chartAutoActive) _chartAutoTick(); });
+});
 
 function chartStatus(msg, color) {
   const el = document.getElementById('chart-status');
@@ -10701,11 +10992,26 @@ function _cpRefreshTuneBadge(ind) {
   const changed = (ind.params||[]).filter(p => cpIndVals[ind.id]?.[p.id] !== p.def);
   if (!(ind.params||[]).length) { el.innerHTML = ''; return; }
   const title = changed.length
-    ? 'Изменено автотюном: ' + changed.map(p => `${p.label} ${p.def}→${cpIndVals[ind.id][p.id]}`).join(', ')
+    ? 'Изменено: ' + changed.map(p => `${p.label} ${p.def}→${cpIndVals[ind.id][p.id]}`).join(', ')
     : 'Значения параметров — классика (без изменений)';
   el.innerHTML = `<span title="${title}" style="font-size:8px;font-family:var(--mono);padding:1px 4px;border-radius:4px;margin-right:2px;flex-shrink:0;
     color:${changed.length?'#B487F8':'#6F648F'};background:${changed.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
-    border:1px solid ${changed.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${changed.length?'🎯 изм.':'классика'}</span>`;
+    border:1px solid ${changed.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${changed.length?'изм.':'класс.'}</span>`;
+  // Обновляем кнопку Δ — показываем количество изменённых
+  _cpRefreshDeltaBtn();
+}
+
+function _cpRefreshDeltaBtn() {
+  const btn = document.getElementById('cp-delta-btn');
+  if (!btn) return;
+  const total = IND_GROUPS.flatMap(g => g.items).filter(ind =>
+    (ind.params||[]).some(p => cpIndVals[ind.id]?.[p.id] !== p.def)
+  ).length;
+  btn.style.color    = total ? '#B487F8' : '#6F648F';
+  btn.style.borderColor = total ? 'rgba(180,135,248,0.35)' : 'rgba(255,255,255,0.08)';
+  btn.style.background  = total ? 'rgba(180,135,248,0.08)' : 'rgba(255,255,255,0.05)';
+  btn.title = total ? `${total} инд. с изменёнными параметрами` : 'Все параметры классические';
+  btn.textContent = total ? `Δ ${total}` : 'Δ';
 }
 
 function _globalAutoTune() {
@@ -10771,6 +11077,119 @@ function _globalAutoReset() {
   const statusEl = document.getElementById('cp-global-status');
   if (statusEl) statusEl.style.display = 'none';
   showToast?.('↺ Параметры сброшены', '#B487F8');
+}
+
+// ═══════════════════════════════════════════
+// ПАНЕЛЬ ИЗМЕНЁННЫХ ПАРАМЕТРОВ (кнопка Δ)
+// ═══════════════════════════════════════════
+function cpShowParamDelta() {
+  // Собираем все индикаторы с изменёнными параметрами
+  const changed = [];
+  for (const g of IND_GROUPS) {
+    for (const ind of g.items) {
+      if (!(ind.params||[]).length) continue;
+      const diffs = ind.params.filter(p => {
+        const cur = cpIndVals[ind.id]?.[p.id];
+        return cur !== undefined && cur !== p.def;
+      });
+      if (diffs.length) changed.push({ ind, diffs });
+    }
+  }
+
+  // Удаляем старое окно если есть
+  document.getElementById('cp-delta-modal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'cp-delta-modal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);';
+  modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+  const box = document.createElement('div');
+  box.style.cssText = 'width:420px;max-height:80vh;background:#0E0922;border:1px solid rgba(180,135,248,0.25);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.7);';
+
+  // шапка
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
+  head.innerHTML = `
+    <span style="font-size:9px;color:#B487F8;font-family:var(--mono);letter-spacing:.07em;text-transform:uppercase;flex:1;">Δ изменённые параметры</span>
+    <span style="font-size:9px;color:#6F648F;font-family:var(--mono);">${changed.length} инд.</span>
+    <button onclick="document.getElementById('cp-delta-modal').remove()"
+      style="margin-left:10px;background:none;border:none;color:#6F648F;font-size:16px;cursor:pointer;line-height:1;">✕</button>`;
+
+  // тело
+  const body = document.createElement('div');
+  body.style.cssText = 'flex:1;overflow-y:auto;padding:8px 10px 12px;scrollbar-width:thin;scrollbar-color:#7A5FBF #0D0820;';
+
+  if (!changed.length) {
+    body.innerHTML = '<div style="text-align:center;color:#6F648F;font-family:var(--mono);font-size:11px;padding:30px 0;">Все индикаторы на классических значениях</div>';
+  } else {
+    body.innerHTML = changed.map(({ ind, diffs }) => `
+      <div style="margin-bottom:10px;background:rgba(180,135,248,0.04);border:1px solid rgba(180,135,248,0.12);border-radius:8px;padding:8px 10px;">
+        <div style="font-size:10px;color:var(--text2);font-family:var(--mono);margin-bottom:6px;font-weight:600;">${ind.name}</div>
+        ${diffs.map(p => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+            <span style="font-size:9px;color:#6F648F;font-family:var(--mono);flex:1;">${p.label}</span>
+            <span style="font-size:9px;color:#5a5080;font-family:var(--mono);">${p.def}</span>
+            <span style="font-size:9px;color:#6F648F;font-family:var(--mono);">→</span>
+            <input type="number" min="${p.min}" max="${p.max}" step="${p.step||1}"
+              value="${cpIndVals[ind.id]?.[p.id] ?? p.def}"
+              data-indid="${ind.id}" data-pid="${p.id}"
+              oninput="_cpDeltaApply(this,'${ind.id}','${p.id}')"
+              style="width:70px;background:#1A1030;border:1px solid rgba(180,135,248,0.25);border-radius:4px;padding:3px 6px;color:#B487F8;font-family:var(--mono);font-size:11px;outline:none;text-align:right;">
+            <button onclick="_cpDeltaReset('${ind.id}','${p.id}',${p.def},this)"
+              title="Сбросить к классике (${p.def})"
+              style="padding:2px 7px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:4px;color:#6F648F;font-family:var(--mono);font-size:8px;cursor:pointer;">↺</button>
+          </div>`).join('')}
+      </div>`).join('');
+  }
+
+  // кнопка «сбросить всё»
+  const foot = document.createElement('div');
+  foot.style.cssText = 'padding:8px 12px;border-top:1px solid rgba(255,255,255,0.05);flex-shrink:0;display:flex;justify-content:flex-end;';
+  foot.innerHTML = `<button onclick="_cpDeltaResetAll()" style="padding:5px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text3);font-family:var(--mono);font-size:9px;cursor:pointer;">↺ Сбросить всё</button>`;
+
+  box.appendChild(head); box.appendChild(body); box.appendChild(foot);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+function _cpDeltaApply(input, indId, pid) {
+  const val = parseFloat(input.value);
+  if (isNaN(val)) return;
+  if (!cpIndVals[indId]) cpIndVals[indId] = {};
+  cpIndVals[indId][pid] = val;
+  // Синхронизируем слайдер и поле в основном списке
+  const numEl = document.getElementById(`cpval-${indId}-${pid}`);
+  const slEl  = document.getElementById(`cpslider-${indId}-${pid}`);
+  if (numEl) numEl.value = val;
+  if (slEl)  slEl.value  = val;
+  // Обновляем бейдж в списке
+  const ind = IND_GROUPS.flatMap(g => g.items).find(i => i.id === indId);
+  if (ind && typeof _cpRefreshTuneBadge === 'function') _cpRefreshTuneBadge(ind);
+  if (typeof cpUpdateInd === 'function') cpUpdateInd(indId);
+  if (typeof chartCandles !== 'undefined' && chartCandles.length) chartRedraw?.();
+}
+
+function _cpDeltaReset(indId, pid, def, btn) {
+  if (!cpIndVals[indId]) cpIndVals[indId] = {};
+  cpIndVals[indId][pid] = def;
+  // Обновляем input в модальном окне
+  const row = btn?.closest('div[style*="margin-bottom:5px"]');
+  const inp = row?.querySelector('input[type="number"]');
+  if (inp) inp.value = def;
+  // Синхронизируем основную панель
+  const numEl = document.getElementById(`cpval-${indId}-${pid}`);
+  const slEl  = document.getElementById(`cpslider-${indId}-${pid}`);
+  if (numEl) numEl.value = def;
+  if (slEl)  slEl.value  = def;
+  const ind = IND_GROUPS.flatMap(g => g.items).find(i => i.id === indId);
+  if (ind && typeof _cpRefreshTuneBadge === 'function') _cpRefreshTuneBadge(ind);
+  if (typeof chartCandles !== 'undefined' && chartCandles.length) chartRedraw?.();
+}
+
+function _cpDeltaResetAll() {
+  _globalAutoReset();
+  document.getElementById('cp-delta-modal')?.remove();
 }
 
 function cpApplyAuto(id) {
@@ -11552,7 +11971,7 @@ function cpInitCanvasEvents() {
 // goPage patch — redirect dead pages to chart
 const _origGP = goPage;
 goPage = function(name, btn) {
-  if (['main','context','calc','ichimoku','fib'].includes(name)) {
+  if (['main','context','calc','fib'].includes(name)) {
     name = 'chart';
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
     const chartBtn = document.querySelector('.nav-btn');
