@@ -7000,27 +7000,31 @@ def _render_page() -> bytes:
     stocks_ru = [t for t in stock_tickers if t in _RU_STOCK_BASE_TICKERS]
     stocks_other = [t for t in stock_tickers if t not in _RU_STOCK_BASE_TICKERS]
 
+    from html import escape as _he
+
     def _stock_chip_row(ts: list[str]) -> str:
         return '<div class="chip-row">' + "".join(
-            f'<div class="chip active chip-stock" data-ticker="{t}" data-kind="stock" '
-            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{t}{"•" if t in oi_tickers else ""}</div>'
+            f'<div class="chip active chip-stock" data-ticker="{_he(t)}" data-kind="stock" '
+            f'title="{"OI" if t in oi_tickers else "settings.ini"}">{_he(t)}{"•" if t in oi_tickers else ""}</div>'
             for t in ts
         ) + '</div>'
 
     def _futures_chip_row(ts: list[str]) -> str:
         return '<div class="chip-row">' + "".join(
-            f'<div class="chip active chip-fut" data-ticker="{t}" data-kind="futures" '
-            f'title="{_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t))}'
-            f' · GO {futures[t].margin_per_lot:.0f}₽">{t}</div>'
+            f'<div class="chip active chip-fut" data-ticker="{_he(t)}" data-kind="futures" '
+            f'title="{_he(_BASE_ASSET_LABEL.get(_futures_base_by_ticker.get(t, ""), _futures_base_by_ticker.get(t, t)))}'
+            f' · GO {futures[t].margin_per_lot:.0f}₽">{_he(t)}</div>'
             for t in ts
         ) + '</div>'
 
     def _sub_section(pid: str, label: str, panel_html: str, open_: bool) -> str:
+        safe_pid = _he(pid)
+        js_pid = pid.replace("\\", "\\\\").replace("'", "\\'")
         return (
-            f'<details class="chip-section cat-panel" data-panel="{pid}"{" open" if open_ else ""}>'
-            f'<summary><span class="chip-section-title">{label}</span>'
+            f'<details class="chip-section cat-panel" data-panel="{safe_pid}"{" open" if open_ else ""}>'
+            f'<summary><span class="chip-section-title">{_he(label)}</span>'
             f'<span class="cat-toc-toggle" title="вкл/выкл всю категорию" '
-            f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{pid}\',this)">⊙</span></summary>'
+            f'onclick="event.preventDefault();event.stopPropagation();toggleCatPanel(\'{js_pid}\',this)">⊙</span></summary>'
             f'{panel_html}'
             f'</details>'
         )
@@ -7095,7 +7099,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/":
-            body = _render_page()
+            try:
+                body = _render_page()
+            except Exception as _e:
+                import traceback
+                err_html = f"<pre>Ошибка рендеринга: {traceback.format_exc()}</pre>".encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(err_html)))
+                self.end_headers()
+                self.wfile.write(err_html)
+                return
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
