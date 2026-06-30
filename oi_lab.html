@@ -220,7 +220,7 @@ async function labBackfill() {
   }
 
   let saved = 0, empty = 0, failed = 0, done = 0;
-  const PARALLEL = 3;
+  const PARALLEL = 5;
   setStatus(`Бэкфилл: 0/${dates.length} дат…`);
 
   async function fetchDate(date) {

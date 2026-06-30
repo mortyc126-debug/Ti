@@ -718,43 +718,62 @@ async function handleDb(path, req, env) {
     }
     if (!tickers.length) return json({ error: 'нет тикеров: пусто и в параметре, и в oi_tracked_state' }, 400);
 
-    // Если передан date= — сохраняем только одну дату (не таймаутит)
+    // Если передан date= — один запрос на всю дату, сохраняем все запрошенные тикеры.
+    // FutOI API возвращает ВСЕ тикеры в одном ответе, поэтому делаем 1 fetch на дату.
     const singleDate = u.searchParams.get('date');
     if (singleDate) {
       const moexKey = env.MOEX_KEY;
-      let saved = 0, empty = 0, failed = 0;
+      // Строим map sym→[тикеры] (несколько контрактов могут иметь один sym, напр. SiU6+SiZ6→Si)
+      const symMap = {};
       for (const ticker of tickers) {
         const sym = futoi2sym(ticker);
-        try {
-          const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${singleDate}&iss.meta=off&limit=1000`;
-          const resp = await fetch(url2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
-          if (!resp.ok) { failed++; continue; }
-          const json2 = await resp.json();
-          const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
-          const rows = issBlockToObjects(block).filter(o => o.ticker === sym);
-          if (!rows.length) { empty++; continue; }
-          const byGroup = {};
-          rows.forEach(o => {
-            const g = (o.clgroup || '').toUpperCase();
-            if (g !== 'YUR' && g !== 'FIZ') return;
-            if (!byGroup[g] || (o.tradetime || '') > (byGroup[g].tradetime || '')) byGroup[g] = o;
-          });
-          const tradedate = (byGroup.YUR || byGroup.FIZ || {}).tradedate || singleDate;
-          await upsertOiDaily(db, {
-            ticker, tradedate, price: 0,
-            yur_long: Number(byGroup.YUR?.pos_long || 0),
-            yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
-            fiz_long: Number(byGroup.FIZ?.pos_long || 0),
-            fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
-            yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
-            yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
-            fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
-            fiz_short_num: Math.abs(Number(byGroup.FIZ?.pos_short_num || 0)),
-          });
-          saved++;
-        } catch(e) { failed++; }
+        (symMap[sym] = symMap[sym] || []).push(ticker);
       }
-      return json({ tickers: tickers.length, date: singleDate, saved, empty, failed });
+      const anyTicker = Object.keys(symMap)[0];
+      try {
+        const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(anyTicker)}&date=${singleDate}&iss.meta=off&limit=10000`;
+        const resp = await fetch(url2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+        if (!resp.ok) return json({ tickers: tickers.length, date: singleDate, saved: 0, empty: 0, failed: tickers.length, httpStatus: resp.status });
+        const json2 = await resp.json();
+        const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
+        const allRows = issBlockToObjects(block);
+
+        // Группируем по sym → clgroup → лучшая запись
+        const bySym = {};
+        allRows.forEach(o => {
+          const g = (o.clgroup || '').toUpperCase();
+          if (g !== 'YUR' && g !== 'FIZ') return;
+          const s = o.ticker;
+          if (!bySym[s]) bySym[s] = {};
+          if (!bySym[s][g] || (o.tradetime || '') > (bySym[s][g].tradetime || '')) bySym[s][g] = o;
+        });
+
+        let saved = 0, empty = 0;
+        const upserts = [];
+        for (const [sym, tickerList] of Object.entries(symMap)) {
+          const byGroup = bySym[sym] || {};
+          if (!byGroup.YUR && !byGroup.FIZ) { empty += tickerList.length; continue; }
+          const tradedate = (byGroup.YUR || byGroup.FIZ).tradedate || singleDate;
+          for (const ticker of tickerList) {
+            upserts.push(upsertOiDaily(db, {
+              ticker, tradedate, price: 0,
+              yur_long: Number(byGroup.YUR?.pos_long || 0),
+              yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
+              fiz_long: Number(byGroup.FIZ?.pos_long || 0),
+              fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+              yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
+              yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
+              fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
+              fiz_short_num: Math.abs(Number(byGroup.FIZ?.pos_short_num || 0)),
+            }));
+            saved++;
+          }
+        }
+        await Promise.all(upserts);
+        return json({ tickers: tickers.length, date: singleDate, saved, empty, failed: 0 });
+      } catch(e) {
+        return json({ tickers: tickers.length, date: singleDate, saved: 0, empty: 0, failed: tickers.length, error: e.message });
+      }
     }
 
     const days = Math.min(Number(u.searchParams.get('days')) || 90, 365);
