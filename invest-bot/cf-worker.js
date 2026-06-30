@@ -692,6 +692,21 @@ async function handleDb(path, req, env) {
     return json(results);
   }
 
+  // ── Диагностика: /db/oitest?ticker=SSU6&date=2026-06-25 — сырой ответ FutOI API ──
+  if (p === '/oitest' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const ticker = u.searchParams.get('ticker');
+    const date   = u.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    const sym = futoi2sym(ticker);
+    const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${date}&iss.meta=off&limit=1000`;
+    const moexKey = env.MOEX_KEY;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+    const text = await resp.text();
+    let body; try { body = JSON.parse(text); } catch(_) { body = text; }
+    return json({ sym, date, status: resp.status, body });
+  }
+
   // ── Разовый backfill истории FutOI: /db/oibackfill?tickers=BRN6,SiU6&days=90 ──
   // Без tickers — берёт текущий отслеживаемый список из oi_tracked_state.
   if (p === '/oibackfill' && req.method === 'GET') {
