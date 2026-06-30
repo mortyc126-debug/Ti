@@ -61,7 +61,6 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     </select>
   </label>
   <button onclick="labLoad()">Загрузить</button>
-  <button class="sec" onclick="labDemo()">Демо (синтетика)</button>
 </div>
 
 <div id="status" class="status">—</div>
@@ -241,45 +240,6 @@ function normalizeRow(r) {
     legal_short_persons: parseFloat(r.yur_short_num || r.legal_short_persons || 0),
     ref_switch: r.ref_switch || false,
   };
-}
-
-// ========== DEMO DATA ==========
-function labDemo() {
-  setStatus('Генерация синтетики…');
-  const n = 120;
-  const rows = [];
-  let price = 3000, phyL = 6000, phyS = 4000;
-  const rng = () => (Math.random() - 0.5);
-  for (let i = 0; i < n; i++) {
-    // флэт первые 40, затем импульс вниз
-    const priceChange = i < 40 ? rng()*5 : (i < 70 ? -8 + rng()*3 : rng()*4);
-    price = Math.max(price + priceChange, 100);
-    phyL += rng()*50;
-    phyS += rng()*40;
-    const phyLp = 2000 + Math.round(rng()*10);
-    const phySp = 1800 + Math.round(rng()*10);
-    const date = new Date(2026,0,1);
-    date.setDate(date.getDate() + i);
-    rows.push({
-      date: date.toISOString().slice(0,10),
-      close: price,
-      phys_long_contracts: Math.max(phyL, 100),
-      phys_short_contracts: Math.max(phyS, 100),
-      phys_long_persons: phyLp,
-      phys_short_persons: phySp,
-      legal_long_contracts: 8000 + rng()*100,
-      legal_short_contracts: 8000 + rng()*100,
-      legal_long_persons: 300,
-      legal_short_persons: 300,
-      ref_switch: false,
-    });
-  }
-  const cfg = readCfg();
-  const result = computeIndicator(rows, cfg, []);
-  _lastRows = rows;
-  _lastResult = result;
-  renderAll(result);
-  setStatus(`Демо: ${rows.length} баров`, 'ok');
 }
 
 // ========== AGGREGATE CONTRACTS ==========
