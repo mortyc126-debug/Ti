@@ -2843,6 +2843,17 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 <!-- ══════════════════════ TAB: БОТ (LIVE) ══════════════════════ -->
 <div class="tab-pane" id="tab-live">
 
+<!-- суб-табы -->
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+  <button class="btn-pill" id="live-sub-btn-ctrl"   onclick="liveSub('ctrl')"   style="opacity:1;">📡 Управление</button>
+  <button class="btn-pill" id="live-sub-btn-cfg"    onclick="liveSub('cfg')"    style="opacity:.5;">⚙️ Настройки</button>
+  <button class="btn-pill" id="live-sub-btn-chart"  onclick="liveSub('chart')"  style="opacity:.5;">📊 График</button>
+  <button class="btn-pill" id="live-sub-btn-council" onclick="liveSub('council')" style="opacity:.5;">🧠 Консилиум</button>
+  <button class="btn-pill" id="live-sub-btn-oi"     onclick="liveSub('oi')"     style="opacity:.5;">📥 OI</button>
+</div>
+
+<!-- ══ СУБ-ТАБ: УПРАВЛЕНИЕ ══ -->
+<div id="live-sub-ctrl">
 <div class="panel">
   <div class="sec-lg">Статус и управление</div>
   <div id="bot_status_bar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
@@ -2899,6 +2910,10 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </div>
 </div>
 
+</div><!-- /live-sub-ctrl -->
+
+<!-- ══ СУБ-ТАБ: НАСТРОЙКИ ══ -->
+<div id="live-sub-cfg" style="display:none;">
 <div class="panel">
   <div class="sec-lg">Глобальные настройки бота</div>
   <div style="font-size:11px;color:var(--txt3);margin-bottom:8px;">
@@ -2950,7 +2965,13 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
 </div>
 
 <div class="panel">
-  <div class="sec-lg">Настройки по тикерам</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+    <div class="sec-lg" style="margin:0;">Настройки по тикерам</div>
+    <button class="btn-pill btn-sm" onclick="ovBulk('enabled',true)">✅ Все торговать</button>
+    <button class="btn-pill btn-sm" onclick="ovBulk('enabled',false)">⏸ Все паузу</button>
+    <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',true)">🔔 Все сигнал</button>
+    <button class="btn-pill btn-sm" onclick="ovBulk('signal_only',false)">💸 Все торговля</button>
+  </div>
   <table class="scen-table">
     <thead><tr>
       <th>Тикер</th><th>Торгуется</th><th>Режим (signal_only)</th>
@@ -2960,8 +2981,11 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </table>
 </div>
 
-<!-- ══ ЖИВОЙ ГРАФИК СДЕЛОК ══════════════════════════════════════════════ -->
-<div class="panel" id="live-chart-panel">
+</div><!-- /live-sub-cfg -->
+
+<!-- ══ СУБ-ТАБ: ГРАФИК СДЕЛОК ══ -->
+<div id="live-sub-chart" style="display:none;">
+<div class="panel">
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
     <div class="sec-lg" style="margin:0;">График сделок (live)</div>
     <select class="inp mid" id="lc_ticker" style="width:90px;"></select>
@@ -2974,32 +2998,12 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
     <button class="btn-pill btn-sm" onclick="loadLiveChart()">⟳ Обновить</button>
     <span id="lc_status" style="font-size:11px;color:var(--txt3);"></span>
   </div>
-  <div id="lc_chart" style="width:100%;height:340px;background:var(--card);border-radius:8px;border:1px solid var(--border2);position:relative;">
+  <div id="lc_chart" style="width:100%;height:400px;background:var(--card);border-radius:8px;border:1px solid var(--border2);position:relative;">
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;" id="lc_placeholder">Выбери тикер и нажми ⟳</div>
     <canvas id="lc_canvas" style="display:none;width:100%;height:100%;"></canvas>
   </div>
   <div id="lc_trades_list" style="margin-top:8px;font-size:11px;color:var(--txt2);"></div>
 </div>
-
-<!-- ══ OI BACKFILL ════════════════════════════════════════════════════ -->
-<div class="panel" style="margin-bottom:0;">
-  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-    <div class="sec-lg" style="margin:0;">Исторический OI (AlgoPack)</div>
-    <select class="inp mid" id="oi_bf_months" style="width:90px;">
-      <option value="3">3 мес.</option>
-      <option value="6">6 мес.</option>
-      <option value="12" selected>12 мес.</option>
-      <option value="24">24 мес.</option>
-    </select>
-    <input type="text" class="inp mid" id="oi_bf_tickers" placeholder="все тикеры" style="width:160px;" title="Через запятую: SBER,GAZP — или пусто для всех">
-    <button class="btn-pill btn-sm" onclick="oiBackfill()">⬇ Загрузить OI</button>
-    <span id="oi_bf_status" style="font-size:11px;color:var(--txt3);"></span>
-  </div>
-  <div id="oi_bf_log" style="margin-top:8px;font-size:11px;color:var(--txt2);max-height:120px;overflow-y:auto;display:none;"></div>
-</div>
-
-<!-- ══ SCORECARD + КОНСИЛИУМ ══════════════════════════════════════════ -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:0;">
 
 <div class="panel">
   <div class="sec-lg">Fitness scorecard</div>
@@ -3007,15 +3011,91 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div style="margin-top:10px;font-size:11px;color:var(--txt3);" id="live_per_ticker"></div>
 </div>
 
+</div><!-- /live-sub-chart -->
+
+<!-- ══ СУБ-ТАБ: КОНСИЛИУМ ══ -->
+<div id="live-sub-council" style="display:none;">
+
 <div class="panel">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <div class="sec-lg" style="margin:0;">Консилиум (последние решения)</div>
-    <button class="btn-pill btn-sm" onclick="loadCouncilLog()">⟳</button>
+  <div class="sec-lg">Запрос к консилиуму</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Задай вопрос агентам-аналитикам. Альфа строит тезис, Бета критикует, Модератор резюмирует.
+    Можно спросить по конкретному тикеру или задать общий вопрос.
   </div>
-  <div id="live_council" style="font-size:11px;color:var(--txt2);max-height:280px;overflow-y:auto;">загрузка...</div>
+  <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:260px;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" class="inp mid" id="ca_ticker" placeholder="Тикер (напр. SBER)" style="width:120px;">
+        <select class="inp" id="ca_direction" style="width:100px;">
+          <option value="LONG">LONG</option>
+          <option value="SHORT">SHORT</option>
+        </select>
+      </div>
+      <textarea class="inp" id="ca_question" placeholder="Вопрос или контекст (необязательно)..." rows="3" style="width:100%;resize:vertical;font-family:inherit;"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <button class="btn-pill" onclick="councilAsk()" id="ca_btn">🧠 Спросить</button>
+      <span style="font-size:10px;color:var(--txt3);">~20-35 секунд</span>
+    </div>
+  </div>
+  <div id="ca_status" style="font-size:11px;color:var(--txt3);margin-top:6px;"></div>
+  <div id="ca_result" style="margin-top:12px;display:none;">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:12px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span id="ca_verdict_badge" style="font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;"></span>
+        <span id="ca_confidence" style="font-size:11px;color:var(--txt3);"></span>
+      </div>
+      <div id="ca_reason" style="font-size:12px;color:var(--txt2);white-space:pre-wrap;"></div>
+      <details style="margin-top:8px;">
+        <summary style="font-size:11px;color:var(--txt3);cursor:pointer;">Полный диалог агентов</summary>
+        <div id="ca_dialog" style="font-size:11px;color:var(--txt2);margin-top:6px;white-space:pre-wrap;"></div>
+      </details>
+    </div>
+  </div>
 </div>
 
-</div><!-- /grid scorecard+council -->
+<div class="panel">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <div class="sec-lg" style="margin:0;">История решений консилиума</div>
+    <button class="btn-pill btn-sm" onclick="loadCouncilLog()">⟳</button>
+  </div>
+  <div id="live_council" style="font-size:11px;color:var(--txt2);max-height:400px;overflow-y:auto;">загрузка...</div>
+</div>
+
+</div><!-- /live-sub-council -->
+
+<!-- ══ СУБ-ТАБ: OI ══ -->
+<div id="live-sub-oi" style="display:none;">
+<div class="panel">
+  <div class="sec-lg">Исторический OI (AlgoPack)</div>
+  <div style="font-size:11px;color:var(--txt3);margin-bottom:10px;">
+    Загружает данные открытого интереса (юр/физ) с MOEX AlgoPack за выбранный период.
+    Тикеры фьючерсных контрактов запрашиваются автоматически с MOEX ISS по каждой дате.
+    Требует токен <code>[MOEX] TOKEN=</code> в settings.ini.
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">Период
+      <select class="inp mid" id="oi_bf_months" style="width:100px;">
+        <option value="3">3 мес.</option>
+        <option value="6">6 мес.</option>
+        <option value="12" selected>12 мес.</option>
+        <option value="24">24 мес.</option>
+      </select>
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;">Тикеры (через запятую)
+      <input type="text" class="inp mid" id="oi_bf_tickers" placeholder="пусто = все из settings.ini" style="width:240px;">
+    </label>
+    <div style="display:flex;flex-direction:column;gap:6px;padding-top:16px;">
+      <button class="btn-pill" onclick="oiBackfill()" id="oi_bf_btn">⬇ Запустить загрузку</button>
+      <button class="btn-pill btn-sm" onclick="oiBackfillStatus()">⟳ Статус</button>
+    </div>
+  </div>
+  <div id="oi_bf_status" style="font-size:12px;color:var(--txt2);padding:8px;background:var(--card);border-radius:6px;border:1px solid var(--border2);min-height:30px;">
+    Не запущено
+  </div>
+  <div id="oi_bf_log" style="margin-top:8px;font-size:11px;color:var(--txt2);max-height:200px;overflow-y:auto;display:none;"></div>
+</div>
+</div><!-- /live-sub-oi -->
 
 </div><!-- /tab-live -->
 
@@ -3064,9 +3144,8 @@ function showTab(name) {{
   document.getElementById('tab-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
   if (name === 'live') {{
+    liveSub('ctrl');
     loadBotStatus(); loadOverrides(); loadAutoAtr();
-    loadCouncilLog(); loadLiveScorecard();
-    _lcInitTickers();
     if (!_statusPollTimer) _statusPollTimer = setInterval(loadBotStatus, 30000);
   }} else {{
     if (_statusPollTimer) {{ clearInterval(_statusPollTimer); _statusPollTimer = null; }}
@@ -5119,28 +5198,134 @@ async function loadCouncilLog() {{
   }}
 }}
 
+// ── суб-табы внутри БОТ (LIVE) ──────────────────────────────────────
+function liveSub(name) {{
+  ['ctrl','cfg','chart','council','oi'].forEach(n => {{
+    const el = document.getElementById('live-sub-' + n);
+    const btn = document.getElementById('live-sub-btn-' + n);
+    if (el) el.style.display = n === name ? '' : 'none';
+    if (btn) btn.style.opacity = n === name ? '1' : '.5';
+  }});
+  // подгружаем данные при первом открытии
+  if (name === 'chart') {{ _lcInitTickers(); loadLiveScorecard(); }}
+  if (name === 'council') loadCouncilLog();
+  if (name === 'oi') oiBackfillStatus();
+}}
+
+// ── Bulk-действия для таблицы тикеров ───────────────────────────────
+function ovBulk(field, value) {{
+  const tbody = document.getElementById('ov_table');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {{
+    if (field === 'enabled') {{
+      const cb = row.querySelector('input[type=checkbox][id^=ov_en_]');
+      if (cb) cb.checked = value;
+    }} else if (field === 'signal_only') {{
+      const sel = row.querySelector('select[id^=ov_so_]');
+      if (sel) sel.value = value ? '1' : '0';
+    }}
+  }});
+}}
+
+// ── OI Backfill ──────────────────────────────────────────────────────
 async function oiBackfill() {{
   const months  = document.getElementById('oi_bf_months').value;
   const tickers = document.getElementById('oi_bf_tickers').value.trim();
   const status  = document.getElementById('oi_bf_status');
-  const log     = document.getElementById('oi_bf_log');
-  status.textContent = '⏳ загружаю...';
-  log.style.display = 'none'; log.innerHTML = '';
+  const btn     = document.getElementById('oi_bf_btn');
+  status.textContent = '⏳ запускаю в фоне...';
+  if (btn) btn.disabled = true;
   try {{
     const body = {{ months: parseInt(months) }};
-    if (tickers) body.tickers = tickers.split(',').map(t => t.trim().toUpperCase()).filter(Boolean);
+    if (tickers) body.tickers = tickers;
     const data = await fetch('/api/oi_backfill', {{
       method: 'POST',
       headers: {{'Content-Type': 'application/json'}},
       body: JSON.stringify(body),
     }}).then(r => r.json());
-    if (data.error) {{ status.textContent = '⚠ ' + data.error; return; }}
-    status.textContent = `✓ готово: ${{data.total_new}} новых записей по ${{data.tickers}} тикерам`;
-    if (data.log && data.log.length) {{
-      log.innerHTML = data.log.map(l => `<div>${{l}}</div>`).join('');
-      log.style.display = '';
+    if (data.error) {{ status.textContent = '⚠ ' + data.error; if(btn) btn.disabled=false; return; }}
+    if (!data.started) {{ status.textContent = '⚠ ' + (data.error || 'не удалось запустить'); if(btn) btn.disabled=false; return; }}
+    status.textContent = `⏳ запущен для тикеров: ${{(data.tickers||[]).join(', ')}}. Проверяй статус кнопкой ⟳`;
+    // авто-опрос каждые 5 сек
+    const poll = setInterval(async () => {{
+      const s = await fetch('/api/oi_backfill_status').then(r=>r.json());
+      if (s.running) {{
+        status.textContent = `⏳ в процессе... (записей: ${{s.total_new||0}})`;
+      }} else {{
+        clearInterval(poll);
+        if(btn) btn.disabled = false;
+        if (s.error) {{ status.textContent = '⚠ Ошибка: ' + s.error; return; }}
+        const log = document.getElementById('oi_bf_log');
+        status.textContent = `✅ готово: +${{s.total_new||0}} новых записей`;
+        if (s.log && s.log.length) {{
+          log.innerHTML = s.log.map(l => `<div>${{l}}</div>`).join('');
+          log.style.display = '';
+        }}
+      }}
+    }}, 5000);
+  }} catch(e) {{ status.textContent = '⚠ ' + e; if(btn) btn.disabled=false; }}
+}}
+
+async function oiBackfillStatus() {{
+  const status = document.getElementById('oi_bf_status');
+  try {{
+    const s = await fetch('/api/oi_backfill_status').then(r=>r.json());
+    if (!s || !s.running && !s.done) {{ status.textContent = 'Не запущено'; return; }}
+    const log = document.getElementById('oi_bf_log');
+    if (s.running) {{
+      status.textContent = `⏳ в процессе... (записей: ${{s.total_new||0}})`;
+    }} else if (s.error) {{
+      status.textContent = '⚠ Ошибка: ' + s.error;
+    }} else {{
+      status.textContent = `✅ готово: +${{s.total_new||0}} новых записей`;
+      if (s.log && s.log.length) {{
+        log.innerHTML = s.log.map(l => `<div>${{l}}</div>`).join('');
+        log.style.display = '';
+      }}
     }}
-  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+  }} catch(e) {{ if(status) status.textContent = '⚠ ' + e; }}
+}}
+
+// ── Диалог консилиума ────────────────────────────────────────────────
+async function councilAsk() {{
+  const ticker    = document.getElementById('ca_ticker').value.trim().toUpperCase();
+  const question  = document.getElementById('ca_question').value.trim();
+  const direction = document.getElementById('ca_direction').value;
+  const btn       = document.getElementById('ca_btn');
+  const statusEl  = document.getElementById('ca_status');
+  const resultEl  = document.getElementById('ca_result');
+  if (!ticker && !question) {{ statusEl.textContent = '⚠ Укажи тикер или задай вопрос'; return; }}
+  btn.disabled = true;
+  statusEl.textContent = '⏳ агенты совещаются (~20-35 сек)...';
+  resultEl.style.display = 'none';
+  try {{
+    const data = await fetch('/api/council_ask', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{ ticker, question, direction }}),
+    }}).then(r => r.json());
+    if (!data.ok) {{ statusEl.textContent = '⚠ ' + (data.error || 'ошибка'); btn.disabled=false; return; }}
+    const r = data.result || {{}};
+    const verdict = r.verdict || 'skip';
+    const vBadge = document.getElementById('ca_verdict_badge');
+    vBadge.textContent = verdict === 'trade' ? '✓ ТОРГОВАТЬ' : '✗ ПРОПУСТИТЬ';
+    vBadge.style.background = verdict === 'trade' ? 'rgba(38,163,123,.25)' : 'rgba(224,82,96,.25)';
+    vBadge.style.color = verdict === 'trade' ? 'var(--pos)' : 'var(--neg)';
+    document.getElementById('ca_confidence').textContent = r.confidence != null ? `уверенность ${{(r.confidence*100).toFixed(0)}}%` : '';
+    document.getElementById('ca_reason').textContent = r.reason || r.summary || '';
+    const dialog = r.alpha_thesis || r.alpha || '';
+    const skeptic = r.beta_critique || r.beta || '';
+    const mod = r.moderator || '';
+    document.getElementById('ca_dialog').textContent = [
+      dialog ? `Альфа: ${{dialog}}` : '',
+      skeptic ? `Бета: ${{skeptic}}` : '',
+      mod ? `Модератор: ${{mod}}` : '',
+    ].filter(Boolean).join('\n\n');
+    statusEl.textContent = '';
+    resultEl.style.display = '';
+  }} catch(e) {{ statusEl.textContent = '⚠ ' + e; }}
+  btn.disabled = false;
 }}
 
 async function loadLiveScorecard() {{
@@ -6613,44 +6798,69 @@ def get_council_log() -> dict:
     return {"lessons": lessons}
 
 
+def council_ask_sync(ticker: str, question: str, direction: str = "LONG") -> dict:
+    """Синхронный вызов консилиума из дашборда (с таймаутом 35с)."""
+    import asyncio
+    try:
+        import council as _council
+        from trade_analytics import full_report_for_council
+        analytics = full_report_for_council(ticker) if ticker else question
+        snap = {"regime": "unknown", "composite": 0.0, "scores": {}, "atr_pct": 0.0}
+        coro = _council.consult_signal(ticker or "?", direction, snap, analytics_text=question or analytics, timeout=35.0)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+            result = loop.run_until_complete(coro)
+        except RuntimeError:
+            result = asyncio.run(coro)
+        return {"ok": True, "result": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+_oi_backfill_job: dict = {}  # {running, log, total_new, error, done}
+_oi_backfill_lock = __import__("threading").Lock()
+
+
 def run_oi_backfill(months: int, tickers: list[str] | None = None) -> dict:
-    """Запускает backfill_oi.backfill() в отдельном потоке (блокирует до завершения)."""
+    """Запускает backfill в фоновом потоке. Возвращает сразу."""
+    import threading
     import backfill_oi
-    token = backfill_oi._get_token()
-    if not token:
-        return {"error": "MOEX_TOKEN не задан в env или settings.ini [MOEX] TOKEN=..."}
 
-    target_tickers = tickers or list(backfill_oi.FUTOI_MAP.keys())
-    log_lines: list[str] = []
-    total_new = 0
+    with _oi_backfill_lock:
+        if _oi_backfill_job.get("running"):
+            return {"started": False, "error": "уже запущен — дождись завершения"}
 
-    from datetime import date, timedelta
-    date_till = date.today().isoformat()
-    date_from = (date.today() - timedelta(days=months * 31)).isoformat()
+        token = backfill_oi._get_token()
+        if not token:
+            return {"started": False, "error": "MOEX_TOKEN не задан в env или settings.ini [MOEX] TOKEN=..."}
 
-    import time as _time
-    history = backfill_oi._load_existing()
+        target_tickers = tickers or backfill_oi._get_strategy_tickers() or list(backfill_oi.FUTOI_MAP.keys() if hasattr(backfill_oi, "FUTOI_MAP") else [])
+        if not target_tickers:
+            return {"started": False, "error": "Нет тикеров: добавь STRATEGY_* секции в settings.ini или укажи вручную"}
 
-    for stock_ticker in target_tickers:
-        fut_sym = backfill_oi.FUTOI_MAP.get(stock_ticker)
-        if not fut_sym:
-            log_lines.append(f"{stock_ticker}: нет в FUTOI_MAP — пропущен")
-            continue
-        rows = backfill_oi._fetch_all(fut_sym, token, date_from, date_till)
-        if not rows:
-            log_lines.append(f"{stock_ticker}: нет данных от AlgoPack")
-            continue
-        aggregated = backfill_oi._aggregate_by_date(rows)
-        existing = history.get(stock_ticker, [])
-        merged = backfill_oi._merge(existing, aggregated)
-        new_count = max(0, len(merged) - len(existing))
-        history[stock_ticker] = merged
-        total_new += new_count
-        log_lines.append(f"{stock_ticker} ({fut_sym}): {len(aggregated)} дней, +{new_count} новых (итого {len(merged)})")
-        _time.sleep(backfill_oi.PAUSE_SEC)
+        _oi_backfill_job.clear()
+        _oi_backfill_job.update({"running": True, "log": [], "total_new": 0, "error": None, "done": False, "tickers": target_tickers})
 
-    backfill_oi._save(history)
-    return {"total_new": total_new, "tickers": len(target_tickers), "log": log_lines}
+    def _worker():
+        try:
+            result = backfill_oi.backfill(target_tickers, months, token)
+            with _oi_backfill_lock:
+                _oi_backfill_job.update({"running": False, "done": True,
+                                         "total_new": result.get("total_new", 0),
+                                         "log": result.get("log", [])})
+        except Exception as e:
+            with _oi_backfill_lock:
+                _oi_backfill_job.update({"running": False, "done": True, "error": str(e)})
+
+    threading.Thread(target=_worker, daemon=True).start()
+    return {"started": True, "tickers": target_tickers}
+
+
+def get_oi_backfill_status() -> dict:
+    with _oi_backfill_lock:
+        return dict(_oi_backfill_job)
 
 
 def get_bot_status() -> dict:
@@ -6975,6 +7185,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(get_scorecard_api())
         elif self.path == "/api/council_log":
             self._send_json(get_council_log())
+        elif self.path == "/api/oi_backfill_status":
+            self._send_json(get_oi_backfill_status())
         elif self.path == "/api/tickers_list":
             self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path.startswith("/api/bar_rules_load"):
@@ -7359,8 +7571,11 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(bot_control_action(action, ticker))
         elif self.path == "/api/oi_backfill":
             months = int(payload.get("months", 12))
-            tickers = payload.get("tickers") or None
+            raw_t = payload.get("tickers") or None
+            tickers = [t.strip().upper() for t in raw_t.split(",") if t.strip()] if isinstance(raw_t, str) and raw_t.strip() else (raw_t if isinstance(raw_t, list) else None)
             self._send_json(run_oi_backfill(months, tickers))
+        elif self.path == "/api/council_ask":
+            self._send_json(council_ask_sync(payload.get("ticker","").upper(), payload.get("question",""), payload.get("direction","LONG").upper()))
         elif self.path == "/api/bot_adopt":
             try:
                 ticker = payload.get("ticker", "").strip()
