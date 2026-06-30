@@ -48,7 +48,19 @@ FUTOI_MAP = {
 # RETAIL_CONTRA просто не считаются для тикера — это не ошибка, остальные
 # методы OICompositeStrategy продолжают работать.
 
-MOEX_TOKEN = os.getenv("MOEX_TOKEN")
+def _load_moex_token() -> str | None:
+    token = os.getenv("MOEX_TOKEN")
+    if token:
+        return token
+    try:
+        from configparser import ConfigParser
+        ini = ConfigParser()
+        ini.read("settings.ini", encoding="utf-8")
+        return ini.get("MOEX", "TOKEN", fallback=None) or None
+    except Exception:
+        return None
+
+MOEX_TOKEN = _load_moex_token()
 FUTOI_URL = "https://apim.moex.com/iss/analyticalproducts/futoi/securities.json"
 
 
