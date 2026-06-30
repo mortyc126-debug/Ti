@@ -2981,6 +2981,23 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   <div id="lc_trades_list" style="margin-top:8px;font-size:11px;color:var(--txt2);"></div>
 </div>
 
+<!-- ══ OI BACKFILL ════════════════════════════════════════════════════ -->
+<div class="panel" style="margin-bottom:0;">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="sec-lg" style="margin:0;">Исторический OI (AlgoPack)</div>
+    <select class="inp mid" id="oi_bf_months" style="width:90px;">
+      <option value="3">3 мес.</option>
+      <option value="6">6 мес.</option>
+      <option value="12" selected>12 мес.</option>
+      <option value="24">24 мес.</option>
+    </select>
+    <input type="text" class="inp mid" id="oi_bf_tickers" placeholder="все тикеры" style="width:160px;" title="Через запятую: SBER,GAZP — или пусто для всех">
+    <button class="btn-pill btn-sm" onclick="oiBackfill()">⬇ Загрузить OI</button>
+    <span id="oi_bf_status" style="font-size:11px;color:var(--txt3);"></span>
+  </div>
+  <div id="oi_bf_log" style="margin-top:8px;font-size:11px;color:var(--txt2);max-height:120px;overflow-y:auto;display:none;"></div>
+</div>
+
 <!-- ══ SCORECARD + КОНСИЛИУМ ══════════════════════════════════════════ -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:0;">
 
@@ -5102,6 +5119,30 @@ async function loadCouncilLog() {{
   }}
 }}
 
+async function oiBackfill() {{
+  const months  = document.getElementById('oi_bf_months').value;
+  const tickers = document.getElementById('oi_bf_tickers').value.trim();
+  const status  = document.getElementById('oi_bf_status');
+  const log     = document.getElementById('oi_bf_log');
+  status.textContent = '⏳ загружаю...';
+  log.style.display = 'none'; log.innerHTML = '';
+  try {{
+    const body = {{ months: parseInt(months) }};
+    if (tickers) body.tickers = tickers.split(',').map(t => t.trim().toUpperCase()).filter(Boolean);
+    const data = await fetch('/api/oi_backfill', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify(body),
+    }}).then(r => r.json());
+    if (data.error) {{ status.textContent = '⚠ ' + data.error; return; }}
+    status.textContent = `✓ готово: ${{data.total_new}} новых записей по ${{data.tickers}} тикерам`;
+    if (data.log && data.log.length) {{
+      log.innerHTML = data.log.map(l => `<div>${{l}}</div>`).join('');
+      log.style.display = '';
+    }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+}}
+
 async function loadLiveScorecard() {{
   try {{
     const data = await fetch('/api/scorecard').then(r=>r.json());
@@ -6572,6 +6613,46 @@ def get_council_log() -> dict:
     return {"lessons": lessons}
 
 
+def run_oi_backfill(months: int, tickers: list[str] | None = None) -> dict:
+    """Запускает backfill_oi.backfill() в отдельном потоке (блокирует до завершения)."""
+    import backfill_oi
+    token = backfill_oi._get_token()
+    if not token:
+        return {"error": "MOEX_TOKEN не задан в env или settings.ini [MOEX] TOKEN=..."}
+
+    target_tickers = tickers or list(backfill_oi.FUTOI_MAP.keys())
+    log_lines: list[str] = []
+    total_new = 0
+
+    from datetime import date, timedelta
+    date_till = date.today().isoformat()
+    date_from = (date.today() - timedelta(days=months * 31)).isoformat()
+
+    import time as _time
+    history = backfill_oi._load_existing()
+
+    for stock_ticker in target_tickers:
+        fut_sym = backfill_oi.FUTOI_MAP.get(stock_ticker)
+        if not fut_sym:
+            log_lines.append(f"{stock_ticker}: нет в FUTOI_MAP — пропущен")
+            continue
+        rows = backfill_oi._fetch_all(fut_sym, token, date_from, date_till)
+        if not rows:
+            log_lines.append(f"{stock_ticker}: нет данных от AlgoPack")
+            continue
+        aggregated = backfill_oi._aggregate_by_date(rows)
+        existing = history.get(stock_ticker, [])
+        merged = backfill_oi._merge(existing, aggregated)
+        new_count = max(0, len(merged) - len(existing))
+        history[stock_ticker] = merged
+        total_new += new_count
+        log_lines.append(f"{stock_ticker} ({fut_sym}): {len(aggregated)} дней, +{new_count} новых (итого {len(merged)})")
+        _time.sleep(backfill_oi.PAUSE_SEC)
+
+    backfill_oi._save(history)
+    return {"total_new": total_new, "tickers": len(target_tickers), "log": log_lines}
+
+
 def get_bot_status() -> dict:
     """data/bot_status.json — живой снимок, который бот обновляет на каждой свече."""
     path = "data/bot_status.json"
@@ -7276,6 +7357,10 @@ class Handler(BaseHTTPRequestHandler):
             action = payload.get("action", "")
             ticker = payload.get("ticker", "")
             self._send_json(bot_control_action(action, ticker))
+        elif self.path == "/api/oi_backfill":
+            months = int(payload.get("months", 12))
+            tickers = payload.get("tickers") or None
+            self._send_json(run_oi_backfill(months, tickers))
         elif self.path == "/api/bot_adopt":
             try:
                 ticker = payload.get("ticker", "").strip()
