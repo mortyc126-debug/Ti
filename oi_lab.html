@@ -220,23 +220,23 @@ async function labBackfill() {
   }
 
   let saved = 0, empty = 0, failed = 0, done = 0;
+  const PARALLEL = 3;
   setStatus(`Бэкфилл: 0/${dates.length} дат…`);
-  for (const date of dates) {
+
+  async function fetchDate(date) {
     try {
-      const url = `${proxy}/db/oibackfill?tickers=${encodeURIComponent(tickers.join(','))}&date=${date}`;
-      const r = await fetch(url);
-      if (r.ok) {
-        const j = await r.json();
-        saved += j.saved || 0;
-        empty += j.empty || 0;
-        failed += j.failed || 0;
-      } else {
-        failed += tickers.length;
-      }
-    } catch(_) { failed += tickers.length; }
-    done++;
-    if (done % 5 === 0 || done === dates.length)
-      setStatus(`Бэкфилл: ${done}/${dates.length} дат, saved=${saved}, empty=${empty}, failed=${failed}`);
+      const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(tickers.join(','))}&date=${date}`);
+      if (r.ok) { const j = await r.json(); return j; }
+    } catch(_) {}
+    return { saved: 0, empty: 0, failed: tickers.length };
+  }
+
+  for (let i = 0; i < dates.length; i += PARALLEL) {
+    const chunk = dates.slice(i, i + PARALLEL);
+    const results = await Promise.all(chunk.map(fetchDate));
+    results.forEach(j => { saved += j.saved||0; empty += j.empty||0; failed += j.failed||0; });
+    done += chunk.length;
+    setStatus(`Бэкфилл: ${done}/${dates.length} дат, saved=${saved}, empty=${empty}, failed=${failed}`);
   }
   setStatus(`Бэкфилл завершён: saved=${saved}, empty=${empty}, failed=${failed}`, saved > 0 ? 'ok' : 'err');
 }
