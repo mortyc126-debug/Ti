@@ -213,8 +213,12 @@ async function labLoad() {
       const r = await fetch(`${proxy}/db/oidaily?ticker=${encodeURIComponent(t)}`);
       if (!r.ok) throw new Error(`HTTP ${r.status} для ${t}`);
       const json = await r.json();
-      const rows = (json.rows || json.data || json || []).map(normalizeRow).filter(r=>r.date);
-      if (!rows.length) throw new Error(`Нет данных для ${t}`);
+      console.log(`[oi_lab] raw response for ${t}:`, json);
+      const rawArr = Array.isArray(json) ? json : (json.rows || json.data || []);
+      console.log(`[oi_lab] rawArr length: ${rawArr.length}, first:`, rawArr[0]);
+      const rows = rawArr.map(normalizeRow).filter(r=>r.date);
+      console.log(`[oi_lab] normalized rows: ${rows.length}, first:`, rows[0]);
+      if (!rows.length) throw new Error(`Нет данных для ${t} (raw: ${rawArr.length} строк, проверь консоль)`);
       contractsMap[t] = rows;
     }
 
