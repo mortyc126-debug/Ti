@@ -8497,19 +8497,10 @@ class OICompositeStrategy(IStrategy):
         if self.__last_regime == "trending_down" and direction == SignalType.LONG:
             return False, "blocked_counter_trend"
 
-        # Фильтр ключевых методов — расширен до 4 на основе анализа trades_export_15.
-        # RMI+PRICE_TREND+ZLEMA_SIGNAL+WICK_REJECTION: 2+ agree → WR=58%, Net=+12.5% (n=64)
-        # против WR=44% среднего. Правила:
-        #   • ни один не согласен → блокировать (нет импульсного подтверждения)
-        #   • 2+ согласны → пропускать, даже если общий гейт не пройден
-        _KEY_METHODS = ("RMI", "PRICE_TREND", "ZLEMA_SIGNAL", "WICK_REJECTION")
-        _key_agree = sum(
-            1 for m in _KEY_METHODS
-            if score_map.get(m, 0.0) * sign_val > AGREE_SCORE_MIN
-        )
-        if _key_agree == 0:
-            return False, "key_methods_none_agree"
-        _key_fast_pass = _key_agree >= 2
+        # Ключевые методы отключены: жёсткий список нестабилен между периодами
+        # (export_15 vs export_16: топ методов меняется). Вместо этого используем
+        # IC-веса и групповое согласие как более стабильный сигнал.
+        _key_fast_pass = False
 
         # P5: адаптивный порог доли согласия по L1-контексту (клип 0.25..0.60).
         # Для сделок ПО тренду (trending_down SHORT / trending_up LONG) снижаем
