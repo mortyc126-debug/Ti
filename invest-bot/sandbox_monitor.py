@@ -94,6 +94,12 @@ def _format_portfolio(portfolio, account_id: str) -> str:
     total_rub = _q(portfolio.total_amount_portfolio)
     expected_yield_pct = _q(portfolio.expected_yield)
 
+    try:
+        import trade_analytics
+        trades_text = trade_analytics.trades_summary(equity_rub=total_rub if total_rub > 0 else None)
+    except Exception:
+        trades_text = None
+
     lines = [
         f"🏖 Sandbox {now} [acc: ...{account_id[-6:]}]",
         f"Портфель: {total_rub:,.0f} ₽  |  P&L: {expected_yield_pct:+.2f}%",
@@ -102,6 +108,9 @@ def _format_portfolio(portfolio, account_id: str) -> str:
     positions = portfolio.positions
     if not positions:
         lines.append("Открытых позиций нет.")
+        if trades_text:
+            lines.append("")
+            lines.append(trades_text)
         return "\n".join(lines)
 
     lines.append(f"Позиции ({len(positions)}):")
@@ -121,6 +130,10 @@ def _format_portfolio(portfolio, account_id: str) -> str:
             )
         except Exception:
             pass
+
+    if trades_text:
+        lines.append("")
+        lines.append(trades_text)
 
     return "\n".join(lines)
 

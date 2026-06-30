@@ -1,14 +1,15 @@
 """
-trade_analytics.py — Анализ истории торговли по данным архива.
+trade_analytics.py — Анализ истории торговли.
 
-Читает data/archive.json (ArchiveStore) и строит текстовые сводки:
-  ticker_summary(ticker)      — подробно по одному тикеру (для council)
-  all_tickers_summary()       — топ-N по качеству сигнала (для Telegram)
-  lessons_for_council(ticker) — компактный блок «что мы знаем» для агентов
+Два источника данных:
+  1. data/archive.json  — ArchiveStore: composite/quality/режим по дням (всегда)
+  2. data/trades.jsonl  — metrics.py: реальные PnL/WR/Kelly (накапливается в sandbox)
 
-Архив заполняется в конце каждого торгового дня через ArchiveStore.record().
-Данные: composite, scores, режим, rolling_quality, live/signal_only,
-        backtest_quality, backtest_trades, narrative_state.
+Функции:
+  ticker_summary(ticker)  — сводка по тикеру из архива (для council)
+  trades_summary()        — статистика реальных сделок (WR, PF, Kelly, fitness)
+  all_tickers_summary()   — топ тикеров по quality (для Telegram)
+  full_report_for_council(ticker) — всё вместе, для агентов
 """
 
 import json
@@ -16,6 +17,8 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
+
+import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -147,3 +150,58 @@ def tickers_with_weak_signal(threshold: float = 0.3) -> list[str]:
         if avg_q < threshold:
             weak.append(ticker)
     return weak
+
+
+def trades_summary(equity_rub: float | None = None) -> str:
+    """
+    Сводка реальных сделок из data/trades.jsonl.
+    Включает: fitness scorecard, win rate, profit factor, Kelly, по тикерам.
+    Используется sandbox_monitor (Telegram) и council (контекст для агентов).
+    """
+    lines = [metrics.scorecard_text(equity_rub=equity_rub)]
+
+    # По тикерам
+    per_ticker = metrics.per_ticker_stats(top=5)
+    if "Сделок пока нет" not in per_ticker:
+        lines.append(per_ticker)
+
+    # ½-Келли рекомендация
+    pct, why = metrics.dynamic_risk_pct()
+    lines.append(f"📐 Рекомендуемый риск/сделку (½-Келли): {pct:.2f}% | {why}")
+
+    return "\n".join(lines)
+
+
+def full_report_for_council(ticker: str) -> str:
+    """
+    Всё что знаем о тикере — для передачи агентам консилиума.
+    Объединяет архив (composite/quality/режим) + реальные сделки (WR/PF).
+    """
+    parts = []
+
+    arch = ticker_summary(ticker)
+    parts.append(arch)
+
+    # Реальные сделки по тикеру
+    ticker_trades = metrics.load_ticker_trades(ticker)
+    if ticker_trades:
+        ts = metrics.trade_stats(ticker_trades)
+        n = ts.get("n", 0)
+        wr = ts.get("win_rate", 0)
+        pf = ts.get("profit_factor")
+        exp = ts.get("expectancy", 0)
+        total = ts.get("total_pnl", 0)
+        parts.append(
+            f"Реальные сделки по {ticker} ({n} шт.): "
+            f"WR={wr:.0%}  PF={pf or 'n/a'}  exp={exp}₽  итого={total:+.0f}₽"
+        )
+    else:
+        parts.append(f"Реальных сделок по {ticker} в trades.jsonl пока нет.")
+
+    # Общий fitness
+    card = metrics.scorecard()
+    fitness = card.get("fitness", "unproven")
+    verdict = card.get("verdict", "")
+    parts.append(f"Общий fitness системы: {fitness} | {verdict}")
+
+    return "\n".join(parts)

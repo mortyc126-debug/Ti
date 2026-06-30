@@ -10,6 +10,10 @@ from decimal import Decimal
 # Выключается через COUNCIL=0, работает только если задан CEREBRAS_API_KEY.
 _COUNCIL_ENABLED = os.getenv("COUNCIL", "1") == "1"
 
+# В sandbox-режиме включаем стакан по умолчанию — на реальном стриме данные
+# актуальны, и imbalance-фильтр + squeeze работают полноценно.
+_IS_SANDBOX = os.getenv("TINKOFF_SANDBOX") == "1"
+
 from tinkoff.invest import Candle, OrderExecutionReportStatus
 from tinkoff.invest.utils import quotation_to_decimal
 
@@ -40,6 +44,7 @@ from archive import ArchiveStore
 from candle_archive import get_candles_cached
 import council
 import trade_analytics
+import metrics
 from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
 import bot_control
@@ -82,7 +87,7 @@ AUTO_ATR_HISTORY_DAYS = 90
 # глубина ORDERBOOK_DEPTH уровней. Выключен по умолчанию (новая живая
 # подписка с доп. нагрузкой на лимиты API) — включается с дашборда
 # (RuntimeOverrides.orderbook_enabled) или ORDERBOOK=1.
-ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "0") == "1"
+ORDERBOOK_DEFAULT_ENABLED = os.getenv("ORDERBOOK", "1" if os.getenv("TINKOFF_SANDBOX") == "1" else "0") == "1"
 ORDERBOOK_DEPTH = int(os.getenv("ORDERBOOK_DEPTH", "10"))
 
 # Спред-фильтр: пропускаем вход если bid-ask спред шире этой доли от цены.
@@ -1498,7 +1503,7 @@ class Trader:
         if _COUNCIL_ENABLED:
             try:
                 _snap = strategy.last_snapshot() if hasattr(strategy, "last_snapshot") else {}
-                _analytics = trade_analytics.ticker_summary(risk_ticker)
+                _analytics = trade_analytics.full_report_for_council(risk_ticker)
                 _cr = await council.consult_signal(
                     ticker=risk_ticker,
                     direction=direction,
@@ -1584,6 +1589,15 @@ class Trader:
                     )
                     self.__blogger.open_position_message(open_position)
                     logger.info(f"Open position: {open_position}")
+                    # Лог открытия в trades.jsonl для metrics.py
+                    metrics.log_trade("open", {
+                        "ticker": risk_ticker, "direction": direction,
+                        "qty": actual_lots, "entry": entry_price,
+                        "stop": stop_price,
+                        "take": float(signal_new.take_profit_level),
+                        "confidence": confidence,
+                        "order_id": open_order_id,
+                    })
                     # Запускаем MFE/MAE трекинг для этой позиции
                     self.__pos_tracking[figi] = {
                         "direction": "LONG" if signal_new.signal_type == SignalType.LONG else "SHORT",
@@ -2329,6 +2343,9 @@ class Trader:
             return None
         result = self.__risk.close_position(
             risk_ticker, price, point_value=strategy.settings.point_value, reason=reason)
+        if result:
+            # Лог закрытия в trades.jsonl — основа для metrics.py (PnL, WR, Kelly)
+            metrics.log_trade("close", result)
         if result and result.get("pnl_rub", 0) < 0:
             self.__loss_cooldown_until[risk_ticker] = datetime.datetime.utcnow() + \
                 datetime.timedelta(minutes=LOSS_REENTRY_COOLDOWN_MINUTES)

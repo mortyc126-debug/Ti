@@ -253,7 +253,7 @@ async def consult_signal(
         f"Нарратив: {snapshot.get('narrative_state', '?')}\n"
     )
     if analytics_text:
-        snapshot_text += f"\nСтатистика по тикеру из архива:\n{analytics_text}"
+        snapshot_text += f"\nАналитика по тикеру (архив + реальные сделки):\n{analytics_text}"
 
     loop = asyncio.get_event_loop()
     obs_a = skeptic_b = moderator = None
