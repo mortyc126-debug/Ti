@@ -8497,10 +8497,30 @@ class OICompositeStrategy(IStrategy):
         if self.__last_regime == "trending_down" and direction == SignalType.LONG:
             return False, "blocked_counter_trend"
 
-        # Ключевые методы отключены: жёсткий список нестабилен между периодами
-        # (export_15 vs export_16: топ методов меняется). Вместо этого используем
-        # IC-веса и групповое согласие как более стабильный сигнал.
+        # Динамический фильтр по IC: вместо захардкоженных имён — методы, у которых
+        # ic_smoothed > IC_KEY_THRESHOLD в текущем режиме (per-regime из __ic_priors).
+        # Работает только после прогрева (IC_WINDOW/2 баров); до этого — нейтрально.
+        # Правила:
+        #   • среди IC-сильных методов ни один не согласен → блокировать
+        #   • 2+ IC-сильных согласны → fast-pass (прошли доп. фильтр)
+        _IC_KEY_THRESHOLD = 0.05   # ic_smoothed > 5% edge → метод "ключевой"
+        _IC_KEY_MIN_CONF  = 0.40   # мин. уверенность (n_effective >= ~20)
+        _ic_warm = self.__ic_bar_counter >= IC_WINDOW // 2
         _key_fast_pass = False
+        if _ic_warm:
+            _ic_strong = [
+                name for name in score_map
+                if self.__ic(name).ic_smoothed > _IC_KEY_THRESHOLD
+                and self.__ic(name).confidence() >= _IC_KEY_MIN_CONF
+            ]
+            if len(_ic_strong) >= 2:
+                _ic_key_agree = sum(
+                    1 for name in _ic_strong
+                    if score_map[name] * sign_val > AGREE_SCORE_MIN
+                )
+                if _ic_key_agree == 0:
+                    return False, "ic_key_none_agree"
+                _key_fast_pass = _ic_key_agree >= 2
 
         # P5: адаптивный порог доли согласия по L1-контексту (клип 0.25..0.60).
         # Для сделок ПО тренду (trending_down SHORT / trending_up LONG) снижаем
