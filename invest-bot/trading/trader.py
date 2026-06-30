@@ -6,6 +6,10 @@ import os
 from collections import deque
 from decimal import Decimal
 
+# Консилиум агентов: Cerebras-based ИИ-совет перед входом в позицию.
+# Выключается через COUNCIL=0, работает только если задан CEREBRAS_API_KEY.
+_COUNCIL_ENABLED = os.getenv("COUNCIL", "1") == "1"
+
 from tinkoff.invest import Candle, OrderExecutionReportStatus
 from tinkoff.invest.utils import quotation_to_decimal
 
@@ -34,6 +38,8 @@ from tradestats import TradeStatsService
 from mega_alerts import MegaAlertsService
 from archive import ArchiveStore
 from candle_archive import get_candles_cached
+import council
+import trade_analytics
 from db_api_client import DbApiClient
 from runtime_overrides import RuntimeOverrides
 import bot_control
@@ -1485,6 +1491,39 @@ class Trader:
                 atr_pct = strategy.last_snapshot().get("atr_pct", 0.0) or 0.0
             except Exception:
                 pass
+
+        # Консилиум: ИИ-совет перед входом (Альфа + Скептик + опционально Модератор).
+        # Если council говорит "skip" — ордер не выставляется, торговлю не блокирует.
+        # Работает только при COUNCIL=1 и наличии CEREBRAS_API_KEY.
+        if _COUNCIL_ENABLED:
+            try:
+                _snap = strategy.last_snapshot() if hasattr(strategy, "last_snapshot") else {}
+                _analytics = trade_analytics.ticker_summary(risk_ticker)
+                _cr = await council.consult_signal(
+                    ticker=risk_ticker,
+                    direction=direction,
+                    snapshot=_snap,
+                    analytics_text=_analytics,
+                    timeout=25.0,
+                )
+                if _cr.get("verdict") == "skip":
+                    _reason = _cr.get("reason", "")
+                    logger.info(
+                        f"Консилиум пропускает {risk_ticker} {direction}: {_reason}"
+                    )
+                    self.__blogger.send_raw(
+                        f"🏛 Консилиум: {risk_ticker} {direction.upper()} → ПРОПУСК\n"
+                        f"Причина: {_reason}\n"
+                        f"Уверенность: {_cr.get('confidence', 0):.0%}"
+                    )
+                    self.__pending_orders.discard(figi)
+                    return
+                logger.info(
+                    f"Консилиум одобрил {risk_ticker}: "
+                    f"conf={_cr.get('confidence', 0):.2f}"
+                )
+            except Exception as _ce:
+                logger.warning(f"Консилиум ошибка ({risk_ticker}): {_ce} — продолжаем без совета")
 
         # Дробный вход: первый транш = TRANCHE1_RATIO*lots, остаток — позже
         first_lots = available_lots
