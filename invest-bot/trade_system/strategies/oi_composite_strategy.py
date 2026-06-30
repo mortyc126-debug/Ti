@@ -8490,6 +8490,20 @@ class OICompositeStrategy(IStrategy):
         if self.__last_regime == "trending_down" and direction == SignalType.LONG:
             return False, "blocked_counter_trend"
 
+        # Фильтр ключевых методов: RMI + PRICE_TREND + SINEWAVE_SIGNAL.
+        # Эмпирически (trades_export_15): комбинации этих трёх дают WR 60-83%
+        # против 44% среднего. Правила:
+        #   • ни один не согласен → блокировать (нет импульсного подтверждения)
+        #   • 2+ согласны → пропускать, даже если общий гейт не пройден
+        _KEY_METHODS = ("RMI", "PRICE_TREND", "SINEWAVE_SIGNAL")
+        _key_agree = sum(
+            1 for m in _KEY_METHODS
+            if score_map.get(m, 0.0) * sign_val > AGREE_SCORE_MIN
+        )
+        if _key_agree == 0:
+            return False, "key_methods_none_agree"
+        _key_fast_pass = _key_agree >= 2
+
         # P5: адаптивный порог доли согласия по L1-контексту (клип 0.25..0.60).
         # Для сделок ПО тренду (trending_down SHORT / trending_up LONG) снижаем
         # базовый порог — режим уже является дополнительным фильтром направления.
@@ -8512,10 +8526,10 @@ class OICompositeStrategy(IStrategy):
             total_strength += strength
             if (sv > 0) == (sign_val > 0):
                 agree_strength += strength
-        if total_strength <= 0 or not (
+        if not _key_fast_pass and (total_strength <= 0 or not (
             agree_strength >= AGREE_STRENGTH_MIN and
             agree_strength / total_strength >= agreement_threshold
-        ):
+        )):
             return False, "methods_disagree"
 
         net = sum(
