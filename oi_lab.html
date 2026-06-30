@@ -61,6 +61,10 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     </select>
   </label>
   <button onclick="labLoad()">Загрузить</button>
+  <label>Бэкфилл (дней)
+    <input id="bf-days" type="number" min="1" max="365" value="90" style="min-width:70px">
+  </label>
+  <button class="sec" onclick="labBackfill()">📥 Бэкфилл</button>
 </div>
 
 <div id="status" class="status">—</div>
@@ -198,6 +202,43 @@ function setStatus(msg, cls='') {
   const el = document.getElementById('status');
   el.textContent = msg;
   el.className = 'status ' + cls;
+}
+
+async function labBackfill() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const tickers = document.getElementById('tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  const days = Math.min(parseInt(document.getElementById('bf-days').value) || 90, 365);
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  if (!tickers.length) { setStatus('Укажи тикер', 'err'); return; }
+
+  // Генерируем даты от сегодня назад
+  const dates = [];
+  const d = new Date();
+  for (let i = 0; i < days; i++) {
+    dates.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() - 1);
+  }
+
+  let saved = 0, empty = 0, failed = 0, done = 0;
+  setStatus(`Бэкфилл: 0/${dates.length} дат…`);
+  for (const date of dates) {
+    try {
+      const url = `${proxy}/db/oibackfill?tickers=${encodeURIComponent(tickers.join(','))}&date=${date}`;
+      const r = await fetch(url);
+      if (r.ok) {
+        const j = await r.json();
+        saved += j.saved || 0;
+        empty += j.empty || 0;
+        failed += j.failed || 0;
+      } else {
+        failed += tickers.length;
+      }
+    } catch(_) { failed += tickers.length; }
+    done++;
+    if (done % 5 === 0 || done === dates.length)
+      setStatus(`Бэкфилл: ${done}/${dates.length} дат, saved=${saved}, empty=${empty}, failed=${failed}`);
+  }
+  setStatus(`Бэкфилл завершён: saved=${saved}, empty=${empty}, failed=${failed}`, saved > 0 ? 'ok' : 'err');
 }
 
 async function labLoad() {
