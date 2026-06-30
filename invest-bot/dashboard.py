@@ -2940,6 +2940,46 @@ textarea{{width:100%;height:140px;background:var(--panel);color:var(--txt);borde
   </table>
 </div>
 
+<!-- ══ ЖИВОЙ ГРАФИК СДЕЛОК ══════════════════════════════════════════════ -->
+<div class="panel" id="live-chart-panel">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+    <div class="sec-lg" style="margin:0;">График сделок (live)</div>
+    <select class="inp mid" id="lc_ticker" style="width:90px;"></select>
+    <select class="inp mid" id="lc_days" style="width:80px;">
+      <option value="3">3 дня</option>
+      <option value="7" selected>7 дней</option>
+      <option value="14">14 дней</option>
+      <option value="30">30 дней</option>
+    </select>
+    <button class="btn-pill btn-sm" onclick="loadLiveChart()">⟳ Обновить</button>
+    <span id="lc_status" style="font-size:11px;color:var(--txt3);"></span>
+  </div>
+  <div id="lc_chart" style="width:100%;height:340px;background:var(--card);border-radius:8px;border:1px solid var(--border2);position:relative;">
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;" id="lc_placeholder">Выбери тикер и нажми ⟳</div>
+    <canvas id="lc_canvas" style="display:none;width:100%;height:100%;"></canvas>
+  </div>
+  <div id="lc_trades_list" style="margin-top:8px;font-size:11px;color:var(--txt2);"></div>
+</div>
+
+<!-- ══ SCORECARD + КОНСИЛИУМ ══════════════════════════════════════════ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:0;">
+
+<div class="panel">
+  <div class="sec-lg">Fitness scorecard</div>
+  <div id="live_scorecard" style="font-size:12px;color:var(--txt2);">загрузка...</div>
+  <div style="margin-top:10px;font-size:11px;color:var(--txt3);" id="live_per_ticker"></div>
+</div>
+
+<div class="panel">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <div class="sec-lg" style="margin:0;">Консилиум (последние решения)</div>
+    <button class="btn-pill btn-sm" onclick="loadCouncilLog()">⟳</button>
+  </div>
+  <div id="live_council" style="font-size:11px;color:var(--txt2);max-height:280px;overflow-y:auto;">загрузка...</div>
+</div>
+
+</div><!-- /grid scorecard+council -->
+
 </div><!-- /tab-live -->
 
 </div><!-- /main-col -->
@@ -2988,6 +3028,8 @@ function showTab(name) {{
   event.currentTarget.classList.add('active');
   if (name === 'live') {{
     loadBotStatus(); loadOverrides(); loadAutoAtr();
+    loadCouncilLog(); loadLiveScorecard();
+    _lcInitTickers();
     if (!_statusPollTimer) _statusPollTimer = setInterval(loadBotStatus, 30000);
   }} else {{
     if (_statusPollTimer) {{ clearInterval(_statusPollTimer); _statusPollTimer = null; }}
@@ -4852,6 +4894,234 @@ async function loadBotStatus() {{
   }}
 }}
 
+// ── Живой график сделок ────────────────────────────────────────────────────
+
+let _lcChart = null;  // Canvas 2D context
+
+function _lcDrawChart(candles, trades) {{
+  const canvas = document.getElementById('lc_canvas');
+  const placeholder = document.getElementById('lc_placeholder');
+  if (!candles || !candles.length) {{
+    placeholder.textContent = 'Нет свечей'; placeholder.style.display = '';
+    canvas.style.display = 'none'; return;
+  }}
+  placeholder.style.display = 'none';
+  canvas.style.display = 'block';
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Цены min/max
+  let lo = Infinity, hi = -Infinity;
+  for (const c of candles) {{ lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); }}
+  // Маркеры входа/стопа/тейка
+  for (const t of (trades || [])) {{
+    if (t.entry_price) {{ lo = Math.min(lo, t.entry_price); hi = Math.max(hi, t.entry_price); }}
+    if (t.stop_price)  {{ lo = Math.min(lo, t.stop_price);  hi = Math.max(hi, t.stop_price); }}
+    if (t.take_price)  {{ lo = Math.min(lo, t.take_price);  hi = Math.max(hi, t.take_price); }}
+  }}
+  const pad = (hi - lo) * 0.05 || 1;
+  lo -= pad; hi += pad;
+  const scaleY = (price) => H - ((price - lo) / (hi - lo)) * H;
+
+  const n = candles.length;
+  const marginLeft = 52, marginRight = 8;
+  const chartW = W - marginLeft - marginRight;
+  const candleW = Math.max(2, Math.floor(chartW / n) - 1);
+  const scaleX = (i) => marginLeft + (i + 0.5) * chartW / n;
+
+  // Фон
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || '#16161e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Сетка
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+  for (let gi = 0; gi <= 4; gi++) {{
+    const y = Math.round(H * gi / 4) + 0.5;
+    ctx.beginPath(); ctx.moveTo(marginLeft, y); ctx.lineTo(W - marginRight, y); ctx.stroke();
+    const price = hi - (hi - lo) * gi / 4;
+    ctx.fillStyle = '#666'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(price.toFixed(2), marginLeft - 2, y + 3);
+  }}
+
+  // Свечи
+  for (let i = 0; i < n; i++) {{
+    const c = candles[i];
+    const x = Math.round(scaleX(i));
+    const isUp = c.c >= c.o;
+    const color = isUp ? '#26a37b' : '#e05260';
+    ctx.strokeStyle = color; ctx.fillStyle = color;
+    // Тень
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, Math.round(scaleY(c.h)));
+    ctx.lineTo(x, Math.round(scaleY(c.l)));
+    ctx.stroke();
+    // Тело
+    const yO = Math.round(scaleY(c.o)), yC = Math.round(scaleY(c.c));
+    const top = Math.min(yO, yC), bodyH = Math.max(1, Math.abs(yC - yO));
+    ctx.fillRect(Math.round(x - candleW / 2), top, candleW, bodyH);
+  }}
+
+  // Горизонтальные линии сделок
+  const times = candles.map(c => new Date(c.t).getTime());
+  function timeToX(ts) {{
+    const t = new Date(ts).getTime();
+    let best = 0;
+    for (let i = 1; i < times.length; i++) if (Math.abs(times[i]-t) < Math.abs(times[best]-t)) best = i;
+    return scaleX(best);
+  }}
+
+  for (const t of (trades || [])) {{
+    const x0 = t.entry_time ? timeToX(t.entry_time) : marginLeft;
+    const x1 = t.exit_time  ? timeToX(t.exit_time)  : W - marginRight;
+    const isLong = (t.direction || '').toLowerCase() === 'long';
+
+    if (t.take_price) {{
+      ctx.setLineDash([4,3]); ctx.strokeStyle = '#26a37b'; ctx.lineWidth = 1;
+      const y = Math.round(scaleY(t.take_price));
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    }}
+    if (t.stop_price) {{
+      ctx.setLineDash([4,3]); ctx.strokeStyle = '#e05260'; ctx.lineWidth = 1;
+      const y = Math.round(scaleY(t.stop_price));
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    }}
+    ctx.setLineDash([]);
+
+    if (t.entry_price) {{
+      const y = Math.round(scaleY(t.entry_price));
+      // Треугольник входа
+      ctx.fillStyle = isLong ? '#26a37b' : '#e05260';
+      ctx.beginPath();
+      if (isLong) {{ ctx.moveTo(x0-5, y+6); ctx.lineTo(x0+5, y+6); ctx.lineTo(x0, y); }}
+      else         {{ ctx.moveTo(x0-5, y-6); ctx.lineTo(x0+5, y-6); ctx.lineTo(x0, y); }}
+      ctx.closePath(); ctx.fill();
+    }}
+    if (t.exit_price) {{
+      const y = Math.round(scaleY(t.exit_price));
+      const win = t.pnl_rub != null ? t.pnl_rub >= 0 : t.win;
+      ctx.fillStyle = win ? '#26a37b' : '#e05260';
+      ctx.beginPath(); ctx.arc(x1, y, 4, 0, 2*Math.PI); ctx.fill();
+    }}
+  }}
+}}
+
+function _lcInitTickers() {{
+  const sel = document.getElementById('lc_ticker');
+  if (sel.options.length > 1) return;
+  const chips = document.querySelectorAll('.chip');
+  const tickers = Array.from(chips).map(c => c.dataset.ticker || c.textContent.trim()).filter(Boolean);
+  sel.innerHTML = tickers.length
+    ? tickers.map(t => `<option value="${{t}}">${{t}}</option>`).join('')
+    : '<option value="">—</option>';
+}}
+
+async function loadLiveChart() {{
+  const ticker = document.getElementById('lc_ticker').value;
+  const days   = document.getElementById('lc_days').value;
+  if (!ticker) return;
+  const status = document.getElementById('lc_status');
+  status.textContent = 'загрузка...';
+  try {{
+    const data = await fetch(`/api/live_chart?ticker=${{encodeURIComponent(ticker)}}&days=${{days}}`).then(r=>r.json());
+    if (data.error) {{ status.textContent = '⚠ ' + data.error; return; }}
+    status.textContent = `${{data.candles?.length||0}} свечей · ${{data.trades?.length||0}} сделок`;
+    _lcDrawChart(data.candles, data.trades);
+
+    // Список сделок
+    const list = document.getElementById('lc_trades_list');
+    if (data.trades && data.trades.length) {{
+      list.innerHTML = data.trades.slice().reverse().map(t => {{
+        const pnlRub = t.pnl_rub != null ? `<span style="color:${{t.pnl_rub>=0?'var(--pos)':'var(--neg)'}}">${{t.pnl_rub>=0?'+':''}}${{t.pnl_rub?.toFixed(0)}}₽</span>` : '';
+        const pnlPct = t.net_pct != null ? ` (${{t.net_pct>=0?'+':''}}${{t.net_pct?.toFixed(2)}}%)` : '';
+        const dir = (t.direction||'').toLowerCase()==='long'
+          ? '<span style="color:var(--pos)">▲ LONG</span>'
+          : '<span style="color:var(--neg)">▼ SHORT</span>';
+        const ts = (t.entry_time||'').slice(5,16).replace('T',' ');
+        return `<div style="padding:3px 8px;margin:2px 0;background:var(--card);border-radius:6px;border:1px solid var(--border2);display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <span style="color:var(--txt3)">${{ts}}</span>
+          ${{dir}} ${{pnlRub}}${{pnlPct}}
+          <span style="color:var(--txt3);font-size:10px;">вход ${{t.entry_price?.toFixed(2)||'—'}} · стоп ${{t.stop_price?.toFixed(2)||'—'}} · тейк ${{t.take_price?.toFixed(2)||'—'}}</span>
+        </div>`;
+      }}).join('');
+    }} else {{
+      list.innerHTML = '<span style="color:var(--txt3)">Сделок пока нет</span>';
+    }}
+  }} catch(e) {{ status.textContent = '⚠ ' + e; }}
+}}
+
+async function loadCouncilLog() {{
+  try {{
+    const data = await fetch('/api/council_log').then(r=>r.json());
+    const el = document.getElementById('live_council');
+    if (!data.lessons || !data.lessons.length) {{
+      el.innerHTML = '<span style="color:var(--txt3)">Диалогов консилиума пока нет</span>'; return;
+    }}
+    el.innerHTML = data.lessons.slice().reverse().map(l => {{
+      const verdict = l.verdict === 'trade'
+        ? '<span style="color:var(--pos);font-weight:700">✓ ТОРГОВАТЬ</span>'
+        : '<span style="color:var(--neg);font-weight:700">✗ ПРОПУСТИТЬ</span>';
+      const ts = (l.ts||'').slice(5,16).replace('T',' ');
+      const lesson = (l.lesson||'').slice(0,250);
+      return `<div style="padding:6px 8px;margin:3px 0;background:var(--card);border-radius:6px;border:1px solid var(--border2);">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:3px;">
+          <span style="color:var(--txt3);font-size:10px;">${{ts}}</span>
+          <b style="color:var(--mem)">${{l.ticker||'?'}}</b>
+          <span style="color:var(--txt3)">${{l.direction||''}}</span>
+          ${{verdict}}
+          <span style="color:var(--txt3);font-size:10px;">режим: ${{l.regime||'?'}}</span>
+        </div>
+        <div style="color:var(--txt2);font-size:10px;line-height:1.4;">${{lesson}}</div>
+      </div>`;
+    }}).join('');
+  }} catch(e) {{
+    document.getElementById('live_council').textContent = '⚠ ' + e;
+  }}
+}}
+
+async function loadLiveScorecard() {{
+  try {{
+    const data = await fetch('/api/scorecard').then(r=>r.json());
+    const el = document.getElementById('live_scorecard');
+    const pt = document.getElementById('live_per_ticker');
+    if (!data || data.n === 0) {{
+      el.innerHTML = '<span style="color:var(--txt3)">Статистики пока нет (trades.jsonl пуст)</span>';
+      pt.innerHTML = ''; return;
+    }}
+    const icons = {{healthy:'✅', ok:'🟡', weak:'🔴', unproven:'⚪'}};
+    const icon = icons[data.fitness] || '?';
+    const col = {{healthy:'var(--pos)', ok:'#e8b04b', weak:'var(--neg)', unproven:'var(--txt3)'}}[data.fitness] || 'var(--txt2)';
+    el.innerHTML =
+      `<div style="font-size:14px;font-weight:700;color:${{col}};margin-bottom:6px;">${{icon}} ${{(data.fitness||'').toUpperCase()}} <span style="font-size:11px;font-weight:400;color:var(--txt3);">— ${{data.n}} сделок (окно ${{data.window}})</span></div>` +
+      `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Win Rate</div><div style="font-weight:700;">${{data.win_rate!=null?(data.win_rate*100).toFixed(0)+'%':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Profit Factor</div><div style="font-weight:700;">${{data.profit_factor??'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Expectancy</div><div style="font-weight:700;">${{data.expectancy!=null?data.expectancy+'₽':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Total PnL</div><div style="font-weight:700;color:${{(data.total_pnl||0)>=0?'var(--pos)':'var(--neg)'}}">${{data.total_pnl!=null?(data.total_pnl>=0?'+':'')+data.total_pnl.toFixed(0)+'₽':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">Max Drawdown</div><div style="font-weight:700;color:var(--neg)">${{data.max_drawdown!=null?data.max_drawdown.toFixed(0)+'₽':'—'}}</div></div>` +
+        `<div><div style="color:var(--txt3);font-size:10px;">½-Kelly риск</div><div style="font-weight:700;">${{data.kelly_pct!=null?data.kelly_pct.toFixed(2)+'%':'—'}}</div></div>` +
+      `</div>` +
+      (data.verdict ? `<div style="margin-top:6px;font-size:10px;color:var(--txt3);">${{data.verdict}}</div>` : '');
+
+    if (data.per_ticker && data.per_ticker.length) {{
+      pt.innerHTML = '<div style="margin-top:2px;color:var(--txt3);font-size:10px;margin-bottom:4px;">По тикерам:</div>' +
+        data.per_ticker.map(r =>
+          `<div style="display:flex;gap:8px;padding:2px 0;border-bottom:1px solid var(--border2);">
+            <b style="min-width:60px;">${{r.ticker}}</b>
+            <span style="color:${{r.total>=0?'var(--pos)':'var(--neg)'}}">${{r.total>=0?'+':''}}${{r.total.toFixed(0)}}₽</span>
+            <span style="color:var(--txt3)">${{r.n}} сделок</span>
+            <span>WR ${{(r.wr*100).toFixed(0)}}%</span>
+          </div>`
+        ).join('');
+    }} else pt.innerHTML = '';
+  }} catch(e) {{
+    document.getElementById('live_scorecard').textContent = '⚠ ' + e;
+  }}
+}}
+
 async function botPause() {{
   await fetch('/api/bot_control', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action:'pause'}})}});
   await loadBotStatus();
@@ -6190,6 +6460,98 @@ def get_overrides_payload() -> dict:
     }
 
 
+def get_live_chart(ticker: str, days: int = 7) -> dict:
+    """Свечи из candle_archive + реальные сделки из data/trades.jsonl для живого графика."""
+    try:
+        from candle_archive import get_candles_cached, _candle_to_row
+    except ImportError:
+        return {"error": "candle_archive недоступен"}
+
+    by_ticker = _all_settings_by_ticker()
+    strategy_settings = by_ticker.get(ticker)
+    if strategy_settings is None:
+        return {"error": f"{ticker}: нет в настройках"}
+
+    try:
+        candles = get_candles_cached(ticker, strategy_settings.figi, days, _market_data, _db)
+    except Exception as e:
+        return {"error": str(e)}
+
+    candle_rows = [_candle_to_row(c) for c in candles]
+
+    # Реальные сделки из trades.jsonl
+    import metrics as _metrics
+    trades_raw = _metrics.load_closed_trades(500)
+    ticker_trades = [t for t in trades_raw if t.get("ticker") == ticker]
+
+    # Также открытые позиции из bot_status
+    status = get_bot_status()
+    open_positions = [p for p in status.get("positions", []) if p.get("ticker") == ticker]
+
+    trades_out = []
+    for t in ticker_trades:
+        trades_out.append({
+            "entry_time": t.get("ts"),       # время закрытия — близко к выходу
+            "exit_time": t.get("closed_ts") or t.get("ts"),
+            "direction": t.get("direction", "").lower(),
+            "entry_price": t.get("entry"),
+            "exit_price": t.get("exit_price") or t.get("close_price"),
+            "stop_price": t.get("stop"),
+            "take_price": t.get("take"),
+            "pnl_rub": t.get("pnl_rub"),
+            "net_pct": round(t["pnl_rub"] / max(t.get("entry", 1), 1) * 100, 3) if t.get("pnl_rub") is not None else None,
+            "reason": t.get("reason", ""),
+        })
+
+    for p in open_positions:
+        trades_out.append({
+            "entry_time": p.get("opened_at"),
+            "exit_time": None,
+            "direction": (p.get("direction") or "").lower(),
+            "entry_price": p.get("entry_price"),
+            "exit_price": None,
+            "stop_price": p.get("stop"),
+            "take_price": p.get("take"),
+            "pnl_rub": None,
+            "net_pct": None,
+            "reason": "открыта",
+        })
+
+    return {"ticker": ticker, "candles": candle_rows, "trades": trades_out}
+
+
+def get_scorecard_api() -> dict:
+    """Scorecard + per_ticker stats + kelly для живого дашборда."""
+    import metrics as _metrics
+    card = _metrics.scorecard()
+    kelly_pct, _ = _metrics.dynamic_risk_pct()
+
+    # Per-ticker
+    trades = _metrics.load_closed_trades(10_000)
+    by_ticker: dict = {}
+    for t in trades:
+        tk = t.get("ticker", "?")
+        by_ticker.setdefault(tk, []).append(t.get("pnl_rub", 0))
+    per_ticker = []
+    for tk, pnls in sorted(by_ticker.items(), key=lambda x: -sum(x[1])):
+        wins = sum(1 for p in pnls if p > 0)
+        per_ticker.append({
+            "ticker": tk,
+            "n": len(pnls),
+            "total": round(sum(pnls), 2),
+            "wr": round(wins / len(pnls), 3) if pnls else 0,
+        })
+
+    return {**card, "kelly_pct": round(kelly_pct, 2), "per_ticker": per_ticker}
+
+
+def get_council_log() -> dict:
+    """Последние уроки консилиума из data/council_lessons.json."""
+    import council as _council
+    lessons = _council._load_lessons()
+    return {"lessons": lessons}
+
+
 def get_bot_status() -> dict:
     """data/bot_status.json — живой снимок, который бот обновляет на каждой свече."""
     path = "data/bot_status.json"
@@ -6503,6 +6865,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(e)})
         elif self.path == "/api/bot_status":
             self._send_json(get_bot_status())
+        elif self.path.startswith("/api/live_chart"):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            ticker = qs.get("ticker", [""])[0].upper()
+            days = int(qs.get("days", ["7"])[0])
+            self._send_json(get_live_chart(ticker, days))
+        elif self.path == "/api/scorecard":
+            self._send_json(get_scorecard_api())
+        elif self.path == "/api/council_log":
+            self._send_json(get_council_log())
         elif self.path == "/api/tickers_list":
             self._send_json(sorted(_all_settings_by_ticker().keys()))
         elif self.path.startswith("/api/bar_rules_load"):
