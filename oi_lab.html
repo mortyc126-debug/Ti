@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OI Lab — тестирование индикатора дисбаланса</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0e1117;color:#cdd6f4;font-family:'Segoe UI',sans-serif;font-size:13px;padding:14px}
+h1{font-size:15px;color:#cba6f7;margin-bottom:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}
+label{display:flex;flex-direction:column;gap:3px;color:#a6adc8;font-size:11px}
+input,select{background:#1e2030;border:1px solid #363a4f;color:#cdd6f4;border-radius:5px;padding:5px 8px;font-size:12px;outline:none;min-width:160px}
+input:focus,select:focus{border-color:#7287fd}
+button{background:#7287fd;color:#fff;border:none;border-radius:5px;padding:6px 14px;cursor:pointer;font-size:12px}
+button:hover{background:#89b4fa}
+button.sec{background:#363a4f;color:#cdd6f4}
+button.sec:hover{background:#45475a}
+.status{font-size:11px;color:#6c7086;margin-bottom:8px;min-height:16px}
+.err{color:#f38ba8}
+.ok{color:#a6e3a1}
+.panel-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.card{background:#1e2030;border-radius:8px;padding:10px 14px;min-width:140px}
+.card .lbl{font-size:10px;color:#6c7086;margin-bottom:2px}
+.card .val{font-size:18px;font-weight:600;color:#cdd6f4}
+.card .sub{font-size:10px;color:#7f849c}
+canvas{display:block;width:100%;border-radius:6px;background:#181825;margin-bottom:12px}
+#c-price{height:180px}
+#c-oi{height:130px}
+#c-phase{height:110px}
+table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:12px}
+th{background:#1e2030;color:#a6adc8;padding:5px 8px;text-align:left;border-bottom:1px solid #363a4f;position:sticky;top:0}
+td{padding:4px 8px;border-bottom:1px solid #181825;color:#cdd6f4}
+tr:hover td{background:#252637}
+td.pos{color:#a6e3a1}
+td.neg{color:#f38ba8}
+td.neu{color:#89b4fa}
+.section{margin-bottom:16px}
+.section-title{font-size:11px;color:#7287fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+#interp{background:#1e2030;border-radius:8px;padding:10px 14px;line-height:1.6;font-size:12px;color:#cdd6f4;margin-bottom:12px}
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;background:#1e2030;border-radius:8px;padding:10px;margin-bottom:12px}
+.cfg-item{display:flex;flex-direction:column;gap:2px}
+.cfg-item label{font-size:10px;color:#6c7086}
+.cfg-item input{min-width:unset;width:100%;font-size:11px;padding:3px 6px}
+details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;user-select:none}
+</style>
+</head>
+<body>
+<h1>🔬 OI Lab — индикатор дисбаланса физ/юр (v3)</h1>
+
+<div class="row">
+  <label>Прокси-URL (invest-bot)
+    <input id="proxy" type="text" placeholder="https://your-worker.workers.dev" value="">
+  </label>
+  <label>Тикер(ы) фьючерса
+    <input id="tickers" type="text" placeholder="SBRF6 или SBRF6,SBRF9" value="">
+  </label>
+  <label>Тип данных
+    <select id="mode">
+      <option value="daily">Дневные (oi_daily из D1)</option>
+    </select>
+  </label>
+  <button onclick="labLoad()">Загрузить</button>
+  <button class="sec" onclick="labDemo()">Демо (синтетика)</button>
+</div>
+
+<div id="status" class="status">—</div>
+
+<!-- Конфиг -->
+<details>
+  <summary>⚙ Настройки индикатора</summary>
+  <div class="cfg-grid" id="cfg-grid"></div>
+</details>
+
+<!-- Метрики последнего бара -->
+<div class="panel-row" id="metrics-row"></div>
+
+<!-- Интерпретация -->
+<div id="interp" style="display:none"></div>
+
+<!-- Графики -->
+<div class="section">
+  <div class="section-title">Цена + фаза накопления</div>
+  <canvas id="c-price"></canvas>
+</div>
+<div class="section">
+  <div class="section-title">WeightedImbalance / PhasePotential</div>
+  <canvas id="c-oi"></canvas>
+</div>
+<div class="section">
+  <div class="section-title">StressDistance / ReleaseFactor</div>
+  <canvas id="c-phase"></canvas>
+</div>
+
+<!-- Таблица данных -->
+<div class="section">
+  <div class="section-title">Данные <button class="sec" style="font-size:10px;padding:2px 8px" onclick="labExportCsv()">CSV</button></div>
+  <div style="max-height:260px;overflow-y:auto">
+    <table id="tbl"><thead><tr></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const CFG_DEFAULTS = {
+  decay: 0.90,
+  decay_window: 10,
+  z_window: 60,
+  conviction_window: 60,
+  conviction_alpha: 0.4,
+  liquidity_window: 60,
+  min_persons_floor: 5,
+  velocity_window: 5,
+  velocity_decel_gamma: 0.3,
+  range_window: 60,
+  range_percentile: 0.25,
+  stress_scale: 0.01,
+  stress_power: 2.0,
+  phase_release_gamma: 0.6,
+  include_yesterday_extreme: true,
+  phase_confirm_bars: 3,
+};
+
+const CFG_LABELS = {
+  decay: 'λ затухание',
+  decay_window: 'Окно force',
+  z_window: 'Окно z-score',
+  conviction_window: 'Окно conviction',
+  conviction_alpha: 'α conviction',
+  liquidity_window: 'Окно liquidity',
+  min_persons_floor: 'Мин.участников',
+  velocity_window: 'Окно velocity',
+  velocity_decel_gamma: 'γ decel',
+  range_window: 'Окно range',
+  range_percentile: 'Порог range',
+  stress_scale: 'Масштаб стресса',
+  stress_power: 'Степень release',
+  phase_release_gamma: 'γ phase release',
+  include_yesterday_extreme: 'Вчер.экстремум',
+  phase_confirm_bars: 'Баров подтверж.',
+};
+
+function buildCfgUI() {
+  const g = document.getElementById('cfg-grid');
+  g.innerHTML = '';
+  for (const [k, v] of Object.entries(CFG_DEFAULTS)) {
+    const d = document.createElement('div');
+    d.className = 'cfg-item';
+    const lbl = document.createElement('label');
+    lbl.textContent = CFG_LABELS[k] || k;
+    const inp = document.createElement('input');
+    inp.id = 'cfg_' + k;
+    inp.type = typeof v === 'boolean' ? 'checkbox' : 'number';
+    if (typeof v === 'boolean') {
+      inp.checked = v;
+      inp.style.width = 'auto';
+    } else {
+      inp.value = v;
+      inp.step = v < 1 && v > 0 ? '0.01' : '1';
+    }
+    d.appendChild(lbl);
+    d.appendChild(inp);
+    g.appendChild(d);
+  }
+}
+
+function readCfg() {
+  const cfg = {};
+  for (const [k, v] of Object.entries(CFG_DEFAULTS)) {
+    const el = document.getElementById('cfg_' + k);
+    if (!el) { cfg[k] = v; continue; }
+    if (typeof v === 'boolean') cfg[k] = el.checked;
+    else cfg[k] = parseFloat(el.value) || v;
+  }
+  return cfg;
+}
+
+buildCfgUI();
+
+// ========== DATA FETCH ==========
+let _lastRows = null;
+let _lastResult = null;
+
+function setStatus(msg, cls='') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + cls;
+}
+
+async function labLoad() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const tickers = document.getElementById('tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  if (!tickers.length) { setStatus('Укажи тикер', 'err'); return; }
+  setStatus('Загрузка…');
+
+  try {
+    const contractsMap = {};
+    for (const t of tickers) {
+      const r = await fetch(`${proxy}/db/oidaily?ticker=${encodeURIComponent(t)}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status} для ${t}`);
+      const json = await r.json();
+      const rows = (json.rows || json.data || json || []).map(normalizeRow).filter(r=>r.date);
+      if (!rows.length) throw new Error(`Нет данных для ${t}`);
+      contractsMap[t] = rows;
+    }
+
+    const cfg = readCfg();
+    let rows, refSwitchDates;
+    if (Object.keys(contractsMap).length === 1) {
+      rows = Object.values(contractsMap)[0];
+      refSwitchDates = [];
+    } else {
+      ({ rows, refSwitchDates } = aggregateContracts(contractsMap));
+    }
+
+    const result = computeIndicator(rows, cfg, refSwitchDates);
+    _lastRows = rows;
+    _lastResult = result;
+    renderAll(result);
+    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')})`, 'ok');
+  } catch(e) {
+    setStatus('Ошибка: ' + e.message, 'err');
+    console.error(e);
+  }
+}
+
+function normalizeRow(r) {
+  // oi_daily колонки: ticker, date, close_price, yur_long, yur_short, fiz_long, fiz_short,
+  //                   yur_long_num, yur_short_num, fiz_long_num, fiz_short_num
+  return {
+    date: r.date || r.timestamp,
+    close: parseFloat(r.close_price || r.close || 0),
+    phys_long_contracts: parseFloat(r.fiz_long || 0),
+    phys_short_contracts: parseFloat(r.fiz_short || 0),
+    phys_long_persons: parseFloat(r.fiz_long_num || r.phys_long_persons || 0),
+    phys_short_persons: parseFloat(r.fiz_short_num || r.phys_short_persons || 0),
+    legal_long_contracts: parseFloat(r.yur_long || 0),
+    legal_short_contracts: parseFloat(r.yur_short || 0),
+    legal_long_persons: parseFloat(r.yur_long_num || r.legal_long_persons || 0),
+    legal_short_persons: parseFloat(r.yur_short_num || r.legal_short_persons || 0),
+    ref_switch: r.ref_switch || false,
+  };
+}
+
+// ========== DEMO DATA ==========
+function labDemo() {
+  setStatus('Генерация синтетики…');
+  const n = 120;
+  const rows = [];
+  let price = 3000, phyL = 6000, phyS = 4000;
+  const rng = () => (Math.random() - 0.5);
+  for (let i = 0; i < n; i++) {
+    // флэт первые 40, затем импульс вниз
+    const priceChange = i < 40 ? rng()*5 : (i < 70 ? -8 + rng()*3 : rng()*4);
+    price = Math.max(price + priceChange, 100);
+    phyL += rng()*50;
+    phyS += rng()*40;
+    const phyLp = 2000 + Math.round(rng()*10);
+    const phySp = 1800 + Math.round(rng()*10);
+    const date = new Date(2026,0,1);
+    date.setDate(date.getDate() + i);
+    rows.push({
+      date: date.toISOString().slice(0,10),
+      close: price,
+      phys_long_contracts: Math.max(phyL, 100),
+      phys_short_contracts: Math.max(phyS, 100),
+      phys_long_persons: phyLp,
+      phys_short_persons: phySp,
+      legal_long_contracts: 8000 + rng()*100,
+      legal_short_contracts: 8000 + rng()*100,
+      legal_long_persons: 300,
+      legal_short_persons: 300,
+      ref_switch: false,
+    });
+  }
+  const cfg = readCfg();
+  const result = computeIndicator(rows, cfg, []);
+  _lastRows = rows;
+  _lastResult = result;
+  renderAll(result);
+  setStatus(`Демо: ${rows.length} баров`, 'ok');
+}
+
+// ========== AGGREGATE CONTRACTS ==========
+function aggregateContracts(contractsMap) {
+  // Собираем все даты
+  const allDates = [...new Set(Object.values(contractsMap).flatMap(r=>r.map(x=>x.date)))].sort();
+
+  const POS_COLS = ['phys_long_contracts','phys_short_contracts','phys_long_persons','phys_short_persons',
+    'legal_long_contracts','legal_short_contracts','legal_long_persons','legal_short_persons'];
+
+  // indexed: ticker -> date -> row
+  const indexed = {};
+  for (const [t, rows] of Object.entries(contractsMap)) {
+    indexed[t] = {};
+    for (const r of rows) indexed[t][r.date] = r;
+  }
+
+  const rows = [];
+  const refSwitchDates = [];
+  let prevRef = null;
+
+  for (const date of allDates) {
+    const agg = { date, close: 0, ref_switch: false };
+    for (const c of POS_COLS) agg[c] = 0;
+
+    let bestOi = -1, bestTicker = null;
+    for (const [t, byDate] of Object.entries(indexed)) {
+      const r = byDate[date];
+      if (!r) continue;
+      for (const c of POS_COLS) agg[c] += (r[c] || 0);
+      const oi = (r.phys_long_contracts||0) + (r.legal_long_contracts||0);
+      if (oi > bestOi) { bestOi = oi; bestTicker = t; }
+    }
+
+    if (bestTicker) {
+      agg.close = indexed[bestTicker][date]?.close || 0;
+      if (prevRef && bestTicker !== prevRef) {
+        agg.ref_switch = true;
+        refSwitchDates.push(date);
+      }
+      prevRef = bestTicker;
+    }
+    rows.push(agg);
+  }
+  return { rows, refSwitchDates };
+}
+
+// ========== INDICATOR COMPUTATION ==========
+
+function _rollingMean(arr, w) {
+  const out = new Array(arr.length).fill(NaN);
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (isFinite(v)) { sum += v; cnt++; }
+    if (i >= w) {
+      const old = arr[i-w];
+      if (isFinite(old)) { sum -= old; cnt--; }
+    }
+    if (cnt >= Math.max(1, Math.floor(w/2))) out[i] = sum/cnt;
+  }
+  return out;
+}
+
+function _rollingStd(arr, w) {
+  const out = new Array(arr.length).fill(NaN);
+  for (let i = w-1; i < arr.length; i++) {
+    let s=0, s2=0, n=0;
+    for (let j=i-w+1; j<=i; j++) {
+      const v = arr[j];
+      if (isFinite(v)) { s+=v; s2+=v*v; n++; }
+    }
+    if (n >= Math.max(1, Math.floor(w/2))) {
+      const mean = s/n;
+      out[i] = Math.sqrt(Math.max(0, s2/n - mean*mean));
+    }
+  }
+  return out;
+}
+
+function _rollingQuantile(arr, w, q) {
+  const out = new Array(arr.length).fill(NaN);
+  for (let i = w-1; i < arr.length; i++) {
+    const win = arr.slice(i-w+1, i+1).filter(isFinite).sort((a,b)=>a-b);
+    if (win.length) out[i] = win[Math.floor(win.length*q)];
+  }
+  return out;
+}
+
+function _percentileRank(arr, w) {
+  const out = new Array(arr.length).fill(NaN);
+  const minPer = Math.max(20, Math.floor(w/10));
+  for (let i = 0; i < arr.length; i++) {
+    const start = Math.max(0, i-w+1);
+    const win = arr.slice(start, i+1).filter(isFinite);
+    if (win.length < minPer) continue;
+    const cur = arr[i];
+    out[i] = win.filter(v=>v<=cur).length / win.length;
+  }
+  return out;
+}
+
+function applyPhaseHysteresis(raw, confirmBars) {
+  const n = raw.length;
+  const out = new Array(n).fill(false);
+  let state = false, trueRun = 0, falseRun = 0;
+  for (let i = 0; i < n; i++) {
+    if (raw[i]) { trueRun++; falseRun = 0; }
+    else { falseRun++; trueRun = 0; }
+    if (!state && trueRun >= confirmBars) state = true;
+    else if (state && falseRun >= confirmBars) state = false;
+    out[i] = state;
+  }
+  return out;
+}
+
+function computeIndicator(rows, cfg, refSwitchDates) {
+  const n = rows.length;
+  const close = rows.map(r=>r.close);
+  const physL = rows.map(r=>r.phys_long_contracts);
+  const physS = rows.map(r=>r.phys_short_contracts);
+  const physLp = rows.map(r=>r.phys_long_persons);
+  const physSp = rows.map(r=>r.phys_short_persons);
+  const legalL = rows.map(r=>r.legal_long_contracts);
+  const legalS = rows.map(r=>r.legal_short_contracts);
+  const legalLp = rows.map(r=>r.legal_long_persons);
+  const legalSp = rows.map(r=>r.legal_short_persons);
+  const hasLegal = legalL.some(v=>v>0);
+
+  // TotalOI
+  const totalOI = new Array(n);
+  const totalPersons = new Array(n);
+  for (let i=0; i<n; i++) {
+    if (hasLegal) {
+      totalOI[i] = ((physL[i]+legalL[i]) + (physS[i]+legalS[i]))/2;
+      totalPersons[i] = physLp[i]+physSp[i]+legalLp[i]+legalSp[i];
+    } else {
+      totalOI[i] = physL[i]+physS[i];
+      totalPersons[i] = physLp[i]+physSp[i];
+    }
+  }
+
+  // NetPhysPct
+  const netPhysPct = new Array(n);
+  for (let i=0; i<n; i++) {
+    netPhysPct[i] = totalOI[i] > 0 ? (physL[i]-physS[i])/totalOI[i] : NaN;
+  }
+
+  // Z-score
+  const rollMean = _rollingMean(netPhysPct, cfg.z_window);
+  const rollStd = _rollingStd(netPhysPct, cfg.z_window);
+  const imbalanceZ = netPhysPct.map((v,i)=> rollStd[i]>0 ? (v-rollMean[i])/rollStd[i] : NaN);
+
+  // Force
+  const delta = new Array(n).fill(NaN);
+  for (let i=1; i<n; i++) delta[i] = netPhysPct[i]-netPhysPct[i-1];
+  const dw = cfg.decay_window;
+  const wts = new Array(dw);
+  let wSum = 0;
+  for (let j=0; j<dw; j++) { wts[j]=Math.pow(cfg.decay, dw-1-j); wSum+=wts[j]; }
+  for (let j=0; j<dw; j++) wts[j]/=wSum;
+  const force = new Array(n).fill(NaN);
+  for (let i=dw-1; i<n; i++) {
+    let s=0, valid=true;
+    for (let j=0; j<dw; j++) { const v=delta[i-dw+1+j]; if(!isFinite(v)){valid=false;break;} s+=v*wts[j]; }
+    if (valid) force[i]=s;
+  }
+
+  // Velocity
+  const vw = cfg.velocity_window;
+  const velocity = new Array(n).fill(NaN);
+  for (let i=vw; i<n; i++) if (close[i-vw]>0) velocity[i]=(close[i]-close[i-vw])/close[i-vw];
+  const absVel = velocity.map(v=>isFinite(v)?Math.abs(v):NaN);
+  const absVelDiff = new Array(n).fill(NaN);
+  for (let i=1; i<n; i++) if(isFinite(absVel[i])&&isFinite(absVel[i-1])) absVelDiff[i]=-(absVel[i]-absVel[i-1]);
+  const rawDecel = _rollingMean(absVelDiff, vw);
+  const decelStd = _rollingStd(rawDecel, cfg.z_window);
+  const velocityDecel = rawDecel.map((v,i)=> decelStd[i]>0 ? Math.tanh(v/decelStd[i]) : 0);
+
+  // Conviction
+  const avgSizeLong = physL.map((v,i)=> physLp[i]>=cfg.min_persons_floor ? v/physLp[i] : NaN);
+  const avgSizeShort = physS.map((v,i)=> physSp[i]>=cfg.min_persons_floor ? v/physSp[i] : NaN);
+  const domAvgSize = netPhysPct.map((v,i)=>v>0 ? avgSizeLong[i] : avgSizeShort[i]);
+  const domDelta = new Array(n).fill(NaN);
+  for (let i=1; i<n; i++) if(isFinite(domAvgSize[i])&&isFinite(domAvgSize[i-1])) domDelta[i]=domAvgSize[i]-domAvgSize[i-1];
+  const domDeltaStd = _rollingStd(domDelta, cfg.conviction_window);
+  const conviction = domDelta.map((v,i)=> domDeltaStd[i]>0 ? v/domDeltaStd[i] : NaN);
+
+  // LiquidityConfidence
+  const liquidityConf = _percentileRank(totalPersons, cfg.liquidity_window);
+
+  // Base signal
+  const refSwitchSet = new Set(refSwitchDates);
+  const weightedImbalance = new Array(n).fill(NaN);
+  for (let i=0; i<n; i++) {
+    if (!isFinite(imbalanceZ[i])) continue;
+    const conv = isFinite(conviction[i]) ? conviction[i] : 0;
+    const lc = isFinite(liquidityConf[i]) ? liquidityConf[i] : 0;
+    const vd = rows[i].ref_switch || refSwitchSet.has(rows[i].date) ? 0 : (isFinite(velocityDecel[i]) ? velocityDecel[i] : 0);
+    weightedImbalance[i] = imbalanceZ[i] * (1 + cfg.conviction_alpha*conv) * lc * (1 + cfg.velocity_decel_gamma*vd);
+  }
+
+  // Accumulation flag
+  const priceRange = new Array(n).fill(NaN);
+  for (let i=cfg.range_window-1; i<n; i++) {
+    const win = close.slice(i-cfg.range_window+1, i+1);
+    priceRange[i] = Math.max(...win) - Math.min(...win);
+  }
+  const rangeThresh = _rollingQuantile(priceRange, cfg.range_window, cfg.range_percentile);
+  const narrowRange = priceRange.map((v,i)=> isFinite(v)&&isFinite(rangeThresh[i]) ? v<=rangeThresh[i] : false);
+  const absZ = imbalanceZ.map(v=>isFinite(v)?Math.abs(v):NaN);
+  const absZDiff = new Array(n).fill(NaN);
+  for (let i=1; i<n; i++) if(isFinite(absZ[i])&&isFinite(absZ[i-1])) absZDiff[i]=absZ[i]-absZ[i-1];
+  const absZMean = _rollingMean(absZDiff, vw);
+  const imbalanceRising = absZMean.map(v=>isFinite(v)&&v>0);
+  const rawFlag = narrowRange.map((v,i)=>v&&imbalanceRising[i]);
+  const accumFlag = applyPhaseHysteresis(rawFlag, cfg.phase_confirm_bars);
+
+  // Phase price range
+  const phaseHigh = new Array(n).fill(NaN);
+  const phaseLow = new Array(n).fill(NaN);
+  let runH = NaN, runL = NaN, curId = -1;
+  let phaseId = 0;
+  const phaseIds = new Array(n).fill(0);
+  for (let i=0; i<n; i++) {
+    const prevFlag = i>0 ? accumFlag[i-1] : false;
+    if (accumFlag[i] && !prevFlag) phaseId++;
+    phaseIds[i] = phaseId;
+    if (phaseIds[i] !== curId) { curId=phaseIds[i]; runH=NaN; runL=NaN; }
+    if (accumFlag[i]) {
+      const c = close[i];
+      runH = isNaN(runH) ? c : Math.max(runH, c);
+      runL = isNaN(runL) ? c : Math.min(runL, c);
+    }
+    phaseHigh[i] = runH;
+    phaseLow[i] = runL;
+  }
+
+  // Intraday extremes (for daily bars: yesterday's high/low)
+  const yesterdayHigh = new Array(n).fill(NaN);
+  const yesterdayLow = new Array(n).fill(NaN);
+  // For daily bars "yesterday" is simply previous bar
+  for (let i=1; i<n; i++) {
+    yesterdayHigh[i] = close[i-1];
+    yesterdayLow[i] = close[i-1];
+  }
+
+  // Stress distance
+  const stressDist = new Array(n).fill(0);
+  for (let i=0; i<n; i++) {
+    const c = close[i];
+    let refL = phaseLow[i], refH = phaseHigh[i];
+    if (cfg.include_yesterday_extreme) {
+      refL = isNaN(refL) ? yesterdayLow[i] : Math.min(refL, yesterdayLow[i]||refL);
+      refH = isNaN(refH) ? yesterdayHigh[i] : Math.max(refH, yesterdayHigh[i]||refH);
+    }
+    const domLong = netPhysPct[i] > 0;
+    if (domLong && isFinite(refL) && refL > 0 && c < refL) {
+      stressDist[i] = (refL - c) / refL;
+    } else if (!domLong && isFinite(refH) && refH > 0 && c > refH) {
+      stressDist[i] = (c - refH) / refH;
+    }
+  }
+
+  // Release factor
+  const releaseFactor = stressDist.map(v=> Math.pow(Math.max(v/cfg.stress_scale,0), cfg.stress_power));
+
+  // Phase anchor
+  const phaseAnchor = new Array(n).fill(NaN);
+  let lastAnchor = NaN;
+  for (let i=0; i<n; i++) {
+    const prevFlag = i>0 ? accumFlag[i-1] : false;
+    const isStart = accumFlag[i] && !prevFlag;
+    if (isStart) lastAnchor = netPhysPct[i];
+    if (accumFlag[i]) phaseAnchor[i] = lastAnchor;
+    else phaseAnchor[i] = lastAnchor; // ffill
+  }
+
+  // Phase potential
+  const phasePotential = phaseAnchor.map((a,i)=>
+    isFinite(a) ? a*(1+cfg.phase_release_gamma*releaseFactor[i]) : NaN
+  );
+
+  return rows.map((r,i)=>({
+    date: r.date,
+    close: close[i],
+    net_phys_pct: netPhysPct[i],
+    total_oi: totalOI[i],
+    total_persons: totalPersons[i],
+    imbalance_z: imbalanceZ[i],
+    force: force[i],
+    conviction: conviction[i],
+    liquidity_conf: liquidityConf[i],
+    velocity_decel: velocityDecel[i],
+    weighted_imbalance: weightedImbalance[i],
+    accum_flag: accumFlag[i],
+    phase_high: phaseHigh[i],
+    phase_low: phaseLow[i],
+    stress_dist: stressDist[i],
+    release_factor: releaseFactor[i],
+    phase_anchor: phaseAnchor[i],
+    phase_potential: phasePotential[i],
+  }));
+}
+
+// ========== RENDER ==========
+function renderAll(result) {
+  renderMetrics(result);
+  renderInterp(result);
+  drawPrice(result);
+  drawOI(result);
+  drawPhase(result);
+  renderTable(result);
+}
+
+function fmt(v, dec=3) {
+  if (!isFinite(v)) return '—';
+  return v.toFixed(dec);
+}
+
+function renderMetrics(result) {
+  const last = result.filter(r=>isFinite(r.weighted_imbalance)).at(-1);
+  if (!last) return;
+  const cards = [
+    { lbl:'WeightedImbalance', val: fmt(last.weighted_imbalance,3), sub:'осн. сигнал', color: last.weighted_imbalance>0?'#f38ba8':'#a6e3a1' },
+    { lbl:'NetPhysPct', val: fmt(last.net_phys_pct*100,1)+'%', sub:'перекос физ.лиц', color: '#cdd6f4' },
+    { lbl:'ImbalanceZ', val: fmt(last.imbalance_z,2), sub:'z-score', color: '#cdd6f4' },
+    { lbl:'LiquidityConf', val: fmt(last.liquidity_conf,2), sub:'уверенность', color: last.liquidity_conf<0.3?'#f38ba8':'#a6e3a1' },
+    { lbl:'PhasePotential', val: fmt(last.phase_potential,3), sub:'фаз. потенциал', color: '#cba6f7' },
+    { lbl:'StressDist', val: fmt(last.stress_dist*100,2)+'%', sub:'дистанция стресса', color: last.stress_dist>0.01?'#f38ba8':'#6c7086' },
+    { lbl:'ReleaseFactor', val: fmt(last.release_factor,3), sub:'release', color: '#fab387' },
+    { lbl:'Накопление', val: last.accum_flag?'ДА':'нет', sub:'фаза флэта', color: last.accum_flag?'#89dceb':'#6c7086' },
+    { lbl:'TotalOI', val: Math.round(last.total_oi).toLocaleString(), sub:'контрактов', color: '#cdd6f4' },
+  ];
+  const row = document.getElementById('metrics-row');
+  row.innerHTML = cards.map(c=>`
+    <div class="card">
+      <div class="lbl">${c.lbl}</div>
+      <div class="val" style="color:${c.color}">${c.val}</div>
+      <div class="sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+function renderInterp(result) {
+  const last = result.filter(r=>isFinite(r.weighted_imbalance)).at(-1);
+  if (!last) return;
+  const el = document.getElementById('interp');
+  el.style.display = '';
+  const wi = last.weighted_imbalance;
+  const npp = last.net_phys_pct;
+  const lc = last.liquidity_conf;
+  const sd = last.stress_dist;
+  const pp = last.phase_potential;
+
+  let txt = '';
+  if (lc < 0.2) txt += '⚠️ Низкая ликвидность (мало участников) — сигнал ненадёжен.<br>';
+
+  const absMag = Math.abs(wi);
+  let mag = absMag < 0.3 ? 'слабый' : absMag < 0.8 ? 'умеренный' : 'сильный';
+
+  if (npp > 0) {
+    txt += `📊 Физ.лица нетто-<b>ЛОНГ</b> (${fmt(npp*100,1)}% от TotalOI). `;
+    txt += `Контрарный сигнал: возможен потенциал движения <b>ВНИЗ</b> (${mag}).`;
+    if (sd > 0.005) txt += `<br>🔴 Стресс-дистанция ${fmt(sd*100,2)}% — цена ниже референсного лоя → риск каскадных стопов лонгистов.`;
+  } else if (npp < 0) {
+    txt += `📊 Физ.лица нетто-<b>ШОРТ</b> (${fmt(npp*100,1)}% от TotalOI). `;
+    txt += `Контрарный сигнал: возможен потенциал движения <b>ВВЕРХ</b> (${mag}).`;
+    if (sd > 0.005) txt += `<br>🟢 Стресс-дистанция ${fmt(sd*100,2)}% — цена выше референсного хая → риск каскадного закрытия шортов.`;
+  } else {
+    txt += 'Дисбаланс близок к нулю.';
+  }
+  if (last.accum_flag) {
+    txt += `<br>🔵 Фаза накопления (флэт) активна. PhasePotential=${fmt(pp,3)} (ReleaseFactor=${fmt(last.release_factor,3)}).`;
+  }
+  el.innerHTML = txt;
+}
+
+// ========== CANVAS HELPERS ==========
+function _setupCanvas(id) {
+  const c = document.getElementById(id);
+  const W = c.parentElement.clientWidth || 800;
+  c.width = W * devicePixelRatio;
+  c.height = c.offsetHeight * devicePixelRatio;
+  const ctx = c.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  return { ctx, W, H: c.offsetHeight };
+}
+
+function _mapY(val, vmin, vmax, H, pad=10) {
+  if (vmax === vmin) return H/2;
+  return pad + (1-(val-vmin)/(vmax-vmin))*(H-2*pad);
+}
+
+function drawPrice(result) {
+  const { ctx, W, H } = _setupCanvas('c-price');
+  ctx.clearRect(0,0,W,H);
+  const valid = result.filter(r=>isFinite(r.close));
+  if (!valid.length) return;
+  const closes = valid.map(r=>r.close);
+  const vmin = Math.min(...closes), vmax = Math.max(...closes);
+  const n = valid.length;
+  const xStep = W/n;
+
+  // Накопление фон
+  ctx.fillStyle = 'rgba(137,220,235,0.08)';
+  for (let i=0; i<n; i++) {
+    if (valid[i].accum_flag) {
+      ctx.fillRect(i*xStep, 0, xStep, H);
+    }
+  }
+
+  // PhaseHigh / PhaseLow
+  ctx.strokeStyle = 'rgba(137,220,235,0.4)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]);
+  for (const key of ['phase_high','phase_low']) {
+    ctx.beginPath();
+    let started = false;
+    for (let i=0; i<n; i++) {
+      const v = valid[i][key];
+      if (!isFinite(v)) { started=false; continue; }
+      const x = (i+0.5)*xStep, y=_mapY(v,vmin,vmax,H);
+      if (!started) { ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Price line
+  ctx.strokeStyle = '#89b4fa';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i=0; i<n; i++) {
+    const x=(i+0.5)*xStep, y=_mapY(closes[i],vmin,vmax,H);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // Ref switches
+  ctx.strokeStyle='rgba(250,179,135,0.7)';
+  ctx.lineWidth=1;
+  for (let i=0; i<n; i++) {
+    if (valid[i].ref_switch) {
+      const x=(i+0.5)*xStep;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+  }
+
+  // Labels
+  ctx.fillStyle='#6c7086'; ctx.font='10px sans-serif';
+  const step = Math.max(1,Math.floor(n/8));
+  for (let i=0; i<n; i+=step) {
+    ctx.fillText(valid[i].date?.slice(5)||'', (i+0.5)*xStep-12, H-2);
+  }
+}
+
+function drawOI(result) {
+  const { ctx, W, H } = _setupCanvas('c-oi');
+  ctx.clearRect(0,0,W,H);
+  const valid = result.filter(r=>isFinite(r.weighted_imbalance));
+  if (!valid.length) return;
+  const n = valid.length;
+  const xStep = W/n;
+
+  const wiVals = valid.map(r=>r.weighted_imbalance);
+  const ppVals = valid.map(r=>r.phase_potential).filter(isFinite);
+  const vAll = [...wiVals, ...ppVals];
+  const vmin = Math.min(...vAll), vmax = Math.max(...vAll);
+  const zero = _mapY(0, vmin, vmax, H);
+
+  // Zero line
+  ctx.strokeStyle='#363a4f'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,zero); ctx.lineTo(W,zero); ctx.stroke();
+
+  // WeightedImbalance histogram
+  for (let i=0; i<n; i++) {
+    const wi = valid[i].weighted_imbalance;
+    const x = i*xStep, y = _mapY(wi, vmin, vmax, H);
+    const col = wi > 0 ? 'rgba(243,139,168,0.6)' : 'rgba(166,227,161,0.6)';
+    ctx.fillStyle = col;
+    if (wi > 0) ctx.fillRect(x, y, xStep-1, zero-y);
+    else ctx.fillRect(x, zero, xStep-1, y-zero);
+  }
+
+  // WI line
+  ctx.strokeStyle='#b4befe'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  for (let i=0; i<n; i++) {
+    const x=(i+0.5)*xStep, y=_mapY(valid[i].weighted_imbalance,vmin,vmax,H);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // PhasePotential line
+  ctx.strokeStyle='#cba6f7'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
+  ctx.beginPath(); let started=false;
+  for (let i=0; i<n; i++) {
+    const v=valid[i].phase_potential;
+    if (!isFinite(v)){started=false;continue;}
+    const x=(i+0.5)*xStep,y=_mapY(v,vmin,vmax,H);
+    if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Legend
+  ctx.font='10px sans-serif';
+  ctx.fillStyle='#b4befe'; ctx.fillText('WeightedImbalance',6,12);
+  ctx.fillStyle='#cba6f7'; ctx.fillText('PhasePotential',6,24);
+}
+
+function drawPhase(result) {
+  const { ctx, W, H } = _setupCanvas('c-phase');
+  ctx.clearRect(0,0,W,H);
+  const valid = result.filter(r=>isFinite(r.stress_dist));
+  if (!valid.length) return;
+  const n = valid.length;
+  const xStep = W/n;
+
+  const sdVals = valid.map(r=>r.stress_dist);
+  const rfVals = valid.map(r=>Math.min(r.release_factor,5)); // cap для отображения
+  const vmax = Math.max(...sdVals, ...rfVals, 0.001);
+
+  // StressDist filled
+  ctx.fillStyle='rgba(243,139,168,0.4)';
+  for (let i=0; i<n; i++) {
+    const v=sdVals[i];
+    if(!v) continue;
+    const x=i*xStep, h=(v/vmax)*(H-10);
+    ctx.fillRect(x, H-h, xStep-1, h);
+  }
+
+  // ReleaseFactor line
+  ctx.strokeStyle='#fab387'; ctx.lineWidth=2;
+  ctx.beginPath();
+  for (let i=0; i<n; i++) {
+    const x=(i+0.5)*xStep, y=H-10-(rfVals[i]/vmax)*(H-10);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  ctx.font='10px sans-serif';
+  ctx.fillStyle='#f38ba8'; ctx.fillText('StressDist',6,12);
+  ctx.fillStyle='#fab387'; ctx.fillText('ReleaseFactor',6,24);
+}
+
+// ========== TABLE ==========
+const TABLE_COLS = [
+  { key:'date', lbl:'Дата' },
+  { key:'close', lbl:'Цена', dec:2 },
+  { key:'net_phys_pct', lbl:'NetPhysPct%', dec:2, pct:100 },
+  { key:'imbalance_z', lbl:'ImbalZ', dec:3 },
+  { key:'conviction', lbl:'Conv', dec:3 },
+  { key:'liquidity_conf', lbl:'LiqConf', dec:2 },
+  { key:'weighted_imbalance', lbl:'WI', dec:3 },
+  { key:'accum_flag', lbl:'Accum' },
+  { key:'stress_dist', lbl:'Stress%', dec:3, pct:100 },
+  { key:'release_factor', lbl:'RelFact', dec:3 },
+  { key:'phase_anchor', lbl:'Anchor', dec:3 },
+  { key:'phase_potential', lbl:'PhasePot', dec:3 },
+];
+
+function renderTable(result) {
+  const tbl = document.getElementById('tbl');
+  tbl.querySelector('thead tr').innerHTML = TABLE_COLS.map(c=>`<th>${c.lbl}</th>`).join('');
+  const tbody = tbl.querySelector('tbody');
+  const rows = result.slice().reverse().slice(0,200);
+  tbody.innerHTML = rows.map(r=>{
+    return '<tr>' + TABLE_COLS.map(c=>{
+      let v = r[c.key];
+      let cls = '';
+      if (typeof v === 'boolean') return `<td>${v?'✓':''}</td>`;
+      if (!isFinite(v)) return `<td style="color:#313244">—</td>`;
+      if (c.pct) v *= c.pct;
+      const fv = c.dec != null ? v.toFixed(c.dec) : v;
+      if (['imbalance_z','weighted_imbalance','net_phys_pct','phase_potential','phase_anchor'].includes(c.key)) {
+        cls = v>0.05?'pos':v<-0.05?'neg':'neu';
+      }
+      return `<td class="${cls}">${fv}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+}
+
+// ========== CSV ==========
+function labExportCsv() {
+  if (!_lastResult) return;
+  const header = TABLE_COLS.map(c=>c.lbl).join(',');
+  const rows = _lastResult.map(r=>TABLE_COLS.map(c=>{
+    const v = r[c.key];
+    if (typeof v === 'boolean') return v?1:0;
+    if (!isFinite(v)) return '';
+    return c.pct ? (v*c.pct).toFixed(4) : (c.dec!=null?v.toFixed(c.dec):v);
+  }).join(',')).join('\n');
+  const blob = new Blob([header+'\n'+rows], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'oi_lab_export.csv';
+  a.click();
+}
+
+// Перерисовка при ресайзе
+window.addEventListener('resize', ()=>{ if (_lastResult) renderAll(_lastResult); });
+
+// Восстановить proxy из localStorage если есть
+const savedProxy = localStorage.getItem('oilab_proxy');
+if (savedProxy) document.getElementById('proxy').value = savedProxy;
+document.getElementById('proxy').addEventListener('change', e=>{
+  localStorage.setItem('oilab_proxy', e.target.value.trim());
+});
+</script>
+</body>
+</html>
