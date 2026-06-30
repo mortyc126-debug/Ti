@@ -1537,6 +1537,16 @@ input[type=range]::-moz-range-progress { height: 2px; background: rgba(180,135,2
           </div>
           <div id="sys-candle" style="font-size:10px;color:var(--text2);font-family:var(--mono);line-height:1.6;"></div>
         </div>
+
+        <!-- Sticky-кнопка «Применить» — появляется когда есть несохранённые переключения -->
+        <div id="sys-apply-wrap" style="display:none;position:sticky;bottom:0;left:0;right:0;padding:8px 0 2px;background:linear-gradient(transparent,#0D0820 30%);z-index:10;">
+          <button id="sys-apply-btn" onclick="_sysApplyAndRedraw()"
+            style="width:100%;padding:9px;background:rgba(199,27,82,0.18);border:1px solid rgba(199,27,82,0.45);
+              border-radius:8px;color:#ff4d7f;font-family:var(--mono);font-size:11px;cursor:pointer;
+              letter-spacing:0.04em;transition:all .15s;">
+            ▶ Применить изменения на графике
+          </button>
+        </div>
       </div>
 
     </div>
@@ -8872,7 +8882,8 @@ function cpTab(btn) {
     if (fibBtn) fibBtn.textContent = chartFibShow ? '✓ На графике' : 'На график';
   }
   if (name === 'combo') cpRenderCombos();
-  if (name === 'sys') cpRenderSystems();
+  if (name === 'sys') { window._sysTabActive = true; cpRenderSystems(); }
+  else { window._sysTabActive = false; _sysShowApplyBtn(false); }
 }
 
 // cpFilterInds — search in indicator list (hide whole ind block)
@@ -9362,11 +9373,27 @@ function _sysOptimalSection() {
     + '</div></details>';
 }
 
+function _sysShowApplyBtn(show) {
+  const wrap = document.getElementById('sys-apply-wrap');
+  if (wrap) wrap.style.display = show ? 'block' : 'none';
+}
+
+async function _sysApplyAndRedraw() {
+  const btn = document.getElementById('sys-apply-btn');
+  if (btn) { btn.textContent = '◆ ◇ ◆ Считаю…'; btn.disabled = true; }
+  _sysShowApplyBtn(false);
+  // Даём браузеру отрисовать кнопку перед тяжёлым расчётом
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  if (chartCandles.length) chartRedraw();
+  if (btn) { btn.textContent = '▶ Применить изменения на графике'; btn.disabled = false; }
+}
+
 function _sysActivateIds(ids) {
   window._cpBatchToggle = true;
   Object.keys(chartInds).forEach(k => { if(chartInds[k]) cpChartToggle(k); });
   ids.forEach(id => { if(!chartInds[id]) cpChartToggle(id); });
   window._cpBatchToggle = false;
+  _sysShowApplyBtn(false);
   showToast('✓ ' + ids.length + ' инд. активированы', '#C71B52');
   setTimeout(() => {
     if (chartCandles.length) chartRedraw();
@@ -11444,8 +11471,13 @@ function cpChartToggle(id) {
   if (['ichi_main','ichi_tk','ichi_cloud'].includes(id)) {
     chartIchiShow = chartInds.ichi_main || chartInds.ichi_tk || chartInds.ichi_cloud;
   }
-  // ↓ defer redraw; подавляется при пакетных операциях (_cpBatchToggle)
-  if (chartCandles.length && !window._cpBatchToggle) requestAnimationFrame(() => requestAnimationFrame(() => chartRedraw()));
+  // ↓ defer redraw; подавляется при пакетных операциях и пока открыт таб Системы
+  if (chartCandles.length && !window._cpBatchToggle && !window._sysTabActive) {
+    requestAnimationFrame(() => requestAnimationFrame(() => chartRedraw()));
+  } else if (window._sysTabActive) {
+    // Показываем кнопку «Применить» — изменения накоплены, редрав ещё не был
+    _sysShowApplyBtn(true);
+  }
 }
 
 // Extend chartToggleInd — just delegate to cpChartToggle for visual sync
