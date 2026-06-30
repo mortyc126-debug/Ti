@@ -6125,9 +6125,7 @@ class OICompositeStrategy(IStrategy):
         s = settings.settings
 
         self._disabled_methods: set[str] = set()
-        # Эмпирически инвертированные методы: KLINGER/DONCHIAN/PRICE_ACCEL дают
-        # WR ниже базы когда «согласны» — значит их сигнал контрарный.
-        self._inverted_methods: set[str] = set(_EMPIRICAL_INVERTED_METHODS)
+        self._inverted_methods: set[str] = set()
         self.__threshold = float(s.get("SIGNAL_THRESHOLD", SIGNAL_THRESHOLD))
         self.__long_take = Decimal(s.get("LONG_TAKE", "1.015"))
         self.__long_stop = Decimal(s.get("LONG_STOP", "0.985"))
