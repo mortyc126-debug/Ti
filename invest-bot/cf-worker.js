@@ -19,6 +19,7 @@
 //   /db/atr?ticker=                   GET  — ATR тикера
 //   /db/indverdict                    POST — сохранить вердикт модуля indlab
 //   /db/indverdict?ticker=            GET  — последний сохранённый вердикт
+//   /db/tickers                       GET  — список тикеров в oi_daily с кол-вом дней и диапазоном дат
 //   /db/oidaily                       POST — upsert дневной снэпшок ОИ (юр/физ, лонг/шорт, цена)
 //   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
 //   /db/oibackfill?tickers=&days=     GET  — разовый backfill истории FutOI юр/физ за прошлые
@@ -673,6 +674,13 @@ async function handleDb(path, req, env) {
     if (!r.ticker || !r.tradedate) return json({ error: 'ticker and tradedate required' }, 400);
     await upsertOiDaily(db, r);
     return json({ ok: true });
+  }
+
+  if (p === '/tickers' && req.method === 'GET') {
+    const { results } = await db.prepare(
+      'SELECT ticker, COUNT(*) as days, MIN(tradedate) as from_date, MAX(tradedate) as to_date FROM oi_daily GROUP BY ticker ORDER BY ticker ASC'
+    ).all();
+    return json(results);
   }
 
   if (p.startsWith('/oidaily') && req.method === 'GET') {
