@@ -5883,18 +5883,21 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sel) sel.addEventListener('change', () => { if (_chartAutoActive) _chartAutoTick(); });
 });
 
-// Drag-to-scroll: тащим мышкой по любому скроллируемому контейнеру
-// Срабатывает только на «пустом» месте (не текст, не кнопка, не input)
+// Drag-to-scroll: тащим мышкой по любому скроллируемому контейнеру.
+// Не мешает кликам — preventDefault вызывается только после реального сдвига (>4px),
+// чтобы кликабельные span/onclick продолжали работать.
 (function _initDragScroll() {
   const DRAG_TAGS = new Set(['BUTTON','INPUT','SELECT','TEXTAREA','A','LABEL']);
-  let _ds = null; // {el, startX, startY, scrollX, scrollY}
+  const MIN_DRAG = 4; // пиксели до старта перетаскивания
+  let _ds = null; // {el, startX, startY, scrollX, scrollY, dragging}
 
   document.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
-    // Если цель — интерактивный элемент или выделяемый текст — не перехватываем
+    // Элемент с onclick или интерактивный тег — не перехватываем совсем
     let t = e.target;
     while (t && t !== document.body) {
       if (DRAG_TAGS.has(t.tagName)) return;
+      if (t.getAttribute('onclick')) return; // есть inline-обработчик
       t = t.parentElement;
     }
     // Ищем ближайший скроллируемый предок
@@ -5908,30 +5911,34 @@ document.addEventListener('DOMContentLoaded', () => {
       el = el.parentElement;
     }
     if (!el || el === document.body) return;
-    _ds = { el, startX: e.clientX, startY: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop };
-    el.style.cursor = 'grabbing';
-    e.preventDefault();
-  }, { passive: false });
+    // Запоминаем точку старта, но НЕ вызываем preventDefault — клик должен пройти
+    _ds = { el, startX: e.clientX, startY: e.clientY, scrollX: el.scrollLeft, scrollY: el.scrollTop, dragging: false };
+  });
 
   document.addEventListener('mousemove', e => {
     if (!_ds) return;
     const dx = e.clientX - _ds.startX;
     const dy = e.clientY - _ds.startY;
+    if (!_ds.dragging) {
+      // Начинаем drag только после реального движения
+      if (Math.abs(dx) < MIN_DRAG && Math.abs(dy) < MIN_DRAG) return;
+      _ds.dragging = true;
+      _ds.el.style.cursor = 'grabbing';
+      // Отменяем выделение текста — только здесь, когда уже точно drag
+      document.onselectstart = () => false;
+    }
     _ds.el.scrollLeft = _ds.scrollX - dx;
     _ds.el.scrollTop  = _ds.scrollY - dy;
   });
 
-  document.addEventListener('mouseup', () => {
+  const _dsEnd = () => {
     if (!_ds) return;
     _ds.el.style.cursor = '';
+    document.onselectstart = null;
     _ds = null;
-  });
-
-  document.addEventListener('mouseleave', () => {
-    if (!_ds) return;
-    _ds.el.style.cursor = '';
-    _ds = null;
-  });
+  };
+  document.addEventListener('mouseup', _dsEnd);
+  document.addEventListener('mouseleave', _dsEnd);
 })();
 
 function chartStatus(msg, color) {
