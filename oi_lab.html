@@ -239,11 +239,11 @@ async function labLoad() {
 }
 
 function normalizeRow(r) {
-  // oi_daily колонки: ticker, date, close_price, yur_long, yur_short, fiz_long, fiz_short,
+  // oi_daily колонки: ticker, tradedate, price, yur_long, yur_short, fiz_long, fiz_short,
   //                   yur_long_num, yur_short_num, fiz_long_num, fiz_short_num
   return {
-    date: r.date || r.timestamp,
-    close: parseFloat(r.close_price || r.close || 0),
+    date: r.tradedate || r.date || r.timestamp,
+    close: parseFloat(r.price || r.close_price || r.close || 0),
     phys_long_contracts: parseFloat(r.fiz_long || 0),
     phys_short_contracts: parseFloat(r.fiz_short || 0),
     phys_long_persons: parseFloat(r.fiz_long_num || r.phys_long_persons || 0),
