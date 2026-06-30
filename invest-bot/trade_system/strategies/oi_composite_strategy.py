@@ -6948,7 +6948,8 @@ class OICompositeStrategy(IStrategy):
     def backtest_scan_signals(self, candles: list[HistoricCandle], max_bars: int = 60,
                                adaptive_narrative: bool = False,
                                narrative_recalib_every_days: int = 20,
-                               block_ranging: bool = False) -> list[dict]:
+                               block_ranging: bool = False,
+                               oi_date_hook=None) -> list[dict]:
         """
         Один проход по свечам с дорогим __compute_composite() (внутри —
         Hawkes-MLE через scipy.optimize и другие методы) — собирает все бары,
@@ -7046,6 +7047,8 @@ class OICompositeStrategy(IStrategy):
                 # L1-буфер: обновляем раз в день (агрегация — O(N) баров)
                 cur_day = candles[i].time.date()
                 if cur_day != last_l1_day:
+                    if oi_date_hook is not None:
+                        oi_date_hook(cur_day.isoformat())
                     last_l1_day = cur_day
                     self.__l1_buffer = candles[max(0, i - self.__l1_buffer_size):i]
                     self.__recalc_l1_context()
@@ -7367,6 +7370,7 @@ class OICompositeStrategy(IStrategy):
             record_history: bool = True,
             adaptive_lasso: bool = False,
             lasso_recalib_every_trades: int = 30,
+            oi_date_hook=None,
     ) -> dict:
         """
         В отличие от backtest_quality() (которая мерит MFE/MAE на фиксированном
@@ -7415,7 +7419,7 @@ class OICompositeStrategy(IStrategy):
         именно исходы, поэтому раньше это не делалось вообще).
         """
         if signals is None:
-            signals = self.backtest_scan_signals(candles, max_bars=max_bars)
+            signals = self.backtest_scan_signals(candles, max_bars=max_bars, oi_date_hook=oi_date_hook)
 
         empty = {"n_trades": 0, "win_rate": 0.0, "avg_r": 0.0, "expectancy_pct": 0.0, "model_stats": {}}
         if return_trades:

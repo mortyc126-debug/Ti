@@ -319,6 +319,97 @@ def _retail_contra_score(rows: list[dict]) -> float:
     return _divergence_correction(score, rows, "fiz_long", "fiz_short", sign=-1.0)
 
 
+class OiBacktestProvider:
+    """
+    Провайдер OI-скоров для бэктеста. Читает data/oi_daily.json и
+    воспроизводит те же скоры (inst_oi, retail_contra, delta_quadrant,
+    absorption, squeeze), что OiLayersService считает в живом режиме, —
+    но только на строках, датированных <= текущей дате бэктеста (нет
+    заглядывания вперёд).
+
+    Использование:
+        prov = OiBacktestProvider.load()
+        strategy.set_inst_oi_provider(prov.inst_oi_score)
+        strategy.set_retail_contra_provider(prov.retail_contra_score)
+        strategy.set_delta_quadrant_provider(prov.delta_quadrant_score)
+        strategy.set_oi_absorption_provider(prov.absorption_score)
+        strategy.set_squeeze_provider(prov.squeeze_score)
+        signals = strategy.backtest_scan_signals(candles, oi_date_hook=prov.set_date)
+    """
+
+    def __init__(self, history: dict[str, list[dict]]):
+        self._history = history          # {ticker: [{tradedate, long, short, ...}]}
+        self._current_date: str = ""
+        self._cache: dict[str, dict] = {}  # ticker -> scores (кеш на текущую дату)
+
+    @classmethod
+    def load(cls, path: str = HISTORY_FILE) -> "OiBacktestProvider":
+        if not os.path.exists(path):
+            return cls({})
+        try:
+            with open(path, encoding="utf-8") as f:
+                return cls(json.load(f))
+        except Exception as e:
+            logger.warning(f"OiBacktestProvider: не удалось загрузить {path}: {e}")
+            return cls({})
+
+    def set_date(self, date_str: str) -> None:
+        """Вызывается бэктестом при переходе на новый день (oi_date_hook)."""
+        if date_str == self._current_date:
+            return
+        self._current_date = date_str
+        self._cache.clear()
+
+    def _scores_for(self, ticker: str) -> dict:
+        if ticker in self._cache:
+            return self._cache[ticker]
+        rows_all = self._history.get(ticker, [])
+        if not rows_all or not self._current_date:
+            self._cache[ticker] = {}
+            return {}
+        # Только строки до текущей даты включительно (нет lookahead)
+        rows = [r for r in rows_all if str(r.get("tradedate", "")) <= self._current_date]
+        if not rows:
+            self._cache[ticker] = {}
+            return {}
+        last = rows[-1]
+        price = float(last.get("price") or 0) or None
+        layers = _build_layers(rows) if price else {}
+        s: dict = {
+            "inst_oi": _inst_oi_score(rows),
+            "retail_contra": _retail_contra_score(rows),
+            "delta_quadrant": _delta_quadrant_score(rows),
+            "absorption": _absorption_score(rows),
+            "squeeze_up": 0.0,
+            "squeeze_down": 0.0,
+        }
+        if price and layers:
+            sq = _squeeze_from_layers(layers, last["tradedate"], price)
+            s["squeeze_up"] = sq["squeeze_up"]
+            s["squeeze_down"] = sq["squeeze_down"]
+        self._cache[ticker] = s
+        return s
+
+    def inst_oi_score(self, ticker: str) -> float:
+        return self._scores_for(ticker).get("inst_oi", 0.0)
+
+    def retail_contra_score(self, ticker: str) -> float:
+        return self._scores_for(ticker).get("retail_contra", 0.0)
+
+    def delta_quadrant_score(self, ticker: str) -> float:
+        return self._scores_for(ticker).get("delta_quadrant", 0.0)
+
+    def absorption_score(self, ticker: str) -> float:
+        return self._scores_for(ticker).get("absorption", 0.0)
+
+    def squeeze_score(self, ticker: str, direction: str) -> float:
+        s = self._scores_for(ticker)
+        return s.get("squeeze_up", 0.0) if direction == "short" else s.get("squeeze_down", 0.0)
+
+    def has_data(self, ticker: str) -> bool:
+        return ticker in self._history and bool(self._history[ticker])
+
+
 class OiLayersService:
     """
     Фоновый поллер ОИ. Запускается на торговый день (asyncio.create_task),
