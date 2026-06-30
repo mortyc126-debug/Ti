@@ -183,6 +183,29 @@ input::placeholder{color:var(--t3);opacity:.5}
   <span class="nm" id="hname"></span>
 </div>
 
+<!-- Settings panel (token + proxy) -->
+<div class="panel" id="settingsPanel" style="margin-bottom:10px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="toggleSettings()">
+    <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t4)">Настройки API</span>
+    <span id="settingsChevron" style="color:var(--t3);font-size:11px">▼</span>
+    <span id="settingsStatus" style="font-size:10px;color:var(--t3);margin-left:4px"></span>
+  </div>
+  <div id="settingsBody" style="display:none">
+    <div class="irow" style="margin-bottom:8px">
+      <div class="ig">
+        <label class="il">T-Invest токен (read-only)</label>
+        <input type="password" id="tinvestToken" placeholder="t.…" autocomplete="off"/>
+      </div>
+      <div class="ig">
+        <label class="il">CF-Worker прокси URL (если нужен)</label>
+        <input type="text" id="proxyUrl" placeholder="https://…workers.dev/?u=" autocomplete="off"/>
+      </div>
+      <button class="btn" onclick="saveSettings()">Сохранить</button>
+    </div>
+    <div style="font-size:10px;color:var(--t3)">Токен и прокси сохраняются в localStorage · Данные: T-Invest API (T-Bank)</div>
+  </div>
+</div>
+
 <!-- Input panel -->
 <div class="panel">
   <div class="irow">
@@ -205,7 +228,7 @@ input::placeholder{color:var(--t3);opacity:.5}
     <button class="btn" id="btngo">АНАЛИЗ</button>
   </div>
   <div style="margin-top:8px;font-size:11px;color:var(--t3)">
-    Введите тикеры (SBER, GAZP, LKOH…) или название компании · Данные: MOEX ISS API
+    Введите тикеры (SBER, GAZP, LKOH…) или название компании · Данные: T-Invest API
   </div>
 </div>
 
@@ -347,32 +370,65 @@ const log=m=>$('plog').textContent=m;
 const showErr=m=>{const e=$('errbox');e.textContent='⚠ '+m;e.style.display='block'};
 const hideErr=()=>$('errbox').style.display='none';
 
-const MOEX='https://iss.moex.com';
-const PROXY='https://corsproxy.io/?url=';
+// ═══════════════════════════════════════════════════
+// SETTINGS (token + proxy)
+// ═══════════════════════════════════════════════════
+const LS_TOKEN='fi_tinvest_token';
+const LS_PROXY='fi_proxy_url';
+const TINVEST_BASE='https://invest-public-api.tinkoff.ru/rest';
 
-async function moexFetch(path){
-  const url=MOEX+path+(path.includes('?')?'&':'?')+'lang=ru';
-  try{
-    const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    return await r.json();
-  }catch(e){
-    const r2=await fetch(PROXY+encodeURIComponent(url),{signal:AbortSignal.timeout(20000)});
-    if(!r2.ok) throw new Error('proxy HTTP '+r2.status);
-    return await r2.json();
-  }
+function loadSettings(){
+  const tok=localStorage.getItem(LS_TOKEN)||'';
+  const prx=localStorage.getItem(LS_PROXY)||'';
+  $('tinvestToken').value=tok;
+  $('proxyUrl').value=prx;
+  $('settingsStatus').textContent=tok?'токен задан':'⚠ токен не задан';
 }
-function norm(obj){const r={};for(const k of Object.keys(obj))r[k.toUpperCase()]=obj[k];return r;}
-function parseTable(d,key){
-  const blk=d[key];if(!blk||!blk.data)return[];
-  const cols=blk.columns;
-  return blk.data.map(r=>norm(Object.fromEntries(cols.map((c,i)=>[c,r[i]]))));
+function saveSettings(){
+  localStorage.setItem(LS_TOKEN,$('tinvestToken').value.trim());
+  localStorage.setItem(LS_PROXY,$('proxyUrl').value.trim());
+  $('settingsStatus').textContent=$('tinvestToken').value.trim()?'токен задан':'⚠ токен не задан';
+  $('settingsBody').style.display='none';
+  $('settingsChevron').textContent='▼';
+}
+function toggleSettings(){
+  const b=$('settingsBody');
+  const open=b.style.display==='none';
+  b.style.display=open?'block':'none';
+  $('settingsChevron').textContent=open?'▲':'▼';
+}
+
+function getToken(){return localStorage.getItem(LS_TOKEN)||'';}
+function getProxy(){return localStorage.getItem(LS_PROXY)||'';}
+
+// T-Invest REST (gRPC-gateway). Через прокси если задан.
+async function tFetch(service,method,body){
+  const token=getToken();
+  if(!token) throw new Error('Не задан T-Invest токен — откройте Настройки API');
+  const path=TINVEST_BASE+'/tinkoff.public.invest.api.contract.v1.'+service+'/'+method;
+  const prx=getProxy();
+  const url=prx?prx+encodeURIComponent(path):path;
+  const r=await fetch(url,{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer '+token,
+      'Accept':'application/json'
+    },
+    body:JSON.stringify(body),
+    signal:AbortSignal.timeout(20000)
+  });
+  if(!r.ok){
+    const txt=await r.text().catch(()=>'');
+    throw new Error('T-Invest '+r.status+': '+txt.slice(0,120));
+  }
+  return r.json();
 }
 
 // ═══════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════
-let instruments=[];       // [{secid, name, type, data:[{date,close,volume}]}]
+let instruments=[];       // [{secid, name, figi, data:[{date,close,volume,high,low}]}]
 let imoexData=[];         // [{date,close}]
 let horizDays=180;
 let rsPeriod=60;
@@ -383,18 +439,29 @@ let ddItems=[];
 let ddIdx=-1;
 let debTimer=null;
 
-// Colors for instruments
+// figi-кэш: ticker → figi
+const _figiCache={};
+// IMOEX figi (индекс Мосбиржи)
+const IMOEX_FIGI='BBG004730ZJ9'; // USD_000000001 не подходит; используем MOEX:IMOEX
+
 const COLORS=['#52F2C9','#FF006E','#FFD600','#7C6FFF','#FF8C42','#A8E6CF','#FF6B6B','#C9B1FF','#4ECDC4','#F7B731'];
 
+// Интервал свечей: дневные = CANDLE_INTERVAL_DAY (5 в proto, но API принимает строку)
+const DAY_INTERVAL='CANDLE_INTERVAL_DAY';
+
 // ═══════════════════════════════════════════════════
-// SEARCH
+// SETTINGS UI init
+// ═══════════════════════════════════════════════════
+loadSettings();
+
+// ═══════════════════════════════════════════════════
+// SEARCH (T-Invest FindInstrument)
 // ═══════════════════════════════════════════════════
 $('qinput').addEventListener('input',e=>{
   const q=e.target.value.trim();
   clearTimeout(debTimer);
   if(q.length<2){closeDD();return;}
-  // Check if looks like tickers (all caps, commas)
-  if(/^[A-Z0-9, ]+$/.test(q) && !q.includes(' ')){closeDD();return;}
+  if(/^[A-Z0-9, ]+$/.test(q)&&!q.includes(' ')){closeDD();return;}
   debTimer=setTimeout(()=>searchSec(q),450);
 });
 
@@ -408,15 +475,12 @@ $('qinput').addEventListener('keydown',e=>{
 document.addEventListener('click',e=>{if(!$('qinput').contains(e.target)&&!$('dropdown').contains(e.target))closeDD();});
 
 async function searchSec(q){
+  if(!getToken())return;
   $('sspinner').style.display='block';
   try{
-    const d=await moexFetch('/securities.json?q='+encodeURIComponent(q)+'&limit=50&is_trading=1');
-    const all=parseTable(d,'securities');
-    const shares=all.filter(s=>{
-      const g=s.GROUP||'';const t=s.TYPE||'';
-      return g==='stock_shares'||t==='common_share'||t==='preferred_share';
-    });
-    ddItems=shares.slice(0,10).map(s=>({secid:s.SECID||s.SHORTNAME,name:s.SHORTNAME||s.NAME||s.SECID,isin:s.ISIN||''}));
+    const d=await tFetch('InstrumentsService','FindInstrument',{query:q,instrumentKind:'INSTRUMENT_TYPE_SHARE',apiTradeAvailableFlag:true});
+    const list=(d.instruments||[]).filter(i=>i.ticker&&i.name);
+    ddItems=list.slice(0,10).map(s=>({secid:s.ticker,name:s.name,isin:s.isin||'',figi:s.figi||'',uid:s.uid||''}));
     const dd=$('dropdown');
     if(!ddItems.length){dd.innerHTML='<div class="dd-hint">Ничего не найдено</div>';dd.classList.add('open');return;}
     dd.innerHTML=ddItems.map((it,i)=>
@@ -424,18 +488,72 @@ async function searchSec(q){
     ).join('');
     dd.querySelectorAll('.dd-item').forEach(el=>el.addEventListener('mousedown',e=>{e.preventDefault();pickItem(parseInt(el.dataset.i));}));
     ddIdx=-1;dd.classList.add('open');
-  }catch(e){}
+  }catch(e){console.warn('search',e);}
   finally{$('sspinner').style.display='none';}
 }
 function pickItem(i){
   const it=ddItems[i];if(!it)return;
+  if(it.figi)_figiCache[it.secid]=it.figi;
   const cur=$('qinput').value.trim();
   const tickers=cur.split(',').map(s=>s.trim()).filter(Boolean);
-  if(!tickers.includes(it.secid)) tickers.push(it.secid);
+  if(!tickers.includes(it.secid))tickers.push(it.secid);
   $('qinput').value=tickers.join(', ');
   closeDD();
 }
 function closeDD(){$('dropdown').classList.remove('open');ddIdx=-1;}
+
+// ═══════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════
+
+// Найти figi по тикеру (или вернуть кэшированный)
+async function resolveFigi(ticker){
+  if(_figiCache[ticker])return _figiCache[ticker];
+  const d=await tFetch('InstrumentsService','FindInstrument',{query:ticker,instrumentKind:'INSTRUMENT_TYPE_SHARE',apiTradeAvailableFlag:true});
+  const list=d.instruments||[];
+  // Точное совпадение по тикеру
+  const exact=list.find(i=>i.ticker===ticker)||list[0];
+  if(!exact)throw new Error('Инструмент не найден: '+ticker);
+  _figiCache[ticker]=exact.uid||exact.figi;
+  return _figiCache[ticker];
+}
+
+// Свечи через GetCandles (uid инструмента)
+async function loadCandles(uid,days){
+  const till=new Date();
+  const from=new Date(Date.now()-days*86400000);
+  const iso=d=>d.toISOString();
+  const d=await tFetch('MarketDataService','GetCandles',{
+    instrumentId:uid,
+    from:iso(from),
+    to:iso(till),
+    interval:DAY_INTERVAL,
+    limit:1000
+  });
+  const candles=d.candles||[];
+  return candles.map(c=>{
+    // цена хранится как {units, nano}
+    const price=v=>v?(parseInt(v.units||0)+parseInt(v.nano||0)/1e9):0;
+    return{
+      date:(c.time||'').slice(0,10),
+      close:price(c.close),
+      high:price(c.high),
+      low:price(c.low),
+      volume:parseInt(c.volume||0)
+    };
+  }).filter(c=>c.date&&c.close>0);
+}
+
+// Найти figi для IMOEX (индекс, тип INDEX)
+async function resolveImoexFigi(){
+  if(_figiCache['__IMOEX'])return _figiCache['__IMOEX'];
+  const d=await tFetch('InstrumentsService','FindInstrument',{query:'IMOEX',instrumentKind:'INSTRUMENT_TYPE_INDEX'});
+  const list=d.instruments||[];
+  const found=list.find(i=>i.ticker==='IMOEX')||list[0];
+  if(!found)throw new Error('IMOEX не найден');
+  _figiCache['__IMOEX']=found.uid||found.figi;
+  return _figiCache['__IMOEX'];
+}
 
 // ═══════════════════════════════════════════════════
 // MAIN GO
@@ -446,6 +564,7 @@ $('qinput').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
 async function go(){
   const raw=$('qinput').value.trim();
   if(!raw){showErr('Введите тикеры');return;}
+  if(!getToken()){showErr('Сначала задайте T-Invest токен в настройках');$('settingsBody').style.display='block';$('settingsChevron').textContent='▲';return;}
   const tickers=[...new Set(raw.split(/[\s,;]+/).map(s=>s.trim().toUpperCase()).filter(s=>s.length>0))];
   if(!tickers.length){showErr('Нет тикеров');return;}
   horizDays=parseInt($('horizSel').value)||180;
@@ -456,22 +575,26 @@ async function go(){
   $('btngo').disabled=true;
 
   try{
-    // 1. Load IMOEX
+    // 1. IMOEX
     log('Загрузка IMOEX…');
-    imoexData=await loadCandles('IMOEX','stock','index',horizDays);
+    try{
+      const imoexUid=await resolveImoexFigi();
+      imoexData=await loadCandles(imoexUid,horizDays);
+    }catch(e){console.warn('IMOEX недоступен:',e.message);}
     sp(10);
 
-    // 2. Load each ticker
+    // 2. Тикеры
     const total=tickers.length;
     for(let i=0;i<total;i++){
       const sec=tickers[i];
       log('Загрузка '+sec+'… ('+(i+1)+'/'+total+')');
       try{
-        // Determine market/engine
-        const info=await getSecInfo(sec);
-        const data=await loadCandles(sec,info.engine,info.market,horizDays);
+        const uid=await resolveFigi(sec);
+        // Достать имя из кэша поиска если есть
+        const found=(ddItems||[]).find(x=>x.secid===sec);
+        const data=await loadCandles(uid,horizDays);
         if(data.length>1){
-          instruments.push({secid:sec,name:info.name||sec,type:info.type||'share',data,color:COLORS[i%COLORS.length]});
+          instruments.push({secid:sec,name:found?.name||sec,uid,data,color:COLORS[i%COLORS.length]});
         }
       }catch(e){
         console.warn('Skipped '+sec,e.message);
@@ -479,12 +602,11 @@ async function go(){
       sp(10+Math.round(((i+1)/total)*75));
     }
 
-    if(!instruments.length) throw new Error('Нет данных ни для одного из тикеров');
+    if(!instruments.length)throw new Error('Нет данных ни для одного из тикеров');
 
-    log('Рассчитываем…');
-    sp(90);
+    log('Рассчитываем…');sp(90);
     renderAll();
-    sp(100); log('');
+    sp(100);log('');
 
   }catch(e){
     showErr(e.message||'Ошибка');
@@ -496,43 +618,6 @@ async function go(){
 function hideAll(){
   ['breadth-empty','rs-empty','attr-empty'].forEach(id=>$(id).style.display='flex');
   ['breadth-content','rs-content','attr-content'].forEach(id=>$(id).style.display='none');
-}
-
-// ═══════════════════════════════════════════════════
-// DATA LOADING
-// ═══════════════════════════════════════════════════
-async function getSecInfo(secid){
-  try{
-    const d=await moexFetch('/securities/'+encodeURIComponent(secid)+'.json');
-    const rows=parseTable(d,'description');
-    const map={};rows.forEach(r=>{if(r.NAME&&r.VALUE!=null)map[r.NAME.toUpperCase()]=r.VALUE;});
-    // Find security in marketdata
-    const mkt=parseTable(d,'boards');
-    let engine='stock',market='shares';
-    if(mkt.length){
-      const prim=mkt.find(b=>b.IS_PRIMARY==1)||mkt[0];
-      engine=(prim.ENGINE||'stock').toLowerCase();
-      market=(prim.MARKET||'shares').toLowerCase();
-    }
-    const name=map.SHORTNAME||map.NAME||secid;
-    return{engine,market,name,type:map.TYPENAME||'share'};
-  }catch(e){return{engine:'stock',market:'shares',name:secid,type:'share'};}
-}
-
-async function loadCandles(secid,engine,market,days){
-  const till=new Date();
-  const from=new Date(till-days*86400000);
-  const fmt2=d=>d.toISOString().slice(0,10);
-  const path='/engines/'+engine+'/markets/'+market+'/securities/'+encodeURIComponent(secid)+'/candles.json?from='+fmt2(from)+'&till='+fmt2(till)+'&interval=24&limit=500';
-  const d=await moexFetch('/history'+path);
-  const rows=parseTable(d,'candles');
-  if(!rows.length){
-    // Try without history (current day)
-    const d2=await moexFetch('/engines/'+engine+'/markets/'+market+'/securities/'+encodeURIComponent(secid)+'/candles.json?interval=24&limit=500');
-    const rows2=parseTable(d2,'candles');
-    return rows2.map(r=>({date:String(r.BEGIN||r.TRADEDATE||'').slice(0,10),close:parseFloat(r.CLOSE||r.LAST||0),volume:parseFloat(r.VOLUME||0),high:parseFloat(r.HIGH||0),low:parseFloat(r.LOW||0)})).filter(r=>r.date&&r.close>0);
-  }
-  return rows.map(r=>({date:String(r.BEGIN||r.TRADEDATE||'').slice(0,10),close:parseFloat(r.CLOSE||r.LAST||0),volume:parseFloat(r.VOLUME||0),high:parseFloat(r.HIGH||0),low:parseFloat(r.LOW||0)})).filter(r=>r.date&&r.close>0);
 }
 
 // ═══════════════════════════════════════════════════
