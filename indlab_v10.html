@@ -10749,8 +10749,11 @@ function cpInitIndPanel() {
               box-shadow:${on?'0 0 6px rgba(255,0,110,0.5)':'none'};"></div>
           <div id="cpaltdiam-${ind.id}" data-indid="${ind.id}"
             class="cp-ind-alt-diamond-btn" style="display:none;"></div>
-          <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};flex:1;user-select:text;cursor:text;">${ind.name}</span>
-          <span id="cptune-${ind.id}">${_tuneBadge}</span>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+            <span class="cp-ind-name" style="font-size:11px;color:${on?'var(--text)':'var(--text2)'};user-select:text;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ind.name}</span>
+            ${(ind.params||[]).length ? `<div id="cpparams-${ind.id}" style="display:flex;flex-wrap:wrap;gap:3px;">${(ind.params||[]).map(p=>{const cur=cpIndVals[ind.id]?.[p.id]??p.def;const changed=cur!==p.def;return`<span title="${p.label}: ${cur}${changed?' (дефолт: '+p.def+')':''}" style="font-size:8px;font-family:var(--mono);padding:1px 5px;border-radius:3px;cursor:default;transition:all .12s;color:${changed?'#B487F8':'#5a5070'};background:${changed?'rgba(180,135,248,0.1)':'rgba(255,255,255,0.03)'};border:1px solid ${changed?'rgba(180,135,248,0.25)':'rgba(255,255,255,0.05)'};">${cur}</span>`;}).join('')}</div>` : ''}
+          </div>
+          <span id="cptune-${ind.id}"></span>
           <span id="cpbadge-${ind.id}" class="pill neutral" style="transform:scale(0.8);transform-origin:right;pointer-events:none;"><span class="pill-dot"></span><span class="pill-lbl">—</span></span>
           <span class="cp-ind-fav" data-indid="${ind.id}" title="Избранное" style="font-size:12px;opacity:${isFav?'1':'0'};transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:${isFav?'#FFD700':'#6F648F'};">★</span>
           <span class="cp-ind-eye" data-indid="${ind.id}" title="Скрыть / показать" style="font-size:11px;opacity:0;transition:opacity 0.15s;pointer-events:auto;padding:0 2px;cursor:pointer;color:#6F648F;">◉</span>
@@ -10987,16 +10990,22 @@ const _GLOBAL_PARAM_MAP = {
 
 // Перерисовывает бейдж "классика/изм." у одной строки списка после автотюна
 function _cpRefreshTuneBadge(ind) {
+  // Обновляем чипы значений параметров в строке
+  const paramsEl = document.getElementById(`cpparams-${ind.id}`);
+  if (paramsEl && (ind.params||[]).length) {
+    paramsEl.innerHTML = ind.params.map(p => {
+      const cur = cpIndVals[ind.id]?.[p.id] ?? p.def;
+      const changed = cur !== p.def;
+      return `<span title="${p.label}: ${cur}${changed?' (дефолт: '+p.def+')':''}"
+        style="font-size:8px;font-family:var(--mono);padding:1px 5px;border-radius:3px;cursor:default;transition:all .12s;
+          color:${changed?'#B487F8':'#5a5070'};background:${changed?'rgba(180,135,248,0.1)':'rgba(255,255,255,0.03)'};
+          border:1px solid ${changed?'rgba(180,135,248,0.25)':'rgba(255,255,255,0.05)'};">${cur}</span>`;
+    }).join('');
+  }
   const el = document.getElementById(`cptune-${ind.id}`);
   if (!el) return;
-  const changed = (ind.params||[]).filter(p => cpIndVals[ind.id]?.[p.id] !== p.def);
-  if (!(ind.params||[]).length) { el.innerHTML = ''; return; }
-  const title = changed.length
-    ? 'Изменено: ' + changed.map(p => `${p.label} ${p.def}→${cpIndVals[ind.id][p.id]}`).join(', ')
-    : 'Значения параметров — классика (без изменений)';
-  el.innerHTML = `<span title="${title}" style="font-size:8px;font-family:var(--mono);padding:1px 4px;border-radius:4px;margin-right:2px;flex-shrink:0;
-    color:${changed.length?'#B487F8':'#6F648F'};background:${changed.length?'rgba(180,135,248,0.12)':'rgba(255,255,255,0.03)'};
-    border:1px solid ${changed.length?'rgba(180,135,248,0.3)':'rgba(255,255,255,0.06)'};">${changed.length?'изм.':'класс.'}</span>`;
+  // cptune больше не нужен как текстовый бейдж — просто очищаем
+  el.innerHTML = '';
   // Обновляем кнопку Δ — показываем количество изменённых
   _cpRefreshDeltaBtn();
 }
