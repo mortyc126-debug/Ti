@@ -6049,6 +6049,7 @@ async function chartLoad() {
 
     chartRedraw();
     chartComputeSignals();
+    _chartUpdateLoadedTs();
     // Автоматически обновляем панель анализа при каждой загрузке графика
     const _anaPanel = document.getElementById('cp-analysis-panel');
     if (_anaPanel) { try { _renderAnalysisInner(_anaPanel); } catch(_){} }
@@ -11008,6 +11009,8 @@ function _cpRefreshTuneBadge(ind) {
   el.innerHTML = '';
   // Обновляем кнопку Δ — показываем количество изменённых
   _cpRefreshDeltaBtn();
+  // Предупреждение на странице Точность, если параметры изменились после последнего запуска
+  if (typeof _anCheckParamsChanged === 'function') _anCheckParamsChanged();
 }
 
 function _cpRefreshDeltaBtn() {
@@ -14154,6 +14157,7 @@ async function ilRunAnalysis() {
     const closes = candles.map(c=>c.close);
     const interval = tfLabel;
     if (statusEl) statusEl.textContent = `Считаю индикаторы (${closes.length} баров)…`;
+    _anProgressSet(10);
     const _testParams = _anReadTestParams();
     let ss = _ilCalcCustomSeries(candles, closes, _testParams);
     const _adaptive = document.getElementById('an-adaptive')?.checked;
@@ -14179,12 +14183,14 @@ async function ilRunAnalysis() {
     const highVolMask = vol10.map(v=>v!=null&&v>=medVol);
     const lowVolMask  = vol10.map(v=>v!=null&&v<medVol);
     const HORIZONS = [5,10,15,30];
+    _anProgressSet(30);
     const chopArrAlt = ilCalcChop(candles,14);
     const ssAlt = {};
     IL_INDICATORS.forEach(id=>{ ssAlt[id] = _ilAltScoreSeries(id, ss, closes, candles, chopArrAlt); });
     // Считаем дефолтные серии для сравнения, если параметры отличаются от дефолта
     const _D = {rsi:14,wr:14,cci:20,mfi:14,stk:14,std:3,mf:12,ms:26,msig:9,bbp:20,bbs:2,ef:12,es:26,adx:14,stp:10,stm:3,elder:13,tsil:25,tsis:13};
     const _paramsChanged = _adaptive || Object.keys(_D).some(k => _testParams[k] !== _D[k]);
+    _anProgressSet(50);
     const ssDefault = _paramsChanged ? _ilCalcAllSeries(candles, closes) : null;
     const stats = {};
     IL_INDICATORS.forEach(id=>{
@@ -14213,6 +14219,7 @@ async function ilRunAnalysis() {
         }
       });
     });
+    _anProgressSet(80);
     // Корреляционная матрица и кластеры
     const corrMatrix={};
     IL_INDICATORS.forEach(a=>{corrMatrix[a]={};IL_INDICATORS.forEach(b=>{corrMatrix[a][b]=_ilPearson(ss[a],ss[b]);});});
@@ -14227,8 +14234,15 @@ async function ilRunAnalysis() {
     const barMinutes = {CANDLE_INTERVAL_1_MIN:1,CANDLE_INTERVAL_5_MIN:5,CANDLE_INTERVAL_15_MIN:15,CANDLE_INTERVAL_30_MIN:30,CANDLE_INTERVAL_HOUR:60}[tfConst]||5;
     _ilBtResults={ticker,stats,clusters,clusterOf,corrMatrix,closes,candles,ss,ssAlt,ssDefault,interval,barMinutes,testParams:_testParams,paramsChanged:_paramsChanged,adaptiveChosen:_adaptiveChosen};
     if(statusEl) statusEl.textContent=`✓ ${ticker} · ${closes.length} баров · ${clusters.length} кластеров`;
+    _anSaveResults(_ilBtResults);
+    _anProgressSet(100);
     ilRenderAnalysis();
-  } catch(e) { if(statusEl) statusEl.textContent='⚠ '+e.message; }
+    const csvBtn = document.getElementById('an-csv-btn');
+    if (csvBtn) csvBtn.style.display = '';
+  } catch(e) {
+    if(statusEl) statusEl.textContent='⚠ '+e.message;
+    _anProgressSet(0);
+  }
 }
 
 // Смысловые группы индикаторов
@@ -14365,8 +14379,9 @@ function ilRenderAnalysis() {
       html+=`</div></div>`;
       return;
     }
-    // сортировка по h15 acc
-    ids.sort((a,b)=>(r.stats[b].h15?.acc??0)-(r.stats[a].h15?.acc??0));
+    // сортировка по выбранному столбцу
+    const _sk = _anSortKey || 'h15', _sd = _anSortDir || -1;
+    ids.sort((a,b)=>_sd*((r.stats[b][_sk]?.acc??-1)-(r.stats[a][_sk]?.acc??-1)));
     const grpContId = `ilgrp-${_ilGrpIdx++}`;
     html+=`<div id="${grpContId}" style="margin-bottom:18px;">
       <div style="font-size:10px;color:${grp.color};letter-spacing:.08em;text-transform:uppercase;margin-bottom:0;padding:5px 8px;border-left:2px solid ${grp.color}88;background:rgba(255,255,255,0.015);">${grp.label}</div>
@@ -14374,10 +14389,10 @@ function ilRenderAnalysis() {
       <table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--mono);">
         <thead><tr style="background:#13101e;">
           <th style="text-align:left;padding:5px 8px;font-weight:400;font-size:10px;color:#7068a0;border-bottom:1px solid #1e1830;">Индикатор</th>
-          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h5lbl}</th>
-          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h10lbl}</th>
-          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h15lbl}</th>
-          <th style="padding:5px 8px;font-weight:600;font-size:11px;color:#a090c8;border-bottom:1px solid #1e1830;white-space:nowrap;">${h30lbl}</th>
+          <th onclick="anSortBy('h5')" style="padding:5px 8px;font-weight:600;font-size:11px;color:${_sk==='h5'?'#fff':'#a090c8'};border-bottom:1px solid #1e1830;white-space:nowrap;cursor:pointer;" title="Сортировать">${h5lbl}${_sk==='h5'?(_sd>0?'↑':'↓'):''}</th>
+          <th onclick="anSortBy('h10')" style="padding:5px 8px;font-weight:600;font-size:11px;color:${_sk==='h10'?'#fff':'#a090c8'};border-bottom:1px solid #1e1830;white-space:nowrap;cursor:pointer;" title="Сортировать">${h10lbl}${_sk==='h10'?(_sd>0?'↑':'↓'):''}</th>
+          <th onclick="anSortBy('h15')" style="padding:5px 8px;font-weight:600;font-size:11px;color:${_sk==='h15'?'#fff':'#a090c8'};border-bottom:1px solid #1e1830;white-space:nowrap;cursor:pointer;" title="Сортировать">${h15lbl}${_sk==='h15'?(_sd>0?'↑':'↓'):''}</th>
+          <th onclick="anSortBy('h30')" style="padding:5px 8px;font-weight:600;font-size:11px;color:${_sk==='h30'?'#fff':'#a090c8'};border-bottom:1px solid #1e1830;white-space:nowrap;cursor:pointer;" title="Сортировать">${h30lbl}${_sk==='h30'?(_sd>0?'↑':'↓'):''}</th>
           <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;border-left:1px solid #2a1f3d;white-space:nowrap;">Тренд</th>
           <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;white-space:nowrap;">Бок</th>
           <th style="padding:5px 8px;font-weight:500;font-size:10px;color:#7868a8;font-weight:400;border-bottom:1px solid #1e1830;white-space:nowrap;">Выс.вол</th>
@@ -14560,7 +14575,14 @@ function initAnalysis() {
   const el=document.getElementById('an-ticker');
   if(el && typeof _cpTicker!=='undefined' && _cpTicker) el.value=_cpTicker;
   else if(el && typeof _chartTicker!=='undefined' && _chartTicker) el.value=_chartTicker;
-  if(_ilBtResults) ilRenderAnalysis();
+  // Подгружаем кэш бэктеста если свежий (< 24ч)
+  if (!_ilBtResults) _anLoadCachedResults();
+  if(_ilBtResults) {
+    ilRenderAnalysis();
+    const csvBtn = document.getElementById('an-csv-btn');
+    if (csvBtn) csvBtn.style.display = '';
+  }
+  _anCheckParamsChanged();
 }
 
 // ══ МУЛЬТИТИКЕР: сравнение точности индикаторов по набору тикеров ══
