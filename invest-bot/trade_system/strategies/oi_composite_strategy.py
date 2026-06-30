@@ -5986,6 +5986,17 @@ MultiTickerProvider = Callable[[str], float]
 # (или если в settings.ini заданы явные ATR_TAKE_K/ATR_STOP_K) авто-подбор не запускается.
 AtrHistoryProvider = Callable[[str], list[HistoricCandle]]
 
+# Лимитный вход: смещение от рыночной цены (0.025% ≈ полспреда фьючерса).
+# LONG покупает ниже last.close, SHORT продаёт выше — экономия на спреде.
+LIMIT_ENTRY_OFFSET_PCT = 0.00025
+
+# Минимальное соотношение тейк/стоп. При R:R < 1.5 и WR 46% EV отрицателен.
+# Если ATR-расчёт даёт меньший тейк, принудительно расширяем до 1.5× стопа.
+MIN_TAKE_STOP_RATIO = 1.5
+
+# Минимальная дистанция стопа. При стопе < 0.6% комиссия RT (~0.08%) = 13%+ от стопа.
+MIN_STOP_DIST_PCT = 0.006
+
 AUTO_ATR_TAKE_KS = (2.5, 3.0, 3.5)
 # Нижняя граница была 1.0 — на минутных барах atr_pct часто ~0.4-0.6%, и
 # stop_dist=1.0*atr_pct получался теснее fixed-стопа (1.5%): walk-forward
@@ -7151,7 +7162,13 @@ class OICompositeStrategy(IStrategy):
                     i += 1
                     continue
 
-                entry = _to_f(candles[i].close)
+                _close = _to_f(candles[i].close)
+                # Лимитный вход: покупаем LONG чуть ниже close, SHORT — чуть выше.
+                # Экономит ~полспреда (LIMIT_ENTRY_OFFSET_PCT) по сравнению с рыночным.
+                if direction == SignalType.LONG:
+                    entry = _close * (1 - LIMIT_ENTRY_OFFSET_PCT)
+                else:
+                    entry = _close * (1 + LIMIT_ENTRY_OFFSET_PCT)
                 window = candles[i + 1:i + 1 + max_bars]
                 # Последние 3 элемента scores — M1/M2/M3 (см. ALL_METHOD_NAMES) —
                 # сохраняем сырыми скорами для attribution в дашборде/бэктесте.
@@ -7460,6 +7477,11 @@ class OICompositeStrategy(IStrategy):
             _hist = sig.get("history_window") or []
             _tp_ext = _tp_extension_mult(_hist, direction == SignalType.LONG)
             take_dist *= _tp_ext
+
+            # Минимальный стоп: при стопе < 0.6% комиссия RT (~0.08%) съедает >13%.
+            stop_dist = max(stop_dist, MIN_STOP_DIST_PCT)
+            # Минимальное R:R: тейк должен быть ≥ 1.5× стопа, иначе EV отрицателен.
+            take_dist = max(take_dist, stop_dist * MIN_TAKE_STOP_RATIO)
 
             if direction == SignalType.LONG:
                 take_price = entry * (1 + take_dist)
@@ -8907,8 +8929,12 @@ class OICompositeStrategy(IStrategy):
         if take_k is not None and stop_k is not None and atr_pct > 0:
             scale_exp = self.__atr_scale_exp if self.__atr_scale_exp is not None else self.__auto_atr_scale_exp
             hold_scale = ATR_SCALE_HOLDING_BARS ** scale_exp if scale_exp else 1.0
-            take_off = Decimal(str(take_k * atr_pct * hold_scale * noise_scale * chop_k))
-            stop_off = Decimal(str(stop_k * atr_pct * hold_scale * noise_scale))
+            stop_raw = stop_k * atr_pct * hold_scale * noise_scale
+            stop_raw = max(stop_raw, MIN_STOP_DIST_PCT)
+            take_raw = take_k * atr_pct * hold_scale * noise_scale * chop_k
+            take_raw = max(take_raw, stop_raw * MIN_TAKE_STOP_RATIO)
+            take_off = Decimal(str(take_raw))
+            stop_off = Decimal(str(stop_raw))
             if direction == SignalType.LONG:
                 return Decimal("1") + take_off, Decimal("1") - stop_off
             return Decimal("1") - take_off, Decimal("1") + stop_off
@@ -8917,9 +8943,14 @@ class OICompositeStrategy(IStrategy):
         if direction == SignalType.LONG:
             take_off = (self.__long_take - Decimal("1")) * scale * chop_d
             stop_off = (Decimal("1") - self.__long_stop) * scale
+        else:
+            take_off = (Decimal("1") - self.__short_take) * scale * chop_d
+            stop_off = (self.__short_stop - Decimal("1")) * scale
+        # Те же ограничения для fixed-режима
+        stop_off = max(stop_off, Decimal(str(MIN_STOP_DIST_PCT)))
+        take_off = max(take_off, stop_off * Decimal(str(MIN_TAKE_STOP_RATIO)))
+        if direction == SignalType.LONG:
             return Decimal("1") + take_off, Decimal("1") - stop_off
-        take_off = (Decimal("1") - self.__short_take) * scale * chop_d
-        stop_off = (self.__short_stop - Decimal("1")) * scale
         return Decimal("1") - take_off, Decimal("1") + stop_off
 
     def __make_signal(
@@ -8930,7 +8961,13 @@ class OICompositeStrategy(IStrategy):
             scores: list[float],
     ) -> Signal:
         last = self.__candles[-1]
-        entry = quotation_to_decimal(last.close)
+        _close = quotation_to_decimal(last.close)
+        # Лимитный вход: цена чуть лучше рынка, Trader выставит лимитку.
+        _offset = Decimal(str(LIMIT_ENTRY_OFFSET_PCT))
+        if signal_type == SignalType.LONG:
+            entry = _close * (Decimal("1") - _offset)
+        else:
+            entry = _close * (Decimal("1") + _offset)
 
         method_scores = {name: scores[i] for i, name in enumerate(ALL_METHOD_NAMES)}
         # confidence должен опираться на тот же composite, что реально
