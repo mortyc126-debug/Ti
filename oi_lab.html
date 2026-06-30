@@ -118,6 +118,13 @@ const CFG_DEFAULTS = {
   phase_release_gamma: 0.6,
   include_yesterday_extreme: true,
   phase_confirm_bars: 3,
+  use_adaptive_confirm: true,
+  atr_window: 20,
+  atr_percentile_window: 60,
+  n_volatility_buckets: 5,
+  adaptive_confirm_quantile: 0.5,
+  min_phase_samples_per_bucket: 3,
+  adaptive_confirm_floor: 3,
 };
 
 const CFG_LABELS = {
@@ -136,7 +143,14 @@ const CFG_LABELS = {
   stress_power: 'Степень release',
   phase_release_gamma: 'γ phase release',
   include_yesterday_extreme: 'Вчер.экстремум',
-  phase_confirm_bars: 'Баров подтверж.',
+  phase_confirm_bars: 'Баров подтверж. (константа)',
+  use_adaptive_confirm: 'Адаптивный confirm',
+  atr_window: 'Окно ATR',
+  atr_percentile_window: 'Окно персент.ATR',
+  n_volatility_buckets: 'Корзин волат.',
+  adaptive_confirm_quantile: 'Квантиль калибровки',
+  min_phase_samples_per_bucket: 'Мин.фаз в корзине',
+  adaptive_confirm_floor: 'Мин.confirm (пол)',
 };
 
 function buildCfgUI() {
@@ -343,17 +357,86 @@ function _percentileRank(arr, w) {
 }
 
 function applyPhaseHysteresis(raw, confirmBars) {
+  // confirmBars — число или массив (адаптивный порог на каждый бар)
   const n = raw.length;
+  const isArr = Array.isArray(confirmBars);
   const out = new Array(n).fill(false);
   let state = false, trueRun = 0, falseRun = 0;
   for (let i = 0; i < n; i++) {
+    const cb = Math.max(1, isArr ? (confirmBars[i] || 1) : confirmBars);
     if (raw[i]) { trueRun++; falseRun = 0; }
     else { falseRun++; trueRun = 0; }
-    if (!state && trueRun >= confirmBars) state = true;
-    else if (state && falseRun >= confirmBars) state = false;
+    if (!state && trueRun >= cb) state = true;
+    else if (state && falseRun >= cb) state = false;
     out[i] = state;
   }
   return out;
+}
+
+// ATR-прокси: rolling high-low за window баров
+function computeAtrProxy(close, window) {
+  const n = close.length;
+  const out = new Array(n).fill(NaN);
+  for (let i = window-1; i < n; i++) {
+    let hi = -Infinity, lo = Infinity;
+    for (let j = i-window+1; j <= i; j++) { if(close[j]>hi) hi=close[j]; if(close[j]<lo) lo=close[j]; }
+    out[i] = hi - lo;
+  }
+  return out;
+}
+
+// Длительности сырых фаз: [{startPos, duration}]
+function extractRawPhaseDurations(rawFlag) {
+  const phases = [];
+  let inPhase = false, start = 0, dur = 0;
+  for (let i = 0; i < rawFlag.length; i++) {
+    if (rawFlag[i] && !inPhase) { inPhase = true; start = i; dur = 1; }
+    else if (rawFlag[i] && inPhase) { dur++; }
+    else if (!rawFlag[i] && inPhase) { phases.push({ startPos: start, duration: dur }); inPhase = false; }
+  }
+  if (inPhase) phases.push({ startPos: start, duration: dur });
+  return phases;
+}
+
+// Калибровка confirm_bars по корзинам волатильности ATR
+// Возвращает {bucketEdges, bucketConfirm} или null
+function calibrateConfirmBarsByVolatility(rawFlag, atrPctl, cfg) {
+  const phases = extractRawPhaseDurations(rawFlag);
+  if (!phases.length) return null;
+
+  const valid = phases.filter(p => p.startPos < atrPctl.length && isFinite(atrPctl[p.startPos]));
+  if (!valid.length) return null;
+
+  const edges = Array.from({length: cfg.n_volatility_buckets+1}, (_,i) => i/cfg.n_volatility_buckets);
+  const buckets = Array.from({length: cfg.n_volatility_buckets}, () => []);
+
+  for (const p of valid) {
+    const pctl = atrPctl[p.startPos];
+    const b = Math.min(cfg.n_volatility_buckets-1, Math.floor(pctl * cfg.n_volatility_buckets));
+    buckets[b].push(p.duration);
+  }
+
+  const bucketConfirm = {};
+  for (let b = 0; b < cfg.n_volatility_buckets; b++) {
+    const durs = buckets[b].sort((a,b)=>a-b);
+    if (durs.length >= cfg.min_phase_samples_per_bucket) {
+      const q = durs[Math.floor(durs.length * cfg.adaptive_confirm_quantile)];
+      bucketConfirm[b] = Math.max(cfg.adaptive_confirm_floor, Math.ceil(q));
+    } else {
+      bucketConfirm[b] = cfg.phase_confirm_bars;
+    }
+  }
+  return { edges, bucketConfirm };
+}
+
+// Переводит персентиль ATR в массив confirm_bars
+function mapConfirmBars(atrPctl, calibration, cfg) {
+  const { bucketConfirm } = calibration;
+  return atrPctl.map(v => {
+    if (!isFinite(v)) return cfg.phase_confirm_bars;
+    const b = Math.min(cfg.n_volatility_buckets-1, Math.floor(v * cfg.n_volatility_buckets));
+    return bucketConfirm[b] ?? cfg.phase_confirm_bars;
+  });
 }
 
 function computeIndicator(rows, cfg, refSwitchDates) {
@@ -456,7 +539,21 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   const absZMean = _rollingMean(absZDiff, vw);
   const imbalanceRising = absZMean.map(v=>isFinite(v)&&v>0);
   const rawFlag = narrowRange.map((v,i)=>v&&imbalanceRising[i]);
-  const accumFlag = applyPhaseHysteresis(rawFlag, cfg.phase_confirm_bars);
+
+  let accumFlag;
+  if (cfg.use_adaptive_confirm) {
+    const atr = computeAtrProxy(close, cfg.atr_window);
+    const atrPctl = _percentileRank(atr, cfg.atr_percentile_window);
+    const calibration = calibrateConfirmBarsByVolatility(rawFlag, atrPctl, cfg);
+    if (calibration) {
+      const confirmArr = mapConfirmBars(atrPctl, calibration, cfg);
+      accumFlag = applyPhaseHysteresis(rawFlag, confirmArr);
+    } else {
+      accumFlag = applyPhaseHysteresis(rawFlag, cfg.phase_confirm_bars);
+    }
+  } else {
+    accumFlag = applyPhaseHysteresis(rawFlag, cfg.phase_confirm_bars);
+  }
 
   // Phase price range
   const phaseHigh = new Array(n).fill(NaN);
