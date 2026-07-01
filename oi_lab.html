@@ -2416,22 +2416,33 @@ function _computeTrendExhaustEdges(cfg, HORIZONS) {
   for (const h of HORIZONS) {
     const all = [];
     for (const inst of instruments) for (const v of inst.fwd[h]) if (isFinite(v)) all.push(v);
-    baseStats[h] = all.length ? { pctDown: all.filter(v=>v<0).length / all.length * 100 } : null;
+    baseStats[h] = all.length ? { pctDown: all.filter(v=>v<0).length / all.length * 100, n: all.length } : null;
   }
   const perInstrumentPhase = instruments.map(inst => _calcCategoricalStats(PHASE_DEFS, inst.result, inst.fwd, HORIZONS));
   const poolPhase = _poolBinStats(perInstrumentPhase, HORIZONS);
   // Индексы 5/6 в PHASE_DEFS — тренд-истощение шорт→сквиз и лонг→коррекция
   const shortSqueeze = poolPhase[5], longCorrection = poolPhase[6];
-  const edgeOf = (bin, dir) => {
+  // edge сам по себе не говорит, надёжен ли он: при N~40 разброс ±1.96·SE двух
+  // биномиальных пропорций (бин vs база) часто сравним по величине с самим edge.
+  // sig = true, только если 95%-й доверительный интервал edge не пересекает 0 —
+  // это и есть критерий «эффект есть», а не просто «в этой точке цифра больше».
+  const edgeStats = (bin, dir) => {
     const s = bin.stats[1]; // +1д — горизонт, где эффект показал себя лучше всего
+    const n = s?.n ?? 0;
+    if (!s || !isFinite(s.accuracy) || !n) return { edge: null, se: null, sig: false, n };
     const base = baseStats[1];
-    if (!s || !base || !isFinite(s.accuracy)) return null;
+    if (!base) return { edge: null, se: null, sig: false, n };
     const baseAcc = dir < 0 ? base.pctDown : (100 - base.pctDown);
-    return s.accuracy - baseAcc;
+    const edge = s.accuracy - baseAcc;
+    const p1 = s.accuracy / 100, p0 = baseAcc / 100;
+    const se = Math.sqrt(p1 * (1 - p1) / n + p0 * (1 - p0) / base.n) * 100;
+    const sig = isFinite(se) && se > 0 && Math.abs(edge) > 1.96 * se;
+    return { edge, se, sig, n };
   };
+  const ss = edgeStats(shortSqueeze, 1), lc = edgeStats(longCorrection, -1);
   return {
-    shortEdge: edgeOf(shortSqueeze, 1), shortN: shortSqueeze.stats[1]?.n ?? 0,
-    longEdge: edgeOf(longCorrection, -1), longN: longCorrection.stats[1]?.n ?? 0,
+    shortEdge: ss.edge, shortN: ss.n, shortSE: ss.se, shortSig: ss.sig,
+    longEdge: lc.edge, longN: lc.n, longSE: lc.se, longSig: lc.sig,
   };
 }
 
@@ -2477,7 +2488,33 @@ function renderPoolSweep(pctlPoints, movePoints, baseCfg) {
   const el = document.getElementById('pool-out');
   const edgeColor = edge => !isFinite(edge) ? '#313244' : edge >= 15 ? '#a6e3a1' : edge >= 5 ? '#94e2b8' : edge <= -5 ? '#f38ba8' : '#cdd6f4';
 
+  // Лучшая точка по оси — не просто максимум edge, а максимум edge СРЕДИ точек,
+  // где 95%-й ДИ не пересекает 0 и N ещё не ниже границы надёжности. Иначе
+  // «лучшей» может оказаться точка, где edge большой только из-за шума на
+  // маленькой выборке — ровно то, от чего должен защищать N-floor.
+  function _bestIdx(points, edgeKey, sigKey, nKey) {
+    let bi = -1, bv = -Infinity;
+    points.forEach((p, i) => {
+      if (p[sigKey] && p[nKey] >= SWEEP_MIN_N && isFinite(p[edgeKey]) && p[edgeKey] > bv) { bv = p[edgeKey]; bi = i; }
+    });
+    return bi;
+  }
+  function _fmtEdge(v) { return isFinite(v) ? (v>0?'+':'')+v.toFixed(0) : '—'; }
+  function _rowCells(points, edgeKey, seKey, sigKey, nKey, bestIdx) {
+    return points.map((p, i) => {
+      const isBest = i === bestIdx;
+      const ci = isFinite(p[seKey]) ? `±${(1.96*p[seKey]).toFixed(0)}` : '';
+      const mark = p[sigKey] ? '<span style="color:#a6e3a1" title="95% ДИ edge не пересекает 0">✓</span>' : '';
+      return `<td style="text-align:center;padding:3px 5px;${isBest?'background:#313244;border-radius:3px':''}">
+        <span style="color:${edgeColor(p[edgeKey])}">${_fmtEdge(p[edgeKey])}</span> ${mark}
+        <br><span style="font-size:9px;color:#6c7086">N${p[nKey]} ${ci}</span>
+      </td>`;
+    }).join('');
+  }
+
   function _axisTable(points, title, fixedVal, axisLbl) {
+    const shortBest = _bestIdx(points, 'shortEdge', 'shortSig', 'shortN');
+    const longBest = _bestIdx(points, 'longEdge', 'longSig', 'longN');
     let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} (второй порог held на ${fixedVal}) — граница по N<${SWEEP_MIN_N}, не наугад</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
@@ -2485,12 +2522,14 @@ function renderPoolSweep(pctlPoints, movePoints, baseCfg) {
       ${points.map(p=>`<th style="padding:3px 5px;background:#181825;color:#a6adc8;text-align:center;font-size:10px">${p.v}</th>`).join('')}
     </tr></thead><tbody>
     <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">Шорт→сквиз edge</td>
-      ${points.map(p=>`<td style="text-align:center;padding:3px 5px;color:${edgeColor(p.shortEdge)}">${isFinite(p.shortEdge)?(p.shortEdge>0?'+':'')+p.shortEdge.toFixed(0):'—'}<br><span style="font-size:9px;color:#6c7086">N${p.shortN}</span></td>`).join('')}
+      ${_rowCells(points, 'shortEdge', 'shortSE', 'shortSig', 'shortN', shortBest)}
     </tr>
     <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">Лонг→коррекция edge</td>
-      ${points.map(p=>`<td style="text-align:center;padding:3px 5px;color:${edgeColor(p.longEdge)}">${isFinite(p.longEdge)?(p.longEdge>0?'+':'')+p.longEdge.toFixed(0):'—'}<br><span style="font-size:9px;color:#6c7086">N${p.longN}</span></td>`).join('')}
+      ${_rowCells(points, 'longEdge', 'longSE', 'longSig', 'longN', longBest)}
     </tr>
-    </tbody></table></div></details>`;
+    </tbody></table></div>
+    <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">✓ = 95% доверительный интервал edge не пересекает 0. Подсветка ячейки = точка с максимальным значимым edge (не просто максимальная цифра на маленькой выборке).</div>
+    </details>`;
     return t;
   }
 
