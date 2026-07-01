@@ -1122,6 +1122,19 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   const physSPctl = _percentileRank(physS, cfg.liquidity_window);
   const physLPctl = _percentileRank(physL, cfg.liquidity_window);
 
+  // Тот же перцентиль, но по ВСЕМ участникам (физ+юр), а не только по физлицам.
+  // Для некоторых инструментов основную массу шортов держат юрлица, а не
+  // физики (напр. на SSU6: yur_short на порядок больше fiz_short, и наоборот
+  // для лонгов) — «шорты физлиц у экстремума» тогда почти никогда не
+  // выполняется осмысленно, потому что физики в принципе редко в шорте на
+  // этом инструменте. totalShort/totalLong не зависят от того, КТО именно
+  // передержал позицию — ловят «рынок в целом перекошен», что и нужно для
+  // сквиз-механики (сжимает тот, кто реально в перегруженной позиции).
+  const totalShortArr = hasLegal ? physS.map((v,i)=>v+legalS[i]) : physS;
+  const totalLongArr  = hasLegal ? physL.map((v,i)=>v+legalL[i]) : physL;
+  const totalShortPctl = _percentileRank(totalShortArr, cfg.liquidity_window);
+  const totalLongPctl  = _percentileRank(totalLongArr, cfg.liquidity_window);
+
   // Phase potential — прогноз движения ПОСЛЕ выхода из диапазона накопления.
   // Знак прогноза = направление уже начавшегося пробоя (dir), а не anchor*dir:
   // и «сквиз против позиции физлиц» (anchor против dir), и «подтверждение по
@@ -1141,10 +1154,18 @@ function computeIndicator(rows, cfg, refSwitchDates) {
 
   // Тренд-истощение — второй, отдельный от «фаз» триггер. Существующая фаза
   // требует ФЛЭТА (narrowRange), а описанный паттерн — наоборот: N баров подряд
-  // направленного движения (широкий диапазон, не флэт) с позицией физлиц у
+  // направленного движения (широкий диапазон, не флэт) с позицией у
   // исторического экстремума → контрарный сигнал разворота/сквиза.
-  // +1 = падали + шорты физлиц у экстремума → ждём сквиз ВВЕРХ
-  // -1 = росли + лонги физлиц у экстремума → ждём коррекцию ВНИЗ
+  // +1 = падали + рынок в целом в шорте у экстремума → ждём сквиз ВВЕРХ
+  // -1 = росли + рынок в целом в лонге у экстремума → ждём коррекцию ВНИЗ
+  //
+  // Уровень позиции берём по ВСЕМ участникам (totalShortPctl/totalLongPctl =
+  // физ+юр), а не только по физлицам: на части инструментов (напр. SSU6)
+  // основную массу шортов держат юрлица, а физики почти всегда в лонге —
+  // «физлица в шорте у экстремума» там почти никогда не выполняется
+  // осмысленно, потому что физики структурно редко шортят этот инструмент.
+  // Сквиз давит на того, кто реально передержал позицию, вне зависимости
+  // от того, юрлицо это или физлицо.
   //
   // Порог хода цены раньше был фиксированным (напр. 5% за окно) — одинаковым
   // для ЛЮБОГО инструмента. Для волатильных серий 5% за 5 баров — рутина
@@ -1163,9 +1184,9 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   for (let i=0; i<n; i++) {
     const tr = trendReturn[i], trp = trendReturnPctl[i];
     if (!isFinite(tr) || !isFinite(trp)) continue;
-    if (trp <= (1 - cfg.trend_exhaust_move_pctl) && isFinite(physSPctl[i]) && physSPctl[i] >= cfg.trend_exhaust_pctl) {
+    if (trp <= (1 - cfg.trend_exhaust_move_pctl) && isFinite(totalShortPctl[i]) && totalShortPctl[i] >= cfg.trend_exhaust_pctl) {
       trendExhaust[i] = 1;
-    } else if (trp >= cfg.trend_exhaust_move_pctl && isFinite(physLPctl[i]) && physLPctl[i] >= cfg.trend_exhaust_pctl) {
+    } else if (trp >= cfg.trend_exhaust_move_pctl && isFinite(totalLongPctl[i]) && totalLongPctl[i] >= cfg.trend_exhaust_pctl) {
       trendExhaust[i] = -1;
     }
   }
@@ -1707,9 +1728,9 @@ const PHASE_DEFS = [
     match: r => !r.accum_flag && r.breakout_dir === -1 && r.phase_aligned === -1 },
   { label: '🔴 Выброс ВНИЗ, по позиции физлиц (шорт) → подтверждение, пад. ↓', dir: -1,
     match: r => !r.accum_flag && r.breakout_dir === -1 && r.phase_aligned === 1 },
-  { label: '🟠 Тренд-истощение: шорты физлиц у экстремума после падения → сквиз ↑', dir: 1,
+  { label: '🟠 Тренд-истощение: рынок в целом в шорте у экстремума после падения → сквиз ↑', dir: 1,
     match: r => r.trend_exhaust === 1 },
-  { label: '🟠 Тренд-истощение: лонги физлиц у экстремума после роста → коррекция ↓', dir: -1,
+  { label: '🟠 Тренд-истощение: рынок в целом в лонге у экстремума после роста → коррекция ↓', dir: -1,
     match: r => r.trend_exhaust === -1 },
 ];
 
