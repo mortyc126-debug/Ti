@@ -904,23 +904,30 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     rollDShort[i] = ss;
   }
 
-  // squeeze_pressure: нормированный перевес накопления.
+  // squeeze_pressure: раньше — (ss-sl)/(|ss|+|sl|), нормировка на сумму модулей.
+  // Эта формула математически схлопывается РОВНО в ±1 всякий раз, когда потоки
+  // шорта и лонга разных знаков (одна сторона набирала, другая одновременно
+  // сокращалась за то же окно) — а это самый обычный сценарий в трендовом
+  // рынке, не редкость. Отсюда «давление всегда под сотку»: это артефакт
+  // формулы, теряющий всю информацию о РАЗМЕРЕ потока, а не признак реальной
+  // экстремальности набора позиций.
+  // Теперь: берём чистую разницу потоков в контрактах (flowDiff), считаем
+  // z-score относительно собственной истории (это и есть «насколько сегодняшний
+  // набор аномален по размеру») и сжимаем в (-1,1) через tanh только для
+  // порогов/отображения — величина при противоположных знаках больше не теряется.
   // > 0 → шорт набирался интенсивнее (потенциал роста, сжатие шортов)
   // < 0 → лонг набирался интенсивнее (потенциал падения)
-  const squeezePressure = new Array(n).fill(NaN);
+  const flowDiff = new Array(n).fill(NaN);
   for (let i=0; i<n; i++) {
     const sl = rollDLong[i], ss = rollDShort[i];
-    if (!isFinite(sl) || !isFinite(ss)) continue;
-    const tot = Math.abs(sl) + Math.abs(ss);
-    squeezePressure[i] = tot > 0 ? (ss - sl) / tot : 0;
+    if (isFinite(sl) && isFinite(ss)) flowDiff[i] = ss - sl;
   }
-
-  // Z-score squeeze_pressure (насколько текущее давление аномально)
-  const sqPrMean = _rollingMean(squeezePressure, cfg.z_window);
-  const sqPrStd  = _rollingStd(squeezePressure, cfg.z_window);
-  const squeezePressureZ = squeezePressure.map((v,i)=>
-    sqPrStd[i]>0 ? (v-sqPrMean[i])/sqPrStd[i] : NaN
+  const flowMean = _rollingMean(flowDiff, cfg.z_window);
+  const flowStd  = _rollingStd(flowDiff, cfg.z_window);
+  const squeezePressureZ = flowDiff.map((v,i)=>
+    isFinite(v) && flowStd[i] > 0 ? (v - flowMean[i]) / flowStd[i] : NaN
   );
+  const squeezePressure = squeezePressureZ.map(z => isFinite(z) ? Math.tanh(z / 2) : NaN);
 
   // Z-score
   const rollMean = _rollingMean(netPhysPct, cfg.z_window);
@@ -1188,7 +1195,7 @@ function renderMetrics(result) {
   if (!last) return;
   const cards = [
     { lbl:'Сигнал', val: fmt(last.weighted_imbalance,3), sub:'+ = физики шортят (рост?), − = в лонге (падение?)', color: last.weighted_imbalance>0?'#a6e3a1':'#f38ba8' },
-    { lbl:'Давление сжатия', val: fmt(last.squeeze_pressure,3), sub:'кто интенсивнее набирал за последние 10 баров: +1=только шорт, −1=только лонг', color: last.squeeze_pressure>0.1?'#a6e3a1':last.squeeze_pressure<-0.1?'#f38ba8':'#cdd6f4' },
+    { lbl:'Давление сжатия', val: fmt(last.squeeze_pressure,3), sub:'z-score перевеса потока шорт/лонг за 10 баров (сжато tanh): +1≈сильно шорт, −1≈сильно лонг', color: last.squeeze_pressure>0.1?'#a6e3a1':last.squeeze_pressure<-0.1?'#f38ba8':'#cdd6f4' },
     { lbl:'Z-давления', val: fmt(last.squeeze_pressure_z,2), sub:'аномальность текущего набора позиций vs история', color: Math.abs(last.squeeze_pressure_z||0)>1.5?'#f9e2af':'#cdd6f4' },
     { lbl:'Перекос физ. лиц', val: fmt(last.net_phys_pct*100,1)+'%', sub:'статичный снэпшот: их нетто-позиция от ОИ', color: last.net_phys_pct>0?'#f38ba8':'#a6e3a1' },
     { lbl:'Z-оценка дисбаланса', val: fmt(last.imbalance_z,2), sub:'насколько перекос отличается от нормы (±1 = умеренно)', color: '#cdd6f4' },
