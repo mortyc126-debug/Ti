@@ -410,12 +410,14 @@ async function scheduledCollectOi(env) {
           fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
         });
 
-        // Если биржа работает (4:00-20:50 UTC = 7:00-23:50 МСК) — пишем
+        // Если биржа работает (4:00-20:50 UTC = 7:00-23:50 МСК, пн-пт) — пишем
         // ещё и в oi_hourly чтобы строить внутридневную историю позиций.
-        // В oi_daily upsert по дате (один снэпшот в день), в oi_hourly
-        // пишем каждый час отдельной записью — поэтому ключ по ts.
-        const nowHourUtc = new Date().getUTCHours();
-        if (nowHourUtc >= 4 && nowHourUtc < 21) {
+        // Фильтр по дням недели делаем здесь, а не в cron — CF Dashboard
+        // не поддерживает MON-FRI синтаксис в базовом интерфейсе.
+        const now = new Date();
+        const nowHourUtc = now.getUTCHours();
+        const nowDow = now.getUTCDay(); // 0=вс, 1=пн, 6=сб
+        if (nowHourUtc >= 4 && nowHourUtc < 21 && nowDow >= 1 && nowDow <= 5) {
           // Округляем ts до начала текущего часа
           const tsHour = Math.floor(Date.now() / 3600000) * 3600000;
           await upsertOiHourly(db, {
