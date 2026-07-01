@@ -2628,19 +2628,43 @@ async function labFetchAssetClasses() {
   if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
   const tickers = _lastPoolRawData.map(r => r.ticker);
   let ok = 0;
+  const errors = [];
+  let rawSample = null; // полный первый ответ — раньше провалы были видны только в
+                         // консоли (console.warn), пользователь их не видел вообще
   for (const t of tickers) {
     setStatus(`Классифицирую тикеры через T-Invest… ${t} (${ok}/${tickers.length})`);
     try {
       const resp = await fetch(`${proxy}/db/instruments/assetclass?ticker=${t}`);
       const r = await resp.json();
+      if (!rawSample) rawSample = r;
       if (r.assetClass) { ASSET_CLASS[r.ticker] = r.assetClass; ok++; }
-      else if (r.error) console.warn(`Классификация ${t}: ${r.error}`);
+      else errors.push(`${t}: ${r.error || `assetClass пуст (assetType="${r.assetType ?? '—'}")`}`);
     } catch(e) {
-      console.warn(`Классификация ${t}: ${e.message}`);
+      errors.push(`${t}: ${e.message}`);
     }
   }
-  setStatus(`Классифицировано ${ok}/${tickers.length} тикеров — пересчитываю признаки…`, 'ok');
+  renderAssetClassDiag(errors, rawSample);
+  setStatus(`Классифицировано ${ok}/${tickers.length} тикеров — пересчитываю признаки…`, ok > 0 ? 'ok' : 'err');
   await labAnalyzeSqueezeFactors();
+}
+
+// Раньше провалы классификации были видны только в консоли браузера —
+// пользователь их не проверял и решал, что «ничего не добавилось, хотя
+// ошибок нет». Показываем прямо в выводе: сырой ответ бэкенда на первый
+// тикер (сигнатура T-Invest FutureBy написана по документации, не
+// проверена вживую — так сразу видно, какое поле называется иначе) и
+// список тикеров, где классификация не удалась.
+function renderAssetClassDiag(errors, rawSample) {
+  if (!errors.length && !rawSample) return;
+  const el = document.getElementById('pool-out');
+  let html = `<details ${errors.length ? 'open' : ''}><summary style="cursor:pointer;font-size:12px;color:#f38ba8;margin-bottom:6px">⚠️ Классификация: ${errors.length} тикеров без результата</summary>
+    <div style="font-size:10px;color:#6c7086;margin-bottom:4px">Сырой ответ бэкенда на первый тикер (для диагностики полей T-Invest):</div>
+    <pre style="font-size:10px;color:#cdd6f4;background:#181825;padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap">${rawSample ? JSON.stringify(rawSample, null, 2).replace(/</g,'&lt;') : '—'}</pre>`;
+  if (errors.length) {
+    html += `<div style="font-size:10px;color:#f38ba8;max-height:200px;overflow-y:auto;margin-top:6px">${errors.map(e=>e.replace(/</g,'&lt;')).join('<br>')}</div>`;
+  }
+  html += `</details>`;
+  el.innerHTML = html + el.innerHTML;
 }
 
 async function labAnalyzeSqueezeFactors() {
