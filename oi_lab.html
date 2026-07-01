@@ -956,6 +956,7 @@ function renderTable(result) {
       let v = r[c.key];
       let cls = '';
       if (typeof v === 'boolean') return `<td>${v?'✓':''}</td>`;
+      if (typeof v === 'string') return `<td>${v}</td>`;
       if (!isFinite(v)) return `<td style="color:#313244">—</td>`;
       if (c.pct) v *= c.pct;
       const fv = c.dec != null ? v.toFixed(c.dec) : v;
