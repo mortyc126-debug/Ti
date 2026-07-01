@@ -2125,6 +2125,29 @@ async function _loadInstrumentForPool(proxy, rootTicker, cfg, log) {
           return c ? { ...r, close: c.cl || r.close, open: c.o, high: c.h, low: c.l } : r;
         });
       }
+      // t сам является root-кодом (2 буквы) и обычная подтяжка свечей не дала
+      // ничего (ожидаемо — T-Invest не резолвит голый root в один FIGI). У root
+      // при этом полная история ОИ, просто без цены (FutOI не даёт её на уровне
+      // серии). Просим бэкенд ретроактивно проставить цену: /oidaily/backfillprice
+      // сам находит через T-Invest FindInstrument ВСЕ дескрипты этой серии
+      // (включая уже экспирировавшие, которых нет в нашей БД вообще) и пишет
+      // цену в oi_daily по датам, где нашлось совпадение — затем перечитываем.
+      if (t === sym && !rows.some(r => r.close > 0)) {
+        try {
+          const bp = await fetch(`${proxy}/db/oidaily/backfillprice?ticker=${encodeURIComponent(t)}`);
+          const bpj = bp.ok ? await bp.json() : { error: `HTTP ${bp.status}` };
+          _l(`${t}: backfillprice → ${JSON.stringify(bpj).slice(0,300)}`);
+          if (bpj.datesPriced > 0) {
+            const r2 = await fetch(`${proxy}/db/oidaily?ticker=${encodeURIComponent(t)}`);
+            if (r2.ok) {
+              const json2 = await r2.json();
+              const rawArr2 = Array.isArray(json2) ? json2 : (json2.rows || json2.data || []);
+              rows = rawArr2.map(normalizeRow).filter(r=>r.date);
+              _l(`${t}: после backfillprice строк с ценой = ${rows.filter(r=>r.close>0).length}/${rows.length}`);
+            }
+          }
+        } catch(e) { _l(`${t}: backfillprice → exception ${e.message}`); }
+      }
     } catch(e) { _l(`${t}: исключение при подтяжке свечей — ${e.message}`); }
     contractsMap[t] = rows;
   }

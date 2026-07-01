@@ -26,6 +26,11 @@
 //   /db/oibackfill?tickers=&days=     GET  — разовый backfill истории FutOI юр/физ за прошлые
 //                                            даты (date= в futoi API); без tickers — берёт
 //                                            текущий отслеживаемый список из oi_tracked_state
+//   /db/oidaily/backfillprice?ticker= GET  — ретроактивно проставить price в oi_daily root-
+//                                            тикера (там всегда 0): ищет все дескрипты серии
+//                                            через T-Invest FindInstrument (не только уже
+//                                            известные нам), тянет их дневные свечи, пишет
+//                                            цену по датам, где нашлось совпадение
 //
 // Cron (scheduled): ежедневный автосбор oi_daily по всем ликвидным фьючерсам
 // FORTS — без участия браузера. Настройка:
@@ -1011,6 +1016,102 @@ async function handleDb(path, req, env) {
     const days = Math.min(Number(u.searchParams.get('days')) || 90, 365);
     const result = await backfillOiHistory(db, env, tickers, days);
     return json(result);
+  }
+
+  // ── Ретроактивный бэкфилл цены для root-тикера (2-буквенный код из all=1) ──
+  // oi_daily для root всегда пишется с price=0 (FutOI отдаёт ОИ на уровне
+  // серии, без цены) — но история ОИ там при этом полная (напр. 114 дней).
+  // Цену для каждой даты нужно взять у КОНКРЕТНОГО дескрипта, который был
+  // front-month в этот день — а мы заранее не знаем полный список дескриптов
+  // серии: в oi_daily попадают только те, что наш cron когда-либо отслеживал
+  // (обычно последние 1-3 недели). Экспирировавшие контракты, которые
+  // торговались раньше, там вообще не появляются.
+  // Решение: ищем ВСЕ фьючерсы этой серии напрямую через T-Invest
+  // FindInstrument по префиксу root (а не по тому, что уже есть в нашей БД),
+  // качаем полную дневную историю свечей по каждому найденному дескрипту и
+  // проставляем price в oi_daily root-тикера там, где нашлось совпадение по дате.
+  // /db/oidaily/backfillprice?ticker=AF
+  if (p === '/oidaily/backfillprice' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const rootTicker = u.searchParams.get('ticker');
+    if (!rootTicker) return json({ error: 'ticker required' }, 400);
+    const token = env.TINVEST_TOKEN;
+    if (!token) return json({ error: 'TINVEST_TOKEN secret не задан' }, 503);
+
+    const { results: rootRows } = await db.prepare(
+      'SELECT tradedate FROM oi_daily WHERE ticker=? ORDER BY tradedate ASC'
+    ).bind(rootTicker).all();
+    if (!rootRows.length) return json({ error: `нет данных oi_daily для ${rootTicker}` }, 404);
+    const fromDate = rootRows[0].tradedate, toDate = rootRows[rootRows.length - 1].tradedate;
+
+    let contracts;
+    try {
+      const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: rootTicker, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
+      });
+      if (!fr.ok) return json({ error: `T-Invest FindInstrument HTTP ${fr.status}` }, 502);
+      const fb = await fr.json();
+      const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
+      contracts = (fb.instruments || []).filter(i => rootRe.test(i.ticker || ''));
+    } catch(e) {
+      return json({ error: 'FindInstrument: ' + e.message }, 502);
+    }
+    if (!contracts.length) {
+      return json({ ticker: rootTicker, error: 'T-Invest не нашёл дескриптов этой серии', contractsFound: [], updated: 0 });
+    }
+
+    const priceOf = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
+    const priceByDate = {}; // date -> {price, vol} — при пересечении дескриптов берём больший объём
+    const contractsUsed = [];
+    for (const inst of contracts) {
+      try {
+        const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ figi: inst.figi, from: new Date(fromDate).toISOString(), to: new Date(toDate + 'T23:59:59Z').toISOString(), interval: 'CANDLE_INTERVAL_DAY' }),
+        });
+        if (!resp.ok) continue;
+        const body = await resp.json();
+        const candles = body.candles || [];
+        if (!candles.length) continue;
+        contractsUsed.push(inst.ticker);
+        const rows = candles.map(c => {
+          const ts = Math.floor(new Date(c.time).getTime() / 1000);
+          return { key: `${inst.ticker}__day__${ts}`, ticker: inst.ticker, tf: 'day', time: ts,
+                   o: priceOf(c.open), h: priceOf(c.high), l: priceOf(c.low), cl: priceOf(c.close), vol: c.volume ?? 0 };
+        });
+        // Заодно сохраняем свечи этого дескрипта в candles — пригодятся при
+        // прямых запросах по нему (без повторного похода в T-Invest).
+        for (let i = 0; i < rows.length; i += 100) {
+          const chunk = rows.slice(i, i + 100);
+          await db.batch(chunk.map(r =>
+            db.prepare('INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)')
+              .bind(r.key, r.ticker, r.tf, r.time, r.o, r.h, r.l, r.cl, r.vol)
+          ));
+        }
+        for (const r of rows) {
+          const date = new Date(r.time * 1000).toISOString().slice(0, 10);
+          const existing = priceByDate[date];
+          if (!existing || r.vol > existing.vol) priceByDate[date] = { price: r.cl, vol: r.vol };
+        }
+      } catch(e) { /* этот дескрипт не подтянулся — пробуем остальные */ }
+    }
+
+    const dates = Object.keys(priceByDate);
+    for (let i = 0; i < dates.length; i += 50) {
+      const chunk = dates.slice(i, i + 50);
+      await db.batch(chunk.map(date =>
+        db.prepare('UPDATE oi_daily SET price=? WHERE ticker=? AND tradedate=?')
+          .bind(priceByDate[date].price, rootTicker, date)
+      ));
+    }
+
+    return json({
+      ticker: rootTicker, datesTotal: rootRows.length, datesPriced: dates.length,
+      contractsFound: contracts.map(c => c.ticker), contractsUsed,
+    });
   }
 
   return json({ error: 'unknown db route: ' + p }, 404);
