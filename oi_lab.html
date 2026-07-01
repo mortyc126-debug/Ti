@@ -123,9 +123,13 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <label>Тикеры пула (через запятую, ≥2, каждый — отдельный базис)
       <input id="pool-tickers" type="text" placeholder="Si,Br,GOLD,RI" value="">
     </label>
+    <label>Мин. дней истории
+      <input id="pool-min-days" type="number" min="1" value="30" style="min-width:70px">
+    </label>
+    <button class="sec" onclick="poolFillAllTickers()">📋 Заполнить всеми из базы</button>
     <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
   </div>
-  <div id="pool-out" style="color:#6c7086;font-size:11px">Укажи ≥2 тикера и нажми «Рассчитать по пулу».</div>
+  <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
 </div>
 
 <!-- Таблица данных -->
@@ -2143,6 +2147,31 @@ function _poolBinStats(perInstrumentStats, HORIZONS, genericLabels) {
     }
     return { label, dir, stats };
   });
+}
+
+// Автозаполнение поля пула всеми root-тикерами (2-буквенный код) из базы,
+// чтобы не вбивать список вручную. Берём только root, а не дескрипты
+// (AFU6, SiU6...) — каждый пункт пула должен быть НЕЗАВИСИМЫМ базисом,
+// а не отдельным контрактом одной и той же серии (та склейка уже делает
+// resolveTickerFamily/aggregateContracts внутри _loadInstrumentForPool).
+async function poolFillAllTickers() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const minDays = parseInt(document.getElementById('pool-min-days').value) || 30;
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  setStatus('Пул: читаю список тикеров из базы…');
+  try {
+    const r = await fetch(`${proxy}/db/tickers`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const list = await r.json();
+    const roots = (Array.isArray(list) ? list : [])
+      .filter(row => /^[A-Za-z]{2}$/.test(row.ticker) && (row.days || 0) >= minDays)
+      .map(row => row.ticker);
+    if (!roots.length) { setStatus(`Пул: не нашлось root-тикеров с ≥${minDays} дней истории`, 'err'); return; }
+    document.getElementById('pool-tickers').value = roots.join(',');
+    setStatus(`Пул: заполнено ${roots.length} тикеров (${roots.join(', ')}) — нажми «Рассчитать по пулу»`, 'ok');
+  } catch(e) {
+    setStatus('Пул: ошибка чтения списка — ' + e.message, 'err');
+  }
 }
 
 async function labCalibratePool() {
