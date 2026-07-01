@@ -1608,6 +1608,7 @@ function labExportCsv() {
   const rows = _lastResult.map(r=>TABLE_COLS.map(c=>{
     const v = r[c.key];
     if (typeof v === 'boolean') return v?1:0;
+    if (typeof v === 'string') return v;
     if (!isFinite(v)) return '';
     return c.pct ? (v*c.pct).toFixed(4) : (c.dec!=null?v.toFixed(c.dec):v);
   }).join(',')).join('\n');
