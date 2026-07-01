@@ -759,70 +759,68 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     accumFlag = applyPhaseHysteresis(rawFlag, cfg.phase_confirm_bars);
   }
 
-  // Phase price range
+  // Phase price range — диапазон накопления.
+  // Во время фазы: rolling max/min close + actual H/L баров.
+  // После фазы: forward-fill, чтобы stressDist видел последний диапазон.
   const phaseHigh = new Array(n).fill(NaN);
-  const phaseLow = new Array(n).fill(NaN);
-  let runH = NaN, runL = NaN, curId = -1;
-  let phaseId = 0;
-  const phaseIds = new Array(n).fill(0);
+  const phaseLow  = new Array(n).fill(NaN);
+  let runH = NaN, runL = NaN;
+  let lastH = NaN, lastL = NaN; // forward-fill после окончания фазы
   for (let i=0; i<n; i++) {
     const prevFlag = i>0 ? accumFlag[i-1] : false;
-    if (accumFlag[i] && !prevFlag) phaseId++;
-    phaseIds[i] = phaseId;
-    if (phaseIds[i] !== curId) { curId=phaseIds[i]; runH=NaN; runL=NaN; }
+    if (accumFlag[i] && !prevFlag) { runH = NaN; runL = NaN; } // начало новой фазы — сброс
     if (accumFlag[i]) {
       const c = close[i];
-      runH = isNaN(runH) ? c : Math.max(runH, c);
-      runL = isNaN(runL) ? c : Math.min(runL, c);
+      const h = rows[i].high > 0 ? rows[i].high : c;
+      const l = rows[i].low  > 0 ? rows[i].low  : c;
+      runH = isNaN(runH) ? h : Math.max(runH, h);
+      runL = isNaN(runL) ? l : Math.min(runL, l);
+      lastH = runH; lastL = runL;
     }
-    phaseHigh[i] = runH;
-    phaseLow[i] = runL;
+    // Всегда forward-fill последнего известного диапазона
+    phaseHigh[i] = isFinite(runH) ? runH : lastH;
+    phaseLow[i]  = isFinite(runL) ? runL : lastL;
   }
 
-  // Intraday extremes (for daily bars: yesterday's high/low)
-  const yesterdayHigh = new Array(n).fill(NaN);
-  const yesterdayLow = new Array(n).fill(NaN);
-  // For daily bars "yesterday" is simply previous bar
-  for (let i=1; i<n; i++) {
-    yesterdayHigh[i] = close[i-1];
-    yesterdayLow[i] = close[i-1];
-  }
-
-  // Stress distance
+  // Стресс-дистанция: насколько цена вышла за пределы диапазона накопления.
+  // Два сценария:
+  //   domLong (физики в лонге) → опасен выброс ВВЕРХ (шорт-сжатие) ИЛИ пробой вниз (стоп-лоссы лонгов)
+  //   domShort (физики в шорте) → опасен выброс ВНИЗ (сжатие лонгов) ИЛИ пробой вверх
+  // Берём максимальное из двух направлений, чтобы не пропустить каскад.
   const stressDist = new Array(n).fill(0);
+  const breakoutDir = new Array(n).fill(0); // +1 = вверх, -1 = вниз
   for (let i=0; i<n; i++) {
     const c = close[i];
-    let refL = phaseLow[i], refH = phaseHigh[i];
-    if (cfg.include_yesterday_extreme) {
-      refL = isNaN(refL) ? yesterdayLow[i] : Math.min(refL, yesterdayLow[i]||refL);
-      refH = isNaN(refH) ? yesterdayHigh[i] : Math.max(refH, yesterdayHigh[i]||refH);
-    }
-    const domLong = netPhysPct[i] > 0;
-    if (domLong && isFinite(refL) && refL > 0 && c < refL) {
-      stressDist[i] = (refL - c) / refL;
-    } else if (!domLong && isFinite(refH) && refH > 0 && c > refH) {
-      stressDist[i] = (c - refH) / refH;
-    }
+    const refH = phaseHigh[i], refL = phaseLow[i];
+    if (!isFinite(refH) || !isFinite(refL) || refH <= 0) continue;
+    const up   = c > refH ? (c - refH) / refH : 0;
+    const down = c < refL ? (refL - c) / refL : 0;
+    if (up >= down) { stressDist[i] = up;   breakoutDir[i] = up > 0 ? 1 : 0; }
+    else            { stressDist[i] = down;  breakoutDir[i] = -1; }
   }
 
-  // Release factor
+  // Release factor — степень выброса
   const releaseFactor = stressDist.map(v=> Math.pow(Math.max(v/cfg.stress_scale,0), cfg.stress_power));
 
-  // Phase anchor
+  // Phase anchor — перекос OI на момент начала фазы (forward-fill)
   const phaseAnchor = new Array(n).fill(NaN);
   let lastAnchor = NaN;
   for (let i=0; i<n; i++) {
     const prevFlag = i>0 ? accumFlag[i-1] : false;
-    const isStart = accumFlag[i] && !prevFlag;
-    if (isStart) lastAnchor = netPhysPct[i];
-    if (accumFlag[i]) phaseAnchor[i] = lastAnchor;
-    else phaseAnchor[i] = lastAnchor; // ffill
+    if (accumFlag[i] && !prevFlag) lastAnchor = netPhysPct[i];
+    phaseAnchor[i] = lastAnchor; // всегда ffill
   }
 
-  // Phase potential
-  const phasePotential = phaseAnchor.map((a,i)=>
-    isFinite(a) ? a*(1+cfg.phase_release_gamma*releaseFactor[i]) : NaN
-  );
+  // Phase potential — прогнозируемое движение: anchor * release
+  // Знак: anchor>0 (физики в лонге) → при выбросе вверх давление растёт (шорт-сжатие)
+  //        anchor<0 → при выбросе вниз давление растёт
+  const phasePotential = phaseAnchor.map((a,i)=> {
+    if (!isFinite(a)) return NaN;
+    const dir = breakoutDir[i];
+    // Контрарная логика: физики в лонге (a>0) и выброс вверх (dir=1) → сигнал роста подтверждается
+    // Физики в лонге и выброс вниз → стоп-лоссы, сигнал падения
+    return a * (dir !== 0 ? dir : 1) * (1 + cfg.phase_release_gamma * releaseFactor[i]);
+  });
 
   return rows.map((r,i)=>({
     date: r.date,
@@ -840,6 +838,7 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     phase_high: phaseHigh[i],
     phase_low: phaseLow[i],
     stress_dist: stressDist[i],
+    breakout_dir: breakoutDir[i],
     release_factor: releaseFactor[i],
     phase_anchor: phaseAnchor[i],
     phase_potential: phasePotential[i],
@@ -877,8 +876,8 @@ function renderMetrics(result) {
     { lbl:'Перекос физ. лиц', val: fmt(last.net_phys_pct*100,1)+'%', sub:'статичный снэпшот: их нетто-позиция от ОИ', color: last.net_phys_pct>0?'#f38ba8':'#a6e3a1' },
     { lbl:'Z-оценка дисбаланса', val: fmt(last.imbalance_z,2), sub:'насколько перекос отличается от нормы (±1 = умеренно)', color: '#cdd6f4' },
     { lbl:'Надёжность', val: fmt(last.liquidity_conf,2), sub:'0→1: чем больше участников, тем надёжнее сигнал', color: last.liquidity_conf<0.3?'#f38ba8':'#a6e3a1' },
-    { lbl:'Потенциал выхода', val: fmt(last.phase_potential,3), sub:'ожидаемый сдвиг после флэта (появляется в фазе)', color: '#cba6f7' },
-    { lbl:'Стресс-риск', val: fmt(last.stress_dist*100,2)+'%', sub:'цена за пределами опорного уровня → риск стопов', color: last.stress_dist>0.01?'#f38ba8':'#6c7086' },
+    { lbl:'Потенциал выхода', val: fmt(last.phase_potential,3), sub:'anchor×release; знак = направление выброса', color: last.phase_potential>0?'#a6e3a1':last.phase_potential<0?'#f38ba8':'#cba6f7' },
+    { lbl:'Выброс за диапазон', val: last.breakout_dir===1?`↑ +${fmt(last.stress_dist*100,1)}%`:last.breakout_dir===-1?`↓ −${fmt(last.stress_dist*100,1)}%`:'внутри', sub:'насколько цена вышла за флэт-диапазон', color: last.stress_dist>0.005?'#f9e2af':'#6c7086' },
     { lbl:'Сила выброса', val: fmt(last.release_factor,3), sub:'как далеко цена от опорного уровня (больше = острее)', color: '#fab387' },
     { lbl:'Фаза накопления', val: last.accum_flag?'ДА':'нет', sub:'флэт + имбаланс = позиции набираются', color: last.accum_flag?'#89dceb':'#6c7086' },
     { lbl:'Открытый интерес', val: Math.round(last.total_oi).toLocaleString(), sub:'всего контрактов в рынке', color: '#cdd6f4' },
@@ -1212,6 +1211,7 @@ const TABLE_COLS = [
   { key:'weighted_imbalance', lbl:'Сигнал', dec:3 },
   { key:'accum_flag', lbl:'Флэт' },
   { key:'stress_dist', lbl:'Стресс%', dec:3, pct:100 },
+  { key:'breakout_dir', lbl:'Выброс↑↓', dec:0 },
   { key:'release_factor', lbl:'Сила выброса', dec:3 },
   { key:'phase_anchor', lbl:'Опорный %', dec:3 },
   { key:'phase_potential', lbl:'Потенциал', dec:3 },
