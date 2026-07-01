@@ -489,12 +489,21 @@ async function labLoad() {
       let rows = rawArr.map(normalizeRow).filter(r=>r.date);
       if (!rows.length) throw new Error(`Нет данных для ${t} (проверь бэкфилл)`);
 
-      // Мёрджим дневные свечи (O/H/L/C) по дате
+      // Мёрджим дневные свечи (O/H/L/C) по дате. Свечи в /db/candles/tinvest
+      // сохраняются под ПОЛНЫМ тикером (SiU6, AFU6...) — искать нужно по нему
+      // же, а не по 2-буквенному sym (тот совпадает с полным только у
+      // 2-буквенных root-кодов вроде «Si», для дескриптов — никогда, поэтому
+      // O/H/L/C из T-Invest фактически никогда не подтягивались).
       try {
-        const cr = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(sym)}&tf=day&from=0`);
-        if (cr.ok) {
+        let carr = [];
+        for (const key of [t, ...(sym !== t ? [sym] : [])]) {
+          const cr = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(key)}&tf=day&from=0`);
+          if (!cr.ok) continue;
           const cdata = await cr.json();
-          const carr = Array.isArray(cdata) ? cdata : (cdata.rows || []);
+          carr = Array.isArray(cdata) ? cdata : (cdata.rows || []);
+          if (carr.length) break;
+        }
+        if (carr.length) {
           const candleMap = {};
           for (const c of carr) {
             if (c.time) candleMap[_mskDateStr(c.time)] = c;
@@ -507,68 +516,76 @@ async function labLoad() {
         }
       } catch(_) {}
 
-      // Если режим «Часовой» — подменяем строки на часовые свечи + OI
+      // Если режим «Часовой» — подменяем строки на часовые свечи + OI.
+      // Свечи и oi_hourly тоже хранятся под полным тикером — та же проблема,
+      // что и с дневными свечами выше, поэтому сначала пробуем t, потом sym.
       if (mode === 'hourly') {
         try {
-          const hr = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(sym)}&tf=hour&from=0`);
-          if (hr.ok) {
+          let hcarr = [];
+          for (const key of [t, ...(sym !== t ? [sym] : [])]) {
+            const hr = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(key)}&tf=hour&from=0`);
+            if (!hr.ok) continue;
             const hdata = await hr.json();
-            const hcarr = (Array.isArray(hdata) ? hdata : (hdata.rows || [])).filter(c=>c.cl>0);
-            if (hcarr.length) {
-              // Пробуем часовые снэпшоты OI из oi_hourly (копятся с момента запуска cron)
-              let hourlyOiMap = null; // ts (ms, начало часа) → OI-запись
-              try {
-                const ohr = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(sym)}&days=180`);
-                if (ohr.ok) {
-                  const ohdata = await ohr.json();
-                  const oharr = Array.isArray(ohdata) ? ohdata : (ohdata.rows || []);
-                  if (oharr.length) {
-                    hourlyOiMap = {};
-                    for (const oh of oharr) hourlyOiMap[oh.ts] = oh;
-                  }
+            hcarr = (Array.isArray(hdata) ? hdata : (hdata.rows || [])).filter(c=>c.cl>0);
+            if (hcarr.length) break;
+          }
+          if (hcarr.length) {
+            // Пробуем часовые снэпшоты OI из oi_hourly (копятся с момента запуска cron)
+            let hourlyOiMap = null; // ts (ms, начало часа) → OI-запись
+            try {
+              let oharr = [];
+              for (const key of [t, ...(sym !== t ? [sym] : [])]) {
+                const ohr = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(key)}&days=180`);
+                if (!ohr.ok) continue;
+                const ohdata = await ohr.json();
+                oharr = Array.isArray(ohdata) ? ohdata : (ohdata.rows || []);
+                if (oharr.length) break;
+              }
+              if (oharr.length) {
+                hourlyOiMap = {};
+                for (const oh of oharr) hourlyOiMap[oh.ts] = oh;
+              }
+            } catch(_) {}
+
+            // Строим fallback: YYYY-MM-DD → дневная OI-запись
+            const oiByDate = {};
+            for (const r of rows) oiByDate[r.date] = r;
+
+            rows = hcarr.map(c => {
+              const date = _mskDateStr(c.time);
+              const tsH  = Math.floor(c.time / 3600) * 3600 * 1000; // начало часа в ms
+
+              // Если есть часовой снэпшот — берём его; иначе spread дневного
+              let oi;
+              if (hourlyOiMap) {
+                // Ищем ближайший снэпшот (FutOI обновляется каждые 5 мин)
+                // Берём запись с минимальной разницей по времени (окно ±30 мин)
+                const WINDOW = 30 * 60 * 1000;
+                let bestTs = null, bestDiff = Infinity;
+                for (const ts of Object.keys(hourlyOiMap)) {
+                  const diff = Math.abs(Number(ts) - tsH);
+                  if (diff < bestDiff && diff <= WINDOW) { bestDiff = diff; bestTs = ts; }
                 }
-              } catch(_) {}
-
-              // Строим fallback: YYYY-MM-DD → дневная OI-запись
-              const oiByDate = {};
-              for (const r of rows) oiByDate[r.date] = r;
-
-              rows = hcarr.map(c => {
-                const date = _mskDateStr(c.time);
-                const tsH  = Math.floor(c.time / 3600) * 3600 * 1000; // начало часа в ms
-
-                // Если есть часовой снэпшот — берём его; иначе spread дневного
-                let oi;
-                if (hourlyOiMap) {
-                  // Ищем ближайший снэпшот (FutOI обновляется каждые 5 мин)
-                  // Берём запись с минимальной разницей по времени (окно ±30 мин)
-                  const WINDOW = 30 * 60 * 1000;
-                  let bestTs = null, bestDiff = Infinity;
-                  for (const ts of Object.keys(hourlyOiMap)) {
-                    const diff = Math.abs(Number(ts) - tsH);
-                    if (diff < bestDiff && diff <= WINDOW) { bestDiff = diff; bestTs = ts; }
-                  }
-                  oi = bestTs ? hourlyOiMap[bestTs] : null;
-                }
-                const d = oiByDate[date] || {};
-                return {
-                  date: _mskDateTimeStr(c.time),
-                  _date: date,
-                  _has_hourly_oi: !!oi,
-                  close: c.cl, open: c.o, high: c.h, low: c.l,
-                  // Часовые поля из oi_hourly (или дневной spread как fallback)
-                  phys_long_contracts:  oi ? (oi.fiz_long  || 0) : (d.phys_long_contracts  || 0),
-                  phys_short_contracts: oi ? (oi.fiz_short || 0) : (d.phys_short_contracts || 0),
-                  phys_long_persons:    oi ? (oi.fiz_long_num  || 0) : (d.phys_long_persons  || 0),
-                  phys_short_persons:   oi ? (oi.fiz_short_num || 0) : (d.phys_short_persons || 0),
-                  legal_long_contracts:  oi ? (oi.yur_long  || 0) : (d.legal_long_contracts  || 0),
-                  legal_short_contracts: oi ? (oi.yur_short || 0) : (d.legal_short_contracts || 0),
-                  legal_long_persons:    oi ? (oi.yur_long_num  || 0) : (d.legal_long_persons  || 0),
-                  legal_short_persons:   oi ? (oi.yur_short_num || 0) : (d.legal_short_persons || 0),
-                  ref_switch: false,
-                };
-              });
-            }
+                oi = bestTs ? hourlyOiMap[bestTs] : null;
+              }
+              const d = oiByDate[date] || {};
+              return {
+                date: _mskDateTimeStr(c.time),
+                _date: date,
+                _has_hourly_oi: !!oi,
+                close: c.cl, open: c.o, high: c.h, low: c.l,
+                // Часовые поля из oi_hourly (или дневной spread как fallback)
+                phys_long_contracts:  oi ? (oi.fiz_long  || 0) : (d.phys_long_contracts  || 0),
+                phys_short_contracts: oi ? (oi.fiz_short || 0) : (d.phys_short_contracts || 0),
+                phys_long_persons:    oi ? (oi.fiz_long_num  || 0) : (d.phys_long_persons  || 0),
+                phys_short_persons:   oi ? (oi.fiz_short_num || 0) : (d.phys_short_persons || 0),
+                legal_long_contracts:  oi ? (oi.yur_long  || 0) : (d.legal_long_contracts  || 0),
+                legal_short_contracts: oi ? (oi.yur_short || 0) : (d.legal_short_contracts || 0),
+                legal_long_persons:    oi ? (oi.yur_long_num  || 0) : (d.legal_long_persons  || 0),
+                legal_short_persons:   oi ? (oi.yur_short_num || 0) : (d.legal_short_persons || 0),
+                ref_switch: false,
+              };
+            });
           }
         } catch(_) {}
       }
