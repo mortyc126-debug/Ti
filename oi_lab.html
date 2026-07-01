@@ -364,7 +364,9 @@ async function labLoad() {
     _lastRows = rows;
     _lastResult = result;
     renderAll(result);
-    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')})`, 'ok');
+    const hasHL = rows.some(r => r.high > 0 && r.low > 0);
+    const accumCount = result.filter(r => r.accum_flag).length;
+    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')}) | H/L свечи: ${hasHL ? 'есть' : 'НЕТ — нажми «Свечи день»'} | Накопление: ${accumCount} баров`, 'ok');
   } catch(e) {
     setStatus('Ошибка: ' + e.message, 'err');
     console.error(e);
@@ -679,9 +681,12 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   }
   const rangeThresh = _rollingQuantile(priceRange, cfg.range_window, cfg.range_percentile);
   const narrowRange = priceRange.map((v,i)=> isFinite(v)&&isFinite(rangeThresh[i]) ? v<=rangeThresh[i] : false);
-  // Условие имбаланса: |Z| > 0.3 (позиции набраны и держатся, не обязательно растут)
+  // Условие имбаланса: Z-score > 0.3 если история достаточна,
+  // иначе fallback на |netPhysPct| > 15% (работает с первого бара).
   const absZ = imbalanceZ.map(v=>isFinite(v)?Math.abs(v):NaN);
-  const imbalanceSignificant = absZ.map(v=>isFinite(v)&&v>0.3);
+  const imbalanceSignificant = absZ.map((v,i)=>
+    isFinite(v) ? v > 0.3 : Math.abs(netPhysPct[i]) > 0.15
+  );
   const rawFlag = narrowRange.map((v,i)=>v&&imbalanceSignificant[i]);
 
   let accumFlag;
