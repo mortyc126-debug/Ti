@@ -1803,7 +1803,20 @@ function labCalibrate() {
         stats[h] = { n: returns.length, mean: returns.reduce((a,b)=>a+b,0)/returns.length,
           median: med, accuracy: correct };
       }
-      bins2D.push({ levelLbl: lz.lbl, dynLbl: dz.lbl, dir: dz.dir, stats,
+      // Профиль скорости: доля итогового хода (к последнему горизонту),
+      // которая уже реализована к первому. Гипотеза (высказана пользователем):
+      // быстрый набор за короткое окно → сквиз реализуется быстро (доля
+      // близка к 1 уже на +1д); медленное, но большое накопление за долгое
+      // время → ход растягивается (доля маленькая, движение доразвивается
+      // только к +5д). Считаем только когда знак медианы не меняется между
+      // первым и последним горизонтом — иначе «доля» не имеет смысла.
+      const hFirst = HORIZONS[0], hLast = HORIZONS[HORIZONS.length-1];
+      const m1 = stats[hFirst]?.median, m5 = stats[hLast]?.median;
+      let speedShare = null;
+      if (isFinite(m1) && isFinite(m5) && Math.abs(m5) > 1e-9 && Math.sign(m1) === Math.sign(m5)) {
+        speedShare = Math.abs(m1) / Math.abs(m5);
+      }
+      bins2D.push({ levelLbl: lz.lbl, dynLbl: dz.lbl, dir: dz.dir, stats, speedShare,
         minL: lz.minL, maxL: lz.maxL, minD: dz.minD, maxD: dz.maxD });
     }
   }
@@ -1855,10 +1868,16 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const thinData = !firstS || firstS.n < 5;
     const color = thinData ? '#6c7086' : (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4');
     const thinNote = thinData ? `<div style="color:#f9e2af;font-size:11px;margin-top:4px">⚠️ Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
+    let speedNote = '';
+    if (bin.dir !== 0 && isFinite(bin.speedShare)) {
+      if (bin.speedShare >= 0.7) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">⚡ Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
+      else if (bin.speedShare <= 0.35) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">〰️ Ход обычно только начинается к ${hLbl(firstH)} и продолжает нарастать дальше — движение растянутое.</div>`;
+    }
     return `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid ${color}">
       <div style="font-size:11px;color:#6c7086;margin-bottom:3px">🎯 2D-позиция: уровень × динамика</div>
       <div style="font-size:14px;font-weight:700;color:${color}">${bin.levelLbl} · ${bin.dynLbl}</div>
       ${thinNote}
+      ${speedNote}
       <div style="margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">
         ${H.map(h => { const s=bin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
@@ -1939,7 +1958,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const levelLabels = [...new Set(bins2D.map(b => b.levelLbl))];
     const dynLabels   = [...new Set(bins2D.map(b => b.dynLbl))];
     const firstH = H[0];
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)})</summary>
+    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; ⚡/〰️ в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Уровень \\ Динамика</th>
@@ -1955,6 +1974,14 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
         if (!cell) { t += `<td colspan="${H.length}" style="text-align:center;color:#313244">—</td>`; continue; }
         const dcolor = cell.dir > 0 ? '#a6e3a1' : cell.dir < 0 ? '#f38ba8' : '#cdd6f4';
         const isCurrent = curBin2D && curBin2D.levelLbl === ll && curBin2D.dynLbl === dl;
+        // Профиль скорости — показываем один раз в первой колонке горизонта.
+        // ⚡ — ход уже почти весь случился к первому горизонту (быстрый сквиз);
+        // 〰️ — ход в основном ещё впереди на момент первого горизонта (растянутый).
+        let speedBadge = '';
+        if (cell.dir !== 0 && isFinite(cell.speedShare)) {
+          if (cell.speedShare >= 0.7) speedBadge = `<span title="Большая часть хода уже реализована к первому горизонту">⚡${(cell.speedShare*100).toFixed(0)}%</span>`;
+          else if (cell.speedShare <= 0.35) speedBadge = `<span title="Ход в основном ещё впереди на момент первого горизонта">〰️${(cell.speedShare*100).toFixed(0)}%</span>`;
+        }
         for (const h of H) {
           const s = cell.stats[h];
           const thinData = !s || s.n < 5;
@@ -1966,6 +1993,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
           t += `<td style="text-align:center;padding:4px 5px;background:${bg};border:${isCurrent?'1px solid #cba6f7':'none'};opacity:${thinData?0.55:1}"${warn}>
             <span style="color:${mc}">${fmtPct(s.median)}</span><br>
             <span style="color:${ac};font-size:10px">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'} N${s.n}</span>
+            ${h===H[0] && speedBadge ? `<br><span style="color:#fab387;font-size:10px">${speedBadge}</span>` : ''}
           </td>`;
         }
       }
