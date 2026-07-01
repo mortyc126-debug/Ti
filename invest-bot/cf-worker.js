@@ -375,65 +375,115 @@ async function scheduledCollectOi(env) {
 
   console.log(`oi cron: отобрано ${finalTickers.length} из ${all.length} фьючерсов`);
 
-  // 4. По каждому отобранному тикеру — FutOI (apim, нужен ключ) + цена из
-  // securities.json — и сохраняем дневной снэпшок. Чанками, чтобы не упереться
-  // в лимиты конкурентных запросов воркера.
-  const CHUNK = 6;
-  for (let i = 0; i < finalTickers.length; i += CHUNK) {
-    const chunk = finalTickers.slice(i, i + CHUNK);
-    await Promise.all(chunk.map(async r => {
-      try {
-        const sym = futoi2sym(r.ticker);
-        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&iss.meta=off&limit=1000`;
-        const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
-        if (!resp.ok) return;
-        const json2 = await resp.json();
-        const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
-        const rows = issBlockToObjects(block).filter(o => o.ticker === sym);
-        if (!rows.length) return;
-        const byGroup = {};
-        rows.forEach(o => {
-          const g = (o.clgroup || '').toUpperCase();
-          if (g !== 'YUR' && g !== 'FIZ') return;
-          if (!byGroup[g] || (o.tradetime || '') > (byGroup[g].tradetime || '')) byGroup[g] = o;
-        });
-        const date = (byGroup.YUR || byGroup.FIZ || {}).tradedate || today;
-        await upsertOiDaily(db, {
-          ticker: r.ticker, tradedate: date, price: r.price,
-          yur_long: Number(byGroup.YUR?.pos_long || 0),
-          yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
-          fiz_long: Number(byGroup.FIZ?.pos_long || 0),
-          fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
-          yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
-          yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
-          fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
-          fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
-        });
+  // 4. Один запрос FutOI без ticker= — возвращает ВСЕ тикеры с текущим OI.
+  // API обновляется каждые 5 минут, tradetime в ответе — время снэпшота.
+  // Сохраняем каждую запись с её tradetime как ключом в oi_hourly.
+  const now = new Date();
+  const nowDow = now.getUTCDay(); // 0=вс, 6=сб
+  const isTradingDay = nowDow >= 1 && nowDow <= 5;
+  const nowHourUtc = now.getUTCHours();
+  const isTradingHour = nowHourUtc >= 4 && nowHourUtc < 21;
 
-        // Если биржа работает (4:00-20:50 UTC = 7:00-23:50 МСК, пн-пт) — пишем
-        // ещё и в oi_hourly чтобы строить внутридневную историю позиций.
-        // Фильтр по дням недели делаем здесь, а не в cron — CF Dashboard
-        // не поддерживает MON-FRI синтаксис в базовом интерфейсе.
-        const now = new Date();
-        const nowHourUtc = now.getUTCHours();
-        const nowDow = now.getUTCDay(); // 0=вс, 1=пн, 6=сб
-        if (nowHourUtc >= 4 && nowHourUtc < 21 && nowDow >= 1 && nowDow <= 5) {
-          // Округляем ts до начала текущего часа
-          const tsHour = Math.floor(Date.now() / 3600000) * 3600000;
-          await upsertOiHourly(db, {
-            ticker: r.ticker, ts: tsHour, price: r.price,
-            yur_long: Number(byGroup.YUR?.pos_long || 0),
-            yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
-            fiz_long: Number(byGroup.FIZ?.pos_long || 0),
-            fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
-            yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
-            yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
-            fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
-            fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
-          });
-        }
-      } catch (e) { console.warn('oi cron:', r.ticker, e.message); }
-    }));
+  try {
+    const futUrl = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?iss.meta=off&limit=5000`;
+    const futResp = await fetch(futUrl, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+    if (!futResp.ok) {
+      console.warn('oi cron: FutOI HTTP', futResp.status);
+      return;
+    }
+    const futJson = await futResp.json();
+    const block = futJson.futoi || futJson[Object.keys(futJson).find(k => k !== 'metadata' && k !== 'history')];
+    const allRows = issBlockToObjects(block);
+
+    // Группируем по тикеру: { sym → { YUR: row, FIZ: row } }
+    // tradetime вида "HH:MM:SS" — берём последний снэпшот дня для oi_daily
+    // и ВСЕ снэпшоты дня для oi_hourly (если данные инtraday)
+    const byTicker = {};
+    for (const o of allRows) {
+      const g = (o.clgroup || '').toUpperCase();
+      if (g !== 'YUR' && g !== 'FIZ') continue;
+      const sym = o.ticker;
+      if (!byTicker[sym]) byTicker[sym] = {};
+      if (!byTicker[sym][g] || (o.tradetime || '') > (byTicker[sym][g].tradetime || ''))
+        byTicker[sym][g] = o;
+    }
+
+    // Цена из securities.json (уже есть в finalTickers)
+    const priceMap = {};
+    for (const r of finalTickers) priceMap[futoi2sym(r.ticker)] = r.price;
+
+    // Для отслеживаемых тикеров — сохраняем дневной снэпшот
+    const trackedSyms = new Set(finalTickers.map(r => futoi2sym(r.ticker)));
+    const toSave = [];
+    for (const [sym, groups] of Object.entries(byTicker)) {
+      if (!trackedSyms.has(sym)) continue;
+      const Y = groups.YUR, F = groups.FIZ;
+      const tradedate = (Y || F)?.tradedate || today;
+      const tradetime = (Y || F)?.tradetime || '00:00:00';
+      // Полный тикер (с месяцем) = ключ в oi_tracked_state; если не найден, используем sym
+      const fullTicker = finalTickers.find(r => futoi2sym(r.ticker) === sym)?.ticker || sym;
+      const rec = {
+        ticker: fullTicker, sym,
+        tradedate, tradetime,
+        price: priceMap[sym] || 0,
+        yur_long:     Number(Y?.pos_long  || 0),
+        yur_short:    Math.abs(Number(Y?.pos_short || 0)),
+        fiz_long:     Number(F?.pos_long  || 0),
+        fiz_short:    Math.abs(Number(F?.pos_short || 0)),
+        yur_long_num:  Number(Y?.pos_long_num  || 0),
+        yur_short_num: Number(Y?.pos_short_num || 0),
+        fiz_long_num:  Number(F?.pos_long_num  || 0),
+        fiz_short_num: Number(F?.pos_short_num || 0),
+      };
+      toSave.push(rec);
+    }
+
+    // Batch upsert в oi_daily (дневной итог — по дате)
+    for (let i = 0; i < toSave.length; i += 50) {
+      const chunk = toSave.slice(i, i + 50);
+      await db.batch(chunk.map(rec => {
+        const key = `${rec.ticker}__${rec.tradedate}`;
+        return db.prepare(
+          `INSERT OR REPLACE INTO oi_daily
+             (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+              yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+        ).bind(key, rec.ticker, rec.tradedate, rec.price,
+               rec.yur_long, rec.yur_short, rec.fiz_long, rec.fiz_short,
+               rec.yur_long_num, rec.yur_short_num, rec.fiz_long_num, rec.fiz_short_num,
+               Date.now());
+      }));
+    }
+
+    // В торговое время — дополнительно пишем в oi_hourly с ключом ticker__tradedate__tradetime
+    // Так сохраняется каждый 5-минутный снэпшот отдельно.
+    if (isTradingDay && isTradingHour) {
+      const tsFromApi = (rec) => {
+        const dt = `${rec.tradedate}T${rec.tradetime}+03:00`; // МСК = UTC+3
+        const ms = new Date(dt).getTime();
+        return isFinite(ms) ? ms : Date.now();
+      };
+      for (let i = 0; i < toSave.length; i += 50) {
+        const chunk = toSave.slice(i, i + 50);
+        await db.batch(chunk.map(rec => {
+          const ts = tsFromApi(rec);
+          const key = `${rec.ticker}__${rec.tradedate}__${rec.tradetime}`;
+          return db.prepare(
+            `INSERT OR REPLACE INTO oi_hourly
+               (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
+                yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+          ).bind(key, rec.ticker, ts, rec.price,
+                 rec.yur_long, rec.yur_short, rec.fiz_long, rec.fiz_short,
+                 rec.yur_long_num, rec.yur_short_num, rec.fiz_long_num, rec.fiz_short_num);
+        }));
+      }
+      console.log(`oi cron: ${toSave.length} тикеров → oi_daily + oi_hourly (${today} ${(toSave[0]?.tradetime || '')})`);
+    } else {
+      console.log(`oi cron: ${toSave.length} тикеров → oi_daily only`);
+    }
+  } catch (e) {
+    console.error('oi cron: FutOI fetch failed:', e.message);
   }
 }
 

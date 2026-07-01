@@ -362,10 +362,15 @@ async function labLoad() {
                 // Если есть часовой снэпшот — берём его; иначе spread дневного
                 let oi;
                 if (hourlyOiMap) {
-                  // Ищем ближайший снэпшот в ±2 часа (FutOI обновляется не ровно в начале часа)
-                  const candidates = [tsH, tsH - 3600000, tsH + 3600000, tsH - 7200000, tsH + 7200000];
-                  const found = candidates.find(t => hourlyOiMap[t]);
-                  oi = found ? hourlyOiMap[found] : null;
+                  // Ищем ближайший снэпшот (FutOI обновляется каждые 5 мин)
+                  // Берём запись с минимальной разницей по времени (окно ±30 мин)
+                  const WINDOW = 30 * 60 * 1000;
+                  let bestTs = null, bestDiff = Infinity;
+                  for (const ts of Object.keys(hourlyOiMap)) {
+                    const diff = Math.abs(Number(ts) - tsH);
+                    if (diff < bestDiff && diff <= WINDOW) { bestDiff = diff; bestTs = ts; }
+                  }
+                  oi = bestTs ? hourlyOiMap[bestTs] : null;
                 }
                 const d = oiByDate[date] || {};
                 return {
