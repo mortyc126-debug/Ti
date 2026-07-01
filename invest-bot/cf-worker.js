@@ -874,7 +874,7 @@ async function handleDb(path, req, env) {
     return json(results);
   }
 
-  if (p.startsWith('/oidaily') && req.method === 'GET') {
+  if (p === '/oidaily' && req.method === 'GET') {
     const ticker = new URL(req.url).searchParams.get('ticker');
     if (!ticker) return json({ error: 'ticker required' }, 400);
     const { results } = await db.prepare(
