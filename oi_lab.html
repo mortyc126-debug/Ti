@@ -2412,6 +2412,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   html += _poolTable(poolSp, '📈 Пул — давление сжатия');
   html += _breakdownTable(perInstrumentSp, '📈 Давление сжатия', 3);
   html += _poolTable(poolPhase, '🔵📤 Пул — фазы и тренд-истощение');
+  html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 1);
   html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 3);
 
   el.innerHTML = html;
