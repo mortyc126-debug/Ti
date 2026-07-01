@@ -947,6 +947,14 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   );
   const squeezePressure = squeezePressureZ.map(z => isFinite(z) ? Math.tanh(z / 2) : NaN);
 
+  // Причинные (без заглядывания в будущее) перцентильные ранги для калибровки —
+  // _makeBins в labCalibrate/labCalibratePool раньше считал p20/40/60/80 по
+  // ВСЕЙ загруженной истории разом, включая даты ПОСЛЕ любой конкретной точки —
+  // в реальном времени такого порога ещё не существовало бы. squeezePressureRank/
+  // netPhysPctRank считаются как phys_short_pctl — скользящим окном строго назад.
+  const squeezePressureRank = _percentileRank(squeezePressure, cfg.liquidity_window);
+  const netPhysPctRank = _percentileRank(netPhysPct, cfg.liquidity_window);
+
   // Z-score
   const rollMean = _rollingMean(netPhysPct, cfg.z_window);
   const rollStd = _rollingStd(netPhysPct, cfg.z_window);
@@ -1195,6 +1203,7 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     date: r.date,
     close: close[i],
     net_phys_pct: netPhysPct[i],
+    net_phys_pct_rank: netPhysPctRank[i],
     total_oi: totalOI[i],
     total_persons: totalPersons[i],
     imbalance_z: imbalanceZ[i],
@@ -1220,6 +1229,7 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     roll_d_short: rollDShort[i],
     squeeze_pressure: squeezePressure[i],
     squeeze_pressure_z: squeezePressureZ[i],
+    squeeze_pressure_rank: squeezePressureRank[i],
     phys_short_pctl: physSPctl[i],
     phys_long_pctl:  physLPctl[i],
   }));
@@ -1396,8 +1406,8 @@ function drawPrice(result) {
 
     // Ожидаемое движение из калибровки
     let calibTip = '';
-    if (_lastCalibStats && isFinite(row.squeeze_pressure)) {
-      const bin = _lastCalibStats.find(b => row.squeeze_pressure >= b.min && row.squeeze_pressure < b.max);
+    if (_lastCalibStats && isFinite(row.squeeze_pressure_rank)) {
+      const bin = _lastCalibStats.find(b => row.squeeze_pressure_rank >= b.min && row.squeeze_pressure_rank < b.max);
       if (bin) {
         const fmtP = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
         const col = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
@@ -1662,17 +1672,19 @@ function _median(arr) {
 
 // Вспомогательная функция построения перцентильных бинов — используется и
 // одиночной калибровкой (labCalibrate), и пуловой (labCalibratePool).
-function _makeBins(values, labels, topDir=-1) {
-  const valid = values.filter(isFinite).sort((a,b)=>a-b);
-  const _p = p => valid[Math.floor((valid.length-1)*p)] ?? NaN;
-  const [p20, p40, p60, p80] = [0.2, 0.4, 0.6, 0.8].map(_p);
-  const f = v => (v*100).toFixed(1)+'%';
+// Бины по уже причинному перцентильному рангу (0..1, посчитан скользящим окном
+// строго назад — см. squeeze_pressure_rank/net_phys_pct_rank в computeIndicator).
+// В отличие от _makeBins, здесь НЕ вычисляются пороги по всей загруженной
+// истории разом (это и было утечкой из будущего: в реальном времени такого
+// порога, посчитанного из ещё не наступивших дат, просто не существовало бы) —
+// границы 0.2/0.4/0.6/0.8 фиксированы, вся адаптация уже сделана на уровне ранга.
+function _makeBinsFromRank(labels, topDir=-1) {
   return [
-    { label: labels[0](f(p80)), min: p80,      max: Infinity, dir: topDir },
-    { label: labels[1](f(p60),f(p80)), min: p60, max: p80,    dir: topDir },
-    { label: labels[2](f(p40),f(p60)), min: p40, max: p60,    dir:  0 },
-    { label: labels[3](f(p20),f(p40)), min: p20, max: p40,    dir: -topDir },
-    { label: labels[4](f(p20)), min: -Infinity, max: p20,     dir: -topDir },
+    { label: labels[0](), min: 0.8, max: Infinity, dir: topDir },
+    { label: labels[1](), min: 0.6, max: 0.8,      dir: topDir },
+    { label: labels[2](), min: 0.4, max: 0.6,      dir: 0 },
+    { label: labels[3](), min: 0.2, max: 0.4,      dir: -topDir },
+    { label: labels[4](), min: -Infinity, max: 0.2, dir: -topDir },
   ];
 }
 
@@ -1758,13 +1770,16 @@ function labCalibrate() {
     });
   }
 
-  // Бины 1: снэпшот позиции (net_phys_pct)
-  const BINS_NPP = _makeBins(result.map(r=>r.net_phys_pct), [
-    p => `Физики >p80 (${p}) в лонге → пад. ↓↓`,
-    (a,b) => `Физики p60-80 (${a}…${b}) → пад. ↓`,
-    (a,b) => `Нейтраль p40-60 (${a}…${b})`,
-    (a,b) => `Физики p20-40 (${a}…${b}) → рост ↑`,
-    p => `Физики <p20 (${p}) в шорте → рост ↑↑`,
+  // Бины 1: снэпшот позиции (net_phys_pct). Бинуем по net_phys_pct_rank —
+  // причинному перцентилю (см. computeIndicator) — а не по сырому значению
+  // с порогами, посчитанными по всей загруженной истории разом (это была
+  // утечка из будущего: в реальном времени такого порога ещё не было бы).
+  const BINS_NPP = _makeBinsFromRank([
+    () => `Физики >p80 в лонге → пад. ↓↓`,
+    () => `Физики p60-80 → пад. ↓`,
+    () => `Нейтраль p40-60`,
+    () => `Физики p20-40 → рост ↑`,
+    () => `Физики <p20 в шорте → рост ↑↑`,
   ]);
 
   // Бины 2: динамика накопления (squeeze_pressure = tanh(z-score потока шорт-лонг))
@@ -1775,37 +1790,35 @@ function labCalibrate() {
   // просто потому, что формула чаще давала +1 в трендовом падении, а не потому,
   // что «шорты набирали → жди падения»). Теперь squeeze_pressure магнитудо-
   // чувствителен, и знак дирекции должен совпадать с его собственным
-  // определением: dir = +1 на верхнем бине, -1 на нижнем.
-  const BINS_SP = _makeBins(result.map(r=>r.squeeze_pressure), [
-    p => `Шорт набирали агрессивно >p80 (${p}) → сжатие, рост ↑↑`,
-    (a,b) => `Шорт набирали умеренно p60-80 (${a}…${b}) → рост ↑`,
-    (a,b) => `Баланс p40-60 (${a}…${b})`,
-    (a,b) => `Лонг набирали p20-40 (${a}…${b}) → пад. ↓`,
-    p => `Лонг набирали агрессивно <p20 (${p}) → пад. ↓↓`,
+  // определением: dir = +1 на верхнем бине, -1 на нижнем. Бинуем по
+  // squeeze_pressure_rank (причинный перцентиль) по той же причине, что и NPP выше.
+  const BINS_SP = _makeBinsFromRank([
+    () => `Шорт набирали агрессивно >p80 → сжатие, рост ↑↑`,
+    () => `Шорт набирали умеренно p60-80 → рост ↑`,
+    () => `Баланс p40-60`,
+    () => `Лонг набирали p20-40 → пад. ↓`,
+    () => `Лонг набирали агрессивно <p20 → пад. ↓↓`,
   ], 1);
 
-  const binStatsNpp = _calcBinStats(BINS_NPP, r => r.net_phys_pct, result, fwd, HORIZONS);
-  const binStatsSp  = _calcBinStats(BINS_SP,  r => r.squeeze_pressure, result, fwd, HORIZONS);
+  const binStatsNpp = _calcBinStats(BINS_NPP, r => r.net_phys_pct_rank, result, fwd, HORIZONS);
+  const binStatsSp  = _calcBinStats(BINS_SP,  r => r.squeeze_pressure_rank, result, fwd, HORIZONS);
 
   // Бины 3: 2D — абсолютный уровень шортов × динамика набора
   // Ячейки: уровень шортов в 3 зонах × давление сжатия в 3 зонах = 9 ячеек
   // Уровень шортов: low (<p33), mid (p33-66), high (>p66) — по phys_short_pctl
-  // Давление сжатия: negative (<p33), flat (p33-66), positive (>p66) — по squeeze_pressure
-  const shortPctls = result.map(r=>r.phys_short_pctl).filter(isFinite).sort((a,b)=>a-b);
-  const sqPvals    = result.map(r=>r.squeeze_pressure).filter(isFinite).sort((a,b)=>a-b);
-  const _pV = (arr, p) => arr[Math.floor((arr.length-1)*p)] ?? NaN;
-  const [sp33, sp66] = [0.33, 0.66].map(p => _pV(shortPctls, p));
-  const [sq33, sq66] = [0.33, 0.66].map(p => _pV(sqPvals, p));
-
+  // Давление сжатия: negative (<p33), flat (p33-66), positive (>p66) — по squeeze_pressure_rank
+  // Оба поля УЖЕ причинные перцентили (см. computeIndicator) — границы 0.33/0.66
+  // фиксированы, а не пересчитаны по всей загруженной истории (раньше здесь
+  // была та же утечка из будущего, что и в _makeBins).
   const LEVEL_ZONES = [
-    { lbl: 'Шорт высокий >p66', minL: sp66, maxL: Infinity },
-    { lbl: 'Шорт средний p33-66', minL: sp33, maxL: sp66 },
-    { lbl: 'Шорт низкий <p33', minL: -Infinity, maxL: sp33 },
+    { lbl: 'Шорт высокий >p66', minL: 0.66, maxL: Infinity },
+    { lbl: 'Шорт средний p33-66', minL: 0.33, maxL: 0.66 },
+    { lbl: 'Шорт низкий <p33', minL: -Infinity, maxL: 0.33 },
   ];
   const DYN_ZONES = [
-    { lbl: 'Шорт набирали', minD: sq66, maxD: Infinity, dir: 1 },
-    { lbl: 'Баланс', minD: sq33, maxD: sq66, dir: 0 },
-    { lbl: 'Лонг набирали', minD: -Infinity, maxD: sq33, dir: -1 },
+    { lbl: 'Шорт набирали', minD: 0.66, maxD: Infinity, dir: 1 },
+    { lbl: 'Баланс', minD: 0.33, maxD: 0.66, dir: 0 },
+    { lbl: 'Лонг набирали', minD: -Infinity, maxD: 0.33, dir: -1 },
   ];
 
   const bins2D = [];
@@ -1813,9 +1826,9 @@ function labCalibrate() {
     for (const dz of DYN_ZONES) {
       const indices = result.map((_,i)=>i).filter(i => {
         const r = result[i];
-        return isFinite(r.phys_short_pctl) && isFinite(r.squeeze_pressure)
+        return isFinite(r.phys_short_pctl) && isFinite(r.squeeze_pressure_rank)
           && r.phys_short_pctl >= lz.minL && r.phys_short_pctl < lz.maxL
-          && r.squeeze_pressure >= dz.minD && r.squeeze_pressure < dz.maxD;
+          && r.squeeze_pressure_rank >= dz.minD && r.squeeze_pressure_rank < dz.maxD;
       });
       const stats = {};
       for (const h of HORIZONS) {
@@ -1853,11 +1866,11 @@ function labCalibrate() {
   const binStatsPhase = _calcCategoricalStats(PHASE_DEFS, result, fwd, HORIZONS);
 
   const last = [...result].reverse().find(r => isFinite(r.squeeze_pressure));
-  const curBinNpp = last ? binStatsNpp.find(b => last.net_phys_pct >= b.min && last.net_phys_pct < b.max) : null;
-  const curBinSp  = last ? binStatsSp.find(b => last.squeeze_pressure >= b.min && last.squeeze_pressure < b.max) : null;
+  const curBinNpp = last ? binStatsNpp.find(b => last.net_phys_pct_rank >= b.min && last.net_phys_pct_rank < b.max) : null;
+  const curBinSp  = last ? binStatsSp.find(b => last.squeeze_pressure_rank >= b.min && last.squeeze_pressure_rank < b.max) : null;
   const curBin2D  = last ? bins2D.find(b =>
     last.phys_short_pctl >= b.minL && last.phys_short_pctl < b.maxL &&
-    last.squeeze_pressure >= b.minD && last.squeeze_pressure < b.maxD
+    last.squeeze_pressure_rank >= b.minD && last.squeeze_pressure_rank < b.maxD
   ) : null;
 
   // Для тултипа используем squeeze_pressure (динамика важнее снэпшота)
@@ -2053,8 +2066,8 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
 
   for (let i = result.length - 1; i >= 0; i--) {
     const r = result[i];
-    if (!isFinite(r.squeeze_pressure)) continue;
-    const bin = binStatsSp.find(b => r.squeeze_pressure >= b.min && r.squeeze_pressure < b.max);
+    if (!isFinite(r.squeeze_pressure) || !isFinite(r.squeeze_pressure_rank)) continue;
+    const bin = binStatsSp.find(b => r.squeeze_pressure_rank >= b.min && r.squeeze_pressure_rank < b.max);
     const rowBg = bin ? (bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030') : '#1e2030';
     const lblCol = bin ? (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4') : '#cdd6f4';
     const spPct = (r.squeeze_pressure*100).toFixed(1)+'%';
@@ -2327,14 +2340,14 @@ async function labCalibratePool() {
   const perInstrumentSp    = [];
   const perInstrumentPhase = [];
   for (const inst of instruments) {
-    const BINS_SP = _makeBins(inst.result.map(r=>r.squeeze_pressure), [
-      p => `Шорт набирали агрессивно >p80 (${p}) → сжатие, рост ↑↑`,
-      (a,b) => `Шорт набирали умеренно p60-80 (${a}…${b}) → рост ↑`,
-      (a,b) => `Баланс p40-60 (${a}…${b})`,
-      (a,b) => `Лонг набирали p20-40 (${a}…${b}) → пад. ↓`,
-      p => `Лонг набирали агрессивно <p20 (${p}) → пад. ↓↓`,
+    const BINS_SP = _makeBinsFromRank([
+      () => `Шорт набирали агрессивно >p80 → сжатие, рост ↑↑`,
+      () => `Шорт набирали умеренно p60-80 → рост ↑`,
+      () => `Баланс p40-60`,
+      () => `Лонг набирали p20-40 → пад. ↓`,
+      () => `Лонг набирали агрессивно <p20 → пад. ↓↓`,
     ], 1);
-    perInstrumentSp.push(_calcBinStats(BINS_SP, r => r.squeeze_pressure, inst.result, inst.fwd, HORIZONS));
+    perInstrumentSp.push(_calcBinStats(BINS_SP, r => r.squeeze_pressure_rank, inst.result, inst.fwd, HORIZONS));
     perInstrumentPhase.push(_calcCategoricalStats(PHASE_DEFS, inst.result, inst.fwd, HORIZONS));
   }
 
