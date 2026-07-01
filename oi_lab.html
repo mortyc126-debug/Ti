@@ -1630,17 +1630,17 @@ function labCalibrate() {
   }
 
   // Вспомогательная функция построения перцентильных бинов
-  function _makeBins(values, labels) {
+  function _makeBins(values, labels, topDir=-1) {
     const valid = values.filter(isFinite).sort((a,b)=>a-b);
     const _p = p => valid[Math.floor((valid.length-1)*p)] ?? NaN;
     const [p20, p40, p60, p80] = [0.2, 0.4, 0.6, 0.8].map(_p);
     const f = v => (v*100).toFixed(1)+'%';
     return [
-      { label: labels[0](f(p80)), min: p80,      max: Infinity, dir: -1 },
-      { label: labels[1](f(p60),f(p80)), min: p60, max: p80,    dir: -1 },
+      { label: labels[0](f(p80)), min: p80,      max: Infinity, dir: topDir },
+      { label: labels[1](f(p60),f(p80)), min: p60, max: p80,    dir: topDir },
       { label: labels[2](f(p40),f(p60)), min: p40, max: p60,    dir:  0 },
-      { label: labels[3](f(p20),f(p40)), min: p20, max: p40,    dir:  1 },
-      { label: labels[4](f(p20)), min: -Infinity, max: p20,     dir:  1 },
+      { label: labels[3](f(p20),f(p40)), min: p20, max: p40,    dir: -topDir },
+      { label: labels[4](f(p20)), min: -Infinity, max: p20,     dir: -topDir },
     ];
   }
 
@@ -1653,17 +1653,22 @@ function labCalibrate() {
     p => `Физики <p20 (${p}) в шорте → рост ↑↑`,
   ]);
 
-  // Бины 2: динамика накопления (squeeze_pressure = (rollDShort - rollDLong) / total)
-  // p80+ → rollDShort >> rollDLong → шорты набирали агрессивно
-  // p20- → rollDLong >> rollDShort → лонги набирали агрессивно
-  // Dir берём эмпирический (в этом датасете шорт-накопление = падение продолжается)
+  // Бины 2: динамика накопления (squeeze_pressure = tanh(z-score потока шорт-лонг))
+  // p80+ → шорты набирали интенсивнее нормы → потенциал сжатия шортов → рост
+  // p20- → лонги набирали интенсивнее нормы → потенциал сжатия лонгов → падение
+  // Раньше dir был перевёрнут («эмпирически» подогнан под старую, схлопывавшуюся
+  // в ±1 формулу squeeze_pressure — там высокое давление коррелировало с падением
+  // просто потому, что формула чаще давала +1 в трендовом падении, а не потому,
+  // что «шорты набирали → жди падения»). Теперь squeeze_pressure магнитудо-
+  // чувствителен, и знак дирекции должен совпадать с его собственным
+  // определением: dir = +1 на верхнем бине, -1 на нижнем.
   const BINS_SP = _makeBins(result.map(r=>r.squeeze_pressure), [
-    p => `Шорт набирали агрессивно >p80 (${p}) → пад. ↓↓`,
-    (a,b) => `Шорт набирали умеренно p60-80 (${a}…${b}) → пад. ↓`,
+    p => `Шорт набирали агрессивно >p80 (${p}) → сжатие, рост ↑↑`,
+    (a,b) => `Шорт набирали умеренно p60-80 (${a}…${b}) → рост ↑`,
     (a,b) => `Баланс p40-60 (${a}…${b})`,
-    (a,b) => `Лонг набирали p20-40 (${a}…${b})`,
-    p => `Лонг набирали агрессивно <p20 (${p})`,
-  ]);
+    (a,b) => `Лонг набирали p20-40 (${a}…${b}) → пад. ↓`,
+    p => `Лонг набирали агрессивно <p20 (${p}) → пад. ↓↓`,
+  ], 1);
 
   function _calcBinStats(BINS, getVal) {
     return BINS.map(bin => {
