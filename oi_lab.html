@@ -1812,7 +1812,7 @@ function labCalibrate() {
       // первым и последним горизонтом — иначе «доля» не имеет смысла.
       const hFirst = HORIZONS[0], hLast = HORIZONS[HORIZONS.length-1];
       const m1 = stats[hFirst]?.median, m5 = stats[hLast]?.median;
-      let speedShare = null;
+      let speedShare = NaN;
       if (isFinite(m1) && isFinite(m5) && Math.abs(m5) > 1e-9 && Math.sign(m1) === Math.sign(m5)) {
         speedShare = Math.abs(m1) / Math.abs(m5);
       }
@@ -1870,7 +1870,8 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const thinNote = thinData ? `<div style="color:#f9e2af;font-size:11px;margin-top:4px">⚠️ Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
     let speedNote = '';
     if (bin.dir !== 0 && isFinite(bin.speedShare)) {
-      if (bin.speedShare >= 0.7) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">⚡ Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
+      if (bin.speedShare > 1.3) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">🔄 Ход обычно уже ПЕРЕЛЁТЕЛ итоговый уровень к ${hLbl(firstH)} и потом частично откатывает — не путать с «быстрым» движением.</div>`;
+      else if (bin.speedShare >= 0.7) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">⚡ Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
       else if (bin.speedShare <= 0.35) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">〰️ Ход обычно только начинается к ${hLbl(firstH)} и продолжает нарастать дальше — движение растянутое.</div>`;
     }
     return `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid ${color}">
@@ -1976,10 +1977,12 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
         const isCurrent = curBin2D && curBin2D.levelLbl === ll && curBin2D.dynLbl === dl;
         // Профиль скорости — показываем один раз в первой колонке горизонта.
         // ⚡ — ход уже почти весь случился к первому горизонту (быстрый сквиз);
-        // 〰️ — ход в основном ещё впереди на момент первого горизонта (растянутый).
+        // 〰️ — ход в основном ещё впереди на момент первого горизонта (растянутый);
+        // 🔄 — ход уже ПЕРЕЛЕТЕЛ итоговый уровень и потом частично откатил (>130%).
         let speedBadge = '';
         if (cell.dir !== 0 && isFinite(cell.speedShare)) {
-          if (cell.speedShare >= 0.7) speedBadge = `<span title="Большая часть хода уже реализована к первому горизонту">⚡${(cell.speedShare*100).toFixed(0)}%</span>`;
+          if (cell.speedShare > 1.3) speedBadge = `<span title="Ход перелетел итоговый уровень к первому горизонту и потом частично откатил">🔄${(cell.speedShare*100).toFixed(0)}%</span>`;
+          else if (cell.speedShare >= 0.7) speedBadge = `<span title="Большая часть хода уже реализована к первому горизонту">⚡${(cell.speedShare*100).toFixed(0)}%</span>`;
           else if (cell.speedShare <= 0.35) speedBadge = `<span title="Ход в основном ещё впереди на момент первого горизонта">〰️${(cell.speedShare*100).toFixed(0)}%</span>`;
         }
         for (const h of H) {
