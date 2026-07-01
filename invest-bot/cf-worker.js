@@ -1,6 +1,6 @@
 // Cloudflare Worker — CORS-прокси + D1 для OI·INTEL
 //
-// Binding: интерес → D1 database oi_signal1
+// Binding: OI_DB → D1 database oi_signal1
 //
 // Маршруты /db/:
 //   /db/init                          GET  — создать/обновить схему
@@ -56,7 +56,7 @@ const CORS = {
   'Access-Control-Allow-Private-Network': 'true',
 };
 
-const DB = env => env.интерес;
+const DB = env => env.OI_DB;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -545,7 +545,7 @@ async function backfillOiHistory(db, env, tickers, days) {
 
 async function handleDb(path, req, env) {
   const db = DB(env);
-  if (!db) return json({ error: 'D1 binding "интерес" не настроен' }, 503);
+  if (!db) return json({ error: 'D1 binding "OI_DB" не настроен' }, 503);
 
   const p = path.replace(/^\/db/, '');
 
