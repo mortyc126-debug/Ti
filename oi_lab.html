@@ -170,8 +170,14 @@ const CFG_DEFAULTS = {
   min_phase_samples_per_bucket: 2,
   adaptive_confirm_floor: 1,
   trend_exhaust_window: 5,       // баров подряд одного направления, чтобы считать «тренд»
-  trend_exhaust_move_pctl: 0.85, // перцентиль хода цены (по своей истории), выше которого — «резкий»
-  trend_exhaust_pctl: 0.85,      // перцентиль позиции физлиц (люди), выше которого — «крайняя»
+  // Пороги разделены по направлению: перебор по пулу (52 инструмента) показал,
+  // что оптимум move_pctl для шорт-сквиза (~0.78, edge падает дальше) и для
+  // лонг-коррекции (растёт монотонно до 0.86+) — РАЗНЫЕ, единый порог был
+  // компромиссом, теряющим edge на обеих сторонах.
+  trend_exhaust_move_pctl_short: 0.78, // перцентиль хода цены ВНИЗ перед шорт-сквизом
+  trend_exhaust_move_pctl_long: 0.86,  // перцентиль хода цены ВВЕРХ перед лонг-коррекцией
+  trend_exhaust_pctl_short: 0.9,       // перцентиль позиции (шорт физлиц), выше которого — «крайняя»
+  trend_exhaust_pctl_long: 0.9,        // перцентиль позиции (лонг физлиц), выше которого — «крайняя»
 };
 
 const CFG_LABELS = {
@@ -199,8 +205,10 @@ const CFG_LABELS = {
   min_phase_samples_per_bucket: 'Мин.фаз в корзине',
   adaptive_confirm_floor: 'Мин.confirm (пол)',
   trend_exhaust_window: 'Окно тренд-истощ.',
-  trend_exhaust_move_pctl: 'Перцентиль хода тренда',
-  trend_exhaust_pctl: 'Перцентиль экстрем.',
+  trend_exhaust_move_pctl_short: 'Перцентиль хода (шорт→сквиз)',
+  trend_exhaust_move_pctl_long: 'Перцентиль хода (лонг→коррекция)',
+  trend_exhaust_pctl_short: 'Перцентиль экстрем. (шорт)',
+  trend_exhaust_pctl_long: 'Перцентиль экстрем. (лонг)',
 };
 
 function buildCfgUI() {
@@ -1193,9 +1201,9 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   for (let i=0; i<n; i++) {
     const tr = trendReturn[i], trp = trendReturnPctl[i];
     if (!isFinite(tr) || !isFinite(trp)) continue;
-    if (trp <= (1 - cfg.trend_exhaust_move_pctl) && isFinite(totalShortPctl[i]) && totalShortPctl[i] >= cfg.trend_exhaust_pctl) {
+    if (trp <= (1 - cfg.trend_exhaust_move_pctl_short) && isFinite(totalShortPctl[i]) && totalShortPctl[i] >= cfg.trend_exhaust_pctl_short) {
       trendExhaust[i] = 1;
-    } else if (trp >= cfg.trend_exhaust_move_pctl && isFinite(totalLongPctl[i]) && totalLongPctl[i] >= cfg.trend_exhaust_pctl) {
+    } else if (trp >= cfg.trend_exhaust_move_pctl_long && isFinite(totalLongPctl[i]) && totalLongPctl[i] >= cfg.trend_exhaust_pctl_long) {
       trendExhaust[i] = -1;
     }
   }
@@ -2463,28 +2471,35 @@ async function labSweepPool() {
   const HORIZONS = [1, 2, 3, 5];
   const baseCfg = readCfg();
 
-  // Одна ось за раз: двигаем один порог мелким шагом, второй держим на
-  // текущем значении cfg, идём вверх от 0.5, пока N обоих бинов не упадёт
-  // ниже SWEEP_MIN_N — это и есть «основание», о котором спросили.
-  function sweepAxis(axisKey, otherKey) {
+  // Пороги шорт-сквиза и лонг-коррекции теперь раздельные параметры (перебор
+  // показал, что общий порог был компромиссом — оптимумы у направлений разные).
+  // Значит и перебор для них независимый: каждая ось двигает только «свой»
+  // порог, три остальных держатся на текущих значениях cfg, и останов —
+  // по N ТОЛЬКО того бина, который эта ось затрагивает.
+  function sweepAxis(axisKey, direction) {
     const points = [];
     for (let v = 0.5; v <= 0.99; v += SWEEP_STEP) {
       const cfg = { ...baseCfg, [axisKey]: v };
       const r = _computeTrendExhaustEdges(cfg, HORIZONS);
       points.push({ v: Math.round(v*100)/100, ...r });
-      if (Math.min(r.shortN, r.longN) < SWEEP_MIN_N) break;
+      const n = direction === 'short' ? r.shortN : r.longN;
+      if (n < SWEEP_MIN_N) break;
     }
     return points;
   }
 
-  const pctlPoints = sweepAxis('trend_exhaust_pctl', 'trend_exhaust_move_pctl');
-  const movePoints = sweepAxis('trend_exhaust_move_pctl', 'trend_exhaust_pctl');
+  const shortPctlPoints = sweepAxis('trend_exhaust_pctl_short', 'short');
+  const shortMovePoints = sweepAxis('trend_exhaust_move_pctl_short', 'short');
+  const longPctlPoints = sweepAxis('trend_exhaust_pctl_long', 'long');
+  const longMovePoints = sweepAxis('trend_exhaust_move_pctl_long', 'long');
 
-  renderPoolSweep(pctlPoints, movePoints, baseCfg);
-  setStatus(`Перебор готов: ${pctlPoints.length + movePoints.length} точек на ${_lastPoolRawData.length} инструментах (граница — N<${SWEEP_MIN_N})`, 'ok');
+  renderPoolSweep({ shortPctlPoints, shortMovePoints, longPctlPoints, longMovePoints }, baseCfg);
+  const total = shortPctlPoints.length + shortMovePoints.length + longPctlPoints.length + longMovePoints.length;
+  setStatus(`Перебор готов: ${total} точек на ${_lastPoolRawData.length} инструментах (граница — N<${SWEEP_MIN_N})`, 'ok');
 }
 
-function renderPoolSweep(pctlPoints, movePoints, baseCfg) {
+function renderPoolSweep(axes, baseCfg) {
+  const { shortPctlPoints, shortMovePoints, longPctlPoints, longMovePoints } = axes;
   const el = document.getElementById('pool-out');
   const edgeColor = edge => !isFinite(edge) ? '#313244' : edge >= 15 ? '#a6e3a1' : edge >= 5 ? '#94e2b8' : edge <= -5 ? '#f38ba8' : '#cdd6f4';
 
@@ -2512,30 +2527,30 @@ function renderPoolSweep(pctlPoints, movePoints, baseCfg) {
     }).join('');
   }
 
-  function _axisTable(points, title, fixedVal, axisLbl) {
-    const shortBest = _bestIdx(points, 'shortEdge', 'shortSig', 'shortN');
-    const longBest = _bestIdx(points, 'longEdge', 'longSig', 'longN');
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} (второй порог held на ${fixedVal}) — граница по N<${SWEEP_MIN_N}, не наугад</summary>
+  // Ось теперь двигает ТОЛЬКО свой порог (short-параметры не влияют на long-бин
+  // и наоборот) — поэтому таблица одна строка на ось, а не две.
+  function _axisTable(points, title, axisLbl, edgeKey, seKey, sigKey, nKey, rowLbl) {
+    const best = _bestIdx(points, edgeKey, sigKey, nKey);
+    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — граница по N<${SWEEP_MIN_N}, не наугад</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">${axisLbl}</th>
       ${points.map(p=>`<th style="padding:3px 5px;background:#181825;color:#a6adc8;text-align:center;font-size:10px">${p.v}</th>`).join('')}
     </tr></thead><tbody>
-    <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">Шорт→сквиз edge</td>
-      ${_rowCells(points, 'shortEdge', 'shortSE', 'shortSig', 'shortN', shortBest)}
-    </tr>
-    <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">Лонг→коррекция edge</td>
-      ${_rowCells(points, 'longEdge', 'longSE', 'longSig', 'longN', longBest)}
+    <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">${rowLbl}</td>
+      ${_rowCells(points, edgeKey, seKey, sigKey, nKey, best)}
     </tr>
     </tbody></table></div>
-    <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">✓ = 95% доверительный интервал edge не пересекает 0. Подсветка ячейки = точка с максимальным значимым edge (не просто максимальная цифра на маленькой выборке).</div>
+    <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">✓ = 95% доверительный интервал edge не пересекает 0. Подсветка ячейки = точка с максимальным значимым edge.</div>
     </details>`;
     return t;
   }
 
-  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах, шаг ${SWEEP_STEP}, останов при N&lt;${SWEEP_MIN_N} по любому из бинов — граница не выбрана заранее, а найдена по данным.</div>`;
-  html += _axisTable(pctlPoints, '🟠 Перцентиль позиции (trend_exhaust_pctl)', baseCfg.trend_exhaust_move_pctl, 'pctl позиции');
-  html += _axisTable(movePoints, '🟠 Перцентиль хода цены (trend_exhaust_move_pctl)', baseCfg.trend_exhaust_pctl, 'pctl хода');
+  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах, шаг ${SWEEP_STEP}, останов при N&lt;${SWEEP_MIN_N} — пороги шорт-сквиза и лонг-коррекции раздельные, каждая ось двигает только свой бин.</div>`;
+  html += _axisTable(shortPctlPoints, '🟠 Шорт→сквиз: перцентиль позиции (trend_exhaust_pctl_short)', 'pctl позиции', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
+  html += _axisTable(shortMovePoints, '🟠 Шорт→сквиз: перцентиль хода цены (trend_exhaust_move_pctl_short)', 'pctl хода', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
+  html += _axisTable(longPctlPoints, '🔵 Лонг→коррекция: перцентиль позиции (trend_exhaust_pctl_long)', 'pctl позиции', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
+  html += _axisTable(longMovePoints, '🔵 Лонг→коррекция: перцентиль хода цены (trend_exhaust_move_pctl_long)', 'pctl хода', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
   el.innerHTML = html + el.innerHTML;
 }
 
