@@ -116,8 +116,8 @@ const CFG_DEFAULTS = {
   min_persons_floor: 5,
   velocity_window: 5,
   velocity_decel_gamma: 0.3,
-  range_window: 60,
-  range_percentile: 0.25,
+  range_window: 15,
+  range_percentile: 0.40,
   stress_scale: 0.01,
   stress_power: 2.0,
   phase_release_gamma: 0.6,
@@ -622,19 +622,20 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   }
 
   // Accumulation flag
+  // Используем % диапазон (нормированный на цену), чтобы порог не зависел от уровня цены.
+  // range_window короткий (15 баров) — ищем НЕДАВНИЙ флэт, а не многомесячный.
   const priceRange = new Array(n).fill(NaN);
   for (let i=cfg.range_window-1; i<n; i++) {
     const win = close.slice(i-cfg.range_window+1, i+1);
-    priceRange[i] = Math.max(...win) - Math.min(...win);
+    const avg = win.reduce((a,b)=>a+b,0)/win.length;
+    if (avg > 0) priceRange[i] = (Math.max(...win) - Math.min(...win)) / avg;
   }
   const rangeThresh = _rollingQuantile(priceRange, cfg.range_window, cfg.range_percentile);
   const narrowRange = priceRange.map((v,i)=> isFinite(v)&&isFinite(rangeThresh[i]) ? v<=rangeThresh[i] : false);
+  // Условие имбаланса: |Z| > 0.3 (позиции набраны и держатся, не обязательно растут)
   const absZ = imbalanceZ.map(v=>isFinite(v)?Math.abs(v):NaN);
-  const absZDiff = new Array(n).fill(NaN);
-  for (let i=1; i<n; i++) if(isFinite(absZ[i])&&isFinite(absZ[i-1])) absZDiff[i]=absZ[i]-absZ[i-1];
-  const absZMean = _rollingMean(absZDiff, vw);
-  const imbalanceRising = absZMean.map(v=>isFinite(v)&&v>0);
-  const rawFlag = narrowRange.map((v,i)=>v&&imbalanceRising[i]);
+  const imbalanceSignificant = absZ.map(v=>isFinite(v)&&v>0.3);
+  const rawFlag = narrowRange.map((v,i)=>v&&imbalanceSignificant[i]);
 
   let accumFlag;
   if (cfg.use_adaptive_confirm) {
