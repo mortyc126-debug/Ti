@@ -130,6 +130,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
     <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
     <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
+    <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
   </div>
   <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
 </div>
@@ -2600,16 +2601,43 @@ function _pearson(xs, ys) {
   return { r, n };
 }
 
-// Класс базового актива — подтверждено пользователем (знает тикеры FORTS
-// наизусть) для части root-тикеров пула, остальные пока не classified.
-// Гипотеза: короткое сжатие — эффект отдельной акции с ограниченным
-// free float, а не индекса/валюты/сырья, которые физически нельзя «зажать».
-// Как только появится классификация остальных тикеров — можно будет считать
-// честную корреляцию, а пока только сравнение «акции vs всё остальное».
-const ASSET_CLASS = {
+// Класс базового актива — вручную подтверждено для части root-тикеров пула
+// (запасной вариант, если T-Invest недоступен), остальные заполняются через
+// labFetchAssetClasses(). Гипотеза: короткое сжатие — эффект отдельной акции
+// с ограниченным free float, а не индекса/валюты/сырья, которые физически
+// нельзя «зажать».
+let ASSET_CLASS = {
   AF: 'акция', AL: 'акция', GZ: 'акция', GK: 'акция', HY: 'акция',
   LK: 'акция', MC: 'акция', ME: 'акция', MG: 'акция', NM: 'акция',
 };
+
+// Биржа сама делит фьючерсы на акции/валюту/товар/индекс — не нужно
+// опознавать полсотни тикеров вручную. Бэкенд ищет живой дескрипт серии
+// через T-Invest FindInstrument и берёт asset_type из полной карточки
+// (FutureBy) — см. /db/instruments/assetclass в cf-worker.js.
+async function labFetchAssetClasses() {
+  if (!_lastPoolRawData || _lastPoolRawData.length < 2) {
+    setStatus('Сначала запусти «Рассчитать по пулу»', 'err');
+    return;
+  }
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  setStatus('Классифицирую тикеры через T-Invest…');
+  const tickers = _lastPoolRawData.map(r => r.ticker);
+  try {
+    const resp = await fetch(`${proxy}/db/instruments/assetclass?tickers=${tickers.join(',')}`);
+    const data = await resp.json();
+    let ok = 0;
+    for (const r of (data.results || [])) {
+      if (r.assetClass) { ASSET_CLASS[r.ticker] = r.assetClass; ok++; }
+      else if (r.error) console.warn(`Классификация ${r.ticker}: ${r.error}`);
+    }
+    setStatus(`Классифицировано ${ok}/${tickers.length} тикеров — пересчитываю признаки…`, 'ok');
+    await labAnalyzeSqueezeFactors();
+  } catch(e) {
+    setStatus('Ошибка классификации: ' + e.message, 'err');
+  }
+}
 
 async function labAnalyzeSqueezeFactors() {
   if (!_lastPoolRawData || _lastPoolRawData.length < 2) {
@@ -2647,19 +2675,19 @@ async function labAnalyzeSqueezeFactors() {
     'Контрактов/участник → лонг-коррекция':       _pearson(rows.map(r=>r.avgPosSize), rows.map(r=>r.longAcc)),
   };
 
-  // Пока подтверждён только класс «акция» — сравниваем со всеми остальными
-  // (не classified), а не считаем корреляцию: категория без обеих групп
-  // подтверждённых значений даёт вырожденный r.
+  // Группируем по ВСЕМ встретившимся классам (акция/валюта/товар/индекс/?),
+  // а не только «акция vs остальное» — так видно, какая именно категория
+  // тянет эффект вниз, а не просто «что-то не акции».
   function _groupMean(items, key) {
     const vals = items.map(r=>r[key]).filter(isFinite);
     return vals.length ? { mean: vals.reduce((a,b)=>a+b,0)/vals.length, n: vals.length } : { mean: NaN, n: 0 };
   }
-  const stocks = rows.filter(r => r.assetClass === 'акция');
-  const rest = rows.filter(r => r.assetClass !== 'акция');
-  const classCompare = {
-    shortStocks: _groupMean(stocks, 'shortAcc'), shortRest: _groupMean(rest, 'shortAcc'),
-    longStocks: _groupMean(stocks, 'longAcc'), longRest: _groupMean(rest, 'longAcc'),
-  };
+  const classNames = [...new Set(rows.map(r => r.assetClass || '? (не classified)'))];
+  const classCompare = {};
+  for (const cls of classNames) {
+    const items = rows.filter(r => (r.assetClass || '? (не classified)') === cls);
+    classCompare[cls] = { short: _groupMean(items, 'shortAcc'), long: _groupMean(items, 'longAcc') };
+  }
 
   renderSqueezeFactors(rows, corr, MIN_N, classCompare);
   setStatus(`Готово: проверено ${rows.length} инструментов (учтены тикеры с N≥${MIN_N})`, 'ok');
@@ -2682,11 +2710,22 @@ function renderSqueezeFactors(rows, corr, minN, classCompare) {
   <div style="font-size:10px;color:#6c7086;margin-bottom:10px">|r|&lt;0.3 — связи нет, 0.3-0.5 — слабая, ≥0.5 — заметная. n — сколько тикеров реально вошло в расчёт (у лонг-коррекции n обычно вдвое меньше — бин реже набирает N≥${minN} на инструмент). При n~10 даже |r|=0.5-0.6 легко объясняется шумом.</div>`;
 
   if (classCompare) {
-    const fmtG = g => isFinite(g.mean) ? `${g.mean.toFixed(0)}% <span style="color:#6c7086;font-size:9px">(n=${g.n})</span>` : `— <span style="color:#6c7086;font-size:9px">(n=0)</span>`;
-    html += `<div style="font-size:11px;margin-bottom:10px"><b style="color:#a6adc8">🏷 Акции (подтверждено вручную) vs остальное (не classified):</b><br>
-      Шорт→сквиз: акции ${fmtG(classCompare.shortStocks)} vs остальное ${fmtG(classCompare.shortRest)}<br>
-      Лонг→коррекция: акции ${fmtG(classCompare.longStocks)} vs остальное ${fmtG(classCompare.longRest)}
-      <div style="font-size:10px;color:#6c7086;margin-top:2px">Классифицирована пока небольшая часть тикеров — остальные ещё не размечены (не значит «не акция»), сравнение предварительное.</div>
+    const fmtG = g => isFinite(g.mean) ? `${g.mean.toFixed(0)}%` : `—`;
+    html += `<div style="font-size:11px;margin-bottom:10px"><b style="color:#a6adc8">🏷 Точность по классу базового актива:</b>
+    <table style="border-collapse:collapse;width:100%;max-width:480px;margin-top:4px">
+    <thead><tr>
+      <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Класс</th>
+      <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:center">Шорт→сквиз</th>
+      <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:center">Лонг→коррекция</th>
+    </tr></thead><tbody>`;
+    for (const [cls, g] of Object.entries(classCompare)) {
+      html += `<tr><td style="padding:3px 8px;color:${cls.startsWith('?')?'#6c7086':'#cdd6f4'}">${cls}</td>
+        <td style="text-align:center;padding:3px 8px;color:${accColor(g.short.mean)}">${fmtG(g.short)} <span style="font-size:9px;color:#6c7086">(n=${g.short.n})</span></td>
+        <td style="text-align:center;padding:3px 8px;color:${accColor(g.long.mean)}">${fmtG(g.long)} <span style="font-size:9px;color:#6c7086">(n=${g.long.n})</span></td>
+      </tr>`;
+    }
+    html += `</tbody></table>
+      <div style="font-size:10px;color:#6c7086;margin-top:2px">«? (не classified)» — класс ещё не определён (жми «🏷 Классифицировать тикеры»), не значит «не акция».</div>
     </div>`;
   }
 

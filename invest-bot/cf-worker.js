@@ -31,6 +31,8 @@
 //                                            через T-Invest FindInstrument (не только уже
 //                                            известные нам), тянет их дневные свечи, пишет
 //                                            цену по датам, где нашлось совпадение
+//   /db/instruments/assetclass?tickers=   GET  — класс актива root-тикеров (акция/валюта/товар/
+//                                            индекс) через T-Invest FindInstrument+FutureBy
 //
 // Cron (scheduled): ежедневный автосбор oi_daily по всем ликвидным фьючерсам
 // FORTS — без участия браузера. Настройка:
@@ -1112,6 +1114,61 @@ async function handleDb(path, req, env) {
       ticker: rootTicker, datesTotal: rootRows.length, datesPriced: dates.length,
       contractsFound: contracts.map(c => c.ticker), contractsUsed,
     });
+  }
+
+  // ── Классификация тикеров по типу базового актива через T-Invest ──
+  // Биржа сама делит фьючерсы на акции/валюту/товар/индекс — не нужно
+  // опознавать полсотни root-тикеров вручную. FindInstrument даёт только
+  // краткую карточку без asset_type, поэтому берём первый живой дескрипт
+  // серии и дальше запрашиваем полную карточку через FutureBy.
+  // /db/instruments/assetclass?tickers=AF,AL,GZ
+  if (p === '/instruments/assetclass' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const tickersParam = u.searchParams.get('tickers');
+    if (!tickersParam) return json({ error: 'tickers required' }, 400);
+    const token = env.TINVEST_TOKEN;
+    if (!token) return json({ error: 'TINVEST_TOKEN secret не задан' }, 503);
+    const rootTickers = tickersParam.split(',').map(s => s.trim()).filter(Boolean);
+
+    const ASSET_TYPE_LABELS = {
+      ASSET_TYPE_SECURITY: 'акция', ASSET_TYPE_CURRENCY: 'валюта',
+      ASSET_TYPE_COMMODITY: 'товар', ASSET_TYPE_INDEX: 'индекс',
+    };
+
+    const results = [];
+    for (const rootTicker of rootTickers) {
+      try {
+        const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: rootTicker, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
+        });
+        if (!fr.ok) { results.push({ ticker: rootTicker, error: `FindInstrument HTTP ${fr.status}` }); continue; }
+        const fb = await fr.json();
+        const rootRe = new RegExp(`^${rootTicker}[FGHJKMNQUVXZ]\\d$`, 'i');
+        const contract = (fb.instruments || []).find(i => rootRe.test(i.ticker || ''));
+        if (!contract) { results.push({ ticker: rootTicker, error: 'дескрипт серии не найден' }); continue; }
+
+        const br = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FutureBy', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idType: 'INSTRUMENT_ID_TYPE_FIGI', id: contract.figi }),
+        });
+        if (!br.ok) { results.push({ ticker: rootTicker, error: `FutureBy HTTP ${br.status}` }); continue; }
+        const bb = await br.json();
+        const inst = bb.instrument || {};
+        results.push({
+          ticker: rootTicker, contract: contract.ticker,
+          assetType: inst.assetType || null,
+          assetClass: ASSET_TYPE_LABELS[inst.assetType] || null,
+          basicAsset: inst.basicAsset || null,
+        });
+      } catch(e) {
+        results.push({ ticker: rootTicker, error: e.message });
+      }
+    }
+
+    return json({ results });
   }
 
   return json({ error: 'unknown db route: ' + p }, 404);
