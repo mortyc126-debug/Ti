@@ -455,7 +455,7 @@ async function handleDb(path, req, env) {
     return json({ ok: true, inserted: rows.length });
   }
 
-  if (p.startsWith('/candles') && req.method === 'GET') {
+  if (p === '/candles' && req.method === 'GET') {
     const u = new URL(req.url);
     const ticker = u.searchParams.get('ticker');
     const tf     = u.searchParams.get('tf');
@@ -465,6 +465,21 @@ async function handleDb(path, req, env) {
       'SELECT * FROM candles WHERE ticker=? AND tf=? AND time>=? ORDER BY time ASC LIMIT 2000'
     ).bind(ticker, tf, from).all();
     return json(results);
+  }
+
+  // ── Поиск FIGI по тикеру: /db/findfigi?query=SSU6 ──
+  if (p === '/findfigi' && req.method === 'GET') {
+    const query = new URL(req.url).searchParams.get('query');
+    if (!query) return json({ error: 'query required' }, 400);
+    const token = env.TINVEST_TOKEN;
+    if (!token) return json({ error: 'TINVEST_TOKEN не задан' }, 503);
+    const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, instrumentKind: 'INSTRUMENT_TYPE_FUTURES' }),
+    });
+    const body = await resp.json();
+    return json({ status: resp.status, instruments: (body.instruments || []).map(i => ({ figi: i.figi, ticker: i.ticker, name: i.name })) });
   }
 
   // ── Бэкфилл дневных свечей из T-Invest: /db/candles/tinvest?ticker=SSU6&figi=FUT...&from=2026-03-01&to=2026-07-01 ──
