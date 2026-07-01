@@ -228,6 +228,21 @@ let _lastMode = 'daily';
 let _lastCalibStats = null;
 let _lastCalibFwd   = null;
 
+// T-Invest отдаёт время свечи в UTC; дневная свеча по факту привязана к
+// торговому дню MSK (00:00 МСК = 21:00 UTC ПРЕДЫДУЩИХ суток) — наивный
+// toISOString().slice(0,10) на сырых UTC-секундах сдвигает календарную
+// дату на сутки назад для вечерних UTC-таймстемпов. tradedate в oi_daily
+// приходит от MOEX как есть, без сдвига — поэтому join цены к ОИ по датам
+// должен приводить свечу к МСК-дате, иначе цена реакции приклеивается
+// к предыдущему дню (ровно то, что видно в детальной таблице калибровки).
+const MSK_OFFSET_MS = 3 * 3600 * 1000;
+function _mskDateStr(epochSec) {
+  return new Date(epochSec * 1000 + MSK_OFFSET_MS).toISOString().slice(0, 10);
+}
+function _mskDateTimeStr(epochSec) {
+  return new Date(epochSec * 1000 + MSK_OFFSET_MS).toISOString().slice(0, 16).replace('T', ' ');
+}
+
 function setStatus(msg, cls='') {
   const el = document.getElementById('status');
   el.textContent = msg;
@@ -482,7 +497,7 @@ async function labLoad() {
           const carr = Array.isArray(cdata) ? cdata : (cdata.rows || []);
           const candleMap = {};
           for (const c of carr) {
-            if (c.time) candleMap[new Date(c.time * 1000).toISOString().slice(0, 10)] = c;
+            if (c.time) candleMap[_mskDateStr(c.time)] = c;
           }
           rows = rows.map(r => {
             const c = candleMap[r.date];
@@ -519,8 +534,7 @@ async function labLoad() {
               for (const r of rows) oiByDate[r.date] = r;
 
               rows = hcarr.map(c => {
-                const dt  = new Date(c.time * 1000);
-                const date = dt.toISOString().slice(0, 10);
+                const date = _mskDateStr(c.time);
                 const tsH  = Math.floor(c.time / 3600) * 3600 * 1000; // начало часа в ms
 
                 // Если есть часовой снэпшот — берём его; иначе spread дневного
@@ -538,7 +552,7 @@ async function labLoad() {
                 }
                 const d = oiByDate[date] || {};
                 return {
-                  date: dt.toISOString().slice(0, 16).replace('T', ' '),
+                  date: _mskDateTimeStr(c.time),
                   _date: date,
                   _has_hourly_oi: !!oi,
                   close: c.cl, open: c.o, high: c.h, low: c.l,
