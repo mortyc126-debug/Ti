@@ -251,15 +251,18 @@ async function labLoad() {
   try {
     const contractsMap = {};
     for (const t of tickers) {
-      const r = await fetch(`${proxy}/db/oidaily?ticker=${encodeURIComponent(t)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status} для ${t}`);
-      const json = await r.json();
-      console.log(`[oi_lab] raw response for ${t}:`, json);
-      const rawArr = Array.isArray(json) ? json : (json.rows || json.data || []);
-      console.log(`[oi_lab] rawArr length: ${rawArr.length}, first:`, rawArr[0]);
+      // Пробуем полный тикер, затем 2-буквенный sym (данные из all=1 бэкфилла хранятся как SS, BR...)
+      const sym = t.match(/^([A-Za-z]{2})/)?.[1] || t;
+      let rawArr = [];
+      for (const key of [t, ...(sym !== t ? [sym] : [])]) {
+        const r = await fetch(`${proxy}/db/oidaily?ticker=${encodeURIComponent(key)}`);
+        if (!r.ok) continue;
+        const json = await r.json();
+        rawArr = Array.isArray(json) ? json : (json.rows || json.data || []);
+        if (rawArr.length) break;
+      }
       const rows = rawArr.map(normalizeRow).filter(r=>r.date);
-      console.log(`[oi_lab] normalized rows: ${rows.length}, first:`, rows[0]);
-      if (!rows.length) throw new Error(`Нет данных для ${t} (raw: ${rawArr.length} строк, проверь консоль)`);
+      if (!rows.length) throw new Error(`Нет данных для ${t} (проверь бэкфилл)`);
       contractsMap[t] = rows;
     }
 
