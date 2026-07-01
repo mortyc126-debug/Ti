@@ -971,8 +971,8 @@ function drawPrice(result) {
 
     // Ожидаемое движение из калибровки
     let calibTip = '';
-    if (_lastCalibStats && isFinite(row.weighted_imbalance)) {
-      const bin = _lastCalibStats.find(b => row.weighted_imbalance >= b.min && row.weighted_imbalance < b.max);
+    if (_lastCalibStats && isFinite(row.net_phys_pct)) {
+      const bin = _lastCalibStats.find(b => row.net_phys_pct >= b.min && row.net_phys_pct < b.max);
       if (bin) {
         const s5 = bin.stats[5], s10 = bin.stats[10];
         const fmtP = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
@@ -1223,26 +1223,25 @@ function labCalibrate() {
     });
   }
 
-  // Сигнальные бины по WI (взвешенный имбаланс)
-  // Правило: WI < 0 → физики в ЛОНГЕ → контрарный сигнал: ожидаем вниз
-  //          WI > 0 → физики в ШОРТЕ → контрарный сигнал: ожидаем вверх
+  // Бины по NetPhysPct (% нетто-позиции физиков от ОИ).
+  // Доступен с первого бара — покрывает всю историю, не только последние 30 баров.
+  // Контрарная логика: физики сильно в лонге → ожидаем падение (и наоборот).
   const BINS = [
-    { label: 'Сильный рост ↑↑', min: 1.0,  max:  Infinity, dir:  1 },
-    { label: 'Рост ↑',          min: 0.3,  max:  1.0,      dir:  1 },
-    { label: 'Слабый рост ↑',   min: 0.1,  max:  0.3,      dir:  1 },
-    { label: 'Нейтраль',        min:-0.1,  max:  0.1,      dir:  0 },
-    { label: 'Слабое падение ↓',min:-0.3,  max: -0.1,      dir: -1 },
-    { label: 'Падение ↓',       min:-1.0,  max: -0.3,      dir: -1 },
-    { label: 'Сильное падение ↓↓',min:-Infinity,max:-1.0,  dir: -1 },
+    { label: 'Физики >50% в лонге → падение ↓↓',  min: 0.50, max:  Infinity, dir: -1 },
+    { label: 'Физики 30-50% в лонге → падение ↓',  min: 0.30, max:  0.50,    dir: -1 },
+    { label: 'Физики 15-30% в лонге → слаб. пад. ↓',min:0.15, max:  0.30,    dir: -1 },
+    { label: 'Нейтраль (±15%)',                     min:-0.15, max:  0.15,    dir:  0 },
+    { label: 'Физики 15-30% в шорте → слаб. рост ↑',min:-0.30,max: -0.15,    dir:  1 },
+    { label: 'Физики 30-50% в шорте → рост ↑',     min:-0.50, max: -0.30,    dir:  1 },
+    { label: 'Физики >50% в шорте → рост ↑↑',      min:-Infinity,max:-0.50,  dir:  1 },
   ];
 
-  // Для каждого бина собираем статистику по горизонтам
   const binStats = BINS.map(bin => {
-    const rows = result.map((r,i) => ({ wi: r.weighted_imbalance, fwd, i }))
-      .filter(({ wi }) => isFinite(wi) && wi >= bin.min && wi < bin.max);
+    const indices = result.map((r,i) => i)
+      .filter(i => isFinite(result[i].net_phys_pct) && result[i].net_phys_pct >= bin.min && result[i].net_phys_pct < bin.max);
     const stats = {};
     for (const h of HORIZONS) {
-      const returns = rows.map(({ i }) => fwd[h][i]).filter(isFinite);
+      const returns = indices.map(i => fwd[h][i]).filter(isFinite);
       if (!returns.length) { stats[h] = null; continue; }
       const correct = bin.dir === 0 ? NaN :
         returns.filter(r => bin.dir > 0 ? r > 0 : r < 0).length / returns.length * 100;
@@ -1258,9 +1257,9 @@ function labCalibrate() {
     return { ...bin, stats };
   });
 
-  // Текущий сигнал — ищем в binStats (там уже есть .stats)
-  const last = [...result].reverse().find(r => isFinite(r.weighted_imbalance));
-  const currentBinStat = last ? binStats.find(b => last.weighted_imbalance >= b.min && last.weighted_imbalance < b.max) : null;
+  // Текущий бар — последний с валидным NetPhysPct
+  const last = [...result].reverse().find(r => isFinite(r.net_phys_pct));
+  const currentBinStat = last ? binStats.find(b => last.net_phys_pct >= b.min && last.net_phys_pct < b.max) : null;
 
   _lastCalibStats = binStats;
   _lastCalibFwd   = fwd;
@@ -1269,30 +1268,28 @@ function labCalibrate() {
 
 function renderCalibration(binStats, last, currentBin, fwd, result) {
   const el = document.getElementById('calib-out');
+  const H = [1, 3, 5, 10];
+  const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
 
   // Текущий прогноз
   let html = '';
-  if (last && currentBin && (currentBin.stats[5] || currentBin.stats[10])) {
-    const s5 = currentBin.stats[5];
-    const s10 = currentBin.stats[10];
+  if (last && currentBin) {
     const color = currentBin.dir > 0 ? '#a6e3a1' : currentBin.dir < 0 ? '#f38ba8' : '#cdd6f4';
-    const fmtPct = v => (isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—');
     html += `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:10px">
-      <div style="font-size:12px;color:#cba6f7;margin-bottom:6px">Текущий прогноз (WI=${last.weighted_imbalance.toFixed(2)})</div>
+      <div style="font-size:12px;color:#cba6f7;margin-bottom:6px">Текущий прогноз (перекос физ.: ${isFinite(last.net_phys_pct)?(last.net_phys_pct*100).toFixed(1)+'%':'—'})</div>
       <div style="font-size:16px;font-weight:700;color:${color}">${currentBin.label}</div>
       <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
-        ${s5 ? `<span>через 5 дней: медиана <b style="color:${color}">${fmtPct(s5.median)}</b> (мин…макс: ${fmtPct(s5.q25)}…${fmtPct(s5.q75)}), точность направления <b>${isFinite(s5.accuracy)?s5.accuracy.toFixed(0)+'%':'—'}</b>, N=${s5.n}</span>` : ''}
-        ${s10 ? `<span>через 10 дней: медиана <b style="color:${color}">${fmtPct(s10.median)}</b>, точность <b>${isFinite(s10.accuracy)?s10.accuracy.toFixed(0)+'%':'—'}</b>, N=${s10.n}</span>` : ''}
+        ${H.map(h => { const s=currentBin.stats[h]; return s?`<span>+${h}д: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
     </div>`;
   }
 
-  // Таблица по бинам
-  const H = [1, 3, 5, 10];
-  html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+  // Сводная таблица точности по бинам
+  html += `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Точность по уровням сигнала</summary>
+  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
     <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
-    ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">+${h}д</th>`).join('')}
+    ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">+${h} дн.</th>`).join('')}
   </tr><tr>
     <th style="background:#181825"></th>
     ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
@@ -1307,21 +1304,58 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
       if (!s) { html += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
       const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
       const ac = isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
-      html += `<td style="text-align:center;padding:4px 6px;color:${mc}">${s.median>0?'+':''}${s.median.toFixed(1)}%</td>
+      html += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(s.median)}</td>
                <td style="text-align:center;padding:4px 6px;color:${ac}">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
                <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
     }
     html += '</tr>';
   }
-  html += '</tbody></table></div>';
+  html += '</tbody></table></div></details>';
 
-  // Мини-график: медиана 5д по бинам
-  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin-bottom:4px"></canvas>`;
-  html += `<div style="font-size:10px;color:#6c7086">Столбики — медианный % сдвига через 5 дней для каждого уровня сигнала (слева = ожидаем рост, справа = падение). Зелёный = цена росла, красный = падала.</div>`;
+  // Мини-график: медиана по бинам (горизонт 5д)
+  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin:6px 0 4px"></canvas>`;
+  html += `<div style="font-size:10px;color:#6c7086;margin-bottom:12px">Медианный сдвиг через 5 дней для каждого уровня перекоса физиков</div>`;
+
+  // Детальная таблица факт/прогноз по барам
+  html += `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Детально по барам: факт vs прогноз</summary>
+  <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table style="font-size:11px;border-collapse:collapse;width:100%">
+  <thead style="position:sticky;top:0;z-index:1"><tr>
+    <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Дата</th>
+    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:right">Перекос физ.</th>
+    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
+    ${H.map(h=>`<th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:center" colspan="3">+${h} дн.</th>`).join('')}
+  </tr><tr>
+    <th colspan="3" style="background:#181825"></th>
+    ${H.map(()=>'<th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">прогноз</th><th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">факт</th><th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">разница</th>').join('')}
+  </tr></thead><tbody>`;
+
+  for (let i = result.length - 1; i >= 0; i--) {
+    const r = result[i];
+    if (!isFinite(r.net_phys_pct)) continue;
+    const bin = binStats.find(b => r.net_phys_pct >= b.min && r.net_phys_pct < b.max);
+    const rowBg = bin ? (bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030') : '#1e2030';
+    const lblCol = bin ? (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4') : '#cdd6f4';
+    html += `<tr style="background:${rowBg}">
+      <td style="padding:3px 8px;color:#cdd6f4">${r.date}</td>
+      <td style="padding:3px 6px;text-align:right;color:${r.net_phys_pct>=0?'#f38ba8':'#a6e3a1'}">${(r.net_phys_pct*100).toFixed(1)}%</td>
+      <td style="padding:3px 6px;color:${lblCol};font-size:10px">${bin ? bin.label.replace(/→.*$/,'').trim() : '—'}</td>`;
+    for (const h of H) {
+      const actual = fwd[h][i];
+      const forecast = bin?.stats[h]?.median;
+      const diff = isFinite(actual) && isFinite(forecast) ? actual - forecast : NaN;
+      const ac = isFinite(actual) ? (actual>=0?'#a6e3a1':'#f38ba8') : '#6c7086';
+      const dc = isFinite(diff) ? (Math.abs(diff)<2?'#a6e3a1':Math.abs(diff)<5?'#f9e2af':'#f38ba8') : '#6c7086';
+      html += `<td style="text-align:center;padding:3px 4px;color:${isFinite(forecast)?'#cba6f7':'#6c7086'}">${fmtPct(forecast)}</td>
+               <td style="text-align:center;padding:3px 4px;color:${ac}">${isFinite(actual)?fmtPct(actual):'—'}</td>
+               <td style="text-align:center;padding:3px 4px;color:${dc}">${isFinite(diff)?fmtPct(diff):'—'}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></details>';
 
   el.innerHTML = html;
 
-  // Рисуем бар-чарт
+  // Бар-чарт
   requestAnimationFrame(() => {
     const c = document.getElementById('c-calib');
     if (!c) return;
@@ -1331,13 +1365,11 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
     const ctx = c.getContext('2d');
     ctx.scale(devicePixelRatio, devicePixelRatio);
     const CH = 120;
-
     const vals = binStats.map(b => b.stats[5]?.median ?? NaN).filter(isFinite);
     if (!vals.length) return;
     const vmax = Math.max(...vals.map(Math.abs), 1);
     const bw = W / binStats.length;
     const midY = CH / 2;
-
     binStats.forEach((bin, i) => {
       const s = bin.stats[5];
       if (!s) return;
@@ -1348,17 +1380,14 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
       ctx.fillStyle = col + '99';
       if (v >= 0) ctx.fillRect(x, midY - barH, bw-4, barH);
       else ctx.fillRect(x, midY, bw-4, barH);
-      // Метка %
       ctx.fillStyle = col;
-      ctx.font = `bold 10px sans-serif`;
+      ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText((v>0?'+':'')+v.toFixed(1)+'%', x + (bw-4)/2, v>=0 ? midY - barH - 3 : midY + barH + 11);
-      // N
       ctx.fillStyle = '#6c7086';
       ctx.font = '9px sans-serif';
       ctx.fillText('N='+s.n, x + (bw-4)/2, v>=0 ? CH-3 : 10);
     });
-    // Zero line
     ctx.strokeStyle = '#363a4f'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
   });
