@@ -2565,12 +2565,13 @@ function renderPoolSweep(axes, baseCfg) {
 // на 5-15 наблюдениях на инструмент).
 function _instrumentFeatures(raw) {
   const rows = raw.rows;
-  let physSum = 0, totalSum = 0, oiSamples = 0;
+  let physSum = 0, totalSum = 0, personsSum = 0, oiSamples = 0;
   let retSqSum = 0, retN = 0, prevClose = NaN;
   for (const r of rows) {
     const p = (r.phys_long_contracts||0) + (r.phys_short_contracts||0);
     const l = (r.legal_long_contracts||0) + (r.legal_short_contracts||0);
-    if (p + l > 0) { physSum += p; totalSum += p + l; oiSamples++; }
+    const persons = (r.phys_long_persons||0) + (r.phys_short_persons||0) + (r.legal_long_persons||0) + (r.legal_short_persons||0);
+    if (p + l > 0) { physSum += p; totalSum += p + l; personsSum += persons; oiSamples++; }
     if (r.close > 0) {
       if (isFinite(prevClose) && prevClose > 0) { const ret = (r.close - prevClose) / prevClose; retSqSum += ret*ret; retN++; }
       prevClose = r.close;
@@ -2580,19 +2581,23 @@ function _instrumentFeatures(raw) {
     physShare: totalSum > 0 ? physSum / totalSum : NaN,             // доля физлиц в ОИ, 0..1
     avgOi: oiSamples > 0 ? totalSum / oiSamples : NaN,               // средний суммарный ОИ (ликвидность)
     volatility: retN > 0 ? Math.sqrt(retSqSum / retN) * 100 : NaN,   // RMS дневной доходности, %
+    avgPosSize: personsSum > 0 ? totalSum / personsSum : NaN,        // контрактов на участника — концентрация («мало крупных» vs «много мелких»)
   };
 }
 
 // Коэффициент корреляции Пирсона — простая, но достаточная мера линейной
 // связи признака с точностью бина; при <4 точках считать бессмысленно.
+// Возвращает и n — иначе r=-0.68 на 10 точках и r=0.28 на 25 выглядят
+// одинаково «весомо», хотя первое почти ничего не доказывает.
 function _pearson(xs, ys) {
   const pts = xs.map((x,i)=>[x, ys[i]]).filter(([x,y])=>isFinite(x)&&isFinite(y));
   const n = pts.length;
-  if (n < 4) return NaN;
+  if (n < 4) return { r: NaN, n };
   const mx = pts.reduce((a,[x])=>a+x,0)/n, my = pts.reduce((a,[,y])=>a+y,0)/n;
   let sxy=0, sxx=0, syy=0;
   for (const [x,y] of pts) { sxy += (x-mx)*(y-my); sxx += (x-mx)**2; syy += (y-my)**2; }
-  return (sxx>0 && syy>0) ? sxy / Math.sqrt(sxx*syy) : NaN;
+  const r = (sxx>0 && syy>0) ? sxy / Math.sqrt(sxx*syy) : NaN;
+  return { r, n };
 }
 
 async function labAnalyzeSqueezeFactors() {
@@ -2620,12 +2625,14 @@ async function labAnalyzeSqueezeFactors() {
   }
 
   const corr = {
-    'Доля физлиц в ОИ → шорт-сквиз':  _pearson(rows.map(r=>r.physShare),  rows.map(r=>r.shortAcc)),
-    'Средний ОИ (ликвидность) → шорт-сквиз': _pearson(rows.map(r=>r.avgOi), rows.map(r=>r.shortAcc)),
-    'Волатильность → шорт-сквиз':     _pearson(rows.map(r=>r.volatility), rows.map(r=>r.shortAcc)),
-    'Доля физлиц в ОИ → лонг-коррекция':  _pearson(rows.map(r=>r.physShare),  rows.map(r=>r.longAcc)),
-    'Средний ОИ (ликвидность) → лонг-коррекция': _pearson(rows.map(r=>r.avgOi), rows.map(r=>r.longAcc)),
-    'Волатильность → лонг-коррекция':     _pearson(rows.map(r=>r.volatility), rows.map(r=>r.longAcc)),
+    'Доля физлиц в ОИ → шорт-сквиз':          _pearson(rows.map(r=>r.physShare),  rows.map(r=>r.shortAcc)),
+    'Средний ОИ (ликвидность) → шорт-сквиз':  _pearson(rows.map(r=>r.avgOi),      rows.map(r=>r.shortAcc)),
+    'Волатильность → шорт-сквиз':             _pearson(rows.map(r=>r.volatility), rows.map(r=>r.shortAcc)),
+    'Контрактов/участник → шорт-сквиз':       _pearson(rows.map(r=>r.avgPosSize), rows.map(r=>r.shortAcc)),
+    'Доля физлиц в ОИ → лонг-коррекция':          _pearson(rows.map(r=>r.physShare),  rows.map(r=>r.longAcc)),
+    'Средний ОИ (ликвидность) → лонг-коррекция':  _pearson(rows.map(r=>r.avgOi),      rows.map(r=>r.longAcc)),
+    'Волатильность → лонг-коррекция':             _pearson(rows.map(r=>r.volatility), rows.map(r=>r.longAcc)),
+    'Контрактов/участник → лонг-коррекция':       _pearson(rows.map(r=>r.avgPosSize), rows.map(r=>r.longAcc)),
   };
 
   renderSqueezeFactors(rows, corr, MIN_N);
@@ -2640,19 +2647,20 @@ function renderSqueezeFactors(rows, corr, minN) {
 
   let html = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🧬 Какой признак инструмента объясняет разброс точности шорт-сквиза/лонг-коррекции (учтены тикеры с N≥${minN} на +1д)</summary>`;
 
-  html += `<div style="font-size:11px;margin-bottom:8px"><table style="border-collapse:collapse;width:100%;max-width:520px">
-    <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Корреляция (Пирсон)</th><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center">r</th></tr></thead><tbody>`;
-  for (const [label, r] of Object.entries(corr)) {
-    html += `<tr><td style="padding:3px 8px;color:#cdd6f4">${label}</td><td style="text-align:center;padding:3px 8px;color:${corrColor(r)}">${isFinite(r)?r.toFixed(2):'—'}</td></tr>`;
+  html += `<div style="font-size:11px;margin-bottom:8px"><table style="border-collapse:collapse;width:100%;max-width:560px">
+    <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Корреляция (Пирсон)</th><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center">r</th><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center">n</th></tr></thead><tbody>`;
+  for (const [label, c] of Object.entries(corr)) {
+    html += `<tr><td style="padding:3px 8px;color:#cdd6f4">${label}</td><td style="text-align:center;padding:3px 8px;color:${corrColor(c.r)}">${isFinite(c.r)?c.r.toFixed(2):'—'}</td><td style="text-align:center;padding:3px 8px;color:#6c7086">${c.n}</td></tr>`;
   }
   html += `</tbody></table></div>
-  <div style="font-size:10px;color:#6c7086;margin-bottom:10px">|r|&lt;0.3 — связи нет, 0.3-0.5 — слабая, ≥0.5 — заметная. При N=25-30 инструментах даже заметная r не строгое доказательство, а повод присмотреться к признаку.</div>`;
+  <div style="font-size:10px;color:#6c7086;margin-bottom:10px">|r|&lt;0.3 — связи нет, 0.3-0.5 — слабая, ≥0.5 — заметная. n — сколько тикеров реально вошло в расчёт (у лонг-коррекции n обычно вдвое меньше — бин реже набирает N≥${minN} на инструмент). При n~10 даже |r|=0.5-0.6 легко объясняется шумом.</div>`;
 
   html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Доля физлиц</th>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Ср. ОИ</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Контр./участник</th>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Волат. %/д</th>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Шорт→сквиз</th>
       <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Лонг→коррекция</th>
@@ -2662,6 +2670,7 @@ function renderSqueezeFactors(rows, corr, minN) {
       <td style="padding:3px 8px;color:#cdd6f4">${r.ticker}</td>
       <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.physShare)?(r.physShare*100).toFixed(0)+'%':'—'}</td>
       <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.avgOi)?Math.round(r.avgOi).toLocaleString():'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.avgPosSize)?r.avgPosSize.toFixed(1):'—'}</td>
       <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.volatility)?r.volatility.toFixed(2):'—'}</td>
       <td style="text-align:center;padding:3px 8px;color:${accColor(r.shortAcc)}">${isFinite(r.shortAcc)?r.shortAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6c7086"> N${r.shortN}</span></td>
       <td style="text-align:center;padding:3px 8px;color:${accColor(r.longAcc)}">${isFinite(r.longAcc)?r.longAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6c7086"> N${r.longN}</span></td>
