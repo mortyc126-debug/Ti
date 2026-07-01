@@ -19,6 +19,7 @@
 //   /db/atr?ticker=                   GET  — ATR тикера
 //   /db/indverdict                    POST — сохранить вердикт модуля indlab
 //   /db/indverdict?ticker=            GET  — последний сохранённый вердикт
+//   /db/candles/tinvest?ticker=&figi=&from=&to= GET — бэкфилл дневных свечей из T-Invest → candles tf=day
 //   /db/tickers                       GET  — список тикеров в oi_daily с кол-вом дней и диапазоном дат
 //   /db/oidaily                       POST — upsert дневной снэпшок ОИ (юр/физ, лонг/шорт, цена)
 //   /db/oidaily?ticker=               GET  — вся история снэпшотов тикера (для слоёв позиций)
@@ -464,6 +465,42 @@ async function handleDb(path, req, env) {
       'SELECT * FROM candles WHERE ticker=? AND tf=? AND time>=? ORDER BY time ASC LIMIT 2000'
     ).bind(ticker, tf, from).all();
     return json(results);
+  }
+
+  // ── Бэкфилл дневных свечей из T-Invest: /db/candles/tinvest?ticker=SSU6&figi=FUT...&from=2026-03-01&to=2026-07-01 ──
+  // Требует secret TINVEST_TOKEN в CF Worker settings.
+  if (p === '/candles/tinvest' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const ticker = u.searchParams.get('ticker');
+    const figi   = u.searchParams.get('figi');
+    const from   = u.searchParams.get('from') || '2026-01-01';
+    const to     = u.searchParams.get('to')   || new Date().toISOString().slice(0,10);
+    if (!ticker || !figi) return json({ error: 'ticker and figi required' }, 400);
+    const token = env.TINVEST_TOKEN;
+    if (!token) return json({ error: 'TINVEST_TOKEN secret не задан в CF Worker' }, 503);
+    const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ figi, from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59Z').toISOString(), interval: 'CANDLE_INTERVAL_DAY' }),
+    });
+    if (!resp.ok) return json({ error: `T-Invest HTTP ${resp.status}`, body: await resp.text() }, 502);
+    const body = await resp.json();
+    const candles = body.candles || [];
+    if (!candles.length) return json({ ticker, saved: 0, empty: true });
+    const rows = candles.map(c => {
+      const ts = Math.floor(new Date(c.time).getTime() / 1000);
+      const price = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
+      return { key: `${ticker}__day__${ts}`, ticker, tf: 'day', time: ts,
+               o: price(c.open), h: price(c.high), l: price(c.low), cl: price(c.close), vol: c.volume ?? 0 };
+    });
+    for (let i = 0; i < rows.length; i += 100) {
+      const chunk = rows.slice(i, i+100);
+      await db.batch(chunk.map(r =>
+        db.prepare('INSERT OR REPLACE INTO candles(key,ticker,tf,time,o,h,l,cl,vol) VALUES(?,?,?,?,?,?,?,?,?)')
+          .bind(r.key, r.ticker, r.tf, r.time, r.o, r.h, r.l, r.cl, r.vol)
+      ));
+    }
+    return json({ ticker, saved: rows.length, from, to });
   }
 
   // ── Signals ──
