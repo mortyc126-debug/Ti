@@ -654,27 +654,34 @@ function aggregateContracts(contractsMap) {
     // дескрипты). Поэтому суммировать позиционные колонки по тикерам НЕЛЬЗЯ —
     // это задваивает/утраивает ОИ на датах, где записаны и root, и дескрипт(ы).
     // Берём max по каждой колонке (без потери данных, без задвоения дублей).
-    let bestOi = -1, bestTicker = null, bestPriceOi = -1, bestPriceTicker = null;
+    let bestPriceOi = -1, bestPriceTicker = null;
     for (const [t, byDate] of Object.entries(indexed)) {
       const r = byDate[date];
       if (!r) continue;
       for (const c of POS_COLS) agg[c] = Math.max(agg[c], r[c] || 0);
       const oi = (r.phys_long_contracts||0) + (r.legal_long_contracts||0);
-      if (oi > bestOi) { bestOi = oi; bestTicker = t; }
       // Root-тикер (2-буквенный код) из бэкфилла all=1 всегда пишется с price=0 —
       // для цены нужен именно дескрипт конкретного контракта, а не root.
       if (r.close > 0 && oi >= bestPriceOi) { bestPriceOi = oi; bestPriceTicker = t; }
     }
 
-    const priceTicker = bestPriceTicker || bestTicker;
-    if (priceTicker) {
-      agg.close = indexed[priceTicker][date]?.close || 0;
-      if (prevRef && priceTicker !== prevRef) {
-        agg.ref_switch = true;
-        refSwitchDates.push(date);
-      }
-      prevRef = priceTicker;
+    // Если ни у одного тикера на эту дату нет реальной цены (только root с
+    // price=0 из бэкфилла all=1, дескрипт ещё не начал отслеживаться) —
+    // строку пропускаем целиком. Раньше close тихо оставался 0, и такие
+    // даты тянули вниз весь диапазон графика (vmin=0) — реальное движение
+    // цены сжималось в узкую полоску наверху, а слева виден фальшивый
+    // вертикальный скачок с нуля до настоящей цены.
+    if (!bestPriceTicker) continue;
+    const priceRow = indexed[bestPriceTicker][date];
+    agg.close = priceRow?.close || 0;
+    agg.open  = priceRow?.open;
+    agg.high  = priceRow?.high;
+    agg.low   = priceRow?.low;
+    if (prevRef && bestPriceTicker !== prevRef) {
+      agg.ref_switch = true;
+      refSwitchDates.push(date);
     }
+    prevRef = bestPriceTicker;
     rows.push(agg);
   }
   return { rows, refSwitchDates };
