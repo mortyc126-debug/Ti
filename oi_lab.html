@@ -1230,17 +1230,19 @@ function labCalibrate() {
     });
   }
 
-  // Бины по NetPhysPct (% нетто-позиции физиков от ОИ).
-  // Доступен с первого бара — покрывает всю историю, не только последние 30 баров.
-  // Контрарная логика: физики сильно в лонге → ожидаем падение (и наоборот).
+  // Перцентильные бины: квинтили по реальному распределению net_phys_pct.
+  // Так данные всегда равномерно попадают во все 5 бинов независимо от инструмента.
+  // Контрарная логика: высокий перцентиль (физики сильно в лонге) → ожидаем падение.
+  const validNpp = result.map(r => r.net_phys_pct).filter(isFinite).sort((a,b)=>a-b);
+  const _pct = p => validNpp[Math.floor((validNpp.length-1)*p)];
+  const [p20, p40, p60, p80] = [0.2, 0.4, 0.6, 0.8].map(_pct);
+  const fmtThr = v => (v*100).toFixed(1)+'%';
   const BINS = [
-    { label: 'Физики >50% в лонге → падение ↓↓',  min: 0.50, max:  Infinity, dir: -1 },
-    { label: 'Физики 30-50% в лонге → падение ↓',  min: 0.30, max:  0.50,    dir: -1 },
-    { label: 'Физики 15-30% в лонге → слаб. пад. ↓',min:0.15, max:  0.30,    dir: -1 },
-    { label: 'Нейтраль (±15%)',                     min:-0.15, max:  0.15,    dir:  0 },
-    { label: 'Физики 15-30% в шорте → слаб. рост ↑',min:-0.30,max: -0.15,    dir:  1 },
-    { label: 'Физики 30-50% в шорте → рост ↑',     min:-0.50, max: -0.30,    dir:  1 },
-    { label: 'Физики >50% в шорте → рост ↑↑',      min:-Infinity,max:-0.50,  dir:  1 },
+    { label: `Физики >p80 (>${fmtThr(p80)}) в лонге → падение ↓↓`, min: p80, max: Infinity,  dir: -1 },
+    { label: `Физики p60-p80 (${fmtThr(p60)}…${fmtThr(p80)}) → пад. ↓`,  min: p60, max: p80, dir: -1 },
+    { label: `Нейтраль p40-p60 (${fmtThr(p40)}…${fmtThr(p60)})`,          min: p40, max: p60, dir:  0 },
+    { label: `Физики p20-p40 (${fmtThr(p20)}…${fmtThr(p40)}) → рост ↑`,   min: p20, max: p40, dir:  1 },
+    { label: `Физики <p20 (<${fmtThr(p20)}) в шорте → рост ↑↑`,           min: -Infinity, max: p20, dir:  1 },
   ];
 
   const binStats = BINS.map(bin => {
