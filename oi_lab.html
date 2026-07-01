@@ -210,6 +210,7 @@ buildCfgUI();
 // ========== DATA FETCH ==========
 let _lastRows = null;
 let _lastResult = null;
+let _lastMode = 'daily';
 let _lastCalibStats = null;
 let _lastCalibFwd   = null;
 
@@ -375,6 +376,7 @@ async function labLoad() {
     const result = computeIndicator(rows, cfg, refSwitchDates);
     _lastRows = rows;
     _lastResult = result;
+    _lastMode = mode;
     renderAll(result);
     const hasHL = rows.some(r => r.high > 0 && r.low > 0);
     const accumCount = result.filter(r => r.accum_flag).length;
@@ -974,22 +976,24 @@ function drawPrice(result) {
     if (_lastCalibStats && isFinite(row.net_phys_pct)) {
       const bin = _lastCalibStats.find(b => row.net_phys_pct >= b.min && row.net_phys_pct < b.max);
       if (bin) {
-        const s5 = bin.stats[5], s10 = bin.stats[10];
         const fmtP = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
         const col = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
+        const isH = _lastMode === 'hourly';
+        const tipHorizons = isH ? [1,2,4,8,24] : [1,2,3,5];
+        const tipLbl = h => isH ? `+${h}ч` : `+${h}д`;
         calibTip = `<span style="color:${col}">${bin.label}</span><br>`
-          + (s5 ? `через 5 дн: медиана <b style="color:${col}">${fmtP(s5.median)}</b>, точность ${isFinite(s5.accuracy)?s5.accuracy.toFixed(0)+'%':'—'}<br>` : '')
-          + (s10 ? `через 10 дн: медиана <b style="color:${col}">${fmtP(s10.median)}</b>` : '');
+          + tipHorizons.map(h => { const s=bin.stats[h]; return s ? `${tipLbl(h)}: <b style="color:${col}">${fmtP(s.median)}</b> (точн ${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'})` : ''; }).filter(Boolean).join(' | ');
       }
     }
 
-    // Реальный результат через 5/10 дней
+    // Реальный факт по горизонтам
     let realTip = '';
     if (_lastCalibFwd) {
       const globalIdx = _lastResult ? _lastResult.findIndex(r => r === row) : -1;
-      const f5 = _lastCalibFwd[5]?.[globalIdx], f10 = _lastCalibFwd[10]?.[globalIdx];
-      if (isFinite(f5)) realTip += `факт +5дн: <b style="color:${f5>0?'#a6e3a1':'#f38ba8'}">${f5>0?'+':''}${f5.toFixed(1)}%</b>`;
-      if (isFinite(f10)) realTip += (realTip?' | ':'') + `факт +10дн: <b style="color:${f10>0?'#a6e3a1':'#f38ba8'}">${f10>0?'+':''}${f10.toFixed(1)}%</b>`;
+      const isH = _lastMode === 'hourly';
+      const tipHorizons = isH ? [1,4,24] : [1,3,5];
+      const tipLbl = h => isH ? `факт +${h}ч` : `факт +${h}д`;
+      realTip = tipHorizons.map(h => { const v=_lastCalibFwd[h]?.[globalIdx]; return isFinite(v)?`${tipLbl(h)}: <b style="color:${v>0?'#a6e3a1':'#f38ba8'}">${v>0?'+':''}${v.toFixed(1)}%</b>`:''; }).filter(Boolean).join(' | ');
     }
 
     const tip = document.getElementById('chart-tooltip');
@@ -1211,7 +1215,10 @@ function labCalibrate() {
   if (!result || result.length < 15) { setStatus('Сначала загрузи данные', 'err'); return; }
 
   const n = result.length;
-  const HORIZONS = [1, 3, 5, 10]; // дней вперёд
+  // В часовом режиме горизонты — в часах, в дневном — в днях
+  const isHourly = _lastMode === 'hourly';
+  const HORIZONS = isHourly ? [1, 2, 4, 8, 24] : [1, 2, 3, 5];
+  const hLabel = h => isHourly ? `+${h}ч` : `+${h}д`;
 
   // Форвардные доходности по горизонтам
   const fwd = {};
@@ -1268,7 +1275,9 @@ function labCalibrate() {
 
 function renderCalibration(binStats, last, currentBin, fwd, result) {
   const el = document.getElementById('calib-out');
-  const H = [1, 3, 5, 10];
+  const isHourly = _lastMode === 'hourly';
+  const H = isHourly ? [1, 2, 4, 8, 24] : [1, 2, 3, 5];
+  const hLbl = h => isHourly ? `+${h}ч` : `+${h}д`;
   const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
 
   // Текущий прогноз
@@ -1279,7 +1288,7 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
       <div style="font-size:12px;color:#cba6f7;margin-bottom:6px">Текущий прогноз (перекос физ.: ${isFinite(last.net_phys_pct)?(last.net_phys_pct*100).toFixed(1)+'%':'—'})</div>
       <div style="font-size:16px;font-weight:700;color:${color}">${currentBin.label}</div>
       <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
-        ${H.map(h => { const s=currentBin.stats[h]; return s?`<span>+${h}д: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
+        ${H.map(h => { const s=currentBin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
     </div>`;
   }
@@ -1289,7 +1298,7 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
     <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
-    ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">+${h} дн.</th>`).join('')}
+    ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
   </tr><tr>
     <th style="background:#181825"></th>
     ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
@@ -1314,7 +1323,7 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
 
   // Мини-график: медиана по бинам (горизонт 5д)
   html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin:6px 0 4px"></canvas>`;
-  html += `<div style="font-size:10px;color:#6c7086;margin-bottom:12px">Медианный сдвиг через 5 дней для каждого уровня перекоса физиков</div>`;
+  html += `<div style="font-size:10px;color:#6c7086;margin-bottom:12px">Медианный сдвиг через ${hLbl(H[H.length-1])} для каждого уровня перекоса физиков</div>`;
 
   // Детальная таблица факт/прогноз по барам
   html += `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Детально по барам: факт vs прогноз</summary>
@@ -1323,7 +1332,7 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
     <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Дата</th>
     <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:right">Перекос физ.</th>
     <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
-    ${H.map(h=>`<th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:center" colspan="3">+${h} дн.</th>`).join('')}
+    ${H.map(h=>`<th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
   </tr><tr>
     <th colspan="3" style="background:#181825"></th>
     ${H.map(()=>'<th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">прогноз</th><th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">факт</th><th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">разница</th>').join('')}
@@ -1365,13 +1374,15 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
     const ctx = c.getContext('2d');
     ctx.scale(devicePixelRatio, devicePixelRatio);
     const CH = 120;
-    const vals = binStats.map(b => b.stats[5]?.median ?? NaN).filter(isFinite);
+    // Для бар-чарта берём последний горизонт (самый показательный)
+    const chartH = H[H.length - 1];
+    const vals = binStats.map(b => b.stats[chartH]?.median ?? NaN).filter(isFinite);
     if (!vals.length) return;
     const vmax = Math.max(...vals.map(Math.abs), 1);
     const bw = W / binStats.length;
     const midY = CH / 2;
     binStats.forEach((bin, i) => {
-      const s = bin.stats[5];
+      const s = bin.stats[chartH];
       if (!s) return;
       const v = s.median;
       const barH = Math.abs(v) / vmax * (CH/2 - 16);
