@@ -68,9 +68,11 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
   <button class="sec" onclick="labBackfill()">📥 Бэкфилл ОИ</button>
   <button class="sec" onclick="labFetchCandles('day')">📈 Свечи день</button>
   <button class="sec" onclick="labFetchCandles('hour')">📈 Свечи 1h</button>
+  <button class="sec" onclick="labDiag()">🩺 Диагностика</button>
 </div>
 
 <div id="status" class="status">—</div>
+<div id="diag-out" style="display:none;background:#1e2030;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:11px"></div>
 <div id="chart-tooltip" style="display:none;position:fixed;background:#1e2030;border:1px solid #363a4f;border-radius:7px;padding:8px 12px;font-size:11px;color:#cdd6f4;pointer-events:none;z-index:999;line-height:1.7"></div>
 
 <!-- Конфиг -->
@@ -220,6 +222,124 @@ function setStatus(msg, cls='') {
   const el = document.getElementById('status');
   el.textContent = msg;
   el.className = 'status ' + cls;
+}
+
+async function labDiag() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const tickers = document.getElementById('tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  const el = document.getElementById('diag-out');
+  el.style.display = 'block';
+  el.innerHTML = '<span style="color:#6c7086">Загрузка…</span>';
+  setStatus('Диагностика…');
+
+  try {
+    // 1. Список тикеров в oi_daily
+    const tr = await fetch(`${proxy}/db/tickers`);
+    const tickerList = tr.ok ? await tr.json() : [];
+
+    // 2. Для выбранных тикеров — статистика oihourly
+    const symList = tickers.length ? tickers : tickerList.map(r => r.ticker).slice(0, 10);
+    const hourlyStats = [];
+    for (const t of symList.slice(0, 8)) {
+      try {
+        const sym = t.match(/^([A-Za-z]{2})/)?.[1] || t;
+        const r = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(t)}&days=30`);
+        if (!r.ok) { hourlyStats.push({ ticker: t, n: 0, from: '—', to: '—', lastFiz: null }); continue; }
+        const rows = await r.json();
+        const arr = Array.isArray(rows) ? rows : [];
+        if (!arr.length) { hourlyStats.push({ ticker: t, n: 0, from: '—', to: '—', lastFiz: null }); continue; }
+        const sorted = arr.sort((a,b) => a.ts - b.ts);
+        const last = sorted.at(-1);
+        hourlyStats.push({
+          ticker: t, n: arr.length,
+          from: new Date(sorted[0].ts).toISOString().slice(0,16).replace('T',' '),
+          to:   new Date(last.ts).toISOString().slice(0,16).replace('T',' '),
+          lastFiz: last,
+        });
+      } catch(_) { hourlyStats.push({ ticker: t, n: 0, from: '—', to: '—', lastFiz: null }); }
+    }
+
+    // 3. Рендер
+    let html = `<div style="font-size:13px;font-weight:700;color:#cba6f7;margin-bottom:10px">🩺 Диагностика базы данных</div>`;
+
+    // oi_daily coverage
+    html += `<div style="margin-bottom:10px"><span style="color:#a6adc8;font-weight:600">oi_daily — тикеры в базе (${tickerList.length}):</span><br>`;
+    if (tickerList.length) {
+      html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;width:100%">
+        <thead><tr>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Дней</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">С</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">По</th>
+        </tr></thead><tbody>`;
+      for (const r of tickerList) {
+        html += `<tr><td style="padding:3px 8px">${r.ticker}</td>
+          <td style="padding:3px 8px;text-align:center;color:${r.days>=30?'#a6e3a1':'#f9e2af'}">${r.days}</td>
+          <td style="padding:3px 8px;color:#6c7086">${r.from_date||'—'}</td>
+          <td style="padding:3px 8px;color:#6c7086">${r.to_date||'—'}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+    } else {
+      html += '<span style="color:#f38ba8">Нет данных — нужен бэкфилл ОИ</span>';
+    }
+    html += '</div>';
+
+    // oi_hourly coverage
+    html += `<div style="margin-bottom:10px"><span style="color:#a6adc8;font-weight:600">oi_hourly — 5-мин снэпшоты (последние 30 дней):</span>`;
+    const hasHourly = hourlyStats.some(s => s.n > 0);
+    if (!hasHourly) {
+      html += `<div style="color:#f38ba8;margin-top:6px">⚠️ Данных нет — cron ещё не запускался или воркер не задеплоен с новым кодом.<br>
+        После деплоя и добавления cron <code style="background:#181825;padding:1px 4px">*/15 * * * *</code> данные начнут копиться.</div>`;
+    } else {
+      html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;width:100%">
+        <thead><tr>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Записей</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">С</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">По (МСК)</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Послед. физ.лонг</th>
+          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Послед. физ.шорт</th>
+        </tr></thead><tbody>`;
+      for (const s of hourlyStats) {
+        const nColor = s.n === 0 ? '#f38ba8' : s.n < 10 ? '#f9e2af' : '#a6e3a1';
+        html += `<tr>
+          <td style="padding:3px 8px">${s.ticker}</td>
+          <td style="padding:3px 8px;text-align:center;color:${nColor}">${s.n}</td>
+          <td style="padding:3px 8px;color:#6c7086">${s.from}</td>
+          <td style="padding:3px 8px;color:#6c7086">${s.to}</td>
+          <td style="padding:3px 8px;color:#89b4fa">${s.lastFiz ? Math.round(s.lastFiz.fiz_long).toLocaleString() : '—'}</td>
+          <td style="padding:3px 8px;color:#f38ba8">${s.lastFiz ? Math.round(s.lastFiz.fiz_short).toLocaleString() : '—'}</td>
+        </tr>`;
+      }
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+
+    // Последний сырой снэпшот FutOI (oitest)
+    if (tickers.length) {
+      try {
+        const tr2 = await fetch(`${proxy}/db/oitest?ticker=${encodeURIComponent(tickers[0])}`);
+        if (tr2.ok) {
+          const raw = await tr2.json();
+          const futoi = raw.body?.futoi;
+          const rows2 = futoi ? (futoi.data || []).slice(0, 6) : [];
+          if (rows2.length) {
+            html += `<div><span style="color:#a6adc8;font-weight:600">Сырой FutOI — последние строки для ${tickers[0]} (${raw.date}):</span>
+              <pre style="margin-top:6px;background:#181825;padding:8px;border-radius:5px;font-size:10px;overflow-x:auto;color:#cdd6f4">${
+                JSON.stringify({ columns: futoi.columns, data: rows2 }, null, 2)
+              }</pre></div>`;
+          }
+        }
+      } catch(_) {}
+    }
+
+    el.innerHTML = html;
+    setStatus('Диагностика готова', 'ok');
+  } catch(e) {
+    el.innerHTML = `<span style="color:#f38ba8">Ошибка: ${e.message}</span>`;
+    setStatus('Ошибка диагностики', 'err');
+  }
 }
 
 async function labBackfill() {
