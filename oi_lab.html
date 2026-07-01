@@ -410,6 +410,21 @@ async function labFetchCandles(tf) {
   setStatus(`Готово [${tf}]: ${totalSaved} баров. Нажми «Загрузить».`, 'ok');
 }
 
+// Определяет реальный шаг между барами по датам (медиана дельт), а не по режиму из UI:
+// если строки на деле дневные (шаг ~24ч), а пользователь выбрал «Часовой» — калибровка
+// не должна называть горизонты «+1ч…+24ч», когда это «+1…+24 дня».
+function _detectGranularity(rows) {
+  const times = rows.map(r => new Date(String(r.date).replace(' ', 'T')).getTime())
+    .filter(isFinite).sort((a,b)=>a-b);
+  if (times.length < 3) return 'daily';
+  const deltas = [];
+  for (let i=1; i<times.length; i++) if (times[i] > times[i-1]) deltas.push(times[i]-times[i-1]);
+  if (!deltas.length) return 'daily';
+  deltas.sort((a,b)=>a-b);
+  const median = deltas[Math.floor(deltas.length/2)];
+  return median >= 20*3600*1000 ? 'daily' : 'hourly';
+}
+
 // Подтягивает все тикеры из /db/tickers с тем же 2-буквенным базисом (Si, Br, Eu...),
 // чтобы открытый интерес считался по всей связке контрактов, а не только по введённым вручную.
 async function resolveTickerFamily(proxy, tickers) {
@@ -553,12 +568,19 @@ async function labLoad() {
     const result = computeIndicator(rows, cfg, refSwitchDates);
     _lastRows = rows;
     _lastResult = result;
-    _lastMode = mode;
+    // Гранулярность определяем по фактическому шагу дат, а не по выбору в дропдауне:
+    // режим «Часовой» тихо откатывается на дневные бары, если /db/candles?tf=hour
+    // не вернул данных (см. try/catch выше) — тогда лейблы «+1ч…+24ч» в калибровке
+    // врали бы (на деле это «+1…+24 бара», т.е. дня).
+    const detectedMode = _detectGranularity(rows);
+    const modeMismatch = mode === 'hourly' && detectedMode === 'daily';
+    _lastMode = detectedMode;
     renderAll(result);
     const hasHL = rows.some(r => r.high > 0 && r.low > 0);
     const accumCount = result.filter(r => r.accum_flag).length;
     const autoAdded = tickers.length > enteredCount ? ` | авто-добавлены: ${tickers.slice(enteredCount).join(', ')}` : '';
-    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')})${autoAdded} | H/L свечи: ${hasHL ? 'есть' : 'НЕТ — нажми «Свечи день»'} | Накопление: ${accumCount} баров`, 'ok');
+    const mismatchNote = modeMismatch ? ' | ⚠️ часовых свечей нет — фактически дневные бары, горизонты калибровки это учтут' : '';
+    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')})${autoAdded} | H/L свечи: ${hasHL ? 'есть' : 'НЕТ — нажми «Свечи день»'} | Накопление: ${accumCount} баров${mismatchNote}`, modeMismatch ? 'err' : 'ok');
   } catch(e) {
     setStatus('Ошибка: ' + e.message, 'err');
     console.error(e);
@@ -606,22 +628,32 @@ function aggregateContracts(contractsMap) {
     const agg = { date, close: 0, ref_switch: false };
     for (const c of POS_COLS) agg[c] = 0;
 
-    let bestOi = -1, bestTicker = null;
+    // ОИ (юр/физ) в FutOI API публикуется на уровне СЕРИИ (root), а не по
+    // конкретному дескрипту контракта — MOEX отдаёт один и тот же объём под
+    // несколькими тикерами одной серии одновременно (напр. AF root + AFU6/AFZ6
+    // дескрипты). Поэтому суммировать позиционные колонки по тикерам НЕЛЬЗЯ —
+    // это задваивает/утраивает ОИ на датах, где записаны и root, и дескрипт(ы).
+    // Берём max по каждой колонке (без потери данных, без задвоения дублей).
+    let bestOi = -1, bestTicker = null, bestPriceOi = -1, bestPriceTicker = null;
     for (const [t, byDate] of Object.entries(indexed)) {
       const r = byDate[date];
       if (!r) continue;
-      for (const c of POS_COLS) agg[c] += (r[c] || 0);
+      for (const c of POS_COLS) agg[c] = Math.max(agg[c], r[c] || 0);
       const oi = (r.phys_long_contracts||0) + (r.legal_long_contracts||0);
       if (oi > bestOi) { bestOi = oi; bestTicker = t; }
+      // Root-тикер (2-буквенный код) из бэкфилла all=1 всегда пишется с price=0 —
+      // для цены нужен именно дескрипт конкретного контракта, а не root.
+      if (r.close > 0 && oi >= bestPriceOi) { bestPriceOi = oi; bestPriceTicker = t; }
     }
 
-    if (bestTicker) {
-      agg.close = indexed[bestTicker][date]?.close || 0;
-      if (prevRef && bestTicker !== prevRef) {
+    const priceTicker = bestPriceTicker || bestTicker;
+    if (priceTicker) {
+      agg.close = indexed[priceTicker][date]?.close || 0;
+      if (prevRef && priceTicker !== prevRef) {
         agg.ref_switch = true;
         refSwitchDates.push(date);
       }
-      prevRef = bestTicker;
+      prevRef = priceTicker;
     }
     rows.push(agg);
   }
