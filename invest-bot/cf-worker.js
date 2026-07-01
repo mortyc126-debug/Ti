@@ -487,12 +487,31 @@ async function handleDb(path, req, env) {
   if (p === '/candles/tinvest' && req.method === 'GET') {
     const u = new URL(req.url);
     const ticker = u.searchParams.get('ticker');
-    const figi   = u.searchParams.get('figi');
+    let   figi   = u.searchParams.get('figi');
     const from   = u.searchParams.get('from') || '2026-01-01';
     const to     = u.searchParams.get('to')   || new Date().toISOString().slice(0,10);
-    if (!ticker || !figi) return json({ error: 'ticker and figi required' }, 400);
+    if (!ticker) return json({ error: 'ticker required' }, 400);
     const token = env.TINVEST_TOKEN;
     if (!token) return json({ error: 'TINVEST_TOKEN secret не задан в CF Worker' }, 503);
+
+    // Автопоиск FIGI: пробуем полный тикер, затем 2-буквенный sym
+    if (!figi) {
+      const sym = ticker.match(/^([A-Za-z]{2})/)?.[1] || ticker;
+      const queries = ticker !== sym ? [ticker, sym] : [ticker];
+      for (const q of queries) {
+        const fr = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, instrumentKind: 'INSTRUMENT_TYPE_FUTURES', apiTradeAvailableFlag: false }),
+        });
+        if (fr.ok) {
+          const fb = await fr.json();
+          const inst = (fb.instruments || []).find(i => i.ticker === ticker || i.ticker === q || i.ticker?.startsWith(sym));
+          if (inst?.figi) { figi = inst.figi; break; }
+        }
+      }
+      if (!figi) return json({ error: `Не удалось найти FIGI для тикера ${ticker}` }, 404);
+    }
     const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

@@ -261,8 +261,30 @@ async function labLoad() {
         rawArr = Array.isArray(json) ? json : (json.rows || json.data || []);
         if (rawArr.length) break;
       }
-      const rows = rawArr.map(normalizeRow).filter(r=>r.date);
+      let rows = rawArr.map(normalizeRow).filter(r=>r.date);
       if (!rows.length) throw new Error(`Нет данных для ${t} (проверь бэкфилл)`);
+
+      // Подтягиваем дневные свечи (цена закрытия) из D1 и мёрджим в строки OI
+      try {
+        const cr = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(sym)}&tf=day&from=0`);
+        if (cr.ok) {
+          const cdata = await cr.json();
+          const carr = Array.isArray(cdata) ? cdata : (cdata.rows || []);
+          // candle.time — unix секунды; преобразуем в YYYY-MM-DD для сопоставления с tradedate
+          const priceMap = {};
+          for (const c of carr) {
+            if (c.cl && c.time) {
+              const d = new Date(c.time * 1000).toISOString().slice(0, 10);
+              priceMap[d] = c.cl;
+            }
+          }
+          rows = rows.map(r => {
+            const p = priceMap[r.date];
+            return p ? { ...r, close: p } : r;
+          });
+        }
+      } catch(_) { /* свечи опциональны, не блокируем загрузку OI */ }
+
       contractsMap[t] = rows;
     }
 
