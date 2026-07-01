@@ -328,7 +328,7 @@ async function labLoad() {
         }
       } catch(_) {}
 
-      // Если режим «Часовой» — подменяем строки на часовые свечи с транслированным OI
+      // Если режим «Часовой» — подменяем строки на часовые свечи + OI
       if (mode === 'hourly') {
         try {
           const hr = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(sym)}&tf=hour&from=0`);
@@ -336,25 +336,52 @@ async function labLoad() {
             const hdata = await hr.json();
             const hcarr = (Array.isArray(hdata) ? hdata : (hdata.rows || [])).filter(c=>c.cl>0);
             if (hcarr.length) {
-              // Строим map: YYYY-MM-DD → дневная строка OI
+              // Пробуем часовые снэпшоты OI из oi_hourly (копятся с момента запуска cron)
+              let hourlyOiMap = null; // ts (ms, начало часа) → OI-запись
+              try {
+                const ohr = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(sym)}&days=180`);
+                if (ohr.ok) {
+                  const ohdata = await ohr.json();
+                  const oharr = Array.isArray(ohdata) ? ohdata : (ohdata.rows || []);
+                  if (oharr.length) {
+                    hourlyOiMap = {};
+                    for (const oh of oharr) hourlyOiMap[oh.ts] = oh;
+                  }
+                }
+              } catch(_) {}
+
+              // Строим fallback: YYYY-MM-DD → дневная OI-запись
               const oiByDate = {};
               for (const r of rows) oiByDate[r.date] = r;
+
               rows = hcarr.map(c => {
-                const dt = new Date(c.time * 1000);
+                const dt  = new Date(c.time * 1000);
                 const date = dt.toISOString().slice(0, 10);
-                const oi = oiByDate[date] || {};
+                const tsH  = Math.floor(c.time / 3600) * 3600 * 1000; // начало часа в ms
+
+                // Если есть часовой снэпшот — берём его; иначе spread дневного
+                let oi;
+                if (hourlyOiMap) {
+                  // Ищем ближайший снэпшот в ±2 часа (FutOI обновляется не ровно в начале часа)
+                  const candidates = [tsH, tsH - 3600000, tsH + 3600000, tsH - 7200000, tsH + 7200000];
+                  const found = candidates.find(t => hourlyOiMap[t]);
+                  oi = found ? hourlyOiMap[found] : null;
+                }
+                const d = oiByDate[date] || {};
                 return {
-                  date: dt.toISOString().slice(0, 16).replace('T', ' '), // "2026-06-25 13:00"
+                  date: dt.toISOString().slice(0, 16).replace('T', ' '),
                   _date: date,
+                  _has_hourly_oi: !!oi,
                   close: c.cl, open: c.o, high: c.h, low: c.l,
-                  phys_long_contracts:  oi.phys_long_contracts  || 0,
-                  phys_short_contracts: oi.phys_short_contracts || 0,
-                  phys_long_persons:    oi.phys_long_persons    || 0,
-                  phys_short_persons:   oi.phys_short_persons   || 0,
-                  legal_long_contracts:  oi.legal_long_contracts  || 0,
-                  legal_short_contracts: oi.legal_short_contracts || 0,
-                  legal_long_persons:    oi.legal_long_persons    || 0,
-                  legal_short_persons:   oi.legal_short_persons   || 0,
+                  // Часовые поля из oi_hourly (или дневной spread как fallback)
+                  phys_long_contracts:  oi ? (oi.fiz_long  || 0) : (d.phys_long_contracts  || 0),
+                  phys_short_contracts: oi ? (oi.fiz_short || 0) : (d.phys_short_contracts || 0),
+                  phys_long_persons:    oi ? (oi.fiz_long_num  || 0) : (d.phys_long_persons  || 0),
+                  phys_short_persons:   oi ? (oi.fiz_short_num || 0) : (d.phys_short_persons || 0),
+                  legal_long_contracts:  oi ? (oi.yur_long  || 0) : (d.legal_long_contracts  || 0),
+                  legal_short_contracts: oi ? (oi.yur_short || 0) : (d.legal_short_contracts || 0),
+                  legal_long_persons:    oi ? (oi.yur_long_num  || 0) : (d.legal_long_persons  || 0),
+                  legal_short_persons:   oi ? (oi.yur_short_num || 0) : (d.legal_short_persons || 0),
                   ref_switch: false,
                 };
               });

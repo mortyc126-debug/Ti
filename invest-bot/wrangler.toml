@@ -1,0 +1,23 @@
+name = "oi-intel-worker"
+main = "cf-worker.js"
+compatibility_date = "2024-09-01"
+
+[[d1_databases]]
+binding = "интерес"
+database_name = "oi_signal1"
+# database_id задаётся в Cloudflare Dashboard → D1 → <база> → копируй ID
+
+# Cron-триггеры:
+#   "0 22 * * *"  — 22:00 UTC (01:00 МСК) — основной дневной снэпшот после публикации FutOI
+#   "0 4-20 * * MON-FRI" — каждый час 4:00-20:00 UTC (7:00-23:00 МСК) в рабочие дни → oi_hourly
+# Оба вызова идут в одну функцию scheduledCollectOi; она сама определяет,
+# нужно ли писать в oi_hourly (только если nowHourUtc >= 4 && < 21).
+[triggers]
+crons = [
+  "0 22 * * *",
+  "0 4-20 * * MON-FRI",
+]
+
+# Секреты задаются командой (не хранятся в репо):
+#   wrangler secret put MOEX_KEY
+#   wrangler secret put TINVEST_TOKEN

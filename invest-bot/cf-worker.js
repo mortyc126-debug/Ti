@@ -191,6 +191,26 @@ const SCHEMA_STMTS = [
     root       TEXT,
     updated_at INTEGER DEFAULT 0
   )`,
+
+  // Часовые снэпшоты ОИ — cron срабатывает каждый час в торговые часы FORTS
+  // (7:00-23:50 МСК = 4:00-20:50 UTC). Ключ = ticker__ts (unix ms).
+  // oi_lab.html использует эту таблицу в hourly-режиме вместо развёртки
+  // одного дневного снэпшота на все часы.
+  `CREATE TABLE IF NOT EXISTS oi_hourly (
+    key          TEXT PRIMARY KEY,
+    ticker       TEXT NOT NULL,
+    ts           INTEGER NOT NULL,
+    price        REAL DEFAULT 0,
+    yur_long     REAL DEFAULT 0,
+    yur_short    REAL DEFAULT 0,
+    fiz_long     REAL DEFAULT 0,
+    fiz_short    REAL DEFAULT 0,
+    yur_long_num  REAL DEFAULT 0,
+    yur_short_num REAL DEFAULT 0,
+    fiz_long_num  REAL DEFAULT 0,
+    fiz_short_num REAL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_oihourly_ticker ON oi_hourly(ticker, ts)`,
 ];
 
 // ── D1 Route Handler ───────────────────────────────────────────────────────
@@ -208,6 +228,25 @@ async function migrateOiDailyNumCols(db) {
   for (const stmt of OI_DAILY_NUM_MIGRATIONS) {
     try { await db.prepare(stmt).run(); } catch (_) { /* колонка уже есть */ }
   }
+}
+
+// ── Upsert одного часового снэпшота в oi_hourly ──
+async function upsertOiHourly(db, r) {
+  const ts = r.ts || Date.now();
+  const key = `${r.ticker}__${ts}`;
+  await db.prepare(
+    `INSERT OR REPLACE INTO oi_hourly
+       (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
+        yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    key, r.ticker, ts,
+    r.price || 0,
+    r.yur_long || 0, r.yur_short || 0,
+    r.fiz_long || 0, r.fiz_short || 0,
+    r.yur_long_num || 0, r.yur_short_num || 0,
+    r.fiz_long_num || 0, r.fiz_short_num || 0,
+  ).run();
 }
 
 // ── Upsert одного снэпшока в oi_daily (общий код для /db/oidaily и cron) ──
@@ -370,6 +409,27 @@ async function scheduledCollectOi(env) {
           fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
           fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
         });
+
+        // Если биржа работает (4:00-20:50 UTC = 7:00-23:50 МСК) — пишем
+        // ещё и в oi_hourly чтобы строить внутридневную историю позиций.
+        // В oi_daily upsert по дате (один снэпшот в день), в oi_hourly
+        // пишем каждый час отдельной записью — поэтому ключ по ts.
+        const nowHourUtc = new Date().getUTCHours();
+        if (nowHourUtc >= 4 && nowHourUtc < 21) {
+          // Округляем ts до начала текущего часа
+          const tsHour = Math.floor(Date.now() / 3600000) * 3600000;
+          await upsertOiHourly(db, {
+            ticker: r.ticker, ts: tsHour, price: r.price,
+            yur_long: Number(byGroup.YUR?.pos_long || 0),
+            yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
+            fiz_long: Number(byGroup.FIZ?.pos_long || 0),
+            fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
+            yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
+            yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
+            fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
+            fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
+          });
+        }
       } catch (e) { console.warn('oi cron:', r.ticker, e.message); }
     }));
   }
@@ -438,7 +498,7 @@ async function handleDb(path, req, env) {
       await db.prepare(stmt).run();
     }
     await migrateOiDailyNumCols(db);
-    return json({ ok: true, msg: 'schema ready (v2 — adaptive)' });
+    return json({ ok: true, msg: 'schema ready (v3 — oi_hourly)' });
   }
 
   // ── Candles ──
@@ -763,6 +823,29 @@ async function handleDb(path, req, env) {
     const { results } = await db.prepare(
       'SELECT * FROM oi_daily WHERE ticker=? ORDER BY tradedate ASC'
     ).bind(ticker).all();
+    return json(results);
+  }
+
+  // ── Часовые снэпшоты ОИ ──
+  // POST body: { ticker, ts, price, yur_long, yur_short, fiz_long, fiz_short, ... }
+  // GET ?ticker=SSU6[&from=<unix_ms>][&days=90] — все записи за период
+  if (p === '/oihourly' && req.method === 'POST') {
+    const r = await req.json();
+    if (!r.ticker) return json({ error: 'ticker required' }, 400);
+    await upsertOiHourly(db, r);
+    return json({ ok: true });
+  }
+
+  if (p.startsWith('/oihourly') && req.method === 'GET') {
+    const u      = new URL(req.url);
+    const ticker = u.searchParams.get('ticker');
+    if (!ticker) return json({ error: 'ticker required' }, 400);
+    const days   = parseInt(u.searchParams.get('days') || '90');
+    const from   = parseInt(u.searchParams.get('from') || '0') ||
+                   (Date.now() - days * 86400 * 1000);
+    const { results } = await db.prepare(
+      'SELECT * FROM oi_hourly WHERE ticker=? AND ts>=? ORDER BY ts ASC LIMIT 5000'
+    ).bind(ticker, from).all();
     return json(results);
   }
 
