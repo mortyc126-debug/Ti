@@ -2363,6 +2363,34 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
       <th style="background:#181825"></th>
       ${HORIZONS.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
     </tr></thead><tbody>`;
+    // Базовый уровень пула — все форвардные доходности по всем инструментам сразу
+    // (не среднее локальных базовых уровней — иначе инструменты с большим N
+    // получили бы такой же вес, как с маленьким, хотя пул должен взвешивать
+    // по факту наблюдений). Без этой строки нельзя понять, есть ли у бина
+    // реальный edge, или его точность просто повторяет то, что рынок и так
+    // делает в среднем по всему пулу.
+    const baseStats = {};
+    for (const h of HORIZONS) {
+      const all = [];
+      for (const inst of instruments) for (const v of inst.fwd[h]) if (isFinite(v)) all.push(v);
+      if (!all.length) { baseStats[h] = null; continue; }
+      const sorted = all.slice().sort((a,b)=>a-b);
+      const med = sorted.length % 2 === 0
+        ? (sorted[sorted.length/2-1] + sorted[sorted.length/2]) / 2
+        : sorted[Math.floor(sorted.length/2)];
+      const pctDown = all.filter(v=>v<0).length / all.length * 100;
+      baseStats[h] = { median: med, pctDown, n: all.length };
+    }
+    t += `<tr style="background:#1e1e2e;border-top:1px solid #313244"><td style="padding:4px 8px;color:#cba6f7;font-weight:600;white-space:nowrap">📐 Базовый уровень пула</td>`;
+    for (const h of HORIZONS) {
+      const b = baseStats[h];
+      if (!b) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
+      const mc = b.median > 0.5 ? '#a6e3a1' : b.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+      t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(b.median)}</td>
+            <td style="text-align:center;padding:4px 6px;color:#f38ba8" title="% дней вниз по всему пулу">${b.pctDown.toFixed(0)}% ↓</td>
+            <td style="text-align:center;padding:4px 6px;color:#6c7086">${b.n}</td>`;
+    }
+    t += '</tr>';
     for (const bin of poolStats) {
       const rc = bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030';
       t += `<tr style="background:${rc}"><td style="padding:4px 8px;color:${bin.dir>0?'#a6e3a1':bin.dir<0?'#f38ba8':'#cdd6f4'}">${bin.label}</td>`;
@@ -2370,9 +2398,15 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
         const s = bin.stats[h];
         if (!s) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
         const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
-        const ac = isFinite(s.accuracy) && s.accuracy >= 55 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
+        const base = baseStats[h];
+        const baseAcc = base ? (bin.dir < 0 ? base.pctDown : (100 - base.pctDown)) : null;
+        const edge = baseAcc !== null && isFinite(s.accuracy) ? s.accuracy - baseAcc : null;
+        const ac = edge !== null
+          ? (edge >= 5 ? '#a6e3a1' : edge <= -5 ? '#f38ba8' : '#cdd6f4')
+          : (isFinite(s.accuracy) && s.accuracy >= 55 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4');
+        const edgeTip = edge !== null ? ` title="Преимущество над базой пула: ${edge>0?'+':''}${edge.toFixed(1)}%"` : '';
         t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(s.median)}</td>
-              <td style="text-align:center;padding:4px 6px;color:${ac}">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
+              <td style="text-align:center;padding:4px 6px;color:${ac}"${edgeTip}>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
               <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
       }
       t += '</tr>';
