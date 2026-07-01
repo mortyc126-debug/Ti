@@ -93,7 +93,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
 
 <!-- Графики -->
 <div class="section">
-  <div class="section-title">Цена + фазы накопления <span style="color:#6c7086;font-size:9px">(синий фон = флэт с имбалансом; пунктир = диапазон фазы)</span></div>
+  <div class="section-title">Цена + фазы накопления <span style="color:#6c7086;font-size:9px">(синий фон = флэт с имбалансом; пунктир = диапазон фазы; 🔺оранж. = тренд-истощение)</span></div>
   <canvas id="c-price"></canvas>
 </div>
 <div class="section">
@@ -150,6 +150,9 @@ const CFG_DEFAULTS = {
   adaptive_confirm_quantile: 0.5,
   min_phase_samples_per_bucket: 2,
   adaptive_confirm_floor: 1,
+  trend_exhaust_window: 5,     // баров подряд одного направления, чтобы считать «тренд»
+  trend_exhaust_return: 0.05,  // порог хода за это окно (5%), после которого ищем истощение
+  trend_exhaust_pctl: 0.85,    // перцентиль позиции физлиц (люди), выше которого — «крайняя»
 };
 
 const CFG_LABELS = {
@@ -176,6 +179,9 @@ const CFG_LABELS = {
   adaptive_confirm_quantile: 'Квантиль калибровки',
   min_phase_samples_per_bucket: 'Мин.фаз в корзине',
   adaptive_confirm_floor: 'Мин.confirm (пол)',
+  trend_exhaust_window: 'Окно тренд-истощ.',
+  trend_exhaust_return: 'Порог хода тренда',
+  trend_exhaust_pctl: 'Перцентиль экстрем.',
 };
 
 function buildCfgUI() {
@@ -990,6 +996,7 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   const ttl = cfg.phase_range_ttl || 20;
   const phaseHigh = new Array(n).fill(NaN);
   const phaseLow  = new Array(n).fill(NaN);
+  const barsSincePhaseArr = new Array(n).fill(Infinity);
   let runH = NaN, runL = NaN;
   let lastH = NaN, lastL = NaN;
   let barsSincePhase = Infinity;
@@ -1007,6 +1014,7 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     } else {
       barsSincePhase++;
     }
+    barsSincePhaseArr[i] = barsSincePhase;
     // Forward-fill только пока диапазон свежий
     if (barsSincePhase <= ttl) {
       phaseHigh[i] = isFinite(runH) ? runH : lastH;
@@ -1035,13 +1043,15 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   // Release factor — степень выброса
   const releaseFactor = stressDist.map(v=> Math.pow(Math.max(v/cfg.stress_scale,0), cfg.stress_power));
 
-  // Phase anchor — перекос OI на момент начала фазы (forward-fill)
+  // Phase anchor — перекос OI на момент начала фазы (forward-fill, но не дольше
+  // phase_range_ttl — тот же барьер свежести, что у phaseHigh/Low, чтобы якорь
+  // не тянулся месяцами после того, как диапазон фазы уже устарел)
   const phaseAnchor = new Array(n).fill(NaN);
   let lastAnchor = NaN;
   for (let i=0; i<n; i++) {
     const prevFlag = i>0 ? accumFlag[i-1] : false;
     if (accumFlag[i] && !prevFlag) lastAnchor = netPhysPct[i];
-    phaseAnchor[i] = lastAnchor; // всегда ffill
+    phaseAnchor[i] = barsSincePhaseArr[i] <= ttl ? lastAnchor : NaN;
   }
 
   // Абсолютный уровень позиций в исторической перцентили
@@ -1049,16 +1059,42 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   const physSPctl = _percentileRank(physS, cfg.liquidity_window);
   const physLPctl = _percentileRank(physL, cfg.liquidity_window);
 
-  // Phase potential — прогнозируемое движение: anchor * release
-  // Знак: anchor>0 (физики в лонге) → при выбросе вверх давление растёт (шорт-сжатие)
-  //        anchor<0 → при выбросе вниз давление растёт
+  // Phase potential — прогноз движения ПОСЛЕ выхода из диапазона накопления.
+  // Знак прогноза = направление уже начавшегося пробоя (dir), а не anchor*dir:
+  // и «сквиз против позиции физлиц» (anchor против dir), и «подтверждение по
+  // позиции» (anchor совпадает с dir) — оба варианта продолжают именно в dir,
+  // разница только в МЕХАНИЗМЕ (сквиз обычно резче). Раньше anchor*dir менял
+  // знак прогноза на противоположный всякий раз, когда физики были в шорте
+  // (anchor<0) — то есть ровно для сценария шорт-сквиза прогноз был перевёрнут.
+  // phase_aligned: +1 = пробой по позиции физлиц (подтверждение тренда),
+  //                -1 = пробой против позиции физлиц (сквиз).
+  const phaseAligned = new Array(n).fill(NaN);
   const phasePotential = phaseAnchor.map((a,i)=> {
-    if (!isFinite(a)) return NaN;
     const dir = breakoutDir[i];
-    // Контрарная логика: физики в лонге (a>0) и выброс вверх (dir=1) → сигнал роста подтверждается
-    // Физики в лонге и выброс вниз → стоп-лоссы, сигнал падения
-    return a * (dir !== 0 ? dir : 1) * (1 + cfg.phase_release_gamma * releaseFactor[i]);
+    if (!isFinite(a) || dir === 0 || a === 0) return NaN; // выхода из диапазона ещё не было — прогнозировать нечего
+    phaseAligned[i] = Math.sign(a) === dir ? 1 : -1;
+    return dir * Math.abs(a) * (1 + cfg.phase_release_gamma * releaseFactor[i]);
   });
+
+  // Тренд-истощение — второй, отдельный от «фаз» триггер. Существующая фаза
+  // требует ФЛЭТА (narrowRange), а описанный паттерн — наоборот: N баров подряд
+  // направленного движения (широкий диапазон, не флэт) с позицией физлиц у
+  // исторического экстремума → контрарный сигнал разворота/сквиза.
+  // +1 = падали + шорты физлиц у экстремума → ждём сквиз ВВЕРХ
+  // -1 = росли + лонги физлиц у экстремума → ждём коррекцию ВНИЗ
+  const tew = Math.max(1, Math.round(cfg.trend_exhaust_window || 5));
+  const trendReturn = new Array(n).fill(NaN);
+  for (let i=tew; i<n; i++) if (close[i-tew] > 0) trendReturn[i] = (close[i]-close[i-tew])/close[i-tew];
+  const trendExhaust = new Array(n).fill(0);
+  for (let i=0; i<n; i++) {
+    const tr = trendReturn[i];
+    if (!isFinite(tr)) continue;
+    if (tr <= -cfg.trend_exhaust_return && isFinite(physSPctl[i]) && physSPctl[i] >= cfg.trend_exhaust_pctl) {
+      trendExhaust[i] = 1;
+    } else if (tr >= cfg.trend_exhaust_return && isFinite(physLPctl[i]) && physLPctl[i] >= cfg.trend_exhaust_pctl) {
+      trendExhaust[i] = -1;
+    }
+  }
 
   return rows.map((r,i)=>({
     date: r.date,
@@ -1080,6 +1116,9 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     release_factor: releaseFactor[i],
     phase_anchor: phaseAnchor[i],
     phase_potential: phasePotential[i],
+    phase_aligned: phaseAligned[i],
+    trend_return: trendReturn[i],
+    trend_exhaust: trendExhaust[i],
     d_long: dLong[i],
     d_short: dShort[i],
     roll_d_long: rollDLong[i],
@@ -1120,6 +1159,7 @@ function renderMetrics(result) {
     { lbl:'Выброс за диапазон', val: last.breakout_dir===1?`↑ +${fmt(last.stress_dist*100,1)}%`:last.breakout_dir===-1?`↓ −${fmt(last.stress_dist*100,1)}%`:'внутри', sub:'насколько цена вышла за флэт-диапазон', color: last.stress_dist>0.005?'#f9e2af':'#6c7086' },
     { lbl:'Сила выброса', val: fmt(last.release_factor,3), sub:'как далеко цена от опорного уровня (больше = острее)', color: '#fab387' },
     { lbl:'Фаза накопления', val: last.accum_flag?'ДА':'нет', sub:'флэт + имбаланс = позиции набираются', color: last.accum_flag?'#89dceb':'#6c7086' },
+    { lbl:'Тренд-истощение', val: last.trend_exhaust===1?'↑ шорты у экстремума':last.trend_exhaust===-1?'↓ лонги у экстремума':'нет', sub:`ход за окно: ${fmt(last.trend_return*100,1)}%`, color: last.trend_exhaust!==0?'#fab387':'#6c7086' },
     { lbl:'Открытый интерес', val: Math.round(last.total_oi).toLocaleString(), sub:'всего контрактов в рынке', color: '#cdd6f4' },
   ];
   const row = document.getElementById('metrics-row');
@@ -1330,6 +1370,20 @@ function drawPriceStatic(valid, vmin, vmax, xStep, W, H, hoverIdx) {
   }
   ctx.stroke();
 
+  // Тренд-истощение: треугольник над/под ценой — контрарный сигнал разворота
+  // (после N баров тренда позиция физлиц у исторического экстремума)
+  ctx.fillStyle = '#fab387';
+  for (let i=0; i<n; i++) {
+    const te = valid[i].trend_exhaust;
+    if (!te) continue;
+    const x = (i+0.5)*xStep, y = _mapY(closes[i], vmin, vmax, H);
+    const dy = te === 1 ? 8 : -8; // шорты у экстремума (te=1, ждём рост) → маркер снизу
+    ctx.beginPath();
+    if (te === 1) { ctx.moveTo(x, y+dy); ctx.lineTo(x-4, y+dy+7); ctx.lineTo(x+4, y+dy+7); }
+    else { ctx.moveTo(x, y+dy); ctx.lineTo(x-4, y+dy-7); ctx.lineTo(x+4, y+dy-7); }
+    ctx.closePath(); ctx.fill();
+  }
+
   if (hoverIdx >= 0 && hoverIdx < n) {
     const x = (hoverIdx+0.5)*xStep;
     ctx.strokeStyle='rgba(203,166,247,0.7)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
@@ -1457,6 +1511,9 @@ const TABLE_COLS = [
   { key:'release_factor', lbl:'Сила выброса', dec:3 },
   { key:'phase_anchor', lbl:'Опорный %', dec:3 },
   { key:'phase_potential', lbl:'Потенциал', dec:3 },
+  { key:'phase_aligned', lbl:'Сквиз/тренд', dec:0 },
+  { key:'trend_return', lbl:'Тренд-ход%', dec:1, pct:100 },
+  { key:'trend_exhaust', lbl:'Тренд-истощ.', dec:0 },
 ];
 
 function renderTable(result) {
@@ -1635,6 +1692,45 @@ function labCalibrate() {
     }
   }
 
+  // Бины 4: ФАЗЫ (накопление → выброс) + тренд-истощение — раньше эти поля
+  // (accum_flag, phase_potential, release_factor, trend_exhaust) считались, но
+  // ни разу не проверялись на точность здесь. Категориальные бины вместо
+  // перцентильных, т.к. состояние фазы — это состояние, а не число.
+  function _calcCategoricalStats(defs) {
+    return defs.map(def => {
+      const indices = result.map((r,i)=>i).filter(i => def.match(result[i]));
+      const stats = {};
+      for (const h of HORIZONS) {
+        const returns = indices.map(i => fwd[h][i]).filter(isFinite);
+        if (!returns.length) { stats[h] = null; continue; }
+        const correct = def.dir === 0 ? NaN :
+          returns.filter(r => def.dir > 0 ? r > 0 : r < 0).length / returns.length * 100;
+        const med = _median(returns);
+        stats[h] = { n: returns.length, mean: returns.reduce((a,b)=>a+b,0)/returns.length,
+          median: med, accuracy: correct };
+      }
+      return { label: def.label, dir: def.dir, min: null, max: null, stats };
+    });
+  }
+
+  const PHASE_DEFS = [
+    { label: '🔵 В фазе накопления (флэт+имбаланс, выброса ещё нет)', dir: 0,
+      match: r => r.accum_flag },
+    { label: '🟢 Выброс ВВЕРХ, против шортов физлиц → сквиз, ждём рост ↑', dir: 1,
+      match: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === -1 },
+    { label: '🟢 Выброс ВВЕРХ, по позиции физлиц (лонг) → подтверждение, рост ↑', dir: 1,
+      match: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === 1 },
+    { label: '🔴 Выброс ВНИЗ, против лонгов физлиц → сквиз, ждём пад. ↓', dir: -1,
+      match: r => !r.accum_flag && r.breakout_dir === -1 && r.phase_aligned === -1 },
+    { label: '🔴 Выброс ВНИЗ, по позиции физлиц (шорт) → подтверждение, пад. ↓', dir: -1,
+      match: r => !r.accum_flag && r.breakout_dir === -1 && r.phase_aligned === 1 },
+    { label: '🟠 Тренд-истощение: шорты физлиц у экстремума после падения → сквиз ↑', dir: 1,
+      match: r => r.trend_exhaust === 1 },
+    { label: '🟠 Тренд-истощение: лонги физлиц у экстремума после роста → коррекция ↓', dir: -1,
+      match: r => r.trend_exhaust === -1 },
+  ];
+  const binStatsPhase = _calcCategoricalStats(PHASE_DEFS);
+
   const last = [...result].reverse().find(r => isFinite(r.squeeze_pressure));
   const curBinNpp = last ? binStatsNpp.find(b => last.net_phys_pct >= b.min && last.net_phys_pct < b.max) : null;
   const curBinSp  = last ? binStatsSp.find(b => last.squeeze_pressure >= b.min && last.squeeze_pressure < b.max) : null;
@@ -1646,10 +1742,10 @@ function labCalibrate() {
   // Для тултипа используем squeeze_pressure (динамика важнее снэпшота)
   _lastCalibStats = binStatsSp;
   _lastCalibFwd   = fwd;
-  renderCalibration(binStatsNpp, binStatsSp, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result);
+  renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result);
 }
 
-function renderCalibration(binStatsNpp, binStatsSp, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result) {
+function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last, curBinNpp, curBinSp, curBin2D, fwd, result) {
   const el = document.getElementById('calib-out');
   const isHourly = _lastMode === 'hourly';
   const H = isHourly ? [1, 2, 4, 8, 24] : [1, 2, 3, 5];
@@ -1795,6 +1891,7 @@ function renderCalibration(binStatsNpp, binStatsSp, bins2D, last, curBinNpp, cur
     html += t + '</tbody></table></div></details>';
   })();
 
+  html += _binTable(binStatsPhase, '🔵📤 Точность по фазам (накопление/выброс + тренд-истощение)');
   html += _binTable(binStatsSp, '📈 Точность по динамике набора (давление сжатия)');
   html += _binTable(binStatsNpp, '📊 Точность по снэпшоту позиции (перекос)');
 
