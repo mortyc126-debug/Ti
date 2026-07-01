@@ -2085,6 +2085,30 @@ async function _loadInstrumentForPool(proxy, rootTicker, cfg) {
         carr = Array.isArray(cdata) ? cdata : (cdata.rows || []);
         if (carr.length) break;
       }
+      // Свечи ещё ни разу не бэкфиллились для этого тикера (пользователь не
+      // жал «Свечи день» вручную) — подтягиваем из T-Invest сами за весь
+      // диапазон ОИ-истории. Без этого у большинства root-тикеров цена
+      // реально есть только за последние 1-2 недели (с момента, когда cron
+      // начал трекать конкретный дескрипт), а весь остальной хвост истории
+      // остаётся без цены и выпадает при склейке (aggregateContracts не
+      // держит close=0 — см. фикс двойного счёта/фейкового скачка на графике).
+      if (!carr.length) {
+        try {
+          const from = rows[0].date.slice(0,10);
+          const to   = rows[rows.length-1].date.slice(0,10);
+          const bf = await fetch(`${proxy}/db/candles/tinvest?ticker=${encodeURIComponent(t)}&tf=day&from=${from}&to=${to}`);
+          if (bf.ok) {
+            const bj = await bf.json();
+            if (bj.saved > 0) {
+              const cr2 = await fetch(`${proxy}/db/candles?ticker=${encodeURIComponent(t)}&tf=day&from=0`);
+              if (cr2.ok) {
+                const cdata2 = await cr2.json();
+                carr = Array.isArray(cdata2) ? cdata2 : (cdata2.rows || []);
+              }
+            }
+          }
+        } catch(_) {}
+      }
       if (carr.length) {
         const candleMap = {};
         for (const c of carr) if (c.time) candleMap[_mskDateStr(c.time)] = c;
