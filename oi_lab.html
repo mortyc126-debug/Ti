@@ -129,6 +129,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <button class="sec" onclick="poolFillAllTickers()">📋 Заполнить всеми из базы</button>
     <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
     <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
+    <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
   </div>
   <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
 </div>
@@ -2551,6 +2552,123 @@ function renderPoolSweep(axes, baseCfg) {
   html += _axisTable(shortMovePoints, '🟠 Шорт→сквиз: перцентиль хода цены (trend_exhaust_move_pctl_short)', 'pctl хода', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
   html += _axisTable(longPctlPoints, '🔵 Лонг→коррекция: перцентиль позиции (trend_exhaust_pctl_long)', 'pctl позиции', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
   html += _axisTable(longMovePoints, '🔵 Лонг→коррекция: перцентиль хода цены (trend_exhaust_move_pctl_long)', 'pctl хода', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
+  el.innerHTML = html + el.innerHTML;
+}
+
+// Разбивка по инструментам показала: лонг→коррекция срабатывает почти
+// одинаково на всех тикерах, а шорт→сквиз чётко делится на «сильные»
+// (MC, ME, NR, TT, AL — 65-90%) и «случайные» (BM, CH, GD, OJ, PT — 30-45%),
+// устойчиво между +1д и +3д — то есть не шум малой выборки, а структурное
+// свойство инструмента. Ищем, каким признаком это объясняется: доля физлиц
+// в открытом интересе, средний размер ОИ (ликвидность) или волатильность —
+// вместо того чтобы подбирать порог под каждый тикер вручную (переобучение
+// на 5-15 наблюдениях на инструмент).
+function _instrumentFeatures(raw) {
+  const rows = raw.rows;
+  let physSum = 0, totalSum = 0, oiSamples = 0;
+  let retSqSum = 0, retN = 0, prevClose = NaN;
+  for (const r of rows) {
+    const p = (r.phys_long_contracts||0) + (r.phys_short_contracts||0);
+    const l = (r.legal_long_contracts||0) + (r.legal_short_contracts||0);
+    if (p + l > 0) { physSum += p; totalSum += p + l; oiSamples++; }
+    if (r.close > 0) {
+      if (isFinite(prevClose) && prevClose > 0) { const ret = (r.close - prevClose) / prevClose; retSqSum += ret*ret; retN++; }
+      prevClose = r.close;
+    }
+  }
+  return {
+    physShare: totalSum > 0 ? physSum / totalSum : NaN,             // доля физлиц в ОИ, 0..1
+    avgOi: oiSamples > 0 ? totalSum / oiSamples : NaN,               // средний суммарный ОИ (ликвидность)
+    volatility: retN > 0 ? Math.sqrt(retSqSum / retN) * 100 : NaN,   // RMS дневной доходности, %
+  };
+}
+
+// Коэффициент корреляции Пирсона — простая, но достаточная мера линейной
+// связи признака с точностью бина; при <4 точках считать бессмысленно.
+function _pearson(xs, ys) {
+  const pts = xs.map((x,i)=>[x, ys[i]]).filter(([x,y])=>isFinite(x)&&isFinite(y));
+  const n = pts.length;
+  if (n < 4) return NaN;
+  const mx = pts.reduce((a,[x])=>a+x,0)/n, my = pts.reduce((a,[,y])=>a+y,0)/n;
+  let sxy=0, sxx=0, syy=0;
+  for (const [x,y] of pts) { sxy += (x-mx)*(y-my); sxx += (x-mx)**2; syy += (y-my)**2; }
+  return (sxx>0 && syy>0) ? sxy / Math.sqrt(sxx*syy) : NaN;
+}
+
+async function labAnalyzeSqueezeFactors() {
+  if (!_lastPoolRawData || _lastPoolRawData.length < 2) {
+    setStatus('Сначала запусти «Рассчитать по пулу» — анализ использует тот же кэш сырых данных', 'err');
+    return;
+  }
+  setStatus('Ищу признак, отличающий инструменты с сильным шорт-сквизом…');
+  const HORIZONS = [1, 3];
+  const cfg = readCfg();
+  const MIN_N = 5; // ниже — точность одного тикера почти не несёт информации
+
+  const rows = [];
+  for (const raw of _lastPoolRawData) {
+    const feat = _instrumentFeatures(raw);
+    const result = computeIndicator(raw.rows, cfg, raw.refSwitchDates);
+    const fwd = _fwdReturns(result, HORIZONS);
+    const phase = _calcCategoricalStats(PHASE_DEFS, result, fwd, HORIZONS);
+    const shortS = phase[5].stats[1], longS = phase[6].stats[1];
+    rows.push({
+      ticker: raw.ticker, ...feat,
+      shortAcc: shortS && shortS.n >= MIN_N ? shortS.accuracy : NaN, shortN: shortS?.n ?? 0,
+      longAcc: longS && longS.n >= MIN_N ? longS.accuracy : NaN, longN: longS?.n ?? 0,
+    });
+  }
+
+  const corr = {
+    'Доля физлиц в ОИ → шорт-сквиз':  _pearson(rows.map(r=>r.physShare),  rows.map(r=>r.shortAcc)),
+    'Средний ОИ (ликвидность) → шорт-сквиз': _pearson(rows.map(r=>r.avgOi), rows.map(r=>r.shortAcc)),
+    'Волатильность → шорт-сквиз':     _pearson(rows.map(r=>r.volatility), rows.map(r=>r.shortAcc)),
+    'Доля физлиц в ОИ → лонг-коррекция':  _pearson(rows.map(r=>r.physShare),  rows.map(r=>r.longAcc)),
+    'Средний ОИ (ликвидность) → лонг-коррекция': _pearson(rows.map(r=>r.avgOi), rows.map(r=>r.longAcc)),
+    'Волатильность → лонг-коррекция':     _pearson(rows.map(r=>r.volatility), rows.map(r=>r.longAcc)),
+  };
+
+  renderSqueezeFactors(rows, corr, MIN_N);
+  setStatus(`Готово: проверено ${rows.length} инструментов (учтены тикеры с N≥${MIN_N})`, 'ok');
+}
+
+function renderSqueezeFactors(rows, corr, minN) {
+  const el = document.getElementById('pool-out');
+  const sorted = rows.slice().sort((a,b) => (isFinite(b.shortAcc)?b.shortAcc:-1) - (isFinite(a.shortAcc)?a.shortAcc:-1));
+  const accColor = v => !isFinite(v) ? '#313244' : v >= 60 ? '#a6e3a1' : v < 45 ? '#f38ba8' : '#cdd6f4';
+  const corrColor = v => !isFinite(v) ? '#6c7086' : Math.abs(v) >= 0.5 ? '#f9e2af' : Math.abs(v) >= 0.3 ? '#cdd6f4' : '#6c7086';
+
+  let html = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🧬 Какой признак инструмента объясняет разброс точности шорт-сквиза/лонг-коррекции (учтены тикеры с N≥${minN} на +1д)</summary>`;
+
+  html += `<div style="font-size:11px;margin-bottom:8px"><table style="border-collapse:collapse;width:100%;max-width:520px">
+    <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Корреляция (Пирсон)</th><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center">r</th></tr></thead><tbody>`;
+  for (const [label, r] of Object.entries(corr)) {
+    html += `<tr><td style="padding:3px 8px;color:#cdd6f4">${label}</td><td style="text-align:center;padding:3px 8px;color:${corrColor(r)}">${isFinite(r)?r.toFixed(2):'—'}</td></tr>`;
+  }
+  html += `</tbody></table></div>
+  <div style="font-size:10px;color:#6c7086;margin-bottom:10px">|r|&lt;0.3 — связи нет, 0.3-0.5 — слабая, ≥0.5 — заметная. При N=25-30 инструментах даже заметная r не строгое доказательство, а повод присмотреться к признаку.</div>`;
+
+  html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+    <thead><tr>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Доля физлиц</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Ср. ОИ</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Волат. %/д</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Шорт→сквиз</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Лонг→коррекция</th>
+    </tr></thead><tbody>`;
+  for (const r of sorted) {
+    html += `<tr>
+      <td style="padding:3px 8px;color:#cdd6f4">${r.ticker}</td>
+      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.physShare)?(r.physShare*100).toFixed(0)+'%':'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.avgOi)?Math.round(r.avgOi).toLocaleString():'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.volatility)?r.volatility.toFixed(2):'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:${accColor(r.shortAcc)}">${isFinite(r.shortAcc)?r.shortAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6c7086"> N${r.shortN}</span></td>
+      <td style="text-align:center;padding:3px 8px;color:${accColor(r.longAcc)}">${isFinite(r.longAcc)?r.longAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6c7086"> N${r.longN}</span></td>
+    </tr>`;
+  }
+  html += `</tbody></table></div></details>`;
+
   el.innerHTML = html + el.innerHTML;
 }
 
