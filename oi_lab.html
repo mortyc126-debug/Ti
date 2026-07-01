@@ -86,15 +86,15 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
 
 <!-- Графики -->
 <div class="section">
-  <div class="section-title">Цена + фаза накопления</div>
+  <div class="section-title">Цена + фазы накопления <span style="color:#6c7086;font-size:9px">(синий фон = флэт с имбалансом; пунктир = диапазон фазы)</span></div>
   <canvas id="c-price"></canvas>
 </div>
 <div class="section">
-  <div class="section-title">WeightedImbalance / PhasePotential</div>
+  <div class="section-title">Сигнал дисбаланса / Потенциал выхода <span style="color:#6c7086;font-size:9px">(красный = физики в лонг → ожидаем вниз; зелёный = в шорт → ожидаем вверх)</span></div>
   <canvas id="c-oi"></canvas>
 </div>
 <div class="section">
-  <div class="section-title">StressDistance / ReleaseFactor</div>
+  <div class="section-title">Стресс-риск / Накопленный выброс <span style="color:#6c7086;font-size:9px">(красные столбики = цена за пределами опорного уровня; оранжевая линия = сила выброса)</span></div>
   <canvas id="c-phase"></canvas>
 </div>
 
@@ -810,15 +810,15 @@ function renderMetrics(result) {
   const last = result.filter(r=>isFinite(r.weighted_imbalance)).at(-1);
   if (!last) return;
   const cards = [
-    { lbl:'WeightedImbalance', val: fmt(last.weighted_imbalance,3), sub:'осн. сигнал', color: last.weighted_imbalance>0?'#f38ba8':'#a6e3a1' },
-    { lbl:'NetPhysPct', val: fmt(last.net_phys_pct*100,1)+'%', sub:'перекос физ.лиц', color: '#cdd6f4' },
-    { lbl:'ImbalanceZ', val: fmt(last.imbalance_z,2), sub:'z-score', color: '#cdd6f4' },
-    { lbl:'LiquidityConf', val: fmt(last.liquidity_conf,2), sub:'уверенность', color: last.liquidity_conf<0.3?'#f38ba8':'#a6e3a1' },
-    { lbl:'PhasePotential', val: fmt(last.phase_potential,3), sub:'фаз. потенциал', color: '#cba6f7' },
-    { lbl:'StressDist', val: fmt(last.stress_dist*100,2)+'%', sub:'дистанция стресса', color: last.stress_dist>0.01?'#f38ba8':'#6c7086' },
-    { lbl:'ReleaseFactor', val: fmt(last.release_factor,3), sub:'release', color: '#fab387' },
-    { lbl:'Накопление', val: last.accum_flag?'ДА':'нет', sub:'фаза флэта', color: last.accum_flag?'#89dceb':'#6c7086' },
-    { lbl:'TotalOI', val: Math.round(last.total_oi).toLocaleString(), sub:'контрактов', color: '#cdd6f4' },
+    { lbl:'Сигнал', val: fmt(last.weighted_imbalance,3), sub:'+ = физики шортят (рост?), − = в лонге (падение?)', color: last.weighted_imbalance>0?'#a6e3a1':'#f38ba8' },
+    { lbl:'Перекос физ. лиц', val: fmt(last.net_phys_pct*100,1)+'%', sub:'их нетто-позиция от ОИ; + = лонг, − = шорт', color: last.net_phys_pct>0?'#f38ba8':'#a6e3a1' },
+    { lbl:'Z-оценка дисбаланса', val: fmt(last.imbalance_z,2), sub:'насколько перекос отличается от нормы (±1 = умеренно)', color: '#cdd6f4' },
+    { lbl:'Надёжность', val: fmt(last.liquidity_conf,2), sub:'0→1: чем больше участников, тем надёжнее сигнал', color: last.liquidity_conf<0.3?'#f38ba8':'#a6e3a1' },
+    { lbl:'Потенциал выхода', val: fmt(last.phase_potential,3), sub:'ожидаемый сдвиг после флэта (появляется в фазе)', color: '#cba6f7' },
+    { lbl:'Стресс-риск', val: fmt(last.stress_dist*100,2)+'%', sub:'цена за пределами опорного уровня → риск стопов', color: last.stress_dist>0.01?'#f38ba8':'#6c7086' },
+    { lbl:'Сила выброса', val: fmt(last.release_factor,3), sub:'как далеко цена от опорного уровня (больше = острее)', color: '#fab387' },
+    { lbl:'Фаза накопления', val: last.accum_flag?'ДА':'нет', sub:'флэт + имбаланс = позиции набираются', color: last.accum_flag?'#89dceb':'#6c7086' },
+    { lbl:'Открытый интерес', val: Math.round(last.total_oi).toLocaleString(), sub:'всего контрактов в рынке', color: '#cdd6f4' },
   ];
   const row = document.getElementById('metrics-row');
   row.innerHTML = cards.map(c=>`
@@ -992,8 +992,8 @@ function drawOI(result) {
 
   // Legend
   ctx.font='10px sans-serif';
-  ctx.fillStyle='#b4befe'; ctx.fillText('WeightedImbalance',6,12);
-  ctx.fillStyle='#cba6f7'; ctx.fillText('PhasePotential',6,24);
+  ctx.fillStyle='#b4befe'; ctx.fillText('Сигнал дисбаланса',6,12);
+  ctx.fillStyle='#cba6f7'; ctx.fillText('Потенциал выхода (пунктир)',6,24);
 }
 
 function drawPhase(result) {
@@ -1027,24 +1027,24 @@ function drawPhase(result) {
   ctx.stroke();
 
   ctx.font='10px sans-serif';
-  ctx.fillStyle='#f38ba8'; ctx.fillText('StressDist',6,12);
-  ctx.fillStyle='#fab387'; ctx.fillText('ReleaseFactor',6,24);
+  ctx.fillStyle='#f38ba8'; ctx.fillText('Стресс-риск (выход за уровень)',6,12);
+  ctx.fillStyle='#fab387'; ctx.fillText('Сила выброса',6,24);
 }
 
 // ========== TABLE ==========
 const TABLE_COLS = [
   { key:'date', lbl:'Дата' },
   { key:'close', lbl:'Цена', dec:2 },
-  { key:'net_phys_pct', lbl:'NetPhysPct%', dec:2, pct:100 },
-  { key:'imbalance_z', lbl:'ImbalZ', dec:3 },
-  { key:'conviction', lbl:'Conv', dec:3 },
-  { key:'liquidity_conf', lbl:'LiqConf', dec:2 },
-  { key:'weighted_imbalance', lbl:'WI', dec:3 },
-  { key:'accum_flag', lbl:'Accum' },
-  { key:'stress_dist', lbl:'Stress%', dec:3, pct:100 },
-  { key:'release_factor', lbl:'RelFact', dec:3 },
-  { key:'phase_anchor', lbl:'Anchor', dec:3 },
-  { key:'phase_potential', lbl:'PhasePot', dec:3 },
+  { key:'net_phys_pct', lbl:'Перекос физ.%', dec:2, pct:100 },
+  { key:'imbalance_z', lbl:'Z-оценка', dec:3 },
+  { key:'conviction', lbl:'Убеждённость', dec:3 },
+  { key:'liquidity_conf', lbl:'Надёжность', dec:2 },
+  { key:'weighted_imbalance', lbl:'Сигнал', dec:3 },
+  { key:'accum_flag', lbl:'Флэт' },
+  { key:'stress_dist', lbl:'Стресс%', dec:3, pct:100 },
+  { key:'release_factor', lbl:'Сила выброса', dec:3 },
+  { key:'phase_anchor', lbl:'Опорный %', dec:3 },
+  { key:'phase_potential', lbl:'Потенциал', dec:3 },
 ];
 
 function renderTable(result) {
