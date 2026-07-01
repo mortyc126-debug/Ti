@@ -55,6 +55,10 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
   <label>Тикер(ы) фьючерса
     <input id="tickers" type="text" placeholder="SBRF6 или SBRF6,SBRF9" value="">
   </label>
+  <label style="flex-direction:row;align-items:center;gap:5px;min-width:auto">
+    <input id="auto-family" type="checkbox" checked style="min-width:auto;width:auto">
+    <span style="white-space:nowrap">Авто-контракты одного базиса</span>
+  </label>
   <label>Режим
     <select id="mode">
       <option value="daily">Дневной (OI + дневные свечи)</option>
@@ -406,13 +410,32 @@ async function labFetchCandles(tf) {
   setStatus(`Готово [${tf}]: ${totalSaved} баров. Нажми «Загрузить».`, 'ok');
 }
 
+// Подтягивает все тикеры из /db/tickers с тем же 2-буквенным базисом (Si, Br, Eu...),
+// чтобы открытый интерес считался по всей связке контрактов, а не только по введённым вручную.
+async function resolveTickerFamily(proxy, tickers) {
+  if (!document.getElementById('auto-family')?.checked) return tickers;
+  try {
+    const r = await fetch(`${proxy}/db/tickers`);
+    if (!r.ok) return tickers;
+    const list = await r.json();
+    const all = (Array.isArray(list) ? list : []).map(x => x.ticker).filter(Boolean);
+    const prefixOf = t => t.match(/^([A-Za-z]{2})/)?.[1]?.toUpperCase();
+    const prefixes = new Set(tickers.map(prefixOf).filter(Boolean));
+    if (!prefixes.size) return tickers;
+    const family = all.filter(t => prefixes.has(prefixOf(t)));
+    return [...new Set([...tickers, ...family])];
+  } catch(_) { return tickers; }
+}
+
 async function labLoad() {
   const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
-  const tickers = document.getElementById('tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  let tickers = document.getElementById('tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
   const mode  = document.getElementById('mode').value;
   if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
   if (!tickers.length) { setStatus('Укажи тикер', 'err'); return; }
   setStatus('Загрузка…');
+  const enteredCount = tickers.length;
+  tickers = await resolveTickerFamily(proxy, tickers);
 
   try {
     const contractsMap = {};
@@ -534,7 +557,8 @@ async function labLoad() {
     renderAll(result);
     const hasHL = rows.some(r => r.high > 0 && r.low > 0);
     const accumCount = result.filter(r => r.accum_flag).length;
-    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')}) | H/L свечи: ${hasHL ? 'есть' : 'НЕТ — нажми «Свечи день»'} | Накопление: ${accumCount} баров`, 'ok');
+    const autoAdded = tickers.length > enteredCount ? ` | авто-добавлены: ${tickers.slice(enteredCount).join(', ')}` : '';
+    setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')})${autoAdded} | H/L свечи: ${hasHL ? 'есть' : 'НЕТ — нажми «Свечи день»'} | Накопление: ${accumCount} баров`, 'ok');
   } catch(e) {
     setStatus('Ошибка: ' + e.message, 'err');
     console.error(e);
