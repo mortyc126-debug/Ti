@@ -2405,6 +2405,44 @@ async function labCalibratePool() {
 // функция (rows, cfg) → result, а rows/refSwitchDates для всех инструментов
 // пула уже в _lastPoolRawData. Проверяет, действительно ли текущие значения
 // по умолчанию (0.85/0.85) — локальный максимум по edge, или рядом есть лучше.
+// Считает edge/N обоих бинов тренд-истощения для одного cfg — общий шаг для
+// перебора, чтобы не дублировать логику.
+function _computeTrendExhaustEdges(cfg, HORIZONS) {
+  const instruments = _lastPoolRawData.map(raw => {
+    const result = computeIndicator(raw.rows, cfg, raw.refSwitchDates);
+    return { ticker: raw.ticker, result, fwd: _fwdReturns(result, HORIZONS) };
+  });
+  const baseStats = {};
+  for (const h of HORIZONS) {
+    const all = [];
+    for (const inst of instruments) for (const v of inst.fwd[h]) if (isFinite(v)) all.push(v);
+    baseStats[h] = all.length ? { pctDown: all.filter(v=>v<0).length / all.length * 100 } : null;
+  }
+  const perInstrumentPhase = instruments.map(inst => _calcCategoricalStats(PHASE_DEFS, inst.result, inst.fwd, HORIZONS));
+  const poolPhase = _poolBinStats(perInstrumentPhase, HORIZONS);
+  // Индексы 5/6 в PHASE_DEFS — тренд-истощение шорт→сквиз и лонг→коррекция
+  const shortSqueeze = poolPhase[5], longCorrection = poolPhase[6];
+  const edgeOf = (bin, dir) => {
+    const s = bin.stats[1]; // +1д — горизонт, где эффект показал себя лучше всего
+    const base = baseStats[1];
+    if (!s || !base || !isFinite(s.accuracy)) return null;
+    const baseAcc = dir < 0 ? base.pctDown : (100 - base.pctDown);
+    return s.accuracy - baseAcc;
+  };
+  return {
+    shortEdge: edgeOf(shortSqueeze, 1), shortN: shortSqueeze.stats[1]?.n ?? 0,
+    longEdge: edgeOf(longCorrection, -1), longN: longCorrection.stats[1]?.n ?? 0,
+  };
+}
+
+// Порог по умолчанию не «наугад между 0.75 и 0.95» — граница перебора теперь
+// задаётся минимальным размером пуловой выборки (MIN_N), а не произвольными
+// числами: расширяем ужесточение порога, пока N (по обоим бинам) не упадёт
+// ниже уровня, на котором edge статистически ненадёжен. Останавливаемся там,
+// где данные сами говорят «дальше некуда», а не там, где я решил остановиться.
+const SWEEP_MIN_N = 40;
+const SWEEP_STEP = 0.02;
+
 async function labSweepPool() {
   if (!_lastPoolRawData || _lastPoolRawData.length < 2) {
     setStatus('Сначала запусти «Рассчитать по пулу» — перебор использует тот же кэш сырых данных', 'err');
@@ -2413,72 +2451,52 @@ async function labSweepPool() {
   setStatus('Перебор параметров trend_exhaust…');
   const HORIZONS = [1, 2, 3, 5];
   const baseCfg = readCfg();
-  const pctlGrid = [0.75, 0.80, 0.85, 0.90, 0.95];
-  const moveGrid = [0.75, 0.85, 0.90];
 
-  const sweepResults = [];
-  for (const pctl of pctlGrid) {
-    for (const move of moveGrid) {
-      const cfg = { ...baseCfg, trend_exhaust_pctl: pctl, trend_exhaust_move_pctl: move };
-      const instruments = _lastPoolRawData.map(raw => {
-        const result = computeIndicator(raw.rows, cfg, raw.refSwitchDates);
-        return { ticker: raw.ticker, result, fwd: _fwdReturns(result, HORIZONS) };
-      });
-      const baseStats = {};
-      for (const h of HORIZONS) {
-        const all = [];
-        for (const inst of instruments) for (const v of inst.fwd[h]) if (isFinite(v)) all.push(v);
-        baseStats[h] = all.length ? { pctDown: all.filter(v=>v<0).length / all.length * 100 } : null;
-      }
-      const perInstrumentPhase = instruments.map(inst => _calcCategoricalStats(PHASE_DEFS, inst.result, inst.fwd, HORIZONS));
-      const poolPhase = _poolBinStats(perInstrumentPhase, HORIZONS);
-      // Индексы 5/6 в PHASE_DEFS — тренд-истощение шорт→сквиз и лонг→коррекция
-      const shortSqueeze = poolPhase[5], longCorrection = poolPhase[6];
-      const edgeOf = (bin, dir) => {
-        const s = bin.stats[1]; // +1д — горизонт, где эффект показал себя лучше всего
-        const base = baseStats[1];
-        if (!s || !base || !isFinite(s.accuracy)) return null;
-        const baseAcc = dir < 0 ? base.pctDown : (100 - base.pctDown);
-        return s.accuracy - baseAcc;
-      };
-      sweepResults.push({
-        pctl, move,
-        shortEdge: edgeOf(shortSqueeze, 1), shortN: shortSqueeze.stats[1]?.n ?? 0,
-        longEdge: edgeOf(longCorrection, -1), longN: longCorrection.stats[1]?.n ?? 0,
-      });
+  // Одна ось за раз: двигаем один порог мелким шагом, второй держим на
+  // текущем значении cfg, идём вверх от 0.5, пока N обоих бинов не упадёт
+  // ниже SWEEP_MIN_N — это и есть «основание», о котором спросили.
+  function sweepAxis(axisKey, otherKey) {
+    const points = [];
+    for (let v = 0.5; v <= 0.99; v += SWEEP_STEP) {
+      const cfg = { ...baseCfg, [axisKey]: v };
+      const r = _computeTrendExhaustEdges(cfg, HORIZONS);
+      points.push({ v: Math.round(v*100)/100, ...r });
+      if (Math.min(r.shortN, r.longN) < SWEEP_MIN_N) break;
     }
+    return points;
   }
-  renderPoolSweep(sweepResults, pctlGrid, moveGrid);
-  setStatus(`Перебор готов: ${sweepResults.length} комбинаций на ${_lastPoolRawData.length} инструментах`, 'ok');
+
+  const pctlPoints = sweepAxis('trend_exhaust_pctl', 'trend_exhaust_move_pctl');
+  const movePoints = sweepAxis('trend_exhaust_move_pctl', 'trend_exhaust_pctl');
+
+  renderPoolSweep(pctlPoints, movePoints, baseCfg);
+  setStatus(`Перебор готов: ${pctlPoints.length + movePoints.length} точек на ${_lastPoolRawData.length} инструментах (граница — N<${SWEEP_MIN_N})`, 'ok');
 }
 
-function renderPoolSweep(sweepResults, pctlGrid, moveGrid) {
+function renderPoolSweep(pctlPoints, movePoints, baseCfg) {
   const el = document.getElementById('pool-out');
-  const cellColor = edge => !isFinite(edge) ? '#313244' : edge >= 15 ? '#a6e3a1' : edge >= 5 ? '#94e2b8' : edge <= -5 ? '#f38ba8' : '#cdd6f4';
-  function _sweepTable(title, edgeKey, nKey) {
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — edge на +1д, по клеткам (perцентиль позиции × перцентиль хода)</summary>
+  const edgeColor = edge => !isFinite(edge) ? '#313244' : edge >= 15 ? '#a6e3a1' : edge >= 5 ? '#94e2b8' : edge <= -5 ? '#f38ba8' : '#cdd6f4';
+
+  function _axisTable(points, title, fixedVal, axisLbl) {
+    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} (второй порог held на ${fixedVal}) — граница по N<${SWEEP_MIN_N}, не наугад</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
-    <thead><tr><th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">pctl позиции \\ pctl хода</th>
-      ${moveGrid.map(m=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">${m}</th>`).join('')}
-    </tr></thead><tbody>`;
-    for (const pctl of pctlGrid) {
-      t += `<tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825;font-weight:600">${pctl}${pctl===0.85?' (по умолч.)':''}</td>`;
-      for (const move of moveGrid) {
-        const r = sweepResults.find(s => s.pctl === pctl && s.move === move);
-        const edge = r ? r[edgeKey] : null;
-        const n = r ? r[nKey] : 0;
-        const isDefault = pctl === 0.85 && move === 0.85;
-        t += `<td style="text-align:center;padding:4px 6px;color:${cellColor(edge)};border:${isDefault?'1px solid #cba6f7':'none'}">
-          ${isFinite(edge) ? (edge>0?'+':'')+edge.toFixed(0) : '—'}<br><span style="font-size:9px;color:#6c7086">N${n}</span>
-        </td>`;
-      }
-      t += '</tr>';
-    }
-    return t + '</tbody></table></div></details>';
+    <thead><tr>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">${axisLbl}</th>
+      ${points.map(p=>`<th style="padding:3px 5px;background:#181825;color:#a6adc8;text-align:center;font-size:10px">${p.v}</th>`).join('')}
+    </tr></thead><tbody>
+    <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">Шорт→сквиз edge</td>
+      ${points.map(p=>`<td style="text-align:center;padding:3px 5px;color:${edgeColor(p.shortEdge)}">${isFinite(p.shortEdge)?(p.shortEdge>0?'+':'')+p.shortEdge.toFixed(0):'—'}<br><span style="font-size:9px;color:#6c7086">N${p.shortN}</span></td>`).join('')}
+    </tr>
+    <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">Лонг→коррекция edge</td>
+      ${points.map(p=>`<td style="text-align:center;padding:3px 5px;color:${edgeColor(p.longEdge)}">${isFinite(p.longEdge)?(p.longEdge>0?'+':'')+p.longEdge.toFixed(0):'—'}<br><span style="font-size:9px;color:#6c7086">N${p.longN}</span></td>`).join('')}
+    </tr>
+    </tbody></table></div></details>`;
+    return t;
   }
-  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах (без повторной загрузки). Рамка — текущие значения по умолчанию.</div>`;
-  html += _sweepTable('🟠 Шорт у экстремума → сквиз ↑', 'shortEdge', 'shortN');
-  html += _sweepTable('🟠 Лонг у экстремума → коррекция ↓', 'longEdge', 'longN');
+
+  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах, шаг ${SWEEP_STEP}, останов при N&lt;${SWEEP_MIN_N} по любому из бинов — граница не выбрана заранее, а найдена по данным.</div>`;
+  html += _axisTable(pctlPoints, '🟠 Перцентиль позиции (trend_exhaust_pctl)', baseCfg.trend_exhaust_move_pctl, 'pctl позиции');
+  html += _axisTable(movePoints, '🟠 Перцентиль хода цены (trend_exhaust_move_pctl)', baseCfg.trend_exhaust_pctl, 'pctl хода');
   el.innerHTML = html + el.innerHTML;
 }
 
