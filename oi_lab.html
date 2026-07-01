@@ -122,6 +122,7 @@ const CFG_DEFAULTS = {
   decay: 0.90,
   decay_window: 10,
   z_window: 60,
+  accum_window: 10,
   conviction_window: 60,
   conviction_alpha: 0.4,
   liquidity_window: 60,
@@ -614,11 +615,51 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     }
   }
 
-  // NetPhysPct
+  // NetPhysPct — статичный снэпшот
   const netPhysPct = new Array(n);
   for (let i=0; i<n; i++) {
     netPhysPct[i] = totalOI[i] > 0 ? (physL[i]-physS[i])/totalOI[i] : NaN;
   }
+
+  // Дельты позиций: сколько контрактов добавлено за бар
+  const dLong  = new Array(n).fill(NaN);
+  const dShort = new Array(n).fill(NaN);
+  for (let i=1; i<n; i++) {
+    dLong[i]  = physL[i] - physL[i-1];
+    dShort[i] = physS[i] - physS[i-1];
+  }
+
+  // Накопленные суммы за accum_window баров: кто агрессивнее набирал
+  const aw = cfg.accum_window || 10;
+  const rollDLong  = new Array(n).fill(NaN);
+  const rollDShort = new Array(n).fill(NaN);
+  for (let i=aw; i<n; i++) {
+    let sl=0, ss=0;
+    for (let j=i-aw+1; j<=i; j++) {
+      if (isFinite(dLong[j]))  sl += dLong[j];
+      if (isFinite(dShort[j])) ss += dShort[j];
+    }
+    rollDLong[i]  = sl;
+    rollDShort[i] = ss;
+  }
+
+  // squeeze_pressure: нормированный перевес накопления.
+  // > 0 → шорт набирался интенсивнее (потенциал роста, сжатие шортов)
+  // < 0 → лонг набирался интенсивнее (потенциал падения)
+  const squeezePressure = new Array(n).fill(NaN);
+  for (let i=0; i<n; i++) {
+    const sl = rollDLong[i], ss = rollDShort[i];
+    if (!isFinite(sl) || !isFinite(ss)) continue;
+    const tot = Math.abs(sl) + Math.abs(ss);
+    squeezePressure[i] = tot > 0 ? (ss - sl) / tot : 0;
+  }
+
+  // Z-score squeeze_pressure (насколько текущее давление аномально)
+  const sqPrMean = _rollingMean(squeezePressure, cfg.z_window);
+  const sqPrStd  = _rollingStd(squeezePressure, cfg.z_window);
+  const squeezePressureZ = squeezePressure.map((v,i)=>
+    sqPrStd[i]>0 ? (v-sqPrMean[i])/sqPrStd[i] : NaN
+  );
 
   // Z-score
   const rollMean = _rollingMean(netPhysPct, cfg.z_window);
@@ -802,6 +843,12 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     release_factor: releaseFactor[i],
     phase_anchor: phaseAnchor[i],
     phase_potential: phasePotential[i],
+    d_long: dLong[i],
+    d_short: dShort[i],
+    roll_d_long: rollDLong[i],
+    roll_d_short: rollDShort[i],
+    squeeze_pressure: squeezePressure[i],
+    squeeze_pressure_z: squeezePressureZ[i],
   }));
 }
 
@@ -825,7 +872,9 @@ function renderMetrics(result) {
   if (!last) return;
   const cards = [
     { lbl:'Сигнал', val: fmt(last.weighted_imbalance,3), sub:'+ = физики шортят (рост?), − = в лонге (падение?)', color: last.weighted_imbalance>0?'#a6e3a1':'#f38ba8' },
-    { lbl:'Перекос физ. лиц', val: fmt(last.net_phys_pct*100,1)+'%', sub:'их нетто-позиция от ОИ; + = лонг, − = шорт', color: last.net_phys_pct>0?'#f38ba8':'#a6e3a1' },
+    { lbl:'Давление сжатия', val: fmt(last.squeeze_pressure,3), sub:'кто интенсивнее набирал за последние 10 баров: +1=только шорт, −1=только лонг', color: last.squeeze_pressure>0.1?'#a6e3a1':last.squeeze_pressure<-0.1?'#f38ba8':'#cdd6f4' },
+    { lbl:'Z-давления', val: fmt(last.squeeze_pressure_z,2), sub:'аномальность текущего набора позиций vs история', color: Math.abs(last.squeeze_pressure_z||0)>1.5?'#f9e2af':'#cdd6f4' },
+    { lbl:'Перекос физ. лиц', val: fmt(last.net_phys_pct*100,1)+'%', sub:'статичный снэпшот: их нетто-позиция от ОИ', color: last.net_phys_pct>0?'#f38ba8':'#a6e3a1' },
     { lbl:'Z-оценка дисбаланса', val: fmt(last.imbalance_z,2), sub:'насколько перекос отличается от нормы (±1 = умеренно)', color: '#cdd6f4' },
     { lbl:'Надёжность', val: fmt(last.liquidity_conf,2), sub:'0→1: чем больше участников, тем надёжнее сигнал', color: last.liquidity_conf<0.3?'#f38ba8':'#a6e3a1' },
     { lbl:'Потенциал выхода', val: fmt(last.phase_potential,3), sub:'ожидаемый сдвиг после флэта (появляется в фазе)', color: '#cba6f7' },
@@ -973,8 +1022,8 @@ function drawPrice(result) {
 
     // Ожидаемое движение из калибровки
     let calibTip = '';
-    if (_lastCalibStats && isFinite(row.net_phys_pct)) {
-      const bin = _lastCalibStats.find(b => row.net_phys_pct >= b.min && row.net_phys_pct < b.max);
+    if (_lastCalibStats && isFinite(row.squeeze_pressure)) {
+      const bin = _lastCalibStats.find(b => row.squeeze_pressure >= b.min && row.squeeze_pressure < b.max);
       if (bin) {
         const fmtP = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
         const col = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
@@ -1151,7 +1200,13 @@ const TABLE_COLS = [
   { key:'date', lbl:'Дата' },
   { key:'close', lbl:'Цена', dec:2 },
   { key:'net_phys_pct', lbl:'Перекос физ.%', dec:2, pct:100 },
-  { key:'imbalance_z', lbl:'Z-оценка', dec:3 },
+  { key:'d_short', lbl:'ΔШорт', dec:0 },
+  { key:'d_long', lbl:'ΔЛонг', dec:0 },
+  { key:'roll_d_short', lbl:'НаборШорт10', dec:0 },
+  { key:'roll_d_long', lbl:'НаборЛонг10', dec:0 },
+  { key:'squeeze_pressure', lbl:'Давление сжатия', dec:3 },
+  { key:'squeeze_pressure_z', lbl:'Z-давление', dec:2 },
+  { key:'imbalance_z', lbl:'Z-перекос', dec:3 },
   { key:'conviction', lbl:'Убеждённость', dec:3 },
   { key:'liquidity_conf', lbl:'Надёжность', dec:2 },
   { key:'weighted_imbalance', lbl:'Сигнал', dec:3 },
@@ -1230,110 +1285,145 @@ function labCalibrate() {
     });
   }
 
-  // Перцентильные бины: квинтили по реальному распределению net_phys_pct.
-  // Так данные всегда равномерно попадают во все 5 бинов независимо от инструмента.
-  // Контрарная логика: высокий перцентиль (физики сильно в лонге) → ожидаем падение.
-  const validNpp = result.map(r => r.net_phys_pct).filter(isFinite).sort((a,b)=>a-b);
-  const _pct = p => validNpp[Math.floor((validNpp.length-1)*p)];
-  const [p20, p40, p60, p80] = [0.2, 0.4, 0.6, 0.8].map(_pct);
-  const fmtThr = v => (v*100).toFixed(1)+'%';
-  const BINS = [
-    { label: `Физики >p80 (>${fmtThr(p80)}) в лонге → падение ↓↓`, min: p80, max: Infinity,  dir: -1 },
-    { label: `Физики p60-p80 (${fmtThr(p60)}…${fmtThr(p80)}) → пад. ↓`,  min: p60, max: p80, dir: -1 },
-    { label: `Нейтраль p40-p60 (${fmtThr(p40)}…${fmtThr(p60)})`,          min: p40, max: p60, dir:  0 },
-    { label: `Физики p20-p40 (${fmtThr(p20)}…${fmtThr(p40)}) → рост ↑`,   min: p20, max: p40, dir:  1 },
-    { label: `Физики <p20 (<${fmtThr(p20)}) в шорте → рост ↑↑`,           min: -Infinity, max: p20, dir:  1 },
-  ];
+  // Вспомогательная функция построения перцентильных бинов
+  function _makeBins(values, labels) {
+    const valid = values.filter(isFinite).sort((a,b)=>a-b);
+    const _p = p => valid[Math.floor((valid.length-1)*p)] ?? NaN;
+    const [p20, p40, p60, p80] = [0.2, 0.4, 0.6, 0.8].map(_p);
+    const f = v => (v*100).toFixed(1)+'%';
+    return [
+      { label: labels[0](f(p80)), min: p80,      max: Infinity, dir: -1 },
+      { label: labels[1](f(p60),f(p80)), min: p60, max: p80,    dir: -1 },
+      { label: labels[2](f(p40),f(p60)), min: p40, max: p60,    dir:  0 },
+      { label: labels[3](f(p20),f(p40)), min: p20, max: p40,    dir:  1 },
+      { label: labels[4](f(p20)), min: -Infinity, max: p20,     dir:  1 },
+    ];
+  }
 
-  const binStats = BINS.map(bin => {
-    const indices = result.map((r,i) => i)
-      .filter(i => isFinite(result[i].net_phys_pct) && result[i].net_phys_pct >= bin.min && result[i].net_phys_pct < bin.max);
-    const stats = {};
-    for (const h of HORIZONS) {
-      const returns = indices.map(i => fwd[h][i]).filter(isFinite);
-      if (!returns.length) { stats[h] = null; continue; }
-      const correct = bin.dir === 0 ? NaN :
-        returns.filter(r => bin.dir > 0 ? r > 0 : r < 0).length / returns.length * 100;
-      stats[h] = {
-        n: returns.length,
-        mean: returns.reduce((a,b)=>a+b,0) / returns.length,
-        median: _median(returns),
-        accuracy: correct,
-        q25: _median(returns.filter(r=>r <= _median(returns))),
-        q75: _median(returns.filter(r=>r >= _median(returns))),
-      };
-    }
-    return { ...bin, stats };
-  });
+  // Бины 1: снэпшот позиции (net_phys_pct)
+  const BINS_NPP = _makeBins(result.map(r=>r.net_phys_pct), [
+    p => `Физики >p80 (${p}) в лонге → пад. ↓↓`,
+    (a,b) => `Физики p60-80 (${a}…${b}) → пад. ↓`,
+    (a,b) => `Нейтраль p40-60 (${a}…${b})`,
+    (a,b) => `Физики p20-40 (${a}…${b}) → рост ↑`,
+    p => `Физики <p20 (${p}) в шорте → рост ↑↑`,
+  ]);
 
-  // Текущий бар — последний с валидным NetPhysPct
-  const last = [...result].reverse().find(r => isFinite(r.net_phys_pct));
-  const currentBinStat = last ? binStats.find(b => last.net_phys_pct >= b.min && last.net_phys_pct < b.max) : null;
+  // Бины 2: динамика накопления (squeeze_pressure)
+  // > 0 → шорт набирали интенсивнее → потенциал сжатия → рост
+  // < 0 → лонг набирали интенсивнее → потенциал слива → падение
+  const BINS_SP = _makeBins(result.map(r=>r.squeeze_pressure), [
+    p => `Лонг набирали агрессивно >p80 (${p}) → пад. ↓↓`,
+    (a,b) => `Лонг набирали p60-80 (${a}…${b}) → пад. ↓`,
+    (a,b) => `Баланс p40-60 (${a}…${b})`,
+    (a,b) => `Шорт набирали p20-40 (${a}…${b}) → рост ↑`,
+    p => `Шорт набирали агрессивно <p20 (${p}) → рост ↑↑`,
+  ]);
 
-  _lastCalibStats = binStats;
+  function _calcBinStats(BINS, getVal) {
+    return BINS.map(bin => {
+      const indices = result.map((r,i)=>i).filter(i => {
+        const v = getVal(result[i]);
+        return isFinite(v) && v >= bin.min && v < bin.max;
+      });
+      const stats = {};
+      for (const h of HORIZONS) {
+        const returns = indices.map(i => fwd[h][i]).filter(isFinite);
+        if (!returns.length) { stats[h] = null; continue; }
+        const correct = bin.dir === 0 ? NaN :
+          returns.filter(r => bin.dir > 0 ? r > 0 : r < 0).length / returns.length * 100;
+        const med = _median(returns);
+        stats[h] = { n: returns.length, mean: returns.reduce((a,b)=>a+b,0)/returns.length,
+          median: med, accuracy: correct,
+          q25: _median(returns.filter(r=>r<=med)), q75: _median(returns.filter(r=>r>=med)) };
+      }
+      return { ...bin, stats };
+    });
+  }
+
+  const binStatsNpp = _calcBinStats(BINS_NPP, r => r.net_phys_pct);
+  const binStatsSp  = _calcBinStats(BINS_SP,  r => r.squeeze_pressure);
+
+  const last = [...result].reverse().find(r => isFinite(r.squeeze_pressure));
+  const curBinNpp = last ? binStatsNpp.find(b => last.net_phys_pct >= b.min && last.net_phys_pct < b.max) : null;
+  const curBinSp  = last ? binStatsSp.find(b => last.squeeze_pressure >= b.min && last.squeeze_pressure < b.max) : null;
+
+  // Для тултипа используем squeeze_pressure (динамика важнее снэпшота)
+  _lastCalibStats = binStatsSp;
   _lastCalibFwd   = fwd;
-  renderCalibration(binStats, last, currentBinStat, fwd, result);
+  renderCalibration(binStatsNpp, binStatsSp, last, curBinNpp, curBinSp, fwd, result);
 }
 
-function renderCalibration(binStats, last, currentBin, fwd, result) {
+function renderCalibration(binStatsNpp, binStatsSp, last, curBinNpp, curBinSp, fwd, result) {
   const el = document.getElementById('calib-out');
   const isHourly = _lastMode === 'hourly';
   const H = isHourly ? [1, 2, 4, 8, 24] : [1, 2, 3, 5];
   const hLbl = h => isHourly ? `+${h}ч` : `+${h}д`;
   const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
 
-  // Текущий прогноз
-  let html = '';
-  if (last && currentBin) {
-    const color = currentBin.dir > 0 ? '#a6e3a1' : currentBin.dir < 0 ? '#f38ba8' : '#cdd6f4';
-    html += `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:10px">
-      <div style="font-size:12px;color:#cba6f7;margin-bottom:6px">Текущий прогноз (перекос физ.: ${isFinite(last.net_phys_pct)?(last.net_phys_pct*100).toFixed(1)+'%':'—'})</div>
-      <div style="font-size:16px;font-weight:700;color:${color}">${currentBin.label}</div>
-      <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
-        ${H.map(h => { const s=currentBin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
+  function _forecastBlock(bin, label, subtitle) {
+    if (!bin) return '';
+    const color = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
+    return `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:8px">
+      <div style="font-size:11px;color:#6c7086;margin-bottom:3px">${subtitle}</div>
+      <div style="font-size:14px;font-weight:700;color:${color}">${bin.label}</div>
+      <div style="margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">
+        ${H.map(h => { const s=bin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
     </div>`;
   }
 
-  // Сводная таблица точности по бинам
-  html += `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Точность по уровням сигнала</summary>
-  <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
-  <thead><tr>
-    <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
-    ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
-  </tr><tr>
-    <th style="background:#181825"></th>
-    ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
-  </tr></thead><tbody>`;
-
-  for (const bin of binStats) {
-    const rowColor = bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030';
-    html += `<tr style="background:${rowColor}">
-      <td style="padding:4px 8px;color:${bin.dir>0?'#a6e3a1':bin.dir<0?'#f38ba8':'#cdd6f4'}">${bin.label}</td>`;
-    for (const h of H) {
-      const s = bin.stats[h];
-      if (!s) { html += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
-      const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
-      const ac = isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
-      html += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(s.median)}</td>
-               <td style="text-align:center;padding:4px 6px;color:${ac}">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
-               <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
-    }
-    html += '</tr>';
+  let html = '';
+  if (last) {
+    const spVal = isFinite(last.squeeze_pressure) ? (last.squeeze_pressure*100).toFixed(1)+'%' : '—';
+    const nppVal = isFinite(last.net_phys_pct) ? (last.net_phys_pct*100).toFixed(1)+'%' : '—';
+    html += `<div style="font-size:12px;color:#cba6f7;margin-bottom:8px;font-weight:600">Текущий прогноз · давление сжатия: ${spVal} · перекос: ${nppVal}</div>`;
+    html += _forecastBlock(curBinSp, 'Давление сжатия', '📈 Динамика набора: кто активнее набирал за последние 10 баров');
+    html += _forecastBlock(curBinNpp, 'Снэпшот позиции', '📊 Статика: соотношение лонг/шорт от общего ОИ');
   }
-  html += '</tbody></table></div></details>';
 
-  // Мини-график: медиана по бинам (горизонт 5д)
-  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin:6px 0 4px"></canvas>`;
-  html += `<div style="font-size:10px;color:#6c7086;margin-bottom:12px">Медианный сдвиг через ${hLbl(H[H.length-1])} для каждого уровня перекоса физиков</div>`;
+  // Вспомогательная функция рендера таблицы точности
+  function _binTable(bStats, title) {
+    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
+    <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+    <thead><tr>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Уровень</th>
+      ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
+    </tr><tr>
+      <th style="background:#181825"></th>
+      ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
+    </tr></thead><tbody>`;
+    for (const bin of bStats) {
+      const rc = bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030';
+      t += `<tr style="background:${rc}"><td style="padding:4px 8px;color:${bin.dir>0?'#a6e3a1':bin.dir<0?'#f38ba8':'#cdd6f4'}">${bin.label}</td>`;
+      for (const h of H) {
+        const s = bin.stats[h];
+        if (!s) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
+        const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+        const ac = isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
+        t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(s.median)}</td>
+              <td style="text-align:center;padding:4px 6px;color:${ac}">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
+              <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
+      }
+      t += '</tr>';
+    }
+    return t + '</tbody></table></div></details>';
+  }
 
-  // Детальная таблица факт/прогноз по барам
-  html += `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Детально по барам: факт vs прогноз</summary>
+  html += _binTable(binStatsSp, '📈 Точность по динамике набора (давление сжатия)');
+  html += _binTable(binStatsNpp, '📊 Точность по снэпшоту позиции (перекос)');
+
+  // Бар-чарт по давлению сжатия
+  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin:8px 0 4px"></canvas>`;
+  html += `<div style="font-size:10px;color:#6c7086;margin-bottom:12px">Медианный сдвиг через ${hLbl(H[H.length-1])} — по квинтилям давления сжатия</div>`;
+
+  // Детальная таблица факт/прогноз по барам (используем SP — динамику)
+  html += `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Детально по барам: факт vs прогноз (по давлению сжатия)</summary>
   <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table style="font-size:11px;border-collapse:collapse;width:100%">
   <thead style="position:sticky;top:0;z-index:1"><tr>
     <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Дата</th>
-    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:right">Перекос физ.</th>
-    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
+    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:right">Давление</th>
+    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:left">Уровень</th>
     ${H.map(h=>`<th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
   </tr><tr>
     <th colspan="3" style="background:#181825"></th>
@@ -1342,13 +1432,14 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
 
   for (let i = result.length - 1; i >= 0; i--) {
     const r = result[i];
-    if (!isFinite(r.net_phys_pct)) continue;
-    const bin = binStats.find(b => r.net_phys_pct >= b.min && r.net_phys_pct < b.max);
+    if (!isFinite(r.squeeze_pressure)) continue;
+    const bin = binStatsSp.find(b => r.squeeze_pressure >= b.min && r.squeeze_pressure < b.max);
     const rowBg = bin ? (bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030') : '#1e2030';
     const lblCol = bin ? (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4') : '#cdd6f4';
+    const spPct = (r.squeeze_pressure*100).toFixed(1)+'%';
     html += `<tr style="background:${rowBg}">
       <td style="padding:3px 8px;color:#cdd6f4">${r.date}</td>
-      <td style="padding:3px 6px;text-align:right;color:${r.net_phys_pct>=0?'#f38ba8':'#a6e3a1'}">${(r.net_phys_pct*100).toFixed(1)}%</td>
+      <td style="padding:3px 6px;text-align:right;color:${r.squeeze_pressure>=0?'#a6e3a1':'#f38ba8'}">${spPct}</td>
       <td style="padding:3px 6px;color:${lblCol};font-size:10px">${bin ? bin.label.replace(/→.*$/,'').trim() : '—'}</td>`;
     for (const h of H) {
       const actual = fwd[h][i];
@@ -1378,12 +1469,12 @@ function renderCalibration(binStats, last, currentBin, fwd, result) {
     const CH = 120;
     // Для бар-чарта берём последний горизонт (самый показательный)
     const chartH = H[H.length - 1];
-    const vals = binStats.map(b => b.stats[chartH]?.median ?? NaN).filter(isFinite);
+    const vals = binStatsSp.map(b => b.stats[chartH]?.median ?? NaN).filter(isFinite);
     if (!vals.length) return;
     const vmax = Math.max(...vals.map(Math.abs), 1);
-    const bw = W / binStats.length;
+    const bw = W / binStatsSp.length;
     const midY = CH / 2;
-    binStats.forEach((bin, i) => {
+    binStatsSp.forEach((bin, i) => {
       const s = bin.stats[chartH];
       if (!s) return;
       const v = s.median;
