@@ -1511,6 +1511,8 @@ function labCalibrate() {
     return BINS.map(bin => {
       const indices = result.map((r,i)=>i).filter(i => {
         const v = getVal(result[i]);
+        // Нижний бин (-Inf…max): используем <=, чтобы значения ровно на границе p20 не терялись
+        if (bin.min === -Infinity) return isFinite(v) && v <= bin.max;
         return isFinite(v) && v >= bin.min && v < bin.max;
       });
       const stats = {};
