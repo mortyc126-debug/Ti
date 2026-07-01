@@ -128,6 +128,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     </label>
     <button class="sec" onclick="poolFillAllTickers()">📋 Заполнить всеми из базы</button>
     <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
+    <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
   </div>
   <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
 </div>
@@ -2142,7 +2143,11 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
 // метрик (это смешало бы разные шкалы), а ИСХОДЫ (верно/неверно) внутри
 // одной и той же ранговой категории — так же, как объединяют результаты
 // нескольких испытаний в мета-анализе.
-async function _loadInstrumentForPool(proxy, rootTicker, cfg, log) {
+// Только сеть: резолвит семью, тянет oidaily+свечи, склеивает. НЕ вызывает
+// computeIndicator — так результат можно закэшировать и пересчитывать
+// индикатор с разными cfg (напр. для перебора параметров) без повторных
+// походов в сеть, которая тут самое дорогое.
+async function _fetchInstrumentRows(proxy, rootTicker, log) {
   const _l = (msg) => { if (log) log.push(msg); };
   const tickers = await resolveTickerFamily(proxy, [rootTicker]);
   _l(`семья: [${tickers.join(', ')}]`);
@@ -2238,8 +2243,13 @@ async function _loadInstrumentForPool(proxy, rootTicker, cfg, log) {
   else ({ rows, refSwitchDates } = aggregateContracts(contractsMap));
   _l(`после склейки (с ценой): строк = ${rows ? rows.length : 0}`);
   if (!rows || rows.length < 15) return null;
-  const result = computeIndicator(rows, cfg, refSwitchDates);
-  return result;
+  return { rows, refSwitchDates };
+}
+
+async function _loadInstrumentForPool(proxy, rootTicker, cfg, log) {
+  const fetched = await _fetchInstrumentRows(proxy, rootTicker, log);
+  if (!fetched) return null;
+  return computeIndicator(fetched.rows, cfg, fetched.refSwitchDates);
 }
 
 function _fwdReturns(result, HORIZONS) {
@@ -2311,6 +2321,11 @@ async function poolFillAllTickers() {
   }
 }
 
+// Кэш сырых (несчитанных) данных последнего пула — [{ticker, rows, refSwitchDates}].
+// Позволяет labSweepPool пересчитывать computeIndicator с другими cfg без
+// повторных походов в сеть (самая дорогая часть загрузки пула).
+let _lastPoolRawData = null;
+
 async function labCalibratePool() {
   const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
   const rootTickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
@@ -2321,20 +2336,24 @@ async function labCalibratePool() {
   const HORIZONS = [1, 2, 3, 5]; // пул считаем на дневных горизонтах вне зависимости от режима — иначе горизонты инструментов несравнимы
 
   const instruments = [];
+  const rawData = [];
   for (const rt of rootTickers) {
     setStatus(`Пул: загружаю ${rt}…`);
     const log = [];
     try {
-      const result = await _loadInstrumentForPool(proxy, rt, cfg, log);
-      if (!result) { console.warn(`Пул: нет данных для ${rt}\n` + log.join('\n')); continue; }
+      const fetched = await _fetchInstrumentRows(proxy, rt, log);
+      if (!fetched) { console.warn(`Пул: нет данных для ${rt}\n` + log.join('\n')); continue; }
+      const result = computeIndicator(fetched.rows, cfg, fetched.refSwitchDates);
       const fwd = _fwdReturns(result, HORIZONS);
       instruments.push({ ticker: rt, result, fwd });
+      rawData.push({ ticker: rt, rows: fetched.rows, refSwitchDates: fetched.refSwitchDates });
     } catch(e) { console.warn(`Пул: ошибка загрузки ${rt}\n` + log.join('\n'), e); }
   }
   if (instruments.length < 2) {
     setStatus('Пул: не удалось загрузить достаточно инструментов (нужно ≥2 с данными)', 'err');
     return;
   }
+  _lastPoolRawData = rawData;
 
   // Считаем per-инструмент статистику по тем же бинам, что и одиночная калибровка
   const perInstrumentSp    = [];
@@ -2379,6 +2398,88 @@ async function labCalibratePool() {
 
   renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap);
   setStatus(`Пул: рассчитано по ${instruments.length}/${rootTickers.length} инструментам (${instruments.map(i=>i.ticker).join(', ')})`, 'ok');
+}
+
+// Перебор порогов trend_exhaust (perцентиль позиции × перцентиль хода цены) по
+// уже загруженному пулу — БЕЗ повторных походов в сеть: computeIndicator чистая
+// функция (rows, cfg) → result, а rows/refSwitchDates для всех инструментов
+// пула уже в _lastPoolRawData. Проверяет, действительно ли текущие значения
+// по умолчанию (0.85/0.85) — локальный максимум по edge, или рядом есть лучше.
+async function labSweepPool() {
+  if (!_lastPoolRawData || _lastPoolRawData.length < 2) {
+    setStatus('Сначала запусти «Рассчитать по пулу» — перебор использует тот же кэш сырых данных', 'err');
+    return;
+  }
+  setStatus('Перебор параметров trend_exhaust…');
+  const HORIZONS = [1, 2, 3, 5];
+  const baseCfg = readCfg();
+  const pctlGrid = [0.75, 0.80, 0.85, 0.90, 0.95];
+  const moveGrid = [0.75, 0.85, 0.90];
+
+  const sweepResults = [];
+  for (const pctl of pctlGrid) {
+    for (const move of moveGrid) {
+      const cfg = { ...baseCfg, trend_exhaust_pctl: pctl, trend_exhaust_move_pctl: move };
+      const instruments = _lastPoolRawData.map(raw => {
+        const result = computeIndicator(raw.rows, cfg, raw.refSwitchDates);
+        return { ticker: raw.ticker, result, fwd: _fwdReturns(result, HORIZONS) };
+      });
+      const baseStats = {};
+      for (const h of HORIZONS) {
+        const all = [];
+        for (const inst of instruments) for (const v of inst.fwd[h]) if (isFinite(v)) all.push(v);
+        baseStats[h] = all.length ? { pctDown: all.filter(v=>v<0).length / all.length * 100 } : null;
+      }
+      const perInstrumentPhase = instruments.map(inst => _calcCategoricalStats(PHASE_DEFS, inst.result, inst.fwd, HORIZONS));
+      const poolPhase = _poolBinStats(perInstrumentPhase, HORIZONS);
+      // Индексы 5/6 в PHASE_DEFS — тренд-истощение шорт→сквиз и лонг→коррекция
+      const shortSqueeze = poolPhase[5], longCorrection = poolPhase[6];
+      const edgeOf = (bin, dir) => {
+        const s = bin.stats[1]; // +1д — горизонт, где эффект показал себя лучше всего
+        const base = baseStats[1];
+        if (!s || !base || !isFinite(s.accuracy)) return null;
+        const baseAcc = dir < 0 ? base.pctDown : (100 - base.pctDown);
+        return s.accuracy - baseAcc;
+      };
+      sweepResults.push({
+        pctl, move,
+        shortEdge: edgeOf(shortSqueeze, 1), shortN: shortSqueeze.stats[1]?.n ?? 0,
+        longEdge: edgeOf(longCorrection, -1), longN: longCorrection.stats[1]?.n ?? 0,
+      });
+    }
+  }
+  renderPoolSweep(sweepResults, pctlGrid, moveGrid);
+  setStatus(`Перебор готов: ${sweepResults.length} комбинаций на ${_lastPoolRawData.length} инструментах`, 'ok');
+}
+
+function renderPoolSweep(sweepResults, pctlGrid, moveGrid) {
+  const el = document.getElementById('pool-out');
+  const cellColor = edge => !isFinite(edge) ? '#313244' : edge >= 15 ? '#a6e3a1' : edge >= 5 ? '#94e2b8' : edge <= -5 ? '#f38ba8' : '#cdd6f4';
+  function _sweepTable(title, edgeKey, nKey) {
+    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — edge на +1д, по клеткам (perцентиль позиции × перцентиль хода)</summary>
+    <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+    <thead><tr><th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">pctl позиции \\ pctl хода</th>
+      ${moveGrid.map(m=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">${m}</th>`).join('')}
+    </tr></thead><tbody>`;
+    for (const pctl of pctlGrid) {
+      t += `<tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825;font-weight:600">${pctl}${pctl===0.85?' (по умолч.)':''}</td>`;
+      for (const move of moveGrid) {
+        const r = sweepResults.find(s => s.pctl === pctl && s.move === move);
+        const edge = r ? r[edgeKey] : null;
+        const n = r ? r[nKey] : 0;
+        const isDefault = pctl === 0.85 && move === 0.85;
+        t += `<td style="text-align:center;padding:4px 6px;color:${cellColor(edge)};border:${isDefault?'1px solid #cba6f7':'none'}">
+          ${isFinite(edge) ? (edge>0?'+':'')+edge.toFixed(0) : '—'}<br><span style="font-size:9px;color:#6c7086">N${n}</span>
+        </td>`;
+      }
+      t += '</tr>';
+    }
+    return t + '</tbody></table></div></details>';
+  }
+  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах (без повторной загрузки). Рамка — текущие значения по умолчанию.</div>`;
+  html += _sweepTable('🟠 Шорт у экстремума → сквиз ↑', 'shortEdge', 'shortN');
+  html += _sweepTable('🟠 Лонг у экстремума → коррекция ↓', 'longEdge', 'longN');
+  el.innerHTML = html + el.innerHTML;
 }
 
 function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap) {
