@@ -2615,6 +2615,10 @@ let ASSET_CLASS = {
 // опознавать полсотни тикеров вручную. Бэкенд ищет живой дескрипт серии
 // через T-Invest FindInstrument и берёт asset_type из полной карточки
 // (FutureBy) — см. /db/instruments/assetclass в cf-worker.js.
+// Дёргаем эндпоинт по ОДНОМУ тикеру за раз (не одним batch-запросом на все
+// полсотни сразу) — Cloudflare режет число сабзапросов за одно инвокейшн
+// воркера (на free-плане 50), а тут 2 сабзапроса на тикер: на пуле в 52
+// тикера batch сразу упирался в лимит («Too many subrequests»).
 async function labFetchAssetClasses() {
   if (!_lastPoolRawData || _lastPoolRawData.length < 2) {
     setStatus('Сначала запусти «Рассчитать по пулу»', 'err');
@@ -2622,21 +2626,21 @@ async function labFetchAssetClasses() {
   }
   const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
   if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
-  setStatus('Классифицирую тикеры через T-Invest…');
   const tickers = _lastPoolRawData.map(r => r.ticker);
-  try {
-    const resp = await fetch(`${proxy}/db/instruments/assetclass?tickers=${tickers.join(',')}`);
-    const data = await resp.json();
-    let ok = 0;
-    for (const r of (data.results || [])) {
+  let ok = 0;
+  for (const t of tickers) {
+    setStatus(`Классифицирую тикеры через T-Invest… ${t} (${ok}/${tickers.length})`);
+    try {
+      const resp = await fetch(`${proxy}/db/instruments/assetclass?ticker=${t}`);
+      const r = await resp.json();
       if (r.assetClass) { ASSET_CLASS[r.ticker] = r.assetClass; ok++; }
-      else if (r.error) console.warn(`Классификация ${r.ticker}: ${r.error}`);
+      else if (r.error) console.warn(`Классификация ${t}: ${r.error}`);
+    } catch(e) {
+      console.warn(`Классификация ${t}: ${e.message}`);
     }
-    setStatus(`Классифицировано ${ok}/${tickers.length} тикеров — пересчитываю признаки…`, 'ok');
-    await labAnalyzeSqueezeFactors();
-  } catch(e) {
-    setStatus('Ошибка классификации: ' + e.message, 'err');
   }
+  setStatus(`Классифицировано ${ok}/${tickers.length} тикеров — пересчитываю признаки…`, 'ok');
+  await labAnalyzeSqueezeFactors();
 }
 
 async function labAnalyzeSqueezeFactors() {
