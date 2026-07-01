@@ -98,6 +98,15 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
   <canvas id="c-phase"></canvas>
 </div>
 
+<!-- Точность системы -->
+<div class="section">
+  <div class="section-title">
+    Точность системы на истории
+    <button class="sec" style="font-size:10px;padding:2px 8px;margin-left:8px" onclick="labCalibrate()">📊 Рассчитать</button>
+  </div>
+  <div id="calib-out" style="color:#6c7086;font-size:11px">Нажми «Рассчитать» после загрузки данных.</div>
+</div>
+
 <!-- Таблица данных -->
 <div class="section">
   <div class="section-title">Данные <button class="sec" style="font-size:10px;padding:2px 8px" onclick="labExportCsv()">CSV</button></div>
@@ -1084,6 +1093,171 @@ function labExportCsv() {
   a.href = URL.createObjectURL(blob);
   a.download = 'oi_lab_export.csv';
   a.click();
+}
+
+// ========== КАЛИБРОВКА / БЭКТЕСТ ==========
+
+function _median(arr) {
+  const s = arr.filter(isFinite).sort((a,b)=>a-b);
+  if (!s.length) return NaN;
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+function labCalibrate() {
+  const result = _lastResult;
+  if (!result || result.length < 15) { setStatus('Сначала загрузи данные', 'err'); return; }
+
+  const n = result.length;
+  const HORIZONS = [1, 3, 5, 10]; // дней вперёд
+
+  // Форвардные доходности по горизонтам
+  const fwd = {};
+  for (const h of HORIZONS) {
+    fwd[h] = result.map((r, i) => {
+      if (i + h >= n) return NaN;
+      const c0 = result[i].close, c1 = result[i+h].close;
+      return (c0 > 0 && c1 > 0) ? (c1 - c0) / c0 * 100 : NaN;
+    });
+  }
+
+  // Сигнальные бины по WI (взвешенный имбаланс)
+  // Правило: WI < 0 → физики в ЛОНГЕ → контрарный сигнал: ожидаем вниз
+  //          WI > 0 → физики в ШОРТЕ → контрарный сигнал: ожидаем вверх
+  const BINS = [
+    { label: 'Сильный рост ↑↑', min: 1.0,  max:  Infinity, dir:  1 },
+    { label: 'Рост ↑',          min: 0.3,  max:  1.0,      dir:  1 },
+    { label: 'Слабый рост ↑',   min: 0.1,  max:  0.3,      dir:  1 },
+    { label: 'Нейтраль',        min:-0.1,  max:  0.1,      dir:  0 },
+    { label: 'Слабое падение ↓',min:-0.3,  max: -0.1,      dir: -1 },
+    { label: 'Падение ↓',       min:-1.0,  max: -0.3,      dir: -1 },
+    { label: 'Сильное падение ↓↓',min:-Infinity,max:-1.0,  dir: -1 },
+  ];
+
+  // Для каждого бина собираем статистику по горизонтам
+  const binStats = BINS.map(bin => {
+    const rows = result.map((r,i) => ({ wi: r.weighted_imbalance, fwd, i }))
+      .filter(({ wi }) => isFinite(wi) && wi >= bin.min && wi < bin.max);
+    const stats = {};
+    for (const h of HORIZONS) {
+      const returns = rows.map(({ i }) => fwd[h][i]).filter(isFinite);
+      if (!returns.length) { stats[h] = null; continue; }
+      const correct = bin.dir === 0 ? NaN :
+        returns.filter(r => bin.dir > 0 ? r > 0 : r < 0).length / returns.length * 100;
+      stats[h] = {
+        n: returns.length,
+        mean: returns.reduce((a,b)=>a+b,0) / returns.length,
+        median: _median(returns),
+        accuracy: correct,
+        q25: _median(returns.filter(r=>r <= _median(returns))),
+        q75: _median(returns.filter(r=>r >= _median(returns))),
+      };
+    }
+    return { ...bin, stats };
+  });
+
+  // Текущий сигнал
+  const last = [...result].reverse().find(r => isFinite(r.weighted_imbalance));
+  const currentBin = last ? BINS.find(b => last.weighted_imbalance >= b.min && last.weighted_imbalance < b.max) : null;
+
+  renderCalibration(binStats, last, currentBin, fwd, result);
+}
+
+function renderCalibration(binStats, last, currentBin, fwd, result) {
+  const el = document.getElementById('calib-out');
+
+  // Текущий прогноз
+  let html = '';
+  if (last && currentBin && currentBin.stats[5]) {
+    const s5 = currentBin.stats[5];
+    const s10 = currentBin.stats[10];
+    const color = currentBin.dir > 0 ? '#a6e3a1' : currentBin.dir < 0 ? '#f38ba8' : '#cdd6f4';
+    const fmtPct = v => (isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—');
+    html += `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:10px">
+      <div style="font-size:12px;color:#cba6f7;margin-bottom:6px">Текущий прогноз (WI=${last.weighted_imbalance.toFixed(2)})</div>
+      <div style="font-size:16px;font-weight:700;color:${color}">${currentBin.label}</div>
+      <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;font-size:11px">
+        ${s5 ? `<span>через 5 дней: медиана <b style="color:${color}">${fmtPct(s5.median)}</b> (мин…макс: ${fmtPct(s5.q25)}…${fmtPct(s5.q75)}), точность направления <b>${isFinite(s5.accuracy)?s5.accuracy.toFixed(0)+'%':'—'}</b>, N=${s5.n}</span>` : ''}
+        ${s10 ? `<span>через 10 дней: медиана <b style="color:${color}">${fmtPct(s10.median)}</b>, точность <b>${isFinite(s10.accuracy)?s10.accuracy.toFixed(0)+'%':'—'}</b>, N=${s10.n}</span>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Таблица по бинам
+  const H = [1, 3, 5, 10];
+  html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+  <thead><tr>
+    <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
+    ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">+${h}д</th>`).join('')}
+  </tr><tr>
+    <th style="background:#181825"></th>
+    ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">медиана</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">N</th>').join('')}
+  </tr></thead><tbody>`;
+
+  for (const bin of binStats) {
+    const rowColor = bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030';
+    html += `<tr style="background:${rowColor}">
+      <td style="padding:4px 8px;color:${bin.dir>0?'#a6e3a1':bin.dir<0?'#f38ba8':'#cdd6f4'}">${bin.label}</td>`;
+    for (const h of H) {
+      const s = bin.stats[h];
+      if (!s) { html += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
+      const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+      const ac = isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
+      html += `<td style="text-align:center;padding:4px 6px;color:${mc}">${s.median>0?'+':''}${s.median.toFixed(1)}%</td>
+               <td style="text-align:center;padding:4px 6px;color:${ac}">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
+               <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+
+  // Мини-график: медиана 5д по бинам
+  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin-bottom:4px"></canvas>`;
+  html += `<div style="font-size:10px;color:#6c7086">Столбики — медианный % сдвига через 5 дней для каждого уровня сигнала (слева = ожидаем рост, справа = падение). Зелёный = цена росла, красный = падала.</div>`;
+
+  el.innerHTML = html;
+
+  // Рисуем бар-чарт
+  requestAnimationFrame(() => {
+    const c = document.getElementById('c-calib');
+    if (!c) return;
+    const W = c.parentElement.clientWidth || 600;
+    c.width = W * devicePixelRatio;
+    c.height = 120 * devicePixelRatio;
+    const ctx = c.getContext('2d');
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+    const CH = 120;
+
+    const vals = binStats.map(b => b.stats[5]?.median ?? NaN).filter(isFinite);
+    if (!vals.length) return;
+    const vmax = Math.max(...vals.map(Math.abs), 1);
+    const bw = W / binStats.length;
+    const midY = CH / 2;
+
+    binStats.forEach((bin, i) => {
+      const s = bin.stats[5];
+      if (!s) return;
+      const v = s.median;
+      const barH = Math.abs(v) / vmax * (CH/2 - 16);
+      const x = i * bw + 2;
+      const col = v > 0 ? '#a6e3a1' : '#f38ba8';
+      ctx.fillStyle = col + '99';
+      if (v >= 0) ctx.fillRect(x, midY - barH, bw-4, barH);
+      else ctx.fillRect(x, midY, bw-4, barH);
+      // Метка %
+      ctx.fillStyle = col;
+      ctx.font = `bold 10px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText((v>0?'+':'')+v.toFixed(1)+'%', x + (bw-4)/2, v>=0 ? midY - barH - 3 : midY + barH + 11);
+      // N
+      ctx.fillStyle = '#6c7086';
+      ctx.font = '9px sans-serif';
+      ctx.fillText('N='+s.n, x + (bw-4)/2, v>=0 ? CH-3 : 10);
+    });
+    // Zero line
+    ctx.strokeStyle = '#363a4f'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
+  });
 }
 
 // Перерисовка при ресайзе
