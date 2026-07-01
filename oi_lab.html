@@ -131,18 +131,19 @@ const CFG_DEFAULTS = {
   velocity_decel_gamma: 0.3,
   range_window: 15,
   range_percentile: 0.40,
-  stress_scale: 0.01,
-  stress_power: 2.0,
+  stress_scale: 0.03,      // 3% выход за диапазон = "единица стресса"
+  stress_power: 1.5,
   phase_release_gamma: 0.6,
   include_yesterday_extreme: true,
-  phase_confirm_bars: 3,
+  phase_confirm_bars: 1,   // минимум — адаптив перезапишет
+  phase_range_ttl: 20,     // баров после конца фазы, пока диапазон актуален
   use_adaptive_confirm: true,
-  atr_window: 20,
+  atr_window: 14,
   atr_percentile_window: 60,
   n_volatility_buckets: 5,
   adaptive_confirm_quantile: 0.5,
-  min_phase_samples_per_bucket: 3,
-  adaptive_confirm_floor: 3,
+  min_phase_samples_per_bucket: 2,
+  adaptive_confirm_floor: 1,
 };
 
 const CFG_LABELS = {
@@ -523,14 +524,22 @@ function applyPhaseHysteresis(raw, confirmBars) {
   return out;
 }
 
-// ATR-прокси: rolling high-low за window баров
-function computeAtrProxy(close, window) {
+// ATR-прокси: средний true range за window баров (H/L если есть, иначе close-range)
+function computeAtrProxy(close, window, rows) {
   const n = close.length;
+  const hasHL = rows && rows.some(r => r.high > 0 && r.low > 0);
+  const tr = new Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    const h = hasHL && rows[i].high > 0 ? rows[i].high : close[i];
+    const l = hasHL && rows[i].low  > 0 ? rows[i].low  : close[i];
+    const prevC = i > 0 ? close[i-1] : close[i];
+    tr[i] = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+  }
   const out = new Array(n).fill(NaN);
   for (let i = window-1; i < n; i++) {
-    let hi = -Infinity, lo = Infinity;
-    for (let j = i-window+1; j <= i; j++) { if(close[j]>hi) hi=close[j]; if(close[j]<lo) lo=close[j]; }
-    out[i] = hi - lo;
+    let s = 0;
+    for (let j = i-window+1; j <= i; j++) if (isFinite(tr[j])) s += tr[j];
+    out[i] = s / window;
   }
   return out;
 }
@@ -715,11 +724,11 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     weightedImbalance[i] = imbalanceZ[i] * (1 + cfg.conviction_alpha*conv) * lc * (1 + cfg.velocity_decel_gamma*vd);
   }
 
-  // Accumulation flag
-  // Используем per-bar H-L диапазон, нормированный на close (% candle range).
-  // Это позволяет обнаружить «тихий бар» (флэт) даже за один день/час,
-  // независимо от истории тренда и уровня цены.
-  // Если H/L недоступны (нет свечей) — fallback: rolling % range close-to-close.
+  // Accumulation flag — оценка «тихого» бара с имбалансом.
+  // Два компонента:
+  //   narrowRange: текущий H-L в нижних 40% диапазонов за окно → цена стоит
+  //   imbalanceScore: взвешенная сила сигнала (не бинарная, а 0..1)
+  // rawFlag = narrowRange И imbalanceScore > порога
   const hasHL = rows.some(r => r.high > 0 && r.low > 0);
   const priceRange = new Array(n).fill(NaN);
   if (hasHL) {
@@ -735,18 +744,25 @@ function computeIndicator(rows, cfg, refSwitchDates) {
     }
   }
   const rangeThresh = _rollingQuantile(priceRange, cfg.range_window, cfg.range_percentile);
-  const narrowRange = priceRange.map((v,i)=> isFinite(v)&&isFinite(rangeThresh[i]) ? v<=rangeThresh[i] : false);
-  // Условие имбаланса: Z-score > 0.3 если история достаточна,
-  // иначе fallback на |netPhysPct| > 15% (работает с первого бара).
-  const absZ = imbalanceZ.map(v=>isFinite(v)?Math.abs(v):NaN);
-  const imbalanceSignificant = absZ.map((v,i)=>
-    isFinite(v) ? v > 0.3 : Math.abs(netPhysPct[i]) > 0.15
+  const narrowRange = priceRange.map((v,i)=>
+    isFinite(v) && isFinite(rangeThresh[i]) ? v <= rangeThresh[i] : false
   );
-  const rawFlag = narrowRange.map((v,i)=>v&&imbalanceSignificant[i]);
+
+  // Сила имбаланса: любое из трёх условий достаточно
+  //   |Z| > 0.5  (отклонение от нормы)
+  //   |netPhysPct| > 15%  (абсолютный перекос — работает с бара 1)
+  //   |squeezePressure| > 0.2 (кто активнее набирал)
+  const imbalanceScore = netPhysPct.map((v, i) => {
+    const z  = isFinite(imbalanceZ[i])    ? Math.min(Math.abs(imbalanceZ[i]) / 1.5, 1)  : 0;
+    const np = isFinite(v)                ? Math.min(Math.abs(v) / 0.20, 1)              : 0;
+    const sp = isFinite(squeezePressure[i])? Math.min(Math.abs(squeezePressure[i]) / 0.3, 1) : 0;
+    return Math.max(z, np, sp);
+  });
+  const rawFlag = narrowRange.map((v,i) => v && imbalanceScore[i] >= 0.5);
 
   let accumFlag;
   if (cfg.use_adaptive_confirm) {
-    const atr = computeAtrProxy(close, cfg.atr_window);
+    const atr = computeAtrProxy(close, cfg.atr_window, rows);
     const atrPctl = _percentileRank(atr, cfg.atr_percentile_window);
     const calibration = calibrateConfirmBarsByVolatility(rawFlag, atrPctl, cfg);
     if (calibration) {
@@ -760,15 +776,18 @@ function computeIndicator(rows, cfg, refSwitchDates) {
   }
 
   // Phase price range — диапазон накопления.
-  // Во время фазы: rolling max/min close + actual H/L баров.
-  // После фазы: forward-fill, чтобы stressDist видел последний диапазон.
+  // Во время фазы: rolling max/min H/L баров.
+  // После фазы: forward-fill не дольше phase_range_ttl баров — чтобы
+  // stressDist не тянул 6-месячный диапазон к текущей цене.
+  const ttl = cfg.phase_range_ttl || 20;
   const phaseHigh = new Array(n).fill(NaN);
   const phaseLow  = new Array(n).fill(NaN);
   let runH = NaN, runL = NaN;
-  let lastH = NaN, lastL = NaN; // forward-fill после окончания фазы
+  let lastH = NaN, lastL = NaN;
+  let barsSincePhase = Infinity;
   for (let i=0; i<n; i++) {
     const prevFlag = i>0 ? accumFlag[i-1] : false;
-    if (accumFlag[i] && !prevFlag) { runH = NaN; runL = NaN; } // начало новой фазы — сброс
+    if (accumFlag[i] && !prevFlag) { runH = NaN; runL = NaN; } // новая фаза — сброс
     if (accumFlag[i]) {
       const c = close[i];
       const h = rows[i].high > 0 ? rows[i].high : c;
@@ -776,10 +795,16 @@ function computeIndicator(rows, cfg, refSwitchDates) {
       runH = isNaN(runH) ? h : Math.max(runH, h);
       runL = isNaN(runL) ? l : Math.min(runL, l);
       lastH = runH; lastL = runL;
+      barsSincePhase = 0;
+    } else {
+      barsSincePhase++;
     }
-    // Всегда forward-fill последнего известного диапазона
-    phaseHigh[i] = isFinite(runH) ? runH : lastH;
-    phaseLow[i]  = isFinite(runL) ? runL : lastL;
+    // Forward-fill только пока диапазон свежий
+    if (barsSincePhase <= ttl) {
+      phaseHigh[i] = isFinite(runH) ? runH : lastH;
+      phaseLow[i]  = isFinite(runL) ? runL : lastL;
+    }
+    // Иначе NaN — stressDist будет 0
   }
 
   // Стресс-дистанция: насколько цена вышла за пределы диапазона накопления.
