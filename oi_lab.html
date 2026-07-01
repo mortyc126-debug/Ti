@@ -64,7 +64,8 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
   <label>Бэкфилл (дней)
     <input id="bf-days" type="number" min="1" max="365" value="90" style="min-width:70px">
   </label>
-  <button class="sec" onclick="labBackfill()">📥 Бэкфилл</button>
+  <button class="sec" onclick="labBackfill()">📥 Бэкфилл ОИ</button>
+  <button class="sec" onclick="labFetchCandles()">📈 Свечи (T-Invest)</button>
 </div>
 
 <div id="status" class="status">—</div>
@@ -239,6 +240,31 @@ async function labBackfill() {
     setStatus(`Бэкфилл: ${done}/${dates.length} дат, saved=${saved}, empty=${empty}, failed=${failed}`);
   }
   setStatus(`Бэкфилл завершён: saved=${saved}, empty=${empty}, failed=${failed}`, saved > 0 ? 'ok' : 'err');
+}
+
+async function labFetchCandles() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const tickers = document.getElementById('tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  if (!tickers.length) { setStatus('Укажи тикер', 'err'); return; }
+
+  const from = '2026-01-01';
+  const to   = new Date().toISOString().slice(0, 10);
+  let totalSaved = 0;
+
+  for (const t of tickers) {
+    setStatus(`Загружаю свечи для ${t}…`);
+    try {
+      const r = await fetch(`${proxy}/db/candles/tinvest?ticker=${encodeURIComponent(t)}&from=${from}&to=${to}`);
+      const j = await r.json();
+      if (!r.ok) { setStatus(`Ошибка ${t}: ${j.error || r.status}`, 'err'); return; }
+      totalSaved += j.saved || 0;
+      setStatus(`${t}: сохранено ${j.saved} свечей (${j.from} — ${j.to})`, 'ok');
+    } catch(e) {
+      setStatus(`Ошибка ${t}: ${e.message}`, 'err'); return;
+    }
+  }
+  setStatus(`Свечи загружены: всего ${totalSaved} баров. Нажми «Загрузить» чтобы обновить график.`, 'ok');
 }
 
 async function labLoad() {
