@@ -512,10 +512,13 @@ async function handleDb(path, req, env) {
       }
       if (!figi) return json({ error: `Не удалось найти FIGI для тикера ${ticker}` }, 404);
     }
+    const tfParam = u.searchParams.get('tf') || 'day';
+    const intervalMap = { day: 'CANDLE_INTERVAL_DAY', hour: 'CANDLE_INTERVAL_HOUR', '15min': 'CANDLE_INTERVAL_15_MIN', '5min': 'CANDLE_INTERVAL_5_MIN' };
+    const interval = intervalMap[tfParam] || 'CANDLE_INTERVAL_DAY';
     const resp = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ figi, from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59Z').toISOString(), interval: 'CANDLE_INTERVAL_DAY' }),
+      body: JSON.stringify({ figi, from: new Date(from).toISOString(), to: new Date(to + 'T23:59:59Z').toISOString(), interval }),
     });
     if (!resp.ok) return json({ error: `T-Invest HTTP ${resp.status}`, body: await resp.text() }, 502);
     const body = await resp.json();
@@ -524,7 +527,7 @@ async function handleDb(path, req, env) {
     const rows = candles.map(c => {
       const ts = Math.floor(new Date(c.time).getTime() / 1000);
       const price = f => (f?.units ? Number(f.units) + (f.nano || 0) / 1e9 : 0);
-      return { key: `${ticker}__day__${ts}`, ticker, tf: 'day', time: ts,
+      return { key: `${ticker}__${tfParam}__${ts}`, ticker, tf: tfParam, time: ts,
                o: price(c.open), h: price(c.high), l: price(c.low), cl: price(c.close), vol: c.volume ?? 0 };
     });
     for (let i = 0; i < rows.length; i += 100) {
@@ -534,7 +537,7 @@ async function handleDb(path, req, env) {
           .bind(r.key, r.ticker, r.tf, r.time, r.o, r.h, r.l, r.cl, r.vol)
       ));
     }
-    return json({ ticker, saved: rows.length, from, to });
+    return json({ ticker, tf: tfParam, saved: rows.length, from, to });
   }
 
   // ── Signals ──
