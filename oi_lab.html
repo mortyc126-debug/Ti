@@ -1343,15 +1343,16 @@ function labCalibrate() {
     p => `Физики <p20 (${p}) в шорте → рост ↑↑`,
   ]);
 
-  // Бины 2: динамика накопления (squeeze_pressure)
-  // > 0 → шорт набирали интенсивнее → потенциал сжатия → рост
-  // < 0 → лонг набирали интенсивнее → потенциал слива → падение
+  // Бины 2: динамика накопления (squeeze_pressure = (rollDShort - rollDLong) / total)
+  // p80+ → rollDShort >> rollDLong → шорты набирали агрессивно
+  // p20- → rollDLong >> rollDShort → лонги набирали агрессивно
+  // Dir берём эмпирический (в этом датасете шорт-накопление = падение продолжается)
   const BINS_SP = _makeBins(result.map(r=>r.squeeze_pressure), [
-    p => `Лонг набирали агрессивно >p80 (${p}) → пад. ↓↓`,
-    (a,b) => `Лонг набирали p60-80 (${a}…${b}) → пад. ↓`,
+    p => `Шорт набирали агрессивно >p80 (${p}) → пад. ↓↓`,
+    (a,b) => `Шорт набирали умеренно p60-80 (${a}…${b}) → пад. ↓`,
     (a,b) => `Баланс p40-60 (${a}…${b})`,
-    (a,b) => `Шорт набирали p20-40 (${a}…${b}) → рост ↑`,
-    p => `Шорт набирали агрессивно <p20 (${p}) → рост ↑↑`,
+    (a,b) => `Лонг набирали p20-40 (${a}…${b})`,
+    p => `Лонг набирали агрессивно <p20 (${p})`,
   ]);
 
   function _calcBinStats(BINS, getVal) {
@@ -1460,10 +1461,15 @@ function renderCalibration(binStatsNpp, binStatsSp, bins2D, last, curBinNpp, cur
   // Вспомогательный рендер 2D-блока прогноза
   function _forecastBlock2D(bin) {
     if (!bin) return '';
-    const color = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
+    const firstH = H[0];
+    const firstS = bin.stats[firstH];
+    const thinData = !firstS || firstS.n < 5;
+    const color = thinData ? '#6c7086' : (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4');
+    const thinNote = thinData ? `<div style="color:#f9e2af;font-size:11px;margin-top:4px">⚠️ Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
     return `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid ${color}">
       <div style="font-size:11px;color:#6c7086;margin-bottom:3px">🎯 2D-позиция: уровень × динамика</div>
       <div style="font-size:14px;font-weight:700;color:${color}">${bin.levelLbl} · ${bin.dynLbl}</div>
+      ${thinNote}
       <div style="margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">
         ${H.map(h => { const s=bin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
       </div>
@@ -1532,11 +1538,13 @@ function renderCalibration(binStatsNpp, binStatsSp, bins2D, last, curBinNpp, cur
         const isCurrent = curBin2D && curBin2D.levelLbl === ll && curBin2D.dynLbl === dl;
         for (const h of H) {
           const s = cell.stats[h];
+          const thinData = !s || s.n < 5;
           const bg = isCurrent ? '#2e2a4a' : (cell.dir>0?'#1a2e1a':cell.dir<0?'#2e1a1a':'#1e2030');
-          if (!s) { t += `<td style="text-align:center;color:#313244;background:${bg}">—</td>`; continue; }
-          const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
-          const ac = isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
-          t += `<td style="text-align:center;padding:4px 5px;background:${bg};border:${isCurrent?'1px solid #cba6f7':'none'}">
+          if (!s) { t += `<td style="text-align:center;color:#313244;background:${bg}" title="Нет данных">—</td>`; continue; }
+          const mc = thinData ? '#6c7086' : (s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4');
+          const ac = thinData ? '#6c7086' : (isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4');
+          const warn = thinData ? ' title="Мало данных (N<5) — ненадёжно"' : '';
+          t += `<td style="text-align:center;padding:4px 5px;background:${bg};border:${isCurrent?'1px solid #cba6f7':'none'};opacity:${thinData?0.55:1}"${warn}>
             <span style="color:${mc}">${fmtPct(s.median)}</span><br>
             <span style="color:${ac};font-size:10px">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'} N${s.n}</span>
           </td>`;
