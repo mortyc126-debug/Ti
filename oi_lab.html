@@ -2361,11 +2361,27 @@ async function labCalibratePool() {
   const poolSp    = _poolBinStats(perInstrumentSp, HORIZONS, SP_GENERIC_LABELS);
   const poolPhase = _poolBinStats(perInstrumentPhase, HORIZONS);
 
-  renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase);
+  // Проверка на корреляцию между инструментами: если триггер срабатывает у
+  // многих инструментов В ОДНИ И ТЕ ЖЕ календарные даты (общее макро-движение
+  // рынка сразу по многим фьючерсам), то N=220 может быть не 220 независимыми
+  // событиями, а гораздо меньшим числом синхронных эпизодов, размноженных по
+  // коррелированным инструментам. uniqueDates << totalMatches — сигнал об этом.
+  const phaseDateOverlap = PHASE_DEFS.map(def => {
+    const dates = new Set();
+    let totalMatches = 0;
+    for (const inst of instruments) {
+      for (const r of inst.result) {
+        if (def.match(r)) { totalMatches++; dates.add(r.date); }
+      }
+    }
+    return { label: def.label, totalMatches, uniqueDates: dates.size };
+  });
+
+  renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap);
   setStatus(`Пул: рассчитано по ${instruments.length}/${rootTickers.length} инструментам (${instruments.map(i=>i.ticker).join(', ')})`, 'ok');
 }
 
-function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase) {
+function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap) {
   const el = document.getElementById('pool-out');
   const hLbl = h => `+${h}д`;
   const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
@@ -2465,6 +2481,29 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   html += _poolTable(poolPhase, '🔵📤 Пул — фазы и тренд-истощение');
   html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 1);
   html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 3);
+
+  if (phaseDateOverlap) {
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🔁 Проверка на пересечение дат (не раздуто ли N синхронными движениями по многим инструментам)</summary>
+    <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
+    <thead><tr>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Всего срабатываний</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Уникальных дат</th>
+      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Доля пересечения</th>
+    </tr></thead><tbody>`;
+    for (const row of phaseDateOverlap) {
+      if (!row.totalMatches) { continue; }
+      const overlapPct = (1 - row.uniqueDates / row.totalMatches) * 100;
+      const oc = overlapPct >= 50 ? '#f9e2af' : '#6c7086';
+      t += `<tr><td style="padding:4px 8px;color:#cdd6f4">${row.label}</td>
+        <td style="text-align:center;padding:4px 6px;color:#6c7086">${row.totalMatches}</td>
+        <td style="text-align:center;padding:4px 6px;color:#6c7086">${row.uniqueDates}</td>
+        <td style="text-align:center;padding:4px 6px;color:${oc}"${overlapPct>=50?' title="Больше половины срабатываний приходится на даты, которые уже встречались у другого инструмента — часть N может быть одним и тем же рыночным движением"':''}>${overlapPct.toFixed(0)}%</td>
+      </tr>`;
+    }
+    t += '</tbody></table></div></details>';
+    html += t;
+  }
 
   el.innerHTML = html;
 }
