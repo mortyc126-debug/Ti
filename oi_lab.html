@@ -2631,7 +2631,7 @@ async function labBackfillIntradayPool() {
   const problems = [];
   for (let ti = 0; ti < tickers.length; ti++) {
     const t = tickers[ti];
-    let start = 0, calls = 0, retries = 0;
+    let start = 0, calls = 0, retries = 0, chainTill = null;
     // pages=12 вместо 40: тяжёлый вызов (40 МБ JSON на разбор) убивался CPU-
     // лимитом бесплатного плана Workers, и Cloudflare отдавал страницу ошибки
     // без CORS-заголовков — в консоли это выглядело как «CORS policy». Лёгкие
@@ -2641,7 +2641,10 @@ async function labBackfillIntradayPool() {
       setStatus(`Интрадей-бэкфилл ${t} (${ti+1}/${tickers.length}): вызов ${calls}, offset ${start}, собрано ${totalIntraday} срезов…`);
       let j = null;
       try {
-        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&pages=12&start=${start}`);
+        // till из первого ответа фиксируется на всю цепочку: offset имеет
+        // смысл только при неизменной правой границе серии
+        const tillParam = chainTill ? `&till=${chainTill}` : '';
+        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&pages=12&start=${start}${tillParam}`);
         if (r.ok) j = await r.json();
       } catch(e) { /* сеть/CORS — уйдём в ретрай ниже */ }
       if (!j || j.error) {
@@ -2652,6 +2655,7 @@ async function labBackfillIntradayPool() {
         continue; // тот же start — уже записанное не задублируется
       }
       retries = 0;
+      if (j.till) chainTill = j.till;
       totalDaily += j.saved || 0;
       totalIntraday += j.savedIntraday || 0;
       if (j.errors && j.errors.length) { problems.push(`${t}: ${j.errors[0]}`); console.warn(`бэкфилл ${t}:`, j.errors); }

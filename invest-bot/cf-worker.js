@@ -272,6 +272,8 @@ async function upsertOiDaily(db, r) {
   ).run();
 }
 
+const MSK_OFFSET_MS_W = 3 * 3600 * 1000; // МСК = UTC+3, для date-строк из ts
+
 // ── FutOI короткий код тикера — те же правила, что в oi-signal-v10.html::futoi2sym ──
 const FUTOI_FULL_MAP = {
   SBER:'SBERF', GAZP:'GAZPF', LKOH:'LKOHF', GMKN:'GMKNF', NVTK:'NVTKF',
@@ -510,7 +512,7 @@ async function scheduledCollectOi(env) {
 // В oi_hourly пишутся снэпшоты с шагом step минут (по умолчанию 30: полный
 // 5-минутный поток за 100 дней — ~36 тыс. строк на тикер, лимит сабзапросов
 // Workers не резиновый), в oi_daily — последний снэпшот каждой даты.
-async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffset = 0, maxPages = 25) {
+async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffset = 0, maxPages = 25, tillOverride = null) {
   const moexKey = env.MOEX_KEY;
   if (!moexKey) return { error: 'secret MOEX_KEY не задан' };
   // Базы, созданные до появления oi_hourly, не имеют этой таблицы, если
@@ -526,7 +528,7 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
   )`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oihourly_ticker ON oi_hourly(ticker, ts)`).run();
   const from = new Date(Date.now() - days * 86400 * 1000).toISOString().slice(0, 10);
-  const till = new Date().toISOString().slice(0, 10);
+  let till = new Date().toISOString().slice(0, 10);
   let saved = 0, savedIntraday = 0, failed = 0, pagesTotal = 0;
   const errors = [];
   const noteErr = (ctx, msg) => { if (errors.length < 5) errors.push(`${ctx}: ${msg}`); };
@@ -543,6 +545,27 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
 
   for (const ticker of tickers) {
     const sym = futoi2sym(ticker);
+    // Возобновление МЕЖДУ запусками: серия листается от свежих к старым, и
+    // повторный запуск с start=0 заново гонял бы уже сохранённые страницы.
+    // Сужаем till до самой старой уже записанной даты тикера (её же
+    // перезапрашиваем целиком — день мог быть записан частично; REPLACE по
+    // ключу дублей не даёт) — цепочка продолжает вглубь, а не с сегодня.
+    // ВАЖНО: внутри одной цепочки start-offset имеет смысл только при
+    // НЕИЗМЕННОМ till (записи первого вызова сдвинули бы min-дату) — поэтому
+    // клиент передаёт till= из ответа первого вызова на все последующие.
+    if (tillOverride) {
+      till = tillOverride;
+    } else if (startOffset === 0) {
+      try {
+        const { results } = await db.prepare('SELECT MIN(ts) AS m FROM oi_hourly WHERE ticker=?').bind(ticker).all();
+        const m = results?.[0]?.m;
+        if (m) {
+          const d = new Date(m + MSK_OFFSET_MS_W).toISOString().slice(0, 10);
+          if (d < till) till = d;
+        }
+      } catch (_) { /* таблицы может не быть — не критично */ }
+    }
+    if (till < from) { continue; } // история уже глубже from — нечего тянуть
     // 1. Страницы серии (ISS отдаёт по limit строк, листаем start=)
     const rowsAll = [];
     for (let page = 0; page < maxPages; page++) {
@@ -1125,7 +1148,10 @@ async function handleDb(path, req, env) {
     // 50 сабзапросов бесплатного плана вместе с батчами записи)
     const startOffset = Math.max(0, Number(u.searchParams.get('start')) || 0);
     const maxPages = Math.max(1, Math.min(Number(u.searchParams.get('pages')) || 25, 40));
-    const result = await backfillOiHistory(db, env, tickers, days, step, startOffset, maxPages);
+    // till= — фиксация правой границы цепочки (из ответа первого вызова):
+    // start-offset валиден только при неизменном till
+    const tillOverride = /^\d{4}-\d{2}-\d{2}$/.test(u.searchParams.get('till') || '') ? u.searchParams.get('till') : null;
+    const result = await backfillOiHistory(db, env, tickers, days, step, startOffset, maxPages, tillOverride);
     return json(result);
   }
 
