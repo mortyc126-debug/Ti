@@ -5,86 +5,166 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OI Lab — тестирование индикатора дисбаланса</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root{
+  --bg:#0B0613;
+  --surface:#140A24;
+  --surface2:#1A1030;
+  --border:#2a1f3d;
+  --border2:#3a2a50;
+  --text:#F2F0FF;
+  --text2:#A79BC9;
+  --text3:#6F648F;
+  --accent:#C71B52;
+  --violet:#B487F8;
+  --mint:#52F2C9;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Inter','Segoe UI',sans-serif;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0e1117;color:#cdd6f4;font-family:'Segoe UI',sans-serif;font-size:13px;padding:14px}
-h1{font-size:15px;color:#cba6f7;margin-bottom:14px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}
-label{display:flex;flex-direction:column;gap:3px;color:#a6adc8;font-size:11px}
-input,select{background:#1e2030;border:1px solid #363a4f;color:#cdd6f4;border-radius:5px;padding:5px 8px;font-size:12px;outline:none;min-width:160px}
-input:focus,select:focus{border-color:#7287fd}
-button{background:#7287fd;color:#fff;border:none;border-radius:5px;padding:6px 14px;cursor:pointer;font-size:12px}
-button:hover{background:#89b4fa}
-button.sec{background:#363a4f;color:#cdd6f4}
-button.sec:hover{background:#45475a}
-.status{font-size:11px;color:#6c7086;margin-bottom:8px;min-height:16px}
-.err{color:#f38ba8}
-.ok{color:#a6e3a1}
-.panel-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.card{background:#1e2030;border-radius:8px;padding:10px 14px;min-width:140px}
-.card .lbl{font-size:10px;color:#6c7086;margin-bottom:2px}
-.card .val{font-size:18px;font-weight:600;color:#cdd6f4}
-.card .sub{font-size:10px;color:#7f849c}
-canvas{display:block;width:100%;border-radius:6px;background:#181825;margin-bottom:12px}
+body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);background-attachment:fixed;color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5}
+* { scrollbar-width:thin; scrollbar-color:rgba(90,60,140,.5) transparent }
+*::-webkit-scrollbar{width:5px;height:5px}
+*::-webkit-scrollbar-thumb{background:rgba(180,135,248,.4);border-radius:3px}
+
+/* ── шапка ── */
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:baseline;gap:10px;padding:12px 16px;background:rgba(11,6,19,.97);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);border-top:2px solid var(--accent)}
+.topbar-brand{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.topbar-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.app{max-width:1180px;margin:0 auto;padding:14px 16px 40px;display:flex;flex-direction:column;gap:14px}
+
+/* ── карточки-разделы ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--border)}
+.panel-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--mono)}
+.panel-body{padding:12px 14px}
+.group-header{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;padding-bottom:5px;margin:12px 0 4px;border-bottom:1px solid var(--border)}
+.group-header:first-child{margin-top:0}
+.hint{font-size:11px;color:var(--text3);line-height:1.55;margin-bottom:9px;max-width:70ch}
+
+/* ── формы ── */
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+.row:last-child{margin-bottom:0}
+label{display:flex;flex-direction:column;gap:4px;color:var(--text2);font-size:11px}
+input,select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:6px 9px;font-size:12px;font-family:var(--mono);outline:none;min-width:160px}
+input:focus,select:focus{border-color:var(--accent)}
+button{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px;font-family:var(--sans);font-weight:500;transition:filter .12s}
+button:hover{filter:brightness(1.15)}
+button.sec{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+button.sec:hover{background:var(--border2);color:var(--text);filter:none}
+button.tiny{font-size:10px;padding:3px 9px}
+.status{font-size:11px;color:var(--text3);min-height:16px}
+.err{color:var(--accent)}
+.ok{color:var(--mint)}
+
+/* ── метрики ── */
+.panel-row{display:flex;gap:10px;flex-wrap:wrap}
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 13px;min-width:140px}
+.card .lbl{font-size:10px;color:var(--text3);margin-bottom:2px}
+.card .val{font-size:18px;font-weight:600;color:var(--text)}
+.card .sub{font-size:10px;color:var(--text3)}
+
+/* ── графики ── */
+canvas{display:block;width:100%;border-radius:6px;background:var(--bg)}
 #c-price{height:180px}
 #c-oi{height:130px}
 #c-phase{height:110px}
-table{border-collapse:collapse;width:100%;font-size:11px;margin-bottom:12px}
-th{background:#1e2030;color:#a6adc8;padding:5px 8px;text-align:left;border-bottom:1px solid #363a4f;position:sticky;top:0}
-td{padding:4px 8px;border-bottom:1px solid #181825;color:#cdd6f4}
-tr:hover td{background:#252637}
-td.pos{color:#a6e3a1}
-td.neg{color:#f38ba8}
-td.neu{color:#89b4fa}
-.section{margin-bottom:16px}
-.section-title{font-size:11px;color:#7287fd;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-#interp{background:#1e2030;border-radius:8px;padding:10px 14px;line-height:1.6;font-size:12px;color:#cdd6f4;margin-bottom:12px}
-.cfg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;background:#1e2030;border-radius:8px;padding:10px;margin-bottom:12px}
+.chart-block+.chart-block{margin-top:16px}
+.chart-cap{font-size:9px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0}
+
+/* ── таблица ── */
+table{border-collapse:collapse;width:100%;font-size:11px}
+th{background:var(--surface2);color:var(--text2);padding:5px 8px;text-align:left;border-bottom:1px solid var(--border2);position:sticky;top:0}
+td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--text)}
+tr:hover td{background:var(--surface2)}
+td.pos{color:var(--mint)}
+td.neg{color:var(--accent)}
+td.neu{color:var(--violet)}
+
+#interp{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;line-height:1.6;font-size:12px;color:var(--text)}
+
+/* ── настройки индикатора ── */
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;background:var(--surface2);border-radius:8px;padding:10px}
 .cfg-item{display:flex;flex-direction:column;gap:2px}
-.cfg-item label{font-size:10px;color:#6c7086}
-.cfg-item input{min-width:unset;width:100%;font-size:11px;padding:3px 6px}
-details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;user-select:none}
+.cfg-item label{font-size:10px;color:var(--text3)}
+.cfg-item input{min-width:unset;width:100%;font-size:11px;padding:4px 6px}
+details>summary{cursor:pointer;color:var(--violet);font-size:11px;user-select:none;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:'▸ ';font-size:9px}
+details[open]>summary::before{content:'▾ '}
+details.panel>summary{padding:10px 14px}
+details.panel[open]>summary{border-bottom:1px solid var(--border)}
+details.panel .panel-body{padding-top:12px}
 </style>
 </head>
 <body>
-<h1>🔬 OI Lab — индикатор дисбаланса физ/юр (v3)</h1>
 
-<div class="row">
-  <label>Прокси-URL (invest-bot)
-    <input id="proxy" type="text" placeholder="https://your-worker.workers.dev" value="">
-  </label>
-  <label>Тикер(ы) фьючерса
-    <input id="tickers" type="text" placeholder="SBRF6 или SBRF6,SBRF9" value="">
-  </label>
-  <label style="flex-direction:row;align-items:center;gap:5px;min-width:auto">
-    <input id="auto-family" type="checkbox" checked style="min-width:auto;width:auto">
-    <span style="white-space:nowrap">Авто-контракты одного базиса</span>
-  </label>
-  <label>Режим
-    <select id="mode">
-      <option value="daily">Дневной (OI + дневные свечи)</option>
-      <option value="hourly">Часовой (OI дня + 1h свечи)</option>
-    </select>
-  </label>
-  <button onclick="labLoad()">Загрузить</button>
-  <label>Бэкфилл (дней)
-    <input id="bf-days" type="number" min="1" max="365" value="90" style="min-width:70px">
-  </label>
-  <button class="sec" onclick="labBackfill()">📥 Бэкфилл ОИ</button>
-  <button class="sec" onclick="labFetchCandles('day')">📈 Свечи день</button>
-  <button class="sec" onclick="labFetchCandles('hour')">📈 Свечи 1h</button>
-  <button class="sec" onclick="labDiag()">🩺 Диагностика</button>
-  <button class="sec" onclick="labSpikeMonitor()">🧨 Монитор кануна</button>
-  <button class="sec" onclick="labOrderflowAutopsy()">🧬 Стакан у выбросов</button>
+<div class="topbar">
+  <div class="topbar-brand">🔬 OI Lab</div>
+  <div class="topbar-sub">индикатор дисбаланса физ/юр · v3</div>
+</div>
+
+<div class="app">
+
+<!-- Источник данных: тикер(ы), режим, загрузка в графики/таблицу ниже -->
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">1 · Источник и загрузка</div></div>
+  <div class="panel-body">
+    <div class="row">
+      <label>Прокси-URL (invest-bot)
+        <input id="proxy" type="text" placeholder="https://your-worker.workers.dev" value="">
+      </label>
+      <label>Тикер(ы) фьючерса
+        <input id="tickers" type="text" placeholder="SBRF6 или SBRF6,SBRF9" value="">
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:5px;min-width:auto">
+        <input id="auto-family" type="checkbox" checked style="min-width:auto;width:auto">
+        <span style="white-space:nowrap">Авто-контракты одного базиса</span>
+      </label>
+      <label>Режим
+        <select id="mode">
+          <option value="daily">Дневной (OI + дневные свечи)</option>
+          <option value="hourly">Часовой (OI дня + 1h свечи)</option>
+        </select>
+      </label>
+      <button onclick="labLoad()">▶ Загрузить</button>
+    </div>
+    <div class="group-header">Обновить данные в базе для этих тикеров</div>
+    <div class="hint">Подтягивает историю ОИ и свечи с MOEX/T-Invest перед первой загрузкой тикера — жми, если «Загрузить» выше ругается на отсутствие данных или график обрывается раньше нужного.</div>
+    <div class="row">
+      <label>Бэкфилл ОИ (дней)
+        <input id="bf-days" type="number" min="1" max="365" value="90" style="min-width:70px">
+      </label>
+      <button class="sec" onclick="labBackfill()">📥 Бэкфилл ОИ</button>
+      <button class="sec" onclick="labFetchCandles('day')">📈 Свечи день</button>
+      <button class="sec" onclick="labFetchCandles('hour')">📈 Свечи 1h</button>
+    </div>
+  </div>
 </div>
 
 <div id="status" class="status">—</div>
-<div id="diag-out" style="display:none;background:#1e2030;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:11px"></div>
-<div id="chart-tooltip" style="display:none;position:fixed;background:#1e2030;border:1px solid #363a4f;border-radius:7px;padding:8px 12px;font-size:11px;color:#cdd6f4;pointer-events:none;z-index:999;line-height:1.7"></div>
+
+<!-- Диагностика базы: чисто служебное, отдельно от расчётов -->
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Диагностика базы</div>
+    <button class="sec tiny" onclick="labDiag()">🩺 Проверить</button>
+  </div>
+  <div class="panel-body">
+    <div class="hint" style="margin-bottom:0">Что реально лежит в базе по введённым тикерам: покрытие oi_daily/oi_hourly и последний сырой снэпшот ОИ — для разбора, почему график/бэкфилл выглядит не так, как ожидалось.</div>
+    <div id="diag-out" style="display:none;margin-top:10px"></div>
+  </div>
+</div>
+
+<div id="chart-tooltip" style="display:none;position:fixed;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--text);pointer-events:none;z-index:999;line-height:1.7"></div>
 
 <!-- Конфиг -->
-<details>
+<details class="panel">
   <summary>⚙ Настройки индикатора</summary>
-  <div class="cfg-grid" id="cfg-grid"></div>
+  <div class="panel-body">
+    <div class="cfg-grid" id="cfg-grid"></div>
+  </div>
 </details>
 
 <!-- Метрики последнего бара -->
@@ -94,60 +174,90 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
 <div id="interp" style="display:none"></div>
 
 <!-- Графики -->
-<div class="section">
-  <div class="section-title">Цена + фазы накопления <span style="color:#6c7086;font-size:9px">(синий фон = флэт с имбалансом; пунктир = диапазон фазы; 🔺оранж. = тренд-истощение)</span></div>
-  <canvas id="c-price"></canvas>
-</div>
-<div class="section">
-  <div class="section-title">Сигнал дисбаланса / Потенциал выхода <span style="color:#6c7086;font-size:9px">(красный = физики в лонг → ожидаем вниз; зелёный = в шорт → ожидаем вверх)</span></div>
-  <canvas id="c-oi"></canvas>
-</div>
-<div class="section">
-  <div class="section-title">Стресс-риск / Накопленный выброс <span style="color:#6c7086;font-size:9px">(красные столбики = цена за пределами опорного уровня; оранжевая линия = сила выброса)</span></div>
-  <canvas id="c-phase"></canvas>
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">2 · Графики</div></div>
+  <div class="panel-body">
+    <div class="chart-block">
+      <div class="group-header chart-cap">Цена + фазы накопления · синий фон = флэт с имбалансом; пунктир = диапазон фазы; 🔺оранж. = тренд-истощение</div>
+      <canvas id="c-price"></canvas>
+    </div>
+    <div class="chart-block">
+      <div class="group-header chart-cap">Сигнал дисбаланса / потенциал выхода · красный = физики в лонге (ждём вниз); зелёный = физики в шорте (ждём вверх)</div>
+      <canvas id="c-oi"></canvas>
+    </div>
+    <div class="chart-block">
+      <div class="group-header chart-cap">Стресс-риск / накопленный выброс · красные столбики = цена за пределами опорного уровня; оранжевая линия = сила выброса</div>
+      <canvas id="c-phase"></canvas>
+    </div>
+  </div>
 </div>
 
-<!-- Точность системы -->
-<div class="section">
-  <div class="section-title">
-    Точность системы на истории
-    <button class="sec" style="font-size:10px;padding:2px 8px;margin-left:8px" onclick="labCalibrate()">📊 Рассчитать</button>
+<!-- Точность на истории текущего тикера: все три кнопки пишут в одну ленту calib-out -->
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">3 · Точность на истории (текущий тикер)</div></div>
+  <div class="panel-body">
+    <div class="hint">Три разбора одного и того же загруженного тикера — результат каждого добавляется в общую ленту ниже.</div>
+    <div class="row">
+      <button class="sec" onclick="labCalibrate()">📊 Рассчитать точность</button>
+      <button class="sec" onclick="labSpikeMonitor()">🧨 Монитор кануна</button>
+      <button class="sec" onclick="labOrderflowAutopsy()">🧬 Стакан у выбросов</button>
+    </div>
+    <div id="calib-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Рассчитать точность» после загрузки данных.</div>
   </div>
-  <div id="calib-out" style="color:#6c7086;font-size:11px">Нажми «Рассчитать» после загрузки данных.</div>
 </div>
 
-<!-- Калибровка по пулу разных инструментов -->
-<div class="section">
-  <div class="section-title">
-    Калибровка по пулу инструментов <span style="color:#6c7086;font-size:9px">(каждый тикер — отдельный независимый инструмент, не роллируется вместе с остальными; проценты/z-score считаются по своей истории каждого — пул усиливает статистику, а не смешивает масштабы)</span>
+<!-- Калибровка по пулу инструментов: сначала подготовка данных, потом анализ — обе группы пишут в pool-out -->
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">4 · Калибровка по пулу инструментов</div></div>
+  <div class="panel-body">
+    <div class="hint">Каждый тикер — отдельный независимый инструмент, не роллируется вместе с остальными; проценты/z-score считаются по своей истории каждого — пул усиливает статистику, а не смешивает масштабы.</div>
+    <div class="row">
+      <label>Тикеры пула (через запятую, ≥2, каждый — отдельный базис)
+        <input id="pool-tickers" type="text" placeholder="Si,Br,GOLD,RI" value="">
+      </label>
+      <label>Мин. дней истории
+        <input id="pool-min-days" type="number" min="1" value="30" style="min-width:70px">
+      </label>
+    </div>
+
+    <div class="group-header">Подготовка данных пула</div>
+    <div class="hint">Сначала собрать данные по всем тикерам пула — без этого шага ниже нечего анализировать.</div>
+    <div class="row">
+      <button class="sec" onclick="poolFillAllTickers()">📋 Заполнить всеми из базы</button>
+      <button class="sec" onclick="labBackfillIntradayPool()">📥 Интрадей-бэкфилл пула</button>
+      <button class="sec" onclick="labBackfillHourlyCandles()">🕐 Часовые свечи пула</button>
+      <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
+    </div>
+
+    <div class="group-header">Анализ пула</div>
+    <div class="hint">Результат каждой кнопки добавляется в общую ленту ниже — самый свежий разбор сверху.</div>
+    <div class="row">
+      <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
+      <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
+      <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
+      <button class="sec" onclick="labSignalScreener()">🎯 Скринер сигналов</button>
+      <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
+    </div>
+
+    <div id="pool-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
   </div>
-  <div class="row" style="margin-bottom:8px">
-    <label>Тикеры пула (через запятую, ≥2, каждый — отдельный базис)
-      <input id="pool-tickers" type="text" placeholder="Si,Br,GOLD,RI" value="">
-    </label>
-    <label>Мин. дней истории
-      <input id="pool-min-days" type="number" min="1" value="30" style="min-width:70px">
-    </label>
-    <button class="sec" onclick="poolFillAllTickers()">📋 Заполнить всеми из базы</button>
-    <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
-    <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
-    <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
-    <button class="sec" onclick="labSignalScreener()">🎯 Скринер сигналов</button>
-    <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
-    <button class="sec" onclick="labBackfillIntradayPool()">📥 Интрадей-бэкфилл пула</button>
-    <button class="sec" onclick="labBackfillHourlyCandles()">🕐 Часовые свечи пула</button>
-    <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
-  </div>
-  <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
 </div>
 
 <!-- Таблица данных -->
-<div class="section">
-  <div class="section-title">Данные <button class="sec" style="font-size:10px;padding:2px 8px" onclick="labExportCsv()">CSV</button></div>
-  <div style="max-height:260px;overflow-y:auto">
-    <table id="tbl"><thead><tr></tr></thead><tbody></tbody></table>
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Данные</div>
+    <button class="sec tiny" onclick="labExportCsv()">⬇ CSV</button>
+  </div>
+  <div class="panel-body">
+    <div style="max-height:260px;overflow-y:auto">
+      <table id="tbl"><thead><tr></tr></thead><tbody></tbody></table>
+    </div>
   </div>
 </div>
+
+</div>
+<!-- /.app -->
 
 <script>
 // ========== CONFIG ==========
