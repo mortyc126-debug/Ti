@@ -33,7 +33,7 @@ body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);back
 
 .topbar-brand{font-size:14px;font-weight:600;letter-spacing:-.01em}
 .tabs{margin-left:auto;display:flex;gap:4px}
-.tab-btn{background:rgba(255,255,255,0.03);color:var(--text2);border:1px solid rgba(255,255,255,0.05);border-radius:999px;padding:5px 14px;font-size:12px;cursor:pointer;box-shadow:none}
+.tab-btn{background:rgba(255,255,255,0.03);color:var(--text2);border:1px solid rgba(255,255,255,0.05);border-radius:6px;padding:6px 16px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:none}
 .tab-btn:hover{color:var(--text);filter:none;background:rgba(255,255,255,0.06)}
 .tab-btn.active{background:linear-gradient(180deg,rgba(255,0,128,0.22),rgba(255,0,128,0.12));color:var(--text);border-color:rgba(255,0,128,0.5);box-shadow:0 0 18px rgba(255,0,128,0.18)}
 .dmd{display:inline-block;width:9px;height:9px;transform:rotate(45deg);border-radius:2px;margin:0 7px 0 2px;vertical-align:-1px}
@@ -111,13 +111,13 @@ details.panel .panel-body{padding-top:12px}
 <body>
 
 <div class="topbar">
-  <div class="topbar-brand">🔬 OI Lab</div>
+  <div class="topbar-brand">OI Lab</div>
   <div class="topbar-sub">дисбаланс физ/юр · v3</div>
   <div class="tabs">
-    <button class="tab-btn" data-tab="screener" onclick="showTab('screener')">🎯 Скринер</button>
-    <button class="tab-btn" data-tab="ticker" onclick="showTab('ticker')">📈 Тикер</button>
-    <button class="tab-btn" data-tab="pool" onclick="showTab('pool')">🧮 Пул</button>
-    <button class="tab-btn" data-tab="service" onclick="showTab('service')" title="Прокси, диагностика базы, настройки индикатора">⚙ Сервис</button>
+    <button class="tab-btn" data-tab="screener" onclick="showTab('screener')">Скринер</button>
+    <button class="tab-btn" data-tab="ticker" onclick="showTab('ticker')">Тикер</button>
+    <button class="tab-btn" data-tab="pool" onclick="showTab('pool')">Пул</button>
+    <button class="tab-btn" data-tab="service" onclick="showTab('service')" title="Прокси, диагностика базы, настройки индикатора">Сервис</button>
   </div>
 </div>
 
@@ -130,7 +130,7 @@ details.panel .panel-body{padding-top:12px}
   <div class="panel">
     <div class="panel-head">
       <div class="panel-title">Топ сигналов прямо сейчас</div>
-      <button class="tiny" onclick="labScreenerRefresh()">🔄 Пересчитать</button>
+      <button class="tiny" onclick="labScreenerRefresh()">Пересчитать</button>
     </div>
     <div class="panel-body">
       <div id="screener-out" class="hint" style="margin:0">Нажми «Пересчитать»: соберёт пул (≈минута) и покажет, на каких инструментах активны проверенные сигналы — отсортировано по исторической точности этого тикера, с направлением и типичным ходом.</div>
@@ -166,9 +166,9 @@ details.panel .panel-body{padding-top:12px}
       <label>Бэкфилл ОИ (дней)
         <input id="bf-days" type="number" min="1" max="365" value="90" style="min-width:70px">
       </label>
-      <button class="sec" onclick="labBackfill()">📥 Бэкфилл ОИ</button>
-      <button class="sec" onclick="labFetchCandles('day')">📈 Свечи день</button>
-      <button class="sec" onclick="labFetchCandles('hour')">📈 Свечи 1h</button>
+      <button class="sec" onclick="labBackfill()">Бэкфилл ОИ</button>
+      <button class="sec" onclick="labFetchCandles('day')">Свечи день</button>
+      <button class="sec" onclick="labFetchCandles('hour')">Свечи 1h</button>
     </div>
   </div>
 </div>
@@ -186,7 +186,7 @@ details.panel .panel-body{padding-top:12px}
   <div class="panel-head"><div class="panel-title">2 · Графики</div></div>
   <div class="panel-body">
     <div class="chart-block">
-      <div class="group-header chart-cap">Цена + фазы накопления · синий фон = флэт с имбалансом; пунктир = диапазон фазы; 🔺оранж. = тренд-истощение · <b>зажми и протяни по графику — измерит отрезок</b></div>
+      <div class="group-header chart-cap">Цена + фазы накопления · синий фон = флэт с имбалансом; пунктир = диапазон фазы; оранж. = тренд-истощение · <b>зажми и протяни по графику — измерит отрезок</b></div>
       <div id="range-info" style="display:none;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:11px;line-height:1.6;margin-bottom:6px"></div>
       <canvas id="c-price"></canvas>
     </div>
@@ -208,9 +208,9 @@ details.panel .panel-body{padding-top:12px}
   <div class="panel-body">
     <div class="hint">Три разбора одного и того же загруженного тикера — результат каждого добавляется в общую ленту ниже.</div>
     <div class="row">
-      <button class="sec" onclick="labCalibrate()">📊 Рассчитать точность</button>
-      <button class="sec" onclick="labSpikeMonitor()">🧨 Монитор кануна</button>
-      <button class="sec" onclick="labOrderflowAutopsy()">🧬 Стакан у выбросов</button>
+      <button class="sec" onclick="labCalibrate()">Рассчитать точность</button>
+      <button class="sec" onclick="labSpikeMonitor()">Монитор кануна</button>
+      <button class="sec" onclick="labOrderflowAutopsy()">Стакан у выбросов</button>
     </div>
     <div id="calib-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Рассчитать точность» после загрузки данных.</div>
   </div>
@@ -221,7 +221,7 @@ details.panel .panel-body{padding-top:12px}
 <div class="panel" id="sec-data">
   <div class="panel-head">
     <div class="panel-title">Данные</div>
-    <button class="sec tiny" onclick="labExportCsv()">⬇ CSV</button>
+    <button class="sec tiny" onclick="labExportCsv()">CSV</button>
   </div>
   <div class="panel-body">
     <div style="max-height:260px;overflow-y:auto">
@@ -252,20 +252,20 @@ details.panel .panel-body{padding-top:12px}
     <div class="group-header">Подготовка данных пула</div>
     <div class="hint">Сначала собрать данные по всем тикерам пула — без этого шага ниже нечего анализировать.</div>
     <div class="row">
-      <button class="sec" onclick="poolFillAllTickers()">📋 Заполнить всеми из базы</button>
-      <button class="sec" onclick="labBackfillIntradayPool()">📥 Интрадей-бэкфилл пула</button>
-      <button class="sec" onclick="labBackfillHourlyCandles()">🕐 Часовые свечи пула</button>
-      <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
+      <button class="sec" onclick="poolFillAllTickers()">Заполнить всеми из базы</button>
+      <button class="sec" onclick="labBackfillIntradayPool()">Интрадей-бэкфилл пула</button>
+      <button class="sec" onclick="labBackfillHourlyCandles()">Часовые свечи пула</button>
+      <button class="sec" onclick="labFetchAssetClasses()">Классифицировать тикеры (T-Invest)</button>
     </div>
 
     <div class="group-header">Анализ пула</div>
     <div class="hint">Результат каждой кнопки добавляется в общую ленту ниже — самый свежий разбор сверху.</div>
     <div class="row">
-      <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
-      <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
-      <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
-      <button class="sec" onclick="labSignalScreener()">🎯 Скринер сигналов</button>
-      <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
+      <button class="sec" onclick="labCalibratePool()">Рассчитать по пулу</button>
+      <button class="sec" onclick="labSweepPool()">Перебор порогов trend_exhaust</button>
+      <button class="sec" onclick="labAnalyzeSqueezeFactors()">Признаки шорт-сквиза</button>
+      <button class="sec" onclick="labSignalScreener()">Скринер сигналов</button>
+      <button class="sec" onclick="labSpikeAutopsy()">Перед выбросами</button>
     </div>
 
     <div id="pool-out" style="color:var(--text3);font-size:11px;margin-top:10px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -289,7 +289,7 @@ details.panel .panel-body{padding-top:12px}
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">Диагностика базы</div>
-    <button class="sec tiny" onclick="labDiag()">🩺 Проверить</button>
+    <button class="sec tiny" onclick="labDiag()">Проверить</button>
   </div>
   <div class="panel-body">
     <div class="hint" style="margin-bottom:0">Что реально лежит в базе по введённым тикерам: покрытие oi_daily/oi_hourly и последний сырой снэпшот ОИ — для разбора, почему график/бэкфилл выглядит не так, как ожидалось.</div>
@@ -300,7 +300,7 @@ details.panel .panel-body{padding-top:12px}
 
 <!-- Конфиг -->
 <details class="panel">
-  <summary>⚙ Настройки индикатора</summary>
+  <summary>Настройки индикатора</summary>
   <div class="panel-body">
     <div class="cfg-grid" id="cfg-grid"></div>
   </div>
@@ -502,7 +502,7 @@ async function labDiag() {
     }
 
     // 3. Рендер
-    let html = `<div style="font-size:13px;font-weight:700;color:#B487F8;margin-bottom:10px">🩺 Диагностика базы данных</div>`;
+    let html = `<div style="font-size:13px;font-weight:700;color:#B487F8;margin-bottom:10px">Диагностика базы данных</div>`;
 
     // oi_daily coverage
     html += `<div style="margin-bottom:10px"><span style="color:#A79BC9;font-weight:600">oi_daily — тикеры в базе (${tickerList.length}):</span><br>`;
@@ -530,7 +530,7 @@ async function labDiag() {
     html += `<div style="margin-bottom:10px"><span style="color:#A79BC9;font-weight:600">oi_hourly — интрадей-срезы (до 150 дней; root-код = бэкфилл, полное имя контракта = live-cron):</span>`;
     const hasHourly = hourlyStats.some(s => s.n > 0);
     if (!hasHourly) {
-      html += `<div style="color:#FF6A8B;margin-top:6px">⚠️ Данных нет — cron ещё не запускался или воркер не задеплоен с новым кодом.<br>
+      html += `<div style="color:#FF6A8B;margin-top:6px">⚠Данных нет — cron ещё не запускался или воркер не задеплоен с новым кодом.<br>
         После деплоя и добавления cron <code style="background:#1A1030;padding:1px 4px">*/15 * * * *</code> данные начнут копиться.</div>`;
     } else {
       html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;width:100%">
@@ -832,7 +832,7 @@ async function labLoad() {
     const hasHL = rows.some(r => r.high > 0 && r.low > 0);
     const accumCount = result.filter(r => r.accum_flag).length;
     const autoAdded = tickers.length > enteredCount ? ` | авто-добавлены: ${tickers.slice(enteredCount).join(', ')}` : '';
-    const mismatchNote = modeMismatch ? ' | ⚠️ часовых свечей нет — фактически дневные бары, горизонты калибровки это учтут' : '';
+    const mismatchNote = modeMismatch ? ' | ⚠часовых свечей нет — фактически дневные бары, горизонты калибровки это учтут' : '';
     setStatus(`Загружено ${rows.length} баров (${tickers.join(', ')})${autoAdded} | H/L свечи: ${hasHL ? 'есть' : 'НЕТ — нажми «Свечи день»'} | Накопление: ${accumCount} баров${mismatchNote}`, modeMismatch ? 'err' : 'ok');
   } catch(e) {
     setStatus('Ошибка: ' + e.message, 'err');
@@ -1503,7 +1503,7 @@ function renderMetrics(result) {
         sub:'объём шортов физ+юр против собственной истории' },
       { lbl:'Лонг всего рынка', val: isFinite(last.total_long_pctl) ? 'p'+Math.round(last.total_long_pctl*100) : '—',
         chip: zone(last.total_long_pctl, 'перегруз лонгами', 'лонгов почти нет'),
-        sub:'перегруз лонгами + рост позади = сигнал 🟠↓ коррекции (70% на +3д)' },
+        sub:'перегруз лонгами + рост позади = сигнал ↓ коррекции (70% на +3д)' },
       { lbl:'Открытый интерес', val: Math.round(last.total_oi).toLocaleString('ru-RU'),
         chip: zone(last.liquidity_conf, 'участников максимум', 'участников мало — сигналы ненадёжны'),
         sub:'контрактов в рынке; зона — активность участников' },
@@ -1511,7 +1511,7 @@ function renderMetrics(result) {
     { title: 'Поток — кто набирал позиции последние ~10 баров', cards: [
       { lbl:'Давление сжатия', val: fmt(last.squeeze_pressure,2),
         chip: zone(last.squeeze_pressure_rank, 'шорт набирали как никогда', 'лонг набирали как никогда'),
-        sub:'+1 = набирали шорт, −1 = лонг. Ниже p20 = сигнал 📉 шорт (65% на +3д); выше p80 — «пристегнуться», НЕ лонг' },
+        sub:'+1 = набирали шорт, −1 = лонг. Ниже p20 = сигнал шорт (65% на +3д); выше p80 — «пристегнуться», НЕ лонг' },
       { lbl:'Аномальность потока', val: isFinite(last.squeeze_pressure_z) ? fmt(last.squeeze_pressure_z,1)+'σ' : '—',
         chip: '',
         sub:'на сколько сигм сегодняшний набор отличается от обычного; за ±2σ — редкое событие' },
@@ -1528,10 +1528,10 @@ function renderMetrics(result) {
         sub:'флэт с перекосом позиций — состояние ожидания, НЕ прогноз (×1.0 к базе на 667 эпизодах)' },
       { lbl:'Выброс из диапазона', val: last.breakout_dir===1 ? '↑ +'+fmt(last.stress_dist*100,1)+'%' : last.breakout_dir===-1 ? '↓ −'+fmt(last.stress_dist*100,1)+'%' : 'внутри',
         chip: '',
-        sub:'пробой флэта; ↑ по позиции физлиц = сигнал 🔴 шорт-истощение (67% на +3д, N=443)' },
+        sub:'пробой флэта; ↑ по позиции физлиц = сигнал шорт-истощение (67% на +3д, N=443)' },
       { lbl:'Тренд-истощение', val: last.trend_exhaust===1 ? '↑ есть (не торгуем)' : last.trend_exhaust===-1 ? '↓ коррекция' : 'нет',
         chip: '',
-        sub:'↓ = подтверждённый шорт 🟠 (70% на +3д); ↑ на чистых данных не подтверждён' },
+        sub:'↓ = подтверждённый шорт (70% на +3д); ↑ на чистых данных не подтверждён' },
     ]},
   ];
   const row = document.getElementById('metrics-row');
@@ -1566,7 +1566,7 @@ function renderInterp(result) {
 
   const sigLine = (emoji, title, body, color) =>
     `<div style="padding:7px 10px;margin:4px 0;background:${color}22;border-left:3px solid ${color};border-radius:4px">
-       <b style="color:${color}">${emoji} ${title}</b><br><span style="font-size:11px">${body}</span></div>`;
+       <b style="color:${color}">${emoji ? emoji + ' ' : ''}${title}</b><br><span style="font-size:11px">${body}</span></div>`;
 
   let txt = '';
   let anySignal = false;
@@ -1575,41 +1575,41 @@ function renderInterp(result) {
   if (last.trend_exhaust === -1) {
     anySignal = true;
     const s = _PLAYBOOK_STATS.longCorr;
-    txt += sigLine('🟠', 'Тренд-истощение: рынок в лонге у экстремума после роста → коррекция вниз',
+    txt += sigLine('', 'Тренд-истощение: рынок в лонге у экстремума после роста → коррекция вниз',
       `Сильнейший выживший сигнал: ${s.acc3d}% точности на +3д против базы ${s.base3d}% (N=${s.n}, чистые данные).`, '#FF6A8B');
   }
   if (!last.accum_flag && last.breakout_dir === 1 && last.phase_aligned === 1) {
     anySignal = true;
     const s = _PLAYBOOK_STATS.exhaustion;
-    txt += sigLine('🔴', 'Выброс ВВЕРХ по позиции физлиц → истощение, шорт',
+    txt += sigLine('', 'Выброс ВВЕРХ по позиции физлиц → истощение, шорт',
       `${s.acc3d}% на +3д против базы ${s.base3d}% на N=${s.n} — самый массовый из подтверждённых. Профиль — сползание: цель 1-2%, короткий стоп.`, '#FF6A8B');
   }
   if (isFinite(last.squeeze_pressure_rank) && last.squeeze_pressure_rank <= 0.2) {
     anySignal = true;
     const s = _PLAYBOOK_STATS.longAggr;
-    txt += sigLine('📉', 'Лонг набирали агрессивно (<p20 давления) → шорт',
+    txt += sigLine('', 'Лонг набирали агрессивно (<p20 давления) → шорт',
       `${s.acc3d}% на +3д; единственный значимый событийный сигнал чистых данных: выброс вниз ловится в ×${s.lift} чаще базы, EV +${s.ev}%.`, '#FF6A8B');
   }
 
   // Похороненные чисткой — предупреждаем явно, чтобы не торговались по памяти
   if (last.spike_setup && last.trend_exhaust === 1) {
-    txt += sigLine('⚪', 'Сетап выброса + тренд-истощение активны — НО сигнал не подтверждён',
+    txt += sigLine('', 'Сетап выброса + тренд-истощение активны — НО сигнал не подтверждён',
       `После исключения фейковых роллов контрактов из данных: EV −3.3%, промах −5.4% (18 эпизодов). Прежние «попадания» в основном были артефактами склейки. НЕ входить в лонг по этому сочетанию.`, '#6F648F');
   } else if (last.trend_exhaust === 1) {
-    txt += sigLine('⚪', 'Тренд-истощение (сквиз ↑) активен — сигнал не подтверждён на чистых данных',
+    txt += sigLine('', 'Тренд-истощение (сквиз ↑) активен — сигнал не подтверждён на чистых данных',
       `Точность 35-45% (хуже монеты против дрейфа), EV −1.1%. В лонг не входить.`, '#6F648F');
   }
   if (isFinite(last.squeeze_pressure_rank) && last.squeeze_pressure_rank >= 0.8) {
-    txt += sigLine('⚪', 'Шорт набирали агрессивно (>p80)',
+    txt += sigLine('', 'Шорт набирали агрессивно (>p80)',
       `Направление не предсказывает (35-46%), но волатильность — да: выбросы вверх в ×1.8 чаще базы при EV −1.1%. Как максимум — сигнал «пристегнуться», не сигнал входа.`, '#6F648F');
   }
   if (last.accum_flag) {
-    txt += sigLine('🔵', 'Фаза накопления (флэт + имбаланс)',
+    txt += sigLine('', 'Фаза накопления (флэт + имбаланс)',
       `Состояние ожидания (×1.0 к базе на 667 эпизодах), а не прогноз.`, '#7CC7FF');
   }
 
   if (!anySignal) {
-    txt = sigLine('⚪', 'Активных подтверждённых сигналов нет',
+    txt = sigLine('', 'Активных подтверждённых сигналов нет',
       `Подтверждённые чисткой данных сигналы (все — шортовые: лонг-коррекция, истощение, лонг-агрессия) сейчас не активны. Карточки выше — диагностика состояния, а не прогноз.`, '#6F648F') + txt;
   }
 
@@ -1770,9 +1770,9 @@ function drawPrice(result) {
     const tip = document.getElementById('chart-tooltip');
     if (!tip) return;
     const flags = [
-      row.accum_flag ? '🔵 фаза' : '',
-      row.trend_exhaust === 1 ? '🟠↑ истощение (не торгуем)' : row.trend_exhaust === -1 ? '🟠↓ коррекция' : '',
-      row.spike_setup ? '🧨 сетап' : '',
+      row.accum_flag ? 'фаза' : '',
+      row.trend_exhaust === 1 ? '↑ истощение (не торгуем)' : row.trend_exhaust === -1 ? '↓ коррекция' : '',
+      row.spike_setup ? 'сетап' : '',
       row.breakout_dir === 1 ? '↑ пробой' : row.breakout_dir === -1 ? '↓ пробой' : '',
       row.ref_switch ? '⚠ ролл контракта' : '',
     ].filter(Boolean).join(' · ');
@@ -1834,7 +1834,7 @@ function _rangeSummary(valid, a, b) {
     · физ.шорт: <b style="color:${col(-sumDS)}">${fmtC(sumDS)}</b> контр.${pctOi(sumDS)}
     · перекос физ: ${(A.net_phys_pct * 100).toFixed(1)}% → ${(B.net_phys_pct * 100).toFixed(1)}%
     · ОИ: <b style="color:${col(dOi)}">${isFinite(dOi) ? sgn(dOi) + '%' : '—'}</b>
-    ${phaseDays || teDays || rolls ? `<br><span style="color:var(--text3)">в отрезке: ${[phaseDays ? '🔵 фаза ' + phaseDays + ' дн.' : '', teDays ? '🟠 истощение ' + teDays + ' дн.' : '', rolls ? '⚠ роллов ' + rolls + ' (цена через ролл — с искажением)' : ''].filter(Boolean).join(' · ')}</span>` : ''}`;
+    ${phaseDays || teDays || rolls ? `<br><span style="color:var(--text3)">в отрезке: ${[phaseDays ? 'фаза ' + phaseDays + ' дн.' : '', teDays ? 'истощение ' + teDays + ' дн.' : '', rolls ? '⚠ роллов ' + rolls + ' (цена через ролл — с искажением)' : ''].filter(Boolean).join(' · ')}</span>` : ''}`;
 }
 
 // Подписи дат по низу графика — без них полосы не привязать ко времени
@@ -2148,23 +2148,23 @@ function _calcCategoricalStats(defs, result, fwd, HORIZONS) {
 
 // Определения фазовых/трендовых бинов — общие для одиночной и пуловой калибровки.
 const PHASE_DEFS = [
-  { label: '🔵 В фазе накопления (флэт+имбаланс, выброса ещё нет)', dir: 0,
+  { label: 'В фазе накопления (флэт+имбаланс, выброса ещё нет)', dir: 0,
     match: r => r.accum_flag },
-  { label: '🟢 Выброс ВВЕРХ, против шортов физлиц → сквиз, ждём рост ↑', dir: 1,
+  { label: 'Выброс ВВЕРХ, против шортов физлиц → сквиз, ждём рост ↑', dir: 1,
     match: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === -1 },
   // Раньше dir=+1 («подтверждение тренда») — но пул (N=124-141, edge −14…−28пп,
   // ухудшается с горизонтом) показал обратное: пробой вверх, совпадающий с уже
   // накопленной длинной позицией физлиц, — признак истощения (blow-off top),
   // а не продолжения. Та же природа ошибки, что была у squeeze_pressure.
-  { label: '🔴 Выброс ВВЕРХ, по позиции физлиц (лонг) → истощение, ждём пад. ↓', dir: -1,
+  { label: 'Выброс ВВЕРХ, по позиции физлиц (лонг) → истощение, ждём пад. ↓', dir: -1,
     match: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === 1 },
-  { label: '🔴 Выброс ВНИЗ, против лонгов физлиц → сквиз, ждём пад. ↓', dir: -1,
+  { label: 'Выброс ВНИЗ, против лонгов физлиц → сквиз, ждём пад. ↓', dir: -1,
     match: r => !r.accum_flag && r.breakout_dir === -1 && r.phase_aligned === -1 },
-  { label: '🔴 Выброс ВНИЗ, по позиции физлиц (шорт) → подтверждение, пад. ↓', dir: -1,
+  { label: 'Выброс ВНИЗ, по позиции физлиц (шорт) → подтверждение, пад. ↓', dir: -1,
     match: r => !r.accum_flag && r.breakout_dir === -1 && r.phase_aligned === 1 },
-  { label: '🟠 Тренд-истощение: рынок в целом в шорте у экстремума после падения → сквиз ↑', dir: 1,
+  { label: 'Тренд-истощение: рынок в целом в шорте у экстремума после падения → сквиз ↑', dir: 1,
     match: r => r.trend_exhaust === 1 },
-  { label: '🟠 Тренд-истощение: рынок в целом в лонге у экстремума после роста → коррекция ↓', dir: -1,
+  { label: 'Тренд-истощение: рынок в целом в лонге у экстремума после роста → коррекция ↓', dir: -1,
     match: r => r.trend_exhaust === -1 },
 ];
 
@@ -2181,11 +2181,11 @@ const PHASE_DEFS = [
 // пробой из флэта интересен в обе стороны).
 const EVENT_DEFS = [
   ...PHASE_DEFS,
-  { label: '📈 Давление: шорт набирали агрессивно (>p80)', dir: 1,
+  { label: 'Давление: шорт набирали агрессивно (>p80)', dir: 1,
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank >= 0.8 },
-  { label: '📉 Давление: лонг набирали агрессивно (&lt;p20)', dir: -1,
+  { label: 'Давление: лонг набирали агрессивно (&lt;p20)', dir: -1,
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank <= 0.2 },
-  { label: '🧨 Сетап выброса: глубокая просадка + поток развернулся в лонг', dir: 1,
+  { label: 'Сетап выброса: глубокая просадка + поток развернулся в лонг', dir: 1,
     match: r => r.spike_setup },
   // Пересечение двух лонговых сквиз-сигналов: на пуле каждый по отдельности
   // дал lift ~×1.4 с хорошей асимметрией (MFE +3.3/-1.2 и +2.4/-1.4), но
@@ -2193,7 +2193,7 @@ const EVENT_DEFS = [
   // у экстремума + резкий ход vs просадка + разворот потока) — если совпадение
   // обоих усиливает edge, это видно здесь; если N пересечения мизерный,
   // строка сама потускнеет.
-  { label: '🧨🟠 Оба сквиз-сигнала разом: сетап выброса И тренд-истощение', dir: 1,
+  { label: 'Оба сквиз-сигнала разом: сетап выброса И тренд-истощение', dir: 1,
     match: r => r.spike_setup && r.trend_exhaust === 1 },
 ];
 
@@ -2363,7 +2363,7 @@ function _renderEventTable(ev, title) {
     return `${arrow(kk==='up'?1:kk==='down'?-1:0)} ${s.p.toFixed(0)}%`;
   }).filter(Boolean).join(' · ');
   t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50">
-    <td style="padding:4px 8px;color:#B487F8;font-weight:600">📐 База (вход в любой день)</td>
+    <td style="padding:4px 8px;color:#B487F8;font-weight:600">База (вход в любой день)</td>
     <td style="text-align:center;color:#6F648F">${b.any ? b.any.evaluated : '—'}</td>
     <td style="text-align:center;color:#6F648F">—</td>
     <td style="text-align:center;color:#F2F0FF">${bTxt}</td>
@@ -2569,8 +2569,8 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       const edge = s.accuracy - baseAcc;
       if (!best || edge > best.edge) best = { h, edge, s, baseAcc };
     }
-    if (!best) return `<div style="margin-top:6px;padding:6px 8px;background:#1A1030;border-radius:5px;font-size:11px;color:#6F648F">⚪ Мало данных для вердикта (нужно N≥30 на горизонте)</div>`;
-    if (best.edge < 5) return `<div style="margin-top:6px;padding:6px 8px;background:#1A1030;border-radius:5px;font-size:11px;color:#6F648F">⚪ Edge над базой нет (${best.edge>0?'+':''}${best.edge.toFixed(0)} пп на ${hLbl(best.h)}) — торгового сигнала из этого бина сейчас НЕТ, проценты выше повторяют фон рынка</div>`;
+    if (!best) return `<div style="margin-top:6px;padding:6px 8px;background:#1A1030;border-radius:5px;font-size:11px;color:#6F648F">Мало данных для вердикта (нужно N≥30 на горизонте)</div>`;
+    if (best.edge < 5) return `<div style="margin-top:6px;padding:6px 8px;background:#1A1030;border-radius:5px;font-size:11px;color:#6F648F">Edge над базой нет (${best.edge>0?'+':''}${best.edge.toFixed(0)} пп на ${hLbl(best.h)}) — торгового сигнала из этого бина сейчас НЕТ, проценты выше повторяют фон рынка</div>`;
     return `<div style="margin-top:6px;padding:6px 8px;background:${dir>0?'rgba(82,242,201,0.08)':'rgba(199,27,82,0.12)'};border-radius:5px;font-size:11px;color:${dir>0?'#52F2C9':'#FF6A8B'};font-weight:600">${dir>0?'<span class="dmd up"></span>ЖДЁМ РОСТ':'<span class="dmd dn"></span>ЖДЁМ ПАДЕНИЕ'} к ${hLbl(best.h)}: точность ${best.s.accuracy.toFixed(0)}% против базы ${best.baseAcc.toFixed(0)}% (edge +${best.edge.toFixed(0)} пп), медианный ход ${fmtPct(best.s.median)}, N=${best.s.n}</div>`;
   }
 
@@ -2594,15 +2594,15 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const firstS = bin.stats[firstH];
     const thinData = !firstS || firstS.n < 5;
     const color = thinData ? '#6F648F' : (bin.dir > 0 ? '#52F2C9' : bin.dir < 0 ? '#FF6A8B' : '#F2F0FF');
-    const thinNote = thinData ? `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">⚠️ Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
+    const thinNote = thinData ? `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">⚠Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
     let speedNote = '';
     if (bin.dir !== 0 && isFinite(bin.speedShare)) {
-      if (bin.speedShare > 1.3) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">🔄 Ход обычно уже ПЕРЕЛЁТЕЛ итоговый уровень к ${hLbl(firstH)} и потом частично откатывает — не путать с «быстрым» движением.</div>`;
-      else if (bin.speedShare >= 0.7) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">⚡ Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
-      else if (bin.speedShare <= 0.35) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">〰️ Ход обычно только начинается к ${hLbl(firstH)} и продолжает нарастать дальше — движение растянутое.</div>`;
+      if (bin.speedShare > 1.3) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">Ход обычно уже ПЕРЕЛЁТЕЛ итоговый уровень к ${hLbl(firstH)} и потом частично откатывает — не путать с «быстрым» движением.</div>`;
+      else if (bin.speedShare >= 0.7) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
+      else if (bin.speedShare <= 0.35) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">Ход обычно только начинается к ${hLbl(firstH)} и продолжает нарастать дальше — движение растянутое.</div>`;
     }
     return `<div style="background:#140A24;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid ${color}">
-      <div style="font-size:11px;color:#6F648F;margin-bottom:3px">🎯 2D-позиция: уровень × динамика</div>
+      <div style="font-size:11px;color:#6F648F;margin-bottom:3px">2D-позиция: уровень × динамика</div>
       <div style="font-size:14px;font-weight:700;color:${color}">${bin.levelLbl} · ${bin.dynLbl}</div>
       ${thinNote}
       ${speedNote}
@@ -2620,8 +2620,8 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const spPctl = isFinite(last.phys_short_pctl) ? (last.phys_short_pctl*100).toFixed(0)+'%' : '—';
     html += `<div style="font-size:12px;color:#B487F8;margin-bottom:8px;font-weight:600">Текущий прогноз · давление сжатия: ${spVal} · перекос: ${nppVal} · шорт-pctl: ${spPctl}</div>`;
     html += _forecastBlock2D(curBin2D);
-    html += _forecastBlock(curBinSp, 'Давление сжатия', '📈 Динамика набора: кто активнее набирал за последние 10 баров');
-    html += _forecastBlock(curBinNpp, 'Снэпшот позиции', '📊 Статика: соотношение лонг/шорт от общего ОИ');
+    html += _forecastBlock(curBinSp, 'Давление сжатия', 'Динамика набора: кто активнее набирал за последние 10 баров');
+    html += _forecastBlock(curBinNpp, 'Снэпшот позиции', 'Статика: соотношение лонг/шорт от общего ОИ');
   }
 
   // Вспомогательная функция рендера таблицы точности
@@ -2636,7 +2636,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       ${H.map(()=>'<th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания бара в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Сколько баров истории попало в бин">N</th>').join('')}
     </tr></thead><tbody>`;
     // База уже посчитана на уровне renderCalibration — общая для таблиц и вердиктов
-    t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50"><td style="padding:4px 8px;color:#B487F8;font-weight:600;white-space:nowrap">📐 Базовый уровень</td>`;
+    t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50"><td style="padding:4px 8px;color:#B487F8;font-weight:600;white-space:nowrap">Базовый уровень</td>`;
     for (const h of H) {
       const b = baseStats[h];
       if (!b) { t += '<td colspan="3" style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
@@ -2676,7 +2676,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const levelLabels = [...new Set(bins2D.map(b => b.levelLbl))];
     const dynLabels   = [...new Set(bins2D.map(b => b.dynLbl))];
     const firstH = H[0];
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; ⚡/〰️ в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; /в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Уровень \\ Динамика</th>
@@ -2693,14 +2693,14 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
         const dcolor = cell.dir > 0 ? '#52F2C9' : cell.dir < 0 ? '#FF6A8B' : '#F2F0FF';
         const isCurrent = curBin2D && curBin2D.levelLbl === ll && curBin2D.dynLbl === dl;
         // Профиль скорости — показываем один раз в первой колонке горизонта.
-        // ⚡ — ход уже почти весь случился к первому горизонту (быстрый сквиз);
-        // 〰️ — ход в основном ещё впереди на момент первого горизонта (растянутый);
-        // 🔄 — ход уже ПЕРЕЛЕТЕЛ итоговый уровень и потом частично откатил (>130%).
+        // — ход уже почти весь случился к первому горизонту (быстрый сквиз);
+        // — ход в основном ещё впереди на момент первого горизонта (растянутый);
+        // — ход уже ПЕРЕЛЕТЕЛ итоговый уровень и потом частично откатил (>130%).
         let speedBadge = '';
         if (cell.dir !== 0 && isFinite(cell.speedShare)) {
-          if (cell.speedShare > 1.3) speedBadge = `<span title="Ход перелетел итоговый уровень к первому горизонту и потом частично откатил">🔄${(cell.speedShare*100).toFixed(0)}%</span>`;
-          else if (cell.speedShare >= 0.7) speedBadge = `<span title="Большая часть хода уже реализована к первому горизонту">⚡${(cell.speedShare*100).toFixed(0)}%</span>`;
-          else if (cell.speedShare <= 0.35) speedBadge = `<span title="Ход в основном ещё впереди на момент первого горизонта">〰️${(cell.speedShare*100).toFixed(0)}%</span>`;
+          if (cell.speedShare > 1.3) speedBadge = `<span title="Ход перелетел итоговый уровень к первому горизонту и потом частично откатил">откат ${(cell.speedShare*100).toFixed(0)}%</span>`;
+          else if (cell.speedShare >= 0.7) speedBadge = `<span title="Большая часть хода уже реализована к первому горизонту">быстро ${(cell.speedShare*100).toFixed(0)}%</span>`;
+          else if (cell.speedShare <= 0.35) speedBadge = `<span title="Ход в основном ещё впереди на момент первого горизонта">долго ${(cell.speedShare*100).toFixed(0)}%</span>`;
         }
         for (const h of H) {
           const s = cell.stats[h];
@@ -2722,10 +2722,10 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     html += t + '</tbody></table></div></details>';
   })();
 
-  html += _renderEventTable(eventTable, '🎯 Событийная оценка — ловля выбросов (главная метрика для спайковых инструментов)');
-  html += _binTable(binStatsPhase, '🔵📤 Точность по фазам (накопление/выброс + тренд-истощение)');
-  html += _binTable(binStatsSp, '📈 Точность по динамике набора (давление сжатия)');
-  html += _binTable(binStatsNpp, '📊 Точность по снэпшоту позиции (перекос)');
+  html += _renderEventTable(eventTable, 'Событийная оценка — ловля выбросов (главная метрика для спайковых инструментов)');
+  html += _binTable(binStatsPhase, 'Точность по фазам (накопление/выброс + тренд-истощение)');
+  html += _binTable(binStatsSp, 'Точность по динамике набора (давление сжатия)');
+  html += _binTable(binStatsNpp, 'Точность по снэпшоту позиции (перекос)');
 
   // Бар-чарт по давлению сжатия
   html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#1A1030;margin:8px 0 4px"></canvas>`;
@@ -3054,7 +3054,7 @@ async function labBackfillIntradayPool() {
   const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
   if (!tickers.length) { setStatus('Заполни тикеры пула — кнопка «Заполнить всеми из базы»', 'err'); return; }
   const days = parseInt(document.getElementById('bf-days').value) || 90;
-  if (!_collectorStart('📥 интрадей-бэкфилл')) return;
+  if (!_collectorStart('интрадей-бэкфилл')) return;
   let totalIntraday = 0, daysDone = 0, daysSkipped = 0, maxSymsSeen = 0;
   const problems = [];
   try {
@@ -3129,7 +3129,7 @@ async function labBackfillHourlyCandles() {
   const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
   if (!tickers.length) { setStatus('Заполни тикеры пула — «Заполнить всеми из базы»', 'err'); return; }
   const days = parseInt(document.getElementById('bf-days').value) || 100;
-  if (!_collectorStart('🕐 часовые свечи')) return;
+  if (!_collectorStart('часовые свечи')) return;
   let totalSaved = 0;
   const problems = [];
   try {
@@ -3233,7 +3233,7 @@ async function labOrderflowAutopsy() {
   const spikeIdx = [];
   for (let i = 1; i < result.length; i++) if (isFinite(dayRet[i]) && dayRet[i] >= thr.up) spikeIdx.push(i);
   if (!spikeIdx.length) { setStatus(`Выбросов вверх (≥ +${thr.up.toFixed(1)}%/д) в истории не нашлось`, 'err'); return; }
-  if (!_collectorStart('🧬 стакан у выбросов')) return;
+  if (!_collectorStart('стакан у выбросов')) return;
   const spikes = spikeIdx.slice(-8); // не больше 8 — по два датасета на день
   const spikeSet = new Set(spikeIdx);
   const controls = [];
@@ -3339,7 +3339,7 @@ async function labOrderflowAutopsy() {
     <td style="text-align:center">${isFinite(s.f.askEveMorn) ? s.f.askEveMorn.toFixed(2) : '—'}</td>
   </tr>`).join('');
 
-  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">🧬 Стакан и агрессоры в кануны выбросов — ${sym} (${spikes.length} канунов против ${controls.length} контрольных)</summary>
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">Стакан и агрессоры в кануны выбросов — ${sym} (${spikes.length} канунов против ${controls.length} контрольных)</summary>
   <div style="font-size:10px;color:#6F648F;margin-bottom:6px">Источник: AlgoPack fo/tradestats + fo/obstats, 5-минутки front-контракта. Порог выброса: ход за день ≥ +${thr.up.toFixed(1)}%.</div>
   ${apDiag.length ? `<div style="font-size:10px;color:#FF8A4C;background:#1A1030;border-radius:5px;padding:6px 8px;margin-bottom:6px">⚠ Диагностика пустых ответов:<br>${apDiag.map(d=>'· '+d).join('<br>')}</div>` : ''}
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:8px">
@@ -3418,15 +3418,15 @@ async function labSpikeMonitor() {
     </tr>`;
   }
   const bonus = [];
-  if (last.trend_exhaust === 1) bonus.push('🟠 тренд-истощение (сквиз ↑) активен');
-  if (last.spike_setup) bonus.push('🧨 сетап выброса активен');
+  if (last.trend_exhaust === 1) bonus.push('тренд-истощение (сквиз ↑) активен');
+  if (last.spike_setup) bonus.push('сетап выброса активен');
 
-  const verdict = passed >= 4 ? ['#52F2C9', `🧨 ПОХОЖЕ НА КАНУН: ${passed}/${total} осей профиля совпали${bonus.length ? ' + ' + bonus.join(' + ') : ''}. Это не гарантия и не дата — но исторически именно так выглядел день перед выбросом.`]
+  const verdict = passed >= 4 ? ['#52F2C9', `ПОХОЖЕ НА КАНУН: ${passed}/${total} осей профиля совпали${bonus.length ? ' + ' + bonus.join(' + ') : ''}. Это не гарантия и не дата — но исторически именно так выглядел день перед выбросом.`]
     : passed >= 3 ? ['#FF8A4C', `Частичное совпадение: ${passed}/${total} осей.${bonus.length ? ' ' + bonus.join(', ') + '.' : ''} Следить, но профиль кануна неполный.`]
     : ['#6F648F', `Не похоже на канун: ${passed}/${total} осей. ${bonus.length ? bonus.join(', ') + ', но ' : ''}профиль состояния далёк от исторических канунов выброса.`];
 
   const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
-  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">🧨 Монитор кануна — ${last.date}</summary>
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">Монитор кануна — ${last.date}</summary>
   <div style="padding:8px 10px;margin-bottom:6px;background:${verdict[0]}22;border-left:3px solid ${verdict[0]};border-radius:4px;font-size:12px;color:${verdict[0]}">${verdict[1]}</div>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
   <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Ось профиля</th>${th('сейчас')}${th('медиана канунов')}${th('медиана фона')}${th('совпадение')}</tr></thead>
@@ -3445,17 +3445,17 @@ async function labSpikeMonitor() {
 // исторической точности ЭТОГО тикера (при N>=8), иначе — по точности пула.
 const _SCREEN_SIGNALS = [
   // Подтверждённые на чистых данных (роллы исключены) — все шортовые
-  { id: 'trendDown', emoji: '🟠↓', name: 'Лонг-коррекция (шорт)', dir: -1,
+  { id: 'trendDown', emoji: '↓', name: 'Лонг-коррекция (шорт)', dir: -1,
     match: r => r.trend_exhaust === -1,
     active: r => r.trend_exhaust === -1 },
-  { id: 'exh', emoji: '🔴', name: 'Истощение после выброса вверх (шорт)', dir: -1,
+  { id: 'exh', emoji: '', name: 'Истощение после выброса вверх (шорт)', dir: -1,
     match: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === 1,
     active: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === 1 },
-  { id: 'longAggr', emoji: '📉', name: 'Лонг набирали агрессивно (шорт)', dir: -1,
+  { id: 'longAggr', emoji: '', name: 'Лонг набирали агрессивно (шорт)', dir: -1,
     match: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank <= 0.2,
     active: r => isFinite(r.squeeze_pressure_rank) && r.squeeze_pressure_rank <= 0.2 },
   // Не подтверждён после чистки (EV −3.3) — оставлен для наблюдения, не для входа
-  { id: 'both', emoji: '⚪', name: 'Сетап+истощение (НЕ подтверждён — наблюдение)', dir: 1,
+  { id: 'both', emoji: '', name: 'Сетап+истощение (НЕ подтверждён — наблюдение)', dir: 1,
     match: r => r.spike_setup && r.trend_exhaust === 1,
     active: r => r.spike_setup && r.trend_exhaust === 1 },
 ];
@@ -3472,7 +3472,7 @@ function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
   const word = _assetWord(asset);
   const pAcc = poolAcc3(h.def.id);
   return `<tr style="background:${hl ? (h.def.dir > 0 ? 'rgba(82,242,201,0.08)' : 'rgba(199,27,82,0.12)') : '#140A24'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
-    <td style="padding:4px 8px;color:#F2F0FF">${h.def.emoji} ${h.def.name}</td>
+    <td style="padding:4px 8px;color:#F2F0FF">${h.def.emoji ? h.def.emoji + ' ' : ''}${h.def.name}</td>
     <td style="text-align:center;cursor:pointer" onclick="openTicker('${h.ticker}')" title="${_rootTitle(h.ticker)} — клик: открыть во вкладке «Тикер» с графиками и монитором"
         onmouseover="this.style.background='rgba(180,135,248,0.12)'" onmouseout="this.style.background=''">
       <span style="color:#B487F8;font-weight:700;font-size:12px;border-bottom:1px dashed #B487F866">${asset} ↗</span>
@@ -3496,7 +3496,7 @@ function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
 
 async function labSignalScreener(prepend) {
   if (!_lastPoolInstruments || !_lastPoolInstruments.length) {
-    setStatus('Скринер работает по рассчитанному пулу — сначала «🧮 Рассчитать по пулу»', 'err');
+    setStatus('Скринер работает по рассчитанному пулу — сначала «Рассчитать по пулу»', 'err');
     return;
   }
   await _getRootNames(document.getElementById('proxy').value.trim().replace(/\/$/, ''));
@@ -3570,7 +3570,7 @@ async function labSignalScreener(prepend) {
   const thin = thinAll.filter(h => _assetKind(_rootAsset(h.ticker) || h.ticker) !== 'акция');
 
   const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
-  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">🎯 Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
+  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
   if (!hits.length) {
     t += `<div style="font-size:11px;color:#6F648F;margin-bottom:10px">Ни на одном инструменте пула нет активного проверенного сигнала по последнему бару. Это нормальное состояние — сигналы редкие.</div>`;
   } else {
@@ -3579,7 +3579,7 @@ async function labSignalScreener(prepend) {
       ${th('Инструмент')}${th('Направление')}${th('Физлица сейчас<br>лонг / шорт (контракты)')}${th('Точность · ход цены<br>за 1 день')}${th('Точность · ход цены<br>за 3 дня')}${th('Пул, 3д')}${th('Последние данные')}
     </tr></thead>`;
     t += strong.length
-      ? `<div style="font-size:11px;color:#52F2C9;margin-bottom:6px">✅ Торгуемое сегодня (сигнал активен И исторически работает на этом тикере: точность ≥60% при N≥8): <b>${strong.map(h=>_rootAsset(h.ticker)||h.ticker).join(', ')}</b></div>`
+      ? `<div style="font-size:11px;color:#52F2C9;margin-bottom:6px">Торгуемое сегодня (сигнал активен И исторически работает на этом тикере: точность ≥60% при N≥8): <b>${strong.map(h=>_rootAsset(h.ticker)||h.ticker).join(', ')}</b></div>`
       : `<div style="font-size:11px;color:#6F648F;margin-bottom:6px">Сегодня нет ни одного сигнала, который был бы активен И исторически работал на своём тикере (точность ≥60% при N≥8). Остальное ниже — кандидаты и шум, торговых решений из них не делать.</div>`;
     t += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
     ${header}<tbody>`;
@@ -3591,7 +3591,7 @@ async function labSignalScreener(prepend) {
       <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${thinStocks.map(h => _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell)).join('')}</tbody></table></div>`;
     }
     if (weak.length) {
-      t += `<details><summary style="cursor:pointer;font-size:11px;color:#FF6A8B;margin:4px 0">⛔ Сигнал активен, но на этих тикерах исторически НЕ работает — не торговать (${weak.length})</summary>
+      t += `<details><summary style="cursor:pointer;font-size:11px;color:#FF6A8B;margin:4px 0">Сигнал активен, но на этих тикерах исторически НЕ работает — не торговать (${weak.length})</summary>
       <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${rowsOf(weak)}</tbody></table></div></details>`;
     }
     if (thin.length) {
@@ -3835,10 +3835,10 @@ function renderPoolSweep(axes, baseCfg) {
   }
 
   let html = `<div style="font-size:11px;color:#6F648F;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах, шаг ${SWEEP_STEP}, останов при N&lt;${SWEEP_MIN_N} — пороги шорт-сквиза и лонг-коррекции раздельные, каждая ось двигает только свой бин.</div>`;
-  html += _axisTable(shortPctlPoints, '🟠 Шорт→сквиз: перцентиль позиции (trend_exhaust_pctl_short)', 'pctl позиции', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
-  html += _axisTable(shortMovePoints, '🟠 Шорт→сквиз: перцентиль хода цены (trend_exhaust_move_pctl_short)', 'pctl хода', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
-  html += _axisTable(longPctlPoints, '🔵 Лонг→коррекция: перцентиль позиции (trend_exhaust_pctl_long)', 'pctl позиции', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
-  html += _axisTable(longMovePoints, '🔵 Лонг→коррекция: перцентиль хода цены (trend_exhaust_move_pctl_long)', 'pctl хода', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
+  html += _axisTable(shortPctlPoints, 'Шорт→сквиз: перцентиль позиции (trend_exhaust_pctl_short)', 'pctl позиции', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
+  html += _axisTable(shortMovePoints, 'Шорт→сквиз: перцентиль хода цены (trend_exhaust_move_pctl_short)', 'pctl хода', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
+  html += _axisTable(longPctlPoints, 'Лонг→коррекция: перцентиль позиции (trend_exhaust_pctl_long)', 'pctl позиции', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
+  html += _axisTable(longMovePoints, 'Лонг→коррекция: перцентиль хода цены (trend_exhaust_move_pctl_long)', 'pctl хода', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
   el.innerHTML = html + el.innerHTML;
 }
 
@@ -3866,9 +3866,9 @@ async function labSpikeAutopsy() {
     { key: '_dd20',                 lbl: 'Просадка от max за 20 баров, %' },
   ];
   const FLAG_FEATS = [
-    { key: '_te_up', lbl: '🟠 Тренд-истощение (сквиз ↑) активен' },
-    { key: 'accum_flag', lbl: '🔵 Фаза накопления активна' },
-    { key: 'spike_setup', lbl: '🧨 Сетап выброса активен' },
+    { key: '_te_up', lbl: 'Тренд-истощение (сквиз ↑) активен' },
+    { key: 'accum_flag', lbl: 'Фаза накопления активна' },
+    { key: 'spike_setup', lbl: 'Сетап выброса активен' },
   ];
 
   const pre = {}, ctl = {};   // массивы значений признаков: накануне выброса / фон
@@ -4018,7 +4018,7 @@ async function labSpikeAutopsy() {
       </tr>`;
     }
   } else if (proxy) {
-    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#FF8A4C;background:#1A1030;font-size:10px">⏱ Интрадей-данных для канунов не нашлось — проверь покрытие oi_hourly (🩺 Диагностика) или запусти «📥 Интрадей-бэкфилл пула»</td></tr>`;
+    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#FF8A4C;background:#1A1030;font-size:10px">⏱ Интрадей-данных для канунов не нашлось — проверь покрытие oi_hourly (Диагностика) или запусти «Интрадей-бэкфилл пула»</td></tr>`;
   }
 
   topSpikes.sort((x,y)=>y.ret-x.ret);
@@ -4029,12 +4029,12 @@ async function labSpikeAutopsy() {
     <td style="text-align:center;color:#F2F0FF">${isFinite(sk.shortPctl)?(sk.shortPctl*100).toFixed(0)+'%':'—'}</td>
     <td style="text-align:center;color:${sk.trendRet<0?'#FF6A8B':'#52F2C9'}">${isFinite(sk.trendRet)?(sk.trendRet>0?'+':'')+sk.trendRet.toFixed(1)+'%':'—'}</td>
     <td style="text-align:center;color:#FF6A8B">${isFinite(sk.dd)?sk.dd.toFixed(1)+'%':'—'}</td>
-    <td style="text-align:center;color:${sk.te?'#FF8A4C':'#6F648F'}">${sk.te?'🟠 да':'нет'}</td>
-    <td style="text-align:center;color:${sk.setup?'#52F2C9':'#6F648F'}">${sk.setup?'🧨 да':'нет'}</td>
+    <td style="text-align:center;color:${sk.te?'#FF8A4C':'#6F648F'}">${sk.te?'да':'нет'}</td>
+    <td style="text-align:center;color:${sk.setup?'#52F2C9':'#6F648F'}">${sk.setup?'да':'нет'}</td>
   </tr>`).join('');
 
   const thStyle = 'padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400';
-  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🔎 Что было перед выбросами — ${nSpikes} дней-выбросов на ${usable} инструментах (порог: квантиль ${q} дневных ходов каждого)</summary>
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">Что было перед выбросами — ${nSpikes} дней-выбросов на ${usable} инструментах (порог: квантиль ${q} дневных ходов каждого)</summary>
   <div style="font-size:10px;color:#6F648F;margin-bottom:6px">Признаки взяты ЗА ДЕНЬ ДО выброса и сравнены с теми же признаками во все остальные дни (${nCtl}). Большая разница = признак реально отличает канун выброса от фона.</div>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
@@ -4053,7 +4053,7 @@ async function labSpikeAutopsy() {
     <th style="${thStyle}">ход за ${cfg.trend_exhaust_window} баров до</th>
     <th style="${thStyle}">просадка от max20</th>
     <th style="${thStyle}">тренд-истощ. ↑</th>
-    <th style="${thStyle}">сетап 🧨</th>
+    <th style="${thStyle}">сетап </th>
   </tr></thead><tbody>${topHtml}</tbody></table></div></details>
   </details>`;
 
@@ -4163,7 +4163,7 @@ async function labFetchAssetClasses() {
 function renderAssetClassDiag(errors, rawSample) {
   if (!errors.length && !rawSample) return;
   const el = document.getElementById('pool-out');
-  let html = `<details ${errors.length ? 'open' : ''}><summary style="cursor:pointer;font-size:12px;color:#FF6A8B;margin-bottom:6px">⚠️ Классификация: ${errors.length} тикеров без результата</summary>
+  let html = `<details ${errors.length ? 'open' : ''}><summary style="cursor:pointer;font-size:12px;color:#FF6A8B;margin-bottom:6px">⚠Классификация: ${errors.length} тикеров без результата</summary>
     <div style="font-size:10px;color:#6F648F;margin-bottom:4px">Сырой ответ бэкенда на первый тикер (для диагностики полей T-Invest):</div>
     <pre style="font-size:10px;color:#F2F0FF;background:#1A1030;padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap">${rawSample ? JSON.stringify(rawSample, null, 2).replace(/</g,'&lt;') : '—'}</pre>`;
   if (errors.length) {
@@ -4233,7 +4233,7 @@ function renderSqueezeFactors(rows, corr, minN, classCompare) {
   const accColor = v => !isFinite(v) ? '#3a2a50' : v >= 60 ? '#52F2C9' : v < 45 ? '#FF6A8B' : '#F2F0FF';
   const corrColor = v => !isFinite(v) ? '#6F648F' : Math.abs(v) >= 0.5 ? '#FF8A4C' : Math.abs(v) >= 0.3 ? '#F2F0FF' : '#6F648F';
 
-  let html = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🧬 Какой признак инструмента объясняет разброс точности шорт-сквиза/лонг-коррекции (учтены тикеры с N≥${minN} на +1д)</summary>`;
+  let html = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">Какой признак инструмента объясняет разброс точности шорт-сквиза/лонг-коррекции (учтены тикеры с N≥${minN} на +1д)</summary>`;
 
   html += `<div style="font-size:11px;margin-bottom:8px"><table style="border-collapse:collapse;width:100%;max-width:560px">
     <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Корреляция (Пирсон)</th><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center">r</th><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center">n</th></tr></thead><tbody>`;
@@ -4245,7 +4245,7 @@ function renderSqueezeFactors(rows, corr, minN, classCompare) {
 
   if (classCompare) {
     const fmtG = g => isFinite(g.mean) ? `${g.mean.toFixed(0)}%` : `—`;
-    html += `<div style="font-size:11px;margin-bottom:10px"><b style="color:#A79BC9">🏷 Точность по классу базового актива:</b>
+    html += `<div style="font-size:11px;margin-bottom:10px"><b style="color:#A79BC9">Точность по классу базового актива:</b>
     <table style="border-collapse:collapse;width:100%;max-width:480px;margin-top:4px">
     <thead><tr>
       <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Класс</th>
@@ -4259,7 +4259,7 @@ function renderSqueezeFactors(rows, corr, minN, classCompare) {
       </tr>`;
     }
     html += `</tbody></table>
-      <div style="font-size:10px;color:#6F648F;margin-top:2px">«? (не classified)» — класс ещё не определён (жми «🏷 Классифицировать тикеры»), не значит «не акция».</div>
+      <div style="font-size:10px;color:#6F648F;margin-top:2px">«? (не classified)» — класс ещё не определён (жми «Классифицировать тикеры»), не значит «не акция».</div>
     </div>`;
   }
 
@@ -4324,7 +4324,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
       const pctDown = all.filter(v=>v<0).length / all.length * 100;
       baseStats[h] = { median: med, pctDown, n: all.length };
     }
-    t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50"><td style="padding:4px 8px;color:#B487F8;font-weight:600;white-space:nowrap">📐 Базовый уровень пула</td>`;
+    t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50"><td style="padding:4px 8px;color:#B487F8;font-weight:600;white-space:nowrap">Базовый уровень пула</td>`;
     for (const h of HORIZONS) {
       const b = baseStats[h];
       if (!b) { t += '<td colspan="3" style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
@@ -4386,15 +4386,15 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   }
 
   let html = `<div style="font-size:11px;color:#6F648F;margin-bottom:8px">Загружено: ${instruments.map(i=>`${i.ticker} (N=${i.result.length})`).join(', ')}</div>`;
-  html += _poolTable(poolSp, '📈 Пул — давление сжатия');
-  html += _breakdownTable(perInstrumentSp, '📈 Давление сжатия', 3);
-  html += _poolTable(poolPhase, '🔵📤 Пул — фазы и тренд-истощение');
-  html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 1);
-  html += _breakdownTable(perInstrumentPhase, '🔵📤 Фазы и тренд-истощение', 3);
-  html += _renderEventTable(poolEvents, '🎯 Событийная оценка по пулу — ловля выбросов (по эпизодам, а не дням)');
+  html += _poolTable(poolSp, 'Пул — давление сжатия');
+  html += _breakdownTable(perInstrumentSp, 'Давление сжатия', 3);
+  html += _poolTable(poolPhase, 'Пул — фазы и тренд-истощение');
+  html += _breakdownTable(perInstrumentPhase, 'Фазы и тренд-истощение', 1);
+  html += _breakdownTable(perInstrumentPhase, 'Фазы и тренд-истощение', 3);
+  html += _renderEventTable(poolEvents, 'Событийная оценка по пулу — ловля выбросов (по эпизодам, а не дням)');
 
   if (phaseDateOverlap) {
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🔁 Проверка на пересечение дат (не раздуто ли N синхронными движениями по многим инструментам)</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">Проверка на пересечение дат (не раздуто ли N синхронными движениями по многим инструментам)</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
       <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Бин</th>
@@ -4438,7 +4438,7 @@ async function openTicker(root) {
 // Кнопка вкладки «Скринер»: собрать пул (если надо) и показать топ
 async function labScreenerRefresh() {
   const proxy = document.getElementById('proxy').value.trim();
-  if (!proxy) { setStatus('Укажи прокси-URL во вкладке «⚙ Сервис»', 'err'); return; }
+  if (!proxy) { setStatus('Укажи прокси-URL во вкладке «Сервис»', 'err'); return; }
   if (_lastPoolInstruments && _lastPoolInstruments.length) { await labSignalScreener(); return; }
   if (!document.getElementById('pool-tickers').value.trim()) await poolFillAllTickers();
   await labCalibratePool(); // сам отрисует и пуловые таблицы, и скринер
