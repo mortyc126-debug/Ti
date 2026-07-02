@@ -1134,9 +1134,11 @@ async function handleDb(path, req, env) {
     const token = env.TINVEST_TOKEN;
     if (!token) return json({ error: 'TINVEST_TOKEN secret не задан' }, 503);
 
+    // Реальные значения из T-Invest — БЕЗ префикса ASSET_TYPE_ (в отличие от
+    // большинства других enum'ов этого API) — уточнено по живому ответу.
     const ASSET_TYPE_LABELS = {
-      ASSET_TYPE_SECURITY: 'акция', ASSET_TYPE_CURRENCY: 'валюта',
-      ASSET_TYPE_COMMODITY: 'товар', ASSET_TYPE_INDEX: 'индекс',
+      TYPE_SECURITY: 'акция', TYPE_CURRENCY: 'валюта',
+      TYPE_COMMODITY: 'товар', TYPE_INDEX: 'индекс',
     };
 
     try {
