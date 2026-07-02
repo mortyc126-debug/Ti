@@ -130,6 +130,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <button class="sec" onclick="labCalibratePool()">🧮 Рассчитать по пулу</button>
     <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
     <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
+    <button class="sec" onclick="labSignalScreener()">🎯 Скринер сигналов</button>
     <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
     <button class="sec" onclick="labBackfillIntradayPool()">📥 Интрадей-бэкфилл пула</button>
     <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
@@ -2761,6 +2762,97 @@ async function labBackfillIntradayPool() {
   setStatus(`Интрадей-бэкфилл готов: дней собрано ${daysDone}, скипнуто ${daysSkipped}, +${totalIntraday} интрадей-срезов (тикеров в ответах: ${maxSymsSeen})${probNote}`, problems.length ? 'err' : 'ok');
 }
 
+// ── СКРИНЕР СИГНАЛОВ: кто в пуле даёт проверенный сигнал ПРЯМО СЕЙЧАС ──
+// Ответ на вопрос «куда смотреть сегодня»: по последнему бару каждого
+// инструмента ищем активные калиброванные сигналы и ранжируем по
+// исторической точности ЭТОГО тикера (при N>=8), иначе — по точности пула.
+const _SCREEN_SIGNALS = [
+  { id: 'both', emoji: '🧨🟠', name: 'Сетап выброса + тренд-истощение (лонг)', dir: 1,
+    match: r => r.spike_setup && r.trend_exhaust === 1,
+    active: r => r.spike_setup && r.trend_exhaust === 1 },
+  { id: 'trendUp', emoji: '🟠↑', name: 'Тренд-сквиз вверх (лонг)', dir: 1,
+    match: r => r.trend_exhaust === 1,
+    active: r => r.trend_exhaust === 1 && !r.spike_setup }, // «оба разом» показывает строка выше
+  { id: 'trendDown', emoji: '🟠↓', name: 'Лонг-коррекция (шорт)', dir: -1,
+    match: r => r.trend_exhaust === -1,
+    active: r => r.trend_exhaust === -1 },
+  { id: 'exh', emoji: '🔴', name: 'Истощение после выброса вверх (шорт)', dir: -1,
+    match: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === 1,
+    active: r => !r.accum_flag && r.breakout_dir === 1 && r.phase_aligned === 1 },
+  { id: 'setup', emoji: '🧨', name: 'Сетап выброса без истощения (кандидат)', dir: 1,
+    match: r => r.spike_setup,
+    active: r => r.spike_setup && r.trend_exhaust !== 1 },
+];
+
+function labSignalScreener(prepend) {
+  if (!_lastPoolInstruments || !_lastPoolInstruments.length) {
+    setStatus('Скринер работает по рассчитанному пулу — сначала «🧮 Рассчитать по пулу»', 'err');
+    return;
+  }
+  const H3 = 3;
+  const hits = [];
+  const poolAgg = {};
+  for (const def of _SCREEN_SIGNALS) poolAgg[def.id] = { c: 0, n: 0 };
+  for (const inst of _lastPoolInstruments) {
+    const res = inst.result, fwd = inst.fwd;
+    for (const def of _SCREEN_SIGNALS) {
+      let c = 0, n = 0; const vals = [];
+      for (let i = 0; i < res.length; i++) {
+        if (!def.match(res[i])) continue;
+        const v = fwd[H3][i];
+        if (!isFinite(v)) continue;
+        n++; vals.push(v);
+        if (def.dir > 0 ? v > 0 : v < 0) c++;
+      }
+      poolAgg[def.id].c += c; poolAgg[def.id].n += n;
+      const lastRow = res[res.length - 1];
+      if (lastRow && def.active(lastRow)) {
+        hits.push({ ticker: inst.ticker, def, accT: n ? c / n * 100 : NaN, nT: n,
+          medT: _median(vals), lastDate: lastRow.date });
+      }
+    }
+  }
+  const poolAcc = id => poolAgg[id].n ? poolAgg[id].c / poolAgg[id].n * 100 : NaN;
+  // Ранжирование: своя точность (если выборка тикера осмысленная), иначе пуловая
+  for (const h of hits) h.score = (isFinite(h.accT) && h.nT >= 8) ? h.accT : poolAcc(h.def.id);
+  hits.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
+  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🎯 Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
+  if (!hits.length) {
+    t += `<div style="font-size:11px;color:#6c7086;margin-bottom:10px">Ни на одном инструменте пула нет активного проверенного сигнала по последнему бару. Это нормальное состояние — сигналы редкие (🧨🟠 ~20 эпизодов на 5900 дней).</div>`;
+  } else {
+    t += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
+    <thead><tr>
+      <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
+      ${th('Тикер')}${th('Направление')}${th('Точность тикера +3д')}${th('Медиана +3д (тикер)')}${th('Точность пула +3д')}${th('Бар')}
+    </tr></thead><tbody>`;
+    for (const h of hits) {
+      const dirTxt = h.def.dir > 0 ? '🟢 лонг' : '🔴 шорт';
+      const strong = isFinite(h.accT) && h.nT >= 8 && h.accT >= 65;
+      const accTxt = isFinite(h.accT) ? `${h.accT.toFixed(0)}% <span style="color:#6c7086;font-size:9px">N${h.nT}</span>` : '—';
+      const pAcc = poolAcc(h.def.id);
+      const thin = !(isFinite(h.accT) && h.nT >= 8);
+      t += `<tr style="background:${strong ? (h.def.dir > 0 ? '#1a2e1a' : '#2e1a1a') : '#1e2030'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
+        <td style="padding:4px 8px;color:#cdd6f4">${h.def.emoji} ${h.def.name}</td>
+        <td style="text-align:center;color:#cba6f7;font-weight:700;font-size:12px">${h.ticker}</td>
+        <td style="text-align:center">${dirTxt}</td>
+        <td style="text-align:center;color:${strong ? '#a6e3a1' : '#cdd6f4'}">${accTxt}${thin ? ' ⚠' : ''}</td>
+        <td style="text-align:center;color:${isFinite(h.medT) ? (h.medT > 0 ? '#a6e3a1' : '#f38ba8') : '#6c7086'}">${isFinite(h.medT) ? (h.medT > 0 ? '+' : '') + h.medT.toFixed(1) + '%' : '—'}</td>
+        <td style="text-align:center;color:#6c7086">${isFinite(pAcc) ? pAcc.toFixed(0) + '%' : '—'} <span style="font-size:9px">N${poolAgg[h.def.id].n}</span></td>
+        <td style="text-align:center;color:#6c7086">${h.lastDate}</td>
+      </tr>`;
+    }
+    t += `</tbody></table></div>
+    <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Сортировка по точности (своя при N≥8, иначе пуловая). Подсветка — тикеры, где сигнал исторически ≥65% на собственной истории. ⚠ — у тикера мало своей истории этого сигнала. «Бар» — дата последнего снэпшота: если она старше вчерашней, данные несвежие.</div>`;
+  }
+  t += `</details>`;
+  const el = document.getElementById('pool-out');
+  if (prepend === false) return t;
+  el.innerHTML = t + el.innerHTML;
+  setStatus(`Скринер: активных сигналов ${hits.length}`, 'ok');
+}
+
 // Кэш сырых (несчитанных) данных последнего пула — [{ticker, rows, refSwitchDates}].
 // Позволяет labSweepPool пересчитывать computeIndicator с другими cfg без
 // повторных походов в сеть (самая дорогая часть загрузки пула).
@@ -2844,6 +2936,7 @@ async function labCalibratePool() {
   const poolEvents = _calcEventTable(instruments.map(i=>i.result), cfg);
 
   renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInstrumentSp, perInstrumentPhase, phaseDateOverlap, poolEvents);
+  labSignalScreener(); // скринер активных сигналов — сразу сверху, без лишнего клика
   setStatus(`Пул: рассчитано по ${instruments.length}/${rootTickers.length} инструментам (${instruments.map(i=>i.ticker).join(', ')})`, 'ok');
 }
 
