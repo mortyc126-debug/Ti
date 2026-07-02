@@ -33,16 +33,16 @@ body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);back
 
 .topbar-brand{font-size:14px;font-weight:600;letter-spacing:-.01em}
 .tabs{margin-left:auto;display:flex;gap:4px}
-.tab-btn{background:transparent;color:var(--text2);border:1px solid transparent;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer}
-.tab-btn:hover{color:var(--text);filter:none;background:var(--surface2)}
-.tab-btn.active{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.tab-btn{background:rgba(255,255,255,0.03);color:var(--text2);border:1px solid rgba(255,255,255,0.05);border-radius:999px;padding:5px 14px;font-size:12px;cursor:pointer;box-shadow:none}
+.tab-btn:hover{color:var(--text);filter:none;background:rgba(255,255,255,0.06)}
+.tab-btn.active{background:linear-gradient(180deg,rgba(255,0,128,0.22),rgba(255,0,128,0.12));color:var(--text);border-color:rgba(255,0,128,0.5);box-shadow:0 0 18px rgba(255,0,128,0.18)}
 .tabpane{display:none}
 .tabpane.active{display:flex;flex-direction:column;gap:10px}
 .topbar-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
 .app{width:100%;padding:10px 14px 40px;display:flex;flex-direction:column;gap:10px}
 
 /* ── карточки-разделы ── */
-.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 0 0 1px rgba(199,27,82,0.03),0 0 18px rgba(199,27,82,0.05),inset 0 0 20px rgba(255,255,255,0.01)}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:6px 12px;border-bottom:1px solid var(--border)}
 .panel-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);font-family:var(--mono)}
 .panel-body{padding:8px 12px}
@@ -56,18 +56,18 @@ body{background:linear-gradient(180deg,#0A0615 0%,#0D0718 35%,#12091F 100%);back
 label{display:flex;flex-direction:column;gap:4px;color:var(--text2);font-size:11px}
 input,select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:5px 8px;font-size:12px;font-family:var(--mono);outline:none;min-width:130px}
 input:focus,select:focus{border-color:var(--accent)}
-button{background:var(--accent);color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-size:12px;font-family:var(--sans);font-weight:500;transition:filter .12s}
+button{background:linear-gradient(180deg,rgba(199,27,82,0.9),rgba(199,27,82,0.75));color:#fff;border:1px solid rgba(255,0,128,0.35);border-radius:999px;padding:7px 16px;cursor:pointer;font-size:12px;font-family:var(--sans);font-weight:500;transition:filter .12s;box-shadow:0 0 14px rgba(255,0,128,0.12)}
 button:hover{filter:brightness(1.15)}
-button.sec{background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+button.sec{background:rgba(255,255,255,0.03);color:var(--text2);border:1px solid rgba(255,255,255,0.07);box-shadow:none}
 button.sec:hover{background:var(--border2);color:var(--text);filter:none}
 button.tiny{font-size:10px;padding:3px 9px}
 .status{font-size:11px;color:var(--text3);min-height:16px}
-.err{color:var(--accent)}
+.err{color:#FF6A8B}
 .ok{color:var(--mint)}
 
 /* ── метрики ── */
 .panel-row{display:flex;gap:10px;flex-wrap:wrap}
-.card{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;min-width:118px}
+.card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:7px 11px;min-width:118px}
 .card .lbl{font-size:10px;color:var(--text3);margin-bottom:1px}
 .card .val{font-size:15px;font-weight:600;color:var(--text)}
 .card .sub{font-size:10px;color:var(--text3)}
@@ -468,7 +468,7 @@ async function labDiag() {
   if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
   const el = document.getElementById('diag-out');
   el.style.display = 'block';
-  el.innerHTML = '<span style="color:#6c7086">Загрузка…</span>';
+  el.innerHTML = '<span style="color:#6F648F">Загрузка…</span>';
   setStatus('Диагностика…');
 
   try {
@@ -499,55 +499,55 @@ async function labDiag() {
     }
 
     // 3. Рендер
-    let html = `<div style="font-size:13px;font-weight:700;color:#cba6f7;margin-bottom:10px">🩺 Диагностика базы данных</div>`;
+    let html = `<div style="font-size:13px;font-weight:700;color:#B487F8;margin-bottom:10px">🩺 Диагностика базы данных</div>`;
 
     // oi_daily coverage
-    html += `<div style="margin-bottom:10px"><span style="color:#a6adc8;font-weight:600">oi_daily — тикеры в базе (${tickerList.length}):</span><br>`;
+    html += `<div style="margin-bottom:10px"><span style="color:#A79BC9;font-weight:600">oi_daily — тикеры в базе (${tickerList.length}):</span><br>`;
     if (tickerList.length) {
       html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;width:100%">
         <thead><tr>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Дней</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">С</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">По</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Тикер</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">Дней</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">С</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">По</th>
         </tr></thead><tbody>`;
       for (const r of tickerList) {
         html += `<tr><td style="padding:3px 8px">${r.ticker}</td>
-          <td style="padding:3px 8px;text-align:center;color:${r.days>=30?'#a6e3a1':'#f9e2af'}">${r.days}</td>
-          <td style="padding:3px 8px;color:#6c7086">${r.from_date||'—'}</td>
-          <td style="padding:3px 8px;color:#6c7086">${r.to_date||'—'}</td></tr>`;
+          <td style="padding:3px 8px;text-align:center;color:${r.days>=30?'#52F2C9':'#FF8A4C'}">${r.days}</td>
+          <td style="padding:3px 8px;color:#6F648F">${r.from_date||'—'}</td>
+          <td style="padding:3px 8px;color:#6F648F">${r.to_date||'—'}</td></tr>`;
       }
       html += '</tbody></table></div>';
     } else {
-      html += '<span style="color:#f38ba8">Нет данных — нужен бэкфилл ОИ</span>';
+      html += '<span style="color:#FF6A8B">Нет данных — нужен бэкфилл ОИ</span>';
     }
     html += '</div>';
 
     // oi_hourly coverage
-    html += `<div style="margin-bottom:10px"><span style="color:#a6adc8;font-weight:600">oi_hourly — интрадей-срезы (до 150 дней; root-код = бэкфилл, полное имя контракта = live-cron):</span>`;
+    html += `<div style="margin-bottom:10px"><span style="color:#A79BC9;font-weight:600">oi_hourly — интрадей-срезы (до 150 дней; root-код = бэкфилл, полное имя контракта = live-cron):</span>`;
     const hasHourly = hourlyStats.some(s => s.n > 0);
     if (!hasHourly) {
-      html += `<div style="color:#f38ba8;margin-top:6px">⚠️ Данных нет — cron ещё не запускался или воркер не задеплоен с новым кодом.<br>
-        После деплоя и добавления cron <code style="background:#181825;padding:1px 4px">*/15 * * * *</code> данные начнут копиться.</div>`;
+      html += `<div style="color:#FF6A8B;margin-top:6px">⚠️ Данных нет — cron ещё не запускался или воркер не задеплоен с новым кодом.<br>
+        После деплоя и добавления cron <code style="background:#1A1030;padding:1px 4px">*/15 * * * *</code> данные начнут копиться.</div>`;
     } else {
       html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;margin-top:6px;width:100%">
         <thead><tr>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Записей</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">С</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">По (МСК)</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Послед. физ.лонг</th>
-          <th style="padding:3px 8px;background:#181825;color:#a6adc8">Послед. физ.шорт</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Тикер</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">Записей</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">С</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">По (МСК)</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">Послед. физ.лонг</th>
+          <th style="padding:3px 8px;background:#1A1030;color:#A79BC9">Послед. физ.шорт</th>
         </tr></thead><tbody>`;
       for (const s of hourlyStats) {
-        const nColor = s.n === 0 ? '#f38ba8' : s.n < 10 ? '#f9e2af' : '#a6e3a1';
+        const nColor = s.n === 0 ? '#FF6A8B' : s.n < 10 ? '#FF8A4C' : '#52F2C9';
         html += `<tr>
           <td style="padding:3px 8px">${s.ticker}</td>
           <td style="padding:3px 8px;text-align:center;color:${nColor}">${s.n}</td>
-          <td style="padding:3px 8px;color:#6c7086">${s.from}</td>
-          <td style="padding:3px 8px;color:#6c7086">${s.to}</td>
-          <td style="padding:3px 8px;color:#89b4fa">${s.lastFiz ? Math.round(s.lastFiz.fiz_long).toLocaleString() : '—'}</td>
-          <td style="padding:3px 8px;color:#f38ba8">${s.lastFiz ? Math.round(s.lastFiz.fiz_short).toLocaleString() : '—'}</td>
+          <td style="padding:3px 8px;color:#6F648F">${s.from}</td>
+          <td style="padding:3px 8px;color:#6F648F">${s.to}</td>
+          <td style="padding:3px 8px;color:#7CC7FF">${s.lastFiz ? Math.round(s.lastFiz.fiz_long).toLocaleString() : '—'}</td>
+          <td style="padding:3px 8px;color:#FF6A8B">${s.lastFiz ? Math.round(s.lastFiz.fiz_short).toLocaleString() : '—'}</td>
         </tr>`;
       }
       html += '</tbody></table></div>';
@@ -563,8 +563,8 @@ async function labDiag() {
           const futoi = raw.body?.futoi;
           const rows2 = futoi ? (futoi.data || []).slice(0, 6) : [];
           if (rows2.length) {
-            html += `<div><span style="color:#a6adc8;font-weight:600">Сырой FutOI — последние строки для ${tickers[0]} (${raw.date}):</span>
-              <pre style="margin-top:6px;background:#181825;padding:8px;border-radius:5px;font-size:10px;overflow-x:auto;color:#cdd6f4">${
+            html += `<div><span style="color:#A79BC9;font-weight:600">Сырой FutOI — последние строки для ${tickers[0]} (${raw.date}):</span>
+              <pre style="margin-top:6px;background:#1A1030;padding:8px;border-radius:5px;font-size:10px;overflow-x:auto;color:#F2F0FF">${
                 JSON.stringify({ columns: futoi.columns, data: rows2 }, null, 2)
               }</pre></div>`;
           }
@@ -575,7 +575,7 @@ async function labDiag() {
     el.innerHTML = html;
     setStatus('Диагностика готова', 'ok');
   } catch(e) {
-    el.innerHTML = `<span style="color:#f38ba8">Ошибка: ${e.message}</span>`;
+    el.innerHTML = `<span style="color:#FF6A8B">Ошибка: ${e.message}</span>`;
     setStatus('Ошибка диагностики', 'err');
   }
 }
@@ -1486,7 +1486,7 @@ function renderMetrics(result) {
   const zone = (p, hiWord, loWord) => {
     if (!isFinite(p)) return '';
     const pc = Math.round(p * 100);
-    const col = p >= 0.85 ? 'var(--accent)' : p <= 0.15 ? '#7aa2f7' : 'var(--text3)';
+    const col = p >= 0.85 ? 'var(--accent)' : p <= 0.15 ? '#7CC7FF' : 'var(--text3)';
     const word = p >= 0.85 ? hiWord : p <= 0.15 ? loWord : 'в норме';
     return `<div style="color:${col};font-size:10px;font-family:var(--mono);margin:1px 0">p${pc} · ${word}</div>`;
   };
@@ -1573,44 +1573,44 @@ function renderInterp(result) {
     anySignal = true;
     const s = _PLAYBOOK_STATS.longCorr;
     txt += sigLine('🟠', 'Тренд-истощение: рынок в лонге у экстремума после роста → коррекция вниз',
-      `Сильнейший выживший сигнал: ${s.acc3d}% точности на +3д против базы ${s.base3d}% (N=${s.n}, чистые данные).`, '#f38ba8');
+      `Сильнейший выживший сигнал: ${s.acc3d}% точности на +3д против базы ${s.base3d}% (N=${s.n}, чистые данные).`, '#FF6A8B');
   }
   if (!last.accum_flag && last.breakout_dir === 1 && last.phase_aligned === 1) {
     anySignal = true;
     const s = _PLAYBOOK_STATS.exhaustion;
     txt += sigLine('🔴', 'Выброс ВВЕРХ по позиции физлиц → истощение, шорт',
-      `${s.acc3d}% на +3д против базы ${s.base3d}% на N=${s.n} — самый массовый из подтверждённых. Профиль — сползание: цель 1-2%, короткий стоп.`, '#f38ba8');
+      `${s.acc3d}% на +3д против базы ${s.base3d}% на N=${s.n} — самый массовый из подтверждённых. Профиль — сползание: цель 1-2%, короткий стоп.`, '#FF6A8B');
   }
   if (isFinite(last.squeeze_pressure_rank) && last.squeeze_pressure_rank <= 0.2) {
     anySignal = true;
     const s = _PLAYBOOK_STATS.longAggr;
     txt += sigLine('📉', 'Лонг набирали агрессивно (<p20 давления) → шорт',
-      `${s.acc3d}% на +3д; единственный значимый событийный сигнал чистых данных: выброс вниз ловится в ×${s.lift} чаще базы, EV +${s.ev}%.`, '#f38ba8');
+      `${s.acc3d}% на +3д; единственный значимый событийный сигнал чистых данных: выброс вниз ловится в ×${s.lift} чаще базы, EV +${s.ev}%.`, '#FF6A8B');
   }
 
   // Похороненные чисткой — предупреждаем явно, чтобы не торговались по памяти
   if (last.spike_setup && last.trend_exhaust === 1) {
     txt += sigLine('⚪', 'Сетап выброса + тренд-истощение активны — НО сигнал не подтверждён',
-      `После исключения фейковых роллов контрактов из данных: EV −3.3%, промах −5.4% (18 эпизодов). Прежние «попадания» в основном были артефактами склейки. НЕ входить в лонг по этому сочетанию.`, '#6c7086');
+      `После исключения фейковых роллов контрактов из данных: EV −3.3%, промах −5.4% (18 эпизодов). Прежние «попадания» в основном были артефактами склейки. НЕ входить в лонг по этому сочетанию.`, '#6F648F');
   } else if (last.trend_exhaust === 1) {
     txt += sigLine('⚪', 'Тренд-истощение (сквиз ↑) активен — сигнал не подтверждён на чистых данных',
-      `Точность 35-45% (хуже монеты против дрейфа), EV −1.1%. В лонг не входить.`, '#6c7086');
+      `Точность 35-45% (хуже монеты против дрейфа), EV −1.1%. В лонг не входить.`, '#6F648F');
   }
   if (isFinite(last.squeeze_pressure_rank) && last.squeeze_pressure_rank >= 0.8) {
     txt += sigLine('⚪', 'Шорт набирали агрессивно (>p80)',
-      `Направление не предсказывает (35-46%), но волатильность — да: выбросы вверх в ×1.8 чаще базы при EV −1.1%. Как максимум — сигнал «пристегнуться», не сигнал входа.`, '#6c7086');
+      `Направление не предсказывает (35-46%), но волатильность — да: выбросы вверх в ×1.8 чаще базы при EV −1.1%. Как максимум — сигнал «пристегнуться», не сигнал входа.`, '#6F648F');
   }
   if (last.accum_flag) {
     txt += sigLine('🔵', 'Фаза накопления (флэт + имбаланс)',
-      `Состояние ожидания (×1.0 к базе на 667 эпизодах), а не прогноз.`, '#89b4fa');
+      `Состояние ожидания (×1.0 к базе на 667 эпизодах), а не прогноз.`, '#7CC7FF');
   }
 
   if (!anySignal) {
     txt = sigLine('⚪', 'Активных подтверждённых сигналов нет',
-      `Подтверждённые чисткой данных сигналы (все — шортовые: лонг-коррекция, истощение, лонг-агрессия) сейчас не активны. Карточки выше — диагностика состояния, а не прогноз.`, '#6c7086') + txt;
+      `Подтверждённые чисткой данных сигналы (все — шортовые: лонг-коррекция, истощение, лонг-агрессия) сейчас не активны. Карточки выше — диагностика состояния, а не прогноз.`, '#6F648F') + txt;
   }
 
-  txt += `<div style="font-size:10px;color:#6c7086;margin-top:4px">Статистика — пул 55 инструментов, ~5900 точек, ЧИСТЫЕ данные (роллы контрактов исключены), прогон 07.2026. Детали — событийная таблица пула.</div>`;
+  txt += `<div style="font-size:10px;color:#6F648F;margin-top:4px">Статистика — пул 55 инструментов, ~5900 точек, ЧИСТЫЕ данные (роллы контрактов исключены), прогон 07.2026. Детали — событийная таблица пула.</div>`;
   el.innerHTML = txt;
 }
 
@@ -1641,7 +1641,7 @@ function drawPrice(result) {
   const xStep = W/n;
 
   // Накопление фон
-  ctx.fillStyle = 'rgba(137,220,235,0.08)';
+  ctx.fillStyle = 'rgba(61,217,255,0.08)';
   for (let i=0; i<n; i++) {
     if (valid[i].accum_flag) {
       ctx.fillRect(i*xStep, 0, xStep, H);
@@ -1649,7 +1649,7 @@ function drawPrice(result) {
   }
 
   // PhaseHigh / PhaseLow
-  ctx.strokeStyle = 'rgba(137,220,235,0.4)';
+  ctx.strokeStyle = 'rgba(61,217,255,0.4)';
   ctx.lineWidth = 1;
   ctx.setLineDash([4,4]);
   for (const key of ['phase_high','phase_low']) {
@@ -1666,7 +1666,7 @@ function drawPrice(result) {
   ctx.setLineDash([]);
 
   // Price line
-  ctx.strokeStyle = '#89b4fa';
+  ctx.strokeStyle = '#7CC7FF';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   for (let i=0; i<n; i++) {
@@ -1676,7 +1676,7 @@ function drawPrice(result) {
   ctx.stroke();
 
   // Ref switches
-  ctx.strokeStyle='rgba(250,179,135,0.7)';
+  ctx.strokeStyle='rgba(255,138,76,0.7)';
   ctx.lineWidth=1;
   for (let i=0; i<n; i++) {
     if (valid[i].ref_switch) {
@@ -1686,7 +1686,7 @@ function drawPrice(result) {
   }
 
   // Labels
-  ctx.fillStyle='#6c7086'; ctx.font='10px sans-serif';
+  ctx.fillStyle='#6F648F'; ctx.font='10px sans-serif';
   const step = Math.max(1,Math.floor(n/8));
   for (let i=0; i<n; i+=step) {
     ctx.fillText(valid[i].date?.slice(5)||'', (i+0.5)*xStep-12, H-2);
@@ -1745,7 +1745,7 @@ function drawPrice(result) {
       const bin = _lastCalibStats.find(b => row.squeeze_pressure_rank >= b.min && row.squeeze_pressure_rank < b.max);
       if (bin) {
         const fmtP = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
-        const col = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
+        const col = bin.dir > 0 ? '#52F2C9' : bin.dir < 0 ? '#FF6A8B' : '#F2F0FF';
         const isH = _lastMode === 'hourly';
         const tipHorizons = isH ? [1,2,4,8,24] : [1,2,3,5];
         const tipLbl = h => isH ? `+${h}ч` : `+${h}д`;
@@ -1761,7 +1761,7 @@ function drawPrice(result) {
       const isH = _lastMode === 'hourly';
       const tipHorizons = isH ? [1,4,24] : [1,3,5];
       const tipLbl = h => isH ? `факт +${h}ч` : `факт +${h}д`;
-      realTip = tipHorizons.map(h => { const v=_lastCalibFwd[h]?.[globalIdx]; return isFinite(v)?`${tipLbl(h)}: <b style="color:${v>0?'#a6e3a1':'#f38ba8'}">${v>0?'+':''}${v.toFixed(1)}%</b>`:''; }).filter(Boolean).join(' | ');
+      realTip = tipHorizons.map(h => { const v=_lastCalibFwd[h]?.[globalIdx]; return isFinite(v)?`${tipLbl(h)}: <b style="color:${v>0?'#52F2C9':'#FF6A8B'}">${v>0?'+':''}${v.toFixed(1)}%</b>`:''; }).filter(Boolean).join(' | ');
     }
 
     const tip = document.getElementById('chart-tooltip');
@@ -1821,7 +1821,7 @@ function _rangeSummary(valid, a, b) {
   const oiAvg = (A.total_oi + B.total_oi) / 2;
   const pctOi = v => oiAvg > 0 ? ` (${v >= 0 ? '+' : ''}${(v / oiAvg * 100).toFixed(1)}% ОИ)` : '';
   const dOi = (A.total_oi > 0 && B.total_oi > 0) ? (B.total_oi - A.total_oi) / A.total_oi * 100 : NaN;
-  const col = v => v > 0 ? '#a6e3a1' : v < 0 ? '#f38ba8' : 'var(--text2)';
+  const col = v => v > 0 ? '#52F2C9' : v < 0 ? '#FF6A8B' : 'var(--text2)';
   const sgn = v => (v > 0 ? '+' : '') + v.toFixed(1);
   const fmtC = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('ru-RU');
   return `<b>${A.date} → ${B.date}</b> · ${bars} бар.${days !== null && days !== bars ? ` (${days} дн.)` : ''}
@@ -1854,10 +1854,10 @@ function drawPriceStatic(valid, vmin, vmax, xStep, W, H, hoverIdx) {
   const n = valid.length;
   const closes = valid.map(r=>r.close);
 
-  ctx.fillStyle = 'rgba(137,220,235,0.08)';
+  ctx.fillStyle = 'rgba(61,217,255,0.08)';
   for (let i=0; i<n; i++) if (valid[i].accum_flag) ctx.fillRect(i*xStep,0,xStep,H);
 
-  ctx.strokeStyle='rgba(137,220,235,0.4)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.strokeStyle='rgba(61,217,255,0.4)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
   for (const key of ['phase_high','phase_low']) {
     ctx.beginPath(); let st=false;
     for (let i=0; i<n; i++) {
@@ -1869,7 +1869,7 @@ function drawPriceStatic(valid, vmin, vmax, xStep, W, H, hoverIdx) {
   }
   ctx.setLineDash([]);
 
-  ctx.strokeStyle='#89b4fa'; ctx.lineWidth=1.5;
+  ctx.strokeStyle='#7CC7FF'; ctx.lineWidth=1.5;
   ctx.beginPath();
   for (let i=0; i<n; i++) {
     const x=(i+0.5)*xStep,y=_mapY(closes[i],vmin,vmax,H);
@@ -1879,7 +1879,7 @@ function drawPriceStatic(valid, vmin, vmax, xStep, W, H, hoverIdx) {
 
   // Тренд-истощение: треугольник над/под ценой — контрарный сигнал разворота
   // (после N баров тренда позиция физлиц у исторического экстремума)
-  ctx.fillStyle = '#fab387';
+  ctx.fillStyle = '#FF8A4C';
   for (let i=0; i<n; i++) {
     const te = valid[i].trend_exhaust;
     if (!te) continue;
@@ -1893,15 +1893,15 @@ function drawPriceStatic(valid, vmin, vmax, xStep, W, H, hoverIdx) {
 
   if (hoverIdx >= 0 && hoverIdx < n) {
     const x = (hoverIdx+0.5)*xStep;
-    ctx.strokeStyle='rgba(203,166,247,0.7)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.strokeStyle='rgba(180,135,248,0.7)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
     ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
     ctx.setLineDash([]);
     const y = _mapY(closes[hoverIdx],vmin,vmax,H);
     ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
-    ctx.fillStyle='#cba6f7'; ctx.fill();
+    ctx.fillStyle='#B487F8'; ctx.fill();
   }
 
-  ctx.fillStyle='#6c7086'; ctx.font='10px sans-serif';
+  ctx.fillStyle='#6F648F'; ctx.font='10px sans-serif';
   const step=Math.max(1,Math.floor(n/8));
   for (let i=0; i<n; i+=step) ctx.fillText(valid[i].date?.slice(5)||'',(i+0.5)*xStep-12,H-2);
   _drawDateAxis(ctx, valid, xStep, H);
@@ -1932,21 +1932,21 @@ function drawOI(result) {
   const zero = _mapY(0, vmin, vmax, H);
 
   // Zero line
-  ctx.strokeStyle='#363a4f'; ctx.lineWidth=1;
+  ctx.strokeStyle='#2a1f3d'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(0,zero); ctx.lineTo(W,zero); ctx.stroke();
 
   // WeightedImbalance histogram
   for (let i=0; i<n; i++) {
     const wi = valid[i].weighted_imbalance;
     const x = i*xStep, y = _mapY(wi, vmin, vmax, H);
-    const col = wi > 0 ? 'rgba(243,139,168,0.6)' : 'rgba(166,227,161,0.6)';
+    const col = wi > 0 ? 'rgba(255,106,139,0.6)' : 'rgba(82,242,201,0.6)';
     ctx.fillStyle = col;
     if (wi > 0) ctx.fillRect(x, y, xStep-1, zero-y);
     else ctx.fillRect(x, zero, xStep-1, y-zero);
   }
 
   // WI line
-  ctx.strokeStyle='#b4befe'; ctx.lineWidth=1.5;
+  ctx.strokeStyle='#B487F8'; ctx.lineWidth=1.5;
   ctx.beginPath();
   for (let i=0; i<n; i++) {
     const x=(i+0.5)*xStep, y=_mapY(valid[i].weighted_imbalance,vmin,vmax,H);
@@ -1955,7 +1955,7 @@ function drawOI(result) {
   ctx.stroke();
 
   // PhasePotential line
-  ctx.strokeStyle='#cba6f7'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
+  ctx.strokeStyle='#B487F8'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
   ctx.beginPath(); let started=false;
   for (let i=0; i<n; i++) {
     const v=valid[i].phase_potential;
@@ -1967,8 +1967,8 @@ function drawOI(result) {
 
   // Legend
   ctx.font='10px sans-serif';
-  ctx.fillStyle='#b4befe'; ctx.fillText('Сигнал дисбаланса',6,12);
-  ctx.fillStyle='#cba6f7'; ctx.fillText('Потенциал выхода (пунктир)',6,24);
+  ctx.fillStyle='#B487F8'; ctx.fillText('Сигнал дисбаланса',6,12);
+  ctx.fillStyle='#B487F8'; ctx.fillText('Потенциал выхода (пунктир)',6,24);
   _drawDateAxis(ctx, valid, xStep, H);
 }
 
@@ -1985,7 +1985,7 @@ function drawPhase(result) {
   const vmax = Math.max(...sdVals, ...rfVals, 0.001);
 
   // StressDist filled
-  ctx.fillStyle='rgba(243,139,168,0.4)';
+  ctx.fillStyle='rgba(255,106,139,0.4)';
   for (let i=0; i<n; i++) {
     const v=sdVals[i];
     if(!v) continue;
@@ -1994,7 +1994,7 @@ function drawPhase(result) {
   }
 
   // ReleaseFactor line
-  ctx.strokeStyle='#fab387'; ctx.lineWidth=2;
+  ctx.strokeStyle='#FF8A4C'; ctx.lineWidth=2;
   ctx.beginPath();
   for (let i=0; i<n; i++) {
     const x=(i+0.5)*xStep, y=H-10-(rfVals[i]/vmax)*(H-10);
@@ -2003,8 +2003,8 @@ function drawPhase(result) {
   ctx.stroke();
 
   ctx.font='10px sans-serif';
-  ctx.fillStyle='#f38ba8'; ctx.fillText('Стресс-риск (выход за уровень)',6,12);
-  ctx.fillStyle='#fab387'; ctx.fillText('Сила выброса',6,24);
+  ctx.fillStyle='#FF6A8B'; ctx.fillText('Стресс-риск (выход за уровень)',6,12);
+  ctx.fillStyle='#FF8A4C'; ctx.fillText('Сила выброса',6,24);
   _drawDateAxis(ctx, valid, xStep, H);
 }
 
@@ -2047,7 +2047,7 @@ function renderTable(result) {
       let cls = '';
       if (typeof v === 'boolean') return `<td>${v?'✓':''}</td>`;
       if (typeof v === 'string') return `<td>${v}</td>`;
-      if (!isFinite(v)) return `<td style="color:#313244">—</td>`;
+      if (!isFinite(v)) return `<td style="color:#3a2a50">—</td>`;
       if (c.pct) v *= c.pct;
       const fv = c.dec != null ? v.toFixed(c.dec) : v;
       if (['imbalance_z','weighted_imbalance','net_phys_pct','phase_potential','phase_anchor'].includes(c.key)) {
@@ -2346,12 +2346,12 @@ function _renderEventTable(ev, title) {
   if (!ev) return '';
   const fmt1 = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
   const arrow = d => d > 0 ? '↑' : d < 0 ? '↓' : '↕';
-  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
-  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
-  <div style="font-size:10px;color:#6c7086;margin-bottom:6px">${ev.thrNote} · окно ${ev.k} баров · вход = ПЕРВЫЙ день эпизода (серия подряд идущих сигнальных дней — одно событие) · MFE/MAE = лучший/худший накопленный ход от входа</div>
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">${title}</summary>
+  <div style="font-size:10px;color:#6F648F;margin-bottom:6px">${ev.thrNote} · окно ${ev.k} баров · вход = ПЕРВЫЙ день эпизода (серия подряд идущих сигнальных дней — одно событие) · MFE/MAE = лучший/худший накопленный ход от входа</div>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
-    <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Бин</th>
+    <th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Бин</th>
     ${th('дней')}${th('эпизодов')}${th(`P(выброс за ${ev.k} баров)`)}${th('× к базе')}${th('MFE ↑ мед')}${th('MAE ↓ мед')}${th('ход при попадании')}${th('ход при промахе')}${th('EV')}${th('баров до выброса')}
   </tr></thead><tbody>`;
   const b = ev.base;
@@ -2359,43 +2359,43 @@ function _renderEventTable(ev, title) {
     const s = b[kk]; if (!s) return '';
     return `${arrow(kk==='up'?1:kk==='down'?-1:0)} ${s.p.toFixed(0)}%`;
   }).filter(Boolean).join(' · ');
-  t += `<tr style="background:#1e1e2e;border-top:1px solid #313244">
-    <td style="padding:4px 8px;color:#cba6f7;font-weight:600">📐 База (вход в любой день)</td>
-    <td style="text-align:center;color:#6c7086">${b.any ? b.any.evaluated : '—'}</td>
-    <td style="text-align:center;color:#6c7086">—</td>
-    <td style="text-align:center;color:#cdd6f4">${bTxt}</td>
-    <td style="text-align:center;color:#6c7086">—</td>
-    <td style="text-align:center;color:#a6e3a1">${b.any ? fmt1(b.any.mfeMed) : '—'}</td>
-    <td style="text-align:center;color:#f38ba8">${b.any ? fmt1(b.any.maeMed) : '—'}</td>
-    <td style="text-align:center;color:#6c7086">—</td>
-    <td style="text-align:center;color:#6c7086">—</td>
-    <td style="text-align:center;color:#6c7086">—</td>
-    <td style="text-align:center;color:#6c7086">—</td>
+  t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50">
+    <td style="padding:4px 8px;color:#B487F8;font-weight:600">📐 База (вход в любой день)</td>
+    <td style="text-align:center;color:#6F648F">${b.any ? b.any.evaluated : '—'}</td>
+    <td style="text-align:center;color:#6F648F">—</td>
+    <td style="text-align:center;color:#F2F0FF">${bTxt}</td>
+    <td style="text-align:center;color:#6F648F">—</td>
+    <td style="text-align:center;color:#52F2C9">${b.any ? fmt1(b.any.mfeMed) : '—'}</td>
+    <td style="text-align:center;color:#FF6A8B">${b.any ? fmt1(b.any.maeMed) : '—'}</td>
+    <td style="text-align:center;color:#6F648F">—</td>
+    <td style="text-align:center;color:#6F648F">—</td>
+    <td style="text-align:center;color:#6F648F">—</td>
+    <td style="text-align:center;color:#6F648F">—</td>
   </tr>`;
   for (const row of ev.rows) {
     if (!row.nEp) continue;
     const s = row.s;
-    const rc = row.dir > 0 ? '#1a2e1a' : row.dir < 0 ? '#2e1a1a' : '#1e2030';
-    const lc = row.dir > 0 ? '#a6e3a1' : row.dir < 0 ? '#f38ba8' : '#cdd6f4';
-    const liftCol = row.sig ? (row.lift >= 1.3 ? '#a6e3a1' : row.lift <= 0.7 ? '#f38ba8' : '#cdd6f4') : '#6c7086';
+    const rc = row.dir > 0 ? 'rgba(82,242,201,0.08)' : row.dir < 0 ? 'rgba(199,27,82,0.12)' : '#140A24';
+    const lc = row.dir > 0 ? '#52F2C9' : row.dir < 0 ? '#FF6A8B' : '#F2F0FF';
+    const liftCol = row.sig ? (row.lift >= 1.3 ? '#52F2C9' : row.lift <= 0.7 ? '#FF6A8B' : '#F2F0FF') : '#6F648F';
     const liftTxt = isFinite(row.lift) ? `×${row.lift.toFixed(1)}${row.sig ? ' ✓' : ''}` : '—';
     const thin = row.nEp < 10;
     t += `<tr style="background:${rc};opacity:${thin?0.6:1}"${thin?' title="Меньше 10 эпизодов — не вывод, а намёк"':''}>
       <td style="padding:4px 8px;color:${lc}">${row.label} ${arrow(row.dir)}</td>
-      <td style="text-align:center;color:#6c7086">${row.nDays}</td>
-      <td style="text-align:center;color:#cdd6f4">${row.nEp}</td>
-      <td style="text-align:center;color:${liftCol}">${s ? s.p.toFixed(0)+'%' : '—'} <span style="color:#6c7086;font-size:9px">(${s?s.hits:0}/${s?s.evaluated:0})</span></td>
+      <td style="text-align:center;color:#6F648F">${row.nDays}</td>
+      <td style="text-align:center;color:#F2F0FF">${row.nEp}</td>
+      <td style="text-align:center;color:${liftCol}">${s ? s.p.toFixed(0)+'%' : '—'} <span style="color:#6F648F;font-size:9px">(${s?s.hits:0}/${s?s.evaluated:0})</span></td>
       <td style="text-align:center;color:${liftCol}" title="Во сколько раз чаще базы; ✓ = 95% ДИ разницы не пересекает 0">${liftTxt}</td>
-      <td style="text-align:center;color:#a6e3a1">${s ? fmt1(s.mfeMed) : '—'}</td>
-      <td style="text-align:center;color:#f38ba8">${s ? fmt1(s.maeMed) : '—'}</td>
-      <td style="text-align:center;color:#a6e3a1" title="Медиана хода В СТОРОНУ сигнала среди эпизодов, где выброс пойман">${s && isFinite(s.favHitMed) ? fmt1(s.favHitMed) : '—'}</td>
-      <td style="text-align:center;color:#f38ba8" title="Медиана хода ПРОТИВ сигнала среди эпизодов без выброса">${s && isFinite(s.advMissMed) ? fmt1(s.advMissMed) : '—'}</td>
-      <td style="text-align:center;color:${s && isFinite(s.ev) ? (s.ev >= 0.5 ? '#a6e3a1' : s.ev <= -0.5 ? '#f38ba8' : '#cdd6f4') : '#6c7086'};font-weight:600" title="P·ход_при_попадании + (1−P)·ход_при_промахе — грубое матожидание в сторону сигнала">${s && isFinite(s.ev) ? fmt1(s.ev) : '—'}</td>
-      <td style="text-align:center;color:#cdd6f4">${s && isFinite(s.daysToMed) ? s.daysToMed.toFixed(0) : '—'}</td>
+      <td style="text-align:center;color:#52F2C9">${s ? fmt1(s.mfeMed) : '—'}</td>
+      <td style="text-align:center;color:#FF6A8B">${s ? fmt1(s.maeMed) : '—'}</td>
+      <td style="text-align:center;color:#52F2C9" title="Медиана хода В СТОРОНУ сигнала среди эпизодов, где выброс пойман">${s && isFinite(s.favHitMed) ? fmt1(s.favHitMed) : '—'}</td>
+      <td style="text-align:center;color:#FF6A8B" title="Медиана хода ПРОТИВ сигнала среди эпизодов без выброса">${s && isFinite(s.advMissMed) ? fmt1(s.advMissMed) : '—'}</td>
+      <td style="text-align:center;color:${s && isFinite(s.ev) ? (s.ev >= 0.5 ? '#52F2C9' : s.ev <= -0.5 ? '#FF6A8B' : '#F2F0FF') : '#6F648F'};font-weight:600" title="P·ход_при_попадании + (1−P)·ход_при_промахе — грубое матожидание в сторону сигнала">${s && isFinite(s.ev) ? fmt1(s.ev) : '—'}</td>
+      <td style="text-align:center;color:#F2F0FF">${s && isFinite(s.daysToMed) ? s.daysToMed.toFixed(0) : '—'}</td>
     </tr>`;
   }
   t += `</tbody></table></div>
-  <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓) и EV &gt; 0. «Ход при попадании/промахе» — в СТОРОНУ сигнала (для ↓-бинов знак перевёрнут): общая медиана MFE прячет бимодальность «редко, но крупно / часто понемногу против». Тусклые строки — меньше 10 эпизодов.</div>
+  <div style="font-size:10px;color:#6F648F;margin:-4px 0 10px">Читать так: у полезного сигнала P(выброс) заметно выше базы (× ≥ 1.3 с ✓) и EV &gt; 0. «Ход при попадании/промахе» — в СТОРОНУ сигнала (для ↓-бинов знак перевёрнут): общая медиана MFE прячет бимодальность «редко, но крупно / часто понемногу против». Тусклые строки — меньше 10 эпизодов.</div>
   </details>`;
   return t;
 }
@@ -2566,16 +2566,16 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       const edge = s.accuracy - baseAcc;
       if (!best || edge > best.edge) best = { h, edge, s, baseAcc };
     }
-    if (!best) return `<div style="margin-top:6px;padding:6px 8px;background:#181825;border-radius:5px;font-size:11px;color:#6c7086">⚪ Мало данных для вердикта (нужно N≥30 на горизонте)</div>`;
-    if (best.edge < 5) return `<div style="margin-top:6px;padding:6px 8px;background:#181825;border-radius:5px;font-size:11px;color:#6c7086">⚪ Edge над базой нет (${best.edge>0?'+':''}${best.edge.toFixed(0)} пп на ${hLbl(best.h)}) — торгового сигнала из этого бина сейчас НЕТ, проценты выше повторяют фон рынка</div>`;
-    return `<div style="margin-top:6px;padding:6px 8px;background:${dir>0?'#1a2e1a':'#2e1a1a'};border-radius:5px;font-size:11px;color:${dir>0?'#a6e3a1':'#f38ba8'};font-weight:600">${dir>0?'🟢 ЖДЁМ РОСТ':'🔴 ЖДЁМ ПАДЕНИЕ'} к ${hLbl(best.h)}: точность ${best.s.accuracy.toFixed(0)}% против базы ${best.baseAcc.toFixed(0)}% (edge +${best.edge.toFixed(0)} пп), медианный ход ${fmtPct(best.s.median)}, N=${best.s.n}</div>`;
+    if (!best) return `<div style="margin-top:6px;padding:6px 8px;background:#1A1030;border-radius:5px;font-size:11px;color:#6F648F">⚪ Мало данных для вердикта (нужно N≥30 на горизонте)</div>`;
+    if (best.edge < 5) return `<div style="margin-top:6px;padding:6px 8px;background:#1A1030;border-radius:5px;font-size:11px;color:#6F648F">⚪ Edge над базой нет (${best.edge>0?'+':''}${best.edge.toFixed(0)} пп на ${hLbl(best.h)}) — торгового сигнала из этого бина сейчас НЕТ, проценты выше повторяют фон рынка</div>`;
+    return `<div style="margin-top:6px;padding:6px 8px;background:${dir>0?'rgba(82,242,201,0.08)':'rgba(199,27,82,0.12)'};border-radius:5px;font-size:11px;color:${dir>0?'#52F2C9':'#FF6A8B'};font-weight:600">${dir>0?'🟢 ЖДЁМ РОСТ':'🔴 ЖДЁМ ПАДЕНИЕ'} к ${hLbl(best.h)}: точность ${best.s.accuracy.toFixed(0)}% против базы ${best.baseAcc.toFixed(0)}% (edge +${best.edge.toFixed(0)} пп), медианный ход ${fmtPct(best.s.median)}, N=${best.s.n}</div>`;
   }
 
   function _forecastBlock(bin, label, subtitle) {
     if (!bin) return '';
-    const color = bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4';
-    return `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:8px">
-      <div style="font-size:11px;color:#6c7086;margin-bottom:3px">${subtitle}</div>
+    const color = bin.dir > 0 ? '#52F2C9' : bin.dir < 0 ? '#FF6A8B' : '#F2F0FF';
+    return `<div style="background:#140A24;border-radius:8px;padding:10px 14px;margin-bottom:8px">
+      <div style="font-size:11px;color:#6F648F;margin-bottom:3px">${subtitle}</div>
       <div style="font-size:14px;font-weight:700;color:${color}">${bin.label}</div>
       <div style="margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px">
         ${H.map(h => { const s=bin.stats[h]; return s?`<span>${hLbl(h)}: медиана <b style="color:${color}">${fmtPct(s.median)}</b>, точность <b>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</b>, N=${s.n}</span>`:''; }).filter(Boolean).join('')}
@@ -2590,16 +2590,16 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const firstH = H[0];
     const firstS = bin.stats[firstH];
     const thinData = !firstS || firstS.n < 5;
-    const color = thinData ? '#6c7086' : (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4');
-    const thinNote = thinData ? `<div style="color:#f9e2af;font-size:11px;margin-top:4px">⚠️ Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
+    const color = thinData ? '#6F648F' : (bin.dir > 0 ? '#52F2C9' : bin.dir < 0 ? '#FF6A8B' : '#F2F0FF');
+    const thinNote = thinData ? `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">⚠️ Мало исторических примеров — статистика ненадёжна. Загрузи дневные данные за более длинный период.</div>` : '';
     let speedNote = '';
     if (bin.dir !== 0 && isFinite(bin.speedShare)) {
-      if (bin.speedShare > 1.3) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">🔄 Ход обычно уже ПЕРЕЛЁТЕЛ итоговый уровень к ${hLbl(firstH)} и потом частично откатывает — не путать с «быстрым» движением.</div>`;
-      else if (bin.speedShare >= 0.7) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">⚡ Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
-      else if (bin.speedShare <= 0.35) speedNote = `<div style="color:#fab387;font-size:11px;margin-top:4px">〰️ Ход обычно только начинается к ${hLbl(firstH)} и продолжает нарастать дальше — движение растянутое.</div>`;
+      if (bin.speedShare > 1.3) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">🔄 Ход обычно уже ПЕРЕЛЁТЕЛ итоговый уровень к ${hLbl(firstH)} и потом частично откатывает — не путать с «быстрым» движением.</div>`;
+      else if (bin.speedShare >= 0.7) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">⚡ Ход обычно уже почти весь реализуется к ${hLbl(firstH)} — ждать долго не стоит, если сработает, то быстро.</div>`;
+      else if (bin.speedShare <= 0.35) speedNote = `<div style="color:#FF8A4C;font-size:11px;margin-top:4px">〰️ Ход обычно только начинается к ${hLbl(firstH)} и продолжает нарастать дальше — движение растянутое.</div>`;
     }
-    return `<div style="background:#1e2030;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid ${color}">
-      <div style="font-size:11px;color:#6c7086;margin-bottom:3px">🎯 2D-позиция: уровень × динамика</div>
+    return `<div style="background:#140A24;border-radius:8px;padding:10px 14px;margin-bottom:8px;border-left:3px solid ${color}">
+      <div style="font-size:11px;color:#6F648F;margin-bottom:3px">🎯 2D-позиция: уровень × динамика</div>
       <div style="font-size:14px;font-weight:700;color:${color}">${bin.levelLbl} · ${bin.dynLbl}</div>
       ${thinNote}
       ${speedNote}
@@ -2615,7 +2615,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const spVal = isFinite(last.squeeze_pressure) ? (last.squeeze_pressure*100).toFixed(1)+'%' : '—';
     const nppVal = isFinite(last.net_phys_pct) ? (last.net_phys_pct*100).toFixed(1)+'%' : '—';
     const spPctl = isFinite(last.phys_short_pctl) ? (last.phys_short_pctl*100).toFixed(0)+'%' : '—';
-    html += `<div style="font-size:12px;color:#cba6f7;margin-bottom:8px;font-weight:600">Текущий прогноз · давление сжатия: ${spVal} · перекос: ${nppVal} · шорт-pctl: ${spPctl}</div>`;
+    html += `<div style="font-size:12px;color:#B487F8;margin-bottom:8px;font-weight:600">Текущий прогноз · давление сжатия: ${spVal} · перекос: ${nppVal} · шорт-pctl: ${spPctl}</div>`;
     html += _forecastBlock2D(curBin2D);
     html += _forecastBlock(curBinSp, 'Давление сжатия', '📈 Динамика набора: кто активнее набирал за последние 10 баров');
     html += _forecastBlock(curBinNpp, 'Снэпшот позиции', '📊 Статика: соотношение лонг/шорт от общего ОИ');
@@ -2623,45 +2623,45 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
 
   // Вспомогательная функция рендера таблицы точности
   function _binTable(bStats, title) {
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">${title}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Уровень</th>
-      ${H.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Уровень</th>
+      ${H.map(h=>`<th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
     </tr><tr>
-      <th style="background:#181825"></th>
-      ${H.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания бара в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Сколько баров истории попало в бин">N</th>').join('')}
+      <th style="background:#1A1030"></th>
+      ${H.map(()=>'<th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания бара в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Сколько баров истории попало в бин">N</th>').join('')}
     </tr></thead><tbody>`;
     // База уже посчитана на уровне renderCalibration — общая для таблиц и вердиктов
-    t += `<tr style="background:#1e1e2e;border-top:1px solid #313244"><td style="padding:4px 8px;color:#cba6f7;font-weight:600;white-space:nowrap">📐 Базовый уровень</td>`;
+    t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50"><td style="padding:4px 8px;color:#B487F8;font-weight:600;white-space:nowrap">📐 Базовый уровень</td>`;
     for (const h of H) {
       const b = baseStats[h];
-      if (!b) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
-      const mc = b.median > 0.5 ? '#a6e3a1' : b.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+      if (!b) { t += '<td colspan="3" style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
+      const mc = b.median > 0.5 ? '#52F2C9' : b.median < -0.5 ? '#FF6A8B' : '#F2F0FF';
       t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(b.median)}</td>
-            <td style="text-align:center;padding:4px 6px;color:#f38ba8" title="% дней вниз за весь период">${b.pctDown.toFixed(0)}% ↓</td>
-            <td style="text-align:center;padding:4px 6px;color:#6c7086">${b.n}</td>`;
+            <td style="text-align:center;padding:4px 6px;color:#FF6A8B" title="% дней вниз за весь период">${b.pctDown.toFixed(0)}% ↓</td>
+            <td style="text-align:center;padding:4px 6px;color:#6F648F">${b.n}</td>`;
     }
     t += '</tr>';
 
     for (const bin of bStats) {
-      const rc = bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030';
-      t += `<tr style="background:${rc}"><td style="padding:4px 8px;color:${bin.dir>0?'#a6e3a1':bin.dir<0?'#f38ba8':'#cdd6f4'}">${bin.label}</td>`;
+      const rc = bin.dir > 0 ? 'rgba(82,242,201,0.08)' : bin.dir < 0 ? 'rgba(199,27,82,0.12)' : '#140A24';
+      t += `<tr style="background:${rc}"><td style="padding:4px 8px;color:${bin.dir>0?'#52F2C9':bin.dir<0?'#FF6A8B':'#F2F0FF'}">${bin.label}</td>`;
       for (const h of H) {
         const s = bin.stats[h];
-        if (!s) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
-        const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+        if (!s) { t += '<td colspan="3" style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
+        const mc = s.median > 0.5 ? '#52F2C9' : s.median < -0.5 ? '#FF6A8B' : '#F2F0FF';
         // Точность: сравниваем с базовым уровнем (% дней в направлении сигнала)
         const base = baseStats[h];
         const baseAcc = base ? (bin.dir < 0 ? base.pctDown : (100 - base.pctDown)) : null;
         const edge = baseAcc !== null && isFinite(s.accuracy) ? s.accuracy - baseAcc : null;
         const ac = edge !== null
-          ? (edge >= 5 ? '#a6e3a1' : edge <= -5 ? '#f38ba8' : '#cdd6f4')
-          : (isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4');
+          ? (edge >= 5 ? '#52F2C9' : edge <= -5 ? '#FF6A8B' : '#F2F0FF')
+          : (isFinite(s.accuracy) && s.accuracy >= 60 ? '#52F2C9' : isFinite(s.accuracy) && s.accuracy < 45 ? '#FF6A8B' : '#F2F0FF');
         const edgeTip = edge !== null ? ` title="Преимущество над базой: ${edge>0?'+':''}${edge.toFixed(1)}%"` : '';
         t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(s.median)}</td>
               <td style="text-align:center;padding:4px 6px;color:${ac}"${edgeTip}>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
-              <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
+              <td style="text-align:center;padding:4px 6px;color:#6F648F">${s.n}</td>`;
       }
       t += '</tr>';
     }
@@ -2673,21 +2673,21 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
     const levelLabels = [...new Set(bins2D.map(b => b.levelLbl))];
     const dynLabels   = [...new Set(bins2D.map(b => b.dynLbl))];
     const firstH = H[0];
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; ⚡/〰️ в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🎯 2D: уровень шортов × динамика набора (медиана/точность/${hLbl(firstH)}; ⚡/〰️ в первой колонке — профиль скорости хода: быстрый ход vs растянутый)</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Уровень \\ Динамика</th>
-      ${dynLabels.map(d=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="${H.length}">${d}</th>`).join('')}
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Уровень \\ Динамика</th>
+      ${dynLabels.map(d=>`<th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center" colspan="${H.length}">${d}</th>`).join('')}
     </tr><tr>
-      <th style="background:#181825"></th>
-      ${dynLabels.map(()=>H.map(h=>`<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center">${hLbl(h)}</th>`).join('')).join('')}
+      <th style="background:#1A1030"></th>
+      ${dynLabels.map(()=>H.map(h=>`<th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center">${hLbl(h)}</th>`).join('')).join('')}
     </tr></thead><tbody>`;
     for (const ll of levelLabels) {
-      t += `<tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825;font-weight:600">${ll}</td>`;
+      t += `<tr><td style="padding:4px 8px;color:#F2F0FF;background:#1A1030;font-weight:600">${ll}</td>`;
       for (const dl of dynLabels) {
         const cell = bins2D.find(b => b.levelLbl === ll && b.dynLbl === dl);
-        if (!cell) { t += `<td colspan="${H.length}" style="text-align:center;color:#313244">—</td>`; continue; }
-        const dcolor = cell.dir > 0 ? '#a6e3a1' : cell.dir < 0 ? '#f38ba8' : '#cdd6f4';
+        if (!cell) { t += `<td colspan="${H.length}" style="text-align:center;color:#3a2a50">—</td>`; continue; }
+        const dcolor = cell.dir > 0 ? '#52F2C9' : cell.dir < 0 ? '#FF6A8B' : '#F2F0FF';
         const isCurrent = curBin2D && curBin2D.levelLbl === ll && curBin2D.dynLbl === dl;
         // Профиль скорости — показываем один раз в первой колонке горизонта.
         // ⚡ — ход уже почти весь случился к первому горизонту (быстрый сквиз);
@@ -2702,15 +2702,15 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
         for (const h of H) {
           const s = cell.stats[h];
           const thinData = !s || s.n < 5;
-          const bg = isCurrent ? '#2e2a4a' : (cell.dir>0?'#1a2e1a':cell.dir<0?'#2e1a1a':'#1e2030');
-          if (!s) { t += `<td style="text-align:center;color:#313244;background:${bg}" title="Нет данных">—</td>`; continue; }
-          const mc = thinData ? '#6c7086' : (s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4');
-          const ac = thinData ? '#6c7086' : (isFinite(s.accuracy) && s.accuracy >= 60 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4');
+          const bg = isCurrent ? 'rgba(180,135,248,0.18)' : (cell.dir>0?'rgba(82,242,201,0.08)':cell.dir<0?'rgba(199,27,82,0.12)':'#140A24');
+          if (!s) { t += `<td style="text-align:center;color:#3a2a50;background:${bg}" title="Нет данных">—</td>`; continue; }
+          const mc = thinData ? '#6F648F' : (s.median > 0.5 ? '#52F2C9' : s.median < -0.5 ? '#FF6A8B' : '#F2F0FF');
+          const ac = thinData ? '#6F648F' : (isFinite(s.accuracy) && s.accuracy >= 60 ? '#52F2C9' : isFinite(s.accuracy) && s.accuracy < 45 ? '#FF6A8B' : '#F2F0FF');
           const warn = thinData ? ' title="Мало данных (N<5) — ненадёжно"' : '';
-          t += `<td style="text-align:center;padding:4px 5px;background:${bg};border:${isCurrent?'1px solid #cba6f7':'none'};opacity:${thinData?0.55:1}"${warn}>
+          t += `<td style="text-align:center;padding:4px 5px;background:${bg};border:${isCurrent?'1px solid #B487F8':'none'};opacity:${thinData?0.55:1}"${warn}>
             <span style="color:${mc}">${fmtPct(s.median)}</span><br>
             <span style="color:${ac};font-size:10px">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'} N${s.n}</span>
-            ${h===H[0] && speedBadge ? `<br><span style="color:#fab387;font-size:10px">${speedBadge}</span>` : ''}
+            ${h===H[0] && speedBadge ? `<br><span style="color:#FF8A4C;font-size:10px">${speedBadge}</span>` : ''}
           </td>`;
         }
       }
@@ -2725,40 +2725,40 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
   html += _binTable(binStatsNpp, '📊 Точность по снэпшоту позиции (перекос)');
 
   // Бар-чарт по давлению сжатия
-  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#181825;margin:8px 0 4px"></canvas>`;
-  html += `<div style="font-size:10px;color:#6c7086;margin-bottom:12px">Медианный сдвиг через ${hLbl(H[H.length-1])} — по квинтилям давления сжатия</div>`;
+  html += `<canvas id="c-calib" style="height:120px;display:block;width:100%;border-radius:6px;background:#1A1030;margin:8px 0 4px"></canvas>`;
+  html += `<div style="font-size:10px;color:#6F648F;margin-bottom:12px">Медианный сдвиг через ${hLbl(H[H.length-1])} — по квинтилям давления сжатия</div>`;
 
   // Детальная таблица факт/прогноз по барам (используем SP — динамику)
-  html += `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">Детально по барам: факт vs прогноз (по давлению сжатия)</summary>
+  html += `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">Детально по барам: факт vs прогноз (по давлению сжатия)</summary>
   <div style="overflow-x:auto;max-height:400px;overflow-y:auto"><table style="font-size:11px;border-collapse:collapse;width:100%">
   <thead style="position:sticky;top:0;z-index:1"><tr>
-    <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Дата</th>
-    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:right">Давление</th>
-    <th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:left">Уровень</th>
-    ${H.map(h=>`<th style="padding:4px 6px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
+    <th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Дата</th>
+    <th style="padding:4px 6px;background:#1A1030;color:#A79BC9;text-align:right">Давление</th>
+    <th style="padding:4px 6px;background:#1A1030;color:#A79BC9;text-align:left">Уровень</th>
+    ${H.map(h=>`<th style="padding:4px 6px;background:#1A1030;color:#A79BC9;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
   </tr><tr>
-    <th colspan="3" style="background:#181825"></th>
-    ${H.map(()=>'<th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">прогноз</th><th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">факт</th><th style="padding:2px 4px;background:#181825;color:#6c7086;font-weight:400;font-size:10px">разница</th>').join('')}
+    <th colspan="3" style="background:#1A1030"></th>
+    ${H.map(()=>'<th style="padding:2px 4px;background:#1A1030;color:#6F648F;font-weight:400;font-size:10px">прогноз</th><th style="padding:2px 4px;background:#1A1030;color:#6F648F;font-weight:400;font-size:10px">факт</th><th style="padding:2px 4px;background:#1A1030;color:#6F648F;font-weight:400;font-size:10px">разница</th>').join('')}
   </tr></thead><tbody>`;
 
   for (let i = result.length - 1; i >= 0; i--) {
     const r = result[i];
     if (!isFinite(r.squeeze_pressure) || !isFinite(r.squeeze_pressure_rank)) continue;
     const bin = binStatsSp.find(b => r.squeeze_pressure_rank >= b.min && r.squeeze_pressure_rank < b.max);
-    const rowBg = bin ? (bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030') : '#1e2030';
-    const lblCol = bin ? (bin.dir > 0 ? '#a6e3a1' : bin.dir < 0 ? '#f38ba8' : '#cdd6f4') : '#cdd6f4';
+    const rowBg = bin ? (bin.dir > 0 ? 'rgba(82,242,201,0.08)' : bin.dir < 0 ? 'rgba(199,27,82,0.12)' : '#140A24') : '#140A24';
+    const lblCol = bin ? (bin.dir > 0 ? '#52F2C9' : bin.dir < 0 ? '#FF6A8B' : '#F2F0FF') : '#F2F0FF';
     const spPct = (r.squeeze_pressure*100).toFixed(1)+'%';
     html += `<tr style="background:${rowBg}">
-      <td style="padding:3px 8px;color:#cdd6f4">${r.date}</td>
-      <td style="padding:3px 6px;text-align:right;color:${r.squeeze_pressure>=0?'#a6e3a1':'#f38ba8'}">${spPct}</td>
+      <td style="padding:3px 8px;color:#F2F0FF">${r.date}</td>
+      <td style="padding:3px 6px;text-align:right;color:${r.squeeze_pressure>=0?'#52F2C9':'#FF6A8B'}">${spPct}</td>
       <td style="padding:3px 6px;color:${lblCol};font-size:10px">${bin ? bin.label.replace(/→.*$/,'').trim() : '—'}</td>`;
     for (const h of H) {
       const actual = fwd[h][i];
       const forecast = bin?.stats[h]?.median;
       const diff = isFinite(actual) && isFinite(forecast) ? actual - forecast : NaN;
-      const ac = isFinite(actual) ? (actual>=0?'#a6e3a1':'#f38ba8') : '#6c7086';
-      const dc = isFinite(diff) ? (Math.abs(diff)<2?'#a6e3a1':Math.abs(diff)<5?'#f9e2af':'#f38ba8') : '#6c7086';
-      html += `<td style="text-align:center;padding:3px 4px;color:${isFinite(forecast)?'#cba6f7':'#6c7086'}">${fmtPct(forecast)}</td>
+      const ac = isFinite(actual) ? (actual>=0?'#52F2C9':'#FF6A8B') : '#6F648F';
+      const dc = isFinite(diff) ? (Math.abs(diff)<2?'#52F2C9':Math.abs(diff)<5?'#FF8A4C':'#FF6A8B') : '#6F648F';
+      html += `<td style="text-align:center;padding:3px 4px;color:${isFinite(forecast)?'#B487F8':'#6F648F'}">${fmtPct(forecast)}</td>
                <td style="text-align:center;padding:3px 4px;color:${ac}">${isFinite(actual)?fmtPct(actual):'—'}</td>
                <td style="text-align:center;padding:3px 4px;color:${dc}">${isFinite(diff)?fmtPct(diff):'—'}</td>`;
     }
@@ -2791,7 +2791,7 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       const v = s.median;
       const barH = Math.abs(v) / vmax * (CH/2 - 16);
       const x = i * bw + 2;
-      const col = v > 0 ? '#a6e3a1' : '#f38ba8';
+      const col = v > 0 ? '#52F2C9' : '#FF6A8B';
       ctx.fillStyle = col + '99';
       if (v >= 0) ctx.fillRect(x, midY - barH, bw-4, barH);
       else ctx.fillRect(x, midY, bw-4, barH);
@@ -2799,11 +2799,11 @@ function renderCalibration(binStatsNpp, binStatsSp, binStatsPhase, bins2D, last,
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText((v>0?'+':'')+v.toFixed(1)+'%', x + (bw-4)/2, v>=0 ? midY - barH - 3 : midY + barH + 11);
-      ctx.fillStyle = '#6c7086';
+      ctx.fillStyle = '#6F648F';
       ctx.font = '9px sans-serif';
       ctx.fillText('N='+s.n, x + (bw-4)/2, v>=0 ? CH-3 : 10);
     });
-    ctx.strokeStyle = '#363a4f'; ctx.lineWidth = 1;
+    ctx.strokeStyle = '#2a1f3d'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
   });
 }
@@ -3316,35 +3316,35 @@ async function labOrderflowAutopsy() {
     for (const fx of IFX) if (isFinite(f[fx.key])) ctl[fx.key].push(f[fx.key]);
   }
 
-  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
   let rowsH = '';
   for (const fx of IFX) {
     const a = _median(pre[fx.key]), b = _median(ctl[fx.key]);
     const d = isFinite(a) && isFinite(b) ? a - b : NaN;
     rowsH += `<tr>
-      <td style="padding:4px 8px;color:#cdd6f4">${fx.lbl}</td>
-      <td style="text-align:center;color:#cba6f7;font-weight:600">${isFinite(a) ? a.toFixed(fx.dec) : '—'} <span style="color:#6c7086;font-size:9px">N${pre[fx.key].length}</span></td>
-      <td style="text-align:center;color:#6c7086">${isFinite(b) ? b.toFixed(fx.dec) : '—'} <span style="font-size:9px">N${ctl[fx.key].length}</span></td>
-      <td style="text-align:center;color:${!isFinite(d) ? '#6c7086' : d > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(d) ? (d > 0 ? '+' : '') + d.toFixed(fx.dec) : '—'}</td>
+      <td style="padding:4px 8px;color:#F2F0FF">${fx.lbl}</td>
+      <td style="text-align:center;color:#B487F8;font-weight:600">${isFinite(a) ? a.toFixed(fx.dec) : '—'} <span style="color:#6F648F;font-size:9px">N${pre[fx.key].length}</span></td>
+      <td style="text-align:center;color:#6F648F">${isFinite(b) ? b.toFixed(fx.dec) : '—'} <span style="font-size:9px">N${ctl[fx.key].length}</span></td>
+      <td style="text-align:center;color:${!isFinite(d) ? '#6F648F' : d > 0 ? '#52F2C9' : '#FF6A8B'}">${isFinite(d) ? (d > 0 ? '+' : '') + d.toFixed(fx.dec) : '—'}</td>
     </tr>`;
   }
   const spikesH = perSpike.map(s => `<tr>
-    <td style="padding:3px 8px;color:#cdd6f4">${s.date}</td>
-    <td style="text-align:center;color:#a6e3a1">+${s.ret.toFixed(1)}%</td>
+    <td style="padding:3px 8px;color:#F2F0FF">${s.date}</td>
+    <td style="text-align:center;color:#52F2C9">+${s.ret.toFixed(1)}%</td>
     <td style="text-align:center">${isFinite(s.f.disbDay) ? s.f.disbDay.toFixed(2) : '—'}</td>
     <td style="text-align:center">${isFinite(s.f.disbLast2h) ? s.f.disbLast2h.toFixed(2) : '—'}</td>
     <td style="text-align:center">${isFinite(s.f.askEveMorn) ? s.f.askEveMorn.toFixed(2) : '—'}</td>
   </tr>`).join('');
 
-  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🧬 Стакан и агрессоры в кануны выбросов — ${sym} (${spikes.length} канунов против ${controls.length} контрольных)</summary>
-  <div style="font-size:10px;color:#6c7086;margin-bottom:6px">Источник: AlgoPack fo/tradestats + fo/obstats, 5-минутки front-контракта. Порог выброса: ход за день ≥ +${thr.up.toFixed(1)}%.</div>
-  ${apDiag.length ? `<div style="font-size:10px;color:#f9e2af;background:#181825;border-radius:5px;padding:6px 8px;margin-bottom:6px">⚠ Диагностика пустых ответов:<br>${apDiag.map(d=>'· '+d).join('<br>')}</div>` : ''}
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">🧬 Стакан и агрессоры в кануны выбросов — ${sym} (${spikes.length} канунов против ${controls.length} контрольных)</summary>
+  <div style="font-size:10px;color:#6F648F;margin-bottom:6px">Источник: AlgoPack fo/tradestats + fo/obstats, 5-минутки front-контракта. Порог выброса: ход за день ≥ +${thr.up.toFixed(1)}%.</div>
+  ${apDiag.length ? `<div style="font-size:10px;color:#FF8A4C;background:#1A1030;border-radius:5px;padding:6px 8px;margin-bottom:6px">⚠ Диагностика пустых ответов:<br>${apDiag.map(d=>'· '+d).join('<br>')}</div>` : ''}
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:8px">
-  <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Признак (в канун)</th>${th('медиана канунов')}${th('медиана контрольных')}${th('разница')}</tr></thead>
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Признак (в канун)</th>${th('медиана канунов')}${th('медиана контрольных')}${th('разница')}</tr></thead>
   <tbody>${rowsH}</tbody></table></div>
-  <details><summary style="cursor:pointer;font-size:11px;color:#7287fd;margin-bottom:4px">По каждому выбросу</summary>
+  <details><summary style="cursor:pointer;font-size:11px;color:#7CC7FF;margin-bottom:4px">По каждому выбросу</summary>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:8px">
-  <thead><tr><th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Дата выброса</th>${th('ход')}${th('дисб. агрессоров канун')}${th('дисб. последние 2ч')}${th('офферы вечер/утро')}</tr></thead>
+  <thead><tr><th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Дата выброса</th>${th('ход')}${th('дисб. агрессоров канун')}${th('дисб. последние 2ч')}${th('офферы вечер/утро')}</tr></thead>
   <tbody>${spikesH}</tbody></table></div></details>
   </details>`;
 
@@ -3407,28 +3407,28 @@ async function labSpikeMonitor() {
     const ok = has && p.pass(v);
     if (has) { total++; if (ok) passed++; }
     rowsH += `<tr>
-      <td style="padding:4px 8px;color:#cdd6f4">${p.lbl}</td>
-      <td style="text-align:center;color:#cba6f7;font-weight:600">${has ? (v>0?'+':'')+v.toFixed(k==='outflow'?2:1) : '— нет данных'}</td>
-      <td style="text-align:center;color:#6c7086">${p.pre>0?'+':''}${p.pre}</td>
-      <td style="text-align:center;color:#6c7086">${p.bg>0?'+':''}${p.bg}</td>
-      <td style="text-align:center">${has ? (ok ? '<span style="color:#a6e3a1">✓</span>' : '<span style="color:#6c7086">✗</span>') : '—'}</td>
+      <td style="padding:4px 8px;color:#F2F0FF">${p.lbl}</td>
+      <td style="text-align:center;color:#B487F8;font-weight:600">${has ? (v>0?'+':'')+v.toFixed(k==='outflow'?2:1) : '— нет данных'}</td>
+      <td style="text-align:center;color:#6F648F">${p.pre>0?'+':''}${p.pre}</td>
+      <td style="text-align:center;color:#6F648F">${p.bg>0?'+':''}${p.bg}</td>
+      <td style="text-align:center">${has ? (ok ? '<span style="color:#52F2C9">✓</span>' : '<span style="color:#6F648F">✗</span>') : '—'}</td>
     </tr>`;
   }
   const bonus = [];
   if (last.trend_exhaust === 1) bonus.push('🟠 тренд-истощение (сквиз ↑) активен');
   if (last.spike_setup) bonus.push('🧨 сетап выброса активен');
 
-  const verdict = passed >= 4 ? ['#a6e3a1', `🧨 ПОХОЖЕ НА КАНУН: ${passed}/${total} осей профиля совпали${bonus.length ? ' + ' + bonus.join(' + ') : ''}. Это не гарантия и не дата — но исторически именно так выглядел день перед выбросом.`]
-    : passed >= 3 ? ['#f9e2af', `Частичное совпадение: ${passed}/${total} осей.${bonus.length ? ' ' + bonus.join(', ') + '.' : ''} Следить, но профиль кануна неполный.`]
-    : ['#6c7086', `Не похоже на канун: ${passed}/${total} осей. ${bonus.length ? bonus.join(', ') + ', но ' : ''}профиль состояния далёк от исторических канунов выброса.`];
+  const verdict = passed >= 4 ? ['#52F2C9', `🧨 ПОХОЖЕ НА КАНУН: ${passed}/${total} осей профиля совпали${bonus.length ? ' + ' + bonus.join(' + ') : ''}. Это не гарантия и не дата — но исторически именно так выглядел день перед выбросом.`]
+    : passed >= 3 ? ['#FF8A4C', `Частичное совпадение: ${passed}/${total} осей.${bonus.length ? ' ' + bonus.join(', ') + '.' : ''} Следить, но профиль кануна неполный.`]
+    : ['#6F648F', `Не похоже на канун: ${passed}/${total} осей. ${bonus.length ? bonus.join(', ') + ', но ' : ''}профиль состояния далёк от исторических канунов выброса.`];
 
-  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
-  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🧨 Монитор кануна — ${last.date}</summary>
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">🧨 Монитор кануна — ${last.date}</summary>
   <div style="padding:8px 10px;margin-bottom:6px;background:${verdict[0]}22;border-left:3px solid ${verdict[0]};border-radius:4px;font-size:12px;color:${verdict[0]}">${verdict[1]}</div>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
-  <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Ось профиля</th>${th('сейчас')}${th('медиана канунов')}${th('медиана фона')}${th('совпадение')}</tr></thead>
+  <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Ось профиля</th>${th('сейчас')}${th('медиана канунов')}${th('медиана фона')}${th('совпадение')}</tr></thead>
   <tbody>${rowsH}</tbody></table></div>
-  <div style="font-size:10px;color:#6c7086;margin-bottom:10px">Профиль — case-control по пулу (141 канун), прогон 07.2026. Монитор отвечает «похоже ли сегодня на канун», а не «когда выброс»: дату по дневному ОИ предсказать нельзя в принципе — мало событий на тикер. Обновляй после закрытия дня.</div>
+  <div style="font-size:10px;color:#6F648F;margin-bottom:10px">Профиль — case-control по пулу (141 канун), прогон 07.2026. Монитор отвечает «похоже ли сегодня на канун», а не «когда выброс»: дату по дневному ОИ предсказать нельзя в принципе — мало событий на тикер. Обновляй после закрытия дня.</div>
   </details>`;
 
   const el = document.getElementById('calib-out');
@@ -3466,26 +3466,26 @@ function _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell) {
   const asset = _rootAsset(h.ticker) || h.ticker;
   const word = _assetWord(asset);
   const pAcc = poolAcc3(h.def.id);
-  return `<tr style="background:${hl ? (h.def.dir > 0 ? '#1a2e1a' : '#2e1a1a') : '#1e2030'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
-    <td style="padding:4px 8px;color:#cdd6f4">${h.def.emoji} ${h.def.name}</td>
+  return `<tr style="background:${hl ? (h.def.dir > 0 ? 'rgba(82,242,201,0.08)' : 'rgba(199,27,82,0.12)') : '#140A24'}"${thin ? ' title="Мало собственной истории сигнала у тикера — ориентируйся на пуловую точность"' : ''}>
+    <td style="padding:4px 8px;color:#F2F0FF">${h.def.emoji} ${h.def.name}</td>
     <td style="text-align:center;cursor:pointer" onclick="openTicker('${h.ticker}')" title="${_rootTitle(h.ticker)} — клик: открыть во вкладке «Тикер» с графиками и монитором"
         onmouseover="this.style.background='rgba(180,135,248,0.12)'" onmouseout="this.style.background=''">
-      <span style="color:#cba6f7;font-weight:700;font-size:12px;border-bottom:1px dashed #cba6f766">${asset} ↗</span>
-      ${word ? `<br><span style="color:#cdd6f4;font-size:10px">${word}</span>` : ''}
-      <br><span style="color:#6c7086;font-size:9px">код серии: ${h.ticker}</span></td>
+      <span style="color:#B487F8;font-weight:700;font-size:12px;border-bottom:1px dashed #B487F866">${asset} ↗</span>
+      ${word ? `<br><span style="color:#F2F0FF;font-size:10px">${word}</span>` : ''}
+      <br><span style="color:#6F648F;font-size:9px">код серии: ${h.ticker}</span></td>
     <td style="text-align:center">${dirTxt}</td>
     <td style="text-align:center;white-space:nowrap;font-size:10px" title="Норма (медиана 60 дней): лонг ${fmtK(h.flMed)}, шорт ${fmtK(h.fsMed)}">
-      <span style="color:#a6e3a1">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)} <span style="color:${h.flD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '%/5д' : ''}</span><br>
-      <span style="color:#f38ba8">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)} <span style="color:${h.fsD5 > 0 ? '#a6e3a1' : '#f38ba8'};font-size:9px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '%/5д' : ''}</span></td>
+      <span style="color:#52F2C9">▲ ${fmtK(h.fl)}</span> ${pctlSpan(h.plP)} <span style="color:${h.flD5 > 0 ? '#52F2C9' : '#FF6A8B'};font-size:9px">${isFinite(h.flD5) ? (h.flD5 > 0 ? '+' : '') + h.flD5.toFixed(0) + '%/5д' : ''}</span><br>
+      <span style="color:#FF6A8B">▼ ${fmtK(h.fs)}</span> ${pctlSpan(h.psP)} <span style="color:${h.fsD5 > 0 ? '#52F2C9' : '#FF6A8B'};font-size:9px">${isFinite(h.fsD5) ? (h.fsD5 > 0 ? '+' : '') + h.fsD5.toFixed(0) + '%/5д' : ''}</span></td>
     ${hCell(h.acc1, h.med1, h.n1)}
-    ${!isFinite(h.acc3) ? '<td style="text-align:center;color:#6c7086">—</td>' : `<td style="text-align:center;white-space:nowrap">
-      <span style="color:${h.acc3 >= 60 ? '#a6e3a1' : h.acc3 < 45 ? '#f38ba8' : '#cdd6f4'}">${h.acc3.toFixed(0)}%</span> · <span style="color:${h.med3 > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(h.med3) ? (h.med3 > 0 ? '+' : '') + h.med3.toFixed(1) + '%' : '—'}</span> <span style="color:#6c7086;font-size:9px">N${h.n3}</span><br>
+    ${!isFinite(h.acc3) ? '<td style="text-align:center;color:#6F648F">—</td>' : `<td style="text-align:center;white-space:nowrap">
+      <span style="color:${h.acc3 >= 60 ? '#52F2C9' : h.acc3 < 45 ? '#FF6A8B' : '#F2F0FF'}">${h.acc3.toFixed(0)}%</span> · <span style="color:${h.med3 > 0 ? '#52F2C9' : '#FF6A8B'}">${isFinite(h.med3) ? (h.med3 > 0 ? '+' : '') + h.med3.toFixed(1) + '%' : '—'}</span> <span style="color:#6F648F;font-size:9px">N${h.n3}</span><br>
       <span style="font-size:9px" title="Медианный ход, когда сигнал оказался прав / когда неправ — асимметрия выигрыша и риска">
-        <span style="color:#a6e3a1">прав: ${isFinite(h.fav3) ? '+' + h.fav3.toFixed(1) + '%' : '—'}</span> ·
-        <span style="color:#f38ba8">неправ: ${isFinite(h.adv3) ? '−' + h.adv3.toFixed(1) + '%' : '—'}</span>
+        <span style="color:#52F2C9">прав: ${isFinite(h.fav3) ? '+' + h.fav3.toFixed(1) + '%' : '—'}</span> ·
+        <span style="color:#FF6A8B">неправ: ${isFinite(h.adv3) ? '−' + h.adv3.toFixed(1) + '%' : '—'}</span>
       </span></td>`}
-    <td style="text-align:center;color:#6c7086">${isFinite(pAcc) ? pAcc.toFixed(0) + '%' : '—'} <span style="font-size:9px">N${poolAgg[h.def.id].n3}</span>${thin ? ' ⚠' : ''}</td>
-    <td style="text-align:center;color:#6c7086">${h.lastDate}</td>
+    <td style="text-align:center;color:#6F648F">${isFinite(pAcc) ? pAcc.toFixed(0) + '%' : '—'} <span style="font-size:9px">N${poolAgg[h.def.id].n3}</span>${thin ? ' ⚠' : ''}</td>
+    <td style="text-align:center;color:#6F648F">${h.lastDate}</td>
   </tr>`;
 }
 
@@ -3548,9 +3548,9 @@ async function labSignalScreener(prepend) {
   // Перцентиль позиции: где текущий объём относительно последних ~60 дней
   // этого тикера. p95 = почти максимум за период (перегруз), p10 = минимум.
   const pctlSpan = p => !isFinite(p) ? '' :
-    `<span style="color:${p >= 0.85 ? '#f38ba8' : p <= 0.15 ? '#89b4fa' : '#6c7086'};font-size:9px" title="Перцентиль относительно последних ~60 дней этого тикера: p85+ — близко к максимуму, p15- — к минимуму">p${Math.round(p*100)}</span>`;
-  const hCell = (acc, med, n) => !isFinite(acc) ? '<td style="text-align:center;color:#6c7086">—</td>'
-    : `<td style="text-align:center;white-space:nowrap"><span style="color:${acc >= 60 ? '#a6e3a1' : acc < 45 ? '#f38ba8' : '#cdd6f4'}">${acc.toFixed(0)}%</span> · <span style="color:${med > 0 ? '#a6e3a1' : '#f38ba8'}">${isFinite(med) ? (med > 0 ? '+' : '') + med.toFixed(1) + '%' : '—'}</span> <span style="color:#6c7086;font-size:9px">N${n}</span></td>`;
+    `<span style="color:${p >= 0.85 ? '#FF6A8B' : p <= 0.15 ? '#7CC7FF' : '#6F648F'};font-size:9px" title="Перцентиль относительно последних ~60 дней этого тикера: p85+ — близко к максимуму, p15- — к минимуму">p${Math.round(p*100)}</span>`;
+  const hCell = (acc, med, n) => !isFinite(acc) ? '<td style="text-align:center;color:#6F648F">—</td>'
+    : `<td style="text-align:center;white-space:nowrap"><span style="color:${acc >= 60 ? '#52F2C9' : acc < 45 ? '#FF6A8B' : '#F2F0FF'}">${acc.toFixed(0)}%</span> · <span style="color:${med > 0 ? '#52F2C9' : '#FF6A8B'}">${isFinite(med) ? (med > 0 ? '+' : '') + med.toFixed(1) + '%' : '—'}</span> <span style="color:#6F648F;font-size:9px">N${n}</span></td>`;
 
   // Три группы: решение принимается по «торгуемым» (своя история N>=8 и
   // точность >=60); «против статистики» — сигнал есть, но на этом тикере
@@ -3564,18 +3564,18 @@ async function labSignalScreener(prepend) {
   const thinStocks = thinAll.filter(h => _assetKind(_rootAsset(h.ticker) || h.ticker) === 'акция');
   const thin = thinAll.filter(h => _assetKind(_rootAsset(h.ticker) || h.ticker) !== 'акция');
 
-  const th = s => `<th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400">${s}</th>`;
-  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#cba6f7;font-weight:600;margin-bottom:6px">🎯 Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
+  const th = s => `<th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400">${s}</th>`;
+  let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#B487F8;font-weight:600;margin-bottom:6px">🎯 Скринер: активные сигналы прямо сейчас (${hits.length} на ${_lastPoolInstruments.length} инструментах)</summary>`;
   if (!hits.length) {
-    t += `<div style="font-size:11px;color:#6c7086;margin-bottom:10px">Ни на одном инструменте пула нет активного проверенного сигнала по последнему бару. Это нормальное состояние — сигналы редкие.</div>`;
+    t += `<div style="font-size:11px;color:#6F648F;margin-bottom:10px">Ни на одном инструменте пула нет активного проверенного сигнала по последнему бару. Это нормальное состояние — сигналы редкие.</div>`;
   } else {
     const header = `<thead><tr>
-      <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Сигнал</th>
+      <th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Сигнал</th>
       ${th('Инструмент')}${th('Направление')}${th('Физлица сейчас<br>лонг / шорт (контракты)')}${th('Точность · ход цены<br>за 1 день')}${th('Точность · ход цены<br>за 3 дня')}${th('Пул, 3д')}${th('Последние данные')}
     </tr></thead>`;
     t += strong.length
-      ? `<div style="font-size:11px;color:#a6e3a1;margin-bottom:6px">✅ Торгуемое сегодня (сигнал активен И исторически работает на этом тикере: точность ≥60% при N≥8): <b>${strong.map(h=>_rootAsset(h.ticker)||h.ticker).join(', ')}</b></div>`
-      : `<div style="font-size:11px;color:#6c7086;margin-bottom:6px">Сегодня нет ни одного сигнала, который был бы активен И исторически работал на своём тикере (точность ≥60% при N≥8). Остальное ниже — кандидаты и шум, торговых решений из них не делать.</div>`;
+      ? `<div style="font-size:11px;color:#52F2C9;margin-bottom:6px">✅ Торгуемое сегодня (сигнал активен И исторически работает на этом тикере: точность ≥60% при N≥8): <b>${strong.map(h=>_rootAsset(h.ticker)||h.ticker).join(', ')}</b></div>`
+      : `<div style="font-size:11px;color:#6F648F;margin-bottom:6px">Сегодня нет ни одного сигнала, который был бы активен И исторически работал на своём тикере (точность ≥60% при N≥8). Остальное ниже — кандидаты и шум, торговых решений из них не делать.</div>`;
     t += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">
     ${header}<tbody>`;
     const rowsOf = arr => arr.map(h => _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell)).join('');
@@ -3586,14 +3586,14 @@ async function labSignalScreener(prepend) {
       <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${thinStocks.map(h => _screenRowHtml(h, poolAcc3, poolAgg, fmtK, pctlSpan, hCell)).join('')}</tbody></table></div>`;
     }
     if (weak.length) {
-      t += `<details><summary style="cursor:pointer;font-size:11px;color:#f38ba8;margin:4px 0">⛔ Сигнал активен, но на этих тикерах исторически НЕ работает — не торговать (${weak.length})</summary>
+      t += `<details><summary style="cursor:pointer;font-size:11px;color:#FF6A8B;margin:4px 0">⛔ Сигнал активен, но на этих тикерах исторически НЕ работает — не торговать (${weak.length})</summary>
       <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${rowsOf(weak)}</tbody></table></div></details>`;
     }
     if (thin.length) {
-      t += `<details><summary style="cursor:pointer;font-size:11px;color:#6c7086;margin:4px 0">⚠ Мало собственной истории (N&lt;8) — только пуловая точность, решений не принимать (${thin.length})</summary>
+      t += `<details><summary style="cursor:pointer;font-size:11px;color:#6F648F;margin:4px 0">⚠ Мало собственной истории (N&lt;8) — только пуловая точность, решений не принимать (${thin.length})</summary>
       <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:6px">${header}<tbody>${rowsOf(thin)}</tbody></table></div></details>`;
     }
-    t += `<div style="font-size:10px;color:#6c7086;margin-bottom:10px">Как читать: «точность · ход» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и медианное изменение (N — сколько раз сигнал встречался). Вторая строка 3-дневной ячейки — асимметрия: <span style="color:#a6e3a1">прав</span> = медианный ход, когда сигнал сработал, <span style="color:#f38ba8">неправ</span> = когда нет (это твой риск). «Физлица сейчас»: ▲ лонг ▼ шорт в контрактах, pXX — место объёма на шкале последних ~60 дней тикера (<span style="color:#f38ba8">p85+</span> у максимума, <span style="color:#89b4fa">p15-</span> у минимума), ±%/5д — изменение за 5 дней; норма (медиана 60д) — в подсказке при наведении. Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠), подсветка — ≥65%.</div>`;
+    t += `<div style="font-size:10px;color:#6F648F;margin-bottom:10px">Как читать: «точность · ход» — как часто цена шла в сторону сигнала за 1/3 дня в истории ЭТОГО тикера и медианное изменение (N — сколько раз сигнал встречался). Вторая строка 3-дневной ячейки — асимметрия: <span style="color:#52F2C9">прав</span> = медианный ход, когда сигнал сработал, <span style="color:#FF6A8B">неправ</span> = когда нет (это твой риск). «Физлица сейчас»: ▲ лонг ▼ шорт в контрактах, pXX — место объёма на шкале последних ~60 дней тикера (<span style="color:#FF6A8B">p85+</span> у максимума, <span style="color:#7CC7FF">p15-</span> у минимума), ±%/5д — изменение за 5 дней; норма (медиана 60д) — в подсказке при наведении. Сортировка по 3-дневной точности (своя при N≥8, иначе пуловая ⚠), подсветка — ≥65%.</div>`;
   }
   t += `</details>`;
   const el = document.getElementById('screener-out');
@@ -3784,7 +3784,7 @@ async function labSweepPool() {
 function renderPoolSweep(axes, baseCfg) {
   const { shortPctlPoints, shortMovePoints, longPctlPoints, longMovePoints } = axes;
   const el = document.getElementById('pool-out');
-  const edgeColor = edge => !isFinite(edge) ? '#313244' : edge >= 15 ? '#a6e3a1' : edge >= 5 ? '#94e2b8' : edge <= -5 ? '#f38ba8' : '#cdd6f4';
+  const edgeColor = edge => !isFinite(edge) ? '#3a2a50' : edge >= 15 ? '#52F2C9' : edge >= 5 ? '#52F2C9' : edge <= -5 ? '#FF6A8B' : '#F2F0FF';
 
   // Лучшая точка по оси — не просто максимум edge, а максимум edge СРЕДИ точек,
   // где 95%-й ДИ не пересекает 0 и N ещё не ниже границы надёжности. Иначе
@@ -3802,10 +3802,10 @@ function renderPoolSweep(axes, baseCfg) {
     return points.map((p, i) => {
       const isBest = i === bestIdx;
       const ci = isFinite(p[seKey]) ? `±${(1.96*p[seKey]).toFixed(0)}` : '';
-      const mark = p[sigKey] ? '<span style="color:#a6e3a1" title="95% ДИ edge не пересекает 0">✓</span>' : '';
-      return `<td style="text-align:center;padding:3px 5px;${isBest?'background:#313244;border-radius:3px':''}">
+      const mark = p[sigKey] ? '<span style="color:#52F2C9" title="95% ДИ edge не пересекает 0">✓</span>' : '';
+      return `<td style="text-align:center;padding:3px 5px;${isBest?'background:#3a2a50;border-radius:3px':''}">
         <span style="color:${edgeColor(p[edgeKey])}">${_fmtEdge(p[edgeKey])}</span> ${mark}
-        <br><span style="font-size:9px;color:#6c7086">N${p[nKey]} ${ci}</span>
+        <br><span style="font-size:9px;color:#6F648F">N${p[nKey]} ${ci}</span>
       </td>`;
     }).join('');
   }
@@ -3814,22 +3814,22 @@ function renderPoolSweep(axes, baseCfg) {
   // и наоборот) — поэтому таблица одна строка на ось, а не две.
   function _axisTable(points, title, axisLbl, edgeKey, seKey, sigKey, nKey, rowLbl) {
     const best = _bestIdx(points, edgeKey, sigKey, nKey);
-    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — граница по N<${SWEEP_MIN_N}, не наугад</summary>
+    let t = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">${title} — граница по N<${SWEEP_MIN_N}, не наугад</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">${axisLbl}</th>
-      ${points.map(p=>`<th style="padding:3px 5px;background:#181825;color:#a6adc8;text-align:center;font-size:10px">${p.v}</th>`).join('')}
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">${axisLbl}</th>
+      ${points.map(p=>`<th style="padding:3px 5px;background:#1A1030;color:#A79BC9;text-align:center;font-size:10px">${p.v}</th>`).join('')}
     </tr></thead><tbody>
-    <tr><td style="padding:4px 8px;color:#cdd6f4;background:#181825">${rowLbl}</td>
+    <tr><td style="padding:4px 8px;color:#F2F0FF;background:#1A1030">${rowLbl}</td>
       ${_rowCells(points, edgeKey, seKey, sigKey, nKey, best)}
     </tr>
     </tbody></table></div>
-    <div style="font-size:10px;color:#6c7086;margin:-4px 0 10px">✓ = 95% доверительный интервал edge не пересекает 0. Подсветка ячейки = точка с максимальным значимым edge.</div>
+    <div style="font-size:10px;color:#6F648F;margin:-4px 0 10px">✓ = 95% доверительный интервал edge не пересекает 0. Подсветка ячейки = точка с максимальным значимым edge.</div>
     </details>`;
     return t;
   }
 
-  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах, шаг ${SWEEP_STEP}, останов при N&lt;${SWEEP_MIN_N} — пороги шорт-сквиза и лонг-коррекции раздельные, каждая ось двигает только свой бин.</div>`;
+  let html = `<div style="font-size:11px;color:#6F648F;margin-bottom:8px">Перебор на уже загруженных ${_lastPoolRawData.length} инструментах, шаг ${SWEEP_STEP}, останов при N&lt;${SWEEP_MIN_N} — пороги шорт-сквиза и лонг-коррекции раздельные, каждая ось двигает только свой бин.</div>`;
   html += _axisTable(shortPctlPoints, '🟠 Шорт→сквиз: перцентиль позиции (trend_exhaust_pctl_short)', 'pctl позиции', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
   html += _axisTable(shortMovePoints, '🟠 Шорт→сквиз: перцентиль хода цены (trend_exhaust_move_pctl_short)', 'pctl хода', 'shortEdge', 'shortSE', 'shortSig', 'shortN', 'Шорт→сквиз edge');
   html += _axisTable(longPctlPoints, '🔵 Лонг→коррекция: перцентиль позиции (trend_exhaust_pctl_long)', 'pctl позиции', 'longEdge', 'longSE', 'longSig', 'longN', 'Лонг→коррекция edge');
@@ -3978,11 +3978,11 @@ async function labSpikeAutopsy() {
   for (const f of NUM_FEATS) {
     const a = _median(pre[f.key]), b = _median(ctl[f.key]);
     const diff = isFinite(a) && isFinite(b) ? a - b : NaN;
-    const dc = !isFinite(diff) ? '#6c7086' : Math.abs(diff) < 1e-9 ? '#6c7086' : diff > 0 ? '#a6e3a1' : '#f38ba8';
+    const dc = !isFinite(diff) ? '#6F648F' : Math.abs(diff) < 1e-9 ? '#6F648F' : diff > 0 ? '#52F2C9' : '#FF6A8B';
     rowsHtml += `<tr>
-      <td style="padding:4px 8px;color:#cdd6f4">${f.lbl}</td>
-      <td style="text-align:center;color:#cba6f7;font-weight:600">${fmtV(f, a)}</td>
-      <td style="text-align:center;color:#6c7086">${fmtV(f, b)}</td>
+      <td style="padding:4px 8px;color:#F2F0FF">${f.lbl}</td>
+      <td style="text-align:center;color:#B487F8;font-weight:600">${fmtV(f, a)}</td>
+      <td style="text-align:center;color:#6F648F">${fmtV(f, b)}</td>
       <td style="text-align:center;color:${dc}">${isFinite(diff) ? (diff>0?'+':'')+fmtV(f, diff).replace('%','')+(f.pct && Math.abs(diff)<=1?' пп':'') : '—'}</td>
     </tr>`;
   }
@@ -3991,58 +3991,58 @@ async function labSpikeAutopsy() {
     const b = ctl[f.key].filter(v=>v===1).length / Math.max(1, ctl[f.key].length) * 100;
     const diff = a - b;
     rowsHtml += `<tr>
-      <td style="padding:4px 8px;color:#cdd6f4">${f.lbl} — доля дней</td>
-      <td style="text-align:center;color:#cba6f7;font-weight:600">${a.toFixed(0)}%</td>
-      <td style="text-align:center;color:#6c7086">${b.toFixed(0)}%</td>
-      <td style="text-align:center;color:${diff>0?'#a6e3a1':diff<0?'#f38ba8':'#6c7086'}">${(diff>0?'+':'')+diff.toFixed(0)} пп</td>
+      <td style="padding:4px 8px;color:#F2F0FF">${f.lbl} — доля дней</td>
+      <td style="text-align:center;color:#B487F8;font-weight:600">${a.toFixed(0)}%</td>
+      <td style="text-align:center;color:#6F648F">${b.toFixed(0)}%</td>
+      <td style="text-align:center;color:${diff>0?'#52F2C9':diff<0?'#FF6A8B':'#6F648F'}">${(diff>0?'+':'')+diff.toFixed(0)} пп</td>
     </tr>`;
   }
   const iPreN = ipre[IFEATS[0].key].filter(isFinite).length;
   const iCtlN = ictl[IFEATS[0].key].filter(isFinite).length;
   if (iPreN) {
-    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#7287fd;background:#181825;font-size:10px">⏱ Интрадей из oi_hourly (30-мин срезы): канунов с данными ${iPreN}, фоновых дней ${iCtlN}, тикеров ${hourlyOk}</td></tr>`;
+    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#7CC7FF;background:#1A1030;font-size:10px">⏱ Интрадей из oi_hourly (30-мин срезы): канунов с данными ${iPreN}, фоновых дней ${iCtlN}, тикеров ${hourlyOk}</td></tr>`;
     for (const f of IFEATS) {
       const a = _median(ipre[f.key]), b = _median(ictl[f.key]);
       const diff = isFinite(a) && isFinite(b) ? a - b : NaN;
-      const dc = !isFinite(diff) ? '#6c7086' : diff > 0 ? '#a6e3a1' : diff < 0 ? '#f38ba8' : '#6c7086';
+      const dc = !isFinite(diff) ? '#6F648F' : diff > 0 ? '#52F2C9' : diff < 0 ? '#FF6A8B' : '#6F648F';
       rowsHtml += `<tr>
-        <td style="padding:4px 8px;color:#cdd6f4">${f.lbl}</td>
-        <td style="text-align:center;color:#cba6f7;font-weight:600">${isFinite(a)?(a>0?'+':'')+a.toFixed(2):'—'}</td>
-        <td style="text-align:center;color:#6c7086">${isFinite(b)?(b>0?'+':'')+b.toFixed(2):'—'}</td>
+        <td style="padding:4px 8px;color:#F2F0FF">${f.lbl}</td>
+        <td style="text-align:center;color:#B487F8;font-weight:600">${isFinite(a)?(a>0?'+':'')+a.toFixed(2):'—'}</td>
+        <td style="text-align:center;color:#6F648F">${isFinite(b)?(b>0?'+':'')+b.toFixed(2):'—'}</td>
         <td style="text-align:center;color:${dc}">${isFinite(diff)?(diff>0?'+':'')+diff.toFixed(2)+' пп':'—'}</td>
       </tr>`;
     }
   } else if (proxy) {
-    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#f9e2af;background:#181825;font-size:10px">⏱ Интрадей-данных для канунов не нашлось — проверь покрытие oi_hourly (🩺 Диагностика) или запусти «📥 Интрадей-бэкфилл пула»</td></tr>`;
+    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#FF8A4C;background:#1A1030;font-size:10px">⏱ Интрадей-данных для канунов не нашлось — проверь покрытие oi_hourly (🩺 Диагностика) или запусти «📥 Интрадей-бэкфилл пула»</td></tr>`;
   }
 
   topSpikes.sort((x,y)=>y.ret-x.ret);
   const topHtml = topSpikes.slice(0, 12).map(sk => `<tr>
-    <td style="padding:3px 8px;color:#cdd6f4">${sk.ticker}</td>
-    <td style="padding:3px 8px;color:#cdd6f4">${sk.date}</td>
-    <td style="text-align:center;color:#a6e3a1;font-weight:600">+${sk.ret.toFixed(1)}%</td>
-    <td style="text-align:center;color:#cdd6f4">${isFinite(sk.shortPctl)?(sk.shortPctl*100).toFixed(0)+'%':'—'}</td>
-    <td style="text-align:center;color:${sk.trendRet<0?'#f38ba8':'#a6e3a1'}">${isFinite(sk.trendRet)?(sk.trendRet>0?'+':'')+sk.trendRet.toFixed(1)+'%':'—'}</td>
-    <td style="text-align:center;color:#f38ba8">${isFinite(sk.dd)?sk.dd.toFixed(1)+'%':'—'}</td>
-    <td style="text-align:center;color:${sk.te?'#fab387':'#6c7086'}">${sk.te?'🟠 да':'нет'}</td>
-    <td style="text-align:center;color:${sk.setup?'#a6e3a1':'#6c7086'}">${sk.setup?'🧨 да':'нет'}</td>
+    <td style="padding:3px 8px;color:#F2F0FF">${sk.ticker}</td>
+    <td style="padding:3px 8px;color:#F2F0FF">${sk.date}</td>
+    <td style="text-align:center;color:#52F2C9;font-weight:600">+${sk.ret.toFixed(1)}%</td>
+    <td style="text-align:center;color:#F2F0FF">${isFinite(sk.shortPctl)?(sk.shortPctl*100).toFixed(0)+'%':'—'}</td>
+    <td style="text-align:center;color:${sk.trendRet<0?'#FF6A8B':'#52F2C9'}">${isFinite(sk.trendRet)?(sk.trendRet>0?'+':'')+sk.trendRet.toFixed(1)+'%':'—'}</td>
+    <td style="text-align:center;color:#FF6A8B">${isFinite(sk.dd)?sk.dd.toFixed(1)+'%':'—'}</td>
+    <td style="text-align:center;color:${sk.te?'#FF8A4C':'#6F648F'}">${sk.te?'🟠 да':'нет'}</td>
+    <td style="text-align:center;color:${sk.setup?'#52F2C9':'#6F648F'}">${sk.setup?'🧨 да':'нет'}</td>
   </tr>`).join('');
 
-  const thStyle = 'padding:4px 8px;background:#181825;color:#a6adc8;text-align:center;font-weight:400';
-  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🔎 Что было перед выбросами — ${nSpikes} дней-выбросов на ${usable} инструментах (порог: квантиль ${q} дневных ходов каждого)</summary>
-  <div style="font-size:10px;color:#6c7086;margin-bottom:6px">Признаки взяты ЗА ДЕНЬ ДО выброса и сравнены с теми же признаками во все остальные дни (${nCtl}). Большая разница = признак реально отличает канун выброса от фона.</div>
+  const thStyle = 'padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center;font-weight:400';
+  const html = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🔎 Что было перед выбросами — ${nSpikes} дней-выбросов на ${usable} инструментах (порог: квантиль ${q} дневных ходов каждого)</summary>
+  <div style="font-size:10px;color:#6F648F;margin-bottom:6px">Признаки взяты ЗА ДЕНЬ ДО выброса и сравнены с теми же признаками во все остальные дни (${nCtl}). Большая разница = признак реально отличает канун выброса от фона.</div>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
-    <th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Признак (накануне)</th>
+    <th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Признак (накануне)</th>
     <th style="${thStyle}">медиана перед выбросом<br>(N=${nSpikes})</th>
     <th style="${thStyle}">медиана в остальные дни<br>(N=${nCtl})</th>
     <th style="${thStyle}">разница</th>
   </tr></thead><tbody>${rowsHtml}</tbody></table></div>
-  <details><summary style="cursor:pointer;font-size:11px;color:#7287fd;margin-bottom:4px">Топ-12 выбросов и что было накануне</summary>
+  <details><summary style="cursor:pointer;font-size:11px;color:#7CC7FF;margin-bottom:4px">Топ-12 выбросов и что было накануне</summary>
   <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
   <thead><tr>
-    <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
-    <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Дата</th>
+    <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Тикер</th>
+    <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Дата</th>
     <th style="${thStyle}">ход за день</th>
     <th style="${thStyle}">шорт рынка pctl</th>
     <th style="${thStyle}">ход за ${cfg.trend_exhaust_window} баров до</th>
@@ -4158,11 +4158,11 @@ async function labFetchAssetClasses() {
 function renderAssetClassDiag(errors, rawSample) {
   if (!errors.length && !rawSample) return;
   const el = document.getElementById('pool-out');
-  let html = `<details ${errors.length ? 'open' : ''}><summary style="cursor:pointer;font-size:12px;color:#f38ba8;margin-bottom:6px">⚠️ Классификация: ${errors.length} тикеров без результата</summary>
-    <div style="font-size:10px;color:#6c7086;margin-bottom:4px">Сырой ответ бэкенда на первый тикер (для диагностики полей T-Invest):</div>
-    <pre style="font-size:10px;color:#cdd6f4;background:#181825;padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap">${rawSample ? JSON.stringify(rawSample, null, 2).replace(/</g,'&lt;') : '—'}</pre>`;
+  let html = `<details ${errors.length ? 'open' : ''}><summary style="cursor:pointer;font-size:12px;color:#FF6A8B;margin-bottom:6px">⚠️ Классификация: ${errors.length} тикеров без результата</summary>
+    <div style="font-size:10px;color:#6F648F;margin-bottom:4px">Сырой ответ бэкенда на первый тикер (для диагностики полей T-Invest):</div>
+    <pre style="font-size:10px;color:#F2F0FF;background:#1A1030;padding:8px;border-radius:4px;overflow-x:auto;white-space:pre-wrap">${rawSample ? JSON.stringify(rawSample, null, 2).replace(/</g,'&lt;') : '—'}</pre>`;
   if (errors.length) {
-    html += `<div style="font-size:10px;color:#f38ba8;max-height:200px;overflow-y:auto;margin-top:6px">${errors.map(e=>e.replace(/</g,'&lt;')).join('<br>')}</div>`;
+    html += `<div style="font-size:10px;color:#FF6A8B;max-height:200px;overflow-y:auto;margin-top:6px">${errors.map(e=>e.replace(/</g,'&lt;')).join('<br>')}</div>`;
   }
   html += `</details>`;
   el.innerHTML = html + el.innerHTML;
@@ -4225,60 +4225,60 @@ async function labAnalyzeSqueezeFactors() {
 function renderSqueezeFactors(rows, corr, minN, classCompare) {
   const el = document.getElementById('pool-out');
   const sorted = rows.slice().sort((a,b) => (isFinite(b.shortAcc)?b.shortAcc:-1) - (isFinite(a.shortAcc)?a.shortAcc:-1));
-  const accColor = v => !isFinite(v) ? '#313244' : v >= 60 ? '#a6e3a1' : v < 45 ? '#f38ba8' : '#cdd6f4';
-  const corrColor = v => !isFinite(v) ? '#6c7086' : Math.abs(v) >= 0.5 ? '#f9e2af' : Math.abs(v) >= 0.3 ? '#cdd6f4' : '#6c7086';
+  const accColor = v => !isFinite(v) ? '#3a2a50' : v >= 60 ? '#52F2C9' : v < 45 ? '#FF6A8B' : '#F2F0FF';
+  const corrColor = v => !isFinite(v) ? '#6F648F' : Math.abs(v) >= 0.5 ? '#FF8A4C' : Math.abs(v) >= 0.3 ? '#F2F0FF' : '#6F648F';
 
-  let html = `<details open><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🧬 Какой признак инструмента объясняет разброс точности шорт-сквиза/лонг-коррекции (учтены тикеры с N≥${minN} на +1д)</summary>`;
+  let html = `<details open><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🧬 Какой признак инструмента объясняет разброс точности шорт-сквиза/лонг-коррекции (учтены тикеры с N≥${minN} на +1д)</summary>`;
 
   html += `<div style="font-size:11px;margin-bottom:8px"><table style="border-collapse:collapse;width:100%;max-width:560px">
-    <thead><tr><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:left">Корреляция (Пирсон)</th><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center">r</th><th style="padding:4px 8px;background:#181825;color:#a6adc8;text-align:center">n</th></tr></thead><tbody>`;
+    <thead><tr><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:left">Корреляция (Пирсон)</th><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center">r</th><th style="padding:4px 8px;background:#1A1030;color:#A79BC9;text-align:center">n</th></tr></thead><tbody>`;
   for (const [label, c] of Object.entries(corr)) {
-    html += `<tr><td style="padding:3px 8px;color:#cdd6f4">${label}</td><td style="text-align:center;padding:3px 8px;color:${corrColor(c.r)}">${isFinite(c.r)?c.r.toFixed(2):'—'}</td><td style="text-align:center;padding:3px 8px;color:#6c7086">${c.n}</td></tr>`;
+    html += `<tr><td style="padding:3px 8px;color:#F2F0FF">${label}</td><td style="text-align:center;padding:3px 8px;color:${corrColor(c.r)}">${isFinite(c.r)?c.r.toFixed(2):'—'}</td><td style="text-align:center;padding:3px 8px;color:#6F648F">${c.n}</td></tr>`;
   }
   html += `</tbody></table></div>
-  <div style="font-size:10px;color:#6c7086;margin-bottom:10px">|r|&lt;0.3 — связи нет, 0.3-0.5 — слабая, ≥0.5 — заметная. n — сколько тикеров реально вошло в расчёт (у лонг-коррекции n обычно вдвое меньше — бин реже набирает N≥${minN} на инструмент). При n~10 даже |r|=0.5-0.6 легко объясняется шумом.</div>`;
+  <div style="font-size:10px;color:#6F648F;margin-bottom:10px">|r|&lt;0.3 — связи нет, 0.3-0.5 — слабая, ≥0.5 — заметная. n — сколько тикеров реально вошло в расчёт (у лонг-коррекции n обычно вдвое меньше — бин реже набирает N≥${minN} на инструмент). При n~10 даже |r|=0.5-0.6 легко объясняется шумом.</div>`;
 
   if (classCompare) {
     const fmtG = g => isFinite(g.mean) ? `${g.mean.toFixed(0)}%` : `—`;
-    html += `<div style="font-size:11px;margin-bottom:10px"><b style="color:#a6adc8">🏷 Точность по классу базового актива:</b>
+    html += `<div style="font-size:11px;margin-bottom:10px"><b style="color:#A79BC9">🏷 Точность по классу базового актива:</b>
     <table style="border-collapse:collapse;width:100%;max-width:480px;margin-top:4px">
     <thead><tr>
-      <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:left">Класс</th>
-      <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:center">Шорт→сквиз</th>
-      <th style="padding:3px 8px;background:#181825;color:#a6adc8;text-align:center">Лонг→коррекция</th>
+      <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:left">Класс</th>
+      <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:center">Шорт→сквиз</th>
+      <th style="padding:3px 8px;background:#1A1030;color:#A79BC9;text-align:center">Лонг→коррекция</th>
     </tr></thead><tbody>`;
     for (const [cls, g] of Object.entries(classCompare)) {
-      html += `<tr><td style="padding:3px 8px;color:${cls.startsWith('?')?'#6c7086':'#cdd6f4'}">${cls}</td>
-        <td style="text-align:center;padding:3px 8px;color:${accColor(g.short.mean)}">${fmtG(g.short)} <span style="font-size:9px;color:#6c7086">(n=${g.short.n})</span></td>
-        <td style="text-align:center;padding:3px 8px;color:${accColor(g.long.mean)}">${fmtG(g.long)} <span style="font-size:9px;color:#6c7086">(n=${g.long.n})</span></td>
+      html += `<tr><td style="padding:3px 8px;color:${cls.startsWith('?')?'#6F648F':'#F2F0FF'}">${cls}</td>
+        <td style="text-align:center;padding:3px 8px;color:${accColor(g.short.mean)}">${fmtG(g.short)} <span style="font-size:9px;color:#6F648F">(n=${g.short.n})</span></td>
+        <td style="text-align:center;padding:3px 8px;color:${accColor(g.long.mean)}">${fmtG(g.long)} <span style="font-size:9px;color:#6F648F">(n=${g.long.n})</span></td>
       </tr>`;
     }
     html += `</tbody></table>
-      <div style="font-size:10px;color:#6c7086;margin-top:2px">«? (не classified)» — класс ещё не определён (жми «🏷 Классифицировать тикеры»), не значит «не акция».</div>
+      <div style="font-size:10px;color:#6F648F;margin-top:2px">«? (не classified)» — класс ещё не определён (жми «🏷 Классифицировать тикеры»), не значит «не акция».</div>
     </div>`;
   }
 
   html += `<div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Тикер</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Класс</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Доля физлиц</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Ср. ОИ</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Контр./участник</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Волат. %/д</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Шорт→сквиз</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Лонг→коррекция</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Тикер</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Класс</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Доля физлиц</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Ср. ОИ</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Контр./участник</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Волат. %/д</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Шорт→сквиз</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Лонг→коррекция</th>
     </tr></thead><tbody>`;
   for (const r of sorted) {
     html += `<tr>
-      <td style="padding:3px 8px;color:#cdd6f4">${r.ticker}</td>
-      <td style="text-align:center;padding:3px 8px;color:${r.assetClass?'#f9e2af':'#313244'}">${r.assetClass || '?'}</td>
-      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.physShare)?(r.physShare*100).toFixed(0)+'%':'—'}</td>
-      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.avgOi)?Math.round(r.avgOi).toLocaleString():'—'}</td>
-      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.avgPosSize)?r.avgPosSize.toFixed(1):'—'}</td>
-      <td style="text-align:center;padding:3px 8px;color:#cdd6f4">${isFinite(r.volatility)?r.volatility.toFixed(2):'—'}</td>
-      <td style="text-align:center;padding:3px 8px;color:${accColor(r.shortAcc)}">${isFinite(r.shortAcc)?r.shortAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6c7086"> N${r.shortN}</span></td>
-      <td style="text-align:center;padding:3px 8px;color:${accColor(r.longAcc)}">${isFinite(r.longAcc)?r.longAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6c7086"> N${r.longN}</span></td>
+      <td style="padding:3px 8px;color:#F2F0FF">${r.ticker}</td>
+      <td style="text-align:center;padding:3px 8px;color:${r.assetClass?'#FF8A4C':'#3a2a50'}">${r.assetClass || '?'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#F2F0FF">${isFinite(r.physShare)?(r.physShare*100).toFixed(0)+'%':'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#F2F0FF">${isFinite(r.avgOi)?Math.round(r.avgOi).toLocaleString():'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#F2F0FF">${isFinite(r.avgPosSize)?r.avgPosSize.toFixed(1):'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:#F2F0FF">${isFinite(r.volatility)?r.volatility.toFixed(2):'—'}</td>
+      <td style="text-align:center;padding:3px 8px;color:${accColor(r.shortAcc)}">${isFinite(r.shortAcc)?r.shortAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6F648F"> N${r.shortN}</span></td>
+      <td style="text-align:center;padding:3px 8px;color:${accColor(r.longAcc)}">${isFinite(r.longAcc)?r.longAcc.toFixed(0)+'%':'—'}<span style="font-size:9px;color:#6F648F"> N${r.longN}</span></td>
     </tr>`;
   }
   html += `</tbody></table></div></details>`;
@@ -4292,14 +4292,14 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   const fmtPct = v => isFinite(v) ? (v>0?'+':'')+v.toFixed(1)+'%' : '—';
 
   function _poolTable(poolStats, title) {
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title}</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">${title}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин (пул из ${instruments.length} инструментов)</th>
-      ${HORIZONS.map(h=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Бин (пул из ${instruments.length} инструментов)</th>
+      ${HORIZONS.map(h=>`<th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center" colspan="3">${hLbl(h)}</th>`).join('')}
     </tr><tr>
-      <th style="background:#181825"></th>
-      ${HORIZONS.map(()=>'<th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания дня в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#181825;color:#6c7086;font-weight:400;text-align:center" title="Сколько дней истории попало в бин">N</th>').join('')}
+      <th style="background:#1A1030"></th>
+      ${HORIZONS.map(()=>'<th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Медианное изменение ЦЕНЫ за этот горизонт после попадания дня в бин">ход цены (мед.)</th><th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Как часто цена шла в сторону прогноза бина">точность</th><th style="padding:3px 6px;background:#1A1030;color:#6F648F;font-weight:400;text-align:center" title="Сколько дней истории попало в бин">N</th>').join('')}
     </tr></thead><tbody>`;
     // Базовый уровень пула — все форвардные доходности по всем инструментам сразу
     // (не среднее локальных базовых уровней — иначе инструменты с большим N
@@ -4319,33 +4319,33 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
       const pctDown = all.filter(v=>v<0).length / all.length * 100;
       baseStats[h] = { median: med, pctDown, n: all.length };
     }
-    t += `<tr style="background:#1e1e2e;border-top:1px solid #313244"><td style="padding:4px 8px;color:#cba6f7;font-weight:600;white-space:nowrap">📐 Базовый уровень пула</td>`;
+    t += `<tr style="background:#1A1030;border-top:1px solid #3a2a50"><td style="padding:4px 8px;color:#B487F8;font-weight:600;white-space:nowrap">📐 Базовый уровень пула</td>`;
     for (const h of HORIZONS) {
       const b = baseStats[h];
-      if (!b) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
-      const mc = b.median > 0.5 ? '#a6e3a1' : b.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+      if (!b) { t += '<td colspan="3" style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
+      const mc = b.median > 0.5 ? '#52F2C9' : b.median < -0.5 ? '#FF6A8B' : '#F2F0FF';
       t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(b.median)}</td>
-            <td style="text-align:center;padding:4px 6px;color:#f38ba8" title="% дней вниз по всему пулу">${b.pctDown.toFixed(0)}% ↓</td>
-            <td style="text-align:center;padding:4px 6px;color:#6c7086">${b.n}</td>`;
+            <td style="text-align:center;padding:4px 6px;color:#FF6A8B" title="% дней вниз по всему пулу">${b.pctDown.toFixed(0)}% ↓</td>
+            <td style="text-align:center;padding:4px 6px;color:#6F648F">${b.n}</td>`;
     }
     t += '</tr>';
     for (const bin of poolStats) {
-      const rc = bin.dir > 0 ? '#1a2e1a' : bin.dir < 0 ? '#2e1a1a' : '#1e2030';
-      t += `<tr style="background:${rc}"><td style="padding:4px 8px;color:${bin.dir>0?'#a6e3a1':bin.dir<0?'#f38ba8':'#cdd6f4'}">${bin.label}</td>`;
+      const rc = bin.dir > 0 ? 'rgba(82,242,201,0.08)' : bin.dir < 0 ? 'rgba(199,27,82,0.12)' : '#140A24';
+      t += `<tr style="background:${rc}"><td style="padding:4px 8px;color:${bin.dir>0?'#52F2C9':bin.dir<0?'#FF6A8B':'#F2F0FF'}">${bin.label}</td>`;
       for (const h of HORIZONS) {
         const s = bin.stats[h];
-        if (!s) { t += '<td colspan="3" style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
-        const mc = s.median > 0.5 ? '#a6e3a1' : s.median < -0.5 ? '#f38ba8' : '#cdd6f4';
+        if (!s) { t += '<td colspan="3" style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
+        const mc = s.median > 0.5 ? '#52F2C9' : s.median < -0.5 ? '#FF6A8B' : '#F2F0FF';
         const base = baseStats[h];
         const baseAcc = base ? (bin.dir < 0 ? base.pctDown : (100 - base.pctDown)) : null;
         const edge = baseAcc !== null && isFinite(s.accuracy) ? s.accuracy - baseAcc : null;
         const ac = edge !== null
-          ? (edge >= 5 ? '#a6e3a1' : edge <= -5 ? '#f38ba8' : '#cdd6f4')
-          : (isFinite(s.accuracy) && s.accuracy >= 55 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4');
+          ? (edge >= 5 ? '#52F2C9' : edge <= -5 ? '#FF6A8B' : '#F2F0FF')
+          : (isFinite(s.accuracy) && s.accuracy >= 55 ? '#52F2C9' : isFinite(s.accuracy) && s.accuracy < 45 ? '#FF6A8B' : '#F2F0FF');
         const edgeTip = edge !== null ? ` title="Преимущество над базой пула: ${edge>0?'+':''}${edge.toFixed(1)}%"` : '';
         t += `<td style="text-align:center;padding:4px 6px;color:${mc}">${fmtPct(s.median)}</td>
               <td style="text-align:center;padding:4px 6px;color:${ac}"${edgeTip}>${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</td>
-              <td style="text-align:center;padding:4px 6px;color:#6c7086">${s.n}</td>`;
+              <td style="text-align:center;padding:4px 6px;color:#6F648F">${s.n}</td>`;
       }
       t += '</tr>';
     }
@@ -4356,23 +4356,23 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   // разрастаться в ширину. Показывает, согласованы ли инструменты между
   // собой (реальный эффект) или расходятся (пул усредняет шум).
   function _breakdownTable(perInstrumentStats, title, h) {
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">${title} — разбивка по инструментам на ${hLbl(h)}</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">${title} — разбивка по инструментам на ${hLbl(h)}</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
-    <thead><tr><th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин · горизонт ${hLbl(h)}</th>
-      ${instruments.map(i=>`<th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center" title="${_rootTitle(i.ticker)}">${_rootAsset(i.ticker) || i.ticker}</th>`).join('')}
+    <thead><tr><th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Бин · горизонт ${hLbl(h)}</th>
+      ${instruments.map(i=>`<th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center" title="${_rootTitle(i.ticker)}">${_rootAsset(i.ticker) || i.ticker}</th>`).join('')}
     </tr></thead><tbody>`;
     const nBins = perInstrumentStats[0].length;
     for (let binIdx=0; binIdx<nBins; binIdx++) {
       const label = perInstrumentStats[0][binIdx].label;
       const dir = perInstrumentStats[0][binIdx].dir;
-      t += `<tr><td style="padding:4px 8px;color:${dir>0?'#a6e3a1':dir<0?'#f38ba8':'#cdd6f4'}">${label}</td>`;
+      t += `<tr><td style="padding:4px 8px;color:${dir>0?'#52F2C9':dir<0?'#FF6A8B':'#F2F0FF'}">${label}</td>`;
       for (const instStats of perInstrumentStats) {
         const s = instStats[binIdx]?.stats[h];
-        if (!s) { t += '<td style="text-align:center;color:#313244;padding:4px">—</td>'; continue; }
-        const ac = isFinite(s.accuracy) && s.accuracy >= 55 ? '#a6e3a1' : isFinite(s.accuracy) && s.accuracy < 45 ? '#f38ba8' : '#cdd6f4';
+        if (!s) { t += '<td style="text-align:center;color:#3a2a50;padding:4px">—</td>'; continue; }
+        const ac = isFinite(s.accuracy) && s.accuracy >= 55 ? '#52F2C9' : isFinite(s.accuracy) && s.accuracy < 45 ? '#FF6A8B' : '#F2F0FF';
         t += `<td style="text-align:center;padding:4px 5px">
           <span style="color:${ac}">${isFinite(s.accuracy)?s.accuracy.toFixed(0)+'%':'—'}</span>
-          <span style="color:#6c7086;font-size:9px"> N${s.n}</span>
+          <span style="color:#6F648F;font-size:9px"> N${s.n}</span>
         </td>`;
       }
       t += '</tr>';
@@ -4380,7 +4380,7 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
     return t + '</tbody></table></div></details>';
   }
 
-  let html = `<div style="font-size:11px;color:#6c7086;margin-bottom:8px">Загружено: ${instruments.map(i=>`${i.ticker} (N=${i.result.length})`).join(', ')}</div>`;
+  let html = `<div style="font-size:11px;color:#6F648F;margin-bottom:8px">Загружено: ${instruments.map(i=>`${i.ticker} (N=${i.result.length})`).join(', ')}</div>`;
   html += _poolTable(poolSp, '📈 Пул — давление сжатия');
   html += _breakdownTable(perInstrumentSp, '📈 Давление сжатия', 3);
   html += _poolTable(poolPhase, '🔵📤 Пул — фазы и тренд-истощение');
@@ -4389,21 +4389,21 @@ function renderPoolCalibration(instruments, HORIZONS, poolSp, poolPhase, perInst
   html += _renderEventTable(poolEvents, '🎯 Событийная оценка по пулу — ловля выбросов (по эпизодам, а не дням)');
 
   if (phaseDateOverlap) {
-    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#a6adc8;margin-bottom:6px">🔁 Проверка на пересечение дат (не раздуто ли N синхронными движениями по многим инструментам)</summary>
+    let t = `<details><summary style="cursor:pointer;font-size:12px;color:#A79BC9;margin-bottom:6px">🔁 Проверка на пересечение дат (не раздуто ли N синхронными движениями по многим инструментам)</summary>
     <div style="overflow-x:auto"><table style="font-size:11px;border-collapse:collapse;width:100%;margin-bottom:10px">
     <thead><tr>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:left">Бин</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Всего срабатываний</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Уникальных дат</th>
-      <th style="padding:5px 8px;background:#181825;color:#a6adc8;text-align:center">Доля пересечения</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:left">Бин</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Всего срабатываний</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Уникальных дат</th>
+      <th style="padding:5px 8px;background:#1A1030;color:#A79BC9;text-align:center">Доля пересечения</th>
     </tr></thead><tbody>`;
     for (const row of phaseDateOverlap) {
       if (!row.totalMatches) { continue; }
       const overlapPct = (1 - row.uniqueDates / row.totalMatches) * 100;
-      const oc = overlapPct >= 50 ? '#f9e2af' : '#6c7086';
-      t += `<tr><td style="padding:4px 8px;color:#cdd6f4">${row.label}</td>
-        <td style="text-align:center;padding:4px 6px;color:#6c7086">${row.totalMatches}</td>
-        <td style="text-align:center;padding:4px 6px;color:#6c7086">${row.uniqueDates}</td>
+      const oc = overlapPct >= 50 ? '#FF8A4C' : '#6F648F';
+      t += `<tr><td style="padding:4px 8px;color:#F2F0FF">${row.label}</td>
+        <td style="text-align:center;padding:4px 6px;color:#6F648F">${row.totalMatches}</td>
+        <td style="text-align:center;padding:4px 6px;color:#6F648F">${row.uniqueDates}</td>
         <td style="text-align:center;padding:4px 6px;color:${oc}"${overlapPct>=50?' title="Больше половины срабатываний приходится на даты, которые уже встречались у другого инструмента — часть N может быть одним и тем же рыночным движением"':''}>${overlapPct.toFixed(0)}%</td>
       </tr>`;
     }
