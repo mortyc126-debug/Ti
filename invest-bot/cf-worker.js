@@ -499,98 +499,110 @@ async function scheduledCollectOi(env) {
 // ── Backfill: разовая подтяжка истории FutOI (юр/физ) за прошлые даты ──
 // futoi/securities.json принимает date= и отдаёт срез на конкретный день,
 // поэтому глубину истории тянем циклом по датам (а не диапазоном за раз).
-// Глубина ограничена тарифом подписки на стороне MOEX — сколько дней реально
-// отдаст API, узнаём только по факту (где данных не будет, просто пропустим).
-async function backfillOiHistory(db, env, tickers, days) {
+// Разовая подтяжка истории FutOI через СЕРИЙНЫЙ endpoint
+// futoi/securities/{sym}.json?from=&till= с пагинацией start= — все снэпшоты
+// одного тикера за диапазон дат. Коллекционный securities.json?date= для
+// этого непригоден: ticker= там игнорируется (приходят все ~65 тикеров разом,
+// ~130 строк на один 5-минутный срез) и limit=1000 покрывает только последние
+// ~40 минут дня; вдобавок сто запросов по датам ловили rate-limit MOEX.
+// Диагностика /db/oitest показала: глубина futoi у ключа — с 2020 года.
+//
+// В oi_hourly пишутся снэпшоты с шагом step минут (по умолчанию 30: полный
+// 5-минутный поток за 100 дней — ~36 тыс. строк на тикер, лимит сабзапросов
+// Workers не резиновый), в oi_daily — последний снэпшот каждой даты.
+async function backfillOiHistory(db, env, tickers, days, stepMin = 30) {
   const moexKey = env.MOEX_KEY;
   if (!moexKey) return { error: 'secret MOEX_KEY не задан' };
-  const dates = [];
-  const d = new Date();
-  for (let i = 0; i < days; i++) {
-    dates.push(d.toISOString().slice(0, 10));
-    d.setDate(d.getDate() - 1);
-  }
-  let saved = 0, empty = 0, failed = 0, savedIntraday = 0;
-  // Первые несколько причин ошибок — иначе failed:97 не говорит НИЧЕГО:
-  // 429 = rate-limit MOEX (нужна пауза), 401/403 = ключ без истор. доступа,
-  // «Too many subrequests» = лимит Workers (уменьшить days на вызов).
+  const from = new Date(Date.now() - days * 86400 * 1000).toISOString().slice(0, 10);
+  const till = new Date().toISOString().slice(0, 10);
+  let saved = 0, savedIntraday = 0, failed = 0, pagesTotal = 0;
   const errors = [];
-  const noteErr = (date, msg) => { if (errors.length < 5) errors.push(`${date}: ${msg}`); };
+  const noteErr = (ctx, msg) => { if (errors.length < 5) errors.push(`${ctx}: ${msg}`); };
+
   for (const ticker of tickers) {
     const sym = futoi2sym(ticker);
-    for (const date of dates) {
+    // 1. Все страницы серии (ISS отдаёт по limit строк, листаем start=)
+    const rowsAll = [];
+    let start = 0;
+    for (let page = 0; page < 80; page++) {
       try {
-        // Пауза между датами — 100 запросов подряд без неё ловят rate-limit
-        if (saved + empty + failed > 0) await new Promise(r => setTimeout(r, 150));
-        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${date}&iss.meta=off&limit=1000`;
+        if (pagesTotal > 0) await new Promise(r => setTimeout(r, 150)); // не дразнить rate-limit
+        const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${till}&iss.meta=off&limit=1000&start=${start}`;
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
-        if (!resp.ok) { failed++; noteErr(date, `HTTP ${resp.status} ${(await resp.text().catch(()=>'')).slice(0,120)}`); continue; }
-        const json2 = await resp.json();
-        const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
-        const rows = issBlockToObjects(block).filter(o => o.ticker === sym);
-        if (!rows.length) { empty++; continue; }
-        const byGroup = {};
-        rows.forEach(o => {
-          const g = (o.clgroup || '').toUpperCase();
-          if (g !== 'YUR' && g !== 'FIZ') return;
-          if (!byGroup[g] || (o.tradetime || '') > (byGroup[g].tradetime || '')) byGroup[g] = o;
-        });
-
-        // ВСЕ внутридневные снэпшоты этой даты → oi_hourly. Раньше бэкфилл
-        // схлопывал ответ в одну последнюю запись дня, хотя futoi за прошлые
-        // даты отдаёт 10-минутные срезы глубиной в несколько месяцев (дальше
-        // MOEX сам хранит реже) — вся эта история выбрасывалась, и интрадей
-        // копился только live-кроном с момента его запуска. Ключ — в том же
-        // формате, что у крона (ticker__date__time), чтобы бэкфилл и live
-        // не плодили дубли одного снэпшота.
-        const byTime = {};
-        for (const o of rows) {
-          const g = (o.clgroup || '').toUpperCase();
-          if (g !== 'YUR' && g !== 'FIZ') continue;
-          const tt = o.tradetime || '00:00:00';
-          if (!byTime[tt]) byTime[tt] = {};
-          byTime[tt][g] = o;
-        }
-        const hourlyStmts = [];
-        for (const [tt, groups] of Object.entries(byTime)) {
-          const Y = groups.YUR, F = groups.FIZ;
-          const td = (Y || F)?.tradedate || date;
-          const ts = new Date(`${td}T${tt}+03:00`).getTime(); // tradetime в МСК
-          if (!isFinite(ts)) continue;
-          hourlyStmts.push(db.prepare(
-            `INSERT OR REPLACE INTO oi_hourly
-               (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
-                yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
-          ).bind(
-            `${ticker}__${td}__${tt}`, ticker, ts, 0,
-            Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
-            Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
-            Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
-            Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
-          ));
-        }
-        for (let i = 0; i < hourlyStmts.length; i += 50) {
-          await db.batch(hourlyStmts.slice(i, i + 50));
-        }
-        savedIntraday += hourlyStmts.length;
-        const tradedate = (byGroup.YUR || byGroup.FIZ || {}).tradedate || date;
-        await upsertOiDaily(db, {
-          ticker, tradedate, price: 0,
-          yur_long: Number(byGroup.YUR?.pos_long || 0),
-          yur_short: Math.abs(Number(byGroup.YUR?.pos_short || 0)),
-          fiz_long: Number(byGroup.FIZ?.pos_long || 0),
-          fiz_short: Math.abs(Number(byGroup.FIZ?.pos_short || 0)),
-          yur_long_num: Number(byGroup.YUR?.pos_long_num || 0),
-          yur_short_num: Number(byGroup.YUR?.pos_short_num || 0),
-          fiz_long_num: Number(byGroup.FIZ?.pos_long_num || 0),
-          fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
-        });
-        saved++;
-      } catch (e) { failed++; noteErr(date, e.message.slice(0, 120)); }
+        if (!resp.ok) { failed++; noteErr(`${sym} стр.${page}`, `HTTP ${resp.status} ${(await resp.text().catch(()=>'')).slice(0,120)}`); break; }
+        const j = await resp.json();
+        const block = j.futoi || j[Object.keys(j).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates')];
+        const rows = issBlockToObjects(block);
+        pagesTotal++;
+        if (!rows.length) break;
+        rowsAll.push(...rows.filter(o => o.ticker === sym));
+        if (rows.length < 1000) break;
+        start += 1000;
+      } catch (e) { failed++; noteErr(`${sym} стр.${page}`, e.message.slice(0, 120)); break; }
     }
+    if (!rowsAll.length) continue;
+
+    // 2. Группировка по (дата, время): YUR и FIZ одного среза — в одну запись
+    const byKey = {};
+    for (const o of rowsAll) {
+      const g = (o.clgroup || '').toUpperCase();
+      if (g !== 'YUR' && g !== 'FIZ') continue;
+      const k = `${o.tradedate}__${o.tradetime || '00:00:00'}`;
+      (byKey[k] = byKey[k] || {})[g] = o;
+    }
+
+    // 3. oi_hourly: срезы с шагом stepMin; попутно ищем последний срез дня.
+    // Ключ — формат live-крона (ticker__date__time), дублей не будет.
+    const hourlyStmts = [];
+    const lastOfDay = {};
+    for (const [k, groups] of Object.entries(byKey)) {
+      const [td, tt] = k.split('__');
+      if (!lastOfDay[td] || tt > lastOfDay[td].tt) lastOfDay[td] = { tt, groups };
+      if (parseInt(tt.slice(3, 5), 10) % stepMin !== 0) continue;
+      const ts = new Date(`${td}T${tt}+03:00`).getTime(); // tradetime — МСК
+      if (!isFinite(ts)) continue;
+      const Y = groups.YUR, F = groups.FIZ;
+      hourlyStmts.push(db.prepare(
+        `INSERT OR REPLACE INTO oi_hourly
+           (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
+            yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+      ).bind(
+        `${ticker}__${td}__${tt}`, ticker, ts, 0,
+        Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
+        Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
+        Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
+        Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
+      ));
+    }
+    for (let i = 0; i < hourlyStmts.length; i += 80) {
+      await db.batch(hourlyStmts.slice(i, i + 80));
+    }
+    savedIntraday += hourlyStmts.length;
+
+    // 4. oi_daily: последний срез каждой даты
+    const dailyStmts = Object.entries(lastOfDay).map(([td, { groups }]) => {
+      const Y = groups.YUR, F = groups.FIZ;
+      return db.prepare(
+        `INSERT OR REPLACE INTO oi_daily
+           (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+            yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      ).bind(
+        `${ticker}__${td}`, ticker, td, 0,
+        Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
+        Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
+        Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
+        Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
+        Date.now(),
+      );
+    });
+    for (let i = 0; i < dailyStmts.length; i += 80) {
+      await db.batch(dailyStmts.slice(i, i + 80));
+    }
+    saved += dailyStmts.length;
   }
-  return { tickers: tickers.length, days, saved, savedIntraday, empty, failed, errors };
+  return { tickers: tickers.length, days, from, till, step: stepMin, pages: pagesTotal, saved, savedIntraday, failed, errors };
 }
 
 async function handleDb(path, req, env) {
@@ -1064,7 +1076,10 @@ async function handleDb(path, req, env) {
     }
 
     const days = Math.min(Number(u.searchParams.get('days')) || 90, 365);
-    const result = await backfillOiHistory(db, env, tickers, days);
+    // step= — шаг интрадей-снэпшотов в минутах (5/10/30/60); 30 по умолчанию,
+    // чтобы за 100 дней не упереться в лимит сабзапросов на батчах записи
+    const step = Math.max(5, Math.min(Number(u.searchParams.get('step')) || 30, 60));
+    const result = await backfillOiHistory(db, env, tickers, days, step);
     return json(result);
   }
 
