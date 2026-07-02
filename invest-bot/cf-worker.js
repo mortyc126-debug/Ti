@@ -568,6 +568,11 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffs
         rowsAll.push(...mine);
         start += 1000;
         if (rows.length < 1000) { start = 0; break; } // серия дочитана до конца
+        // Серия идёт от свежих к старым: если вся страница уже старше from,
+        // дальше только более старая история — дочитывать незачем (страховка
+        // на случай, если from= на стороне MOEX не фильтрует)
+        const pageNewest = rows.reduce((m, o) => (o.tradedate && o.tradedate > m) ? o.tradedate : m, '');
+        if (pageNewest && pageNewest < from) { start = 0; break; }
         if (page === maxPages - 1) done = false;      // бюджет вызова исчерпан
       } catch (e) { failed++; noteErr(`${sym} стр.${page}`, e.message.slice(0, 120)); done = false; break; }
     }

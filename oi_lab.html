@@ -131,6 +131,7 @@ details>summary{cursor:pointer;color:#7287fd;font-size:11px;margin-bottom:6px;us
     <button class="sec" onclick="labSweepPool()">🔬 Перебор порогов trend_exhaust</button>
     <button class="sec" onclick="labAnalyzeSqueezeFactors()">🧬 Признаки шорт-сквиза</button>
     <button class="sec" onclick="labSpikeAutopsy()">🔎 Перед выбросами</button>
+    <button class="sec" onclick="labBackfillIntradayPool()">📥 Интрадей-бэкфилл пула</button>
     <button class="sec" onclick="labFetchAssetClasses()">🏷 Классифицировать тикеры (T-Invest)</button>
   </div>
   <div id="pool-out" style="color:#6c7086;font-size:11px">Нажми «Заполнить всеми из базы» (или впиши тикеры вручную), затем «Рассчитать по пулу».</div>
@@ -2612,6 +2613,44 @@ async function poolFillAllTickers() {
   } catch(e) {
     setStatus('Пул: ошибка чтения списка — ' + e.message, 'err');
   }
+}
+
+// Интрадей-бэкфилл ОИ по всем тикерам пула. Endpoint воркера возобновляемый:
+// бесплатный план Workers даёт 50 сабзапросов на вызов, поэтому серия
+// отдаётся порциями по 40 страниц (done:false + nextStart), а цепочку
+// start→nextStart гоняет браузер — у каждого вызова воркера свой лимит.
+// Серия у MOEX плотная (~6 тыс. строк на тикер в день, от свежих к старым):
+// на 100 дней истории выходит ~15-25 вызовов на тикер, вручную не накликать.
+async function labBackfillIntradayPool() {
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  if (!tickers.length) { setStatus('Заполни тикеры пула (можно один) — кнопка «Заполнить всеми из базы»', 'err'); return; }
+  const days = parseInt(document.getElementById('bf-days').value) || 100;
+  let totalDaily = 0, totalIntraday = 0;
+  const problems = [];
+  for (let ti = 0; ti < tickers.length; ti++) {
+    const t = tickers[ti];
+    let start = 0, calls = 0;
+    while (calls < 60) { // предохранитель: ~60 вызовов × 40 стр. хватает на годы истории
+      calls++;
+      setStatus(`Интрадей-бэкфилл ${t} (${ti+1}/${tickers.length}): вызов ${calls}, offset ${start}, собрано ${totalIntraday} срезов…`);
+      let j;
+      try {
+        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&pages=40&start=${start}`);
+        j = await r.json();
+      } catch(e) { problems.push(`${t}: сеть — ${e.message}`); break; }
+      if (j.error) { problems.push(`${t}: ${j.error}`); break; }
+      totalDaily += j.saved || 0;
+      totalIntraday += j.savedIntraday || 0;
+      if (j.errors && j.errors.length) { problems.push(`${t}: ${j.errors[0]}`); console.warn(`бэкфилл ${t}:`, j.errors); }
+      if (j.done || !j.nextStart) break;
+      start = j.nextStart;
+    }
+  }
+  const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
+  if (problems.length) console.warn('Интрадей-бэкфилл, проблемы:', problems);
+  setStatus(`Интрадей-бэкфилл готов: +${totalDaily} дневных, +${totalIntraday} интрадей-срезов, тикеров: ${tickers.length}${probNote}`, problems.length ? 'err' : 'ok');
 }
 
 // Кэш сырых (несчитанных) данных последнего пула — [{ticker, rows, refSwitchDates}].
