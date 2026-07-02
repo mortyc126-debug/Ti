@@ -1333,37 +1333,80 @@ function renderMetrics(result) {
     </div>`).join('');
 }
 
+// Проверенная на пуле статистика сигналов (55 инструментов, ~5900 точек,
+// прогон 2026-07; событийные метрики — окно 5 дневных баров). Интерпретация
+// говорит ТОЛЬКО на языке этих измерений — старый текст «физики в лонге →
+// возможно вниз» повторял гипотезы, половину которых калибровка опровергла.
+const _PLAYBOOK_STATS = {
+  both:      { p: 45, lift: 3.4, sig: true, hit: +5.2, miss: -2.5, ev: +0.9, waitBars: 3 },
+  trendUp:   { p: 19, lift: 1.4, sig: false, hit: +10.3, miss: -1.4, ev: +0.8, waitBars: 3 },
+  longCorr:  { p: 14, lift: 1.3, sig: false, hit: +8.1, miss: -0.2, ev: +1.0, waitBars: 2 },
+  exhaustion:{ acc3d: 74, base3d: 56 }, // направленная точность на +3д (пул)
+};
+
 function renderInterp(result) {
-  const last = result.filter(r=>isFinite(r.weighted_imbalance)).at(-1);
+  const last = result.filter(r=>isFinite(r.net_phys_pct)).at(-1);
   if (!last) return;
   const el = document.getElementById('interp');
   el.style.display = '';
-  const wi = last.weighted_imbalance;
-  const npp = last.net_phys_pct;
-  const lc = last.liquidity_conf;
-  const sd = last.stress_dist;
-  const pp = last.phase_potential;
+
+  const sigLine = (emoji, title, body, color) =>
+    `<div style="padding:7px 10px;margin:4px 0;background:${color}22;border-left:3px solid ${color};border-radius:4px">
+       <b style="color:${color}">${emoji} ${title}</b><br><span style="font-size:11px">${body}</span></div>`;
 
   let txt = '';
-  if (lc < 0.2) txt += '⚠️ Низкая ликвидность (мало участников) — сигнал ненадёжен.<br>';
+  let anySignal = false;
 
-  const absMag = Math.abs(wi);
-  let mag = absMag < 0.3 ? 'слабый' : absMag < 0.8 ? 'умеренный' : 'сильный';
-
-  if (npp > 0) {
-    txt += `📊 Физ.лица нетто-<b>ЛОНГ</b> (${fmt(npp*100,1)}% от TotalOI). `;
-    txt += `Контрарный сигнал: возможен потенциал движения <b>ВНИЗ</b> (${mag}).`;
-    if (sd > 0.005) txt += `<br>🔴 Стресс-дистанция ${fmt(sd*100,2)}% — цена ниже референсного лоя → риск каскадных стопов лонгистов.`;
-  } else if (npp < 0) {
-    txt += `📊 Физ.лица нетто-<b>ШОРТ</b> (${fmt(npp*100,1)}% от TotalOI). `;
-    txt += `Контрарный сигнал: возможен потенциал движения <b>ВВЕРХ</b> (${mag}).`;
-    if (sd > 0.005) txt += `<br>🟢 Стресс-дистанция ${fmt(sd*100,2)}% — цена выше референсного хая → риск каскадного закрытия шортов.`;
-  } else {
-    txt += 'Дисбаланс близок к нулю.';
+  // 1. Лучший лонг-сигнал системы — пересечение
+  if (last.spike_setup && last.trend_exhaust === 1) {
+    anySignal = true;
+    const s = _PLAYBOOK_STATS.both;
+    txt += sigLine('🧨🟠', 'СЕТАП ВЫБРОСА + ТРЕНД-ИСТОЩЕНИЕ — главный лонг-сигнал (единственный значимый)',
+      `Исторически по пулу: выброс вверх в ближайшие 5 дней в ${s.p}% случаев (×${s.lift} к базе, значимо). Попадание в среднем ${s.hit>0?'+':''}${s.hit}%, промах ${s.miss}%, EV ≈ +${s.ev}% на вход. Выброс обычно на ${s.waitBars}-й бар; если за 5 баров не случился — выходить.`, '#a6e3a1');
+  } else if (last.trend_exhaust === 1) {
+    anySignal = true;
+    const s = _PLAYBOOK_STATS.trendUp;
+    txt += sigLine('🟠', 'Тренд-истощение: рынок в шорте у экстремума после падения → возможен сквиз вверх',
+      `По пулу: P(выброс за 5 дн.) ${s.p}% (×${s.lift}), попадание +${s.hit}%, промах ${s.miss}%, EV +${s.ev}%. Без второго условия (сетап выброса) сигнал вдвое слабее пересечения — размер позиции меньше.`, '#fab387');
+  } else if (last.spike_setup) {
+    anySignal = true;
+    txt += sigLine('🧨', 'Сетап выброса: глубокая просадка + поток развернулся в лонг',
+      `Сам по себе — кандидат (×1.5 к базе, EV около нуля). Становится сигналом, если добавится тренд-истощение (🟠) — жди его, а не входи сразу.`, '#f9e2af');
   }
+  if (last.trend_exhaust === -1) {
+    anySignal = true;
+    const s = _PLAYBOOK_STATS.longCorr;
+    txt += sigLine('🟠', 'Тренд-истощение: рынок в лонге у экстремума после роста → коррекция вниз',
+      `Шорт-сигнал с почти бесплатным промахом: попадание +${s.hit}% в сторону шорта, промах всего ${s.miss}%, EV +${s.ev}%.`, '#f38ba8');
+  }
+
+  // 2. Пробой из фазы: работает только «истощение» (вверх ПО позиции физлиц)
+  if (!last.accum_flag && last.breakout_dir === 1 && last.phase_aligned === 1) {
+    anySignal = true;
+    const s = _PLAYBOOK_STATS.exhaustion;
+    txt += sigLine('🔴', 'Выброс ВВЕРХ по позиции физлиц → истощение, самый консистентный шорт пула',
+      `Направленная точность ${s.acc3d}% на +3д против базы ${s.base3d}% — работает почти на каждом тикере (исключение: CC). Профиль — стабильное сползание, не обвал: шорт с целью 2-3% и коротким стопом.`, '#f38ba8');
+  } else if (!last.accum_flag && last.breakout_dir !== 0 && isFinite(last.phase_aligned)) {
+    txt += sigLine('⚪', `Пробой ${last.breakout_dir > 0 ? 'вверх' : 'вниз'} из диапазона (${last.phase_aligned === 1 ? 'по' : 'против'} позиции физлиц)`,
+      `Этот тип пробоя edge на пуле НЕ показал (пробои вниз: EV −1…−2% в обе интерпретации) — не торговый сигнал.`, '#6c7086');
+  }
+
+  // 3. Контекст без вердикта
   if (last.accum_flag) {
-    txt += `<br>🔵 Фаза накопления (флэт) активна. PhasePotential=${fmt(pp,3)} (ReleaseFactor=${fmt(last.release_factor,3)}).`;
+    txt += sigLine('🔵', 'Фаза накопления (флэт + имбаланс)',
+      `Сама по себе выброс не предсказывает (×1.0 к базе на 696 эпизодах) — это состояние ожидания. Торговый интерес появится на пробое или на 🧨/🟠.`, '#89b4fa');
   }
+  if (isFinite(last.squeeze_pressure_rank) && last.squeeze_pressure_rank >= 0.8) {
+    txt += sigLine('⚪', 'Шорт набирали агрессивно (>p80 давления)',
+      `Проверено на пуле: это НЕ сигнал роста (EV −2.2% на 136 эпизодах) — чаще начало движения вниз. Лонг по этому признаку не открывать.`, '#6c7086');
+  }
+
+  if (!anySignal) {
+    txt = sigLine('⚪', 'Активных проверенных сигналов нет',
+      `Ни один из калиброванных сигналов (🧨🟠 пересечение, тренд-истощение ↑/↓, истощение после выброса вверх) сейчас не активен. Показатели в карточках выше — диагностика состояния, а не прогноз.`, '#6c7086') + txt;
+  }
+
+  txt += `<div style="font-size:10px;color:#6c7086;margin-top:4px">Статистика — пул 55 инструментов, ~5900 точек (прогон 07.2026). Пересчитать: «🧮 Рассчитать по пулу». Детали по бинам — событийная таблица.</div>`;
   el.innerHTML = txt;
 }
 
