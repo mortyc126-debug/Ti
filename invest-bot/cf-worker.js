@@ -510,7 +510,7 @@ async function scheduledCollectOi(env) {
 // В oi_hourly пишутся снэпшоты с шагом step минут (по умолчанию 30: полный
 // 5-минутный поток за 100 дней — ~36 тыс. строк на тикер, лимит сабзапросов
 // Workers не резиновый), в oi_daily — последний снэпшот каждой даты.
-async function backfillOiHistory(db, env, tickers, days, stepMin = 30) {
+async function backfillOiHistory(db, env, tickers, days, stepMin = 30, startOffset = 0, maxPages = 25) {
   const moexKey = env.MOEX_KEY;
   if (!moexKey) return { error: 'secret MOEX_KEY не задан' };
   // Базы, созданные до появления oi_hourly, не имеют этой таблицы, если
@@ -531,12 +531,21 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30) {
   const errors = [];
   const noteErr = (ctx, msg) => { if (errors.length < 5) errors.push(`${ctx}: ${msg}`); };
 
+  // Возобновляемость: бесплатный план Workers даёт всего 50 сабзапросов на
+  // вызов (страница = fetch, батч записи = запрос к D1). Один вызов съедает
+  // бюджет maxPages страниц и возвращает done:false + nextStart — следующий
+  // вызов с &start=nextStart продолжает с того же места. Клиент (браузер)
+  // просто дёргает URL в цикле, у каждого вызова лимит свой.
+  let start = Number.isFinite(startOffset) ? startOffset : 0;
+  let done = true;
+  let rowsFetched = 0, rowsMatched = 0;
+  let minDate = null, maxDate = null;
+
   for (const ticker of tickers) {
     const sym = futoi2sym(ticker);
-    // 1. Все страницы серии (ISS отдаёт по limit строк, листаем start=)
+    // 1. Страницы серии (ISS отдаёт по limit строк, листаем start=)
     const rowsAll = [];
-    let start = 0;
-    for (let page = 0; page < 80; page++) {
+    for (let page = 0; page < maxPages; page++) {
       try {
         if (pagesTotal > 0) await new Promise(r => setTimeout(r, 150)); // не дразнить rate-limit
         const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${from}&till=${till}&iss.meta=off&limit=1000&start=${start}`;
@@ -547,10 +556,20 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30) {
         const rows = issBlockToObjects(block);
         pagesTotal++;
         if (!rows.length) break;
-        rowsAll.push(...rows.filter(o => o.ticker === sym));
-        if (rows.length < 1000) break;
+        rowsFetched += rows.length;
+        const mine = rows.filter(o => o.ticker === sym);
+        rowsMatched += mine.length;
+        for (const o of mine) {
+          if (o.tradedate) {
+            if (!minDate || o.tradedate < minDate) minDate = o.tradedate;
+            if (!maxDate || o.tradedate > maxDate) maxDate = o.tradedate;
+          }
+        }
+        rowsAll.push(...mine);
         start += 1000;
-      } catch (e) { failed++; noteErr(`${sym} стр.${page}`, e.message.slice(0, 120)); break; }
+        if (rows.length < 1000) { start = 0; break; } // серия дочитана до конца
+        if (page === maxPages - 1) done = false;      // бюджет вызова исчерпан
+      } catch (e) { failed++; noteErr(`${sym} стр.${page}`, e.message.slice(0, 120)); done = false; break; }
     }
     if (!rowsAll.length) continue;
 
@@ -614,7 +633,10 @@ async function backfillOiHistory(db, env, tickers, days, stepMin = 30) {
     }
     saved += dailyStmts.length;
   }
-  return { tickers: tickers.length, days, from, till, step: stepMin, pages: pagesTotal, saved, savedIntraday, failed, errors };
+  return { tickers: tickers.length, days, from, till, step: stepMin, pages: pagesTotal,
+    rowsFetched, rowsMatched, matchedDates: minDate ? [minDate, maxDate] : null,
+    saved, savedIntraday, failed, errors,
+    done, nextStart: done ? null : start };
 }
 
 async function handleDb(path, req, env) {
@@ -1091,7 +1113,12 @@ async function handleDb(path, req, env) {
     // step= — шаг интрадей-снэпшотов в минутах (5/10/30/60); 30 по умолчанию,
     // чтобы за 100 дней не упереться в лимит сабзапросов на батчах записи
     const step = Math.max(5, Math.min(Number(u.searchParams.get('step')) || 30, 60));
-    const result = await backfillOiHistory(db, env, tickers, days, step);
+    // start= — оффсет пагинации из nextStart предыдущего ответа (возобновление);
+    // pages= — бюджет страниц на вызов (25 по умолчанию: помещается в лимит
+    // 50 сабзапросов бесплатного плана вместе с батчами записи)
+    const startOffset = Math.max(0, Number(u.searchParams.get('start')) || 0);
+    const maxPages = Math.max(1, Math.min(Number(u.searchParams.get('pages')) || 25, 40));
+    const result = await backfillOiHistory(db, env, tickers, days, step, startOffset, maxPages);
     return json(result);
   }
 
