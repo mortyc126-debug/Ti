@@ -511,13 +511,20 @@ async function backfillOiHistory(db, env, tickers, days) {
     d.setDate(d.getDate() - 1);
   }
   let saved = 0, empty = 0, failed = 0, savedIntraday = 0;
+  // Первые несколько причин ошибок — иначе failed:97 не говорит НИЧЕГО:
+  // 429 = rate-limit MOEX (нужна пауза), 401/403 = ключ без истор. доступа,
+  // «Too many subrequests» = лимит Workers (уменьшить days на вызов).
+  const errors = [];
+  const noteErr = (date, msg) => { if (errors.length < 5) errors.push(`${date}: ${msg}`); };
   for (const ticker of tickers) {
     const sym = futoi2sym(ticker);
     for (const date of dates) {
       try {
+        // Пауза между датами — 100 запросов подряд без неё ловят rate-limit
+        if (saved + empty + failed > 0) await new Promise(r => setTimeout(r, 150));
         const url = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=${encodeURIComponent(sym)}&date=${date}&iss.meta=off&limit=1000`;
         const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
-        if (!resp.ok) { failed++; continue; }
+        if (!resp.ok) { failed++; noteErr(date, `HTTP ${resp.status} ${(await resp.text().catch(()=>'')).slice(0,120)}`); continue; }
         const json2 = await resp.json();
         const block = json2.futoi || json2[Object.keys(json2).find(k => k !== 'metadata' && k !== 'history')];
         const rows = issBlockToObjects(block).filter(o => o.ticker === sym);
@@ -580,10 +587,10 @@ async function backfillOiHistory(db, env, tickers, days) {
           fiz_short_num: Number(byGroup.FIZ?.pos_short_num || 0),
         });
         saved++;
-      } catch (e) { failed++; }
+      } catch (e) { failed++; noteErr(date, e.message.slice(0, 120)); }
     }
   }
-  return { tickers: tickers.length, days, saved, savedIntraday, empty, failed };
+  return { tickers: tickers.length, days, saved, savedIntraday, empty, failed, errors };
 }
 
 async function handleDb(path, req, env) {
