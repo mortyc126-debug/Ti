@@ -1128,6 +1128,45 @@ async function handleDb(path, req, env) {
       nextCidx: cidx + 1 < contracts.length ? cidx + 1 : null });
   }
 
+  // ── Разведчик AlgoPack: /db/aptest?type=tradestats&date=&ticker=&sec=fo ──
+  // Проверка по факту, что отдаёт ключ по датасетам AlgoPack для фьючерсов:
+  // tradestats (агрегаты сделок: агрессивные покупки/продажи), obstats
+  // (глубина стакана), orderstats (постановка/снятие заявок). Как с futoi,
+  // покрытие/глубина/имена полей узнаются только пробным запросом.
+  // ticker= — вариант с per-security путём; full=1 — сырой ответ;
+  // extra= — произвольные параметры (url-encoded).
+  if (p === '/aptest' && req.method === 'GET') {
+    const u = new URL(req.url);
+    const moexKey = env.MOEX_KEY;
+    if (!moexKey) return json({ error: 'secret MOEX_KEY не задан' }, 503);
+    const type = (u.searchParams.get('type') || 'tradestats').replace(/[^a-z]/g, '');
+    const sec  = (u.searchParams.get('sec') || 'fo').replace(/[^a-z]/g, '');
+    const date = u.searchParams.get('date') || new Date(Date.now() - 86400 * 1000).toISOString().slice(0, 10);
+    const ticker = u.searchParams.get('ticker');
+    const extra = u.searchParams.get('extra') ? `&${u.searchParams.get('extra')}` : '';
+    const url = ticker
+      ? `https://apim.moex.com/iss/datashop/algopack/${sec}/${type}/${encodeURIComponent(ticker)}.json?date=${date}&iss.meta=off&limit=1000${extra}`
+      : `https://apim.moex.com/iss/datashop/algopack/${sec}/${type}.json?date=${date}&iss.meta=off&limit=1000${extra}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+    const text = await resp.text();
+    let body; try { body = JSON.parse(text); } catch (_) { body = text.slice(0, 500); }
+    if (u.searchParams.get('full') === '1' || typeof body === 'string') {
+      return json({ url, status: resp.status, body });
+    }
+    const blockKey = Object.keys(body).find(k => k !== 'metadata' && !k.endsWith('.cursor') && !k.endsWith('.dates'));
+    const block = body[blockKey] || body.data;
+    const rows = issBlockToObjects(block);
+    const datesBlock = body[`${blockKey}.dates`];
+    return json({
+      url, status: resp.status, blocks: Object.keys(body),
+      columns: block?.columns || null,
+      rowCount: rows.length,
+      firstRow: rows[0] || null,
+      lastRow: rows.length > 1 ? rows[rows.length - 1] : null,
+      datesAvailable: datesBlock ? issBlockToObjects(datesBlock)[0] : null,
+    });
+  }
+
   // ── Человеческие имена root-тикеров: /db/rootnames ──
   // FutOI оперирует 2-буквенными кодами серий (AF, SR, GD), а в терминале
   // пользователь видит коды базового актива (AFLT, SBER, GOLD). Публичный
