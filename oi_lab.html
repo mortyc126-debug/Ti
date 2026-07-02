@@ -2615,67 +2615,47 @@ async function poolFillAllTickers() {
   }
 }
 
-// Интрадей-бэкфилл ОИ по всем тикерам пула. Endpoint воркера возобновляемый:
-// бесплатный план Workers даёт 50 сабзапросов на вызов, поэтому серия
-// отдаётся порциями по 40 страниц (done:false + nextStart), а цепочку
-// start→nextStart гоняет браузер — у каждого вызова воркера свой лимит.
-// Серия у MOEX плотная (~6 тыс. строк на тикер в день, от свежих к старым):
-// на 100 дней истории выходит ~15-25 вызовов на тикер, вручную не накликать.
+// Интрадей-бэкфилл ОИ: обход ПО ДАТАМ, каждая дата — все тикеры разом.
+// Серийный по-тикерный endpoint оказался тупиком: futoi пишет строку на
+// каждое обновление, и прокрутка одного AF дошла до offset 1.4 млн строк.
+// Коллекционный запрос ?date= отдаёт весь день всех ~65 тикеров 5-минутками
+// (~23 тыс. строк = 2-3 страницы) — итого ~90 вызовов на весь пул целиком.
+// Уже закрытые даты воркер скипает по count(*) — перезапуск почти бесплатен.
 async function labBackfillIntradayPool() {
   const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
   if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
-  const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
-  if (!tickers.length) { setStatus('Заполни тикеры пула (можно один) — кнопка «Заполнить всеми из базы»', 'err'); return; }
-  const days = parseInt(document.getElementById('bf-days').value) || 100;
-  let totalDaily = 0, totalIntraday = 0;
+  const days = parseInt(document.getElementById('bf-days').value) || 90;
+  let totalDaily = 0, totalIntraday = 0, skipped = 0, done = 0;
   const problems = [];
-  for (let ti = 0; ti < tickers.length; ti++) {
-    const t = tickers[ti];
-    let start = 0, calls = 0, retries = 0, chainTill = null;
-    // pages=12 вместо 40: тяжёлый вызов (40 МБ JSON на разбор) убивался CPU-
-    // лимитом бесплатного плана Workers, и Cloudflare отдавал страницу ошибки
-    // без CORS-заголовков — в консоли это выглядело как «CORS policy». Лёгкие
-    // вызовы + пауза между ними + ретрай с бэкоффом на упавших.
-    while (calls < 200) { // предохранитель
-      calls++;
-      setStatus(`Интрадей-бэкфилл ${t} (${ti+1}/${tickers.length}): вызов ${calls}, offset ${start}, собрано ${totalIntraday} срезов…`);
-      let j = null;
+  for (let d = 0; d < days; d++) {
+    const dt = new Date(Date.now() - d * 86400 * 1000);
+    const dow = dt.getUTCDay();
+    if (dow === 0 || dow === 6) continue; // выходные — данных нет
+    const date = dt.toISOString().slice(0, 10);
+    let j = null, retries = 0;
+    while (true) {
+      setStatus(`Интрадей-бэкфилл: ${date} (${d+1}/${days} дней), собрано ${totalIntraday} срезов, скипов ${skipped}…`);
       try {
-        // till из первого ответа фиксируется на всю цепочку: offset имеет
-        // смысл только при неизменной правой границе серии
-        const tillParam = chainTill ? `&till=${chainTill}` : '';
-        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&pages=12&start=${start}${tillParam}`);
+        const r = await fetch(`${proxy}/db/oibackfill?date=${date}&all=1&intraday=1&skipdone=1`);
         if (r.ok) j = await r.json();
-      } catch(e) { /* сеть/CORS — уйдём в ретрай ниже */ }
-      if (!j || j.error) {
-        retries++;
-        if (retries > 4) { problems.push(`${t}: не ожил после 4 ретраев на offset ${start}${j?.error ? ' — ' + j.error : ''}`); break; }
-        setStatus(`Интрадей-бэкфилл ${t}: вызов упал (лимиты воркера), ретрай ${retries}/4 через ${2 ** retries}с…`);
-        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
-        continue; // тот же start — уже записанное не задублируется
-      }
-      retries = 0;
-      if (j.till) chainTill = j.till;
-      // Видимость глубины: без дат в статусе не отличить «легитимно копает
-      // плотную серию» от «улетел в 2020 год» (см. историю с AF/offset 780k)
-      if (j.matchedDates) setStatus(`Интрадей-бэкфилл ${t} (${ti+1}/${tickers.length}): вызов ${calls}, копает ${j.matchedDates[0]}…${j.matchedDates[1]}, собрано ${totalIntraday} срезов`);
-      totalDaily += j.saved || 0;
-      totalIntraday += j.savedIntraday || 0;
-      if (j.errors && j.errors.length) { problems.push(`${t}: ${j.errors[0]}`); console.warn(`бэкфилл ${t}:`, j.errors); }
-      if (j.done || !j.nextStart) break;
-      // Клиентский стоп-предохранитель, дублирующий воркерный: MOEX может
-      // игнорировать from= в серийном endpoint, и без стопа цепочка листала
-      // бы историю до 2020 года. Как только самая старая полученная дата
-      // ушла глубже запрошенных days — тикер добит, дальше только старьё.
-      const fromDate = new Date(Date.now() - days * 86400 * 1000).toISOString().slice(0, 10);
-      if (j.matchedDates && j.matchedDates[0] && j.matchedDates[0] < fromDate) break;
-      start = j.nextStart;
-      await new Promise(r => setTimeout(r, 400)); // не долбить воркер очередями
+      } catch(e) { /* сеть — в ретрай */ }
+      if (j && !j.error) break;
+      retries++;
+      if (retries > 4) { problems.push(`${date}: не ожил после 4 ретраев${j?.error ? ' — ' + j.error : ''}`); break; }
+      setStatus(`Интрадей-бэкфилл ${date}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
+      await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+      j = null;
     }
+    if (!j) continue;
+    if (j.skipped) { skipped++; continue; }
+    done++;
+    totalIntraday += j.savedIntraday || 0;
+    totalDaily += j.savedDaily || 0;
+    await new Promise(r => setTimeout(r, 300)); // не долбить воркер очередями
   }
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
   if (problems.length) console.warn('Интрадей-бэкфилл, проблемы:', problems);
-  setStatus(`Интрадей-бэкфилл готов: +${totalDaily} дневных, +${totalIntraday} интрадей-срезов, тикеров: ${tickers.length}${probNote}`, problems.length ? 'err' : 'ok');
+  setStatus(`Интрадей-бэкфилл готов: дат обработано ${done}, скипнуто (уже были) ${skipped}, +${totalIntraday} интрадей-срезов, +${totalDaily} дневных${probNote}`, problems.length ? 'err' : 'ok');
 }
 
 // Кэш сырых (несчитанных) данных последнего пула — [{ticker, rows, refSwitchDates}].

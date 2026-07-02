@@ -1066,6 +1066,110 @@ async function handleDb(path, req, env) {
     // Если передан date= — один запрос на всю дату, сохраняем все запрошенные тикеры.
     // FutOI API возвращает ВСЕ тикеры в одном ответе, поэтому делаем 1 fetch на дату.
     const singleDate = u.searchParams.get('date');
+
+    // ── Интрадей-бэкфилл ОДНОЙ ДАТЫ для ВСЕХ тикеров разом: date=&intraday=1 ──
+    // Серийный endpoint (futoi/securities/{sym}) оказался тупиком для массовой
+    // закачки: он пишет строку на каждое обновление (тысячи строк на тикер в
+    // день), и постраничная прокрутка одного AF дошла до offset 1.4 млн.
+    // Коллекционный же запрос ?date= отдаёт весь день ВСЕХ ~65 тикеров
+    // 5-минутными срезами (~23 тыс. строк = 2-3 страницы по 10000) — на два
+    // порядка дешевле: ~3 запроса к MOEX на дату за весь пул сразу.
+    if (singleDate && u.searchParams.get('intraday') === '1') {
+      const moexKey = env.MOEX_KEY;
+      const stepMin = Math.max(5, Math.min(Number(u.searchParams.get('step')) || 30, 60));
+      await db.prepare(`CREATE TABLE IF NOT EXISTS oi_hourly (
+        key TEXT PRIMARY KEY, ticker TEXT NOT NULL, ts INTEGER NOT NULL,
+        price REAL DEFAULT 0,
+        yur_long REAL DEFAULT 0, yur_short REAL DEFAULT 0,
+        fiz_long REAL DEFAULT 0, fiz_short REAL DEFAULT 0,
+        yur_long_num REAL DEFAULT 0, yur_short_num REAL DEFAULT 0,
+        fiz_long_num REAL DEFAULT 0, fiz_short_num REAL DEFAULT 0
+      )`).run();
+      // Быстрый скип уже закрытой даты — повторный прогон не жжёт запросы к MOEX
+      if (u.searchParams.get('skipdone') === '1') {
+        const dayFrom = new Date(`${singleDate}T00:00:00+03:00`).getTime();
+        const dayTill = dayFrom + 86400 * 1000;
+        const { results } = await db.prepare('SELECT COUNT(*) AS c FROM oi_hourly WHERE ts>=? AND ts<?').bind(dayFrom, dayTill).all();
+        if ((results?.[0]?.c || 0) >= 500) return json({ date: singleDate, skipped: true, existing: results[0].c });
+      }
+      try {
+        const allRows = [];
+        let pages = 0;
+        for (let start2 = 0; pages < 4; start2 += 10000) {
+          const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=SS&date=${singleDate}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=10000&start=${start2}`;
+          const resp = await fetch(url2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+          if (!resp.ok) return json({ date: singleDate, savedIntraday: 0, failed: 1, httpStatus: resp.status });
+          const j2 = await resp.json();
+          const rows2 = issBlockToObjects(j2.futoi || j2[Object.keys(j2).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates')]);
+          pages++;
+          if (!rows2.length) break;
+          allRows.push(...rows2);
+          if (rows2.length < 10000) break;
+        }
+        if (!allRows.length) return json({ date: singleDate, savedIntraday: 0, savedDaily: 0, pages, empty: true });
+
+        // sym → минута → {YUR, FIZ}; фильтр по списку тикеров, если не all=1
+        const wanted = saveAll ? null : new Set(tickers.map(futoi2sym));
+        const bySymTime = {};
+        const lastOfDayBySym = {};
+        for (const o of allRows) {
+          const g = (o.clgroup || '').toUpperCase();
+          if (g !== 'YUR' && g !== 'FIZ') continue;
+          const s = o.ticker;
+          if (wanted && !wanted.has(s)) continue;
+          const tt = `${(o.tradetime || '00:00:00').slice(0, 5)}:00`;
+          const k = `${s}__${tt}`;
+          (bySymTime[k] = bySymTime[k] || { sym: s, tt })[g] = o;
+          if (!lastOfDayBySym[s] || tt > lastOfDayBySym[s].tt) lastOfDayBySym[s] = { tt, k };
+        }
+        const hourlyStmts = [];
+        for (const rec of Object.values(bySymTime)) {
+          if (parseInt(rec.tt.slice(3, 5), 10) % stepMin !== 0) continue;
+          const ts = new Date(`${singleDate}T${rec.tt}+03:00`).getTime();
+          if (!isFinite(ts)) continue;
+          const Y = rec.YUR, F = rec.FIZ;
+          hourlyStmts.push(db.prepare(
+            `INSERT OR REPLACE INTO oi_hourly
+               (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
+                yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+          ).bind(
+            `${rec.sym}__${singleDate}__${rec.tt}`, rec.sym, ts, 0,
+            Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
+            Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
+            Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
+            Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
+          ));
+        }
+        for (let i = 0; i < hourlyStmts.length; i += 80) await db.batch(hourlyStmts.slice(i, i + 80));
+
+        // Дневной итог (последний срез дня каждого sym) — батчем, а не по одному
+        const dailyStmts = Object.entries(lastOfDayBySym).map(([s, { k }]) => {
+          const rec = bySymTime[k];
+          const Y = rec.YUR, F = rec.FIZ;
+          return db.prepare(
+            `INSERT OR REPLACE INTO oi_daily
+               (key,ticker,tradedate,price,yur_long,yur_short,fiz_long,fiz_short,
+                yur_long_num,yur_short_num,fiz_long_num,fiz_short_num,updated_at)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          ).bind(
+            `${s}__${singleDate}`, s, singleDate, 0,
+            Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
+            Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
+            Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
+            Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
+            Date.now(),
+          );
+        });
+        for (let i = 0; i < dailyStmts.length; i += 80) await db.batch(dailyStmts.slice(i, i + 80));
+
+        return json({ date: singleDate, pages, rows: allRows.length,
+          savedIntraday: hourlyStmts.length, savedDaily: dailyStmts.length });
+      } catch (e) {
+        return json({ date: singleDate, savedIntraday: 0, failed: 1, error: e.message }, 500);
+      }
+    }
+
     if (singleDate) {
       const moexKey = env.MOEX_KEY;
       // Один запрос — весь снэпшот сессии (все тикеры в одном ответе)
