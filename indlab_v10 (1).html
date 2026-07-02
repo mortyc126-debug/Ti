@@ -9389,9 +9389,9 @@ function _sysRenderStaticSections() {
           const useAlt = hasAlt && (typeof _ilAltPrefGet === 'function') && _ilAltPrefGet(id);
           // ромб классика — клик вкл/выкл индикатор на графике
           const cOn = !!(typeof chartInds !== 'undefined' && chartInds[id]);
-          const cBg = cOn ? 'rgba(82,242,201,0.85)' : 'transparent';
-          const cBorder = cOn ? '#52F2C9' : 'rgba(82,242,201,0.6)';
-          const cGlow = cOn ? '0 0 5px rgba(82,242,201,0.6)' : 'none';
+          const cBg = cOn ? 'rgba(242,240,255,0.85)' : 'transparent';
+          const cBorder = cOn ? 'var(--text)' : 'rgba(242,240,255,0.6)';
+          const cGlow = cOn ? '0 0 5px rgba(242,240,255,0.6)' : 'none';
           const cDiam = '<span onclick="event.stopPropagation();cpChartToggle(\''+id+'\');_sysUpdateDiam(\''+id+'\')" title="Вкл/выкл на графике" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;cursor:pointer;">'
             + '<span id="sysdiam-c-'+id+'" style="display:inline-block;width:11px;height:11px;transform:rotate(45deg);flex-shrink:0;border:1.5px solid '+cBorder+';background:'+cBg+';transition:all .15s;box-shadow:'+cGlow+';"></span>'
             + '</span>';
@@ -9406,7 +9406,7 @@ function _sysRenderStaticSections() {
           return '<div style="display:flex;align-items:center;gap:0;padding:1px 0;">'
             + cDiam
             + aDiam
-            + '<span id="sysname-'+id+'" style="font-size:10px;color:'+(cOn?'#52F2C9':useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
+            + '<span id="sysname-'+id+'" style="font-size:10px;color:'+(cOn?'var(--text)':useAlt?'#B487F8':'var(--text2)')+';font-family:var(--mono);">'+name+'</span>'
             + '</div>';
         }).join('')
         + '</div>';
@@ -10535,9 +10535,9 @@ function _sysUpdateDiam(id) {
 
   const cEl = document.getElementById('sysdiam-c-' + id);
   if (cEl) {
-    cEl.style.background   = cOn ? 'rgba(82,242,201,0.85)' : 'transparent';
-    cEl.style.borderColor  = cOn ? '#52F2C9' : 'rgba(82,242,201,0.6)';
-    cEl.style.boxShadow    = cOn ? '0 0 5px rgba(82,242,201,0.6)' : 'none';
+    cEl.style.background   = cOn ? 'rgba(242,240,255,0.85)' : 'transparent';
+    cEl.style.borderColor  = cOn ? 'var(--text)' : 'rgba(242,240,255,0.6)';
+    cEl.style.boxShadow    = cOn ? '0 0 5px rgba(242,240,255,0.6)' : 'none';
   }
   const aEl = document.getElementById('sysdiam-a-' + id);
   if (aEl) {
@@ -10546,7 +10546,7 @@ function _sysUpdateDiam(id) {
     aEl.style.boxShadow    = useAlt ? '0 0 5px rgba(180,135,248,0.5)' : 'none';
   }
   const nEl = document.getElementById('sysname-' + id);
-  if (nEl) nEl.style.color = cOn ? '#52F2C9' : useAlt ? '#B487F8' : 'var(--text2)';
+  if (nEl) nEl.style.color = cOn ? 'var(--text)' : useAlt ? '#B487F8' : 'var(--text2)';
 }
 
 function _sysRenderVP() {
