@@ -2632,25 +2632,32 @@ async function labBackfillIntradayPool() {
     const dow = dt.getUTCDay();
     if (dow === 0 || dow === 6) continue; // выходные — данных нет
     const date = dt.toISOString().slice(0, 10);
-    let j = null, retries = 0;
-    while (true) {
-      setStatus(`Интрадей-бэкфилл: ${date} (${d+1}/${days} дней), собрано ${totalIntraday} срезов, скипов ${skipped}…`);
+    // День не влезает в один вызов воркера (MOEX режет страницы до 1000 строк,
+    // полный день ~23 тыс.) — воркер отдаёт nextPstart, гоняем дату чанками
+    let pstart = 0, dateDone = false, dateSkipped = false, retries = 0;
+    while (!dateDone) {
+      setStatus(`Интрадей-бэкфилл: ${date} (${d+1}/${days} дней), чанк с ${pstart}, собрано ${totalIntraday} срезов, скипов ${skipped}…`);
+      let j = null;
       try {
-        const r = await fetch(`${proxy}/db/oibackfill?date=${date}&all=1&intraday=1&skipdone=1`);
+        const r = await fetch(`${proxy}/db/oibackfill?date=${date}&all=1&intraday=1&skipdone=1&pstart=${pstart}`);
         if (r.ok) j = await r.json();
       } catch(e) { /* сеть — в ретрай */ }
-      if (j && !j.error) break;
-      retries++;
-      if (retries > 4) { problems.push(`${date}: не ожил после 4 ретраев${j?.error ? ' — ' + j.error : ''}`); break; }
-      setStatus(`Интрадей-бэкфилл ${date}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
-      await new Promise(r => setTimeout(r, 2 ** retries * 1000));
-      j = null;
+      if (!j || j.error) {
+        retries++;
+        if (retries > 4) { problems.push(`${date}: не ожил после 4 ретраев${j?.error ? ' — ' + j.error : ''}`); break; }
+        setStatus(`Интрадей-бэкфилл ${date}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
+        await new Promise(r => setTimeout(r, 2 ** retries * 1000));
+        continue;
+      }
+      retries = 0;
+      if (j.skipped) { dateSkipped = true; break; }
+      totalIntraday += j.savedIntraday || 0;
+      totalDaily += j.savedDaily || 0;
+      if (j.nextPstart) { pstart = j.nextPstart; await new Promise(r => setTimeout(r, 250)); }
+      else dateDone = true;
     }
-    if (!j) continue;
-    if (j.skipped) { skipped++; continue; }
-    done++;
-    totalIntraday += j.savedIntraday || 0;
-    totalDaily += j.savedDaily || 0;
+    if (dateSkipped) { skipped++; continue; }
+    if (dateDone) done++;
     await new Promise(r => setTimeout(r, 300)); // не долбить воркер очередями
   }
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';

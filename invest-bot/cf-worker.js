@@ -1085,26 +1085,36 @@ async function handleDb(path, req, env) {
         yur_long_num REAL DEFAULT 0, yur_short_num REAL DEFAULT 0,
         fiz_long_num REAL DEFAULT 0, fiz_short_num REAL DEFAULT 0
       )`).run();
+      const pstart = Math.max(0, Number(u.searchParams.get('pstart')) || 0);
       // Быстрый скип уже закрытой даты — повторный прогон не жжёт запросы к MOEX
-      if (u.searchParams.get('skipdone') === '1') {
+      if (pstart === 0 && u.searchParams.get('skipdone') === '1') {
         const dayFrom = new Date(`${singleDate}T00:00:00+03:00`).getTime();
         const dayTill = dayFrom + 86400 * 1000;
         const { results } = await db.prepare('SELECT COUNT(*) AS c FROM oi_hourly WHERE ts>=? AND ts<?').bind(dayFrom, dayTill).all();
-        if ((results?.[0]?.c || 0) >= 500) return json({ date: singleDate, skipped: true, existing: results[0].c });
+        // Полный день пула ~1950 срезов (65 тикеров × ~30 отметок), прерванная
+        // на середине дата ~975 — порог 1500 отличает целые дни от огрызков
+        if ((results?.[0]?.c || 0) >= 1500) return json({ date: singleDate, skipped: true, existing: results[0].c });
       }
       try {
+        // MOEX режет страницу до 1000 строк независимо от limit= (проверено:
+        // limit=10000 вернул ровно 1000, и «весь день» оказался последними
+        // 40 минутами — в базу попало по одному срезу на тикер). Листаем по
+        // ФАКТИЧЕСКОМУ размеру страницы; день не влезает в бюджет одного
+        // вызова (лимит 50 сабзапросов) — возвращаем nextPstart, клиент
+        // продолжает ту же дату следующим вызовом.
         const allRows = [];
-        let pages = 0;
-        for (let start2 = 0; pages < 4; start2 += 10000) {
-          const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=SS&date=${singleDate}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=10000&start=${start2}`;
+        let pages = 0, start2 = pstart, finished = false;
+        for (; pages < 12; ) {
+          const url2 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities.json?ticker=SS&date=${singleDate}&iss.meta=off&iss.only=futoi&futoi.columns=ticker,tradedate,tradetime,clgroup,pos_long,pos_short,pos_long_num,pos_short_num&limit=1000&start=${start2}`;
           const resp = await fetch(url2, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
           if (!resp.ok) return json({ date: singleDate, savedIntraday: 0, failed: 1, httpStatus: resp.status });
           const j2 = await resp.json();
           const rows2 = issBlockToObjects(j2.futoi || j2[Object.keys(j2).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates')]);
           pages++;
-          if (!rows2.length) break;
+          if (!rows2.length) { finished = true; break; }
           allRows.push(...rows2);
-          if (rows2.length < 10000) break;
+          start2 += rows2.length;
+          if (rows2.length < 1000) { finished = true; break; }
         }
         if (!allRows.length) return json({ date: singleDate, savedIntraday: 0, savedDaily: 0, pages, empty: true });
 
@@ -1143,8 +1153,11 @@ async function handleDb(path, req, env) {
         }
         for (let i = 0; i < hourlyStmts.length; i += 80) await db.batch(hourlyStmts.slice(i, i + 80));
 
-        // Дневной итог (последний срез дня каждого sym) — батчем, а не по одному
-        const dailyStmts = Object.entries(lastOfDayBySym).map(([s, { k }]) => {
+        // Дневной итог (последний срез дня каждого sym) — батчем, а не по одному.
+        // Только из первого чанка даты: страницы идут от конца дня к началу,
+        // последний срез дня есть лишь при pstart=0 — продолжение даты
+        // затёрло бы oi_daily более ранним временем
+        const dailyStmts = pstart > 0 ? [] : Object.entries(lastOfDayBySym).map(([s, { k }]) => {
           const rec = bySymTime[k];
           const Y = rec.YUR, F = rec.FIZ;
           return db.prepare(
@@ -1164,7 +1177,8 @@ async function handleDb(path, req, env) {
         for (let i = 0; i < dailyStmts.length; i += 80) await db.batch(dailyStmts.slice(i, i + 80));
 
         return json({ date: singleDate, pages, rows: allRows.length,
-          savedIntraday: hourlyStmts.length, savedDaily: dailyStmts.length });
+          savedIntraday: hourlyStmts.length, savedDaily: dailyStmts.length,
+          nextPstart: finished ? null : start2 });
       } catch (e) {
         return json({ date: singleDate, savedIntraday: 0, failed: 1, error: e.message }, 500);
       }
