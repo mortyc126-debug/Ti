@@ -2660,6 +2660,12 @@ async function labBackfillIntradayPool() {
       totalIntraday += j.savedIntraday || 0;
       if (j.errors && j.errors.length) { problems.push(`${t}: ${j.errors[0]}`); console.warn(`бэкфилл ${t}:`, j.errors); }
       if (j.done || !j.nextStart) break;
+      // Клиентский стоп-предохранитель, дублирующий воркерный: MOEX может
+      // игнорировать from= в серийном endpoint, и без стопа цепочка листала
+      // бы историю до 2020 года. Как только самая старая полученная дата
+      // ушла глубже запрошенных days — тикер добит, дальше только старьё.
+      const fromDate = new Date(Date.now() - days * 86400 * 1000).toISOString().slice(0, 10);
+      if (j.matchedDates && j.matchedDates[0] && j.matchedDates[0] < fromDate) break;
       start = j.nextStart;
       await new Promise(r => setTimeout(r, 400)); // не долбить воркер очередями
     }
