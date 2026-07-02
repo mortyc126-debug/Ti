@@ -1080,6 +1080,129 @@ async function handleDb(path, req, env) {
     }
     if (!saveAll && !tickers.length) return json({ error: 'нет тикеров: пусто и в параметре, и в oi_tracked_state' }, 400);
 
+    // ── Интрадей-бэкфилл: mode=seriesdays — СЕРИЙНЫЙ endpoint по одному дню ──
+    // Итог всех экспериментов: коллекционный ?date= отдаёт только последние
+    // ~40 минут дня и не листается вовсе (start/interval игнорируются);
+    // серийный securities/{sym} листается, а с from=till=ОДИН ДЕНЬ отдаёт
+    // 5-минутки этого дня (по наблюдению пользователя — всех тикеров разом).
+    // Обходим дни от свежих к старым; бюджет вызова ~14 страниц, продолжение
+    // через cursor(дата)+pstart(строка внутри дня). oi_daily здесь не пишем:
+    // порядок строк в чанках не гарантирован, а дневные итоги уже есть.
+    if (u.searchParams.get('mode') === 'seriesdays') {
+      const moexKey = env.MOEX_KEY;
+      if (!moexKey) return json({ error: 'secret MOEX_KEY не задан' });
+      const ticker0 = tickers[0];
+      if (!ticker0) return json({ error: 'tickers= обязателен (тикер для пути серии)' }, 400);
+      const sym = futoi2sym(ticker0);
+      const days = Math.min(Number(u.searchParams.get('days')) || 90, 365);
+      const stepMin = Math.max(5, Math.min(Number(u.searchParams.get('step')) || 30, 60));
+      const fromDate = new Date(Date.now() - days * 86400 * 1000).toISOString().slice(0, 10);
+      const curParam = u.searchParams.get('cursor') || '';
+      let cursor = /^\d{4}-\d{2}-\d{2}$/.test(curParam) ? curParam : new Date().toISOString().slice(0, 10);
+      let pstart = Math.max(0, Number(u.searchParams.get('pstart')) || 0);
+      await db.batch([
+        db.prepare(`CREATE TABLE IF NOT EXISTS oi_hourly (
+          key TEXT PRIMARY KEY, ticker TEXT NOT NULL, ts INTEGER NOT NULL,
+          price REAL DEFAULT 0,
+          yur_long REAL DEFAULT 0, yur_short REAL DEFAULT 0,
+          fiz_long REAL DEFAULT 0, fiz_short REAL DEFAULT 0,
+          yur_long_num REAL DEFAULT 0, yur_short_num REAL DEFAULT 0,
+          fiz_long_num REAL DEFAULT 0, fiz_short_num REAL DEFAULT 0
+        )`),
+        db.prepare(`CREATE INDEX IF NOT EXISTS idx_oihourly_ticker ON oi_hourly(ticker, ts)`),
+      ]);
+      // Уже покрытые дни (по опорному sym): скип без похода в MOEX
+      const covered = new Set();
+      try {
+        const fromTs = new Date(`${fromDate}T00:00:00+03:00`).getTime();
+        const { results } = await db.prepare(
+          'SELECT CAST((ts + 10800000)/86400000 AS INTEGER) AS d, COUNT(*) AS c FROM oi_hourly WHERE ticker=? AND ts>=? GROUP BY d'
+        ).bind(sym, fromTs).all();
+        for (const r of (results || [])) if (Number(r.c) >= 15) covered.add(Number(r.d));
+      } catch (_) {}
+      const dayNum = (ds) => Math.floor((new Date(`${ds}T00:00:00+03:00`).getTime() + 10800000) / 86400000);
+      const prevDay = (ds) => new Date(new Date(`${ds}T12:00:00Z`).getTime() - 86400 * 1000).toISOString().slice(0, 10);
+
+      let fetches = 0, savedIntraday = 0, daysDone = 0, daysSkipped = 0, stuck = false;
+      const symsSeen = new Set();
+      const errors = [];
+      let nextCursor = null, nextPstart = 0;
+
+      for (let ds = cursor; ds >= fromDate; ) {
+        const dow = new Date(`${ds}T12:00:00Z`).getUTCDay();
+        if (dow === 0 || dow === 6) { ds = prevDay(ds); pstart = 0; continue; }
+        if (pstart === 0 && covered.has(dayNum(ds))) { daysSkipped++; ds = prevDay(ds); continue; }
+        if (fetches >= 14) { nextCursor = ds; nextPstart = pstart; break; }
+
+        // Страницы одного дня с pstart; защита от залипшей пагинации
+        const rowsDay = [];
+        let st = pstart, finishedDay = false, lastSig = '';
+        while (fetches < 14) {
+          fetches++;
+          const url3 = `https://apim.moex.com/iss/analyticalproducts/futoi/securities/${encodeURIComponent(sym)}.json?from=${ds}&till=${ds}&iss.meta=off&limit=1000&start=${st}`;
+          let rows3;
+          try {
+            const resp = await fetch(url3, { headers: { Authorization: `Bearer ${moexKey}`, Accept: 'application/json' } });
+            if (!resp.ok) { if (errors.length < 5) errors.push(`${ds}: HTTP ${resp.status}`); finishedDay = true; break; }
+            const j3 = await resp.json();
+            rows3 = issBlockToObjects(j3.futoi || j3[Object.keys(j3).find(k => k !== 'metadata' && k !== 'history' && k !== 'futoi.dates')]);
+          } catch (e) { if (errors.length < 5) errors.push(`${ds}: ${e.message.slice(0, 80)}`); finishedDay = true; break; }
+          if (!rows3.length) { finishedDay = true; break; }
+          const sig = `${rows3[0].tradedate}_${rows3[0].tradetime}_${rows3[0].ticker}_${rows3[0].clgroup}`;
+          if (sig === lastSig) { stuck = true; finishedDay = true; break; }
+          lastSig = sig;
+          rowsDay.push(...rows3);
+          st += rows3.length;
+          if (rows3.length < 1000) { finishedDay = true; break; }
+          await new Promise(r => setTimeout(r, 120));
+        }
+
+        // Запись собранного куска дня: sym×минута, шаг stepMin
+        if (rowsDay.length) {
+          const byKey2 = {};
+          for (const o of rowsDay) {
+            const g = (o.clgroup || '').toUpperCase();
+            if (g !== 'YUR' && g !== 'FIZ') continue;
+            if (o.tradedate && o.tradedate !== ds) continue;
+            symsSeen.add(o.ticker);
+            const tt = `${(o.tradetime || '00:00:00').slice(0, 5)}:00`;
+            if (parseInt(tt.slice(3, 5), 10) % stepMin !== 0) continue;
+            const k = `${o.ticker}__${tt}`;
+            (byKey2[k] = byKey2[k] || { sym2: o.ticker, tt })[g] = o;
+          }
+          const stmts = [];
+          for (const rec of Object.values(byKey2)) {
+            const ts = new Date(`${ds}T${rec.tt}+03:00`).getTime();
+            if (!isFinite(ts)) continue;
+            const Y = rec.YUR, F = rec.FIZ;
+            stmts.push(db.prepare(
+              `INSERT OR REPLACE INTO oi_hourly
+                 (key,ticker,ts,price,yur_long,yur_short,fiz_long,fiz_short,
+                  yur_long_num,yur_short_num,fiz_long_num,fiz_short_num)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`
+            ).bind(
+              `${rec.sym2}__${ds}__${rec.tt}`, rec.sym2, ts, 0,
+              Number(Y?.pos_long || 0), Math.abs(Number(Y?.pos_short || 0)),
+              Number(F?.pos_long || 0), Math.abs(Number(F?.pos_short || 0)),
+              Number(Y?.pos_long_num || 0), Number(Y?.pos_short_num || 0),
+              Number(F?.pos_long_num || 0), Number(F?.pos_short_num || 0),
+            ));
+          }
+          for (let i = 0; i < stmts.length; i += 80) await db.batch(stmts.slice(i, i + 80));
+          savedIntraday += stmts.length;
+        }
+
+        if (!finishedDay) { nextCursor = ds; nextPstart = st; break; } // бюджет кончился внутри дня
+        daysDone++;
+        ds = prevDay(ds);
+        pstart = 0;
+      }
+
+      return json({ ticker: ticker0, sym, from: fromDate, cursor, fetches,
+        daysDone, daysSkipped, savedIntraday, symsSeen: symsSeen.size,
+        stuck, errors, nextCursor, nextPstart: nextCursor ? nextPstart : null });
+    }
+
     // Если передан date= — один запрос на всю дату, сохраняем все запрошенные тикеры.
     // FutOI API возвращает ВСЕ тикеры в одном ответе, поэтому делаем 1 fetch на дату.
     const singleDate = u.searchParams.get('date');

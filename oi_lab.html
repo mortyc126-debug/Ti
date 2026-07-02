@@ -2615,55 +2615,63 @@ async function poolFillAllTickers() {
   }
 }
 
-// Интрадей-бэкфилл ОИ: обход ПО ДАТАМ, каждая дата — все тикеры разом.
-// Серийный по-тикерный endpoint оказался тупиком: futoi пишет строку на
-// каждое обновление, и прокрутка одного AF дошла до offset 1.4 млн строк.
-// Коллекционный запрос ?date= отдаёт весь день всех ~65 тикеров 5-минутками
-// (~23 тыс. строк = 2-3 страницы) — итого ~90 вызовов на весь пул целиком.
-// Уже закрытые даты воркер скипает по count(*) — перезапуск почти бесплатен.
+// Интрадей-бэкфилл ОИ через серийный endpoint по одному дню (mode=seriesdays).
+// Итог экспериментов: коллекционный ?date= отдаёт только последние ~40 минут
+// дня и не листается; серийный листается, а с from=till=день отдаёт 5-минутки
+// дня (наблюдение: всех тикеров разом). Воркер обходит дни от свежих к старым
+// в бюджете ~14 страниц на вызов и возвращает cursor+pstart для продолжения.
+// Если ответы реально содержат весь пул (symsSeen велик) — хватает одной
+// цепочки; если только опорный тикер — цепочка гоняется на каждый тикер пула.
 async function labBackfillIntradayPool() {
   const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
   if (!proxy) { setStatus('Укажи прокси-URL', 'err'); return; }
+  const tickers = document.getElementById('pool-tickers').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+  if (!tickers.length) { setStatus('Заполни тикеры пула — кнопка «Заполнить всеми из базы»', 'err'); return; }
   const days = parseInt(document.getElementById('bf-days').value) || 90;
-  let totalDaily = 0, totalIntraday = 0, skipped = 0, done = 0;
+  let totalIntraday = 0, daysDone = 0, daysSkipped = 0, maxSymsSeen = 0;
   const problems = [];
-  for (let d = 0; d < days; d++) {
-    const dt = new Date(Date.now() - d * 86400 * 1000);
-    const dow = dt.getUTCDay();
-    if (dow === 0 || dow === 6) continue; // выходные — данных нет
-    const date = dt.toISOString().slice(0, 10);
-    // День не влезает в один вызов воркера (MOEX режет страницы до 1000 строк,
-    // полный день ~23 тыс.) — воркер отдаёт nextPstart, гоняем дату чанками
-    let pstart = 0, dateDone = false, dateSkipped = false, retries = 0;
-    while (!dateDone) {
-      setStatus(`Интрадей-бэкфилл: ${date} (${d+1}/${days} дней), чанк с ${pstart}, собрано ${totalIntraday} срезов, скипов ${skipped}…`);
+
+  const runChain = async (t, ti, tn) => {
+    let cursor = null, pstart = 0, calls = 0, retries = 0;
+    while (calls < 120) {
+      calls++;
+      setStatus(`Интрадей-бэкфилл ${t} (${ti}/${tn}): вызов ${calls}${cursor ? ', день ' + cursor : ''}, собрано ${totalIntraday} срезов, скипов ${daysSkipped}…`);
       let j = null;
       try {
-        const r = await fetch(`${proxy}/db/oibackfill?date=${date}&all=1&intraday=1&skipdone=1&pstart=${pstart}`);
+        const cur = cursor ? `&cursor=${cursor}&pstart=${pstart}` : '';
+        const r = await fetch(`${proxy}/db/oibackfill?tickers=${encodeURIComponent(t)}&days=${days}&mode=seriesdays${cur}`);
         if (r.ok) j = await r.json();
       } catch(e) { /* сеть — в ретрай */ }
-      if (j && j.fatal) { problems.push(`${date}: ${j.error}`); break; } // ретраить бессмысленно
       if (!j || j.error) {
         retries++;
-        if (retries > 4) { problems.push(`${date}: не ожил после 4 ретраев${j?.error ? ' — ' + j.error : ''}`); break; }
-        setStatus(`Интрадей-бэкфилл ${date}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
+        if (retries > 4) { problems.push(`${t}: не ожил после 4 ретраев${j?.error ? ' — ' + j.error : ''}`); return; }
+        setStatus(`Интрадей-бэкфилл ${t}: вызов упал, ретрай ${retries}/4 через ${2 ** retries}с…`);
         await new Promise(r => setTimeout(r, 2 ** retries * 1000));
         continue;
       }
       retries = 0;
-      if (j.skipped) { dateSkipped = true; break; }
       totalIntraday += j.savedIntraday || 0;
-      totalDaily += j.savedDaily || 0;
-      if (j.nextPstart) { pstart = j.nextPstart; await new Promise(r => setTimeout(r, 250)); }
-      else dateDone = true;
+      daysDone += j.daysDone || 0;
+      daysSkipped += j.daysSkipped || 0;
+      maxSymsSeen = Math.max(maxSymsSeen, j.symsSeen || 0);
+      if (j.stuck) { problems.push(`${t}: пагинация залипла на ${j.cursor}`); return; }
+      if (j.errors && j.errors.length) console.warn(`бэкфилл ${t}:`, j.errors);
+      if (!j.nextCursor) return; // диапазон дочитан
+      cursor = j.nextCursor;
+      pstart = j.nextPstart || 0;
+      await new Promise(r => setTimeout(r, 300));
     }
-    if (dateSkipped) { skipped++; continue; }
-    if (dateDone) done++;
-    await new Promise(r => setTimeout(r, 300)); // не долбить воркер очередями
+  };
+
+  await runChain(tickers[0], 1, tickers.length);
+  // Если серия отдаёт все тикеры разом — одной цепочки достаточно
+  if (maxSymsSeen < 5) {
+    for (let i = 1; i < tickers.length; i++) await runChain(tickers[i], i + 1, tickers.length);
   }
+
   const probNote = problems.length ? ` · проблемы: ${problems.length} (см. консоль)` : '';
   if (problems.length) console.warn('Интрадей-бэкфилл, проблемы:', problems);
-  setStatus(`Интрадей-бэкфилл готов: дат обработано ${done}, скипнуто (уже были) ${skipped}, +${totalIntraday} интрадей-срезов, +${totalDaily} дневных${probNote}`, problems.length ? 'err' : 'ok');
+  setStatus(`Интрадей-бэкфилл готов: дней собрано ${daysDone}, скипнуто ${daysSkipped}, +${totalIntraday} интрадей-срезов (тикеров в ответах: ${maxSymsSeen})${probNote}`, problems.length ? 'err' : 'ok');
 }
 
 // Кэш сырых (несчитанных) данных последнего пула — [{ticker, rows, refSwitchDates}].
