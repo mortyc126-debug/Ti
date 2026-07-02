@@ -2912,7 +2912,7 @@ function renderPoolSweep(axes, baseCfg) {
 // ≥ порога вверх, смотрим признаки за день до, и сравниваем с медианой тех
 // же признаков во все остальные дни. Если признак реально предсказывает
 // выброс — его распределение накануне должно заметно отличаться от фона.
-function labSpikeAutopsy() {
+async function labSpikeAutopsy() {
   const insts = (_lastPoolInstruments && _lastPoolInstruments.length)
     ? _lastPoolInstruments
     : (_lastResult ? [{ ticker: document.getElementById('tickers').value.trim() || '—', result: _lastResult }] : null);
@@ -2978,6 +2978,65 @@ function labSpikeAutopsy() {
   }
   if (!nSpikes) { setStatus('Выбросов по текущему порогу не нашлось — снизь квантиль дня-выброса в настройках', 'err'); return; }
 
+  // ── Интрадей-слой (oi_hourly): что происходило с позициями ВНУТРИ кануна ──
+  // Дневной снэпшот видит только итог дня; 30-минутные срезы показывают,
+  // шёл ли набор/крытие внутри дня накануне выброса и было ли вечернее
+  // ускорение. Всё нормируется на суммарный ОИ дня (% ОИ), чтобы тикеры
+  // разных масштабов были сравнимы.
+  const proxy = document.getElementById('proxy').value.trim().replace(/\/$/, '');
+  const IFEATS = [
+    { key: 'dFizShort',  lbl: '⏱ Δ шорта физлиц за канун, % ОИ' },
+    { key: 'dFizLong',   lbl: '⏱ Δ лонга физлиц за канун, % ОИ' },
+    { key: 'dYurShort',  lbl: '⏱ Δ шорта юрлиц за канун, % ОИ' },
+    { key: 'eveFizShort',lbl: '⏱ Δ шорта физлиц в последние 3ч кануна, % ОИ' },
+    { key: 'eveFizLong', lbl: '⏱ Δ лонга физлиц в последние 3ч кануна, % ОИ' },
+  ];
+  const ipre = {}, ictl = {};
+  for (const f of IFEATS) { ipre[f.key] = []; ictl[f.key] = []; }
+  let hourlyOk = 0;
+  if (proxy) {
+    for (let ii = 0; ii < insts.length; ii++) {
+      const inst = insts[ii];
+      const res = inst.result;
+      const dayRet = _dailyReturns(res);
+      const thr = _spikeThresholds(dayRet, q);
+      if (!thr) continue;
+      const preDates = new Set();
+      for (let t2 = 1; t2 < res.length; t2++)
+        if (isFinite(dayRet[t2]) && dayRet[t2] >= thr.up) preDates.add(res[t2-1].date);
+      setStatus(`Разбор перед выбросами: интрадей ${inst.ticker} (${ii+1}/${insts.length})…`);
+      let hrows = [];
+      try {
+        const r = await fetch(`${proxy}/db/oihourly?ticker=${encodeURIComponent(inst.ticker)}&days=150`);
+        if (r.ok) hrows = await r.json();
+      } catch(_) {}
+      if (!Array.isArray(hrows) || hrows.length < 30) continue;
+      hourlyOk++;
+      const byDay = {};
+      for (const h of hrows) {
+        const d = new Date(h.ts + 3*3600*1000).toISOString().slice(0, 10);
+        (byDay[d] = byDay[d] || []).push(h);
+      }
+      for (const [d, marks] of Object.entries(byDay)) {
+        if (marks.length < 5) continue; // огрызок дня — не считаем
+        marks.sort((a, b) => a.ts - b.ts);
+        const F = marks[0], L = marks[marks.length - 1];
+        const oiBase = (Number(L.fiz_long) + Number(L.fiz_short) + Number(L.yur_long) + Number(L.yur_short)) / 2;
+        if (!(oiBase > 0)) continue;
+        const M3 = [...marks].reverse().find(m => m.ts <= L.ts - 3 * 3600 * 1000);
+        const fv = {
+          dFizShort:   (L.fiz_short - F.fiz_short) / oiBase * 100,
+          dFizLong:    (L.fiz_long  - F.fiz_long)  / oiBase * 100,
+          dYurShort:   (L.yur_short - F.yur_short) / oiBase * 100,
+          eveFizShort: M3 ? (L.fiz_short - M3.fiz_short) / oiBase * 100 : NaN,
+          eveFizLong:  M3 ? (L.fiz_long  - M3.fiz_long)  / oiBase * 100 : NaN,
+        };
+        const bucket = preDates.has(d) ? ipre : ictl;
+        for (const f of IFEATS) bucket[f.key].push(fv[f.key]);
+      }
+    }
+  }
+
   const fmtV = (f, v) => !isFinite(v) ? '—' : f.pct && Math.abs(v) <= 1 ? (v*100).toFixed(0)+'%' : v.toFixed(1);
   let rowsHtml = '';
   for (const f of NUM_FEATS) {
@@ -3001,6 +3060,24 @@ function labSpikeAutopsy() {
       <td style="text-align:center;color:#6c7086">${b.toFixed(0)}%</td>
       <td style="text-align:center;color:${diff>0?'#a6e3a1':diff<0?'#f38ba8':'#6c7086'}">${(diff>0?'+':'')+diff.toFixed(0)} пп</td>
     </tr>`;
+  }
+  const iPreN = ipre[IFEATS[0].key].filter(isFinite).length;
+  const iCtlN = ictl[IFEATS[0].key].filter(isFinite).length;
+  if (iPreN) {
+    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#7287fd;background:#181825;font-size:10px">⏱ Интрадей из oi_hourly (30-мин срезы): канунов с данными ${iPreN}, фоновых дней ${iCtlN}, тикеров ${hourlyOk}</td></tr>`;
+    for (const f of IFEATS) {
+      const a = _median(ipre[f.key]), b = _median(ictl[f.key]);
+      const diff = isFinite(a) && isFinite(b) ? a - b : NaN;
+      const dc = !isFinite(diff) ? '#6c7086' : diff > 0 ? '#a6e3a1' : diff < 0 ? '#f38ba8' : '#6c7086';
+      rowsHtml += `<tr>
+        <td style="padding:4px 8px;color:#cdd6f4">${f.lbl}</td>
+        <td style="text-align:center;color:#cba6f7;font-weight:600">${isFinite(a)?(a>0?'+':'')+a.toFixed(2):'—'}</td>
+        <td style="text-align:center;color:#6c7086">${isFinite(b)?(b>0?'+':'')+b.toFixed(2):'—'}</td>
+        <td style="text-align:center;color:${dc}">${isFinite(diff)?(diff>0?'+':'')+diff.toFixed(2)+' пп':'—'}</td>
+      </tr>`;
+    }
+  } else if (proxy) {
+    rowsHtml += `<tr><td colspan="4" style="padding:5px 8px;color:#f9e2af;background:#181825;font-size:10px">⏱ Интрадей-данных для канунов не нашлось — проверь покрытие oi_hourly (🩺 Диагностика) или запусти «📥 Интрадей-бэкфилл пула»</td></tr>`;
   }
 
   topSpikes.sort((x,y)=>y.ret-x.ret);
